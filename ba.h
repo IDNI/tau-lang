@@ -10,6 +10,15 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
+#define DEBUG
+#ifdef DEBUG
+#define DBG(x) x
+#include <iostream>
+#else
+#define DBG(x)
+#endif
+
 #include <vector>
 #include <map>
 #include <set>
@@ -20,13 +29,6 @@
 #include <cassert>
 
 using namespace std;
-
-#define DEBUG
-#ifdef DEBUG
-#define DBG(x) x
-#else
-#define DBG(x)
-#endif
 
 struct Bool {
 	bool b;
@@ -311,7 +313,7 @@ term<elem> subst(const term<elem>& t, const string& s, const bf<elem>& f) {
 
 template<typename elem>
 bf<elem> subst(const minterm<elem>& t, const string& s, const bf<elem>& f) {
-	bf<elem> r;
+	bf<elem> r = bf<elem>::one();
 	for (const term<elem>& x : t[0])
 		r = minterm<elem>(true, subst(x, s, f)) & r;
 	for (const term<elem>& x : t[1])
@@ -321,7 +323,7 @@ bf<elem> subst(const minterm<elem>& t, const string& s, const bf<elem>& f) {
 
 template<typename elem>
 bf<elem> subst(const bf<elem>& x, const string& s, const bf<elem>& y) {
-	bf<elem> z;
+	bf<elem> z = bf<elem>::zero();
 	for (const minterm<elem>& t : x) z = subst(t, s, y) | z;
 	return z;
 }
@@ -368,6 +370,8 @@ ostream& operator<<(ostream& os, const minterm<elem>& x) {
 }
 
 template<typename elem> ostream& operator<<(ostream& os, const bf<elem>& f) {
+	if (f.v == bf<elem>::ONE) return os << '1';
+	if (f.v == bf<elem>::ZERO) return os << '0';
 	size_t n = f.size();
 	for (auto& t : f) os << t << (--n ? " | " : "");
 	return os;

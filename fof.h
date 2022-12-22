@@ -88,9 +88,13 @@ clause ex(const clause& c, const string& v) {
 	clause r;
 	assert(c[0].size() == 1);
 	sbf f0 = c[0].begin()->e;
+	//DBG(cout << "f0: " << f0 << endl;)
 	r[0] = {all(f0, v)};
+	//DBG(cout<< "r0: " << *r[0].begin() << endl;)
 	sbf f1 = subst(f0, v, sbf::one());
+	//DBG(cout<< "f1: " << f1 << endl;)
 	f0 = subst(f0, v, sbf::zero());
+	//DBG(cout<< "f0: " << f0 << endl;)
 	for (const term<sbf>& t : c[1])
 		r = r & clause(false, subst(t.e, v, f0) | subst(t.e, v, ~f1));
 	return r;

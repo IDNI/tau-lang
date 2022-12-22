@@ -11,9 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "fof.h"
-#include <sstream>
 #include <iostream>
-#include <cassert>
 
 term<Bool> var_term(int v) {
 	stringstream ss;
@@ -53,12 +51,12 @@ int main() {
 //	sbf g(fapp("g", {"y", "x"}));
 //	cout << (~(f & g)) << endl;
 //	cout << (generic(2, 3, 2) & generic(1,1,1)) << endl;
-	cout << fapp(0, 0, 1) << endl;
-	sbf f = subst(fapp(0, 0, 1), string("x[0]"), sbf(term<Bool>(string("y"))));
-	f = subst(fapp(0, 0, 1), string("x[0]"), sbf(fapp(1,1,2)));
-	cout << f << endl;
+//	cout << fapp(0, 0, 1) << endl;
+//	sbf f = subst(fapp(0, 0, 1), string("x[0]"), sbf(term<Bool>(string("y"))));
+//	f = subst(fapp(0, 0, 1), string("x[0]"), sbf(fapp(1,1,2)));
+//	cout << f << endl;
 	cout << generic(1,2,1) << endl;
-	cout << ex(generic(2,2,2), "x[0]") << endl;
+	cout << ex(generic(1,2,1), "x[0]") << endl;
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;
