@@ -304,6 +304,7 @@ term<elem>::arg term<elem>::subst(
 template<typename elem>
 term<elem> subst(const term<elem>& t, const string& s, const bf<elem>& f) {
 	if (t.t == term<elem>::VAR) return s == t.sym ? term<elem>(f) : t;
+	if (t.t == term<elem>::BF) return subst(t.f, s, f);
 	assert(t.t == term<elem>::FUNC);
 	term r = t;
 	for (size_t n = 0; n != r.args.size(); ++n)
