@@ -108,6 +108,10 @@ fof operator&(const fof&, const fof&);
 fof operator|(const fof&, const clause&);
 fof operator|(const fof&, const fof&);
 bool operator<=(const clause&, const clause&);
+bool operator<=(const clause& c, const clause& d) {return operator<=<sbf>(c,d);}
+bool operator<=(const clause& c, const fof& f) { return operator<=<sbf>(c, f); }
+fof operator|(const fof& x, const fof& y) { return operator|<sbf>(x, y); }
+fof operator&(const fof& x, const fof& y) { return operator&<sbf>(x, y); }
 clause subst(const clause&, int, const term<Bool>&);
 fof subst(const fof&, int, const term<Bool>&);
 fof all(const fof&, int);

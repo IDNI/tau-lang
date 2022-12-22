@@ -192,18 +192,6 @@ bf<elem> operator&(const bf<elem>& x, const bf<elem>& y) {
 	return z;
 }
 
-bool operator<=(const clause& c, const clause& d) {
-	return operator<=<sbf>(c, d);
-}
-
-bool operator<=(const clause& c, const fof& f) {
-	return operator<=<sbf>(c, f);
-}
-
-fof operator&(const fof& x, const fof& y) {
-	return operator&<sbf>(x, y);
-}
-
 template<typename elem>
 bf<elem> operator|(const bf<elem>& x, const bf<elem>& y) {
 	bf<elem> z = x;
@@ -258,19 +246,15 @@ bf<elem> subst(const bf<elem>& x, int s, const bf<elem>& y) {
 fof all(const fof&, int);
 fof ex(const fof&, int);
 
-ostream& operator<<(ostream& os, const Bool& b) {
-	return os << (b.b ? "T" : "F");
-}
+ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b?"T":"F"); }
 
 template<typename elem>
 ostream& operator<<(ostream& os, const typename term<elem>::arg& a) {
-	if (a.t) return os << *a.t;
-	return os << *a.f;
+	return a.ist ? os << a.t : os << a.f;
 }
 
 template<typename elem>
 void out(ostream& os, const typename term<elem>::arg& a) {
-	//if (a.t) os << *a.t; else os << *a.f;
 	if (a.ist) os << a.t; else os << a.f;
 }
 
@@ -281,7 +265,7 @@ ostream& operator<<(ostream& os, const term<elem>& t) {
 	if (t.t == term<elem>::FUNC) os << t.sym << "(";//"f[" << t.sym << "](";
 	for (size_t n = 0; n != t.args.size(); ++n) {
 		out<elem>(os, t.args[n]);
-		//os << t.args[n];
+		//os << t.args[n]; -- compiler error somehow
 		os << (n == t.args.size() - 1 ? "" : ",");
 	}
 	if (t.t == term<elem>::FUNC) os << ")";
@@ -295,8 +279,7 @@ ostream& operator<<(ostream& os, const minterm<elem>& x) {
 	return os;
 }
 
-template<typename elem>
-ostream& operator<<(ostream& os, const bf<elem>& f) {
+template<typename elem> ostream& operator<<(ostream& os, const bf<elem>& f) {
 	size_t n = f.size();
 	for (auto& t : f) os << t << (--n ? " | " : "");
 	return os;
@@ -305,6 +288,12 @@ ostream& operator<<(ostream& os, const bf<elem>& f) {
 ostream& operator<<(ostream& os, const clause& c) {
 	for (auto& t : c[0]) os << t << " = 0" << endl;
 	for (auto& t : c[1]) os << t << " != 0" << endl;
+	return os;
+}
+
+ostream& operator<<(ostream& os, const fof& f) {
+	size_t n = f.size();
+	for (const clause& c : f) os << c << (--n ? "\t||" : "") << endl;
 	return os;
 }
 
@@ -332,14 +321,22 @@ term<Bool> fapp(size_t i, size_t j, size_t v) {
 
 fof generic(size_t nc, size_t csz, size_t nv) {
 	fof f = fof::zero();
-	for (size_t k = 0; k != nc; ++k)
+	for (size_t k = 0; k != nc; ++k) {
+		fof g = fof::one();
 		for (size_t n = 0; n != csz; ++n)
-			f = clause(!n, term<sbf>(sbf(fapp(k, n, nv)))) | f;
+			g = clause(!n, term<sbf>(sbf(fapp(k, n, nv)))) & g;
+		f = f | g;
+	}
 	return f;
 }
 
 int main() {
-	cout << generic(2, 2, 2) << endl;
+	sbf f(fapp("f", {"x", "y"}));
+	sbf g(fapp("g", {"y", "x"}));
+	cout << (~(f & g)) << endl;
+	cout << generic(2, 3, 2) << endl;
+	return 0;
+/*	cout << generic(2, 2, 2) << endl;
 	return 0;
 	//auto f = ~(var(-1) & var(-2) & var(-3) & var(-4));
 	auto f = ~(var(1) & var(2));
@@ -356,5 +353,5 @@ int main() {
 	cout << c2 << endl;
 	cout << (f1 & f2) << endl;
 //	bf<Bool> f;
-//	cout << f << endl;
+//	cout << f << endl;*/
 }
