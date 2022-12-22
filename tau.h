@@ -29,6 +29,7 @@ struct Bool {
 	const Bool& operator|(const Bool& t) const {return b|t.b?one():zero();}
 	const Bool& operator~() const { return b ? zero() : one(); }
 	bool operator<(const Bool& t) const { return b < t.b; }
+	bool operator==(const Bool& t) const { return b == t.b; }
 };
 
 template<typename elem> struct bf;
@@ -42,11 +43,13 @@ template<typename elem> struct term {
 		arg(const bf<elem>& f);
 		bool operator==(const arg&) const;
 		bool operator<(const arg&) const;
+		arg subst(const string& s, const bf<elem>& f);
 	};
-	enum type { ELEM, VAR, FUNC } t;
+	enum type { ELEM, VAR, BF, FUNC } t;
 	//int sym = 0;
 	string sym;
 	elem e;
+	bf<elem> f;
 	vector<arg> args;
 	term() {}
 	term(const elem& e) : t(ELEM), e(e) {}
@@ -54,6 +57,7 @@ template<typename elem> struct term {
 	term(const string& sym) : t(VAR), sym(sym) {}
 	term(const string& sym, const vector<arg>& a) :
 		t(FUNC), sym(sym), args(a) {}
+	term(const bf<elem>& f) : t(BF), f(f) {}
 	bool operator==(const term& x) const;
 	bool operator<(const term& x) const;
 };
@@ -98,10 +102,13 @@ template<typename elem> bf<elem> operator&(const bf<elem>&, const bf<elem>&);
 template<typename elem> bf<elem> operator|(const bf<elem>&, const bf<elem>&);
 template<typename elem> bool operator<=(const bf<elem>&, const bf<elem>&);
 template<typename elem>
-term<elem>::arg subst(const typename term<elem>::arg&, int, const bf<elem>&);
-template<typename elem> term<elem> subst(const term<elem>&, int, const bf<elem>&);
-template<typename elem> bf<elem> subst(const minterm<elem>&, int, const bf<elem>&);
-template<typename elem> bf<elem> subst(const bf<elem>&, int, const bf<elem>&);
+term<elem> subst(const term<elem>&, const string&, const bf<elem>&);
+template<typename elem>
+bf<elem> subst(const minterm<elem>&, const string&, const bf<elem>&);
+template<typename elem>
+bf<elem> subst(const bf<elem>&, const string&, const bf<elem>&);
+template<typename elem> bf<elem> ex(const bf<elem>&, int);
+template<typename elem> bf<elem> all(const bf<elem>&, int);
 fof operator~(const clause&);
 fof operator~(const fof&);
 fof operator&(const fof&, const fof&);
@@ -110,12 +117,17 @@ fof operator|(const fof&, const fof&);
 bool operator<=(const clause&, const clause&);
 bool operator<=(const clause& c, const clause& d) {return operator<=<sbf>(c,d);}
 bool operator<=(const clause& c, const fof& f) { return operator<=<sbf>(c, f); }
+fof operator~(const clause& x) { return operator~<sbf>(x); }
+fof operator~(const fof& x) { return operator~<sbf>(x); }
 fof operator|(const fof& x, const fof& y) { return operator|<sbf>(x, y); }
 fof operator&(const fof& x, const fof& y) { return operator&<sbf>(x, y); }
-clause subst(const clause&, int, const term<Bool>&);
-fof subst(const fof&, int, const term<Bool>&);
-fof all(const fof&, int);
-fof ex(const fof&, int);
+clause subst(const clause&, const string&, const term<Bool>&);
+fof subst(const fof&, const string&, const term<Bool>&);
+template<typename elem> bf<elem> ex(const bf<elem>&, const string&);
+template<typename elem> bf<elem> all(const bf<elem>&, const string&);
+clause ex(const clause&, const string&);
+fof ex(const fof&, const string&);
+fof all(const fof& f, const string& v) { return ~ex(~f, v); }
 
 template<typename elem>
 ostream& operator<<(ostream& os, const typename term<elem>::arg& a);

@@ -43,16 +43,25 @@ template<typename elem> bool term<elem>::arg::operator<(
 }
 
 template<typename elem> bool term<elem>::operator==(const term& x) const {
-	return t == x.t && sym == x.sym && args == x.args;
+	if (t != x.t) return false;
+	switch (t) {
+		case ELEM: return e == x.e;
+		case VAR: return sym == x.sym;
+		case BF: return f == x.f;
+		case FUNC: return sym == x.sym && args == x.args;
+		default: assert(0);
+	}
 }
 
 template<typename elem> bool term<elem>::operator<(const term& x) const {
 	if (t != x.t) return t < x.t;
-	if (t == ELEM) return e < x.e;
-	if (t == VAR) return sym < x.sym;
-	if (t != FUNC) return false;
-	if (sym != x.sym) return sym < x.sym;
-	return args < x.args;
+	switch (t) {
+		case ELEM: return e < x.e;
+		case VAR: return sym < x.sym;
+		case BF: return f < x.f;
+		case FUNC: return sym == x.sym ? args < x.args : sym < x.sym;
+		default: assert(0);
+	}
 }
 
 template<typename elem> minterm<elem>::minterm(bool pos, const term<elem>& t) :
@@ -206,45 +215,81 @@ bool operator<=(const bf<elem>& x, const bf<elem>& y) {
 }
 
 template<typename elem>
-term<elem>::arg subst(
-	const typename term<elem>::arg& a, int s, const bf<elem>& f) {
-	return a.t ? term<elem>::arg(subst(*a.t, s, f)) : a;
+term<elem>::arg term<elem>::arg::subst(const string& s, const bf<elem>& f) {
+	return ist ? arg(::subst(t, s, f)) : *this;
 }
+/*template<typename elem>
+term<elem>::arg term<elem>::subst(
+	const term<elem>::arg& a, const string& s, const bf<elem>& f) {
+	return a.ist ? term<elem>::arg(subst(a.t, s, f)) : a;
+}*/
 
 template<typename elem>
-term<elem> subst(const term<elem>& t, int s, const bf<elem>& f) {
-	if (t.t == term<elem>::VAR) {
-		if (t.sym != s) return t;
-		return term({f});
-	}
-	if (t.t == term<elem>::FUNC) {
-		term r = t;
-		for (size_t n = 0; n != r.args.size(); ++n)
-			r.args[n] = subst(r.args[n], s, f);
-		return r;
-	}
-	return t;
-}
-
-template<typename elem>
-bf<elem> subst(const minterm<elem>& t, int s, const bf<elem>& f) {
-	bf<elem> r(minterm<elem>::one());
-	for (const term<elem>& x : t[0])
-		r = minterm<elem>(true, subst(x, s, f)) && r;
-	for (const term<elem>& x : t[1])
-		r = minterm<elem>(false, subst(x, s, f)) && r;
+term<elem> subst(const term<elem>& t, const string& s, const bf<elem>& f) {
+	if (t.t == term<elem>::VAR) return s == t.sym ? term<elem>(f) : t;
+	assert(t.t == term<elem>::FUNC);
+	term r = t;
+	for (size_t n = 0; n != r.args.size(); ++n)
+		r.args[n] = r.args[n].subst(s, f);
 	return r;
 }
 
 template<typename elem>
-bf<elem> subst(const bf<elem>& x, int s, const bf<elem>& y) {
+bf<elem> subst(const minterm<elem>& t, const string& s, const bf<elem>& f) {
+	bf<elem> r;
+	for (const term<elem>& x : t[0])
+		r = minterm<elem>(true, subst(x, s, f)) & r;
+	for (const term<elem>& x : t[1])
+		r = minterm<elem>(false, subst(x, s, f)) & r;
+	return r;
+}
+
+template<typename elem>
+bf<elem> subst(const bf<elem>& x, const string& s, const bf<elem>& y) {
 	bf<elem> z;
-	for (const minterm<elem>& t : x) z = z | subst(t, s, y);
+	for (const minterm<elem>& t : x) z = subst(t, s, y) | z;
 	return z;
 }
 
-fof all(const fof&, int);
-fof ex(const fof&, int);
+template<typename elem> bf<elem> ex(const bf<elem>& f, const string& v) {
+	return subst(f, v, bf<elem>::zero()) | subst(f, v, bf<elem>::one());
+}
+
+template<typename elem> bf<elem> all(const bf<elem>& f, const string& v) {
+	return subst(f, v, bf<elem>::zero()) & subst(f, v, bf<elem>::one());
+}
+
+clause ex(const clause& c, const string& v) {
+	if (c[0].empty()) {
+		assert(!c[1].empty());
+		clause r;
+		for (const term<sbf>& t : c[1]) {
+			assert(t.t == term<sbf>::ELEM);
+			r = r & clause(false, ex(t.e, v));
+		}
+		return r;
+	}
+	if (c[1].empty()) {
+		assert(c[0].size() == 1);
+		assert(c[0].begin()->t == term<sbf>::ELEM);
+		return clause(true, all(c[0].begin()->e, v));
+	}
+	clause r;
+	assert(c[0].size() == 1);
+	sbf f0 = c[0].begin()->e;
+	r[0] = {all(f0, v)};
+	sbf f1 = subst(f0, v, sbf::one());
+	f0 = subst(f0, v, sbf::zero());
+	for (const term<sbf>& t : c[1])
+		r = r & clause(false, subst(t.e, v, f0) | subst(t.e, v, ~f1));
+	return r;
+}
+
+fof ex(const fof& f, const string& v) {
+	fof g = fof::zero();
+	for (const clause& c : f) g = ex(c, v) | g;
+	return g;
+}
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b?"T":"F"); }
 
@@ -262,14 +307,14 @@ template<typename elem>
 ostream& operator<<(ostream& os, const term<elem>& t) {
 	if (t.t == term<elem>::ELEM) return os << t.e;
 	if (t.t == term<elem>::VAR) return os << t.sym;// "x[" << -t.sym << "]";
+	if (t.t == term<elem>::BF) return os << t.f;
 	if (t.t == term<elem>::FUNC) os << t.sym << "(";//"f[" << t.sym << "](";
 	for (size_t n = 0; n != t.args.size(); ++n) {
 		out<elem>(os, t.args[n]);
 		//os << t.args[n]; -- compiler error somehow
 		os << (n == t.args.size() - 1 ? "" : ",");
 	}
-	if (t.t == term<elem>::FUNC) os << ")";
-	return os;
+	return os << ")";
 }
 
 template<typename elem>
@@ -331,10 +376,15 @@ fof generic(size_t nc, size_t csz, size_t nv) {
 }
 
 int main() {
-	sbf f(fapp("f", {"x", "y"}));
-	sbf g(fapp("g", {"y", "x"}));
-	cout << (~(f & g)) << endl;
-	cout << generic(2, 3, 2) << endl;
+//	sbf f(fapp("f", {"x", "y"}));
+//	sbf g(fapp("g", {"y", "x"}));
+//	cout << (~(f & g)) << endl;
+//	cout << (generic(2, 3, 2) & generic(1,1,1)) << endl;
+	cout << fapp(0, 0, 1) << endl;
+	sbf f = subst(fapp(0, 0, 1), string("x[0]"), sbf(term<Bool>(string("y"))));
+	cout << f << endl;
+//	cout << generic(1,2,1) << endl;
+//	cout << ex(generic(2,2,2), "x[0]") << endl;
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;
