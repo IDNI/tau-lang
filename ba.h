@@ -260,8 +260,8 @@ bool complementary(const minterm<elem>& x, minterm<elem>& y) {
 
 template<typename elem>
 bf<elem> operator|(const minterm<elem>& t, const bf<elem>& f) {
-	assert(!t[0].empty() || !t[1].empty());
-	//if (t[0].empty() && t[1].empty()) return f;
+	//assert(!t[0].empty() || !t[1].empty());
+	if (t[0].empty() && t[1].empty()) return bf<elem>::one();// f;
 	if (f == bf<elem>::one()) return f;
 	if (f == bf<elem>::zero()) return bf<elem>(t);
 	//DBG(cout << t << "||" << f << " = ";)
@@ -274,9 +274,9 @@ bf<elem> operator|(const minterm<elem>& t, const bf<elem>& f) {
 	auto s = t;
 	auto it = g.begin();
 	while (it != g.end())
-		if (complementary<elem>(*it++, s))
-			break;
-	if (it != g.end()) g.erase(it);
+		if (complementary<elem>(*it, s)) break;
+		else ++it;
+	if (it != g.end()) return g.erase(it), s | g;
 	g.insert(s);
 	//DBG(cout << g << endl;)
 	return g;

@@ -55,6 +55,10 @@ int main() {
 //	sbf f = subst(fapp(0, 0, 1), string("x[0]"), sbf(term<Bool>(string("y"))));
 //	f = subst(fapp(0, 0, 1), string("x[0]"), sbf(fapp(1,1,2)));
 //	cout << f << endl;
+	cout << var(1) << endl;
+	cout << (~var(1)) << endl;
+	cout << (var(1) | (~var(1))) << endl;
+	cout << ((var(1) & (~var(2))) | (var(1) & var(2))) << endl;
 	cout << generic(2,2,1) << endl;
 	cout << ex(generic(2,2,1), "x[0]") << endl;
 	cout << ex(ex(generic(2,2,2), "x[0]"), "x[1]") << endl;
