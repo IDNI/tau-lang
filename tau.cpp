@@ -57,7 +57,7 @@ int main() {
 //	cout << f << endl;
 	cout << generic(2,2,1) << endl;
 	cout << ex(generic(2,2,1), "x[0]") << endl;
-	cout << ex(ex(generic(2,2,1), "x[0]"), "x[1]") << endl;
+	cout << ex(ex(generic(2,2,2), "x[0]"), "x[1]") << endl;
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;

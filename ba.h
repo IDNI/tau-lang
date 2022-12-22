@@ -220,12 +220,12 @@ bool operator<=(const minterm<elem>& x, const minterm<elem>& y) {
 	return (x & y) == x;
 }
 
-template<typename elem>
+/*template<typename elem>
 bf<elem>& operator+=(bf<elem>& f, const minterm<elem>& t) {
 	if (t == minterm<elem>::zero()) return f;
 	if (t == minterm<elem>::one()) { f.clear(); f.insert(t); }
 	return f.insert(t), f;
-}
+}*/
 
 template<typename elem>
 bool operator<=(const minterm<elem>& t, const bf<elem>& f) {
@@ -234,17 +234,50 @@ bool operator<=(const minterm<elem>& t, const bf<elem>& f) {
 	return false;
 }
 
+template<typename T>
+T symdiff(const T& x, const T& y) {
+	T r;
+	for (auto& t : x) if (y.find(t) == y.end()) r.insert(t);
+	for (auto& t : y) if (x.find(t) == x.end()) r.insert(t);
+	return r;
+}
+
+template<typename elem>
+bool complementary(const minterm<elem>& x, minterm<elem>& y) {
+	// whether x=y except a single element that is in both x[0] and y[1]
+	// or x[1] and y[0]
+	// so symdiff x[0]+y[0] and x[1]+y[1] should have one elem each
+	set<term<elem>> d0 = symdiff(x[0], y[0]);
+	if (d0.size() != 1) return false;
+	set<term<elem>> d1 = symdiff(x[1], y[1]);
+	if (d1.size() != 1) return false;
+	if (*d0.begin() != *d1.begin()) return false;
+	if (auto it = y[0].find(*d0.begin()); it != y[0].end())
+		y[0].erase(it);
+	else y[1].erase(*d0.begin());
+	return true;
+}
+
 template<typename elem>
 bf<elem> operator|(const minterm<elem>& t, const bf<elem>& f) {
-	if (t[0].empty() && t[1].empty()) return f;
+	assert(!t[0].empty() || !t[1].empty());
+	//if (t[0].empty() && t[1].empty()) return f;
 	if (f == bf<elem>::one()) return f;
 	if (f == bf<elem>::zero()) return bf<elem>(t);
 	//DBG(cout << t << "||" << f << " = ";)
 	for (const minterm<elem>& x : f) if (t <= x) return f;
-	bf g = {t};
-	for (const minterm<elem>& x : f)
-		//if (!(x <= t)) TODO //g += x;
-		g.insert(x);
+//	bf g = {t};
+//	for (const minterm<elem>& x : f)
+//		//if (!(x <= t)) TODO //g += x;
+//		g.insert(x);
+	bf g = f;
+	auto s = t;
+	auto it = g.begin();
+	while (it != g.end())
+		if (complementary<elem>(*it++, s))
+			break;
+	if (it != g.end()) g.erase(it);
+	g.insert(s);
 	//DBG(cout << g << endl;)
 	return g;
 }
