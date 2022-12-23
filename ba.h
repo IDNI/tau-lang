@@ -219,6 +219,7 @@ template<typename B> minterm<B> operator&(
 	for (const term<B>& t : y[0]) assert(!t.zero() && !t.one());
 	for (const term<B>& t : y[1]) assert(!t.zero() && !t.one());
 #endif
+	//cout << "(" << x << ") & (" << y << ") = " << endl;
 	minterm<B> z = x;
 	for (const term<B>& t : y[0])
 		if (auto it = x[1].find(t); it != x[1].end())
@@ -314,33 +315,34 @@ template<typename B> bf<B> operator~(const bf<B>& f) {
 	return g;
 }
 
-template<typename B>
-bf<B> operator&(const minterm<B>& x, const bf<B>& y) {
+template<typename B> bf<B> operator&(const minterm<B>& x, const bf<B>& y) {
 	if (y == bf<B>::zero()) return y;
 	if (y == bf<B>::one()) return bf<B>(x);
+	//cout << "(" << x << ") & (" << y << ") = ";
 	bf<B> z;
 	for (const minterm<B>& t : y)
 //		if (minterm<B> m = (x & t); m.empty()) return bf<B>::zero();
 		if (minterm<B> m = (x & t); !m.empty()) 
 	//	else 
 			z = m | z;
+	//cout << z << endl;
 	return z.empty() ? bf<B>(false) : z;
 }
 
-template<typename B>
-bf<B> operator&(const bf<B>& x, const bf<B>& y) {
+template<typename B> bf<B> operator&(const bf<B>& x, const bf<B>& y) {
 	if (x == bf<B>::zero() || y == bf<B>::zero()) return bf<B>::zero();
 	if (x == bf<B>::one()) return y;
 	if (y == bf<B>::one()) return x;
-	bf<B> z;
+	bf<B> z = bf<B>::zero();
 	for (const minterm<B>& s : x)
-		for (const minterm<B>& t : y)
-			z = ((s & t) | z);
+		for (const minterm<B>& t : y) {
+			minterm<B> m = s & t;
+			if (!m[0].empty() || !m[1].empty()) z = (m | z);
+		}
 	return z;
 }
 
-template<typename B>
-bf<B> operator|(const bf<B>& x, const bf<B>& y) {
+template<typename B> bf<B> operator|(const bf<B>& x, const bf<B>& y) {
 	if (x == bf<B>::zero()) return y;
 	if (y == bf<B>::zero()) return x;
 	if (x == bf<B>::one() || y == bf<B>::one()) return bf<B>::one();
@@ -349,8 +351,7 @@ bf<B> operator|(const bf<B>& x, const bf<B>& y) {
 	return z;
 }
 
-template<typename B>
-bool operator<=(const bf<B>& x, const bf<B>& y) {
+template<typename B> bool operator<=(const bf<B>& x, const bf<B>& y) {
 	for (const minterm<B>& t : x) if (!(t <= y)) return false;
 	return true;
 }
@@ -410,14 +411,15 @@ bf<B> subst(const bf<B>& x,
 }*/
 
 template<typename B> bf<B> ex(const bf<B>& f, const sym_t& v) {
-	cout << "in ex" << endl;
-	cout << "subst 0 for " << v << " in " << f << " = " << f.subst(v, bf<B>::zero()) << endl;
-	cout << "subst 1 for " << v << " in " << f << " = " << f.subst(v, bf<B>::one()) << endl;
-	cout << "their disj: " << (f.subst(v, bf<B>::zero()) | f.subst(v, bf<B>::one())) << endl;
 	return f.subst(v, bf<B>::zero()) | f.subst(v, bf<B>::one());
 }
 
 template<typename B> bf<B> all(const bf<B>& f, const sym_t& v) {
+	//cout << "in all" << endl;
+	//auto f0 = f.subst(v, bf<B>::zero()), f1 = f.subst(v, bf<B>::one());
+	//cout << "subst 0 for " << v << " in " << f << " = " << f0 << endl;
+	//cout << "subst 1 for " << v << " in " << f << " = " << f1 << endl;
+	//cout << "their conj: " << (f0 & f1) << endl;
 	return f.subst(v, bf<B>::zero()) & f.subst(v, bf<B>::one());
 }
 

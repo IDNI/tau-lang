@@ -48,8 +48,7 @@ template<typename B> bf<B> generic(size_t nv, size_t c = 0) {
 	return r;
 }
 
-template<typename B>
-fof<B> generic(size_t nc, size_t csz, size_t nv) {
+template<typename B> fof<B> generic(size_t nc, size_t csz, size_t nv) {
 	fof<B> f(false);
 	for (size_t k = 0; k != nc; ++k) {
 		clause<B> c;
@@ -85,10 +84,10 @@ int main() {
 //	cout << generic<Bool>(2,2,1) << endl; return 0;
 //	auto f = [](sym_t v)->sym_t { return 1+v; };
 //	cout << transform_vars(generic<Bool>(2,2,3), f) << endl;
-	cout << generic<Bool>(1,1,1) << endl;
-	//cout << generic<Bool>(1,1,1).subst(0,term<Bool>(1)) << endl;
-	cout << all(generic<Bool>(1,1,1),0) << endl;
-	seq<Bool>((generic<Bool>(1,1,2)));
+//	cout << generic<Bool>(1,1,1) << endl;
+//	cout << generic<Bool>(1,1,1).subst(0,term<Bool>(1)) << endl;
+//	cout << all(generic<Bool>(2),0) << endl;
+	seq<Bool>((generic<Bool>(2,1,1)));
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;

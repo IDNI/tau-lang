@@ -83,7 +83,7 @@ fof<B> operator|(clause<B> c, const fof<B>& f) {
 template<typename B>
 clause<B> ex(const clause<B>& c, const sym_t& v) {
 	if (c[0].empty()) {
-		assert(!c[1].empty());
+		DBG(assert(!c[1].empty());)
 		clause<B> r;
 		for (const term<bf<B>>& t : c[1]) {
 			assert(t.t == term<bf<B>>::ELEM);
@@ -92,20 +92,20 @@ clause<B> ex(const clause<B>& c, const sym_t& v) {
 		return r;
 	}
 	if (c[1].empty()) {
-		assert(c[0].size() == 1);
-		assert(c[0].begin()->t == term<bf<B>>::ELEM);
+		DBG(assert(c[0].size() == 1);)
+		DBG(assert(c[0].begin()->t == term<bf<B>>::ELEM);)
 		return clause<B>(true, all(c[0].begin()->e, v));
 	}
 	clause<B> r;
 	assert(c[0].size() == 1);
 	bf<B> f0 = c[0].begin()->e;
-	//DBG(cout << "f0: " << f0 << endl;)
+	DBG(cout << "f0: " << f0 << endl;)
 	r[0] = {all(f0, v)};
-	//DBG(cout<< "r0: " << *r[0].begin() << endl;)
+	DBG(cout<< "r0: " << *r[0].begin() << endl;)
 	bf<B> f1 = f0.subst(v, bf<B>::one());
-	//DBG(cout<< "f1: " << f1 << endl;)
+	DBG(cout<< "f1: " << f1 << endl;)
 	f0 = f0.subst(v, bf<B>::zero());
-	//DBG(cout<< "f0: " << f0 << endl;)
+	DBG(cout<< "f0: " << f0 << endl;)
 	for (const term<bf<B>>& t : c[1])
 		r = r & clause<B>(false, t.e.subst(v, f0) | t.e.subst(v, ~f1));
 	return r;
