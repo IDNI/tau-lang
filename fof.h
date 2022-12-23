@@ -65,12 +65,12 @@ clause<B> ex(const clause<B>& c, const sym_t& v) {
 	//DBG(cout << "f0: " << f0 << endl;)
 	r[0] = {all(f0, v)};
 	//DBG(cout<< "r0: " << *r[0].begin() << endl;)
-	bf<B> f1 = subst(f0, v, bf<B>::one());
+	bf<B> f1 = f0.subst(v, bf<B>::one());
 	//DBG(cout<< "f1: " << f1 << endl;)
-	f0 = subst(f0, v, bf<B>::zero());
+	f0 = f0.subst(v, bf<B>::zero());
 	//DBG(cout<< "f0: " << f0 << endl;)
 	for (const term<bf<B>>& t : c[1])
-		r = r & clause<B>(false, subst(t.e, v, f0) | subst(t.e, v, ~f1));
+		r = r & clause<B>(false, t.e.subst(v, f0) | t.e.subst(v, ~f1));
 	return r;
 }
 

@@ -41,10 +41,12 @@ template<typename B>
 fof<B> generic(size_t nc, size_t csz, size_t nv) {
 	fof<B> f = fof<B>::zero();
 	for (size_t k = 0; k != nc; ++k) {
-		fof<B> g = fof<B>::one();
+		clause<B> c;
 		for (size_t n = 0; n != csz; ++n)
-			g = clause<B>(!n, term<bf<B>>(bf<B>(fapp(k,n,nv)))) & g;
-		f = f | g;
+			c = clause<B>(!n, term<bf<B>>(bf<B>(fapp(k,n,nv)))) & c;
+		cout << "c: " << c << endl;
+		f = c | f;
+		cout << "f: " << f << endl;
 	}
 	return f;
 }
@@ -62,7 +64,7 @@ int main() {
 //	cout << (~var(1)) << endl;
 //	cout << (var(1) | (~var(1))) << endl;
 //	cout << ((var(1) & (~var(2))) | (var(1) & var(2))) << endl;
-	cout << generic<Bool>(5,5,1) << endl;
+	cout << generic<Bool>(2,2,1) << endl; return 0;
 	auto f = [](sym_t v)->sym_t { return 1+v; };
 	cout << transform_vars(generic<Bool>(2,2,3), f) << endl;
 	seq(generic<Bool>(5,15,2));

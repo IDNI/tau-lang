@@ -41,14 +41,18 @@ struct Bool {
 	Bool(bool b) : b(b) {}
 	static const Bool& zero() { static Bool b(false); return b; }
 	static const Bool& one() { static Bool b(true); return b; }
-	const Bool& operator&(const Bool& t) const {return b&t.b?one():zero();}
-	const Bool& operator|(const Bool& t) const {return b|t.b?one():zero();}
+	const Bool& operator&(const Bool& t) const {return(b&t.b)?one():zero();}
+	const Bool& operator|(const Bool& t) const {return(b|t.b)?one():zero();}
 	const Bool& operator~() const { return b ? zero() : one(); }
 	bool operator<(const Bool& t) const { return b < t.b; }
 	bool operator==(const Bool& t) const { return b == t.b; }
 };
 
+template<typename B> struct term;
 template<typename B> struct bf;
+template<typename B>
+bf<B> subst(const term<B>&, const sym_t&, const bf<B>&);
+
 template<typename B> struct term {
 	struct arg {
 		bool ist;
@@ -59,7 +63,9 @@ template<typename B> struct term {
 		arg(const bf<B>& f);
 		bool operator==(const arg&) const;
 		bool operator<(const arg&) const;
-		arg subst(const sym_t& s, const bf<B>& f);
+		arg subst(const sym_t& s, const bf<B>& f) {
+			return ist ? arg(::subst(t, s, f)) : *this;
+		}
 	};
 	enum type { ELEM, VAR, BF, FUNC } t;
 	//int sym = 0;
@@ -79,6 +85,7 @@ template<typename B> struct term {
 	term(const bf<B>& f) : t(BF), f(f) {}
 	bool operator==(const term& x) const;
 	bool operator<(const term& x) const;
+	term subst(const sym_t&, const bf<B>&) const;
 };
 
 template<typename B> struct minterm : public array<set<term<B>>, 2> {
@@ -86,6 +93,7 @@ template<typename B> struct minterm : public array<set<term<B>>, 2> {
 
 	minterm() : base() {}
 	minterm(bool pos, const term<B>& t);
+	bf<B> subst(const sym_t& s, const bf<B>& f) const;
 };
 
 template<typename B> struct bf : public set<minterm<B>> {
@@ -101,6 +109,7 @@ template<typename B> struct bf : public set<minterm<B>> {
 	bool operator<(const bf<B>& f) const;
 	static const bf<B>& zero();
 	static const bf<B>& one();
+	bf subst(const sym_t& s, const bf<B>& y) const;
 };
 
 template<typename B> term<B>::arg::arg(const term<B>& t) :
@@ -283,35 +292,30 @@ bool operator<=(const bf<B>& x, const bf<B>& y) {
 }
 
 template<typename B>
-term<B> subst(const term<B>& t, const sym_t& s, const bf<B>& f) {
-	if (t.t == term<B>::VAR) return s == t.sym ? term<B>(f) : t;
-	if (t.t == term<B>::BF) return subst(t.f, s, f);
-	assert(t.t == term<B>::FUNC);
-	term r = t;
+term<B> term<B>::subst(const sym_t& s, const bf<B>& g) const {
+	if (t == term<B>::VAR) return s == sym ? term<B>(g) : *this;
+	if (t == term<B>::BF) return f.subst(s, g);
+	assert(t == term<B>::FUNC);
+	term r = *this;
 	for (size_t n = 0; n != r.args.size(); ++n)
-		r.args[n] = r.args[n].subst(s, f);
+		r.args[n] = r.args[n].subst(s, g);
 	return r;
 }
 
 template<typename B>
-term<B>::arg term<B>::arg::subst(const sym_t& s, const bf<B>& f) {
-	return ist ? arg(::subst(t, s, f)) : *this;
-}
-
-template<typename B>
-bf<B> subst(const minterm<B>& t, const sym_t& s, const bf<B>& f) {
-	bf<B> r = bf<B>::one();
-	for (const term<B>& x : t[0])
-		r = minterm<B>(true, subst(x, s, f)) & r;
-	for (const term<B>& x : t[1])
-		r = minterm<B>(false, subst(x, s, f)) & r;
+bf<B> minterm<B>::subst(const sym_t& s, const bf<B>& f) const {
+	bf<B> r(true);
+	for (const term<B>& x : (*this)[0])
+		r = minterm<B>(true, x.subst(s, f)) & r;
+	for (const term<B>& x : (*this)[1])
+		r = minterm<B>(false, x.subst(s, f)) & r;
 	return r;
 }
 
 template<typename B>
-bf<B> subst(const bf<B>& x, const sym_t& s, const bf<B>& y) {
-	bf<B> z = bf<B>::zero();
-	for (const minterm<B>& t : x) z = subst(t, s, y) | z;
+bf<B> bf<B>::subst(const sym_t& s, const bf<B>& y) const {
+	bf<B> z(false);
+	for (const minterm<B>& t : *this) z = t.subst(s, y) | z;
 	return z;
 }
 
@@ -340,11 +344,11 @@ bf<B> subst(const bf<B>& x,
 }*/
 
 template<typename B> bf<B> ex(const bf<B>& f, const sym_t& v) {
-	return subst(f, v, bf<B>::zero()) | subst(f, v, bf<B>::one());
+	return f.subst(v, bf<B>::zero()) | f.subst(v, bf<B>::one());
 }
 
 template<typename B> bf<B> all(const bf<B>& f, const sym_t& v) {
-	return subst(f, v, bf<B>::zero()) & subst(f, v, bf<B>::one());
+	return f.subst(v, bf<B>::zero()) & f.subst(v, bf<B>::one());
 }
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b?"T":"F"); }
