@@ -300,8 +300,7 @@ bf<B> disj_fmt(const minterm<B>& t, const bf<B>& f) {
 		if (complementary<B>(*it, s)) break;
 		else ++it;
 	if (it != g.end()) return g.erase(it), s | g;
-	g.insert(s);
-	return g;
+	return g.insert(s), g;
 }
 
 template<typename B>
@@ -330,8 +329,7 @@ bf<B> operator&(const minterm<B>& x, const bf<B>& y) {
 
 template<typename B>
 bf<B> operator&(const bf<B>& x, const bf<B>& y) {
-	if (x == bf<B>::zero()) return x;
-	if (y == bf<B>::zero()) return y;
+	if (x == bf<B>::zero() || y == bf<B>::zero()) return bf<B>::zero();
 	if (x == bf<B>::one()) return y;
 	if (y == bf<B>::one()) return x;
 	bf<B> z;
@@ -343,6 +341,9 @@ bf<B> operator&(const bf<B>& x, const bf<B>& y) {
 
 template<typename B>
 bf<B> operator|(const bf<B>& x, const bf<B>& y) {
+	if (x == bf<B>::zero()) return y;
+	if (y == bf<B>::zero()) return x;
+	if (x == bf<B>::one() || y == bf<B>::one()) return bf<B>::one();
 	bf<B> z = x;
 	for (const minterm<B>& t : y) z = t | z;
 	return z;
