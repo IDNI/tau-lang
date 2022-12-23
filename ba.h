@@ -113,6 +113,7 @@ template<typename B> struct term {
 	}
 };
 
+//template<typename B> struct minterm : public array<set<term<B>>, 2> {
 template<typename B> struct minterm : public array<set<term<B>>, 2> {
 	typedef array<set<term<B>>, 2> base;
 
@@ -122,6 +123,7 @@ template<typename B> struct minterm : public array<set<term<B>>, 2> {
 	bf<B> subst(const sym_t& s, const bf<B>& f) const;
 };
 
+//template<typename B> struct bf : public set<minterm<B>> {
 template<typename B> struct bf : public set<minterm<B>> {
 	enum { ZERO, ONE, NONE } v;
 
@@ -276,13 +278,13 @@ bf<B> disj_fmt(const minterm<B>& t, const bf<B>& f) {
 		else if (x.t == term<B>::BF) {
 			minterm<B> s = t;
 			return s[0].erase(x), s & (f & x.f);
-		} else assert(x.t != term<B>::ELEM);
+		} //else assert(x.t != term<B>::ELEM);
 	for (const term<B>& x : t[1])
 		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
 		else if (x.t == term<B>::BF) {
 			minterm<B> s = t;
 			return s[1].erase(x), s & (f & ~x.f);
-		} else assert(x.t != term<B>::ELEM);
+		} //else assert(x.t != term<B>::ELEM);
 	for (const minterm<B>& x : f) if (t <= x) return f;
 	if (t[0].size() == 1 && t[1].empty())
 		for (const minterm<B>& m : f)
