@@ -11,19 +11,21 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "fof.h"
+#include "seq.h"
 #include <iostream>
 
 term<Bool> var_term(int v) {
-	stringstream ss;
-	ss << "x[" << v << "]";
-	return term<Bool>(ss.str());
+	return term<Bool>(v);
+//	stringstream ss;
+//	ss << "x[" << v << "]";
+//	return term<Bool>(ss.str());
 }
 
 bf<Bool> var(int v) { return bf<Bool>(minterm(true, var_term(v))); }
 
-term<Bool> fapp(const string& fname, const vector<string>& args) {
+term<Bool> fapp(const string& fname, const vector<sym_t>& args) {
 	vector<term<Bool>::arg> v;
-	for (const string& s : args) v.emplace_back(term<Bool>(s));
+	for (const sym_t& s : args) v.emplace_back(term<Bool>(s));
 	return term<Bool>(fname, v);
 }
 
@@ -56,13 +58,15 @@ int main() {
 //	bf<B> f = subst(fapp(0, 0, 1), string("x[0]"), bf<B>(term<Bool>(string("y"))));
 //	f = subst(fapp(0, 0, 1), string("x[0]"), bf<B>(fapp(1,1,2)));
 //	cout << f << endl;
-	cout << var(1) << endl;
-	cout << (~var(1)) << endl;
-	cout << (var(1) | (~var(1))) << endl;
-	cout << ((var(1) & (~var(2))) | (var(1) & var(2))) << endl;
-	cout << generic<Bool>(2,2,1) << endl;
-	cout << ex(generic<Bool>(2,2,1), "x[0]") << endl;
-	cout << ex(ex(generic<Bool>(2,2,2), "x[0]"), "x[1]") << endl;
+//	cout << var(1) << endl;
+//	cout << (~var(1)) << endl;
+//	cout << (var(1) | (~var(1))) << endl;
+//	cout << ((var(1) & (~var(2))) | (var(1) & var(2))) << endl;
+	cout << generic<Bool>(2,2,3) << endl;
+	auto f = [](sym_t v)->sym_t { return 1+v; };
+	cout << transform_vars(generic<Bool>(2,2,3), f) << endl;
+//	cout << ex(generic<Bool>(2,2,1), 0) << endl;
+//	cout << ex(ex(generic<Bool>(2,2,2), 0), 1) << endl;
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;

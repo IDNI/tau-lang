@@ -10,6 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __FOF_H__
+#define __FOF_H__
 #include "ba.h"
 
 template<typename B> using clause = minterm<bf<B>>;
@@ -42,7 +44,7 @@ operator&(const clause<B>& x, const clause<B>& y) {
 }
 
 template<typename B>
-clause<B> ex(const clause<B>& c, const string& v) {
+clause<B> ex(const clause<B>& c, const sym_t& v) {
 	if (c[0].empty()) {
 		assert(!c[1].empty());
 		clause<B> r;
@@ -73,14 +75,61 @@ clause<B> ex(const clause<B>& c, const string& v) {
 }
 
 template<typename B>
-fof<B> ex(const fof<B>& f, const string& v) {
+fof<B> ex(const fof<B>& f, const sym_t& v) {
 	fof<B> g = fof<B>::zero();
 	for (const clause<B>& c : f) g = ex(c, v) | g;
 	return g;
 }
 
 template<typename B>
-fof<B> all(const fof<B>& f, const string& v) { return ~ex(~f, v); }
+fof<B> all(const fof<B>& f, const sym_t& v) { return ~ex(~f, v); }
+
+template<typename B>
+term<B> term_trans_vars(const term<B>& t, function<sym_t(sym_t)> g) {
+//	cout << "in: " << t << endl;
+	if (t.t == term<B>::VAR) return term<B>(g(t.sym));
+	if (t.t == term<B>::FUNC) {
+		term<B> r;
+		r.t = term<B>::FUNC;
+		r.name = t.name;
+		for (auto& a : t.args)
+			if (a.ist)
+				r.args.emplace_back(term_trans_vars<B>(a.t, g));
+			else r.args.push_back(a);
+//		cout << "out: " << r << endl;
+		return r;
+	}
+//	cout << "out: " << t << endl;
+	return t;
+}
+
+template<typename B>
+fof<B> transform_vars(const fof<B>& f, function<sym_t(sym_t)> g) {
+	fof<B> r;
+	for (const clause<B>& c : f) {
+		clause<B> d;
+		for (size_t i = 0; i != 2; ++i)
+			for (const term<bf<B>>& s : c[i]) {
+				assert(s.t == term<bf<B>>::ELEM);
+				const bf<B>& h = s.e;
+				bf<B> p;
+				for (const minterm<B>& m : h) {
+					minterm<B> b;
+					for (size_t j = 0; j != 2; ++j)
+						for (const term<B>& t : m[j])
+							b = b & minterm<B>(!j,
+							term_trans_vars(t, g));
+					p = b | p;
+					//cout << p << endl;
+				}
+				d = d & clause<B>(!i, p);
+				//cout << d << endl;
+			}
+		r = d | r;
+		//cout << r << endl;
+	}
+	return r;
+}
 
 template<typename B>
 ostream& operator<<(ostream& os, const clause<B>& c) {
@@ -95,3 +144,4 @@ ostream& operator<<(ostream& os, const fof<B>& f) {
 	for (const clause<B>& c : f) os << c << (--n ? "\t||" : "") << endl;
 	return os;
 }
+#endif

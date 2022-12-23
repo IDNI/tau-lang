@@ -10,7 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-
+#ifndef __BA_H__
+#define __BA_H__
 #define DEBUG
 #ifdef DEBUG
 #define DBG(x) x
@@ -27,8 +28,12 @@
 #include <string>
 #include <sstream>
 #include <cassert>
+#include <functional>
 
 using namespace std;
+
+//typedef string sym_t;
+typedef int sym_t;
 
 struct Bool {
 	bool b;
@@ -47,27 +52,30 @@ template<typename B> struct bf;
 template<typename B> struct term {
 	struct arg {
 		bool ist;
-		term t;
+		term<B> t;
 		bf<B> f;
 		arg() {}
 		arg(const term& t);
 		arg(const bf<B>& f);
 		bool operator==(const arg&) const;
 		bool operator<(const arg&) const;
-		arg subst(const string& s, const bf<B>& f);
+		arg subst(const sym_t& s, const bf<B>& f);
 	};
 	enum type { ELEM, VAR, BF, FUNC } t;
 	//int sym = 0;
-	string sym;
+	sym_t sym;
+	string name;
 	B e;
 	bf<B> f;
 	vector<arg> args;
 	term() {}
 	term(const B& e) : t(ELEM), e(e) {}
 	term(type t) : t(t) {}
-	term(const string& sym) : t(VAR), sym(sym) {}
-	term(const string& sym, const vector<arg>& a) :
-		t(FUNC), sym(sym), args(a) {}
+	term(const sym_t& sym) : t(VAR), sym(sym) {}
+	//term(const sym_t& sym, const vector<arg>& a) :
+	//	t(FUNC), sym(sym), args(a) {}
+	term(const string& name, const vector<arg>& a) :
+		t(FUNC), name(name), args(a) {}
 	term(const bf<B>& f) : t(BF), f(f) {}
 	bool operator==(const term& x) const;
 	bool operator<(const term& x) const;
@@ -117,7 +125,7 @@ template<typename B> bool term<B>::operator==(const term& x) const {
 		case ELEM: return e == x.e;
 		case VAR: return sym == x.sym;
 		case BF: return f == x.f;
-		case FUNC: return sym == x.sym && args == x.args;
+		case FUNC: return name == x.name && args == x.args;
 		default: assert(0);
 	}
 }
@@ -128,7 +136,7 @@ template<typename B> bool term<B>::operator<(const term& x) const {
 		case ELEM: return e < x.e;
 		case VAR: return sym < x.sym;
 		case BF: return f < x.f;
-		case FUNC: return sym == x.sym ? args < x.args : sym < x.sym;
+		case FUNC: return name == x.name ? args < x.args : sym < x.sym;
 		default: assert(0);
 	}
 }
@@ -275,7 +283,7 @@ bool operator<=(const bf<B>& x, const bf<B>& y) {
 }
 
 template<typename B>
-term<B> subst(const term<B>& t, const string& s, const bf<B>& f) {
+term<B> subst(const term<B>& t, const sym_t& s, const bf<B>& f) {
 	if (t.t == term<B>::VAR) return s == t.sym ? term<B>(f) : t;
 	if (t.t == term<B>::BF) return subst(t.f, s, f);
 	assert(t.t == term<B>::FUNC);
@@ -286,12 +294,12 @@ term<B> subst(const term<B>& t, const string& s, const bf<B>& f) {
 }
 
 template<typename B>
-term<B>::arg term<B>::arg::subst(const string& s, const bf<B>& f) {
+term<B>::arg term<B>::arg::subst(const sym_t& s, const bf<B>& f) {
 	return ist ? arg(::subst(t, s, f)) : *this;
 }
 
 template<typename B>
-bf<B> subst(const minterm<B>& t, const string& s, const bf<B>& f) {
+bf<B> subst(const minterm<B>& t, const sym_t& s, const bf<B>& f) {
 	bf<B> r = bf<B>::one();
 	for (const term<B>& x : t[0])
 		r = minterm<B>(true, subst(x, s, f)) & r;
@@ -301,17 +309,41 @@ bf<B> subst(const minterm<B>& t, const string& s, const bf<B>& f) {
 }
 
 template<typename B>
-bf<B> subst(const bf<B>& x, const string& s, const bf<B>& y) {
+bf<B> subst(const bf<B>& x, const sym_t& s, const bf<B>& y) {
 	bf<B> z = bf<B>::zero();
 	for (const minterm<B>& t : x) z = subst(t, s, y) | z;
 	return z;
 }
 
-template<typename B> bf<B> ex(const bf<B>& f, const string& v) {
+/*template<typename B>
+term<B> subst(const term<B>& t,
+	function<bf<B>(const bf<B>&)> &f, function<term<B>(const term<B>)>& g) {
+	switch (t.t) {
+		
+	}
+	enum type { ELEM, VAR, BF, FUNC } t;
+}
+
+template<typename B>
+bf<B> subst(const bf<B>& x,
+	function<bf<B>(const bf<B>&)> &f, function<term<B>(const term<B>)>& g) {
+	bf<B> r;
+	for (const minterm<B>& y : x) {
+		minterm<B> m;
+		for (const term<B>& t : x[0])
+			m[0] = m[0] & minterm<B>(subst(t, f, g));
+		for (const term<B>& t : x[1])
+			m[1] = m[1] & minterm<B>(subst(t, f, g));
+		r = m | r;
+	}
+	return r;
+}*/
+
+template<typename B> bf<B> ex(const bf<B>& f, const sym_t& v) {
 	return subst(f, v, bf<B>::zero()) | subst(f, v, bf<B>::one());
 }
 
-template<typename B> bf<B> all(const bf<B>& f, const string& v) {
+template<typename B> bf<B> all(const bf<B>& f, const sym_t& v) {
 	return subst(f, v, bf<B>::zero()) & subst(f, v, bf<B>::one());
 }
 
@@ -330,9 +362,9 @@ void out(ostream& os, const typename term<B>::arg& a) {
 template<typename B>
 ostream& operator<<(ostream& os, const term<B>& t) {
 	if (t.t == term<B>::ELEM) return os << t.e;
-	if (t.t == term<B>::VAR) return os << t.sym;// "x[" << -t.sym << "]";
+	if (t.t == term<B>::VAR) return os << "x[" << t.sym << "]";
 	if (t.t == term<B>::BF) return os << t.f;
-	if (t.t == term<B>::FUNC) os << t.sym << "(";//"f[" << t.sym << "](";
+	if (t.t == term<B>::FUNC) os << t.name << "(";//"f[" << t.sym << "](";
 	for (size_t n = 0; n != t.args.size(); ++n) {
 		out<B>(os, t.args[n]);
 		//os << t.args[n]; -- compiler error somehow
@@ -355,4 +387,4 @@ template<typename B> ostream& operator<<(ostream& os, const bf<B>& f) {
 	for (auto& t : f) os << t << (--n ? " | " : "");
 	return os;
 }
-
+#endif
