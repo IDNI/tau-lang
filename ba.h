@@ -274,17 +274,25 @@ bf<B> disj_fmt(const minterm<B>& t, const bf<B>& f) {
 		if (x.t == term<B>::ELEM && x.e == B::zero()) return f;
 		else if (x.t == term<B>::BF) {
 			minterm<B> s = t;
-			s[0].erase(x);
-			return s & (f & x.f);
-		}
+			return s[0].erase(x), s & (f & x.f);
+		} else assert(x.t != term<B>::ELEM);
 	for (const term<B>& x : t[1])
 		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
 		else if (x.t == term<B>::BF) {
 			minterm<B> s = t;
-			s[1].erase(x);
-			return s & (f & ~x.f);
-		}
+			return s[1].erase(x), s & (f & ~x.f);
+		} else assert(x.t != term<B>::ELEM);
 	for (const minterm<B>& x : f) if (t <= x) return f;
+	if (t[0].size() == 1 && t[1].empty())
+		for (const minterm<B>& m : f)
+			if (	m[1].size() == 1 && m[0].empty() &&
+				*m[1].begin() == *t[0].begin())
+				return bf<B>(true);
+	if (t[1].size() == 1 && t[0].empty())
+		for (const minterm<B>& m : f)
+			if (	m[0].size() == 1 && m[1].empty() &&
+				*m[0].begin() == *t[1].begin())
+				return bf<B>(true);
 	bf g = f;
 	auto s = t;
 	auto it = g.begin();
