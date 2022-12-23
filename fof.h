@@ -17,20 +17,40 @@
 template<typename B> using clause = minterm<bf<B>>;
 template<typename B> using fof = bf<bf<B>>;
 
-template<typename B> clause<B>
-operator&(const clause<B>& x, const clause<B>& y) {
+template<typename B> bf<B> simplify(const bf<B>& f, const bf<B>& g) {
+	bf<B> r;
+	for (const minterm<B>& x : g) {
+		bool b = true;
+		for (const minterm<B>& y : f) b &= !(y <= x);
+		if (b) r.insert(x);
+	}
+	return r;
+}
+
+template<typename B> clause<B> simplify(const clause<B>& c) {
+	if (c[0].empty()) return c;
+	clause<B> d;
+	assert(c[0].size() == 1);
+	bf<B> f = c[0].begin()->e;
+	d[0].emplace(f);
+	for (auto& t : c[1])
+		if (bf<B> g = simplify(f, t.e); g == bf<B>::one())
+			return clause<B>();
+		else d[1].emplace(g);
+	return d;
+}
+
+template<typename B>
+clause<B> operator&(const clause<B>& x, const clause<B>& y) {
 	//DBG(cout << x << "&&" << y << " = ";)
 	clause<B> z;
 	z[1] = x[1];
-	assert(x[0].size() <= 1);
-	assert(y[0].size() <= 1);
+	assert(x[0].size() <= 1 && y[0].size() <= 1);
 	if (!x[0].empty()) {
 		if (y[0].empty()) z[0] = x[0];
 		else {
-			term<bf<Bool>> t1 = *x[0].begin();
-			assert(t1.t == term<bf<B>>::ELEM);
-			term<bf<Bool>> t2 = *y[0].begin();
-			assert(t2.t == term<bf<B>>::ELEM);
+			term<bf<Bool>> t1 = *x[0].begin(), t2 = *y[0].begin();
+			assert(t1.t==term<bf<B>>::ELEM&&t2.t==term<bf<B>>::ELEM);
 			auto t = t1.e | t2.e;
 			if (t != bf<Bool>::one()) z[0].insert(t);
 		}
@@ -38,9 +58,26 @@ operator&(const clause<B>& x, const clause<B>& y) {
 	for (auto& t : y[1])
 		if (auto it = z[0].find(t); it != z[0].end())
 			return minterm<bf<B>>();
+		else if (t == bf<Bool>::one()) continue;
+		else if (t == bf<Bool>::zero()) throw 0;
 		else z[1].insert(t);
 	//DBG(cout << z << endl;)
-	return z;
+	return simplify(z);
+}
+
+template<typename B>
+fof<B> operator|(clause<B> c, const fof<B>& f) {
+	if (!c[0].empty()) {
+		bf<B> g = c[0].begin()->e;
+		if (g == bf<B>::zero()) c[0].clear();
+		else if (g == bf<B>::one()) return f;
+	}
+	for (auto it = c[1].begin(); it != c[1].end(); ++it) {
+		bf<B> g = it->e;
+		if (g == bf<B>::one()) c[1].erase(it);
+		else if (g == bf<B>::one()) return f;
+	}
+	return disj_fmt(c, f);
 }
 
 template<typename B>

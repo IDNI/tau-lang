@@ -21,7 +21,7 @@ term<Bool> var_term(int v) {
 //	return term<Bool>(ss.str());
 }
 
-bf<Bool> var(int v) { return bf<Bool>(minterm(true, var_term(v))); }
+bf<Bool> var(int v) { return bf<Bool>(minterm<Bool>(true, v)); }
 
 term<Bool> fapp(const string& fname, const vector<sym_t>& args) {
 	vector<term<Bool>::arg> v;
@@ -37,24 +37,42 @@ term<Bool> fapp(size_t i, size_t j, size_t v) {
 	return term<Bool>(ss.str(), a);
 }
 
+template<typename B> bf<B> generic(size_t nv, size_t c = 0) {
+	bf<B> r;
+	for (size_t v = 0; v != (((size_t)1) << nv); ++v) {
+		minterm<B> m(true, term<B>(-v-1-c));
+		for (size_t k = 0; k != nv; ++k)
+			m[(v & (1 << k)) ? 0 : 1].insert(term<B>(k));
+		r.insert(m);
+	}
+	return r;
+}
+
 template<typename B>
 fof<B> generic(size_t nc, size_t csz, size_t nv) {
-	fof<B> f = fof<B>::zero();
+	fof<B> f(false);
 	for (size_t k = 0; k != nc; ++k) {
 		clause<B> c;
 		for (size_t n = 0; n != csz; ++n)
-			c = clause<B>(!n, term<bf<B>>(bf<B>(fapp(k,n,nv)))) & c;
-		cout << "c: " << c << endl;
+			//c = clause<B>(!n, term<bf<B>>(bf<B>(fapp(k,n,nv)))) & c;
+			c = clause<B>(!n,
+			term<bf<B>>(generic<B>(nv, (1<<nv) * (nc * n + k)))) & c;
+		//cout << "c: " << c << endl;
 		f = c | f;
-		cout << "f: " << f << endl;
+		//cout << "f: " << f << endl;
 	}
 	return f;
 }
 
 int main() {
-//	bf<B> f(fapp("f", {"x", "y"}));
-//	bf<B> g(fapp("g", {"y", "x"}));
+//	cout << generic<Bool>(2, 2, 2) << endl;
+	//cout << generic<Bool>(2) << endl;
+	//cout << generic<Bool>(3) << endl;
+//	return 0;
+	bf<Bool> f(fapp("f", {0,1}));
+	bf<Bool> g(fapp("g", {1,2}));
 //	cout << (~(f & g)) << endl;
+	cout << ex(ex(~(~fof<Bool>(f) | fof<Bool>(g)), 0),1) << endl;
 //	cout << (generic(2, 3, 2) & generic(1,1,1)) << endl;
 //	cout << fapp(0, 0, 1) << endl;
 //	bf<B> f = subst(fapp(0, 0, 1), string("x[0]"), bf<B>(term<Bool>(string("y"))));
@@ -64,12 +82,10 @@ int main() {
 //	cout << (~var(1)) << endl;
 //	cout << (var(1) | (~var(1))) << endl;
 //	cout << ((var(1) & (~var(2))) | (var(1) & var(2))) << endl;
-	cout << generic<Bool>(2,2,1) << endl; return 0;
-	auto f = [](sym_t v)->sym_t { return 1+v; };
-	cout << transform_vars(generic<Bool>(2,2,3), f) << endl;
-	seq(generic<Bool>(5,15,2));
-//	cout << ex(generic<Bool>(2,2,1), 0) << endl;
-//	cout << ex(ex(generic<Bool>(2,2,2), 0), 1) << endl;
+//	cout << generic<Bool>(2,2,1) << endl; return 0;
+//	auto f = [](sym_t v)->sym_t { return 1+v; };
+//	cout << transform_vars(generic<Bool>(2,2,3), f) << endl;
+	seq(generic<Bool>(2,2,2));
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;

@@ -6,13 +6,13 @@
 
 template<typename B>
 fof<B> shr(const fof<B>& f) {
-	static auto g = [](sym_t v)->sym_t { return v + 1; };
+	static auto g = [](sym_t v)->sym_t { return v >= 0 ? v + 1 : v; };
 	return transform_vars(f, g);
 }
 
 template<typename B>
 fof<B> shl(const fof<B>& f) {
-	static auto g = [](sym_t v)->sym_t { return v - 1; };
+	static auto g = [](sym_t v)->sym_t { return v >= 0 ? v - 1 : v; };
 	return transform_vars(f, g);
 }
 

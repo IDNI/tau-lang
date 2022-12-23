@@ -50,8 +50,6 @@ struct Bool {
 
 template<typename B> struct term;
 template<typename B> struct bf;
-template<typename B>
-bf<B> subst(const term<B>&, const sym_t&, const bf<B>&);
 
 template<typename B> struct term {
 	struct arg {
@@ -64,7 +62,7 @@ template<typename B> struct term {
 		bool operator==(const arg&) const;
 		bool operator<(const arg&) const;
 		arg subst(const sym_t& s, const bf<B>& f) {
-			return ist ? arg(::subst(t, s, f)) : *this;
+			return ist ? arg(t.subst(s, f)) : *this;
 		}
 	};
 	enum type { ELEM, VAR, BF, FUNC } t;
@@ -92,7 +90,8 @@ template<typename B> struct minterm : public array<set<term<B>>, 2> {
 	typedef array<set<term<B>>, 2> base;
 
 	minterm() : base() {}
-	minterm(bool pos, const term<B>& t);
+	minterm(bool pos, const term<B>& t) : base() { add(pos, term<B>(t)); }
+	void add(bool, const term<B>&);
 	bf<B> subst(const sym_t& s, const bf<B>& f) const;
 };
 
@@ -145,13 +144,13 @@ template<typename B> bool term<B>::operator<(const term& x) const {
 		case ELEM: return e < x.e;
 		case VAR: return sym < x.sym;
 		case BF: return f < x.f;
-		case FUNC: return name == x.name ? args < x.args : sym < x.sym;
+		case FUNC: return name == x.name ? args < x.args : name < x.name;
 		default: assert(0);
 	}
 }
 
-template<typename B> minterm<B>::minterm(bool pos, const term<B>& t) :
-	base() {
+template<typename B> void minterm<B>::add(bool pos, const term<B>& t) {
+	assert(!(t.t == term<B>::ELEM && t.e == B::zero()));
 	(*this)[pos ? 0 : 1].insert(t);
 }
 
@@ -187,13 +186,25 @@ template<typename B> bf<B> operator~(const minterm<B>& x) {
 template<typename B> minterm<B> operator&(
 		const minterm<B>& x, const minterm<B>& y) {
 	//DBG(cout << x << "&&" << y << " = ";)
-	minterm<B> z = x;
+	minterm<B> z ;
+	for (const term<B>& t : x[0])
+		if (t.t == term<B>::ELEM && t.e == B::zero()) return minterm<B>();
+		else if (t.t == term<B>::ELEM && t.e == B::one()) continue;
+		else z[0].insert(t);
+	for (const term<B>& t : x[1])
+		if (t.t == term<B>::ELEM && t.e == B::one()) return minterm<B>();
+		else if (t.t == term<B>::ELEM && t.e == B::zero()) continue;
+		else z[1].insert(t);
 	for (const term<B>& t : y[0])
-		if (auto it = z[1].find(t); it != z[1].end())
+		if (t.t == term<B>::ELEM && t.e == B::zero()) return minterm<B>();
+		else if (t.t == term<B>::ELEM && t.e == B::one()) continue;
+		else if (auto it = x[1].find(t); it != x[1].end())
 			return minterm<B>();
 		else z[0].insert(t);
 	for (const term<B>& t : y[1])
-		if (auto it = z[0].find(t); it != z[0].end())
+		if (t.t == term<B>::ELEM && t.e == B::one()) return minterm<B>();
+		else if (t.t == term<B>::ELEM && t.e == B::zero()) continue;
+		else if (auto it = x[0].find(t); it != x[0].end())
 			return minterm<B>();
 		else z[1].insert(t);
 	//DBG(cout << z << endl;)
@@ -234,10 +245,16 @@ bool complementary(const minterm<B>& x, minterm<B>& y) {
 }
 
 template<typename B>
-bf<B> operator|(const minterm<B>& t, const bf<B>& f) {
-	if (t[0].empty() && t[1].empty()) return bf<B>::one();// f;
+bf<B> disj_fmt(const minterm<B>& t, const bf<B>& f) {
+	if (t[0].empty() && t[1].empty()) return bf<B>(true);// f;
 	if (f == bf<B>::one()) return f;
 	if (f == bf<B>::zero()) return bf<B>(t);
+	for (const term<B>& x : t[0])
+		if (x.t == term<B>::ELEM && x.e == B::zero())
+			return f;
+	for (const term<B>& x : t[1])
+		if (x.t == term<B>::ELEM && x.e == B::one())
+			return f;
 	for (const minterm<B>& x : f) if (t <= x) return f;
 	bf g = f;
 	auto s = t;
@@ -248,6 +265,11 @@ bf<B> operator|(const minterm<B>& t, const bf<B>& f) {
 	if (it != g.end()) return g.erase(it), s | g;
 	g.insert(s);
 	return g;
+}
+
+template<typename B>
+bf<B> operator|(const minterm<B>& t, const bf<B>& f) {
+	return disj_fmt<B>(t, f);
 }
 
 template<typename B> bf<B> operator~(const bf<B>& f) {
@@ -261,7 +283,9 @@ bf<B> operator&(const minterm<B>& x, const bf<B>& y) {
 	if (y == bf<B>::zero()) return y;
 	if (y == bf<B>::one()) return bf<B>(x);
 	bf<B> z;
-	for (const minterm<B>& t : y) z = (x & t) | z;
+	for (const minterm<B>& t : y)
+		if (minterm<B> m = (x & t); m.empty()) return bf<B>::zero();
+		else z = m | z;
 	return z;
 }
 
@@ -274,7 +298,7 @@ bf<B> operator&(const bf<B>& x, const bf<B>& y) {
 	bf<B> z;
 	for (const minterm<B>& s : x)
 		for (const minterm<B>& t : y)
-			z = (s & t) | z;
+			z = ((s & t) | z);
 	return z;
 }
 
