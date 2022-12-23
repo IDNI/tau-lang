@@ -69,10 +69,10 @@ int main() {
 	//cout << generic<Bool>(2) << endl;
 	//cout << generic<Bool>(3) << endl;
 //	return 0;
-	bf<Bool> f(fapp("f", {0,1}));
-	bf<Bool> g(fapp("g", {1,2}));
+//	bf<Bool> f(fapp("f", {0,1}));
+//	bf<Bool> g(fapp("g", {1,2}));
 //	cout << (~(f & g)) << endl;
-	cout << ex(ex(~(~fof<Bool>(f) | fof<Bool>(g)), 0),1) << endl;
+//	cout << ex(ex(~(~fof<Bool>(f) | fof<Bool>(g)), 0),1) << endl;
 //	cout << (generic(2, 3, 2) & generic(1,1,1)) << endl;
 //	cout << fapp(0, 0, 1) << endl;
 //	bf<B> f = subst(fapp(0, 0, 1), string("x[0]"), bf<B>(term<Bool>(string("y"))));
@@ -85,7 +85,10 @@ int main() {
 //	cout << generic<Bool>(2,2,1) << endl; return 0;
 //	auto f = [](sym_t v)->sym_t { return 1+v; };
 //	cout << transform_vars(generic<Bool>(2,2,3), f) << endl;
-	seq(generic<Bool>(2,2,2));
+	cout << generic<Bool>(1,1,1) << endl;
+	//cout << generic<Bool>(1,1,1).subst(0,term<Bool>(1)) << endl;
+	cout << all(generic<Bool>(1,1,1),0) << endl;
+	seq<Bool>((generic<Bool>(1,1,2)));
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;

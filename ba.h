@@ -80,10 +80,36 @@ template<typename B> struct term {
 	//	t(FUNC), sym(sym), args(a) {}
 	term(const string& name, const vector<arg>& a) :
 		t(FUNC), name(name), args(a) {}
-	term(const bf<B>& f) : t(BF), f(f) {}
+	term(const bf<B>& g) {
+		if (g.v == bf<B>::ZERO) { t = ELEM; e = B::zero(); return; }
+		if (g.v == bf<B>::ONE) { t = ELEM; e = B::one(); return; }
+		assert(!g.empty());
+		if (g.size() == 1) {
+			auto& c = *g.begin();
+			if (c[1].empty() && c[0].size() == 1)
+				*this = *c[0].begin();
+			return;
+		}
+		t = BF;
+		f = g;
+	}
 	bool operator==(const term& x) const;
 	bool operator<(const term& x) const;
 	term subst(const sym_t&, const bf<B>&) const;
+	bool zero() const {
+		switch (t) {
+			case ELEM: return e == B::zero();
+			case BF: return f.v == bf<B>::ZERO;
+			default: return false;
+		}
+	}
+	bool one() const {
+		switch (t) {
+			case ELEM: return e == B::one();
+			case BF: return f.v == bf<B>::ONE;
+			default: return false;
+		}
+	}
 };
 
 template<typename B> struct minterm : public array<set<term<B>>, 2> {
@@ -188,22 +214,22 @@ template<typename B> minterm<B> operator&(
 	//DBG(cout << x << "&&" << y << " = ";)
 	minterm<B> z ;
 	for (const term<B>& t : x[0])
-		if (t.t == term<B>::ELEM && t.e == B::zero()) return minterm<B>();
-		else if (t.t == term<B>::ELEM && t.e == B::one()) continue;
+		if (t.zero()) return minterm<B>();
+		else if (t.one()) continue;
 		else z[0].insert(t);
 	for (const term<B>& t : x[1])
-		if (t.t == term<B>::ELEM && t.e == B::one()) return minterm<B>();
-		else if (t.t == term<B>::ELEM && t.e == B::zero()) continue;
+		if (t.one()) return minterm<B>();
+		else if (t.zero()) continue;
 		else z[1].insert(t);
 	for (const term<B>& t : y[0])
-		if (t.t == term<B>::ELEM && t.e == B::zero()) return minterm<B>();
-		else if (t.t == term<B>::ELEM && t.e == B::one()) continue;
+		if (t.zero()) return minterm<B>();
+		else if (t.one()) continue;
 		else if (auto it = x[1].find(t); it != x[1].end())
 			return minterm<B>();
 		else z[0].insert(t);
 	for (const term<B>& t : y[1])
-		if (t.t == term<B>::ELEM && t.e == B::one()) return minterm<B>();
-		else if (t.t == term<B>::ELEM && t.e == B::zero()) continue;
+		if (t.one()) return minterm<B>();
+		else if (t.zero()) continue;
 		else if (auto it = x[0].find(t); it != x[0].end())
 			return minterm<B>();
 		else z[1].insert(t);
@@ -248,7 +274,7 @@ template<typename B>
 bf<B> disj_fmt(const minterm<B>& t, const bf<B>& f) {
 	if (t[0].empty() && t[1].empty()) return bf<B>(true);// f;
 	if (f == bf<B>::one()) return f;
-	if (f == bf<B>::zero()) return bf<B>(t);
+	if (f == bf<B>::zero() || f.empty()) return bf<B>(t);
 	for (const term<B>& x : t[0])
 		if (x.t == term<B>::ELEM && x.e == B::zero())
 			return f;
@@ -330,9 +356,11 @@ template<typename B>
 bf<B> minterm<B>::subst(const sym_t& s, const bf<B>& f) const {
 	bf<B> r(true);
 	for (const term<B>& x : (*this)[0])
-		r = minterm<B>(true, x.subst(s, f)) & r;
+		if (term<B> t = x.subst(s, f); t.zero()) return bf<B>(false);
+		else if (!t.one()) r = minterm<B>(true, t) & r;
 	for (const term<B>& x : (*this)[1])
-		r = minterm<B>(false, x.subst(s, f)) & r;
+		if (term <B> t = x.subst(s, f); t.one()) return bf<B>(false);
+		else if (!t.zero()) r = minterm<B>(false, t) & r;
 	return r;
 }
 
@@ -368,6 +396,10 @@ bf<B> subst(const bf<B>& x,
 }*/
 
 template<typename B> bf<B> ex(const bf<B>& f, const sym_t& v) {
+	cout << "in ex" << endl;
+	cout << "subst 0 for " << v << " in " << f << " = " << f.subst(v, bf<B>::zero()) << endl;
+	cout << "subst 1 for " << v << " in " << f << " = " << f.subst(v, bf<B>::one()) << endl;
+	cout << "their disj: " << (f.subst(v, bf<B>::zero()) | f.subst(v, bf<B>::one())) << endl;
 	return f.subst(v, bf<B>::zero()) | f.subst(v, bf<B>::one());
 }
 

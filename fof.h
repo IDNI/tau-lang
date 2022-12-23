@@ -113,7 +113,7 @@ clause<B> ex(const clause<B>& c, const sym_t& v) {
 
 template<typename B>
 fof<B> ex(const fof<B>& f, const sym_t& v) {
-	fof<B> g = fof<B>::zero();
+	fof<B> g(false);
 	for (const clause<B>& c : f) g = ex(c, v) | g;
 	return g;
 }
