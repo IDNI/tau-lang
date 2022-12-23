@@ -104,30 +104,34 @@ term<B> term_trans_vars(const term<B>& t, function<sym_t(sym_t)> g) {
 }
 
 template<typename B>
+minterm<B> mt_trans_vars(const minterm<B>& m, function<sym_t(sym_t)> g) {
+	minterm<B> b;
+	for (size_t j = 0; j != 2; ++j)
+		for (const term<B>& t : m[j])
+			b = b & minterm<B>(!j,
+				term_trans_vars(t, g));
+	return b;
+}
+
+template<typename B>
+clause<B> transform_vars(const clause<B>& c, function<sym_t(sym_t)> g) {
+	clause<B> d;
+	for (size_t i = 0; i != 2; ++i)
+		for (const term<bf<B>>& s : c[i]) {
+			assert(s.t == term<bf<B>>::ELEM);
+			const bf<B>& h = s.e;
+			bf<B> p;
+			for (const minterm<B>& m : h)
+				p = mt_trans_vars(m, g) | p;
+			d = d & clause<B>(!i, p);
+		}
+	return d;
+}
+
+template<typename B>
 fof<B> transform_vars(const fof<B>& f, function<sym_t(sym_t)> g) {
 	fof<B> r;
-	for (const clause<B>& c : f) {
-		clause<B> d;
-		for (size_t i = 0; i != 2; ++i)
-			for (const term<bf<B>>& s : c[i]) {
-				assert(s.t == term<bf<B>>::ELEM);
-				const bf<B>& h = s.e;
-				bf<B> p;
-				for (const minterm<B>& m : h) {
-					minterm<B> b;
-					for (size_t j = 0; j != 2; ++j)
-						for (const term<B>& t : m[j])
-							b = b & minterm<B>(!j,
-							term_trans_vars(t, g));
-					p = b | p;
-					//cout << p << endl;
-				}
-				d = d & clause<B>(!i, p);
-				//cout << d << endl;
-			}
-		r = d | r;
-		//cout << r << endl;
-	}
+	for (const clause<B>& c : f) r = transform_vars<B>(c, g) | r;
 	return r;
 }
 
