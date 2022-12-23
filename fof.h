@@ -67,6 +67,7 @@ clause<B> operator&(const clause<B>& x, const clause<B>& y) {
 
 template<typename B>
 fof<B> operator|(clause<B> c, const fof<B>& f) {
+//	cout << "disj with " << f.size() << " clauses." << endl;
 	if (!c[0].empty()) {
 		bf<B> g = c[0].begin()->e;
 		if (g == bf<B>::zero()) c[0].clear();
@@ -75,8 +76,9 @@ fof<B> operator|(clause<B> c, const fof<B>& f) {
 	for (auto it = c[1].begin(); it != c[1].end(); ++it) {
 		bf<B> g = it->e;
 		if (g == bf<B>::one()) c[1].erase(it);
-		else if (g == bf<B>::one()) return f;
+		else if (g == bf<B>::zero()) return f;
 	}
+//	if (fof(c) <= f) return f;
 	return disj_fmt(c, f);
 }
 
