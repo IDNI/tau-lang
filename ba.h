@@ -43,107 +43,75 @@ struct Bool {
 	bool operator==(const Bool& t) const { return b == t.b; }
 };
 
-template<typename elem> struct bf;
-template<typename elem> struct term {
+template<typename B> struct bf;
+template<typename B> struct term {
 	struct arg {
 		bool ist;
 		term t;
-		bf<elem> f;
+		bf<B> f;
 		arg() {}
 		arg(const term& t);
-		arg(const bf<elem>& f);
+		arg(const bf<B>& f);
 		bool operator==(const arg&) const;
 		bool operator<(const arg&) const;
-		arg subst(const string& s, const bf<elem>& f);
+		arg subst(const string& s, const bf<B>& f);
 	};
 	enum type { ELEM, VAR, BF, FUNC } t;
 	//int sym = 0;
 	string sym;
-	elem e;
-	bf<elem> f;
+	B e;
+	bf<B> f;
 	vector<arg> args;
 	term() {}
-	term(const elem& e) : t(ELEM), e(e) {}
+	term(const B& e) : t(ELEM), e(e) {}
 	term(type t) : t(t) {}
 	term(const string& sym) : t(VAR), sym(sym) {}
 	term(const string& sym, const vector<arg>& a) :
 		t(FUNC), sym(sym), args(a) {}
-	term(const bf<elem>& f) : t(BF), f(f) {}
+	term(const bf<B>& f) : t(BF), f(f) {}
 	bool operator==(const term& x) const;
 	bool operator<(const term& x) const;
 };
 
-template<typename elem> struct minterm : public array<set<term<elem>>, 2> {
-	typedef array<set<term<elem>>, 2> base;
+template<typename B> struct minterm : public array<set<term<B>>, 2> {
+	typedef array<set<term<B>>, 2> base;
 
 	minterm() : base() {}
-	minterm(bool pos, const term<elem>& t);
+	minterm(bool pos, const term<B>& t);
 };
 
-template<typename elem> struct bf : public set<minterm<elem>> {
+template<typename B> struct bf : public set<minterm<B>> {
 	enum { ZERO, ONE, NONE } v;
 
-	bf() : set<minterm<elem>>(), v(NONE) {}
-	bf(const term<elem>& t) : set<minterm<elem>>({minterm<elem>(true, t)}),
+	bf() : set<minterm<B>>(), v(NONE) {}
+	bf(const term<B>& t) : set<minterm<B>>({minterm<B>(true, t)}),
 		v(NONE) {}
-	bf(const minterm<elem>& t) : set<minterm<elem>>({t}), v(NONE) {}
+	bf(const minterm<B>& t) : set<minterm<B>>({t}), v(NONE) {}
 	bf(bool b) { v = b ? ONE : ZERO; }
 
-	bool operator==(const bf<elem>& f) const;
-	bool operator<(const bf<elem>& f) const;
-	static const bf<elem>& zero();
-	static const bf<elem>& one();
+	bool operator==(const bf<B>& f) const;
+	bool operator<(const bf<B>& f) const;
+	static const bf<B>& zero();
+	static const bf<B>& one();
 };
 
-template<typename elem> bf<elem> operator~(const minterm<elem>&);
-template<typename elem>
-minterm<elem> operator&(const minterm<elem>&, const minterm<elem>&);
-template<typename elem>
-bool operator<=(const minterm<elem>&, const minterm<elem>&);
-template<typename elem>
-bool operator<=(const minterm<elem>&, const bf<elem>&);
-template<typename elem>
-bf<elem> operator|(const minterm<elem>&, const bf<elem>&);
-template<typename elem> bf<elem> operator~(const bf<elem>&);
-template<typename elem> bf<elem> operator&(const bf<elem>&, const bf<elem>&);
-template<typename elem> bf<elem> operator|(const bf<elem>&, const bf<elem>&);
-template<typename elem> bool operator<=(const bf<elem>&, const bf<elem>&);
-template<typename elem>
-term<elem> subst(const term<elem>&, const string&, const bf<elem>&);
-template<typename elem>
-bf<elem> subst(const minterm<elem>&, const string&, const bf<elem>&);
-template<typename elem>
-bf<elem> subst(const bf<elem>&, const string&, const bf<elem>&);
-template<typename elem> bf<elem> ex(const bf<elem>&, int);
-template<typename elem> bf<elem> all(const bf<elem>&, int);
-template<typename elem> bf<elem> ex(const bf<elem>&, const string&);
-template<typename elem> bf<elem> all(const bf<elem>&, const string&);
-template<typename elem>
-ostream& operator<<(ostream& os, const typename term<elem>::arg& a);
-template<typename elem>
-ostream& operator<<(ostream& os, const term<elem>& t);
-template<typename elem>
-ostream& operator<<(ostream& os, const minterm<elem>& x);
-template<typename elem>
-ostream& operator<<(ostream& os, const bf<elem>& f);
-
-template<typename elem> term<elem>::arg::arg(const term<elem>& t) :
+template<typename B> term<B>::arg::arg(const term<B>& t) :
 	ist(true), t(t) {}
 
-template<typename elem> term<elem>::arg::arg(const bf<elem>& f) :
-	ist(false), f(bf<elem>(f)) {}
+template<typename B> term<B>::arg::arg(const bf<B>& f) :
+	ist(false), f(bf<B>(f)) {}
 
-template<typename elem> bool term<elem>::arg::operator==(
-		const term<elem>::arg& a) const {
+template<typename B> bool term<B>::arg::operator==(
+		const term<B>::arg& a) const {
 	return ist != a.ist ? false : ist ? t == a.t : f == a.f;
 }
 
-template<typename elem> bool term<elem>::arg::operator<(
-		const term<elem>::arg& a) const {
+template<typename B> bool term<B>::arg::operator<(
+		const term<B>::arg& a) const {
 	return a.ist != ist ? ist : ist ? a.t < t : a.f < f;
 }
 
-template<typename elem> bool term<elem>::operator==(const term& x) const {
+template<typename B> bool term<B>::operator==(const term& x) const {
 	if (t != x.t) return false;
 	switch (t) {
 		case ELEM: return e == x.e;
@@ -154,7 +122,7 @@ template<typename elem> bool term<elem>::operator==(const term& x) const {
 	}
 }
 
-template<typename elem> bool term<elem>::operator<(const term& x) const {
+template<typename B> bool term<B>::operator<(const term& x) const {
 	if (t != x.t) return t < x.t;
 	switch (t) {
 		case ELEM: return e < x.e;
@@ -165,72 +133,65 @@ template<typename elem> bool term<elem>::operator<(const term& x) const {
 	}
 }
 
-template<typename elem> minterm<elem>::minterm(bool pos, const term<elem>& t) :
+template<typename B> minterm<B>::minterm(bool pos, const term<B>& t) :
 	base() {
 	(*this)[pos ? 0 : 1].insert(t);
 }
 
-template<typename elem> bool bf<elem>::operator==(const bf<elem>& f) const {
+template<typename B> bool bf<B>::operator==(const bf<B>& f) const {
 	if (f.v != v) return false;
-	return (set<minterm<elem>>)(*this) == (set<minterm<elem>>)f;
+	return (set<minterm<B>>)(*this) == (set<minterm<B>>)f;
 }
 
-template<typename elem> bool bf<elem>::operator<(const bf<elem>& f) const {
+template<typename B> bool bf<B>::operator<(const bf<B>& f) const {
 	if (f.v != v) return v < f.v;
-	return (set<minterm<elem>>)(*this) < (set<minterm<elem>>)f;
+	return (set<minterm<B>>)(*this) < (set<minterm<B>>)f;
 }
 
-template<typename elem> const bf<elem>& bf<elem>::zero() {
-	static bf<elem> z(false);
+template<typename B> const bf<B>& bf<B>::zero() {
+	static bf<B> z(false);
 	return z;
 }
 
-template<typename elem> const bf<elem>& bf<elem>::one() {
-	static bf<elem> z(true);
+template<typename B> const bf<B>& bf<B>::one() {
+	static bf<B> z(true);
 	return z;
 }
 
-template<typename elem> bf<elem> operator~(const minterm<elem>& x) {
-	bf<elem> f = bf<elem>::zero();
-	for (const term<elem>& t : x[0])
-		f = f | bf<elem>(minterm(false, t));
-	for (const term<elem>& t : x[1])
-		f = f | bf<elem>(minterm(true, t));
+template<typename B> bf<B> operator~(const minterm<B>& x) {
+	bf<B> f = bf<B>::zero();
+	for (const term<B>& t : x[0])
+		f = f | bf<B>(minterm(false, t));
+	for (const term<B>& t : x[1])
+		f = f | bf<B>(minterm(true, t));
 	return f;
 }
 
-template<typename elem> minterm<elem> operator&(
-		const minterm<elem>& x, const minterm<elem>& y) {
+template<typename B> minterm<B> operator&(
+		const minterm<B>& x, const minterm<B>& y) {
 	//DBG(cout << x << "&&" << y << " = ";)
-	minterm<elem> z = x;
-	for (const term<elem>& t : y[0])
+	minterm<B> z = x;
+	for (const term<B>& t : y[0])
 		if (auto it = z[1].find(t); it != z[1].end())
-			return minterm<elem>();
+			return minterm<B>();
 		else z[0].insert(t);
-	for (const term<elem>& t : y[1])
+	for (const term<B>& t : y[1])
 		if (auto it = z[0].find(t); it != z[0].end())
-			return minterm<elem>();
+			return minterm<B>();
 		else z[1].insert(t);
 	//DBG(cout << z << endl;)
 	return z;
 }
 
-template<typename elem>
-bool operator<=(const minterm<elem>& x, const minterm<elem>& y) {
+template<typename B>
+bool operator<=(const minterm<B>& x, const minterm<B>& y) {
 	return (x & y) == x;
 }
 
-/*template<typename elem>
-bf<elem>& operator+=(bf<elem>& f, const minterm<elem>& t) {
-	if (t == minterm<elem>::zero()) return f;
-	if (t == minterm<elem>::one()) { f.clear(); f.insert(t); }
-	return f.insert(t), f;
-}*/
-
-template<typename elem>
-bool operator<=(const minterm<elem>& t, const bf<elem>& f) {
-	if (f == bf<elem>::one()) return true;
-	for (const minterm<elem>& x : f) if (t <= x) return true;
+template<typename B>
+bool operator<=(const minterm<B>& t, const bf<B>& f) {
+	if (f == bf<B>::one()) return true;
+	for (const minterm<B>& x : f) if (t <= x) return true;
 	return false;
 }
 
@@ -242,14 +203,11 @@ T symdiff(const T& x, const T& y) {
 	return r;
 }
 
-template<typename elem>
-bool complementary(const minterm<elem>& x, minterm<elem>& y) {
-	// whether x=y except a single element that is in both x[0] and y[1]
-	// or x[1] and y[0]
-	// so symdiff x[0]+y[0] and x[1]+y[1] should have one elem each
-	set<term<elem>> d0 = symdiff(x[0], y[0]);
+template<typename B>
+bool complementary(const minterm<B>& x, minterm<B>& y) {
+	set<term<B>> d0 = symdiff(x[0], y[0]);
 	if (d0.size() != 1) return false;
-	set<term<elem>> d1 = symdiff(x[1], y[1]);
+	set<term<B>> d1 = symdiff(x[1], y[1]);
 	if (d1.size() != 1) return false;
 	if (*d0.begin() != *d1.begin()) return false;
 	if (auto it = y[0].find(*d0.begin()); it != y[0].end())
@@ -258,154 +216,141 @@ bool complementary(const minterm<elem>& x, minterm<elem>& y) {
 	return true;
 }
 
-template<typename elem>
-bf<elem> operator|(const minterm<elem>& t, const bf<elem>& f) {
-	//assert(!t[0].empty() || !t[1].empty());
-	if (t[0].empty() && t[1].empty()) return bf<elem>::one();// f;
-	if (f == bf<elem>::one()) return f;
-	if (f == bf<elem>::zero()) return bf<elem>(t);
-	//DBG(cout << t << "||" << f << " = ";)
-	for (const minterm<elem>& x : f) if (t <= x) return f;
-//	bf g = {t};
-//	for (const minterm<elem>& x : f)
-//		//if (!(x <= t)) TODO //g += x;
-//		g.insert(x);
+template<typename B>
+bf<B> operator|(const minterm<B>& t, const bf<B>& f) {
+	if (t[0].empty() && t[1].empty()) return bf<B>::one();// f;
+	if (f == bf<B>::one()) return f;
+	if (f == bf<B>::zero()) return bf<B>(t);
+	for (const minterm<B>& x : f) if (t <= x) return f;
 	bf g = f;
 	auto s = t;
 	auto it = g.begin();
 	while (it != g.end())
-		if (complementary<elem>(*it, s)) break;
+		if (complementary<B>(*it, s)) break;
 		else ++it;
 	if (it != g.end()) return g.erase(it), s | g;
 	g.insert(s);
-	//DBG(cout << g << endl;)
 	return g;
 }
 
-template<typename elem> bf<elem> operator~(const bf<elem>& f) {
-	bf g = bf<elem>::one();
-	for (const minterm<elem>& t : f) g = g & ~t;
+template<typename B> bf<B> operator~(const bf<B>& f) {
+	bf g = bf<B>::one();
+	for (const minterm<B>& t : f) g = g & ~t;
 	return g;
 }
 
-template<typename elem>
-bf<elem> operator&(const minterm<elem>& x, const bf<elem>& y) {
-	if (y == bf<elem>::zero()) return y;
-	if (y == bf<elem>::one()) return bf<elem>(x);
-	bf<elem> z;
-	for (const minterm<elem>& t : y) z = (x & t) | z;
+template<typename B>
+bf<B> operator&(const minterm<B>& x, const bf<B>& y) {
+	if (y == bf<B>::zero()) return y;
+	if (y == bf<B>::one()) return bf<B>(x);
+	bf<B> z;
+	for (const minterm<B>& t : y) z = (x & t) | z;
 	return z;
 }
 
-template<typename elem>
-bf<elem> operator&(const bf<elem>& x, const bf<elem>& y) {
-	if (x == bf<elem>::zero()) return x;
-	if (y == bf<elem>::zero()) return y;
-	if (x == bf<elem>::one()) return y;
-	if (y == bf<elem>::one()) return x;
-	bf<elem> z;
-	for (const minterm<elem>& s : x)
-		for (const minterm<elem>& t : y)
+template<typename B>
+bf<B> operator&(const bf<B>& x, const bf<B>& y) {
+	if (x == bf<B>::zero()) return x;
+	if (y == bf<B>::zero()) return y;
+	if (x == bf<B>::one()) return y;
+	if (y == bf<B>::one()) return x;
+	bf<B> z;
+	for (const minterm<B>& s : x)
+		for (const minterm<B>& t : y)
 			z = (s & t) | z;
 	return z;
 }
 
-template<typename elem>
-bf<elem> operator|(const bf<elem>& x, const bf<elem>& y) {
-	bf<elem> z = x;
-	for (const minterm<elem>& t : y) z = t | z;
+template<typename B>
+bf<B> operator|(const bf<B>& x, const bf<B>& y) {
+	bf<B> z = x;
+	for (const minterm<B>& t : y) z = t | z;
 	return z;
 }
 
-template<typename elem>
-bool operator<=(const bf<elem>& x, const bf<elem>& y) {
-	for (const minterm<elem>& t : x) if (!(t <= y)) return false;
+template<typename B>
+bool operator<=(const bf<B>& x, const bf<B>& y) {
+	for (const minterm<B>& t : x) if (!(t <= y)) return false;
 	return true;
 }
 
-template<typename elem>
-term<elem>::arg term<elem>::arg::subst(const string& s, const bf<elem>& f) {
-	return ist ? arg(::subst(t, s, f)) : *this;
-}
-
-/*template<typename elem>
-term<elem>::arg term<elem>::subst(
-	const term<elem>::arg& a, const string& s, const bf<elem>& f) {
-	return a.ist ? term<elem>::arg(subst(a.t, s, f)) : a;
-}*/
-
-template<typename elem>
-term<elem> subst(const term<elem>& t, const string& s, const bf<elem>& f) {
-	if (t.t == term<elem>::VAR) return s == t.sym ? term<elem>(f) : t;
-	if (t.t == term<elem>::BF) return subst(t.f, s, f);
-	assert(t.t == term<elem>::FUNC);
+template<typename B>
+term<B> subst(const term<B>& t, const string& s, const bf<B>& f) {
+	if (t.t == term<B>::VAR) return s == t.sym ? term<B>(f) : t;
+	if (t.t == term<B>::BF) return subst(t.f, s, f);
+	assert(t.t == term<B>::FUNC);
 	term r = t;
 	for (size_t n = 0; n != r.args.size(); ++n)
 		r.args[n] = r.args[n].subst(s, f);
 	return r;
 }
 
-template<typename elem>
-bf<elem> subst(const minterm<elem>& t, const string& s, const bf<elem>& f) {
-	bf<elem> r = bf<elem>::one();
-	for (const term<elem>& x : t[0])
-		r = minterm<elem>(true, subst(x, s, f)) & r;
-	for (const term<elem>& x : t[1])
-		r = minterm<elem>(false, subst(x, s, f)) & r;
+template<typename B>
+term<B>::arg term<B>::arg::subst(const string& s, const bf<B>& f) {
+	return ist ? arg(::subst(t, s, f)) : *this;
+}
+
+template<typename B>
+bf<B> subst(const minterm<B>& t, const string& s, const bf<B>& f) {
+	bf<B> r = bf<B>::one();
+	for (const term<B>& x : t[0])
+		r = minterm<B>(true, subst(x, s, f)) & r;
+	for (const term<B>& x : t[1])
+		r = minterm<B>(false, subst(x, s, f)) & r;
 	return r;
 }
 
-template<typename elem>
-bf<elem> subst(const bf<elem>& x, const string& s, const bf<elem>& y) {
-	bf<elem> z = bf<elem>::zero();
-	for (const minterm<elem>& t : x) z = subst(t, s, y) | z;
+template<typename B>
+bf<B> subst(const bf<B>& x, const string& s, const bf<B>& y) {
+	bf<B> z = bf<B>::zero();
+	for (const minterm<B>& t : x) z = subst(t, s, y) | z;
 	return z;
 }
 
-template<typename elem> bf<elem> ex(const bf<elem>& f, const string& v) {
-	return subst(f, v, bf<elem>::zero()) | subst(f, v, bf<elem>::one());
+template<typename B> bf<B> ex(const bf<B>& f, const string& v) {
+	return subst(f, v, bf<B>::zero()) | subst(f, v, bf<B>::one());
 }
 
-template<typename elem> bf<elem> all(const bf<elem>& f, const string& v) {
-	return subst(f, v, bf<elem>::zero()) & subst(f, v, bf<elem>::one());
+template<typename B> bf<B> all(const bf<B>& f, const string& v) {
+	return subst(f, v, bf<B>::zero()) & subst(f, v, bf<B>::one());
 }
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b?"T":"F"); }
 
-template<typename elem>
-ostream& operator<<(ostream& os, const typename term<elem>::arg& a) {
+template<typename B>
+ostream& operator<<(ostream& os, const typename term<B>::arg& a) {
 	return a.ist ? os << a.t : os << a.f;
 }
 
-template<typename elem>
-void out(ostream& os, const typename term<elem>::arg& a) {
+template<typename B>
+void out(ostream& os, const typename term<B>::arg& a) {
 	if (a.ist) os << a.t; else os << a.f;
 }
 
-template<typename elem>
-ostream& operator<<(ostream& os, const term<elem>& t) {
-	if (t.t == term<elem>::ELEM) return os << t.e;
-	if (t.t == term<elem>::VAR) return os << t.sym;// "x[" << -t.sym << "]";
-	if (t.t == term<elem>::BF) return os << t.f;
-	if (t.t == term<elem>::FUNC) os << t.sym << "(";//"f[" << t.sym << "](";
+template<typename B>
+ostream& operator<<(ostream& os, const term<B>& t) {
+	if (t.t == term<B>::ELEM) return os << t.e;
+	if (t.t == term<B>::VAR) return os << t.sym;// "x[" << -t.sym << "]";
+	if (t.t == term<B>::BF) return os << t.f;
+	if (t.t == term<B>::FUNC) os << t.sym << "(";//"f[" << t.sym << "](";
 	for (size_t n = 0; n != t.args.size(); ++n) {
-		out<elem>(os, t.args[n]);
+		out<B>(os, t.args[n]);
 		//os << t.args[n]; -- compiler error somehow
 		os << (n == t.args.size() - 1 ? "" : ",");
 	}
 	return os << ")";
 }
 
-template<typename elem>
-ostream& operator<<(ostream& os, const minterm<elem>& x) {
-	for (const term<elem>& t : x[0]) os << t;
-	for (const term<elem>& t : x[1]) os << t << "'";
+template<typename B>
+ostream& operator<<(ostream& os, const minterm<B>& x) {
+	for (const term<B>& t : x[0]) os << t;
+	for (const term<B>& t : x[1]) os << t << "'";
 	return os;
 }
 
-template<typename elem> ostream& operator<<(ostream& os, const bf<elem>& f) {
-	if (f.v == bf<elem>::ONE) return os << '1';
-	if (f.v == bf<elem>::ZERO) return os << '0';
+template<typename B> ostream& operator<<(ostream& os, const bf<B>& f) {
+	if (f.v == bf<B>::ONE) return os << '1';
+	if (f.v == bf<B>::ZERO) return os << '0';
 	size_t n = f.size();
 	for (auto& t : f) os << t << (--n ? " | " : "");
 	return os;

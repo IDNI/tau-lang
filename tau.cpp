@@ -35,33 +35,34 @@ term<Bool> fapp(size_t i, size_t j, size_t v) {
 	return term<Bool>(ss.str(), a);
 }
 
-fof generic(size_t nc, size_t csz, size_t nv) {
-	fof f = fof::zero();
+template<typename B>
+fof<B> generic(size_t nc, size_t csz, size_t nv) {
+	fof<B> f = fof<B>::zero();
 	for (size_t k = 0; k != nc; ++k) {
-		fof g = fof::one();
+		fof<B> g = fof<B>::one();
 		for (size_t n = 0; n != csz; ++n)
-			g = clause(!n, term<sbf>(sbf(fapp(k, n, nv)))) & g;
+			g = clause<B>(!n, term<bf<B>>(bf<B>(fapp(k, n, nv)))) & g;
 		f = f | g;
 	}
 	return f;
 }
 
 int main() {
-//	sbf f(fapp("f", {"x", "y"}));
-//	sbf g(fapp("g", {"y", "x"}));
+//	bf<B> f(fapp("f", {"x", "y"}));
+//	bf<B> g(fapp("g", {"y", "x"}));
 //	cout << (~(f & g)) << endl;
 //	cout << (generic(2, 3, 2) & generic(1,1,1)) << endl;
 //	cout << fapp(0, 0, 1) << endl;
-//	sbf f = subst(fapp(0, 0, 1), string("x[0]"), sbf(term<Bool>(string("y"))));
-//	f = subst(fapp(0, 0, 1), string("x[0]"), sbf(fapp(1,1,2)));
+//	bf<B> f = subst(fapp(0, 0, 1), string("x[0]"), bf<B>(term<Bool>(string("y"))));
+//	f = subst(fapp(0, 0, 1), string("x[0]"), bf<B>(fapp(1,1,2)));
 //	cout << f << endl;
 	cout << var(1) << endl;
 	cout << (~var(1)) << endl;
 	cout << (var(1) | (~var(1))) << endl;
 	cout << ((var(1) & (~var(2))) | (var(1) & var(2))) << endl;
-	cout << generic(2,2,1) << endl;
-	cout << ex(generic(2,2,1), "x[0]") << endl;
-	cout << ex(ex(generic(2,2,2), "x[0]"), "x[1]") << endl;
+	cout << generic<Bool>(2,2,1) << endl;
+	cout << ex(generic<Bool>(2,2,1), "x[0]") << endl;
+	cout << ex(ex(generic<Bool>(2,2,2), "x[0]"), "x[1]") << endl;
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;

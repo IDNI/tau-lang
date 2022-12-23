@@ -12,42 +12,13 @@
 // modified over time by the Author.
 #include "ba.h"
 
-template struct bf<Bool>;
-typedef bf<Bool> sbf;
-template struct minterm<sbf>;
-typedef minterm<sbf> clause;
-template struct bf<sbf>;
-typedef bf<sbf> fof;
+template<typename B> using clause = minterm<bf<B>>;
+template<typename B> using fof = bf<bf<B>>;
 
-fof operator~(const clause&);
-fof operator~(const fof&);
-fof operator&(const fof&, const fof&);
-fof operator|(const fof&, const clause&);
-fof operator|(const fof&, const fof&);
-bool operator<=(const clause&, const clause&);
-bool operator<=(const clause&, const clause&);
-bool operator<=(const clause&, const fof&);
-fof operator~(const clause&);
-fof operator~(const fof&);
-fof operator|(const fof&, const fof& y);
-fof operator&(const fof&, const fof&);
-clause subst(const clause&, const string&, const term<Bool>&);
-fof subst(const fof&, const string&, const term<Bool>&);
-clause ex(const clause&, const string&);
-fof ex(const fof&, const string&);
-fof all(const fof&, const string&);
-
-bool operator<=(const clause& c, const clause& d) {return operator<=<sbf>(c,d);}
-bool operator<=(const clause& c, const fof& f) { return operator<=<sbf>(c, f); }
-fof operator~(const clause& x) { return operator~<sbf>(x); }
-fof operator~(const fof& x) { return operator~<sbf>(x); }
-fof operator|(const fof& x, const fof& y) { return operator|<sbf>(x, y); }
-fof operator&(const fof& x, const fof& y) { return operator&<sbf>(x, y); }
-fof all(const fof& f, const string& v) { return ~ex(~f, v); }
-
-clause operator&(const clause& x, const clause& y) {
+template<typename B> clause<B>
+operator&(const clause<B>& x, const clause<B>& y) {
 	//DBG(cout << x << "&&" << y << " = ";)
-	clause z;
+	clause<B> z;
 	z[1] = x[1];
 	assert(x[0].size() <= 1);
 	assert(y[0].size() <= 1);
@@ -55,65 +26,72 @@ clause operator&(const clause& x, const clause& y) {
 		if (y[0].empty()) z[0] = x[0];
 		else {
 			term<bf<Bool>> t1 = *x[0].begin();
-			assert(t1.t == term<sbf>::ELEM);
+			assert(t1.t == term<bf<B>>::ELEM);
 			term<bf<Bool>> t2 = *y[0].begin();
-			assert(t2.t == term<sbf>::ELEM);
+			assert(t2.t == term<bf<B>>::ELEM);
 			auto t = t1.e | t2.e;
 			if (t != bf<Bool>::one()) z[0].insert(t);
 		}
 	} else z[0] = y[0];
 	for (auto& t : y[1])
 		if (auto it = z[0].find(t); it != z[0].end())
-			return minterm<sbf>();
+			return minterm<bf<B>>();
 		else z[1].insert(t);
 	//DBG(cout << z << endl;)
 	return z;
 }
 
-clause ex(const clause& c, const string& v) {
+template<typename B>
+clause<B> ex(const clause<B>& c, const string& v) {
 	if (c[0].empty()) {
 		assert(!c[1].empty());
-		clause r;
-		for (const term<sbf>& t : c[1]) {
-			assert(t.t == term<sbf>::ELEM);
-			r = r & clause(false, ex(t.e, v));
+		clause<B> r;
+		for (const term<bf<B>>& t : c[1]) {
+			assert(t.t == term<bf<B>>::ELEM);
+			r = r & clause<B>(false, ex(t.e, v));
 		}
 		return r;
 	}
 	if (c[1].empty()) {
 		assert(c[0].size() == 1);
-		assert(c[0].begin()->t == term<sbf>::ELEM);
-		return clause(true, all(c[0].begin()->e, v));
+		assert(c[0].begin()->t == term<bf<B>>::ELEM);
+		return clause<B>(true, all(c[0].begin()->e, v));
 	}
-	clause r;
+	clause<B> r;
 	assert(c[0].size() == 1);
-	sbf f0 = c[0].begin()->e;
+	bf<B> f0 = c[0].begin()->e;
 	//DBG(cout << "f0: " << f0 << endl;)
 	r[0] = {all(f0, v)};
 	//DBG(cout<< "r0: " << *r[0].begin() << endl;)
-	sbf f1 = subst(f0, v, sbf::one());
+	bf<B> f1 = subst(f0, v, bf<B>::one());
 	//DBG(cout<< "f1: " << f1 << endl;)
-	f0 = subst(f0, v, sbf::zero());
+	f0 = subst(f0, v, bf<B>::zero());
 	//DBG(cout<< "f0: " << f0 << endl;)
-	for (const term<sbf>& t : c[1])
-		r = r & clause(false, subst(t.e, v, f0) | subst(t.e, v, ~f1));
+	for (const term<bf<B>>& t : c[1])
+		r = r & clause<B>(false, subst(t.e, v, f0) | subst(t.e, v, ~f1));
 	return r;
 }
 
-fof ex(const fof& f, const string& v) {
-	fof g = fof::zero();
-	for (const clause& c : f) g = ex(c, v) | g;
+template<typename B>
+fof<B> ex(const fof<B>& f, const string& v) {
+	fof<B> g = fof<B>::zero();
+	for (const clause<B>& c : f) g = ex(c, v) | g;
 	return g;
 }
 
-ostream& operator<<(ostream& os, const clause& c) {
+template<typename B>
+fof<B> all(const fof<B>& f, const string& v) { return ~ex(~f, v); }
+
+template<typename B>
+ostream& operator<<(ostream& os, const clause<B>& c) {
 	for (auto& t : c[0]) os << t << " = 0" << endl;
 	for (auto& t : c[1]) os << t << " != 0" << endl;
 	return os;
 }
 
-ostream& operator<<(ostream& os, const fof& f) {
+template<typename B>
+ostream& operator<<(ostream& os, const fof<B>& f) {
 	size_t n = f.size();
-	for (const clause& c : f) os << c << (--n ? "\t||" : "") << endl;
+	for (const clause<B>& c : f) os << c << (--n ? "\t||" : "") << endl;
 	return os;
 }
