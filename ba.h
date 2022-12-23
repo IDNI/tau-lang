@@ -13,6 +13,7 @@
 #ifndef __BA_H__
 #define __BA_H__
 #define DEBUG
+
 #ifdef DEBUG
 #define DBG(x) x
 #include <iostream>
@@ -212,25 +213,19 @@ template<typename B> bf<B> operator~(const minterm<B>& x) {
 template<typename B> minterm<B> operator&(
 		const minterm<B>& x, const minterm<B>& y) {
 	//DBG(cout << x << "&&" << y << " = ";)
-	minterm<B> z ;
-	for (const term<B>& t : x[0])
-		if (t.zero()) return minterm<B>();
-		else if (t.one()) continue;
-		else z[0].insert(t);
-	for (const term<B>& t : x[1])
-		if (t.one()) return minterm<B>();
-		else if (t.zero()) continue;
-		else z[1].insert(t);
+#ifdef DEBUG
+	for (const term<B>& t : x[0]) assert(!t.zero() && !t.one());
+	for (const term<B>& t : x[1]) assert(!t.zero() && !t.one());
+	for (const term<B>& t : y[0]) assert(!t.zero() && !t.one());
+	for (const term<B>& t : y[1]) assert(!t.zero() && !t.one());
+#endif
+	minterm<B> z = x;
 	for (const term<B>& t : y[0])
-		if (t.zero()) return minterm<B>();
-		else if (t.one()) continue;
-		else if (auto it = x[1].find(t); it != x[1].end())
+		if (auto it = x[1].find(t); it != x[1].end())
 			return minterm<B>();
 		else z[0].insert(t);
 	for (const term<B>& t : y[1])
-		if (t.one()) return minterm<B>();
-		else if (t.zero()) continue;
-		else if (auto it = x[0].find(t); it != x[0].end())
+		if (auto it = x[0].find(t); it != x[0].end())
 			return minterm<B>();
 		else z[1].insert(t);
 	//DBG(cout << z << endl;)
@@ -276,11 +271,19 @@ bf<B> disj_fmt(const minterm<B>& t, const bf<B>& f) {
 	if (f == bf<B>::one()) return f;
 	if (f == bf<B>::zero() || f.empty()) return bf<B>(t);
 	for (const term<B>& x : t[0])
-		if (x.t == term<B>::ELEM && x.e == B::zero())
-			return f;
+		if (x.t == term<B>::ELEM && x.e == B::zero()) return f;
+		else if (x.t == term<B>::BF) {
+			minterm<B> s = t;
+			s[0].erase(x);
+			return s & (f & x.f);
+		}
 	for (const term<B>& x : t[1])
-		if (x.t == term<B>::ELEM && x.e == B::one())
-			return f;
+		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
+		else if (x.t == term<B>::BF) {
+			minterm<B> s = t;
+			s[1].erase(x);
+			return s & (f & ~x.f);
+		}
 	for (const minterm<B>& x : f) if (t <= x) return f;
 	bf g = f;
 	auto s = t;
@@ -310,9 +313,11 @@ bf<B> operator&(const minterm<B>& x, const bf<B>& y) {
 	if (y == bf<B>::one()) return bf<B>(x);
 	bf<B> z;
 	for (const minterm<B>& t : y)
-		if (minterm<B> m = (x & t); m.empty()) return bf<B>::zero();
-		else z = m | z;
-	return z;
+//		if (minterm<B> m = (x & t); m.empty()) return bf<B>::zero();
+		if (minterm<B> m = (x & t); !m.empty()) 
+	//	else 
+			z = m | z;
+	return z.empty() ? bf<B>(false) : z;
 }
 
 template<typename B>
