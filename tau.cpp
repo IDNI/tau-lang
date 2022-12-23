@@ -43,7 +43,7 @@ fof<B> generic(size_t nc, size_t csz, size_t nv) {
 	for (size_t k = 0; k != nc; ++k) {
 		fof<B> g = fof<B>::one();
 		for (size_t n = 0; n != csz; ++n)
-			g = clause<B>(!n, term<bf<B>>(bf<B>(fapp(k, n, nv)))) & g;
+			g = clause<B>(!n, term<bf<B>>(bf<B>(fapp(k,n,nv)))) & g;
 		f = f | g;
 	}
 	return f;
@@ -62,9 +62,10 @@ int main() {
 //	cout << (~var(1)) << endl;
 //	cout << (var(1) | (~var(1))) << endl;
 //	cout << ((var(1) & (~var(2))) | (var(1) & var(2))) << endl;
-	cout << generic<Bool>(2,2,3) << endl;
+	cout << generic<Bool>(5,5,1) << endl;
 	auto f = [](sym_t v)->sym_t { return 1+v; };
 	cout << transform_vars(generic<Bool>(2,2,3), f) << endl;
+	seq(generic<Bool>(5,15,2));
 //	cout << ex(generic<Bool>(2,2,1), 0) << endl;
 //	cout << ex(ex(generic<Bool>(2,2,2), 0), 1) << endl;
 	return 0;
