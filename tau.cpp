@@ -38,12 +38,12 @@ term<Bool> fapp(size_t i, size_t j, size_t v) {
 }
 
 template<typename B> bf<B> generic(size_t nv, size_t c = 0) {
-	bf<B> r;
+	bf<B> r(false);
 	for (size_t v = 0; v != (((size_t)1) << nv); ++v) {
 		minterm<B> m(true, term<B>(-v-1-c));
 		for (size_t k = 0; k != nv; ++k)
-			m[(v & (1 << k)) ? 0 : 1].insert(term<B>(k));
-		r.insert(m);
+			m[(v & (1 << k)) ? 0 : 1].push_back(term<B>(k));
+		r = m | r;
 	}
 	return r;
 }
@@ -51,10 +51,9 @@ template<typename B> bf<B> generic(size_t nv, size_t c = 0) {
 template<typename B> fof<B> generic(size_t nc, size_t csz, size_t nv) {
 	fof<B> f(false);
 	for (size_t k = 0; k != nc; ++k) {
-		clause<B> c;
-		for (size_t n = 0; n != csz; ++n)
-			//c = clause<B>(!n, term<bf<B>>(bf<B>(fapp(k,n,nv)))) & c;
-			c = clause<B>(!n,
+		clause<B> c(true, term<bf<B>>(generic<B>(nv, (1<<nv)*k)));
+		for (size_t n = 1; n != csz; ++n)
+			c = clause<B>(false,
 			term<bf<B>>(generic<B>(nv, (1<<nv) * (nc * n + k)))) & c;
 		//cout << "c: " << c << endl;
 		f = c | f;
@@ -68,9 +67,9 @@ int main() {
 	//cout << generic<Bool>(2) << endl;
 	//cout << generic<Bool>(3) << endl;
 //	return 0;
-//	bf<Bool> f(fapp("f", {0,1}));
-//	bf<Bool> g(fapp("g", {1,2}));
-//	cout << (~(f & g)) << endl;
+	bf<Bool> f(fapp("f", {0,1}));
+	bf<Bool> g(fapp("g", {1,2}));
+	cout << (~(f & g)) << endl;
 //	cout << ex(ex(~(~fof<Bool>(f) | fof<Bool>(g)), 0),1) << endl;
 //	cout << (generic(2, 3, 2) & generic(1,1,1)) << endl;
 //	cout << fapp(0, 0, 1) << endl;
@@ -86,8 +85,9 @@ int main() {
 //	cout << transform_vars(generic<Bool>(2,2,3), f) << endl;
 //	cout << generic<Bool>(1,1,1) << endl;
 //	cout << generic<Bool>(1,1,1).subst(0,term<Bool>(1)) << endl;
+//	cout << generic<Bool>(2) << endl;
 //	cout << all(generic<Bool>(2),0) << endl;
-	seq<Bool>((generic<Bool>(1,2,2)));
+	seq<Bool>(generic<Bool>(2,2,2));
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;

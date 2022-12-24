@@ -31,12 +31,21 @@
 #include <string>
 #include <sstream>
 #include <cassert>
+#include <algorithm>
 #include <functional>
 
 using namespace std;
 
 //typedef string sym_t;
 typedef int sym_t;
+
+template<typename T, typename V> bool has(const T& t, const V& v) {
+	return t.find(v) != t.end();
+}
+
+template<typename T, typename V> bool hasv(const T& t, const V& v) {
+	return std::find(t.begin(), t.end(), v) != t.end();
+}
 
 struct Bool {
 	bool b;
@@ -56,9 +65,9 @@ template<typename B> struct bf;
 
 template<typename B> struct term {
 	struct arg {
-		const bool ist;
-		const term<B> t;
-		const bf<B> f;
+		bool ist;
+		term<B> t;
+		bf<B> f;
 		arg(const term& t);
 		arg(const bf<B>& f);
 		bool operator==(const arg&) const;
@@ -67,13 +76,13 @@ template<typename B> struct term {
 			return ist ? arg(t.subst(s, f)) : *this;
 		}
 	};
-	const enum type { ELEM, VAR, BF, FUNC } t;
+	enum type { ELEM, VAR, BF, FUNC } t;
 	//int sym = 0;
-	const sym_t sym;
-	const string name;
-	const B e;
-	const bf<B> f;
-	const vector<arg> args;
+	sym_t sym;
+	string name;
+	B e;
+	bf<B> f;
+	vector<arg> args;
 	//term() {}
 	term(const B& e) :
 		t(ELEM), sym(0), name(), e(e),
@@ -123,20 +132,38 @@ private:
 };
 
 //template<typename B> struct minterm : public array<set<term<B>>, 2> {
-template<typename B> struct minterm : public array<set<term<B>>, 2> {
-	typedef array<set<term<B>>, 2> base;
+template<typename B> struct minterm : public array<vector<term<B>>, 2> {
+	typedef array<vector<term<B>>, 2> base;
 
 	minterm() : base() {}
+	minterm(const vector<term<B>>& x, const vector<term<B>>& y) :
+		base({x, y}) {}
+	minterm(const minterm &m) { (*this)[0] = m[0]; (*this)[1] = m[1]; }
+	minterm(minterm &&m) { (*this)[0] = move(m[0]); (*this)[1] = move(m[1]);}
 	minterm(bool pos, const term<B>& t) : base() { add(pos, term<B>(t)); }
 	void add(bool, const term<B>&);
 	bf<B> subst(const sym_t& s, const bf<B>& f) const;
+	bool operator==(const minterm& m) const {
+		if ((*this)[0].size() != m[0].size()) return false;
+		if ((*this)[1].size() != m[1].size()) return false;
+		for (auto& x : (*this)[0]) if (!hasv(m[0], x)) return false;
+		for (auto& x : (*this)[1]) if (!hasv(m[1], x)) return false;
+		for (auto& x : m[0]) if (!hasv((*this)[0], x)) return false;
+		for (auto& x : m[1]) if (!hasv((*this)[1], x)) return false;
+		return true;
+	}
+	minterm& operator=(const minterm& m) {
+		(*this)[0] = m[0];
+		(*this)[1] = m[1];
+		return *this;
+	}
 };
 
 //template<typename B> struct bf : public set<minterm<B>> {
 template<typename B> struct bf : public set<minterm<B>> {
 	enum { ZERO, ONE, NONE } v;
 
-	bf() : set<minterm<B>>(), v(NONE) {}
+//	bf() : set<minterm<B>>(), v(NONE) {}
 	bf(const term<B>& t) : set<minterm<B>>({minterm<B>(true, t)}),
 		v(NONE) {}
 	bf(const minterm<B>& t) : set<minterm<B>>({t}), v(NONE) {}
@@ -150,7 +177,7 @@ template<typename B> struct bf : public set<minterm<B>> {
 };
 
 template<typename B> term<B>::arg::arg(const term<B>& t) :
-	ist(true), t(t) {}
+	ist(true), t(t), f(false) {}
 
 template<typename B> term<B>::arg::arg(const bf<B>& f) :
 	ist(false), f(bf<B>(f)) {}
@@ -189,7 +216,7 @@ template<typename B> bool term<B>::operator<(const term& x) const {
 
 template<typename B> void minterm<B>::add(bool pos, const term<B>& t) {
 	assert(!(t.t == term<B>::ELEM && t.e == B::zero()));
-	(*this)[pos ? 0 : 1].insert(t);
+	(*this)[pos ? 0 : 1].push_back(t);
 }
 
 template<typename B> bool bf<B>::operator==(const bf<B>& f) const {
@@ -213,23 +240,24 @@ template<typename B> const bf<B>& bf<B>::one() {
 }
 
 template<typename B> bf<B> operator~(const minterm<B>& x) {
-	bf<B> f = bf<B>::zero();
-	for (const term<B>& t : x[0])
-		f = f | bf<B>(minterm(false, t));
-	for (const term<B>& t : x[1])
-		f = f | bf<B>(minterm(true, t));
+	bf<B> f(false);
+	for (const term<B>& t : x[0]) f = minterm(false, t) | f;
+	for (const term<B>& t : x[1]) f = minterm(true, t) | f;
 	return f;
 }
 
 template<typename B> minterm<B> operator&(
 		const minterm<B>& x, const minterm<B>& y) {
+	if (x[0].empty() && x[1].empty()) return y;
+	if (y[0].empty() && y[1].empty()) return x;
 	//DBG(cout << x << "&&" << y << " = ";)
 	static map<array<minterm<B>, 2>, minterm<B>> M;
 	static size_t hits = 0, misses = 0;
 	if (y < x) return y & x;
 	if (auto it = M.find({x, y}); it != M.end()) return ++hits, it->second;
 	++misses;
-	if ((hits + misses)%100000 == 0) cout << "(M) hits: " << hits << " misses: " << misses << endl;
+	if ((hits + misses)%100000 == 0)
+		cout << "(M) hits: " << hits << " misses: " << misses << endl;
 	if ((hits + misses)>1000000) M.clear();
 #ifdef DEBUG
 	for (const term<B>& t : x[0]) assert(!t.zero() && !t.one());
@@ -238,17 +266,15 @@ template<typename B> minterm<B> operator&(
 	for (const term<B>& t : y[1]) assert(!t.zero() && !t.one());
 #endif
 	//cout << "(" << x << ") & (" << y << ") = " << endl;
-	minterm<B> z = x;
 	for (const term<B>& t : y[0])
-		if (auto it = x[1].find(t); it != x[1].end())
-			return minterm<B>();
-		else z[0].insert(t);
+		if (hasv(x[1], t)) return minterm<B>();
 	for (const term<B>& t : y[1])
-		if (auto it = x[0].find(t); it != x[0].end())
-			return minterm<B>();
-		else z[1].insert(t);
+		if (hasv(x[0], t)) return minterm<B>();
+	minterm<B> z = x;
+	for (auto& t : y[0]) if (!hasv(z[0], t)) z[0].push_back(t);
+	for (auto& t : y[1]) if (!hasv(z[1], t)) z[1].push_back(t);
 	//DBG(cout << z << endl;)
-	//M.insert({array<minterm<B>, 2>{x, y}, z});
+	M.insert({array<minterm<B>, 2>{x, y}, z});
 	return z;
 }
 
@@ -264,63 +290,75 @@ bool operator<=(const minterm<B>& t, const bf<B>& f) {
 	return false;
 }
 
-template<typename T>
-T symdiff(const T& x, const T& y) {
-	T r;
-	for (auto& t : x) if (y.find(t) == y.end()) r.insert(t);
-	for (auto& t : y) if (x.find(t) == x.end()) r.insert(t);
-	return r;
-}
-
+// two minterms are complementary if one pos lit appears neg in the other
+// and all the rest are the same.
 template<typename B>
 bool complementary(const minterm<B>& x, minterm<B>& y) {
-	set<term<B>> d0 = symdiff(x[0], y[0]);
-	if (d0.size() != 1) return false;
-	set<term<B>> d1 = symdiff(x[1], y[1]);
-	if (d1.size() != 1) return false;
-	if (*d0.begin() != *d1.begin()) return false;
-	if (auto it = y[0].find(*d0.begin()); it != y[0].end())
-		y[0].erase(it);
-	else y[1].erase(*d0.begin());
-	return true;
+	size_t n0 = x[0].size(), n1 = x[1].size();
+	size_t k0 = y[0].size(), k1 = y[1].size();
+	if (n0 == k0 + 1 && n1 + 1 == k1) {
+		const term<B> *t1 = 0;
+		bool b = false;
+		for (auto& t : x[0])
+			if (!hasv(y[0], t)) {
+				if (b) return false;
+				t1 = &t, b = true;
+			}
+		assert(b && t1);
+		b = false;
+		for (auto& t : y[1])
+			if (!hasv(x[1], t)) {
+				if (b || t != *t1) return false;
+				b = true;
+			}
+		if (!b) return false;
+		y[1] = x[1];
+		return true;
+		//return b ? minterm<B>(x[0], y[1]) : false;
+	}
+	if (n0 + 1 == k0 && n1 == k1 + 1) {
+		const term<B> *t1 = 0;
+		bool b = false;
+		for (auto& t : y[0])
+			if (!hasv(x[0], t)) {
+				if (b) return false;
+				t1 = &t, b = true;
+			}
+		assert(b && t1);
+		b = false;
+		for (auto& t : x[1])
+			if (!hasv(y[1], t)) {
+				if (b || t != *t1) return false;
+				b = true;
+			}
+		if (!b) return false;
+		y[0] = x[0];
+		return true;
+//		return b ? minterm<B>(y[0], x[1]) : minterm<B>();
+	}
+	return false;
 }
 
 template<typename B>
-bf<B> disj_fmt(const minterm<B>& t, const bf<B>& f) {
-	if (t[0].empty() && t[1].empty()) return bf<B>(true);// f;
+bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
 	if (f == bf<B>::one()) return f;
-	if (f == bf<B>::zero() || f.empty()) return bf<B>(t);
+	if (f == bf<B>::zero()) return bf<B>(t);
+	if (t[0].empty() && t[1].empty()) throw 0;//return bf<B>(true);// f;
+	if (f.empty()) throw 0;//return bf<B>(t);
 	for (const term<B>& x : t[0])
 		if (x.t == term<B>::ELEM && x.e == B::zero()) return f;
-		else if (x.t == term<B>::BF) {
-			minterm<B> s = t;
-			return s[0].erase(x), s & (f & x.f);
-		} //else assert(x.t != term<B>::ELEM);
+		else if (x.t == term<B>::BF) throw 0;
 	for (const term<B>& x : t[1])
 		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
-		else if (x.t == term<B>::BF) {
-			minterm<B> s = t;
-			return s[1].erase(x), s & (f & ~x.f);
-		} //else assert(x.t != term<B>::ELEM);
-	for (const minterm<B>& x : f) if (t <= x) return f;
-	if (t[0].size() == 1 && t[1].empty())
-		for (const minterm<B>& m : f)
-			if (	m[1].size() == 1 && m[0].empty() &&
-				*m[1].begin() == *t[0].begin())
-				return bf<B>(true);
-	if (t[1].size() == 1 && t[0].empty())
-		for (const minterm<B>& m : f)
-			if (	m[0].size() == 1 && m[1].empty() &&
-				*m[0].begin() == *t[1].begin())
-				return bf<B>(true);
+		else if (x.t == term<B>::BF) throw 0;
+	for (const minterm<B>& x : f)
+		if (t <= x) return f;
+		else if (complementary(x, t)) {
+			bf<B> g = f;
+			return g.erase(x), g.insert(t), g;
+		}
 	bf g = f;
-	auto s = t;
-	auto it = g.begin();
-	while (it != g.end())
-		if (complementary<B>(*it, s)) break;
-		else ++it;
-	if (it != g.end()) return g.erase(it), s | g;
-	return g.insert(s), g;
+	return g.insert(t), g;
 }
 
 template<typename B>
@@ -338,7 +376,7 @@ template<typename B> bf<B> operator&(const minterm<B>& x, const bf<B>& y) {
 	if (y == bf<B>::zero()) return y;
 	if (y == bf<B>::one()) return bf<B>(x);
 	//cout << "(" << x << ") & (" << y << ") = ";
-	bf<B> z;
+	bf<B> z(false);
 	for (const minterm<B>& t : y)
 //		if (minterm<B> m = (x & t); m.empty()) return bf<B>::zero();
 		if (minterm<B> m = (x & t); !m.empty()) 
@@ -375,9 +413,22 @@ template<typename B> bool operator<=(const bf<B>& x, const bf<B>& y) {
 	return true;
 }
 
+template<typename B> bool isvar(const bf<B>& f) {
+	if (f.size() != 1) return false;
+	auto& m = *f.begin();
+	if (m[0].size() == 1 && m[1].empty()) return m[0][0].t == term<B>::VAR;
+	return false;
+}
+
 template<typename B>
 term<B> term<B>::subst(const sym_t& s, const bf<B>& g) const {
-	if (t == term<B>::VAR) return s == sym ? term<B>(g) : *this;
+	if (t == term<B>::VAR) {
+		if (isvar(g)) {
+			sym_t x = (*g.begin())[0][0].sym;
+			return s == x ? term<B>(x) : *this;
+		}
+		return s == sym ? term<B>(g) : *this;
+	}
 	if (t == term<B>::BF) return f.subst(s, g);
 	assert(t == term<B>::FUNC);
 	vector<typename term<B>::arg> v;
@@ -385,15 +436,67 @@ term<B> term<B>::subst(const sym_t& s, const bf<B>& g) const {
 	return term<B>(name, v);
 }
 
+template<typename B> bool hasvar(const term<B>& t, sym_t v);
+
+template<typename B> bool hasvar(const bf<B>& f, sym_t v) {
+	for (auto& x : f) {
+		for (auto& y : x[0]) if (hasvar(y, v)) return true;
+		for (auto& y : x[1]) if (hasvar(y, v)) return true;
+	}
+	return false;
+}
+
+template<typename B> bool hasvar(const term<B>& t, sym_t v) {
+	switch (t.t) {
+		case term<B>::VAR: return t.sym == v;
+		case term<B>::ELEM: return false;
+		case term<B>::FUNC:
+			for (auto& x : t.args)
+				if (x.ist && hasvar(x.t, v)) return true;
+				else if (!x.ist && hasvar(x.f, v)) return true;
+			return false;
+		case term<B>::BF: return hasvar(t.f, v);
+		default: throw 0;
+	}
+}
+
 template<typename B>
 bf<B> minterm<B>::subst(const sym_t& s, const bf<B>& f) const {
 	bf<B> r(true);
-	for (const term<B>& x : (*this)[0])
-		if (term<B> t = x.subst(s, f); t.zero()) return bf<B>(false);
-		else if (!t.one()) r = minterm<B>(true, t) & r;
-	for (const term<B>& x : (*this)[1])
-		if (term <B> t = x.subst(s, f); t.one()) return bf<B>(false);
-		else if (!t.zero()) r = minterm<B>(false, t) & r;
+	for (auto& t : (*this)[0])
+		switch (t.t) {
+			case term<B>::BF:
+				r = 	(hasvar(t.f, s)
+					? t.f.subst(s, f) : bf<B>(t)) & r;
+				break;
+			case term<B>::FUNC:
+				r = 	(hasvar(t, s)
+					? bf<B>(t.subst(s, f)) : bf<B>(t)) & r;
+				break;
+			case term<B>::VAR:
+				if (t.sym != s) r = bf<B>(t) & r;
+				else r = r & f;
+				break;
+			case term<B>::ELEM: r = bf<B>(t) & r; break;
+			default: throw 0;
+		}
+	for (auto& t : (*this)[1])
+		switch (t.t) {
+			case term<B>::BF:
+				r = 	(hasvar(t.f, s)
+					? ~t.f.subst(s, f) : ~bf<B>(t)) & r;
+				break;
+			case term<B>::FUNC:
+				r = 	(hasvar(t, s)
+					? ~bf<B>(t.subst(s, f)) : ~bf<B>(t)) & r;
+				break;
+			case term<B>::VAR:
+				if (t.sym != s) r = ~bf<B>(t) & r;
+				else r = r & ~f;
+				break;
+			case term<B>::ELEM: r = ~bf<B>(t) & r; break;
+			default: throw 0;
+		}
 	return r;
 }
 

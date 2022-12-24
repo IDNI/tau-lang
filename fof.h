@@ -18,11 +18,11 @@ template<typename B> using clause = minterm<bf<B>>;
 template<typename B> using fof = bf<bf<B>>;
 
 template<typename B> bf<B> simplify(const bf<B>& f, const bf<B>& g) {
-	bf<B> r;
+	bf<B> r(false);
 	for (const minterm<B>& x : g) {
 		bool b = true;
 		for (const minterm<B>& y : f) b &= !(y <= x);
-		if (b) r.insert(x);
+		if (b) r = x | r;
 	}
 	return r;
 }
@@ -32,11 +32,11 @@ template<typename B> clause<B> simplify(const clause<B>& c) {
 	clause<B> d;
 	assert(c[0].size() == 1);
 	bf<B> f = c[0].begin()->e;
-	d[0].emplace(f);
+	d[0].emplace_back(f);
 	for (auto& t : c[1])
 		if (bf<B> g = simplify(f, t.e); g == bf<B>::one())
 			return clause<B>();
-		else d[1].emplace(g);
+		else d[1].emplace_back(g);
 	return d;
 }
 
@@ -48,26 +48,26 @@ clause<B> operator&(const clause<B>& x, const clause<B>& y) {
 	if (y < x) return y & x;
 	if (auto it = M.find({x, y}); it != M.end()) return ++hits, it->second;
 	++misses;
-	if ((hits + misses)%1000 == 0) cout << "hits: " << hits << " misses: " << misses << endl;
+	if ((hits + misses)%1000 == 0) cout << "hits: " << hits << " misses: "
+	       	<< misses << endl;
 	//DBG(cout << x << "&&" << y << " = ";)
-	clause<B> z;
-	z[1] = x[1];
+	clause<B> z(vector<term<bf<B>>>(), x[1]);
+//	z[1] = x[1];
 	assert(x[0].size() <= 1 && y[0].size() <= 1);
 	if (!x[0].empty()) {
-		if (y[0].empty()) z[0] = x[0];
+		if (y[0].empty()) z[0].push_back(*x[0].begin());
 		else {
 			term<bf<Bool>> t1 = *x[0].begin(), t2 = *y[0].begin();
 			assert(t1.t==term<bf<B>>::ELEM&&t2.t==term<bf<B>>::ELEM);
 			auto t = t1.e | t2.e;
-			if (t != bf<Bool>::one()) z[0].insert(t);
+			if (t != bf<Bool>::one()) z[0].push_back(t);
 		}
-	} else z[0] = y[0];
+	} else z[0] = y[0];//.push_back(*y[0].begin());
 	for (auto& t : y[1])
-		if (auto it = z[0].find(t); it != z[0].end())
-			return minterm<bf<B>>();
+		if (!z[0].empty() && z[0][0] == t) return clause<B>();
 		else if (t == bf<Bool>::one()) continue;
 		else if (t == bf<Bool>::zero()) throw 0;
-		else z[1].insert(t);
+		else z[1].push_back(t);
 	//DBG(cout << z << endl;)
 	M.insert({array<clause<B>, 2>{x, y}, z = simplify(z)});
 	return z;
@@ -102,12 +102,12 @@ fof<B> operator|(clause<B> c, const fof<B>& f) {
 #endif
 //	cout << "disj with " << f.size() << " clauses." << endl;
 	if (!c[0].empty()) {
-		bf<B> g = c[0].begin()->e;
+		const bf<B>& g = c[0].begin()->e;
 		if (g == bf<B>::zero()) c[0].clear();
 		else if (g == bf<B>::one()) return f;
 	}
 	for (auto it = c[1].begin(); it != c[1].end(); ++it) {
-		bf<B> g = it->e;
+		const bf<B>& g = it->e;
 		if (g == bf<B>::one()) c[1].erase(it);
 		else if (g == bf<B>::zero()) return f;
 	}
@@ -177,7 +177,7 @@ minterm<B> mt_trans_vars(const minterm<B>& m, function<sym_t(sym_t)> g) {
 	minterm<B> b;
 	for (size_t j = 0; j != 2; ++j)
 		for (const term<B>& t : m[j])
-			b = b & minterm<B>(!j, term_trans_vars(t, g));
+			b = (b & minterm<B>(!j, term_trans_vars(t, g)));
 	return b;
 }
 
@@ -187,7 +187,7 @@ clause<B> transform_vars(const clause<B>& c, function<sym_t(sym_t)> g) {
 	for (size_t i = 0; i != 2; ++i)
 		for (const term<bf<B>>& s : c[i]) {
 			assert(s.t == term<bf<B>>::ELEM);
-			bf<B> p;
+			bf<B> p(false);
 			for (const minterm<B>& m : s.e)
 				p = mt_trans_vars(m, g) | p;
 			d = d & clause<B>(!i, p);
@@ -197,7 +197,7 @@ clause<B> transform_vars(const clause<B>& c, function<sym_t(sym_t)> g) {
 
 template<typename B>
 fof<B> transform_vars(const fof<B>& f, function<sym_t(sym_t)> g) {
-	fof<B> r;
+	fof<B> r(false);
 	for (const clause<B>& c : f) r = transform_vars<B>(c, g) | r;
 	return r;
 }
