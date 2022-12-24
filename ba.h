@@ -12,12 +12,14 @@
 // modified over time by the Author.
 #ifndef __BA_H__
 #define __BA_H__
-#define DEBUG
+//#define DEBUG
+//#define BREAK_BF
 
 #ifdef DEBUG
 #define DBG(x) x
 #include <iostream>
 #else
+#include <iostream>
 #define DBG(x)
 #endif
 
@@ -54,45 +56,48 @@ template<typename B> struct bf;
 
 template<typename B> struct term {
 	struct arg {
-		bool ist;
-		term<B> t;
-		bf<B> f;
-		arg() {}
+		const bool ist;
+		const term<B> t;
+		const bf<B> f;
 		arg(const term& t);
 		arg(const bf<B>& f);
 		bool operator==(const arg&) const;
 		bool operator<(const arg&) const;
-		arg subst(const sym_t& s, const bf<B>& f) {
+		arg subst(const sym_t& s, const bf<B>& f) const {
 			return ist ? arg(t.subst(s, f)) : *this;
 		}
 	};
-	enum type { ELEM, VAR, BF, FUNC } t;
+	const enum type { ELEM, VAR, BF, FUNC } t;
 	//int sym = 0;
-	sym_t sym;
-	string name;
-	B e;
-	bf<B> f;
-	vector<arg> args;
-	term() {}
-	term(const B& e) : t(ELEM), e(e) {}
-	term(type t) : t(t) {}
-	term(const sym_t& sym) : t(VAR), sym(sym) {}
+	const sym_t sym;
+	const string name;
+	const B e;
+	const bf<B> f;
+	const vector<arg> args;
+	//term() {}
+	term(const B& e) :
+		t(ELEM), sym(0), name(), e(e),
+		f(bf<B>::zero()), args() {}
+//	term(type t) : t(t) {}
+	term(const sym_t& sym) :
+		t(VAR), sym(sym), name(), e(),
+		f(bf<B>::zero()), args() {}
 	//term(const sym_t& sym, const vector<arg>& a) :
 	//	t(FUNC), sym(sym), args(a) {}
 	term(const string& name, const vector<arg>& a) :
-		t(FUNC), name(name), args(a) {}
-	term(const bf<B>& g) {
-		if (g.v == bf<B>::ZERO) { t = ELEM; e = B::zero(); return; }
-		if (g.v == bf<B>::ONE) { t = ELEM; e = B::one(); return; }
-		assert(!g.empty());
-		if (g.size() == 1) {
-			auto& c = *g.begin();
+		t(FUNC), sym(0), name(name), e(B::zero()),
+		f(bf<B>::zero()), args(a) {}
+
+	static term<B> mk(const bf<B>& f) {
+		if (f.v == bf<B>::ZERO) return term<B>(B::zero());
+		if (f.v == bf<B>::ONE) return term<B>(B::one());
+		assert(!f.empty());
+		if (f.size() == 1) {
+			auto& c = *f.begin();
 			if (c[1].empty() && c[0].size() == 1)
-				*this = *c[0].begin();
-			return;
+				return term<B>(*c[0].begin());
 		}
-		t = BF;
-		f = g;
+		return term<B>(f);
 	}
 	bool operator==(const term& x) const;
 	bool operator<(const term& x) const;
@@ -111,6 +116,10 @@ template<typename B> struct term {
 			default: return false;
 		}
 	}
+private:
+	term(const bf<B>& f) :
+		t(BF), sym(0), name(), e(B::zero()),
+		f(f), args() {}
 };
 
 //template<typename B> struct minterm : public array<set<term<B>>, 2> {
@@ -215,6 +224,13 @@ template<typename B> bf<B> operator~(const minterm<B>& x) {
 template<typename B> minterm<B> operator&(
 		const minterm<B>& x, const minterm<B>& y) {
 	//DBG(cout << x << "&&" << y << " = ";)
+	static map<array<minterm<B>, 2>, minterm<B>> M;
+	static size_t hits = 0, misses = 0;
+	if (y < x) return y & x;
+	if (auto it = M.find({x, y}); it != M.end()) return ++hits, it->second;
+	++misses;
+	if ((hits + misses)%100000 == 0) cout << "(M) hits: " << hits << " misses: " << misses << endl;
+	if ((hits + misses)>1000000) M.clear();
 #ifdef DEBUG
 	for (const term<B>& t : x[0]) assert(!t.zero() && !t.one());
 	for (const term<B>& t : x[1]) assert(!t.zero() && !t.one());
@@ -232,6 +248,7 @@ template<typename B> minterm<B> operator&(
 			return minterm<B>();
 		else z[1].insert(t);
 	//DBG(cout << z << endl;)
+	//M.insert({array<minterm<B>, 2>{x, y}, z});
 	return z;
 }
 
@@ -363,10 +380,9 @@ term<B> term<B>::subst(const sym_t& s, const bf<B>& g) const {
 	if (t == term<B>::VAR) return s == sym ? term<B>(g) : *this;
 	if (t == term<B>::BF) return f.subst(s, g);
 	assert(t == term<B>::FUNC);
-	term r = *this;
-	for (size_t n = 0; n != r.args.size(); ++n)
-		r.args[n] = r.args[n].subst(s, g);
-	return r;
+	vector<typename term<B>::arg> v;
+	for (auto& a : args) v.push_back(a.subst(s, g));
+	return term<B>(name, v);
 }
 
 template<typename B>
