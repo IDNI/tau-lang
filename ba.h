@@ -163,7 +163,7 @@ template<typename B> struct minterm : public array<vector<term<B>>, 2> {
 template<typename B> struct bf : public set<minterm<B>> {
 	enum { ZERO, ONE, NONE } v;
 
-//	bf() : set<minterm<B>>(), v(NONE) {}
+	bf() : set<minterm<B>>(), v(NONE) {}
 	bf(const term<B>& t) : set<minterm<B>>({minterm<B>(true, t)}),
 		v(NONE) {}
 	bf(const minterm<B>& t) : set<minterm<B>>({t}), v(NONE) {}
@@ -286,6 +286,7 @@ bool operator<=(const minterm<B>& x, const minterm<B>& y) {
 template<typename B>
 bool operator<=(const minterm<B>& t, const bf<B>& f) {
 	if (f == bf<B>::one()) return true;
+	if (f == bf<B>::zero()) return false;
 	for (const minterm<B>& x : f) if (t <= x) return true;
 	return false;
 }
@@ -341,8 +342,10 @@ bool complementary(const minterm<B>& x, minterm<B>& y) {
 
 template<typename B>
 bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
+//	cout << t << " | " << f << " = " << endl;
 	if (f == bf<B>::one()) return f;
 	if (f == bf<B>::zero()) return bf<B>(t);
+	if (t <= f) return f;
 	if (t[0].empty() && t[1].empty()) throw 0;//return bf<B>(true);// f;
 	if (f.empty()) throw 0;//return bf<B>(t);
 	for (const term<B>& x : t[0])
@@ -351,15 +354,19 @@ bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
 	for (const term<B>& x : t[1])
 		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
 		else if (x.t == term<B>::BF) throw 0;
-	for (const minterm<B>& x : f)
-		if (t <= x) return f;
-		else if (complementary(x, t)) {
-			bf<B> g = f;
-			return g.erase(x), g.insert(t), g;
-		}
-	bf g = f;
-	return g.insert(t), g;
-}
+	bf<B> g, h;
+	for (auto it = f.begin(); it != f.end(); ++it)
+		if (t <= *it) return f;
+		else if (!(*it <= t)) g.insert(*it);
+	while (!g.empty()) {
+		auto x = *g.begin();
+		g.erase(g.begin());
+		if (!complementary(x, t)) h.insert(x);
+	}
+	h.insert(t);
+//	cout << "\t" << g << endl;
+	return h;
+} 
 
 template<typename B>
 bf<B> operator|(const minterm<B>& t, const bf<B>& f) {
@@ -409,6 +416,10 @@ template<typename B> bf<B> operator|(const bf<B>& x, const bf<B>& y) {
 }
 
 template<typename B> bool operator<=(const bf<B>& x, const bf<B>& y) {
+	if (y == bf<B>::zero()) return x == bf<B>::zero();
+	if (x == bf<B>::zero()) return true;
+	if (x == bf<B>::one()) return y == bf<B>::one();
+	if (y == bf<B>::one()) return true;
 	for (const minterm<B>& t : x) if (!(t <= y)) return false;
 	return true;
 }

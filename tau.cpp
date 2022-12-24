@@ -67,9 +67,9 @@ int main() {
 	//cout << generic<Bool>(2) << endl;
 	//cout << generic<Bool>(3) << endl;
 //	return 0;
-	bf<Bool> f(fapp("f", {0,1}));
-	bf<Bool> g(fapp("g", {1,2}));
-	cout << (~(f & g)) << endl;
+//	bf<Bool> f(fapp("f", {0,1}));
+//	bf<Bool> g(fapp("g", {1,2}));
+//	cout << (~(f & g)) << endl;
 //	cout << ex(ex(~(~fof<Bool>(f) | fof<Bool>(g)), 0),1) << endl;
 //	cout << (generic(2, 3, 2) & generic(1,1,1)) << endl;
 //	cout << fapp(0, 0, 1) << endl;
@@ -87,7 +87,7 @@ int main() {
 //	cout << generic<Bool>(1,1,1).subst(0,term<Bool>(1)) << endl;
 //	cout << generic<Bool>(2) << endl;
 //	cout << all(generic<Bool>(2),0) << endl;
-	seq<Bool>(generic<Bool>(2,2,2));
+	seq<Bool>(generic<Bool>(1,1,1));
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;
