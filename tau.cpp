@@ -51,7 +51,7 @@ template<typename B> bf<B> generic(size_t nv, size_t c = 0) {
 template<typename B> fof<B> generic(size_t nc, size_t csz, size_t nv) {
 	fof<B> f(false);
 	for (size_t k = 0; k != nc; ++k) {
-		clause<B> c(true, term<bf<B>>(generic<B>(nv, (1<<nv)*k)));
+		fof<B> c(clause<B>(true, term<bf<B>>(generic<B>(nv, (1<<nv)*k))));
 		for (size_t n = 1; n != csz; ++n)
 			c = clause<B>(false,
 			term<bf<B>>(generic<B>(nv, (1<<nv) * (nc * n + k)))) & c;
@@ -62,15 +62,29 @@ template<typename B> fof<B> generic(size_t nc, size_t csz, size_t nv) {
 	return f;
 }
 
+void test(const fof<Bool>& f, const fof<Bool>& g) {
+	if (f == g && (f + g) == fof<Bool>(false)) return;
+	cout << "f: " << f << endl;
+	cout << "g: " << g << endl;
+	cout << "f+g: " << (f+g) << endl;
+	assert(f == g);
+	assert((f + g) == fof<Bool>(false));
+}
+
+void test() {
+	// ex(x, ax+bx'=0) <=> ab=0
+	test((("x"_v) + ("x'"_v)) <<= 1,
+		(("x"_v) | ("x'"_v)) <<= 1);
+	test((("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0,
+		(("a"_v & "x"_v) | ("b"_v & "x'"_v)) <<= 0);
+	test(ex("x", (("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0),
+		("a"_v & "b"_v) <<= 0);
+	// ex(x, ax+bx'!=0) <=> a!=0 | b!=0
+	// ax+bx'=0 <=> a<=x<=b'
+}
+
 int main() {
-	fof<Bool> f = ("x"_v & "y'"_v) <<= 0;
-	cout << f << endl;
-	cout << ex(f, "x") << endl;
-	cout << (~f) << endl;
-	cout << ex(~f, "x") << endl;
-	cout << ~ex(~f, "x") << endl;
-	fof<Bool> g = all(f, "x");
-	cout << g << endl;
+	test(); return 0;
 //	cout << generic<Bool>(2, 2, 2) << endl;
 	//cout << generic<Bool>(2) << endl;
 	//cout << generic<Bool>(3) << endl;

@@ -152,8 +152,11 @@ template<typename B> struct bf : public set<minterm<B>> {
 	enum { ZERO, ONE, NONE } v;
 
 	bf() : set<minterm<B>>(), v(NONE) {}
-	bf(const term<B>& t) : set<minterm<B>>({minterm<B>(true, t)}),
-		v(NONE) {}
+	bf(const term<B>& t) : bf() {
+		if (t.t != term<B>::ELEM) this->emplace(true, t);
+		if (t.e == B::zero()) v = ZERO;
+		if (t.e == B::one()) v = ONE;
+	}
 	bf(const minterm<B>& t) : set<minterm<B>>({t}), v(NONE) {}
 	bf(bool b) { v = b ? ONE : ZERO; }
 
@@ -236,12 +239,12 @@ template<typename B> bf<B> operator~(const minterm<B>& x) {
 	return f;
 }
 
-template<typename B> minterm<B> operator&(
+template<typename B> bf<B> operator&(
 		const minterm<B>& x, const minterm<B>& y) {
 	if (x[0].empty() && x[1].empty()) return y;
 	if (y[0].empty() && y[1].empty()) return x;
 	//DBG(cout << x << "&&" << y << " = ";)
-	static map<array<minterm<B>, 2>, minterm<B>> M;
+	static map<array<minterm<B>, 2>, bf<B>> M;
 	static size_t hits = 0, misses = 0;
 	if (y < x) return y & x;
 	if (auto it = M.find({x, y}); it != M.end()) return ++hits, it->second;
@@ -257,15 +260,16 @@ template<typename B> minterm<B> operator&(
 #endif
 	//cout << "(" << x << ") & (" << y << ") = " << endl;
 	for (const term<B>& t : y[0])
-		if (has(x[1], t)) return minterm<B>();
+		if (has(x[1], t)) return bf<B>(false);
 	for (const term<B>& t : y[1])
-		if (has(x[0], t)) return minterm<B>();
+		if (has(x[0], t)) return bf<B>(false);
 	minterm<B> z = x;
 	z[0].insert(y[0].begin(), y[0].end());
 	z[1].insert(y[1].begin(), y[1].end());
+	bf<B> r(move(z));
 	//DBG(cout << z << endl;)
-	M.insert({array<minterm<B>, 2>{x, y}, z});
-	return z;
+	M.insert({array<minterm<B>, 2>{x, y}, r});
+	return r;
 }
 
 template<typename B>
@@ -344,18 +348,18 @@ bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
 	for (const term<B>& x : t[1])
 		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
 		else if (x.t == term<B>::BF) throw 0;
-	bf<B> g, h;
-	for (auto it = f.begin(); it != f.end(); ++it)
-		if (t <= *it) return f;
-		else if (!(*it <= t)) g.insert(*it);
+	bf<B> g(false), h(false);
+	for (auto& x : f)
+		if (t <= x) return f;
+		else if (!(x <= t)) g.insert(x);
 	while (!g.empty()) {
 		auto x = *g.begin();
 		g.erase(g.begin());
 		if (!complementary(x, t)) h.insert(x);
+		else if (t[0].empty() && t[1].empty()) return bf<B>(true);
 	}
-	h.insert(t);
 //	cout << "\t" << g << endl;
-	return h;
+	return h.insert(t), h;
 } 
 
 template<typename B>
@@ -364,6 +368,8 @@ bf<B> operator|(const minterm<B>& t, const bf<B>& f) {
 }
 
 template<typename B> bf<B> operator~(const bf<B>& f) {
+	if (f == bf<B>::one()) return bf<B>::zero();
+	if (f == bf<B>::zero()) return bf<B>::one();
 	bf g = bf<B>::one();
 	for (const minterm<B>& t : f) g = g & ~t;
 	return g;
@@ -372,14 +378,8 @@ template<typename B> bf<B> operator~(const bf<B>& f) {
 template<typename B> bf<B> operator&(const minterm<B>& x, const bf<B>& y) {
 	if (y == bf<B>::zero()) return y;
 	if (y == bf<B>::one()) return bf<B>(x);
-	//cout << "(" << x << ") & (" << y << ") = ";
 	bf<B> z(false);
-	for (const minterm<B>& t : y)
-//		if (minterm<B> m = (x & t); m.empty()) return bf<B>::zero();
-		if (minterm<B> m = (x & t); !m.empty()) 
-	//	else 
-			z = m | z;
-	//cout << z << endl;
+	for (const minterm<B>& t : y) z = (x & t) | z;
 	return z.empty() ? bf<B>(false) : z;
 }
 
@@ -389,10 +389,8 @@ template<typename B> bf<B> operator&(const bf<B>& x, const bf<B>& y) {
 	if (y == bf<B>::one()) return x;
 	bf<B> z = bf<B>::zero();
 	for (const minterm<B>& s : x)
-		for (const minterm<B>& t : y) {
-			minterm<B> m = s & t;
-			if (!m[0].empty() || !m[1].empty()) z = (m | z);
-		}
+		for (const minterm<B>& t : y)
+			z = (s & t) | z;
 	return z;
 }
 
@@ -403,6 +401,10 @@ template<typename B> bf<B> operator|(const bf<B>& x, const bf<B>& y) {
 	bf<B> z = x;
 	for (const minterm<B>& t : y) z = t | z;
 	return z;
+}
+
+template<typename B> bf<B> operator+(const bf<B>& x, const bf<B>& y) {
+	return (x&~y)|(y&~x);
 }
 
 template<typename B> bool operator<=(const bf<B>& x, const bf<B>& y) {

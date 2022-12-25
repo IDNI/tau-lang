@@ -3,7 +3,7 @@
 #include <cstring>
 using namespace std::literals;
 
-minterm<Bool> operator ""_v(const char* s, size_t n) {
+bf<Bool> operator ""_v(const char* s, size_t n) {
 	bool neg = s[n-1] == '\'';
 	char* k = (char*)alloca(n + 1);
 	strcpy(k, s);
@@ -12,22 +12,22 @@ minterm<Bool> operator ""_v(const char* s, size_t n) {
 	return minterm<Bool>(!neg, term<Bool>(t));
 }
 
-fof<Bool> operator<<=(const bf<Bool>& f, int n) {
+fof<Bool> operator<<=(const bf<Bool>& f, int n) { // eq
 	assert(n == 0 || n == 1);
 	return fof<Bool>(term<bf<Bool>>(n ? ~f : f));
 }
 
-fof<Bool> operator<<(const bf<Bool>& f, int n) {
+fof<Bool> operator<<(const bf<Bool>& f, int n) { // neq
 	assert(n == 0 || n == 1);
 	return fof<Bool>(clause<Bool>(false, term<bf<Bool>>(n ? ~f : f)));
 }
 
-template<typename B> fof<B> ex(const fof<B>& f, string s) {
-	return ex(f, dict(s.c_str()));
+template<typename B> fof<B> ex(const string& x, const fof<B>& f) {
+	return ex(f, dict(x.c_str()));
 }
 
-template<typename B> fof<B> all(const fof<B>& f, string s) {
-	return all(f, dict(s.c_str()));
+template<typename B> fof<B> all(const string& x, const fof<B>& f) {
+	return all(f, dict(x.c_str()));
 }
 
 ostream& operator<<(ostream& os, const term<Bool>& t) {
