@@ -20,6 +20,7 @@ template<typename B> using fof = bf<bf<B>>;
 template<typename B> clause<B> simplify(const clause<B>& c) {
 	if (c[0].empty()) return c;
 	clause<B> d;
+	d[0] = c[0];
 	set<term<B>> s;
 	for (const minterm<B>& x : c[0].begin()->e)
 		if (x[0].empty() && x[1].size() == 1) s.insert(*x[1].begin());
