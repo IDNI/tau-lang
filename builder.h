@@ -4,10 +4,10 @@
 using namespace std::literals;
 
 minterm<Bool> operator ""_v(const char* s, size_t n) {
-	bool neg = s[n] == '\'';
+	bool neg = s[n-1] == '\'';
 	char* k = (char*)alloca(n + 1);
 	strcpy(k, s);
-	if (neg) k[n] = 0;
+	if (neg) k[n - 1] = 0;
 	sym_t t = dict(k);
 	return minterm<Bool>(!neg, term<Bool>(t));
 }

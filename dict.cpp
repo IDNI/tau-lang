@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sstream>
 using namespace std;
 
 vector<string> v;
@@ -12,4 +13,12 @@ sym_t dict(const char* s) {
 	return m.emplace(s, v.size()), v.push_back(s), v.size() - 1;
 }
 
-const char* dict(sym_t n) { return v[n].c_str(); }
+const char* dict(sym_t n) {
+	if (n >= v.size()) {
+		static string tmp;
+		stringstream ss;
+		ss << "x[" << n << "]";
+		return (tmp = ss.str()).c_str();
+	}
+	return v[n].c_str();
+}
