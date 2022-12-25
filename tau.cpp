@@ -63,7 +63,10 @@ template<typename B> fof<B> generic(size_t nc, size_t csz, size_t nv) {
 }
 
 void test(const fof<Bool>& f, const fof<Bool>& g) {
-	if (f == g && (f + g) == fof<Bool>(false)) return;
+	if (f == g && (f + g) == fof<Bool>(false)) {
+		cout << "passed" << endl;
+		return;
+	}
 	cout << "f: " << f << endl;
 	cout << "g: " << g << endl;
 	cout << "f+g: " << (f+g) << endl;
@@ -75,6 +78,7 @@ void test() {
 	// ex(x, ax+bx'=0) <=> ab=0
 	test((("x"_v) + ("x'"_v)) <<= 1,
 		(("x"_v) | ("x'"_v)) <<= 1);
+	cout << ((("a"_v & "x"_v) | ("b"_v & "x'"_v)) <<= 0) << endl;
 	test((("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0,
 		(("a"_v & "x"_v) | ("b"_v & "x'"_v)) <<= 0);
 	test(ex("x", (("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0),

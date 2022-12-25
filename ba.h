@@ -154,8 +154,9 @@ template<typename B> struct bf : public set<minterm<B>> {
 	bf() : set<minterm<B>>(), v(NONE) {}
 	bf(const term<B>& t) : bf() {
 		if (t.t != term<B>::ELEM) this->emplace(true, t);
-		if (t.e == B::zero()) v = ZERO;
-		if (t.e == B::one()) v = ONE;
+		else if (t.e == B::zero()) v = ZERO;
+		else if (t.e == B::one()) v = ONE;
+		else this->emplace(true, t);
 	}
 	bf(const minterm<B>& t) : set<minterm<B>>({t}), v(NONE) {}
 	bf(bool b) { v = b ? ONE : ZERO; }
@@ -348,7 +349,7 @@ bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
 	for (const term<B>& x : t[1])
 		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
 		else if (x.t == term<B>::BF) throw 0;
-	bf<B> g(false), h(false);
+	bf<B> g, h;
 	for (auto& x : f)
 		if (t <= x) return f;
 		else if (!(x <= t)) g.insert(x);
