@@ -65,6 +65,9 @@ template<typename B> struct term {
 		arg subst(const sym_t& s, const bf<B>& f) const {
 			return ist ? arg(t.subst(s, f)) : *this;
 		}
+		arg subst(const term<B>& s, const bf<B>& f) const {
+			return ist ? arg(t.subst(s, f)) : *this;
+		}
 	};
 	enum type { ELEM, VAR, BF, FUNC } t;
 	//int sym = 0;
@@ -100,7 +103,7 @@ template<typename B> struct term {
 	}
 	bool operator==(const term& x) const;
 	bool operator<(const term& x) const;
-	term subst(const sym_t&, const bf<B>&) const;
+	term subst(const term<B>&, const bf<B>&) const;
 	bool zero() const {
 		switch (t) {
 			case ELEM: return e == B::zero();
@@ -115,6 +118,7 @@ template<typename B> struct term {
 			default: return false;
 		}
 	}
+	bool hasterm(const term<B>& v) const;
 private:
 	term(const bf<B>& f) :
 		t(BF), sym(0), name(), e(B::zero()),
@@ -131,7 +135,8 @@ template<typename B> struct minterm : public array<set<term<B>>, 2> {
 	minterm(minterm &&m) { (*this)[0] = move(m[0]); (*this)[1] = move(m[1]);}
 	minterm(bool pos, const term<B>& t) : base() { add(pos, term<B>(t)); }
 	void add(bool, const term<B>&);
-	bf<B> subst(const sym_t& s, const bf<B>& f) const;
+	bf<B> subst(sym_t, const bf<B>& f) const;
+	bf<B> subst(const term<B>& s, const bf<B>& f) const;
 	bool operator==(const minterm& m) const {
 		return (*this)[0] == m[0] && (*this)[1] == m[1];
 	}
@@ -156,7 +161,9 @@ template<typename B> struct bf : public set<minterm<B>> {
 	bool operator<(const bf<B>& f) const;
 	static const bf<B>& zero();
 	static const bf<B>& one();
-	bf subst(const sym_t& s, const bf<B>& y) const;
+	bf subst(sym_t s, const bf<B>& y) const;
+	bf subst(const term<B>& s, const bf<B>& y) const;
+	bool hasterm(const term<B>& v) const;
 };
 
 template<typename B> term<B>::arg::arg(const term<B>& t) :
@@ -416,14 +423,8 @@ template<typename B> bool isvar(const bf<B>& f) {
 }
 
 template<typename B>
-term<B> term<B>::subst(const sym_t& s, const bf<B>& g) const {
-	if (t == term<B>::VAR) {
-		if (isvar(g)) {
-			sym_t x = (*g.begin())[0].begin()->sym;
-			return s == x ? term<B>(x) : *this;
-		}
-		return s == sym ? term<B>(g) : *this;
-	}
+term<B> term<B>::subst(const term<B>& s, const bf<B>& g) const {
+	if (*this == s) return term<B>(g);
 	if (t == term<B>::BF) return f.subst(s, g);
 	assert(t == term<B>::FUNC);
 	vector<typename term<B>::arg> v;
@@ -431,45 +432,49 @@ term<B> term<B>::subst(const sym_t& s, const bf<B>& g) const {
 	return term<B>(name, v);
 }
 
-template<typename B> bool hasvar(const term<B>& t, sym_t v);
-
-template<typename B> bool hasvar(const bf<B>& f, sym_t v) {
-	for (auto& x : f) {
-		for (auto& y : x[0]) if (hasvar(y, v)) return true;
-		for (auto& y : x[1]) if (hasvar(y, v)) return true;
+template<typename B> bool bf<B>::hasterm(const term<B>& v) const {
+	for (auto& x : *this) {
+		for (auto& y : x[0]) if (y.hasterm(v)) return true;
+		for (auto& y : x[1]) if (y.hasterm(v)) return true;
 	}
 	return false;
 }
 
-template<typename B> bool hasvar(const term<B>& t, sym_t v) {
-	switch (t.t) {
-		case term<B>::VAR: return t.sym == v;
-		case term<B>::ELEM: return false;
-		case term<B>::FUNC:
-			for (auto& x : t.args)
-				if (x.ist && hasvar(x.t, v)) return true;
-				else if (!x.ist && hasvar(x.f, v)) return true;
+template<typename B> bool term<B>::hasterm(const term<B>& v) const {
+	switch (t) {
+		case VAR: return v == *this;
+		case ELEM: return false;
+		case FUNC:
+			for (auto& x : args)
+				if 	((x.ist && x.t.hasterm(v)) ||
+					(!x.ist && x.f.hasterm(v)))
+				return true;
 			return false;
-		case term<B>::BF: return hasvar(t.f, v);
+		case BF: return f.hasterm(v);
 		default: throw 0;
 	}
 }
 
+template<typename B> bf<B> minterm<B>::subst(sym_t s, const bf<B>& f) const {
+	return subst(term<B>(s), f);
+}
+
 template<typename B>
-bf<B> minterm<B>::subst(const sym_t& s, const bf<B>& f) const {
+bf<B> minterm<B>::subst(const term<B>& s, const bf<B>& f) const {
 	bf<B> r(true);
 	for (auto& t : (*this)[0])
 		switch (t.t) {
 			case term<B>::BF:
-				r = 	(hasvar(t.f, s)
+				r = 	(t.f.hasterm(s)
 					? t.f.subst(s, f) : bf<B>(t)) & r;
 				break;
 			case term<B>::FUNC:
-				r = 	(hasvar(t, s)
+				r = 	(t.hasterm(s)
 					? bf<B>(t.subst(s, f)) : bf<B>(t)) & r;
 				break;
 			case term<B>::VAR:
-				if (t.sym != s) r = bf<B>(t) & r;
+				if (s.t != term<B>::VAR || t.sym != s.sym)
+					r = bf<B>(t) & r;
 				else r = r & f;
 				break;
 			case term<B>::ELEM: r = bf<B>(t) & r; break;
@@ -478,15 +483,16 @@ bf<B> minterm<B>::subst(const sym_t& s, const bf<B>& f) const {
 	for (auto& t : (*this)[1])
 		switch (t.t) {
 			case term<B>::BF:
-				r = 	(hasvar(t.f, s)
+				r = 	(t.f.hasterm(s)
 					? ~t.f.subst(s, f) : ~bf<B>(t)) & r;
 				break;
 			case term<B>::FUNC:
-				r = 	(hasvar(t, s)
+				r = 	(t.hasterm(s)
 					? ~bf<B>(t.subst(s, f)) : ~bf<B>(t)) & r;
 				break;
 			case term<B>::VAR:
-				if (t.sym != s) r = ~bf<B>(t) & r;
+				if (s.t != term<B>::VAR || t.sym != s.sym)
+					r = ~bf<B>(t) & r;
 				else r = r & ~f;
 				break;
 			case term<B>::ELEM: r = ~bf<B>(t) & r; break;
@@ -495,8 +501,12 @@ bf<B> minterm<B>::subst(const sym_t& s, const bf<B>& f) const {
 	return r;
 }
 
+template<typename B> bf<B> bf<B>::subst(sym_t s, const bf<B>& y) const {
+	return subst(term<B>(s), y);
+}
+
 template<typename B>
-bf<B> bf<B>::subst(const sym_t& s, const bf<B>& y) const {
+bf<B> bf<B>::subst(const term<B>& s, const bf<B>& y) const {
 	bf<B> z(false);
 	for (const minterm<B>& t : *this) z = t.subst(s, y) | z;
 	return z;

@@ -17,34 +17,27 @@
 template<typename B> using clause = minterm<bf<B>>;
 template<typename B> using fof = bf<bf<B>>;
 
-// todo:
-// 1. remove all minterms in negs that appear in pos
-// 2. elim in neg all unit (pos or neg) minterms that appear in pos
-// 3. also sort in order to elim duplicate clauses
-template<typename B> bf<B> simplify(const bf<B>& f, const bf<B>& g) {
-	bf<B> r(false);
-	for (const minterm<B>& x : g) {
-		bool b = true;
-		for (const minterm<B>& y : f) if (!(b &= !(y <= x))) break;
-		if (b) r = x | r;
-	}
-	return r;
-}
-
 template<typename B> clause<B> simplify(const clause<B>& c) {
 	if (c[0].empty()) return c;
 	clause<B> d;
-	assert(c[0].size() == 1);
-	bf<B> f = c[0].begin()->e;
-	d[0].emplace_back(f);
-	for (auto& t : c[1])
-		if (bf<B> g = simplify(f, t.e); g == bf<B>::one())
-			return clause<B>();
-		else d[1].emplace_back(g);
+	set<term<B>> s;
+	for (const minterm<B>& x : c[0].begin()->e)
+		if (x[0].empty() && x[1].size() == 1) s.insert(*x[1].begin());
+	for (const term<bf<B>>& t : c[1]) {
+		const bf<B>& f = t.e;
+		bf<B> g;
+		for (const minterm<B>& x : f) {
+			bool b = true;
+			for (const minterm<B>& y : c[0].begin()->e)
+				if (!(b &= !(x <= y))) break;
+			if (b) g.insert(x);
+		}
+		for (const term<B>& t : s) g = g.subst(t, bf<Bool>(true));
+		d[1].insert(g);
+	}
 	return d;
 }
 
-#include <iostream>
 template<typename B>
 clause<B> operator&(const clause<B>& x, const clause<B>& y) {
 	static map<array<clause<B>, 2>, clause<B>> M;
@@ -78,7 +71,7 @@ clause<B> operator&(const clause<B>& x, const clause<B>& y) {
 			if (b) z[1].insert(t);
 		}
 	//DBG(cout << z << endl;)
-	M.insert({array<clause<B>, 2>{x, y}, z /*= simplify(z)*/});
+	M.insert({array<clause<B>, 2>{x, y}, z = simplify(z)});
 	return z;
 }
 
