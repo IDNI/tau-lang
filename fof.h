@@ -17,6 +17,10 @@
 template<typename B> using clause = minterm<bf<B>>;
 template<typename B> using fof = bf<bf<B>>;
 
+// todo:
+// 1. remove all minterms in negs that appear in pos
+// 2. elim in neg all unit (pos or neg) minterms that appear in pos
+// 3. also sort in order to elim duplicate clauses
 template<typename B> bf<B> simplify(const bf<B>& f, const bf<B>& g) {
 	bf<B> r(false);
 	for (const minterm<B>& x : g) {

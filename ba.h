@@ -14,15 +14,7 @@
 #define __BA_H__
 //#define DEBUG
 //#define BREAK_BF
-
-#ifdef DEBUG
-#define DBG(x) x
-#include <iostream>
-#else
-#include <iostream>
-#define DBG(x)
-#endif
-
+#include "defs.h"
 #include <vector>
 #include <map>
 #include <set>
@@ -33,11 +25,9 @@
 #include <cassert>
 #include <algorithm>
 #include <functional>
-
 using namespace std;
 
 //typedef string sym_t;
-typedef int sym_t;
 
 template<typename T, typename V> bool has(const T& t, const V& v) {
 	return t.find(v) != t.end();
@@ -567,8 +557,7 @@ void out(ostream& os, const typename term<B>::arg& a) {
 	if (a.ist) os << a.t; else os << a.f;
 }
 
-template<typename B>
-ostream& operator<<(ostream& os, const term<B>& t) {
+template<typename B> ostream& operator<<(ostream& os, const term<B>& t) {
 	if (t.t == term<B>::ELEM) return os << t.e;
 	if (t.t == term<B>::VAR) return os << "x[" << t.sym << "]";
 	if (t.t == term<B>::BF) return os << t.f;

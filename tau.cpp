@@ -11,7 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "fof.h"
-#include "seq.h"
+#include "builder.h"
 #include <iostream>
 
 term<Bool> var_term(int v) {
@@ -63,6 +63,10 @@ template<typename B> fof<B> generic(size_t nc, size_t csz, size_t nv) {
 }
 
 int main() {
+	fof<Bool> f = ("x"_v & "y'"_v) << 0;
+	cout << f << endl;
+	cout << ex(f, "x") << endl;
+	cout << all(f, "x'") << endl;
 //	cout << generic<Bool>(2, 2, 2) << endl;
 	//cout << generic<Bool>(2) << endl;
 	//cout << generic<Bool>(3) << endl;
@@ -87,7 +91,7 @@ int main() {
 //	cout << generic<Bool>(1,1,1).subst(0,term<Bool>(1)) << endl;
 //	cout << generic<Bool>(2) << endl;
 //	cout << all(generic<Bool>(2),0) << endl;
-	seq<Bool>(generic<Bool>(1,1,1));
+//	seq<Bool>(generic<Bool>(2,2,2));
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;
