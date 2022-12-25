@@ -92,6 +92,22 @@ fof<B> c2fof(const clause<B>& c) {
 
 template<typename B> fof<B> operator|(clause<B> c, const fof<B>& f) {
 	assert(!c[0].empty() || !c[1].empty());
+	if (c[0].empty() && c[1].size() == 1) {
+		clause<B> x;
+		for (const clause<B>& d : f)
+			if (d[0].empty() && d[1].size() == 1)
+				{ x = d; break; } // there must be only one
+		if (!x[1].empty()) {
+#ifdef DEBUG
+			for (const clause<B>& d : f)
+				if (d[0].empty() && d[1].size() == 1)
+					assert(x == d);
+#endif
+			fof<B> g = ~fof<B>(c[1].begin()->e | x[1].begin()->e);
+			for (const clause<B>& d : f) if (d != x) g.insert(d);
+			return g;
+		}
+	}
 #ifdef BREAK_BF
 	bool b = !c[1].empty();
 /*	for (const auto& t : c[0])

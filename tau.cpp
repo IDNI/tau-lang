@@ -93,11 +93,13 @@ void test() {
 	test(ex("x", (("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0),
 		("a"_v & "b"_v) <<= 0);
 	// ex(x, ax+bx'!=0) <=> a!=0 | b!=0
+	test(ex("x", (("a"_v & "x"_v) + ("b"_v & "x'"_v)) << 0),
+			("a"_v << 0) | ("b"_v << 0));
 	// ax+bx'=0 <=> a<=x<=b'
 }
 
 int main() {
-	test(); return 0;
+	test();
 //	cout << generic<Bool>(2, 2, 2) << endl;
 	//cout << generic<Bool>(2) << endl;
 	//cout << generic<Bool>(3) << endl;
