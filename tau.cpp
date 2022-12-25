@@ -42,7 +42,7 @@ template<typename B> bf<B> generic(size_t nv, size_t c = 0) {
 	for (size_t v = 0; v != (((size_t)1) << nv); ++v) {
 		minterm<B> m(true, term<B>(-v-1-c));
 		for (size_t k = 0; k != nv; ++k)
-			m[(v & (1 << k)) ? 0 : 1].push_back(term<B>(k));
+			m[(v & (1 << k)) ? 0 : 1].insert(term<B>(k));
 		r = m | r;
 	}
 	return r;

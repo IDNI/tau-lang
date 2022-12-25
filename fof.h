@@ -55,27 +55,27 @@ clause<B> operator&(const clause<B>& x, const clause<B>& y) {
 	if ((hits + misses)%1000 == 0) cout << "hits: " << hits << " misses: "
 	       	<< misses << endl;
 	//DBG(cout << x << "&&" << y << " = ";)
-	clause<B> z(vector<term<bf<B>>>(), x[1]);
+	clause<B> z(set<term<bf<B>>>(), x[1]);
 //	z[1] = x[1];
 	assert(x[0].size() <= 1 && y[0].size() <= 1);
 	if (!x[0].empty()) {
-		if (y[0].empty()) z[0].push_back(*x[0].begin());
+		if (y[0].empty()) z[0].insert(*x[0].begin());
 		else {
 			term<bf<Bool>> t1 = *x[0].begin(), t2 = *y[0].begin();
 			assert(t1.t==term<bf<B>>::ELEM&&t2.t==term<bf<B>>::ELEM);
 			auto t = t1.e | t2.e;
 			if (t == bf<Bool>::one()) return clause<B>();
-			else z[0].push_back(t);
+			else z[0].insert(t);
 		}
 	} else z[0] = y[0];//.push_back(*y[0].begin());
 	for (auto& t : y[1])
-		if (!z[0].empty() && t.e <= z[0][0].e) return clause<B>();
+		if (!z[0].empty() && t.e <= z[0].begin()->e) return clause<B>();
 		else if (t.e == bf<Bool>::one()) continue;
 		else if (t.e == bf<Bool>::zero()) throw 0;
 		else {
 			bool b = true;
 			for (auto& s : z[1]) if (!(b &= !(s.e <= t.e))) break;
-			if (b) z[1].push_back(t);
+			if (b) z[1].insert(t);
 		}
 	//DBG(cout << z << endl;)
 	M.insert({array<clause<B>, 2>{x, y}, z /*= simplify(z)*/});

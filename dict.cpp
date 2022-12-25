@@ -14,7 +14,7 @@ sym_t dict(const char* s) {
 }
 
 const char* dict(sym_t n) {
-	if (n >= v.size()) {
+	if ((size_t)n >= v.size()) {
 		static string tmp;
 		stringstream ss;
 		ss << "x[" << n << "]";
