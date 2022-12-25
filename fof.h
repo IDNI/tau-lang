@@ -131,7 +131,9 @@ fof<B> ex(const clause<B>& c, const sym_t& v) {
 		clause<B> r;
 		for (const term<bf<B>>& t : c[1]) {
 			assert(t.t == term<bf<B>>::ELEM);
-			r = r & clause<B>(false, ex(t.e, v));
+			bf<B> f = ex(t.e, v);
+			if (f == bf<B>::one()) return fof<B>::zero();
+			r = r & clause<B>(false, f);
 		}
 		return r;
 	}
