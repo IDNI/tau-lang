@@ -42,8 +42,9 @@ template<typename B> clause<B> simplify(const clause<B>& c) {
 template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
 	static map<array<clause<B>, 2>, clause<B>> M;
 	static size_t hits = 0, misses = 0;
-	if (y < x) return y & x;
-	if (auto it = M.find({x, y}); it != M.end()) return ++hits, it->second;
+	array<clause<B>, 2> a;
+	if (x < y) a = {x, y}; else a = {y, x};
+	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
 	++misses;
 	if ((hits + misses)%1000 == 0) cout << "hits: " << hits << " misses: "
 	       	<< misses << endl;
@@ -70,7 +71,7 @@ template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
 			for (auto& s : z[1]) if (!(b &= !(s.e <= t.e))) break;
 			if (b) z[1].insert(t);
 		}
-	M.insert({array<clause<B>, 2>{x, y}, z = simplify(z)});
+	M.insert({a, z = simplify(z)});
 	return z;
 }
 

@@ -69,18 +69,27 @@ void test(const fof<Bool>& f, const fof<Bool>& g) {
 	}
 	cout << "f: " << f << endl;
 	cout << "g: " << g << endl;
+	cout << "f': " << (~f) << endl;
+	cout << "g': " << (~g) << endl;
+	cout << "f'|g': " << ((~f)|(~g)) << endl;
+	cout << "ff': " << (f&~f) << endl;
 	cout << "f+g: " << (f+g) << endl;
+	cout << "f&g': " << (f&~g) << endl;
 	assert(f == g);
 	assert((f + g) == fof<Bool>(false));
 }
 
 void test() {
+	fof<Bool> f, g;
 	// ex(x, ax+bx'=0) <=> ab=0
+	f = "x"_v <<= 1;
+	test(fof<Bool>(false), f & ~f);
 	test((("x"_v) + ("x'"_v)) <<= 1,
 		(("x"_v) | ("x'"_v)) <<= 1);
 	cout << ((("a"_v & "x"_v) | ("b"_v & "x'"_v)) <<= 0) << endl;
-	test((("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0,
-		(("a"_v & "x"_v) | ("b"_v & "x'"_v)) <<= 0);
+	g = (("a"_v & "x"_v) | ("b"_v & "x'"_v)) <<= 0;
+	f = (("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0;
+	test(f, g);		
 	test(ex("x", (("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0),
 		("a"_v & "b"_v) <<= 0);
 	// ex(x, ax+bx'!=0) <=> a!=0 | b!=0

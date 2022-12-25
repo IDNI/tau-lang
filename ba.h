@@ -247,8 +247,9 @@ template<typename B> bf<B> operator&(
 	//DBG(cout << x << "&&" << y << " = ";)
 	static map<array<minterm<B>, 2>, bf<B>> M;
 	static size_t hits = 0, misses = 0;
-	if (y < x) return y & x;
-	if (auto it = M.find({x, y}); it != M.end()) return ++hits, it->second;
+	array<minterm<B>, 2> a;
+	if (x < y) a = {x, y}; else a = {y, x};
+	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
 	++misses;
 	if ((hits + misses)%100000 == 0)
 		cout << "(M) hits: " << hits << " misses: " << misses << endl;
@@ -269,7 +270,7 @@ template<typename B> bf<B> operator&(
 	z[1].insert(y[1].begin(), y[1].end());
 	bf<B> r(move(z));
 	//DBG(cout << z << endl;)
-	M.insert({array<minterm<B>, 2>{x, y}, r});
+	M.insert({a, r});
 	return r;
 }
 
@@ -335,8 +336,7 @@ bool complementary(const minterm<B>& x, minterm<B>& y) {
 	return false;
 }
 
-template<typename B>
-bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
+template<typename B> bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
 //	cout << t << " | " << f << " = " << endl;
 	if (f == bf<B>::one()) return f;
 	if (f == bf<B>::zero()) return bf<B>(t);
