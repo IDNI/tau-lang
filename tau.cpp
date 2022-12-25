@@ -63,10 +63,14 @@ template<typename B> fof<B> generic(size_t nc, size_t csz, size_t nv) {
 }
 
 int main() {
-	fof<Bool> f = ("x"_v & "y'"_v) << 0;
+	fof<Bool> f = ("x"_v & "y'"_v) <<= 0;
 	cout << f << endl;
 	cout << ex(f, "x") << endl;
-	cout << all(f, "x'") << endl;
+	cout << (~f) << endl;
+	cout << ex(~f, "x") << endl;
+	cout << ~ex(~f, "x") << endl;
+	fof<Bool> g = all(f, "x'");
+	cout << g << endl;
 //	cout << generic<Bool>(2, 2, 2) << endl;
 	//cout << generic<Bool>(2) << endl;
 	//cout << generic<Bool>(3) << endl;

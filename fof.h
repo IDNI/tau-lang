@@ -125,7 +125,7 @@ template<typename B> fof<B> operator|(clause<B> c, const fof<B>& f) {
 }
 
 template<typename B>
-clause<B> ex(const clause<B>& c, const sym_t& v) {
+fof<B> ex(const clause<B>& c, const sym_t& v) {
 	if (c[0].empty()) {
 		DBG(assert(!c[1].empty());)
 		clause<B> r;
@@ -138,7 +138,8 @@ clause<B> ex(const clause<B>& c, const sym_t& v) {
 	if (c[1].empty()) {
 		DBG(assert(c[0].size() == 1);)
 		DBG(assert(c[0].begin()->t == term<bf<B>>::ELEM);)
-		return clause<B>(true, all(c[0].begin()->e, v));
+		bf<B> f = all(c[0].begin()->e, v);
+		return f.empty() ? fof<B>(true) : clause<B>(true, f); 
 	}
 	assert(c[0].size() == 1);
 	bf<B> f0 = c[0].begin()->e;
@@ -162,7 +163,7 @@ template<typename B> fof<B> ex(const fof<B>& f, const sym_t& v) {
 }
 
 template<typename B>
-fof<B> all(const fof<B>& f, const sym_t& v) { return ~ex(~f, v); }
+fof<B> all(const fof<B>& f, const sym_t& v) { return ~ex<B>(~f, v); }
 
 template<typename B>
 term<B> term_trans_vars(const term<B>& t, function<sym_t(sym_t)> g) {
@@ -220,6 +221,8 @@ ostream& operator<<(ostream& os, const clause<B>& c) {
 
 template<typename B>
 ostream& operator<<(ostream& os, const fof<B>& f) {
+	if (f == fof<B>::zero()) os << "F";
+	if (f == fof<B>::one()) os << "T";
 	size_t n = f.size();
 	for (const clause<B>& c : f) os << c << (--n ? "\t||" : "") << endl;
 	return os;
