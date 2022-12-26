@@ -177,8 +177,7 @@ term<B> term_trans_vars(const term<B>& t, function<sym_t(sym_t)> g) {
 	if (t.t == term<B>::FUNC) {
 		vector<typename term<B>::arg> v;
 		for (auto& a : t.args)
-			if (a.ist)
-				v.emplace_back(term_trans_vars<B>(a.t, g));
+			if (a.ist) v.emplace_back(term_trans_vars<B>(a.t, g));
 			else v.push_back(a);
 //		cout << "out: " << r << endl;
 		return term<B>(t.name, v);
@@ -189,7 +188,7 @@ term<B> term_trans_vars(const term<B>& t, function<sym_t(sym_t)> g) {
 
 template<typename B>
 bf<B> mt_trans_vars(const minterm<B>& m, function<sym_t(sym_t)> g) {
-	bf<B> b;
+	bf<B> b(true);
 	for (size_t j = 0; j != 2; ++j)
 		for (const term<B>& t : m[j])
 			b = minterm<B>(!j, term_trans_vars(t, g)) & b;
@@ -198,7 +197,7 @@ bf<B> mt_trans_vars(const minterm<B>& m, function<sym_t(sym_t)> g) {
 
 template<typename B>
 fof<B> transform_vars(const clause<B>& c, function<sym_t(sym_t)> g) {
-	fof<B> d;
+	fof<B> d(true);
 	for (size_t i = 0; i != 2; ++i)
 		for (const term<bf<B>>& s : c[i]) {
 			assert(s.t == term<bf<B>>::ELEM);

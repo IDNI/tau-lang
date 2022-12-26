@@ -81,7 +81,6 @@ void test(const fof<Bool>& f, const fof<Bool>& g) {
 
 void test() {
 	fof<Bool> f, g;
-	// ex(x, ax+bx'=0) <=> ab=0
 	f = ("x"_v) << 0;
 	cout << (f & ~f) << endl;
 	test(fof<Bool>(false), f & ~f);
@@ -91,6 +90,7 @@ void test() {
 	g = (("a"_v & "x"_v) | ("b"_v & "x'"_v)) <<= 0;
 	f = (("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0;
 	test(f, g);		
+	// ex(x, ax+bx'=0) <=> ab=0
 	test(ex("x", (("a"_v & "x"_v) + ("b"_v & "x'"_v)) <<= 0),
 		("a"_v & "b"_v) <<= 0);
 	// ex(x, ax+bx'!=0) <=> a!=0 | b!=0
