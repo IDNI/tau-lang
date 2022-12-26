@@ -139,6 +139,13 @@ template<typename B> struct minterm : public array<set<term<B>>, 2> {
 	void add(bool, const term<B>&);
 	bf<B> subst(sym_t, const bf<B>& f) const;
 	bf<B> subst(const term<B>& s, const bf<B>& f) const;
+	bool operator<(const minterm& m) const {
+		if ((*this)[0].size() != m[0].size())
+			return (*this)[0].size() < m[0].size();
+		if ((*this)[1].size() != m[1].size())
+			return (*this)[1].size() < m[1].size();
+		return (base)*this < (base)m;
+	}
 	bool operator==(const minterm& m) const {
 		return (*this)[0] == m[0] && (*this)[1] == m[1];
 	}
@@ -149,19 +156,19 @@ template<typename B> struct minterm : public array<set<term<B>>, 2> {
 	}
 };
 
-//template<typename B> struct bf : public set<minterm<B>> {
 template<typename B> struct bf : public set<minterm<B>> {
+	typedef set<minterm<B>> base;
 	enum { ZERO, ONE, NONE } v;
 
-	bf() : set<minterm<B>>(), v(NONE) {}
+	bf() : base(), v(NONE) {}
 	bf(const term<B>& t) : bf() {
 		if (t.t != term<B>::ELEM) this->emplace(true, t);
 		else if (t.e == B::zero()) v = ZERO;
 		else if (t.e == B::one()) v = ONE;
 		else this->emplace(true, t);
 	}
-	bf(const minterm<B>& t) : set<minterm<B>>({t}), v(NONE) {}
-	bf(bool b) { v = b ? ONE : ZERO; }
+	bf(const minterm<B>& t) : base({t}), v(NONE) {}
+	bf(bool b) { v = (b ? ONE : ZERO); }
 
 	bool operator==(const bf<B>& f) const;
 	bool operator<(const bf<B>& f) const;
@@ -217,12 +224,13 @@ template<typename B> void minterm<B>::add(bool pos, const term<B>& t) {
 
 template<typename B> bool bf<B>::operator==(const bf<B>& f) const {
 	if (f.v != v) return false;
-	return (set<minterm<B>>)(*this) == (set<minterm<B>>)f;
+	return (base)(*this) == (base)f;
 }
 
 template<typename B> bool bf<B>::operator<(const bf<B>& f) const {
 	if (f.v != v) return v < f.v;
-	return (set<minterm<B>>)(*this) < (set<minterm<B>>)f;
+	if (base::size() != f.size()) return base::size() < f.size();
+	return (base)(*this) < (base)f;
 }
 
 template<typename B> const bf<B>& bf<B>::zero() {
@@ -466,43 +474,56 @@ template<typename B> bf<B> minterm<B>::subst(sym_t s, const bf<B>& f) const {
 
 template<typename B>
 bf<B> minterm<B>::subst(const term<B>& s, const bf<B>& f) const {
+	/*template<typename B>*/ struct item {
+		item(const minterm<B>& m, const term<B>& t, const bf<B>& f) :
+			m(m), t(t), f(f) {}
+		minterm<B> m;
+		term<B> t;
+		bf<B> f;
+		bool operator<(const item& x) const {
+			if (t != x.t) return t < x.t;
+			if (m != x.m) return m < x.m;
+			return f < x.f;
+		}
+	};
+	static map<item, bf<B>> M;
+	static size_t hits = 0, misses = 0;
+	item a(*this, s, f);
+	if (auto it = M.find(a); it != M.end()) {
+		/*assert(a.m == *this);
+		assert(a.t == s);
+		assert(a.f == f);
+		assert(it->first.m == *this);
+		assert(it->first.t == s);
+		assert(it->first.f == f);*/
+		return ++hits, it->second;
+	}
+	++misses;
+	if ((hits + misses)%100000 == 0)
+		cout << "(S) hits: " << hits << " misses: " << misses << endl;
+	if ((hits + misses)>1000000) M.clear();
 	bf<B> r(true);
 	for (auto& t : (*this)[0])
-		switch (t.t) {
-			case term<B>::BF:
-				r = 	(t.f.hasterm(s)
-					? t.f.subst(s, f) : bf<B>(t)) & r;
-				break;
-			case term<B>::FUNC:
-				r = 	(t.hasterm(s)
-					? bf<B>(t.subst(s, f)) : bf<B>(t)) & r;
-				break;
-			case term<B>::VAR:
-				if (s.t != term<B>::VAR || t.sym != s.sym)
-					r = bf<B>(t) & r;
-				else r = r & f;
-				break;
-			case term<B>::ELEM: r = bf<B>(t) & r; break;
-			default: throw 0;
-		}
+		if (t.t == term<B>::BF)
+			r = (t.f.hasterm(s) ? t.f.subst(s, f) : bf<B>(t)) & r;
+		else if (t.t == term<B>::FUNC)
+			r = (t.hasterm(s) ? bf<B>(t.subst(s,f)) : bf<B>(t)) & r;
+		else if (t.t == term<B>::VAR) {
+			if (s.t == term<B>::VAR && t.sym == s.sym) r = r & f;
+			else r = bf<B>(t) & r;
+		} else if (t.t == term<B>::ELEM) r = bf<B>(t) & r;
+		else throw 0;
 	for (auto& t : (*this)[1])
-		switch (t.t) {
-			case term<B>::BF:
-				r = 	(t.f.hasterm(s)
-					? ~t.f.subst(s, f) : ~bf<B>(t)) & r;
-				break;
-			case term<B>::FUNC:
-				r = 	(t.hasterm(s)
-					? ~bf<B>(t.subst(s, f)) : ~bf<B>(t)) & r;
-				break;
-			case term<B>::VAR:
-				if (s.t != term<B>::VAR || t.sym != s.sym)
-					r = ~bf<B>(t) & r;
-				else r = r & ~f;
-				break;
-			case term<B>::ELEM: r = ~bf<B>(t) & r; break;
-			default: throw 0;
-		}
+		if (t.t == term<B>::BF)
+			r = (t.f.hasterm(s) ? ~t.f.subst(s, f) : ~bf<B>(t)) & r;
+		else if (t.t == term<B>::FUNC)
+			r = (t.hasterm(s) ? ~bf<B>(t.subst(s,f)) : ~bf<B>(t))&r;
+		else if (t.t == term<B>::VAR) {
+			if (s.t == term<B>::VAR && t.sym == s.sym) r = r & ~f;
+			else r = ~bf<B>(t) & r;
+		} else if (t.t == term<B>::ELEM) r = ~bf<B>(t) & r;
+		else throw 0;
+	M.emplace(a, r);
 	return r;
 }
 

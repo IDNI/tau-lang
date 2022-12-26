@@ -19,7 +19,7 @@ template<typename B> using fof = bf<bf<B>>;
 
 template<typename B> clause<B> simplify(const clause<B>& c) {
 	if (c[0].empty()) return c;
-	cout << "simplifying " << c;
+//	cout << "simplifying " << c;
 	clause<B> d;
 	d[0] = c[0];
 	set<term<B>> s;
@@ -37,7 +37,7 @@ template<typename B> clause<B> simplify(const clause<B>& c) {
 		for (const term<B>& t : s) g = g.subst(t, bf<Bool>(true));
 		d[1].insert(g);
 	}
-	cout << " gives " << d << endl;
+//	cout << " gives " << d << endl;
 	return d;
 }
 

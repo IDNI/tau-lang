@@ -22,11 +22,11 @@ void seq(fof<B> f) {
 	size_t n = 0;
 	cout << f << endl;
 	for (ever) {
-		cout << "f:" << f << endl;
-		cout << "shr(f): " << shr(f) << endl;
-		cout << "f & shr(f): " << (f & shr(f)) << endl;
-		cout << "ex f & shr(f): " << ex(f & shr(f), 0) << endl;
-		f = shl(ex(f & shr(f), 0));
+//		cout << "f:" << f << endl;
+//		cout << "shr(f): " << shr(f) << endl;
+//		cout << "f & shr(f): " << (f & shr(f)) << endl;
+//		cout << "ex f & shr(f): " << ex(f & shr(f), 0) << endl;
+		f = shl(ex(ex(f & shr(f), 0), 1));
 		cout << ++n << '\t' << f << endl;
 		if (f == fof<B>::zero()) { cout << "unsat" << endl; return; }
 		for (size_t k = 0; k != v.size(); ++k)
