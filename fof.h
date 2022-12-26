@@ -133,6 +133,15 @@ template<typename B> fof<B> operator|(clause<B> c, const fof<B>& f) {
 	return disj_fmt(c, f);
 }
 
+template<typename B>
+fof<B> horn(const bf<B>& f, const bf<B>& g, const sym_t& v) {
+	static size_t n = 0;
+	cout << "horn " << ++n << endl;
+	return	(fof<B>(all(g, v)) | ~fof<B>(all(f, v))) &
+		fof<B>(	g.subst(v, f.subst(v, bf<B>::zero())) |
+			g.subst(v, ~f.subst(v, bf<B>::one())));
+}
+
 template<typename B> fof<B> ex(const clause<B>& c, const sym_t& v) {
 	if (c[0].empty()) {
 		DBG(assert(!c[1].empty());)
@@ -151,6 +160,7 @@ template<typename B> fof<B> ex(const clause<B>& c, const sym_t& v) {
 		bf<B> f = all(c[0].begin()->e, v);
 		return f.empty() ? fof<B>(true) : clause<B>(true, f); 
 	}
+	if (c[1].size() == 1) return horn(pfst(c[1]).e, pfst(c[0]).e, v);
 	assert(c[0].size() == 1);
 	bf<B> f0 = c[0].begin()->e;
 	fof<B> r(all(f0, v));
@@ -161,9 +171,25 @@ template<typename B> fof<B> ex(const clause<B>& c, const sym_t& v) {
 	return r;
 }
 
+template<typename B>
+array<clause<B>, 2> split(const clause<B>& c, const sym_t& v) {
+	clause<B> x, y;
+	term<B> s(v);
+	for (auto& t : c[0]) (t.e.hasterm(s) ? x : y)[0].insert(t);
+	for (auto& t : c[1]) (t.e.hasterm(s) ? x : y)[1].insert(t);
+	return {x, y};
+}
+
 template<typename B> fof<B> ex(const fof<B>& f, const sym_t& v) {
 	fof<B> g(false);
-	for (const clause<B>& c : f) g = ex(c, v) | g;
+	array<clause<B>, 2> a;
+	for (const clause<B>& c : f) {
+		if (a = split(c, v); a[0][0].empty() && a[0][1].empty())
+			g = c | g;
+		else g = ex(a[0], v) | g;
+		if (!a[1][0].empty() || !a[1][1].empty()) g = a[1] & g;
+		g = ex(c, v) | g;
+	}
 	return g;
 }
 
