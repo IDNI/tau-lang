@@ -12,7 +12,6 @@
 // modified over time by the Author.
 #ifndef __BA_H__
 #define __BA_H__
-//#define DEBUG
 //#define BREAK_BF
 #include "defs.h"
 #include <vector>
@@ -286,8 +285,13 @@ template<typename B> bf<B> operator&(
 
 template<typename B>
 bool operator<=(const minterm<B>& x, const minterm<B>& y) {
-//	cout << x << "&" << y << " = " << (x & y);
 	return (x & y) == x;
+}
+
+bool operator<=(const minterm<Bool>& x, const minterm<Bool>& y) {
+	for (auto& t : y[0]) if (x[0].find(t) == x[0].end()) return false;
+	for (auto& t : y[1]) if (x[1].find(t) == x[1].end()) return false;
+	return true;
 }
 
 template<typename B>

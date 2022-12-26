@@ -188,7 +188,7 @@ template<typename B> fof<B> ex(const fof<B>& f, const sym_t& v) {
 			g = c | g;
 		else g = ex(a[0], v) | g;
 		if (!a[1][0].empty() || !a[1][1].empty()) g = a[1] & g;
-		g = ex(c, v) | g;
+		//g = ex(c, v) | g;
 	}
 	return g;
 }

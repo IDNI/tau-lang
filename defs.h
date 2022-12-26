@@ -1,5 +1,5 @@
 typedef int sym_t;
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define DBG(x) x
