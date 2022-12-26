@@ -19,6 +19,7 @@ template<typename B> using fof = bf<bf<B>>;
 
 template<typename B> clause<B> simplify(const clause<B>& c) {
 	if (c[0].empty()) return c;
+	cout << "simplifying " << c;
 	clause<B> d;
 	d[0] = c[0];
 	set<term<B>> s;
@@ -36,14 +37,15 @@ template<typename B> clause<B> simplify(const clause<B>& c) {
 		for (const term<B>& t : s) g = g.subst(t, bf<Bool>(true));
 		d[1].insert(g);
 	}
+	cout << " gives " << d << endl;
 	return d;
 }
 
 template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
 	static map<array<clause<B>, 2>, clause<B>> M;
 	static size_t hits = 0, misses = 0;
-	array<clause<B>, 2> a;
-	if (x < y) a = {x, y}; else a = {y, x};
+	typedef array<clause<B>, 2> item;
+	item a = (x < y) ? item{x, y} : item{y, x};
 	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
 	++misses;
 	if ((hits + misses)%1000 == 0) cout << "hits: " << hits << " misses: "
@@ -51,22 +53,19 @@ template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
 	//DBG(cout << x << "&&" << y << " = ";)
 	clause<B> z(set<term<bf<B>>>(), x[1]);
 	assert(x[0].size() <= 1 && y[0].size() <= 1);
-	if (!x[0].empty()) {
-		if (y[0].empty()) z[0] = x[0];
-		else {
-			term<bf<Bool>> t1 = *x[0].begin(), t2 = *y[0].begin();
-			assert(t1.t==term<bf<B>>::ELEM&&t2.t==term<bf<B>>::ELEM);
-			auto t = t1.e | t2.e;
-			if (t == bf<Bool>::one()) return fof<B>(false);
-			else z[0].insert(t);
-		}
-	} else z[0] = y[0];
+	if (x[0].empty()) z[0] = y[0];
+	else if (y[0].empty()) z[0] = x[0];
+	else if (bf<B> t = pfst(x[0]).e | pfst(y[0]).e; t == bf<Bool>::one())
+		return fof<B>(false);
+	else z[0].insert(t);
+	if (!z[0].empty())
+		for (auto& t : z[1])
+			if (t.e <= pfst(z[0]).e) return fof<B>(false);
 	for (auto& t : y[1])
-		if (!z[0].empty() && t.e <= z[0].begin()->e)
-			return fof<B>(false);
+		if (!z[0].empty() && t.e <= pfst(z[0]).e) return fof<B>(false);
 		else if (t.e == bf<Bool>::one()) continue;
-		else if (t.e == bf<Bool>::zero()) throw 0;
 		else {
+			assert(t.e != bf<Bool>::zero());
 			bool b = true;
 			for (auto& s : z[1]) if (!(b &= !(s.e <= t.e))) break;
 			if (b) z[1].insert(t);
@@ -91,6 +90,7 @@ fof<B> c2fof(const clause<B>& c) {
 }
 
 template<typename B> fof<B> operator|(clause<B> c, const fof<B>& f) {
+	assert(!f.empty() || f == fof<B>::zero() || f == fof<B>::one());
 	assert(!c[0].empty() || !c[1].empty());
 	if (c[0].empty() && c[1].size() == 1) {
 		clause<B> x;

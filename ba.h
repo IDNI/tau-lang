@@ -25,8 +25,10 @@
 #include <cassert>
 #include <algorithm>
 #include <functional>
+#include <climits>
 using namespace std;
 
+#define pfst(x) (*(x).begin())
 //typedef string sym_t;
 
 template<typename T, typename V> bool has(const T& t, const V& v) {
@@ -247,8 +249,8 @@ template<typename B> bf<B> operator&(
 	//DBG(cout << x << "&&" << y << " = ";)
 	static map<array<minterm<B>, 2>, bf<B>> M;
 	static size_t hits = 0, misses = 0;
-	array<minterm<B>, 2> a;
-	if (x < y) a = {x, y}; else a = {y, x};
+	typedef array<minterm<B>, 2> item;
+	item a = (x < y) ? item{x, y} : item{y, x};
 	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
 	++misses;
 	if ((hits + misses)%100000 == 0)
@@ -276,6 +278,7 @@ template<typename B> bf<B> operator&(
 
 template<typename B>
 bool operator<=(const minterm<B>& x, const minterm<B>& y) {
+//	cout << x << "&" << y << " = " << (x & y);
 	return (x & y) == x;
 }
 
@@ -284,6 +287,7 @@ bool operator<=(const minterm<B>& t, const bf<B>& f) {
 	if (f == bf<B>::one()) return true;
 	if (f == bf<B>::zero()) return false;
 	for (const minterm<B>& x : f) if (t <= x) return true;
+//	cout << t << " is not leq " << f << endl;
 	return false;
 }
 
@@ -337,18 +341,17 @@ bool complementary(const minterm<B>& x, minterm<B>& y) {
 }
 
 template<typename B> bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
-//	cout << t << " | " << f << " = " << endl;
 	if (f == bf<B>::one()) return f;
 	if (f == bf<B>::zero()) return bf<B>(t);
 	if (t <= f) return f;
-	if (t[0].empty() && t[1].empty()) throw 0;//return bf<B>(true);// f;
-	if (f.empty()) throw 0;//return bf<B>(t);
+	assert(!t[0].empty() || !t[1].empty());
+	assert(!f.empty());
 	for (const term<B>& x : t[0])
 		if (x.t == term<B>::ELEM && x.e == B::zero()) return f;
-		else if (x.t == term<B>::BF) throw 0;
+		else assert(x.t != term<B>::BF);
 	for (const term<B>& x : t[1])
 		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
-		else if (x.t == term<B>::BF) throw 0;
+		else assert(x.t != term<B>::BF);
 	bf<B> g, h;
 	for (auto& x : f)
 		if (t <= x) return f;
@@ -359,7 +362,6 @@ template<typename B> bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
 		if (!complementary(x, t)) h.insert(x);
 		else if (t[0].empty() && t[1].empty()) return bf<B>(true);
 	}
-//	cout << "\t" << g << endl;
 	return h.insert(t), h;
 } 
 
@@ -550,6 +552,21 @@ template<typename B> bf<B> all(const bf<B>& f, const sym_t& v) {
 	//cout << "subst 1 for " << v << " in " << f << " = " << f1 << endl;
 	//cout << "their conj: " << (f0 & f1) << endl;
 	return f.subst(v, bf<B>::zero()) & f.subst(v, bf<B>::one());
+}
+
+template<typename B>
+vector<bf<B>> lgrs(const bf<B>& f, const vector<term<B>>& v) {
+	assert(f != bf<B>::one());
+	size_t n = INT_MAX;
+	minterm<B> z;
+	for (const minterm<B>& m : f)
+		if (m[0].size() < n)
+			n = m[0].size, z = m;
+	vector<bf<B>> r;
+	for (size_t n = 0; n != v.size(); ++n)
+		if (has(z[0], v[n])) r[n] = f + bf<B>(v[n]) & ~f;
+		else r[n] = bf<B>(v[n]) & ~f;
+	return r;
 }
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b?"T":"F"); }
