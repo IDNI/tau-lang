@@ -12,6 +12,7 @@
 // modified over time by the Author.
 #include "fof.h"
 #include "builder.h"
+#include "fof.h"
 #include "bdd.h"
 #include <iostream>
 #include <sstream>

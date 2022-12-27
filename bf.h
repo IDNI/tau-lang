@@ -166,6 +166,35 @@ template<typename B> bool bf<B>::hasterm(const term<B>& v) const {
 	return false;
 }
 
+template<typename B>
+bf<B> mt_trans_vars(const minterm<B>& m, function<sym_t(sym_t)> g) {
+	bf<B> b(true);
+	for (size_t j = 0; j != 2; ++j)
+		for (const term<B>& t : m[j])
+			b = minterm<B>(!j, term_trans_vars(t, g)) & b;
+	return b;
+}
+
+// condition g!=0 given f=0
+template<typename B> bf<B> condition(const bf<B>& f, const bf<B>& g) {
+	set<term<B>> s;
+	// find negative units
+	for (const minterm<B>& x : f)
+		if (x[0].empty() && x[1].size() == 1)
+			s.insert(*x[1].begin());
+	bf<B> r;
+	for (const minterm<B>& x : g) {
+		bool b = true;
+		for (const minterm<B>& y : f)
+			// elim terms dominated by zero
+			if (!(b &= !(x <= y))) break;
+		if (b) r.insert(x);
+	}
+	// elim the units
+	for (const term<B>& t : s) r = r.subst(t, bf<Bool>(true));
+	return r;
+}
+
 template<typename B> bf<B> bf<B>::subst(sym_t s, const bf<B>& y) const {
 	return subst(term<B>(s), y);
 }

@@ -18,28 +18,20 @@
 template<typename B> using clause = minterm<bf<B>>;
 template<typename B> using fof = bf<bf<B>>;
 
-template<typename B> clause<B> simplify(const clause<B>& c) {
+template<typename B> fof<B> simplify(const clause<B>& c) {
 	if (c[0].empty()) return c;
-//	cout << "simplifying " << c;
-	clause<B> d;
-	d[0] = c[0];
-	set<term<B>> s;
-	for (const minterm<B>& x : c[0].begin()->e)
-		if (x[0].empty() && x[1].size() == 1) s.insert(*x[1].begin());
-	for (const term<bf<B>>& t : c[1]) {
-		const bf<B>& f = t.e;
-		bf<B> g;
-		for (const minterm<B>& x : f) {
-			bool b = true;
-			for (const minterm<B>& y : c[0].begin()->e)
-				if (!(b &= !(x <= y))) break;
-			if (b) g.insert(x);
-		}
-		for (const term<B>& t : s) g = g.subst(t, bf<Bool>(true));
-		d[1].insert(g);
+	static bool in;
+	if (in) return c;
+	in = true;
+	fof<B> f(*c[0].begin());
+	for (auto& t : c[1]) {
+		bf<B> g = condition(c[0].begin()->e, t.e);
+		if (g == bf<B>::zero()) return in = false, fof<B>::zero();
+		if (g == bf<B>::one()) continue;
+		f = clause<B>(false, g) & f;
+		if (f == fof<B>::zero()) return in = false, f;
 	}
-//	cout << " gives " << d << endl;
-	return d;
+	return in = false, f;
 }
 
 template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
@@ -71,9 +63,9 @@ template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
 			for (auto& s : z[1]) if (!(b &= !(s.e <= t.e))) break;
 			if (b) z[1].insert(t);
 		}
-	z = simplify(z);
-//	M.insert({a, z});
-	return z;
+	fof<B> r = simplify(z);
+//	M.insert({a, r});
+	return r;
 }
 
 template<typename B> fof<B> c2fof(const clause<B>& c) {
@@ -214,31 +206,6 @@ template<typename B> fof<B> ex(const fof<B>& f, const sym_t& v) {
 
 template<typename B>
 fof<B> all(const fof<B>& f, const sym_t& v) { return ~ex<B>(~f, v); }
-
-template<typename B>
-term<B> term_trans_vars(const term<B>& t, function<sym_t(sym_t)> g) {
-//	cout << "in: " << t << endl;
-	if (t.t == term<B>::VAR) return term<B>(g(t.sym));
-	if (t.t == term<B>::FUNC) {
-		vector<typename term<B>::arg> v;
-		for (auto& a : t.args)
-			if (a.ist) v.emplace_back(term_trans_vars<B>(a.t, g));
-			else v.push_back(a);
-//		cout << "out: " << r << endl;
-		return term<B>(t.name, v);
-	}
-//	cout << "out: " << t << endl;
-	return t;
-}
-
-template<typename B>
-bf<B> mt_trans_vars(const minterm<B>& m, function<sym_t(sym_t)> g) {
-	bf<B> b(true);
-	for (size_t j = 0; j != 2; ++j)
-		for (const term<B>& t : m[j])
-			b = minterm<B>(!j, term_trans_vars(t, g)) & b;
-	return b;
-}
 
 template<typename B>
 fof<B> transform_vars(const clause<B>& c, function<sym_t(sym_t)> g) {

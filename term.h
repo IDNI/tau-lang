@@ -2,6 +2,7 @@
 #define __TERM_H__
 #include "defs.h"
 #include <vector>
+#include <functional>
 #include <string>
 #include <cassert>
 
@@ -144,6 +145,22 @@ template<typename B> ostream& operator<<(ostream& os, const term<B>& t) {
 		os << (n == t.args.size() - 1 ? "" : ",");
 	}
 	return os << ")";
+}
+
+template<typename B>
+term<B> term_trans_vars(const term<B>& t, function<sym_t(sym_t)> g) {
+//	cout << "in: " << t << endl;
+	if (t.t == term<B>::VAR) return term<B>(g(t.sym));
+	if (t.t == term<B>::FUNC) {
+		vector<typename term<B>::arg> v;
+		for (auto& a : t.args)
+			if (a.ist) v.emplace_back(term_trans_vars<B>(a.t, g));
+			else v.push_back(a);
+//		cout << "out: " << r << endl;
+		return term<B>(t.name, v);
+	}
+//	cout << "out: " << t << endl;
+	return t;
 }
 
 template<typename B>
