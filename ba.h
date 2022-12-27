@@ -251,13 +251,29 @@ template<typename B> bf<B> operator~(const minterm<B>& x) {
 
 template<typename B> bf<B> operator&(
 		const minterm<B>& x, const minterm<B>& y) {
+//	typedef array<minterm<B>, 2> item;
+	struct item {
+		const minterm<B> x, y;
+		item(const minterm<B>& x, const minterm<B>& y) : x(x), y(y) {}
+		bool operator<(const item& a) const {
+			if (x[0].size() != a.x[0].size())
+				return x[0].size() < a.x[0].size();
+			if (x[1].size() != a.x[1].size())
+				return x[1].size() < a.x[1].size();
+			if (y[0].size() != a.y[0].size())
+				return y[0].size() < a.y[0].size();
+			if (y[1].size() != a.y[1].size())
+				return y[1].size() < a.y[1].size();
+			return (x != a.x) ? x < a.x : y < a.y;
+
+		}
+	};
 	if (x[0].empty() && x[1].empty()) return y;
 	if (y[0].empty() && y[1].empty()) return x;
 	//DBG(cout << x << "&&" << y << " = ";)
-	static map<array<minterm<B>, 2>, bf<B>> M;
+	static map<item, bf<B>> M;
 	static size_t hits = 0, misses = 0;
-	typedef array<minterm<B>, 2> item;
-	item a = (x < y) ? item{x, y} : item{y, x};
+	item a = (x < y) ? item(x, y) : item(y, x);
 	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
 	++misses;
 	if ((hits + misses)%100000 == 0)
@@ -284,9 +300,7 @@ template<typename B> bf<B> operator&(
 }
 
 template<typename B>
-bool operator<=(const minterm<B>& x, const minterm<B>& y) {
-	return (x & y) == x;
-}
+bool operator<=(const minterm<B>& x, const minterm<B>& y) { return (x&y) == x; }
 
 bool operator<=(const minterm<Bool>& x, const minterm<Bool>& y) {
 	for (auto& t : y[0]) if (x[0].find(t) == x[0].end()) return false;
@@ -303,59 +317,42 @@ bool operator<=(const minterm<B>& t, const bf<B>& f) {
 	return false;
 }
 
-// two minterms are complementary if one pos lit appears neg in the other
-// and all the rest are the same.
 template<typename B>
 bool complementary(const minterm<B>& x, minterm<B>& y) {
 	size_t n0 = x[0].size(), n1 = x[1].size();
 	size_t k0 = y[0].size(), k1 = y[1].size();
+	const term<B> *t1 = 0;
 	if (n0 == k0 + 1 && n1 + 1 == k1) {
-		const term<B> *t1 = 0;
 		bool b = false;
 		for (auto& t : x[0])
-			if (!has(y[0], t)) {
-				if (b) return false;
-				t1 = &t, b = true;
-			}
-		assert(b && t1);
+			if (has(y[0], t)) continue;
+			else if (b) return false;
+			else t1 = &t, b = true;
 		b = false;
 		for (auto& t : y[1])
-			if (!has(x[1], t)) {
-				if (b || t != *t1) return false;
-				b = true;
-			}
-		if (!b) return false;
-		y[1] = x[1];
-		return true;
-		//return b ? minterm<B>(x[0], y[1]) : false;
+			if (has(x[1], t)) continue;
+			else if (b || t != *t1) return false;
+			else b = true;
+		return b ? y[1] = x[1], true : false;
 	}
-	if (n0 + 1 == k0 && n1 == k1 + 1) {
-		const term<B> *t1 = 0;
-		bool b = false;
-		for (auto& t : y[0])
-			if (!has(x[0], t)) {
-				if (b) return false;
-				t1 = &t, b = true;
-			}
-		assert(b && t1);
-		b = false;
-		for (auto& t : x[1])
-			if (!has(y[1], t)) {
-				if (b || t != *t1) return false;
-				b = true;
-			}
-		if (!b) return false;
-		y[0] = x[0];
-		return true;
-//		return b ? minterm<B>(y[0], x[1]) : minterm<B>();
-	}
-	return false;
+	if (n0 + 1 != k0 || n1 != k1 + 1) return false;
+	bool b = false;
+	for (auto& t : y[0])
+		if (has(x[0], t)) continue;
+		else if (b) return false;
+		else t1 = &t, b = true;
+	b = false;
+	for (auto& t : x[1])
+		if (has(y[1], t)) continue;
+		else if (b || t != *t1) return false;
+		else b = true;
+	return b ? y[0] = x[0], true : false;
 }
 
 template<typename B> bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
 	if (f == bf<B>::one()) return f;
 	if (f == bf<B>::zero()) return bf<B>(t);
-	if (t <= f) return f;
+	//if (t <= f) return f;
 	assert(!t[0].empty() || !t[1].empty());
 	assert(!f.empty());
 	for (const term<B>& x : t[0])
@@ -478,7 +475,7 @@ template<typename B> bf<B> minterm<B>::subst(sym_t s, const bf<B>& f) const {
 
 template<typename B>
 bf<B> minterm<B>::subst(const term<B>& s, const bf<B>& f) const {
-	/*template<typename B>*/ struct item {
+	struct item {
 		item(const minterm<B>& m, const term<B>& t, const bf<B>& f) :
 			m(m), t(t), f(f) {}
 		minterm<B> m;

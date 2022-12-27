@@ -133,13 +133,9 @@ template<typename B> fof<B> operator|(clause<B> c, const fof<B>& f) {
 	return disj_fmt(c, f);
 }
 
-template<typename B>
-fof<B> horn(const bf<B>& f, const bf<B>& g, const sym_t& v) {
-	static size_t n = 0;
-	cout << "horn " << ++n << endl;
-	return	(fof<B>(all(g, v)) | ~fof<B>(all(f, v))) &
-		fof<B>(	g.subst(v, f.subst(v, bf<B>::zero())) |
-			g.subst(v, ~f.subst(v, bf<B>::one())));
+template<typename B> bf<B> elim(const bf<B>& f, const bf<B>& g, const sym_t& v) {
+	return 	g.subst(v, f.subst(v, bf<B>::zero())) |
+		g.subst(v, ~f.subst(v, bf<B>::one()));
 }
 
 template<typename B> fof<B> ex(const clause<B>& c, const sym_t& v) {
@@ -160,14 +156,14 @@ template<typename B> fof<B> ex(const clause<B>& c, const sym_t& v) {
 		bf<B> f = all(c[0].begin()->e, v);
 		return f.empty() ? fof<B>(true) : clause<B>(true, f); 
 	}
-	if (c[1].size() == 1) return horn(pfst(c[1]).e, pfst(c[0]).e, v);
 	assert(c[0].size() == 1);
-	bf<B> f0 = c[0].begin()->e;
+	const bf<B>& f0 = c[0].begin()->e;
 	fof<B> r(all(f0, v));
-	bf<B> f1 = f0.subst(v, bf<B>::one());
-	f0 = f0.subst(v, bf<B>::zero());
+//	bf<B> f1 = f0.subst(v, bf<B>::one());
+//	f0 = f0.subst(v, bf<B>::zero());
 	for (const term<bf<B>>& t : c[1])
-		r = clause<B>(false, t.e.subst(v, f0) | t.e.subst(v, ~f1)) & r;
+//		r = clause<B>(false, t.e.subst(v, f0) | t.e.subst(v, ~f1)) & r;
+		r = clause<B>(false, elim(f0, t.e, v)) & r;
 	return r;
 }
 
@@ -180,7 +176,38 @@ array<clause<B>, 2> split(const clause<B>& c, const sym_t& v) {
 	return {x, y};
 }
 
+template<typename B> // f=0->g=0
+fof<B> horn(const bf<B>& f, const bf<B>& g, const sym_t& v) {
+	static size_t n = 0;
+	cout << "horn " << ++n << endl;
+	return (fof<B>(all(g, v)) | ~fof<B>(all(f, v))) & fof<B>(elim(f, g, v));
+}
+
 template<typename B> fof<B> ex(const fof<B>& f, const sym_t& v) {
+#ifdef DEBUG
+	static bool nohorn = false;
+	if (!nohorn)
+#endif
+	for (auto& c : f)
+		for (auto& d : f)
+			if (c[0].empty() && d[1].empty()) {
+				DBG(assert(!d[0].empty());)
+				const bf<B> g =d[0].begin()->e;
+				bf<B> h(false);
+				for (auto& t : c[1]) h = h | t.e;
+				if (f.size() == 2) {
+#ifdef DEBUG
+					fof<B> t = d | fof<B>(c);
+					nohorn = true;
+					assert(ex(t, v) == horn(g, h, v));
+					nohorn = false;
+#endif
+					return horn(h, g, v);
+				}
+				fof<B> r = f;
+				r.erase(c), r.erase(d);
+				return horn(g, h, v) | ex(r, v);
+			}
 	fof<B> g(false);
 	array<clause<B>, 2> a;
 	for (const clause<B>& c : f) {

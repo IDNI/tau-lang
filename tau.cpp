@@ -126,7 +126,7 @@ int main() {
 //	cout << generic<Bool>(1,1,1).subst(0,term<Bool>(1)) << endl;
 //	cout << generic<Bool>(2) << endl;
 //	cout << all(generic<Bool>(2),0) << endl;
-	seq<Bool>(generic<Bool>(2,2,2));
+	seq<Bool>(generic<Bool>(3,3,2));
 	return 0;
 /*	cout << generic(2, 2, 2) << endl;
 	return 0;
