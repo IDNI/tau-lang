@@ -94,7 +94,7 @@ template<typename B> struct term {
 	static term<B> mk(const bf<B>& f) {
 		if (f.v == bf<B>::ZERO) return term<B>(B::zero());
 		if (f.v == bf<B>::ONE) return term<B>(B::one());
-		assert(!f.empty());
+		DBG(assert(!f.empty()));
 		if (f.size() == 1) {
 			auto& c = *f.begin();
 			if (c[1].empty() && c[0].size() == 1)
@@ -224,7 +224,7 @@ template<typename B> bool term<B>::operator<(const term& x) const {
 }
 
 template<typename B> void minterm<B>::add(bool pos, const term<B>& t) {
-	assert(!(t.t == term<B>::ELEM && t.e == B::zero()));
+	DBG(assert(!(t.t == term<B>::ELEM && t.e == B::zero()));)
 	(*this)[pos ? 0 : 1].insert(t);
 }
 
@@ -283,14 +283,14 @@ template<typename B> bf<B> operator&(
 	if (x[0].empty() && x[1].empty()) return y;
 	if (y[0].empty() && y[1].empty()) return x;
 	//DBG(cout << x << "&&" << y << " = ";)
-	static map<item, bf<B>> M;
-	static size_t hits = 0, misses = 0;
-	item a = (x < y) ? item(x, y) : item(y, x);
-	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
-	++misses;
-	if ((hits + misses)%100000 == 0)
-		cout << "(M) hits: " << hits << " misses: " << misses << endl;
-	if ((hits + misses)>1000000) M.clear();
+//	static map<item, bf<B>> M;
+//	static size_t hits = 0, misses = 0;
+//	item a = (x < y) ? item(x, y) : item(y, x);
+//	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
+//	++misses;
+//	if ((hits + misses)%100000 == 0)
+//		cout << "(M) hits: " << hits << " misses: " << misses << endl;
+//	if ((hits + misses)>1000000) M.clear();
 #ifdef DEBUG
 	for (const term<B>& t : x[0]) assert(!t.zero() && !t.one());
 	for (const term<B>& t : x[1]) assert(!t.zero() && !t.one());
@@ -307,7 +307,7 @@ template<typename B> bf<B> operator&(
 	z[1].insert(y[1].begin(), y[1].end());
 	bf<B> r(move(z));
 	//DBG(cout << z << endl;)
-	M.insert({a, r});
+	//M.insert({a, r});
 	return r;
 }
 
@@ -365,14 +365,14 @@ template<typename B> bf<B> disj_fmt(minterm<B> t, const bf<B>& f) {
 	if (f == bf<B>::one()) return f;
 	if (f == bf<B>::zero()) return bf<B>(t);
 	//if (t <= f) return f;
-	assert(!t[0].empty() || !t[1].empty());
-	assert(!f.empty());
+	DBG(assert(!t[0].empty() || !t[1].empty());)
+	DBG(assert(!f.empty());)
 	for (const term<B>& x : t[0])
 		if (x.t == term<B>::ELEM && x.e == B::zero()) return f;
-		else assert(x.t != term<B>::BF);
+		DBG(else assert(x.t != term<B>::BF);)
 	for (const term<B>& x : t[1])
 		if (x.t == term<B>::ELEM && x.e == B::one()) return f;
-		else assert(x.t != term<B>::BF);
+		DBG(else assert(x.t != term<B>::BF);)
 	bf<B> g, h;
 	for (auto& x : f)
 		if (t <= x) return f;
@@ -452,7 +452,7 @@ template<typename B>
 term<B> term<B>::subst(const term<B>& s, const bf<B>& g) const {
 	if (*this == s) return term<B>(g);
 	if (t == term<B>::BF) return f.subst(s, g);
-	assert(t == term<B>::FUNC);
+	DBG(assert(t == term<B>::FUNC);)
 	vector<typename term<B>::arg> v;
 	for (auto& a : args) v.push_back(a.subst(s, g));
 	return term<B>(name, v);
@@ -590,7 +590,7 @@ template<typename B> bf<B> all(const bf<B>& f, const sym_t& v) {
 
 template<typename B>
 vector<bf<B>> lgrs(const bf<B>& f, const vector<term<B>>& v) {
-	assert(f != bf<B>::one());
+	DBG(assert(f != bf<B>::one());)
 	size_t n = INT_MAX;
 	minterm<B> z;
 	for (const minterm<B>& m : f)

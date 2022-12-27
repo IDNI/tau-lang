@@ -5,19 +5,31 @@
 #define ever ;;
 
 template<typename B>
-fof<B> shr(const fof<B>& f) {
-	static auto g = [](sym_t v)->sym_t { return v >= 0 ? v + 1 : v; };
-	return transform_vars(f, g);
+using f2f = function<fof<B>(const fof<B>&)>;
+
+template<typename B> size_t seq(const fof<B>& f, f2f<B> init, f2f<B> F) {
+	vector<fof<B>> v({init(f)});
+	for (ever) {
+		if (v.back() == fof<B>::zero()) return 0;
+		v.push_back(F(v.back()));
+		cout << v.size() << '\t' << v.back() << endl;
+		for (size_t k = 0; k != v.size() - 1; ++k)
+			if (v[k] == v.back()) {
+				cout << "equals iter " << k << endl;
+				return v.size();
+			}
+	}
 }
 
-template<typename B>
-fof<B> shl(const fof<B>& f) {
-	static auto g = [](sym_t v)->sym_t { return v >= 0 ? v - 1 : v; };
-	return transform_vars(f, g);
+template<typename B> size_t seq(const fof<B>& f, f2f<B> F) {
+	return seq<B>(f, [](const fof<B>& f){ return f; }, F);
 }
 
-template<typename B>
-void seq(fof<B> f) {
+template<typename B> void seq(fof<B> f) {
+	f2f<B> init = [](const fof<B>& g) { return ex(g, 0); };
+	f2f<B> F = [](const fof<B>& g) { return shl(ex(g & shr(g), 1)); };
+	seq(f, init, F);
+	return;
 	vector<fof<B>> v({f});
 	size_t n = 0;
 	cout << f << endl;

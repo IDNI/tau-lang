@@ -42,17 +42,17 @@ template<typename B> clause<B> simplify(const clause<B>& c) {
 }
 
 template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
-	static map<array<clause<B>, 2>, clause<B>> M;
-	static size_t hits = 0, misses = 0;
-	typedef array<clause<B>, 2> item;
-	item a = (x < y) ? item{x, y} : item{y, x};
-	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
-	++misses;
-	if ((hits + misses)%1000 == 0) cout << "hits: " << hits << " misses: "
-	       	<< misses << endl;
+//	static map<array<clause<B>, 2>, clause<B>> M;
+//	static size_t hits = 0, misses = 0;
+//	typedef array<clause<B>, 2> item;
+//	item a = (x < y) ? item{x, y} : item{y, x};
+//	if (auto it = M.find(a); it != M.end()) return ++hits, it->second;
+//	++misses;
+//	if ((hits + misses)%1000 == 0) cout << "hits: " << hits << " misses: "
+//	       	<< misses << endl;
 	//DBG(cout << x << "&&" << y << " = ";)
 	clause<B> z(set<term<bf<B>>>(), x[1]);
-	assert(x[0].size() <= 1 && y[0].size() <= 1);
+	DBG(assert(x[0].size() <= 1 && y[0].size() <= 1);)
 	if (x[0].empty()) z[0] = y[0];
 	else if (y[0].empty()) z[0] = x[0];
 	else if (bf<B> t = pfst(x[0]).e | pfst(y[0]).e; t == bf<Bool>::one())
@@ -65,12 +65,13 @@ template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
 		if (!z[0].empty() && t.e <= pfst(z[0]).e) return fof<B>(false);
 		else if (t.e == bf<Bool>::one()) continue;
 		else {
-			assert(t.e != bf<Bool>::zero());
+			DBG(assert(t.e != bf<Bool>::zero());)
 			bool b = true;
 			for (auto& s : z[1]) if (!(b &= !(s.e <= t.e))) break;
 			if (b) z[1].insert(t);
 		}
-	M.insert({a, z = simplify(z)});
+	z = simplify(z);
+//	M.insert({a, z});
 	return z;
 }
 
@@ -90,13 +91,13 @@ fof<B> c2fof(const clause<B>& c) {
 }
 
 template<typename B> fof<B> operator|(clause<B> c, const fof<B>& f) {
-	assert(!f.empty() || f == fof<B>::zero() || f == fof<B>::one());
-	assert(!c[0].empty() || !c[1].empty());
+	DBG(assert(!f.empty() || f == fof<B>::zero() || f == fof<B>::one());)
+	DBG(assert(!c[0].empty() || !c[1].empty());)
 	if (c[0].empty() && c[1].size() == 1) {
 		clause<B> x;
 		for (const clause<B>& d : f)
 			if (d[0].empty() && d[1].size() == 1)
-				{ x = d; break; } // there must be only one
+				{ x = d; break; }
 		if (!x[1].empty()) {
 #ifdef DEBUG
 			for (const clause<B>& d : f)
@@ -110,9 +111,6 @@ template<typename B> fof<B> operator|(clause<B> c, const fof<B>& f) {
 	}
 #ifdef BREAK_BF
 	bool b = !c[1].empty();
-/*	for (const auto& t : c[0])
-		if (!(b &= (t.f.size() == 1)))
-			break;*/
 	if (b) for (const auto& t : c[1])
 		if (!(b &= (t.f.size() == 1)))
 			break;
@@ -120,15 +118,13 @@ template<typename B> fof<B> operator|(clause<B> c, const fof<B>& f) {
 #endif
 //	cout << "disj with " << f.size() << " clauses." << endl;
 	if (!c[0].empty()) {
-		const bf<B>& g = c[0].begin()->e;
-		if (g == bf<B>::zero()) c[0].clear();
+		if (const bf<B>& g = c[0].begin()->e; g == bf<B>::zero())
+			c[0].clear();
 		else if (g == bf<B>::one()) return f;
 	}
-	for (auto it = c[1].begin(); it != c[1].end(); ++it) {
-		const bf<B>& g = it->e;
-		if (g == bf<B>::one()) c[1].erase(it);
+	for (auto it = c[1].begin(); it != c[1].end(); ++it)
+		if (const bf<B>& g = it->e; g == bf<B>::one()) c[1].erase(it);
 		else if (g == bf<B>::zero()) return f;
-	}
 //	if (fof(c) <= f) return f;
 	return disj_fmt(c, f);
 }
@@ -142,28 +138,24 @@ template<typename B> fof<B> ex(const clause<B>& c, const sym_t& v) {
 	if (c[0].empty()) {
 		DBG(assert(!c[1].empty());)
 		fof<B> r(true);
-		for (const term<bf<B>>& t : c[1]) {
-			assert(t.t == term<bf<B>>::ELEM);
-			bf<B> f = ex(t.e, v);
-			if (f == bf<B>::one()) return fof<B>::zero();
-			r = clause<B>(false, f) & r;
-		}
+		for (const term<bf<B>>& t : c[1])
+			if (bf<B> f = ex(t.e, v); f == bf<B>::one())
+				return fof<B>::zero();
+			else r = clause<B>(false, f) & r;
 		return r;
 	}
 	if (c[1].empty()) {
 		DBG(assert(c[0].size() == 1);)
 		DBG(assert(c[0].begin()->t == term<bf<B>>::ELEM);)
-		bf<B> f = all(c[0].begin()->e, v);
+		const bf<B> f = all(c[0].begin()->e, v);
 		return f.empty() ? fof<B>(true) : clause<B>(true, f); 
 	}
-	assert(c[0].size() == 1);
-	const bf<B>& f0 = c[0].begin()->e;
-	fof<B> r(all(f0, v));
-//	bf<B> f1 = f0.subst(v, bf<B>::one());
-//	f0 = f0.subst(v, bf<B>::zero());
-	for (const term<bf<B>>& t : c[1])
-//		r = clause<B>(false, t.e.subst(v, f0) | t.e.subst(v, ~f1)) & r;
-		r = clause<B>(false, elim(f0, t.e, v)) & r;
+	DBG(assert(c[0].size() == 1);)
+	const bf<B>& f = c[0].begin()->e;
+	fof<B> r(all(f, v));
+	if (r != fof<B>::zero())
+		for (const term<bf<B>>& t : c[1])
+			r = clause<B>(false, elim(f, t.e, v)) & r;
 	return r;
 }
 
@@ -253,7 +245,7 @@ fof<B> transform_vars(const clause<B>& c, function<sym_t(sym_t)> g) {
 	fof<B> d(true);
 	for (size_t i = 0; i != 2; ++i)
 		for (const term<bf<B>>& s : c[i]) {
-			assert(s.t == term<bf<B>>::ELEM);
+			DBG(assert(s.t == term<bf<B>>::ELEM);)
 			bf<B> p(false);
 			for (const minterm<B>& m : s.e)
 				p = mt_trans_vars(m, g) | p;
@@ -271,6 +263,16 @@ fof<B> transform_vars(const fof<B>& f, function<sym_t(sym_t)> g) {
 	fof<B> r(false);
 	for (const clause<B>& c : f) r = transform_vars<B>(c, g) | r;
 	return r;
+}
+
+template<typename B> fof<B> shr(const fof<B>& f) {
+	static auto g = [](sym_t v)->sym_t { return v >= 0 ? v + 1 : v; };
+	return transform_vars(f, g);
+}
+
+template<typename B> fof<B> shl(const fof<B>& f) {
+	static auto g = [](sym_t v)->sym_t { return v >= 0 ? v - 1 : v; };
+	return transform_vars(f, g);
 }
 
 template<typename B>
