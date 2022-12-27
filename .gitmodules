@@ -1,0 +1,3 @@
+[submodule "bdd"]
+	path = bdd
+	url = git@github.com:IDNI/bdd.git

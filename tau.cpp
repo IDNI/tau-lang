@@ -12,8 +12,11 @@
 // modified over time by the Author.
 #include "fof.h"
 #include "builder.h"
+#include "bdd.h"
 #include <iostream>
 #include <sstream>
+
+using namespace idni;
 
 term<Bool> var_term(int v) {
 	return term<Bool>(v);
@@ -102,6 +105,7 @@ void test() {
 }
 
 int main() {
+	bdd::init();
 	test();
 //	cout << generic<Bool>(2, 2, 2) << endl;
 	//cout << generic<Bool>(2) << endl;
