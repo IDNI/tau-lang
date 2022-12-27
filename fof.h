@@ -12,7 +12,8 @@
 // modified over time by the Author.
 #ifndef __FOF_H__
 #define __FOF_H__
-#include "ba.h"
+#include "bf.h"
+#include <functional>
 
 template<typename B> using clause = minterm<bf<B>>;
 template<typename B> using fof = bf<bf<B>>;
@@ -75,8 +76,7 @@ template<typename B> fof<B> operator&(const clause<B>& x, const clause<B>& y) {
 	return z;
 }
 
-template<typename B>
-fof<B> c2fof(const clause<B>& c) {
+template<typename B> fof<B> c2fof(const clause<B>& c) {
 	fof<B> r(true);
 /*	for (const auto& t : c[0])
 		for (const auto& m : t.f)

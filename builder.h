@@ -1,5 +1,6 @@
 #include "dict.h"
 #include "seq.h"
+#include "bool.h"
 #include <cstring>
 using namespace std::literals;
 

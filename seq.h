@@ -27,8 +27,9 @@ template<typename B> size_t seq(const fof<B>& f, f2f<B> F) {
 
 template<typename B> void seq(fof<B> f) {
 	f2f<B> init = [](const fof<B>& g) { return ex(g, 0); };
-	f2f<B> F = [](const fof<B>& g) { return shl(ex(g & shr(g), 1)); };
-	seq(f, init, F);
+	f2f<B> F = [](const fof<B>& g) { return shl(ex(ex(g & shr(g), 0), 1)); };
+	seq(f, F);
+	//seq(f, init, F);
 	return;
 	vector<fof<B>> v({f});
 	size_t n = 0;

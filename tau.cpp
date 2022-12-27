@@ -13,6 +13,7 @@
 #include "fof.h"
 #include "builder.h"
 #include <iostream>
+#include <sstream>
 
 term<Bool> var_term(int v) {
 	return term<Bool>(v);
