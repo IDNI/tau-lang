@@ -143,6 +143,13 @@ template<typename B> struct minterm : public array<set<term<B>>, 2> {
 			return (*this)[0].size() < m[0].size();
 		if ((*this)[1].size() != m[1].size())
 			return (*this)[1].size() < m[1].size();
+		for (	auto it = (*this)[0].begin(), jt = m[0].begin();
+			it != (*this)[0].end(); ++it, ++jt)
+			if (*it != *jt) return *it < *jt;
+		for (	auto it = (*this)[1].begin(), jt = m[1].begin();
+			it != (*this)[1].end(); ++it, ++jt)
+			if (*it != *jt) return *it < *jt;
+		return false;
 		return (base)*this < (base)m;
 	}
 	bool operator==(const minterm& m) const {
@@ -229,6 +236,11 @@ template<typename B> bool bf<B>::operator==(const bf<B>& f) const {
 template<typename B> bool bf<B>::operator<(const bf<B>& f) const {
 	if (f.v != v) return v < f.v;
 	if (base::size() != f.size()) return base::size() < f.size();
+	for (auto it=this->begin(), jt=f.begin(); it != this->end(); ++it, ++jt)
+		if ((*it)[0].size() != (*jt)[0].size())
+			return (*it)[0].size() < (*jt)[0].size();
+		else if ((*it)[1].size() != (*jt)[1].size())
+			return (*it)[1].size() < (*jt)[1].size();
 	return (base)(*this) < (base)f;
 }
 
