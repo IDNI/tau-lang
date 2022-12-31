@@ -5,9 +5,9 @@
 #define ever ;;
 
 template<typename B>
-using f2f = function<fof<B>(const fof<B>&)>;
+using f2f = function<fof<bf<B>>(const fof<bf<B>>&)>;
 
-template<typename B> size_t seq(const fof<B>& f, f2f<B> init, f2f<B> F) {
+template<typename B> size_t seq(const fof<bf<B>>& f, f2f<B> init, f2f<B> F) {
 	vector<fof<B>> v({init(f)});
 	for (ever) {
 		if (v.back() == fof<B>::zero()) return 0;
@@ -21,8 +21,8 @@ template<typename B> size_t seq(const fof<B>& f, f2f<B> init, f2f<B> F) {
 	}
 }
 
-template<typename B> size_t seq(const fof<B>& f, f2f<B> F) {
-	return seq<B>(f, [](const fof<B>& f){ return f; }, F);
+template<typename B> size_t seq(const fof<bf<B>>& f, f2f<B> F) {
+	return seq<B>(f, [](const fof<bf<B>>& f){ return f; }, F);
 }
 
 template<typename B> void seq(fof<B> f) {

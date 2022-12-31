@@ -14,6 +14,14 @@ typedef int sym_t;
 #define pfst(x) (*(x).begin())
 using namespace std;
 
+template<typename B> struct zero {
+	bool operator()(const B&) const;
+};
+
+template<typename B> struct one {
+	bool operator()(const B&) const;
+};
+
 template<typename T, typename V> bool has(const T& t, const V& v) {
 	return t.find(v) != t.end();
 }
