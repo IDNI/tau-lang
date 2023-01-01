@@ -17,18 +17,27 @@
 #include "bool.h"
 #include "anf.h"
 #include <ostream>
+#include <sstream>
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
 
 template<typename B> ostream& operator<<(ostream& os, const hbdd<B>& f) {
 	set<pair<B, vector<int_t>>> dnf = f->dnf();
 	size_t n = dnf.size();
+	set<string> ss;
 	for (auto& c : dnf) {
+		set<string> s;
 		assert(!(c.first == false));
-		if (!(c.first == true)) os << '{' << c.first << '}';
+		stringstream t;
+		if (!(c.first == true)) t << '{' << c.first << '}';
 		for (int_t v : c.second)
-			if (v < 0) os << dict(-v) << '\'';
-			else os << dict(v);
+			if (v < 0) s.insert(string(dict(-v)) + "'"s);
+			else s.insert(dict(v));
+		for (auto& x : s) t << x;
+		ss.insert(t.str());
+	}
+	for (auto& s : ss) {
+		os << s;
 		if (--n) os << " | ";
 	}
 	return os;
@@ -59,8 +68,16 @@ ostream& operator<<(ostream& os, const tau<BAs...>& t) {
 
 ostream& operator<<(ostream& os, const anf& a) {
 	size_t n = a.size();
+	set<string> ss;
 	for (auto& x : a) {
-		for (auto y : x) os << dict(y);
+		set<string> s;
+		for (auto y : x) s.insert(dict(y));
+		string t;
+		for (const string& y : s) t += y;
+		ss.insert(t);
+	}
+	for (const string& s : ss) {
+		os << s;
 		if (--n) os << " + ";
 	}
 	return os;
