@@ -10,6 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+#ifndef __BDD_HANDLE_H__
+#define __BDD_HANDLE_H__
 #include "babdd.h"
 
 template<typename B> struct bdd_handle;
@@ -116,6 +118,8 @@ template<typename B>
 hbdd<B> operator&(const hbdd<B>& x, const hbdd<B>& y) { return (*x) & y; }
 template<typename B>
 hbdd<B> operator|(const hbdd<B>& x, const hbdd<B>& y) { return (*x) | y; }
+template<typename B>
+hbdd<B> operator+(const hbdd<B>& x, const hbdd<B>& y) { return (y&~x)|(x&~y); }
 template<typename B> hbdd<B> operator~(const hbdd<B>& x) { return ~*x; }
 
 template<typename B> void bdd<B>::init() {
@@ -126,3 +130,4 @@ template<typename B> void bdd<B>::init() {
 	bdd_handle<B>::hfalse = bdd_handle<B>::get(bdd<B>::get(-1));
 	bdd_handle<B>::htrue = bdd_handle<B>::get(bdd<B>::get(1));
 }
+#endif

@@ -14,6 +14,7 @@
 #include "tau.h"
 #include "out.h"
 #include "builder.h"
+#include "anf.h"
 #include <iostream>
 
 template<typename B> vector<bdd<B>> bdd<B>::V;
@@ -34,7 +35,13 @@ int main() {
 	typedef tau<Bool, sbf> fof;
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
-//	cout << f << endl << g << endl;
+	cout << f << endl << g << endl << g->subst(dict("x"), f) << endl;
+	g = g->subst(dict("x"), f);
+	cout << g->sub0(dict("x")) << endl << g->sub1(dict("x")) << endl;
+	cout << (g = (g->sub0(dict("x")) | g->sub1(dict("x")))) << endl;
+	cout << anf(g) << endl;
+	anf(g).verify();
+	return 0;
 	cout << (fof(true) += f).ex(dict("x")) << endl;
 	cout << ((fof(true) += f) -= g).ex(dict("x")) << endl;
 	return 0;

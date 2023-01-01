@@ -15,6 +15,7 @@
 #include "tau.h"
 #include "dict.h"
 #include "bool.h"
+#include "anf.h"
 #include <ostream>
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
@@ -53,6 +54,15 @@ ostream& operator<<(ostream& os, const tau<BAs...>& t) {
 	DBG(assert(!t.empty());)
 	size_t n = t.size();
 	for (auto& c : t) if (os << c; --n) os << " || " << endl;
+	return os;
+}
+
+ostream& operator<<(ostream& os, const anf& a) {
+	size_t n = a.size();
+	for (auto& x : a) {
+		for (auto y : x) os << dict(y);
+		if (--n) os << " + ";
+	}
 	return os;
 }
 #endif
