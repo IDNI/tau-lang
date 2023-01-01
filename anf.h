@@ -17,6 +17,10 @@
 #include <set>
 using namespace std;
 
+#ifdef DEBUG
+ostream& operator<<(ostream& os, const struct anf& a);
+#endif
+
 struct anf : set<set<int_t>> {
 	bool neg = false;
 	anf() {}
@@ -97,9 +101,35 @@ struct anf : set<set<int_t>> {
 		};
 		anf r;
 		for (auto& t : *this) r = r + g(t);
+#ifdef DEBUG
 		verify();
 		r.verify();
 		assert(r == anf(to_bdd()->subst(v, f.to_bdd())));
+		if (!f.empty())
+			assert(r == ((f * sub1(v)) | ((~f) * sub0(v)))),
+			assert(r == ((f * sub1(v)) + ((~f) * sub0(v))));
+#endif
+		return r;
+	}
+
+	anf sub0(int_t v) const {
+		anf r;
+		for (auto& c : *this)
+			if (c.find(v) == c.end())
+				r.insert(c);
+		DBG(assert(r == subst(v, anf(false)));)
+		DBG(r.verify();)
+		return r;
+	}
+
+	anf sub1(int_t v) const {
+		anf r;
+		for (auto c : *this) {
+			if (auto it = c.find(v); it != c.end()) c.erase(it);
+			if (!c.empty()) r = r + c;
+		}
+		DBG(assert(r == subst(v, anf(true)));)
+		DBG(r.verify();)
 		return r;
 	}
 };

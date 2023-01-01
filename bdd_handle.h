@@ -17,6 +17,27 @@
 template<typename B> struct bdd_handle;
 template<typename B> using hbdd = sp<bdd_handle<B>>;
 
+template<typename B>
+bool operator==(const hbdd<B>& x, bool b) { return b ? x->one() : x->zero(); }
+
+template<typename B>
+hbdd<B> operator&(const hbdd<B>& x, const hbdd<B>& y) { return (*x) & y; }
+
+template<typename B>
+hbdd<B> operator|(const hbdd<B>& x, const hbdd<B>& y) { return (*x) | y; }
+
+template<typename B>
+hbdd<B> operator+(const hbdd<B>& x, const hbdd<B>& y) { return (y&~x)|(x&~y); }
+
+template<typename B> hbdd<B> operator~(const hbdd<B>& x) { return ~*x; }
+
+#ifdef DEBUG
+template<typename B> bool operator==(const hbdd<B>& x, const hbdd<B>& y) {
+	assert((&*x == &*y) == (x->b == y->b));
+	return x->b == y->b;
+}
+#endif
+
 template<typename B> struct bdd_handle {
 	static unordered_map<bdd_node, std::shared_ptr<bdd_handle>> Mn;
 	static map<B, std::shared_ptr<bdd_handle>> Mb;
@@ -93,7 +114,12 @@ template<typename B> struct bdd_handle {
 	hbdd<B> all(int_t v) const { return get(bdd<B>::all(b, v)); }
 
 	hbdd<B> subst(size_t v, const hbdd<B>& x) const {
-		return get(bdd<B>::subst(b, v, x->b));
+#ifdef DEBUG
+//		assert( get(bdd<B>::subst(b, v, x->b)) ==
+//			((sub0(v) & ~x) | (sub1(v) & x)));
+#endif
+		return (sub0(v) & ~x) | (sub1(v) & x);
+//		return get(bdd<B>::subst(b, v, x->b));
 	}
 
 	hbdd<B> sub0(size_t v) const { return get(bdd<B>::sub0(b, v)); }
@@ -108,19 +134,11 @@ template<typename B> struct bdd_handle {
 		vector<int_t> v;
 		return bdd<B>::dnf(b, r, v), r;
 	}
+#ifndef DEBUG
 private:
+#endif
 	int_t b;
 };
-
-template<typename B>
-bool operator==(const hbdd<B>& x, bool b) { return b ? x->one() : x->zero(); }
-template<typename B>
-hbdd<B> operator&(const hbdd<B>& x, const hbdd<B>& y) { return (*x) & y; }
-template<typename B>
-hbdd<B> operator|(const hbdd<B>& x, const hbdd<B>& y) { return (*x) | y; }
-template<typename B>
-hbdd<B> operator+(const hbdd<B>& x, const hbdd<B>& y) { return (y&~x)|(x&~y); }
-template<typename B> hbdd<B> operator~(const hbdd<B>& x) { return ~*x; }
 
 template<typename B> void bdd<B>::init() {
 	bdd<B>::V.emplace_back(B::zero());

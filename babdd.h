@@ -179,15 +179,15 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		else return r | get_eelim(nx.l);
 	}
 
-	static int_t subst(int_t x, int_t v, int_t y) {
-		const bdd &xx = get(x);
-		if (xx.leaf()) return x;
-		const bdd_node &nx = std::get<bdd_node>(xx);
-		if (nx.v < v)
-			return add(nx.v, subst(nx.h, v, y), subst(nx.l, v, y));
-		if (nx.v > v) return x;
-		return -bdd_and(-bdd_and(y, nx.h), -bdd_and(-y, nx.l));
-	}
+//	static int_t subst(int_t x, int_t v, int_t y) {
+//		const bdd &xx = get(x);
+//		if (xx.leaf()) return x;
+//		const bdd_node &nx = std::get<bdd_node>(xx);
+//		if (nx.v < v)
+//			return add(nx.v, subst(nx.h, v, y), subst(nx.l, v, y));
+//		if (nx.v > v) return x;
+//		return -bdd_and(-bdd_and(y, nx.h), -bdd_and(-y, nx.l));
+//	}
 
 	static int_t sub0(int_t x, int_t v) {
 		const bdd &xx = get(x);

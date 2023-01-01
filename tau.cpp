@@ -37,7 +37,7 @@ int main() {
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
 	cout << f << endl << g << endl << g->subst(dict("x"), f) << endl;
 //	cout << anf(f) << endl << anf(g) << endl;
-	anf(g).subst(dict("x"), anf(f));
+/*	anf(g).subst(dict("x"), anf(f));
 	g = g->subst(dict("x"), f);
 //	cout << anf(g) << endl;
 //	anf(g).verify();
@@ -61,11 +61,13 @@ int main() {
 	assert(anf((g->subst(x, f))->sub0(x) | (g->subst(x, ~f))->sub1(x)) ==
 		((anf(g).subst(x, anf(f))).subst(x, anf(false)) | (anf(g).subst(x, ~anf(f))).subst(x, anf(true))));
 	return 0;
-	cout << g->sub0(dict("x")) << endl << g->sub1(dict("x")) << endl;
-	cout << (g = (g->sub0(dict("x")) | g->sub1(dict("x")))) << endl;
-	cout << anf(g) << endl;
+	cout << g->sub0(dict("x")) << endl << g->sub1(dict("x")) << endl;*/
+	int_t x = dict("x");
+	cout << anf(g = (g->subst(x, f)->sub0(x) | g->subst(x, ~f)->sub1(x)))
+		<< endl << g << endl;
+//	cout << anf(g) << endl;
 	anf(g).verify();
-	return 0;
+//	return 0;
 	cout << (fof(true) += f).ex(dict("x")) << endl;
 	cout << ((fof(true) += f) -= g).ex(dict("x")) << endl;
 	return 0;
