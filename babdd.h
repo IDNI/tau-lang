@@ -115,13 +115,29 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 	static void init();
 
 	static int_t bdd_and(int_t x, const B& b) {
+		if (x == T) return add(b);
+		if (x == F) return F;
 		const bdd& xx = get(x);
-		if (xx.leaf()) return add(b & std::get<B>(xx));
+		if (xx.leaf()) {
+#ifdef DEBUG
+			if constexpr(is_same<B, struct Bool>::value)
+				if (b == true && !((b & std::get<B>(xx)) == xx))
+					assert((b & std::get<B>(xx)) == xx);
+#endif
+			return add(b & std::get<B>(xx));
+		}
 		const bdd_node &nx = std::get<bdd_node>(xx);
-		return add(nx.v, bdd_and(nx.h, b), bdd_and(nx.l, b));
+		int_t y = add(nx.v, bdd_and(nx.h, b), bdd_and(nx.l, b));
+#ifdef DEBUG
+		if (b == true) assert(y == x);
+#endif
+		return y;
 	}
 
 	static int_t bdd_and(int_t x, int_t y) {
+		if (x == F || y == F) return F;
+		if (x == T) return y;
+		if (y == T) return x;
 		const bdd &xx = get(x), &yy = get(y);
 		if (xx.leaf()) return bdd_and(y, std::get<B>(xx));
 		if (yy.leaf()) return bdd_and(x, std::get<B>(yy));
@@ -202,31 +218,31 @@ template<typename B> struct bdd_handle;
 template<typename B> using hbdd = sp<bdd_handle<B>>;
 
 template<typename B> struct bdd_handle {
-	static unordered_map<bdd_node, std::weak_ptr<bdd_handle>> Mn;
-	static map<B, std::weak_ptr<bdd_handle>> Mb;
+	static unordered_map<bdd_node, std::shared_ptr<bdd_handle>> Mn;
+	static map<B, std::shared_ptr<bdd_handle>> Mb;
 	static hbdd<B> htrue, hfalse;
 
 	static hbdd<B> get(const bdd_node& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
-			return it->second.lock();
+			return it->second;//.lock();
 		hbdd<B> h(new bdd_handle);
 		h->b = bdd<B>::add(x);
-		Mn.emplace(x, weak_ptr<bdd_handle<B>>(h));
+		Mn.emplace(x, shared_ptr<bdd_handle<B>>(h));
 		return h;
 	}
 
 	static hbdd<B> get(const B& x) {
 		if (auto it = Mb.find(x); it != Mb.end())
-			return it->second.lock();
+			return it->second;//.lock();
 		hbdd<B> h(new bdd_handle);
 		h->b = bdd<B>::add(x);
-		Mb.emplace(x, weak_ptr<bdd_handle<B>>(h));
+		Mb.emplace(x, shared_ptr<bdd_handle<B>>(h));
 		return h;
 	}
 
 	static hbdd<B> get(const bdd<B>& x) {
-		if (x.leaf()) return get(std::get<B>(x));
-		return get(std::get<bdd_node>(x));
+		return	x.leaf() ? get(std::get<B>(x))
+			: get(std::get<bdd_node>(x));
 	}
 
 	bdd<B> get() const { return bdd<B>::get(b); }
@@ -236,8 +252,9 @@ template<typename B> struct bdd_handle {
 
 	static hbdd<B> bit(bool b, int_t v) {
 		if (bdd<B>::V.empty()) bdd<B>::init();
-		assert(v);
-		hbdd<B> r = get(bdd<B>::add(v, bdd<B>::T, bdd<B>::F));
+		DBG(assert(v);)
+		hbdd<B> r = get(bdd_node(v, bdd<B>::T, bdd<B>::F));
+		DBG(assert(r);)
 		return b ? r : ~r;
 	}
 
@@ -245,17 +262,26 @@ template<typename B> struct bdd_handle {
 	B get_eelim() const { return bdd<B>::get_eelim(b); }
 
 	hbdd<B> operator&(const hbdd<B>& x) const {
-		const bdd<B> &xx = std::get<B>(x->get());
-		const bdd<B> &yy = std::get<B>(get());
+		const bdd<B> &xx = x->get();
+		const bdd<B> &yy = get();
 		if (xx.leaf()) {
+#ifndef DEBUG
+			if (std::get<B>(xx) == true) return get(*this);
+			if (std::get<B>(xx) == false) return hfalse;
+#endif
 			if (yy.leaf())
 				return	bdd_handle<B>::get(
 					std::get<B>(xx) & std::get<B>(yy));
 			return	get(bdd<B>::get(bdd<B>::bdd_and(
 				b, std::get<B>(xx))));
-		} else if (yy.leaf())
+		} else if (yy.leaf()) {
+#ifndef DEBUG
+			if (std::get<B>(yy) == true) return x;
+			if (std::get<B>(yy) == false) return hfalse;
+#endif
 			return	get(bdd<B>::get(bdd<B>::bdd_and(
 				x->b, std::get<B>(yy))));
+		}
 		else return get(bdd<B>::get(bdd<B>::bdd_and(x->b, b)));
 	}
 
@@ -296,7 +322,7 @@ template<typename B> void bdd<B>::init() {
 	bdd<B>::V.emplace_back(B::one());
 	bdd<B>::Mb.emplace(B::one(), 1);
 	bdd<B>::F = -(bdd<B>::T = 1);
-	bdd_handle<B>::hfalse = bdd_handle<B>::get(-1);
-	bdd_handle<B>::htrue = bdd_handle<B>::get(1);
+	bdd_handle<B>::hfalse = bdd_handle<B>::get(bdd<B>::get(-1));
+	bdd_handle<B>::htrue = bdd_handle<B>::get(bdd<B>::get(1));
 }
 #endif

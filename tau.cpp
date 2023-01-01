@@ -22,15 +22,15 @@ template<typename B> map<B, size_t> bdd<B>::Mb;
 template<typename B> int_t bdd<B>::T;
 template<typename B> int_t bdd<B>::F;
 template<typename B>
-unordered_map<bdd_node, std::weak_ptr<bdd_handle<B>>> bdd_handle<B>::Mn;
+unordered_map<bdd_node, std::shared_ptr<bdd_handle<B>>> bdd_handle<B>::Mn;
 template<typename B>
-map<B, std::weak_ptr<bdd_handle<B>>> bdd_handle<B>::Mb;
+map<B, std::shared_ptr<bdd_handle<B>>> bdd_handle<B>::Mb;
 template<typename B> hbdd<B> bdd_handle<B>::htrue;
 template<typename B> hbdd<B> bdd_handle<B>::hfalse;
 //template<typename B> bdd<B>::initializer bdd<B>::I;
 
 int main() {
-	tau<Bool, hbdd<Bool>> t;
+	tau<Bool, hbdd<Bool>> t(true);
 	t += "x"s & "y'"s;
 	t -= "x'"s & "y"s;
 	cout << t;
