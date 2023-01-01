@@ -60,13 +60,18 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 
 	bool leaf() const { return holds_alternative<B>(*this); }
 
-	struct initializer { initializer() { bdd::init(); }};
+	struct initializer {
+		initializer() {
+			cout << "init!!" << endl;
+			bdd::init();
+		}
+	};
 
 	static vector<bdd> V;
 	static unordered_map<bdd_node, size_t> Mn;
 	static map<B, size_t> Mb;
 	static int_t T, F;
-	static initializer I;
+	inline static initializer I;
 
 	static int_t add(const bdd_node& n) { return add(n.v, n.h, n.l); }
 
@@ -230,6 +235,7 @@ template<typename B> struct bdd_handle {
 	bool one() const { return b == bdd<B>::T; }
 
 	static hbdd<B> bit(bool b, int_t v) {
+		if (bdd<B>::V.empty()) bdd<B>::init();
 		assert(v);
 		hbdd<B> r = get(bdd<B>::add(v, bdd<B>::T, bdd<B>::F));
 		return b ? r : ~r;
@@ -286,7 +292,11 @@ hbdd<B> operator|(const hbdd<B>& x, const hbdd<B>& y) { return (*x) | y; }
 template<typename B> hbdd<B> operator~(const hbdd<B>& x) { return ~*x; }
 
 template<typename B> void bdd<B>::init() {
-	hbdd<B>::hfalse = hbdd<B>::get(F = add(B::zero()));
-	hbdd<B>::htrue = hbdd<B>::get(T = add(B::one()));
+	bdd<B>::V.emplace_back(B::zero());
+	bdd<B>::V.emplace_back(B::one());
+	bdd<B>::Mb.emplace(B::one(), 1);
+	bdd<B>::F = -(bdd<B>::T = 1);
+	bdd_handle<B>::hfalse = bdd_handle<B>::get(-1);
+	bdd_handle<B>::htrue = bdd_handle<B>::get(1);
 }
 #endif

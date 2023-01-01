@@ -27,7 +27,7 @@ template<typename B>
 map<B, std::weak_ptr<bdd_handle<B>>> bdd_handle<B>::Mb;
 template<typename B> hbdd<B> bdd_handle<B>::htrue;
 template<typename B> hbdd<B> bdd_handle<B>::hfalse;
-template<typename B> bdd<B>::initializer bdd<B>::I;
+//template<typename B> bdd<B>::initializer bdd<B>::I;
 
 int main() {
 	tau<Bool, hbdd<Bool>> t;
