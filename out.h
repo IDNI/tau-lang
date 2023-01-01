@@ -14,6 +14,7 @@
 #define __OUT_H__
 #include "tau.h"
 #include "dict.h"
+#include "bool.h"
 #include <ostream>
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }

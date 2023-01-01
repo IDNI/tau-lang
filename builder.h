@@ -1,6 +1,6 @@
 #include "dict.h"
-#include "babdd.h"
 #include "tau.h"
+#include "bool.h"
 #include <cstring>
 
 hbdd<Bool> operator|(string x, string y) {

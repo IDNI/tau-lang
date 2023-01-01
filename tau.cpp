@@ -31,13 +31,14 @@ template<typename B> hbdd<B> bdd_handle<B>::hfalse;
 
 int main() {
 	tau<Bool, hbdd<Bool>> t(true);
-	hbdd<Bool> f = "x"s & "y'"s;
+	hbdd<Bool> f = "x"s & "y"s;
 //	cout << f << endl;
 //	cout << (f | "y'"s )<< endl;
 	t += f;
 //	cout << t;
-	t -= "x'"s & "y"s;
+	t -= "x"s & "y'"s;
 	cout << t;
+	cout << t.ex(dict("x"));
 }
 
 /*#include "fof.h"

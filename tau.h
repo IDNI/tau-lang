@@ -12,169 +12,9 @@
 // modified over time by the Author.
 #ifndef __TAU_H__
 #define __TAU_H__
-#include <vector>
-#include <set>
+#include "clauses.h"
 #include <utility>
 #include <cstddef>
-#include "babdd.h"
-using namespace std;
-
-struct Bool {
-	bool b;
-	Bool(bool b) : b(b) {}
-	template<typename T> Bool(const T&) {
-		static_assert(is_same<T, bool>::value);
-	}
-	static const Bool& zero() { static Bool b(false); return b; }
-	static const Bool& one() { static Bool b(true); return b; }
-	Bool operator&(const Bool& x) const;
-	Bool operator|(const Bool& x) const;
-	Bool operator~() const;
-	bool operator<(const Bool& x) const { return b < x.b; }
-	bool operator==(bool t) const { return b == t; }
-};
-
-Bool Bool::operator&(const Bool& x) const {
-	return (*this == false) ? zero() : x;
-}
-Bool Bool::operator|(const Bool& x) const {
-	return (*this == true) ? one() : x;
-}
-
-Bool Bool::operator~() const { return *this == true ? zero() : one(); }
-
-template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
-	clause() {}
-	clause(const hbdd<B>& f) { this->first = f; }
-
-	static const clause<B>& zero() {
-		static clause<B> r(bdd_handle<B>::htrue);
-		return r;
-	}
-
-	static const clause<B>& one() {
-		static clause<B> r(bdd_handle<B>::hfalse);
-		return r;
-	}
-
-	void to_zero() { *this = zero(); }
-	void to_one() { *this = one(); }
-
-	bool operator==(bool b) const {
-		return	this->first && (
-			b ? (this->first == false) : (this->first == true));
-	}
-
-	clause<B>& operator+=(const hbdd<B>& f) {
-		if (!(f->get_uelim() == false)) return *this = zero();
-		this->first = (!this->first ? f : (this->first | f));
-		return *this;
-	}
-
-	clause<B>& operator-=(const hbdd<B>& f) {
-		return	f == false ? *this = zero()
-			: (this->second.insert(f), *this);
-	}
-
-	clause<B> operator&(clause<B> x) const {
-		if (*this == false || x == false) return zero();
-		if (x == true) return *this;
-		if (*this == true) return x;
-		if (this->first) x += this->first;
-		for (const hbdd<B>& f : this->second) x -= f;
-		return x.simplify(), x;
-	}
-
-	set<clause<B>> operator~() const {
-		set<clause<B>> r;
-		clause<B> c;
-		if (this->first) r.insert(c -= this->first);
-		for (const hbdd<B>& f : this->second) 
-			r.insert(clause<B>() += f);
-		return r;
-	}
-
-	bool ex(int_t v) {
-		hbdd<B> f = this->first;
-		if (hbdd<B> g = all(v, f); g != hbdd<B>::hfalse) return false;
-		else this->first = g;
-		set<clause<B>> s;
-		for (hbdd<B> g : s) {
-			g =	(g->subst(v, f->sub0(v)) |
-				g->subst(v, ~(f->sub1(v))));
-			if (g == hbdd<B>::hfalse) return false;
-			s.insert(g);
-		}
-		return this->second = s, true;
-	}
-
-	clause<B> subst(int_t s, const hbdd<B>& t) const {
-		clause r;
-		const hbdd<B>& f = this->first.subst(s, t);
-		if (f == hbdd<B>::htrue) return zero();
-		r += f;
-		for (const hbdd<B>& g : this->second)
-			if ((f = g.subst(s, t))->zero()) return zero();
-			else r -= f;
-		r.simplify();
-	}
-
-	void simplify() {
-		if (!this->first || *this == true || *this == false) return;
-		set<hbdd<B>> s;
-		for (const hbdd<B>& f : this->second)
-			if (const hbdd<B>& g = f & ~this->first; g->zero())
-				{ *this = zero(); return; }
-			else s.insert(g);
-		this->second = s;
-	}
-};
-
-template<typename... BAs> struct clauses : public tuple<clause<BAs>...> {
-	clauses() {}
-	clauses(bool b) {
-		auto f = [&b](auto& x) { b ? x.to_one() : x.to_zero(); };
-		(f(get<BAs>(*this)), ...);
-	}
-	template<typename B> clauses(const clause<B>& c) {
-		get<clause<B>>(*this) = c;
-	}
-
-	template<typename B> void put(const clause<B>& c) {
-		if (c == false) clear_all();
-		get<clause<B>>(*this) = (c == true) ? clause<B>() : c;
-	}
-
-	template<typename B> clauses& clear() { put(clause<B>()); return *this; }
-	void clear_all() { (clear<BAs>(), ...); }
-
-	template<typename B> clauses& subst(int_t v, const hbdd<B>& t) {
-		return put(get<clause<B>>(*this).subst(v, t)), *this;
-	}
-
-	template<typename B> clauses& operator&=(const clause<B>& c) {
-		return put(get<clause<B>>(*this) & c), *this;
-	}
-
-	clauses operator&(clauses cs) const {
-		auto f = [&cs](auto x) { cs &= x; };
-		(f(get<clause<BAs>>(*this)), ...);
-		return cs;
-	}
-
-	template<typename B>
-	static void put(tuple<set<clause<BAs>>...>& t,
-			const set<clause<B>>& s) {
-		get<set<clause<B>>>(t) = s;
-	}
-
-	tuple<set<clause<BAs>>...> operator~() const {
-		tuple<set<clause<BAs>>...> r;
-		auto f = [&r](auto& x) { put(r, ~x); };
-		(f(get<clause<BAs>>(*this)), ...);
-		return r;
-	}
-};
 
 template<typename... BAs> struct tau :
 	public set<clauses<tau<BAs...>, BAs...>> {
@@ -270,6 +110,13 @@ template<typename... BAs> struct tau :
 	template<typename B> tau& operator-=(const hbdd<B>& f) {
 		return *this = (*this & (clause<B>() -= f));
 	}
+
+	tau ex(int_t v) const {
+		tau r(false);
+		for (auto cs : *this) if (cs.ex(v)) r.insert(cs);
+		return r;
+	}
+
 private:
 	tau() : t(NONE) {}
 };
