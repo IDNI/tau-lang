@@ -1,3 +1,15 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
 #include "bdd_handle.h"
 
 template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
@@ -16,6 +28,8 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 
 	void to_zero() { *this = zero(); }
 	void to_one() { *this = one(); }
+
+	bool empty() const { return !this->first && this->second.empty(); }
 
 	bool operator==(bool b) const {
 		return	this->first && (
@@ -58,8 +72,10 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 			return this->second = s, true;
 		}
 		hbdd<B> f = this->first;
+//		cout << f << endl;
 		if (hbdd<B> g = f->all(v); g == true) return false;
 		else this->first = g;
+//		cout << this->first << endl;
 		for (hbdd<B> g : this->second)
 			if ((g = g->condition(v, f)) == false) return false;
 			else s.insert(g);

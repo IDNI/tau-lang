@@ -1,3 +1,15 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
 #include "clause.h"
 
 template<typename... BAs> struct clauses : public tuple<clause<BAs>...> {
@@ -13,6 +25,12 @@ template<typename... BAs> struct clauses : public tuple<clause<BAs>...> {
 
 	void apply(auto f) { (f(get<clause<BAs>>(*this)), ...); }
 	void apply(auto f) const { (f(get<clause<BAs>>(*this)), ...); }
+
+	bool empty() const {
+		try { apply([](auto& x) { if (!x.empty()) throw 0; }); }
+		catch (...) { return false; }
+		return true;
+	}
 
 	template<typename B> void put(const clause<B>& c) {
 		if (c == false) clear_all();
@@ -50,7 +68,7 @@ template<typename... BAs> struct clauses : public tuple<clause<BAs>...> {
 //		(f(get<clause<BAs>>(*this)), ...);
 		return r;
 	}
-
+//
 	bool ex(int_t v) {
 //		auto f = [v](auto& c) { if (!c.ex(v)) throw 0; };
 		try {

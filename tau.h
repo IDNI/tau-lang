@@ -58,7 +58,7 @@ template<typename... BAs> struct tau :
 		if (t == ZERO) return *this;
 		if (t == ONE) return *this |= c;
 		tau r(true);
-		for (const auto& cs : *this) r.insert(cs & c);
+		for (const auto& cs : *this) r |= cs & c;
 		return r;
 	}
 
@@ -73,11 +73,14 @@ template<typename... BAs> struct tau :
 		return t |= s;
 	}
 
-	tau<BAs...>& operator|=(const clauses<tau, BAs...>& t) {
-		auto f = [this](auto& x) { *this |= x; };
-		*this |= get<0>(t);
-		(f(get<clause<BAs>>(t)), ...);
-		return *this;
+	tau<BAs...>& operator|=(const clauses<tau, BAs...>& cs) {
+		if (!cs.empty()) this->insert(cs);
+		return t = NONE, *this;
+//		tau r(true);
+//		auto f = [&r](auto& x) { r = r & x; };
+//		*this |= get<0>(t);
+//		(f(get<clause<BAs>>(t)), ...);
+//		return *this = *this | r;
 	}
 
 	tau operator|(tau x) const {
@@ -113,7 +116,7 @@ template<typename... BAs> struct tau :
 
 	tau ex(int_t v) const {
 		tau r(false);
-		for (auto cs : *this) if (cs.ex(v)) r.insert(cs);
+		for (auto cs : *this) if (cs.ex(v)) r |= cs;
 		return r;
 	}
 

@@ -48,11 +48,11 @@ ostream& operator<<(ostream& os, const tuple<Ts...>& t) {
 
 template<typename... BAs>
 ostream& operator<<(ostream& os, const tau<BAs...>& t) {
+	if (t == false) return os << 'F';
+	if (t == true) return os << 'T';
+	DBG(assert(!t.empty());)
 	size_t n = t.size();
-	for (auto& c : t) {
-		os << c;
-		if (--n) os << " || " << endl;
-	}
+	for (auto& c : t) if (os << c; --n) os << " || " << endl;
 	return os;
 }
 #endif
