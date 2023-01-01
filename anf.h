@@ -20,7 +20,10 @@ using namespace std;
 struct anf : set<set<int_t>> {
 	bool neg = false;
 	anf() {}
+	anf(bool pos) : neg(pos) {} // surprisingly enough
 	anf(int_t t, bool pos = true) : neg(!pos) { insert({t}); }
+	anf(const set<int_t>& s) { insert(s); }
+
 	anf(const hbdd<Bool>& f) {
 		for (auto& c : f->dnf()) {
 			assert(c.first == true);
@@ -36,6 +39,7 @@ struct anf : set<set<int_t>> {
 		anf r = *this;
 		return r.neg = !r.neg, r;
 	}
+
 	anf operator+(const anf& x) const {
 		anf r;
 		for (auto& v : *this) if (x.find(v) == x.end()) r.insert(v);
@@ -43,16 +47,17 @@ struct anf : set<set<int_t>> {
 		r.neg = !(neg == x.neg);
 		return r;
 	}
+	
+	anf operator|(const anf& x) const { return x + *this + (*this * x); }
 
 	static set<int_t> union_(const set<int_t>& x, const set<int_t>& y) {
 		set<int_t> r = x;
-		for (int_t t : y) r.insert(t);
-		return r;
+		return r.insert(y.begin(), y.end()), r;
 	}
 
 	anf operator*(const set<int_t>& v) const {
 		anf r;
-		for (auto& t : *this) r.insert(union_(t, v));
+		for (auto& t : *this) r = r + union_(t, v);
 		if (neg) {
 			if (auto it = r.find(v); it == r.end()) r.insert(v);
 			else r.erase(it);
@@ -60,14 +65,14 @@ struct anf : set<set<int_t>> {
 		return r;
 	}
 
-	anf operator*(anf x) const {
-		anf r;
+	anf operator*(const anf& x) const {
+		anf r(false);
 		for (auto& t : *this) r = r + (x * t);
 		if (neg) r = r + x;
 		return r;
 	}
 
-	void verify() const {
+	hbdd<Bool> to_bdd() const {
 		auto f = [](auto& t) {
 			hbdd<Bool> f = bdd_handle<Bool>::htrue;
 			for (auto x : t) f = f & bdd_handle<Bool>::bit(true, x);
@@ -76,15 +81,26 @@ struct anf : set<set<int_t>> {
 		hbdd<Bool> g = bdd_handle<Bool>::hfalse;
 		for (auto& t : *this) g = g + f(t);
 		if (neg) g = ~g;
-		/*anf h;
-		for (auto c : g->dnf()) {
-			assert(c.first == true);
-			anf t;
-			t.neg = true;
-			for (int_t i : c) t = t * anf(i, i > 0);
-			h = h + t;
-		}*/
-		assert(anf(g) == *this);
+		return g;
+	}
+
+	void verify() const { assert(anf(to_bdd()) == *this); }
+
+	anf subst(int_t v, const anf& f) const {
+		auto g = [v, &f](auto& t) {
+			anf r;
+			r.neg = true;
+			for (int_t i : t)
+				if (i == v) r = r * f;
+				else r = r * anf(i);
+			return r;
+		};
+		anf r;
+		for (auto& t : *this) r = r + g(t);
+		verify();
+		r.verify();
+		assert(r == anf(to_bdd()->subst(v, f.to_bdd())));
+		return r;
 	}
 };
 #endif
