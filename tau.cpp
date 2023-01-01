@@ -13,6 +13,7 @@
 
 #include "tau.h"
 #include "out.h"
+#include "builder.h"
 #include <iostream>
 
 template<typename B> vector<bdd<B>> bdd<B>::V;
@@ -26,9 +27,12 @@ template<typename B>
 map<B, std::weak_ptr<bdd_handle<B>>> bdd_handle<B>::Mb;
 template<typename B> hbdd<B> bdd_handle<B>::htrue;
 template<typename B> hbdd<B> bdd_handle<B>::hfalse;
+template<typename B> bdd<B>::initializer bdd<B>::I;
 
 int main() {
 	tau<Bool, hbdd<Bool>> t;
+	t += "x"s & "y'"s;
+	t -= "x'"s & "y"s;
 	cout << t;
 }
 

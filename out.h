@@ -21,8 +21,8 @@ template<typename B> ostream& operator<<(ostream& os, const hbdd<B>& f) {
 	set<pair<B, vector<int_t>>> dnf = f->dnf();
 	size_t n = dnf.size();
 	for (auto& c : dnf) {
-		assert(!zero<B>()(c.first));
-		if (!one<B>()(c.first)) os << '{' << c.first << '}';
+		assert(!(c.first == false));
+		if (!(c.first == true)) os << '{' << c.first << '}';
 		for (int_t v : c.second)
 			if (v < 0) os << "x[" << -v << "]'";
 			else os << "x[" << v << ']';
@@ -37,15 +37,21 @@ template<typename B> ostream& operator<<(ostream& os, const clause<B>& c) {
 	return os;
 }
 
-template<typename B> ostream& operator<<(ostream& os, const set<clause<B>>& s) {
-	for (auto& c : s) os << c;
-	return os;
-}
+//template<typename B> ostream& operator<<(ostream& os, const set<clause<B>>& s) {
+//	for (auto& c : s) os << c;
+//	return os;
+//}
 
 template<typename... Ts>
 ostream& operator<<(ostream& os, const tuple<Ts...>& t) {
 	auto f = [&os](auto x) { os << x; };
 	(f(get<Ts>(t)), ...);
+	return os;
+}
+
+template<typename... BAs>
+ostream& operator<<(ostream& os, const tau<BAs...>& t) {
+	for (auto& c : t) os << c << endl << " || " << endl;
 	return os;
 }
 #endif

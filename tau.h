@@ -28,26 +28,20 @@ struct Bool {
 	Bool operator|(const Bool& x) const;
 	Bool operator~() const;
 	bool operator<(const Bool& x) const { return b < x.b; }
-};
-
-template<> struct zero<Bool> {
-	bool operator()(const Bool& x) const { return !x.b; }
-};
-
-template<> struct one<Bool> {
-	bool operator()(const Bool& x) const { return x.b; }
+	bool operator==(bool t) const { return b == t; }
 };
 
 //template<> bool zero(const Bool& b) { return !b.b; }
 //template<> bool one(const Bool& b) { return b.b; }
 
 Bool Bool::operator&(const Bool& x) const {
-	return ::zero<Bool>()(*this) ? zero() : x;
+	return *this == false ? zero() : x;
 }
 Bool Bool::operator|(const Bool& x) const {
-	return ::one<Bool>()(*this) ? one() : x;
+	return *this == true ? one() : x;
 }
-Bool Bool::operator~() const { return ::zero<Bool>()(*this) ? zero() : one(); }
+
+Bool Bool::operator~() const { return *this == false ? zero() : one(); }
 
 template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 	clause() {}
@@ -63,25 +57,30 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 		return r;
 	}
 
+	void to_zero() { *this = zero(); }
+	void to_one() { *this = one(); }
+
+	bool operator==(bool b) const { return !(this->first == b); }
+
 	clause<B>& operator+=(const hbdd<B>& f) {
-		if (!::zero<B>()(f->get_uelim())) return *this = zero();
+		if (!(f->get_uelim() == false)) return *this = zero();
 		this->first = (!this->first ? f : (this->first | f));
 		return *this;
 	}
 
 	clause<B>& operator-=(const hbdd<B>& f) {
-		return	::zero<hbdd<B>>()(f) ? *this = zero()
+		return	f == false ? *this = zero()
 			: (this->second.insert(f), *this);
 	}
 
 	clause<B> operator&(clause<B> x) const {
-		if (::zero<clause<B>>()(*this) || ::zero<clause<B>>()(x))
+		if (*this == false || x == false)
 			return zero();
-		if (::one<clause<B>>()(x)) return *this;
-		if (::one<clause<B>>()(*this)) return x;
+		if (x == true) return *this;
+		if (*this == true) return x;
 		x += this->first;
 		for (const hbdd<B>& f : this->second) x -= f;
-		return simplify(x), x;
+		return x.simplify(), x;
 	}
 
 	set<clause<B>> operator~() const {
@@ -89,7 +88,8 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 		clause<B> c;
 		if (this->first) r.insert(c -= this->first);
 		for (const hbdd<B>& f : this->second) 
-			r.insert((c = clause<B>()) += f);
+			r.insert(clause<B>() += f);
+			//r.insert((c = clause<B>()) += f);
 		return r;
 	}
 
@@ -99,7 +99,8 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 		else this->first = g;
 		set<clause<B>> s;
 		for (hbdd<B> g : s) {
-			g = (g->subst(v, f->sub0(v)) | g->subst(v, ~(f->sub1(v))));
+			g =	(g->subst(v, f->sub0(v)) |
+				g->subst(v, ~(f->sub1(v))));
 			if (g == hbdd<B>::hfalse) return false;
 			s.insert(g);
 		}
@@ -118,7 +119,7 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 	}
 
 	void simplify() {
-		if (!this->first || zero() || one()) return;
+		if (!this->first || *this == true || *this == false) return;
 		set<hbdd<B>> s;
 		for (const hbdd<B>& f : this->second)
 			if (const hbdd<B>& g = f & ~this->first; g->zero())
@@ -128,17 +129,58 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 	}
 };
 
-template<typename B> struct zero<clause<B>> {
-	bool operator()(const clause<B>& c) const { return c.first->one(); }
-};
+template<typename... BAs> struct clauses : public tuple<clause<BAs>...> {
+	clauses() {}
+	clauses(bool b) {
+		auto f = [&b](auto& x) { b ? x.to_one() : x.to_zero(); };
+		(f(get<BAs>(*this)), ...);
+	}
+	template<typename B> clauses(const clause<B>& c) {
+		get<clause<B>>(*this) = c;
+	}
 
-template<typename B> struct one<clause<B>> {
-	bool operator()(const clause<B>& c) const { return c.first->zero(); }
+	template<typename B> void put(const clause<B>& c) {
+		if (c == false) clear_all();
+		get<clause<B>>(*this) = (c == true) ? clause<B>() : c;
+	}
+
+	template<typename B> clauses& clear() { put(clause<B>()); return *this; }
+	void clear_all() { (clear<BAs>(), ...); }
+
+	template<typename B> clauses& subst(int_t v, const hbdd<B>& t) {
+		return put(get<clause<B>>(*this).subst(v, t)), *this;
+	}
+
+	template<typename B> clauses& operator&=(const clause<B>& c) {
+		return put(get<clause<B>>(*this) & c), *this;
+	}
+
+	clauses operator&(clauses cs) const {
+		auto f = [&cs](auto x) { cs &= x; };
+		(f(get<clause<BAs>>(*this)), ...);
+		return cs;
+	}
+
+	template<typename B>
+	static void put(tuple<set<clause<BAs>>...>& t,
+			const set<clause<B>>& s) {
+		get<set<clause<B>>>(t) = s;
+	}
+
+	tuple<set<clause<BAs>>...> operator~() const {
+		tuple<set<clause<BAs>>...> r;
+		auto f = [&r](auto& x) { put(r, ~x); };
+		(f(get<clause<BAs>>(*this)), ...);
+		return r;
+	}
 };
 
 template<typename... BAs> struct tau :
-	public tuple<set<clause<tau<BAs...>>>, set<clause<BAs>>...> {
+	public set<clauses<tau<BAs...>, BAs...>> {
+//	public set<tuple<clause<tau<BAs...>>, clause<BAs>...>> {
+	typedef tuple<clause<tau<BAs...>>, clause<BAs>...> ct; // clauses tuple
 	enum type { ZERO, ONE, NONE } t;
+
 	tau() : t(NONE) {}
 	tau(bool b) : t(b ? ONE : ZERO) {}
 	template<typename B> tau(const set<clause<B>>& s) {
@@ -155,20 +197,31 @@ template<typename... BAs> struct tau :
 		return r;
 	}
 
-	template<typename B> tau subst(int_t s, const hbdd<B>& t) const {
-		tau r;
-		auto f = [&s, &t, &r](const auto& cs) {
-			for (auto& c : cs) r |= c.subst(s, t);
-		};
-		f(get<0>(*this));
-		(f(get<set<clause<BAs>>>(*this)), ...);
-		return r;
+	template<typename B> void remove() {
+		tau r = *this;
+		this->clear();
+		for (ct t : r) *this |= t.put(clause<B>());
+	}
+
+	bool operator==(bool b) const { return t == (b ? ONE : ZERO); }
+
+	template<typename B> void subst(int_t s, const hbdd<B>& t) {
+		set<clause<B>> cs;
+		for (const ct& x : *this) cs.insert(get<clause<B>>(x));
+		remove<B>;
+		for (const clause<B>& c : cs) *this |= c.subst(s, t);
+//		tau r;
+//		auto f = [&s, &t, &r](const auto& c) { r |= c.subst(s, t); };
+//		for (auto& c : *this)
+//			f(c.get<0>(*this)),
+//			(f(c.get<clause<BAs>>(*this)), ...);
+//		return r;
 	}
 
 	template<typename B> tau<BAs...>& operator|=(const clause<B>& c) {
-		if (::zero<clause<B>>()(c)) return *this;
-		if (::one<clause<B>>()(c)) return *this = one();
-		return t = NONE, get<set<clause<B>>>(*this).insert(c), *this;
+		if (c == false) return *this;
+		if (c == true) return *this = one();
+		return t = NONE, this->emplace(c), *this;
 	}
 	
 	template<typename B> tau<BAs...>& operator|=(const set<clause<B>>& s) {
@@ -176,24 +229,35 @@ template<typename... BAs> struct tau :
 		return *this;
 	}
 
-	template<typename B> tau<BAs...>& operator&=(const clause<B>& c) {
-		return (get<B>(*this) = (get<B>(*this) & c)), *this;
+	template<typename B> tau<BAs...> operator&(const clause<B>& c) {
+		tau r(true);
+		for (const auto& cs : *this) r |= cs & c;
+		return r;
 	}
 
-	template<typename B> tau<BAs...>& operator|(const clause<B>& c) {
+	template<typename B> tau<BAs...> operator|(const clause<B>& c) const {
 		tau t = *this;
 		return t |= c;
 	}
 
-	template<typename B> tau<BAs...>& operator|(const set<clause<B>>& s) {
+	template<typename B>
+	tau<BAs...> operator|(const set<clause<B>>& s) const {
 		tau t = *this;
 		return t |= s;
 	}
 
+	tau<BAs...>& operator|=(const ct& t) {
+		auto f = [this](auto& x) { *this |= x; };
+		*this |= get<0>(t);
+		(f(get<clause<BAs>>(t)), ...);
+		return *this;
+	}
+
 	tau operator|(tau x) const {
-		auto f = [&x](auto& y) { x |= y; };
-		f(get<0>(*this));
-		(f(get<set<clause<BAs>>>(*this)), ...);
+		for (const ct& t : *this) x |= t;
+//		auto f = [&x](auto& y) { x |= y; };
+//		f(get<0>(*this));
+//		(f(get<set<clause<BAs>>>(*this)), ...);
 		return x;
 	}
 
@@ -205,24 +269,40 @@ template<typename... BAs> struct tau :
 //		return x;
 	}
 
-	tau operator~() const {
-		tau r(true);
-		auto f = [&r](auto &x) { for (auto& y : x) r = r & tau(~y); };
-		f(get<0>(*this));
-		(f(get<set<clause<BAs>>>(*this)), ...);
+	static tau neg(const ct& t) {
+		tau r;
+		auto f = [&r](auto c) { r |= ~c; };
+		(f(get<clause<BAs>>(t)), ...);
 		return r;
 	}
-};
 
-template<typename... BAs> struct zero<tau<BAs...>> {
-	bool operator()(const tau<BAs...>& t) const {
-		return t.t == tau<BAs...>::ZERO;
+	template<typename... Ts>
+	static tau to_tau(const tuple<set<clause<Ts>>...>& t) {
+		tau r(false);
+		auto f = [&r](auto& x) { r |= x; };
+		(f(get<set<clause<Ts>>>(t)), ...);
+		return r;
 	}
-};
 
-template<typename... BAs> struct one<tau<BAs...>> {
-	bool operator()(const tau<BAs...>& t) const {
-		return t.t == tau<BAs...>::ONE;
+	tau operator~() const {
+		tau r(true);
+		for (clauses cs : *this) r = r & to_tau(~cs);
+//		auto f = [&r](auto &x) { for (auto& y : x) r = r & tau(~y); };
+//		f(get<0>(*this));
+//		(f(get<set<clause<BAs>>>(*this)), ...);
+		return r;
+	}
+
+	template<typename B> tau& operator+=(const hbdd<B>& f) {
+		return *this = (*this & (clause<B>() += f));
+//		clause<B> c;
+//		return *this |= (c += f);
+	}
+
+	template<typename B> tau& operator-=(const hbdd<B>& f) {
+		return *this = (*this & (clause<B>() -= f));
+//		clause<B> c;
+//		return *this |= (c -= f);
 	}
 };
 #endif

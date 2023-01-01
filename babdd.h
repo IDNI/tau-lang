@@ -60,10 +60,13 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 
 	bool leaf() const { return holds_alternative<B>(*this); }
 
+	struct initializer { initializer() { bdd::init(); }};
+
 	static vector<bdd> V;
 	static unordered_map<bdd_node, size_t> Mn;
 	static map<B, size_t> Mb;
 	static int_t T, F;
+	static initializer I;
 
 	static int_t add(const bdd_node& n) { return add(n.v, n.h, n.l); }
 
@@ -87,8 +90,8 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 	}
 
 	static int_t add(const B& b) {
-		if (zero<B>()(b)) return F;
-		if (one<B>()(b)) return T;
+		if (b == false) return F;
+		if (b == true) return T;
 		if (auto it = Mb.find(b); it != Mb.end()) return it->second;
 		else if ((it = Mb.find(~b)) != Mb.end()) return -it->second;
 		Mb.emplace(b, V.size());
@@ -96,20 +99,6 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		return V.size() - 1;
 	}
 
-/*	inline static int_t hi(int_t x) {
-		DBG(assert(x);)
-		return 	x > 0 ? std::get<bdd_node>(V[x]).h :
-			-std::get<bdd_node>(V[x]).h;
-	}
-
-	inline static int_t lo(int_t x) {
-		DBG(assert(x);)
-		return	x > 0 ? std::get<bdd_node>(V[x]).l :
-			-std::get<bdd_node>(V[-x]).l;
-	}
-
-	inline static int_t var(int_t x) { return std::get<bdd_node>(V[x]).v; }
-*/
 	static bdd get(int_t n) {
 		if (n > 0) return V[n];
 		n = -n;
@@ -146,7 +135,7 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		const bdd &xx = get(x);
 		if (xx.leaf()) return std::get<B>(xx);
 		const bdd_node &nx = std::get<bdd_node>(xx);
-		if (B r = get_uelim(nx.h); ::zero<B>()(r)) return r;
+		if (B r = get_uelim(nx.h); r == false) return r;
 		else return r & get_uelim(nx.l);
 	}
 
@@ -154,7 +143,7 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		const bdd &xx = get(x);
 		if (xx.leaf()) return std::get<B>(xx);
 		const bdd_node &nx = std::get<bdd_node>(xx);
-		if (B r = get_eelim(nx.h); ::one<B>()(r)) return r;
+		if (B r = get_eelim(nx.h); r == true) return r;
 		else return r | get_eelim(nx.l);
 	}
 
@@ -191,7 +180,7 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		int_t x, set<pair<B, vector<int_t>>>& s, vector<int_t>& v) {
 		const bdd& xx = get(x);
 		if (xx.leaf()) {
-			if (!zero<B>()(std::get<B>(xx)))
+			if (!(std::get<B>(xx) == false))
 				s.emplace(std::get<B>(xx), v);
 			return;
 		}
@@ -242,8 +231,8 @@ template<typename B> struct bdd_handle {
 
 	static hbdd<B> bit(bool b, int_t v) {
 		assert(v);
-		int_t r = get(bdd<B>::add(v, bdd<B>::T, bdd<B>::F));
-		return b ? r : -r;
+		hbdd<B> r = get(bdd<B>::add(v, bdd<B>::T, bdd<B>::F));
+		return b ? r : ~r;
 	}
 
 	B get_uelim() const { return bdd<B>::get_uelim(b); }
@@ -288,16 +277,8 @@ private:
 	int_t b;
 };
 
-template<typename B> struct zero<hbdd<B>> {
-	bool operator()(const hbdd<B>& x) const { return x->zero(); }
-};
-
-template<typename B> struct one<hbdd<B>> {
-	bool operator()(const hbdd<B>& x) const { return x->one(); }
-};
-//template<typename B> bool zero<hbdd<B>>(const hbdd<B>& x) { return x->zero(); }
-//template<typename B> bool one<hbdd<B>(const hbdd<B>& x) { return x->one(); }
-
+template<typename B>
+bool operator==(const hbdd<B>& x, bool b) { return b ? x->one() : x->zero(); }
 template<typename B>
 hbdd<B> operator&(const hbdd<B>& x, const hbdd<B>& y) { return (*x) & y; }
 template<typename B>

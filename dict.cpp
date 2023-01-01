@@ -5,7 +5,7 @@
 #include <sstream>
 using namespace std;
 
-vector<string> v;
+vector<string> v({"dummy"});
 map<string, size_t> m;
 
 sym_t dict(const char* s) {
@@ -22,3 +22,5 @@ const char* dict(sym_t n) {
 	}
 	return v[n].c_str();
 }
+
+sym_t dict(const string& s) { return dict(s.c_str()); }
