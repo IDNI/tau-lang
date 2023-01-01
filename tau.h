@@ -34,9 +34,6 @@ struct Bool {
 	bool operator==(bool t) const { return b == t; }
 };
 
-//template<> bool zero(const Bool& b) { return !b.b; }
-//template<> bool one(const Bool& b) { return b.b; }
-
 Bool Bool::operator&(const Bool& x) const {
 	return (*this == false) ? zero() : x;
 }
@@ -64,7 +61,8 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 	void to_one() { *this = one(); }
 
 	bool operator==(bool b) const {
-		return this->first && !(this->first == b);
+		return	this->first && (
+			b ? (this->first == false) : (this->first == true));
 	}
 
 	clause<B>& operator+=(const hbdd<B>& f) {
@@ -79,11 +77,10 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 	}
 
 	clause<B> operator&(clause<B> x) const {
-		if (*this == false || x == false)
-			return zero();
+		if (*this == false || x == false) return zero();
 		if (x == true) return *this;
 		if (*this == true) return x;
-		x += this->first;
+		if (this->first) x += this->first;
 		for (const hbdd<B>& f : this->second) x -= f;
 		return x.simplify(), x;
 	}
@@ -94,7 +91,6 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 		if (this->first) r.insert(c -= this->first);
 		for (const hbdd<B>& f : this->second) 
 			r.insert(clause<B>() += f);
-			//r.insert((c = clause<B>()) += f);
 		return r;
 	}
 
@@ -182,7 +178,6 @@ template<typename... BAs> struct clauses : public tuple<clause<BAs>...> {
 
 template<typename... BAs> struct tau :
 	public set<clauses<tau<BAs...>, BAs...>> {
-	//typedef tuple<clause<tau<BAs...>>, clause<BAs>...> ct; // clauses tuple
 	enum type { ZERO, ONE, NONE } t;
 
 	tau(bool b) : t(b ? ONE : ZERO) {}
@@ -200,22 +195,12 @@ template<typename... BAs> struct tau :
 		return r;
 	}
 
-//	template<typename B> void remove() {
-//		tau r = *this;
-//		this->clear();
-//		for (ct t : r) *this |= t.put(clause<B>());
-//	}
-
 	bool operator==(bool b) const { return t == (b ? ONE : ZERO); }
 
 	template<typename B> void subst(int_t s, const hbdd<B>& t) {
 		tau r = *this;
 		this->clear();
 		for (const clauses<BAs...>& x : r) *this |= x.subst(s, t);
-//		set<clause<B>> cs;
-//		for (const clauses& x : *this) cs.insert(get<clause<B>>(x));
-//		remove<B>;
-//		for (const clause<B>& c : cs) *this |= c.subst(s, t);
 	}
 
 	template<typename B> tau<BAs...>& operator|=(const clause<B>& c) {
@@ -263,13 +248,6 @@ template<typename... BAs> struct tau :
 	tau operator&(const tau& x) const {
 		return ~((~x) | ~*this); // TODO: better
 	}
-
-//	static tau neg(const ct& t) {
-//		tau r;
-//		auto f = [&r](auto c) { r |= ~c; };
-//		(f(get<clause<BAs>>(t)), ...);
-//		return r;
-//	}
 
 	template<typename... Ts>
 	static tau to_tau(const tuple<set<clause<Ts>>...>& t) {

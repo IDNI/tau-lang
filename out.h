@@ -13,6 +13,7 @@
 #ifndef __OUT_H__
 #define __OUT_H__
 #include "tau.h"
+#include "dict.h"
 #include <ostream>
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
@@ -24,8 +25,8 @@ template<typename B> ostream& operator<<(ostream& os, const hbdd<B>& f) {
 		assert(!(c.first == false));
 		if (!(c.first == true)) os << '{' << c.first << '}';
 		for (int_t v : c.second)
-			if (v < 0) os << "x[" << -v << "]'";
-			else os << "x[" << v << ']';
+			if (v < 0) os << dict(-v) << '\'';
+			else os << dict(v);
 		if (--n) os << " | ";
 	}
 	return os;
@@ -37,11 +38,6 @@ template<typename B> ostream& operator<<(ostream& os, const clause<B>& c) {
 	return os;
 }
 
-//template<typename B> ostream& operator<<(ostream& os, const set<clause<B>>& s) {
-//	for (auto& c : s) os << c;
-//	return os;
-//}
-
 template<typename... Ts>
 ostream& operator<<(ostream& os, const tuple<Ts...>& t) {
 	auto f = [&os](auto x) { os << x; };
@@ -51,7 +47,11 @@ ostream& operator<<(ostream& os, const tuple<Ts...>& t) {
 
 template<typename... BAs>
 ostream& operator<<(ostream& os, const tau<BAs...>& t) {
-	for (auto& c : t) os << c << endl << " || " << endl;
+	size_t n = t.size();
+	for (auto& c : t) {
+		os << c;
+		if (--n) os << " || " << endl;
+	}
 	return os;
 }
 #endif

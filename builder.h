@@ -21,4 +21,26 @@ hbdd<Bool> operator&(string x, string y) {
 		bdd_handle<Bool>::bit(!ny, dict(y));
 }
 
-//template<typename T, typename... BAs> tau<BAs...> operator&&(const hbdd<B>
+hbdd<Bool> operator|(string x, const hbdd<Bool>& y) {
+	bool nx = '\'' == x.back();
+	if (nx) x.pop_back();
+	return	bdd_handle<Bool>::bit(!nx, dict(x)) | y;
+}
+
+hbdd<Bool> operator&(string x, const hbdd<Bool>& y) {
+	bool nx = '\'' == x.back();
+	if (nx) x.pop_back();
+	return	bdd_handle<Bool>::bit(!nx, dict(x)) & y;
+}
+
+hbdd<Bool> operator|(const hbdd<Bool>& y, string x) {
+	bool nx = '\'' == x.back();
+	if (nx) x.pop_back();
+	return	bdd_handle<Bool>::bit(!nx, dict(x)) | y;
+}
+
+hbdd<Bool> operator&(const hbdd<Bool>& y, string x) {
+	bool nx = '\'' == x.back();
+	if (nx) x.pop_back();
+	return	bdd_handle<Bool>::bit(!nx, dict(x)) & y;
+}
