@@ -35,7 +35,12 @@ int main() {
 	typedef tau<Bool, sbf> fof;
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
-	cout << f << endl << g << endl << g->subst(dict("x"), f) << endl;
+	fof t(true);
+	t += f;
+	t -= g;
+	cout << (~t) << endl;
+	return 0;
+	cout << ~(fof(true)+=f) << endl << g << endl << g->subst(dict("x"), f) << endl;
 //	cout << anf(f) << endl << anf(g) << endl;
 /*	anf(g).subst(dict("x"), anf(f));
 	g = g->subst(dict("x"), f);

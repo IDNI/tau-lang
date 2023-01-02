@@ -94,6 +94,7 @@ template<typename B> struct clause : public pair<hbdd<B>, set<hbdd<B>>> {
 	}
 
 	void simplify() {
+		return;
 		if (!this->first || *this == true || *this == false) return;
 		set<hbdd<B>> s;
 		for (const hbdd<B>& f : this->second)

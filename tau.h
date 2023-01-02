@@ -18,6 +18,7 @@
 
 template<typename... BAs> struct tau :
 	public set<clauses<tau<BAs...>, BAs...>> {
+	typedef set<clauses<tau<BAs...>, BAs...>> base;
 	enum type { ZERO, ONE, NONE } t;
 
 	tau(bool b) : t(b ? ONE : ZERO) {}
@@ -36,6 +37,10 @@ template<typename... BAs> struct tau :
 	}
 
 	bool operator==(bool b) const { return t == (b ? ONE : ZERO); }
+
+	bool operator==(const tau& x) const {
+		return t == x.t && (base)(*this) == (base)(x);
+	}
 
 	template<typename B> void subst(int_t s, const hbdd<B>& t) {
 		tau r = *this;
@@ -76,11 +81,6 @@ template<typename... BAs> struct tau :
 	tau<BAs...>& operator|=(const clauses<tau, BAs...>& cs) {
 		if (!cs.empty()) this->insert(cs);
 		return t = NONE, *this;
-//		tau r(true);
-//		auto f = [&r](auto& x) { r = r & x; };
-//		*this |= get<0>(t);
-//		(f(get<clause<BAs>>(t)), ...);
-//		return *this = *this | r;
 	}
 
 	tau operator|(tau x) const {
@@ -89,6 +89,14 @@ template<typename... BAs> struct tau :
 	}
 
 	tau operator&(const tau& x) const {
+		if (x == false || *this == false) return zero();
+		if (x == true) return *this;
+		if (*this == true) return x;
+		tau r(false);
+		for (auto& c : x)
+			for (auto& d : *this)
+				r |= (c & d);
+		return r;
 		return ~((~x) | ~*this); // TODO: better
 	}
 
