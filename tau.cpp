@@ -32,7 +32,7 @@ template<typename B> hbdd<B> bdd_handle<B>::hfalse;
 
 int main() {
 	typedef hbdd<Bool> sbf;
-	typedef tau<Bool, sbf> fof;
+	typedef nso<Bool, sbf> fof;
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
 	fof t(true);
@@ -76,7 +76,7 @@ int main() {
 	cout << (fof(true) += f).ex(dict("x")) << endl;
 	cout << ((fof(true) += f) -= g).ex(dict("x")) << endl;
 	return 0;
-/*	tau<Bool, hbdd<Bool>> t(true);
+/*	nso<Bool, hbdd<Bool>> t(true);
 	hbdd<Bool> f = "x"s & "y"s;
 //	cout << f << endl;
 //	cout << (f | "y'"s )<< endl;
