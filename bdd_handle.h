@@ -48,18 +48,18 @@ template<typename B> struct bdd_handle {
 	static hbdd<B> get(const bdd_node& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
-		hbdd<B> h(new bdd_handle);
+		hbdd<B> h = make_shared<bdd_handle<B>>();//(new bdd_handle);
 		h->b = bdd<B>::add(x);
-		Mn.emplace(x, shared_ptr<bdd_handle<B>>(h));
+		Mn.emplace(x, h);
 		return h;
 	}
 
 	static hbdd<B> get(const B& x) {
 		if (auto it = Mb.find(x); it != Mb.end())
 			return it->second;//.lock();
-		hbdd<B> h(new bdd_handle);
+		hbdd<B> h = make_shared<bdd_handle<B>>();//(new bdd_handle);
 		h->b = bdd<B>::add(x);
-		Mb.emplace(x, shared_ptr<bdd_handle<B>>(h));
+		Mb.emplace(x, h);
 		return h;
 	}
 
@@ -150,6 +150,13 @@ template<typename T> constexpr bool is_sp<sp<T>>(true);
 template<typename T> auto sp_underlying(sp<T> x) { return *x; }
 
 template<typename B> void bdd_init() requires is_sp<B> {
+	if (!bdd<B>::V.empty()) return;
+#ifdef DEBUG
+	int s;
+	cout << "bdd_init" << '<' <<
+		abi::__cxa_demangle(typeid(bdd<B>).name(), 0, 0, &s) <<
+		'>' << endl;
+#endif
 	auto one = B::element_type::one();
 	bdd<B>::V.emplace_back(one);
 	bdd<B>::V.emplace_back(one);
@@ -160,6 +167,13 @@ template<typename B> void bdd_init() requires is_sp<B> {
 }
 
 template<typename B> void bdd_init() {
+	if (!bdd<B>::V.empty()) return;
+#ifdef DEBUG
+	int s;
+	cout << "bdd_init" << '<' <<
+		abi::__cxa_demangle(typeid(bdd<B>).name(), 0, 0, &s) <<
+		'>' << endl;
+#endif
 //	bdd<B>::V.emplace_back(B::zero());
 	bdd<B>::V.emplace_back(B::one());
 	bdd<B>::V.emplace_back(B::one());
@@ -169,16 +183,5 @@ template<typename B> void bdd_init() {
 	bdd_handle<B>::htrue = bdd_handle<B>::get(bdd<B>::get(1));
 }
 
-#ifdef DEBUG
-#include <cxxabi.h>
-#endif
-template<typename B> bdd<B>::initializer::initializer() {
-#ifdef DEBUG
-	int s;
-	cout << "bdd_init" << '<' <<
-		abi::__cxa_demangle(typeid(bdd<B>).name(), 0, 0, &s) <<
-		'>' << endl;
-#endif
-	bdd_init<B>();
-}
+//template<typename B> bdd<B>::initializer::initializer() { bdd_init<B>(); }
 #endif

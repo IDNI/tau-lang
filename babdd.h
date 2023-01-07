@@ -60,17 +60,17 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 
 	bool leaf() const { return holds_alternative<B>(*this); }
 
-	struct initializer { initializer(); };
+//	struct initializer { initializer(); };
 
 	inline static vector<bdd> V;
 	inline static unordered_map<bdd_node, size_t> Mn;
 	inline static map<B, size_t> Mb;
 	inline static int_t T, F;
+//	inline static initializer I;
 
 	static int_t add(const bdd_node& n) { return add(n.v, n.h, n.l); }
-
+	
 	static int_t add(int_t v, int_t h, int_t l) {
-		static initializer I;
 		if (h == l) return h;
 		if (l < 0) {
 			h = -h, l = -l;
@@ -106,8 +106,6 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		const bdd_node& t = std::get<bdd_node>(V[n]);
 		return bdd(t.v, -t.h, -t.l);
 	}
-
-//	static void init();
 
 	static int_t bdd_and(int_t x, const B& b) {
 		if (x == T) return add(b);

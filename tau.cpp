@@ -33,11 +33,19 @@
 int main() {
 	typedef hbdd<Bool> sbf;
 	typedef tau<Bool, sbf> fof;
+	fof::init();
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
 	fof t(true);
 	t += f;
 	t -= g;
+	fof tt(true);
+//	cout << bdd_handle<fof>::get(t) << endl;
+	tt += (bdd_handle<fof>::bit(true, 1) & bdd_handle<fof>::get(t));
+	cout << tt << endl;
+	return 0;
+	t += bdd_handle<fof>::get(t);
+	cout << t << endl;
 	cout << (~t) << endl;
 	return 0;
 	cout << ~(fof(true)+=f) << endl << g << endl << g->subst(dict("x"), f) << endl;

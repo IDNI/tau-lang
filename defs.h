@@ -18,6 +18,7 @@ typedef int sym_t;
 #ifdef DEBUG
 #define DBG(x) x
 #include <iostream>
+#include <cxxabi.h>
 #else
 #include <iostream>
 #define DBG(x)
