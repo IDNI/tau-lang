@@ -26,11 +26,6 @@ template<typename... BAs> struct tau :
 		get<set<clause<B>>>(*this) = s;
 	}
 
-	static void init() {
-		bdd_init<tau>();
-		(bdd_init<BAs>(), ...);
-	}
-
 	static const tau& zero() {
 		static tau r(false);
 		return r;

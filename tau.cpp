@@ -33,7 +33,7 @@
 int main() {
 	typedef hbdd<Bool> sbf;
 	typedef tau<Bool, sbf> fof;
-	fof::init();
+	//fof::init();
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
 	fof t(true);

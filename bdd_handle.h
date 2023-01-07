@@ -45,22 +45,20 @@ template<typename B> struct bdd_handle {
 	inline static map<B, std::shared_ptr<bdd_handle>> Mb;
 	inline static hbdd<B> htrue, hfalse;
 
+	bdd_handle();
+
 	static hbdd<B> get(const bdd_node& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
 		hbdd<B> h = make_shared<bdd_handle<B>>();//(new bdd_handle);
-		h->b = bdd<B>::add(x);
-		Mn.emplace(x, h);
-		return h;
+		return h->b = bdd<B>::add(x), Mn.emplace(x, h), h;
 	}
 
 	static hbdd<B> get(const B& x) {
 		if (auto it = Mb.find(x); it != Mb.end())
 			return it->second;//.lock();
 		hbdd<B> h = make_shared<bdd_handle<B>>();//(new bdd_handle);
-		h->b = bdd<B>::add(x);
-		Mb.emplace(x, h);
-		return h;
+		return h->b = bdd<B>::add(x), Mb.emplace(x, h), h;
 	}
 
 	static hbdd<B> get(const bdd<B>& x) {
@@ -147,8 +145,6 @@ private:
 template<typename T> constexpr bool is_sp{};
 template<typename T> constexpr bool is_sp<sp<T>>(true);
 
-template<typename T> auto sp_underlying(sp<T> x) { return *x; }
-
 template<typename B> void bdd_init() requires is_sp<B> {
 	if (!bdd<B>::V.empty()) return;
 #ifdef DEBUG
@@ -174,7 +170,6 @@ template<typename B> void bdd_init() {
 		abi::__cxa_demangle(typeid(bdd<B>).name(), 0, 0, &s) <<
 		'>' << endl;
 #endif
-//	bdd<B>::V.emplace_back(B::zero());
 	bdd<B>::V.emplace_back(B::one());
 	bdd<B>::V.emplace_back(B::one());
 	bdd<B>::Mb.emplace(B::one(), 1);
@@ -183,5 +178,6 @@ template<typename B> void bdd_init() {
 	bdd_handle<B>::htrue = bdd_handle<B>::get(bdd<B>::get(1));
 }
 
+template<typename B> bdd_handle<B>::bdd_handle() { bdd_init<B>(); }
 //template<typename B> bdd<B>::initializer::initializer() { bdd_init<B>(); }
 #endif
