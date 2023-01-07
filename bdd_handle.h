@@ -18,7 +18,9 @@ template<typename B> struct bdd_handle;
 template<typename B> using hbdd = sp<bdd_handle<B>>;
 
 template<typename B>
-bool operator==(const hbdd<B>& x, bool b) { return b ? x->one() : x->zero(); }
+bool operator==(const hbdd<B>& x, bool b) {
+	return b ? x->is_one() : x->is_zero();
+}
 
 template<typename B>
 hbdd<B> operator&(const hbdd<B>& x, const hbdd<B>& y) { return (*x) & y; }
@@ -39,9 +41,9 @@ template<typename B> bool operator==(const hbdd<B>& x, const hbdd<B>& y) {
 #endif
 
 template<typename B> struct bdd_handle {
-	static unordered_map<bdd_node, std::shared_ptr<bdd_handle>> Mn;
-	static map<B, std::shared_ptr<bdd_handle>> Mb;
-	static hbdd<B> htrue, hfalse;
+	inline static unordered_map<bdd_node, std::shared_ptr<bdd_handle>> Mn;
+	inline static map<B, std::shared_ptr<bdd_handle>> Mb;
+	inline static hbdd<B> htrue, hfalse;
 
 	static hbdd<B> get(const bdd_node& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
@@ -70,11 +72,13 @@ template<typename B> struct bdd_handle {
 
 	bdd<B> get() const { return bdd<B>::get(b); }
 
-	bool zero() const { return b == bdd<B>::F; }
-	bool one() const { return b == bdd<B>::T; }
+	bool is_zero() const { return b == bdd<B>::F; }
+	bool is_one() const { return b == bdd<B>::T; }
+
+	static hbdd<B> one() { return get(bdd<B>::T); }
+	static hbdd<B> zero() { return get(bdd<B>::F); }
 
 	static hbdd<B> bit(bool b, int_t v) {
-		if (bdd<B>::V.empty()) bdd<B>::init();
 		DBG(assert(v);)
 		hbdd<B> r = get(bdd_node(v, bdd<B>::T, bdd<B>::F));
 		DBG(assert(r);)
@@ -140,12 +144,41 @@ private:
 	int_t b;
 };
 
-template<typename B> void bdd<B>::init() {
-	bdd<B>::V.emplace_back(B::zero());
+template<typename T> constexpr bool is_sp{};
+template<typename T> constexpr bool is_sp<sp<T>>(true);
+
+template<typename T> auto sp_underlying(sp<T> x) { return *x; }
+
+template<typename B> void bdd_init() requires is_sp<B> {
+	auto one = B::element_type::one();
+	bdd<B>::V.emplace_back(one);
+	bdd<B>::V.emplace_back(one);
+	bdd<B>::Mb.emplace(one, 1);
+	bdd<B>::F = -(bdd<B>::T = 1);
+	bdd_handle<B>::hfalse = bdd_handle<B>::get(bdd<B>::get(-1));
+	bdd_handle<B>::htrue = bdd_handle<B>::get(bdd<B>::get(1));
+}
+
+template<typename B> void bdd_init() {
+//	bdd<B>::V.emplace_back(B::zero());
+	bdd<B>::V.emplace_back(B::one());
 	bdd<B>::V.emplace_back(B::one());
 	bdd<B>::Mb.emplace(B::one(), 1);
 	bdd<B>::F = -(bdd<B>::T = 1);
 	bdd_handle<B>::hfalse = bdd_handle<B>::get(bdd<B>::get(-1));
 	bdd_handle<B>::htrue = bdd_handle<B>::get(bdd<B>::get(1));
+}
+
+#ifdef DEBUG
+#include <cxxabi.h>
+#endif
+template<typename B> bdd<B>::initializer::initializer() {
+#ifdef DEBUG
+	int s;
+	cout << "bdd_init" << '<' <<
+		abi::__cxa_demangle(typeid(bdd<B>).name(), 0, 0, &s) <<
+		'>' << endl;
+#endif
+	bdd_init<B>();
 }
 #endif

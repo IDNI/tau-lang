@@ -17,22 +17,22 @@
 #include "anf.h"
 #include <iostream>
 
-template<typename B> vector<bdd<B>> bdd<B>::V;
-template<typename B> unordered_map<bdd_node, size_t> bdd<B>::Mn;
-template<typename B> map<B, size_t> bdd<B>::Mb;
-template<typename B> int_t bdd<B>::T;
-template<typename B> int_t bdd<B>::F;
-template<typename B>
-unordered_map<bdd_node, std::shared_ptr<bdd_handle<B>>> bdd_handle<B>::Mn;
-template<typename B>
-map<B, std::shared_ptr<bdd_handle<B>>> bdd_handle<B>::Mb;
-template<typename B> hbdd<B> bdd_handle<B>::htrue;
-template<typename B> hbdd<B> bdd_handle<B>::hfalse;
+//template<typename B> vector<bdd<B>> bdd<B>::V;
+//template<typename B> unordered_map<bdd_node, size_t> bdd<B>::Mn;
+//template<typename B> map<B, size_t> bdd<B>::Mb;
+//template<typename B> int_t bdd<B>::T;
+//template<typename B> int_t bdd<B>::F;
+//template<typename B>
+//unordered_map<bdd_node, std::shared_ptr<bdd_handle<B>>> bdd_handle<B>::Mn;
+//template<typename B>
+//map<B, std::shared_ptr<bdd_handle<B>>> bdd_handle<B>::Mb;
+//template<typename B> hbdd<B> bdd_handle<B>::htrue;
+//template<typename B> hbdd<B> bdd_handle<B>::hfalse;
 //template<typename B> bdd<B>::initializer bdd<B>::I;
 
 int main() {
 	typedef hbdd<Bool> sbf;
-	typedef nso<Bool, sbf> fof;
+	typedef tau<Bool, sbf> fof;
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
 	fof t(true);
@@ -76,7 +76,7 @@ int main() {
 	cout << (fof(true) += f).ex(dict("x")) << endl;
 	cout << ((fof(true) += f) -= g).ex(dict("x")) << endl;
 	return 0;
-/*	nso<Bool, hbdd<Bool>> t(true);
+/*	tau<Bool, hbdd<Bool>> t(true);
 	hbdd<Bool> f = "x"s & "y"s;
 //	cout << f << endl;
 //	cout << (f | "y'"s )<< endl;

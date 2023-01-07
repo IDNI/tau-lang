@@ -1,53 +1,59 @@
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
 #ifndef __SEQ_H__
 #define __SEQ_H__
-#include "fof.h"
+#include "nso.h"
 #include <iostream>
 #define ever ;;
 
-template<typename B>
-using f2f = function<fof<bf<B>>(const fof<bf<B>>&)>;
+template<typename... BAs> struct seq {
+	typedef nso<BAs...> nso_t;
+	nso_t pos;
+	vector<nso_t> neg;
+	typedef map<size_t, nso_t> state;
+	map<size_t s, nso_t> cache;
 
-template<typename B> size_t seq(const fof<bf<B>>& f, f2f<B> init, f2f<B> F) {
-	vector<fof<B>> v({init(f)});
-	for (ever) {
-		if (v.back() == fof<B>::zero()) return 0;
-		v.push_back(F(v.back()));
-		cout << v.size() << '\t' << v.back() << endl;
-		for (size_t k = 0; k != v.size() - 1; ++k)
-			if (v[k] == v.back()) {
-				cout << "equals iter " << k << endl;
-				return v.size();
-			}
+	template<typename T> seq(const nso_t& pos, const T& neg) :
+		pos(pos), neg(t.begin(), t.end()) {}
+
+	nso_t negs(size_t s) const {
+		if (one_bit(s)) return vec[the_bit(s)];
+		if (auto it = cache.find(s) != it->end()) return it->second;
+		return cache[s] = (negs(del_lsb(s)) & vec[get_lsb(s)]);
 	}
-}
 
-template<typename B> size_t seq(const fof<bf<B>>& f, f2f<B> F) {
-	return seq<B>(f, [](const fof<bf<B>>& f){ return f; }, F);
-}
-
-template<typename B> void seq(fof<B> f) {
-	f2f<B> init = [](const fof<B>& g) { return ex(g, 0); };
-	f2f<B> F = [](const fof<B>& g) { return shl(ex(ex(g & shr(g), 0), 1)); };
-	seq(f, F);
-	//seq(f, init, F);
-	return;
-	vector<fof<B>> v({f});
-	size_t n = 0;
-	cout << f << endl;
-	for (ever) {
-//		cout << "f:" << f << endl;
-//		cout << "shr(f): " << shr(f) << endl;
-//		cout << "f & shr(f): " << (f & shr(f)) << endl;
-//		cout << "ex f & shr(f): " << ex(f & shr(f), 0) << endl;
-		f = shl(ex(ex(f & shr(f), 0), 1));
-		cout << ++n << '\t' << f << endl;
-		if (f == fof<B>::zero()) { cout << "unsat" << endl; return; }
-		for (size_t k = 0; k != v.size(); ++k)
-			if (v[k] == f) {
-				cout << "equals iter " << k << endl;
-				return;
-			}
-		v.push_back(f);
+	void iter(fsyms fs, auto q, size_t s,
+		const state& prev, state& curr) const {
+		nso_t &f = (curr[s] = prev.at(s) & this->first);
+		for_each_subset_dec(s, [&f](size_t s) {
+				f = f & (prev.at(s) | ~psi(s)); 
+		});
+		f = q(f);
 	}
-}
-#endif
+
+	static tau<BAs...> quant(
+		const vector<tau_lit<BAs...>>& v, vector<set<int_t>> q) {
+		tau<BAs...> f(true);
+		for (auto& x : v)
+			if (v.neg) f = f & ~v.f;
+			else f = f & v.f;
+		size_t n = q.size();
+		bool ex = true;
+		while (n--) {
+			for (int_t x : q[n]) f = ex ? f.ex(x) : f.all(x);
+			ex = !ex;
+		}
+		return f;
+	}
+
+};

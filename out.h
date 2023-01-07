@@ -12,7 +12,7 @@
 // modified over time by the Author.
 #ifndef __OUT_H__
 #define __OUT_H__
-#include "nso.h"
+#include "tau.h"
 #include "dict.h"
 #include "bool.h"
 #include "anf.h"
@@ -57,7 +57,7 @@ ostream& operator<<(ostream& os, const tuple<Ts...>& t) {
 }
 
 template<typename... BAs>
-ostream& operator<<(ostream& os, const nso<BAs...>& t) {
+ostream& operator<<(ostream& os, const tau<BAs...>& t) {
 	if (t == false) return os << 'F';
 	if (t == true) return os << 'T';
 	DBG(assert(!t.empty());)

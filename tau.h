@@ -1,85 +1,38 @@
-#include "nso.h"
-#define ever ;;
+// LICENSE
+// This software is free for use and redistribution while including this
+// license notice, unless:
+// 1. is used for commercial or non-personal purposes, or
+// 2. used for a product which includes or associated with a blockchain or other
+// decentralized database technology, or
+// 3. used for a product which includes or associated with the issuance or use
+// of cryptographic or electronic currencies/coins/tokens.
+// On all of the mentioned cases, an explicit and written permission is required
+// from the Author (Ohad Asor).
+// Contact ohad@idni.org for requesting a permission. This license may be
+// modified over time by the Author.
+#ifndef __TAU_H__
+#define __TAU_H__
+#include "clauses.h"
+#include <utility>
+#include <cstddef>
 
-template<typename... BAs> struct tau;
-
-template<typename... BAs> struct tau_lit {
-	bool neg = false;
-	tau<BAs...> f;
-
-	tau_lit(const tau<BAs...>& f) : f(f) {}
-
-	tau_lit operator~() const {
-		tau r = *this;
-		r.neg = !this->neg;
-		return r;
-	}
-
-	bool operator<(const tau_lit& x) const {
-		if (neg != x.neg) return neg < x.neg;
-		return f < x.f;
-	}
-};
-
-template<typename... BAs> struct tau_clause : public set<tau_lit<BAs...>> {
-	tau_clause operator&(tau_clause x) const {
-		for (auto& t : *this) x.insert(t);
-		return x;
-	}
-
-	tau<BAs...> operator~() {
-		tau<BAs...> r(false);
-		for (auto& t : *this) r.insert(~t);
-		return r;
-	}
-
-	static vector<tau_lit<BAs...>> iter(
-		const vector<tau_lit<BAs...>>& v,
-		const vector<set<int_t>>& q,
-		const set<int_t>& init,
-		const vector<int_t>& order) {
-	}
-
-	static tau<BAs...> quant(
-		const vector<tau_lit<BAs...>>& v, vector<set<int_t>> q) {
-		tau<BAs...> f(true);
-		for (auto& x : v)
-			if (v.neg) f = f & ~v.f;
-			else f = f & v.f;
-		size_t n = q.size();
-		bool ex = true;
-		while (n--) for (int_t x : q[n]) f = ex ? f.ex(x) : f.all(x);
-		return f;
-	}
-
-	bool sat(	const vector<set<int_t>>& q,
-			const set<int_t>& init,
-			const vector<int_t>& order) const {
-		vector<vector<tau_lit<BAs...>>> v(*this);
-		for (ever) {
-			v.push_back(iter(v.back()), q, init, order);
-			auto x = quant(v.back(), q);
-			if (x == false) return false;
-			if (x == true) return true;
-			size_t n = v.size() - 2;
-			while (n--) if (v[n] == v.back()) return true;
-		}
-	}
-};
-
-template<typename... BAs> struct tau : public set<tau_clause<BAs...>> {
-	typedef set<set<tau_lit<BAs...>>> base;
+template<typename... BAs> struct tau :
+	public set<clauses<tau<BAs...>, BAs...>> {
+	typedef set<clauses<tau<BAs...>, BAs...>> base;
 	enum type { ZERO, ONE, NONE } t;
 
 	tau(bool b) : t(b ? ONE : ZERO) {}
+	template<typename B> tau(const set<clause<B>>& s) : t(NONE) {
+		get<set<clause<B>>>(*this) = s;
+	}
 
 	static const tau& zero() {
-		static nso r(false);
+		static tau r(false);
 		return r;
 	}
 
 	static const tau& one() {
-		static nso r(true);
+		static tau r(true);
 		return r;
 	}
 
@@ -93,40 +46,102 @@ template<typename... BAs> struct tau : public set<tau_clause<BAs...>> {
 		return t != x.t ? t < x.t : ((base)(*this) < (base)(x));
 	}
 
+	template<typename B> void subst(int_t s, const hbdd<B>& t) {
+		tau r = *this;
+		this->clear();
+		for (const clauses<BAs...>& x : r) *this |= x.subst(s, t);
+	}
+
+	template<typename B> tau& operator|=(const clause<B>& c) {
+		if (c == false) return *this;
+		if (c == true) return *this = one();
+		return t = NONE, this->emplace(c), *this;
+	}
+	
+	template<typename B> tau& operator|=(const set<clause<B>>& s) {
+		for (const clause<B>& c : s) *this |= c;
+		return *this;
+	}
+
+	template<typename B> tau operator&(const clause<B>& c) {
+		if (t == ZERO) return *this;
+		if (t == ONE) return *this |= c;
+		tau r(true);
+		for (const auto& cs : *this) r |= cs & c;
+		return r;
+	}
+
+	template<typename B> tau operator|(const clause<B>& c) const {
+		tau t = *this;
+		return t |= c;
+	}
+
+	template<typename B>
+	tau operator|(const set<clause<B>>& s) const {
+		tau t = *this;
+		return t |= s;
+	}
+
+	tau& operator|=(const clauses<tau, BAs...>& cs) {
+		if (!cs.empty()) this->insert(cs);
+		return t = NONE, *this;
+	}
+
 	tau operator|(const tau& x) const {
 		if (x == true || *this == true) return one();
 		if (x == false) return *this;
 		if (*this == false) return x;
-		tau r = *this;
-		for (auto& s : x) r.insert(s);
+		tau r = x;
+		for (auto& t : *this) r |= t;
 		return r;
 	}
 
-	tau operator&(const tau& t) const {
-		if (t == false || *this == false) return zero();
-		if (t == true) return *this;
-		if (*this == true) return t;
-		tau r;
-		for (auto& x : *this)
-			for (auto& y : t) {
-				auto z = x & y;
-				if (!z.empty()) r.insert(z);
-			}
+	tau operator&(const tau& x) const {
+		if (x == false || *this == false) return zero();
+		if (x == true) return *this;
+		if (*this == true) return x;
+		tau r(false);
+		for (auto& c : x)
+			for (auto& d : *this)
+				r |= (c & d);
+		return r;
+		return ~((~x) | ~*this); // TODO: better
+	}
+
+	template<typename... Ts>
+	static tau to_tau(const tuple<set<clause<Ts>>...>& t) {
+		tau r(false);
+		auto f = [&r](auto& x) { r |= x; };
+		(f(get<set<clause<Ts>>>(t)), ...);
 		return r;
 	}
 
 	tau operator~() const {
 		if (*this == false) return one();
 		if (*this == true) return zero();
-		tau r;
-		for (auto& t : *this) r = r | ~t;
+		tau r(true);
+		for (clauses cs : *this) r = r & to_tau(~cs);
 		return r;
 	}
 
-	bool sat() const {
-		for (auto& c : *this) if (c.sat()) return true;
-		return false;
+	template<typename B> tau& operator+=(const hbdd<B>& f) {
+		return *this = (*this & (clause<B>() += f));
 	}
+
+	template<typename B> tau& operator-=(const hbdd<B>& f) {
+		return *this = (*this & (clause<B>() -= f));
+	}
+
+	tau ex(int_t v) const {
+		tau r(false);
+		for (auto cs : *this) if (cs.ex(v)) r |= cs;
+		return r;
+	}
+
+	tau all(int_t v) const { return ~((~*this).ex(v)); }
+
 private:
 	tau() : t(NONE) {}
 };
+
+#endif

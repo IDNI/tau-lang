@@ -60,22 +60,17 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 
 	bool leaf() const { return holds_alternative<B>(*this); }
 
-	struct initializer {
-		initializer() {
-			cout << "init!!" << endl;
-			bdd::init();
-		}
-	};
+	struct initializer { initializer(); };
 
-	static vector<bdd> V;
-	static unordered_map<bdd_node, size_t> Mn;
-	static map<B, size_t> Mb;
-	static int_t T, F;
-	inline static initializer I;
+	inline static vector<bdd> V;
+	inline static unordered_map<bdd_node, size_t> Mn;
+	inline static map<B, size_t> Mb;
+	inline static int_t T, F;
 
 	static int_t add(const bdd_node& n) { return add(n.v, n.h, n.l); }
 
 	static int_t add(int_t v, int_t h, int_t l) {
+		static initializer I;
 		if (h == l) return h;
 		if (l < 0) {
 			h = -h, l = -l;
@@ -112,7 +107,7 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		return bdd(t.v, -t.h, -t.l);
 	}
 
-	static void init();
+//	static void init();
 
 	static int_t bdd_and(int_t x, const B& b) {
 		if (x == T) return add(b);
@@ -178,16 +173,6 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		if (B r = get_eelim(nx.h); r == true) return r;
 		else return r | get_eelim(nx.l);
 	}
-
-//	static int_t subst(int_t x, int_t v, int_t y) {
-//		const bdd &xx = get(x);
-//		if (xx.leaf()) return x;
-//		const bdd_node &nx = std::get<bdd_node>(xx);
-//		if (nx.v < v)
-//			return add(nx.v, subst(nx.h, v, y), subst(nx.l, v, y));
-//		if (nx.v > v) return x;
-//		return -bdd_and(-bdd_and(y, nx.h), -bdd_and(-y, nx.l));
-//	}
 
 	static int_t sub0(int_t x, int_t v) {
 		const bdd &xx = get(x);
