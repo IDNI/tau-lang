@@ -56,10 +56,10 @@ struct normalizer<tuple<BDDs...>, aux...> {
 		msba_t r(true, p);
 		hbdd<B> np = ~p;
 		if (!(p->get_uelim() == false)) return msba_t(false); 
-//		auto t = p->lgrs();
+		auto t = p->lgrs();
 		for (const hbdd<B>& x : neg) {
-			//auto z = x->compose(t) & np;
-			hbdd<B> z = (x & np);
+			hbdd<B> z = x->compose(t) & np;
+			//hbdd<B> z = (x & np);
 			if (!(z->get_uelim() == false)) continue;
 			else if ((r = (r & msba_t(false, z))) == false) return r;
 		}

@@ -18,9 +18,13 @@
 typedef pair<array<int_t, 2>, vector<int_t>> named; // name+idx+args[]
 typedef pair<pair<named, int_t>, vector<int_t>> call; // named+idx+args[]
 
+struct calls : public set<call> {
+};
+
 template<typename... BAs>
 struct barr : public msba<tuple<hbdd<barr<BAs...>>, hbdd<BAs>...>> {
 	typedef msba<tuple<hbdd<barr<BAs...>>, hbdd<BAs>...>> base;
+	typedef barr<BAs...> barr_t;
 	using base::base;
 
 	barr operator&(const barr& x) const { return base::operator&(x); }

@@ -55,6 +55,9 @@ template<> struct std::hash<bdd_node> {
 	size_t operator()(const bdd_node& n) const { return n.hash; }
 };
 
+template<typename B> B get_zero() { return B::zero(); }
+template<typename B> B get_one() { return B::one(); }
+
 template<typename B> struct bdd : variant<bdd_node, B> {
 	typedef variant<bdd_node, B> base;
 
@@ -101,6 +104,10 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		return V.size()-1;
 	}
 
+	static int_t bit(int_t v) {
+		return v > 0 ? add(v, T, F) : add(-v, F, T);
+	}
+
 	static int_t add(const B& b) {
 		if (b == false) return F;
 		if (b == true) return T;
@@ -120,9 +127,7 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 	}
 
 	static B get_elem(int_t x) { return std::get<B>(get(x)); }
-	static bdd_node get_node(int_t x) {
-		return std::get<bdd_node>(get(x));
-	}
+	static bdd_node get_node(int_t x) { return std::get<bdd_node>(get(x)); }
 
 	static int_t bdd_and(int_t x, const B& b) {
 		if (x == T) return add(b);
@@ -237,28 +242,55 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		return -bdd_and(-bdd_and(x, y), -bdd_and(-x,z));
 	}
 	static void get_one_zero(int_t, map<int_t, B>&);
-	static int_t compose(int_t, const map<int_t, int_t>&);
-	static B eval(int_t, const map<int_t, B>&);
+
+	static int_t compose(int_t x, const map<int_t, int_t>& m) {
+		if (leaf(x)) return x;
+		const bdd_node& n = get_node(x);
+		int_t a = compose(n.h, m), b = compose(n.l, m);
+		if (auto it = m.find(n.v); it == m.end())
+			return ite(add(n.v, T, F), a, b);
+		else return ite(it->second, a, b);
+	}
+
+	// m must include all vars in x, otherwise use compose()
+	static B eval(int_t x, const map<int_t, B>& m) {
+		if (leaf(x)) return get_elem(x);
+		const bdd_node& n = get_node(x);
+		B a = get_elem(eval(n.h, m)), b = get_elem(eval(n.l, m));
+		if (auto it = m.find(n.v); it == m.end()) assert(0);
+		else return ite(it->second, a, b);
+	}
+
+	static int_t from_clause(const pair<B, vector<int_t>>& v) {
+		int_t r = bdd_and(T, v.first);
+		for (int_t t : v.second) r = bdd_and(r, bit(t));
+		return r;
+	}
+
+	static int_t from_dnf(const set<pair<B, vector<int_t>>>& s) {
+		int_t r = F;
+		for (auto& x : s) r = -bdd_and(-r, -from_clause(x));
+		return r;
+	}
+
+	// treat x as a *disjoint* union of elements of s
+	static int_t split(int_t x, const B& e, const set<B>& s) {
+		set<pair<B, vector<int_t>>> r;
+		B p = get_one<B>();
+		for (const B& y : s)
+			if ((p = (p & ~y)) == false)
+				break;
+		dnf(x, [&r, &e, &s, &p](auto x) {
+			if ((x.first & e) == false) r.insert(x);
+			else {
+				r.emplace(x.first & p, x.second);
+				for (const B& y : x.second)
+					r.emplace(x.first & y, x.second);
+			}
+		});
+		return from_dnf(r);
+	}
 };
-
-template<typename B>
-int_t bdd<B>::compose(int_t x, const map<int_t, int_t>& m) {
-	if (leaf(x)) return x;
-	const bdd_node& n = get_node(x);
-	int_t a = compose(n.h, m), b = compose(n.l, m);
-	if (auto it = m.find(n.v); it == m.end())
-		return ite(add(n.v, T, F), a, b);
-	else return ite(it->second, a, b);
-}
-
-// m must include all vars in x, otherwise use compose()
-template<typename B> B bdd<B>::eval(int_t x, const map<int_t, B>& m) {
-	if (leaf(x)) return get_elem(x);
-	const bdd_node& n = get_node(x);
-	B a = get_elem(eval(n.h, m)), b = get_elem(eval(n.l, m));
-	if (auto it = m.find(n.v); it == m.end()) assert(0);
-	else return ite(it->second, a, b);
-}
 
 template<typename B>
 void bdd<B>::get_one_zero(int_t x, map<int_t, B>& m) {

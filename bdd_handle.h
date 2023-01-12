@@ -85,8 +85,9 @@ template<typename B> struct bdd_handle {
 	static hbdd<B> zero() { return get(bdd<B>::F); }
 
 	static hbdd<B> bit(bool b, int_t v) {
-		DBG(assert(v);)
-		hbdd<B> r = get(bdd_node(v, bdd<B>::T, bdd<B>::F));
+		DBG(assert(v > 0);)
+		hbdd<B> r = get(bdd<B>::bit(b ? v : -v));
+		//hbdd<B> r = get(bdd_node(v, bdd<B>::T, bdd<B>::F));
 		DBG(assert(r);)
 		return b ? r : ~r;
 	}
@@ -197,7 +198,6 @@ template<typename T> constexpr bool is_sp<sp<T>>{true};
 template<typename B> B get_one() requires is_sp<B> {
 	return B::element_type::one();
 }
-template<typename B> B get_one() { return B::one(); }
 
 /*template<typename B> void bdd_init() requires is_sp<B> {
 	if (!bdd<B>::V.empty()) return;
