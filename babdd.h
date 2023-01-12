@@ -13,6 +13,7 @@
 #ifndef __BABDD_H__
 #define __BABDD_H__
 #include "defs.h"
+#include "bool.h"
 #include <vector>
 #include <map>
 #include <set>
@@ -21,6 +22,7 @@
 #include <cstdint>
 #include <cassert>
 #include <memory>
+#include <functional>
 using namespace std;
 
 typedef int32_t int_t;
@@ -40,8 +42,10 @@ inline size_t fpairing(size_t x, size_t y) {
 struct bdd_node {
 	bdd_node(int_t v, int_t h, int_t l) :
 		v(v), h(h), l(l), hash(hash_utri(v, h, l)) {}
-	const int_t v, h, l;
-	const size_t hash;
+//	const int_t v, h, l;
+//	const size_t hash; // problems with operator=...
+	int_t v, h, l;
+	size_t hash;
 	bool operator==(const bdd_node& x) const {
 		return hash == x.hash && v == x.v && h == x.h && l == x.l;
 	}
@@ -59,19 +63,28 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 	bdd(const B& b) : base(b) {}
 
 	bool leaf() const { return holds_alternative<B>(*this); }
+	static bool leaf(int_t n) { return V[abs(n)].leaf(); }
 
-//	struct initializer { initializer(); };
+	struct initializer { initializer(); };
 
 	inline static vector<bdd> V;
 	inline static unordered_map<bdd_node, size_t> Mn;
 	inline static map<B, size_t> Mb;
 	inline static int_t T, F;
-//	inline static initializer I;
+	inline static initializer I;
 
 	static int_t add(const bdd_node& n) { return add(n.v, n.h, n.l); }
 	
 	static int_t add(int_t v, int_t h, int_t l) {
 		if (h == l) return h;
+#ifdef DEBUG
+		auto p = V[abs(l)], q = V[abs(h)];
+		if (!p.leaf() && !q.leaf()) {
+			const auto x = std::get<bdd_node>(p);
+			const auto y = std::get<bdd_node>(q);
+			assert((x.v > v) && (y.v > v));
+		}
+#endif
 		if (l < 0) {
 			h = -h, l = -l;
 			bdd_node n(v, h, l);
@@ -82,8 +95,7 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 			return -V.size()+1;
 		}
 		bdd_node n(v, h, l);
-		if (auto it = Mn.find(n); it != Mn.end())
-			return it->second;
+		if (auto it = Mn.find(n); it != Mn.end()) return it->second;
 		Mn.emplace(n, V.size());
 		V.emplace_back(n);
 		return V.size()-1;
@@ -107,16 +119,21 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		return bdd(t.v, -t.h, -t.l);
 	}
 
+	static const B& get_elem(int_t x) { return std::get<B>(get(x)); }
+	static const bdd_node& get_node(int_t x) {
+		return std::get<bdd_node>(get(x));
+	}
+
 	static int_t bdd_and(int_t x, const B& b) {
 		if (x == T) return add(b);
 		if (x == F) return F;
 		const bdd& xx = get(x);
 		if (xx.leaf()) {
-#ifdef DEBUG
-			if constexpr(is_same<B, struct Bool>::value)
-				if (b == true && !((b & std::get<B>(xx)) == xx))
-					assert((b & std::get<B>(xx)) == xx);
-#endif
+//#ifdef DEBUG
+//			if constexpr(is_same<B, struct Bool>::value)
+//				if (b == true && !((b & std::get<B>(xx)) == xx))
+//					assert((b & std::get<B>(xx)) == xx);
+//#endif
 			return add(b & std::get<B>(xx));
 		}
 		const bdd_node &nx = std::get<bdd_node>(xx);
@@ -191,20 +208,82 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		return nx.h;
 	}
 
-	static void dnf(
-		int_t x, set<pair<B, vector<int_t>>>& s, vector<int_t>& v) {
+	static bool dnf(int_t x, vector<int_t>& v,
+		function<bool(const pair<B, vector<int_t>>&)> f) {
 		const bdd& xx = get(x);
 		if (xx.leaf()) {
 			if (!(std::get<B>(xx) == false))
-				s.emplace(std::get<B>(xx), v);
-			return;
+				return f({std::get<B>(xx), v});
+			return true;
 		}
 		const bdd_node& n = std::get<bdd_node>(xx);
 		v.push_back(n.v);
-		dnf(n.h, s, v);
+		if (!dnf(n.h, v, f)) return false;
 		v.back() = -n.v;
-		dnf(n.l, s, v);
+		if (!dnf(n.l, v, f)) return false;
 		v.pop_back();
+		return true;
 	}
+
+	static void get_vars(int_t x, set<int_t>& s) {
+		const bdd& xx = get(x);
+		if (xx.leaf()) return;
+		const bdd_node& n = std::get<bdd_node>(xx);
+		if (s.find(n.v) != s.end()) return;
+		s.insert(n.v), get_vars(n.h, s), get_vars(n.l, s);
+	}
+
+	static int_t ite(int_t x, int_t y, int_t z) {
+		return -bdd_and(-bdd_and(x, y), -bdd_and(-x,z));
+	}
+	static void get_one_zero(int_t, map<int_t, B>&);
+	static int_t compose(int_t, const map<int_t, int_t>&);
+	static B eval(int_t, const map<int_t, B>&);
 };
+
+template<typename B>
+int_t bdd<B>::compose(int_t x, const map<int_t, int_t>& m) {
+	if (leaf(x)) return x;
+	const bdd_node& n = get_node(x);
+	int_t a = compose(n.h, m), b = compose(n.l, m);
+	if (auto it = m.find(n.v); it == m.end())
+		return ite(add(n.v, T, F), a, b);
+	else return ite(it->second, a, b);
+}
+
+// m must include all vars in x, otherwise use compose()
+template<typename B> B bdd<B>::eval(int_t x, const map<int_t, B>& m) {
+	if (leaf(x)) return get_elem(x);
+	const bdd_node& n = get_node(x);
+	B a = get_elem(eval(n.h, m)), b = get_elem(eval(n.l, m));
+	if (auto it = m.find(n.v); it == m.end()) assert(0);
+	else return ite(it->second, a, b);
+}
+
+template<typename B>
+void bdd<B>::get_one_zero(int_t x, map<int_t, B>& m) {
+	assert(!leaf(x));
+	const bdd_node& n = get_node(x);
+	if (n.l == F) m.clear(), m.emplace(n.v, B::zero());
+	else if (n.h == F) m.clear(), m.emplace(n.v, B::one());
+	else if (!leaf(n.l))
+		get_one_zero(bdd_and(n.l, n.h), m),
+		m.empalce(n.v, get_elem(eval(n.l, m)));
+	else if (leaf(n.h)) m.emplace(n.v, get_elem(n.l));
+	else	get_one_zero(bdd_and(n.h, get_elem(n.l)), m),
+		m.emplace(n.v, compose(-n.h, m));
+	DBG(assert(compose(x, m) == false);)
+}
+
+template<> void bdd<Bool>::get_one_zero(int_t x, map<int_t, Bool>& m) {
+	DBG(assert(x != T);)
+	m.clear();
+	while (!leaf(x)) {
+		const bdd_node& n = get_node(x);
+		if (n.h == F) { m.emplace(n.v, true); return; }
+		m.emplace(n.v, false);
+		if ((x = n.l) == F) return;
+	}
+	throw 0;
+}
 #endif

@@ -11,10 +11,10 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#include "tau.h"
+#include "barr.h"
 #include "out.h"
+//#include "anf.h"
 #include "builder.h"
-#include "anf.h"
 #include <iostream>
 
 //template<typename B> vector<bdd<B>> bdd<B>::V;
@@ -28,29 +28,48 @@
 //map<B, std::shared_ptr<bdd_handle<B>>> bdd_handle<B>::Mb;
 //template<typename B> hbdd<B> bdd_handle<B>::htrue;
 //template<typename B> hbdd<B> bdd_handle<B>::hfalse;
-//template<typename B> bdd<B>::initializer bdd<B>::I;
+
+// all this and init is still not called...
+template<typename B> bool bdd_handle<B>::dummy = (bdd_init<B>(), true);
+template<typename... BAs, typename... aux>
+bool msba<tuple<BAs...>, aux...>::dummy =
+	(msba<tuple<BAs...>, aux...>::init(), true);
 
 int main() {
-	typedef hbdd<Bool> sbf;
-	typedef tau<Bool, sbf> fof;
-	//fof::init();
+	typedef msba<tuple<sbf>> fof;
+	bdd_init<Bool>();
+	fof::init();
+	fof x(true, sbf_T), y(false, sbf_F);
+	fof a(true, sbf_F), b(false, sbf_T);
+	out(out(cout, x), y);
+	out(out(cout, a), b);
+	x.normalize();
+	y.normalize();
+	a.normalize();
+	b.normalize();
+	out(out(cout, x), y);
+	out(out(cout, a), b);
+	fof z = (x&y);
+	z.normalize();
+	out<sbf>(cout, z);
+
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
 	fof t(true);
-	t += f;
-	t -= g;
+	t = (t & fof(true, f));
+	t = (t & fof(false, g));
 	fof tt(true);
 //	cout << bdd_handle<fof>::get(t) << endl;
-	tt += (bdd_handle<fof>::bit(true, 1) & bdd_handle<fof>::get(t));
-	cout << tt << endl;
+//	tt = (t & fof(true, bdd_handle<fof>::bit(true, 1) & bdd_handle<fof>::get(t)));
+	out(out(cout, t), tt);
 	return 0;
-	t += bdd_handle<fof>::get(t);
+/*	t += bdd_handle<fof>::get(t);
 	cout << t << endl;
 	cout << (~t) << endl;
 	return 0;
 	cout << ~(fof(true)+=f) << endl << g << endl << g->subst(dict("x"), f) << endl;
 //	cout << anf(f) << endl << anf(g) << endl;
-/*	anf(g).subst(dict("x"), anf(f));
+	anf(g).subst(dict("x"), anf(f));
 	g = g->subst(dict("x"), f);
 //	cout << anf(g) << endl;
 //	anf(g).verify();
@@ -75,7 +94,7 @@ int main() {
 		((anf(g).subst(x, anf(f))).subst(x, anf(false)) | (anf(g).subst(x, ~anf(f))).subst(x, anf(true))));
 	return 0;
 	cout << g->sub0(dict("x")) << endl << g->sub1(dict("x")) << endl;*/
-	int_t x = dict("x");
+/*	int_t x = dict("x");
 	cout << anf(g = (g->subst(x, f)->sub0(x) | g->subst(x, ~f)->sub1(x)))
 		<< endl << g << endl;
 //	cout << anf(g) << endl;
@@ -84,7 +103,7 @@ int main() {
 	cout << (fof(true) += f).ex(dict("x")) << endl;
 	cout << ((fof(true) += f) -= g).ex(dict("x")) << endl;
 	return 0;
-/*	tau<Bool, hbdd<Bool>> t(true);
+	tau<Bool, hbdd<Bool>> t(true);
 	hbdd<Bool> f = "x"s & "y"s;
 //	cout << f << endl;
 //	cout << (f | "y'"s )<< endl;

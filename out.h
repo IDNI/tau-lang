@@ -12,7 +12,7 @@
 // modified over time by the Author.
 #ifndef __OUT_H__
 #define __OUT_H__
-#include "tau.h"
+#include "barr.h"
 #include "dict.h"
 #include "bool.h"
 #include "anf.h"
@@ -22,6 +22,8 @@
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
 
 template<typename B> ostream& operator<<(ostream& os, const hbdd<B>& f) {
+	if (f == bdd_handle<B>::htrue) return os << '1';
+	if (f == bdd_handle<B>::hfalse) return os << '0';
 	set<pair<B, vector<int_t>>> dnf = f->dnf();
 	size_t n = dnf.size();
 	set<string> ss;
@@ -43,20 +45,32 @@ template<typename B> ostream& operator<<(ostream& os, const hbdd<B>& f) {
 	return os;
 }
 
-template<typename B> ostream& operator<<(ostream& os, const clause<B>& c) {
-	if (c.first) os << c.first << " = 0" << endl;
-	for (const hbdd<B>& f : c.second) os << f << " != 0" << endl;
+// converting this to operator<< gives weird compile error
+template<typename... BDDs, typename... aux>
+ostream& out(ostream& os, const msba<tuple<BDDs...>, aux...>& m) {
+	typedef msba<tuple<BDDs...>, aux...> msba_t;
+	if (m.b == false) return os << 'F' << endl;
+	if (m.b == true) return os << 'T' << endl;
+	set<pair<Bool, vector<int_t>>> dnf = m.b->dnf();
+	size_t n = dnf.size();
+	set<string> ss;
+	stringstream t;
+	auto f = [&t](const auto& x) { t << x; };
+	for (const auto& c : dnf) {
+		for (int_t v : c.second)
+			visit(f, msba_t::V[abs(v)]),
+			t << (v > 0 ? " = 0" : " != 0") << endl;
+		ss.insert(t.str());
+		t = stringstream();
+	}
+	for (auto& s : ss) {
+		os << s;
+		if (--n) os << endl << " || " << endl;
+	}
 	return os;
 }
 
-template<typename... Ts>
-ostream& operator<<(ostream& os, const tuple<Ts...>& t) {
-	auto f = [&os](auto x) { os << x; };
-	(f(get<Ts>(t)), ...);
-	return os;
-}
-
-template<typename... BAs>
+/*template<typename... BAs>
 ostream& operator<<(ostream& os, const tau<BAs...>& t) {
 	if (t == false) return os << 'F';
 	if (t == true) return os << 'T';
@@ -64,7 +78,7 @@ ostream& operator<<(ostream& os, const tau<BAs...>& t) {
 	size_t n = t.size();
 	for (auto& c : t) if (os << c; --n) os << " || " << endl;
 	return os;
-}
+}*/
 
 ostream& operator<<(ostream& os, const anf& a) {
 	size_t n = a.size();

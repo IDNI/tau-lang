@@ -41,11 +41,19 @@ template<typename B> bool operator==(const hbdd<B>& x, const hbdd<B>& y) {
 #endif
 
 template<typename B> struct bdd_handle {
-	inline static unordered_map<bdd_node, std::shared_ptr<bdd_handle>> Mn;
+	typedef unordered_map<bdd_node, shared_ptr<bdd_handle>> mn_type;
+	typedef map<B, std::shared_ptr<bdd_handle>> mb_type;
+	inline static unordered_map<bdd_node, shared_ptr<bdd_handle>> Mn;
 	inline static map<B, std::shared_ptr<bdd_handle>> Mb;
 	inline static hbdd<B> htrue, hfalse;
 
-	bdd_handle();
+	// nonworking hack to call init
+	template<typename T, T> struct dummy_type {};
+	typedef dummy_type<mn_type&, Mn> dummy_mn_type;
+	typedef dummy_type<mb_type&, Mb> dummy_mb_type;
+	static bool dummy;
+
+//	bdd_handle();
 
 	static hbdd<B> get(const bdd_node& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
@@ -109,7 +117,6 @@ template<typename B> struct bdd_handle {
 	}
 
 	hbdd<B> operator~() const { return get(bdd<B>::bdd_and(bdd<B>::T, -b)); }
-
 	hbdd<B> operator|(const hbdd<B>& x) const { return ~((~x) & (~*this)); }
 
 	hbdd<B> ex(int_t v) const { return get(bdd<B>::ex(b, v)); }
@@ -131,10 +138,52 @@ template<typename B> struct bdd_handle {
 		return subst(v, f->sub0(v)) | subst(v, ~(f->sub1(v)));
 	}
 
+	void dnf(function<bool(const pair<B, vector<int_t>>&)> f) const {
+		vector<int_t> v;
+		bdd<B>::dnf(b, v, [f](const pair<B, vector<int_t>>& v) {
+			return f(v);
+		});
+	}
+	
 	set<pair<B, vector<int_t>>> dnf() const {
 		set<pair<B, vector<int_t>>> r;
-		vector<int_t> v;
-		return bdd<B>::dnf(b, r, v), r;
+		dnf([&r](auto& x) { r.insert(x); return true; });
+		return r;
+	}
+
+	set<int_t> get_vars() const {
+		set<int_t> r;
+		return bdd<B>::get_vars(b, r), r;
+	}
+
+	map<int_t, B> get_one_zero() const {
+		map<int_t, B> m;
+		bdd<B>::get_one_zero(b, m);
+//#ifdef DEBUG
+//		auto d = dnf();
+//		bool t = false;
+//		for (auto x : d) t |= (r == x.second);
+//		assert(!t);
+//#endif
+		return m;
+	}
+
+	hbdd<B> compose(const map<int_t, hbdd<B>>& m) const {
+		map<int_t, int_t> p;
+		for (auto& x : m) p.emplace(x.first, x.second->b);
+		return get(bdd<B>::compose(b, p));
+	}
+
+	B eval(map<int_t, B>& m) const { return bdd<B>::eval(b, m); }
+
+	map<int_t, hbdd<B>> lgrs() const {
+		map<int_t, hbdd<B>> r;
+		if (b == bdd<B>::F) return r;
+		DBG(assert(b != bdd<B>::T);)
+		for (const auto& z : get_one_zero())
+			r.emplace(z.first,	((*this) & get(z.second)) |
+						(bit(true, z.first) & ~*this));
+		return r;
 	}
 #ifndef DEBUG
 private:
@@ -143,9 +192,14 @@ private:
 };
 
 template<typename T> constexpr bool is_sp{};
-template<typename T> constexpr bool is_sp<sp<T>>(true);
+template<typename T> constexpr bool is_sp<sp<T>>{true};
 
-template<typename B> void bdd_init() requires is_sp<B> {
+template<typename B> B get_one() requires is_sp<B> {
+	return B::element_type::one();
+}
+template<typename B> B get_one() { return B::one(); }
+
+/*template<typename B> void bdd_init() requires is_sp<B> {
 	if (!bdd<B>::V.empty()) return;
 #ifdef DEBUG
 	int s;
@@ -153,14 +207,14 @@ template<typename B> void bdd_init() requires is_sp<B> {
 		abi::__cxa_demangle(typeid(bdd<B>).name(), 0, 0, &s) <<
 		'>' << endl;
 #endif
-	auto one = B::element_type::one();
+	auto one = get_one<B>();
 	bdd<B>::V.emplace_back(one);
 	bdd<B>::V.emplace_back(one);
 	bdd<B>::Mb.emplace(one, 1);
 	bdd<B>::F = -(bdd<B>::T = 1);
 	bdd_handle<B>::hfalse = bdd_handle<B>::get(bdd<B>::get(-1));
 	bdd_handle<B>::htrue = bdd_handle<B>::get(bdd<B>::get(1));
-}
+}*/
 
 template<typename B> void bdd_init() {
 	if (!bdd<B>::V.empty()) return;
@@ -170,14 +224,15 @@ template<typename B> void bdd_init() {
 		abi::__cxa_demangle(typeid(bdd<B>).name(), 0, 0, &s) <<
 		'>' << endl;
 #endif
-	bdd<B>::V.emplace_back(B::one());
-	bdd<B>::V.emplace_back(B::one());
-	bdd<B>::Mb.emplace(B::one(), 1);
+	auto one = get_one<B>();
+	bdd<B>::V.emplace_back(one);
+	bdd<B>::V.emplace_back(one);
+	bdd<B>::Mb.emplace(one, 1);
+	//bdd<B>::Mb.emplace(B::one(), 1);
 	bdd<B>::F = -(bdd<B>::T = 1);
 	bdd_handle<B>::hfalse = bdd_handle<B>::get(bdd<B>::get(-1));
 	bdd_handle<B>::htrue = bdd_handle<B>::get(bdd<B>::get(1));
 }
 
-template<typename B> bdd_handle<B>::bdd_handle() { bdd_init<B>(); }
-//template<typename B> bdd<B>::initializer::initializer() { bdd_init<B>(); }
+template<typename B> bdd<B>::initializer::initializer() { bdd_init<B>(); }
 #endif
