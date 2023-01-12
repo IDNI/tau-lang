@@ -39,7 +39,7 @@ int main() {
 	typedef msba<tuple<sbf>> fof;
 	bdd_init<Bool>();
 	fof::init();
-	fof x(true, sbf_T), y(false, sbf_F);
+/*	fof x(true, sbf_T), y(false, sbf_F);
 	fof a(true, sbf_F), b(false, sbf_T);
 	out(out(cout, x), y);
 	out(out(cout, a), b);
@@ -51,7 +51,7 @@ int main() {
 	out(out(cout, a), b);
 	fof z = (x&y);
 	z.normalize();
-	out<sbf>(cout, z);
+	out<sbf>(cout, z);*/
 
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
@@ -61,7 +61,11 @@ int main() {
 	fof tt(true);
 //	cout << bdd_handle<fof>::get(t) << endl;
 //	tt = (t & fof(true, bdd_handle<fof>::bit(true, 1) & bdd_handle<fof>::get(t)));
-	out(out(cout, t), tt);
+	out(cout, t);
+	cout << t.b << endl;
+	t.normalize();
+	cout << t.b << endl;
+	out(cout, t);
 	return 0;
 /*	t += bdd_handle<fof>::get(t);
 	cout << t << endl;

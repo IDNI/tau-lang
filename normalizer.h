@@ -51,16 +51,17 @@ struct normalizer<tuple<BDDs...>, aux...> {
 			for (auto y : neg)
 				if ((x & y) == y)
 					return msba_t(false);
-		auto p = ~get_one<hbdd<B>>();
+		hbdd<B> p = ~get_one<hbdd<B>>();
 		for (const auto& x : pos) p = (p | x);
 		msba_t r(true, p);
-		auto np = ~p;
+		hbdd<B> np = ~p;
 		if (!(p->get_uelim() == false)) return msba_t(false); 
-		auto t = p->lgrs();
-		for (const auto& x : neg) {
-			auto z = x->compose(t) & np;
+//		auto t = p->lgrs();
+		for (const hbdd<B>& x : neg) {
+			//auto z = x->compose(t) & np;
+			hbdd<B> z = (x & np);
 			if (!(z->get_uelim() == false)) continue;
-			else if ((r = (r & x)) == false) return r;
+			else if ((r = (r & msba_t(false, z))) == false) return r;
 		}
 		return r;
 	}

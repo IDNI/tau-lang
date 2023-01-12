@@ -119,8 +119,8 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		return bdd(t.v, -t.h, -t.l);
 	}
 
-	static const B& get_elem(int_t x) { return std::get<B>(get(x)); }
-	static const bdd_node& get_node(int_t x) {
+	static B get_elem(int_t x) { return std::get<B>(get(x)); }
+	static bdd_node get_node(int_t x) {
 		return std::get<bdd_node>(get(x));
 	}
 

@@ -28,9 +28,9 @@ sbf leq_bdd(int_t x, int_t y) {
 #ifdef DEBUG
 template<typename T, typename S> T operator&(T, S) {
 	int s;
-	cout << "msba::init " <<
-		abi::__cxa_demangle(typeid(T).name(), 0, 0, &s) << endl;
-	cout << "msba::init " <<
+	cout << "wrong call to operator& with types " <<
+		abi::__cxa_demangle(typeid(T).name(), 0, 0, &s) <<
+		" and " <<
 		abi::__cxa_demangle(typeid(S).name(), 0, 0, &s) << endl;
 	throw 0;
 }
