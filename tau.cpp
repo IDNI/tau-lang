@@ -36,8 +36,9 @@ bool msba<tuple<BAs...>, aux...>::dummy =
 	(msba<tuple<BAs...>, aux...>::init(), true);
 
 int main() {
-	typedef msba<tuple<sbf>> fof;
-	bdd_init<Bool>();
+	//typedef msba<tuple<sbf>> fof;
+	typedef barr<sbf> fof;
+	//typedef barr<Bool> fof;
 	fof::init();
 /*	fof x(true, sbf_T), y(false, sbf_F);
 	fof a(true, sbf_F), b(false, sbf_T);

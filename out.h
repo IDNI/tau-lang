@@ -45,6 +45,13 @@ template<typename B> ostream& operator<<(ostream& os, const hbdd<B>& f) {
 	return os;
 }
 
+template<typename... BAs>
+ostream& operator<<(ostream& os, const call<BAs...>& c) {
+	os << c.n << '[' << c.idx << "](";
+	for (auto& a : c.args) os << a;
+	return os << ')';
+}
+
 // converting this to operator<< gives weird compile error
 template<typename... BDDs, typename... aux>
 ostream& out(ostream& os, const msba<tuple<BDDs...>, aux...>& m) {

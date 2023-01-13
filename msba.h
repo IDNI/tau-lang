@@ -81,7 +81,7 @@ struct msba<tuple<BDDs...>, aux...> {
 		// weirdly, but because this is actually "something = F"
 		if (x == true) b = (p ? sbf_F : sbf_T);
 		else if (x == false) b = (p ? sbf_T : sbf_F);
-		else b = bdd_handle<Bool>::bit(p, get(x));
+		else b = bdd_handle<Bool>::bit(p, get(elem(x)));
 	}
 
 	static bool dummy; // nonworking hack to call init
@@ -106,18 +106,48 @@ struct msba<tuple<BDDs...>, aux...> {
 	bool operator<(const msba& x) const { return b < x.b; }
 
 	typedef normalizer<tuple<BDDs...>, aux...> norm_t;
+	template<typename T> using set_t = set<remove_cvref_t<T>>;
 
-	void normalize() {
+	// naturally expected to be called as dnf(this->b->dnf())
+	static set<tuple<set<BDDs>..., set<aux>...>>
+	dnf(const set<pair<Bool, vector<int_t>>>& s) {
+		set<tuple<set<BDDs>..., set<aux>...>> r;
+		for (const pair<Bool, vector<int_t>>& c : s) {
+			tuple<set<BDDs>..., set<aux>...> t;
+			for (int_t i : c.second)
+				visit([i, &t](auto& x) {
+					std::get<set_t<decltype(x)>>(t)
+						.insert(i > 0 ? x : ~x);
+				}, V[abs(i)]);
+			r.insert(t);
+		}
+		return r;
+	}
+
+	void normalize(const set<pair<Bool, vector<int_t>>>& s) {
 		msba r(false);
-		auto f = [&r](const auto& p) {
-			vector<int_t> pos, neg;
+		vector<int_t> pos, neg;
+		for (auto& p : s) {
+			pos.clear(), neg.clear();
 			for (int_t i : p.second)
 				(i > 0 ? pos : neg).push_back(abs(i));
 			r = (r | norm_t::normalize(norm_t::to_tuple(pos, neg)));
-			return true;
-		};
-		b->dnf(f), r.apply_leq(), *this = r;
+		}
+		r.apply_leq(), *this = r;
 	}
+	void normalize() { normalize(b->dnf()); }
+
+//	void normalize() {
+//		msba r(false);
+//		auto f = [&r](const auto& p) {
+//			vector<int_t> pos, neg;
+//			for (int_t i : p.second)
+//				(i > 0 ? pos : neg).push_back(abs(i));
+//			r = (r | norm_t::normalize(norm_t::to_tuple(pos, neg)));
+//			return true;
+//		};
+//		b->dnf(f), r.apply_leq(), *this = r;
+//	}
 
 	void apply_leq() {
 		set<int_t> v = b->get_vars();
@@ -135,8 +165,6 @@ struct msba<tuple<BDDs...>, aux...> {
 				if (V[x].index() != V[y].index()) continue;
 				else if (x < y && leq.find({x, y}) == leq.end())
 					visit(f, V[n = x], V[k = y]);
-//					if ((V[x] & V[y]) == V[x])
-//						s.insert({x, y});
 		leq.insert(s.begin(), s.end());
 		for (auto x : s) b = (b & leq_bdd(x[0], x[1]));
 	}

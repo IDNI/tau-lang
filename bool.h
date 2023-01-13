@@ -16,7 +16,8 @@ struct Bool {
 	bool b;
 	Bool(bool b) : b(b) {}
 	template<typename T> Bool(const T&) {
-		static_assert(is_same<T, bool>::value);
+		throw 0;
+//		static_assert(is_same<T, bool>::value);
 	}
 	static const Bool& zero() { static Bool b(false); return b; }
 	static const Bool& one() { static Bool b(true); return b; }
