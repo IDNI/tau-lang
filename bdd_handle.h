@@ -15,7 +15,8 @@
 #include "babdd.h"
 
 template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd_handle;
-template<typename B, bool inv_in, bool inv_out, bool varshift> using hbdd = sp<bdd_handle<B, inv_in, inv_out, varshift>>;
+template<typename B, bool inv_in, bool inv_out, bool varshift>
+using hbdd = sp<bdd_handle<B, inv_in, inv_out, varshift>>;
 
 template<typename B, bool inv_in, bool inv_out, bool varshift>
 bool operator==(const hbdd<B, inv_in, inv_out, varshift>& x, bool b) {
@@ -23,20 +24,24 @@ bool operator==(const hbdd<B, inv_in, inv_out, varshift>& x, bool b) {
 }
 
 template<typename B, bool inv_in, bool inv_out, bool varshift>
-hbdd<B, inv_in, inv_out, varshift> operator&(const hbdd<B, inv_in, inv_out, varshift>& x, const hbdd<B, inv_in, inv_out, varshift>& y) { return (*x) & y; }
+hbdd<B, inv_in, inv_out, varshift> operator&(const hbdd<B, inv_in, inv_out, varshift>& x,
+	const hbdd<B, inv_in, inv_out, varshift>& y) { return (*x) & y; }
 
 template<typename B, bool inv_in, bool inv_out, bool varshift>
-hbdd<B, inv_in, inv_out, varshift> operator|(const hbdd<B, inv_in, inv_out, varshift>& x, const hbdd<B, inv_in, inv_out, varshift>& y) { return (*x) | y; }
+hbdd<B, inv_in, inv_out, varshift> operator|(const hbdd<B, inv_in, inv_out, varshift>& x,
+	const hbdd<B, inv_in, inv_out, varshift>& y) { return (*x) | y; }
 
 template<typename B, bool inv_in, bool inv_out, bool varshift>
-hbdd<B, inv_in, inv_out, varshift> operator+(const hbdd<B, inv_in, inv_out, varshift>& x, const hbdd<B, inv_in, inv_out, varshift>& y) { return (y&~x)|(x&~y); }
+hbdd<B, inv_in, inv_out, varshift> operator+(const hbdd<B, inv_in, inv_out, varshift>& x,
+	const hbdd<B, inv_in, inv_out, varshift>& y) { return (y&~x)|(x&~y); }
 
 template<typename B, bool inv_in, bool inv_out, bool varshift> 
 hbdd<B, inv_in, inv_out, varshift> operator~(const hbdd<B, inv_in, inv_out, varshift>& x) { return ~(*x); }
 
 #ifdef DEBUG
 template<typename B, bool inv_in, bool inv_out, bool varshift> 
-bool operator==(const hbdd<B, inv_in, inv_out, varshift>& x, const hbdd<B, inv_in, inv_out, varshift>& y) {
+bool operator==(const hbdd<B, inv_in, inv_out, varshift>& x,
+	const hbdd<B, inv_in, inv_out, varshift>& y) {
 	assert((&*x == &*y) == (x->b == y->b));
 	return x->b == y->b;
 }
@@ -77,9 +82,13 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd_handle
 			: get(std::get<bdd_node>(x));
 	}
 
-	static hbdd_t get(int_t t) { return get(bdd<B, inv_in, inv_out, varshift>::get(t)); }
+	static hbdd_t get(int_t t) {
+		return get(bdd<B, inv_in, inv_out, varshift>::get(t));
+	}
 
-	bdd<B, inv_in, inv_out, varshift> get() const { return bdd<B, inv_in, inv_out, varshift>::get(b); }
+	bdd<B, inv_in, inv_out, varshift> get() const {
+		return bdd<B, inv_in, inv_out, varshift>::get(b);
+	}
 
 	bool is_zero() const { return b == bdd<B, inv_in, inv_out, varshift>::F; }
 	bool is_one() const { return b == bdd<B, inv_in, inv_out, varshift>::T; }
@@ -255,5 +264,7 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> void bdd_init() {
 }
 
 template<typename B, bool inv_in, bool inv_out, bool varshift> 
-bdd<B, inv_in, inv_out, varshift>::initializer::initializer() { bdd_init<B, inv_in, inv_out, varshift>(); }
+bdd<B, inv_in, inv_out, varshift>::initializer::initializer() {
+	bdd_init<B, inv_in, inv_out, varshift>();
+}
 #endif

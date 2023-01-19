@@ -22,7 +22,8 @@ typedef hbdd<Bool, true, true, false> sbf;
 #define sbf_F bdd_handle<Bool, true, true, false>::hfalse
 
 sbf leq_bdd(int_t x, int_t y) {
-	return bdd_handle<Bool, true, true, false>::bit(false, x) | bdd_handle<Bool, true, true, false>::bit(true, y);
+	return bdd_handle<Bool, true, true, false>::bit(false, x) |
+		bdd_handle<Bool, true, true, false>::bit(true, y);
 }
 
 #ifdef DEBUG

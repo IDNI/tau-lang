@@ -98,7 +98,8 @@ struct barr : public msba<tuple<BAs...>, calls<BAs...>> {
 		return t.get_vars();
 	}
 
-	template<typename T> static set<int_t> get_vars(const hbdd<T, true, true, false>& t) {
+	template<typename T>
+	static set<int_t> get_vars(const hbdd<T, true, true, false>& t) {
 		return t->get_vars();
 	}
 
