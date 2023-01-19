@@ -58,7 +58,7 @@ template<> struct std::hash<bdd_node> {
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
-template<typename B> struct bdd : variant<bdd_node, B> {
+template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : variant<bdd_node, B> {
 	typedef variant<bdd_node, B> base;
 
 	bdd(int_t v, int_t h, int_t l) : base(bdd_node(v, h, l)) {}
@@ -88,7 +88,8 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 			assert((x.v > v) && (y.v > v));
 		}
 #endif
-		if (l < 0) {
+        	if (inv_in && abs(h) < abs(l)) swap(h, l), v = -v;
+		if (inv_out && l < 0) {
 			h = -h, l = -l;
 			bdd_node n(v, h, l);
 			if (auto it = Mn.find(n); it != Mn.end())
@@ -112,18 +113,26 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 		if (b == false) return F;
 		if (b == true) return T;
 		if (auto it = Mb.find(b); it != Mb.end()) return it->second;
-		else if ((it = Mb.find(~b)) != Mb.end()) return -it->second;
+		else if (inv_out && (it = Mb.find(~b)) != Mb.end()) return -it->second;
 		Mb.emplace(b, V.size());
 		V.emplace_back(b);
 		return V.size() - 1;
 	}
 
 	static bdd get(int_t n) {
-		if (n > 0) return V[n];
+#ifdef DEBUG
+		if(!inv_out) assert(n > 0);
+#endif
+		if (n > 0) {
+			if(!inv_in) return V[n];
+			if(V[n].leaf()) return V[n];
+			const bdd_node &t = std::get<bdd_node>(V[n]);
+			return t.v > 0 ? V[n] : bdd(-t.v, t.l, t.h);
+		}
 		n = -n;
 		if (V[n].leaf()) return bdd(~std::get<B>(V[n]));
 		const bdd_node& t = std::get<bdd_node>(V[n]);
-		return bdd(t.v, -t.h, -t.l);
+		return t.v > 0 ? bdd(t.v, -t.h, -t.l) : bdd(-t.v, -t.l, -t.h);
 	}
 
 	static B get_elem(int_t x) { return std::get<B>(get(x)); }
@@ -292,8 +301,8 @@ template<typename B> struct bdd : variant<bdd_node, B> {
 	}
 };
 
-template<typename B>
-void bdd<B>::get_one_zero(int_t x, map<int_t, B>& m) {
+template<typename B, bool inv_in, bool inv_out, bool varshift>
+void bdd<B, inv_in, inv_out, varshift>::get_one_zero(int_t x, map<int_t, B>& m) {
 	assert(!leaf(x));
 	const bdd_node& n = get_node(x);
 	if (n.l == F) m.clear(), m.emplace(n.v, B::zero());
@@ -307,7 +316,7 @@ void bdd<B>::get_one_zero(int_t x, map<int_t, B>& m) {
 	DBG(assert(compose(x, m) == false);)
 }
 
-template<> void bdd<Bool>::get_one_zero(int_t x, map<int_t, Bool>& m) {
+template<> void bdd<Bool, true, true, false>::get_one_zero(int_t x, map<int_t, Bool>& m) {
 	DBG(assert(x != T);)
 	m.clear();
 	while (!leaf(x)) {
