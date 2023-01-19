@@ -85,7 +85,7 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : vari
 		if (!p.leaf() && !q.leaf()) {
 			const auto x = std::get<bdd_node>(p);
 			const auto y = std::get<bdd_node>(q);
-			assert((x.v > v) && (y.v > v));
+			if(!inv_in) assert((x.v > v) && (y.v > v));
 		}
 #endif
         	if (inv_in && abs(h) < abs(l)) swap(h, l), v = -v;
@@ -121,8 +121,9 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : vari
 
 	static bdd get(int_t n) {
 #ifdef DEBUG
-		if(!inv_out) assert(n > 0);
+		if(!inv_out) assert(n >= 0);
 #endif
+		if(!inv_out && n == 0) return V[0];
 		if (n > 0) {
 			if(!inv_in) return V[n];
 			if(V[n].leaf()) return V[n];
@@ -137,6 +138,18 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : vari
 
 	static B get_elem(int_t x) { return std::get<B>(get(x)); }
 	static bdd_node get_node(int_t x) { return std::get<bdd_node>(get(x)); }
+
+	static int_t bdd_not(int_t x) {
+		if(inv_out) return -x;
+		if (x == T) return F;
+		if (x == F) return T;
+		const bdd& xx = get(x);
+		if(xx.leaf()) {
+			return add(~std::get<B>(xx));
+		}
+		const bdd_node &nx = std::get<bdd_node>(xx);
+		return add(nx.v, bdd_not(nx.h), bdd_not(nx.l));
+	}
 
 	static int_t bdd_and(int_t x, const B& b) {
 		if (x == T) return add(b);
@@ -176,16 +189,56 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : vari
 		return add(ny.v, bdd_and(ny.h, x), bdd_and(ny.l, x));
 	}
 
+	static int_t bdd_or(int_t x, const B& b) {
+		if (x == T) return T;
+		if (x == F) return add(b);
+		const bdd& xx = get(x);
+		if (xx.leaf()) {
+			return add(b | std::get<B>(xx));
+		}
+		const bdd_node &nx = std::get<bdd_node>(xx);
+		int_t y = add(nx.v, bdd_or(nx.h, b), bdd_or(nx.l, b));
+#ifdef DEBUG
+		if (b == true) assert(y == T);
+#endif
+		return y;
+	}
+
+	static int_t bdd_or(int_t x, int_t y){
+		if (x == T || y == T) return T;
+		if (x == F) return y;
+		if (y == F) return x;
+		const bdd &xx = get(x), &yy = get(y);
+		if (xx.leaf()) return bdd_or(y, std::get<B>(xx));
+		if (yy.leaf()) return bdd_or(x, std::get<B>(yy));
+		const bdd_node &nx = std::get<bdd_node>(xx);
+		const bdd_node &ny = std::get<bdd_node>(yy);
+		if (nx.v == ny.v)
+			return	add(nx.v,
+					  bdd_or(nx.h, ny.h),
+					  bdd_or(nx.l, ny.l));
+		if (nx.v < ny.v)
+			return add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
+		return add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
+	}
+
 	static int_t ex(int_t x, int_t v) {
 		const bdd &xx = get(x);
 		if (xx.leaf()) return x;
 		const bdd_node &nx = std::get<bdd_node>(xx);
 		if (nx.v < v) return add(nx.v, ex(nx.h, v), ex(nx.l, v));
 		if (nx.v > v) return x;
-		return -bdd_and(-nx.h, -nx.l);
+		return bdd_or(nx.h, nx.l);
 	}
 
-	static int_t all(int_t x, int_t v) { return -ex(-x, v); }
+	static int_t all(int_t x, int_t v) {
+		const bdd &xx = get(x);
+		if (xx.leaf()) return x;
+		const bdd_node &nx = std::get<bdd_node>(xx);
+		if (nx.v < v) return add(nx.v, all(nx.h, v), all(nx.l, v));
+		if (nx.v > v) return x;
+		return bdd_and(nx.h, nx.l);
+	}
 
 	static B get_uelim(int x) {
 		const bdd &xx = get(x);
@@ -248,7 +301,7 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : vari
 	}
 
 	static int_t ite(int_t x, int_t y, int_t z) {
-		return -bdd_and(-bdd_and(x, y), -bdd_and(-x,z));
+		return bdd_or(bdd_and(x, y), bdd_and(bdd_not(x),z));
 	}
 	static void get_one_zero(int_t, map<int_t, B>&);
 
@@ -278,7 +331,7 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : vari
 
 	static int_t from_dnf(const set<pair<B, vector<int_t>>>& s) {
 		int_t r = F;
-		for (auto& x : s) r = -bdd_and(-r, -from_clause(x));
+		for (auto& x : s) r = bdd_or(r, from_clause(x));
 		return r;
 	}
 
@@ -312,7 +365,7 @@ void bdd<B, inv_in, inv_out, varshift>::get_one_zero(int_t x, map<int_t, B>& m) 
 		m.empalce(n.v, get_elem(eval(n.l, m)));
 	else if (leaf(n.h)) m.emplace(n.v, get_elem(n.l));
 	else	get_one_zero(bdd_and(n.h, get_elem(n.l)), m),
-		m.emplace(n.v, compose(-n.h, m));
+		m.emplace(n.v, compose(bdd_not(n.h), m));
 	DBG(assert(compose(x, m) == false);)
 }
 

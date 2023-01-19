@@ -21,9 +21,9 @@
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
 
-template<typename B> ostream& operator<<(ostream& os, const hbdd<B>& f) {
-	if (f == bdd_handle<B>::htrue) return os << '1';
-	if (f == bdd_handle<B>::hfalse) return os << '0';
+template<typename B, bool inv_in, bool inv_out, bool varshift> ostream& operator<<(ostream& os, const hbdd<B, inv_in, inv_out, varshift>& f) {
+	if (f == bdd_handle<B, inv_in, inv_out, varshift>::htrue) return os << '1';
+	if (f == bdd_handle<B, inv_in, inv_out, varshift>::hfalse) return os << '0';
 	set<pair<B, vector<int_t>>> dnf = f->dnf();
 	size_t n = dnf.size();
 	set<string> ss;
