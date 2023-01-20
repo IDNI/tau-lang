@@ -45,22 +45,22 @@ struct normalizer<tuple<BDDs...>, aux...> {
 		return r;
 	}
 
-	template<typename B, bdd_param_defaults>
-	static msba_t normalize( const set<hbdd<B, bdd_param_names>>& pos,
-		const set<hbdd<B, bdd_param_names>>& neg) {
+	template<typename B, bool inv_in = true, bool inv_out = true, bool varshift = false>
+	static msba_t normalize( const set<hbdd<B, inv_in, inv_out, varshift>>& pos,
+		const set<hbdd<B, inv_in, inv_out, varshift>>& neg) {
 		for (auto x : pos)
 			for (auto y : neg)
 				if ((x & y) == y)
 					return msba_t(false);
-		hbdd<B, bdd_param_names> p =
-			~get_one<hbdd<B, bdd_param_names>>();
+		hbdd<B, inv_in, inv_out, varshift> p =
+			~get_one<hbdd<B, inv_in, inv_out, varshift>>();
 		for (const auto& x : pos) p = (p | x);
 		msba_t r(true, p);
-		hbdd<B, bdd_param_names> np = ~p;
+		hbdd<B, inv_in, inv_out, varshift> np = ~p;
 		if (!(p->get_uelim() == false)) return msba_t(false); 
 		auto t = p->lgrs();
-		for (const hbdd<B, bdd_param_names>& x : neg) {
-			hbdd<B, bdd_param_names> z = x->compose(t) & np;
+		for (const hbdd<B, inv_in, inv_out, varshift>& x : neg) {
+			hbdd<B, inv_in, inv_out, varshift> z = x->compose(t) & np;
 			//hbdd<B> z = (x & np);
 			if (!(z->get_uelim() == false)) continue;
 			else if ((r = (r & msba_t(false, z))) == false) return r;

@@ -33,10 +33,6 @@ template<typename T> using sp = shared_ptr<T>;
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
 #define hash_upair(x, y) fpairing(x, y)
 #define hash_utri(x, y, z) fpairing(hash_upair(x, y), z)
-// Define the default settings for the bdd class
-#define bdd_param_defaults bool inv_in = true, bool inv_out = true, bool varshift = false
-#define bdd_param_types bool inv_in, bool inv_out, bool varshift
-#define bdd_param_names inv_in, inv_out, varshift
 
 inline size_t fpairing(size_t x, size_t y) {
 	const size_t z = x + y;
@@ -62,7 +58,7 @@ template<> struct std::hash<bdd_node> {
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
-template<typename B, bdd_param_defaults>
+template<typename B, bool inv_in = true, bool inv_out = true, bool varshift = false>
 struct bdd : variant<bdd_node, B> {
 	typedef variant<bdd_node, B> base;
 
@@ -361,8 +357,8 @@ struct bdd : variant<bdd_node, B> {
 	}
 };
 
-template<typename B, bdd_param_types>
-void bdd<B, bdd_param_names>::get_one_zero(int_t x, map<int_t, B>& m) {
+template<typename B, bool inv_in, bool inv_out, bool varshift>
+void bdd<B, inv_in, inv_out, varshift>::get_one_zero(int_t x, map<int_t, B>& m) {
 	assert(!leaf(x));
 	const bdd_node& n = get_node(x);
 	if (n.l == F) m.clear(), m.emplace(n.v, B::zero());
