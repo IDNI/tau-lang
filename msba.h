@@ -17,13 +17,12 @@
 #include "bool.h"
 #include <variant>
 
-typedef hbdd<Bool, true, true, false> sbf;
-#define sbf_T bdd_handle<Bool, true, true, false>::htrue
-#define sbf_F bdd_handle<Bool, true, true, false>::hfalse
+typedef hbdd<Bool> sbf;
+#define sbf_T bdd_handle<Bool>::htrue
+#define sbf_F bdd_handle<Bool>::hfalse
 
 sbf leq_bdd(int_t x, int_t y) {
-	return bdd_handle<Bool, true, true, false>::bit(false, x) |
-		bdd_handle<Bool, true, true, false>::bit(true, y);
+	return bdd_handle<Bool>::bit(false, x) | bdd_handle<Bool>::bit(true, y);
 }
 
 #ifdef DEBUG
@@ -82,7 +81,7 @@ struct msba<tuple<BDDs...>, aux...> {
 		// weirdly, but because this is actually "something = F"
 		if (x == true) b = (p ? sbf_F : sbf_T);
 		else if (x == false) b = (p ? sbf_T : sbf_F);
-		else b = bdd_handle<Bool, true, true, false>::bit(p, get(elem(x)));
+		else b = bdd_handle<Bool>::bit(p, get(elem(x)));
 	}
 
 	static bool dummy; // nonworking hack to call init

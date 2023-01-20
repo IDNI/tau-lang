@@ -33,6 +33,10 @@ template<typename T> using sp = shared_ptr<T>;
 #define hash_tri(x, y, z) fpairing(hash_pair(x, y), neg_to_odd(z))
 #define hash_upair(x, y) fpairing(x, y)
 #define hash_utri(x, y, z) fpairing(hash_upair(x, y), z)
+// Define the default settings for the bdd class
+#define bdd_param_defaults bool inv_in = true, bool inv_out = true, bool varshift = false
+#define bdd_param_types bool inv_in, bool inv_out, bool varshift
+#define bdd_param_names inv_in, inv_out, varshift
 
 inline size_t fpairing(size_t x, size_t y) {
 	const size_t z = x + y;
@@ -58,7 +62,8 @@ template<> struct std::hash<bdd_node> {
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
-template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : variant<bdd_node, B> {
+template<typename B, bdd_param_defaults>
+struct bdd : variant<bdd_node, B> {
 	typedef variant<bdd_node, B> base;
 
 	bdd(int_t v, int_t h, int_t l) : base(bdd_node(v, h, l)) {}
@@ -88,7 +93,9 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : vari
 			if(!inv_in) assert((x.v > v) && (y.v > v));
 		}
 #endif
-        	if (inv_in && abs(h) < abs(l)) swap(h, l), v = -v;
+        	if (inv_in && abs(h) < abs(l)) {
+			swap(h, l), v = -v;
+		}
 		if (inv_out && l < 0) {
 			h = -h, l = -l;
 			bdd_node n(v, h, l);
@@ -354,8 +361,8 @@ template<typename B, bool inv_in, bool inv_out, bool varshift> struct bdd : vari
 	}
 };
 
-template<typename B, bool inv_in, bool inv_out, bool varshift>
-void bdd<B, inv_in, inv_out, varshift>::get_one_zero(int_t x, map<int_t, B>& m) {
+template<typename B, bdd_param_types>
+void bdd<B, bdd_param_names>::get_one_zero(int_t x, map<int_t, B>& m) {
 	assert(!leaf(x));
 	const bdd_node& n = get_node(x);
 	if (n.l == F) m.clear(), m.emplace(n.v, B::zero());
@@ -369,7 +376,7 @@ void bdd<B, inv_in, inv_out, varshift>::get_one_zero(int_t x, map<int_t, B>& m) 
 	DBG(assert(compose(x, m) == false);)
 }
 
-template<> void bdd<Bool, true, true, false>::get_one_zero(int_t x, map<int_t, Bool>& m) {
+template<> void bdd<Bool>::get_one_zero(int_t x, map<int_t, Bool>& m) {
 	DBG(assert(x != T);)
 	m.clear();
 	while (!leaf(x)) {

@@ -89,8 +89,8 @@ struct barr : public msba<tuple<BAs...>, calls<BAs...>> {
 	barr(const base& t) : base(t) {}
 
 	static void init() {
-		bdd_init<Bool, true, true, false>();
-		(bdd_init<BAs, true, true, false>(), ...);
+		bdd_init<Bool>();
+		(bdd_init<BAs>(), ...);
 		base::init();
 	}
 
@@ -99,7 +99,7 @@ struct barr : public msba<tuple<BAs...>, calls<BAs...>> {
 	}
 
 	template<typename T>
-	static set<int_t> get_vars(const hbdd<T, true, true, false>& t) {
+	static set<int_t> get_vars(const hbdd<T>& t) {
 		return t->get_vars();
 	}
 
@@ -121,13 +121,13 @@ struct barr : public msba<tuple<BAs...>, calls<BAs...>> {
 			if (x.neg) continue;
 			else for (const call_t& y : x) cs.insert(y);
 		for (const call_t& x : cs)
-			r = 	(r & bdd_handle<Bool, true, true, false>::
+			r = 	(r & bdd_handle<Bool>::
 				bit(true, base::get(calls(x))));
 		cs.clear();
 		for (const calls_t& x : std::get<set<calls_t>>(c))
 			if (x.neg) cs.insert(x.begin(), x.end());
 		for (const call_t& x : cs)
-			s = 	(s | bdd_handle<Bool, true, true, false>::
+			s = 	(s | bdd_handle<Bool>::
 				bit(false, base::get(calls(x))));
 		return base::dnf((r & s)->dnf());
 	}

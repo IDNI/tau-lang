@@ -28,7 +28,7 @@ struct anf : set<set<int_t>> {
 	anf(int_t t, bool pos = true) : neg(!pos) { insert({t}); }
 	anf(const set<int_t>& s) { insert(s); }
 
-	anf(const hbdd<Bool, true, true, false>& f) {
+	anf(const hbdd<Bool>& f) {
 		for (auto& c : f->dnf()) {
 			assert(c.first == true);
 			anf t;
@@ -76,15 +76,15 @@ struct anf : set<set<int_t>> {
 		return r;
 	}
 
-	hbdd<Bool, true, true, false> to_bdd() const {
+	hbdd<Bool> to_bdd() const {
 		auto f = [](auto& t) {
-			hbdd<Bool, true, true, false> f =
-				bdd_handle<Bool, true, true, false>::htrue;
+			hbdd<Bool> f =
+				bdd_handle<Bool>::htrue;
 			for (auto x : t)
-				f = f & bdd_handle<Bool, true, true, false>::bit(true, x);
+				f = f & bdd_handle<Bool>::bit(true, x);
 			return f;
 		};
-		hbdd<Bool, true, true, false> g = bdd_handle<Bool, true, true, false>::hfalse;
+		hbdd<Bool> g = bdd_handle<Bool>::hfalse;
 		for (auto& t : *this) g = g + f(t);
 		if (neg) g = ~g;
 		return g;
