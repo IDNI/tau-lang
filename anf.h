@@ -78,10 +78,8 @@ struct anf : set<set<int_t>> {
 
 	hbdd<Bool> to_bdd() const {
 		auto f = [](auto& t) {
-			hbdd<Bool> f =
-				bdd_handle<Bool>::htrue;
-			for (auto x : t)
-				f = f & bdd_handle<Bool>::bit(true, x);
+			hbdd<Bool> f = bdd_handle<Bool>::htrue;
+			for (auto x : t) f = f & bdd_handle<Bool>::bit(true, x);
 			return f;
 		};
 		hbdd<Bool> g = bdd_handle<Bool>::hfalse;
