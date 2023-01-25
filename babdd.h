@@ -58,7 +58,13 @@ template<> struct std::hash<bdd_node> {
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
-template<typename B, bool inv_in = true, bool inv_out = true, bool varshift = false>
+enum bdd_params { INV_IN = (1u << 0), INV_OUT = (1u << 1), VARSHIFT = (1u << 2) };
+
+constexpr auto operator&(auto a, bdd_params b) {
+	return a & static_cast<uint8_t>(b);
+}
+
+template<typename B, auto params = INV_IN | INV_OUT | VARSHIFT>
 struct bdd : variant<bdd_node, B> {
 	typedef variant<bdd_node, B> base;
 
@@ -86,21 +92,22 @@ struct bdd : variant<bdd_node, B> {
 		if (!p.leaf() && !q.leaf()) {
 			const auto x = std::get<bdd_node>(p);
 			const auto y = std::get<bdd_node>(q);
-			if(!inv_in) assert((x.v > v) && (y.v > v));
+			if constexpr (!(params & INV_IN)) assert((x.v > v) && (y.v > v));
 		}
 #endif
-        	if (inv_in && abs(h) < abs(l)) {
-			swap(h, l), v = -v;
-		}
-		if (inv_out && l < 0) {
-			h = -h, l = -l;
-			bdd_node n(v, h, l);
-			if (auto it = Mn.find(n); it != Mn.end())
-				return -it->second;
-			Mn.emplace(n, V.size());
-			V.emplace_back(n);
-			return -V.size()+1;
-		}
+        	if constexpr (params & INV_IN)
+			if(abs(h) < abs(l))
+				swap(h, l), v = -v;
+		if constexpr (params & INV_OUT)
+			if (l < 0) {
+				h = -h, l = -l;
+				bdd_node n(v, h, l);
+				if (auto it = Mn.find(n); it != Mn.end())
+					return -it->second;
+				Mn.emplace(n, V.size());
+				V.emplace_back(n);
+				return -V.size()+1;
+			}
 		bdd_node n(v, h, l);
 		if (auto it = Mn.find(n); it != Mn.end()) return it->second;
 		Mn.emplace(n, V.size());
@@ -116,7 +123,8 @@ struct bdd : variant<bdd_node, B> {
 		if (b == false) return F;
 		if (b == true) return T;
 		if (auto it = Mb.find(b); it != Mb.end()) return it->second;
-		else if (inv_out && (it = Mb.find(~b)) != Mb.end()) return -it->second;
+		else if constexpr (params & INV_OUT)
+			if ((it = Mb.find(~b)) != Mb.end()) return -it->second;
 		Mb.emplace(b, V.size());
 		V.emplace_back(b);
 		return V.size() - 1;
@@ -124,11 +132,12 @@ struct bdd : variant<bdd_node, B> {
 
 	static bdd get(int_t n) {
 #ifdef DEBUG
-		if(!inv_out) assert(n >= 0);
+		if constexpr (!(params & INV_OUT)) assert(n >= 0);
 #endif
-		if(!inv_out && n == 0) return V[0];
+		if constexpr (!(params & INV_OUT))
+			if (n == 0) return V[0];
 		if (n > 0) {
-			if(!inv_in) return V[n];
+			if constexpr (!(params & INV_IN)) return V[n];
 			if(V[n].leaf()) return V[n];
 			const bdd_node &t = std::get<bdd_node>(V[n]);
 			return t.v > 0 ? V[n] : bdd(-t.v, t.l, t.h);
@@ -143,7 +152,7 @@ struct bdd : variant<bdd_node, B> {
 	static bdd_node get_node(int_t x) { return std::get<bdd_node>(get(x)); }
 
 	static int_t bdd_not(int_t x) {
-		if(inv_out) return -x;
+		if constexpr (params & INV_OUT) return -x;
 		if (x == T) return F;
 		if (x == F) return T;
 		const bdd& xx = get(x);
@@ -357,8 +366,8 @@ struct bdd : variant<bdd_node, B> {
 	}
 };
 
-template<typename B, bool inv_in, bool inv_out, bool varshift>
-void bdd<B, inv_in, inv_out, varshift>::get_one_zero(int_t x, map<int_t, B>& m) {
+template<typename B, auto params>
+void bdd<B, params>::get_one_zero(int_t x, map<int_t, B>& m) {
 	assert(!leaf(x));
 	const bdd_node& n = get_node(x);
 	if (n.l == F) m.clear(), m.emplace(n.v, B::zero());
