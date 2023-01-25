@@ -21,10 +21,10 @@
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
 
-template<typename B, auto params = INV_IN | INV_OUT | VARSHIFT>
-ostream& operator<<(ostream& os, const hbdd<B, params>& f) {
-	if (f == bdd_handle<B, params>::htrue) return os << '1';
-	if (f == bdd_handle<B, params>::hfalse) return os << '0';
+template<typename B, auto o = bdd_options()>
+ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
+	if (f == bdd_handle<B, o>::htrue) return os << '1';
+	if (f == bdd_handle<B, o>::hfalse) return os << '0';
 	set<pair<B, vector<int_t>>> dnf = f->dnf();
 	size_t n = dnf.size();
 	set<string> ss;

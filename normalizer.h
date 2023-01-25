@@ -45,21 +45,21 @@ struct normalizer<tuple<BDDs...>, aux...> {
 		return r;
 	}
 
-	template<typename B, auto params = INV_IN | INV_OUT | VARSHIFT>
-	static msba_t normalize( const set<hbdd<B, params>>& pos,
-		const set<hbdd<B, params>>& neg) {
+	template<typename B, auto o = bdd_options()>
+	static msba_t normalize( const set<hbdd<B, o>>& pos,
+		const set<hbdd<B, o>>& neg) {
 		for (auto x : pos)
 			for (auto y : neg)
 				if ((x & y) == y)
 					return msba_t(false);
-		hbdd<B, params> p = ~get_one<hbdd<B, params>>();
+		hbdd<B, o> p = ~get_one<hbdd<B, o>>();
 		for (const auto& x : pos) p = (p | x);
 		msba_t r(true, p);
-		hbdd<B, params> np = ~p;
+		hbdd<B, o> np = ~p;
 		if (!(p->get_uelim() == false)) return msba_t(false); 
 		auto t = p->lgrs();
-		for (const hbdd<B, params>& x : neg) {
-			hbdd<B, params> z = x->compose(t) & np;
+		for (const hbdd<B, o>& x : neg) {
+			hbdd<B, o> z = x->compose(t) & np;
 			//hbdd<B> z = (x & np);
 			if (!(z->get_uelim() == false)) continue;
 			else if ((r = (r & msba_t(false, z))) == false) return r;

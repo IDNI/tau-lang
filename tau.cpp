@@ -30,8 +30,8 @@
 //template<typename B> hbdd<B> bdd_handle<B>::hfalse;
 
 // all this and init is still not called...
-template<typename B, auto params>
-bool bdd_handle<B, params>::dummy = (bdd_init<B, params>(), true);
+template<typename B, auto o>
+bool bdd_handle<B, o>::dummy = (bdd_init<B, o>(), true);
 template<typename... BAs, typename... aux>
 bool msba<tuple<BAs...>, aux...>::dummy =
 	(msba<tuple<BAs...>, aux...>::init(), true);
