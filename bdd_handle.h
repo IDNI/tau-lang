@@ -51,9 +51,11 @@ bool operator==(const hbdd<B, o>& x, const hbdd<B, o>& y) {
 
 template<typename B, auto o = bdd_options()>
 struct bdd_handle {
-	typedef unordered_map<bdd_node, shared_ptr<bdd_handle>> mn_type;
+	typedef bdd_node<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH> bdd_node_t;
+	typedef unordered_map<bdd_node_t, shared_ptr<bdd_handle>> mn_type;
 	typedef map<B, std::shared_ptr<bdd_handle>> mb_type;
-	inline static unordered_map<bdd_node, shared_ptr<bdd_handle>> Mn;
+	using bdd_ref = bdd_node_t::bdd_ref;
+	inline static unordered_map<bdd_node_t, shared_ptr<bdd_handle>> Mn;
 	inline static map<B, std::shared_ptr<bdd_handle>> Mb;
 	inline static hbdd<B, o> htrue, hfalse;
 
@@ -65,7 +67,7 @@ struct bdd_handle {
 
 //	bdd_handle();
 
-	static hbdd<B, o> get(const bdd_node& x) {
+	static hbdd<B, o> get(const bdd_node_t& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
 		hbdd<B, o> h = make_shared<bdd_handle<B, o>>(); //(new bdd_handle);
@@ -82,10 +84,10 @@ struct bdd_handle {
 	static hbdd<B, o>
 	        get(const bdd<B, o>& x) {
 		return	x.leaf() ? get(std::get<B>(x))
-			: get(std::get<bdd_node>(x));
+			: get(std::get<bdd_node_t>(x));
 	}
 
-	static hbdd<B, o> get(int_t t) {
+	static hbdd<B, o> get(bdd_ref t) {
 		return get(bdd<B, o>::get(t));
 	}
 
@@ -104,7 +106,7 @@ struct bdd_handle {
 		return get(bdd<B, o>::F);
 	}
 
-	static hbdd<B, o> bit(bool b, int_t v) {
+	static hbdd<B, o> bit(bool b, uint_t v) {
 		DBG(assert(v > 0);)
 		hbdd<B, o> r = get(bdd<B, o>::bit(b ? v : -v));
 		//hbdd<B, o> r = get(bdd_node(v, bdd<B, o>::T, bdd<B, o>::F));
@@ -115,8 +117,7 @@ struct bdd_handle {
 	B get_uelim() const { return bdd<B, o>::get_uelim(b); }
 	B get_eelim() const { return bdd<B, o>::get_eelim(b); }
 
-	hbdd<B, o> operator&(
-		const hbdd<B, o>& x) const {
+	hbdd<B, o> operator&(const hbdd<B, o>& x) const {
 		const bdd<B, o> &xx = x->get();
 		const bdd<B, o> &yy = get();
 		if (xx.leaf()) {
@@ -144,8 +145,7 @@ struct bdd_handle {
 			bdd<B, o>::bdd_not(b)));
 	}
 
-	hbdd<B, o>
-	operator|(const hbdd<B, o>& x) const {
+	hbdd<B, o> operator|(const hbdd<B, o>& x) const {
 		return ~((~x) & (~*this));
 	}
 
@@ -212,7 +212,7 @@ struct bdd_handle {
 
 	hbdd<B, o>
 	compose(const map<int_t, hbdd<B, o>>& m) const {
-		map<int_t, int_t> p;
+		map<int_t, bdd_ref> p;
 		for (auto& x : m) p.emplace(x.first, x.second->b);
 		return get(bdd<B, o>::compose(b, p));
 	}
@@ -231,7 +231,7 @@ struct bdd_handle {
 #ifndef DEBUG
 private:
 #endif
-	int_t b;
+	bdd_ref b;
 };
 
 template<typename T> constexpr bool is_sp{};
@@ -259,6 +259,9 @@ template<typename B> B get_one() requires is_sp<B> {
 }*/
 
 template<typename B, auto o = bdd_options()> void bdd_init() {
+	typedef bdd_node<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH> bdd_node_t;
+	using bdd_ref = bdd_node_t::bdd_ref;
+
 	if (!bdd<B, o>::V.empty()) return;
 #ifdef DEBUG
 	int s;
@@ -267,7 +270,7 @@ template<typename B, auto o = bdd_options()> void bdd_init() {
 	     '>' << endl;
 #endif
 	auto one = get_one<B>();
-	if constexpr (!(o.params  & INV_OUT)) {
+	if constexpr (!o.has_inv_out()) {
 		auto zero = ~one;
 		bdd<B, o>::V.emplace_back(zero);
 		bdd<B, o>::Mb.emplace(zero, 0);
@@ -275,16 +278,15 @@ template<typename B, auto o = bdd_options()> void bdd_init() {
 	bdd<B, o>::V.emplace_back(one);
 	bdd<B, o>::Mb.emplace(one, 1);
 	//bdd<B, o>::Mb.emplace(B::one(), 1);
-	if constexpr (o.params  & INV_OUT)
-		bdd<B, o>::F = -(bdd<B, o>::T = 1);
-	else {
-		bdd<B, o>::F = 0;
-		bdd<B, o>::T = 1;
+	if constexpr (o.has_inv_out()) {
+		bdd<B, o>::T = bdd_ref(0,0,0);
+		bdd<B, o>::F = bdd_ref(0,1,0);
+	} else {
+		bdd<B, o>::F = bdd_ref(0,0,0);
+		bdd<B, o>::T = bdd_ref(0,0,1);
 	}
-	bdd_handle<B, o>::hfalse = bdd_handle<B, o>::get(
-		bdd<B, o>::get(bdd<B, o>::bdd_not(1)));
-	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(
-		bdd<B, o>::get(1));
+	bdd_handle<B, o>::hfalse = bdd_handle<B, o>::get(bdd<B, o>::F);
+	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(bdd<B, o>::T);
 }
 
 template<typename B, auto o>
