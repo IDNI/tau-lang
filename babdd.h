@@ -41,7 +41,11 @@ inline size_t fpairing(size_t x, size_t y) {
 	return y+((z * (z + 1))>>1);
 }
 
-// Functionality options for bdd library
+/* Functionality options for bdd library
+ * - use of input inverters
+ * - use of output inverters
+ * - use of  variable shifters
+ */
 enum bdd_params { INV_IN = (1u << 0), INV_OUT = (1u << 1), VARSHIFT = (1u << 2) };
 
 /* Options for bdd instantiation. The class handles dependencies and restrictions
@@ -90,75 +94,81 @@ struct bdd_options {
 	}
 };
 
-//TODO: Conversion of bit field to ref_type for hashing
+// Defines the reference type to reference a bdd_node in the bdd universe
 template<bool SHIFTED, int_t ID_WIDTH, int_t SHIFT_WIDTH>
-struct bdd_node {
-	// Defines the reference type to reference a bdd_node in the bdd universe
-	struct bdd_ref {
-		typedef std::conditional<ID_WIDTH + SHIFT_WIDTH <= 30, uint32_t, uint64_t>::type ref_type;
-		ref_type IN 	: 1 = 0;
-		ref_type OUT	: 1 = 0;
-		ref_type SHIFT	: SHIFT_WIDTH = 0;
-		ref_type ID	: ID_WIDTH = 0;
-		bdd_ref() = default;
-		bdd_ref(auto in, auto out, auto id) : IN(in), OUT(out), ID(id) {}
-		bdd_ref(auto in, auto out, auto shift, auto id) : IN(in), OUT(out), SHIFT(shift), ID(id) {}
-		bool operator==(const bdd_ref& x) const {
-			return IN == x.IN && OUT == x.OUT && SHIFT == x.SHIFT && ID == x.ID;
-		}
-		static bdd_ref flip_in(const bdd_ref x) {
-			return x.IN == 1 ? bdd_ref(0, x.OUT, x.SHIFT, x.ID) :
-			       bdd_ref(1, x.OUT, x.SHIFT, x.ID);
-		}
-		static bdd_ref flip_out(const bdd_ref x) {
-			return x.OUT == 1 ? bdd_ref(x.IN, 0, x.SHIFT, x.ID) :
-			       bdd_ref(x.IN, 1, x.SHIFT, x.ID);
-		}
-		static size_t hash(bdd_ref x) {
-			return (x.ID + x.IN) ^ (x.SHIFT + x.OUT);
-		}
-	};
-	bdd_node(uint_t v, bdd_ref h, bdd_ref l) :
-		v(v), h(h), l(l), hash(hash_utri(v, bdd_ref::hash(h), bdd_ref::hash(l))) {}
-	uint_t v;
-	bdd_ref h, l;
-	size_t hash;
-	bool operator==(const bdd_node& x) const {
-		return hash == x.hash && v == x.v && h == x.h && l == x.l;
+struct bdd_reference {
+	typedef std::conditional<ID_WIDTH + SHIFT_WIDTH <= 30,
+					uint32_t, uint64_t>::type ref_type;
+	ref_type IN: 1 = 0;
+	ref_type OUT: 1 = 0;
+	ref_type SHIFT: SHIFT_WIDTH = 0;
+	ref_type ID: ID_WIDTH = 0;
+
+	bdd_reference() = default;
+	bdd_reference(auto in, auto out, auto id) : IN(in), OUT(out), ID(id) {}
+	bdd_reference(auto in, auto out, auto shift, auto id) : IN(in), OUT(out),
+							  SHIFT(shift),
+							  ID(id) {}
+
+	bool operator==(const bdd_reference x) const {
+		return IN == x.IN && OUT == x.OUT && SHIFT == x.SHIFT &&
+		       ID == x.ID;
+	}
+
+	static bdd_reference flip_in(const bdd_reference x) {
+		return x.IN == 1 ? bdd_reference(0, x.OUT, x.SHIFT, x.ID) :
+		       bdd_reference(1, x.OUT, x.SHIFT, x.ID);
+	}
+
+	static bdd_reference flip_out(const bdd_reference x) {
+		return x.OUT == 1 ? bdd_reference(x.IN, 0, x.SHIFT, x.ID) :
+		       bdd_reference(x.IN, 1, x.SHIFT, x.ID);
+	}
+
+	static size_t hash(const bdd_reference x) {
+		return (x.ID + x.IN) ^ (x.SHIFT + x.OUT);
 	}
 };
 
 template<int_t ID_WIDTH, int_t SHIFT_WIDTH>
-struct bdd_node<false, ID_WIDTH, SHIFT_WIDTH> {
-	// Defines the reference type to reference a bdd_node in the bdd universe
-	struct bdd_ref {
-		typedef std::conditional<ID_WIDTH <= 30, uint32_t, uint64_t>::type ref_type;
-		ref_type IN 	: 1 = 0;
-		ref_type OUT	: 1 = 0;
-		ref_type ID	: ID_WIDTH = 0;
-		bdd_ref() = default;
-		bdd_ref(auto in, auto out, auto id) : IN(in), OUT(out),ID(id) {}
-		bool operator==(const bdd_ref& x) const {
-			return IN == x.IN && OUT == x.OUT && ID == x.ID;
-		}
-		static bdd_ref flip_in(const bdd_ref x) {
-			return x.IN == 1 ? bdd_ref(0, x.OUT, x.ID) :
-					   bdd_ref(1, x.OUT, x.ID);
-		}
-		static bdd_ref flip_out(const bdd_ref x) {
-			return x.OUT == 1 ? bdd_ref(x.IN, 0, x.ID) :
-					    bdd_ref(x.IN, 1, x.ID);
-		}
-		static size_t hash(bdd_ref x) {
-			return (x.ID + x.IN) ^ x.OUT;
-		}
-	};
-	bdd_node(uint_t v, bdd_ref h, bdd_ref l) :
-		v(v), h(h), l(l), hash(hash_utri(v, bdd_ref::hash(h), bdd_ref::hash(l))) {}
+struct bdd_reference<false, ID_WIDTH, SHIFT_WIDTH> {
+	typedef std::conditional<ID_WIDTH <= 30,
+					uint32_t, uint64_t>::type ref_type;
+	ref_type IN: 1 = 0;
+	ref_type OUT: 1 = 0;
+	ref_type ID: ID_WIDTH = 0;
+
+	bdd_reference() = default;
+	bdd_reference(auto in, auto out, auto id) : IN(in), OUT(out), ID(id) {}
+
+	bool operator==(const bdd_reference x) const {
+		return IN == x.IN && OUT == x.OUT && ID == x.ID;
+	}
+
+	static bdd_reference flip_in(const bdd_reference x) {
+		return x.IN == 1 ? bdd_ref(0, x.OUT, x.ID) :
+		       bdd_ref(1, x.OUT, x.ID);
+	}
+
+	static bdd_reference flip_out(const bdd_reference x) {
+		return x.OUT == 1 ? bdd_reference(x.IN, 0, x.ID) :
+		       bdd_reference(x.IN, 1, x.ID);
+	}
+
+	static size_t hash(const bdd_reference x) {
+		return (x.ID + x.IN) ^ x.OUT;
+	}
+};
+
+template<typename R>
+struct bdd_node {
+	bdd_node(uint_t v, R h, R l) :
+		v(v), h(h), l(l),
+		hash(hash_utri(v, R::hash(h), R::hash(l))) {}
 	uint_t v;
-	bdd_ref h, l;
+	R h, l;
 	size_t hash;
-	bool operator==(const bdd_node& x) const {
+	bool operator==(const auto& x) const {
 		return hash == x.hash && v == x.v && h == x.h && l == x.l;
 	}
 };
@@ -169,7 +179,7 @@ struct bdd_node<false, ID_WIDTH, SHIFT_WIDTH> {
 template<typename R>
 struct node_skeleton {
 	node_skeleton(R h, R l) :
-		h(h), l(l), hash(hash_upair(h, l)) {}
+		h(h), l(l), hash(hash_upair(R::hash(h), R::hash(l))) {}
 	R h, l;
 	size_t hash;
 	bool operator==(const auto& x) const {
@@ -177,13 +187,13 @@ struct node_skeleton {
 	}
 };
 
-template<bool SHIFTED, int_t ID_WIDTH, int_t SHIFT_WIDTH>
-struct std::hash<bdd_node<SHIFTED, ID_WIDTH, SHIFT_WIDTH>> {
+template<typename R>
+struct std::hash<bdd_node<R>> {
 	size_t operator()(auto& n) const { return n.hash; }
 };
 
-template<class bdd_node>
-struct std::hash<node_skeleton<bdd_node>> {
+template<typename R>
+struct std::hash<node_skeleton<R>> {
 	size_t operator()(auto& n) const { return n.hash; }
 };
 
@@ -191,10 +201,10 @@ template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
 template<typename B, auto o = bdd_options()>
-struct bdd : variant<bdd_node<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>, B> {
-	typedef bdd_node<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH> bdd_node_t;
+struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>>, B> {
+	using bdd_ref = bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>;
+	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef variant<bdd_node_t, B> base;
-	using bdd_ref = bdd_node_t::bdd_ref;
 
 	// This class is placed into the bdd universe if variable shifters are used
 	struct bdd_skeleton : variant<node_skeleton<bdd_ref>, B> {
@@ -214,7 +224,8 @@ struct bdd : variant<bdd_node<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>, B> {
 
 	struct initializer { initializer(); };
 
-	inline static std::conditional<o.has_varshift(), vector<bdd_skeleton>, vector<bdd>>::type V;
+	inline static std::conditional<o.has_varshift(),
+				vector<bdd_skeleton>, vector<bdd>>::type V;
 	inline static unordered_map<bdd_node_t, size_t> Mn;
 	inline static map<B, size_t> Mb;
 	inline static bdd_ref T, F;

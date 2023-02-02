@@ -51,10 +51,10 @@ bool operator==(const hbdd<B, o>& x, const hbdd<B, o>& y) {
 
 template<typename B, auto o = bdd_options()>
 struct bdd_handle {
-	typedef bdd_node<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH> bdd_node_t;
+	using bdd_ref = bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>;
+	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef unordered_map<bdd_node_t, shared_ptr<bdd_handle>> mn_type;
 	typedef map<B, std::shared_ptr<bdd_handle>> mb_type;
-	using bdd_ref = bdd_node_t::bdd_ref;
 	inline static unordered_map<bdd_node_t, shared_ptr<bdd_handle>> Mn;
 	inline static map<B, std::shared_ptr<bdd_handle>> Mb;
 	inline static hbdd<B, o> htrue, hfalse;
@@ -259,8 +259,7 @@ template<typename B> B get_one() requires is_sp<B> {
 }*/
 
 template<typename B, auto o = bdd_options()> void bdd_init() {
-	typedef bdd_node<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH> bdd_node_t;
-	using bdd_ref = bdd_node_t::bdd_ref;
+	using bdd_ref = bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>;
 
 	if (!bdd<B, o>::V.empty()) return;
 #ifdef DEBUG
