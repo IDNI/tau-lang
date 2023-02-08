@@ -35,7 +35,6 @@ template<typename T> using sp = shared_ptr<T>;
 #define hash_upair(x, y) fpairing(x, y)
 #define hash_utri(x, y, z) fpairing(hash_upair(x, y), z)
 
-//TODO: Is hash type big enough for 64 bits?
 inline size_t fpairing(size_t x, size_t y) {
 	const size_t z = x + y;
 	return y+((z * (z + 1))>>1);
@@ -44,14 +43,14 @@ inline size_t fpairing(size_t x, size_t y) {
 /* Functionality options for bdd library
  * - use of input inverters
  * - use of output inverters
- * - use of  variable shifters
+ * - use of variable shifters
  */
 enum bdd_params { INV_IN = (1u << 0), INV_OUT = (1u << 1), VARSHIFT = (1u << 2) };
 
 /* Options for bdd instantiation. The class handles dependencies and restrictions
  * between parameters
  */
-template<uint8_t params = INV_IN | INV_OUT>
+template<uint8_t params = INV_IN | INV_OUT | VARSHIFT>
 struct bdd_options {
 	uint8_t ID_WIDTH = 18;
 	uint8_t SHIFT_WIDTH = 12;
@@ -123,6 +122,16 @@ struct bdd_reference {
 	static bdd_reference flip_out(const bdd_reference x) {
 		return x.OUT == 1 ? bdd_reference(x.IN, 0, x.SHIFT, x.ID) :
 		       bdd_reference(x.IN, 1, x.SHIFT, x.ID);
+	}
+
+	static bdd_reference to_shift_node(const bdd_reference x, uint_t v) {
+		if(x.SHIFT == 0) return x;
+		else return bdd_reference(x.IN, x.OUT, x.SHIFT - v, x.ID);
+	}
+
+	static bdd_reference to_bdd_node(const bdd_reference x, uint_t v) {
+		if(x.SHIFT == 0) return x;
+		else return bdd_reference(x.IN, x.OUT, x.SHIFT + v, x.ID);
 	}
 
 	static size_t hash(const bdd_reference x) {
@@ -226,7 +235,9 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 
 	inline static std::conditional<o.has_varshift(),
 				vector<bdd_skeleton>, vector<bdd>>::type V;
-	inline static unordered_map<bdd_node_t, size_t> Mn;
+	inline static std::conditional<o.has_varshift(),
+			unordered_map<node_skeleton<bdd_ref>, size_t>,
+			        unordered_map<bdd_node_t, size_t>>::type Mn;
 	inline static map<B, size_t> Mb;
 	inline static bdd_ref T, F;
 	inline static initializer I;
@@ -236,14 +247,14 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
 		if (h == l) return h;
 #ifdef DEBUG
-		auto p = V[l.ID], q = V[h.ID];
+		auto p = get(l), q = get(h);
 		if (!p.leaf() && !q.leaf()) {
 			const auto x = std::get<bdd_node_t>(p);
 			const auto y = std::get<bdd_node_t>(q);
 			if constexpr (!o.has_inv_in()) assert((x.v > v) && (y.v > v));
 		}
 #endif
-		bool in = false;
+		bool in = false, out = false;
         	if constexpr (o.has_inv_in())
 			if(h.ID < l.ID)
 				swap(h, l), in = true;
@@ -251,19 +262,25 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 			if (l.OUT) {
 				h = bdd_ref::flip_out(h);
 				l = bdd_ref::flip_out(l);
-				bdd_node_t n(v, h, l);
-				if (auto it = Mn.find(n); it != Mn.end())
-					return bdd_ref(in, 1, it->second);
-				Mn.emplace(n, V.size());
-				V.emplace_back(n);
-				return bdd_ref(in, 1, V.size()-1);
+				out = true;
 			}
-		bdd_node_t n(v, h, l);
-		if (auto it = Mn.find(n); it != Mn.end())
-			return bdd_ref(in, 0, it->second);
-		Mn.emplace(n, V.size());
-		V.emplace_back(n);
-		return bdd_ref(in, 0, V.size()-1);
+		if constexpr (o.has_varshift()){
+			h = bdd_ref::to_shift_node(h, v);
+			l = bdd_ref::to_shift_node(l, v);
+			node_skeleton<bdd_ref> n(h, l);
+			if (auto it = Mn.find(n); it != Mn.end())
+				return bdd_ref(in, out, v, it->second);
+			Mn.emplace(n, V.size());
+			V.emplace_back(n);
+			return bdd_ref(in, out, v, V.size()-1);
+		} else {
+			bdd_node_t n(v, h, l);
+			if (auto it = Mn.find(n); it != Mn.end())
+				return bdd_ref(in, out, it->second);
+			Mn.emplace(n, V.size());
+			V.emplace_back(n);
+			return bdd_ref(in, out, V.size() - 1);
+		}
 	}
 
 	static bdd_ref bit(int_t v) {
@@ -282,19 +299,32 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 	}
 
 	static bdd get(bdd_ref n) {
+		constexpr auto get_bdd_node = [](const bdd_ref n) {
+			if constexpr (o.has_varshift()) {
+				const bdd_skeleton& s = V[n.ID];
+				if(s.leaf()) return bdd(std::get<B>(s));
+				const auto& x = std::get<node_skeleton<bdd_ref>>(s);
+				return bdd(n.SHIFT, bdd_ref::to_bdd_node(x.h, n.SHIFT),
+					   	bdd_ref::to_bdd_node(x.l, n.SHIFT));
+			} else {
+				return V[n.ID];
+			}
+		};
 #ifdef DEBUG
 		if constexpr (!o.has_inv_out()) assert(!n.OUT);
+		if constexpr (!o.has_inv_in()) assert(!n.IN);
 #endif
+		const auto& b = get_bdd_node(n);
 		if constexpr (!o.has_inv_out())
-			if (n.ID == 0) return V[0];
+			if (n.ID == 0) return b;
 		if (!n.OUT) {
-			if constexpr (!o.has_inv_in()) return V[n.ID];
-			if(leaf(n)) return V[n.ID];
-			const bdd_node_t &t = std::get<bdd_node_t>(V[n.ID]);
-			return !n.IN ? V[n.ID] : bdd(t.v, t.l, t.h);
+			if constexpr (!o.has_inv_in()) return b;
+			if(leaf(n)) return b;
+			const auto &t = std::get<bdd_node_t>(b);
+			return !n.IN ? b : bdd(t.v, t.l, t.h);
 		}
-		if (leaf(n)) return bdd(~std::get<B>(V[n.ID]));
-		const bdd_node_t& t = std::get<bdd_node_t>(V[n.ID]);
+		if (leaf(n)) return bdd(~std::get<B>(b));
+		const auto& t = std::get<bdd_node_t>(b);
 		return !n.IN ? bdd(t.v, bdd_ref::flip_out(t.h), bdd_ref::flip_out(t.l)) :
 				bdd(t.v, bdd_ref::flip_out(t.l), bdd_ref::flip_out(t.h));
 	}
