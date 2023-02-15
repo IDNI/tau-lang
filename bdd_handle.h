@@ -15,43 +15,43 @@
 #include "babdd.h"
 
 template<typename B, auto o> struct bdd_handle;
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 using hbdd = sp<bdd_handle<B, o>>;
 
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 bool operator==(const hbdd<B, o>& x, bool b) {
 	return b ? x->is_one() : x->is_zero();
 }
 
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator&(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 	return (*x) & y;
 }
 
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator|(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 	return (*x) | y;
 }
 
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator+(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 	return (y & ~x) | (x & ~y);
 }
 
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 
 #ifdef DEBUG
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 bool operator==(const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	assert((&*x == &*y) == (x->b == y->b));
 	return x->b == y->b;
 }
 #endif
 
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 struct bdd_handle {
-	using bdd_ref = bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>;
+	using bdd_ref = bdd_reference<o.has_varshift(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef unordered_map<bdd_node_t, shared_ptr<bdd_handle>> mn_type;
 	typedef map<B, std::shared_ptr<bdd_handle>> mb_type;
@@ -258,8 +258,8 @@ template<typename B> B get_one() requires is_sp<B> {
 	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(bdd<B, o>::get(1));
 }*/
 
-template<typename B, auto o = bdd_options()> void bdd_init() {
-	using bdd_ref = bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>;
+template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
+	using bdd_ref = bdd_reference<o.has_varshift(), o.idW, o.shiftW>;
 
 	if (!bdd<B, o>::V.empty()) return;
 #ifdef DEBUG

@@ -18,6 +18,7 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <array>
 #include <variant>
 #include <cstdint>
 #include <cassert>
@@ -48,40 +49,35 @@ inline size_t fpairing(size_t x, size_t y) {
 enum bdd_params { INV_IN = (1u << 0), INV_OUT = (1u << 1), VARSHIFT = (1u << 2) };
 
 /* Options for bdd instantiation. The class handles dependencies and restrictions
- * between parameters
+ * between parameters. Create by static functions bdd_options::create.
  */
 template<uint8_t params = INV_IN | INV_OUT | VARSHIFT>
-struct bdd_options {
-	uint8_t ID_WIDTH = 18;
-	uint8_t SHIFT_WIDTH = 12;
+class bdd_options {
+	constexpr bdd_options(auto idWidth, auto shiftWidth) :
+		idW(idWidth), shiftW(shiftWidth) {}
 
-	constexpr bdd_options() {
-		if constexpr (!(params & VARSHIFT)) {
-			SHIFT_WIDTH = 0;
-			ID_WIDTH = 30;
-		}
-	}
-	constexpr bdd_options(auto ID_WIDTH_) {
-		if constexpr (!(params & VARSHIFT)) {
-			DBG(assert(ID_WIDTH_ <= 62));
-			SHIFT_WIDTH = 0;
-			ID_WIDTH = ID_WIDTH_;
+public:
+	// bit width for id and shift
+	const uint8_t idW;
+	const uint8_t shiftW;
+
+	constexpr static bdd_options
+	create(const auto idWidth, const auto shiftWidth) {
+		if constexpr (params & VARSHIFT) {
+			DBG(assert(idWidth + shiftWidth <= 62));
+			return bdd_options(idWidth, shiftWidth);
 		} else {
-			DBG(assert(ID_WIDTH_ < 30));
-			SHIFT_WIDTH = 30 - ID_WIDTH_;
-			ID_WIDTH = ID_WIDTH_;
+			DBG(assert(idWidth <= 62));
+			return bdd_options(idWidth, 0);
 		}
 	}
-	constexpr bdd_options(auto ID_WIDTH_, auto SHIFT_WIDTH_) {
-		DBG(assert(ID_WIDTH_ <= 62));
-		if constexpr (!(params & VARSHIFT)) {
-			SHIFT_WIDTH = 0;
-			ID_WIDTH = ID_WIDTH_;
-		} else {
-			SHIFT_WIDTH = SHIFT_WIDTH_;
-			ID_WIDTH = ID_WIDTH_;
-		}
+
+	constexpr static bdd_options create() {
+		if constexpr (params & VARSHIFT)
+			return bdd_options(18, 12);
+		else return bdd_options(30, 0);
 	}
+
 	constexpr bool has_varshift() const {
 		return params & static_cast<uint8_t>(VARSHIFT);
 	}
@@ -98,44 +94,42 @@ template<bool SHIFTED, int_t ID_WIDTH, int_t SHIFT_WIDTH>
 struct bdd_reference {
 	typedef std::conditional<ID_WIDTH + SHIFT_WIDTH <= 30,
 					uint32_t, uint64_t>::type ref_type;
-	ref_type IN: 1 = 0;
-	ref_type OUT: 1 = 0;
-	ref_type SHIFT: SHIFT_WIDTH = 0;
-	ref_type ID: ID_WIDTH = 0;
+	ref_type in: 1 = 0;
+	ref_type out: 1 = 0;
+	ref_type shift: SHIFT_WIDTH = 0;
+	ref_type id: ID_WIDTH = 0;
 
 	bdd_reference() = default;
-	bdd_reference(auto in, auto out, auto id) : IN(in), OUT(out), ID(id) {}
-	bdd_reference(auto in, auto out, auto shift, auto id) : IN(in), OUT(out),
-							  SHIFT(shift),
-							  ID(id) {}
+	bdd_reference(auto in, auto out, auto id) : in(in), out(out), id(id) {}
+	bdd_reference(auto in, auto out, auto shift, auto id) : in(in), out(out),
+								shift(shift),
+								id(id) {}
 
 	bool operator==(const bdd_reference x) const {
-		return IN == x.IN && OUT == x.OUT && SHIFT == x.SHIFT &&
-		       ID == x.ID;
+		return in == x.in && out == x.out && shift == x.shift &&
+		       id == x.id;
 	}
 
 	static bdd_reference flip_in(const bdd_reference x) {
-		return x.IN == 1 ? bdd_reference(0, x.OUT, x.SHIFT, x.ID) :
-		       bdd_reference(1, x.OUT, x.SHIFT, x.ID);
+		return bdd_reference(x.in ? 0 : 1, x.out, x.shift, x.id);
 	}
 
 	static bdd_reference flip_out(const bdd_reference x) {
-		return x.OUT == 1 ? bdd_reference(x.IN, 0, x.SHIFT, x.ID) :
-		       bdd_reference(x.IN, 1, x.SHIFT, x.ID);
+		return bdd_reference(x.in, x.out == 1 ? 0 : 1, x.shift, x.id);
 	}
 
 	static bdd_reference to_shift_node(const bdd_reference x, uint_t v) {
-		if(x.SHIFT == 0) return x;
-		else return bdd_reference(x.IN, x.OUT, x.SHIFT - v, x.ID);
+		if(x.shift == 0) return x;
+		else return bdd_reference(x.in, x.out, x.shift - (v - 1), x.id);
 	}
 
 	static bdd_reference to_bdd_node(const bdd_reference x, uint_t v) {
-		if(x.SHIFT == 0) return x;
-		else return bdd_reference(x.IN, x.OUT, x.SHIFT + v, x.ID);
+		if(x.shift == 0) return x;
+		else return bdd_reference(x.in, x.out, x.shift + (v - 1), x.id);
 	}
 
 	static size_t hash(const bdd_reference x) {
-		return (x.ID + x.IN) ^ (x.SHIFT + x.OUT);
+		return (x.id + x.in) ^ (x.shift + x.out);
 	}
 };
 
@@ -143,29 +137,27 @@ template<int_t ID_WIDTH, int_t SHIFT_WIDTH>
 struct bdd_reference<false, ID_WIDTH, SHIFT_WIDTH> {
 	typedef std::conditional<ID_WIDTH <= 30,
 					uint32_t, uint64_t>::type ref_type;
-	ref_type IN: 1 = 0;
-	ref_type OUT: 1 = 0;
-	ref_type ID: ID_WIDTH = 0;
+	ref_type in: 1 = 0;
+	ref_type out: 1 = 0;
+	ref_type id: ID_WIDTH = 0;
 
 	bdd_reference() = default;
-	bdd_reference(auto in, auto out, auto id) : IN(in), OUT(out), ID(id) {}
+	bdd_reference(auto in, auto out, auto id) : in(in), out(out), id(id) {}
 
 	bool operator==(const bdd_reference x) const {
-		return IN == x.IN && OUT == x.OUT && ID == x.ID;
+		return in == x.in && out == x.out && id == x.id;
 	}
 
 	static bdd_reference flip_in(const bdd_reference x) {
-		return x.IN == 1 ? bdd_ref(0, x.OUT, x.ID) :
-		       bdd_ref(1, x.OUT, x.ID);
+		return bdd_ref(x.in == 1 ? 0 : 1, x.out, x.id);
 	}
 
 	static bdd_reference flip_out(const bdd_reference x) {
-		return x.OUT == 1 ? bdd_reference(x.IN, 0, x.ID) :
-		       bdd_reference(x.IN, 1, x.ID);
+		return bdd_reference(x.in, x.out == 1 ? 0 : 1, x.id);
 	}
 
 	static size_t hash(const bdd_reference x) {
-		return (x.ID + x.IN) ^ x.OUT;
+		return (x.id + x.in) ^ x.out;
 	}
 };
 
@@ -206,12 +198,35 @@ struct std::hash<node_skeleton<R>> {
 	size_t operator()(auto& n) const { return n.hash; }
 };
 
+template<bool S, int_t IW, int_t SW>
+struct std::hash<std::array<bdd_reference<S, IW, SW>, 2>> {
+	size_t operator()(const auto& a) const {
+		return hash_upair((bdd_reference<S, IW, SW>::hash(a[0])),
+				  (bdd_reference<S, IW, SW>::hash(a[1])));
+	}
+};
+
+template<bool S, int_t IW, int_t SW>
+struct std::hash<bdd_reference<S, IW, SW>> {
+	size_t operator()(const auto& a) const {
+		return bdd_reference<S, IW, SW>::hash(a);
+	}
+};
+
+template<bool S, int_t IW, int_t SW>
+struct std::hash<pair<bdd_reference<S, IW, SW>, uint_t>> {
+	size_t operator()(const auto& p) const {
+		return hash_upair((hash<bdd_reference<S, IW, SW>>{}(p.first)),
+				  p.second);
+	}
+};
+
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
-template<typename B, auto o = bdd_options()>
-struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>>, B> {
-	using bdd_ref = bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIFT_WIDTH>;
+template<typename B, auto o = bdd_options<>::create()>
+struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>, B> {
+	using bdd_ref = bdd_reference<o.has_varshift(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
 	typedef variant<bdd_node_t, B> base;
 
@@ -229,7 +244,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 	//bdd(const B& b) : base(b) {}
 
 	bool leaf() const { return holds_alternative<B>(*this); }
-	static bool leaf(bdd_ref n) { return holds_alternative<B>(V[n.ID]); }
+	static bool leaf(bdd_ref n) { return holds_alternative<B>(V[n.id]); }
 
 	struct initializer { initializer(); };
 
@@ -241,6 +256,84 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 	inline static map<B, size_t> Mb;
 	inline static bdd_ref T, F;
 	inline static initializer I;
+
+	// Caches for bdd operations
+	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
+	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
+	inline static unordered_map<bdd_ref, bdd_ref> not_memo;
+	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
+	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
+
+	static bool check_cache(bdd_ref& x, const auto& cache) {
+		if constexpr (o.has_varshift()) {
+			if (auto it = cache.find(bdd_ref::to_shift_node(x, x.shift));
+				it != cache.end()){
+				x = bdd_ref::to_bdd_node(it->second, x.shift);
+				return true;
+			} else return false;
+		} else {
+			if (auto it = cache.find(x); it != cache.end())
+				return x = it->second, true;
+			else return false;
+		}
+	}
+
+	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
+		if constexpr (o.has_varshift()) {
+			auto d = min(x.shift, y.shift);
+			if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
+						  bdd_ref::to_shift_node(y, d)});
+				it != cache.end()) {
+				x = bdd_ref::to_bdd_node(it->second, d);
+				return true;
+			} else return false;
+		} else {
+			if (auto it = cache.find({x,y}); it != cache.end())
+				return x = it->second, true;
+			else return false;
+		}
+	}
+
+	static bool check_cache(bdd_ref& x, uint_t v, const auto& cache){
+		if constexpr (o.has_varshift()) {
+			if (auto it = cache.find(
+					{bdd_ref::to_shift_node(x, x.shift),
+					 v - (x.shift - 1)}); it != cache.end()) {
+				x = bdd_ref::to_bdd_node(it->second, x.shift);
+				return true;
+			} else return false;
+		} else {
+			if (auto it = cache.find({x,v}); it != cache.end())
+				return x = it->second, true;
+			else return false;
+		}
+	}
+
+	static void update_cache(bdd_ref x, bdd_ref r, auto& cache) {
+		if constexpr (o.has_varshift()) {
+			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
+				      bdd_ref::to_shift_node(r, x.shift));
+		} else cache.emplace(move(x), move(r));
+	}
+
+	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
+		if constexpr (o.has_varshift()) {
+			cache.emplace(std::pair<bdd_ref, uint_t>{
+					      bdd_ref::to_shift_node(x, x.shift),
+					      v - (x.shift - 1)},
+				      bdd_ref::to_shift_node(r, x.shift));
+		} else cache.emplace(std::pair<bdd_ref, uint_t>{move(x), v}, move(r));
+	}
+
+	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
+		if constexpr (o.has_varshift()) {
+			auto d = min(x.shift, y.shift);
+			cache.emplace(std::array<bdd_ref, 2>{
+					      bdd_ref::to_shift_node(x, d),
+					      bdd_ref::to_shift_node(y, d)},
+				      bdd_ref::to_shift_node(r, d));
+		} else cache.emplace(std::array<bdd_ref,2>{move(x),move(y)},move(r));
+	}
 
 	static bdd_ref add(const bdd_node_t& n) { return add(n.v, n.h, n.l); }
 
@@ -256,35 +349,39 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 #endif
 		bool in = false, out = false;
         	if constexpr (o.has_inv_in())
-			if(h.ID < l.ID)
+			if(h.id < l.id)
 				swap(h, l), in = true;
 		if constexpr (o.has_inv_out())
-			if (l.OUT) {
+			if (l.out) {
 				h = bdd_ref::flip_out(h);
 				l = bdd_ref::flip_out(l);
 				out = true;
 			}
-		if constexpr (o.has_varshift()){
-			h = bdd_ref::to_shift_node(h, v);
-			l = bdd_ref::to_shift_node(l, v);
-			node_skeleton<bdd_ref> n(h, l);
-			if (auto it = Mn.find(n); it != Mn.end())
-				return bdd_ref(in, out, v, it->second);
-			Mn.emplace(n, V.size());
-			V.emplace_back(n);
-			return bdd_ref(in, out, v, V.size()-1);
-		} else {
-			bdd_node_t n(v, h, l);
-			if (auto it = Mn.find(n); it != Mn.end())
-				return bdd_ref(in, out, it->second);
-			Mn.emplace(n, V.size());
-			V.emplace_back(n);
-			return bdd_ref(in, out, V.size() - 1);
-		}
+		if constexpr (o.has_varshift()) return add_with_shift(v, h, l, in, out);
+		else return add_without_shift(v, h, l, in, out);
 	}
 
-	static bdd_ref bit(int_t v) {
-		return v > 0 ? add(v, T, F) : add(-v, F, T);
+	static bdd_ref
+	add_without_shift(uint_t v, const bdd_ref &h, const bdd_ref &l, bool in,
+			  bool out) {
+		bdd_node_t n(v, h, l);
+		if (auto it = Mn.find(n); it != Mn.end())
+			return bdd_ref(in, out, it->second);
+		Mn.emplace(n, V.size());
+		V.emplace_back(n);
+		return bdd_ref(in, out, V.size() - 1);
+	}
+
+	static bdd_ref
+	add_with_shift(uint_t v, bdd_ref &h, bdd_ref &l, bool in, bool out) {
+		h = bdd_ref::to_shift_node(h, v);
+		l = bdd_ref::to_shift_node(l, v);
+		node_skeleton<bdd_ref> n(h, l);
+		if (auto it = Mn.find(n); it != Mn.end())
+			return bdd_ref(in, out, v, it->second);
+		Mn.emplace(n, V.size());
+		V.emplace_back(n);
+		return bdd_ref(in, out, v, V.size() - 1);
 	}
 
 	static bdd_ref add(const B& b) {
@@ -301,52 +398,59 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 	static bdd get(bdd_ref n) {
 		constexpr auto get_bdd_node = [](const bdd_ref n) {
 			if constexpr (o.has_varshift()) {
-				const bdd_skeleton& s = V[n.ID];
+				const bdd_skeleton& s = V[n.id];
 				if(s.leaf()) return bdd(std::get<B>(s));
 				const auto& x = std::get<node_skeleton<bdd_ref>>(s);
-				return bdd(n.SHIFT, bdd_ref::to_bdd_node(x.h, n.SHIFT),
-					   	bdd_ref::to_bdd_node(x.l, n.SHIFT));
-			} else {
-				return V[n.ID];
-			}
+				return bdd(n.shift, bdd_ref::to_bdd_node(x.h, n.shift),
+					   bdd_ref::to_bdd_node(x.l, n.shift));
+			} else return V[n.id];
 		};
 #ifdef DEBUG
-		if constexpr (!o.has_inv_out()) assert(!n.OUT);
-		if constexpr (!o.has_inv_in()) assert(!n.IN);
+		if constexpr (!o.has_inv_out()) assert(!n.out);
+		if constexpr (!o.has_inv_in()) assert(!n.in);
 #endif
 		const auto& b = get_bdd_node(n);
 		if constexpr (!o.has_inv_out())
-			if (n.ID == 0) return b;
-		if (!n.OUT) {
+			if (n.id == 0) return b;
+		if (!n.out) {
 			if constexpr (!o.has_inv_in()) return b;
 			if(leaf(n)) return b;
 			const auto &t = std::get<bdd_node_t>(b);
-			return !n.IN ? b : bdd(t.v, t.l, t.h);
+			return !n.in ? b : bdd(t.v, t.l, t.h);
 		}
 		if (leaf(n)) return bdd(~std::get<B>(b));
 		const auto& t = std::get<bdd_node_t>(b);
-		return !n.IN ? bdd(t.v, bdd_ref::flip_out(t.h), bdd_ref::flip_out(t.l)) :
-				bdd(t.v, bdd_ref::flip_out(t.l), bdd_ref::flip_out(t.h));
+		return !n.in ? bdd(t.v, bdd_ref::flip_out(t.h), bdd_ref::flip_out(t.l)) :
+		       bdd(t.v, bdd_ref::flip_out(t.l), bdd_ref::flip_out(t.h));
 	}
 
 	static B get_elem(bdd_ref x) { return std::get<B>(get(x)); }
 	static bdd_node_t get_node(bdd_ref x) { return std::get<bdd_node_t>(get(x)); }
 
+	static bdd_ref bit(int_t v) {
+		return v > 0 ? add(v, T, F) : add(-v, F, T);
+	}
+
 	static bdd_ref bdd_not(bdd_ref x) {
 		if constexpr (o.has_inv_out()) return bdd_ref::flip_out(x);
 		if (x == T) return F;
 		if (x == F) return T;
+		if (check_cache(x, not_memo)) return x;
+
 		const bdd& xx = get(x);
 		if(xx.leaf()) {
-			return add(~std::get<B>(xx));
+			auto r = add(~std::get<B>(xx));
+			return update_cache(x, r, not_memo), r;
 		}
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		return add(nx.v, bdd_not(nx.h), bdd_not(nx.l));
+		auto r = add(nx.v, bdd_not(nx.h), bdd_not(nx.l));
+		return update_cache(x, r, not_memo), r;
 	}
 
 	static bdd_ref bdd_and(bdd_ref x, const B& b) {
 		if (x == T) return add(b);
 		if (x == F) return F;
+		if (check_cache(x, add(b), and_memo)) return x;
 		const bdd& xx = get(x);
 		if (xx.leaf()) {
 //#ifdef DEBUG
@@ -361,30 +465,34 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 #ifdef DEBUG
 		if (b == true) assert(y == x);
 #endif
-		return y;
+		return update_cache(x, add(b), y, and_memo), y;
 	}
 
 	static bdd_ref bdd_and(bdd_ref x, bdd_ref y) {
 		if (x == F || y == F) return F;
 		if (x == T) return y;
 		if (y == T) return x;
+		if (check_cache(x, y, and_memo)) return x;
 		const bdd &xx = get(x), &yy = get(y);
 		if (xx.leaf()) return bdd_and(y, std::get<B>(xx));
 		if (yy.leaf()) return bdd_and(x, std::get<B>(yy));
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
 		const bdd_node_t &ny = std::get<bdd_node_t>(yy);
+		bdd_ref r;
 		if (nx.v == ny.v)
-			return	add(nx.v,
+			r =	add(nx.v,
 				bdd_and(nx.h, ny.h),
 				bdd_and(nx.l, ny.l));
-		if (nx.v < ny.v)
-			return add(nx.v, bdd_and(nx.h, y), bdd_and(nx.l, y));
-		return add(ny.v, bdd_and(ny.h, x), bdd_and(ny.l, x));
+		else if (nx.v < ny.v)
+			r = add(nx.v, bdd_and(nx.h, y), bdd_and(nx.l, y));
+		else r = add(ny.v, bdd_and(ny.h, x), bdd_and(ny.l, x));
+		return update_cache(x, y, r, and_memo), r;
 	}
 
 	static bdd_ref bdd_or(bdd_ref x, const B& b) {
 		if (x == T) return T;
 		if (x == F) return add(b);
+		if (check_cache(x, add(b), or_memo)) return x;
 		const bdd& xx = get(x);
 		if (xx.leaf()) {
 			return add(b | std::get<B>(xx));
@@ -394,43 +502,54 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.ID_WIDTH, o.SHIF
 #ifdef DEBUG
 		if (b == true) assert(y == T);
 #endif
-		return y;
+		return update_cache(x, add(b), y, or_memo), y;
 	}
 
 	static bdd_ref bdd_or(bdd_ref x, bdd_ref y){
 		if (x == T || y == T) return T;
 		if (x == F) return y;
 		if (y == F) return x;
+		if (check_cache(x, y, or_memo)) return x;
 		const bdd &xx = get(x), &yy = get(y);
 		if (xx.leaf()) return bdd_or(y, std::get<B>(xx));
 		if (yy.leaf()) return bdd_or(x, std::get<B>(yy));
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
 		const bdd_node_t &ny = std::get<bdd_node_t>(yy);
+		bdd_ref r;
 		if (nx.v == ny.v)
-			return	add(nx.v,
-					  bdd_or(nx.h, ny.h),
-					  bdd_or(nx.l, ny.l));
-		if (nx.v < ny.v)
-			return add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
-		return add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
+			r =	add(nx.v,
+				       bdd_or(nx.h, ny.h),
+				       bdd_or(nx.l, ny.l));
+		else if (nx.v < ny.v)
+			r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
+		else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
+		return update_cache(x, y, r, or_memo), r;
 	}
 
 	static bdd_ref ex(bdd_ref x, uint_t v) {
+		if (check_cache(x, v, ex_memo)) return x;
 		const bdd &xx = get(x);
 		if (xx.leaf()) return x;
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		if (nx.v < v) return add(nx.v, ex(nx.h, v), ex(nx.l, v));
-		if (nx.v > v) return x;
-		return bdd_or(nx.h, nx.l);
+		bdd_ref r;
+		if (nx.v < v) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
+		else if (nx.v > v) r = x;
+		else r = bdd_or(nx.h, nx.l);
+		update_cache(x, v, r, ex_memo);
+		return r;
 	}
 
 	static bdd_ref all(bdd_ref x, uint_t v) {
+		if (check_cache(x, v, all_memo)) return x;
 		const bdd &xx = get(x);
 		if (xx.leaf()) return x;
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		if (nx.v < v) return add(nx.v, all(nx.h, v), all(nx.l, v));
-		if (nx.v > v) return x;
-		return bdd_and(nx.h, nx.l);
+		bdd_ref r;
+		if (nx.v < v) r = add(nx.v, all(nx.h, v), all(nx.l, v));
+		else if (nx.v > v) r = x;
+		else r = bdd_and(nx.h, nx.l);
+		update_cache(x, v, r, all_memo);
+		return r;
 	}
 
 	static B get_uelim(bdd_ref x) {
