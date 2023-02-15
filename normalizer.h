@@ -45,7 +45,7 @@ struct normalizer<tuple<BDDs...>, aux...> {
 		return r;
 	}
 
-	template<typename B, auto o = bdd_options()>
+	template<typename B, auto o = bdd_options<>::create()>
 	static msba_t normalize( const set<hbdd<B, o>>& pos,
 		const set<hbdd<B, o>>& neg) {
 		for (auto x : pos)

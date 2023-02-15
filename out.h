@@ -21,7 +21,7 @@
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
 
-template<typename B, auto o = bdd_options()>
+template<typename B, auto o = bdd_options<>::create()>
 ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
 	if (f == bdd_handle<B, o>::htrue) return os << '1';
 	if (f == bdd_handle<B, o>::hfalse) return os << '0';
