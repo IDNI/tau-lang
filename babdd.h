@@ -46,12 +46,17 @@ inline size_t fpairing(size_t x, size_t y) {
  * - use of output inverters
  * - use of variable shifters
  */
-enum bdd_params { INV_IN = (1u << 0), INV_OUT = (1u << 1), VARSHIFT = (1u << 2) };
+enum bdd_params {
+	INV_IN = (1u << 0),
+	INV_OUT = (1u << 1),
+	VARSHIFT = (1u << 2),
+	INV_ORDER = (1u << 3)
+};
 
 /* Options for bdd instantiation. The class handles dependencies and restrictions
  * between parameters. Create by static functions bdd_options::create.
  */
-template<uint8_t params = INV_IN | INV_OUT | VARSHIFT>
+template<uint8_t params = INV_IN | INV_OUT | VARSHIFT | INV_ORDER>
 class bdd_options {
 	constexpr bdd_options(auto idWidth, auto shiftWidth) :
 		idW(idWidth), shiftW(shiftWidth) {}
@@ -86,6 +91,9 @@ public:
 	}
 	constexpr bool has_inv_out() const {
 		return params & static_cast<uint8_t>(INV_OUT);
+	}
+	constexpr bool has_inv_order() const {
+		return params & static_cast<uint8_t>(INV_ORDER);
 	}
 };
 
@@ -245,6 +253,10 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 
 	bool leaf() const { return holds_alternative<B>(*this); }
 	static bool leaf(bdd_ref n) { return holds_alternative<B>(V[n.id]); }
+	static bool var_cmp (int_t vl, int_t vr) {
+		if constexpr (o.has_inv_order()) return vl < vr;
+		else return vl > vr;
+	}
 
 	struct initializer { initializer(); };
 
@@ -357,7 +369,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 		if (!p.leaf() && !q.leaf()) {
 			const auto x = std::get<bdd_node_t>(p);
 			const auto y = std::get<bdd_node_t>(q);
-			if constexpr (!o.has_inv_in()) assert((x.v > v) && (y.v > v));
+			if constexpr (!o.has_inv_in()) assert(var_cmp(v, x.v)) && (var_cmp(v, y.v));
 		}
 #endif
 		bool in = false, out = false;
@@ -498,7 +510,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 			r =	add(nx.v,
 				bdd_and(nx.h, ny.h),
 				bdd_and(nx.l, ny.l));
-		else if (nx.v < ny.v)
+		else if (var_cmp(nx.v, ny.v))
 			r = add(nx.v, bdd_and(nx.h, y), bdd_and(nx.l, y));
 		else r = add(ny.v, bdd_and(ny.h, x), bdd_and(ny.l, x));
 		return update_cache(x, y, r, and_memo), r;
@@ -540,7 +552,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 			r =	add(nx.v,
 				       bdd_or(nx.h, ny.h),
 				       bdd_or(nx.l, ny.l));
-		else if (nx.v < ny.v)
+		else if (var_cmp(nx.v, ny.v))
 			r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
 		else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
 		return update_cache(x, y, r, or_memo), r;
@@ -552,8 +564,8 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 		if (xx.leaf()) return x;
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
 		bdd_ref r;
-		if (nx.v < v) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
-		else if (nx.v > v) r = x;
+		if (var_cmp(nx.v, v)) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
+		else if (var_cmp(v, nx.v)) r = x;
 		else r = bdd_or(nx.h, nx.l);
 		update_cache(x, v, r, ex_memo);
 		return r;
@@ -565,8 +577,8 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 		if (xx.leaf()) return x;
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
 		bdd_ref r;
-		if (nx.v < v) r = add(nx.v, all(nx.h, v), all(nx.l, v));
-		else if (nx.v > v) r = x;
+		if (var_cmp(nx.v, v)) r = add(nx.v, all(nx.h, v), all(nx.l, v));
+		else if (var_cmp(v, nx.v)) r = x;
 		else r = bdd_and(nx.h, nx.l);
 		update_cache(x, v, r, all_memo);
 		return r;
@@ -592,8 +604,8 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 		const bdd &xx = get(x);
 		if (xx.leaf()) return x;
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		if (nx.v < v) return add(nx.v, sub0(nx.h, v), sub0(nx.l, v));
-		if (nx.v > v) return x;
+		if (var_cmp(nx.v, v)) return add(nx.v, sub0(nx.h, v), sub0(nx.l, v));
+		if (var_cmp(v, nx.v)) return x;
 		return nx.l;
 	
 	}
@@ -602,8 +614,8 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 		const bdd &xx = get(x);
 		if (xx.leaf()) return x;
 		const bdd_node_t &nx = std::get<bdd_node_t>(xx);
-		if (nx.v < v) return add(nx.v, sub1(nx.h, v), sub1(nx.l, v));
-		if (nx.v > v) return x;
+		if (var_cmp(nx.v, v)) return add(nx.v, sub1(nx.h, v), sub1(nx.l, v));
+		if (var_cmp(v, nx.v)) return x;
 		return nx.h;
 	}
 
@@ -725,6 +737,11 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 		else return x.id < 2;
 	}
 
+	static bool var_cmp (int_t vl, int_t vr) {
+		if constexpr (o.has_inv_order()) return vl < vr;
+		else return vl > vr;
+	}
+
 	// Caches for bdd operations
 	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
 	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
@@ -822,7 +839,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 		if (h == l) return h;
 #ifdef DEBUG
 		if(!leaf(l) && !leaf(h))
-			assert((get(l).v > v) && (get(h).v > v));
+			assert(var_cmp(v, get(l).v) && var_cmp(v, get(h).v));
 #endif
 		bool in = false, out = false;
 		if constexpr (o.has_inv_in())
@@ -909,7 +926,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 			r =	add(nx.v,
 				       bdd_and(nx.h, ny.h),
 				       bdd_and(nx.l, ny.l));
-		else if (nx.v < ny.v)
+		else if (var_cmp(nx.v, ny.v))
 			r = add(nx.v, bdd_and(nx.h, y), bdd_and(nx.l, y));
 		else r = add(ny.v, bdd_and(ny.h, x), bdd_and(ny.l, x));
 		return update_cache(x, y, r, and_memo), r;
@@ -931,7 +948,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 			r =	add(nx.v,
 				       bdd_or(nx.h, ny.h),
 				       bdd_or(nx.l, ny.l));
-		else if (nx.v < ny.v)
+		else if (var_cmp(nx.v, ny.v))
 			r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
 		else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
 		return update_cache(x, y, r, or_memo), r;
@@ -944,8 +961,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 		const bdd &nx = get(x);
 		if (leaf(nx)) return x;
 		bdd_ref r;
-		if (nx.v < v) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
-		else if (nx.v > v) r = x;
+		if (var_cmp(nx.v, v)) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
+		else if (var_cmp(v, nx.v)) r = x;
 		else r = bdd_or(nx.h, nx.l);
 		update_cache(x, v, r, ex_memo);
 		return r;
@@ -956,8 +973,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 		const bdd &nx = get(x);
 		if (leaf(nx)) return x;
 		bdd_ref r;
-		if (nx.v < v) r = add(nx.v, all(nx.h, v), all(nx.l, v));
-		else if (nx.v > v) r = x;
+		if (var_cmp(nx.v, v)) r = add(nx.v, all(nx.h, v), all(nx.l, v));
+		else if (var_cmp(v, nx.v)) r = x;
 		else r = bdd_and(nx.h, nx.l);
 		update_cache(x, v, r, all_memo);
 		return r;
@@ -984,16 +1001,16 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 	static bdd_ref sub0(bdd_ref x, uint_t v) {
 		if (leaf(x)) return x;
 		const bdd &nx = get(x);
-		if (nx.v < v) return add(nx.v, sub0(nx.h, v), sub0(nx.l, v));
-		if (nx.v > v) return x;
+		if (var_cmp(nx.v, v)) return add(nx.v, sub0(nx.h, v), sub0(nx.l, v));
+		if (var_cmp(v, nx.v)) return x;
 		return nx.l;
 	}
 
 	static bdd_ref sub1(bdd_ref x, uint_t v) {
 		if (leaf(x)) return x;
 		const bdd &nx = get(x);
-		if (nx.v < v) return add(nx.v, sub1(nx.h, v), sub1(nx.l, v));
-		if (nx.v > v) return x;
+		if (var_cmp(nx.v, v)) return add(nx.v, sub1(nx.h, v), sub1(nx.l, v));
+		if (var_cmp(v, nx.v)) return x;
 		return nx.h;
 	}
 
