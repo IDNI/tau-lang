@@ -224,7 +224,7 @@ struct std::hash<pair<bdd_reference<S, IW, SW>, uint_t>> {
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
-template<typename B, auto o = bdd_options<>::create()>
+template<typename B, bdd_options o = bdd_options<>::create()>
 struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>, B> {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
@@ -333,6 +333,19 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 					      bdd_ref::to_shift_node(y, d)},
 				      bdd_ref::to_shift_node(r, d));
 		} else cache.emplace(std::array<bdd_ref,2>{move(x),move(y)},move(r));
+	}
+
+	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
+		if constexpr (o.has_varshift())
+			if (x.id == y.id && x.shift > y.shift) swap(x, y);
+		if(x.id > y.id) swap(x,y);
+	}
+
+	// Fast check if output inverters are enabled
+	static bool negation_of(bdd_ref x, bdd_ref y) {
+		if constexpr (o.has_inv_out()) {
+			return bdd_ref::flip_out(x) == y;
+		} else return false;
 	}
 
 	static bdd_ref add(const bdd_node_t& n) { return add(n.v, n.h, n.l); }
@@ -472,6 +485,8 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 		if (x == F || y == F) return F;
 		if (x == T) return y;
 		if (y == T) return x;
+		if (negation_of(x, y)) return F;
+		mk_order_canonical(x,y);
 		if (check_cache(x, y, and_memo)) return x;
 		const bdd &xx = get(x), &yy = get(y);
 		if (xx.leaf()) return bdd_and(y, std::get<B>(xx));
@@ -506,9 +521,14 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 	}
 
 	static bdd_ref bdd_or(bdd_ref x, bdd_ref y){
+		if constexpr (o.has_inv_out())
+			return bdd_ref::flip_out(
+				bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
 		if (x == T || y == T) return T;
 		if (x == F) return y;
 		if (y == F) return x;
+		if (negation_of(x, y)) return T;
+		mk_order_canonical(x,y);
 		if (check_cache(x, y, or_memo)) return x;
 		const bdd &xx = get(x), &yy = get(y);
 		if (xx.leaf()) return bdd_or(y, std::get<B>(xx));
@@ -667,7 +687,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>,
 	}
 };
 
-template<typename B, auto o>
+template<typename B, bdd_options o>
 void bdd<B, o>::get_one_zero(bdd_ref x, map<int_t, B>& m) {
 	assert(!leaf(x));
 	const bdd_node_t& n = get_node(x);
@@ -675,22 +695,392 @@ void bdd<B, o>::get_one_zero(bdd_ref x, map<int_t, B>& m) {
 	else if (n.h == F) m.clear(), m.emplace(n.v, B::one());
 	else if (!leaf(n.l))
 		get_one_zero(bdd_and(n.l, n.h), m),
-		m.empalce(n.v, get_elem(eval(n.l, m)));
+			m.empalce(n.v, get_elem(eval(n.l, m)));
 	else if (leaf(n.h)) m.emplace(n.v, get_elem(n.l));
 	else	get_one_zero(bdd_and(n.h, get_elem(n.l)), m),
-		m.emplace(n.v, compose(bdd_not(n.h), m));
+			m.emplace(n.v, compose(bdd_not(n.h), m));
 	DBG(assert(compose(x, m) == false);)
 }
 
-template<> void bdd<Bool>::get_one_zero(bdd_ref x, map<int_t, Bool>& m) {
-	DBG(assert(x != T);)
-	m.clear();
-	while (!leaf(x)) {
-		const bdd_node_t& n = get_node(x);
-		if (n.h == F) { m.emplace(n.v, true); return; }
-		m.emplace(n.v, false);
-		if ((x = n.l) == F) return;
+// Specialization for Bool of BDD library
+
+template<bdd_options o>
+struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>> {
+	using bdd_ref = bdd_reference<o.has_varshift(), o.idW, o.shiftW>;
+	typedef bdd_node<bdd_ref> bdd_node_t;
+
+	bdd(uint_t v, bdd_ref h, bdd_ref l) : bdd_node_t(v, h, l) {}
+	struct initializer { initializer(); };
+
+	inline static std::conditional<o.has_varshift(),
+		vector<node_skeleton<bdd_ref>>, vector<bdd>>::type V;
+	inline static std::conditional<o.has_varshift(),
+		unordered_map<node_skeleton<bdd_ref>, size_t>,
+		unordered_map<bdd_node_t, size_t>>::type Mn;
+	inline static bdd_ref T, F;
+	inline static initializer I;
+
+	static bool leaf (bdd_ref x) {
+		if constexpr (o.has_inv_out()) return x.id == 0;
+		else return x.id < 2;
 	}
-	throw 0;
-}
+
+	// Caches for bdd operations
+	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
+	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
+	inline static unordered_map<bdd_ref, bdd_ref> not_memo;
+	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
+	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
+
+	static bool check_cache(bdd_ref& x, const auto& cache) {
+		if constexpr (o.has_varshift()) {
+			if (auto it = cache.find(bdd_ref::to_shift_node(x, x.shift));
+				it != cache.end()){
+				x = bdd_ref::to_bdd_node(it->second, x.shift);
+				return true;
+			} else return false;
+		} else {
+			if (auto it = cache.find(x); it != cache.end())
+				return x = it->second, true;
+			else return false;
+		}
+	}
+
+	static bool check_cache(bdd_ref& x, bdd_ref y, const auto& cache) {
+		if constexpr (o.has_varshift()) {
+			auto d = min(x.shift, y.shift);
+			if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
+						  bdd_ref::to_shift_node(y, d)});
+				it != cache.end()) {
+				x = bdd_ref::to_bdd_node(it->second, d);
+				return true;
+			} else return false;
+		} else {
+			if (auto it = cache.find({x,y}); it != cache.end())
+				return x = it->second, true;
+			else return false;
+		}
+	}
+
+	static bool check_cache(bdd_ref& x, uint_t v, const auto& cache){
+		if constexpr (o.has_varshift()) {
+			if (auto it = cache.find(
+					{bdd_ref::to_shift_node(x, x.shift),
+					 v - (x.shift - 1)}); it != cache.end()) {
+				x = bdd_ref::to_bdd_node(it->second, x.shift);
+				return true;
+			} else return false;
+		} else {
+			if (auto it = cache.find({x,v}); it != cache.end())
+				return x = it->second, true;
+			else return false;
+		}
+	}
+
+	static void update_cache(bdd_ref x, bdd_ref r, auto& cache) {
+		if constexpr (o.has_varshift()) {
+			cache.emplace(bdd_ref::to_shift_node(x, x.shift),
+				      bdd_ref::to_shift_node(r, x.shift));
+		} else cache.emplace(move(x), move(r));
+	}
+
+	static void update_cache(bdd_ref x, uint_t v, bdd_ref r, auto& cache) {
+		if constexpr (o.has_varshift()) {
+			cache.emplace(std::pair<bdd_ref, uint_t>{
+					      bdd_ref::to_shift_node(x, x.shift),
+					      v - (x.shift - 1)},
+				      bdd_ref::to_shift_node(r, x.shift));
+		} else cache.emplace(std::pair<bdd_ref, uint_t>{move(x), v}, move(r));
+	}
+
+	static void update_cache(bdd_ref x, bdd_ref y, bdd_ref r, auto &cache) {
+		if constexpr (o.has_varshift()) {
+			auto d = min(x.shift, y.shift);
+			cache.emplace(std::array<bdd_ref, 2>{
+					      bdd_ref::to_shift_node(x, d),
+					      bdd_ref::to_shift_node(y, d)},
+				      bdd_ref::to_shift_node(r, d));
+		} else cache.emplace(std::array<bdd_ref,2>{move(x),move(y)},move(r));
+	}
+
+	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
+		if constexpr (o.has_varshift())
+			if (x.id == y.id && x.shift > y.shift) swap(x, y);
+		if(x.id > y.id) swap(x,y);
+	}
+
+	// Fast check only if output inverters are enabled
+	static bool negation_of(bdd_ref x, bdd_ref y) {
+		if constexpr (o.has_inv_out()) {
+			return bdd_ref::flip_out(x) == y;
+		} else return false;
+	}
+
+	static bdd_ref add(bdd_node_t b) { return add(b.v, b.h, b.l); }
+
+	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
+		if (h == l) return h;
+#ifdef DEBUG
+		if(!leaf(l) && !leaf(h))
+			assert((get(l).v > v) && (get(h).v > v));
+#endif
+		bool in = false, out = false;
+		if constexpr (o.has_inv_in())
+			if(h.id < l.id)
+				swap(h, l), in = true;
+		if constexpr (o.has_inv_out())
+			if (l.out) {
+				h = bdd_ref::flip_out(h);
+				l = bdd_ref::flip_out(l);
+				out = true;
+			}
+		if constexpr (o.has_varshift()) return add_with_shift(v, h, l, in, out);
+		else return add_without_shift(v, h, l, in, out);
+	}
+
+	static bdd_ref
+	add_without_shift(uint_t v, const bdd_ref &h, const bdd_ref &l, bool in,
+			  bool out) {
+		bdd_node_t n(v, h, l);
+		if (auto it = Mn.find(n); it != Mn.end())
+			return bdd_ref(in, out, it->second);
+		Mn.emplace(n, V.size());
+		V.emplace_back(n);
+		return bdd_ref(in, out, V.size() - 1);
+	}
+
+	static bdd_ref
+	add_with_shift(uint_t v, bdd_ref &h, bdd_ref &l, bool in, bool out) {
+		h = bdd_ref::to_shift_node(h, v);
+		l = bdd_ref::to_shift_node(l, v);
+		node_skeleton<bdd_ref> n(h, l);
+		if (auto it = Mn.find(n); it != Mn.end())
+			return bdd_ref(in, out, v, it->second);
+		Mn.emplace(n, V.size());
+		V.emplace_back(n);
+		return bdd_ref(in, out, v, V.size() - 1);
+	}
+
+	static bdd get(bdd_ref n) {
+		constexpr auto get_bdd_node = [](const bdd_ref n) {
+			if constexpr (o.has_varshift()) {
+				const node_skeleton<bdd_ref>& s = V[n.id];
+				return bdd(n.shift, bdd_ref::to_bdd_node(s.h, n.shift),
+					   bdd_ref::to_bdd_node(s.l, n.shift));
+			} else return V[n.id];
+		};
+#ifdef DEBUG
+		if constexpr (!o.has_inv_out()) assert(!n.out);
+		if constexpr (!o.has_inv_in()) assert(!n.in);
+#endif
+		const auto& b = get_bdd_node(n);
+		if (!n.out) {
+			if constexpr (!o.has_inv_in()) return b;
+			return !n.in ? b : bdd(b.v, b.l, b.h);
+		}
+		return !n.in ? bdd(b.v, bdd_ref::flip_out(b.h), bdd_ref::flip_out(b.l)) :
+		       bdd(b.v, bdd_ref::flip_out(b.l), bdd_ref::flip_out(b.h));
+	}
+
+	static bdd_ref bit(int_t v) {
+		return v > 0 ? add(v, T, F) : add(-v, F, T);
+	}
+
+	static bdd_ref bdd_not(bdd_ref x) {
+		if constexpr (o.has_inv_out()) return bdd_ref::flip_out(x);
+		if (x == T) return F;
+		if (x == F) return T;
+		if (check_cache(x, not_memo)) return x;
+		const bdd& xx = get(x);
+		auto r = add(xx.v, bdd_not(xx.h), bdd_not(xx.l));
+		return update_cache(x, r, not_memo), r;
+	}
+
+	static bdd_ref bdd_and(bdd_ref x, bdd_ref y) {
+		if (x == F || y == F) return F;
+		if (x == T) return y;
+		if (y == T) return x;
+		if (negation_of(x, y)) return F;
+		mk_order_canonical(x,y);
+		if (check_cache(x, y, and_memo)) return x;
+		const bdd &nx = get(x), &ny = get(y);
+		bdd_ref r;
+		if (nx.v == ny.v)
+			r =	add(nx.v,
+				       bdd_and(nx.h, ny.h),
+				       bdd_and(nx.l, ny.l));
+		else if (nx.v < ny.v)
+			r = add(nx.v, bdd_and(nx.h, y), bdd_and(nx.l, y));
+		else r = add(ny.v, bdd_and(ny.h, x), bdd_and(ny.l, x));
+		return update_cache(x, y, r, and_memo), r;
+	}
+
+	static bdd_ref bdd_or(bdd_ref x, bdd_ref y){
+		if constexpr (o.has_inv_out())
+			return bdd_ref::flip_out(
+				bdd_and(bdd_ref::flip_out(x), bdd_ref::flip_out(y)));
+		if (x == T || y == T) return T;
+		if (x == F) return y;
+		if (y == F) return x;
+		if (negation_of(x, y)) return T;
+		mk_order_canonical(x,y);
+		if (check_cache(x, y, or_memo)) return x;
+		const bdd &nx = get(x), &ny = get(y);
+		bdd_ref r;
+		if (nx.v == ny.v)
+			r =	add(nx.v,
+				       bdd_or(nx.h, ny.h),
+				       bdd_or(nx.l, ny.l));
+		else if (nx.v < ny.v)
+			r = add(nx.v, bdd_or(nx.h, y), bdd_or(nx.l, y));
+		else r = add(ny.v, bdd_or(ny.h, x), bdd_or(ny.l, x));
+		return update_cache(x, y, r, or_memo), r;
+	}
+
+	static bdd_ref ex(bdd_ref x, uint_t v) {
+		if constexpr (o.has_inv_out())
+			return bdd_ref::flip_out(all(bdd_ref::flip_out(x), v));
+		if (check_cache(x, v, ex_memo)) return x;
+		const bdd &nx = get(x);
+		if (leaf(nx)) return x;
+		bdd_ref r;
+		if (nx.v < v) r = add(nx.v, ex(nx.h, v), ex(nx.l, v));
+		else if (nx.v > v) r = x;
+		else r = bdd_or(nx.h, nx.l);
+		update_cache(x, v, r, ex_memo);
+		return r;
+	}
+
+	static bdd_ref all(bdd_ref x, uint_t v) {
+		if (check_cache(x, v, all_memo)) return x;
+		const bdd &nx = get(x);
+		if (leaf(nx)) return x;
+		bdd_ref r;
+		if (nx.v < v) r = add(nx.v, all(nx.h, v), all(nx.l, v));
+		else if (nx.v > v) r = x;
+		else r = bdd_and(nx.h, nx.l);
+		update_cache(x, v, r, all_memo);
+		return r;
+	}
+
+	//TODO: returns always false
+	static Bool get_uelim(bdd_ref x) {
+		if (x == T) return {true};
+		if (x == F) return {false};
+		const bdd &nx = get(x);
+		if (Bool r = get_uelim(nx.h); r == false) return r;
+		else return r & get_uelim(nx.l);
+	}
+
+	//TODO: returns always true
+	static Bool get_eelim(bdd_ref x) {
+		if (x == T) return {true};
+		if (x == F) return {false};
+		const bdd &nx = get(x);
+		if (Bool r = get_eelim(nx.h); r == true) return r;
+		else return r | get_eelim(nx.l);
+	}
+
+	static bdd_ref sub0(bdd_ref x, uint_t v) {
+		if (leaf(x)) return x;
+		const bdd &nx = get(x);
+		if (nx.v < v) return add(nx.v, sub0(nx.h, v), sub0(nx.l, v));
+		if (nx.v > v) return x;
+		return nx.l;
+	}
+
+	static bdd_ref sub1(bdd_ref x, uint_t v) {
+		if (leaf(x)) return x;
+		const bdd &nx = get(x);
+		if (nx.v < v) return add(nx.v, sub1(nx.h, v), sub1(nx.l, v));
+		if (nx.v > v) return x;
+		return nx.h;
+	}
+
+	static bool dnf(bdd_ref x, vector<int_t>& v,
+			function<bool(const pair<Bool, vector<int_t>>&)> f) {
+		if (x == F) return f({Bool(false), v});
+		if (x == T) return true;
+		const bdd& n = get(x);
+		v.push_back(n.v);
+		if (!dnf(n.h, v, f)) return false;
+		v.back() = -n.v;
+		if (!dnf(n.l, v, f)) return false;
+		v.pop_back();
+		return true;
+	}
+
+	static void get_vars(bdd_ref x, set<int_t>& s) {
+		if (leaf(x)) return;
+		const bdd& n = get(x);
+		if (s.find(n.v) != s.end()) return;
+		s.insert(n.v), get_vars(n.h, s), get_vars(n.l, s);
+	}
+
+	static bdd_ref ite(bdd_ref x, bdd_ref y, bdd_ref z) {
+		return bdd_or(bdd_and(x, y), bdd_and(bdd_not(x),z));
+	}
+
+	static void get_one_zero(bdd_ref x, map<int_t, Bool>& m) {
+		DBG(assert(x != T);)
+		m.clear();
+		while (!leaf(x)) {
+			const bdd_node_t& n = get(x);
+			if (n.h == F) { m.emplace(n.v, true); return; }
+			m.emplace(n.v, false);
+			if ((x = n.l) == F) return;
+		}
+		throw 0;
+	}
+
+	static bdd_ref compose(bdd_ref x, const map<int_t, bdd_ref>& m) {
+		if (leaf(x)) return x;
+		const bdd_node_t& n = get(x);
+		bdd_ref a = compose(n.h, m), b = compose(n.l, m);
+		if (auto it = m.find(n.v); it == m.end())
+			return ite(add(n.v, T, F), a, b);
+		else return ite(it->second, a, b);
+	}
+
+	// m must include all vars in x, otherwise use compose()
+	static Bool eval(bdd_ref x, const map<int_t, Bool>& m) {
+		if (x == T) return {true};
+		if (x == F) return {false};
+		const bdd_node_t& n = get(x);
+		Bool a = eval(n.h, m), b = eval(n.l, m);
+		if (auto it = m.find(n.v); it == m.end()) assert(0);
+		else return ite(it->second, a, b);
+	}
+
+	static bdd_ref from_clause(const pair<Bool, vector<int_t>>& v) {
+		bdd_ref r = bdd_and(T, v.first);
+		for (int_t t : v.second) r = bdd_and(r, bit(t));
+		return r;
+	}
+
+	static bdd_ref from_dnf(const set<pair<Bool, vector<int_t>>>& s) {
+		bdd_ref r = F;
+		for (auto& x : s) r = bdd_or(r, from_clause(x));
+		return r;
+	}
+
+	// treat x as a *disjoint* union of elements of s
+	static bdd_ref split(bdd_ref x, const Bool& e, const set<Bool>& s) {
+		set<pair<Bool, vector<int_t>>> r;
+		Bool p = Bool(true);
+		for (const Bool& y : s)
+			if ((p = (p & ~y)) == false)
+				break;
+		dnf(x, [&r, &e, &s, &p](auto x) {
+			if ((x.first & e) == false) r.insert(x);
+			else {
+				r.emplace(x.first & p, x.second);
+				for (const Bool& y : x.second)
+					r.emplace(x.first & y, x.second);
+			}
+		});
+		return from_dnf(r);
+	}
+};
+
 #endif

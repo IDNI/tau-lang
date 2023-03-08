@@ -234,6 +234,164 @@ private:
 	bdd_ref b;
 };
 
+// Specialization for type Bool
+
+template<bdd_options o>
+struct bdd_handle<Bool, o> {
+	using bdd_ref = bdd_reference<o.has_varshift(), o.idW, o.shiftW>;
+	typedef bdd_node<bdd_ref> bdd_node_t;
+	typedef unordered_map<bdd_node_t, shared_ptr<bdd_handle>> mn_type;
+	typedef map<Bool, std::shared_ptr<bdd_handle>> mb_type;
+	inline static unordered_map<bdd_node_t, shared_ptr<bdd_handle>> Mn;
+	inline static map<Bool, std::shared_ptr<bdd_handle>> Mb;
+	inline static hbdd<Bool, o> htrue, hfalse;
+
+	// nonworking hack to call init
+	template<typename T, T> struct dummy_type {};
+	typedef dummy_type<mn_type&, Mn> dummy_mn_type;
+	typedef dummy_type<mb_type&, Mb> dummy_mb_type;
+	static bool dummy;
+
+//	bdd_handle();
+
+	static hbdd<Bool, o> get(const bdd_node_t& x) {
+		if (auto it = Mn.find(x); it != Mn.end())
+			return it->second;//.lock();
+		hbdd<Bool, o> h = make_shared<bdd_handle<Bool, o>>(); //(new bdd_handle);
+		return h->b = bdd<Bool, o>::add(x), Mn.emplace(x, h), h;
+	}
+
+	static hbdd<Bool, o> get(bdd_ref t) {
+		return get(bdd<Bool, o>::get(t));
+	}
+
+	static hbdd<Bool, o> get(Bool b) {
+		return b == true ? htrue : hfalse;
+	}
+
+	bdd<Bool, o> get() const {
+		return bdd<Bool, o>::get(b);
+	}
+
+	bool is_zero() const { return b == bdd<Bool, o>::F; }
+	bool is_one() const { return b == bdd<Bool, o>::T; }
+
+	static hbdd<Bool, o> one() {
+		return get(bdd<Bool, o>::T);
+	}
+
+	static hbdd<Bool, o> zero() {
+		return get(bdd<Bool, o>::F);
+	}
+
+	static hbdd<Bool, o> bit(bool b, uint_t v) {
+		DBG(assert(v > 0);)
+		hbdd<Bool, o> r = get(bdd<Bool, o>::bit(b ? v : -v));
+		//hbdd<Bool, o> r = get(bdd_node(v, bdd<Bool, o>::T, bdd<Bool, o>::F));
+		DBG(assert(r);)
+		return r;
+	}
+
+	Bool get_uelim() const { return bdd<Bool, o>::get_uelim(b); }
+	Bool get_eelim() const { return bdd<Bool, o>::get_eelim(b); }
+
+	hbdd<Bool, o> operator&(const hbdd<Bool, o>& x) const {
+		return get(bdd<Bool, o>::bdd_and(x->b, b));
+	}
+
+	hbdd<Bool, o> operator~() const {
+		return get(bdd<Bool, o>::bdd_not(b));
+	}
+
+	hbdd<Bool, o> operator|(const hbdd<Bool, o>& x) const {
+		return ~((~x) & (~*this));
+	}
+
+	hbdd<Bool, o> ex(int_t v) const {
+		return get(bdd<Bool, o>::ex(b, v));
+	}
+
+	hbdd<Bool, o> all(int_t v) const {
+		return get(bdd<Bool, o>::all(b, v));
+	}
+
+	hbdd<Bool, o>
+	subst(size_t v, const hbdd<Bool, o>& x) const {
+#ifdef DEBUG
+//		assert( get(bdd<Bool, o>::subst(b, v, x->b)) ==
+//			((sub0(v) & ~x) | (sub1(v) & x)));
+#endif
+		return (sub0(v) & ~x) | (sub1(v) & x);
+//		return get(bdd<Bool, o>::subst(b, v, x->b));
+	}
+
+	hbdd<Bool, o> sub0(size_t v) const {
+		return get(bdd<Bool, o>::sub0(b, v));
+	}
+
+	hbdd<Bool, o> sub1(size_t v) const {
+		return get(bdd<Bool, o>::sub1(b, v));
+	}
+
+	hbdd<Bool, o>
+	condition(size_t v, const hbdd<Bool, o>& f) const {
+		return subst(v, f->sub0(v)) | subst(v, ~(f->sub1(v)));
+	}
+
+	void dnf(function<bool(const pair<Bool, vector<int_t>>&)> f) const {
+		vector<int_t> v;
+		bdd<Bool, o>::dnf(b, v, [f](const pair<Bool, vector<int_t>>& v) {
+			return f(v);
+		});
+	}
+
+	set<pair<Bool, vector<int_t>>> dnf() const {
+		set<pair<Bool, vector<int_t>>> r;
+		dnf([&r](auto& x) { r.insert(x); return true; });
+		return r;
+	}
+
+	set<int_t> get_vars() const {
+		set<int_t> r;
+		return bdd<Bool, o>::get_vars(b, r), r;
+	}
+
+	map<int_t, Bool> get_one_zero() const {
+		map<int_t, Bool> m;
+		bdd<Bool, o>::get_one_zero(b, m);
+//#ifdef DEBUG
+//		auto d = dnf();
+//		bool t = false;
+//		for (auto x : d) t |= (r == x.second);
+//		assert(!t);
+//#endif
+		return m;
+	}
+
+	hbdd<Bool, o>
+	compose(const map<int_t, hbdd<Bool, o>>& m) const {
+		map<int_t, bdd_ref> p;
+		for (auto& x : m) p.emplace(x.first, x.second->b);
+		return get(bdd<Bool, o>::compose(b, p));
+	}
+
+	Bool eval(map<int_t, Bool>& m) const { return bdd<Bool, o>::eval(b, m); }
+
+	map<int_t, hbdd<Bool, o>> lgrs() const {
+		map<int_t, hbdd<Bool, o>> r;
+		if (b == bdd<Bool, o>::F) return r;
+		DBG(assert((b != bdd<Bool, o>::T));)
+		for (const auto& z : get_one_zero())
+			r.emplace(z.first,	((*this) & get(z.second)) |
+						  (bit(true, z.first) & ~*this));
+		return r;
+	}
+#ifndef DEBUG
+	private:
+#endif
+	bdd_ref b;
+};
+
 template<typename T> constexpr bool is_sp{};
 template<typename T> constexpr bool is_sp<sp<T>>{true};
 
@@ -268,14 +426,6 @@ template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
 	     abi::__cxa_demangle(typeid(bdd<B, o>).name(), 0, 0, &s) <<
 	     '>' << endl;
 #endif
-	auto one = get_one<B>();
-	if constexpr (!o.has_inv_out()) {
-		auto zero = ~one;
-		bdd<B, o>::V.emplace_back(zero);
-		bdd<B, o>::Mb.emplace(zero, 0);
-	} else bdd<B, o>::V.emplace_back(one);
-	bdd<B, o>::V.emplace_back(one);
-	bdd<B, o>::Mb.emplace(one, 1);
 	//bdd<B, o>::Mb.emplace(B::one(), 1);
 	if constexpr (o.has_inv_out()) {
 		bdd<B, o>::T = bdd_ref(0,0,0);
@@ -284,12 +434,62 @@ template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
 		bdd<B, o>::F = bdd_ref(0,0,0);
 		bdd<B, o>::T = bdd_ref(0,0,1);
 	}
+	create_universe<B, o>(get_one<B>());
 	bdd_handle<B, o>::hfalse = bdd_handle<B, o>::get(bdd<B, o>::F);
 	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(bdd<B, o>::T);
 }
 
-template<typename B, auto o>
+template<typename B, bdd_options o> void create_universe(B a) {
+	auto one = get_one<B>();
+	if constexpr (!o.has_inv_out()) {
+		auto zero = ~one;
+		bdd<B, o>::V.emplace_back(zero);
+		bdd<B, o>::Mb.emplace(zero, 0);
+		bdd<B, o>::V.emplace_back(one);
+		bdd<B, o>::Mb.emplace(one, 1);
+	} else {
+		bdd<B, o>::V.emplace_back(one);
+		bdd<B, o>::Mb.emplace(one, 0);
+	}
+}
+
+template<typename B, bdd_options o> void create_universe(Bool a) {
+	const auto &T = bdd<Bool, o>::T;
+	const auto &F = bdd<Bool, o>::F;
+	const auto &V = bdd<Bool, o>::V;
+	const auto &Mn = bdd<Bool, o>::Mn;
+	if constexpr (o.has_varshift()) {
+		if constexpr (!o.has_inv_out()) {
+			V.emplace_back(F,F);
+			Mn.emplace(V[0],0);
+			V.emplace_back(T,T);
+			Mn.emplace(V[1],1);
+		} else {
+			V.emplace_back(T,T);
+			Mn.emplace(V[0],0);
+		}
+	} else {
+		if constexpr (!o.has_inv_out()) {
+			V.emplace_back(0,F,F);
+			Mn.emplace(V[0],0);
+			V.emplace_back(0,T,T);
+			Mn.emplace(V[1],1);
+		} else {
+			V.emplace_back(0, T, T);
+			Mn.emplace(V[0], 0);
+		}
+	}
+}
+
+// ...auto o> fails to build here
+template<typename B, bdd_options o>
 bdd<B, o>::initializer::initializer() {
 	bdd_init<B, o>();
 }
+
+template<bdd_options o>
+bdd<Bool, o>::initializer::initializer() {
+	bdd_init<Bool, o>();
+}
+
 #endif
