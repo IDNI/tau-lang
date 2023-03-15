@@ -56,7 +56,7 @@ enum bdd_params {
 /* Options for bdd instantiation. The class handles dependencies and restrictions
  * between parameters. Create by static functions bdd_options::create.
  */
-template<uint8_t params = INV_IN | INV_OUT | VARSHIFT | INV_ORDER>
+template<uint8_t params = INV_IN | INV_OUT>
 class bdd_options {
 	constexpr bdd_options(auto idWidth, auto shiftWidth) :
 		idW(idWidth), shiftW(shiftWidth) {}
@@ -722,6 +722,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 	typedef bdd_node<bdd_ref> bdd_node_t;
 
 	bdd(uint_t v, bdd_ref h, bdd_ref l) : bdd_node_t(v, h, l) {}
+	explicit bdd(const auto& n) : bdd_node_t(n) {}
 	struct initializer { initializer(); };
 
 	inline static std::conditional<o.has_varshift(),
@@ -1016,8 +1017,13 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.idW, o.shiftW>>
 
 	static bool dnf(bdd_ref x, vector<int_t>& v,
 			function<bool(const pair<Bool, vector<int_t>>&)> f) {
-		if (x == F) return f({Bool(false), v});
-		if (x == T) return true;
+		/*
+		 * if (!(std::get<B>(xx) == false))
+				return f({std::get<B>(xx), v});
+			return true;
+		 */
+		if (x == F) return true;
+		if (x == T) return f({Bool(true), v});
 		const bdd& n = get(x);
 		v.push_back(n.v);
 		if (!dnf(n.h, v, f)) return false;

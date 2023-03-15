@@ -456,8 +456,8 @@ template<typename B, bdd_options o> void create_universe(B a) {
 template<typename B, bdd_options o> void create_universe(Bool a) {
 	const auto &T = bdd<Bool, o>::T;
 	const auto &F = bdd<Bool, o>::F;
-	const auto &V = bdd<Bool, o>::V;
-	const auto &Mn = bdd<Bool, o>::Mn;
+	auto &V = bdd<Bool, o>::V;
+	auto &Mn = bdd<Bool, o>::Mn;
 	if constexpr (o.has_varshift()) {
 		if constexpr (!o.has_inv_out()) {
 			V.emplace_back(F,F);
