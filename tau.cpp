@@ -56,6 +56,7 @@ int main() {
 	out<sbf>(cout, z);*/
 
 	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
+//	auto dnf = f->dnf();
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
 	fof t(true);
 	t = (t & fof(true, f));
