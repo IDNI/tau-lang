@@ -139,14 +139,34 @@ struct bdd_handle {
 		return get(bdd<B, o>::bdd_and(x->b, b));
 	}
 
+	hbdd<B, o> operator|(const hbdd<B, o>& x) const {
+		if constexpr (o.has_inv_out()) return ~((~x) & (~*this));
+
+		const bdd<B, o> &xx = x->get();
+		const bdd<B, o> &yy = get();
+		if (xx.leaf()) {
+#ifndef DEBUG
+			if (std::get<B>(xx) == true) return htrue;
+			if (std::get<B>(xx) == false) return get(*this);
+#endif
+			if (yy.leaf())
+				return	bdd_handle<B, o>::get(
+					std::get<B>(xx) | std::get<B>(yy));
+			return get(bdd<B, o>::bdd_or(b, std::get<B>(xx)));
+		} else if (yy.leaf()) {
+#ifndef DEBUG
+			if (std::get<B, o>(yy) == true) return htrue;
+			if (std::get<B, o>(yy) == false) return x;
+#endif
+			return get(bdd<B, o>::bdd_or(x->b, std::get<B>(yy)));
+		}
+		return get(bdd<B, o>::bdd_or(x->b, b));
+	}
+
 	hbdd<B, o> operator~() const {
 		return get( bdd<B, o>::bdd_and(
 			bdd<B, o>::T,
 			bdd<B, o>::bdd_not(b)));
-	}
-
-	hbdd<B, o> operator|(const hbdd<B, o>& x) const {
-		return ~((~x) & (~*this));
 	}
 
 	hbdd<B, o> ex(int_t v) const {
@@ -304,7 +324,8 @@ struct bdd_handle<Bool, o> {
 	}
 
 	hbdd<Bool, o> operator|(const hbdd<Bool, o>& x) const {
-		return ~((~x) & (~*this));
+		if constexpr (o.has_inv_out()) return ~((~x) & (~*this));
+		return get(bdd<Bool, o>::bdd_or(x->b, b));
 	}
 
 	hbdd<Bool, o> ex(int_t v) const {
