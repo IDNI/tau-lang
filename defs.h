@@ -17,14 +17,15 @@ typedef int sym_t;
 
 #ifdef DEBUG
 #define DBG(x) x
-#include <iostream>
 #include <cxxabi.h>
 #else
-#include <iostream>
 #define DBG(x)
 #endif
+#include <algorithm>
+#include <iostream>
 
 #define pfst(x) (*(x).begin())
+#define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 using namespace std;
 
 template<typename B> struct zero {

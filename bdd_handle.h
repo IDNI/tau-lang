@@ -328,6 +328,12 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool, o>::bdd_or(x->b, b));
 	}
 
+	static hbdd<Bool, o> and_many(const vector<hbdd<Bool, o>>& v) {
+		vector<bdd_ref> x;
+		for (const auto& e : v) x.push_back(e->b);
+		return get(bdd<Bool, o>::bdd_and_many(x));
+	}
+
 	hbdd<Bool, o> ex(int_t v) const {
 		return get(bdd<Bool, o>::ex(b, v));
 	}

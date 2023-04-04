@@ -247,6 +247,18 @@ struct std::hash<pair<bdd_reference<S, O, IW, SW>, uint_t>> {
 	}
 };
 
+template<typename X>
+struct std::hash<std::vector<X>> {
+	size_t operator()(const std::vector<X>& vec) const {
+		std::hash<X> hasher;
+		size_t seed = vec.size();
+		for(auto& i : vec) {
+			seed ^= hasher(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+		}
+		return seed;
+	}
+};
+
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
@@ -427,7 +439,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 		if (!p.leaf() && !q.leaf()) {
 			const auto x = std::get<bdd_node_t>(p);
 			const auto y = std::get<bdd_node_t>(q);
-			if constexpr (!o.has_inv_in()) assert(var_cmp(v, x.v)) && (var_cmp(v, y.v));
+			if constexpr (!o.has_inv_in()) assert(var_cmp(v, x.v) && var_cmp(v, y.v));
 		}
 #endif
 		bool in = false, out = false;
@@ -804,9 +816,11 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bool (*var_cmp)(int, int);
+	static bool (*am_cmp)(const bdd_ref&, const bdd_ref&);
 
 	// Caches for bdd operations
 	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
+	inline static unordered_map<vector<bdd_ref>, bdd_ref> and_many_memo;
 	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
 	inline static unordered_map<bdd_ref, bdd_ref> not_memo;
 	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
@@ -1038,6 +1052,105 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return update_cache(x, y, r, and_memo), r;
 	}
 
+	static void am_sort(vector<bdd_ref>& b) {
+		sort(b.begin(), b.end(), am_cmp);
+		for (size_t n = 0; n < b.size();)
+			if (b[n] == T) b.erase(b.begin() + n);
+			else if (b[n] == F) { b = {F}; return; }
+			else if (!n) { ++n; continue; }
+			else if (b[n] == b[n-1]) b.erase(b.begin() + n);
+			else if (b[n] == bdd_ref::flip_out(b[n-1])) { b = {F}; return; }
+			else ++n;
+	}
+
+	static size_t bdd_and_many_iter(vector<bdd_ref> v, vector<bdd_ref> &h,
+					vector<bdd_ref> &l, bdd_ref &res,
+					uint_t &m) {
+		size_t i;
+		bool flag = false;
+		m = get(v[0]).v;
+		for (i = 1; i != v.size(); ++i)
+			if (!leaf(v[i])) {
+				if (get(v[i]).v < m) m = get(v[i]).v;
+			} else if (v[i] == F) return res = F, 1;
+		h.reserve(v.size()), l.reserve(v.size());
+		for (i = 0; i != v.size(); ++i) {
+			const auto& b = get(v[i]);
+			if (b.v != m) h.push_back(v[i]);
+			else if (!leaf(b.h)) h.push_back(b.h);
+			else if (b.h == F) { flag = true; break; }
+		}
+		if (!flag) am_sort(h);
+		for (i = 0; i != v.size(); ++i) {
+			const auto& b = get(v[i]);
+			if (b.v != m) l.push_back(v[i]);
+			else if (!leaf(b.l)) l.push_back(b.l);
+			else if (b.l == F) return flag ? res = F, 1 : 2;
+		}
+		am_sort(l);
+		if (!flag) { if (h.size() && h[0] == F) flag = true; }
+		if (l.size() && l[0] == F) return flag ? 3 : 2;
+		if (flag) return 3;
+		vector<bdd_ref> x;
+		set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x),
+				 am_cmp);
+		am_sort(x);
+		if (x.size() > 1) {
+			for (size_t n = 0; n < h.size();)
+				if (hasbc(x, h[n], am_cmp)) h.erase(h.begin() + n);
+				else ++n;
+			for (size_t n = 0; n < l.size();)
+				if (hasbc(x, l[n], am_cmp)) l.erase(l.begin() + n);
+				else ++n;
+			h.shrink_to_fit(), l.shrink_to_fit(), x.shrink_to_fit();
+			bdd_ref r = bdd_and_many(move(x));
+			if (r == F) return res = F, 1;
+			if (r != T) {
+				if (!hasbc(h, r, am_cmp)) h.push_back(r), am_sort(h);
+				if (!hasbc(l, r, am_cmp)) l.push_back(r), am_sort(l);
+			}
+		}
+		return 0;
+	}
+
+	static bdd_ref bdd_and_many(vector<bdd_ref> v) {
+		if (v.empty()) return T;
+		if (v.size() == 1) return v[0];
+
+		for (size_t n = 0; n < v.size(); ++n)
+			for (size_t k = 0; k < n; ++k) {
+				bdd_ref x = v[n], y = v[k];
+				mk_order_canonical(x, y);
+				if (check_cache(x, y, and_memo)) {
+					v.erase(v.begin()+k), v.erase(v.begin()+n-1);
+					v.push_back(x);
+					n = k = 0;
+					break;
+				}
+			}
+		am_sort(v);
+		if (v.empty()) return T;
+		if (v.size() == 1) return v[0];
+		auto it = and_many_memo.find(v);
+		if (it != and_many_memo.end()) return it->second;
+		if (v.size() == 2)
+			return and_many_memo.emplace(v, bdd_and(v[0], v[1])).first->second;
+		bdd_ref res = F, h, l;
+		uint_t m = 0;
+		vector<bdd_ref> vh, vl;
+		switch (bdd_and_many_iter(v, vh, vl, res, m)) {
+			case 0: l = bdd_and_many(move(vl)),
+					h = bdd_and_many(move(vh));
+				break;
+			case 1: return and_many_memo.emplace(v, res), res;
+			case 2: h = bdd_and_many(move(vh)), l = F; break;
+			case 3: h = F, l = bdd_and_many(move(vl)); break;
+			default: { DBG(assert(false)); }
+		}
+		return and_many_memo.emplace(v, bdd::add(m, h, l)).first->second;
+	}
+
+
 	static bdd_ref bdd_or(bdd_ref x, bdd_ref y){
 		if constexpr (o.has_inv_out())
 			return bdd_ref::flip_out(
@@ -1210,6 +1323,14 @@ template<bdd_options o>
 bool(*bdd<Bool, o>::var_cmp)(int_t, int_t) = [](int_t vl, int_t vr){
 	if constexpr (!o.has_inv_order()) return vl < vr;
 	else return vl > vr;
+};
+
+template<bdd_options o>
+bool
+(*bdd<Bool, o>::am_cmp)(const bdd_ref &, const bdd_ref &) = [](const bdd_ref &x,
+							       const bdd_ref &y) {
+	bool s = x.out && !y.out;
+	return x.id < y.id || (x.id == y.id && s);
 };
 
 #endif
