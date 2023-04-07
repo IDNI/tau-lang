@@ -13,6 +13,75 @@
 #ifndef __NORMALIZER_H__
 #define __NORMALIZER_H__
 #include "msba.h"
+#include "bdd_handle.h"
+
+template <typename N /* parse tree node adapter */, typename B /* boolean algebra */>
+class builder {
+
+	enum struct bf_t { VAR, ELEM, TRUE, FALSE, REF, AND, NOT, FOR_ALL, EXISTS };
+	enum struct cbf_t { REF, BF, CONDITION, AND, NOT };
+	enum struct wwf_t { CBF, REF, NOT, AND, FOR_ALL, EXISTS };
+	enum struct defs_t { CBF, WWF };
+
+	bdd_handle<B> build_bf(N node) { 
+		switch (node.get_type()) {
+			case bf_t::VAR: /* build_bf_var */; break;
+			case bf_t::ELEM: /* build_bf_elem */; break;
+			case bf_t::TRUE: return B::one();
+			case bf_t::FALSE: return B::zero();
+			case bf_t::REF: /* build_bf_ref */; break;
+			case bf_t::AND: return build_bf(n.left()) && build_bf(n.right()); 
+			case bf_t::NOT: return !build_bf(n.child());
+			case bf_t::FOR_ALL: /* build_bf_for_all */; break;
+			case bf_t::EXISTS: /* build_bf_exists */; break;
+			// TODO change by assert(false);
+			default: break;
+		}
+		bdd_handle<B> b; return b; 
+	}
+
+	bdd_handle<B> build_cbf(N node) { 
+		switch (node.get_type()) {
+			case cbf_t::REF: /* build_cbf_ref */; break;
+			case cbf_t::BF: return build_bf(n);
+			case cbf_t::CONDITION: /* build_cbf_condition*/ ; break;
+			case cbf_t::AND: return build_bf(n.left()) && build_bf(n.right()); 
+			case cbf_t::NOT: return !build_bf(n.child());
+			// TODO change by assert(false);
+			default: bdd_handle<B> b; return b;
+
+		}
+		bdd_handle<B> b; return b; 
+	}
+
+	bdd_handle<B> build_wwf(N node) { 
+		switch (node.get_type()) {
+			case wwf_t::CBF: return build_cbf(n);
+			case wwf_t::REF: /* build_wwf_ref */; break;
+			case wwf_t::NOT: return !build_wwf(n.child());
+			case wwf_t::AND: return build_wwf(n.left()) && build_wwf(n.right()); 
+			case wwf_t::FOR_ALL: /* build_wwf_for_all */; break;
+			case wwf_t::EXISTS: /* build_wwf_exists */; break;
+			// TODO change by assert(false);
+			default: break;
+		}
+		bdd_handle<B> b; return b; 
+	}
+
+public: 
+
+	bdd_handle<B> build(N node) {
+		for (auto& child: node.get_defs())
+			switch(child.get_type()) {
+				case defs_t::CBF: build_cbf(n); break;
+				case defs_t::WFF: build_wwf(n); break;
+				// TODO change by assert(false);
+				default: break;
+			}
+		bdd_handle<B> b; return b; 
+	};
+
+};
 
 template<typename... BDDs, typename... aux>
 struct normalizer<tuple<BDDs...>, aux...> {

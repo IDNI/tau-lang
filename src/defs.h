@@ -13,7 +13,6 @@
 #ifndef __DEF_H__
 #define __DEF_H__
 typedef int sym_t;
-#define DEBUG
 
 #ifdef DEBUG
 #define DBG(x) x
