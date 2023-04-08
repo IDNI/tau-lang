@@ -30,8 +30,8 @@ class builder {
 			case bf_t::TRUE: return B::one();
 			case bf_t::FALSE: return B::zero();
 			case bf_t::REF: /* build_bf_ref */; break;
-			case bf_t::AND: return build_bf(n.left()) && build_bf(n.right()); 
-			case bf_t::NOT: return !build_bf(n.child());
+			case bf_t::AND: return build_bf(node.left()) && build_bf(node.right()); 
+			case bf_t::NOT: return !build_bf(node.child());
 			case bf_t::FOR_ALL: /* build_bf_for_all */; break;
 			case bf_t::EXISTS: /* build_bf_exists */; break;
 			// TODO change by assert(false);
@@ -43,10 +43,10 @@ class builder {
 	bdd_handle<B> build_cbf(N node) { 
 		switch (node.get_type()) {
 			case cbf_t::REF: /* build_cbf_ref */; break;
-			case cbf_t::BF: return build_bf(n);
+			case cbf_t::BF: return build_bf(node);
 			case cbf_t::CONDITION: /* build_cbf_condition*/ ; break;
-			case cbf_t::AND: return build_bf(n.left()) && build_bf(n.right()); 
-			case cbf_t::NOT: return !build_bf(n.child());
+			case cbf_t::AND: return build_bf(node.left()) && build_bf(node.right()); 
+			case cbf_t::NOT: return !build_bf(node.child());
 			// TODO change by assert(false);
 			default: bdd_handle<B> b; return b;
 
@@ -56,10 +56,10 @@ class builder {
 
 	bdd_handle<B> build_wwf(N node) { 
 		switch (node.get_type()) {
-			case wwf_t::CBF: return build_cbf(n);
+			case wwf_t::CBF: return build_cbf(node);
 			case wwf_t::REF: /* build_wwf_ref */; break;
-			case wwf_t::NOT: return !build_wwf(n.child());
-			case wwf_t::AND: return build_wwf(n.left()) && build_wwf(n.right()); 
+			case wwf_t::NOT: return !build_wwf(node.child());
+			case wwf_t::AND: return build_wwf(node.left()) && build_wwf(node.right()); 
 			case wwf_t::FOR_ALL: /* build_wwf_for_all */; break;
 			case wwf_t::EXISTS: /* build_wwf_exists */; break;
 			// TODO change by assert(false);
@@ -73,8 +73,8 @@ public:
 	bdd_handle<B> build(N node) {
 		for (auto& child: node.get_defs())
 			switch(child.get_type()) {
-				case defs_t::CBF: build_cbf(n); break;
-				case defs_t::WFF: build_wwf(n); break;
+				case defs_t::CBF: build_cbf(node); break;
+				case defs_t::WFF: build_wwf(node); break;
 				// TODO change by assert(false);
 				default: break;
 			}
