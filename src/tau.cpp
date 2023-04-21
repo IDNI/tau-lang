@@ -11,11 +11,13 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
+#include <iostream>
+
 #include "barr.h"
 #include "out.h"
 //#include "anf.h"
 #include "builder.h"
-#include <iostream>
+#include "ba.h"
 
 //template<typename B> vector<bdd<B>> bdd<B>::V;
 //template<typename B> unordered_map<bdd_node, size_t> bdd<B>::Mn;

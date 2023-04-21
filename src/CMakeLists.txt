@@ -17,6 +17,7 @@ include(tau-common)
 
 set(TAU_HEADERS
 	anf.h
+	ba.h
 	babdd.h
 	barr.h
 	bdd_handle.h
