@@ -101,8 +101,8 @@ ba_product<BAS...> operator!(ba_product<BAS...>& thiz) {
 }
 
 template <typename... BAS>
-ba_product<BAS...> operator&&(ba_product<BAS...>& thiz, ba_product<BAS...>& that) {
+ba_product<BAS...> operator&(ba_product<BAS...>& thiz, ba_product<BAS...>& that) {
 	ba_product<BAS...> result;
-	bi_tuple_transform<sizeof...(BAS)>(thiz, that, result, [](auto&& a, auto&& b) { return a && b; });
+	bi_tuple_transform<sizeof...(BAS)>(thiz, that, result, [](auto&& a, auto&& b) { return a & b; });
 	return result;
 }

@@ -24,7 +24,7 @@ TEST_SUITE("product boolean algebra") {
 	struct ba_01 {
 		bool value;
 
-		ba_01 operator&&(const ba_01& that) { return {value && that.value}; }
+		ba_01 operator&(const ba_01& that) { return {value & that.value}; }
 		ba_01 operator!() { return {!value}; }
 		auto operator<=>(const ba_01& that) const = default;
 	};
@@ -34,10 +34,10 @@ TEST_SUITE("product boolean algebra") {
 		ba_product<ba_01> F(ba_01(false));
 		ba_product<ba_01> T(ba_01(true));
 
-		CHECK( (F && F) == F);
-		CHECK( (F && T) == F);
-		CHECK( (T && F) == F);
-		CHECK( (T && T) == T);
+		CHECK( (F & F) == F);
+		CHECK( (F & T) == F);
+		CHECK( (T & F) == F);
+		CHECK( (T & T) == T);
 
 
 		CHECK( !F == T);	
@@ -56,21 +56,21 @@ TEST_SUITE("product boolean algebra") {
 		CHECK( !TF == FT);
 		CHECK( !TT == FF);
 
-		CHECK( (FF && TT) == FF);
-		CHECK( (FF && TF) == FF);	
-		CHECK( (FF && FT) == FF);
-		CHECK( (FF && FF) == FF);
-		CHECK( (FT && TT) == FT);
-		CHECK( (FT && TF) == FF);
-		CHECK( (FT && FT) == FT);
-		CHECK( (FT && FF) == FF);
-		CHECK( (TF && TT) == TF);
-		CHECK( (TF && FT) == FF);
-		CHECK( (TF && TF) == TF);
-		CHECK( (TF && FF) == FF);
-		CHECK( (TT && TT) == TT);
-		CHECK( (TT && TF) == TF);
-		CHECK( (TT && FT) == FT);
-		CHECK( (TT && FF) == FF);
+		CHECK( (FF & TT) == FF);
+		CHECK( (FF & TF) == FF);	
+		CHECK( (FF & FT) == FF);
+		CHECK( (FF & FF) == FF);
+		CHECK( (FT & TT) == FT);
+		CHECK( (FT & TF) == FF);
+		CHECK( (FT & FT) == FT);
+		CHECK( (FT & FF) == FF);
+		CHECK( (TF & TT) == TF);
+		CHECK( (TF & FT) == FF);
+		CHECK( (TF & TF) == TF);
+		CHECK( (TF & FF) == FF);
+		CHECK( (TT & TT) == TT);
+		CHECK( (TT & TF) == TF);
+		CHECK( (TT & FT) == FT);
+		CHECK( (TT & FF) == FF);
 	}
 }
