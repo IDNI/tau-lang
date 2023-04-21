@@ -85,7 +85,7 @@ struct ba_product: std::tuple<BAS...> {
 	template <typename... OBAS> 
 	friend ba_product<OBAS...> operator!(ba_product<OBAS...>& thiz);
 	template <typename... OBAS> 
-	friend ba_product<OBAS...> operator&&(ba_product<OBAS...>& thiz, ba_product<OBAS...>& that);
+	friend ba_product<OBAS...> operator&(ba_product<OBAS...>& thiz, ba_product<OBAS...>& that);
 
 	ba_product(): std::tuple<BAS...>() {}
 	ba_product(BAS... bas): std::tuple<BAS...>(bas...) {}
