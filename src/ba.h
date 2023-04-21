@@ -13,59 +13,96 @@
 
 #include <tuple>
 
-/*
- * This is a template for a general product of boolean algebras.
- */
+// Infraestructure required for the product boolean algebra
+namespace details
+{
+    template<typename Int, typename, Int Begin, bool Increasing>
+    struct integer_range_impl;
+ 
+    template<typename Int, Int... N, Int Begin>
+    struct integer_range_impl<Int, std::integer_sequence<Int, N...>, Begin, true> {
+        using type = std::integer_sequence<Int, N+Begin...>;
+    };
+ 
+    template<typename Int, Int... N, Int Begin>
+    struct integer_range_impl<Int, std::integer_sequence<Int, N...>, Begin, false> {
+        using type = std::integer_sequence<Int, Begin-N...>;
+    };
+}
+ 
+template<typename Int, Int Begin, Int End>
+using integer_range = typename details::integer_range_impl<
+    Int, std::make_integer_sequence<Int, (Begin<End) ? End-Begin : Begin-End>,
+    Begin, (Begin<End) >::type;
+ 
+template<std::size_t Begin, std::size_t End>
+using index_range = integer_range<std::size_t, Begin, End>;
+ 
+template<size_t SN, size_t DN, class TSrc, class TDest, class Func>
+void tuple_call_assign(TSrc&& source, TDest& target, Func f)
+{
+    std::get<DN>(target) = f(std::get<SN>(std::forward<TSrc>(source)));	
+}
+ 
+template<size_t To, class TSrc, class TDest, class Func, size_t...Is, size_t...DIs>
+void tuple_transform(TSrc&& source, TDest& target, Func f, std::index_sequence<Is...>, std::index_sequence<DIs...>)
+{
+    using expander = int[];
+    (void)expander { 0, (tuple_call_assign<Is,DIs>(std::forward<TSrc>(source),target,f), 0)... };
+}
+ 
+template<size_t To, class TSrc, class TDest, class Func>
+void tuple_transform(TSrc&& source, TDest& target, Func f)
+{
+    tuple_transform<To>(std::forward<TSrc>(source), target, f,
+                    index_range<0,To>(), index_range<0, To>());
+}
+
+template<size_t SN, size_t DN, class TSrc, class TDest, class Func>
+void bi_tuple_call_assign(TSrc&& source, TSrc&& sourceB, TDest& target, Func f)
+{
+    std::get<DN>(target) = f(std::get<SN>(std::forward<TSrc>(source)), std::get<SN>(std::forward<TSrc>(sourceB)));	
+}
+ 
+template<size_t To, class TSrc, class TDest, class Func, size_t...Is, size_t...DIs>
+void bi_tuple_transform(TSrc&& source, TSrc&& sourceB, TDest& target, Func f, std::index_sequence<Is...>, std::index_sequence<DIs...>)
+{
+    using expander = int[];
+    (void)expander { 0, (bi_tuple_call_assign<Is,DIs>(std::forward<TSrc>(source), std::forward<TSrc>(sourceB),target,f), 0)... };
+}
+ 
+template<size_t To, class TSrc, class TDest, class Func>
+void bi_tuple_transform(TSrc&& source, TSrc&& sourceB, TDest& target, Func f)
+{
+    bi_tuple_transform<To>(std::forward<TSrc>(source), std::forward<TSrc>(sourceB), target, f,
+                    index_range<0,To>(), index_range<0, To>());
+}
+
+// The product boolean algebra
 template <typename...BAS>
 struct ba_product: std::tuple<BAS...> {
 
+	template <typename... OBAS> 
+	friend ba_product<OBAS...> operator!(ba_product<OBAS...>& thiz);
+	template <typename... OBAS> 
+	friend ba_product<OBAS...> operator&&(ba_product<OBAS...>& thiz, ba_product<OBAS...>& that);
+
+	ba_product(): std::tuple<BAS...>() {}
 	ba_product(BAS... bas): std::tuple<BAS...>(bas...) {}
 
-	template <std::size_t I = 0, typename P, typename... PS>
-	inline typename std::enable_if<(0 < sizeof...(PS)), std::tuple<P, PS...>>::type
-	_not() {
-		return std::tuple_cat(
-			std::make_tuple(!std::get<I>(*this)),
-			__not<I+1, PS...>());
-	}
-
-	template <std::size_t I = 0, typename P, typename... PS>
-	inline typename std::enable_if<(0 == sizeof...(PS)), std::tuple<P>>::type
-	__not() {
-		return std::make_tuple(!std::get<I>(*this));
-	}
-
-	std::tuple<BAS...> operator!() {
-		return __not<0, BAS...>();
-	}
-
-	template <std::size_t I = 0, typename P, typename... PS>
-	inline typename std::enable_if<(0 < sizeof...(PS)), std::tuple<PS...>>::type
-	__and(std::tuple<PS...>& that) {
-		return std::tuple_cat(
-			std::make_tuple(std::get<I>(*this) && std::get<I>(that)),
-			__and<I+1, PS...>(that));
-	}
-
-	template <std::size_t I = 0, typename P, typename... PS>
-	inline typename std::enable_if<(I == sizeof...(PS)), std::tuple<P>>::type
-	__and(std::tuple<BAS...>& that) {
-		return std::make_tuple(std::get<I>(*this) && std::get<I>(that));
-	}
-
-	std::tuple<BAS...> operator&&(std::tuple<BAS...>& that) {
-		return __and<0, BAS...>(that);
-	}
-
+	auto operator<=>(const ba_product<BAS...>& that) const = default;
 };
 
-/*
- * This is the implementation of the classical 0/1 algebraa.
- */
+template <typename... BAS>
+ba_product<BAS...> operator!(ba_product<BAS...>& thiz) {
+	ba_product<BAS...> result;
+	tuple_transform<sizeof...(BAS)>(thiz, result, [](auto&& a) { return !a; });
+	return result;
+}
 
-struct ba_01 {
-	bool value;
-
-	ba_01 operator&&(ba_01 that) { return {value && that.value}; }
-	ba_01 operator!() { return {!value}; }
-};
+template <typename... BAS>
+ba_product<BAS...> operator&&(ba_product<BAS...>& thiz, ba_product<BAS...>& that) {
+	ba_product<BAS...> result;
+	bi_tuple_transform<sizeof...(BAS)>(thiz, that, result, [](auto&& a, auto&& b) { return a && b; });
+	return result;
+}

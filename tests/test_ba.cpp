@@ -19,20 +19,31 @@
 namespace testing = doctest;
 
 TEST_SUITE("product boolean algebra") {
+
+	// Sample 0/1 boolean algebra for testing purposes.
+	struct ba_01 {
+		bool value;
+
+		ba_01 operator&&(const ba_01& that) { return {value && that.value}; }
+		ba_01 operator!() { return {!value}; }
+		auto operator<=>(const ba_01& that) const = default;
+	};
+
 	TEST_CASE("the product of one 0/1 boolean algebra is the correct boolean algebra") {
 	
 		ba_product<ba_01> F(ba_01(false));
 		ba_product<ba_01> T(ba_01(true));
 
-		
-		CHECK( get<0>(F && F).value == false );
-		CHECK( get<0>(F && T).value == false);	
-		CHECK( get<0>(T && F).value == false);	
-		CHECK( get<0>(T && T).value == true);	
+		CHECK( (F && F) == F);
+		CHECK( (F && T) == F);
+		CHECK( (T && F) == F);
+		CHECK( (T && T) == T);
 
-		CHECK( get<0>(!F).value == true);	
-		CHECK( get<0>(!T).value == false);	
+
+		CHECK( !F == T);	
+		CHECK( !T == F);	
 	}
+
 	TEST_CASE("the product of two 0/1 boolean algebra is the correct boolean algebra") {
 	
 		ba_product<ba_01, ba_01> FF(ba_01(false), ba_01(false));
@@ -40,65 +51,26 @@ TEST_SUITE("product boolean algebra") {
 		ba_product<ba_01, ba_01> TF(ba_01(true), ba_01(false));
 		ba_product<ba_01, ba_01> TT(ba_01(true), ba_01(true));
 
-		
-		CHECK( get<0>(FF && FF).value == false );
-		CHECK( get<1>(FF && FF).value == false );
+		CHECK( !FF == TT);
+		CHECK( !FT == TF);
+		CHECK( !TF == FT);
+		CHECK( !TT == FF);
 
-		CHECK( get<0>(FF && FT).value == false );
-		CHECK( get<1>(FF && FT).value == false );
-		
-		CHECK( get<0>(FF && TF).value == false );
-		CHECK( get<1>(FF && TF).value == false );
-		
-		CHECK( get<0>(FF && TT).value == false );
-		CHECK( get<1>(FF && TT).value == false );
-		
-		CHECK( get<0>(FT && FF).value == false );
-		CHECK( get<1>(FT && FF).value == false );
-		
-		CHECK( get<0>(FT && FT).value == false );
-		CHECK( get<1>(FT && FT).value == true );
-		
-		CHECK( get<0>(FT && TF).value == false );
-		CHECK( get<1>(FT && TF).value == false );
-		
-		CHECK( get<0>(FT && TT).value == false );
-		CHECK( get<1>(FT && TT).value == true );
-		
-		CHECK( get<0>(TF && FF).value == false );
-		CHECK( get<1>(TF && FF).value == false );
-		
-		CHECK( get<0>(TF && FT).value == false );
-		CHECK( get<1>(TF && FT).value == false );
-		
-		CHECK( get<0>(TF && TF).value == true );
-		CHECK( get<1>(TF && TF).value == false );
-		
-		CHECK( get<0>(TF && TT).value == true );
-		CHECK( get<1>(TF && TT).value == false );
-		
-		CHECK( get<0>(TT && FF).value == false );
-		CHECK( get<1>(TT && FF).value == false );
-		
-		CHECK( get<0>(TT && FT).value == false );
-		CHECK( get<1>(TT && FT).value == true );
-		
-		CHECK( get<0>(TT && TF).value == true );
-		CHECK( get<1>(TT && TF).value == false );
-		
-		CHECK( get<0>(TT && TT).value == true );
-		CHECK( get<1>(TT && TT).value == true );
-
-		CHECK( get<0>(!FF).value == true);	
-		CHECK( get<1>(!FF).value == true);	
-
-		CHECK( get<0>(!FT).value == true);
-		CHECK( get<1>(!FT).value == false);
-
-		CHECK( get<0>(!TF).value == false);
-		CHECK( get<1>(!TF).value == true);
-
-		CHECK( get<0>(!TT).value == false);
-		CHECK( get<1>(!TT).value == false);
+		CHECK( (FF && TT) == FF);
+		CHECK( (FF && TF) == FF);	
+		CHECK( (FF && FT) == FF);
+		CHECK( (FF && FF) == FF);
+		CHECK( (FT && TT) == FT);
+		CHECK( (FT && TF) == FF);
+		CHECK( (FT && FT) == FT);
+		CHECK( (FT && FF) == FF);
+		CHECK( (TF && TT) == TF);
+		CHECK( (TF && FT) == FF);
+		CHECK( (TF && TF) == TF);
+		CHECK( (TF && FF) == FF);
+		CHECK( (TT && TT) == TT);
+		CHECK( (TT && TF) == TF);
+		CHECK( (TT && FT) == FT);
+		CHECK( (TT && FF) == FF);
 	}
 }
