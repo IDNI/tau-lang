@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 cmake_host_system_information(RESULT CORE_COUNT QUERY NUMBER_OF_LOGICAL_CORES)
@@ -7,11 +8,11 @@ set(CMAKE_VERBOSE_MAKEFILE true CACHE BOOL "")
 
 set(USED_CMAKE_GENERATOR "${CMAKE_GENERATOR}" CACHE STRING "Expose CMAKE_GENERATOR" FORCE)
 if (USED_CMAKE_GENERATOR MATCHES "Ninja")
-	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif ()
 
 if (NOT CMAKE_BUILD_TYPE)
-	set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
 project(tau)
@@ -47,18 +48,7 @@ set(BUILD_TESTS ON CACHE STRING "build the tau-lang test suite ON")
 set_property(CACHE BUILD_TESTS PROPERTY STRINGS "OFF" "ON")
 
 if (BUILD_TESTS)
-	set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
-	if (NOT EXISTS "${DOCTEST_HEADER}")
-		message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")
-		find_package(Wget REQUIRED)
-		execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/onqtam/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR}/src)
-	endif ()
-
-	add_library(doctest INTERFACE)
-	target_compile_definitions(doctest INTERFACE TAU_USE_DOCTEST)
-	set(TEST_FRAMEWORK doctest)
-
-	enable_testing()
+	enable_testing()	
 	add_subdirectory(tests)
 endif ()
 

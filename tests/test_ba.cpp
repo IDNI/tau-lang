@@ -20,7 +20,7 @@ namespace testing = doctest;
 
 TEST_SUITE("product boolean algebra") {
 
-	// Sample 0/1 boolean algebra for testing purposes.
+	// Classical 0/1 boolean algebra for testing purposes.
 	struct ba_01 {
 		bool value;
 
