@@ -49,6 +49,7 @@ CMakeCache.txt
 *.nocmake
 !cmake/*
 src/doctest.h
+Testing
 
 # Sonarqube
 .scannerwork
