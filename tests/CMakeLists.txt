@@ -3,6 +3,7 @@ set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest hea
 if (NOT EXISTS "${DOCTEST_HEADER}")
 	message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")
 	find_package(Wget REQUIRED)
+	# TODO we should use a fixed tag instead of master
 	execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/doctest/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR}/src)
 endif ()
 
@@ -22,5 +23,5 @@ add_executable(test_ba ${TEST_BA})
 target_setup(test_ba)
 target_link_libraries(test_ba TAUo doctest)
 
-add_test(NAME test_sample COMMAND "${PROJECT_SOURCE_DIR}/build-Debug/test_sample")
-add_test(NAME test_ba COMMAND "${PROJECT_SOURCE_DIR}/build-Debug/test_ba")
+add_test(NAME test_sample COMMAND "${PROJECT_BINARY_DIR}/test_sample")
+add_test(NAME test_ba COMMAND "${PROJECT_BINARY_DIR}/test_ba")
