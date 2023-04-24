@@ -39,42 +39,42 @@ template<std::size_t Begin, std::size_t End>
 using index_range = integer_range<std::size_t, Begin, End>;
  
 template<size_t SN, size_t DN, class TSrc, class TDest, class Func>
-void tuple_call_assign(TSrc&& source, TDest& target, Func f)
+void __assign(TSrc&& source, TDest& target, Func f)
 {
     std::get<DN>(target) = f(std::get<SN>(std::forward<TSrc>(source)));	
 }
  
 template<size_t To, class TSrc, class TDest, class Func, size_t...Is, size_t...DIs>
-void tuple_transform(TSrc&& source, TDest& target, Func f, std::index_sequence<Is...>, std::index_sequence<DIs...>)
+void __neg(TSrc&& source, TDest& target, Func f, std::index_sequence<Is...>, std::index_sequence<DIs...>)
 {
     using expander = int[];
-    (void)expander { 0, (tuple_call_assign<Is,DIs>(std::forward<TSrc>(source),target,f), 0)... };
+    (void)expander { 0, (__assign<Is,DIs>(std::forward<TSrc>(source),target,f), 0)... };
 }
  
 template<size_t To, class TSrc, class TDest, class Func>
-void tuple_transform(TSrc&& source, TDest& target, Func f)
+void __neg(TSrc&& source, TDest& target, Func f)
 {
-    tuple_transform<To>(std::forward<TSrc>(source), target, f,
+    __neg<To>(std::forward<TSrc>(source), target, f,
                     index_range<0,To>(), index_range<0, To>());
 }
 
 template<size_t SN, size_t DN, class TSrc, class TDest, class Func>
-void bi_tuple_call_assign(TSrc&& source, TSrc&& sourceB, TDest& target, Func f)
+void __assign(TSrc&& source, TSrc&& sourceB, TDest& target, Func f)
 {
     std::get<DN>(target) = f(std::get<SN>(std::forward<TSrc>(source)), std::get<SN>(std::forward<TSrc>(sourceB)));	
 }
  
 template<size_t To, class TSrc, class TDest, class Func, size_t...Is, size_t...DIs>
-void bi_tuple_transform(TSrc&& source, TSrc&& sourceB, TDest& target, Func f, std::index_sequence<Is...>, std::index_sequence<DIs...>)
+void __and(TSrc&& source, TSrc&& sourceB, TDest& target, Func f, std::index_sequence<Is...>, std::index_sequence<DIs...>)
 {
     using expander = int[];
-    (void)expander { 0, (bi_tuple_call_assign<Is,DIs>(std::forward<TSrc>(source), std::forward<TSrc>(sourceB),target,f), 0)... };
+    (void)expander { 0, (__assign<Is,DIs>(std::forward<TSrc>(source), std::forward<TSrc>(sourceB),target,f), 0)... };
 }
  
 template<size_t To, class TSrc, class TDest, class Func>
-void bi_tuple_transform(TSrc&& source, TSrc&& sourceB, TDest& target, Func f)
+void __and(TSrc&& source, TSrc&& sourceB, TDest& target, Func f)
 {
-    bi_tuple_transform<To>(std::forward<TSrc>(source), std::forward<TSrc>(sourceB), target, f,
+    __and<To>(std::forward<TSrc>(source), std::forward<TSrc>(sourceB), target, f,
                     index_range<0,To>(), index_range<0, To>());
 }
 
@@ -96,13 +96,13 @@ struct ba_product: std::tuple<BAS...> {
 template <typename... BAS>
 ba_product<BAS...> operator!(ba_product<BAS...>& thiz) {
 	ba_product<BAS...> result;
-	tuple_transform<sizeof...(BAS)>(thiz, result, [](auto&& a) { return !a; });
+	__neg<sizeof...(BAS)>(thiz, result, [](auto&& a) { return !a; });
 	return result;
 }
 
 template <typename... BAS>
 ba_product<BAS...> operator&(ba_product<BAS...>& thiz, ba_product<BAS...>& that) {
 	ba_product<BAS...> result;
-	bi_tuple_transform<sizeof...(BAS)>(thiz, that, result, [](auto&& a, auto&& b) { return a & b; });
+	__and<sizeof...(BAS)>(thiz, that, result, [](auto&& a, auto&& b) { return a & b; });
 	return result;
 }
