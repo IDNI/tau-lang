@@ -36,4 +36,18 @@ struct ba_product: std::tuple<BAS...> {
 		(__and(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
 		return result;
 	}
+
+	ba_product<BAS...> operator|(ba_product<BAS...>& that) {
+		ba_product<BAS...> result;
+		auto __or = [](auto a, auto b, auto& c ) { return c = (a | b); };
+		(__or(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
+		return result;
+	}
+
+	ba_product<BAS...> operator^(ba_product<BAS...>& that) {
+		ba_product<BAS...> result;
+		auto __xor = [](auto a, auto b, auto& c ) { return c = (a ^ b); };
+		(__xor(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
+		return result;
+	}
 };
