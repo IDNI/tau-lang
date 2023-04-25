@@ -11,12 +11,18 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#include <tuple>
+#ifndef __BA_H__
+#define __BA_H__
 
-// The product boolean algebra
+#include <tuple>
+#include <list>
+#include <variant>
+
+#include "babdd.h"
+
+// product boolean algebra
 template <typename...BAS>
 struct ba_product: std::tuple<BAS...> {
-
 
 	ba_product(): std::tuple<BAS...>() {}
 	ba_product(BAS... bas): std::tuple<BAS...>(bas...) {}
@@ -51,3 +57,31 @@ struct ba_product: std::tuple<BAS...> {
 		return result;
 	}
 };
+
+// reference boolean algebra
+template <typename B>
+struct ba_ref {
+	struct var {
+		size_t id;
+		int offset;
+	};
+
+	struct ref {
+		std::size_t id;
+		std::list<std::variant<var, size_t>> idxs;
+		std::list<std::variant<var, B>> args;
+	};
+
+	// each ref correspond to a unique bdd variable identified by id
+	static std::map<ref, size_t> refs_map;
+	hbdd<B> h;
+
+	explicit ba_ref(hbdd<B> h): h(h) {}
+
+	ba_ref<B> operator~() {	return {~h}; }
+	ba_ref<B> operator&(ba_ref<B>& that) { return {h & that.h}; }
+	ba_ref<B> operator|(ba_ref<B>& that) { return {h | that.h}; }
+	ba_ref<B> operator^(ba_ref<B>& that) { return {h ^ that.h};	}
+};
+
+#endif // __BA_H__

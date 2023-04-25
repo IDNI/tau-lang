@@ -94,6 +94,5 @@ TEST_SUITE("product boolean algebra") {
 		CHECK( (TF ^ TF) == FF); CHECK( (TF ^ FF) == TF);
 		CHECK( (TT ^ TT) == FF); CHECK( (TT ^ TF) == FT);
 		CHECK( (TT ^ FT) == TF); CHECK( (TT ^ FF) == TT);
-		
 	}
 }
