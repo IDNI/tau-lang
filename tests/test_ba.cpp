@@ -29,6 +29,14 @@ TEST_SUITE("product boolean algebra") {
 		auto operator<=>(const ba_01& that) const = default;
 	};
 
+	struct ba_01p {
+		bool value;
+
+		ba_01p operator&(const ba_01p& that) { return {value & that.value}; }
+		ba_01p operator!() { return {!value}; }
+		auto operator<=>(const ba_01p& that) const = default;
+	};
+
 	TEST_CASE("the product of one 0/1 boolean algebra is the correct boolean algebra") {
 	
 		ba_product<ba_01> F(ba_01(false));
@@ -46,10 +54,10 @@ TEST_SUITE("product boolean algebra") {
 
 	TEST_CASE("the product of two 0/1 boolean algebra is the correct boolean algebra") {
 	
-		ba_product<ba_01, ba_01> FF(ba_01(false), ba_01(false));
-		ba_product<ba_01, ba_01> FT(ba_01(false), ba_01(true));
-		ba_product<ba_01, ba_01> TF(ba_01(true), ba_01(false));
-		ba_product<ba_01, ba_01> TT(ba_01(true), ba_01(true));
+		ba_product<ba_01, ba_01p> FF(ba_01(false), ba_01p(false));
+		ba_product<ba_01, ba_01p> FT(ba_01(false), ba_01p(true));
+		ba_product<ba_01, ba_01p> TF(ba_01(true), ba_01p(false));
+		ba_product<ba_01, ba_01p> TT(ba_01(true), ba_01p(true));
 
 		CHECK( !FF == TT);
 		CHECK( !FT == TF);

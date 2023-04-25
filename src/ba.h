@@ -23,30 +23,17 @@ struct ba_product: std::tuple<BAS...> {
 
 	auto operator<=>(const ba_product<BAS...>& that) const = default;
 
-	template <size_t...idx>
-	void __not(ba_product<BAS...>& to, std::index_sequence<idx...>) {
-		auto f = [](auto a) { return !a; };
-		(void)std::initializer_list<int>{
-			(std::get<idx>(to) = f(std::get<idx>(std::forward<ba_product<BAS...>>(*this))), 0)...};  
-	}
-
 	ba_product<BAS...> operator!() {
 		ba_product<BAS...> result;
-		__not(result, std::make_integer_sequence<size_t, sizeof...(BAS)>());
+		auto __not = [](auto a, auto& c ) { return c = !a; };
+		(__not(get<BAS>(*this), get<BAS>(result)), ...);
 		return result;
-	}
-
-	template <size_t...idx>
-	void __and(ba_product<BAS...>& that, ba_product<BAS...>& to, std::index_sequence<idx...>) {
-		auto f = [](auto a, auto b) { return a & b; };
-		(void)std::initializer_list<int>{
-			(std::get<idx>(to) = f(std::get<idx>(std::forward<ba_product<BAS...>>(*this)), 
-				std::get<idx>(std::forward<ba_product<BAS...>>(that))), 0)...};  
 	}
 
 	ba_product<BAS...> operator&(ba_product<BAS...>& that) {
 		ba_product<BAS...> result;
-		__and(that, result, std::make_integer_sequence<size_t, sizeof...(BAS)>());
+		auto __and = [](auto a, auto b, auto& c ) { return c = (a & b); };
+		(__and(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
 		return result;
 	}
 };
