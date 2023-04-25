@@ -23,9 +23,9 @@ struct ba_product: std::tuple<BAS...> {
 
 	auto operator<=>(const ba_product<BAS...>& that) const = default;
 
-	ba_product<BAS...> operator!() {
+	ba_product<BAS...> operator~() {
 		ba_product<BAS...> result;
-		auto __not = [](auto a, auto& c ) { return c = !a; };
+		auto __not = [](auto a, auto& c ) { return c = ~a; };
 		(__not(get<BAS>(*this), get<BAS>(result)), ...);
 		return result;
 	}
