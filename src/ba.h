@@ -18,7 +18,7 @@
 #include <list>
 #include <variant>
 
-#include "babdd.h"
+#include "bdd_handle.h"
 
 // product boolean algebra
 template <typename...BAS>
@@ -61,18 +61,22 @@ struct ba_product: std::tuple<BAS...> {
 // reference boolean algebra
 template <typename B>
 struct ba_ref {
+	//TODO add proper builders/constructors to
+	// all the classes involved in this algebra
 	struct var {
 		size_t id;
 		int offset;
 	};
 
 	struct ref {
+		// id of the cbf or wff that this ref belongs to
 		std::size_t id;
+		// TODO check if maybe a pair of variants is better?
 		std::list<std::variant<var, size_t>> idxs;
 		std::list<std::variant<var, B>> args;
 	};
 
-	// each ref correspond to a unique bdd variable identified by id
+	// each ref corresponds to a unique bdd variable
 	static std::map<ref, size_t> refs_map;
 	hbdd<B> h;
 
