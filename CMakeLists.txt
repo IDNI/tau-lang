@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
-
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 cmake_host_system_information(RESULT CORE_COUNT QUERY NUMBER_OF_LOGICAL_CORES)
@@ -16,8 +15,15 @@ if (NOT CMAKE_BUILD_TYPE)
 set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
+include(tau-common)
+
 project(tau)
 add_subdirectory("src")
+
+#
+# Adding git submodules
+#
+add_git_submodule("external/parser")
 
 #
 # Build documentationo
@@ -62,3 +68,4 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	message(STATUS "CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
 	message(STATUS "CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER}")
 endif ()
+

@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
