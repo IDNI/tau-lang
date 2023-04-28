@@ -56,7 +56,7 @@ target_link_options(TAUo        PRIVATE ${TAU_LINK_OPTIONS})
 target_sources(TAUo             PRIVATE ${TAU_SOURCES} ${TAU_HEADERS})
 target_link_libraries(TAUo      ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(TAUo
-	${OBJECT_LIB_NAME} idni_parser_object)
+	${OBJECT_LIB_NAME} idni_parser)
 target_include_directories(TAUo PUBLIC 
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/parser>	
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>)	
@@ -74,7 +74,7 @@ target_compile_options(TAUso     PRIVATE ${TAU_COMPILE_OPTIONS})
 target_link_options(TAUso        PRIVATE ${TAU_LINK_OPTIONS})
 target_link_libraries(TAUso      TAUo)
 target_link_libraries(TAUso
-	${OBJECT_LIB_NAME} idni_parser_object)
+	${OBJECT_LIB_NAME} idni_parser)
 target_include_directories(TAUso PUBLIC 
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/parser>	
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/parser/src>)	
