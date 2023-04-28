@@ -4,6 +4,8 @@ endif()
 
 # adds git definitions
 include(git-defs)
+include(add-git-submodule)
+
 function(target_git_definitions target)
 	target_compile_definitions(${target} PRIVATE ${GIT_DEFINITIONS})
 endfunction()
