@@ -21,6 +21,7 @@ set(TAU_HEADERS
 	babdd.h
 	barr.h
 	bdd_handle.h
+	combinators.h
 	defs.h
 	bool.h
 	builder.h

@@ -10,9 +10,11 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #include "dict.h"
 #include "barr.h"
 #include "bool.h"
+
 #include <cstring>
 
 template <typename N /* parse tree node adapter */, typename B /* boolean algebra */>
