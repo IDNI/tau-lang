@@ -49,7 +49,7 @@ private:
 		auto cb_enter = [&x, &f, this](const auto& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "` ["<<n.second[0]<<","<<n.second[1]<<"]\n";)
 			if (n.first.nt() && n.first.n() == id("bool"))
-				switch (terminals_to_string<char>(f, n)[0]) {
+				switch (terminals_to_str<char>(f, n)[0]) {
 					case 'T': x.push_back(true); break;
 					case 'F': x.push_back(false); break;
 				}
@@ -59,9 +59,9 @@ private:
 			if (!n.first.nt()) return;
 			const auto& l = n.first.n();
 			if      (l == id("neg")) x.back() = !x.back();
-			else if (l == id("and")) (x[x.size()-2] &= x.back()),
+			else if (l == id("and")) (x[x.size()-2] = x[x.size()-2] & x.back()),
 						x.pop_back();
-			else if (l == id("or")) (x[x.size()-2] |= x.back()),
+			else if (l == id("or")) (x[x.size()-2] = x[x.size()-2] | x.back()),
 						x.pop_back();
 		};
 		f.traverse(cb_enter, cb_exit);
