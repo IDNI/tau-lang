@@ -1,5 +1,5 @@
 set(EXAMPLES
-	tau_basic_arithmetic
+	tau_bool
 )
 
 foreach(X IN LISTS EXAMPLES)

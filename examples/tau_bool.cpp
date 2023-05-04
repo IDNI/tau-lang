@@ -16,25 +16,20 @@
 using namespace std;
 using namespace idni;
 
-struct tau_basic_arithmetic {
+struct tau_bool {
 	const char* ba_tgf =
-	"	@use_char_class space, digit. "
+	"	@use_char_class space, true, false. "
 	"	ws           => space*. "
-	"	integer      => digit+. "
-	"	expr1        => addsub | expr2. "
-	"	expr2        => muldiv | factor. "
-	"	addsub       => add | sub & ~add. "
-	"	muldiv       => mul | div & ~mul. "
-	"	add          => expr1 ws '+' ws expr2. "
-	"	sub          => expr1 ws '-' ws expr2. "
-	"	mul          => expr2 ws '*' ws factor. "
-	"	div          => expr2 ws '/' ws factor. "
-	"	factor       => pos | neg | integer | '(' ws expr1 ws ')'. "
-	"       pos          => '+' ws factor. "
-	"	neg          => '-' ws factor. "
-	"	start        => ws expr1 ws. "
+	"	true 	   	 => 'T'. "
+	"	false 	   	 => 'F'. "
+	"	bool         => true | false. "
+	"	expr         => or | and | neg | bool. "
+	"	or           => expr ws '|' ws expr. "
+	"	and          => expr ws '&' ws expr. "
+	"	neg          => '~' ws expr. "
+	"	start        => ws expr ws. "
 	;
-	tau_basic_arithmetic() :
+	tau_bool() :
 		g(tgf<char>::from_string(nts, ba_tgf)), p(g) { }
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
@@ -76,7 +71,7 @@ private:
 };
 
 int main() {
-	tau_basic_arithmetic ba;
+	tau_bool ba;
 	string line;
 	while (getline(cin, line)) {
 		if (line.size() == 0) continue;
