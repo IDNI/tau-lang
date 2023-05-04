@@ -17,8 +17,8 @@ using namespace std;
 using namespace idni;
 
 struct tau_bool {
-	const char* ba_tgf =
-	"	@use_char_class space, true, false. "
+	const char* tb_tgf =
+	" @use_char_class space, alpha, alnum, bool. "
 	"	ws           => space*. "
 	"	true 	   	 => 'T'. "
 	"	false 	   	 => 'F'. "
@@ -27,10 +27,20 @@ struct tau_bool {
 	"	or           => expr ws '|' ws expr. "
 	"	and          => expr ws '&' ws expr. "
 	"	neg          => '~' ws expr. "
-	"	start        => ws expr ws. "
+	" 	chars        => alpha (alnum)*."
+	" 	var          => '?' chars."
+	" 	matcher      => mor | mand | mneg | mbool. "
+	"	mbool         => bool | var. "
+	" 	mor           => matcher ws '|' ws matcher. "
+	" 	mand          => matcher ws '&' ws matcher. "
+	" 	mneg          => '~' ws matcher. "
+	" 	rule		   => matcher ws ':-' ws action ws '.'. "
+	" 	action	   => '(' ws matcher* ws ')'."
+	" 	start        => ws expr ws '.' ws rule (ws rule)*. "
 	;
-	tau_bool() :
-		g(tgf<char>::from_string(nts, ba_tgf)), p(g) { }
+
+	tau_bool(): g(tgf<char>::from_string(nts, tb_tgf)), p(g) { }
+
 	bool eval(const string& s) {
 		auto f = p.parse(s.c_str(), s.size());
 		if (!f || !p.found()) {
@@ -39,11 +49,14 @@ struct tau_bool {
 		cout << evaluate_forest(*f) << endl;
 		return true;
 	}
+
 private:
 	nonterminals<char> nts{};
 	grammar<char> g;
 	parser<char> p;
+	
 	size_t id(const string& s) { return nts.get(s); }
+	
 	bool evaluate_forest(parser<char>::pforest& f) {
 		vector<bool> x;  // intermediate evaluations (nested)
 		auto cb_enter = [&x, &f, this](const auto& n) {
@@ -65,7 +78,7 @@ private:
 						x.pop_back();
 		};
 		f.traverse(cb_enter, cb_exit);
-		return x.size() ? x.back() : 0;
+		return x.size() ? x.back() : false;
 	}
 };
 
