@@ -1,0 +1,73 @@
+@use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
+
+# whitespace and comments
+eol            => '\n' | '\r' | eof.
+ws_comment     => '#' eol | '#' printable+ eol.
+ws_required    => space ws | ws_comment ws.
+ws             => ws_required | null.
+
+# characters
+hex_escape     => "\\x" xdigit xdigit.
+unicode_escape => "\\u" xdigit xdigit xdigit xdigit.
+char_escape_encode => hex_escape | unicode_escape.
+
+# defining char/string/qstring as all chars but its wrapping character
+# enables using TAB and new lines in char(')/string(")/bqstring(`)
+# sequences
+esc            => "\\\\".
+q_char         => '\''.
+q_str          => '"'.
+q_bqstr        => '`'.
+char_punct     => punct & ~q_char & ~q_str & ~q_bqstr
+		& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr).
+char0          => alnum | space | char_escape_encode | char_punct.
+char_          => char0 | esc q_char |     q_str |     q_bqstr.
+string_char    => char0 |     q_char | esc q_str |     q_bqstr.
+bqstring_char  => char0 |     q_char |     q_str | esc q_bqstr.
+chars          => alpha (alnum)*.
+
+# elements
+sym            => chars.
+rvar           => '#' chars.
+lvar           => '?' chars.
+
+# term
+term           => negative_term | positive_term.
+negative_term  => '~' ws positive_term.
+positive_term  => relname args | relname.
+args           => ws '(' ws elems ws ')' | ws '(' ws ')'.
+elems          => elem | elem ws_required elems_rest | relname args
+		| relname args ws elems_rest.
+elems_rest     => elem | elem args | elem ws_required elems_rest | args.
+elem           => sym | lvar | rvar.
+relname        => sym.
+
+char_class    => "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
+		| "graph" | "lower" | "printable" | "punct" | "space"
+		| "upper" | "xdigit".
+
+# FO formula statement
+fof            => preds ws ":-" ws form ws '.'.
+form           => form1  (ws causal_op ws form1)*.
+form1          => matrix (ws junct_op ws matrix)*.
+causal_op      => implies | coimplies.
+junct_op       => and_ | or_.
+and_           => "&&".
+or_            => "||".
+implies        => "->".
+coimplies      => "<->".
+
+matrix         => neg_matrix | matrix_block | prefix_decl | positive_term.
+neg_matrix     => '~' matrix.
+matrix_block   => '{' ws form ws '}'.
+prefix_decl    => prefix ws prefix_arg ws form.
+prefix         => "forall" | "exists" | "unique".
+prefix_arg     => lvar | rvar.
+
+matcher 	   => matrix.
+action	  	   => '(' ws matcher* ws ')'.
+rule		   => matcher ws ":-" ws action ws '.'.
+rules          => ws rule (ws_required rule)*.
+main 		   => matrix.
+program        => ws main ws rules ws.
+start          => program.
