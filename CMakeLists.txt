@@ -19,6 +19,7 @@ include(tau-common)
 
 project(tau)
 add_subdirectory("src")
+add_subdirectory("examples")
 
 #
 # Adding git submodules
