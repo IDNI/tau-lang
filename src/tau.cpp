@@ -18,6 +18,7 @@
 //#include "anf.h"
 #include "builder.h"
 #include "ba.h"
+#include "tau_parser.generated.h"
 
 //template<typename B> vector<bdd<B>> bdd<B>::V;
 //template<typename B> unordered_map<bdd_node, size_t> bdd<B>::Mn;
