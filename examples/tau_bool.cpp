@@ -44,25 +44,24 @@ private:
 	grammar<char> g;
 	parser<char> p;
 	size_t id(const string& s) { return nts.get(s); }
-	int_t evaluate_forest(parser<char>::pforest& f) {
-		vector<int_t> x;  // intermediate evaluations (nested)
+	bool evaluate_forest(parser<char>::pforest& f) {
+		vector<bool> x;  // intermediate evaluations (nested)
 		auto cb_enter = [&x, &f, this](const auto& n) {
 			//DBG(cout << "entering: `" << n.first.to_std_string() << "` ["<<n.second[0]<<","<<n.second[1]<<"]\n";)
-			if (n.first.nt() && n.first.n() == id("integer"))
-				x.push_back(terminals_to_int<char>(f, n));
+			if (n.first.nt() && n.first.n() == id("bool"))
+				switch (terminals_to_string<char>(f, n)[0]) {
+					case 'T': x.push_back(true); break;
+					case 'F': x.push_back(false); break;
+				}
 		};
 		auto cb_exit = [&x, this](const auto& n, const auto&) {
 			//DBG(cout << "exiting: `" << n.first.to_std_string() << "`\n";)
 			if (!n.first.nt()) return;
 			const auto& l = n.first.n();
-			if      (l == id("neg")) x.back() = -x.back();
-			else if (l == id("add")) (x[x.size()-2] += x.back()),
+			if      (l == id("neg")) x.back() = !x.back();
+			else if (l == id("and")) (x[x.size()-2] &= x.back()),
 						x.pop_back();
-			else if (l == id("sub")) (x[x.size()-2] -= x.back()),
-						x.pop_back();
-			else if (l == id("mul")) (x[x.size()-2] *= x.back()),
-						x.pop_back();
-			else if (l == id("div")) (x[x.size()-2] /= x.back()),
+			else if (l == id("or")) (x[x.size()-2] |= x.back()),
 						x.pop_back();
 		};
 		f.traverse(cb_enter, cb_exit);
