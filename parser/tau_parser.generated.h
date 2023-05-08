@@ -5,7 +5,7 @@
 struct tau_parser {
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(75), cc), p(g) { }
+		g(nts, load_prods(), nt(69), cc), p(g) { }
 	std::unique_ptr<typename idni::parser<char>::pforest> parse(
 		const char* data, size_t size = 0,
 		char eof = std::char_traits<char>::eof())
@@ -21,10 +21,10 @@ struct tau_parser {
 private:
 	std::vector<char> ts{
 		'\0', '\n', '\r', '#', '\\', 'x', 'u', '\'', '"', 
-		'`', '.', '_', '?', '~', '(', ')', 'a', 'l', 'n', 
-		'm', 'p', 'h', 'b', 'k', 'c', 't', 'r', 'd', 'i', 
-		'g', 'e', 'o', 'f', 'w', 's', ':', '-', '&', '|', 
-		'>', '<', '{', '}', 'q', 
+		'`', '?', '~', '(', ')', 'a', 'l', 'n', 'm', 'p', 
+		'h', 'b', 'k', 'c', 't', 'r', 'd', 'i', 'g', 'e', 
+		'o', 'f', 'w', 's', '&', '|', '-', '>', '<', '{', 
+		'}', 'q', ':', '.', 
 	};
 	idni::nonterminals<char> nts{};
 	idni::char_class_fns<char> cc;
@@ -42,11 +42,10 @@ private:
 			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "eol", 
 			"ws_comment", "_Rws_comment_0", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", "q_str", 
 			"q_bqstr", "char_punct", "_Rchar_punct_1", "_Rchar_punct_2", "_Rchar_punct_3", "char0", "char_", "string_char", "bqstring_char", "chars", 
-			"_Rchars_4", "_Rchars_5", "sym", "mvar", "rvar", "ivar", "lvar", "term", "negative_term", "positive_term", 
-			"relname", "args", "elems", "elem", "elems_rest", "char_class", "fof", "preds", "form", "form1", 
-			"causal_op", "_Rform_6", "_Rform_7", "matrix", "junct_op", "_Rform1_8", "_Rform1_9", "implies", "coimplies", "and_", 
-			"or_", "neg_matrix", "matrix_block", "prefix_decl", "prefix", "prefix_arg", "matcher", "action", "_Raction_10", "rule", 
-			"rules", "_Rrules_11", "_Rrules_12", "main", "program", "start", 
+			"_Rchars_4", "_Rchars_5", "sym", "ignore", "var", "term", "negative_term", "positive_term", "relname", "args", 
+			"elems", "elem", "elems_rest", "char_class", "form", "form1", "causal_op", "_Rform_6", "_Rform_7", "matrix", 
+			"junct_op", "_Rform1_8", "_Rform1_9", "implies", "coimplies", "and_", "or_", "neg_matrix", "matrix_block", "prefix_decl", 
+			"prefix", "prefix_arg", "ivar", "rule", "rules", "_Rrules_10", "_Rrules_11", "main", "program", "start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -108,84 +107,76 @@ private:
 		q(nt(31), (nul));
 		q(nt(29), (nt(5)+nt(31)));
 		q(nt(32), (nt(29)));
-		q(nt(33), (t(3)+nt(29)));
-		q(nt(34), (t(3)+nt(29)+t(10)+t(10)+t(10)));
-		q(nt(35), (t(3)+t(11)));
-		q(nt(36), (t(12)+nt(29)));
+		q(nt(33), (t(10)+t(10)));
+		q(nt(34), (t(10)+nt(29)));
+		q(nt(35), (nt(36)));
+		q(nt(35), (nt(37)));
+		q(nt(36), (t(11)+nt(13)+nt(37)));
 		q(nt(37), (nt(38)));
-		q(nt(37), (nt(39)));
-		q(nt(38), (t(13)+nt(13)+nt(39)));
-		q(nt(39), (nt(40)));
-		q(nt(39), (nt(40)+nt(41)));
-		q(nt(41), (nt(13)+t(14)+nt(13)+nt(42)+nt(13)+t(15)));
-		q(nt(41), (nt(13)+t(14)+nt(13)+t(15)));
-		q(nt(42), (nt(40)+nt(41)));
-		q(nt(42), (nt(40)+nt(41)+nt(13)+nt(44)));
-		q(nt(42), (nt(43)));
-		q(nt(42), (nt(43)+nt(12)+nt(44)));
-		q(nt(44), (nt(41)));
-		q(nt(44), (nt(43)));
-		q(nt(44), (nt(43)+nt(12)+nt(44)));
-		q(nt(44), (nt(43)+nt(41)));
-		q(nt(43), (nt(32)));
-		q(nt(43), (nt(33)));
-		q(nt(43), (nt(34)));
-		q(nt(43), (nt(35)));
-		q(nt(43), (nt(36)));
-		q(nt(40), (nt(32)));
-		q(nt(45), (t(16)+t(17)+t(18)+t(6)+t(19)));
-		q(nt(45), (t(16)+t(17)+t(20)+t(21)+t(16)));
-		q(nt(45), (t(22)+t(17)+t(16)+t(18)+t(23)));
-		q(nt(45), (t(24)+t(18)+t(25)+t(26)+t(17)));
-		q(nt(45), (t(27)+t(28)+t(29)+t(28)+t(25)));
-		q(nt(45), (t(30)+t(31)+t(32)));
-		q(nt(45), (t(29)+t(26)+t(16)+t(20)+t(21)));
-		q(nt(45), (t(17)+t(31)+t(33)+t(30)+t(26)));
-		q(nt(45), (t(20)+t(26)+t(28)+t(18)+t(25)+t(16)+t(22)+t(17)+t(30)));
-		q(nt(45), (t(20)+t(6)+t(18)+t(24)+t(25)));
-		q(nt(45), (t(34)+t(20)+t(16)+t(24)+t(30)));
-		q(nt(45), (t(6)+t(20)+t(20)+t(30)+t(26)));
-		q(nt(45), (t(5)+t(27)+t(28)+t(29)+t(28)+t(25)));
-		q(nt(46), (nt(47)+nt(13)+t(35)+t(36)+nt(13)+nt(48)+nt(13)+t(10)));
+		q(nt(37), (nt(38)+nt(39)));
+		q(nt(39), (nt(13)+t(12)+nt(13)+nt(40)+nt(13)+t(13)));
+		q(nt(39), (nt(13)+t(12)+nt(13)+t(13)));
+		q(nt(40), (nt(38)+nt(39)));
+		q(nt(40), (nt(38)+nt(39)+nt(13)+nt(42)));
+		q(nt(40), (nt(41)));
+		q(nt(40), (nt(41)+nt(12)+nt(42)));
+		q(nt(42), (nt(39)));
+		q(nt(42), (nt(41)));
+		q(nt(42), (nt(41)+nt(12)+nt(42)));
+		q(nt(42), (nt(41)+nt(39)));
+		q(nt(41), (nt(32)));
+		q(nt(41), (nt(33)));
+		q(nt(41), (nt(34)));
+		q(nt(38), (nt(32)));
+		q(nt(43), (t(14)+t(15)+t(16)+t(6)+t(17)));
+		q(nt(43), (t(14)+t(15)+t(18)+t(19)+t(14)));
+		q(nt(43), (t(20)+t(15)+t(14)+t(16)+t(21)));
+		q(nt(43), (t(22)+t(16)+t(23)+t(24)+t(15)));
+		q(nt(43), (t(25)+t(26)+t(27)+t(26)+t(23)));
+		q(nt(43), (t(28)+t(29)+t(30)));
+		q(nt(43), (t(27)+t(24)+t(14)+t(18)+t(19)));
+		q(nt(43), (t(15)+t(29)+t(31)+t(28)+t(24)));
+		q(nt(43), (t(18)+t(24)+t(26)+t(16)+t(23)+t(14)+t(20)+t(15)+t(28)));
+		q(nt(43), (t(18)+t(6)+t(16)+t(22)+t(23)));
+		q(nt(43), (t(32)+t(18)+t(14)+t(22)+t(28)));
+		q(nt(43), (t(6)+t(18)+t(18)+t(28)+t(24)));
+		q(nt(43), (t(5)+t(25)+t(26)+t(27)+t(26)+t(23)));
+		q(nt(47), (nt(13)+nt(46)+nt(13)+nt(45)));
+		q(nt(48), (nt(47)+nt(48)));
+		q(nt(48), (nul));
+		q(nt(44), (nt(45)+nt(48)));
 		q(nt(51), (nt(13)+nt(50)+nt(13)+nt(49)));
 		q(nt(52), (nt(51)+nt(52)));
 		q(nt(52), (nul));
-		q(nt(48), (nt(49)+nt(52)));
-		q(nt(55), (nt(13)+nt(54)+nt(13)+nt(53)));
-		q(nt(56), (nt(55)+nt(56)));
-		q(nt(56), (nul));
-		q(nt(49), (nt(53)+nt(56)));
-		q(nt(50), (nt(57)));
-		q(nt(50), (nt(58)));
-		q(nt(54), (nt(59)));
-		q(nt(54), (nt(60)));
-		q(nt(59), (t(37)+t(37)));
-		q(nt(60), (t(38)+t(38)));
-		q(nt(57), (t(36)+t(39)));
-		q(nt(58), (t(40)+t(36)+t(39)));
-		q(nt(53), (nt(39)));
-		q(nt(53), (nt(61)));
-		q(nt(53), (nt(62)));
-		q(nt(53), (nt(63)));
-		q(nt(61), (t(13)+nt(53)));
-		q(nt(62), (t(41)+nt(13)+nt(48)+nt(13)+t(42)));
-		q(nt(63), (nt(64)+nt(13)+nt(65)+nt(13)+nt(48)));
-		q(nt(64), (t(30)+t(5)+t(28)+t(34)+t(25)+t(34)));
-		q(nt(64), (t(32)+t(31)+t(26)+t(16)+t(17)+t(17)));
-		q(nt(64), (t(6)+t(18)+t(28)+t(43)+t(6)+t(30)));
-		q(nt(65), (nt(36)));
-		q(nt(66), (nt(53)));
-		q(nt(68), (nul));
-		q(nt(68), (t(14)+nt(13)+nt(66)+nt(68)));
-		q(nt(67), (nt(68)+nt(13)+t(15)));
-		q(nt(69), (nt(66)+nt(13)+t(35)+t(36)+nt(13)+nt(67)+nt(13)+t(10)));
-		q(nt(71), (nt(12)+nt(69)));
-		q(nt(72), (nt(71)+nt(72)));
-		q(nt(72), (nul));
-		q(nt(70), (nt(13)+nt(69)+nt(72)));
-		q(nt(73), (nt(53)));
-		q(nt(74), (nt(13)+nt(73)+nt(13)+nt(70)+nt(13)));
-		q(nt(75), (nt(74)));
+		q(nt(45), (nt(49)+nt(52)));
+		q(nt(46), (nt(53)));
+		q(nt(46), (nt(54)));
+		q(nt(50), (nt(55)));
+		q(nt(50), (nt(56)));
+		q(nt(55), (t(33)+t(33)));
+		q(nt(56), (t(34)+t(34)));
+		q(nt(53), (t(35)+t(36)));
+		q(nt(54), (t(37)+t(35)+t(36)));
+		q(nt(49), (nt(37)));
+		q(nt(49), (nt(57)));
+		q(nt(49), (nt(58)));
+		q(nt(49), (nt(59)));
+		q(nt(57), (t(11)+nt(49)));
+		q(nt(58), (t(38)+nt(13)+nt(44)+nt(13)+t(39)));
+		q(nt(59), (nt(60)+nt(13)+nt(61)+nt(13)+nt(44)));
+		q(nt(60), (t(28)+t(5)+t(26)+t(32)+t(23)+t(32)));
+		q(nt(60), (t(30)+t(29)+t(24)+t(14)+t(15)+t(15)));
+		q(nt(60), (t(6)+t(16)+t(26)+t(40)+t(6)+t(28)));
+		q(nt(61), (nt(34)));
+		q(nt(61), (nt(62)));
+		q(nt(63), (nt(49)+nt(13)+t(41)+t(35)+nt(13)+nt(49)+nt(13)+t(42)));
+		q(nt(65), (nt(13)+nt(63)));
+		q(nt(66), (nt(65)+nt(66)));
+		q(nt(66), (nul));
+		q(nt(64), (nt(66)));
+		q(nt(67), (nt(49)+nt(13)+t(42)));
+		q(nt(68), (nt(13)+nt(64)+nt(13)+nt(67)+nt(13)));
+		q(nt(69), (nt(68)));
 		return q;
 	}
 };
