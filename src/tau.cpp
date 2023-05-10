@@ -11,11 +11,14 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
+#include <iostream>
+
 #include "barr.h"
 #include "out.h"
 //#include "anf.h"
 #include "builder.h"
-#include <iostream>
+#include "ba.h"
+#include "tau_parser.generated.h"
 
 //template<typename B> vector<bdd<B>> bdd<B>::V;
 //template<typename B> unordered_map<bdd_node, size_t> bdd<B>::Mn;
@@ -38,9 +41,9 @@ bool msba<tuple<BAs...>, aux...>::dummy =
 
 int main() {
 	//typedef msba<tuple<sbf>> fof;
-	typedef barr<sbf> fof;
+	// typedef barr<sbf> fof;
 	//typedef barr<Bool> fof;
-	fof::init();
+	// fof::init();
 /*	fof x(true, sbf_T), y(false, sbf_F);
 	fof a(true, sbf_F), b(false, sbf_T);
 	out(out(cout, x), y);
@@ -55,20 +58,19 @@ int main() {
 	z.normalize();
 	out<sbf>(cout, z);*/
 
-	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
-//	auto dnf = f->dnf();
+/*	sbf f = ("a"s & "x"s) | ("b"s & "x'"s);
 	sbf g = ("c"s & "x"s) | ("d"s & "x'"s);
 	fof t(true);
 	t = (t & fof(true, f));
 	t = (t & fof(false, g));
-	fof tt(true);
+	fof tt(true);*/
 //	cout << bdd_handle<fof>::get(t) << endl;
 //	tt = (t & fof(true, bdd_handle<fof>::bit(true, 1) & bdd_handle<fof>::get(t)));
-	out(cout, t);
+/*	out(cout, t);
 	cout << t.b << endl;
 	t.normalize();
 	cout << t.b << endl;
-	out(cout, t);
+	out(cout, t);*/
 	return 0;
 /*	t += bdd_handle<fof>::get(t);
 	cout << t << endl;
