@@ -13,6 +13,7 @@
 #ifndef __NORMALIZER_H__
 #define __NORMALIZER_H__
 #include "msba.h"
+#include "bdd_handle.h"
 
 template<typename... BDDs, typename... aux>
 struct normalizer<tuple<BDDs...>, aux...> {

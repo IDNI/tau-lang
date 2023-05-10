@@ -13,6 +13,7 @@
 
 #ifndef __BARR_H__ // boolean algebra with recurrence relations
 #define __BARR_H__
+
 #include "normalizer.h"
 
 typedef pair<array<int_t, 2>, vector<int_t>> named; // name+idx+args[]

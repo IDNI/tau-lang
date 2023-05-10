@@ -10,8 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #ifndef __BDD_HANDLE_H__
 #define __BDD_HANDLE_H__
+
 #include "babdd.h"
 
 template<typename B, auto o> struct bdd_handle;
