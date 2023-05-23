@@ -24,5 +24,11 @@ add_executable(test_ba ${TEST_BA})
 target_setup(test_ba)
 target_link_libraries(test_ba TAUo doctest)
 
+set(TEST_REWRITING test_rewriting.cpp)
+add_executable(test_rewriting ${TEST_REWRITING})
+target_setup(test_rewriting)
+target_link_libraries(test_rewriting TAUo doctest)
+
 add_test(NAME test_sample COMMAND "${PROJECT_BINARY_DIR}/test_sample")
 add_test(NAME test_ba COMMAND "${PROJECT_BINARY_DIR}/test_ba")
+add_test(NAME test_rewriting COMMAND "${PROJECT_BINARY_DIR}/test_rewriting")
