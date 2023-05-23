@@ -23,6 +23,7 @@ set(TAU_HEADERS
 	bdd_handle.h
 	defs.h
 	bool.h
+	rewriting.h
 	dict.h
 	msba.h
 	normalizer.h
@@ -32,6 +33,7 @@ set(TAU_HEADERS
 
 set(TAU_SOURCES
 	dict.cpp
+	rewriting.cpp
 )
 
 set(CLI_SOURCES tau.cpp)
