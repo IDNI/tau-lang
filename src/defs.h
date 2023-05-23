@@ -10,8 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #ifndef __DEF_H__
 #define __DEF_H__
+
 typedef int sym_t;
 
 #ifdef DEBUG
