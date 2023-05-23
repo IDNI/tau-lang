@@ -16,7 +16,6 @@
 #include "barr.h"
 #include "out.h"
 //#include "anf.h"
-#include "builder.h"
 #include "ba.h"
 
 //template<typename B> vector<bdd<B>> bdd<B>::V;

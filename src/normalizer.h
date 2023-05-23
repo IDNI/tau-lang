@@ -10,8 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #ifndef __NORMALIZER_H__
 #define __NORMALIZER_H__
+
 #include "msba.h"
 #include "bdd_handle.h"
 
