@@ -69,6 +69,7 @@ struct rewriter {
 
 	bool apply(const rule& r);
 	void traverse(const std::function<void(const node&)>& cb) { g.traverse(cb); }
+	// void find(const function<bool(const node&)>& cb);
 
 	rewriter(const options& o) : opts(o) { }
 	rewriter(const forest<symbol>::graph& g, const options& o) : opts(o), g(g, g.root) { }

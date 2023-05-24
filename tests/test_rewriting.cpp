@@ -15,6 +15,7 @@
 
 #include "../src/doctest.h"
 #include "../src/rewriting.h"
+#include "test_rewriting/rewriting_parser.generated.h"
 
 using namespace idni;
 
@@ -22,13 +23,13 @@ namespace testing = doctest;
 
 TEST_SUITE("rewriting engine: helper functions") {
 
-	struct rewriter_test : public idni::rewriter<char> {
-		rewriter_test() : idni::rewriter<char>(options{0, 1}) { }
-	};
+	size_t ignore = rewriting_parser::ignore;
+	size_t variable = rewriting_parser::var;
 
-	rewriter_test r;
+	const char* ceci_est_une_var = "t(a b).";
 
 	TEST_CASE("is_var") {
+
 	}
 
 	TEST_CASE("is_terminal") {
