@@ -1,71 +1,112 @@
 @use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
 # whitespace and comments
-eol            => '\n' | '\r' | eof.
-ws_comment     => '#' eol | '#' printable+ eol.
-ws_required    => space ws | ws_comment ws.
-ws             => ws_required | null.
+eol				=> '\n' | '\r' | eof.
+ws_comment		=> '#' eol | '#' printable+ eol.
+ws_required		=> space ws | ws_comment ws.
+ws				=> ws_required | null.
 
 # characters
-hex_escape     => "\\x" xdigit xdigit.
-unicode_escape => "\\u" xdigit xdigit xdigit xdigit.
-char_escape_encode => hex_escape | unicode_escape.
+hex_escape			=> "\\x" xdigit xdigit.
+unicode_escape		=> "\\u" xdigit xdigit xdigit xdigit.
+char_escape_encode	=> hex_escape | unicode_escape.
 
 # defining char/string/qstring as all chars but its wrapping character
 # enables using TAB and new lines in char(')/string(")/bqstring(`)
 # sequences
-esc            => "\\\\".
-q_char         => '\''.
-q_str          => '"'.
-q_bqstr        => '`'.
-char_punct     => punct & ~q_char & ~q_str & ~q_bqstr
-		& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr).
-char0          => alnum | space | char_escape_encode | char_punct.
-char_          => char0 | esc q_char |     q_str |     q_bqstr.
-string_char    => char0 |     q_char | esc q_str |     q_bqstr.
-bqstring_char  => char0 |     q_char |     q_str | esc q_bqstr.
-chars          => alpha (alnum)*.
+esc				=> "\\\\".
+q_char			=> '\''.
+q_str			=> '"'.
+q_bqstr			=> '`'.
+char_punct		=> punct & ~q_char & ~q_str & ~q_bqstr
+					& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr).
+char0			=> alnum | space | char_escape_encode | char_punct.
+char_			=> char0 | esc q_char |     q_str |     q_bqstr.
+string_char		=> char0 |     q_char | esc q_str |     q_bqstr.
+bqstring_char	=> char0 |     q_char |     q_str | esc q_bqstr.
+chars			=> alpha (alnum)*.
 
 # elements
-sym            => chars.
-ignore           => "??".
-var           => '?' chars.
+sym				=> chars.
+ignore 			=> "??_".
+capture			=> '??' chars.
+var				=> '?' chars.
+
+char_class    	=> "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
+				| "graph" | "lower" | "printable" | "punct" | "space"
+				| "upper" | "xdigit".
+
+# wff
+wff_def			=> ws wff_rule ws | ws wff_macro ws '.'.
+wff_rule		=> ws wff_head ws "<=" ws wff ws '.'.
+wff_macro		=> ws wff_head ws "<=" ws wff_rule ws '.'.
+wff_head		=> relname ws '[' indexes ']' ws '(' ws vars ws')'.
+wff 			=> wff_eq | wff_ref | wff_and | wff_neg | wff_xor | wff_or | wff_all | wff_ex.
+wff_eq 			=> ws elem ws "=" F ws.
+wff_ref			=> ws wff_head ws.
+wff_and			=> ws "(" ws wff ws "wff_and" ws wff ws ")" ws.
+wff_or			=> ws "(" ws wff ws "wff_or" ws wff ws ")" ws.
+wff_xor			=> ws "(" ws wff ws "wff_xor" ws wff ws ")" ws.
+wff_neg			=> ws "wff_neg" ws "(" ws wff ws ")" ws.
+wff_all			=> ws "wff_all" ws _var ws "(" ws wff ws ")" ws.
+wff_ex			=> ws "wff_ex" ws _var ws "(" ws wff ws ")" ws.
+
+#cbf
+cbf_def 		=> ws cbf_rule ws "|" ws cbf_macro ws '.'.
+cbf_rule 		=> ws cbf_head ws "<=" ws cbf ws '.'.
+cbf_macro 		=> ws cbf_head ws "<=" ws cbf_rule ws '.'.
+cbf_head 		=> relname ws '[' indexes ']' ws '(' ws vars ws')'.
+cbf 			=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or.
+cbf_ref			=> ws cbf_head ws.
+cbf_and			=> ws "(" ws cbf ws "cbf_and" ws cbf ws ")" ws.
+cbf_or			=> ws "(" ws cbf ws "cbf_or" ws cbf ws ")" ws.
+cbf_xor			=> ws "(" ws cbf ws "cbf_xor" ws cbf ws ")" ws.
+cbf_neg			=> ws "cbf_neg" ws "(" ws cbf ws ")" ws.
+cbf_if			=> ws "if" ws "(" ws cbf_if_condition ws ")" ws 
+				"then" ws cbf_if_then ws 
+				"else" ws cbf_if_else ws.
+cbf_if_condition	=> wff.
+cbf_if_then		=> cbf.
+cbf_if_else		=> cbf.
+
+# bf
+bf				=> elem | bf_and | bf_neg | bf_xor | bf_or | bf_all | bf_ex.
+bf_and			=> ws "(" ws bf ws "bf_and" ws bf ws ")" ws.
+bf_or			=> ws "(" ws bf ws "bf_or" ws bf ws ")" ws.
+bf_xor			=> ws "(" ws bf ws "bf_xor" ws bf ws ")" ws.
+bf_neg			=> ws "bf_neg" ws "(" ws bf ws ")" ws.
+bf_all			=> ws "bf_all" ws _var ws "(" ws bf ws ")" ws.
+bf_ex			=> ws "bf_ex" ws _var ws "(" ws bf ws ")" ws.
+
+# elem
+elem	=> term | cbf | cbf_ref | T | F.
+T		=> ws "T" ws.
+F		=> ws "F" ws.
 
 # term
-term           => negative_term | positive_term.
-negative_term  => '~' ws positive_term.
-positive_term  => relname args | relname.
-args           => ws '(' ws elems ws ')' | ws '(' ws ')'.
-elems          => elem | elem ws_required elems_rest | relname args
-		| relname args ws elems_rest.
-elems_rest     => elem | elem args | elem ws_required elems_rest | args.
-elem           => sym | var | ignore.
-relname        => sym.
+term			=> relname ws '(' ws args ws ')'.
+args			=> elem_arg | term | elem_arg args_rest | .
+args_rest		=> elem_arg | elem_arg args_rest .
+elem_arg		=> _var.
+relname			=> sym.
 
-char_class    => "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
-		| "graph" | "lower" | "printable" | "punct" | "space"
-		| "upper" | "xdigit".
+# indexes
+indexes				=> index | index indexes_rest |.
+indexes_rest		=> index | index indexes_rest.
+index				=> _var | num | var_minus_offset.
+num					=> digit+.
+var_minus_offset	=> _var ws '-' ws num.
 
-# FO formula statement
-form           => form1  (ws causal_op ws form1)*.
-form1          => matrix (ws junct_op ws matrix)*.
-causal_op      => implies | coimplies.
-junct_op       => and_ | or_.
-and_           => "&&".
-or_            => "||".
-implies        => "->".
-coimplies      => "<->".
+# vars
+vars			=> _var |_ var vars_rest |.
+vars_rest		=> _var | _var vars_rest.
+_var			=> var | ignore | capture.	
 
-matrix         => neg_matrix | matrix_block | prefix_decl | positive_term.
-neg_matrix     => '~' matrix.
-matrix_block   => '{' ws form ws '}'.
-prefix_decl    => prefix ws prefix_arg ws form.
-prefix         => "forall" | "exists" | "unique".
-prefix_arg     => var | ivar.
+# main
+main 		   => wff ws '.'.
 
-rule		   => matrix ws ":-" ws matrix ws '.'.
-rules          => (ws rule)*.
-main 		   => matrix ws '.'.
+rule		   => wff_def | cbf_def.
+rules          => (ws rule)* | ws main ws '.'..
 program        => ws rules ws main ws.
 start          => program.
 
