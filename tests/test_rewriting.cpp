@@ -50,7 +50,8 @@ TEST_SUITE("node") {
 		CHECK( d1.childs.size() == 0 );
 	}
 	
-	TEST_CASE("node constructor: given a sym and children, the node has that sym and children") {
+	TEST_CASE("node constructor: given a sym and children, the node has that sym "
+			"and children") {
 		auto d1 = *d('a', {d('b'), d('c'), d('d')});
 		CHECK( d1.sym == 'a' );
 		CHECK( d1.childs.size() == 3 );
@@ -58,39 +59,47 @@ TEST_SUITE("node") {
 		CHECK( d1.childs[1]->sym == 'c' );
 		CHECK( d1.childs[2]->sym == 'd' );
 	}
-	TEST_CASE("node order: given two simple nodes, the order is given by the order of the syms") {
+	TEST_CASE("node order: given two simple nodes, the order is given by the order "
+			"of the syms") {
 		CHECK( *d('a') < *d('b') );
 	}
 
-	TEST_CASE("node order: given two nodes with same sym and different children, one is bigger than the other") {
+	TEST_CASE("node order: given two nodes with same sym and different children, "
+			"one is bigger than the other") {
 		auto d1 = *d('a', {d('b')});
 		auto d2 = *d('a', {d('b'), d('c')});
 		CHECK( ((d1 < d2) || (d2 < d1)) );
 	}
 
-	TEST_CASE("node order: given two nodes with the same sym and children, neither of them is bigger than the other") {
+	TEST_CASE("node order: given two nodes with the same sym and children, neither "
+			"of them is bigger than the other") {
 		auto d1 = *d('a', {n('b'), n('c'), n('d')});
 		auto d2 = *d('a', {n('b'), n('c'), n('d')});
 		CHECK( (!(d1 < d2) && !(d2 < d1)) );
 	}
 
-	TEST_CASE("node equality: given two simple nodes with the same sym, they are equal") {
+	TEST_CASE("node equality: given two simple nodes with the same sym, they "
+			"are equal") {
 		CHECK( *d('a') == *d('a') );
 	}
 
-	TEST_CASE("node equality: given two nodes with the same sym and children, they are equal") {
+	TEST_CASE("node equality: given two nodes with the same sym and children, "
+			"they are equal") {
 		CHECK( *d('a', {n('b'), n('c'), n('d')}) == *d('a', {n('b'), n('c'), n('d')}) );
 	}
 
-	TEST_CASE("node equality: given two simple nodes with different syms, they are not equal") {
+	TEST_CASE("node equality: given two simple nodes with different syms, they "
+			"are not equal") {
 		CHECK( *d('a') != *d('b') );
 	}
 
-	TEST_CASE("node equality: given two nodes with different syms and same children, they are not equal") {
+	TEST_CASE("node equality: given two nodes with different syms and same children, "
+			"they are not equal") {
 		CHECK( *d('a', {n('b'), n('c'), n('d')}) != *d('b', {n('b'), n('c'), n('d')}) );
 	}
 
-	TEST_CASE("node equality: given two nodes with same syms and different children, they are not equal") {
+	TEST_CASE("node equality: given two nodes with same syms and different children, "
+			"they are not equal") {
 		CHECK(  *d('a', {d('b'), d('c'), d('d')}) !=  *d('a', {d('b'), d('c'), d('d')}) );
 	}
 }
@@ -102,13 +111,15 @@ TEST_SUITE("tree") {
 		CHECK( *t1.root == *n('a'));
 	}
 
-	TEST_CASE("tree order: given two trees with the same root, neither of them is bigger than the other") {
+	TEST_CASE("tree order: given two trees with the same root, neither of them is "
+			"bigger than the other") {
 		auto t1 = tree(n('a'));
 		auto t2 = tree(n('a'));
 		CHECK( (!(t1 < t2) && !(t2 < t1)) );
 	}
 
-	TEST_CASE("tree order: given two trees with different roots, one is bigger than the other") {
+	TEST_CASE("tree order: given two trees with different roots, one is bigger "
+			"than the other") {
 		auto t1 = tree(n('a'));
 		auto t2 = tree(n('b'));
 		CHECK( ((t1 < t2) || (t2 < t1)) );
@@ -129,25 +140,29 @@ TEST_SUITE("tree") {
 
 TEST_SUITE("make_node") {
 
-	TEST_CASE("make_node uniqueness: given two simple nodes with the same sym, it returns the same node") {
+	TEST_CASE("make_node uniqueness: given two simple nodes with the same sym, it "
+			"returns the same node") {
 		auto n1 = make_node<char>('a', {}).first;
 		auto n2 = make_node<char>('a', {}).first;
 		CHECK( n1 == n2 );		
 	}
 
-	TEST_CASE("make_node uniqueness: given two nodes with the same sym and children, it returns the same node") {
+	TEST_CASE("make_node uniqueness: given two nodes with the same sym and children, "
+			"it returns the same node") {
 		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')}).first;
 		auto n2 = make_node<char>('a', {n('b'), n('c'), n('d')}).first;
 		CHECK( n1 == n2 );		
 	}
 
-	TEST_CASE("make_node uniqueness: given two nodes with different sym and same children, it returns the different nodes") {
+	TEST_CASE("make_node uniqueness: given two nodes with different sym and same "
+			"children, it returns the different nodes") {
 		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')}).first;
 		auto n2 = make_node<char>('b', {n('b'), n('c'), n('d')}).first;
 		CHECK( n1 != n2 );		
 	}
 
-	TEST_CASE("make_node uniqueness: given two nodes with same sym and different children, it returns the different nodes") {
+	TEST_CASE("make_node uniqueness: given two nodes with same sym and different "
+			"children, it returns the different nodes") {
 		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')}).first;
 		auto n2 = make_node<char>('a', {n('b'), n('c'), n('e')}).first;
 		CHECK( n1 != n2 );		
@@ -202,7 +217,8 @@ TEST_SUITE("post_order_traverser") {
 		CHECK( visited.nodes == expected );
 	}
 
-	TEST_CASE("post_order_traverser: given a tree with two children, it visits the children and then the root") {
+	TEST_CASE("post_order_traverser: given a tree with two children, it visits "
+			"the children and then the root") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		identity_visitor<sp_node<char>> identity;
 		collect_visitor<identity_visitor<sp_node<char>>, sp_node<char>> visited{identity};
@@ -212,7 +228,8 @@ TEST_SUITE("post_order_traverser") {
 		CHECK( visited.nodes == expected );
 	}
 
-	TEST_CASE("post_order_traversal: given tree with underlying diamond like DAG, it visits the children and then the root") {
+	TEST_CASE("post_order_traversal: given tree with underlying diamond like DAG, "
+			"it visits the children and then the root") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		identity_visitor<sp_node<char>> identity;
 		collect_visitor<identity_visitor<sp_node<char>>, sp_node<char>> visited{identity};
@@ -225,7 +242,8 @@ TEST_SUITE("post_order_traverser") {
 
 TEST_SUITE("map_transformer") {
 
-	TEST_CASE("map_transformer: given a simple tree and a visitor, it returns a new tree with the changes applied by the visitor") {
+	TEST_CASE("map_transformer: given a simple tree and a visitor, it returns a "
+			"new tree with the changes applied by the visitor") {
 		sp_node<char> root = n('a');
 		auto transform = [](char c) { return c == 'a' ? 'z' : c; };
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
@@ -234,7 +252,8 @@ TEST_SUITE("map_transformer") {
 		CHECK( post_order_traverser(map , always)(root) == expected );
 	}
 
-	TEST_CASE("map_transformer: given a tree with two children and a visitor, it returns a new tree with the changes applied by the visitor") {
+	TEST_CASE("map_transformer: given a tree with two children and a visitor, "
+			"it returns a new tree with the changes applied by the visitor") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto transform = [](char c) { return c == 'b' ? 'z' : c; };
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
@@ -243,7 +262,9 @@ TEST_SUITE("map_transformer") {
 		CHECK( post_order_traverser(map , always)(root) == expected );
 	}
 
-	TEST_CASE("map_transformer: given a tree with underlying diamond like DAG and a visitor, it returns a new tree with the changes applied by the visitor") {
+	TEST_CASE("map_transformer: given a tree with underlying diamond like DAG "
+			"and a visitor, it returns a new tree with the changes applied by "
+			"the visitor") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto transform = [](char c) { return c == 'd' ? 'z' : c; };
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
@@ -255,7 +276,8 @@ TEST_SUITE("map_transformer") {
 
 TEST_SUITE("replace_transformer") {
 
-	TEST_CASE("replace_transformer: given a simple tree and a visitor, it returns a new tree with the provided replacements") {
+	TEST_CASE("replace_transformer: given a simple tree and a visitor, it returns "
+			"a new tree with the provided replacements") {
 		sp_node<char> root = n('a');
 		map<sp_node<char>, sp_node<char>> m;
 		m[root] = n('z');
@@ -265,7 +287,8 @@ TEST_SUITE("replace_transformer") {
 		CHECK( post_order_traverser(replace, always)(root) == expected );
 	}
 
-	TEST_CASE("replace_transform: given a tree with two children and a visitor, it returns a new tree with the provided replacements") {
+	TEST_CASE("replace_transform: given a tree with two children and a visitor, "
+			"it returns a new tree with the provided replacements") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		map<sp_node<char>, sp_node<char>> m;
 		m[n('b')] = n('z');
@@ -275,7 +298,8 @@ TEST_SUITE("replace_transformer") {
 		CHECK( post_order_traverser(replace, always)(root) == expected );
 	}
 
-	TEST_CASE("replace_transform: given a tree with underlying diamond like DAG and a visitor, it returns a new tree with the provided replacements") {
+	TEST_CASE("replace_transform: given a tree with underlying diamond like DAG "
+			"and a visitor, it returns a new tree with the provided replacements") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		map<sp_node<char>, sp_node<char>> m;
 		m[n('d')] = n('z');
@@ -293,7 +317,8 @@ TEST_SUITE("to_visitor") {
 
 TEST_SUITE("select_top_predicate") {
 
-	TEST_CASE("select_top_predicate: given a simple tree whose root satisfies the predicate, it returns the root") {
+	TEST_CASE("select_top_predicate: given a simple tree whose root satisfies the "
+			"predicate, it returns the root") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'a'; };
 		vector<sp_node<char>> selected;
@@ -304,7 +329,8 @@ TEST_SUITE("select_top_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("select_top_predicate: given a simple tree whose root does not satisfy the predicate, it returns an empty vector") {
+	TEST_CASE("select_top_predicate: given a simple tree whose root does not "
+			"satisfy the predicate, it returns an empty vector") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b'; };
 		vector<sp_node<char>> selected;
@@ -315,7 +341,8 @@ TEST_SUITE("select_top_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("selected_top_predicate: given a tree with two children that satisfy the predicate, it returns the children satisfying the predicate") {
+	TEST_CASE("selected_top_predicate: given a tree with two children that satisfy "
+			"the predicate, it returns the children satisfying the predicate") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		vector<sp_node<char>> selected;
@@ -326,7 +353,9 @@ TEST_SUITE("select_top_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("select_top_predicate: given a tree with two children that do not satisfy the predicate, it returns an empty vector satisfying the predicate") {
+	TEST_CASE("select_top_predicate: given a tree with two children that do not "
+			"satisfy the predicate, it returns an empty vector satisfying the "
+			"predicate") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'd' || n->sym == 'e'; };
 		vector<sp_node<char>> selected;
@@ -337,7 +366,9 @@ TEST_SUITE("select_top_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("select_top_predicate: given a tree with underlying diamond like DAG and a visitor, it returns a vector with only one bottom node satisfying the predicate") {
+	TEST_CASE("select_top_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns a vector with only one bottom node "
+			"satisfying the predicate") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'd'; };
 		vector<sp_node<char>> selected;
@@ -348,7 +379,9 @@ TEST_SUITE("select_top_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("select_top_predicate: given a tree with underlying diamond like DAG and a visitor, it returns a vector the two top nodes satisfying the predicate") {
+	TEST_CASE("select_top_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns a vector the two top nodes satisfying "
+			"the predicate") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		vector<sp_node<char>> selected;
@@ -364,7 +397,8 @@ TEST_SUITE("select_top_predicate") {
 
 TEST_SUITE("select_all_predicate") {
 
-	TEST_CASE("select_all_predicate: given a simple tree whose root satisfies the predicate, it returns the root") {
+	TEST_CASE("select_all_predicate: given a simple tree whose root satisfies "
+			"the predicate, it returns the root") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'a'; };
 		vector<sp_node<char>> selected;
@@ -375,7 +409,8 @@ TEST_SUITE("select_all_predicate") {
 		CHECK( selected == expected );
 	}
 	
-	TEST_CASE("select_all_predicate: given a simple tree whose root does not satisfy the predicate, it returns an empty vector") {
+	TEST_CASE("select_all_predicate: given a simple tree whose root does not "
+			"satisfy the predicate, it returns an empty vector") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b'; };
 		vector<sp_node<char>> selected;
@@ -386,7 +421,8 @@ TEST_SUITE("select_all_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("select_all_predicate: given a tree with two children that satisfy the predicate, it returns the children satisfying the predicate") {
+	TEST_CASE("select_all_predicate: given a tree with two children that satisfy "
+			"the predicate, it returns the children satisfying the predicate") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		vector<sp_node<char>> selected;
@@ -397,7 +433,9 @@ TEST_SUITE("select_all_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("select_all_predicate: given a tree with two children that do not satisfy the predicate, it returns an empty vector satisfying the predicate") {
+	TEST_CASE("select_all_predicate: given a tree with two children that do not "
+			"satisfy the predicate, it returns an empty vector satisfying the "
+			"predicate") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'd' || n->sym == 'e'; };
 		vector<sp_node<char>> selected;
@@ -408,7 +446,9 @@ TEST_SUITE("select_all_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("select_all_predicate: given a tree with underlying diamond like DAG and a visitor, it returns a vector with only one bottom node satisfying the predicate") {
+	TEST_CASE("select_all_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns a vector with only one bottom node "
+			"satisfying the predicate") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'd'; };
 		vector<sp_node<char>> selected;
@@ -419,7 +459,9 @@ TEST_SUITE("select_all_predicate") {
 		CHECK( selected == expected );
 	}
 
-	TEST_CASE("select_all_predicate: given a tree with underlying diamond like DAG and a visitor, it returns a vector the two top nodes satisfying the predicate") {
+	TEST_CASE("select_all_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns a vector the two top nodes satisfying "
+			"the predicate") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		vector<sp_node<char>> selected;
@@ -433,7 +475,8 @@ TEST_SUITE("select_all_predicate") {
 
 TEST_SUITE("find_top_predicate") {
 
-	TEST_CASE("find_top_predicate: given a simple tree whose root satisfies the predicate, it returns the root") {
+	TEST_CASE("find_top_predicate: given a simple tree whose root satisfies the "
+			"predicate, it returns the root") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'a'; };
 		optional<sp_node<char>> found;
@@ -444,7 +487,8 @@ TEST_SUITE("find_top_predicate") {
 		CHECK( found.value() == expected );
 	}
 
-	TEST_CASE("find_top_predicate: given a simple tree whose root does not satisfy the predicate, it returns an empty optional") {
+	TEST_CASE("find_top_predicate: given a simple tree whose root does not "
+			"satisfy the predicate, it returns an empty optional") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b'; };
 		optional<sp_node<char>> found;
@@ -454,7 +498,8 @@ TEST_SUITE("find_top_predicate") {
 		CHECK( !found );
 	}
 
-	TEST_CASE("find_top_predicate: given a tree with two children that satisfy the predicate, it returns the first child satisfying the predicate") {
+	TEST_CASE("find_top_predicate: given a tree with two children that satisfy "
+			"the predicate, it returns the first child satisfying the predicate") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		optional<sp_node<char>> found;
@@ -465,7 +510,8 @@ TEST_SUITE("find_top_predicate") {
 		CHECK( found.value() == expected );
 	}
 
-	TEST_CASE("find_top_predicate: given a tree with two children that do not satisfy the predicate, it returns an empty optional") {
+	TEST_CASE("find_top_predicate: given a tree with two children that do not "
+			"satisfy the predicate, it returns an empty optional") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'd' || n->sym == 'e'; };
 		optional<sp_node<char>> found;
@@ -475,7 +521,8 @@ TEST_SUITE("find_top_predicate") {
 		CHECK( !found );
 	}
 
-	TEST_CASE("find_top_predicate: given a tree with underlying diamond like DAG and a visitor, it returns the top node satisfying the predicate") {
+	TEST_CASE("find_top_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns the top node satisfying the predicate") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		optional<sp_node<char>> found;
@@ -499,7 +546,8 @@ TEST_SUITE("logical predicates") {
 		CHECK( !f(n('a')) );
 	}
 
-	TEST_CASE("and_predicate: given a true and a false predicate, it computes the true table") {
+	TEST_CASE("and_predicate: given a true and a false predicate, it computes "
+			"the true table") {
 		auto t = true_predicate<sp_node<char>>(); 
 		auto f = false_predicate<sp_node<char>>(); 
 		CHECK( and_predicate(t, t)(d('a')) );
@@ -508,7 +556,8 @@ TEST_SUITE("logical predicates") {
 		CHECK( !and_predicate(f, f)(d('a')) );
 	}
 
-	TEST_CASE("or_predicate: given a true and a false predicate, it computes the true table") {
+	TEST_CASE("or_predicate: given a true and a false predicate, it computes "
+			"the true table") {
 		auto t = true_predicate<sp_node<char>>(); 
 		auto f = false_predicate<sp_node<char>>(); 
 		CHECK( or_predicate(t, t)(d('a')) );
@@ -517,7 +566,8 @@ TEST_SUITE("logical predicates") {
 		CHECK( !or_predicate(f, f)(d('a')) );
 	}
 
-	TEST_CASE("neg_predicate: given a true and a false predicate, it computes the true table") {
+	TEST_CASE("neg_predicate: given a true and a false predicate, it computes "
+			"the true table") {
 		auto t = true_predicate<sp_node<char>>(); 
 		auto f = false_predicate<sp_node<char>>(); 
 		CHECK( !neg_predicate(t)(d('a')) );
@@ -527,56 +577,64 @@ TEST_SUITE("logical predicates") {
 
 TEST_SUITE("trim_top") {
 
-	TEST_CASE("trim_top: given a simple tree and a predicate not satisfied by the root, it returns the tree itself whatever the predicate") {
+	TEST_CASE("trim_top: given a simple tree and a predicate not satisfied by "
+			"the root, it returns the tree itself whatever the predicate") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		sp_node<char> expected {root};
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("trim_top: given a simple tree and a predicate satisfied by the root, it returns the tree itself whatever the predicate") {
+	TEST_CASE("trim_top: given a simple tree and a predicate satisfied by the "
+			"root, it returns the tree itself whatever the predicate") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'a'; };
 		sp_node<char> expected {root};
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("trim_top: given a tree with two children -the right one matching the predicate-, it returns the tree without the matching child") {
+	TEST_CASE("trim_top: given a tree with two children -the right one matching "
+			"the predicate-, it returns the tree without the matching child") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		sp_node<char> expected {n('a', {n('b')})};
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("trim_top: given a tree with two children -the left one matching the predicate-, it returns the tree without the matching child") {
+	TEST_CASE("trim_top: given a tree with two children -the left one matching "
+			"the predicate-, it returns the tree without the matching child") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b'; };
 		sp_node<char> expected {n('a', {n('c')})};
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}	
 
-	TEST_CASE("trim_top: given a tree with two children -both matching the predicate-, it returns the root") {
+	TEST_CASE("trim_top: given a tree with two children -both matching the "
+			"predicate-, it returns the root") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		sp_node<char> expected { n('a') }; 
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}	
 
-	TEST_CASE("trim_top: given a tree with two children -none matching the predicate-, it returns the given tree") {
+	TEST_CASE("trim_top: given a tree with two children -none matching the "
+			"predicate-, it returns the given tree") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'd' || n->sym == 'e'; };
 		sp_node<char> expected { root }; 
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("trim_top: given a tree with underlying diamond like DAG and a predicate not satisfied by the nodes, it returns the tree itself") {
+	TEST_CASE("trim_top: given a tree with underlying diamond like DAG and a "
+			"predicate not satisfied by the nodes, it returns the tree itself") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'e'; };
 		sp_node<char> expected {root};
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("trim_top: given a tree with underlying diamond like DAG and a predicate satisfied by the bottom, it returns the tree without it") {
+	TEST_CASE("trim_top: given a tree with underlying diamond like DAG and a "
+			"predicate satisfied by the bottom, it returns the tree without it") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'd'; };
 		sp_node<char> expected {n('a', {n('b'), n('c')})};
@@ -587,41 +645,47 @@ TEST_SUITE("trim_top") {
 
 TEST_SUITE("select_top") {
 
-	TEST_CASE("select_top: given a simple tree and a predicate not satisfied by the root, it returns the an empty collection") {
+	TEST_CASE("select_top: given a simple tree and a predicate not satisfied "
+			"by the root, it returns the an empty collection") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		CHECK( select_top<decltype(predicate), char>(root, predicate).empty() );
 	}
 
-	TEST_CASE("select_top: given a simple tree and a predicate satisfied by the root, it returns the root") {
+	TEST_CASE("select_top: given a simple tree and a predicate satisfied by "
+			"the root, it returns the root") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'a'; };
 		vector<sp_node<char>> expected {root};
 		CHECK( select_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("select_top: given a tree with two children -the right one matching the predicate-, it returns the matching child") {
+	TEST_CASE("select_top: given a tree with two children -the right one "
+			"matching the predicate-, it returns the matching child") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		vector<sp_node<char>> expected {n('c')};
 		CHECK( select_top<decltype(predicate), char>(root, predicate) == expected );
 	}	
 
-	TEST_CASE("select_top: given a tree with two children -the left one matching the predicate-, it returns the matching child") {
+	TEST_CASE("select_top: given a tree with two children -the left one "
+			"matching the predicate-, it returns the matching child") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b'; };
 		vector<sp_node<char>> expected {n('b')};
 		CHECK( select_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("select_top: given a tree with two children -both matching the predicate-, it returns the left one") {
+	TEST_CASE("select_top: given a tree with two children -both matching "
+			"the predicate-, it returns the left one") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		vector<sp_node<char>> expected { n('b'), n('c') }; 
 		CHECK( select_top<decltype(predicate), char>(root, predicate) == expected );
 	}	
 
-	TEST_CASE("select_top: given a tree with underlying diamond like DAG and a predicate satisfied by the bottom, it returns the bottom") {
+	TEST_CASE("select_top: given a tree with underlying diamond like DAG and "
+			"a predicate satisfied by the bottom, it returns the bottom") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'd'; };
 		vector<sp_node<char>> expected {n('d')};
@@ -632,41 +696,47 @@ TEST_SUITE("select_top") {
 
 TEST_SUITE("select_all") {
 
-	TEST_CASE("select_all: given a simple tree and a predicate not satisfied by the root, it returns an empty collection") {
+	TEST_CASE("select_all: given a simple tree and a predicate not satisfied "
+			"by the root, it returns an empty collection") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		CHECK( select_all<decltype(predicate), char>(root, predicate).empty() );
 	}
 
-	TEST_CASE("select_all: given a simple tree and a predicate satisfied by the root, it returns the root") {
+	TEST_CASE("select_all: given a simple tree and a predicate satisfied by "
+			"the root, it returns the root") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'a'; };
 		vector<sp_node<char>> expected {root};
 		CHECK( select_all<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("select_all: given a tree with two children -the right one matching the predicate-, it returns the matching child") {
+	TEST_CASE("select_all: given a tree with two children -the right one "
+			"matching the predicate-, it returns the matching child") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		vector<sp_node<char>> expected {n('c')};
 		CHECK( select_all<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("select_all: given a tree with two children -the left one matching the predicate-, it returns the matching child") {
+	TEST_CASE("select_all: given a tree with two children -the left one "
+			"matching the predicate-, it returns the matching child") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b'; };
 		vector<sp_node<char>> expected {n('b')};
 		CHECK( select_all<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("select_all: given a tree with two children -both matching the predicate-, it returns both") {
+	TEST_CASE("select_all: given a tree with two children -both matching the "
+			"predicate-, it returns both") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		vector<sp_node<char>> expected { n('b'), n('c') }; 
 		CHECK( select_all<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("select_all: given a tree with two children -both matching the predicate-, it returns both") {
+	TEST_CASE("select_all: given a tree with two children -both matching the "
+			"predicate-, it returns both") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		vector<sp_node<char>> expected { n('b'), n('c') }; 
@@ -676,43 +746,51 @@ TEST_SUITE("select_all") {
 
 TEST_SUITE("find_top") {
 
-	TEST_CASE("find_top: given a simple tree and a predicate not satisfied by the root, it returns an empty optional") {
+	TEST_CASE("find_top: given a simple tree and a predicate not satisfied by "
+			"the root, it returns an empty optional") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		CHECK( !find_top<decltype(predicate), char>(root, predicate) );
 	}
 
-	TEST_CASE("find_top: given a simple tree and a predicate satisfied by the root, it returns the root") {
+	TEST_CASE("find_top: given a simple tree and a predicate satisfied by the "
+			"root, it returns the root") {
 		sp_node<char> root = n('a');
 		auto predicate = [](sp_node<char> n) { return n->sym == 'a'; };
 		optional<sp_node<char>> expected {root};
 		CHECK( find_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("find_top: given a tree with two children -the right one matching the predicate-, it returns the matching node") {
+	TEST_CASE("find_top: given a tree with two children -the right one matching "
+			"the predicate-, it returns the matching node") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'c'; };
 		optional<sp_node<char>> expected {n('c')};
 		CHECK( find_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("find_top: given a tree with two children -the left one matching the predicate-, it returns the matching node") {
+	TEST_CASE("find_top: given a tree with two children -the left one matching "
+			"the predicate-, it returns the matching node") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b'; };
 		optional<sp_node<char>> expected {n('b')};
 		CHECK( find_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("find_top: given a tree with two children -both matching the predicate-, it returns the first matching node") {
+	TEST_CASE("find_top: given a tree with two children -both matching the "
+			"predicate-, it returns the first matching node") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c'; };
 		optional<sp_node<char>> expected { n('b') }; 
 		CHECK( find_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
-	TEST_CASE("find_top: given a tree with an underlying diamond like DAG and a predicate satisfied by the bottom nodes, it returns the first matching node") {
+	TEST_CASE("find_top: given a tree with an underlying diamond like DAG "
+			"and a predicate satisfied by the bottom nodes, it returns the "
+			"first matching node") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-		auto predicate = [](sp_node<char> n) { return n->sym == 'b' || n->sym == 'c' || n->sym == 'd'; };
+		auto predicate = [](sp_node<char> n) { 
+			return n->sym == 'b' || n->sym == 'c' || n->sym == 'd'; };
 		optional<sp_node<char>> expected { n('b', {n('d')}) }; 
 		CHECK( find_top<decltype(predicate), char>(root, predicate) == expected );
 	}
@@ -737,7 +815,8 @@ TEST_SUITE("pattern_matcher") {
 	static auto is_ignore = is_ignore_predicate();
 	static auto is_capture = is_capture_predicate();
 
-	TEST_CASE("pattern_matcher: given a simple tree and a simple capture, it returns a substitution with the capture") {
+	TEST_CASE("pattern_matcher: given a simple tree and a simple capture, it "
+			"returns a substitution with the capture") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('X');
 		unification<sp_node<char>> expected { {pattern, root} };
@@ -748,7 +827,8 @@ TEST_SUITE("pattern_matcher") {
 		CHECK( matcher.substitutions == expected);
 	}
 	
-	TEST_CASE("pattern_matcher: given a simple tree and a simple ignore, it returns an empty substitution") {
+	TEST_CASE("pattern_matcher: given a simple tree and a simple ignore, it "
+			"returns an empty substitution") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('I');
 		unification<sp_node<char>> expected;
@@ -759,7 +839,8 @@ TEST_SUITE("pattern_matcher") {
 		CHECK( matcher.substitutions == expected);
 	}
 
-	TEST_CASE("pattern_matcher: given a tree with two children, a same structure tree pattern -both of them captures-,"
+	TEST_CASE("pattern_matcher: given a tree with two children, a same "
+			"structure tree pattern -both of them captures-,"
 			" it returns a substitution with both captures") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		sp_node<char> pattern = n('a', {n('X'), n('Y')});
@@ -771,7 +852,8 @@ TEST_SUITE("pattern_matcher") {
 		CHECK( matcher.substitutions == expected);
 	}
 
-	TEST_CASE("pattern_matcher: given a tree with two equal children and a same structure pattern -both of them the same captures-,"
+	TEST_CASE("pattern_matcher: given a tree with two equal children and a "
+			"same structure pattern -both of them the same captures-,"
 			", it returns a substitution with one capture") {
 		sp_node<char> root = n('a', {n('b'), n('b')});
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
@@ -783,7 +865,8 @@ TEST_SUITE("pattern_matcher") {
 		CHECK( matcher.substitutions == expected);
 	}
 
-	TEST_CASE("pattern_matcher: given a tree with two different children and a same structure pattern -both of them the same captures-,"
+	TEST_CASE("pattern_matcher: given a tree with two different children and a "
+			"same structure pattern -both of them the same captures-,"
 			", it returns a substitution with one capture") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
@@ -823,72 +906,84 @@ TEST_SUITE("pattern_matcher") {
 	static auto is_capture = is_capture_predicate();
 	static auto is_skip = is_skip_predicate();
 
-	TEST_CASE("pattern_matcher_with_skip: given a simple tree and a simple capture, it returns a substitution with the capture") {
+	TEST_CASE("pattern_matcher_with_skip: given a simple tree and a simple "
+			"capture, it returns a substitution with the capture") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('X');
 		unification<sp_node<char>> expected { {pattern, root} };
 		unification<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, is_capture, is_skip);
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
 		CHECK( matcher.substitutions == expected);
 	}
 	
-	TEST_CASE("pattern_matcher_with_skip: given a simple tree and a simple ignore, it returns an empty substitution") {
+	TEST_CASE("pattern_matcher_with_skip: given a simple tree and a simple "
+			"ignore, it returns an empty substitution") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('I');
 		unification<sp_node<char>> expected;
 		unification<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, is_capture, is_skip);
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
 		CHECK( matcher.substitutions == expected);
 	}
 
-	TEST_CASE("pattern_matcher_with_skip: given a tree with two children, a same structure tree pattern -both of them captures-,"
-			" it returns a substitution with both captures") {
+	TEST_CASE("pattern_matcher_with_skip: given a tree with two children, a "
+			"same structure tree pattern -both of them captures-, it returns "
+			"a substitution with both captures") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		sp_node<char> pattern = n('a', {n('X'), n('Y')});
 		unification<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
 		unification<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, is_capture, is_skip);
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
 		CHECK( matcher.substitutions == expected);
 	}
 
-	TEST_CASE("pattern_matcher_with_skip: given a tree with two equal children and a same structure pattern -both of them the same captures-,"
-			", it returns a substitution with one capture") {
+	TEST_CASE("pattern_matcher_with_skip: given a tree with two equal children "
+			"and a same structure pattern -both of them the same captures-, it "
+			"returns a substitution with one capture") {
 		sp_node<char> root = n('a', {n('b'), n('b')});
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
 		unification<sp_node<char>> expected { {n('X'), n('b')} };
 		unification<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, is_capture, is_skip);
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
 		CHECK( matcher.substitutions == expected);
 	}
 
-	TEST_CASE("pattern_matcher_with_skip: given a tree with two different children and a same structure pattern -both of them the same captures-,"
-			", it returns a substitution with one capture") {
+	TEST_CASE("pattern_matcher_with_skip: given a tree with two different "
+			"children and a same structure pattern -both of them the same captures-,"
+			" it returns a substitution with one capture") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
 		unification<sp_node<char>> expected { };
 		unification<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, is_capture, is_skip);
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+			is_capture, is_skip);
 		matcher(root);
 		CHECK( !matcher.matched );
 		CHECK( matcher.substitutions == expected);
 	}
 
-	TEST_CASE("pattern_matcher_with_skip: given a tree with children (several of them satisfying is_skip an two of them "
-			" not satisfying is_skip), an a similar structure tree pattern -with two to captures-,"
-			" it returns a substitution with both captures") {
+	TEST_CASE("pattern_matcher_with_skip: given a tree with children (several "
+			"of them satisfying is_skip an two of them not satisfying is_skip), "
+			"an a similar structure tree pattern -with two to captures-, it "
+			"returns a substitution with both captures") {
 		sp_node<char> root = n('a', {n('S'), n('b'), n('S'), n('c'), n('S')});
 		sp_node<char> pattern = n('a', {n('X'), n('S'), n('S'), n('Y')});
 		unification<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
 		unification<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, is_capture, is_skip);
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
 		CHECK( matcher.substitutions == expected);
@@ -1002,9 +1097,10 @@ TEST_SUITE("apply") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply: given a tree with children (several of them satisfying is_skip an two of them "
-			" not satisfying is_skip), an a similar structure tree pattern -with two to captures-,"
-			" it returns a substitution with both captures") {
+	TEST_CASE("apply: given a tree with children (several of them satisfying "
+			"is_skip an two of them not satisfying is_skip), an a similar "
+			"structure tree pattern -with two to captures-, it returns a "
+			"substitution with both captures") {
 		sp_node<char> root = n('a', {n('S'), n('b'), n('S'), n('c'), n('S')});
 		sp_node<char> pattern = n('a', {n('X'), n('S'), n('S'), n('Y')});
 		sp_node<char> substitution {n('a', {n('Y'), n('X')})};
