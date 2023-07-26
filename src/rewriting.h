@@ -37,6 +37,10 @@ namespace idni::rewriter {
 // TODO This is very similar to idni::forest<...>::tree, but it
 // also defines equality operators and ordering (important during hashing).
 // Both notions could be unified if we keep those operators defined.
+//
+// TODO make make_node a friend function and the constructor private. Right now
+// it is public to easy the construction of the tree during testing, but it is 
+// not really needed.
 template <typename symbol_t>
 struct node {
 	// equality operators and ordering
@@ -69,7 +73,9 @@ template <typename node_t>
 struct tree {
 
 	// constructors and assignment operators
+	// 
 	// TODO add initializer list constructor or remove all of them
+	//
 	// tree(const sp_node& root) : root(root) {}
 	// tree(const tree& that) : root(that.root) {}
 	// tree(tree&& that) : root(std::move(that.root)) {}
@@ -560,6 +566,8 @@ sp_node<symbol_t> apply_with_skip(rule<sp_node<symbol_t>>& r, sp_node<symbol_t>&
 // apply a substitution to a rule according to a given matcher
 template <typename symbol_t, typename matcher_t> 
 sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& matcher) {
+	// TODO check if this could be improved using a composed transformer
+	// that deals with the matcher and the substitution.
 	identity_transformer<sp_node<symbol_t>> identity;
 	true_predicate<sp_node<symbol_t>> always;
 	post_order_traverser(identity, matcher)(n);
