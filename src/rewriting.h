@@ -289,7 +289,7 @@ struct and_predicate {
 	r_predicate_t& p2;
 };
 
-// CHECK we use combinators to build logical predicates. This could be simplified
+// TODO we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
 template <typename l_predicate_t, typename r_predicate_t>
 struct or_predicate {
@@ -317,9 +317,6 @@ struct neg_predicate {
 
 	predicate_t& p;
 };
-
-
-// tree methods 
 
 // delete all top nodes that satisfy a predicate.
 template <typename predicate_t, typename symbol_t>
@@ -349,6 +346,7 @@ std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predic
 	return selected;
 }
 
+// select all top nodes of a tree that satisfy a predicate and return them.
 template <typename predicate_t, typename symbol_t, 
 	typename tree_t = tree<symbol_t>, typename node_t = tree<symbol_t>::sp_node>
 std::vector<node_t> select_top(const tree_t& input, predicate_t& query) {
@@ -367,6 +365,7 @@ std::vector<sp_node<symbol_t>> select_all(const sp_node<symbol_t>& input, predic
 	return selected;
 }
 
+// select all top nodes of a tree that satisfy a predicate and return them.
 template <typename predicate_t, typename symbol_t, 
 	typename tree_t = tree<symbol_t>, typename node_t = tree<symbol_t>::sp_node>
 std::vector<node_t> select_all(const tree_t& input, predicate_t& query) {
@@ -384,6 +383,7 @@ std::optional<sp_node<symbol_t>> find_top(const sp_node<symbol_t>& input,
 	return found;
 }
 
+// find the top nodes of a tree that satisfy a predicate and return them.
 template <typename predicate_t, typename symbol_t, 
 	typename tree_t = tree<symbol_t>, typename node_t = tree<symbol_t>::sp_node>
 std::optional<node_t> find_top(const tree_t& input, predicate_t& query) {
@@ -536,17 +536,20 @@ sp_node<symbol_t> apply(rule<sp_node<symbol_t>>& r, sp_node<symbol_t>& n,
 	return apply(s, n, matcher);
 }
 
-// TODO merge implementation with previous method
+// apply a rule to a tree using the predicate to pattern_matcher and skipping
+// unnecessary trees
 template <typename symbol_t, typename is_ignore_t, typename is_capture_t, 
 	typename is_skip_t> 
 sp_node<symbol_t> apply_with_skip(rule<sp_node<symbol_t>>& r, sp_node<symbol_t>& n, 
 		is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
 	auto [p , s] = r;
 	unification<sp_node<symbol_t>> u;
-	pattern_matcher_with_skip<sp_node<symbol_t>, is_ignore_t, is_capture_t, is_skip_t> matcher {p, u, i, c, sk};
+	pattern_matcher_with_skip<sp_node<symbol_t>, is_ignore_t, is_capture_t, is_skip_t> 
+		matcher {p, u, i, c, sk};
 	return apply(s, n, matcher);
 }
 
+// apply a substitution to a rule according to a given matcher
 template <typename symbol_t, typename matcher_t> 
 sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& matcher) {
 	identity_transformer<sp_node<symbol_t>> identity;
@@ -562,16 +565,31 @@ sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& m
 	return n;
 }
 
-template <typename node_t>
-tree<node_t> apply(const rule<node_t>& r, const tree<node_t>& n) {
-	return { apply(r, n.root) };
+// apply a substitution to a rule according to a given matcher on a tree
+template <typename node_t, typename is_ignore_t, typename is_capture_t>
+tree<node_t> apply(const rule<node_t>& r, const tree<node_t>& n, 
+		is_ignore_t& is_ignore, is_capture_t& is_capture) {
+	return { apply(r, n.root, is_ignore, is_capture) };
 }
 
-// std::pair<idni::lit<char, char>, std::array<size_t, 2UL>>
+// apply a substitution to a rule according to a given matcher on a tree
+// taking into account the skip predicate
+template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t>
+tree<node_t> apply_with_skip(const rule<node_t>& r, const tree<node_t>& n, 
+		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t& is_skip) {
+	return { apply(r, n.root, is_ignore, is_capture, is_skip) };
+}
+
+// transform a parse tree into a tree of symbols according to the given
+// transformer.
+//
+// The usual type of output_t is idni::lit<char, char> and the usual type of
+// input is std::pair<idni::lit<char, char>, std::array<size_t, 2UL>>
 template <typename input_t, typename output_t, typename transformer_t>
 sp_node<output_t> transform_parse_tree(const typename idni::forest<input_t>::sptree& t, 
 		transformer_t& transformer) {
-	// traverse the tree t and build the new tree applying the transformation to each node
+	// traverse recursively the parse tree t and build the new tree applying 
+	// the transformation to each node
 	std::vector<sp_node<output_t>> childs;
 	for (const auto& c : t->child) childs.push_back(transform_parse_tree(c, transformer));
 	return make_node<output_t>(transformer(t->value), childs);
