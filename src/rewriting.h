@@ -32,7 +32,11 @@
 
 namespace idni::rewriter {
 
-// node of a tree.
+// node of a tree. 
+//
+// TODO This is very similar to idni::forest<...>::tree, but it
+// also defines equality operators and ordering (important during hashing).
+// Both notions could be unified if we keep those operators defined.
 template <typename symbol_t>
 struct node {
 	// equality operators and ordering
@@ -57,6 +61,10 @@ using sp_node = std::shared_ptr<node<symbol_t>>;
 // it defines a tree of symbols, where each node has a symbol and a list of
 // children. The tree is immutable, and it is implemented as a shared pointer
 // to the root node.
+//
+// TODO this notions of tree could be removed, also the methods that deal with it.
+// It was added to keep track of the root node of a tree, but it is not really
+// needed.
 template <typename node_t> 
 struct tree {
 

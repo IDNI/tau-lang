@@ -1006,13 +1006,6 @@ TEST_SUITE("apply") {
 		}
 	};
 
-	struct is_skip_predicate {
-
-		bool operator()(const sp_node<char>& n) {
-			return n->sym == 'S';
-		}
-	};
-
 	TEST_CASE("apply: given tree with one child and a substitution that "
 	 		"transform a node with one children into two, it returns the "
 			"tree with the substitution applied") {
@@ -1096,8 +1089,106 @@ TEST_SUITE("apply") {
 		auto replaced = apply(rule, root, is_ignore, is_capture) ;
 		CHECK( replaced == expected );
 	}
+}
 
-	TEST_CASE("apply: given a tree with children (several of them satisfying "
+TEST_SUITE("apply_with_skip") {
+
+	struct is_capture_predicate {
+
+		bool operator()(const sp_node<char>& n) {
+			return n->sym == 'X' || n->sym == 'Y' || n->sym == 'Z';
+		}
+	};
+
+	struct is_ignore_predicate {
+
+		bool operator()(const sp_node<char>& n) {
+			return n->sym == 'I';
+		}
+	};
+
+	struct is_skip_predicate {
+
+		bool operator()(const sp_node<char>& n) {
+			return n->sym == 'S';
+		}
+	};
+
+	TEST_CASE("apply_with_skip: given tree with one child and a substitution that "
+	 		"transform a node with one children into two, it returns the "
+			"tree with the substitution applied") {
+		sp_node<char> root {n('a', {n('b')})};
+		sp_node<char> pattern {n('a', {n('X')})};
+		sp_node<char> substitution {n('a', {n('X'), n('X')})};
+		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> expected = n('a', {n('b'), n('b')});
+		is_ignore_predicate is_ignore;
+		is_capture_predicate is_capture;
+		is_skip_predicate is_skip;
+		auto replaced = apply_with_skip(rule, root, is_ignore, is_capture, is_skip);
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply_with_skip: given tree with one child and a substitution that "
+			"transform that ignore the children node and replace the root node , "
+			"it returns the tree with the substitution applied") {
+		sp_node<char> root {n('a', {n('b')})};
+		sp_node<char> pattern {n('a', {n('I')})};
+		sp_node<char> substitution {n('a')};
+		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> expected = n('a');
+		is_ignore_predicate is_ignore;
+		is_capture_predicate is_capture;
+		is_skip_predicate is_skip;
+		auto replaced = apply_with_skip(rule, root, is_ignore, is_capture, is_skip);
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply_with_skip: given tree with two children and a substitution that "
+			"transform that swaps the children, it returns the tree with the "
+			"substitution applied") {
+		sp_node<char> root {n('a', {n('b'), n('c')})};
+		sp_node<char> pattern {n('a', {n('X'), n('Y')})};
+		sp_node<char> substitution {n('a', {n('Y'), n('X')})};
+		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> expected = n('a', {n('c'), n('b')});
+		is_ignore_predicate is_ignore;
+		is_capture_predicate is_capture;
+		is_skip_predicate is_skip;
+		auto replaced = apply_with_skip(rule, root, is_ignore, is_capture, is_skip);
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply_with_skip: given tree with two children and a substitution that "
+			"transform that swaps the children, it returns the tree with the "
+			"substitution applied") {
+		sp_node<char> root {n('a', {n('b'), n('c', {n('d'), n('e')})})};
+		sp_node<char> pattern {n('a', {n('X'), n('c', {n('Y'), n('Z')})})};
+		sp_node<char> substitution {n('a', {n('Y'), n('c', {n('Z'), n('X')})})};
+		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> expected = n('a', {n('d'), n('c', {n('e'), n('b')})});
+		is_ignore_predicate is_ignore;
+		is_capture_predicate is_capture;
+		is_skip_predicate is_skip;
+		auto replaced = apply_with_skip(rule, root, is_ignore, is_capture, is_skip);
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply_with_skip: given a tree with a diamond like DAG and a substitution "
+			"that breaks the diamond like shape, it returns the tree with the "
+			"substitution applied") {
+		sp_node<char> root {n('a', {n('b', {n('d')}), n('c', {n('d')})})};
+		sp_node<char> pattern {n('b', {n('X')})};
+		sp_node<char> substitution {n('b', {n('e')})};
+		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> expected = n('a', {n('b', {n('e')}), n('c', {n('d')})});
+		is_ignore_predicate is_ignore;
+		is_capture_predicate is_capture;
+		is_skip_predicate is_skip;
+		auto replaced = apply_with_skip(rule, root, is_ignore, is_capture, is_skip);
+		CHECK( replaced == expected );
+	}
+	TEST_CASE("apply_with_skip: given a tree with children (several of them satisfying "
 			"is_skip an two of them not satisfying is_skip), an a similar "
 			"structure tree pattern -with two to captures-, it returns a "
 			"substitution with both captures") {
@@ -1114,7 +1205,6 @@ TEST_SUITE("apply") {
 	}
 }
 
-// TODO write tests for apply_with_skip (tree case), not really needed
-// TODO write tests for apply (tree case), not really needed
-// TODO write tests for transform_parse_tree
-
+// TODO write tests for apply_with_skip (tree case), not really needed and maybe unnecessary
+// TODO write tests for apply (tree case), not really needed and maybe unnecessary
+// TODO write tests for transform_parse_tree, needed and necessary
