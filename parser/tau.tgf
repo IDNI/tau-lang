@@ -1,5 +1,16 @@
 @use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
+# in all those cases: x and y is are vars and "tau" is a constant 
+# x & tau // wrong
+# x & {tau} // ok
+# x && {tau} // wrong
+# x && tau // wrong
+# x &&& tau // wrong
+# x &&& {tau} // ok
+# x && y // wrong
+# x & y // ok if x and y came from the same boolean algebra
+# x &&& y // ok if x and y came from the boolean algebra of tau formulas
+
 # whitespace and comments
 eol				=> '\n' | '\r' | eof.
 ws_comment		=> '#' eol | '#' printable+ eol.
@@ -14,99 +25,160 @@ char_escape_encode	=> hex_escape | unicode_escape.
 # defining char/string/qstring as all chars but its wrapping character
 # enables using TAB and new lines in char(')/string(")/bqstring(`)
 # sequences
+
+# common stuff copy cut from tml grammar
 esc				=> "\\\\".
 q_char			=> '\''.
 q_str			=> '"'.
 q_bqstr			=> '`'.
 char_punct		=> punct & ~q_char & ~q_str & ~q_bqstr
 					& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr).
+
 char0			=> alnum | space | char_escape_encode | char_punct.
 char_			=> char0 | esc q_char |     q_str |     q_bqstr.
 string_char		=> char0 |     q_char | esc q_str |     q_bqstr.
 bqstring_char	=> char0 |     q_char |     q_str | esc q_bqstr.
 chars			=> alpha (alnum)*.
 
-# elements
-sym				=> chars.
-ignore 			=> "??_".
-capture			=> '??' chars.
-var				=> '?' chars.
-
 char_class    	=> "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
 				| "graph" | "lower" | "printable" | "punct" | "space"
 				| "upper" | "xdigit".
 
-# wff
-wff_def			=> ws wff_rule ws | ws wff_macro ws '.'.
-wff_rule		=> ws wff_head ws "<=" ws wff ws '.'.
-wff_macro		=> ws wff_head ws "<=" ws wff_rule ws '.'.
-wff_head		=> relname ws '[' indexes ']' ws '(' ws vars ws')'.
-wff 			=> wff_eq | wff_ref | wff_and | wff_neg | wff_xor | wff_or | wff_all | wff_ex.
-wff_eq 			=> ws elem ws "=" F ws.
-wff_ref			=> ws wff_head ws.
-wff_and			=> ws "(" ws wff ws "wff_and" ws wff ws ")" ws.
-wff_or			=> ws "(" ws wff ws "wff_or" ws wff ws ")" ws.
-wff_xor			=> ws "(" ws wff ws "wff_xor" ws wff ws ")" ws.
-wff_neg			=> ws "wff_neg" ws "(" ws wff ws ")" ws.
-wff_all			=> ws "wff_all" ws _var ws "(" ws wff ws ")" ws.
-wff_ex			=> ws "wff_ex" ws _var ws "(" ws wff ws ")" ws.
+# elements
+sym				=> ws chars ws.
 
-#cbf
-cbf_def 		=> ws cbf_rule ws "|" ws cbf_macro ws '.'.
-cbf_rule 		=> ws cbf_head ws "<=" ws cbf ws '.'.
-cbf_macro 		=> ws cbf_head ws "<=" ws cbf_rule ws '.'.
-cbf_head 		=> relname ws '[' indexes ']' ws '(' ws vars ws')'.
-cbf 			=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or.
-cbf_ref			=> ws cbf_head ws.
-cbf_and			=> ws "(" ws cbf ws "cbf_and" ws cbf ws ")" ws.
-cbf_or			=> ws "(" ws cbf ws "cbf_or" ws cbf ws ")" ws.
-cbf_xor			=> ws "(" ws cbf ws "cbf_xor" ws cbf ws ")" ws.
-cbf_neg			=> ws "cbf_neg" ws "(" ws cbf ws ")" ws.
-cbf_if			=> ws "if" ws "(" ws cbf_if_condition ws ")" ws 
-				"then" ws cbf_if_then ws 
-				"else" ws cbf_if_else ws.
-cbf_if_condition	=> wff.
-cbf_if_then		=> cbf.
-cbf_if_else		=> cbf.
-
-# bf
-bf				=> elem | bf_and | bf_neg | bf_xor | bf_or | bf_all | bf_ex.
-bf_and			=> ws "(" ws bf ws "bf_and" ws bf ws ")" ws.
-bf_or			=> ws "(" ws bf ws "bf_or" ws bf ws ")" ws.
-bf_xor			=> ws "(" ws bf ws "bf_xor" ws bf ws ")" ws.
-bf_neg			=> ws "bf_neg" ws "(" ws bf ws ")" ws.
-bf_all			=> ws "bf_all" ws _var ws "(" ws bf ws ")" ws.
-bf_ex			=> ws "bf_ex" ws _var ws "(" ws bf ws ")" ws.
-
-# elem
-elem	=> term | cbf | cbf_ref | T | F.
-T		=> ws "T" ws.
-F		=> ws "F" ws.
-
-# term
-term			=> relname ws '(' ws args ws ')'.
-args			=> elem_arg | term | elem_arg args_rest | .
-args_rest		=> elem_arg | elem_arg args_rest .
-elem_arg		=> _var.
-relname			=> sym.
+# common symbols
+equality			=> ws '=' ws. 
+dot 				=> ws '.' ws.
+open_parenthesis	=> ws '(' ws.
+close_parenthesis	=> ws ')' ws.
+open_bracket		=> ws '[' ws.
+close_bracket		=> ws ']' ws.
+open_brace			=> ws '{' ws.
+close_brace			=> ws '}' ws.
+less_than			=> ws '<' ws.
+greater_than		=> ws '>' ws.
+minus				=> ws '-' ws.
+plus				=> ws '+' ws.
 
 # indexes
-indexes				=> index | index indexes_rest |.
-indexes_rest		=> index | index indexes_rest.
-index				=> _var | num | var_minus_offset.
+indexes				=> open_bracket index* close_bracket.
+index				=> var | offset.
 num					=> digit+.
-var_minus_offset	=> _var ws '-' ws num.
 
-# vars
-vars			=> _var |_ var vars_rest |.
-vars_rest		=> _var | _var vars_rest.
-_var			=> var | ignore | capture.	
+# variables 
+variable		=> var | ignore | capture.
 
-# main
-main 		   => wff ws '.'.
+# QUESTION dows timed variables have one index or several?
+timed			=> ( var_in| var_out) indexes. 
+offset			=> variable | variable minus num | variable plus num.
+ignore 			=> "??_".
+capture			=> "??" chars.
+var				=> '?' chars.
+var_in			=> "?i_" chars. # instead of '<', easy to remember
+var_out			=> "?o_" chars. # instead of '>', easy to remember
 
-rule		   => wff_def | cbf_def.
-rules          => (ws rule)* | ws main ws '.'..
-program        => ws rules ws main ws.
-start          => program.
+# wff
+wff_def				=> wff_rule dot.
+wff_rule			=> wff_head wff_body.
+wff_body 			=> equality wff dot.
+wff_head			=> sym indexes wff_head_args.
+wff_head_args		=> open_parenthesis variable* close_parenthesis.
+
+wff 			=> wff_eq | wff_ref | wff_and | wff_neg | wff_xor | wff_or | wff_all | wff_ex.
+wff_eq 			=> bf equality bf.
+wff_ref			=> wff_head.
+wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
+wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
+wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
+wff_neg			=> wff_neg_sym open_parenthesis wff close_parenthesis.
+wff_all			=> wff_all_sym variable open_parenthesis wff close_parenthesis.
+wff_ex			=> wff_ex_sym variable open_parenthesis wff close_parenthesis.
+
+# wff_op_sym
+wff_and_sym		=> ws "wff_and" ws.
+wff_or_sym		=> ws "wff_or" ws.
+wff_xor_sym		=> ws "wff_xor" ws.
+wff_neg_sym		=> ws "wff_neg" ws.
+wff_all_sym		=> ws "wff_all" ws.
+wff_ex_sym		=> ws "wff_ex" ws.
+
+#cbf
+cbf_def 		=> cbf_rule dot.
+cbf_rule 		=> cbf_head equality cbf dot.
+cbf_head 		=> sym indexes open_parenthesis variable* close_parenthesis.
+cbf 			=> bf_def | cbf_if | cbf_ref | bf_and | bf_neg | bf_xor | bf_or.
+cbf_ref			=> cbf_head.
+cbf_if			=> cbf_if_sym open_parenthesis cbf_if_condition close_parenthesis 
+					cbf_then_sym cbf_if_then 
+					cbf_else_sym cbf_if_else. 
+cbf_if_condition	=> wff.
+cbf_if_then			=> cbf.
+cbf_if_else			=> cbf.
+
+# cbf_op_sym
+cbf_and_sym		=> ws "cbf_and" ws.
+cbf_or_sym		=> ws "cbf_or" ws.
+cbf_xor_sym		=> ws "cbf_xor" ws.
+cbf_neg_sym		=> ws "cbf_neg" ws.
+cbf_if_sym		=> ws "cbf_if" ws.
+cbf_then_sym	=> ws "then" ws.
+cbf_else_sym	=> ws "else" ws.
+
+# bf - TODO bf => constant | bf & bf | bf | bf | ~bf | bf ^ bf | in[n][t] 
+# | out[n][t] <<< this thing is important!!!
+#
+# QUESTION: Does timed vars appear only in bf formulas?
+
+bf_def			=> (bf_rule | bf) dot.
+bf_rule			=> bf equality bf dot.
+bf				=> bf_constant | cbf | cbf_ref | bf_and | bf_neg | bf_xor | bf_or
+					| bf_all | bf_ex | variable | timed.
+bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
+bf_or			=> open_parenthesis bf bf_or_sym close_parenthesis.
+bf_xor			=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
+bf_neg			=> bf_neg_sym open_parenthesis bf close_parenthesis.
+bf_all			=> bf_all_sym variable open_parenthesis bf close_parenthesis.
+bf_ex			=> bf_ex_sym variable open_parenthesis bf close_parenthesis.
+
+# bf_op_sym
+bf_and_sym		=> ws "bf_and" ws.
+bf_or_sym		=> ws "bf_or" ws.
+bf_xor_sym		=> ws "bf_xor" ws.
+bf_neg_sym		=> ws "bf_neg" ws.
+bf_all_sym		=> ws "bf_all" ws.
+bf_ex_sym		=> ws "bf_ex" ws.
+
+# constant
+bf_constant		=> open_brace constant close_brace.
+
+#constants
+constant		=> T | F | bf_builtin | binding | capture | ignore.
+T				=> ws '1' ws.
+F				=> ws '0' ws.
+bf_builtin		=> bf_and_bltin | bf_or_bltin | bf_xor_bltin | bf_neg_bltin.
+binding			=> ws chars ws.
+
+# bf_bltins
+bf_and_bltin	=> bltin_arg bf_and_bltin_sym bltin_arg.
+bf_or_bltin		=> bltin_arg bf_or_bltin_sym bltin_arg.
+bf_xor_bltin	=> bltin_arg bf_xor_bltin_sym bltin_arg.
+bf_neg_bltin	=> neg_bltin_sym bltin_arg.
+
+# bf_bultin_arg
+bltin_arg	=> capture.
+
+# bf_bltin_syms
+bf_and_bltin_sym	=> ws "bf_and_bltin" ws.
+bf_or_bltin_sym		=> ws "bf_or_bltin" ws.
+bf_xor_bltin_sym	=> ws "bf_xor_bltin" ws.
+bf_neg_bltin_sym	=> ws "bf_neg_bltin" ws.
+
+
+# main - TODO - tau & tau /n tau && tau /n tau &&& tau
+main			=> wff dot.
+rule			=> wff_def | cbf_def | bf_rule.
+program			=> rule* main dot.
+library 		=> rule+.
+start			=> program | library.
 
