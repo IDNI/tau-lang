@@ -14,13 +14,11 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "../src/doctest.h"
-#include "../src/rewriting.cpp"
-/*
-#include "test_rewriting/rewriting_parser.generated.h"
-#include "../src/normalizer2.h"
-*/
+#include "../src/rewriting.h"
 
 using namespace idni::rewriter;
+using namespace std;
+
 namespace testing = doctest;
 
 // TODO move helper methods to a different file
