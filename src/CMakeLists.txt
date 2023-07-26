@@ -38,7 +38,6 @@ set(TAU_HEADERS
 set(TAU_SOURCES
 	dict.cpp
 #	program.cpp
-	rewriting.cpp
 )
 
 set(CLI_SOURCES tau.cpp)
