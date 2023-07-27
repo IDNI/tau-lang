@@ -596,22 +596,5 @@ tree<node_t> apply_with_skip(const rule<node_t>& r, const tree<node_t>& n,
 	return { apply(r, n.root, is_ignore, is_capture, is_skip) };
 }
 
-
-/*
-// transform a parse tree into a tree of symbols according to the given
-// transformer.
-//
-// The usual type of output_t is idni::lit<char, char> and the usual type of
-// input is std::pair<idni::lit<char, char>, std::array<size_t, 2UL>>
-template <typename input_t, typename output_t, typename transformer_t>
-sp_node<output_t> transform_parse_tree(const typename idni::forest<input_t>::sptree& t, 
-		transformer_t& transformer) {
-	// traverse recursively the parse tree t and build the new tree applying 
-	// the transformation to each node
-	std::vector<sp_node<output_t>> childs;
-	for (const auto& c : t->child) childs.push_back(transform_parse_tree(c, transformer));
-	return make_node<output_t>(transformer(t->value), childs);
-		}
-
 } // namespace idni::rewriter
 #endif // __IDNI__REWRITING_H__
