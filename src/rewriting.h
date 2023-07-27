@@ -47,15 +47,17 @@ struct node {
 	bool operator==(const node& that) const = default;
 	bool operator!=(const node& that) const = default;
 	auto operator <=> (const node& that) const noexcept {
-		if (auto cmp = sym <=> that.sym; cmp != 0) { return cmp; }
+		if (auto cmp = value <=> that.value; cmp != 0) { return cmp; }
 		return std::lexicographical_compare_three_way(
-			childs.begin(), childs.end(),
-			that.childs.begin(), that.childs.end());
+			child.begin(), child.end(),
+			that.child.begin(), that.child.end());
 	}	
 
-	// the symbol of the node and pointers to the children
-	symbol_t sym;
-	std::vector<std::shared_ptr<node>> childs;
+	// the value of the node and pointers to the children, we follow the same 
+	// notation as in forest<...>::tree to be able to reuse the code with
+	// forest<...>::tree.
+	symbol_t value;
+	std::vector<std::shared_ptr<node>> child;
 };
 
 // pointer to a node
@@ -110,43 +112,41 @@ struct identity_transformer {
 };
 
 // visitor that traverse the tree in post-order.
-template <typename wrapped_t, typename predicate_t>
+template <typename wrapped_t, typename predicate_t, typename input_node_t, 
+	typename output_node_t = input_node_t>
 struct post_order_traverser {
 
 	post_order_traverser(wrapped_t& wrapped, predicate_t& query) : 
-		wrapped(wrapped), 
-		query(query) {}
+		wrapped(wrapped), query(query) {}
 
 	template <typename node_t>
 	node_t operator()(const node_t& n) {
-		// we kept track of the visited nodes to avoid visiting the same node
-		// twice. However, we do not need to keep track of the root node, since
-		// it is the one we start from and we will never visit it again (as we
-		// always work with trees compacted into a DAG).
-		std::set<node_t> v;
 		// if the root node matches the query predicate, we traverse it, otherwise
-
-		return query(n) ? traverse(n, v) : n;
+		// we return the result of apply the wrapped transform to the node.
+		return query(n) ? traverse(n) : wrapped(n);
 	}
 
+	// we kept track of the visited nodes to avoid visiting the same node
+	// twice. However, we do not need to keep track of the root node, since
+	// it is the one we start from and we will always be visited.
+	std::set<input_node_t> visited;
 	wrapped_t& wrapped;
 	predicate_t& query;
 
 private:
-	template<typename node_t>
-	node_t traverse(const node_t& n, std::set<node_t>& v) {
+	output_node_t traverse(const input_node_t& n) {
 		// we traverse the children of the node in post-order, i.e. we visit
 		// the children first and then the node itself.
-		for (const auto& c : n->childs) 
+		for (const auto& c : n->child) 
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
-			if (!v.contains(c) && query(c)) {
-				traverse(c, v);
+			if (!visited.contains(c) && query(c)) {
+				traverse(c);
 				// we assume we have no cycles, i.e. there is no way we could
 				// visit the same node again down the tree. 
 				// thus we can safely add the node to the visited set after
 				// visiting it.
-				v.insert(c);
+				visited.insert(c);
 			}
 		// finally we apply the wrapped visitor to the node if it is present.
 		return wrapped(n);
@@ -162,10 +162,10 @@ struct map_transformer {
 	map_transformer(wrapped_t& wrapped) : wrapped(wrapped) {}
 
 	output_node_t operator()(const input_node_t& n) {
-		std::vector<output_node_t> childs;
-		for (const auto& c : n->childs) 
-			if (changes.contains(c)) childs.push_back(changes[c]);
-		auto nn = make_node(wrapped(n->sym), childs).first;
+		std::vector<output_node_t> child;
+		for (const auto& c : n->child) 
+			if (changes.contains(c)) child.push_back(changes[c]);
+		auto nn = make_node(wrapped(n->value), child).first;
 		changes[n] = nn;
 		return nn;
 	}
@@ -188,11 +188,11 @@ struct replace_transformer {
 	std::map<node_t, node_t>& changes;
 private:
 	node_t replace(const node_t& n) {
-		std::vector<node_t> childs;
-		for (const auto& c : n->childs) 
-			if (changes.contains(c)) childs.push_back(changes[c]);
-			else childs.push_back(c);
-		auto nn = make_node(n->sym, childs).first;
+		std::vector<node_t> child;
+		for (const auto& c : n->child) 
+			if (changes.contains(c)) child.push_back(changes[c]);
+			else child.push_back(c);
+		auto nn = make_node(n->value, child).first;
 		changes[n] = nn;
 		return nn;
 	}
@@ -340,7 +340,7 @@ sp_node<symbol_t> trim_top(const sp_node<symbol_t>& input, predicate_t& query) {
 	identity_transformer<symbol_t> identity;
 	auto neg = neg_predicate(query);
 	auto map = map_transformer<decltype(identity), sp_node<symbol_t>>(identity);
-	return post_order_traverser(map, neg)(input);
+	return post_order_traverser<decltype(map), decltype(neg), sp_node<symbol_t>>(map, neg)(input);
 }
 
 template <typename predicate_t, typename symbol_t>
@@ -356,7 +356,7 @@ std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predic
 	std::vector<sp_node<symbol_t>> selected;
 	identity_transformer<sp_node<symbol_t>> identity;
 	auto select = select_top_predicate<predicate_t, sp_node<symbol_t>>(query, selected);
-	post_order_traverser(identity, select)(input);
+	post_order_traverser<decltype(identity), decltype(select), sp_node<symbol_t>>(identity, select)(input);
 	return selected;
 }
 
@@ -375,7 +375,7 @@ std::vector<sp_node<symbol_t>> select_all(const sp_node<symbol_t>& input, predic
 	std::vector<sp_node<symbol_t>> selected;
 	identity_transformer<sp_node<symbol_t>> identity;
 	auto select = select_all_predicate<predicate_t, sp_node<symbol_t>>(query, selected);
-	post_order_traverser(identity, select)(input);
+	post_order_traverser<decltype(identity), decltype(select), sp_node<symbol_t>>(identity, select)(input);
 	return selected;
 }
 
@@ -393,7 +393,7 @@ std::optional<sp_node<symbol_t>> find_top(const sp_node<symbol_t>& input,
 	std::optional<sp_node<symbol_t>> found;
 	identity_transformer<sp_node<symbol_t>> identity;
 	auto find_top = find_top_predicate<predicate_t, sp_node<symbol_t>>(query, found);
-	post_order_traverser(identity, find_top)(input);
+	post_order_traverser<decltype(identity), decltype(find_top), sp_node<symbol_t>>(identity, find_top)(input);
 	return found;
 }
 
@@ -466,11 +466,11 @@ private:
 		// otherwise, we check the symbol of the current node and if it is the
 		// same as the one of the current pattern, we check if the children
 		// match recursively.
-		else if (p->sym == n->sym) {
-			if (p->childs.size() != n->childs.size()) return false;
-			for (size_t i = 0; i < p->childs.size(); ++i) {
-				if (p->childs[i] == n->childs[i]) continue;
-				else if (match(p->childs[i], n->childs[i])) continue;
+		else if (p->value == n->value) {
+			if (p->child.size() != n->child.size()) return false;
+			for (size_t i = 0; i < p->child.size(); ++i) {
+				if (p->child[i] == n->child[i]) continue;
+				else if (match(p->child[i], n->child[i])) continue;
 				else return false;
 			}
 			return true;
@@ -524,10 +524,10 @@ private:
 		// otherwise, we check the symbol of the current node and if it is the
 		// same as the one of the current pattern, we check if the children
 		// match recursively.
-		else if (p->sym == n->sym) {
-			auto p_it = p->childs.begin();
-			auto n_it = n->childs.begin();
-			while (p_it != p->childs.end() && n_it != n->childs.end()) {
+		else if (p->value == n->value) {
+			auto p_it = p->child.begin();
+			auto n_it = n->child.begin();
+			while (p_it != p->child.end() && n_it != n->child.end()) {
 				if (is_skip(*p_it)) { ++p_it; continue; }
 				if (is_skip(*n_it)) { ++n_it; continue; }
 				if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
@@ -570,13 +570,13 @@ sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& m
 	// that deals with the matcher and the substitution.
 	identity_transformer<sp_node<symbol_t>> identity;
 	true_predicate<sp_node<symbol_t>> always;
-	post_order_traverser(identity, matcher)(n);
+	post_order_traverser<decltype(identity), decltype(matcher), sp_node<symbol_t>>(identity, matcher)(n);
 	if (matcher.matched) {
 		replace_transformer<sp_node<symbol_t>> replace {matcher.substitutions};
-		auto nn = post_order_traverser(replace, always)(s);
+		auto nn = post_order_traverser<decltype(replace), decltype(always), sp_node<symbol_t>>(replace, always)(s);
 		unification<sp_node<symbol_t>> nu { {matcher.matched.value(), nn} };
 		replace_transformer<sp_node<symbol_t>> nreplace {nu};
-		return post_order_traverser(nreplace, always)(n);
+		return post_order_traverser<decltype(nreplace), decltype(always), sp_node<symbol_t>>(nreplace, always)(n);
 	}
 	return n;
 }
@@ -596,6 +596,8 @@ tree<node_t> apply_with_skip(const rule<node_t>& r, const tree<node_t>& n,
 	return { apply(r, n.root, is_ignore, is_capture, is_skip) };
 }
 
+
+/*
 // transform a parse tree into a tree of symbols according to the given
 // transformer.
 //
@@ -609,7 +611,7 @@ sp_node<output_t> transform_parse_tree(const typename idni::forest<input_t>::spt
 	std::vector<sp_node<output_t>> childs;
 	for (const auto& c : t->child) childs.push_back(transform_parse_tree(c, transformer));
 	return make_node<output_t>(transformer(t->value), childs);
-}
+		}
 
 } // namespace idni::rewriter
 #endif // __IDNI__REWRITING_H__
