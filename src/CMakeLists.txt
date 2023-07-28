@@ -28,9 +28,9 @@ set(TAU_HEADERS
 	dict.h
 	msba.h
 	normalizer.h
-#	normalizer2.h
+	normalizer2.h
 	out.h
-#	program.h
+	program.h
 	seq.h
 #	tree.h
 )
