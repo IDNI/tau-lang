@@ -119,29 +119,29 @@ struct post_order_traverser {
 	post_order_traverser(wrapped_t& wrapped, predicate_t& query) : 
 		wrapped(wrapped), query(query) {}
 
-	template <typename node_t>
-	node_t operator()(const node_t& n) {
+
+	output_node_t operator()(const input_node_t& n) {
+		// we kept track of the visited nodes to avoid visiting the same node
+		// twice. However, we do not need to keep track of the root node, since
+		// it is the one we start from and we will always be visited.
+		std::set<input_node_t> visited;
 		// if the root node matches the query predicate, we traverse it, otherwise
 		// we return the result of apply the wrapped transform to the node.
-		return query(n) ? traverse(n) : wrapped(n);
+		return query(n) ? traverse(n, visited) : wrapped(n);
 	}
 
-	// we kept track of the visited nodes to avoid visiting the same node
-	// twice. However, we do not need to keep track of the root node, since
-	// it is the one we start from and we will always be visited.
-	std::set<input_node_t> visited;
 	wrapped_t& wrapped;
 	predicate_t& query;
 
 private:
-	output_node_t traverse(const input_node_t& n) {
+	output_node_t traverse(const input_node_t& n, std::set<input_node_t>& visited) {
 		// we traverse the children of the node in post-order, i.e. we visit
 		// the children first and then the node itself.
 		for (const auto& c : n->child) 
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
 			if (!visited.contains(c) && query(c)) {
-				traverse(c);
+				traverse(c, visited);
 				// we assume we have no cycles, i.e. there is no way we could
 				// visit the same node again down the tree. 
 				// thus we can safely add the node to the visited set after
