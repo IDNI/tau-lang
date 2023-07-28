@@ -72,16 +72,16 @@ variable		=> var | ignore | capture.
 # QUESTION dows timed variables have one index or several?
 timed			=> ( var_in| var_out) indexes. 
 offset			=> variable | variable minus num | variable plus num.
-ignore 			=> "??_".
-capture			=> "??" chars.
-var				=> '?' chars.
-var_in			=> "?i_" chars. # instead of '<', easy to remember
-var_out			=> "?o_" chars. # instead of '>', easy to remember
+ignore 			=> "?".
+capture			=> "$" chars.
+var				=> '%' chars.
+var_in			=> "%i_" chars. # instead of '<', easy to remember
+var_out			=> "%o_" chars. # instead of '>', easy to remember
 
 # wff
 wff_def				=> wff_rule dot.
-wff_rule			=> wff_head wff_body.
-wff_body 			=> equality wff dot.
+wff_rule			=> wff_head equality wff_body dot.
+wff_body 			=> wff.
 wff_head			=> sym indexes wff_head_args.
 wff_head_args		=> open_parenthesis variable* close_parenthesis.
 
@@ -156,7 +156,7 @@ bf_constant		=> open_brace constant close_brace.
 constant		=> T | F | bf_builtin | binding | capture | ignore.
 T				=> ws '1' ws.
 F				=> ws '0' ws.
-bf_builtin		=> bf_and_bltin | bf_or_bltin | bf_xor_bltin | bf_neg_bltin.
+bf_builtin		=> bf_and_bltin | bf_or_bltin | bf_xor_bltin | bf_neg_bltin | bf_subs_bltin.
 binding			=> ws chars ws.
 
 # bf_bltins
@@ -164,16 +164,17 @@ bf_and_bltin	=> bltin_arg bf_and_bltin_sym bltin_arg.
 bf_or_bltin		=> bltin_arg bf_or_bltin_sym bltin_arg.
 bf_xor_bltin	=> bltin_arg bf_xor_bltin_sym bltin_arg.
 bf_neg_bltin	=> neg_bltin_sym bltin_arg.
+bf_subs_bltin	=> subs_bltin_sym bltin_arg bltin_arg bltin_arg.
 
 # bf_bultin_arg
-bltin_arg	=> capture.
+bltin_arg	=> capture | T | F.
 
 # bf_bltin_syms
 bf_and_bltin_sym	=> ws "bf_and_bltin" ws.
 bf_or_bltin_sym		=> ws "bf_or_bltin" ws.
 bf_xor_bltin_sym	=> ws "bf_xor_bltin" ws.
 bf_neg_bltin_sym	=> ws "bf_neg_bltin" ws.
-
+subs_bltin_sym		=> ws "subs_bltin" ws.
 
 # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 main			=> wff dot.
