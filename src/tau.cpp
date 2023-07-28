@@ -17,6 +17,8 @@
 #include "out.h"
 //#include "anf.h"
 #include "ba.h"
+#include "program.h"
+#include "normalizer2.h"
 
 //template<typename B> vector<bdd<B>> bdd<B>::V;
 //template<typename B> unordered_map<bdd_node, size_t> bdd<B>::Mn;
