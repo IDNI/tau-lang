@@ -37,7 +37,7 @@ using tau_source_tree = tree<node<idni::lit<char, char>>>;
 // node type for the tau language related programs, libraries and 
 // specifications trees.
 template <typename... BAs>
-using tau_sym = std::variant<tau_source_node, std::variant<BAs...>>;
+using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>>;
 template <typename... BAs>
 using tau_node = node<tau_sym<BAs...>>;
 template <typename... BAs>
@@ -45,7 +45,7 @@ using sp_tau_node = sp_node<tau_sym<BAs...>>;;
 template <typename... BAs>
 using tau_tree = tree<tau_node<BAs...>>;
 template <typename... BAs>
-using tau_rule = rule<node<tau_sym<BAs...>>>;
+using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 
 
 // defines a vector of rules in the tau language, the order is important as it defines
@@ -117,23 +117,23 @@ template<typename... BAs>
 struct is_non_terminal {
 
 	size_t operator()(const sp_tau_node<BAs...>& n) {
-		return std::holds_alternative<tau_source_node>(*n) 
-			&& get<tau_source_node>(*n).nt();
+		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
+			&& get<0>(*n).nt();
 	}
 };
 
 template <size_t nt_t>
 struct is {
 
-	bool operator()(sp_tau_source_node& n) {
-		return (*n).value.nt() && (*n).value.n() == nt_t;
+	bool operator()(const sp_tau_source_node& n) {
+		return n->value.nt() && n->value.n() == nt_t;
 	}
 
 	template <typename... BAs>
-	bool operator()(sp_tau_node<BAs...>& n) {
-		return std::holds_alternative<tau_source_node>(*n)
-			&& get<tau_source_node>(*n).nt() 
-			&& get<tau_source_node>(*n).n() == nt_t;
+	bool operator()(const sp_tau_node<BAs...>& n) {
+		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
+			&& get<0>(n->value).nt() 
+			&& get<0>(n->value).n() == nt_t;
 	}
 };
 
@@ -141,8 +141,8 @@ template<typename... BAs>
 struct is_capture_predicate {
 
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		return std::holds_alternative<tau_source_node>(*n) 
-			&& get<tau_source_node>(*n).n() == ::tau_parser::capture;
+		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
+			&& get<0>(n->value).n() == ::tau_parser::capture;
 	}
 };
 
@@ -150,17 +150,16 @@ template<typename... BAs>
 struct is_ignore_predicate {
 
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		return std::holds_alternative<tau_source_node>(*n) 
-			&& get<tau_source_node>(*n).n() == ::tau_parser::ignore;
-		auto sn = get<tau_source_node>(n->value);
-		return sn != 0 && sn->value.nt() && n.get()->value.n() == ::tau_parser::ignore;
+		if(!std::holds_alternative<tau_sym>(n->value)) return false;
+		auto sn = get<0>(n->value);
+		return sn->nt() && n->n() == ::tau_parser::ignore;
 	}
 };
 
 template <size_t nt_t, typename... BAs>
 std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
 	return select_top(n, [](const sp_tau_node<BAs...>& n) {
-		return get<tau_source_node>(*n)->value.nt() == nt_t;
+		return get<0>(*n)->value.nt() == nt_t;
 	});
 }
 
@@ -215,8 +214,9 @@ private:
 template <typename... BAs>
 struct tauify {
 
-	sp_tau_node<BAs...> operator()(sp_tau_source_node& n) {
-		return { n->value };
+	sp_tau_node<BAs...> operator()(const sp_tau_source_node& n) const {
+		tau_sym<BAs...> nn(n->value);
+		return make_node<tau_sym<BAs...>>(nn, {});
 	}
 };
 
@@ -225,7 +225,7 @@ struct bind {
 
 	bind(const bindings<BAs...>& bs) : bs(bs) {}
 
-	sp_tau_node<BAs...> operator()(sp_tau_source_node& n) {
+	sp_tau_node<BAs...> operator()(sp_tau_source_node& n) const {
 		if (n->value.nt() && !is<::tau_parser::sym>()(n)) return { (n->value) };
 		auto bn = make_string(n);
 		return make_node<tau_node<BAs...>>(bs.get(bn), {});
@@ -255,23 +255,27 @@ private:
 
 template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
-	return { n->child[0]->child[0]->child[0], n->child[0]->child[0]->child[2] };
+	auto p = n->child[0]->child[0]->child[0];
+	auto s = n->child[0]->child[0]->child[1];
+	tau_rule<BAs...> r(p, s);
+	return r;
 }
 
 template<typename... BAs>
 library<BAs...> make_library(tau_source& tau_source) {
 	true_predicate<sp_tau_source_node> always;
-	tauify tf;
+	tauify<BAs...> tf;
 	auto lib = post_order_traverser<decltype(tf), decltype(always),sp_tau_source_node, sp_tau_node<BAs...>>(tf, always)(tau_source.root);
 	rules<BAs...> rs;
-	for (auto& r: select_top(lib, is<::tau_parser::rule>())) rs.push_back(make_rule<BAs...>(r));
+	auto is_rule = is<::tau_parser::rule>();
+	for (auto& r: select_top(lib, is_rule)) rs.push_back(make_rule<BAs...>(r));
 	return { rs };
 }
 
 template<typename... BAs>
 program<BAs...> make_program(tau_source& tau_source, bindings<BAs...>& bindings) {
 	true_predicate<sp_tau_source_node> always;
-	tauify tf;
+	tauify<BAs...> tf;
 	auto src = post_order_traverser<decltype(tf), decltype(always),sp_tau_source_node, sp_tau_node<BAs...>>(tf, always)(tau_source.root);
 	auto m = find_top(src, is<::tau_parser::main>()).value;
 	bind bs(bindings); 
