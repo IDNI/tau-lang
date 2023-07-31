@@ -95,20 +95,20 @@ struct tree {
 
 // node factory method
 template <typename symbol_t>
-::std::pair<sp_node<symbol_t>, bool> make_node(const symbol_t& s, 
+sp_node<symbol_t> make_node(const symbol_t& s, 
 		const std::vector<sp_node<symbol_t>>& ns) {
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
 	node<symbol_t> key{s, ns}; 
 	if (auto it = cache.find(key); it != cache.end()) {
-		return std::pair(it->second, false);
+		return it->second;
 	}
 	cache[key] = std::make_shared<node<symbol_t>>(s, ns);
-	return std::pair(cache[key], true);
+	return cache[key];
 }
 
 template <typename node_t>
 struct identity_transformer {
-	node_t operator()(const node_t& n) { return n; }
+	node_t operator()(const node_t& n) const { return n; }
 };
 
 // visitor that traverse the tree in post-order.
@@ -165,7 +165,7 @@ struct map_transformer {
 		std::vector<output_node_t> child;
 		for (const auto& c : n->child) 
 			if (changes.contains(c)) child.push_back(changes[c]);
-		auto nn = make_node(wrapped(n->value), child).first;
+		auto nn = make_node(wrapped(n->value), child);
 		changes[n] = nn;
 		return nn;
 	}
@@ -192,7 +192,7 @@ private:
 		for (const auto& c : n->child) 
 			if (changes.contains(c)) child.push_back(changes[c]);
 			else child.push_back(c);
-		auto nn = make_node(n->value, child).first;
+		auto nn = make_node(n->value, child);
 		changes[n] = nn;
 		return nn;
 	}
@@ -274,7 +274,7 @@ struct find_top_predicate {
 template<typename node_t>
 struct true_predicate {
 	
-	bool operator()(const node_t& n) {
+	bool operator()(const node_t& n) const {
 		return true;
 	}
 };
@@ -282,7 +282,7 @@ struct true_predicate {
 template<typename node_t>
 struct false_predicate {
 	
-	bool operator()(const node_t& n) {
+	bool operator()(const node_t& n) const {
 		return false;
 	}
 };
@@ -295,7 +295,7 @@ struct and_predicate {
 	and_predicate(l_predicate_t& p1, r_predicate_t& p2) : p1(p1), p2(p2) {}
 
 	template<typename node_t>
-	bool operator()(const node_t& n) {
+	bool operator()(const node_t& n) const {
 		return p1(n) && p2(n);
 	}
 
@@ -311,7 +311,7 @@ struct or_predicate {
 	or_predicate(l_predicate_t& p1, r_predicate_t& p2) : p1(p1), p2(p2) {}
 
 	template<typename node_t>
-	bool operator()(const node_t& n) {
+	bool operator()(const node_t& n) const {
 		return p1(n) || p2(n);
 	}
 
@@ -325,7 +325,7 @@ struct neg_predicate {
 	neg_predicate(predicate_t& p) : p(p) {}
 
 	template<typename node_t>
-	bool operator()(const node_t& n) {
+	bool operator()(const node_t& n) const {
 		return !p(n);
 	}
 
