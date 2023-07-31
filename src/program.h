@@ -114,11 +114,26 @@ struct tau_spec {
 
 // TODO implementations details to be moved to a separate file
 template<typename... BAs>
-struct non_terminal {
+struct is_non_terminal {
 
 	size_t operator()(const sp_tau_node<BAs...>& n) {
-		auto sn = get<tau_source_node>(n->value);
-		return sn != 0 && sn->value.nt();
+		return std::holds_alternative<tau_source_node>(*n) 
+			&& get<tau_source_node>(*n).nt();
+	}
+};
+
+template <size_t nt_t>
+struct is {
+
+	bool operator()(sp_tau_source_node& n) {
+		return (*n).value.nt() && (*n).value.n() == nt_t;
+	}
+
+	template <typename... BAs>
+	bool operator()(sp_tau_node<BAs...>& n) {
+		return std::holds_alternative<tau_source_node>(*n)
+			&& get<tau_source_node>(*n).nt() 
+			&& get<tau_source_node>(*n).n() == nt_t;
 	}
 };
 
@@ -126,8 +141,8 @@ template<typename... BAs>
 struct is_capture_predicate {
 
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		auto sn = get<tau_source_node>(n->value);
-		return sn != 0 && sn->value.nt() && n.get()->value.n() == ::tau_parser::capture;
+		return std::holds_alternative<tau_source_node>(*n) 
+			&& get<tau_source_node>(*n).n() == ::tau_parser::capture;
 	}
 };
 
@@ -135,6 +150,8 @@ template<typename... BAs>
 struct is_ignore_predicate {
 
 	bool operator()(const sp_tau_node<BAs...>& n) {
+		return std::holds_alternative<tau_source_node>(*n) 
+			&& get<tau_source_node>(*n).n() == ::tau_parser::ignore;
 		auto sn = get<tau_source_node>(n->value);
 		return sn != 0 && sn->value.nt() && n.get()->value.n() == ::tau_parser::ignore;
 	}
@@ -203,11 +220,6 @@ struct tauify {
 	}
 };
 
-template <size_t nt_t>
-bool is(sp_tau_source_node& n) {
-	return n.get()->value.nt() && n.get()->value.n() == nt_t;
-}
-
 template <size_t nt_t, typename... BAs>
 bool is_tau(sp_tau_node<BAs...>& n) {
 	return n.get()->index() == 0 && is(nt_t, get<tau_source_node>(n));
@@ -219,7 +231,7 @@ struct bind {
 	bind(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> operator()(sp_tau_source_node& n) {
-		if (n->value.nt() && !is<::tau_parser::sym>(n)) return { n->value };
+		if (n.get()->value.nt() && !is<::tau_parser::sym>()(n)) return { n.get()->value };
 		auto bn = make_string(n);
 		return make_node<tau_node<BAs...>>(bs.get(bn), {});
 	}
@@ -257,7 +269,7 @@ library<BAs...> make_library(tau_source& tau_source) {
 	tauify tf;
 	auto lib = post_order_traverser<decltype(tf), decltype(always),sp_tau_source_node, sp_tau_node<BAs...>>(tf, always)(tau_source.root);
 	rules<BAs...> rs;
-	for (auto& r: select_top(lib, is<::tau_parser::rule>)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(lib, is<::tau_parser::rule>())) rs.push_back(make_rule<BAs...>(r));
 	return { rs };
 }
 
@@ -266,11 +278,11 @@ program<BAs...> make_program(tau_source& tau_source, bindings<BAs...>& bindings)
 	true_predicate<sp_tau_source_node> always;
 	tauify tf;
 	auto src = post_order_traverser<decltype(tf), decltype(always),sp_tau_source_node, sp_tau_node<BAs...>>(tf, always)(tau_source.root);
-	auto m = find_top(src, is<::tau_parser::main>).value();
+	auto m = find_top(src, is<::tau_parser::main>()).value;
 	bind bs(bindings); 
 	auto statement = post_order_traverser<decltype(bs), decltype(always), sp_tau_node<BAs...>>(bs, always)(m);
 	rules<BAs...> rs;
-	for (auto& r: select_top(src, is<::tau_parser::rule>)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(src, is<::tau_parser::rule>())) rs.push_back(make_rule<BAs...>(r));
 	return { rs, statement };
 }
 
@@ -285,7 +297,7 @@ sp_tau_node<BAs...> apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs.
 template<typename... BAs>
 sp_tau_node<BAs...> apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;
-	for (auto& r : rs) nn = apply(r, nn);
+	for (auto& r : rs) nn = apply(r, nn, is<::tau_parser::ignore>(), is<::tau_parser::capture>());
 	return nn;
 }
 
