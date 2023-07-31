@@ -216,14 +216,9 @@ template <typename... BAs>
 struct tauify {
 
 	sp_tau_node<BAs...> operator()(sp_tau_source_node& n) {
-		return { n-> value };
+		return { n->value };
 	}
 };
-
-template <size_t nt_t, typename... BAs>
-bool is_tau(sp_tau_node<BAs...>& n) {
-	return n.get()->index() == 0 && is(nt_t, get<tau_source_node>(n));
-}
 
 template<typename... BAs>
 struct bind {
@@ -231,7 +226,7 @@ struct bind {
 	bind(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> operator()(sp_tau_source_node& n) {
-		if (n.get()->value.nt() && !is<::tau_parser::sym>()(n)) return { n.get()->value };
+		if (n->value.nt() && !is<::tau_parser::sym>()(n)) return { (n->value) };
 		auto bn = make_string(n);
 		return make_node<tau_node<BAs...>>(bs.get(bn), {});
 	}
