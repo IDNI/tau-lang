@@ -14,18 +14,14 @@
 #define __BOOL_H__
 struct Bool {
 	bool b;
+	Bool() : b(false) {}
 	Bool(bool b) : b(b) {}
-	template<typename T> Bool(const T&) {
-		throw 0;
-//		static_assert(is_same<T, bool>::value);
-	}
 	static const Bool& zero() { static Bool b(false); return b; }
 	static const Bool& one() { static Bool b(true); return b; }
 	Bool operator&(const Bool& x) const;
 	Bool operator|(const Bool& x) const;
 	Bool operator~() const;
-	bool operator<(const Bool& x) const { return b < x.b; }
-	bool operator==(bool t) const { return b == t; }
+	auto operator<=>(const Bool& x) const = default; //noexcept { return this->b <=> x.b; }
 };
 
 Bool Bool::operator&(const Bool& x) const {
