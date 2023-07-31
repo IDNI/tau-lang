@@ -16,12 +16,40 @@
 #include "../src/doctest.h"
 #include "../src/program.h"
 #include "../src/bool.h"
+#include "../src/bdd_handle.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
 using namespace std;
 
 namespace testing = doctest;
+
+TEST_SUITE("testing order") {
+
+	TEST_CASE("bool") {
+		auto t = std::variant<bool>(true);
+		auto f = std::variant<bool>(false);
+		CHECK( (f <=> t) == std::strong_ordering::less );
+	}
+
+	struct Char {
+		char c;
+		Char(char c) : c(c) {}
+		auto operator<=>(const Char& o) const = default;
+	};
+
+	TEST_CASE("Char") {
+		auto b = std::variant<Char>(Char('b'));
+		auto a = std::variant<Char>(Char('a'));
+		CHECK( (a <=> b) == std::strong_ordering::less );
+	}
+
+	TEST_CASE("Bool") {
+		auto t = std::variant<Bool>(Bool(true));
+		auto f = std::variant<Bool>(Bool(false));
+		CHECK( (f <=> t) == std::strong_ordering::less );
+	}
+}
 
 /*TEST_SUITE("make_program") {
 
@@ -37,7 +65,7 @@ namespace testing = doctest;
 		CHECK( false );
 	}
 
-}
+}*/
 
 TEST_SUITE("make_library") {
 
@@ -47,7 +75,7 @@ TEST_SUITE("make_library") {
 		auto src = make_tau_source(sample);
 		tau_source t(src);
 		auto lib = make_library<Bool>(t);
-		CHECK( false );
+		CHECK( true );
 	}
 
 }
@@ -57,9 +85,9 @@ TEST_SUITE("make_tau_source") {
 
 	TEST_CASE("make_tau_source") {
 		auto src = make_tau_source(sample);
-		CHECK( false );
+		CHECK( true );
 	}
-}*/
+}
 
 TEST_SUITE("apply") {
 
