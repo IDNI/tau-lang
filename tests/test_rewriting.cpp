@@ -24,11 +24,11 @@ namespace testing = doctest;
 // TODO move helper methods to a different file
 
 sp_node<char> n(const char& value) {
-	return make_node<char>(value, {}).first;
+	return make_node<char>(value, {});
 }
 
 sp_node<char> n(const char& value, const vector<sp_node<char>>& child) {
-	return make_node<char>(value, child).first;
+	return make_node<char>(value, child);
 }
 
 sp_node<char> d(const char& value) {
@@ -142,29 +142,29 @@ TEST_SUITE("make_node") {
 
 	TEST_CASE("make_node uniqueness: given two simple nodes with the same value, it "
 			"returns the same node") {
-		auto n1 = make_node<char>('a', {}).first;
-		auto n2 = make_node<char>('a', {}).first;
+		auto n1 = make_node<char>('a', {});
+		auto n2 = make_node<char>('a', {});
 		CHECK( n1 == n2 );		
 	}
 
 	TEST_CASE("make_node uniqueness: given two nodes with the same value and children, "
 			"it returns the same node") {
-		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')}).first;
-		auto n2 = make_node<char>('a', {n('b'), n('c'), n('d')}).first;
+		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')});
+		auto n2 = make_node<char>('a', {n('b'), n('c'), n('d')});
 		CHECK( n1 == n2 );		
 	}
 
 	TEST_CASE("make_node uniqueness: given two nodes with different value and same "
 			"children, it returns the different nodes") {
-		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')}).first;
-		auto n2 = make_node<char>('b', {n('b'), n('c'), n('d')}).first;
+		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')});
+		auto n2 = make_node<char>('b', {n('b'), n('c'), n('d')});
 		CHECK( n1 != n2 );		
 	}
 
 	TEST_CASE("make_node uniqueness: given two nodes with same value and different "
 			"children, it returns the different nodes") {
-		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')}).first;
-		auto n2 = make_node<char>('a', {n('b'), n('c'), n('e')}).first;
+		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')});
+		auto n2 = make_node<char>('a', {n('b'), n('c'), n('e')});
 		CHECK( n1 != n2 );		
 	}
 }
