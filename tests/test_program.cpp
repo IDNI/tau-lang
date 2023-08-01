@@ -51,7 +51,7 @@ TEST_SUITE("testing order") {
 	}
 }
 
-/*TEST_SUITE("make_program") {
+TEST_SUITE("make_program") {
 
 	static constexpr char* sample =	
 		"bf_neg ( bf_neg ( $X ) ) = $X ."
@@ -65,7 +65,7 @@ TEST_SUITE("testing order") {
 		CHECK( false );
 	}
 
-}*/
+}
 
 TEST_SUITE("make_library") {
 

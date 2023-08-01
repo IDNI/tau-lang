@@ -13,15 +13,18 @@
 #ifndef __BOOL_H__
 #define __BOOL_H__
 struct Bool {
-	bool b;
 	Bool() : b(false) {}
 	Bool(bool b) : b(b) {}
+
 	static const Bool& zero() { static Bool b(false); return b; }
 	static const Bool& one() { static Bool b(true); return b; }
+	
 	Bool operator&(const Bool& x) const;
 	Bool operator|(const Bool& x) const;
 	Bool operator~() const;
-	auto operator<=>(const Bool& x) const = default; //noexcept { return this->b <=> x.b; }
+	auto operator<=>(const Bool& x) const = default;
+	
+	bool b;
 };
 
 Bool Bool::operator&(const Bool& x) const {
