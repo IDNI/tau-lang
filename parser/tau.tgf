@@ -72,9 +72,9 @@ variable		=> var | ignore | capture.
 # QUESTION dows timed variables have one index or several?
 timed			=> ( var_in| var_out) indexes. 
 offset			=> variable | variable minus num | variable plus num.
-ignore 			=> "?".
-capture			=> "$" chars.
-var				=> '%' chars.
+ignore 			=> '_'.
+capture			=> '$' chars.
+var				=> '?' chars.
 var_in			=> "%i_" chars. # instead of '<', easy to remember
 var_out			=> "%o_" chars. # instead of '>', easy to remember
 
@@ -107,7 +107,7 @@ wff_ex_sym		=> ws "wff_ex" ws.
 cbf_def 		=> cbf_rule dot.
 cbf_rule 		=> cbf_head equality cbf dot.
 cbf_head 		=> sym indexes open_parenthesis variable* close_parenthesis.
-cbf 			=> bf_def | cbf_if | cbf_ref | bf_and | bf_neg | bf_xor | bf_or.
+cbf 			=> bf | cbf_if | cbf_ref | bf_and | bf_neg | bf_xor | bf_or.
 cbf_ref			=> cbf_head.
 cbf_if			=> cbf_if_sym open_parenthesis cbf_if_condition close_parenthesis 
 					cbf_then_sym cbf_if_then 
@@ -130,8 +130,7 @@ cbf_else_sym	=> ws "else" ws.
 #
 # QUESTION: Does timed vars appear only in bf formulas?
 
-bf_def			=> (bf_rule | bf) dot.
-bf_rule			=> bf equality bf dot.
+bf_rule			=> ws bf equality bf ws dot.
 bf				=> bf_constant | cbf | cbf_ref | bf_and | bf_neg | bf_xor | bf_or
 					| bf_all | bf_ex | variable | timed.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
