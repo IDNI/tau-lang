@@ -214,18 +214,39 @@ private:
 template <typename... BAs>
 struct tauify {
 
-	sp_tau_node<BAs...> operator()(const sp_tau_source_node& n) const {
-		tau_sym<BAs...> nn(n->value);
-		return make_node<tau_sym<BAs...>>(nn, {});
+	tau_sym<BAs...> operator()(const tau_source_sym& n) const {
+		tau_sym<BAs...> nn(n);
+		return nn;
 	}
 };
 
 template<typename... BAs>
-struct bind {
+struct bind_transformer {
 
-	bind(const bindings<BAs...>& bs) : bs(bs) {}
+	bind_transformer(const bindings<BAs...>& bs) : bs(bs) {}
 
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
+	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
+		if (changes.contains(n)) return changes[n];
+		if (auto b = bind(n); b != n) {
+			changes[n] = b;
+			return b;
+		}
+		bool changed = false;
+		std::vector<sp_tau_node<BAs...>> child;
+		for (auto& c : n->child) {
+			if (changes.contains(c)) changed = true, child.push_back(changes[c]);
+			else child.push_back(c);
+		}
+		auto nn = make_node<tau_sym<BAs...>>(n->value, child);
+		if (changed) 
+			changes[n] = nn;
+		return nn;
+	}
+
+	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+	const bindings<BAs...>& bs;
+private:
+	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		if (n->value.index() != 0) return n;
 		if (get<0>(n->value).nt() && get<0>(n->value).n() == ::tau_parser::binding) {
 			auto bn = make_string(n);
@@ -234,19 +255,16 @@ struct bind {
 				tau_sym<BAs...> ts = s->second;
 				return make_node<tau_sym<BAs...>>(ts, {});
 			}
-
 		}
 		return n;
 	}
 
-	const bindings<BAs...>& bs;
-
-private:
 	std::string make_string(const sp_tau_node<BAs...>& n) const {
 		std::basic_stringstream<char> ss;
 		stringify sy(ss);
-		true_predicate<sp_tau_node<BAs...>> always;
-		post_order_traverser<decltype(sy), decltype(always), sp_tau_node<BAs...>>(sy, always)(n);
+		// true_predicate<sp_tau_node<BAs...>> always;
+		auto not_ws = [](const sp_tau_node<BAs...>& n) { return !(n->value.index() == 0 && get<0>(n->value).nt() && get<0>(n->value).n() == tau_parser::ws); };	
+		post_order_tree_traverser<decltype(sy), decltype(not_ws), sp_tau_node<BAs...>>(sy, not_ws)(n);
 		return ss.str();
 	}
 
@@ -256,7 +274,9 @@ private:
 
 		sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
 			if (n->value.index() != 0) return n;
-			if (n->value.index() == 0 && !get<0>(n->value).nt()) 
+			if (n->value.index() == 0 
+					&& !get<0>(n->value).nt()
+					&& !get<0>(n->value).is_null())
 				ss << get<0>(n->value).t(); 
 			return n;
 		}
@@ -275,9 +295,8 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
 
 template<typename... BAs>
 library<BAs...> make_library(tau_source& tau_source) {
-	true_predicate<sp_tau_source_node> always;
 	tauify<BAs...> tf;
-	auto lib = post_order_traverser<decltype(tf), decltype(always),sp_tau_source_node, sp_tau_node<BAs...>>(tf, always)(tau_source.root);
+	auto lib = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source.root);
 	rules<BAs...> rs;
 	auto is_rule = is<::tau_parser::rule>();
 	for (auto& r: select_top(lib, is_rule)) rs.push_back(make_rule<BAs...>(r));
@@ -286,14 +305,13 @@ library<BAs...> make_library(tau_source& tau_source) {
 
 template<typename... BAs>
 program<BAs...> make_program(tau_source& tau_source, const bindings<BAs...>& bindings) {
-	true_predicate<sp_tau_source_node> always;
 	tauify<BAs...> tf;
-	auto src = post_order_traverser<decltype(tf), decltype(always),sp_tau_source_node, sp_tau_node<BAs...>>(tf, always)(tau_source.root);
+	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source.root);
 	auto is_main = is<::tau_parser::main>();
 	auto m = find_top(src, is_main).value();
-	bind<BAs...> bs(bindings); 
-	true_predicate<sp_tau_node<BAs...>> always2;
-	auto statement = post_order_traverser<decltype(bs), decltype(always2), sp_tau_node<BAs...>>(bs, always2)(m);
+	bind_transformer<BAs...> bs(bindings); 
+	true_predicate<sp_tau_node<BAs...>> always;
+	auto statement = post_order_traverser<decltype(bs), decltype(always), sp_tau_node<BAs...>>(bs, always)(m);
 	rules<BAs...> rs;
 	is<::tau_parser::rule> is_rule;
 	for (auto& r: select_top(src, is_rule)) rs.push_back(make_rule<BAs...>(r));
