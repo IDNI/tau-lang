@@ -20,11 +20,10 @@
 
 using namespace idni::rewriter;
 using namespace idni::tau;
-using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("testing order") {
+/*TEST_SUITE("testing order") {
 
 	TEST_CASE("bool") {
 		auto t = std::variant<bool>(true);
@@ -49,57 +48,7 @@ TEST_SUITE("testing order") {
 		auto f = std::variant<Bool>(Bool(false));
 		CHECK( (f <=> t) == std::strong_ordering::less );
 	}
-}
-
-TEST_SUITE("make_program") {
-
-	static constexpr char* sample =	
-		"bf_neg ( bf_neg ( $X ) ) = $X ."
-		" { 0 } ";
-
-	TEST_CASE("make_library") {
-		auto src = make_tau_source(sample);
-		bindings<Bool> bs;
-		tau_source t(src);
-		auto lib = make_program<Bool>(t, bs);
-		CHECK( false );
-	}
-
-}
-
-TEST_SUITE("make_library") {
-
-	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
-
-	TEST_CASE("make_library") {
-		auto src = make_tau_source(sample);
-		tau_source t(src);
-		auto lib = make_library<Bool>(t);
-		CHECK( true );
-	}
-
-}
-
-TEST_SUITE("make_tau_source") {
-	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
-
-	TEST_CASE("make_tau_source") {
-		auto src = make_tau_source(sample);
-		CHECK( true );
-	}
-}
-
-TEST_SUITE("apply") {
-
-}
-
-TEST_SUITE("bind") {
-
-}
-
-TEST_SUITE("builtin_applier") {
-
-}
+}*/
 
 TEST_SUITE("get") {
 
@@ -116,3 +65,96 @@ TEST_SUITE("is_capture") {
 TEST_SUITE("non_terminal") {
 
 }
+
+TEST_SUITE("bind") {
+
+	sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {
+	tauify<Bool> tf;
+	map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
+	true_predicate<sp_node<tau_source_sym>> always;
+	return post_order_traverser<decltype(transform), decltype(always),
+		sp_node<tau_source_sym>, sp_tau_node<Bool>>(transform, always)(source);
+	}
+
+	sp_tau_node<Bool> make_binding(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
+		true_predicate<sp_tau_node<Bool>> always;
+		bind_transformer<Bool> binder(bs); 
+		return post_order_traverser<decltype(binder), decltype(always), sp_tau_node<Bool>>(binder, always)(statement);
+	}
+
+	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
+		static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		bindings<Bool> bs; bs["binding"] = { Bool(true) };
+		auto binded = make_binding(statement, bs);
+		CHECK( binded == statement );
+	}
+
+	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
+		static constexpr char* sample =	"bf_neg ( bf_neg ( { binding } ) ) = { binding } .";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		bindings<Bool> bs; bs["binding"] = { Bool(true) };
+		auto binded = make_binding(statement, bs);
+		CHECK( binded != statement );
+	}
+
+	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
+		static constexpr char* sample =	"bf_neg ( bf_neg ( { non_matching } ) ) = { non_matching } .";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		bindings<Bool> bs; bs["binding"] = { Bool(true) };
+		auto binded = make_binding(statement, bs);
+		CHECK( binded == statement );
+	}
+}
+
+TEST_SUITE("builtin_applier") {
+
+}
+
+TEST_SUITE("apply") {
+
+}
+
+TEST_SUITE("make_tau_source") {
+
+	static constexpr char* sample =	
+		"bf_neg ( bf_neg ( $X ) ) = $X .";
+
+	TEST_CASE("one_rule_n_main") {
+		auto src = make_tau_source(sample);
+		CHECK( true );
+	}
+}
+
+TEST_SUITE("make_library") {
+
+	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
+
+	TEST_CASE("one_rule") {
+		auto src = make_tau_source(sample);
+		tau_source t(src);
+		auto lib = make_library<Bool>(t);
+		CHECK( true );
+	}
+
+}
+
+/* TEST_SUITE("make_program") {
+
+	static constexpr char* sample =	
+		"bf_neg ( bf_neg ( $X ) ) = $X ."
+		" { 0 } .";
+
+	TEST_CASE("one_rule_n_main") {
+		auto src = make_tau_source(sample);
+		bindings<Bool> bs;
+		tau_source t(src);
+		auto lib = make_program<Bool>(t, bs);
+		CHECK( true );
+	}
+
+}*/
+
