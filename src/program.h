@@ -320,16 +320,16 @@ program<BAs...> make_program(tau_source& tau_source, const bindings<BAs...>& bin
 
 // apply one tau rule to the tree given by a tau node
 template<typename... BAs>
-sp_tau_node<BAs...> apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
 	// TODO we could also apply only once
 	return post_order_traverser(map_transformer(builtin_applier<BAs...>()))(apply(r,n));
 }
 
 // execute one step of the program
 template<typename... BAs>
-sp_tau_node<BAs...> apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;
-	for (auto& r : rs) nn = apply(r, nn, is<::tau_parser::ignore>(), is<::tau_parser::capture>());
+	for (auto& r : rs) nn = tau_apply(r, nn, is<::tau_parser::ignore>(), is<::tau_parser::capture>());
 	return nn;
 }
 
