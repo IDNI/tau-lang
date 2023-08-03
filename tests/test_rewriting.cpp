@@ -250,7 +250,8 @@ TEST_SUITE("map_transformer") {
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
 		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('z') };
-		CHECK( post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root) == expected );
+		auto result = post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root);
+		CHECK( result == expected );
 	}
 
 	TEST_CASE("map_transformer: given a tree with two children and a visitor, "
@@ -260,7 +261,8 @@ TEST_SUITE("map_transformer") {
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
 		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('a', {n('z'), n('c')}) };
-		CHECK( post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root) == expected );
+		auto result = post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root);
+		CHECK( result == expected );
 	}
 
 	TEST_CASE("map_transformer: given a tree with underlying diamond like DAG "
@@ -271,7 +273,8 @@ TEST_SUITE("map_transformer") {
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
 		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
-		CHECK( post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root) == expected );
+		auto result = post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root);
+		CHECK( result == expected );
 	}
 }
 
@@ -285,7 +288,8 @@ TEST_SUITE("replace_transformer") {
 		replace_transformer<sp_node<char>> replace{m};
 		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('z') };
-		CHECK( post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root) == expected );
+		auto result = post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root);
+		CHECK( result == expected );
 	}
 
 	TEST_CASE("replace_transform: given a tree with two children and a visitor, "
@@ -296,7 +300,8 @@ TEST_SUITE("replace_transformer") {
 		replace_transformer<sp_node<char>> replace{m};
 		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('a', {n('z'), n('c')}) };
-		CHECK( post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root) == expected );
+		auto result = post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root);
+		CHECK( result == expected );
 	}
 
 	TEST_CASE("replace_transform: given a tree with underlying diamond like DAG "
@@ -307,13 +312,14 @@ TEST_SUITE("replace_transformer") {
 		replace_transformer<sp_node<char>> replace{m};
 		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
-		CHECK( post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root) == expected );
+		auto result = post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root);
+		CHECK( result == expected );
 	}
 	// TODO add the tests corresponding to related functions
 }
 
 TEST_SUITE("to_visitor") {
-	/* not used yet */
+	/* TODO not used yet in final code, maybe we could remove it */
 }
 
 TEST_SUITE("select_top_predicate") {
@@ -743,6 +749,8 @@ TEST_SUITE("select_all") {
 		vector<sp_node<char>> expected { n('b'), n('c') }; 
 		CHECK( select_all<decltype(predicate), char>(root, predicate) == expected );
 	}
+
+	// TODO check also select_all for trees
 }
 
 TEST_SUITE("find_top") {
@@ -795,6 +803,8 @@ TEST_SUITE("find_top") {
 		optional<sp_node<char>> expected { n('b', {n('d')}) }; 
 		CHECK( find_top<decltype(predicate), char>(root, predicate) == expected );
 	}
+
+	// TODO check also find_top for trees
 }
 
 TEST_SUITE("pattern_matcher") {
@@ -880,7 +890,7 @@ TEST_SUITE("pattern_matcher") {
 	}
 }
 
-TEST_SUITE("pattern_matcher") {
+TEST_SUITE("pattern_matcher_with_skip") {
 
 	struct is_capture_predicate {
 
@@ -1090,6 +1100,8 @@ TEST_SUITE("apply") {
 		auto replaced = apply(rule, root, is_ignore, is_capture) ;
 		CHECK( replaced == expected );
 	}
+
+	// TODO write tests for apply (tree case), not really needed and maybe unnecessary
 }
 
 TEST_SUITE("apply_with_skip") {
@@ -1204,8 +1216,8 @@ TEST_SUITE("apply_with_skip") {
 		auto replaced = apply_with_skip(rule, root, is_ignore, is_capture, is_skip);
 		CHECK( replaced == expected );
 	}
+
+	// TODO write tests for apply_with_skip (tree case), not really needed and maybe unnecessary
 }
 
-// TODO write tests for apply_with_skip (tree case), not really needed and maybe unnecessary
-// TODO write tests for apply (tree case), not really needed and maybe unnecessary
 // TODO write tests for transform_parse_tree, needed and necessary

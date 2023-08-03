@@ -111,7 +111,7 @@ struct identity_transformer {
 	node_t operator()(const node_t& n) const { return n; }
 };
 
-// visitor that traverse the tree in post-order.
+// visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t, 
 	typename output_node_t = input_node_t>
 struct post_order_traverser {
@@ -153,6 +153,37 @@ private:
 	}
 };
 
+// visitor that traverse the tree in post-order (repiting visited nodes if necessary).
+template <typename wrapped_t, typename predicate_t, typename input_node_t, 
+	typename output_node_t = input_node_t>
+struct post_order_tree_traverser {
+
+	post_order_tree_traverser(wrapped_t& wrapped, predicate_t& query) : 
+		wrapped(wrapped), query(query) {}
+
+
+	output_node_t operator()(const input_node_t& n) {
+		// if the root node matches the query predicate, we traverse it, otherwise
+		// we return the result of apply the wrapped transform to the node.
+		return query(n) ? traverse(n) : wrapped(n);
+	}
+
+	wrapped_t& wrapped;
+	predicate_t& query;
+
+private:
+	output_node_t traverse(const input_node_t& n) {
+		// we traverse the children of the node in post-order, i.e. we visit
+		// the children first and then the node itself.
+		for (const auto& c : n->child) 
+			// we skip already visited nodes and nodes that do not match the
+			// query predicate if it is present.
+			if (query(c)) traverse(c);
+		// finally we apply the wrapped visitor to the node if it is present.
+		return wrapped(n);
+	}
+};
+
 // visitor that produces nodes transformed accordingly to the 
 // given transformer. It only works with post order traversals.
 template <typename wrapped_t, typename input_node_t, 
@@ -181,8 +212,7 @@ struct replace_transformer {
 	replace_transformer(std::map<node_t, node_t>& changes) : changes(changes) {}
 
 	node_t operator()(const node_t& n) {
-		if (changes.contains(n)) return changes[n];
-		return replace(n);
+		return changes.contains(n) ? changes[n]: replace(n);
 	}
 
 	std::map<node_t, node_t>& changes;
