@@ -827,66 +827,66 @@ TEST_SUITE("pattern_matcher") {
 	static auto is_capture = is_capture_predicate();
 
 	TEST_CASE("pattern_matcher: given a simple tree and a simple capture, it "
-			"returns a substitution with the capture") {
+			"returns a environment with the capture") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('X');
-		unification<sp_node<char>> expected { {pattern, root} };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { {pattern, root} };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher(pattern, matched, is_ignore, is_capture);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 	
 	TEST_CASE("pattern_matcher: given a simple tree and a simple ignore, it "
-			"returns an empty substitution") {
+			"returns an empty environment") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('I');
-		unification<sp_node<char>> expected;
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected;
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher(pattern, matched, is_ignore, is_capture);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 
 	TEST_CASE("pattern_matcher: given a tree with two children, a same "
 			"structure tree pattern -both of them captures-,"
-			" it returns a substitution with both captures") {
+			" it returns a environment with both captures") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		sp_node<char> pattern = n('a', {n('X'), n('Y')});
-		unification<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher(pattern, matched, is_ignore, is_capture);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 
 	TEST_CASE("pattern_matcher: given a tree with two equal children and a "
 			"same structure pattern -both of them the same captures-,"
-			", it returns a substitution with one capture") {
+			", it returns a environment with one capture") {
 		sp_node<char> root = n('a', {n('b'), n('b')});
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
-		unification<sp_node<char>> expected { {n('X'), n('b')} };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { {n('X'), n('b')} };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher(pattern, matched, is_ignore, is_capture);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 
 	TEST_CASE("pattern_matcher: given a tree with two different children and a "
 			"same structure pattern -both of them the same captures-,"
-			", it returns a substitution with one capture") {
+			", it returns a environment with one capture") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
-		unification<sp_node<char>> expected { };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher(pattern, matched, is_ignore, is_capture);
 		matcher(root);
 		CHECK( !matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 }
 
@@ -918,86 +918,86 @@ TEST_SUITE("pattern_matcher_with_skip") {
 	static auto is_skip = is_skip_predicate();
 
 	TEST_CASE("pattern_matcher_with_skip: given a simple tree and a simple "
-			"capture, it returns a substitution with the capture") {
+			"capture, it returns a environment with the capture") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('X');
-		unification<sp_node<char>> expected { {pattern, root} };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { {pattern, root} };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 	
 	TEST_CASE("pattern_matcher_with_skip: given a simple tree and a simple "
-			"ignore, it returns an empty substitution") {
+			"ignore, it returns an empty environment") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('I');
-		unification<sp_node<char>> expected;
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected;
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 
 	TEST_CASE("pattern_matcher_with_skip: given a tree with two children, a "
 			"same structure tree pattern -both of them captures-, it returns "
-			"a substitution with both captures") {
+			"a environment with both captures") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		sp_node<char> pattern = n('a', {n('X'), n('Y')});
-		unification<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 
 	TEST_CASE("pattern_matcher_with_skip: given a tree with two equal children "
 			"and a same structure pattern -both of them the same captures-, it "
-			"returns a substitution with one capture") {
+			"returns a environment with one capture") {
 		sp_node<char> root = n('a', {n('b'), n('b')});
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
-		unification<sp_node<char>> expected { {n('X'), n('b')} };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { {n('X'), n('b')} };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 
 	TEST_CASE("pattern_matcher_with_skip: given a tree with two different "
 			"children and a same structure pattern -both of them the same captures-,"
-			" it returns a substitution with one capture") {
+			" it returns a environment with one capture") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
-		unification<sp_node<char>> expected { };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( !matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 
 	TEST_CASE("pattern_matcher_with_skip: given a tree with children (several "
 			"of them satisfying is_skip an two of them not satisfying is_skip), "
 			"an a similar structure tree pattern -with two to captures-, it "
-			"returns a substitution with both captures") {
+			"returns a environment with both captures") {
 		sp_node<char> root = n('a', {n('S'), n('b'), n('S'), n('c'), n('S')});
 		sp_node<char> pattern = n('a', {n('X'), n('S'), n('S'), n('Y')});
-		unification<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
-		unification<sp_node<char>> matched;
+		environment<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
+		environment<sp_node<char>> matched;
 		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
-		CHECK( matcher.substitutions == expected);
+		CHECK( matcher.env == expected);
 	}
 }
 
@@ -1017,13 +1017,13 @@ TEST_SUITE("apply") {
 		}
 	};
 
-	TEST_CASE("apply: given tree with one child and a substitution that "
+	TEST_CASE("apply: given tree with one child and a environment that "
 	 		"transform a node with one children into two, it returns the "
-			"tree with the substitution applied") {
+			"tree with the environment applied") {
 		sp_node<char> root {n('a', {n('b')})};
 		sp_node<char> pattern {n('a', {n('X')})};
-		sp_node<char> substitution {n('a', {n('X'), n('X')})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a', {n('X'), n('X')})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('b'), n('b')});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1031,13 +1031,13 @@ TEST_SUITE("apply") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply: given tree with one child and a substitution that "
+	TEST_CASE("apply: given tree with one child and a environment that "
 			"transform that ignore the children node and replace the root node , "
-			"it returns the tree with the substitution applied") {
+			"it returns the tree with the environment applied") {
 		sp_node<char> root {n('a', {n('b')})};
 		sp_node<char> pattern {n('a', {n('I')})};
-		sp_node<char> substitution {n('a')};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a')};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a');
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1045,13 +1045,13 @@ TEST_SUITE("apply") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply: given tree with two children and a substitution that "
+	TEST_CASE("apply: given tree with two children and a environment that "
 			"transform that swaps the children, it returns the tree with the "
-			"substitution applied") {
+			"environment applied") {
 		sp_node<char> root {n('a', {n('b'), n('c')})};
 		sp_node<char> pattern {n('a', {n('X'), n('Y')})};
-		sp_node<char> substitution {n('a', {n('Y'), n('X')})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a', {n('Y'), n('X')})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('c'), n('b')});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1059,13 +1059,13 @@ TEST_SUITE("apply") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply: given tree with two children and a substitution that "
+	TEST_CASE("apply: given tree with two children and a environment that "
 			"transform that swaps the children, it returns the tree with the "
-			"substitution applied") {
+			"environment applied") {
 		sp_node<char> root {n('a', {n('b'), n('c', {n('d'), n('e')})})};
 		sp_node<char> pattern {n('a', {n('X'), n('c', {n('Y'), n('Z')})})};
-		sp_node<char> substitution {n('a', {n('Y'), n('c', {n('Z'), n('X')})})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a', {n('Y'), n('c', {n('Z'), n('X')})})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('d'), n('c', {n('e'), n('b')})});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1073,13 +1073,13 @@ TEST_SUITE("apply") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply: given a tree with a diamond like DAG and a substitution "
+	TEST_CASE("apply: given a tree with a diamond like DAG and a environment "
 			"that breaks the diamond like shape, it returns the tree with the "
-			"substitution applied") {
+			"environment applied") {
 		sp_node<char> root {n('a', {n('b', {n('d')}), n('c', {n('d')})})};
 		sp_node<char> pattern {n('b', {n('X')})};
-		sp_node<char> substitution {n('b', {n('e')})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('b', {n('e')})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('b', {n('e')}), n('c', {n('d')})});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1087,13 +1087,13 @@ TEST_SUITE("apply") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply: given a tree with a diamond like DAG and a substitution "
+	TEST_CASE("apply: given a tree with a diamond like DAG and a environment "
 			"that swaps the intermediate children, it returns the tree with the "
-			"substitution applied") {
+			"environment applied") {
 		sp_node<char> root {n('a', {n('b', {n('d')}), n('c', {n('d')})})};
 		sp_node<char> pattern {n('a', {n('X'), n('Y')})};
-		sp_node<char> substitution {n('a', {n('Y'), n('X')})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a', {n('Y'), n('X')})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('c', {n('d')}), n('b', {n('d')})});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1127,13 +1127,13 @@ TEST_SUITE("apply_with_skip") {
 		}
 	};
 
-	TEST_CASE("apply_with_skip: given tree with one child and a substitution that "
+	TEST_CASE("apply_with_skip: given tree with one child and a environment that "
 	 		"transform a node with one children into two, it returns the "
-			"tree with the substitution applied") {
+			"tree with the environment applied") {
 		sp_node<char> root {n('a', {n('b')})};
 		sp_node<char> pattern {n('a', {n('X')})};
-		sp_node<char> substitution {n('a', {n('X'), n('X')})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a', {n('X'), n('X')})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('b'), n('b')});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1142,13 +1142,13 @@ TEST_SUITE("apply_with_skip") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply_with_skip: given tree with one child and a substitution that "
+	TEST_CASE("apply_with_skip: given tree with one child and a environment that "
 			"transform that ignore the children node and replace the root node , "
-			"it returns the tree with the substitution applied") {
+			"it returns the tree with the environment applied") {
 		sp_node<char> root {n('a', {n('b')})};
 		sp_node<char> pattern {n('a', {n('I')})};
-		sp_node<char> substitution {n('a')};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a')};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a');
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1157,13 +1157,13 @@ TEST_SUITE("apply_with_skip") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply_with_skip: given tree with two children and a substitution that "
+	TEST_CASE("apply_with_skip: given tree with two children and a environment that "
 			"transform that swaps the children, it returns the tree with the "
-			"substitution applied") {
+			"environment applied") {
 		sp_node<char> root {n('a', {n('b'), n('c')})};
 		sp_node<char> pattern {n('a', {n('X'), n('Y')})};
-		sp_node<char> substitution {n('a', {n('Y'), n('X')})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a', {n('Y'), n('X')})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('c'), n('b')});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1172,13 +1172,13 @@ TEST_SUITE("apply_with_skip") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply_with_skip: given tree with two children and a substitution that "
+	TEST_CASE("apply_with_skip: given tree with two children and a environment that "
 			"transform that swaps the children, it returns the tree with the "
-			"substitution applied") {
+			"environment applied") {
 		sp_node<char> root {n('a', {n('b'), n('c', {n('d'), n('e')})})};
 		sp_node<char> pattern {n('a', {n('X'), n('c', {n('Y'), n('Z')})})};
-		sp_node<char> substitution {n('a', {n('Y'), n('c', {n('Z'), n('X')})})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a', {n('Y'), n('c', {n('Z'), n('X')})})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('d'), n('c', {n('e'), n('b')})});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1187,13 +1187,13 @@ TEST_SUITE("apply_with_skip") {
 		CHECK( replaced == expected );
 	}
 
-	TEST_CASE("apply_with_skip: given a tree with a diamond like DAG and a substitution "
+	TEST_CASE("apply_with_skip: given a tree with a diamond like DAG and a environment "
 			"that breaks the diamond like shape, it returns the tree with the "
-			"substitution applied") {
+			"environment applied") {
 		sp_node<char> root {n('a', {n('b', {n('d')}), n('c', {n('d')})})};
 		sp_node<char> pattern {n('b', {n('X')})};
-		sp_node<char> substitution {n('b', {n('e')})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('b', {n('e')})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('b', {n('e')}), n('c', {n('d')})});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
@@ -1204,11 +1204,11 @@ TEST_SUITE("apply_with_skip") {
 	TEST_CASE("apply_with_skip: given a tree with children (several of them satisfying "
 			"is_skip an two of them not satisfying is_skip), an a similar "
 			"structure tree pattern -with two to captures-, it returns a "
-			"substitution with both captures") {
+			"environment with both captures") {
 		sp_node<char> root = n('a', {n('S'), n('b'), n('S'), n('c'), n('S')});
 		sp_node<char> pattern = n('a', {n('X'), n('S'), n('S'), n('Y')});
-		sp_node<char> substitution {n('a', {n('Y'), n('X')})};
-		rule<sp_node<char>> rule {pattern, substitution};
+		sp_node<char> environment {n('a', {n('Y'), n('X')})};
+		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('c'), n('b')});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;

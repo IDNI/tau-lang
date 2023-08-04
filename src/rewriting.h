@@ -68,7 +68,7 @@ using sp_node = std::shared_ptr<node<symbol_t>>;
 // children. The tree is immutable, and it is implemented as a shared pointer
 // to the root node.
 //
-// TODO this notions of tree could be removed, also the methods that deal with it.
+// TODO this notion of tree could be removed, also the methods that deal with it.
 // It was added to keep track of the root node of a tree, but it is not really
 // needed.
 template <typename node_t> 
@@ -102,8 +102,7 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 	if (auto it = cache.find(key); it != cache.end()) {
 		return it->second;
 	}
-	cache[key] = std::make_shared<node<symbol_t>>(s, ns);
-	return cache[key];
+	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns)).first->second;
 }
 
 template <typename node_t>
@@ -118,7 +117,6 @@ struct post_order_traverser {
 
 	post_order_traverser(wrapped_t& wrapped, predicate_t& query) : 
 		wrapped(wrapped), query(query) {}
-
 
 	output_node_t operator()(const input_node_t& n) {
 		// we kept track of the visited nodes to avoid visiting the same node
@@ -161,7 +159,6 @@ struct post_order_tree_traverser {
 	post_order_tree_traverser(wrapped_t& wrapped, predicate_t& query) : 
 		wrapped(wrapped), query(query) {}
 
-
 	output_node_t operator()(const input_node_t& n) {
 		// if the root node matches the query predicate, we traverse it, otherwise
 		// we return the result of apply the wrapped transform to the node.
@@ -195,10 +192,9 @@ struct map_transformer {
 	output_node_t operator()(const input_node_t& n) {
 		std::vector<output_node_t> child;
 		for (const auto& c : n->child) 
-			if (changes.contains(c)) child.push_back(changes[c]);
-		auto nn = make_node(wrapped(n->value), child);
-		changes[n] = nn;
-		return nn;
+			if (auto it = changes.find(c); it != changes.end()) 
+				child.push_back(it->second);
+		return changes[n] = make_node(wrapped(n->value), child);
 	}
 
 	std::map<input_node_t, output_node_t> changes;
@@ -212,7 +208,8 @@ struct replace_transformer {
 	replace_transformer(std::map<node_t, node_t>& changes) : changes(changes) {}
 
 	node_t operator()(const node_t& n) {
-		return changes.contains(n) ? changes[n]: replace(n);
+		auto it = changes.find(n);
+		return it != changes.end() ? it->second : replace(n);
 	}
 
 	std::map<node_t, node_t>& changes;
@@ -220,11 +217,10 @@ private:
 	node_t replace(const node_t& n) {
 		std::vector<node_t> child;
 		for (const auto& c : n->child) 
-			if (changes.contains(c)) child.push_back(changes[c]);
+			if (auto it = changes.find(c); it != changes.end()) 
+				child.push_back(it->second);
 			else child.push_back(c);
-		auto nn = make_node(n->value, child);
-		changes[n] = nn;
-		return nn;
+		return changes[n] = make_node(n->value, child);
 	}
 };
 
@@ -254,14 +250,12 @@ struct select_top_predicate {
 		query(query), selected(selected) {}
 
 	bool operator()(const node_t& n) {
-		if (query(n)) { 
-			// we return false to avoid visiting the children of the node
-			// since we are only interested in the top nodes.
-			if (std::find(selected.begin(), selected.end(), n) == selected.end())
-				selected.push_back(n);
-			return false; 
-		}
-		return true;
+		if (!query(n)) return true;
+		// we return false to avoid visiting the children of the node
+		// since we are only interested in the top nodes.
+		if (std::find(selected.begin(), selected.end(), n) == selected.end())
+			selected.push_back(n);
+		return false; 
 	}
 
 	predicate_t& query;
@@ -434,11 +428,11 @@ std::optional<node_t> find_top(const tree_t& input, predicate_t& query) {
 	return find_top(input.root, query);
 }
 
-// a unification is a map from captures to tree nodes, it is used
+// a environment is a map from captures to tree nodes, it is used
 // to keep track of the captures that have been unified and their
 // corresponding tree nodes.
 template<typename node_t>
-using unification = std::map<node_t, node_t>;
+using environment = std::map<node_t, node_t>;
 
 // a rule is a pair of a pattern and a substitution. It is used to
 // rewrite a tree.
@@ -453,32 +447,32 @@ struct non_terminal {
 	}
 };
 
-// this predicate matches when there exists a unification that makes the
+// this predicate matches when there exists a environment that makes the
 // pattern match the node.
 template <typename node_t, typename is_ignore_t, typename is_capture_t> 
 struct pattern_matcher {
 	using pattern_t = node_t;
 
-	pattern_matcher(pattern_t& pattern, unification<node_t>& substitutions, 
+	pattern_matcher(pattern_t& pattern, environment<node_t>& env, 
 		is_ignore_t& is_ignore, is_capture_t& is_capture): pattern(pattern), 
-		substitutions(substitutions), is_ignore(is_ignore), is_capture(is_capture) {}
+		env(env), is_ignore(is_ignore), is_capture(is_capture) {}
 
 	bool operator()(const node_t& n) {
 		// if we have matched the pattern, we never try again to unify
 		if (matched) return false;
-		// we clear previous unification attempts
-		substitutions.clear();
+		// we clear previous environment attempts
+		env.clear();
 		// then we try to match the pattern against the node and if the match
 		// was successful, we save the node that matched.
 		if (match(pattern, n)) matched = { n };
-		else substitutions.clear();
+		else env.clear();
 		// we continue visiting until we found a match.
 		return !matched;
 	}
 
 	std::optional<node_t> matched = std::nullopt;
 	pattern_t& pattern;
-	unification<node_t>& substitutions;
+	environment<node_t>& env;
 	is_ignore_t& is_ignore;
 	is_capture_t& is_capture;
 
@@ -487,10 +481,12 @@ private:
 		// if we already have captured a node associated to the current capture
 		// we check if it is the same as the current node, if it is not, we
 		// return false...
-		if (is_capture(p) && substitutions.contains(p)  && substitutions[p] != n) return false;
-		// ...otherwise we save the current node as the one associated to the
-		// current capture and return true.
-		else if (is_capture(p)) return substitutions.emplace(p, n), true;
+		if (is_capture(p)) 
+			if (auto it = env.find(p); it != env.end() && it->second != n) 
+				return false;
+			// ...otherwise we save the current node as the one associated to the
+			// current capture and return true.
+			else return env.emplace(p, n), true;
 		// if the current node is an ignore, we return true.
 		else if (is_ignore(p)) return true;
 		// otherwise, we check the symbol of the current node and if it is the
@@ -509,33 +505,33 @@ private:
 	}
 };
 
-// this predicate matches when there exists a unification that makes the
+// this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
 template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t> 
 struct pattern_matcher_with_skip {
 	using pattern_t = node_t;
 
-	pattern_matcher_with_skip(pattern_t& pattern, unification<node_t>& substitutions, 
+	pattern_matcher_with_skip(pattern_t& pattern, environment<node_t>& env, 
 		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t is_skip): 
-		pattern(pattern), substitutions(substitutions), is_ignore(is_ignore), 
+		pattern(pattern), env(env), is_ignore(is_ignore), 
 		is_capture(is_capture), is_skip(is_skip) {}
 
 	bool operator()(const node_t& n) {
 		// if we have matched the pattern, we never try again to unify
 		if (matched) return false;
-		// we clear previous unification attempts
-		substitutions.clear();
+		// we clear previous environment attempts
+		env.clear();
 		// then we try to match the pattern against the node and if the match
 		// was successful, we save the node that matched.
 		if (match(pattern, n)) matched = { n };
-		else substitutions.clear();
+		else env.clear();
 		// we continue visiting until we found a match.
 		return !matched;
 	}
 
 	std::optional<node_t> matched = std::nullopt;
 	pattern_t& pattern;
-	unification<node_t>& substitutions;
+	environment<node_t>& env;
 	is_ignore_t& is_ignore;
 	is_capture_t& is_capture;
 	is_skip_t& is_skip;
@@ -545,10 +541,12 @@ private:
 		// if we already have captured a node associated to the current capture
 		// we check if it is the same as the current node, if it is not, we
 		// return false...
-		if (is_capture(p) && substitutions.contains(p)  && substitutions[p] != n) return false;
-		// ...otherwise we save the current node as the one associated to the
-		// current capture and return true.
-		else if (is_capture(p)) return substitutions.emplace(p, n), true;
+		if (is_capture(p)) 
+			if (auto it = env.find(p); it != env.end()  && it->second != n) 
+				return false;
+			// ...otherwise we save the current node as the one associated to the
+			// current capture and return true.
+			else return env.emplace(p, n), true;
 		// if the current node is an ignore, we return true.
 		else if (is_ignore(p)) return true;
 		// otherwise, we check the symbol of the current node and if it is the
@@ -575,7 +573,7 @@ template <typename symbol_t, typename is_ignore_t, typename is_capture_t>
 sp_node<symbol_t> apply(rule<sp_node<symbol_t>>& r, sp_node<symbol_t>& n, 
 		is_ignore_t& i, is_capture_t& c) {
 	auto [p , s] = r;
-	unification<sp_node<symbol_t>> u;
+	environment<sp_node<symbol_t>> u;
 	pattern_matcher<sp_node<symbol_t>, is_ignore_t, is_capture_t> matcher {p, u, i, c};
 	return apply(s, n, matcher);
 }
@@ -587,7 +585,7 @@ template <typename symbol_t, typename is_ignore_t, typename is_capture_t,
 sp_node<symbol_t> apply_with_skip(rule<sp_node<symbol_t>>& r, sp_node<symbol_t>& n, 
 		is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
 	auto [p , s] = r;
-	unification<sp_node<symbol_t>> u;
+	environment<sp_node<symbol_t>> u;
 	pattern_matcher_with_skip<sp_node<symbol_t>, is_ignore_t, is_capture_t, is_skip_t> 
 		matcher {p, u, i, c, sk};
 	return apply(s, n, matcher);
@@ -602,9 +600,9 @@ sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& m
 	true_predicate<sp_node<symbol_t>> always;
 	post_order_traverser<decltype(identity), decltype(matcher), sp_node<symbol_t>>(identity, matcher)(n);
 	if (matcher.matched) {
-		replace_transformer<sp_node<symbol_t>> replace {matcher.substitutions};
+		replace_transformer<sp_node<symbol_t>> replace {matcher.env};
 		auto nn = post_order_traverser<decltype(replace), decltype(always), sp_node<symbol_t>>(replace, always)(s);
-		unification<sp_node<symbol_t>> nu { {matcher.matched.value(), nn} };
+		environment<sp_node<symbol_t>> nu { {matcher.matched.value(), nn} };
 		replace_transformer<sp_node<symbol_t>> nreplace {nu};
 		return post_order_traverser<decltype(nreplace), decltype(always), sp_node<symbol_t>>(nreplace, always)(n);
 	}

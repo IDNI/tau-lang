@@ -226,17 +226,14 @@ struct bind_transformer {
 	bind_transformer(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-		if (changes.contains(n)) return changes[n];
-		if (auto b = bind(n); b != n) {
-			changes[n] = b;
-			return b;
-		}
+		if (auto it = changes.find(n); it != changes.end()) return it->second;
+		if (auto b = bind(n); b != n) 
+			return changes.emplace(n, b).first->second;
 		bool changed = false;
 		std::vector<sp_tau_node<BAs...>> child;
-		for (auto& c : n->child) {
+		for (auto& c : n->child) 
 			if (changes.contains(c)) changed = true, child.push_back(changes[c]);
 			else child.push_back(c);
-		}
 		auto nn = make_node<tau_sym<BAs...>>(n->value, child);
 		if (changed) 
 			changes[n] = nn;
@@ -289,8 +286,7 @@ template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
 	auto p = n->child[0]->child[0]->child[0];
 	auto s = n->child[0]->child[0]->child[1];
-	tau_rule<BAs...> r(p, s);
-	return r;
+	return { p, s }; 
 }
 
 template<typename... BAs>
