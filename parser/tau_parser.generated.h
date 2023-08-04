@@ -166,25 +166,25 @@
 // constant		=> T | F | bf_builtin | binding | capture | ignore.
 // T				=> ws '1' ws.
 // F				=> ws '0' ws.
-// bf_builtin		=> bf_and_bltin | bf_or_bltin | bf_xor_bltin | bf_neg_bltin | bf_subs_bltin.
+// bf_builtin		=> bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb | bf_subs_cb.
 // binding			=> ws chars ws.
 // 
-// # bf_bltins
-// bf_and_bltin	=> bltin_arg bf_and_bltin_sym bltin_arg.
-// bf_or_bltin		=> bltin_arg bf_or_bltin_sym bltin_arg.
-// bf_xor_bltin	=> bltin_arg bf_xor_bltin_sym bltin_arg.
-// bf_neg_bltin	=> neg_bltin_sym bltin_arg.
-// bf_subs_bltin	=> subs_bltin_sym bltin_arg bltin_arg bltin_arg.
+// # bf_cbs
+// bf_and_cb	=> cb_arg bf_and_cb_sym cb_arg.
+// bf_or_cb		=> cb_arg bf_or_cb_sym cb_arg.
+// bf_xor_cb	=> cb_arg bf_xor_cb_sym cb_arg.
+// bf_neg_cb	=> neg_cb_sym cb_arg.
+// bf_subs_cb	=> subs_cb_sym cb_arg cb_arg cb_arg.
 // 
 // # bf_bultin_arg
-// bltin_arg	=> capture | T | F.
+// cb_arg	=> capture | T | F.
 // 
-// # bf_bltin_syms
-// bf_and_bltin_sym	=> ws "bf_and_bltin" ws.
-// bf_or_bltin_sym		=> ws "bf_or_bltin" ws.
-// bf_xor_bltin_sym	=> ws "bf_xor_bltin" ws.
-// bf_neg_bltin_sym	=> ws "bf_neg_bltin" ws.
-// subs_bltin_sym		=> ws "bf_subs_bltin" ws.
+// # bf_cb_syms
+// bf_and_cb_sym	=> ws "bf_and_cb" ws.
+// bf_or_cb_sym		=> ws "bf_or_cb" ws.
+// bf_xor_cb_sym	=> ws "bf_xor_cb" ws.
+// bf_neg_cb_sym	=> ws "bf_neg_cb" ws.
+// subs_cb_sym		=> ws "bf_subs_cb" ws.
 // 
 // # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 // main			=> wff dot.
@@ -234,8 +234,8 @@ struct tau_parser {
 			cbf_if, cbf_ref, cbf_and, cbf_neg, cbf_xor, cbf_or, cbf_if_sym, cbf_if_condition, cbf_then_sym, cbf_if_then, 
 			cbf_else_sym, cbf_if_else, cbf_and_sym, cbf_neg_sym, cbf_xor_sym, cbf_or_sym, bf_rule, bf_constant, bf_ref, bf_and, 
 			bf_neg, bf_xor, bf_or, bf_all, bf_ex, bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_all_sym, 
-			bf_ex_sym, constant, T, bf_builtin, binding, bf_and_bltin, bf_or_bltin, bf_xor_bltin, bf_neg_bltin, bf_subs_bltin, 
-			bltin_arg, bf_and_bltin_sym, bf_or_bltin_sym, bf_xor_bltin_sym, neg_bltin_sym, subs_bltin_sym, bf_neg_bltin_sym, main, rule, formula, 
+			bf_ex_sym, constant, T, bf_builtin, binding, bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, bf_subs_cb, 
+			cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, neg_cb_sym, subs_cb_sym, bf_neg_cb_sym, main, rule, formula, 
 			_Rprogram_11, library, _Rlibrary_12, start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
@@ -272,8 +272,8 @@ private:
 			"cbf_if", "cbf_ref", "cbf_and", "cbf_neg", "cbf_xor", "cbf_or", "cbf_if_sym", "cbf_if_condition", "cbf_then_sym", "cbf_if_then", 
 			"cbf_else_sym", "cbf_if_else", "cbf_and_sym", "cbf_neg_sym", "cbf_xor_sym", "cbf_or_sym", "bf_rule", "bf_constant", "bf_ref", "bf_and", 
 			"bf_neg", "bf_xor", "bf_or", "bf_all", "bf_ex", "bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_all_sym", 
-			"bf_ex_sym", "constant", "T", "bf_builtin", "binding", "bf_and_bltin", "bf_or_bltin", "bf_xor_bltin", "bf_neg_bltin", "bf_subs_bltin", 
-			"bltin_arg", "bf_and_bltin_sym", "bf_or_bltin_sym", "bf_xor_bltin_sym", "neg_bltin_sym", "subs_bltin_sym", "bf_neg_bltin_sym", "main", "rule", "formula", 
+			"bf_ex_sym", "constant", "T", "bf_builtin", "binding", "bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", "bf_subs_cb", 
+			"cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "neg_cb_sym", "subs_cb_sym", "bf_neg_cb_sym", "main", "rule", "formula", 
 			"_Rprogram_11", "library", "_Rlibrary_12", "start", 
 		}) nts.get(nt);
 		return nts;

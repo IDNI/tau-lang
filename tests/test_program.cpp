@@ -110,7 +110,7 @@ TEST_SUITE("bind") {
 	}
 }
 
-TEST_SUITE("builtin_applier") {
+TEST_SUITE("callback_applier") {
 
 }
 

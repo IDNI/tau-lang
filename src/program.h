@@ -91,24 +91,24 @@ struct formula {
 // a formula is a set of rules and a main, the boolean algebra constants 
 // (unless '0' or '1') are uninstantiated.
 template<typename... BAs>
-struct tau_spec {
+struct tau {
 
 	// logical operators on tau specs, dummy implementation for now.
-	tau_spec operator&(tau_spec const& that) const { 
+	tau operator&(tau const& that) const { 
 		// TODO: implement in the future
-		return tau_spec(); 
+		return tau(); 
 	}
-	tau_spec operator|(tau_spec const& that) const {
+	tau operator|(tau const& that) const {
 		// TODO: implement in the future
-		return tau_spec(); 
+		return tau(); 
 	}
-	tau_spec operator^(tau_spec const& that) const {
+	tau operator^(tau const& that) const {
 		// TODO: implement in the future
-		return tau_spec(); 
+		return tau(); 
 	}
-	tau_spec operator~() const {
+	tau operator~() const {
 		// TODO: implement in the future
-		return tau_spec(); 
+		return tau(); 
 	}
 };
 
@@ -164,52 +164,37 @@ std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
 }
 
 template <typename... BAs>
-struct builtin_applier {
+struct callback_applier {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-		if (!is_builtin(n)) return n;
+		if (!is_callback(n)) return n;
+		auto os = get<tau_parser::cb_arg>(n);
 		switch (n->get().nt()) {
-			case ::tau_parser::bf_and_bltin: return apply_and<BAs...>(n);
-			case ::tau_parser::bf_or_bltin: return apply_or<BAs...>(n);
-			case ::tau_parser::bf_neg_bltin: return apply_neg<BAs...>(n);
-			case ::tau_parser::bf_xor_bltin: return apply_xor<BAs...>(n);
-			case ::tau_parser::bf_subs_bltin: return apply_subs<BAs...>(n);
+			case ::tau_parser::bf_and_cb: return make_shared<tau_node<BAs...>>(*os[0] & *os[1]);
+			case ::tau_parser::bf_or_cb: return make_shared<tau_node<BAs...>>(*os[0] | *os[1]);
+			case ::tau_parser::bf_neg_cb: return make_shared<tau_node<BAs...>>(~*os[0]);
+			case ::tau_parser::bf_xor_cb: return make_shared<tau_node<BAs...>>(*os[0] ^ *os[1]);
+			case ::tau_parser::bf_subs_cb: return apply_subs<BAs...>(n);
 			default: return n;
 		}
 	}
 
 private:
-	sp_tau_node<BAs...> apply_and(const sp_tau_node<BAs...>& n) {
-		auto os = get<tau_parser::bltin_arg>(n);
-		return make_shared<tau_node<BAs...>>(*os[0] & *os[1]);
+	bool is_callback(const sp_tau_node<BAs...>& n) {
+		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
+			&& get<0>(n->value).nt() >= ::tau_parser::bf_and_cb
+			&& get<0>(n->value).nt() <= ::tau_parser::bf_subs_cb;
 	}
 
-	sp_tau_node<BAs...> apply_or(const sp_tau_node<BAs...>& n) {
-		auto os = get<tau_parser::bltin_arg>(n);
-		return make_shared<tau_node<BAs...>>(*os[0] | *os[1]);
-	}
-
-	sp_tau_node<BAs...> apply_neg(const sp_tau_node<BAs...>& n) {
-		auto os = get<tau_parser::bltin_arg>(n);
-		return make_shared<tau_node<BAs...>>(~*os[0]);
-	}
-
-	sp_tau_node<BAs...> apply_xor(const sp_tau_node<BAs...>& n) {
-		auto os = get<tau_parser::bltin_arg>(n);
-		return make_shared<tau_node<BAs...>>(*os[0] ^ *os[1]);
-	}
-	
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
-		auto os = get<tau_parser::bltin_arg>(n);
+		auto os = get<tau_parser::cb_arg>(n);
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
 		m[os[0]] = os[1];
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
 		true_predicate<sp_tau_node<BAs...>> always;
 		return post_order_traverser<decltype(replace), decltype(always), sp_tau_node<BAs...>>(replace , always)(os[2]);
-	}
-	
+	}	
 };
-
 
 template <typename... BAs>
 struct tauify {
@@ -318,7 +303,7 @@ formula<BAs...> make_program(tau_source& tau_source, const bindings<BAs...>& bin
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
 	// TODO we could also apply only once
-	return post_order_traverser(map_transformer(builtin_applier<BAs...>()))(apply(r,n));
+	return post_order_traverser(map_transformer(callback_applier<BAs...>()))(apply(r,n));
 }
 
 // execute one step of the formula
@@ -330,9 +315,9 @@ sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>
 }
 
 template<typename... BAs>
-tau_spec<BAs...> make_tau_spec() {
+tau<BAs...> make_tau() {
 	// TODO give a proper implementation in the future
-	return tau_spec<BAs...>();
+	return tau<BAs...>();
 }
 
 using parse_symbol = idni::lit<char, char>;
