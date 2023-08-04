@@ -34,17 +34,17 @@ program<BAs...> program_step(const program<BAs...>& p, const library<BAs...>& l)
 
 // tau system library, used to define the tau system of rewriting rules
 static constexpr char* system = 
+	// eliminate for all
+	"bf_neg (bf_all $X ($Y)) == bf_ex $X ( bf_neg ($Y))."
 	// distributivity
 	"($X bf_or $Y) bf_and $Z = ($X bf_and $Y) bf_or ($X bf_and $Z))."
 	"$X bf_and ($Y bf_or $Z) = ($X bf_and $Y) bf_or ($X bf_and $Z))."
 	"$X wwf_and ($Y wwf_or $Z) = ($X wwf_and $Y) wwf_or ($X wwf_and $Z))."
 	"$X wwf_or ($Y wwf_and $Z) = ($X wwf_or $Y) wwf_and ($X wwf_or $Z))."
-	// push negations inwards
+	// push negations inwards, nff = negation normal form
 	"bf_neg ($X bf_and $Y) = (bf_neg $X) bf_or (bf_neg $Y)."
 	"bf_neg ($X bf_or $Y) = (bf_neg $X) bf_and (bf_neg $Y)."
 	"bf_neg (bf_neg $X) =  $X."
-	// eliminate for all
-	"bf_neg (bf_all $X ($Y)) == bf_ex $X ( bf_neg ($Y))."
 	// some simplifications
 	"( { 1 } bf_or $X ) = { 1 }."
 	"( { 0 } bf_or $X ) = $X."
@@ -54,6 +54,12 @@ static constexpr char* system =
 	"( $X bf_or { 0 } ) = $X."
 	"( $X bf_and { 1 } ) = $X."
 	"( $X bf_and { 0 } ) = { 0 }."
+	"( $X bf_and $X ) = $X."
+	"( $X bf_or $X ) = $X."
+	"( $X bf_and neg_bf ( $X )) = { 0 }."
+	"( neg_bf ( $X ) and_bf $X) = { 0 }."
+	"( $X bf_or neg_bf ( $X )) = { 1 }."
+	"( neg_bf ( $X ) or_bf $X) = { 1 }."
 	// ba computations
 	"( { $X } bf_or { $Y } ) = { $X bf_or_bltin $Y }."
 	"( { $X } bf_and { $Y } ) = { $X bf_and_bltin $Y }."
