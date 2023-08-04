@@ -26,9 +26,9 @@ namespace testing = doctest;
 // IMPORTANT: To check the parser (and the underlying grammar) we don't need 
 // any special boolean algebra, so we use Bool to simplify our testing.
 
-// The following test suites represent correct sentences of a tau program or 
+// The following test suites represent correct sentences of a tau formula or 
 // library and as such must be parsed correctly and satisfy the structural checks
-// we perform on the parsed program (as the rest of the code assumes such structure).
+// we perform on the parsed formula (as the rest of the code assumes such structure).
 
 TEST_SUITE("bf_main") {
 

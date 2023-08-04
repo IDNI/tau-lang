@@ -54,8 +54,8 @@
 // rule		   => term ws "<=" ws term ws '.'.
 // rules          => (ws rule)*.
 // main 		   => term ws '.'.
-// program        => ws rules ws main ws.
-// start          => program.
+// formula        => ws rules ws main ws.
+// start          => formula.
 //
 
 #include <string.h>
@@ -86,7 +86,7 @@ struct rewriting_parser {
 			ws_comment, _Rws_comment_0, ws_required, ws, hex_escape, unicode_escape, char_escape_encode, esc, q_char, q_str, 
 			q_bqstr, char_punct, _Rchar_punct_1, _Rchar_punct_2, _Rchar_punct_3, char0, char_, string_char, bqstring_char, chars, 
 			_Rchars_4, _Rchars_5, sym, ignore, var, term, negative_term, positive_term, relname, args, 
-			elems, elem, elems_rest, char_class, rule, rules, _Rrules_6, _Rrules_7, main, program, 
+			elems, elem, elems_rest, char_class, rule, rules, _Rrules_6, _Rrules_7, main, formula, 
 			start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
@@ -114,7 +114,7 @@ private:
 			"ws_comment", "_Rws_comment_0", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", "q_str", 
 			"q_bqstr", "char_punct", "_Rchar_punct_1", "_Rchar_punct_2", "_Rchar_punct_3", "char0", "char_", "string_char", "bqstring_char", "chars", 
 			"_Rchars_4", "_Rchars_5", "sym", "ignore", "var", "term", "negative_term", "positive_term", "relname", "args", 
-			"elems", "elem", "elems_rest", "char_class", "rule", "rules", "_Rrules_6", "_Rrules_7", "main", "program", 
+			"elems", "elem", "elems_rest", "char_class", "rule", "rules", "_Rrules_6", "_Rrules_7", "main", "formula", 
 			"start", 
 		}) nts.get(nt);
 		return nts;
