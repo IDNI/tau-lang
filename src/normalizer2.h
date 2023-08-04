@@ -22,14 +22,14 @@
 
 namespace idni::tau {
 
-// execute one step of the program
+// execute one step of the formula
 template<typename... BAs>
-program<BAs...> program_step(const program<BAs...>& p, const library<BAs...>& l) {
+formula<BAs...> program_step(const formula<BAs...>& p, const library<BAs...>& l) {
 	auto main = p.main;
 	auto main_after_prog = apply(p.rec_relations, main);
 	// TODO sys rules should be applied while possible
 	auto main_after_sys = tau_apply(l.system, main_after_prog);
-	return program<BAs...>(main_after_sys, p.rec_relations);
+	return formula<BAs...>(main_after_sys, p.rec_relations);
 }
 
 // tau system library, used to define the tau system of rewriting rules
@@ -83,11 +83,13 @@ static constexpr char* system =
 	"( { 1 } = 0 ) = { 0 }"
 	;
 
+// TODO add rules for wwf and bbf
+
 // CHECK could we assume we are working with the product algebra?
 template<typename... BAs>
 struct prog_less {
 
-	bool operator()(const program<BAs...>& p1, const program<BAs...>& p2) const {
+	bool operator()(const formula<BAs...>& p1, const formula<BAs...>& p2) const {
 		auto m1 = extract_cte(p1.main);
 		auto m2 = extract_cte(p2.main);
 		// CHECK Could we assume we have a partial order on the algebra induced by
@@ -105,12 +107,12 @@ private:
 };
 
 template<typename... BAs>
-program<BAs...> normalizer(std::string source, bindings<BAs...> bs) {
+formula<BAs...> normalizer(std::string source, bindings<BAs...> bs) {
 	auto prog_source = make_tau_source(source);
 	auto sys_source = make_tau_source(system);
 	auto prog = make_program(prog_source, bs);
 	auto lib = make_library<BAs...>(sys_source);
-	std::set<program<BAs...>, prog_less<BAs...>> previous;
+	std::set<formula<BAs...>, prog_less<BAs...>> previous;
 	previous.insert(prog);
 	auto nprog = program_step(prog, lib);
 	while (!previous.insert(nprog).second) {

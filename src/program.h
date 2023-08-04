@@ -52,12 +52,12 @@ using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 // the order of the rules in the rewriting process of the tau language.
 template <typename... BAs>
 using rules = std::vector<tau_rule<BAs...>>;
-// defines the main statement of a tau program.
+// defines the main statement of a tau formula.
 template <typename... BAs>
 using statement = sp_tau_node<BAs...>;
 
 // a tau source is a set of rules and a (possibly) main rule, it is an intermediate
-// representation of a program/library, it is not a program itself. A real program
+// representation of a formula/library, it is not a formula itself. A real formula
 // is a tau source with all the boolean algebra constants instantiated. Neither is
 // a library, which is a tau source transformed into a proper library, i.e. a set
 // of rules to be applied in the rewriting process of the tau language.
@@ -77,18 +77,18 @@ struct library {
 template<typename... BAs>
 using bindings = std::map<std::string, std::variant<BAs...>>;
 
-// a program is a set of rules and a main, the boolean algebra constants 
+// a formula is a set of rules and a main, the boolean algebra constants 
 // (unless '0' or '1') are uninstantiated.
 template<typename... BAs>
-struct program {
+struct formula {
 
-	program(rules<BAs...>& rec_relations, statement<BAs...>& main): rec_relations(rec_relations), main(main) {};
+	formula(rules<BAs...>& rec_relations, statement<BAs...>& main): rec_relations(rec_relations), main(main) {};
 
 	rules<BAs...> rec_relations;
 	statement<BAs...> main;
 };
 
-// a program is a set of rules and a main, the boolean algebra constants 
+// a formula is a set of rules and a main, the boolean algebra constants 
 // (unless '0' or '1') are uninstantiated.
 template<typename... BAs>
 struct tau_spec {
@@ -300,7 +300,7 @@ library<BAs...> make_library(tau_source& tau_source) {
 }
 
 template<typename... BAs>
-program<BAs...> make_program(tau_source& tau_source, const bindings<BAs...>& bindings) {
+formula<BAs...> make_program(tau_source& tau_source, const bindings<BAs...>& bindings) {
 	tauify<BAs...> tf;
 	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source.root);
 	auto is_main = is<::tau_parser::main>();
@@ -321,7 +321,7 @@ sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<
 	return post_order_traverser(map_transformer(builtin_applier<BAs...>()))(apply(r,n));
 }
 
-// execute one step of the program
+// execute one step of the formula
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;

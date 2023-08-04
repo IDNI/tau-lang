@@ -189,9 +189,9 @@
 // # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 // main			=> wff dot.
 // rule			=> wff_def | cbf_def | bf_rule.
-// program			=> rule* main dot.
+// formula			=> rule* main dot.
 // library 		=> rule+.
-// start			=> program | library.
+// start			=> formula | library.
 // 
 //
 
@@ -235,7 +235,7 @@ struct tau_parser {
 			cbf_else_sym, cbf_if_else, cbf_and_sym, cbf_neg_sym, cbf_xor_sym, cbf_or_sym, bf_rule, bf_constant, bf_ref, bf_and, 
 			bf_neg, bf_xor, bf_or, bf_all, bf_ex, bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_all_sym, 
 			bf_ex_sym, constant, T, bf_builtin, binding, bf_and_bltin, bf_or_bltin, bf_xor_bltin, bf_neg_bltin, bf_subs_bltin, 
-			bltin_arg, bf_and_bltin_sym, bf_or_bltin_sym, bf_xor_bltin_sym, neg_bltin_sym, subs_bltin_sym, bf_neg_bltin_sym, main, rule, program, 
+			bltin_arg, bf_and_bltin_sym, bf_or_bltin_sym, bf_xor_bltin_sym, neg_bltin_sym, subs_bltin_sym, bf_neg_bltin_sym, main, rule, formula, 
 			_Rprogram_11, library, _Rlibrary_12, start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
@@ -273,7 +273,7 @@ private:
 			"cbf_else_sym", "cbf_if_else", "cbf_and_sym", "cbf_neg_sym", "cbf_xor_sym", "cbf_or_sym", "bf_rule", "bf_constant", "bf_ref", "bf_and", 
 			"bf_neg", "bf_xor", "bf_or", "bf_all", "bf_ex", "bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_all_sym", 
 			"bf_ex_sym", "constant", "T", "bf_builtin", "binding", "bf_and_bltin", "bf_or_bltin", "bf_xor_bltin", "bf_neg_bltin", "bf_subs_bltin", 
-			"bltin_arg", "bf_and_bltin_sym", "bf_or_bltin_sym", "bf_xor_bltin_sym", "neg_bltin_sym", "subs_bltin_sym", "bf_neg_bltin_sym", "main", "rule", "program", 
+			"bltin_arg", "bf_and_bltin_sym", "bf_or_bltin_sym", "bf_xor_bltin_sym", "neg_bltin_sym", "subs_bltin_sym", "bf_neg_bltin_sym", "main", "rule", "formula", 
 			"_Rprogram_11", "library", "_Rlibrary_12", "start", 
 		}) nts.get(nt);
 		return nts;
