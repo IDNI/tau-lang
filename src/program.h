@@ -205,6 +205,45 @@ struct tauify {
 	}
 };
 
+template <typename... BAs>
+struct stringify {
+
+	stringify(std::basic_stringstream<char>& ss) : ss(ss) {}
+
+	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
+		if (n->value.index() != 0) return n;
+		if (n->value.index() == 0 
+				&& !get<0>(n->value).nt()
+				&& !get<0>(n->value).is_null())
+			ss << get<0>(n->value).t(); 
+		return n;
+	}
+
+	std::basic_stringstream<char>& ss;
+};
+
+template <typename predicate_t, typename... BAs>
+std::string make_string_with_skip(const sp_tau_node<BAs...>& n, const predicate_t& skip) {
+	std::basic_stringstream<char> ss;
+	stringify<BAs...> sy(ss);
+	post_order_tree_traverser<decltype(sy), decltype(skip), sp_tau_node<BAs...>>(sy, skip)(n);
+	return ss.str();
+}
+
+template <typename... BAs>
+std::string make_string(const sp_tau_node<BAs...>& n) {
+	std::basic_stringstream<char> ss;
+	return ss << n, ss.str();
+}
+
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& stream, const sp_tau_node<BAs...>& n){
+	stringify<BAs...> sy(stream);
+	auto all = true_predicate<sp_tau_node<BAs...>>();
+	post_order_tree_traverser<decltype(sy), decltype(all), sp_tau_node<BAs...>>(sy, all)(n);
+	return stream;
+}
+
 template<typename... BAs>
 struct bind_transformer {
 
@@ -231,7 +270,8 @@ private:
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		if (n->value.index() != 0) return n;
 		if (get<0>(n->value).nt() && get<0>(n->value).n() == ::tau_parser::binding) {
-			auto bn = make_string(n);
+			auto not_ws = [](const sp_tau_node<BAs...>& n) { return !(n->value.index() == 0 && get<0>(n->value).nt() && get<0>(n->value).n() == tau_parser::ws); };	
+			auto bn = make_string_with_skip<decltype(not_ws), BAs...>(n, not_ws);
 			auto s = bs.find(bn);
 			if (s != bs.end()) {
 				tau_sym<BAs...> ts = s->second;
@@ -241,30 +281,6 @@ private:
 		return n;
 	}
 
-	std::string make_string(const sp_tau_node<BAs...>& n) const {
-		std::basic_stringstream<char> ss;
-		stringify sy(ss);
-		// true_predicate<sp_tau_node<BAs...>> always;
-		auto not_ws = [](const sp_tau_node<BAs...>& n) { return !(n->value.index() == 0 && get<0>(n->value).nt() && get<0>(n->value).n() == tau_parser::ws); };	
-		post_order_tree_traverser<decltype(sy), decltype(not_ws), sp_tau_node<BAs...>>(sy, not_ws)(n);
-		return ss.str();
-	}
-
-	struct stringify {
-
-		stringify(std::basic_stringstream<char>& ss) : ss(ss) {}
-
-		sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-			if (n->value.index() != 0) return n;
-			if (n->value.index() == 0 
-					&& !get<0>(n->value).nt()
-					&& !get<0>(n->value).is_null())
-				ss << get<0>(n->value).t(); 
-			return n;
-		}
-
-		std::basic_stringstream<char>& ss;
-	};
 };
 
 template<typename... BAs>
