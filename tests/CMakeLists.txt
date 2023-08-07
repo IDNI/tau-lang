@@ -24,6 +24,11 @@ add_executable(test_ba ${TEST_BA})
 target_setup(test_ba)
 target_link_libraries(test_ba TAUo doctest)
 
+set(TEST_RULES test_rules.cpp)
+add_executable(test_rules ${TEST_RULES})
+target_setup(test_rules)
+target_link_libraries(test_rules TAUo doctest)
+
 set(TEST_REWRITING test_rewriting.cpp)
 add_executable(test_rewriting ${TEST_REWRITING})
 target_setup(test_rewriting)
