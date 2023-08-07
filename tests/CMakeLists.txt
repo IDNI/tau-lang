@@ -50,7 +50,7 @@ target_setup(test_normalizer2)
 target_link_libraries(test_normalizer2 TAUo doctest)
 
 add_test(NAME test_sample COMMAND "${PROJECT_BINARY_DIR}/test_sample")
-add_test(NAME test_rules COMMAND "${PROJECT_BINARY_DIR}/test_rules"s)
+add_test(NAME test_rules COMMAND "${PROJECT_BINARY_DIR}/test_rules")
 add_test(NAME test_ba COMMAND "${PROJECT_BINARY_DIR}/test_ba")
 add_test(NAME test_rewriting COMMAND "${PROJECT_BINARY_DIR}/test_rewriting")
 add_test(NAME test_program COMMAND "${PROJECT_BINARY_DIR}/test_program")
