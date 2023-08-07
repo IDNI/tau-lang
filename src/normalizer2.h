@@ -33,57 +33,56 @@ formula<BAs...> program_step(const formula<BAs...>& p, const library<BAs...>& l)
 }
 
 // tau system library, used to define the tau system of rewriting rules
-static constexpr char* system = 
-	// eliminate for all
-	"bf_neg (bf_all $X ($Y)) == bf_ex $X ( bf_neg ($Y))."
-	// distributivity
-	"($X bf_or $Y) bf_and $Z = ($X bf_and $Y) bf_or ($X bf_and $Z))."
-	"$X bf_and ($Y bf_or $Z) = ($X bf_and $Y) bf_or ($X bf_and $Z))."
-	"$X wwf_and ($Y wwf_or $Z) = ($X wwf_and $Y) wwf_or ($X wwf_and $Z))."
-	"$X wwf_or ($Y wwf_and $Z) = ($X wwf_or $Y) wwf_and ($X wwf_or $Z))."
-	// push negations inwards, nff = negation normal form
-	"bf_neg ($X bf_and $Y) = (bf_neg $X) bf_or (bf_neg $Y)."
-	"bf_neg ($X bf_or $Y) = (bf_neg $X) bf_and (bf_neg $Y)."
-	"bf_neg (bf_neg $X) =  $X."
-	// some simplifications
-	"( { 1 } bf_or $X ) = { 1 }."
-	"( { 0 } bf_or $X ) = $X."
-	"( { 1 } bf_and $X ) = $X."
-	"( { 0 } bf_and $X ) = { 0 }."
-	"( $X bf_or { 1 } ) = { 1 }."
-	"( $X bf_or { 0 } ) = $X."
-	"( $X bf_and { 1 } ) = $X."
-	"( $X bf_and { 0 } ) = { 0 }."
-	"( $X bf_and $X ) = $X."
-	"( $X bf_or $X ) = $X."
-	"( $X bf_and neg_bf ( $X )) = { 0 }."
-	"( neg_bf ( $X ) and_bf $X) = { 0 }."
-	"( $X bf_or neg_bf ( $X )) = { 1 }."
-	"( neg_bf ( $X ) or_bf $X) = { 1 }."
-	// ba computations
-	"( { $X } bf_or { $Y } ) = { $X bf_or_bltin $Y }."
-	"( { $X } bf_and { $Y } ) = { $X bf_and_bltin $Y }."
-	"( { $X } bf_xor { $Y } ) = { $X bf_xor_bltin $Y }."
-	"bf_neg( { $X } ) = { bf_neg_bltin $X }."
-	// squeeze positives
-	"( $X = 0 ) wwf_and ($Y = 0) = ($X bf_or $Y) = 0."
-	// functional quantifiers
-	"bf_all $X ( $Y ) = ( bf_subs_bltn $X { 0 } $Y  bf_and bf_subs_bltn $X { 1 } $Y )."
-	"bf_ex $X ( $Y ) = ( bf_subs_bltn $X { 0 } $Y  bf_or bf_subs_bltn $X { 1 } $Y )."
-	// further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) = (a ∨ b) ∧ ¬(a ∧ b))
-	// "( ($X bf_and $Y) = 0 ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = 0 )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
-	"( ($X bf_and $Y) = 0 ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = 0 )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and $Y ) ) wwf_and $Z )."
-	// skip constants
-	"{ $X } bf_and $Y = $Y bf_and { $X }."
-	// rotate literals
-	"( $X bf_ and ( $Y bf_and $Z ) ) = ( $Y bf_and ( $Z bf_and $X ) )."
-	"( ( $X bf_ and $Y ) bf_and $Z ) ) = ( ( $Y bf_and $Z ) bf_and $X ) )."
-	// trivialities
-	"( { 0 } = 0 ) = { 1 }"
-	"( { 1 } = 0 ) = { 0 }"
-	;
-
+#define RULE(name, code) const std::string name = code;
+RULE(BF_ELIM_FORALL, "bf_all $X ($Y) = bf_neg (bf_ex $X (bf_neg ($Y))).")
+RULE(BF_DISTRIBUTE_0, "($X bf_or $Y) bf_and $Z = ($X bf_and $Y) bf_or ($X bf_and $Z)).")
+RULE(BF_DISTRIBUTE_1, "$X bf_and ($Y bf_or $Z) = ($X bf_and $Y) bf_or ($X bf_and $Z)).")
+RULE(BF_PUSH_NEGATION_INWARDS_0, "bf_neg ($X bf_and $Y) = (bf_neg $X) bf_or (bf_neg $Y).")
+RULE(BF_PUSH_NEGATION_INWARDS_1, "bf_neg ($X bf_or $Y) = (bf_neg $X) bf_and (bf_neg $Y).")
+RULE(BF_ELIM_DOUBLE_NEGATION_0, "bf_neg (bf_neg $X) =  $X.")
+RULE(BF_SIMPLIFY_ONE_0, "( { 1 } bf_or $X ) = { 1 }.")
+RULE(BF_SIMPLIFY_ONE_1, "( $X bf_or { 1 } ) = { 1 }.")
+RULE(BF_SIMPLIFY_ONE_2, "( { 1 } bf_and $X ) = $X.")
+RULE(BF_SIMPLIFY_ONE_3, "( $X bf_and { 1 } ) = $X.")
+RULE(BF_SIMPLIFY_ZERO_0, "( { 0 } bf_and $X ) = { 0 }.")
+RULE(BF_SIMPLIFY_ZERO_1, "( $X bf_and { 0 } ) = { 0 }.")
+RULE(BF_SIMPLIFY_ZERO_2, "( { 0 } bf_or $X ) = $X.")
+RULE(BF_SIMPLIFY_ZERO_3, "( $X bf_or { 0 } ) = $X.")
+RULE(BF_SIMPLIFY_SELF_0, "( $X bf_and $X ) = $X.")
+RULE(BF_SIMPLIFY_SELF_1, "( $X bf_or $X ) = $X.")
+RULE(BF_SIMPLIFY_SELF_2, "( $X bf_and (bf_neg $X) ) = { 0 }.")
+RULE(BF_SIMPLIFY_SELF_3, "( $X bf_or (bf_neg $X) ) = { 1 }.")
+RULE(BF_SIMPLIFY_SELF_4, "( (bf_neg $X) bf_and $X ) = { 0 }.")
+RULE(BF_SIMPLIFY_SELF_5, "( (bf_neg $X) bf_or $X ) = { 1 }.")
+RULE(BF_CALLBACK_0, "( { $X } bf_or { $Y } ) = { $X bf_or_bltin $Y }.")
+RULE(BF_CALLBACK_1, "( { $X } bf_and { $Y } ) = { $X bf_and_bltin $Y }.")
+RULE(BF_CALLBACK_2, "( { $X } bf_xor { $Y } ) = { $X bf_xor_bltin $Y }.")
+RULE(BF_CALLBACK_3, "bf_neg( { $X } ) = { bf_neg_bltin $X }.")
+RULE(BF_SQUEEZE_POSITIVES_0, "( $X = 0 ) wwf_and ($Y = 0) = ($X bf_or $Y) = 0.")
+RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "bf_all $X ( $Y ) = ( bf_subs_bltn $X { 0 } $Y  bf_and bf_subs_bltn $X { 1 } $Y ).")
+RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "bf_ex $X ( $Y ) = ( bf_subs_bltn $X { 0 } $Y  bf_or bf_subs_bltn $X { 1 } $Y ).")
+// further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) = (a ∨ b) ∧ ¬(a ∧ b))
+// "( ($X bf_and $Y) = 0 ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = 0 )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
+RULE(BF_PROCESS_0, "( ($X bf_and $Y) = 0 ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = 0 )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and $Y ) ) wwf_and $Z ).")
+RULE(BF_SKIP_CONSTANTS_0, "{ $X } bf_and $Y = $Y bf_and { $X }.")
+RULE(BF_ROTATE_LITERALS_0, "( $X bf_ and ( $Y bf_and $Z ) ) = ( $Y bf_and ( $Z bf_and $X ) ).")
+RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_ and $Y ) bf_and $Z ) ) = ( ( $Y bf_and $Z ) bf_and $X ) ).")
+RULE(BF_TRIVIALITY_0, "( { 0 } = 0 ) = { 1 }.")
+RULE(BF_TRIVIALITY_1, "( { 1 } = 0 ) = { 0 }.")
+RULE(BF_TRIVIALITY_2, "( { 0 } != 0 ) = { 0 }.")
+RULE(BF_TRIVIALITY_3, "( { 1 } != 0 ) = { 1 }.")
 // TODO add rules for wwf and bbf
+
+
+const std::string system = BF_ELIM_FORALL + BF_DISTRIBUTE_0 + BF_DISTRIBUTE_1
+	+ BF_PUSH_NEGATION_INWARDS_0 + BF_PUSH_NEGATION_INWARDS_1 + BF_ELIM_DOUBLE_NEGATION_0
+	+ BF_SIMPLIFY_ONE_0 + BF_SIMPLIFY_ONE_1 + BF_SIMPLIFY_ONE_2 + BF_SIMPLIFY_ONE_3
+	+ BF_SIMPLIFY_ZERO_0 + BF_SIMPLIFY_ZERO_1 + BF_SIMPLIFY_ZERO_2 + BF_SIMPLIFY_ZERO_3
+	+ BF_SIMPLIFY_SELF_0 + BF_SIMPLIFY_SELF_1 + BF_SIMPLIFY_SELF_2 + BF_SIMPLIFY_SELF_3
+	+ BF_SIMPLIFY_SELF_4 + BF_SIMPLIFY_SELF_5 + BF_CALLBACK_0 + BF_CALLBACK_1 + BF_CALLBACK_2
+	+ BF_CALLBACK_3 + BF_SQUEEZE_POSITIVES_0 + BF_FUNCTIONAL_QUANTIFIERS_0
+	+ BF_FUNCTIONAL_QUANTIFIERS_1 + BF_PROCESS_0 + BF_SKIP_CONSTANTS_0 + BF_ROTATE_LITERALS_0
+	+ BF_ROTATE_LITERALS_1 + BF_TRIVIALITY_0 + BF_TRIVIALITY_1 + BF_TRIVIALITY_2 + BF_TRIVIALITY_3;
 
 // CHECK could we assume we are working with the product algebra?
 template<typename... BAs>
