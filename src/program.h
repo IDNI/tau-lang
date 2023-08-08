@@ -21,6 +21,7 @@
 #include <memory>
 
 //#include "tree.h"
+#include "bool.h"
 #include "rewriting.h"
 #include "../parser/tau_parser.generated.h"
 
@@ -168,7 +169,7 @@ struct callback_applier {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
 		if (!is_callback(n)) return n;
-		auto os = get<tau_parser::cb_arg>(n);
+		auto os = get<tau_parser::bf_cb_arg>(n);
 		switch (n->get().nt()) {
 			case ::tau_parser::bf_and_cb: return make_shared<tau_node<BAs...>>(*os[0] & *os[1]);
 			case ::tau_parser::bf_or_cb: return make_shared<tau_node<BAs...>>(*os[0] | *os[1]);
@@ -187,7 +188,7 @@ private:
 	}
 
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
-		auto os = get<tau_parser::cb_arg>(n);
+		auto os = get<tau_parser::bf_cb_arg>(n);
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
 		m[os[0]] = os[1];
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
@@ -236,6 +237,7 @@ std::string make_string(const sp_tau_node<BAs...>& n) {
 	return ss << n, ss.str();
 }
 
+// TODO maybe it should be move to out.h
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const sp_tau_node<BAs...>& n){
 	stringify<BAs...> sy(stream);
@@ -280,7 +282,6 @@ private:
 		}
 		return n;
 	}
-
 };
 
 template<typename... BAs>
