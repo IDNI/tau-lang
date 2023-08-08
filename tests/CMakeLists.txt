@@ -19,6 +19,11 @@ add_executable(test_sample ${TEST_SAMPLE})
 target_setup(test_sample)
 target_link_libraries(test_sample TAUo doctest)
 
+set(DEBUG_TAU_NORMALIZER debug_tau_normalizer.cpp)
+add_executable(debug_tau_normalizer ${DEBUG_TAU_NORMALIZER})
+target_setup(debug_tau_normalizer)
+target_link_libraries(debug_tau_normalizer TAUo)
+
 set(TEST_BA test_ba.cpp)
 add_executable(test_ba ${TEST_BA})
 target_setup(test_ba)
