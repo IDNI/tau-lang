@@ -81,8 +81,8 @@
 // ignore 			=> '_'.
 // capture			=> '$' chars.
 // var				=> '?' chars.
-// var_in			=> "%i_" chars. # instead of '<', easy to remember
-// var_out			=> "%o_" chars. # instead of '>', easy to remember
+// var_in			=> "?i_" chars. # instead of '<', easy to remember
+// var_out			=> "?o_" chars. # instead of '>', easy to remember
 // 
 // # wff
 // wff_def				=> wff_rule dot.
@@ -162,26 +162,27 @@
 // # constant
 // bf_constant		=> open_brace constant close_brace.
 // 
-// #constants
+// #constants, test_bf is included for testing purposes only
 // constant		=> T | F | bf_builtin | binding | capture | ignore.
 // T				=> ws '1' ws.
 // F				=> ws '0' ws.
 // bf_builtin		=> bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb | bf_subs_cb.
 // binding			=> ws chars ws.
+// bf_test			=> ws test ws. 
 // 
 // # bf_cbs
-// bf_and_cb	=> cb_arg bf_and_cb_sym cb_arg.
-// bf_or_cb		=> cb_arg bf_or_cb_sym cb_arg.
-// bf_xor_cb	=> cb_arg bf_xor_cb_sym cb_arg.
-// bf_neg_cb	=> neg_cb_sym cb_arg.
-// bf_subs_cb	=> subs_cb_sym cb_arg cb_arg cb_arg.
+// bf_and_cb	=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
+// bf_or_cb	=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
+// bf_xor_cb	=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
+// bf_neg_cb	=> neg_cb_sym bf_cb_arg.
+// bf_subs_cb	=> subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
 // 
 // # bf_bultin_arg
-// cb_arg	=> capture | T | F.
+// bf_cb_arg	=> capture | T | F.
 // 
 // # bf_cb_syms
 // bf_and_cb_sym	=> ws "bf_and_cb" ws.
-// bf_or_cb_sym		=> ws "bf_or_cb" ws.
+// bf_or_cb_sym	=> ws "bf_or_cb" ws.
 // bf_xor_cb_sym	=> ws "bf_xor_cb" ws.
 // bf_neg_cb_sym	=> ws "bf_neg_cb" ws.
 // subs_cb_sym		=> ws "bf_subs_cb" ws.
@@ -189,9 +190,9 @@
 // # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 // main			=> wff dot.
 // rule			=> wff_def | cbf_def | bf_rule.
-// formula			=> rule* main dot.
+// program			=> rule* main dot.
 // library 		=> rule+.
-// start			=> formula | library.
+// start			=> program | library.
 // 
 //
 
@@ -203,7 +204,7 @@
 struct tau_parser {
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(143), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(145), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
 		const char* data, size_t size = 0,
 		char eof = std::char_traits<char>::eof())
@@ -235,8 +236,8 @@ struct tau_parser {
 			cbf_else_sym, cbf_if_else, cbf_and_sym, cbf_neg_sym, cbf_xor_sym, cbf_or_sym, bf_rule, bf_constant, bf_ref, bf_and, 
 			bf_neg, bf_xor, bf_or, bf_all, bf_ex, bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_all_sym, 
 			bf_ex_sym, constant, T, bf_builtin, binding, bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, bf_subs_cb, 
-			cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, neg_cb_sym, subs_cb_sym, bf_neg_cb_sym, main, rule, formula, 
-			_Rprogram_11, library, _Rlibrary_12, start, 
+			bf_test, test, bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, neg_cb_sym, subs_cb_sym, bf_neg_cb_sym, main, 
+			rule, program, _Rprogram_11, library, _Rlibrary_12, start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -245,7 +246,7 @@ private:
 		'`', 'a', 'l', 'n', 'm', 'p', 'h', 'b', 'k', 'c', 
 		't', 'r', 'd', 'i', 'g', 'e', 'o', 'f', 'w', 's', 
 		'=', '!', '.', '(', ')', '[', ']', '{', '}', '<', 
-		'>', '-', '+', '_', '$', '?', '%', '1', '0', 
+		'>', '-', '+', '_', '$', '?', '1', '0', 
 	};
 	idni::nonterminals<char, char> nts{};
 	idni::char_class_fns<char> cc;
@@ -273,8 +274,8 @@ private:
 			"cbf_else_sym", "cbf_if_else", "cbf_and_sym", "cbf_neg_sym", "cbf_xor_sym", "cbf_or_sym", "bf_rule", "bf_constant", "bf_ref", "bf_and", 
 			"bf_neg", "bf_xor", "bf_or", "bf_all", "bf_ex", "bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_all_sym", 
 			"bf_ex_sym", "constant", "T", "bf_builtin", "binding", "bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", "bf_subs_cb", 
-			"cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "neg_cb_sym", "subs_cb_sym", "bf_neg_cb_sym", "main", "rule", "formula", 
-			"_Rprogram_11", "library", "_Rlibrary_12", "start", 
+			"bf_test", "test", "bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "neg_cb_sym", "subs_cb_sym", "bf_neg_cb_sym", "main", 
+			"rule", "program", "_Rprogram_11", "library", "_Rlibrary_12", "start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -385,8 +386,8 @@ private:
 		q(nt(55), (t(42)));
 		q(nt(56), (t(43)+nt(29)));
 		q(nt(54), (t(44)+nt(29)));
-		q(nt(58), (t(45)+t(22)+t(42)+nt(29)));
-		q(nt(59), (t(45)+t(25)+t(42)+nt(29)));
+		q(nt(58), (t(44)+t(22)+t(42)+nt(29)));
+		q(nt(59), (t(44)+t(25)+t(42)+nt(29)));
 		q(nt(61), (nt(62)+nt(36)));
 		q(nt(62), (nt(63)+nt(34)+nt(64)+nt(36)));
 		q(nt(64), (nt(65)));
@@ -477,39 +478,40 @@ private:
 		q(nt(121), (nt(122)));
 		q(nt(121), (nt(123)));
 		q(nt(121), (nt(124)));
-		q(nt(122), (nt(13)+t(46)+nt(13)));
-		q(nt(78), (nt(13)+t(47)+nt(13)));
+		q(nt(122), (nt(13)+t(45)+nt(13)));
+		q(nt(78), (nt(13)+t(46)+nt(13)));
 		q(nt(123), (nt(125)));
 		q(nt(123), (nt(126)));
 		q(nt(123), (nt(127)));
 		q(nt(123), (nt(128)));
 		q(nt(123), (nt(129)));
 		q(nt(124), (nt(13)+nt(29)+nt(13)));
-		q(nt(125), (nt(130)+nt(131)+nt(130)));
-		q(nt(126), (nt(130)+nt(132)+nt(130)));
-		q(nt(127), (nt(130)+nt(133)+nt(130)));
-		q(nt(128), (nt(134)+nt(130)));
-		q(nt(129), (nt(135)+nt(130)+nt(130)+nt(130)));
-		q(nt(130), (nt(56)));
-		q(nt(130), (nt(78)));
-		q(nt(130), (nt(122)));
-		q(nt(131), (nt(13)+t(16)+t(26)+t(42)+t(10)+t(12)+t(21)+t(42)+t(16)+t(11)+t(19)+t(22)+t(12)+nt(13)));
-		q(nt(132), (nt(13)+t(16)+t(26)+t(42)+t(25)+t(20)+t(42)+t(16)+t(11)+t(19)+t(22)+t(12)+nt(13)));
-		q(nt(133), (nt(13)+t(16)+t(26)+t(42)+t(5)+t(25)+t(20)+t(42)+t(16)+t(11)+t(19)+t(22)+t(12)+nt(13)));
-		q(nt(136), (nt(13)+t(16)+t(26)+t(42)+t(12)+t(24)+t(23)+t(42)+t(16)+t(11)+t(19)+t(22)+t(12)+nt(13)));
-		q(nt(135), (nt(13)+t(16)+t(26)+t(42)+t(28)+t(6)+t(16)+t(28)+t(42)+t(16)+t(11)+t(19)+t(22)+t(12)+nt(13)));
-		q(nt(137), (nt(65)+nt(36)));
-		q(nt(138), (nt(61)));
-		q(nt(138), (nt(85)));
-		q(nt(138), (nt(106)));
-		q(nt(140), (nt(138)+nt(140)));
-		q(nt(140), (nul));
-		q(nt(139), (nt(140)+nt(137)+nt(36)));
-		q(nt(142), (nt(138)));
-		q(nt(142), (nt(138)+nt(142)));
-		q(nt(141), (nt(142)));
-		q(nt(143), (nt(139)));
-		q(nt(143), (nt(141)));
+		q(nt(130), (nt(13)+nt(131)+nt(13)));
+		q(nt(125), (nt(132)+nt(133)+nt(132)));
+		q(nt(126), (nt(132)+nt(134)+nt(132)));
+		q(nt(127), (nt(132)+nt(135)+nt(132)));
+		q(nt(128), (nt(136)+nt(132)));
+		q(nt(129), (nt(137)+nt(132)+nt(132)+nt(132)));
+		q(nt(132), (nt(56)));
+		q(nt(132), (nt(78)));
+		q(nt(132), (nt(122)));
+		q(nt(133), (nt(13)+t(16)+t(26)+t(42)+t(10)+t(12)+t(21)+t(42)+t(18)+t(16)+nt(13)));
+		q(nt(134), (nt(13)+t(16)+t(26)+t(42)+t(25)+t(20)+t(42)+t(18)+t(16)+nt(13)));
+		q(nt(135), (nt(13)+t(16)+t(26)+t(42)+t(5)+t(25)+t(20)+t(42)+t(18)+t(16)+nt(13)));
+		q(nt(138), (nt(13)+t(16)+t(26)+t(42)+t(12)+t(24)+t(23)+t(42)+t(18)+t(16)+nt(13)));
+		q(nt(137), (nt(13)+t(16)+t(26)+t(42)+t(28)+t(6)+t(16)+t(28)+t(42)+t(18)+t(16)+nt(13)));
+		q(nt(139), (nt(65)+nt(36)));
+		q(nt(140), (nt(61)));
+		q(nt(140), (nt(85)));
+		q(nt(140), (nt(106)));
+		q(nt(142), (nt(140)+nt(142)));
+		q(nt(142), (nul));
+		q(nt(141), (nt(142)+nt(139)+nt(36)));
+		q(nt(144), (nt(140)));
+		q(nt(144), (nt(140)+nt(144)));
+		q(nt(143), (nt(144)));
+		q(nt(145), (nt(141)));
+		q(nt(145), (nt(143)));
 		return q;
 	}
 };

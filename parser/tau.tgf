@@ -76,8 +76,8 @@ offset			=> variable | variable minus num.
 ignore 			=> '_'.
 capture			=> '$' chars.
 var				=> '?' chars.
-var_in			=> "%i_" chars. # instead of '<', easy to remember
-var_out			=> "%o_" chars. # instead of '>', easy to remember
+var_in			=> "?i_" chars. # instead of '<', easy to remember
+var_out			=> "?o_" chars. # instead of '>', easy to remember
 
 # wff
 wff_def				=> wff_rule dot.
@@ -157,26 +157,27 @@ bf_ex_sym		=> ws "bf_ex" ws.
 # constant
 bf_constant		=> open_brace constant close_brace.
 
-#constants
+#constants, test_bf is included for testing purposes only
 constant		=> T | F | bf_builtin | binding | capture | ignore.
 T				=> ws '1' ws.
 F				=> ws '0' ws.
 bf_builtin		=> bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb | bf_subs_cb.
 binding			=> ws chars ws.
+bf_test			=> ws test ws. 
 
 # bf_cbs
-bf_and_cb	=> cb_arg bf_and_cb_sym cb_arg.
-bf_or_cb		=> cb_arg bf_or_cb_sym cb_arg.
-bf_xor_cb	=> cb_arg bf_xor_cb_sym cb_arg.
-bf_neg_cb	=> neg_cb_sym cb_arg.
-bf_subs_cb	=> subs_cb_sym cb_arg cb_arg cb_arg.
+bf_and_cb	=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
+bf_or_cb	=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
+bf_xor_cb	=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
+bf_neg_cb	=> neg_cb_sym bf_cb_arg.
+bf_subs_cb	=> subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
 
 # bf_bultin_arg
-cb_arg	=> capture | T | F.
+bf_cb_arg	=> capture | T | F.
 
 # bf_cb_syms
 bf_and_cb_sym	=> ws "bf_and_cb" ws.
-bf_or_cb_sym		=> ws "bf_or_cb" ws.
+bf_or_cb_sym	=> ws "bf_or_cb" ws.
 bf_xor_cb_sym	=> ws "bf_xor_cb" ws.
 bf_neg_cb_sym	=> ws "bf_neg_cb" ws.
 subs_cb_sym		=> ws "bf_subs_cb" ws.
