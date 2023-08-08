@@ -22,16 +22,6 @@
 
 namespace idni::tau {
 
-// execute one step of the formula
-template<typename... BAs>
-formula<BAs...> program_step(const formula<BAs...>& p, const library<BAs...>& l) {
-	auto main = p.main;
-	auto main_after_prog = apply(p.rec_relations, main);
-	// TODO sys rules should be applied while possible
-	auto main_after_sys = tau_apply(l.system, main_after_prog);
-	return formula<BAs...>(main_after_sys, p.rec_relations);
-}
-
 // tau system library, used to define the tau system of rewriting rules
 #define RULE(name, code) const std::string name = code;
 RULE(BF_ELIM_FORALL, "bf_all $X ($Y) = bf_neg (bf_ex $X (bf_neg ($Y))).")
@@ -114,7 +104,17 @@ private:
 	}
 };
 
+// execute one step of the formula
 template<typename... BAs>
+formula<BAs...> program_step(const formula<BAs...>& p, const library<BAs...>& l) {
+	auto main = p.main;
+	auto main_after_prog = apply(p.rec_relations, main);
+	// TODO sys rules should be applied while possible
+	auto main_after_sys = tau_apply(l.system, main_after_prog);
+	return formula<BAs...>(main_after_sys, p.rec_relations);
+}
+
+template<typename binder_t, typename... BAs>
 formula<BAs...> normalizer(std::string source, bindings<BAs...> bs) {
 	auto prog_source = make_tau_source(source);
 	auto sys_source = make_tau_source(system);
