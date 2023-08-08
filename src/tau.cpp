@@ -13,11 +13,22 @@
 
 #include <iostream>
 
-#include "barr.h"
-#include "out.h"
-//#include "anf.h"
-#include "ba.h"
 #include "normalizer2.h"
+
+using namespace std;
+using namespace idni::tau;
+
+int main(int argc, char** argv) {
+	// TODO tau main method: parse command line arguments, read input file,
+	// normalize, print output, etc.
+	return 0;
+}
+
+// TODO move to unit tests
+//#include "barr.h"
+//#include "out.h"
+//#include "anf.h"
+//#include "ba.h"
 
 //template<typename B> vector<bdd<B>> bdd<B>::V;
 //template<typename B> unordered_map<bdd_node, size_t> bdd<B>::Mn;
@@ -32,13 +43,13 @@
 //template<typename B> hbdd<B> bdd_handle<B>::hfalse;
 
 // all this and init is still not called...
-template<typename B, auto o>
-bool bdd_handle<B, o>::dummy = (bdd_init<B, o>(), true);
-template<typename... BAs, typename... aux>
-bool msba<tuple<BAs...>, aux...>::dummy =
-	(msba<tuple<BAs...>, aux...>::init(), true);
+//template<typename B, auto o>
+//bool bdd_handle<B, o>::dummy = (bdd_init<B, o>(), true);
+//template<typename... BAs, typename... aux>
+//bool msba<tuple<BAs...>, aux...>::dummy =
+//	(msba<tuple<BAs...>, aux...>::init(), true);
 
-int main() {
+
 	//typedef msba<tuple<sbf>> fof;
 	// typedef barr<sbf> fof;
 	//typedef barr<Bool> fof;
@@ -70,7 +81,7 @@ int main() {
 	t.normalize();
 	cout << t.b << endl;
 	out(cout, t);*/
-	return 0;
+//	return 0;
 /*	t += bdd_handle<fof>::get(t);
 	cout << t << endl;
 	cout << (~t) << endl;
@@ -120,4 +131,3 @@ int main() {
 	t -= "x"s & "y'"s;
 	cout << t;
 	cout << t.ex(dict("x"));*/
-}
