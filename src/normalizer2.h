@@ -97,7 +97,7 @@ struct prog_less {
 	}
 private:
 	sp_tau_node<BAs...> extract_cte(sp_tau_node<BAs...> n) const {
-		auto is_bf_cte = is<tau_parser::bf_constant>();
+		auto is_bf_cte = is_predicate<tau_parser::bf_constant>();
 		auto cte = find_top(n, is_bf_cte).value()[1];
 		if (cte->value.index() == 0) return cte->child[0]->value;
 		return cte->value;

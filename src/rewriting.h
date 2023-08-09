@@ -225,6 +225,8 @@ private:
 };
 
 // visitor that outputs the tree corresponding to a post order traversal.
+//
+// TODO remove this visitor as it is not used anymore.
 template <typename wrapped_t, typename symbol_t>
 struct to_visitor {
 
