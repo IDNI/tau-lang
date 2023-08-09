@@ -166,7 +166,7 @@ bf_builtin		=> bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb | bf_subs_cb.
 binding			=> source_binding | named_binding.
 named_binding	=> chars.
 source_binding	=> type colon source.
-type 			=> chars.
+type 			=> chars | null.
 
 # source related definition
 source_punct		=> punct & ~q_char & ~q_str & ~q_bqstr

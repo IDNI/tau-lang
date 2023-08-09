@@ -78,7 +78,8 @@ TEST_SUITE("bind") {
 
 	sp_tau_node<Bool> make_binding(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
 		true_predicate<sp_tau_node<Bool>> always;
-		bind_transformer<Bool> binder(bs); 
+		name_binder<Bool> nb(bs);
+		bind_transformer<decltype(nb), Bool> binder(nb); 
 		return post_order_traverser<decltype(binder), decltype(always), sp_tau_node<Bool>>(binder, always)(statement);
 	}
 
