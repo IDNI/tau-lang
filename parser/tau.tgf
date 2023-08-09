@@ -61,9 +61,10 @@ less_than			=> ws '<' ws.
 greater_than		=> ws '>' ws.
 minus				=> ws '-' ws.
 plus				=> ws '+' ws.
+colon				=> ws ':' ws.
 
 # indexes
-indexes				=> open_bracket index* close_bracket.
+indexes				=> open_bracket (index)* close_bracket.
 index				=> variable | offset.
 num					=> digit+.
 
@@ -84,7 +85,7 @@ wff_def				=> wff_rule dot.
 wff_rule			=> wff_head equality wff_body dot.
 wff_body 			=> wff.
 wff_head			=> sym indexes wff_head_args.
-wff_head_args		=> open_parenthesis variable* close_parenthesis.
+wff_head_args		=> open_parenthesis (variable)* close_parenthesis.
 
 wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | wff_or | wff_all | wff_ex.
 wff_eq 			=> open_parenthesis bf equality F close_parenthesis.
@@ -108,7 +109,7 @@ wff_ex_sym		=> ws "wff_ex" ws.
 #cbf
 cbf_def 		=> cbf_rule dot.
 cbf_rule 		=> cbf_head equality cbf dot.
-cbf_head 		=> sym indexes open_parenthesis variable* close_parenthesis.
+cbf_head 		=> sym indexes open_parenthesis (variable)* close_parenthesis.
 cbf 			=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or.
 cbf_ref			=> cbf_head.
 cbf_if			=> cbf_if_sym open_parenthesis cbf_if_condition close_parenthesis 
@@ -162,8 +163,18 @@ constant		=> T | F | bf_builtin | binding | capture | ignore.
 T				=> ws '1' ws.
 F				=> ws '0' ws.
 bf_builtin		=> bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb | bf_subs_cb.
-binding			=> ws chars ws.
-bf_test			=> ws test ws. 
+binding			=> source_binding | named_binding.
+named_binding	=> chars.
+source_binding	=> type colon source.
+type 			=> chars.
+
+# source related definition
+source_punct		=> punct & ~q_char & ~q_str & ~q_bqstr
+					& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr) 
+					& ~open_brace & ~close_brace.
+
+source0			=> alnum | space | char_escape_encode | source_punct.
+source			=> (source0)+.
 
 # bf_cbs
 bf_and_cb	=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
@@ -185,7 +196,7 @@ subs_cb_sym		=> ws "bf_subs_cb" ws.
 # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 main			=> wff dot.
 rule			=> wff_def | cbf_def | bf_rule.
-program			=> rule* main dot.
+program			=> (rule)* main dot.
 library 		=> rule+.
 start			=> program | library.
 
