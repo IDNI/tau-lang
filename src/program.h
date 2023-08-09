@@ -320,7 +320,7 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 	// if (!is_predicate<tau_parser::bf>(n)) return n;
 	if (auto unresolved = is_unresolved(n); unresolved) {
 		// always we have type information or it is not needed at all
-		auto type = find_top(n, is_resolved_predicate<BAs...>()).value();
+		auto type = find_bottom(n, is_resolved_predicate<BAs...>()).value();
 		// TODO this should be extracted to a function in rewriting as it is 
 		// a common pattern.
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
