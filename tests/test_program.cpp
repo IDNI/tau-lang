@@ -71,16 +71,15 @@ TEST_SUITE("bind") {
 	sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {
 	tauify<Bool> tf;
 	map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
-	true_predicate<sp_node<tau_source_sym>> always;
-	return post_order_traverser<decltype(transform), decltype(always),
-		sp_node<tau_source_sym>, sp_tau_node<Bool>>(transform, always)(source);
+	return post_order_traverser<decltype(transform), decltype(all<sp_tau_source_node>),
+		sp_node<tau_source_sym>, sp_tau_node<Bool>>(transform, all<sp_tau_source_node>)(source);
 	}
 
 	sp_tau_node<Bool> make_binding(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
 		true_predicate<sp_tau_node<Bool>> always;
 		name_binder<Bool> nb(bs);
 		bind_transformer<decltype(nb), Bool> binder(nb); 
-		return post_order_traverser<decltype(binder), decltype(always), sp_tau_node<Bool>>(binder, always)(statement);
+		return post_order_traverser<decltype(binder), decltype(all<sp_tau_node<Bool>>), sp_tau_node<Bool>>(binder, all<sp_tau_node<Bool>>)(statement);
 	}
 
 	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {

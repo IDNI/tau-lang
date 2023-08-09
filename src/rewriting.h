@@ -60,6 +60,9 @@ struct node {
 	std::vector<std::shared_ptr<node>> child;
 };
 
+template <typename node_t>
+static const auto all = [](const node_t&) { return true; };
+
 // pointer to a node
 template <typename symbol_t>
 using sp_node = std::shared_ptr<node<symbol_t>>;
@@ -122,7 +125,7 @@ private:
 	}
 };
 
-// visitor that traverse the tree in post-order (repiting visited nodes if necessary).
+// visitor that traverse the tree in post-order (repeating visited nodes if necessary).
 template <typename wrapped_t, typename predicate_t, typename input_node_t, 
 	typename output_node_t = input_node_t>
 struct post_order_tree_traverser {
@@ -556,14 +559,13 @@ sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& m
 	// TODO check if this could be improved using a composed transformer
 	// that deals with the matcher and the substitution.
 	identity_transformer<sp_node<symbol_t>> identity;
-	true_predicate<sp_node<symbol_t>> always;
 	post_order_traverser<decltype(identity), decltype(matcher), sp_node<symbol_t>>(identity, matcher)(n);
 	if (matcher.matched) {
 		replace_transformer<sp_node<symbol_t>> replace {matcher.env};
-		auto nn = post_order_traverser<decltype(replace), decltype(always), sp_node<symbol_t>>(replace, always)(s);
+		auto nn = post_order_traverser<decltype(replace), decltype(all<sp_node<symbol_t>>), sp_node<symbol_t>>(replace, all<sp_node<symbol_t>>)(s);
 		environment<sp_node<symbol_t>> nu { {matcher.matched.value(), nn} };
 		replace_transformer<sp_node<symbol_t>> nreplace {nu};
-		return post_order_traverser<decltype(nreplace), decltype(always), sp_node<symbol_t>>(nreplace, always)(n);
+		return post_order_traverser<decltype(nreplace), decltype(all<sp_node<symbol_t>>), sp_node<symbol_t>>(nreplace, all<sp_node<symbol_t>>)(n);
 	}
 	return n;
 }
