@@ -568,5 +568,8 @@ sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& m
 	return n;
 }
 
+// TODO add replace function that takes a node, a substitute and a root node and 
+// returns a new node with the substitute in place of the node. 
+
 } // namespace idni::rewriter
 #endif // __IDNI__REWRITING_H__
