@@ -104,40 +104,6 @@ TEST_SUITE("node") {
 	}
 }
 
-TEST_SUITE("tree") {
-
-	TEST_CASE("tree constructor: given a node, the tree has that node as root") {
-		auto t1 = tree(n('a'));
-		CHECK( *t1.root == *n('a'));
-	}
-
-	TEST_CASE("tree order: given two trees with the same root, neither of them is "
-			"bigger than the other") {
-		auto t1 = tree(n('a'));
-		auto t2 = tree(n('a'));
-		CHECK( (!(t1 < t2) && !(t2 < t1)) );
-	}
-
-	TEST_CASE("tree order: given two trees with different roots, one is bigger "
-			"than the other") {
-		auto t1 = tree(n('a'));
-		auto t2 = tree(n('b'));
-		CHECK( ((t1 < t2) || (t2 < t1)) );
-	}
-
-	TEST_CASE("tree equality: given two trees with the same root, they are equal") {
-		auto t1 = tree(n('a'));
-		auto t2 = tree(n('a'));
-		CHECK( t1 == t2 );
-	}
-
-	TEST_CASE("tree equality: given two trees with different roots, they are not equal") {
-		auto t1 = tree(n('a'));
-		auto t2 = tree(n('b'));
-		CHECK( t1 != t2 );
-	}
-}
-
 TEST_SUITE("make_node") {
 
 	TEST_CASE("make_node uniqueness: given two simple nodes with the same value, it "

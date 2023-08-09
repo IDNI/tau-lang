@@ -33,7 +33,6 @@ namespace idni::tau {
 using tau_source_sym = idni::lit<char, char>;
 using tau_source_node = node<idni::lit<char, char>>;
 using sp_tau_source_node = sp_node<idni::lit<char, char>>;
-using tau_source_tree = tree<node<idni::lit<char, char>>>;
 
 // node type for the tau language related programs, libraries and 
 // specifications trees.
@@ -43,8 +42,6 @@ template <typename... BAs>
 using tau_node = node<tau_sym<BAs...>>;
 template <typename... BAs>
 using sp_tau_node = sp_node<tau_sym<BAs...>>;;
-template <typename... BAs>
-using tau_tree = tree<tau_node<BAs...>>;
 template <typename... BAs>
 using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 
@@ -56,13 +53,6 @@ using rules = std::vector<tau_rule<BAs...>>;
 // defines the main statement of a tau formula.
 template <typename... BAs>
 using statement = sp_tau_node<BAs...>;
-
-// a tau source is a set of rules and a (possibly) main rule, it is an intermediate
-// representation of a formula/library, it is not a formula itself. A real formula
-// is a tau source with all the boolean algebra constants instantiated. Neither is
-// a library, which is a tau source transformed into a proper library, i.e. a set
-// of rules to be applied in the rewriting process of the tau language.
-using tau_source = tree<node<tau_source_sym>>;
 
 // a library is a set of rules to be applied in the rewriting process of the tau
 // language, the order of the rules is important.
@@ -381,26 +371,26 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
 }
 
 template<typename... BAs>
-library<BAs...> make_library(tau_source& tau_source) {
+library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
-	auto lib = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source.root);
+	auto lib = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	rules<BAs...> rs;
-	auto is_rule = is_predicate<::tau_parser::rule>();
+	auto is_rule = is_predicate<tau_parser::rule>();
 	for (auto& r: select_top(lib, is_rule)) rs.push_back(make_rule<BAs...>(r));
 	return { rs };
 }
 
 template<typename... BAs>
-formula<BAs...> make_program(tau_source& tau_source, const bindings<BAs...>& bindings) {
+formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
 	tauify<BAs...> tf;
-	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source.root);
-	auto is_main = is_predicate<::tau_parser::main>();
+	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
+	auto is_main = is_predicate<tau_parser::main>();
 	auto m = find_top(src, is_main).value();
 	bind_transformer<BAs...> bs(bindings); 
 	true_predicate<sp_tau_node<BAs...>> always;
 	auto statement = post_order_traverser<decltype(bs), decltype(always), sp_tau_node<BAs...>>(bs, always)(m);
 	rules<BAs...> rs;
-	is_predicate<::tau_parser::rule> is_rule;
+	is_predicate<tau_parser::rule> is_rule;
 	for (auto& r: select_top(src, is_rule)) rs.push_back(make_rule<BAs...>(r));
 	return { rs, statement };
 }
