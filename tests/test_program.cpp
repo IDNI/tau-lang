@@ -136,11 +136,9 @@ TEST_SUITE("make_library") {
 
 	TEST_CASE("one_rule") {
 		auto src = make_tau_source(sample);
-		tau_source t(src);
-		auto lib = make_library<Bool>(t);
+		auto lib = make_library<Bool>(src);
 		CHECK( true );
 	}
-
 }
 
 /* TEST_SUITE("make_program") {

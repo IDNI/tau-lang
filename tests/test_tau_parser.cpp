@@ -35,8 +35,7 @@ TEST_SUITE("bf_main") {
 	TEST_CASE("bf_neg_T") {
 		static constexpr char* sample =	"$X =bf_neg({1}).";
 		auto src = make_tau_source(sample);
-		tau_source t(src);
-		auto lib = make_library<Bool>(t);
+		auto lib = make_library<Bool>(src);
 	}
 
 /*	TEST_CASE("bf_neg_F") {

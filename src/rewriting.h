@@ -64,35 +64,6 @@ struct node {
 template <typename symbol_t>
 using sp_node = std::shared_ptr<node<symbol_t>>;
 
-// it defines a tree of symbols, where each node has a symbol and a list of
-// children. The tree is immutable, and it is implemented as a shared pointer
-// to the root node.
-//
-// TODO this notion of tree could be removed, also the methods that deal with it.
-// It was added to keep track of the root node of a tree, but it is not really
-// needed.
-template <typename node_t> 
-struct tree {
-
-	// constructors and assignment operators
-	// 
-	// TODO add initializer list constructor or remove all of them
-	//
-	// tree(const sp_node& root) : root(root) {}
-	// tree(const tree& that) : root(that.root) {}
-	// tree(tree&& that) : root(std::move(that.root)) {}
-	// tree& operator=(const tree& that) { root = that.root; return *this; }
-	// tree& operator=(tree&& that) { root = std::move(that.root); return *this; }
-
-	// ordering operator
-	bool operator==(const tree& that) const = default;
-	bool operator!=(const tree& that) const = default;
-	auto operator <=> (const tree& that) const noexcept { return root <=> that.root; }
-
-	// the root of the tree
-	std::shared_ptr<node_t> root;
-};
-
 // node factory method
 template <typename symbol_t>
 sp_node<symbol_t> make_node(const symbol_t& s, 
@@ -224,25 +195,6 @@ private:
 	}
 };
 
-// visitor that outputs the tree corresponding to a post order traversal.
-//
-// TODO remove this visitor as it is not used anymore.
-template <typename wrapped_t, typename symbol_t>
-struct to_visitor {
-
-	to_visitor(tree<symbol_t>& output, wrapped_t& wrapped) : output(output), 
-		wrapped(wrapped) {}
-
-	template <typename node_t>
-	sp_node<symbol_t> operator()(const node_t& n) {
-		output.root = wrapped(n);
-		return output.root;
-	}
-
-	wrapped_t& wrapped;
-	tree<symbol_t>& output;
-};
-
 // visitor that selects top nodes that satisfy a predicate and stores them in the 
 // supplied vector. It only works with post order traversals and never produces
 // duplicates.
@@ -369,11 +321,6 @@ sp_node<symbol_t> trim_top(const sp_node<symbol_t>& input, predicate_t& query) {
 	return post_order_traverser<decltype(map), decltype(neg), sp_node<symbol_t>>(map, neg)(input);
 }
 
-template <typename predicate_t, typename symbol_t>
-tree<symbol_t> trim_top(const tree<symbol_t>& input, predicate_t& query) { 
-	return { trim_top(input.root, query) };
-}
-
 // select all top nodes that satisfy a predicate and return them.
 template <typename predicate_t, typename symbol_t>
 std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predicate_t& query) {
@@ -384,13 +331,6 @@ std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predic
 	auto select = select_top_predicate<predicate_t, sp_node<symbol_t>>(query, selected);
 	post_order_traverser<decltype(identity), decltype(select), sp_node<symbol_t>>(identity, select)(input);
 	return selected;
-}
-
-// select all top nodes of a tree that satisfy a predicate and return them.
-template <typename predicate_t, typename symbol_t, 
-	typename tree_t = tree<symbol_t>, typename node_t = tree<symbol_t>::sp_node>
-std::vector<node_t> select_top(const tree_t& input, predicate_t& query) {
-	return select_top(input.root, query);
 }
 
 // select all top nodes that satisfy a predicate and return them.
@@ -405,13 +345,6 @@ std::vector<sp_node<symbol_t>> select_all(const sp_node<symbol_t>& input, predic
 	return selected;
 }
 
-// select all top nodes of a tree that satisfy a predicate and return them.
-template <typename predicate_t, typename symbol_t, 
-	typename tree_t = tree<symbol_t>, typename node_t = tree<symbol_t>::sp_node>
-std::vector<node_t> select_all(const tree_t& input, predicate_t& query) {
-	return select_all(input.root, query);
-}
-
 // find the first node that satisfy a predicate and return it.
 template <typename predicate_t, typename symbol_t>
 std::optional<sp_node<symbol_t>> find_top(const sp_node<symbol_t>& input, 
@@ -421,13 +354,6 @@ std::optional<sp_node<symbol_t>> find_top(const sp_node<symbol_t>& input,
 	auto find_top = find_top_predicate<predicate_t, sp_node<symbol_t>>(query, found);
 	post_order_traverser<decltype(identity), decltype(find_top), sp_node<symbol_t>>(identity, find_top)(input);
 	return found;
-}
-
-// find the top nodes of a tree that satisfy a predicate and return them.
-template <typename predicate_t, typename symbol_t, 
-	typename tree_t = tree<symbol_t>, typename node_t = tree<symbol_t>::sp_node>
-std::optional<node_t> find_top(const tree_t& input, predicate_t& query) {
-	return find_top(input.root, query);
 }
 
 // a environment is a map from captures to tree nodes, it is used
@@ -440,14 +366,6 @@ using environment = std::map<node_t, node_t>;
 // rewrite a tree.
 template<typename node_t>
 using rule = std::pair<node_t, node_t>;
-
-template<typename node_t>
-struct non_terminal {
-
-	std::optional<size_t> operator()(const node_t& s) const override {
-		return std::nullopt;
-	}
-};
 
 // this predicate matches when there exists a environment that makes the
 // pattern match the node.
@@ -609,21 +527,6 @@ sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& m
 		return post_order_traverser<decltype(nreplace), decltype(always), sp_node<symbol_t>>(nreplace, always)(n);
 	}
 	return n;
-}
-
-// apply a substitution to a rule according to a given matcher on a tree
-template <typename node_t, typename is_ignore_t, typename is_capture_t>
-tree<node_t> apply(const rule<node_t>& r, const tree<node_t>& n, 
-		is_ignore_t& is_ignore, is_capture_t& is_capture) {
-	return { apply(r, n.root, is_ignore, is_capture) };
-}
-
-// apply a substitution to a rule according to a given matcher on a tree
-// taking into account the skip predicate
-template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t>
-tree<node_t> apply_with_skip(const rule<node_t>& r, const tree<node_t>& n, 
-		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t& is_skip) {
-	return { apply(r, n.root, is_ignore, is_capture, is_skip) };
 }
 
 } // namespace idni::rewriter
