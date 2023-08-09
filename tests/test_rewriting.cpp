@@ -135,7 +135,7 @@ TEST_SUITE("make_node") {
 	}
 }
 
-TEST_SUITE("rewriting transformer _identity") {
+TEST_SUITE("rewriting transformer_identity") {
 
 }
 
@@ -282,10 +282,6 @@ TEST_SUITE("replace_transformer") {
 		CHECK( result == expected );
 	}
 	// TODO add the tests corresponding to related functions
-}
-
-TEST_SUITE("to_visitor") {
-	/* TODO not used yet in final code, maybe we could remove it */
 }
 
 TEST_SUITE("select_top_predicate") {
@@ -613,7 +609,6 @@ TEST_SUITE("trim_top") {
 		sp_node<char> expected {n('a', {n('b'), n('c')})};
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}
-	// TODO check also trim_top for trees
 }
 
 TEST_SUITE("select_top") {
@@ -664,7 +659,6 @@ TEST_SUITE("select_top") {
 		vector<sp_node<char>> expected {n('d')};
 		CHECK( select_top<decltype(predicate), char>(root, predicate) == expected );
 	}
-	// TODO check also select_top for trees
 }
 
 TEST_SUITE("select_all") {
@@ -715,8 +709,6 @@ TEST_SUITE("select_all") {
 		vector<sp_node<char>> expected { n('b'), n('c') }; 
 		CHECK( select_all<decltype(predicate), char>(root, predicate) == expected );
 	}
-
-	// TODO check also select_all for trees
 }
 
 TEST_SUITE("find_top") {
@@ -769,8 +761,6 @@ TEST_SUITE("find_top") {
 		optional<sp_node<char>> expected { n('b', {n('d')}) }; 
 		CHECK( find_top<decltype(predicate), char>(root, predicate) == expected );
 	}
-
-	// TODO check also find_top for trees
 }
 
 TEST_SUITE("pattern_matcher") {
@@ -1066,8 +1056,6 @@ TEST_SUITE("apply") {
 		auto replaced = apply(rule, root, is_ignore, is_capture) ;
 		CHECK( replaced == expected );
 	}
-
-	// TODO write tests for apply (tree case), not really needed and maybe unnecessary
 }
 
 TEST_SUITE("apply_with_skip") {
@@ -1182,8 +1170,8 @@ TEST_SUITE("apply_with_skip") {
 		auto replaced = apply_with_skip(rule, root, is_ignore, is_capture, is_skip);
 		CHECK( replaced == expected );
 	}
-
-	// TODO write tests for apply_with_skip (tree case), not really needed and maybe unnecessary
 }
 
-// TODO write tests for transform_parse_tree, needed and necessary
+// TODO write tests for find_bottom
+// TODO write tests for find_visitor
+// TODO write tests for while_not_found
