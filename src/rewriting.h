@@ -356,6 +356,45 @@ std::optional<sp_node<symbol_t>> find_top(const sp_node<symbol_t>& input,
 	return found;
 }
 
+// 
+template <typename node_t>
+struct while_not_found_predicate {
+
+	while_not_found_predicate(std::optional<node_t>& found) : found(found) {}
+
+	bool operator()(const node_t& n) const {
+		return !found;		
+	}
+
+	std::optional<node_t>& found;
+};
+
+template <typename predicate_t, typename node_t>
+struct find_visitor {
+	
+	find_visitor(predicate_t& query, std::optional<node_t>& found) : query(query), found(found) {}
+
+	void operator()(const node_t& n) const {
+		if (query(n)) {
+			found = n;
+		}
+	}
+
+	predicate_t& query;
+	std::optional<node_t>& found;
+};
+
+
+// find the first node that satisfy a predicate and return it.
+template <typename predicate_t, typename node_t>
+std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
+	std::optional<node_t> node;
+	while_not_found_predicate<node_t> not_found(node);
+	find_visitor<predicate_t, node_t> fv(query, node);
+	post_order_traverser<decltype(fv), decltype(not_found), node_t>(fv, not_found)(input);
+	return node;
+}
+
 // a environment is a map from captures to tree nodes, it is used
 // to keep track of the captures that have been unified and their
 // corresponding tree nodes.
