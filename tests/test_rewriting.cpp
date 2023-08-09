@@ -177,10 +177,8 @@ TEST_SUITE("post_order_traverser") {
 		auto root = n('a');
 		identity_visitor<sp_node<char>> identity;
 		collect_visitor<identity_visitor<sp_node<char>>, sp_node<char>> visited{identity};
-		true_predicate<sp_node<char>> always;
 		vector<sp_node<char>> expected {root};
-		post_order_traverser<decltype(visited), decltype(always), sp_node<char>>(visited , always)(root);
-		// post_order_traverser(visited , always)(root);
+		post_order_traverser<decltype(visited), decltype(all<sp_node<char>>), sp_node<char>>(visited , all<sp_node<char>>)(root);
 		CHECK( visited.nodes == expected );
 	}
 
@@ -189,9 +187,8 @@ TEST_SUITE("post_order_traverser") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		identity_visitor<sp_node<char>> identity;
 		collect_visitor<identity_visitor<sp_node<char>>, sp_node<char>> visited{identity};
-		true_predicate<sp_node<char>> always;
 		vector<sp_node<char>> expected {n('b'), n('c'), root};
-		post_order_traverser<decltype(visited), decltype(always), sp_node<char>>(visited , always)(root);
+		post_order_traverser<decltype(visited), decltype(all<sp_node<char>>), sp_node<char>>(visited , all<sp_node<char>>)(root);
 		CHECK( visited.nodes == expected );
 	}
 
@@ -200,9 +197,8 @@ TEST_SUITE("post_order_traverser") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		identity_visitor<sp_node<char>> identity;
 		collect_visitor<identity_visitor<sp_node<char>>, sp_node<char>> visited{identity};
-		true_predicate<sp_node<char>> always;
 		vector<sp_node<char>> expected {n('d'), n('b', {n('d')}), n('c', {n('d')}), root};
-		post_order_traverser<decltype(visited), decltype(always), sp_node<char>>(visited , always)(root);
+		post_order_traverser<decltype(visited), decltype(all<sp_node<char>>), sp_node<char>>(visited , all<sp_node<char>>)(root);
 		CHECK( visited.nodes == expected );
 	}
 }
@@ -214,9 +210,8 @@ TEST_SUITE("map_transformer") {
 		sp_node<char> root = n('a');
 		auto transform = [](char c) { return c == 'a' ? 'z' : c; };
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
-		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('z') };
-		auto result = post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root);
+		auto result = post_order_traverser<decltype(map), decltype(all<sp_node<char>>), sp_node<char>>(map , all<sp_node<char>>)(root);
 		CHECK( result == expected );
 	}
 
@@ -225,9 +220,8 @@ TEST_SUITE("map_transformer") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto transform = [](char c) { return c == 'b' ? 'z' : c; };
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
-		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('a', {n('z'), n('c')}) };
-		auto result = post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root);
+		auto result = post_order_traverser<decltype(map), decltype(all<sp_node<char>>), sp_node<char>>(map , all<sp_node<char>>)(root);
 		CHECK( result == expected );
 	}
 
@@ -237,9 +231,8 @@ TEST_SUITE("map_transformer") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		auto transform = [](char c) { return c == 'd' ? 'z' : c; };
 		map_transformer<decltype(transform), sp_node<char>> map{transform};
-		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
-		auto result = post_order_traverser<decltype(map), decltype(always), sp_node<char>>(map , always)(root);
+		auto result = post_order_traverser<decltype(map), decltype(all<sp_node<char>>), sp_node<char>>(map , all<sp_node<char>>)(root);
 		CHECK( result == expected );
 	}
 }
@@ -252,9 +245,8 @@ TEST_SUITE("replace_transformer") {
 		map<sp_node<char>, sp_node<char>> m;
 		m[root] = n('z');
 		replace_transformer<sp_node<char>> replace{m};
-		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('z') };
-		auto result = post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root);
+		auto result = post_order_traverser<decltype(replace), decltype(all<sp_node<char>>), sp_node<char>>(replace , all<sp_node<char>>)(root);
 		CHECK( result == expected );
 	}
 
@@ -264,9 +256,8 @@ TEST_SUITE("replace_transformer") {
 		map<sp_node<char>, sp_node<char>> m;
 		m[n('b')] = n('z');
 		replace_transformer<sp_node<char>> replace{m};
-		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('a', {n('z'), n('c')}) };
-		auto result = post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root);
+		auto result = post_order_traverser<decltype(replace), decltype(all<sp_node<char>>), sp_node<char>>(replace , all<sp_node<char>>)(root);
 		CHECK( result == expected );
 	}
 
@@ -276,9 +267,8 @@ TEST_SUITE("replace_transformer") {
 		map<sp_node<char>, sp_node<char>> m;
 		m[n('d')] = n('z');
 		replace_transformer<sp_node<char>> replace{m};
-		true_predicate<sp_node<char>> always;
 		sp_node<char> expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
-		auto result = post_order_traverser<decltype(replace), decltype(always), sp_node<char>>(replace , always)(root);
+		auto result = post_order_traverser<decltype(replace), decltype(all<sp_node<char>>), sp_node<char>>(replace , all<sp_node<char>>)(root);
 		CHECK( result == expected );
 	}
 	// TODO add the tests corresponding to related functions

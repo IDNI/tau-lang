@@ -182,8 +182,9 @@ private:
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
 		m[os[0]] = os[1];
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
-		true_predicate<sp_tau_node<BAs...>> always;
-		return post_order_traverser<decltype(replace), decltype(always), sp_tau_node<BAs...>>(replace , always)(os[2]);
+		return post_order_traverser<decltype(replace), 
+			decltype(all<sp_tau_node<BAs...>>), 
+			sp_tau_node<BAs...>>(replace , all<sp_tau_node<BAs...>>)(os[2]);
 	}	
 };
 
@@ -326,8 +327,8 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
 		m[unresolved.value()] = type;
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
-		true_predicate<sp_tau_node<BAs...>> always;
-		return post_order_traverser<decltype(replace), decltype(always), sp_tau_node<BAs...>>(replace , always)(n);
+		return post_order_traverser<decltype(replace), 
+			decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(replace , all<sp_tau_node<BAs...>>)(n);
 	}
 }
 
@@ -338,8 +339,8 @@ sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 		if (auto rbf = resolve_type(bf); rbf != bf) changes[bf] = rbf;
 	}
 	replace_transformer<sp_tau_node<BAs...>> rt(changes);
-	true_predicate<sp_tau_node<BAs...>> always;
-	return post_order_traverser<decltype(rt), decltype(always), sp_tau_node<BAs...>>(rt, always)(source);
+	return post_order_traverser<decltype(rt), 
+		decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(rt, all<sp_tau_node<BAs...>>)(source);
 }
 
 template<typename... BAs>
@@ -387,8 +388,7 @@ formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs.
 	auto is_main = is_predicate<tau_parser::main>();
 	auto m = find_top(src, is_main).value();
 	bind_transformer<BAs...> bs(bindings); 
-	true_predicate<sp_tau_node<BAs...>> always;
-	auto statement = post_order_traverser<decltype(bs), decltype(always), sp_tau_node<BAs...>>(bs, always)(m);
+	auto statement = post_order_traverser<decltype(bs), decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(bs, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
 	is_predicate<tau_parser::rule> is_rule;
 	for (auto& r: select_top(src, is_rule)) rs.push_back(make_rule<BAs...>(r));
@@ -450,9 +450,8 @@ sp_tau_source_node make_tau_source(const std::string source) {
 
 	drop_location dl;
 	map_transformer<drop_location, sp_parse_tree, sp_tau_source_node> transform(dl);
-	true_predicate<sp_parse_tree> always;
-	return post_order_traverser<decltype(transform), decltype(always),
-		sp_parse_tree, sp_node<tau_source_sym>>(transform, always)(t);
+	return post_order_traverser<decltype(transform), decltype(all<sp_parse_tree>),
+		sp_parse_tree, sp_node<tau_source_sym>>(transform, all<sp_parse_tree>)(t);
 }
 
 } // namespace idni::tau
