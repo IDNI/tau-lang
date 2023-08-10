@@ -60,12 +60,6 @@ struct node {
 	std::vector<std::shared_ptr<node>> child;
 };
 
-template <typename node_t>
-static const auto all = [](const node_t&) { return true; };
-
-template <typename node_t>
-static const auto identity = [](const node_t& n) { return n; };
-
 // pointer to a node
 template <typename symbol_t>
 using sp_node = std::shared_ptr<node<symbol_t>>;
@@ -81,6 +75,13 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 	}
 	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns)).first->second;
 }
+
+// simple function objects to be used as default values for the traversers.
+template <typename node_t>
+static const auto all = [](const node_t&) { return true; };
+
+template <typename node_t>
+static const auto identity = [](const node_t& n) { return n; };
 
 // visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t, 
@@ -122,6 +123,9 @@ private:
 		return wrapped(n);
 	}
 };
+
+// TODO add a post_order_traverser that does not have a wrapped transformer so
+// it is faster when dealing with only predicate operations (searches,...).
 
 // visitor that traverse the tree in post-order (repeating visited nodes if necessary).
 template <typename wrapped_t, typename predicate_t, typename input_node_t, 
@@ -250,6 +254,11 @@ struct find_top_predicate {
 	std::optional<node_t>& found;
 };
 
+// always true predicate
+//
+// TODO define a const version of the predicate, move it to rewriter and use
+// it in all the code. Review the connection with all predicate and use only 
+// one of them.
 template<typename node_t>
 struct true_predicate {
 	
@@ -258,6 +267,10 @@ struct true_predicate {
 	}
 };
 
+// always false predicate
+//
+// TODO define a const version of the predicate, move it to rewriter and use
+// it in all the code.
 template<typename node_t>
 struct false_predicate {
 	
@@ -266,7 +279,9 @@ struct false_predicate {
 	}
 };
 
-// CHECK we use combinators to build logical predicates. This could be simplified
+// disjuction of the wrapped predicates.
+//
+// TODO we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
 template <typename l_predicate_t, typename r_predicate_t>
 struct and_predicate {
@@ -282,6 +297,8 @@ struct and_predicate {
 	r_predicate_t& p2;
 };
 
+// disjuction of the wrapped predicates.
+//
 // TODO we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
 template <typename l_predicate_t, typename r_predicate_t>
@@ -298,6 +315,10 @@ struct or_predicate {
 	r_predicate_t& p2;
 };
 
+// negation of the wrapped predicate.
+//
+// TODO we use combinators to build logical predicates. This could be simplified
+// by overloading the operators &&, ||, !, etc.
 template <typename predicate_t>
 struct neg_predicate {
 
@@ -333,6 +354,8 @@ std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predic
 }
 
 // select all top nodes that satisfy a predicate and return them.
+//
+// TODO rename to select
 template <typename predicate_t, typename symbol_t>
 std::vector<sp_node<symbol_t>> select_all(const sp_node<symbol_t>& input, predicate_t& query) {
 	// TODO try a functional object instead of a lambda to easy the type deduction,
@@ -353,7 +376,8 @@ std::optional<sp_node<symbol_t>> find_top(const sp_node<symbol_t>& input,
 	return found;
 }
 
-// 
+// true while found is not set (found), it aborts the traversal once found has
+// been set.
 template <typename node_t>
 struct while_not_found_predicate {
 
@@ -366,6 +390,8 @@ struct while_not_found_predicate {
 	std::optional<node_t>& found;
 };
 
+// to be used in conjunction with while_not_found_predicate. It sets found when
+// the predicate is satisfied by a node (set in found).
 template <typename predicate_t, typename node_t>
 struct find_visitor {
 	
@@ -381,8 +407,9 @@ struct find_visitor {
 	std::optional<node_t>& found;
 };
 
-
 // find the first node that satisfy a predicate and return it.
+//
+// TODO rename to find.
 template <typename predicate_t, typename node_t>
 std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	std::optional<node_t> node;
@@ -463,6 +490,8 @@ private:
 
 // this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
+//
+// TODO remove attribute env and pass it as a parameter to match.
 template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t> 
 struct pattern_matcher_with_skip {
 	using pattern_t = node_t;
@@ -535,7 +564,7 @@ node_t apply(rule<node_t>& r, node_t& n,
 }
 
 // apply a rule to a tree using the predicate to pattern_matcher and skipping
-// unnecessary trees
+// unnecessary subtrees
 template <typename node_t, typename is_ignore_t, typename is_capture_t, 
 	typename is_skip_t> 
 node_t apply_with_skip(rule<node_t>& r, node_t& n, 
@@ -547,7 +576,8 @@ node_t apply_with_skip(rule<node_t>& r, node_t& n,
 	return apply(s, n, matcher);
 }
 
-// apply a substitution to a rule according to a given matcher
+// apply a substitution to a rule according to a given matcher, this method is 
+// use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t> 
 node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 	// TODO check if this could be improved using a composed transformer

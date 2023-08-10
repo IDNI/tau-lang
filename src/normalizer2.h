@@ -84,6 +84,10 @@ const std::string system =
 	+ BF_TRIVIALITY_0 + BF_TRIVIALITY_1 + BF_TRIVIALITY_2 + BF_TRIVIALITY_3;
 
 // CHECK could we assume we are working with the product algebra?
+// this should be used in conjuction with std::set. it must provide
+// a strict weak ordering in such a way that equivalent formulas are
+// considered equal.
+// TODO once a final implementation is done, check the comments.
 template<typename... BAs>
 struct prog_less {
 
@@ -114,6 +118,8 @@ formula<BAs...> program_step(const formula<BAs...>& p, const library<BAs...>& l)
 	return formula<BAs...>(main_after_sys, p.rec_relations);
 }
 
+// executes the normalizer on the given source code, maybe in the future we 
+// need to pass a formula instead of a source code.
 template<typename binder_t, typename... BAs>
 formula<BAs...> normalizer(std::string source, bindings<BAs...> bs) {
 	auto prog_source = make_tau_source(source);

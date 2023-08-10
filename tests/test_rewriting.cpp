@@ -135,9 +135,8 @@ TEST_SUITE("make_node") {
 	}
 }
 
-TEST_SUITE("identity") {
-
-}
+// TODO maybe add tests for all predicate, not really necessary though.
+// TODO maybe add tests for identity transformer, not really necessary though.
 
 TEST_SUITE("post_order_traverser") {
 
@@ -725,6 +724,10 @@ TEST_SUITE("find_top") {
 	}
 }
 
+// TODO write tests for while_not_found_predicate
+// TODO write tests for find_visitor
+// TODO write tests for find_bottom
+
 TEST_SUITE("pattern_matcher") {
 
 	struct is_capture_predicate {
@@ -1133,7 +1136,3 @@ TEST_SUITE("apply_with_skip") {
 		CHECK( replaced == expected );
 	}
 }
-
-// TODO write tests for find_bottom
-// TODO write tests for find_visitor
-// TODO write tests for while_not_found

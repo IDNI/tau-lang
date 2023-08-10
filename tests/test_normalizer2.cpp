@@ -23,11 +23,6 @@ using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("normalizer2") {
-
-	TEST_CASE("sample true test case") {
-		CHECK(true);
-	}
-
-}
+// TODO write regression test that exercise the full normalizer, from parsing 
+// source, conversion to tau sources, final form, bindings, etc.
 
