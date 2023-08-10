@@ -531,41 +531,41 @@ private:
 };
 
 // apply a rule to a tree using the predicate to pattern_matcher.
-template <typename symbol_t, typename is_ignore_t, typename is_capture_t> 
-sp_node<symbol_t> apply(rule<sp_node<symbol_t>>& r, sp_node<symbol_t>& n, 
+template <typename node_t, typename is_ignore_t, typename is_capture_t> 
+node_t apply(rule<node_t>& r, node_t& n, 
 		is_ignore_t& i, is_capture_t& c) {
 	auto [p , s] = r;
-	environment<sp_node<symbol_t>> u;
-	pattern_matcher<sp_node<symbol_t>, is_ignore_t, is_capture_t> matcher {p, u, i, c};
+	environment<node_t> u;
+	pattern_matcher<node_t, is_ignore_t, is_capture_t> matcher {p, u, i, c};
 	return apply(s, n, matcher);
 }
 
 // apply a rule to a tree using the predicate to pattern_matcher and skipping
 // unnecessary trees
-template <typename symbol_t, typename is_ignore_t, typename is_capture_t, 
+template <typename node_t, typename is_ignore_t, typename is_capture_t, 
 	typename is_skip_t> 
-sp_node<symbol_t> apply_with_skip(rule<sp_node<symbol_t>>& r, sp_node<symbol_t>& n, 
+node_t apply_with_skip(rule<node_t>& r, node_t& n, 
 		is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
 	auto [p , s] = r;
-	environment<sp_node<symbol_t>> u;
-	pattern_matcher_with_skip<sp_node<symbol_t>, is_ignore_t, is_capture_t, is_skip_t> 
+	environment<node_t> u;
+	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t> 
 		matcher {p, u, i, c, sk};
 	return apply(s, n, matcher);
 }
 
 // apply a substitution to a rule according to a given matcher
-template <typename symbol_t, typename matcher_t> 
-sp_node<symbol_t> apply(sp_node<symbol_t>& s, sp_node<symbol_t>& n, matcher_t& matcher) {
+template <typename node_t, typename matcher_t> 
+node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 	// TODO check if this could be improved using a composed transformer
 	// that deals with the matcher and the substitution.
-	identity_transformer<sp_node<symbol_t>> identity;
-	post_order_traverser<decltype(identity), decltype(matcher), sp_node<symbol_t>>(identity, matcher)(n);
+	identity_transformer<node_t> identity;
+	post_order_traverser<decltype(identity), decltype(matcher), node_t>(identity, matcher)(n);
 	if (matcher.matched) {
-		replace_transformer<sp_node<symbol_t>> replace {matcher.env};
-		auto nn = post_order_traverser<decltype(replace), decltype(all<sp_node<symbol_t>>), sp_node<symbol_t>>(replace, all<sp_node<symbol_t>>)(s);
-		environment<sp_node<symbol_t>> nu { {matcher.matched.value(), nn} };
-		replace_transformer<sp_node<symbol_t>> nreplace {nu};
-		return post_order_traverser<decltype(nreplace), decltype(all<sp_node<symbol_t>>), sp_node<symbol_t>>(nreplace, all<sp_node<symbol_t>>)(n);
+		replace_transformer<node_t> replace {matcher.env};
+		auto nn = post_order_traverser<decltype(replace), decltype(all<node_t>), node_t>(replace, all<node_t>)(s);
+		environment<node_t> nu { {matcher.matched.value(), nn} };
+		replace_transformer<node_t> nreplace {nu};
+		return post_order_traverser<decltype(nreplace), decltype(all<node_t>), node_t>(nreplace, all<node_t>)(n);
 	}
 	return n;
 }
