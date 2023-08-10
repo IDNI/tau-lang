@@ -102,8 +102,8 @@ struct tau {
 	}
 };
 
-// TODO implementations details to be moved to a separate file
-// TODO rename to is_non_terminal_predicate
+// TODO:LOW implementations details to be moved to a separate file
+// TODO:LOW rename to is_non_terminal_predicate
 template<typename... BAs>
 struct is_non_terminal {
 
@@ -164,8 +164,8 @@ std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
 	});
 }
 
-// TODO add get_children
-// TODO add get_child
+// TODO:HIGH add get_children
+// TODO:HIGH add get_child
 
 // apply the given callback if the value of the node is a callback
 //
@@ -254,7 +254,7 @@ std::string make_string(const sp_tau_node<BAs...>& n) {
 // outputs a sp_tau_node<...> to a stream.
 //
 // TODO maybe it should be move to out.h
-// TODO review we have proper operator<< in bool and bdd
+// TODO:HIGH review we have proper operator<< in bool and bdd
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const sp_tau_node<BAs...>& n){
 	stringify<BAs...> sy(stream);
@@ -421,7 +421,7 @@ formula<BAs...> resolve_types(const formula<BAs...> f) {
 	return { resolve_types(f.rec_relations), resolve_type(f.main) };
 }
 
-// TODO improve code a make it dependant in non-terminals
+// TODO:HIGH improve code a make it dependant in non-terminals
 template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
 	auto p = n->child[0]->child[0]->child[0];
@@ -463,7 +463,7 @@ formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs.
 // apply one tau rule to the given expression
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
-	// TODO we could also apply only once
+	// TODO:MEDIUM we could also apply only once
 	return post_order_traverser(map_transformer(callback_applier<BAs...>()))(apply(r,n));
 }
 

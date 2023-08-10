@@ -726,7 +726,7 @@ TEST_SUITE("find_top") {
 
 // TODO write tests for while_not_found_predicate
 // TODO write tests for find_visitor
-// TODO write tests for find_bottom
+// TODO:HIGH write tests for find_bottom
 
 TEST_SUITE("pattern_matcher") {
 

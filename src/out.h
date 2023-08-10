@@ -88,6 +88,8 @@ ostream& operator<<(ostream& os, const tau<BAs...>& t) {
 	return os;
 }*/
 
+// TODO:HIGH add operator<<(ostream, bdd) 
+
 ostream& operator<<(ostream& os, const anf& a) {
 	size_t n = a.size();
 	set<string> ss;

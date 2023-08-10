@@ -124,8 +124,9 @@ private:
 	}
 };
 
-// TODO add a post_order_traverser that does not have a wrapped transformer so
-// it is faster when dealing with only predicate operations (searches,...).
+// TODO:MEDIUM add a post_order_traverser that does not have a wrapped transformer so
+// it is faster when dealing with only predicate operations (searches,...) and
+// change all the related code.
 
 // visitor that traverse the tree in post-order (repeating visited nodes if necessary).
 template <typename wrapped_t, typename predicate_t, typename input_node_t, 
@@ -350,8 +351,6 @@ std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predic
 }
 
 // select all top nodes that satisfy a predicate and return them.
-//
-// TODO rename to select
 template <typename predicate_t, typename symbol_t>
 std::vector<sp_node<symbol_t>> select_all(const sp_node<symbol_t>& input, predicate_t& query) {
 	std::vector<sp_node<symbol_t>> selected;
@@ -402,8 +401,6 @@ struct find_visitor {
 };
 
 // find the first node that satisfy a predicate and return it.
-//
-// TODO rename to find.
 template <typename predicate_t, typename node_t>
 std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	std::optional<node_t> node;
@@ -426,6 +423,10 @@ using rule = std::pair<node_t, node_t>;
 
 // this predicate matches when there exists a environment that makes the
 // pattern match the node.
+//
+// TODO create and env in operator() and pass it as a parameter to match, if
+// a  match occurs, copy the data from the temp env to the env passed as
+// parameter.
 template <typename node_t, typename is_ignore_t, typename is_capture_t> 
 struct pattern_matcher {
 	using pattern_t = node_t;
@@ -485,7 +486,9 @@ private:
 // this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
 //
-// TODO remove attribute env and pass it as a parameter to match.
+// TODO create and env in operator() and pass it as a parameter to match, if
+// a  match occurs, copy the data from the temp env to the env passed as
+// parameter.
 template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t> 
 struct pattern_matcher_with_skip {
 	using pattern_t = node_t;
