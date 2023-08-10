@@ -18,6 +18,10 @@
 using namespace std;
 using namespace idni::tau;
 
+// TODO:HIGH:VERY_IMPORTANT deal with runtime errors in the code. For example,
+// if the user provides a formula with errors, we should not continue
+// and print garbage. Instead, we should print an error message and exit.
+
 int main(int argc, char** argv) {
 	// TODO tau main method: parse command line arguments, read input file,
 	// normalize, print output, etc.
