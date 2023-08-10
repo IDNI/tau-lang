@@ -45,7 +45,6 @@ using sp_tau_node = sp_node<tau_sym<BAs...>>;;
 template <typename... BAs>
 using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 
-
 // defines a vector of rules in the tau language, the order is important as it defines
 // the order of the rules in the rewriting process of the tau language.
 template <typename... BAs>
@@ -362,7 +361,6 @@ template<typename binder_t, typename... BAs>
 formula<BAs...> resolve_types(const formula<BAs...> f) {
 	return { resolve_types(f.rec_relations), resolve_type(f.main) };
 }
-
 
 template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
