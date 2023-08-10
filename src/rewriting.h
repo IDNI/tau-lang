@@ -63,6 +63,9 @@ struct node {
 template <typename node_t>
 static const auto all = [](const node_t&) { return true; };
 
+template <typename node_t>
+static const auto identity = [](const node_t& n) { return n; };
+
 // pointer to a node
 template <typename symbol_t>
 using sp_node = std::shared_ptr<node<symbol_t>>;
@@ -78,11 +81,6 @@ sp_node<symbol_t> make_node(const symbol_t& s,
 	}
 	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns)).first->second;
 }
-
-template <typename node_t>
-struct identity_transformer {
-	node_t operator()(const node_t& n) const { return n; }
-};
 
 // visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t, 
@@ -318,9 +316,8 @@ template <typename predicate_t, typename symbol_t>
 sp_node<symbol_t> trim_top(const sp_node<symbol_t>& input, predicate_t& query) {
 	// TODO try a functional object instead of a lambda to easy the type deduction,
 	// or try to reduce the source code and/or the type deduction aids somehow.
-	identity_transformer<symbol_t> identity;
 	auto neg = neg_predicate(query);
-	auto map = map_transformer<decltype(identity), sp_node<symbol_t>>(identity);
+	auto map = map_transformer<decltype(identity<symbol_t>), sp_node<symbol_t>>(identity<symbol_t>);
 	return post_order_traverser<decltype(map), decltype(neg), sp_node<symbol_t>>(map, neg)(input);
 }
 
@@ -330,9 +327,8 @@ std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predic
 	// TODO try a functional object instead of a lambda to easy the type deduction,
 	// or try to reduce the source code and/or the type deduction aids somehow.
 	std::vector<sp_node<symbol_t>> selected;
-	identity_transformer<sp_node<symbol_t>> identity;
 	auto select = select_top_predicate<predicate_t, sp_node<symbol_t>>(query, selected);
-	post_order_traverser<decltype(identity), decltype(select), sp_node<symbol_t>>(identity, select)(input);
+	post_order_traverser<decltype(identity<sp_node<symbol_t>>), decltype(select), sp_node<symbol_t>>(identity<sp_node<symbol_t>>, select)(input);
 	return selected;
 }
 
@@ -342,9 +338,8 @@ std::vector<sp_node<symbol_t>> select_all(const sp_node<symbol_t>& input, predic
 	// TODO try a functional object instead of a lambda to easy the type deduction,
 	// or try to reduce the source code and/or the type deduction aids somehow.
 	std::vector<sp_node<symbol_t>> selected;
-	identity_transformer<sp_node<symbol_t>> identity;
 	auto select = select_all_predicate<predicate_t, sp_node<symbol_t>>(query, selected);
-	post_order_traverser<decltype(identity), decltype(select), sp_node<symbol_t>>(identity, select)(input);
+	post_order_traverser<decltype(identity<sp_node<symbol_t>>), decltype(select), sp_node<symbol_t>>(identity<sp_node<symbol_t>>, select)(input);
 	return selected;
 }
 
@@ -353,9 +348,8 @@ template <typename predicate_t, typename symbol_t>
 std::optional<sp_node<symbol_t>> find_top(const sp_node<symbol_t>& input, 
 		predicate_t& query) {
 	std::optional<sp_node<symbol_t>> found;
-	identity_transformer<sp_node<symbol_t>> identity;
 	auto find_top = find_top_predicate<predicate_t, sp_node<symbol_t>>(query, found);
-	post_order_traverser<decltype(identity), decltype(find_top), sp_node<symbol_t>>(identity, find_top)(input);
+	post_order_traverser<decltype(identity<sp_node<symbol_t>>), decltype(find_top), sp_node<symbol_t>>(identity<sp_node<symbol_t>>, find_top)(input);
 	return found;
 }
 
@@ -558,8 +552,7 @@ template <typename node_t, typename matcher_t>
 node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 	// TODO check if this could be improved using a composed transformer
 	// that deals with the matcher and the substitution.
-	identity_transformer<node_t> identity;
-	post_order_traverser<decltype(identity), decltype(matcher), node_t>(identity, matcher)(n);
+	post_order_traverser<decltype(identity<node_t>), decltype(matcher), node_t>(identity<node_t>, matcher)(n);
 	if (matcher.matched) {
 		replace_transformer<node_t> replace {matcher.env};
 		auto nn = post_order_traverser<decltype(replace), decltype(all<node_t>), node_t>(replace, all<node_t>)(s);

@@ -135,7 +135,7 @@ TEST_SUITE("make_node") {
 	}
 }
 
-TEST_SUITE("rewriting transformer_identity") {
+TEST_SUITE("identity") {
 
 }
 
@@ -165,18 +165,9 @@ TEST_SUITE("post_order_traverser") {
 		wrapped_t& wrapped;
 	};
 
-	template <typename node_t>
-	struct identity_visitor {
-
-		node_t operator()(node_t n) {
-			return n;
-		}
-	};
-
 	TEST_CASE("post_order_traverser: given a simple tree, it visits the root node") {
 		auto root = n('a');
-		identity_visitor<sp_node<char>> identity;
-		collect_visitor<identity_visitor<sp_node<char>>, sp_node<char>> visited{identity};
+		collect_visitor<decltype(::idni::rewriter::identity<sp_node<char>>), sp_node<char>> visited{::idni::rewriter::identity<sp_node<char>>};
 		vector<sp_node<char>> expected {root};
 		post_order_traverser<decltype(visited), decltype(all<sp_node<char>>), sp_node<char>>(visited , all<sp_node<char>>)(root);
 		CHECK( visited.nodes == expected );
@@ -185,8 +176,7 @@ TEST_SUITE("post_order_traverser") {
 	TEST_CASE("post_order_traverser: given a tree with two children, it visits "
 			"the children and then the root") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
-		identity_visitor<sp_node<char>> identity;
-		collect_visitor<identity_visitor<sp_node<char>>, sp_node<char>> visited{identity};
+		collect_visitor<decltype(::idni::rewriter::identity<sp_node<char>>), sp_node<char>> visited{::idni::rewriter::identity<sp_node<char>>};
 		vector<sp_node<char>> expected {n('b'), n('c'), root};
 		post_order_traverser<decltype(visited), decltype(all<sp_node<char>>), sp_node<char>>(visited , all<sp_node<char>>)(root);
 		CHECK( visited.nodes == expected );
@@ -195,8 +185,7 @@ TEST_SUITE("post_order_traverser") {
 	TEST_CASE("post_order_traversal: given tree with underlying diamond like DAG, "
 			"it visits the children and then the root") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-		identity_visitor<sp_node<char>> identity;
-		collect_visitor<identity_visitor<sp_node<char>>, sp_node<char>> visited{identity};
+		collect_visitor<decltype(::idni::rewriter::identity<sp_node<char>>), sp_node<char>> visited{::idni::rewriter::identity<sp_node<char>>};
 		vector<sp_node<char>> expected {n('d'), n('b', {n('d')}), n('c', {n('d')}), root};
 		post_order_traverser<decltype(visited), decltype(all<sp_node<char>>), sp_node<char>>(visited , all<sp_node<char>>)(root);
 		CHECK( visited.nodes == expected );
@@ -283,8 +272,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {root};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -295,8 +283,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -307,8 +294,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('b'), n('c')};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -320,8 +306,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -333,8 +318,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('d')};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -346,8 +330,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('b', {n('d')}), n('c', {n('d')})};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -363,8 +346,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {root};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 	
@@ -375,8 +357,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -387,8 +368,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('b'), n('c')};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -400,8 +380,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -413,8 +392,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('d')};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 
@@ -426,8 +404,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('b', {n('d')}), n('c', {n('d')})};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(select), sp_node<char>>(identity , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
 		CHECK( selected == expected );
 	}
 }
@@ -441,8 +418,7 @@ TEST_SUITE("find_top_predicate") {
 		optional<sp_node<char>> found;
 		sp_node<char> expected {root};
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(find), sp_node<char>>(identity, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
 		CHECK( found.value() == expected );
 	}
 
@@ -452,8 +428,7 @@ TEST_SUITE("find_top_predicate") {
 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
 		optional<sp_node<char>> found;
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(find), sp_node<char>>(identity, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
 		CHECK( !found );
 	}
 
@@ -464,8 +439,7 @@ TEST_SUITE("find_top_predicate") {
 		optional<sp_node<char>> found;
 		sp_node<char> expected {n('b')};
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(find), sp_node<char>>(identity, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
 		CHECK( found.value() == expected );
 	}
 
@@ -475,8 +449,7 @@ TEST_SUITE("find_top_predicate") {
 		auto predicate = [](sp_node<char> n) { return n->value == 'd' || n->value == 'e'; };
 		optional<sp_node<char>> found;
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(find), sp_node<char>>(identity, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
 		CHECK( !found );
 	}
 
@@ -487,8 +460,7 @@ TEST_SUITE("find_top_predicate") {
 		optional<sp_node<char>> found;
 		sp_node<char> expected {n('c', {n('d')})};
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		identity_transformer<sp_node<char>> identity;
-		post_order_traverser<decltype(identity), decltype(find), sp_node<char>>(identity, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
 		CHECK( found.value() == expected );
 	}
 }
