@@ -113,48 +113,18 @@ struct is_non_terminal {
 	}
 };
 
-// check if the given node is the given non-terminal
-//
-// TODO convert to a const static predicate and change all the code accordingly
-template <size_t nt_t>
-struct is_predicate {
+// check if the node is the given non-terminal
 
-	bool operator()(const sp_tau_source_node& n) {
-		return n->value.nt() && n->value.n() == nt_t;
-	}
 
-	template <typename... BAs>
-	bool operator()(const sp_tau_node<BAs...>& n) {
-		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
+template <size_t nt, typename...BAs>
+auto is_tau_node = [](const sp_tau_node<BAs...> n) { return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
 			&& get<0>(n->value).nt() 
-			&& get<0>(n->value).n() == nt_t;
-	}
-};
+			&& get<0>(n->value).n() == nt;
+ };
 
-// check if the given node is a capture in the sense of the matching process
-//
-// TODO convert to a const static predicate and change all the code accordingly
-template<typename... BAs>
-struct is_capture_predicate {
-
-	bool operator()(const sp_tau_node<BAs...>& n) {
-		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
-			&& get<0>(n->value).n() == ::tau_parser::capture;
-	}
-};
-
-// check if the given node is a ignore in the sense of the matching process
-//
-// TODO convert to a const static predicate and change all the code accordingly
-template<typename... BAs>
-struct is_ignore_predicate {
-
-	bool operator()(const sp_tau_node<BAs...>& n) {
-		if(!std::holds_alternative<tau_sym>(n->value)) return false;
-		auto sn = get<0>(n->value);
-		return sn->nt() && n->n() == ::tau_parser::ignore;
-	}
-};
+// check if the node is the given non-terminal
+template <size_t nt>
+auto is_tau_source = [](const sp_tau_source_node& n) { return n->value() && n->value.n() == nt; };
 
 // gets the top nodes of the given non terminal type
 template <size_t nt_t, typename... BAs>
@@ -274,7 +244,7 @@ struct bind_transformer {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
 		if (auto it = changes.find(n); it != changes.end()) return it->second;
-		if (is_predicate<tau_parser::binding>()(n)) 
+		if (is_tau_node<tau_parser::binding, BAs...>(n)) 
 			return changes.emplace(n, binder.bind(n)).first->second;
 		bool changed = false;
 		std::vector<sp_tau_node<BAs...>> child;
@@ -323,7 +293,7 @@ struct factory_binder {
 	factory_binder(const factory_t& factory) : factory(factory) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		if(auto type = find_top(n, is_predicate<tau_parser::type>()); type)
+		if(auto type = find_top(n, is_tau_node<tau_parser::type, BAs...>); type)
 			// the factory take two arguments, the first is the type and the 
 			// second is the node representing the constant.
 			return factory.build(type, n);
@@ -340,7 +310,7 @@ template<typename... BAs>
 struct is_unresolved_predicate {
 	
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		return is_predicate<tau_parser::type>(n) && make_string(n).empty();
+		return is_tau_node<tau_parser::type, BAs...>(n) && make_string(n).empty();
 	}
 };
 
@@ -351,7 +321,7 @@ template<typename... BAs>
 struct is_resolved_predicate {
 	
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		return is_predicate<tau_parser::type>(n) || !make_string(n).empty();
+		return is_tau_node<tau_parser::type, BAs...>(n) || !make_string(n).empty();
 	}
 };
 
@@ -372,7 +342,7 @@ std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
 template<typename... BAs>
 sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 	// should not be call with other that bfs.
-	// if (!is_predicate<tau_parser::bf>(n)) return n;
+	// if (!is_tau_node<tau_parser::bf, BAs...>(n)) return n;
 	if (auto unresolved = is_unresolved(n); unresolved) {
 		// always we have type information or it is not needed at all
 		auto type = find_bottom(n, is_resolved_predicate<BAs...>()).value();
@@ -390,7 +360,7 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 template<typename binder_t, typename... BAs>
 sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	for (const auto& bf: select_top(source, is_predicate<tau_parser::bf>())) {
+	for (const auto& bf: select_top(source, is_tau_node<tau_parser::bf, BAs...>)) {
 		if (auto rbf = resolve_type(bf); rbf != bf) changes[bf] = rbf;
 	}
 	replace_transformer<sp_tau_node<BAs...>> rt(changes);
@@ -435,8 +405,7 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
 	auto lib = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	rules<BAs...> rs;
-	auto is_rule = is_predicate<tau_parser::rule>();
-	for (auto& r: select_top(lib, is_rule)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(lib, is_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs };
 }
 
@@ -447,22 +416,21 @@ template<typename... BAs>
 formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
 	tauify<BAs...> tf;
 	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
-	auto is_main = is_predicate<tau_parser::main>();
-	auto m = find_top(src, is_main).value();
+	auto m = find_top(src, is_tau_node<tau_parser::main, BAs...>).value();
 	name_binder<BAs...> nb(bindings);
 	bind_transformer<name_binder<BAs...>, BAs...> bs(nb); 
 	auto statement = post_order_traverser<decltype(bs), decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(bs, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
-	is_predicate<tau_parser::rule> is_rule;
-	for (auto& r: select_top(src, is_rule)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(src, is_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs, statement };
 }
 
-// TODO add a make_formula function dealing with factory_binder
+// TODO:HIGH add a make_formula function dealing with factory_binder
 
 // apply one tau rule to the given expression
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
+	// TODO:HIGH print info about node, rule and result ifdef APPLY_RULES_DEBUG
 	// TODO:MEDIUM we could also apply only once
 	return post_order_traverser(map_transformer(callback_applier<BAs...>()))(apply(r,n));
 }
@@ -471,7 +439,7 @@ sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;
-	for (auto& r : rs) nn = tau_apply(r, nn, is_predicate<::tau_parser::ignore>(), is_predicate<::tau_parser::capture>());
+	for (auto& r : rs) nn = tau_apply(r, nn, is_tau_node<::tau_parser::ignore, BAs...>, is_tau_node<::tau_parser::capture, BAs...>);
 	return nn;
 }
 
