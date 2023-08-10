@@ -103,6 +103,7 @@ struct tau {
 };
 
 // TODO implementations details to be moved to a separate file
+// TODO rename to is_non_terminal_predicate
 template<typename... BAs>
 struct is_non_terminal {
 
@@ -112,6 +113,9 @@ struct is_non_terminal {
 	}
 };
 
+// check if the given node is the given non-terminal
+//
+// TODO convert to a const static predicate and change all the code accordingly
 template <size_t nt_t>
 struct is_predicate {
 
@@ -127,6 +131,9 @@ struct is_predicate {
 	}
 };
 
+// check if the given node is a capture in the sense of the matching process
+//
+// TODO convert to a const static predicate and change all the code accordingly
 template<typename... BAs>
 struct is_capture_predicate {
 
@@ -136,6 +143,9 @@ struct is_capture_predicate {
 	}
 };
 
+// check if the given node is a ignore in the sense of the matching process
+//
+// TODO convert to a const static predicate and change all the code accordingly
 template<typename... BAs>
 struct is_ignore_predicate {
 
@@ -146,6 +156,7 @@ struct is_ignore_predicate {
 	}
 };
 
+// gets the top nodes of the given non terminal type
 template <size_t nt_t, typename... BAs>
 std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
 	return select_top(n, [](const sp_tau_node<BAs...>& n) {
@@ -153,6 +164,12 @@ std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
 	});
 }
 
+// TODO add get_children
+// TODO add get_child
+
+// apply the given callback if the value of the node is a callback
+//
+// TODO convert to a const static predicate and change all the code accordingly
 template <typename... BAs>
 struct callback_applier {
 
@@ -187,6 +204,8 @@ private:
 	}	
 };
 
+// converts a tau_source_sym to a tau_sym, it is used to convert from
+// tau_source to tau_node...
 template <typename... BAs>
 struct tauify {
 
@@ -196,6 +215,8 @@ struct tauify {
 	}
 };
 
+// adds terminal symbols to a given stream, used in conjuction with usual
+// traversals (see make_string_* methods).
 template <typename... BAs>
 struct stringify {
 
@@ -213,6 +234,8 @@ struct stringify {
 	std::basic_stringstream<char>& ss;
 };
 
+// converts a sp_tau_node<...> to a string skipping the nodes that satisfy the 
+// given predicate.
 template <typename predicate_t, typename... BAs>
 std::string make_string_with_skip(const sp_tau_node<BAs...>& n, const predicate_t& skip) {
 	std::basic_stringstream<char> ss;
@@ -221,13 +244,17 @@ std::string make_string_with_skip(const sp_tau_node<BAs...>& n, const predicate_
 	return ss.str();
 }
 
+// converts a sp_tau_node<...> to a string.
 template <typename... BAs>
 std::string make_string(const sp_tau_node<BAs...>& n) {
 	std::basic_stringstream<char> ss;
 	return ss << n, ss.str();
 }
 
+// outputs a sp_tau_node<...> to a stream.
+//
 // TODO maybe it should be move to out.h
+// TODO review we have proper operator<< in bool and bdd
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const sp_tau_node<BAs...>& n){
 	stringify<BAs...> sy(stream);
@@ -236,6 +263,10 @@ std::ostream& operator<<(std::ostream& stream, const sp_tau_node<BAs...>& n){
 	return stream;
 }
 
+// TODO maybe it should be move to out.h
+// add operator<<(ostream, sp_tau_source_node)
+
+// bind the given, using a binder, the constants of the a given sp_tau_node<...>.
 template<typename binder_t, typename... BAs>
 struct bind_transformer {
 
@@ -260,13 +291,18 @@ struct bind_transformer {
 	const binder_t binder;
 };
 
+// binds the constants of a given binding using the label specified
+// in the code and according to a map from labels to constants in the BAs...
 template<typename... BAs>
 struct name_binder {
 	
 	name_binder(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		auto not_ws = [](const sp_tau_node<BAs...>& n) { return !(n->value.index() == 0 && get<0>(n->value).nt() && get<0>(n->value).n() == tau_parser::ws); };	
+		auto not_ws = [](const sp_tau_node<BAs...>& n) { 
+			return !(n->value.index() == 0 
+				&& get<0>(n->value).nt() 
+				&& get<0>(n->value).n() == tau_parser::ws); };	
 		auto bn = make_string_with_skip<decltype(not_ws), BAs...>(n, not_ws);
 		auto s = bs.find(bn);
 		if (s != bs.end()) {
@@ -279,6 +315,8 @@ struct name_binder {
 	const bindings<BAs...>& bs;
 };
 
+// binds the constants of a given binding using the multi-factory for the types
+// supported. 
 template<typename factory_t, typename... BAs>
 struct factory_binder {
 
@@ -286,14 +324,18 @@ struct factory_binder {
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		if(auto type = find_top(n, is_predicate<tau_parser::type>()); type)
+			// the factory take two arguments, the first is the type and the 
+			// second is the node representing the constant.
 			return factory.build(type, n);
-		else  return n;
+		else return n;
 	}
 
 	const factory_t& factory;
 };
 
-template<typename... BAs>
+// check if the type is unresolved.
+//
+// TODO add static definition for is_unresolved and update code
 struct is_unresolved_predicate {
 	
 	bool operator()(const sp_tau_node<BAs...>& n) {
@@ -301,6 +343,9 @@ struct is_unresolved_predicate {
 	}
 };
 
+// check if the type is resolved.
+//
+// TODO add static definition for is_resolved and update code
 template<typename... BAs>
 struct is_resolved_predicate {
 	
@@ -309,11 +354,20 @@ struct is_resolved_predicate {
 	}
 };
 
+// TODO add static definition for is_unresolved_predicate and update code
+// TODO add static definition for is_resolved_predicate and update code
+
+// check if the given expression is unresolved, i.e. contains a type which
+// is not resolved.
+//
+// TODO rename to find_unresolved
 template<typename... BAs>
 std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
 	return find_top(n, is_unresolved_predicate<BAs...>());
 }
 
+// resolve all the unresolved types in the given expression. the types are
+// resolved to the first bottom type resolved in the expression.
 template<typename... BAs>
 sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 	// should not be call with other that bfs.
@@ -331,6 +385,7 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 	}
 }
 
+// resolve all the unresolved types in the given statement.
 template<typename binder_t, typename... BAs>
 sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
@@ -342,6 +397,7 @@ sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 		decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(rt, all<sp_tau_node<BAs...>>)(source);
 }
 
+// resolve all the unresolved types in the given rules.
 template<typename... BAs>
 rules<BAs...> resolve_types(const rules<BAs...> rs) {
 	rules<BAs...> nrs;
@@ -352,16 +408,19 @@ rules<BAs...> resolve_types(const rules<BAs...> rs) {
 	return nrs;
 }
 
+// resolve all the unresolved types in the given library.
 template<typename binder_t, typename... BAs>
 library<BAs...> resolve_types(const library<BAs...> lib) {
 	return { resolve_types(lib.system) };
 }
 
+// resolve all the unresolved types in the given formula.
 template<typename binder_t, typename... BAs>
 formula<BAs...> resolve_types(const formula<BAs...> f) {
 	return { resolve_types(f.rec_relations), resolve_type(f.main) };
 }
 
+// TODO improve code a make it dependant in non-terminals
 template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
 	auto p = n->child[0]->child[0]->child[0];
@@ -369,6 +428,7 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
 	return { p, s }; 
 }
 
+// make a library from the given tau source.
 template<typename... BAs>
 library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
@@ -379,13 +439,17 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	return { rs };
 }
 
+// make a formula from the given tau source and bindings.
+//
+// TODO rename to make_formula
 template<typename... BAs>
 formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
 	tauify<BAs...> tf;
 	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	auto is_main = is_predicate<tau_parser::main>();
 	auto m = find_top(src, is_main).value();
-	bind_transformer<BAs...> bs(bindings); 
+	name_binder<BAs...> nb(bindings);
+	bind_transformer<name_binder<BAs...>, BAs...> bs(nb); 
 	auto statement = post_order_traverser<decltype(bs), decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(bs, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
 	is_predicate<tau_parser::rule> is_rule;
@@ -393,14 +457,16 @@ formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs.
 	return { rs, statement };
 }
 
-// apply one tau rule to the tree given by a tau node
+// TODO add a make_formula function dealing with factory_binder
+
+// apply one tau rule to the given expression
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
 	// TODO we could also apply only once
 	return post_order_traverser(map_transformer(callback_applier<BAs...>()))(apply(r,n));
 }
 
-// execute one step of the formula
+// apply the given rules to the given expression
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;
@@ -423,13 +489,15 @@ using sp_parse_tree = typename parse_forest::sptree;
 using parse_node = typename parse_forest::node;
 using parse_graph = typename parse_forest::graph;
 
+// drop unnecessary information from the parse tree nodes
+//
+// TODO make an static const version of this and change all the code to use it
 struct drop_location {
 
-	tau_source_sym operator()(const parse_node& p) {
-		return p.first;
-	}	
+	tau_source_sym operator()(const parse_node& p) { return p.first; }	
 };
 
+// make a tau source from the given source code string.
 sp_tau_source_node make_tau_source(const std::string source) {
 	sp_parse_tree t;
 	tau_parser p;

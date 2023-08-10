@@ -23,48 +23,21 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-/*TEST_SUITE("testing order") {
+// TODO write tests for is_non_terminal_predicate
+// TODO write tests for is_ignore_predicate
+// TODO write tests for is_capture_predicate
 
-	TEST_CASE("bool") {
-		auto t = std::variant<bool>(true);
-		auto f = std::variant<bool>(false);
-		CHECK( (f <=> t) == std::strong_ordering::less );
-	}
+// TODO write tests for get
+// TODO write tests for get_children
+// TODO write tests for get_child
 
-	struct Char {
-		char c;
-		Char(char c) : c(c) {}
-		auto operator<=>(const Char& o) const = default;
-	};
-
-	TEST_CASE("Char") {
-		auto b = std::variant<Char>(Char('b'));
-		auto a = std::variant<Char>(Char('a'));
-		CHECK( (a <=> b) == std::strong_ordering::less );
-	}
-
-	TEST_CASE("Bool") {
-		auto t = std::variant<Bool>(Bool(true));
-		auto f = std::variant<Bool>(Bool(false));
-		CHECK( (f <=> t) == std::strong_ordering::less );
-	}
-}*/
-
-TEST_SUITE("get") {
-
-}
-
-TEST_SUITE("is_ignore") {
-
-}
-
-TEST_SUITE("is_capture") {
-
-}
-
-TEST_SUITE("non_terminal") {
-
-}
+// TODO write tests for callback_applier
+// TODO write tests for tauify
+// TODO write tests for stringify
+// TODO write tests for make_string_with_skip
+// TODO write tests for make_string
+// TODO write tests for operator<<(ostream, sp_tau_node<...>)
+// TODO write tests for operator<<(ostream, sp_tau_source_node)
 
 TEST_SUITE("bind") {
 
@@ -110,13 +83,46 @@ TEST_SUITE("bind") {
 	}
 }
 
-TEST_SUITE("callback_applier") {
+// TODO write tests for factory_binder
+// TODO write tests for is_unresolved_predicate
+// TODO write tests for is_resolved_predicate
+// TODO write tests for is_unresolved
+// TODO write tests for resolve_type
+// TODO write tests for resolve_types (with rule)
+// TODO write tests for resolve_types (with rules)
 
+// TODO write tests for make rule
+TEST_SUITE("make_library") {
+
+	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
+
+	TEST_CASE("one_rule") {
+		auto src = make_tau_source(sample);
+		auto lib = make_library<Bool>(src);
+		CHECK( true );
+	}
+	// TODO add more unit tests
 }
 
-TEST_SUITE("apply") {
+TEST_SUITE("make_program") {
 
+	static constexpr char* sample =	
+		"bf_neg ( bf_neg ( $X ) ) = $X ."
+		" { 0 } .";
+
+	TEST_CASE("one_rule_n_main") {
+		auto src = make_tau_source(sample);
+		bindings<Bool> bs;
+		auto lib = make_program<Bool>(src, bs);
+		CHECK( true );
+	}
+	// TODO add more unit tests
 }
+
+// TODO write tests for tau_apply (with rule)
+// TODO write tests for tau_apply (with rules)
+// TODO write tests for make_tau in the future
+
 
 TEST_SUITE("make_tau_source") {
 
@@ -127,32 +133,7 @@ TEST_SUITE("make_tau_source") {
 		auto src = make_tau_source(sample);
 		CHECK( true );
 	}
+	// TODO add more unit tests
 }
 
-TEST_SUITE("make_library") {
-
-	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
-
-	TEST_CASE("one_rule") {
-		auto src = make_tau_source(sample);
-		auto lib = make_library<Bool>(src);
-		CHECK( true );
-	}
-}
-
-/* TEST_SUITE("make_program") {
-
-	static constexpr char* sample =	
-		"bf_neg ( bf_neg ( $X ) ) = $X ."
-		" { 0 } .";
-
-	TEST_CASE("one_rule_n_main") {
-		auto src = make_tau_source(sample);
-		bindings<Bool> bs;
-		tau_source t(src);
-		auto lib = make_program<Bool>(t, bs);
-		CHECK( true );
-	}
-
-}*/
 
