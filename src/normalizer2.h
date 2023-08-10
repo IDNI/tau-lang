@@ -61,11 +61,11 @@ RULE(BF_TRIVIALITY_0, "( { 0 } = 0 ) = { 1 }.")
 RULE(BF_TRIVIALITY_1, "( { 1 } = 0 ) = { 0 }.")
 RULE(BF_TRIVIALITY_2, "( { 0 } != 0 ) = { 0 }.")
 RULE(BF_TRIVIALITY_3, "( { 1 } != 0 ) = { 1 }.")
-// TODO define rules for wwf and bbf
+// TODO:MEDIUM define rules for wwf and bbf
 
 // rules to be used during normalization, the order matters.
 //
-// TODO add the rules for wff and cbf when ready.
+// TODO:MEDIUM add the rules for wff and cbf when ready.
 const std::string system = 
 	BF_ELIM_FORALL 
 	+ BF_DISTRIBUTE_0 + BF_DISTRIBUTE_1
@@ -107,6 +107,9 @@ private:
 		return cte->value;
 	}
 };
+
+// TODO:HIGH tweak the execution of the system rules, maybe we can do it in a more
+// efficient way.
 
 // execute one step of the formula
 template<typename... BAs>

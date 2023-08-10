@@ -27,11 +27,11 @@ namespace testing = doctest;
 // TODO write tests for is_ignore_predicate
 // TODO write tests for is_capture_predicate
 
-// TODO write tests for get
-// TODO write tests for get_children
-// TODO write tests for get_child
+// TODO:MEDIUM write tests for get
+// TODO:MEDIUM write tests for get_children
+// TODO:MEDIUM write tests for get_child
 
-// TODO write tests for callback_applier
+// TODO:HIGH write tests for callback_applier
 // TODO write tests for tauify
 // TODO write tests for stringify
 // TODO write tests for make_string_with_skip
@@ -83,11 +83,11 @@ TEST_SUITE("bind") {
 	}
 }
 
-// TODO write tests for factory_binder
+// TODO:HIGH write tests for factory_binder
 // TODO write tests for is_unresolved_predicate
 // TODO write tests for is_resolved_predicate
 // TODO write tests for is_unresolved
-// TODO write tests for resolve_type
+// TODO:HIGH write tests for resolve_type
 // TODO write tests for resolve_types (with rule)
 // TODO write tests for resolve_types (with rules)
 

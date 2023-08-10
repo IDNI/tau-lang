@@ -28,3 +28,6 @@ int main(int argc, char** argv) {
 	// TODO read formula from file, normalize it and print the output
 	return 0;
 }
+
+// TODO add bdd factory for bindings
+// TODO add bdd grammar for bindings
