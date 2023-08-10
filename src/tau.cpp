@@ -18,7 +18,7 @@
 using namespace std;
 using namespace idni::tau;
 
-// TODO:HIGH:VERY_IMPORTANT deal with runtime errors in the code. For example,
+// TODO:MEDIUM:VERY_IMPORTANT deal with runtime errors in the code. For example,
 // if the user provides a formula with errors, we should not continue
 // and print garbage. Instead, we should print an error message and exit.
 

@@ -81,9 +81,7 @@ var_in			=> "?i_" chars. # instead of '<', easy to remember
 var_out			=> "?o_" chars. # instead of '>', easy to remember
 
 # wff
-wff_def				=> wff_rule dot.
-wff_rule			=> wff_head equality wff_body dot.
-wff_body 			=> wff.
+wff_def				=> wff_head equality wff dot.
 wff_head			=> sym indexes wff_head_args.
 wff_head_args		=> open_parenthesis (variable)* close_parenthesis.
 
@@ -107,8 +105,7 @@ wff_all_sym		=> ws "wff_all" ws.
 wff_ex_sym		=> ws "wff_ex" ws.
 
 #cbf
-cbf_def 		=> cbf_rule dot.
-cbf_rule 		=> cbf_head equality cbf dot.
+cbf_def 		=> cbf_head equality cbf dot.
 cbf_head 		=> sym indexes open_parenthesis (variable)* close_parenthesis.
 cbf 			=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or.
 cbf_ref			=> cbf_head.
@@ -137,7 +134,7 @@ cbf_else_sym	=> ws "else" ws.
 #
 # QUESTION: Does timed vars appear only in bf formulas?
 
-bf_rule			=> ws bf equality bf ws dot.
+bf_rule			=> bf equality bf dot.
 bf				=> bf_constant | bf | bf_ref | bf_and | bf_neg | bf_xor | bf_or
 					| bf_all | bf_ex | variable | timed.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
