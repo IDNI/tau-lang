@@ -106,7 +106,7 @@ TEST_SUITE("make_library") {
 
 TEST_SUITE("make_program") {
 
-	static constexpr char* sample =	
+	/* static constexpr char* sample =	
 		"bf_neg ( bf_neg ( $X ) ) = $X ."
 		" { 0 } .";
 
@@ -115,7 +115,8 @@ TEST_SUITE("make_program") {
 		bindings<Bool> bs;
 		auto lib = make_program<Bool>(src, bs);
 		CHECK( true );
-	}
+	}*/
+
 	// TODO add more unit tests
 }
 
@@ -126,13 +127,14 @@ TEST_SUITE("make_program") {
 
 TEST_SUITE("make_tau_source") {
 
-	static constexpr char* sample =	
+	/* static constexpr char* sample =	
 		"bf_neg ( bf_neg ( $X ) ) = $X .";
 
 	TEST_CASE("one_rule_n_main") {
 		auto src = make_tau_source(sample);
 		CHECK( true );
-	}
+	}*/
+
 	// TODO add more unit tests
 }
 

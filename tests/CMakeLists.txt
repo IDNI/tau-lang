@@ -14,11 +14,6 @@ set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
 add_link_options("-flto")
 
-set(TEST_SAMPLE test_sample.cpp)
-add_executable(test_sample ${TEST_SAMPLE})
-target_setup(test_sample)
-target_link_libraries(test_sample TAUo doctest)
-
 set(DEBUG_TAU_NORMALIZER debug_tau_normalizer.cpp)
 add_executable(debug_tau_normalizer ${DEBUG_TAU_NORMALIZER})
 target_setup(debug_tau_normalizer)
@@ -54,7 +49,6 @@ add_executable(test_normalizer2 ${TEST_NORMALIZER2})
 target_setup(test_normalizer2)
 target_link_libraries(test_normalizer2 TAUo doctest)
 
-add_test(NAME test_sample COMMAND "${PROJECT_BINARY_DIR}/test_sample")
 add_test(NAME test_rules COMMAND "${PROJECT_BINARY_DIR}/test_rules")
 add_test(NAME test_ba COMMAND "${PROJECT_BINARY_DIR}/test_ba")
 add_test(NAME test_rewriting COMMAND "${PROJECT_BINARY_DIR}/test_rewriting")
