@@ -127,15 +127,24 @@ template <size_t nt>
 auto is_tau_source = [](const sp_tau_source_node& n) { return n->value() && n->value.n() == nt; };
 
 // gets the top nodes of the given non terminal type
-template <size_t nt_t, typename... BAs>
+template <size_t nt, typename... BAs>
 std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
-	return select_top(n, [](const sp_tau_node<BAs...>& n) {
-		return get<0>(*n)->value.nt() == nt_t;
-	});
+	return select_top(n, is_tau_node<nt, BAs...>);
 }
 
-// TODO:HIGH add get_children
-// TODO:HIGH add get_child
+// gets the children of the top nodes of the given non terminal type
+template <size_t nt, typename... BAs>
+std::vector<sp_tau_node<BAs...>> get_children(const sp_tau_node<BAs...>& n) {
+	std::vector<sp_tau_node<BAs...>> result;
+	for (auto& c : select_top(n, is_tau_node<nt, BAs...>)) result.push_back(c->child[0]);
+	return result;
+}
+
+// gets the only child of the top nodes of the given non terminal type
+template <size_t nt, typename... BAs>
+sp_tau_node<BAs...> get_child(const sp_tau_node<BAs...>& n) {
+	return get_children<nt, BAs...>(n)[0];
+}
 
 // apply the given callback if the value of the node is a callback
 //
