@@ -244,7 +244,6 @@ std::string make_string(const sp_tau_node<BAs...>& n) {
 // outputs a sp_tau_node<...> to a stream.
 //
 // TODO maybe it should be move to out.h
-// TODO:HIGH review we have proper operator<< in bool and bdd
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const sp_tau_node<BAs...>& n){
 	stringify<BAs...> sy(stream);
@@ -460,7 +459,7 @@ formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs.
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
 	// TODO:HIGH print info about node, rule and result ifdef APPLY_RULES_DEBUG
-	// TODO:MEDIUM we could also apply only once
+	// TODO we could also apply only once
 	return post_order_traverser(map_transformer(callback_applier<BAs...>()))(apply(r,n));
 }
 
