@@ -335,20 +335,16 @@ struct neg_predicate {
 // delete all top nodes that satisfy a predicate.
 template <typename predicate_t, typename symbol_t>
 sp_node<symbol_t> trim_top(const sp_node<symbol_t>& input, predicate_t& query) {
-	// TODO try a functional object instead of a lambda to easy the type deduction,
-	// or try to reduce the source code and/or the type deduction aids somehow.
-	auto neg = neg_predicate(query);
-	auto map = map_transformer<decltype(identity<symbol_t>), sp_node<symbol_t>>(identity<symbol_t>);
+	neg_predicate neg(query);
+	map_transformer<decltype(identity<symbol_t>), sp_node<symbol_t>> map(identity<symbol_t>);
 	return post_order_traverser<decltype(map), decltype(neg), sp_node<symbol_t>>(map, neg)(input);
 }
 
 // select all top nodes that satisfy a predicate and return them.
 template <typename predicate_t, typename symbol_t>
 std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predicate_t& query) {
-	// TODO try a functional object instead of a lambda to easy the type deduction,
-	// or try to reduce the source code and/or the type deduction aids somehow.
 	std::vector<sp_node<symbol_t>> selected;
-	auto select = select_top_predicate<predicate_t, sp_node<symbol_t>>(query, selected);
+	select_top_predicate<predicate_t, sp_node<symbol_t>> select(query, selected);
 	post_order_traverser<decltype(identity<sp_node<symbol_t>>), decltype(select), sp_node<symbol_t>>(identity<sp_node<symbol_t>>, select)(input);
 	return selected;
 }
@@ -358,10 +354,8 @@ std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predic
 // TODO rename to select
 template <typename predicate_t, typename symbol_t>
 std::vector<sp_node<symbol_t>> select_all(const sp_node<symbol_t>& input, predicate_t& query) {
-	// TODO try a functional object instead of a lambda to easy the type deduction,
-	// or try to reduce the source code and/or the type deduction aids somehow.
 	std::vector<sp_node<symbol_t>> selected;
-	auto select = select_all_predicate<predicate_t, sp_node<symbol_t>>(query, selected);
+	select_all_predicate<predicate_t, sp_node<symbol_t>> select(query, selected);
 	post_order_traverser<decltype(identity<sp_node<symbol_t>>), decltype(select), sp_node<symbol_t>>(identity<sp_node<symbol_t>>, select)(input);
 	return selected;
 }
