@@ -142,8 +142,19 @@ std::vector<sp_tau_node<BAs...>> get_children(const sp_tau_node<BAs...>& n) {
 
 // gets the only child of the top nodes of the given non terminal type
 template <size_t nt, typename... BAs>
-sp_tau_node<BAs...> get_child(const sp_tau_node<BAs...>& n) {
-	return get_children<nt, BAs...>(n)[0];
+std::optional<sp_tau_node<BAs...>> get_child(const sp_tau_node<BAs...>& n) {
+	auto children = get_children<nt, BAs...>(n);
+	return (children.size() == 1) ? std::optional(std::move(children[0])) : std::nullopt;
+}
+
+// gets a pair of children of the top nodes of the corresponding non terminal type.
+// Its mainly used to get the left and right children of a binary operator,
+// equality, implication, etc.
+template<size_t nt_l, size_t nt_r, typename... BAs>
+std::optional<std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>>> get_pair(const sp_tau_node<BAs...>& n) {
+	auto l = get_child<nt_l, BAs...>(n);
+	auto r = get_child<nt_r, BAs...>(n);
+	return (l && r) ? std::optional(std::move(std::make_pair(*l, *r))) : std::nullopt;
 }
 
 // apply the given callback if the value of the node is a callback
@@ -400,12 +411,21 @@ formula<BAs...> resolve_types(const formula<BAs...> f) {
 	return { resolve_types(f.rec_relations), resolve_type(f.main) };
 }
 
-// TODO:HIGH improve code a make it dependant in non-terminals
+// creates a specific rule from a generic rule.
 template<typename... BAs>
-tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& n) {
-	auto p = n->child[0]->child[0]->child[0];
-	auto s = n->child[0]->child[0]->child[1];
-	return { p, s }; 
+tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
+	// TODO this tree structure should be checked in test_tau_parser.cpp
+	auto rule_type = get<0>(rule->child[0]->value).n();
+	switch(rule_type) {
+		case ::tau_parser::wff_def:
+			return *get_pair<::tau_parser::wff_head, ::tau_parser::wff, BAs...>(rule);
+		case ::tau_parser::cbf_def:
+			return *get_pair<::tau_parser::cbf_head, ::tau_parser::cbf, BAs...>(rule);
+		case ::tau_parser::bf_rule:
+			return *get_pair<::tau_parser::bf, ::tau_parser::bf, BAs...>(rule);
+		default:
+			assert(false); // error in grammar or parser
+	} 
 }
 
 // make a library from the given tau source.
