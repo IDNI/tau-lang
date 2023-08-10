@@ -336,6 +336,7 @@ struct factory_binder {
 // check if the type is unresolved.
 //
 // TODO add static definition for is_unresolved and update code
+template<typename... BAs>
 struct is_unresolved_predicate {
 	
 	bool operator()(const sp_tau_node<BAs...>& n) {
