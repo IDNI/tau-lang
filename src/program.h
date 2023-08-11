@@ -284,7 +284,7 @@ template<typename... BAs>
 static const auto not_whitespace_predicate = [](const sp_tau_node<BAs...>& n) { 
 	return n->value.index() != 0 
 		|| !get<0>(n->value).nt() 
-		|| get<0>(n->value).n() != tau_parser::ws); 
+		|| get<0>(n->value).n() != tau_parser::ws; 
 };
 
 // binds the constants of a given binding using the label specified
@@ -445,22 +445,31 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 }
 
 // make a formula from the given tau source and bindings.
-//
-// TODO rename to make_formula
 template<typename... BAs>
-formula<BAs...> make_formula(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
+formula<BAs...> make_formula_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
+	name_binder<BAs...> nb(bindings);
+	bind_transformer<name_binder<BAs...>, BAs...> bs(nb); 
+	return make_formula_using_binder<decltype(bs), BAs...>(tau_source, bs);
+}
+
+// make a formula from the given tau source and bindings.
+template<typename factory_t, typename... BAs>
+formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, const factory_t& factory) {
+	bind_transformer<factory_t, BAs...> bs(factory);
+	return make_formula_using_binder<decltype(bs), BAs...>(tau_source, bs);
+}
+
+// make a formula from the given tau source and binder.
+template<typename binder_t, typename... BAs>
+formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const binder_t& binder) {
 	tauify<BAs...> tf;
 	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	auto m = find_top(src, is_tau_node<tau_parser::main, BAs...>).value();
-	name_binder<BAs...> nb(bindings);
-	bind_transformer<name_binder<BAs...>, BAs...> bs(nb); 
-	auto statement = post_order_traverser<decltype(bs), decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(bs, all<sp_tau_node<BAs...>>)(m);
+	auto statement = post_order_traverser<binder_t, decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(binder, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
 	for (auto& r: select_top(src, is_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs, statement };
 }
-
-// TODO:HIGH add a make_formula function dealing with factory_binder
 
 // apply one tau rule to the given expression
 template<typename... BAs>

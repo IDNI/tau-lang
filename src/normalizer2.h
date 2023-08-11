@@ -126,7 +126,7 @@ template<typename binder_t, typename... BAs>
 formula<BAs...> normalizer(std::string source, bindings<BAs...> bs) {
 	auto prog_source = make_tau_source(source);
 	auto sys_source = make_tau_source(system);
-	auto prog = make_formula(prog_source, bs);
+	auto prog = make_formula_using_bindings(prog_source, bs);
 	auto lib = make_library<BAs...>(sys_source);
 	std::set<formula<BAs...>, prog_less<BAs...>> previous;
 	previous.insert(prog);
