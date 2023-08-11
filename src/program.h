@@ -114,8 +114,6 @@ struct is_non_terminal {
 };
 
 // check if the node is the given non-terminal
-
-
 template <size_t nt, typename...BAs>
 auto is_tau_node = [](const sp_tau_node<BAs...> n) { return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
 			&& get<0>(n->value).nt() 
@@ -240,20 +238,6 @@ std::string make_string(const sp_tau_node<BAs...>& n) {
 	std::basic_stringstream<char> ss;
 	return ss << n, ss.str();
 }
-
-// outputs a sp_tau_node<...> to a stream.
-//
-// TODO maybe it should be move to out.h
-template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream, const sp_tau_node<BAs...>& n){
-	stringify<BAs...> sy(stream);
-	auto all = true_predicate<sp_tau_node<BAs...>>();
-	post_order_tree_traverser<decltype(sy), decltype(all), sp_tau_node<BAs...>>(sy, all)(n);
-	return stream;
-}
-
-// TODO maybe it should be move to out.h
-// add operator<<(ostream, sp_tau_source_node)
 
 // bind the given, using a binder, the constants of the a given sp_tau_node<...>.
 template<typename binder_t, typename... BAs>
@@ -518,4 +502,23 @@ sp_tau_source_node make_tau_source(const std::string source) {
 }
 
 } // namespace idni::tau
+
+// outputs a sp_tau_node<...> to a stream, using the stringify transformer
+// and assumes that the constants also override operator<<.
+//
+// TODO maybe it should be move to out.h
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n){
+	std::basic_stringstream<char> bss;
+	idni::tau::stringify<BAs...> sy(bss);
+	auto str = idni::rewriter::post_order_tree_traverser<
+		decltype(sy), 
+		decltype(idni::rewriter::all<idni::tau::sp_tau_node<BAs...>>), 
+		idni::tau::sp_tau_node<BAs...>>(sy, idni::rewriter::all<idni::tau::sp_tau_node<BAs...>>)(n);
+	return stream << str;
+}
+
+// TODO maybe it should be move to out.h
+// add operator<<(ostream, sp_tau_source_node)
+
 #endif // __PROGRAM_H__
