@@ -570,13 +570,13 @@ node_t apply_with_skip(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t&
 		matcher {p, u, i, c, sk};
 	#ifndef OUTPUT_APPLY_RULES
 	return apply(s, n, matcher);
-	#else
+	#else // OUTPUT_APPLY_RULES
 	auto nn = apply(s, n, matcher);
 	std::cout << "applying rule: " << p << " = " << s << std::endl;
 	std::cout << "\tinitial node: " << n << std::endl;
 	std::cout << "\tfinal node: " << nn << std::endl;
 	return nn;
-	#endif
+	#endif // OUTPUT_APPLY_RULES
 }
 
 // apply a substitution to a rule according to a given matcher, this method is 
@@ -596,7 +596,42 @@ node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 	return n;
 }
 
-// TODO add replace function that takes a node, a substitute and a root node and 
+// drop unnecessary information from the parse tree nodes
+template <typename parse_symbol_t, typename symbol_t>
+auto drop_location = [](const parse_symbol_t& n) -> symbol_t { return n.first; };
+
+// make a tau source from the given source code string.
+template<typename parser_t, typename transformer_t, typename parse_symbol_t, typename symbol_t>
+sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const std::string source) {
+	using parse_forest = idni::forest<parse_symbol_t>;
+	using parse_tree = typename parse_forest::tree;
+	using sp_parse_tree = typename parse_forest::sptree;
+	using parse_graph = typename parse_forest::graph;
+
+	sp_parse_tree t;
+	parser_t parser;
+	auto f = parser.parse(source.c_str(), source.size());
+	if (!f || !parser.found()) {
+		std::cerr << parser.get_error().to_str(); 
+	}
+
+	auto get_tree = [&f, &t] (auto& g ){
+			f->remove_recursive_nodes(g);
+			t = g.extract_trees();
+			#ifdef OUTPUT_PARSED_TREES
+			t->to_print(std::cout);
+			#endif // OUTPUT_PARSED_TREES
+			return false;
+		};
+	f->extract_graphs(f->root(), get_tree);
+
+	map_transformer<decltype(drop_location<parse_symbol_t, symbol_t>), 
+		sp_parse_tree, sp_node<symbol_t>> transform(drop_location<parse_symbol_t, symbol_t>);
+	return post_order_traverser<decltype(transform), decltype(all<sp_parse_tree>),
+		sp_parse_tree, sp_node<symbol_t>>(transform, all<sp_parse_tree>)(t);
+}
+
+// TODO:MEDIUM add replace function that takes a node, a substitute and a root node and 
 // returns a new node with the substitute in place of the node. 
 
 } // namespace idni::rewriter

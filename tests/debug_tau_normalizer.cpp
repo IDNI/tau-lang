@@ -21,7 +21,18 @@
 using namespace std;
 using namespace idni::tau;
 
+using bdd_sym = idni::lit<char, char>;
+using sp_bdd_node = sp_node<bdd_sym>;
 
+sp_bdd_node make_bdd_from_string(const std::string source) {
+	using parse_lit = idni::lit<char, char>;
+	using parse_location = std::array<size_t, 2UL>;
+	using parse_symbol = std::pair<parse_lit, parse_location>;
+
+	return make_node_from_string<bdd_parser, decltype(drop_location<parse_symbol, bdd_sym>),
+			parse_symbol, bdd_sym>(drop_location<parse_symbol, bdd_sym>, 
+			source);
+}
 
 int main(int argc, char** argv) {
 	if (argc != 2) return cerr << argv[0] << ": requires 1 argument: formula file\n", 1;

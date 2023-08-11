@@ -492,44 +492,32 @@ tau<BAs...> make_tau() {
 	return tau<BAs...>();
 }
 
-using parse_symbol = idni::lit<char, char>;
+/*using parse_symbol = idni::lit<char, char>;
 using parse_location = std::array<size_t, 2UL>;
 using parse_node = std::pair<parse_symbol, parse_location>;
 using parse_forest = idni::forest<parse_node>;
 using parse_tree = typename parse_forest::tree;
 using sp_parse_tree = typename parse_forest::sptree;
 using parse_node = typename parse_forest::node;
-using parse_graph = typename parse_forest::graph;
+using parse_graph = typename parse_forest::graph;*/
 
 // drop unnecessary information from the parse tree nodes
 //
 // TODO make an static const version of this and change all the code to use it
-struct drop_location {
+/*struct drop_location {
 
 	tau_source_sym operator()(const parse_node& p) { return p.first; }	
-};
+};*/
 
 // make a tau source from the given source code string.
 sp_tau_source_node make_tau_source(const std::string source) {
-	sp_parse_tree t;
-	tau_parser p;
-	auto f = p.parse(source.c_str(), source.size());
-	if (!f || !p.found()) {
-		std::cerr << p.get_error().to_str(); 
-	}
+	using parse_lit = idni::lit<char, char>;
+	using parse_location = std::array<size_t, 2UL>;
+	using parse_symbol = std::pair<parse_lit, parse_location>;
 
-	auto get_tree = [&f, &t] (auto& g ){
-			f->remove_recursive_nodes(g);
-			t = g.extract_trees();
-			t->to_print(std::cout);
-			return false;
-		};
-	f->extract_graphs(f->root(), get_tree);
-
-	drop_location dl;
-	map_transformer<drop_location, sp_parse_tree, sp_tau_source_node> transform(dl);
-	return post_order_traverser<decltype(transform), decltype(all<sp_parse_tree>),
-		sp_parse_tree, sp_node<tau_source_sym>>(transform, all<sp_parse_tree>)(t);
+	return make_node_from_string<tau_parser, decltype(drop_location<parse_symbol, tau_source_sym>),
+			parse_symbol, tau_source_sym>(drop_location<parse_symbol, tau_source_sym>, 
+			source);
 }
 
 } // namespace idni::tau
