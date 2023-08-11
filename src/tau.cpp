@@ -22,6 +22,10 @@ using namespace idni::tau;
 // if the user provides a formula with errors, we should not continue
 // and print garbage. Instead, we should print an error message and exit.
 
+// TODO:LOW we use a lot decltype(...) to get the type of static const 
+// predicates (given by lambdas). We could declare a type for them and use it
+// instead.
+
 int main(int argc, char** argv) {
 	// TODO tau main method: parse command line arguments, read input file,
 	// normalize, print output, etc.

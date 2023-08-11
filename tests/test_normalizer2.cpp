@@ -26,3 +26,4 @@ namespace testing = doctest;
 // TODO write regression test that exercise the full normalizer, from parsing 
 // source, conversion to tau sources, final form, bindings, etc.
 
+// TODO:HIGH add Ohad's examples
