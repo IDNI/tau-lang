@@ -10,14 +10,17 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #ifndef __OUT_H__
 #define __OUT_H__
+
+#include <ostream>
+#include <sstream>
+
 #include "barr.h"
 #include "dict.h"
 #include "bool.h"
 #include "anf.h"
-#include <ostream>
-#include <sstream>
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
 
