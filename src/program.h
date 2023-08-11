@@ -279,6 +279,14 @@ struct bind_transformer {
 	const binder_t binder;
 };
 
+// is not a whitespace predicate
+template<typename... BAs>
+static const auto not_whitespace_predicate = [](const sp_tau_node<BAs...>& n) { 
+	return n->value.index() != 0 
+		|| !get<0>(n->value).nt() 
+		|| get<0>(n->value).n() != tau_parser::ws); 
+};
+
 // binds the constants of a given binding using the label specified
 // in the code and according to a map from labels to constants in the BAs...
 template<typename... BAs>
@@ -287,14 +295,11 @@ struct name_binder {
 	name_binder(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		// TODO:HIGH extract this to a proper lambda and review it
-		auto not_ws = [](const sp_tau_node<BAs...>& n) { 
-			return !(n->value.index() == 0 
-				&& get<0>(n->value).nt() 
-				&& get<0>(n->value).n() == tau_parser::ws); };	
 		auto bn = make_string_with_skip<
 			decltype(tau_node_terminal_extractor<BAs...>),
-			decltype(not_ws), sp_tau_node<BAs...>>(tau_node_terminal_extractor<BAs...>, not_ws, n);
+			decltype(not_whitespace_predicate<BAs...>), 
+			sp_tau_node<BAs...>>(tau_node_terminal_extractor<BAs...>, 
+				not_whitespace_predicate<BAs...>, n);
 		auto s = bs.find(bn);
 		if (s != bs.end()) {
 			tau_sym<BAs...> ts = s->second;
@@ -460,7 +465,6 @@ formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs.
 // apply one tau rule to the given expression
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
-	// TODO:HIGH print info about node, rule and result ifdef APPLY_RULES_DEBUG
 	// TODO we could also apply only once
 	return post_order_traverser(map_transformer(callback_applier<BAs...>()))(apply(r,n));
 }
