@@ -166,11 +166,7 @@ source_binding	=> type colon source.
 type 			=> chars | null.
 
 # source related definition
-source_punct		=> punct & ~q_char & ~q_str & ~q_bqstr
-					& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr) 
-					& ~open_brace & ~close_brace.
-
-source0			=> alnum | space | char_escape_encode | source_punct.
+source0			=> alnum | space | char_escape_encode | char_punct.
 source			=> (source0)+.
 
 # bf_cbs
