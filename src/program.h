@@ -492,23 +492,6 @@ tau<BAs...> make_tau() {
 	return tau<BAs...>();
 }
 
-/*using parse_symbol = idni::lit<char, char>;
-using parse_location = std::array<size_t, 2UL>;
-using parse_node = std::pair<parse_symbol, parse_location>;
-using parse_forest = idni::forest<parse_node>;
-using parse_tree = typename parse_forest::tree;
-using sp_parse_tree = typename parse_forest::sptree;
-using parse_node = typename parse_forest::node;
-using parse_graph = typename parse_forest::graph;*/
-
-// drop unnecessary information from the parse tree nodes
-//
-// TODO make an static const version of this and change all the code to use it
-/*struct drop_location {
-
-	tau_source_sym operator()(const parse_node& p) { return p.first; }	
-};*/
-
 // make a tau source from the given source code string.
 sp_tau_source_node make_tau_source(const std::string source) {
 	using parse_lit = idni::lit<char, char>;
