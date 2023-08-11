@@ -16,6 +16,7 @@
 #include "../src/bdd_handle.h"
 #include "../src/bool.h"
 #include "../src/normalizer2.h"
+#include "../parser/bdd_parser.generated.h"
 
 using namespace std;
 using namespace idni::tau;
@@ -29,5 +30,4 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-// TODO add bdd factory for bindings
-// TODO add bdd grammar for bindings
+// TODO:HIGH add bdd factory for bindings
