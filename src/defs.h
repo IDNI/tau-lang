@@ -16,6 +16,15 @@
 
 typedef int sym_t;
 
+
+
+// toggles for debugging
+
+// comment this to disable debug output during rule application. in the future 
+// this will be controlled by a command line flag.
+#define OUTPUT_APPLY_RULES
+
+// basic macro for conditional execution of code
 #ifdef DEBUG
 #define DBG(x) x
 #include <cxxabi.h>
