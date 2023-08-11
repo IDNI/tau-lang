@@ -203,40 +203,55 @@ struct tauify {
 	}
 };
 
+// extracts terminal from sp_tau_source_node
+template <typename... BAs>
+auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
+	if (n->value.index() == 0 
+			&& !get<0>(n->value).nt()
+			&& !get<0>(n->value).is_null())
+		return std::optional<char>(get<0>(n->value).t());
+	return std::optional<char>();
+};
+
+// extracts terminal from sp_tau_source_node
+auto tau_source_terminal_extractor = [](const sp_tau_source_node& n) -> std::optional<char> {
+	if (n->value.nt()&& !(n->value).is_null())
+		return std::optional<char>(n->value.t());
+	return std::optional<char>();
+};
+
 // adds terminal symbols to a given stream, used in conjuction with usual
 // traversals (see make_string_* methods).
-template <typename... BAs>
+template <typename extractor_t, typename node_t>
 struct stringify {
 
-	stringify(std::basic_stringstream<char>& ss) : ss(ss) {}
+	stringify(const extractor_t& extractor, std::basic_stringstream<char>& stream) 
+		: stream(stream), extractor(extractor) {}
 
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-		if (n->value.index() != 0) return n;
-		if (n->value.index() == 0 
-				&& !get<0>(n->value).nt()
-				&& !get<0>(n->value).is_null())
-			ss << get<0>(n->value).t(); 
+	node_t operator()(const node_t& n) {
+		if (auto str = extractor(n); str)
+			stream << str.value(); 
 		return n;
 	}
 
-	std::basic_stringstream<char>& ss;
+	const extractor_t& extractor;
+	std::basic_stringstream<char>& stream;
 };
 
 // converts a sp_tau_node<...> to a string skipping the nodes that satisfy the 
 // given predicate.
-template <typename predicate_t, typename... BAs>
-std::string make_string_with_skip(const sp_tau_node<BAs...>& n, const predicate_t& skip) {
+template <typename extractor_t, typename predicate_t, typename node_t>
+std::string make_string_with_skip(const extractor_t& extractor, predicate_t& skip, const node_t& n) {
 	std::basic_stringstream<char> ss;
-	stringify<BAs...> sy(ss);
-	post_order_tree_traverser<decltype(sy), decltype(skip), sp_tau_node<BAs...>>(sy, skip)(n);
+	stringify<extractor_t, node_t> sy(extractor, ss);
+	post_order_tree_traverser<decltype(sy), predicate_t, node_t>(sy, skip)(n);
 	return ss.str();
 }
 
 // converts a sp_tau_node<...> to a string.
-template <typename... BAs>
-std::string make_string(const sp_tau_node<BAs...>& n) {
-	std::basic_stringstream<char> ss;
-	return ss << n, ss.str();
+template <typename extractor_t, typename node_t>
+std::string make_string(const extractor_t& extractor, const node_t& n) {
+	return make_string_with_skip<extractor_t, decltype(all<node_t>), node_t>(extractor, all<node_t>, n);
 }
 
 // bind the given, using a binder, the constants of the a given sp_tau_node<...>.
@@ -272,11 +287,14 @@ struct name_binder {
 	name_binder(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
+		// TODO:HIGH extract this to a proper lambda and review it
 		auto not_ws = [](const sp_tau_node<BAs...>& n) { 
 			return !(n->value.index() == 0 
 				&& get<0>(n->value).nt() 
 				&& get<0>(n->value).n() == tau_parser::ws); };	
-		auto bn = make_string_with_skip<decltype(not_ws), BAs...>(n, not_ws);
+		auto bn = make_string_with_skip<
+			decltype(tau_node_terminal_extractor<BAs...>),
+			decltype(not_ws), sp_tau_node<BAs...>>(tau_node_terminal_extractor<BAs...>, not_ws, n);
 		auto s = bs.find(bn);
 		if (s != bs.end()) {
 			tau_sym<BAs...> ts = s->second;
@@ -509,16 +527,15 @@ sp_tau_source_node make_tau_source(const std::string source) {
 // TODO maybe it should be move to out.h
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n){
-	std::basic_stringstream<char> bss;
-	idni::tau::stringify<BAs...> sy(bss);
-	auto str = idni::rewriter::post_order_tree_traverser<
-		decltype(sy), 
-		decltype(idni::rewriter::all<idni::tau::sp_tau_node<BAs...>>), 
-		idni::tau::sp_tau_node<BAs...>>(sy, idni::rewriter::all<idni::tau::sp_tau_node<BAs...>>)(n);
-	return stream << str;
+	return stream << idni::tau::make_string(idni::tau::tau_node_terminal_extractor<BAs...>, n);
 }
 
+// outputs a sp_tau_source_node to a stream, using the stringify transformer
+// and assumes that the constants also override operator<<.
+//
 // TODO maybe it should be move to out.h
-// add operator<<(ostream, sp_tau_source_node)
+std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_source_node& n){
+	return stream << idni::tau::make_string(idni::tau::tau_source_terminal_extractor, n);
+}
 
 #endif // __PROGRAM_H__
