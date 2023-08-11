@@ -104,7 +104,7 @@ TEST_SUITE("make_library") {
 	// TODO add more unit tests
 }
 
-TEST_SUITE("make_program") {
+TEST_SUITE("make_formula") {
 
 	/* static constexpr char* sample =	
 		"bf_neg ( bf_neg ( $X ) ) = $X ."
@@ -113,7 +113,7 @@ TEST_SUITE("make_program") {
 	TEST_CASE("one_rule_n_main") {
 		auto src = make_tau_source(sample);
 		bindings<Bool> bs;
-		auto lib = make_program<Bool>(src, bs);
+		auto lib = make_formula<Bool>(src, bs);
 		CHECK( true );
 	}*/
 
