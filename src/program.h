@@ -448,7 +448,7 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 //
 // TODO rename to make_formula
 template<typename... BAs>
-formula<BAs...> make_program(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
+formula<BAs...> make_formula(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
 	tauify<BAs...> tf;
 	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	auto m = find_top(src, is_tau_node<tau_parser::main, BAs...>).value();
