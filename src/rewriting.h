@@ -552,8 +552,7 @@ private:
 
 // apply a rule to a tree using the predicate to pattern_matcher.
 template <typename node_t, typename is_ignore_t, typename is_capture_t> 
-node_t apply(rule<node_t>& r, node_t& n, 
-		is_ignore_t& i, is_capture_t& c) {
+node_t apply(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c) {
 	auto [p , s] = r;
 	environment<node_t> u;
 	pattern_matcher<node_t, is_ignore_t, is_capture_t> matcher {p, u, i, c};
@@ -564,13 +563,20 @@ node_t apply(rule<node_t>& r, node_t& n,
 // unnecessary subtrees
 template <typename node_t, typename is_ignore_t, typename is_capture_t, 
 	typename is_skip_t> 
-node_t apply_with_skip(rule<node_t>& r, node_t& n, 
-		is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
+node_t apply_with_skip(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
 	auto [p , s] = r;
 	environment<node_t> u;
 	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t> 
 		matcher {p, u, i, c, sk};
+	#ifndef OUTPUT_APPLY_RULES
 	return apply(s, n, matcher);
+	#else
+	auto nn = apply(s, n, matcher);
+	std::cout << "applying rule: " << p << " = " << s << std::endl;
+	std::cout << "\tinitial node: " << n << std::endl;
+	std::cout << "\tfinal node: " << nn << std::endl;
+	return nn;
+	#endif
 }
 
 // apply a substitution to a rule according to a given matcher, this method is 
