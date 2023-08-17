@@ -16,8 +16,6 @@
 
 typedef int sym_t;
 
-
-
 // toggles for debugging, comment properly to enable/disable each feature/debug helper. 
 //
 // TODO final features should be cotrolled by a command line flag.
