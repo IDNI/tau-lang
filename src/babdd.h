@@ -1199,7 +1199,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return r;
 	}
 
-	//TODO: returns always false
+	// TODO returns always false
 	static Bool get_uelim(bdd_ref x) {
 		if (x == T) return {true};
 		if (x == F) return {false};
@@ -1208,7 +1208,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		else return r & get_uelim(nx.l);
 	}
 
-	//TODO: returns always true
+	// TODO returns always true
 	static Bool get_eelim(bdd_ref x) {
 		if (x == T) return {true};
 		if (x == F) return {false};

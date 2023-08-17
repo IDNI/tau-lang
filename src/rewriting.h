@@ -32,15 +32,15 @@
 
 namespace idni::rewriter {
 
-// node of a tree. 
-//
-// TODO This is very similar to idni::forest<...>::tree, but it
+// IDEA This is very similar to idni::forest<...>::tree, but it
 // also defines equality operators and ordering (important during hashing).
 // Both notions could be unified if we keep those operators defined.
-//
+
 // TODO make make_node a friend function and the constructor private. Right now
 // it is public to easy the construction of the tree during testing, but it is 
 // not really needed.
+
+// node of a tree. 
 template <typename symbol_t>
 struct node {
 	// equality operators and ordering
@@ -124,7 +124,7 @@ private:
 	}
 };
 
-// TODO:MEDIUM add a post_order_traverser that does not have a wrapped transformer so
+// TODO (MEDIUM) add a post_order_traverser that does not have a wrapped transformer so
 // it is faster when dealing with only predicate operations (searches,...) and
 // change all the related code.
 
@@ -631,8 +631,11 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 		sp_parse_tree, sp_node<symbol_t>>(transform, all<sp_parse_tree>)(t);
 }
 
-// TODO:MEDIUM add replace function that takes a node, a substitute and a root node and 
-// returns a new node with the substitute in place of the node. 
+// TODO (MEDIUM) add replace function that takes a node, a substitute and a root
+// node and returns a new node with the substitute in place of the node. 
+
+// TODO (MEDIUM) add a reducer/evaluator that takes a tree and a function and
+// returns a value of a given type.
 
 } // namespace idni::rewriter
 #endif // __IDNI__REWRITING_H__

@@ -18,11 +18,35 @@
 using namespace std;
 using namespace idni::tau;
 
-// TODO:MEDIUM:VERY_IMPORTANT deal with runtime errors in the code. For example,
+// Trought all the code we would use the following tags to denote different
+// types of tasks or notes.
+
+// TODO (HIGH) this is a sample of a high priority TODO
+
+// TODO (MEDIUM) this is a sample of a medium priority TODO
+
+// TODO (LOW) this is a sample of a low priority TODO
+
+// TODO (IMPORTANT) this is a sample of an important TODO
+
+// TODO (IMPORTANT) this is another sample of an important TODO 
+// which turns out to be a multi-line TODO
+
+// DOING this is a task currently been done
+
+// IDEA this is a sample idea entry
+
+// FIXME this is a sample fixme enrty
+
+// REVIEW this is a sample review entry
+
+// MARK this is a sample mark entry
+
+// TODO (MEDIUM) deal with runtime errors in the code. For example,
 // if the user provides a formula with errors, we should not continue
 // and print garbage. Instead, we should print an error message and exit.
 
-// TODO:LOW we use a lot decltype(...) to get the type of static const 
+// TODO (LOW) we use a lot decltype(...) to get the type of static const 
 // predicates (given by lambdas). We could declare a type for them and use it
 // instead.
 

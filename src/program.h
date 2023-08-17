@@ -85,25 +85,25 @@ struct tau {
 
 	// logical operators on tau specs, dummy implementation for now.
 	tau operator&(tau const& that) const { 
-		// TODO: implement in the future
+		// TODO implement in the future
 		return tau(); 
 	}
 	tau operator|(tau const& that) const {
-		// TODO: implement in the future
+		// TODO implement in the future
 		return tau(); 
 	}
 	tau operator^(tau const& that) const {
-		// TODO: implement in the future
+		// TODO implement in the future
 		return tau(); 
 	}
 	tau operator~() const {
-		// TODO: implement in the future
+		// TODO implement in the future
 		return tau(); 
 	}
 };
 
-// TODO:LOW implementations details to be moved to a separate file
-// TODO:LOW rename to is_non_terminal_predicate
+// TODO (LOW) implementations details to be moved to a separate file
+// TODO (LOW) rename to is_non_terminal_predicate
 template<typename... BAs>
 struct is_non_terminal {
 
@@ -115,7 +115,7 @@ struct is_non_terminal {
 
 // check if the node is the given non-terminal
 template <size_t nt, typename...BAs>
-auto is_tau_node = [](const sp_tau_node<BAs...> n) { return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
+auto is_tau_node = [](const sp_tau_node<BAs...>& n) { return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
 			&& get<0>(n->value).nt() 
 			&& get<0>(n->value).n() == nt;
  };
