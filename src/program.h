@@ -102,23 +102,17 @@ struct tau {
 	}
 };
 
-// TODO (LOW) implementations details to be moved to a separate file
-// TODO (LOW) rename to is_non_terminal_predicate
 template<typename... BAs>
-struct is_non_terminal {
-
-	size_t operator()(const sp_tau_node<BAs...>& n) {
+auto is_non_terminal_predicate = [](const sp_tau_node<BAs...>& n) {
 		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
 			&& get<0>(*n).nt();
-	}
 };
 
 // check if the node is the given non-terminal
 template <size_t nt, typename...BAs>
-auto is_tau_node = [](const sp_tau_node<BAs...>& n) { return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
-			&& get<0>(n->value).nt() 
-			&& get<0>(n->value).n() == nt;
- };
+auto is_tau_node = [](const sp_tau_node<BAs...>& n) { 
+	return is_non_terminal_predicate<BAs...>(n) && get<0>(n->value).n() == nt;
+};
 
 // check if the node is the given non-terminal
 template <size_t nt>
