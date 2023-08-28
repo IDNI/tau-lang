@@ -180,6 +180,28 @@ struct map_transformer {
 
 // visitor that produces nodes transformed accordingly to the 
 // given transformer. It only works with post order traversals.
+//
+// TODO (MEDIUM) merge replace and replace_node transformers into one.
+template <typename wrapped_t, typename input_node_t, 
+	typename output_node_t = input_node_t>
+struct replace_node_transformer {
+
+	replace_node_transformer(wrapped_t& wrapped) : wrapped(wrapped) {}
+
+	output_node_t operator()(const input_node_t& n) {
+		std::vector<output_node_t> child;
+		for (const auto& c : n->child) 
+			if (auto it = changes.find(c); it != changes.end()) 
+				child.push_back(it->second);
+		return changes[n] = wrapped(n->value, child);
+	}
+
+	std::map<input_node_t, output_node_t> changes;
+	wrapped_t& wrapped;
+};
+
+// visitor that produces nodes transformed accordingly to the 
+// given transformer. It only works with post order traversals.
 template <typename node_t>
 struct replace_transformer {
 	replace_transformer(std::map<node_t, node_t>& changes) : changes(changes) {}

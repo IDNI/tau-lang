@@ -105,7 +105,7 @@ struct tau {
 template<typename... BAs>
 auto is_non_terminal_predicate = [](const sp_tau_node<BAs...>& n) {
 		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
-			&& get<0>(*n).nt();
+			&& get<0>(n->value).nt();
 };
 
 // check if the node is the given non-terminal

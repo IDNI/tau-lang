@@ -32,7 +32,9 @@ using namespace idni::tau;
 // TODO (IMPORTANT) this is another sample of an important TODO 
 // which turns out to be a multi-line TODO
 
-// DOING this is a task currently been done
+// DOING (HIGH) this is a task currently been done
+
+// DOING (HIGH) this is another task currently been done
 
 // IDEA this is a sample idea entry
 
