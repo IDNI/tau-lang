@@ -54,10 +54,11 @@ var				=> '?' chars.
 
 # bdd
 bdd				=> bdd_and | bdd_neg | bdd_xor | bdd_or | var | T | F.
-bdd_and			=> open_parenthesis bdd bdd_and_sym bdd close_parenthesis.
-bdd_or			=> open_parenthesis bdd bdd_or_sym close_parenthesis.
-bdd_xor			=> open_parenthesis bdd bdd_xor_sym ws bdd close_parenthesis.
-bdd_neg			=> bdd_neg_sym open_parenthesis bdd close_parenthesis.
+bdd_and			=> open_parenthesis bdd_arg bdd_and_sym bdd_arg close_parenthesis.
+bdd_or			=> open_parenthesis bdd_arg bdd_or_sym bdd_arg close_parenthesis.
+bdd_xor			=> open_parenthesis bdd_arg bdd_xor_sym bdd_arg close_parenthesis.
+bdd_neg			=> bdd_neg_sym open_parenthesis bdd_arg close_parenthesis.
+bdd_arg 		=> bdd.
 
 # bdd_op_sym
 bdd_and_sym		=> ws "bdd_and" ws.
