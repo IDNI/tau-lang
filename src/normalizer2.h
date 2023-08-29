@@ -101,7 +101,7 @@ struct prog_less {
 	}
 private:
 	sp_tau_node<BAs...> extract_cte(sp_tau_node<BAs...> n) const {
-		auto cte = find_top(n, is_tau_node<tau_parser::bf_constant, BAs...>).value()[1];
+		auto cte = find_top(n, is_nonterminal_tau_node<tau_parser::bf_constant, BAs...>).value()[1];
 		if (cte->value.index() == 0) return cte->child[0]->value;
 		return cte->value;
 	}
@@ -126,6 +126,7 @@ template<typename binder_t, typename... BAs>
 formula<BAs...> normalizer(std::string source, bindings<BAs...> bs) {
 	auto prog_source = make_tau_source(source);
 	auto sys_source = make_tau_source(system);
+	// TODO (HIGH) replace for appropriate binding strategy
 	auto prog = make_formula_using_bindings(prog_source, bs);
 	auto lib = make_library<BAs...>(sys_source);
 	std::set<formula<BAs...>, prog_less<BAs...>> previous;

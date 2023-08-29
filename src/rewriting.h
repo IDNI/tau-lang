@@ -622,7 +622,7 @@ node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 template <typename parse_symbol_t, typename symbol_t>
 auto drop_location = [](const parse_symbol_t& n) -> symbol_t { return n.first; };
 
-// make a tau source from the given source code string.
+// make a tree from the given source code string.
 template<typename parser_t, typename transformer_t, typename parse_symbol_t, typename symbol_t>
 sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const std::string source) {
 	using parse_forest = idni::forest<parse_symbol_t>;
