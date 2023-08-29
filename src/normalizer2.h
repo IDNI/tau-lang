@@ -107,36 +107,55 @@ private:
 	}
 };
 
+// executes the normalizer on the given source code taking into account the
+// bindings provided.
+template<typename... BAs>
+formula<BAs...> normalizer(std::string source, bindings<BAs...> binds) {
+	auto form_source = make_tau_source(source);
+	auto form = make_formula_using_bindings(form_source, binds);
+	return normalizer(form);
+}
+
+// executes the normalizer on the given source code taking into account the
+// provided factory.
+template<typename factory_t, typename... BAs>
+formula<BAs...> normalizer(std::string source, factory_t factory) {
+	auto form_source = make_tau_source(source);
+	auto form = make_formula_using_factory(form_source, factory);
+	return normalizer(form);
+}
+
+template <typename... BAs>
+formula<BAs...> normalizer(formula<BAs...> form) {
+	auto sys_source = make_tau_source(system);
+	auto lib = make_library<BAs...>(sys_source);
+	return normalizer(form, lib);
+}
+
 // TODO (HIGH) tweak the execution of the system rules, maybe we can do it in a more
 // efficient way.
 
 // execute one step of the formula
 template<typename... BAs>
-formula<BAs...> program_step(const formula<BAs...>& p, const library<BAs...>& l) {
-	auto main = p.main;
-	auto main_after_prog = apply(p.rec_relations, main);
+formula<BAs...> program_step(const formula<BAs...>& form, const library<BAs...>& lib) {
+	auto main = form.main;
+	auto main_after_prog = apply(form.rec_relations, main);
 	// TODO sys rules should be applied while possible
-	auto main_after_sys = tau_apply(l.system, main_after_prog);
-	return formula<BAs...>(main_after_sys, p.rec_relations);
+	auto main_after_sys = tau_apply(lib.system, main_after_prog);
+	return formula<BAs...>(main_after_sys, form.rec_relations);
 }
 
-// executes the normalizer on the given source code, maybe in the future we 
-// need to pass a formula instead of a source code.
-template<typename binder_t, typename... BAs>
-formula<BAs...> normalizer(std::string source, bindings<BAs...> bs) {
-	auto prog_source = make_tau_source(source);
-	auto sys_source = make_tau_source(system);
-// TODO (HIGH) replace for appropriate binding strategy
-	auto prog = make_formula_using_bindings(prog_source, bs);
-	auto lib = make_library<BAs...>(sys_source);
+template <typename... BAs>
+formula<BAs...> normalizer(formula<BAs...> form, library<BAs...> lib) {
 	std::set<formula<BAs...>, prog_less<BAs...>> previous;
-	previous.insert(prog);
-	auto nprog = program_step(prog, lib);
-	while (!previous.insert(nprog).second) {
-		prog = nprog;
-		nprog = program_step(prog, lib);
+	previous.insert(form);
+	auto current = form;
+	auto next = program_step(current, lib);
+	while (!previous.insert(next).second) {
+		current = next;
+		next = program_step(current, lib);
 	}
-	return prog;
+	return current;
 }
 
 } // namespace idni::tau
