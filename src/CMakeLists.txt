@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(CMAKE_VERBOSE_MAKEFILE true)
 
-project(tau-lang)
-
 if(CMAKE_CONFIGURATION_TYPES)
 	set(CMAKE_CONFIGURATION_TYPES Debug Release)
 	set(CMAKE_CONFIGURATION_TYPES
