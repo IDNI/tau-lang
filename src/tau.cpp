@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-// TODO move to unit tests
+// TODO move to unit tests or delete it
 //#include "barr.h"
 //#include "out.h"
 //#include "anf.h"

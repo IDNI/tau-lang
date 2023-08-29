@@ -225,6 +225,8 @@ TEST_SUITE("map_transformer") {
 	}
 }
 
+// TODO (LOW) add tests for replace_node_transformer
+
 TEST_SUITE("replace_transformer") {
 
 	TEST_CASE("replace_transformer: given a simple tree and a visitor, it returns "

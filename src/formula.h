@@ -151,7 +151,7 @@ std::optional<std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>>> get_pair(cons
 
 // apply the given callback if the value of the node is a callback
 //
-// TODO convert to a const static predicate and change all the code accordingly
+// TODO convert to a const static applier and change all the code accordingly
 template <typename... BAs>
 struct callback_applier {
 

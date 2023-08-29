@@ -32,11 +32,11 @@
 
 namespace idni::rewriter {
 
-// IDEA This is very similar to idni::forest<...>::tree, but it
+// IDEA this is very similar to idni::forest<...>::tree, but it
 // also defines equality operators and ordering (important during hashing).
 // Both notions could be unified if we keep those operators defined.
 
-// TODO make make_node a friend function and the constructor private. Right now
+// IDEA make make_node a friend function and the constructor private. Right now
 // it is public to easy the construction of the tree during testing, but it is 
 // not really needed.
 
@@ -656,7 +656,8 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 // TODO (MEDIUM) add replace function that takes a node, a substitute and a root
 // node and returns a new node with the substitute in place of the node. 
 
-// TODO (MEDIUM) add a reducer/evaluator that takes a tree and a function and
+
+// TODO (MEDIUM) add a reducer or evaluator that takes a tree and a function and
 // returns a value of a given type.
 
 } // namespace idni::rewriter

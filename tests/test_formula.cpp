@@ -23,21 +23,21 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TODO write tests for is_nonterminal_predicate
-// TODO write tests for is_ignore_predicate
-// TODO write tests for is_capture_predicate
+// TODO (HIGH) write tests for factory_binder
+// TODO (HIGH) write tests for resolve_type
 
 // TODO (MEDIUM) write tests for get
 // TODO (MEDIUM) write tests for get_children
 // TODO (MEDIUM) write tests for get_child
 
 // TODO (HIGH) write tests for callback_applier
-// TODO write tests for tauify
-// TODO write tests for stringify
-// TODO write tests for make_string_with_skip
-// TODO write tests for make_string
-// TODO write tests for operator<<(ostream, sp_tau_node<...>)
-// TODO write tests for operator<<(ostream, sp_tau_source_node)
+TEST_SUITE("callback_applier") {
+
+
+
+}
+
+
 
 TEST_SUITE("bind") {
 
@@ -83,27 +83,21 @@ TEST_SUITE("bind") {
 	}
 }
 
-// TODO (HIGH) write tests for factory_binder
-// TODO write tests for is_unresolved_predicate
-// TODO write tests for is_resolved_predicate
-// TODO write tests for is_unresolved
-// TODO (HIGH) write tests for resolve_type
-// TODO write tests for resolve_types (with rule)
-// TODO write tests for resolve_types (with rules)
-
-// TODO write tests for make rule
+// TODO (HIGH) add more unit tests for make_library
 TEST_SUITE("make_library") {
 
 	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
 
-	TEST_CASE("one_rule") {
+	TEST_CASE("make_library: one rule case") {
 		auto src = make_tau_source(sample);
 		auto lib = make_library<Bool>(src);
-		CHECK( true );
+		// FIXME add sensible checks
+		CHECK( true ); 
 	}
-	// TODO add more unit tests
+
 }
 
+// TODO (MEDIUM) write tests for make_formula_using_bindings
 TEST_SUITE("make_formula_using_bindings") {
 
 	/* static constexpr char* sample =	
@@ -117,14 +111,26 @@ TEST_SUITE("make_formula_using_bindings") {
 		CHECK( true );
 	}*/
 
-	// TODO add more unit tests
 }
 
-// TODO write tests for tau_apply (with rule)
-// TODO write tests for tau_apply (with rules)
-// TODO write tests for make_tau in the future
+// TODO (MEDIUM) write tests for make_formula_using_factory
+TEST_SUITE("make_formula_using_factory") {
+
+	/* static constexpr char* sample =	
+		"bf_neg ( bf_neg ( $X ) ) = $X ."
+		" { 0 } .";
+
+	TEST_CASE("one_rule_n_main") {
+		auto src = make_tau_source(sample);
+		bindings<Bool> bs;
+		auto lib = make_formula_using_bindings<Bool>(src, bs);
+		CHECK( true );
+	}*/
+
+}
 
 
+// TODO (HIGH) add more unit tests for make_tau_source
 TEST_SUITE("make_tau_source") {
 
 	/* static constexpr char* sample =	
@@ -135,7 +141,26 @@ TEST_SUITE("make_tau_source") {
 		CHECK( true );
 	}*/
 
-	// TODO add more unit tests
 }
+
+// TODO write tests for tau_apply (with rule)
+// TODO write tests for tau_apply (with rules)
+// TODO write tests for make_tau in the future
+// TODO write tests for is_nonterminal_predicate
+// TODO write tests for is_ignore_predicate
+// TODO write tests for is_capture_predicate
+// TODO write tests for tauify
+// TODO write tests for stringify
+// TODO write tests for make_string_with_skip
+// TODO write tests for make_string
+// TODO write tests for operator<<(ostream, sp_tau_node<...>)
+// TODO write tests for operator<<(ostream, sp_tau_source_node)
+// TODO write tests for is_unresolved_predicate
+// TODO write tests for is_resolved_predicate
+// TODO write tests for is_unresolved
+// TODO write tests for resolve_types (with rule)
+// TODO write tests for resolve_types (with rules)
+// TODO write tests for make rule
+
 
 
