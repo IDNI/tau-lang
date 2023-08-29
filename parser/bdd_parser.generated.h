@@ -59,10 +59,11 @@
 // 
 // # bdd
 // bdd				=> bdd_and | bdd_neg | bdd_xor | bdd_or | var | T | F.
-// bdd_and			=> open_parenthesis bdd bdd_and_sym bdd close_parenthesis.
-// bdd_or			=> open_parenthesis bdd bdd_or_sym close_parenthesis.
-// bdd_xor			=> open_parenthesis bdd bdd_xor_sym ws bdd close_parenthesis.
-// bdd_neg			=> bdd_neg_sym open_parenthesis bdd close_parenthesis.
+// bdd_and			=> open_parenthesis bdd_arg bdd_and_sym bdd_arg close_parenthesis.
+// bdd_or			=> open_parenthesis bdd_arg bdd_or_sym bdd_arg close_parenthesis.
+// bdd_xor			=> open_parenthesis bdd_arg bdd_xor_sym bdd_arg close_parenthesis.
+// bdd_neg			=> bdd_neg_sym open_parenthesis bdd_arg close_parenthesis.
+// bdd_arg 		=> bdd.
 // 
 // # bdd_op_sym
 // bdd_and_sym		=> ws "bdd_and" ws.
@@ -86,7 +87,7 @@
 struct bdd_parser {
 	bdd_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(59), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(60), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
 		const char* data, size_t size = 0,
 		char eof = std::char_traits<char>::eof())
@@ -110,7 +111,8 @@ struct bdd_parser {
 			q_bqstr, char_punct, _Rchar_punct_1, _Rchar_punct_2, _Rchar_punct_3, char0, char_, string_char, bqstring_char, chars, 
 			_Rchars_4, _Rchars_5, char_class, equality, nequality, dot, open_parenthesis, close_parenthesis, open_bracket, close_bracket, 
 			open_brace, close_brace, less_than, greater_than, minus, plus, colon, var, bdd, bdd_and, 
-			bdd_neg, bdd_xor, bdd_or, T, F, bdd_and_sym, bdd_or_sym, bdd_xor_sym, bdd_neg_sym, start, 
+			bdd_neg, bdd_xor, bdd_or, T, F, bdd_arg, bdd_and_sym, bdd_or_sym, bdd_xor_sym, bdd_neg_sym, 
+			start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -139,7 +141,8 @@ private:
 			"q_bqstr", "char_punct", "_Rchar_punct_1", "_Rchar_punct_2", "_Rchar_punct_3", "char0", "char_", "string_char", "bqstring_char", "chars", 
 			"_Rchars_4", "_Rchars_5", "char_class", "equality", "nequality", "dot", "open_parenthesis", "close_parenthesis", "open_bracket", "close_bracket", 
 			"open_brace", "close_brace", "less_than", "greater_than", "minus", "plus", "colon", "var", "bdd", "bdd_and", 
-			"bdd_neg", "bdd_xor", "bdd_or", "T", "F", "bdd_and_sym", "bdd_or_sym", "bdd_xor_sym", "bdd_neg_sym", "start", 
+			"bdd_neg", "bdd_xor", "bdd_or", "T", "F", "bdd_arg", "bdd_and_sym", "bdd_or_sym", "bdd_xor_sym", "bdd_neg_sym", 
+			"start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -239,17 +242,18 @@ private:
 		q(nt(48), (nt(52)));
 		q(nt(48), (nt(53)));
 		q(nt(48), (nt(54)));
-		q(nt(49), (nt(36)+nt(48)+nt(55)+nt(48)+nt(37)));
-		q(nt(52), (nt(36)+nt(48)+nt(56)+nt(37)));
-		q(nt(51), (nt(36)+nt(48)+nt(57)+nt(13)+nt(48)+nt(37)));
-		q(nt(50), (nt(58)+nt(36)+nt(48)+nt(37)));
-		q(nt(55), (nt(13)+t(16)+t(21)+t(21)+t(44)+t(10)+t(12)+t(21)+nt(13)));
-		q(nt(56), (nt(13)+t(16)+t(21)+t(21)+t(44)+t(25)+t(20)+nt(13)));
-		q(nt(57), (nt(13)+t(16)+t(21)+t(21)+t(44)+t(5)+t(25)+t(20)+nt(13)));
-		q(nt(58), (nt(13)+t(16)+t(21)+t(21)+t(44)+t(12)+t(24)+t(23)+nt(13)));
+		q(nt(49), (nt(36)+nt(55)+nt(56)+nt(55)+nt(37)));
+		q(nt(52), (nt(36)+nt(55)+nt(57)+nt(55)+nt(37)));
+		q(nt(51), (nt(36)+nt(55)+nt(58)+nt(55)+nt(37)));
+		q(nt(50), (nt(59)+nt(36)+nt(55)+nt(37)));
+		q(nt(55), (nt(48)));
+		q(nt(56), (nt(13)+t(16)+t(21)+t(21)+t(44)+t(10)+t(12)+t(21)+nt(13)));
+		q(nt(57), (nt(13)+t(16)+t(21)+t(21)+t(44)+t(25)+t(20)+nt(13)));
+		q(nt(58), (nt(13)+t(16)+t(21)+t(21)+t(44)+t(5)+t(25)+t(20)+nt(13)));
+		q(nt(59), (nt(13)+t(16)+t(21)+t(21)+t(44)+t(12)+t(24)+t(23)+nt(13)));
 		q(nt(53), (nt(13)+t(45)+nt(13)));
 		q(nt(54), (nt(13)+t(46)+nt(13)));
-		q(nt(59), (nt(48)));
+		q(nt(60), (nt(48)));
 		return q;
 	}
 };
