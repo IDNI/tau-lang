@@ -428,6 +428,10 @@ template<typename B> B get_one() requires is_sp<B> {
 	return B::element_type::one();
 }
 
+template<typename B> B get_zero() requires is_sp<B> {
+	return B::element_type::zero();
+}
+
 /*template<typename B> void bdd_init() requires is_sp<B, o> {
 	if (!bdd<B, o>::V.empty()) return;
 #ifdef DEBUG
