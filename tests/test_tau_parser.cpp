@@ -14,7 +14,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "../src/doctest.h"
-#include "../src/program.h"
+#include "../src/formula.h"
 #include "../src/bool.h"
 
 using namespace idni::rewriter;

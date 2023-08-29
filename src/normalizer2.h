@@ -18,7 +18,7 @@
 #include <optional>
 
 #include "rewriting.h"
-#include "program.h"
+#include "formula.h"
 
 namespace idni::tau {
 
@@ -126,7 +126,7 @@ template<typename binder_t, typename... BAs>
 formula<BAs...> normalizer(std::string source, bindings<BAs...> bs) {
 	auto prog_source = make_tau_source(source);
 	auto sys_source = make_tau_source(system);
-	// TODO (HIGH) replace for appropriate binding strategy
+// TODO (HIGH) replace for appropriate binding strategy
 	auto prog = make_formula_using_bindings(prog_source, bs);
 	auto lib = make_library<BAs...>(sys_source);
 	std::set<formula<BAs...>, prog_less<BAs...>> previous;

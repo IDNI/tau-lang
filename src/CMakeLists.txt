@@ -24,20 +24,17 @@ set(TAU_HEADERS
 	defs.h
 	bool.h
 	rewriting.h
-#	rewriting2.h
 	dict.h
 	msba.h
 	normalizer.h
 	normalizer2.h
 	out.h
-	program.h
+	formula.h
 	seq.h
-#	tree.h
 )
 
 set(TAU_SOURCES
 	dict.cpp
-#	program.cpp
 )
 
 set(CLI_SOURCES tau.cpp)
