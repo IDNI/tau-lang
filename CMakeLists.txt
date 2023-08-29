@@ -8,7 +8,7 @@ set(CMAKE_VERBOSE_MAKEFILE true CACHE BOOL "")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
 set(USED_CMAKE_GENERATOR "${CMAKE_GENERATOR}" CACHE STRING "Expose CMAKE_GENERATOR" FORCE)
 if (USED_CMAKE_GENERATOR MATCHES "Ninja")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif ()
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -17,7 +17,7 @@ endif ()
 
 include(tau-common)
 
-project(tau)
+project(tau_lang)
 add_subdirectory("src")
 add_subdirectory("examples")
 
