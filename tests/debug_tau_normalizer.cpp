@@ -21,18 +21,36 @@
 using namespace std;
 using namespace idni::tau;
 
-using bdd_sym = idni::lit<char, char>;
-using sp_bdd_node = sp_node<bdd_sym>;
+namespace idni::tau::debug_normalization {
 
-sp_bdd_node make_bdd_from_string(const std::string source) {
-	using parse_lit = idni::lit<char, char>;
-	using parse_location = std::array<size_t, 2UL>;
-	using parse_symbol = std::pair<parse_lit, parse_location>;
+using bdd_source_sym = idni::lit<char, char>;
+using bdd_source_node = tau_source_node;
+using sp_bdd_source_node = sp_tau_source_node;
+using bdd_sym = tau_sym<hbdd<Bool>>;
+using bdd_node = tau_node<hbdd<Bool>>;
+using sp_bdd_node = sp_tau_node<hbdd<Bool>>;
 
-	return make_node_from_string<bdd_parser, decltype(drop_location<parse_symbol, bdd_sym>),
-			parse_symbol, bdd_sym>(drop_location<parse_symbol, bdd_sym>, 
-			source);
-}
+struct bdd_var_binder {
+
+	sp_tau_node<hbdd<Bool>> bind(const sp_tau_node<hbdd<Bool>>& n) const {
+		auto bn = make_string_with_skip<
+			decltype(tau_node_terminal_extractor<hbdd<Bool>>),
+			decltype(not_whitespace_predicate<hbdd<Bool>>), 
+			sp_tau_node<hbdd<Bool>>>(tau_node_terminal_extractor<hbdd<Bool>>, 
+				not_whitespace_predicate<hbdd<Bool>>, n);
+		if (auto s = bs.find(bn); s != bs.end()) {
+			tau_sym<hbdd<Bool>> ts = s->second;
+			return make_node<tau_sym<hbdd<Bool>>>(ts, {});
+		}
+		auto idx = bs.emplace(bn, ++index).first->second;
+		return make_node<tau_sym<hbdd<Bool>>>(bdd_handle<Bool>::bit(true, idx), {});
+	}
+
+	static size_t index;
+	static std::map<std::string, size_t> bs;
+};
+
+} // namespace idni::debug_normalization
 
 int main(int argc, char** argv) {
 	if (argc != 2) return cerr << argv[0] << ": requires 1 argument: formula file\n", 1;
@@ -41,4 +59,3 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-// TODO:HIGH add bdd factory for bindings
