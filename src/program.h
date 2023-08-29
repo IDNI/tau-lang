@@ -103,15 +103,15 @@ struct tau {
 };
 
 template<typename... BAs>
-auto is_non_terminal_predicate = [](const sp_tau_node<BAs...>& n) {
+auto is_nonterminal_predicate = [](const sp_tau_node<BAs...>& n) {
 		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
 			&& get<0>(n->value).nt();
 };
 
 // check if the node is the given non-terminal
 template <size_t nt, typename...BAs>
-auto is_tau_node = [](const sp_tau_node<BAs...>& n) { 
-	return is_non_terminal_predicate<BAs...>(n) && get<0>(n->value).n() == nt;
+auto is_nonterminal_tau_node = [](const sp_tau_node<BAs...>& n) { 
+	return is_nonterminal_predicate<BAs...>(n) && get<0>(n->value).n() == nt;
 };
 
 // check if the node is the given non-terminal
@@ -121,14 +121,14 @@ auto is_tau_source = [](const sp_tau_source_node& n) { return n->value() && n->v
 // gets the top nodes of the given non terminal type
 template <size_t nt, typename... BAs>
 std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
-	return select_top(n, is_tau_node<nt, BAs...>);
+	return select_top(n, is_nonterminal_tau_node<nt, BAs...>);
 }
 
 // gets the children of the top nodes of the given non terminal type
 template <size_t nt, typename... BAs>
 std::vector<sp_tau_node<BAs...>> get_children(const sp_tau_node<BAs...>& n) {
 	std::vector<sp_tau_node<BAs...>> result;
-	for (auto& c : select_top(n, is_tau_node<nt, BAs...>)) result.push_back(c->child[0]);
+	for (auto& c : select_top(n, is_nonterminal_tau_node<nt, BAs...>)) result.push_back(c->child[0]);
 	return result;
 }
 
@@ -256,7 +256,7 @@ struct bind_transformer {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
 		if (auto it = changes.find(n); it != changes.end()) return it->second;
-		if (is_tau_node<tau_parser::binding, BAs...>(n)) 
+		if (is_nonterminal_tau_node<tau_parser::binding, BAs...>(n)) 
 			return changes.emplace(n, binder.bind(n)).first->second;
 		bool changed = false;
 		std::vector<sp_tau_node<BAs...>> child;
@@ -313,7 +313,7 @@ struct factory_binder {
 	factory_binder(const factory_t& factory) : factory(factory) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		if(auto type = find_top(n, is_tau_node<tau_parser::type, BAs...>); type)
+		if(auto type = find_top(n, is_nonterminal_tau_node<tau_parser::type, BAs...>); type)
 			// the factory take two arguments, the first is the type and the 
 			// second is the node representing the constant.
 			return factory.build(type, n);
@@ -330,7 +330,7 @@ template<typename... BAs>
 struct is_unresolved_predicate {
 	
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		return is_tau_node<tau_parser::type, BAs...>(n) && make_string(n).empty();
+		return is_nonterminal_tau_node<tau_parser::type, BAs...>(n) && make_string(n).empty();
 	}
 };
 
@@ -341,7 +341,7 @@ template<typename... BAs>
 struct is_resolved_predicate {
 	
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		return is_tau_node<tau_parser::type, BAs...>(n) || !make_string(n).empty();
+		return is_nonterminal_tau_node<tau_parser::type, BAs...>(n) || !make_string(n).empty();
 	}
 };
 
@@ -362,7 +362,7 @@ std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
 template<typename... BAs>
 sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 	// should not be call with other that bfs.
-	// if (!is_tau_node<tau_parser::bf, BAs...>(n)) return n;
+	// if (!is_nonterminal_tau_node<tau_parser::bf, BAs...>(n)) return n;
 	if (auto unresolved = is_unresolved(n); unresolved) {
 		// always we have type information or it is not needed at all
 		auto type = find_bottom(n, is_resolved_predicate<BAs...>()).value();
@@ -380,7 +380,7 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 template<typename binder_t, typename... BAs>
 sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	for (const auto& bf: select_top(source, is_tau_node<tau_parser::bf, BAs...>)) {
+	for (const auto& bf: select_top(source, is_nonterminal_tau_node<tau_parser::bf, BAs...>)) {
 		if (auto rbf = resolve_type(bf); rbf != bf) changes[bf] = rbf;
 	}
 	replace_transformer<sp_tau_node<BAs...>> rt(changes);
@@ -434,7 +434,7 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
 	auto lib = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	rules<BAs...> rs;
-	for (auto& r: select_top(lib, is_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(lib, is_nonterminal_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs };
 }
 
@@ -458,10 +458,10 @@ template<typename binder_t, typename... BAs>
 formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const binder_t& binder) {
 	tauify<BAs...> tf;
 	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
-	auto m = find_top(src, is_tau_node<tau_parser::main, BAs...>).value();
+	auto m = find_top(src, is_nonterminal_tau_node<tau_parser::main, BAs...>).value();
 	auto statement = post_order_traverser<binder_t, decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(binder, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
-	for (auto& r: select_top(src, is_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(src, is_nonterminal_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs, statement };
 }
 
@@ -476,7 +476,7 @@ sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;
-	for (auto& r : rs) nn = tau_apply(r, nn, is_tau_node<::tau_parser::ignore, BAs...>, is_tau_node<::tau_parser::capture, BAs...>);
+	for (auto& r : rs) nn = tau_apply(r, nn, is_nonterminal_tau_node<::tau_parser::ignore, BAs...>, is_nonterminal_tau_node<::tau_parser::capture, BAs...>);
 	return nn;
 }
 

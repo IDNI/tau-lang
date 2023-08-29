@@ -23,7 +23,7 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TODO write tests for is_non_terminal_predicate
+// TODO write tests for is_nonterminal_predicate
 // TODO write tests for is_ignore_predicate
 // TODO write tests for is_capture_predicate
 
