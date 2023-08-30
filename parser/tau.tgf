@@ -71,7 +71,7 @@ num					=> digit+.
 # variables 
 variable		=> var | ignore | capture.
 
-# QUESTION dows timed variables have one index or several?
+# QUESTION does timed variables have one index or several?
 timed			=> ( var_in| var_out) indexes. 
 offset			=> variable | variable minus num.
 ignore 			=> '_'.
@@ -177,7 +177,7 @@ bf_neg_cb	=> neg_cb_sym bf_cb_arg.
 bf_subs_cb	=> subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
 
 # bf_bultin_arg
-bf_cb_arg	=> capture | T | F.
+bf_cb_arg	=> capture | binding.
 
 # bf_cb_syms
 bf_and_cb_sym	=> ws "bf_and_cb" ws.
