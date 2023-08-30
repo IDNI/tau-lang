@@ -182,7 +182,7 @@
 // bf_subs_cb	=> subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
 // 
 // # bf_bultin_arg
-// bf_cb_arg	=> capture | T | F.
+// bf_cb_arg	=> capture | binding.
 // 
 // # bf_cb_syms
 // bf_and_cb_sym	=> ws "bf_and_cb" ws.
@@ -512,8 +512,7 @@ private:
 		q(nt(129), (nt(142)+nt(138)));
 		q(nt(130), (nt(143)+nt(138)+nt(138)+nt(138)));
 		q(nt(138), (nt(58)));
-		q(nt(138), (nt(79)));
-		q(nt(138), (nt(123)));
+		q(nt(138), (nt(125)));
 		q(nt(139), (nt(13)+t(16)+t(26)+t(43)+t(10)+t(12)+t(21)+t(43)+t(18)+t(16)+nt(13)));
 		q(nt(140), (nt(13)+t(16)+t(26)+t(43)+t(25)+t(20)+t(43)+t(18)+t(16)+nt(13)));
 		q(nt(141), (nt(13)+t(16)+t(26)+t(43)+t(5)+t(25)+t(20)+t(43)+t(18)+t(16)+nt(13)));
