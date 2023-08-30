@@ -364,11 +364,11 @@ sp_node<symbol_t> trim_top(const sp_node<symbol_t>& input, predicate_t& query) {
 }
 
 // select all top nodes that satisfy a predicate and return them.
-template <typename predicate_t, typename symbol_t>
-std::vector<sp_node<symbol_t>> select_top(const sp_node<symbol_t>& input, predicate_t& query) {
-	std::vector<sp_node<symbol_t>> selected;
-	select_top_predicate<predicate_t, sp_node<symbol_t>> select(query, selected);
-	post_order_traverser<decltype(identity<sp_node<symbol_t>>), decltype(select), sp_node<symbol_t>>(identity<sp_node<symbol_t>>, select)(input);
+template <typename predicate_t, typename node_t>
+std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
+	std::vector<node_t> selected;
+	select_top_predicate<predicate_t, node_t> select(query, selected);
+	post_order_traverser<decltype(identity<node_t>), decltype(select), node_t>(identity<node_t>, select)(input);
 	return selected;
 }
 
