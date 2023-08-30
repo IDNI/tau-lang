@@ -30,24 +30,27 @@ using bdd_sym = tau_sym<hbdd<Bool>>;
 using bdd_node = tau_node<hbdd<Bool>>;
 using sp_bdd_node = sp_tau_node<hbdd<Bool>>;
 
-struct bdd_var_binder {
-
-	sp_tau_node<hbdd<Bool>> bind(const sp_tau_node<hbdd<Bool>>& n) const {
-		auto bn = make_string_with_skip<
+struct bdd_factory {
+	
+	sp_tau_node<hbdd<Bool>> build(const sp_tau_node<hbdd<Bool>>& type, const sp_tau_node<hbdd<Bool>> n) {
+		auto string_type = make_string_with_skip<
 			decltype(tau_node_terminal_extractor<hbdd<Bool>>),
 			decltype(not_whitespace_predicate<hbdd<Bool>>), 
 			sp_tau_node<hbdd<Bool>>>(tau_node_terminal_extractor<hbdd<Bool>>, 
-				not_whitespace_predicate<hbdd<Bool>>, n);
-		if (auto s = bs.find(bn); s != bs.end()) {
-			tau_sym<hbdd<Bool>> ts = s->second;
-			return make_node<tau_sym<hbdd<Bool>>>(ts, {});
-		}
-		auto idx = bs.emplace(bn, ++index).first->second;
-		return make_node<tau_sym<hbdd<Bool>>>(bdd_handle<Bool>::bit(true, idx), {});
+			not_whitespace_predicate<hbdd<Bool>>, type);
+		if (string_type != "bdd") return n;
+		auto var = make_string_with_skip<
+			decltype(tau_node_terminal_extractor<hbdd<Bool>>),
+			decltype(not_whitespace_predicate<hbdd<Bool>>), 
+			sp_tau_node<hbdd<Bool>>>(tau_node_terminal_extractor<hbdd<Bool>>, 
+			not_whitespace_predicate<hbdd<Bool>>, type);
+		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
+		auto nn =  make_node<tau_sym<hbdd<Bool>>>(bdd_handle<Bool>::bit(true, index++), {});
+		return cache.emplace(var, nn).first->second;
 	}
 
 	static size_t index;
-	static std::map<std::string, size_t> bs;
+	static std::map<std::string, sp_tau_node<hbdd<Bool>>> cache;
 };
 
 } // namespace idni::debug_normalization
