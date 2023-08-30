@@ -356,11 +356,11 @@ struct neg_predicate {
 };
 
 // delete all top nodes that satisfy a predicate.
-template <typename predicate_t, typename symbol_t>
-sp_node<symbol_t> trim_top(const sp_node<symbol_t>& input, predicate_t& query) {
+template <typename predicate_t, typename symbol_t, typename node_t = sp_node<symbol_t>>
+node_t trim_top(const node_t& input, predicate_t& query) {
 	neg_predicate neg(query);
-	map_transformer<decltype(identity<symbol_t>), sp_node<symbol_t>> map(identity<symbol_t>);
-	return post_order_traverser<decltype(map), decltype(neg), sp_node<symbol_t>>(map, neg)(input);
+	map_transformer<decltype(identity<symbol_t>), node_t> map(identity<symbol_t>);
+	return post_order_traverser<decltype(map), decltype(neg), node_t>(map, neg)(input);
 }
 
 // select all top nodes that satisfy a predicate and return them.
@@ -373,21 +373,21 @@ std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 }
 
 // select all top nodes that satisfy a predicate and return them.
-template <typename predicate_t, typename symbol_t>
-std::vector<sp_node<symbol_t>> select_all(const sp_node<symbol_t>& input, predicate_t& query) {
-	std::vector<sp_node<symbol_t>> selected;
-	select_all_predicate<predicate_t, sp_node<symbol_t>> select(query, selected);
-	post_order_traverser<decltype(identity<sp_node<symbol_t>>), decltype(select), sp_node<symbol_t>>(identity<sp_node<symbol_t>>, select)(input);
+template <typename predicate_t, typename node_t>
+std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
+	std::vector<node_t> selected;
+	select_all_predicate<predicate_t, node_t> select(query, selected);
+	post_order_traverser<decltype(identity<node_t>), decltype(select), node_t>(identity<node_t>, select)(input);
 	return selected;
 }
 
 // find the first node that satisfy a predicate and return it.
-template <typename predicate_t, typename symbol_t>
-std::optional<sp_node<symbol_t>> find_top(const sp_node<symbol_t>& input, 
+template <typename predicate_t, typename node_t>
+std::optional<node_t> find_top(const node_t& input, 
 		predicate_t& query) {
-	std::optional<sp_node<symbol_t>> found;
-	auto find_top = find_top_predicate<predicate_t, sp_node<symbol_t>>(query, found);
-	post_order_traverser<decltype(identity<sp_node<symbol_t>>), decltype(find_top), sp_node<symbol_t>>(identity<sp_node<symbol_t>>, find_top)(input);
+	std::optional<node_t> found;
+	auto find_top = find_top_predicate<predicate_t, node_t>(query, found);
+	post_order_traverser<decltype(identity<node_t>), decltype(find_top), node_t>(identity<node_t>, find_top)(input);
 	return found;
 }
 
