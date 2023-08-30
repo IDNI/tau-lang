@@ -258,6 +258,7 @@ struct bind_transformer {
 		if (auto it = changes.find(n); it != changes.end()) return it->second;
 		if (is_nonterminal_tau_node<tau_parser::binding, BAs...>(n)) 
 			return changes.emplace(n, binder.bind(n)).first->second;
+		// IDEA maybe we could use the replace transform instead of having the following code
 		bool changed = false;
 		std::vector<sp_tau_node<BAs...>> child;
 		for (auto& c : n->child) 
@@ -289,6 +290,7 @@ struct name_binder {
 	name_binder(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
+		// FIXME check if the node is a named binding one
 		auto bn = make_string_with_skip<
 			decltype(tau_node_terminal_extractor<BAs...>),
 			decltype(not_whitespace_predicate<BAs...>), 
@@ -313,6 +315,7 @@ struct factory_binder {
 	factory_binder(const factory_t& factory) : factory(factory) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
+		// FIXME check that the node is a factory binding one
 		if(auto type = find_top(n, is_nonterminal_tau_node<tau_parser::type, BAs...>); type)
 			// the factory take two arguments, the first is the type and the 
 			// second is the node representing the constant.
