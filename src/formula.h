@@ -138,6 +138,12 @@ bool is_terminal(const sp_tau_node<BAs...>& n) {
 	return is_terminal_predicate<BAs...>(n) && get<tau_source_sym>(n->value).n() == c;
 };
 
+//
+// functions to traverse the tree according to the specified non terminals
+// and collect the corresponding nodes
+//
+//
+
 // traverse the tree, depth first, according to the specified non 
 // terminals and return, if possible, the required non terminal node
 template <size_t nt, typename... BAs>
@@ -284,38 +290,6 @@ auto get_bas(const sp_tau_node<BAs...>& n) {
 	return get_optionals<nts..., ba_extractor_t<BAs...>, BAs...>(ba_extractor<BAs...>, n);
 }
 
-// TODO remove get, get_children, get_child and get_pair and use the previous methods
-
-// gets the top nodes of the given non terminal type
-template <size_t nt, typename... BAs>
-std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
-	return select_top(n, is_non_terminal<nt, BAs...>);
-}
-
-// gets the children of the top nodes of the given non terminal type
-template <size_t nt, typename... BAs>
-std::vector<sp_tau_node<BAs...>> get_children(const sp_tau_node<BAs...>& n) {
-	std::vector<sp_tau_node<BAs...>> result;
-	for (auto& c : select_top(n, is_non_terminal<nt, BAs...>)) result.push_back(c->child[0]);
-	return result;
-}
-
-// gets the only child of the top nodes of the given non terminal type
-template <size_t nt, typename... BAs>
-std::optional<sp_tau_node<BAs...>> get_child(const sp_tau_node<BAs...>& n) {
-	auto children = get_children<nt, BAs...>(n);
-	return (children.size() == 1) ? std::optional(std::move(children[0])) : std::nullopt;
-}
-
-// gets a pair of children of the top nodes of the corresponding non terminal type.
-// Its mainly used to get the left and right children of a binary operator,
-// equality, implication, etc.
-template<size_t nt_l, size_t nt_r, typename... BAs>
-std::optional<std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>>> get_pair(const sp_tau_node<BAs...>& n) {
-	auto l = get_child<nt_l, BAs...>(n);
-	auto r = get_child<nt_r, BAs...>(n);
-	return (l && r) ? std::optional(std::move(std::make_pair(*l, *r))) : std::nullopt;
-}
 
 // apply the given callback if the value of the node is a callback
 //
@@ -365,6 +339,7 @@ struct tauify {
 	}
 };
 
+// TODO remove this extractor and use a previous one
 // extracts terminal from sp_tau_source_node
 template <typename... BAs>
 auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
@@ -375,6 +350,7 @@ auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::opti
 	return std::optional<char>();
 };
 
+// TODO remove this extractor and use a previous one
 // extracts terminal from sp_tau_source_node
 auto tau_source_terminal_extractor = [](const sp_tau_source_node& n) -> std::optional<char> {
 	if (n->value.nt()&& !(n->value).is_null())
@@ -589,11 +565,11 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	auto rule_type = get<0>(rule->child[0]->value).n();
 	switch(rule_type) {
 		case ::tau_parser::wff_def:
-			return *get_pair<::tau_parser::wff_head, ::tau_parser::wff, BAs...>(rule);
+			return { get_node<::tau_parser::wff_head, BAs...>(rule).value(), get_node<::tau_parser::wff, BAs...>(rule).value() };
 		case ::tau_parser::cbf_def:
-			return *get_pair<::tau_parser::cbf_head, ::tau_parser::cbf, BAs...>(rule);
+			return { get_node<::tau_parser::cbf_head, BAs...>(rule).value(), get_node<::tau_parser::cbf, BAs...>(rule).value() };
 		case ::tau_parser::bf_rule:
-			return *get_pair<::tau_parser::bf, ::tau_parser::bf, BAs...>(rule);
+			return { get_node<::tau_parser::bf, BAs...>(rule).value(), get_node<::tau_parser::bf, BAs...>(rule).value() };
 		default:
 			assert(false); // error in grammar or parser
 	} 
