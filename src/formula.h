@@ -19,6 +19,10 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <optional>
+#include <algorithm>
+#include <functional>
+#include <ranges>
 
 //#include "tree.h"
 #include "bool.h"
@@ -28,6 +32,10 @@
 using namespace idni::rewriter;
 
 namespace idni::tau {
+
+// 
+// types related to the tau language
+// 
 
 // tau_source_node is the type of nodes we use to represent get from parsing tau language
 using tau_source_sym = idni::lit<char, char>;
@@ -102,33 +110,193 @@ struct tau {
 	}
 };
 
+//
+// predicates and functions related to the tau language
+//
+
+// check if a node is a non terminal
 template<typename... BAs>
-auto is_nonterminal_predicate = [](const sp_tau_node<BAs...>& n) {
-		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
-			&& get<0>(n->value).nt();
-};
+bool is_non_terminal(const sp_tau_node<BAs...>& n) {
+	return std::holds_alternative<tau_source_sym>(n->value) && get<tau_source_sym>(n->value).nt();
+}
 
 // check if the node is the given non-terminal
 template <size_t nt, typename...BAs>
-auto is_nonterminal_tau_node = [](const sp_tau_node<BAs...>& n) { 
-	return is_nonterminal_predicate<BAs...>(n) && get<0>(n->value).n() == nt;
+bool is_non_terminal(const sp_tau_node<BAs...>& n) { 
+	return is_non_terminal<BAs...>(n) && get<tau_source_sym>(n->value).n() == nt;
+}
+
+// check if a node is a terminal
+template<typename... BAs>
+bool is_terminal(const sp_tau_node<BAs...>& n) {
+	return std::holds_alternative<tau_source_sym>(n->value) && !get<tau_source_sym>(n->value).nt();
 };
 
 // check if the node is the given non-terminal
-template <size_t nt>
-auto is_tau_source = [](const sp_tau_source_node& n) { return n->value() && n->value.n() == nt; };
+template <char c, typename...BAs>
+bool is_terminal(const sp_tau_node<BAs...>& n) { 
+	return is_terminal_predicate<BAs...>(n) && get<tau_source_sym>(n->value).n() == c;
+};
+
+// traverse the tree, depth first, according to the specified non 
+// terminals and return, if possible, the required non terminal node
+template <size_t nt, typename... BAs>
+std::optional<sp_tau_node<BAs...>> get_node(const sp_tau_node<BAs...>& n) {
+	auto node = n->child 
+		| std::ranges::views::filter(is_non_terminal<nt, BAs...>)
+		| std::ranges::views::take(1);
+	// IDEA maybe use std::ranges::to<...>() when implemented in gcc and clang
+	return std::ranges::empty(node) 
+		? std::optional<sp_tau_node<BAs...>>()
+		: std::optional<sp_tau_node<BAs...>>(*node.begin());
+}
+
+template <size_t first_nt, size_t second_nt, size_t... rest_nts, typename... BAs>
+std::optional<sp_tau_node<BAs...>> get_node(const sp_tau_node<BAs...>& n) {
+	/*auto get_child_node = [](const auto& n) { 
+		return get_node<second_nt, rest_nts..., BAs...>(n); 
+	};*/
+	return get_node<first_nt, BAs...>(n).transform(&get_node<second_nt, rest_nts..., BAs...>);
+}
+
+// traverse the tree, top down, and return all the nodes accessible according
+// to the specified non terminals and return them
+template <size_t nt, typename... BAs>
+auto get_nodes(const sp_tau_node<BAs...>& n) {
+	return n->child | std::ranges::views::filter(is_non_terminal<nt, BAs...>);
+}
+
+template <size_t first_nt, size_t second_nt, size_t... rest_nts, typename... BAs>
+auto get_nodes(const sp_tau_node<BAs...>& n) {
+	/*auto get_child_nodes = [](const auto& n) { 
+		return get_nodes<second_nt, rest_nts..., BAs...>(n); 
+	};*/
+	return n->child 
+		| std::ranges::views::filter(is_non_terminal<first_nt, BAs...>)
+		| std::ranges::transform(&get_nodes<second_nt, rest_nts..., BAs...>)
+		| std::ranges::views::join;
+}
+
+//
+// functions to extract components/informatino from nodes
+//
+//
+
+// extract the value of the node
+template<typename... BAs>
+auto value_extractor = [](const sp_tau_node<BAs...>& n) -> tau_sym<BAs...> {
+	return n->value;
+};
+
+template<typename... BAs>
+using value_extractor_t = decltype(value_extractor<BAs...>);
+
+// returns an optional containing the terminal of the node if possible
+template<typename... BAs>
+auto terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
+	auto value = n->value;
+	if (!std::holds_alternative<tau_sym<BAs...>>(value)
+			|| get<tau_sym<BAs...>>(value).nt() 
+			|| get<tau_sym<BAs...>>(value).is_null()) 
+		return std::optional<char>();
+	return std::optional<char>(get<tau_sym<BAs...>>(value).t());
+};
+
+template<typename... BAs>
+using terminal_extractor_t = decltype(terminal_extractor<BAs...>);
+
+// returns an optional containing the non terminal of the node if possible
+template<typename... BAs>
+auto non_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<size_t> {
+	if (n->value.index() == 0 && get<0>(n->value).nt())
+		return std::optional<size_t>(get<0>(n->value).nt());
+	return std::optional<size_t>();
+};
+
+template<typename... BAs>
+using non_terminal_extractor_t = decltype(terminal_extractor<BAs...>);
+
+// returns an optional containing the bas... of the node if possible
+template<typename... BAs>
+auto ba_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<std::variant<BAs...>> {
+	if (n->value.index() == 1) return std::optional<std::variant<BAs...>>(get<1>(n->value));
+	return std::optional<std::variant<BAs...>>();
+};
+
+template<typename... BAs>
+using ba_extractor_t = decltype(terminal_extractor<BAs...>);
+
+//
+// functions traversing the nodes according to the specified non terminals and
+// extracting the required information from them 
+//
+//
+
+// returns the extracted component/information of the specified node if possible,  
+// the component/information is extracted using the given extractor. 
+template <size_t... nt, typename extractor_t, typename... BAs>
+auto get_optional(const extractor_t& extractor, const sp_tau_node<BAs...>& n) {
+	return get_node<nt..., BAs...>(n).and_then(extractor);
+}
+
+// returns the extracted components/informations of the specified nodes, the 
+// component/information is extracted using the given extractor. 
+template <size_t... nt, typename extractor_t, typename... BAs>
+auto get_optionals(const extractor_t& extractor, const sp_tau_node<BAs...>& n) {
+	return get_nodes<nt..., BAs...>(n) 
+		| std::ranges::views::transform(extractor)
+		| std::ranges::views::filter(&std::optional<tau_sym<BAs...>>::has_value);
+}
+
+// returns the terminal of the specified node if possible
+template <size_t... nts, typename... BAs>
+auto get_terminal(const sp_tau_node<BAs...>& n) {
+	return get_optional<nts..., terminal_extractor_t<BAs...>, BAs...>(terminal_extractor<BAs...>, n);
+}
+
+// returns the terminals of the specified nodes
+template <size_t... nts, typename... BAs>
+auto get_terminals(const sp_tau_node<BAs...>& n) {
+	return get_optionals<nts..., terminal_extractor_t<BAs...>, BAs...>(terminal_extractor<BAs...>, n);
+}
+
+// returns the non terminal of the specified node if possible
+template <size_t... nts, typename... BAs>
+std::optional<char> get_non_terminal(const sp_tau_node<BAs...>& n) {
+	return get_optional<nts..., non_terminal_extractor_t<BAs...>, BAs...>(non_terminal_extractor<BAs...>, n);
+}
+
+// returns the non terminals of the specified nodes
+template <size_t... nts, typename... BAs>
+auto get_non_terminals(const sp_tau_node<BAs...>& n) {
+	return get_optionals<nts..., non_terminal_extractor_t<BAs...>, BAs...>(non_terminal_extractor<BAs...>, n);
+}
+
+// returns the bas... of the specified node if possible
+template <size_t... nts, typename... BAs>
+std::optional<char> get_ba(const sp_tau_node<BAs...>& n) {
+	return get_optional<nts..., ba_extractor_t<BAs...>, BAs...>(ba_extractor<BAs...>, n);
+}
+
+// returns the bas... of the specified nodes
+template <size_t... nts, typename... BAs>
+auto get_bas(const sp_tau_node<BAs...>& n) {
+	return get_optionals<nts..., ba_extractor_t<BAs...>, BAs...>(ba_extractor<BAs...>, n);
+}
+
+// TODO remove get, get_children, get_child and get_pair and use the previous methods
 
 // gets the top nodes of the given non terminal type
 template <size_t nt, typename... BAs>
 std::vector<sp_tau_node<BAs...>> get(const sp_tau_node<BAs...>& n) {
-	return select_top(n, is_nonterminal_tau_node<nt, BAs...>);
+	return select_top(n, is_non_terminal<nt, BAs...>);
 }
 
 // gets the children of the top nodes of the given non terminal type
 template <size_t nt, typename... BAs>
 std::vector<sp_tau_node<BAs...>> get_children(const sp_tau_node<BAs...>& n) {
 	std::vector<sp_tau_node<BAs...>> result;
-	for (auto& c : select_top(n, is_nonterminal_tau_node<nt, BAs...>)) result.push_back(c->child[0]);
+	for (auto& c : select_top(n, is_non_terminal<nt, BAs...>)) result.push_back(c->child[0]);
 	return result;
 }
 
@@ -256,7 +424,7 @@ struct bind_transformer {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
 		if (auto it = changes.find(n); it != changes.end()) return it->second;
-		if (is_nonterminal_tau_node<tau_parser::binding, BAs...>(n)) 
+		if (is_non_terminal<tau_parser::binding, BAs...>(n)) 
 			return changes.emplace(n, binder.bind(n)).first->second;
 		// IDEA maybe we could use the replace transform instead of having the following code
 		bool changed = false;
@@ -316,7 +484,7 @@ struct factory_binder {
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		// FIXME check that the node is a factory binding one
-		if(auto type = find_top(n, is_nonterminal_tau_node<tau_parser::type, BAs...>); type)
+		if(auto type = find_top(n, is_non_terminal<tau_parser::type, BAs...>); type)
 			// the factory take two arguments, the first is the type and the 
 			// second is the node representing the constant.
 			return factory.build(type, n);
@@ -333,7 +501,7 @@ template<typename... BAs>
 struct is_unresolved_predicate {
 	
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		return is_nonterminal_tau_node<tau_parser::type, BAs...>(n) && make_string(n).empty();
+		return is_non_terminal<tau_parser::type, BAs...>(n) && make_string(n).empty();
 	}
 };
 
@@ -344,7 +512,7 @@ template<typename... BAs>
 struct is_resolved_predicate {
 	
 	bool operator()(const sp_tau_node<BAs...>& n) {
-		return is_nonterminal_tau_node<tau_parser::type, BAs...>(n) || !make_string(n).empty();
+		return is_non_terminal<tau_parser::type, BAs...>(n) || !make_string(n).empty();
 	}
 };
 
@@ -365,7 +533,7 @@ std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
 template<typename... BAs>
 sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 	// should not be call with other that bfs.
-	// if (!is_nonterminal_tau_node<tau_parser::bf, BAs...>(n)) return n;
+	// if (!is_non_terminal<tau_parser::bf, BAs...>(n)) return n;
 	if (auto unresolved = is_unresolved(n); unresolved) {
 		// always we have type information or it is not needed at all
 		auto type = find_bottom(n, is_resolved_predicate<BAs...>()).value();
@@ -383,7 +551,7 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 template<typename binder_t, typename... BAs>
 sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	for (const auto& bf: select_top(source, is_nonterminal_tau_node<tau_parser::bf, BAs...>)) {
+	for (const auto& bf: select_top(source, is_non_terminal<tau_parser::bf, BAs...>)) {
 		if (auto rbf = resolve_type(bf); rbf != bf) changes[bf] = rbf;
 	}
 	replace_transformer<sp_tau_node<BAs...>> rt(changes);
@@ -437,7 +605,7 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
 	auto lib = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	rules<BAs...> rs;
-	for (auto& r: select_top(lib, is_nonterminal_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(lib, is_non_terminal<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs };
 }
 
@@ -461,10 +629,10 @@ template<typename binder_t, typename... BAs>
 formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const binder_t& binder) {
 	tauify<BAs...> tf;
 	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
-	auto m = find_top(src, is_nonterminal_tau_node<tau_parser::main, BAs...>).value();
+	auto m = find_top(src, is_non_terminal<tau_parser::main, BAs...>).value();
 	auto statement = post_order_traverser<binder_t, decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(binder, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
-	for (auto& r: select_top(src, is_nonterminal_tau_node<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(src, is_non_terminal<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs, statement };
 }
 
@@ -479,7 +647,7 @@ sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;
-	for (auto& r : rs) nn = tau_apply(r, nn, is_nonterminal_tau_node<::tau_parser::ignore, BAs...>, is_nonterminal_tau_node<::tau_parser::capture, BAs...>);
+	for (auto& r : rs) nn = tau_apply(r, nn, is_non_terminal<::tau_parser::ignore, BAs...>, is_non_terminal<::tau_parser::capture, BAs...>);
 	return nn;
 }
 
