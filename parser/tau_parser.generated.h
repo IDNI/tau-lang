@@ -76,7 +76,7 @@
 // # variables 
 // variable		=> var | ignore | capture.
 // 
-// # QUESTION dows timed variables have one index or several?
+// # QUESTION does timed variables have one index or several?
 // timed			=> ( var_in| var_out) indexes. 
 // offset			=> variable | variable minus num.
 // ignore 			=> '_'.
@@ -194,9 +194,10 @@
 // # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 // main			=> wff dot.
 // rule			=> wff_def | cbf_def | bf_rule.
-// program			=> (rule)* main dot.
-// library 		=> rule+.
-// start			=> program | library.
+// rules			=> null | rule | rule rules.
+// formula			=> rules main dot.
+// library 		=> rule | rule rules.
+// start			=> formula | library.
 // 
 //
 
@@ -208,7 +209,7 @@
 struct tau_parser {
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(152), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(150), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
 		const char* data, size_t size = 0,
 		char eof = std::char_traits<char>::eof())
@@ -241,8 +242,8 @@ struct tau_parser {
 			bf_and, bf_neg, bf_xor, bf_or, bf_all, bf_ex, bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, 
 			bf_all_sym, bf_ex_sym, constant, T, bf_builtin, binding, bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, 
 			bf_subs_cb, source_binding, named_binding, type, source, source0, _Rsource_14, _Rsource_15, bf_cb_arg, bf_and_cb_sym, 
-			bf_or_cb_sym, bf_xor_cb_sym, neg_cb_sym, subs_cb_sym, bf_neg_cb_sym, main, rule, program, _Rprogram_16, _Rprogram_17, 
-			library, _Rlibrary_18, start, 
+			bf_or_cb_sym, bf_xor_cb_sym, neg_cb_sym, subs_cb_sym, bf_neg_cb_sym, main, rule, rules, formula, library, 
+			start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -280,8 +281,8 @@ private:
 			"bf_and", "bf_neg", "bf_xor", "bf_or", "bf_all", "bf_ex", "bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", 
 			"bf_all_sym", "bf_ex_sym", "constant", "T", "bf_builtin", "binding", "bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", 
 			"bf_subs_cb", "source_binding", "named_binding", "type", "source", "source0", "_Rsource_14", "_Rsource_15", "bf_cb_arg", "bf_and_cb_sym", 
-			"bf_or_cb_sym", "bf_xor_cb_sym", "neg_cb_sym", "subs_cb_sym", "bf_neg_cb_sym", "main", "rule", "program", "_Rprogram_16", "_Rprogram_17", 
-			"library", "_Rlibrary_18", "start", 
+			"bf_or_cb_sym", "bf_xor_cb_sym", "neg_cb_sym", "subs_cb_sym", "bf_neg_cb_sym", "main", "rule", "rules", "formula", "library", 
+			"start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -522,15 +523,14 @@ private:
 		q(nt(146), (nt(63)));
 		q(nt(146), (nt(86)));
 		q(nt(146), (nt(107)));
-		q(nt(148), (nt(146)));
-		q(nt(149), (nt(148)+nt(149)));
-		q(nt(149), (nul));
-		q(nt(147), (nt(149)+nt(145)+nt(36)));
-		q(nt(151), (nt(146)));
-		q(nt(151), (nt(146)+nt(151)));
-		q(nt(150), (nt(151)));
-		q(nt(152), (nt(147)));
-		q(nt(152), (nt(150)));
+		q(nt(147), (nt(146)));
+		q(nt(147), (nt(146)+nt(147)));
+		q(nt(147), (nul));
+		q(nt(148), (nt(147)+nt(145)+nt(36)));
+		q(nt(149), (nt(146)));
+		q(nt(149), (nt(146)+nt(147)));
+		q(nt(150), (nt(148)));
+		q(nt(150), (nt(149)));
 		return q;
 	}
 };

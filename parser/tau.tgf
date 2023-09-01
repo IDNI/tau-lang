@@ -189,7 +189,8 @@ subs_cb_sym		=> ws "bf_subs_cb" ws.
 # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 main			=> wff dot.
 rule			=> wff_def | cbf_def | bf_rule.
-program			=> (rule)* main dot.
-library 		=> rule+.
-start			=> program | library.
+rules			=> null | rule | rule rules.
+formula			=> rules main dot.
+library 		=> rule | rule rules.
+start			=> formula | library.
 
