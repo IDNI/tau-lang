@@ -16,6 +16,7 @@
 #include "../src/doctest.h"
 #include "../src/formula.h"
 #include "../src/bool.h"
+#include "test_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -30,5 +31,30 @@ namespace testing = doctest;
 // library and as such must be parsed correctly and satisfy the structural checks
 // we perform on the parsed formula (as the rest of the code assumes such structure).
 
-// TODO write tests checking the correctness of the parsed formula according to
-// the way we used in the code.
+TEST_SUITE("parse tree structure") {
+
+	// TODO (HIGH) test libary parsing structure
+	/*TEST_CASE("parse tree structure: library") {
+		CHECK(true);
+	}*/
+}
+
+// TODO (HIGH) test rule parsing structure
+// TODO (HIGH) test program parsing structure
+
+// TODO (HIGH) test wwf rule parsing structure
+// TODO (HIGH) test cbf rule parsing structure
+// TODO (HIGH) test bf rule parsing structure
+
+// TODO (HIGH) test source binding parsing structure
+// TODO (HIGH) test named binding parsing structure
+// TODO (HIGH) test source binding type parsing structure
+// TODO (HIGH) test source binding source parsing structure
+// TODO (HIGH) test unresolved source binding
+// TODO (HIGH) test resolved source binding
+
+// TODO (HIGH) test and callback parsing structure
+// TODO (HIGH) test or callback parsing structure
+// TODO (HIGH) test xor callback parsing structure
+// TODO (HIGH) test neg callback parsing structure
+// TODO (HIGH) test subs callback parsing structure
