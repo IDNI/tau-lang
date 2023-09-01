@@ -649,7 +649,7 @@ sp_tau_source_node make_tau_source(const std::string source) {
 // outputs a sp_tau_node<...> to a stream, using the stringify transformer
 // and assumes that the constants also override operator<<.
 //
-// TODO maybe it should be move to out.h
+// IDEA maybe it should be move to out.h
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n){
 	return stream << idni::tau::make_string(idni::tau::tau_node_terminal_extractor<BAs...>, n);
@@ -658,7 +658,7 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_node<BAs.
 // outputs a sp_tau_source_node to a stream, using the stringify transformer
 // and assumes that the constants also override operator<<.
 //
-// TODO maybe it should be move to out.h
+// IDEA maybe it should be move to out.h
 std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_source_node& n){
 	return stream << idni::tau::make_string(idni::tau::tau_source_terminal_extractor, n);
 }
