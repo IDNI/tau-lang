@@ -11,6 +11,13 @@
 # x & y // ok if x and y came from the same boolean algebra
 # x &&& y // ok if x and y came from the boolean algebra of tau formulas
 
+#
+# as a rule of thumb, to ease navigation of the corresponding tree, the 
+# non-terminals shouldn't appear in * or + expressions. Otherwise, 
+# intermediate non terminals would be created and break the expected tree 
+# structure
+#
+
 # whitespace and comments
 eol				=> '\n' | '\r' | eof.
 ws_comment		=> '#' eol | '#' printable+ eol.

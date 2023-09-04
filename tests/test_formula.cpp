@@ -47,7 +47,6 @@ TEST_SUITE("callback_applier") {
 		// bindings<Bool> bs { { "result", Bool(false) }, { "value", Bool(true) } };
 		CHECK( true );
 	} 
-
 }
 
 TEST_SUITE("bind") {

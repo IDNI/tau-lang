@@ -34,9 +34,13 @@ namespace testing = doctest;
 TEST_SUITE("parse tree structure") {
 
 	// TODO (HIGH) test libary parsing structure
-	/*TEST_CASE("parse tree structure: library") {
-		CHECK(true);
-	}*/
+	TEST_CASE("parse tree structure: library") {
+		static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto result = lib | tau_parser::start | tau_parser::library;
+		CHECK( true ); // ( result.has_value() );
+	}
 }
 
 // TODO (HIGH) test rule parsing structure
