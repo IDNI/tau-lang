@@ -13,6 +13,7 @@
 
 #include <iostream>
 
+#include "../src/defs.h"
 #include "../src/bdd_handle.h"
 #include "../src/bool.h"
 #include "../src/normalizer2.h"

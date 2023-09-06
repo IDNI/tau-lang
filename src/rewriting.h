@@ -633,9 +633,10 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 	sp_parse_tree t;
 	parser_t parser;
 	auto f = parser.parse(source.c_str(), source.size());
+	/* avoiding doctest issues, uncomment for errors
 	if (!f || !parser.found()) {
 		std::cerr << parser.get_error().to_str(); 
-	}
+	}*/
 
 	auto get_tree = [&f, &t] (auto& g ){
 			f->remove_recursive_nodes(g);

@@ -658,9 +658,9 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	// TODO this tree structure should be checked in test_tau_parser.cpp
 	auto type = non_terminal_extractor<BAs...>(rule->child[0]).value();
 	switch(type) {
-		case ::tau_parser::wff_def:
+		case ::tau_parser::wff_rule:
 			return { (rule | ::tau_parser::wff_head).value() , (rule | ::tau_parser::wff).value() };
-		case ::tau_parser::cbf_def:
+		case ::tau_parser::cbf_rule:
 			return { (rule | ::tau_parser::cbf_head).value(), (rule | ::tau_parser::cbf).value() };
 		case ::tau_parser::bf_rule:
 			return { (rule | ::tau_parser::bf).value(), (rule | ::tau_parser::bf).value() };
