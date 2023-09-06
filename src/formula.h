@@ -264,15 +264,25 @@ using value_extractor_t = decltype(value_extractor<BAs...>);
 template<typename... BAs>
 auto terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
 	auto value = n->value;
-	if (!std::holds_alternative<tau_sym<BAs...>>(value)
-			|| get<tau_sym<BAs...>>(value).nt() 
-			|| get<tau_sym<BAs...>>(value).is_null()) 
+	if (!std::holds_alternative<tau_source_sym>(value)
+			|| get<tau_source_sym>(value).nt() 
+			|| get<tau_source_sym>(value).is_null()) 
 		return std::optional<char>();
-	return std::optional<char>(get<tau_sym<BAs...>>(value).t());
+	return std::optional<char>(get<tau_source_sym>(value).t());
 };
 
 template<typename... BAs>
 using terminal_extractor_t = decltype(terminal_extractor<BAs...>);
+
+template <typename... BAs>
+std::ranges::view auto operator||(const std::ranges::view auto& v, const terminal_extractor_t<BAs...> e) {
+	return v | std::ranges::views::transform(e); 
+}
+
+template <typename... BAs>
+std::optional<char> operator|(const std::optional<sp_tau_node<BAs...>>& o, const terminal_extractor_t<BAs...> e) {
+	return o.transform(e); 
+}
 
 // returns an optional containing the non terminal of the node if possible
 template<typename... BAs>
@@ -284,7 +294,17 @@ auto non_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<
 };
 
 template<typename... BAs>
-using non_terminal_extractor_t = decltype(terminal_extractor<BAs...>);
+using non_terminal_extractor_t = decltype(non_terminal_extractor<BAs...>);
+
+template <typename... BAs>
+std::ranges::view auto operator||(const std::ranges::view auto& v, const non_terminal_extractor_t<BAs...> e) {
+	return v | std::ranges::views::transform(e); 
+}
+
+template <typename... BAs>
+std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, const non_terminal_extractor_t<BAs...> e) {
+	return o.transform(e); 
+}
 
 // returns an optional containing the bas... of the node if possible
 template<typename... BAs>
@@ -295,7 +315,17 @@ auto ba_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<std::varia
 };
 
 template<typename... BAs>
-using ba_extractor_t = decltype(terminal_extractor<BAs...>);
+using ba_extractor_t = decltype(ba_extractor<BAs...>);
+
+template <typename... BAs>
+std::ranges::view auto operator||(const std::ranges::view auto& v, const ba_extractor_t<BAs...> e) {
+	return v | std::ranges::views::transform(e); 
+}
+
+template <typename... BAs>
+std::optional<std::variant<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& o, const ba_extractor_t<BAs...> e) {
+	return o.transform(e); 
+}
 
 //
 // functions traversing the nodes according to the specified non terminals and
