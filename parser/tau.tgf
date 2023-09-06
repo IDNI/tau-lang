@@ -55,6 +55,7 @@ char_class    	=> "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
 sym				=> ws chars ws.
 
 # common symbols
+definition			=> ws ":=" ws.
 equality			=> ws '=' ws. 
 nequality			=> ws "!=" ws. 
 dot 				=> ws '.' ws.
@@ -82,13 +83,13 @@ variable		=> var | ignore | capture.
 timed			=> ( var_in| var_out) indexes. 
 offset			=> variable | variable minus num.
 ignore 			=> '_'.
-capture			=> '$' chars.
-var				=> '?' chars.
-var_in			=> "?i_" chars. # instead of '<', easy to remember
-var_out			=> "?o_" chars. # instead of '>', easy to remember
+capture			=> ws '$' chars ws.
+var				=> ws '?' chars ws .
+var_in			=> ws "?i_" chars ws. # instead of '<', easy to remember
+var_out			=> ws "?o_" chars ws. # instead of '>', easy to remember
 
 # wff
-wff_def				=> wff_head equality wff dot.
+cbf_rule				=> wff_head definition wff dot.
 wff_head			=> sym indexes wff_head_args.
 wff_head_args		=> open_parenthesis (variable)* close_parenthesis.
 
@@ -99,9 +100,9 @@ wff_ref			=> wff_head.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
-wff_neg			=> wff_neg_sym open_parenthesis wff close_parenthesis.
-wff_all			=> wff_all_sym variable open_parenthesis wff close_parenthesis.
-wff_ex			=> wff_ex_sym variable open_parenthesis wff close_parenthesis.
+wff_neg			=> wff_neg_sym wff.
+wff_all			=> wff_all_sym variable wff.
+wff_ex			=> wff_ex_sym variable wff.
 
 # wff_op_sym
 wff_and_sym		=> ws "wff_and" ws.
@@ -112,7 +113,7 @@ wff_all_sym		=> ws "wff_all" ws.
 wff_ex_sym		=> ws "wff_ex" ws.
 
 #cbf
-cbf_def 		=> cbf_head equality cbf dot.
+cbf_rule 		=> cbf_head definition cbf dot.
 cbf_head 		=> sym indexes open_parenthesis (variable)* close_parenthesis.
 cbf 			=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or.
 cbf_ref			=> cbf_head.
@@ -123,7 +124,7 @@ cbf_if_condition	=> wff.
 cbf_if_then			=> cbf.
 cbf_if_else			=> cbf.
 cbf_and				=> open_parenthesis cbf cbf_and_sym cbf close_parenthesis.
-cbf_neg				=> cbf_neg_sym open_parenthesis cbf close_parenthesis.
+cbf_neg				=> cbf_neg_sym cbf.
 cbf_xor				=> open_parenthesis cbf cbf_xor_sym cbf close_parenthesis.
 cbf_or				=> open_parenthesis cbf cbf_or_sym cbf close_parenthesis.
 
@@ -141,15 +142,15 @@ cbf_else_sym	=> ws "else" ws.
 #
 # QUESTION: Does timed vars appear only in bf formulas?
 
-bf_rule			=> bf equality bf dot.
-bf				=> bf_constant | bf | bf_ref | bf_and | bf_neg | bf_xor | bf_or
+bf_rule			=> bf definition bf dot.
+bf				=> bf_constant | bf  | bf_and | bf_neg | bf_xor | bf_or
 					| bf_all | bf_ex | variable | timed.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
-bf_or			=> open_parenthesis bf bf_or_sym close_parenthesis.
+bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
 bf_xor			=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
-bf_neg			=> bf_neg_sym open_parenthesis bf close_parenthesis.
-bf_all			=> bf_all_sym variable open_parenthesis bf close_parenthesis.
-bf_ex			=> bf_ex_sym variable open_parenthesis bf close_parenthesis.
+bf_neg			=> bf_neg_sym bf.
+bf_all			=> bf_all_sym variable bf.
+bf_ex			=> bf_ex_sym variable bf.
 
 # bf_op_sym
 bf_and_sym		=> ws "bf_and" ws.
@@ -195,9 +196,9 @@ subs_cb_sym		=> ws "bf_subs_cb" ws.
 
 # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 main			=> wff dot.
-rule			=> wff_def | cbf_def | bf_rule.
+rule			=> wff_rule | cbf_rule | bf_rule.
 rules			=> null | rule | rule rules.
-formula			=> rules main dot.
-library 		=> rule | rule rules.
+formula			=> rules main.
+library 		=> rules.
 start			=> formula | library.
 

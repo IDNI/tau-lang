@@ -16,6 +16,13 @@
 // # x & y // ok if x and y came from the same boolean algebra
 // # x &&& y // ok if x and y came from the boolean algebra of tau formulas
 // 
+// #
+// # as a rule of thumb, to ease navigation of the corresponding tree, the 
+// # non-terminals shouldn't appear in * or + expressions. Otherwise, 
+// # intermediate non terminals would be created and break the expected tree 
+// # structure
+// #
+// 
 // # whitespace and comments
 // eol				=> '\n' | '\r' | eof.
 // ws_comment		=> '#' eol | '#' printable+ eol.
@@ -53,6 +60,7 @@
 // sym				=> ws chars ws.
 // 
 // # common symbols
+// definition			=> ws ":=" ws.
 // equality			=> ws '=' ws. 
 // nequality			=> ws "!=" ws. 
 // dot 				=> ws '.' ws.
@@ -80,13 +88,13 @@
 // timed			=> ( var_in| var_out) indexes. 
 // offset			=> variable | variable minus num.
 // ignore 			=> '_'.
-// capture			=> '$' chars.
-// var				=> '?' chars.
-// var_in			=> "?i_" chars. # instead of '<', easy to remember
-// var_out			=> "?o_" chars. # instead of '>', easy to remember
+// capture			=> ws '$' chars ws.
+// var				=> ws '?' chars ws .
+// var_in			=> ws "?i_" chars ws. # instead of '<', easy to remember
+// var_out			=> ws "?o_" chars ws. # instead of '>', easy to remember
 // 
 // # wff
-// wff_def				=> wff_head equality wff dot.
+// cbf_rule				=> wff_head definition wff dot.
 // wff_head			=> sym indexes wff_head_args.
 // wff_head_args		=> open_parenthesis (variable)* close_parenthesis.
 // 
@@ -97,9 +105,9 @@
 // wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 // wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 // wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
-// wff_neg			=> wff_neg_sym open_parenthesis wff close_parenthesis.
-// wff_all			=> wff_all_sym variable open_parenthesis wff close_parenthesis.
-// wff_ex			=> wff_ex_sym variable open_parenthesis wff close_parenthesis.
+// wff_neg			=> wff_neg_sym wff.
+// wff_all			=> wff_all_sym variable wff.
+// wff_ex			=> wff_ex_sym variable wff.
 // 
 // # wff_op_sym
 // wff_and_sym		=> ws "wff_and" ws.
@@ -110,7 +118,7 @@
 // wff_ex_sym		=> ws "wff_ex" ws.
 // 
 // #cbf
-// cbf_def 		=> cbf_head equality cbf dot.
+// cbf_rule 		=> cbf_head definition cbf dot.
 // cbf_head 		=> sym indexes open_parenthesis (variable)* close_parenthesis.
 // cbf 			=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or.
 // cbf_ref			=> cbf_head.
@@ -121,7 +129,7 @@
 // cbf_if_then			=> cbf.
 // cbf_if_else			=> cbf.
 // cbf_and				=> open_parenthesis cbf cbf_and_sym cbf close_parenthesis.
-// cbf_neg				=> cbf_neg_sym open_parenthesis cbf close_parenthesis.
+// cbf_neg				=> cbf_neg_sym cbf.
 // cbf_xor				=> open_parenthesis cbf cbf_xor_sym cbf close_parenthesis.
 // cbf_or				=> open_parenthesis cbf cbf_or_sym cbf close_parenthesis.
 // 
@@ -139,15 +147,15 @@
 // #
 // # QUESTION: Does timed vars appear only in bf formulas?
 // 
-// bf_rule			=> bf equality bf dot.
-// bf				=> bf_constant | bf | bf_ref | bf_and | bf_neg | bf_xor | bf_or
+// bf_rule			=> bf definition bf dot.
+// bf				=> bf_constant | bf  | bf_and | bf_neg | bf_xor | bf_or
 // 					| bf_all | bf_ex | variable | timed.
 // bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
-// bf_or			=> open_parenthesis bf bf_or_sym close_parenthesis.
+// bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
 // bf_xor			=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
-// bf_neg			=> bf_neg_sym open_parenthesis bf close_parenthesis.
-// bf_all			=> bf_all_sym variable open_parenthesis bf close_parenthesis.
-// bf_ex			=> bf_ex_sym variable open_parenthesis bf close_parenthesis.
+// bf_neg			=> bf_neg_sym bf.
+// bf_all			=> bf_all_sym variable bf.
+// bf_ex			=> bf_ex_sym variable bf.
 // 
 // # bf_op_sym
 // bf_and_sym		=> ws "bf_and" ws.
@@ -193,10 +201,10 @@
 // 
 // # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 // main			=> wff dot.
-// rule			=> wff_def | cbf_def | bf_rule.
+// rule			=> wff_rule | cbf_rule | bf_rule.
 // rules			=> null | rule | rule rules.
-// formula			=> rules main dot.
-// library 		=> rule | rule rules.
+// formula			=> rules main.
+// library 		=> rules.
 // start			=> formula | library.
 // 
 //
@@ -231,18 +239,18 @@ struct tau_parser {
 			empty_string, eof, space, digit, xdigit, alpha, alnum, punct, printable, eol, 
 			ws_comment, _Rws_comment_0, ws_required, ws, hex_escape, unicode_escape, char_escape_encode, esc, q_char, q_str, 
 			q_bqstr, char_punct, _Rchar_punct_1, _Rchar_punct_2, _Rchar_punct_3, char0, char_, string_char, bqstring_char, chars, 
-			_Rchars_4, _Rchars_5, char_class, sym, equality, nequality, dot, open_parenthesis, close_parenthesis, open_bracket, 
-			close_bracket, open_brace, close_brace, less_than, greater_than, minus, plus, colon, indexes, index, 
-			_Rindexes_6, _Rindexes_7, variable, offset, num, _Rnum_8, var, ignore, capture, timed, 
-			var_in, var_out, _Rtimed_9, wff_def, wff_head, wff, wff_head_args, _Rwff_head_args_10, _Rwff_head_args_11, wff_eq, 
-			wff_neq, wff_ref, wff_and, wff_neg, wff_xor, wff_or, wff_all, wff_ex, bf, F, 
-			wff_and_sym, wff_or_sym, wff_xor_sym, wff_neg_sym, wff_all_sym, wff_ex_sym, cbf_def, cbf_head, cbf, _Rcbf_head_12, 
+			_Rchars_4, _Rchars_5, char_class, sym, definition, equality, nequality, dot, open_parenthesis, close_parenthesis, 
+			open_bracket, close_bracket, open_brace, close_brace, less_than, greater_than, minus, plus, colon, indexes, 
+			index, _Rindexes_6, _Rindexes_7, variable, offset, num, _Rnum_8, var, ignore, capture, 
+			timed, var_in, var_out, _Rtimed_9, cbf_rule, wff_head, wff, wff_head_args, _Rwff_head_args_10, _Rwff_head_args_11, 
+			wff_eq, wff_neq, wff_ref, wff_and, wff_neg, wff_xor, wff_or, wff_all, wff_ex, bf, 
+			F, wff_and_sym, wff_or_sym, wff_xor_sym, wff_neg_sym, wff_all_sym, wff_ex_sym, cbf_head, cbf, _Rcbf_head_12, 
 			_Rcbf_head_13, cbf_if, cbf_ref, cbf_and, cbf_neg, cbf_xor, cbf_or, cbf_if_sym, cbf_if_condition, cbf_then_sym, 
-			cbf_if_then, cbf_else_sym, cbf_if_else, cbf_and_sym, cbf_neg_sym, cbf_xor_sym, cbf_or_sym, bf_rule, bf_constant, bf_ref, 
-			bf_and, bf_neg, bf_xor, bf_or, bf_all, bf_ex, bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, 
-			bf_all_sym, bf_ex_sym, constant, T, bf_builtin, binding, bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, 
-			bf_subs_cb, source_binding, named_binding, type, source, source0, _Rsource_14, _Rsource_15, bf_cb_arg, bf_and_cb_sym, 
-			bf_or_cb_sym, bf_xor_cb_sym, neg_cb_sym, subs_cb_sym, bf_neg_cb_sym, main, rule, rules, formula, library, 
+			cbf_if_then, cbf_else_sym, cbf_if_else, cbf_and_sym, cbf_neg_sym, cbf_xor_sym, cbf_or_sym, bf_rule, bf_constant, bf_and, 
+			bf_neg, bf_xor, bf_or, bf_all, bf_ex, bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_all_sym, 
+			bf_ex_sym, constant, T, bf_builtin, binding, bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, bf_subs_cb, 
+			source_binding, named_binding, type, source, source0, _Rsource_14, _Rsource_15, bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, 
+			bf_xor_cb_sym, neg_cb_sym, subs_cb_sym, bf_neg_cb_sym, main, rule, wff_rule, rules, formula, library, 
 			start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
@@ -251,8 +259,8 @@ private:
 		'\0', '\n', '\r', '#', '\\', 'x', 'u', '\'', '"', 
 		'`', 'a', 'l', 'n', 'm', 'p', 'h', 'b', 'k', 'c', 
 		't', 'r', 'd', 'i', 'g', 'e', 'o', 'f', 'w', 's', 
-		'=', '!', '.', '(', ')', '[', ']', '{', '}', '<', 
-		'>', '-', '+', ':', '_', '$', '?', '1', '0', 
+		':', '=', '!', '.', '(', ')', '[', ']', '{', '}', 
+		'<', '>', '-', '+', '_', '$', '?', '1', '0', 
 	};
 	idni::nonterminals<char, char> nts{};
 	idni::char_class_fns<char> cc;
@@ -270,18 +278,18 @@ private:
 			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "eol", 
 			"ws_comment", "_Rws_comment_0", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", "q_str", 
 			"q_bqstr", "char_punct", "_Rchar_punct_1", "_Rchar_punct_2", "_Rchar_punct_3", "char0", "char_", "string_char", "bqstring_char", "chars", 
-			"_Rchars_4", "_Rchars_5", "char_class", "sym", "equality", "nequality", "dot", "open_parenthesis", "close_parenthesis", "open_bracket", 
-			"close_bracket", "open_brace", "close_brace", "less_than", "greater_than", "minus", "plus", "colon", "indexes", "index", 
-			"_Rindexes_6", "_Rindexes_7", "variable", "offset", "num", "_Rnum_8", "var", "ignore", "capture", "timed", 
-			"var_in", "var_out", "_Rtimed_9", "wff_def", "wff_head", "wff", "wff_head_args", "_Rwff_head_args_10", "_Rwff_head_args_11", "wff_eq", 
-			"wff_neq", "wff_ref", "wff_and", "wff_neg", "wff_xor", "wff_or", "wff_all", "wff_ex", "bf", "F", 
-			"wff_and_sym", "wff_or_sym", "wff_xor_sym", "wff_neg_sym", "wff_all_sym", "wff_ex_sym", "cbf_def", "cbf_head", "cbf", "_Rcbf_head_12", 
+			"_Rchars_4", "_Rchars_5", "char_class", "sym", "definition", "equality", "nequality", "dot", "open_parenthesis", "close_parenthesis", 
+			"open_bracket", "close_bracket", "open_brace", "close_brace", "less_than", "greater_than", "minus", "plus", "colon", "indexes", 
+			"index", "_Rindexes_6", "_Rindexes_7", "variable", "offset", "num", "_Rnum_8", "var", "ignore", "capture", 
+			"timed", "var_in", "var_out", "_Rtimed_9", "cbf_rule", "wff_head", "wff", "wff_head_args", "_Rwff_head_args_10", "_Rwff_head_args_11", 
+			"wff_eq", "wff_neq", "wff_ref", "wff_and", "wff_neg", "wff_xor", "wff_or", "wff_all", "wff_ex", "bf", 
+			"F", "wff_and_sym", "wff_or_sym", "wff_xor_sym", "wff_neg_sym", "wff_all_sym", "wff_ex_sym", "cbf_head", "cbf", "_Rcbf_head_12", 
 			"_Rcbf_head_13", "cbf_if", "cbf_ref", "cbf_and", "cbf_neg", "cbf_xor", "cbf_or", "cbf_if_sym", "cbf_if_condition", "cbf_then_sym", 
-			"cbf_if_then", "cbf_else_sym", "cbf_if_else", "cbf_and_sym", "cbf_neg_sym", "cbf_xor_sym", "cbf_or_sym", "bf_rule", "bf_constant", "bf_ref", 
-			"bf_and", "bf_neg", "bf_xor", "bf_or", "bf_all", "bf_ex", "bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", 
-			"bf_all_sym", "bf_ex_sym", "constant", "T", "bf_builtin", "binding", "bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", 
-			"bf_subs_cb", "source_binding", "named_binding", "type", "source", "source0", "_Rsource_14", "_Rsource_15", "bf_cb_arg", "bf_and_cb_sym", 
-			"bf_or_cb_sym", "bf_xor_cb_sym", "neg_cb_sym", "subs_cb_sym", "bf_neg_cb_sym", "main", "rule", "rules", "formula", "library", 
+			"cbf_if_then", "cbf_else_sym", "cbf_if_else", "cbf_and_sym", "cbf_neg_sym", "cbf_xor_sym", "cbf_or_sym", "bf_rule", "bf_constant", "bf_and", 
+			"bf_neg", "bf_xor", "bf_or", "bf_all", "bf_ex", "bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_all_sym", 
+			"bf_ex_sym", "constant", "T", "bf_builtin", "binding", "bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", "bf_subs_cb", 
+			"source_binding", "named_binding", "type", "source", "source0", "_Rsource_14", "_Rsource_15", "bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", 
+			"bf_xor_cb_sym", "neg_cb_sym", "subs_cb_sym", "bf_neg_cb_sym", "main", "rule", "wff_rule", "rules", "formula", "library", 
 			"start", 
 		}) nts.get(nt);
 		return nts;
@@ -361,9 +369,9 @@ private:
 		q(nt(32), (t(6)+t(14)+t(14)+t(24)+t(20)));
 		q(nt(32), (t(5)+t(21)+t(22)+t(23)+t(22)+t(19)));
 		q(nt(33), (nt(13)+nt(29)+nt(13)));
-		q(nt(34), (nt(13)+t(29)+nt(13)));
-		q(nt(35), (nt(13)+t(30)+t(29)+nt(13)));
-		q(nt(36), (nt(13)+t(31)+nt(13)));
+		q(nt(34), (nt(13)+t(29)+t(30)+nt(13)));
+		q(nt(35), (nt(13)+t(30)+nt(13)));
+		q(nt(36), (nt(13)+t(31)+t(30)+nt(13)));
 		q(nt(37), (nt(13)+t(32)+nt(13)));
 		q(nt(38), (nt(13)+t(33)+nt(13)));
 		q(nt(39), (nt(13)+t(34)+nt(13)));
@@ -375,64 +383,65 @@ private:
 		q(nt(45), (nt(13)+t(40)+nt(13)));
 		q(nt(46), (nt(13)+t(41)+nt(13)));
 		q(nt(47), (nt(13)+t(42)+nt(13)));
-		q(nt(50), (nt(49)));
-		q(nt(51), (nt(50)+nt(51)));
-		q(nt(51), (nul));
-		q(nt(48), (nt(39)+nt(51)+nt(40)));
-		q(nt(49), (nt(52)));
-		q(nt(49), (nt(53)));
-		q(nt(55), (nt(3)));
-		q(nt(55), (nt(3)+nt(55)));
-		q(nt(54), (nt(55)));
-		q(nt(52), (nt(56)));
-		q(nt(52), (nt(57)));
-		q(nt(52), (nt(58)));
-		q(nt(62), (nt(60)));
-		q(nt(62), (nt(61)));
-		q(nt(59), (nt(62)+nt(48)));
-		q(nt(53), (nt(52)));
-		q(nt(53), (nt(52)+nt(45)+nt(54)));
-		q(nt(57), (t(43)));
-		q(nt(58), (t(44)+nt(29)));
-		q(nt(56), (t(45)+nt(29)));
-		q(nt(60), (t(45)+t(22)+t(43)+nt(29)));
-		q(nt(61), (t(45)+t(25)+t(43)+nt(29)));
-		q(nt(63), (nt(64)+nt(34)+nt(65)+nt(36)));
-		q(nt(64), (nt(33)+nt(48)+nt(66)));
-		q(nt(67), (nt(52)));
-		q(nt(68), (nt(67)+nt(68)));
-		q(nt(68), (nul));
-		q(nt(66), (nt(37)+nt(68)+nt(38)));
-		q(nt(65), (nt(69)));
-		q(nt(65), (nt(70)));
-		q(nt(65), (nt(71)));
-		q(nt(65), (nt(72)));
-		q(nt(65), (nt(73)));
-		q(nt(65), (nt(74)));
-		q(nt(65), (nt(75)));
-		q(nt(65), (nt(76)));
-		q(nt(65), (nt(77)));
-		q(nt(69), (nt(37)+nt(78)+nt(34)+nt(79)+nt(38)));
-		q(nt(70), (nt(37)+nt(78)+nt(35)+nt(79)+nt(38)));
-		q(nt(71), (nt(64)));
-		q(nt(72), (nt(37)+nt(65)+nt(80)+nt(65)+nt(38)));
-		q(nt(75), (nt(37)+nt(65)+nt(81)+nt(65)+nt(38)));
-		q(nt(74), (nt(37)+nt(65)+nt(82)+nt(65)+nt(38)));
-		q(nt(73), (nt(83)+nt(37)+nt(65)+nt(38)));
-		q(nt(76), (nt(84)+nt(52)+nt(37)+nt(65)+nt(38)));
-		q(nt(77), (nt(85)+nt(52)+nt(37)+nt(65)+nt(38)));
-		q(nt(80), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(10)+t(12)+t(21)+nt(13)));
-		q(nt(81), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(25)+t(20)+nt(13)));
-		q(nt(82), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(5)+t(25)+t(20)+nt(13)));
-		q(nt(83), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(12)+t(24)+t(23)+nt(13)));
-		q(nt(84), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(10)+t(11)+t(11)+nt(13)));
-		q(nt(85), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(24)+t(5)+nt(13)));
-		q(nt(86), (nt(87)+nt(34)+nt(88)+nt(36)));
-		q(nt(89), (nt(52)));
+		q(nt(48), (nt(13)+t(29)+nt(13)));
+		q(nt(51), (nt(50)));
+		q(nt(52), (nt(51)+nt(52)));
+		q(nt(52), (nul));
+		q(nt(49), (nt(40)+nt(52)+nt(41)));
+		q(nt(50), (nt(53)));
+		q(nt(50), (nt(54)));
+		q(nt(56), (nt(3)));
+		q(nt(56), (nt(3)+nt(56)));
+		q(nt(55), (nt(56)));
+		q(nt(53), (nt(57)));
+		q(nt(53), (nt(58)));
+		q(nt(53), (nt(59)));
+		q(nt(63), (nt(61)));
+		q(nt(63), (nt(62)));
+		q(nt(60), (nt(63)+nt(49)));
+		q(nt(54), (nt(53)));
+		q(nt(54), (nt(53)+nt(46)+nt(55)));
+		q(nt(58), (t(43)));
+		q(nt(59), (nt(13)+t(44)+nt(29)+nt(13)));
+		q(nt(57), (nt(13)+t(45)+nt(29)+nt(13)));
+		q(nt(61), (nt(13)+t(45)+t(22)+t(43)+nt(29)+nt(13)));
+		q(nt(62), (nt(13)+t(45)+t(25)+t(43)+nt(29)+nt(13)));
+		q(nt(64), (nt(65)+nt(34)+nt(66)+nt(37)));
+		q(nt(65), (nt(33)+nt(49)+nt(67)));
+		q(nt(68), (nt(53)));
+		q(nt(69), (nt(68)+nt(69)));
+		q(nt(69), (nul));
+		q(nt(67), (nt(38)+nt(69)+nt(39)));
+		q(nt(66), (nt(70)));
+		q(nt(66), (nt(71)));
+		q(nt(66), (nt(72)));
+		q(nt(66), (nt(73)));
+		q(nt(66), (nt(74)));
+		q(nt(66), (nt(75)));
+		q(nt(66), (nt(76)));
+		q(nt(66), (nt(77)));
+		q(nt(66), (nt(78)));
+		q(nt(70), (nt(38)+nt(79)+nt(35)+nt(80)+nt(39)));
+		q(nt(71), (nt(38)+nt(79)+nt(36)+nt(80)+nt(39)));
+		q(nt(72), (nt(65)));
+		q(nt(73), (nt(38)+nt(66)+nt(81)+nt(66)+nt(39)));
+		q(nt(76), (nt(38)+nt(66)+nt(82)+nt(66)+nt(39)));
+		q(nt(75), (nt(38)+nt(66)+nt(83)+nt(66)+nt(39)));
+		q(nt(74), (nt(84)+nt(66)));
+		q(nt(77), (nt(85)+nt(53)+nt(66)));
+		q(nt(78), (nt(86)+nt(53)+nt(66)));
+		q(nt(81), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(10)+t(12)+t(21)+nt(13)));
+		q(nt(82), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(25)+t(20)+nt(13)));
+		q(nt(83), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(5)+t(25)+t(20)+nt(13)));
+		q(nt(84), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(12)+t(24)+t(23)+nt(13)));
+		q(nt(85), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(10)+t(11)+t(11)+nt(13)));
+		q(nt(86), (nt(13)+t(27)+t(26)+t(26)+t(43)+t(24)+t(5)+nt(13)));
+		q(nt(64), (nt(87)+nt(34)+nt(88)+nt(37)));
+		q(nt(89), (nt(53)));
 		q(nt(90), (nt(89)+nt(90)));
 		q(nt(90), (nul));
-		q(nt(87), (nt(33)+nt(48)+nt(37)+nt(90)+nt(38)));
-		q(nt(88), (nt(78)));
+		q(nt(87), (nt(33)+nt(49)+nt(38)+nt(90)+nt(39)));
+		q(nt(88), (nt(79)));
 		q(nt(88), (nt(91)));
 		q(nt(88), (nt(92)));
 		q(nt(88), (nt(93)));
@@ -440,14 +449,14 @@ private:
 		q(nt(88), (nt(95)));
 		q(nt(88), (nt(96)));
 		q(nt(92), (nt(87)));
-		q(nt(91), (nt(97)+nt(37)+nt(98)+nt(38)+nt(99)+nt(100)+nt(101)+nt(102)));
-		q(nt(98), (nt(65)));
+		q(nt(91), (nt(97)+nt(38)+nt(98)+nt(39)+nt(99)+nt(100)+nt(101)+nt(102)));
+		q(nt(98), (nt(66)));
 		q(nt(100), (nt(88)));
 		q(nt(102), (nt(88)));
-		q(nt(93), (nt(37)+nt(88)+nt(103)+nt(88)+nt(38)));
-		q(nt(94), (nt(104)+nt(37)+nt(88)+nt(38)));
-		q(nt(95), (nt(37)+nt(88)+nt(105)+nt(88)+nt(38)));
-		q(nt(96), (nt(37)+nt(88)+nt(106)+nt(88)+nt(38)));
+		q(nt(93), (nt(38)+nt(88)+nt(103)+nt(88)+nt(39)));
+		q(nt(94), (nt(104)+nt(88)));
+		q(nt(95), (nt(38)+nt(88)+nt(105)+nt(88)+nt(39)));
+		q(nt(96), (nt(38)+nt(88)+nt(106)+nt(88)+nt(39)));
 		q(nt(103), (nt(13)+t(18)+t(16)+t(26)+t(43)+t(10)+t(12)+t(21)+nt(13)));
 		q(nt(106), (nt(13)+t(18)+t(16)+t(26)+t(43)+t(25)+t(20)+nt(13)));
 		q(nt(105), (nt(13)+t(18)+t(16)+t(26)+t(43)+t(5)+t(25)+t(20)+nt(13)));
@@ -455,80 +464,78 @@ private:
 		q(nt(97), (nt(13)+t(18)+t(16)+t(26)+t(43)+t(22)+t(26)+nt(13)));
 		q(nt(99), (nt(13)+t(19)+t(15)+t(24)+t(12)+nt(13)));
 		q(nt(101), (nt(13)+t(24)+t(11)+t(28)+t(24)+nt(13)));
-		q(nt(107), (nt(78)+nt(34)+nt(78)+nt(36)));
-		q(nt(78), (nt(52)));
-		q(nt(78), (nt(59)));
-		q(nt(78), (nt(78)));
-		q(nt(78), (nt(108)));
-		q(nt(78), (nt(109)));
-		q(nt(78), (nt(110)));
-		q(nt(78), (nt(111)));
-		q(nt(78), (nt(112)));
-		q(nt(78), (nt(113)));
-		q(nt(78), (nt(114)));
-		q(nt(78), (nt(115)));
-		q(nt(110), (nt(37)+nt(78)+nt(116)+nt(78)+nt(38)));
-		q(nt(113), (nt(37)+nt(78)+nt(117)+nt(38)));
-		q(nt(112), (nt(37)+nt(78)+nt(118)+nt(13)+nt(78)+nt(38)));
-		q(nt(111), (nt(119)+nt(37)+nt(78)+nt(38)));
-		q(nt(114), (nt(120)+nt(52)+nt(37)+nt(78)+nt(38)));
-		q(nt(115), (nt(121)+nt(52)+nt(37)+nt(78)+nt(38)));
-		q(nt(116), (nt(13)+t(16)+t(26)+t(43)+t(10)+t(12)+t(21)+nt(13)));
-		q(nt(117), (nt(13)+t(16)+t(26)+t(43)+t(25)+t(20)+nt(13)));
-		q(nt(118), (nt(13)+t(16)+t(26)+t(43)+t(5)+t(25)+t(20)+nt(13)));
-		q(nt(119), (nt(13)+t(16)+t(26)+t(43)+t(12)+t(24)+t(23)+nt(13)));
-		q(nt(120), (nt(13)+t(16)+t(26)+t(43)+t(10)+t(11)+t(11)+nt(13)));
-		q(nt(121), (nt(13)+t(16)+t(26)+t(43)+t(24)+t(5)+nt(13)));
-		q(nt(108), (nt(41)+nt(122)+nt(42)));
-		q(nt(122), (nt(57)));
-		q(nt(122), (nt(58)));
-		q(nt(122), (nt(79)));
-		q(nt(122), (nt(123)));
-		q(nt(122), (nt(124)));
-		q(nt(122), (nt(125)));
-		q(nt(123), (nt(13)+t(46)+nt(13)));
-		q(nt(79), (nt(13)+t(47)+nt(13)));
-		q(nt(124), (nt(126)));
-		q(nt(124), (nt(127)));
-		q(nt(124), (nt(128)));
-		q(nt(124), (nt(129)));
+		q(nt(107), (nt(79)+nt(34)+nt(79)+nt(37)));
+		q(nt(79), (nt(53)));
+		q(nt(79), (nt(60)));
+		q(nt(79), (nt(79)));
+		q(nt(79), (nt(108)));
+		q(nt(79), (nt(109)));
+		q(nt(79), (nt(110)));
+		q(nt(79), (nt(111)));
+		q(nt(79), (nt(112)));
+		q(nt(79), (nt(113)));
+		q(nt(79), (nt(114)));
+		q(nt(109), (nt(38)+nt(79)+nt(115)+nt(79)+nt(39)));
+		q(nt(112), (nt(38)+nt(79)+nt(116)+nt(79)+nt(39)));
+		q(nt(111), (nt(38)+nt(79)+nt(117)+nt(13)+nt(79)+nt(39)));
+		q(nt(110), (nt(118)+nt(79)));
+		q(nt(113), (nt(119)+nt(53)+nt(79)));
+		q(nt(114), (nt(120)+nt(53)+nt(79)));
+		q(nt(115), (nt(13)+t(16)+t(26)+t(43)+t(10)+t(12)+t(21)+nt(13)));
+		q(nt(116), (nt(13)+t(16)+t(26)+t(43)+t(25)+t(20)+nt(13)));
+		q(nt(117), (nt(13)+t(16)+t(26)+t(43)+t(5)+t(25)+t(20)+nt(13)));
+		q(nt(118), (nt(13)+t(16)+t(26)+t(43)+t(12)+t(24)+t(23)+nt(13)));
+		q(nt(119), (nt(13)+t(16)+t(26)+t(43)+t(10)+t(11)+t(11)+nt(13)));
+		q(nt(120), (nt(13)+t(16)+t(26)+t(43)+t(24)+t(5)+nt(13)));
+		q(nt(108), (nt(42)+nt(121)+nt(43)));
+		q(nt(121), (nt(58)));
+		q(nt(121), (nt(59)));
+		q(nt(121), (nt(80)));
+		q(nt(121), (nt(122)));
+		q(nt(121), (nt(123)));
+		q(nt(121), (nt(124)));
+		q(nt(122), (nt(13)+t(46)+nt(13)));
+		q(nt(80), (nt(13)+t(47)+nt(13)));
+		q(nt(123), (nt(125)));
+		q(nt(123), (nt(126)));
+		q(nt(123), (nt(127)));
+		q(nt(123), (nt(128)));
+		q(nt(123), (nt(129)));
 		q(nt(124), (nt(130)));
-		q(nt(125), (nt(131)));
-		q(nt(125), (nt(132)));
+		q(nt(124), (nt(131)));
+		q(nt(131), (nt(29)));
+		q(nt(130), (nt(132)+nt(48)+nt(133)));
 		q(nt(132), (nt(29)));
-		q(nt(131), (nt(133)+nt(47)+nt(134)));
-		q(nt(133), (nt(29)));
-		q(nt(133), (nul));
-		q(nt(135), (nt(2)));
-		q(nt(135), (nt(6)));
-		q(nt(135), (nt(16)));
-		q(nt(135), (nt(21)));
+		q(nt(132), (nul));
+		q(nt(134), (nt(2)));
+		q(nt(134), (nt(6)));
+		q(nt(134), (nt(16)));
+		q(nt(134), (nt(21)));
+		q(nt(135), (nt(134)));
 		q(nt(136), (nt(135)));
-		q(nt(137), (nt(136)));
-		q(nt(137), (nt(136)+nt(137)));
-		q(nt(134), (nt(137)));
-		q(nt(126), (nt(138)+nt(139)+nt(138)));
-		q(nt(127), (nt(138)+nt(140)+nt(138)));
-		q(nt(128), (nt(138)+nt(141)+nt(138)));
-		q(nt(129), (nt(142)+nt(138)));
-		q(nt(130), (nt(143)+nt(138)+nt(138)+nt(138)));
-		q(nt(138), (nt(58)));
-		q(nt(138), (nt(125)));
-		q(nt(139), (nt(13)+t(16)+t(26)+t(43)+t(10)+t(12)+t(21)+t(43)+t(18)+t(16)+nt(13)));
-		q(nt(140), (nt(13)+t(16)+t(26)+t(43)+t(25)+t(20)+t(43)+t(18)+t(16)+nt(13)));
-		q(nt(141), (nt(13)+t(16)+t(26)+t(43)+t(5)+t(25)+t(20)+t(43)+t(18)+t(16)+nt(13)));
-		q(nt(144), (nt(13)+t(16)+t(26)+t(43)+t(12)+t(24)+t(23)+t(43)+t(18)+t(16)+nt(13)));
-		q(nt(143), (nt(13)+t(16)+t(26)+t(43)+t(28)+t(6)+t(16)+t(28)+t(43)+t(18)+t(16)+nt(13)));
-		q(nt(145), (nt(65)+nt(36)));
-		q(nt(146), (nt(63)));
-		q(nt(146), (nt(86)));
-		q(nt(146), (nt(107)));
-		q(nt(147), (nt(146)));
-		q(nt(147), (nt(146)+nt(147)));
+		q(nt(136), (nt(135)+nt(136)));
+		q(nt(133), (nt(136)));
+		q(nt(125), (nt(137)+nt(138)+nt(137)));
+		q(nt(126), (nt(137)+nt(139)+nt(137)));
+		q(nt(127), (nt(137)+nt(140)+nt(137)));
+		q(nt(128), (nt(141)+nt(137)));
+		q(nt(129), (nt(142)+nt(137)+nt(137)+nt(137)));
+		q(nt(137), (nt(59)));
+		q(nt(137), (nt(124)));
+		q(nt(138), (nt(13)+t(16)+t(26)+t(43)+t(10)+t(12)+t(21)+t(43)+t(18)+t(16)+nt(13)));
+		q(nt(139), (nt(13)+t(16)+t(26)+t(43)+t(25)+t(20)+t(43)+t(18)+t(16)+nt(13)));
+		q(nt(140), (nt(13)+t(16)+t(26)+t(43)+t(5)+t(25)+t(20)+t(43)+t(18)+t(16)+nt(13)));
+		q(nt(143), (nt(13)+t(16)+t(26)+t(43)+t(12)+t(24)+t(23)+t(43)+t(18)+t(16)+nt(13)));
+		q(nt(142), (nt(13)+t(16)+t(26)+t(43)+t(28)+t(6)+t(16)+t(28)+t(43)+t(18)+t(16)+nt(13)));
+		q(nt(144), (nt(66)+nt(37)));
+		q(nt(145), (nt(64)));
+		q(nt(145), (nt(107)));
+		q(nt(145), (nt(146)));
+		q(nt(147), (nt(145)));
+		q(nt(147), (nt(145)+nt(147)));
 		q(nt(147), (nul));
-		q(nt(148), (nt(147)+nt(145)+nt(36)));
-		q(nt(149), (nt(146)));
-		q(nt(149), (nt(146)+nt(147)));
+		q(nt(148), (nt(147)+nt(144)));
+		q(nt(149), (nt(147)));
 		q(nt(150), (nt(148)));
 		q(nt(150), (nt(149)));
 		return q;

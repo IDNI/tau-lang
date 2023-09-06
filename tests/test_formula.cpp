@@ -52,7 +52,7 @@ TEST_SUITE("callback_applier") {
 TEST_SUITE("bind") {
 
 	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
-		static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
+		static constexpr char* sample =	"bf_neg $X := $X .";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -61,7 +61,7 @@ TEST_SUITE("bind") {
 	}
 
 	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
-		static constexpr char* sample =	"bf_neg ( bf_neg ( { binding } ) ) = { binding } .";
+		static constexpr char* sample =	"bf_neg { binding } := { binding } .";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -70,7 +70,7 @@ TEST_SUITE("bind") {
 	}
 
 	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
-		static constexpr char* sample =	"bf_neg ( bf_neg ( { non_matching } ) ) = { non_matching } .";
+		static constexpr char* sample =	"bf_neg { non_matching } := { non_matching } .";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -82,7 +82,7 @@ TEST_SUITE("bind") {
 // TODO (HIGH) add more unit tests for make_library
 TEST_SUITE("make_library") {
 
-	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) = $X .";
+	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) := $X .";
 
 	TEST_CASE("make_library: one rule case") {
 		auto src = make_tau_source(sample);
