@@ -281,7 +281,8 @@ std::ranges::view auto operator||(const std::ranges::view auto& v, const termina
 
 template <typename... BAs>
 std::optional<char> operator|(const std::optional<sp_tau_node<BAs...>>& o, const terminal_extractor_t<BAs...> e) {
-	return o.transform(e); 
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return o.has_value() ? e(o.value()) : std::optional<char>(); 
 }
 
 // returns an optional containing the non terminal of the node if possible
@@ -303,7 +304,8 @@ std::ranges::view auto operator||(const std::ranges::view auto& v, const non_ter
 
 template <typename... BAs>
 std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, const non_terminal_extractor_t<BAs...> e) {
-	return o.transform(e); 
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return o.has_value() ? e(o.value()) : std::optional<size_t>(); 
 }
 
 // returns an optional containing the bas... of the node if possible
