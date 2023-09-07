@@ -454,8 +454,8 @@ TEST_SUITE("parser: bindings ") {
 			| tau_parser::binding
 			| tau_parser::source_binding
 			| tau_parser::type
-			| tau_parser::empty_string;
-		CHECK( type.has_value() );
+			| tau_parser::chars;
+		CHECK( !type.has_value() );
 	}
 
 	TEST_CASE("resolved source binding") {
