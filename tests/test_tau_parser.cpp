@@ -277,8 +277,7 @@ TEST_SUITE("parser: cbf formulas ") {
 TEST_SUITE("parser: bf formulas ") {
 
 	TEST_CASE("bf_neg") {
-		static constexpr char* sample =	
-			"bf_neg ?Z := ?Z.";
+		static constexpr char* sample =	"bf_neg ?Z := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);		
 		auto neg_rule = lib 
@@ -292,8 +291,7 @@ TEST_SUITE("parser: bf formulas ") {
 	}
 
 	TEST_CASE("bf_and") {
-		static constexpr char* sample =	
-			"(?Z bf_and ?Z) := ?Z.";
+		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto and_rule = lib 
@@ -307,8 +305,7 @@ TEST_SUITE("parser: bf formulas ") {
 	}
 
 	TEST_CASE("bf_or") {
-		static constexpr char* sample =	
-			"(?Z bf_or ?Z) := ?Z.";
+		static constexpr char* sample =	"(?Z bf_or ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto or_rule = lib 
@@ -322,8 +319,7 @@ TEST_SUITE("parser: bf formulas ") {
 	}
 
 	TEST_CASE("bf_xor") {
-		static constexpr char* sample =	
-			"(?Z bf_xor ?Z) := ?Z.";
+		static constexpr char* sample =	"(?Z bf_xor ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto xor_rule = lib 
@@ -337,8 +333,7 @@ TEST_SUITE("parser: bf formulas ") {
 	}
 
 	TEST_CASE("bf_all") {
-		static constexpr char* sample =	
-			"bf_all ?Z ?Z := ?Z.";
+		static constexpr char* sample =	"bf_all ?Z ?Z := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto all_rule = lib 
@@ -352,8 +347,7 @@ TEST_SUITE("parser: bf formulas ") {
 	}
 
 	TEST_CASE("bf_ex") {
-		static constexpr char* sample =	
-			"bf_ex ?Z ?Z := ?Z.";
+		static constexpr char* sample =	"bf_ex ?Z ?Z := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto ex_rule = lib 
@@ -375,28 +369,112 @@ TEST_SUITE("parser: bf formulas ") {
 // TODO (HIGH) test resolved source binding
 TEST_SUITE("parser: bindings ") {
 
-	TEST_CASE("source binding") {
-		CHECK( false );
+	TEST_CASE("named binding") {
+		static constexpr char* sample =	"{ binding } := { binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto named = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::named_binding;
+		CHECK( named.has_value() );
 	}
 
-	TEST_CASE("named binding") {
-		CHECK( false );
+	TEST_CASE("source binding") {
+		static constexpr char* sample =	"{ type : binding } := { type : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto source = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding;
+		CHECK( source.has_value() );
 	}
 
 	TEST_CASE("source binding type") {
-		CHECK( false );
+		static constexpr char* sample =	"{ type : binding } := { type : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto type = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding
+			| tau_parser::type;
+		CHECK( type.has_value() );
 	}
 
 	TEST_CASE("source binding source") {
-		CHECK( false );
+		static constexpr char* sample =	"{ type : binding } := { type : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto source = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding
+			| tau_parser::source;
+		CHECK( source.has_value() );
 	}
 
 	TEST_CASE("unresolved source binding") {
-		CHECK( false );
+		static constexpr char* sample =	"{  : binding } := {  : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto type = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding
+			| tau_parser::type
+			| tau_parser::empty_string;
+		CHECK( type.has_value() );
 	}
 
 	TEST_CASE("resolved source binding") {
-		CHECK( false );
+		static constexpr char* sample =	"{ type : binding } := { type : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto type = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding
+			| tau_parser::type
+			| tau_parser::chars;
+		CHECK( type.has_value() );
 	}
 }
 
