@@ -224,7 +224,8 @@ TEST_SUITE("parser: wwf formulas ") {
 TEST_SUITE("parser: cbf formulas ") {
 
 	TEST_CASE("cbf_neg") {
-		/*static constexpr char* sample =	
+		// REVIEW (HIGH) this code left the parser extracting trees for ever in commit  ae0a743
+		static constexpr char* sample =	
 			"?Z := cbf_neg ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);		
@@ -232,15 +233,15 @@ TEST_SUITE("parser: cbf formulas ") {
 			| tau_parser::library 
 			| tau_parser::rules 
 			| tau_parser::rule 
-			| tau_parser::cbf_def
+			| tau_parser::cbf_rule
 			| tau_parser::cbf
 			| tau_parser::cbf_neg; 
-		CHECK( neg_rule.has_value() );*/
-		CHECK( false );
+		CHECK( neg_rule.has_value() );
 	}
 
 	TEST_CASE("cbf_and") {
-		/*static constexpr char* sample =	
+		// REVIEW (HIGH) this code left the parser extracting trees for ever in commit  ae0a743
+		static constexpr char* sample =	
 			"?Z := ( ?Z cbf_and ?Z ).";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);		
@@ -248,11 +249,10 @@ TEST_SUITE("parser: cbf formulas ") {
 			| tau_parser::library 
 			| tau_parser::rules 
 			| tau_parser::rule 
-			| tau_parser::cbf_def
+			| tau_parser::cbf_rule
 			| tau_parser::cbf
 			| tau_parser::cbf_and; 
-		CHECK( and_rule.has_value() );*/
-		CHECK( false );
+		CHECK( and_rule.has_value() );
 	}
 
 	TEST_CASE("cbf_or") {
