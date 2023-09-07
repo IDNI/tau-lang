@@ -89,8 +89,8 @@ var_in			=> ws "?i_" chars ws. # instead of '<', easy to remember
 var_out			=> ws "?o_" chars ws. # instead of '>', easy to remember
 
 # wff
-wff_rule		=> wff_head definition wff dot.
-wff_head		=> sym indexes wff_head_args | wwf.
+wff_rule		=> (wff | wff_head) definition wff dot.
+wff_head		=> sym indexes wff_head_args.
 wff_head_args	=> open_parenthesis (variable)* close_parenthesis.
 
 wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | wff_or | wff_all | wff_ex.
@@ -113,8 +113,8 @@ wff_all_sym		=> ws "wff_all" ws.
 wff_ex_sym		=> ws "wff_ex" ws.
 
 #cbf
-cbf_rule 		=> cbf_head definition cbf dot.
-cbf_head 		=> sym indexes cbf_head_args | cbf.
+cbf_rule 		=> (cbf | cbf_head) definition cbf dot.
+cbf_head 		=> sym indexes cbf_head_args.
 cbf_head_args	=> open_parenthesis (variable)* close_parenthesis.
 
 cbf 			=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or.
