@@ -72,9 +72,9 @@ plus				=> ws '+' ws.
 colon				=> ws ':' ws.
 
 # indexes
-indexes				=> open_bracket (index)* close_bracket.
-index				=> variable | offset.
-num					=> digit+.
+indexes			=> open_bracket (index)* close_bracket.
+index			=> variable | offset.
+num				=> digit+.
 
 # variables 
 variable		=> var | ignore | capture.
@@ -89,9 +89,9 @@ var_in			=> ws "?i_" chars ws. # instead of '<', easy to remember
 var_out			=> ws "?o_" chars ws. # instead of '>', easy to remember
 
 # wff
-cbf_rule				=> wff_head definition wff dot.
-wff_head			=> sym indexes wff_head_args.
-wff_head_args		=> open_parenthesis (variable)* close_parenthesis.
+wff_rule		=> wff_head definition wff dot.
+wff_head		=> sym indexes wff_head_args | wwf.
+wff_head_args	=> open_parenthesis (variable)* close_parenthesis.
 
 wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | wff_or | wff_all | wff_ex.
 wff_eq 			=> open_parenthesis bf equality F close_parenthesis.
@@ -114,7 +114,9 @@ wff_ex_sym		=> ws "wff_ex" ws.
 
 #cbf
 cbf_rule 		=> cbf_head definition cbf dot.
-cbf_head 		=> sym indexes open_parenthesis (variable)* close_parenthesis.
+cbf_head 		=> sym indexes cbf_head_args | cbf.
+cbf_head_args	=> open_parenthesis (variable)* close_parenthesis.
+
 cbf 			=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or.
 cbf_ref			=> cbf_head.
 cbf_if			=> cbf_if_sym open_parenthesis cbf_if_condition close_parenthesis 
@@ -142,7 +144,8 @@ cbf_else_sym	=> ws "else" ws.
 #
 # QUESTION: Does timed vars appear only in bf formulas?
 
-bf_rule			=> bf definition bf dot.
+bf_rule			=> bf_head definition bf dot.
+bf_head			=> bf.
 bf				=> bf_constant | bf  | bf_and | bf_neg | bf_xor | bf_or
 					| bf_all | bf_ex | variable | timed.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.

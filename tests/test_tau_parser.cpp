@@ -285,6 +285,7 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::bf_rule
+			| tau_parser::bf_head
 			| tau_parser::bf
 			| tau_parser::bf_neg; 
 		CHECK( neg_rule.has_value() );
@@ -299,6 +300,7 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::bf_rule
+			| tau_parser::bf_head
 			| tau_parser::bf
 			| tau_parser::bf_and;
 		CHECK( and_rule.has_value() );
@@ -313,6 +315,7 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::bf_rule
+			| tau_parser::bf_head
 			| tau_parser::bf
 			| tau_parser::bf_or;
 		CHECK( or_rule.has_value() );
@@ -327,6 +330,7 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::bf_rule
+			| tau_parser::bf_head
 			| tau_parser::bf
 			| tau_parser::bf_xor;
 		CHECK( xor_rule.has_value() );
@@ -341,6 +345,7 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::bf_rule
+			| tau_parser::bf_head
 			| tau_parser::bf
 			| tau_parser::bf_all;
 		CHECK( all_rule.has_value() );
@@ -355,6 +360,7 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::bf_rule
+			| tau_parser::bf_head
 			| tau_parser::bf
 			| tau_parser::bf_ex;
 		CHECK( ex_rule.has_value() );
