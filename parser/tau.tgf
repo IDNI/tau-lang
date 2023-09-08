@@ -146,7 +146,7 @@ cbf_else_sym	=> ws "else" ws.
 
 bf_rule			=> bf_matcher definition bf dot.
 bf_matcher		=> bf.
-bf				=> bf_constant | bf  | bf_and | bf_neg | bf_xor | bf_or
+bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
 					| bf_all | bf_ex | variable | timed.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
@@ -184,7 +184,7 @@ source			=> (source0)+.
 bf_and_cb	=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
 bf_or_cb	=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
 bf_xor_cb	=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
-bf_neg_cb	=> neg_cb_sym bf_cb_arg.
+bf_neg_cb	=> bf_neg_cb_sym bf_cb_arg.
 bf_subs_cb	=> subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
 
 # bf_bultin_arg
