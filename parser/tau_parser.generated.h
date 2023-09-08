@@ -151,7 +151,7 @@
 // 
 // bf_rule			=> bf_matcher definition bf dot.
 // bf_matcher		=> bf.
-// bf				=> bf_constant | bf  | bf_and | bf_neg | bf_xor | bf_or
+// bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
 // 					| bf_all | bf_ex | variable | timed.
 // bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 // bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
@@ -189,7 +189,7 @@
 // bf_and_cb	=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
 // bf_or_cb	=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
 // bf_xor_cb	=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
-// bf_neg_cb	=> neg_cb_sym bf_cb_arg.
+// bf_neg_cb	=> bf_neg_cb_sym bf_cb_arg.
 // bf_subs_cb	=> subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
 // 
 // # bf_bultin_arg
@@ -220,7 +220,7 @@
 struct tau_parser {
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(154), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(153), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
 		const char* data, size_t size = 0,
 		char eof = std::char_traits<char>::eof())
@@ -253,8 +253,8 @@ struct tau_parser {
 			cbf_or_sym, bf_rule, bf_matcher, bf_constant, bf_and, bf_neg, bf_xor, bf_or, bf_all, bf_ex, 
 			bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_all_sym, bf_ex_sym, constant, T, bf_builtin, binding, 
 			bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, bf_subs_cb, source_binding, named_binding, type, source, source0, 
-			_Rsource_16, _Rsource_17, bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, neg_cb_sym, subs_cb_sym, bf_neg_cb_sym, main, 
-			rule, rules, formula, library, start, 
+			_Rsource_16, _Rsource_17, bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, bf_neg_cb_sym, subs_cb_sym, main, rule, 
+			rules, formula, library, start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -292,8 +292,8 @@ private:
 			"cbf_or_sym", "bf_rule", "bf_matcher", "bf_constant", "bf_and", "bf_neg", "bf_xor", "bf_or", "bf_all", "bf_ex", 
 			"bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_all_sym", "bf_ex_sym", "constant", "T", "bf_builtin", "binding", 
 			"bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", "bf_subs_cb", "source_binding", "named_binding", "type", "source", "source0", 
-			"_Rsource_16", "_Rsource_17", "bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "neg_cb_sym", "subs_cb_sym", "bf_neg_cb_sym", "main", 
-			"rule", "rules", "formula", "library", "start", 
+			"_Rsource_16", "_Rsource_17", "bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "bf_neg_cb_sym", "subs_cb_sym", "main", "rule", 
+			"rules", "formula", "library", "start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -476,7 +476,6 @@ private:
 		q(nt(112), (nt(80)));
 		q(nt(80), (nt(53)));
 		q(nt(80), (nt(60)));
-		q(nt(80), (nt(80)));
 		q(nt(80), (nt(113)));
 		q(nt(80), (nt(114)));
 		q(nt(80), (nt(115)));
@@ -534,19 +533,19 @@ private:
 		q(nt(143), (nt(13)+t(16)+t(26)+t(43)+t(10)+t(12)+t(21)+t(43)+t(18)+t(16)+nt(13)));
 		q(nt(144), (nt(13)+t(16)+t(26)+t(43)+t(25)+t(20)+t(43)+t(18)+t(16)+nt(13)));
 		q(nt(145), (nt(13)+t(16)+t(26)+t(43)+t(5)+t(25)+t(20)+t(43)+t(18)+t(16)+nt(13)));
-		q(nt(148), (nt(13)+t(16)+t(26)+t(43)+t(12)+t(24)+t(23)+t(43)+t(18)+t(16)+nt(13)));
+		q(nt(146), (nt(13)+t(16)+t(26)+t(43)+t(12)+t(24)+t(23)+t(43)+t(18)+t(16)+nt(13)));
 		q(nt(147), (nt(13)+t(16)+t(26)+t(43)+t(28)+t(6)+t(16)+t(28)+t(43)+t(18)+t(16)+nt(13)));
-		q(nt(149), (nt(68)+nt(37)));
-		q(nt(150), (nt(64)));
-		q(nt(150), (nt(88)));
-		q(nt(150), (nt(111)));
-		q(nt(151), (nt(150)));
-		q(nt(151), (nt(150)+nt(151)));
-		q(nt(151), (nul));
-		q(nt(152), (nt(151)+nt(149)));
+		q(nt(148), (nt(68)+nt(37)));
+		q(nt(149), (nt(64)));
+		q(nt(149), (nt(88)));
+		q(nt(149), (nt(111)));
+		q(nt(150), (nt(149)));
+		q(nt(150), (nt(149)+nt(150)));
+		q(nt(150), (nul));
+		q(nt(151), (nt(150)+nt(148)));
+		q(nt(152), (nt(150)));
 		q(nt(153), (nt(151)));
-		q(nt(154), (nt(152)));
-		q(nt(154), (nt(153)));
+		q(nt(153), (nt(152)));
 		return q;
 	}
 };
