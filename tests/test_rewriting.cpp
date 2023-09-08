@@ -21,8 +21,6 @@ using namespace std;
 
 namespace testing = doctest;
 
-// TODO move helper methods to a different file
-
 sp_node<char> n(const char& value) {
 	return make_node<char>(value, {});
 }
