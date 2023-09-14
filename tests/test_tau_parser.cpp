@@ -518,11 +518,6 @@ TEST_SUITE("parser: bindings ") {
 	}
 }
 
-// TODO (HIGH) test and callback parsing structure
-// TODO (HIGH) test or callback parsing structure
-// TODO (HIGH) test xor callback parsing structure
-// TODO (HIGH) test neg callback parsing structure
-// TODO (HIGH) test subs callback parsing structure
 TEST_SUITE("parser: callbacks ") {
 
 	TEST_CASE("bf_and_cb") {

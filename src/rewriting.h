@@ -449,6 +449,9 @@ using rule = std::pair<node_t, node_t>;
 // TODO create and env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
+//
+// IDEA use also a skip predicate to skip subtrees that are not needed in the match.
+// It should allow to detects matches in the middle of a tree.
 template <typename node_t, typename is_ignore_t, typename is_capture_t> 
 struct pattern_matcher {
 	using pattern_t = node_t;
