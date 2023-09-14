@@ -223,7 +223,7 @@ std::vector<sp_tau_node<BAs...>> operator|(const std::vector<sp_tau_node<BAs...>
 // traverse the tree, top down, and return all the nodes accessible according
 // to the specified non terminals and return them
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> operator|=(const sp_tau_node<BAs...>& n, const tau_parser::nonterminal nt) {
+std::vector<sp_tau_node<BAs...>> operator||(const sp_tau_node<BAs...>& n, const tau_parser::nonterminal nt) {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
 	std::vector<sp_tau_node<BAs...>> nv;
 	for (const auto& c: n->child 
@@ -233,7 +233,7 @@ std::vector<sp_tau_node<BAs...>> operator|=(const sp_tau_node<BAs...>& n, const 
 }
 
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>>  operator|=(const std::optional<sp_tau_node<BAs...>>& n, const tau_parser::nonterminal nt) {
+std::vector<sp_tau_node<BAs...>>  operator||(const std::optional<sp_tau_node<BAs...>>& n, const tau_parser::nonterminal nt) {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
 	std::vector<sp_tau_node<BAs...>> nv;
 	if (n) for(const auto& c: n.value()->child 
@@ -244,12 +244,12 @@ std::vector<sp_tau_node<BAs...>>  operator|=(const std::optional<sp_tau_node<BAs
 
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> get_nodes(const size_t nt, const sp_tau_node<BAs...>& n) {
-	return n |= nt;
+	return n || nt;
 }
 
 template <size_t nt, typename... BAs>
 std::vector<sp_tau_node<BAs...>> get_nodes(const sp_tau_node<BAs...>& n) {
-	return n |= nt;
+	return n || nt;
 }
 
 template <typename... BAs>
@@ -258,7 +258,7 @@ auto get_nodes(const size_t nt) {
 }
 
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> operator|=(const std::ranges::view auto& v, const tau_parser::nonterminal nt) {
+std::vector<sp_tau_node<BAs...>> operator||(const std::ranges::view auto& v, const tau_parser::nonterminal nt) {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
 	std::vector<sp_tau_node<BAs...>> nv;
 	for (const auto& n: v 
@@ -297,7 +297,7 @@ template<typename... BAs>
 using terminal_extractor_t = decltype(terminal_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> operator|=(const std::ranges::view auto& v, const terminal_extractor_t<BAs...> e) {
+std::vector<sp_tau_node<BAs...>> operator||(const std::ranges::view auto& v, const terminal_extractor_t<BAs...> e) {
 	return v | std::ranges::views::transform(e); 
 }
 
@@ -320,7 +320,7 @@ template<typename... BAs>
 using non_terminal_extractor_t = decltype(non_terminal_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> operator|=(const std::ranges::view auto& v, const non_terminal_extractor_t<BAs...> e) {
+std::vector<sp_tau_node<BAs...>> operator||(const std::ranges::view auto& v, const non_terminal_extractor_t<BAs...> e) {
 	return v | std::ranges::views::transform(e); 
 }
 
@@ -342,7 +342,7 @@ template<typename... BAs>
 using ba_extractor_t = decltype(ba_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> operator|=(const std::ranges::view auto& v, const ba_extractor_t<BAs...> e) {
+std::vector<sp_tau_node<BAs...>> operator||(const std::ranges::view auto& v, const ba_extractor_t<BAs...> e) {
 	return v | std::ranges::views::transform(e); 
 }
 

@@ -80,7 +80,7 @@ TEST_SUITE("operator|") {
 	}
 }
 
-TEST_SUITE("operator|=") {
+TEST_SUITE("operator||") {
 
 	TEST_CASE("match zero nodes") {
 		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
@@ -91,7 +91,7 @@ TEST_SUITE("operator|=") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::wff_rule
-			|= tau_parser::wff;
+			|| tau_parser::wff;
 		CHECK( args.size() == 0 );
 	}
 
@@ -103,7 +103,7 @@ TEST_SUITE("operator|=") {
 			| tau_parser::library 
 			| tau_parser::rules 
 			| tau_parser::rule 
-			|= tau_parser::bf_rule;
+			|| tau_parser::bf_rule;
 		CHECK( args.size() == 1 );
 	}
 
@@ -120,7 +120,7 @@ TEST_SUITE("operator|=") {
 			| tau_parser::bf_matcher
 			| tau_parser::bf
 			| tau_parser::bf_and
-			|= tau_parser::bf;
+			|| tau_parser::bf;
 		CHECK( args.size() == 2 );
 		CHECK( args[0] == args[1] );		
 	}
