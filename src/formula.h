@@ -226,6 +226,7 @@ template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const sp_tau_node<BAs...>& n, const tau_parser::nonterminal nt) {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
 	std::vector<sp_tau_node<BAs...>> nv;
+	nv.reserve(n->child.size());
 	for (const auto& c: n->child 
 			| std::ranges::views::filter(is_non_terminal<BAs...>(nt))) 
 		nv.push_back(c);
@@ -257,7 +258,7 @@ auto get_nodes(const tau_parser::nonterminal nt) {
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const tau_parser::nonterminal nt) {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
-	std::vector<sp_tau_node<BAs...>> nv;
+	std::vector<sp_tau_node<BAs...>> nv; nv.reserve(v.size());
 	for (const auto& n: v 
 			| std::ranges::views::transform(get_nodes<BAs...>(nt)) 
 			| std::ranges::views::join)
