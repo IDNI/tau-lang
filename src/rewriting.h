@@ -643,6 +643,7 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 
 	auto get_tree = [&f, &t] (auto& g ){
 			f->remove_recursive_nodes(g);
+			f->remove_binarization(g);
 			t = g.extract_trees();
 			#ifdef OUTPUT_PARSED_TREES
 			t->to_print(std::cout);

@@ -205,7 +205,7 @@
 // # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 // main			=> wff dot.
 // rule			=> wff_rule | cbf_rule | bf_rule.
-// rules			=> null | rule | rule rules.
+// rules			=> (rule)*.
 // formula			=> rules main.
 // library 		=> rules.
 // start			=> formula | library.
@@ -220,7 +220,7 @@
 struct tau_parser {
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(153), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(155), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
 		const char* data, size_t size = 0,
 		char eof = std::char_traits<char>::eof())
@@ -254,7 +254,7 @@ struct tau_parser {
 			bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_all_sym, bf_ex_sym, constant, T, bf_builtin, binding, 
 			bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, bf_subs_cb, source_binding, named_binding, type, source, source0, 
 			_Rsource_16, _Rsource_17, bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, bf_neg_cb_sym, subs_cb_sym, main, rule, 
-			rules, formula, library, start, 
+			rules, _Rrules_18, _Rrules_19, formula, library, start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -293,7 +293,7 @@ private:
 			"bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_all_sym", "bf_ex_sym", "constant", "T", "bf_builtin", "binding", 
 			"bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", "bf_subs_cb", "source_binding", "named_binding", "type", "source", "source0", 
 			"_Rsource_16", "_Rsource_17", "bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "bf_neg_cb_sym", "subs_cb_sym", "main", "rule", 
-			"rules", "formula", "library", "start", 
+			"rules", "_Rrules_18", "_Rrules_19", "formula", "library", "start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -539,13 +539,14 @@ private:
 		q(nt(149), (nt(64)));
 		q(nt(149), (nt(88)));
 		q(nt(149), (nt(111)));
-		q(nt(150), (nt(149)));
-		q(nt(150), (nt(149)+nt(150)));
-		q(nt(150), (nul));
-		q(nt(151), (nt(150)+nt(148)));
-		q(nt(152), (nt(150)));
-		q(nt(153), (nt(151)));
-		q(nt(153), (nt(152)));
+		q(nt(151), (nt(149)));
+		q(nt(152), (nt(151)+nt(152)));
+		q(nt(152), (nul));
+		q(nt(150), (nt(152)));
+		q(nt(153), (nt(150)+nt(148)));
+		q(nt(154), (nt(150)));
+		q(nt(155), (nt(153)));
+		q(nt(155), (nt(154)));
 		return q;
 	}
 };

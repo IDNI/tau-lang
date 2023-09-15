@@ -47,23 +47,13 @@ TEST_SUITE("parser: formula") {
 	}
 
 	TEST_CASE("rules") {
-		auto first_rules = frml | tau_parser::formula | tau_parser::rules ;
-		CHECK( first_rules.has_value() );
-		auto second_rules = frml | tau_parser::formula | tau_parser::rules | tau_parser::rules ;
-		CHECK( second_rules.has_value() );
-		auto empty_rules = second_rules | tau_parser::rules ;
-		CHECK( empty_rules.has_value() );
-		auto no_more_rules = empty_rules | tau_parser::rules ;
-		CHECK( !no_more_rules.has_value() );
-		auto no_more_rule = empty_rules | tau_parser::rule ;
-		CHECK( !no_more_rule.has_value() );
+		auto rules = frml | tau_parser::formula | tau_parser::rules ;
+		CHECK( rules.has_value() );
 	}
 
 	TEST_CASE("rule") {
-		auto first_rule = frml | tau_parser::formula | tau_parser::rules | tau_parser::rule;
-		CHECK( first_rule.has_value() );
-		auto second_rule = frml | tau_parser::formula | tau_parser::rules | tau_parser::rules |tau_parser::rule;
-		CHECK( second_rule.has_value() );
+		auto rules = frml | tau_parser::formula | tau_parser::rules || tau_parser::rule;
+		CHECK( rules.size() == 2 );
 	}
 
 	TEST_CASE("main") {
@@ -86,23 +76,13 @@ TEST_SUITE("parser: library") {
 	}
 
 	TEST_CASE("rules") {
-		auto first_rules = lib | tau_parser::library | tau_parser::rules ;
-		CHECK( first_rules.has_value() );
-		auto second_rules = lib | tau_parser::library | tau_parser::rules | tau_parser::rules ;
-		CHECK( second_rules.has_value() );
-		auto empty_rules = second_rules | tau_parser::rules ;
-		CHECK( empty_rules.has_value() );
-		auto no_more_rules = empty_rules | tau_parser::rules ;
-		CHECK( !no_more_rules.has_value() );
-		auto no_more_rule = empty_rules | tau_parser::rule ;
-		CHECK( !no_more_rule.has_value() );
+		auto rules = lib | tau_parser::library | tau_parser::rules ;
+		CHECK( rules.has_value());
 	}
 
 	TEST_CASE("rule") {
-		auto first_rule = lib | tau_parser::library | tau_parser::rules | tau_parser::rule;
-		CHECK( first_rule.has_value() );
-		auto second_rule = lib | tau_parser::library | tau_parser::rules | tau_parser::rules |tau_parser::rule;
-		CHECK( second_rule.has_value() );
+		auto rules = lib | tau_parser::library | tau_parser::rules || tau_parser::rule;
+		CHECK( rules.size() == 2 );
 	}
 }
 
