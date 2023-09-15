@@ -69,15 +69,6 @@ TEST_SUITE("operator|") {
 			| tau_parser::rules;
 		CHECK( args );
 	}
-
-	TEST_CASE("match two node") {
-		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto args = lib 
-			| tau_parser::library;
-		CHECK( args );
-	}
 }
 
 TEST_SUITE("operator||") {
@@ -108,8 +99,8 @@ TEST_SUITE("operator||") {
 	}
 
 	// TODO simplify the test cases
-	TEST_CASE("match two nodes") {
-		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
+	TEST_CASE("match several nodes") {
+		static constexpr char* sample =	"((?Z bf_and ?Z) bf_and (?Z bf_and ?Z)) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib 
@@ -120,8 +111,10 @@ TEST_SUITE("operator||") {
 			| tau_parser::bf_matcher
 			| tau_parser::bf
 			| tau_parser::bf_and
+			|| tau_parser::bf
+			|| tau_parser::bf_and
 			|| tau_parser::bf;
-		CHECK( args.size() == 2 );
+		CHECK( args.size() == 4 );
 		CHECK( args[0] == args[1] );		
 	}
 }

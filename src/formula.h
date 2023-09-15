@@ -235,11 +235,12 @@ std::vector<sp_tau_node<BAs...>> operator||(const sp_tau_node<BAs...>& n, const 
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>>  operator||(const std::optional<sp_tau_node<BAs...>>& n, const tau_parser::nonterminal nt) {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
-	return n ? n.value() || nt : {};
+	if (n) return n.value() || nt;
+	return {};
 }
 
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> get_nodes(const size_t nt, const sp_tau_node<BAs...>& n) {
+std::vector<sp_tau_node<BAs...>> get_nodes(const tau_parser::nonterminal nt, const sp_tau_node<BAs...>& n) {
 	return n || nt;
 }
 
@@ -249,7 +250,7 @@ std::vector<sp_tau_node<BAs...>> get_nodes(const sp_tau_node<BAs...>& n) {
 }
 
 template <typename... BAs>
-auto get_nodes(const size_t nt) {
+auto get_nodes(const tau_parser::nonterminal nt) {
 	return [nt](const sp_tau_node<BAs...>& n) { return get_nodes<BAs...>(nt, n); };
 }
 
