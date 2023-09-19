@@ -749,15 +749,34 @@ tau<BAs...> make_tau() {
 	return tau<BAs...>();
 }
 
+// TODO (DOING) write a clean predicate and apply it before calling make_node_from_string
+auto non_essential_predicates = [] (const sp_tau_source_node& n) {
+	return n->value.nt() == tau_parser::ws
+		|| n->value.nt() == tau_parser::close_brace
+		|| n->value.nt() == tau_parser::open_brace
+		|| n->value.nt() == tau_parser::open_bracket
+		|| n->value.nt() == tau_parser::close_bracket
+		|| n->value.nt() == tau_parser::open_parenthesis
+		|| n->value.nt() == tau_parser::close_parenthesis;
+};
+using non_essential_predicates_t = decltype(non_essential_predicates);
+
+sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
+	return trim_top<non_essential_predicates_t, tau_source_sym, sp_tau_source_node>(tau_source, non_essential_predicates);	
+}
+
 // make a tau source from the given source code string.
-sp_tau_source_node make_tau_source(const std::string source) {
+sp_tau_source_node parse_tau_source(const std::string source) {
 	using parse_lit = idni::lit<char, char>;
 	using parse_location = std::array<size_t, 2UL>;
 	using parse_symbol = std::pair<parse_lit, parse_location>;
-
 	return make_node_from_string<tau_parser, decltype(drop_location<parse_symbol, tau_source_sym>),
-			parse_symbol, tau_source_sym>(drop_location<parse_symbol, tau_source_sym>, 
-			source);
+			parse_symbol, tau_source_sym>(drop_location<parse_symbol, tau_source_sym>, source);
+}
+
+sp_tau_source_node make_tau_source(const std::string source) {
+	auto tau_source = parse_tau_source(source);
+	return clean_tau_source(tau_source);
 }
 
 } // namespace idni::tau
