@@ -65,10 +65,7 @@ open_bracket		=> ws '[' ws.
 close_bracket		=> ws ']' ws.
 open_brace			=> ws '{' ws.
 close_brace			=> ws '}' ws.
-less_than			=> ws '<' ws.
-greater_than		=> ws '>' ws.
 minus				=> ws '-' ws.
-plus				=> ws '+' ws.
 colon				=> ws ':' ws.
 
 # indexes
