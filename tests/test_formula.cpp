@@ -116,6 +116,8 @@ TEST_SUITE("operator||") {
 			|| tau_parser::bf;
 		CHECK( args.size() == 4 );
 		CHECK( args[0] == args[1] );		
+		CHECK( args[0] == args[2] );		
+		CHECK( args[0] == args[3] );		
 	}
 }
 
