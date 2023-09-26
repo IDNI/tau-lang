@@ -730,8 +730,9 @@ formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const 
 
 // apply one tau rule to the given expression
 template<typename... BAs>
-sp_tau_node<BAs...> tau_apply(const rule<tau_sym<BAs...>>& r, const sp_tau_node<BAs...>& n) {
-	// TODO we could also apply only once
+sp_tau_node<BAs...> tau_apply(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n) {
+	// IDEA maybe we could apply only once
+
 	return post_order_traverser(map_transformer(callback_applier<BAs...>()))(apply(r,n));
 }
 
@@ -770,7 +771,7 @@ sp_tau_source_node parse_tau_source(const std::string source) {
 	using parse_lit = idni::lit<char, char>;
 	using parse_location = std::array<size_t, 2UL>;
 	using parse_symbol = std::pair<parse_lit, parse_location>;
-	return make_node_from_string<tau_parser, decltype(drop_location<parse_symbol, tau_source_sym>),
+	return make_node_from_string<tau_parser, drop_location_t<parse_symbol, tau_source_sym>,
 			parse_symbol, tau_source_sym>(drop_location<parse_symbol, tau_source_sym>, source);
 }
 

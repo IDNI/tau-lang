@@ -624,6 +624,8 @@ node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 // drop unnecessary information from the parse tree nodes
 template <typename parse_symbol_t, typename symbol_t>
 auto drop_location = [](const parse_symbol_t& n) -> symbol_t { return n.first; };
+template <typename parse_symbol_t, typename symbol_t>
+using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
 // make a tree from the given source code string.
 template<typename parser_t, typename transformer_t, typename parse_symbol_t, typename symbol_t>
@@ -652,7 +654,7 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 		};
 	f->extract_graphs(f->root(), get_tree);
 
-	map_transformer<decltype(drop_location<parse_symbol_t, symbol_t>), 
+	map_transformer<drop_location_t<parse_symbol_t, symbol_t>, 
 		sp_parse_tree, sp_node<symbol_t>> transform(drop_location<parse_symbol_t, symbol_t>);
 	return post_order_traverser<decltype(transform), decltype(all<sp_parse_tree>),
 		sp_parse_tree, sp_node<symbol_t>>(transform, all<sp_parse_tree>)(t);
