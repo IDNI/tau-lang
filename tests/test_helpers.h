@@ -36,4 +36,5 @@ sp_tau_node<Bool> make_binding(const sp_tau_node<Bool>& statement, const binding
 	return post_order_traverser<decltype(binder), decltype(all<sp_tau_node<Bool>>), sp_tau_node<Bool>>(binder, all<sp_tau_node<Bool>>)(statement);
 }
 
+
 #endif // __TEST_HELPERS_H__

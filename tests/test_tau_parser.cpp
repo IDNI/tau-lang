@@ -512,7 +512,7 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::bf_builtin
+			| tau_parser::bf_cte_cb
 			| tau_parser::bf_and_cb;
 		CHECK( and_cb.has_value() );
 	}
@@ -529,7 +529,7 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::bf_builtin
+			| tau_parser::bf_cte_cb
 			| tau_parser::bf_or_cb;
 		CHECK( or_cb.has_value() );
 	}
@@ -546,7 +546,7 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::bf_builtin
+			| tau_parser::bf_cte_cb
 			| tau_parser::bf_xor_cb;
 		CHECK( xor_cb.has_value() );
 	}
@@ -563,13 +563,13 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::bf_builtin
+			| tau_parser::bf_cte_cb
 			| tau_parser::bf_neg_cb;
 		CHECK( neg_cb.has_value() );
 	}
 
 	TEST_CASE("bf_subs_cb") {
-		static constexpr char* sample =	"$X := { bf_subs_cb $X $X $X}.";
+		static constexpr char* sample =	"$X := bf_subs_cb $X $X $X.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto subs_cb = lib 
@@ -578,9 +578,6 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::constant
-			| tau_parser::bf_builtin
 			| tau_parser::bf_subs_cb;
 		CHECK( subs_cb.has_value() );
 	}
