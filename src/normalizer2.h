@@ -62,11 +62,11 @@ RULE(BF_TRIVIALITY_0, "( 0 = 0 ) := 1.")
 RULE(BF_TRIVIALITY_1, "( 1 = 0 ) :=  0.")
 RULE(BF_TRIVIALITY_2, "( 0 != 0 ) := 0.")
 RULE(BF_TRIVIALITY_3, "( 1 != 0 ) := 1.")
-RULE(BF_SQUEEZE_POSITIVES_0, "(( $X = 0 ) wwf_and ($Y = 0)) := (( $X bf_or $Y ) = 0).")
+RULE(BF_SQUEEZE_POSITIVES_0, "(( $X = 0 ) wff_and ($Y = 0)) := (( $X bf_or $Y ) = 0).")
+// TODO HIGH review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
 // further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) = (a ∨ b) ∧ ¬(a ∧ b))
 // "( ($X bf_and $Y) = 0 ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = 0 )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
-RULE(BF_PROCESS_0, "( ($X bf_and $Y) = 0 ) wwf_and ( ($X bf_and $Z) != 0) := (bf_all $X ( ( $X bf_and $Y$ ) = 0 )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg $X bf_and $Y ) wwf_and $Z )).")
-
+RULE(BF_PROCESS_0, "((($X bf_and $Y) = 0) wff_and (($X bf_and $Z) != 0)) := (bf_all $X ((($X bf_and $Y) = 0 )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
 
 // TODO (HIGH) define rules for wwf and cbf
 
