@@ -21,6 +21,7 @@ struct Bool {
 	
 	Bool operator&(const Bool& x) const;
 	Bool operator|(const Bool& x) const;
+	Bool operator^(const Bool& x) const;
 	Bool operator~() const;
 	auto operator<=>(const Bool& x) const = default;
 	
@@ -30,7 +31,12 @@ struct Bool {
 Bool Bool::operator&(const Bool& x) const {
 	return (*this == false) ? zero() : x;
 }
+
 Bool Bool::operator|(const Bool& x) const {
+	return (*this == true) ? one() : x;
+}
+
+Bool Bool::operator^(const Bool& x) const {
 	return (*this == true) ? one() : x;
 }
 
