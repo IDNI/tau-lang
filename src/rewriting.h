@@ -81,7 +81,19 @@ template <typename node_t>
 static const auto all = [](const node_t&) { return true; };
 
 template <typename node_t>
+using all_t = decltype(all<node_t>);
+
+template <typename node_t>
+static const auto none = [](const node_t&) { return false; };
+
+template <typename node_t>
+using none_t = decltype(none<node_t>);
+
+template <typename node_t>
 static const auto identity = [](const node_t& n) { return n; };
+
+template <typename node_t>
+using identity_t = decltype(identity<node_t>);
 
 // visitor that traverse the tree in post-order (avoiding visited nodes).
 template <typename wrapped_t, typename predicate_t, typename input_node_t, 
@@ -172,6 +184,27 @@ struct map_transformer {
 			if (auto it = changes.find(c); it != changes.end()) 
 				child.push_back(it->second);
 		return changes[n] = make_node(wrapped(n->value), child);
+	}
+
+	std::map<input_node_t, output_node_t> changes;
+	wrapped_t& wrapped;
+};
+
+// visitor that produces nodes transformed accordingly to the 
+// given transformer. It only works with post order traversals.
+template <typename wrapped_t, typename input_node_t, 
+	typename output_node_t = input_node_t>
+struct map_node_transformer {
+
+	map_node_transformer(wrapped_t& wrapped) : wrapped(wrapped) {}
+
+	output_node_t operator()(const input_node_t& n) {
+		std::vector<output_node_t> child;
+		for (const auto& c : n->child) 
+			if (auto it = changes.find(c); it != changes.end()) 
+				child.push_back(it->second);
+			else child.push_back(c);
+		return changes[n] = wrapped(n);
 	}
 
 	std::map<input_node_t, output_node_t> changes;
@@ -638,18 +671,20 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 	sp_parse_tree t;
 	parser_t parser;
 	auto f = parser.parse(source.c_str(), source.size());
-	/* avoiding doctest issues, uncomment for errors
-	if (!f || !parser.found()) {
-		std::cerr << parser.get_error().to_str(); 
-	}*/
+	// MARK output the error if the parser failed
+	// avoiding doctest issues, uncomment for errors
+	//if (!f || !parser.found()) {
+	//	std::cerr << parser.get_error().to_str(); 
+	//}
 
 	auto get_tree = [&f, &t] (auto& g ){
 			f->remove_recursive_nodes(g);
 			f->remove_binarization(g);
 			t = g.extract_trees();
-			#ifdef OUTPUT_PARSED_TREES
+			// MARK output the parsed tree
+			// #ifdef OUTPUT_PARSED_TREES
 			t->to_print(std::cout);
-			#endif // OUTPUT_PARSED_TREES
+			// #endif // OUTPUT_PARSED_TREES
 			return false;
 		};
 	f->extract_graphs(f->root(), get_tree);

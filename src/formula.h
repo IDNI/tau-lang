@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <functional>
 #include <ranges>
+#include <variant>
 
 //#include "tree.h"
 #include "bool.h"
@@ -173,6 +174,30 @@ std::function<bool(const sp_tau_node<BAs...>&)> is_terminal(char c) {
 	return [c](const sp_tau_node<BAs...>& n) { return is_terminal<BAs...>(c, n); };
 }
 
+template<typename... BAs>
+static const auto is_capture = [](const sp_tau_node<BAs...>& n) { 
+	return std::holds_alternative<tau_source_sym>(n->value) 
+		&& get<tau_source_sym>(n->value).nt() 
+		&& get<tau_source_sym>(n->value).n() == tau_parser::capture; 
+};
+
+template<typename... BAs>
+using is_capture_t = decltype(is_capture<BAs...>);
+
+template<typename...BAs>
+static const auto is_callback= [](const sp_tau_node<BAs...>& n) {
+	return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
+		&& get<0>(n->value).nt() == ::tau_parser::bf_and_cb
+		&& get<0>(n->value).nt() == ::tau_parser::bf_or_cb
+		&& get<0>(n->value).nt() == ::tau_parser::bf_neg_cb
+		&& get<0>(n->value).nt() == ::tau_parser::bf_xor_cb
+		&& get<0>(n->value).nt() == ::tau_parser::bf_subs_cb;
+};
+
+template<typename...BAs>
+using is_callback_t = decltype(is_callback<BAs...>);
+
+
 //
 // functions to traverse the tree according to the specified non terminals
 // and collect the corresponding nodes
@@ -273,7 +298,7 @@ std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...
 
 // extract the value of the node
 template<typename... BAs>
-auto value_extractor = [](const sp_tau_node<BAs...>& n) -> tau_sym<BAs...> {
+static const auto value_extractor = [](const sp_tau_node<BAs...>& n) -> tau_sym<BAs...> {
 	return n->value;
 };
 
@@ -282,7 +307,7 @@ using value_extractor_t = decltype(value_extractor<BAs...>);
 
 // returns an optional containing the terminal of the node if possible
 template<typename... BAs>
-auto terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
+static const auto terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
 	auto value = n->value;
 	if (!std::holds_alternative<tau_source_sym>(value)
 			|| get<tau_source_sym>(value).nt() 
@@ -307,7 +332,7 @@ std::optional<char> operator|(const std::optional<sp_tau_node<BAs...>>& o, const
 
 // returns an optional containing the non terminal of the node if possible
 template<typename... BAs>
-auto non_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<size_t> {
+static const auto non_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<size_t> {
 	if (std::holds_alternative<tau_source_sym>(n->value) 
 			&& get<tau_source_sym>(n->value).nt())
 		return std::optional<size_t>(get<tau_source_sym>(n->value).n());
@@ -330,7 +355,7 @@ std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, con
 
 // returns an optional containing the bas... of the node if possible
 template<typename... BAs>
-auto ba_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<std::variant<BAs...>> {
+static const auto ba_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<std::variant<BAs...>> {
 	if (std::holds_alternative<std::variant<BAs...>>(n->value) ) 
 		return std::optional<std::variant<BAs...>>(get<std::variant<BAs...>>(n->value));
 	return std::optional<std::variant<BAs...>>();
@@ -340,8 +365,10 @@ template<typename... BAs>
 using ba_extractor_t = decltype(ba_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const ba_extractor_t<BAs...> e) {
-	return v | std::ranges::views::transform(e); 
+std::vector<std::variant<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const ba_extractor_t<BAs...> e) {
+	std::vector<std::variant<BAs...>> nv;
+	for (const auto& n: v | std::ranges::views::transform(e)) nv.push_back(n.value());
+	return nv;
 }
 
 template <typename... BAs>
@@ -414,33 +441,36 @@ template <typename... BAs>
 struct callback_applier {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-		if (!is_callback(n)) return n;
-		auto os = get<tau_parser::bf_cb_arg>(n);
-		switch (n->get().nt()) {
-			case ::tau_parser::bf_and_cb: return make_shared<tau_node<BAs...>>(*os[0] & *os[1]);
-			case ::tau_parser::bf_or_cb: return make_shared<tau_node<BAs...>>(*os[0] | *os[1]);
-			case ::tau_parser::bf_neg_cb: return make_shared<tau_node<BAs...>>(~*os[0]);
-			case ::tau_parser::bf_xor_cb: return make_shared<tau_node<BAs...>>(*os[0] ^ *os[1]);
-			case ::tau_parser::bf_subs_cb: return apply_subs<BAs...>(n);
+		if (!is_callback<BAs...>(n)) return n;
+		auto bas = n || tau_parser::bf_cb_arg || ba_extractor<BAs...>;
+		auto nt = get<tau_source_sym>(n->value).nt();
+		switch (nt) {
+			case ::tau_parser::bf_and_cb: return make_node<tau_sym<BAs...>>(std::visit(_and, bas[0], bas[1]), {});
+			case ::tau_parser::bf_or_cb: return make_node<tau_sym<BAs...>>(std::visit(_or, bas[0], bas[1]), {});
+			case ::tau_parser::bf_neg_cb: return make_node<tau_sym<BAs...>>(std::visit(_neg, bas[0]), {});
+			case ::tau_parser::bf_xor_cb: return make_node<tau_sym<BAs...>>(std::visit(_xor, bas[0], bas[1]), {});
+			case ::tau_parser::bf_subs_cb: return apply_subs(n);
 			default: return n;
 		}
 	}
 
 private:
-	bool is_callback(const sp_tau_node<BAs...>& n) {
-		return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
-			&& get<0>(n->value).nt() >= ::tau_parser::bf_and_cb
-			&& get<0>(n->value).nt() <= ::tau_parser::bf_subs_cb;
-	}
+
+	static constexpr auto _and = [](const auto& l, const auto& r) { return l & r; };
+	static constexpr auto _or = [](const auto& l, const auto& r) { return l | r; };
+	static constexpr auto _neg = [](const auto& l) { return ~l; };
+	static constexpr auto _xor = [](const auto& l, const auto& r) { return l ^ r; };
 
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
-		auto os = get<tau_parser::bf_cb_arg>(n);
+		auto params = n || tau_parser::bf_cb_arg;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
-		m[os[0]] = os[1];
+		m[params[0]] = params[1];
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
-		return post_order_traverser<decltype(replace), 
-			decltype(all<sp_tau_node<BAs...>>), 
-			sp_tau_node<BAs...>>(replace , all<sp_tau_node<BAs...>>)(os[2]);
+		return post_order_traverser<
+				replace_transformer<sp_tau_node<BAs...>>, 
+				all_t<sp_tau_node<BAs...>>, 
+				sp_tau_node<BAs...>>
+			(replace , all<sp_tau_node<BAs...>>)(params[2]);
 	}	
 };
 
@@ -466,6 +496,9 @@ auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::opti
 	return std::optional<char>();
 };
 
+template <typename... BAs>
+using tau_node_terminal_extractor_t = decltype(tau_node_terminal_extractor<BAs...>);
+
 // TODO remove this extractor and use a previous one
 // extracts terminal from sp_tau_source_node
 auto tau_source_terminal_extractor = [](const sp_tau_source_node& n) -> std::optional<char> {
@@ -473,6 +506,9 @@ auto tau_source_terminal_extractor = [](const sp_tau_source_node& n) -> std::opt
 		return std::optional<char>(n->value.t());
 	return std::optional<char>();
 };
+
+template <typename... BAs>
+using tau_source_terminal_extractor_t = decltype(tau_source_terminal_extractor);
 
 // adds terminal symbols to a given stream, used in conjuction with usual
 // traversals (see make_string_* methods).
@@ -722,7 +758,7 @@ formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const 
 	tauify<BAs...> tf;
 	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	auto m = find_top(src, is_non_terminal<tau_parser::main, BAs...>).value();
-	auto statement = post_order_traverser<binder_t, decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(binder, all<sp_tau_node<BAs...>>)(m);
+	auto statement = post_order_traverser<binder_t, all_t<sp_tau_node<BAs...>>, sp_tau_node<BAs...>>(binder, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
 	for (auto& r: select_top(src, is_non_terminal<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs, statement };
@@ -730,10 +766,15 @@ formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const 
 
 // apply one tau rule to the given expression
 template<typename... BAs>
-sp_tau_node<BAs...> tau_apply(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could apply only once
-
-	return post_order_traverser(map_transformer(callback_applier<BAs...>()))(apply(r,n));
+	callback_applier<BAs...> cb_applier;
+	map_node_transformer<callback_applier<BAs...>, sp_tau_node<BAs...>, sp_tau_node<BAs...>> transformer(cb_applier);
+	return post_order_traverser<
+			map_node_transformer<callback_applier<BAs...>, sp_tau_node<BAs...>, sp_tau_node<BAs...>>,
+			all_t<sp_tau_node<BAs...>>, 
+			sp_tau_node<BAs...>>(
+		transformer, all<sp_tau_node<BAs...>>)(apply(r,n, none<sp_tau_node<BAs...>>, is_capture<BAs...>));
 }
 
 // apply the given rules to the given expression
