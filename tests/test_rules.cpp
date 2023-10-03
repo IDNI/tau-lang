@@ -638,6 +638,7 @@ TEST_SUITE("executing bf rules") {
 	}
 	
 	TEST_CASE("BF_CALLBACK_0") {
+		// TODO (HIGH) this test doesn't test what it should
 		auto src_rule = make_tau_source(BF_CALLBACK_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -649,6 +650,7 @@ TEST_SUITE("executing bf rules") {
 	}
 		
 	TEST_CASE("BF_CALLBACK_1") {
+		// TODO (HIGH) this test doesn't test what it should
 		auto src_rule = make_tau_source(BF_CALLBACK_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -660,6 +662,7 @@ TEST_SUITE("executing bf rules") {
 	}
 		
 	TEST_CASE("BF_CALLBACK_2") {
+		// TODO (HIGH) this test doesn't test what it should
 		auto src_rule = make_tau_source(BF_CALLBACK_2);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -671,6 +674,7 @@ TEST_SUITE("executing bf rules") {
 	}
 		
 	TEST_CASE("BF_CALLBACK_3") {
+		// TODO (HIGH) this test doesn't test what it should
 		auto src_rule = make_tau_source(BF_CALLBACK_3);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
