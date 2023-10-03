@@ -186,12 +186,12 @@ using is_capture_t = decltype(is_capture<BAs...>);
 
 template<typename...BAs>
 static const auto is_callback= [](const sp_tau_node<BAs...>& n) {
-	return n->value.index() == 0 // std::holds_alternative<tau_sym>(*n) 
-		&& get<0>(n->value).nt() == ::tau_parser::bf_and_cb
-		&& get<0>(n->value).nt() == ::tau_parser::bf_or_cb
-		&& get<0>(n->value).nt() == ::tau_parser::bf_neg_cb
-		&& get<0>(n->value).nt() == ::tau_parser::bf_xor_cb
-		&& get<0>(n->value).nt() == ::tau_parser::bf_subs_cb;
+	return std::holds_alternative<tau_source_sym>(n->value) 
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_and_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_or_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_neg_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_xor_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_subs_cb;
 };
 
 template<typename...BAs>
