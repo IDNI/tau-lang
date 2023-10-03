@@ -155,7 +155,7 @@ struct msba<tuple<BDDs...>, aux...> {
 		int_t n, k;
 		auto f = [&s, &n, &k, this](const auto& a, const auto& b) {
 #ifdef DEBUG
-			if constexpr(!is_same_v<decltype(a), decltype(a)>)
+						if constexpr(!is_same_v<decltype(a), decltype(a)>)
 				assert(0);
 #endif
 			if ((a & b) == a) s.insert({n, k});

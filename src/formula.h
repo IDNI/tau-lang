@@ -197,7 +197,6 @@ static const auto is_callback= [](const sp_tau_node<BAs...>& n) {
 template<typename...BAs>
 using is_callback_t = decltype(is_callback<BAs...>);
 
-
 //
 // functions to traverse the tree according to the specified non terminals
 // and collect the corresponding nodes
@@ -356,7 +355,7 @@ std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, con
 // returns an optional containing the bas... of the node if possible
 template<typename... BAs>
 static const auto ba_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<std::variant<BAs...>> {
-	if (std::holds_alternative<std::variant<BAs...>>(n->value) ) 
+	if (std::holds_alternative<std::variant<BAs...>>(n->value)) 
 		return std::optional<std::variant<BAs...>>(get<std::variant<BAs...>>(n->value));
 	return std::optional<std::variant<BAs...>>();
 };
@@ -534,14 +533,14 @@ template <typename extractor_t, typename predicate_t, typename node_t>
 std::string make_string_with_skip(const extractor_t& extractor, predicate_t& skip, const node_t& n) {
 	std::basic_stringstream<char> ss;
 	stringify<extractor_t, node_t> sy(extractor, ss);
-	post_order_tree_traverser<decltype(sy), predicate_t, node_t>(sy, skip)(n);
+	post_order_tree_traverser<stringify<extractor_t, node_t>, predicate_t, node_t>(sy, skip)(n);
 	return ss.str();
 }
 
 // converts a sp_tau_node<...> to a string.
 template <typename extractor_t, typename node_t>
 std::string make_string(const extractor_t& extractor, const node_t& n) {
-	return make_string_with_skip<extractor_t, decltype(all<node_t>), node_t>(extractor, all<node_t>, n);
+	return make_string_with_skip<extractor_t, all_t<node_t>, node_t>(extractor, all<node_t>, n);
 }
 
 // bind the given, using a binder, the constants of the a given sp_tau_node<...>.
@@ -578,6 +577,9 @@ static const auto not_whitespace_predicate = [](const sp_tau_node<BAs...>& n) {
 		|| get<0>(n->value).n() != tau_parser::ws; 
 };
 
+template<typename... BAs>
+using not_whitespace_predicate_t = decltype(not_whitespace_predicate<BAs...>);
+
 // binds the constants of a given binding using the label specified
 // in the code and according to a map from labels to constants in the BAs...
 template<typename... BAs>
@@ -588,8 +590,8 @@ struct name_binder {
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		// FIXME check if the node is a named binding one
 		auto bn = make_string_with_skip<
-			decltype(tau_node_terminal_extractor<BAs...>),
-			decltype(not_whitespace_predicate<BAs...>), 
+			tau_node_terminal_extractor_t<BAs...>,
+			not_whitespace_predicate_t<BAs...>, 
 			sp_tau_node<BAs...>>(tau_node_terminal_extractor<BAs...>, 
 				not_whitespace_predicate<BAs...>, n);
 		auto s = bs.find(bn);
@@ -670,8 +672,8 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
 		m[unresolved.value()] = type;
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
-		return post_order_traverser<decltype(replace), 
-			decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(replace , all<sp_tau_node<BAs...>>)(n);
+		return post_order_traverser<replace_transformer<sp_tau_node<BAs...>>, 
+			all_t<sp_tau_node<BAs...>>, sp_tau_node<BAs...>>(replace , all<sp_tau_node<BAs...>>)(n);
 	}
 }
 
@@ -683,8 +685,8 @@ sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 		if (auto rbf = resolve_type(bf); rbf != bf) changes[bf] = rbf;
 	}
 	replace_transformer<sp_tau_node<BAs...>> rt(changes);
-	return post_order_traverser<decltype(rt), 
-		decltype(all<sp_tau_node<BAs...>>), sp_tau_node<BAs...>>(rt, all<sp_tau_node<BAs...>>)(source);
+	return post_order_traverser<replace_transformer<sp_tau_node<BAs...>>, 
+		all_t<sp_tau_node<BAs...>>, sp_tau_node<BAs...>>(rt, all<sp_tau_node<BAs...>>)(source);
 }
 
 // resolve all the unresolved types in the given rules.
@@ -733,7 +735,7 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 template<typename... BAs>
 library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
-	auto lib = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
+	auto lib = map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	rules<BAs...> rs;
 	for (auto& r: select_top(lib, is_non_terminal<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs };
@@ -744,21 +746,21 @@ template<typename... BAs>
 formula<BAs...> make_formula_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
 	name_binder<BAs...> nb(bindings);
 	bind_transformer<name_binder<BAs...>, BAs...> bs(nb); 
-	return make_formula_using_binder<decltype(bs), BAs...>(tau_source, bs);
+	return make_formula_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
 }
 
 // make a formula from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
 formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, const factory_t& factory) {
 	bind_transformer<factory_t, BAs...> bs(factory);
-	return make_formula_using_binder<decltype(bs), BAs...>(tau_source, bs);
+	return make_formula_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
 }
 
 // make a formula from the given tau source and binder.
 template<typename binder_t, typename... BAs>
 formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const binder_t& binder) {
 	tauify<BAs...> tf;
-	auto src = map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
+	auto src = map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	auto m = find_top(src, is_non_terminal<tau_parser::main, BAs...>).value();
 	auto statement = post_order_traverser<binder_t, all_t<sp_tau_node<BAs...>>, sp_tau_node<BAs...>>(binder, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
@@ -776,7 +778,7 @@ sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 			map_node_transformer<callback_applier<BAs...>, sp_tau_node<BAs...>, sp_tau_node<BAs...>>,
 			all_t<sp_tau_node<BAs...>>, 
 			sp_tau_node<BAs...>>(
-		transformer, all<sp_tau_node<BAs...>>)(apply(r,n, none<sp_tau_node<BAs...>>, is_capture<BAs...>));
+		transformer, all<sp_tau_node<BAs...>>)(apply(r ,n, none<sp_tau_node<BAs...>>, is_capture<BAs...>));
 }
 
 // apply the given rules to the given expression

@@ -323,6 +323,9 @@ struct true_predicate {
 	}
 };
 
+template <typename node_t>
+using true_predicate_t = true_predicate<node_t>;
+
 // always false predicate
 //
 // TODO define a const version of the predicate, move it to rewriter and use
@@ -334,6 +337,9 @@ struct false_predicate {
 		return false;
 	}
 };
+
+template <typename node_t>
+using false_predicate_t = false_predicate<node_t>;
 
 // disjuction of the wrapped predicates.
 //
@@ -353,6 +359,9 @@ struct and_predicate {
 	r_predicate_t& p2;
 };
 
+template <typename l_predicate_t, typename r_predicate_t>
+using and_predicate_t = and_predicate<l_predicate_t, r_predicate_t>;
+
 // disjuction of the wrapped predicates.
 //
 // TODO we use combinators to build logical predicates. This could be simplified
@@ -371,6 +380,9 @@ struct or_predicate {
 	r_predicate_t& p2;
 };
 
+template <typename l_predicate_t, typename r_predicate_t>
+using or_predicate_t = or_predicate<l_predicate_t, r_predicate_t>;
+
 // negation of the wrapped predicate.
 //
 // TODO we use combinators to build logical predicates. This could be simplified
@@ -388,12 +400,15 @@ struct neg_predicate {
 	predicate_t& p;
 };
 
+template <typename predicate_t>
+using neg_predicate_t = neg_predicate<predicate_t>;
+
 // delete all top nodes that satisfy a predicate.
 template <typename predicate_t, typename symbol_t, typename node_t = sp_node<symbol_t>>
 node_t trim_top(const node_t& input, predicate_t& query) {
-	neg_predicate neg(query);
-	map_transformer<decltype(identity<symbol_t>), node_t> map(identity<symbol_t>);
-	return post_order_traverser<decltype(map), decltype(neg), node_t>(map, neg)(input);
+	neg_predicate<predicate_t> neg(query);
+	map_transformer<identity_t<symbol_t>, node_t> map(identity<symbol_t>);
+	return post_order_traverser<map_transformer<identity_t<symbol_t>, node_t>, neg_predicate_t<predicate_t>, node_t>(map, neg)(input);
 }
 
 // select all top nodes that satisfy a predicate and return them.
@@ -401,7 +416,7 @@ template <typename predicate_t, typename node_t>
 std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_top_predicate<predicate_t, node_t> select(query, selected);
-	post_order_traverser<decltype(identity<node_t>), decltype(select), node_t>(identity<node_t>, select)(input);
+	post_order_traverser<identity_t<node_t>, select_top_predicate<predicate_t, node_t>, node_t>(identity<node_t>, select)(input);
 	return selected;
 }
 
@@ -410,7 +425,7 @@ template <typename predicate_t, typename node_t>
 std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_all_predicate<predicate_t, node_t> select(query, selected);
-	post_order_traverser<decltype(identity<node_t>), decltype(select), node_t>(identity<node_t>, select)(input);
+	post_order_traverser<identity_t<node_t>, select_all_predicate<predicate_t, node_t>, node_t>(identity<node_t>, select)(input);
 	return selected;
 }
 
@@ -420,7 +435,7 @@ std::optional<node_t> find_top(const node_t& input,
 		predicate_t& query) {
 	std::optional<node_t> found;
 	auto find_top = find_top_predicate<predicate_t, node_t>(query, found);
-	post_order_traverser<decltype(identity<node_t>), decltype(find_top), node_t>(identity<node_t>, find_top)(input);
+	post_order_traverser<identity_t<node_t>, find_top_predicate<predicate_t, node_t>, node_t>(identity<node_t>, find_top)(input);
 	return found;
 }
 
@@ -461,7 +476,7 @@ std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	std::optional<node_t> node;
 	while_not_found_predicate<node_t> not_found(node);
 	find_visitor<predicate_t, node_t> fv(query, node);
-	post_order_traverser<decltype(fv), decltype(not_found), node_t>(fv, not_found)(input);
+	post_order_traverser<find_visitor<predicate_t, node_t>, while_not_found_predicate<node_t>, node_t>(fv, not_found)(input);
 	return node;
 }
 
@@ -643,13 +658,13 @@ template <typename node_t, typename matcher_t>
 node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 	// TODO check if this could be improved using a composed transformer
 	// that deals with the matcher and the substitution.
-	post_order_traverser<decltype(identity<node_t>), decltype(matcher), node_t>(identity<node_t>, matcher)(n);
+	post_order_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
 	if (matcher.matched) {
 		replace_transformer<node_t> replace {matcher.env};
-		auto nn = post_order_traverser<decltype(replace), decltype(all<node_t>), node_t>(replace, all<node_t>)(s);
+		auto nn = post_order_traverser<replace_transformer<node_t>,all_t<node_t>, node_t>(replace, all<node_t>)(s);
 		environment<node_t> nu { {matcher.matched.value(), nn} };
 		replace_transformer<node_t> nreplace {nu};
-		return post_order_traverser<decltype(nreplace), decltype(all<node_t>), node_t>(nreplace, all<node_t>)(n);
+		return post_order_traverser<replace_transformer<node_t>, all_t<node_t>, node_t>(nreplace, all<node_t>)(n);
 	}
 	return n;
 }
@@ -691,8 +706,11 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 
 	map_transformer<drop_location_t<parse_symbol_t, symbol_t>, 
 		sp_parse_tree, sp_node<symbol_t>> transform(drop_location<parse_symbol_t, symbol_t>);
-	return post_order_traverser<decltype(transform), decltype(all<sp_parse_tree>),
-		sp_parse_tree, sp_node<symbol_t>>(transform, all<sp_parse_tree>)(t);
+	return post_order_traverser<
+			map_transformer<drop_location_t<parse_symbol_t, symbol_t>, sp_parse_tree, sp_node<symbol_t>>, 
+			all_t<sp_parse_tree>,
+			sp_parse_tree, sp_node<symbol_t>>
+		(transform, all<sp_parse_tree>)(t);
 }
 
 // TODO (MEDIUM) add replace function that takes a node, a substitute and a root
