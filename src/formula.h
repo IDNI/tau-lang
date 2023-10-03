@@ -717,11 +717,13 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	auto type = non_terminal_extractor<BAs...>(rule->child[0]).value();
 	switch(type) {
 		case ::tau_parser::wff_rule:
-			return { (rule | ::tau_parser::wff_ref).value() , (rule | ::tau_parser::wff).value() };
+			// TODO (HIGH) consider also wff_ref 
+			return { (rule | ::tau_parser::wff_rule | tau_parser::wff_matcher).value() , (rule | ::tau_parser::wff_rule | ::tau_parser::wff).value() };
 		case ::tau_parser::cbf_rule:
-			return { (rule | ::tau_parser::cbf_ref).value(), (rule | ::tau_parser::cbf).value() };
+			// TODO (HIGH) consider also cbf_ref 
+			return { (rule | ::tau_parser::cbf_rule | tau_parser::cbf_matcher).value(), (rule | ::tau_parser::cbf_rule | ::tau_parser::cbf).value() };
 		case ::tau_parser::bf_rule:
-			return { (rule | ::tau_parser::bf).value(), (rule | ::tau_parser::bf).value() };
+			return { (rule | ::tau_parser::bf_rule | tau_parser::bf_matcher).value(), (rule | ::tau_parser::bf_rule | ::tau_parser::bf).value() };
 		default:
 			assert(false); // error in grammar or parser
 	} 
