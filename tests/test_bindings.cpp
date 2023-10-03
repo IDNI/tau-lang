@@ -25,9 +25,32 @@ using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("bindings") {
+TEST_SUITE("bindings: basic") {
 
-	TEST_CASE("dummy") {
-		CHECK( false );
+	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
+		static constexpr char* sample =	"$X := $X.";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		bindings<Bool> bs; bs["binding"] = { Bool(true) };
+		auto binded = make_binding(statement, bs);
+		CHECK( binded == statement );
+	}
+
+	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
+		static constexpr char* sample =	"{ binding } := { binding }.";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		bindings<Bool> bs; bs["binding"] = { Bool(true) };
+		auto binded = make_binding(statement, bs);
+		CHECK( binded != statement );
+	}
+
+	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
+		static constexpr char* sample =	"{ non_matching } := { non_matching }.";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		bindings<Bool> bs; bs["binding"] = { Bool(true) };
+		auto binded = make_binding(statement, bs);
+		CHECK( binded == statement );
 	}
 }
