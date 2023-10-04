@@ -25,10 +25,101 @@ using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("type system") {
+TEST_SUITE("is_resolved_predicate") {
 
-	TEST_CASE("dummy") {
-		CHECK( false );
+	TEST_CASE("is_resolved_predicate: true") {
+		static constexpr char* sample =	"$X := { type : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto type = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding
+			| tau_parser::type;
+		CHECK( type.has_value() );	
+		CHECK( is_resolved_predicate<Bool>(type.value()) );	
 	}
 
+	TEST_CASE("is_resolved_predicate: false") {
+		static constexpr char* sample =	"$X := { : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto type = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding
+			| tau_parser::type;
+		CHECK( type.has_value() );	
+		CHECK( !is_resolved_predicate<Bool>(type.value()) );	
+	}
+}
+
+TEST_SUITE("is_unresolved_predicate") {
+
+	TEST_CASE("is_resolved_predicate: true") {
+		static constexpr char* sample =	"$X := { : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto type = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding
+			| tau_parser::type;
+		CHECK( type.has_value() );	
+		CHECK( is_unresolved_predicate<Bool>(type.value()) );	
+	}
+
+	TEST_CASE("is_unresolved_predicate: false") {
+		static constexpr char* sample =	"$X := { type : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto type = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule
+			| tau_parser::bf_rule
+			| tau_parser::bf
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| tau_parser::binding
+			| tau_parser::source_binding
+			| tau_parser::type;
+		CHECK( type.has_value() );	
+		CHECK( !is_unresolved_predicate<Bool>(type.value()) );	
+	}
+}
+
+TEST_SUITE("is_unresolved") {
+
+	TEST_CASE("is_resolved_predicate: true") {
+		static constexpr char* sample =	"$X := { : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		CHECK( is_unresolved<Bool>(lib) );	
+	}
+
+	TEST_CASE("is_unresolved_predicate: false") {
+		static constexpr char* sample =	"$X := { type : binding }.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		CHECK( !is_unresolved<Bool>(lib) );	
+	}
 }

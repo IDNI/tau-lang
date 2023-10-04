@@ -79,7 +79,7 @@ TEST_SUITE("factory bindings") {
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		auto binded = make_factory_bindings<dummy_factory>(statement, factory);
-		TODO (LOW) check that the binding was properly replaced
+		//TODO (LOW) check that the binding was properly replaced
 		CHECK( binded != statement );
 	}
 
