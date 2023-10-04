@@ -688,18 +688,20 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 	// if (!is_non_terminal<tau_parser::bf, BAs...>(n)) return n;
 	if (auto unresolved = is_unresolved(n); unresolved) {
 		// always we have type information or it is not needed at all
-		auto type = find_bottom(n, is_resolved_predicate<BAs...>).value();
-		// TODO this should be extracted to a function in rewriting as it is 
-		// a common pattern.
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
-		m[unresolved.value()] = type;
-		replace_transformer<sp_tau_node<BAs...>> replace{m};
-		return post_order_traverser<
-				replace_transformer<sp_tau_node<BAs...>>, 
-				all_t<sp_tau_node<BAs...>>, 
-				sp_tau_node<BAs...>>(
-			replace , all<sp_tau_node<BAs...>>)(n);
+		if (auto type = find_bottom(n, is_resolved_predicate<BAs...>); type) { 
+			// TODO this should be extracted to a function in rewriting as it is 
+			// a common pattern.
+			std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
+			m[unresolved.value()] = type.value();
+			replace_transformer<sp_tau_node<BAs...>> replace{m};
+			return post_order_traverser<
+					replace_transformer<sp_tau_node<BAs...>>, 
+					all_t<sp_tau_node<BAs...>>, 
+					sp_tau_node<BAs...>>(
+				replace , all<sp_tau_node<BAs...>>)(n);
+		}
 	}
+	return n;
 }
 
 // resolve all the unresolved types in the given statement.

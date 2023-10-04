@@ -408,7 +408,11 @@ template <typename predicate_t, typename symbol_t, typename node_t = sp_node<sym
 node_t trim_top(const node_t& input, predicate_t& query) {
 	neg_predicate<predicate_t> neg(query);
 	map_transformer<identity_t<symbol_t>, node_t> map(identity<symbol_t>);
-	return post_order_traverser<map_transformer<identity_t<symbol_t>, node_t>, neg_predicate_t<predicate_t>, node_t>(map, neg)(input);
+	return post_order_traverser<
+			map_transformer<identity_t<symbol_t>, node_t>, 
+			neg_predicate_t<predicate_t>, 
+			node_t>(
+		map, neg)(input);
 }
 
 // select all top nodes that satisfy a predicate and return them.
@@ -416,7 +420,11 @@ template <typename predicate_t, typename node_t>
 std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_top_predicate<predicate_t, node_t> select(query, selected);
-	post_order_traverser<identity_t<node_t>, select_top_predicate<predicate_t, node_t>, node_t>(identity<node_t>, select)(input);
+	post_order_traverser<
+			identity_t<node_t>, 
+			select_top_predicate<predicate_t, node_t>, 
+			node_t>(
+		identity<node_t>, select)(input);
 	return selected;
 }
 
@@ -425,7 +433,11 @@ template <typename predicate_t, typename node_t>
 std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_all_predicate<predicate_t, node_t> select(query, selected);
-	post_order_traverser<identity_t<node_t>, select_all_predicate<predicate_t, node_t>, node_t>(identity<node_t>, select)(input);
+	post_order_traverser<
+			identity_t<node_t>, 
+			select_all_predicate<predicate_t, node_t>, 
+			node_t>(
+		identity<node_t>, select)(input);
 	return selected;
 }
 
@@ -435,7 +447,11 @@ std::optional<node_t> find_top(const node_t& input,
 		predicate_t& query) {
 	std::optional<node_t> found;
 	auto find_top = find_top_predicate<predicate_t, node_t>(query, found);
-	post_order_traverser<identity_t<node_t>, find_top_predicate<predicate_t, node_t>, node_t>(identity<node_t>, find_top)(input);
+	post_order_traverser<
+			identity_t<node_t>, 
+			find_top_predicate<predicate_t, node_t>, 
+			node_t>(
+		identity<node_t>, find_top)(input);
 	return found;
 }
 
