@@ -460,10 +460,9 @@ struct find_visitor {
 	
 	find_visitor(predicate_t& query, std::optional<node_t>& found) : query(query), found(found) {}
 
-	void operator()(const node_t& n) const {
-		if (query(n)) {
-			found = n;
-		}
+	node_t operator()(const node_t& n) const {
+		if (!found && query(n)) found = n;
+		return n;
 	}
 
 	predicate_t& query;
@@ -475,8 +474,12 @@ template <typename predicate_t, typename node_t>
 std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	std::optional<node_t> node;
 	while_not_found_predicate<node_t> not_found(node);
-	find_visitor<predicate_t, node_t> fv(query, node);
-	post_order_traverser<find_visitor<predicate_t, node_t>, while_not_found_predicate<node_t>, node_t>(fv, not_found)(input);
+	find_visitor<predicate_t, node_t> find(query, node);
+	post_order_traverser<
+			find_visitor<predicate_t, node_t>, 
+			while_not_found_predicate<node_t>, 
+			node_t>(
+		find, not_found)(input);
 	return node;
 }
 
