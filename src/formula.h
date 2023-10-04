@@ -636,23 +636,37 @@ struct factory_binder {
 //
 // TODO add static definition for is_unresolved and update code
 template<typename... BAs>
-struct is_unresolved_predicate {
-	
-	bool operator()(const sp_tau_node<BAs...>& n) {
-		return is_non_terminal<tau_parser::type, BAs...>(n) && make_string(n).empty();
-	}
-};
+static const auto is_unresolved_predicate = [](const sp_tau_node<BAs...>& n) {
+	if (!is_non_terminal<tau_parser::type, BAs...>(n)) return false;
+	auto type_name = make_string_with_skip<
+			tau_node_terminal_extractor_t<BAs...>,
+			not_whitespace_predicate_t<BAs...>, 
+			sp_tau_node<BAs...>>(
+			tau_node_terminal_extractor<BAs...>, 
+		not_whitespace_predicate<BAs...>, n);
+	return type_name.empty();
+};	
+
+template<typename... BAs>
+using is_unresolved_predicate_t = decltype(is_unresolved_predicate<BAs...>);
 
 // check if the type is resolved.
 //
 // TODO add static definition for is_resolved and update code
 template<typename... BAs>
-struct is_resolved_predicate {
-	
-	bool operator()(const sp_tau_node<BAs...>& n) {
-		return is_non_terminal<tau_parser::type, BAs...>(n) || !make_string(n).empty();
-	}
+static const auto is_resolved_predicate = [](const sp_tau_node<BAs...>& n) {
+	if (!is_non_terminal<tau_parser::type, BAs...>(n)) return false;
+	auto type_name = make_string_with_skip<
+			tau_node_terminal_extractor_t<BAs...>,
+			not_whitespace_predicate_t<BAs...>, 
+			sp_tau_node<BAs...>>(
+			tau_node_terminal_extractor<BAs...>, 
+		not_whitespace_predicate<BAs...>, n);
+	return !type_name.empty();
 };
+
+template<typename... BAs>
+using is_resolved_predicate_t = decltype(is_resolved_predicate<BAs...>);
 
 // TODO add static definition for is_unresolved_predicate and update code
 // TODO add static definition for is_resolved_predicate and update code
@@ -663,7 +677,7 @@ struct is_resolved_predicate {
 // TODO rename to find_unresolved
 template<typename... BAs>
 std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
-	return find_top(n, is_unresolved_predicate<BAs...>());
+	return find_top(n, is_unresolved_predicate<BAs...>);
 }
 
 // resolve all the unresolved types in the given expression. the types are
@@ -680,8 +694,11 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
 		m[unresolved.value()] = type;
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
-		return post_order_traverser<replace_transformer<sp_tau_node<BAs...>>, 
-			all_t<sp_tau_node<BAs...>>, sp_tau_node<BAs...>>(replace , all<sp_tau_node<BAs...>>)(n);
+		return post_order_traverser<
+				replace_transformer<sp_tau_node<BAs...>>, 
+				all_t<sp_tau_node<BAs...>>, 
+				sp_tau_node<BAs...>>(
+			replace , all<sp_tau_node<BAs...>>)(n);
 	}
 }
 
@@ -693,8 +710,11 @@ sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 		if (auto rbf = resolve_type(bf); rbf != bf) changes[bf] = rbf;
 	}
 	replace_transformer<sp_tau_node<BAs...>> rt(changes);
-	return post_order_traverser<replace_transformer<sp_tau_node<BAs...>>, 
-		all_t<sp_tau_node<BAs...>>, sp_tau_node<BAs...>>(rt, all<sp_tau_node<BAs...>>)(source);
+	return post_order_traverser<
+			replace_transformer<sp_tau_node<BAs...>>, 
+			all_t<sp_tau_node<BAs...>>, 
+			sp_tau_node<BAs...>>(
+		rt, all<sp_tau_node<BAs...>>)(source);
 }
 
 // resolve all the unresolved types in the given rules.
