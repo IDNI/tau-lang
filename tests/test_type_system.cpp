@@ -138,6 +138,7 @@ TEST_SUITE("resolve_type") {
 			| tau_parser::bf;
 		auto result = resolve_type<Bool>(unresolved.value());
 		CHECK( result != unresolved.value() );	
+		CHECK( !is_unresolved<Bool>(result) );
 	}
 
 	TEST_CASE("resolved case") {
