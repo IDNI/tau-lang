@@ -25,14 +25,14 @@ using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("bindings: basic") {
+TEST_SUITE("named bindings") {
 
 	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
 		static constexpr char* sample =	"$X := $X.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
-		auto binded = make_binding(statement, bs);
+		auto binded = make_named_bindings(statement, bs);
 		CHECK( binded == statement );
 	}
 
@@ -41,7 +41,7 @@ TEST_SUITE("bindings: basic") {
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
-		auto binded = make_binding(statement, bs);
+		auto binded = make_named_bindings(statement, bs);
 		CHECK( binded != statement );
 	}
 
@@ -50,7 +50,44 @@ TEST_SUITE("bindings: basic") {
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
-		auto binded = make_binding(statement, bs);
+		auto binded = make_named_bindings(statement, bs);
+		CHECK( binded == statement );
+	}
+}
+
+TEST_SUITE("factory bindings") {
+
+	struct dummy_factory {
+
+		sp_tau_node<Bool> build(const std::string type_name, const sp_tau_node<Bool>& n) {
+			return type_name == "bool" ? make_node<tau_sym<Bool>>(Bool(true), {}) : n;
+		}
+	};
+
+	static auto factory = dummy_factory();
+
+	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
+		static constexpr char* sample =	"$X := $X.";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		auto binded = make_factory_bindings<dummy_factory>(statement, factory);
+		CHECK( binded == statement );
+	}
+
+	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
+		static constexpr char* sample =	"{ binding } := { bool : some_source_sode }.";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		auto binded = make_factory_bindings<dummy_factory>(statement, factory);
+		TODO (LOW) check that the binding was properly replaced
+		CHECK( binded != statement );
+	}
+
+	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
+		static constexpr char* sample =	"{ non_matching } := { non_bool: some_source_code }.";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		auto binded = make_factory_bindings<dummy_factory>(statement, factory);
 		CHECK( binded == statement );
 	}
 }

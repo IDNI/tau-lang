@@ -24,17 +24,36 @@ namespace testing = doctest;
 // helper functions
 sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {
 	tauify<Bool> tf;
-	map_transformer<decltype(tf), sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
-	return post_order_traverser<decltype(transform), decltype(all<sp_tau_source_node>),
-		sp_node<tau_source_sym>, sp_tau_node<Bool>>(transform, all<sp_tau_source_node>)(source);
+	map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
+	return post_order_traverser<
+			map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>>, 
+			all_t<sp_tau_source_node>, 
+			sp_node<tau_source_sym>, 
+			sp_tau_node<Bool>>(
+		transform, all<sp_tau_source_node>)(source);
 }
 
-sp_tau_node<Bool> make_binding(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
+sp_tau_node<Bool> make_named_bindings(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
 	true_predicate<sp_tau_node<Bool>> always;
 	name_binder<Bool> nb(bs);
-	bind_transformer<decltype(nb), Bool> binder(nb); 
-	return post_order_traverser<decltype(binder), decltype(all<sp_tau_node<Bool>>), sp_tau_node<Bool>>(binder, all<sp_tau_node<Bool>>)(statement);
+	bind_transformer<name_binder<Bool>, Bool> binder(nb); 
+	return post_order_traverser<
+			bind_transformer<name_binder<Bool>, Bool>, 
+			all_t<sp_tau_node<Bool>>, 
+			sp_tau_node<Bool>>(
+		binder, all<sp_tau_node<Bool>>)(statement);
 }
 
+template<typename factory_t>
+sp_tau_node<Bool> make_factory_bindings(const sp_tau_node<Bool>& statement, factory_t& factory) {
+	true_predicate<sp_tau_node<Bool>> always;
+	factory_binder<factory_t, Bool> fb(factory);
+	bind_transformer<factory_binder<factory_t, Bool>, Bool> binder(fb); 
+	return post_order_traverser<
+			bind_transformer<factory_binder<factory_t, Bool>, Bool>, 
+			all_t<sp_tau_node<Bool>>, 
+			sp_tau_node<Bool>>(
+		binder, all<sp_tau_node<Bool>>)(statement);
+}
 
 #endif // __TEST_HELPERS_H__
