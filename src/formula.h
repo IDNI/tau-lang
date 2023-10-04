@@ -185,7 +185,7 @@ template<typename... BAs>
 using is_capture_t = decltype(is_capture<BAs...>);
 
 template<typename...BAs>
-static const auto is_callback= [](const sp_tau_node<BAs...>& n) {
+static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value) 
 		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_and_cb
 		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_or_cb
@@ -547,7 +547,7 @@ std::string make_string(const extractor_t& extractor, const node_t& n) {
 template<typename binder_t, typename... BAs>
 struct bind_transformer {
 
-	bind_transformer(const binder_t& binder) : binder(binder) {}
+	bind_transformer(binder_t& binder) : binder(binder) {}
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
 		if (auto it = changes.find(n); it != changes.end()) return it->second;
@@ -566,7 +566,7 @@ struct bind_transformer {
 	}
 
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	const binder_t binder;
+	binder_t binder;
 };
 
 // is not a whitespace predicate
@@ -590,10 +590,11 @@ struct name_binder {
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		// FIXME check if the node is a named binding one
 		auto bn = make_string_with_skip<
-			tau_node_terminal_extractor_t<BAs...>,
-			not_whitespace_predicate_t<BAs...>, 
-			sp_tau_node<BAs...>>(tau_node_terminal_extractor<BAs...>, 
-				not_whitespace_predicate<BAs...>, n);
+				tau_node_terminal_extractor_t<BAs...>,
+				not_whitespace_predicate_t<BAs...>, 
+				sp_tau_node<BAs...>>(
+			tau_node_terminal_extractor<BAs...>, 
+			not_whitespace_predicate<BAs...>, n);
 		auto s = bs.find(bn);
 		if (s != bs.end()) {
 			tau_sym<BAs...> ts = s->second;
@@ -610,18 +611,25 @@ struct name_binder {
 template<typename factory_t, typename... BAs>
 struct factory_binder {
 
-	factory_binder(const factory_t& factory) : factory(factory) {}
+	factory_binder(factory_t& factory) : factory(factory) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		// FIXME check that the node is a factory binding one
-		if(auto type = find_top(n, is_non_terminal<tau_parser::type, BAs...>); type)
+		if(auto type = find_top(n, is_non_terminal<tau_parser::type, BAs...>); type) {
 			// the factory take two arguments, the first is the type and the 
 			// second is the node representing the constant.
-			return factory.build(type, n);
-		else return n;
+			auto type_name = make_string_with_skip<
+					tau_node_terminal_extractor_t<BAs...>,
+					not_whitespace_predicate_t<BAs...>, 
+					sp_tau_node<BAs...>>(
+				tau_node_terminal_extractor<BAs...>, 
+				not_whitespace_predicate<BAs...>, type.value());
+			return factory.build(type_name, n);
+		}
+		return n;
 	}
 
-	const factory_t& factory;
+	factory_t& factory;
 };
 
 // check if the type is unresolved.
