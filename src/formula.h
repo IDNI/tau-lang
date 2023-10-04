@@ -684,11 +684,11 @@ std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
 // resolved to the first bottom type resolved in the expression.
 template<typename... BAs>
 sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
-	// should not be call with other that bfs.
+	// REVIEW (MEDIUM) should this be called only with bfs?
 	// if (!is_non_terminal<tau_parser::bf, BAs...>(n)) return n;
 	if (auto unresolved = is_unresolved(n); unresolved) {
 		// always we have type information or it is not needed at all
-		auto type = find_bottom(n, is_resolved_predicate<BAs...>()).value();
+		auto type = find_bottom(n, is_resolved_predicate<BAs...>).value();
 		// TODO this should be extracted to a function in rewriting as it is 
 		// a common pattern.
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;

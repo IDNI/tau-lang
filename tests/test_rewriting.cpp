@@ -724,9 +724,65 @@ TEST_SUITE("find_top") {
 	}
 }
 
-// TODO write tests for while_not_found_predicate
-// TODO write tests for find_visitor
-// TODO (HIGH) write tests for find_bottom
+// TODO (LOW) write tests for while_not_found_predicate
+// TODO (LOW) write tests for find_visitor
+
+TEST_SUITE("find_bottom") {
+
+	TEST_CASE("find_bottom: given a simple tree and a predicate not satisfied by "
+			"the root, it returns an empty optional") {
+		sp_node<char> root = n('a');
+		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
+		CHECK( !find_bottom<decltype(predicate), sp_node<char>>(root, predicate) );
+	}
+
+	TEST_CASE("find_bottom: given a simple tree and a predicate satisfied by the "
+			"root, it returns the root") {
+		sp_node<char> root = n('a');
+		auto predicate = [](sp_node<char> n) { return n->value == 'a'; };
+		optional<sp_node<char>> expected {root};
+		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("find_bottom: given a tree with two children -the right one matching "
+			"the predicate-, it returns the matching node") {
+		sp_node<char> root = n('a', {n('b'), n('c')});
+		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
+		optional<sp_node<char>> expected {n('c')};
+		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("find_bottom: given a tree with two children -the left one matching "
+			"the predicate-, it returns the matching node") {
+		sp_node<char> root = n('a', {n('b'), n('c')});
+		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
+		optional<sp_node<char>> expected {n('b')};
+		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("find_bottom: given a tree with two children -both matching the "
+			"predicate-, it returns the first matching node") {
+		sp_node<char> root = n('a', {n('b'), n('c')});
+		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
+		optional<sp_node<char>> expected { n('b') }; 
+		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
+		CHECK( result == expected );
+	}
+
+	TEST_CASE("find_bottom: given a tree with an underlying diamond like DAG "
+			"and a predicate satisfied by the bottom nodes, it returns the "
+			"first matching node") {
+		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](sp_node<char> n) { 
+			return n->value == 'b' || n->value == 'c' || n->value == 'd'; };
+		optional<sp_node<char>> expected { n('d') }; 
+		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
+		CHECK( result == expected );
+	}
+}
 
 TEST_SUITE("pattern_matcher") {
 
