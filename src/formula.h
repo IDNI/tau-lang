@@ -691,9 +691,9 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 		if (auto type = find_bottom(n, is_resolved_predicate<BAs...>); type) { 
 			// TODO this should be extracted to a function in rewriting as it is 
 			// a common pattern.
-			std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
-			m[unresolved.value()] = type.value();
-			replace_transformer<sp_tau_node<BAs...>> replace{m};
+			std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> change;
+			change[unresolved.value()] = type.value();
+			replace_transformer<sp_tau_node<BAs...>> replace{change};
 			return post_order_traverser<
 					replace_transformer<sp_tau_node<BAs...>>, 
 					all_t<sp_tau_node<BAs...>>, 
