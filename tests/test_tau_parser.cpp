@@ -353,6 +353,96 @@ TEST_SUITE("parser: bf formulas ") {
 		// TODO (MEDIUM) add checks for the xor formula
 	}
 
+	TEST_CASE("bf_less") {
+		static constexpr char* sample =	"(?Z bf_less ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto less_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::bf_rule
+			| tau_parser::bf_matcher
+			| tau_parser::bf
+			| tau_parser::bf_less;
+		CHECK( less_rule.has_value() );
+	}
+
+	TEST_CASE("bf_less_equal") {
+		static constexpr char* sample =	"(?Z bf_less_equal ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto less_equal_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::bf_rule
+			| tau_parser::bf_matcher
+			| tau_parser::bf
+			| tau_parser::bf_less_equal;
+		CHECK( less_equal_rule.has_value() );
+	}
+
+	TEST_CASE("bf_greater") {
+		static constexpr char* sample =	"(?Z bf_greater ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto greater_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::bf_rule
+			| tau_parser::bf_matcher
+			| tau_parser::bf
+			| tau_parser::bf_greater;
+		CHECK( greater_rule.has_value() );
+	}
+
+	TEST_CASE("bf_imply") {
+		static constexpr char* sample =	"(?Z bf_imply ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto imply_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::bf_rule
+			| tau_parser::bf_matcher
+			| tau_parser::bf
+			| tau_parser::bf_imply;
+		CHECK( imply_rule.has_value() );
+	}
+
+	TEST_CASE("bf_coimply") {
+		static constexpr char* sample =	"(?Z bf_coimply ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto coimply_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::bf_rule
+			| tau_parser::bf_matcher
+			| tau_parser::bf
+			| tau_parser::bf_coimply;
+		CHECK( coimply_rule.has_value() );
+	}
+
+	TEST_CASE("bf_equiv") {
+		static constexpr char* sample =	"(?Z bf_equiv ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto equiv_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::bf_rule
+			| tau_parser::bf_matcher
+			| tau_parser::bf
+			| tau_parser::bf_equiv;
+		CHECK( equiv_rule.has_value() );
+	}
+
 	TEST_CASE("bf_all") {
 		static constexpr char* sample =	"bf_all ?Z ?Z := ?Z.";
 		auto src = make_tau_source(sample);
