@@ -58,6 +58,15 @@ RULE(BF_SKIP_CONSTANTS_0, "({ $X } bf_and $Y) := ($Y bf_and { $X }).")
 RULE(BF_ROTATE_LITERALS_0, "( $X bf_and ( $Y bf_and $Z ) ) := ( $Y bf_and ( $Z bf_and $X ) ).")
 RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_and $Y ) bf_and $Z ) := ( ( $Y bf_and $Z ) bf_and $X ).")
 
+// bf definitions of <, <=, >, xor, ->, <- and <->.
+//RULE(BF_DEF_LESS, "( $X bf_less $Y ) := ")
+//RULE(BF_DEF_LESS_EQUAL, "( $X bf_less_equal $Y ) := ")
+//RULE(BF_DEF_GREATER, "( $X bf_greater $Y ) := ")
+RULE(BF_DEF_XOR, "( $X bf_xor $Y ) := (( $X bf_and bf_neg $Y ) bf_or ( bf_neg $X bf_and $Y )).")
+RULE(BF_DEF_IMPLY, "( $X bf_imply $Y ) := ( bf_neg $X bf_or $Y).")
+RULE(BF_DEF_COIMPLY, "( $X bf_coimply $Y ) := ( $Y bf_imply $X).")
+RULE(BF_DEF_EQUIV, "( $X bf_equiv $Y ) := (( $X bf_imply $Y ) bf_and ( $Y bf_imply $X )).")
+
 // wff rules
 RULE(BF_TRIVIALITY_0, "( F = F ) := T.")
 RULE(BF_TRIVIALITY_1, "( T = F ) :=  F.")
@@ -65,11 +74,11 @@ RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
 RULE(BF_TRIVIALITY_3, "( T != F ) := T.")
 RULE(BF_SQUEEZE_POSITIVES_0, "(( $X = F ) wff_and ($Y = F)) := (( $X bf_or $Y ) = F).")
 // TODO (VERY HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
-
-
 // further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) = (a ∨ b) ∧ ¬(a ∧ b))
 // "( ($X bf_and $Y) = F ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
 RULE(BF_PROCESS_0, "((($X bf_and $Y) = 0) wff_and (($X bf_and $Z) != 0)) := (bf_all $X ((($X bf_and $Y) = F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
+
+// TODO (HIGH) add rules defining <- <-> -> + <= < >
 
 // TODO (HIGH) define rules for wwf and cbf
 
@@ -103,17 +112,26 @@ const std::string system =
 	+ BF_CALLBACK_1 
 	+ BF_CALLBACK_2 
 	+ BF_CALLBACK_3 
-	+ BF_SQUEEZE_POSITIVES_0 
 	+ BF_FUNCTIONAL_QUANTIFIERS_0 
 	+ BF_FUNCTIONAL_QUANTIFIERS_1 
 	+ BF_PROCESS_0 
 	+ BF_SKIP_CONSTANTS_0 
 	+ BF_ROTATE_LITERALS_0	
 	+ BF_ROTATE_LITERALS_1 
+
+//	+ BF_DEF_LESS
+//	+ BF_DEF_LESS_EQUAL
+//	+ BF_DEF_GREATER
+	+ BF_DEF_XOR
+	+ BF_DEF_IMPLY
+	+ BF_DEF_COIMPLY
+	+ BF_DEF_EQUIV
+
 	+ BF_TRIVIALITY_0 
 	+ BF_TRIVIALITY_1 
 	+ BF_TRIVIALITY_2 
-	+ BF_TRIVIALITY_3;
+	+ BF_TRIVIALITY_3
+	+ BF_SQUEEZE_POSITIVES_0;
 
 // CHECK could we assume we are working with the product algebra?
 // this should be used in conjuction with std::set. it must provide
