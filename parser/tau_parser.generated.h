@@ -170,8 +170,8 @@
 // 
 // #constants, test_bf is included for testing purposes only
 // constant		=> bf_cte_cb | binding | capture | ignore.
-// T				=> ws '1' ws.
-// F				=> ws '0' ws.
+// T				=> ws 'T' ws.
+// F				=> ws 'F' ws.
 // bf_cte_cb		=> bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
 // binding			=> source_binding | named_binding.
 // named_binding	=> chars.
@@ -260,7 +260,7 @@ private:
 		'`', 'a', 'l', 'n', 'm', 'p', 'h', 'b', 'k', 'c', 
 		't', 'r', 'd', 'i', 'g', 'e', 'o', 'f', 'w', 's', 
 		':', '=', '!', '.', '(', ')', '[', ']', '{', '}', 
-		'-', '_', '$', '?', '1', '0', 
+		'-', '_', '$', '?', 'T', 'F', 
 	};
 	idni::nonterminals<char, char> nts{};
 	idni::char_class_fns<char> cc;

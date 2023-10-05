@@ -40,7 +40,7 @@ TEST_SUITE("parser: formula") {
 	static constexpr char* sample =	
 		"?X := ?X."
 		"?Y := ?Y."
-		" ( ?Z = 0 ) .";
+		" ( ?Z = F ) .";
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
 
@@ -96,7 +96,7 @@ TEST_SUITE("parser: wwf formulas ") {
 	
 	TEST_CASE("wff_neg") {
 		static constexpr char* sample =	
-			"wff_neg ( ?Z = 0 ).";
+			"wff_neg ( ?Z = F ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);		
 		auto neg_formula = frml 
@@ -110,7 +110,7 @@ TEST_SUITE("parser: wwf formulas ") {
 
 	TEST_CASE("wff_and") {
 		static constexpr char* sample =	
-			"(( ?Z = 0 ) wff_and ( ?X = 0 )).";
+			"(( ?Z = F ) wff_and ( ?X = F )).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);		
 		auto and_formula = frml 
@@ -124,7 +124,7 @@ TEST_SUITE("parser: wwf formulas ") {
 
 	TEST_CASE("wff_or") {
 		static constexpr char* sample =	
-			"(( ?Z = 0 ) wff_or ( ?X = 0 )).";
+			"(( ?Z = F ) wff_or ( ?X = F )).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);		
 		auto or_formula = frml 
@@ -138,7 +138,7 @@ TEST_SUITE("parser: wwf formulas ") {
 
 	TEST_CASE("wff_xor") {
 		static constexpr char* sample =	
-			"(( ?Z = 0 ) wff_xor ( ?X = 0 )).";
+			"(( ?Z = F ) wff_xor ( ?X = F )).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);		
 		auto xor_formula = frml 
@@ -152,7 +152,7 @@ TEST_SUITE("parser: wwf formulas ") {
 
 	TEST_CASE("wff_eq") {
 		static constexpr char* sample =	
-			"( ?Z = 0 ).";
+			"( ?Z = F ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);		
 		auto eq_formula = frml 
@@ -166,7 +166,7 @@ TEST_SUITE("parser: wwf formulas ") {
 
 	TEST_CASE("wff_all") {
 		static constexpr char* sample =	
-			"wff_all ?Z ( ?Z = 0 ) .";
+			"wff_all ?Z ( ?Z = F ) .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);		
 		auto all_formula = frml 
@@ -182,7 +182,7 @@ TEST_SUITE("parser: wwf formulas ") {
 
 	TEST_CASE("wff_ex") {
 		static constexpr char* sample =	
-			"wff_ex ?Z ( ?Z = 0 ) .";
+			"wff_ex ?Z ( ?Z = F ) .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);		
 		auto ex_formula = frml 
@@ -267,7 +267,7 @@ TEST_SUITE("parser: cbf formulas ") {
 	}
 
 	TEST_CASE("cbf_if") {
-		static constexpr char* sample =	"?Z := if ( ?Z = 0 ) then ?Z  else ?Z.";
+		static constexpr char* sample =	"?Z := if ( ?Z = F ) then ?Z  else ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);		
 		auto if_rule = lib 
