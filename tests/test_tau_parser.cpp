@@ -266,6 +266,52 @@ TEST_SUITE("parser: cbf formulas ") {
 		// TODO (MEDIUM) add checks for the xor formula
 	}
 
+
+	TEST_CASE("cbf_imply") {
+		static constexpr char* sample =	"(?Z cbf_imply ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto imply_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::cbf_rule
+			| tau_parser::cbf_matcher
+			| tau_parser::cbf
+			| tau_parser::cbf_imply;
+		CHECK( imply_rule.has_value() );
+	}
+
+	TEST_CASE("cbf_coimply") {
+		static constexpr char* sample =	"(?Z cbf_coimply ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto coimply_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::cbf_rule
+			| tau_parser::cbf_matcher
+			| tau_parser::cbf
+			| tau_parser::cbf_coimply;
+		CHECK( coimply_rule.has_value() );
+	}
+
+	TEST_CASE("cbf_equiv") {
+		static constexpr char* sample =	"(?Z cbf_equiv ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto equiv_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::cbf_rule
+			| tau_parser::cbf_matcher
+			| tau_parser::cbf
+			| tau_parser::cbf_equiv;
+		CHECK( equiv_rule.has_value() );
+	}
+
 	TEST_CASE("cbf_if") {
 		static constexpr char* sample =	"?Z := if ( ?Z = F ) then ?Z  else ?Z.";
 		auto src = make_tau_source(sample);
