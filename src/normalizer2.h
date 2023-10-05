@@ -67,6 +67,35 @@ RULE(BF_DEF_IMPLY, "( $X bf_imply $Y ) := ( bf_neg $X bf_or $Y).")
 RULE(BF_DEF_COIMPLY, "( $X bf_coimply $Y ) := ( $Y bf_imply $X).")
 RULE(BF_DEF_EQUIV, "( $X bf_equiv $Y ) := (( $X bf_imply $Y ) bf_and ( $Y bf_imply $X )).")
 
+// cbf rules
+RULE(CBF_DISTRIBUTE_0, "(($X cbf_or $Y) cbf_and $Z) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
+RULE(CBF_DISTRIBUTE_1, "($X cbf_and ($Y cbf_or $Z)) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
+RULE(CBF_PUSH_NEGATION_INWARDS_0, "cbf_neg ($X cbf_and $Y) := (cbf_neg $X cbf_or cbf_neg $Y).")
+RULE(CBF_PUSH_NEGATION_INWARDS_1, "cbf_neg ($X cbf_or $Y) := (cbf_neg $X cbf_and cbf_neg $Y).")
+RULE(CBF_ELIM_DOUBLE_NEGATION_0, "cbf_neg cbf_neg $X :=  $X.")
+RULE(CBF_SIMPLIFY_ONE_0, "( T cbf_or $X ) := T.")
+RULE(CBF_SIMPLIFY_ONE_1, "( $X cbf_or T ) := T.")
+RULE(CBF_SIMPLIFY_ONE_2, "( T cbf_and $X ) := $X.")
+RULE(CBF_SIMPLIFY_ONE_3, "( $X cbf_and T ) := $X.")
+RULE(CBF_SIMPLIFY_ZERO_0, "( F cbf_and $X ) := F.")
+RULE(CBF_SIMPLIFY_ZERO_1, "( $X cbf_and F ) := F.")
+RULE(CBF_SIMPLIFY_ZERO_2, "( F cbf_or $X ) := $X.")
+RULE(CBF_SIMPLIFY_ZERO_3, "( $X cbf_or F ) := $X.")
+RULE(CBF_SIMPLIFY_SELF_0, "( $X cbf_and $X ) := $X.")
+RULE(CBF_SIMPLIFY_SELF_1, "( $X cbf_or $X ) := $X.")
+RULE(CBF_SIMPLIFY_SELF_2, "( $X cbf_and cbf_neg $X ) := F.")
+RULE(CBF_SIMPLIFY_SELF_3, "( $X cbf_or cbf_neg $X ) := T.")
+RULE(CBF_SIMPLIFY_SELF_4, "( cbf_neg $X cbf_and $X ) := F.")
+RULE(CBF_SIMPLIFY_SELF_5, "( cbf_neg $X cbf_or $X ) := T.")
+
+// TODO (HIGH) check if the following rules are correct
+
+// cbf definitions of xor, ->, <- and <->.
+RULE(CBF_DEF_XOR, "( $X cbf_xor $Y ) := (( $X cbf_and cbf_neg $Y ) cbf_or ( cbf_neg $X cbf_and $Y )).")
+RULE(CBF_DEF_IMPLY, "( $X cbf_imply $Y ) := ( cbf_neg $X cbf_or $Y).")
+RULE(CBF_DEF_COIMPLY, "( $X cbf_coimply $Y ) := ( $Y cbf_imply $X).")
+RULE(CBF_DEF_EQUIV, "( $X cbf_equiv $Y ) := (( $X cbf_imply $Y ) cbf_and ( $Y cbf_imply $X )).")
+
 // wff rules
 RULE(BF_TRIVIALITY_0, "( F = F ) := T.")
 RULE(BF_TRIVIALITY_1, "( T = F ) :=  F.")
