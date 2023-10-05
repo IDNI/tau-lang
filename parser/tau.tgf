@@ -144,21 +144,35 @@ cbf_else_sym	=> ws "else" ws.
 bf_rule			=> bf_matcher definition bf dot.
 bf_matcher		=> bf.
 bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
+					| bf_imply | bf_equiv | bf_coimply
+					| bf_less | bf_less_equal | bf_greater
 					| bf_all | bf_ex | variable | timed | bf_subs_cb.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
 bf_xor			=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
 bf_neg			=> bf_neg_sym bf.
+bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
+bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
+bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
+bf_imply		=> open_parenthesis bf bf_imply_sym bf close_parenthesis.
+bf_equiv		=> open_parenthesis bf bf_equiv_sym bf close_parenthesis.
+bf_coimply		=> open_parenthesis bf bf_coimply_sym bf close_parenthesis.
 bf_all			=> bf_all_sym variable (bf | capture).
 bf_ex			=> bf_ex_sym variable (bf | capture).
 
 # bf_op_sym
-bf_and_sym		=> ws "bf_and" ws.
-bf_or_sym		=> ws "bf_or" ws.
-bf_xor_sym		=> ws "bf_xor" ws.
-bf_neg_sym		=> ws "bf_neg" ws.
-bf_all_sym		=> ws "bf_all" ws.
-bf_ex_sym		=> ws "bf_ex" ws.
+bf_and_sym			=> ws "bf_and" ws.
+bf_or_sym			=> ws "bf_or" ws.
+bf_xor_sym			=> ws "bf_xor" ws.
+bf_neg_sym			=> ws "bf_neg" ws.
+bf_less_sym			=> ws "bf_less" ws.
+bf_less_equal_sym	=> ws "bf_less_equal" ws.
+bf_greater_sym		=> ws "bf_greater" ws.
+bf_imply_sym		=> ws "bf_imply" ws.
+bf_equiv_sym		=> ws "bf_equiv" ws.
+bf_coimply_sym		=> ws "bf_coimply" ws.	
+bf_all_sym			=> ws "bf_all" ws.
+bf_ex_sym			=> ws "bf_ex" ws.
 
 # constant
 bf_constant		=> T | F | open_brace constant close_brace.
@@ -167,7 +181,9 @@ bf_constant		=> T | F | open_brace constant close_brace.
 constant		=> bf_cte_cb | binding | capture | ignore.
 T				=> ws 'T' ws.
 F				=> ws 'F' ws.
-bf_cte_cb		=> bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
+bf_cte_cb		=> bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb 
+					| bf_imply_cb | bf_equiv_cb | bf_coimply_cb
+					| bf_less_cb | bf_less_equal_cb | bf_greater_cb.
 binding			=> source_binding | named_binding.
 named_binding	=> chars.
 source_binding	=> type colon source.
@@ -178,21 +194,33 @@ source0			=> alnum | space | char_escape_encode | char_punct.
 source			=> (source0)+.
 
 # bf_cbs
-bf_and_cb	=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
-bf_or_cb	=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
-bf_xor_cb	=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
-bf_neg_cb	=> bf_neg_cb_sym bf_cb_arg.
-bf_subs_cb	=> bf_subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
+bf_and_cb			=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
+bf_or_cb			=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
+bf_xor_cb			=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
+bf_neg_cb			=> bf_neg_cb_sym bf_cb_arg.
+bf_less_cb			=> bf_cb_arg bf_less_cb_sym bf_cb_arg.
+bf_less_equal_cb	=> bf_cb_arg bf_less_equal_cb_sym bf_cb_arg.
+bf_greater_cb		=> bf_cb_arg bf_greater_cb_sym bf_cb_arg.
+bf_imply_cb			=> bf_cb_arg bf_imply_cb_sym bf_cb_arg.
+bf_equiv_cb			=> bf_cb_arg bf_equiv_cb_sym bf_cb_arg.
+bf_coimply_cb		=> bf_cb_arg bf_coimply_cb_sym bf_cb_arg.
+bf_subs_cb			=> bf_subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
 
 # bf_bultin_arg
 bf_cb_arg	=> capture | binding | T | F.
 
 # bf_cb_syms
-bf_and_cb_sym	=> ws "bf_and_cb" ws.
-bf_or_cb_sym	=> ws "bf_or_cb" ws.
-bf_xor_cb_sym	=> ws "bf_xor_cb" ws.
-bf_neg_cb_sym	=> ws "bf_neg_cb" ws.
-bf_subs_cb_sym	=> ws "bf_subs_cb" ws.
+bf_and_cb_sym			=> ws "bf_and_cb" ws.
+bf_or_cb_sym			=> ws "bf_or_cb" ws.
+bf_xor_cb_sym			=> ws "bf_xor_cb" ws.
+bf_neg_cb_sym			=> ws "bf_neg_cb" ws.
+bf_less_cb_sym			=> ws "bf_less_cb" ws.
+bf_less_equal_cb_sym	=> ws "bf_less_equal_cb" ws.
+bf_greater_cb_sym		=> ws "bf_greater_cb" ws.
+bf_imply_cb_sym			=> ws "bf_imply_cb" ws.
+bf_equiv_cb_sym			=> ws "bf_equiv_cb" ws.
+bf_coimply_cb_sym		=> ws "bf_coimply_cb" ws.
+bf_subs_cb_sym			=> ws "bf_subs_cb" ws.
 
 # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 main			=> wff dot.
