@@ -159,7 +159,7 @@ cbf_else_sym		=> ws "else" ws.
 bf_rule			=> bf_matcher definition bf dot.
 bf_matcher		=> bf.
 bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
-					| bf_imply | bf_equiv | bf_coimply
+					| bf_imply | bf_equiv | bf_coimply | bf_add
 					| bf_less | bf_less_equal | bf_greater
 					| bf_all | bf_ex | variable | timed | bf_subs_cb.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
@@ -172,6 +172,7 @@ bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
 bf_imply		=> open_parenthesis bf bf_imply_sym bf close_parenthesis.
 bf_equiv		=> open_parenthesis bf bf_equiv_sym bf close_parenthesis.
 bf_coimply		=> open_parenthesis bf bf_coimply_sym bf close_parenthesis.
+bf_add			=> open_parenthesis bf bf_add_sym bf close_parenthesis.
 bf_all			=> bf_all_sym variable (bf | capture).
 bf_ex			=> bf_ex_sym variable (bf | capture).
 
@@ -186,6 +187,7 @@ bf_greater_sym		=> ws "bf_greater" ws.
 bf_imply_sym		=> ws "bf_imply" ws.
 bf_equiv_sym		=> ws "bf_equiv" ws.
 bf_coimply_sym		=> ws "bf_coimply" ws.	
+bf_add_sym			=> ws "bf_add" ws.	
 bf_all_sym			=> ws "bf_all" ws.
 bf_ex_sym			=> ws "bf_ex" ws.
 
