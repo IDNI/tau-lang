@@ -97,6 +97,34 @@ RULE(CBF_DEF_COIMPLY, "( $X cbf_coimply $Y ) := ( $Y cbf_imply $X).")
 RULE(CBF_DEF_EQUIV, "( $X cbf_equiv $Y ) := (( $X cbf_imply $Y ) cbf_and ( $Y cbf_imply $X )).")
 
 // wff rules
+RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
+RULE(WFF_DISTRIBUTE_1, "($X wff_and ($Y wff_or $Z)) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
+RULE(WFF_PUSH_NEGATION_INWARDS_0, "wff_neg ($X wff_and $Y) := (wff_neg $X wff_or wff_neg $Y).")
+RULE(WFF_PUSH_NEGATION_INWARDS_1, "wff_neg ($X wff_or $Y) := (wff_neg $X wff_and wff_neg $Y).")
+RULE(WFF_ELIM_DOUBLE_NEGATION_0, "wff_neg wff_neg $X :=  $X.")
+RULE(WFF_SIMPLIFY_ONE_0, "( T wff_or $X ) := T.")
+RULE(WFF_SIMPLIFY_ONE_1, "( $X wff_or T ) := T.")
+RULE(WFF_SIMPLIFY_ONE_2, "( T wff_and $X ) := $X.")
+RULE(WFF_SIMPLIFY_ONE_3, "( $X wff_and T ) := $X.")
+RULE(WFF_SIMPLIFY_ZERO_0, "( F wff_and $X ) := F.")
+RULE(WFF_SIMPLIFY_ZERO_1, "( $X wff_and F ) := F.")
+RULE(WFF_SIMPLIFY_ZERO_2, "( F wff_or $X ) := $X.")
+RULE(WFF_SIMPLIFY_ZERO_3, "( $X wff_or F ) := $X.")
+RULE(WFF_SIMPLIFY_SELF_0, "( $X wff_and $X ) := $X.")
+RULE(WFF_SIMPLIFY_SELF_1, "( $X wff_or $X ) := $X.")
+RULE(WFF_SIMPLIFY_SELF_2, "( $X wff_and wff_neg $X ) := F.")
+RULE(WFF_SIMPLIFY_SELF_3, "( $X wff_or wff_neg $X ) := T.")
+RULE(WFF_SIMPLIFY_SELF_4, "( wff_neg $X wff_and $X ) := F.")
+RULE(WFF_SIMPLIFY_SELF_5, "( wff_neg $X wff_or $X ) := T.")
+
+// TODO (HIGH) check if the following rules are correct
+
+// wff definitions of xor, ->, <- and <->.
+RULE(WFF_DEF_XOR, "( $X wff_xor $Y ) := (( $X wff_and wff_neg $Y ) wff_or ( wff_neg $X wff_and $Y )).")
+RULE(WFF_DEF_IMPLY, "( $X wff_imply $Y ) := ( wff_neg $X wff_or $Y).")
+RULE(WFF_DEF_COIMPLY, "( $X wff_coimply $Y ) := ( $Y wff_imply $X).")
+RULE(WFF_DEF_EQUIV, "( $X wff_equiv $Y ) := (( $X wff_imply $Y ) wff_and ( $Y wff_imply $X )).")
+
 RULE(BF_TRIVIALITY_0, "( F = F ) := T.")
 RULE(BF_TRIVIALITY_1, "( T = F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
@@ -117,6 +145,7 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) = 0) wff_and (($X bf_and $Z) != 0)) := (bf_
 //
 // TODO (HIGH) add the rules for wff and cbf when ready.
 const std::string system = 
+	// bf rules
 	BF_ELIM_FORALL 
 	+ BF_DISTRIBUTE_0 
 	+ BF_DISTRIBUTE_1
@@ -155,6 +184,58 @@ const std::string system =
 	+ BF_DEF_IMPLY
 	+ BF_DEF_COIMPLY
 	+ BF_DEF_EQUIV
+
+	// cbf rules
+	+ CBF_DISTRIBUTE_0 
+	+ CBF_DISTRIBUTE_1
+	+ CBF_PUSH_NEGATION_INWARDS_0 
+	+ CBF_PUSH_NEGATION_INWARDS_1 
+	+ CBF_ELIM_DOUBLE_NEGATION_0
+	+ CBF_SIMPLIFY_ONE_0 
+	+ CBF_SIMPLIFY_ONE_1 
+	+ CBF_SIMPLIFY_ONE_2 
+	+ CBF_SIMPLIFY_ONE_3
+	+ CBF_SIMPLIFY_ZERO_0 
+	+ CBF_SIMPLIFY_ZERO_1 
+	+ CBF_SIMPLIFY_ZERO_2 
+	+ CBF_SIMPLIFY_ZERO_3
+	+ CBF_SIMPLIFY_SELF_0 
+	+ CBF_SIMPLIFY_SELF_1 
+	+ CBF_SIMPLIFY_SELF_2 
+	+ CBF_SIMPLIFY_SELF_3
+	+ CBF_SIMPLIFY_SELF_4 
+	+ CBF_SIMPLIFY_SELF_5 
+
+	+ CBF_DEF_XOR
+	+ CBF_DEF_IMPLY
+	+ CBF_DEF_COIMPLY
+	+ CBF_DEF_EQUIV
+
+	// wff rules
+	+ WFF_DISTRIBUTE_0 
+	+ WFF_DISTRIBUTE_1
+	+ WFF_PUSH_NEGATION_INWARDS_0 
+	+ WFF_PUSH_NEGATION_INWARDS_1 
+	+ WFF_ELIM_DOUBLE_NEGATION_0
+	+ WFF_SIMPLIFY_ONE_0 
+	+ WFF_SIMPLIFY_ONE_1 
+	+ WFF_SIMPLIFY_ONE_2 
+	+ WFF_SIMPLIFY_ONE_3
+	+ WFF_SIMPLIFY_ZERO_0 
+	+ WFF_SIMPLIFY_ZERO_1 
+	+ WFF_SIMPLIFY_ZERO_2 
+	+ WFF_SIMPLIFY_ZERO_3
+	+ WFF_SIMPLIFY_SELF_0 
+	+ WFF_SIMPLIFY_SELF_1 
+	+ WFF_SIMPLIFY_SELF_2 
+	+ WFF_SIMPLIFY_SELF_3
+	+ WFF_SIMPLIFY_SELF_4 
+	+ WFF_SIMPLIFY_SELF_5 
+
+	+ WFF_DEF_XOR
+	+ WFF_DEF_IMPLY
+	+ WFF_DEF_COIMPLY
+	+ WFF_DEF_EQUIV	
 
 	+ BF_TRIVIALITY_0 
 	+ BF_TRIVIALITY_1 

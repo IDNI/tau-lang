@@ -164,6 +164,51 @@ TEST_SUITE("parser: wwf formulas ") {
 		// TODO (MEDIUM) add checks for the eq formula
 	}
 
+	TEST_CASE("wff_imply") {
+		static constexpr char* sample =	"(?Z wff_imply ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto imply_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::wff_rule
+			| tau_parser::wff_matcher
+			| tau_parser::wff
+			| tau_parser::wff_imply;
+		CHECK( imply_rule.has_value() );
+	}
+
+	TEST_CASE("wff_coimply") {
+		static constexpr char* sample =	"(?Z wff_coimply ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto coimply_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::wff_rule
+			| tau_parser::wff_matcher
+			| tau_parser::wff
+			| tau_parser::wff_coimply;
+		CHECK( coimply_rule.has_value() );
+	}
+
+	TEST_CASE("wff_equiv") {
+		static constexpr char* sample =	"(?Z wff_equiv ?Z) := ?Z.";
+		auto src = make_tau_source(sample);
+		auto lib = make_statement(src);
+		auto equiv_rule = lib 
+			| tau_parser::library 
+			| tau_parser::rules 
+			| tau_parser::rule 
+			| tau_parser::wff_rule
+			| tau_parser::wff_matcher
+			| tau_parser::wff
+			| tau_parser::wff_equiv;
+		CHECK( equiv_rule.has_value() );
+	}
+
 	TEST_CASE("wff_all") {
 		static constexpr char* sample =	
 			"wff_all ?Z ( ?Z = F ) .";

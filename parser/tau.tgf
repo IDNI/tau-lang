@@ -91,13 +91,18 @@ wff_matcher		=> wff.
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
-wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | wff_or | wff_all | wff_ex | T | F.
+wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor 
+					| wff_or | wff_all | wff_ex | T | F | variable | timed
+					| wff_imply | wff_equiv | wff_coimply.
 wff_eq 			=> open_parenthesis bf equality F close_parenthesis.
 wff_neq 		=> open_parenthesis bf nequality F close_parenthesis.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
 wff_neg			=> wff_neg_sym wff.
+wff_imply		=> open_parenthesis wff wff_imply_sym wff close_parenthesis.
+wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
+wff_coimply		=> open_parenthesis wff wff_coimply_sym wff close_parenthesis.
 wff_all			=> wff_all_sym variable wff.
 wff_ex			=> wff_ex_sym variable wff.
 
@@ -106,6 +111,9 @@ wff_and_sym		=> ws "wff_and" ws.
 wff_or_sym		=> ws "wff_or" ws.
 wff_xor_sym		=> ws "wff_xor" ws.
 wff_neg_sym		=> ws "wff_neg" ws.
+wff_imply_sym	=> ws "wff_imply" ws.
+wff_equiv_sym	=> ws "wff_equiv" ws.
+wff_coimply_sym	=> ws "wff_coimply" ws.	
 wff_all_sym		=> ws "wff_all" ws.
 wff_ex_sym		=> ws "wff_ex" ws.
 
@@ -116,7 +124,7 @@ cbf_ref 		=> sym indexes cbf_ref_args.
 cbf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
 cbf 				=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or
-						| cbf_imply | cbf_equiv | cbf_coimply.
+						| cbf_imply | cbf_equiv | cbf_coimply | T | F.
 cbf_if				=> cbf_if_sym cbf_if_condition 
 						cbf_then_sym cbf_if_then 
 						cbf_else_sym cbf_if_else. 
