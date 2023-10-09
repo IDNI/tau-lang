@@ -47,10 +47,11 @@ RULE(BF_SIMPLIFY_SELF_2, "( $X bf_and bf_neg $X ) := F.")
 RULE(BF_SIMPLIFY_SELF_3, "( $X bf_or bf_neg $X ) := T.")
 RULE(BF_SIMPLIFY_SELF_4, "( bf_neg $X bf_and $X ) := F.")
 RULE(BF_SIMPLIFY_SELF_5, "( bf_neg $X bf_or $X ) := T.")
-RULE(BF_CALLBACK_0, "( { $X } bf_or { $Y } ) := { $X bf_or_cb $Y }.")
-RULE(BF_CALLBACK_1, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
-RULE(BF_CALLBACK_2, "( { $X } bf_xor { $Y } ) := { $X bf_xor_cb $Y }.")
-RULE(BF_CALLBACK_3, "bf_neg { $X }  := { bf_neg_cb $X }.")
+
+// callbacks
+RULE(BF_CALLBACK_AND, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
+RULE(BF_CALLBACK_NEG, "bf_neg { $X }  := { bf_neg_cb $X }.")
+RULE(BF_CALLBACK_EQ, "( { $X } == { $Y } ) := bf_eq_cb $X $Y T F.")
 
 // TODO (HIGH) check if the following rules are correct
 RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "bf_all $X $Y := ( bf_subs_cb $X F $Y bf_and bf_subs_cb $X T $Y).")
@@ -60,10 +61,9 @@ RULE(BF_ROTATE_LITERALS_0, "( $X bf_and ( $Y bf_and $Z ) ) := ( $Y bf_and ( $Z b
 RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_and $Y ) bf_and $Z ) := ( ( $Y bf_and $Z ) bf_and $X ).")
 
 // bf definitions of <, <=, >, xor, ->, <- and <->.
-RULE(BF_DEF_LESS, "( { $X } bf_less { $Y } ) := (({ $X } bf_xor { $Y }) != F).")
-RULE(BF_DEF_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := (({ $X } bf_and bf_neg { $Y }) bf_eq F).")
+RULE(BF_DEF_LESS, "( { $X } bf_less { $Y } ) := ( ( { $X } bf_xor { $Y } ) != F).")
+RULE(BF_DEF_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := (({ $X } bf_and bf_neg { $Y }) == F).")
 RULE(BF_DEF_GREATER, "( { $X } bf_greater { $Y}  ) := bf_neg ( { $X } bf_less_equal { $Y } ).")
-RULE(BF_EQ, "( { $X } == { $Y } ) := bf_eq_cb $X $Y T F.")
 RULE(BF_DEF_XOR, "( $X bf_xor $Y ) := (( $X bf_and bf_neg $Y ) bf_or ( bf_neg $X bf_and $Y )).")
 RULE(BF_DEF_IMPLY, "( $X bf_imply $Y ) := ( bf_neg $X bf_or $Y).")
 RULE(BF_DEF_EQUIV, "( $X bf_equiv $Y ) := (( $X bf_imply $Y ) bf_and ( $Y bf_imply $X )).")
@@ -169,10 +169,9 @@ const std::string system =
 	+ BF_SIMPLIFY_SELF_3
 	+ BF_SIMPLIFY_SELF_4 
 	+ BF_SIMPLIFY_SELF_5 
-	+ BF_CALLBACK_0 
-	+ BF_CALLBACK_1 
-	+ BF_CALLBACK_2 
-	+ BF_CALLBACK_3 
+	+ BF_CALLBACK_AND 
+	+ BF_CALLBACK_NEG 
+	+ BF_CALLBACK_EQ
 	+ BF_FUNCTIONAL_QUANTIFIERS_0 
 	+ BF_FUNCTIONAL_QUANTIFIERS_1 
 	+ BF_PROCESS_0 
