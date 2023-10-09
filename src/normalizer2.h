@@ -63,7 +63,7 @@ RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_and $Y ) bf_and $Z ) := ( ( $Y bf_and $Z )
 RULE(BF_DEF_LESS, "( { $X } bf_less { $Y } ) := (({ $X } bf_xor { $Y }) != F).")
 RULE(BF_DEF_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := (({ $X } bf_and bf_neg { $Y }) bf_eq F).")
 RULE(BF_DEF_GREATER, "( { $X } bf_greater { $Y}  ) := bf_neg ( { $X } bf_less_equal { $Y } ).")
-RULE(BF_EQ, "( { $X } bf_eq { $Y } ) := bf_eq_cb $X $Y T F.")
+RULE(BF_EQ, "( { $X } == { $Y } ) := bf_eq_cb $X $Y T F.")
 RULE(BF_DEF_XOR, "( $X bf_xor $Y ) := (( $X bf_and bf_neg $Y ) bf_or ( bf_neg $X bf_and $Y )).")
 RULE(BF_DEF_IMPLY, "( $X bf_imply $Y ) := ( bf_neg $X bf_or $Y).")
 RULE(BF_DEF_EQUIV, "( $X bf_equiv $Y ) := (( $X bf_imply $Y ) bf_and ( $Y bf_imply $X )).")
@@ -128,21 +128,21 @@ RULE(WFF_DEF_IMPLY, "( $X wff_imply $Y ) := ( wff_neg $X wff_or $Y).")
 RULE(WFF_DEF_COIMPLY, "( $X wff_coimply $Y ) := ( $Y wff_imply $X).")
 RULE(WFF_DEF_EQUIV, "( $X wff_equiv $Y ) := (( $X wff_imply $Y ) wff_and ( $Y wff_imply $X )).")
 
-RULE(BF_TRIVIALITY_0, "( F = F ) := T.")
-RULE(BF_TRIVIALITY_1, "( T = F ) :=  F.")
+RULE(BF_TRIVIALITY_0, "( F == F ) := T.")
+RULE(BF_TRIVIALITY_1, "( T == F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
 RULE(BF_TRIVIALITY_3, "( T != F ) := T.")
-RULE(BF_SQUEEZE_POSITIVES_0, "(( $X = F ) wff_and ($Y = F)) := (( $X bf_or $Y ) = F).")
+RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y ) == F).")
 // TODO (VERY HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
-// further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) = (a ∨ b) ∧ ¬(a ∧ b))
-// "( ($X bf_and $Y) = F ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
-RULE(BF_PROCESS_0, "((($X bf_and $Y) = 0) wff_and (($X bf_and $Z) != 0)) := (bf_all $X ((($X bf_and $Y) = F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
+// further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) == (a ∨ b) ∧ ¬(a ∧ b))
+// "( ($X bf_and $Y) == F ) wwf_and ( ($X bf_and $Z) != 0) == ( bf_all $X ( ( $X bf_and $Y$ ) == F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
+RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf_all $X ((($X bf_and $Y) == F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
 
 // TODO (HIGH) add rules defining <- <-> -> + <= < >
 
 // TODO (HIGH) define rules for wwf and cbf
 
-// TODO (HIGH) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ). 
+// TODO (HIGH) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
 
 // rules to be used during normalization, the order matters.
 //
@@ -259,7 +259,7 @@ struct prog_less {
 		auto m1 = extract_cte(p1.main);
 		auto m2 = extract_cte(p2.main);
 		// CHECK Could we assume we have a partial order on the algebra induced by
-		// the operations of the algebra (i.e. a ≤ b iff a = b ∧ a )?
+		// the operations of the algebra (i.e. a ≤ b iff a == b ∧ a )?
 		// CHECK Do we need < or ≤ is enough for working?
 		return m1 < m2;
 	}
