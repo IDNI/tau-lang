@@ -60,9 +60,10 @@ RULE(BF_ROTATE_LITERALS_0, "( $X bf_and ( $Y bf_and $Z ) ) := ( $Y bf_and ( $Z b
 RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_and $Y ) bf_and $Z ) := ( ( $Y bf_and $Z ) bf_and $X ).")
 
 // bf definitions of <, <=, >, xor, ->, <- and <->.
-//RULE(BF_DEF_LESS, "( $X bf_less $Y ) := ")
-//RULE(BF_DEF_LESS_EQUAL, "( $X bf_less_equal $Y ) := ")
-//RULE(BF_DEF_GREATER, "( $X bf_greater $Y ) := ")
+RULE(BF_DEF_LESS, "( { $X } bf_less { $Y } ) := (({ $X } bf_xor { $Y }) != F).")
+RULE(BF_DEF_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := (({ $X } bf_and bf_neg { $Y }) bf_eq F).")
+RULE(BF_DEF_GREATER, "( { $X } bf_greater { $Y}  ) := bf_neg ( { $X } bf_less_equal { $Y } ).")
+RULE(BF_EQ, "( { $X } bf_eq { $Y } ) := bf_eq_cb $X $Y T F.")
 RULE(BF_DEF_XOR, "( $X bf_xor $Y ) := (( $X bf_and bf_neg $Y ) bf_or ( bf_neg $X bf_and $Y )).")
 RULE(BF_DEF_IMPLY, "( $X bf_imply $Y ) := ( bf_neg $X bf_or $Y).")
 RULE(BF_DEF_EQUIV, "( $X bf_equiv $Y ) := (( $X bf_imply $Y ) bf_and ( $Y bf_imply $X )).")
@@ -187,7 +188,7 @@ const std::string system =
 	+ BF_DEF_COIMPLY
 	+ BF_DEF_EQUIV
 	+ BF_DEF_ADD
-	
+
 	// cbf rules
 	+ CBF_DISTRIBUTE_0 
 	+ CBF_DISTRIBUTE_1
