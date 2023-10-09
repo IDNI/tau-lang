@@ -86,8 +86,11 @@ var_in			=> ws "?i_" chars ws. # instead of '<', easy to remember
 var_out			=> ws "?o_" chars ws. # instead of '>', easy to remember
 
 # wff
-wff_rule		=> (wff_matcher | wff_ref) definition wff dot.
-wff_matcher		=> wff.
+wff_rule		=> (wff_matcher | wff_ref) definition (wff | bf_eq_cb) dot.
+
+# TODO (MEDIUM) move this to a lowr level
+wff_matcher		=> (wff | bf_less | bf_less_equal ).
+
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
@@ -160,7 +163,7 @@ bf_rule			=> bf_matcher definition bf dot.
 bf_matcher		=> bf.
 bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
 					| bf_imply | bf_equiv | bf_coimply | bf_add
-					| bf_less | bf_less_equal | bf_greater
+					| bf_less | bf_less_equal | bf_greater | bf_eq
 					| bf_all | bf_ex | variable | timed | bf_subs_cb | bf_eq_cb.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
