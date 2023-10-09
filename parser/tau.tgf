@@ -56,7 +56,7 @@ sym				=> ws chars ws.
 
 # common symbols
 definition			=> ws ":=" ws.
-equality			=> ws '=' ws. 
+equality			=> ws "==" ws. 
 nequality			=> ws "!=" ws. 
 dot 				=> ws '.' ws.
 open_parenthesis	=> ws '(' ws.
@@ -94,8 +94,8 @@ wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor 
 					| wff_or | wff_all | wff_ex | T | F | variable | timed
 					| wff_imply | wff_equiv | wff_coimply.
-wff_eq 			=> open_parenthesis bf equality F close_parenthesis.
-wff_neq 		=> open_parenthesis bf nequality F close_parenthesis.
+wff_eq 			=> open_parenthesis cbf equality cbf close_parenthesis.
+wff_neq 		=> open_parenthesis cbf nequality cbf close_parenthesis.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
