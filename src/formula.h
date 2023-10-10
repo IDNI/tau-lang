@@ -189,9 +189,17 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value) 
 		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_and_cb
 		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_or_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_neg_cb
 		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_xor_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_subs_cb;
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_neg_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_less_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_less_equal_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_greater_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_imply_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_equiv_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_coimply_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_subs_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_eq_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_neq_cb;
 };
 
 template<typename...BAs>
@@ -446,9 +454,17 @@ struct callback_applier {
 		switch (nt) {
 			case ::tau_parser::bf_and_cb: return make_node<tau_sym<BAs...>>(std::visit(_and, bas[0], bas[1]), {});
 			case ::tau_parser::bf_or_cb: return make_node<tau_sym<BAs...>>(std::visit(_or, bas[0], bas[1]), {});
-			case ::tau_parser::bf_neg_cb: return make_node<tau_sym<BAs...>>(std::visit(_neg, bas[0]), {});
 			case ::tau_parser::bf_xor_cb: return make_node<tau_sym<BAs...>>(std::visit(_xor, bas[0], bas[1]), {});
+			case ::tau_parser::bf_neg_cb: return make_node<tau_sym<BAs...>>(std::visit(_neg, bas[0]), {});
+			case ::tau_parser::bf_less_cb: return make_node<tau_sym<BAs...>>(std::visit(_less, bas[0], bas[1], bas[2], bas[3]), {});
+			case ::tau_parser::bf_less_equal_cb: return make_node<tau_sym<BAs...>>(std::visit(_less_equal, bas[0], bas[1], bas[2], bas[3]), {});
+			case ::tau_parser::bf_greater_cb: return make_node<tau_sym<BAs...>>(std::visit(_greater, bas[0], bas[1], bas[2], bas[3]), {});
+			case ::tau_parser::bf_imply_cb: return make_node<tau_sym<BAs...>>(std::visit(_imply, bas[0], bas[1]), {});
+			case ::tau_parser::bf_equiv_cb: return make_node<tau_sym<BAs...>>(std::visit(_equiv, bas[0], bas[1]), {});
+			case ::tau_parser::bf_coimply_cb: return make_node<tau_sym<BAs...>>(std::visit(_coimply, bas[0], bas[1]), {});
 			case ::tau_parser::bf_subs_cb: return apply_subs(n);
+			case ::tau_parser::bf_eq_cb: return make_node<tau_sym<BAs...>>(std::visit(_eq, bas[0], bas[1], bas[2], bas[3]), {});
+			case ::tau_parser::bf_neq_cb: return make_node<tau_sym<BAs...>>(std::visit(_neq, bas[0], bas[1], bas[2], bas[3]), {});
 			default: return n;
 		}
 	}
@@ -457,8 +473,16 @@ private:
 
 	static constexpr auto _and = [](const auto& l, const auto& r) { return l & r; };
 	static constexpr auto _or = [](const auto& l, const auto& r) { return l | r; };
-	static constexpr auto _neg = [](const auto& l) { return ~l; };
 	static constexpr auto _xor = [](const auto& l, const auto& r) { return l ^ r; };
+	static constexpr auto _neg = [](const auto& l) { return ~l; };
+	static constexpr auto _less = [](const auto& l, const auto& r, const auto& t, const auto& f) { return ((l ^ ~r) & ( (l & ~r) | (~l & r))) != 0 ? t : f ; };
+	static constexpr auto _less_equal = [](const auto& l, const auto& r, const auto& t, const auto& f) { return (l ^ ~r) == 0 ? t : f; };
+	static constexpr auto _greater = [](const auto& l, const auto& r, const auto& t, const auto& f) { return _less_equal(l, r, f, t); };
+	static constexpr auto _imply = [](const auto& l, const auto& r) { return ~l | r; };
+	static constexpr auto _equiv = [](const auto& l, const auto& r) { return _imply(l, r) & _imply(r, l); };
+	static constexpr auto _coimply = [](const auto& l, const auto& r) { return l & ~r; };
+	static constexpr auto _eq = [](const auto& l, const auto& r, const auto& t, const auto& f) { return l == r ? t : f; };
+	static constexpr auto _neq = [](const auto& l, const auto& r, const auto& t, const auto& f) { return l != r? t : f; };
 
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
 		auto params = n || tau_parser::bf_cb_arg;
