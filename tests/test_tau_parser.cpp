@@ -452,8 +452,9 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::library 
 			| tau_parser::rules 
 			| tau_parser::rule 
-			| tau_parser::wff_rule
-			| tau_parser::wff_matcher
+			| tau_parser::bf_rule
+			| tau_parser::bf_matcher
+			| tau_parser::bf
 			| tau_parser::bf_less;
 		CHECK( less_rule.has_value() );
 	}
@@ -466,8 +467,9 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::library 
 			| tau_parser::rules 
 			| tau_parser::rule 
-			| tau_parser::wff_rule
-			| tau_parser::wff_matcher
+			| tau_parser::bf_rule
+			| tau_parser::bf_matcher
+			| tau_parser::bf
 			| tau_parser::bf_less_equal;
 		CHECK( less_equal_rule.has_value() );
 	}
