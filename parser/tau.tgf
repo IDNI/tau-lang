@@ -86,7 +86,7 @@ var_in			=> ws "?i_" chars ws. # instead of '<', easy to remember
 var_out			=> ws "?o_" chars ws. # instead of '>', easy to remember
 
 # wff
-wff_rule		=> (wff_matcher | wff_ref) definition (wff | bf_eq_cb) dot.
+wff_rule		=> (wff_matcher | wff_ref) definition wff dot.
 
 wff_matcher		=> wff.
 
@@ -98,7 +98,7 @@ wff 			=> wff_eq | wff_neq
 					| wff_ref | wff_and | wff_neg | wff_xor 
 					| wff_or | wff_all | wff_ex | T | F | variable | timed
 					| wff_imply | wff_equiv | wff_coimply
-					| bf_eq_cb | bf_neq_cb.
+					| bf_eq_cb | bf_neq_cb | cbf_if.
 wff_eq 			=> open_parenthesis cbf equality cbf close_parenthesis.
 wff_neq 		=> open_parenthesis cbf nequality cbf close_parenthesis.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
@@ -128,7 +128,7 @@ cbf_matcher		=> cbf.
 cbf_ref 		=> sym indexes cbf_ref_args.
 cbf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
-cbf 				=> bf | cbf_if | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or
+cbf 				=> bf | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or
 						| cbf_imply | cbf_equiv | cbf_coimply | cbf_ref | T | F.
 cbf_if				=> cbf_if_sym cbf_if_condition 
 						cbf_then_sym cbf_if_then 

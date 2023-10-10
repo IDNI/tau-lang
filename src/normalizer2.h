@@ -25,8 +25,9 @@ namespace idni::tau {
 // tau system library, used to define the tau system of rewriting rules
 #define RULE(name, code) const std::string name = code;
 
+// IDEA (MEDIUM) add commutative rule and halve the number of rules if is performance friendly
+
 // bf rules
-// TODO (MEDIUM) add commutative rule and halve the number of rules
 RULE(BF_ELIM_FORALL, "bf_all $X $Y := bf_neg bf_ex $X bf_neg $Y.")
 RULE(BF_DISTRIBUTE_0, "(($X bf_or $Y) bf_and $Z) := (($X bf_and $Y) bf_or ($X bf_and $Z)).")
 RULE(BF_DISTRIBUTE_1, "($X bf_and ($Y bf_or $Z)) := (($X bf_and $Y) bf_or ($X bf_and $Z)).")
@@ -96,6 +97,7 @@ RULE(CBF_DEF_XOR, "( $X cbf_xor $Y ) := (( $X cbf_and cbf_neg $Y ) cbf_or ( cbf_
 RULE(CBF_DEF_IMPLY, "( $X cbf_imply $Y ) := ( cbf_neg $X cbf_or $Y).")
 RULE(CBF_DEF_COIMPLY, "( $X cbf_coimply $Y ) := ( $Y cbf_imply $X).")
 RULE(CBF_DEF_EQUIV, "( $X cbf_equiv $Y ) := (( $X cbf_imply $Y ) cbf_and ( $Y cbf_imply $X )).")
+RULE(CBF_DEF_IF, "if $X then $Y else $Z := (( $X wff_imply $Y ) wff_and ( wff_neg $X wff_imply $Z )).")
 
 // wff rules
 RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
@@ -136,15 +138,9 @@ RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y 
 // "( ($X bf_and $Y) == F ) wwf_and ( ($X bf_and $Z) != 0) == ( bf_all $X ( ( $X bf_and $Y$ ) == F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
 RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf_all $X ((($X bf_and $Y) == F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
 
-// TODO (HIGH) add rules defining <- <-> -> + <= < >
-
-// TODO (HIGH) define rules for wwf and cbf
-
 // TODO (HIGH) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
 
 // rules to be used during normalization, the order matters.
-//
-// TODO (HIGH) add the rules for wff and cbf when ready.
 const std::string system = 
 	// bf rules
 	BF_ELIM_FORALL 
@@ -213,6 +209,7 @@ const std::string system =
 	+ CBF_DEF_IMPLY
 	+ CBF_DEF_COIMPLY
 	+ CBF_DEF_EQUIV
+	+ CBF_DEF_IF
 
 	// wff rules
 	+ WFF_DISTRIBUTE_0 
