@@ -45,7 +45,7 @@ TEST_SUITE("callback_applier") {
 		auto src = make_tau_source(sample);
 		bindings<Bool> bs { { "result", Bool(true) }, { "value", Bool(false) } };
 		// bindings<Bool> bs { { "result", Bool(false) }, { "value", Bool(true) } };
-		CHECK( true );
+		//CHECK( true );
 	} 
 }
 
@@ -59,7 +59,7 @@ TEST_SUITE("make_library") {
 		auto src = make_tau_source(sample);
 		auto lib = make_library<Bool>(src);
 		// FIXME add sensible checks
-		CHECK( true ); 
+		//CHECK( true ); 
 	}
 
 }
