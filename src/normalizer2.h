@@ -48,27 +48,25 @@ RULE(BF_SIMPLIFY_SELF_3, "( $X bf_or bf_neg $X ) := T.")
 RULE(BF_SIMPLIFY_SELF_4, "( bf_neg $X bf_and $X ) := F.")
 RULE(BF_SIMPLIFY_SELF_5, "( bf_neg $X bf_or $X ) := T.")
 
-// callbacks
-RULE(BF_CALLBACK_AND, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
-RULE(BF_CALLBACK_NEG, "bf_neg { $X }  := { bf_neg_cb $X }.")
-RULE(BF_CALLBACK_EQ, "( { $X } == { $Y } ) := bf_eq_cb $X $Y T F.")
-
-// TODO (HIGH) check if the following rules are correct
 RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "bf_all $X $Y := ( bf_subs_cb $X F $Y bf_and bf_subs_cb $X T $Y).")
 RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "bf_ex $X $Y := ( bf_subs_cb $X F $Y bf_or bf_subs_cb $X T $Y).")
 RULE(BF_SKIP_CONSTANTS_0, "({ $X } bf_and $Y) := ($Y bf_and { $X }).")
 RULE(BF_ROTATE_LITERALS_0, "( $X bf_and ( $Y bf_and $Z ) ) := ( $Y bf_and ( $Z bf_and $X ) ).")
 RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_and $Y ) bf_and $Z ) := ( ( $Y bf_and $Z ) bf_and $X ).")
 
-// bf definitions of <, <=, >, xor, ->, <- and <->.
-RULE(BF_DEF_LESS, "( { $X } bf_less { $Y } ) := ( ( { $X } bf_xor { $Y } ) != F).")
-RULE(BF_DEF_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := (({ $X } bf_and bf_neg { $Y }) == F).")
-RULE(BF_DEF_GREATER, "( { $X } bf_greater { $Y}  ) := bf_neg ( { $X } bf_less_equal { $Y } ).")
-RULE(BF_DEF_XOR, "( $X bf_xor $Y ) := (( $X bf_and bf_neg $Y ) bf_or ( bf_neg $X bf_and $Y )).")
-RULE(BF_DEF_IMPLY, "( $X bf_imply $Y ) := ( bf_neg $X bf_or $Y).")
-RULE(BF_DEF_EQUIV, "( $X bf_equiv $Y ) := (( $X bf_imply $Y ) bf_and ( $Y bf_imply $X )).")
-RULE(BF_DEF_COIMPLY, "( $X bf_coimply $Y ) := ( $Y bf_imply $X).")
-RULE(BF_DEF_ADD, "( { $X } bf_add { $Y } ) := (({$X} bf_and bf_neg {$Y}) bf_or (bf_neg {$X} bf_and {$Y})).")
+// bf callbacks
+RULE(BF_CALLBACK_AND, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
+RULE(BF_CALLBACK_OR, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
+RULE(BF_CALLBACK_XOR, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
+RULE(BF_CALLBACK_NEG, "bf_neg { $X }  := { bf_neg_cb $X }.")
+RULE(BF_CALLBACK_LESS, "( { $X } bf_less { $Y } ) := bf_less_cb $X $Y T F.")
+RULE(BF_CALLBACK_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := bf_less_equal_cb $X $Y T F.")
+RULE(BF_CALLBACK_GREATER, "( { $X } bf_greater { $Y } ) := bf_greater_cb $X $Y T F.")
+RULE(BF_CALLBACK_IMPLY, "( { $X } bf_imply { $Y } ) :=  { $X bf_imply_cb $Y }.")
+RULE(BF_CALLBACK_COIMPLY, "( { $X } bf_coimply { $Y } ) := { $X bf_coimply_cb $Y }.")
+RULE(BF_CALLBACK_EQUIV, "( { $X } bf_equiv { $Y } ) := { $X bf_equiv_cb $Y }.")
+RULE(BF_CALLBACK_EQ, "( { $X } == { $Y } ) := bf_eq_cb $X $Y T F.")
+RULE(BF_CALLBACK_NEQ, "( { $X } != { $Y } ) := bf_neq_cb $X $Y T F.")
 
 // cbf rules
 RULE(CBF_DISTRIBUTE_0, "(($X cbf_or $Y) cbf_and $Z) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
@@ -169,9 +167,6 @@ const std::string system =
 	+ BF_SIMPLIFY_SELF_3
 	+ BF_SIMPLIFY_SELF_4 
 	+ BF_SIMPLIFY_SELF_5 
-	+ BF_CALLBACK_AND 
-	+ BF_CALLBACK_NEG 
-	+ BF_CALLBACK_EQ
 	+ BF_FUNCTIONAL_QUANTIFIERS_0 
 	+ BF_FUNCTIONAL_QUANTIFIERS_1 
 	+ BF_PROCESS_0 
@@ -179,14 +174,19 @@ const std::string system =
 	+ BF_ROTATE_LITERALS_0	
 	+ BF_ROTATE_LITERALS_1 
 
-//	+ BF_DEF_LESS
-//	+ BF_DEF_LESS_EQUAL
-//	+ BF_DEF_GREATER
-	+ BF_DEF_XOR
-	+ BF_DEF_IMPLY
-	+ BF_DEF_COIMPLY
-	+ BF_DEF_EQUIV
-	+ BF_DEF_ADD
+	// BF CALLBACKS
+	+ BF_CALLBACK_AND 
+	+ BF_CALLBACK_OR
+	+ BF_CALLBACK_XOR 
+	+ BF_CALLBACK_NEG 
+	+ BF_CALLBACK_LESS
+	+ BF_CALLBACK_LESS_EQUAL
+	+ BF_CALLBACK_GREATER
+	+ BF_CALLBACK_IMPLY
+	+ BF_CALLBACK_COIMPLY 
+	+ BF_CALLBACK_EQUIV 
+	+ BF_CALLBACK_EQ
+ 	+ BF_CALLBACK_NEQ
 
 	// cbf rules
 	+ CBF_DISTRIBUTE_0 
