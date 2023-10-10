@@ -28,7 +28,7 @@ TAU Implementation introito
 			given algebras, using the type system,...
 	- The type system:
 		- provides a way to bind constants to the program, in this case providing
-			an string to be parser by a factory that produce the acutal values 
+			a string to be parser by a factory that produce the acutal values 
 			for the constants.
 	- The callbacks:
 		- provide the way to call the operations of the underlying BA from the 
