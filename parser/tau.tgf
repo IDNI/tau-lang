@@ -77,6 +77,7 @@ num				=> digit+.
 variable		=> var | ignore | capture.
 
 # QUESTION does timed variables have one index or several?
+# this should be typed according to the original BA.
 timed			=> ( var_in| var_out) indexes. 
 offset			=> variable | variable minus num.
 ignore 			=> '_'.
@@ -169,7 +170,7 @@ bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
 					| bf_less | bf_less_equal | bf_greater
 					| bf_subs_cb | bf_xor_cb | bf_and_cb | bf_or_cb | bf_neg_cb
 					| bf_less_cb | bf_less_equal_cb | bf_greater_cb | bf_imply_cb
-					| bf_coimply_cb | bf_equiv_cb.
+					| bf_coimply_cb | bf_equiv_cb | bf_is_zero_cb | bf_is_one_cb.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
 bf_xor			=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
@@ -229,6 +230,8 @@ bf_coimply_cb		=> bf_cb_arg bf_coimply_cb_sym bf_cb_arg.
 bf_subs_cb			=> bf_subs_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg.
 bf_eq_cb			=> bf_eq_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg bf_cb_arg.
 bf_neq_cb			=> bf_neq_cb_sym bf_cb_arg bf_cb_arg bf_cb_arg bf_cb_arg.
+bf_is_zero_cb		=> bf_is_zero_cb_sym bf_cb_arg  bf_cb_arg.
+bf_is_one_cb		=> bf_is_one_cb_sym bf_cb_arg bf_cb_arg.
 
 # bf_bultin_arg
 bf_cb_arg	=> capture | binding | T | F.
@@ -247,6 +250,8 @@ bf_coimply_cb_sym		=> ws "bf_coimply_cb" ws.
 bf_subs_cb_sym			=> ws "bf_subs_cb" ws.
 bf_eq_cb_sym			=> ws "bf_eq_cb" ws.
 bf_neq_cb_sym			=> ws "bf_neq_cb" ws.
+bf_is_zero_cb_sym		=> ws "bf_is_zero_cb" ws.
+bf_is_one_cb_sym		=> ws "bf_is_one_cb" ws.
 
 # main - TODO - tau & tau /n tau && tau /n tau &&& tau
 main			=> wff dot.
