@@ -27,7 +27,8 @@ namespace idni::tau {
 
 // IDEA (MEDIUM) add commutative rule and halve the number of rules if is performance friendly
 
-// bf rules
+// bf rules 
+// TODO (HIGH) remove most of them
 RULE(BF_ELIM_FORALL, "bf_all $X $Y := bf_neg bf_ex $X bf_neg $Y.")
 RULE(BF_DISTRIBUTE_0, "(($X bf_or $Y) bf_and $Z) := (($X bf_and $Y) bf_or ($X bf_and $Z)).")
 RULE(BF_DISTRIBUTE_1, "($X bf_and ($Y bf_or $Z)) := (($X bf_and $Y) bf_or ($X bf_and $Z)).")
@@ -68,6 +69,8 @@ RULE(BF_CALLBACK_COIMPLY, "( { $X } bf_coimply { $Y } ) := { $X bf_coimply_cb $Y
 RULE(BF_CALLBACK_EQUIV, "( { $X } bf_equiv { $Y } ) := { $X bf_equiv_cb $Y }.")
 RULE(BF_CALLBACK_EQ, "( { $X } == { $Y } ) := bf_eq_cb $X $Y T F.")
 RULE(BF_CALLBACK_NEQ, "( { $X } != { $Y } ) := bf_neq_cb $X $Y T F.")
+RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb $X F.")
+RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb $X T.")
 
 // cbf rules
 RULE(CBF_DISTRIBUTE_0, "(($X cbf_or $Y) cbf_and $Z) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
@@ -100,6 +103,7 @@ RULE(CBF_DEF_EQUIV, "( $X cbf_equiv $Y ) := (( $X cbf_imply $Y ) cbf_and ( $Y cb
 RULE(CBF_DEF_IF, "if $X then $Y else $Z := (( $X wff_imply $Y ) wff_and ( wff_neg $X wff_imply $Z )).")
 
 // wff rules
+// TODO (HIGH) add logical forall -> neg exists
 RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
 RULE(WFF_DISTRIBUTE_1, "($X wff_and ($Y wff_or $Z)) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
 RULE(WFF_PUSH_NEGATION_INWARDS_0, "wff_neg ($X wff_and $Y) := (wff_neg $X wff_or wff_neg $Y).")
@@ -142,6 +146,7 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 
 // rules to be used during normalization, the order matters.
 const std::string system = 
+
 	// bf rules
 	BF_ELIM_FORALL 
 	+ BF_DISTRIBUTE_0 
@@ -170,7 +175,7 @@ const std::string system =
 	+ BF_ROTATE_LITERALS_0	
 	+ BF_ROTATE_LITERALS_1 
 
-	// BF CALLBACKS
+	// bf callbacks
 	+ BF_CALLBACK_AND 
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR 
@@ -242,6 +247,128 @@ const std::string system =
 	+ BF_TRIVIALITY_2 
 	+ BF_TRIVIALITY_3
 	+ BF_SQUEEZE_POSITIVES_0;
+
+// bf defs are just callbacks
+const std::string apply_defs = 
+	// wff defs
+	WFF_DEF_XOR
+	+ WFF_DEF_IMPLY
+	+ WFF_DEF_COIMPLY
+	+ WFF_DEF_EQUIV	
+	// cbf defs
+	+ CBF_DEF_XOR
+	+ CBF_DEF_IMPLY
+	+ CBF_DEF_COIMPLY
+	+ CBF_DEF_EQUIV
+	+ CBF_DEF_IF;
+
+const std::string to_dnf_wff = 
+	WFF_DISTRIBUTE_0 
+	+ WFF_DISTRIBUTE_1
+	+ WFF_PUSH_NEGATION_INWARDS_0 
+	+ WFF_PUSH_NEGATION_INWARDS_1 
+	+ WFF_ELIM_DOUBLE_NEGATION_0;
+
+const std::string to_dnf_cbf = 
+	CBF_DISTRIBUTE_0 
+	+ CBF_DISTRIBUTE_1
+	+ CBF_PUSH_NEGATION_INWARDS_0 
+	+ CBF_PUSH_NEGATION_INWARDS_1 
+	+ CBF_ELIM_DOUBLE_NEGATION_0;
+
+const std::string to_dnf_bf = 
+	BF_DISTRIBUTE_0 
+	+ BF_DISTRIBUTE_1
+	+ BF_PUSH_NEGATION_INWARDS_0 
+	+ BF_PUSH_NEGATION_INWARDS_1 
+	+ BF_ELIM_DOUBLE_NEGATION_0;
+
+const std::string simplify_bf = 
+	BF_SIMPLIFY_ONE_0 
+	+ BF_SIMPLIFY_ONE_1 
+	+ BF_SIMPLIFY_ONE_2 
+	+ BF_SIMPLIFY_ONE_3
+	+ BF_SIMPLIFY_ZERO_0 
+	+ BF_SIMPLIFY_ZERO_1 
+	+ BF_SIMPLIFY_ZERO_2 
+	+ BF_SIMPLIFY_ZERO_3
+	+ BF_SIMPLIFY_SELF_0 
+	+ BF_SIMPLIFY_SELF_1 
+	+ BF_SIMPLIFY_SELF_2 
+	+ BF_SIMPLIFY_SELF_3
+	+ BF_SIMPLIFY_SELF_4 
+	+ BF_SIMPLIFY_SELF_5;
+
+const std::string simplify_wff = 
+	WFF_SIMPLIFY_ONE_0 
+	+ WFF_SIMPLIFY_ONE_1 
+	+ WFF_SIMPLIFY_ONE_2 
+	+ WFF_SIMPLIFY_ONE_3
+	+ WFF_SIMPLIFY_ZERO_0 
+	+ WFF_SIMPLIFY_ZERO_1 
+	+ WFF_SIMPLIFY_ZERO_2 
+	+ WFF_SIMPLIFY_ZERO_3
+	+ WFF_SIMPLIFY_SELF_0 
+	+ WFF_SIMPLIFY_SELF_1 
+	+ WFF_SIMPLIFY_SELF_2 
+	+ WFF_SIMPLIFY_SELF_3
+	+ WFF_SIMPLIFY_SELF_4 
+	+ WFF_SIMPLIFY_SELF_5;
+
+const std::string simplify_cbf = 
+	CBF_SIMPLIFY_ONE_0 
+	+ CBF_SIMPLIFY_ONE_1 
+	+ CBF_SIMPLIFY_ONE_2 
+	+ CBF_SIMPLIFY_ONE_3
+	+ CBF_SIMPLIFY_ZERO_0 
+	+ CBF_SIMPLIFY_ZERO_1 
+	+ CBF_SIMPLIFY_ZERO_2 
+	+ CBF_SIMPLIFY_ZERO_3
+	+ CBF_SIMPLIFY_SELF_0 
+	+ CBF_SIMPLIFY_SELF_1 
+	+ CBF_SIMPLIFY_SELF_2 
+	+ CBF_SIMPLIFY_SELF_3
+	+ CBF_SIMPLIFY_SELF_4 
+	+ CBF_SIMPLIFY_SELF_5;
+
+const std::string apply_cb = 
+	BF_CALLBACK_AND 
+	+ BF_CALLBACK_OR
+	+ BF_CALLBACK_XOR 
+	+ BF_CALLBACK_NEG 
+	+ BF_CALLBACK_LESS
+	+ BF_CALLBACK_LESS_EQUAL
+	+ BF_CALLBACK_GREATER
+	+ BF_CALLBACK_IMPLY
+	+ BF_CALLBACK_COIMPLY 
+	+ BF_CALLBACK_EQUIV 
+	+ BF_CALLBACK_EQ
+ 	+ BF_CALLBACK_NEQ;
+
+const std::string wff_reduce =
+	BF_FUNCTIONAL_QUANTIFIERS_0 
+	+ BF_FUNCTIONAL_QUANTIFIERS_1 
+	+ BF_PROCESS_0 
+	+ BF_SKIP_CONSTANTS_0 
+	+ BF_ROTATE_LITERALS_0	
+	+ BF_ROTATE_LITERALS_1
+	+ BF_SQUEEZE_POSITIVES_0;
+
+const std::string wff_simplify =
+	BF_TRIVIALITY_0 
+	+ BF_TRIVIALITY_1 
+	+ BF_TRIVIALITY_2 
+	+ BF_TRIVIALITY_3;
+
+
+// each bunch of rules whould applied till no more changes are made, then we 
+// apply the next rule in the vector till no further changes and so on,...
+// the API would provide a method to execute the rules accodingly.
+const std::vector<std::string> step_0 = { apply_defs };
+const std::vector<std::string> step_1 = { to_dnf_cbf, simplify_cbf };
+const std::vector<std::string> step_2 = { apply_cb, to_dnf_bf, simplify_bf };
+const std::vector<std::string> step_3 = { to_dnf_wff };
+const std::vector<std::string> step_4 = { wff_reduce , wff_simplify};
 
 // CHECK could we assume we are working with the product algebra?
 // this should be used in conjuction with std::set. it must provide

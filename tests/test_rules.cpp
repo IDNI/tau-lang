@@ -433,6 +433,28 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::wff_rule;
 		CHECK( check.has_value() );
 	}
+
+	TEST_CASE("BF_CALLBACK_IS_ZERO") {
+		auto src_rule = make_tau_source(BF_CALLBACK_IS_ZERO);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::bf_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BF_CALLBACK_IS_ONE") {
+		auto src_rule = make_tau_source(BF_CALLBACK_IS_ONE);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::bf_rule;
+		CHECK( check.has_value() );
+	}
 }
 
 TEST_SUITE("parsing cbf rules") {
@@ -1436,6 +1458,30 @@ TEST_SUITE("executing bf rules") {
 	TEST_CASE("BF_CALLBACK_NEQ") {
 		// TODO (HIGH) this test doesn't test what it should
 		auto src_rule = make_tau_source(BF_CALLBACK_NEQ);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		//CHECK( matcher != body );
+		//CHECK( result != body );
+	}
+
+	TEST_CASE("BF_CALLBACK_IS_ONE") {
+		// TODO (HIGH) this test doesn't test what it should
+		auto src_rule = make_tau_source(BF_CALLBACK_IS_ONE);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		//CHECK( matcher != body );
+		//CHECK( result != body );
+	}
+
+	TEST_CASE("BF_CALLBACK_IS_ZERO") {
+		// TODO (HIGH) this test doesn't test what it should
+		auto src_rule = make_tau_source(BF_CALLBACK_IS_ZERO);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());

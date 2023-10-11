@@ -199,7 +199,9 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_coimply_cb
 		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_subs_cb
 		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_eq_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_neq_cb;
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_neq_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_is_one_cb
+		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_is_zero_cb;
 };
 
 template<typename...BAs>
@@ -465,12 +467,16 @@ struct callback_applier {
 			case ::tau_parser::bf_subs_cb: return apply_subs(n);
 			case ::tau_parser::bf_eq_cb: return make_node<tau_sym<BAs...>>(std::visit(_eq, bas[0], bas[1], bas[2], bas[3]), {});
 			case ::tau_parser::bf_neq_cb: return make_node<tau_sym<BAs...>>(std::visit(_neq, bas[0], bas[1], bas[2], bas[3]), {});
+			case ::tau_parser::bf_is_one_cb: return make_node<tau_sym<BAs...>>(std::visit(_is_one, bas[0], bas[1]), {});
+			case ::tau_parser::bf_is_zero_cb: return make_node<tau_sym<BAs...>>(std::visit(_is_zero, bas[0], bas[1]), {});
 			default: return n;
 		}
 	}
 
 private:
 
+	static constexpr auto _is_one = [](const auto& l, const auto& t) { return l == 1 ? t : l; };
+	static constexpr auto _is_zero = [](const auto& l, const auto& t) { return l == 0 ? t : l; };
 	static constexpr auto _and = [](const auto& l, const auto& r) { return l & r; };
 	static constexpr auto _or = [](const auto& l, const auto& r) { return l | r; };
 	static constexpr auto _xor = [](const auto& l, const auto& r) { return l ^ r; };
