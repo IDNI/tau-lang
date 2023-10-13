@@ -12,6 +12,7 @@
 // modified over time by the Author.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define OUTPUT_APPLY_RULES
 
 #include "../src/doctest.h"
 #include "../src/defs.h"
@@ -535,7 +536,7 @@ TEST_SUITE("parser: bf formulas ") {
 	}
 
 	TEST_CASE("bf_all") {
-		static constexpr char* sample =	"bf_all ?Z ?Z := ?Z.";
+		static constexpr char* sample =	"bf_all ?Z $Z := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto all_rule = lib 
@@ -553,7 +554,7 @@ TEST_SUITE("parser: bf formulas ") {
 	// TODO (MEDIUM) test bf_all with multiple variables
 
 	TEST_CASE("bf_ex") {
-		static constexpr char* sample =	"bf_ex ?Z ?Z := ?Z.";
+		static constexpr char* sample =	"bf_ex ?Z $Z := $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto ex_rule = lib 
@@ -696,7 +697,6 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::bf_cte_cb
 			| tau_parser::bf_and_cb;
 		CHECK( and_cb.has_value() );
 	}
@@ -713,7 +713,6 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::bf_cte_cb
 			| tau_parser::bf_or_cb;
 		CHECK( or_cb.has_value() );
 	}
@@ -730,7 +729,6 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::bf_cte_cb
 			| tau_parser::bf_xor_cb;
 		CHECK( xor_cb.has_value() );
 	}
@@ -747,7 +745,6 @@ TEST_SUITE("parser: callbacks ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::bf_cte_cb
 			| tau_parser::bf_neg_cb;
 		CHECK( neg_cb.has_value() );
 	}

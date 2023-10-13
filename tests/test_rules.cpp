@@ -27,17 +27,6 @@ namespace testing = doctest;
 
 TEST_SUITE("parsing bf rules") {
 
-	TEST_CASE("BF_ELIM_FORALL") {
-		auto src_rule = make_tau_source(BF_ELIM_FORALL);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-
 	TEST_CASE("BF_DISTRIBUTE_0") { 
 		auto src_rule = make_tau_source(BF_DISTRIBUTE_0);
 		auto tau_rule = make_statement(src_rule);
@@ -1048,17 +1037,6 @@ TEST_SUITE("parsing wff rules") {
 
 TEST_SUITE("executing bf rules") {
 
-	TEST_CASE("BF_ELIM_FORALL") {
-		auto src_rule = make_tau_source(BF_ELIM_FORALL);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
 	TEST_CASE("BF_DISTRIBUTE_0") { 
 		auto src_rule = make_tau_source(BF_DISTRIBUTE_0);
 		auto statement = make_statement(src_rule);
@@ -1827,7 +1805,7 @@ TEST_SUITE("executing wff rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
+		CHECK( matcher != body ); 
 		CHECK( result == body );
 	}
 		
@@ -1838,18 +1816,18 @@ TEST_SUITE("executing wff rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
+		CHECK( matcher != body ); 
 		CHECK( result == body );
 	}
 		
 	TEST_CASE("WFF_SIMPLIFY_ONE_2") { 
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ONE_2);
-		auto statement = make_statement(src_rule);
+		auto statement = make_statement(src_rule); 
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
+		CHECK( matcher != body ); 
 		CHECK( result == body );
 	}
 		
@@ -1860,7 +1838,7 @@ TEST_SUITE("executing wff rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
+		CHECK( matcher != body ); 
 		CHECK( result == body );
 	}
 		

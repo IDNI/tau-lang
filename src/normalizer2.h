@@ -29,7 +29,6 @@ namespace idni::tau {
 
 // bf rules 
 // TODO (HIGH) remove most of them
-RULE(BF_ELIM_FORALL, "bf_all $X $Y := bf_neg bf_ex $X bf_neg $Y.")
 RULE(BF_DISTRIBUTE_0, "(($X bf_or $Y) bf_and $Z) := (($X bf_and $Y) bf_or ($X bf_and $Z)).")
 RULE(BF_DISTRIBUTE_1, "($X bf_and ($Y bf_or $Z)) := (($X bf_and $Y) bf_or ($X bf_and $Z)).")
 RULE(BF_PUSH_NEGATION_INWARDS_0, "bf_neg ($X bf_and $Y) := (bf_neg $X bf_or bf_neg $Y).")
@@ -58,8 +57,8 @@ RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_and $Y ) bf_and $Z ) := ( ( $Y bf_and $Z )
 
 // bf callbacks
 RULE(BF_CALLBACK_AND, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
-RULE(BF_CALLBACK_OR, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
-RULE(BF_CALLBACK_XOR, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
+RULE(BF_CALLBACK_OR, "( { $X } bf_or { $Y } ) := { $X bf_or_cb $Y }.")
+RULE(BF_CALLBACK_XOR, "( { $X } bf_xor { $Y } ) := { $X bf_xor_cb $Y }.")
 RULE(BF_CALLBACK_NEG, "bf_neg { $X }  := { bf_neg_cb $X }.")
 RULE(BF_CALLBACK_LESS, "( { $X } bf_less { $Y } ) := bf_less_cb $X $Y T F.")
 RULE(BF_CALLBACK_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := bf_less_equal_cb $X $Y T F.")
@@ -67,8 +66,8 @@ RULE(BF_CALLBACK_GREATER, "( { $X } bf_greater { $Y } ) := bf_greater_cb $X $Y T
 RULE(BF_CALLBACK_IMPLY, "( { $X } bf_imply { $Y } ) :=  { $X bf_imply_cb $Y }.")
 RULE(BF_CALLBACK_COIMPLY, "( { $X } bf_coimply { $Y } ) := { $X bf_coimply_cb $Y }.")
 RULE(BF_CALLBACK_EQUIV, "( { $X } bf_equiv { $Y } ) := { $X bf_equiv_cb $Y }.")
-RULE(BF_CALLBACK_EQ, "( { $X } == { $Y } ) := bf_eq_cb $X $Y T F.")
-RULE(BF_CALLBACK_NEQ, "( { $X } != { $Y } ) := bf_neq_cb $X $Y T F.")
+RULE(BF_CALLBACK_EQ, "( { $X } == F ) := bf_eq_cb $X T F.")
+RULE(BF_CALLBACK_NEQ, "( { $X } != F ) := bf_neq_cb $X T F.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb $X F.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb $X T.")
 
@@ -148,8 +147,7 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 const std::string system = 
 
 	// bf rules
-	BF_ELIM_FORALL 
-	+ BF_DISTRIBUTE_0 
+	BF_DISTRIBUTE_0 
 	+ BF_DISTRIBUTE_1
 	+ BF_PUSH_NEGATION_INWARDS_0 
 	+ BF_PUSH_NEGATION_INWARDS_1 
