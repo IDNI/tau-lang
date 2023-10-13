@@ -29,16 +29,19 @@ struct Bool {
 };
 
 Bool Bool::operator&(const Bool& x) const {
-	return (*this == false) ? zero() : x;
+	return (this->b == false) ? zero() : x;
 }
 
 Bool Bool::operator|(const Bool& x) const {
-	return (*this == true) ? one() : x;
+	return (this->b == true) ? one() : x;
 }
 
 Bool Bool::operator^(const Bool& x) const {
-	return (*this == true) ? one() : x;
+	return (this->b == true) ? one() : x;
 }
 
-Bool Bool::operator~() const { return *this == true ? zero() : one(); }
+Bool Bool::operator~() const { 
+	return (this->b == true) ? zero() : one(); 
+}
+
 #endif
