@@ -392,7 +392,9 @@ using terminal_extractor_t = decltype(terminal_extractor<BAs...>);
 
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const terminal_extractor_t<BAs...> e) {
-	return v | std::ranges::views::transform(e); 
+	std::vector<std::variant<BAs...>> nv;
+	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
+	return nv;
 }
 
 template <typename... BAs>
@@ -446,6 +448,42 @@ template <typename... BAs>
 std::optional<std::variant<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& o, const ba_extractor_t<BAs...> e) {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
+}
+
+template <typename... BAs>
+std::optional<std::variant<BAs...>> operator|(const sp_tau_node<BAs...>& o, const ba_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return e(o);
+}
+
+// returns the only child of a node
+template <typename... BAs>
+static const auto only_child_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<sp_tau_node<BAs...>> {
+	if (n->child.size() != 1) return std::optional<sp_tau_node<BAs...>>();
+	return std::optional<sp_tau_node<BAs...>>(n->child[0]);
+};
+
+template<typename... BAs>
+using only_child_extractor_t = decltype(only_child_extractor<BAs...>);
+
+template <typename... BAs>
+std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const only_child_extractor_t<BAs...> e) {
+	std::vector<sp_tau_node<BAs...>> nv;
+	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
+	return nv;
+}
+
+template <typename... BAs>
+std::optional<sp_tau_node<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& o, const only_child_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return o.has_value() ? e(o.value()) : std::optional<sp_tau_node<BAs...>>(); 
+}
+
+// IDEA maybe unnify all the implementations dealing with operator| and operator|| fro extractors
+template <typename... BAs>
+std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const only_child_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return e(o);
 }
 
 //
@@ -514,24 +552,29 @@ struct callback_applier {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
 		if (!is_callback<BAs...>(n)) return n;
-		auto bas = n || tau_parser::bf_cb_arg || ba_extractor<BAs...>;
-		auto nt = get<tau_source_sym>(n->value).nt();
+//		std::cout << "callback node: " << std::endl;
+//		print_sp_tau_node(std::cout, n);
+		// TODO (MEDIUM) deal with errors once we have a clear strategy
+		auto bas = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...> || ba_extractor<BAs...>;
+//		auto ba = (b || tau_parser::bf)[0]->child[0];
+//		auto bas = (ba | ba_extractor<BAs...>).value();
+		auto nt = get<tau_source_sym>(n->value).n();
 		switch (nt) {
+			case ::tau_parser::bf_neg_cb: return make_node<tau_sym<BAs...>>(std::visit(_neg, bas[0]), {});
 			case ::tau_parser::bf_and_cb: return make_node<tau_sym<BAs...>>(std::visit(_and, bas[0], bas[1]), {});
 			case ::tau_parser::bf_or_cb: return make_node<tau_sym<BAs...>>(std::visit(_or, bas[0], bas[1]), {});
 			case ::tau_parser::bf_xor_cb: return make_node<tau_sym<BAs...>>(std::visit(_xor, bas[0], bas[1]), {});
-			case ::tau_parser::bf_neg_cb: return make_node<tau_sym<BAs...>>(std::visit(_neg, bas[0]), {});
-			case ::tau_parser::bf_less_cb: return make_node<tau_sym<BAs...>>(std::visit(_less, bas[0], bas[1], bas[2], bas[3]), {});
-			case ::tau_parser::bf_less_equal_cb: return make_node<tau_sym<BAs...>>(std::visit(_less_equal, bas[0], bas[1], bas[2], bas[3]), {});
-			case ::tau_parser::bf_greater_cb: return make_node<tau_sym<BAs...>>(std::visit(_greater, bas[0], bas[1], bas[2], bas[3]), {});
 			case ::tau_parser::bf_imply_cb: return make_node<tau_sym<BAs...>>(std::visit(_imply, bas[0], bas[1]), {});
 			case ::tau_parser::bf_equiv_cb: return make_node<tau_sym<BAs...>>(std::visit(_equiv, bas[0], bas[1]), {});
 			case ::tau_parser::bf_coimply_cb: return make_node<tau_sym<BAs...>>(std::visit(_coimply, bas[0], bas[1]), {});
+			/*case ::tau_parser::bf_less_cb: return make_node<tau_sym<BAs...>>(std::visit(_less, bas[0], bas[1], bas[2], bas[3]), {});
+			case ::tau_parser::bf_less_equal_cb: return make_node<tau_sym<BAs...>>(std::visit(_less_equal, bas[0], bas[1], bas[2], bas[3]), {});
+			case ::tau_parser::bf_greater_cb: return make_node<tau_sym<BAs...>>(std::visit(_greater, bas[0], bas[1], bas[2], bas[3]), {});
 			case ::tau_parser::bf_subs_cb: return apply_subs(n);
 			case ::tau_parser::bf_eq_cb: return make_node<tau_sym<BAs...>>(std::visit(_eq, bas[0], bas[1], bas[2], bas[3]), {});
 			case ::tau_parser::bf_neq_cb: return make_node<tau_sym<BAs...>>(std::visit(_neq, bas[0], bas[1], bas[2], bas[3]), {});
 			case ::tau_parser::bf_is_one_cb: return make_node<tau_sym<BAs...>>(std::visit(_is_one, bas[0], bas[1]), {});
-			case ::tau_parser::bf_is_zero_cb: return make_node<tau_sym<BAs...>>(std::visit(_is_zero, bas[0], bas[1]), {});
+			case ::tau_parser::bf_is_zero_cb: return make_node<tau_sym<BAs...>>(std::visit(_is_zero, bas[0], bas[1]), {});*/
 			default: return n;
 		}
 	}
@@ -892,14 +935,21 @@ formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const 
 // apply one tau rule to the given expression
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
-	// IDEA maybe we could apply only once
-	callback_applier<BAs...> cb_applier;
-	map_node_transformer<callback_applier<BAs...>, sp_tau_node<BAs...>, sp_tau_node<BAs...>> transformer(cb_applier);
-	return post_order_traverser<
-			map_node_transformer<callback_applier<BAs...>, sp_tau_node<BAs...>, sp_tau_node<BAs...>>,
-			all_t<sp_tau_node<BAs...>>, 
-			sp_tau_node<BAs...>>(
-		transformer, all<sp_tau_node<BAs...>>)(apply_with_skip(r, n , none<sp_tau_node<BAs...>>, is_capture<BAs...>, is_non_essential<BAs...>));
+	// IDEA maybe we could traverse only once
+	auto nn = apply_with_skip(r, n , none<sp_tau_node<BAs...>>, is_capture<BAs...>, is_non_essential<BAs...>);
+	if (auto cb = find_bottom(nn, is_callback<BAs...>); cb) {
+		callback_applier<BAs...> cb_applier;
+		auto nnn = cb_applier(cb.value());
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> change;
+		change[cb.value()] = nnn;
+		replace_transformer<sp_tau_node<BAs...>> replace{change};
+		return post_order_traverser<
+				replace_transformer<sp_tau_node<BAs...>>, 
+				all_t<sp_tau_node<BAs...>>, 
+				sp_tau_node<BAs...>>(
+			replace , all<sp_tau_node<BAs...>>)(nn);
+	}
+	return nn;
 }
 
 // apply the given rules to the given expression

@@ -196,15 +196,19 @@ template <typename wrapped_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct map_node_transformer {
 
+	// REVIEW (MEDIUM) check the implementation of this transformer, it seems buggy
 	map_node_transformer(wrapped_t& wrapped) : wrapped(wrapped) {}
 
 	output_node_t operator()(const input_node_t& n) {
+		auto nn = wrapped(n);
+		if (nn != n) { changes[n] == nn; return nn; };
 		std::vector<output_node_t> child;
 		for (const auto& c : n->child) 
 			if (auto it = changes.find(c); it != changes.end()) 
 				child.push_back(it->second);
 			else child.push_back(c);
-		return changes[n] = wrapped(n);
+		auto nn2 = make_node(nn->value, child);
+		return changes[n] = nn2;
 	}
 
 	std::map<input_node_t, output_node_t> changes;
