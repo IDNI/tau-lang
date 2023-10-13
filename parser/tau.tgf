@@ -167,9 +167,8 @@ bf_matcher		=> bf.
 bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or | bf_imply 
 					| bf_equiv | bf_coimply	| bf_all | bf_ex | variable | timed 
 					| bf_less | bf_less_equal | bf_greater | bf_subs_cb
-					| bf_xor_cb | bf_and_cb | bf_or_cb | bf_neg_cb | bf_less_cb 
-					| bf_less_equal_cb | bf_greater_cb | bf_imply_cb 
-					| bf_coimply_cb | bf_equiv_cb | bf_is_zero_cb | bf_is_one_cb
+					| bf_less_cb | bf_less_equal_cb | bf_greater_cb | bf_imply_cb 
+					| bf_is_zero_cb | bf_is_one_cb
 					| T | F | variable | capture | ignore.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
@@ -204,9 +203,7 @@ bf_constant		=> T | F | open_brace constant close_brace.
 #constants, test_bf is included for testing purposes only
 constant		=>  binding | capture | ignore | var | T | F
 					| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb 
-					| bf_imply_cb | bf_equiv_cb | bf_coimply_cb
-					| bf_less_cb | bf_less_equal_cb | bf_greater_cb
-					| bf_is_zero_cb | bf_is_one_cb | bf_subs_cb.
+					| bf_imply_cb | bf_equiv_cb | bf_coimply_cb.
 T				=> ws 'T' ws.
 F				=> ws 'F' ws.
 binding			=> source_binding | named_binding.
