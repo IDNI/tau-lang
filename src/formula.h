@@ -181,27 +181,89 @@ static const auto is_capture = [](const sp_tau_node<BAs...>& n) {
 		&& get<tau_source_sym>(n->value).n() == tau_parser::capture; 
 };
 
+template<typename...BAs>
+auto is_non_essential = [] (const sp_tau_node<BAs...>& n) {
+	if (!std::holds_alternative<tau_source_sym>(n->value) || !get<tau_source_sym>(n->value).nt()) return false;
+	auto nt = get<tau_source_sym>(n->value).n();
+	return  
+		nt == tau_parser::empty_string
+		|| nt == tau_parser::eof
+		|| nt == tau_parser::space
+		|| nt == tau_parser::digit
+		|| nt == tau_parser::xdigit
+		|| nt == tau_parser::alpha
+		|| nt == tau_parser::alnum
+		|| nt == tau_parser::punct
+		|| nt == tau_parser::printable
+		|| nt == tau_parser::eol
+		|| nt == tau_parser::ws_comment
+		|| nt == tau_parser::_Rws_comment_0
+		|| nt == tau_parser::ws_required
+		|| nt == tau_parser::ws
+		|| nt == tau_parser::esc
+		|| nt == tau_parser::open_parenthesis
+		|| nt == tau_parser::close_parenthesis
+		|| nt == tau_parser::open_bracket
+		|| nt == tau_parser::close_bracket
+		|| nt == tau_parser::open_brace
+		|| nt == tau_parser::close_brace;
+};
+
+template<typename...BAs>
+using is_non_essential_t = decltype(is_non_essential<BAs...>);
+
+auto is_non_essential_source = [] (const sp_tau_source_node& n) {
+	if (!n->value.nt()) return false;
+	auto nt = n->value.n();
+	return  
+		nt == tau_parser::empty_string
+		|| nt == tau_parser::eof
+		|| nt == tau_parser::space
+		|| nt == tau_parser::digit
+		|| nt == tau_parser::xdigit
+		|| nt == tau_parser::alpha
+		|| nt == tau_parser::alnum
+		|| nt == tau_parser::punct
+		|| nt == tau_parser::printable
+		|| nt == tau_parser::eol
+		|| nt == tau_parser::ws_required
+		|| nt == tau_parser::ws
+		|| nt == tau_parser::esc
+		|| nt == tau_parser::open_parenthesis
+		|| nt == tau_parser::close_parenthesis
+		|| nt == tau_parser::open_bracket
+		|| nt == tau_parser::close_bracket
+		|| nt == tau_parser::open_brace
+		|| nt == tau_parser::close_brace;
+};
+
+using is_non_essential_source_t = decltype(is_non_essential_source);
+
+
 template<typename... BAs>
 using is_capture_t = decltype(is_capture<BAs...>);
 
+// TODO (HIGH) implement is_skip and is_skip_t
+
 template<typename...BAs>
 static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
-	return std::holds_alternative<tau_source_sym>(n->value) 
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_and_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_or_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_xor_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_neg_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_less_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_less_equal_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_greater_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_imply_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_equiv_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_coimply_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_subs_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_eq_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_neq_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_is_one_cb
-		&& get<tau_source_sym>(n->value).nt() == ::tau_parser::bf_is_zero_cb;
+	if (!std::holds_alternative<tau_source_sym>(n->value) || !get<tau_source_sym>(n->value).nt()) return false;
+	auto nt = get<tau_source_sym>(n->value).n();
+	return nt == ::tau_parser::bf_and_cb
+		|| nt == ::tau_parser::bf_or_cb
+		|| nt == ::tau_parser::bf_xor_cb
+		|| nt == ::tau_parser::bf_neg_cb
+		|| nt == ::tau_parser::bf_less_cb
+		|| nt == ::tau_parser::bf_less_equal_cb
+		|| nt == ::tau_parser::bf_greater_cb
+		|| nt == ::tau_parser::bf_imply_cb
+		|| nt == ::tau_parser::bf_equiv_cb
+		|| nt == ::tau_parser::bf_coimply_cb
+		|| nt == ::tau_parser::bf_subs_cb
+		|| nt == ::tau_parser::bf_eq_cb
+		|| nt == ::tau_parser::bf_neq_cb
+		|| nt == ::tau_parser::bf_is_one_cb
+		|| nt == ::tau_parser::bf_is_zero_cb;
 };
 
 template<typename...BAs>
@@ -376,13 +438,14 @@ using ba_extractor_t = decltype(ba_extractor<BAs...>);
 template <typename... BAs>
 std::vector<std::variant<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const ba_extractor_t<BAs...> e) {
 	std::vector<std::variant<BAs...>> nv;
-	for (const auto& n: v | std::ranges::views::transform(e)) nv.push_back(n.value());
+	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
 	return nv;
 }
 
 template <typename... BAs>
 std::optional<std::variant<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& o, const ba_extractor_t<BAs...> e) {
-	return o.transform(e); 
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return o.has_value() ? e(o.value()) : std::optional<size_t>();
 }
 
 //
@@ -779,13 +842,11 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	auto type = non_terminal_extractor<BAs...>(rule->child[0]).value();
 	switch(type) {
 		case ::tau_parser::wff_rule:
-			// TODO (HIGH) consider also wff_ref 
-			return { (rule | ::tau_parser::wff_rule | tau_parser::wff_matcher).value() , (rule | ::tau_parser::wff_rule | ::tau_parser::wff).value() };
+			return { (rule | ::tau_parser::wff_rule | tau_parser::wff_matcher).value()->child[0] , (rule | ::tau_parser::wff_rule | ::tau_parser::wff).value() };
 		case ::tau_parser::cbf_rule:
-			// TODO (HIGH) consider also cbf_ref 
-			return { (rule | ::tau_parser::cbf_rule | tau_parser::cbf_matcher).value(), (rule | ::tau_parser::cbf_rule | ::tau_parser::cbf).value() };
+			return { (rule | ::tau_parser::cbf_rule | tau_parser::cbf_matcher).value()->child[0], (rule | ::tau_parser::cbf_rule | ::tau_parser::cbf).value() };
 		case ::tau_parser::bf_rule:
-			return { (rule | ::tau_parser::bf_rule | tau_parser::bf_matcher).value(), (rule | ::tau_parser::bf_rule | ::tau_parser::bf).value() };
+			return { (rule | ::tau_parser::bf_rule | tau_parser::bf_matcher).value()->child[0], (rule | ::tau_parser::bf_rule | ::tau_parser::bf).value() };
 		default:
 			assert(false); // error in grammar or parser
 	} 
@@ -838,7 +899,7 @@ sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 			map_node_transformer<callback_applier<BAs...>, sp_tau_node<BAs...>, sp_tau_node<BAs...>>,
 			all_t<sp_tau_node<BAs...>>, 
 			sp_tau_node<BAs...>>(
-		transformer, all<sp_tau_node<BAs...>>)(apply(r ,n, none<sp_tau_node<BAs...>>, is_capture<BAs...>));
+		transformer, all<sp_tau_node<BAs...>>)(apply_with_skip(r, n , none<sp_tau_node<BAs...>>, is_capture<BAs...>, is_non_essential<BAs...>));
 }
 
 // apply the given rules to the given expression
@@ -855,20 +916,10 @@ tau<BAs...> make_tau() {
 	return tau<BAs...>();
 }
 
-// TODO (DOING) write a clean predicate and apply it before calling make_node_from_string
-auto non_essential_predicates = [] (const sp_tau_source_node& n) {
-	return n->value.nt() == tau_parser::ws
-		|| n->value.nt() == tau_parser::close_brace
-		|| n->value.nt() == tau_parser::open_brace
-		|| n->value.nt() == tau_parser::open_bracket
-		|| n->value.nt() == tau_parser::close_bracket
-		|| n->value.nt() == tau_parser::open_parenthesis
-		|| n->value.nt() == tau_parser::close_parenthesis;
-};
-using non_essential_predicates_t = decltype(non_essential_predicates);
-
 sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
-	return trim_top<non_essential_predicates_t, tau_source_sym, sp_tau_source_node>(tau_source, non_essential_predicates);	
+	// return tau_source;
+	// FIXME (LOW) fix the trim implementation
+	return trim_top<is_non_essential_source_t, tau_source_sym, sp_tau_source_node>(tau_source, is_non_essential_source);	
 }
 
 // make a tau source from the given source code string.
@@ -881,8 +932,7 @@ sp_tau_source_node parse_tau_source(const std::string source) {
 }
 
 sp_tau_source_node make_tau_source(const std::string source) {
-	auto tau_source = parse_tau_source(source);
-	return clean_tau_source(tau_source);
+	return parse_tau_source(source);
 }
 
 } // namespace idni::tau
