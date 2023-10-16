@@ -63,9 +63,6 @@ RULE(BF_CALLBACK_NEG, "bf_neg { $X } := { bf_neg_cb $X }.")
 RULE(BF_CALLBACK_LESS, "( { $X } bf_less { $Y } ) := bf_less_cb $X $Y T F.")
 RULE(BF_CALLBACK_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := bf_less_equal_cb $X $Y T F.")
 RULE(BF_CALLBACK_GREATER, "( { $X } bf_greater { $Y } ) := bf_greater_cb $X $Y T F.")
-RULE(BF_CALLBACK_IMPLY, "( { $X } bf_imply { $Y } ) :=  { $X bf_imply_cb $Y }.")
-RULE(BF_CALLBACK_COIMPLY, "( { $X } bf_coimply { $Y } ) := { $X bf_coimply_cb $Y }.")
-RULE(BF_CALLBACK_EQUIV, "( { $X } bf_equiv { $Y } ) := { $X bf_equiv_cb $Y }.")
 RULE(BF_CALLBACK_EQ, "( { $X } == F ) := bf_eq_cb $X T F.")
 RULE(BF_CALLBACK_NEQ, "( { $X } != F ) := bf_neq_cb $X T F.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb $X F.")
@@ -181,9 +178,6 @@ const std::string system =
 	+ BF_CALLBACK_LESS
 	+ BF_CALLBACK_LESS_EQUAL
 	+ BF_CALLBACK_GREATER
-	+ BF_CALLBACK_IMPLY
-	+ BF_CALLBACK_COIMPLY 
-	+ BF_CALLBACK_EQUIV 
 	+ BF_CALLBACK_EQ
  	+ BF_CALLBACK_NEQ
 
@@ -337,9 +331,6 @@ const std::string apply_cb =
 	+ BF_CALLBACK_LESS
 	+ BF_CALLBACK_LESS_EQUAL
 	+ BF_CALLBACK_GREATER
-	+ BF_CALLBACK_IMPLY
-	+ BF_CALLBACK_COIMPLY 
-	+ BF_CALLBACK_EQUIV 
 	+ BF_CALLBACK_EQ
  	+ BF_CALLBACK_NEQ;
 

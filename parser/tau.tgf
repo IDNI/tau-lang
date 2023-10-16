@@ -164,7 +164,7 @@ cbf_else_sym		=> ws "else" ws.
 
 bf_rule			=> bf_matcher definition bf dot.
 bf_matcher		=> bf.
-bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or | bf_imply 
+bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or 
 					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater 
 					| bf_less_cb | bf_less_equal_cb | bf_greater_cb 
 					| bf_subs_cb | bf_is_zero_cb | bf_is_one_cb
@@ -176,9 +176,6 @@ bf_neg			=> bf_neg_sym bf.
 bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
 bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
 bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
-bf_imply		=> open_parenthesis bf bf_imply_sym bf close_parenthesis.
-bf_equiv		=> open_parenthesis bf bf_equiv_sym bf close_parenthesis.
-bf_coimply		=> open_parenthesis bf bf_coimply_sym bf close_parenthesis.
 bf_all			=> bf_all_sym ws_required (variable | capture) ws_required bf.
 bf_ex			=> bf_ex_sym ws_required (variable | capture) ws_required bf.
 
@@ -190,9 +187,6 @@ bf_neg_sym			=> ws "bf_neg" ws.
 bf_less_sym			=> ws "bf_less" ws.
 bf_less_equal_sym	=> ws "bf_less_equal" ws.
 bf_greater_sym		=> ws "bf_greater" ws.
-bf_imply_sym		=> ws "bf_imply" ws.
-bf_equiv_sym		=> ws "bf_equiv" ws.
-bf_coimply_sym		=> ws "bf_coimply" ws.	
 bf_all_sym			=> ws "bf_all" ws.
 bf_ex_sym			=> ws "bf_ex" ws.
 
@@ -201,8 +195,7 @@ bf_constant		=> open_brace constant close_brace.
 
 #constants, test_bf is included for testing purposes only
 constant		=>  binding | capture | ignore | var | T | F
-					| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb
-					| bf_imply_cb | bf_equiv_cb | bf_coimply_cb.
+					| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
 T				=> ws 'T' ws.
 F				=> ws 'F' ws.
 binding			=> source_binding | named_binding.
@@ -222,9 +215,6 @@ bf_neg_cb			=> bf_neg_cb_sym bf_cb_arg.
 bf_less_cb			=> bf_less_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 bf_less_equal_cb	=> bf_less_equal_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 bf_greater_cb		=> bf_greater_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-bf_imply_cb			=> bf_cb_arg bf_imply_cb_sym bf_cb_arg.
-bf_equiv_cb			=> bf_cb_arg bf_equiv_cb_sym bf_cb_arg.
-bf_coimply_cb		=> bf_cb_arg bf_coimply_cb_sym bf_cb_arg.
 bf_subs_cb			=> bf_subs_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 bf_eq_cb			=> bf_eq_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 bf_neq_cb			=> bf_neq_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
@@ -242,9 +232,6 @@ bf_neg_cb_sym			=> ws "bf_neg_cb" ws.
 bf_less_cb_sym			=> ws "bf_less_cb" ws.
 bf_less_equal_cb_sym	=> ws "bf_less_equal_cb" ws.
 bf_greater_cb_sym		=> ws "bf_greater_cb" ws.
-bf_imply_cb_sym			=> ws "bf_imply_cb" ws.
-bf_equiv_cb_sym			=> ws "bf_equiv_cb" ws.
-bf_coimply_cb_sym		=> ws "bf_coimply_cb" ws.
 bf_subs_cb_sym			=> ws "bf_subs_cb" ws.
 bf_eq_cb_sym			=> ws "bf_eq_cb" ws.
 bf_neq_cb_sym			=> ws "bf_neq_cb" ws.
