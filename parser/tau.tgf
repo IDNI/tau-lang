@@ -91,9 +91,10 @@ in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
 
 # wff
-wff_rule		=> (wff_matcher | wff_ref) definition wff dot.
+wff_rule		=> (wff_matcher | wff_ref ) definition wff dot.
 
-wff_matcher		=> wff.
+# needed for rule CBF_DEF_IF
+wff_matcher		=> wff | cbf_if.
 
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
@@ -112,8 +113,8 @@ wff_neg			=> wff_neg_sym wff.
 wff_imply		=> open_parenthesis wff wff_imply_sym wff close_parenthesis.
 wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
 wff_coimply		=> open_parenthesis wff wff_coimply_sym wff close_parenthesis.
-wff_all			=> wff_all_sym ws_required (variable|capture|ignore) ws_required wff.
-wff_ex			=> wff_ex_sym ws_required (variable|capture|ignore) ws_required wff.
+wff_all			=> wff_all_sym (variable|capture|ignore) ws_required wff.
+wff_ex			=> wff_ex_sym (variable|capture|ignore) ws_required wff.
 
 # wff_op_sym
 wff_and_sym		=> ws "wff_and" ws.
@@ -132,7 +133,7 @@ cbf_matcher		=> cbf.
 cbf_ref 		=> sym indexes cbf_ref_args.
 cbf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
-cbf 				=> bf | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or | cbf_if
+cbf 				=> bf | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or 
 						| cbf_imply | cbf_equiv | cbf_coimply | cbf_ref 
 						| T | F | variable | capture | ignore.
 cbf_if				=> cbf_if_sym cbf_if_condition 
