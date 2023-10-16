@@ -368,39 +368,6 @@ TEST_SUITE("parsing bf rules") {
 		CHECK( check.has_value() );
 	}
 		
-	TEST_CASE("BF_CALLBACK_IMPLY") {
-		auto src_rule = make_tau_source(BF_CALLBACK_IMPLY);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-		
-	TEST_CASE("BF_CALLBACK_COIMPLY") {
-		auto src_rule = make_tau_source(BF_CALLBACK_COIMPLY);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-		
-	TEST_CASE("BF_CALLBACK_EQUIV") {
-		auto src_rule = make_tau_source(BF_CALLBACK_EQUIV);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-		
 	TEST_CASE("BF_CALLBACK_EQ") {
 		auto src_rule = make_tau_source(BF_CALLBACK_EQ);
 		auto tau_rule = make_statement(src_rule);
@@ -1364,7 +1331,8 @@ TEST_SUITE("executing bf rules") {
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
 			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
-		CHECK( check.has_value() );	}
+		CHECK( check.has_value() );	
+	}
 		
 	TEST_CASE("BF_CALLBACK_NEG") {
 		static constexpr char* sample =	"( bf_neg { l } == F ).";
@@ -1389,47 +1357,58 @@ TEST_SUITE("executing bf rules") {
 	}
 		
 	TEST_CASE("BF_CALLBACK_LESS") {
-		// TODO (HIGH) this test doesn't test what it should
-		auto src_rule = make_tau_source(BF_CALLBACK_LESS);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		static constexpr char* sample =	"( ( { l } bf_less { r } ) == F ).";
+		auto sample_src = make_tau_source(sample);
+		auto sample_statement = make_statement(sample_src);
+		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
+		auto binded = make_named_bindings(sample_statement, bs);
+		std::cout << "binded: " << std::endl;
+		print_sp_tau_node(std::cout, binded);
+		auto rule_src = make_tau_source(BF_CALLBACK_LESS);
+		auto rule_statement = make_statement(rule_src);
+		auto rule = rule_statement 
+			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( false );
+		auto result = tau_apply(tau_rule, binded);
+		std::cout << "result: " << std::endl;
+		print_sp_tau_node(std::cout, result);
+		auto check = result
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
+			| tau_parser::cbf | tau_parser::bf | tau_parser::F;
+		CHECK( check.has_value() );	
 	}
 		
 	TEST_CASE("BF_CALLBACK_LESS_EQUAL") {
-		// TODO (HIGH) this test doesn't test what it should
-		auto src_rule = make_tau_source(BF_CALLBACK_LESS_EQUAL);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		static constexpr char* sample =	"( ( { l } bf_less_equal { r } ) == F ).";
+		auto sample_src = make_tau_source(sample);
+		auto sample_statement = make_statement(sample_src);
+		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
+		auto binded = make_named_bindings(sample_statement, bs);
+		std::cout << "binded: " << std::endl;
+		print_sp_tau_node(std::cout, binded);
+		auto rule_src = make_tau_source(BF_CALLBACK_LESS_EQUAL);
+		auto rule_statement = make_statement(rule_src);
+		auto rule = rule_statement 
+			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( false );
+		auto result = tau_apply(tau_rule, binded);
+		std::cout << "result: " << std::endl;
+		print_sp_tau_node(std::cout, result);
+		auto check = result
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
+			| tau_parser::cbf | tau_parser::bf | tau_parser::F;
+		CHECK( check.has_value() );	
 	}
 		
 	TEST_CASE("BF_CALLBACK_GREATER") {
-		// TODO (HIGH) this test doesn't test what it should
-		auto src_rule = make_tau_source(BF_CALLBACK_GREATER);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( false );
-	}
-		
-	TEST_CASE("BF_CALLBACK_IMPLY") {
-		static constexpr char* sample =	"( ( { l } bf_imply { r } ) == F ).";
+		static constexpr char* sample =	"( ( { l } bf_greater { r } ) == F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
 		std::cout << "binded: " << std::endl;
 		print_sp_tau_node(std::cout, binded);
-		auto rule_src = make_tau_source(BF_CALLBACK_IMPLY);
+		auto rule_src = make_tau_source(BF_CALLBACK_GREATER);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
@@ -1438,75 +1417,54 @@ TEST_SUITE("executing bf rules") {
 		std::cout << "result: " << std::endl;
 		print_sp_tau_node(std::cout, result);
 		auto check = result
+			// just checking, maybe wrong, interesaría quitar bf_constant
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
-		CHECK( check.has_value() );	
-	}
-		
-	TEST_CASE("BF_CALLBACK_COIMPLY") {
-		static constexpr char* sample =	"( ( { l } bf_coimply { r } ) == F ).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
-		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
-		auto rule_src = make_tau_source(BF_CALLBACK_COIMPLY);
-		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement 
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
-		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
-		CHECK( check.has_value() );	
-	}
-		
-	TEST_CASE("BF_CALLBACK_EQUIV") {
-		static constexpr char* sample =	"( ( { l } bf_equiv { r } ) == F ).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
-		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
-		auto rule_src = make_tau_source(BF_CALLBACK_EQUIV);
-		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement 
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
-		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
+			| tau_parser::cbf | tau_parser::bf |tau_parser::bf_constant | tau_parser::T;
 		CHECK( check.has_value() );	
 	}
 		
 	TEST_CASE("BF_CALLBACK_EQ") {
-		// TODO (HIGH) this test doesn't test what it should
-		auto src_rule = make_tau_source(BF_CALLBACK_EQ);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		static constexpr char* sample =	"( { l } == F ).";
+		auto sample_src = make_tau_source(sample);
+		auto sample_statement = make_statement(sample_src);
+		bindings<Bool> bs; bs["l"] = { Bool(true) };
+		auto binded = make_named_bindings(sample_statement, bs);
+		std::cout << "binded: " << std::endl;
+		print_sp_tau_node(std::cout, binded);
+		auto rule_src = make_tau_source(BF_CALLBACK_EQ);
+		auto rule_statement = make_statement(rule_src);
+		auto rule = rule_statement 
+			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( false );
+		auto result = tau_apply(tau_rule, binded);
+		std::cout << "result: " << std::endl;
+		print_sp_tau_node(std::cout, result);
+		auto check = result
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
+			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant | tau_parser::F;
+		CHECK( check.has_value() );	
 	}
 		
 	TEST_CASE("BF_CALLBACK_NEQ") {
-		// TODO (HIGH) this test doesn't test what it should
-		auto src_rule = make_tau_source(BF_CALLBACK_NEQ);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		static constexpr char* sample =	"( { l } != F ).";
+		auto sample_src = make_tau_source(sample);
+		auto sample_statement = make_statement(sample_src);
+		bindings<Bool> bs; bs["l"] = { Bool(true) };
+		auto binded = make_named_bindings(sample_statement, bs);
+		std::cout << "binded: " << std::endl;
+		print_sp_tau_node(std::cout, binded);
+		auto rule_src = make_tau_source(BF_CALLBACK_NEQ);
+		auto rule_statement = make_statement(rule_src);
+		auto rule = rule_statement 
+			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( false );
+		auto result = tau_apply(tau_rule, binded);
+		std::cout << "result: " << std::endl;
+		print_sp_tau_node(std::cout, result);
+		// just checking this is wrong we should avoid bf_constant
+		auto check = result
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::bf_constant | tau_parser::T;
+		CHECK( check.has_value() );	
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ONE") {

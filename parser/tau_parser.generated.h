@@ -169,7 +169,7 @@
 // 
 // bf_rule			=> bf_matcher definition bf dot.
 // bf_matcher		=> bf.
-// bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or | bf_imply 
+// bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or 
 // 					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater 
 // 					| bf_less_cb | bf_less_equal_cb | bf_greater_cb 
 // 					| bf_subs_cb | bf_is_zero_cb | bf_is_one_cb
@@ -181,9 +181,6 @@
 // bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
 // bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
 // bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
-// bf_imply		=> open_parenthesis bf bf_imply_sym bf close_parenthesis.
-// bf_equiv		=> open_parenthesis bf bf_equiv_sym bf close_parenthesis.
-// bf_coimply		=> open_parenthesis bf bf_coimply_sym bf close_parenthesis.
 // bf_all			=> bf_all_sym ws_required (variable | capture) ws_required bf.
 // bf_ex			=> bf_ex_sym ws_required (variable | capture) ws_required bf.
 // 
@@ -195,9 +192,6 @@
 // bf_less_sym			=> ws "bf_less" ws.
 // bf_less_equal_sym	=> ws "bf_less_equal" ws.
 // bf_greater_sym		=> ws "bf_greater" ws.
-// bf_imply_sym		=> ws "bf_imply" ws.
-// bf_equiv_sym		=> ws "bf_equiv" ws.
-// bf_coimply_sym		=> ws "bf_coimply" ws.	
 // bf_all_sym			=> ws "bf_all" ws.
 // bf_ex_sym			=> ws "bf_ex" ws.
 // 
@@ -206,8 +200,7 @@
 // 
 // #constants, test_bf is included for testing purposes only
 // constant		=>  binding | capture | ignore | var | T | F
-// 					| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb
-// 					| bf_imply_cb | bf_equiv_cb | bf_coimply_cb.
+// 					| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
 // T				=> ws 'T' ws.
 // F				=> ws 'F' ws.
 // binding			=> source_binding | named_binding.
@@ -227,9 +220,6 @@
 // bf_less_cb			=> bf_less_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 // bf_less_equal_cb	=> bf_less_equal_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 // bf_greater_cb		=> bf_greater_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-// bf_imply_cb			=> bf_cb_arg bf_imply_cb_sym bf_cb_arg.
-// bf_equiv_cb			=> bf_cb_arg bf_equiv_cb_sym bf_cb_arg.
-// bf_coimply_cb		=> bf_cb_arg bf_coimply_cb_sym bf_cb_arg.
 // bf_subs_cb			=> bf_subs_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 // bf_eq_cb			=> bf_eq_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 // bf_neq_cb			=> bf_neq_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
@@ -247,9 +237,6 @@
 // bf_less_cb_sym			=> ws "bf_less_cb" ws.
 // bf_less_equal_cb_sym	=> ws "bf_less_equal_cb" ws.
 // bf_greater_cb_sym		=> ws "bf_greater_cb" ws.
-// bf_imply_cb_sym			=> ws "bf_imply_cb" ws.
-// bf_equiv_cb_sym			=> ws "bf_equiv_cb" ws.
-// bf_coimply_cb_sym		=> ws "bf_coimply_cb" ws.
 // bf_subs_cb_sym			=> ws "bf_subs_cb" ws.
 // bf_eq_cb_sym			=> ws "bf_eq_cb" ws.
 // bf_neq_cb_sym			=> ws "bf_neq_cb" ws.
@@ -274,7 +261,7 @@
 struct tau_parser {
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(197), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(185), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
 		const char* data, size_t size = 0,
 		char eof = std::char_traits<char>::eof())
@@ -306,13 +293,12 @@ struct tau_parser {
 			_Rcbf_ref_args_15, bf, cbf_and, cbf_neg, cbf_xor, cbf_or, cbf_if, cbf_imply, cbf_equiv, cbf_coimply, 
 			cbf_if_sym, cbf_if_condition, cbf_then_sym, cbf_if_then, cbf_else_sym, cbf_if_else, cbf_and_sym, cbf_or_sym, cbf_xor_sym, cbf_neg_sym, 
 			cbf_imply_sym, cbf_equiv_sym, cbf_coimply_sym, bf_rule, bf_matcher, bf_constant, bf_and, bf_neg, bf_xor, bf_or, 
-			bf_imply, bf_all, bf_ex, bf_less, bf_less_equal, bf_greater, bf_less_cb, bf_less_equal_cb, bf_greater_cb, bf_subs_cb, 
-			bf_is_zero_cb, bf_is_one_cb, bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_less_sym, bf_less_equal_sym, bf_greater_sym, bf_imply_sym, 
-			bf_equiv, bf_equiv_sym, bf_coimply, bf_coimply_sym, bf_all_sym, _Rbf_all_16, bf_ex_sym, _Rbf_ex_17, constant, binding, 
-			bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, bf_imply_cb, bf_equiv_cb, bf_coimply_cb, source_binding, named_binding, type, 
-			source, source0, _Rsource_18, _Rsource_19, bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, bf_neg_cb_sym, bf_less_cb_sym, 
-			bf_less_equal_cb_sym, bf_greater_cb_sym, bf_imply_cb_sym, bf_equiv_cb_sym, bf_coimply_cb_sym, bf_subs_cb_sym, bf_eq_cb_sym, bf_neq_cb_sym, bf_is_zero_cb_sym, bf_is_one_cb_sym, 
-			main, rule, rules, _Rrules_20, _Rrules_21, formula, library, start, 
+			bf_all, bf_ex, bf_less, bf_less_equal, bf_greater, bf_less_cb, bf_less_equal_cb, bf_greater_cb, bf_subs_cb, bf_is_zero_cb, 
+			bf_is_one_cb, bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_less_sym, bf_less_equal_sym, bf_greater_sym, bf_all_sym, _Rbf_all_16, 
+			bf_ex_sym, _Rbf_ex_17, constant, binding, bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb, source_binding, named_binding, 
+			type, source, source0, _Rsource_18, _Rsource_19, bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, bf_neg_cb_sym, 
+			bf_less_cb_sym, bf_less_equal_cb_sym, bf_greater_cb_sym, bf_subs_cb_sym, bf_eq_cb_sym, bf_neq_cb_sym, bf_is_zero_cb_sym, bf_is_one_cb_sym, main, rule, 
+			rules, _Rrules_20, _Rrules_21, formula, library, start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -349,13 +335,12 @@ private:
 			"_Rcbf_ref_args_15", "bf", "cbf_and", "cbf_neg", "cbf_xor", "cbf_or", "cbf_if", "cbf_imply", "cbf_equiv", "cbf_coimply", 
 			"cbf_if_sym", "cbf_if_condition", "cbf_then_sym", "cbf_if_then", "cbf_else_sym", "cbf_if_else", "cbf_and_sym", "cbf_or_sym", "cbf_xor_sym", "cbf_neg_sym", 
 			"cbf_imply_sym", "cbf_equiv_sym", "cbf_coimply_sym", "bf_rule", "bf_matcher", "bf_constant", "bf_and", "bf_neg", "bf_xor", "bf_or", 
-			"bf_imply", "bf_all", "bf_ex", "bf_less", "bf_less_equal", "bf_greater", "bf_less_cb", "bf_less_equal_cb", "bf_greater_cb", "bf_subs_cb", 
-			"bf_is_zero_cb", "bf_is_one_cb", "bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_less_sym", "bf_less_equal_sym", "bf_greater_sym", "bf_imply_sym", 
-			"bf_equiv", "bf_equiv_sym", "bf_coimply", "bf_coimply_sym", "bf_all_sym", "_Rbf_all_16", "bf_ex_sym", "_Rbf_ex_17", "constant", "binding", 
-			"bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", "bf_imply_cb", "bf_equiv_cb", "bf_coimply_cb", "source_binding", "named_binding", "type", 
-			"source", "source0", "_Rsource_18", "_Rsource_19", "bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "bf_neg_cb_sym", "bf_less_cb_sym", 
-			"bf_less_equal_cb_sym", "bf_greater_cb_sym", "bf_imply_cb_sym", "bf_equiv_cb_sym", "bf_coimply_cb_sym", "bf_subs_cb_sym", "bf_eq_cb_sym", "bf_neq_cb_sym", "bf_is_zero_cb_sym", "bf_is_one_cb_sym", 
-			"main", "rule", "rules", "_Rrules_20", "_Rrules_21", "formula", "library", "start", 
+			"bf_all", "bf_ex", "bf_less", "bf_less_equal", "bf_greater", "bf_less_cb", "bf_less_equal_cb", "bf_greater_cb", "bf_subs_cb", "bf_is_zero_cb", 
+			"bf_is_one_cb", "bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_less_sym", "bf_less_equal_sym", "bf_greater_sym", "bf_all_sym", "_Rbf_all_16", 
+			"bf_ex_sym", "_Rbf_ex_17", "constant", "binding", "bf_and_cb", "bf_or_cb", "bf_xor_cb", "bf_neg_cb", "source_binding", "named_binding", 
+			"type", "source", "source0", "_Rsource_18", "_Rsource_19", "bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "bf_neg_cb_sym", 
+			"bf_less_cb_sym", "bf_less_equal_cb_sym", "bf_greater_cb_sym", "bf_subs_cb_sym", "bf_eq_cb_sym", "bf_neq_cb_sym", "bf_is_zero_cb_sym", "bf_is_one_cb_sym", "main", "rule", 
+			"rules", "_Rrules_20", "_Rrules_21", "formula", "library", "start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -585,112 +570,96 @@ private:
 		q(nt(101), (nt(138)));
 		q(nt(101), (nt(139)));
 		q(nt(101), (nt(140)));
-		q(nt(101), (nt(141)));
-		q(nt(126), (nt(38)+nt(101)+nt(142)+nt(101)+nt(39)));
-		q(nt(129), (nt(38)+nt(101)+nt(143)+nt(101)+nt(39)));
-		q(nt(128), (nt(38)+nt(101)+nt(144)+nt(13)+nt(101)+nt(39)));
-		q(nt(127), (nt(145)+nt(101)));
+		q(nt(126), (nt(38)+nt(101)+nt(141)+nt(101)+nt(39)));
+		q(nt(129), (nt(38)+nt(101)+nt(142)+nt(101)+nt(39)));
+		q(nt(128), (nt(38)+nt(101)+nt(143)+nt(13)+nt(101)+nt(39)));
+		q(nt(127), (nt(144)+nt(101)));
+		q(nt(132), (nt(38)+nt(101)+nt(145)+nt(101)+nt(39)));
 		q(nt(133), (nt(38)+nt(101)+nt(146)+nt(101)+nt(39)));
 		q(nt(134), (nt(38)+nt(101)+nt(147)+nt(101)+nt(39)));
-		q(nt(135), (nt(38)+nt(101)+nt(148)+nt(101)+nt(39)));
-		q(nt(130), (nt(38)+nt(101)+nt(149)+nt(101)+nt(39)));
-		q(nt(150), (nt(38)+nt(101)+nt(151)+nt(101)+nt(39)));
-		q(nt(152), (nt(38)+nt(101)+nt(153)+nt(101)+nt(39)));
-		q(nt(155), (nt(50)));
-		q(nt(155), (nt(51)));
-		q(nt(131), (nt(154)+nt(12)+nt(155)+nt(12)+nt(101)));
-		q(nt(157), (nt(50)));
-		q(nt(157), (nt(51)));
-		q(nt(132), (nt(156)+nt(12)+nt(157)+nt(12)+nt(101)));
-		q(nt(142), (nt(13)+t(16)+t(26)+t(40)+t(10)+t(12)+t(21)+nt(13)));
-		q(nt(143), (nt(13)+t(16)+t(26)+t(40)+t(25)+t(20)+nt(13)));
-		q(nt(144), (nt(13)+t(16)+t(26)+t(40)+t(5)+t(25)+t(20)+nt(13)));
-		q(nt(145), (nt(13)+t(16)+t(26)+t(40)+t(12)+t(24)+t(23)+nt(13)));
-		q(nt(146), (nt(13)+t(16)+t(26)+t(40)+t(11)+t(24)+t(28)+t(28)+nt(13)));
-		q(nt(147), (nt(13)+t(16)+t(26)+t(40)+t(11)+t(24)+t(28)+t(28)+t(40)+t(24)+t(44)+t(6)+t(10)+t(11)+nt(13)));
-		q(nt(148), (nt(13)+t(16)+t(26)+t(40)+t(23)+t(20)+t(24)+t(10)+t(19)+t(24)+t(20)+nt(13)));
-		q(nt(149), (nt(13)+t(16)+t(26)+t(40)+t(22)+t(13)+t(14)+t(11)+t(43)+nt(13)));
-		q(nt(151), (nt(13)+t(16)+t(26)+t(40)+t(24)+t(44)+t(6)+t(22)+t(45)+nt(13)));
-		q(nt(153), (nt(13)+t(16)+t(26)+t(40)+t(18)+t(25)+t(22)+t(13)+t(14)+t(11)+t(43)+nt(13)));
-		q(nt(154), (nt(13)+t(16)+t(26)+t(40)+t(10)+t(11)+t(11)+nt(13)));
-		q(nt(156), (nt(13)+t(16)+t(26)+t(40)+t(24)+t(5)+nt(13)));
-		q(nt(125), (nt(42)+nt(158)+nt(43)));
-		q(nt(158), (nt(51)));
-		q(nt(158), (nt(52)));
-		q(nt(158), (nt(56)));
-		q(nt(158), (nt(82)));
-		q(nt(158), (nt(83)));
-		q(nt(158), (nt(159)));
-		q(nt(158), (nt(160)));
-		q(nt(158), (nt(161)));
-		q(nt(158), (nt(162)));
-		q(nt(158), (nt(163)));
-		q(nt(158), (nt(164)));
-		q(nt(158), (nt(165)));
-		q(nt(158), (nt(166)));
+		q(nt(149), (nt(50)));
+		q(nt(149), (nt(51)));
+		q(nt(130), (nt(148)+nt(12)+nt(149)+nt(12)+nt(101)));
+		q(nt(151), (nt(50)));
+		q(nt(151), (nt(51)));
+		q(nt(131), (nt(150)+nt(12)+nt(151)+nt(12)+nt(101)));
+		q(nt(141), (nt(13)+t(16)+t(26)+t(40)+t(10)+t(12)+t(21)+nt(13)));
+		q(nt(142), (nt(13)+t(16)+t(26)+t(40)+t(25)+t(20)+nt(13)));
+		q(nt(143), (nt(13)+t(16)+t(26)+t(40)+t(5)+t(25)+t(20)+nt(13)));
+		q(nt(144), (nt(13)+t(16)+t(26)+t(40)+t(12)+t(24)+t(23)+nt(13)));
+		q(nt(145), (nt(13)+t(16)+t(26)+t(40)+t(11)+t(24)+t(28)+t(28)+nt(13)));
+		q(nt(146), (nt(13)+t(16)+t(26)+t(40)+t(11)+t(24)+t(28)+t(28)+t(40)+t(24)+t(44)+t(6)+t(10)+t(11)+nt(13)));
+		q(nt(147), (nt(13)+t(16)+t(26)+t(40)+t(23)+t(20)+t(24)+t(10)+t(19)+t(24)+t(20)+nt(13)));
+		q(nt(148), (nt(13)+t(16)+t(26)+t(40)+t(10)+t(11)+t(11)+nt(13)));
+		q(nt(150), (nt(13)+t(16)+t(26)+t(40)+t(24)+t(5)+nt(13)));
+		q(nt(125), (nt(42)+nt(152)+nt(43)));
+		q(nt(152), (nt(51)));
+		q(nt(152), (nt(52)));
+		q(nt(152), (nt(56)));
+		q(nt(152), (nt(82)));
+		q(nt(152), (nt(83)));
+		q(nt(152), (nt(153)));
+		q(nt(152), (nt(154)));
+		q(nt(152), (nt(155)));
+		q(nt(152), (nt(156)));
+		q(nt(152), (nt(157)));
 		q(nt(82), (nt(13)+t(46)+nt(13)));
 		q(nt(83), (nt(13)+t(47)+nt(13)));
-		q(nt(159), (nt(167)));
-		q(nt(159), (nt(168)));
-		q(nt(168), (nt(29)));
-		q(nt(167), (nt(169)+nt(45)+nt(170)));
-		q(nt(169), (nt(29)));
-		q(nt(169), (nul));
-		q(nt(171), (nt(2)));
-		q(nt(171), (nt(6)));
-		q(nt(171), (nt(16)));
-		q(nt(171), (nt(21)));
-		q(nt(172), (nt(171)));
-		q(nt(173), (nt(172)));
-		q(nt(173), (nt(172)+nt(173)));
-		q(nt(170), (nt(173)));
-		q(nt(160), (nt(174)+nt(175)+nt(174)));
-		q(nt(161), (nt(174)+nt(176)+nt(174)));
-		q(nt(162), (nt(174)+nt(177)+nt(174)));
-		q(nt(163), (nt(178)+nt(174)));
-		q(nt(136), (nt(179)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)));
-		q(nt(137), (nt(180)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)));
-		q(nt(138), (nt(181)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)));
-		q(nt(164), (nt(174)+nt(182)+nt(174)));
-		q(nt(165), (nt(174)+nt(183)+nt(174)));
-		q(nt(166), (nt(174)+nt(184)+nt(174)));
-		q(nt(139), (nt(185)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)));
-		q(nt(80), (nt(186)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)));
-		q(nt(81), (nt(187)+nt(174)+nt(12)+nt(174)+nt(12)+nt(174)));
-		q(nt(140), (nt(188)+nt(174)+nt(12)+nt(174)));
-		q(nt(141), (nt(189)+nt(174)+nt(12)+nt(174)));
-		q(nt(174), (nt(51)));
-		q(nt(174), (nt(52)));
-		q(nt(174), (nt(82)));
-		q(nt(174), (nt(83)));
-		q(nt(174), (nt(101)));
-		q(nt(175), (nt(13)+t(16)+t(26)+t(40)+t(10)+t(12)+t(21)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(176), (nt(13)+t(16)+t(26)+t(40)+t(25)+t(20)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(177), (nt(13)+t(16)+t(26)+t(40)+t(5)+t(25)+t(20)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(178), (nt(13)+t(16)+t(26)+t(40)+t(12)+t(24)+t(23)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(179), (nt(13)+t(16)+t(26)+t(40)+t(11)+t(24)+t(28)+t(28)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(180), (nt(13)+t(16)+t(26)+t(40)+t(11)+t(24)+t(28)+t(28)+t(40)+t(24)+t(44)+t(6)+t(10)+t(11)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(181), (nt(13)+t(16)+t(26)+t(40)+t(23)+t(20)+t(24)+t(10)+t(19)+t(24)+t(20)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(182), (nt(13)+t(16)+t(26)+t(40)+t(22)+t(13)+t(14)+t(11)+t(43)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(183), (nt(13)+t(16)+t(26)+t(40)+t(24)+t(44)+t(6)+t(22)+t(45)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(184), (nt(13)+t(16)+t(26)+t(40)+t(18)+t(25)+t(22)+t(13)+t(14)+t(11)+t(43)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(185), (nt(13)+t(16)+t(26)+t(40)+t(28)+t(6)+t(16)+t(28)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(186), (nt(13)+t(16)+t(26)+t(40)+t(24)+t(44)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(187), (nt(13)+t(16)+t(26)+t(40)+t(12)+t(24)+t(44)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(188), (nt(13)+t(16)+t(26)+t(40)+t(22)+t(28)+t(40)+t(48)+t(24)+t(20)+t(25)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(189), (nt(13)+t(16)+t(26)+t(40)+t(22)+t(28)+t(40)+t(25)+t(12)+t(24)+t(40)+t(18)+t(16)+nt(13)));
-		q(nt(190), (nt(65)+nt(37)));
-		q(nt(191), (nt(61)));
-		q(nt(191), (nt(94)));
-		q(nt(191), (nt(123)));
-		q(nt(193), (nt(191)));
-		q(nt(194), (nt(193)+nt(194)));
-		q(nt(194), (nul));
-		q(nt(192), (nt(194)));
-		q(nt(195), (nt(192)+nt(190)));
-		q(nt(196), (nt(192)));
-		q(nt(197), (nt(195)));
-		q(nt(197), (nt(196)));
+		q(nt(153), (nt(158)));
+		q(nt(153), (nt(159)));
+		q(nt(159), (nt(29)));
+		q(nt(158), (nt(160)+nt(45)+nt(161)));
+		q(nt(160), (nt(29)));
+		q(nt(160), (nul));
+		q(nt(162), (nt(2)));
+		q(nt(162), (nt(6)));
+		q(nt(162), (nt(16)));
+		q(nt(162), (nt(21)));
+		q(nt(163), (nt(162)));
+		q(nt(164), (nt(163)));
+		q(nt(164), (nt(163)+nt(164)));
+		q(nt(161), (nt(164)));
+		q(nt(154), (nt(165)+nt(166)+nt(165)));
+		q(nt(155), (nt(165)+nt(167)+nt(165)));
+		q(nt(156), (nt(165)+nt(168)+nt(165)));
+		q(nt(157), (nt(169)+nt(165)));
+		q(nt(135), (nt(170)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)));
+		q(nt(136), (nt(171)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)));
+		q(nt(137), (nt(172)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)));
+		q(nt(138), (nt(173)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)));
+		q(nt(80), (nt(174)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)));
+		q(nt(81), (nt(175)+nt(165)+nt(12)+nt(165)+nt(12)+nt(165)));
+		q(nt(139), (nt(176)+nt(165)+nt(12)+nt(165)));
+		q(nt(140), (nt(177)+nt(165)+nt(12)+nt(165)));
+		q(nt(165), (nt(51)));
+		q(nt(165), (nt(52)));
+		q(nt(165), (nt(82)));
+		q(nt(165), (nt(83)));
+		q(nt(165), (nt(101)));
+		q(nt(166), (nt(13)+t(16)+t(26)+t(40)+t(10)+t(12)+t(21)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(167), (nt(13)+t(16)+t(26)+t(40)+t(25)+t(20)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(168), (nt(13)+t(16)+t(26)+t(40)+t(5)+t(25)+t(20)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(169), (nt(13)+t(16)+t(26)+t(40)+t(12)+t(24)+t(23)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(170), (nt(13)+t(16)+t(26)+t(40)+t(11)+t(24)+t(28)+t(28)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(171), (nt(13)+t(16)+t(26)+t(40)+t(11)+t(24)+t(28)+t(28)+t(40)+t(24)+t(44)+t(6)+t(10)+t(11)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(172), (nt(13)+t(16)+t(26)+t(40)+t(23)+t(20)+t(24)+t(10)+t(19)+t(24)+t(20)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(173), (nt(13)+t(16)+t(26)+t(40)+t(28)+t(6)+t(16)+t(28)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(174), (nt(13)+t(16)+t(26)+t(40)+t(24)+t(44)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(175), (nt(13)+t(16)+t(26)+t(40)+t(12)+t(24)+t(44)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(176), (nt(13)+t(16)+t(26)+t(40)+t(22)+t(28)+t(40)+t(48)+t(24)+t(20)+t(25)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(177), (nt(13)+t(16)+t(26)+t(40)+t(22)+t(28)+t(40)+t(25)+t(12)+t(24)+t(40)+t(18)+t(16)+nt(13)));
+		q(nt(178), (nt(65)+nt(37)));
+		q(nt(179), (nt(61)));
+		q(nt(179), (nt(94)));
+		q(nt(179), (nt(123)));
+		q(nt(181), (nt(179)));
+		q(nt(182), (nt(181)+nt(182)));
+		q(nt(182), (nul));
+		q(nt(180), (nt(182)));
+		q(nt(183), (nt(180)+nt(178)));
+		q(nt(184), (nt(180)));
+		q(nt(185), (nt(183)));
+		q(nt(185), (nt(184)));
 		return q;
 	}
 };
