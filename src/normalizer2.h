@@ -89,8 +89,6 @@ RULE(CBF_SIMPLIFY_SELF_3, "( $X cbf_or cbf_neg $X ) := T.")
 RULE(CBF_SIMPLIFY_SELF_4, "( cbf_neg $X cbf_and $X ) := F.")
 RULE(CBF_SIMPLIFY_SELF_5, "( cbf_neg $X cbf_or $X ) := T.")
 
-// TODO (HIGH) check if the following rules are correct
-
 // cbf definitions of xor, ->, <- and <->.
 RULE(CBF_DEF_XOR, "( $X cbf_xor $Y ) := (( $X cbf_and cbf_neg $Y ) cbf_or ( cbf_neg $X cbf_and $Y )).")
 RULE(CBF_DEF_IMPLY, "( $X cbf_imply $Y ) := ( cbf_neg $X cbf_or $Y).")
@@ -104,7 +102,9 @@ RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or (
 RULE(WFF_DISTRIBUTE_1, "($X wff_and ($Y wff_or $Z)) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
 RULE(WFF_PUSH_NEGATION_INWARDS_0, "wff_neg ($X wff_and $Y) := (wff_neg $X wff_or wff_neg $Y).")
 RULE(WFF_PUSH_NEGATION_INWARDS_1, "wff_neg ($X wff_or $Y) := (wff_neg $X wff_and wff_neg $Y).")
+// TODO rename to WFF_ELIM_DOUBLE_NEGATION
 RULE(WFF_ELIM_DOUBLE_NEGATION_0, "wff_neg wff_neg $X :=  $X.")
+RULE(WFF_ELIM_FORALL, "wff_all $X $Y := wff_neg wff_ex $X wff_neg $Y.")
 RULE(WFF_SIMPLIFY_ONE_0, "( T wff_or $X ) := T.")
 RULE(WFF_SIMPLIFY_ONE_1, "( $X wff_or T ) := T.")
 RULE(WFF_SIMPLIFY_ONE_2, "( T wff_and $X ) := $X.")
@@ -120,8 +120,6 @@ RULE(WFF_SIMPLIFY_SELF_3, "( $X wff_or wff_neg $X ) := T.")
 RULE(WFF_SIMPLIFY_SELF_4, "( wff_neg $X wff_and $X ) := F.")
 RULE(WFF_SIMPLIFY_SELF_5, "( wff_neg $X wff_or $X ) := T.")
 
-// TODO (HIGH) check if the following rules are correct
-
 // wff definitions of xor, ->, <- and <->.
 RULE(WFF_DEF_XOR, "( $X wff_xor $Y ) := (( $X wff_and wff_neg $Y ) wff_or ( wff_neg $X wff_and $Y )).")
 RULE(WFF_DEF_IMPLY, "( $X wff_imply $Y ) := ( wff_neg $X wff_or $Y).")
@@ -133,6 +131,7 @@ RULE(BF_TRIVIALITY_1, "( T == F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
 RULE(BF_TRIVIALITY_3, "( T != F ) := T.")
 RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y ) == F).")
+
 // TODO (VERY HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
 // further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) == (a ∨ b) ∧ ¬(a ∧ b))
 // "( ($X bf_and $Y) == F ) wwf_and ( ($X bf_and $Z) != 0) == ( bf_all $X ( ( $X bf_and $Y$ ) == F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
@@ -214,6 +213,7 @@ const std::string system =
 	+ WFF_PUSH_NEGATION_INWARDS_0 
 	+ WFF_PUSH_NEGATION_INWARDS_1 
 	+ WFF_ELIM_DOUBLE_NEGATION_0
+	+ WFF_ELIM_FORALL
 	+ WFF_SIMPLIFY_ONE_0 
 	+ WFF_SIMPLIFY_ONE_1 
 	+ WFF_SIMPLIFY_ONE_2 
@@ -259,7 +259,8 @@ const std::string to_dnf_wff =
 	+ WFF_DISTRIBUTE_1
 	+ WFF_PUSH_NEGATION_INWARDS_0 
 	+ WFF_PUSH_NEGATION_INWARDS_1 
-	+ WFF_ELIM_DOUBLE_NEGATION_0;
+	+ WFF_ELIM_DOUBLE_NEGATION_0
+	+ WFF_ELIM_FORALL;
 
 const std::string to_dnf_cbf = 
 	CBF_DISTRIBUTE_0 

@@ -1,5 +1,9 @@
 @use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
+# TODO clarify the use of () in the grammar, p.e.in negations...
+# TODO clarify the use of variable, capture and ignore
+# TODO clarify the use of T anf f
+
 # in all those cases: x and y is are vars and "tau" is a constant 
 # x & tau // wrong
 # x & {tau} // ok
@@ -108,8 +112,8 @@ wff_neg			=> wff_neg_sym wff.
 wff_imply		=> open_parenthesis wff wff_imply_sym wff close_parenthesis.
 wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
 wff_coimply		=> open_parenthesis wff wff_coimply_sym wff close_parenthesis.
-wff_all			=> wff_all_sym variable wff.
-wff_ex			=> wff_ex_sym variable wff.
+wff_all			=> wff_all_sym ws_required (variable|capture|ignore) ws_required wff.
+wff_ex			=> wff_ex_sym ws_required (variable|capture|ignore) ws_required wff.
 
 # wff_op_sym
 wff_and_sym		=> ws "wff_and" ws.
