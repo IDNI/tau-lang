@@ -359,7 +359,7 @@ TEST_SUITE("parser: cbf formulas ") {
 	}
 
 	TEST_CASE("cbf_if") {
-		static constexpr char* sample =	"?Z := if ( ?Z == F ) then ?Z  else ?Z.";
+		static constexpr char* sample =	"if $Y then $Z  else $Z := $X.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);		
 		auto if_rule = lib 
@@ -367,7 +367,7 @@ TEST_SUITE("parser: cbf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::wff_rule
-			| tau_parser::wff
+			| tau_parser::wff_matcher
 			| tau_parser::cbf_if; 
 		CHECK( if_rule.has_value() );
 		// TODO (MEDIUM) add checks for the if formula
