@@ -571,7 +571,7 @@ struct callback_applier {
 			case ::tau_parser::bf_less_equal_cb: return apply_comparison(_less_equal, n);
 			case ::tau_parser::bf_less_cb: return apply_comparison(_less, n);
 			case ::tau_parser::bf_greater_cb: return apply_comparison(_greater, n);
-			// TODO uncomment when method apply_subs reviewed 
+			// TODO (MEDIUM) uncomment when method apply_subs reviewed 
 			/*case ::tau_parser::bf_subs_cb: return apply_subs(n);*/
 			default: return n;
 		}
@@ -628,7 +628,7 @@ private:
 		return std::visit(op, ba_first_element, ba_second_element) ? args[2] : args[3];
 	}
 
-	// REVIEW check this code 	
+	// REVIEW (MEDIUM) check this code 	
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
 		auto params = n || tau_parser::bf_cb_arg;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;

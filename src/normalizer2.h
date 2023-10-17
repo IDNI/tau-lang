@@ -228,9 +228,6 @@ const std::string system =
 	+ BF_TRIVIALITY_3
 	+ BF_SQUEEZE_POSITIVES_0;
 
-// TODO (HIGH) define a function to process source code and retunr a library
-// apply that function to each of the following blocks.
-
 // bf defs are just callbacks
 const std::string apply_defs = 
 	// wff defs
@@ -334,10 +331,10 @@ const std::string wff_simplify =
 	+ BF_TRIVIALITY_2 
 	+ BF_TRIVIALITY_3;
 
-
-// each bunch of rules whould applied till no more changes are made, then we 
-// apply the next rule in the vector till no further changes and so on,...
+// each bunch of rules whould be applied till no more changes are made, then we 
+// apply the next set of rules in the vector till no further changes and so on,...
 // the API would provide a method to execute the rules accodingly.
+
 const std::vector<std::string> step_0 = { apply_defs };
 const std::vector<std::string> step_1 = { to_dnf_cbf, simplify_cbf };
 const std::vector<std::string> step_2 = { apply_cb, simplify_bf };
@@ -345,6 +342,7 @@ const std::vector<std::string> step_3 = { to_dnf_wff };
 const std::vector<std::string> step_4 = { wff_reduce , wff_simplify};
 
 // REVIEW could we assume we are working with the product algebra?
+
 // this should be used in conjuction with std::set. it must provide
 // a strict weak ordering in such a way that equivalent formulas are
 // considered equal.

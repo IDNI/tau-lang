@@ -106,7 +106,6 @@ TEST_SUITE("parser: wwf formulas ") {
 			| tau_parser::wff 
 			| tau_parser::wff_neg;
 		CHECK( neg_formula.has_value() );
-		// TODO (MEDIUM) add checks for the negated formula
 	}
 
 	TEST_CASE("wff_and") {
@@ -120,7 +119,6 @@ TEST_SUITE("parser: wwf formulas ") {
 			| tau_parser::wff 
 			| tau_parser::wff_and;
 		CHECK( and_formula.has_value() );
-		// TODO (MEDIUM) add checks for the and formula
 	}
 
 	TEST_CASE("wff_or") {
@@ -134,7 +132,6 @@ TEST_SUITE("parser: wwf formulas ") {
 			| tau_parser::wff 
 			| tau_parser::wff_or;
 		CHECK( or_formula.has_value() );
-		// TODO (MEDIUM) add checks for the or formula
 	}
 
 	TEST_CASE("wff_xor") {
@@ -148,7 +145,6 @@ TEST_SUITE("parser: wwf formulas ") {
 			| tau_parser::wff 
 			| tau_parser::wff_xor;
 		CHECK( xor_formula.has_value() );
-		// TODO (MEDIUM) add checks for the xor formula
 	}
 
 	TEST_CASE("wff_eq") {
@@ -162,7 +158,6 @@ TEST_SUITE("parser: wwf formulas ") {
 			| tau_parser::wff 
 			| tau_parser::wff_eq;
 		CHECK( eq_formula.has_value() );
-		// TODO (MEDIUM) add checks for the eq formula
 	}
 
 	TEST_CASE("wff_imply") {
@@ -221,10 +216,7 @@ TEST_SUITE("parser: wwf formulas ") {
 			| tau_parser::wff 
 			| tau_parser::wff_all;
 		CHECK( all_formula.has_value() );
-		// TODO (MEDIUM) add checks for the all formula
 	}
-
-	// TODO (MEDIUM) test wff_all with multiple variables
 
 	TEST_CASE("wff_ex") {
 		static constexpr char* sample =	
@@ -237,10 +229,7 @@ TEST_SUITE("parser: wwf formulas ") {
 			| tau_parser::wff 
 			| tau_parser::wff_ex;
 		CHECK( ex_formula.has_value() );
-		// TODO (MEDIUM) add checks for the ex formula
 	}
-
-	// TODO (MEDIUM) test wff_ex with multiple variables
 
 	// TODO (MEDIUM) test wwf refs
 	TEST_CASE("wff_ref") {
@@ -262,7 +251,6 @@ TEST_SUITE("parser: cbf formulas ") {
 			| tau_parser::cbf
 			| tau_parser::cbf_neg; 
 		CHECK( neg_rule.has_value() );
-		// TODO (MEDIUM) add checks for the neg formula
 	}
 
 	TEST_CASE("cbf_and") {
@@ -277,7 +265,6 @@ TEST_SUITE("parser: cbf formulas ") {
 			| tau_parser::cbf
 			| tau_parser::cbf_and; 
 		CHECK( and_rule.has_value() );
-		// TODO (MEDIUM) add checks for the and formula
 	}
 
 	TEST_CASE("cbf_or") {
@@ -292,7 +279,6 @@ TEST_SUITE("parser: cbf formulas ") {
 			| tau_parser::cbf
 			| tau_parser::cbf_or; 
 		CHECK( or_rule.has_value() );
-		// TODO (MEDIUM) add checks for the or formula
 	}
 
 	TEST_CASE("cbf_xor") {
@@ -307,9 +293,7 @@ TEST_SUITE("parser: cbf formulas ") {
 			| tau_parser::cbf
 			| tau_parser::cbf_xor; 
 		CHECK( xor_rule.has_value() );
-		// TODO (MEDIUM) add checks for the xor formula
 	}
-
 
 	TEST_CASE("cbf_imply") {
 		static constexpr char* sample =	"(?Z cbf_imply ?Z) := ?Z.";
@@ -368,7 +352,6 @@ TEST_SUITE("parser: cbf formulas ") {
 			| tau_parser::wff_matcher
 			| tau_parser::cbf_if; 
 		CHECK( if_rule.has_value() );
-		// TODO (MEDIUM) add checks for the if formula
 	}
 
 	// TODO (MEDIUM) test cbf refs
@@ -392,7 +375,6 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::bf
 			| tau_parser::bf_neg; 
 		CHECK( neg_rule.has_value() );
-		// TODO (MEDIUM) add checks for the neg formula
 	}
 
 	TEST_CASE("bf_and") {
@@ -408,7 +390,6 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::bf
 			| tau_parser::bf_and;
 		CHECK( and_rule.has_value() );
-		// TODO (MEDIUM) add checks for the and formula
 	}
 
 	TEST_CASE("bf_or") {
@@ -424,7 +405,6 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::bf
 			| tau_parser::bf_or;
 		CHECK( or_rule.has_value() );
-		// TODO (MEDIUM) add checks for the or formula
 	}
 
 	TEST_CASE("bf_xor") {
@@ -440,7 +420,6 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::bf
 			| tau_parser::bf_xor;
 		CHECK( xor_rule.has_value() );
-		// TODO (MEDIUM) add checks for the xor formula
 	}
 
 	TEST_CASE("bf_less") {
@@ -501,10 +480,7 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::bf
 			| tau_parser::bf_all;
 		CHECK( all_rule.has_value() );
-		// TODO (MEDIUM) add checks for the all formula
 	}
-
-	// TODO (MEDIUM) test bf_all with multiple variables
 
 	TEST_CASE("bf_ex") {
 		static constexpr char* sample =	"bf_ex ?Z $Z := $Z.";
@@ -519,10 +495,7 @@ TEST_SUITE("parser: bf formulas ") {
 			| tau_parser::bf
 			| tau_parser::bf_ex;
 		CHECK( ex_rule.has_value() );
-		// TODO (MEDIUM) add checks for the ex formula
 	}
-
-	// TODO (MEDIUM) test bf_ex with multiple variables
 }
 
 TEST_SUITE("parser: bindings ") {
