@@ -251,7 +251,6 @@ TEST_SUITE("parser: wwf formulas ") {
 TEST_SUITE("parser: cbf formulas ") {
 
 	TEST_CASE("cbf_neg") {
-		// REVIEW (HIGH) this code left the parser extracting trees forever in commit  ae0a743
 		static constexpr char* sample =	"?Z := cbf_neg ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);		
@@ -267,7 +266,6 @@ TEST_SUITE("parser: cbf formulas ") {
 	}
 
 	TEST_CASE("cbf_and") {
-		// REVIEW (HIGH) this code left the parser extracting trees forever in commit  ae0a743
 		static constexpr char* sample =	"?Z := ( ?Z cbf_and ?Z ).";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);		

@@ -23,10 +23,5 @@ using namespace std;
 
 namespace testing = doctest;
 
-// TODO (HIGH) write regression test that exercise the full normalizer
+// TODO (HIGH) write tests that check the normalizer
 // from parsing source, conversion to tau sources, final form, bindings, etc.
-
-// TODO (HIGH) add Ohad's examples
-// this could be done in the following ways
-// - in separate tau files executed using debug_tau_normalizer
-// - passed as strings in different test cases (prefered)

@@ -239,11 +239,8 @@ auto is_non_essential_source = [] (const sp_tau_source_node& n) {
 
 using is_non_essential_source_t = decltype(is_non_essential_source);
 
-
 template<typename... BAs>
 using is_capture_t = decltype(is_capture<BAs...>);
-
-// TODO (HIGH) implement is_skip and is_skip_t
 
 template<typename...BAs>
 static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
