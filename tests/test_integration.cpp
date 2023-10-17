@@ -29,7 +29,7 @@ namespace testing = doctest;
 
 // TDDO (HIGH) add all Ohad's test formulas
 
-TEST_SUITE("Simple cases") {
+TEST_SUITE("simple cases") {
 
 	TEST_CASE("formula 1") {
 		

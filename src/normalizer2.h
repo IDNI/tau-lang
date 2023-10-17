@@ -354,8 +354,12 @@ struct prog_less {
 	bool operator()(const formula<BAs...>& p1, const formula<BAs...>& p2) const {
 		auto m1 = extract_cte(p1.main);
 		auto m2 = extract_cte(p2.main);
-		// REVIEW Could we assume we have a partial order on the algebra induced by
-		// the operations of the algebra (i.e. a ≤ b iff a == b ∧ a )?
+
+		// REVIEW Could we assume we have a partial order 
+		
+		// the order would be defined on the algebra induced by
+		// the operations of the algebra (i.e. a ≤ b iff a == b ∧ a )...
+		
 		// REVIEW Do we need < or ≤ is enough for working?
 		return m1 < m2;
 	}

@@ -29,8 +29,6 @@ namespace testing = doctest;
 // TODO (HIGH) write tests for factory_binder
 
 // TODO (LOW) write tests for get
-// TODO (LOW) write tests for get_children
-// TODO (LOW) write tests for get_child
 
 // TODO (LOW) add more unit tests for make_library
 TEST_SUITE("make_library") {
@@ -79,7 +77,6 @@ TEST_SUITE("make_tau_source") {
 // TODO write tests for make_tau in the future
 
 // TODO write tests for is_non_terminal
-// TODO write tests for is_terminal_predicate
 // TODO write tests for is_terminal
 // TODO write tests for get_node
 // TODO write tests for get_nodes
