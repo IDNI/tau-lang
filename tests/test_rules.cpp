@@ -27,61 +27,6 @@ namespace testing = doctest;
 
 TEST_SUITE("parsing bf rules") {
 
-	TEST_CASE("BF_DISTRIBUTE_0") { 
-		auto src_rule = make_tau_source(BF_DISTRIBUTE_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BF_DISTRIBUTE_1") {
-		auto src_rule = make_tau_source(BF_DISTRIBUTE_1);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-		
-	TEST_CASE("BF_PUSH_NEGATION_INWARDS_0") {
-		auto src_rule = make_tau_source(BF_PUSH_NEGATION_INWARDS_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-		
-	TEST_CASE("BF_PUSH_NEGATION_INWARDS_1") {
-		auto src_rule = make_tau_source(BF_PUSH_NEGATION_INWARDS_1);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-		
-	TEST_CASE("BF_ELIM_DOUBLE_NEGATION_0") {
-		auto src_rule = make_tau_source(BF_ELIM_DOUBLE_NEGATION_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-		
 	TEST_CASE("BF_SIMPLIFY_ONE_0") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_0);
 		auto tau_rule = make_statement(src_rule);
@@ -1015,61 +960,6 @@ TEST_SUITE("parsing wff rules") {
 
 TEST_SUITE("executing bf rules") {
 
-	TEST_CASE("BF_DISTRIBUTE_0") { 
-		auto src_rule = make_tau_source(BF_DISTRIBUTE_0);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_DISTRIBUTE_1") {
-		auto src_rule = make_tau_source(BF_DISTRIBUTE_1);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-		
-	TEST_CASE("BF_PUSH_NEGATION_INWARDS_0") {
-		auto src_rule = make_tau_source(BF_PUSH_NEGATION_INWARDS_0);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-		
-	TEST_CASE("BF_PUSH_NEGATION_INWARDS_1") {
-		auto src_rule = make_tau_source(BF_PUSH_NEGATION_INWARDS_1);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-		
-	TEST_CASE("BF_ELIM_DOUBLE_NEGATION_0") {
-		auto src_rule = make_tau_source(BF_ELIM_DOUBLE_NEGATION_0);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-		
 	TEST_CASE("BF_SIMPLIFY_ONE_0") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_0);
 		auto statement = make_statement(src_rule);
@@ -1278,6 +1168,12 @@ TEST_SUITE("executing bf rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
+
+	// REVIEW (MEDIUM) remaining tests of the test suite are flaky
+
+	// They properly run when executed independenly but fails otherwise. Maybe
+	// there is something wrong with the way the tests are executed, the constants
+	// used within or something else.
 
 	TEST_CASE("BF_CALLBACK_AND") {
 		static constexpr char* sample =	"( ({l} bf_and { r }) == F ).";

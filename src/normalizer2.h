@@ -28,12 +28,6 @@ namespace idni::tau {
 // IDEA (MEDIUM) add commutative rule and halve the number of rules if is performance friendly
 
 // bf rules 
-// TODO (HIGH) remove most of them
-RULE(BF_DISTRIBUTE_0, "(($X bf_or $Y) bf_and $Z) := (($X bf_and $Y) bf_or ($X bf_and $Z)).")
-RULE(BF_DISTRIBUTE_1, "($X bf_and ($Y bf_or $Z)) := (($X bf_and $Y) bf_or ($X bf_and $Z)).")
-RULE(BF_PUSH_NEGATION_INWARDS_0, "bf_neg ($X bf_and $Y) := (bf_neg $X bf_or bf_neg $Y).")
-RULE(BF_PUSH_NEGATION_INWARDS_1, "bf_neg ($X bf_or $Y) := (bf_neg $X bf_and bf_neg $Y).")
-RULE(BF_ELIM_DOUBLE_NEGATION_0, "bf_neg bf_neg $X :=  $X.")
 RULE(BF_SIMPLIFY_ONE_0, "( T bf_or $X ) := T.")
 RULE(BF_SIMPLIFY_ONE_1, "( $X bf_or T ) := T.")
 RULE(BF_SIMPLIFY_ONE_2, "( T bf_and $X ) := $X.")
@@ -142,12 +136,7 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 const std::string system = 
 
 	// bf rules
-	BF_DISTRIBUTE_0 
-	+ BF_DISTRIBUTE_1
-	+ BF_PUSH_NEGATION_INWARDS_0 
-	+ BF_PUSH_NEGATION_INWARDS_1 
-	+ BF_ELIM_DOUBLE_NEGATION_0
-	+ BF_SIMPLIFY_ONE_0 
+	 BF_SIMPLIFY_ONE_0 
 	+ BF_SIMPLIFY_ONE_1 
 	+ BF_SIMPLIFY_ONE_2 
 	+ BF_SIMPLIFY_ONE_3
@@ -239,6 +228,9 @@ const std::string system =
 	+ BF_TRIVIALITY_3
 	+ BF_SQUEEZE_POSITIVES_0;
 
+// TODO (HIGH) define a function to process source code and retunr a library
+// apply that function to each of the following blocks.
+
 // bf defs are just callbacks
 const std::string apply_defs = 
 	// wff defs
@@ -267,13 +259,6 @@ const std::string to_dnf_cbf =
 	+ CBF_PUSH_NEGATION_INWARDS_0 
 	+ CBF_PUSH_NEGATION_INWARDS_1 
 	+ CBF_ELIM_DOUBLE_NEGATION_0;
-
-const std::string to_dnf_bf = 
-	BF_DISTRIBUTE_0 
-	+ BF_DISTRIBUTE_1
-	+ BF_PUSH_NEGATION_INWARDS_0 
-	+ BF_PUSH_NEGATION_INWARDS_1 
-	+ BF_ELIM_DOUBLE_NEGATION_0;
 
 const std::string simplify_bf = 
 	BF_SIMPLIFY_ONE_0 
@@ -355,14 +340,15 @@ const std::string wff_simplify =
 // the API would provide a method to execute the rules accodingly.
 const std::vector<std::string> step_0 = { apply_defs };
 const std::vector<std::string> step_1 = { to_dnf_cbf, simplify_cbf };
-const std::vector<std::string> step_2 = { apply_cb, to_dnf_bf, simplify_bf };
+const std::vector<std::string> step_2 = { apply_cb, simplify_bf };
 const std::vector<std::string> step_3 = { to_dnf_wff };
 const std::vector<std::string> step_4 = { wff_reduce , wff_simplify};
 
-// CHECK could we assume we are working with the product algebra?
+// REVIEW could we assume we are working with the product algebra?
 // this should be used in conjuction with std::set. it must provide
 // a strict weak ordering in such a way that equivalent formulas are
 // considered equal.
+
 // TODO once a final implementation is done, check the comments.
 template<typename... BAs>
 struct prog_less {
@@ -370,9 +356,9 @@ struct prog_less {
 	bool operator()(const formula<BAs...>& p1, const formula<BAs...>& p2) const {
 		auto m1 = extract_cte(p1.main);
 		auto m2 = extract_cte(p2.main);
-		// CHECK Could we assume we have a partial order on the algebra induced by
+		// REVIEW Could we assume we have a partial order on the algebra induced by
 		// the operations of the algebra (i.e. a ≤ b iff a == b ∧ a )?
-		// CHECK Do we need < or ≤ is enough for working?
+		// REVIEW Do we need < or ≤ is enough for working?
 		return m1 < m2;
 	}
 private:
@@ -404,8 +390,12 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...> form) {
 	auto sys_source = make_tau_source(system);
-	auto lib = make_library<BAs...>(sys_source);
-	return normalizer(form, lib);
+	// TODO (HIGH) add all the steps of the normalizer here
+	auto step1 = program_step(form, sys_source);
+	auto step2 = program_step(step1, sys_source);
+	auto step3 = program_step(step2, sys_source);
+	// ...
+	return step3;
 }
 
 // TODO (HIGH) tweak the execution of the system rules, maybe we can do it in a more
