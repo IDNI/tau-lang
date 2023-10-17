@@ -78,15 +78,10 @@ TEST_SUITE("make_tau_source") {
 
 // TODO write tests for is_non_terminal
 // TODO write tests for is_terminal
-// TODO write tests for get_node
 // TODO write tests for get_nodes
 // TODO write tests for value_extractor
-// TODO write tests for get_value
-// TODO write tests for get_values
 // TODO write tests for terminal_extractor
 // TODO write tests for non_terminal_extractor
-// TODO write tests for get_non_terminal
-// TODO write tests for get_non_terminals
 // TODO write tests for ba_extractor
 
 // TODO write tests for stringify
