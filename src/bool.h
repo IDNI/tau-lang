@@ -25,8 +25,12 @@ struct Bool {
 	Bool operator~() const;
 	auto operator<=>(const Bool& x) const = default;
 	
-	bool is_zero() const { return b == false; }
-	bool is_one() const { return b == true; }
+	bool is_zero() const { 
+		return !b; 
+	}
+	bool is_one() const { 
+		return b; 
+	}
 
 	bool b;
 };

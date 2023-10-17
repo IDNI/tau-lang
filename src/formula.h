@@ -569,8 +569,8 @@ struct callback_applier {
 			case ::tau_parser::bf_neg_cb: return apply_unary_operation(_neg, n);
 			case ::tau_parser::bf_eq_cb: return apply_ternary_operator(_eq, n);
 			case ::tau_parser::bf_neq_cb: return apply_ternary_operator(_neq, n);
-			case ::tau_parser::bf_is_one_cb: return apply_ternary_operator(_is_one, n);
-			case ::tau_parser::bf_is_zero_cb: return apply_ternary_operator(_is_zero, n);
+			case ::tau_parser::bf_is_one_cb: return apply_binary_operator(_is_one, n);
+			case ::tau_parser::bf_is_zero_cb: return apply_binary_operator(_is_zero, n);
 			case ::tau_parser::bf_less_equal_cb: return apply_comparison(_less_equal, n);
 			case ::tau_parser::bf_less_cb: return apply_comparison(_less, n);
 			case ::tau_parser::bf_greater_cb: return apply_comparison(_greater, n);
@@ -600,7 +600,6 @@ private:
 	static constexpr auto _is_one = [](const auto& l) -> bool { return l.is_one(); };
 	static constexpr auto _is_zero = [](const auto& l) -> bool { return l.is_zero(); };
 
-
 	sp_tau_node<BAs...> apply_binary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
 		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf ||only_child_extractor<BAs...> || ba_extractor<BAs...>;
 		return make_node<tau_sym<BAs...>>(std::visit(op, ba_elements[0], ba_elements[1]), {});
@@ -615,6 +614,14 @@ private:
 		auto args = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>;
 		auto ba_element = args[0] | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
 		return std::visit(op, ba_element) ? args[1] : args[2];
+	}
+
+	sp_tau_node<BAs...> apply_binary_operator(const auto& op, const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>;
+		auto ba_element = args[0] | tau_parser::constant | only_child_extractor<BAs...> |  ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
+		auto if_true_element = (n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>)[1]; 
+		auto original_element = n | tau_parser::bf_cb_arg | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+		return std::visit(op, ba_element) ? if_true_element : original_element;
 	}
 
 	sp_tau_node<BAs...> apply_comparison(const auto& op, const sp_tau_node<BAs...>& n) {
