@@ -88,8 +88,6 @@ TEST_SUITE("make_tau_source") {
 // TODO write tests for get_non_terminal
 // TODO write tests for get_non_terminals
 // TODO write tests for ba_extractor
-// TODO write tests for get_ba
-// TODO write tests for get_bas
 
 // TODO write tests for stringify
 // TODO write tests for make_string_with_skip
