@@ -65,8 +65,8 @@ RULE(BF_CALLBACK_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := bf_less_equal_c
 RULE(BF_CALLBACK_GREATER, "( { $X } bf_greater { $Y } ) := bf_greater_cb $X $Y T F.")
 RULE(BF_CALLBACK_EQ, "( { $X } == F ) := bf_eq_cb $X T F.")
 RULE(BF_CALLBACK_NEQ, "( { $X } != F ) := bf_neq_cb $X T F.")
-RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb $X F.")
-RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb $X T.")
+RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } T.")
+RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } T.")
 
 // cbf rules
 RULE(CBF_DISTRIBUTE_0, "(($X cbf_or $Y) cbf_and $Z) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
