@@ -506,18 +506,6 @@ auto get_optionals(const extractor_t& extractor, const sp_tau_node<BAs...>& n) {
 		| std::ranges::views::filter(&std::optional<tau_sym<BAs...>>::has_value);
 }
 
-// returns the bas... of the specified node if possible
-template <size_t... nts, typename... BAs>
-std::optional<char> get_ba(const sp_tau_node<BAs...>& n) {
-	return get_optional<nts..., ba_extractor_t<BAs...>, BAs...>(ba_extractor<BAs...>, n);
-}
-
-// returns the bas... of the specified nodes
-template <size_t... nts, typename... BAs>
-auto get_bas(const sp_tau_node<BAs...>& n) {
-	return get_optionals<nts..., ba_extractor_t<BAs...>, BAs...>(ba_extractor<BAs...>, n);
-}
-
 // apply the given callback if the value of the node is a callback
 //
 // TODO convert to a const static applier and change all the code accordingly
