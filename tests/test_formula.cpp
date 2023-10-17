@@ -31,6 +31,7 @@ namespace testing = doctest;
 // TODO (LOW) write tests for get
 
 // TODO (LOW) add more unit tests for make_library
+
 TEST_SUITE("make_library") {
 
 	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) := $X .";
@@ -83,7 +84,6 @@ TEST_SUITE("make_tau_source") {
 // TODO write tests for terminal_extractor
 // TODO write tests for non_terminal_extractor
 // TODO write tests for ba_extractor
-
 // TODO write tests for stringify
 // TODO write tests for make_string_with_skip
 // TODO write tests for make_string

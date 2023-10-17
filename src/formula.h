@@ -466,7 +466,7 @@ std::optional<sp_tau_node<BAs...>> operator|(const std::optional<sp_tau_node<BAs
 	return o.has_value() ? e(o.value()) : std::optional<sp_tau_node<BAs...>>(); 
 }
 
-// IDEA maybe unnify all the implementations dealing with operator| and operator|| fro extractors
+// IDEA maybe unify all the implementations dealing with operator| and operator|| for extractors
 template <typename... BAs>
 std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const only_child_extractor_t<BAs...> e) {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
