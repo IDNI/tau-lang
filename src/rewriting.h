@@ -734,14 +734,6 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 			all_t<sp_parse_tree>,
 			sp_parse_tree, sp_node<symbol_t>>
 		(transform, all<sp_parse_tree>)(t);
-}
-
-// TODO (MEDIUM) add replace function that takes a node, a substitute and a root
-// node and returns a new node with the substitute in place of the node. 
-
-
-// TODO (MEDIUM) add a reducer or evaluator that takes a tree and a function and
-// returns a value of a given type.
-
+	}
 } // namespace idni::rewriter
 #endif // __IDNI__REWRITING_H__

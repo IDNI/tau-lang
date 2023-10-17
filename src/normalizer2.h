@@ -396,8 +396,9 @@ formula<BAs...> normalizer(formula<BAs...> form) {
 	return step3;
 }
 
-// TODO (HIGH) tweak the execution of the system rules, maybe we can do it in a more
-// efficient way.
+// TODO (HIGH) tweak the execution of the system rules
+
+// maybe we can do it in a more efficient way.
 
 // execute one step of the formula
 template<typename... BAs>
