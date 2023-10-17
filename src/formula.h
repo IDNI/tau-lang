@@ -483,6 +483,17 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const
 	return e(o);
 }
 
+template <typename T>
+static const auto optional_value_extractor = [](const std::optional<T>& o) {return o.value();} ;
+
+template <typename T>
+using optional_value_extractor_t = decltype(optional_value_extractor<T>);
+
+template <typename T>
+T operator|(const std::optional<T>& o, const optional_value_extractor_t<T> e) {
+	return e(o);
+}
+
 //
 // functions traversing the nodes according to the specified non terminals and
 // extracting the required information from them 
@@ -548,45 +559,72 @@ template <typename... BAs>
 struct callback_applier {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-		if (!is_callback<BAs...>(n)) return n;
-//		std::cout << "callback node: " << std::endl;
-//		print_sp_tau_node(std::cout, n);
 		// TODO (MEDIUM) deal with errors once we have a clear strategy
-		auto bas = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...> || ba_extractor<BAs...>;
-//		auto ba = (b || tau_parser::bf)[0]->child[0];
-//		auto bas = (ba | ba_extractor<BAs...>).value();
+		if (!is_callback<BAs...>(n)) return n;
 		auto nt = get<tau_source_sym>(n->value).n();
 		switch (nt) {
-			case ::tau_parser::bf_neg_cb: return make_node<tau_sym<BAs...>>(std::visit(_neg, bas[0]), {});
-			case ::tau_parser::bf_and_cb: return make_node<tau_sym<BAs...>>(std::visit(_and, bas[0], bas[1]), {});
-			case ::tau_parser::bf_or_cb: return make_node<tau_sym<BAs...>>(std::visit(_or, bas[0], bas[1]), {});
-			case ::tau_parser::bf_xor_cb: return make_node<tau_sym<BAs...>>(std::visit(_xor, bas[0], bas[1]), {});
-			/*case ::tau_parser::bf_less_cb: return make_node<tau_sym<BAs...>>(std::visit(_less, bas[0], bas[1], bas[2], bas[3]), {});
-			case ::tau_parser::bf_less_equal_cb: return make_node<tau_sym<BAs...>>(std::visit(_less_equal, bas[0], bas[1], bas[2], bas[3]), {});
-			case ::tau_parser::bf_greater_cb: return make_node<tau_sym<BAs...>>(std::visit(_greater, bas[0], bas[1], bas[2], bas[3]), {});
-			case ::tau_parser::bf_subs_cb: return apply_subs(n);
-			case ::tau_parser::bf_eq_cb: return make_node<tau_sym<BAs...>>(std::visit(_eq, bas[0], bas[1], bas[2], bas[3]), {});
-			case ::tau_parser::bf_neq_cb: return make_node<tau_sym<BAs...>>(std::visit(_neq, bas[0], bas[1], bas[2], bas[3]), {});
-			case ::tau_parser::bf_is_one_cb: return make_node<tau_sym<BAs...>>(std::visit(_is_one, bas[0], bas[1]), {});
-			case ::tau_parser::bf_is_zero_cb: return make_node<tau_sym<BAs...>>(std::visit(_is_zero, bas[0], bas[1]), {});*/
+			case ::tau_parser::bf_and_cb: return apply_binary_operation(_and, n);
+			case ::tau_parser::bf_or_cb: return apply_binary_operation(_or, n);
+			case ::tau_parser::bf_xor_cb: return apply_binary_operation(_xor, n);
+			case ::tau_parser::bf_neg_cb: return apply_unary_operation(_neg, n);
+			case ::tau_parser::bf_eq_cb: return apply_ternary_operator(_eq, n);
+			case ::tau_parser::bf_neq_cb: return apply_ternary_operator(_neq, n);
+			case ::tau_parser::bf_is_one_cb: return apply_ternary_operator(_is_one, n);
+			case ::tau_parser::bf_is_zero_cb: return apply_ternary_operator(_is_zero, n);
+			case ::tau_parser::bf_less_equal_cb: return apply_comparison(_less_equal, n);
+			case ::tau_parser::bf_less_cb: return apply_comparison(_less, n);
+			case ::tau_parser::bf_greater_cb: return apply_comparison(_greater, n);
+			// TODO uncomment when method apply_subs reviewed 
+			/*case ::tau_parser::bf_subs_cb: return apply_subs(n);*/
 			default: return n;
 		}
 	}
 
 private:
-
-	static constexpr auto _is_one = [](const auto& l, const auto& t) { return l == 1 ? t : l; };
-	static constexpr auto _is_zero = [](const auto& l, const auto& t) { return l == 0 ? t : l; };
+	
+	// binary operations
 	static constexpr auto _and = [](const auto& l, const auto& r) { return l & r; };
 	static constexpr auto _or = [](const auto& l, const auto& r) { return l | r; };
 	static constexpr auto _xor = [](const auto& l, const auto& r) { return l ^ r; };
+	static constexpr auto _imply = [](const auto& l, const auto& r) { return ~l | r; };
+	static constexpr auto _equiv = [](const auto& l, const auto& r) { return _imply(l, r) & _imply(r, l); };
+	// unary operation	
 	static constexpr auto _neg = [](const auto& l) { return ~l; };
-	static constexpr auto _less = [](const auto& l, const auto& r, const auto& t, const auto& f) { return ((l ^ ~r) & ( (l & ~r) | (~l & r))) != 0 ? t : f ; };
-	static constexpr auto _less_equal = [](const auto& l, const auto& r, const auto& t, const auto& f) { return (l ^ ~r) == 0 ? t : f; };
-	static constexpr auto _greater = [](const auto& l, const auto& r, const auto& t, const auto& f) { return _less_equal(l, r, f, t); };
-	static constexpr auto _eq = [](const auto& l, const auto& r, const auto& t, const auto& f) { return l == r ? t : f; };
-	static constexpr auto _neq = [](const auto& l, const auto& r, const auto& t, const auto& f) { return l != r? t : f; };
+	// order operations
+	static constexpr auto _less = [](const auto& l, const auto& r) -> bool { return !((l ^ ~r) & ( (l & ~r) | (~l & r))).is_zero(); };
+	static constexpr auto _less_equal = [](const auto& l, const auto& r) -> bool { return (l ^ ~r).is_zero(); };
+	static constexpr auto _greater = [](const auto& l, const auto& r) -> bool { return !_less_equal(l, r); };
+	// ternary operators
+	static constexpr auto _eq = [](const auto& l) -> bool { return l.is_zero(); };
+	static constexpr auto _neq = [](const auto& l) -> bool { return !l.is_zero(); };
+	static constexpr auto _is_one = [](const auto& l) -> bool { return l.is_one(); };
+	static constexpr auto _is_zero = [](const auto& l) -> bool { return l.is_zero(); };
 
+
+	sp_tau_node<BAs...> apply_binary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
+		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf ||only_child_extractor<BAs...> || ba_extractor<BAs...>;
+		return make_node<tau_sym<BAs...>>(std::visit(op, ba_elements[0], ba_elements[1]), {});
+	}
+
+	sp_tau_node<BAs...> apply_unary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
+		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...> || ba_extractor<BAs...>;
+		return make_node<tau_sym<BAs...>>(std::visit(op, ba_elements[0]), {});
+	}
+
+	sp_tau_node<BAs...> apply_ternary_operator(const auto& op, const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>;
+		auto ba_element = args[0] | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
+		return std::visit(op, ba_element) ? args[1] : args[2];
+	}
+
+	sp_tau_node<BAs...> apply_comparison(const auto& op, const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>;
+		auto ba_first_element = args[0] | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;;
+		auto ba_second_element = args[1] | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;;
+		return std::visit(op, ba_first_element, ba_second_element) ? args[2] : args[3];
+	}
+
+	// REVIEW check this code 	
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
 		auto params = n || tau_parser::bf_cb_arg;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
