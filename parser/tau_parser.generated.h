@@ -5,9 +5,9 @@
 //
 // @use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 // 
-// # TODO clarify the use of () in the grammar, p.e.in negations...
-// # TODO clarify the use of variable, capture and ignore
-// # TODO clarify the use of T anf f
+// # TODO (MEDIUM) clarify the use of () in the grammar, p.e.in negations...
+// # TODO (MEDIUM) clarify the use of variable, capture and ignore
+// # TODO (HIGH) clarify the use of T anf F
 // 
 // # in all those cases: x and y is are vars and "tau" is a constant 
 // # x & tau // wrong

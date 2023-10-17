@@ -724,8 +724,8 @@ TEST_SUITE("find_top") {
 	}
 }
 
-// TODO (LOW) write tests for while_not_found_predicate
-// TODO (LOW) write tests for find_visitor
+// TODO write tests for while_not_found_predicate
+// TODO write tests for find_visitor
 
 TEST_SUITE("find_bottom") {
 

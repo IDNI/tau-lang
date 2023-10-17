@@ -132,102 +132,6 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 
 // TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
 
-// rules to be used during normalization, the order matters.
-const std::string system = 
-
-	// bf rules
-	 BF_SIMPLIFY_ONE_0 
-	+ BF_SIMPLIFY_ONE_1 
-	+ BF_SIMPLIFY_ONE_2 
-	+ BF_SIMPLIFY_ONE_3
-	+ BF_SIMPLIFY_ZERO_0 
-	+ BF_SIMPLIFY_ZERO_1 
-	+ BF_SIMPLIFY_ZERO_2 
-	+ BF_SIMPLIFY_ZERO_3
-	+ BF_SIMPLIFY_SELF_0 
-	+ BF_SIMPLIFY_SELF_1 
-	+ BF_SIMPLIFY_SELF_2 
-	+ BF_SIMPLIFY_SELF_3
-	+ BF_SIMPLIFY_SELF_4 
-	+ BF_SIMPLIFY_SELF_5 
-	+ BF_FUNCTIONAL_QUANTIFIERS_0 
-	+ BF_FUNCTIONAL_QUANTIFIERS_1 
-	+ BF_PROCESS_0 
-	+ BF_SKIP_CONSTANTS_0 
-	+ BF_ROTATE_LITERALS_0	
-	+ BF_ROTATE_LITERALS_1 
-
-	// bf callbacks
-	+ BF_CALLBACK_AND 
-	+ BF_CALLBACK_OR
-	+ BF_CALLBACK_XOR 
-	+ BF_CALLBACK_NEG 
-	+ BF_CALLBACK_LESS
-	+ BF_CALLBACK_LESS_EQUAL
-	+ BF_CALLBACK_GREATER
-	+ BF_CALLBACK_EQ
- 	+ BF_CALLBACK_NEQ
-
-	// cbf rules
-	+ CBF_DISTRIBUTE_0 
-	+ CBF_DISTRIBUTE_1
-	+ CBF_PUSH_NEGATION_INWARDS_0 
-	+ CBF_PUSH_NEGATION_INWARDS_1 
-	+ CBF_ELIM_DOUBLE_NEGATION_0
-	+ CBF_SIMPLIFY_ONE_0 
-	+ CBF_SIMPLIFY_ONE_1 
-	+ CBF_SIMPLIFY_ONE_2 
-	+ CBF_SIMPLIFY_ONE_3
-	+ CBF_SIMPLIFY_ZERO_0 
-	+ CBF_SIMPLIFY_ZERO_1 
-	+ CBF_SIMPLIFY_ZERO_2 
-	+ CBF_SIMPLIFY_ZERO_3
-	+ CBF_SIMPLIFY_SELF_0 
-	+ CBF_SIMPLIFY_SELF_1 
-	+ CBF_SIMPLIFY_SELF_2 
-	+ CBF_SIMPLIFY_SELF_3
-	+ CBF_SIMPLIFY_SELF_4 
-	+ CBF_SIMPLIFY_SELF_5 
-
-	+ CBF_DEF_XOR
-	+ CBF_DEF_IMPLY
-	+ CBF_DEF_COIMPLY
-	+ CBF_DEF_EQUIV
-	+ CBF_DEF_IF
-
-	// wff rules
-	+ WFF_DISTRIBUTE_0 
-	+ WFF_DISTRIBUTE_1
-	+ WFF_PUSH_NEGATION_INWARDS_0 
-	+ WFF_PUSH_NEGATION_INWARDS_1 
-	+ WFF_ELIM_DOUBLE_NEGATION_0
-	+ WFF_ELIM_FORALL
-	+ WFF_SIMPLIFY_ONE_0 
-	+ WFF_SIMPLIFY_ONE_1 
-	+ WFF_SIMPLIFY_ONE_2 
-	+ WFF_SIMPLIFY_ONE_3
-	+ WFF_SIMPLIFY_ZERO_0 
-	+ WFF_SIMPLIFY_ZERO_1 
-	+ WFF_SIMPLIFY_ZERO_2 
-	+ WFF_SIMPLIFY_ZERO_3
-	+ WFF_SIMPLIFY_SELF_0 
-	+ WFF_SIMPLIFY_SELF_1 
-	+ WFF_SIMPLIFY_SELF_2 
-	+ WFF_SIMPLIFY_SELF_3
-	+ WFF_SIMPLIFY_SELF_4 
-	+ WFF_SIMPLIFY_SELF_5 
-
-	+ WFF_DEF_XOR
-	+ WFF_DEF_IMPLY
-	+ WFF_DEF_COIMPLY
-	+ WFF_DEF_EQUIV	
-
-	+ BF_TRIVIALITY_0 
-	+ BF_TRIVIALITY_1 
-	+ BF_TRIVIALITY_2 
-	+ BF_TRIVIALITY_3
-	+ BF_SQUEEZE_POSITIVES_0;
-
 // bf defs are just callbacks
 const std::string apply_defs = 
 	// wff defs
@@ -359,7 +263,7 @@ struct prog_less {
 		
 		// the order would be defined on the algebra induced by
 		// the operations of the algebra (i.e. a ≤ b iff a == b ∧ a )...
-		
+
 		// REVIEW Do we need < or ≤ is enough for working?
 		return m1 < m2;
 	}
@@ -399,10 +303,6 @@ formula<BAs...> normalizer(formula<BAs...> form) {
 	// ...
 	return step3;
 }
-
-// TODO (HIGH) tweak the execution of the system rules
-
-// maybe we can do it in a more efficient way.
 
 // execute one step of the formula
 template<typename... BAs>
