@@ -94,19 +94,27 @@ struct tau {
 
 	// logical operators on tau specs, dummy implementation for now.
 	tau operator&(tau const& that) const { 
+
 		// TODO implement in the future
+
 		return tau(); 
 	}
 	tau operator|(tau const& that) const {
+
 		// TODO implement in the future
+
 		return tau(); 
 	}
 	tau operator^(tau const& that) const {
+
 		// TODO implement in the future
+
 		return tau(); 
 	}
 	tau operator~() const {
+
 		// TODO implement in the future
+
 		return tau(); 
 	}
 };
@@ -282,21 +290,6 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& n, const
 template <typename... BAs>
 std::optional<sp_tau_node<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& n, const size_t nt) {
 	return n ? n.value() | nt : n; 
-}
-
-template <typename... BAs>
-std::optional<sp_tau_node<BAs...>> get_node(const size_t nt, const sp_tau_node<BAs...>& n) {
-	return n | nt;
-}
-
-template <size_t nt, typename... BAs>
-std::optional<sp_tau_node<BAs...>> get_node(const sp_tau_node<BAs...>& n) {
-	return n | nt;
-}
-
-template <typename... BAs>
-std::optional<sp_tau_node<BAs...>> get_node(const size_t nt) {
-	return [nt](const sp_tau_node<BAs...>& n) { return get_node<BAs...>(nt, n); };
 }
 
 template <typename... BAs>
@@ -858,8 +851,10 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 	if (auto unresolved = is_unresolved(n); unresolved) {
 		// always we have type information or it is not needed at all
 		if (auto type = find_bottom(n, is_resolved_predicate<BAs...>); type) { 
-			// TODO this should be extracted to a function in rewriting as it is 
-			// a common pattern.
+
+			// TODO this should be extracted to a function in rewriting 
+			
+			// it is a common pattern.
 			std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> change;
 			change[unresolved.value()] = type.value();
 			replace_transformer<sp_tau_node<BAs...>> replace{change};
