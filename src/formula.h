@@ -506,18 +506,6 @@ auto get_optionals(const extractor_t& extractor, const sp_tau_node<BAs...>& n) {
 		| std::ranges::views::filter(&std::optional<tau_sym<BAs...>>::has_value);
 }
 
-// returns the terminal of the specified node if possible
-template <size_t... nts, typename... BAs>
-auto get_terminal(const sp_tau_node<BAs...>& n) {
-	return get_optional<nts..., terminal_extractor_t<BAs...>, BAs...>(terminal_extractor<BAs...>, n);
-}
-
-// returns the terminals of the specified nodes
-template <size_t... nts, typename... BAs>
-auto get_terminals(const sp_tau_node<BAs...>& n) {
-	return get_optionals<nts..., terminal_extractor_t<BAs...>, BAs...>(terminal_extractor<BAs...>, n);
-}
-
 // returns the non terminal of the specified node if possible
 template <size_t... nts, typename... BAs>
 std::optional<char> get_non_terminal(const sp_tau_node<BAs...>& n) {
