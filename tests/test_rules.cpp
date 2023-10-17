@@ -1285,16 +1285,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_AND);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
 			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
@@ -1307,16 +1303,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_OR);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
 			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
@@ -1329,16 +1321,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_XOR);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
 			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
@@ -1351,16 +1339,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_NEG);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
 			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
@@ -1373,16 +1357,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_LESS);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
 			| tau_parser::cbf | tau_parser::bf | tau_parser::T;
@@ -1395,16 +1375,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_LESS_EQUAL);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
 			| tau_parser::cbf | tau_parser::bf | tau_parser::F;
@@ -1417,16 +1393,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_GREATER);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
 			| tau_parser::cbf | tau_parser::bf | tau_parser::T;
@@ -1439,16 +1411,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_EQ);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::F;
 		CHECK( check.has_value() );	
@@ -1460,16 +1428,12 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto rule_src = make_tau_source(BF_CALLBACK_NEQ);
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::T;
 		CHECK( check.has_value() );	
@@ -1481,8 +1445,6 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto extracted = binded 
 			| tau_parser::formula | tau_parser::main | tau_parser::wff 
 			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf
@@ -1492,16 +1454,7 @@ TEST_SUITE("executing bf rules") {
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
-		std::cout << "extracted: " << std::endl;
-		print_sp_tau_node(std::cout, extracted);
-		auto [head, body] = tau_rule;
-		std::cout << "head: " << std::endl;
-		print_sp_tau_node(std::cout, head);
-		std::cout << "body: " << std::endl;
-		print_sp_tau_node(std::cout, body);
 		auto result = tau_apply(tau_rule, extracted);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result | tau_parser::bf | tau_parser::bf_constant;
 		CHECK( check.has_value() );	
 	}
@@ -1512,8 +1465,6 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		std::cout << "binded: " << std::endl;
-		print_sp_tau_node(std::cout, binded);
 		auto extracted = binded 
 			| tau_parser::formula | tau_parser::main | tau_parser::wff 
 			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf
@@ -1523,16 +1474,7 @@ TEST_SUITE("executing bf rules") {
 		auto rule = rule_statement 
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
-		std::cout << "extracted: " << std::endl;
-		print_sp_tau_node(std::cout, extracted);
-		auto [head, body] = tau_rule;
-		std::cout << "head: " << std::endl;
-		print_sp_tau_node(std::cout, head);
-		std::cout << "body: " << std::endl;
-		print_sp_tau_node(std::cout, body);
 		auto result = tau_apply(tau_rule, extracted);
-		std::cout << "result: " << std::endl;
-		print_sp_tau_node(std::cout, result);
 		auto check = result | tau_parser::T;
 		CHECK( check.has_value() );	
 	}
