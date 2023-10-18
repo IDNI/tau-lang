@@ -877,11 +877,14 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	auto type = non_terminal_extractor<BAs...>(rule->child[0]).value();
 	switch(type) {
 		case ::tau_parser::wff_rule:
-			return { (rule | ::tau_parser::wff_rule | tau_parser::wff_matcher).value()->child[0] , (rule | ::tau_parser::wff_rule | ::tau_parser::wff).value() };
+			return { (rule | ::tau_parser::wff_rule | tau_parser::wff_matcher).value()->child[0], 
+				(rule | ::tau_parser::wff_rule | ::tau_parser::wff).value() };
 		case ::tau_parser::cbf_rule:
-			return { (rule | ::tau_parser::cbf_rule | tau_parser::cbf_matcher).value()->child[0], (rule | ::tau_parser::cbf_rule | ::tau_parser::cbf).value() };
+			return { (rule | ::tau_parser::cbf_rule | tau_parser::cbf_matcher).value()->child[0], 
+				(rule | ::tau_parser::cbf_rule | ::tau_parser::cbf).value() };
 		case ::tau_parser::bf_rule:
-			return { (rule | ::tau_parser::bf_rule | tau_parser::bf_matcher).value()->child[0], (rule | ::tau_parser::bf_rule | ::tau_parser::bf).value() };
+			return { (rule | ::tau_parser::bf_rule | tau_parser::bf_matcher).value()->child[0], 
+				(rule | ::tau_parser::bf_rule | ::tau_parser::bf).value() };
 		default:
 			assert(false); // error in grammar or parser
 	} 
@@ -891,9 +894,14 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 template<typename... BAs>
 library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
-	auto lib = map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
+	auto lib = map_transformer<
+			tauify<BAs...>, 
+			sp_tau_source_node, 
+			sp_tau_node<BAs...>>(
+		tf)(tau_source);
 	rules<BAs...> rs;
-	for (auto& r: select_top(lib, is_non_terminal<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(lib, is_non_terminal<tau_parser::rule, BAs...>)) 
+		rs.push_back(make_rule<BAs...>(r));
 	return { rs };
 }
 
@@ -918,7 +926,11 @@ formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const 
 	tauify<BAs...> tf;
 	auto src = map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
 	auto m = find_top(src, is_non_terminal<tau_parser::main, BAs...>).value();
-	auto statement = post_order_traverser<binder_t, all_t<sp_tau_node<BAs...>>, sp_tau_node<BAs...>>(binder, all<sp_tau_node<BAs...>>)(m);
+	auto statement = post_order_traverser<
+			binder_t, 
+			all_t<sp_tau_node<BAs...>>, 
+			sp_tau_node<BAs...>>(
+		binder, all<sp_tau_node<BAs...>>)(m);
 	rules<BAs...> rs;
 	for (auto& r: select_top(src, is_non_terminal<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
 	return { rs, statement };
@@ -969,12 +981,23 @@ sp_tau_source_node parse_tau_source(const std::string source) {
 	using parse_lit = idni::lit<char, char>;
 	using parse_location = std::array<size_t, 2UL>;
 	using parse_symbol = std::pair<parse_lit, parse_location>;
-	return make_node_from_string<tau_parser, drop_location_t<parse_symbol, tau_source_sym>,
-			parse_symbol, tau_source_sym>(drop_location<parse_symbol, tau_source_sym>, source);
+	return make_node_from_string<
+			tau_parser, 
+			drop_location_t<parse_symbol, tau_source_sym>,
+			parse_symbol, 
+			tau_source_sym>(
+		drop_location<parse_symbol, tau_source_sym>, source);
 }
 
 sp_tau_source_node make_tau_source(const std::string source) {
 	return parse_tau_source(source);
+}
+
+// make a library from the given tau source string.
+template<typename... BAs>
+library<BAs...> make_library(const std::string& source) {
+	auto tau_source = make_tau_source(source);
+	return make_library<BAs...>(tau_source);
 }
 
 } // namespace idni::tau

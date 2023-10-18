@@ -133,7 +133,8 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 // TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
 
 // bf defs are just callbacks
-const std::string apply_defs = 
+template<typename... BAs>
+static const auto apply_defs = make_library(
 	// wff defs
 	WFF_DEF_XOR
 	+ WFF_DEF_IMPLY
@@ -144,24 +145,30 @@ const std::string apply_defs =
 	+ CBF_DEF_IMPLY
 	+ CBF_DEF_COIMPLY
 	+ CBF_DEF_EQUIV
-	+ CBF_DEF_IF;
+	+ CBF_DEF_IF
+);
 
-const std::string to_dnf_wff = 
+template<typename... BAs>
+static const auto to_dnf_wff = make_library(
 	WFF_DISTRIBUTE_0 
 	+ WFF_DISTRIBUTE_1
 	+ WFF_PUSH_NEGATION_INWARDS_0 
 	+ WFF_PUSH_NEGATION_INWARDS_1 
 	+ WFF_ELIM_DOUBLE_NEGATION_0
-	+ WFF_ELIM_FORALL;
+	+ WFF_ELIM_FORALL
+);
 
-const std::string to_dnf_cbf = 
+template<typename... BAs>
+static const auto to_dnf_cbf = make_library(
 	CBF_DISTRIBUTE_0 
 	+ CBF_DISTRIBUTE_1
 	+ CBF_PUSH_NEGATION_INWARDS_0 
 	+ CBF_PUSH_NEGATION_INWARDS_1 
-	+ CBF_ELIM_DOUBLE_NEGATION_0;
+	+ CBF_ELIM_DOUBLE_NEGATION_0
+);
 
-const std::string simplify_bf = 
+template<typename... BAs>
+static const auto simplify_bf = make_library(
 	BF_SIMPLIFY_ONE_0 
 	+ BF_SIMPLIFY_ONE_1 
 	+ BF_SIMPLIFY_ONE_2 
@@ -175,9 +182,11 @@ const std::string simplify_bf =
 	+ BF_SIMPLIFY_SELF_2 
 	+ BF_SIMPLIFY_SELF_3
 	+ BF_SIMPLIFY_SELF_4 
-	+ BF_SIMPLIFY_SELF_5;
+	+ BF_SIMPLIFY_SELF_5
+);
 
-const std::string simplify_wff = 
+template<typename... BAs>
+static const auto simplify_wff = make_library(
 	WFF_SIMPLIFY_ONE_0 
 	+ WFF_SIMPLIFY_ONE_1 
 	+ WFF_SIMPLIFY_ONE_2 
@@ -191,9 +200,11 @@ const std::string simplify_wff =
 	+ WFF_SIMPLIFY_SELF_2 
 	+ WFF_SIMPLIFY_SELF_3
 	+ WFF_SIMPLIFY_SELF_4 
-	+ WFF_SIMPLIFY_SELF_5;
+	+ WFF_SIMPLIFY_SELF_5
+);
 
-const std::string simplify_cbf = 
+template<typename... BAs>
+static const auto simplify_cbf = make_library(
 	CBF_SIMPLIFY_ONE_0 
 	+ CBF_SIMPLIFY_ONE_1 
 	+ CBF_SIMPLIFY_ONE_2 
@@ -207,9 +218,11 @@ const std::string simplify_cbf =
 	+ CBF_SIMPLIFY_SELF_2 
 	+ CBF_SIMPLIFY_SELF_3
 	+ CBF_SIMPLIFY_SELF_4 
-	+ CBF_SIMPLIFY_SELF_5;
+	+ CBF_SIMPLIFY_SELF_5
+);
 
-const std::string apply_cb = 
+template<typename... BAs>
+static const auto apply_cb = make_library(
 	BF_CALLBACK_AND 
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR 
@@ -218,32 +231,42 @@ const std::string apply_cb =
 	+ BF_CALLBACK_LESS_EQUAL
 	+ BF_CALLBACK_GREATER
 	+ BF_CALLBACK_EQ
- 	+ BF_CALLBACK_NEQ;
+ 	+ BF_CALLBACK_NEQ
+);
 
-const std::string wff_reduce =
+template<typename... BAs>
+static const auto wff_reduce = make_library(
 	BF_FUNCTIONAL_QUANTIFIERS_0 
 	+ BF_FUNCTIONAL_QUANTIFIERS_1 
 	+ BF_PROCESS_0 
 	+ BF_SKIP_CONSTANTS_0 
 	+ BF_ROTATE_LITERALS_0	
 	+ BF_ROTATE_LITERALS_1
-	+ BF_SQUEEZE_POSITIVES_0;
+	+ BF_SQUEEZE_POSITIVES_0
+);
 
-const std::string wff_simplify =
+template<typename... BAs>
+static const auto wff_simplify = make_library(
 	BF_TRIVIALITY_0 
 	+ BF_TRIVIALITY_1 
 	+ BF_TRIVIALITY_2 
-	+ BF_TRIVIALITY_3;
+	+ BF_TRIVIALITY_3
+);
 
 // each bunch of rules whould be applied till no more changes are made, then we 
 // apply the next set of rules in the vector till no further changes and so on,...
 // the API would provide a method to execute the rules accodingly.
 
-const std::vector<std::string> step_0 = { apply_defs };
-const std::vector<std::string> step_1 = { to_dnf_cbf, simplify_cbf };
-const std::vector<std::string> step_2 = { apply_cb, simplify_bf };
-const std::vector<std::string> step_3 = { to_dnf_wff };
-const std::vector<std::string> step_4 = { wff_reduce , wff_simplify};
+template<typename... BAs>
+static const std::vector<library<BAs...>> step_0 = { apply_defs<BAs...> };
+template<typename... BAs>
+static const std::vector<library<BAs...>>  step_1 = { to_dnf_cbf<BAs...>, simplify_cbf<BAs...> };
+template<typename... BAs>
+static const std::vector<library<BAs...>> step_2 = { apply_cb<BAs...>, simplify_bf<BAs...> };
+template<typename... BAs>
+static const std::vector<library<BAs...>> step_3 = { to_dnf_wff<BAs...> };
+template<typename... BAs>
+static const std::vector<library<BAs...>> step_4 = { wff_reduce<BAs...> , wff_simplify<BAs...>};
 
 // REVIEW could we assume we are working with the product algebra?
 
@@ -295,7 +318,7 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...> form) {
-	auto sys_source = make_tau_source(system);
+	library<BAs...> sys_source;
 	// TODO (HIGH) add all the steps of the normalizer here
 	auto step1 = program_step(form, sys_source);
 	auto step2 = program_step(step1, sys_source);
