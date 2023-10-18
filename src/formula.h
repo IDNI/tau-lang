@@ -982,7 +982,7 @@ sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
 }
 
 // make a tau source from the given source code string.
-sp_tau_source_node make_tau_source(const std::string source) {
+sp_tau_source_node make_tau_source(const std::string& source) {
 	using parse_lit = idni::lit<char, char>;
 	using parse_location = std::array<size_t, 2UL>;
 	using parse_symbol = std::pair<parse_lit, parse_location>;
@@ -1000,6 +1000,23 @@ library<BAs...> make_library(const std::string& source) {
 	auto tau_source = make_tau_source(source);
 	return make_library<BAs...>(tau_source);
 }
+
+// make a formula from the given tau source and bindings.
+template<typename factory_t, typename... BAs>
+formula<BAs...> make_formula_using_factory(const std::string& source, const factory_t& factory) {
+	auto tau_source = make_tau_source(source);
+	return make_formula_using_factory<factory_t, BAs...>(tau_source, factory);
+}
+
+// make a formula from the given tau source and bindings.
+template<typename... BAs>
+formula<BAs...> make_formula_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
+	auto tau_source = make_tau_source(source);
+	name_binder<BAs...> nb(bindings);
+	bind_transformer<name_binder<BAs...>, BAs...> bs(nb); 
+	return make_formula_using_bindings<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
+}
+
 
 } // namespace idni::tau
 
