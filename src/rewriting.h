@@ -707,7 +707,7 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 	using parse_graph = typename parse_forest::graph;
 
 	sp_parse_tree t;
-	parser_t parser;
+	static parser_t parser;
 	auto f = parser.parse(source.c_str(), source.size());
 	// MARK output the error if the parser failed
 	// avoiding doctest issues, uncomment for errors
