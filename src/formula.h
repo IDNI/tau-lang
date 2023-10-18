@@ -58,6 +58,7 @@ using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 // the order of the rules in the rewriting process of the tau language.
 template <typename... BAs>
 using rules = std::vector<tau_rule<BAs...>>;
+// TODO (LOW) define rec_relations as a vector of rules
 // defines the main statement of a tau formula.
 template <typename... BAs>
 using statement = sp_tau_node<BAs...>;
@@ -78,6 +79,8 @@ using bindings = std::map<std::string, std::variant<BAs...>>;
 
 // a formula is a set of rules and a main, the boolean algebra constants 
 // (unless '0' or '1') are uninstantiated.
+
+// TODO (LOW) replace formula with a pair of rules and main
 template<typename... BAs>
 struct formula {
 
@@ -323,6 +326,7 @@ std::vector<sp_tau_node<BAs...>>  operator||(const std::optional<sp_tau_node<BAs
 	return {};
 }
 
+// TODO (LOW) remove get_nodes if possible and use operator|| instead
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> get_nodes(const tau_parser::nonterminal nt, const sp_tau_node<BAs...>& n) {
 	return n || nt;
@@ -931,12 +935,12 @@ formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const 
 			all_t<sp_tau_node<BAs...>>, 
 			sp_tau_node<BAs...>>(
 		binder, all<sp_tau_node<BAs...>>)(m);
-	rules<BAs...> rs;
-	for (auto& r: select_top(src, is_non_terminal<tau_parser::rule, BAs...>)) rs.push_back(make_rule<BAs...>(r));
-	return { rs, statement };
+	auto rules = make_rules<BAs...>(src);
+	return { rules.system, statement };
 }
 
 // apply one tau rule to the given expression
+// IDEA maybe this could be operator|
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
@@ -957,6 +961,7 @@ sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 }
 
 // apply the given rules to the given expression
+// IDEA maybe this could be operator|
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;
@@ -977,7 +982,7 @@ sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
 }
 
 // make a tau source from the given source code string.
-sp_tau_source_node parse_tau_source(const std::string source) {
+sp_tau_source_node make_tau_source(const std::string source) {
 	using parse_lit = idni::lit<char, char>;
 	using parse_location = std::array<size_t, 2UL>;
 	using parse_symbol = std::pair<parse_lit, parse_location>;
@@ -987,10 +992,6 @@ sp_tau_source_node parse_tau_source(const std::string source) {
 			parse_symbol, 
 			tau_source_sym>(
 		drop_location<parse_symbol, tau_source_sym>, source);
-}
-
-sp_tau_source_node make_tau_source(const std::string source) {
-	return parse_tau_source(source);
 }
 
 // make a library from the given tau source string.
