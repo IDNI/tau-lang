@@ -928,7 +928,11 @@ formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, const
 template<typename binder_t, typename... BAs>
 formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const binder_t& binder) {
 	tauify<BAs...> tf;
-	auto src = map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>(tf)(tau_source);
+	auto src = map_transformer<
+			tauify<BAs...>, 
+			sp_tau_source_node, 
+			sp_tau_node<BAs...>>(
+		tf)(tau_source);
 	auto m = find_top(src, is_non_terminal<tau_parser::main, BAs...>).value();
 	auto statement = post_order_traverser<
 			binder_t, 
@@ -978,7 +982,11 @@ tau<BAs...> make_tau() {
 sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
 	// return tau_source;
 	// FIXME (LOW) fix the trim implementation
-	return trim_top<is_non_essential_source_t, tau_source_sym, sp_tau_source_node>(tau_source, is_non_essential_source);	
+	return trim_top<
+			is_non_essential_source_t, 
+			tau_source_sym, 
+			sp_tau_source_node>(
+		tau_source, is_non_essential_source);	
 }
 
 // make a tau source from the given source code string.
@@ -1014,7 +1022,10 @@ formula<BAs...> make_formula_using_bindings(const std::string& source, const bin
 	auto tau_source = make_tau_source(source);
 	name_binder<BAs...> nb(bindings);
 	bind_transformer<name_binder<BAs...>, BAs...> bs(nb); 
-	return make_formula_using_bindings<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
+	return make_formula_using_bindings<
+			bind_transformer<name_binder<BAs...>, BAs...>, 
+			BAs...>(
+		tau_source, bs);
 }
 
 
