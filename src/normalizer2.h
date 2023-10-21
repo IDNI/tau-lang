@@ -134,7 +134,7 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 
 // bf defs are just callbacks
 template<typename... BAs>
-static const auto apply_defs = make_library(
+static auto apply_defs = make_library<BAs...>(
 	// wff defs
 	WFF_DEF_XOR
 	+ WFF_DEF_IMPLY
@@ -149,7 +149,7 @@ static const auto apply_defs = make_library(
 );
 
 template<typename... BAs>
-static const auto to_dnf_wff = make_library(
+static auto to_dnf_wff = make_library<BAs...>(
 	WFF_DISTRIBUTE_0 
 	+ WFF_DISTRIBUTE_1
 	+ WFF_PUSH_NEGATION_INWARDS_0 
@@ -159,7 +159,7 @@ static const auto to_dnf_wff = make_library(
 );
 
 template<typename... BAs>
-static const auto to_dnf_cbf = make_library(
+static auto to_dnf_cbf = make_library<BAs...>(
 	CBF_DISTRIBUTE_0 
 	+ CBF_DISTRIBUTE_1
 	+ CBF_PUSH_NEGATION_INWARDS_0 
@@ -168,7 +168,7 @@ static const auto to_dnf_cbf = make_library(
 );
 
 template<typename... BAs>
-static const auto simplify_bf = make_library(
+static auto simplify_bf = make_library<BAs...>(
 	BF_SIMPLIFY_ONE_0 
 	+ BF_SIMPLIFY_ONE_1 
 	+ BF_SIMPLIFY_ONE_2 
@@ -186,7 +186,7 @@ static const auto simplify_bf = make_library(
 );
 
 template<typename... BAs>
-static const auto simplify_wff = make_library(
+static auto simplify_wff = make_library<BAs...>(
 	WFF_SIMPLIFY_ONE_0 
 	+ WFF_SIMPLIFY_ONE_1 
 	+ WFF_SIMPLIFY_ONE_2 
@@ -204,7 +204,7 @@ static const auto simplify_wff = make_library(
 );
 
 template<typename... BAs>
-static const auto simplify_cbf = make_library(
+static auto simplify_cbf = make_library<BAs...>(
 	CBF_SIMPLIFY_ONE_0 
 	+ CBF_SIMPLIFY_ONE_1 
 	+ CBF_SIMPLIFY_ONE_2 
@@ -222,7 +222,7 @@ static const auto simplify_cbf = make_library(
 );
 
 template<typename... BAs>
-static const auto apply_cb = make_library(
+static auto apply_cb = make_library<BAs...>(
 	BF_CALLBACK_AND 
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR 
@@ -235,7 +235,7 @@ static const auto apply_cb = make_library(
 );
 
 template<typename... BAs>
-static const auto wff_reduce = make_library(
+static auto wff_reduce = make_library<BAs...>(
 	BF_FUNCTIONAL_QUANTIFIERS_0 
 	+ BF_FUNCTIONAL_QUANTIFIERS_1 
 	+ BF_PROCESS_0 
@@ -246,12 +246,92 @@ static const auto wff_reduce = make_library(
 );
 
 template<typename... BAs>
-static const auto wff_simplify = make_library(
+static auto trivialities = make_library<BAs...>(
 	BF_TRIVIALITY_0 
 	+ BF_TRIVIALITY_1 
 	+ BF_TRIVIALITY_2 
 	+ BF_TRIVIALITY_3
 );
+
+template<typename...BAs>
+struct steps {
+	steps(std::vector<library<BAs...>>& libraries) : libraries(libraries) {}
+
+	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
+		auto nn = n;
+		for (auto& lib : libraries) nn = tau_apply(lib, nn);
+		return nn;
+	}
+
+	std::vector<rules<BAs...>>& libraries;
+};
+
+template<typename... BAs>
+struct repeat_each {
+	
+	repeat_each (steps<BAs...>& substeps) : substeps(substeps) {}
+
+	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
+		auto nn = n;
+		for (auto& lib: substeps.libraries) {
+			std::set<sp_tau_node<BAs...>> visited;
+			while (true) {
+				nn = tau_apply(lib, nn);
+				if (visited.find(nn) != visited.end()) break;
+				visited.insert(nn);
+			}
+		}
+		return nn;
+	}
+
+	steps<rules<BAs...>>& substeps;
+};
+
+template<typename step_t, typename... BAs>
+struct repeat_all {
+	
+	repeat_all (steps<BAs...>& substeps) : substeps(substeps) {}
+
+	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
+		auto nn = n;
+		std::set<sp_tau_node<BAs...>> visited;
+		while (true) {
+			for (auto& lib : substeps.libraries) nn = tau_apply(lib, nn);
+			if (visited.find(nn) != visited.end()) break;
+			visited.insert(nn);
+		}
+		return nn;
+	}
+
+	steps<rules<BAs...>>& substeps;
+};
+
+
+template<typename... BAs>
+steps<BAs...> operator|(library<BAs...>& l, library<BAs...>& r) {
+	return steps({l.system, r.system});
+}
+
+template<typename... BAs>
+steps<BAs...> operator|(steps<BAs...>& s, library<BAs...>& l) {
+	s.libraries.push_back(l.system);
+	return s;
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, steps<BAs...>& s) {
+	return s(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_all<BAs...>& r) {
+	return r(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_each<BAs...>& r) {
+	return r(n);
+}
 
 // each bunch of rules whould be applied till no more changes are made, then we 
 // apply the next set of rules in the vector till no further changes and so on,...
@@ -266,7 +346,7 @@ static const std::vector<library<BAs...>> step_2 = { apply_cb<BAs...>, simplify_
 template<typename... BAs>
 static const std::vector<library<BAs...>> step_3 = { to_dnf_wff<BAs...> };
 template<typename... BAs>
-static const std::vector<library<BAs...>> step_4 = { wff_reduce<BAs...> , wff_simplify<BAs...>};
+static const std::vector<library<BAs...>> step_4 = { wff_reduce<BAs...> , trivialities<BAs...>};
 
 // REVIEW could we assume we are working with the product algebra?
 

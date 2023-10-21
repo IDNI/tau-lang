@@ -19,6 +19,7 @@
 #include "../src/formula.h"
 #include "../src/bool.h"
 #include "../src/bdd_handle.h"
+#include "../src/normalizer2.h"
 #include "test_helpers.h"
 
 using namespace idni::rewriter;
@@ -26,27 +27,35 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TODO (HIGH) write tests for factory_binder
-
-// TODO (LOW) write tests for get
-
-// TODO (LOW) add more unit tests for make_library
-
 TEST_SUITE("make_library") {
 
-	static constexpr char* sample =	"bf_neg ( bf_neg ( $X ) ) := $X .";
 
 	TEST_CASE("make_library: one rule case") {
-		auto src = make_tau_source(sample);
-		auto lib = make_library<Bool>(src);
-		// FIXME add sensible checks
-		//CHECK( true ); 
+		const auto sample = WFF_ELIM_DOUBLE_NEGATION_0;
+		auto lib = make_library<Bool>(sample);
+		CHECK( lib.system.size() == 1 );
 	}
 
 }
 
 // TODO (MEDIUM) write tests for make_formula_using_factory
 TEST_SUITE("make_formula_using_factory") {
+
+	/* static constexpr char* sample =	
+		"bf_neg ( bf_neg ( $X ) ) = $X ."
+		" { 0 } .";
+
+	TEST_CASE("one_rule_n_main") {
+		auto src = make_tau_source(sample);
+		bindings<Bool> bs;
+		auto lib = make_formula_using_bindings<Bool>(src, bs);
+		CHECK( true );
+	}*/
+
+}
+
+// TODO (MEDIUM) write tests for make_formula_using_bindings
+TEST_SUITE("make_formula_using_bindings") {
 
 	/* static constexpr char* sample =	
 		"bf_neg ( bf_neg ( $X ) ) = $X ."
@@ -79,7 +88,6 @@ TEST_SUITE("make_tau_source") {
 
 // TODO write tests for is_non_terminal
 // TODO write tests for is_terminal
-// TODO write tests for get_nodes
 // TODO write tests for value_extractor
 // TODO write tests for terminal_extractor
 // TODO write tests for non_terminal_extractor
