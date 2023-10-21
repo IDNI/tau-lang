@@ -238,6 +238,7 @@ template<typename... BAs>
 static auto wff_reduce = make_library<BAs...>(
 	BF_FUNCTIONAL_QUANTIFIERS_0 
 	+ BF_FUNCTIONAL_QUANTIFIERS_1 
+	// TODO (HIGH) fix BF_PROCESS_0, it is not working
 	+ BF_PROCESS_0 
 	+ BF_SKIP_CONSTANTS_0 
 	+ BF_ROTATE_LITERALS_0	
@@ -309,12 +310,12 @@ struct repeat_all {
 
 template<typename... BAs>
 steps<BAs...> operator|(library<BAs...>& l, library<BAs...>& r) {
-	return steps({l.system, r.system});
+	return steps({l, r});
 }
 
 template<typename... BAs>
 steps<BAs...> operator|(steps<BAs...>& s, library<BAs...>& l) {
-	s.libraries.push_back(l.system);
+	s.libraries.push_back(l);
 	return s;
 }
 

@@ -66,12 +66,7 @@ using statement = sp_tau_node<BAs...>;
 // a library is a set of rules to be applied in the rewriting process of the tau
 // language, the order of the rules is important.
 template <typename... BAs>
-struct library {
-
-	library(rules<BAs...>& system): system(system) {};
-
-	rules<BAs...> system;
-};
+using library = rules<BAs...>;
 
 // bindings map tau_source constants (strings) into elements of the boolean algebras.
 template<typename... BAs>
@@ -894,19 +889,27 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	} 
 }
 
+// create a set of rules from a given tau source.
+template<typename... BAs>
+rules<BAs...> make_rules(sp_tau_node<BAs...>& tau_source) {
+	rules<BAs...> rs;
+	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rule, BAs...>)) 
+		rs.push_back(make_rule<BAs...>(r));
+	return rs;
+}
+
 // make a library from the given tau source.
 template<typename... BAs>
 library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
-	auto lib = map_transformer<
-			tauify<BAs...>, 
-			sp_tau_source_node, 
-			sp_tau_node<BAs...>>(
-		tf)(tau_source);
-	rules<BAs...> rs;
-	for (auto& r: select_top(lib, is_non_terminal<tau_parser::rule, BAs...>)) 
-		rs.push_back(make_rule<BAs...>(r));
-	return { rs };
+	map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
+	auto lib = post_order_traverser<
+			map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>>, 
+			all_t<sp_tau_source_node>, 
+			sp_node<tau_source_sym>, 
+			sp_tau_node<Bool>>(
+		transform, all<sp_tau_source_node>)(tau_source);
+	return make_rules(lib);
 }
 
 // make a formula from the given tau source and bindings.
