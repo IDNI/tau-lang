@@ -33,7 +33,7 @@ TEST_SUITE("make_library") {
 	TEST_CASE("make_library: one rule case") {
 		const auto sample = WFF_ELIM_DOUBLE_NEGATION_0;
 		auto lib = make_library<Bool>(sample);
-		CHECK( lib.system.size() == 1 );
+		CHECK( lib.size() == 1 );
 	}
 
 }
