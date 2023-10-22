@@ -29,39 +29,39 @@ namespace testing = doctest;
 TEST_SUITE("parsing of steps") {
 	
 	TEST_CASE("apply_defs") {
-		CHECK( apply_defs<Bool>.size() != 0 );
+		CHECK( apply_defs<Bool>.size() == 9 );
 	}
 	
 	TEST_CASE("to_dnf_wff") {
-		CHECK( to_dnf_wff<Bool>.size() != 0 );
+		CHECK( to_dnf_wff<Bool>.size() == 6 );
 	}
 	
 	TEST_CASE("to_dnf_cbf") {
-		CHECK( to_dnf_cbf<Bool>.size() != 0 );
+		CHECK( to_dnf_cbf<Bool>.size() == 5 );
 	}
 	
 	TEST_CASE("simplify_bf") {
-		CHECK( simplify_bf<Bool>.size() != 0 );
+		CHECK( simplify_bf<Bool>.size() == 14 );
 	}
 	
 	TEST_CASE("simplify_wff") {
-		CHECK( simplify_wff<Bool>.size() != 0 );
+		CHECK( simplify_wff<Bool>.size() == 14 );
 	}
 	
 	TEST_CASE("simplify_cbf") {
-		CHECK( simplify_cbf<Bool>.size() != 0 );
+		CHECK( simplify_cbf<Bool>.size() == 14 );
 	}
 	
 	TEST_CASE("apply_cb") {
-		CHECK( apply_cb<Bool>.size() != 0 );
+		CHECK( apply_cb<Bool>.size() == 9 );
 	}
 	
 	TEST_CASE("wff_reduce") {
-		CHECK( wff_reduce<Bool>.size() != 0 );
+		CHECK( wff_reduce<Bool>.size() == 7 );
 	}
 	
 	TEST_CASE("trivialities") {
-		CHECK( trivialities<Bool>.size() != 0 );
+		CHECK( trivialities<Bool>.size() == 4 );
 	}
 }
 

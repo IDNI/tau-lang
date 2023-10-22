@@ -381,16 +381,6 @@ formula<BAs...> normalizer_step(formula<BAs...> form) {
 	};
 }
 
-// execute one step of the formula
-template<typename... BAs>
-formula<BAs...> program_step(const formula<BAs...>& form, const library<BAs...>& lib) {
-	auto main = form.main;
-	auto main_after_prog = apply(form.rec_relations, main);
-	// TODO sys rules should be applied while possible
-	auto main_after_sys = tau_apply(lib.system, main_after_prog);
-	return formula<BAs...>(main_after_sys, form.rec_relations);
-}
-
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...> form, library<BAs...> lib) {
 	std::set<formula<BAs...>> previous;
