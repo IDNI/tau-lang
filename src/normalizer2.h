@@ -334,50 +334,11 @@ sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_each<BAs...>& r) {
 	return r(n);
 }
 
-// each bunch of rules whould be applied till no more changes are made, then we 
-// apply the next set of rules in the vector till no further changes and so on,...
-// the API would provide a method to execute the rules accodingly.
-
-template<typename... BAs>
-static const std::vector<library<BAs...>> step_0 = { apply_defs<BAs...> };
-template<typename... BAs>
-static const std::vector<library<BAs...>>  step_1 = { to_dnf_cbf<BAs...>, simplify_cbf<BAs...> };
-template<typename... BAs>
-static const std::vector<library<BAs...>> step_2 = { apply_cb<BAs...>, simplify_bf<BAs...> };
-template<typename... BAs>
-static const std::vector<library<BAs...>> step_3 = { to_dnf_wff<BAs...> };
-template<typename... BAs>
-static const std::vector<library<BAs...>> step_4 = { wff_reduce<BAs...> , trivialities<BAs...>};
-
 // REVIEW could we assume we are working with the product algebra?
 
 // this should be used in conjuction with std::set. it must provide
 // a strict weak ordering in such a way that equivalent formulas are
 // considered equal.
-
-// TODO once a final implementation is done, check the comments.
-template<typename... BAs>
-struct prog_less {
-
-	bool operator()(const formula<BAs...>& p1, const formula<BAs...>& p2) const {
-		auto m1 = extract_cte(p1.main);
-		auto m2 = extract_cte(p2.main);
-
-		// REVIEW Could we assume we have a partial order 
-		
-		// the order would be defined on the algebra induced by
-		// the operations of the algebra (i.e. a ≤ b iff a == b ∧ a )...
-
-		// REVIEW Do we need < or ≤ is enough for working?
-		return m1 < m2;
-	}
-private:
-	sp_tau_node<BAs...> extract_cte(sp_tau_node<BAs...> n) const {
-		auto cte = find_top(n, is_non_terminal<tau_parser::bf_constant, BAs...>).value()[1];
-		if (cte->value.index() == 0) return cte->child[0]->value;
-		return cte->value;
-	}
-};
 
 // executes the normalizer on the given source code taking into account the
 // bindings provided.
@@ -398,14 +359,26 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 }
 
 template <typename... BAs>
-formula<BAs...> normalizer(formula<BAs...> form) {
-	library<BAs...> sys_source;
-	// TODO (HIGH) add all the steps of the normalizer here
-	auto step1 = program_step(form, sys_source);
-	auto step2 = program_step(step1, sys_source);
-	auto step3 = program_step(step2, sys_source);
-	// ...
-	return step3;
+formula<BAs...> normalizer_step(formula<BAs...> form) {
+	// each bunch of rules whould be applied till no more changes are made, then we 
+	// apply the next set of rules in the vector till no further changes and so on,...
+	// the API would provide a method to execute the rules accodingly.
+
+	return { 
+		form.rec_relations, 
+		form.main
+			| form.rec_relations
+			| apply_defs<BAs...>
+			| repeat_each<BAs...>(
+				simplify_bf<BAs...> 
+				| apply_cb<BAs...>
+				| to_dnf_cbf<BAs...> 
+				| simplify_cbf<BAs...> 
+				| apply_cb<BAs...>
+				| to_dnf_wff<BAs...> 
+				| wff_reduce<BAs...> 
+				| trivialities<BAs...>)
+	};
 }
 
 // execute one step of the formula
@@ -420,7 +393,7 @@ formula<BAs...> program_step(const formula<BAs...>& form, const library<BAs...>&
 
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...> form, library<BAs...> lib) {
-	std::set<formula<BAs...>, prog_less<BAs...>> previous;
+	std::set<formula<BAs...>> previous;
 	previous.insert(form);
 	auto current = form;
 	auto next = program_step(current, lib);
