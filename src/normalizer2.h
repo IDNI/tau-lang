@@ -95,7 +95,6 @@ RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or (
 RULE(WFF_DISTRIBUTE_1, "($X wff_and ($Y wff_or $Z)) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
 RULE(WFF_PUSH_NEGATION_INWARDS_0, "wff_neg ($X wff_and $Y) := (wff_neg $X wff_or wff_neg $Y).")
 RULE(WFF_PUSH_NEGATION_INWARDS_1, "wff_neg ($X wff_or $Y) := (wff_neg $X wff_and wff_neg $Y).")
-// TODO rename to WFF_ELIM_DOUBLE_NEGATION
 RULE(WFF_ELIM_DOUBLE_NEGATION_0, "wff_neg wff_neg $X :=  $X.")
 RULE(WFF_ELIM_FORALL, "wff_all $X $Y := wff_neg wff_ex $X wff_neg $Y.")
 RULE(WFF_SIMPLIFY_ONE_0, "( T wff_or $X ) := T.")
@@ -368,9 +367,6 @@ sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_each<BAs...>& r) {
 
 template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...> form) {
-	// each bunch of rules whould be applied till no more changes are made, then we 
-	// apply the next set of rules in the vector till no further changes and so on,...
-	// the API would provide a method to execute the rules accodingly.
 	return { 
 		form.rec_relations, 
 		form.main
@@ -380,7 +376,7 @@ formula<BAs...> normalizer_step(formula<BAs...> form) {
 			| repeat(to_dnf_wff<BAs...>)
 			| repeat(simplify_wff<BAs...>)
 			| repeat(squeeze_positives<BAs...>)
-			| repeat_each<BAs...>(
+			| repeat_all<BAs...>(
 				to_dnf_cbf<BAs...> 
 				| simplify_cbf<BAs...> 
 				| apply_cb<BAs...>
@@ -426,7 +422,7 @@ template <typename... BAs>
 struct equiv {
 
 	bool operator()(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
-		// TODO (HIGH) implement this
+		// TODO (HIGH) implement equiv relationship between wwf formulas
 		return true;
 	}
 };

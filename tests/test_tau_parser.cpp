@@ -33,7 +33,7 @@ namespace testing = doctest;
 // library and as such must be parsed correctly and satisfy the structural checks
 // we perform on the parsed formula (as the rest of the code assumes such structure).
 
-// TODO (HIGH) why "$X := { : src_code } bf_and { bool : src_code }." is parsed
+// TODO (LOW) why "$X := { : src_code } bf_and { bool : src_code }." is parsed
 // improperly? bf | bf_constant | ...
 
 TEST_SUITE("parser: formula") {

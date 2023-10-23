@@ -59,7 +59,7 @@ struct bdd_factory {
 int main(int argc, char** argv) {
 	if (argc != 2) return cerr << argv[0] << ": requires 1 argument: formula file\n", 1;
 	string formula_file(argv[1]);
-	// TODO read formula from file, normalize it and print the output
+	// TODO (HIGH) read formula from file, normalize it and print the output
 	return 0;
 }
 
