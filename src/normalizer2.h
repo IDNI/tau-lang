@@ -149,13 +149,18 @@ static auto apply_defs = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto elim_for_all = make_library<BAs...>(
+	WFF_ELIM_FORALL
+);
+
+
+template<typename... BAs>
 static auto to_dnf_wff = make_library<BAs...>(
 	WFF_DISTRIBUTE_0 
 	+ WFF_DISTRIBUTE_1
 	+ WFF_PUSH_NEGATION_INWARDS_0 
 	+ WFF_PUSH_NEGATION_INWARDS_1 
 	+ WFF_ELIM_DOUBLE_NEGATION_0
-	+ WFF_ELIM_FORALL
 );
 
 template<typename... BAs>
@@ -307,6 +312,25 @@ struct repeat_all {
 	steps<rules<BAs...>>& substeps;
 };
 
+template<typename step_t, typename... BAs>
+struct repeat {
+	
+	repeat(rules<BAs...>& step) : step(step) {}
+
+	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
+		auto nn = n;
+		std::set<sp_tau_node<BAs...>> visited;
+		while (true) {
+			tau_apply(step, nn);
+			if (visited.find(nn) != visited.end()) break;
+			visited.insert(nn);
+		}
+		return nn;
+	}
+
+	rules<BAs...>& step;
+};
+
 
 template<typename... BAs>
 steps<BAs...> operator|(library<BAs...>& l, library<BAs...>& r) {
@@ -334,6 +358,30 @@ sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_each<BAs...>& r) {
 	return r(n);
 }
 
+template <typename... BAs>
+formula<BAs...> normalizer_step(formula<BAs...> form) {
+	// each bunch of rules whould be applied till no more changes are made, then we 
+	// apply the next set of rules in the vector till no further changes and so on,...
+	// the API would provide a method to execute the rules accodingly.
+	return { 
+		form.rec_relations, 
+		form.main
+			| form.rec_relations
+			| apply_defs<BAs...>
+			| repeat(elim_for_all<BAs...>)
+			| repeat_all(to_dnf_wff<BAs...>)
+			| repeat_each<BAs...>(
+				simplify_bf<BAs...> 
+				| apply_cb<BAs...>
+				| to_dnf_cbf<BAs...> 
+				| simplify_cbf<BAs...> 
+				| apply_cb<BAs...>
+				| to_dnf_wff<BAs...> 
+				| wff_reduce<BAs...> 
+				| trivialities<BAs...>)
+	};
+}
+
 // REVIEW could we assume we are working with the product algebra?
 
 // this should be used in conjuction with std::set. it must provide
@@ -359,37 +407,14 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 }
 
 template <typename... BAs>
-formula<BAs...> normalizer_step(formula<BAs...> form) {
-	// each bunch of rules whould be applied till no more changes are made, then we 
-	// apply the next set of rules in the vector till no further changes and so on,...
-	// the API would provide a method to execute the rules accodingly.
-
-	return { 
-		form.rec_relations, 
-		form.main
-			| form.rec_relations
-			| apply_defs<BAs...>
-			| repeat_each<BAs...>(
-				simplify_bf<BAs...> 
-				| apply_cb<BAs...>
-				| to_dnf_cbf<BAs...> 
-				| simplify_cbf<BAs...> 
-				| apply_cb<BAs...>
-				| to_dnf_wff<BAs...> 
-				| wff_reduce<BAs...> 
-				| trivialities<BAs...>)
-	};
-}
-
-template <typename... BAs>
-formula<BAs...> normalizer(formula<BAs...> form, library<BAs...> lib) {
+formula<BAs...> normalizer(formula<BAs...> form) {
 	std::set<formula<BAs...>> previous;
 	previous.insert(form);
 	auto current = form;
-	auto next = program_step(current, lib);
+	auto next = normalizer_step(current);
 	while (!previous.insert(next).second) {
 		current = next;
-		next = program_step(current, lib);
+		next = normalizer_step(current);
 	}
 	return current;
 }

@@ -26,7 +26,7 @@ namespace testing = doctest;
 // TODO (HIGH) write tests that check the normalizer
 // from parsing source, conversion to tau sources, final form, bindings, etc.
 
-TEST_SUITE("parsing of steps") {
+TEST_SUITE("steps parsing") {
 	
 	TEST_CASE("apply_defs") {
 		CHECK( apply_defs<Bool>.size() == 9 );
@@ -65,7 +65,7 @@ TEST_SUITE("parsing of steps") {
 	}
 }
 
-TEST_SUITE("steps"){
+/*TEST_SUITE("steps"){
 // TODO (HIGH) write tests to check steps
 
 }
@@ -83,4 +83,4 @@ TEST_SUITE("repeat_all"){
 TEST_SUITE("operator|"){
 // TODO (HIGH) write tests to check operator|
 
-}
+}*/
