@@ -420,14 +420,16 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 	return normalizer(form);
 }
 
+
+
 template <typename... BAs>
 struct equiv {
 
-	bool operator<(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	bool operator()(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
 		// TODO (HIGH) implement this
 		return true;
 	}
-}>
+};
 
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...> form) {
