@@ -32,8 +32,12 @@ TEST_SUITE("steps parsing") {
 		CHECK( apply_defs<Bool>.size() == 9 );
 	}
 	
+	TEST_CASE("elim_for_all") {
+		CHECK( elim_for_all<Bool>.size() == 1 );
+	}
+	
 	TEST_CASE("to_dnf_wff") {
-		CHECK( to_dnf_wff<Bool>.size() == 6 );
+		CHECK( to_dnf_wff<Bool>.size() == 5 );
 	}
 	
 	TEST_CASE("to_dnf_cbf") {
@@ -56,8 +60,16 @@ TEST_SUITE("steps parsing") {
 		CHECK( apply_cb<Bool>.size() == 9 );
 	}
 	
-	TEST_CASE("wff_reduce") {
-		CHECK( wff_reduce<Bool>.size() == 7 );
+	TEST_CASE("squeeze_positives") {
+		CHECK( squeeze_positives<Bool>.size() == 3 );
+	}
+	
+	TEST_CASE("further_process") {
+		CHECK( further_process<Bool>.size() == 2 );
+	}
+	
+	TEST_CASE("bf_elim_quantifiers") {
+		CHECK( bf_elim_quantifiers<Bool>.size() == 2 );
 	}
 	
 	TEST_CASE("trivialities") {
