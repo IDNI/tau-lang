@@ -23,7 +23,7 @@ using namespace std;
 
 namespace testing = doctest;
 
-// TODO (HIGH) write tests that check the normalizer
+// TODO (MEDIUM) write tests that check the normalizer
 // from parsing source, conversion to tau sources, final form, bindings, etc.
 
 TEST_SUITE("steps parsing") {
@@ -78,21 +78,26 @@ TEST_SUITE("steps parsing") {
 }
 
 /*TEST_SUITE("steps"){
-// TODO (HIGH) write tests to check steps
+// TODO (MEDIUM) write tests to check steps
 
 }
 
 TEST_SUITE("repeat_each"){
-// TODO (HIGH) write tests to check repeat_each
+// TODO (MEDIUM) write tests to check repeat_each
+
+}
+
+TEST_SUITE("repeat_each"){
+// TODO (MEDIUM) write tests to check repeat
 
 }
 
 TEST_SUITE("repeat_all"){
-// TODO (HIGH) write tests to check repeat_all
+// TODO (MEDIUM) write tests to check repeat_all
 
 }
 
 TEST_SUITE("operator|"){
-// TODO (HIGH) write tests to check operator|
+// TODO (MEDIUM) write tests to check operator|
 
 }*/

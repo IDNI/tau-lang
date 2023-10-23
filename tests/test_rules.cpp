@@ -1376,7 +1376,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_SUBS") {
-		// TODO (HIGH) this test doesn't test what it should
+		// TODO (HIGH) add test for subs callbacks
 		CHECK( false );
 	}
 }
@@ -1981,6 +1981,6 @@ TEST_SUITE("executing wff rules") {
 	}
 }
 
-// TODO (HIGH) writes tests for simple recursive relations
+// TODO (MEDIUM) writes tests for simple recursive relations
 // The tests should range from simple direct substitutions to more complex 
 // substitutions (involving multiple variables and indexes).

@@ -58,7 +58,6 @@ using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 // the order of the rules in the rewriting process of the tau language.
 template <typename... BAs>
 using rules = std::vector<tau_rule<BAs...>>;
-// TODO (LOW) define rec_relations as a vector of rules
 // defines the main statement of a tau formula.
 template <typename... BAs>
 using statement = sp_tau_node<BAs...>;
@@ -527,7 +526,7 @@ struct callback_applier {
 			case ::tau_parser::bf_less_equal_cb: return apply_comparison(_less_equal, n);
 			case ::tau_parser::bf_less_cb: return apply_comparison(_less, n);
 			case ::tau_parser::bf_greater_cb: return apply_comparison(_greater, n);
-			// TODO (MEDIUM) uncomment when method apply_subs reviewed 
+			// TODO (HIGH) uncomment when method apply_subs reviewed 
 			/*case ::tau_parser::bf_subs_cb: return apply_subs(n);*/
 			default: return n;
 		}
