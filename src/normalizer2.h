@@ -240,15 +240,23 @@ static auto apply_cb = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto wff_reduce = make_library<BAs...>(
-	BF_FUNCTIONAL_QUANTIFIERS_0 
-	+ BF_FUNCTIONAL_QUANTIFIERS_1 
-	// TODO (HIGH) fix BF_PROCESS_0, it is not working
-	+ BF_PROCESS_0 
-	+ BF_SKIP_CONSTANTS_0 
+static auto squeeze_positives = make_library<BAs...>(
+	BF_SQUEEZE_POSITIVES_0
 	+ BF_ROTATE_LITERALS_0	
 	+ BF_ROTATE_LITERALS_1
-	+ BF_SQUEEZE_POSITIVES_0
+);
+
+template<typename... BAs>
+static auto further_process = make_library<BAs...>(
+	// TODO (HIGH) fix BF_PROCESS_0, it is not working
+	BF_PROCESS_0 
+	+ BF_SKIP_CONSTANTS_0 
+);
+
+template<typename... BAs>
+static auto bf_elim_quantifiers = make_library<BAs...>(
+	BF_FUNCTIONAL_QUANTIFIERS_0 
+	+ BF_FUNCTIONAL_QUANTIFIERS_1 
 );
 
 template<typename... BAs>
@@ -369,16 +377,22 @@ formula<BAs...> normalizer_step(formula<BAs...> form) {
 			| form.rec_relations
 			| apply_defs<BAs...>
 			| repeat(elim_for_all<BAs...>)
-			| repeat_all(to_dnf_wff<BAs...>)
+			| repeat(to_dnf_wff<BAs...>)
+			| repeat(simplify_wff<BAs...>)
+			| repeat(squeeze_positives<BAs...>)
 			| repeat_each<BAs...>(
-				simplify_bf<BAs...> 
-				| apply_cb<BAs...>
-				| to_dnf_cbf<BAs...> 
+				to_dnf_cbf<BAs...> 
 				| simplify_cbf<BAs...> 
 				| apply_cb<BAs...>
-				| to_dnf_wff<BAs...> 
-				| wff_reduce<BAs...> 
-				| trivialities<BAs...>)
+				| bf_elim_quantifiers<BAs...>
+				| apply_cb<BAs...>
+				| simplify_bf<BAs...> 
+				| apply_cb<BAs...>)
+			| repeat(trivialities<BAs...>)
+			| repeat(simplify_wff<BAs...>)
+			| repeat(simplify_cbf<BAs...>)
+			| repeat(simplify_bf<BAs...>)
+			| repeat(trivialities<BAs...>)
 	};
 }
 
@@ -407,8 +421,17 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 }
 
 template <typename... BAs>
+struct equiv {
+
+	bool operator<(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+		// TODO (HIGH) implement this
+		return true;
+	}
+}>
+
+template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...> form) {
-	std::set<formula<BAs...>> previous;
+	std::set<formula<BAs...>, equiv<BAs...>> previous;
 	previous.insert(form);
 	auto current = form;
 	auto next = normalizer_step(current);
