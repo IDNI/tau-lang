@@ -73,6 +73,10 @@ indexes			=> open_bracket (index)* close_bracket.
 index			=> variable | capture | ignore | offset.
 num				=> digit+.
 
+# captures
+
+captures 		=> open_parenthesis ws capture (ws_required capture)* close_parenthesis.
+
 # variables 
 variable		=> var | timed.
 
@@ -245,5 +249,6 @@ rule			=> wff_rule | cbf_rule | bf_rule.
 rules			=> (rule)*.
 formula			=> rules main.
 library 		=> rules.
-start			=> formula | library.
+constructors	=> captures definition wff dot.
+start			=> formula | library | constructors.
 

@@ -133,6 +133,7 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 
 // bf defs are just callbacks
 template<typename... BAs>
+// TODO (HIGH) rename library with rwsys
 static auto apply_defs = make_library<BAs...>(
 	// wff defs
 	WFF_DEF_XOR
@@ -267,6 +268,7 @@ static auto trivialities = make_library<BAs...>(
 );
 
 template<typename...BAs>
+// TODO (HIGH) add const whenever possible
 struct steps {
 	steps(std::vector<library<BAs...>>& libraries) : libraries(libraries) {}
 
@@ -310,6 +312,7 @@ struct repeat_all {
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
 			for (auto& lib : substeps.libraries) nn = tau_apply(lib, nn);
+			// TODO (HIGH) call insert and check the return value to break
 			if (visited.find(nn) != visited.end()) break;
 			visited.insert(nn);
 		}
@@ -318,6 +321,8 @@ struct repeat_all {
 
 	steps<rules<BAs...>>& substeps;
 };
+
+// TODO (MEDIUM) review do while loop... while insert...
 
 template<typename step_t, typename... BAs>
 struct repeat {
@@ -373,7 +378,7 @@ formula<BAs...> normalizer_step(formula<BAs...> form) {
 			| form.rec_relations
 			| apply_defs<BAs...>
 			| repeat(elim_for_all<BAs...>)
-			| repeat(to_dnf_wff<BAs...>)
+			| repeat_all(to_dnf_wff<BAs...> | simplify_wff<BAs...>)
 			| repeat(simplify_wff<BAs...>)
 			| repeat(squeeze_positives<BAs...>)
 			| repeat_all<BAs...>(
