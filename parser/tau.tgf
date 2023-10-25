@@ -249,6 +249,6 @@ rule			=> wff_rule | cbf_rule | bf_rule.
 rules			=> (rule)*.
 formula			=> rules main.
 library 		=> rules.
-constructors	=> captures definition wff dot.
-start			=> formula | library | constructors.
+builder			=> captures definition wff dot.
+start			=> formula | library | builder.
 
