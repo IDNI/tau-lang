@@ -254,8 +254,8 @@
 // rules			=> (rule)*.
 // formula			=> rules main.
 // library 		=> rules.
-// constructors	=> captures definition wff dot.
-// start			=> formula | library | constructors.
+// builder			=> captures definition wff dot.
+// start			=> formula | library | builder.
 // 
 //
 
@@ -305,7 +305,7 @@ struct tau_parser {
 			bf_or_cb, bf_xor_cb, bf_neg_cb, source_binding, named_binding, type, source, source0, _Rsource_22, _Rsource_23, 
 			bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, bf_neg_cb_sym, bf_less_cb_sym, bf_less_equal_cb_sym, bf_greater_cb_sym, bf_subs_cb_sym, bf_eq_cb_sym, 
 			bf_neq_cb_sym, bf_is_zero_cb_sym, bf_is_one_cb_sym, main, rule, rules, _Rrules_24, _Rrules_25, formula, library, 
-			constructors, start, 
+			builder, start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -348,7 +348,7 @@ private:
 			"bf_or_cb", "bf_xor_cb", "bf_neg_cb", "source_binding", "named_binding", "type", "source", "source0", "_Rsource_22", "_Rsource_23", 
 			"bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "bf_neg_cb_sym", "bf_less_cb_sym", "bf_less_equal_cb_sym", "bf_greater_cb_sym", "bf_subs_cb_sym", "bf_eq_cb_sym", 
 			"bf_neq_cb_sym", "bf_is_zero_cb_sym", "bf_is_one_cb_sym", "main", "rule", "rules", "_Rrules_24", "_Rrules_25", "formula", "library", 
-			"constructors", "start", 
+			"builder", "start", 
 		}) nts.get(nt);
 		return nts;
 	}
