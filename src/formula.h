@@ -54,6 +54,13 @@ using sp_tau_node = sp_node<tau_sym<BAs...>>;
 template <typename... BAs>
 using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 
+// IDEA maybe we could define a wrapper for recursive rules and rewriting rules that
+// call the appropriate apply method. This would play also nice with the builders
+// defined in the normalizer.
+
+template <typename... BAs>
+using builder = rule<sp_node<tau_sym<BAs...>>>;
+
 // defines a vector of rules in the tau language, the order is important as it defines
 // the order of the rules in the rewriting process of the tau language.
 template <typename... BAs>
@@ -911,6 +918,7 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	return make_rules(lib);
 }
 
+
 // make a formula from the given tau source and bindings.
 template<typename... BAs>
 formula<BAs...> make_formula_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
@@ -1009,6 +1017,33 @@ template<typename... BAs>
 library<BAs...> make_library(const std::string& source) {
 	auto tau_source = make_tau_source(source);
 	return make_library<BAs...>(tau_source);
+}
+
+// creates a specific builder from a sp_tau_node.
+template<typename... BAs>
+builder<BAs...> make_builder(sp_tau_node<BAs...>& builder) {
+	return {builder | tau_parser::builder | tau_parser::captures, builder | tau_parser::builder | tau_parser::wff};
+}
+
+// create a builder from a given tau source.
+template<typename... BAs>
+builder<BAs...> make_builder(sp_tau_source_node& tau_source) {
+	tauify<BAs...> tf;
+	map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
+	auto builder = post_order_traverser<
+			map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>>, 
+			all_t<sp_tau_source_node>, 
+			sp_node<tau_source_sym>, 
+			sp_tau_node<Bool>>(
+		transform, all<sp_tau_source_node>)(tau_source);
+	return make_builder(builder);
+}
+
+// make a builder from the given tau source string.
+template<typename... BAs>
+builder<BAs...> make_builder(const std::string& source) {
+	auto tau_source = make_tau_source(source);
+	return make_builder<BAs...>(tau_source);
 }
 
 // make a formula from the given tau source and bindings.

@@ -424,7 +424,7 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 
 
 template <typename... BAs>
-struct equiv {
+struct sp_tau_node_less {
 
 	bool operator()(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
 		// TODO (HIGH) implement equiv relationship between wwf formulas
@@ -434,7 +434,7 @@ struct equiv {
 
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...> form) {
-	std::set<formula<BAs...>, equiv<BAs...>> previous;
+	std::set<formula<BAs...>, sp_tau_node_less<BAs...>> previous;
 	previous.insert(form);
 	auto current = form;
 	auto next = normalizer_step(current);
