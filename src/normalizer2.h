@@ -421,8 +421,6 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 	return normalizer(form);
 }
 
-
-
 template <typename... BAs>
 struct sp_tau_node_less {
 
