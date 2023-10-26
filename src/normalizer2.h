@@ -421,6 +421,7 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 	return normalizer(form);
 }
 
+// definitions of builder rules
 const std::string BLDR_WFF_EQ = "( $X $Y ) := ($X == $Y)";
 const std::string BLDR_WFF_NEQ = "( $X $Y ) := ($X != $Y)";
 const std::string BLDR_WFF_AND = "( $X $Y ) := ($X wff_and $Y)";
@@ -433,6 +434,7 @@ const std::string BLDR_WFF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y)";
 const std::string BLDR_WFF_ALL = "( $X $Y ) := wff_all $X $Y";
 const std::string BLDR_WFF_EX = "( $X $Y ) := wff_ex $X $Y";
 
+// wff builder
 template<typename... BAs>
 static auto bldr_wff_eq = make_builder<BAs...>(BLDR_WFF_EQ);
 template<typename... BAs>
@@ -456,6 +458,7 @@ static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
 template<typename... BAs>
 static auto bldr_wff_ex = make_builder<BAs...>(BLDR_WFF_EX);
 
+// wff factory method for building wff formulas
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_eq(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
 	return tau_apply_builder<BAs...>(bldr_wff_eq<BAs...>, {l, r});
