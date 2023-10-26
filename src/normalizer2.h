@@ -434,25 +434,82 @@ const std::string BLDR_WFF_ALL = "( $X $Y ) := wff_all $X $Y";
 const std::string BLDR_WFF_EX = "( $X $Y ) := wff_ex $X $Y";
 
 template<typename... BAs>
-static auto build_wff_eq = make_builder<BAs...>(BLDR_WFF_EQ);
+static auto bldr_wff_eq = make_builder<BAs...>(BLDR_WFF_EQ);
 template<typename... BAs>
-static auto build_wff_neq = make_builder<BAs...>(BLDR_WFF_NEQ);
+static auto bldr_wff_neq = make_builder<BAs...>(BLDR_WFF_NEQ);
 template<typename... BAs>
-static auto build_wff_and = make_builder<BAs...>(BLDR_WFF_AND);
+static auto bldr_wff_and = make_builder<BAs...>(BLDR_WFF_AND);
 template<typename... BAs>
-static auto build_wff_or = make_builder<BAs...>(BLDR_WFF_OR);
+static auto bldr_wff_or = make_builder<BAs...>(BLDR_WFF_OR);
 template<typename... BAs>
-static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+static auto bldr_wff_xor = make_builder<BAs...>(BLDR_WFF_XOR);
 template<typename... BAs>
-static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+static auto bldr_wff_neg = make_builder<BAs...>(BLDR_WFF_NEG);
 template<typename... BAs>
-static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+static auto bldr_wff_imply = make_builder<BAs...>(BLDR_WFF_IMPLY);
 template<typename... BAs>
-static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+static auto bldr_wff_equiv = make_builder<BAs...>(BLDR_WFF_EQUIV);
 template<typename... BAs>
-static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+static auto bldr_wff_coimply = make_builder<BAs...>(BLDR_WFF_COIMPLY);
 template<typename... BAs>
-static auto build_wff_equiv = make_builder<BAs...>(BLDR_WFF_EQUIV);
+static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+template<typename... BAs>
+static auto bldr_wff_ex = make_builder<BAs...>(BLDR_WFF_EX);
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_eq(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_eq<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_neq(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_neq<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_and(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_and<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_or(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_or<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_xor(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_xor<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_neg(sp_tau_node<BAs...> l) {
+	return tau_apply_builder<BAs...>(bldr_wff_neg<BAs...>, {l});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_imply(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_imply<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_equiv(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_equiv<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_coimply(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_coimply<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_all(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_all<BAs...>, {l, r});
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_ex(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+	return tau_apply_builder<BAs...>(bldr_wff_ex<BAs...>, {l, r});
+}
 
 template <typename... BAs>
 struct sp_tau_node_less {
@@ -461,8 +518,8 @@ struct sp_tau_node_less {
 	bool operator()(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
 		// l < r iff FA Xs... (l -> r) && EX Xs... not(r -> l)
 		auto vars = free_variables(l, r);
-		sp_tau_node<BAs...> wff = tau_apply_builder<BAs...>(build_wff<BAs...>, {l, r});
-		for(auto& v: vars) wff = tau_apply_builder<BAs...>(build_all<BAs...>, {v, wff});
+		sp_tau_node<BAs...> wff = build_wff_equiv<BAs...>(l, r);
+		for(auto& v: vars) wff = build_all<BAs...>(v, wff);
 		// call normalizer
 		return false;
 	}
