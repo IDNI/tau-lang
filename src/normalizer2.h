@@ -421,13 +421,63 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 	return normalizer(form);
 }
 
+const std::string BLDR_WFF_EQ = "( $X $Y ) := ($X == $Y)";
+const std::string BLDR_WFF_NEQ = "( $X $Y ) := ($X != $Y)";
+const std::string BLDR_WFF_AND = "( $X $Y ) := ($X wff_and $Y)";
+const std::string BLDR_WFF_OR = "( $X $Y ) := ($X wff_or $Y)";
+const std::string BLDR_WFF_XOR = "( $X $Y ) := ($X wff_xor $Y)";
+const std::string BLDR_WFF_NEG = "( $X ) := wff_neg $X";
+const std::string BLDR_WFF_IMPLY = "( $X $Y ) := ($X wff_imply $Y)";
+const std::string BLDR_WFF_EQUIV = "( $X $Y) := ( $X wff_equiv $Y ))";
+const std::string BLDR_WFF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y)";
+const std::string BLDR_WFF_ALL = "( $X $Y ) := wff_all $X $Y";
+const std::string BLDR_WFF_EX = "( $X $Y ) := wff_ex $X $Y";
+
+template<typename... BAs>
+static auto build_wff_eq = make_builder<BAs...>(BLDR_WFF_EQ);
+template<typename... BAs>
+static auto build_wff_neq = make_builder<BAs...>(BLDR_WFF_NEQ);
+template<typename... BAs>
+static auto build_wff_and = make_builder<BAs...>(BLDR_WFF_AND);
+template<typename... BAs>
+static auto build_wff_or = make_builder<BAs...>(BLDR_WFF_OR);
+template<typename... BAs>
+static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+template<typename... BAs>
+static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+template<typename... BAs>
+static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+template<typename... BAs>
+static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+template<typename... BAs>
+static auto build_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+template<typename... BAs>
+static auto build_wff_equiv = make_builder<BAs...>(BLDR_WFF_EQUIV);
+
 template <typename... BAs>
 struct sp_tau_node_less {
 
+	// TODO (HIGH) implement equiv relationship between wwf formulas
 	bool operator()(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
-		// TODO (HIGH) implement equiv relationship between wwf formulas
-		return true;
+		// l < r iff FA Xs... (l -> r) && EX Xs... not(r -> l)
+		auto vars = free_variables(l, r);
+		sp_tau_node<BAs...> wff = tau_apply_builder<BAs...>(build_wff<BAs...>, {l, r});
+		for(auto& v: vars) wff = tau_apply_builder<BAs...>(build_all<BAs...>, {v, wff});
+		// call normalizer
+		return false;
 	}
+
+private:
+
+	std::set<sp_tau_node<BAs...>> free_variables(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
+		std::set<sp_tau_node<BAs...>> vars;
+		auto lv = find_top(l, is_non_terminal<tau_parser::capture, BAs...>);
+		auto lr = find_top(r, is_non_terminal<tau_parser::capture, BAs...>);
+		for( auto& v : lv ) vars.insert(v);
+		for( auto& v : lr ) vars.insert(v);
+		return vars;
+	}
+
 };
 
 template <typename... BAs>
