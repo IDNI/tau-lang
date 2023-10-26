@@ -34,6 +34,8 @@ using namespace idni::rewriter;
 
 namespace idni::tau {
 
+// TODO (LOW) reorganize methods so related ones are closed
+
 // 
 // types related to the tau language
 // 
@@ -59,7 +61,7 @@ using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 // defined in the normalizer.
 
 template <typename... BAs>
-using builder = rule<sp_node<tau_sym<BAs...>>>;
+using builder = tau_rule<BAs...>;
 
 // defines a vector of rules in the tau language, the order is important as it defines
 // the order of the rules in the rewriting process of the tau language.
@@ -899,25 +901,68 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 template<typename... BAs>
 rules<BAs...> make_rules(sp_tau_node<BAs...>& tau_source) {
 	rules<BAs...> rs;
+	// TODO change call to select by operator|| and operator|
 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rule, BAs...>)) 
 		rs.push_back(make_rule<BAs...>(r));
 	return rs;
 }
 
+sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
+	// return tau_source;
+	// FIXME (LOW) fix the trim implementation
+	return trim_top<
+			is_non_essential_source_t, 
+			tau_source_sym, 
+			sp_tau_source_node>(
+		tau_source, is_non_essential_source);	
+}
+
+// make a tau source from the given source code string.
+sp_tau_source_node make_tau_source(const std::string& source) {
+	using parse_lit = idni::lit<char, char>;
+	using parse_location = std::array<size_t, 2UL>;
+	using parse_symbol = std::pair<parse_lit, parse_location>;
+	return make_node_from_string<
+			tau_parser, 
+			drop_location_t<parse_symbol, tau_source_sym>,
+			parse_symbol, 
+			tau_source_sym>(
+		drop_location<parse_symbol, tau_source_sym>, source);
+}
+
+// create tau code from tau source
+template<typename... BAs>
+sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
+	tauify<BAs...> tf;
+	map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>> transform(tf);
+	return post_order_traverser<
+			map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>, 
+			all_t<sp_tau_source_node>, 
+			sp_node<tau_source_sym>, 
+			sp_tau_node<BAs...>>(
+		transform, all<sp_tau_source_node>)(tau_source);
+}
+
 // make a library from the given tau source.
 template<typename... BAs>
 library<BAs...> make_library(sp_tau_source_node& tau_source) {
-	tauify<BAs...> tf;
-	map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
-	auto lib = post_order_traverser<
-			map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>>, 
-			all_t<sp_tau_source_node>, 
-			sp_node<tau_source_sym>, 
-			sp_tau_node<Bool>>(
-		transform, all<sp_tau_source_node>)(tau_source);
+	auto lib = make_tau_code<BAs...>(tau_source);
 	return make_rules(lib);
 }
 
+// make a formula from the given tau source and binder.
+template<typename binder_t, typename... BAs>
+formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const binder_t& binder) {
+	auto src = make_tau_code<BAs...>(tau_source);
+	auto main = src | tau_parser::formula | tau_parser::main | tau_parser::wff | value_extractor<sp_tau_node<BAs...>>;
+	auto statement = post_order_traverser<
+			binder_t, 
+			all_t<sp_tau_node<BAs...>>, 
+			sp_tau_node<BAs...>>(
+		binder, all<sp_tau_node<BAs...>>)(main);
+	auto rules = make_rules<BAs...>(src);
+	return { rules.system, statement };
+}
 
 // make a formula from the given tau source and bindings.
 template<typename... BAs>
@@ -932,25 +977,6 @@ template<typename factory_t, typename... BAs>
 formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, const factory_t& factory) {
 	bind_transformer<factory_t, BAs...> bs(factory);
 	return make_formula_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
-}
-
-// make a formula from the given tau source and binder.
-template<typename binder_t, typename... BAs>
-formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const binder_t& binder) {
-	tauify<BAs...> tf;
-	auto src = map_transformer<
-			tauify<BAs...>, 
-			sp_tau_source_node, 
-			sp_tau_node<BAs...>>(
-		tf)(tau_source);
-	auto m = find_top(src, is_non_terminal<tau_parser::main, BAs...>).value();
-	auto statement = post_order_traverser<
-			binder_t, 
-			all_t<sp_tau_node<BAs...>>, 
-			sp_tau_node<BAs...>>(
-		binder, all<sp_tau_node<BAs...>>)(m);
-	auto rules = make_rules<BAs...>(src);
-	return { rules.system, statement };
 }
 
 // apply one tau rule to the given expression
@@ -989,29 +1015,6 @@ tau<BAs...> make_tau() {
 	return tau<BAs...>();
 }
 
-sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
-	// return tau_source;
-	// FIXME (LOW) fix the trim implementation
-	return trim_top<
-			is_non_essential_source_t, 
-			tau_source_sym, 
-			sp_tau_source_node>(
-		tau_source, is_non_essential_source);	
-}
-
-// make a tau source from the given source code string.
-sp_tau_source_node make_tau_source(const std::string& source) {
-	using parse_lit = idni::lit<char, char>;
-	using parse_location = std::array<size_t, 2UL>;
-	using parse_symbol = std::pair<parse_lit, parse_location>;
-	return make_node_from_string<
-			tau_parser, 
-			drop_location_t<parse_symbol, tau_source_sym>,
-			parse_symbol, 
-			tau_source_sym>(
-		drop_location<parse_symbol, tau_source_sym>, source);
-}
-
 // make a library from the given tau source string.
 template<typename... BAs>
 library<BAs...> make_library(const std::string& source) {
@@ -1022,20 +1025,14 @@ library<BAs...> make_library(const std::string& source) {
 // creates a specific builder from a sp_tau_node.
 template<typename... BAs>
 builder<BAs...> make_builder(sp_tau_node<BAs...>& builder) {
-	return {builder | tau_parser::builder | tau_parser::captures, builder | tau_parser::builder | tau_parser::wff};
+	return {builder | tau_parser::builder | tau_parser::captures | optional_value_extractor<sp_tau_node<BAs...>>, 
+			builder | tau_parser::builder | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>};
 }
 
 // create a builder from a given tau source.
 template<typename... BAs>
 builder<BAs...> make_builder(sp_tau_source_node& tau_source) {
-	tauify<BAs...> tf;
-	map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
-	auto builder = post_order_traverser<
-			map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>>, 
-			all_t<sp_tau_source_node>, 
-			sp_node<tau_source_sym>, 
-			sp_tau_node<Bool>>(
-		transform, all<sp_tau_source_node>)(tau_source);
+	auto builder = make_tau_code<BAs...>(tau_source);
 	return make_builder(builder);
 }
 
