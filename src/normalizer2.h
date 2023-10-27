@@ -515,16 +515,15 @@ sp_tau_node<BAs...> build_wff_ex(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
 }
 
 template <typename... BAs>
-struct sp_tau_node_less {
+struct sp_tau_node_equiv {
 
-	// TODO (HIGH) implement equiv relationship between wwf formulas
 	bool operator()(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
-		// l < r iff FA Xs... (l -> r) && EX Xs... not(r -> l)
 		auto vars = free_variables(l, r);
 		sp_tau_node<BAs...> wff = build_wff_equiv<BAs...>(l, r);
 		for(auto& v: vars) wff = build_all<BAs...>(v, wff);
-		// call normalizer
-		return false;
+		auto norm_form = normalizer( {{}, wff} ) ;
+		auto check = norm_form | tau_parser::wff | tau_parser::T;
+		return check.has_value();
 	}
 
 private:
@@ -542,13 +541,12 @@ private:
 
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...> form) {
-	std::set<formula<BAs...>, sp_tau_node_less<BAs...>> previous;
-	previous.insert(form);
-	auto current = form;
-	auto next = normalizer_step(current);
-	while (!previous.insert(next).second) {
-		current = next;
-		next = normalizer_step(current);
+	static auto equiv = sp_tau_node_equiv<BAs...>();
+	std::vector<formula<BAs...>> previous;
+	formula<BAs...> current = normalizer_step(form);
+	while (std::find_if(previous.rend(), previous.rbegin(),  equiv)) {
+		previous.push_back(current);
+		current = normalizer_step(current);
 	}
 	return current;
 }
