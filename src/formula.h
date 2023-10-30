@@ -535,8 +535,7 @@ struct callback_applier {
 			case ::tau_parser::bf_less_equal_cb: return apply_comparison(_less_equal, n);
 			case ::tau_parser::bf_less_cb: return apply_comparison(_less, n);
 			case ::tau_parser::bf_greater_cb: return apply_comparison(_greater, n);
-			// TODO (HIGH) uncomment when method apply_subs reviewed 
-			/*case ::tau_parser::bf_subs_cb: return apply_subs(n);*/
+			case ::tau_parser::bf_subs_cb: return apply_subs(n);
 			default: return n;
 		}
 	}
@@ -592,9 +591,8 @@ private:
 		return std::visit(op, ba_first_element, ba_second_element) ? args[2] : args[3];
 	}
 
-	// REVIEW (MEDIUM) check this code 	
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
-		auto params = n || tau_parser::bf_cb_arg;
+		auto params = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
 		m[params[0]] = params[1];
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
@@ -766,8 +764,6 @@ struct factory_binder {
 };
 
 // check if the type is unresolved.
-//
-// TODO add static definition for is_unresolved and update code
 template<typename... BAs>
 static const auto is_unresolved_predicate = [](const sp_tau_node<BAs...>& n) {
 	if (!is_non_terminal<tau_parser::type, BAs...>(n)) return false;
@@ -784,8 +780,6 @@ template<typename... BAs>
 using is_unresolved_predicate_t = decltype(is_unresolved_predicate<BAs...>);
 
 // check if the type is resolved.
-//
-// TODO add static definition for is_resolved and update code
 template<typename... BAs>
 static const auto is_resolved_predicate = [](const sp_tau_node<BAs...>& n) {
 	if (!is_non_terminal<tau_parser::type, BAs...>(n)) return false;
@@ -801,13 +795,8 @@ static const auto is_resolved_predicate = [](const sp_tau_node<BAs...>& n) {
 template<typename... BAs>
 using is_resolved_predicate_t = decltype(is_resolved_predicate<BAs...>);
 
-// TODO add static definition for is_unresolved_predicate and update code
-// TODO add static definition for is_resolved_predicate and update code
-
 // check if the given expression is unresolved, i.e. contains a type which
 // is not resolved.
-//
-// TODO rename to find_unresolved
 template<typename... BAs>
 std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
 	return find_top(n, is_unresolved_predicate<BAs...>);
