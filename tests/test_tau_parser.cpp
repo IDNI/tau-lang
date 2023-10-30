@@ -66,6 +66,26 @@ TEST_SUITE("parser: formula") {
 	}
 }
 
+
+TEST_SUITE("builders parsing") {
+
+	TEST_CASE("one capture") {
+		static constexpr char* sample =	"( $X ) := (?X wff_and $X).";
+		auto src = make_builder<Bool>(sample);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(src.first) );
+		CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
+	}
+
+	TEST_CASE("two capture") {
+		static constexpr char* sample =	"( $X $Y ) := (?X wff_and $Y).";
+		auto src = make_builder<Bool>(sample);
+		auto left = src.first;
+		auto right = src.first;
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(src.first) );
+		CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
+	}
+}
+
 TEST_SUITE("parser: library") {
 
 	static constexpr char* sample =	
