@@ -1047,14 +1047,14 @@ builder<BAs...> make_builder(const std::string& source) {
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply_builder(builder<BAs...>& b, std::vector<sp_tau_node<BAs...>>& n) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	std::vector<sp_tau_node<BAs...>> vars = b || tau_parser::capture;
+	std::vector<sp_tau_node<BAs...>> vars = b.first || tau_parser::capture;
 	for (int i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
 	replace_transformer<sp_tau_node<BAs...>> replace{changes};
 	return post_order_traverser<
 			replace_transformer<sp_tau_node<BAs...>>, 
 			all_t<sp_tau_node<BAs...>>, 
 			sp_tau_node<BAs...>>(
-		replace , all<sp_tau_node<BAs...>>)(n);
+		replace , all<sp_tau_node<BAs...>>)(b.second);
 }
 
 
