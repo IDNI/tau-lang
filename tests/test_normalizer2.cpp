@@ -19,7 +19,6 @@
 
 using namespace idni::rewriter;
 using namespace idni::tau;
-using namespace std;
 
 namespace testing = doctest;
 
@@ -101,7 +100,7 @@ TEST_SUITE("operator|"){
 }
 
 // TODO (LOW) write tests to check build_wff_eq
-// TODO (LOW)write tests to check build_wff_neq
+// TODO (LOW) write tests to check build_wff_neq
 // TODO (LOW) write tests to check build_wff_and
 // TODO (LOW) write tests to check build_wff_or
 // TODO (LOW) write tests to check build_wff_xor
