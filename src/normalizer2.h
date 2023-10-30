@@ -536,7 +536,6 @@ private:
 		for( auto& v : lr ) vars.insert(v);
 		return vars;
 	}
-
 };
 
 template <typename... BAs>
