@@ -1,5 +1,9 @@
 name: CMake
 
+# TODO (HIGH) fix workflow to use gcc-13 when it is available on github actions
+#
+# check issue: https://github.com/actions/runner-images/issues/8555
+
 on:
   push:
     branches: [ "main" ]
