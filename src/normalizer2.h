@@ -248,7 +248,7 @@ static auto squeeze_positives = make_library<BAs...>(
 
 template<typename... BAs>
 static auto further_process = make_library<BAs...>(
-	// TODO (HIGH) fix BF_PROCESS_0, it is not working
+	// TODO (HIGH) fix BF_PROCESS_0, it is not parsing properly
 	BF_PROCESS_0 
 	+ BF_SKIP_CONSTANTS_0 
 );
