@@ -254,6 +254,7 @@
 // rules			=> (rule)*.
 // formula			=> rules main.
 // library 		=> rules.
+// # each builder is define on its own string
 // builder			=> captures definition wff dot.
 // start			=> formula | library | builder.
 // 

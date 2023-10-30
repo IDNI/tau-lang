@@ -422,17 +422,17 @@ formula<BAs...> normalizer(std::string source, factory_t factory) {
 }
 
 // definitions of builder rules
-const std::string BLDR_WFF_EQ = "( $X $Y ) := ($X == $Y)";
-const std::string BLDR_WFF_NEQ = "( $X $Y ) := ($X != $Y)";
-const std::string BLDR_WFF_AND = "( $X $Y ) := ($X wff_and $Y)";
-const std::string BLDR_WFF_OR = "( $X $Y ) := ($X wff_or $Y)";
-const std::string BLDR_WFF_XOR = "( $X $Y ) := ($X wff_xor $Y)";
-const std::string BLDR_WFF_NEG = "( $X ) := wff_neg $X";
-const std::string BLDR_WFF_IMPLY = "( $X $Y ) := ($X wff_imply $Y)";
-const std::string BLDR_WFF_EQUIV = "( $X $Y) := ( $X wff_equiv $Y ))";
-const std::string BLDR_WFF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y)";
-const std::string BLDR_WFF_ALL = "( $X $Y ) := wff_all $X $Y";
-const std::string BLDR_WFF_EX = "( $X $Y ) := wff_ex $X $Y";
+const std::string BLDR_WFF_EQ = "( $X ) := ($X == F).";
+const std::string BLDR_WFF_NEQ = "( $X ) := ($X != F).";
+const std::string BLDR_WFF_AND = "( $X $Y ) := ($X wff_and $Y).";
+const std::string BLDR_WFF_OR = "( $X $Y ) := ($X wff_or $Y).";
+const std::string BLDR_WFF_XOR = "( $X $Y ) := ($X wff_xor $Y).";
+const std::string BLDR_WFF_NEG = "( $X ) := wff_neg $X.";
+const std::string BLDR_WFF_IMPLY = "( $X $Y ) := ($X wff_imply $Y).";
+const std::string BLDR_WFF_EQUIV = "( $X $Y) := ( $X wff_equiv $Y ).";
+const std::string BLDR_WFF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y).";
+const std::string BLDR_WFF_ALL = "( $X $Y ) := wff_all $X $Y.";
+const std::string BLDR_WFF_EX = "( $X $Y ) := wff_ex $X $Y.";
 
 // wff builder
 template<typename... BAs>
