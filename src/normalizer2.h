@@ -124,7 +124,7 @@ RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
 RULE(BF_TRIVIALITY_3, "( T != F ) := T.")
 RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y ) == F).")
 
-// TODO (VERY HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
+// TODO (HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
 // further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) == (a ∨ b) ∧ ¬(a ∧ b))
 // "( ($X bf_and $Y) == F ) wwf_and ( ($X bf_and $Z) != 0) == ( bf_all $X ( ( $X bf_and $Y$ ) == F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
 RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf_all $X ((($X bf_and $Y) == F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
@@ -133,7 +133,7 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 
 // bf defs are just callbacks
 template<typename... BAs>
-// TODO (HIGH) rename library with rwsys
+// TODO (LOW) rename library with rwsys
 static auto apply_defs = make_library<BAs...>(
 	// wff defs
 	WFF_DEF_XOR
@@ -268,7 +268,7 @@ static auto trivialities = make_library<BAs...>(
 );
 
 template<typename...BAs>
-// TODO (HIGH) add const whenever possible
+// TODO (MEDIUM) add const whenever possible
 struct steps {
 	steps(std::vector<library<BAs...>>& libraries) : libraries(libraries) {}
 

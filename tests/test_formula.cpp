@@ -36,9 +36,16 @@ TEST_SUITE("make_library") {
 		CHECK( lib.size() == 1 );
 	}
 
+	// TODO (LOW) add more unit tests for make_library
+
 }
 
-// TODO (MEDIUM) write tests for make_formula_using_factory
+// TODO (LOW) write tests to check make_rule
+// TODO (LOW) write tests to check make_tau_source
+// TODO (LOW) write tests to check make_tau_code
+// TODO (LOW) write tests to check make_builder
+
+// TODO (LOW) write tests for make_formula_using_factory
 TEST_SUITE("make_formula_using_factory") {
 
 	/* static constexpr char* sample =	
@@ -54,7 +61,7 @@ TEST_SUITE("make_formula_using_factory") {
 
 }
 
-// TODO (MEDIUM) write tests for make_formula_using_bindings
+// TODO (LOW) write tests for make_formula_using_bindings
 TEST_SUITE("make_formula_using_bindings") {
 
 	/* static constexpr char* sample =	
@@ -71,7 +78,7 @@ TEST_SUITE("make_formula_using_bindings") {
 }
 
 
-// TODO (LOW) add more unit tests for make_tau_source
+// TODO (LOW) write tests for make_tau_source
 TEST_SUITE("make_tau_source") {
 
 	/* static constexpr char* sample =	
@@ -84,19 +91,20 @@ TEST_SUITE("make_tau_source") {
 
 }
 
-// TODO write tests for make_tau in the future
+// TODO (LOW) write tests for tau_apply
+// TODO (LOW) write tests for tau_apply_builder
 
-// TODO write tests for is_non_terminal
-// TODO write tests for is_terminal
-// TODO write tests for value_extractor
-// TODO write tests for terminal_extractor
-// TODO write tests for non_terminal_extractor
-// TODO write tests for ba_extractor
-// TODO write tests for stringify
-// TODO write tests for make_string_with_skip
-// TODO write tests for make_string
-// TODO write tests for operator<<(ostream, sp_tau_node<...>)
-// TODO write tests for operator<<(ostream, sp_tau_source_node)
+// TODO (LOW) write tests for is_non_terminal
+// TODO (LOW) write tests for is_terminal
+// TODO (LOW) write tests for value_extractor
+// TODO (LOW) write tests for terminal_extractor
+// TODO (LOW) write tests for non_terminal_extractor
+// TODO (LOW) write tests for ba_extractor
+// TODO (LOW) write tests for stringify
+// TODO (LOW) write tests for make_string_with_skip
+// TODO (LOW) write tests for make_string
+// TODO (LOW) write tests for operator<<(ostream, sp_tau_node<...>)
+// TODO (LOW) write tests for operator<<(ostream, sp_tau_source_node)
 
 
 

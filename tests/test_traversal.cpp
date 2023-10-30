@@ -76,7 +76,6 @@ TEST_SUITE("operator||") {
 		CHECK( args.size() == 1 );
 	}
 
-	// TODO simplify the test cases
 	TEST_CASE("match several nodes") {
 		static constexpr char* sample =	"((?Z bf_and ?Z) bf_and (?Z bf_and ?Z)) := ?Z.";
 		auto src = make_tau_source(sample);

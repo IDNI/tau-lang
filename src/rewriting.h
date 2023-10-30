@@ -347,7 +347,7 @@ using false_predicate_t = false_predicate<node_t>;
 
 // disjuction of the wrapped predicates.
 //
-// TODO we use combinators to build logical predicates. This could be simplified
+// IDEA we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
 template <typename l_predicate_t, typename r_predicate_t>
 struct and_predicate {
@@ -368,7 +368,7 @@ using and_predicate_t = and_predicate<l_predicate_t, r_predicate_t>;
 
 // disjuction of the wrapped predicates.
 //
-// TODO we use combinators to build logical predicates. This could be simplified
+// IDEA we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
 template <typename l_predicate_t, typename r_predicate_t>
 struct or_predicate {
@@ -389,7 +389,7 @@ using or_predicate_t = or_predicate<l_predicate_t, r_predicate_t>;
 
 // negation of the wrapped predicate.
 //
-// TODO we use combinators to build logical predicates. This could be simplified
+// IDEA we use combinators to build logical predicates. This could be simplified
 // by overloading the operators &&, ||, !, etc.
 template <typename predicate_t>
 struct neg_predicate {

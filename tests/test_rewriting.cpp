@@ -133,8 +133,8 @@ TEST_SUITE("make_node") {
 	}
 }
 
-// TODO maybe add tests for all predicate, not really necessary though.
-// TODO maybe add tests for identity transformer, not really necessary though.
+// TODO (LOW) maybe add tests for all predicate, not really necessary though.
+// TODO (LOW) maybe add tests for identity transformer, not really necessary though.
 
 TEST_SUITE("post_order_traverser") {
 
@@ -724,8 +724,8 @@ TEST_SUITE("find_top") {
 	}
 }
 
-// TODO write tests for while_not_found_predicate
-// TODO write tests for find_visitor
+// TODO (LOW) write tests for while_not_found_predicate
+// TODO (LOW) write tests for find_visitor
 
 TEST_SUITE("find_bottom") {
 

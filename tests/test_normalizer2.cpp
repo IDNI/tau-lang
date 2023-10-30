@@ -23,9 +23,6 @@ using namespace std;
 
 namespace testing = doctest;
 
-// TODO (MEDIUM) write tests that check the normalizer
-// from parsing source, conversion to tau sources, final form, bindings, etc.
-
 TEST_SUITE("steps parsing") {
 	
 	TEST_CASE("apply_defs") {
@@ -78,7 +75,7 @@ TEST_SUITE("steps parsing") {
 	}
 }
 
-/*TEST_SUITE("steps"){
+TEST_SUITE("steps"){
 // TODO (MEDIUM) write tests to check steps
 
 }
@@ -88,17 +85,29 @@ TEST_SUITE("repeat_each"){
 
 }
 
-TEST_SUITE("repeat_each"){
-// TODO (MEDIUM) write tests to check repeat
-
-}
-
 TEST_SUITE("repeat_all"){
 // TODO (MEDIUM) write tests to check repeat_all
 
 }
 
-TEST_SUITE("operator|"){
-// TODO (MEDIUM) write tests to check operator|
+TEST_SUITE("repeat"){
+// TODO (MEDIUM) write tests to check repeat
 
-}*/
+}
+
+TEST_SUITE("operator|"){
+// TODO (MEDIUM) write tests to check operator| (all versions)
+
+}
+
+// TODO (LOW) write tests to check build_wff_eq
+// TODO (LOW)write tests to check build_wff_neq
+// TODO (LOW) write tests to check build_wff_and
+// TODO (LOW) write tests to check build_wff_or
+// TODO (LOW) write tests to check build_wff_xor
+// TODO (LOW) write tests to check build_wff_neg
+// TODO (LOW) write tests to check build_wff_imply
+// TODO (LOW) write tests to check build_wff_equiv
+// TODO (LOW) write tests to check build_wff_coimply
+// TODO (LOW) write tests to check build_wff_all
+// TODO (LOW) write tests to check build_wff_ex

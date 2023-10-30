@@ -104,7 +104,7 @@
 // wff_ref			=> sym indexes wff_ref_args.
 // wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 // 
-// # TODO rename wff_eq and wff_new to bf_eq and bf_neq
+// # TODO (LOW) rename wff_eq and wff_new to bf_eq and bf_neq
 // wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor 
 // 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv 
 // 					| wff_coimply | bf_eq_cb | bf_neq_cb 
