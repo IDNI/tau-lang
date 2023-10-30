@@ -36,7 +36,7 @@ namespace testing = doctest;
 // TODO (LOW) why "$X := { : src_code } bf_and { bool : src_code }." is parsed
 // improperly? bf | bf_constant | ...
 
-TEST_SUITE("parser: formula") {
+TEST_SUITE("parsing formula") {
 
 	static constexpr char* sample =	
 		"?X := ?X."
@@ -67,7 +67,7 @@ TEST_SUITE("parser: formula") {
 }
 
 
-TEST_SUITE("builders parsing") {
+TEST_SUITE("parsing builders") {
 
 	TEST_CASE("one capture") {
 		static constexpr char* sample =	"( $X ) := (?X wff_and $X).";
@@ -86,7 +86,7 @@ TEST_SUITE("builders parsing") {
 	}
 }
 
-TEST_SUITE("parser: library") {
+TEST_SUITE("parsing library") {
 
 	static constexpr char* sample =	
 		"?X := ?X."
@@ -110,10 +110,40 @@ TEST_SUITE("parser: library") {
 	}
 }
 
-// TODO (HIGH) test variables (capture, ignore, var, i_, o_...)
-// TODO (HIGH) test indexes
+TEST_SUITE("parsing rules") {
 
-TEST_SUITE("parser: wwf formulas ") {
+	TEST_CASE("wff rule") {
+		// TODO (HIGH) add test for wff rule parsing
+	}
+	TEST_CASE("cbf rule") {
+		// TODO (HIGH) add test for cbf rule parsing
+	}
+	TEST_CASE("bf rule") {
+		// TODO (HIGH) add test for bf rule parsing
+	}
+}
+
+TEST_SUITE("parsing variables") {
+	// done inderectly
+}
+
+TEST_SUITE("parsing captures") {
+	// done inderectly
+}
+
+TEST_SUITE("parsing inputs") {
+	// TODO (HIGH) add tests for inputs parsing
+}
+
+TEST_SUITE("parsing outputs") {
+	// TODO (HIGH) add tests for outputs parsing
+}
+
+TEST_SUITE("parsing indexes"){
+	// TODO (HIGH) add tests for indexes parsing
+}
+
+TEST_SUITE("parsing wwf formulas ") {
 	
 	TEST_CASE("wff_neg") {
 		static constexpr char* sample =	
@@ -251,13 +281,13 @@ TEST_SUITE("parser: wwf formulas ") {
 		CHECK( ex_formula.has_value() );
 	}
 
-	// TODO (MEDIUM) test wwf refs
+	// TODO (HIGH) test wwf refs
 	TEST_CASE("wff_ref") {
 		//CHECK( false );
 	}
 }
 
-TEST_SUITE("parser: cbf formulas ") {
+TEST_SUITE("parsing cbf formulas ") {
 
 	TEST_CASE("cbf_neg") {
 		static constexpr char* sample =	"?Z := cbf_neg ?Z.";
@@ -374,13 +404,13 @@ TEST_SUITE("parser: cbf formulas ") {
 		CHECK( if_rule.has_value() );
 	}
 
-	// TODO (MEDIUM) test cbf refs
+	// TODO (HIGH) test cbf refs
 	TEST_CASE("cbf_ref") {
 		// CHECK( false );
 	}
 }
 
-TEST_SUITE("parser: bf formulas ") {
+TEST_SUITE("parsing bf formulas ") {
 
 	TEST_CASE("bf_neg") {
 		static constexpr char* sample =	"bf_neg ?Z := ?Z.";
@@ -518,7 +548,7 @@ TEST_SUITE("parser: bf formulas ") {
 	}
 }
 
-TEST_SUITE("parser: bindings ") {
+TEST_SUITE("parsing bindings ") {
 
 	TEST_CASE("named binding") {
 		static constexpr char* sample =	"{ binding } := { binding }.";
@@ -629,7 +659,7 @@ TEST_SUITE("parser: bindings ") {
 	}
 }
 
-TEST_SUITE("parser: callbacks ") {
+TEST_SUITE("parsing callbacks ") {
 
 	TEST_CASE("bf_and_cb") {
 		static constexpr char* sample =	"$X := { $X bf_and_cb $X }.";

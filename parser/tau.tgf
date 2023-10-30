@@ -84,6 +84,7 @@ variable		=> var | timed.
 # this should be typed according to the original BA.
 timed			=> (in | out)  indexes. 
 offset			=> variable | variable minus num.
+# TODO (LOW) remove ignore as it is not used
 ignore 			=> '_'.
 capture			=> '$' chars.
 var				=> '?' chars.
@@ -99,7 +100,7 @@ wff_matcher		=> wff | cbf_if.
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
-# TODO rename wff_eq and wff_new to bf_eq and bf_neq
+# TODO (LOW) rename wff_eq and wff_new to bf_eq and bf_neq
 wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor 
 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv 
 					| wff_coimply | bf_eq_cb | bf_neq_cb 
@@ -243,7 +244,6 @@ bf_neq_cb_sym			=> ws "bf_neq_cb" ws.
 bf_is_zero_cb_sym		=> ws "bf_is_zero_cb" ws.
 bf_is_one_cb_sym		=> ws "bf_is_one_cb" ws.
 
-# main - TODO - tau & tau /n tau && tau /n tau &&& tau
 main			=> wff dot.
 rule			=> wff_rule | cbf_rule | bf_rule.
 rules			=> (rule)*.
@@ -253,3 +253,4 @@ library 		=> rules.
 builder			=> captures definition wff dot.
 start			=> formula | library | builder.
 
+# TODO (LOW) rename operators to tau & tau, tau && tau, tau &&& tau,...

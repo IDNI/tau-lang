@@ -101,25 +101,25 @@ struct tau {
 	// logical operators on tau specs, dummy implementation for now.
 	tau operator&(tau const& that) const { 
 
-		// TODO implement in the future
+		// TODO (IMPORTANT) implement in the future
 
 		return tau(); 
 	}
 	tau operator|(tau const& that) const {
 
-		// TODO implement in the future
+		// TODO (IMPORTANT) implement in the future
 
 		return tau(); 
 	}
 	tau operator^(tau const& that) const {
 
-		// TODO implement in the future
+		// TODO (IMPORTANT) implement in the future
 
 		return tau(); 
 	}
 	tau operator~() const {
 
-		// TODO implement in the future
+		// TODO (IMPORTANT) implement in the future
 
 		return tau(); 
 	}
@@ -520,7 +520,7 @@ template <typename... BAs>
 struct callback_applier {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-		// TODO (MEDIUM) deal with errors once we have a clear strategy
+		// TODO (IMPORTANT) deal with errors once we have a clear strategy
 		if (!is_callback<BAs...>(n)) return n;
 		auto nt = get<tau_source_sym>(n->value).n();
 		switch (nt) {
@@ -1000,7 +1000,7 @@ sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>
 
 template<typename... BAs>
 tau<BAs...> make_tau() {
-	// TODO give a proper implementation in the future
+	// TODO (IMPORTANT) give a proper implementation in the future
 	return tau<BAs...>();
 }
 

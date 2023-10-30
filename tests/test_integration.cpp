@@ -27,7 +27,8 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TDDO (HIGH) add all Ohad's test formulas
+
+// TODO (HIGH) write tests for really basic formula cases
 
 TEST_SUITE("basic cases") {
 
@@ -38,6 +39,8 @@ TEST_SUITE("basic cases") {
 	} 
 }
 
+// TODO (HIGH) write tests for simple formula cases
+
 TEST_SUITE("simple cases") {
 
 	TEST_CASE("formula 1") {
@@ -46,6 +49,8 @@ TEST_SUITE("simple cases") {
 		CHECK( false );
 	} 
 }
+
+// TODO (HIGH) write tests for all Ohad's test formulas
 
 TEST_SUITE("Ohad's test formulas") {
 
