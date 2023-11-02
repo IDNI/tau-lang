@@ -105,7 +105,7 @@ TEST_SUITE("builders execution") {
 		| optional_value_extractor<sp_tau_node<Bool>>;
 	auto F = frml
 		| tau_parser::formula | tau_parser::main | tau_parser::wff
-		| tau_parser::wff_eq | tau_parser::F 
+		| tau_parser::wff_eq | tau_parser::wff_f 
 		| optional_value_extractor<sp_tau_node<Bool>>;
 
 	TEST_CASE("BLDR_WFF_EQ") {
