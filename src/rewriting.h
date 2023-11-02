@@ -447,8 +447,7 @@ std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 
 // find the first node that satisfy a predicate and return it.
 template <typename predicate_t, typename node_t>
-std::optional<node_t> find_top(const node_t& input, 
-		predicate_t& query) {
+std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
 	auto find_top = find_top_predicate<predicate_t, node_t>(query, found);
 	post_order_traverser<

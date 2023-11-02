@@ -513,7 +513,7 @@ auto get_optionals(const extractor_t& extractor, const sp_tau_node<BAs...>& n) {
 		| std::ranges::views::filter(&std::optional<tau_sym<BAs...>>::has_value);
 }
 
-// apply the given callback if the value of the node is a callback
+// apply the given  T and F are  if the value of the node is a callback
 //
 // TODO convert to a const static applier and change all the code accordingly
 template <typename... BAs>
@@ -974,12 +974,14 @@ template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
 	auto nn = apply_with_skip(r, n , none<sp_tau_node<BAs...>>, is_capture<BAs...>, is_non_essential<BAs...>);
-	if (auto cb = find_bottom(nn, is_callback<BAs...>); cb) {
+	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
 		callback_applier<BAs...> cb_applier;
-		auto nnn = cb_applier(cb.value());
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> change;
-		change[cb.value()] = nnn;
-		replace_transformer<sp_tau_node<BAs...>> replace{change};
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+		for (auto& cb : cbs) {
+			auto nnn = cb_applier(cb);
+			changes[cb] = nnn;
+		}
+		replace_transformer<sp_tau_node<BAs...>> replace{changes};
 		return post_order_traverser<
 				replace_transformer<sp_tau_node<BAs...>>, 
 				all_t<sp_tau_node<BAs...>>, 

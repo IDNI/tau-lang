@@ -1121,8 +1121,10 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
+		auto args = result  | tau_parser::bf_and || tau_parser::bf;
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(result) );
+		CHECK( args.size() == 2 );
+		CHECK( args[0] == args[1] );
 	}
 		
 	TEST_CASE("BF_FUNCTIONAL_QUANTIFIERS_1") {
@@ -1132,8 +1134,10 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
+		auto args = result  | tau_parser::bf_or ||tau_parser::bf;
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(result) );
+		CHECK( args.size() == 2 );
+		CHECK( args[0] == args[1] );
 	}
 		
 	TEST_CASE("BF_SKIP_CONSTANTS_0") { 
