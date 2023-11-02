@@ -1317,7 +1317,6 @@ TEST_SUITE("executing bf rules") {
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
-		print_sp_tau_node(std::cout, result);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
 		CHECK( check.has_value() );	
