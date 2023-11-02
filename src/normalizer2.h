@@ -57,10 +57,10 @@ RULE(BF_CALLBACK_NEG, "bf_neg { $X } := { bf_neg_cb $X }.")
 RULE(BF_CALLBACK_LESS, "( { $X } bf_less { $Y } ) := bf_less_cb $X $Y T F.")
 RULE(BF_CALLBACK_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := bf_less_equal_cb $X $Y T F.")
 RULE(BF_CALLBACK_GREATER, "( { $X } bf_greater { $Y } ) := bf_greater_cb $X $Y T F.")
-RULE(BF_CALLBACK_EQ, "( { $X } == F ) := bf_eq_cb $X T F.")
-RULE(BF_CALLBACK_NEQ, "( { $X } != F ) := bf_neq_cb $X T F.")
-RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } T.")
-RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } T.")
+RULE(BF_CALLBACK_EQ, "( { $X } == F ) := bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
+RULE(BF_CALLBACK_NEQ, "( { $X } != F ) := bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
+RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } T.") // (T|F) is bf_(t|f)
+RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } T.") // (T|F) is bf_(t|f)
 
 // cbf rules
 RULE(CBF_DISTRIBUTE_0, "(($X cbf_or $Y) cbf_and $Z) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
@@ -522,7 +522,7 @@ struct sp_tau_node_equiv {
 		sp_tau_node<BAs...> wff = build_wff_equiv<BAs...>(l, r);
 		for(auto& v: vars) wff = build_all<BAs...>(v, wff);
 		auto norm_form = normalizer( {{}, wff} ) ;
-		auto check = norm_form | tau_parser::wff | tau_parser::T;
+		auto check = norm_form | tau_parser::wff | tau_parser::wff_t;
 		return check.has_value();
 	}
 

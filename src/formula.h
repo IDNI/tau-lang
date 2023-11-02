@@ -571,9 +571,10 @@ private:
 	}
 
 	sp_tau_node<BAs...> apply_ternary_operator(const auto& op, const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>;
-		auto ba_element = args[0] | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
-		return std::visit(op, ba_element) ? args[1] : args[2];
+		auto bf_arg = n | tau_parser::bf_cb_arg | tau_parser::bf | only_child_extractor<BAs...>;
+		auto wff_args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
+		auto ba_element = bf_arg | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
+		return std::visit(op, ba_element) ? wff_args[0] : wff_args[1];
 	}
 
 	sp_tau_node<BAs...> apply_binary_operator(const auto& op, const sp_tau_node<BAs...>& n) {
@@ -872,9 +873,17 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	// TODO this tree structure should be checked in test_tau_parser.cpp
 	auto type = non_terminal_extractor<BAs...>(rule->child[0]).value();
 	switch(type) {
-		case ::tau_parser::wff_rule:
+		case ::tau_parser::wff_rule: {
+			sp_tau_node<BAs...> body;
+			if (auto kind = rule | tau_parser::wff_rule | tau_parser::bf_eq_cb; kind.has_value())
+				body = kind.value();
+			else if (auto kind = rule | tau_parser::wff_rule | tau_parser::bf_neq_cb; kind.has_value())
+				body = kind.value();
+			else body = (rule | tau_parser::wff_rule | tau_parser::wff).value();
 			return { (rule | ::tau_parser::wff_rule | tau_parser::wff_matcher).value()->child[0], 
-				(rule | ::tau_parser::wff_rule | ::tau_parser::wff).value() };
+				body };
+
+		}
 		case ::tau_parser::cbf_rule:
 			return { (rule | ::tau_parser::cbf_rule | tau_parser::cbf_matcher).value()->child[0], 
 				(rule | ::tau_parser::cbf_rule | ::tau_parser::cbf).value() };
