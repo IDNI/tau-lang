@@ -334,7 +334,7 @@ struct repeat {
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
 			tau_apply(step, nn);
-			if (visited.find(nn) != visited.end()) break;
+			if (visited.find(nn) == visited.end()) break;
 			visited.insert(nn);
 		}
 		return nn;
