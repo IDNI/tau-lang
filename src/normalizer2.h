@@ -292,7 +292,7 @@ struct repeat_each {
 			std::set<sp_tau_node<BAs...>> visited;
 			while (true) {
 				nn = tau_apply(lib, nn);
-				if (visited.find(nn) != visited.end()) break;
+				if (visited.find(nn) == visited.end()) break;
 				visited.insert(nn);
 			}
 		}
@@ -313,7 +313,7 @@ struct repeat_all {
 		while (true) {
 			for (auto& lib : substeps.libraries) nn = tau_apply(lib, nn);
 			// TODO (HIGH) call insert and check the return value to break
-			if (visited.find(nn) != visited.end()) break;
+			if (visited.find(nn) == visited.end()) break;
 			visited.insert(nn);
 		}
 		return nn;
