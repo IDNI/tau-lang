@@ -729,6 +729,7 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 	map_transformer<drop_location_t<parse_symbol_t, symbol_t>, 
 		sp_parse_tree, sp_node<symbol_t>> transform(drop_location<parse_symbol_t, symbol_t>);
 	return post_order_traverser<
+			// REVIEW maybe should be transformer instead of drop_location
 			map_transformer<drop_location_t<parse_symbol_t, symbol_t>, sp_parse_tree, sp_node<symbol_t>>, 
 			all_t<sp_parse_tree>,
 			sp_parse_tree, sp_node<symbol_t>>
