@@ -565,14 +565,14 @@ private:
 	// unary operation	
 	static constexpr auto _neg = [](const auto& l) { return ~l; };
 	// order operations
-	static constexpr auto _less = [](const auto& l, const auto& r) -> bool { return !((l ^ ~r) & ( (l & ~r) | (~l & r))).is_zero(); };
-	static constexpr auto _less_equal = [](const auto& l, const auto& r) -> bool { return (l ^ ~r).is_zero(); };
+	static constexpr auto _less = [](const auto& l, const auto& r) -> bool { return !(((l ^ ~r) & ( (l & ~r) | (~l & r))) == false); };
+	static constexpr auto _less_equal = [](const auto& l, const auto& r) -> bool { return (l ^ ~r) == false; };
 	static constexpr auto _greater = [](const auto& l, const auto& r) -> bool { return !_less_equal(l, r); };
 	// ternary operators
-	static constexpr auto _eq = [](const auto& l) -> bool { return l.is_zero(); };
-	static constexpr auto _neq = [](const auto& l) -> bool { return !l.is_zero(); };
-	static constexpr auto _is_one = [](const auto& l) -> bool { return l.is_one(); };
-	static constexpr auto _is_zero = [](const auto& l) -> bool { return l.is_zero(); };
+	static constexpr auto _eq = [](const auto& l) -> bool { return l == false; };
+	static constexpr auto _neq = [](const auto& l) -> bool { return !(l == false); };
+	static constexpr auto _is_one = [](const auto& l) -> bool { return l == true; };
+	static constexpr auto _is_zero = [](const auto& l) -> bool { return l == true; };
 
 	sp_tau_node<BAs...> apply_binary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
 		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf ||only_child_extractor<BAs...> || ba_extractor<BAs...>;
