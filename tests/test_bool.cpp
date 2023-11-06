@@ -20,7 +20,7 @@ namespace testing = doctest;
 
 TEST_SUITE("operator==") {
 
-	TEST_CASE("Bool == true") {
+	TEST_CASE("Bool == bool") {
 		CHECK( Bool(true) == true );
 		CHECK( Bool(false) == false );
 		CHECK( Bool(true) != false );
