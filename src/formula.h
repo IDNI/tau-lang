@@ -87,7 +87,8 @@ using bindings = std::map<std::string, std::variant<BAs...>>;
 template<typename... BAs>
 struct formula {
 
-	formula(rules<BAs...>& rec_relations, statement<BAs...>& main): rec_relations(rec_relations), main(main) {};
+	formula(rules<BAs...>& rec_relations, statement<BAs...>& main) : rec_relations(rec_relations), main(main) {};
+	formula(statement<BAs...>& main) : main(main) {};
 
 	rules<BAs...> rec_relations;
 	statement<BAs...> main;
@@ -370,6 +371,19 @@ static const auto value_extractor = [](const sp_tau_node<BAs...>& n) -> tau_sym<
 template<typename... BAs>
 using value_extractor_t = decltype(value_extractor<BAs...>);
 
+template <typename... BAs>
+std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const value_extractor_t<BAs...> e) {
+	std::vector<std::variant<BAs...>> nv;
+	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
+	return nv;
+}
+
+template <typename... BAs>
+std::optional<char> operator|(const std::optional<sp_tau_node<BAs...>>& o, const value_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return o.has_value() ? e(o.value()) : std::optional<char>(); 
+}
+
 // returns an optional containing the terminal of the node if possible
 template<typename... BAs>
 static const auto terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
@@ -441,7 +455,7 @@ std::vector<std::variant<BAs...>> operator||(const std::vector<sp_tau_node<BAs..
 template <typename... BAs>
 std::optional<std::variant<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& o, const ba_extractor_t<BAs...> e) {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
-	return o.has_value() ? e(o.value()) : std::optional<size_t>();
+	return o.has_value() ? e(o.value()) : std::optional<std::variant<BAs...>>();
 }
 
 template <typename... BAs>
@@ -950,16 +964,16 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 
 // make a formula from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, const binder_t& binder) {
+formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
 	auto src = make_tau_code<BAs...>(tau_source);
-	auto main = src | tau_parser::formula | tau_parser::main | tau_parser::wff | value_extractor<sp_tau_node<BAs...>>;
-	auto statement = post_order_traverser<
+	auto unbinded_main = src | tau_parser::formula | tau_parser::main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto binded_main = post_order_traverser<
 			binder_t, 
 			all_t<sp_tau_node<BAs...>>, 
 			sp_tau_node<BAs...>>(
-		binder, all<sp_tau_node<BAs...>>)(main);
-	auto rules = make_rules<BAs...>(src);
-	return { rules.system, statement };
+		binder, all<sp_tau_node<BAs...>>)(unbinded_main);
+	auto rules = make_rules<BAs...>(binded_main);
+	return { rules, binded_main };
 }
 
 // make a formula from the given tau source and bindings.
@@ -972,9 +986,9 @@ formula<BAs...> make_formula_using_bindings(sp_tau_source_node& tau_source, cons
 
 // make a formula from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
-formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, const factory_t& factory) {
+formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
 	bind_transformer<factory_t, BAs...> bs(factory);
-	return make_formula_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
+	return make_formula_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
 }
 
 // apply one tau rule to the given expression
@@ -982,7 +996,12 @@ formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, const
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
-	auto nn = apply_with_skip(r, n , none<sp_tau_node<BAs...>>, is_capture<BAs...>, is_non_essential<BAs...>);
+	auto nn = apply_with_skip<
+			sp_tau_node<BAs...>,
+			none_t<sp_tau_node<BAs...>>,
+			is_capture_t<BAs...>,
+			is_non_essential_t<BAs...>>(
+		r, n , none<sp_tau_node<BAs...>>, is_capture<BAs...>, is_non_essential<BAs...>);
 	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
 		callback_applier<BAs...> cb_applier;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
@@ -1003,9 +1022,9 @@ sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> tau_apply(rules<BAs...>& rs, sp_tau_node<BAs...>& n) {
 	sp_tau_node<BAs...> nn;
-	for (auto& r : rs) nn = tau_apply(r, nn, is_non_terminal<::tau_parser::ignore, BAs...>, is_non_terminal<::tau_parser::capture, BAs...>);
+	for (auto& r : rs) nn = tau_apply<BAs...>(r, nn);
 	return nn;
 }
 
@@ -1024,7 +1043,7 @@ library<BAs...> make_library(const std::string& source) {
 
 // creates a specific builder from a sp_tau_node.
 template<typename... BAs>
-builder<BAs...> make_builder(sp_tau_node<BAs...>& builder) {
+builder<BAs...> make_builder(const sp_tau_node<BAs...>& builder) {
 	return {builder | tau_parser::builder | tau_parser::captures | optional_value_extractor<sp_tau_node<BAs...>>, 
 			builder | tau_parser::builder | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>};
 }
@@ -1045,7 +1064,7 @@ builder<BAs...> make_builder(const std::string& source) {
 
 // apply the given builder to the given expression
 template<typename... BAs>
-sp_tau_node<BAs...> tau_apply_builder(builder<BAs...>& b, std::vector<sp_tau_node<BAs...>>& n) {
+sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_tau_node<BAs...>>& n) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 	std::vector<sp_tau_node<BAs...>> vars = b.first || tau_parser::capture;
 	for (int i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
@@ -1060,7 +1079,7 @@ sp_tau_node<BAs...> tau_apply_builder(builder<BAs...>& b, std::vector<sp_tau_nod
 
 // make a formula from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
-formula<BAs...> make_formula_using_factory(const std::string& source, const factory_t& factory) {
+formula<BAs...> make_formula_using_factory(const std::string& source, factory_t& factory) {
 	auto tau_source = make_tau_source(source);
 	return make_formula_using_factory<factory_t, BAs...>(tau_source, factory);
 }

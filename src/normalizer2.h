@@ -270,7 +270,11 @@ static auto trivialities = make_library<BAs...>(
 template<typename...BAs>
 // TODO (MEDIUM) add const whenever possible
 struct steps {
+
 	steps(std::vector<library<BAs...>>& libraries) : libraries(libraries) {}
+	steps(library<BAs...>& library) {
+		libraries.push_back(library);
+	}
 
 	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
 		auto nn = n;
@@ -278,7 +282,7 @@ struct steps {
 		return nn;
 	}
 
-	std::vector<rules<BAs...>>& libraries;
+	std::vector<rules<BAs...>> libraries;
 };
 
 template<typename... BAs>
@@ -299,10 +303,10 @@ struct repeat_each {
 		return nn;
 	}
 
-	steps<rules<BAs...>>& substeps;
+	steps<rules<BAs...>> substeps;
 };
 
-template<typename step_t, typename... BAs>
+template<typename... BAs>
 struct repeat_all {
 	
 	repeat_all (steps<BAs...>& substeps) : substeps(substeps) {}
@@ -319,12 +323,12 @@ struct repeat_all {
 		return nn;
 	}
 
-	steps<rules<BAs...>>& substeps;
+	steps<rules<BAs...>> substeps;
 };
 
 // TODO (MEDIUM) review do while loop... while insert...
 
-template<typename step_t, typename... BAs>
+template<typename... BAs>
 struct repeat {
 	
 	repeat(rules<BAs...>& step) : step(step) {}
@@ -333,14 +337,14 @@ struct repeat {
 		auto nn = n;
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
-			tau_apply(step, nn);
+			tau_apply<BAs...>(step, nn);
 			if (visited.find(nn) != visited.end()) break;
 			visited.insert(nn);
 		}
 		return nn;
 	}
 
-	rules<BAs...>& step;
+	rules<BAs...> step;
 };
 
 
@@ -361,6 +365,11 @@ sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, steps<BAs...>& s) {
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat<BAs...>& r) {
+	return r(n);
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_all<BAs...>& r) {
 	return r(n);
 }
@@ -368,57 +377,6 @@ sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_all<BAs...>& r) {
 template<typename... BAs>
 sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_each<BAs...>& r) {
 	return r(n);
-}
-
-template <typename... BAs>
-formula<BAs...> normalizer_step(formula<BAs...> form) {
-	return { 
-		form.rec_relations, 
-		form.main
-			| form.rec_relations
-			| apply_defs<BAs...>
-			| repeat(elim_for_all<BAs...>)
-			| repeat_all(to_dnf_wff<BAs...> | simplify_wff<BAs...>)
-			| repeat(simplify_wff<BAs...>)
-			| repeat(squeeze_positives<BAs...>)
-			| repeat_all<BAs...>(
-				to_dnf_cbf<BAs...> 
-				| simplify_cbf<BAs...> 
-				| apply_cb<BAs...>
-				| bf_elim_quantifiers<BAs...>
-				| apply_cb<BAs...>
-				| simplify_bf<BAs...> 
-				| apply_cb<BAs...>)
-			| repeat(trivialities<BAs...>)
-			| repeat(simplify_wff<BAs...>)
-			| repeat(simplify_cbf<BAs...>)
-			| repeat(simplify_bf<BAs...>)
-			| repeat(trivialities<BAs...>)
-	};
-}
-
-// REVIEW could we assume we are working with the product algebra?
-
-// this should be used in conjuction with std::set. it must provide
-// a strict weak ordering in such a way that equivalent formulas are
-// considered equal.
-
-// executes the normalizer on the given source code taking into account the
-// bindings provided.
-template<typename... BAs>
-formula<BAs...> normalizer(std::string source, bindings<BAs...> binds) {
-	auto form_source = make_tau_source(source);
-	auto form = make_formula_using_bindings(form_source, binds);
-	return normalizer(form);
-}
-
-// executes the normalizer on the given source code taking into account the
-// provided factory.
-template<typename factory_t, typename... BAs>
-formula<BAs...> normalizer(std::string source, factory_t factory) {
-	auto form_source = make_tau_source(source);
-	auto form = make_formula_using_factory(form_source, factory);
-	return normalizer(form);
 }
 
 // definitions of builder rules
@@ -460,91 +418,183 @@ static auto bldr_wff_ex = make_builder<BAs...>(BLDR_WFF_EX);
 
 // wff factory method for building wff formulas
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_eq(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_eq<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_eq(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_eq<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_neq(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_neq<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_neq(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_neq<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_and(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_and<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_and(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_and<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_or(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_or<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_or(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_or<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_xor(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_xor<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_xor(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_xor<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_neg(sp_tau_node<BAs...> l) {
-	return tau_apply_builder<BAs...>(bldr_wff_neg<BAs...>, {l});
+sp_tau_node<BAs...> build_wff_neg(sp_tau_node<BAs...>& l) {
+	std::vector<sp_tau_node<BAs...>> args {l} ;
+	return tau_apply_builder<BAs...>(bldr_wff_neg<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_imply(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_imply<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_imply(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_imply<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_equiv(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_equiv<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_equiv(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_equiv<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_coimply(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_coimply<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_coimply(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_coimply<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_all(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_all<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_all(const sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_all<BAs...>, args);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_ex(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-	return tau_apply_builder<BAs...>(bldr_wff_ex<BAs...>, {l, r});
+sp_tau_node<BAs...> build_wff_ex(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_ex<BAs...>, args);
 }
+
 
 template <typename... BAs>
-struct sp_tau_node_equiv {
+formula<BAs...> normalizer_step(formula<BAs...>& form) {
+	auto applied_rec_relations = steps<BAs...>(form.rec_relations)(form.main);
+	auto applied_defs = steps<BAs...>(apply_defs<BAs...>)(applied_rec_relations);
+	auto applied_for_all = repeat<BAs...>(elim_for_all<BAs...>)(applied_defs);
+	auto applied_to_dnf_wff = repeat<BAs...>(to_dnf_wff<BAs...>)(applied_for_all);
+	auto simplified_wff = repeat<BAs...>(to_dnf_wff<BAs...>)(applied_to_dnf_wff);
+	auto squeezed_positives = repeat<BAs...>(squeeze_positives<BAs...>)(simplified_wff);
+	auto applied_to_dnf_cbf = repeat<BAs...>(to_dnf_cbf<BAs...>)(squeezed_positives);
+	auto simplified_cbf = repeat<BAs...>(simplify_cbf<BAs...>)(applied_to_dnf_cbf);
+	auto applied_cb = repeat<BAs...>(apply_cb<BAs...>)(simplified_cbf);
+	auto applied_bf_elim_quantifiers = repeat<BAs...>(bf_elim_quantifiers<BAs...>)(applied_cb);
+	auto applied_cb_again = repeat<BAs...>(apply_cb<BAs...>)(applied_bf_elim_quantifiers);
+	auto simplified_bf = repeat<BAs...>(simplify_bf<BAs...>)(applied_cb_again);
+	auto applied_cb_again_2 = repeat<BAs...>(apply_cb<BAs...>)(simplified_bf);
+	auto applied_trivialities = repeat<BAs...>(trivialities<BAs...>)(applied_cb_again_2);
+	auto simplified_wff_again = repeat<BAs...>(simplify_wff<BAs...>)(applied_trivialities);
+	auto simplified_cbf_again = repeat<BAs...>(simplify_cbf<BAs...>)(simplified_wff_again);
+	auto simplified_bf_again = repeat<BAs...>(simplify_bf<BAs...>)(simplified_cbf_again);
+	auto applied_trivialities_again = repeat<BAs...>(trivialities<BAs...>)(simplified_bf_again);
+	return { 
+		form.rec_relations, 
+		applied_trivialities_again
+	};
 
-	bool operator()(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
-		auto vars = free_variables(l, r);
-		sp_tau_node<BAs...> wff = build_wff_equiv<BAs...>(l, r);
-		for(auto& v: vars) wff = build_all<BAs...>(v, wff);
-		auto norm_form = normalizer( {{}, wff} ) ;
-		auto check = norm_form | tau_parser::wff | tau_parser::wff_t;
+	/*return { 
+		form.rec_relations, 
+		form.main
+			| steps(form.rec_relations)
+			| apply_defs<BAs...>
+			| repeat(elim_for_all<BAs...>)
+			| repeat_all(to_dnf_wff<BAs...> | simplify_wff<BAs...>)
+			| repeat(simplify_wff<BAs...>)
+			| repeat(squeeze_positives<BAs...>)
+			| repeat_all<BAs...>(
+				to_dnf_cbf<BAs...> 
+				| simplify_cbf<BAs...> 
+				| apply_cb<BAs...>
+				| bf_elim_quantifiers<BAs...>
+				| apply_cb<BAs...>
+				| simplify_bf<BAs...> 
+				| apply_cb<BAs...>)
+			| repeat(trivialities<BAs...>)
+			| repeat(simplify_wff<BAs...>)
+			| repeat(simplify_cbf<BAs...>)
+			| repeat(simplify_bf<BAs...>)
+			| repeat(trivialities<BAs...>)
+	};*/
+}
+
+// REVIEW could we assume we are working with the product algebra?
+
+// this should be used in conjuction with std::set. it must provide
+// a strict weak ordering in such a way that equivalent formulas are
+// considered equal.
+
+// executes the normalizer on the given source code taking into account the
+// bindings provided.
+template<typename... BAs>
+formula<BAs...> normalizer(std::string& source, bindings<BAs...>& binds) {
+	auto form_source = make_tau_source(source);
+	auto form = make_formula_using_bindings(form_source, binds);
+	return normalizer(form);
+}
+
+// executes the normalizer on the given source code taking into account the
+// provided factory.
+template<typename factory_t, typename... BAs>
+formula<BAs...> normalizer(std::string& source, factory_t& factory) {
+	auto form_source = make_tau_source(source);
+	auto form = make_formula_using_factory(form_source, factory);
+	return normalizer(form);
+}
+
+
+template <typename... BAs>
+struct is_equivalent_predicate {
+
+	is_equivalent_predicate(sp_tau_node<BAs...> node) : node(node) {
+		node_free_variables = free_variables(node);
+	}
+
+	bool operator()(sp_tau_node<BAs...>& n) {
+		std::set<sp_tau_node<BAs...>> free_vars = free_variables(n);
+		free_vars.insert(node_free_variables.begin(), node_free_variables.end());
+		sp_tau_node<BAs...> wff = build_wff_equiv<BAs...>(node, n);
+		for(auto& v: free_vars) wff = build_wff_all<BAs...>(v, wff);
+		formula<BAs...> form(wff);
+		auto norm_form = normalizer(form);
+		auto check = norm_form.main | tau_parser::wff | tau_parser::wff_t;
 		return check.has_value();
 	}
 
+	sp_tau_node<BAs...> node;
+	std::set<sp_tau_node<BAs...>> node_free_variables;
 private:
 
-	std::set<sp_tau_node<BAs...>> free_variables(sp_tau_node<BAs...> l, sp_tau_node<BAs...> r) {
-		std::set<sp_tau_node<BAs...>> vars;
-		auto lv = find_top(l, is_non_terminal<tau_parser::capture, BAs...>);
-		auto lr = find_top(r, is_non_terminal<tau_parser::capture, BAs...>);
-		for( auto& v : lv ) vars.insert(v);
-		for( auto& v : lr ) vars.insert(v);
+	std::set<sp_tau_node<BAs...>> free_variables(sp_tau_node<BAs...>& n) {
+		auto captures = select_all(n, is_non_terminal<tau_parser::capture, BAs...>);
+		std::set<sp_tau_node<BAs...>> vars(captures.begin(), captures.end());
 		return vars;
 	}
 };
 
 template <typename... BAs>
-formula<BAs...> normalizer(formula<BAs...> form) {
-	static auto equiv = sp_tau_node_equiv<BAs...>();
-	std::vector<formula<BAs...>> previous;
+formula<BAs...> normalizer(formula<BAs...>& form) {
+	std::vector<sp_tau_node<BAs...>> previous;
 	formula<BAs...> current = normalizer_step(form);
-	while (std::find_if(previous.rend(), previous.rbegin(),  equiv)) {
-		previous.push_back(current);
+	auto is_equivalent = is_equivalent_predicate<BAs...>(current.main);
+	while (std::find_if(previous.rend(), previous.rbegin(),  is_equivalent) == previous.rend()) {
+		previous.push_back(current.main);
 		current = normalizer_step(current);
 	}
 	return current;
