@@ -41,6 +41,11 @@ hbdd<B, o> operator+(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 }
 
 template<typename B, auto o = bdd_options<>::create()>
+hbdd<B, o> operator^(const hbdd<B, o> &x, const hbdd<B, o> &y) {
+	return x + y;
+}
+
+template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 
 #ifdef DEBUG
