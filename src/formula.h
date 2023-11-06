@@ -565,9 +565,9 @@ private:
 	// unary operation	
 	static constexpr auto _neg = [](const auto& l) { return ~l; };
 	// order operations
-	static constexpr auto _less = [](const auto& l, const auto& r) -> bool { return !(((l ^ ~r) & ( (l & ~r) | (~l & r))) == false); };
-	static constexpr auto _less_equal = [](const auto& l, const auto& r) -> bool { return (l ^ ~r) == false; };
+	static constexpr auto _less_equal = [](const auto& l, const auto& r) -> bool { return (l & (~r)) == false; };
 	static constexpr auto _greater = [](const auto& l, const auto& r) -> bool { return !_less_equal(l, r); };
+	static constexpr auto _less = [](const auto& l, const auto& r) -> bool { return _less_equal(l,r) && ((l ^ r) != false); };
 	// ternary operators
 	static constexpr auto _eq = [](const auto& l) -> bool { return l == false; };
 	static constexpr auto _neq = [](const auto& l) -> bool { return !(l == false); };
