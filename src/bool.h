@@ -45,11 +45,11 @@ Bool Bool::operator|(const Bool& x) const {
 }
 
 Bool Bool::operator^(const Bool& x) const {
-	return (this->b == true) ? one() : x;
+	return (this->b == true) ? ~x : x;
 }
 
 Bool Bool::operator+(const Bool& x) const {
-	return (this->b == true) ? one() : x;
+	return (this->b == true) ? ~x : x;
 }
 
 Bool Bool::operator~() const { 
