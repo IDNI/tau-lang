@@ -28,3 +28,52 @@ TEST_SUITE("operator==") {
 		CHECK( get_zero<Bool>() != true );
 	}
 }
+
+TEST_SUITE("operator&") {
+
+	TEST_CASE("hbdd & hbdd") {
+		CHECK( (get_one<Bool>() & get_one<Bool>()) == true );
+		CHECK( (get_one<Bool>() & get_zero<Bool>()) == false );
+		CHECK( (get_zero<Bool>() & get_one<Bool>()) == false );
+		CHECK( (get_zero<Bool>() & get_zero<Bool>()) == false );
+	}
+}
+
+TEST_SUITE("operator|") {
+
+	TEST_CASE("hbdd | hbdd") {
+		CHECK( (get_one<Bool>() | get_one<Bool>()) == true );
+		CHECK( (get_one<Bool>() | get_zero<Bool>()) == true );
+		CHECK( (get_zero<Bool>() | get_one<Bool>()) == true );
+		CHECK( (get_zero<Bool>() | get_zero<Bool>()) == false );
+	}
+}
+
+TEST_SUITE("operator^") {
+
+	TEST_CASE("hbdd ^ hbdd") {
+		CHECK( (get_one<Bool>() ^ get_one<Bool>()) == false );
+		CHECK( (get_one<Bool>() ^ get_zero<Bool>()) == true );
+		CHECK( (get_zero<Bool>() ^ get_one<Bool>()) == true );
+		CHECK( (get_zero<Bool>() ^ get_zero<Bool>()) == false );
+	}
+}
+
+TEST_SUITE("operator+") {
+
+	TEST_CASE("hbdd + hbdd") {
+		CHECK( (get_one<Bool>() + get_one<Bool>()) == false );
+		CHECK( (get_one<Bool>() + get_zero<Bool>()) == true );
+		CHECK( (get_zero<Bool>() + get_one<Bool>()) == true );
+		CHECK( (get_zero<Bool>() + get_zero<Bool>()) == false );
+	}
+}
+
+TEST_SUITE("operator~") {
+
+	TEST_CASE("hbdd ~") {
+		CHECK( (~get_one<Bool>()) == get_zero<Bool>() );
+		CHECK( (~get_zero<Bool>()) == get_one<Bool>() );
+	}
+}
+
