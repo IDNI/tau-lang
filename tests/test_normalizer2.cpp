@@ -41,15 +41,15 @@ TEST_SUITE("steps parsing") {
 	}
 	
 	TEST_CASE("simplify_bf") {
-		CHECK( simplify_bf<Bool>.size() == 14 );
+		CHECK( simplify_bf<Bool>.size() == 16 );
 	}
 	
 	TEST_CASE("simplify_wff") {
-		CHECK( simplify_wff<Bool>.size() == 14 );
+		CHECK( simplify_wff<Bool>.size() == 16 );
 	}
 	
 	TEST_CASE("simplify_cbf") {
-		CHECK( simplify_cbf<Bool>.size() == 14 );
+		CHECK( simplify_cbf<Bool>.size() == 16 );
 	}
 	
 	TEST_CASE("apply_cb") {
@@ -110,3 +110,16 @@ TEST_SUITE("operator|"){
 // TODO (LOW) write tests to check build_wff_coimply
 // TODO (LOW) write tests to check build_wff_all
 // TODO (LOW) write tests to check build_wff_ex
+
+// TODO (MEDIUM) write test to check apply_defs
+// TODO (MEDIUM) write test to check elim_for_all
+// TODO (MEDIUM) write test to check to_dnf_wff
+// TODO (MEDIUM) write test to check to_dnf_cbf
+// TODO (MEDIUM) write test to check simplify_bf
+// TODO (MEDIUM) write test to check simplify_wff
+// TODO (MEDIUM) write test to check simplify_cbf
+// TODO (MEDIUM) write test to check apply_cb
+// TODO (MEDIUM) write test to check squeeze_positives
+// TODO (MEDIUM) write test to check further_process
+// TODO (MEDIUM) write test to check bf_elim_quantifiers
+// TODO (MEDIUM) write test to check trivialities

@@ -32,10 +32,12 @@ RULE(BF_SIMPLIFY_ONE_0, "( T bf_or $X ) := T.")
 RULE(BF_SIMPLIFY_ONE_1, "( $X bf_or T ) := T.")
 RULE(BF_SIMPLIFY_ONE_2, "( T bf_and $X ) := $X.")
 RULE(BF_SIMPLIFY_ONE_3, "( $X bf_and T ) := $X.")
+RULE(BF_SIMPLIFY_ONE_4, "bf_neg T := F.")
 RULE(BF_SIMPLIFY_ZERO_0, "( F bf_and $X ) := F.")
 RULE(BF_SIMPLIFY_ZERO_1, "( $X bf_and F ) := F.")
 RULE(BF_SIMPLIFY_ZERO_2, "( F bf_or $X ) := $X.")
 RULE(BF_SIMPLIFY_ZERO_3, "( $X bf_or F ) := $X.")
+RULE(BF_SIMPLIFY_ZERO_4, "bf_neg F := T.")
 RULE(BF_SIMPLIFY_SELF_0, "( $X bf_and $X ) := $X.")
 RULE(BF_SIMPLIFY_SELF_1, "( $X bf_or $X ) := $X.")
 RULE(BF_SIMPLIFY_SELF_2, "( $X bf_and bf_neg $X ) := F.")
@@ -72,10 +74,12 @@ RULE(CBF_SIMPLIFY_ONE_0, "( T cbf_or $X ) := T.")
 RULE(CBF_SIMPLIFY_ONE_1, "( $X cbf_or T ) := T.")
 RULE(CBF_SIMPLIFY_ONE_2, "( T cbf_and $X ) := $X.")
 RULE(CBF_SIMPLIFY_ONE_3, "( $X cbf_and T ) := $X.")
+RULE(CBF_SIMPLIFY_ONE_4, "cbf_neg T := F.")
 RULE(CBF_SIMPLIFY_ZERO_0, "( F cbf_and $X ) := F.")
 RULE(CBF_SIMPLIFY_ZERO_1, "( $X cbf_and F ) := F.")
 RULE(CBF_SIMPLIFY_ZERO_2, "( F cbf_or $X ) := $X.")
 RULE(CBF_SIMPLIFY_ZERO_3, "( $X cbf_or F ) := $X.")
+RULE(CBF_SIMPLIFY_ZERO_4, "cbf_neg F := T.")
 RULE(CBF_SIMPLIFY_SELF_0, "( $X cbf_and $X ) := $X.")
 RULE(CBF_SIMPLIFY_SELF_1, "( $X cbf_or $X ) := $X.")
 RULE(CBF_SIMPLIFY_SELF_2, "( $X cbf_and cbf_neg $X ) := F.")
@@ -101,10 +105,12 @@ RULE(WFF_SIMPLIFY_ONE_0, "( T wff_or $X ) := T.")
 RULE(WFF_SIMPLIFY_ONE_1, "( $X wff_or T ) := T.")
 RULE(WFF_SIMPLIFY_ONE_2, "( T wff_and $X ) := $X.")
 RULE(WFF_SIMPLIFY_ONE_3, "( $X wff_and T ) := $X.")
+RULE(WFF_SIMPLIFY_ONE_4, " wff_neg T := F.")
 RULE(WFF_SIMPLIFY_ZERO_0, "( F wff_and $X ) := F.")
 RULE(WFF_SIMPLIFY_ZERO_1, "( $X wff_and F ) := F.")
 RULE(WFF_SIMPLIFY_ZERO_2, "( F wff_or $X ) := $X.")
 RULE(WFF_SIMPLIFY_ZERO_3, "( $X wff_or F ) := $X.")
+RULE(WFF_SIMPLIFY_ZERO_4, "wff_neg F := T.")
 RULE(WFF_SIMPLIFY_SELF_0, "( $X wff_and $X ) := $X.")
 RULE(WFF_SIMPLIFY_SELF_1, "( $X wff_or $X ) := $X.")
 RULE(WFF_SIMPLIFY_SELF_2, "( $X wff_and wff_neg $X ) := F.")
@@ -178,10 +184,12 @@ static auto simplify_bf = make_library<BAs...>(
 	+ BF_SIMPLIFY_ONE_1 
 	+ BF_SIMPLIFY_ONE_2 
 	+ BF_SIMPLIFY_ONE_3
+	+ BF_SIMPLIFY_ONE_4
 	+ BF_SIMPLIFY_ZERO_0 
 	+ BF_SIMPLIFY_ZERO_1 
 	+ BF_SIMPLIFY_ZERO_2 
 	+ BF_SIMPLIFY_ZERO_3
+	+ BF_SIMPLIFY_ZERO_4
 	+ BF_SIMPLIFY_SELF_0 
 	+ BF_SIMPLIFY_SELF_1 
 	+ BF_SIMPLIFY_SELF_2 
@@ -196,10 +204,12 @@ static auto simplify_wff = make_library<BAs...>(
 	+ WFF_SIMPLIFY_ONE_1 
 	+ WFF_SIMPLIFY_ONE_2 
 	+ WFF_SIMPLIFY_ONE_3
+	+ WFF_SIMPLIFY_ONE_4
 	+ WFF_SIMPLIFY_ZERO_0 
 	+ WFF_SIMPLIFY_ZERO_1 
 	+ WFF_SIMPLIFY_ZERO_2 
 	+ WFF_SIMPLIFY_ZERO_3
+	+ WFF_SIMPLIFY_ZERO_4
 	+ WFF_SIMPLIFY_SELF_0 
 	+ WFF_SIMPLIFY_SELF_1 
 	+ WFF_SIMPLIFY_SELF_2 
@@ -214,10 +224,12 @@ static auto simplify_cbf = make_library<BAs...>(
 	+ CBF_SIMPLIFY_ONE_1 
 	+ CBF_SIMPLIFY_ONE_2 
 	+ CBF_SIMPLIFY_ONE_3
+	+ CBF_SIMPLIFY_ONE_4
 	+ CBF_SIMPLIFY_ZERO_0 
 	+ CBF_SIMPLIFY_ZERO_1 
 	+ CBF_SIMPLIFY_ZERO_2 
 	+ CBF_SIMPLIFY_ZERO_3
+	+ CBF_SIMPLIFY_ZERO_4
 	+ CBF_SIMPLIFY_SELF_0 
 	+ CBF_SIMPLIFY_SELF_1 
 	+ CBF_SIMPLIFY_SELF_2 
