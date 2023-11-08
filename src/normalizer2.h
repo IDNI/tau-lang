@@ -276,7 +276,8 @@ struct steps {
 		libraries.push_back(library);
 	}
 
-	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> operator()(sp_tau_node<BAs...>& n) {
+		if (libraries.empty()) return n;
 		auto nn = n;
 		for (auto& lib : libraries) nn = tau_apply(lib, nn);
 		return nn;
@@ -290,7 +291,7 @@ struct repeat_each {
 	
 	repeat_each (steps<BAs...>& substeps) : substeps(substeps) {}
 
-	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> operator()(sp_tau_node<BAs...>& n) {
 		auto nn = n;
 		for (auto& lib: substeps.libraries) {
 			std::set<sp_tau_node<BAs...>> visited;
@@ -311,7 +312,7 @@ struct repeat_all {
 	
 	repeat_all (steps<BAs...>& substeps) : substeps(substeps) {}
 
-	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> operator()(sp_tau_node<BAs...>& n) {
 		auto nn = n;
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
@@ -333,11 +334,11 @@ struct repeat {
 	
 	repeat(rules<BAs...>& step) : step(step) {}
 
-	sp_tau_node<BAs...>& operator()(sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> operator()(sp_tau_node<BAs...>& n) {
 		auto nn = n;
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
-			tau_apply<BAs...>(step, nn);
+			nn = tau_apply<BAs...>(step, nn);
 			if (visited.find(nn) != visited.end()) break;
 			visited.insert(nn);
 		}
@@ -490,7 +491,7 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	auto applied_defs = steps<BAs...>(apply_defs<BAs...>)(applied_rec_relations);
 	auto applied_for_all = repeat<BAs...>(elim_for_all<BAs...>)(applied_defs);
 	auto applied_to_dnf_wff = repeat<BAs...>(to_dnf_wff<BAs...>)(applied_for_all);
-	auto simplified_wff = repeat<BAs...>(to_dnf_wff<BAs...>)(applied_to_dnf_wff);
+	auto simplified_wff = repeat<BAs...>(simplify_wff<BAs...>)(applied_to_dnf_wff);
 	auto squeezed_positives = repeat<BAs...>(squeeze_positives<BAs...>)(simplified_wff);
 	auto applied_to_dnf_cbf = repeat<BAs...>(to_dnf_cbf<BAs...>)(squeezed_positives);
 	auto simplified_cbf = repeat<BAs...>(simplify_cbf<BAs...>)(applied_to_dnf_cbf);
@@ -571,7 +572,8 @@ struct is_equivalent_predicate {
 		free_vars.insert(node_free_variables.begin(), node_free_variables.end());
 		sp_tau_node<BAs...> wff = build_wff_equiv<BAs...>(node, n);
 		for(auto& v: free_vars) wff = build_wff_all<BAs...>(v, wff);
-		formula<BAs...> form(wff);
+		rules<BAs...> rls;
+		formula<BAs...> form{rls, wff};
 		auto norm_form = normalizer(form);
 		auto check = norm_form.main | tau_parser::wff | tau_parser::wff_t;
 		return check.has_value();
