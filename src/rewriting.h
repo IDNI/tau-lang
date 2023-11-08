@@ -720,7 +720,7 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 			t = g.extract_trees();
 			// MARK output the parsed tree
 			// #ifdef OUTPUT_PARSED_TREES
-			t->to_print(std::cout);
+			//t->to_print(std::cout);
 			// #endif // OUTPUT_PARSED_TREES
 			return false;
 		};

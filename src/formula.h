@@ -88,7 +88,7 @@ template<typename... BAs>
 struct formula {
 
 	formula(rules<BAs...>& rec_relations, statement<BAs...>& main) : rec_relations(rec_relations), main(main) {};
-	formula(statement<BAs...>& main) : main(main) {};
+//	formula(statement<BAs...>& main) : main(main) {};
 
 	rules<BAs...> rec_relations;
 	statement<BAs...> main;
@@ -1023,7 +1023,8 @@ sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 // IDEA maybe this could be operator|
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(rules<BAs...>& rs, sp_tau_node<BAs...>& n) {
-	sp_tau_node<BAs...> nn;
+	if (rs.empty()) return n;
+	sp_tau_node<BAs...> nn = n;
 	for (auto& r : rs) nn = tau_apply<BAs...>(r, nn);
 	return nn;
 }
