@@ -500,7 +500,7 @@ sp_tau_node<BAs...> build_wff_ex(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r)
 template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	auto applied_rec_relations = steps<BAs...>(form.rec_relations)(form.main);
-	auto applied_defs = steps<BAs...>(apply_defs<BAs...>)(applied_rec_relations);
+	auto applied_defs = repeat<BAs...>(apply_defs<BAs...>)(applied_rec_relations);
 	auto applied_for_all = repeat<BAs...>(elim_for_all<BAs...>)(applied_defs);
 	auto applied_to_dnf_wff = repeat<BAs...>(to_dnf_wff<BAs...>)(applied_for_all);
 	auto simplified_wff = repeat<BAs...>(simplify_wff<BAs...>)(applied_to_dnf_wff);
