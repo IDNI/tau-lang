@@ -19,27 +19,47 @@
 using namespace idni::rewriter;
 using namespace idni::tau;
 
-struct bdd_factory {
-	
-	sp_tau_node<hbdd<Bool>> build(const sp_tau_node<hbdd<Bool>>& type, const sp_tau_node<hbdd<Bool>> n) {
-		auto string_type = make_string_with_skip<
-			decltype(tau_node_terminal_extractor<hbdd<Bool>>),
-			decltype(not_whitespace_predicate<hbdd<Bool>>), 
-			sp_tau_node<hbdd<Bool>>>(tau_node_terminal_extractor<hbdd<Bool>>, 
-			not_whitespace_predicate<hbdd<Bool>>, type);
-		if (string_type != "bdd") return n;
-		auto var = make_string_with_skip<
-			decltype(tau_node_terminal_extractor<hbdd<Bool>>),
-			decltype(not_whitespace_predicate<hbdd<Bool>>), 
-			sp_tau_node<hbdd<Bool>>>(tau_node_terminal_extractor<hbdd<Bool>>, 
-			not_whitespace_predicate<hbdd<Bool>>, type);
+using bdd_test = hbdd<Bool>;
+
+struct bdd_test_factory {	
+
+	sp_tau_node<bdd_test> build(const std::string type_name, const sp_tau_node<bdd_test>& n) {
+		if (type_name != "bdd") return n;
+		std::string var = make_string_with_skip<
+			tau_node_terminal_extractor_t<bdd_test>,
+			not_whitespace_predicate_t<bdd_test>, 
+			sp_tau_node<bdd_test>>(
+				tau_node_terminal_extractor<bdd_test>, 
+				not_whitespace_predicate<bdd_test>, n);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
-		auto nn =  make_node<tau_sym<hbdd<Bool>>>(bdd_handle<Bool>::bit(true, index++), {});
+		auto nn =  make_node<tau_sym<bdd_test>>(bdd_handle<Bool>::bit(true, index++), {});
 		return cache.emplace(var, nn).first->second;
 	}
 
-	static size_t index;
-	static std::map<std::string, sp_tau_node<hbdd<Bool>>> cache;
+	size_t index = 0;
+	std::map<std::string, sp_tau_node<bdd_test>> cache;
 };
+
+using bdd_test_factory_t = bdd_test_factory;
+
+template<class... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n, size_t l = 0) {
+	os << "{";
+	// for (size_t t = 0; t < l; t++) os << " ";
+	std::visit(overloaded{
+		[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
+		[&os](std::variant<bdd_test> v) { 
+			if (auto b = std::get<0>(v); b == true) os << "true"; 
+			else if (auto b = std::get<0>(v); b == false) os << "false"; 
+			else os << "...bdd..."; }
+	}, n->value);
+	for (auto& d : n->child) print_sp_tau_node(os, d, l + 1);
+	os << "}";
+	return os;
+}
 
 #endif // __TEST_INTEGRATION_HELPERS_H__
