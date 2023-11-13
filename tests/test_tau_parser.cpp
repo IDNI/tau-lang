@@ -34,7 +34,10 @@ namespace testing = doctest;
 // we perform on the parsed formula (as the rest of the code assumes such structure).
 
 // TODO (LOW) why "$X := { : src_code } bf_and { bool : src_code }." is parsed
+//
 // improperly? bf | bf_constant | ...
+//
+// Check if still hapopens after the latest changes to the grammar.
 
 TEST_SUITE("parsing formula") {
 
@@ -113,13 +116,13 @@ TEST_SUITE("parsing library") {
 TEST_SUITE("parsing rules") {
 
 	TEST_CASE("wff rule") {
-		// TODO (HIGH) add test for wff rule parsing
+		// TODO (LOW) add test for wff rule parsing
 	}
 	TEST_CASE("cbf rule") {
-		// TODO (HIGH) add test for cbf rule parsing
+		// TODO (LOW) add test for cbf rule parsing
 	}
 	TEST_CASE("bf rule") {
-		// TODO (HIGH) add test for bf rule parsing
+		// TODO (LOW) add test for bf rule parsing
 	}
 }
 
@@ -132,15 +135,15 @@ TEST_SUITE("parsing captures") {
 }
 
 TEST_SUITE("parsing inputs") {
-	// TODO (HIGH) add tests for inputs parsing
+	// TODO (LOW) add tests for inputs parsing
 }
 
 TEST_SUITE("parsing outputs") {
-	// TODO (HIGH) add tests for outputs parsing
+	// TODO (LOW) add tests for outputs parsing
 }
 
 TEST_SUITE("parsing indexes"){
-	// TODO (HIGH) add tests for indexes parsing
+	// TODO (LOW) add tests for indexes parsing
 }
 
 TEST_SUITE("parsing wwf formulas ") {
@@ -757,17 +760,20 @@ TEST_SUITE("parsing callbacks ") {
 		CHECK( subs_cb.has_value() );
 	}
 
-	// TODO (HIGH) add bf_less_cb test
-	// TODO (HIGH) add bf_less_equal_cb test
-	// TODO (HIGH) add bf_greater_cb test
-	// TODO (HIGH) add bf_eq_cb test
-	// TODO (HIGH) add bf_neq_cb test
-	// TODO (HIGH) add bf_is_zero_cb test
-	// TODO (HIGH) add bf_is_one_cb test
-	// TODO (HIGH) add bf_has_clashing_subformulas_cb test
-	// TODO (HIGH) add bf_has_subformula_cb test
-	// TODO (HIGH) add wff_has_clashing_subformulas_cb test
-	// TODO (HIGH) add wfff_has_subformula_cb test
+	// The following todos are classified as LOW because they are tested inderectly
+	// in other unit/integration tests. However, it is better to have explicit tests.
+	//
+	// TODO (MEDIUM) add bf_less_cb test
+	// TODO (MEDIUM) add bf_less_equal_cb test
+	// TODO (MEDIUM) add bf_greater_cb test
+	// TODO (MEDIUM) add bf_eq_cb test
+	// TODO (MEDIUM) add bf_neq_cb test
+	// TODO (MEDIUM) add bf_is_zero_cb test
+	// TODO (MEDIUM) add bf_is_one_cb test
+	// TODO (MEDIUM) add bf_has_clashing_subformulas_cb test
+	// TODO (MEDIUM) add bf_has_subformula_cb test
+	// TODO (MEDIUM) add wff_has_clashing_subformulas_cb test
+	// TODO (MEDIUM) add wfff_has_subformula_cb test
 
 }
 
