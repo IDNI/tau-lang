@@ -480,7 +480,7 @@ static const auto only_child_extractor = [](const sp_tau_node<BAs...>& n) -> std
 template<typename... BAs>
 using only_child_extractor_t = decltype(only_child_extractor<BAs...>);
 
-// TODO (MEDIUM) merge both implementations using a new template parameter 
+// TODO (HIGH) merge both implementations using a new template parameter 
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const only_child_extractor_t<BAs...> e) {
 	std::vector<sp_tau_node<BAs...>> nv;
@@ -543,7 +543,7 @@ auto get_optionals(const extractor_t& extractor, const sp_tau_node<BAs...>& n) {
 
 // apply the given  T and F are  if the value of the node is a callback
 //
-// TODO convert to a const static applier and change all the code accordingly
+// TODO (HIGH) convert to a const static applier and change all the code accordingly
 template <typename... BAs>
 struct callback_applier {
 
@@ -703,7 +703,7 @@ private:
 		pretty_print_sp_tau_node(std::cout, params[1]) << " params[1]: " << std::endl;
 		pretty_print_sp_tau_node(std::cout, params[2]) << " params[2]: " << std::endl;
 		m[params[0]] = params[1];
-		// TODO (MEDIUM) extract this pattern to a method call replace in rewriting.h
+		// TODO (HIGH) extract this pattern to a method call replace in rewriting.h
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
 		return post_order_traverser<
 				replace_transformer<sp_tau_node<BAs...>>, 
@@ -724,7 +724,7 @@ struct tauify {
 	}
 };
 
-// TODO remove this extractor and use a previous one
+// TODO (LOW) remove this extractor and use a previous one
 // extracts terminal from sp_tau_source_node
 template <typename... BAs>
 auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
@@ -738,7 +738,7 @@ auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::opti
 template <typename... BAs>
 using tau_node_terminal_extractor_t = decltype(tau_node_terminal_extractor<BAs...>);
 
-// TODO remove this extractor and use a previous one
+// TODO (LOW) remove this extractor and use a previous one
 // extracts terminal from sp_tau_source_node
 auto tau_source_terminal_extractor = [](const sp_tau_source_node& n) -> std::optional<char> {
 	if (n->value.nt()&& !(n->value).is_null())
@@ -921,9 +921,11 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 		// always we have type information or it is not needed at all
 		if (auto type = find_bottom(n, is_resolved_predicate<BAs...>); type) { 
 
-			// TODO this should be extracted to a function in rewriting 
-			
-			// it is a common pattern.
+			// TODO (HIGH) this should be extracted to a function in rewriting 
+			//
+			// there are few places where we deal with a similar pattern, this
+			// should be extracted to a function in rewriting.h named replace
+			// which takes as arguments the node and thhe changes.	
 			std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> change;
 			change[unresolved.value()] = type.value();
 			replace_transformer<sp_tau_node<BAs...>> replace{change};
@@ -987,14 +989,13 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 // creates a specific rule from a generic rule.
 template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
-	// TODO this tree structure should be checked in test_tau_parser.cpp
 	// TODO (IMPORTANT) check that the rule is well formed an raise an error otherwise
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
 	case tau_parser::bf_rule: return make_rule<tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
 	case tau_parser::wff_rule: return make_rule<tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
 	case tau_parser::cbf_rule: return make_rule<tau_parser::cbf_rule, tau_parser::cbf_matcher, tau_parser::cbf_body, BAs...>(rule);
-	default: assert(false); // TODO (IMPORTANT) raise an error
+	default: assert(false);
 	};
 }
 
@@ -1002,7 +1003,7 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 template<typename... BAs>
 rules<BAs...> make_rules(sp_tau_node<BAs...>& tau_source) {
 	rules<BAs...> rs;
-	// TODO change call to select by operator|| and operator|
+	// TODO (HIGH) change call to select by operator|| and operator|
 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rule, BAs...>)) 
 		rs.push_back(make_rule<BAs...>(r));
 	return rs;

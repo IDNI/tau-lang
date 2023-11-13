@@ -142,7 +142,7 @@ RULE(WFF_DEF_IMPLY, "( $X wff_imply $Y ) := ( wff_neg $X wff_or $Y).")
 RULE(WFF_DEF_COIMPLY, "( $X wff_coimply $Y ) := ( $Y wff_imply $X).")
 RULE(WFF_DEF_EQUIV, "( $X wff_equiv $Y ) := (( $X wff_imply $Y ) wff_and ( $Y wff_imply $X )).")
 
-// TODO rename to (N)EQ_SIMPLYFY
+// TODO (HIGH) rename to (N)EQ_SIMPLYFY
 RULE(BF_TRIVIALITY_0, "( F == F ) := T.")
 RULE(BF_TRIVIALITY_1, "( T == F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
@@ -158,7 +158,7 @@ RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf
 
 // bf defs are just callbacks
 template<typename... BAs>
-// TODO (LOW) rename library with rwsys
+// TODO (LOW) rename library with rwsys or another name
 static auto apply_defs = make_library<BAs...>(
 	// wff defs
 	WFF_DEF_XOR
@@ -332,7 +332,7 @@ static auto trivialities = make_library<BAs...>(
 );
 
 template<typename...BAs>
-// TODO (MEDIUM) add const whenever possible
+// TODO (HIGH) add const whenever possible ion all the code
 struct steps {
 
 	steps(std::vector<library<BAs...>>& libraries) : libraries(libraries) {}
@@ -381,7 +381,7 @@ struct repeat_all {
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
 			for (auto& lib : substeps.libraries) nn = tau_apply(lib, nn);
-			// TODO (HIGH) call insert and check the return value to break
+			// TODO (HIGH) call contains and check the return value to break
 			if (visited.find(nn) != visited.end()) break;
 			visited.insert(nn);
 		}
@@ -390,8 +390,6 @@ struct repeat_all {
 
 	steps<rules<BAs...>> substeps;
 };
-
-// TODO (MEDIUM) review do while loop... while insert...
 
 template<typename... BAs>
 struct repeat {

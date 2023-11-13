@@ -119,27 +119,14 @@ TEST_SUITE("operator|"){
 
 }
 
-// TODO (LOW) write tests to check build_wff_eq
-// TODO (LOW) write tests to check build_wff_neq
-// TODO (LOW) write tests to check build_wff_and
-// TODO (LOW) write tests to check build_wff_or
-// TODO (LOW) write tests to check build_wff_xor
-// TODO (LOW) write tests to check build_wff_neg
-// TODO (LOW) write tests to check build_wff_imply
-// TODO (LOW) write tests to check build_wff_equiv
-// TODO (LOW) write tests to check build_wff_coimply
-// TODO (LOW) write tests to check build_wff_all
-// TODO (LOW) write tests to check build_wff_ex
-
-// TODO (MEDIUM) write test to check apply_defs
-// TODO (MEDIUM) write test to check elim_for_all
-// TODO (MEDIUM) write test to check to_dnf_wff
-// TODO (MEDIUM) write test to check to_dnf_cbf
-// TODO (MEDIUM) write test to check simplify_bf
-// TODO (MEDIUM) write test to check simplify_wff
-// TODO (MEDIUM) write test to check simplify_cbf
-// TODO (MEDIUM) write test to check apply_cb
-// TODO (MEDIUM) write test to check squeeze_positives
-// TODO (MEDIUM) write test to check further_process
-// TODO (MEDIUM) write test to check bf_elim_quantifiers
-// TODO (MEDIUM) write test to check trivialities
+// TODO (MEDIUM) write tests to check build_wff_eq
+// TODO (MEDIUM) write tests to check build_wff_neq
+// TODO (MEDIUM) write tests to check build_wff_and
+// TODO (MEDIUM) write tests to check build_wff_or
+// TODO (MEDIUM) write tests to check build_wff_xor
+// TODO (MEDIUM) write tests to check build_wff_neg
+// TODO (MEDIUM) write tests to check build_wff_imply
+// TODO (MEDIUM) write tests to check build_wff_equiv
+// TODO (MEDIUM) write tests to check build_wff_coimply
+// TODO (MEDIUM) write tests to check build_wff_all
+// TODO (MEDIUM) write tests to check build_wff_ex

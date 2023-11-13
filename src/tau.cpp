@@ -23,20 +23,21 @@ using namespace idni::tau;
 
 // We could use TODO (HIGH|MEDIUM|LOW|nothing), DOING, IDEA, FIXME, REVIEW and MARK.
 
-// TODO (MEDIUM) deal with runtime errors in the code. For example,
-// if the user provides a formula with errors, we should not continue
+// TODO (IMPORTANT) deal with runtime errors in the code. 
+// For example, if the user provides a formula with errors, we should not continue
 // and print garbage. Instead, we should print an error message and exit.
 
-// predicates (given by lambdas). We could declare a type for them and use it
-// instead.
+// TODO (MEDIUM) declare a static const lambda instead of a predicates if possible
+//
+// This could be done in all the code. 
 
 int main(int argc, char** argv) {
-	// TODO tau main method: parse command line arguments, read input file,
+	// TODO (LOW) tau main method, parse command line arguments, read input file,...
 	// normalize, print output, etc.
 	return 0;
 }
 
-// TODO move to unit tests or delete it
+// TODO (LOW) move to unit tests or delete it
 //#include "barr.h"
 //#include "out.h"
 //#include "anf.h"

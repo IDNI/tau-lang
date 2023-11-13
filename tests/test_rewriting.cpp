@@ -259,7 +259,7 @@ TEST_SUITE("replace_transformer") {
 		auto result = post_order_traverser<decltype(replace), decltype(all<sp_node<char>>), sp_node<char>>(replace , all<sp_node<char>>)(root);
 		CHECK( result == expected );
 	}
-	// TODO add the tests corresponding to related functions
+	// TODO (LOW) add the tests corresponding to related functions
 }
 
 TEST_SUITE("select_top_predicate") {
@@ -333,7 +333,7 @@ TEST_SUITE("select_top_predicate") {
 		CHECK( selected == expected );
 	}
 
-	// TODO add the tests corresponding to related functions
+	// TODO (LOW) add the tests corresponding to related functions
 }
 
 TEST_SUITE("select_all_predicate") {

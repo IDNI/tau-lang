@@ -89,7 +89,9 @@
 // # this should be typed according to the original BA.
 // timed			=> (in | out)  indexes. 
 // offset			=> variable | variable minus num.
-// # TODO (LOW) remove ignore as it is not used
+// # TODO (HIGH) remove ignore as it is not used
+// #
+// # That aldo implies removing the ignore rule from the code when neccessary
 // ignore 			=> '_'.
 // capture			=> '$' chars.
 // var				=> '?' chars.
@@ -107,7 +109,7 @@
 // wff_ref			=> sym indexes wff_ref_args.
 // wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 // 
-// # TODO (LOW) rename wff_eq and wff_new to bf_eq and bf_neq
+// # TODO (HIGH) rename wff_eq and wff_new to bf_eq and bf_neq
 // wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | cbf_if
 // 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv | cbf_and_wff
 // 					| wff_coimply | wff_t | wff_f | variable | capture |ignore.
@@ -188,7 +190,10 @@
 // bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or 
 // 					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater 
 // 					| bf_less_cb | bf_less_equal_cb | bf_greater_cb 
-// 					# TODO check proper use of bf_subs_cb in code
+// 					# TODO (LOW) check proper use of bf_subs_cb in code
+// 					#
+// 					# we should have a check method that verifies that the user
+// 					# is not uising subs in its code.
 // 					| bf_subs_cb | bf_t | bf_f | variable | capture | ignore.
 // bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 // bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
@@ -282,7 +287,7 @@
 // builder			=> captures definition wff dot.
 // start			=> formula | library | builder.
 // 
-// # TODO (LOW) rename operators to tau & tau, tau && tau, tau &&& tau,...
+// # TODO (HIGH) rename operators to tau & tau, tau && tau, tau &&& tau,...
 //
 
 //

@@ -316,9 +316,10 @@ struct find_top_predicate {
 
 // always true predicate
 //
-// TODO define a const version of the predicate, move it to rewriter and use
+// TODO (LOW) define a const version of the predicate, move it to rewriter and use
 // it in all the code. Review the connection with all predicate and use only 
 // one of them.
+// Check if we have other cases like this one
 template<typename node_t>
 struct true_predicate {
 	
@@ -332,8 +333,9 @@ using true_predicate_t = true_predicate<node_t>;
 
 // always false predicate
 //
-// TODO define a const version of the predicate, move it to rewriter and use
+// TODO (LOW) define a const version of the predicate as a lambda, move it to rewriter and use
 // it in all the code.
+// Check if we have other cases like this one
 template<typename node_t>
 struct false_predicate {
 	
@@ -516,7 +518,7 @@ using rule = std::pair<node_t, node_t>;
 // this predicate matches when there exists a environment that makes the
 // pattern match the node.
 //
-// TODO create and env in operator() and pass it as a parameter to match, if
+// TODO (LOW) create and env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
 //
@@ -581,7 +583,7 @@ private:
 // this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
 //
-// TODO create and env in operator() and pass it as a parameter to match, if
+// TODO (LOW) create and env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
 template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t> 
@@ -678,8 +680,6 @@ node_t apply_with_skip(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t&
 // use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t> 
 node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
-	// TODO check if this could be improved using a composed transformer
-	// that deals with the matcher and the substitution.
 	post_order_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
 	if (matcher.matched) {
 		replace_transformer<node_t> replace {matcher.env};

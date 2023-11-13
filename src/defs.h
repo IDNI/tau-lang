@@ -18,7 +18,7 @@ typedef int sym_t;
 
 // toggles for debugging, comment properly to enable/disable each feature/debug helper. 
 
-// TODO final features should be cotrolled by a command line flag
+// TODO (LOW) final features should be cotrolled by a command line flag
 
 #define OUTPUT_APPLY_RULES
 #define OUTPUT_PARSED_TREES

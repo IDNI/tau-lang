@@ -80,7 +80,7 @@ TEST_SUITE("callbacks") {
 		CHECK( check.has_value() );	
 	}
 
-	// TODO (LOW) add explicit unit tests for the remaining callbacks
+	// TODO (MEDIUM) add explicit unit tests for the remaining callbacks
 	//
 	// All of them are tested inderectly when appying the rules of the normalizer
 	// in the file test_rules.cpp. However, it is better to have explicit tests
