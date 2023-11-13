@@ -260,6 +260,14 @@ static auto apply_cb = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto apply_speed_up_cb = make_library<BAs...>(
+	BF_CALLBACK_CLASHING_SUBFORMULAS_0
+	+ BF_CALLBACK_HAS_SUBFORMULA_0
+	+ WFF_CALLBACK_CLASHING_SUBFORMULAS_0
+	+ WFF_CALLBACK_HAS_SUBFORMULA_0
+);
+
+template<typename... BAs>
 static auto clause_simplify_bf = make_library<BAs...>(
 	BF_CALLBACK_CLASHING_SUBFORMULAS_0
 	+ BF_CALLBACK_HAS_SUBFORMULA_0
@@ -528,7 +536,8 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	auto applied_to_dnf_cbf = repeat<BAs...>(to_dnf_cbf<BAs...>)(squeezed_positives);
 	auto simplified_cbf = repeat<BAs...>(simplify_cbf<BAs...>)(applied_to_dnf_cbf);
 	auto applied_cb = repeat<BAs...>(apply_cb<BAs...>)(simplified_cbf);
-	auto applied_bf_elim_quantifiers = repeat<BAs...>(bf_elim_quantifiers<BAs...>)(applied_cb);
+	auto applied_speed_up_cb = repeat<BAs...>(apply_cb<BAs...>)(applied_cb);
+	auto applied_bf_elim_quantifiers = repeat<BAs...>(bf_elim_quantifiers<BAs...>)(applied_speed_up_cb);
 	auto applied_cb_again = repeat<BAs...>(apply_cb<BAs...>)(applied_bf_elim_quantifiers);
 	auto simplified_bf = repeat<BAs...>(simplify_bf<BAs...>)(applied_cb_again);
 	auto applied_cb_again_2 = repeat<BAs...>(apply_cb<BAs...>)(simplified_bf);
