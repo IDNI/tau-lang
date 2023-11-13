@@ -60,6 +60,14 @@ TEST_SUITE("steps parsing") {
 		CHECK( squeeze_positives<Bool>.size() == 3 );
 	}
 	
+	TEST_CASE("clause_simplify_bf") {
+		CHECK( clause_simplify_bf<Bool>.size() == 2 );
+	}
+	
+	TEST_CASE("clause_simplify_wff") {
+		CHECK( clause_simplify_wff<Bool>.size() == 2 );
+	}
+	
 	/*TEST_CASE("further_process") {
 		// TODO (HIGH) fix this test
 		CHECK( further_process<Bool>.size() == 2 );

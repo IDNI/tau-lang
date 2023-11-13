@@ -36,6 +36,7 @@ TEST_SUITE("is_resolved_predicate") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -55,6 +56,7 @@ TEST_SUITE("is_resolved_predicate") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -77,6 +79,7 @@ TEST_SUITE("is_unresolved_predicate") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -96,6 +99,7 @@ TEST_SUITE("is_unresolved_predicate") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -135,6 +139,7 @@ TEST_SUITE("resolve_type") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf;
 		auto result = resolve_type<Bool>(unresolved.value());
 		CHECK( result != unresolved.value() );	
@@ -150,6 +155,7 @@ TEST_SUITE("resolve_type") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf;
 		auto result = resolve_type<Bool>(resolved.value());
 		CHECK( result == resolved.value() );	

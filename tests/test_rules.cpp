@@ -378,6 +378,28 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
 	}
+
+	TEST_CASE("BF_CALLBACK_CLASHING_SUBFORMULAS_0") {
+		auto src_rule = make_tau_source(BF_CALLBACK_CLASHING_SUBFORMULAS_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::bf_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BF_CALLBACK_HAS_SUBFORMULA_0") {
+		auto src_rule = make_tau_source(BF_CALLBACK_HAS_SUBFORMULA_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::bf_rule;
+		CHECK( check.has_value() );
+	}
 }
 
 TEST_SUITE("parsing cbf rules") {
@@ -1022,6 +1044,28 @@ TEST_SUITE("parsing wff rules") {
 			| tau_parser::wff_rule;
 		CHECK( check.has_value() );
 	}
+
+	TEST_CASE("WFF_CALLBACK_CLASHING_SUBFORMULAS_0") {
+		auto src_rule = make_tau_source(WFF_CALLBACK_CLASHING_SUBFORMULAS_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("WFF_CALLBACK_HAS_SUBFORMULA_0") {
+		auto src_rule = make_tau_source(WFF_CALLBACK_HAS_SUBFORMULA_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
 }
 
 TEST_SUITE("executing bf rules") {
@@ -1439,6 +1483,7 @@ TEST_SUITE("executing bf rules") {
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
+		pretty_print_sp_tau_node(std::cout, result);
 		auto check = result 
 			| tau_parser::formula | tau_parser::main | tau_parser::wff 
 			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_t;
@@ -1459,14 +1504,48 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result 
 			| tau_parser::formula | tau_parser::main | tau_parser::wff 
-			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_t;
+			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );	
 	}
 
-	TEST_CASE("BF_CALLBACK_SUBS") {
-		// TODO (HIGH) add test for subs callbacks
-		CHECK( false );
+	TEST_CASE("BF_CALLBACK_CLASHING_SUBFORMULAS_0") {
+		static constexpr char* sample =	"( (T bf_and bf_neg T) == F ).";
+		auto sample_src = make_tau_source(sample);
+		auto sample_statement = make_statement(sample_src);
+		pretty_print_sp_tau_node(std::cout, sample_statement) << std::endl;
+		auto rule_src = make_tau_source(BF_CALLBACK_CLASHING_SUBFORMULAS_0);
+		auto rule_statement = make_statement(rule_src);
+		auto rule = rule_statement 
+			| tau_parser::library| tau_parser::rules | tau_parser::rule | optional_value_extractor<sp_tau_node<Bool>>;
+		auto tau_rule = make_rule(rule);
+		auto result = tau_apply(tau_rule, sample_statement);
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result 
+			| tau_parser::formula | tau_parser::main | tau_parser::wff 
+			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_f;
+		CHECK( check.has_value() );	
 	}
+
+	TEST_CASE("BF_CALLBACK_HAS_SUBFORMULA_0") {
+		static constexpr char* sample =	"( (T bf_and F) == F ).";
+		auto sample_src = make_tau_source(sample);
+		auto sample_statement = make_statement(sample_src);
+		pretty_print_sp_tau_node(std::cout, sample_statement) << std::endl;
+		auto rule_src = make_tau_source(BF_CALLBACK_HAS_SUBFORMULA_0);
+		auto rule_statement = make_statement(rule_src);
+		auto rule = rule_statement 
+			| tau_parser::library| tau_parser::rules | tau_parser::rule | optional_value_extractor<sp_tau_node<Bool>>;
+		auto tau_rule = make_rule(rule);
+		auto result = tau_apply(tau_rule, sample_statement);
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result 
+			| tau_parser::formula | tau_parser::main | tau_parser::wff 
+			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_f;
+		CHECK( check.has_value() );
+	}
+
 }
 
 TEST_SUITE("executing cbf rules") {
@@ -2111,8 +2190,45 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
+
+	TEST_CASE("WFF_CALLBACK_CLASHING_SUBFORMULAS_0") {
+		static constexpr char* sample =	"( T wff_and wff_neg T ).";
+		auto sample_src = make_tau_source(sample);
+		auto sample_statement = make_statement(sample_src);
+		pretty_print_sp_tau_node(std::cout, sample_statement) << std::endl;
+		auto rule_src = make_tau_source(WFF_CALLBACK_CLASHING_SUBFORMULAS_0);
+		auto rule_statement = make_statement(rule_src);
+		auto rule = rule_statement 
+			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto result = tau_apply(tau_rule, sample_statement);
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result 
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
+		CHECK( check.has_value() );	
+	}
+
+	TEST_CASE("WFF_CALLBACK_HAS_SUBFORMULA_0") {
+		static constexpr char* sample =	"(T wff_and T).";
+		auto sample_src = make_tau_source(sample);
+		auto sample_statement = make_statement(sample_src);
+		pretty_print_sp_tau_node(std::cout, sample_statement) << std::endl;
+		auto rule_src = make_tau_source(WFF_CALLBACK_HAS_SUBFORMULA_0);
+		auto rule_statement = make_statement(rule_src);
+		auto rule = rule_statement 
+			| tau_parser::library| tau_parser::rules | tau_parser::rule | optional_value_extractor<sp_tau_node<Bool>>;
+		auto tau_rule = make_rule(rule);
+		auto result = tau_apply(tau_rule, sample_statement);
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result 
+			| tau_parser::formula | tau_parser::main | tau_parser::wff 	| tau_parser::wff_and;
+		CHECK( check.has_value() );
+	}
 }
 
 // TODO (MEDIUM) writes tests for simple recursive relations
 // The tests should range from simple direct substitutions to more complex 
 // substitutions (involving multiple variables and indexes).
+
