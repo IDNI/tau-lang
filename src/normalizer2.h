@@ -59,10 +59,18 @@ RULE(BF_CALLBACK_NEG, "bf_neg { $X } := { bf_neg_cb $X }.")
 RULE(BF_CALLBACK_LESS, "( { $X } bf_less { $Y } ) := bf_less_cb $X $Y T F.")
 RULE(BF_CALLBACK_LESS_EQUAL, "( { $X } bf_less_equal { $Y } ) := bf_less_equal_cb $X $Y T F.")
 RULE(BF_CALLBACK_GREATER, "( { $X } bf_greater { $Y } ) := bf_greater_cb $X $Y T F.")
+RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } F.") // (T|F) is bf_(t|f)
+RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } T.") // (T|F) is bf_(t|f)
+
+// wff callbacks
 RULE(BF_CALLBACK_EQ, "( { $X } == F ) := bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
 RULE(BF_CALLBACK_NEQ, "( { $X } != F ) := bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
-RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } T.") // (T|F) is bf_(t|f)
-RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } T.") // (T|F) is bf_(t|f)
+
+// speed up callbacks
+RULE(BF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X bf_and $Y ) :=  bf_has_clashing_subformulas_cb ( $X bf_and $Y ) F.")
+RULE(BF_CALLBACK_HAS_SUBFORMULA_0, "( $X bf_and $Y ) := bf_has_subformula_cb ( $X bf_and $Y ) F F.")
+RULE(WFF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X wff_and $Y ) :=  wff_has_clashing_subformulas_cb ( $X wff_and $Y ) F.")
+RULE(WFF_CALLBACK_HAS_SUBFORMULA_0, "( $X wff_and $Y ) := wff_has_subformula_cb ( $X wff_and $Y ) F F.")
 
 // cbf rules
 RULE(CBF_DISTRIBUTE_0, "(($X cbf_or $Y) cbf_and $Z) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
@@ -124,6 +132,7 @@ RULE(WFF_DEF_IMPLY, "( $X wff_imply $Y ) := ( wff_neg $X wff_or $Y).")
 RULE(WFF_DEF_COIMPLY, "( $X wff_coimply $Y ) := ( $Y wff_imply $X).")
 RULE(WFF_DEF_EQUIV, "( $X wff_equiv $Y ) := (( $X wff_imply $Y ) wff_and ( $Y wff_imply $X )).")
 
+// TODO rename to (N)EQ_SIMPLYFY
 RULE(BF_TRIVIALITY_0, "( F == F ) := T.")
 RULE(BF_TRIVIALITY_1, "( T == F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
@@ -158,7 +167,6 @@ template<typename... BAs>
 static auto elim_for_all = make_library<BAs...>(
 	WFF_ELIM_FORALL
 );
-
 
 template<typename... BAs>
 static auto to_dnf_wff = make_library<BAs...>(
@@ -249,6 +257,18 @@ static auto apply_cb = make_library<BAs...>(
 	+ BF_CALLBACK_GREATER
 	+ BF_CALLBACK_EQ
  	+ BF_CALLBACK_NEQ
+);
+
+template<typename... BAs>
+static auto clause_simplify_bf = make_library<BAs...>(
+	BF_CALLBACK_CLASHING_SUBFORMULAS_0
+	+ BF_CALLBACK_HAS_SUBFORMULA_0
+);
+
+template<typename... BAs>
+static auto clause_simplify_wff = make_library<BAs...>(
+	WFF_CALLBACK_CLASHING_SUBFORMULAS_0
+	+ WFF_CALLBACK_HAS_SUBFORMULA_0
 );
 
 template<typename... BAs>

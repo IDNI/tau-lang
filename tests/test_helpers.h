@@ -65,7 +65,7 @@ overloaded(Ts...) -> overloaded<Ts...>;
 std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<Bool> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
-	std::visit(overloaded{
+	std::visit(overloaded {
 		[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
 		[&os](std::variant<Bool> v) { if (auto b = std::get<0>(v); b.b) os << "true"; else os << "false"; }
 	}, n->value);
@@ -74,4 +74,16 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<Bool> n, size_t l 
 	return os;
 }
 
+std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<Bool> n, size_t l = 0) {
+	// for (size_t t = 0; t < l; t++) os << " ";
+	std::visit(overloaded{
+		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },
+		[&os](std::variant<Bool> v) { 
+			if (auto b = std::get<0>(v); b == true) os << "true"; 
+			else if (auto b = std::get<0>(v); b == false) os << "false"; 
+			else os << "...bdd..."; }
+	}, n->value);
+	for (auto& d : n->child) pretty_print_sp_tau_node(os, d, l + 1);
+	return os;
+}
 #endif // __TEST_HELPERS_H__

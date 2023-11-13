@@ -253,7 +253,7 @@ private:
 	node_t replace(const node_t& n) {
 		std::vector<node_t> child;
 		for (const auto& c : n->child) 
-			if (auto it = changes.find(c); it != changes.end()) 
+			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 			else child.push_back(c);
 		return changes[n] = make_node(n->value, child);
@@ -449,7 +449,7 @@ std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 template <typename predicate_t, typename node_t>
 std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
-	auto find_top = find_top_predicate<predicate_t, node_t>(query, found);
+	find_top_predicate<predicate_t, node_t> find_top(query, found);
 	post_order_traverser<
 			identity_t<node_t>, 
 			find_top_predicate<predicate_t, node_t>, 

@@ -153,6 +153,7 @@ template <size_t nt, typename...BAs>
 bool is_non_terminal(const sp_tau_node<BAs...>& n) { 
 	return is_non_terminal<BAs...>(nt, n);
 }
+
 // factory method for is_non_terminal predicate
 template<typename... BAs>
 std::function<bool(const sp_tau_node<BAs...>&)> is_non_terminal(const size_t nt) {
@@ -261,22 +262,27 @@ template<typename...BAs>
 static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value) || !get<tau_source_sym>(n->value).nt()) return false;
 	auto nt = get<tau_source_sym>(n->value).n();
-	return nt == ::tau_parser::bf_and_cb
-		|| nt == ::tau_parser::bf_or_cb
-		|| nt == ::tau_parser::bf_xor_cb
-		|| nt == ::tau_parser::bf_neg_cb
-		|| nt == ::tau_parser::bf_less_cb
-		|| nt == ::tau_parser::bf_less_equal_cb
-		|| nt == ::tau_parser::bf_greater_cb
-		|| nt == ::tau_parser::bf_subs_cb
-		|| nt == ::tau_parser::bf_eq_cb
-		|| nt == ::tau_parser::bf_neq_cb
-		|| nt == ::tau_parser::bf_is_one_cb
-		|| nt == ::tau_parser::bf_is_zero_cb;
+	return nt == tau_parser::bf_and_cb
+		|| nt == tau_parser::bf_or_cb
+		|| nt == tau_parser::bf_xor_cb
+		|| nt == tau_parser::bf_neg_cb
+		|| nt == tau_parser::bf_less_cb
+		|| nt == tau_parser::bf_less_equal_cb
+		|| nt == tau_parser::bf_greater_cb
+		|| nt == tau_parser::bf_subs_cb
+		|| nt == tau_parser::bf_eq_cb
+		|| nt == tau_parser::bf_neq_cb
+		|| nt == tau_parser::bf_is_one_cb
+		|| nt == tau_parser::bf_is_zero_cb
+		|| nt == tau_parser::bf_has_clashing_subformulas_cb
+		|| nt == tau_parser::wff_has_clashing_subformulas_cb
+		|| nt == tau_parser::bf_has_subformula_cb
+		|| nt == tau_parser::wff_has_subformula_cb;
 };
 
 template<typename...BAs>
 using is_callback_t = decltype(is_callback<BAs...>);
+
 
 //
 // functions to traverse the tree according to the specified non terminals
@@ -474,8 +480,16 @@ static const auto only_child_extractor = [](const sp_tau_node<BAs...>& n) -> std
 template<typename... BAs>
 using only_child_extractor_t = decltype(only_child_extractor<BAs...>);
 
+// TODO (MEDIUM) merge both implementations using a new template parameter 
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const only_child_extractor_t<BAs...> e) {
+	std::vector<sp_tau_node<BAs...>> nv;
+	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
+	return nv;
+}
+
+template <typename... BAs>
+std::vector<sp_tau_node<BAs...>> operator||(const std::set<sp_tau_node<BAs...>>& v, const only_child_extractor_t<BAs...> e) {
 	std::vector<sp_tau_node<BAs...>> nv;
 	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
 	return nv;
@@ -538,24 +552,29 @@ struct callback_applier {
 		if (!is_callback<BAs...>(n)) return n;
 		auto nt = get<tau_source_sym>(n->value).n();
 		switch (nt) {
-			case ::tau_parser::bf_and_cb: return apply_binary_operation(_and, n);
-			case ::tau_parser::bf_or_cb: return apply_binary_operation(_or, n);
-			case ::tau_parser::bf_xor_cb: return apply_binary_operation(_xor, n);
-			case ::tau_parser::bf_neg_cb: return apply_unary_operation(_neg, n);
-			case ::tau_parser::bf_eq_cb: return apply_ternary_operator(_eq, n);
-			case ::tau_parser::bf_neq_cb: return apply_ternary_operator(_neq, n);
-			case ::tau_parser::bf_is_one_cb: return apply_binary_operator(_is_one, n);
-			case ::tau_parser::bf_is_zero_cb: return apply_binary_operator(_is_zero, n);
-			case ::tau_parser::bf_less_equal_cb: return apply_comparison(_less_equal, n);
-			case ::tau_parser::bf_less_cb: return apply_comparison(_less, n);
-			case ::tau_parser::bf_greater_cb: return apply_comparison(_greater, n);
-			case ::tau_parser::bf_subs_cb: return apply_subs(n);
+			case tau_parser::bf_and_cb: return apply_binary_operation(_and, n);
+			case tau_parser::bf_or_cb: return apply_binary_operation(_or, n);
+			case tau_parser::bf_xor_cb: return apply_binary_operation(_xor, n);
+			case tau_parser::bf_neg_cb: return apply_unary_operation(_neg, n);
+			case tau_parser::bf_eq_cb: return apply_equality_relation(_eq, n);
+			case tau_parser::bf_neq_cb: return apply_equality_relation(_neq, n);
+			case tau_parser::bf_is_one_cb: return apply_constant_check(_is_one, n);
+			case tau_parser::bf_is_zero_cb: return apply_constant_check(_is_zero, n);
+			case tau_parser::bf_less_equal_cb: return apply_order_relation(_less_equal, n);
+			case tau_parser::bf_less_cb: return apply_order_relation(_less, n);
+			case tau_parser::bf_greater_cb: return apply_order_relation(_greater, n);
+			case tau_parser::bf_subs_cb: return apply_subs(n);
+			case tau_parser::bf_has_clashing_subformulas_cb: return apply_bf_clashing_subformulas_check(n);
+			case tau_parser::bf_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::bf_cb_arg);
+			case tau_parser::wff_has_clashing_subformulas_cb: return apply_wff_clashing_subformulas_check(n);
+			case tau_parser::wff_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::wff_cb_arg);
 			default: return n;
 		}
 	}
 
 private:
-	
+	// speed up callbacks
+
 	// binary operations
 	static constexpr auto _and = [](const auto& l, const auto& r) { return l & r; };
 	static constexpr auto _or = [](const auto& l, const auto& r) { return l | r; };
@@ -574,8 +593,80 @@ private:
 	static constexpr auto _is_one = [](const auto& l) -> bool { return l == true; };
 	static constexpr auto _is_zero = [](const auto& l) -> bool { return l == false; };
 
+	// TODO (LOW) this should be promoted to a predicate if needed elsewhere
+	bool are_equal(sp_tau_node<BAs...>& p, sp_tau_node<BAs...>& n) {
+		if (p->value == n->value) {
+			auto p_it = p->child.begin();
+			auto n_it = n->child.begin();
+			while (p_it != p->child.end() && n_it != n->child.end()) {
+				if (is_non_essential<BAs...>(*p_it)) { ++p_it; continue; }
+				if (is_non_essential<BAs...>(*n_it)) { ++n_it; continue; }
+				if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
+				if (are_equal(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
+				return false;
+			}
+			return true;
+		}
+		return false;
+	}
+
+	sp_tau_node<BAs...> apply_has_subformula_check(sp_tau_node<BAs...> n, const tau_parser::nonterminal& cb_arg_t) {
+		auto args = n || cb_arg_t || only_child_extractor<BAs...>;
+		for (auto& subformula: select_all(args[0], all<sp_tau_node<BAs...>>))
+			if (subformula == args[1]) return args[2];
+		return args[0];
+	}
+
+	// TODO (HIGH) make a cleaner implementation
+	// TODO (HIGH) merge with next method
+	sp_tau_node<BAs...> apply_wff_clashing_subformulas_check(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
+		//std::set<sp_tau_node<BAs...>> positives, negatives;
+		std::vector<sp_tau_node<BAs...>> positives, negatives;
+		for (auto& op: select_all(args[0], all<sp_tau_node<BAs...>>))
+			if (is_non_terminal<tau_parser::wff_and>(op))
+				for (auto& c: op->child)
+					if (auto check = c | tau_parser::wff_and; !check.has_value() && is_non_terminal<tau_parser::wff>(c)) {
+						auto cc = c | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>; 
+						//(is_non_terminal<tau_parser::wff_neg>(cc) ? negatives : positives).insert(cc);
+						(is_non_terminal<tau_parser::wff_neg>(cc) ? negatives : positives).push_back(cc);
+					}
+		for (auto& negation: negatives) {
+			auto negated = negation | tau_parser::wff | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+			//if(std::find(positives.begin(), positives.end(), negated) != positives.end()) return args[1];
+			//if (positives.contains(negated)) return args[1];
+			for (auto& positive: positives) 
+				if (are_equal(positive, negated)) 
+					return args[1];
+		}
+		return args[0];
+	}
+
+	sp_tau_node<BAs...> apply_bf_clashing_subformulas_check(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
+		//std::set<sp_tau_node<BAs...>> positives, negatives;
+		std::vector<sp_tau_node<BAs...>> positives, negatives;
+		for (auto& op: select_all(args[0], all<sp_tau_node<BAs...>>))
+			if (is_non_terminal<tau_parser::bf_and>(op))
+				for (auto& c: op->child)
+					if (auto check = c | tau_parser::bf_and; !check.has_value() && is_non_terminal<tau_parser::bf>(c)) {
+						auto cc = c | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>; 
+						//(is_non_terminal<tau_parser::wff_neg>(cc) ? negatives : positives).insert(cc);
+						(is_non_terminal<tau_parser::bf_neg>(cc) ? negatives : positives).push_back(cc);
+					}
+		for (auto& negation: negatives) {
+			auto negated = negation | tau_parser::bf | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+			//if(std::find(positives.begin(), positives.end(), negated) != positives.end()) return args[1];
+			//if (positives.contains(negated)) return args[1];
+			for (auto& positive: positives) 
+				if (are_equal(positive, negated)) 
+					return args[1];
+		}
+		return args[0];
+	}
+
 	sp_tau_node<BAs...> apply_binary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
-		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf ||only_child_extractor<BAs...> || ba_extractor<BAs...>;
+		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...> || ba_extractor<BAs...>;
 		return make_node<tau_sym<BAs...>>(std::visit(op, ba_elements[0], ba_elements[1]), {});
 	}
 
@@ -584,22 +675,21 @@ private:
 		return make_node<tau_sym<BAs...>>(std::visit(op, ba_elements[0]), {});
 	}
 
-	sp_tau_node<BAs...> apply_ternary_operator(const auto& op, const sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> apply_equality_relation(const auto& op, const sp_tau_node<BAs...>& n) {
 		auto bf_arg = n | tau_parser::bf_cb_arg | tau_parser::bf | only_child_extractor<BAs...>;
 		auto wff_args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
 		auto ba_element = bf_arg | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
 		return std::visit(op, ba_element) ? wff_args[0] : wff_args[1];
 	}
 
-	sp_tau_node<BAs...> apply_binary_operator(const auto& op, const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>;
-		auto ba_element = args[0] | tau_parser::constant | only_child_extractor<BAs...> |  ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
-		auto if_true_element = (n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>)[1]; 
-		auto original_element = n | tau_parser::bf_cb_arg | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
-		return std::visit(op, ba_element) ? if_true_element : original_element;
+	sp_tau_node<BAs...> apply_constant_check(const auto& op, const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
+		auto ba_element = args[0] | tau_parser::bf_constant | tau_parser::constant 
+			| only_child_extractor<BAs...> |  ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
+		return std::visit(op, ba_element) ? args[1] : args[0];
 	}
 
-	sp_tau_node<BAs...> apply_comparison(const auto& op, const sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> apply_order_relation(const auto& op, const sp_tau_node<BAs...>& n) {
 		auto args = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...>;
 		auto ba_first_element = args[0] | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;;
 		auto ba_second_element = args[1] | ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;;
@@ -609,7 +699,11 @@ private:
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
 		auto params = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
+		pretty_print_sp_tau_node(std::cout, params[0]) << " params[0]: " << std::endl;
+		pretty_print_sp_tau_node(std::cout, params[1]) << " params[1]: " << std::endl;
+		pretty_print_sp_tau_node(std::cout, params[2]) << " params[2]: " << std::endl;
 		m[params[0]] = params[1];
+		// TODO (MEDIUM) extract this pattern to a method call replace in rewriting.h
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
 		return post_order_traverser<
 				replace_transformer<sp_tau_node<BAs...>>, 
@@ -847,7 +941,7 @@ sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
 template<typename binder_t, typename... BAs>
 sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	for (const auto& bf: select_top(source, is_non_terminal<tau_parser::bf, BAs...>)) {
+	for (const auto& bf: select_top(source, is_non_terminal<BAs...>(tau_parser::bf))) {
 		if (auto rbf = resolve_type(bf); rbf != bf) changes[bf] = rbf;
 	}
 	replace_transformer<sp_tau_node<BAs...>> rt(changes);
@@ -882,31 +976,26 @@ formula<BAs...> resolve_types(const formula<BAs...> f) {
 }
 
 // creates a specific rule from a generic rule.
+template<size_t rule_t, size_t matcher_t, size_t body_t, typename... BAs>
+tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
+	auto matcher = rule | rule_t | matcher_t| only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto body = rule | rule_t | body_t | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+	return { matcher, body };
+}
+
+
+// creates a specific rule from a generic rule.
 template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	// TODO this tree structure should be checked in test_tau_parser.cpp
-	auto type = non_terminal_extractor<BAs...>(rule->child[0]).value();
-	switch(type) {
-		case ::tau_parser::wff_rule: {
-			sp_tau_node<BAs...> body;
-			if (auto kind = rule | tau_parser::wff_rule | tau_parser::bf_eq_cb; kind.has_value())
-				body = kind.value();
-			else if (auto kind = rule | tau_parser::wff_rule | tau_parser::bf_neq_cb; kind.has_value())
-				body = kind.value();
-			else body = (rule | tau_parser::wff_rule | tau_parser::wff).value();
-			return { (rule | ::tau_parser::wff_rule | tau_parser::wff_matcher).value()->child[0], 
-				body };
-
-		}
-		case ::tau_parser::cbf_rule:
-			return { (rule | ::tau_parser::cbf_rule | tau_parser::cbf_matcher).value()->child[0], 
-				(rule | ::tau_parser::cbf_rule | ::tau_parser::cbf).value() };
-		case ::tau_parser::bf_rule:
-			return { (rule | ::tau_parser::bf_rule | tau_parser::bf_matcher).value()->child[0], 
-				(rule | ::tau_parser::bf_rule | ::tau_parser::bf).value() };
-		default:
-			assert(false); // error in grammar or parser
-	} 
+	// TODO (IMPORTANT) check that the rule is well formed an raise an error otherwise
+	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
+	switch (type) {
+	case tau_parser::bf_rule: return make_rule<tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
+	case tau_parser::wff_rule: return make_rule<tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
+	case tau_parser::cbf_rule: return make_rule<tau_parser::cbf_rule, tau_parser::cbf_matcher, tau_parser::cbf_body, BAs...>(rule);
+	default: assert(false); // TODO (IMPORTANT) raise an error
+	};
 }
 
 // create a set of rules from a given tau source.

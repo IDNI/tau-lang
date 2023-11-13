@@ -92,12 +92,11 @@ in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
 
 # wff
-# TODO (HIGH) move wff_ref to wff_matcher
-# TODO (MEDIUM) add wff_body
-wff_rule		=> (wff_matcher | wff_ref) definition (wff | bf_eq_cb | bf_neq_cb ) dot.
+wff_rule		=> wff_matcher definition wff_body dot.
 
 # needed for rule CBF_DEF_IF
-wff_matcher		=> wff | cbf_if.
+wff_matcher	=> wff | cbf_if | wff_ref.
+wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb | wff_has_subformula_cb.
 
 
 wff_ref			=> sym indexes wff_ref_args.
@@ -132,10 +131,11 @@ wff_ex_sym		=> ws "wff_ex" ws.
 wff_t			=> ws 'T' ws.
 wff_f			=> ws 'F' ws.
 
-#cbf
-# TODO (HIGH) move cbf_ref to cbf_matcher
-cbf_rule 		=> (cbf_matcher | cbf_ref) definition cbf dot.
-cbf_matcher		=> cbf.
+# cbf
+cbf_rule 	=> cbf_matcher definition cbf_body dot.
+cbf_matcher	=> cbf | cbf_ref.
+cbf_body	=> cbf.
+
 cbf_ref 		=> sym indexes cbf_ref_args.
 cbf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
@@ -173,13 +173,16 @@ cbf_else_sym		=> ws "else" ws.
 #
 # QUESTION: Does timed vars appear only in bf formulas?
 
-bf_rule			=> bf_matcher definition bf dot.
-bf_matcher		=> bf.
+bf_rule		=> bf_matcher definition bf_body dot.
+
+bf_matcher	=> bf.
+bf_body 	=> bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb | bf_has_subformula_cb.
+
 bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or 
 					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater 
 					| bf_less_cb | bf_less_equal_cb | bf_greater_cb 
-					| bf_subs_cb | bf_is_zero_cb | bf_is_one_cb
-					| bf_t | bf_f | variable | capture | ignore.
+					# TODO check proper use of bf_subs_cb in code
+					| bf_subs_cb | bf_t | bf_f | variable | capture | ignore.
 bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
 bf_xor			=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
@@ -232,6 +235,12 @@ bf_neq_cb			=> bf_neq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb
 bf_is_zero_cb		=> bf_is_zero_cb_sym bf_cb_arg ws_required bf_cb_arg.
 bf_is_one_cb		=> bf_is_one_cb_sym bf_cb_arg ws_required bf_cb_arg.
 
+# extra callbacks to speed up computations
+bf_has_clashing_subformulas_cb	=> bf_has_clashing_subformulas_cb_sym bf_cb_arg ws_required bf_cb_arg.
+wff_has_clashing_subformulas_cb	=> wff_has_clashing_subformulas_cb_sym wff_cb_arg ws_required wff_cb_arg.
+bf_has_subformula_cb 			=> bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
+wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.	
+
 # bultin_args
 bf_cb_arg	=> capture | ignore | bf.
 wff_cb_arg	=> capture | ignore | wff.
@@ -250,8 +259,15 @@ bf_neq_cb_sym			=> ws "bf_neq_cb" ws.
 bf_is_zero_cb_sym		=> ws "bf_is_zero_cb" ws.
 bf_is_one_cb_sym		=> ws "bf_is_one_cb" ws.
 
+# speed up callbacks syms
+# IDEA we could reuse the same symbol 
+bf_has_clashing_subformulas_cb_sym	=> ws "bf_has_clashing_subformulas_cb" ws.
+bf_has_subformula_cb_sym				=> ws "bf_has_subformula_cb" ws.
+wff_has_clashing_subformulas_cb_sym	=> ws "wff_has_clashing_subformulas_cb" ws.
+wff_has_subformula_cb_sym				=> ws "wff_has_subformula_cb" ws.
+
 main			=> wff dot.
-rule			=> wff_rule | cbf_rule | bf_rule.
+rule			=> wff_rule | cbf_rule | bf_rule .
 rules			=> (rule)*.
 formula			=> rules main.
 library 		=> rules.

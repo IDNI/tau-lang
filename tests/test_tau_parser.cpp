@@ -298,6 +298,7 @@ TEST_SUITE("parsing cbf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::cbf_rule
+			| tau_parser::cbf_body
 			| tau_parser::cbf
 			| tau_parser::cbf_neg; 
 		CHECK( neg_rule.has_value() );
@@ -312,6 +313,7 @@ TEST_SUITE("parsing cbf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::cbf_rule
+			| tau_parser::cbf_body
 			| tau_parser::cbf
 			| tau_parser::cbf_and; 
 		CHECK( and_rule.has_value() );
@@ -326,6 +328,7 @@ TEST_SUITE("parsing cbf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::cbf_rule
+			| tau_parser::cbf_body
 			| tau_parser::cbf
 			| tau_parser::cbf_or; 
 		CHECK( or_rule.has_value() );
@@ -340,6 +343,7 @@ TEST_SUITE("parsing cbf formulas ") {
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::cbf_rule
+			| tau_parser::cbf_body
 			| tau_parser::cbf
 			| tau_parser::cbf_xor; 
 		CHECK( xor_rule.has_value() );
@@ -559,6 +563,7 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -576,6 +581,7 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -593,6 +599,7 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -611,6 +618,7 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -629,6 +637,7 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -648,6 +657,7 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -670,6 +680,7 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -686,6 +697,7 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -702,6 +714,7 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -718,6 +731,7 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -734,10 +748,24 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rules 
 			| tau_parser::rule
 			| tau_parser::bf_rule
+			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_subs_cb;
 		CHECK( subs_cb.has_value() );
 	}
+
+	// TODO (HIGH) add bf_less_cb test
+	// TODO (HIGH) add bf_less_equal_cb test
+	// TODO (HIGH) add bf_greater_cb test
+	// TODO (HIGH) add bf_eq_cb test
+	// TODO (HIGH) add bf_neq_cb test
+	// TODO (HIGH) add bf_is_zero_cb test
+	// TODO (HIGH) add bf_is_one_cb test
+	// TODO (HIGH) add bf_has_clashing_subformulas_cb test
+	// TODO (HIGH) add bf_has_subformula_cb test
+	// TODO (HIGH) add wff_has_clashing_subformulas_cb test
+	// TODO (HIGH) add wfff_has_subformula_cb test
+
 }
 
 
