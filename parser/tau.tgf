@@ -95,7 +95,7 @@ out				=> "?o_" chars. # instead of '>', easy to remember
 wff_rule		=> wff_matcher definition wff_body dot.
 
 # needed for rule CBF_DEF_IF
-wff_matcher	=> wff | cbf_if | wff_ref.
+wff_matcher	=> wff | wff_ref.
 wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb | wff_has_subformula_cb.
 
 
@@ -103,8 +103,8 @@ wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
 # TODO (LOW) rename wff_eq and wff_new to bf_eq and bf_neq
-wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor 
-					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv 
+wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | cbf_if
+					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv | cbf_and_wff
 					| wff_coimply | wff_t | wff_f | variable | capture |ignore.
 wff_eq 			=> open_parenthesis cbf equality wff_f close_parenthesis.
 wff_neq 		=> open_parenthesis cbf nequality wff_f close_parenthesis.
@@ -117,6 +117,14 @@ wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
 wff_coimply		=> open_parenthesis wff wff_coimply_sym wff close_parenthesis.
 wff_all			=> wff_all_sym (variable|capture|ignore) ws_required wff.
 wff_ex			=> wff_ex_sym (variable|capture|ignore) ws_required wff.
+cbf_and_wff		=> open_parenthesis cbf cbf_and_wff_sym wff close_parenthesis.
+
+cbf_if				=> open_parenthesis cbf_if_sym cbf_if_condition 
+						cbf_then_sym cbf_if_then 
+						cbf_else_sym cbf_if_else close_parenthesis. 
+cbf_if_condition	=> wff.
+cbf_if_then			=> cbf.
+cbf_if_else			=> cbf.
 
 # wff_op_sym
 wff_and_sym		=> ws "wff_and" ws.
@@ -130,6 +138,7 @@ wff_all_sym		=> ws "wff_all" ws.
 wff_ex_sym		=> ws "wff_ex" ws.
 wff_t			=> ws 'T' ws.
 wff_f			=> ws 'F' ws.
+cbf_and_wff_sym	=> ws "cbf_and_wff" ws.
 
 # cbf
 cbf_rule 	=> cbf_matcher definition cbf_body dot.
@@ -141,13 +150,6 @@ cbf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
 cbf 				=> bf | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or 
 						| cbf_imply | cbf_equiv | cbf_coimply | cbf_ref. 
-# TODO (HIGH) add parenthesisis around if then else
-cbf_if				=> cbf_if_sym cbf_if_condition 
-						cbf_then_sym cbf_if_then 
-						cbf_else_sym cbf_if_else. 
-cbf_if_condition	=> wff.
-cbf_if_then			=> cbf.
-cbf_if_else			=> cbf.
 cbf_and				=> open_parenthesis cbf cbf_and_sym cbf close_parenthesis.
 cbf_or				=> open_parenthesis cbf cbf_or_sym cbf close_parenthesis.
 cbf_xor				=> open_parenthesis cbf cbf_xor_sym cbf close_parenthesis.

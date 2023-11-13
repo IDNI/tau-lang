@@ -48,6 +48,14 @@ TEST_SUITE("steps parsing") {
 		CHECK( simplify_wff<Bool>.size() == 16 );
 	}
 	
+	TEST_CASE("simplify_bf_and_wff") {
+		CHECK( simplify_bf_and_wff<Bool>.size() == 3 );
+	}
+	
+	TEST_CASE("distribute_bf_and_wff") {
+		CHECK( distribute_bf_and_wff<Bool>.size() == 2 );
+	}
+	
 	TEST_CASE("simplify_cbf") {
 		CHECK( simplify_cbf<Bool>.size() == 16 );
 	}

@@ -923,9 +923,64 @@ TEST_SUITE("parsing wff rules") {
 			| tau_parser::wff_rule;
 		CHECK( check.has_value() );
 	}
-	
+			
 	TEST_CASE("WFF_SIMPLIFY_SELF_5") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_SELF_5);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BF_AND_WFF_SIMPLIFY_ONE_0") {
+		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ONE_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+		
+	TEST_CASE("BF_AND_WFF_SIMPLIFY_ZERO_0") {
+		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ZERO_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+		
+	TEST_CASE("BF_AND_WFF_SIMPLIFY_ZERO_1") {
+		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ZERO_1);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+		
+	TEST_CASE("BF_AND_WFF_DISTRIBUTE_0") {
+		auto src_rule = make_tau_source(BF_AND_WFF_DISTRIBUTE_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+		
+	TEST_CASE("BF_AND_WFF_DISTRIBUTE_1") {
+		auto src_rule = make_tau_source(BF_AND_WFF_DISTRIBUTE_1);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule 
 			| tau_parser::library
@@ -2072,6 +2127,61 @@ TEST_SUITE("executing wff rules") {
 	
 	TEST_CASE("WFF_SIMPLIFY_SELF_5") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_SELF_5);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_AND_WFF_SIMPLIFY_ONE_0") {
+		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ONE_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_AND_WFF_SIMPLIFY_ZERO_0") {
+		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ZERO_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_AND_WFF_SIMPLIFY_ZERO_1") {
+		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ZERO_1);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_AND_WFF_DISTRIBUTE_0") {
+		auto src_rule = make_tau_source(BF_AND_WFF_DISTRIBUTE_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_AND_WFF_DISTRIBUTE_1") {
+		auto src_rule = make_tau_source(BF_AND_WFF_DISTRIBUTE_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());

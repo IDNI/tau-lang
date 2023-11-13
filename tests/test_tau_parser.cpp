@@ -395,16 +395,19 @@ TEST_SUITE("parsing cbf formulas ") {
 	}
 
 	TEST_CASE("cbf_if") {
-		static constexpr char* sample =	"if $Y then $Z  else $Z := $X.";
+		static constexpr char* sample =	"(if $Y then $Z  else $Z) := $X.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);		
+		print_sp_tau_node(std::cout, lib) << std::endl;
 		auto if_rule = lib 
 			| tau_parser::library 
 			| tau_parser::rules 
 			| tau_parser::rule 
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
+			| tau_parser::wff
 			| tau_parser::cbf_if; 
+//		print_sp_tau_node(std::cout, if_rule | optional_value_extractor<sp_tau_node<Bool>>) << std::endl;
 		CHECK( if_rule.has_value() );
 	}
 
