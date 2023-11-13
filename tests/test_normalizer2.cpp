@@ -56,6 +56,10 @@ TEST_SUITE("steps parsing") {
 		CHECK( apply_cb<Bool>.size() == 9 );
 	}
 	
+	TEST_CASE("apply_speed_up_cb") {
+		CHECK( apply_speed_up_cb<Bool>.size() == 4 );
+	}
+	
 	TEST_CASE("squeeze_positives") {
 		CHECK( squeeze_positives<Bool>.size() == 3 );
 	}
