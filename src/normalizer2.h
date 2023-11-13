@@ -100,7 +100,7 @@ RULE(CBF_DEF_XOR, "( $X cbf_xor $Y ) := (( $X cbf_and cbf_neg $Y ) cbf_or ( cbf_
 RULE(CBF_DEF_IMPLY, "( $X cbf_imply $Y ) := ( cbf_neg $X cbf_or $Y).")
 RULE(CBF_DEF_COIMPLY, "( $X cbf_coimply $Y ) := ( $Y cbf_imply $X).")
 RULE(CBF_DEF_EQUIV, "( $X cbf_equiv $Y ) := (( $X cbf_imply $Y ) cbf_and ( $Y cbf_imply $X )).")
-RULE(CBF_DEF_IF, "if $X then $Y else $Z := (( $X wff_imply $Y ) wff_and ( wff_neg $X wff_imply $Z )).")
+RULE(CBF_DEF_IF, "if $X then $Y else $Z := (( $Y cbf_and_wff $Y ) wff_or ( $Z cbf_and_wff wff_neg $X)).")
 
 // wff rules
 RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
@@ -125,6 +125,16 @@ RULE(WFF_SIMPLIFY_SELF_2, "( $X wff_and wff_neg $X ) := F.")
 RULE(WFF_SIMPLIFY_SELF_3, "( $X wff_or wff_neg $X ) := T.")
 RULE(WFF_SIMPLIFY_SELF_4, "( wff_neg $X wff_and $X ) := F.")
 RULE(WFF_SIMPLIFY_SELF_5, "( wff_neg $X wff_or $X ) := T.")
+
+// bf_and_wff simplification rules
+RULE(BF_AND_WFF_SIMPLIFY_ONE_0, "( T cbf_and_wff $X ) := $X.")
+RULE(BF_AND_WFF_SIMPLIFY_ZERO_0, "( F cbf_and_wff $X ) := F.")
+RULE(BF_AND_WFF_SIMPLIFY_ZERO_1, "( $X cbf_and_wff F ) := F.")
+
+// bf_and_wff other rules
+RULE(BF_AND_WFF_DISTRIBUTE_0, "(( $X cbf_and_wff $Y ) wff_and ( $Z cbf_and_wff $W )):= (($X cbf_and_wff $Z) wff_and ($Y cbf_and_wff $W)).")
+RULE(BF_AND_WFF_DISTRIBUTE_1, "($X wff_and ( $Y cbf_and_wff $Z )):= ($Y cbf_and_wff ($X wff_and $Z)).")
+
 
 // wff definitions of xor, ->, <- and <->.
 RULE(WFF_DEF_XOR, "( $X wff_xor $Y ) := (( $X wff_and wff_neg $Y ) wff_or ( wff_neg $X wff_and $Y )).")
@@ -224,6 +234,20 @@ static auto simplify_wff = make_library<BAs...>(
 	+ WFF_SIMPLIFY_SELF_3
 	+ WFF_SIMPLIFY_SELF_4 
 	+ WFF_SIMPLIFY_SELF_5
+);
+
+
+template<typename... BAs>
+static auto simplify_bf_and_wff = make_library<BAs...>(
+	BF_AND_WFF_SIMPLIFY_ONE_0
+	+ BF_AND_WFF_SIMPLIFY_ZERO_0
+	+ BF_AND_WFF_SIMPLIFY_ZERO_1
+);
+
+template<typename... BAs>
+static auto distribute_bf_and_wff = make_library<BAs...>(
+	BF_AND_WFF_DISTRIBUTE_0
+	+ BF_AND_WFF_DISTRIBUTE_1
 );
 
 template<typename... BAs>
@@ -529,7 +553,9 @@ template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	auto applied_rec_relations = steps<BAs...>(form.rec_relations)(form.main);
 	auto applied_defs = repeat<BAs...>(apply_defs<BAs...>)(applied_rec_relations);
-	auto applied_for_all = repeat<BAs...>(elim_for_all<BAs...>)(applied_defs);
+	auto distributed_bf_and_wff = repeat<BAs...>(distribute_bf_and_wff<BAs...>)(applied_defs);
+	auto simplified_bf_and_wff = repeat<BAs...>(simplify_bf_and_wff<BAs...>)(distributed_bf_and_wff);
+	auto applied_for_all = repeat<BAs...>(elim_for_all<BAs...>)(simplified_bf_and_wff);
 	auto applied_to_dnf_wff = repeat<BAs...>(to_dnf_wff<BAs...>)(applied_for_all);
 	auto simplified_wff = repeat<BAs...>(simplify_wff<BAs...>)(applied_to_dnf_wff);
 	auto squeezed_positives = repeat<BAs...>(squeeze_positives<BAs...>)(simplified_wff);
