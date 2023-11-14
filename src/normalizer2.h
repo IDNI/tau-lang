@@ -100,7 +100,7 @@ RULE(CBF_DEF_XOR, "( $X cbf_xor $Y ) := (( $X cbf_and cbf_neg $Y ) cbf_or ( cbf_
 RULE(CBF_DEF_IMPLY, "( $X cbf_imply $Y ) := ( cbf_neg $X cbf_or $Y).")
 RULE(CBF_DEF_COIMPLY, "( $X cbf_coimply $Y ) := ( $Y cbf_imply $X).")
 RULE(CBF_DEF_EQUIV, "( $X cbf_equiv $Y ) := (( $X cbf_imply $Y ) cbf_and ( $Y cbf_imply $X )).")
-RULE(CBF_DEF_IF, "if $X then $Y else $Z := (( $Y cbf_and_wff $Y ) wff_or ( $Z cbf_and_wff wff_neg $X)).")
+RULE(CBF_DEF_IF, "(if $X then $Y else $Z) := (( $Y cbf_and_wff $Y ) wff_or ( $Z cbf_and_wff wff_neg $X)).")
 
 // wff rules
 RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
