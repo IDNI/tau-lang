@@ -81,8 +81,8 @@
 // 
 // # captures
 // 
-// captures 		=> open_parenthesis ws close_parenthesis
-// 					| open_parenthesis ws capture (ws_required capture)* close_parenthesis.
+// captures 		=> open_parenthesis capture (ws_required capture)* close_parenthesis
+// 				| open_parenthesis close_parenthesis.
 // 
 // # variables 
 // variable		=> var | timed.
@@ -286,7 +286,8 @@
 // formula			=> rules main.
 // library 		=> rules.
 // # each builder is define on its own string
-// builder			=> captures definition (wff | cbf | bf) dot.
+// builder			=> captures definition builder_body dot.
+// builder_body	=> wff | cbf | bf.
 // start			=> formula | library | builder.
 // 
 // # TODO (HIGH) rename operators to tau & tau, tau && tau, tau &&& tau,...
@@ -339,7 +340,7 @@ struct tau_parser {
 			bf_xor_cb, bf_neg_cb, source_binding, named_binding, type, source, source0, _Rsource_20, _Rsource_21, bf_cb_arg, 
 			bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, bf_neg_cb_sym, bf_less_cb_sym, bf_less_equal_cb_sym, bf_greater_cb_sym, bf_subs_cb_sym, bf_eq_cb_sym, wff_cb_arg, 
 			bf_neq_cb_sym, bf_is_zero_cb_sym, bf_is_one_cb_sym, bf_has_clashing_subformulas_cb_sym, wff_has_clashing_subformulas_cb_sym, bf_has_subformula_cb_sym, wff_has_subformula_cb_sym, main, rule, rules, 
-			_Rrules_22, _Rrules_23, formula, library, builder, _Rbuilder_24, start, 
+			_Rrules_22, _Rrules_23, formula, library, builder, builder_body, start, 
    };
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -383,7 +384,7 @@ private:
 			"bf_xor_cb", "bf_neg_cb", "source_binding", "named_binding", "type", "source", "source0", "_Rsource_20", "_Rsource_21", "bf_cb_arg", 
 			"bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "bf_neg_cb_sym", "bf_less_cb_sym", "bf_less_equal_cb_sym", "bf_greater_cb_sym", "bf_subs_cb_sym", "bf_eq_cb_sym", "wff_cb_arg", 
 			"bf_neq_cb_sym", "bf_is_zero_cb_sym", "bf_is_one_cb_sym", "bf_has_clashing_subformulas_cb_sym", "wff_has_clashing_subformulas_cb_sym", "bf_has_subformula_cb_sym", "wff_has_subformula_cb_sym", "main", "rule", "rules", 
-			"_Rrules_22", "_Rrules_23", "formula", "library", "builder", "_Rbuilder_24", "start", 
+			"_Rrules_22", "_Rrules_23", "formula", "library", "builder", "builder_body", "start", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -488,8 +489,8 @@ private:
 		q(nt(57), (nt(12)+nt(51)));
 		q(nt(58), (nt(57)+nt(58)));
 		q(nt(58), (nul));
-		q(nt(56), (nt(38)+nt(13)+nt(39)+nt(38)+nt(13)+nt(51)));
-		q(nt(56), (nt(38)+nt(13)+nt(39)+nt(58)+nt(39)));
+		q(nt(56), (nt(38)+nt(51)+nt(38)+nt(39)));
+		q(nt(56), (nt(38)+nt(51)+nt(58)+nt(39)));
 		q(nt(50), (nt(59)));
 		q(nt(50), (nt(60)));
 		q(nt(63), (nt(61)));
@@ -723,10 +724,10 @@ private:
 		q(nt(199), (nt(201)));
 		q(nt(202), (nt(199)+nt(197)));
 		q(nt(203), (nt(199)));
+		q(nt(204), (nt(56)+nt(34)+nt(205)+nt(37)));
 		q(nt(205), (nt(67)));
 		q(nt(205), (nt(91)));
 		q(nt(205), (nt(117)));
-		q(nt(204), (nt(56)+nt(34)+nt(205)+nt(37)));
 		q(nt(206), (nt(202)));
 		q(nt(206), (nt(203)));
 		q(nt(206), (nt(204)));
