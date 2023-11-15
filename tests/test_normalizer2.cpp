@@ -119,14 +119,14 @@ TEST_SUITE("operator|"){
 
 }
 
-// TODO (MEDIUM) write tests to check build_wff_eq
-// TODO (MEDIUM) write tests to check build_wff_neq
-// TODO (MEDIUM) write tests to check build_wff_and
-// TODO (MEDIUM) write tests to check build_wff_or
-// TODO (MEDIUM) write tests to check build_wff_xor
-// TODO (MEDIUM) write tests to check build_wff_neg
-// TODO (MEDIUM) write tests to check build_wff_imply
-// TODO (MEDIUM) write tests to check build_wff_equiv
-// TODO (MEDIUM) write tests to check build_wff_coimply
-// TODO (MEDIUM) write tests to check build_wff_all
-// TODO (MEDIUM) write tests to check build_wff_ex
+// TODO (TK) (HIGH) write tests to check build_wff_eq
+// TODO (TK) (HIGH) write tests to check build_wff_neq
+// TODO (TK) (HIGH) write tests to check build_wff_and
+// TODO (TK) (HIGH) write tests to check build_wff_or
+// TODO (TK) (HIGH) write tests to check build_wff_xor
+// TODO (TK) (HIGH) write tests to check build_wff_neg
+// TODO (TK) (HIGH) write tests to check build_wff_imply
+// TODO (TK) (HIGH) write tests to check build_wff_equiv
+// TODO (TK) (HIGH) write tests to check build_wff_coimply
+// TODO (TK) (HIGH) write tests to check build_wff_all
+// TODO (TK) (HIGH) write tests to check build_wff_ex
