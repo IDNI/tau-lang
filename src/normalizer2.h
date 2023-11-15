@@ -100,7 +100,7 @@ RULE(CBF_DEF_XOR, "( $X cbf_xor $Y ) := (( $X cbf_and cbf_neg $Y ) cbf_or ( cbf_
 RULE(CBF_DEF_IMPLY, "( $X cbf_imply $Y ) := ( cbf_neg $X cbf_or $Y).")
 RULE(CBF_DEF_COIMPLY, "( $X cbf_coimply $Y ) := ( $Y cbf_imply $X).")
 RULE(CBF_DEF_EQUIV, "( $X cbf_equiv $Y ) := (( $X cbf_imply $Y ) cbf_and ( $Y cbf_imply $X )).")
-RULE(CBF_DEF_IF, "(if $X then $Y else $Z) := (( $Y cbf_and_wff $Y ) wff_or ( $Z cbf_and_wff wff_neg $X)).")
+RULE(CBF_DEF_IF, "(if $X then $Y else $Z) := (( $Y cbf_and_wff $X ) wff_or ( $Z cbf_and_wff wff_neg $X)).")
 
 // wff rules
 RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
@@ -132,9 +132,9 @@ RULE(BF_AND_WFF_SIMPLIFY_ZERO_0, "( F cbf_and_wff $X ) := F.")
 RULE(BF_AND_WFF_SIMPLIFY_ZERO_1, "( $X cbf_and_wff F ) := F.")
 
 // bf_and_wff other rules
-RULE(BF_AND_WFF_DISTRIBUTE_0, "(( $X cbf_and_wff $Y ) wff_and ( $Z cbf_and_wff $W )):= (($X cbf_and_wff $Z) wff_and ($Y cbf_and_wff $W)).")
+RULE(BF_AND_WFF_DISTRIBUTE_0, "(( $X cbf_and_wff $Y ) wff_and ( $Z cbf_and_wff $W )):= (($X cbf_and $Z) cbf_and_wff ($Y wff_and $W)).")
 RULE(BF_AND_WFF_DISTRIBUTE_1, "($X wff_and ( $Y cbf_and_wff $Z )):= ($Y cbf_and_wff ($X wff_and $Z)).")
-
+RULE(BF_AND_WFF_DISTRIBUTE_2, "(($X cbf_and_wff $Y) wff_and $Z ):= ($X cbf_and_wff ($Y wff_and $Z)).")
 
 // wff definitions of xor, ->, <- and <->.
 RULE(WFF_DEF_XOR, "( $X wff_xor $Y ) := (( $X wff_and wff_neg $Y ) wff_or ( wff_neg $X wff_and $Y )).")
@@ -248,6 +248,7 @@ template<typename... BAs>
 static auto distribute_bf_and_wff = make_library<BAs...>(
 	BF_AND_WFF_DISTRIBUTE_0
 	+ BF_AND_WFF_DISTRIBUTE_1
+	+ BF_AND_WFF_DISTRIBUTE_2
 );
 
 template<typename... BAs>

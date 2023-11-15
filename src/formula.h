@@ -49,6 +49,7 @@ using sp_tau_source_node = sp_node<idni::lit<char, char>>;
 // specifications trees.
 template <typename... BAs>
 using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>>;
+// TODO (LOW) remove tau_node
 template <typename... BAs>
 using tau_node = node<tau_sym<BAs...>>;
 template <typename... BAs>
@@ -93,6 +94,25 @@ struct formula {
 	rules<BAs...> rec_relations;
 	statement<BAs...> main;
 };
+
+//
+// operators << to pretty print the tau language related types
+//
+
+// TODO (HIGH) << for tau_source_sym
+// TODO (HIGH) << for tau_source_node
+// TODO (HIGH) << for tau_source_node
+// TODO (HIGH) << for sp_tau_source_node
+// TODO (HIGH) << for tau_sym
+// TODO (HIGH) << for sp_tau_node
+// TODO (HIGH) << for tau_rule
+// TODO (HIGH) << for rule
+// TODO (HIGH) << for rules
+// TODO (HIGH) << for statement
+// TODO (HIGH) << for library
+// TODO (HIGH) << for bindings
+// TODO (HIGH) << for formulas
+
 
 // a formula is a set of rules and a main, the boolean algebra constants 
 // (unless '0' or '1') are uninstantiated.
