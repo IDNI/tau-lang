@@ -119,14 +119,3 @@ TEST_SUITE("operator|"){
 
 }
 
-// TODO (TK) (HIGH) write tests to check build_wff_eq
-// TODO (TK) (HIGH) write tests to check build_wff_neq
-// TODO (TK) (HIGH) write tests to check build_wff_and
-// TODO (TK) (HIGH) write tests to check build_wff_or
-// TODO (TK) (HIGH) write tests to check build_wff_xor
-// TODO (TK) (HIGH) write tests to check build_wff_neg
-// TODO (TK) (HIGH) write tests to check build_wff_imply
-// TODO (TK) (HIGH) write tests to check build_wff_equiv
-// TODO (TK) (HIGH) write tests to check build_wff_coimply
-// TODO (TK) (HIGH) write tests to check build_wff_all
-// TODO (TK) (HIGH) write tests to check build_wff_ex

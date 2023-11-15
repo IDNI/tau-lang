@@ -25,6 +25,19 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+
+// TODO (TK) (HIGH) write tests to check build_cbf_eq
+// TODO (TK) (HIGH) write tests to check build_cbf_neq
+// TODO (TK) (HIGH) write tests to check build_cbf_and
+// TODO (TK) (HIGH) write tests to check build_cbf_or
+// TODO (TK) (HIGH) write tests to check build_cbf_xor
+// TODO (TK) (HIGH) write tests to check build_cbf_neg
+// TODO (TK) (HIGH) write tests to check build_cbf_imply
+// TODO (TK) (HIGH) write tests to check build_cbf_equiv
+// TODO (TK) (HIGH) write tests to check build_cbf_coimply
+// TODO (TK) (HIGH) write tests to check build_cbf_if
+// TODO (TK) (HIGH) same for bfs
+
 TEST_SUITE("builders parsing") {
 
 	TEST_CASE("BLDR_WFF_EQ") {
@@ -92,8 +105,6 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
-
-	// TODO (HIGH) : add tests for other builders parsing
 }
 
 TEST_SUITE("builders execution") {
@@ -186,6 +197,4 @@ TEST_SUITE("builders execution") {
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_ex;
 		CHECK( check.has_value() );
 	}	
-
-	// TODO (HIGH) add tests for other builders execution
 }
