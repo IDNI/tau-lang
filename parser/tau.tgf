@@ -76,7 +76,8 @@ num				=> digit+.
 
 # captures
 
-captures 		=> open_parenthesis ws capture (ws_required capture)* close_parenthesis.
+captures 		=> open_parenthesis ws close_parenthesis
+					| open_parenthesis ws capture (ws_required capture)* close_parenthesis.
 
 # variables 
 variable		=> var | timed.
@@ -280,7 +281,7 @@ rules			=> (rule)*.
 formula			=> rules main.
 library 		=> rules.
 # each builder is define on its own string
-builder			=> captures definition wff dot.
+builder			=> captures definition (wff | cbf | bf) dot.
 start			=> formula | library | builder.
 
 # TODO (HIGH) rename operators to tau & tau, tau && tau, tau &&& tau,...
