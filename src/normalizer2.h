@@ -51,6 +51,9 @@ RULE(BF_SKIP_CONSTANTS_0, "({ $X } bf_and $Y) := ($Y bf_and { $X }).")
 RULE(BF_ROTATE_LITERALS_0, "( $X bf_and ( $Y bf_and $Z ) ) := ( $Y bf_and ( $Z bf_and $X ) ).")
 RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_and $Y ) bf_and $Z ) := ( ( $Y bf_and $Z ) bf_and $X ).")
 
+// cbf definitions of xor, ->, <- and <->.
+RULE(BF_DEF_XOR, "( $X bf_xor $Y ) := (( $X bf_and bf_neg $Y ) bf_or ( bf_neg $X bf_and $Y )).")
+
 // bf callbacks
 RULE(BF_CALLBACK_AND, "( { $X } bf_and { $Y } ) := { $X bf_and_cb $Y }.")
 RULE(BF_CALLBACK_OR, "( { $X } bf_or { $Y } ) := { $X bf_or_cb $Y }.")
@@ -177,6 +180,8 @@ static auto apply_defs = make_library<BAs...>(
 	+ CBF_DEF_COIMPLY
 	+ CBF_DEF_EQUIV
 	+ CBF_DEF_IF
+	// bf defs
+	+ BF_DEF_XOR
 );
 
 template<typename... BAs>
@@ -457,7 +462,7 @@ const std::string BLDR_WFF_OR = "( $X $Y ) := ($X wff_or $Y).";
 const std::string BLDR_WFF_XOR = "( $X $Y ) := ($X wff_xor $Y).";
 const std::string BLDR_WFF_NEG = "( $X ) := wff_neg $X.";
 const std::string BLDR_WFF_IMPLY = "( $X $Y ) := ($X wff_imply $Y).";
-const std::string BLDR_WFF_EQUIV = "( $X $Y) := ( $X wff_equiv $Y ).";
+const std::string BLDR_WFF_EQUIV = "( $X $Y ) := ( $X wff_equiv $Y ).";
 const std::string BLDR_WFF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y).";
 const std::string BLDR_WFF_ALL = "( $X $Y ) := wff_all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) := wff_ex $X $Y.";
@@ -465,13 +470,13 @@ const std::string BLDR_WFF_T = "( ) := T.";
 const std::string BLDR_WFF_F = "( ) := F.";
 
 // definitions of cbf builder rules
-const std::string BLDR_CBF_AND = "( $X $Y ) := ($X wff_and $Y).";
-const std::string BLDR_CBF_OR = "( $X $Y ) := ($X wff_or $Y).";
-const std::string BLDR_CBF_XOR = "( $X $Y ) := ($X wff_xor $Y).";
-const std::string BLDR_CBF_NEG = "( $X ) := wff_neg $X.";
-const std::string BLDR_CBF_IMPLY = "( $X $Y ) := ($X wff_imply $Y).";
-const std::string BLDR_CBF_EQUIV = "( $X $Y) := ( $X wff_equiv $Y ).";
-const std::string BLDR_CBF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y).";
+const std::string BLDR_CBF_AND = "( $X $Y ) := ($X cbf_and $Y).";
+const std::string BLDR_CBF_OR = "( $X $Y ) := ($X cbf_or $Y).";
+const std::string BLDR_CBF_XOR = "( $X $Y ) := ($X cbf_xor $Y).";
+const std::string BLDR_CBF_NEG = "( $X ) := cbf_neg $X.";
+const std::string BLDR_CBF_IMPLY = "( $X $Y ) := ($X cbf_imply $Y).";
+const std::string BLDR_CBF_EQUIV = "( $X $Y ) := ( $X cbf_equiv $Y ).";
+const std::string BLDR_CBF_COIMPLY = "( $X $Y ) := ($X cbf_coimply $Y).";
 const std::string BLDR_CBF_IF = "( $X $Y $Z ) := if $X then $Y else $Z.";
 
 // definitions of bf builder rules
@@ -482,7 +487,7 @@ const std::string BLDR_BF_NEG = "( $X ) := bf_neg $X.";
 const std::string BLDR_BF_LESS = "( $X $Y ) := ($X bf_less $Y).";
 const std::string BLDR_BF_LESS_EQUAL = "( $X $Y ) := ($X bf_less_equal $Y).";
 const std::string BLDR_BF_GREATER = "( $X $Y ) := ($X bf_greater $Y).";
-const std::string BLDR_BF_ALL = "( $X $Y) := bf_all $X $Y.";
+const std::string BLDR_BF_ALL = "( $X $Y ) := bf_all $X $Y.";
 const std::string BLDR_BF_EX = "( $X $Y ) := bf_ex $X $Y.";
 const std::string BLDR_BF_T = "( ) := T.";
 const std::string BLDR_BF_F = "( ) := F.";

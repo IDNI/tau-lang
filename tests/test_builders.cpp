@@ -25,7 +25,6 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-
 // TODO (TK) (HIGH) write tests to check build_cbf_eq
 // TODO (TK) (HIGH) write tests to check build_cbf_neq
 // TODO (TK) (HIGH) write tests to check build_cbf_and
