@@ -92,6 +92,8 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
+
+	// TODO (HIGH) : add tests for other builders parsing
 }
 
 TEST_SUITE("builders execution") {
@@ -184,4 +186,6 @@ TEST_SUITE("builders execution") {
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_ex;
 		CHECK( check.has_value() );
 	}	
+
+	// TODO (HIGH) add tests for other builders execution
 }

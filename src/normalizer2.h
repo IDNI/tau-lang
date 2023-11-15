@@ -150,8 +150,14 @@ RULE(BF_TRIVIALITY_3, "( T != F ) := T.")
 RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y ) == F).")
 
 // TODO (HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
+// Maybe, we could use a callback to get a variable and build the formula using the builders
 // further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) == (a ∨ b) ∧ ¬(a ∧ b))
 // "( ($X bf_and $Y) == F ) wwf_and ( ($X bf_and $Z) != 0) == ( bf_all $X ( ( $X bf_and $Y$ ) == F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
+RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != 0) wff_and (($Y == 0) wff_and ($Z != 0)) := (($Y == 0) wff_and (($X != 0) wff_and ($Z != 0))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != 0) wff_and (($Y != 0) wff_and ($Z == 0)) := (($Z == 0) wff_and (($X != 0) wff_and ($Y != 0))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X == 0) wff_and ( $Y != 0)) wff_and ($Z != 0)) := (($X == 0) wff_and (($Y != 0) wff_and ($Z != 0))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "((($X != 0) wff_and ( $Y == 0)) wff_and ($Z != 0)) := (($Y == 0) wff_and (($X != 0) wff_and ($Z != 0))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != 0) wff_and ( $Y == 0)) := (($Y == 0) wff_and ($X != 0)).")
 RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf_all $X ((($X bf_and $Y) == F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
 
 // TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
@@ -443,7 +449,7 @@ sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_each<BAs...>& r) {
 	return r(n);
 }
 
-// definitions of builder rules
+// definitions of wff builder rules
 const std::string BLDR_WFF_EQ = "( $X ) := ($X == F).";
 const std::string BLDR_WFF_NEQ = "( $X ) := ($X != F).";
 const std::string BLDR_WFF_AND = "( $X $Y ) := ($X wff_and $Y).";
@@ -455,6 +461,31 @@ const std::string BLDR_WFF_EQUIV = "( $X $Y) := ( $X wff_equiv $Y ).";
 const std::string BLDR_WFF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y).";
 const std::string BLDR_WFF_ALL = "( $X $Y ) := wff_all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) := wff_ex $X $Y.";
+const std::string BLDR_WFF_T = "( ) := T.";
+const std::string BLDR_WFF_F = "( ) := F.";
+
+// definitions of cbf builder rules
+const std::string BLDR_CBF_AND = "( $X $Y ) := ($X wff_and $Y).";
+const std::string BLDR_CBF_OR = "( $X $Y ) := ($X wff_or $Y).";
+const std::string BLDR_CBF_XOR = "( $X $Y ) := ($X wff_xor $Y).";
+const std::string BLDR_CBF_NEG = "( $X ) := wff_neg $X.";
+const std::string BLDR_CBF_IMPLY = "( $X $Y ) := ($X wff_imply $Y).";
+const std::string BLDR_CBF_EQUIV = "( $X $Y) := ( $X wff_equiv $Y ).";
+const std::string BLDR_CBF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y).";
+const std::string BLDR_CBF_IF = "( $X $Y $Z ) := if $X then $Y else $Z.";
+
+// definitions of bf builder rules
+const std::string BLDR_BF_AND = "( $X $Y ) := ($X bf_and $Y).";
+const std::string BLDR_BF_OR = "( $X $Y ) := ($X bf_or $Y).";
+const std::string BLDR_BF_XOR = "( $X $Y ) := ($X bf_xor $Y).";
+const std::string BLDR_BF_NEG = "( $X ) := bf_neg $X.";
+const std::string BLDR_BF_LESS = "( $X $Y ) := ($X bf_less $Y).";
+const std::string BLDR_BF_LESS_EQUAL = "( $X $Y ) := ($X bf_less_equal $Y).";
+const std::string BLDR_BF_GREATER = "( $X $Y ) := ($X bf_greater $Y).";
+const std::string BLDR_BF_ALL = "( $X $Y) := bf_all $X $Y.";
+const std::string BLDR_BF_EX = "( $X $Y ) := bf_ex $X $Y.";
+const std::string BLDR_BF_T = "( ) := T.";
+const std::string BLDR_BF_F = "( ) := F.";
 
 // wff builder
 template<typename... BAs>
@@ -479,6 +510,52 @@ template<typename... BAs>
 static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
 template<typename... BAs>
 static auto bldr_wff_ex = make_builder<BAs...>(BLDR_WFF_EX);
+template<typename... BAs>
+static auto bldr_wff_t = make_builder<BAs...>(BLDR_WFF_T);
+template<typename... BAs>
+static auto bldr_wff_f = make_builder<BAs...>(BLDR_WFF_F);
+
+// cbf builder
+template<typename... BAs>
+static auto bldr_cbf_and = make_builder<BAs...>(BLDR_CBF_AND);
+template<typename... BAs>
+static auto bldr_cbf_or = make_builder<BAs...>(BLDR_CBF_OR);
+template<typename... BAs>
+static auto bldr_cbf_xor = make_builder<BAs...>(BLDR_CBF_XOR);
+template<typename... BAs>
+static auto bldr_cbf_neg = make_builder<BAs...>(BLDR_CBF_NEG);
+template<typename... BAs>
+static auto bldr_cbf_imply = make_builder<BAs...>(BLDR_CBF_IMPLY);
+template<typename... BAs>
+static auto bldr_cbf_equiv = make_builder<BAs...>(BLDR_CBF_EQUIV);
+template<typename... BAs>
+static auto bldr_cbf_coimply = make_builder<BAs...>(BLDR_CBF_COIMPLY);
+template<typename... BAs>
+static auto bldr_cbf_if = make_builder<BAs...>(BLDR_CBF_IF);
+
+// bf builder
+template<typename... BAs>
+static auto bldr_bf_and = make_builder<BAs...>(BLDR_BF_AND);
+template<typename... BAs>
+static auto bldr_bf_or = make_builder<BAs...>(BLDR_BF_OR);
+template<typename... BAs>
+static auto bldr_bf_xor = make_builder<BAs...>(BLDR_BF_XOR);
+template<typename... BAs>
+static auto bldr_bf_neg = make_builder<BAs...>(BLDR_BF_NEG);
+template<typename... BAs>
+static auto bldr_bf_less = make_builder<BAs...>(BLDR_BF_LESS);
+template<typename... BAs>
+static auto bldr_bf_less_equal = make_builder<BAs...>(BLDR_BF_LESS_EQUAL);
+template<typename... BAs>
+static auto bldr_bf_greater = make_builder<BAs...>(BLDR_BF_GREATER);
+template<typename... BAs>
+static auto bldr_bf_all = make_builder<BAs...>(BLDR_BF_ALL);
+template<typename... BAs>
+static auto bldr_bf_ex = make_builder<BAs...>(BLDR_BF_EX);
+template<typename... BAs>
+static auto bldr_bf_t = make_builder<BAs...>(BLDR_BF_T);
+template<typename... BAs>
+static auto bldr_bf_f = make_builder<BAs...>(BLDR_BF_F);
 
 // wff factory method for building wff formulas
 template<typename... BAs>
@@ -547,6 +624,133 @@ sp_tau_node<BAs...> build_wff_ex(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r)
 	return tau_apply_builder<BAs...>(bldr_wff_ex<BAs...>, args);
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_t() {
+	std::vector<sp_tau_node<BAs...>> args {} ;
+	return tau_apply_builder<BAs...>(bldr_wff_t<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_f() {
+	std::vector<sp_tau_node<BAs...>> args {} ;
+	return tau_apply_builder<BAs...>(bldr_wff_f<BAs...>, args);
+}
+
+// cbf factory method for building cbf formulas
+template<typename... BAs>
+sp_tau_node<BAs...> build_cbf_and(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_cbf_and<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_cbf_or(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_cbf_or<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_cbf_xor(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_cbf_xor<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_cbf_neg(sp_tau_node<BAs...>& l) {
+	std::vector<sp_tau_node<BAs...>> args {l};
+	return tau_apply_builder<BAs...>(bldr_cbf_neg<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_cbf_imply(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_cbf_imply<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_cbf_equiv(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_cbf_equiv<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_cbf_coimply(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_cbf_coimply<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_cbf_if(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r, sp_tau_node<BAs...>& s) {
+	std::vector<sp_tau_node<BAs...>> args {l, r, s};
+	return tau_apply_builder<BAs...>(bldr_cbf_if<BAs...>, args);
+}
+
+// bf factory method for building bf formulas
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_and(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_bf_and<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_or(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_bf_or<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_xor(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_bf_xor<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_neg(sp_tau_node<BAs...>& l) {
+	std::vector<sp_tau_node<BAs...>> args {l};
+	return tau_apply_builder<BAs...>(bldr_bf_neg<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_less(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_bf_less<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_less_equal(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_bf_less_equal<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_greater(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_bf_greater<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_all(const sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_bf_all<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_ex(sp_tau_node<BAs...>& l, sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r};
+	return tau_apply_builder<BAs...>(bldr_bf_ex<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_t() {
+	std::vector<sp_tau_node<BAs...>> args {};
+	return tau_apply_builder<BAs...>(bldr_bf_t<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_f() {
+	std::vector<sp_tau_node<BAs...>> args {};
+	return tau_apply_builder<BAs...>(bldr_bf_f<BAs...>, args);
+}
 
 template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...>& form) {
