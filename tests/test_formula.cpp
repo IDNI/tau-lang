@@ -75,7 +75,6 @@ TEST_SUITE("callbacks") {
 			| tau_parser::bf_matcher | tau_parser::bf | tau_parser::bf_subs_cb 
 			| optional_value_extractor<sp_tau_node<Bool>>;
 		auto result = cb_applier(extracted);
-		pretty_print_sp_tau_node(std::cout, result) << " result: " << std::endl;
 		auto check = result | tau_parser::bf_t;
 		CHECK( check.has_value() );	
 	}
