@@ -15,6 +15,7 @@
 #define __TEST_INTEGRATION_HELPERS_H__
 
 #include "../src/formula.h"
+#include "../src/babdd.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -32,7 +33,8 @@ struct bdd_test_factory {
 				tau_node_terminal_extractor<bdd_test>, 
 				not_whitespace_predicate<bdd_test>, n);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
-		auto nn =  make_node<tau_sym<bdd_test>>(bdd_handle<Bool>::bit(true, index++), {});
+		auto ref = bdd<Bool>::bit(index++);
+		auto nn =  make_node<tau_sym<bdd_test>>(bdd_handle<Bool>::get(ref), {});
 		return cache.emplace(var, nn).first->second;
 	}
 
