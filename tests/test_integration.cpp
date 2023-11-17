@@ -237,7 +237,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		CHECK( check.has_value() );
 	} 
 
-		TEST_CASE("F cbf_xor T == F.") {
+	TEST_CASE("F cbf_xor T == F.") {
 		static constexpr char* sample =	"((F cbf_xor T) == F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -332,6 +332,84 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
 	} 
+
+	TEST_CASE("(bf_neg {bdd : Y} bf_and {bdd : Y}) == F") {
+		bdd_init<Bool>();
+		static constexpr char* sample =	"( (bf_neg {bdd : Y} bf_and {bdd : Y}) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("(bf_neg {bdd : Y} bf_or {bdd : Y}) != F") {
+		bdd_init<Bool>();
+		static constexpr char* sample =	"( (bf_neg {bdd : Y} bf_or {bdd : Y}) != F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("( {bdd : Y} bf_less_equal {bdd : Y}) != F") {
+		bdd_init<Bool>();
+		static constexpr char* sample =	"( ({bdd : Y} bf_less_equal {bdd : Y}) != F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("( bf_neg {bdd : Y} bf_less_equal {bdd : Y}) == F") {
+		bdd_init<Bool>();
+		static constexpr char* sample =	"( ( bf_neg {bdd : Y} bf_less_equal {bdd : Y}) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("(({bdd : Y} bf_and { bdd : X}) bf_less {bdd : Y}) != F") {
+		bdd_init<Bool>();
+		static constexpr char* sample =	"( (({bdd : Y} bf_and { bdd : X}) bf_less {bdd : Y}) != F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("({bdd : Y} bf_greater ({bdd:X} bf_and {bdd : Y}) == F") {
+		bdd_init<Bool>();
+		static constexpr char* sample =	"( (({bdd : Y} bf_and {bdd : X}) bf_greater {bdd : Y}) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
 }
 
 TEST_SUITE("formulas: variables, no bindings and quantifiers") {
@@ -357,10 +435,14 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	} 
+
+	// TODO (HIGH) add tests for wff_all and wff_ex
 }
 
 TEST_SUITE("formulas: variables, bindings and quantifiers") {
+	// TODO (HIGH) look for big formulas
 }
 
 TEST_SUITE("formulas: recurrence relations") {
+	// TODO (HIGH) add tests for recurrence relations
 }
