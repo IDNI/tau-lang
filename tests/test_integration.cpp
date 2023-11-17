@@ -218,7 +218,96 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		CHECK( check.has_value() );
 	} 
 
-	// TODO (HIGH) add cbf tests
+	TEST_CASE("cbf_neg T == F.") {
+		static constexpr char* sample =	"(cbf_neg T == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		pretty_print_sp_tau_node(std::cout, sample_formula.main) << std::endl;
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("F cbf_and T == F.") {
+		static constexpr char* sample =	"((F cbf_and T) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		pretty_print_sp_tau_node(std::cout, sample_formula.main) << std::endl;
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
+
+		TEST_CASE("F cbf_or T == F.") {
+		static constexpr char* sample =	"((F cbf_or T) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		pretty_print_sp_tau_node(std::cout, sample_formula.main) << std::endl;
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	} 
+
+		TEST_CASE("F cbf_xor T == F.") {
+		static constexpr char* sample =	"((F cbf_xor T) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		pretty_print_sp_tau_node(std::cout, sample_formula.main) << std::endl;
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("F cbf_imply T == F.") {
+		static constexpr char* sample =	"((F cbf_imply T) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		pretty_print_sp_tau_node(std::cout, sample_formula.main) << std::endl;
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("F cbf_coimply T == F.") {
+		static constexpr char* sample =	"((F cbf_coimply T) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		pretty_print_sp_tau_node(std::cout, sample_formula.main) << std::endl;
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
+
+	TEST_CASE("F cbf_equiv T == F.") {
+		static constexpr char* sample =	"((F cbf_equiv T) == F).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
+		pretty_print_sp_tau_node(std::cout, sample_formula.main) << std::endl;
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result) << std::endl;
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	} 
 }
 
 TEST_SUITE("formulas: variables, no bindings and no quantifiers") {
