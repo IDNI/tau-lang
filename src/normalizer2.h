@@ -794,6 +794,7 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 		applied_trivialities_again
 	};
 
+	// TODO (HIGH) activate when we have added consts in the code
 	/*return { 
 		form.rec_relations, 
 		form.main

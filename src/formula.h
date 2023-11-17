@@ -510,7 +510,7 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const
 }
 
 template <typename T>
-static const auto optional_value_extractor = [](const std::optional<T>& o) {return o.value();} ;
+static const auto optional_value_extractor = [](const std::optional<T>& o) -> T {return o.value();} ;
 
 template <typename T>
 using optional_value_extractor_t = decltype(optional_value_extractor<T>);
@@ -700,10 +700,7 @@ private:
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
 		auto params = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
-		pretty_print_sp_tau_node(std::cout, params[0]) << " params[0]: " << std::endl;
-		pretty_print_sp_tau_node(std::cout, params[1]) << " params[1]: " << std::endl;
-		pretty_print_sp_tau_node(std::cout, params[2]) << " params[2]: " << std::endl;
-		m[params[0]] = params[1];
+		m[params[0]] = params[1] | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 		// TODO (HIGH) extract this pattern to a method call replace in rewriting.h
 		replace_transformer<sp_tau_node<BAs...>> replace{m};
 		return post_order_traverser<
