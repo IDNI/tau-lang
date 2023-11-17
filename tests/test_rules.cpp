@@ -1089,6 +1089,61 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_0") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_1") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_1);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_2") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_2);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_3") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_3);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_4") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_4);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+
 	TEST_CASE("BF_PROCESS_0") {
 		auto src_rule = make_tau_source(BF_PROCESS_0);
 		auto tau_rule = make_statement(src_rule);
@@ -2281,6 +2336,61 @@ TEST_SUITE("executing wff rules") {
 
 	TEST_CASE("BF_SQUEEZE_POSITIVES_0") {
 		auto src_rule = make_tau_source(BF_SQUEEZE_POSITIVES_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_0") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_1") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_1);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_2") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_2);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_3") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_3);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_4") {
+		auto src_rule = make_tau_source(BF_POSITIVE_LITERAL_UPWARDS_4);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());

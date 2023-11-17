@@ -95,25 +95,6 @@ struct formula {
 	statement<BAs...> main;
 };
 
-//
-// operators << to pretty print the tau language related types
-//
-
-// TODO (HIGH) << for tau_source_sym
-// TODO (HIGH) << for tau_source_node
-// TODO (HIGH) << for tau_source_node
-// TODO (HIGH) << for sp_tau_source_node
-// TODO (HIGH) << for tau_sym
-// TODO (HIGH) << for sp_tau_node
-// TODO (HIGH) << for tau_rule
-// TODO (HIGH) << for rule
-// TODO (HIGH) << for rules
-// TODO (HIGH) << for statement
-// TODO (HIGH) << for library
-// TODO (HIGH) << for bindings
-// TODO (HIGH) << for formulas
-
-
 // a formula is a set of rules and a main, the boolean algebra constants 
 // (unless '0' or '1') are uninstantiated.
 template<typename... BAs>
@@ -1209,6 +1190,26 @@ formula<BAs...> make_formula_using_bindings(const std::string& source, const bin
 
 
 } // namespace idni::tau
+
+//
+// operators << to pretty print the tau language related types
+//
+
+// TODO (HIGH) << for tau_source_sym
+// TODO (HIGH) << for tau_source_node
+// TODO (HIGH) << for tau_source_node
+// TODO (HIGH) << for sp_tau_source_node
+// TODO (HIGH) << for tau_sym
+// TODO (HIGH) << for sp_tau_node
+// TODO (HIGH) << for tau_rule
+// TODO (HIGH) << for rule
+// TODO (HIGH) << for rules
+// TODO (HIGH) << for statement
+// TODO (HIGH) << for library
+// TODO (HIGH) << for bindings
+// TODO (HIGH) << for formulas
+
+
 
 // outputs a sp_tau_node<...> to a stream, using the stringify transformer
 // and assumes that the constants also override operator<<.
