@@ -217,6 +217,8 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	} 
+
+	// TODO (HIGH) add cbf tests
 }
 
 TEST_SUITE("formulas: variables, no bindings and no quantifiers") {
@@ -247,4 +249,16 @@ TEST_SUITE("formulas: variables, no bindings and no quantifiers") {
 		CHECK( check.has_value() );
 	} 
 
+}
+
+TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
+}
+
+TEST_SUITE("formulas: variables, no bindings and quantifiers") {
+}
+
+TEST_SUITE("formulas: variables, bindings and quantifiers") {
+}
+
+TEST_SUITE("formulas: recurrence relations") {
 }

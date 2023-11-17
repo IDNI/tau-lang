@@ -25,7 +25,7 @@ namespace testing = doctest;
 TEST_SUITE("steps parsing") {
 	
 	TEST_CASE("apply_defs") {
-		CHECK( apply_defs<Bool>.size() == 9 );
+		CHECK( apply_defs<Bool>.size() == 10 );
 	}
 	
 	TEST_CASE("elim_for_all") {
@@ -53,7 +53,7 @@ TEST_SUITE("steps parsing") {
 	}
 	
 	TEST_CASE("distribute_bf_and_wff") {
-		CHECK( distribute_bf_and_wff<Bool>.size() == 2 );
+		CHECK( distribute_bf_and_wff<Bool>.size() == 3 );
 	}
 	
 	TEST_CASE("simplify_cbf") {
@@ -78,6 +78,10 @@ TEST_SUITE("steps parsing") {
 	
 	TEST_CASE("clause_simplify_wff") {
 		CHECK( clause_simplify_wff<Bool>.size() == 2 );
+	}
+	
+	TEST_CASE("bf_positives_upwards") {
+		CHECK( bf_positives_upwards<Bool>.size() == 5 );
 	}
 	
 	/*TEST_CASE("further_process") {

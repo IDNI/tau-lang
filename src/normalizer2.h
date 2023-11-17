@@ -156,12 +156,12 @@ RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y 
 // Maybe, we could use a callback to get a variable and build the formula using the builders
 // further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) == (a ∨ b) ∧ ¬(a ∧ b))
 // "( ($X bf_and $Y) == F ) wwf_and ( ($X bf_and $Z) != 0) == ( bf_all $X ( ( $X bf_and $Y$ ) == F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
-RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != 0) wff_and (($Y == 0) wff_and ($Z != 0)) := (($Y == 0) wff_and (($X != 0) wff_and ($Z != 0))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != 0) wff_and (($Y != 0) wff_and ($Z == 0)) := (($Z == 0) wff_and (($X != 0) wff_and ($Y != 0))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X == 0) wff_and ( $Y != 0)) wff_and ($Z != 0)) := (($X == 0) wff_and (($Y != 0) wff_and ($Z != 0))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "((($X != 0) wff_and ( $Y == 0)) wff_and ($Z != 0)) := (($Y == 0) wff_and (($X != 0) wff_and ($Z != 0))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != 0) wff_and ( $Y == 0)) := (($Y == 0) wff_and ($X != 0)).")
-RULE(BF_PROCESS_0, "((($X bf_and $Y) == 0) wff_and (($X bf_and $Z) != 0)) := (bf_all $X ((($X bf_and $Y) == F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != F) wff_and (($Y == F) wff_and ($Z != F))) := (($Y == F) wff_and (($X != F) wff_and ($Z != F))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != F) wff_and (($Y != F) wff_and ($Z == F))) := (($Z == F) wff_and (($X != F) wff_and ($Y != F))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X == F) wff_and ( $Y != F)) wff_and ($Z != F)) := (($X == F) wff_and (($Y != F) wff_and ($Z != F))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "((($X != F) wff_and ( $Y == F)) wff_and ($Z != F)) := (($Y == F) wff_and (($X != F) wff_and ($Z != F))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != F) wff_and ( $Y == F)) := (($Y == F) wff_and ($X != F)).")
+RULE(BF_PROCESS_0, "((($X bf_and $Y) == F) wff_and (($X bf_and $Z) != F)) := (bf_all $X ((($X bf_and $Y) == F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
 
 // TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
 
@@ -341,6 +341,15 @@ static auto trivialities = make_library<BAs...>(
 	+ BF_TRIVIALITY_1 
 	+ BF_TRIVIALITY_2 
 	+ BF_TRIVIALITY_3
+);
+
+template<typename... BAs>
+static auto bf_positives_upwards = make_library<BAs...>(
+	BF_POSITIVE_LITERAL_UPWARDS_0
+	+ BF_POSITIVE_LITERAL_UPWARDS_1
+	+ BF_POSITIVE_LITERAL_UPWARDS_2
+	+ BF_POSITIVE_LITERAL_UPWARDS_3
+	+ BF_POSITIVE_LITERAL_UPWARDS_4
 );
 
 template<typename...BAs>
