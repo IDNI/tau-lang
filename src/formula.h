@@ -198,66 +198,52 @@ static const auto is_capture = [](const sp_tau_node<BAs...>& n) {
 		&& get<tau_source_sym>(n->value).n() == tau_parser::capture; 
 };
 
-template<typename...BAs>
-auto is_non_essential = [] (const sp_tau_node<BAs...>& n) {
-	if (!std::holds_alternative<tau_source_sym>(n->value) || !get<tau_source_sym>(n->value).nt()) return false;
-	auto nt = get<tau_source_sym>(n->value).n();
-	return  
-		nt == tau_parser::empty_string
-		|| nt == tau_parser::eof
-		|| nt == tau_parser::space
-		|| nt == tau_parser::digit
-		|| nt == tau_parser::xdigit
-		|| nt == tau_parser::alpha
-		|| nt == tau_parser::alnum
-		|| nt == tau_parser::punct
-		|| nt == tau_parser::printable
-		|| nt == tau_parser::eol
-		|| nt == tau_parser::ws_comment
-		|| nt == tau_parser::_Rws_comment_0
-		|| nt == tau_parser::ws_required
-		|| nt == tau_parser::ws
-		|| nt == tau_parser::esc
-		|| nt == tau_parser::open_parenthesis
-		|| nt == tau_parser::close_parenthesis
-		|| nt == tau_parser::open_bracket
-		|| nt == tau_parser::close_bracket
-		|| nt == tau_parser::open_brace
-		|| nt == tau_parser::close_brace;
+template<typename... BAs>
+using is_capture_t = decltype(is_capture<BAs...>);
+
+auto is_non_essential_terminal = [] (const size_t n) {
+	return n == tau_parser::empty_string
+		|| n == tau_parser::eof
+		|| n == tau_parser::space
+		|| n == tau_parser::digit
+		|| n == tau_parser::xdigit
+		|| n == tau_parser::alpha
+		|| n == tau_parser::alnum
+		|| n == tau_parser::punct
+		|| n == tau_parser::printable
+		|| n == tau_parser::eol
+		|| n == tau_parser::ws_required
+		|| n == tau_parser::ws_comment
+		|| n == tau_parser::ws
+		|| n == tau_parser::esc
+		|| n == tau_parser::open_parenthesis
+		|| n == tau_parser::close_parenthesis
+		|| n == tau_parser::open_bracket
+		|| n == tau_parser::close_bracket
+		|| n == tau_parser::open_brace
+		|| n == tau_parser::close_brace;
 };
 
-template<typename...BAs>
-using is_non_essential_t = decltype(is_non_essential<BAs...>);
+auto is_non_essential_sym = [] (const tau_source_sym& n) {
+	if (!n.nt()) return false;
+	return  is_non_essential_terminal(n.n());
+};
 
 auto is_non_essential_source = [] (const sp_tau_source_node& n) {
 	if (!n->value.nt()) return false;
-	auto nt = n->value.n();
-	return  
-		nt == tau_parser::empty_string
-		|| nt == tau_parser::eof
-		|| nt == tau_parser::space
-		|| nt == tau_parser::digit
-		|| nt == tau_parser::xdigit
-		|| nt == tau_parser::alpha
-		|| nt == tau_parser::alnum
-		|| nt == tau_parser::punct
-		|| nt == tau_parser::printable
-		|| nt == tau_parser::eol
-		|| nt == tau_parser::ws_required
-		|| nt == tau_parser::ws
-		|| nt == tau_parser::esc
-		|| nt == tau_parser::open_parenthesis
-		|| nt == tau_parser::close_parenthesis
-		|| nt == tau_parser::open_bracket
-		|| nt == tau_parser::close_bracket
-		|| nt == tau_parser::open_brace
-		|| nt == tau_parser::close_brace;
+	return  is_non_essential_terminal(n->value.n());
 };
 
 using is_non_essential_source_t = decltype(is_non_essential_source);
 
-template<typename... BAs>
-using is_capture_t = decltype(is_capture<BAs...>);
+template<typename...BAs>
+auto is_non_essential = [] (const sp_tau_node<BAs...>& n) {
+	if (!std::holds_alternative<tau_source_sym>(n->value)) return false;
+	return is_non_essential_sym(std::get<tau_source_sym>(n->value));
+};
+
+template<typename...BAs>
+using is_non_essential_t = decltype(is_non_essential<BAs...>);
 
 template<typename...BAs>
 static const auto is_callback = [](const sp_tau_node<BAs...>& n) {

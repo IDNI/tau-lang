@@ -75,8 +75,7 @@ TEST_SUITE("callbacks") {
 			| tau_parser::bf_matcher | tau_parser::bf | tau_parser::bf_subs_cb 
 			| optional_value_extractor<sp_tau_node<Bool>>;
 		auto result = cb_applier(extracted);
-		auto check = result | tau_parser::bf_t;
-		CHECK( check.has_value() );	
+		CHECK( is_non_terminal<Bool>(tau_parser::bf_t, result) );	
 	}
 
 	// TODO (MEDIUM) add explicit unit tests for the remaining callbacks
