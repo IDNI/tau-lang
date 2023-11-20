@@ -68,6 +68,7 @@ open_brace			=> ws '{' ws.
 close_brace			=> ws '}' ws.
 minus				=> ws '-' ws.
 colon				=> ws ':' ws.
+less				=> ws '<' ws.
 
 # indexes
 indexes			=> open_bracket (index)* close_bracket.
@@ -293,6 +294,11 @@ wff_has_clashing_subformulas_cb_sym		=> ws "wff_has_clashing_subformulas_cb" ws.
 wff_has_subformula_cb_sym				=> ws "wff_has_subformula_cb" ws.
 wff_remove_existential_sym				=> ws "wff_remove_existential" ws.
 
+# input definition
+input			=> in colon open_brace source_binding close_brace.
+
+# main posibilities
+inputs			=> less input input* dot.
 main			=> wff dot.
 rule			=> wff_rule | cbf_rule | bf_rule .
 rules			=> (rule)*.
@@ -301,6 +307,6 @@ library 		=> rules.
 # each builder is define on its own string
 builder			=> captures definition builder_body dot.
 builder_body	=> wff | cbf | bf.
-start			=> formula | library | builder.
+start			=> formula | library | builder | inputs.
 
 # TODO (HIGH) rename operators to tau & tau, tau && tau, tau &&& tau,...
