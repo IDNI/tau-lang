@@ -100,8 +100,8 @@ wff_rule		=> wff_matcher definition wff_body dot.
 
 # needed for rule CBF_DEF_IF
 wff_matcher	=> wff | wff_ref.
-wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb | wff_has_subformula_cb.
-
+wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb 
+				| wff_has_subformula_cb | wff_remove_existential.
 
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
@@ -182,7 +182,8 @@ cbf_else_sym		=> ws "else" ws.
 bf_rule		=> bf_matcher definition bf_body dot.
 
 bf_matcher	=> bf.
-bf_body 	=> bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb | bf_has_subformula_cb.
+bf_body 	=> bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb 
+				| bf_has_subformula_cb.
 
 bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or 
 					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater 
@@ -249,7 +250,7 @@ bf_has_clashing_subformulas_cb	=> bf_has_clashing_subformulas_cb_sym bf_cb_arg w
 wff_has_clashing_subformulas_cb	=> wff_has_clashing_subformulas_cb_sym wff_cb_arg ws_required wff_cb_arg.
 bf_has_subformula_cb 			=> bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.	
-
+wff_remove_existential			=> wff_remove_existential_sym (variable | capture) ws_required wff.
 # bultin_args
 bf_cb_arg	=> capture | ignore | bf.
 wff_cb_arg	=> capture | ignore | wff.
@@ -270,10 +271,11 @@ bf_is_one_cb_sym		=> ws "bf_is_one_cb" ws.
 
 # speed up callbacks syms
 # IDEA we could reuse the same symbol 
-bf_has_clashing_subformulas_cb_sym	=> ws "bf_has_clashing_subformulas_cb" ws.
+bf_has_clashing_subformulas_cb_sym		=> ws "bf_has_clashing_subformulas_cb" ws.
 bf_has_subformula_cb_sym				=> ws "bf_has_subformula_cb" ws.
-wff_has_clashing_subformulas_cb_sym	=> ws "wff_has_clashing_subformulas_cb" ws.
+wff_has_clashing_subformulas_cb_sym		=> ws "wff_has_clashing_subformulas_cb" ws.
 wff_has_subformula_cb_sym				=> ws "wff_has_subformula_cb" ws.
+wff_remove_existential_sym				=> ws "wff_remove_existential" ws.
 
 main			=> wff dot.
 rule			=> wff_rule | cbf_rule | bf_rule .

@@ -150,7 +150,6 @@ RULE(BF_TRIVIALITY_0, "( F == F ) := T.")
 RULE(BF_TRIVIALITY_1, "( T == F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
 RULE(BF_TRIVIALITY_3, "( T != F ) := T.")
-RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y ) == F).")
 
 // TODO (HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
 // Maybe, we could use a callback to get a variable and build the formula using the builders
@@ -161,7 +160,8 @@ RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != F) wff_and (($Y != F) wff_and ($Z =
 RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X == F) wff_and ( $Y != F)) wff_and ($Z != F)) := (($X == F) wff_and (($Y != F) wff_and ($Z != F))).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "((($X != F) wff_and ( $Y == F)) wff_and ($Z != F)) := (($Y == F) wff_and (($X != F) wff_and ($Z != F))).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != F) wff_and ( $Y == F)) := (($Y == F) wff_and ($X != F)).")
-RULE(BF_PROCESS_0, "((($X bf_and $Y) == F) wff_and (($X bf_and $Z) != F)) := (bf_all $X ((($X bf_and $Y) == F )  wff_and ( bf_ex $X (( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ($X bf_and $Y)) wff_and $Z )).")
+RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y ) == F).")
+RULE(WFF_REMOVE_EX_0, "wff_ex $X $Y := wff_remove_existential $X $Y.")
 
 // TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
 
@@ -323,10 +323,8 @@ static auto squeeze_positives = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto further_process = make_library<BAs...>(
-	// TODO (HIGH) fix BF_PROCESS_0, it is not parsing properly
-	BF_PROCESS_0 
-	+ BF_SKIP_CONSTANTS_0 
+static auto remove_existential = make_library<BAs...>(
+	WFF_REMOVE_EX_0 
 );
 
 template<typename... BAs>

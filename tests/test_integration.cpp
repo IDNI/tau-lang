@@ -226,7 +226,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		CHECK( check.has_value() );
 	} 
 
-		TEST_CASE("F cbf_or T == F.") {
+	TEST_CASE("F cbf_or T == F.") {
 		static constexpr char* sample =	"((F cbf_or T) == F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -374,14 +374,14 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("( bf_neg {bdd : Y} bf_less_equal {bdd : Y}) == F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( ( bf_neg {bdd : Y} bf_less_equal {bdd : Y}) == F).";
+		static constexpr char* sample =	"( ( bf_neg {bdd : Y} bf_less_equal {bdd : Y}) != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
 		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
 		auto result = normalizer<bdd_test>(sample_formula).main;
 		pretty_print_sp_tau_node(std::cout, result);
-		auto check = result |  tau_parser::wff_t;
+		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
 	} 
 
