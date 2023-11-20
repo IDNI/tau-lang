@@ -64,8 +64,30 @@ struct tau_execution {
 	tau_outputs<output_size, BAs...> outputs;
 	tau_inputs<input_size, BAs...> inputs;
 
+	// named input and outputs varianbles
+	std::set<sp_tau_node<BAs...>> input_vars;
+	std::set<sp_tau_node<BAs...>> output_vars;
+
+	// the formula to be executed
 	formula<BAs...> f;
 };
+
+template<size_t input_size, size_t output_size, typename factory_t, typename...BAs>
+tau_execution<input_size, output_size, BAs...> execute_step(
+		const tau_execution<input_size, output_size, BAs...>& te,
+		const std::string& tis) {
+	// TODO (HIGH) implement tau_step
+	return tau_execution<input_size, output_size, BAs...>(te.f);
+}
+
+template<size_t input_size, size_t output_size, typename...BAs>
+tau_execution<input_size, output_size, BAs...> execute_step(
+		const tau_execution<input_size, output_size, BAs...>& te,
+		const tau_input<input_size, BAs...>& ti) {
+	// TODO (HIGH) implement tau_step
+	return tau_execution<input_size, output_size, BAs...>(te.f);
+}
+
 
 template<size_t input_size, size_t output_size, typename...BAs>
 std::optional<tau_execution<input_size, output_size, BAs...>> execute(const formula<BAs...>& f) {
