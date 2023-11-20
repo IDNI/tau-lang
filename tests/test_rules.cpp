@@ -1144,8 +1144,8 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("BF_PROCESS_0") {
-		auto src_rule = make_tau_source(BF_PROCESS_0);
+	TEST_CASE("WFF_REMOVE_EX_0") {
+		auto src_rule = make_tau_source(WFF_REMOVE_EX_0);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule 
 			| tau_parser::library
@@ -2393,8 +2393,8 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("BF_PROCESS_0") {
-		auto src_rule = make_tau_source(BF_PROCESS_0);
+	TEST_CASE("WFF_REMOVE_EX_0") {
+		auto src_rule = make_tau_source(WFF_REMOVE_EX_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
