@@ -35,7 +35,7 @@ set(TAU_SOURCES
 	dict.cpp
 )
 
-set(CLI_SOURCES tau.cpp)
+set(CLI_SOURCES main.cpp)
 
 set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
 set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG")
