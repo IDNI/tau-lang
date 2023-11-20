@@ -34,15 +34,27 @@ using tau_output = std::map<sp_tau_node<BAs...>, std::variant<BAs...>>;
 template<size_t size, typename...BAs>
 using tau_outputs = std::vector<tau_output>;
 
+template<typename...BAs>
+bool is_satisfiable(const formula<BAs...>& f) {
+	// TODO (HIGH) check that the formula is satisfiable
+	return false;
+}
+
 // we need to bind the input/output values to sp_tau_nodes in the program,
 // the inputs would be the input variables of the program and would be binded from
-// actual parsed inputs or given constants if executed as a library.
+// actual parsed inputs or given formulkas supplied by the user (build in whatever way).
 
+// helpers method could be provided to create tau_input from an input strings 
+// as we do in formula bindings
+
+// how we could avoid the creation of tau_execution if the formula is insatisfiable?
 template<size_t input_size, size_t output_size, typename...BAs>
-struct tau_execution_state {
+struct tau_execution {
+
+	tau_execution(const formula<BAs...>& f) : f(f) {}
 
 	// maybe we could use promise/futures for input/outputs
-	tau_outputs<output_size, BAs...> step(const tau_input<input_size, BAs...>& f) {
+	tau_output<output_size, BAs...> step(const tau_input<input_size, BAs...>& f) {
 		// TODO (HIGH) implement tau_step
 		return tau_output<output_size, BAs...>();
 	}
@@ -51,16 +63,12 @@ struct tau_execution_state {
 	// index in the datastructre denotes time
 	tau_outputs<output_size, BAs...> outputs;
 	tau_inputs<input_size, BAs...> inputs;
+
+	formula<BAs...> f;
 };
 
-template<typename...BAs>
-bool satisfiable(const formula<BAs...>& f) {
-	// TODO (HIGH) check that the formula is satisfiable
-	return false;
-}
-
 template<size_t input_size, size_t output_size, typename...BAs>
-std::optional<tau_execution_state<input_size, output_size, BAs...>> execute(const formula<BAs...>& f) {
+std::optional<tau_execution<input_size, output_size, BAs...>> execute(const formula<BAs...>& f) {
 	// TODO (HIGH) prepare formula for execution
 	// the optional would be empty if the formula is not satisfiable
 	// otherwise it would retunr an initial tau_execution_state
