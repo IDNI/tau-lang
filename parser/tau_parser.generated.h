@@ -237,6 +237,22 @@
 // source			=> (source0)+.
 // 
 // # callbacks
+// 
+// # callbacks must be used in the following cases:
+// #
+// # 1.- underlying boolean algebras operations: and, or, xor, neg, less,
+// # less_equal, greater, subs, eq, neq, is_zero, is_one,... In this case, no
+// # other way we have to call the uderlying operations of the boolean algebra
+// # 2.- speed up computations: has_clashing_subformulas, has_subformula,
+// # remove_existential... In this case, we could use the the callback to
+// # avoid the creation of intermediate formulas. For instance, if we want
+// # to check if a formula has a subformula, we could use the callback to
+// # avoid the creation of the subformulas to check that point.
+// # 3.- to create new subformulas in other rules, for instance, to create a
+// # new formula that is the substitution of a variable by a constant.
+// 
+// # TODO (HIGH) Earley parser doesn't support tabs in comments
+// 
 // bf_and_cb			=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
 // bf_or_cb			=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
 // bf_xor_cb			=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
