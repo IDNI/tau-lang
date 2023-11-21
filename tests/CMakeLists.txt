@@ -14,10 +14,13 @@ set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
 add_link_options("-flto")
 
-set(TESTS
+set(TESTS_WITHOUT_PARSER
 	ba
 	bool
 	hbdd
+)
+
+set(TESTS_WITH_PARSER
 	rules
 	builders
 	rewriting
@@ -30,15 +33,17 @@ set(TESTS
 	integration
 )
 
+set(TESTS ${TESTS_WITHOUT_PARSER} ${TESTS_WITH_PARSER})
+
 foreach(X IN LISTS TESTS)
 	set(N "test_${X}")
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
-	target_link_libraries(${N}
-		${OBJECT_LIB_NAME}
-		${IDNI_PARSER_OBJECT_LIB}
-		doctest
-	)
+	target_link_libraries(${N} ${OBJECT_LIB_NAME} doctest)
+	list(FIND TESTS_WITH_PARSER "${X}" _index)
+	if (${_index} GREATER -1)
+		target_link_libraries(${N} ${IDNI_PARSER_OBJECT_LIB})
+	endif()
 	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
 endforeach()
 
