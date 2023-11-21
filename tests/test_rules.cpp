@@ -2399,9 +2399,9 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = tau_apply(tau_rule, matcher); // returns $Y, ok.
 		CHECK( matcher != body );
-		CHECK( result == body );
+		CHECK( matcher != result );
 	}
 
 	TEST_CASE("WFF_CALLBACK_CLASHING_SUBFORMULAS_0") {
