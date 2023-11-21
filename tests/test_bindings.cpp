@@ -28,7 +28,7 @@ namespace testing = doctest;
 TEST_SUITE("named bindings") {
 
 	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
-		static constexpr char* sample =	"$X := $X.";
+		const char* sample = "$X := $X.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -37,7 +37,7 @@ TEST_SUITE("named bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
-		static constexpr char* sample =	"{ binding } := { binding }.";
+		const char* sample = "{ binding } := { binding }.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -46,7 +46,7 @@ TEST_SUITE("named bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
-		static constexpr char* sample =	"{ non_matching } := { non_matching }.";
+		const char* sample = "{ non_matching } := { non_matching }.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -67,7 +67,7 @@ TEST_SUITE("factory bindings") {
 	static auto factory = dummy_factory();
 
 	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
-		static constexpr char* sample =	"$X := $X.";
+		const char* sample = "$X := $X.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		auto binded = make_factory_bindings<dummy_factory>(statement, factory);
@@ -75,7 +75,7 @@ TEST_SUITE("factory bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
-		static constexpr char* sample =	"{ binding } := { bool : some_source_sode }.";
+		const char* sample = "{ binding } := { bool : some_source_sode }.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		auto binded = make_factory_bindings<dummy_factory>(statement, factory);
@@ -83,7 +83,7 @@ TEST_SUITE("factory bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
-		static constexpr char* sample =	"{ non_matching } := { non_bool: some_source_code }.";
+		const char* sample = "{ non_matching } := { non_bool: some_source_code }.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		auto binded = make_factory_bindings<dummy_factory>(statement, factory);

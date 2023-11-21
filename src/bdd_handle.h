@@ -213,7 +213,7 @@ struct bdd_handle {
 			return f(v);
 		});
 	}
-	
+
 	set<pair<B, vector<int_t>>> dnf() const {
 		set<pair<B, vector<int_t>>> r;
 		dnf([&r](auto& x) { r.insert(x); return true; });
@@ -491,7 +491,7 @@ template<typename B, bdd_options o> void create_universe(B a) {
 	}
 }
 
-template<typename B, bdd_options o> void create_universe(Bool a) {
+template<typename B, bdd_options o> void create_universe(Bool /*a*/) {
 	const auto &T = bdd<Bool, o>::T;
 	const auto &F = bdd<Bool, o>::F;
 	auto &V = bdd<Bool, o>::V;

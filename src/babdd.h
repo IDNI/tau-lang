@@ -431,8 +431,10 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 	static bdd_ref add(const bdd_node_t& n) { return add(n.v, n.h, n.l); }
 
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
-		DBG(assert(V.size() < pow(2, o.idW)));
-		if constexpr (o.has_varshift()) DBG(assert(v < pow(2, o.shiftW)));
+#ifdef DEBUG
+		assert(V.size() < pow(2, o.idW));
+		if constexpr (o.has_varshift()) { assert(v < pow(2, o.shiftW)); }
+#endif
 		if (h == l) return h;
 #ifdef DEBUG
 		auto p = get(l), q = get(h);
@@ -678,7 +680,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 		if (var_cmp(nx.v, v)) return add(nx.v, sub0(nx.h, v), sub0(nx.l, v));
 		if (var_cmp(v, nx.v)) return x;
 		return nx.l;
-	
+
 	}
 
 	static bdd_ref sub1(bdd_ref x, uint_t v) {
@@ -954,8 +956,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static bdd_ref add(bdd_node_t b) { return add(b.v, b.h, b.l); }
 
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
-		DBG(assert(V.size() < pow(2, o.idW)));
-		if constexpr (o.has_varshift()) DBG(assert(v < pow(2, o.shiftW)));
+#ifdef DEBUG
+		assert(V.size() < pow(2, o.idW));
+		if constexpr (o.has_varshift()) { assert(v < pow(2, o.shiftW)); }
+#endif
 		if (h == l) return h;
 #ifdef DEBUG
 		if(!leaf(l) && !leaf(h))

@@ -37,10 +37,10 @@ namespace idni::rewriter {
 // Both notions could be unified if we keep those operators defined.
 
 // IDEA make make_node a friend function and the constructor private. Right now
-// it is public to easy the construction of the tree during testing, but it is 
+// it is public to easy the construction of the tree during testing, but it is
 // not really needed.
 
-// node of a tree. 
+// node of a tree.
 template <typename symbol_t>
 struct node {
 	// equality operators and ordering
@@ -51,9 +51,9 @@ struct node {
 		return std::lexicographical_compare_three_way(
 			child.begin(), child.end(),
 			that.child.begin(), that.child.end());
-	}	
+	}
 
-	// the value of the node and pointers to the children, we follow the same 
+	// the value of the node and pointers to the children, we follow the same
 	// notation as in forest<...>::tree to be able to reuse the code with
 	// forest<...>::tree.
 	symbol_t value;
@@ -66,10 +66,10 @@ using sp_node = std::shared_ptr<node<symbol_t>>;
 
 // node factory method
 template <typename symbol_t>
-sp_node<symbol_t> make_node(const symbol_t& s, 
+sp_node<symbol_t> make_node(const symbol_t& s,
 		const std::vector<sp_node<symbol_t>>& ns) {
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
-	node<symbol_t> key{s, ns}; 
+	node<symbol_t> key{s, ns};
 	if (auto it = cache.find(key); it != cache.end()) {
 		return it->second;
 	}
@@ -96,11 +96,11 @@ template <typename node_t>
 using identity_t = decltype(identity<node_t>);
 
 // visitor that traverse the tree in post-order (avoiding visited nodes).
-template <typename wrapped_t, typename predicate_t, typename input_node_t, 
+template <typename wrapped_t, typename predicate_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct post_order_traverser {
 
-	post_order_traverser(wrapped_t& wrapped, predicate_t& query) : 
+	post_order_traverser(wrapped_t& wrapped, predicate_t& query) :
 		wrapped(wrapped), query(query) {}
 
 	output_node_t operator()(const input_node_t& n) {
@@ -120,13 +120,13 @@ private:
 	output_node_t traverse(const input_node_t& n, std::set<input_node_t>& visited) {
 		// we traverse the children of the node in post-order, i.e. we visit
 		// the children first and then the node itself.
-		for (const auto& c : n->child) 
+		for (const auto& c : n->child)
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
 			if (!visited.contains(c) && query(c)) {
 				traverse(c, visited);
 				// we assume we have no cycles, i.e. there is no way we could
-				// visit the same node again down the tree. 
+				// visit the same node again down the tree.
 				// thus we can safely add the node to the visited set after
 				// visiting it.
 				visited.insert(c);
@@ -141,11 +141,11 @@ private:
 // change all the related code.
 
 // visitor that traverse the tree in post-order (repeating visited nodes if necessary).
-template <typename wrapped_t, typename predicate_t, typename input_node_t, 
+template <typename wrapped_t, typename predicate_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct post_order_tree_traverser {
 
-	post_order_tree_traverser(wrapped_t& wrapped, predicate_t& query) : 
+	post_order_tree_traverser(wrapped_t& wrapped, predicate_t& query) :
 		wrapped(wrapped), query(query) {}
 
 	output_node_t operator()(const input_node_t& n) {
@@ -161,7 +161,7 @@ private:
 	output_node_t traverse(const input_node_t& n) {
 		// we traverse the children of the node in post-order, i.e. we visit
 		// the children first and then the node itself.
-		for (const auto& c : n->child) 
+		for (const auto& c : n->child)
 			// we skip already visited nodes and nodes that do not match the
 			// query predicate if it is present.
 			if (query(c)) traverse(c);
@@ -170,9 +170,9 @@ private:
 	}
 };
 
-// visitor that produces nodes transformed accordingly to the 
+// visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
-template <typename wrapped_t, typename input_node_t, 
+template <typename wrapped_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct map_transformer {
 
@@ -180,8 +180,8 @@ struct map_transformer {
 
 	output_node_t operator()(const input_node_t& n) {
 		std::vector<output_node_t> child;
-		for (const auto& c : n->child) 
-			if (auto it = changes.find(c); it != changes.end()) 
+		for (const auto& c : n->child)
+			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 		return changes[n] = make_node(wrapped(n->value), child);
 	}
@@ -190,9 +190,9 @@ struct map_transformer {
 	wrapped_t& wrapped;
 };
 
-// visitor that produces nodes transformed accordingly to the 
+// visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
-template <typename wrapped_t, typename input_node_t, 
+template <typename wrapped_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct map_node_transformer {
 
@@ -203,8 +203,8 @@ struct map_node_transformer {
 		auto nn = wrapped(n);
 		if (nn != n) { changes[n] == nn; return nn; };
 		std::vector<output_node_t> child;
-		for (const auto& c : n->child) 
-			if (auto it = changes.find(c); it != changes.end()) 
+		for (const auto& c : n->child)
+			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 			else child.push_back(c);
 		auto nn2 = make_node(nn->value, child);
@@ -215,11 +215,11 @@ struct map_node_transformer {
 	wrapped_t& wrapped;
 };
 
-// visitor that produces nodes transformed accordingly to the 
+// visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
 //
 // TODO (MEDIUM) merge replace and replace_node transformers into one.
-template <typename wrapped_t, typename input_node_t, 
+template <typename wrapped_t, typename input_node_t,
 	typename output_node_t = input_node_t>
 struct replace_node_transformer {
 
@@ -227,8 +227,8 @@ struct replace_node_transformer {
 
 	output_node_t operator()(const input_node_t& n) {
 		std::vector<output_node_t> child;
-		for (const auto& c : n->child) 
-			if (auto it = changes.find(c); it != changes.end()) 
+		for (const auto& c : n->child)
+			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 		return changes[n] = wrapped(n->value, child);
 	}
@@ -237,7 +237,7 @@ struct replace_node_transformer {
 	wrapped_t& wrapped;
 };
 
-// visitor that produces nodes transformed accordingly to the 
+// visitor that produces nodes transformed accordingly to the
 // given transformer. It only works with post order traversals.
 template <typename node_t>
 struct replace_transformer {
@@ -252,7 +252,7 @@ struct replace_transformer {
 private:
 	node_t replace(const node_t& n) {
 		std::vector<node_t> child;
-		for (const auto& c : n->child) 
+		for (const auto& c : n->child)
 			if (auto it = changes.find(c); it != changes.end())
 				child.push_back(it->second);
 			else child.push_back(c);
@@ -260,12 +260,12 @@ private:
 	}
 };
 
-// visitor that selects top nodes that satisfy a predicate and stores them in the 
+// visitor that selects top nodes that satisfy a predicate and stores them in the
 // supplied vector. It only works with post order traversals and never produces
 // duplicates.
 template <typename predicate_t, typename node_t>
 struct select_top_predicate {
-	select_top_predicate(predicate_t& query, std::vector<node_t>& selected) : 
+	select_top_predicate(predicate_t& query, std::vector<node_t>& selected) :
 		query(query), selected(selected) {}
 
 	bool operator()(const node_t& n) {
@@ -274,40 +274,40 @@ struct select_top_predicate {
 		// since we are only interested in the top nodes.
 		if (std::find(selected.begin(), selected.end(), n) == selected.end())
 			selected.push_back(n);
-		return false; 
+		return false;
 	}
 
 	predicate_t& query;
 	std::vector<node_t>& selected;
 };
 
-// visitor that selects nodes that satisfy a predicate and stores them in the 
+// visitor that selects nodes that satisfy a predicate and stores them in the
 // supplied vector.
 template <typename predicate_t, typename node_t>
 struct select_all_predicate {
-	select_all_predicate(predicate_t& query, std::vector<node_t>& selected) : 
+	select_all_predicate(predicate_t& query, std::vector<node_t>& selected) :
 		query(query), selected(selected) {}
 
 	bool operator()(const node_t& n) {
 		if (query(n)) selected.push_back(n);
 		// we always return true to visit all the nodes.
-		return true;		
+		return true;
 	}
 
 	predicate_t& query;
 	std::vector<node_t>& selected;
 };
 
-// visitor that selects nodes that satisfy a predicate and stores them in the 
+// visitor that selects nodes that satisfy a predicate and stores them in the
 // supplied vector.
 template <typename predicate_t, typename node_t>
 struct find_top_predicate {
-	find_top_predicate(predicate_t& query, std::optional<node_t>& found) : 
+	find_top_predicate(predicate_t& query, std::optional<node_t>& found) :
 	query(query), found(found) {}
 
 	bool operator()(const node_t& n) {
 		if (!found && query(n)) found = n;
-		return !found;		
+		return !found;
 	}
 
 	predicate_t& query;
@@ -317,13 +317,13 @@ struct find_top_predicate {
 // always true predicate
 //
 // TODO (LOW) define a const version of the predicate, move it to rewriter and use
-// it in all the code. Review the connection with all predicate and use only 
+// it in all the code. Review the connection with all predicate and use only
 // one of them.
 // Check if we have other cases like this one
 template<typename node_t>
 struct true_predicate {
-	
-	bool operator()(const node_t& n) const {
+
+	bool operator()(const node_t& /*n*/) const {
 		return true;
 	}
 };
@@ -338,8 +338,8 @@ using true_predicate_t = true_predicate<node_t>;
 // Check if we have other cases like this one
 template<typename node_t>
 struct false_predicate {
-	
-	bool operator()(const node_t& n) const {
+
+	bool operator()(const node_t& /*n*/) const {
 		return false;
 	}
 };
@@ -415,8 +415,8 @@ node_t trim_top(const node_t& input, predicate_t& query) {
 	neg_predicate<predicate_t> neg(query);
 	map_transformer<identity_t<symbol_t>, node_t> map(identity<symbol_t>);
 	return post_order_traverser<
-			map_transformer<identity_t<symbol_t>, node_t>, 
-			neg_predicate_t<predicate_t>, 
+			map_transformer<identity_t<symbol_t>, node_t>,
+			neg_predicate_t<predicate_t>,
 			node_t>(
 		map, neg)(input);
 }
@@ -427,8 +427,8 @@ std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_top_predicate<predicate_t, node_t> select(query, selected);
 	post_order_traverser<
-			identity_t<node_t>, 
-			select_top_predicate<predicate_t, node_t>, 
+			identity_t<node_t>,
+			select_top_predicate<predicate_t, node_t>,
 			node_t>(
 		identity<node_t>, select)(input);
 	return selected;
@@ -440,8 +440,8 @@ std::vector<node_t> select_all(const node_t& input, predicate_t& query) {
 	std::vector<node_t> selected;
 	select_all_predicate<predicate_t, node_t> select(query, selected);
 	post_order_traverser<
-			identity_t<node_t>, 
-			select_all_predicate<predicate_t, node_t>, 
+			identity_t<node_t>,
+			select_all_predicate<predicate_t, node_t>,
 			node_t>(
 		identity<node_t>, select)(input);
 	return selected;
@@ -453,8 +453,8 @@ std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	std::optional<node_t> found;
 	find_top_predicate<predicate_t, node_t> find_top(query, found);
 	post_order_traverser<
-			identity_t<node_t>, 
-			find_top_predicate<predicate_t, node_t>, 
+			identity_t<node_t>,
+			find_top_predicate<predicate_t, node_t>,
 			node_t>(
 		identity<node_t>, find_top)(input);
 	return found;
@@ -467,8 +467,8 @@ struct while_not_found_predicate {
 
 	while_not_found_predicate(std::optional<node_t>& found) : found(found) {}
 
-	bool operator()(const node_t& n) const {
-		return !found;		
+	bool operator()(const node_t& /*n*/) const {
+		return !found;
 	}
 
 	std::optional<node_t>& found;
@@ -478,7 +478,7 @@ struct while_not_found_predicate {
 // the predicate is satisfied by a node (set in found).
 template <typename predicate_t, typename node_t>
 struct find_visitor {
-	
+
 	find_visitor(predicate_t& query, std::optional<node_t>& found) : query(query), found(found) {}
 
 	node_t operator()(const node_t& n) const {
@@ -497,8 +497,8 @@ std::optional<node_t> find_bottom(const node_t& input, predicate_t& query) {
 	while_not_found_predicate<node_t> not_found(node);
 	find_visitor<predicate_t, node_t> find(query, node);
 	post_order_traverser<
-			find_visitor<predicate_t, node_t>, 
-			while_not_found_predicate<node_t>, 
+			find_visitor<predicate_t, node_t>,
+			while_not_found_predicate<node_t>,
 			node_t>(
 		find, not_found)(input);
 	return node;
@@ -524,12 +524,12 @@ using rule = std::pair<node_t, node_t>;
 //
 // IDEA use also a skip predicate to skip subtrees that are not needed in the match.
 // It should allow to detects matches in the middle of a tree.
-template <typename node_t, typename is_ignore_t, typename is_capture_t> 
+template <typename node_t, typename is_ignore_t, typename is_capture_t>
 struct pattern_matcher {
 	using pattern_t = node_t;
 
-	pattern_matcher(pattern_t& pattern, environment<node_t>& env, 
-		is_ignore_t& is_ignore, is_capture_t& is_capture): pattern(pattern), 
+	pattern_matcher(pattern_t& pattern, environment<node_t>& env,
+		is_ignore_t& is_ignore, is_capture_t& is_capture): pattern(pattern),
 		env(env), is_ignore(is_ignore), is_capture(is_capture) {}
 
 	bool operator()(const node_t& n) {
@@ -556,8 +556,8 @@ private:
 		// if we already have captured a node associated to the current capture
 		// we check if it is the same as the current node, if it is not, we
 		// return false...
-		if (is_capture(p)) 
-			if (auto it = env.find(p); it != env.end() && it->second != n) 
+		if (is_capture(p))
+			if (auto it = env.find(p); it != env.end() && it->second != n)
 				return false;
 			// ...otherwise we save the current node as the one associated to the
 			// current capture and return true.
@@ -586,13 +586,13 @@ private:
 // TODO (LOW) create and env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
-template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t> 
+template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t>
 struct pattern_matcher_with_skip {
 	using pattern_t = node_t;
 
-	pattern_matcher_with_skip(pattern_t& pattern, environment<node_t>& env, 
-		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t is_skip): 
-		pattern(pattern), env(env), is_ignore(is_ignore), 
+	pattern_matcher_with_skip(pattern_t& pattern, environment<node_t>& env,
+		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t& is_skip):
+		pattern(pattern), env(env), is_ignore(is_ignore),
 		is_capture(is_capture), is_skip(is_skip) {}
 
 	bool operator()(const node_t& n) {
@@ -620,8 +620,8 @@ private:
 		// if we already have captured a node associated to the current capture
 		// we check if it is the same as the current node, if it is not, we
 		// return false...
-		if (is_capture(p)) 
-			if (auto it = env.find(p); it != env.end()  && it->second != n) 
+		if (is_capture(p))
+			if (auto it = env.find(p); it != env.end()  && it->second != n)
 				return false;
 			// ...otherwise we save the current node as the one associated to the
 			// current capture and return true.
@@ -648,7 +648,7 @@ private:
 };
 
 // apply a rule to a tree using the predicate to pattern_matcher.
-template <typename node_t, typename is_ignore_t, typename is_capture_t> 
+template <typename node_t, typename is_ignore_t, typename is_capture_t>
 node_t apply(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c) {
 	auto [p , s] = r;
 	environment<node_t> u;
@@ -658,12 +658,12 @@ node_t apply(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c) {
 
 // apply a rule to a tree using the predicate to pattern_matcher and skipping
 // unnecessary subtrees
-template <typename node_t, typename is_ignore_t, typename is_capture_t, 
-	typename is_skip_t> 
+template <typename node_t, typename is_ignore_t, typename is_capture_t,
+	typename is_skip_t>
 node_t apply_with_skip(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
 	auto [p , s] = r;
 	environment<node_t> u;
-	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t> 
+	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t>
 		matcher {p, u, i, c, sk};
 	#ifndef OUTPUT_APPLY_RULES
 	return apply(s, n, matcher);
@@ -676,9 +676,9 @@ node_t apply_with_skip(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t&
 	#endif // OUTPUT_APPLY_RULES
 }
 
-// apply a substitution to a rule according to a given matcher, this method is 
+// apply a substitution to a rule according to a given matcher, this method is
 // use internaly by apply and apply with skip.
-template <typename node_t, typename matcher_t> 
+template <typename node_t, typename matcher_t>
 node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 	post_order_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
 	if (matcher.matched) {
@@ -699,11 +699,11 @@ using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
 // make a tree from the given source code string.
 template<typename parser_t, typename transformer_t, typename parse_symbol_t, typename symbol_t>
-sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const std::string source) {
+sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, const std::string source) {
 	using parse_forest = idni::forest<parse_symbol_t>;
-	using parse_tree = typename parse_forest::tree;
+	//using parse_tree = typename parse_forest::tree;
 	using sp_parse_tree = typename parse_forest::sptree;
-	using parse_graph = typename parse_forest::graph;
+	//using parse_graph = typename parse_forest::graph;
 
 	sp_parse_tree t;
 	static parser_t parser;
@@ -711,7 +711,7 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 	// MARK output the error if the parser failed
 	// avoiding doctest issues, uncomment for errors
 	//if (!f || !parser.found()) {
-	//	std::cerr << parser.get_error().to_str(); 
+	//	std::cerr << parser.get_error().to_str();
 	//}
 
 	auto get_tree = [&f, &t] (auto& g ){
@@ -726,11 +726,11 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer, const 
 		};
 	f->extract_graphs(f->root(), get_tree);
 
-	map_transformer<drop_location_t<parse_symbol_t, symbol_t>, 
+	map_transformer<drop_location_t<parse_symbol_t, symbol_t>,
 		sp_parse_tree, sp_node<symbol_t>> transform(drop_location<parse_symbol_t, symbol_t>);
 	return post_order_traverser<
 			// REVIEW maybe should be transformer instead of drop_location
-			map_transformer<drop_location_t<parse_symbol_t, symbol_t>, sp_parse_tree, sp_node<symbol_t>>, 
+			map_transformer<drop_location_t<parse_symbol_t, symbol_t>, sp_parse_tree, sp_node<symbol_t>>,
 			all_t<sp_parse_tree>,
 			sp_parse_tree, sp_node<symbol_t>>
 		(transform, all<sp_parse_tree>)(t);

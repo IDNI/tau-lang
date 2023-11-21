@@ -26,10 +26,10 @@ using namespace std;
 
 namespace testing = doctest;
 
-// IMPORTANT: To check the parser (and the underlying grammar) we don't need 
+// IMPORTANT: To check the parser (and the underlying grammar) we don't need
 // any special boolean algebra, so we use Bool to simplify our testing.
 
-// The following test suites represent correct sentences of a tau formula or 
+// The following test suites represent correct sentences of a tau formula or
 // library and as such must be parsed correctly and satisfy the structural checks
 // we perform on the parsed formula (as the rest of the code assumes such structure).
 
@@ -41,7 +41,7 @@ namespace testing = doctest;
 
 TEST_SUITE("parsing formula") {
 
-	static constexpr char* sample =	
+	const char* sample =
 		"?X := ?X."
 		"?Y := ?Y."
 		" ( ?Z == F ) .";
@@ -73,14 +73,14 @@ TEST_SUITE("parsing formula") {
 TEST_SUITE("parsing builders") {
 
 	TEST_CASE("one capture") {
-		static constexpr char* sample =	"( $X ) := (?X wff_and $X).";
+		const char* sample = "( $X ) := (?X wff_and $X).";
 		auto src = make_builder<Bool>(sample);
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(src.first) );
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
 	}
 
 	TEST_CASE("two capture") {
-		static constexpr char* sample =	"( $X $Y ) := (?X wff_and $Y).";
+		const char* sample = "( $X $Y ) := (?X wff_and $Y).";
 		auto src = make_builder<Bool>(sample);
 		auto left = src.first;
 		auto right = src.first;
@@ -91,7 +91,7 @@ TEST_SUITE("parsing builders") {
 
 TEST_SUITE("parsing library") {
 
-	static constexpr char* sample =	
+	const char* sample =
 		"?X := ?X."
 		"?Y := ?Y.";
 	auto src = make_tau_source(sample);
@@ -147,80 +147,75 @@ TEST_SUITE("parsing indexes"){
 }
 
 TEST_SUITE("parsing wwf formulas ") {
-	
+
 	TEST_CASE("wff_neg") {
-		static constexpr char* sample =	
-			"wff_neg ( ?Z == F ).";
+		const char* sample = "wff_neg ( ?Z == F ).";
 		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);		
-		auto neg_formula = frml 
-			| tau_parser::formula 
-			| tau_parser::main 
-			| tau_parser::wff 
+		auto frml = make_statement(src);
+		auto neg_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
 			| tau_parser::wff_neg;
 		CHECK( neg_formula.has_value() );
 	}
 
 	TEST_CASE("wff_and") {
-		static constexpr char* sample =	
-			"(( ?Z == F ) wff_and ( ?X == F )).";
+		const char* sample = "(( ?Z == F ) wff_and ( ?X == F )).";
 		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);		
-		auto and_formula = frml 
-			| tau_parser::formula 
-			| tau_parser::main 
-			| tau_parser::wff 
+		auto frml = make_statement(src);
+		auto and_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
 			| tau_parser::wff_and;
 		CHECK( and_formula.has_value() );
 	}
 
 	TEST_CASE("wff_or") {
-		static constexpr char* sample =	
-			"(( ?Z == F ) wff_or ( ?X == F )).";
+		const char* sample = "(( ?Z == F ) wff_or ( ?X == F )).";
 		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);		
-		auto or_formula = frml 
-			| tau_parser::formula 
-			| tau_parser::main 
-			| tau_parser::wff 
+		auto frml = make_statement(src);
+		auto or_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
 			| tau_parser::wff_or;
 		CHECK( or_formula.has_value() );
 	}
 
 	TEST_CASE("wff_xor") {
-		static constexpr char* sample =	
-			"(( ?Z == F ) wff_xor ( ?X == F )).";
+		const char* sample = "(( ?Z == F ) wff_xor ( ?X == F )).";
 		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);		
-		auto xor_formula = frml 
-			| tau_parser::formula 
-			| tau_parser::main 
-			| tau_parser::wff 
+		auto frml = make_statement(src);
+		auto xor_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
 			| tau_parser::wff_xor;
 		CHECK( xor_formula.has_value() );
 	}
 
 	TEST_CASE("wff_eq") {
-		static constexpr char* sample =	
-			"( ?Z == F ).";
+		const char* sample = "( ?Z == F ).";
 		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);		
-		auto eq_formula = frml 
-			| tau_parser::formula 
-			| tau_parser::main 
-			| tau_parser::wff 
+		auto frml = make_statement(src);
+		auto eq_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
 			| tau_parser::wff_eq;
 		CHECK( eq_formula.has_value() );
 	}
 
 	TEST_CASE("wff_imply") {
-		static constexpr char* sample =	"(?Z wff_imply ?Z) := ?Z.";
+		const char* sample = "(?Z wff_imply ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto imply_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto imply_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
 			| tau_parser::wff
@@ -229,13 +224,13 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("wff_coimply") {
-		static constexpr char* sample =	"(?Z wff_coimply ?Z) := ?Z.";
+		const char* sample = "(?Z wff_coimply ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto coimply_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto coimply_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
 			| tau_parser::wff
@@ -244,13 +239,13 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("wff_equiv") {
-		static constexpr char* sample =	"(?Z wff_equiv ?Z) := ?Z.";
+		const char* sample = "(?Z wff_equiv ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto equiv_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto equiv_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
 			| tau_parser::wff
@@ -259,27 +254,25 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("wff_all") {
-		static constexpr char* sample =	
-			"wff_all ?Z ( ?Z == F ) .";
+		const char* sample = "wff_all ?Z ( ?Z == F ) .";
 		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);		
-		auto all_formula = frml 
-			| tau_parser::formula 
-			| tau_parser::main 
-			| tau_parser::wff 
+		auto frml = make_statement(src);
+		auto all_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
 			| tau_parser::wff_all;
 		CHECK( all_formula.has_value() );
 	}
 
 	TEST_CASE("wff_ex") {
-		static constexpr char* sample =	
-			"wff_ex ?Z ( ?Z == F ) .";
+		const char* sample = "wff_ex ?Z ( ?Z == F ) .";
 		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);		
-		auto ex_formula = frml 
-			| tau_parser::formula 
-			| tau_parser::main 
-			| tau_parser::wff 
+		auto frml = make_statement(src);
+		auto ex_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
 			| tau_parser::wff_ex;
 		CHECK( ex_formula.has_value() );
 	}
@@ -293,73 +286,73 @@ TEST_SUITE("parsing wwf formulas ") {
 TEST_SUITE("parsing cbf formulas ") {
 
 	TEST_CASE("cbf_neg") {
-		static constexpr char* sample =	"?Z := cbf_neg ?Z.";
+		const char* sample = "?Z := cbf_neg ?Z.";
 		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);		
-		auto neg_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto lib = make_statement(src);
+		auto neg_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::cbf_rule
 			| tau_parser::cbf_body
 			| tau_parser::cbf
-			| tau_parser::cbf_neg; 
+			| tau_parser::cbf_neg;
 		CHECK( neg_rule.has_value() );
 	}
 
 	TEST_CASE("cbf_and") {
-		static constexpr char* sample =	"?Z := ( ?Z cbf_and ?Z ).";
+		const char* sample = "?Z := ( ?Z cbf_and ?Z ).";
 		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);		
-		auto and_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto lib = make_statement(src);
+		auto and_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::cbf_rule
 			| tau_parser::cbf_body
 			| tau_parser::cbf
-			| tau_parser::cbf_and; 
+			| tau_parser::cbf_and;
 		CHECK( and_rule.has_value() );
 	}
 
 	TEST_CASE("cbf_or") {
-		static constexpr char* sample =	"?Z := ( ?Z cbf_or ?Z ).";
+		const char* sample = "?Z := ( ?Z cbf_or ?Z ).";
 		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);		
-		auto or_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto lib = make_statement(src);
+		auto or_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::cbf_rule
 			| tau_parser::cbf_body
 			| tau_parser::cbf
-			| tau_parser::cbf_or; 
+			| tau_parser::cbf_or;
 		CHECK( or_rule.has_value() );
 	}
 
 	TEST_CASE("cbf_xor") {
-		static constexpr char* sample =	"?Z := ( ?Z cbf_xor ?Z ).";
+		const char* sample = "?Z := ( ?Z cbf_xor ?Z ).";
 		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);		
-		auto xor_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto lib = make_statement(src);
+		auto xor_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::cbf_rule
 			| tau_parser::cbf_body
 			| tau_parser::cbf
-			| tau_parser::cbf_xor; 
+			| tau_parser::cbf_xor;
 		CHECK( xor_rule.has_value() );
 	}
 
 	TEST_CASE("cbf_imply") {
-		static constexpr char* sample =	"(?Z cbf_imply ?Z) := ?Z.";
+		const char* sample = "(?Z cbf_imply ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto imply_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto imply_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::cbf_rule
 			| tau_parser::cbf_matcher
 			| tau_parser::cbf
@@ -368,13 +361,13 @@ TEST_SUITE("parsing cbf formulas ") {
 	}
 
 	TEST_CASE("cbf_coimply") {
-		static constexpr char* sample =	"(?Z cbf_coimply ?Z) := ?Z.";
+		const char* sample = "(?Z cbf_coimply ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto coimply_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto coimply_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::cbf_rule
 			| tau_parser::cbf_matcher
 			| tau_parser::cbf
@@ -383,13 +376,13 @@ TEST_SUITE("parsing cbf formulas ") {
 	}
 
 	TEST_CASE("cbf_equiv") {
-		static constexpr char* sample =	"(?Z cbf_equiv ?Z) := ?Z.";
+		const char* sample = "(?Z cbf_equiv ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto equiv_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto equiv_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::cbf_rule
 			| tau_parser::cbf_matcher
 			| tau_parser::cbf
@@ -398,17 +391,17 @@ TEST_SUITE("parsing cbf formulas ") {
 	}
 
 	TEST_CASE("cbf_if") {
-		static constexpr char* sample =	"(if $Y then $Z  else $Z) := $X.";
+		const char* sample = "(if $Y then $Z  else $Z) := $X.";
 		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);		
-		auto if_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto lib = make_statement(src);
+		auto if_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
 			| tau_parser::wff
-			| tau_parser::cbf_if; 
+			| tau_parser::cbf_if;
 		CHECK( if_rule.has_value() );
 	}
 
@@ -421,28 +414,28 @@ TEST_SUITE("parsing cbf formulas ") {
 TEST_SUITE("parsing bf formulas ") {
 
 	TEST_CASE("bf_neg") {
-		static constexpr char* sample =	"bf_neg ?Z := ?Z.";
+		const char* sample = "bf_neg ?Z := ?Z.";
 		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);		
-		auto neg_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto lib = make_statement(src);
+		auto neg_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
-			| tau_parser::bf_neg; 
+			| tau_parser::bf_neg;
 		CHECK( neg_rule.has_value() );
 	}
 
 	TEST_CASE("bf_and") {
-		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
+		const char* sample = "(?Z bf_and ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto and_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto and_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -451,13 +444,13 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("bf_or") {
-		static constexpr char* sample =	"(?Z bf_or ?Z) := ?Z.";
+		const char* sample = "(?Z bf_or ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto or_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto or_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -466,13 +459,13 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("bf_xor") {
-		static constexpr char* sample =	"(?Z bf_xor ?Z) := ?Z.";
+		const char* sample = "(?Z bf_xor ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto xor_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto xor_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -481,13 +474,13 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("bf_less") {
-		static constexpr char* sample =	"(?Z bf_less ?Z) := ?Z.";
+		const char* sample = "(?Z bf_less ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto less_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto less_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -496,13 +489,13 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("bf_less_equal") {
-		static constexpr char* sample =	"(?Z bf_less_equal ?Z) := ?Z.";
+		const char* sample = "(?Z bf_less_equal ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto less_equal_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto less_equal_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -511,13 +504,13 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("bf_greater") {
-		static constexpr char* sample =	"(?Z bf_greater ?Z) := ?Z.";
+		const char* sample = "(?Z bf_greater ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto greater_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto greater_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -526,13 +519,13 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("bf_all") {
-		static constexpr char* sample =	"bf_all ?Z $Z := ?Z.";
+		const char* sample = "bf_all ?Z $Z := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto all_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto all_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -541,13 +534,13 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("bf_ex") {
-		static constexpr char* sample =	"bf_ex ?Z $Z := $Z.";
+		const char* sample = "bf_ex ?Z $Z := $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto ex_rule = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto ex_rule = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -559,12 +552,12 @@ TEST_SUITE("parsing bf formulas ") {
 TEST_SUITE("parsing bindings ") {
 
 	TEST_CASE("named binding") {
-		static constexpr char* sample =	"{ binding } := { binding }.";
+		const char* sample = "{ binding } := { binding }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto named = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto named = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -577,12 +570,12 @@ TEST_SUITE("parsing bindings ") {
 	}
 
 	TEST_CASE("source binding") {
-		static constexpr char* sample =	"{ type : binding } := { type : binding }.";
+		const char* sample = "{ type : binding } := { type : binding }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto source = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto source = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -595,12 +588,12 @@ TEST_SUITE("parsing bindings ") {
 	}
 
 	TEST_CASE("source binding type") {
-		static constexpr char* sample =	"{ type : binding } := { type : binding }.";
+		const char* sample = "{ type : binding } := { type : binding }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto type = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto type = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -614,12 +607,12 @@ TEST_SUITE("parsing bindings ") {
 	}
 
 	TEST_CASE("source binding source") {
-		static constexpr char* sample =	"{ type : binding } := { type : binding }.";
+		const char* sample = "{ type : binding } := { type : binding }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto source = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto source = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -633,12 +626,12 @@ TEST_SUITE("parsing bindings ") {
 	}
 
 	TEST_CASE("unresolved source binding") {
-		static constexpr char* sample =	"{  : binding } := {  : binding }.";
+		const char* sample = "{  : binding } := {  : binding }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto type = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto type = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -653,12 +646,12 @@ TEST_SUITE("parsing bindings ") {
 	}
 
 	TEST_CASE("resolved source binding") {
-		static constexpr char* sample =	"{ type : binding } := { type : binding }.";
+		const char* sample = "{ type : binding } := { type : binding }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto type = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto type = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -676,12 +669,12 @@ TEST_SUITE("parsing bindings ") {
 TEST_SUITE("parsing callbacks ") {
 
 	TEST_CASE("bf_and_cb") {
-		static constexpr char* sample =	"$X := { $X bf_and_cb $X }.";
+		const char* sample = "$X := { $X bf_and_cb $X }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto and_cb = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto and_cb = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -693,12 +686,12 @@ TEST_SUITE("parsing callbacks ") {
 	}
 
 	TEST_CASE("bf_or_cb") {
-		static constexpr char* sample =	"$X := { $X bf_or_cb $X }.";
+		const char* sample = "$X := { $X bf_or_cb $X }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto or_cb = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto or_cb = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -710,12 +703,12 @@ TEST_SUITE("parsing callbacks ") {
 	}
 
 	TEST_CASE("bf_xor_cb") {
-		static constexpr char* sample =	"$X := { $X bf_xor_cb $X }.";
+		const char* sample = "$X := { $X bf_xor_cb $X }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto xor_cb = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto xor_cb = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -727,12 +720,12 @@ TEST_SUITE("parsing callbacks ") {
 	}
 
 	TEST_CASE("bf_neg_cb") {
-		static constexpr char* sample =	"$X := { bf_neg_cb $X }.";
+		const char* sample = "$X := { bf_neg_cb $X }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto neg_cb = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto neg_cb = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -744,12 +737,12 @@ TEST_SUITE("parsing callbacks ") {
 	}
 
 	TEST_CASE("bf_subs_cb") {
-		static constexpr char* sample =	"$X := bf_subs_cb $X $X $X.";
+		const char* sample = "$X := bf_subs_cb $X $X $X.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto subs_cb = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
+		auto subs_cb = lib
+			| tau_parser::library
+			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
@@ -774,8 +767,3 @@ TEST_SUITE("parsing callbacks ") {
 	// TODO (MEDIUM) add wfff_has_subformula_cb test
 
 }
-
-
-
-
-
