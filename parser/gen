@@ -1,0 +1,20 @@
+#!/bin/sh
+
+TGF_DIR="../external/parser"
+TGF="$TGF_DIR/build-Release/tgf"
+
+if [[ ! -f "$TGF" ]]; then
+	echo "tgf tool not built. Building..."
+	D=`pwd`
+	cd "$TGF_DIR"
+	./release.sh
+	cd "$D"
+fi
+
+echo "Generating tau_parser"
+$TGF ./tau.tgf gen --name tau_parser > tau_parser.generated.h
+
+echo "Generating bdd_parser"
+$TGF ./bdd.tgf gen --name bdd_parser > bdd_parser.generated.h
+
+echo "Generation done"
