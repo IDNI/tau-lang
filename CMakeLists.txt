@@ -15,18 +15,20 @@ if (NOT CMAKE_BUILD_TYPE)
 set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
-include(tau-common)
-
 project(tau_lang)
-add_subdirectory("src")
-add_subdirectory("examples")
-
-# TODO (HIGH) generate new parser from grammar when needed
 
 #
 # Adding git submodules
 #
+include(add-git-submodule)
 add_git_submodule("external/parser")
+
+include(tau-common)
+
+add_subdirectory("src")
+add_subdirectory("examples")
+
+# TODO (HIGH) generate new parser from grammar when needed
 
 #
 # Build documentationo
@@ -58,7 +60,7 @@ set(BUILD_TESTS ON CACHE STRING "build the tau-lang test suite ON")
 set_property(CACHE BUILD_TESTS PROPERTY STRINGS "OFF" "ON")
 
 if (BUILD_TESTS)
-	enable_testing()	
+	enable_testing()
 	add_subdirectory(tests)
 endif ()
 
@@ -71,4 +73,3 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	message(STATUS "CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
 	message(STATUS "CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER}")
 endif ()
-
