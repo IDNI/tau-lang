@@ -30,19 +30,19 @@ namespace testing = doctest;
 TEST_SUITE("operator|") {
 
 	TEST_CASE("match zero nodes") {
-		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
+		const char* sample = "(?Z bf_and ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto args = lib 
+		auto args = lib
 			| tau_parser::main;
 		CHECK( !args );
 	}
 
 	TEST_CASE("match one node") {
-		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
+		const char* sample = "(?Z bf_and ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto args = lib 
+		auto args = lib
 			| tau_parser::library
 			| tau_parser::rules;
 		CHECK( args );
@@ -52,38 +52,38 @@ TEST_SUITE("operator|") {
 TEST_SUITE("operator||") {
 
 	TEST_CASE("match zero nodes") {
-		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
+		const char* sample = "(?Z bf_and ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto args = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto args = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::wff_rule
 			|| tau_parser::wff;
 		CHECK( args.size() == 0 );
 	}
 
 	TEST_CASE("match one node") {
-		static constexpr char* sample =	"(?Z bf_and ?Z) := ?Z.";
+		const char* sample = "(?Z bf_and ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto args = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto args = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			|| tau_parser::bf_rule;
 		CHECK( args.size() == 1 );
 	}
 
 	TEST_CASE("match several nodes") {
-		static constexpr char* sample =	"((?Z bf_and ?Z) bf_and (?Z bf_and ?Z)) := ?Z.";
+		const char* sample = "((?Z bf_and ?Z) bf_and (?Z bf_and ?Z)) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
-		auto args = lib 
-			| tau_parser::library 
-			| tau_parser::rules 
-			| tau_parser::rule 
+		auto args = lib
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
@@ -92,8 +92,8 @@ TEST_SUITE("operator||") {
 			|| tau_parser::bf_and
 			|| tau_parser::bf;
 		CHECK( args.size() == 4 );
-		CHECK( args[0] == args[1] );		
-		CHECK( args[0] == args[2] );		
-		CHECK( args[0] == args[3] );		
+		CHECK( args[0] == args[1] );
+		CHECK( args[0] == args[2] );
+		CHECK( args[0] == args[3] );
 	}
 }

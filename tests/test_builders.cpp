@@ -108,16 +108,16 @@ TEST_SUITE("builders parsing") {
 
 TEST_SUITE("builders execution") {
 
-	static constexpr char* sample =	" ( ?X == F ) .";
+	const char* sample = " ( ?X == F ) .";
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
-	auto X = frml 
+	auto X = frml
 		| tau_parser::formula | tau_parser::main | tau_parser::wff
-		| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::variable 
+		| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::variable
 		| optional_value_extractor<sp_tau_node<Bool>>;
 	auto F = frml
 		| tau_parser::formula | tau_parser::main | tau_parser::wff
-		| tau_parser::wff_eq | tau_parser::wff_f 
+		| tau_parser::wff_eq | tau_parser::wff_f
 		| optional_value_extractor<sp_tau_node<Bool>>;
 
 	TEST_CASE("BLDR_WFF_EQ") {
@@ -195,5 +195,5 @@ TEST_SUITE("builders execution") {
 		std::vector<sp_tau_node<Bool>> args = {X, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_ex;
 		CHECK( check.has_value() );
-	}	
+	}
 }
