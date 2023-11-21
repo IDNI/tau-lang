@@ -79,15 +79,18 @@ TEST_SUITE("steps parsing") {
 	TEST_CASE("clause_simplify_wff") {
 		CHECK( clause_simplify_wff<Bool>.size() == 2 );
 	}
-	
+
+	TEST_CASE("wff_remove_existential") {
+		CHECK( wff_remove_existential<Bool>.size() == 1 );
+	}
+		
 	TEST_CASE("bf_positives_upwards") {
 		CHECK( bf_positives_upwards<Bool>.size() == 5 );
 	}
 	
-	/*TEST_CASE("further_process") {
-		// TODO (HIGH) fix this test
-		CHECK( further_process<Bool>.size() == 2 );
-	}*/
+	TEST_CASE("bf_positives_upwards") {
+		CHECK( bf_positives_upwards<Bool>.size() == 5 );
+	}
 	
 	TEST_CASE("bf_elim_quantifiers") {
 		CHECK( bf_elim_quantifiers<Bool>.size() == 2 );

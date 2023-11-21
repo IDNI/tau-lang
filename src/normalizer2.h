@@ -161,7 +161,7 @@ RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X == F) wff_and ( $Y != F)) wff_and ($Z
 RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "((($X != F) wff_and ( $Y == F)) wff_and ($Z != F)) := (($Y == F) wff_and (($X != F) wff_and ($Z != F))).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != F) wff_and ( $Y == F)) := (($Y == F) wff_and ($X != F)).")
 RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y ) == F).")
-RULE(WFF_REMOVE_EX_0, "wff_ex $X $Y := wff_remove_existential $X $Y.")
+RULE(WFF_REMOVE_EX_0, "wff_ex $X $Y := wff_remove_existential_cb $X $Y.")
 
 // TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
 
@@ -323,7 +323,7 @@ static auto squeeze_positives = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto remove_existential = make_library<BAs...>(
+static auto wff_remove_existential = make_library<BAs...>(
 	WFF_REMOVE_EX_0 
 );
 
