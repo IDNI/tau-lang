@@ -1,17 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
-set(CMAKE_VERBOSE_MAKEFILE true)
-
-if(CMAKE_CONFIGURATION_TYPES)
-	set(CMAKE_CONFIGURATION_TYPES Debug Release)
-	set(CMAKE_CONFIGURATION_TYPES
-		"${CMAKE_CONFIGURATION_TYPES}" CACHE STRING "" FORCE
-	)
-endif()
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(TAU "${CMAKE_SOURCE_DIR}/..")
 list(APPEND CMAKE_MODULE_PATH ${TAU}/cmake)
-include(tau-common)
 
 set(TAU_HEADERS
 	anf.h
@@ -37,101 +26,116 @@ set(TAU_SOURCES
 
 set(CLI_SOURCES main.cpp)
 
-set(TAU_DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
-set(TAU_RELEASE_OPTIONS "-O3;-DNDEBUG")
 
-set(TAU_COMPILE_OPTIONS
-	"$<IF:$<CONFIG:Debug>,${TAU_DEBUG_OPTIONS},${TAU_RELEASE_OPTIONS}>"
-	"$<$<CONFIG:Release>:-flto=auto>"
-)
-set(TAU_LINK_OPTIONS "-flto=auto")
+#
+# include common CMAKE settings and target_setup() and exclude()
+#
+include(tau-common)
+
+# target names
+set(OBJECT_LIB_NAME "${PROJECT_LIB_NAME}o")
+set(STATIC_LIB_NAME "${PROJECT_LIB_NAME}_static")
+set(SHARED_LIB_NAME "${PROJECT_LIB_NAME}")
+set(EXECUTABLE_NAME "${PROJECT_NAME}")
+set(EXE_SHARED_NAME "${PROJECT_NAME}_shared")
 
 #
 # object library
 #
-add_library(TAUo OBJECT)
-target_setup(TAUo)
-target_compile_options(TAUo     PRIVATE ${TAU_COMPILE_OPTIONS} -fPIC)
-target_link_options(TAUo        PRIVATE ${TAU_LINK_OPTIONS})
-target_sources(TAUo             PRIVATE ${TAU_SOURCES} ${TAU_HEADERS})
-target_link_libraries(TAUo      ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(TAUo		${OBJECT_LIB_NAME} idni_parser)
-target_include_directories(TAUo PUBLIC 
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/parser>	
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/parser/src>)	
-target_include_directories(TAUo PUBLIC
+add_library(${OBJECT_LIB_NAME} OBJECT)
+target_sources(${OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
+target_setup(${OBJECT_LIB_NAME})
+target_link_libraries(${OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
+target_compile_options(${OBJECT_LIB_NAME} PRIVATE -fPIC)
+target_include_directories(${OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
-)
-
-#
-# shared library
-#
-add_library(TAUso SHARED)
-add_library(TAU::TMLso ALIAS TAUso)
-target_setup(TAUso)
-target_compile_options(TAUso     PRIVATE ${TAU_COMPILE_OPTIONS})
-target_link_options(TAUso        PRIVATE ${TAU_LINK_OPTIONS})
-target_link_libraries(TAUso      TAUo)
-target_link_libraries(TAUso		 ${OBJECT_LIB_NAME} idni_parser)
-target_include_directories(TAUso PUBLIC 
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/parser>	
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/parser/src>)	
-target_include_directories(TAUso PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
-	$<INSTALL_INTERFACE:.>
-)
-set_target_properties(TAUso PROPERTIES
-	EXPORT_NAME TAUso
-	PUBLIC_HEADER "${TAU_HEADERS}"
+	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/parser>
+	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/parser/src>
 )
 
 #
 # static library
 #
-add_library(TAUs STATIC)
-add_library(TAU::TAUs ALIAS TAUs)
-target_setup(TAUs)
-target_compile_options(TAUs     PRIVATE ${TAU_COMPILE_OPTIONS})
-target_link_options(TAUs        PRIVATE ${TAU_LINK_OPTIONS})
-target_link_libraries(TAUs      TAUo)
-target_include_directories(TAUs 
-	PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+add_library(${STATIC_LIB_NAME} STATIC)
+target_sources(${STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
+target_setup(${STATIC_LIB_NAME})
+target_link_libraries(${STATIC_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
+target_include_directories(${STATIC_LIB_NAME} PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
 )
-set_target_properties(TAUs PROPERTIES OUTPUT_NAME "TAU")
+set_target_properties(${STATIC_LIB_NAME} PROPERTIES
+	OUTPUT_NAME ${PROJECT_LIB_NAME})
+if(NOT BUILD_STATIC_LIBRARY)
+	exclude(${STATIC_LIB_NAME})
+endif()
+
+#
+# shared library
+#
+add_library(${SHARED_LIB_NAME} SHARED)
+add_library(${namespace}::${SHARED_LIB_NAME} ALIAS ${SHARED_LIB_NAME})
+target_sources(${SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
+target_setup(${SHARED_LIB_NAME})
+target_link_libraries(${SHARED_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
+target_include_directories(${SHARED_LIB_NAME} PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/parser>
+	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/parser/src>
+	$<INSTALL_INTERFACE:.>
+)
+set_target_properties(${SHARED_LIB_NAME} PROPERTIES
+	EXPORT_NAME ${SHARED_LIB_NAME}
+	PUBLIC_HEADER "${TAU_HEADERS}"
+)
+if(NOT BUILD_SHARED_LIBRARY)
+	exclude(${SHARED_LIB_NAME})
+endif()
 
 #
 # executable
 #
-add_executable(tau)
-target_setup(tau)
-target_compile_options(tau PRIVATE ${TAU_COMPILE_OPTIONS})
-target_link_options(tau    PRIVATE ${TAU_LINK_OPTIONS})
-target_sources(tau         PRIVATE ${CLI_SOURCES})
-target_link_libraries(tau  TAUs)
-if (WITH_EXCEPTIONS)
-	target_compile_definitions(tau PRIVATE "-DWITH_EXCEPTIONS")
-endif ()
+if(BUILD_EXECUTABLE)
+        add_executable(${EXECUTABLE_NAME})
+        target_sources(${EXECUTABLE_NAME} PRIVATE ${CLI_SOURCES})
+        target_setup(${EXECUTABLE_NAME})
+        target_link_libraries(${EXECUTABLE_NAME} ${STATIC_LIB_NAME})
+endif(BUILD_EXECUTABLE)
 
 #
 # executable using shared library
 #
-add_executable(tau_shared)
-target_setup(tau_shared)
-target_compile_options(tau_shared PRIVATE ${TAU_COMPILE_OPTIONS})
-target_link_options(tau_shared    PRIVATE ${TAU_LINK_OPTIONS})
-target_sources(tau_shared         PRIVATE ${CLI_SOURCES})
-target_link_libraries(tau_shared  TAUso)
-exclude(tau_shared)
+if(BUILD_SHARED_EXECUTABLE)
+        add_executable(${EXE_SHARED_NAME})
+        target_sources(${EXE_SHARED_NAME} PRIVATE ${CLI_SOURCES})
+        target_setup(${EXE_SHARED_NAME})
+        target_link_libraries(${EXE_SHARED_NAME} ${SHARED_LIB_NAME})
+endif(BUILD_SHARED_EXECUTABLE)
 
 #
 # install
 #
 include(GNUInstallDirs)
-install(TARGETS tau TAUso TAUo
+
+set(BUILD_TARGETS ${OBJECT_LIB_NAME})
+if(BUILD_SHARED_LIBRARY)
+	set(BUILD_TARGETS "${BUILD_TARGETS}" ${SHARED_LIB_NAME})
+endif()
+if(BUILD_STATIC_LIBRARY)
+	set(BUILD_TARGETS "${BUILD_TARGETS}" ${STATIC_LIB_NAME})
+endif()
+if(BUILD_EXECUTABLE)
+	set(BUILD_TARGETS "${BUILD_TARGETS}" ${EXECUTABLE_NAME})
+endif()
+if(BUILD_SHARED_EXECUTABLE)
+	set(BUILD_TARGETS "${BUILD_TARGETS}" ${EXE_SHARED_NAME})
+endif()
+
+install(TARGETS ${BUILD_TARGETS}
 	EXPORT TAU
-	LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
-	PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/TAU
 	RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+	LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	INCLUDES      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+	PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/TAU
+	)
 export(EXPORT TAU FILE ${TAU}/tau-config.cmake)
 install(EXPORT TAU DESTINATION ${PROJECT_BINARY_DIR})
