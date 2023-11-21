@@ -1,4 +1,4 @@
-// This file is generated from a file ./tau.tgfby 
+// This file is generated from a file /home/klip/idni/tau-lang.devel/parser/tau.tgfby 
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __TAU_PARSER_H__
