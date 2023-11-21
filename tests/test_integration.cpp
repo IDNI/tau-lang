@@ -26,6 +26,12 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+// TODO (MEDIUM) this tests should be splitted into 4 different files
+//
+// The idea is speed up test execution allowing parallel execution of tests.
+// Each test suite must go into different files named test_integration-1.cpp,...
+
+
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
 	TEST_CASE("T") {
