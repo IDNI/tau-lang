@@ -9,13 +9,14 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
-option(BUILD_DOC               "Build documentation"     OFF)
-option(BUILD_STATIC_LIBRARY    "Build static library"    OFF)
-option(BUILD_SHARED_LIBRARY    "Build shared library"    OFF)
-option(BUILD_EXECUTABLE        "Build executable"        OFF)
-option(BUILD_SHARED_EXECUTABLE "Build shared executable" OFF)
-option(BUILD_TESTS             "Build tests"             OFF)
-#option(BUILD_EXAMPLES          "Build examples"          OFF)
+option(BUILD_DOC               "Build documentation"         OFF)
+option(BUILD_STATIC_LIBRARY    "Build static library"        OFF)
+option(BUILD_SHARED_LIBRARY    "Build shared library"        OFF)
+option(BUILD_EXECUTABLE        "Build executable"            OFF)
+option(BUILD_SHARED_EXECUTABLE "Build shared executable"     OFF)
+option(BUILD_TESTS             "Build tests"                 OFF)
+#option(BUILD_EXAMPLES          "Build examples"              OFF)
+option(GENERATE_PARSER         "Generates parser from TGF"   OFF)
 set_property(CACHE BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE BUILD_SHARED_LIBRARY    PROPERTY STRINGS "OFF" "ON")
@@ -23,6 +24,7 @@ set_property(CACHE BUILD_EXECUTABLE        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE BUILD_SHARED_EXECUTABLE PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE BUILD_TESTS             PROPERTY STRINGS "OFF" "ON")
 #set_property(CACHE BUILD_EXAMPLES          PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE GENERATE_PARSER         PROPERTY STRINGS "OFF" "ON")
 if(NOT BUILD_STATIC_LIBRARY AND NOT BUILD_SHARED_LIBRARY
 	AND NOT BUILD_EXECUTABLE AND NOT BUILD_SHARED_EXECUTABLE
 	AND NOT BUILD_TESTS) # AND NOT BUILD_EXAMPLES)
@@ -38,6 +40,7 @@ message(STATUS "BUILD_EXECUTABLE: ${BUILD_EXECUTABLE}")
 message(STATUS "BUILD_SHARED_EXECUTABLE: ${BUILD_SHARED_EXECUTABLE}")
 message(STATUS "BUILD_TESTS: ${BUILD_TESTS}")
 #message(STATUS "BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
+message(STATUS "GENERATE_PARSER: ${GENERATE_PARSER}")
 
 #
 # Adding parser library's git submodule
@@ -47,11 +50,18 @@ add_git_submodule("external/parser")
 set(IDNI_PARSER_OBJECT_LIB "idni_parsero")
 
 #
+# Generate C++ parser from TGF if requested
+#
+if (GENERATE_PARSER)
+	include(generate-parser)
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf" tau_parser)
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/bdd.tgf" bdd_parser)
+endif()
+
+#
 # Adding src dir
 #
 add_subdirectory("src")
-
-# TODO (HIGH) generate new parser from grammar when needed
 
 #if (BUILD_EXAMPLES)
 #	add_subdirectory("examples")

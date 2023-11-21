@@ -1,20 +1,33 @@
 #!/bin/sh
 
-TGF_DIR="../external/parser"
+TGF_FILE=$1
+PARSER_NAME=$2
+PARSER_FILE=$3
+
+if [[ -z "$TGF_FILE" ]]; then
+	echo "provide an existing TGF file path"
+	exit 1
+fi
+if [[ -z "$PARSER_NAME" ]]; then
+	echo "provide a resulting parser name"
+	exit 2
+fi
+if [[ -z "$PARSER_FILE" ]]; then
+	echo "provide a resulting parser file path"
+	exit 3
+fi
+
+TGF_DIR="./external/parser"
 TGF="$TGF_DIR/build-Release/tgf"
 
 if [[ ! -f "$TGF" ]]; then
 	echo "tgf tool not built. Building..."
 	D=`pwd`
 	cd "$TGF_DIR"
-	./release.sh
+	./release.sh -DBUILD_TOOLS=1
 	cd "$D"
 fi
 
-echo "Generating tau_parser"
-$TGF ./tau.tgf gen --name tau_parser > tau_parser.generated.h
-
-echo "Generating bdd_parser"
-$TGF ./bdd.tgf gen --name bdd_parser > bdd_parser.generated.h
-
+echo "Generating $PARSER_NAME ..."
+$TGF "$TGF_FILE" gen --name "$PARSER_NAME" > "$PARSER_FILE"
 echo "Generation done"

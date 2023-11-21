@@ -1,4 +1,4 @@
-// This file is generated from a file ./bdd.tgfby 
+// This file is generated from a file /home/klip/idni/tau-lang.devel/parser/bdd.tgfby 
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __BDD_PARSER_H__
