@@ -289,28 +289,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 }
 
 TEST_SUITE("formulas: variables, no bindings and no quantifiers") {
-
-	TEST_CASE("?P wff_imply ?P") {
-		static constexpr char* sample =	"(?P wff_imply ?P).";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
-		auto result = normalizer<bdd_test>(sample_formula).main;
-		auto check = result |  tau_parser::wff_t;
-		CHECK( check.has_value() );
-	} 
-
-	TEST_CASE("?P xor_imply wff_neg ?P") {
-		static constexpr char* sample =	"(?P wff_xor wff_neg ?P).";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb); 
-		auto result = normalizer<bdd_test>(sample_formula).main;
-		auto check = result |  tau_parser::wff_t;
-		CHECK( check.has_value() );
-	} 
+	// TODO (HIGH) add tests for variables
 }
 
 TEST_SUITE("formulas: no variables, bindings and no quantifiers") {

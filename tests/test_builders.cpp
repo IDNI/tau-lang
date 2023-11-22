@@ -138,11 +138,11 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
 	}
 
-	// TEST_CASE("BLDR_CBF_IF") {
-	// 	auto bldr = make_builder<Bool>(BLDR_CBF_COIMPLY);
-	// 	CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
-	// 	CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
-	// }
+	TEST_CASE("BLDR_CBF_IF") {
+	 	auto bldr = make_builder<Bool>(BLDR_CBF_IF);
+	 	CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+	 	CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
+	}
 
 	TEST_CASE("BLDR_BF_AND") {
 		auto bldr = make_builder<Bool>(BLDR_BF_AND);
