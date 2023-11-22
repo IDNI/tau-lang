@@ -58,6 +58,9 @@ if (GENERATE_PARSER)
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/bdd.tgf" bdd_parser)
 endif()
 
+# load common cmake settings and load functions
+# 		target_setup(), target_compile_definitions_if() and exclude()
+include(tau-common)
 #
 # Adding src dir
 #

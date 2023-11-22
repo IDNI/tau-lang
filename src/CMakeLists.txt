@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TAU "${CMAKE_SOURCE_DIR}/..")
-list(APPEND CMAKE_MODULE_PATH ${TAU}/cmake)
 
 set(TAU_HEADERS
 	anf.h
@@ -26,28 +24,15 @@ set(TAU_SOURCES
 
 set(CLI_SOURCES main.cpp)
 
-
-#
-# include common CMAKE settings and target_setup() and exclude()
-#
-include(tau-common)
-
-# target names
-set(OBJECT_LIB_NAME "${PROJECT_LIB_NAME}o")
-set(STATIC_LIB_NAME "${PROJECT_LIB_NAME}_static")
-set(SHARED_LIB_NAME "${PROJECT_LIB_NAME}")
-set(EXECUTABLE_NAME "${PROJECT_NAME}")
-set(EXE_SHARED_NAME "${PROJECT_NAME}_shared")
-
 #
 # object library
 #
-add_library(${OBJECT_LIB_NAME} OBJECT)
-target_sources(${OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
-target_setup(${OBJECT_LIB_NAME})
-target_link_libraries(${OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
-target_compile_options(${OBJECT_LIB_NAME} PRIVATE -fPIC)
-target_include_directories(${OBJECT_LIB_NAME} PUBLIC
+add_library(${TAU_OBJECT_LIB_NAME} OBJECT)
+target_sources(${TAU_OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
+target_setup(${TAU_OBJECT_LIB_NAME})
+target_link_libraries(${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
+target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
+target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/parser>
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/parser/src>
@@ -56,59 +41,59 @@ target_include_directories(${OBJECT_LIB_NAME} PUBLIC
 #
 # static library
 #
-add_library(${STATIC_LIB_NAME} STATIC)
-target_sources(${STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
-target_setup(${STATIC_LIB_NAME})
-target_link_libraries(${STATIC_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
-target_include_directories(${STATIC_LIB_NAME} PUBLIC
+add_library(${TAU_STATIC_LIB_NAME} STATIC)
+target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
+target_setup(${TAU_STATIC_LIB_NAME})
+target_link_libraries(${TAU_STATIC_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
+target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
 )
-set_target_properties(${STATIC_LIB_NAME} PROPERTIES
+set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
 if(NOT BUILD_STATIC_LIBRARY)
-	exclude(${STATIC_LIB_NAME})
+	exclude(${TAU_STATIC_LIB_NAME})
 endif()
 
 #
 # shared library
 #
-add_library(${SHARED_LIB_NAME} SHARED)
-add_library(${namespace}::${SHARED_LIB_NAME} ALIAS ${SHARED_LIB_NAME})
-target_sources(${SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
-target_setup(${SHARED_LIB_NAME})
-target_link_libraries(${SHARED_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
-target_include_directories(${SHARED_LIB_NAME} PUBLIC
+add_library(${TAU_SHARED_LIB_NAME} SHARED)
+add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
+target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
+target_setup(${TAU_SHARED_LIB_NAME})
+target_link_libraries(${TAU_SHARED_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
+target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/parser>
 	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/parser/src>
 	$<INSTALL_INTERFACE:.>
 )
-set_target_properties(${SHARED_LIB_NAME} PROPERTIES
-	EXPORT_NAME ${SHARED_LIB_NAME}
+set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
+	EXPORT_NAME ${TAU_SHARED_LIB_NAME}
 	PUBLIC_HEADER "${TAU_HEADERS}"
 )
 if(NOT BUILD_SHARED_LIBRARY)
-	exclude(${SHARED_LIB_NAME})
+	exclude(${TAU_SHARED_LIB_NAME})
 endif()
 
 #
 # executable
 #
 if(BUILD_EXECUTABLE)
-        add_executable(${EXECUTABLE_NAME})
-        target_sources(${EXECUTABLE_NAME} PRIVATE ${CLI_SOURCES})
-        target_setup(${EXECUTABLE_NAME})
-        target_link_libraries(${EXECUTABLE_NAME} ${STATIC_LIB_NAME})
+        add_executable(${TAU_EXECUTABLE_NAME})
+        target_sources(${TAU_EXECUTABLE_NAME} PRIVATE ${CLI_SOURCES})
+        target_setup(${TAU_EXECUTABLE_NAME})
+        target_link_libraries(${TAU_EXECUTABLE_NAME} ${TAU_STATIC_LIB_NAME})
 endif(BUILD_EXECUTABLE)
 
 #
 # executable using shared library
 #
 if(BUILD_SHARED_EXECUTABLE)
-        add_executable(${EXE_SHARED_NAME})
-        target_sources(${EXE_SHARED_NAME} PRIVATE ${CLI_SOURCES})
-        target_setup(${EXE_SHARED_NAME})
-        target_link_libraries(${EXE_SHARED_NAME} ${SHARED_LIB_NAME})
+        add_executable(${TAU_EXE_SHARED_NAME})
+        target_sources(${TAU_EXE_SHARED_NAME} PRIVATE ${CLI_SOURCES})
+        target_setup(${TAU_EXE_SHARED_NAME})
+        target_link_libraries(${TAU_EXE_SHARED_NAME} ${TAU_SHARED_LIB_NAME})
 endif(BUILD_SHARED_EXECUTABLE)
 
 #
@@ -116,18 +101,18 @@ endif(BUILD_SHARED_EXECUTABLE)
 #
 include(GNUInstallDirs)
 
-set(BUILD_TARGETS ${OBJECT_LIB_NAME})
+set(BUILD_TARGETS ${TAU_OBJECT_LIB_NAME})
 if(BUILD_SHARED_LIBRARY)
-	set(BUILD_TARGETS "${BUILD_TARGETS}" ${SHARED_LIB_NAME})
+	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_SHARED_LIB_NAME})
 endif()
 if(BUILD_STATIC_LIBRARY)
-	set(BUILD_TARGETS "${BUILD_TARGETS}" ${STATIC_LIB_NAME})
+	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_STATIC_LIB_NAME})
 endif()
 if(BUILD_EXECUTABLE)
-	set(BUILD_TARGETS "${BUILD_TARGETS}" ${EXECUTABLE_NAME})
+	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_EXECUTABLE_NAME})
 endif()
 if(BUILD_SHARED_EXECUTABLE)
-	set(BUILD_TARGETS "${BUILD_TARGETS}" ${EXE_SHARED_NAME})
+	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_EXE_SHARED_NAME})
 endif()
 
 install(TARGETS ${BUILD_TARGETS}

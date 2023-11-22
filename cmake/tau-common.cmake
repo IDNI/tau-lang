@@ -67,11 +67,6 @@ function(target_setup target)
 	target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
 	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")
 	target_git_definitions(${target})
-	foreach(X IN LISTS PROJECT_DEFINITIONS)
-		if(${X})
-			target_compile_definitions(${target} PRIVATE "-D${X}")
-		endif()
-	endforeach()
 	set_target_properties(${target} PROPERTIES
 		ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
@@ -87,3 +82,10 @@ function(exclude target)
 		EXCLUDE_FROM_DEFAULT_BUILD 1
 	)
 endfunction()
+
+# target names
+set(TAU_OBJECT_LIB_NAME "${PROJECT_LIB_NAME}o")
+set(TAU_STATIC_LIB_NAME "${PROJECT_LIB_NAME}_static")
+set(TAU_SHARED_LIB_NAME "${PROJECT_LIB_NAME}")
+set(TAU_EXECUTABLE_NAME "${PROJECT_NAME}")
+set(TAU_EXE_SHARED_NAME "${PROJECT_NAME}_shared")
