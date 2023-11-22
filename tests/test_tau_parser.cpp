@@ -73,14 +73,14 @@ TEST_SUITE("parsing formula") {
 TEST_SUITE("parsing builders") {
 
 	TEST_CASE("one capture") {
-		static constexpr char* sample =	"( $X ) := (?X wff_and $X).";
+		static constexpr char* sample =	"( $X ) := ($X wff_and $X).";
 		auto src = make_builder<Bool>(sample);
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(src.first) );
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
 	}
 
 	TEST_CASE("two capture") {
-		static constexpr char* sample =	"( $X $Y ) := (?X wff_and $Y).";
+		static constexpr char* sample =	"( $X $Y ) := ($X wff_and $Y).";
 		auto src = make_builder<Bool>(sample);
 		auto left = src.first;
 		auto right = src.first;
@@ -214,7 +214,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("wff_imply") {
-		static constexpr char* sample =	"(?Z wff_imply ?Z) := ?Z.";
+		static constexpr char* sample =	"($Z wff_imply $Z) := $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto imply_rule = lib 
@@ -229,7 +229,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("wff_coimply") {
-		static constexpr char* sample =	"(?Z wff_coimply ?Z) := ?Z.";
+		static constexpr char* sample =	"($Z wff_coimply $Z) := $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto coimply_rule = lib 
@@ -244,7 +244,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("wff_equiv") {
-		static constexpr char* sample =	"(?Z wff_equiv ?Z) := ?Z.";
+		static constexpr char* sample =	"($Z wff_equiv $Z) := $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto equiv_rule = lib 

@@ -115,7 +115,7 @@
 // # TODO (HIGH) rename wff_eq and wff_new to bf_eq and bf_neq
 // wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | cbf_if
 // 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv | cbf_and_wff
-// 					| wff_coimply | wff_t | wff_f | variable | capture |ignore.
+// 					| wff_coimply | wff_t | wff_f | capture |ignore.
 // wff_eq 			=> open_parenthesis cbf equality wff_f close_parenthesis.
 // wff_neq 		=> open_parenthesis cbf nequality wff_f close_parenthesis.
 // wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
@@ -545,7 +545,6 @@ private:
 		q(nt(77), (nt(76)+nt(77)));
 		q(nt(77), (nul));
 		q(nt(75), (nt(38)+nt(77)+nt(39)));
-		q(nt(68), (nt(51)));
 		q(nt(68), (nt(52)));
 		q(nt(68), (nt(53)));
 		q(nt(68), (nt(69)));

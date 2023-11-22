@@ -967,7 +967,7 @@ const std::string BLDR_CBF_NEG = "( $X ) := cbf_neg $X.";
 const std::string BLDR_CBF_IMPLY = "( $X $Y ) := ($X cbf_imply $Y).";
 const std::string BLDR_CBF_EQUIV = "( $X $Y ) := ( $X cbf_equiv $Y ).";
 const std::string BLDR_CBF_COIMPLY = "( $X $Y ) := ($X cbf_coimply $Y).";
-const std::string BLDR_CBF_IF = "( $X $Y $Z ) := if $X then $Y else $Z.";
+const std::string BLDR_CBF_IF = "( $X $Y $Z ) := (if $X then $Y else $Z).";
 
 // definitions of bf builder rules
 const std::string BLDR_BF_AND = "( $X $Y ) := ($X bf_and $Y).";
