@@ -460,6 +460,19 @@ std::optional<node_t> find_top(const node_t& input, predicate_t& query) {
 	return found;
 }
 
+// find the first node that satisfy a predicate and return it.
+template <typename node_t>
+node_t replace(const node_t& n, std::map<node_t, node_t>& changes) {
+	replace_transformer<node_t> replace{changes};
+	return post_order_traverser<
+			replace_transformer<node_t>,
+			all_t<node_t>,
+			node_t>
+		(replace , all<node_t>)(n);
+}
+
+// TODO (LOW) consider adding a similar functino for replace_node...
+
 // true while found is not set (found), it aborts the traversal once found has
 // been set.
 template <typename node_t>
@@ -682,11 +695,9 @@ template <typename node_t, typename matcher_t>
 node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
 	post_order_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
 	if (matcher.matched) {
-		replace_transformer<node_t> replace {matcher.env};
-		auto nn = post_order_traverser<replace_transformer<node_t>,all_t<node_t>, node_t>(replace, all<node_t>)(s);
-		environment<node_t> nu { {matcher.matched.value(), nn} };
-		replace_transformer<node_t> nreplace {nu};
-		return post_order_traverser<replace_transformer<node_t>, all_t<node_t>, node_t>(nreplace, all<node_t>)(n);
+		auto nn = replace<node_t>(s, matcher.env);
+		environment<node_t> nenv { {matcher.matched.value(), nn} };
+		return replace<node_t>(n, nenv);
 	}
 	return n;
 }
@@ -708,12 +719,9 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 	sp_parse_tree t;
 	static parser_t parser;
 	auto f = parser.parse(source.c_str(), source.size());
-	// output the error if the parser failed. causes SIGSEGV
-	// MARK this to avoid SIGSEGV in doctest but then the test may pass.
-	if (!f || !parser.found()) {
+	// output the error if the parser failed.
+	if (!f || !parser.found())
 		std::cerr << parser.get_error().to_str() << std::endl;
-		return {};
-	}
 #ifdef DEBUG
 	// // MARK show number of trees if ambiguous
 	// if (f && f->is_ambiguous()) {

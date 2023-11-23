@@ -19,7 +19,12 @@ set(TESTS_WITHOUT_PARSER
 )
 
 set(TESTS_WITH_PARSER
-	rules
+	rules-bf_execution
+	rules-bf_parsing
+	rules-cbf_execution
+	rules-cbf_parsing
+	rules-wff_execution
+	rules-wff_parsing
 	builders
 	rewriting
 	formula

@@ -25,17 +25,7 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TODO (TK) (HIGH) write tests to check build_cbf_eq
-// TODO (TK) (HIGH) write tests to check build_cbf_neq
-// TODO (TK) (HIGH) write tests to check build_cbf_and
-// TODO (TK) (HIGH) write tests to check build_cbf_or
-// TODO (TK) (HIGH) write tests to check build_cbf_xor
-// TODO (TK) (HIGH) write tests to check build_cbf_neg
-// TODO (TK) (HIGH) write tests to check build_cbf_imply
-// TODO (TK) (HIGH) write tests to check build_cbf_equiv
-// TODO (TK) (HIGH) write tests to check build_cbf_coimply
-// TODO (TK) (HIGH) write tests to check build_cbf_if
-// TODO (TK) (HIGH) same for bfs
+// TODO (TK) (HIGH) remove BLDR_WFF_T, BLDR_WFF_F, BLDR_BF_T and BLDR_BF_F
 
 TEST_SUITE("builders parsing") {
 
@@ -103,6 +93,108 @@ TEST_SUITE("builders parsing") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EX);
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_CBF_AND") {
+		auto bldr = make_builder<Bool>(BLDR_CBF_AND);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_CBF_OR") {
+		auto bldr = make_builder<Bool>(BLDR_CBF_OR);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_CBF_XOR") {
+		auto bldr = make_builder<Bool>(BLDR_CBF_XOR);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_CBF_NEG") {
+		auto bldr = make_builder<Bool>(BLDR_CBF_NEG);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_CBF_IMPLY") {
+		auto bldr = make_builder<Bool>(BLDR_CBF_IMPLY);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_CBF_EQUIV") {
+		auto bldr = make_builder<Bool>(BLDR_CBF_EQUIV);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_CBF_COIMPLY") {
+		auto bldr = make_builder<Bool>(BLDR_CBF_COIMPLY);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::cbf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_CBF_IF") {
+	 	auto bldr = make_builder<Bool>(BLDR_CBF_IF);
+	 	CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+	 	CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_AND") {
+		auto bldr = make_builder<Bool>(BLDR_BF_AND);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_OR") {
+		auto bldr = make_builder<Bool>(BLDR_BF_OR);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_XOR") {
+		auto bldr = make_builder<Bool>(BLDR_BF_XOR);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_NEG") {
+		auto bldr = make_builder<Bool>(BLDR_BF_NEG);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_LESS") {
+		auto bldr = make_builder<Bool>(BLDR_BF_LESS);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_LESS_EQUAL") {
+		auto bldr = make_builder<Bool>(BLDR_BF_LESS_EQUAL);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_GREATER") {
+		auto bldr = make_builder<Bool>(BLDR_BF_GREATER);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_ALL") {
+		auto bldr = make_builder<Bool>(BLDR_BF_ALL);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
+	TEST_CASE("BLDR_BF_EX") {
+		auto bldr = make_builder<Bool>(BLDR_BF_EX);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
 	}
 }
 

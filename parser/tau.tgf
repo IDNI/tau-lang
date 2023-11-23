@@ -110,7 +110,7 @@ wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 # TODO (HIGH) rename wff_eq and wff_new to bf_eq and bf_neq
 wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | cbf_if
 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv | cbf_and_wff
-					| wff_coimply | wff_t | wff_f | variable | capture |ignore.
+					| wff_coimply | wff_t | wff_f | capture |ignore.
 wff_eq 			=> open_parenthesis cbf equality wff_f close_parenthesis.
 wff_neq 		=> open_parenthesis cbf nequality wff_f close_parenthesis.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
@@ -267,7 +267,7 @@ bf_has_clashing_subformulas_cb	=> bf_has_clashing_subformulas_cb_sym bf_cb_arg w
 wff_has_clashing_subformulas_cb	=> wff_has_clashing_subformulas_cb_sym wff_cb_arg ws_required wff_cb_arg.
 bf_has_subformula_cb 			=> bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-wff_remove_existential			=> wff_remove_existential_sym (variable | capture) ws_required wff.
+wff_remove_existential			=> wff_remove_existential_cb_sym wff_cb_arg ws_required wff_cb_arg.
 # bultin_args
 bf_cb_arg	=> capture | ignore | bf.
 wff_cb_arg	=> capture | ignore | wff.
@@ -292,7 +292,7 @@ bf_has_clashing_subformulas_cb_sym		=> ws "bf_has_clashing_subformulas_cb" ws.
 bf_has_subformula_cb_sym				=> ws "bf_has_subformula_cb" ws.
 wff_has_clashing_subformulas_cb_sym		=> ws "wff_has_clashing_subformulas_cb" ws.
 wff_has_subformula_cb_sym				=> ws "wff_has_subformula_cb" ws.
-wff_remove_existential_sym				=> ws "wff_remove_existential" ws.
+wff_remove_existential_cb_sym			=> ws "wff_remove_existential_cb" ws.
 
 # input definition
 input			=> in colon open_brace source_binding close_brace.
