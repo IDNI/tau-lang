@@ -708,13 +708,21 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 	sp_parse_tree t;
 	static parser_t parser;
 	auto f = parser.parse(source.c_str(), source.size());
-	// MARK output the error if the parser failed
-	// avoiding doctest issues, uncomment for errors
-	//if (!f || !parser.found()) {
-	//	std::cerr << parser.get_error().to_str();
-	//}
-
-	auto get_tree = [&f, &t] (auto& g ){
+	// output the error if the parser failed. causes SIGSEGV
+	// MARK this to avoid SIGSEGV in doctest but then the test may pass.
+	if (!f || !parser.found()) {
+		std::cerr << parser.get_error().to_str() << std::endl;
+		return {};
+	}
+#ifdef DEBUG
+	// // MARK show number of trees if ambiguous
+	// if (f && f->is_ambiguous()) {
+	// 	std::cout << "N trees: " << f->count_trees() << std::endl;
+	// 	// // MARK show forest data
+	// 	//f->print_data(std::cout << " for source: \n" << source << "\": \n") << std::endl;)
+	// }
+#endif
+	auto get_tree = [&f, &t] (auto& g) {
 			f->remove_recursive_nodes(g);
 			f->remove_binarization(g);
 			t = g.extract_trees();

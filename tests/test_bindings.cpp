@@ -46,7 +46,7 @@ TEST_SUITE("named bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
-		const char* sample = "{ non_matching } := { non_matching }.";
+		const char* sample = "{ nonmatching } := { nonmatching }.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -83,7 +83,7 @@ TEST_SUITE("factory bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
-		const char* sample = "{ non_matching } := { non_bool: some_source_code }.";
+		const char* sample = "{ nonmatching } := { nonbool: some_source_code }.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
 		auto binded = make_factory_bindings<dummy_factory>(statement, factory);
