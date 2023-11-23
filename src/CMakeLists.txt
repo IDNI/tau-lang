@@ -1,4 +1,4 @@
-set(TAU "${CMAKE_SOURCE_DIR}/..")
+set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
 	anf.h
@@ -33,9 +33,9 @@ target_setup(${TAU_OBJECT_LIB_NAME})
 target_link_libraries(${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
 target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/parser>
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/parser/src>
+	$<BUILD_INTERFACE:${TAU}/src>
+	$<BUILD_INTERFACE:${TAU}/parser>
+	$<BUILD_INTERFACE:${TAU}/external/parser/src>
 )
 
 #
@@ -46,7 +46,7 @@ target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_STATIC_LIB_NAME})
 target_link_libraries(${TAU_STATIC_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+	$<BUILD_INTERFACE:${TAU}/src>
 )
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
@@ -63,9 +63,9 @@ target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_SHARED_LIB_NAME})
 target_link_libraries(${TAU_SHARED_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/parser>
-	$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/external/parser/src>
+	$<BUILD_INTERFACE:${TAU}/src>
+	$<BUILD_INTERFACE:${TAU}/parser>
+	$<BUILD_INTERFACE:${TAU}/external/parser/src>
 	$<INSTALL_INTERFACE:.>
 )
 set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
@@ -84,6 +84,10 @@ if(BUILD_EXECUTABLE)
         target_sources(${TAU_EXECUTABLE_NAME} PRIVATE ${CLI_SOURCES})
         target_setup(${TAU_EXECUTABLE_NAME})
         target_link_libraries(${TAU_EXECUTABLE_NAME} ${TAU_STATIC_LIB_NAME})
+	target_include_directories(${TAU_EXECUTABLE_NAME} PUBLIC
+		$<BUILD_INTERFACE:${TAU}/src>
+		$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	)
 endif(BUILD_EXECUTABLE)
 
 #
@@ -94,6 +98,10 @@ if(BUILD_SHARED_EXECUTABLE)
         target_sources(${TAU_EXE_SHARED_NAME} PRIVATE ${CLI_SOURCES})
         target_setup(${TAU_EXE_SHARED_NAME})
         target_link_libraries(${TAU_EXE_SHARED_NAME} ${TAU_SHARED_LIB_NAME})
+	target_include_directories(${TAU_EXE_SHARED_NAME} PUBLIC
+		$<BUILD_INTERFACE:${TAU}/src>
+		$<BUILD_INTERFACE:${TAU}/external/parser/src>
+	)
 endif(BUILD_SHARED_EXECUTABLE)
 
 #
