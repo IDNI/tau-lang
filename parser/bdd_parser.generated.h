@@ -1,4 +1,4 @@
-// This file is generated from a file /home/klip/idni/tau-lang.devel/parser/bdd.tgfby 
+// This file is generated from a file /home/klip/idni/tau-lang.devel/parser/bdd.tgf by 
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __BDD_PARSER_H__
@@ -27,9 +27,9 @@ struct bdd_parser {
 		{ return p.get_error(); }
 	enum nonterminal {
 		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, eol, 
-		ws_comment, ws_comment_0, ws_required, ws, hex_escape, unicode_escape, char_escape_encode, esc, q_char, q_str, 
-		q_bqstr, char_punct, char_punct_1, char_punct_2, char_punct_3, char0, char_, string_char, bqstring_char, chars, 
-		chars_4, chars_5, char_class, equality, nequality, dot, open_parenthesis, close_parenthesis, open_bracket, close_bracket, 
+		ws_comment, _Rws_comment_0, ws_required, ws, hex_escape, unicode_escape, char_escape_encode, esc, q_char, q_str, 
+		q_bqstr, char_punct, _Rchar_punct_1, _Rchar_punct_2, _Rchar_punct_3, char0, char_, string_char, bqstring_char, chars, 
+		_Rchars_4, _Rchars_5, char_class, equality, nequality, dot, open_parenthesis, close_parenthesis, open_bracket, close_bracket, 
 		open_brace, close_brace, less_than, greater_than, minus, plus, colon, var, bdd, bdd_and, 
 		bdd_neg, bdd_xor, bdd_or, T, F, bdd_arg, bdd_and_sym, bdd_or_sym, bdd_xor_sym, bdd_neg_sym, 
 		start, __neg_0, __neg_1, __neg_2, __neg_3, __neg_4, __neg_5, 
@@ -57,9 +57,9 @@ private:
 		idni::nonterminals<char, char> nts{};
 		for (const auto& nt : {
 			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "eol", 
-			"ws_comment", "ws_comment_0", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", "q_str", 
-			"q_bqstr", "char_punct", "char_punct_1", "char_punct_2", "char_punct_3", "char0", "char_", "string_char", "bqstring_char", "chars", 
-			"chars_4", "chars_5", "char_class", "equality", "nequality", "dot", "open_parenthesis", "close_parenthesis", "open_bracket", "close_bracket", 
+			"ws_comment", "_Rws_comment_0", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", "q_str", 
+			"q_bqstr", "char_punct", "_Rchar_punct_1", "_Rchar_punct_2", "_Rchar_punct_3", "char0", "char_", "string_char", "bqstring_char", "chars", 
+			"_Rchars_4", "_Rchars_5", "char_class", "equality", "nequality", "dot", "open_parenthesis", "close_parenthesis", "open_bracket", "close_bracket", 
 			"open_brace", "close_brace", "less_than", "greater_than", "minus", "plus", "colon", "var", "bdd", "bdd_and", 
 			"bdd_neg", "bdd_xor", "bdd_or", "T", "F", "bdd_arg", "bdd_and_sym", "bdd_or_sym", "bdd_xor_sym", "bdd_neg_sym", 
 			"start", "__neg_0", "__neg_1", "__neg_2", "__neg_3", "__neg_4", "__neg_5", 
@@ -90,13 +90,13 @@ private:
 		q(nt(9), (t(1)));
 		// eol => '\r'.
 		q(nt(9), (t(2)));
-		// ws_comment_0 => printable.
+		// _Rws_comment_0 => printable.
 		q(nt(11), (nt(8)));
-		// ws_comment_0 => printable ws_comment_0.
+		// _Rws_comment_0 => printable _Rws_comment_0.
 		q(nt(11), (nt(8)+nt(11)));
 		// ws_comment => '#' eol.
 		q(nt(10), (t(3)+nt(9)));
-		// ws_comment => '#' ws_comment_0 eol.
+		// ws_comment => '#' _Rws_comment_0 eol.
 		q(nt(10), (t(3)+nt(11)+nt(9)));
 		// ws_required => space ws.
 		q(nt(12), (nt(2)+nt(13)));
@@ -122,11 +122,11 @@ private:
 		q(nt(19), (t(8)));
 		// q_bqstr => '`'.
 		q(nt(20), (t(9)));
-		// char_punct_1 => esc q_char.
+		// _Rchar_punct_1 => esc q_char.
 		q(nt(22), (nt(17)+nt(18)));
-		// char_punct_2 => esc q_str.
+		// _Rchar_punct_2 => esc q_str.
 		q(nt(23), (nt(17)+nt(19)));
-		// char_punct_3 => esc q_bqstr.
+		// _Rchar_punct_3 => esc q_bqstr.
 		q(nt(24), (nt(17)+nt(20)));
 		// __neg_0 => q_char.
 		q(nt(61), (nt(18)));
@@ -134,11 +134,11 @@ private:
 		q(nt(62), (nt(19)));
 		// __neg_2 => q_bqstr.
 		q(nt(63), (nt(20)));
-		// __neg_3 => char_punct_1.
+		// __neg_3 => _Rchar_punct_1.
 		q(nt(64), (nt(22)));
-		// __neg_4 => char_punct_2.
+		// __neg_4 => _Rchar_punct_2.
 		q(nt(65), (nt(23)));
-		// __neg_5 => char_punct_3.
+		// __neg_5 => _Rchar_punct_3.
 		q(nt(66), (nt(24)));
 		// char_punct => punct & ~( __neg_0 ) & ~( __neg_1 ) & ~( __neg_2 ) & ~( __neg_3 ) & ~( __neg_4 ) & ~( __neg_5 ).
 		q(nt(21), (nt(7)) & ~(nt(61)) & ~(nt(62)) & ~(nt(63)) & ~(nt(64)) & ~(nt(65)) & ~(nt(66)));
@@ -174,13 +174,13 @@ private:
 		q(nt(28), (nt(19)));
 		// bqstring_char => char0.
 		q(nt(28), (nt(25)));
-		// chars_4 => alnum.
+		// _Rchars_4 => alnum.
 		q(nt(30), (nt(6)));
-		// chars_5 => chars_4 chars_5.
+		// _Rchars_5 => _Rchars_4 _Rchars_5.
 		q(nt(31), (nt(30)+nt(31)));
-		// chars_5 => ε.
+		// _Rchars_5 => ε.
 		q(nt(31), (nul));
-		// chars => alpha chars_5.
+		// chars => alpha _Rchars_5.
 		q(nt(29), (nt(5)+nt(31)));
 		// char_class => 'a' 'l' 'n' 'u' 'm'.
 		q(nt(32), (t(10)+t(11)+t(12)+t(6)+t(13)));
