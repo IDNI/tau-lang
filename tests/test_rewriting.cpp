@@ -1110,8 +1110,8 @@ TEST_SUITE("apply_with_skip") {
 		sp_node<char> root {n('a', {n('b')})};
 		sp_node<char> pattern {n('a', {n('X')})};
 		sp_node<char> environment {n('a', {n('X'), n('X')})};
-		rule<sp_node<char>> rule {pattern, environment};
-		sp_node<char> expected = n('a', {n('b'), n('b')});
+		const rule<sp_node<char>> rule {pattern, environment};
+		const sp_node<char> expected = n('a', {n('b'), n('b')});
 		is_ignore_predicate is_ignore;
 		is_capture_predicate is_capture;
 		is_skip_predicate is_skip;

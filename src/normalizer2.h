@@ -354,12 +354,12 @@ template<typename...BAs>
 // TODO (HIGH) add const whenever possible ion all the code
 struct steps {
 
-	steps(std::vector<library<BAs...>>& libraries) : libraries(libraries) {}
-	steps(library<BAs...>& library) {
+	steps(std::vector<library<BAs...>> libraries) : libraries(libraries) {}
+	steps(library<BAs...> library) {
 		libraries.push_back(library);
 	}
 
-	sp_tau_node<BAs...> operator()(sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
 		if (libraries.empty()) return n;
 		auto nn = n;
 		for (auto& lib : libraries) nn = tau_apply(lib, nn);
@@ -372,9 +372,9 @@ struct steps {
 template<typename... BAs>
 struct repeat_each {
 	
-	repeat_each (steps<BAs...>& substeps) : substeps(substeps) {}
+	repeat_each (steps<BAs...> substeps) : substeps(substeps) {}
 
-	sp_tau_node<BAs...> operator()(sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
 		auto nn = n;
 		for (auto& lib: substeps.libraries) {
 			std::set<sp_tau_node<BAs...>> visited;
@@ -387,15 +387,15 @@ struct repeat_each {
 		return nn;
 	}
 
-	steps<rules<BAs...>> substeps;
+	steps<BAs...> substeps;
 };
 
 template<typename... BAs>
 struct repeat_all {
 	
-	repeat_all (steps<BAs...>& substeps) : substeps(substeps) {}
+	repeat_all (steps<BAs...> substeps) : substeps(substeps) {}
 
-	sp_tau_node<BAs...> operator()(sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
 		auto nn = n;
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
@@ -407,15 +407,15 @@ struct repeat_all {
 		return nn;
 	}
 
-	steps<rules<BAs...>> substeps;
+	steps<BAs...> substeps;
 };
 
 template<typename... BAs>
 struct repeat {
 	
-	repeat(rules<BAs...>& step) : step(step) {}
+	repeat(rules<BAs...> step) : step(step) {}
 
-	sp_tau_node<BAs...> operator()(sp_tau_node<BAs...>& n) {
+	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
 		auto nn = n;
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
@@ -431,39 +431,48 @@ struct repeat {
 
 
 template<typename... BAs>
-steps<BAs...> operator|(library<BAs...>& l, library<BAs...>& r) {
-	return steps({l, r});
-}
-
-template<typename... BAs>
-steps<BAs...> operator|(steps<BAs...>& s, library<BAs...>& l) {
-	s.libraries.push_back(l);
+steps<BAs...> operator|(const library<BAs...>& l, const library<BAs...>& r) {
+	auto s = steps<BAs...>(l);
+	s.libraries.push_back(r);
 	return s;
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, steps<BAs...>& s) {
+steps<BAs...> operator|(const steps<BAs...>& s, const library<BAs...>& l) {
+	auto ns = s;
+	ns.libraries.push_back(l);
+	return ns;
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const steps<BAs...>& s) {
 	return s(n);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat<BAs...>& r) {
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const library<BAs...>& l) {
+	auto s = steps<BAs...>(l);
+	return s(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat<BAs...>& r) {
 	return r(n);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_all<BAs...>& r) {
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_all<BAs...>& r) {
 	return r(n);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> operator|(sp_tau_node<BAs...>& n, repeat_each<BAs...>& r) {
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<BAs...>& r) {
 	return r(n);
 }
 
 template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...>& form) {
-	auto applied_rec_relations = steps<BAs...>(form.rec_relations)(form.main);
+	/*auto applied_rec_relations = steps<BAs...>(form.rec_relations)(form.main);
 	auto applied_defs = repeat<BAs...>(apply_defs<BAs...>)(applied_rec_relations);
 	auto distributed_bf_and_wff = repeat<BAs...>(distribute_bf_and_wff<BAs...>)(applied_defs);
 	auto simplified_bf_and_wff = repeat<BAs...>(simplify_bf_and_wff<BAs...>)(distributed_bf_and_wff);
@@ -487,18 +496,16 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	return { 
 		form.rec_relations, 
 		applied_trivialities_again
-	};
+	};*/
 
 	// TODO (HIGH) activate when we have added consts in the code
-	/*return { 
-		form.rec_relations, 
-		form.main
+	auto nmain = form.main
 			| steps(form.rec_relations)
-			| apply_defs<BAs...>
-			| repeat(elim_for_all<BAs...>)
-			| repeat_all(to_dnf_wff<BAs...> | simplify_wff<BAs...>)
-			| repeat(simplify_wff<BAs...>)
-			| repeat(squeeze_positives<BAs...>)
+			| repeat<BAs...>(apply_defs<BAs...>)
+			| repeat<BAs...>(elim_for_all<BAs...>)
+			| repeat_all<BAs...>(to_dnf_wff<BAs...> | simplify_wff<BAs...>)
+			| repeat<BAs...>(simplify_wff<BAs...>)
+			| repeat<BAs...>(squeeze_positives<BAs...>)
 			| repeat_all<BAs...>(
 				to_dnf_cbf<BAs...> 
 				| simplify_cbf<BAs...> 
@@ -507,12 +514,14 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 				| apply_cb<BAs...>
 				| simplify_bf<BAs...> 
 				| apply_cb<BAs...>)
-			| repeat(trivialities<BAs...>)
-			| repeat(simplify_wff<BAs...>)
-			| repeat(simplify_cbf<BAs...>)
-			| repeat(simplify_bf<BAs...>)
-			| repeat(trivialities<BAs...>)
-	};*/
+			| repeat<BAs...>(trivialities<BAs...>)
+			| repeat_all<BAs...>(
+				simplify_bf_and_wff<BAs...>
+				|simplify_wff<BAs...>)
+			| repeat<BAs...>(simplify_cbf<BAs...>)
+			| repeat<BAs...>(simplify_bf<BAs...>)
+			| repeat<BAs...>(trivialities<BAs...>);
+	return { form.rec_relations, nmain};
 }
 
 // REVIEW could we assume we are working with the product algebra?
