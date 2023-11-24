@@ -1443,7 +1443,7 @@ private:
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> tau_apply(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
 	auto nn = apply_with_skip<
 			sp_tau_node<BAs...>,
@@ -1466,7 +1466,7 @@ sp_tau_node<BAs...> tau_apply(tau_rule<BAs...>& r, sp_tau_node<BAs...>& n) {
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> tau_apply(rules<BAs...>& rs, sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	if (rs.empty()) return n;
 	sp_tau_node<BAs...> nn = n;
 	for (auto& r : rs) nn = tau_apply<BAs...>(r, nn);

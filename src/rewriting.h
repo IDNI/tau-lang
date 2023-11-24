@@ -603,7 +603,7 @@ template <typename node_t, typename is_ignore_t, typename is_capture_t, typename
 struct pattern_matcher_with_skip {
 	using pattern_t = node_t;
 
-	pattern_matcher_with_skip(pattern_t& pattern, environment<node_t>& env, 
+	pattern_matcher_with_skip(const pattern_t& pattern, environment<node_t>& env, 
 		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t is_skip): 
 		pattern(pattern), env(env), is_ignore(is_ignore), 
 		is_capture(is_capture), is_skip(is_skip) {}
@@ -622,7 +622,7 @@ struct pattern_matcher_with_skip {
 	}
 
 	std::optional<node_t> matched = std::nullopt;
-	pattern_t& pattern;
+	const pattern_t& pattern;
 	environment<node_t>& env;
 	is_ignore_t& is_ignore;
 	is_capture_t& is_capture;
@@ -673,7 +673,7 @@ node_t apply(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c) {
 // unnecessary subtrees
 template <typename node_t, typename is_ignore_t, typename is_capture_t, 
 	typename is_skip_t> 
-node_t apply_with_skip(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
+node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
 	auto [p , s] = r;
 	environment<node_t> u;
 	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t> 
@@ -692,7 +692,7 @@ node_t apply_with_skip(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t&
 // apply a substitution to a rule according to a given matcher, this method is 
 // use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t> 
-node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
+node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
 	post_order_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
 	if (matcher.matched) {
 		auto nn = replace<node_t>(s, matcher.env);
