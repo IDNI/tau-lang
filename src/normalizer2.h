@@ -494,8 +494,9 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 				| apply_cb<BAs...>)
 			| repeat<BAs...>(trivialities<BAs...>)
 			| repeat_all<BAs...>(
-				simplify_bf_and_wff<BAs...>
-				|simplify_wff<BAs...>)
+				wff_remove_existential<BAs...>
+				| simplify_bf_and_wff<BAs...>
+				| simplify_wff<BAs...>)
 			| repeat<BAs...>(simplify_cbf<BAs...>)
 			| repeat<BAs...>(simplify_bf<BAs...>)
 			| repeat<BAs...>(trivialities<BAs...>);
