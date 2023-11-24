@@ -472,32 +472,6 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<BA
 
 template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...>& form) {
-	/*auto applied_rec_relations = steps<BAs...>(form.rec_relations)(form.main);
-	auto applied_defs = repeat<BAs...>(apply_defs<BAs...>)(applied_rec_relations);
-	auto distributed_bf_and_wff = repeat<BAs...>(distribute_bf_and_wff<BAs...>)(applied_defs);
-	auto simplified_bf_and_wff = repeat<BAs...>(simplify_bf_and_wff<BAs...>)(distributed_bf_and_wff);
-	auto applied_for_all = repeat<BAs...>(elim_for_all<BAs...>)(simplified_bf_and_wff);
-	auto applied_to_dnf_wff = repeat<BAs...>(to_dnf_wff<BAs...>)(applied_for_all);
-	auto simplified_wff = repeat<BAs...>(simplify_wff<BAs...>)(applied_to_dnf_wff);
-	auto squeezed_positives = repeat<BAs...>(squeeze_positives<BAs...>)(simplified_wff);
-	auto applied_to_dnf_cbf = repeat<BAs...>(to_dnf_cbf<BAs...>)(squeezed_positives);
-	auto simplified_cbf = repeat<BAs...>(simplify_cbf<BAs...>)(applied_to_dnf_cbf);
-	auto applied_cb = repeat<BAs...>(apply_cb<BAs...>)(simplified_cbf);
-	auto applied_speed_up_cb = repeat<BAs...>(apply_cb<BAs...>)(applied_cb);
-	auto applied_bf_elim_quantifiers = repeat<BAs...>(bf_elim_quantifiers<BAs...>)(applied_speed_up_cb);
-	auto applied_cb_again = repeat<BAs...>(apply_cb<BAs...>)(applied_bf_elim_quantifiers);
-	auto simplified_bf = repeat<BAs...>(simplify_bf<BAs...>)(applied_cb_again);
-	auto applied_cb_again_2 = repeat<BAs...>(apply_cb<BAs...>)(simplified_bf);
-	auto applied_trivialities = repeat<BAs...>(trivialities<BAs...>)(applied_cb_again_2);
-	auto simplified_wff_again = repeat<BAs...>(simplify_wff<BAs...>)(applied_trivialities);
-	auto simplified_cbf_again = repeat<BAs...>(simplify_cbf<BAs...>)(simplified_wff_again);
-	auto simplified_bf_again = repeat<BAs...>(simplify_bf<BAs...>)(simplified_cbf_again);
-	auto applied_trivialities_again = repeat<BAs...>(trivialities<BAs...>)(simplified_bf_again);
-	return { 
-		form.rec_relations, 
-		applied_trivialities_again
-	};*/
-
 	// TODO (HIGH) activate when we have added consts in the code
 	auto nmain = form.main
 			| steps(form.rec_relations)
@@ -506,6 +480,10 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 			| repeat_all<BAs...>(to_dnf_wff<BAs...> | simplify_wff<BAs...>)
 			| repeat<BAs...>(simplify_wff<BAs...>)
 			| repeat<BAs...>(squeeze_positives<BAs...>)
+			| repeat_all<BAs...>(
+				wff_remove_existential<BAs...>
+				| to_dnf_wff<BAs...>
+				| simplify_wff<BAs...>)
 			| repeat_all<BAs...>(
 				to_dnf_cbf<BAs...> 
 				| simplify_cbf<BAs...> 
