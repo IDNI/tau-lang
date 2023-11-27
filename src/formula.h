@@ -917,6 +917,10 @@ builder<BAs...> make_builder(const std::string& source) {
 }
 
 // apply the given builder to the given expression
+// TODO (MEDIUM) it should return the child, it currtently returns the parent 
+// 
+// i.e. rightnow it retuns a a bf, cbf or wff formula, but we are interested in the child
+// thus it, a wwf_eq formula, or wff_neq formula,...
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_tau_node<BAs...>>& n) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
