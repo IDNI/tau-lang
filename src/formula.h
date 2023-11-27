@@ -1314,7 +1314,7 @@ private:
 
 	sp_tau_node<BAs...> apply_wff_remove_existential(const sp_tau_node<BAs...>& n) {
 		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
-		auto var = args[0];
+		auto var = args[0] | tau_parser::variable | optional_value_extractor<sp_tau_node<BAs...>>;
 		auto wff = args[1];
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> wff_changes;
 		for (auto& l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
@@ -1323,32 +1323,27 @@ private:
 			auto check_eq = find_top(l, is_non_terminal<tau_parser::wff_eq, BAs...>);
 			if (check_eq.has_value()) {
 				auto f = check_eq 
-					| tau_parser::wff 
+					| tau_parser::cbf | tau_parser::bf
 					| only_child_extractor<BAs...> 
 					| optional_value_extractor<sp_tau_node<BAs...>>;
-				auto fall = build_bf_all<BAs...>(var, f);
-				n_changes[check_eq.value()] = build_wff_eq<BAs...>(fall);
-				auto x_plus_fx = build_bf_xor<BAs...>(var, f);
+				auto fall = build_bf_all<BAs...>(var, f) | tau_parser::bf_all | optional_value_extractor<sp_tau_node<BAs...>>;
+				wff_changes[check_eq.value()] = build_wff_eq<BAs...>(fall) | tau_parser::wff_eq | optional_value_extractor<sp_tau_node<BAs...>>;
+				auto x_plus_fx = build_bf_xor<BAs...>(var, f) | tau_parser::bf_xor | optional_value_extractor<sp_tau_node<BAs...>>;
 				for (auto& neq: select_all(n, is_non_terminal<tau_parser::wff_neq, BAs...>)) {
-					auto g_i = neq | tau_parser::wff | only_child_extractor<BAs...> 
+					auto g_i = neq | tau_parser::cbf | only_child_extractor<BAs...> 
 						| optional_value_extractor<sp_tau_node<BAs...>>;
 					std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> gi_changes{{var, x_plus_fx}};
 					auto ngi = replace<sp_tau_node<BAs...>>(g_i, gi_changes);
-					auto fex = build_bf_ex<BAs...>(var, ngi);
-					n_changes[neq] = build_wff_neq(fex);
+					auto fex = build_bf_ex<BAs...>(var, ngi)| tau_parser::bf_ex | optional_value_extractor<sp_tau_node<BAs...>>;
+					wff_changes[neq] = build_wff_neq<BAs...>(fex)| tau_parser::wff_neq | optional_value_extractor<sp_tau_node<BAs...>>;
 				}
-				wff_changes[n] = replace<sp_tau_node<BAs...>>(n, wff_changes);
 			} else {
-				auto x_plus_fx = build_bf_xor<BAs...>(var, n);
 				for (auto& neq: select_all(n, is_non_terminal<tau_parser::wff_neq, BAs...>)) {
-					auto g_i = neq | tau_parser::wff | only_child_extractor<BAs...> 
+					auto g_i = neq | tau_parser::cbf | tau_parser::bf | only_child_extractor<BAs...> 
 						| optional_value_extractor<sp_tau_node<BAs...>>;
-					std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> gi_changes{{var, x_plus_fx}};
-					auto ngi = replace<sp_tau_node<BAs...>>(g_i, gi_changes);
-					auto fex = build_bf_ex<BAs...>(var, ngi);
-					n_changes[neq] = build_wff_neq(fex);
+					auto fex = build_bf_ex<BAs...>(var, g_i)| tau_parser::bf_ex | optional_value_extractor<sp_tau_node<BAs...>>;
+					wff_changes[neq] = build_wff_neq<BAs...>(fex)| tau_parser::wff_neq | optional_value_extractor<sp_tau_node<BAs...>>;
 				}
-				wff_changes[n] = replace<sp_tau_node<BAs...>>(n, wff_changes);
 			}
 		}
 		return replace<sp_tau_node<BAs...>>(wff, wff_changes);
