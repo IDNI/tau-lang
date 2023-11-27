@@ -682,9 +682,11 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, i
 	return apply(s, n, matcher);
 	#else // OUTPUT_APPLY_RULES
 	auto nn = apply(s, n, matcher);
-	std::cout << "applying rule: " << p << " = " << s << std::endl;
-	std::cout << "\tinitial node: " << n << std::endl;
-	std::cout << "\tfinal node: " << nn << std::endl;
+	if (nn != n) {
+		std::cout << "applying rule: " << p << " = " << s << std::endl;
+		std::cout << "\tinitial node: " << n << std::endl;
+		std::cout << "\tfinal node: " << nn << std::endl;
+	}
 	return nn;
 	#endif // OUTPUT_APPLY_RULES
 }

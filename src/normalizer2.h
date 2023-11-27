@@ -543,6 +543,7 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 			| repeat<step<BAs...>, BAs...>(trivialities<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
 				wff_remove_existential<BAs...>
+				// TODO (HIGH) add simplify wff (in particular, also add a rule to neg an (n)equalities)
 				| simplify_bf_and_wff<BAs...>
 				| simplify_wff<BAs...>)
 			| repeat<step<BAs...>, BAs...>(simplify_cbf<BAs...>)
