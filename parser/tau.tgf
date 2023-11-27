@@ -1,6 +1,6 @@
 @use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
-# in all those cases: x and y is are vars and "tau" is a constant 
+# in all those cases: x and y is are vars and "tau" is a constant
 # x & tau // wrong
 # x & {tau} // ok
 # x && {tau} // wrong
@@ -12,9 +12,9 @@
 # x &&& y // ok if x and y came from the boolean algebra of tau formulas
 
 #
-# as a rule of thumb, to ease navigation of the corresponding tree, the 
-# non-terminals shouldn't appear in * or + expressions. Otherwise, 
-# intermediate non terminals would be created and break the expected tree 
+# as a rule of thumb, to ease navigation of the corresponding tree, the
+# non-terminals shouldn't appear in * or + expressions. Otherwise,
+# intermediate non terminals would be created and break the expected tree
 # structure
 #
 
@@ -56,9 +56,8 @@ sym				=> chars.
 
 # common symbols
 definition			=> ws ":=" ws.
-# TODO (TK) (MEDIUM) should be = instead of ==
-equality			=> ws "==" ws. 
-nequality			=> ws "!=" ws. 
+equality			=> ws "=" ws.
+nequality			=> ws "!=" ws.
 dot 				=> ws '.' ws.
 open_parenthesis	=> ws '(' ws.
 close_parenthesis	=> ws ')' ws.
@@ -80,12 +79,12 @@ num				=> digit+.
 captures 		=> open_parenthesis capture (ws_required capture)* close_parenthesis
 				| open_parenthesis close_parenthesis.
 
-# variables 
+# variables
 variable		=> var | timed.
 
 # QUESTION does timed variables have one index or several?
 # this should be typed according to the original BA.
-timed			=> (in | out)  indexes. 
+timed			=> (in | out)  indexes.
 offset			=> variable | variable minus num.
 # TODO (HIGH) remove ignore as it is not used
 #
@@ -101,7 +100,7 @@ wff_rule		=> wff_matcher definition wff_body dot.
 
 # needed for rule CBF_DEF_IF
 wff_matcher	=> wff | wff_ref.
-wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb 
+wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 				| wff_has_subformula_cb | wff_remove_existential.
 
 wff_ref			=> sym indexes wff_ref_args.
@@ -124,9 +123,9 @@ wff_all			=> wff_all_sym (variable|capture|ignore) ws_required wff.
 wff_ex			=> wff_ex_sym (variable|capture|ignore) ws_required wff.
 cbf_and_wff		=> open_parenthesis cbf cbf_and_wff_sym wff close_parenthesis.
 
-cbf_if				=> open_parenthesis cbf_if_sym cbf_if_condition 
-						cbf_then_sym cbf_if_then 
-						cbf_else_sym cbf_if_else close_parenthesis. 
+cbf_if				=> open_parenthesis cbf_if_sym cbf_if_condition
+						cbf_then_sym cbf_if_then
+						cbf_else_sym cbf_if_else close_parenthesis.
 cbf_if_condition	=> wff.
 cbf_if_then			=> cbf.
 cbf_if_else			=> cbf.
@@ -138,7 +137,7 @@ wff_xor_sym		=> ws "wff_xor" ws.
 wff_neg_sym		=> ws "wff_neg" ws.
 wff_imply_sym	=> ws "wff_imply" ws.
 wff_equiv_sym	=> ws "wff_equiv" ws.
-wff_coimply_sym	=> ws "wff_coimply" ws.	
+wff_coimply_sym	=> ws "wff_coimply" ws.
 wff_all_sym		=> ws "wff_all" ws.
 wff_ex_sym		=> ws "wff_ex" ws.
 wff_t			=> ws 'T' ws.
@@ -153,8 +152,8 @@ cbf_body	=> cbf.
 cbf_ref 		=> sym indexes cbf_ref_args.
 cbf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
-cbf 				=> bf | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or 
-						| cbf_imply | cbf_equiv | cbf_coimply | cbf_ref. 
+cbf 				=> bf | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or
+						| cbf_imply | cbf_equiv | cbf_coimply | cbf_ref.
 cbf_and				=> open_parenthesis cbf cbf_and_sym cbf close_parenthesis.
 cbf_or				=> open_parenthesis cbf cbf_or_sym cbf close_parenthesis.
 cbf_xor				=> open_parenthesis cbf cbf_xor_sym cbf close_parenthesis.
@@ -170,12 +169,12 @@ cbf_xor_sym			=> ws "cbf_xor" ws.
 cbf_neg_sym			=> ws "cbf_neg" ws.
 cbf_imply_sym		=> ws "cbf_imply" ws.
 cbf_equiv_sym		=> ws "cbf_equiv" ws.
-cbf_coimply_sym		=> ws "cbf_coimply" ws.	
+cbf_coimply_sym		=> ws "cbf_coimply" ws.
 cbf_if_sym			=> ws "if" ws.
 cbf_then_sym		=> ws "then" ws.
 cbf_else_sym		=> ws "else" ws.
 
-# bf - TODO bf => constant | bf & bf | bf | bf | ~bf | bf ^ bf | in[n][t] 
+# bf - TODO bf => constant | bf & bf | bf | bf | ~bf | bf ^ bf | in[n][t]
 # | out[n][t] <<< this thing is important!!!
 #
 # QUESTION: Does timed vars appear only in bf formulas?
@@ -183,12 +182,12 @@ cbf_else_sym		=> ws "else" ws.
 bf_rule		=> bf_matcher definition bf_body dot.
 
 bf_matcher	=> bf.
-bf_body 	=> bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb 
+bf_body 	=> bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
 				| bf_has_subformula_cb.
 
-bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or 
-					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater 
-					| bf_less_cb | bf_less_equal_cb | bf_greater_cb 
+bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
+					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater
+					| bf_less_cb | bf_less_equal_cb | bf_greater_cb
 					# TODO (LOW) check proper use of bf_subs_cb in code
 					#
 					# we should have a check method that verifies that the user
@@ -266,7 +265,7 @@ bf_is_one_cb		=> bf_is_one_cb_sym bf_cb_arg ws_required bf_cb_arg.
 bf_has_clashing_subformulas_cb	=> bf_has_clashing_subformulas_cb_sym bf_cb_arg ws_required bf_cb_arg.
 wff_has_clashing_subformulas_cb	=> wff_has_clashing_subformulas_cb_sym wff_cb_arg ws_required wff_cb_arg.
 bf_has_subformula_cb 			=> bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.	
+wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 wff_remove_existential			=> wff_remove_existential_cb_sym wff_cb_arg ws_required wff_cb_arg.
 # bultin_args
 bf_cb_arg	=> capture | ignore | bf.
@@ -279,7 +278,7 @@ bf_xor_cb_sym			=> ws "bf_xor_cb" ws.
 bf_neg_cb_sym			=> ws "bf_neg_cb" ws.
 bf_less_cb_sym			=> ws "bf_less_cb" ws.
 bf_less_equal_cb_sym	=> ws "bf_less_equal_cb" ws.
-bf_greater_cb_sym		=> ws "bf_greater_cb" ws. 
+bf_greater_cb_sym		=> ws "bf_greater_cb" ws.
 bf_subs_cb_sym			=> ws "bf_subs_cb" ws.
 bf_eq_cb_sym			=> ws "bf_eq_cb" ws.
 bf_neq_cb_sym			=> ws "bf_neq_cb" ws.
@@ -287,7 +286,7 @@ bf_is_zero_cb_sym		=> ws "bf_is_zero_cb" ws.
 bf_is_one_cb_sym		=> ws "bf_is_one_cb" ws.
 
 # speed up callbacks syms
-# IDEA we could reuse the same symbol 
+# IDEA we could reuse the same symbol
 bf_has_clashing_subformulas_cb_sym		=> ws "bf_has_clashing_subformulas_cb" ws.
 bf_has_subformula_cb_sym				=> ws "bf_has_subformula_cb" ws.
 wff_has_clashing_subformulas_cb_sym		=> ws "wff_has_clashing_subformulas_cb" ws.
