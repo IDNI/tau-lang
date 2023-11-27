@@ -27,7 +27,7 @@ namespace idni::tau {
 
 // IDEA (MEDIUM) add commutative rule and halve the number of rules if is performance friendly
 
-// bf rules 
+// bf rules
 RULE(BF_SIMPLIFY_ONE_0, "( T bf_or $X ) := T.")
 RULE(BF_SIMPLIFY_ONE_1, "( $X bf_or T ) := T.")
 RULE(BF_SIMPLIFY_ONE_2, "( T bf_and $X ) := $X.")
@@ -66,7 +66,7 @@ RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } F.") // (T|F) is bf_(t
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } T.") // (T|F) is bf_(t|f)
 
 // wff callbacks
-RULE(BF_CALLBACK_EQ, "( { $X } == F ) := bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
+RULE(BF_CALLBACK_EQ, "( { $X } = F ) := bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
 RULE(BF_CALLBACK_NEQ, "( { $X } != F ) := bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
 
 // speed up callbacks
@@ -146,24 +146,24 @@ RULE(WFF_DEF_COIMPLY, "( $X wff_coimply $Y ) := ( $Y wff_imply $X).")
 RULE(WFF_DEF_EQUIV, "( $X wff_equiv $Y ) := (( $X wff_imply $Y ) wff_and ( $Y wff_imply $X )).")
 
 // TODO (HIGH) rename to (N)EQ_SIMPLYFY
-RULE(BF_TRIVIALITY_0, "( F == F ) := T.")
-RULE(BF_TRIVIALITY_1, "( T == F ) :=  F.")
+RULE(BF_TRIVIALITY_0, "( F = F ) := T.")
+RULE(BF_TRIVIALITY_1, "( T = F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
 RULE(BF_TRIVIALITY_3, "( T != F ) := T.")
 
 // TODO (HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
 // Maybe, we could use a callback to get a variable and build the formula using the builders
-// further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) == (a ∨ b) ∧ ¬(a ∧ b))
-// "( ($X bf_and $Y) == F ) wwf_and ( ($X bf_and $Z) != 0) == ( bf_all $X ( ( $X bf_and $Y$ ) == F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
-RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != F) wff_and (($Y == F) wff_and ($Z != F))) := (($Y == F) wff_and (($X != F) wff_and ($Z != F))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != F) wff_and (($Y != F) wff_and ($Z == F))) := (($Z == F) wff_and (($X != F) wff_and ($Y != F))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X == F) wff_and ( $Y != F)) wff_and ($Z != F)) := (($X == F) wff_and (($Y != F) wff_and ($Z != F))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "((($X != F) wff_and ( $Y == F)) wff_and ($Z != F)) := (($Y == F) wff_and (($X != F) wff_and ($Z != F))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != F) wff_and ( $Y == F)) := (($Y == F) wff_and ($X != F)).")
-RULE(BF_SQUEEZE_POSITIVES_0, "(( $X == F ) wff_and ($Y == F)) := (( $X bf_or $Y ) == F).")
+// further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) = (a ∨ b) ∧ ¬(a ∧ b))
+// "( ($X bf_and $Y) = F ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
+RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != F) wff_and (($Y = F) wff_and ($Z != F))) := (($Y = F) wff_and (($X != F) wff_and ($Z != F))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != F) wff_and (($Y != F) wff_and ($Z = F))) := (($Z = F) wff_and (($X != F) wff_and ($Y != F))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X = F) wff_and ( $Y != F)) wff_and ($Z != F)) := (($X = F) wff_and (($Y != F) wff_and ($Z != F))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "((($X != F) wff_and ( $Y = F)) wff_and ($Z != F)) := (($Y = F) wff_and (($X != F) wff_and ($Z != F))).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != F) wff_and ( $Y = F)) := (($Y = F) wff_and ($X != F)).")
+RULE(BF_SQUEEZE_POSITIVES_0, "(( $X = F ) wff_and ($Y = F)) := (( $X bf_or $Y ) = F).")
 RULE(WFF_REMOVE_EX_0, "wff_ex $X $Y := wff_remove_existential_cb $X $Y.")
 
-// TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F == no_x..., ). 
+// TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
 // bf defs are just callbacks
 template<typename... BAs>
@@ -173,7 +173,7 @@ static auto apply_defs = make_library<BAs...>(
 	WFF_DEF_XOR
 	+ WFF_DEF_IMPLY
 	+ WFF_DEF_COIMPLY
-	+ WFF_DEF_EQUIV	
+	+ WFF_DEF_EQUIV
 	// cbf defs
 	+ CBF_DEF_XOR
 	+ CBF_DEF_IMPLY
@@ -191,59 +191,59 @@ static auto elim_for_all = make_library<BAs...>(
 
 template<typename... BAs>
 static auto to_dnf_wff = make_library<BAs...>(
-	WFF_DISTRIBUTE_0 
+	WFF_DISTRIBUTE_0
 	+ WFF_DISTRIBUTE_1
-	+ WFF_PUSH_NEGATION_INWARDS_0 
-	+ WFF_PUSH_NEGATION_INWARDS_1 
+	+ WFF_PUSH_NEGATION_INWARDS_0
+	+ WFF_PUSH_NEGATION_INWARDS_1
 	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
 static auto to_dnf_cbf = make_library<BAs...>(
-	CBF_DISTRIBUTE_0 
+	CBF_DISTRIBUTE_0
 	+ CBF_DISTRIBUTE_1
-	+ CBF_PUSH_NEGATION_INWARDS_0 
-	+ CBF_PUSH_NEGATION_INWARDS_1 
+	+ CBF_PUSH_NEGATION_INWARDS_0
+	+ CBF_PUSH_NEGATION_INWARDS_1
 	+ CBF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
 static auto simplify_bf = make_library<BAs...>(
-	BF_SIMPLIFY_ONE_0 
-	+ BF_SIMPLIFY_ONE_1 
-	+ BF_SIMPLIFY_ONE_2 
+	BF_SIMPLIFY_ONE_0
+	+ BF_SIMPLIFY_ONE_1
+	+ BF_SIMPLIFY_ONE_2
 	+ BF_SIMPLIFY_ONE_3
 	+ BF_SIMPLIFY_ONE_4
-	+ BF_SIMPLIFY_ZERO_0 
-	+ BF_SIMPLIFY_ZERO_1 
-	+ BF_SIMPLIFY_ZERO_2 
+	+ BF_SIMPLIFY_ZERO_0
+	+ BF_SIMPLIFY_ZERO_1
+	+ BF_SIMPLIFY_ZERO_2
 	+ BF_SIMPLIFY_ZERO_3
 	+ BF_SIMPLIFY_ZERO_4
-	+ BF_SIMPLIFY_SELF_0 
-	+ BF_SIMPLIFY_SELF_1 
-	+ BF_SIMPLIFY_SELF_2 
+	+ BF_SIMPLIFY_SELF_0
+	+ BF_SIMPLIFY_SELF_1
+	+ BF_SIMPLIFY_SELF_2
 	+ BF_SIMPLIFY_SELF_3
-	+ BF_SIMPLIFY_SELF_4 
+	+ BF_SIMPLIFY_SELF_4
 	+ BF_SIMPLIFY_SELF_5
 );
 
 template<typename... BAs>
 static auto simplify_wff = make_library<BAs...>(
-	WFF_SIMPLIFY_ONE_0 
-	+ WFF_SIMPLIFY_ONE_1 
-	+ WFF_SIMPLIFY_ONE_2 
+	WFF_SIMPLIFY_ONE_0
+	+ WFF_SIMPLIFY_ONE_1
+	+ WFF_SIMPLIFY_ONE_2
 	+ WFF_SIMPLIFY_ONE_3
 	+ WFF_SIMPLIFY_ONE_4
-	+ WFF_SIMPLIFY_ZERO_0 
-	+ WFF_SIMPLIFY_ZERO_1 
-	+ WFF_SIMPLIFY_ZERO_2 
+	+ WFF_SIMPLIFY_ZERO_0
+	+ WFF_SIMPLIFY_ZERO_1
+	+ WFF_SIMPLIFY_ZERO_2
 	+ WFF_SIMPLIFY_ZERO_3
 	+ WFF_SIMPLIFY_ZERO_4
-	+ WFF_SIMPLIFY_SELF_0 
-	+ WFF_SIMPLIFY_SELF_1 
-	+ WFF_SIMPLIFY_SELF_2 
+	+ WFF_SIMPLIFY_SELF_0
+	+ WFF_SIMPLIFY_SELF_1
+	+ WFF_SIMPLIFY_SELF_2
 	+ WFF_SIMPLIFY_SELF_3
-	+ WFF_SIMPLIFY_SELF_4 
+	+ WFF_SIMPLIFY_SELF_4
 	+ WFF_SIMPLIFY_SELF_5
 );
 
@@ -264,30 +264,30 @@ static auto distribute_bf_and_wff = make_library<BAs...>(
 
 template<typename... BAs>
 static auto simplify_cbf = make_library<BAs...>(
-	CBF_SIMPLIFY_ONE_0 
-	+ CBF_SIMPLIFY_ONE_1 
-	+ CBF_SIMPLIFY_ONE_2 
+	CBF_SIMPLIFY_ONE_0
+	+ CBF_SIMPLIFY_ONE_1
+	+ CBF_SIMPLIFY_ONE_2
 	+ CBF_SIMPLIFY_ONE_3
 	+ CBF_SIMPLIFY_ONE_4
-	+ CBF_SIMPLIFY_ZERO_0 
-	+ CBF_SIMPLIFY_ZERO_1 
-	+ CBF_SIMPLIFY_ZERO_2 
+	+ CBF_SIMPLIFY_ZERO_0
+	+ CBF_SIMPLIFY_ZERO_1
+	+ CBF_SIMPLIFY_ZERO_2
 	+ CBF_SIMPLIFY_ZERO_3
 	+ CBF_SIMPLIFY_ZERO_4
-	+ CBF_SIMPLIFY_SELF_0 
-	+ CBF_SIMPLIFY_SELF_1 
-	+ CBF_SIMPLIFY_SELF_2 
+	+ CBF_SIMPLIFY_SELF_0
+	+ CBF_SIMPLIFY_SELF_1
+	+ CBF_SIMPLIFY_SELF_2
 	+ CBF_SIMPLIFY_SELF_3
-	+ CBF_SIMPLIFY_SELF_4 
+	+ CBF_SIMPLIFY_SELF_4
 	+ CBF_SIMPLIFY_SELF_5
 );
 
 template<typename... BAs>
 static auto apply_cb = make_library<BAs...>(
-	BF_CALLBACK_AND 
+	BF_CALLBACK_AND
 	+ BF_CALLBACK_OR
-	+ BF_CALLBACK_XOR 
-	+ BF_CALLBACK_NEG 
+	+ BF_CALLBACK_XOR
+	+ BF_CALLBACK_NEG
 	+ BF_CALLBACK_LESS
 	+ BF_CALLBACK_LESS_EQUAL
 	+ BF_CALLBACK_GREATER
@@ -318,26 +318,26 @@ static auto clause_simplify_wff = make_library<BAs...>(
 template<typename... BAs>
 static auto squeeze_positives = make_library<BAs...>(
 	BF_SQUEEZE_POSITIVES_0
-	+ BF_ROTATE_LITERALS_0	
+	+ BF_ROTATE_LITERALS_0
 	+ BF_ROTATE_LITERALS_1
 );
 
 template<typename... BAs>
 static auto wff_remove_existential = make_library<BAs...>(
-	WFF_REMOVE_EX_0 
+	WFF_REMOVE_EX_0
 );
 
 template<typename... BAs>
 static auto bf_elim_quantifiers = make_library<BAs...>(
-	BF_FUNCTIONAL_QUANTIFIERS_0 
-	+ BF_FUNCTIONAL_QUANTIFIERS_1 
+	BF_FUNCTIONAL_QUANTIFIERS_0
+	+ BF_FUNCTIONAL_QUANTIFIERS_1
 );
 
 template<typename... BAs>
 static auto trivialities = make_library<BAs...>(
-	BF_TRIVIALITY_0 
-	+ BF_TRIVIALITY_1 
-	+ BF_TRIVIALITY_2 
+	BF_TRIVIALITY_0
+	+ BF_TRIVIALITY_1
+	+ BF_TRIVIALITY_2
 	+ BF_TRIVIALITY_3
 );
 
@@ -371,7 +371,7 @@ struct steps {
 
 template<typename... BAs>
 struct repeat_each {
-	
+
 	repeat_each (steps<BAs...> substeps) : substeps(substeps) {}
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
@@ -392,7 +392,7 @@ struct repeat_each {
 
 template<typename... BAs>
 struct repeat_all {
-	
+
 	repeat_all (steps<BAs...> substeps) : substeps(substeps) {}
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
@@ -412,7 +412,7 @@ struct repeat_all {
 
 template<typename... BAs>
 struct repeat {
-	
+
 	repeat(rules<BAs...> step) : step(step) {}
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
@@ -485,12 +485,12 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 				| to_dnf_wff<BAs...>
 				| simplify_wff<BAs...>)
 			| repeat_all<BAs...>(
-				to_dnf_cbf<BAs...> 
-				| simplify_cbf<BAs...> 
+				to_dnf_cbf<BAs...>
+				| simplify_cbf<BAs...>
 				| apply_cb<BAs...>
 				| bf_elim_quantifiers<BAs...>
 				| apply_cb<BAs...>
-				| simplify_bf<BAs...> 
+				| simplify_bf<BAs...>
 				| apply_cb<BAs...>)
 			| repeat<BAs...>(trivialities<BAs...>)
 			| repeat_all<BAs...>(
