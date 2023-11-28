@@ -48,8 +48,6 @@ RULE(BF_SIMPLIFY_SELF_5, "( bf_neg $X bf_or $X ) := T.")
 RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "bf_all $X $Y := ( bf_subs_cb $X F $Y bf_and bf_subs_cb $X T $Y).")
 RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "bf_ex $X $Y := ( bf_subs_cb $X F $Y bf_or bf_subs_cb $X T $Y).")
 RULE(BF_SKIP_CONSTANTS_0, "({ $X } bf_and $Y) := ($Y bf_and { $X }).")
-RULE(BF_ROTATE_LITERALS_0, "( $X bf_and ( $Y bf_and $Z ) ) := ( $Y bf_and ( $Z bf_and $X ) ).")
-RULE(BF_ROTATE_LITERALS_1, "( ( $X bf_and $Y ) bf_and $Z ) := ( ( $Y bf_and $Z ) bf_and $X ).")
 
 // cbf definitions of xor, ->, <- and <->.
 RULE(BF_DEF_XOR, "( $X bf_xor $Y ) := (( $X bf_and bf_neg $Y ) bf_or ( bf_neg $X bf_and $Y )).")
@@ -322,8 +320,6 @@ static auto clause_simplify_wff = make_library<BAs...>(
 template<typename... BAs>
 static auto squeeze_positives = make_library<BAs...>(
 	BF_SQUEEZE_POSITIVES_0
-	+ BF_ROTATE_LITERALS_0
-	+ BF_ROTATE_LITERALS_1
 );
 
 template<typename... BAs>

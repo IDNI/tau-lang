@@ -241,28 +241,6 @@ TEST_SUITE("parsing bf rules") {
 		CHECK( check.has_value() );
 	}
 		
-	TEST_CASE("BF_ROTATE_LITERALS_0") {
-		auto src_rule = make_tau_source(BF_ROTATE_LITERALS_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-		
-	TEST_CASE("BF_ROTATE_LITERALS_1") {
-		auto src_rule = make_tau_source(BF_ROTATE_LITERALS_1);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule 
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
-	}
-
 	TEST_CASE("BF_CALLBACK_AND") {
 		auto src_rule = make_tau_source(BF_CALLBACK_AND);
 		auto tau_rule = make_statement(src_rule);
