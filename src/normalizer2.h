@@ -525,6 +525,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<st
 template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	#ifdef OUTPUT_APPLY_RULES
+	std::cout << "(I): -- Running normalizer step" << std::endl;
 	std::cout << "(F): " << form.main << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
@@ -617,6 +618,11 @@ private:
 
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...>& form) {
+
+	#ifdef OUTPUT_APPLY_RULES
+	std::cout << "(I): -- Running normalizer" << std::endl;
+	#endif // OUTPUT_APPLY_RULES
+
 	std::vector<sp_tau_node<BAs...>> previous;
 	formula<BAs...> current = normalizer_step(form);
 	auto is_equivalent = is_equivalent_predicate<BAs...>(current.main);
