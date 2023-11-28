@@ -1483,8 +1483,15 @@ sp_tau_node<BAs...> tau_apply(const tau_rule<BAs...>& r, const sp_tau_node<BAs..
 			auto nnn = cb_applier(cb);
 			changes[cb] = nnn;
 		}
-		return replace<sp_tau_node<BAs...>>(nn, changes);
+		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
+
+		#ifdef OUTPUT_APPLY_RULES
+		std::cout << "(C): " << cnn << std::endl;
+		#endif // OUTPUT_APPLY_RULES
+
+		return cnn;
 	}
+
 	return nn;
 }
 

@@ -678,17 +678,16 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, i
 	environment<node_t> u;
 	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t> 
 		matcher {p, u, i, c, sk};
-	#ifndef OUTPUT_APPLY_RULES
-	return apply(s, n, matcher);
-	#else // OUTPUT_APPLY_RULES
 	auto nn = apply(s, n, matcher);
+
+	#ifdef OUTPUT_APPLY_RULES
 	if (nn != n) {
-		std::cout << "applying rule: " << p << " = " << s << std::endl;
-		std::cout << "\tinitial node: " << n << std::endl;
-		std::cout << "\tfinal node: " << nn << std::endl;
+		std::cout << "(R): " << p << " = " << s << std::endl;
+		std::cout << "(F): " << nn << std::endl;
 	}
-	return nn;
 	#endif // OUTPUT_APPLY_RULES
+
+	return nn;
 }
 
 // apply a substitution to a rule according to a given matcher, this method is 

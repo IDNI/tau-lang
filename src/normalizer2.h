@@ -520,6 +520,10 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<st
 
 template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...>& form) {
+	#ifdef OUTPUT_APPLY_RULES
+	std::cout << "(F): " << form.main << std::endl;
+	#endif // OUTPUT_APPLY_RULES
+
 	// TODO (HIGH) activate when we have added consts in the code
 	auto nmain = form.main
 			| steps<step<BAs...>, BAs...>(form.rec_relations)
