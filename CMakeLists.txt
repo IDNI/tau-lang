@@ -58,7 +58,7 @@ set(BUILD_TESTS ON CACHE STRING "build the tau-lang test suite ON")
 set_property(CACHE BUILD_TESTS PROPERTY STRINGS "OFF" "ON")
 
 if (BUILD_TESTS)
-	enable_testing()	
+	enable_testing()
 	add_subdirectory(tests)
 endif ()
 
@@ -71,4 +71,3 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	message(STATUS "CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
 	message(STATUS "CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER}")
 endif ()
-

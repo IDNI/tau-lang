@@ -14,6 +14,21 @@ set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 
 add_link_options("-flto")
 
+#
+# Regression testing
+#
+set(BUILD_REGRESSION ON CACHE STRING "build the tau-lang regression suite ON")
+set_property(CACHE BUILD_REGRESSION PROPERTY STRINGS "OFF" "ON")
+
+if (BUILD_REGRESSION)
+	enable_testing()
+	add_subdirectory(regression)
+endif ()
+
+#
+# Unit testing
+#
+
 set(DEBUG_TAU_NORMALIZER debug_tau_normalizer.cpp)
 add_executable(debug_tau_normalizer ${DEBUG_TAU_NORMALIZER})
 target_setup(debug_tau_normalizer)
