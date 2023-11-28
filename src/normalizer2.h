@@ -110,6 +110,8 @@ RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or (
 RULE(WFF_DISTRIBUTE_1, "($X wff_and ($Y wff_or $Z)) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
 RULE(WFF_PUSH_NEGATION_INWARDS_0, "wff_neg ($X wff_and $Y) := (wff_neg $X wff_or wff_neg $Y).")
 RULE(WFF_PUSH_NEGATION_INWARDS_1, "wff_neg ($X wff_or $Y) := (wff_neg $X wff_and wff_neg $Y).")
+RULE(WFF_PUSH_NEGATION_INWARDS_2, "wff_neg ($X == F) := ($X != F).")
+RULE(WFF_PUSH_NEGATION_INWARDS_3, "wff_neg ($X != F) := ($X == F).")
 RULE(WFF_ELIM_DOUBLE_NEGATION_0, "wff_neg wff_neg $X :=  $X.")
 RULE(WFF_ELIM_FORALL, "wff_all $X $Y := wff_neg wff_ex $X wff_neg $Y.")
 RULE(WFF_SIMPLIFY_ONE_0, "( T wff_or $X ) := T.")
@@ -195,6 +197,8 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_DISTRIBUTE_1
 	+ WFF_PUSH_NEGATION_INWARDS_0 
 	+ WFF_PUSH_NEGATION_INWARDS_1 
+	+ WFF_PUSH_NEGATION_INWARDS_2 
+	+ WFF_PUSH_NEGATION_INWARDS_3 
 	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 

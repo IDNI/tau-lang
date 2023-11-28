@@ -33,7 +33,7 @@ TEST_SUITE("steps parsing") {
 	}
 	
 	TEST_CASE("to_dnf_wff") {
-		CHECK( to_dnf_wff<Bool>.size() == 5 );
+		CHECK( to_dnf_wff<Bool>.size() == 7 );
 	}
 	
 	TEST_CASE("to_dnf_cbf") {

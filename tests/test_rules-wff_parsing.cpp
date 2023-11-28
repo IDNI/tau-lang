@@ -71,6 +71,28 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 		
+	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_2") {
+		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_2);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+		
+	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_3") {
+		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_3);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule 
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+		
 	TEST_CASE("WFF_ELIM_DOUBLE_NEGATION_0") {
 		auto src_rule = make_tau_source(WFF_ELIM_DOUBLE_NEGATION_0);
 		auto tau_rule = make_statement(src_rule);
