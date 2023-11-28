@@ -147,7 +147,7 @@ RULE(WFF_DEF_IMPLY, "( $X wff_imply $Y ) := ( wff_neg $X wff_or $Y).")
 RULE(WFF_DEF_COIMPLY, "( $X wff_coimply $Y ) := ( $Y wff_imply $X).")
 RULE(WFF_DEF_EQUIV, "( $X wff_equiv $Y ) := (( $X wff_imply $Y ) wff_and ( $Y wff_imply $X )).")
 
-// TODO (HIGH) rename to (N)EQ_SIMPLYFY
+// TODO (LOW) rename to (N)EQ_SIMPLYFY
 RULE(BF_TRIVIALITY_0, "( F = F ) := T.")
 RULE(BF_TRIVIALITY_1, "( T = F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
@@ -530,7 +530,6 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	std::cout << "(F): " << form.main << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
-	// TODO (HIGH) activate when we have added consts in the code
 	auto nmain = form.main
 			| steps<step<BAs...>, BAs...>(form.rec_relations)
 			| repeat<step<BAs...>, BAs...>(apply_defs<BAs...>)
@@ -553,7 +552,6 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 			| repeat<step<BAs...>, BAs...>(trivialities<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
 				wff_remove_existential<BAs...>
-				// TODO (HIGH) add simplify wff (in particular, also add a rule to neg an (n)equalities)
 				| simplify_bf_and_wff<BAs...>
 				| simplify_wff<BAs...>)
 			| repeat<step<BAs...>, BAs...>(simplify_cbf<BAs...>)
