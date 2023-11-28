@@ -69,7 +69,7 @@ TEST_SUITE("steps parsing") {
 	}
 	
 	TEST_CASE("squeeze_positives") {
-		CHECK( squeeze_positives<Bool>.size() == 3 );
+		CHECK( squeeze_positives<Bool>.size() == 1 );
 	}
 	
 	TEST_CASE("clause_simplify_bf") {

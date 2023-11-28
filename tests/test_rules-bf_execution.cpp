@@ -240,28 +240,6 @@ TEST_SUITE("executing bf rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("BF_ROTATE_LITERALS_0") {
-		auto src_rule = make_tau_source(BF_ROTATE_LITERALS_0);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_ROTATE_LITERALS_1") {
-		auto src_rule = make_tau_source(BF_ROTATE_LITERALS_1);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
 	// REVIEW (MEDIUM) remaining tests of the test suite are flaky
 
 	// They properly run when executed independenly but fails otherwise. Maybe
