@@ -527,16 +527,27 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	#endif // OUTPUT_APPLY_RULES
 
 	auto nmain = form.main
-			| steps<step<BAs...>, BAs...>(form.rec_relations)
-			| repeat<step<BAs...>, BAs...>(apply_defs<BAs...>)
-			| repeat<step<BAs...>, BAs...>(elim_for_all<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...> | simplify_wff<BAs...>)
-			| repeat<step<BAs...>, BAs...>(simplify_wff<BAs...>)
-			| repeat<step<BAs...>, BAs...>(squeeze_positives<BAs...>)
+			| steps<step<BAs...>, BAs...>(
+				form.rec_relations)
+			| repeat<step<BAs...>, BAs...>(
+				apply_defs<BAs...>)
+			| repeat<step<BAs...>, BAs...>(
+				elim_for_all<BAs...>)
+			| repeat_all<step<BAs...>, BAs...>(
+				to_dnf_wff<BAs...> 
+				| simplify_wff<BAs...>)
+			| repeat<step<BAs...>, BAs...>(
+				simplify_wff<BAs...>)
+			| repeat<step<BAs...>, BAs...>(
+				squeeze_positives<BAs...> 
+				| bf_positives_upwards<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
 				wff_remove_existential<BAs...>
 				| to_dnf_wff<BAs...>
-				| simplify_wff<BAs...>)
+				| simplify_wff<BAs...>
+				| clause_simplify_wff<BAs...>
+				| distribute_bf_and_wff<BAs...>
+				| simplify_bf_and_wff<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
 				to_dnf_cbf<BAs...> 
 				| simplify_cbf<BAs...> 
@@ -545,14 +556,19 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 				| apply_cb<BAs...>
 				| simplify_bf<BAs...>
 				| apply_cb<BAs...>)
-			| repeat<step<BAs...>, BAs...>(trivialities<BAs...>)
+			| repeat<step<BAs...>, BAs...>(
+				trivialities<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
 				wff_remove_existential<BAs...>
 				| simplify_bf_and_wff<BAs...>
 				| simplify_wff<BAs...>)
-			| repeat<step<BAs...>, BAs...>(simplify_cbf<BAs...>)
-			| repeat<step<BAs...>, BAs...>(simplify_bf<BAs...>)
-			| repeat<step<BAs...>, BAs...>(trivialities<BAs...>);
+			| repeat<step<BAs...>, BAs...>(
+				simplify_cbf<BAs...>)
+			| repeat<step<BAs...>, BAs...>(
+				simplify_bf<BAs...>
+				| clause_simplify_bf<BAs...>)
+			| repeat<step<BAs...>, BAs...>(
+				trivialities<BAs...>);
 
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << "(I): -- End normalizer step" << std::endl;
