@@ -21,7 +21,7 @@ project(tau_lang)
 add_subdirectory("src")
 add_subdirectory("examples")
 
-# TODO (HIGH) generate new parser from grammar when needed
+# TODO (MEDIUM) generate new parser from grammar when needed
 
 #
 # Adding git submodules

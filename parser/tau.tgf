@@ -86,7 +86,7 @@ variable		=> var | timed.
 # this should be typed according to the original BA.
 timed			=> (in | out)  indexes.
 offset			=> variable | variable minus num.
-# TODO (HIGH) remove ignore as it is not used
+# TODO (MEDIUM) remove ignore as it is not used
 #
 # That aldo implies removing the ignore rule from the code when neccessary
 ignore 			=> '_'.
@@ -106,7 +106,7 @@ wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
-# TODO (HIGH) rename wff_eq and wff_new to bf_eq and bf_neq
+# TODO (LOW) rename wff_eq and wff_new to bf_eq and bf_neq
 wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | cbf_if
 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv | cbf_and_wff
 					| wff_coimply | wff_t | wff_f | capture |ignore.
