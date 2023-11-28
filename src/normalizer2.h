@@ -524,8 +524,9 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<st
 
 template <typename... BAs>
 formula<BAs...> normalizer_step(formula<BAs...>& form) {
+
 	#ifdef OUTPUT_APPLY_RULES
-	std::cout << "(I): -- Running normalizer step" << std::endl;
+	std::cout << "(I): -- Begin normalizer step" << std::endl;
 	std::cout << "(F): " << form.main << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
@@ -558,6 +559,11 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 			| repeat<step<BAs...>, BAs...>(simplify_cbf<BAs...>)
 			| repeat<step<BAs...>, BAs...>(simplify_bf<BAs...>)
 			| repeat<step<BAs...>, BAs...>(trivialities<BAs...>);
+
+	#ifdef OUTPUT_APPLY_RULES
+	std::cout << "(I): -- End normalizer step" << std::endl;
+	#endif // OUTPUT_APPLY_RULES
+
 	return { form.rec_relations, nmain };
 }
 
@@ -620,7 +626,7 @@ template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...>& form) {
 
 	#ifdef OUTPUT_APPLY_RULES
-	std::cout << "(I): -- Running normalizer" << std::endl;
+	std::cout << "(I): -- Begin normalizer" << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
 	std::vector<sp_tau_node<BAs...>> previous;
@@ -630,6 +636,12 @@ formula<BAs...> normalizer(formula<BAs...>& form) {
 		previous.push_back(current.main);
 		current = normalizer_step(current);
 	}
+
+	#ifdef OUTPUT_APPLY_RULES
+	std::cout << "(I): -- End normalizer" << std::endl;
+	std::cout << "(O): " << current.main << std::endl;
+	#endif // OUTPUT_APPLY_RULES
+
 	return current;
 }
 
