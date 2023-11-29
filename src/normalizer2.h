@@ -525,19 +525,21 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 				| clause_simplify_wff<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
 				bf_positives_upwards<BAs...>
-				| squeeze_positives<BAs...>)
-			| repeat_once<step<BAs...>, BAs...>(
-				step<BAs...>(wff_remove_existential<BAs...>))
+				| squeeze_positives<BAs...>
+				| wff_remove_existential<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
 				bf_elim_quantifiers<BAs...>
 				| simplify_bf<BAs...>
 				| apply_cb<BAs...>
+				| clause_simplify_bf<BAs...>
 				| distribute_bf_and_wff<BAs...>
 				| simplify_bf_and_wff<BAs...>
 				| to_dnf_cbf<BAs...>
 				| simplify_cbf<BAs...>
 				| trivialities<BAs...>
-				| clause_simplify_bf<BAs...>);
+				| to_dnf_wff<BAs...>
+				| simplify_wff<BAs...>
+				| clause_simplify_wff<BAs...>);
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << "(I): -- End normalizer step" << std::endl;
 	#endif // OUTPUT_APPLY_RULES
