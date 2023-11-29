@@ -151,10 +151,6 @@ RULE(BF_TRIVIALITY_1, "( T = F ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( F != F ) := F.")
 RULE(BF_TRIVIALITY_3, "( T != F ) := T.")
 
-// TODO (HIGH) review this rule, something is wrong, check point (d) of the paper tauimpl1.pdf
-// Maybe, we could use a callback to get a variable and build the formula using the builders
-// further processing (a + b := (a ∧ ¬b) ∨ (b ∧ ¬a) = (a ∨ b) ∧ ¬(a ∧ b))
-// "( ($X bf_and $Y) = F ) wwf_and ( ($X bf_and $Z) != 0) = ( bf_all $X ( ( $X bf_and $Y$ ) = F )  wwf_and ( bf_ex $X ( ( $X bf_or ( $X bf_and $Y )) bf_and bf_neg ( $X bf_and ($X bf_and $Y ) ) wwf_and $Z )."
 RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != F) wff_and (($Y = F) wff_and ($Z != F))) := (($Y = F) wff_and (($X != F) wff_and ($Z != F))).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != F) wff_and (($Y != F) wff_and ($Z = F))) := (($Z = F) wff_and (($X != F) wff_and ($Y != F))).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X = F) wff_and ( $Y != F)) wff_and ($Z != F)) := (($X = F) wff_and (($Y != F) wff_and ($Z != F))).")
@@ -195,8 +191,8 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_DISTRIBUTE_1
 	+ WFF_PUSH_NEGATION_INWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_1
-	+ WFF_PUSH_NEGATION_INWARDS_2 
-	+ WFF_PUSH_NEGATION_INWARDS_3 
+	+ WFF_PUSH_NEGATION_INWARDS_2
+	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
@@ -423,18 +419,15 @@ struct repeat_all {
 };
 
 template<typename step_t, typename... BAs>
-struct repeat {
-	
-	repeat(steps<step_t, BAs...> s) : s(s) {}
-	repeat(step_t s) : s(steps<step_t, BAs...>(s)) {}
+struct repeat_once {
+
+	repeat_once(steps<step_t, BAs...> s) : s(s) {}
+	repeat_once(step_t s) : s(steps<step_t, BAs...>(s)) {}
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
 		auto nn = n;
-		std::set<sp_tau_node<BAs...>> visited;
-		while (true) {
-			nn = s(nn);
-			if (visited.find(nn) != visited.end()) break;
-			visited.insert(nn);
+		for(auto& l: s.libraries) {
+			nn = l(nn);
 		}
 		return nn;
 	}
@@ -446,13 +439,6 @@ struct repeat {
 template<typename...BAs>
 steps<step<BAs...>, BAs...> operator|(const library<BAs...>& l, const library<BAs...>& r) {
 	auto s = steps<step<BAs...>, BAs...>(step<BAs...>(l));
-	s.libraries.push_back(r);
-	return s;
-}
-
-template<typename step_t, typename...BAs>
-steps<repeat<step_t, BAs...>, BAs...> operator|(const repeat<step_t, BAs...>& l, const repeat<step_t, BAs...>& r) {
-	auto s = steps<repeat<step_t, BAs...>, BAs...>(l);
 	s.libraries.push_back(r);
 	return s;
 }
@@ -504,7 +490,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const library<BAs...
 }
 
 template<typename step_t, typename... BAs>
-sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat<step_t, BAs...>& r) {
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_once<step_t, BAs...>& r) {
 	return r(n);
 }
 
@@ -527,49 +513,31 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 	#endif // OUTPUT_APPLY_RULES
 
 	auto nmain = form.main
-			| steps<step<BAs...>, BAs...>(
-				form.rec_relations)
-			| repeat<step<BAs...>, BAs...>(
-				apply_defs<BAs...>)
-			| repeat<step<BAs...>, BAs...>(
-				elim_for_all<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
-				to_dnf_wff<BAs...> 
-				| simplify_wff<BAs...>)
-			| repeat<step<BAs...>, BAs...>(
-				simplify_wff<BAs...>)
-			| repeat<step<BAs...>, BAs...>(
-				squeeze_positives<BAs...> 
-				| bf_positives_upwards<BAs...>)
+				step<BAs...>(form.rec_relations))
 			| repeat_all<step<BAs...>, BAs...>(
-				wff_remove_existential<BAs...>
-				| to_dnf_wff<BAs...>
+				step<BAs...>(apply_defs<BAs...>))
+			| repeat_all<step<BAs...>, BAs...>(
+				step<BAs...>(elim_for_all<BAs...>))
+			| repeat_all<step<BAs...>, BAs...>(
+				to_dnf_wff<BAs...>
 				| simplify_wff<BAs...>
-				| clause_simplify_wff<BAs...>
-				| distribute_bf_and_wff<BAs...>
-				| simplify_bf_and_wff<BAs...>)
+				| clause_simplify_wff<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
-				to_dnf_cbf<BAs...> 
-				| simplify_cbf<BAs...> 
-				| apply_cb<BAs...>
-				| bf_elim_quantifiers<BAs...>
-				| apply_cb<BAs...>
+				bf_positives_upwards<BAs...>
+				| squeeze_positives<BAs...>)
+			| repeat_once<step<BAs...>, BAs...>(
+				step<BAs...>(wff_remove_existential<BAs...>))
+			| repeat_all<step<BAs...>, BAs...>(
+				bf_elim_quantifiers<BAs...>
 				| simplify_bf<BAs...>
-				| apply_cb<BAs...>)
-			| repeat<step<BAs...>, BAs...>(
-				trivialities<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(
-				wff_remove_existential<BAs...>
+				| apply_cb<BAs...>
+				| distribute_bf_and_wff<BAs...>
 				| simplify_bf_and_wff<BAs...>
-				| simplify_wff<BAs...>)
-			| repeat<step<BAs...>, BAs...>(
-				simplify_cbf<BAs...>)
-			| repeat<step<BAs...>, BAs...>(
-				simplify_bf<BAs...>
-				| clause_simplify_bf<BAs...>)
-			| repeat<step<BAs...>, BAs...>(
-				trivialities<BAs...>);
-
+				| to_dnf_cbf<BAs...>
+				| simplify_cbf<BAs...>
+				| trivialities<BAs...>
+				| clause_simplify_bf<BAs...>);
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << "(I): -- End normalizer step" << std::endl;
 	#endif // OUTPUT_APPLY_RULES
