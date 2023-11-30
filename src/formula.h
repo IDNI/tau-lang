@@ -580,8 +580,8 @@ struct stringify {
 		return n;
 	}
 
-	const extractor_t& extractor;
 	std::basic_stringstream<char>& stream;
+	const extractor_t& extractor;
 };
 
 // converts a sp_tau_node<...> to a string skipping the nodes that satisfy the
@@ -795,7 +795,7 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	switch (type) {
 	case tau_parser::bf_rule: return make_rule<tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
 	case tau_parser::wff_rule: return make_rule<tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
-	default: assert(false);
+	default: assert(false); return {};
 	};
 }
 
@@ -924,7 +924,7 @@ template<typename... BAs>
 sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_tau_node<BAs...>>& n) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 	std::vector<sp_tau_node<BAs...>> vars = b.first || tau_parser::capture;
-	for (int i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
+	for (size_t i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
 	return replace<sp_tau_node<BAs...>>(b.second, changes);
 }
 
@@ -1434,7 +1434,6 @@ sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>
 //
 
 // TODO (HIGH) << for tau_source_sym
-// TODO (HIGH) << for tau_source_node
 // TODO (HIGH) << for tau_source_node
 // TODO (HIGH) << for sp_tau_source_node
 // TODO (HIGH) << for tau_sym

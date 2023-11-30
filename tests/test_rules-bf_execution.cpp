@@ -247,7 +247,7 @@ TEST_SUITE("executing bf rules") {
 	// used within or something else.
 
 	TEST_CASE("BF_CALLBACK_AND") {
-		static constexpr char* sample =	"( ({l} bf_and { r }) = F ).";
+		const char* sample =	"( ({l} bf_and { r }) = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -265,7 +265,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_OR") {
-		static constexpr char* sample =	"( ({l} bf_or { r }) = F ).";
+		const char* sample =	"( ({l} bf_or { r }) = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -283,7 +283,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_XOR") {
-		static constexpr char* sample =	"( ({l} bf_xor { r }) = F ).";
+		const char* sample =	"( ({l} bf_xor { r }) = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -301,7 +301,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_NEG") {
-		static constexpr char* sample =	"( bf_neg { l } = F ).";
+		const char* sample =	"( bf_neg { l } = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -319,7 +319,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_LESS") {
-		static constexpr char* sample =	"( ( { l } bf_less { r } ) = F ).";
+		const char* sample =	"( ( { l } bf_less { r } ) = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -337,7 +337,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_LESS_EQUAL") {
-		static constexpr char* sample =	"( ( { l } bf_less_equal { r } ) = F ).";
+		const char* sample =	"( ( { l } bf_less_equal { r } ) = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -355,7 +355,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_GREATER") {
-		static constexpr char* sample =	"( ( { l } bf_greater { r } ) = F ).";
+		const char* sample =	"( ( { l } bf_greater { r } ) = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -373,7 +373,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_EQ") {
-		static constexpr char* sample =	"( { l } = F ).";
+		const char* sample =	"( { l } = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -390,7 +390,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_NEQ") {
-		static constexpr char* sample =	"( { l } != F ).";
+		const char* sample =	"( { l } != F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -407,7 +407,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ONE") {
-		static constexpr char* sample =	"( { l } = F ).";
+		const char* sample =	"( { l } = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -425,7 +425,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ZERO") {
-		static constexpr char* sample =	"( { l } = F ).";
+		const char* sample =	"( { l } = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(false) };
@@ -443,7 +443,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_CLASHING_SUBFORMULAS_0") {
-		static constexpr char* sample =	"( (T bf_and bf_neg T) = F ).";
+		const char* sample =	"( (T bf_and bf_neg T) = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		auto rule_src = make_tau_source(BF_CALLBACK_CLASHING_SUBFORMULAS_0);
@@ -459,7 +459,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_HAS_SUBFORMULA_0") {
-		static constexpr char* sample =	"( (T bf_and F) = F ).";
+		const char* sample =	"( (T bf_and F) = F ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		auto rule_src = make_tau_source(BF_CALLBACK_HAS_SUBFORMULA_0);

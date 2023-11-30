@@ -18,19 +18,19 @@ struct Bool {
 
 	static const Bool& zero() { static Bool b(false); return b; }
 	static const Bool& one() { static Bool b(true); return b; }
-	
+
 	Bool operator&(const Bool& x) const;
 	Bool operator|(const Bool& x) const;
 	Bool operator^(const Bool& x) const;
 	Bool operator+(const Bool& x) const;
 	Bool operator~() const;
 	auto operator<=>(const Bool& x) const = default;
-	
-	bool is_zero() const { 
-		return !b; 
+
+	bool is_zero() const {
+		return !b;
 	}
-	bool is_one() const { 
-		return b; 
+	bool is_one() const {
+		return b;
 	}
 
 	bool b;
@@ -52,8 +52,8 @@ Bool Bool::operator+(const Bool& x) const {
 	return (this->b == true) ? ~x : x;
 }
 
-Bool Bool::operator~() const { 
-	return (this->b == true) ? zero() : one(); 
+Bool Bool::operator~() const {
+	return (this->b == true) ? zero() : one();
 }
 
 #endif
