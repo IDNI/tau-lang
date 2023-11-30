@@ -49,7 +49,7 @@ RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "bf_all $X $Y := ( bf_subs_cb $X F $Y bf_and b
 RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "bf_ex $X $Y := ( bf_subs_cb $X F $Y bf_or bf_subs_cb $X T $Y).")
 RULE(BF_SKIP_CONSTANTS_0, "({ $X } bf_and $Y) := ($Y bf_and { $X }).")
 
-// cbf definitions of xor, ->, <- and <->.
+// bf definitions
 RULE(BF_DEF_XOR, "( $X bf_xor $Y ) := (( $X bf_and bf_neg $Y ) bf_or ( bf_neg $X bf_and $Y )).")
 
 // bf callbacks
@@ -72,36 +72,6 @@ RULE(BF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X bf_and $Y ) :=  bf_has_clashing_s
 RULE(BF_CALLBACK_HAS_SUBFORMULA_0, "( $X bf_and $Y ) := bf_has_subformula_cb ( $X bf_and $Y ) F F.")
 RULE(WFF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X wff_and $Y ) :=  wff_has_clashing_subformulas_cb ( $X wff_and $Y ) F.")
 RULE(WFF_CALLBACK_HAS_SUBFORMULA_0, "( $X wff_and $Y ) := wff_has_subformula_cb ( $X wff_and $Y ) F F.")
-
-// cbf rules
-RULE(CBF_DISTRIBUTE_0, "(($X cbf_or $Y) cbf_and $Z) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
-RULE(CBF_DISTRIBUTE_1, "($X cbf_and ($Y cbf_or $Z)) := (($X cbf_and $Y) cbf_or ($X cbf_and $Z)).")
-RULE(CBF_PUSH_NEGATION_INWARDS_0, "cbf_neg ($X cbf_and $Y) := (cbf_neg $X cbf_or cbf_neg $Y).")
-RULE(CBF_PUSH_NEGATION_INWARDS_1, "cbf_neg ($X cbf_or $Y) := (cbf_neg $X cbf_and cbf_neg $Y).")
-RULE(CBF_ELIM_DOUBLE_NEGATION_0, "cbf_neg cbf_neg $X :=  $X.")
-RULE(CBF_SIMPLIFY_ONE_0, "( T cbf_or $X ) := T.")
-RULE(CBF_SIMPLIFY_ONE_1, "( $X cbf_or T ) := T.")
-RULE(CBF_SIMPLIFY_ONE_2, "( T cbf_and $X ) := $X.")
-RULE(CBF_SIMPLIFY_ONE_3, "( $X cbf_and T ) := $X.")
-RULE(CBF_SIMPLIFY_ONE_4, "cbf_neg T := F.")
-RULE(CBF_SIMPLIFY_ZERO_0, "( F cbf_and $X ) := F.")
-RULE(CBF_SIMPLIFY_ZERO_1, "( $X cbf_and F ) := F.")
-RULE(CBF_SIMPLIFY_ZERO_2, "( F cbf_or $X ) := $X.")
-RULE(CBF_SIMPLIFY_ZERO_3, "( $X cbf_or F ) := $X.")
-RULE(CBF_SIMPLIFY_ZERO_4, "cbf_neg F := T.")
-RULE(CBF_SIMPLIFY_SELF_0, "( $X cbf_and $X ) := $X.")
-RULE(CBF_SIMPLIFY_SELF_1, "( $X cbf_or $X ) := $X.")
-RULE(CBF_SIMPLIFY_SELF_2, "( $X cbf_and cbf_neg $X ) := F.")
-RULE(CBF_SIMPLIFY_SELF_3, "( $X cbf_or cbf_neg $X ) := T.")
-RULE(CBF_SIMPLIFY_SELF_4, "( cbf_neg $X cbf_and $X ) := F.")
-RULE(CBF_SIMPLIFY_SELF_5, "( cbf_neg $X cbf_or $X ) := T.")
-
-// cbf definitions of xor, ->, <- and <->.
-RULE(CBF_DEF_XOR, "( $X cbf_xor $Y ) := (( $X cbf_and cbf_neg $Y ) cbf_or ( cbf_neg $X cbf_and $Y )).")
-RULE(CBF_DEF_IMPLY, "( $X cbf_imply $Y ) := ( cbf_neg $X cbf_or $Y).")
-RULE(CBF_DEF_COIMPLY, "( $X cbf_coimply $Y ) := ( $Y cbf_imply $X).")
-RULE(CBF_DEF_EQUIV, "( $X cbf_equiv $Y ) := (( $X cbf_imply $Y ) cbf_and ( $Y cbf_imply $X )).")
-RULE(CBF_DEF_IF, "(if $X then $Y else $Z) := (( $Y cbf_and_wff $X ) wff_or ( $Z cbf_and_wff wff_neg $X)).")
 
 // wff rules
 RULE(WFF_DISTRIBUTE_0, "(($X wff_or $Y) wff_and $Z) := (($X wff_and $Y) wff_or ($X wff_and $Z)).")
@@ -128,16 +98,6 @@ RULE(WFF_SIMPLIFY_SELF_2, "( $X wff_and wff_neg $X ) := F.")
 RULE(WFF_SIMPLIFY_SELF_3, "( $X wff_or wff_neg $X ) := T.")
 RULE(WFF_SIMPLIFY_SELF_4, "( wff_neg $X wff_and $X ) := F.")
 RULE(WFF_SIMPLIFY_SELF_5, "( wff_neg $X wff_or $X ) := T.")
-
-// bf_and_wff simplification rules
-RULE(BF_AND_WFF_SIMPLIFY_ONE_0, "( T cbf_and_wff $X ) := $X.")
-RULE(BF_AND_WFF_SIMPLIFY_ZERO_0, "( F cbf_and_wff $X ) := F.")
-RULE(BF_AND_WFF_SIMPLIFY_ZERO_1, "( $X cbf_and_wff F ) := F.")
-
-// bf_and_wff other rules
-RULE(BF_AND_WFF_DISTRIBUTE_0, "(( $X cbf_and_wff $Y ) wff_and ( $Z cbf_and_wff $W )):= (($X cbf_and $Z) cbf_and_wff ($Y wff_and $W)).")
-RULE(BF_AND_WFF_DISTRIBUTE_1, "($X wff_and ( $Y cbf_and_wff $Z )):= ($Y cbf_and_wff ($X wff_and $Z)).")
-RULE(BF_AND_WFF_DISTRIBUTE_2, "(($X cbf_and_wff $Y) wff_and $Z ):= ($X cbf_and_wff ($Y wff_and $Z)).")
 
 // wff definitions of xor, ->, <- and <->.
 RULE(WFF_DEF_XOR, "( $X wff_xor $Y ) := (( $X wff_and wff_neg $Y ) wff_or ( wff_neg $X wff_and $Y )).")
@@ -170,12 +130,6 @@ static auto apply_defs = make_library<BAs...>(
 	+ WFF_DEF_IMPLY
 	+ WFF_DEF_COIMPLY
 	+ WFF_DEF_EQUIV
-	// cbf defs
-	+ CBF_DEF_XOR
-	+ CBF_DEF_IMPLY
-	+ CBF_DEF_COIMPLY
-	+ CBF_DEF_EQUIV
-	+ CBF_DEF_IF
 	// bf defs
 	+ BF_DEF_XOR
 );
@@ -194,15 +148,6 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_ELIM_DOUBLE_NEGATION_0
-);
-
-template<typename... BAs>
-static auto to_dnf_cbf = make_library<BAs...>(
-	CBF_DISTRIBUTE_0
-	+ CBF_DISTRIBUTE_1
-	+ CBF_PUSH_NEGATION_INWARDS_0
-	+ CBF_PUSH_NEGATION_INWARDS_1
-	+ CBF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -243,41 +188,6 @@ static auto simplify_wff = make_library<BAs...>(
 	+ WFF_SIMPLIFY_SELF_3
 	+ WFF_SIMPLIFY_SELF_4
 	+ WFF_SIMPLIFY_SELF_5
-);
-
-
-template<typename... BAs>
-static auto simplify_bf_and_wff = make_library<BAs...>(
-	BF_AND_WFF_SIMPLIFY_ONE_0
-	+ BF_AND_WFF_SIMPLIFY_ZERO_0
-	+ BF_AND_WFF_SIMPLIFY_ZERO_1
-);
-
-template<typename... BAs>
-static auto distribute_bf_and_wff = make_library<BAs...>(
-	BF_AND_WFF_DISTRIBUTE_0
-	+ BF_AND_WFF_DISTRIBUTE_1
-	+ BF_AND_WFF_DISTRIBUTE_2
-);
-
-template<typename... BAs>
-static auto simplify_cbf = make_library<BAs...>(
-	CBF_SIMPLIFY_ONE_0
-	+ CBF_SIMPLIFY_ONE_1
-	+ CBF_SIMPLIFY_ONE_2
-	+ CBF_SIMPLIFY_ONE_3
-	+ CBF_SIMPLIFY_ONE_4
-	+ CBF_SIMPLIFY_ZERO_0
-	+ CBF_SIMPLIFY_ZERO_1
-	+ CBF_SIMPLIFY_ZERO_2
-	+ CBF_SIMPLIFY_ZERO_3
-	+ CBF_SIMPLIFY_ZERO_4
-	+ CBF_SIMPLIFY_SELF_0
-	+ CBF_SIMPLIFY_SELF_1
-	+ CBF_SIMPLIFY_SELF_2
-	+ CBF_SIMPLIFY_SELF_3
-	+ CBF_SIMPLIFY_SELF_4
-	+ CBF_SIMPLIFY_SELF_5
 );
 
 template<typename... BAs>
@@ -532,10 +442,6 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 				| simplify_bf<BAs...>
 				| apply_cb<BAs...>
 				| clause_simplify_bf<BAs...>
-				| distribute_bf_and_wff<BAs...>
-				| simplify_bf_and_wff<BAs...>
-				| to_dnf_cbf<BAs...>
-				| simplify_cbf<BAs...>
 				| trivialities<BAs...>
 				| to_dnf_wff<BAs...>
 				| simplify_wff<BAs...>

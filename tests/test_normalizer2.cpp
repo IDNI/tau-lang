@@ -23,59 +23,43 @@ using namespace idni::tau;
 namespace testing = doctest;
 
 TEST_SUITE("steps parsing") {
-	
+
 	TEST_CASE("apply_defs") {
-		CHECK( apply_defs<Bool>.size() == 10 );
+		CHECK( apply_defs<Bool>.size() == 5 );
 	}
-	
+
 	TEST_CASE("elim_for_all") {
 		CHECK( elim_for_all<Bool>.size() == 1 );
 	}
-	
+
 	TEST_CASE("to_dnf_wff") {
 		CHECK( to_dnf_wff<Bool>.size() == 7 );
 	}
-	
-	TEST_CASE("to_dnf_cbf") {
-		CHECK( to_dnf_cbf<Bool>.size() == 5 );
-	}
-	
+
 	TEST_CASE("simplify_bf") {
 		CHECK( simplify_bf<Bool>.size() == 16 );
 	}
-	
+
 	TEST_CASE("simplify_wff") {
 		CHECK( simplify_wff<Bool>.size() == 16 );
 	}
-	
-	TEST_CASE("simplify_bf_and_wff") {
-		CHECK( simplify_bf_and_wff<Bool>.size() == 3 );
-	}
-	
-	TEST_CASE("distribute_bf_and_wff") {
-		CHECK( distribute_bf_and_wff<Bool>.size() == 3 );
-	}
-	
-	TEST_CASE("simplify_cbf") {
-		CHECK( simplify_cbf<Bool>.size() == 16 );
-	}
-	
+
 	TEST_CASE("apply_cb") {
 		CHECK( apply_cb<Bool>.size() == 9 );
 	}
-	
+
 	TEST_CASE("apply_speed_up_cb") {
 		CHECK( apply_speed_up_cb<Bool>.size() == 4 );
 	}
-	
+
 	TEST_CASE("squeeze_positives") {
 		CHECK( squeeze_positives<Bool>.size() == 1 );
 	}
-	
+
 	TEST_CASE("clause_simplify_bf") {
 		CHECK( clause_simplify_bf<Bool>.size() == 2 );
 	}
-	
+
 	TEST_CASE("clause_simplify_wff") {
 		CHECK( clause_simplify_wff<Bool>.size() == 2 );
 	}
@@ -83,19 +67,19 @@ TEST_SUITE("steps parsing") {
 	TEST_CASE("wff_remove_existential") {
 		CHECK( wff_remove_existential<Bool>.size() == 1 );
 	}
-		
+
 	TEST_CASE("bf_positives_upwards") {
 		CHECK( bf_positives_upwards<Bool>.size() == 5 );
 	}
-	
+
 	TEST_CASE("bf_positives_upwards") {
 		CHECK( bf_positives_upwards<Bool>.size() == 5 );
 	}
-	
+
 	TEST_CASE("bf_elim_quantifiers") {
 		CHECK( bf_elim_quantifiers<Bool>.size() == 2 );
 	}
-	
+
 	TEST_CASE("trivialities") {
 		CHECK( trivialities<Bool>.size() == 4 );
 	}
@@ -125,4 +109,3 @@ TEST_SUITE("operator|"){
 // TODO (MEDIUM) write tests to check operator| (all versions)
 
 }
-

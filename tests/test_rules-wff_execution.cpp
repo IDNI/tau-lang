@@ -27,7 +27,7 @@ namespace testing = doctest;
 
 TEST_SUITE("executing wff rules") {
 
-	TEST_CASE("WFF_DISTRIBUTE_0") { 
+	TEST_CASE("WFF_DISTRIBUTE_0") {
 		auto src_rule = make_tau_source(WFF_DISTRIBUTE_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -48,7 +48,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_0") {
 		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_0);
 		auto statement = make_statement(src_rule);
@@ -59,7 +59,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_1") {
 		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_1);
 		auto statement = make_statement(src_rule);
@@ -70,7 +70,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_2") {
 		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_2);
 		auto statement = make_statement(src_rule);
@@ -81,7 +81,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_3") {
 		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_3);
 		auto statement = make_statement(src_rule);
@@ -92,7 +92,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_ELIM_DOUBLE_NEGATION_0") {
 		auto src_rule = make_tau_source(WFF_ELIM_DOUBLE_NEGATION_0);
 		auto statement = make_statement(src_rule);
@@ -103,7 +103,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_ELIM_FORALL") {
 		auto src_rule = make_tau_source(WFF_ELIM_FORALL);
 		auto statement = make_statement(src_rule);
@@ -114,7 +114,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_ONE_0") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ONE_0);
 		auto statement = make_statement(src_rule);
@@ -122,54 +122,54 @@ TEST_SUITE("executing wff rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body ); 
+		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
-	TEST_CASE("WFF_SIMPLIFY_ONE_1") { 
+
+	TEST_CASE("WFF_SIMPLIFY_ONE_1") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ONE_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body ); 
+		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
-	TEST_CASE("WFF_SIMPLIFY_ONE_2") { 
+
+	TEST_CASE("WFF_SIMPLIFY_ONE_2") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ONE_2);
-		auto statement = make_statement(src_rule); 
+		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body ); 
+		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
-	TEST_CASE("WFF_SIMPLIFY_ONE_3") { 
+
+	TEST_CASE("WFF_SIMPLIFY_ONE_3") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ONE_3);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body ); 
+		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
-	TEST_CASE("WFF_SIMPLIFY_ONE_4") { 
+
+	TEST_CASE("WFF_SIMPLIFY_ONE_4") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ONE_4);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
 		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body ); 
+		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_ZERO_0") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ZERO_0);
 		auto statement = make_statement(src_rule);
@@ -180,7 +180,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_ZERO_1") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ZERO_1);
 		auto statement = make_statement(src_rule);
@@ -191,7 +191,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_ZERO_2") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ZERO_2);
 		auto statement = make_statement(src_rule);
@@ -202,7 +202,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_ZERO_3") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ZERO_3);
 		auto statement = make_statement(src_rule);
@@ -213,7 +213,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_ZERO_4") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ZERO_4);
 		auto statement = make_statement(src_rule);
@@ -224,7 +224,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_SELF_0") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_SELF_0);
 		auto statement = make_statement(src_rule);
@@ -235,7 +235,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_SELF_1") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_SELF_1);
 		auto statement = make_statement(src_rule);
@@ -246,7 +246,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_SELF_2") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_SELF_2);
 		auto statement = make_statement(src_rule);
@@ -257,7 +257,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_SELF_3") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_SELF_3);
 		auto statement = make_statement(src_rule);
@@ -268,7 +268,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-		
+
 	TEST_CASE("WFF_SIMPLIFY_SELF_4") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_SELF_4);
 		auto statement = make_statement(src_rule);
@@ -279,64 +279,9 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-	
+
 	TEST_CASE("WFF_SIMPLIFY_SELF_5") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_SELF_5);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_AND_WFF_SIMPLIFY_ONE_0") {
-		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ONE_0);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_AND_WFF_SIMPLIFY_ZERO_0") {
-		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ZERO_0);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_AND_WFF_SIMPLIFY_ZERO_1") {
-		auto src_rule = make_tau_source(BF_AND_WFF_SIMPLIFY_ZERO_1);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_AND_WFF_DISTRIBUTE_0") {
-		auto src_rule = make_tau_source(BF_AND_WFF_DISTRIBUTE_0);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_AND_WFF_DISTRIBUTE_1") {
-		auto src_rule = make_tau_source(BF_AND_WFF_DISTRIBUTE_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
@@ -411,7 +356,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-	
+
 	TEST_CASE("BF_TRIVIALITY_2") {
 		auto src_rule = make_tau_source(BF_TRIVIALITY_2);
 		auto statement = make_statement(src_rule);
@@ -422,7 +367,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-	
+
 	TEST_CASE("BF_TRIVIALITY_3") {
 		auto src_rule = make_tau_source(BF_TRIVIALITY_3);
 		auto statement = make_statement(src_rule);
@@ -518,13 +463,13 @@ TEST_SUITE("executing wff rules") {
 		auto sample_statement = make_statement(sample_src);
 		auto rule_src = make_tau_source(WFF_CALLBACK_CLASHING_SUBFORMULAS_0);
 		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement 
+		auto rule = rule_statement
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, sample_statement);
-		auto check = result 
+		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
-		CHECK( check.has_value() );	
+		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("WFF_CALLBACK_HAS_SUBFORMULA_0") {
@@ -533,17 +478,16 @@ TEST_SUITE("executing wff rules") {
 		auto sample_statement = make_statement(sample_src);
 		auto rule_src = make_tau_source(WFF_CALLBACK_HAS_SUBFORMULA_0);
 		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement 
+		auto rule = rule_statement
 			| tau_parser::library| tau_parser::rules | tau_parser::rule | optional_value_extractor<sp_tau_node<Bool>>;
 		auto tau_rule = make_rule(rule);
 		auto result = tau_apply(tau_rule, sample_statement);
-		auto check = result 
+		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff 	| tau_parser::wff_and;
 		CHECK( check.has_value() );
 	}
 }
 
 // TODO (MEDIUM) writes tests for simple recursive relations
-// The tests should range from simple direct substitutions to more complex 
+// The tests should range from simple direct substitutions to more complex
 // substitutions (involving multiple variables and indexes).
-
