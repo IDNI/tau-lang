@@ -107,11 +107,11 @@ wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
 # TODO (LOW) rename wff_eq and wff_new to bf_eq and bf_neq
-wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | cbf_if
-					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv | cbf_and_wff
+wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor
+					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
 					| wff_coimply | wff_t | wff_f | capture |ignore.
-wff_eq 			=> open_parenthesis cbf equality wff_f close_parenthesis.
-wff_neq 		=> open_parenthesis cbf nequality wff_f close_parenthesis.
+wff_eq 			=> open_parenthesis bf equality wff_f close_parenthesis.
+wff_neq 		=> open_parenthesis bf nequality wff_f close_parenthesis.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
@@ -121,14 +121,6 @@ wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
 wff_coimply		=> open_parenthesis wff wff_coimply_sym wff close_parenthesis.
 wff_all			=> wff_all_sym (variable|capture|ignore) ws_required wff.
 wff_ex			=> wff_ex_sym (variable|capture|ignore) ws_required wff.
-cbf_and_wff		=> open_parenthesis cbf cbf_and_wff_sym wff close_parenthesis.
-
-cbf_if				=> open_parenthesis cbf_if_sym cbf_if_condition
-						cbf_then_sym cbf_if_then
-						cbf_else_sym cbf_if_else close_parenthesis.
-cbf_if_condition	=> wff.
-cbf_if_then			=> cbf.
-cbf_if_else			=> cbf.
 
 # wff_op_sym
 wff_and_sym		=> ws "wff_and" ws.
@@ -142,43 +134,10 @@ wff_all_sym		=> ws "wff_all" ws.
 wff_ex_sym		=> ws "wff_ex" ws.
 wff_t			=> ws 'T' ws.
 wff_f			=> ws 'F' ws.
-cbf_and_wff_sym	=> ws "cbf_and_wff" ws.
 
-# cbf
-cbf_rule 	=> cbf_matcher definition cbf_body dot.
-cbf_matcher	=> cbf | cbf_ref.
-cbf_body	=> cbf.
-
-cbf_ref 		=> sym indexes cbf_ref_args.
-cbf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
-
-cbf 				=> bf | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or
-						| cbf_imply | cbf_equiv | cbf_coimply | cbf_ref.
-cbf_and				=> open_parenthesis cbf cbf_and_sym cbf close_parenthesis.
-cbf_or				=> open_parenthesis cbf cbf_or_sym cbf close_parenthesis.
-cbf_xor				=> open_parenthesis cbf cbf_xor_sym cbf close_parenthesis.
-cbf_neg				=> cbf_neg_sym cbf.
-cbf_imply			=> open_parenthesis cbf cbf_imply_sym cbf close_parenthesis.
-cbf_equiv			=> open_parenthesis cbf cbf_equiv_sym cbf close_parenthesis.
-cbf_coimply			=> open_parenthesis cbf cbf_coimply_sym cbf close_parenthesis.
-
-# cbf_op_sym
-cbf_and_sym			=> ws "cbf_and" ws.
-cbf_or_sym			=> ws "cbf_or" ws.
-cbf_xor_sym			=> ws "cbf_xor" ws.
-cbf_neg_sym			=> ws "cbf_neg" ws.
-cbf_imply_sym		=> ws "cbf_imply" ws.
-cbf_equiv_sym		=> ws "cbf_equiv" ws.
-cbf_coimply_sym		=> ws "cbf_coimply" ws.
-cbf_if_sym			=> ws "if" ws.
-cbf_then_sym		=> ws "then" ws.
-cbf_else_sym		=> ws "else" ws.
-
-# bf - TODO bf => constant | bf & bf | bf | bf | ~bf | bf ^ bf | in[n][t]
-# | out[n][t] <<< this thing is important!!!
-#
-# QUESTION: Does timed vars appear only in bf formulas?
-
+# bf
+bf_ref 		=> sym indexes bf_ref_args.
+bf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 bf_rule		=> bf_matcher definition bf_body dot.
 
 bf_matcher	=> bf.
@@ -297,15 +256,13 @@ wff_remove_existential_cb_sym			=> ws "wff_remove_existential_cb" ws.
 input			=> in colon open_brace source_binding close_brace.
 
 # main posibilities
-inputs			=> less input input* dot.
+inputs			=> less input (input)* dot.
 main			=> wff dot.
-rule			=> wff_rule | cbf_rule | bf_rule .
+rule			=> wff_rule | bf_rule .
 rules			=> (rule)*.
 formula			=> rules main.
 library 		=> rules.
 # each builder is define on its own string
 builder			=> captures definition builder_body dot.
-builder_body	=> wff | cbf | bf.
+builder_body	=> wff | bf.
 start			=> formula | library | builder | inputs.
-
-# TODO (HIGH) rename operators to tau & tau, tau && tau, tau &&& tau,...

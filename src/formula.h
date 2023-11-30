@@ -795,7 +795,6 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	switch (type) {
 	case tau_parser::bf_rule: return make_rule<tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
 	case tau_parser::wff_rule: return make_rule<tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
-	case tau_parser::cbf_rule: return make_rule<tau_parser::cbf_rule, tau_parser::cbf_matcher, tau_parser::cbf_body, BAs...>(rule);
 	default: assert(false);
 	};
 }
@@ -917,9 +916,9 @@ builder<BAs...> make_builder(const std::string& source) {
 }
 
 // apply the given builder to the given expression
-// TODO (MEDIUM) it should return the child, it currtently returns the parent 
-// 
-// i.e. rightnow it retuns a a bf, cbf or wff formula, but we are interested in the child
+// TODO (MEDIUM) it should return the child, it currtently returns the parent
+//
+// i.e. rightnow it retuns a a bf or wff formula, but we are interested in the child
 // thus it, a wwf_eq formula, or wff_neq formula,...
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_tau_node<BAs...>>& n) {
@@ -963,16 +962,6 @@ const std::string BLDR_WFF_EX = "( $X $Y ) := wff_ex $X $Y.";
 const std::string BLDR_WFF_T = "( ) := T.";
 const std::string BLDR_WFF_F = "( ) := F.";
 
-// definitions of cbf builder rules
-const std::string BLDR_CBF_AND = "( $X $Y ) := ($X cbf_and $Y).";
-const std::string BLDR_CBF_OR = "( $X $Y ) := ($X cbf_or $Y).";
-const std::string BLDR_CBF_XOR = "( $X $Y ) := ($X cbf_xor $Y).";
-const std::string BLDR_CBF_NEG = "( $X ) := cbf_neg $X.";
-const std::string BLDR_CBF_IMPLY = "( $X $Y ) := ($X cbf_imply $Y).";
-const std::string BLDR_CBF_EQUIV = "( $X $Y ) := ( $X cbf_equiv $Y ).";
-const std::string BLDR_CBF_COIMPLY = "( $X $Y ) := ($X cbf_coimply $Y).";
-const std::string BLDR_CBF_IF = "( $X $Y $Z ) := (if $X then $Y else $Z).";
-
 // definitions of bf builder rules
 const std::string BLDR_BF_AND = "( $X $Y ) := ($X bf_and $Y).";
 const std::string BLDR_BF_OR = "( $X $Y ) := ($X bf_or $Y).";
@@ -1013,24 +1002,6 @@ template<typename... BAs>
 static auto bldr_wff_t = make_builder<BAs...>(BLDR_WFF_T);
 template<typename... BAs>
 static auto bldr_wff_f = make_builder<BAs...>(BLDR_WFF_F);
-
-// cbf builder
-template<typename... BAs>
-static auto bldr_cbf_and = make_builder<BAs...>(BLDR_CBF_AND);
-template<typename... BAs>
-static auto bldr_cbf_or = make_builder<BAs...>(BLDR_CBF_OR);
-template<typename... BAs>
-static auto bldr_cbf_xor = make_builder<BAs...>(BLDR_CBF_XOR);
-template<typename... BAs>
-static auto bldr_cbf_neg = make_builder<BAs...>(BLDR_CBF_NEG);
-template<typename... BAs>
-static auto bldr_cbf_imply = make_builder<BAs...>(BLDR_CBF_IMPLY);
-template<typename... BAs>
-static auto bldr_cbf_equiv = make_builder<BAs...>(BLDR_CBF_EQUIV);
-template<typename... BAs>
-static auto bldr_cbf_coimply = make_builder<BAs...>(BLDR_CBF_COIMPLY);
-template<typename... BAs>
-static auto bldr_cbf_if = make_builder<BAs...>(BLDR_CBF_IF);
 
 // bf builder
 template<typename... BAs>
@@ -1133,55 +1104,6 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_wff_f() {
 	std::vector<sp_tau_node<BAs...>> args {} ;
 	return tau_apply_builder<BAs...>(bldr_wff_f<BAs...>, args);
-}
-
-// cbf factory method for building cbf formulas
-template<typename... BAs>
-sp_tau_node<BAs...> build_cbf_and(const sp_tau_node<BAs...>& l,const  sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, r};
-	return tau_apply_builder<BAs...>(bldr_cbf_and<BAs...>, args);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_cbf_or(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, r};
-	return tau_apply_builder<BAs...>(bldr_cbf_or<BAs...>, args);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_cbf_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, r};
-	return tau_apply_builder<BAs...>(bldr_cbf_xor<BAs...>, args);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_cbf_neg(const sp_tau_node<BAs...>& l) {
-	std::vector<sp_tau_node<BAs...>> args {l};
-	return tau_apply_builder<BAs...>(bldr_cbf_neg<BAs...>, args);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_cbf_imply(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, r};
-	return tau_apply_builder<BAs...>(bldr_cbf_imply<BAs...>, args);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_cbf_equiv(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, r};
-	return tau_apply_builder<BAs...>(bldr_cbf_equiv<BAs...>, args);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_cbf_coimply(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, r};
-	return tau_apply_builder<BAs...>(bldr_cbf_coimply<BAs...>, args);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_cbf_if(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r, const sp_tau_node<BAs...>& s) {
-	std::vector<sp_tau_node<BAs...>> args {l, r, s};
-	return tau_apply_builder<BAs...>(bldr_cbf_if<BAs...>, args);
 }
 
 // bf factory method for building bf formulas
@@ -1326,17 +1248,17 @@ private:
 			// FIXME it could have no equalities
 			auto check_eq = find_top(l, is_non_terminal<tau_parser::wff_eq, BAs...>);
 			if (check_eq.has_value()) {
-				auto f = check_eq 
-					| tau_parser::cbf | tau_parser::bf
-					| only_child_extractor<BAs...> 
+				auto f = check_eq
+					| tau_parser::bf
+					| only_child_extractor<BAs...>
 					| optional_value_extractor<sp_tau_node<BAs...>>;
 				auto fall = build_bf_all<BAs...>(var, f) | tau_parser::bf_all | optional_value_extractor<sp_tau_node<BAs...>>;
 				wff_changes[check_eq.value()] = build_wff_eq<BAs...>(fall) | tau_parser::wff_eq | optional_value_extractor<sp_tau_node<BAs...>>;
 				auto x_plus_fx = build_bf_xor<BAs...>(var, f) | tau_parser::bf_xor | optional_value_extractor<sp_tau_node<BAs...>>;
 				for (auto& neq: select_all(n, is_non_terminal<tau_parser::wff_neq, BAs...>)) {
-					auto g_i = neq | tau_parser::cbf | only_child_extractor<BAs...> 
+					auto g_i = neq | tau_parser::bf | only_child_extractor<BAs...>
 						| optional_value_extractor<sp_tau_node<BAs...>>;
-					std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> gi_changes; 
+					std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> gi_changes;
 					gi_changes[var] = x_plus_fx;
 					auto ngi = replace<sp_tau_node<BAs...>>(g_i, gi_changes);
 					auto fex = build_bf_ex<BAs...>(var, ngi)| tau_parser::bf_ex | optional_value_extractor<sp_tau_node<BAs...>>;
@@ -1344,7 +1266,7 @@ private:
 				}
 			} else {
 				for (auto& neq: select_all(n, is_non_terminal<tau_parser::wff_neq, BAs...>)) {
-					auto g_i = neq | tau_parser::cbf | tau_parser::bf | only_child_extractor<BAs...> 
+					auto g_i = neq | tau_parser::bf | only_child_extractor<BAs...>
 						| optional_value_extractor<sp_tau_node<BAs...>>;
 					auto fex = build_bf_ex<BAs...>(var, g_i)| tau_parser::bf_ex | optional_value_extractor<sp_tau_node<BAs...>>;
 					wff_changes[neq] = build_wff_neq<BAs...>(fex)| tau_parser::wff_neq | optional_value_extractor<sp_tau_node<BAs...>>;

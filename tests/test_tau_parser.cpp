@@ -118,9 +118,7 @@ TEST_SUITE("parsing rules") {
 	TEST_CASE("wff rule") {
 		// TODO (LOW) add test for wff rule parsing
 	}
-	TEST_CASE("cbf rule") {
-		// TODO (LOW) add test for cbf rule parsing
-	}
+
 	TEST_CASE("bf rule") {
 		// TODO (LOW) add test for bf rule parsing
 	}
@@ -290,134 +288,6 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 }
 
-TEST_SUITE("parsing cbf formulas ") {
-
-	TEST_CASE("cbf_neg") {
-		static constexpr char* sample =	"?Z := cbf_neg ?Z.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto neg_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::cbf_rule
-			| tau_parser::cbf_body
-			| tau_parser::cbf
-			| tau_parser::cbf_neg;
-		CHECK( neg_rule.has_value() );
-	}
-
-	TEST_CASE("cbf_and") {
-		static constexpr char* sample =	"?Z := ( ?Z cbf_and ?Z ).";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto and_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::cbf_rule
-			| tau_parser::cbf_body
-			| tau_parser::cbf
-			| tau_parser::cbf_and;
-		CHECK( and_rule.has_value() );
-	}
-
-	TEST_CASE("cbf_or") {
-		static constexpr char* sample =	"?Z := ( ?Z cbf_or ?Z ).";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto or_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::cbf_rule
-			| tau_parser::cbf_body
-			| tau_parser::cbf
-			| tau_parser::cbf_or;
-		CHECK( or_rule.has_value() );
-	}
-
-	TEST_CASE("cbf_xor") {
-		static constexpr char* sample =	"?Z := ( ?Z cbf_xor ?Z ).";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto xor_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::cbf_rule
-			| tau_parser::cbf_body
-			| tau_parser::cbf
-			| tau_parser::cbf_xor;
-		CHECK( xor_rule.has_value() );
-	}
-
-	TEST_CASE("cbf_imply") {
-		static constexpr char* sample =	"(?Z cbf_imply ?Z) := ?Z.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto imply_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::cbf_rule
-			| tau_parser::cbf_matcher
-			| tau_parser::cbf
-			| tau_parser::cbf_imply;
-		CHECK( imply_rule.has_value() );
-	}
-
-	TEST_CASE("cbf_coimply") {
-		static constexpr char* sample =	"(?Z cbf_coimply ?Z) := ?Z.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto coimply_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::cbf_rule
-			| tau_parser::cbf_matcher
-			| tau_parser::cbf
-			| tau_parser::cbf_coimply;
-		CHECK( coimply_rule.has_value() );
-	}
-
-	TEST_CASE("cbf_equiv") {
-		static constexpr char* sample =	"(?Z cbf_equiv ?Z) := ?Z.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto equiv_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::cbf_rule
-			| tau_parser::cbf_matcher
-			| tau_parser::cbf
-			| tau_parser::cbf_equiv;
-		CHECK( equiv_rule.has_value() );
-	}
-
-	TEST_CASE("cbf_if") {
-		static constexpr char* sample =	"(if $Y then $Z  else $Z) := $X.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto if_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule
-			| tau_parser::wff_matcher
-			| tau_parser::wff
-			| tau_parser::cbf_if;
-		CHECK( if_rule.has_value() );
-	}
-
-	// TODO (HIGH) test cbf refs
-	TEST_CASE("cbf_ref") {
-		// CHECK( false );
-	}
-}
-
 TEST_SUITE("parsing bf formulas ") {
 
 	TEST_CASE("bf_neg") {
@@ -553,6 +423,11 @@ TEST_SUITE("parsing bf formulas ") {
 			| tau_parser::bf
 			| tau_parser::bf_ex;
 		CHECK( ex_rule.has_value() );
+	}
+
+	// TODO (HIGH) test bf refs
+	TEST_CASE("bf_ref") {
+		// CHECK( false );
 	}
 }
 

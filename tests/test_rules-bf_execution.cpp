@@ -260,7 +260,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
+			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 
@@ -278,7 +278,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
+			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 
@@ -296,7 +296,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
+			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 
@@ -314,7 +314,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
+			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 
@@ -332,7 +332,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
 
@@ -350,7 +350,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
 
@@ -368,7 +368,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::cbf | tau_parser::bf | tau_parser::bf_t;
+			| tau_parser::bf | tau_parser::bf_t;
 		CHECK( check.has_value() );
 	}
 
@@ -420,7 +420,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff
-			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_t;
+			| tau_parser::wff_eq | tau_parser::bf | tau_parser::bf_t;
 		CHECK( check.has_value() );
 	}
 
@@ -438,7 +438,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff
-			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::wff_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
 
@@ -454,7 +454,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, sample_statement);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff
-			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::wff_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
 
@@ -470,7 +470,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, sample_statement);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff
-			| tau_parser::wff_eq | tau_parser::cbf | tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::wff_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
 
