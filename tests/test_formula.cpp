@@ -65,17 +65,17 @@ TEST_SUITE("make_library") {
 TEST_SUITE("callbacks") {
 
 	TEST_CASE("BF_CALLBACK_SUBS") {
-		static constexpr char* sample =	"bf_subs_cb F T F := F.";
+		const char* sample =	"bf_subs_cb F T F := F.";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		callback_applier<Bool> cb_applier;
-		auto extracted = sample_statement 
-			| tau_parser::library | tau_parser::rules 
-			| tau_parser::rule | tau_parser::bf_rule 
-			| tau_parser::bf_matcher | tau_parser::bf | tau_parser::bf_subs_cb 
+		auto extracted = sample_statement
+			| tau_parser::library | tau_parser::rules
+			| tau_parser::rule | tau_parser::bf_rule
+			| tau_parser::bf_matcher | tau_parser::bf | tau_parser::bf_subs_cb
 			| optional_value_extractor<sp_tau_node<Bool>>;
 		auto result = cb_applier(extracted);
-		CHECK( is_non_terminal<Bool>(tau_parser::bf_t, result) );	
+		CHECK( is_non_terminal<Bool>(tau_parser::bf_t, result) );
 	}
 
 	// TODO (MEDIUM) add explicit unit tests for the remaining callbacks
@@ -83,4 +83,3 @@ TEST_SUITE("callbacks") {
 	// All of them are tested inderectly when appying the rules of the normalizer
 	// in the file test_rules.cpp. However, it is better to have explicit tests
 }
-

@@ -26,32 +26,32 @@ sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {
 	tauify<Bool> tf;
 	map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
 	return post_order_traverser<
-			map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>>, 
-			all_t<sp_tau_source_node>, 
-			sp_node<tau_source_sym>, 
+			map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>>,
+			all_t<sp_tau_source_node>,
+			sp_node<tau_source_sym>,
 			sp_tau_node<Bool>>(
 		transform, all<sp_tau_source_node>)(source);
 }
 
 sp_tau_node<Bool> make_named_bindings(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
-	true_predicate<sp_tau_node<Bool>> always;
+	//true_predicate<sp_tau_node<Bool>> always;
 	name_binder<Bool> nb(bs);
-	bind_transformer<name_binder<Bool>, Bool> binder(nb); 
+	bind_transformer<name_binder<Bool>, Bool> binder(nb);
 	return post_order_traverser<
-			bind_transformer<name_binder<Bool>, Bool>, 
-			all_t<sp_tau_node<Bool>>, 
+			bind_transformer<name_binder<Bool>, Bool>,
+			all_t<sp_tau_node<Bool>>,
 			sp_tau_node<Bool>>(
 		binder, all<sp_tau_node<Bool>>)(statement);
 }
 
 template<typename factory_t>
 sp_tau_node<Bool> make_factory_bindings(const sp_tau_node<Bool>& statement, factory_t& factory) {
-	true_predicate<sp_tau_node<Bool>> always;
+	//true_predicate<sp_tau_node<Bool>> always;
 	factory_binder<factory_t, Bool> fb(factory);
-	bind_transformer<factory_binder<factory_t, Bool>, Bool> binder(fb); 
+	bind_transformer<factory_binder<factory_t, Bool>, Bool> binder(fb);
 	return post_order_traverser<
-			bind_transformer<factory_binder<factory_t, Bool>, Bool>, 
-			all_t<sp_tau_node<Bool>>, 
+			bind_transformer<factory_binder<factory_t, Bool>, Bool>,
+			all_t<sp_tau_node<Bool>>,
 			sp_tau_node<Bool>>(
 		binder, all<sp_tau_node<Bool>>)(statement);
 }
@@ -78,9 +78,9 @@ std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<Bool> n, si
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },
-		[&os](std::variant<Bool> v) { 
-			if (auto b = std::get<0>(v); b == true) os << "true"; 
-			else if (auto b = std::get<0>(v); b == false) os << "false"; 
+		[&os](std::variant<Bool> v) {
+			if (auto b = std::get<0>(v); b == true) os << "true";
+			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...bdd..."; }
 	}, n->value);
 	for (auto& d : n->child) pretty_print_sp_tau_node(os, d, l + 1);

@@ -51,7 +51,7 @@ struct anf : set<set<int_t>> {
 		r.neg = !(neg == x.neg);
 		return r;
 	}
-	
+
 	anf operator|(const anf& x) const { return x + *this + (*this * x); }
 
 	static set<int_t> union_(const set<int_t>& x, const set<int_t>& y) {

@@ -15,6 +15,7 @@
 
 #include <cassert>
 
+#undef  OUTPUT_APPLY_RULES
 #define OUTPUT_APPLY_RULES 1
 
 #include "../src/doctest.h"
@@ -37,7 +38,7 @@ namespace testing = doctest;
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
 	TEST_CASE("T") {
-		static constexpr char* sample =	"T.";
+		const char* sample =	"T.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -48,7 +49,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F") {
-		static constexpr char* sample =	"F.";
+		const char* sample =	"F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -59,7 +60,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T wff_and F") {
-		static constexpr char* sample =	"(T wff_and F).";
+		const char* sample =	"(T wff_and F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -70,7 +71,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T wff_xor F") {
-		static constexpr char* sample =	"(T wff_xor F).";
+		const char* sample =	"(T wff_xor F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -81,7 +82,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F wff_or F") {
-		static constexpr char* sample =	"(F wff_or F).";
+		const char* sample =	"(F wff_or F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -92,7 +93,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("wff_neg F") {
-		static constexpr char* sample =	"wff_neg F.";
+		const char* sample =	"wff_neg F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -103,7 +104,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F wff_imply F") {
-		static constexpr char* sample =	"(F wff_imply F).";
+		const char* sample =	"(F wff_imply F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -114,7 +115,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T wff_coimply F") {
-		static constexpr char* sample =	"(T wff_coimply F).";
+		const char* sample =	"(T wff_coimply F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -125,7 +126,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F wff_equiv F") {
-		static constexpr char* sample =	"(F wff_equiv F).";
+		const char* sample =	"(F wff_equiv F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -136,7 +137,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T bf_and F = F.") {
-		static constexpr char* sample =	"((T bf_and F) = F).";
+		const char* sample =	"((T bf_and F) = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -147,7 +148,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T bf_or F = F.") {
-		static constexpr char* sample =	"((T bf_or F) = F).";
+		const char* sample =	"((T bf_or F) = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -158,7 +159,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T bf_xor F != F.") {
-		static constexpr char* sample =	"((T bf_xor F) != F).";
+		const char* sample =	"((T bf_xor F) != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -169,7 +170,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("bf_neg F = F.") {
-		static constexpr char* sample =	"(bf_neg F = F).";
+		const char* sample =	"(bf_neg F = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -180,7 +181,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("bf_neg T = F.") {
-		static constexpr char* sample =	"(bf_neg T = F).";
+		const char* sample =	"(bf_neg T = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -199,7 +200,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("{ bdd : X } != F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( { bdd : X } != F).";
+		const char* sample =	"( { bdd : X } != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -211,7 +212,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("{ bdd : X } = F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( { bdd : X }  = F).";
+		const char* sample =	"( { bdd : X }  = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -223,7 +224,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("(bf_neg {bdd : Y} bf_and {bdd : Y}) = F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( (bf_neg {bdd : Y} bf_and {bdd : Y}) = F).";
+		const char* sample =	"( (bf_neg {bdd : Y} bf_and {bdd : Y}) = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -236,7 +237,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("(bf_neg {bdd : Y} bf_or {bdd : Y}) != F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( (bf_neg {bdd : Y} bf_or {bdd : Y}) != F).";
+		const char* sample =	"( (bf_neg {bdd : Y} bf_or {bdd : Y}) != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -249,7 +250,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("( {bdd : Y} bf_less_equal {bdd : Y}) != F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( ({bdd : Y} bf_less_equal {bdd : Y}) != F).";
+		const char* sample =	"( ({bdd : Y} bf_less_equal {bdd : Y}) != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -262,7 +263,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("( bf_neg {bdd : Y} bf_less_equal {bdd : Y}) != F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( ( bf_neg {bdd : Y} bf_less_equal {bdd : Y}) != F).";
+		const char* sample =	"( ( bf_neg {bdd : Y} bf_less_equal {bdd : Y}) != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -275,7 +276,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("(({bdd : Y} bf_and { bdd : X}) bf_less {bdd : Y}) != F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( (({bdd : Y} bf_and { bdd : X}) bf_less {bdd : Y}) != F).";
+		const char* sample =	"( (({bdd : Y} bf_and { bdd : X}) bf_less {bdd : Y}) != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -288,7 +289,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("({bdd : Y} bf_greater ({bdd:X} bf_and {bdd : Y}) = F") {
 		bdd_init<Bool>();
-		static constexpr char* sample =	"( (({bdd : Y} bf_and {bdd : X}) bf_greater {bdd : Y}) = F).";
+		const char* sample =	"( (({bdd : Y} bf_and {bdd : X}) bf_greater {bdd : Y}) = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -303,7 +304,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 
 	TEST_CASE("bf_all ?P ?P = F") {
-		static constexpr char* sample =	"(bf_all ?P ?P = F).";
+		const char* sample =	"(bf_all ?P ?P = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -316,7 +317,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("bf_all ?P ?P != F") {
-		static constexpr char* sample =	"(bf_all ?P ?P != F).";
+		const char* sample =	"(bf_all ?P ?P != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -329,7 +330,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("bf_ex ?P ?P == F") {
-		static constexpr char* sample =	"(bf_ex ?P ?P = F).";
+		const char* sample =	"(bf_ex ?P ?P = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -340,7 +341,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("bf_ex ?P ?P != F") {
-		static constexpr char* sample =	"(bf_ex ?P ?P != F).";
+		const char* sample =	"(bf_ex ?P ?P != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -351,7 +352,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("wff_ex ?P (?P != F)") {
-		static constexpr char* sample =	"wff_ex ?P (?P != F).";
+		const char* sample =	"wff_ex ?P (?P != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -364,7 +365,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("bf_all ?P ?P != F") {
-		static constexpr char* sample =	"(bf_all ?P ?P != F).";
+		const char* sample =	"(bf_all ?P ?P != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -377,7 +378,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("bf_ex ?P ?P == F") {
-		static constexpr char* sample =	"(bf_ex ?P ?P = F).";
+		const char* sample =	"(bf_ex ?P ?P = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -388,7 +389,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("wff_ex ?P (?P == F)") {
-		static constexpr char* sample =	"wff_ex ?P (?P = F).";
+		const char* sample =	"wff_ex ?P (?P = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -399,7 +400,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("wff_all ?P (?P != F)") {
-		static constexpr char* sample =	"wff_all ?P (?P != F).";
+		const char* sample =	"wff_all ?P (?P != F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -410,7 +411,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("wff_all ?P (?P == F)") {
-		static constexpr char* sample =	"wff_all ?P (?P = F).";
+		const char* sample =	"wff_all ?P (?P = F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
