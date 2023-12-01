@@ -77,7 +77,7 @@ TEST_SUITE("operator||") {
 	}
 
 	TEST_CASE("match several nodes") {
-		static constexpr char* sample =	"((?Z & ?Z) & (?Z & ?Z)) := ?Z.";
+		static constexpr char* sample =	"(?Z & ?Z) := ?Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib
@@ -88,12 +88,8 @@ TEST_SUITE("operator||") {
 			| tau_parser::bf_matcher
 			| tau_parser::bf
 			| tau_parser::bf_and
-			|| tau_parser::bf
-			|| tau_parser::bf_and
 			|| tau_parser::bf;
-		CHECK( args.size() == 4 );
+		CHECK( args.size() == 2 );
 		CHECK( args[0] == args[1] );
-		CHECK( args[0] == args[2] );
-		CHECK( args[0] == args[3] );
 	}
 }

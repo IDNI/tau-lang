@@ -15,6 +15,7 @@
 
 #include <cassert>
 
+#undef  OUTPUT_APPLY_RULES
 #define OUTPUT_APPLY_RULES 1
 
 #include "../src/doctest.h"
@@ -37,7 +38,7 @@ namespace testing = doctest;
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
 	TEST_CASE("T") {
-		static constexpr char* sample =	"T.";
+		const char* sample =	"T.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -48,7 +49,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F") {
-		static constexpr char* sample =	"F.";
+		const char* sample =	"F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -114,7 +115,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T wff_coimply F") {
-		static constexpr char* sample =	"(T wff_coimply F).";
+		const char* sample =	"(T wff_coimply F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);

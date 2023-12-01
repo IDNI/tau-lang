@@ -34,7 +34,7 @@ sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {
 }
 
 sp_tau_node<Bool> make_named_bindings(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
-	true_predicate<sp_tau_node<Bool>> always;
+	//true_predicate<sp_tau_node<Bool>> always;
 	name_binder<Bool> nb(bs);
 	bind_transformer<name_binder<Bool>, Bool> binder(nb);
 	return post_order_traverser<
@@ -46,7 +46,7 @@ sp_tau_node<Bool> make_named_bindings(const sp_tau_node<Bool>& statement, const 
 
 template<typename factory_t>
 sp_tau_node<Bool> make_factory_bindings(const sp_tau_node<Bool>& statement, factory_t& factory) {
-	true_predicate<sp_tau_node<Bool>> always;
+	//true_predicate<sp_tau_node<Bool>> always;
 	factory_binder<factory_t, Bool> fb(factory);
 	bind_transformer<factory_binder<factory_t, Bool>, Bool> binder(fb);
 	return post_order_traverser<

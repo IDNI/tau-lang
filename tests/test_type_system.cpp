@@ -28,7 +28,7 @@ namespace testing = doctest;
 TEST_SUITE("is_resolved_predicate") {
 
 	TEST_CASE("is_resolved_predicate: true") {
-		static constexpr char* sample =	"$X := { bool : src_code }.";
+		const char* sample =	"$X := { bool : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto type = lib
@@ -45,10 +45,12 @@ TEST_SUITE("is_resolved_predicate") {
 			| tau_parser::type;
 		CHECK( type.has_value() );
 		CHECK( is_resolved_predicate<Bool>(type.value()) );
+		CHECK( type.has_value() );
+		CHECK( is_resolved_predicate<Bool>(type.value()) );
 	}
 
 	TEST_CASE("is_resolved_predicate: false") {
-		static constexpr char* sample =	"$X := { : src_code }.";
+		const char* sample =	"$X := { : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto type = lib
@@ -65,13 +67,15 @@ TEST_SUITE("is_resolved_predicate") {
 			| tau_parser::type;
 		CHECK( type.has_value() );
 		CHECK( !is_resolved_predicate<Bool>(type.value()) );
+		CHECK( type.has_value() );
+		CHECK( !is_resolved_predicate<Bool>(type.value()) );
 	}
 }
 
 TEST_SUITE("is_unresolved_predicate") {
 
 	TEST_CASE("is_resolved_predicate: true") {
-		static constexpr char* sample =	"$X := { : src_code }.";
+		const char* sample =	"$X := { : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto type = lib
@@ -88,10 +92,12 @@ TEST_SUITE("is_unresolved_predicate") {
 			| tau_parser::type;
 		CHECK( type.has_value() );
 		CHECK( is_unresolved_predicate<Bool>(type.value()) );
+		CHECK( type.has_value() );
+		CHECK( is_unresolved_predicate<Bool>(type.value()) );
 	}
 
 	TEST_CASE("is_unresolved_predicate: false") {
-		static constexpr char* sample =	"$X := { bool : src_code }.";
+		const char* sample =	"$X := { bool : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto type = lib
@@ -108,22 +114,26 @@ TEST_SUITE("is_unresolved_predicate") {
 			| tau_parser::type;
 		CHECK( type.has_value() );
 		CHECK( !is_unresolved_predicate<Bool>(type.value()) );
+		CHECK( type.has_value() );
+		CHECK( !is_unresolved_predicate<Bool>(type.value()) );
 	}
 }
 
 TEST_SUITE("is_unresolved") {
 
 	TEST_CASE("is_resolved_predicate: true") {
-		static constexpr char* sample =	"$X := { : src_code }.";
+		const char* sample =	"$X := { : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
+		CHECK( is_unresolved<Bool>(lib) );
 		CHECK( is_unresolved<Bool>(lib) );
 	}
 
 	TEST_CASE("is_unresolved_predicate: false") {
-		static constexpr char* sample =	"$X := { bool : src_code }.";
+		const char* sample =	"$X := { bool : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
+		CHECK( !is_unresolved<Bool>(lib) );
 		CHECK( !is_unresolved<Bool>(lib) );
 	}
 }
@@ -143,11 +153,12 @@ TEST_SUITE("resolve_type") {
 			| tau_parser::bf;
 		auto result = resolve_type<Bool>(unresolved.value());
 		CHECK( result != unresolved.value() );
+		CHECK( result != unresolved.value() );
 		CHECK( !is_unresolved<Bool>(result) );
 	}
 
 	TEST_CASE("resolved case") {
-		static constexpr char* sample =	"$X := { bool : src_code }.";
+		const char* sample =	"$X := { bool : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto resolved = lib
@@ -158,6 +169,7 @@ TEST_SUITE("resolve_type") {
 			| tau_parser::bf_body
 			| tau_parser::bf;
 		auto result = resolve_type<Bool>(resolved.value());
+		CHECK( result == resolved.value() );
 		CHECK( result == resolved.value() );
 	}
 }
