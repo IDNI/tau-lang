@@ -44,7 +44,7 @@ bool is_satisfiable(const formula<BAs...>& f) {
 // the inputs would be the input variables of the program and would be binded from
 // actual parsed inputs or given formulkas supplied by the user (build in whatever way).
 
-// helpers method could be provided to create tau_input from an input strings 
+// helpers method could be provided to create tau_input from an input strings
 // as we do in formula bindings
 
 // how we could avoid the creation of tau_execution if the formula is insatisfiable?

@@ -36,7 +36,7 @@ template<typename... BAs> struct seq {
 		const state& prev, state& curr) const {
 		nso_t &f = (curr[s] = prev.at(s) & this->first);
 		for_each_subset_dec(s, [&f](size_t s) {
-				f = f & (prev.at(s) | ~psi(s)); 
+				f = f & (prev.at(s) | ~psi(s));
 		});
 		f = q(f);
 	}

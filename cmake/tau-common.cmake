@@ -26,14 +26,12 @@ function(target_setup target)
 		target_compile_options(${target} PRIVATE
 			-W -Wall -Wextra -Wpedantic
 			-Wformat=2
-			-Wno-variadic-macros
 			-Wcast-align
 			-Wstrict-aliasing=2
 			-Wstrict-overflow=5
 			-Wfloat-equal
 			-Wwrite-strings
-			-Wno-missing-braces
-			-Wno-parentheses-equality)
+		)
 	endif()
 	target_compile_features(${target} PRIVATE cxx_std_20)
 	target_git_definitions(${target})
