@@ -107,13 +107,14 @@ wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
-wff 			=> wff_ref | wff_and | wff_neg | wff_xor
+wff 			=> wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
 					| wff_t | wff_f | capture |ignore
 					| bf_eq | bf_neq | bf_less | bf_less_equal | bf_greater.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
+wff_conditional	=> open_parenthesis wff wff_conditional_sym wff colon wff close_parenthesis.
 wff_neg			=> wff_neg_sym wff.
 wff_imply		=> open_parenthesis wff wff_imply_sym wff close_parenthesis.
 wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
@@ -132,16 +133,17 @@ bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
 bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
 
 # wff_op_sym
-wff_and_sym		=> ws "&&" ws.
-wff_or_sym		=> ws "||" ws.
-wff_xor_sym		=> ws '^' ws.
-wff_neg_sym		=> ws '!' ws.
-wff_imply_sym	=> ws "->" ws.
-wff_equiv_sym	=> ws "<->" ws.
-wff_all_sym		=> ws "all" ws.
-wff_ex_sym		=> ws "ex" ws.
-wff_t			=> ws 'T' ws.
-wff_f			=> ws 'F' ws.
+wff_and_sym			=> ws "&&" ws.
+wff_or_sym			=> ws "||" ws.
+wff_xor_sym			=> ws '^' ws.
+wff_conditional_sym	=> ws '?' ws.
+wff_neg_sym			=> ws '!' ws.
+wff_imply_sym		=> ws "->" ws.
+wff_equiv_sym		=> ws "<->" ws.
+wff_all_sym			=> ws "all" ws.
+wff_ex_sym			=> ws "ex" ws.
+wff_t				=> ws 'T' ws.
+wff_f				=> ws 'F' ws.
 
 # bf
 bf_ref 		=> sym indexes bf_ref_args.

@@ -59,6 +59,12 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
 
+	TEST_CASE("BLDR_WFF_CONDITIONAL") {
+		auto bldr = make_builder<Bool>(BLDR_WFF_CONDITIONAL);
+		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
+	}
+
 	TEST_CASE("BLDR_WFF_NEG") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_NEG);
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );

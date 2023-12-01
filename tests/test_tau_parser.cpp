@@ -194,6 +194,18 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( xor_formula.has_value() );
 	}
 
+	TEST_CASE("?") {
+		static constexpr char* sample =	"($Z ? $Z : $Z).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto xor_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
+			| tau_parser::wff_conditional;
+		CHECK( xor_formula.has_value() );
+	}
+
 	TEST_CASE("= 0") {
 		static constexpr char* sample =	"( ?Z = 0 ).";
 		auto src = make_tau_source(sample);
@@ -628,6 +640,6 @@ TEST_SUITE("parsing callbacks ") {
 	// TODO (MEDIUM) add bf_has_clashing_subformulas_cb test
 	// TODO (MEDIUM) add bf_has_subformula_cb test
 	// TODO (MEDIUM) add wff_has_clashing_subformulas_cb test
-	// TODO (MEDIUM) add wfff_has_subformula_cb test
+	// TODO (MEDIUM) add wff_has_subformula_cb test
 
 }
