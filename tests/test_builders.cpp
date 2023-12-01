@@ -122,19 +122,19 @@ TEST_SUITE("builders parsing") {
 	TEST_CASE("BLDR_BF_LESS") {
 		auto bldr = make_builder<Bool>(BLDR_BF_LESS);
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
 
 	TEST_CASE("BLDR_BF_LESS_EQUAL") {
 		auto bldr = make_builder<Bool>(BLDR_BF_LESS_EQUAL);
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
 
 	TEST_CASE("BLDR_BF_GREATER") {
 		auto bldr = make_builder<Bool>(BLDR_BF_GREATER);
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
 
 	TEST_CASE("BLDR_BF_ALL") {
@@ -152,29 +152,29 @@ TEST_SUITE("builders parsing") {
 
 TEST_SUITE("builders execution") {
 
-	static constexpr char* sample =	" ( ?X = F ) .";
+	static constexpr char* sample =	" ( ?X = 0 ) .";
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
 	auto X = frml
 		| tau_parser::formula | tau_parser::main | tau_parser::wff
-		| tau_parser::wff_eq | tau_parser::bf | tau_parser::variable
+		| tau_parser::bf_eq | tau_parser::bf | tau_parser::variable
 		| optional_value_extractor<sp_tau_node<Bool>>;
 	auto F = frml
 		| tau_parser::formula | tau_parser::main | tau_parser::wff
-		| tau_parser::wff_eq | tau_parser::wff_f
+		| tau_parser::bf_eq | tau_parser::bf_f
 		| optional_value_extractor<sp_tau_node<Bool>>;
 
 	TEST_CASE("BLDR_WFF_EQ") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EQ);
 		std::vector<sp_tau_node<Bool>> args = {X};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_eq;
+		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_eq;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BLDR_WFF_NEQ") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_NEQ);
 		std::vector<sp_tau_node<Bool>> args = {X};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_neq;
+		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_neq;
 		CHECK( check.has_value() );
 	}
 

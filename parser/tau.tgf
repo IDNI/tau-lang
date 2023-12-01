@@ -56,8 +56,6 @@ sym				=> chars.
 
 # common symbols
 definition			=> ws ":=" ws.
-equality			=> ws "=" ws.
-nequality			=> ws "!=" ws.
 dot 				=> ws '.' ws.
 open_parenthesis	=> ws '(' ws.
 close_parenthesis	=> ws ')' ws.
@@ -89,6 +87,8 @@ offset			=> variable | variable minus num.
 # TODO (MEDIUM) remove ignore as it is not used
 #
 # That aldo implies removing the ignore rule from the code when neccessary
+#
+# TODO (HIGH) remove ? from vars
 ignore 			=> '_'.
 capture			=> '$' chars.
 var				=> '?' chars.
@@ -101,17 +101,16 @@ wff_rule		=> wff_matcher definition wff_body dot.
 # needed for rule CBF_DEF_IF
 wff_matcher	=> wff | wff_ref.
 wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
-				| wff_has_subformula_cb | wff_remove_existential.
+				| wff_has_subformula_cb | wff_remove_existential
+				| bf_less_cb | bf_less_equal_cb | bf_greater_cb.
 
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
-# TODO (LOW) rename wff_eq and wff_new to bf_eq and bf_neq
-wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor
+wff 			=> wff_ref | wff_and | wff_neg | wff_xor
 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
-					| wff_coimply | wff_t | wff_f | capture |ignore.
-wff_eq 			=> open_parenthesis bf equality wff_f close_parenthesis.
-wff_neq 		=> open_parenthesis bf nequality wff_f close_parenthesis.
+					| wff_coimply | wff_t | wff_f | capture |ignore
+					| bf_eq | bf_neq | bf_less | bf_less_equal | bf_greater.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
@@ -122,16 +121,27 @@ wff_coimply		=> open_parenthesis wff wff_coimply_sym wff close_parenthesis.
 wff_all			=> wff_all_sym (variable|capture|ignore) ws_required wff.
 wff_ex			=> wff_ex_sym (variable|capture|ignore) ws_required wff.
 
+# relational operators
+#
+# they are named bf_* as they involve boolean functions,
+# but they are not boolean functions themselves, they return a T/F wff value
+# and hence, should be considered as wffs
+bf_eq 			=> open_parenthesis bf bf_equality_sym bf_f close_parenthesis.
+bf_neq 			=> open_parenthesis bf bf_nequality_sym bf_f close_parenthesis.
+bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
+bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
+bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
+
 # wff_op_sym
-wff_and_sym		=> ws "wff_and" ws.
-wff_or_sym		=> ws "wff_or" ws.
-wff_xor_sym		=> ws "wff_xor" ws.
-wff_neg_sym		=> ws "wff_neg" ws.
-wff_imply_sym	=> ws "wff_imply" ws.
-wff_equiv_sym	=> ws "wff_equiv" ws.
+wff_and_sym		=> ws "&&" ws.
+wff_or_sym		=> ws "||" ws.
+wff_xor_sym		=> ws '^' ws.
+wff_neg_sym		=> ws '!' ws.
+wff_imply_sym	=> ws "->" ws.
+wff_equiv_sym	=> ws "<->" ws.
 wff_coimply_sym	=> ws "wff_coimply" ws.
-wff_all_sym		=> ws "wff_all" ws.
-wff_ex_sym		=> ws "wff_ex" ws.
+wff_all_sym		=> ws "all" ws.
+wff_ex_sym		=> ws "ex" ws.
 wff_t			=> ws 'T' ws.
 wff_f			=> ws 'F' ws.
 
@@ -142,11 +152,11 @@ bf_rule		=> bf_matcher definition bf_body dot.
 
 bf_matcher	=> bf.
 bf_body 	=> bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
+
 				| bf_has_subformula_cb.
 
 bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
-					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater
-					| bf_less_cb | bf_less_equal_cb | bf_greater_cb
+					| bf_all | bf_ex
 					# TODO (LOW) check proper use of bf_subs_cb in code
 					#
 					# we should have a check method that verifies that the user
@@ -156,24 +166,23 @@ bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
 bf_xor			=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
 bf_neg			=> bf_neg_sym bf.
-bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
-bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
-bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
 bf_all			=> bf_all_sym ws_required (variable | capture) ws_required bf.
 bf_ex			=> bf_ex_sym ws_required (variable | capture) ws_required bf.
 
 # bf_op_sym
-bf_and_sym			=> ws "bf_and" ws.
-bf_or_sym			=> ws "bf_or" ws.
-bf_xor_sym			=> ws "bf_xor" ws.
-bf_neg_sym			=> ws "bf_neg" ws.
-bf_less_sym			=> ws "bf_less" ws.
-bf_less_equal_sym	=> ws "bf_less_equal" ws.
-bf_greater_sym		=> ws "bf_greater" ws.
-bf_all_sym			=> ws "bf_all" ws.
-bf_ex_sym			=> ws "bf_ex" ws.
-bf_t				=> ws 'T' ws.
-bf_f				=> ws 'F' ws.
+bf_and_sym			=> ws '&' ws.
+bf_or_sym			=> ws '|' ws.
+bf_xor_sym			=> ws '+' ws.
+bf_neg_sym			=> ws '~' ws.
+bf_equality_sym		=> ws "=" ws.
+bf_nequality_sym	=> ws "!=" ws.
+bf_less_sym			=> ws '<' ws.
+bf_less_equal_sym	=> ws "<=" ws.
+bf_greater_sym		=> ws '>' ws.
+bf_all_sym			=> ws "fall" ws.
+bf_ex_sym			=> ws "fex" ws.
+bf_t				=> ws '1' ws.
+bf_f				=> ws '0' ws.
 
 # constant
 bf_constant		=> open_brace constant close_brace.
@@ -211,9 +220,9 @@ bf_and_cb			=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
 bf_or_cb			=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
 bf_xor_cb			=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
 bf_neg_cb			=> bf_neg_cb_sym bf_cb_arg.
-bf_less_cb			=> bf_less_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-bf_less_equal_cb	=> bf_less_equal_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-bf_greater_cb		=> bf_greater_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
+bf_less_cb			=> bf_less_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
+bf_less_equal_cb	=> bf_less_equal_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
+bf_greater_cb		=> bf_greater_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 bf_subs_cb			=> bf_subs_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 bf_eq_cb			=> bf_eq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 bf_neq_cb			=> bf_neq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
@@ -226,6 +235,7 @@ wff_has_clashing_subformulas_cb	=> wff_has_clashing_subformulas_cb_sym wff_cb_ar
 bf_has_subformula_cb 			=> bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 wff_remove_existential			=> wff_remove_existential_cb_sym wff_cb_arg ws_required wff_cb_arg.
+
 # bultin_args
 bf_cb_arg	=> capture | ignore | bf.
 wff_cb_arg	=> capture | ignore | wff.

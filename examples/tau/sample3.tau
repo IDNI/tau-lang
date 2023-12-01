@@ -1,0 +1,1 @@
+wff_ex ?X (((?A bf_and ?X) bf_xor (?B bf_and bf_neg ?X)) = F).

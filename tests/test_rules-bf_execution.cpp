@@ -247,7 +247,7 @@ TEST_SUITE("executing bf rules") {
 	// used within or something else.
 
 	TEST_CASE("BF_CALLBACK_AND") {
-		static constexpr char* sample =	"( ({l} bf_and { r }) = F ).";
+		static constexpr char* sample =	"( ({l} & { r } ) = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -259,13 +259,13 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_OR") {
-		static constexpr char* sample =	"( ({l} bf_or { r }) = F ).";
+		static constexpr char* sample =	"( ({l} | { r } ) = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -277,13 +277,13 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_XOR") {
-		static constexpr char* sample =	"( ({l} bf_xor { r }) = F ).";
+		static constexpr char* sample =	"( ({l} + { r } ) = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -295,13 +295,13 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_NEG") {
-		static constexpr char* sample =	"( bf_neg { l } = F ).";
+		static constexpr char* sample =	"( ~ { l } = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -313,13 +313,13 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_LESS") {
-		static constexpr char* sample =	"( ( { l } bf_less { r } ) = F ).";
+		static constexpr char* sample =	"( { l } < { r } ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -330,14 +330,14 @@ TEST_SUITE("executing bf rules") {
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
+		std::cout << result << std::endl;
 		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_LESS_EQUAL") {
-		static constexpr char* sample =	"( ( { l } bf_less_equal { r } ) = F ).";
+		static constexpr char* sample =	"( { l } <= { r } ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -348,14 +348,14 @@ TEST_SUITE("executing bf rules") {
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
+		std::cout << result << std::endl;
 		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_GREATER") {
-		static constexpr char* sample =	"( ( { l } bf_greater { r } ) = F ).";
+		static constexpr char* sample =	"( { l } > { r } ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -366,14 +366,14 @@ TEST_SUITE("executing bf rules") {
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = tau_apply(tau_rule, binded);
+		std::cout << result << std::endl;
 		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_eq
-			| tau_parser::bf | tau_parser::bf_t;
+			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_EQ") {
-		static constexpr char* sample =	"( { l } = F ).";
+		static constexpr char* sample =	"( { l } = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -390,7 +390,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_NEQ") {
-		static constexpr char* sample =	"( { l } != F ).";
+		static constexpr char* sample =	"( { l } != 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -407,7 +407,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ONE") {
-		static constexpr char* sample =	"( { l } = F ).";
+		static constexpr char* sample =	"( { l } = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -420,12 +420,12 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff
-			| tau_parser::wff_eq | tau_parser::bf | tau_parser::bf_t;
+			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_t;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ZERO") {
-		static constexpr char* sample =	"( { l } = F ).";
+		static constexpr char* sample =	"( { l } = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(false) };
@@ -438,12 +438,12 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, binded);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff
-			| tau_parser::wff_eq | tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_CLASHING_SUBFORMULAS_0") {
-		static constexpr char* sample =	"( (T bf_and bf_neg T) = F ).";
+		static constexpr char* sample =	"( (0 & ~ 0) = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		auto rule_src = make_tau_source(BF_CALLBACK_CLASHING_SUBFORMULAS_0);
@@ -454,12 +454,12 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, sample_statement);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff
-			| tau_parser::wff_eq | tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BF_CALLBACK_HAS_SUBFORMULA_0") {
-		static constexpr char* sample =	"( (T bf_and F) = F ).";
+		static constexpr char* sample =	"( (1 & 0) = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		auto rule_src = make_tau_source(BF_CALLBACK_HAS_SUBFORMULA_0);
@@ -470,7 +470,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = tau_apply(tau_rule, sample_statement);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff
-			| tau_parser::wff_eq | tau_parser::bf | tau_parser::bf_f;
+			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
 
