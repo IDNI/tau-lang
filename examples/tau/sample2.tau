@@ -1,1 +1,1 @@
-wff_ex ?P (?P != F).
+ex ?P (?P != F).
