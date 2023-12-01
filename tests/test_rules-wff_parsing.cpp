@@ -313,17 +313,6 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("WFF_DEF_COIMPLY") {
-		auto src_rule = make_tau_source(WFF_DEF_COIMPLY);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
-	}
-
 	TEST_CASE("WFF_DEF_EQUIV") {
 		auto src_rule = make_tau_source(WFF_DEF_EQUIV);
 		auto tau_rule = make_statement(src_rule);

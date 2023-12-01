@@ -77,12 +77,6 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
 
-	TEST_CASE("BLDR_WFF_COIMPLY") {
-		auto bldr = make_builder<Bool>(BLDR_WFF_COIMPLY);
-		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
-	}
-
 	TEST_CASE("BLDR_WFF_ALL") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_ALL);
 		CHECK( is_non_terminal<tau_parser::captures, Bool>(bldr.first) );
@@ -217,13 +211,6 @@ TEST_SUITE("builders execution") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EQUIV);
 		std::vector<sp_tau_node<Bool>> args = {F, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_equiv;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BLDR_WFF_COIMPLY") {
-		auto bldr = make_builder<Bool>(BLDR_WFF_COIMPLY);
-		std::vector<sp_tau_node<Bool>> args = {F, F};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_coimply;
 		CHECK( check.has_value() );
 	}
 
