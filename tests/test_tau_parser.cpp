@@ -268,21 +268,6 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( imply_rule.has_value() );
 	}
 
-	TEST_CASE("wff_coimply") {
-		const char* sample =	"($Z wff_coimply $Z) := $Z.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto coimply_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule
-			| tau_parser::wff_matcher
-			| tau_parser::wff
-			| tau_parser::wff_coimply;
-		CHECK( coimply_rule.has_value() );
-	}
-
 	TEST_CASE("<->") {
 		static constexpr char* sample =	"($Z <-> $Z) := $Z.";
 		auto src = make_tau_source(sample);

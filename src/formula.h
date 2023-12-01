@@ -959,7 +959,6 @@ const std::string BLDR_WFF_XOR = "( $X $Y ) := ($X ^ $Y).";
 const std::string BLDR_WFF_NEG = "( $X ) := ! $X.";
 const std::string BLDR_WFF_IMPLY = "( $X $Y ) := ($X -> $Y).";
 const std::string BLDR_WFF_EQUIV = "( $X $Y ) := ( $X <-> $Y ).";
-const std::string BLDR_WFF_COIMPLY = "( $X $Y ) := ($X wff_coimply $Y).";
 const std::string BLDR_WFF_ALL = "( $X $Y ) := all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) := ex $X $Y.";
 
@@ -988,8 +987,6 @@ template<typename... BAs>
 static auto bldr_wff_imply = make_builder<BAs...>(BLDR_WFF_IMPLY);
 template<typename... BAs>
 static auto bldr_wff_equiv = make_builder<BAs...>(BLDR_WFF_EQUIV);
-template<typename... BAs>
-static auto bldr_wff_coimply = make_builder<BAs...>(BLDR_WFF_COIMPLY);
 template<typename... BAs>
 static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
 template<typename... BAs>
@@ -1062,12 +1059,6 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_wff_equiv(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	std::vector<sp_tau_node<BAs...>> args {l, r} ;
 	return tau_apply_builder<BAs...>(bldr_wff_equiv<BAs...>, args);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_wff_coimply(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, r} ;
-	return tau_apply_builder<BAs...>(bldr_wff_coimply<BAs...>, args);
 }
 
 template<typename... BAs>

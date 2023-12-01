@@ -102,7 +102,6 @@ RULE(WFF_SIMPLIFY_SELF_5, "( ! $X || $X ) := T.")
 // wff definitions of xor, ->, <- and <->.
 RULE(WFF_DEF_XOR, "( $X ^ $Y ) := (( $X && ! $Y ) || ( ! $X && $Y )).")
 RULE(WFF_DEF_IMPLY, "( $X -> $Y ) := ( ! $X || $Y).")
-RULE(WFF_DEF_COIMPLY, "( $X wff_coimply $Y ) := ( $Y -> $X).")
 RULE(WFF_DEF_EQUIV, "( $X <-> $Y ) := (( $X -> $Y ) && ( $Y -> $X )).")
 
 // TODO (LOW) rename to (N)EQ_SIMPLYFY
@@ -129,7 +128,6 @@ static auto apply_defs = make_library<BAs...>(
 	// wff defs
 	WFF_DEF_XOR
 	+ WFF_DEF_IMPLY
-	+ WFF_DEF_COIMPLY
 	+ WFF_DEF_EQUIV
 	// bf defs
 	+ BF_DEF_XOR
