@@ -302,6 +302,17 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
+	TEST_CASE("WFF_DEF_CONDITIONAL") {
+		auto src_rule = make_tau_source(WFF_DEF_CONDITIONAL);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
 	TEST_CASE("WFF_DEF_IMPLY") {
 		auto src_rule = make_tau_source(WFF_DEF_IMPLY);
 		auto statement = make_statement(src_rule);

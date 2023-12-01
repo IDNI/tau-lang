@@ -74,7 +74,7 @@ RULE(WFF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X && $Y ) :=  wff_has_clashing_sub
 RULE(WFF_CALLBACK_HAS_SUBFORMULA_0, "( $X && $Y ) := wff_has_subformula_cb ( $X && $Y ) F F.")
 
 // wff rules
-RULE(WFF_DISTRIBUTE_0, "(($X || $Y) && $Z) := (($X && $Y) || ($X && $Z)).")
+RULE(WFF_DISTRIBUTE_0, "(($X || $Y) && $Z) := (($X && $Z) || ($Y && $Z)).")
 RULE(WFF_DISTRIBUTE_1, "($X && ($Y || $Z)) := (($X && $Y) || ($X && $Z)).")
 RULE(WFF_PUSH_NEGATION_INWARDS_0, "! ($X && $Y) := (! $X || ! $Y).")
 RULE(WFF_PUSH_NEGATION_INWARDS_1, "! ($X || $Y) := (! $X && ! $Y).")
@@ -101,6 +101,7 @@ RULE(WFF_SIMPLIFY_SELF_5, "( ! $X || $X ) := T.")
 
 // wff definitions of xor, ->, <- and <->.
 RULE(WFF_DEF_XOR, "( $X ^ $Y ) := (( $X && ! $Y ) || ( ! $X && $Y )).")
+RULE(WFF_DEF_CONDITIONAL, "( $X ? $Y : $Z) := (($X -> $Y) && (! $X -> $Z)).")
 RULE(WFF_DEF_IMPLY, "( $X -> $Y ) := ( ! $X || $Y).")
 RULE(WFF_DEF_EQUIV, "( $X <-> $Y ) := (( $X -> $Y ) && ( $Y -> $X )).")
 
@@ -127,6 +128,7 @@ template<typename... BAs>
 static auto apply_defs = make_library<BAs...>(
 	// wff defs
 	WFF_DEF_XOR
+	+ WFF_DEF_CONDITIONAL
 	+ WFF_DEF_IMPLY
 	+ WFF_DEF_EQUIV
 	// bf defs

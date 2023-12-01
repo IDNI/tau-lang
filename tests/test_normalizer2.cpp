@@ -25,7 +25,7 @@ namespace testing = doctest;
 TEST_SUITE("steps parsing") {
 
 	TEST_CASE("apply_defs") {
-		CHECK( apply_defs<Bool>.size() == 4 );
+		CHECK( apply_defs<Bool>.size() == 5 );
 	}
 
 	TEST_CASE("elim_for_all") {
