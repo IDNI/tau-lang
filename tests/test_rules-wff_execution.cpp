@@ -458,7 +458,7 @@ TEST_SUITE("executing wff rules") {
 	}
 
 	TEST_CASE("WFF_CALLBACK_CLASHING_SUBFORMULAS_0") {
-		static constexpr char* sample =	"( T wff_and wff_neg T ).";
+		static constexpr char* sample =	"( T && ! T ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		auto rule_src = make_tau_source(WFF_CALLBACK_CLASHING_SUBFORMULAS_0);
@@ -473,7 +473,7 @@ TEST_SUITE("executing wff rules") {
 	}
 
 	TEST_CASE("WFF_CALLBACK_HAS_SUBFORMULA_0") {
-		static constexpr char* sample =	"(T wff_and T).";
+		static constexpr char* sample =	"(T && T).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		auto rule_src = make_tau_source(WFF_CALLBACK_HAS_SUBFORMULA_0);
