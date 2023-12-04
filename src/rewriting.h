@@ -136,6 +136,53 @@ private:
 	}
 };
 
+// visitor that traverse the tree in post-order (avoiding visited nodes).
+template <typename wrapped_t, typename predicate_t, typename input_node_t,
+	typename output_node_t = input_node_t>
+struct post_order_query_traverser {
+
+	post_order_query_traverser(wrapped_t& wrapped, predicate_t& query) :
+		wrapped(wrapped), query(query) {}
+
+	output_node_t operator()(const input_node_t& n) {
+		// we kept track of the visited nodes to avoid visiting the same node
+		// twice. However, we do not need to keep track of the root node, since
+		// it is the one we start from and we will always be visited.
+		std::set<input_node_t> visited;
+		// if the root node matches the query predicate, we traverse it, otherwise
+		// we return the result of apply the wrapped transform to the node.
+		return traverse(n, visited);
+	}
+
+	wrapped_t& wrapped;
+	predicate_t& query;
+
+private:
+	std::optional<output_node_t> found;
+
+	output_node_t traverse(const input_node_t& n, std::set<input_node_t>& visited) {
+		// we traverse the children of the node in post-order, i.e. we visit
+		// the children first and then the node itself.
+		if (found) return found.value();
+		for (const auto& c : n->child)
+			// we skip already visited nodes and nodes that do not match the
+			// query predicate if it is present.
+			if (!visited.contains(c) && !found) {
+				traverse(c, visited);
+				// we assume we have no cycles, i.e. there is no way we could
+				// visit the same node again down the tree.
+				// thus we can safely add the node to the visited set after
+				// visiting it.
+				visited.insert(c);
+				if (!found) found = query(c) ? wrapped(c) : std::optional<output_node_t>{};
+			}
+		// finally we apply the wrapped visitor to the node if it is present.
+		if (!found) found = query(n) ? wrapped(n) : std::optional<output_node_t>{};
+		return found ? found.value() : wrapped(n);
+	}
+};
+
+
 // TODO (MEDIUM) add a post_order_traverser that does not have a wrapped transformer so
 // it is faster when dealing with only predicate operations (searches,...) and
 // change all the related code.
@@ -555,7 +602,7 @@ struct pattern_matcher {
 		if (match(pattern, n)) matched = { n };
 		else env.clear();
 		// we continue visiting until we found a match.
-		return !matched;
+		return matched.has_value();
 	}
 
 	std::optional<node_t> matched = std::nullopt;
@@ -618,7 +665,7 @@ struct pattern_matcher_with_skip {
 		if (match(pattern, n)) matched = { n };
 		else env.clear();
 		// we continue visiting until we found a match.
-		return !matched;
+		return matched.has_value();
 	}
 
 	std::optional<node_t> matched = std::nullopt;
@@ -694,7 +741,7 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, i
 // use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t>
 node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
-	post_order_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
+	post_order_query_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
 	if (matcher.matched) {
 		auto nn = replace<node_t>(s, matcher.env);
 		environment<node_t> nenv { {matcher.matched.value(), nn} };
