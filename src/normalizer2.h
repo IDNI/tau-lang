@@ -28,12 +28,17 @@ namespace idni::tau {
 // IDEA (MEDIUM) add commutative rule and halve the number of rules if is performance friendly
 
 // bf rules
+RULE(BF_DISTRIBUTE_0, "(($X | $Y) & $Z) := (($X & $Z) | ($Y & $Z)).")
+RULE(BF_DISTRIBUTE_1, "($X & ($Y | $Z)) := (($X & $Y) | ($X & $Z)).")
+RULE(BF_PUSH_NEGATION_INWARDS_0, "~ ($X & $Y) := (~ $X | ~ $Y).")
+RULE(BF_PUSH_NEGATION_INWARDS_1, "~ ($X | $Y) := (~ $X & ~ $Y).")
+RULE(BF_ELIM_DOUBLE_NEGATION_0, "~ ~ $X :=  $X.")
 RULE(BF_SIMPLIFY_ONE_0, "( 1 | $X ) := 1.")
 RULE(BF_SIMPLIFY_ONE_1, "( $X | 1 ) := 1.")
 RULE(BF_SIMPLIFY_ONE_2, "( 1 & $X ) := $X.")
 RULE(BF_SIMPLIFY_ONE_3, "( $X & 1 ) := $X.")
 RULE(BF_SIMPLIFY_ONE_4, "~ 1 := 0.")
-RULE(BF_SIMPLIFY_ZERO_0, "( 0 & $X ) := 1.")
+RULE(BF_SIMPLIFY_ZERO_0, "( 0 & $X ) := 0.")
 RULE(BF_SIMPLIFY_ZERO_1, "( $X & 0 ) := 0.")
 RULE(BF_SIMPLIFY_ZERO_2, "( 0 | $X ) := $X.")
 RULE(BF_SIMPLIFY_ZERO_3, "( $X | 0 ) := $X.")
@@ -57,15 +62,8 @@ RULE(BF_CALLBACK_AND, "( { $X } & { $Y } ) := { $X bf_and_cb $Y }.")
 RULE(BF_CALLBACK_OR, "( { $X } | { $Y } ) := { $X bf_or_cb $Y }.")
 RULE(BF_CALLBACK_XOR, "( { $X } + { $Y } ) := { $X bf_xor_cb $Y }.")
 RULE(BF_CALLBACK_NEG, "~ { $X } := { bf_neg_cb $X }.")
-RULE(BF_CALLBACK_LESS, "( { $X } < { $Y } ) := bf_less_cb $X $Y T F.")
-RULE(BF_CALLBACK_LESS_EQUAL, "( { $X } <= { $Y } ) := bf_less_equal_cb $X $Y T F.")
-RULE(BF_CALLBACK_GREATER, "( { $X } > { $Y } ) := bf_greater_cb $X $Y T F.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.") // (T|F) is bf_(t|f)
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.") // (T|F) is bf_(t|f)
-
-// wff callbacks
-RULE(BF_CALLBACK_EQ, "( { $X } = 0 ) := bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
-RULE(BF_CALLBACK_NEQ, "( { $X } != 0 ) := bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
 
 // speed up callbacks
 RULE(BF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X & $Y ) :=  bf_has_clashing_subformulas_cb ( $X & $Y ) 0.")
@@ -105,6 +103,17 @@ RULE(WFF_DEF_CONDITIONAL, "( $X ? $Y : $Z) := (($X -> $Y) && (! $X -> $Z)).")
 RULE(WFF_DEF_IMPLY, "( $X -> $Y ) := ( ! $X || $Y).")
 RULE(WFF_DEF_EQUIV, "( $X <-> $Y ) := (( $X -> $Y ) && ( $Y -> $X )).")
 
+// additional wff dewfinitions (include wff formulas)
+RULE(BF_DEF_LESS_EQUAL, "( $X <= $Y ) := ( ($X & ~ $Y) = 0).")
+RULE(BF_DEF_LESS, "( $X < $Y ) := (( ($X & ~ $Y) = 0) && ( ($X + ~ $Y) != 0)).")
+RULE(BF_DEF_GREATER, "( $X > $Y ) := ((( $X & ~ $Y ) != 0) || (( $X + ~ $Y) = 0)).")
+RULE(BF_DEF_EQ, "( $X = $Y ) := (( $X + $Y ) = 0).")
+RULE(BF_DEF_NEQ, "( $X != $Y ) := (( $X + $Y ) != 0).")
+
+// wff callbacks
+RULE(BF_CALLBACK_EQ, "( { $X } = 0 ) := bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
+RULE(BF_CALLBACK_NEQ, "( { $X } != 0 ) := bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
+
 // TODO (LOW) rename to (N)EQ_SIMPLYFY
 RULE(BF_TRIVIALITY_0, "( 0 = 0 ) := T.")
 RULE(BF_TRIVIALITY_1, "( 1 = 0 ) :=  F.")
@@ -122,7 +131,7 @@ RULE(WFF_REMOVE_EX_0, "ex $X $Y := wff_remove_existential_cb $X $Y.")
 
 // TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
-// bf defs are just callbacks
+// bf
 template<typename... BAs>
 // TODO (LOW) rename library with rwsys or another name
 static auto apply_defs = make_library<BAs...>(
@@ -133,6 +142,16 @@ static auto apply_defs = make_library<BAs...>(
 	+ WFF_DEF_EQUIV
 	// bf defs
 	+ BF_DEF_XOR
+);
+
+template<typename... BAs>
+static auto apply_defs_once = make_library<BAs...>(
+	// wff defs
+	BF_DEF_LESS_EQUAL
+	+ BF_DEF_LESS
+	+ BF_DEF_GREATER
+	+ BF_DEF_EQ
+	+ BF_DEF_NEQ
 );
 
 template<typename... BAs>
@@ -149,6 +168,15 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_ELIM_DOUBLE_NEGATION_0
+);
+
+template<typename... BAs>
+static auto to_dnf_bf = make_library<BAs...>(
+	BF_DISTRIBUTE_0
+	+ BF_DISTRIBUTE_1
+	+ BF_PUSH_NEGATION_INWARDS_0
+	+ BF_PUSH_NEGATION_INWARDS_1
+	+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -197,9 +225,6 @@ static auto apply_cb = make_library<BAs...>(
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR
 	+ BF_CALLBACK_NEG
-	+ BF_CALLBACK_LESS
-	+ BF_CALLBACK_LESS_EQUAL
-	+ BF_CALLBACK_GREATER
 	+ BF_CALLBACK_EQ
  	+ BF_CALLBACK_NEQ
 );
@@ -389,14 +414,14 @@ steps<step<library<BAs...>, BAs...>, BAs...> operator|(const steps<step<library<
 	return ns;
 }
 
-template<typename step_t, typename... BAs>
-sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const steps<step_t, BAs...>& s) {
+template<typename... BAs>
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const library<BAs...>& l) {
+	auto s = step<BAs...>(l);
 	return s(n);
 }
 
-template<typename... BAs>
-sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const library<BAs...>& l) {
-	auto s = steps<library<BAs...>, BAs...>(l);
+template<typename step_t, typename... BAs>
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const steps<step_t, BAs...>& s) {
 	return s(n);
 }
 
@@ -440,9 +465,11 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 				| wff_remove_existential<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
 				bf_elim_quantifiers<BAs...>
+				| to_dnf_bf<BAs...>
 				| simplify_bf<BAs...>
-				| apply_cb<BAs...>
-				| clause_simplify_bf<BAs...>
+				| apply_cb<BAs...>)
+			| repeat_all<step<BAs...>, BAs...>(
+				clause_simplify_bf<BAs...>
 				| trivialities<BAs...>
 				| to_dnf_wff<BAs...>
 				| simplify_wff<BAs...>
@@ -511,13 +538,27 @@ private:
 
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...>& form) {
+	// IDEA extract this to an operator| overload
+	// apply defs to formula
+
+	#ifdef OUTPUT_APPLY_RULES
+	std::cout << "(I): -- Apply once definitions" << std::endl;
+	std::cout << "(F): " << form.main << std::endl;
+	#endif // OUTPUT_APPLY_RULES
+
+	auto nmain = tau_apply(apply_defs_once<BAs...>, form.main);
+	rules<BAs...> nrec_relations;
+	for (const auto& r : form.rec_relations) {
+		nrec_relations.emplace_back(r.first, tau_apply(apply_defs_once<BAs...>, r.second));
+	}
+	formula<BAs...> nform{ nrec_relations, nmain };
 
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << "(I): -- Begin normalizer" << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
 	std::vector<sp_tau_node<BAs...>> previous;
-	formula<BAs...> current = normalizer_step(form);
+	formula<BAs...> current = normalizer_step(nform);
 	auto is_equivalent = is_equivalent_predicate<BAs...>(current.main);
 	while (std::find_if(previous.rend(), previous.rbegin(),  is_equivalent) == previous.rend()) {
 		previous.push_back(current.main);

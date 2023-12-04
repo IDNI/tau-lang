@@ -28,6 +28,10 @@ TEST_SUITE("steps parsing") {
 		CHECK( apply_defs<Bool>.size() == 5 );
 	}
 
+	TEST_CASE("apply_defs_once") {
+		CHECK( apply_defs_once<Bool>.size() == 5 );
+	}
+
 	TEST_CASE("elim_for_all") {
 		CHECK( elim_for_all<Bool>.size() == 1 );
 	}
@@ -45,7 +49,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("apply_cb") {
-		CHECK( apply_cb<Bool>.size() == 9 );
+		CHECK( apply_cb<Bool>.size() == 6 );
 	}
 
 	TEST_CASE("apply_speed_up_cb") {

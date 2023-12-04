@@ -101,8 +101,7 @@ wff_rule		=> wff_matcher definition wff_body dot.
 # needed for rule CBF_DEF_IF
 wff_matcher	=> wff | wff_ref.
 wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
-				| wff_has_subformula_cb | wff_remove_existential
-				| bf_less_cb | bf_less_equal_cb | bf_greater_cb.
+				| wff_has_subformula_cb | wff_remove_existential.
 
 wff_ref			=> sym indexes wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
@@ -126,8 +125,10 @@ wff_ex			=> wff_ex_sym (variable|capture|ignore) ws_required wff.
 # they are named bf_* as they involve boolean functions,
 # but they are not boolean functions themselves, they return a T/F wff value
 # and hence, should be considered as wffs
-bf_eq 			=> open_parenthesis bf bf_equality_sym bf_f close_parenthesis.
-bf_neq 			=> open_parenthesis bf bf_nequality_sym bf_f close_parenthesis.
+bf_eq 			=> open_parenthesis bf bf_equality_sym bf close_parenthesis.
+bf_neq 			=> open_parenthesis bf bf_nequality_sym bf close_parenthesis.
+bf_eq 			=> open_parenthesis bf bf_equality_sym bf close_parenthesis.
+bf_neq 			=> open_parenthesis bf bf_nequality_sym bf close_parenthesis.
 bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
 bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
 bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
@@ -220,9 +221,6 @@ bf_and_cb			=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
 bf_or_cb			=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
 bf_xor_cb			=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
 bf_neg_cb			=> bf_neg_cb_sym bf_cb_arg.
-bf_less_cb			=> bf_less_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-bf_less_equal_cb	=> bf_less_equal_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-bf_greater_cb		=> bf_greater_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 bf_subs_cb			=> bf_subs_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 bf_eq_cb			=> bf_eq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 bf_neq_cb			=> bf_neq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
@@ -245,9 +243,6 @@ bf_and_cb_sym			=> ws "bf_and_cb" ws.
 bf_or_cb_sym			=> ws "bf_or_cb" ws.
 bf_xor_cb_sym			=> ws "bf_xor_cb" ws.
 bf_neg_cb_sym			=> ws "bf_neg_cb" ws.
-bf_less_cb_sym			=> ws "bf_less_cb" ws.
-bf_less_equal_cb_sym	=> ws "bf_less_equal_cb" ws.
-bf_greater_cb_sym		=> ws "bf_greater_cb" ws.
 bf_subs_cb_sym			=> ws "bf_subs_cb" ws.
 bf_eq_cb_sym			=> ws "bf_eq_cb" ws.
 bf_neq_cb_sym			=> ws "bf_neq_cb" ws.

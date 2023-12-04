@@ -240,6 +240,17 @@ TEST_SUITE("executing bf rules") {
 		CHECK( result == body );
 	}
 
+	TEST_CASE("BF_DEF_XOR") {
+		auto src_rule = make_tau_source(BF_DEF_XOR);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = tau_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
 	// REVIEW (MEDIUM) remaining tests of the test suite are flaky
 
 	// They properly run when executed independenly but fails otherwise. Maybe
@@ -315,60 +326,6 @@ TEST_SUITE("executing bf rules") {
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BF_CALLBACK_LESS") {
-		static constexpr char* sample =	"( { l } < { r } ).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
-		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_LESS);
-		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto result = tau_apply(tau_rule, binded);
-		std::cout << result << std::endl;
-		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BF_CALLBACK_LESS_EQUAL") {
-		static constexpr char* sample =	"( { l } <= { r } ).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
-		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_LESS_EQUAL);
-		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto result = tau_apply(tau_rule, binded);
-		std::cout << result << std::endl;
-		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BF_CALLBACK_GREATER") {
-		static constexpr char* sample =	"( { l } > { r } ).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
-		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_GREATER);
-		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto result = tau_apply(tau_rule, binded);
-		std::cout << result << std::endl;
-		auto check = result
-			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 
