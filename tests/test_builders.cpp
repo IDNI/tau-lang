@@ -155,13 +155,12 @@ TEST_SUITE("builders execution") {
 	static constexpr char* sample =	" ( ?X = 0 ) .";
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
-	auto X = frml
+	auto bfs = frml
 		| tau_parser::formula | tau_parser::main | tau_parser::wff
-		| tau_parser::bf_eq | tau_parser::bf | tau_parser::variable
+		| tau_parser::bf_eq || tau_parser::bf;
+	auto X = bfs[0] | tau_parser::variable
 		| optional_value_extractor<sp_tau_node<Bool>>;
-	auto F = frml
-		| tau_parser::formula | tau_parser::main | tau_parser::wff
-		| tau_parser::bf_eq | tau_parser::bf_f
+	auto F = bfs[1] | tau_parser::bf_f
 		| optional_value_extractor<sp_tau_node<Bool>>;
 
 	TEST_CASE("BLDR_WFF_EQ") {

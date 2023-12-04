@@ -335,6 +335,57 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 
+	TEST_CASE("BF_DEF_LESS_EQUAL") {
+		auto src_rule = make_tau_source(BF_DEF_LESS_EQUAL);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+	TEST_CASE("BF_DEF_LESS") {
+		auto src_rule = make_tau_source(BF_DEF_LESS);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+	TEST_CASE("BF_DEF_GREATER") {
+		auto src_rule = make_tau_source(BF_DEF_GREATER);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+	TEST_CASE("BF_DEF_EQ") {
+		auto src_rule = make_tau_source(BF_DEF_EQ);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+	TEST_CASE("BF_DEF_NEQ") {
+		auto src_rule = make_tau_source(BF_DEF_NEQ);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::wff_rule;
+		CHECK( check.has_value() );
+	}
+
 	TEST_CASE("BF_TRIVIALITY_0") {
 		auto src_rule = make_tau_source(BF_TRIVIALITY_0);
 		auto tau_rule = make_statement(src_rule);
