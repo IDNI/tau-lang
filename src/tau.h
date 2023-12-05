@@ -69,22 +69,42 @@ tau<BAs...> operator~(const tau<BAs...>& t) {
 	return tau<BAs...>({{}, build_wff_not<BAs...>(t.form.main)});
 }
 
-template<typename...BAs>
+template<typename base_factory_t, typename...BAs>
 struct tau_factory {
 
+	tau_factory(base_factory_t& bf) : bf(bf) {}
+
 	sp_tau_node<tau<BAs...>> build(const std::string type_name, const sp_tau_node<tau<BAs...>>& n) {
-		if (type_name != "tau") return n;
-		std::string var = make_string_with_skip<
-			tau_node_terminal_extractor_t<tau<BAs...>>,
-			not_whitespace_predicate_t<tau<BAs...>>,
-			sp_tau_node<tau<BAs...>>>(
+		if (type_name == "tau") {
+			std::string var = make_string_with_skip<
+					tau_node_terminal_extractor_t<tau<BAs...>>,
+					not_whitespace_predicate_t<tau<BAs...>>,
+					sp_tau_node<tau<BAs...>>>(
 				tau_node_terminal_extractor<tau<BAs...>>,
 				not_whitespace_predicate<tau<BAs...>>, n);
-		// TODO (MEDIUM) use a cache as we have a proper order for tau struct
-		return make_formula_using_factory<tau_factory<BAs...>, tau<BAs...>>(var, *this);
+			return make_formula_using_factory<tau_factory<BAs...>, tau<BAs...>>(var, *this);
+		}
+		return bf.build(type_name, n);
 	}
+
+	base_factory_t& bf;
 };
 
+template<typename base_factory_t, typename...BAs>
+formula<tau<BAs...>> make_tau_using_factory(const std::string& src, base_factory_t& bf) {
+	tau_factory<base_factory_t, BAs...> tf(bf);
+	return make_formula_using_factory<tau_factory<base_factory_t, BAs...>, tau<BAs...>>(src, tf);
+}
 
+template<typename...BAs>
+formula<tau<BAs...>> make_tau_using_bindings(const std::string& src, const bindings<tau<BAs...>>& bs) {
+	return make_formula_using_bindings<tau<BAs...>>(src, bs);
+}
+
+template<typename...BAs>
+ostream& operator<<(ostream& os, const formula<tau<BAs...>>& t) {
+	// TODO (MEDIUM) implement
+	return os << "tau<>";
+}
 
 } // namespace idni::tau
