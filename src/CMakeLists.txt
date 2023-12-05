@@ -29,6 +29,7 @@ set(TAU_HEADERS
 	out.h
 	formula.h
 	seq.h
+	tau.h
 )
 
 set(TAU_SOURCES

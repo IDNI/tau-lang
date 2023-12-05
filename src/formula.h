@@ -95,38 +95,6 @@ struct formula {
 	statement<BAs...> main;
 };
 
-// a formula is a set of rules and a main, the boolean algebra constants
-// (unless '0' or '1') are uninstantiated.
-template<typename... BAs>
-struct tau {
-
-	// logical operators on tau specs, dummy implementation for now.
-	tau operator&(tau const& that) const {
-
-		// TODO (IMPORTANT) implement in the future
-
-		return tau();
-	}
-	tau operator|(tau const& that) const {
-
-		// TODO (IMPORTANT) implement in the future
-
-		return tau();
-	}
-	tau operator^(tau const& that) const {
-
-		// TODO (IMPORTANT) implement in the future
-
-		return tau();
-	}
-	tau operator~() const {
-
-		// TODO (IMPORTANT) implement in the future
-
-		return tau();
-	}
-};
-
 //
 // predicates and functions related to the tau language
 //
@@ -876,12 +844,6 @@ template<typename factory_t, typename... BAs>
 formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
 	bind_transformer<factory_t, BAs...> bs(factory);
 	return make_formula_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
-}
-
-template<typename... BAs>
-tau<BAs...> make_tau() {
-	// TODO (IMPORTANT) give a proper implementation in the future
-	return tau<BAs...>();
 }
 
 // make a library from the given tau source string.
