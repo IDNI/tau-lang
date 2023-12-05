@@ -40,34 +40,31 @@ struct tau {
 				that.form.rec_relations.begin(), that.form.rec_relations.end());
 	}
 
+	// TODO (HIGH) take into account rec. relations
+
+	tau<BAs...> operator&(const tau<BAs...>& that) {
+		return tau<BAs...>({{}, build_wff_and<BAs...>(form.main, that.form.main)});
+	}
+
+	tau<BAs...> operator|( const tau<BAs...>& that) {
+		return tau<BAs...>({{}, build_wff_or<BAs...>(form.main, that.form.main)});
+	}
+
+	tau<BAs...> operator^(const tau<BAs...>& that) {
+		return tau<BAs...>({{}, build_wff_xor<BAs...>(form.main, that.form.main)});
+	}
+
+	tau<BAs...> operator+(const tau<BAs...>& that) {
+		return tau<BAs...>({{}, build_wff_xor<BAs...>(form.main, that.form.main)});
+	}
+
+	tau<BAs...> operator~() {
+		return tau<BAs...>({{}, build_wff_not<BAs...>(form.main)});
+	}
+
 	// the formula to be executed
 	formula<BAs...> form;
 };
-
-template<typename...BAs>
-tau<BAs...> operator&(const tau<BAs...>& l, const tau<BAs...>& r) {
-	return tau<BAs...>({{}, build_wff_and<BAs...>(l.form.main, r.form.main)});
-}
-
-template<typename...BAs>
-tau<BAs...> operator|(const tau<BAs...>& l, const tau<BAs...>& r) {
-	return tau<BAs...>({{}, build_wff_or<BAs...>(l.form.main, r.form.main)});
-}
-
-template<typename...BAs>
-tau<BAs...> operator^(const tau<BAs...>& l, const tau<BAs...>& r) {
-	return tau<BAs...>({{}, build_wff_xor<BAs...>(l.form.main, r.form.main)});
-}
-
-template<typename...BAs>
-tau<BAs...> operator+(const tau<BAs...>& l, const tau<BAs...>& r) {
-	return tau<BAs...>({{}, build_wff_xor<BAs...>(l.form.main, r.form.main)});
-}
-
-template<typename...BAs>
-tau<BAs...> operator~(const tau<BAs...>& t) {
-	return tau<BAs...>({{}, build_wff_not<BAs...>(t.form.main)});
-}
 
 template<typename base_factory_t, typename...BAs>
 struct tau_factory {
