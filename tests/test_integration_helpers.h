@@ -16,21 +16,23 @@
 
 #include "../src/formula.h"
 #include "../src/babdd.h"
+#include "../src/tau.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
 
 using bdd_test = hbdd<Bool>;
+using tau_bdd_test = tau<bdd_test>;
 
-struct bdd_test_factory {	
+struct bdd_test_factory {
 
 	sp_tau_node<bdd_test> build(const std::string type_name, const sp_tau_node<bdd_test>& n) {
 		if (type_name != "bdd") return n;
 		std::string var = make_string_with_skip<
 			tau_node_terminal_extractor_t<bdd_test>,
-			not_whitespace_predicate_t<bdd_test>, 
+			not_whitespace_predicate_t<bdd_test>,
 			sp_tau_node<bdd_test>>(
-				tau_node_terminal_extractor<bdd_test>, 
+				tau_node_terminal_extractor<bdd_test>,
 				not_whitespace_predicate<bdd_test>, n);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		auto ref = bdd<Bool>::bit(index++);
@@ -54,9 +56,9 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n, size_
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
-		[&os](std::variant<bdd_test> v) { 
-			if (auto b = std::get<0>(v); b == true) os << "true"; 
-			else if (auto b = std::get<0>(v); b == false) os << "false"; 
+		[&os](std::variant<bdd_test> v) {
+			if (auto b = std::get<0>(v); b == true) os << "true";
+			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...bdd..."; }
 	}, n->value);
 	for (auto& d : n->child) print_sp_tau_node(os, d, l + 1);
@@ -68,9 +70,9 @@ std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },
-		[&os](std::variant<bdd_test> v) { 
-			if (auto b = std::get<0>(v); b == true) os << "true"; 
-			else if (auto b = std::get<0>(v); b == false) os << "false"; 
+		[&os](std::variant<bdd_test> v) {
+			if (auto b = std::get<0>(v); b == true) os << "true";
+			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...bdd..."; }
 	}, n->value);
 	for (auto& d : n->child) pretty_print_sp_tau_node(os, d, l + 1);
