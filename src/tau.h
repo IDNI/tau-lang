@@ -75,16 +75,14 @@ struct tau_factory {
 	tau_factory(base_factory_t& bf) : bf(bf) {}
 
 	sp_tau_node<tau<BAs...>> build(const std::string type_name, const sp_tau_node<tau<BAs...>>& n) {
-		if (type_name == "tau") {
-			std::string var = make_string_with_skip<
-					tau_node_terminal_extractor_t<tau<BAs...>>,
-					not_whitespace_predicate_t<tau<BAs...>>,
-					sp_tau_node<tau<BAs...>>>(
-				tau_node_terminal_extractor<tau<BAs...>>,
-				not_whitespace_predicate<tau<BAs...>>, n);
-			return make_formula_using_factory<tau_factory<BAs...>, tau<BAs...>>(var, *this);
-		}
-		return bf.build(type_name, n);
+		if (auto nn = bf.build(type_name, n); nn != n) return nn;
+		std::string var = make_string_with_skip<
+				tau_node_terminal_extractor_t<tau<BAs...>>,
+				not_whitespace_predicate_t<tau<BAs...>>,
+				sp_tau_node<tau<BAs...>>>(
+			tau_node_terminal_extractor<tau<BAs...>>,
+			not_whitespace_predicate<tau<BAs...>>, n);
+		return make_formula_using_factory<tau_factory<BAs...>, tau<BAs...>>(var, *this);
 	}
 
 	base_factory_t& bf;
