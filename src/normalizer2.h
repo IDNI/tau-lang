@@ -441,16 +441,68 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<st
 }
 
 template <typename... BAs>
-formula<BAs...> normalizer_step(formula<BAs...>& form) {
+formula<BAs...> replace_captures_by_step(formula<BAs...>& form, int step) {
+	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+	for(auto& n: select_all(form.main, is_non_terminal<tau_parser::step, BAs...>)) {
+		auto digits = make_node<tau_sym<BAs...>>(step, {});
+		auto num = make_node<tau_sym<BAs...>>(tau_parser::num, {digits});
+		if (auto c = n | tau_parser::capture; c.has_value()) {
+			changes[c.value()] = num;
+		} else if (auto c = n | tau_parser::shift | tau_parser::capture; c.has_value()) {
+			changes[c.value()] = num;
+		}
+	}
+	auto nmain = replace<sp_tau_node<BAs...>>(form.main, changes);
+	return { form.rec_relations, nmain };
+}
+
+template <typename... BAs>
+formula<BAs...> apply_rec_relations_by_step(formula<BAs...>& form) {
+	// TODO (LOW) exit if no rec. relations
+	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+
+	auto nmain = form.main
+		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(form.rec_relations));
+
+	for (const auto& shift: select_top(nmain, is_non_terminal<tau_parser::shift, BAs...>)) {
+		int off = 0;
+		std::optional<sp_tau_node<BAs...>> current(shift);
+		while (current.has_value()) {
+			off += get<size_t>(((current.value() | tau_parser::num).value())->value);
+			current = current.value() | tau_parser::shift;
+		}
+		auto digits = make_node<tau_sym<BAs...>>(off, {});
+		auto num = make_node<tau_sym<BAs...>>(tau_parser::num, {digits});
+		auto nshift = make_node<tau_sym<BAs...>>(tau_parser::shift, {
+			shift | tau_parser::capture | optional_value_extractor<sp_tau_node<BAs...>>,
+			shift | tau_parser::minus | optional_value_extractor<sp_tau_node<BAs...>>,
+			num});
+		changes[shift] = nshift;
+	}
+
+	auto nnmain = replace<sp_tau_node<BAs...>>(nmain, changes);
+	return { form.rec_relations, nnmain };
+}
+
+template <typename... BAs>
+formula<BAs...> prepare_main_for_step(formula<BAs...>& form, int step) {
+	auto nform = replace_captures_by_step<BAs...>(form, step);
+	return apply_rec_relations_by_step<BAs...>(nform);
+}
+
+template <typename... BAs>
+formula<BAs...> normalizer_step(formula<BAs...>& form, int stp = 0) {
 
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << "(I): -- Begin normalizer step" << std::endl;
 	std::cout << "(F): " << form.main << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
-	auto nmain = form.main
+	formula<BAs...> nform = prepare_main_for_step<BAs...>(form, stp);
+
+	sp_tau_node<BAs...> nmain = nform.main
 			| repeat_all<step<BAs...>, BAs...>(
-				step<BAs...>(form.rec_relations))
+				step<BAs...>(nform.rec_relations))
 			| repeat_all<step<BAs...>, BAs...>(
 				step<BAs...>(apply_defs<BAs...>))
 			| repeat_all<step<BAs...>, BAs...>(
@@ -474,6 +526,7 @@ formula<BAs...> normalizer_step(formula<BAs...>& form) {
 				| to_dnf_wff<BAs...>
 				| simplify_wff<BAs...>
 				| clause_simplify_wff<BAs...>);
+
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << "(I): -- End normalizer step" << std::endl;
 	#endif // OUTPUT_APPLY_RULES
@@ -560,9 +613,9 @@ formula<BAs...> normalizer(formula<BAs...>& form) {
 	std::vector<sp_tau_node<BAs...>> previous;
 	formula<BAs...> current = normalizer_step(nform);
 	auto is_equivalent = is_equivalent_predicate<BAs...>(current.main);
-	while (std::find_if(previous.rend(), previous.rbegin(),  is_equivalent) == previous.rend()) {
+	for (int i = 1; std::find_if(previous.rend(), previous.rbegin(),  is_equivalent) == previous.rend(); i++) {
 		previous.push_back(current.main);
-		current = normalizer_step(current);
+		current = normalizer_step(current, i);
 	}
 
 	#ifdef OUTPUT_APPLY_RULES
