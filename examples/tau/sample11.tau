@@ -1,0 +1,2 @@
+# quantify over X and Y and check = and !=
+(((((( A & X ) & Y) + ((B & X) & Y))) + ((( C & ~ X) & Y)+(( D & ~ X) & ~Y))) = 0).

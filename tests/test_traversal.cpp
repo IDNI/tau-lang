@@ -65,7 +65,7 @@ TEST_SUITE("operator||") {
 	}
 
 	TEST_CASE("match one node") {
-		static constexpr char* sample =	"(?Z & ?Z) := ?Z.";
+		static constexpr char* sample =	"(Z & Z) := Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib
@@ -77,7 +77,7 @@ TEST_SUITE("operator||") {
 	}
 
 	TEST_CASE("match several nodes") {
-		static constexpr char* sample =	"(?Z & ?Z) := ?Z.";
+		static constexpr char* sample =	"(Z & Z) := Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib
