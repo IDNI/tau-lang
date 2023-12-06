@@ -65,7 +65,7 @@ TEST_SUITE("make_library") {
 TEST_SUITE("callbacks") {
 
 	TEST_CASE("BF_CALLBACK_SUBS") {
-		static constexpr char* sample =	"bf_subs_cb 0 1 0 := 0.";
+		const char* sample =	"bf_subs_cb 0 1 0 := 0.";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		callback_applier<Bool> cb_applier;

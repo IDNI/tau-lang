@@ -141,7 +141,7 @@ TEST_SUITE("is_unresolved") {
 TEST_SUITE("resolve_type") {
 
 	TEST_CASE("unresolved case") {
-		static constexpr char* sample =	"$X := ({ : src_code } & { bool : src_code }).";
+		const char* sample =	"$X := ({ : src_code } & { bool : src_code }).";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto unresolved = lib
