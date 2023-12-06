@@ -48,7 +48,7 @@ using sp_tau_source_node = sp_node<idni::lit<char, char>>;
 // node type for the tau language related programs, libraries and
 // specifications trees.
 template <typename... BAs>
-using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>>;
+using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
 // TODO (LOW) remove tau_node
 template <typename... BAs>
 using tau_node = node<tau_sym<BAs...>>;
@@ -797,17 +797,35 @@ sp_tau_source_node make_tau_source(const std::string& source) {
 		drop_location<parse_symbol, tau_source_sym>, source);
 }
 
+template<typename...BAs>
+sp_tau_node<BAs...> process_digits(sp_tau_node<BAs...>& tau_source){
+	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+	for(auto& n: select_top(tau_source, is_non_terminal<tau_parser::digits, BAs...>)){
+		auto offset = make_string_with_skip<
+				tau_node_terminal_extractor_t<BAs...>,
+				not_whitespace_predicate_t<BAs...>,
+				sp_tau_node<BAs...>>(
+			tau_node_terminal_extractor<BAs...>,
+			not_whitespace_predicate<BAs...>, n);
+		auto num = std::stoul(offset);
+		auto nn = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(num), {});
+		changes[n] = nn;
+	}
+	return replace<sp_tau_node<BAs...>>(tau_source, changes);
+}
+
 // create tau code from tau source
 template<typename... BAs>
 sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
 	map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>> transform(tf);
-	return post_order_traverser<
+	auto tau_code = post_order_traverser<
 			map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>,
 			all_t<sp_tau_source_node>,
 			sp_node<tau_source_sym>,
 			sp_tau_node<BAs...>>(
 		transform, all<sp_tau_source_node>)(tau_source);
+	return process_digits(tau_code);
 }
 
 // make a library from the given tau source.
