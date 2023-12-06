@@ -1339,6 +1339,46 @@ private:
 
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
+template<typename predicate_t, typename... BAs>
+sp_tau_node<BAs...> tau_apply_if(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
+	// IDEA maybe we could traverse only once
+	auto nn = apply_with_skip_if<
+			sp_tau_node<BAs...>,
+			none_t<sp_tau_node<BAs...>>,
+			is_capture_t<BAs...>,
+			is_non_essential_t<BAs...>,
+			predicate_t>(
+		r, n , none<sp_tau_node<BAs...>>, is_capture<BAs...>, is_non_essential<BAs...>, predicate);
+	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
+		callback_applier<BAs...> cb_applier;
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+		for (auto& cb : cbs) {
+			auto nnn = cb_applier(cb);
+			changes[cb] = nnn;
+		}
+		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
+
+		#ifdef OUTPUT_APPLY_RULES
+		std::cout << "(C): " << cnn << std::endl;
+		#endif // OUTPUT_APPLY_RULES
+
+		return cnn;
+	}
+	return nn;
+}
+
+// apply the given rules to the given expression
+// IDEA maybe this could be operator|
+template<typename predicate_t, typename... BAs>
+sp_tau_node<BAs...> tau_apply_if(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
+	if (rs.empty()) return n;
+	sp_tau_node<BAs...> nn = n;
+	for (auto& r : rs) nn = tau_apply_if<predicate_t, BAs...>(r, nn, predicate);
+	return nn;
+}
+
+// apply one tau rule to the given expression
+// IDEA maybe this could be operator|
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
