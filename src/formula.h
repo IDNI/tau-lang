@@ -874,7 +874,7 @@ library<BAs...> make_library(const std::string& source) {
 // creates a specific builder from a sp_tau_node.
 template<typename... BAs>
 builder<BAs...> make_builder(const sp_tau_node<BAs...>& builder) {
-	return {builder | tau_parser::builder | tau_parser::captures | optional_value_extractor<sp_tau_node<BAs...>>,
+	return {builder | tau_parser::builder | tau_parser::builder_head | optional_value_extractor<sp_tau_node<BAs...>>,
 			builder | tau_parser::builder | tau_parser::builder_body | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>};
 }
 

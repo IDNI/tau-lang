@@ -61,15 +61,14 @@ offsets			=> open_bracket step (comma offset)* close_bracket.
 offset			=> num | capture | shift.
 step			=> num | capture | shift.
 shift 			=> capture minus num.
-num				=> digits.
+num				=> ws digits ws.
 
-captures 		=> open_parenthesis capture (ws_required capture)* close_parenthesis.
 variable		=> var | timed.
 timed			=> (in | out)  offsets.
 
 # TODO (HIGH) remove ? from vars
 capture			=> '$' chars.
-var				=> '?' chars.
+var				=> chars.
 in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
 
@@ -243,6 +242,7 @@ rules			=> (rule)*.
 formula			=> rules main.
 library 		=> rules.
 # each builder is define on its own string
-builder			=> captures definition builder_body dot.
+builder			=> builder_head definition builder_body dot.
+builder_head	=> open_parenthesis capture (ws_required capture)* close_parenthesis.
 builder_body	=> wff | bf.
 start			=> formula | library | builder | inputs.
