@@ -152,7 +152,7 @@ TEST_SUITE("builders parsing") {
 
 TEST_SUITE("builders execution") {
 
-	static constexpr char* sample =	" ( X = 0 ) .";
+	const char* sample = " ( X = 0 ) .";
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
 	auto bfs = frml
