@@ -20,7 +20,7 @@
 #include "../src/bool.h"
 #include "../src/normalizer2.h"
 #include "../parser/bdd_parser.generated.h"
-#include "test_integration_helpers.h"
+#include "integration/test_integration_helpers.h"
 
 using namespace std;
 using namespace idni::tau;
