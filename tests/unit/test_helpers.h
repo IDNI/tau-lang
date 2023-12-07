@@ -14,12 +14,14 @@
 #ifndef __TEST_HELPERS_H__
 #define __TEST_HELPERS_H__
 
-#include "../src/formula.h"
+#include "../../src/formula.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
 
 namespace testing = doctest;
+
+// TODO (LOW) most of this functions could be remove and replace by the standart API
 
 // helper functions
 sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {

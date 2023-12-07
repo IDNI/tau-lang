@@ -28,7 +28,6 @@
 
 #include "forest.h"
 #include "parser.h"
-//#include "tree.h"
 
 namespace idni::rewriter {
 
@@ -66,8 +65,7 @@ using sp_node = std::shared_ptr<node<symbol_t>>;
 
 // node factory method
 template <typename symbol_t>
-sp_node<symbol_t> make_node(const symbol_t& s,
-		const std::vector<sp_node<symbol_t>>& ns) {
+sp_node<symbol_t> make_node(const symbol_t& s, const std::vector<sp_node<symbol_t>>& ns) {
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
 	node<symbol_t> key{s, ns};
 	if (auto it = cache.find(key); it != cache.end()) {

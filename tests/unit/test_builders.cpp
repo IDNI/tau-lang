@@ -13,11 +13,11 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "../src/doctest.h"
-#include "../src/formula.h"
-#include "../src/bool.h"
-#include "../src/bdd_handle.h"
-#include "../src/normalizer2.h"
+#include "../../src/doctest.h"
+#include "../../src/formula.h"
+#include "../../src/bool.h"
+#include "../../src/bdd_handle.h"
+#include "../../src/normalizer2.h"
 #include "test_helpers.h"
 
 using namespace idni::rewriter;

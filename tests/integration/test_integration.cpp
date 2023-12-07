@@ -18,11 +18,11 @@
 #undef  OUTPUT_APPLY_RULES
 #define OUTPUT_APPLY_RULES 1
 
-#include "../src/doctest.h"
-#include "../src/formula.h"
-#include "../src/bdd_handle.h"
-#include "../src/normalizer2.h"
-#include "test_integration_helpers.h"
+#include "../../src/doctest.h"
+#include "../../src/formula.h"
+#include "../../src/bdd_handle.h"
+#include "../../src/normalizer2.h"
+#include "../test_integration_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
