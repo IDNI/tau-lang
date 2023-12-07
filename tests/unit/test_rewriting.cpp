@@ -13,8 +13,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "../src/doctest.h"
-#include "../src/rewriting.h"
+#include "../../src/doctest.h"
+#include "../../src/rewriting.h"
 
 using namespace idni::rewriter;
 using namespace std;
@@ -41,13 +41,13 @@ sp_node<char> d(const char& value, const vector<sp_node<char>>& child) {
 // tests suites
 
 TEST_SUITE("node") {
-	
+
 	TEST_CASE("node constructor: given a value, the node has that value") {
 		auto d1 = *d('a');
 		CHECK( d1.value == 'a' );
 		CHECK( d1.child.size() == 0 );
 	}
-	
+
 	TEST_CASE("node constructor: given a value and children, the node has that value "
 			"and children") {
 		auto d1 = *d('a', {d('b'), d('c'), d('d')});
@@ -108,28 +108,28 @@ TEST_SUITE("make_node") {
 			"returns the same node") {
 		auto n1 = make_node<char>('a', {});
 		auto n2 = make_node<char>('a', {});
-		CHECK( n1 == n2 );		
+		CHECK( n1 == n2 );
 	}
 
 	TEST_CASE("make_node uniqueness: given two nodes with the same value and children, "
 			"it returns the same node") {
 		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')});
 		auto n2 = make_node<char>('a', {n('b'), n('c'), n('d')});
-		CHECK( n1 == n2 );		
+		CHECK( n1 == n2 );
 	}
 
 	TEST_CASE("make_node uniqueness: given two nodes with different value and same "
 			"children, it returns the different nodes") {
 		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')});
 		auto n2 = make_node<char>('b', {n('b'), n('c'), n('d')});
-		CHECK( n1 != n2 );		
+		CHECK( n1 != n2 );
 	}
 
 	TEST_CASE("make_node uniqueness: given two nodes with same value and different "
 			"children, it returns the different nodes") {
 		auto n1 = make_node<char>('a', {n('b'), n('c'), n('d')});
 		auto n2 = make_node<char>('a', {n('b'), n('c'), n('e')});
-		CHECK( n1 != n2 );		
+		CHECK( n1 != n2 );
 	}
 }
 
@@ -271,7 +271,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {root};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -282,7 +282,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -293,7 +293,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('b'), n('c')};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -305,7 +305,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -317,7 +317,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('d')};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -329,7 +329,7 @@ TEST_SUITE("select_top_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('b', {n('d')}), n('c', {n('d')})};
 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -345,10 +345,10 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {root};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
-	
+
 	TEST_CASE("select_all_predicate: given a simple tree whose root does not "
 			"satisfy the predicate, it returns an empty vector") {
 		sp_node<char> root = n('a');
@@ -356,7 +356,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -367,7 +367,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('b'), n('c')};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -379,7 +379,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -391,7 +391,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('d')};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 
@@ -403,7 +403,7 @@ TEST_SUITE("select_all_predicate") {
 		vector<sp_node<char>> selected;
 		vector<sp_node<char>> expected {n('b', {n('d')}), n('c', {n('d')})};
 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(select), sp_node<char>>(::idni::rewriter::identity<sp_node<char>> , select)(root);
 		CHECK( selected == expected );
 	}
 }
@@ -417,7 +417,7 @@ TEST_SUITE("find_top_predicate") {
 		optional<sp_node<char>> found;
 		sp_node<char> expected {root};
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);
 		CHECK( found.value() == expected );
 	}
 
@@ -427,7 +427,7 @@ TEST_SUITE("find_top_predicate") {
 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
 		optional<sp_node<char>> found;
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);
 		CHECK( !found );
 	}
 
@@ -438,7 +438,7 @@ TEST_SUITE("find_top_predicate") {
 		optional<sp_node<char>> found;
 		sp_node<char> expected {n('b')};
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);
 		CHECK( found.value() == expected );
 	}
 
@@ -448,7 +448,7 @@ TEST_SUITE("find_top_predicate") {
 		auto predicate = [](sp_node<char> n) { return n->value == 'd' || n->value == 'e'; };
 		optional<sp_node<char>> found;
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);
 		CHECK( !found );
 	}
 
@@ -459,7 +459,7 @@ TEST_SUITE("find_top_predicate") {
 		optional<sp_node<char>> found;
 		sp_node<char> expected {n('c', {n('d')})};
 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);		
+		post_order_traverser<decltype(::idni::rewriter::identity<sp_node<char>>), decltype(find), sp_node<char>>(::idni::rewriter::identity<sp_node<char>>, find)(root);
 		CHECK( found.value() == expected );
 	}
 }
@@ -469,19 +469,19 @@ TEST_SUITE("find_top_predicate") {
 TEST_SUITE("logical predicates") {
 
 	TEST_CASE("true_predicate: given a node, it always returns true") {
-		auto t = true_predicate<sp_node<char>>(); 
+		auto t = true_predicate<sp_node<char>>();
 		CHECK( t(n('a')) );
 	}
 
 	TEST_CASE("false_predicate: given a node, it always returns false") {
-		auto f = false_predicate<sp_node<char>>(); 
+		auto f = false_predicate<sp_node<char>>();
 		CHECK( !f(n('a')) );
 	}
 
 	TEST_CASE("and_predicate: given a true and a false predicate, it computes "
 			"the true table") {
-		auto t = true_predicate<sp_node<char>>(); 
-		auto f = false_predicate<sp_node<char>>(); 
+		auto t = true_predicate<sp_node<char>>();
+		auto f = false_predicate<sp_node<char>>();
 		CHECK( and_predicate(t, t)(d('a')) );
 		CHECK( !and_predicate(t, f)(d('a')) );
 		CHECK( !and_predicate(f, t)(d('a')) );
@@ -490,8 +490,8 @@ TEST_SUITE("logical predicates") {
 
 	TEST_CASE("or_predicate: given a true and a false predicate, it computes "
 			"the true table") {
-		auto t = true_predicate<sp_node<char>>(); 
-		auto f = false_predicate<sp_node<char>>(); 
+		auto t = true_predicate<sp_node<char>>();
+		auto f = false_predicate<sp_node<char>>();
 		CHECK( or_predicate(t, t)(d('a')) );
 		CHECK( or_predicate(t, f)(d('a')) );
 		CHECK( or_predicate(f, t)(d('a')) );
@@ -500,8 +500,8 @@ TEST_SUITE("logical predicates") {
 
 	TEST_CASE("neg_predicate: given a true and a false predicate, it computes "
 			"the true table") {
-		auto t = true_predicate<sp_node<char>>(); 
-		auto f = false_predicate<sp_node<char>>(); 
+		auto t = true_predicate<sp_node<char>>();
+		auto f = false_predicate<sp_node<char>>();
 		CHECK( !neg_predicate(t)(d('a')) );
 		CHECK( neg_predicate(f)(d('a')) );
 	}
@@ -539,21 +539,21 @@ TEST_SUITE("trim_top") {
 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
 		sp_node<char> expected {n('a', {n('c')})};
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-	}	
+	}
 
 	TEST_CASE("trim_top: given a tree with two children -both matching the "
 			"predicate-, it returns the root") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-		sp_node<char> expected { n('a') }; 
+		sp_node<char> expected { n('a') };
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-	}	
+	}
 
 	TEST_CASE("trim_top: given a tree with two children -none matching the "
 			"predicate-, it returns the given tree") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->value == 'd' || n->value == 'e'; };
-		sp_node<char> expected { root }; 
+		sp_node<char> expected { root };
 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
 	}
 
@@ -597,7 +597,7 @@ TEST_SUITE("select_top") {
 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
 		vector<sp_node<char>> expected {n('c')};
 		CHECK( select_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-	}	
+	}
 
 	TEST_CASE("select_top: given a tree with two children -the left one "
 			"matching the predicate-, it returns the matching child") {
@@ -611,9 +611,9 @@ TEST_SUITE("select_top") {
 			"the predicate-, it returns the left one") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-		vector<sp_node<char>> expected { n('b'), n('c') }; 
+		vector<sp_node<char>> expected { n('b'), n('c') };
 		CHECK( select_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-	}	
+	}
 
 	TEST_CASE("select_top: given a tree with underlying diamond like DAG and "
 			"a predicate satisfied by the bottom, it returns the bottom") {
@@ -661,7 +661,7 @@ TEST_SUITE("select_all") {
 			"predicate-, it returns both") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-		vector<sp_node<char>> expected { n('b'), n('c') }; 
+		vector<sp_node<char>> expected { n('b'), n('c') };
 		CHECK( select_all<decltype(predicate), sp_node<char>>(root, predicate) == expected );
 	}
 
@@ -669,7 +669,7 @@ TEST_SUITE("select_all") {
 			"predicate-, it returns both") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-		vector<sp_node<char>> expected { n('b'), n('c') }; 
+		vector<sp_node<char>> expected { n('b'), n('c') };
 		CHECK( select_all<decltype(predicate), sp_node<char>>(root, predicate) == expected );
 	}
 }
@@ -711,7 +711,7 @@ TEST_SUITE("find_top") {
 			"predicate-, it returns the first matching node") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-		optional<sp_node<char>> expected { n('b') }; 
+		optional<sp_node<char>> expected { n('b') };
 		CHECK( find_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
 	}
 
@@ -719,9 +719,9 @@ TEST_SUITE("find_top") {
 			"and a predicate satisfied by the bottom nodes, it returns the "
 			"first matching node") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-		auto predicate = [](sp_node<char> n) { 
+		auto predicate = [](sp_node<char> n) {
 			return n->value == 'b' || n->value == 'c' || n->value == 'd'; };
-		optional<sp_node<char>> expected { n('b', {n('d')}) }; 
+		optional<sp_node<char>> expected { n('b', {n('d')}) };
 		CHECK( find_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
 	}
 }
@@ -769,7 +769,7 @@ TEST_SUITE("find_bottom") {
 			"predicate-, it returns the first matching node") {
 		sp_node<char> root = n('a', {n('b'), n('c')});
 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-		optional<sp_node<char>> expected { n('b') }; 
+		optional<sp_node<char>> expected { n('b') };
 		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
 		CHECK( result == expected );
 	}
@@ -778,9 +778,9 @@ TEST_SUITE("find_bottom") {
 			"and a predicate satisfied by the bottom nodes, it returns the "
 			"first matching node") {
 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-		auto predicate = [](sp_node<char> n) { 
+		auto predicate = [](sp_node<char> n) {
 			return n->value == 'b' || n->value == 'c' || n->value == 'd'; };
-		optional<sp_node<char>> expected { n('d') }; 
+		optional<sp_node<char>> expected { n('d') };
 		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
 		CHECK( result == expected );
 	}
@@ -801,7 +801,7 @@ TEST_SUITE("pattern_matcher") {
 			return n->value == 'I';
 		}
 	};
-	
+
 	static auto is_ignore = is_ignore_predicate();
 	static auto is_capture = is_capture_predicate();
 
@@ -816,7 +816,7 @@ TEST_SUITE("pattern_matcher") {
 		CHECK( matcher.matched );
 		CHECK( matcher.env == expected);
 	}
-	
+
 	TEST_CASE("pattern_matcher: given a simple tree and a simple ignore, it "
 			"returns an empty environment") {
 		sp_node<char> root = n('a');
@@ -891,7 +891,7 @@ TEST_SUITE("pattern_matcher_with_skip") {
 			return n->value == 'S';
 		}
 	};
-	
+
 	static auto is_ignore = is_ignore_predicate();
 	static auto is_capture = is_capture_predicate();
 	static auto is_skip = is_skip_predicate();
@@ -902,20 +902,20 @@ TEST_SUITE("pattern_matcher_with_skip") {
 		sp_node<char> pattern = n('X');
 		environment<sp_node<char>> expected { {pattern, root} };
 		environment<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore,
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
 		CHECK( matcher.env == expected);
 	}
-	
+
 	TEST_CASE("pattern_matcher_with_skip: given a simple tree and a simple "
 			"ignore, it returns an empty environment") {
 		sp_node<char> root = n('a');
 		sp_node<char> pattern = n('I');
 		environment<sp_node<char>> expected;
 		environment<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore,
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
@@ -929,7 +929,7 @@ TEST_SUITE("pattern_matcher_with_skip") {
 		sp_node<char> pattern = n('a', {n('X'), n('Y')});
 		environment<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
 		environment<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore,
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
@@ -943,7 +943,7 @@ TEST_SUITE("pattern_matcher_with_skip") {
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
 		environment<sp_node<char>> expected { {n('X'), n('b')} };
 		environment<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore,
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );
@@ -957,7 +957,7 @@ TEST_SUITE("pattern_matcher_with_skip") {
 		sp_node<char> pattern = n('a', {n('X'), n('X')});
 		environment<sp_node<char>> expected { };
 		environment<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore,
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( !matcher.matched );
@@ -972,7 +972,7 @@ TEST_SUITE("pattern_matcher_with_skip") {
 		sp_node<char> pattern = n('a', {n('X'), n('S'), n('S'), n('Y')});
 		environment<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
 		environment<sp_node<char>> matched;
-		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore, 
+		auto matcher = pattern_matcher_with_skip(pattern, matched, is_ignore,
 			is_capture, is_skip);
 		matcher(root);
 		CHECK( matcher.matched );

@@ -13,9 +13,9 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "../src/doctest.h"
-#include "../src/bool.h"
-#include "../src/bdd_handle.h"
+#include "../../src/doctest.h"
+#include "../../src/bool.h"
+#include "../../src/bdd_handle.h"
 
 namespace testing = doctest;
 
@@ -76,4 +76,3 @@ TEST_SUITE("operator~") {
 		CHECK( (~get_zero<Bool>()) == get_one<Bool>() );
 	}
 }
-

@@ -26,37 +26,31 @@ if (BUILD_REGRESSION)
 endif ()
 
 #
+# Integration testing
+#
+set(BUILD_REGRESSION ON CACHE STRING "build the tau-lang integration suite ON")
+set_property(CACHE BUILD_REGRESSION PROPERTY STRINGS "OFF" "ON")
+
+if (BUILD_REGRESSION)
+	enable_testing()
+	add_subdirectory(integration)
+endif ()
+
+#
 # Unit testing
 #
+set(BUILD_REGRESSION ON CACHE STRING "build the tau-lang unit suite ON")
+set_property(CACHE BUILD_REGRESSION PROPERTY STRINGS "OFF" "ON")
 
-set(TESTS
-	ba
-	bool
-	hbdd
-	rules-bf_execution
-	rules-bf_parsing
-	rules-wff_execution
-	rules-wff_parsing
-	builders
-	rewriting
-	formula
-	tau_parser
-	normalizer2
-	type_system
-	bindings
-	traversal
-	integration
-)
+if (BUILD_REGRESSION)
+	enable_testing()
+	add_subdirectory(unit)
+endif ()
 
-foreach(X IN LISTS TESTS)
-	set(N "test_${X}")
-	add_executable(${N} "${N}.cpp")
-	target_setup(${N})
-	target_link_libraries(${N} TAUo doctest)
-	target_compile_options(${N} PUBLIC -Wno-unused-function)
-	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
-endforeach()
+add_executable(debug-tau_normalizer-tau debug-tau_normalizer-tau.cpp)
+target_setup(debug-tau_normalizer-tau)
+target_link_libraries(debug-tau_normalizer-tau TAUo)
 
-add_executable(debug_tau_normalizer debug_tau_normalizer.cpp)
-target_setup(debug_tau_normalizer)
-target_link_libraries(debug_tau_normalizer TAUo)
+add_executable(debug-tau_normalizer-bdd debug-tau_normalizer-bdd.cpp)
+target_setup(debug-tau_normalizer-bdd)
+target_link_libraries(debug-tau_normalizer-bdd TAUo)

@@ -15,10 +15,10 @@
 
 #include <cassert>
 
-#include "../src/doctest.h"
-#include "../src/formula.h"
-#include "../src/bool.h"
-#include "../src/bdd_handle.h"
+#include "../../src/doctest.h"
+#include "../../src/formula.h"
+#include "../../src/bool.h"
+#include "../../src/bdd_handle.h"
 #include "test_helpers.h"
 
 using namespace idni::rewriter;
