@@ -20,7 +20,7 @@
 #include "../src/bool.h"
 #include "../src/normalizer2.h"
 #include "../parser/bdd_parser.generated.h"
-#include "test_integration_helpers.h"
+#include "integration/test_integration_helpers.h"
 
 using namespace std;
 using namespace idni::tau;
@@ -39,10 +39,9 @@ int main(int argc, char** argv) {
 
 	bdd_test_factory bf;
 	factory_binder<bdd_test_factory, bdd_test> fb(bf);
-	auto formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(content, fb); 
+	auto formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(content, fb);
 
 	normalizer<bdd_test>(formula);
 
 	return 0;
 }
-

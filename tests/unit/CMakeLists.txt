@@ -1,24 +1,25 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	test_ba
-	test_bool
-	test_hbdd
-	test_rules-bf_execution
-	test_rules-bf_parsing
-	test_rules-wff_execution
-	test_rules-wff_parsing
-	test_builders
-	test_rewriting
-	test_formula
-	test_tau_parser
-	test_normalizer2
-	test_type_system
-	test_bindings
-	test_traversal
+	ba
+	bool
+	hbdd
+	rules-bf_execution
+	rules-bf_parsing
+	rules-wff_execution
+	rules-wff_parsing
+	builders
+	rewriting
+	formula
+	tau_parser
+	normalizer2
+	type_system
+	bindings
+	traversal
 )
 
-foreach(N IN LISTS TESTS)
+foreach(X IN LISTS TESTS)
+	set(N "test_${X}")
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
 	target_link_libraries(${N} TAUo doctest)
