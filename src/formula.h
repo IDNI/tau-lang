@@ -89,7 +89,7 @@ template<typename... BAs>
 struct formula {
 
 	formula(rules<BAs...>& rec_relations, statement<BAs...>& main) : rec_relations(rec_relations), main(main) {};
-//	formula(statement<BAs...>& main) : main(main) {};
+	formula(statement<BAs...>& main) : main(main) {};
 
 	rules<BAs...> rec_relations;
 	statement<BAs...> main;
@@ -1114,6 +1114,12 @@ sp_tau_node<BAs...> build_bf_ex(const sp_tau_node<BAs...>& l, const sp_tau_node<
 	return tau_apply_builder<BAs...>(bldr_bf_ex<BAs...>, args);
 }
 
+
+template<class... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
 // apply the given  T and F are  if the value of the node is a callback
 //
 // TODO (HIGH) convert to a const static applier and change all the code accordingly
@@ -1125,10 +1131,10 @@ struct callback_applier {
 		if (!is_callback<BAs...>(n)) return n;
 		auto nt = get<tau_source_sym>(n->value).n();
 		switch (nt) {
+			case tau_parser::bf_neg_cb: return apply_unary_operation(_neg, n);
 			case tau_parser::bf_and_cb: return apply_binary_operation(_and, n);
 			case tau_parser::bf_or_cb: return apply_binary_operation(_or, n);
 			case tau_parser::bf_xor_cb: return apply_binary_operation(_xor, n);
-			case tau_parser::bf_neg_cb: return apply_unary_operation(_neg, n);
 			case tau_parser::bf_eq_cb: return apply_equality_relation(_eq, n);
 			case tau_parser::bf_neq_cb: return apply_equality_relation(_neq, n);
 			case tau_parser::bf_is_one_cb: return apply_constant_check(_is_one, n);
@@ -1144,16 +1150,38 @@ struct callback_applier {
 	}
 
 private:
-	// speed up callbacks
-
-	// binary operations
-	static constexpr auto _and = [](const auto& l, const auto& r) { return l & r; };
-	static constexpr auto _or = [](const auto& l, const auto& r) { return l | r; };
-	static constexpr auto _xor = [](const auto& l, const auto& r) { return l ^ r; };
-	static constexpr auto _imply = [](const auto& l, const auto& r) { return ~l | r; };
-	static constexpr auto _equiv = [](const auto& l, const auto& r) { return _imply(l, r) & _imply(r, l); };
 	// unary operation
-	static constexpr auto _neg = [](const auto& l) { return ~l; };
+	static constexpr auto _neg = [](const auto& l) -> sp_tau_node<BAs...> {
+		auto res = ~l;
+		std::variant<BAs...> v(res);
+		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	};
+	// binary operations
+	static constexpr auto _and = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
+			auto res = l & r;
+			std::variant<BAs...> v(res);
+			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+	static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
+			auto res = l | r;
+			std::variant<BAs...> v(res);
+			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+	static constexpr auto _xor = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
+			auto res = l | r;
+			std::variant<BAs...> v(res);
+			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+	static constexpr auto _imply = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
+			auto res = ~l | r;
+			std::variant<BAs...> v(res);
+			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+	static constexpr auto _equiv = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
+			auto res = (~l | r) & (~r | l);
+			std::variant<BAs...> v(res);
+			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
 	// ternary operators
 	static constexpr auto _eq = [](const auto& l) -> bool { return l == false; };
 	static constexpr auto _neq = [](const auto& l) -> bool { return !(l == false); };
@@ -1306,12 +1334,12 @@ private:
 
 	sp_tau_node<BAs...> apply_binary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
 		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...> || ba_extractor<BAs...>;
-		return make_node<tau_sym<BAs...>>(std::visit(op, ba_elements[0], ba_elements[1]), {});
+		return std::visit(op, ba_elements[0], ba_elements[1]);
 	}
 
 	sp_tau_node<BAs...> apply_unary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
 		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...> || ba_extractor<BAs...>;
-		return make_node<tau_sym<BAs...>>(std::visit(op, ba_elements[0]), {});
+		return std::visit(op, ba_elements[0]);
 	}
 
 	sp_tau_node<BAs...> apply_equality_relation(const auto& op, const sp_tau_node<BAs...>& n) {

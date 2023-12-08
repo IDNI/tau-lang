@@ -21,65 +21,162 @@ using namespace idni::tau;
 namespace idni::tau {
 
 template<typename...BAs>
+using wff = sp_tau_node<BAs...>;
+
+// Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
+// the implementation of "Deducing this" on gcc.
+// See also (https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html)
+// and https://devblogs.microsoft.com/cppblog/cpp23-deducing-this/ for how to use
+// "Deducing this" on CRTP..
+
+template<typename...BAs>
+auto operator<=>(const tau_sym<BAs...>& l, const tau_sym<BAs...>& r) {
+	// TODO (HIGH) review return values when we have different types of tau_sym
+	return std::addressof(l)<=>std::addressof(r);
+	/*auto cmp = overloaded(*/
+		/*[](const tau_source_sym& l, const tau_source_sym& r) -> std::partial_ordering {*/
+		/*[](const tau_source_sym& l, const tau_source_sym& r) -> std::strong_ordering {
+			return l<=>r;*/
+			/*std::strong_ordering strong = l<=> r;
+			if (strong == std::strong_ordering::less) {
+				return std::partial_ordering::less;
+			} else if (strong == std::strong_ordering::equal) {
+				return std::partial_ordering::equivalent;
+			} else  {
+				return std::partial_ordering::greater;
+			}*/
+		/*}, [](const tau_source_sym&, const auto&) -> std::partial_ordering { return std::partial_ordering::greater; },*/
+		/*}, [](const tau_source_sym&, const auto&) -> std::strong_ordering { return std::strong_ordering::greater; },*/
+		/*[](const auto&, const tau_source_sym&) -> std::partial_ordering { return std::strong_ordering::less; },*/
+		/*[](const auto&, const tau_source_sym&) -> std::strong_ordering { return std::strong_ordering::less; },*/
+		/*[](const size_t& l, const size_t& r) -> std::partial_ordering {*/
+		/*[](const size_t& l, const size_t& r) -> std::strong_ordering {
+			return l<=>r;*/
+			/*std::strong_ordering strong = l<=> r;
+			if (strong == std::strong_ordering::less) {
+				return std::partial_ordering::less;
+			} else if (strong == std::strong_ordering::equal) {
+				return std::partial_ordering::equivalent;
+			} else  {
+				return std::partial_ordering::greater;
+			}*/
+		/*},*/
+		/*[](const size_t&, const auto&) -> std::partial_ordering { return std::partial_ordering::greater; },*/
+		/*[](const size_t&, const auto&) -> std::strong_ordering { return std::strong_ordering::greater; },*/
+		/*[](const auto&, const size_t&) -> std::partial_ordering { return std::partial_ordering::less; },*/
+		/*[](const auto&, const size_t&) -> std::strong_ordering { return std::strong_ordering::less; },*/
+		// we could allow unordered BAs by defining here the order of the BAs as follows
+		// []<typename T>(const T& l, const T& r) -> std::partial_ordering {
+		//		if ((l & ~r == false) | (l ^ ~r != false)) return std::partial_ordering::less;
+		//		if (l ^ r == false) return std::partial_ordering::equivalent;
+		//		if ((l & ~r != false) | (l ^ ~r == false)) return std::partial_ordering::greater;
+		//		return std::partial_ordering::unordered;
+		// otherwise, we need the following:
+		/*[]<typename T>(const T& l, const T& r) -> std::partial_ordering {*/
+		/*[]<typename T>(const T& l, const T& r) -> std::strong_ordering {
+			return std::addressof(l)<=>std::addressof(r);*/
+			//return l<=>r;
+		/*},*/
+		/*[](const auto&, const auto&) -> std::partial_ordering { return std::partial_ordering::unordered; }*/
+		/*[](const auto&, const auto&) -> std::partial_ordering { throw std::logic_error("bad type"); }
+	);
+	return std::visit(cmp, l, r);*/
+}
+
+template<typename...BAs>
 struct tau {
 
-	tau(const formula<BAs...>& f) : form(f) {}
+	tau(formula<tau<BAs...>, BAs...>& form) : form(form) {}
+	tau(wff<tau<BAs...>, BAs...>& main) : form(main) {}
+
+	auto operator<=>(const tau<BAs...>& other) {
+		return form <=> other.form;
+	}
+
+	bool operator==(const tau<BAs...>& other) const {
+		return form.main == other.form.main;
+	}
+
+	bool operator!=(const tau<BAs...>& other) const {
+		return form.main != other.form.main;
+	}
+
+	tau<BAs...> operator~() const {
+		auto nform = build_wff_neg<tau<BAs...>, BAs...>(form.main);
+		return tau<BAs...>(nform);
+	}
+
+	tau<BAs...> operator&(const tau<BAs...>& other) const {
+		auto nform = build_wff_and<tau<BAs...>, BAs...>(form.main, other.form.main);
+		return tau<BAs...>(nform);
+	}
+
+	tau<BAs...> operator|(const tau<BAs...>& other) const {
+		auto nform = build_wff_or<tau<BAs...>, BAs...>(form.main, other.form.main);
+		return tau<BAs...>(nform);
+	}
+
+	tau<BAs...> operator^(const tau<BAs...>& other) const {
+		auto nform = build_wff_xor<tau<BAs...>, BAs...>(form.main, other.form.main);
+		return tau<BAs...>(nform);
+	}
+
+	tau<BAs...> operator+(const tau<BAs...>& other) const {
+		auto nform = build_wff_xor<tau<BAs...>, BAs...>(form.main, other.form.main);
+		return tau<BAs...>(nform);
+	}
 
 	bool is_zero() const {
-		return (normalizer<BAs...>(form).main | tau_parser::wff_f).has_value();
+		auto normalized = normalizer<tau<BAs...>, BAs...>(form);
+		return (normalized.main | tau_parser::wff_f).has_value();
 	}
 
 	bool is_one() const {
-		return (normalizer<BAs...>(form).main | tau_parser::wff_t).has_value();
+		auto normalized = normalizer<tau<BAs...>, BAs...>(form);
+		return (normalized.main | tau_parser::wff_t).has_value();
 	}
 
-	tau<BAs...> operator<=>(const tau<BAs...>& that) {
-			if (auto cmp = form.main <=> that.main; cmp != 0) { return cmp; }
-			return std::lexicographical_compare_three_way(
-				form.rec_relations.begin(), form.rec_relations.end(),
-				that.form.rec_relations.begin(), that.form.rec_relations.end());
-	}
-
-	// TODO (HIGH) take into account rec. relations
-
-	tau<BAs...> operator&(const tau<BAs...>& that) {
-		return tau<BAs...>({{}, build_wff_and<BAs...>(form.main, that.form.main)});
-	}
-
-	tau<BAs...> operator|( const tau<BAs...>& that) {
-		return tau<BAs...>({{}, build_wff_or<BAs...>(form.main, that.form.main)});
-	}
-
-	tau<BAs...> operator^(const tau<BAs...>& that) {
-		return tau<BAs...>({{}, build_wff_xor<BAs...>(form.main, that.form.main)});
-	}
-
-	tau<BAs...> operator+(const tau<BAs...>& that) {
-		return tau<BAs...>({{}, build_wff_xor<BAs...>(form.main, that.form.main)});
-	}
-
-	tau<BAs...> operator~() {
-		return tau<BAs...>({{}, build_wff_not<BAs...>(form.main)});
-	}
-
-	// the formula to be executed
-	formula<BAs...> form;
+	formula<tau<BAs...>, BAs...> form;
 };
+
+template<typename...BAs>
+bool operator==(const bool& b, const tau<BAs...>& other) {
+	auto normalized = normalizer<tau<BAs...>, BAs...>(other.form);
+	auto is_one = (normalized.main | tau_parser::wff_t).has_value();
+	auto is_zero = (normalized.main | tau_parser::wff_f).has_value();
+	return b ? is_one : is_zero ;
+}
+
+template<typename...BAs>
+bool operator==(const tau<BAs...>& other, const bool& b) {
+	return other == b;
+}
+
+template<typename...BAs>
+bool operator!=(const tau<BAs...>& other, const bool& b) {
+	return !(other == b);
+}
+
+template<typename...BAs>
+bool operator!=(const bool& b, const tau<BAs...>& other) {
+	return !(other == b);
+}
 
 template<typename base_factory_t, typename...BAs>
 struct tau_factory {
 
 	tau_factory(base_factory_t& bf) : bf(bf) {}
 
-	sp_tau_node<tau<BAs...>> build(const std::string type_name, const sp_tau_node<tau<BAs...>>& n) {
+	sp_tau_node<tau<BAs...>, BAs...> build(const std::string type_name, const sp_tau_node<tau<BAs...>, BAs...>& n) {
 		if (auto nn = bf.build(type_name, n); nn != n) return nn;
 		std::string var = make_string_with_skip<
-				tau_node_terminal_extractor_t<tau<BAs...>>,
-				not_whitespace_predicate_t<tau<BAs...>>,
-				sp_tau_node<tau<BAs...>>>(
-			tau_node_terminal_extractor<tau<BAs...>>,
-			not_whitespace_predicate<tau<BAs...>>, n);
-		return make_formula_using_factory<tau_factory<BAs...>, tau<BAs...>>(var, *this);
+				tau_node_terminal_extractor_t<tau<BAs...>, BAs...>,
+				not_whitespace_predicate_t<tau<BAs...>, BAs...>,
+				sp_tau_node<tau<BAs...>, BAs...>>(
+			tau_node_terminal_extractor<tau<BAs...>, BAs...>,
+			not_whitespace_predicate<tau<BAs...>, BAs...>, n);
+		factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...> fb(*this);
+		return make_formula_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...>, tau<BAs...>, BAs...>(var, fb).main;
 	}
 
 	base_factory_t& bf;
