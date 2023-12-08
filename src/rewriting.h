@@ -45,6 +45,7 @@ struct node {
 	// equality operators and ordering
 	bool operator==(const node& that) const = default;
 	bool operator!=(const node& that) const = default;
+
 	auto operator <=> (const node& that) const noexcept {
 		if (auto cmp = value <=> that.value; cmp != 0) { return cmp; }
 		return std::lexicographical_compare_three_way(
