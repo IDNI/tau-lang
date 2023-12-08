@@ -11,8 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#ifndef __TEST_INTEGRATION_HELPERS_H__
-#define __TEST_INTEGRATION_HELPERS_H__
+#ifndef __TEST_INTEGRATION_HELPERS_BDD_H__
+#define __TEST_INTEGRATION_HELPERS_BDD_H__
 
 #include "../src/formula.h"
 #include "../src/babdd.h"
@@ -73,4 +73,4 @@ std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n
 	return os;
 }
 
-#endif // __TEST_INTEGRATION_HELPERS_H__
+#endif // __TEST_INTEGRATION_HELPERS_BDD_H__
