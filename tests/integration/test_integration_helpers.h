@@ -16,13 +16,11 @@
 
 #include "../src/formula.h"
 #include "../src/babdd.h"
-#include "../src/tau.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
 
 using bdd_test = hbdd<Bool>;
-using tau_bdd_test = tau<bdd_test>;
 
 struct bdd_test_factory {
 
@@ -46,10 +44,6 @@ struct bdd_test_factory {
 
 using bdd_test_factory_t = bdd_test_factory;
 
-template<class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n, size_t l = 0) {
 	os << "{";

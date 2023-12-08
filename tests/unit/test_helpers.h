@@ -58,12 +58,6 @@ sp_tau_node<Bool> make_factory_bindings(const sp_tau_node<Bool>& statement, fact
 		binder, all<sp_tau_node<Bool>>)(statement);
 }
 
-// helper types for visitor
-template<class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
-
 std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<Bool> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
