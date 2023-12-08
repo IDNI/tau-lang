@@ -35,6 +35,7 @@ namespace testing = doctest;
 // The idea is speed up test execution allowing parallel execution of tests.
 // Each test suite must go into different files named test_integration-1.cpp,...
 
+// TODO (MEDIUM) simplify this test cases extracting common logic to the helpers file
 
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 

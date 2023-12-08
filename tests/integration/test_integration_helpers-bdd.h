@@ -26,12 +26,13 @@ struct bdd_test_factory {
 
 	sp_tau_node<bdd_test> build(const std::string type_name, const sp_tau_node<bdd_test>& n) {
 		if (type_name != "bdd") return n;
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<bdd_test>>;
 		std::string var = make_string_with_skip<
 			tau_node_terminal_extractor_t<bdd_test>,
 			not_whitespace_predicate_t<bdd_test>,
 			sp_tau_node<bdd_test>>(
 				tau_node_terminal_extractor<bdd_test>,
-				not_whitespace_predicate<bdd_test>, n);
+				not_whitespace_predicate<bdd_test>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		auto ref = bdd<Bool>::bit(index++);
 		auto nn =  make_node<tau_sym<bdd_test>>(bdd_handle<Bool>::get(ref), {});
