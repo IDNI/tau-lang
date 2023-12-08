@@ -11,6 +11,9 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
+#ifndef __TAU_H__
+#define __TAU_H__
+
 #include <iostream>
 
 #include "normalizer2.h"
@@ -140,15 +143,16 @@ struct tau {
 };
 
 template<typename...BAs>
-bool operator==(const bool& b, const tau<BAs...>& other) {
-	auto normalized = normalizer<tau<BAs...>, BAs...>(other.form);
+bool operator==(const tau<BAs...>& other, const bool& b) {
+	auto nother = other;
+	auto normalized = normalizer<tau<BAs...>, BAs...>(nother.form);
 	auto is_one = (normalized.main | tau_parser::wff_t).has_value();
 	auto is_zero = (normalized.main | tau_parser::wff_f).has_value();
 	return b ? is_one : is_zero ;
 }
 
 template<typename...BAs>
-bool operator==(const tau<BAs...>& other, const bool& b) {
+bool operator==(const bool& b, const tau<BAs...>& other) {
 	return other == b;
 }
 
@@ -169,14 +173,12 @@ struct tau_factory {
 
 	sp_tau_node<tau<BAs...>, BAs...> build(const std::string type_name, const sp_tau_node<tau<BAs...>, BAs...>& n) {
 		if (auto nn = bf.build(type_name, n); nn != n) return nn;
-		std::string var = make_string_with_skip<
-				tau_node_terminal_extractor_t<tau<BAs...>, BAs...>,
-				not_whitespace_predicate_t<tau<BAs...>, BAs...>,
-				sp_tau_node<tau<BAs...>, BAs...>>(
-			tau_node_terminal_extractor<tau<BAs...>, BAs...>,
-			not_whitespace_predicate<tau<BAs...>, BAs...>, n);
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<tau<BAs...>, BAs...>>;
+		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau<BAs...>, BAs...>, source);
 		factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...> fb(*this);
-		return make_formula_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...>, tau<BAs...>, BAs...>(var, fb).main;
+		auto form = make_formula_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...>, tau<BAs...>, BAs...>(var, fb).main;
+		tau<BAs...> t(form);
+		return make_node<tau_sym<tau<BAs...>, BAs...>>(t, {});
 	}
 
 	base_factory_t& bf;
@@ -200,3 +202,5 @@ ostream& operator<<(ostream& os, const formula<tau<BAs...>>& t) {
 }
 
 } // namespace idni::tau
+
+#endif // __TAU_H__
