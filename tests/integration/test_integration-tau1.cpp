@@ -92,6 +92,7 @@ TEST_SUITE("formulas: two level rec, no variables, no bindings and no quantifier
 		CHECK( check.has_value() );
 	}
 
+	// TODO (HIGH) fix this test
 	// Ohad's example
 	/*TEST_CASE("ex X ( { : (X = { : Y = 0. }). } = 0).") {
 		const char* sample = "ex X ( { : ( X = { : (Y = 0).}). } = 0).";

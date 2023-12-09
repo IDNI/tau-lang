@@ -592,10 +592,15 @@ using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate
 
 template<typename... BAs>
 formula<BAs...> apply_definitions(formula<BAs...>& form) {
-	auto nmain = tau_apply_if(apply_defs<BAs...>, form.main);
-	return { form.rec_relations, nmain };
+	auto nmain = tau_apply_if(apply_defs_once<BAs...>, form.main, is_not_eq_or_neq_to_zero_predicate<BAs...>);
+	rules<BAs...> nrec_relations;
+	for (const auto& r : form.rec_relations) {
+		nrec_relations.emplace_back(r.first, tau_apply_if(apply_defs_once<BAs...>, r.second, is_not_eq_or_neq_to_zero_predicate<BAs...>));
+	}
+	return formula<BAs...>{ nrec_relations, nmain };
 }
 
+// REVIEW (HIGH) review overall execution
 template <typename... BAs>
 formula<BAs...> normalizer(formula<BAs...>& form) {
 	// IDEA extract this to an operator| overload
@@ -606,15 +611,7 @@ formula<BAs...> normalizer(formula<BAs...>& form) {
 	std::cout << "(F): " << form.main << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
-	// TODO (HIGH) this should be done in a different method and only if needed
-	//
-	// actually in the above apply_definitions method
-	auto nmain = tau_apply_if(apply_defs_once<BAs...>, form.main, is_not_eq_or_neq_to_zero_predicate<BAs...>);
-	rules<BAs...> nrec_relations;
-	for (const auto& r : form.rec_relations) {
-		nrec_relations.emplace_back(r.first, tau_apply_if(apply_defs_once<BAs...>, r.second, is_not_eq_or_neq_to_zero_predicate<BAs...>));
-	}
-	formula<BAs...> nform{ nrec_relations, nmain };
+	auto nform = apply_definitions(form);
 
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << "(I): -- Begin normalizer" << std::endl;
