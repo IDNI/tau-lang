@@ -31,12 +31,7 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TODO (MEDIUM) this tests should be splitted into 4 different files
-//
-// The idea is speed up test execution allowing parallel execution of tests.
-// Each test suite must go into different files named test_integration-1.cpp,...
-
-TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
+TEST_SUITE("formulas: one level rec, no variables, no bindings and no quantifiers") {
 
 	TEST_CASE("{ : F. } = 0") {
 		const char* sample = "( { : F. } = 0 ).";
@@ -65,14 +60,43 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		auto check = normalized.main | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
-
-	
 }
 
-TEST_SUITE("formulas: variables, bindings and quantifiers") {
-	// TODO (HIGH) look for big formulas
-}
+TEST_SUITE("formulas: two level rec, no variables, no bindings and no quantifiers") {
 
-TEST_SUITE("formulas: recurrence relations") {
-	// TODO (HIGH) add tests for recurrence relations
+	TEST_CASE("( { : ({ : F.} = 0). } = 0 ).") {
+		const char* sample = "( { : ({ : F.} = 0). } = 0 ).";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized.main | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("({ : ({ : T.} = 0). } = 0).") {
+		const char* sample = "({ : ({ : T.} = 0). } = 0).";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized.main | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("({ : ({ : F.} = 0). } != 0).") {
+		const char* sample = "({ : ({ : F.} = 0). } != 0).";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized.main | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("( { : ({ : T.} = 0). } != 0 ).") {
+		const char* sample = "( { : ({ : T.} = 0). } != 0 ).";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized.main | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	// Ohad's example
+	/*TEST_CASE("ex X ( { : (X = { : Y = 0. }). } = 0).") {
+		const char* sample = "ex X ( { : ( X = { : (Y = 0).}). } = 0).";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized.main | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}*/
 }

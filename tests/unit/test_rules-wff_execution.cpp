@@ -501,7 +501,6 @@ TEST_SUITE("executing wff rules") {
 	}
 
 	TEST_CASE("WFF_REMOVE_EX_0") {
-		// TODO (MEDIUM) add a more complex test case for this rule
 		auto src_rule = make_tau_source(WFF_REMOVE_EX_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -542,7 +541,3 @@ TEST_SUITE("executing wff rules") {
 		CHECK( check.has_value() );
 	}
 }
-
-// TODO (MEDIUM) writes tests for simple recursive relations
-// The tests should range from simple direct substitutions to more complex
-// substitutions (involving multiple variables and indexes).

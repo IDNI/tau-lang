@@ -530,6 +530,6 @@ TEST_SUITE("parsing wff rules") {
 	}
 }
 
-// TODO (MEDIUM) writes tests for simple recursive relations
+// TODO (HIGH) writes tests for simple recursive relations
 // The tests should range from simple direct substitutions to more complex
 // substitutions (involving multiple variables and indexes).

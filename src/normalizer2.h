@@ -119,7 +119,6 @@ RULE(BF_TRIVIALITY_0, "( 0 = 0 ) := T.")
 RULE(BF_TRIVIALITY_1, "( 1 = 0 ) :=  F.")
 RULE(BF_TRIVIALITY_2, "( 0 != 0 ) := F.")
 RULE(BF_TRIVIALITY_3, "( 1 != 0 ) := T.")
-// TODO (HIGH) add rules for <, <= and >
 
 RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != 0) && (($Y = 0) && ($Z != 0))) := (($Y = 0) && (($X != 0) && ($Z != 0))).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != 0) && (($Y != 0) && ($Z = 0))) := (($Z = 0) && (($X != 0) && ($Y != 0))).")
@@ -129,7 +128,7 @@ RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != 0) && ( $Y = 0)) := (($Y = 0) && ($
 RULE(BF_SQUEEZE_POSITIVES_0, "(( $X = 0 ) && ($Y = 0)) := (( $X | $Y ) = 0).")
 RULE(WFF_REMOVE_EX_0, "ex $X $Y := wff_remove_existential_cb $X $Y.")
 
-// TODO (MEDIUM) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
+// TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
 // bf
 template<typename... BAs>
@@ -534,12 +533,6 @@ formula<BAs...> normalizer_step(formula<BAs...>& form, int stp = 0) {
 	return { form.rec_relations, nmain };
 }
 
-// REVIEW could we assume we are working with the product algebra?
-
-// this should be used in conjuction with std::set. it must provide
-// a strict weak ordering in such a way that equivalent formulas are
-// considered equal.
-
 // executes the normalizer on the given source code taking into account the
 // bindings provided.
 template<typename... BAs>
@@ -557,7 +550,6 @@ formula<BAs...> normalizer(std::string& source, factory_t& factory) {
 	auto form = make_formula_using_factory(form_source, factory);
 	return normalizer(form);
 }
-
 
 template <typename... BAs>
 struct is_equivalent_predicate {
@@ -615,6 +607,8 @@ formula<BAs...> normalizer(formula<BAs...>& form) {
 	#endif // OUTPUT_APPLY_RULES
 
 	// TODO (HIGH) this should be done in a different method and only if needed
+	//
+	// actually in the above apply_definitions method
 	auto nmain = tau_apply_if(apply_defs_once<BAs...>, form.main, is_not_eq_or_neq_to_zero_predicate<BAs...>);
 	rules<BAs...> nrec_relations;
 	for (const auto& r : form.rec_relations) {

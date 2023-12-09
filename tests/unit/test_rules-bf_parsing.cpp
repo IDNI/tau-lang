@@ -25,11 +25,6 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TODO (MEDIUM) this tests should be splitted into 4 different files
-//
-// The idea is speed up test execution allowing parallel execution of tests.
-// Each test suite must go into different files named test_rules-parsing-bf.cpp,...
-
 TEST_SUITE("parsing bf rules") {
 
 	TEST_CASE("BF_SIMPLIFY_ONE_0") {
