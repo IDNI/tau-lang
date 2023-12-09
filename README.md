@@ -4,6 +4,8 @@
 
 To compile the source code you need a recent C++ compiler, say GCC 13.1.0 compiler suite, as the source code use recent features introduced inC++23 standard. You also need at least a cmake version 3.22.1 installed in your system. No extra libraries are required to compile the source code.
 
+## Basic compilation
+
 The first step to compile the code is to clone the repository:
 
 ```bash
@@ -24,6 +26,15 @@ We also provide scripts to execute the tests suite so you could check that every
 ```bash
 ./test_release.sh # Runs the tests in release mode
 ./test_debug.sh # Runs the tests in debug mode
+```
+
+## Additional options
+
+If you want to produce the documentation of the source code you need to install the `doxygen` tool. After that, you could run the `release.sh` or `debug.sh`script as follows to produce the documentation of the source code:
+
+```bash
+./release.sh -DBUILD_DOC=ON # Compiles the source code in release mode and also the documentation
+./debug.sh -DBUILD_DOC=ON # Compiles the source code in debug mode and also the documentation
 ```
 
 # Running TAU programs
