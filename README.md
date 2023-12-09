@@ -76,13 +76,28 @@ wff -> (wff "&" wff) | "!" wff | (wff "^" wff) | (wff "|" wff) | (wff "->" wff)
 ```
 
 where `wff` stands for a sub-well formed formula, `wff_ref` stands for a reference to a well formed formula (see recursive relations Section), `T` stands for the true constant and `F` stands for the false constant. As usual, the operators `&`, `!`, `^`,  `|`, `->`,
-`<->` and `?` stands for conjunction, negation, exclusive-or, disjunction, implication, equivalence and conditional respectively.
+`<->` and `?` stands for conjunction, negation, exclusive-or, disjunction, implication, equivalence and conditional (in the usual sense) respectively.
 
 Also, `all` stands for the universal quantifier and `ex` for the existential one, whereas `=` stands for equality, `!=` for disequality, `<` for less than, `<=` for less or equal than, `>` for greater than (all of them in one of the underlying boolean algebras) and `T` for true and `F` for false.
 
 ## Recursive relations
 
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+Recursive ralations are introduced to simplify the writing of boolean functions and well formed formulas. They are given by the following grammar:
+
+```
+bf_rec_relation -> bf_ref ":=" bf.
+bf_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
+```
+
+and in the case of well-formed formulas, the grammar is:
+
+```
+wff_rec_relation -> wff_ref ":=" wff.
+wff_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
+```
+
+where `bf_rec_relation` stands for a boolean function recursive relation, `bf_ref` stands for a reference to a boolean function (see boolean functions Section), `wff_rec_relation` stands for a well formed formula recursive relation, `wff_ref` stands for a reference to a well formed formula (see well formed formulas Section), `sym` stands for a symbol, `offset` stands for an offset and `capture` stands for a capture/variable.
+
 
 ## TAU programs
 
