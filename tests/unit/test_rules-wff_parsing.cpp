@@ -529,7 +529,3 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 }
-
-// TODO (HIGH) writes tests for recursive relations
-// The tests should range from simple direct substitutions to more complex
-// substitutions (involving multiple variables and indexes).
