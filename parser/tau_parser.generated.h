@@ -71,7 +71,6 @@
 // variable		=> var | timed.
 // timed			=> (in | out)  offsets.
 //
-// # TODO (HIGH) remove ? from vars
 // capture			=> '$' chars.
 // var				=> chars.
 // in				=> "?i_" chars. # instead of '<', easy to remember
@@ -99,15 +98,13 @@
 // wff_imply		=> open_parenthesis wff wff_imply_sym wff close_parenthesis.
 // wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
 // wff_all			=> wff_all_sym (variable|capture) ws_required wff.
-// wff_ex			=> wff_ex_sym (variable|capture) ws_required wff.
+// wff_ex			=> wff_ex_sym ws_required (variable|capture) ws_required wff.
 //
 // # relational operators
 // #
 // # they are named bf_* as they involve boolean functions,
 // # but they are not boolean functions themselves, they return a T/F wff value
 // # and hence, should be considered as wffs
-// bf_eq 			=> open_parenthesis bf bf_equality_sym bf close_parenthesis.
-// bf_neq 			=> open_parenthesis bf bf_nequality_sym bf close_parenthesis.
 // bf_eq 			=> open_parenthesis bf bf_equality_sym bf close_parenthesis.
 // bf_neq 			=> open_parenthesis bf bf_nequality_sym bf close_parenthesis.
 // bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
@@ -137,7 +134,6 @@
 // 				| bf_has_subformula_cb.
 // bf			=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
 // 				| bf_all | bf_ex
-// 				# TODO (LOW) check proper use of bf_subs_cb in code
 // 				#
 // 				# we should have a check method that verifies that the user
 // 				# is not uising subs in its code.
@@ -194,7 +190,7 @@
 // # 3.- to create new subformulas in other rules, for instance, to create a
 // # new formula that is the substitution of a variable by a constant.
 //
-// # TODO (HIGH) Earley parser doesn't support tabs in comments
+// # TODO (HIGH) earley parser doesn't support tabs in comments
 //
 // bf_and_cb			=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
 // bf_or_cb			=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
@@ -238,6 +234,8 @@
 //
 // # input definition
 // input			=> in colon open_brace source_binding close_brace.
+//
+// # TODO (HIGH) split rules in rules and rec. relations
 //
 // # main posibilities
 // inputs			=> less input (input)* dot.
@@ -501,9 +499,7 @@ private:
 		q(nt(81), (nt(99)+nt(100)+nt(12)+nt(66)));
 		q(nt(102), (nt(55)));
 		q(nt(102), (nt(57)));
-		q(nt(82), (nt(101)+nt(102)+nt(12)+nt(66)));
-		q(nt(87), (nt(38)+nt(103)+nt(104)+nt(103)+nt(39)));
-		q(nt(88), (nt(38)+nt(103)+nt(105)+nt(103)+nt(39)));
+		q(nt(82), (nt(101)+nt(12)+nt(102)+nt(12)+nt(66)));
 		q(nt(87), (nt(38)+nt(103)+nt(104)+nt(103)+nt(39)));
 		q(nt(88), (nt(38)+nt(103)+nt(105)+nt(103)+nt(39)));
 		q(nt(89), (nt(38)+nt(103)+nt(106)+nt(103)+nt(39)));
