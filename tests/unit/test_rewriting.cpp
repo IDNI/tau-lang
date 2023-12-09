@@ -133,9 +133,6 @@ TEST_SUITE("make_node") {
 	}
 }
 
-// TODO (LOW) maybe add tests for all predicate, not really necessary though.
-// TODO (LOW) maybe add tests for identity transformer, not really necessary though.
-
 TEST_SUITE("post_order_traverser") {
 
 	template <typename node_t>
@@ -223,7 +220,7 @@ TEST_SUITE("map_transformer") {
 	}
 }
 
-// TODO (LOW) add tests for replace_node_transformer
+// TODO (LOW) write tests for replace_node_transformer
 
 TEST_SUITE("replace_transformer") {
 
@@ -259,7 +256,7 @@ TEST_SUITE("replace_transformer") {
 		auto result = post_order_traverser<decltype(replace), decltype(all<sp_node<char>>), sp_node<char>>(replace , all<sp_node<char>>)(root);
 		CHECK( result == expected );
 	}
-	// TODO (LOW) add the tests corresponding to related functions
+	// TODO (LOW) write tests corresponding to related functions
 }
 
 TEST_SUITE("select_top_predicate") {
@@ -333,7 +330,7 @@ TEST_SUITE("select_top_predicate") {
 		CHECK( selected == expected );
 	}
 
-	// TODO (LOW) add the tests corresponding to related functions
+	// TODO (LOW) write tests corresponding to related functions
 }
 
 TEST_SUITE("select_all_predicate") {
@@ -464,7 +461,7 @@ TEST_SUITE("find_top_predicate") {
 	}
 }
 
-// TODO (LOW) add tests for replace
+// TODO (LOW) write tests for replace
 
 TEST_SUITE("logical predicates") {
 

@@ -201,7 +201,11 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 }
 
 TEST_SUITE("formulas: variables, no bindings and no quantifiers") {
-	// TODO (MEDIUM) add tests for variables
+	// TODO (LOW) write tests for variables
+	//
+	// This task is tagged as LOW because it is extensively tested inderectly in
+	// other unit/integration tests. However, it is better to have explicit tests
+	// for it.
 }
 
 TEST_SUITE("formulas: no variables, bindings and no quantifiers") {

@@ -36,16 +36,27 @@ TEST_SUITE("make_library") {
 	}
 }
 
-// TODO (LOW) add more unit tests for make_library
-// TODO (LOW) write tests to check make_rule
-// TODO (LOW) write tests to check make_tau_source
-// TODO (LOW) write tests to check make_tau_code
-// TODO (LOW) write tests to check make_builder
-// TODO (LOW) write tests for make_formula_using_factory
-// TODO (LOW) write tests for make_formula_using_bindings
-// TODO (LOW) write tests for make_tau_source
-// TODO (LOW) write tests for tau_apply
-// TODO (LOW) write tests for tau_apply_builder
+// TODO (VERY_LOW) write more unit tests for make_library
+// TODO (VERY_LOW) write tests to check make_rule
+// TODO (VERY_LOW) write tests to check make_tau_source
+// TODO (VERY_LOW) write tests to check make_tau_code
+// TODO (VERY_LOW) write tests to check make_builder
+// TODO (VERY_LOW) write tests for make_formula_using_factory
+// TODO (VERY_LOW) write tests for make_formula_using_bindings
+// TODO (VERY_LOW) write tests for make_tau_source
+// TODO (VERY_LOW) write tests for tau_apply
+// TODO (VERY_LOW) write tests for tau_apply_builder
+//
+// They are tagged as VERY_LOW because they are extensively tested inderectly in
+// other unit/integration tests. However, it is better to have explicit tests
+// for each of them.
+
+// TODO (VERY_LOW) write tests for operator<<(ostream, sp_tau_node<...>)
+// TODO (VERY_LOW) write tests for operator<<(ostream, sp_tau_source_node)
+//
+// They are tagged as VERY_LOW because they should be remove once we have a proper
+// UI and I/O api.
+
 // TODO (LOW) write tests for is_non_terminal
 // TODO (LOW) write tests for is_terminal
 // TODO (LOW) write tests for value_extractor
@@ -55,12 +66,9 @@ TEST_SUITE("make_library") {
 // TODO (LOW) write tests for stringify
 // TODO (LOW) write tests for make_string_with_skip
 // TODO (LOW) write tests for make_string
-// TODO (LOW) write tests for operator<<(ostream, sp_tau_node<...>)
-// TODO (LOW) write tests for operator<<(ostream, sp_tau_source_node)
 //
 // All of them are extensively tested inderectly in other unit/integration tests.
-// However, it is better to have explicit tests
-
+// However, it is better to have explicit tests for each of them.
 
 TEST_SUITE("callbacks") {
 
@@ -78,16 +86,21 @@ TEST_SUITE("callbacks") {
 		CHECK( is_non_terminal<Bool>(tau_parser::bf_t, result) );
 	}
 
-	// TODO (MEDIUM) add execution bf_less_cb test
-	// TODO (MEDIUM) add execution bf_less_equal_cb test
-	// TODO (MEDIUM) add execution bf_greater_cb test
-	// TODO (MEDIUM) add execution bf_eq_cb test
-	// TODO (MEDIUM) add execution bf_neq_cb test
-	// TODO (MEDIUM) add execution bf_is_zero_cb test
-	// TODO (MEDIUM) add execution bf_is_one_cb test
-	// TODO (MEDIUM) add execution bf_has_clashing_subformulas_cb test
-	// TODO (MEDIUM) add execution bf_has_subformula_cb test
-	// TODO (MEDIUM) add execution wff_has_clashing_subformulas_cb test
-	// TODO (MEDIUM) add execution wff_has_subformula_cb test
+	// TODO (MEDIUM) write tests for execution bf_less_cb
+	// TODO (MEDIUM) write tests for execution bf_less_equal_cb
+	// TODO (MEDIUM) write tests for execution bf_greater_cb
+	// TODO (MEDIUM) write tests for execution bf_eq_cb
+	// TODO (MEDIUM) write tests for execution bf_neq_cb
+	// TODO (MEDIUM) write tests for execution bf_is_zero_cb
+	// TODO (MEDIUM) write tests for execution bf_is_one_cb
+	// TODO (MEDIUM) write tests for execution bf_has_clashing_subformulas_cb
+	// TODO (MEDIUM) write tests for execution bf_has_subformula_cb
+	// TODO (MEDIUM) write tests for execution wff_has_clashing_subformulas_cb
+	// TODO (MEDIUM) write tests for execution wff_has_subformula_cb
+	//
+	// Callbacks are a crucial part of the execution of the normalizer and should
+	// be tested properly. However, they are extensively tested inderectly in
+	// other unit/integration tests. However, it is better to have explicit tests
+	// for each of them.
 
 }
