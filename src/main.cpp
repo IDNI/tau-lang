@@ -23,32 +23,46 @@ using namespace idni::tau;
 // We could use TODO, DOING, IDEA, FIXME, REVIEW, DOCUMENTATION and MARK. Also,
 // we could give a priority to each task by adding HIGH, LOW or MEDIUM between
 // parenthesis.
+//
+// We use the subtags as follows:
+// - (IMPORTANT) for main tasks of the project,
+// - (HIGH) for tasks that should be done asap as they are important missing
+//   functionallity or important improvements,
+// - (MEDIUM) for tasks that should be done soon as they are but they are not
+//   missing functionallity or important improvements, mostly related to code
+//   quality and testing,
+// - (LOW) for tasks that should be done at some point but they are not
+//   important, mostly related to code quality and testing but not as important as
+//   MEDIUM tasks,
+// - (VERY LOW) for tasks that should be done at some point but they are not
+//   important, mostly related to code quality and testing but not as important as
+//   LOW tasks,
 
 //
 // Global tasks
 //
 
-// TODO (HIGH) normalizer
+// TODO (IMPORTANT) normalizer
 
-// TODO (HIGH) satisfability
+// TODO (IMPORTANT) satisfability
 
-// TODO (HIGH) execution
+// TODO (IMPORTANT) execution
 
-// TODO (HIGH) basic UI and I/O api
+// TODO (IMPORTANT) basic UI and I/O api
 
-// TODO (MEDIUM) basic documentation
+// TODO (IMPORTANT) basic documentation
 
-// TODO (HIGH) error and runtime error handling
+// TODO (IMPORTANT) error and runtime error handling
 
-// TODO (HIGH) basic logics (implementation, splitter,...)
-// TODO (HIGH) propositional logic
-// TODO (HIGH) tau BA
+// TODO (IMPORTANT) basic logics (implementation, splitter,...)
+// TODO (IMPORTANT) propositional logic
+// TODO (IMPORTANT) tau BA
 
-// TODO (HIGH) semantic checks
+// TODO (IMPORTANT) semantic checks
 
-// TODO (MEDIUM) cryptographic support
+// TODO (IMPORTANT) cryptographic support
 
-// TODO (MEDIUM) finite boolean algebras and arithmetic
+// TODO (IMPORTANT) finite boolean algebras and arithmetic
 // - Check SMT coompetition (best seems to be CVC5)
 // - SMT-Lib format allow us to interact with several solvers, using the best
 //   one for each task.
@@ -57,7 +71,7 @@ using namespace idni::tau;
 //
 // Further info in https://en.wikipedia.org/wiki/Satisfiability_modulo_theories#Standardization_and_the_SMT-COMP_solver_competition
 
-// TODO (MEDIUM) blockchain support
+// TODO (IMPORTANT) blockchain support
 // - acceptance conditions
 // - selfamending network
 // - user consensus
@@ -73,7 +87,7 @@ using namespace idni::tau;
 
 // TODO (LOW) split code into h/cpp files
 
-// TODO (LOW) final features should be cotrolled by a command line flag
+// TODO (MEDIUM) final features should be cotrolled by a command line flag
 //
 // toggles for debugging, comment properly to enable/disable each feature/debug helper.
 
@@ -84,7 +98,7 @@ using namespace idni::tau;
 // Just convert the current comments into proper doxygen description.
 
 int main(int /*argc*/, char** /*argv*/) {
-	// TODO (LOW) tau main method, parse command line arguments, read input file,...
+	// TODO (MEDIUM) tau main method, parse command line arguments, read input file,...
 	// normalize, print output, etc.
 	return 0;
 }
