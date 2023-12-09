@@ -152,8 +152,7 @@ struct tau {
 template<typename...BAs>
 bool operator==(const tau<BAs...>& other, const bool& b) {
 	// TODO (HIGH) review const modifier in normalizer methods
-	auto nother = other;
-	auto normalized = normalizer<tau<BAs...>, BAs...>(nother.form);
+	auto normalized = normalizer<tau<BAs...>, BAs...>(other.form);
 	auto is_one = (normalized.main | tau_parser::wff_t).has_value();
 	auto is_zero = (normalized.main | tau_parser::wff_f).has_value();
 	return b ? is_one : is_zero ;
