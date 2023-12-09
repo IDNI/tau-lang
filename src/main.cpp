@@ -38,9 +38,13 @@ using namespace idni::tau;
 
 // TODO (MEDIUM) basic documentation
 
+// TODO (HIGH) error and runtime error handling
+
 // TODO (HIGH) basic logics (implementation, splitter,...)
 // TODO (HIGH) propositional logic
 // TODO (HIGH) tau BA
+
+// TODO (HIGH) semantic checks
 
 // TODO (MEDIUM) cryptographic support
 
@@ -62,15 +66,10 @@ using namespace idni::tau;
 // General tasks that are not related to any specific file.
 //
 
-// TODO (IMPORTANT) check that the rule is well formed an raise an error otherwise
-
-// TODO (IMPORTANT) deal with runtime errors in the code.
 
 // TODO (MEDIUM) declare a static const lambda instead of a predicates if possible
 
 // TODO (MEDIUM) declare a static const lambda instead of stateless struct possible
-
-// TODO (IMPORTANT) deal with errors once we have a clear strategy
 
 // TODO (LOW) split code into h/cpp files
 

@@ -436,7 +436,7 @@ static const auto only_child_extractor = [](const sp_tau_node<BAs...>& n) -> std
 template<typename... BAs>
 using only_child_extractor_t = decltype(only_child_extractor<BAs...>);
 
-// TODO (HIGH) merge both implementations using a new template parameter
+// TODO (LOW) merge both implementations using a new template parameter
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const only_child_extractor_t<BAs...> e) {
 	std::vector<sp_tau_node<BAs...>> nv;
@@ -1453,20 +1453,11 @@ sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>
 // operators << to pretty print the tau language related types
 //
 
-// TODO (HIGH) << for tau_source_sym
-// TODO (HIGH) << for tau_source_node
-// TODO (HIGH) << for sp_tau_source_node
-// TODO (HIGH) << for tau_sym
-// TODO (HIGH) << for sp_tau_node
-// TODO (HIGH) << for tau_rule
-// TODO (HIGH) << for rule
-// TODO (HIGH) << for rules
-// TODO (HIGH) << for statement
-// TODO (HIGH) << for library
-// TODO (HIGH) << for bindings
-// TODO (HIGH) << for formulas
-
-
+// TODO (HIGH) << for basic types
+//
+// For example: tau_source_sym, tau_source_node,  sp_tau_source_node, tau_sym,
+// sp_tau_node, tau_rule, rule,, rules, statement,, library,, bindings,
+// formulas,...
 
 // outputs a sp_tau_node<...> to a stream, using the stringify transformer
 // and assumes that the constants also override operator<<.
