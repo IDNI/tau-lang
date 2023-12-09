@@ -598,8 +598,8 @@ template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
 template<typename... BAs>
-wff<BAs...> apply_definitions(const wff<BAs...>& form) {
-	return tau_apply_if(apply_defs_once<BAs...>, form.main, is_not_eq_or_neq_to_zero_predicate<BAs...>);
+sp_tau_node<BAs...> apply_definitions(const sp_tau_node<BAs...>& form) {
+	return tau_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
 }
 
 template<typename... BAs>
