@@ -72,19 +72,20 @@ in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
 
 # wff
-wff_rule		=> wff_matcher definition wff_body dot.
+wff_rule			=> wff_matcher definition wff_body dot.
+wff_rec_relation	=> wff_ref definition wff dot.
 
-# needed for rule CBF_DEF_IF
 wff_matcher	=> wff | wff_ref.
 wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 				| wff_has_subformula_cb | wff_remove_existential.
-wff_ref			=> sym offsets wff_ref_args.
-wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 
+# TODO (MEDIUM) check programatically that no capture is use in a rec_relation as wff
 wff 			=> wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
 					| wff_t | wff_f | capture
 					| bf_eq | bf_neq | bf_less | bf_less_equal | bf_greater.
+wff_ref			=> sym offsets wff_ref_args.
+wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
@@ -120,19 +121,19 @@ wff_t				=> ws 'T' ws.
 wff_f				=> ws 'F' ws.
 
 # bf
-bf_ref 		=> sym offsets bf_ref_args.
-bf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 bf_rule		=> bf_matcher definition bf_body dot.
+bf_rec_relation	=> bf_ref definition bf dot.
 
 bf_matcher	=> bf.
 bf_body 	=> bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
 				| bf_has_subformula_cb.
-bf			=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
+
+# TODO (MEDIUM) remove bf_subs_cb and add a callback to eliminate fall and fex
+bf			=> bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_or
 				| bf_all | bf_ex
-				#
-				# we should have a check method that verifies that the user
-				# is not uising subs in its code.
 				| bf_subs_cb | bf_t | bf_f | variable | capture.
+bf_ref 		=> sym offsets bf_ref_args.
+bf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
 bf_and		=> open_parenthesis bf bf_and_sym bf close_parenthesis.
 bf_or		=> open_parenthesis bf bf_or_sym bf close_parenthesis.
 bf_xor		=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
@@ -186,6 +187,8 @@ source			=> (source0)+.
 # new formula that is the substitution of a variable by a constant.
 
 # TODO (HIGH) earley parser doesn't support tabs in comments
+#
+# This should be move to a TODO in the parsers...
 
 bf_and_cb			=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
 bf_or_cb			=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
@@ -230,14 +233,14 @@ wff_remove_existential_cb_sym			=> ws "wff_remove_existential_cb" ws.
 # input definition
 input			=> in colon open_brace source_binding close_brace.
 
-# TODO (HIGH) split rules in rules and rec. relations
-
 # main posibilities
 inputs			=> less input (input)* dot.
 main			=> wff dot.
 rule			=> wff_rule | bf_rule .
 rules			=> (rule)*.
-formula			=> rules main.
+rec_relation	=> bf_rec_relation | wff_rec_relation dot.
+rec_relations	=> (rec_relation)*.
+formula			=> rec_relations main.
 library 		=> rules.
 # each builder is define on its own string
 builder			=> builder_head definition builder_body dot.

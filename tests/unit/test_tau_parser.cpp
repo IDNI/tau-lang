@@ -42,8 +42,8 @@ namespace testing = doctest;
 TEST_SUITE("parsing formula") {
 
 	const char* sample =
-		"X := X."
-		"Y := Y."
+		"f [0] (X) := X."
+		"g [0] (Y) := Y."
 		" ( Z = 0 ) .";
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
@@ -54,12 +54,12 @@ TEST_SUITE("parsing formula") {
 	}
 
 	TEST_CASE("rules") {
-		auto rules = frml | tau_parser::formula | tau_parser::rules ;
+		auto rules = frml | tau_parser::formula | tau_parser::rec_relations ;
 		CHECK( rules.has_value() );
 	}
 
 	TEST_CASE("rule") {
-		auto rules = frml | tau_parser::formula | tau_parser::rules || tau_parser::rule;
+		auto rules = frml | tau_parser::formula | tau_parser::rec_relations || tau_parser::rec_relation;
 		CHECK( rules.size() == 2 );
 	}
 
