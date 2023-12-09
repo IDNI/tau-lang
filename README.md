@@ -1,15 +1,18 @@
-= Tau Readme
 
-== Compiling
+[The TAU logo](docs/Logo_Tau_Negative-Renan.svg)
 
-== Running
+# The TAU Language
 
-== Understanding Tau language syntax
+## Compiling
 
-=== Boolean functions
+## Running
 
-=== Well-formed formulas
+## Understanding TAU language syntax
 
-== Understanding Tau language execution
+### Boolean functions
 
-== Examples
+### Well-formed formulas
+
+## Understanding TAU language execution
+
+## Examples
