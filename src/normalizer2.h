@@ -598,7 +598,7 @@ template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
 template<typename... BAs>
-formula<BAs...> apply_definitions(formula<BAs...>& form) {
+formula<BAs...> apply_definitions(const formula<BAs...>& form) {
 	auto nmain = tau_apply_if(apply_defs_once<BAs...>, form.main, is_not_eq_or_neq_to_zero_predicate<BAs...>);
 	rules<BAs...> nrec_relations;
 	for (const auto& r : form.rec_relations) {
@@ -609,7 +609,7 @@ formula<BAs...> apply_definitions(formula<BAs...>& form) {
 
 // REVIEW (HIGH) review overall execution
 template <typename... BAs>
-formula<BAs...> normalizer(formula<BAs...>& form) {
+formula<BAs...> normalizer(const formula<BAs...>& form) {
 	// IDEA extract this to an operator| overload
 	// apply defs to formula
 
