@@ -116,11 +116,11 @@ TEST_SUITE("parsing library") {
 TEST_SUITE("parsing rules") {
 
 	TEST_CASE("wff rule") {
-		// TODO (LOW) add test for wff rule parsing
+		// TODO (LOW) write test for wff rule parsing
 	}
 
 	TEST_CASE("bf rule") {
-		// TODO (LOW) add test for bf rule parsing
+		// TODO (LOW) write test for bf rule parsing
 	}
 }
 
@@ -133,15 +133,15 @@ TEST_SUITE("parsing captures") {
 }
 
 TEST_SUITE("parsing inputs") {
-	// TODO (LOW) add tests for inputs parsing
+	// TODO (LOW) write tests for inputs parsing
 }
 
 TEST_SUITE("parsing outputs") {
-	// TODO (LOW) add tests for outputs parsing
+	// TODO (LOW) write tests for outputs parsing
 }
 
 TEST_SUITE("parsing indexes"){
-	// TODO (LOW) add tests for indexes parsing
+	// TODO (LOW) write tests for indexes parsing
 }
 
 TEST_SUITE("parsing wwf formulas ") {
@@ -321,7 +321,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( ex_formula.has_value() );
 	}
 
-	// TODO (LOW) test wwf refs
+	// TODO (LOW) write test wwf refs
 	TEST_CASE("wff_ref") {
 		//CHECK( false );
 	}
@@ -419,7 +419,7 @@ TEST_SUITE("parsing bf formulas ") {
 		CHECK( ex_rule.has_value() );
 	}
 
-	// TODO (LOW) test bf refs
+	// TODO (LOW) write test bf refs
 	TEST_CASE("bf_ref") {
 		// CHECK( false );
 	}

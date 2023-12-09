@@ -580,6 +580,8 @@ using environment = std::map<node_t, node_t>;
 template<typename node_t>
 using rule = std::pair<node_t, node_t>;
 
+// TODO (MEDIUM) simplify matchers code and extract common code.
+
 // this predicate matches when there exists a environment that makes the
 // pattern match the node.
 //
@@ -715,7 +717,7 @@ private:
 // this predicate matches when there exists a environment that makes the
 // pattern match the node ignoring the nodes detected as skippable.
 //
-// TODO (LOW) create and env in operator() and pass it as a parameter to match, if
+// TODO (LOW) create an env in operator() and pass it as a parameter to match, if
 // a  match occurs, copy the data from the temp env to the env passed as
 // parameter.
 template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t, typename predicate_t>

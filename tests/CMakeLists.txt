@@ -4,7 +4,7 @@ set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest hea
 if (NOT EXISTS "${DOCTEST_HEADER}")
 	message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")
 	find_package(Wget REQUIRED)
-	# TODO (MEDIUM) we should use a fixed tag instead of master
+	# TODO (MEDIUM) we should use a fixed tag or commit instead of master
 	execute_process(COMMAND "${WGET_EXECUTABLE}" https://raw.githubusercontent.com/doctest/doctest/master/doctest/doctest.h -P ${PROJECT_SOURCE_DIR}/src)
 endif ()
 
