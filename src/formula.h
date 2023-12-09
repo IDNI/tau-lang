@@ -60,6 +60,9 @@ using sp_tau_node = sp_node<tau_sym<BAs...>>;
 template <typename... BAs>
 using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 
+template <typename... BAs>
+using tau_rec_relation = rule<sp_node<tau_sym<BAs...>>>;
+
 // IDEA maybe we could define a wrapper for recursive rules and rewriting rules that
 // call the appropriate apply method. This would play also nice with the builders
 // defined in the normalizer.
@@ -71,6 +74,12 @@ using builder = tau_rule<BAs...>;
 // the order of the rules in the rewriting process of the tau language.
 template <typename... BAs>
 using rules = std::vector<tau_rule<BAs...>>;
+
+// defines a vector of rec. relations in the tau language, the order is important as it defines
+// the order of the rec relations in the rewriting process of the tau language.
+template <typename... BAs>
+using rec_relations = std::vector<tau_rule<BAs...>>;
+
 // defines the main statement of a tau formula.
 template <typename... BAs>
 using statement = sp_tau_node<BAs...>;
@@ -743,8 +752,7 @@ formula<BAs...> resolve_types(const formula<BAs...> f) {
 	return { resolve_types(f.rec_relations), resolve_type(f.main) };
 }
 
-
-// creates a specific rule from a generic rule.
+// creates a specific rule from a generic rule, also used for rec. relations
 template<size_t rule_t, size_t matcher_t, size_t body_t, typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	auto matcher = rule | rule_t | matcher_t| only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
@@ -752,14 +760,24 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	return { matcher, body };
 }
 
-
-// creates a specific rule from a generic rule.
+// creates a specific rule from a generic rule
 template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
 	case tau_parser::bf_rule: return make_rule<tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
 	case tau_parser::wff_rule: return make_rule<tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
+	default: assert(false); return {};
+	};
+}
+
+// creates a specific rule from a generic rule.
+template<typename... BAs>
+tau_rec_relation<BAs...> make_rec_relation(sp_tau_node<BAs...>& rule) {
+	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
+	switch (type) {
+	case tau_parser::bf_rec_relation: return make_rule<tau_parser::bf_rec_relation, tau_parser::bf_ref, tau_parser::bf, BAs...>(rule);
+	case tau_parser::wff_rec_relation: return make_rule<tau_parser::wff_rec_relation, tau_parser::wff_ref, tau_parser::wff, BAs...>(rule);
 	default: assert(false); return {};
 	};
 }
@@ -774,8 +792,17 @@ rules<BAs...> make_rules(sp_tau_node<BAs...>& tau_source) {
 	return rs;
 }
 
+// create a set of relations from a given tau source.
+template<typename... BAs>
+rec_relations<BAs...> make_rec_relations(sp_tau_node<BAs...>& tau_source) {
+	rules<BAs...> rs;
+	// TODO (LOW) change call to select by operator|| and operator|
+	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rule, BAs...>))
+		rs.push_back(make_rule<BAs...>(r));
+	return rs;
+}
+
 sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
-	// return tau_source;
 	// FIXME (LOW) fix the trim implementation
 	return trim_top<
 			is_non_essential_source_t,
@@ -845,7 +872,7 @@ formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, binder
 			all_t<sp_tau_node<BAs...>>,
 			sp_tau_node<BAs...>>(
 		binder, all<sp_tau_node<BAs...>>)(unbinded_main);
-	auto rules = make_rules<BAs...>(binded_main);
+	auto rules = make_rec_relations<BAs...>(binded_main);
 	return { rules, binded_main };
 }
 

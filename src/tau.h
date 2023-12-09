@@ -37,7 +37,7 @@ using wff = sp_tau_node<BAs...>;
 // and https://devblogs.microsoft.com/cppblog/cpp23-deducing-this/ for how to use
 // "Deducing this" on CRTP..
 
-// TODO (HIGH) give a proper implementation for == and != operators
+// TODO (HIGH) give a proper implementation for <=>, == and != operators
 template<typename...BAs>
 auto operator<=>(const tau_sym<BAs...>& l, const tau_sym<BAs...>& r) {
 	return std::addressof(l)<=>std::addressof(r);
@@ -152,7 +152,6 @@ struct tau {
 
 template<typename...BAs>
 bool operator==(const tau<BAs...>& other, const bool& b) {
-	// TODO (HIGH) review const modifier in normalizer methods
 	auto normalized = normalizer<tau<BAs...>, BAs...>(other.form);
 	auto is_one = (normalized.main | tau_parser::wff_t).has_value();
 	auto is_zero = (normalized.main | tau_parser::wff_f).has_value();
