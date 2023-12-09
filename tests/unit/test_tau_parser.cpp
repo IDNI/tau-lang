@@ -627,23 +627,23 @@ TEST_SUITE("parsing callbacks ") {
 		CHECK( subs_cb.has_value() );
 	}
 
-	// TODO (VERY LOW) add parsing bf_less_cb test
-	// TODO (VERY LOW) add parsing bf_less_equal_cb test
-	// TODO (VERY LOW) add parsing bf_greater_cb test
-	// TODO (VERY LOW) add parsing bf_eq_cb test
-	// TODO (VERY LOW) add parsing bf_neq_cb test
-	// TODO (VERY LOW) add parsing bf_is_zero_cb test
-	// TODO (VERY LOW) add parsing bf_is_one_cb test
-	// TODO (VERY LOW) add parsing bf_has_clashing_subformulas_cb test
-	// TODO (VERY LOW) add parsing bf_has_subformula_cb test
-	// TODO (VERY LOW) add parsing wff_has_clashing_subformulas_cb test
-	// TODO (VERY LOW) add parsing wff_has_subformula_cb test
+	// TODO (VERY_LOW) add parsing bf_less_cb test
+	// TODO (VERY_LOW) add parsing bf_less_equal_cb test
+	// TODO (VERY_LOW) add parsing bf_greater_cb test
+	// TODO (VERY_LOW) add parsing bf_eq_cb test
+	// TODO (VERY_LOW) add parsing bf_neq_cb test
+	// TODO (VERY_LOW) add parsing bf_is_zero_cb test
+	// TODO (VERY_LOW) add parsing bf_is_one_cb test
+	// TODO (VERY_LOW) add parsing bf_has_clashing_subformulas_cb test
+	// TODO (VERY_LOW) add parsing bf_has_subformula_cb test
+	// TODO (VERY_LOW) add parsing wff_has_clashing_subformulas_cb test
+	// TODO (VERY_LOW) add parsing wff_has_subformula_cb test
 	//
 	// It is categorized as LOW because we have lot of tests parsing specific rules
 }
 
 TEST_SUITE("parsing rules") {
-	// TODO (VERY LOW) writes tests for rules parsing
+	// TODO (VERY_LOW) writes tests for rules parsing
 	//
 	// It is categorized as LOW because we have lot of tests parsing specific rules
 }
