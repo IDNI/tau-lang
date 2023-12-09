@@ -58,7 +58,8 @@ There are a lot examples of TAU programs in the `examples/tau` directory.
 In the TAU language we could represent boolean functions essentially following the grammar:
 
 ```
-bf -> elem | (bf "&" bf) | "~" bf | (bf "^" bf) | (bf "+" bf) | (bf "|" bf) | fall var bf | fex var bf
+bf -> elem | (bf "&" bf) | "~" bf | (bf "^" bf) | (bf "+" bf) | (bf "|" bf)
+		| fall var bf | fex var bf
 elem -> var | const | bf_ref
 const -> 0 | 1 | { B }
 ```
