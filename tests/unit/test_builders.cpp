@@ -25,8 +25,6 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TODO (TK) (HIGH) remove BLDR_WFF_T, BLDR_WFF_F, BLDR_BF_T and BLDR_BF_F
-
 TEST_SUITE("builders parsing") {
 
 	TEST_CASE("BLDR_WFF_EQ") {

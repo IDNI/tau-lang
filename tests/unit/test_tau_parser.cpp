@@ -321,7 +321,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( ex_formula.has_value() );
 	}
 
-	// TODO (HIGH) test wwf refs
+	// TODO (LOW) test wwf refs
 	TEST_CASE("wff_ref") {
 		//CHECK( false );
 	}
@@ -419,7 +419,7 @@ TEST_SUITE("parsing bf formulas ") {
 		CHECK( ex_rule.has_value() );
 	}
 
-	// TODO (HIGH) test bf refs
+	// TODO (LOW) test bf refs
 	TEST_CASE("bf_ref") {
 		// CHECK( false );
 	}
@@ -627,19 +627,16 @@ TEST_SUITE("parsing callbacks ") {
 		CHECK( subs_cb.has_value() );
 	}
 
-	// The following todos are classified as LOW because they are tested inderectly
-	// in other unit/integration tests. However, it is better to have explicit tests.
-	//
-	// TODO (MEDIUM) add bf_less_cb test
-	// TODO (MEDIUM) add bf_less_equal_cb test
-	// TODO (MEDIUM) add bf_greater_cb test
-	// TODO (MEDIUM) add bf_eq_cb test
-	// TODO (MEDIUM) add bf_neq_cb test
-	// TODO (MEDIUM) add bf_is_zero_cb test
-	// TODO (MEDIUM) add bf_is_one_cb test
-	// TODO (MEDIUM) add bf_has_clashing_subformulas_cb test
-	// TODO (MEDIUM) add bf_has_subformula_cb test
-	// TODO (MEDIUM) add wff_has_clashing_subformulas_cb test
-	// TODO (MEDIUM) add wff_has_subformula_cb test
+	// TODO (MEDIUM) add parsing bf_less_cb test
+	// TODO (MEDIUM) add parsing bf_less_equal_cb test
+	// TODO (MEDIUM) add parsing bf_greater_cb test
+	// TODO (MEDIUM) add parsing bf_eq_cb test
+	// TODO (MEDIUM) add parsing bf_neq_cb test
+	// TODO (MEDIUM) add parsing bf_is_zero_cb test
+	// TODO (MEDIUM) add parsing bf_is_one_cb test
+	// TODO (MEDIUM) add parsing bf_has_clashing_subformulas_cb test
+	// TODO (MEDIUM) add parsing bf_has_subformula_cb test
+	// TODO (MEDIUM) add parsing wff_has_clashing_subformulas_cb test
+	// TODO (MEDIUM) add parsing wff_has_subformula_cb test
 
 }

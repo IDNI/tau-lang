@@ -21,7 +21,11 @@ project(tau_lang)
 add_subdirectory("src")
 add_subdirectory("examples")
 
-# TODO (MEDIUM) generate new parser from grammar when needed
+# TODO (LOW) generate new parser from grammar when needed
+#
+# this would be anice feature as it would allow us to use the latest version of the parser
+# always and eliminate possible mismatches between the parser and the grammar
+
 
 #
 # Adding git submodules

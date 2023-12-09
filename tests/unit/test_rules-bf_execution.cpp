@@ -251,12 +251,6 @@ TEST_SUITE("executing bf rules") {
 		CHECK( result == body );
 	}
 
-	// REVIEW (MEDIUM) remaining tests of the test suite are flaky
-
-	// They properly run when executed independenly but fails otherwise. Maybe
-	// there is something wrong with the way the tests are executed, the constants
-	// used within or something else.
-
 	TEST_CASE("BF_CALLBACK_AND") {
 		const char* sample = "( ({l} & { r } ) = 0 ).";
 		auto sample_src = make_tau_source(sample);

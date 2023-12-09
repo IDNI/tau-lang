@@ -78,8 +78,16 @@ TEST_SUITE("callbacks") {
 		CHECK( is_non_terminal<Bool>(tau_parser::bf_t, result) );
 	}
 
-	// TODO (MEDIUM) add explicit unit tests for the remaining callbacks
-	//
-	// All of them are tested inderectly when appying the rules of the normalizer
-	// in the file test_rules.cpp. However, it is better to have explicit tests
+	// TODO (MEDIUM) add execution bf_less_cb test
+	// TODO (MEDIUM) add execution bf_less_equal_cb test
+	// TODO (MEDIUM) add execution bf_greater_cb test
+	// TODO (MEDIUM) add execution bf_eq_cb test
+	// TODO (MEDIUM) add execution bf_neq_cb test
+	// TODO (MEDIUM) add execution bf_is_zero_cb test
+	// TODO (MEDIUM) add execution bf_is_one_cb test
+	// TODO (MEDIUM) add execution bf_has_clashing_subformulas_cb test
+	// TODO (MEDIUM) add execution bf_has_subformula_cb test
+	// TODO (MEDIUM) add execution wff_has_clashing_subformulas_cb test
+	// TODO (MEDIUM) add execution wff_has_subformula_cb test
+
 }

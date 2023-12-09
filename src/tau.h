@@ -32,9 +32,9 @@ using wff = sp_tau_node<BAs...>;
 // and https://devblogs.microsoft.com/cppblog/cpp23-deducing-this/ for how to use
 // "Deducing this" on CRTP..
 
+// TODO (HIGH) give a proper implementation for == and != operators
 template<typename...BAs>
 auto operator<=>(const tau_sym<BAs...>& l, const tau_sym<BAs...>& r) {
-	// TODO (HIGH) review return values when we have different types of tau_sym
 	return std::addressof(l)<=>std::addressof(r);
 	/*auto cmp = overloaded(*/
 		/*[](const tau_source_sym& l, const tau_source_sym& r) -> std::partial_ordering {*/
@@ -144,6 +144,7 @@ struct tau {
 
 template<typename...BAs>
 bool operator==(const tau<BAs...>& other, const bool& b) {
+	// TODO (HIGH) review const modifier in normalizer methods
 	auto nother = other;
 	auto normalized = normalizer<tau<BAs...>, BAs...>(nother.form);
 	auto is_one = (normalized.main | tau_parser::wff_t).has_value();
@@ -193,12 +194,6 @@ formula<tau<BAs...>> make_tau_using_factory(const std::string& src, base_factory
 template<typename...BAs>
 formula<tau<BAs...>> make_tau_using_bindings(const std::string& src, const bindings<tau<BAs...>>& bs) {
 	return make_formula_using_bindings<tau<BAs...>>(src, bs);
-}
-
-template<typename...BAs>
-ostream& operator<<(ostream& os, const formula<tau<BAs...>>& t) {
-	// TODO (MEDIUM) implement
-	return os << "tau<>";
 }
 
 } // namespace idni::tau

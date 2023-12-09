@@ -30,11 +30,7 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-// TODO (MEDIUM) this tests should be splitted into 4 different files
-//
-// The idea is speed up test execution allowing parallel execution of tests.
-// Each test suite must go into different files named test_integration-1.cpp,...
-
+// TODO (LOW) simplify this test cases extracting common logic to the helpers file
 
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
@@ -48,12 +44,4 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
-}
-
-TEST_SUITE("formulas: variables, bindings and quantifiers") {
-	// TODO (HIGH) look for big formulas
-}
-
-TEST_SUITE("formulas: recurrence relations") {
-	// TODO (HIGH) add tests for recurrence relations
 }

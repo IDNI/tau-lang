@@ -90,26 +90,26 @@ TEST_SUITE("steps parsing") {
 }
 
 TEST_SUITE("steps"){
-// TODO (MEDIUM) write tests to check steps
+// TODO (LOW) write tests to check steps
 
 }
 
 TEST_SUITE("repeat_each"){
-// TODO (MEDIUM) write tests to check repeat_each
+// TODO (LOW) write tests to check repeat_each
 
 }
 
 TEST_SUITE("repeat_all"){
-// TODO (MEDIUM) write tests to check repeat_all
+// TODO (LOW) write tests to check repeat_all
 
 }
 
 TEST_SUITE("repeat"){
-// TODO (MEDIUM) write tests to check repeat
+// TODO (LOW) write tests to check repeat
 
 }
 
 TEST_SUITE("operator|"){
-// TODO (MEDIUM) write tests to check operator| (all versions)
+// TODO (LOW) write tests to check operator| (all versions)
 
 }

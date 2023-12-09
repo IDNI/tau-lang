@@ -34,8 +34,6 @@ using namespace idni::rewriter;
 
 namespace idni::tau {
 
-// TODO (LOW) reorganize methods so related ones are closed
-
 //
 // types related to the tau language
 //
@@ -506,8 +504,9 @@ struct tauify {
 	}
 };
 
-// TODO (LOW) remove this extractor and use a previous one
-// extracts terminal from sp_tau_source_node
+// TODO (LOW) change this extractor so it uses the next one
+
+// extracts terminal from sp_tau_node
 template <typename... BAs>
 auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<char> {
 	if (n->value.index() == 0
@@ -520,7 +519,6 @@ auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n) -> std::opti
 template <typename... BAs>
 using tau_node_terminal_extractor_t = decltype(tau_node_terminal_extractor<BAs...>);
 
-// TODO (LOW) remove this extractor and use a previous one
 // extracts terminal from sp_tau_source_node
 auto tau_source_terminal_extractor = [](const sp_tau_source_node& n) -> std::optional<char> {
 	if (n->value.nt()&& !(n->value).is_null())
@@ -697,8 +695,6 @@ std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
 // resolved to the first bottom type resolved in the expression.
 template<typename... BAs>
 sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
-	// REVIEW (MEDIUM) should this be called only with bfs?
-	// if (!is_non_terminal<tau_parser::bf, BAs...>(n)) return n;
 	if (auto unresolved = is_unresolved(n); unresolved) {
 		// always we have type information or it is not needed at all
 		if (auto type = find_bottom(n, is_resolved_predicate<BAs...>); type) {
@@ -755,7 +751,6 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 // creates a specific rule from a generic rule.
 template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
-	// TODO (IMPORTANT) check that the rule is well formed an raise an error otherwise
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
 	case tau_parser::bf_rule: return make_rule<tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
@@ -768,7 +763,7 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 template<typename... BAs>
 rules<BAs...> make_rules(sp_tau_node<BAs...>& tau_source) {
 	rules<BAs...> rs;
-	// TODO (HIGH) change call to select by operator|| and operator|
+	// TODO (LOW) change call to select by operator|| and operator|
 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rule, BAs...>))
 		rs.push_back(make_rule<BAs...>(r));
 	return rs;
@@ -1127,7 +1122,6 @@ template <typename... BAs>
 struct callback_applier {
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-		// TODO (IMPORTANT) deal with errors once we have a clear strategy
 		if (!is_callback<BAs...>(n)) return n;
 		auto nt = get<tau_source_sym>(n->value).n();
 		switch (nt) {
@@ -1284,8 +1278,10 @@ private:
 		return args[0];
 	}
 
-	// TODO (HIGH) make a cleaner implementation
-	// TODO (HIGH) merge with next method
+	// TODO (MEDIUM) make a cleaner implementation
+	//
+	// we should merge the two following methods and split the logic in
+	// meaningful methods
 	sp_tau_node<BAs...> apply_wff_clashing_subformulas_check(const sp_tau_node<BAs...>& n) {
 		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
 		//std::set<sp_tau_node<BAs...>> positives, negatives;
