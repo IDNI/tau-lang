@@ -59,7 +59,7 @@ In the TAU language we could represent boolean functions essentially following t
 
 ```
 bf -> elem | (bf "&" bf) | "~" bf | (bf "^" bf) | (bf "+" bf) | (bf "|" bf)
-		| fall var bf | fex var bf
+	| fall var bf | fex var bf
 elem -> var | const | bf_ref
 const -> 0 | 1 | { B }
 ```
@@ -80,8 +80,8 @@ Well formed formulas are given in the TAU language by the following grammar:
 
 ```
 wff -> (wff "&" wff) | "!" wff | (wff "^" wff) | (wff "|" wff) | (wff "->" wff)
-		| (wff "<->" wff) | (wff "?" wff ":" wff) | all var wff | ex var wff | wff_ref
-		| (bf "=" bf) | (bf "!=" bf) | (bf "<" bf) | (bf "<=" bf) | (bf ">" bf) | T | F.
+	| (wff "<->" wff) | (wff "?" wff ":" wff) | all var wff | ex var wff | wff_ref
+	| (bf "=" bf) | (bf "!=" bf) | (bf "<" bf) | (bf "<=" bf) | (bf ">" bf) | T | F.
 ```
 
 where `wff` stands for a sub-well formed formula, `wff_ref` stands for a reference to a well formed formula (see recursive relations Section), `T` stands for the true constant and `F` stands for the false constant. As usual, the operators `&`, `!`, `^`,  `|`, `->`,
