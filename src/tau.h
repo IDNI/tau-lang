@@ -21,6 +21,12 @@
 using namespace std;
 using namespace idni::tau;
 
+// TODO (MEDIUM) fix proper types (alias) at this level of abstraction
+//
+// We should talk about statement, formula (nso_with_rr?), library, rule, builder,
+// bindings, etc... instead of sp_tau_node,...
+
+
 namespace idni::tau {
 
 template<typename...BAs>

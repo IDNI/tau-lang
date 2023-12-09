@@ -20,6 +20,13 @@
 #include "rewriting.h"
 #include "formula.h"
 
+
+// TODO (MEDIUM) fix proper types (alias) at this level of abstraction
+//
+// We should talk about statement, formula (nso_with_rr?), library, rule, builder,
+// bindings, etc... instead of sp_tau_node,...
+
+
 namespace idni::tau {
 
 // tau system library, used to define the tau system of rewriting rules

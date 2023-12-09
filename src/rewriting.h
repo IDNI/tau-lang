@@ -29,6 +29,11 @@
 #include "forest.h"
 #include "parser.h"
 
+// TODO (MEDIUM) fix proper types (alias) at this level of abstraction
+//
+// We should talk about of sp_tau_node, rule,...
+
+
 namespace idni::rewriter {
 
 // IDEA this is very similar to idni::forest<...>::tree, but it

@@ -34,6 +34,11 @@ using namespace idni::rewriter;
 
 namespace idni::tau {
 
+// TODO (MEDIUM) fix proper types (alias) at this level of abstraction
+//
+// We should talk about statement, formula (nso_with_rr?), library, rule, builder,
+// bindings, etc... instead of sp_tau_node,...
+
 //
 // types related to the tau language
 //
@@ -1115,9 +1120,10 @@ struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-// apply the given  T and F are  if the value of the node is a callback
+// IDEA convert to a const static applier and change all the code accordingly
 //
-// TODO (HIGH) convert to a const static applier and change all the code accordingly
+// however, the logic is quite complez a lot of private functions doesn't make
+// sense outside the actual structure.
 template <typename... BAs>
 struct callback_applier {
 
