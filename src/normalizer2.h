@@ -598,11 +598,17 @@ template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
 template<typename... BAs>
+wff<BAs...> apply_definitions(const wff<BAs...>& form) {
+	return tau_apply_if(apply_defs_once<BAs...>, form.main, is_not_eq_or_neq_to_zero_predicate<BAs...>);
+}
+
+template<typename... BAs>
 formula<BAs...> apply_definitions(const formula<BAs...>& form) {
-	auto nmain = tau_apply_if(apply_defs_once<BAs...>, form.main, is_not_eq_or_neq_to_zero_predicate<BAs...>);
+	auto nmain = apply_definitions(form.main);
 	rules<BAs...> nrec_relations;
 	for (const auto& r : form.rec_relations) {
-		nrec_relations.emplace_back(r.first, tau_apply_if(apply_defs_once<BAs...>, r.second, is_not_eq_or_neq_to_zero_predicate<BAs...>));
+		auto [matcher, body] = r;
+		nrec_relations.emplace_back(matcher, apply_definitions(body));
 	}
 	return formula<BAs...>{ nrec_relations, nmain };
 }
