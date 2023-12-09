@@ -39,7 +39,15 @@ If you want to produce the documentation of the source code you need to install 
 
 # Running TAU programs
 
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+Once you have compiled the source code you could run the `tau` executable to execute a TAU programs. The `tau` executable is located in the `build-Release` or `build-Debug` directory (depending in your build). You could run the `tau` executable as follows:
+
+```bash
+./tau tau_example.tau
+```
+
+where `tau_example.tau` is a TAU program.
+
+There are a lot examples of TAU programs in the `examples/tau` directory.
 
 # Understanding TAU language syntax
 
