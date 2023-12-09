@@ -139,6 +139,7 @@ struct tau {
 		return (normalized.main | tau_parser::wff_t).has_value();
 	}
 
+	// TODO (HIGH) this should be a wff<tau<BAs...>, BAs...>
 	formula<tau<BAs...>, BAs...> form;
 };
 
