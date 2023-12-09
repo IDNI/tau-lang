@@ -26,7 +26,6 @@ using namespace idni::tau;
 // We should talk about statement, formula (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
-
 namespace idni::tau {
 
 template<typename...BAs>
@@ -145,7 +144,9 @@ struct tau {
 		return (normalized.main | tau_parser::wff_t).has_value();
 	}
 
-	// TODO (HIGH) this should be a wff<tau<BAs...>, BAs...>
+	// REVIEW (HIGH) this should be a wff<tau<BAs...>, BAs...>
+	//
+	// Maybe confirm with Ohad.
 	formula<tau<BAs...>, BAs...> form;
 };
 
