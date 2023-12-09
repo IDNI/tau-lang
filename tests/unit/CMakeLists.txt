@@ -16,6 +16,7 @@ set(TESTS
 	type_system
 	bindings
 	traversal
+	rec_relations-execution
 )
 
 foreach(X IN LISTS TESTS)
