@@ -72,7 +72,20 @@ where `elem` stands for an element of one of the boolean algebras, `bf` for a su
 
 ## Well-formed formulas
 
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+Well formed formulas are given in the TAU language by the following grammar:
+
+```
+wff -> wff "&" wff | "!" wff | wff "^" wff | wff "|" wff | wff "->" wff
+		| wff "<->" wff | wff "?" wff ":" wff | all var wff | ex var wff | wff_ref
+		| "=" | "!=" | "<" | "<=" | ">" | T | F.
+```
+
+where `wff` stands for a sub-well formed formula, `wff_ref` stands for a reference to a well formed formula (see recursive relations Section), `T` stands for the true constant and `F` stands for the false constant. As usual, the operators `&`, `!`, `^`,  `|`, `->`,
+`<->` and `?` stands for conjunction, negation, exclusive-or, disjunction, implication, equivalence and conditional respectively.
+
+Also, `all` stands for the universal quantifier and `ex` for the existential one.
+
+
 
 ## Well-formed formulas
 
