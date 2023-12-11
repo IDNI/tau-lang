@@ -49,7 +49,7 @@ where `tau_example.tau` is a TAU program.
 
 There are a lot examples of TAU programs in the `examples/tau` directory.
 
-# Understanding TAU language syntax
+# Understanding TAU language
 
 "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
 
@@ -111,6 +111,18 @@ where `bf_rec_relation` stands for a boolean function recursive relation, `bf_re
 ## TAU programs
 
 "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+
+## Type resolution
+
+Type resolution is used to ensure that all the Boolean Algebra operations are consistente. Types could be specified at two levels:
+
+* At the boolean algebra expression level: in this case, the type of the expression is the type of one of the constants
+of the boolean expression, there is no need to provide the type in each of them.
+
+* At the quantifier expression level: in this case, the type of a variable is specified and all the
+underlying boolean algebra expressions are typed accordingly.
+
+In both cases, if there is a missmatch between the types, an error is raised during the type resolution phase, i.e. before executing the program.
 
 # Understanding TAU language execution
 
