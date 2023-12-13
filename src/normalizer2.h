@@ -121,11 +121,10 @@ RULE(BF_DEF_NEQ, "( $X != $Y ) := (( $X + $Y ) != 0).")
 RULE(BF_CALLBACK_EQ, "( { $X } = 0 ) := bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
 RULE(BF_CALLBACK_NEQ, "( { $X } != 0 ) := bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
 
-// TODO (LOW) rename to (N)EQ_SIMPLYFY
-RULE(BF_TRIVIALITY_0, "( 0 = 0 ) := T.")
-RULE(BF_TRIVIALITY_1, "( 1 = 0 ) :=  F.")
-RULE(BF_TRIVIALITY_2, "( 0 != 0 ) := F.")
-RULE(BF_TRIVIALITY_3, "( 1 != 0 ) := T.")
+RULE(BF_EQ_SIMPLIFY_0, "( 1 = 0 ) :=  F.")
+RULE(BF_EQ_SIMPLIFY_1, "( 0 = 0 ) := T.")
+RULE(BF_NEQ_SIMPLIFY_0, "( 0 != 0 ) := F.")
+RULE(BF_NEQ_SIMPLIFY_1, "( 1 != 0 ) := T.")
 
 RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != 0) && (($Y = 0) && ($Z != 0))) := (($Y = 0) && (($X != 0) && ($Z != 0))).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != 0) && (($Y != 0) && ($Z = 0))) := (($Z = 0) && (($X != 0) && ($Y != 0))).")
@@ -273,10 +272,10 @@ static auto bf_elim_quantifiers = make_library<BAs...>(
 
 template<typename... BAs>
 static auto trivialities = make_library<BAs...>(
-	BF_TRIVIALITY_0
-	+ BF_TRIVIALITY_1
-	+ BF_TRIVIALITY_2
-	+ BF_TRIVIALITY_3
+	BF_EQ_SIMPLIFY_0
+	+ BF_EQ_SIMPLIFY_1
+	+ BF_NEQ_SIMPLIFY_0
+	+ BF_NEQ_SIMPLIFY_1
 );
 
 template<typename... BAs>
