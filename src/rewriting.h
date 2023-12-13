@@ -866,7 +866,7 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 	// MARK output the error if the parser failed
 	// avoiding doctest issues, uncomment for errors
 	//if (!f || !parser.found()) {
-	//	std::cerr << parser.get_error().to_str();
+		//	std::cerr << parser.get_error().to_str();
 	//}
 
 	auto get_tree = [&f, &t] (auto& g ){
@@ -890,4 +890,27 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 		(transform, all<sp_parse_tree>)(t);
 	}
 } // namespace idni::rewriter
+
+//
+// operators << to pretty print the tau language related types
+//
+
+// << for sp_node
+template <typename symbol_t>
+std::ostream& operator<<(std::ostream& stream, const idni::rewriter::sp_node<symbol_t>& n) {
+	return stream << n << "\n";
+}
+
+// << for node (make it shared make use of the previous operator)
+template <typename symbol_t>
+std::ostream& operator<<(std::ostream& stream, const idni::rewriter::node<symbol_t>& n) {
+	return stream << make_shared<idni::rewriter::sp_node<symbol_t>>(n);
+}
+
+// << for rule
+template <typename node_t>
+std::ostream& operator<<(std::ostream& stream, const idni::rewriter::rule<node_t>& r) {
+	return stream << r.first << " := " << r.second << ".";
+}
+
 #endif // __IDNI__REWRITING_H__
