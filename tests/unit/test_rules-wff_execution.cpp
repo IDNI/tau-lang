@@ -390,8 +390,8 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("BF_TRIVIALITY_0") {
-		auto src_rule = make_tau_source(BF_TRIVIALITY_0);
+	TEST_CASE("BF_EQ_SIMPLIFY_0") {
+		auto src_rule = make_tau_source(BF_EQ_SIMPLIFY_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
@@ -401,8 +401,8 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("BF_TRIVIALITY_1") {
-		auto src_rule = make_tau_source(BF_TRIVIALITY_1);
+	TEST_CASE("BF_EQ_SIMPLIFY_1") {
+		auto src_rule = make_tau_source(BF_EQ_SIMPLIFY_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
@@ -412,8 +412,8 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("BF_TRIVIALITY_2") {
-		auto src_rule = make_tau_source(BF_TRIVIALITY_2);
+	TEST_CASE("BF_NEQ_SIMPLIFY_0") {
+		auto src_rule = make_tau_source(BF_NEQ_SIMPLIFY_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
@@ -423,8 +423,8 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("BF_TRIVIALITY_3") {
-		auto src_rule = make_tau_source(BF_TRIVIALITY_3);
+	TEST_CASE("BF_NEQ_SIMPLIFY_1") {
+		auto src_rule = make_tau_source(BF_NEQ_SIMPLIFY_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
