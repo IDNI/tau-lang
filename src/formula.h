@@ -665,6 +665,23 @@ struct factory_binder {
 	factory_t& factory;
 };
 
+// TODO (HIGH) improve type resolution adding types to quantifiers.
+//
+// Type resolution is used to ensure that all the Boolean Algebra operations are
+// consistente. Types could be specified at two levels:
+//
+// - At the boolean algebra expression level: in this case, the type of the
+//   expression is the type of one of the constants of the boolean expression,
+//   there is no need to provide the type in each of them.
+//
+// - At the quantifier expression level: in this case, the type of a variable is
+//   specified and all the underlying boolean algebra expressions are typed
+//   accordingly.
+//
+// In both cases, if there is a missmatch between the types, an error is raised
+// during the type resolution phase, i.e. before executing the program.
+
+
 // check if the type is unresolved.
 template<typename... BAs>
 static const auto is_unresolved_predicate = [](const sp_tau_node<BAs...>& n) {
