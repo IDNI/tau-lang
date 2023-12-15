@@ -15,10 +15,10 @@ add_link_options("-flto")
 #
 # Regression testing
 #
-set(BUILD_REGRESSION ON CACHE STRING "build the tau-lang regression suite ON")
-set_property(CACHE BUILD_REGRESSION PROPERTY STRINGS "OFF" "ON")
+set(TAU_BUILD_REGRESSION ON CACHE STRING "build the tau-lang regression suite ON")
+set_property(CACHE TAU_BUILD_REGRESSION PROPERTY STRINGS "OFF" "ON")
 
-if (BUILD_REGRESSION)
+if (TAU_BUILD_REGRESSION)
 	enable_testing()
 	add_subdirectory(regression)
 endif ()
@@ -26,10 +26,10 @@ endif ()
 #
 # Integration testing
 #
-set(BUILD_INTEGRATION ON CACHE STRING "build the tau-lang integration suite ON")
-set_property(CACHE BUILD_INTEGRATION PROPERTY STRINGS "OFF" "ON")
+set(TAU_BUILD_INTEGRATION ON CACHE STRING "build the tau-lang integration suite ON")
+set_property(CACHE TAU_BUILD_INTEGRATION PROPERTY STRINGS "OFF" "ON")
 
-if (BUILD_INTEGRATION)
+if (TAU_BUILD_INTEGRATION)
 	enable_testing()
 	add_subdirectory(integration)
 endif ()
@@ -37,10 +37,10 @@ endif ()
 #
 # Unit testing
 #
-set(BUILD_TESTS ON CACHE STRING "build the tau-lang unit suite ON")
-set_property(CACHE BUILD_TESTS PROPERTY STRINGS "OFF" "ON")
+set(TAU_BUILD_TESTS ON CACHE STRING "build the tau-lang unit suite ON")
+set_property(CACHE TAU_BUILD_TESTS PROPERTY STRINGS "OFF" "ON")
 
-if (BUILD_TESTS)
+if (TAU_BUILD_TESTS)
 	enable_testing()
 	add_subdirectory(unit)
 endif ()
