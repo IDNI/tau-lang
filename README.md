@@ -68,7 +68,23 @@ where `elem` stands for an element of one of the boolean algebras, `bf` for a su
 
 ### Functional quantifiers
 
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+As show in the `bf` grammar, we consider two types of `bf` qantifiers: the existential one `fex`and the universal one `fall`. Both depend in a variable and a `bf`formula. The formula could be whatever we derive from the previious grammar, whereas the varibles could be of the following types:
+
+- regular variables, they are just a sequence of `chars` (no especial symbols). They stand for regular variables in a formula, like the ones in predicate logic, and
+- captures, they are a sequence of `chars`preceed by a `$`. They behave in the same way as PROLOG variables.
+
+Functional existential quantifiers get converted as follows:
+
+```
+fex x f(x, X) := f(0,X) | f(1, X).
+```
+
+whereas universal functional quantifiers get converted in the following way:
+```
+fall x f(x, X) := f(0,X) & f(1, X).
+```
+
+We would go further about the meaning of captures in subsequent sections, for the time being, just keep in mind that functional quatifiers depend on variables and they essentially quantify over the given boolean algebra.
 
 ## Well-formed formulas
 
@@ -84,6 +100,8 @@ where `wff` stands for a sub-well formed formula, `wff_ref` stands for a referen
 `<->` and `?` stands for conjunction, negation, exclusive-or, disjunction, implication, equivalence and conditional (in the usual sense) respectively.
 
 Also, `all` stands for the universal quantifier and `ex` for the existential one, whereas `=` stands for equality, `!=` for disequality, `<` for less than, `<=` for less or equal than, `>` for greater than (all of them in one of the underlying boolean algebras) and `T` for true and `F` for false.
+
+As in the caes of `bf`, we have two types of qantifiers and the varibles could be of the above types. As announced, we would clarify both of them in a forthcoming Section.
 
 ## Recursive relations
 
@@ -103,7 +121,7 @@ wff_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
 
 where `bf_rec_relation` stands for a boolean function recursive relation, `bf_ref` stands for a reference to a boolean function (see boolean functions Section), `wff_rec_relation` stands for a well formed formula recursive relation, `wff_ref` stands for a reference to a well formed formula (see well formed formulas Section), `sym` stands for a symbol, `offset` stands for an offset and `capture` stands for a capture/variable.
 
-## Variables, variables, variables...
+### Variables, variables, variables,...
 
 "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
 

@@ -1,4 +1,4 @@
 [submodule "external/parser"]
 	path = external/parser
 	url = https://github.com/IDNI/parser.git
-	branch = tau_sync
+	branch = master
