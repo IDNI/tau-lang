@@ -658,7 +658,7 @@ struct pattern_matcher_with_skip {
 	using pattern_t = node_t;
 
 	pattern_matcher_with_skip(const pattern_t& pattern, environment<node_t>& env,
-		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t &is_skip):
+		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t& is_skip):
 		pattern(pattern), env(env), is_ignore(is_ignore),
 		is_capture(is_capture), is_skip(is_skip) {}
 
@@ -865,11 +865,9 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 	auto f = parser.parse(source.c_str(), source.size());
 	// MARK output the error if the parser failed
 	// avoiding doctest issues, uncomment for errors
-	//if (!f || !parser.found()) {
-		//	std::cerr << parser.get_error().to_str();
-	//}
-
-	auto get_tree = [&f, &t] (auto& g ){
+	// if (!f || !parser.found())
+	// 	std::cerr << parser.get_error().to_str() << std::endl;
+	auto get_tree = [&f, &t] (auto& g) {
 			f->remove_recursive_nodes(g);
 			f->remove_binarization(g);
 			t = g.extract_trees();

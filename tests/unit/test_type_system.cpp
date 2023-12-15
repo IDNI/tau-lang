@@ -28,7 +28,7 @@ namespace testing = doctest;
 TEST_SUITE("is_resolved_predicate") {
 
 	TEST_CASE("is_resolved_predicate: true") {
-		const char* sample =	"$X := { bool : src_code }.";
+		const char* sample = "$X := { bool : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto type = lib
@@ -50,7 +50,7 @@ TEST_SUITE("is_resolved_predicate") {
 	}
 
 	TEST_CASE("is_resolved_predicate: false") {
-		const char* sample =	"$X := { : src_code }.";
+		const char* sample = "$X := { : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto type = lib
@@ -75,7 +75,7 @@ TEST_SUITE("is_resolved_predicate") {
 TEST_SUITE("is_unresolved_predicate") {
 
 	TEST_CASE("is_resolved_predicate: true") {
-		const char* sample =	"$X := { : src_code }.";
+		const char* sample = "$X := { : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto type = lib
@@ -97,7 +97,7 @@ TEST_SUITE("is_unresolved_predicate") {
 	}
 
 	TEST_CASE("is_unresolved_predicate: false") {
-		const char* sample =	"$X := { bool : src_code }.";
+		const char* sample = "$X := { bool : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto type = lib
@@ -122,7 +122,7 @@ TEST_SUITE("is_unresolved_predicate") {
 TEST_SUITE("is_unresolved") {
 
 	TEST_CASE("is_resolved_predicate: true") {
-		const char* sample =	"$X := { : src_code }.";
+		const char* sample = "$X := { : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		CHECK( is_unresolved<Bool>(lib) );
@@ -130,7 +130,7 @@ TEST_SUITE("is_unresolved") {
 	}
 
 	TEST_CASE("is_unresolved_predicate: false") {
-		const char* sample =	"$X := { bool : src_code }.";
+		const char* sample = "$X := { bool : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		CHECK( !is_unresolved<Bool>(lib) );
@@ -141,7 +141,7 @@ TEST_SUITE("is_unresolved") {
 TEST_SUITE("resolve_type") {
 
 	TEST_CASE("unresolved case") {
-		const char* sample =	"$X := ({ : src_code } & { bool : src_code }).";
+		const char* sample = "$X := ({ : src_code } & { bool : src_code }).";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto unresolved = lib
@@ -158,7 +158,7 @@ TEST_SUITE("resolve_type") {
 	}
 
 	TEST_CASE("resolved case") {
-		const char* sample =	"$X := { bool : src_code }.";
+		const char* sample = "$X := { bool : src_code }.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto resolved = lib
