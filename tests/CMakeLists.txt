@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
-
 set(DOCTEST_HEADER "${PROJECT_SOURCE_DIR}/src/doctest.h" CACHE PATH "Doctest header")
 if (NOT EXISTS "${DOCTEST_HEADER}")
 	message(STATUS "Downloading doctest to '${PROJECT_SOURCE_DIR}'")
@@ -49,8 +47,8 @@ endif ()
 
 add_executable(debug-tau_normalizer-tau debug-tau_normalizer-tau.cpp)
 target_setup(debug-tau_normalizer-tau)
-target_link_libraries(debug-tau_normalizer-tau TAUo)
+target_link_libraries(debug-tau_normalizer-tau ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
 
 add_executable(debug-tau_normalizer-bdd debug-tau_normalizer-bdd.cpp)
 target_setup(debug-tau_normalizer-bdd)
-target_link_libraries(debug-tau_normalizer-bdd TAUo)
+target_link_libraries(debug-tau_normalizer-bdd ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})

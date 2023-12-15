@@ -181,7 +181,7 @@ template<typename... BAs>
 using is_capture_t = decltype(is_capture<BAs...>);
 
 auto is_non_essential_terminal = [] (const size_t n) {
-	return n == tau_parser::empty_string
+	return n == tau_parser::nul
 		|| n == tau_parser::eof
 		|| n == tau_parser::space
 		|| n == tau_parser::digit
