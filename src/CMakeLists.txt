@@ -51,7 +51,7 @@ target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 )
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
-if(NOT BUILD_STATIC_LIBRARY)
+if(NOT TAU_BUILD_STATIC_LIBRARY)
 	exclude(${TAU_STATIC_LIB_NAME})
 endif()
 
@@ -73,14 +73,14 @@ set_target_properties(${TAU_SHARED_LIB_NAME} PROPERTIES
 	EXPORT_NAME ${TAU_SHARED_LIB_NAME}
 	PUBLIC_HEADER "${TAU_HEADERS}"
 )
-if(NOT BUILD_SHARED_LIBRARY)
+if(NOT TAU_BUILD_SHARED_LIBRARY)
 	exclude(${TAU_SHARED_LIB_NAME})
 endif()
 
 #
 # executable
 #
-if(BUILD_EXECUTABLE)
+if(TAU_BUILD_EXECUTABLE)
         add_executable(${TAU_EXECUTABLE_NAME})
         target_sources(${TAU_EXECUTABLE_NAME} PRIVATE ${CLI_SOURCES})
         target_setup(${TAU_EXECUTABLE_NAME})
@@ -89,12 +89,12 @@ if(BUILD_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
 	)
-endif(BUILD_EXECUTABLE)
+endif(TAU_BUILD_EXECUTABLE)
 
 #
 # executable using shared library
 #
-if(BUILD_SHARED_EXECUTABLE)
+if(TAU_BUILD_SHARED_EXECUTABLE)
         add_executable(${TAU_EXE_SHARED_NAME})
         target_sources(${TAU_EXE_SHARED_NAME} PRIVATE ${CLI_SOURCES})
         target_setup(${TAU_EXE_SHARED_NAME})
@@ -103,7 +103,7 @@ if(BUILD_SHARED_EXECUTABLE)
 		$<BUILD_INTERFACE:${TAU}/src>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
 	)
-endif(BUILD_SHARED_EXECUTABLE)
+endif(TAU_BUILD_SHARED_EXECUTABLE)
 
 #
 # install
