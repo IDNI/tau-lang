@@ -534,7 +534,7 @@ using tau_node_terminal_extractor_t = decltype(tau_node_terminal_extractor<BAs..
 
 // extracts terminal from sp_tau_source_node
 auto tau_source_terminal_extractor = [](const sp_tau_source_node& n) -> std::optional<char> {
-	if (n->value.nt()&& !(n->value).is_null())
+	if (!n->value.nt() && !(n->value).is_null())
 		return std::optional<char>(n->value.t());
 	return std::optional<char>();
 };
@@ -1496,11 +1496,27 @@ sp_tau_node<BAs...> tau_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>
 // operators << to pretty print the tau language related types
 //
 
-// TODO (HIGH) << for basic types
-//
-// For example: tau_source_sym, tau_source_node,  sp_tau_source_node, tau_sym,
-// sp_tau_node, tau_rule, rule,, rules, statement,, library,, bindings,
-// formulas,...
+// << for rules
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& stream, const idni::tau::rules<BAs...>& rs) {
+	for (const auto& r : rs) stream << r << "\n";
+	return stream;
+}
+
+// << for formulas
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& stream, const idni::tau::formula<BAs...>& f) {
+	return stream << f.rec_relations << f.main << "\n";
+}
+
+// << for bindings
+// TODO (HIGH) << for bindings depends on << for variant<BAs...>
+// TODO (HIGH) << for bindings needs to follow tau lang syntax
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& stream, const idni::tau::bindings<BAs...>& bs) {
+	for (const auto& b : bs) stream << b.first << ": " << b.second << "\n";
+	return stream;
+}
 
 // outputs a sp_tau_node<...> to a stream, using the stringify transformer
 // and assumes that the constants also override operator<<.
@@ -1517,6 +1533,11 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_node<BAs.
 // IDEA maybe it should be move to out.h
 std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_source_node& n){
 	return stream << idni::tau::make_string(idni::tau::tau_source_terminal_extractor, n);
+}
+
+// << tau_source_node (make it shared to make use of the previous operator)
+std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_node& n){
+	return stream << std::make_shared<idni::tau::tau_source_node>(n);
 }
 
 #endif // __PROGRAM_H__
