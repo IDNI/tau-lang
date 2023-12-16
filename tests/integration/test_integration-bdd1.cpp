@@ -35,7 +35,7 @@ namespace testing = doctest;
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
 	TEST_CASE("T") {
-		const char* sample =	"T.";
+		const char* sample = "T.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -46,7 +46,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F") {
-		const char* sample =	"F.";
+		const char* sample = "F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -57,7 +57,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T && F") {
-		const char* sample =	"(T && F).";
+		const char* sample = "(T && F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -68,7 +68,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T ^ F") {
-		const char* sample =	"(T ^ F).";
+		const char* sample = "(T ^ F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -79,7 +79,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T ? T : F") {
-		const char* sample =	"(T ? T : F).";
+		const char* sample = "(T ? T : F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -90,7 +90,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F ? T : F") {
-		const char* sample =	"(F ? T : F).";
+		const char* sample = "(F ? T : F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -101,7 +101,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F || F") {
-		const char* sample =	"(F || F).";
+		const char* sample = "(F || F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -112,7 +112,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("! F") {
-		const char* sample =	"! F.";
+		const char* sample = "! F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -123,7 +123,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F -> F") {
-		const char* sample =	"(F -> F).";
+		const char* sample = "(F -> F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
