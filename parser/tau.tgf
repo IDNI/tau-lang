@@ -1,16 +1,5 @@
 @use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
-# in all those cases: x and y is are vars and "tau" is a constant
-# x & tau // wrong
-# x & {tau} // ok
-# x && {tau} // wrong
-# x && tau // wrong
-# x &&& tau // wrong
-# x &&& {tau} // ok
-# x && y // wrong
-# x & y // ok if x and y came from the same boolean algebra
-# x &&& y // ok if x and y came from the boolean algebra of tau formulas
-
 #
 # as a rule of thumb, to ease navigation of the corresponding tree, the
 # non-terminals shouldn't appear in * or + expressions. Otherwise,
@@ -40,25 +29,18 @@ q_str			=> '"'.
 q_bqstr			=> '`'.
 char_punct		=> punct & ~q_char & ~q_str & ~q_bqstr
 					& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr).
-
 char0			=> alnum | space | char_escape_encode | char_punct.
 char_			=> char0 | esc q_char |     q_str |     q_bqstr.
 string_char		=> char0 |     q_char | esc q_str |     q_bqstr.
 bqstring_char	=> char0 |     q_char |     q_str | esc q_bqstr.
 chars			=> alpha (alnum)*.
-
 char_class    	=> "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
 				| "graph" | "lower" | "printable" | "punct" | "space"
 				| "upper" | "xdigit".
-
-# elements
-sym				=> chars.
+digits			=> digit (digit)*.
 
 # common symbols
 definition			=> ws ":=" ws.
-# TODO (TK) (MEDIUM) should be = instead of ==
-equality			=> ws "==" ws.
-nequality			=> ws "!=" ws.
 dot 				=> ws '.' ws.
 open_parenthesis	=> ws '(' ws.
 close_parenthesis	=> ws ')' ws.
@@ -69,159 +51,116 @@ close_brace			=> ws '}' ws.
 minus				=> ws '-' ws.
 colon				=> ws ':' ws.
 less				=> ws '<' ws.
+comma 				=> ws ',' ws.
 
-# indexes
-indexes			=> open_bracket (index)* close_bracket.
-index			=> variable | capture | ignore | offset.
-num				=> digit+.
+# elements
+sym				=> chars.
 
-# captures
+# offsets
+offsets			=> open_bracket step (comma offset)* close_bracket.
+offset			=> num | capture | shift.
+step			=> num | capture | shift.
+shift 			=> capture minus num.
+num				=> ws digits ws.
 
-captures 		=> open_parenthesis capture (ws_required capture)* close_parenthesis
-				| open_parenthesis close_parenthesis.
-
-# variables
 variable		=> var | timed.
+timed			=> (in | out)  offsets.
 
-# QUESTION does timed variables have one index or several?
-# this should be typed according to the original BA.
-timed			=> (in | out)  indexes.
-offset			=> variable | variable minus num.
-# TODO (HIGH) remove ignore as it is not used
-#
-# That aldo implies removing the ignore rule from the code when neccessary
-ignore 			=> '_'.
 capture			=> '$' chars.
-var				=> '?' chars.
+var				=> chars.
 in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
 
 # wff
-wff_rule		=> wff_matcher definition wff_body dot.
+wff_rule			=> wff_matcher definition wff_body dot.
+wff_rec_relation	=> wff_ref definition wff dot.
 
-# needed for rule CBF_DEF_IF
 wff_matcher	=> wff | wff_ref.
 wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 				| wff_has_subformula_cb | wff_remove_existential.
 
-wff_ref			=> sym indexes wff_ref_args.
+# TODO (MEDIUM) check programatically that no capture is use in a rec_relation as wff
+wff 			=> wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
+					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
+					| wff_t | wff_f | capture
+					| bf_eq | bf_neq | bf_less | bf_less_equal | bf_greater.
+wff_ref			=> sym offsets wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
-
-# TODO (HIGH) rename wff_eq and wff_new to bf_eq and bf_neq
-wff 			=> wff_eq | wff_neq | wff_ref | wff_and | wff_neg | wff_xor | cbf_if
-					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv | cbf_and_wff
-					| wff_coimply | wff_t | wff_f | capture |ignore.
-wff_eq 			=> open_parenthesis cbf equality wff_f close_parenthesis.
-wff_neq 		=> open_parenthesis cbf nequality wff_f close_parenthesis.
 wff_and			=> open_parenthesis wff wff_and_sym wff close_parenthesis.
 wff_or			=> open_parenthesis wff wff_or_sym wff close_parenthesis.
 wff_xor			=> open_parenthesis wff wff_xor_sym wff close_parenthesis.
+wff_conditional	=> open_parenthesis wff wff_conditional_sym wff colon wff close_parenthesis.
 wff_neg			=> wff_neg_sym wff.
 wff_imply		=> open_parenthesis wff wff_imply_sym wff close_parenthesis.
 wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
-wff_coimply		=> open_parenthesis wff wff_coimply_sym wff close_parenthesis.
-wff_all			=> wff_all_sym (variable|capture|ignore) ws_required wff.
-wff_ex			=> wff_ex_sym (variable|capture|ignore) ws_required wff.
-cbf_and_wff		=> open_parenthesis cbf cbf_and_wff_sym wff close_parenthesis.
+wff_all			=> wff_all_sym (variable|capture) ws_required wff.
+wff_ex			=> wff_ex_sym ws_required (variable|capture) ws_required wff.
 
-cbf_if				=> open_parenthesis cbf_if_sym cbf_if_condition
-						cbf_then_sym cbf_if_then
-						cbf_else_sym cbf_if_else close_parenthesis.
-cbf_if_condition	=> wff.
-cbf_if_then			=> cbf.
-cbf_if_else			=> cbf.
+# relational operators
+#
+# they are named bf_* as they involve boolean functions,
+# but they are not boolean functions themselves, they return a T/F wff value
+# and hence, should be considered as wffs
+bf_eq 			=> open_parenthesis bf bf_equality_sym bf close_parenthesis.
+bf_neq 			=> open_parenthesis bf bf_nequality_sym bf close_parenthesis.
+bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
+bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
+bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
 
 # wff_op_sym
-wff_and_sym		=> ws "wff_and" ws.
-wff_or_sym		=> ws "wff_or" ws.
-wff_xor_sym		=> ws "wff_xor" ws.
-wff_neg_sym		=> ws "wff_neg" ws.
-wff_imply_sym	=> ws "wff_imply" ws.
-wff_equiv_sym	=> ws "wff_equiv" ws.
-wff_coimply_sym	=> ws "wff_coimply" ws.
-wff_all_sym		=> ws "wff_all" ws.
-wff_ex_sym		=> ws "wff_ex" ws.
-wff_t			=> ws 'T' ws.
-wff_f			=> ws 'F' ws.
-cbf_and_wff_sym	=> ws "cbf_and_wff" ws.
+wff_and_sym			=> ws "&&" ws.
+wff_or_sym			=> ws "||" ws.
+wff_xor_sym			=> ws '^' ws.
+wff_conditional_sym	=> ws '?' ws.
+wff_neg_sym			=> ws '!' ws.
+wff_imply_sym		=> ws "->" ws.
+wff_equiv_sym		=> ws "<->" ws.
+wff_all_sym			=> ws "all" ws.
+wff_ex_sym			=> ws "ex" ws.
+wff_t				=> ws 'T' ws.
+wff_f				=> ws 'F' ws.
 
-# cbf
-cbf_rule 	=> cbf_matcher definition cbf_body dot.
-cbf_matcher	=> cbf | cbf_ref.
-cbf_body	=> cbf.
-
-cbf_ref 		=> sym indexes cbf_ref_args.
-cbf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
-
-cbf 				=> bf | cbf_ref | cbf_and | cbf_neg | cbf_xor | cbf_or
-						| cbf_imply | cbf_equiv | cbf_coimply | cbf_ref.
-cbf_and				=> open_parenthesis cbf cbf_and_sym cbf close_parenthesis.
-cbf_or				=> open_parenthesis cbf cbf_or_sym cbf close_parenthesis.
-cbf_xor				=> open_parenthesis cbf cbf_xor_sym cbf close_parenthesis.
-cbf_neg				=> cbf_neg_sym cbf.
-cbf_imply			=> open_parenthesis cbf cbf_imply_sym cbf close_parenthesis.
-cbf_equiv			=> open_parenthesis cbf cbf_equiv_sym cbf close_parenthesis.
-cbf_coimply			=> open_parenthesis cbf cbf_coimply_sym cbf close_parenthesis.
-
-# cbf_op_sym
-cbf_and_sym			=> ws "cbf_and" ws.
-cbf_or_sym			=> ws "cbf_or" ws.
-cbf_xor_sym			=> ws "cbf_xor" ws.
-cbf_neg_sym			=> ws "cbf_neg" ws.
-cbf_imply_sym		=> ws "cbf_imply" ws.
-cbf_equiv_sym		=> ws "cbf_equiv" ws.
-cbf_coimply_sym		=> ws "cbf_coimply" ws.
-cbf_if_sym			=> ws "if" ws.
-cbf_then_sym		=> ws "then" ws.
-cbf_else_sym		=> ws "else" ws.
-
-# bf - TODO bf => constant | bf & bf | bf | bf | ~bf | bf ^ bf | in[n][t]
-# | out[n][t] <<< this thing is important!!!
-#
-# QUESTION: Does timed vars appear only in bf formulas?
-
+# bf
 bf_rule		=> bf_matcher definition bf_body dot.
+bf_rec_relation	=> bf_ref definition bf dot.
 
 bf_matcher	=> bf.
 bf_body 	=> bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
 				| bf_has_subformula_cb.
 
-bf				=> bf_constant | bf_and | bf_neg | bf_xor | bf_or
-					| bf_all | bf_ex | bf_less | bf_less_equal | bf_greater
-					| bf_less_cb | bf_less_equal_cb | bf_greater_cb
-					# TODO (LOW) check proper use of bf_subs_cb in code
-					#
-					# we should have a check method that verifies that the user
-					# is not uising subs in its code.
-					| bf_subs_cb | bf_t | bf_f | variable | capture | ignore.
-bf_and			=> open_parenthesis bf bf_and_sym bf close_parenthesis.
-bf_or			=> open_parenthesis bf bf_or_sym bf close_parenthesis.
-bf_xor			=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
-bf_neg			=> bf_neg_sym bf.
-bf_less			=> open_parenthesis bf bf_less_sym bf close_parenthesis.
-bf_less_equal	=> open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
-bf_greater		=> open_parenthesis bf bf_greater_sym bf close_parenthesis.
-bf_all			=> bf_all_sym ws_required (variable | capture) ws_required bf.
-bf_ex			=> bf_ex_sym ws_required (variable | capture) ws_required bf.
+# TODO (MEDIUM) remove bf_subs_cb and add a callback to eliminate fall and fex
+bf			=> bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_or
+				| bf_all | bf_ex
+				| bf_subs_cb | bf_t | bf_f | variable | capture.
+bf_ref 		=> sym offsets bf_ref_args.
+bf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
+bf_and		=> open_parenthesis bf bf_and_sym bf close_parenthesis.
+bf_or		=> open_parenthesis bf bf_or_sym bf close_parenthesis.
+bf_xor		=> open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
+bf_neg		=> bf_neg_sym bf.
+bf_all		=> bf_all_sym ws_required (variable | capture) ws_required bf.
+bf_ex		=> bf_ex_sym ws_required (variable | capture) ws_required bf.
 
 # bf_op_sym
-bf_and_sym			=> ws "bf_and" ws.
-bf_or_sym			=> ws "bf_or" ws.
-bf_xor_sym			=> ws "bf_xor" ws.
-bf_neg_sym			=> ws "bf_neg" ws.
-bf_less_sym			=> ws "bf_less" ws.
-bf_less_equal_sym	=> ws "bf_less_equal" ws.
-bf_greater_sym		=> ws "bf_greater" ws.
-bf_all_sym			=> ws "bf_all" ws.
-bf_ex_sym			=> ws "bf_ex" ws.
-bf_t				=> ws 'T' ws.
-bf_f				=> ws 'F' ws.
+bf_and_sym			=> ws '&' ws.
+bf_or_sym			=> ws '|' ws.
+bf_xor_sym			=> ws '+' ws.
+bf_neg_sym			=> ws '~' ws.
+bf_equality_sym		=> ws "=" ws.
+bf_nequality_sym	=> ws "!=" ws.
+bf_less_sym			=> ws '<' ws.
+bf_less_equal_sym	=> ws "<=" ws.
+bf_greater_sym		=> ws '>' ws.
+bf_all_sym			=> ws "fall" ws.
+bf_ex_sym			=> ws "fex" ws.
+bf_t				=> ws '1' ws.
+bf_f				=> ws '0' ws.
 
 # constant
 bf_constant		=> open_brace constant close_brace.
 
-#constants, test_bf is included for testing purposes only
-constant		=>  binding | capture | ignore
+#constants
+constant		=>  binding | capture
 					| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
 binding			=> source_binding | named_binding.
 named_binding	=> chars.
@@ -247,15 +186,14 @@ source			=> (source0)+.
 # 3.- to create new subformulas in other rules, for instance, to create a
 # new formula that is the substitution of a variable by a constant.
 
-# TODO (HIGH) Earley parser doesn't support tabs in comments
+# TODO (HIGH) earley parser doesn't support tabs in comments
+#
+# This should be move to a TODO in the parsers...
 
 bf_and_cb			=> bf_cb_arg bf_and_cb_sym bf_cb_arg.
 bf_or_cb			=> bf_cb_arg bf_or_cb_sym bf_cb_arg.
 bf_xor_cb			=> bf_cb_arg bf_xor_cb_sym bf_cb_arg.
 bf_neg_cb			=> bf_neg_cb_sym bf_cb_arg.
-bf_less_cb			=> bf_less_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-bf_less_equal_cb	=> bf_less_equal_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-bf_greater_cb		=> bf_greater_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 bf_subs_cb			=> bf_subs_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 bf_eq_cb			=> bf_eq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 bf_neq_cb			=> bf_neq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
@@ -268,18 +206,16 @@ wff_has_clashing_subformulas_cb	=> wff_has_clashing_subformulas_cb_sym wff_cb_ar
 bf_has_subformula_cb 			=> bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 wff_remove_existential			=> wff_remove_existential_cb_sym wff_cb_arg ws_required wff_cb_arg.
+
 # bultin_args
-bf_cb_arg	=> capture | ignore | bf.
-wff_cb_arg	=> capture | ignore | wff.
+bf_cb_arg	=> capture | bf.
+wff_cb_arg	=> capture | wff.
 
 # bf_cb_syms
 bf_and_cb_sym			=> ws "bf_and_cb" ws.
 bf_or_cb_sym			=> ws "bf_or_cb" ws.
 bf_xor_cb_sym			=> ws "bf_xor_cb" ws.
 bf_neg_cb_sym			=> ws "bf_neg_cb" ws.
-bf_less_cb_sym			=> ws "bf_less_cb" ws.
-bf_less_equal_cb_sym	=> ws "bf_less_equal_cb" ws.
-bf_greater_cb_sym		=> ws "bf_greater_cb" ws.
 bf_subs_cb_sym			=> ws "bf_subs_cb" ws.
 bf_eq_cb_sym			=> ws "bf_eq_cb" ws.
 bf_neq_cb_sym			=> ws "bf_neq_cb" ws.
@@ -300,13 +236,14 @@ input			=> in colon open_brace source_binding close_brace.
 # main posibilities
 inputs			=> less input (input)* dot.
 main			=> wff dot.
-rule			=> wff_rule | cbf_rule | bf_rule .
+rule			=> wff_rule | bf_rule .
 rules			=> (rule)*.
-formula			=> rules main.
+rec_relation	=> bf_rec_relation | wff_rec_relation dot.
+rec_relations	=> (rec_relation)*.
+formula			=> rec_relations main.
 library 		=> rules.
 # each builder is define on its own string
-builder			=> captures definition builder_body dot.
-builder_body	=> wff | cbf | bf.
+builder			=> builder_head definition builder_body dot.
+builder_head	=> open_parenthesis capture (ws_required capture)* close_parenthesis.
+builder_body	=> wff | bf.
 start			=> formula | library | builder | inputs.
-
-# TODO (HIGH) rename operators to tau & tau, tau && tau, tau &&& tau,...

@@ -433,7 +433,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
 #ifdef DEBUG
 		assert(V.size() < pow(2, o.idW));
-		if constexpr (o.has_varshift()) { assert(v < pow(2, o.shiftW)); }
+		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
 #endif
 		if (h == l) return h;
 #ifdef DEBUG
@@ -958,7 +958,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static bdd_ref add(uint_t v, bdd_ref h, bdd_ref l) {
 #ifdef DEBUG
 		assert(V.size() < pow(2, o.idW));
-		if constexpr (o.has_varshift()) { assert(v < pow(2, o.shiftW)); }
+		if constexpr (o.has_varshift()) assert(v < pow(2, o.shiftW));
 #endif
 		if (h == l) return h;
 #ifdef DEBUG

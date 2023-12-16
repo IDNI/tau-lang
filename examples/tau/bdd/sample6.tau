@@ -1,0 +1,1 @@
+all X all Y ((Y & X) != 0).

@@ -28,7 +28,11 @@
 
 #include "forest.h"
 #include "parser.h"
-//#include "tree.h"
+
+// TODO (MEDIUM) fix proper types (alias) at this level of abstraction
+//
+// We should talk about of sp_tau_node, rule,...
+
 
 namespace idni::rewriter {
 
@@ -46,6 +50,8 @@ struct node {
 	// equality operators and ordering
 	bool operator==(const node& that) const = default;
 	bool operator!=(const node& that) const = default;
+
+	// TODO (HIGH) give a proper implementation of ==, != and <=> operators
 	auto operator <=> (const node& that) const noexcept {
 		if (auto cmp = value <=> that.value; cmp != 0) { return cmp; }
 		return std::lexicographical_compare_three_way(
@@ -66,8 +72,7 @@ using sp_node = std::shared_ptr<node<symbol_t>>;
 
 // node factory method
 template <typename symbol_t>
-sp_node<symbol_t> make_node(const symbol_t& s,
-		const std::vector<sp_node<symbol_t>>& ns) {
+sp_node<symbol_t> make_node(const symbol_t& s, const std::vector<sp_node<symbol_t>>& ns) {
 	static std::map<node<symbol_t>, sp_node<symbol_t>> cache;
 	node<symbol_t> key{s, ns};
 	if (auto it = cache.find(key); it != cache.end()) {
@@ -136,7 +141,54 @@ private:
 	}
 };
 
-// TODO (MEDIUM) add a post_order_traverser that does not have a wrapped transformer so
+// visitor that traverse the tree in post-order (avoiding visited nodes).
+template <typename wrapped_t, typename predicate_t, typename input_node_t,
+	typename output_node_t = input_node_t>
+struct post_order_query_traverser {
+
+	post_order_query_traverser(wrapped_t& wrapped, predicate_t& query) :
+		wrapped(wrapped), query(query) {}
+
+	output_node_t operator()(const input_node_t& n) {
+		// we kept track of the visited nodes to avoid visiting the same node
+		// twice. However, we do not need to keep track of the root node, since
+		// it is the one we start from and we will always be visited.
+		std::set<input_node_t> visited;
+		// if the root node matches the query predicate, we traverse it, otherwise
+		// we return the result of apply the wrapped transform to the node.
+		return traverse(n, visited);
+	}
+
+	wrapped_t& wrapped;
+	predicate_t& query;
+
+private:
+	std::optional<output_node_t> found;
+
+	output_node_t traverse(const input_node_t& n, std::set<input_node_t>& visited) {
+		// we traverse the children of the node in post-order, i.e. we visit
+		// the children first and then the node itself.
+		if (found) return found.value();
+		for (const auto& c : n->child)
+			// we skip already visited nodes and nodes that do not match the
+			// query predicate if it is present.
+			if (!visited.contains(c) && !found) {
+				traverse(c, visited);
+				// we assume we have no cycles, i.e. there is no way we could
+				// visit the same node again down the tree.
+				// thus we can safely add the node to the visited set after
+				// visiting it.
+				visited.insert(c);
+				if (!found) found = query(c) ? wrapped(c) : std::optional<output_node_t>{};
+			}
+		// finally we apply the wrapped visitor to the node if it is present.
+		if (!found) found = query(n) ? wrapped(n) : std::optional<output_node_t>{};
+		return found ? found.value() : wrapped(n);
+	}
+};
+
+
+// TODO (LOW) add a post_order_traverser that does not have a wrapped transformer so
 // it is faster when dealing with only predicate operations (searches,...) and
 // change all the related code.
 
@@ -528,6 +580,8 @@ using environment = std::map<node_t, node_t>;
 template<typename node_t>
 using rule = std::pair<node_t, node_t>;
 
+// TODO (MEDIUM) simplify matchers code and extract common code.
+
 // this predicate matches when there exists a environment that makes the
 // pattern match the node.
 //
@@ -555,7 +609,7 @@ struct pattern_matcher {
 		if (match(pattern, n)) matched = { n };
 		else env.clear();
 		// we continue visiting until we found a match.
-		return !matched;
+		return matched.has_value();
 	}
 
 	std::optional<node_t> matched = std::nullopt;
@@ -603,7 +657,7 @@ template <typename node_t, typename is_ignore_t, typename is_capture_t, typename
 struct pattern_matcher_with_skip {
 	using pattern_t = node_t;
 
-	pattern_matcher_with_skip(pattern_t& pattern, environment<node_t>& env,
+	pattern_matcher_with_skip(const pattern_t& pattern, environment<node_t>& env,
 		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t& is_skip):
 		pattern(pattern), env(env), is_ignore(is_ignore),
 		is_capture(is_capture), is_skip(is_skip) {}
@@ -618,15 +672,83 @@ struct pattern_matcher_with_skip {
 		if (match(pattern, n)) matched = { n };
 		else env.clear();
 		// we continue visiting until we found a match.
-		return !matched;
+		return matched.has_value();
 	}
 
 	std::optional<node_t> matched = std::nullopt;
-	pattern_t& pattern;
+	const pattern_t& pattern;
 	environment<node_t>& env;
 	is_ignore_t& is_ignore;
 	is_capture_t& is_capture;
 	is_skip_t& is_skip;
+
+private:
+	bool match(const pattern_t& p, const node_t& n) {
+		// if we already have captured a node associated to the current capture
+		// we check if it is the same as the current node, if it is not, we
+		// return false...
+		if (is_capture(p))
+			if (auto it = env.find(p); it != env.end()  && it->second != n)
+				return false;
+			// ...otherwise we save the current node as the one associated to the
+			// current capture and return true.
+			else return env.emplace(p, n), true;
+		// if the current node is an ignore, we return true.
+		else if (is_ignore(p)) return true;
+		// otherwise, we check the symbol of the current node and if it is the
+		// same as the one of the current pattern, we check if the children
+		// match recursively.
+		else if (p->value == n->value) {
+			auto p_it = p->child.begin();
+			auto n_it = n->child.begin();
+			while (p_it != p->child.end() && n_it != n->child.end()) {
+				if (is_skip(*p_it)) { ++p_it; continue; }
+				if (is_skip(*n_it)) { ++n_it; continue; }
+				if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
+				if (match(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
+				return false;
+			}
+			return true;
+		}
+		return false;
+	}
+};
+
+// this predicate matches when there exists a environment that makes the
+// pattern match the node ignoring the nodes detected as skippable.
+//
+// TODO (LOW) create an env in operator() and pass it as a parameter to match, if
+// a  match occurs, copy the data from the temp env to the env passed as
+// parameter.
+template <typename node_t, typename is_ignore_t, typename is_capture_t, typename is_skip_t, typename predicate_t>
+struct pattern_matcher_with_skip_if {
+	using pattern_t = node_t;
+
+	pattern_matcher_with_skip_if(const pattern_t& pattern, environment<node_t>& env,
+		is_ignore_t& is_ignore, is_capture_t& is_capture, is_skip_t &is_skip, predicate_t& predicate):
+		pattern(pattern), env(env), is_ignore(is_ignore),
+		is_capture(is_capture), is_skip(is_skip), predicate(predicate) {}
+
+	bool operator()(const node_t& n) {
+		// if we have matched the pattern, we never try again to unify
+		if (matched) return false;
+		// we clear previous environment attempts
+		env.clear();
+		// then we try to match the pattern against the node and if the match
+		// was successful, we save the node that matched.
+		if (match(pattern, n) && predicate(n)) matched = { n };
+		else env.clear();
+		// we continue visiting until we found a match.
+		return matched.has_value();
+	}
+
+	std::optional<node_t> matched = std::nullopt;
+	const pattern_t& pattern;
+	environment<node_t>& env;
+	is_ignore_t& is_ignore;
+	is_capture_t& is_capture;
+	is_skip_t& is_skip;
+	predicate_t& predicate;
 
 private:
 	bool match(const pattern_t& p, const node_t& n) {
@@ -673,27 +795,49 @@ node_t apply(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c) {
 // unnecessary subtrees
 template <typename node_t, typename is_ignore_t, typename is_capture_t,
 	typename is_skip_t>
-node_t apply_with_skip(rule<node_t>& r, node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
+node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
 	auto [p , s] = r;
 	environment<node_t> u;
 	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t>
 		matcher {p, u, i, c, sk};
-	#ifndef OUTPUT_APPLY_RULES
-	return apply(s, n, matcher);
-	#else // OUTPUT_APPLY_RULES
 	auto nn = apply(s, n, matcher);
-	std::cout << "applying rule: " << p << " = " << s << std::endl;
-	std::cout << "\tinitial node: " << n << std::endl;
-	std::cout << "\tfinal node: " << nn << std::endl;
-	return nn;
+
+	#ifdef OUTPUT_APPLY_RULES
+	if (nn != n) {
+		std::cout << "(R): " << p << " = " << s << std::endl;
+		std::cout << "(F): " << nn << std::endl;
+	}
 	#endif // OUTPUT_APPLY_RULES
+
+	return nn;
+}
+
+// apply a rule to a tree using the predicate to pattern_matcher and skipping
+// unnecessary subtrees
+template <typename node_t, typename is_ignore_t, typename is_capture_t,
+	typename is_skip_t, typename predicate_t>
+node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk, predicate_t& predicate) {
+	auto [p , s] = r;
+	environment<node_t> u;
+	pattern_matcher_with_skip_if<node_t, is_ignore_t, is_capture_t, is_skip_t, predicate_t>
+		matcher {p, u, i, c, sk, predicate};
+	auto nn = apply(s, n, matcher);
+
+	#ifdef OUTPUT_APPLY_RULES
+	if (nn != n) {
+		std::cout << "(R): " << p << " = " << s << std::endl;
+		std::cout << "(F): " << nn << std::endl;
+	}
+	#endif // OUTPUT_APPLY_RULES
+
+	return nn;
 }
 
 // apply a substitution to a rule according to a given matcher, this method is
 // use internaly by apply and apply with skip.
 template <typename node_t, typename matcher_t>
-node_t apply(node_t& s, node_t& n, matcher_t& matcher) {
-	post_order_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
+node_t apply(const node_t& s, const node_t& n, matcher_t& matcher) {
+	post_order_query_traverser<identity_t<node_t>, matcher_t, node_t>(identity<node_t>, matcher)(n);
 	if (matcher.matched) {
 		auto nn = replace<node_t>(s, matcher.env);
 		environment<node_t> nenv { {matcher.matched.value(), nn} };
@@ -719,17 +863,10 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 	sp_parse_tree t;
 	static parser_t parser;
 	auto f = parser.parse(source.c_str(), source.size());
-	// output the error if the parser failed.
-	if (!f || !parser.found())
-		std::cerr << parser.get_error().to_str() << std::endl;
-#ifdef DEBUG
-	// // MARK show number of trees if ambiguous
-	// if (f && f->is_ambiguous()) {
-	// 	std::cout << "N trees: " << f->count_trees() << std::endl;
-	// 	// // MARK show forest data
-	// 	//f->print_data(std::cout << " for source: \n" << source << "\": \n") << std::endl;)
-	// }
-#endif
+	// MARK output the error if the parser failed
+	// avoiding doctest issues, uncomment for errors
+	// if (!f || !parser.found())
+	// 	std::cerr << parser.get_error().to_str() << std::endl;
 	auto get_tree = [&f, &t] (auto& g) {
 			f->remove_recursive_nodes(g);
 			f->remove_binarization(g);
@@ -745,11 +882,33 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 	map_transformer<drop_location_t<parse_symbol_t, symbol_t>,
 		sp_parse_tree, sp_node<symbol_t>> transform(drop_location<parse_symbol_t, symbol_t>);
 	return post_order_traverser<
-			// REVIEW maybe should be transformer instead of drop_location
 			map_transformer<drop_location_t<parse_symbol_t, symbol_t>, sp_parse_tree, sp_node<symbol_t>>,
 			all_t<sp_parse_tree>,
 			sp_parse_tree, sp_node<symbol_t>>
 		(transform, all<sp_parse_tree>)(t);
 	}
 } // namespace idni::rewriter
+
+//
+// operators << to pretty print the tau language related types
+//
+
+// << for sp_node
+template <typename symbol_t>
+std::ostream& operator<<(std::ostream& stream, const idni::rewriter::sp_node<symbol_t>& n) {
+	return stream << n << "\n";
+}
+
+// << for node (make it shared make use of the previous operator)
+template <typename symbol_t>
+std::ostream& operator<<(std::ostream& stream, const idni::rewriter::node<symbol_t>& n) {
+	return stream << make_shared<idni::rewriter::sp_node<symbol_t>>(n);
+}
+
+// << for rule
+template <typename node_t>
+std::ostream& operator<<(std::ostream& stream, const idni::rewriter::rule<node_t>& r) {
+	return stream << r.first << " := " << r.second << ".";
+}
+
 #endif // __IDNI__REWRITING_H__

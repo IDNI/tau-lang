@@ -56,7 +56,6 @@ function(target_setup target)
 			-Wstrict-overflow=5
 			-Wfloat-equal
 			-Wwrite-strings
-			-Wno-unused-function
 			#-Werror
 			#-Wfatal-errors
 		)

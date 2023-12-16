@@ -1,4 +1,4 @@
-// This file is generated from a file /home/klip/idni/tau-lang.devel/parser/bdd.tgf by 
+// This file is generated from a file parser/bdd.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
 #ifndef __BDD_PARSER_H__
@@ -10,38 +10,43 @@ struct bdd_parser {
 		nts(load_nonterminals()), cc(load_cc()),
 		g(nts, load_prods(), nt(60), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		const char* data, size_t size = 0,
+		const char* data, size_t size = 0, size_t max_l = 0,
 		char eof = std::char_traits<char>::eof())
-			{ return p.parse(data, size, eof); }
+			{ return p.parse(data, size, max_l, eof); }
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		int fd, size_t size = 0,
+		std::basic_istream<char>& is, size_t max_l = 0,
 		char eof = std::char_traits<char>::eof())
-			{ return p.parse(fd, size, eof); }
+			{ return p.parse(is, max_l, eof); }
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		std::basic_istream<char>& is,
-		size_t size = 0,
+		std::string fn, mmap_mode m, size_t max_l = 0,
 		char eof = std::char_traits<char>::eof())
-			{ return p.parse(is, size, eof); }
+			{ return p.parse(fn, m, max_l, eof); }
+#ifndef WIN32
+	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
+		int fd, size_t max_l = 0,
+		char eof = std::char_traits<char>::eof())
+			{ return p.parse(fd, max_l, eof); }
+#endif //WIN32
 	bool found() { return p.found(); }
 	typename idni::parser<char, char>::error get_error()
 		{ return p.get_error(); }
 	enum nonterminal {
-		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, eol, 
-		ws_comment, _Rws_comment_0, ws_required, ws, hex_escape, unicode_escape, char_escape_encode, esc, q_char, q_str, 
-		q_bqstr, char_punct, _Rchar_punct_1, _Rchar_punct_2, _Rchar_punct_3, char0, char_, string_char, bqstring_char, chars, 
-		_Rchars_4, _Rchars_5, char_class, equality, nequality, dot, open_parenthesis, close_parenthesis, open_bracket, close_bracket, 
-		open_brace, close_brace, less_than, greater_than, minus, plus, colon, var, bdd, bdd_and, 
-		bdd_neg, bdd_xor, bdd_or, T, F, bdd_arg, bdd_and_sym, bdd_or_sym, bdd_xor_sym, bdd_neg_sym, 
-		start, __neg_0, __neg_1, __neg_2, __neg_3, __neg_4, __neg_5, 
+		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, eol,
+		ws_comment, _Rws_comment_0, ws_required, ws, hex_escape, unicode_escape, char_escape_encode, esc, q_char, q_str,
+		q_bqstr, char_punct, _Rchar_punct_1, _Rchar_punct_2, _Rchar_punct_3, char0, char_, string_char, bqstring_char, chars,
+		_Rchars_4, _Rchars_5, char_class, equality, nequality, dot, open_parenthesis, close_parenthesis, open_bracket, close_bracket,
+		open_brace, close_brace, less_than, greater_than, minus, plus, colon, var, bdd, bdd_and,
+		bdd_neg, bdd_xor, bdd_or, T, F, bdd_arg, bdd_and_sym, bdd_or_sym, bdd_xor_sym, bdd_neg_sym,
+		start, __neg_0, __neg_1, __neg_2, __neg_3, __neg_4, __neg_5,
 	};
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
 	std::vector<char> ts{
-		'\0', '\n', '\r', '#', '\\', 'x', 'u', '\'', '"', 
-		'`', 'a', 'l', 'n', 'm', 'p', 'h', 'b', 'k', 'c', 
-		't', 'r', 'd', 'i', 'g', 'e', 'o', 'f', 'w', 's', 
-		'=', '!', '.', '(', ')', '[', ']', '{', '}', '<', 
-		'>', '-', '+', ':', '?', '_', '1', '0', 
+		'\0', '\n', '\r', '#', '\\', 'x', 'u', '\'', '"',
+		'`', 'a', 'l', 'n', 'm', 'p', 'h', 'b', 'k', 'c',
+		't', 'r', 'd', 'i', 'g', 'e', 'o', 'f', 'w', 's',
+		'=', '!', '.', '(', ')', '[', ']', '{', '}', '<',
+		'>', '-', '+', ':', '?', '_', '1', '0',
 	};
 	idni::nonterminals<char, char> nts{};
 	idni::char_class_fns<char> cc;
@@ -56,13 +61,13 @@ private:
 	idni::nonterminals<char, char> load_nonterminals() const {
 		idni::nonterminals<char, char> nts{};
 		for (const auto& nt : {
-			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "eol", 
-			"ws_comment", "_Rws_comment_0", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", "q_str", 
-			"q_bqstr", "char_punct", "_Rchar_punct_1", "_Rchar_punct_2", "_Rchar_punct_3", "char0", "char_", "string_char", "bqstring_char", "chars", 
-			"_Rchars_4", "_Rchars_5", "char_class", "equality", "nequality", "dot", "open_parenthesis", "close_parenthesis", "open_bracket", "close_bracket", 
-			"open_brace", "close_brace", "less_than", "greater_than", "minus", "plus", "colon", "var", "bdd", "bdd_and", 
-			"bdd_neg", "bdd_xor", "bdd_or", "T", "F", "bdd_arg", "bdd_and_sym", "bdd_or_sym", "bdd_xor_sym", "bdd_neg_sym", 
-			"start", "__neg_0", "__neg_1", "__neg_2", "__neg_3", "__neg_4", "__neg_5", 
+			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "eol",
+			"ws_comment", "_Rws_comment_0", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", "q_str",
+			"q_bqstr", "char_punct", "_Rchar_punct_1", "_Rchar_punct_2", "_Rchar_punct_3", "char0", "char_", "string_char", "bqstring_char", "chars",
+			"_Rchars_4", "_Rchars_5", "char_class", "equality", "nequality", "dot", "open_parenthesis", "close_parenthesis", "open_bracket", "close_bracket",
+			"open_brace", "close_brace", "less_than", "greater_than", "minus", "plus", "colon", "var", "bdd", "bdd_and",
+			"bdd_neg", "bdd_xor", "bdd_or", "T", "F", "bdd_arg", "bdd_and_sym", "bdd_or_sym", "bdd_xor_sym", "bdd_neg_sym",
+			"start", "__neg_0", "__neg_1", "__neg_2", "__neg_3", "__neg_4", "__neg_5",
 		}) nts.get(nt);
 		return nts;
 	}
@@ -104,7 +109,7 @@ private:
 		q(nt(12), (nt(10)+nt(13)));
 		// ws => ws_required.
 		q(nt(13), (nt(12)));
-		// ws => ε.
+		// ws => null.
 		q(nt(13), (nul));
 		// hex_escape => '\\' '\\' 'x' xdigit xdigit.
 		q(nt(14), (t(4)+t(4)+t(5)+nt(4)+nt(4)));
@@ -178,7 +183,7 @@ private:
 		q(nt(30), (nt(6)));
 		// _Rchars_5 => _Rchars_4 _Rchars_5.
 		q(nt(31), (nt(30)+nt(31)));
-		// _Rchars_5 => ε.
+		// _Rchars_5 => null.
 		q(nt(31), (nul));
 		// chars => alpha _Rchars_5.
 		q(nt(29), (nt(5)+nt(31)));
