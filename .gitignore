@@ -31,7 +31,7 @@
 *.out
 *.app
 
-# IDE files	
+# IDE files
 .idea
 .vscode
 
@@ -54,3 +54,6 @@ Testing
 # Sonarqube
 .scannerwork
 bw-output
+
+# private directory for a local stuff
+.local
