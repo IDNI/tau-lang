@@ -3,6 +3,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 set(namespace "TAU")
 set(PROJECT_NAME tau_lang)
+# TODO (LOW) check if tau is better than TAU
 set(PROJECT_LIB_NAME TAU)
 project("${PROJECT_NAME}"
 	VERSION 0.0.1
@@ -18,7 +19,7 @@ option(TAU_BUILD_TESTS             "Build tests"                 OFF)
 option(TAU_BUILD_INTEGRATION       "Build integration tests"     OFF)
 option(TAU_BUILD_REGRESSION        "Build regression tests"      OFF)
 #option(TAU_BUILD_EXAMPLES          "Build examples"              OFF)
-option(GENERATE_PARSER         "Generates parser from TGF"   OFF)
+option(TAU_GENERATE_PARSER         "Generates parser from TGF"   OFF)
 set_property(CACHE TAU_BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_LIBRARY    PROPERTY STRINGS "OFF" "ON")
@@ -28,7 +29,7 @@ set_property(CACHE TAU_BUILD_TESTS             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_INTEGRATION       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REGRESSION        PROPERTY STRINGS "OFF" "ON")
 #set_property(CACHE TAU_BUILD_EXAMPLES          PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE GENERATE_PARSER         PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_GENERATE_PARSER         PROPERTY STRINGS "OFF" "ON")
 
 if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 	AND NOT TAU_BUILD_EXECUTABLE AND NOT TAU_BUILD_SHARED_EXECUTABLE
@@ -49,7 +50,7 @@ message(STATUS "TAU_BUILD_SHARED_EXECUTABLE: ${TAU_BUILD_SHARED_EXECUTABLE}")
 message(STATUS "TAU_BUILD_TESTS: ${TAU_BUILD_TESTS}")
 message(STATUS "TAU_BUILD_REGRESSION: ${TAU_BUILD_REGRESSION}")
 #message(STATUS "TAU_BUILD_EXAMPLES: ${TAU_BUILD_EXAMPLES}")
-message(STATUS "GENERATE_PARSER: ${GENERATE_PARSER}")
+message(STATUS "TAU_GENERATE_PARSER: ${GENERATE_PARSER}")
 
 #
 # Adding parser library's git submodule
@@ -58,10 +59,14 @@ include(add-git-submodule)
 add_git_submodule("external/parser")
 set(IDNI_PARSER_OBJECT_LIB "idni_parsero")
 
+# TODO (LOW) make it run automatically on grammar modifications
+#
+# Check https://stackoverflow.com/questions/26193068/how-to-only-build-auto-generated-code-when-the-generator-or-input-changes-in-cma
+
 #
 # Generate C++ parser from TGF if requested
 #
-if (GENERATE_PARSER)
+if (TAU_GENERATE_PARSER)
 	include(generate-parser)
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf" tau_parser)
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/bdd.tgf" bdd_parser)
