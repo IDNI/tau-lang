@@ -64,10 +64,19 @@ step			=> num | capture | shift.
 shift 			=> capture minus num.
 num				=> ws digits ws.
 
+# timed_offset
+# TODO (HIGH) check that no timed offset is used in a formula (msnso_rr)
+timed_offset	=> open_bracket timed_step close_bracket.
+timed_step		=> num | timed_capture | timed_shift.
+timed_shift 	=> timed_capture minus num.
+timed_capture	=> ws 't' ws.
+
 variable		=> var | timed.
-timed			=> (in | out)  offsets.
+timed			=> (in | out)  timed_offset.
 
 capture			=> '$' chars.
+# TODO (HIGH) var t is reserved for timed variables, so we should check that is not used here
+# TODO (MEDIUM) maybe remove? from timed variables
 var				=> chars.
 in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
