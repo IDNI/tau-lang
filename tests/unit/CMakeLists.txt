@@ -15,6 +15,7 @@ set(TESTS
 	normalizer2
 	type_system
 	bindings
+	iterators
 	traversal
 	rec_relations-execution
 )

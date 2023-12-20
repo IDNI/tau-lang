@@ -17,10 +17,12 @@ set(TAU_HEADERS
 	formula.h
 	seq.h
 	tau.h
+	iterators.h
 )
 
 set(TAU_SOURCES
 	dict.cpp
+	iterators.cpp
 )
 
 set(CLI_SOURCES main.cpp)
