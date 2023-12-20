@@ -50,6 +50,7 @@ open_brace			=> ws '{' ws.
 close_brace			=> ws '}' ws.
 minus				=> ws '-' ws.
 colon				=> ws ':' ws.
+semicolon			=> ws ';' ws.
 less				=> ws '<' ws.
 comma 				=> ws ',' ws.
 
@@ -70,6 +71,20 @@ capture			=> '$' chars.
 var				=> chars.
 in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
+
+# tau
+# TODO (HIGH) check programatically that we do not have inappropriated element from wff in tau
+tau		=> wff | tau_and | tau_or | tau_neg.
+tau_and	=> open_parenthesis tau tau_and_sym tau close_parenthesis.
+tau_or	=> open_parenthesis tau tau_or_sym tau close_parenthesis.
+tau_neg	=> tau_neg_sym tau.
+
+# tau_op_sym
+tau_and_sym	=> ws "&&&" ws.
+tau_or_sym	=> ws "|||" ws.
+# TODO (HIGH) rename to ~ notation
+tau_neg_sym	=> ws "!!!" ws.
+
 
 # wff
 wff_rule			=> wff_matcher definition wff_body dot.
@@ -145,6 +160,7 @@ bf_ex		=> bf_ex_sym ws_required (variable | capture) ws_required bf.
 bf_and_sym			=> ws '&' ws.
 bf_or_sym			=> ws '|' ws.
 bf_xor_sym			=> ws '+' ws.
+# TODO (HIGH) rename to ' notation
 bf_neg_sym			=> ws '~' ws.
 bf_equality_sym		=> ws "=" ws.
 bf_nequality_sym	=> ws "!=" ws.
@@ -240,10 +256,12 @@ rule			=> wff_rule | bf_rule .
 rules			=> (rule)*.
 rec_relation	=> bf_rec_relation | wff_rec_relation dot.
 rec_relations	=> (rec_relation)*.
+# TODO (LOW) rename to msnso_rr
 formula			=> rec_relations main.
 library 		=> rules.
 # each builder is define on its own string
 builder			=> builder_head definition builder_body dot.
 builder_head	=> open_parenthesis capture (ws_required capture)* close_parenthesis.
 builder_body	=> wff | bf.
-start			=> formula | library | builder | inputs.
+gssotc			=> tau semicolon.
+start			=> formula | gssotc | library | builder | inputs.
