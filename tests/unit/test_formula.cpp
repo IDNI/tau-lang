@@ -44,7 +44,7 @@ TEST_SUITE("make_library") {
 // TODO (VERY_LOW) write tests for make_formula_using_factory
 // TODO (VERY_LOW) write tests for make_formula_using_bindings
 // TODO (VERY_LOW) write tests for make_tau_source
-// TODO (VERY_LOW) write tests for tau_apply
+// TODO (VERY_LOW) write tests for formula_apply
 // TODO (VERY_LOW) write tests for tau_apply_builder
 //
 // They are tagged as VERY_LOW because they are extensively tested inderectly in

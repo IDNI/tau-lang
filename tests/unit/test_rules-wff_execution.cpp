@@ -33,7 +33,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -44,7 +44,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -55,7 +55,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -66,7 +66,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -77,7 +77,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -88,7 +88,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -99,7 +99,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -110,7 +110,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -121,7 +121,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -132,7 +132,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -143,7 +143,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -154,7 +154,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -165,7 +165,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -176,7 +176,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -187,7 +187,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -198,7 +198,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -209,7 +209,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -220,7 +220,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -231,7 +231,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -242,7 +242,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -253,7 +253,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -264,7 +264,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -275,7 +275,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -286,7 +286,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -297,7 +297,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -308,7 +308,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -319,7 +319,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -330,7 +330,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -341,7 +341,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -352,7 +352,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -363,7 +363,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -374,7 +374,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -385,7 +385,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -396,7 +396,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -407,7 +407,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -418,7 +418,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -429,7 +429,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -440,7 +440,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -451,7 +451,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -462,7 +462,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -473,7 +473,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -484,7 +484,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -495,7 +495,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher);
+		auto result = formula_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
@@ -506,7 +506,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto [matcher, body] = tau_rule;
-		auto result = tau_apply(tau_rule, matcher); // returns $Y, ok.
+		auto result = formula_apply(tau_rule, matcher); // returns $Y, ok.
 		CHECK( matcher != body );
 		CHECK( matcher != result );
 	}
@@ -520,7 +520,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = rule_statement
 			| tau_parser::library| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
-		auto result = tau_apply(tau_rule, sample_statement);
+		auto result = formula_apply(tau_rule, sample_statement);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -535,7 +535,7 @@ TEST_SUITE("executing wff rules") {
 		auto rule = rule_statement
 			| tau_parser::library| tau_parser::rules | tau_parser::rule | optional_value_extractor<sp_tau_node<Bool>>;
 		auto tau_rule = make_rule(rule);
-		auto result = tau_apply(tau_rule, sample_statement);
+		auto result = formula_apply(tau_rule, sample_statement);
 		auto check = result
 			| tau_parser::formula | tau_parser::main | tau_parser::wff 	| tau_parser::wff_and;
 		CHECK( check.has_value() );
