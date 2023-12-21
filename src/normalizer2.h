@@ -293,7 +293,7 @@ struct step {
 	step(library<BAs...> lib): lib(lib) {}
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
-		return tau_apply(lib, n);
+		return formula_apply(lib, n);
 	}
 
 	library<BAs...> lib;
@@ -598,7 +598,7 @@ using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate
 
 template<typename... BAs>
 sp_tau_node<BAs...> apply_definitions(const sp_tau_node<BAs...>& form) {
-	return tau_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
+	return formula_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
 }
 
 template<typename... BAs>
