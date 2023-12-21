@@ -31,6 +31,70 @@ namespace idni::tau {
 template<typename...BAs>
 using wff = sp_tau_node<BAs...>;
 
+// tau rules
+RULE(TAU_DISTRIBUTE_0, "(($X ||| $Y) &&& $Z) := (($X &&& $Z) ||| ($Y &&& $Z)).")
+RULE(TAU_DISTRIBUTE_1, "($X &&& ($Y ||| $Z)) := (($X &&& $Y) ||| ($X &&& $Z)).")
+RULE(TAU_PUSH_NEGATION_INWARDS_0, "% ($X &&& $Y) := (% $X ||| % $Y).")
+RULE(TAU_PUSH_NEGATION_INWARDS_1, "% ($X ||| $Y) := (% $X &&& % $Y).")
+RULE(TAU_ELIM_DOUBLE_NEGATION_0, "% % $X :=  $X.")
+RULE(TAU_SIMPLIFY_ONE_0, "( T ||| $X ) := T.")
+RULE(TAU_SIMPLIFY_ONE_1, "( $X ||| T ) := T.")
+RULE(TAU_SIMPLIFY_ONE_2, "( T &&& $X ) := $X.")
+RULE(TAU_SIMPLIFY_ONE_3, "( $X &&& T ) := $X.")
+RULE(TAU_SIMPLIFY_ONE_4, "% T := F.")
+RULE(TAU_SIMPLIFY_ZERO_0, "( F &&& $X ) := F.")
+RULE(TAU_SIMPLIFY_ZERO_1, "( $X &&& F ) := F.")
+RULE(TAU_SIMPLIFY_ZERO_2, "( F ||| $X ) := $X.")
+RULE(TAU_SIMPLIFY_ZERO_3, "( $X ||| F ) := $X.")
+RULE(TAU_SIMPLIFY_ZERO_4, "% F := T.")
+RULE(TAU_SIMPLIFY_SELF_0, "( $X &&& $X ) := $X.")
+RULE(TAU_SIMPLIFY_SELF_1, "( $X ||| $X ) := $X.")
+RULE(TAU_SIMPLIFY_SELF_2, "( $X &&& % $X ) := F.")
+RULE(TAU_SIMPLIFY_SELF_3, "( $X ||| % $X ) := T.")
+RULE(TAU_SIMPLIFY_SELF_4, "( % $X &&& $X ) := F.")
+RULE(TAU_SIMPLIFY_SELF_5, "( % $X ||| $X ) := T.")
+
+template<typename... BAs>
+static auto to_dnf_tau = make_library<BAs...>(
+	TAU_DISTRIBUTE_0
+	+ TAU_DISTRIBUTE_1
+	+ TAU_PUSH_NEGATION_INWARDS_0
+	+ TAU_PUSH_NEGATION_INWARDS_1
+	+ TAU_ELIM_DOUBLE_NEGATION_0
+);
+
+template<typename... BAs>
+static auto simplify_tau = make_library<BAs...>(
+	TAU_SIMPLIFY_ONE_0
+	+ TAU_SIMPLIFY_ONE_1
+	+ TAU_SIMPLIFY_ONE_2
+	+ TAU_SIMPLIFY_ONE_3
+	+ TAU_SIMPLIFY_ONE_4
+	+ TAU_SIMPLIFY_ZERO_0
+	+ TAU_SIMPLIFY_ZERO_1
+	+ TAU_SIMPLIFY_ZERO_2
+	+ TAU_SIMPLIFY_ZERO_3
+	+ TAU_SIMPLIFY_ZERO_4
+	+ TAU_SIMPLIFY_SELF_0
+	+ TAU_SIMPLIFY_SELF_1
+	+ TAU_SIMPLIFY_SELF_2
+	+ TAU_SIMPLIFY_SELF_3
+	+ TAU_SIMPLIFY_SELF_4
+	+ TAU_SIMPLIFY_SELF_5
+);
+
+// definitions of bf builder rules
+const std::string BLDR_TAU_AND = "( $X $Y ) := ($X &&& $Y).";
+const std::string BLDR_TAU_OR = "( $X $Y ) := ($X ||| $Y).";
+const std::string BLDR_TAU_NEG = "( $X ) := % $X.";
+
+template<typename... BAs>
+static auto bldr_tau_and = make_builder<BAs...>(BLDR_WFF_AND);
+template<typename... BAs>
+static auto bldr_tau_or = make_builder<BAs...>(BLDR_WFF_OR);
+template<typename... BAs>
+static auto bldr_tau_neg = make_builder<BAs...>(BLDR_WFF_NEG);
+
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.
 // See also (https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html)

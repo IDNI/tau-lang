@@ -8,6 +8,8 @@ set(TESTS
 	rules-bf_parsing
 	rules-wff_execution
 	rules-wff_parsing
+	rules-tau_execution
+	rules-tau_parsing
 	builders
 	rewriting
 	formula
