@@ -82,9 +82,9 @@ in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
 
 # tau
-tau_rule			=> tau_matcher definition tau_body dot.
+tau_rule	=> tau_matcher definition tau_body dot.
 tau_matcher	=> tau.
-tau_body	=> tau.
+tau_body	=> tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
 
 
 # TODO (HIGH) check programatically that we do not have inappropriated element from wff in tau
@@ -261,6 +261,12 @@ bf_has_subformula_cb_sym				=> ws "bf_has_subformula_cb" ws.
 wff_has_clashing_subformulas_cb_sym		=> ws "wff_has_clashing_subformulas_cb" ws.
 wff_has_subformula_cb_sym				=> ws "wff_has_subformula_cb" ws.
 wff_remove_existential_cb_sym			=> ws "wff_remove_existential_cb" ws.
+
+
+# cb for tau
+tau_collapse_positives_cb	=> tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ws_required tau_cb_arg.
+tau_positives_upwards_cb	=> tau_positives_upwards_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
+tau_cb_arg	=> capture | tau.
 
 # input definition
 input			=> in colon open_brace source_binding close_brace.

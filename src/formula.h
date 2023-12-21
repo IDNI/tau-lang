@@ -1192,6 +1192,8 @@ struct callback_applier {
 			case tau_parser::wff_has_clashing_subformulas_cb: return apply_wff_clashing_subformulas_check(n);
 			case tau_parser::wff_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::wff_cb_arg);
 			case tau_parser::wff_remove_existential: return apply_wff_remove_existential(n);
+			case tau_parser::tau_collapse_positives_cb: return apply_tau_collapse_positives(n);
+			case tau_parser::tau_positives_upwards_cb: return apply_tau_positives_upwards(n);
 			default: return n;
 		}
 	}
@@ -1411,6 +1413,19 @@ private:
 		m[args[0]] = args[1];
 		auto tmp = replace<sp_tau_node<BAs...>>(args[2], m)| only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 		return tmp;
+	}
+
+	sp_tau_node<BAs...> apply_tau_collapse_positives(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
+
+	}
+
+	sp_tau_node<BAs...> apply_tau_positives_upwards(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::tau_cb_arg || only_child_extractor<BAs...>;
+		if (auto check_1eft = args[0] | tau_parser::wff; check_left)
+			if (auto check_right = args[1] | tau_parser::wff; check_right) return args[2];
+		return n;
 	}
 };
 
