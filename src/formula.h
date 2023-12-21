@@ -786,6 +786,7 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	switch (type) {
 	case tau_parser::bf_rule: return make_rule<tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
 	case tau_parser::wff_rule: return make_rule<tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
+	case tau_parser::tau_rule: return make_rule<tau_parser::tau_rule, tau_parser::tau_matcher, tau_parser::tau_body, BAs...>(rule);
 	default: assert(false); return {};
 	};
 }

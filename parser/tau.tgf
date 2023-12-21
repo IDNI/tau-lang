@@ -82,17 +82,24 @@ in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
 
 # tau
+tau_rule			=> tau_matcher definition tau_body dot.
+tau_matcher	=> tau.
+tau_body	=> tau.
+
+
 # TODO (HIGH) check programatically that we do not have inappropriated element from wff in tau
-tau		=> wff | tau_and | tau_or | tau_neg.
+tau		=> wff | tau_and | tau_or | tau_neg | tau_t | tau_f.
 tau_and	=> open_parenthesis tau tau_and_sym tau close_parenthesis.
 tau_or	=> open_parenthesis tau tau_or_sym tau close_parenthesis.
 tau_neg	=> tau_neg_sym tau.
+tau_t	=> ws 'T' ws.
+tau_f	=> ws 'F' ws.
 
 # tau_op_sym
 tau_and_sym	=> ws "&&&" ws.
 tau_or_sym	=> ws "|||" ws.
 # TODO (HIGH) rename to ~ notation
-tau_neg_sym	=> ws "!!!" ws.
+tau_neg_sym	=> ws '%' ws.
 
 
 # wff
@@ -261,7 +268,7 @@ input			=> in colon open_brace source_binding close_brace.
 # main posibilities
 inputs			=> less input (input)* dot.
 main			=> wff dot.
-rule			=> wff_rule | bf_rule .
+rule			=> wff_rule | bf_rule | tau_rule.
 rules			=> (rule)*.
 rec_relation	=> bf_rec_relation | wff_rec_relation dot.
 rec_relations	=> (rec_relation)*.
@@ -271,6 +278,6 @@ library 		=> rules.
 # each builder is define on its own string
 builder			=> builder_head definition builder_body dot.
 builder_head	=> open_parenthesis capture (ws_required capture)* close_parenthesis.
-builder_body	=> wff | bf.
+builder_body	=> wff | bf | tau.
 gssotc			=> tau semicolon.
 start			=> formula | gssotc | library | builder | inputs.
