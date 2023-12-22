@@ -1415,15 +1415,15 @@ private:
 		return tmp;
 	}
 
-	sp_tau_node<BAs...> apply_tau_collapse_positives(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
-
-	}
-
 	sp_tau_node<BAs...> apply_tau_positives_upwards(const sp_tau_node<BAs...>& n) {
 		auto args = n || tau_parser::tau_cb_arg || only_child_extractor<BAs...>;
-		if (auto check_1eft = args[0] | tau_parser::wff; check_left)
+		if (auto check = args[0] | tau_parser::wff; check) return args[1];
+		return n;
+	}
+
+	sp_tau_node<BAs...> apply_tau_collapse_positives(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::tau_cb_arg || only_child_extractor<BAs...>;
+		if (auto check_1eft = args[0] | tau_parser::wff; check_1eft)
 			if (auto check_right = args[1] | tau_parser::wff; check_right) return args[2];
 		return n;
 	}
