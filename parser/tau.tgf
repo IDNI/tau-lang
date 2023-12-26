@@ -84,7 +84,7 @@ out				=> "?o_" chars. # instead of '>', easy to remember
 # tau
 tau_rule	=> tau_matcher definition tau_body dot.
 tau_matcher	=> tau.
-tau_body	=> tau | tau_collapse_positives_cb | tau_collapse_positives2_cb | tau_positives_upwards_cb.
+tau_body	=> tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
 
 
 # TODO (HIGH) check programatically that we do not have inappropriated element from wff in tau
@@ -261,7 +261,8 @@ bf_is_zero_cb_sym		=> ws "bf_is_zero_cb" ws.
 bf_is_one_cb_sym		=> ws "bf_is_one_cb" ws.
 
 # cb for tau
-tau_collapse_positives_cb	=> tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg [ ws_required tau_cb_arg] .
+tau_collapse_positives_cb	=> ( tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ws_required tau_cb_arg)
+							| (tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ).
 tau_positives_upwards_cb	=> tau_positives_upwards_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
 tau_cb_arg	=> capture | tau.
 tau_collapse_positives_cb_sym	=> ws "tau_collapse_positives_cb" ws.
