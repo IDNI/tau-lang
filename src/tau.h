@@ -54,7 +54,7 @@ RULE(TAU_SIMPLIFY_SELF_3, "( $X ||| % $X ) := T.")
 RULE(TAU_SIMPLIFY_SELF_4, "( % $X &&& $X ) := F.")
 RULE(TAU_SIMPLIFY_SELF_5, "( % $X ||| $X ) := T.")
 
-RULE(TAU_COLLAPSE_POSITIVES_0, "($X &&& $Y) := tau_collapse_positives $X $Y ($X && $Y).")
+RULE(TAU_COLLAPSE_POSITIVES_0, "($X &&& $Y) := tau_collapse_positives $X $Y.")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "($X &&& ($Y &&& $Z) := tau_positives_upwards $Y ($Y &&& ($X &&& $Z).")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "($X &&& ($Y &&& $Z) := tau_positives_upwards $Z ($Z &&& ($X &&& $Y).")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "(($X &&& $Y) &&& $Z) := tau_positives_upwards $X ($X &&& ($Y &&& $Z).")
