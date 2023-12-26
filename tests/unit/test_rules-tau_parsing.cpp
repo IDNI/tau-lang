@@ -225,4 +225,125 @@ TEST_SUITE("parsing tau rules") {
 			| tau_parser::tau_rule;
 		CHECK( check.has_value() );
 	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_0") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_1") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_1);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_2") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_2);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_3") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_3);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_4") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_4);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_5") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_5);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_6") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_6);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_PUSH_POSITIVES_UPWARDS_0") {
+		auto src_rule = make_tau_source(TAU_PUSH_POSITIVES_UPWARDS_0);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_PUSH_POSITIVES_UPWARDS_1") {
+		auto src_rule = make_tau_source(TAU_PUSH_POSITIVES_UPWARDS_1);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_PUSH_POSITIVES_UPWARDS_2") {
+		auto src_rule = make_tau_source(TAU_PUSH_POSITIVES_UPWARDS_2);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("TAU_PUSH_POSITIVES_UPWARDS_3") {
+		auto src_rule = make_tau_source(TAU_PUSH_POSITIVES_UPWARDS_3);
+		auto tau_rule = make_statement(src_rule);
+		auto check = tau_rule
+			| tau_parser::library
+			| tau_parser::rules
+			| tau_parser::rule
+			| tau_parser::tau_rule;
+		CHECK( check.has_value() );
+	}
 }

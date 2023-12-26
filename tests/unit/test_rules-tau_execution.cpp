@@ -260,5 +260,124 @@ TEST_SUITE("executing tau rules") {
 		CHECK( result == body );
 	}
 
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_0") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
 
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_1") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_1);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_2") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_2);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_3") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_3);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_4") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_4);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_5") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_5);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_COLLAPSE_POSITIVES_6") {
+		auto src_rule = make_tau_source(TAU_COLLAPSE_POSITIVES_6);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_PUSH_POSITIVES_UPWARDS_0") {
+		auto src_rule = make_tau_source(TAU_PUSH_POSITIVES_UPWARDS_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_PUSH_POSITIVES_UPWARDS_1") {
+		auto src_rule = make_tau_source(TAU_PUSH_POSITIVES_UPWARDS_1);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_PUSH_POSITIVES_UPWARDS_2") {
+		auto src_rule = make_tau_source(TAU_PUSH_POSITIVES_UPWARDS_2);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
+
+	TEST_CASE("TAU_PUSH_POSITIVES_UPWARDS_3") {
+		auto src_rule = make_tau_source(TAU_PUSH_POSITIVES_UPWARDS_3);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher);
+		CHECK( matcher != body );
+		CHECK( result == body );
+	}
 }
