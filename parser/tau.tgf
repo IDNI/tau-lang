@@ -84,11 +84,11 @@ out				=> "?o_" chars. # instead of '>', easy to remember
 # tau
 tau_rule	=> tau_matcher definition tau_body dot.
 tau_matcher	=> tau.
-tau_body	=> tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
+tau_body	=> tau | tau_collapse_positives_cb | tau_collapse_positives2_cb | tau_positives_upwards_cb.
 
 
 # TODO (HIGH) check programatically that we do not have inappropriated element from wff in tau
-tau		=> wff | tau_and | tau_or | tau_neg | tau_t | tau_f.
+tau		=> wff | tau_and | tau_or | tau_neg | tau_t | tau_f | capture.
 tau_and	=> open_parenthesis tau tau_and_sym tau close_parenthesis.
 tau_or	=> open_parenthesis tau tau_or_sym tau close_parenthesis.
 tau_neg	=> tau_neg_sym tau.
@@ -238,6 +238,12 @@ wff_has_clashing_subformulas_cb	=> wff_has_clashing_subformulas_cb_sym wff_cb_ar
 bf_has_subformula_cb 			=> bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 wff_remove_existential			=> wff_remove_existential_cb_sym wff_cb_arg ws_required wff_cb_arg.
+# IDEA we could reuse the same symbol
+bf_has_clashing_subformulas_cb_sym		=> ws "bf_has_clashing_subformulas_cb" ws.
+bf_has_subformula_cb_sym				=> ws "bf_has_subformula_cb" ws.
+wff_has_clashing_subformulas_cb_sym		=> ws "wff_has_clashing_subformulas_cb" ws.
+wff_has_subformula_cb_sym				=> ws "wff_has_subformula_cb" ws.
+wff_remove_existential_cb_sym			=> ws "wff_remove_existential_cb" ws.
 
 # bultin_args
 bf_cb_arg	=> capture | bf.
@@ -254,19 +260,12 @@ bf_neq_cb_sym			=> ws "bf_neq_cb" ws.
 bf_is_zero_cb_sym		=> ws "bf_is_zero_cb" ws.
 bf_is_one_cb_sym		=> ws "bf_is_one_cb" ws.
 
-# speed up callbacks syms
-# IDEA we could reuse the same symbol
-bf_has_clashing_subformulas_cb_sym		=> ws "bf_has_clashing_subformulas_cb" ws.
-bf_has_subformula_cb_sym				=> ws "bf_has_subformula_cb" ws.
-wff_has_clashing_subformulas_cb_sym		=> ws "wff_has_clashing_subformulas_cb" ws.
-wff_has_subformula_cb_sym				=> ws "wff_has_subformula_cb" ws.
-wff_remove_existential_cb_sym			=> ws "wff_remove_existential_cb" ws.
-
-
 # cb for tau
-tau_collapse_positives_cb	=> tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
+tau_collapse_positives_cb	=> tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg [ ws_required tau_cb_arg] .
 tau_positives_upwards_cb	=> tau_positives_upwards_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
 tau_cb_arg	=> capture | tau.
+tau_collapse_positives_cb_sym	=> ws "tau_collapse_positives_cb" ws.
+tau_positives_upwards_cb_sym	=> ws "tau_positives_upwards_cb" ws.
 
 # input definition
 input			=> in colon open_brace source_binding close_brace.

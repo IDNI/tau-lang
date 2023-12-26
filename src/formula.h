@@ -995,6 +995,13 @@ const std::string BLDR_BF_NEG = "( $X ) := ~ $X.";
 const std::string BLDR_BF_ALL = "( $X $Y ) := fall $X $Y.";
 const std::string BLDR_BF_EX = "( $X $Y ) := fex $X $Y.";
 
+// definitions of tau builder rules
+// definitions of bf builder rules
+// IDEA maybe move it to formula.h or normalizer.h
+const std::string BLDR_TAU_AND = "( $X $Y ) := ($X &&& $Y).";
+const std::string BLDR_TAU_OR = "( $X $Y ) := ($X ||| $Y).";
+const std::string BLDR_TAU_NEG = "( $X ) := % $X.";
+
 // wff builder
 template<typename... BAs>
 static auto bldr_wff_eq = make_builder<BAs...>(BLDR_WFF_EQ);
@@ -1038,6 +1045,14 @@ template<typename... BAs>
 static auto bldr_bf_all = make_builder<BAs...>(BLDR_BF_ALL);
 template<typename... BAs>
 static auto bldr_bf_ex = make_builder<BAs...>(BLDR_BF_EX);
+
+// tau builder
+template<typename... BAs>
+static auto bldr_tau_and = make_builder<BAs...>(BLDR_WFF_AND);
+template<typename... BAs>
+static auto bldr_tau_or = make_builder<BAs...>(BLDR_WFF_OR);
+template<typename... BAs>
+static auto bldr_tau_neg = make_builder<BAs...>(BLDR_WFF_NEG);
 
 // wff factory method for building wff formulas
 template<typename... BAs>
@@ -1161,6 +1176,24 @@ sp_tau_node<BAs...> build_bf_ex(const sp_tau_node<BAs...>& l, const sp_tau_node<
 	return tau_apply_builder<BAs...>(bldr_bf_ex<BAs...>, args);
 }
 
+// tau factory method for building tau formulas
+template<typename... BAs>
+sp_tau_node<BAs...> build_tau_and(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args{l, r};
+	return tau_apply_builder<BAs...>(bldr_tau_and<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_tau_or(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args{l, r};
+	return tau_apply_builder<BAs...>(bldr_tau_or<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_tau_neg(const sp_tau_node<BAs...>& l) {
+	std::vector<sp_tau_node<BAs...>> args{l};
+	return tau_apply_builder<BAs...>(bldr_tau_neg<BAs...>, args);
+}
 
 template<class... Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
@@ -1426,7 +1459,10 @@ private:
 		if (auto check_1eft = args[0] | tau_parser::wff; check_1eft)
 			if (auto check_right = args[1] | tau_parser::wff; check_right) {
 				auto wff = build_wff_and<BAs...>(check_1eft.value(), check_right.value());
-				return make_node<tau_sym<BAs...>>(tau_parser::tau, { wff });
+				auto tau = make_node<tau_sym<BAs...>>(tau_parser::tau, { wff });
+				if (args.size() == 2) return tau;
+				auto arg3 = args[2] | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+				return build_tau_and<BAs...>(tau, arg3);
 			}
 		return n;
 	}
