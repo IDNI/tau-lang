@@ -55,6 +55,12 @@ RULE(TAU_SIMPLIFY_SELF_4, "( % $X &&& $X ) := F.")
 RULE(TAU_SIMPLIFY_SELF_5, "( % $X ||| $X ) := T.")
 
 RULE(TAU_COLLAPSE_POSITIVES_0, "($X &&& $Y) := tau_collapse_positives $X $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_1, "($X &&& ($Y &&& $Z)) := tau_collapse_positives $X $Y $Z.")
+RULE(TAU_COLLAPSE_POSITIVES_2, "($X &&& ($Y &&& $Z)) := tau_collapse_positives $X $Z $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_3, "($X &&& ($Y &&& $Z)) := tau_collapse_positives $Y $Z $X.")
+RULE(TAU_COLLAPSE_POSITIVES_4, "(($X &&& $Y) &&& $Z)) := tau_collapse_positives $Y $Z $X.")
+RULE(TAU_COLLAPSE_POSITIVES_5, "(($X &&& $Y) &&& $Z)) := tau_collapse_positives $X $Z $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_6, "(($X &&& $Y) &&& $Z)) := tau_collapse_positives $X $Y $Z.")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "($X &&& ($Y &&& $Z) := tau_positives_upwards $Y ($Y &&& ($X &&& $Z).")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "($X &&& ($Y &&& $Z) := tau_positives_upwards $Z ($Z &&& ($X &&& $Y).")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "(($X &&& $Y) &&& $Z) := tau_positives_upwards $X ($X &&& ($Y &&& $Z).")
@@ -90,18 +96,21 @@ static auto simplify_tau = make_library<BAs...>(
 	+ TAU_SIMPLIFY_SELF_5
 );
 
-// definitions of bf builder rules
-// IDEA maybe move it to formula.h or normalizer.h
-const std::string BLDR_TAU_AND = "( $X $Y ) := ($X &&& $Y).";
-const std::string BLDR_TAU_OR = "( $X $Y ) := ($X ||| $Y).";
-const std::string BLDR_TAU_NEG = "( $X ) := % $X.";
-
 template<typename... BAs>
-static auto bldr_tau_and = make_builder<BAs...>(BLDR_WFF_AND);
-template<typename... BAs>
-static auto bldr_tau_or = make_builder<BAs...>(BLDR_WFF_OR);
-template<typename... BAs>
-static auto bldr_tau_neg = make_builder<BAs...>(BLDR_WFF_NEG);
+static auto collapse_positives_tau = make_library<BAs...>(
+	TAU_COLLAPSE_POSITIVES_0
+	+ TAU_COLLAPSE_POSITIVES_1
+	+ TAU_COLLAPSE_POSITIVES_2
+	+ TAU_COLLAPSE_POSITIVES_3
+	+ TAU_COLLAPSE_POSITIVES_4
+	+ TAU_COLLAPSE_POSITIVES_5
+	+ TAU_COLLAPSE_POSITIVES_6
+	+ TAU_PUSH_POSITIVES_UPWARDS_0
+	+ TAU_PUSH_POSITIVES_UPWARDS_1
+	+ TAU_PUSH_POSITIVES_UPWARDS_2
+	+ TAU_PUSH_POSITIVES_UPWARDS_3
+	+ TAU_PUSH_POSITIVES_UPWARDS_4
+);
 
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.
