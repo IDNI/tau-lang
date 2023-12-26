@@ -58,7 +58,7 @@ RULE(TAU_COLLAPSE_POSITIVES_0, "($X &&& $Y) := tau_collapse_positives $X $Y.")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "($X &&& ($Y &&& $Z) := tau_positives_upwards $Y ($Y &&& ($X &&& $Z).")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "($X &&& ($Y &&& $Z) := tau_positives_upwards $Z ($Z &&& ($X &&& $Y).")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "(($X &&& $Y) &&& $Z) := tau_positives_upwards $X ($X &&& ($Y &&& $Z).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_3, "(($X &&& $Y) &&& $Z) := tau_positives_upwards $X ($Y &&& ($X &&& $Z).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_3, "(($X &&& $Y) &&& $Z) := tau_positives_upwards $Y ($Y &&& ($X &&& $Z).")
 RULE(TAU_PUSH_POSITIVES_UPWARDS_4, "($X &&& $Y) := ($Y &&& $X).")
 
 template<typename... BAs>
