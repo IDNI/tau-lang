@@ -1424,7 +1424,10 @@ private:
 	sp_tau_node<BAs...> apply_tau_collapse_positives(const sp_tau_node<BAs...>& n) {
 		auto args = n || tau_parser::tau_cb_arg || only_child_extractor<BAs...>;
 		if (auto check_1eft = args[0] | tau_parser::wff; check_1eft)
-			if (auto check_right = args[1] | tau_parser::wff; check_right) return args[2];
+			if (auto check_right = args[1] | tau_parser::wff; check_right) {
+				auto wff = build_wff_and<BAs...>(check_1eft.value(), check_right.value());
+				return make_node<tau_sym<BAs...>>(tau_parser::tau, { wff });
+			}
 		return n;
 	}
 };

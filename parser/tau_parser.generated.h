@@ -701,8 +701,8 @@ private:
 		q(nt(186), (nt(13)+t(27)+t(26)+t(26)+t(44)+t(15)+t(10)+t(28)+t(44)+t(28)+t(6)+t(16)+t(26)+t(25)+t(20)+t(13)+t(6)+t(11)+t(10)+t(44)+t(18)+t(16)+nt(13)));
 		// wff_remove_existential_cb_sym => ws 'w' 'f' 'f' '_' 'r' 'e' 'm' 'o' 'v' 'e' '_' 'e' 'x' 'i' 's' 't' 'e' 'n' 't' 'i' 'a' 'l' '_' 'c' 'b' ws.
 		q(nt(187), (nt(13)+t(27)+t(26)+t(26)+t(44)+t(20)+t(24)+t(13)+t(25)+t(59)+t(24)+t(44)+t(24)+t(5)+t(22)+t(28)+t(19)+t(24)+t(12)+t(19)+t(22)+t(10)+t(11)+t(44)+t(18)+t(16)+nt(13)));
-		// tau_collapse_positives_cb => tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ws_required tau_cb_arg.
-		q(nt(72), (nt(188)+nt(12)+nt(189)+nt(12)+nt(189)+nt(12)+nt(189)));
+		// tau_collapse_positives_cb => tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
+		q(nt(72), (nt(188)+nt(12)+nt(189)+nt(12)+nt(189)));
 		// tau_positives_upwards_cb => tau_positives_upwards_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
 		q(nt(73), (nt(190)+nt(12)+nt(189)+nt(12)+nt(189)));
 		// tau_cb_arg => capture.

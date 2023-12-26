@@ -264,7 +264,7 @@ wff_remove_existential_cb_sym			=> ws "wff_remove_existential_cb" ws.
 
 
 # cb for tau
-tau_collapse_positives_cb	=> tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ws_required tau_cb_arg.
+tau_collapse_positives_cb	=> tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
 tau_positives_upwards_cb	=> tau_positives_upwards_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
 tau_cb_arg	=> capture | tau.
 
