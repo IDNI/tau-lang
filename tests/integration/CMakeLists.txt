@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 set(TESTS
 	test_integration-bdd1
 	test_integration-bdd2
-	test_integration-tau1
+	test_integration-tau_ba1
 )
 
 foreach(N IN LISTS TESTS)
