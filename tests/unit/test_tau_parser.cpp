@@ -321,6 +321,32 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( ex_formula.has_value() );
 	}
 
+	TEST_CASE("ball") {
+		const char* sample =
+			"ball ?Z ?Z.";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto all_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
+			| tau_parser::wff_ball;
+		CHECK( all_formula.has_value() );
+	}
+
+	TEST_CASE("bex") {
+		const char* sample =
+			"bex ?Z ?Z.";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto ex_formula = frml
+			| tau_parser::formula
+			| tau_parser::main
+			| tau_parser::wff
+			| tau_parser::wff_bex;
+		CHECK( ex_formula.has_value() );
+	}
+
 	// TODO (LOW) write test wwf refs
 	TEST_CASE("wff_ref") {
 		//CHECK( false );
