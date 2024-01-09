@@ -235,7 +235,6 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 		|| nt == tau_parser::bf_or_cb
 		|| nt == tau_parser::bf_xor_cb
 		|| nt == tau_parser::bf_neg_cb
-		|| nt == tau_parser::bf_subs_cb
 		|| nt == tau_parser::bf_eq_cb
 		|| nt == tau_parser::bf_neq_cb
 		|| nt == tau_parser::bf_is_one_cb
@@ -246,7 +245,9 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 		|| nt == tau_parser::wff_has_subformula_cb
 		|| nt == tau_parser::wff_remove_existential_cb
 		|| nt == tau_parser::wff_remove_buniversal_cb
-		|| nt == tau_parser::wff_remove_bexistential_cb;
+		|| nt == tau_parser::wff_remove_bexistential_cb
+		|| nt == tau_parser::bf_remove_funiversal_cb
+		|| nt == tau_parser::bf_remove_fexistential_cb;
 };
 
 template<typename...BAs>
@@ -1242,7 +1243,6 @@ struct callback_applier {
 			case tau_parser::bf_neq_cb: return apply_equality_relation(_neq, n);
 			case tau_parser::bf_is_one_cb: return apply_constant_check(_is_one, n);
 			case tau_parser::bf_is_zero_cb: return apply_constant_check(_is_zero, n);
-			case tau_parser::bf_subs_cb: return apply_subs(n);
 			case tau_parser::bf_has_clashing_subformulas_cb: return apply_bf_clashing_subformulas_check(n);
 			case tau_parser::bf_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::bf_cb_arg);
 			case tau_parser::wff_has_clashing_subformulas_cb: return apply_wff_clashing_subformulas_check(n);
@@ -1250,6 +1250,8 @@ struct callback_applier {
 			case tau_parser::wff_remove_existential_cb: return apply_wff_remove_existential(n);
 			case tau_parser::wff_remove_bexistential_cb: return apply_wff_remove_bexistential(n);
 			case tau_parser::wff_remove_buniversal_cb: return apply_wff_remove_buniversal(n);
+			case tau_parser::bf_remove_funiversal_cb: return apply_bf_remove_funiversal(n);
+			case tau_parser::bf_remove_fexistential_cb: return apply_bf_remove_fexistential(n);
 			case tau_parser::tau_collapse_positives_cb: return apply_tau_collapse_positives(n);
 			case tau_parser::tau_positives_upwards_cb: return apply_tau_positives_upwards(n);
 			default: return n;
@@ -1356,6 +1358,38 @@ private:
 		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
 			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_or<BAs...>(left, right);
+	}
+
+	sp_tau_node<BAs...> apply_bf_remove_funiversal(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
+		auto var = args[0];
+		auto T = args[2];
+		auto F = args[3];
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
+		left_changes[var] = T;
+		auto left = replace<sp_tau_node<BAs...>>(args[1], left_changes)
+			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> right_changes;
+		right_changes[var] = F;
+		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
+			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_and<BAs...>(left, right);
+	}
+
+	sp_tau_node<BAs...> apply_bf_remove_fexistential(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
+		auto var = args[0];
+		auto T = args[2];
+		auto F = args[3];
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
+		left_changes[var] = T;
+		auto left = replace<sp_tau_node<BAs...>>(args[1], left_changes)
+			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> right_changes;
+		right_changes[var] = F;
+		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
+			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_or<BAs...>(left, right);
 	}
 
 	sp_tau_node<BAs...> apply_wff_remove_existential(const sp_tau_node<BAs...>& n) {
