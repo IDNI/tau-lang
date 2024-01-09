@@ -244,7 +244,9 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 		|| nt == tau_parser::wff_has_clashing_subformulas_cb
 		|| nt == tau_parser::bf_has_subformula_cb
 		|| nt == tau_parser::wff_has_subformula_cb
-		|| nt == tau_parser::wff_remove_existential;
+		|| nt == tau_parser::wff_remove_existential_cb
+		|| nt == tau_parser::wff_remove_buniversal_cb
+		|| nt == tau_parser::wff_remove_bexistential_cb;
 };
 
 template<typename...BAs>
@@ -986,6 +988,8 @@ const std::string BLDR_WFF_IMPLY = "( $X $Y ) := ($X -> $Y).";
 const std::string BLDR_WFF_EQUIV = "( $X $Y ) := ( $X <-> $Y ).";
 const std::string BLDR_WFF_ALL = "( $X $Y ) := all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) := ex $X $Y.";
+const std::string BLDR_WFF_BALL = "( $X $Y ) := ball $X $Y.";
+const std::string BLDR_WFF_BEX = "( $X $Y ) := bex $X $Y.";
 
 // definitions of bf builder rules
 const std::string BLDR_BF_AND = "( $X $Y ) := ($X & $Y).";
@@ -1025,6 +1029,10 @@ template<typename... BAs>
 static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
 template<typename... BAs>
 static auto bldr_wff_ex = make_builder<BAs...>(BLDR_WFF_EX);
+template<typename... BAs>
+static auto bldr_wff_ball = make_builder<BAs...>(BLDR_WFF_BALL);
+template<typename... BAs>
+static auto bldr_wff_bex = make_builder<BAs...>(BLDR_WFF_BEX);
 
 // bf builder
 template<typename... BAs>
@@ -1121,6 +1129,18 @@ sp_tau_node<BAs...> build_wff_ex(const sp_tau_node<BAs...>& l, const sp_tau_node
 	return tau_apply_builder<BAs...>(bldr_wff_ex<BAs...>, args);
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_ball(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_ball<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_bex(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {l, r} ;
+	return tau_apply_builder<BAs...>(bldr_wff_bex<BAs...>, args);
+}
+
 // bf factory method for building bf formulas
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_and(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
@@ -1195,6 +1215,9 @@ sp_tau_node<BAs...> build_tau_neg(const sp_tau_node<BAs...>& l) {
 	return tau_apply_builder<BAs...>(bldr_tau_neg<BAs...>, args);
 }
 
+// TODO (HIGH) add needed builder to write rec_relations
+
+
 template<class... Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
@@ -1224,7 +1247,9 @@ struct callback_applier {
 			case tau_parser::bf_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::bf_cb_arg);
 			case tau_parser::wff_has_clashing_subformulas_cb: return apply_wff_clashing_subformulas_check(n);
 			case tau_parser::wff_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::wff_cb_arg);
-			case tau_parser::wff_remove_existential: return apply_wff_remove_existential(n);
+			case tau_parser::wff_remove_existential_cb: return apply_wff_remove_existential(n);
+			case tau_parser::wff_remove_bexistential_cb: return apply_wff_remove_bexistential(n);
+			case tau_parser::wff_remove_buniversal_cb: return apply_wff_remove_buniversal(n);
 			case tau_parser::tau_collapse_positives_cb: return apply_tau_collapse_positives(n);
 			case tau_parser::tau_positives_upwards_cb: return apply_tau_positives_upwards(n);
 			default: return n;
@@ -1299,6 +1324,38 @@ private:
 		std::vector<sp_tau_node<BAs...>> leaves;
 		get_leaves(n, branch, skip, leaves);
 		return leaves;
+	}
+
+	sp_tau_node<BAs...> apply_wff_remove_buniversal(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
+		auto var = args[0];
+		auto T = args[2];
+		auto F = args[3];
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
+		left_changes[var] = T;
+		auto left = replace<sp_tau_node<BAs...>>(args[1], left_changes)
+			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> right_changes;
+		right_changes[var] = F;
+		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
+			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_wff_and<BAs...>(left, right);
+	}
+
+	sp_tau_node<BAs...> apply_wff_remove_bexistential(const sp_tau_node<BAs...>& n) {
+		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
+		auto var = args[0];
+		auto T = args[2];
+		auto F = args[3];
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
+		left_changes[var] = T;
+		auto left = replace<sp_tau_node<BAs...>>(args[1], left_changes)
+			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> right_changes;
+		right_changes[var] = F;
+		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
+			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_wff_or<BAs...>(left, right);
 	}
 
 	sp_tau_node<BAs...> apply_wff_remove_existential(const sp_tau_node<BAs...>& n) {

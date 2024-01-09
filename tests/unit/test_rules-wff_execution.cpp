@@ -511,6 +511,28 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != result );
 	}
 
+	TEST_CASE("WFF_DEF_BEX_0") {
+		auto src_rule = make_tau_source(WFF_DEF_BEX_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher); // returns $Y, ok.
+		CHECK( matcher != body );
+		CHECK( matcher != result );
+	}
+
+	TEST_CASE("WFF_DEF_BALL_0") {
+		auto src_rule = make_tau_source(WFF_DEF_BALL_0);
+		auto statement = make_statement(src_rule);
+		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
+		auto tau_rule = make_rule(rule.value());
+		auto [matcher, body] = tau_rule;
+		auto result = formula_apply(tau_rule, matcher); // returns $Y, ok.
+		CHECK( matcher != body );
+		CHECK( matcher != result );
+	}
+
 	TEST_CASE("WFF_CALLBACK_CLASHING_SUBFORMULAS_0") {
 		const char* sample = "( T && ! T ).";
 		auto sample_src = make_tau_source(sample);
