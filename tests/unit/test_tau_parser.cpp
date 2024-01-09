@@ -638,22 +638,6 @@ TEST_SUITE("parsing callbacks ") {
 		CHECK( neg_cb.has_value() );
 	}
 
-//	TEST_CASE("bf_subs_cb") {
-//		const char* sample =	"$X := bf_subs_cb $X $X $X.";
-//		auto src = make_tau_source(sample);
-//		auto lib = make_statement(src);
-//		auto subs_cb = lib
-//			| tau_parser::library
-//			| tau_parser::rules
-//			| tau_parser::rule
-//			| tau_parser::bf_rule
-//			| tau_parser::bf_body
-//			| tau_parser::bf
-//			| tau_parser::bf_subs_cb;
-//		CHECK( subs_cb.has_value() );
-//	}
-
-
 	// TODO (MEDIUM) write tests for execution bf_is_zero_cb
 	// TODO (MEDIUM) write tests for execution bf_is_one_cb
 	// TODO (MEDIUM) write tests for execution bf_has_clashing_subformulas_cb
