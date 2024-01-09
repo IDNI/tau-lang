@@ -92,14 +92,19 @@ Well formed formulas are given in the Tau language by the following grammar:
 
 ```
 wff -> (wff "&" wff) | "!" wff | (wff "^" wff) | (wff "|" wff) | (wff "->" wff)
-	| (wff "<->" wff) | (wff "?" wff ":" wff) | all var wff | ex var wff | wff_ref
+	| (wff "<->" wff) | (wff "?" wff ":" wff) | all var wff | ex var wff
+	| ball bool_var wff | bex bool_var wff | wff_ref
 	| (bf "=" bf) | (bf "!=" bf) | (bf "<" bf) | (bf "<=" bf) | (bf ">" bf) | T | F.
 ```
 
 where `wff` stands for a sub-well formed formula, `wff_ref` stands for a reference to a well formed formula (see recursive relations Section), `T` stands for the true constant and `F` stands for the false constant. As usual, the operators `&`, `!`, `^`,  `|`, `->`,
 `<->` and `?` stands for conjunction, negation, exclusive-or, disjunction, implication, equivalence and conditional (in the usual sense) respectively.
 
-Also, `all` stands for the universal quantifier and `ex` for the existential one, whereas `=` stands for equality, `!=` for disequality, `<` for less than, `<=` for less or equal than, `>` for greater than (all of them in one of the underlying boolean algebras) and `T` for true and `F` for false.
+Also, `all` stands for the universal quantifier and `ex` for the existential one, whereas `ball` stands for boolean universal quantifier and `bex` stands for boolean existential quantifier. The difference between the boolean and the regular quantifiers is that the boolean ones depend on a boolean variable, i.e. a variable whose values are exactly `T` of `F`. The use of such quantifiers is to simplify the writing of complex formulas.
+
+Finally, the operators `=`, `!=`, `<`, `<=` and `>` stands for equality, disequality, less than, less or equal than and greater than respectively.
+
+Finally, `=` stands for equality, `!=` for disequality, `<` for less than, `<=` for less or equal than, `>` for greater than (all of them in one of the underlying boolean algebras) and `T` for true and `F` for false.
 
 As in the caes of `bf`, we have two types of qantifiers and the varibles could be of the above types. As announced, we would clarify both of them in a forthcoming Section.
 
