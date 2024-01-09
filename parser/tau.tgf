@@ -73,7 +73,7 @@ timed_capture	=> ws 't' ws.
 
 variable		=> var | timed.
 timed			=> (in | out)  timed_offset.
-
+bool_variable	=> '?' chars.
 # TODO (HIGH) capture t is reserved for timed variables, so we should check that is not used here
 capture			=> '$' chars.
 # TODO (MEDIUM) remove '?' from timed variables
@@ -115,7 +115,7 @@ wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 # TODO (MEDIUM) check programatically that no capture is use in a rec_relation as wff
 wff 			=> wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
-					| wff_t | wff_f | capture | variable | wff_ball | wff_bex
+					| wff_t | wff_f | capture | bool_variable | wff_ball | wff_bex
 					| bf_eq | bf_neq | bf_less | bf_less_equal | bf_greater.
 wff_ref			=> sym offsets wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
@@ -128,8 +128,8 @@ wff_imply		=> open_parenthesis wff wff_imply_sym wff close_parenthesis.
 wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
 wff_all			=> wff_all_sym ws_required (variable|capture) ws_required wff.
 wff_ex			=> wff_ex_sym ws_required (variable|capture) ws_required wff.
-wff_ball		=> wff_ball_sym ws_required (variable|capture) ws_required wff.
-wff_bex			=> wff_bex_sym ws_required (variable|capture) ws_required wff.
+wff_ball		=> wff_ball_sym ws_required (bool_variable|capture) ws_required wff.
+wff_bex			=> wff_bex_sym ws_required (bool_variable|capture) ws_required wff.
 
 # relational operators
 #
