@@ -74,9 +74,10 @@ timed_capture	=> ws 't' ws.
 variable		=> var | timed.
 timed			=> (in | out)  timed_offset.
 
+# TODO (HIGH) capture t is reserved for timed variables, so we should check that is not used here
 capture			=> '$' chars.
-# TODO (HIGH) var t is reserved for timed variables, so we should check that is not used here
-# TODO (MEDIUM) maybe remove? from timed variables
+# TODO (MEDIUM) remove '?' from timed variables
+# TODO (MEDIUM) avoid i_ and o_ in variables
 var				=> chars.
 in				=> "?i_" chars. # instead of '<', easy to remember
 out				=> "?o_" chars. # instead of '>', easy to remember
@@ -108,12 +109,13 @@ wff_rec_relation	=> wff_ref definition wff dot.
 
 wff_matcher	=> wff | wff_ref.
 wff_body	=> wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
-				| wff_has_subformula_cb | wff_remove_existential.
+				| wff_has_subformula_cb | wff_remove_existential_cb
+				| wff_remove_bexistential_cb |wff_remove_buniversal_cb.
 
 # TODO (MEDIUM) check programatically that no capture is use in a rec_relation as wff
 wff 			=> wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
 					| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
-					| wff_t | wff_f | capture
+					| wff_t | wff_f | capture | variable | wff_ball | wff_bex
 					| bf_eq | bf_neq | bf_less | bf_less_equal | bf_greater.
 wff_ref			=> sym offsets wff_ref_args.
 wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
@@ -124,8 +126,10 @@ wff_conditional	=> open_parenthesis wff wff_conditional_sym wff colon wff close_
 wff_neg			=> wff_neg_sym wff.
 wff_imply		=> open_parenthesis wff wff_imply_sym wff close_parenthesis.
 wff_equiv		=> open_parenthesis wff wff_equiv_sym wff close_parenthesis.
-wff_all			=> wff_all_sym (variable|capture) ws_required wff.
+wff_all			=> wff_all_sym ws_required (variable|capture) ws_required wff.
 wff_ex			=> wff_ex_sym ws_required (variable|capture) ws_required wff.
+wff_ball		=> wff_ball_sym ws_required (variable|capture) ws_required wff.
+wff_bex			=> wff_bex_sym ws_required (variable|capture) ws_required wff.
 
 # relational operators
 #
@@ -148,6 +152,8 @@ wff_imply_sym		=> ws "->" ws.
 wff_equiv_sym		=> ws "<->" ws.
 wff_all_sym			=> ws "all" ws.
 wff_ex_sym			=> ws "ex" ws.
+wff_ball_sym		=> ws "ball" ws.
+wff_bex_sym			=> ws "bex" ws.
 wff_t				=> ws 'T' ws.
 wff_f				=> ws 'F' ws.
 
@@ -237,13 +243,17 @@ bf_has_clashing_subformulas_cb	=> bf_has_clashing_subformulas_cb_sym bf_cb_arg w
 wff_has_clashing_subformulas_cb	=> wff_has_clashing_subformulas_cb_sym wff_cb_arg ws_required wff_cb_arg.
 bf_has_subformula_cb 			=> bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
 wff_has_subformula_cb 			=> wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-wff_remove_existential			=> wff_remove_existential_cb_sym wff_cb_arg ws_required wff_cb_arg.
+wff_remove_existential_cb		=> wff_remove_existential_cb_sym wff_cb_arg ws_required wff_cb_arg.
+wff_remove_bexistential_cb		=> wff_remove_bexistential_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
+wff_remove_buniversal_cb		=> wff_remove_buniversal_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 # IDEA we could reuse the same symbol
 bf_has_clashing_subformulas_cb_sym		=> ws "bf_has_clashing_subformulas_cb" ws.
 bf_has_subformula_cb_sym				=> ws "bf_has_subformula_cb" ws.
 wff_has_clashing_subformulas_cb_sym		=> ws "wff_has_clashing_subformulas_cb" ws.
 wff_has_subformula_cb_sym				=> ws "wff_has_subformula_cb" ws.
 wff_remove_existential_cb_sym			=> ws "wff_remove_existential_cb" ws.
+wff_remove_bexistential_cb_sym			=> ws "wff_remove_bexistential_cb" ws.
+wff_remove_buniversal_cb_sym			=> ws "wff_remove_buniversal_cb" ws.
 
 # bultin_args
 bf_cb_arg	=> capture | bf.

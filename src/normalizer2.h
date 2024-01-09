@@ -109,6 +109,8 @@ RULE(WFF_DEF_XOR, "( $X ^ $Y ) := (( $X && ! $Y ) || ( ! $X && $Y )).")
 RULE(WFF_DEF_CONDITIONAL, "( $X ? $Y : $Z) := (($X -> $Y) && (! $X -> $Z)).")
 RULE(WFF_DEF_IMPLY, "( $X -> $Y ) := ( ! $X || $Y).")
 RULE(WFF_DEF_EQUIV, "( $X <-> $Y ) := (( $X -> $Y ) && ( $Y -> $X )).")
+RULE(WFF_DEF_BEX_0, "bex $X $Y := wff_remove_bexistential_cb $X $Y T F.")
+RULE(WFF_DEF_BALL_0, "ball $X $Y :=  wff_remove_buniversal_cb $X $Y T F.")
 
 // additional wff dewfinitions (include wff formulas)
 RULE(BF_DEF_LESS_EQUAL, "( $X <= $Y ) := ( ($X & ~ $Y) = 0).")
@@ -147,6 +149,8 @@ static auto apply_defs = make_library<BAs...>(
 	+ WFF_DEF_EQUIV
 	// bf defs
 	+ BF_DEF_XOR
+	+ WFF_DEF_BEX_0
+	+ WFF_DEF_BALL_0
 );
 
 template<typename... BAs>
@@ -512,7 +516,7 @@ formula<BAs...> normalizer_step(formula<BAs...>& form, int stp = 0) {
 				step<BAs...>(apply_defs<BAs...>))
 			| repeat_all<step<BAs...>, BAs...>(
 				step<BAs...>(elim_for_all<BAs...>))
-			| repeat_all<step<BAs...>, BAs...>(
+			| repeat_each<step<BAs...>, BAs...>(
 				to_dnf_wff<BAs...>
 				| simplify_wff<BAs...>
 				| clause_simplify_wff<BAs...>)
@@ -591,6 +595,11 @@ template<typename... BAs>
 static const auto is_not_eq_or_neq_to_zero_predicate = [](const sp_tau_node<BAs...>& n) {
 	auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
 	return check.empty();
+//	if (is_non_terminal<tau_parser::bf_eq, BAs...>(n) || is_non_terminal<tau_parser::bf_neq, BAs...>(n)) {
+//		auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
+//		return check.empty();
+//	}
+//	return true;
 };
 
 template<typename... BAs>
@@ -619,15 +628,12 @@ formula<BAs...> normalizer(const formula<BAs...>& form) {
 	// apply defs to formula
 
 	#ifdef OUTPUT_APPLY_RULES
+	std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;
 	std::cout << "(I): -- Apply once definitions" << std::endl;
 	std::cout << "(F): " << form.main << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
 	auto nform = apply_definitions(form);
-
-	#ifdef OUTPUT_APPLY_RULES
-	std::cout << "(I): -- Begin normalizer" << std::endl;
-	#endif // OUTPUT_APPLY_RULES
 
 	std::vector<sp_tau_node<BAs...>> previous;
 	formula<BAs...> current = normalizer_step(nform);

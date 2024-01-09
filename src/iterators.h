@@ -208,6 +208,7 @@ public:
 		return *this;
 	}
 
+	// REVIEW: operations on second_...
 	partitions_const_iterator operator++(int) {
 		auto current = *this;
 		auto delta = *(++grey_code_);

@@ -270,16 +270,23 @@ struct tau_factory {
 	base_factory_t& bf;
 };
 
+
+// TODO (HIGH) rewrite this using tau formulas instead of tau_parser::formulas
 template<typename base_factory_t, typename...BAs>
-formula<tau<BAs...>> make_tau_using_factory(const std::string& src, base_factory_t& bf) {
+formula<tau<BAs...>, BAs...> make_tau_using_factory(const std::string& src, base_factory_t& bf) {
 	tau_factory<base_factory_t, BAs...> tf(bf);
 	return make_formula_using_factory<tau_factory<base_factory_t, BAs...>, tau<BAs...>>(src, tf);
 }
 
+// TODO (HIGH) rewrite this using tau formulas instead of tau_parser::formulas
 template<typename...BAs>
-formula<tau<BAs...>> make_tau_using_bindings(const std::string& src, const bindings<tau<BAs...>>& bs) {
+formula<tau<BAs...>, BAs...> make_tau_using_bindings(const std::string& src, const bindings<tau<BAs...>>& bs) {
 	return make_formula_using_bindings<tau<BAs...>>(src, bs);
 }
+
+// TODO (HIGH) add convert tau formula to dnf
+
+// TODO (HIGH) add convert tau dnf formula to single positive dnf
 
 } // namespace idni::tau
 

@@ -356,4 +356,56 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
+
+	TEST_CASE("bex P P") {
+		const char* sample =	"bex P P.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("ball P P") {
+		const char* sample =	"ball P P.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("ball P bex Q (P || Q)") {
+		const char* sample =	"ball P bex Q (P || Q).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("bex P ball Q (P || Q)") {
+		const char* sample =	"bex P ball Q (P || Q).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		pretty_print_sp_tau_node(std::cout, result);
+		print_sp_tau_node(std::cout, result);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
 }
