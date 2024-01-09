@@ -1328,8 +1328,8 @@ private:
 		return leaves;
 	}
 
-	sp_tau_node<BAs...> apply_wff_remove_buniversal(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
+	std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>> get_quantifier_remove_constituents(const tau_parser::nonterminal type, const sp_tau_node<BAs...>& n) {
+		auto args = n || type || only_child_extractor<BAs...>;
 		auto var = args[0];
 		auto T = args[2];
 		auto F = args[3];
@@ -1341,54 +1341,26 @@ private:
 		right_changes[var] = F;
 		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
 			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		return {left, right};
+	}
+
+	sp_tau_node<BAs...> apply_wff_remove_buniversal(const sp_tau_node<BAs...>& n) {
+		auto [left, right] = get_quantifier_remove_constituents(tau_parser::wff_cb_arg, n);
 		return build_wff_and<BAs...>(left, right);
 	}
 
 	sp_tau_node<BAs...> apply_wff_remove_bexistential(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
-		auto var = args[0];
-		auto T = args[2];
-		auto F = args[3];
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
-		left_changes[var] = T;
-		auto left = replace<sp_tau_node<BAs...>>(args[1], left_changes)
-			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> right_changes;
-		right_changes[var] = F;
-		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
-			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		auto [left, right] = get_quantifier_remove_constituents(tau_parser::wff_cb_arg, n);
 		return build_wff_or<BAs...>(left, right);
 	}
 
 	sp_tau_node<BAs...> apply_bf_remove_funiversal(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
-		auto var = args[0];
-		auto T = args[2];
-		auto F = args[3];
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
-		left_changes[var] = T;
-		auto left = replace<sp_tau_node<BAs...>>(args[1], left_changes)
-			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> right_changes;
-		right_changes[var] = F;
-		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
-			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		auto [left, right] = get_quantifier_remove_constituents(tau_parser::bf_cb_arg, n);
 		return build_bf_and<BAs...>(left, right);
 	}
 
 	sp_tau_node<BAs...> apply_bf_remove_fexistential(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
-		auto var = args[0];
-		auto T = args[2];
-		auto F = args[3];
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
-		left_changes[var] = T;
-		auto left = replace<sp_tau_node<BAs...>>(args[1], left_changes)
-			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> right_changes;
-		right_changes[var] = F;
-		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
-			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		auto [left, right] = get_quantifier_remove_constituents(tau_parser::bf_cb_arg, n);
 		return build_bf_or<BAs...>(left, right);
 	}
 
