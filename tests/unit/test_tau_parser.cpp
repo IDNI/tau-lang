@@ -612,34 +612,41 @@ TEST_SUITE("parsing callbacks ") {
 		CHECK( neg_cb.has_value() );
 	}
 
-	TEST_CASE("bf_subs_cb") {
-		const char* sample =	"$X := bf_subs_cb $X $X $X.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto subs_cb = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_subs_cb;
-		CHECK( subs_cb.has_value() );
-	}
+//	TEST_CASE("bf_subs_cb") {
+//		const char* sample =	"$X := bf_subs_cb $X $X $X.";
+//		auto src = make_tau_source(sample);
+//		auto lib = make_statement(src);
+//		auto subs_cb = lib
+//			| tau_parser::library
+//			| tau_parser::rules
+//			| tau_parser::rule
+//			| tau_parser::bf_rule
+//			| tau_parser::bf_body
+//			| tau_parser::bf
+//			| tau_parser::bf_subs_cb;
+//		CHECK( subs_cb.has_value() );
+//	}
 
-	// TODO (VERY_LOW) add parsing bf_less_cb test
-	// TODO (VERY_LOW) add parsing bf_less_equal_cb test
-	// TODO (VERY_LOW) add parsing bf_greater_cb test
-	// TODO (VERY_LOW) add parsing bf_eq_cb test
-	// TODO (VERY_LOW) add parsing bf_neq_cb test
-	// TODO (VERY_LOW) add parsing bf_is_zero_cb test
-	// TODO (VERY_LOW) add parsing bf_is_one_cb test
-	// TODO (VERY_LOW) add parsing bf_has_clashing_subformulas_cb test
-	// TODO (VERY_LOW) add parsing bf_has_subformula_cb test
-	// TODO (VERY_LOW) add parsing wff_has_clashing_subformulas_cb test
-	// TODO (VERY_LOW) add parsing wff_has_subformula_cb test
+
+	// TODO (MEDIUM) write tests for execution bf_is_zero_cb
+	// TODO (MEDIUM) write tests for execution bf_is_one_cb
+	// TODO (MEDIUM) write tests for execution bf_has_clashing_subformulas_cb
+	// TODO (MEDIUM) write tests for execution bf_has_subformula_cb
+	// TODO (MEDIUM) write tests for execution bf_remove_fexistential_cb
+	// TODO (MEDIUM) write tests for execution bf_remove_funiversal_cb
+
+	// TODO (MEDIUM) write tests for execution bf_eq_cb
+	// TODO (MEDIUM) write tests for execution bf_neq_cb
+	// TODO (MEDIUM) write tests for execution wff_remove_existential_cb
+	// TODO (MEDIUM) write tests for execution wff_remove_bexistential_cb
+	// TODO (MEDIUM) write tests for execution wff_remove_buniversal_cb.
+	// TODO (MEDIUM) write tests for execution wff_has_clashing_subformulas_cb
+	// TODO (MEDIUM) write tests for execution wff_has_subformula_cb
 	//
-	// It is categorized as LOW because we have lot of tests parsing specific rules
+	// Callbacks are a crucial part of the execution of the normalizer and should
+	// be tested properly. However, they are extensively tested inderectly in
+	// other unit/integration tests. However, it is better to have explicit tests
+	// for each of them.
 }
 
 TEST_SUITE("parsing rules") {

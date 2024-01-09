@@ -72,29 +72,23 @@ TEST_SUITE("make_library") {
 
 TEST_SUITE("callbacks") {
 
-	TEST_CASE("BF_CALLBACK_SUBS") {
-		const char* sample =	"bf_subs_cb 0 1 0 := 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		callback_applier<Bool> cb_applier;
-		auto extracted = sample_statement
-			| tau_parser::library | tau_parser::rules
-			| tau_parser::rule | tau_parser::bf_rule
-			| tau_parser::bf_matcher | tau_parser::bf | tau_parser::bf_subs_cb
-			| optional_value_extractor<sp_tau_node<Bool>>;
-		auto result = cb_applier(extracted);
-		CHECK( is_non_terminal<Bool>(tau_parser::bf_t, result) );
-	}
 
-	// TODO (MEDIUM) write tests for execution bf_less_cb
-	// TODO (MEDIUM) write tests for execution bf_less_equal_cb
-	// TODO (MEDIUM) write tests for execution bf_greater_cb
-	// TODO (MEDIUM) write tests for execution bf_eq_cb
-	// TODO (MEDIUM) write tests for execution bf_neq_cb
+	// TODO (MEDIUM) write tests for execution bf_and_cb
+	// TODO (MEDIUM) write tests for execution bf_or_cb
+	// TODO (MEDIUM) write tests for execution bf_xor_cb
+	// TODO (MEDIUM) write tests for execution bf_neg_cb
 	// TODO (MEDIUM) write tests for execution bf_is_zero_cb
 	// TODO (MEDIUM) write tests for execution bf_is_one_cb
 	// TODO (MEDIUM) write tests for execution bf_has_clashing_subformulas_cb
 	// TODO (MEDIUM) write tests for execution bf_has_subformula_cb
+	// TODO (MEDIUM) write tests for execution bf_remove_fexistential_cb
+	// TODO (MEDIUM) write tests for execution bf_remove_funiversal_cb
+
+	// TODO (MEDIUM) write tests for execution bf_eq_cb
+	// TODO (MEDIUM) write tests for execution bf_neq_cb
+	// TODO (MEDIUM) write tests for execution wff_remove_existential_cb
+	// TODO (MEDIUM) write tests for execution wff_remove_bexistential_cb
+	// TODO (MEDIUM) write tests for execution wff_remove_buniversal_cb.
 	// TODO (MEDIUM) write tests for execution wff_has_clashing_subformulas_cb
 	// TODO (MEDIUM) write tests for execution wff_has_subformula_cb
 	//

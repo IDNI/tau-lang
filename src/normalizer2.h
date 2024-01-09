@@ -57,8 +57,8 @@ RULE(BF_SIMPLIFY_SELF_3, "( $X | ~ $X ) := 1.")
 RULE(BF_SIMPLIFY_SELF_4, "( ~ $X & $X ) := 0.")
 RULE(BF_SIMPLIFY_SELF_5, "( ~ $X | $X ) := 1.")
 
-RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "fall $X $Y := ( bf_subs_cb $X 0 $Y & bf_subs_cb $X 1 $Y).")
-RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "fex $X $Y := ( bf_subs_cb $X 0 $Y | bf_subs_cb $X 1 $Y).")
+RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "fall $X $Y := bf_remove_funiversal_cb $X $Y 1 0.")
+RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "fex $X $Y := bf_remove_fexistential_cb $X $Y 1 0.")
 RULE(BF_SKIP_CONSTANTS_0, "({ $X } & $Y) := ($Y & { $X }).")
 
 // bf definitions
