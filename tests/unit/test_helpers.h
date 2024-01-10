@@ -14,7 +14,7 @@
 #ifndef __TEST_HELPERS_H__
 #define __TEST_HELPERS_H__
 
-#include "../../src/formula.h"
+#include "../../src/nso_rr.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;

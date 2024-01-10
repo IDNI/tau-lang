@@ -14,7 +14,7 @@ set(TAU_HEADERS
 	normalizer.h
 	normalizer2.h
 	out.h
-	formula.h
+	nso_rr.h
 	seq.h
 	tau.h
 	iterators.h

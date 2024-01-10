@@ -289,12 +289,11 @@ rule			=> wff_rule | bf_rule | tau_rule.
 rules			=> (rule)*.
 rec_relation	=> bf_rec_relation | wff_rec_relation dot.
 rec_relations	=> (rec_relation)*.
-# TODO (LOW) rename to msnso_rr
-formula			=> rec_relations main.
+nso_rr			=> rec_relations main.
 library 		=> rules.
 # each builder is define on its own string
 builder			=> builder_head definition builder_body dot.
 builder_head	=> open_parenthesis capture (ws_required capture)* close_parenthesis.
 builder_body	=> wff | bf | tau.
 gssotc			=> tau semicolon.
-start			=> formula | gssotc | library | builder | inputs.
+start			=> nso_rr | gssotc | library | builder | inputs.

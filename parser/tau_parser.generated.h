@@ -52,7 +52,7 @@ struct tau_parser {
 		_Rsource_21, _Rsource_22, bf_cb_arg, bf_and_cb_sym, bf_or_cb_sym, bf_xor_cb_sym, bf_neg_cb_sym, bf_eq_cb_sym, wff_cb_arg, bf_neq_cb_sym,
 		bf_is_zero_cb_sym, bf_is_one_cb_sym, bf_remove_funiversal_cb_sym, bf_remove_fexistential_cb_sym, wff_remove_existential_cb_sym, wff_remove_bexistential_cb_sym, wff_remove_buniversal_cb_sym, bf_has_clashing_subformulas_cb_sym, wff_has_clashing_subformulas_cb_sym, bf_has_subformula_cb_sym,
 		wff_has_subformula_cb_sym, tau_collapse_positives_cb_sym, tau_cb_arg, _Rtau_collapse_positives_cb_23, _Rtau_collapse_positives_cb_24, tau_positives_upwards_cb_sym, input, inputs, _Rinputs_25, _Rinputs_26,
-		main, rule, rules, _Rrules_27, _Rrules_28, rec_relation, rec_relations, _Rrec_relations_29, _Rrec_relations_30, formula,
+		main, rule, rules, _Rrules_27, _Rrules_28, rec_relation, rec_relations, _Rrec_relations_29, _Rrec_relations_30, nso_rr,
 		library, builder, builder_head, builder_body, _Rbuilder_head_31, _Rbuilder_head_32, gssotc, start, __neg_0, __neg_1,
 		__neg_2, __neg_3, __neg_4, __neg_5,
 	};
@@ -101,7 +101,7 @@ private:
 			"_Rsource_21", "_Rsource_22", "bf_cb_arg", "bf_and_cb_sym", "bf_or_cb_sym", "bf_xor_cb_sym", "bf_neg_cb_sym", "bf_eq_cb_sym", "wff_cb_arg", "bf_neq_cb_sym",
 			"bf_is_zero_cb_sym", "bf_is_one_cb_sym", "bf_remove_funiversal_cb_sym", "bf_remove_fexistential_cb_sym", "wff_remove_existential_cb_sym", "wff_remove_bexistential_cb_sym", "wff_remove_buniversal_cb_sym", "bf_has_clashing_subformulas_cb_sym", "wff_has_clashing_subformulas_cb_sym", "bf_has_subformula_cb_sym",
 			"wff_has_subformula_cb_sym", "tau_collapse_positives_cb_sym", "tau_cb_arg", "_Rtau_collapse_positives_cb_23", "_Rtau_collapse_positives_cb_24", "tau_positives_upwards_cb_sym", "input", "inputs", "_Rinputs_25", "_Rinputs_26",
-			"main", "rule", "rules", "_Rrules_27", "_Rrules_28", "rec_relation", "rec_relations", "_Rrec_relations_29", "_Rrec_relations_30", "formula",
+			"main", "rule", "rules", "_Rrules_27", "_Rrules_28", "rec_relation", "rec_relations", "_Rrec_relations_29", "_Rrec_relations_30", "nso_rr",
 			"library", "builder", "builder_head", "builder_body", "_Rbuilder_head_31", "_Rbuilder_head_32", "gssotc", "start", "__neg_0", "__neg_1",
 			"__neg_2", "__neg_3", "__neg_4", "__neg_5",
 		}) nts.get(nt);
@@ -805,7 +805,7 @@ private:
 		q(nt(218), (nt(217)+nt(218)));
 		// rec_relations => _Rrec_relations_30.
 		q(nt(216), (nt(218)));
-		// formula => rec_relations main.
+		// nso_rr => rec_relations main.
 		q(nt(219), (nt(216)+nt(210)));
 		// library => rules.
 		q(nt(220), (nt(212)));
@@ -829,7 +829,7 @@ private:
 		q(nt(226), (nt(72)+nt(46)));
 		// start => inputs.
 		q(nt(227), (nt(207)));
-		// start => formula.
+		// start => nso_rr.
 		q(nt(227), (nt(219)));
 		// start => library.
 		q(nt(227), (nt(220)));

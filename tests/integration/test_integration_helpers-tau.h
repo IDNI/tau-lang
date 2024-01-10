@@ -14,7 +14,7 @@
 #ifndef __TEST_INTEGRATION_HELPERS_TAU_H__
 #define __TEST_INTEGRATION_HELPERS_TAU_H__
 
-#include "../src/formula.h"
+#include "../src/nso_rr.h"
 #include "../src/babdd.h"
 #include "../src/bdd_handle.h"
 #include "../src/bool.h"
@@ -52,15 +52,15 @@ struct bdd_test_factory {
 template<typename...BAs>
 using bdd_test_factory_t = bdd_test_factory<BAs...>;
 
-formula<tau<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
+nso_rr<tau<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
 	bdd_test_factory<bdd_test> bf;
 	tau_factory<bdd_test_factory_t<bdd_test>, bdd_test> fb(bf);
 	factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>, tau<bdd_test>, bdd_test> fbinder(fb);
-	formula<tau<bdd_test>, bdd_test> formula = make_formula_using_factory<
+	nso_rr<tau<bdd_test>, bdd_test> nso_rr = make_nso_rr_using_factory<
 			factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>,tau<bdd_test>, bdd_test>,
 			tau<bdd_test>, bdd_test>(src, fbinder);
 
-	return normalizer<tau<bdd_test>, bdd_test>(formula);
+	return normalizer<tau<bdd_test>, bdd_test>(nso_rr);
 }
 
 #endif // __TEST_INTEGRATION_HELPERS_TAU_H__

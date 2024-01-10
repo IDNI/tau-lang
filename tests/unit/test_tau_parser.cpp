@@ -16,7 +16,7 @@
 
 #include "../../src/doctest.h"
 #include "../../src/defs.h"
-#include "../../src/formula.h"
+#include "../../src/nso_rr.h"
 #include "../../src/bool.h"
 #include "test_helpers.h"
 
@@ -29,9 +29,9 @@ namespace testing = doctest;
 // IMPORTANT: To check the parser (and the underlying grammar) we don't need
 // any special boolean algebra, so we use Bool to simplify our testing.
 
-// The following test suites represent correct sentences of a tau formula or
+// The following test suites represent correct sentences of a tau nso_rr or
 // library and as such must be parsed correctly and satisfy the structural checks
-// we perform on the parsed formula (as the rest of the code assumes such structure).
+// we perform on the parsed nso_rr (as the rest of the code assumes such structure).
 
 // TODO (LOW) why "$X := { : src_code } bf_and { bool : src_code }." is parsed
 //
@@ -39,7 +39,7 @@ namespace testing = doctest;
 //
 // Check if still hapopens after the latest changes to the grammar.
 
-TEST_SUITE("parsing formula") {
+TEST_SUITE("parsing nso_rr") {
 
 	const char* sample =
 		"f [0] (X) := X."
@@ -48,23 +48,23 @@ TEST_SUITE("parsing formula") {
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
 
-	TEST_CASE("formula") {
-		auto formula = frml | tau_parser::formula ;
-		CHECK( formula.has_value() );
+	TEST_CASE("nso_rr") {
+		auto nso_rr = frml | tau_parser::nso_rr ;
+		CHECK( nso_rr.has_value() );
 	}
 
 	TEST_CASE("rules") {
-		auto rules = frml | tau_parser::formula | tau_parser::rec_relations ;
+		auto rules = frml | tau_parser::nso_rr | tau_parser::rec_relations ;
 		CHECK( rules.has_value() );
 	}
 
 	TEST_CASE("rule") {
-		auto rules = frml | tau_parser::formula | tau_parser::rec_relations || tau_parser::rec_relation;
+		auto rules = frml | tau_parser::nso_rr | tau_parser::rec_relations || tau_parser::rec_relation;
 		CHECK( rules.size() == 2 );
 	}
 
 	TEST_CASE("main") {
-		auto main = frml | tau_parser::formula | tau_parser::main;
+		auto main = frml | tau_parser::nso_rr | tau_parser::main;
 		CHECK( main.has_value() );
 	}
 }
@@ -151,7 +151,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto neg_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_neg;
@@ -163,7 +163,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto and_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_and;
@@ -175,7 +175,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto or_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_or;
@@ -187,7 +187,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto xor_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_xor;
@@ -199,7 +199,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto xor_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_conditional;
@@ -211,7 +211,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto eq_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::bf_eq;
@@ -223,7 +223,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto eq_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::bf_neq;
@@ -234,7 +234,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto less_rule = lib
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::bf_less;
@@ -246,7 +246,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto less_equal_rule = lib
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::bf_less_equal;
@@ -258,7 +258,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto greater_rule = lib
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::bf_greater;
@@ -301,7 +301,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto all_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_all;
@@ -314,7 +314,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto ex_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_ex;
@@ -327,7 +327,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto all_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_ball;
@@ -340,7 +340,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto ex_formula = frml
-			| tau_parser::formula
+			| tau_parser::nso_rr
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_bex;

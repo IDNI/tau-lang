@@ -38,7 +38,7 @@ namespace idni::tau {
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
-// We should talk about statement, formula (nso_with_rr?), library, rule, builder,
+// We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
 //
@@ -81,7 +81,7 @@ using rules = std::vector<tau_rule<BAs...>>;
 template <typename... BAs>
 using rec_relations = std::vector<tau_rule<BAs...>>;
 
-// defines the main statement of a tau formula.
+// defines the main statement of a tau nso_rr.
 template <typename... BAs>
 using statement = sp_tau_node<BAs...>;
 
@@ -94,15 +94,15 @@ using library = rules<BAs...>;
 template<typename... BAs>
 using bindings = std::map<std::string, std::variant<BAs...>>;
 
-// a formula is a set of rules and a main, the boolean algebra constants
+// a nso_rr is a set of rules and a main, the boolean algebra constants
 // (unless '0' or '1') are uninstantiated.
 
-// TODO (LOW) replace formula with a pair of rules and main
+// TODO (LOW) replace nso_rr with a pair of rules and main
 template<typename... BAs>
-struct formula {
+struct nso_rr {
 
-	formula(rules<BAs...>& rec_relations, statement<BAs...>& main) : rec_relations(rec_relations), main(main) {};
-	formula(statement<BAs...>& main) : main(main) {};
+	nso_rr(rules<BAs...>& rec_relations, statement<BAs...>& main) : rec_relations(rec_relations), main(main) {};
+	nso_rr(statement<BAs...>& main) : main(main) {};
 
 	rules<BAs...> rec_relations;
 	statement<BAs...> main;
@@ -768,9 +768,9 @@ library<BAs...> resolve_types(const library<BAs...> lib) {
 	return { resolve_types(lib.system) };
 }
 
-// resolve all the unresolved types in the given formula.
+// resolve all the unresolved types in the given nso_rr.
 template<typename binder_t, typename... BAs>
-formula<BAs...> resolve_types(const formula<BAs...> f) {
+nso_rr<BAs...> resolve_types(const nso_rr<BAs...> f) {
 	return { resolve_types(f.rec_relations), resolve_type(f.main) };
 }
 
@@ -885,11 +885,11 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	return make_rules(lib);
 }
 
-// make a formula from the given tau source and binder.
+// make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
+nso_rr<BAs...> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
 	auto src = make_tau_code<BAs...>(tau_source);
-	auto unbinded_main = src | tau_parser::formula | tau_parser::main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto unbinded_main = src | tau_parser::nso_rr | tau_parser::main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
 	auto binded_main = post_order_traverser<
 			binder_t,
 			all_t<sp_tau_node<BAs...>>,
@@ -899,19 +899,19 @@ formula<BAs...> make_formula_using_binder(sp_tau_source_node& tau_source, binder
 	return { rules, binded_main };
 }
 
-// make a formula from the given tau source and bindings.
+// make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-formula<BAs...> make_formula_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
+nso_rr<BAs...> make_nso_rr_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
 	name_binder<BAs...> nb(bindings);
 	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
-	return make_formula_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
+	return make_nso_rr_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
 }
 
-// make a formula from the given tau source and bindings.
+// make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
-formula<BAs...> make_formula_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
+nso_rr<BAs...> make_nso_rr_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
 	bind_transformer<factory_t, BAs...> bs(factory);
-	return make_formula_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
+	return make_nso_rr_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
 }
 
 // make a library from the given tau source string.
@@ -945,8 +945,8 @@ builder<BAs...> make_builder(const std::string& source) {
 // apply the given builder to the given expression
 // TODO (MEDIUM) it should return the child, it currtently returns the parent
 //
-// i.e. rightnow it retuns a a bf or wff formula, but we are interested in the child
-// thus it, a wwf_eq formula, or wff_neq formula,...
+// i.e. rightnow it retuns a a bf or wff nso_rr, but we are interested in the child
+// thus it, a wwf_eq nso_rr, or wff_neq nso_rr,...
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_tau_node<BAs...>>& n) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
@@ -955,20 +955,20 @@ sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_t
 	return replace<sp_tau_node<BAs...>>(b.second, changes);
 }
 
-// make a formula from the given tau source and bindings.
+// make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
-formula<BAs...> make_formula_using_factory(const std::string& source, factory_t& factory) {
+nso_rr<BAs...> make_nso_rr_using_factory(const std::string& source, factory_t& factory) {
 	auto tau_source = make_tau_source(source);
-	return make_formula_using_factory<factory_t, BAs...>(tau_source, factory);
+	return make_nso_rr_using_factory<factory_t, BAs...>(tau_source, factory);
 }
 
-// make a formula from the given tau source and bindings.
+// make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-formula<BAs...> make_formula_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
+nso_rr<BAs...> make_nso_rr_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
 	auto tau_source = make_tau_source(source);
 	name_binder<BAs...> nb(bindings);
 	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
-	return make_formula_using_bindings<
+	return make_nso_rr_using_bindings<
 			bind_transformer<name_binder<BAs...>, BAs...>,
 			BAs...>(
 		tau_source, bs);
@@ -1002,7 +1002,6 @@ const std::string BLDR_BF_EX = "( $X $Y ) := fex $X $Y.";
 
 // definitions of tau builder rules
 // definitions of bf builder rules
-// IDEA maybe move it to formula.h or normalizer.h
 const std::string BLDR_TAU_AND = "( $X $Y ) := ($X &&& $Y).";
 const std::string BLDR_TAU_OR = "( $X $Y ) := ($X ||| $Y).";
 const std::string BLDR_TAU_NEG = "( $X ) := % $X.";
@@ -1696,7 +1695,7 @@ private:
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template<typename predicate_t, typename... BAs>
-sp_tau_node<BAs...> formula_apply_if(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
+sp_tau_node<BAs...> nso_rr_apply_if(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
 	// IDEA maybe we could traverse only once
 	auto nn = apply_with_skip_if<
 			sp_tau_node<BAs...>,
@@ -1726,17 +1725,17 @@ sp_tau_node<BAs...> formula_apply_if(const tau_rule<BAs...>& r, const sp_tau_nod
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template<typename predicate_t, typename... BAs>
-sp_tau_node<BAs...> formula_apply_if(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
+sp_tau_node<BAs...> nso_rr_apply_if(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
 	if (rs.empty()) return n;
 	sp_tau_node<BAs...> nn = n;
-	for (auto& r : rs) nn = formula_apply_if<predicate_t, BAs...>(r, nn, predicate);
+	for (auto& r : rs) nn = nso_rr_apply_if<predicate_t, BAs...>(r, nn, predicate);
 	return nn;
 }
 
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> formula_apply(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> nso_rr_apply(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
 	auto nn = apply_with_skip<
 			sp_tau_node<BAs...>,
@@ -1766,10 +1765,10 @@ sp_tau_node<BAs...> formula_apply(const tau_rule<BAs...>& r, const sp_tau_node<B
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> formula_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> nso_rr_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
 	if (rs.empty()) return n;
 	sp_tau_node<BAs...> nn = n;
-	for (auto& r : rs) nn = formula_apply<BAs...>(r, nn);
+	for (auto& r : rs) nn = nso_rr_apply<BAs...>(r, nn);
 	return nn;
 }
 
@@ -1788,7 +1787,7 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::rules<BAs...>& r
 
 // << for formulas
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream, const idni::tau::formula<BAs...>& f) {
+std::ostream& operator<<(std::ostream& stream, const idni::tau::nso_rr<BAs...>& f) {
 	return stream << f.rec_relations << f.main << "\n";
 }
 
