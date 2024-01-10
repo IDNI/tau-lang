@@ -9,7 +9,7 @@
 
 # whitespace and comments
 eol                    => '\n' | '\r' | eof.
-ws_comment             => '#' eol | '#' printable+ eol.
+ws_comment             => '#' (printable | '\t')* eol.
 ws_required            => space ws | ws_comment ws.
 ws                     => ws_required | null.
 
@@ -34,42 +34,39 @@ char_                  => char0 | esc q_char |     q_str |     q_bqstr.
 string_char            => char0 |     q_char | esc q_str |     q_bqstr.
 bqstring_char          => char0 |     q_char |     q_str | esc q_bqstr.
 chars                  => alpha (alnum)*.
-char_class             => "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
-			| "graph" | "lower" | "printable" | "punct" | "space"
-			| "upper" | "xdigit".
-digits                 => digit (digit)*.
+digits                 => digit+.
 
 # common symbols
-definition             => ws ":=" ws.
-dot                    => ws '.' ws.
-open_parenthesis       => ws '(' ws.
-close_parenthesis      => ws ')' ws.
-open_bracket           => ws '[' ws.
-close_bracket          => ws ']' ws.
-open_brace             => ws '{' ws.
-close_brace            => ws '}' ws.
-minus                  => ws '-' ws.
-colon                  => ws ':' ws.
-semicolon              => ws ';' ws.
-less                   => ws '<' ws.
-comma                  => ws ',' ws.
+definition             => ":=".
+dot                    => '.'.
+open_parenthesis       => '('.
+close_parenthesis      => ')'.
+open_bracket           => '['.
+close_bracket          => ']'.
+open_brace             => '{'.
+close_brace            => '}'.
+minus                  => '-'.
+colon                  => ':'.
+semicolon              => ';'.
+less                   => '<'.
+comma                  => ','.
 
 # elements
 sym                    => chars.
 
 # offsets
-offsets                => open_bracket step (comma offset)* close_bracket.
+offsets                => open_bracket ws step (ws comma ws offset)* ws close_bracket.
 offset                 => num | capture | shift.
 step                   => num | capture | shift.
 shift                  => capture minus num.
-num                    => ws digits ws.
+num                    => digits.
 
 # timed_offset
 # TODO (HIGH) check that no timed offset is used in a formula (msnso_rr)
-timed_offset           => open_bracket timed_step close_bracket.
+timed_offset           => open_bracket ws timed_step ws close_bracket.
 timed_step             => num | timed_capture | timed_shift.
-timed_shift            => timed_capture minus num.
-timed_capture          => ws 't' ws.
+timed_shift            => timed_capture ws minus ws num.
+timed_capture          => 't'.
 
 variable               => var | timed.
 timed                  => (in | out)  timed_offset.
@@ -83,123 +80,123 @@ in                     => "?i_" chars. # instead of '<', easy to remember
 out                    => "?o_" chars. # instead of '>', easy to remember
 
 # tau
-tau_rule               => tau_matcher definition tau_body dot.
+tau_rule               => tau_matcher ws definition ws tau_body ws dot.
 tau_matcher            => tau.
 tau_body               => tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
 
 
 # TODO (HIGH) check programatically that we do not have inappropriated element from wff in tau
 tau                    => wff | tau_and | tau_or | tau_neg | tau_t | tau_f | capture.
-tau_and                => open_parenthesis tau tau_and_sym tau close_parenthesis.
-tau_or                 => open_parenthesis tau tau_or_sym tau close_parenthesis.
-tau_neg                => tau_neg_sym tau.
-tau_t                  => ws 'T' ws.
-tau_f                  => ws 'F' ws.
+tau_and                => open_parenthesis ws tau ws tau_and_sym ws tau ws close_parenthesis.
+tau_or                 => open_parenthesis ws tau ws tau_or_sym ws tau ws close_parenthesis.
+tau_neg                => tau_neg_sym ws tau.
+tau_t                  => 'T'.
+tau_f                  => 'F'.
 
 # tau_op_sym
-tau_and_sym            => ws "&&&" ws.
-tau_or_sym             => ws "|||" ws.
+tau_and_sym            => "&&&".
+tau_or_sym             => "|||".
 # TODO (HIGH) rename to ~ notation
-tau_neg_sym            => ws '%' ws.
+tau_neg_sym            => '%'.
 
 
 # wff
-wff_rule               => wff_matcher definition wff_body dot.
-wff_rec_relation       => wff_ref definition wff dot.
+wff_rule               => wff_matcher ws definition ws wff_body ws dot.
+wff_rec_relation       => wff_ref ws definition ws wff ws dot.
 
 wff_matcher            => wff | wff_ref.
 wff_body               => wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 			| wff_has_subformula_cb | wff_remove_existential_cb
-			| wff_remove_bexistential_cb |wff_remove_buniversal_cb.
+			| wff_remove_bexistential_cb | wff_remove_buniversal_cb.
 
 # TODO (MEDIUM) check programatically that no capture is use in a rec_relation as wff
 wff                    => wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
 			| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
 			| wff_t | wff_f | capture | bool_variable | wff_ball | wff_bex
 			| bf_eq | bf_neq | bf_less | bf_less_equal | bf_greater.
-wff_ref                => sym offsets wff_ref_args.
-wff_ref_args           => open_parenthesis (variable)* close_parenthesis.
-wff_and                => open_parenthesis wff wff_and_sym wff close_parenthesis.
-wff_or                 => open_parenthesis wff wff_or_sym wff close_parenthesis.
-wff_xor                => open_parenthesis wff wff_xor_sym wff close_parenthesis.
-wff_conditional        => open_parenthesis wff wff_conditional_sym wff colon wff close_parenthesis.
-wff_neg                => wff_neg_sym wff.
-wff_imply              => open_parenthesis wff wff_imply_sym wff close_parenthesis.
-wff_equiv              => open_parenthesis wff wff_equiv_sym wff close_parenthesis.
-wff_all                => wff_all_sym (variable|capture) ws_required wff.
-wff_ex                 => wff_ex_sym ws_required (variable|capture) ws_required wff.
-wff_ball               => wff_ball_sym ws_required (bool_variable|capture) ws_required wff.
-wff_bex                => wff_bex_sym ws_required (bool_variable|capture) ws_required wff.
+wff_ref                => sym ws offsets ws wff_ref_args.
+wff_ref_args           => open_parenthesis (ws variable)* ws close_parenthesis.
+wff_and                => open_parenthesis ws wff ws wff_and_sym ws wff ws close_parenthesis.
+wff_or                 => open_parenthesis ws wff ws wff_or_sym ws wff ws close_parenthesis.
+wff_xor                => open_parenthesis ws wff ws wff_xor_sym ws wff ws close_parenthesis.
+wff_conditional        => open_parenthesis ws wff ws wff_conditional_sym ws wff ws colon ws wff ws close_parenthesis.
+wff_neg                => wff_neg_sym ws wff.
+wff_imply              => open_parenthesis ws wff ws wff_imply_sym ws wff ws close_parenthesis.
+wff_equiv              => open_parenthesis ws wff ws wff_equiv_sym ws wff ws close_parenthesis.
+wff_all                => wff_all_sym ws_required (variable | capture) ws_required wff.
+wff_ex                 => wff_ex_sym ws_required (variable | capture) ws_required wff.
+wff_ball               => wff_ball_sym ws_required (bool_variable | capture) ws_required wff.
+wff_bex                => wff_bex_sym ws_required (bool_variable | capture) ws_required wff.
 
 # relational operators
 #
 # they are named bf_* as they involve boolean functions,
 # but they are not boolean functions themselves, they return a T/F wff value
 # and hence, should be considered as wffs
-bf_eq                  => open_parenthesis bf bf_equality_sym bf close_parenthesis.
-bf_neq                 => open_parenthesis bf bf_nequality_sym bf close_parenthesis.
-bf_less                => open_parenthesis bf bf_less_sym bf close_parenthesis.
-bf_less_equal          => open_parenthesis bf bf_less_equal_sym bf close_parenthesis.
-bf_greater             => open_parenthesis bf bf_greater_sym bf close_parenthesis.
+bf_eq                  => open_parenthesis ws bf ws bf_equality_sym ws bf ws close_parenthesis.
+bf_neq                 => open_parenthesis ws bf ws bf_nequality_sym ws bf ws close_parenthesis.
+bf_less                => open_parenthesis ws bf ws bf_less_sym ws bf ws close_parenthesis.
+bf_less_equal          => open_parenthesis ws bf ws bf_less_equal_sym ws bf ws close_parenthesis.
+bf_greater             => open_parenthesis ws bf ws bf_greater_sym ws bf ws close_parenthesis.
 
 # wff_op_sym
-wff_and_sym            => ws "&&" ws.
-wff_or_sym             => ws "||" ws.
-wff_xor_sym            => ws '^' ws.
-wff_conditional_sym    => ws '?' ws.
-wff_neg_sym            => ws '!' ws.
-wff_imply_sym          => ws "->" ws.
-wff_equiv_sym          => ws "<->" ws.
-wff_all_sym            => ws "all" ws.
-wff_ex_sym             => ws "ex" ws.
-wff_ball_sym           => ws "ball" ws.
-wff_bex_sym            => ws "bex" ws.
-wff_t                  => ws 'T' ws.
-wff_f                  => ws 'F' ws.
+wff_and_sym            => "&&".
+wff_or_sym             => "||".
+wff_xor_sym            => '^'.
+wff_conditional_sym    => '?'.
+wff_neg_sym            => '!'.
+wff_imply_sym          => "->".
+wff_equiv_sym          => "<->".
+wff_all_sym            => "all".
+wff_ex_sym             => "ex".
+wff_ball_sym           => "ball".
+wff_bex_sym            => "bex".
+wff_t                  => 'T'.
+wff_f                  => 'F'.
 
 # bf
-bf_rule                => bf_matcher definition bf_body dot.
-bf_rec_relation        => bf_ref definition bf dot.
+bf_rule                => bf_matcher ws definition ws bf_body ws dot.
+bf_rec_relation        => bf_ref ws definition ws bf ws dot.
 
 bf_matcher             => bf.
 bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
 			| bf_has_subformula_cb | bf_remove_funiversal_cb | bf_remove_fexistential_cb.
 bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_or
 			| bf_all | bf_ex | bf_t | bf_f | variable | capture.
-bf_ref                 => sym offsets bf_ref_args.
-bf_ref_args            => open_parenthesis (variable)* close_parenthesis.
-bf_and                 => open_parenthesis bf bf_and_sym bf close_parenthesis.
-bf_or                  => open_parenthesis bf bf_or_sym bf close_parenthesis.
-bf_xor                 => open_parenthesis bf bf_xor_sym ws bf close_parenthesis.
-bf_neg                 => bf_neg_sym bf.
+bf_ref                 => sym ws offsets ws bf_ref_args.
+bf_ref_args            => open_parenthesis (ws variable)* ws close_parenthesis.
+bf_and                 => open_parenthesis ws bf ws bf_and_sym ws bf ws close_parenthesis.
+bf_or                  => open_parenthesis ws bf ws bf_or_sym ws bf ws close_parenthesis.
+bf_xor                 => open_parenthesis ws bf ws bf_xor_sym ws bf ws close_parenthesis.
+bf_neg                 => bf_neg_sym ws bf.
 bf_all                 => bf_all_sym ws_required (variable | capture) ws_required bf.
 bf_ex                  => bf_ex_sym ws_required (variable | capture) ws_required bf.
 
 # bf_op_sym
-bf_and_sym             => ws '&' ws.
-bf_or_sym              => ws '|' ws.
-bf_xor_sym             => ws '+' ws.
+bf_and_sym             => '&'.
+bf_or_sym              => '|'.
+bf_xor_sym             => '+'.
 # TODO (HIGH) rename to ' notation
-bf_neg_sym             => ws '~' ws.
-bf_equality_sym        => ws "=" ws.
-bf_nequality_sym       => ws "!=" ws.
-bf_less_sym            => ws '<' ws.
-bf_less_equal_sym      => ws "<=" ws.
-bf_greater_sym         => ws '>' ws.
-bf_all_sym             => ws "fall" ws.
-bf_ex_sym              => ws "fex" ws.
-bf_t                   => ws '1' ws.
-bf_f                   => ws '0' ws.
+bf_neg_sym             => '~'.
+bf_equality_sym        => "=".
+bf_nequality_sym       => "!=".
+bf_less_sym            => '<'.
+bf_less_equal_sym      => "<=".
+bf_greater_sym         => '>'.
+bf_all_sym             => "fall".
+bf_ex_sym              => "fex".
+bf_t                   => '1'.
+bf_f                   => '0'.
 
 # constant
-bf_constant            => open_brace constant close_brace.
+bf_constant            => open_brace ws constant ws close_brace.
 
 #constants
-constant               =>  binding | capture
+constant               => binding | capture
 			| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
 binding                => source_binding | named_binding.
 named_binding          => chars.
-source_binding         => type colon source.
+source_binding         => type ws colon ws source.
 type                   => chars | null.
 
 # source related definition
@@ -225,75 +222,75 @@ source                 => (source0)+.
 #
 # This should be move to a TODO in the parsers...
 
-bf_and_cb              => bf_cb_arg bf_and_cb_sym bf_cb_arg.
-bf_or_cb               => bf_cb_arg bf_or_cb_sym bf_cb_arg.
-bf_xor_cb              => bf_cb_arg bf_xor_cb_sym bf_cb_arg.
-bf_neg_cb              => bf_neg_cb_sym bf_cb_arg.
-bf_eq_cb               => bf_eq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-bf_neq_cb              => bf_neq_cb_sym bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-bf_is_zero_cb          => bf_is_zero_cb_sym bf_cb_arg ws_required bf_cb_arg.
-bf_is_one_cb           => bf_is_one_cb_sym bf_cb_arg ws_required bf_cb_arg.
+bf_and_cb              => bf_cb_arg ws bf_and_cb_sym ws bf_cb_arg.
+bf_or_cb               => bf_cb_arg ws bf_or_cb_sym ws bf_cb_arg.
+bf_xor_cb              => bf_cb_arg ws bf_xor_cb_sym ws bf_cb_arg.
+bf_neg_cb              => bf_neg_cb_sym ws bf_cb_arg.
+bf_eq_cb               => bf_eq_cb_sym ws bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
+bf_neq_cb              => bf_neq_cb_sym ws bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
+bf_is_zero_cb          => bf_is_zero_cb_sym ws bf_cb_arg ws_required bf_cb_arg.
+bf_is_one_cb           => bf_is_one_cb_sym ws bf_cb_arg ws_required bf_cb_arg.
 
-bf_remove_funiversal_cb		=> bf_remove_funiversal_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-bf_remove_fexistential_cb	=> bf_remove_fexistential_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-wff_remove_existential_cb	=> wff_remove_existential_cb_sym wff_cb_arg ws_required wff_cb_arg.
-wff_remove_bexistential_cb	=> wff_remove_bexistential_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-wff_remove_buniversal_cb	=> wff_remove_buniversal_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
+bf_remove_funiversal_cb     => bf_remove_funiversal_cb_sym ws bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
+bf_remove_fexistential_cb   => bf_remove_fexistential_cb_sym ws bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
+wff_remove_existential_cb   => wff_remove_existential_cb_sym ws wff_cb_arg ws_required wff_cb_arg.
+wff_remove_bexistential_cb  => wff_remove_bexistential_cb_sym ws wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
+wff_remove_buniversal_cb    => wff_remove_buniversal_cb_sym ws wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 
 # extra callbacks to speed up computations
-bf_has_clashing_subformulas_cb  => bf_has_clashing_subformulas_cb_sym bf_cb_arg ws_required bf_cb_arg.
-wff_has_clashing_subformulas_cb => wff_has_clashing_subformulas_cb_sym wff_cb_arg ws_required wff_cb_arg.
-bf_has_subformula_cb            => bf_has_subformula_cb_sym bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-wff_has_subformula_cb           => wff_has_subformula_cb_sym wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
+bf_has_clashing_subformulas_cb  => bf_has_clashing_subformulas_cb_sym ws bf_cb_arg ws_required bf_cb_arg.
+wff_has_clashing_subformulas_cb => wff_has_clashing_subformulas_cb_sym ws wff_cb_arg ws_required wff_cb_arg.
+bf_has_subformula_cb            => bf_has_subformula_cb_sym ws bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
+wff_has_subformula_cb           => wff_has_subformula_cb_sym ws wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 
 # callback symbols
-bf_has_clashing_subformulas_cb_sym  => ws "bf_has_clashing_subformulas_cb" ws.
-bf_has_subformula_cb_sym            => ws "bf_has_subformula_cb" ws.
-wff_has_clashing_subformulas_cb_sym => ws "wff_has_clashing_subformulas_cb" ws.
-wff_has_subformula_cb_sym           => ws "wff_has_subformula_cb" ws.
-wff_remove_existential_cb_sym       => ws "wff_remove_existential_cb" ws.
-wff_remove_bexistential_cb_sym      => ws "wff_remove_bexistential_cb" ws.
-wff_remove_buniversal_cb_sym        => ws "wff_remove_buniversal_cb" ws.
-bf_remove_fexistential_cb_sym       => ws "bf_remove_fexistential_cb" ws.
-bf_remove_funiversal_cb_sym         => ws "bf_remove_funiversal_cb" ws.
+bf_has_clashing_subformulas_cb_sym  => "bf_has_clashing_subformulas_cb".
+bf_has_subformula_cb_sym            => "bf_has_subformula_cb".
+wff_has_clashing_subformulas_cb_sym => "wff_has_clashing_subformulas_cb".
+wff_has_subformula_cb_sym           => "wff_has_subformula_cb".
+wff_remove_existential_cb_sym       => "wff_remove_existential_cb".
+wff_remove_bexistential_cb_sym      => "wff_remove_bexistential_cb".
+wff_remove_buniversal_cb_sym        => "wff_remove_buniversal_cb".
+bf_remove_fexistential_cb_sym       => "bf_remove_fexistential_cb".
+bf_remove_funiversal_cb_sym         => "bf_remove_funiversal_cb".
 
 # bultin_args
 bf_cb_arg              => capture | bf.
 wff_cb_arg             => capture | wff.
 
 # bf_cb_syms
-bf_and_cb_sym          => ws "bf_and_cb" ws.
-bf_or_cb_sym           => ws "bf_or_cb" ws.
-bf_xor_cb_sym          => ws "bf_xor_cb" ws.
-bf_neg_cb_sym          => ws "bf_neg_cb" ws.
-bf_eq_cb_sym           => ws "bf_eq_cb" ws.
-bf_neq_cb_sym          => ws "bf_neq_cb" ws.
-bf_is_zero_cb_sym      => ws "bf_is_zero_cb" ws.
-bf_is_one_cb_sym       => ws "bf_is_one_cb" ws.
+bf_and_cb_sym          => "bf_and_cb".
+bf_or_cb_sym           => "bf_or_cb".
+bf_xor_cb_sym          => "bf_xor_cb".
+bf_neg_cb_sym          => "bf_neg_cb".
+bf_eq_cb_sym           => "bf_eq_cb".
+bf_neq_cb_sym          => "bf_neq_cb".
+bf_is_zero_cb_sym      => "bf_is_zero_cb".
+bf_is_one_cb_sym       => "bf_is_one_cb".
 
 # cb for tau
-tau_collapse_positives_cb      => ( tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ws_required tau_cb_arg)
-				| (tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ).
+tau_collapse_positives_cb      => (tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ws_required tau_cb_arg)
+				| (tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg).
 tau_positives_upwards_cb       => tau_positives_upwards_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
 tau_cb_arg                     => capture | tau.
-tau_collapse_positives_cb_sym  => ws "tau_collapse_positives_cb" ws.
-tau_positives_upwards_cb_sym   => ws "tau_positives_upwards_cb" ws.
+tau_collapse_positives_cb_sym  => "tau_collapse_positives_cb".
+tau_positives_upwards_cb_sym   => "tau_positives_upwards_cb".
 
 # input definition
-input                  => in colon open_brace source_binding close_brace.
+input                  => in ws colon ws open_brace ws source_binding ws close_brace.
 
 # main posibilities
-inputs                 => less input (input)* dot.
-main                   => wff dot.
+inputs                 => ws less ws input (ws input)* ws dot.
+main                   => wff ws dot.
 rule                   => wff_rule | bf_rule | tau_rule.
-rules                  => (rule)*.
+rules                  => (ws rule)*.
 rec_relation           => bf_rec_relation | wff_rec_relation dot.
-rec_relations          => (rec_relation)*.
-nso_rr                 => rec_relations main.
+rec_relations          => (ws rec_relation)*.
+nso_rr                 => rec_relations ws main.
 library                => rules.
 # each builder is define on its own string
-builder                => builder_head definition builder_body dot.
-builder_head           => open_parenthesis capture (ws_required capture)* close_parenthesis.
+builder                => ws builder_head ws definition ws builder_body ws dot.
+builder_head           => open_parenthesis ws capture (ws_required capture)* ws close_parenthesis.
 builder_body           => wff | bf | tau.
-gssotc                 => tau semicolon.
-start                  => nso_rr | gssotc | library | builder | inputs.
+gssotc                 => ws tau ws semicolon.
+start                  => (nso_rr | gssotc | library | builder | inputs) ws.
