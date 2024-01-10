@@ -18,12 +18,12 @@
 #include <optional>
 
 #include "rewriting.h"
-#include "formula.h"
+#include "nso_rr.h"
 
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
-// We should talk about statement, formula (nso_with_rr?), library, rule, builder,
+// We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
 
@@ -297,7 +297,7 @@ struct step {
 	step(library<BAs...> lib): lib(lib) {}
 
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
-		return formula_apply(lib, n);
+		return nso_rr_apply(lib, n);
 	}
 
 	library<BAs...> lib;
@@ -450,7 +450,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<st
 }
 
 template <typename... BAs>
-formula<BAs...> replace_captures_by_step(formula<BAs...>& form, int step) {
+nso_rr<BAs...> replace_captures_by_step(nso_rr<BAs...>& form, int step) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 	for(auto& n: select_all(form.main, is_non_terminal<tau_parser::step, BAs...>)) {
 		auto digits = make_node<tau_sym<BAs...>>(step, {});
@@ -466,7 +466,7 @@ formula<BAs...> replace_captures_by_step(formula<BAs...>& form, int step) {
 }
 
 template <typename... BAs>
-formula<BAs...> apply_rec_relations_by_step(formula<BAs...>& form) {
+nso_rr<BAs...> apply_rec_relations_by_step(nso_rr<BAs...>& form) {
 	// TODO (LOW) exit if no rec. relations
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 
@@ -494,20 +494,20 @@ formula<BAs...> apply_rec_relations_by_step(formula<BAs...>& form) {
 }
 
 template <typename... BAs>
-formula<BAs...> prepare_main_for_step(formula<BAs...>& form, int step) {
+nso_rr<BAs...> prepare_main_for_step(nso_rr<BAs...>& form, int step) {
 	auto nform = replace_captures_by_step<BAs...>(form, step);
 	return apply_rec_relations_by_step<BAs...>(nform);
 }
 
 template <typename... BAs>
-formula<BAs...> normalizer_step(formula<BAs...>& form, int stp = 0) {
+nso_rr<BAs...> normalizer_step(nso_rr<BAs...>& form, int stp = 0) {
 
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << "(I): -- Begin normalizer step" << std::endl;
 	std::cout << "(F): " << form.main << std::endl;
 	#endif // OUTPUT_APPLY_RULES
 
-	formula<BAs...> nform = prepare_main_for_step<BAs...>(form, stp);
+	nso_rr<BAs...> nform = prepare_main_for_step<BAs...>(form, stp);
 
 	sp_tau_node<BAs...> nmain = nform.main
 			| repeat_all<step<BAs...>, BAs...>(
@@ -546,18 +546,18 @@ formula<BAs...> normalizer_step(formula<BAs...>& form, int stp = 0) {
 // executes the normalizer on the given source code taking into account the
 // bindings provided.
 template<typename... BAs>
-formula<BAs...> normalizer(std::string& source, bindings<BAs...>& binds) {
+nso_rr<BAs...> normalizer(std::string& source, bindings<BAs...>& binds) {
 	auto form_source = make_tau_source(source);
-	auto form = make_formula_using_bindings(form_source, binds);
+	auto form = make_nso_rr_using_bindings(form_source, binds);
 	return normalizer(form);
 }
 
 // executes the normalizer on the given source code taking into account the
 // provided factory.
 template<typename factory_t, typename... BAs>
-formula<BAs...> normalizer(std::string& source, factory_t& factory) {
+nso_rr<BAs...> normalizer(std::string& source, factory_t& factory) {
 	auto form_source = make_tau_source(source);
-	auto form = make_formula_using_factory(form_source, factory);
+	auto form = make_nso_rr_using_factory(form_source, factory);
 	return normalizer(form);
 }
 
@@ -574,7 +574,7 @@ struct is_equivalent_predicate {
 		sp_tau_node<BAs...> wff = build_wff_equiv<BAs...>(node, n);
 		for(auto& v: free_vars) wff = build_wff_all<BAs...>(v, wff);
 		rules<BAs...> rls;
-		formula<BAs...> form{rls, wff};
+		nso_rr<BAs...> form{rls, wff};
 		auto norm_form = normalizer(form);
 		auto check = norm_form.main | tau_parser::wff | tau_parser::wff_t;
 		return check.has_value();
@@ -607,25 +607,25 @@ using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate
 
 template<typename... BAs>
 sp_tau_node<BAs...> apply_definitions(const sp_tau_node<BAs...>& form) {
-	return formula_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
+	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
 }
 
 template<typename... BAs>
-formula<BAs...> apply_definitions(const formula<BAs...>& form) {
+nso_rr<BAs...> apply_definitions(const nso_rr<BAs...>& form) {
 	auto nmain = apply_definitions(form.main);
 	rules<BAs...> nrec_relations;
 	for (const auto& r : form.rec_relations) {
 		auto [matcher, body] = r;
 		nrec_relations.emplace_back(matcher, apply_definitions(body));
 	}
-	return formula<BAs...>{ nrec_relations, nmain };
+	return nso_rr<BAs...>{ nrec_relations, nmain };
 }
 
 // REVIEW (HIGH) review overall execution
 template <typename... BAs>
-formula<BAs...> normalizer(const formula<BAs...>& form) {
+nso_rr<BAs...> normalizer(const nso_rr<BAs...>& form) {
 	// IDEA extract this to an operator| overload
-	// apply defs to formula
+	// apply defs to nso_rr
 
 	#ifdef OUTPUT_APPLY_RULES
 	std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;
@@ -636,7 +636,7 @@ formula<BAs...> normalizer(const formula<BAs...>& form) {
 	auto nform = apply_definitions(form);
 
 	std::vector<sp_tau_node<BAs...>> previous;
-	formula<BAs...> current = normalizer_step(nform);
+	nso_rr<BAs...> current = normalizer_step(nform);
 	auto is_equivalent = is_equivalent_predicate<BAs...>(current.main);
 	for (int i = 1; std::find_if(previous.rend(), previous.rbegin(),  is_equivalent) == previous.rend(); i++) {
 		previous.push_back(current.main);

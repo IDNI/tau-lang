@@ -14,7 +14,7 @@
 #ifndef __TEST_INTEGRATION_HELPERS_BDD_H__
 #define __TEST_INTEGRATION_HELPERS_BDD_H__
 
-#include "../src/formula.h"
+#include "../src/nso_rr.h"
 #include "../src/babdd.h"
 
 using namespace idni::rewriter;

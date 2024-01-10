@@ -16,7 +16,7 @@
 #include <cassert>
 
 #include "../../src/doctest.h"
-#include "../../src/formula.h"
+#include "../../src/nso_rr.h"
 #include "../../src/bool.h"
 #include "../../src/bdd_handle.h"
 #include "../../src/normalizer2.h"
@@ -41,10 +41,10 @@ TEST_SUITE("make_library") {
 // TODO (VERY_LOW) write tests to check make_tau_source
 // TODO (VERY_LOW) write tests to check make_tau_code
 // TODO (VERY_LOW) write tests to check make_builder
-// TODO (VERY_LOW) write tests for make_formula_using_factory
-// TODO (VERY_LOW) write tests for make_formula_using_bindings
+// TODO (VERY_LOW) write tests for make_nso_rr_using_factory
+// TODO (VERY_LOW) write tests for make_nso_rr_using_bindings
 // TODO (VERY_LOW) write tests for make_tau_source
-// TODO (VERY_LOW) write tests for formula_apply
+// TODO (VERY_LOW) write tests for nso_rr_apply
 // TODO (VERY_LOW) write tests for tau_apply_builder
 //
 // They are tagged as VERY_LOW because they are extensively tested inderectly in

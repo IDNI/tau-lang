@@ -12,7 +12,7 @@ set(TESTS
 	rules-tau_parsing
 	builders
 	rewriting
-	formula
+	nso_rr
 	tau_parser
 	normalizer2
 	type_system

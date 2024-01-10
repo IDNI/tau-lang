@@ -23,7 +23,7 @@ using namespace idni::tau;
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
-// We should talk about statement, formula (nso_with_rr?), library, rule, builder,
+// We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
 namespace idni::tau {
@@ -173,7 +173,7 @@ auto operator<=>(const tau_sym<BAs...>& l, const tau_sym<BAs...>& r) {
 template<typename...BAs>
 struct tau {
 
-	tau(formula<tau<BAs...>, BAs...>& form) : form(form) {}
+	tau(nso_rr<tau<BAs...>, BAs...>& form) : form(form) {}
 	tau(wff<tau<BAs...>, BAs...>& main) : form(main) {}
 
 	auto operator<=>(const tau<BAs...>& other) {
@@ -226,7 +226,7 @@ struct tau {
 	// REVIEW (HIGH) this should be a wff<tau<BAs...>, BAs...>
 	//
 	// Maybe confirm with Ohad.
-	formula<tau<BAs...>, BAs...> form;
+	nso_rr<tau<BAs...>, BAs...> form;
 };
 
 template<typename...BAs>
@@ -262,7 +262,7 @@ struct tau_factory {
 		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<tau<BAs...>, BAs...>>;
 		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau<BAs...>, BAs...>, source);
 		factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...> fb(*this);
-		auto form = make_formula_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...>, tau<BAs...>, BAs...>(var, fb).main;
+		auto form = make_nso_rr_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...>, tau<BAs...>, BAs...>(var, fb).main;
 		tau<BAs...> t(form);
 		return make_node<tau_sym<tau<BAs...>, BAs...>>(t, {});
 	}
@@ -271,22 +271,22 @@ struct tau_factory {
 };
 
 
-// TODO (HIGH) rewrite this using tau formulas instead of tau_parser::formulas
+// TODO (HIGH) rewrite this using tau formulas instead of tau_parser::nso_rr
 template<typename base_factory_t, typename...BAs>
-formula<tau<BAs...>, BAs...> make_tau_using_factory(const std::string& src, base_factory_t& bf) {
+nso_rr<tau<BAs...>, BAs...> make_tau_using_factory(const std::string& src, base_factory_t& bf) {
 	tau_factory<base_factory_t, BAs...> tf(bf);
-	return make_formula_using_factory<tau_factory<base_factory_t, BAs...>, tau<BAs...>>(src, tf);
+	return make_nso_rr_using_factory<tau_factory<base_factory_t, BAs...>, tau<BAs...>>(src, tf);
 }
 
-// TODO (HIGH) rewrite this using tau formulas instead of tau_parser::formulas
+// TODO (HIGH) rewrite this using tau formulas instead of tau_parser::nso_rr
 template<typename...BAs>
-formula<tau<BAs...>, BAs...> make_tau_using_bindings(const std::string& src, const bindings<tau<BAs...>>& bs) {
-	return make_formula_using_bindings<tau<BAs...>>(src, bs);
+nso_rr<tau<BAs...>, BAs...> make_tau_using_bindings(const std::string& src, const bindings<tau<BAs...>>& bs) {
+	return make_nso_rr_using_bindings<tau<BAs...>>(src, bs);
 }
 
-// TODO (HIGH) add convert tau formula to dnf
+// TODO (HIGH) add convert tau nso_rr to dnf
 
-// TODO (HIGH) add convert tau dnf formula to single positive dnf
+// TODO (HIGH) add convert tau dnf nso_rr to single positive dnf
 
 } // namespace idni::tau
 

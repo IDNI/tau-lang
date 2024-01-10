@@ -27,7 +27,7 @@ using namespace std;
 using namespace idni::tau;
 
 int main(int argc, char** argv) {
-	if (argc != 2) return cerr << argv[0] << ": requires 1 argument: formula file\n", 1;
+	if (argc != 2) return cerr << argv[0] << ": requires 1 argument: nso_rr file\n", 1;
 
 	string formula_file(argv[1]);
 	ifstream file(formula_file);
@@ -41,11 +41,11 @@ int main(int argc, char** argv) {
 	bdd_test_factory<bdd_test> bf;
 	tau_factory<bdd_test_factory_t<bdd_test>, bdd_test> fb(bf);
 	factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>, tau<bdd_test>, bdd_test> fbinder(fb);
-	formula<tau<bdd_test>, bdd_test> formula = make_formula_using_factory<
+	nso_rr<tau<bdd_test>, bdd_test> nso_rr = make_nso_rr_using_factory<
 			factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>,tau<bdd_test>, bdd_test>,
 			tau<bdd_test>, bdd_test>(content, fbinder);
 
-	normalizer<tau<bdd_test>, bdd_test>(formula);
+	normalizer<tau<bdd_test>, bdd_test>(nso_rr);
 
 	return 0;
 }

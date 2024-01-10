@@ -19,7 +19,7 @@
 #define OUTPUT_APPLY_RULES 1
 
 #include "../../src/doctest.h"
-#include "../../src/formula.h"
+#include "../../src/nso_rr.h"
 #include "../../src/bdd_handle.h"
 #include "../../src/normalizer2.h"
 
@@ -39,7 +39,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_formula_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
 		auto result = normalizer<bdd_test>(sample_formula).main;
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
