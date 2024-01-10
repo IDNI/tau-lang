@@ -69,8 +69,8 @@ RULE(BF_CALLBACK_AND, "( { $X } & { $Y } ) := { $X bf_and_cb $Y }.")
 RULE(BF_CALLBACK_OR, "( { $X } | { $Y } ) := { $X bf_or_cb $Y }.")
 RULE(BF_CALLBACK_XOR, "( { $X } + { $Y } ) := { $X bf_xor_cb $Y }.")
 RULE(BF_CALLBACK_NEG, "~ { $X } := { bf_neg_cb $X }.")
-RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.") // (T|F) is bf_(t|f)
-RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.") // (T|F) is bf_(t|f)
+RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
+RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 
 // speed up callbacks
 RULE(BF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X & $Y ) :=  bf_has_clashing_subformulas_cb ( $X & $Y ) 0.")

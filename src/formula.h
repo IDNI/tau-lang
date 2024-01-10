@@ -1216,7 +1216,170 @@ sp_tau_node<BAs...> build_tau_neg(const sp_tau_node<BAs...>& l) {
 	return tau_apply_builder<BAs...>(bldr_tau_neg<BAs...>, args);
 }
 
-// TODO (HIGH) add needed builder to write rec_relations
+// DOING (HIGH) add needed builder to write rec_relations
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_tau_symbol(const tau_parser::nonterminal& symbol);
+/*
+definition			=> ws ":=" ws.
+dot 				=> ws '.' ws.
+open_parenthesis	=> ws '(' ws.
+close_parenthesis	=> ws ')' ws.
+open_bracket		=> ws '[' ws.
+close_bracket		=> ws ']' ws.
+open_brace			=> ws '{' ws.
+close_brace			=> ws '}' ws.
+minus				=> ws '-' ws.
+colon				=> ws ':' ws.
+semicolon			=> ws ';' ws.
+less				=> ws '<' ws.
+comma 				=> ws ',' ws.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_num(const size_t num);
+/*
+num		=> ws digits ws.
+digits	=> digit (digit)*.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_chars(const std::string& chars);
+/*
+chars => alpha (alnum)*.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_var();
+/*
+var	=> chars.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_in();
+/*
+in	=> "?i_" chars. # instead of '<', easy to remember
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_out();
+/*
+out	=> "?o_" chars. # instead of '>', easy to remember
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_timed_capture();
+/*
+timed_capture	=> ws 't' ws.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_timed_shift();
+/*
+timed_shift 	=> timed_capture minus num.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_timed_step();
+/*
+timed_step		=> num | timed_capture | timed_shift.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_timed_offset();
+/*
+timed_offset	=> open_bracket timed_step close_bracket.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_timed();
+/*
+timed	=> (in | out)  timed_offset.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_variable();
+/*
+variable	=> var | timed.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bool_variable();
+/*
+bool_variable	=> '?' chars.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_tau_sym();
+/*
+sym				=> chars.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_capture();
+/*
+capture	=> '$' chars.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_shift();
+/*
+shift => capture minus num.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_step();
+/*
+timed_step	=> num | timed_capture | timed_shift.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_offset();
+/*
+offset	=> num | capture | shift.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_offsets();
+/*
+offsets	=> open_bracket step (comma offset)* close_bracket.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_ref_args();
+/*
+wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_ref();
+/*
+wff_ref	=> sym offsets wff_ref_args.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_rec_relation();
+/*
+wff_rec_relation	=> wff_ref definition wff dot.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_ref_args();
+/*
+bf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_ref();
+/*
+bf_ref	=> sym offsets bf_ref_args.
+*/
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_rec_relation();
+/*
+bf_rec_relation	=> bf_ref definition bf dot.
+*/
 
 
 template<class... Ts>
