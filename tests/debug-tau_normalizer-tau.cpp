@@ -40,12 +40,12 @@ int main(int argc, char** argv) {
 
 	bdd_test_factory<bdd_test> bf;
 	tau_factory<bdd_test_factory_t<bdd_test>, bdd_test> fb(bf);
-	factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>, tau<bdd_test>, bdd_test> fbinder(fb);
-	nso_rr<tau<bdd_test>, bdd_test> nso_rr = make_nso_rr_using_factory<
-			factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>,tau<bdd_test>, bdd_test>,
-			tau<bdd_test>, bdd_test>(content, fbinder);
+	factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>, tau_ba<bdd_test>, bdd_test> fbinder(fb);
+	nso_rr<tau_ba<bdd_test>, bdd_test> nso_rr = make_nso_rr_using_factory<
+			factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>,tau_ba<bdd_test>, bdd_test>,
+			tau_ba<bdd_test>, bdd_test>(content, fbinder);
 
-	normalizer<tau<bdd_test>, bdd_test>(nso_rr);
+	normalizer<tau_ba<bdd_test>, bdd_test>(nso_rr);
 
 	return 0;
 }

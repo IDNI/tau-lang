@@ -28,9 +28,6 @@ using namespace idni::tau;
 
 namespace idni::tau {
 
-template<typename...BAs>
-using wff = sp_tau_node<BAs...>;
-
 // tau rules
 RULE(TAU_DISTRIBUTE_0, "(($X ||| $Y) &&& $Z) := (($X &&& $Z) ||| ($Y &&& $Z)).")
 RULE(TAU_DISTRIBUTE_1, "($X &&& ($Y ||| $Z)) := (($X &&& $Y) ||| ($X &&& $Z)).")
@@ -171,84 +168,84 @@ auto operator<=>(const tau_sym<BAs...>& l, const tau_sym<BAs...>& r) {
 }
 
 template<typename...BAs>
-struct tau {
+struct tau_ba {
 
-	tau(nso_rr<tau<BAs...>, BAs...>& form) : form(form) {}
-	tau(wff<tau<BAs...>, BAs...>& main) : form(main) {}
+	tau_ba(nso_rr<tau_ba<BAs...>, BAs...>& form) : form(form) {}
+	tau_ba(wff<tau_ba<BAs...>, BAs...>& main) : form(main) {}
 
-	auto operator<=>(const tau<BAs...>& other) {
+	auto operator<=>(const tau_ba<BAs...>& other) {
 		return form <=> other.form;
 	}
 
-	bool operator==(const tau<BAs...>& other) const {
+	bool operator==(const tau_ba<BAs...>& other) const {
 		return form.main == other.form.main;
 	}
 
-	bool operator!=(const tau<BAs...>& other) const {
+	bool operator!=(const tau_ba<BAs...>& other) const {
 		return form.main != other.form.main;
 	}
 
-	tau<BAs...> operator~() const {
-		auto nform = build_wff_neg<tau<BAs...>, BAs...>(form.main);
-		return tau<BAs...>(nform);
+	tau_ba<BAs...> operator~() const {
+		auto nform = build_wff_neg<tau_ba<BAs...>, BAs...>(form.main);
+		return tau_ba<BAs...>(nform);
 	}
 
-	tau<BAs...> operator&(const tau<BAs...>& other) const {
-		auto nform = build_wff_and<tau<BAs...>, BAs...>(form.main, other.form.main);
-		return tau<BAs...>(nform);
+	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const {
+		auto nform = build_wff_and<tau_ba<BAs...>, BAs...>(form.main, other.form.main);
+		return tau_ba<BAs...>(nform);
 	}
 
-	tau<BAs...> operator|(const tau<BAs...>& other) const {
-		auto nform = build_wff_or<tau<BAs...>, BAs...>(form.main, other.form.main);
-		return tau<BAs...>(nform);
+	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const {
+		auto nform = build_wff_or<tau_ba<BAs...>, BAs...>(form.main, other.form.main);
+		return tau_ba<BAs...>(nform);
 	}
 
-	tau<BAs...> operator^(const tau<BAs...>& other) const {
-		auto nform = build_wff_xor<tau<BAs...>, BAs...>(form.main, other.form.main);
-		return tau<BAs...>(nform);
+	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const {
+		auto nform = build_wff_xor<tau_ba<BAs...>, BAs...>(form.main, other.form.main);
+		return tau_ba<BAs...>(nform);
 	}
 
-	tau<BAs...> operator+(const tau<BAs...>& other) const {
-		auto nform = build_wff_xor<tau<BAs...>, BAs...>(form.main, other.form.main);
-		return tau<BAs...>(nform);
+	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const {
+		auto nform = build_wff_xor<tau_ba<BAs...>, BAs...>(form.main, other.form.main);
+		return tau_ba<BAs...>(nform);
 	}
 
 	bool is_zero() const {
-		auto normalized = normalizer<tau<BAs...>, BAs...>(form);
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(form);
 		return (normalized.main | tau_parser::wff_f).has_value();
 	}
 
 	bool is_one() const {
-		auto normalized = normalizer<tau<BAs...>, BAs...>(form);
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(form);
 		return (normalized.main | tau_parser::wff_t).has_value();
 	}
 
-	// REVIEW (HIGH) this should be a wff<tau<BAs...>, BAs...>
+	// REVIEW (HIGH) this should be a wff<tau_ba<BAs...>, BAs...>
 	//
 	// Maybe confirm with Ohad.
-	nso_rr<tau<BAs...>, BAs...> form;
+	nso_rr<tau_ba<BAs...>, BAs...> form;
 };
 
 template<typename...BAs>
-bool operator==(const tau<BAs...>& other, const bool& b) {
-	auto normalized = normalizer<tau<BAs...>, BAs...>(other.form);
+bool operator==(const tau_ba<BAs...>& other, const bool& b) {
+	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.form);
 	auto is_one = (normalized.main | tau_parser::wff_t).has_value();
 	auto is_zero = (normalized.main | tau_parser::wff_f).has_value();
 	return b ? is_one : is_zero ;
 }
 
 template<typename...BAs>
-bool operator==(const bool& b, const tau<BAs...>& other) {
+bool operator==(const bool& b, const tau_ba<BAs...>& other) {
 	return other == b;
 }
 
 template<typename...BAs>
-bool operator!=(const tau<BAs...>& other, const bool& b) {
+bool operator!=(const tau_ba<BAs...>& other, const bool& b) {
 	return !(other == b);
 }
 
 template<typename...BAs>
-bool operator!=(const bool& b, const tau<BAs...>& other) {
+bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
@@ -257,14 +254,14 @@ struct tau_factory {
 
 	tau_factory(base_factory_t& bf) : bf(bf) {}
 
-	sp_tau_node<tau<BAs...>, BAs...> build(const std::string type_name, const sp_tau_node<tau<BAs...>, BAs...>& n) {
+	sp_tau_node<tau_ba<BAs...>, BAs...> build(const std::string type_name, const sp_tau_node<tau_ba<BAs...>, BAs...>& n) {
 		if (auto nn = bf.build(type_name, n); nn != n) return nn;
-		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<tau<BAs...>, BAs...>>;
-		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau<BAs...>, BAs...>, source);
-		factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...> fb(*this);
-		auto form = make_nso_rr_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau<BAs...>, BAs...>, tau<BAs...>, BAs...>(var, fb).main;
-		tau<BAs...> t(form);
-		return make_node<tau_sym<tau<BAs...>, BAs...>>(t, {});
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
+		factory_binder<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...> fb(*this);
+		auto form = make_nso_rr_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(var, fb).main;
+		tau_ba<BAs...> t(form);
+		return make_node<tau_sym<tau_ba<BAs...>, BAs...>>(t, {});
 	}
 
 	base_factory_t& bf;
@@ -273,15 +270,15 @@ struct tau_factory {
 
 // TODO (HIGH) rewrite this using tau formulas instead of tau_parser::nso_rr
 template<typename base_factory_t, typename...BAs>
-nso_rr<tau<BAs...>, BAs...> make_tau_using_factory(const std::string& src, base_factory_t& bf) {
+nso_rr<tau_ba<BAs...>, BAs...> make_tau_using_factory(const std::string& src, base_factory_t& bf) {
 	tau_factory<base_factory_t, BAs...> tf(bf);
-	return make_nso_rr_using_factory<tau_factory<base_factory_t, BAs...>, tau<BAs...>>(src, tf);
+	return make_nso_rr_using_factory<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>>(src, tf);
 }
 
 // TODO (HIGH) rewrite this using tau formulas instead of tau_parser::nso_rr
 template<typename...BAs>
-nso_rr<tau<BAs...>, BAs...> make_tau_using_bindings(const std::string& src, const bindings<tau<BAs...>>& bs) {
-	return make_nso_rr_using_bindings<tau<BAs...>>(src, bs);
+nso_rr<tau_ba<BAs...>, BAs...> make_tau_using_bindings(const std::string& src, const bindings<tau_ba<BAs...>>& bs) {
+	return make_nso_rr_using_bindings<tau_ba<BAs...>>(src, bs);
 }
 
 // TODO (HIGH) add convert tau nso_rr to dnf
