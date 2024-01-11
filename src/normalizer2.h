@@ -651,6 +651,13 @@ nso_rr<BAs...> normalizer(const nso_rr<BAs...>& form) {
 	return current;
 }
 
+template <typename... BAs>
+nso_rr<BAs...> normalizer(const wff<BAs...>& form) {
+	nso_rr<BAs...> nso(form);
+	return normalizer(nso);
+}
+
+
 } // namespace idni::tau
 
 #endif // __NORMALIZER2_H__

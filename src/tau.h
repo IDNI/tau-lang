@@ -170,7 +170,7 @@ auto operator<=>(const tau_sym<BAs...>& l, const tau_sym<BAs...>& r) {
 template<typename...BAs>
 struct tau_ba {
 
-	tau_ba(nso_rr<tau_ba<BAs...>, BAs...>& form) : form(form) {}
+	tau_ba(nso_rr<tau_ba<BAs...>, BAs...>& form) : form(form.main) {}
 	tau_ba(wff<tau_ba<BAs...>, BAs...>& main) : form(main) {}
 
 	auto operator<=>(const tau_ba<BAs...>& other) {
@@ -178,59 +178,59 @@ struct tau_ba {
 	}
 
 	bool operator==(const tau_ba<BAs...>& other) const {
-		return form.main == other.form.main;
+		return form == other.form;
 	}
 
 	bool operator!=(const tau_ba<BAs...>& other) const {
-		return form.main != other.form.main;
+		return form != other.form;
 	}
 
 	tau_ba<BAs...> operator~() const {
-		auto nform = build_wff_neg<tau_ba<BAs...>, BAs...>(form.main);
+		auto nform = build_wff_neg<tau_ba<BAs...>, BAs...>(form);
 		return tau_ba<BAs...>(nform);
 	}
 
 	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const {
-		auto nform = build_wff_and<tau_ba<BAs...>, BAs...>(form.main, other.form.main);
+		auto nform = build_wff_and<tau_ba<BAs...>, BAs...>(form, other.form);
 		return tau_ba<BAs...>(nform);
 	}
 
 	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const {
-		auto nform = build_wff_or<tau_ba<BAs...>, BAs...>(form.main, other.form.main);
+		auto nform = build_wff_or<tau_ba<BAs...>, BAs...>(form, other.form);
 		return tau_ba<BAs...>(nform);
 	}
 
 	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const {
-		auto nform = build_wff_xor<tau_ba<BAs...>, BAs...>(form.main, other.form.main);
+		auto nform = build_wff_xor<tau_ba<BAs...>, BAs...>(form, other.form);
 		return tau_ba<BAs...>(nform);
 	}
 
 	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const {
-		auto nform = build_wff_xor<tau_ba<BAs...>, BAs...>(form.main, other.form.main);
+		auto nform = build_wff_xor<tau_ba<BAs...>, BAs...>(form, other.form);
 		return tau_ba<BAs...>(nform);
 	}
 
 	bool is_zero() const {
 		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(form);
-		return (normalized.main | tau_parser::wff_f).has_value();
+		return (normalized | tau_parser::wff_f).has_value();
 	}
 
 	bool is_one() const {
 		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(form);
-		return (normalized.main | tau_parser::wff_t).has_value();
+		return (normalized | tau_parser::wff_t).has_value();
 	}
 
 	// REVIEW (HIGH) this should be a wff<tau_ba<BAs...>, BAs...>
 	//
 	// Maybe confirm with Ohad.
-	nso_rr<tau_ba<BAs...>, BAs...> form;
+	wff<tau_ba<BAs...>, BAs...> form;
 };
 
 template<typename...BAs>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
-	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.form);
-	auto is_one = (normalized.main | tau_parser::wff_t).has_value();
-	auto is_zero = (normalized.main | tau_parser::wff_f).has_value();
+	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.form).main;
+	auto is_one = (normalized | tau_parser::wff_t).has_value();
+	auto is_zero = (normalized | tau_parser::wff_f).has_value();
 	return b ? is_one : is_zero ;
 }
 
