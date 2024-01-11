@@ -29,38 +29,38 @@ using bdd_test = hbdd<Bool>;
 template<typename...BAs>
 struct bdd_test_factory {
 
-	sp_tau_node<tau<bdd_test>, bdd_test> build(const std::string type_name, const sp_tau_node<tau<bdd_test>, bdd_test>& n) {
+	sp_tau_node<tau_ba<bdd_test>, bdd_test> build(const std::string type_name, const sp_tau_node<tau_ba<bdd_test>, bdd_test>& n) {
 		if (type_name != "bdd") return n;
 		std::string var = make_string_with_skip<
-			tau_node_terminal_extractor_t<tau<bdd_test>, bdd_test>,
-			not_whitespace_predicate_t<tau<bdd_test>, bdd_test>,
-			sp_tau_node<tau<bdd_test>, bdd_test>>(
-				tau_node_terminal_extractor<tau<bdd_test>, bdd_test>,
-				not_whitespace_predicate<tau<bdd_test>, bdd_test>, n);
+			tau_node_terminal_extractor_t<tau_ba<bdd_test>, bdd_test>,
+			not_whitespace_predicate_t<tau_ba<bdd_test>, bdd_test>,
+			sp_tau_node<tau_ba<bdd_test>, bdd_test>>(
+				tau_node_terminal_extractor<tau_ba<bdd_test>, bdd_test>,
+				not_whitespace_predicate<tau_ba<bdd_test>, bdd_test>, n);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		auto ref = bdd<Bool>::bit(index++);
 		auto sp = bdd_handle<Bool>::get(ref);
-		tau_sym<tau<bdd_test>, bdd_test> ts(sp);
-		auto nn =  make_node<tau_sym<tau<bdd_test>, bdd_test>>(ts, {});
+		tau_sym<tau_ba<bdd_test>, bdd_test> ts(sp);
+		auto nn =  make_node<tau_sym<tau_ba<bdd_test>, bdd_test>>(ts, {});
 		return cache.emplace(var, nn).first->second;
 	}
 
 	size_t index = 0;
-	std::map<std::string, sp_tau_node<tau<bdd_test>, bdd_test>> cache;
+	std::map<std::string, sp_tau_node<tau_ba<bdd_test>, bdd_test>> cache;
 };
 
 template<typename...BAs>
 using bdd_test_factory_t = bdd_test_factory<BAs...>;
 
-nso_rr<tau<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
+nso_rr<tau_ba<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
 	bdd_test_factory<bdd_test> bf;
 	tau_factory<bdd_test_factory_t<bdd_test>, bdd_test> fb(bf);
-	factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>, tau<bdd_test>, bdd_test> fbinder(fb);
-	nso_rr<tau<bdd_test>, bdd_test> nso_rr = make_nso_rr_using_factory<
-			factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>,tau<bdd_test>, bdd_test>,
-			tau<bdd_test>, bdd_test>(src, fbinder);
+	factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>, tau_ba<bdd_test>, bdd_test> fbinder(fb);
+	nso_rr<tau_ba<bdd_test>, bdd_test> nso_rr = make_nso_rr_using_factory<
+			factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>,tau_ba<bdd_test>, bdd_test>,
+			tau_ba<bdd_test>, bdd_test>(src, fbinder);
 
-	return normalizer<tau<bdd_test>, bdd_test>(nso_rr);
+	return normalizer<tau_ba<bdd_test>, bdd_test>(nso_rr);
 }
 
 #endif // __TEST_INTEGRATION_HELPERS_TAU_H__

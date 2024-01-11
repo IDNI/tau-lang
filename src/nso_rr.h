@@ -94,6 +94,10 @@ using library = rules<BAs...>;
 template<typename... BAs>
 using bindings = std::map<std::string, std::variant<BAs...>>;
 
+
+template<typename...BAs>
+using wff = sp_tau_node<BAs...>;
+
 // a nso_rr is a set of rules and a main, the boolean algebra constants
 // (unless '0' or '1') are uninstantiated.
 
