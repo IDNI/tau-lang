@@ -105,8 +105,8 @@ using wff = sp_tau_node<BAs...>;
 template<typename... BAs>
 struct nso_rr {
 
-	nso_rr(rules<BAs...>& rec_relations, statement<BAs...>& main) : rec_relations(rec_relations), main(main) {};
-	nso_rr(statement<BAs...>& main) : main(main) {};
+	nso_rr(const rules<BAs...>& rec_relations, const statement<BAs...>& main) : rec_relations(rec_relations), main(main) {};
+	nso_rr(const statement<BAs...>& main) : main(main) {};
 
 	rules<BAs...> rec_relations;
 	statement<BAs...> main;
