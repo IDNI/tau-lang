@@ -220,9 +220,6 @@ struct tau_ba {
 		return (normalized | tau_parser::wff_t).has_value();
 	}
 
-	// REVIEW (HIGH) this should be a wff<tau_ba<BAs...>, BAs...>
-	//
-	// Maybe confirm with Ohad.
 	wff<tau_ba<BAs...>, BAs...> form;
 };
 
@@ -249,6 +246,9 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
+template<typename...BAs>
+using tau_spec = wff<tau_ba<BAs...>, BAs...>;
+
 template<typename base_factory_t, typename...BAs>
 struct tau_factory {
 
@@ -267,18 +267,51 @@ struct tau_factory {
 	base_factory_t& bf;
 };
 
-
-// TODO (HIGH) rewrite this using tau formulas instead of tau_parser::nso_rr
-template<typename base_factory_t, typename...BAs>
-nso_rr<tau_ba<BAs...>, BAs...> make_tau_using_factory(const std::string& src, base_factory_t& bf) {
-	tau_factory<base_factory_t, BAs...> tf(bf);
-	return make_nso_rr_using_factory<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>>(src, tf);
+// make a nso_rr from the given tau source and binder.
+template<typename binder_t, typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
+	auto src = make_tau_code<BAs...>(tau_source);
+	auto unbinded_form = src | tau_parser::gssotc | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto binded_form = post_order_traverser<
+			binder_t,
+			all_t<sp_tau_node<BAs...>>,
+			sp_tau_node<BAs...>>(
+		binder, all<sp_tau_node<BAs...>>)(unbinded_form);
+	return binded_form;
 }
 
-// TODO (HIGH) rewrite this using tau formulas instead of tau_parser::nso_rr
-template<typename...BAs>
-nso_rr<tau_ba<BAs...>, BAs...> make_tau_using_bindings(const std::string& src, const bindings<tau_ba<BAs...>>& bs) {
-	return make_nso_rr_using_bindings<tau_ba<BAs...>>(src, bs);
+// make a nso_rr from the given tau source and bindings.
+template<typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
+	name_binder<BAs...> nb(bindings);
+	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
+	return make_nso_rr_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename factory_t, typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
+	bind_transformer<factory_t, BAs...> bs(factory);
+	return make_nso_rr_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename factory_t, typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_factory(const std::string& source, factory_t& factory) {
+	auto tau_source = make_tau_source(source);
+	return make_nso_rr_using_factory<factory_t, BAs...>(tau_source, factory);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
+	auto tau_source = make_tau_source(source);
+	name_binder<BAs...> nb(bindings);
+	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
+	return make_nso_rr_using_bindings<
+			bind_transformer<name_binder<BAs...>, BAs...>,
+			BAs...>(
+		tau_source, bs);
 }
 
 // TODO (HIGH) add convert tau nso_rr to dnf

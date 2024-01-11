@@ -824,8 +824,8 @@ template<typename... BAs>
 rec_relations<BAs...> make_rec_relations(sp_tau_node<BAs...>& tau_source) {
 	rules<BAs...> rs;
 	// TODO (LOW) change call to select by operator|| and operator|
-	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rule, BAs...>))
-		rs.push_back(make_rule<BAs...>(r));
+	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rec_relation, BAs...>))
+		rs.push_back(make_rec_relation<BAs...>(r));
 	return rs;
 }
 
@@ -889,6 +889,13 @@ library<BAs...> make_library(sp_tau_source_node& tau_source) {
 	return make_rules(lib);
 }
 
+// make a library from the given tau source string.
+template<typename... BAs>
+library<BAs...> make_library(const std::string& source) {
+	auto tau_source = make_tau_source(source);
+	return make_library<BAs...>(tau_source);
+}
+
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
 nso_rr<BAs...> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
@@ -899,7 +906,7 @@ nso_rr<BAs...> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t
 			all_t<sp_tau_node<BAs...>>,
 			sp_tau_node<BAs...>>(
 		binder, all<sp_tau_node<BAs...>>)(unbinded_main);
-	auto rules = make_rec_relations<BAs...>(binded_main);
+	auto rules = make_rec_relations<BAs...>(src);
 	return { rules, binded_main };
 }
 
@@ -918,11 +925,23 @@ nso_rr<BAs...> make_nso_rr_using_factory(sp_tau_source_node& tau_source, factory
 	return make_nso_rr_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
 }
 
-// make a library from the given tau source string.
-template<typename... BAs>
-library<BAs...> make_library(const std::string& source) {
+// make a nso_rr from the given tau source and bindings.
+template<typename factory_t, typename... BAs>
+nso_rr<BAs...> make_nso_rr_using_factory(const std::string& source, factory_t& factory) {
 	auto tau_source = make_tau_source(source);
-	return make_library<BAs...>(tau_source);
+	return make_nso_rr_using_factory<factory_t, BAs...>(tau_source, factory);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename... BAs>
+nso_rr<BAs...> make_nso_rr_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
+	auto tau_source = make_tau_source(source);
+	name_binder<BAs...> nb(bindings);
+	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
+	return make_nso_rr_using_bindings<
+			bind_transformer<name_binder<BAs...>, BAs...>,
+			BAs...>(
+		tau_source, bs);
 }
 
 // creates a specific builder from a sp_tau_node.
@@ -957,25 +976,6 @@ sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_t
 	std::vector<sp_tau_node<BAs...>> vars = b.first || tau_parser::capture;
 	for (size_t i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
 	return replace<sp_tau_node<BAs...>>(b.second, changes);
-}
-
-// make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-nso_rr<BAs...> make_nso_rr_using_factory(const std::string& source, factory_t& factory) {
-	auto tau_source = make_tau_source(source);
-	return make_nso_rr_using_factory<factory_t, BAs...>(tau_source, factory);
-}
-
-// make a nso_rr from the given tau source and bindings.
-template<typename... BAs>
-nso_rr<BAs...> make_nso_rr_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
-	auto tau_source = make_tau_source(source);
-	name_binder<BAs...> nb(bindings);
-	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
-	return make_nso_rr_using_bindings<
-			bind_transformer<name_binder<BAs...>, BAs...>,
-			BAs...>(
-		tau_source, bs);
 }
 
 // definitions of wff builder rules
