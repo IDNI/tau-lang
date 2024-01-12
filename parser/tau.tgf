@@ -63,19 +63,23 @@ num                    => digits.
 
 # timed_offset
 # TODO (HIGH) check that no timed offset is used in a formula (msnso_rr)
-timed_offset           => open_bracket ws timed_step ws close_bracket.
-timed_step             => num | timed_capture | timed_shift.
 timed_shift            => timed_capture ws minus ws num.
 timed_capture          => 't'.
 
 variable               => var | timed.
-timed                  => (in | out)  timed_offset.
+timed                  => in_current | in_absolute | in_relative | out_current | out_absolute | out_relative.
 bool_variable          => '?' chars.
 # TODO (HIGH) capture t is reserved for timed variables, so we should check that is not used here
 capture                => '$' chars.
 # TODO (MEDIUM) remove '?' from timed variables
 # TODO (MEDIUM) avoid i_ and o_ in variables
 var                    => chars.
+in_current             => in open_bracket timed_capture close_bracket.
+in_absolute            => in ws open_bracket num close_bracket.
+in_relative            => in ws open_bracket timed_shift close_bracket.
+out_current            => out open_bracket timed_capture close_bracket.
+out_absolute           => out ws open_bracket num close_bracket.
+out_relative           => out ws open_bracket timed_shift close_bracket.
 in                     => "?i_" chars. # instead of '<', easy to remember
 out                    => "?o_" chars. # instead of '>', easy to remember
 
