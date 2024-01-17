@@ -314,6 +314,291 @@ tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const b
 		tau_source, bs);
 }
 
+template<typename... BAs>
+void get_clauses(const tau_spec<BAs...>& n, std::vector<sp_tau_node<tau_ba<BAs...>, BAs...>>& clauses) {
+	if (auto check = n | tau_parser::tau_or; !check.has_value() && is_non_terminal(tau_parser::tau, n)) clauses.push_back(n);
+	else for (auto& c: n->child)
+		if (is_non_terminal(tau_parser::tau_or, c)) get_clauses(c ,clauses);
+}
+
+template<typename... BAs>
+std::vector<tau_spec<BAs...>> get_clauses(const sp_tau_node<BAs...>& n) {
+	std::vector<tau_spec<BAs...>> clauses;
+	get_clauses(n, clauses);
+	return clauses;
+}
+
+template<typename... BAs>
+using extracted_bindings = std::map<std::variant<BAs...>, std::string>;
+
+template<typename... BAs>
+std::string clause_to_string(const sp_tau_node<tau_ba<BAs...>, BAs...>& clause, extracted_bindings<tau_ba<BAs...>, BAs...>& extracted_bindings, size_t& binding_seed) {
+	std::basic_stringstream<char> str;
+
+	auto visitor = overload(
+		[&str] (const tau_source_sym& l) {
+			if (!l.nt()) str << l.t(); },
+		[&str, &extracted_bindings, &binding_seed] (const std::variant<tau_ba<BAs...>, BAs...>& bae) {
+			if (extracted_bindings.contains(bae)) str << bae;
+			else {
+				auto binding = "binding" + std::to_string(binding_seed++);
+				extracted_bindings.add(bae, binding);
+				str << binding;
+			}},
+		[&str] (const size_t& n) { str << n; });
+
+	auto print = [&str, &visitor] (const auto& e) {
+		std::visit(visitor, e);
+	};
+	using print_t = decltype(print);
+
+	post_order_tree_traverser<
+			print_t,
+			all_t<sp_tau_node<tau_ba<BAs...>, BAs...>>,
+			sp_tau_node<tau_ba<BAs...>, BAs...>>(
+		print, all<sp_tau_node<tau_ba<BAs...>, BAs...>>)(clause);
+
+	return str.str();
+}
+
+template<typename... BAs>
+void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
+		wff<tau_ba<BAs...>, BAs...>& positive, std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives) {
+	// do stuff
+}
+
+template<typename... BAs>
+std::pair<tau_spec<BAs...>, std::vector<tau_spec<>>> get_positive_and_negative_literals(const tau_spec<BAs...> collapsed) {
+	wff<tau_ba<BAs...>, BAs...> positive;
+	std::vector<wff<tau_ba<BAs...>, BAs...>> negatives;
+	get_positive_and_negative_literals(collapsed, positive, negatives);
+	return {positive, negatives};
+}
+
+template<typename...BAs>
+struct tau_spec_io_vars {
+
+	void add(const sp_tau_node<tau_ba<BAs...>, BAs...>& io) {
+		auto pos = io
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| tau_parser::var_pos
+			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
+			| optional_value_extractor<size_t>;
+		auto var_name = (io
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>).child[0];
+		switch (pos) {
+			case tau_parser::current_pos:
+				name.emplace(var_name);
+				break;
+			case tau_parser::absolute_pos:
+				name.emplace(var_name);
+				loopback = max(loopback,
+					io | only_child_extractor<tau_ba<BAs...>, BAs...>
+					| tau_parser::var_pos
+					| tau_parser::absolute_pos
+					| tau_parser::num
+					| only_child_extractor<tau_ba<BAs...>, BAs...>
+					| offset_extractor<tau_ba<BAs...>, BAs...>
+					| optional_value_extractor<size_t>);
+				break;
+			case tau_parser::relative_pos:
+				name.emplace(var_name);
+				loopback = max(loopback,
+					io | only_child_extractor<tau_ba<BAs...>, BAs...>
+					| tau_parser::var_pos
+					| tau_parser::relative_pos
+					| tau_parser::num
+					| only_child_extractor<tau_ba<BAs...>, BAs...>
+					| offset_extractor<tau_ba<BAs...>, BAs...>
+					| optional_value_extractor<size_t>);
+				break;
+			default:
+				throw std::logic_error("bad timed pos");
+		}
+	}
+
+	std::set<wff<tau_ba<BAs...>, BAs...>> name;
+	size_t loopback = 0;
+};
+
+template<typename... BAs>
+std::pair<tau_spec_io_vars<BAs...>, tau_spec_io_vars<BAs...>> get_io_vars(const tau_spec<BAs...> collapsed) {
+	tau_spec_io_vars<BAs...> inputs;
+	tau_spec_io_vars<BAs...> outputs;
+	for (const auto& variable: select_top(collapsed, is_non_terminal<tau_parser::timed, tau_ba<BAs...>, BAs...>)) {
+		auto type = variable
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
+			| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+		(type == tau_parser::in ? inputs : outputs).add(variable);
+	}
+	return {inputs, outputs};
+}
+
+template<typename... BAs>
+nso_rr<tau_ba<BAs...>, BAs...>  get_eta_nso_rr(
+		const std::optional<wff<tau_ba<BAs...>, BAs...>>& positive,
+		const std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives,
+		const tau_spec_io_vars<BAs...>& inputs,
+		const tau_spec_io_vars<BAs...>& outputs) {
+	auto print_vars = [] (const auto& vars) {
+		std::basic_stringstream<char> str;
+		for (const auto& var: vars.name) {
+			str << var;
+			if (var != *vars.name.rbegin()) str << ", ";
+		}
+		return str.str();
+	};
+	auto universally_quantify_vars = [] (const auto& vars, size_t loopback) {
+		std::basic_stringstream<char> str;
+		for (const auto& var: vars.name) {
+			str << "all " << var << "[" << loopback << "] ";
+		}
+		return str.str();
+	};
+	auto existentially_quantify_vars = [] (const auto& vars, size_t loopback) {
+		std::basic_stringstream<char> str;
+		for (const auto& var: vars.name) {
+			str << "ex " << var << "[" << loopback << "] ";
+		}
+		return str.str();
+	};
+	auto print_boolean_existential_quantifiers = [] (size_t negatives) {
+		std::basic_stringstream<char> str;
+		for (size_t i = 1; i <= negatives; ++i) {
+			str << "bex $nn" << i;
+			if (i < negatives) str << ",";
+		}
+		return str.str();
+	};
+	auto print_t = [] (size_t negatives) {
+		std::basic_stringstream<char> str;
+		for (size_t i = 1; i <= negatives; ++i) {
+			str << "t";
+			if (i < negatives) str << ",";
+		}
+		return str.str();
+	};
+	auto print_negative_vars = [] (size_t negatives) {
+		std::basic_stringstream<char> str;
+		for (size_t i = 1; i <= negatives; ++i) {
+			str << "$n" << i;
+			if (i < negatives) str << ",";
+		}
+		return str.str();
+	};
+	auto print_new_negative_vars = [] (size_t negatives) {
+		std::basic_stringstream<char> str;
+		for (size_t i = 1; i <= negatives; ++i) {
+			str << "$nn" << i;
+			if (i < negatives) str << ",";
+		}
+		return str.str();
+	};
+	extracted_bindings<tau_ba<BAs...>, BAs...> bindings;
+	size_t binding_seed = 0;
+	size_t loopback = max(inputs.loopback, outputs.loopback);
+	std::basic_stringstream<char> nsorr;
+	nsorr << "eta[t](" << print_vars(outputs) << ") := ";
+		// add call to etas
+		if (negatives.size() > 0) {
+			nsorr << "etas[t](" << print_vars(outputs) << print_t(outputs.size()) << ").\n";
+		}
+	nsorr << "etas[t](" << print_vars(outputs) << print_negative_vars(outputs.size()) <<") := ";
+		// quantify input and output variables
+		for (size_t i = 1; i <= loopback; ++i) {
+			nsorr << universally_quantify_vars(inputs, i);
+			nsorr << existentially_quantify_vars(outputs, i);
+		}
+		// boolean quantify new negative vars
+		nsorr << print_boolean_existential_quantifiers(outputs.size());
+		// add positive literal if it exists
+		if (positive.has_value()) {
+			nsorr << clause_to_string(positive.value(), bindings, binding_seed);
+			if (negatives.size() > 0) nsorr << " && ";
+		}
+		// generate a disjunction of all negations conjucted with the max_loopback variables and
+		if (negatives.size() > 0) {
+			for (size_t i = 0; i < negatives.size(); ++i) {
+				nsorr << "(( $n" << i << " && " << "$nn" << i << " ) &&& " << clause_to_string(negatives[i], bindings, binding_seed) << ") &&& ";
+			}
+			// add recursive call with t-1
+			nsorr << "etas[t-1](" << print_vars(outputs) << print_new_negative_vars(outputs.size()) << ").\n";
+		}
+	// add main
+	return make_nso_rr_using_bindings<tau_ba<BAs...>, BAs...>>(nsorr.get(), bindings);
+}
+
+template<typename... BAs>
+std::string get_check_nso_rr(const tau_spec_io_vars<BAs...>& outputs, size_t loopback, size_t current) {
+	auto existentially_quantify_vars = [] (const auto& vars, size_t loopback) {
+		std::basic_stringstream<char> str;
+		for (const auto& var: vars.name) {
+			str << "ex " << var << "[" << loopback << "] ";
+		}
+		return str.str();
+	};
+	std::basic_stringstream<char> check;
+	check << existentially_quantify_vars(outputs, loopback) <<
+		" (eta[" << current << "](" << print_vars(outputs) << ").\n";
+	return check.str();
+}
+
+template<typename... BAs>
+std::string get_main_nso_rr(const tau_spec_io_vars<BAs...>& outputs, size_t loopback, size_t current, size_t previous) {
+	auto universally_quantify_vars = [] (const auto& vars, size_t loopback) {
+		std::basic_stringstream<char> str;
+		for (const auto& var: vars.name) {
+			str << "all " << var << "[" << loopback << "] ";
+		}
+		return str.str();
+	};
+	std::basic_stringstream<char> main;
+	main << universally_quantify_vars(outputs, loopback) <<
+		" (eta[" << current << "](" << print_vars(outputs) << ") <-> eta[" << previous << "]).\n";
+	return main.str();
+}
+
+
+template<typename... BAs>
+bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
+	auto collapsed = clause |
+		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			collapse_positives_tau<tau_ba<BAs...>, BAs...>);
+	auto [positive, negatives] = get_positive_and_negative_literals(collapsed);
+	auto [inputs, outputs] = get_io_vars(collapsed);
+	size_t loopback = max(inputs.loopback, outputs.loopback);
+	bindings<tau_ba<BAs...>, BAs...> bindings;
+	auto etas = get_eta_nso_rr<tau_ba<BAs...>, BAs...>(positive, negatives, inputs, outputs);
+	for (size_t current = 1; ; ++current) {
+		auto eta = get_eta_nso_rr<tau_ba<BAs...>, BAs...>(positive, negatives, inputs, outputs);
+		auto check = get_check_nso_rr(outputs, loopback, current);
+		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta + check);
+		if ((normalize | tau_parser::wff_f).has_value()) return false;
+		for (size_t previous = 1; previous < current; ++previous) {
+			auto main = get_main_nso_rr(outputs, loopback, current, previous);
+			auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta + main);
+			if ((normalize | tau_parser::wff_t).has_value()) return true;
+		}
+
+	}
+}
+
+// check satisfability of a tau_spec (boolean combination case)
+template<typename...BAs>
+bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
+	auto dnf = tau_spec |
+		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			to_dnf_tau<tau_ba<BAs...>, BAs...>
+			| simplify_tau<tau_ba<BAs...>, BAs...>
+		);
+	for(auto& clause: get_clauses(dnf)) {
+		if (is_satisfiable_clause(clause)) return true;
+	}
+	return false;
+}
+
 // TODO (HIGH) add convert tau nso_rr to dnf
 
 // TODO (HIGH) add convert tau dnf nso_rr to single positive dnf
