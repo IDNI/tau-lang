@@ -468,10 +468,10 @@ template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
 
 	if (!bdd<B, o>::V.empty()) return;
 #ifdef DEBUG
-	int s;
-	cout << "bdd_init" << '<' <<
-	     abi::__cxa_demangle(typeid(bdd<B, o>).name(), 0, 0, &s) <<
-	     '>' << endl;
+//	int s;
+//	cout << "bdd_init" << '<' <<
+//	     abi::__cxa_demangle(typeid(bdd<B, o>).name(), 0, 0, &s) <<
+//	     '>' << endl;
 #endif
 	//bdd<B, o>::Mb.emplace(B::one(), 1);
 	if constexpr (o.has_inv_out()) {

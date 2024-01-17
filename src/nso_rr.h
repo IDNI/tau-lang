@@ -414,6 +414,28 @@ std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, con
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
 }
 
+// returns an optional containing the offset of the node if possible
+template<typename... BAs>
+static const auto offset_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<size_t> {
+	if (std::holds_alternative<size_t>(n->value))
+		return std::optional<size_t>(get<size_t>(n->value));
+	return std::optional<size_t>();
+};
+
+template<typename... BAs>
+using offset_extractor_t = decltype(offset_extractor<BAs...>);
+
+template <typename... BAs>
+std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const offset_extractor_t<BAs...> e) {
+	return v | std::ranges::views::transform(e);
+}
+
+template <typename... BAs>
+std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, const offset_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return o.has_value() ? e(o.value()) : std::optional<size_t>();
+}
+
 // returns an optional containing the bas... of the node if possible
 template<typename... BAs>
 static const auto ba_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<std::variant<BAs...>> {
@@ -1786,6 +1808,25 @@ sp_tau_node<BAs...> nso_rr_apply(const rules<BAs...>& rs, const sp_tau_node<BAs.
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::rules<BAs...>& rs) {
 	for (const auto& r : rs) stream << r << "\n";
+	return stream;
+}
+
+// << for tau_source_sym
+std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_sym& rs) {
+	if (rs.nt()) stream << rs.t();
+	return stream;
+}
+
+// << for tau_sym
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>& rs) {
+	// using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
+	auto print = overload(
+		[&stream](const idni::tau::tau_source_sym& t) {
+			if (t.nt()) stream << t.t(); },
+		[&stream](const std::variant<BAs...>& bae) { stream << bae; },
+		[&stream](const size_t& n) { stream << n; });
+	std::visit(print, rs);
 	return stream;
 }
 

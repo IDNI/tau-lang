@@ -1,3 +1,6 @@
+// This file is generated from a file parser/tau.tgf by
+//       https://github.com/IDNI/parser/tools/tgf
+//
 #ifndef __TAU_PARSER_H__
 #define __TAU_PARSER_H__
 #include <string.h>
@@ -34,8 +37,8 @@ struct tau_parser {
 		chars, _Rchars_5, _Rchars_6, digits, _Rdigits_7, definition, dot, open_parenthesis, close_parenthesis, open_bracket,
 		close_bracket, open_brace, close_brace, minus, colon, semicolon, less, comma, sym, offsets,
 		step, offset, _Roffsets_8, _Roffsets_9, num, capture, shift, timed_shift, timed_capture, variable,
-		var, timed, in_current, in_absolute, in_relative, out_current, out_absolute, out_relative, bool_variable, in,
-		out, tau_rule, tau_matcher, tau_body, tau, tau_collapse_positives_cb, tau_positives_upwards_cb, wff, tau_and, tau_or,
+		var, timed, in, out, in_var_name, var_pos, out_var_name, current_pos, absolute_pos, relative_pos,
+		bool_variable, tau_rule, tau_matcher, tau_body, tau, tau_collapse_positives_cb, tau_positives_upwards_cb, wff, tau_and, tau_or,
 		tau_neg, tau_t, tau_f, tau_and_sym, tau_or_sym, tau_neg_sym, wff_rule, wff_matcher, wff_body, wff_rec_relation,
 		wff_ref, bf_eq_cb, bf_neq_cb, wff_has_clashing_subformulas_cb, wff_has_subformula_cb, wff_remove_existential_cb, wff_remove_bexistential_cb, wff_remove_buniversal_cb, wff_and, wff_neg,
 		wff_xor, wff_conditional, wff_or, wff_all, wff_ex, wff_imply, wff_equiv, wff_t, wff_f, wff_ball,
@@ -83,8 +86,8 @@ private:
 			"chars", "_Rchars_5", "_Rchars_6", "digits", "_Rdigits_7", "definition", "dot", "open_parenthesis", "close_parenthesis", "open_bracket",
 			"close_bracket", "open_brace", "close_brace", "minus", "colon", "semicolon", "less", "comma", "sym", "offsets",
 			"step", "offset", "_Roffsets_8", "_Roffsets_9", "num", "capture", "shift", "timed_shift", "timed_capture", "variable",
-			"var", "timed", "in_current", "in_absolute", "in_relative", "out_current", "out_absolute", "out_relative", "bool_variable", "in",
-			"out", "tau_rule", "tau_matcher", "tau_body", "tau", "tau_collapse_positives_cb", "tau_positives_upwards_cb", "wff", "tau_and", "tau_or",
+			"var", "timed", "in", "out", "in_var_name", "var_pos", "out_var_name", "current_pos", "absolute_pos", "relative_pos",
+			"bool_variable", "tau_rule", "tau_matcher", "tau_body", "tau", "tau_collapse_positives_cb", "tau_positives_upwards_cb", "wff", "tau_and", "tau_or",
 			"tau_neg", "tau_t", "tau_f", "tau_and_sym", "tau_or_sym", "tau_neg_sym", "wff_rule", "wff_matcher", "wff_body", "wff_rec_relation",
 			"wff_ref", "bf_eq_cb", "bf_neq_cb", "wff_has_clashing_subformulas_cb", "wff_has_subformula_cb", "wff_remove_existential_cb", "wff_remove_bexistential_cb", "wff_remove_buniversal_cb", "wff_and", "wff_neg",
 			"wff_xor", "wff_conditional", "wff_or", "wff_all", "wff_ex", "wff_imply", "wff_equiv", "wff_t", "wff_f", "wff_ball",
@@ -288,40 +291,36 @@ private:
 		q(nt(59), (nt(60)));
 		// variable => timed.
 		q(nt(59), (nt(61)));
-		// timed => in_current.
+		// timed => in.
 		q(nt(61), (nt(62)));
-		// timed => in_absolute.
+		// timed => out.
 		q(nt(61), (nt(63)));
-		// timed => in_relative.
-		q(nt(61), (nt(64)));
-		// timed => out_current.
-		q(nt(61), (nt(65)));
-		// timed => out_absolute.
-		q(nt(61), (nt(66)));
-		// timed => out_relative.
-		q(nt(61), (nt(67)));
+		// in => in_var_name var_pos.
+		q(nt(62), (nt(64)+nt(65)));
+		// out => out_var_name var_pos.
+		q(nt(63), (nt(66)+nt(65)));
+		// var_pos => current_pos.
+		q(nt(65), (nt(67)));
+		// var_pos => absolute_pos.
+		q(nt(65), (nt(68)));
+		// var_pos => relative_pos.
+		q(nt(65), (nt(69)));
 		// bool_variable => '?' chars.
-		q(nt(68), (t(25)+nt(30)));
+		q(nt(70), (t(25)+nt(30)));
 		// capture => '$' chars.
 		q(nt(55), (t(26)+nt(30)));
 		// var => chars.
 		q(nt(60), (nt(30)));
-		// in_current => in open_bracket timed_capture close_bracket.
-		q(nt(62), (nt(69)+nt(39)+nt(58)+nt(40)));
-		// in_absolute => in ws open_bracket num close_bracket.
-		q(nt(63), (nt(69)+nt(14)+nt(39)+nt(54)+nt(40)));
-		// in_relative => in ws open_bracket timed_shift close_bracket.
-		q(nt(64), (nt(69)+nt(14)+nt(39)+nt(57)+nt(40)));
-		// out_current => out open_bracket timed_capture close_bracket.
-		q(nt(65), (nt(70)+nt(39)+nt(58)+nt(40)));
-		// out_absolute => out ws open_bracket num close_bracket.
-		q(nt(66), (nt(70)+nt(14)+nt(39)+nt(54)+nt(40)));
-		// out_relative => out ws open_bracket timed_shift close_bracket.
-		q(nt(67), (nt(70)+nt(14)+nt(39)+nt(57)+nt(40)));
-		// in => '?' 'i' '_' chars.
-		q(nt(69), (t(25)+t(27)+t(28)+nt(30)));
-		// out => '?' 'o' '_' chars.
-		q(nt(70), (t(25)+t(29)+t(28)+nt(30)));
+		// current_pos => open_bracket timed_capture close_bracket.
+		q(nt(67), (nt(39)+nt(58)+nt(40)));
+		// absolute_pos => open_bracket num close_bracket.
+		q(nt(68), (nt(39)+nt(54)+nt(40)));
+		// relative_pos => open_bracket timed_shift close_bracket.
+		q(nt(69), (nt(39)+nt(57)+nt(40)));
+		// in_var_name => '?' 'i' '_' chars.
+		q(nt(64), (t(25)+t(27)+t(28)+nt(30)));
+		// out_var_name => '?' 'o' '_' chars.
+		q(nt(66), (t(25)+t(29)+t(28)+nt(30)));
 		// tau_rule => tau_matcher ws definition ws tau_body ws dot.
 		q(nt(71), (nt(72)+nt(14)+nt(35)+nt(14)+nt(73)+nt(14)+nt(36)));
 		// tau_matcher => tau.
@@ -389,7 +388,7 @@ private:
 		// wff => capture.
 		q(nt(77), (nt(55)));
 		// wff => bool_variable.
-		q(nt(77), (nt(68)));
+		q(nt(77), (nt(70)));
 		// wff => wff_ref.
 		q(nt(77), (nt(90)));
 		// wff => wff_and.
@@ -467,13 +466,13 @@ private:
 		// _Rwff_ball_14 => capture.
 		q(nt(131), (nt(55)));
 		// _Rwff_ball_14 => bool_variable.
-		q(nt(131), (nt(68)));
+		q(nt(131), (nt(70)));
 		// wff_ball => wff_ball_sym ws_required _Rwff_ball_14 ws_required wff.
 		q(nt(109), (nt(130)+nt(13)+nt(131)+nt(13)+nt(77)));
 		// _Rwff_bex_15 => capture.
 		q(nt(133), (nt(55)));
 		// _Rwff_bex_15 => bool_variable.
-		q(nt(133), (nt(68)));
+		q(nt(133), (nt(70)));
 		// wff_bex => wff_bex_sym ws_required _Rwff_bex_15 ws_required wff.
 		q(nt(110), (nt(132)+nt(13)+nt(133)+nt(13)+nt(77)));
 		// bf_eq => open_parenthesis ws bf ws bf_equality_sym ws bf ws close_parenthesis.
@@ -749,7 +748,7 @@ private:
 		// tau_positives_upwards_cb_sym => 't' 'a' 'u' '_' 'p' 'o' 's' 'i' 't' 'i' 'v' 'e' 's' '_' 'u' 'p' 'w' 'a' 'r' 'd' 's' '_' 'c' 'b'.
 		q(nt(207), (t(24)+t(38)+t(7)+t(28)+t(59)+t(29)+t(48)+t(27)+t(24)+t(27)+t(55)+t(40)+t(48)+t(28)+t(7)+t(59)+t(54)+t(38)+t(52)+t(56)+t(48)+t(28)+t(49)+t(41)));
 		// input => in ws colon ws open_brace ws source_binding ws close_brace.
-		q(nt(208), (nt(69)+nt(14)+nt(44)+nt(14)+nt(41)+nt(14)+nt(177)+nt(14)+nt(42)));
+		q(nt(208), (nt(62)+nt(14)+nt(44)+nt(14)+nt(41)+nt(14)+nt(177)+nt(14)+nt(42)));
 		// _Rinputs_24 => ws input.
 		q(nt(210), (nt(14)+nt(208)));
 		// _Rinputs_25 => null.
