@@ -332,7 +332,9 @@ template<typename... BAs>
 using extracted_bindings = std::map<std::variant<BAs...>, std::string>;
 
 template<typename... BAs>
-std::string clause_to_string(const sp_tau_node<tau_ba<BAs...>, BAs...>& clause, extracted_bindings<tau_ba<BAs...>, BAs...>& extracted_bindings, size_t& binding_seed) {
+std::string clause_to_string(const sp_tau_node<tau_ba<BAs...>, BAs...>& clause,
+		extracted_bindings<tau_ba<BAs...>, BAs...>& extracted_bindings,
+		size_t& binding_seed) {
 	std::basic_stringstream<char> str;
 
 	auto visitor = overload(
@@ -363,20 +365,25 @@ std::string clause_to_string(const sp_tau_node<tau_ba<BAs...>, BAs...>& clause, 
 
 template<typename... BAs>
 void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
-		wff<tau_ba<BAs...>, BAs...>& positive, std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives) {
-	// do stuff
+		wff<tau_ba<BAs...>, BAs...>& positive,
+	std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives) {
 }
 
 template<typename... BAs>
-std::pair<tau_spec<BAs...>, std::vector<tau_spec<>>> get_positive_and_negative_literals(const tau_spec<BAs...> collapsed) {
-	wff<tau_ba<BAs...>, BAs...> positive;
+std::pair<std::optional<tau_spec<BAs...>>, std::vector<tau_spec<>>> get_positive_and_negative_literals(
+		const tau_spec<BAs...> collapsed) {
+	std::optional<wff<tau_ba<BAs...>, BAs...>> positive;
 	std::vector<wff<tau_ba<BAs...>, BAs...>> negatives;
-	get_positive_and_negative_literals(collapsed, positive, negatives);
+	for (auto& negative: select_all(collapsed, is_non_terminal<tau_parser::tau_neg, BAs...>)) {
+		negatives.push_back(negative);
+	}
+	if (auto check = collapsed.child[0] | tau_parser::tau; check.has_value())
+		positive = check.value();
 	return {positive, negatives};
 }
 
 template<typename...BAs>
-struct tau_spec_io_vars {
+struct tau_spec_vars {
 
 	void add(const sp_tau_node<tau_ba<BAs...>, BAs...>& io) {
 		auto pos = io
@@ -423,9 +430,9 @@ struct tau_spec_io_vars {
 };
 
 template<typename... BAs>
-std::pair<tau_spec_io_vars<BAs...>, tau_spec_io_vars<BAs...>> get_io_vars(const tau_spec<BAs...> collapsed) {
-	tau_spec_io_vars<BAs...> inputs;
-	tau_spec_io_vars<BAs...> outputs;
+std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const tau_spec<BAs...> collapsed) {
+	tau_spec_vars<BAs...> inputs;
+	tau_spec_vars<BAs...> outputs;
 	for (const auto& variable: select_top(collapsed, is_non_terminal<tau_parser::timed, tau_ba<BAs...>, BAs...>)) {
 		auto type = variable
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
@@ -440,8 +447,8 @@ template<typename... BAs>
 nso_rr<tau_ba<BAs...>, BAs...>  get_eta_nso_rr(
 		const std::optional<wff<tau_ba<BAs...>, BAs...>>& positive,
 		const std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives,
-		const tau_spec_io_vars<BAs...>& inputs,
-		const tau_spec_io_vars<BAs...>& outputs) {
+		const tau_spec_vars<BAs...>& inputs,
+		const tau_spec_vars<BAs...>& outputs) {
 	auto print_vars = [] (const auto& vars) {
 		std::basic_stringstream<char> str;
 		for (const auto& var: vars.name) {
@@ -531,7 +538,7 @@ nso_rr<tau_ba<BAs...>, BAs...>  get_eta_nso_rr(
 }
 
 template<typename... BAs>
-std::string get_check_nso_rr(const tau_spec_io_vars<BAs...>& outputs, size_t loopback, size_t current) {
+std::string get_check_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopback, size_t current) {
 	auto existentially_quantify_vars = [] (const auto& vars, size_t loopback) {
 		std::basic_stringstream<char> str;
 		for (const auto& var: vars.name) {
@@ -546,7 +553,7 @@ std::string get_check_nso_rr(const tau_spec_io_vars<BAs...>& outputs, size_t loo
 }
 
 template<typename... BAs>
-std::string get_main_nso_rr(const tau_spec_io_vars<BAs...>& outputs, size_t loopback, size_t current, size_t previous) {
+std::string get_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopback, size_t current, size_t previous) {
 	auto universally_quantify_vars = [] (const auto& vars, size_t loopback) {
 		std::basic_stringstream<char> str;
 		for (const auto& var: vars.name) {
@@ -598,10 +605,6 @@ bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
 	}
 	return false;
 }
-
-// TODO (HIGH) add convert tau nso_rr to dnf
-
-// TODO (HIGH) add convert tau dnf nso_rr to single positive dnf
 
 } // namespace idni::tau
 
