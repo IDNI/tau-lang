@@ -66,9 +66,9 @@ const -> 0 | 1 | { B }
 
 where `elem` stands for an element of one of the boolean algebras, `bf` for a sub-boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `~`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
 
-### Functional quantifiers
+## Functional quantifiers
 
-As show in the `bf` grammar, we consider two types of `bf` qantifiers: the existential one `fex`and the universal one `fall`. Both depend in a variable and a `bf`formula. The formula could be whatever we derive from the previious grammar, whereas the varibles could be of the following types:
+As show in the `bf` grammar, we consider two types of `bf` qantifiers: the existential one `fex`and the universal one `fall`. Both depend in a variable and a `bf` formula. The formula could be whatever we derive from the previious grammar, whereas the varibles could be of the following types:
 
 - regular variables, they are just a sequence of `chars` (no especial symbols). They stand for regular variables in a formula, like the ones in predicate logic, and
 - captures, they are a sequence of `chars`preceed by a `$`. They behave in the same way as PROLOG variables.
@@ -110,14 +110,14 @@ As in the caes of `bf`, we have two types of qantifiers and the varibles could b
 
 ## Recursive relations
 
-Recursive ralations are introduced to simplify the writing of boolean functions and well formed formulas. They are given by the following grammar:
+Recursive ralations are introduced to simplify the writing of well formed formulas. They are given by the following grammar:
 
 ```
 bf_rec_relation -> bf_ref ":=" bf.
 bf_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
 ```
 
-and in the case of well-formed formulas, the grammar is:
+in the case of boolean functions and in the case of well-formed general formulas, the grammar is:
 
 ```
 wff_rec_relation -> wff_ref ":=" wff.
@@ -126,9 +126,13 @@ wff_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
 
 where `bf_rec_relation` stands for a boolean function recursive relation, `bf_ref` stands for a reference to a boolean function (see boolean functions Section), `wff_rec_relation` stands for a well formed formula recursive relation, `wff_ref` stands for a reference to a well formed formula (see well formed formulas Section), `sym` stands for a symbol, `offset` stands for an offset and `capture` stands for a capture/variable.
 
-### Variables, variables, variables,...
+## Variables, variables, variables,...
 
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+Tau specifications, as deal with program specifications, could freely include input and output variables. The disctintion between input and output variables is made by the use of the `i_` and `o_` prefix. For instance, in a Tau specification we could have variables named `ì_keyboard` or `o_terminal`. Moreover, the variables must have a timestamp, i.e. you could have
+`i_keyboard[t]` that denotes the value of the variable `i_keyboard` at time `t`. Also you could have `i_keyboard[t-1]` that denotes the value of the variable `i_keyboard` at time `t-1` or `ì_keyboard[3]` that denotes the value of variable at
+time `3` of the specification.
+
+Free variables used in recursive relations must be preceed by a `$` symbol, for example `$X` or `$Y`. The use of `$` symbol is to avoid name clashes with the variables of the specification. They could be used freely inside the body of the definitions.
 
 ## Tau programs
 
@@ -185,7 +189,6 @@ In both cases, if there is a missmatch between the types, an error is raised dur
 ### Source code bindings
 
 "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
-
 
 ### Boolean algebra element factories
 
