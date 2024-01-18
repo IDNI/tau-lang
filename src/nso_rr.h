@@ -180,8 +180,7 @@ template<typename... BAs>
 static const auto is_capture = [](const sp_tau_node<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value)
 		&& get<tau_source_sym>(n->value).nt()
-		&& ( get<tau_source_sym>(n->value).n() == tau_parser::capture
-			|| get<tau_source_sym>(n->value).n() == tau_parser::timed_capture);
+		&& ( get<tau_source_sym>(n->value).n() == tau_parser::capture);
 };
 
 template<typename... BAs>

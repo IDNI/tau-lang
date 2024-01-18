@@ -433,7 +433,7 @@ template<typename... BAs>
 std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const tau_spec<BAs...> collapsed) {
 	tau_spec_vars<BAs...> inputs;
 	tau_spec_vars<BAs...> outputs;
-	for (const auto& variable: select_top(collapsed, is_non_terminal<tau_parser::timed, tau_ba<BAs...>, BAs...>)) {
+	for (const auto& variable: select_top(collapsed, is_non_terminal<tau_parser::io_var, tau_ba<BAs...>, BAs...>)) {
 		auto type = variable
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
