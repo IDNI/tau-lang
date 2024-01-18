@@ -150,9 +150,9 @@ underlying boolean algebra expressions are typed accordingly.
 
 In both cases, if there is a missmatch between the types, an error is raised during the type resolution phase, i.e. before executing the program.
 
-## Reserved keywords
+## Reserved symbols
 
-Tau language has a set of reserved symbols that cannot be used as identifiers. In particular, no symbol could have the prefix `tau`as is used for internal pourposes. Moreover, no capture or variable could be `t` as also is use
+Tau language has a set of reserved symbols that cannot be used as identifiers. In particular, no symbol could have the prefix `tau` as is used for internal pourposes. Moreover, no capture or variable could be `t` as also is use
 internally to denote the current instant of execution.
 
 # Understanding Tau language execution
