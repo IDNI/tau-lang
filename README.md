@@ -1,4 +1,6 @@
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+Tau advances formal methods by removing coding from the process, while expanding its industrial capability, reliability and ease of maintenance. Tau enables you to automatically create the most complex, provably correct software, by simply writing sentences about what you want the software to do.
+
+Tau Language is able to embed and extend the most powerful decidable knowledge representation languages, logics, and Boolean algebras to describe states in the specification. Tau Language is able to embed and extend the most powerful decidable knowledge representation languages and logics to describe states in the Tau specification.
 
 # Compiling the source code
 
@@ -152,7 +154,7 @@ In both cases, if there is a missmatch between the types, an error is raised dur
 
 ## Reserved symbols
 
-Tau language has a set of reserved symbols that cannot be used as identifiers. In particular, no symbol could have the prefix `tau` as is used for internal pourposes. Moreover, no capture or variable could be `t` as also is use
+Tau language has a set of reserved symbols that cannot be used as identifiers. In particular, no symbol could have the prefix `tau` as is used for internal pourposes. Moreover, no capture or variable could be `t` as also is used
 internally to denote the current instant of execution.
 
 # Understanding Tau language execution
