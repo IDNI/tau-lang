@@ -333,6 +333,10 @@ TEST_SUITE("select_top_predicate") {
 	// TODO (LOW) write tests corresponding to related functions
 }
 
+// TODO (MEDIUM) write tests for select_subnodes predicates
+// TODO (MEDIUM) write tests for select_subnodes functions
+
+
 TEST_SUITE("select_all_predicate") {
 
 	TEST_CASE("select_all_predicate: given a simple tree whose root satisfies "

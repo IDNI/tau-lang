@@ -333,6 +333,30 @@ struct select_top_predicate {
 	std::vector<node_t>& selected;
 };
 
+// visitor that selects nodes that satisfy a predicate and stores the subnodes
+// extracted from them in the supplied vector. It only works with post order
+// traversals and never produces duplicates.
+template <typename predicate_t, typename extractor_t, typename node_t>
+struct select_subnodes_predicate {
+	select_subnodes_predicate(predicate_t& query, extractor_t extractor, std::vector<node_t>& selected) :
+		query(query), extractor(extractor), selected(selected) {}
+
+	bool operator()(const node_t& n) {
+		if (!query(n)) return true;
+		auto extracted = extractor(n);
+		for (auto& e : extracted) {
+			if (std::find(selected.begin(), selected.end(), e) == selected.end())
+				selected.push_back(e);
+		}
+		return false;
+	}
+
+	predicate_t& query;
+	extractor_t& extractor;
+	std::vector<node_t>& selected;
+};
+
+
 // visitor that selects nodes that satisfy a predicate and stores them in the
 // supplied vector.
 template <typename predicate_t, typename node_t>
@@ -485,6 +509,20 @@ std::vector<node_t> select_top(const node_t& input, predicate_t& query) {
 		identity<node_t>, select)(input);
 	return selected;
 }
+
+// select all subnodes that satisfy a predicate according to the extractor and return them.
+template <typename predicate_t, typename extractor_t, typename node_t>
+std::vector<node_t> select_subnodes(const node_t& input, predicate_t& query, extractor_t extractor) {
+	std::vector<node_t> selected;
+	select_subnodes_predicate<predicate_t, extractor_t, node_t> select(query, extractor, selected);
+	post_order_traverser<
+			identity_t<node_t>,
+			select_top_predicate<predicate_t, node_t>,
+			node_t>(
+		identity<node_t>, select)(input);
+	return selected;
+}
+
 
 // select all top nodes that satisfy a predicate and return them.
 template <typename predicate_t, typename node_t>
