@@ -69,15 +69,15 @@ out                    => out_var_name var_pos.
 var_pos                => current_pos | absolute_pos | relative_pos.
 bool_variable          => '?' chars.
 # TODO (HIGH) capture t is reserved for timed variables, so we should check that is not used here
-capture                => capture_var | pos.
+capture                => capture_var | pos_var.
 capture_var            => '$' chars.
 # TODO (MEDIUM) remove '?' from timed variables
 # TODO (MEDIUM) avoid i_ and o_ in variables
 var                    => chars.
-pos                    => 't'.
-current_pos            => open_bracket pos close_bracket.
+pos_var                => 't'.
+current_pos            => open_bracket pos_var close_bracket.
 absolute_pos           => open_bracket num close_bracket.
-relative_pos           => open_bracket pos minus num close_bracket.
+relative_pos           => open_bracket pos_var minus num close_bracket.
 in_var_name            => "?i_" chars.
 out_var_name           => "?o_" chars.
 
