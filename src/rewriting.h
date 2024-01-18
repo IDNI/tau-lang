@@ -315,6 +315,7 @@ private:
 // visitor that selects top nodes that satisfy a predicate and stores them in the
 // supplied vector. It only works with post order traversals and never produces
 // duplicates.
+// TODO (MEDIUM) replace vector by set
 template <typename predicate_t, typename node_t>
 struct select_top_predicate {
 	select_top_predicate(predicate_t& query, std::vector<node_t>& selected) :
@@ -336,6 +337,7 @@ struct select_top_predicate {
 // visitor that selects nodes that satisfy a predicate and stores the subnodes
 // extracted from them in the supplied vector. It only works with post order
 // traversals and never produces duplicates.
+// TODO (MEDIUM) replace vector by set
 template <typename predicate_t, typename extractor_t, typename node_t>
 struct select_subnodes_predicate {
 	select_subnodes_predicate(predicate_t& query, extractor_t extractor, std::vector<node_t>& selected) :
@@ -359,6 +361,7 @@ struct select_subnodes_predicate {
 
 // visitor that selects nodes that satisfy a predicate and stores them in the
 // supplied vector.
+// TODO (MEDIUM) replace vector by set
 template <typename predicate_t, typename node_t>
 struct select_all_predicate {
 	select_all_predicate(predicate_t& query, std::vector<node_t>& selected) :

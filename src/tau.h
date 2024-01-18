@@ -365,8 +365,18 @@ std::string clause_to_string(const sp_tau_node<tau_ba<BAs...>, BAs...>& clause,
 
 template<typename... BAs>
 void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
-		wff<tau_ba<BAs...>, BAs...>& positive,
-	std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives) {
+		std::optional<wff<tau_ba<BAs...>, BAs...>>& positive, std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives) {
+	auto is_negative = [&collapsed] (const auto& n) {
+		auto check = collapsed | tau_parser::tau | tau_parser::tau_neg;
+		return check.has_value();
+	};
+	auto is_positive = [&collapsed] (const auto& n) {
+		auto check = collapsed | tau_parser::tau | tau_parser::tau_neg;
+		return !check.has_value();
+	};
+	negatives = select_top(collapsed, is_negative);
+	auto positives = collapsed.child | std::views::filter(is_positive) |  std::views::take(1);
+	if (positives.size() > 0) positive = positives[0];
 }
 
 template<typename... BAs>
