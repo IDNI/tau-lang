@@ -38,7 +38,7 @@ struct tau_parser {
 		close_bracket, open_brace, close_brace, minus, colon, semicolon, less, comma, sym, offsets,
 		step, offset, _Roffsets_8, _Roffsets_9, num, capture, shift, variable, var, io_var,
 		in, out, in_var_name, var_pos, out_var_name, current_pos, absolute_pos, relative_pos, bool_variable, capture_var,
-		pos, tau_rule, tau_matcher, tau_body, tau, tau_collapse_positives_cb, tau_positives_upwards_cb, wff, tau_and, tau_or,
+		pos_var, tau_rule, tau_matcher, tau_body, tau, tau_collapse_positives_cb, tau_positives_upwards_cb, wff, tau_and, tau_or,
 		tau_neg, tau_t, tau_f, tau_and_sym, tau_or_sym, tau_neg_sym, wff_rule, wff_matcher, wff_body, wff_rec_relation,
 		wff_ref, bf_eq_cb, bf_neq_cb, wff_has_clashing_subformulas_cb, wff_has_subformula_cb, wff_remove_existential_cb, wff_remove_bexistential_cb, wff_remove_buniversal_cb, wff_and, wff_neg,
 		wff_xor, wff_conditional, wff_or, wff_all, wff_ex, wff_imply, wff_equiv, wff_t, wff_f, wff_ball,
@@ -87,7 +87,7 @@ private:
 			"close_bracket", "open_brace", "close_brace", "minus", "colon", "semicolon", "less", "comma", "sym", "offsets",
 			"step", "offset", "_Roffsets_8", "_Roffsets_9", "num", "capture", "shift", "variable", "var", "io_var",
 			"in", "out", "in_var_name", "var_pos", "out_var_name", "current_pos", "absolute_pos", "relative_pos", "bool_variable", "capture_var",
-			"pos", "tau_rule", "tau_matcher", "tau_body", "tau", "tau_collapse_positives_cb", "tau_positives_upwards_cb", "wff", "tau_and", "tau_or",
+			"pos_var", "tau_rule", "tau_matcher", "tau_body", "tau", "tau_collapse_positives_cb", "tau_positives_upwards_cb", "wff", "tau_and", "tau_or",
 			"tau_neg", "tau_t", "tau_f", "tau_and_sym", "tau_or_sym", "tau_neg_sym", "wff_rule", "wff_matcher", "wff_body", "wff_rec_relation",
 			"wff_ref", "bf_eq_cb", "bf_neq_cb", "wff_has_clashing_subformulas_cb", "wff_has_subformula_cb", "wff_remove_existential_cb", "wff_remove_bexistential_cb", "wff_remove_buniversal_cb", "wff_and", "wff_neg",
 			"wff_xor", "wff_conditional", "wff_or", "wff_all", "wff_ex", "wff_imply", "wff_equiv", "wff_t", "wff_f", "wff_ball",
@@ -305,19 +305,19 @@ private:
 		q(nt(68), (t(24)+nt(30)));
 		// capture => capture_var.
 		q(nt(55), (nt(69)));
-		// capture => pos.
+		// capture => pos_var.
 		q(nt(55), (nt(70)));
 		// capture_var => '$' chars.
 		q(nt(69), (t(25)+nt(30)));
 		// var => chars.
 		q(nt(58), (nt(30)));
-		// pos => 't'.
+		// pos_var => 't'.
 		q(nt(70), (t(26)));
-		// current_pos => open_bracket pos close_bracket.
+		// current_pos => open_bracket pos_var close_bracket.
 		q(nt(65), (nt(39)+nt(70)+nt(40)));
 		// absolute_pos => open_bracket num close_bracket.
 		q(nt(66), (nt(39)+nt(54)+nt(40)));
-		// relative_pos => open_bracket pos minus num close_bracket.
+		// relative_pos => open_bracket pos_var minus num close_bracket.
 		q(nt(67), (nt(39)+nt(70)+nt(43)+nt(54)+nt(40)));
 		// in_var_name => '?' 'i' '_' chars.
 		q(nt(62), (t(24)+t(27)+t(28)+nt(30)));
