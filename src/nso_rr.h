@@ -1240,171 +1240,6 @@ sp_tau_node<BAs...> build_tau_neg(const sp_tau_node<BAs...>& l) {
 	return tau_apply_builder<BAs...>(bldr_tau_neg<BAs...>, args);
 }
 
-// DOING (HIGH) add needed builder to write rec_relations
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_tau_symbol(const tau_parser::nonterminal& symbol);
-/*
-definition			=> ws ":=" ws.
-dot 				=> ws '.' ws.
-open_parenthesis	=> ws '(' ws.
-close_parenthesis	=> ws ')' ws.
-open_bracket		=> ws '[' ws.
-close_bracket		=> ws ']' ws.
-open_brace			=> ws '{' ws.
-close_brace			=> ws '}' ws.
-minus				=> ws '-' ws.
-colon				=> ws ':' ws.
-semicolon			=> ws ';' ws.
-less				=> ws '<' ws.
-comma 				=> ws ',' ws.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_num(const size_t num) { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-num		=> ws digits ws.
-digits	=> digit (digit)*.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_chars(const std::string& chars) { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-chars => alpha (alnum)*.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_var() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-var	=> chars.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_in() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-in	=> "?i_" chars. # instead of '<', easy to remember
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_out() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-out	=> "?o_" chars. # instead of '>', easy to remember
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_timed_capture() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-timed_capture	=> ws 't' ws.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_timed_shift() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-timed_shift 	=> timed_capture minus num.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_timed_step() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-timed_step		=> num | timed_capture | timed_shift.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_timed_offset() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-timed_offset	=> open_bracket timed_step close_bracket.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_timed() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-timed	=> (in | out)  timed_offset.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_variable() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-variable	=> var | timed.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_bool_variable() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-bool_variable	=> '?' chars.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_tau_sym() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-sym				=> chars.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_capture() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-capture	=> '$' chars.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_shift() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-shift => capture minus num.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_step() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-timed_step	=> num | timed_capture | timed_shift.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_offset() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-offset	=> num | capture | shift.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_offsets() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-offsets	=> open_bracket step (comma offset)* close_bracket.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_wff_ref_args() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-wff_ref_args	=> open_parenthesis (variable)* close_parenthesis.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_wff_ref() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-wff_ref	=> sym offsets wff_ref_args.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_wff_rec_relation() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-wff_rec_relation	=> wff_ref definition wff dot.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_bf_ref_args() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-bf_ref_args	=> open_parenthesis (variable)* close_parenthesis.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_bf_ref() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-bf_ref	=> sym offsets bf_ref_args.
-*/
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_bf_rec_relation() { return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_parser::nul), {}); }
-/*
-bf_rec_relation	=> bf_ref definition bf dot.
-*/
-
 template<class... Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
@@ -1516,16 +1351,13 @@ private:
 
 	std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>> get_quantifier_remove_constituents(const tau_parser::nonterminal type, const sp_tau_node<BAs...>& n) {
 		auto args = n || type || only_child_extractor<BAs...>;
-		auto var = args[0];
-		auto T = args[2];
-		auto F = args[3];
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
-		left_changes[var] = T;
-		auto left = replace<sp_tau_node<BAs...>>(args[1], left_changes)
+		left_changes[args[0] /* var */] = args[2] /* T */;
+		auto left = replace<sp_tau_node<BAs...>>(args[1] /* formula */, left_changes)
 			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> right_changes;
-		right_changes[var] = F;
-		auto right = replace<sp_tau_node<BAs...>>(args[1], right_changes)
+		right_changes[args[0] /* var */] = args[3] /* F */;
+		auto right = replace<sp_tau_node<BAs...>>(args[1] /* formula */, right_changes)
 			 | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 		return {left, right};
 	}
