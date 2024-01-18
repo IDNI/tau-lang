@@ -1389,7 +1389,6 @@ private:
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> wff_changes;
 		for (auto& l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
 			std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> n_changes;
-			// FIXME it could have no equalities
 			auto check_eq = find_top(l, is_non_terminal<tau_parser::bf_eq, BAs...>);
 			if (check_eq.has_value()) {
 				auto f = check_eq
