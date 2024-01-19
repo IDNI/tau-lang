@@ -95,7 +95,7 @@ We would go further about the meaning of captures in subsequent sections, for th
 Well formed formulas are given in the Tau language by the following grammar:
 
 ```
-wff -> (wff "&" wff) | "!" wff | (wff "^" wff) | (wff "|" wff) | (wff "->" wff)
+wff -> (wff "&&" wff) | "!" wff | (wff "^" wff) | (wff "||" wff) | (wff "->" wff)
 	| (wff "<->" wff) | (wff "?" wff ":" wff) | all var wff | ex var wff
 	| ball bool_var wff | bex bool_var wff | wff_ref
 	| (bf "=" bf) | (bf "!=" bf) | (bf "<" bf) | (bf "<=" bf) | (bf ">" bf) | T | F.
@@ -124,7 +124,7 @@ bf_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
 in the case of boolean functions and in the case of well-formed general formulas, the grammar is:
 
 ```
-wff_rec_relation -> wff_ref ":=" wff.
+wff_rec_relation -> wff_ref "::=" wff.
 wff_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
 ```
 
