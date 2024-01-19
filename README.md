@@ -157,7 +157,7 @@ In both cases, if there is a missmatch between the types, an error is raised dur
 ## Reserved symbols
 
 Tau language has a set of reserved symbols that cannot be used as identifiers. In particular, no symbol could have the prefix `tau` as is used for internal pourposes. Moreover, no capture or variable could be `t` as also is used
-internally to denote the current instant of execution.
+internally to denote the current instant of execution. Also, `T` and `F` are reserved for true and false values respectively.
 
 # Understanding Tau language execution
 
