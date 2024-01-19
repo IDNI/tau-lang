@@ -365,10 +365,10 @@ private:
 		q(nt(85), (t(33)+t(33)+t(33)));
 		// tau_neg_sym => '%'.
 		q(nt(86), (t(34)));
-		// wff_rule => wff_matcher ws definition ws wff_body ws dot.
-		q(nt(87), (nt(88)+nt(14)+nt(35)+nt(14)+nt(89)+nt(14)+nt(37)));
-		// wff_rec_relation => wff_ref ws definition ws wff ws dot.
-		q(nt(90), (nt(91)+nt(14)+nt(35)+nt(14)+nt(78)+nt(14)+nt(37)));
+		// wff_rule => wff_matcher ws double_definition ws wff_body ws dot.
+		q(nt(87), (nt(88)+nt(14)+nt(36)+nt(14)+nt(89)+nt(14)+nt(37)));
+		// wff_rec_relation => wff_ref ws double_definition ws wff ws dot.
+		q(nt(90), (nt(91)+nt(14)+nt(36)+nt(14)+nt(78)+nt(14)+nt(37)));
 		// wff_matcher => wff.
 		q(nt(88), (nt(78)));
 		// wff_body => wff.
@@ -515,8 +515,8 @@ private:
 		q(nt(109), (t(31)));
 		// bf_rule => bf_matcher ws definition ws bf_body ws dot.
 		q(nt(141), (nt(142)+nt(14)+nt(35)+nt(14)+nt(143)+nt(14)+nt(37)));
-		// bf_rec_relation => bf_ref ws double_definition ws bf ws dot.
-		q(nt(144), (nt(145)+nt(14)+nt(36)+nt(14)+nt(135)+nt(14)+nt(37)));
+		// bf_rec_relation => bf_ref ws definition ws bf ws dot.
+		q(nt(144), (nt(145)+nt(14)+nt(35)+nt(14)+nt(135)+nt(14)+nt(37)));
 		// bf_matcher => bf.
 		q(nt(142), (nt(135)));
 		// bf_body => bf.
