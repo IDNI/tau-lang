@@ -53,14 +53,24 @@ TEST_SUITE("parsing nso_rr") {
 		CHECK( nso_rr.has_value() );
 	}
 
-	TEST_CASE("rules") {
-		auto rules = frml | tau_parser::nso_rr | tau_parser::rec_relations ;
-		CHECK( rules.has_value() );
+	TEST_CASE("rec_relations") {
+		auto rec_relations = frml | tau_parser::nso_rr | tau_parser::rec_relations ;
+		CHECK( rec_relations.has_value() );
 	}
 
-	TEST_CASE("rule") {
-		auto rules = frml | tau_parser::nso_rr | tau_parser::rec_relations || tau_parser::rec_relation;
-		CHECK( rules.size() == 2 );
+	TEST_CASE("rec_relation") {
+		auto rec_relation = frml | tau_parser::nso_rr | tau_parser::rec_relations || tau_parser::rec_relation;
+		CHECK( rec_relation.size() == 2 );
+	}
+
+	TEST_CASE("wff_rec_relation") {
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::rec_relations || tau_parser::rec_relation || tau_parser::wff_rec_relation;
+		CHECK( wff_rec_relation.size() == 1 );
+	}
+
+	TEST_CASE("bf_rec_relation") {
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::rec_relations || tau_parser::rec_relation || tau_parser::bf_rec_relation;
+		CHECK( bf_rec_relation.size() == 1 );
 	}
 
 	TEST_CASE("main") {
