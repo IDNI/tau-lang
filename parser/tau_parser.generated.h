@@ -36,7 +36,7 @@ struct tau_parser {
 		q_str, q_bqstr, char_punct, _Rchar_punct_2, _Rchar_punct_3, _Rchar_punct_4, char0, char_, string_char, bqstring_char,
 		chars, _Rchars_5, _Rchars_6, digits, _Rdigits_7, definition, double_definition, dot, open_parenthesis, close_parenthesis,
 		open_bracket, close_bracket, open_brace, close_brace, minus, colon, semicolon, less, comma, sym,
-		offsets, step, offset, _Roffsets_8, _Roffsets_9, num, capture, shift, variable, var,
+		offsets, offset, _Roffsets_8, _Roffsets_9, num, capture, shift, step, variable, var,
 		io_var, in, out, in_var_name, var_pos, out_var_name, current_pos, absolute_pos, relative_pos, bool_variable,
 		capture_var, pos_var, tau_rule, tau_matcher, tau_body, tau, tau_collapse_positives_cb, tau_positives_upwards_cb, wff, tau_and,
 		tau_or, tau_neg, tau_t, tau_f, tau_and_sym, tau_or_sym, tau_neg_sym, wff_rule, wff_matcher, wff_body,
@@ -85,7 +85,7 @@ private:
 			"q_str", "q_bqstr", "char_punct", "_Rchar_punct_2", "_Rchar_punct_3", "_Rchar_punct_4", "char0", "char_", "string_char", "bqstring_char",
 			"chars", "_Rchars_5", "_Rchars_6", "digits", "_Rdigits_7", "definition", "double_definition", "dot", "open_parenthesis", "close_parenthesis",
 			"open_bracket", "close_bracket", "open_brace", "close_brace", "minus", "colon", "semicolon", "less", "comma", "sym",
-			"offsets", "step", "offset", "_Roffsets_8", "_Roffsets_9", "num", "capture", "shift", "variable", "var",
+			"offsets", "offset", "_Roffsets_8", "_Roffsets_9", "num", "capture", "shift", "step", "variable", "var",
 			"io_var", "in", "out", "in_var_name", "var_pos", "out_var_name", "current_pos", "absolute_pos", "relative_pos", "bool_variable",
 			"capture_var", "pos_var", "tau_rule", "tau_matcher", "tau_body", "tau", "tau_collapse_positives_cb", "tau_positives_upwards_cb", "wff", "tau_and",
 			"tau_or", "tau_neg", "tau_t", "tau_f", "tau_and_sym", "tau_or_sym", "tau_neg_sym", "wff_rule", "wff_matcher", "wff_body",
@@ -262,29 +262,29 @@ private:
 		// sym => chars.
 		q(nt(49), (nt(30)));
 		// _Roffsets_8 => ws comma ws offset.
-		q(nt(53), (nt(14)+nt(48)+nt(14)+nt(52)));
+		q(nt(52), (nt(14)+nt(48)+nt(14)+nt(51)));
 		// _Roffsets_9 => null.
-		q(nt(54), (nul));
+		q(nt(53), (nul));
 		// _Roffsets_9 => _Roffsets_8 _Roffsets_9.
-		q(nt(54), (nt(53)+nt(54)));
-		// offsets => open_bracket ws step _Roffsets_9 ws close_bracket.
-		q(nt(50), (nt(40)+nt(14)+nt(51)+nt(54)+nt(14)+nt(41)));
+		q(nt(53), (nt(52)+nt(53)));
+		// offsets => open_bracket ws offset _Roffsets_9 ws close_bracket.
+		q(nt(50), (nt(40)+nt(14)+nt(51)+nt(53)+nt(14)+nt(41)));
 		// offset => num.
-		q(nt(52), (nt(55)));
+		q(nt(51), (nt(54)));
 		// offset => capture.
-		q(nt(52), (nt(56)));
-		// offset => shift.
-		q(nt(52), (nt(57)));
-		// step => num.
 		q(nt(51), (nt(55)));
-		// step => capture.
+		// offset => shift.
 		q(nt(51), (nt(56)));
+		// step => num.
+		q(nt(57), (nt(54)));
+		// step => capture.
+		q(nt(57), (nt(55)));
 		// step => shift.
-		q(nt(51), (nt(57)));
+		q(nt(57), (nt(56)));
 		// shift => capture minus num.
-		q(nt(57), (nt(56)+nt(44)+nt(55)));
+		q(nt(56), (nt(55)+nt(44)+nt(54)));
 		// num => digits.
-		q(nt(55), (nt(33)));
+		q(nt(54), (nt(33)));
 		// variable => var.
 		q(nt(58), (nt(59)));
 		// variable => io_var.
@@ -306,9 +306,9 @@ private:
 		// bool_variable => '?' chars.
 		q(nt(69), (t(24)+nt(30)));
 		// capture => capture_var.
-		q(nt(56), (nt(70)));
+		q(nt(55), (nt(70)));
 		// capture => pos_var.
-		q(nt(56), (nt(71)));
+		q(nt(55), (nt(71)));
 		// capture_var => '$' chars.
 		q(nt(70), (t(25)+nt(30)));
 		// var => chars.
@@ -318,9 +318,9 @@ private:
 		// current_pos => open_bracket pos_var close_bracket.
 		q(nt(66), (nt(40)+nt(71)+nt(41)));
 		// absolute_pos => open_bracket num close_bracket.
-		q(nt(67), (nt(40)+nt(55)+nt(41)));
+		q(nt(67), (nt(40)+nt(54)+nt(41)));
 		// relative_pos => open_bracket pos_var minus num close_bracket.
-		q(nt(68), (nt(40)+nt(71)+nt(44)+nt(55)+nt(41)));
+		q(nt(68), (nt(40)+nt(71)+nt(44)+nt(54)+nt(41)));
 		// in_var_name => '?' 'i' '_' chars.
 		q(nt(63), (t(24)+t(27)+t(28)+nt(30)));
 		// out_var_name => '?' 'o' '_' chars.
@@ -336,7 +336,7 @@ private:
 		// tau_body => tau_positives_upwards_cb.
 		q(nt(74), (nt(77)));
 		// tau => capture.
-		q(nt(75), (nt(56)));
+		q(nt(75), (nt(55)));
 		// tau => wff.
 		q(nt(75), (nt(78)));
 		// tau => tau_and.
@@ -371,8 +371,6 @@ private:
 		q(nt(90), (nt(91)+nt(14)+nt(35)+nt(14)+nt(78)+nt(14)+nt(37)));
 		// wff_matcher => wff.
 		q(nt(88), (nt(78)));
-		// wff_matcher => wff_ref.
-		q(nt(88), (nt(91)));
 		// wff_body => wff.
 		q(nt(89), (nt(78)));
 		// wff_body => bf_eq_cb.
@@ -390,7 +388,7 @@ private:
 		// wff_body => wff_remove_buniversal_cb.
 		q(nt(89), (nt(98)));
 		// wff => capture.
-		q(nt(78), (nt(56)));
+		q(nt(78), (nt(55)));
 		// wff => bool_variable.
 		q(nt(78), (nt(69)));
 		// wff => wff_ref.
@@ -456,25 +454,25 @@ private:
 		// wff_equiv => open_parenthesis ws wff ws wff_equiv_sym ws wff ws close_parenthesis.
 		q(nt(107), (nt(38)+nt(14)+nt(78)+nt(14)+nt(126)+nt(14)+nt(78)+nt(14)+nt(39)));
 		// _Rwff_all_12 => capture.
-		q(nt(128), (nt(56)));
+		q(nt(128), (nt(55)));
 		// _Rwff_all_12 => variable.
 		q(nt(128), (nt(58)));
 		// wff_all => wff_all_sym ws_required _Rwff_all_12 ws_required wff.
 		q(nt(104), (nt(127)+nt(13)+nt(128)+nt(13)+nt(78)));
 		// _Rwff_ex_13 => capture.
-		q(nt(130), (nt(56)));
+		q(nt(130), (nt(55)));
 		// _Rwff_ex_13 => variable.
 		q(nt(130), (nt(58)));
 		// wff_ex => wff_ex_sym ws_required _Rwff_ex_13 ws_required wff.
 		q(nt(105), (nt(129)+nt(13)+nt(130)+nt(13)+nt(78)));
 		// _Rwff_ball_14 => capture.
-		q(nt(132), (nt(56)));
+		q(nt(132), (nt(55)));
 		// _Rwff_ball_14 => bool_variable.
 		q(nt(132), (nt(69)));
 		// wff_ball => wff_ball_sym ws_required _Rwff_ball_14 ws_required wff.
 		q(nt(110), (nt(131)+nt(13)+nt(132)+nt(13)+nt(78)));
 		// _Rwff_bex_15 => capture.
-		q(nt(134), (nt(56)));
+		q(nt(134), (nt(55)));
 		// _Rwff_bex_15 => bool_variable.
 		q(nt(134), (nt(69)));
 		// wff_bex => wff_bex_sym ws_required _Rwff_bex_15 ws_required wff.
@@ -536,7 +534,7 @@ private:
 		// bf_body => bf_remove_fexistential_cb.
 		q(nt(143), (nt(151)));
 		// bf => capture.
-		q(nt(135), (nt(56)));
+		q(nt(135), (nt(55)));
 		// bf => variable.
 		q(nt(135), (nt(58)));
 		// bf => bf_ref.
@@ -578,13 +576,13 @@ private:
 		// bf_neg => bf_neg_sym ws bf.
 		q(nt(154), (nt(167)+nt(14)+nt(135)));
 		// _Rbf_all_18 => capture.
-		q(nt(169), (nt(56)));
+		q(nt(169), (nt(55)));
 		// _Rbf_all_18 => variable.
 		q(nt(169), (nt(58)));
 		// bf_all => bf_all_sym ws_required _Rbf_all_18 ws_required bf.
 		q(nt(157), (nt(168)+nt(13)+nt(169)+nt(13)+nt(135)));
 		// _Rbf_ex_19 => capture.
-		q(nt(171), (nt(56)));
+		q(nt(171), (nt(55)));
 		// _Rbf_ex_19 => variable.
 		q(nt(171), (nt(58)));
 		// bf_ex => bf_ex_sym ws_required _Rbf_ex_19 ws_required bf.
@@ -618,7 +616,7 @@ private:
 		// bf_constant => open_brace ws constant ws close_brace.
 		q(nt(152), (nt(42)+nt(14)+nt(172)+nt(14)+nt(43)));
 		// constant => capture.
-		q(nt(172), (nt(56)));
+		q(nt(172), (nt(55)));
 		// constant => binding.
 		q(nt(172), (nt(173)));
 		// constant => bf_and_cb.
@@ -710,11 +708,11 @@ private:
 		// bf_remove_funiversal_cb_sym => 'b' 'f' '_' 'r' 'e' 'm' 'o' 'v' 'e' '_' 'f' 'u' 'n' 'i' 'v' 'e' 'r' 's' 'a' 'l' '_' 'c' 'b'.
 		q(nt(195), (t(41)+t(44)+t(28)+t(52)+t(40)+t(53)+t(29)+t(55)+t(40)+t(28)+t(44)+t(7)+t(50)+t(27)+t(55)+t(40)+t(52)+t(48)+t(38)+t(39)+t(28)+t(49)+t(41)));
 		// bf_cb_arg => capture.
-		q(nt(185), (nt(56)));
+		q(nt(185), (nt(55)));
 		// bf_cb_arg => bf.
 		q(nt(185), (nt(135)));
 		// wff_cb_arg => capture.
-		q(nt(191), (nt(56)));
+		q(nt(191), (nt(55)));
 		// wff_cb_arg => wff.
 		q(nt(191), (nt(78)));
 		// bf_and_cb_sym => 'b' 'f' '_' 'a' 'n' 'd' '_' 'c' 'b'.
@@ -744,7 +742,7 @@ private:
 		// tau_positives_upwards_cb => tau_positives_upwards_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
 		q(nt(77), (nt(208)+nt(13)+nt(205)+nt(13)+nt(205)));
 		// tau_cb_arg => capture.
-		q(nt(205), (nt(56)));
+		q(nt(205), (nt(55)));
 		// tau_cb_arg => tau.
 		q(nt(205), (nt(75)));
 		// tau_collapse_positives_cb_sym => 't' 'a' 'u' '_' 'c' 'o' 'l' 'l' 'a' 'p' 's' 'e' '_' 'p' 'o' 's' 'i' 't' 'i' 'v' 'e' 's' '_' 'c' 'b'.
@@ -777,8 +775,8 @@ private:
 		q(nt(217), (nt(216)+nt(217)));
 		// rules => _Rrules_27.
 		q(nt(215), (nt(217)));
-		// rec_relation => wff_rec_relation dot.
-		q(nt(218), (nt(90)+nt(37)));
+		// rec_relation => wff_rec_relation.
+		q(nt(218), (nt(90)));
 		// rec_relation => bf_rec_relation.
 		q(nt(218), (nt(144)));
 		// _Rrec_relations_28 => ws rec_relation.
@@ -796,13 +794,13 @@ private:
 		// builder => ws builder_head ws definition ws builder_body ws dot.
 		q(nt(224), (nt(14)+nt(225)+nt(14)+nt(35)+nt(14)+nt(226)+nt(14)+nt(37)));
 		// _Rbuilder_head_30 => ws_required capture.
-		q(nt(227), (nt(13)+nt(56)));
+		q(nt(227), (nt(13)+nt(55)));
 		// _Rbuilder_head_31 => null.
 		q(nt(228), (nul));
 		// _Rbuilder_head_31 => _Rbuilder_head_30 _Rbuilder_head_31.
 		q(nt(228), (nt(227)+nt(228)));
 		// builder_head => open_parenthesis ws capture _Rbuilder_head_31 ws close_parenthesis.
-		q(nt(225), (nt(38)+nt(14)+nt(56)+nt(228)+nt(14)+nt(39)));
+		q(nt(225), (nt(38)+nt(14)+nt(55)+nt(228)+nt(14)+nt(39)));
 		// builder_body => tau.
 		q(nt(226), (nt(75)));
 		// builder_body => wff.
