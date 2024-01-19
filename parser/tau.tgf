@@ -108,7 +108,7 @@ tau_neg_sym            => '%'.
 wff_rule               => wff_matcher ws definition ws wff_body ws dot.
 wff_rec_relation       => wff_ref ws definition ws wff ws dot.
 
-wff_matcher            => wff | wff_ref.
+wff_matcher            => wff.
 wff_body               => wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 			| wff_has_subformula_cb | wff_remove_existential_cb
 			| wff_remove_bexistential_cb | wff_remove_buniversal_cb.
@@ -288,7 +288,7 @@ inputs                 => ws less ws input (ws input)* ws dot.
 main                   => wff ws dot.
 rule                   => wff_rule | bf_rule | tau_rule.
 rules                  => (ws rule)*.
-rec_relation           => bf_rec_relation | wff_rec_relation dot.
+rec_relation           => bf_rec_relation | wff_rec_relation.
 rec_relations          => (ws rec_relation)*.
 nso_rr                 => rec_relations ws main.
 library                => rules.
