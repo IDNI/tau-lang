@@ -42,8 +42,8 @@ namespace testing = doctest;
 TEST_SUITE("parsing nso_rr") {
 
 	const char* sample =
-		"f [0] (X) := X."
-		"g [0] (Y) := Y."
+		"f [0] (X) ::= X."
+		"g [0] (Y) ::= Y."
 		" ( Z = 0 ) .";
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
