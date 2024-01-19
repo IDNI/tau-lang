@@ -37,8 +37,8 @@ chars                  => alpha (alnum)*.
 digits                 => digit+.
 
 # common symbols
-definition             => ":=". # for rewriting rules and wff rec. relations definition
-double_definition      => "::=". # for bf rec. relations definition
+definition             => ":=". # for rewriting rules and bf rec. relations definition
+double_definition      => "::=". # for wff rec. relations definition
 dot                    => '.'.
 open_parenthesis       => '('.
 close_parenthesis      => ')'.
@@ -105,8 +105,8 @@ tau_neg_sym            => '%'.
 
 
 # wff
-wff_rule               => wff_matcher ws definition ws wff_body ws dot.
-wff_rec_relation       => wff_ref ws definition ws wff ws dot.
+wff_rule               => wff_matcher ws double_definition ws wff_body ws dot.
+wff_rec_relation       => wff_ref ws double_definition ws wff ws dot.
 
 wff_matcher            => wff.
 wff_body               => wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
@@ -160,7 +160,7 @@ wff_f                  => 'F'.
 
 # bf
 bf_rule                => bf_matcher ws definition ws bf_body ws dot.
-bf_rec_relation        => bf_ref ws double_definition ws bf ws dot.
+bf_rec_relation        => bf_ref ws definition ws bf ws dot.
 
 bf_matcher             => bf.
 bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
