@@ -37,7 +37,8 @@ chars                  => alpha (alnum)*.
 digits                 => digit+.
 
 # common symbols
-definition             => ":=".
+definition             => ":=". # for rewriting rules and wff rec. relations definition
+double_definition      => "::=". # for bf rec. relations definition
 dot                    => '.'.
 open_parenthesis       => '('.
 close_parenthesis      => ')'.
@@ -56,7 +57,7 @@ sym                    => chars.
 
 # offsets
 # TODO (HIGH) check programatically that no shift is use in a rec_relation defs
-offsets                => open_bracket ws step (ws comma ws offset)* ws close_bracket.
+offsets                => open_bracket ws offset (ws comma ws offset)* ws close_bracket.
 offset                 => num | capture | shift.
 step                   => num | capture | shift.
 shift                  => capture minus num.
@@ -159,7 +160,7 @@ wff_f                  => 'F'.
 
 # bf
 bf_rule                => bf_matcher ws definition ws bf_body ws dot.
-bf_rec_relation        => bf_ref ws definition ws bf ws dot.
+bf_rec_relation        => bf_ref ws double_definition ws bf ws dot.
 
 bf_matcher             => bf.
 bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
