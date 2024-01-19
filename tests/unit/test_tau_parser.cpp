@@ -140,7 +140,7 @@ TEST_SUITE("parsing outputs") {
 	// TODO (LOW) write tests for outputs parsing
 }
 
-TEST_SUITE("parsing indexes"){
+TEST_SUITE("parsing offsets"){
 	// TODO (LOW) write tests for indexes parsing
 }
 
@@ -638,20 +638,20 @@ TEST_SUITE("parsing callbacks ") {
 		CHECK( neg_cb.has_value() );
 	}
 
-	// TODO (MEDIUM) write tests for execution bf_is_zero_cb
-	// TODO (MEDIUM) write tests for execution bf_is_one_cb
-	// TODO (MEDIUM) write tests for execution bf_has_clashing_subformulas_cb
-	// TODO (MEDIUM) write tests for execution bf_has_subformula_cb
-	// TODO (MEDIUM) write tests for execution bf_remove_fexistential_cb
-	// TODO (MEDIUM) write tests for execution bf_remove_funiversal_cb
+	// TODO (MEDIUM) write tests for parsing bf_is_zero_cb
+	// TODO (MEDIUM) write tests for parsing bf_is_one_cb
+	// TODO (MEDIUM) write tests for parsing bf_has_clashing_subformulas_cb
+	// TODO (MEDIUM) write tests for parsing bf_has_subformula_cb
+	// TODO (MEDIUM) write tests for parsing bf_remove_fexistential_cb
+	// TODO (MEDIUM) write tests for parsing bf_remove_funiversal_cb
 
-	// TODO (MEDIUM) write tests for execution bf_eq_cb
-	// TODO (MEDIUM) write tests for execution bf_neq_cb
-	// TODO (MEDIUM) write tests for execution wff_remove_existential_cb
-	// TODO (MEDIUM) write tests for execution wff_remove_bexistential_cb
-	// TODO (MEDIUM) write tests for execution wff_remove_buniversal_cb.
-	// TODO (MEDIUM) write tests for execution wff_has_clashing_subformulas_cb
-	// TODO (MEDIUM) write tests for execution wff_has_subformula_cb
+	// TODO (MEDIUM) write tests for parsing bf_eq_cb
+	// TODO (MEDIUM) write tests for parsing bf_neq_cb
+	// TODO (MEDIUM) write tests for parsing wff_remove_existential_cb
+	// TODO (MEDIUM) write tests for parsing wff_remove_bexistential_cb
+	// TODO (MEDIUM) write tests for parsing wff_remove_buniversal_cb.
+	// TODO (MEDIUM) write tests for parsing wff_has_clashing_subformulas_cb
+	// TODO (MEDIUM) write tests for parsing wff_has_subformula_cb
 	//
 	// Callbacks are a crucial part of the execution of the normalizer and should
 	// be tested properly. However, they are extensively tested inderectly in
