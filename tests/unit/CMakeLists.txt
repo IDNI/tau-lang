@@ -20,6 +20,7 @@ set(TESTS
 	iterators
 	traversal
 	rec_relations-execution
+	tau
 )
 
 foreach(X IN LISTS TESTS)

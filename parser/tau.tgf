@@ -55,6 +55,7 @@ comma                  => ','.
 sym                    => chars.
 
 # offsets
+# TODO (HIGH) check programatically that no shift is use in a rec_relation defs
 offsets                => open_bracket ws step (ws comma ws offset)* ws close_bracket.
 offset                 => num | capture | shift.
 step                   => num | capture | shift.
