@@ -41,13 +41,6 @@ namespace testing = doctest;
 
 TEST_SUITE("parsing basic nso_rr") {
 
-	const char* sample =
-		"f [0] (X) ::= X."
-		"g [0] (Y) := T."
-		" ( Z = 0 ) .";
-	auto src = make_tau_source(sample);
-	auto frml = make_statement(src);
-
 	TEST_CASE("nso_rr main") {
 		const char* sample =
 			" ( Z = 0 ) .";
@@ -108,23 +101,21 @@ TEST_SUITE("parsing builders") {
 
 TEST_SUITE("parsing library") {
 
+	TEST_CASE("one rule") {
+	const char* sample =
+		"X := X.";
+	auto src = make_tau_source(sample);
+	auto lib = make_statement(src);
+		auto rules = lib | tau_parser::library | tau_parser::rules || tau_parser::rule;
+		CHECK( rules.size() == 1 );
+	}
+
+	TEST_CASE("two rule") {
 	const char* sample =
 		"X := X."
 		"Y := Y.";
 	auto src = make_tau_source(sample);
 	auto lib = make_statement(src);
-
-	TEST_CASE("library") {
-		auto library = lib | tau_parser::library ;
-		CHECK( library.has_value() );
-	}
-
-	TEST_CASE("rules") {
-		auto rules = lib | tau_parser::library | tau_parser::rules ;
-		CHECK( rules.has_value());
-	}
-
-	TEST_CASE("rule") {
 		auto rules = lib | tau_parser::library | tau_parser::rules || tau_parser::rule;
 		CHECK( rules.size() == 2 );
 	}
