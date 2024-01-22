@@ -19,7 +19,6 @@ set(TESTS
 	bindings
 	iterators
 	traversal
-	rec_relations-execution
 	tau
 )
 

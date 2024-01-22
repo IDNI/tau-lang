@@ -26,7 +26,6 @@ using namespace idni::tau;
 
 using bdd_test = hbdd<Bool>;
 
-template<typename...BAs>
 struct bdd_test_factory {
 
 	sp_tau_node<tau_ba<bdd_test>, bdd_test> build(const std::string type_name, const sp_tau_node<tau_ba<bdd_test>, bdd_test>& n) {
@@ -49,15 +48,12 @@ struct bdd_test_factory {
 	std::map<std::string, sp_tau_node<tau_ba<bdd_test>, bdd_test>> cache;
 };
 
-template<typename...BAs>
-using bdd_test_factory_t = bdd_test_factory<BAs...>;
-
 nso_rr<tau_ba<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
-	bdd_test_factory<bdd_test> bf;
-	tau_factory<bdd_test_factory_t<bdd_test>, bdd_test> fb(bf);
-	factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>, tau_ba<bdd_test>, bdd_test> fbinder(fb);
+	bdd_test_factory bf;
+	tau_factory<bdd_test_factory, bdd_test> fb(bf);
+	factory_binder<tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test> fbinder(fb);
 	nso_rr<tau_ba<bdd_test>, bdd_test> nso_rr = make_nso_rr_using_factory<
-			factory_binder<tau_factory<bdd_test_factory_t<bdd_test>, bdd_test>,tau_ba<bdd_test>, bdd_test>,
+			factory_binder<tau_factory<bdd_test_factory, bdd_test>,tau_ba<bdd_test>, bdd_test>,
 			tau_ba<bdd_test>, bdd_test>(src, fbinder);
 
 	return normalizer<tau_ba<bdd_test>, bdd_test>(nso_rr);

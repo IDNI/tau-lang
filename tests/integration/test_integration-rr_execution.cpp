@@ -18,7 +18,6 @@
 #include "../../src/bool.h"
 #include "../../src/bdd_handle.h"
 #include "../../src/normalizer2.h"
-#include "test_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
