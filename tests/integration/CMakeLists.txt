@@ -4,6 +4,8 @@ set(TESTS
 	test_integration-bdd1
 	test_integration-bdd2
 	test_integration-tau_ba1
+	test_integration-rr_execution
+	test_integration-tau1
 )
 
 foreach(N IN LISTS TESTS)
