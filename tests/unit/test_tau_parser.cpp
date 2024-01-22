@@ -157,7 +157,7 @@ TEST_SUITE("parsing outputs") {
 }
 
 TEST_SUITE("parsing offsets"){
-	// TODO (LOW) write tests for indexes parsing
+	// done inderectly
 }
 
 TEST_SUITE("parsing wwf formulas ") {
@@ -361,11 +361,6 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::wff
 			| tau_parser::wff_bex;
 		CHECK( ex_formula.has_value() );
-	}
-
-	// TODO (LOW) write test wwf refs
-	TEST_CASE("wff_ref") {
-		//CHECK( false );
 	}
 }
 
