@@ -843,12 +843,12 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, i
 		matcher {p, u, i, c, sk};
 	auto nn = apply(s, n, matcher);
 
-	#ifdef OUTPUT_APPLY_RULES
+	#ifdef DEBUG
 	if (nn != n) {
 		std::cout << "(R): " << p << " = " << s << std::endl;
 		std::cout << "(F): " << nn << std::endl;
 	}
-	#endif // OUTPUT_APPLY_RULES
+	#endif // DEBUG
 
 	return nn;
 }
@@ -864,12 +864,12 @@ node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n, is_ignore_t& i
 		matcher {p, u, i, c, sk, predicate};
 	auto nn = apply(s, n, matcher);
 
-	#ifdef OUTPUT_APPLY_RULES
+	#ifdef DEBUG
 	if (nn != n) {
 		std::cout << "(R): " << p << " = " << s << std::endl;
 		std::cout << "(F): " << nn << std::endl;
 	}
-	#endif // OUTPUT_APPLY_RULES
+	#endif // DEBUG
 
 	return nn;
 }

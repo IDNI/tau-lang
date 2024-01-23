@@ -1569,9 +1569,9 @@ sp_tau_node<BAs...> nso_rr_apply_if(const tau_rule<BAs...>& r, const sp_tau_node
 		}
 		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
 
-		#ifdef OUTPUT_APPLY_RULES
+		#ifdef DEBUG
 		std::cout << "(C): " << cnn << std::endl;
-		#endif // OUTPUT_APPLY_RULES
+		#endif // DEBUG
 
 		return cnn;
 	}
@@ -1608,9 +1608,9 @@ sp_tau_node<BAs...> nso_rr_apply(const tau_rule<BAs...>& r, const sp_tau_node<BA
 		}
 		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
 
-		#ifdef OUTPUT_APPLY_RULES
+		#ifdef DEBUG
 		std::cout << "(C): " << cnn << std::endl;
-		#endif // OUTPUT_APPLY_RULES
+		#endif // DEBUG
 
 		return cnn;
 	}

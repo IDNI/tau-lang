@@ -502,10 +502,10 @@ nso_rr<BAs...> prepare_main_for_step(nso_rr<BAs...>& form, int step) {
 template <typename... BAs>
 nso_rr<BAs...> normalizer_step(nso_rr<BAs...>& form, int stp = 0) {
 
-	#ifdef OUTPUT_APPLY_RULES
+	#ifdef DEBUG
 	std::cout << "(I): -- Begin normalizer step" << std::endl;
 	std::cout << "(F): " << form.main << std::endl;
-	#endif // OUTPUT_APPLY_RULES
+	#endif // DEBUG
 
 	nso_rr<BAs...> nform = prepare_main_for_step<BAs...>(form, stp);
 
@@ -536,9 +536,9 @@ nso_rr<BAs...> normalizer_step(nso_rr<BAs...>& form, int stp = 0) {
 				| simplify_wff<BAs...>
 				| clause_simplify_wff<BAs...>);
 
-	#ifdef OUTPUT_APPLY_RULES
+	#ifdef DEBUG
 	std::cout << "(I): -- End normalizer step" << std::endl;
-	#endif // OUTPUT_APPLY_RULES
+	#endif // DEBUG
 
 	return { form.rec_relations, nmain };
 }
@@ -627,11 +627,11 @@ nso_rr<BAs...> normalizer(const nso_rr<BAs...>& form) {
 	// IDEA extract this to an operator| overload
 	// apply defs to nso_rr
 
-	#ifdef OUTPUT_APPLY_RULES
+	#ifdef DEBUG
 	std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;
 	std::cout << "(I): -- Apply once definitions" << std::endl;
 	std::cout << "(F): " << form.main << std::endl;
-	#endif // OUTPUT_APPLY_RULES
+	#endif // DEBUG
 
 	auto nform = apply_definitions(form);
 
@@ -643,10 +643,10 @@ nso_rr<BAs...> normalizer(const nso_rr<BAs...>& form) {
 		current = normalizer_step(current, i);
 	}
 
-	#ifdef OUTPUT_APPLY_RULES
+	#ifdef DEBUG
 	std::cout << "(I): -- End normalizer" << std::endl;
 	std::cout << "(O): " << current.main << std::endl;
-	#endif // OUTPUT_APPLY_RULES
+	#endif // DEBUG
 
 	return current;
 }

@@ -15,9 +15,6 @@
 
 #include <cassert>
 
-#undef  OUTPUT_APPLY_RULES
-#define OUTPUT_APPLY_RULES 1
-
 #include "../../src/doctest.h"
 #include "../../src/nso_rr.h"
 #include "../../src/bdd_handle.h"
