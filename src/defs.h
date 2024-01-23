@@ -16,8 +16,6 @@
 
 typedef int sym_t;
 
-#undef  OUTPUT_APPLY_RULES
-#define OUTPUT_APPLY_RULES
 #define OUTPUT_PARSED_TREES
 
 // basic macro for conditional execution of code

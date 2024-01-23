@@ -331,6 +331,13 @@ template<typename... BAs>
 std::vector<tau_spec<BAs...>> get_clauses(const tau_spec<BAs...>& n) {
 	std::vector<tau_spec<BAs...>> clauses;
 	get_clauses(n, clauses);
+
+	#ifdef DEBUG
+	std::cout << "clauses: " ;
+	for (auto& c: clauses) std::cout << c << ", ";
+	std::cout << std::endl;
+	#endif // DEBUG
+
 	return clauses;
 }
 
@@ -551,6 +558,12 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>>  get_eta_nso_
 			nsorr << "etas[t-1](" << print_vars(outputs) << print_new_negative_vars(outputs.name.size()) << ").\n";
 		}
 	// add main
+
+	#ifdef DEBUG
+	std::cout << "get_eta_nso_rr: " << nsorr.str() << std::endl;
+	#endif // DEBUG
+
+
 	return {nsorr.str(), bindings};
 }
 
@@ -574,6 +587,11 @@ std::string get_check_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopba
 	std::basic_stringstream<char> check;
 	check << existentially_quantify_vars(outputs, loopback) <<
 		" (eta[" << current << "](" << print_vars(outputs) << ").\n";
+
+	#ifdef DEBUG
+	std::cout << "get_check_nso_rr: " << check.str() << std::endl;
+	#endif // DEBUG
+
 	return check.str();
 }
 
@@ -597,16 +615,38 @@ std::string get_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopbac
 	std::basic_stringstream<char> main;
 	main << universally_quantify_vars(outputs, loopback) <<
 		" (eta[" << current << "](" << print_vars(outputs) << ") <-> eta[" << previous << "]).\n";
+
+	#ifdef DEBUG
+	std::cout << "get_main_nso_rr: " << main.str() << std::endl;
+	#endif // DEBUG
+
 	return main.str();
 }
 
 
 template<typename... BAs>
 bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
+
+	#ifdef DEBUG
+	std::cout << "is_satisfiable_clause: " << clause << std::endl;
+	#endif // DEBUG
+
 	auto collapsed = clause |
 		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-			collapse_positives_tau<tau_ba<BAs...>, BAs...>);
+			simplify_tau<tau_ba<BAs...>, BAs...>
+			| collapse_positives_tau<tau_ba<BAs...>, BAs...>);
+
 	auto [positive, negatives] = get_positive_and_negative_literals(collapsed);
+
+	if (!positive.has_value() && negatives.size() == 0) {
+		std::basic_stringstream<char> str;
+		bindings<tau_ba<BAs...>, BAs...> reversed_bindings;
+		str << clause << ".";
+		auto main = str.str();
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(main, reversed_bindings).main;
+		return ((normalized | tau_parser::wff_t).has_value()) ? true : false;
+	}
+
 	auto [inputs, outputs] = get_io_vars(collapsed);
 	size_t loopback = max(inputs.loopback, outputs.loopback);
 	auto etas = get_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
@@ -615,27 +655,46 @@ bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
 		bindings<tau_ba<BAs...>, BAs...> reversed_bindings; // TODO (LOW) reverse
 		auto check = get_check_nso_rr(outputs, loopback, current);
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), reversed_bindings).main;
-		if ((normalize | tau_parser::wff_f).has_value()) return false;
+		if ((normalize | tau_parser::wff_f).has_value()) {
+			#ifdef DEBUG
+			std::cout << "is_satisfiable_clause: " << clause << std::endl;
+			#endif // DEBUG
+
+			return false;
+		}
 		for (size_t previous = 1; previous < current; ++previous) {
 			auto main = get_main_nso_rr(outputs, loopback, current, previous);
 			auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(main), reversed_bindings).main;
 			if ((normalize | tau_parser::wff_t).has_value()) return true;
 		}
-
 	}
 }
 
 // check satisfability of a tau_spec (boolean combination case)
 template<typename...BAs>
 bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
+	#ifdef DEBUG
+	std::cout << "(I) is_satisfiable: " << tau_spec << std::endl;
+	#endif // DEBUG
+
 	auto dnf = tau_spec |
 		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
 			to_dnf_tau<tau_ba<BAs...>, BAs...>
 			| simplify_tau<tau_ba<BAs...>, BAs...>
 		);
 	for(auto& clause: get_clauses(dnf)) {
-		if (is_satisfiable_clause(clause)) return true;
+		if (is_satisfiable_clause(clause)) {
+			#ifdef DEBUG
+			std::cout << "(I) is_satisfiable: true" << std::endl;
+			#endif // DEBUG
+
+			return true;
+		}
 	}
+	#ifdef DEBUG
+	std::cout << "(I) is_satisfiable: false" << std::endl;
+	#endif // DEBUG
+
 	return false;
 }
 

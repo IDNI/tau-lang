@@ -15,9 +15,6 @@
 
 #include <cassert>
 
-#undef  OUTPUT_APPLY_RULES
-#define OUTPUT_APPLY_RULES 1
-
 #include "../../src/doctest.h"
 #include "../../src/nso_rr.h"
 #include "../../src/bdd_handle.h"
@@ -41,52 +38,106 @@ TEST_SUITE("simple tau formulas: only T and F specs") {
 		tau_factory<bdd_test_factory, tau_ba<bdd_test>,  bdd_test> tf(bf);
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		// CHECK( is_satisfiable<bdd_test>(sample_formula) );
-		CHECK (true);
-	}
 
-	/*TEST_CASE("F") {
-		const char* sample = "{F}.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory_t, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
 		CHECK( is_satisfiable<bdd_test>(sample_formula) );
 	}
 
-	TEST_CASE("T && F") {
-		const char* sample = "({T} &&& {F}).";
+	TEST_CASE("F") {
+		const char* sample = "F;";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory_t, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("T &&& T") {
+		const char* sample = "(T &&& T);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("F &&& F") {
+		const char* sample = "(F &&& F);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("T &&& F") {
+		const char* sample = "(T &&& F);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("F &&& T") {
+		const char* sample = "(F &&& T);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("T ||| T") {
+		const char* sample = "(T ||| T);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
 		CHECK( is_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("F ||| F") {
-		const char* sample = "({F} ||| {F}).";
+		const char* sample = "(F ||| F);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory_t, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("T ||| F") {
+		const char* sample = "(T ||| F);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("F ||| T") {
+		const char* sample = "(F ||| T);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test>, bdd_test>(sample_src, fb);
 		CHECK( is_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("! F") {
-		const char* sample = "!!! {F}.";
+		const char* sample = "!!! F;";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory_t, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
 		CHECK( is_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("! T") {
-		const char* sample = "!!! {F}.";
+		const char* sample = "!!! T;";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory_t, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
-	}*/
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
 }

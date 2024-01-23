@@ -12,7 +12,6 @@
 // modified over time by the Author.
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#define OUTPUT_APPLY_RULES
 
 #include "../../src/doctest.h"
 #include "../../src/defs.h"
