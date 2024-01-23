@@ -333,7 +333,7 @@ std::vector<tau_spec<BAs...>> get_clauses(const tau_spec<BAs...>& n) {
 	get_clauses(n, clauses);
 
 	#ifdef DEBUG
-	std::cout << "clauses: " ;
+	std::cout << "(I) clauses: " ;
 	for (auto& c: clauses) std::cout << c << ", ";
 	std::cout << std::endl;
 	#endif // DEBUG
@@ -560,7 +560,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>>  get_eta_nso_
 	// add main
 
 	#ifdef DEBUG
-	std::cout << "get_eta_nso_rr: " << nsorr.str() << std::endl;
+	std::cout << "(I) get_eta_nso_rr: " << nsorr.str() << std::endl;
 	#endif // DEBUG
 
 
@@ -589,7 +589,7 @@ std::string get_check_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopba
 		" (eta[" << current << "](" << print_vars(outputs) << ").\n";
 
 	#ifdef DEBUG
-	std::cout << "get_check_nso_rr: " << check.str() << std::endl;
+	std::cout << "(I) get_check_nso_rr: " << check.str() << std::endl;
 	#endif // DEBUG
 
 	return check.str();
@@ -617,7 +617,7 @@ std::string get_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopbac
 		" (eta[" << current << "](" << print_vars(outputs) << ") <-> eta[" << previous << "]).\n";
 
 	#ifdef DEBUG
-	std::cout << "get_main_nso_rr: " << main.str() << std::endl;
+	std::cout << "(I) get_main_nso_rr: " << main.str() << std::endl;
 	#endif // DEBUG
 
 	return main.str();
@@ -628,7 +628,7 @@ template<typename... BAs>
 bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
 
 	#ifdef DEBUG
-	std::cout << "is_satisfiable_clause: " << clause << std::endl;
+	std::cout << "(I) is_satisfiable_clause: " << clause << std::endl;
 	#endif // DEBUG
 
 	auto collapsed = clause |
@@ -657,7 +657,7 @@ bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), reversed_bindings).main;
 		if ((normalize | tau_parser::wff_f).has_value()) {
 			#ifdef DEBUG
-			std::cout << "is_satisfiable_clause: " << clause << std::endl;
+			std::cout << "(I) is_satisfiable_clause: " << clause << std::endl;
 			#endif // DEBUG
 
 			return false;
