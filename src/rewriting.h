@@ -894,8 +894,11 @@ template <typename parse_symbol_t, typename symbol_t>
 using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
 // make a tree from the given source code string.
-template<typename parser_t, typename transformer_t, typename parse_symbol_t, typename symbol_t>
-sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, const std::string source) {
+template<typename parser_t, typename transformer_t, typename parse_symbol_t,
+	typename symbol_t>
+sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/,
+	const std::string source)
+{
 	using parse_forest = idni::forest<parse_symbol_t>;
 	//using parse_tree = typename parse_forest::tree;
 	using sp_parse_tree = typename parse_forest::sptree;
@@ -908,6 +911,29 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 	// avoiding doctest issues, uncomment for errors
 	// if (!f || !parser.found())
 	// 	std::cerr << parser.get_error().to_str() << std::endl;
+#ifdef DEBUG
+	if (!f || !parser.found())
+		std::cerr << "# source: `" << source << "`\n"
+	 		<< parser.get_error().to_str() << "\n";
+	else if (f->is_ambiguous()) {
+		std::cerr << "# source: `" << source << "`\n"
+			<< "# n trees: " << f->count_trees() << "\n"
+			<< "# ambiguous nodes:\n";
+		for (auto& n : f->ambiguous_nodes()) {
+			std::cerr << "\t `" << n.first.first << "` ["
+				<< n.first.second[0] << "," << n.first.second[1]
+				<< "]\n";
+			size_t d = 0;
+			for (auto ns : n.second) {
+				std::cerr << "\t\t " << d++ << "\t";
+				for (auto nt : ns) std::cerr << " `" << nt.first
+					<< "`[" << nt.second[0] << ","
+					<< nt.second[1] << "] ";
+				std::cerr << "\n";
+			}
+		}
+	}
+#endif // DEBUG
 	auto get_tree = [&f, &t] (auto& g) {
 			f->remove_recursive_nodes(g);
 			f->remove_binarization(g);
@@ -921,13 +947,14 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/, co
 	f->extract_graphs(f->root(), get_tree);
 
 	map_transformer<drop_location_t<parse_symbol_t, symbol_t>,
-		sp_parse_tree, sp_node<symbol_t>> transform(drop_location<parse_symbol_t, symbol_t>);
+		sp_parse_tree, sp_node<symbol_t>> transform(
+			drop_location<parse_symbol_t, symbol_t>);
 	return post_order_traverser<
 			map_transformer<drop_location_t<parse_symbol_t, symbol_t>, sp_parse_tree, sp_node<symbol_t>>,
 			all_t<sp_parse_tree>,
 			sp_parse_tree, sp_node<symbol_t>>
 		(transform, all<sp_parse_tree>)(t);
-	}
+}
 } // namespace idni::rewriter
 
 //
