@@ -68,7 +68,7 @@ elem -> var | const | bf_ref
 const -> 0 | 1 | { B }
 ```
 
-where `elem` stands for an element of one of the boolean algebras, `bf` for a sub-boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `~`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
+where `elem` stands for an element of one of the boolean algebras, `bf` for a boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `~`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
 
 ## Functional quantifiers
 
@@ -106,9 +106,9 @@ where `wff` stands for a sub-well formed formula, `wff_ref` stands for a referen
 
 Also, `all` stands for the universal quantifier and `ex` for the existential one, whereas `ball` stands for boolean universal quantifier and `bex` stands for boolean existential quantifier. The difference between the boolean and the regular quantifiers is that the boolean ones depend on a boolean variable, i.e. a variable whose values are exactly `T` of `F`. The use of such quantifiers is to simplify the writing of complex formulas.
 
-Finally, the operators `=`, `!=`, `<`, `<=` and `>` stands for equality, disequality, less than, less or equal than and greater than respectively.
+Finally, the operators `=`, `!=`, `<`, `<=` and `>` stands for equality, inequality, less than, less or equal than and greater than respectively.
 
-Finally, `=` stands for equality, `!=` for disequality, `<` for less than, `<=` for less or equal than, `>` for greater than (all of them in one of the underlying boolean algebras) and `T` for true and `F` for false.
+Finally, `=` stands for equality, `!=` for inequality, `<` for less than, `<=` for less or equal than, `>` for greater than (all of them in one of the underlying boolean algebras) and `T` for true and `F` for false.
 
 As in the caes of `bf`, we have two types of qantifiers and the varibles could be of the above types. As announced, we would clarify both of them in a forthcoming Section.
 
