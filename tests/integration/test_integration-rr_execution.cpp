@@ -19,6 +19,9 @@
 #include "../../src/bdd_handle.h"
 #include "../../src/normalizer2.h"
 
+#include "test_integration_helpers-bdd.h"
+#include "../unit/test_helpers.h"
+
 using namespace idni::rewriter;
 using namespace idni::tau;
 
@@ -28,4 +31,26 @@ TEST_SUITE("rec relations execution") {
 	// TODO (HIGH) writes tests for recursive relations execution
 	// The tests should range from simple direct substitutions to more complex
 	// substitutions (involving multiple variables and indexes).
+
+	TEST_CASE("T") {
+		const char* sample = "T.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+
+	TEST_CASE("nso_rr wff_rec_relation") {
+		const char* sample =
+			"g [0] (Y) ::= T."
+			" T .";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::rec_relations | tau_parser::rec_relation | tau_parser::wff_rec_relation;
+		CHECK( wff_rec_relation.has_value() );
+	}
 }
