@@ -178,7 +178,6 @@ bf_ex                  => bf_ex_sym ws_required (variable | capture) ws_required
 bf_and_sym             => '&'.
 bf_or_sym              => '|'.
 bf_xor_sym             => '+'.
-# TODO (HIGH) rename to ' notation
 bf_neg_sym             => '~'.
 bf_equality_sym        => "=".
 bf_nequality_sym       => "!=".

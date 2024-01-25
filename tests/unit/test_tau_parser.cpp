@@ -17,6 +17,7 @@
 #include "../../src/defs.h"
 #include "../../src/nso_rr.h"
 #include "../../src/bool.h"
+
 #include "test_helpers.h"
 
 using namespace idni::rewriter;
