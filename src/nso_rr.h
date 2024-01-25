@@ -98,6 +98,28 @@ using bindings = std::map<std::string, std::variant<BAs...>>;
 template<typename...BAs>
 using wff = sp_tau_node<BAs...>;
 
+template<class... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+#ifdef DEBUG
+template <typename...BAs>
+std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<BAs...> n, size_t l = 0) {
+	os << "{";
+	// for (size_t t = 0; t < l; t++) os << " ";
+	std::visit(overloaded {
+			[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
+			[&os](std::variant<BAs...>) {
+				os << "...BAs..."; },
+			[&os](size_t v) { os << v; }},
+		n->value);
+	for (auto& d : n->child) print_sp_tau_node(os, d, l + 1);
+	os << "}";
+	return os;
+}
+#endif // DEBUG
+
 // a nso_rr is a set of rules and a main, the boolean algebra constants
 // (unless '0' or '1') are uninstantiated.
 
@@ -1240,10 +1262,6 @@ sp_tau_node<BAs...> build_tau_neg(const sp_tau_node<BAs...>& l) {
 	return tau_apply_builder<BAs...>(bldr_tau_neg<BAs...>, args);
 }
 
-template<class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 // IDEA convert to a const static applier and change all the code accordingly
 //
