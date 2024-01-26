@@ -1,74 +1,24 @@
-@use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
+@use_char_class space, alpha, alnum.
 
-# whitespace and comments
-eol				=> '\n' | '\r' | eof.
-ws_comment		=> '#' eol | '#' printable+ eol.
-ws_required		=> space ws | ws_comment ws.
-ws				=> ws_required | null.
+start                   => ws bdd ws.
 
-# characters
-hex_escape			=> "\\x" xdigit xdigit.
-unicode_escape		=> "\\u" xdigit xdigit xdigit xdigit.
-char_escape_encode	=> hex_escape | unicode_escape.
+ws_required             => space ws.
+ws                      => ws_required | null.
 
-# defining char/string/qstring as all chars but its wrapping character
-# enables using TAB and new lines in char(')/string(")/bqstring(`)
-# sequences
+bdd                     => disjunction  | bdd2.
+bdd2                    => conjunction  | bdd3.
+bdd3                    => exclusive_or | bdd4.
+bdd4                    => negation     | bdd5.
+bdd5                    => literal      | '(' ws bdd ws ')'.
 
-# common stuff copy cut from tml grammar
-esc				=> "\\\\".
-q_char			=> '\''.
-q_str			=> '"'.
-q_bqstr			=> '`'.
-char_punct		=> punct & ~q_char & ~q_str & ~q_bqstr
-					& ~(esc q_char) & ~(esc q_str) & ~(esc q_bqstr).
+disjunction             => bdd  ws '|' ws         bdd2.
+conjunction             => bdd2 ws '&' ws         bdd3.
+conjunction             => bdd2 ws_required       bdd3.
+exclusive_or            => bdd3 ws ('^' | '+') ws bdd4.
+negation                => bdd5 ws "'".
 
-char0			=> alnum | space | char_escape_encode | char_punct.
-char_			=> char0 | esc q_char |     q_str |     q_bqstr.
-string_char		=> char0 |     q_char | esc q_str |     q_bqstr.
-bqstring_char	=> char0 |     q_char |     q_str | esc q_bqstr.
-chars			=> alpha (alnum)*.
+literal                 => var | T | F.
 
-char_class    	=> "eof" | "alnum" | "alpha" | "blank" | "cntrl" | "digit"
-				| "graph" | "lower" | "printable" | "punct" | "space"
-				| "upper" | "xdigit".
-
-# common symbols
-equality			=> ws '=' ws. 
-nequality			=> ws "!=" ws. 
-dot 				=> ws '.' ws.
-open_parenthesis	=> ws '(' ws.
-close_parenthesis	=> ws ')' ws.
-open_bracket		=> ws '[' ws.
-close_bracket		=> ws ']' ws.
-open_brace			=> ws '{' ws.
-close_brace			=> ws '}' ws.
-less_than			=> ws '<' ws.
-greater_than		=> ws '>' ws.
-minus				=> ws '-' ws.
-plus				=> ws '+' ws.
-colon				=> ws ':' ws.
-
-# variables
-var				=> '?' chars.
-
-# bdd
-bdd				=> bdd_and | bdd_neg | bdd_xor | bdd_or | var | T | F.
-bdd_and			=> open_parenthesis bdd_arg bdd_and_sym bdd_arg close_parenthesis.
-bdd_or			=> open_parenthesis bdd_arg bdd_or_sym bdd_arg close_parenthesis.
-bdd_xor			=> open_parenthesis bdd_arg bdd_xor_sym bdd_arg close_parenthesis.
-bdd_neg			=> bdd_neg_sym open_parenthesis bdd_arg close_parenthesis.
-bdd_arg 		=> bdd.
-
-# bdd_op_sym
-bdd_and_sym		=> ws "bdd_and" ws.
-bdd_or_sym		=> ws "bdd_or" ws.
-bdd_xor_sym		=> ws "bdd_xor" ws.
-bdd_neg_sym		=> ws "bdd_neg" ws.
-
-# constants
-T				=> ws '1' ws.
-F				=> ws '0' ws.
-
-start			=> bdd.
-
+var                     => alpha (alnum)*.
+T                       => '1'.
+F                       => '0'.
