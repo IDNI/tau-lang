@@ -146,6 +146,12 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
 		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
 	}
+
+	TEST_CASE("BLDR_BF_CONSTANT") {
+		auto bldr = make_builder<Bool>(BLDR_BF_CONSTANT);
+		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
 }
 
 TEST_SUITE("builders execution") {
@@ -291,6 +297,13 @@ TEST_SUITE("builders execution") {
 		auto bldr = make_builder<Bool>(BLDR_BF_EX);
 		std::vector<sp_tau_node<Bool>> args = {X, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_ex;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BLDR_BF_CONSTANT") {
+		auto bldr = make_builder<Bool>(BLDR_BF_CONSTANT);
+		std::vector<sp_tau_node<Bool>> args = { F };
+		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
 }

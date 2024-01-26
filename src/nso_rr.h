@@ -1046,6 +1046,7 @@ const std::string BLDR_BF_XOR = "( $X $Y ) := ($X + $Y).";
 const std::string BLDR_BF_NEG = "( $X ) := ~ $X.";
 const std::string BLDR_BF_ALL = "( $X $Y ) := fall $X $Y.";
 const std::string BLDR_BF_EX = "( $X $Y ) := fex $X $Y.";
+const std::string BLDR_BF_CONSTANT = "( $X ) := { $X}.";
 
 // definitions of tau builder rules
 // definitions of bf builder rules
@@ -1100,6 +1101,8 @@ template<typename... BAs>
 static auto bldr_bf_all = make_builder<BAs...>(BLDR_BF_ALL);
 template<typename... BAs>
 static auto bldr_bf_ex = make_builder<BAs...>(BLDR_BF_EX);
+template<typename... BAs>
+static auto bldr_bf_constant = make_builder<BAs...>(BLDR_BF_CONSTANT);
 
 // tau builder
 template<typename... BAs>
