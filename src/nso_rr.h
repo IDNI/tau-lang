@@ -1519,12 +1519,16 @@ private:
 
 	sp_tau_node<BAs...> apply_binary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
 		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...> || ba_extractor<BAs...>;
-		return std::visit(op, ba_elements[0], ba_elements[1]);
+		sp_tau_node<BAs...> nn(std::visit(op, ba_elements[0], ba_elements[1]));
+		std::vector<sp_tau_node<BAs...>> arg { nn };
+		return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
 	}
 
 	sp_tau_node<BAs...> apply_unary_operation(const auto& op, const sp_tau_node<BAs...>& n) {
 		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf || only_child_extractor<BAs...> || ba_extractor<BAs...>;
-		return std::visit(op, ba_elements[0]);
+		sp_tau_node<BAs...> nn(std::visit(op, ba_elements[0]));
+		std::vector<sp_tau_node<BAs...>> arg { nn };
+		return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
 	}
 
 	sp_tau_node<BAs...> apply_equality_relation(const auto& op, const sp_tau_node<BAs...>& n) {
