@@ -642,10 +642,8 @@ private:
 		q(nt(182), (nt(2)));
 		// source0 => alnum.
 		q(nt(182), (nt(6)));
-		// source0 => char_escape_encode.
-		q(nt(182), (nt(17)));
-		// source0 => char_punct.
-		q(nt(182), (nt(22)));
+		// source0 => punct.
+		q(nt(182), (nt(7)));
 		// _Rsource_20 => source0.
 		q(nt(183), (nt(182)));
 		// _Rsource_21 => _Rsource_20.
