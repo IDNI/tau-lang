@@ -65,10 +65,10 @@ RULE(BF_SKIP_CONSTANTS_0, "({ $X } & $Y) := ($Y & { $X }).")
 RULE(BF_DEF_XOR, "( $X + $Y ) := (( $X & ~ $Y ) | ( ~ $X & $Y )).")
 
 // bf callbacks
-RULE(BF_CALLBACK_AND, "( { $X } & { $Y } ) := { $X bf_and_cb $Y }.")
-RULE(BF_CALLBACK_OR, "( { $X } | { $Y } ) := { $X bf_or_cb $Y }.")
-RULE(BF_CALLBACK_XOR, "( { $X } + { $Y } ) := { $X bf_xor_cb $Y }.")
-RULE(BF_CALLBACK_NEG, "~ { $X } := { bf_neg_cb $X }.")
+RULE(BF_CALLBACK_AND, "( { $X } & { $Y } ) := bf_and_cb $X $Y.")
+RULE(BF_CALLBACK_OR, "( { $X } | { $Y } ) := bf_or_cb $X $Y.")
+RULE(BF_CALLBACK_XOR, "( { $X } + { $Y } ) := bf_xor_cb $X $Y.")
+RULE(BF_CALLBACK_NEG, "~ { $X } := bf_neg_cb $X.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 

@@ -162,7 +162,8 @@ bf_rec_relation        => bf_ref ws definition ws bf ws dot.
 
 bf_matcher             => bf.
 bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
-			| bf_has_subformula_cb | bf_remove_funiversal_cb | bf_remove_fexistential_cb.
+			| bf_has_subformula_cb | bf_remove_funiversal_cb | bf_remove_fexistential_cb
+			| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
 bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_or
 			| bf_all | bf_ex | bf_t | bf_f | variable | capture.
 bf_ref                 => sym ws offsets ws bf_ref_args.
@@ -193,8 +194,7 @@ bf_f                   => '0'.
 bf_constant            => open_brace ws constant ws close_brace.
 
 #constants
-constant               => binding | capture
-			| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
+constant               => binding | capture.
 binding                => source_binding | named_binding.
 named_binding          => chars.
 source_binding         => type ws colon ws source.
@@ -223,10 +223,10 @@ source                 => (source0)+.
 #
 # This should be move to a TODO in the parsers...
 
-bf_and_cb              => bf_cb_arg ws bf_and_cb_sym ws bf_cb_arg.
-bf_or_cb               => bf_cb_arg ws bf_or_cb_sym ws bf_cb_arg.
-bf_xor_cb              => bf_cb_arg ws bf_xor_cb_sym ws bf_cb_arg.
-bf_neg_cb              => bf_neg_cb_sym ws bf_cb_arg.
+bf_and_cb              => bf_and_cb_sym ws_required bf_cb_arg ws_required bf_cb_arg.
+bf_or_cb               => bf_or_cb_sym ws_required bf_cb_arg ws_required bf_cb_arg.
+bf_xor_cb              => bf_xor_cb_sym ws_required bf_cb_arg ws_required bf_cb_arg.
+bf_neg_cb              => bf_neg_cb_sym ws_required bf_cb_arg.
 bf_eq_cb               => bf_eq_cb_sym ws bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 bf_neq_cb              => bf_neq_cb_sym ws bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
 bf_is_zero_cb          => bf_is_zero_cb_sym ws bf_cb_arg ws_required bf_cb_arg.

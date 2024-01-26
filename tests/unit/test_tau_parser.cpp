@@ -582,7 +582,7 @@ TEST_SUITE("parsing bindings ") {
 TEST_SUITE("parsing callbacks ") {
 
 	TEST_CASE("bf_and_cb") {
-		const char* sample =	"$X := { $X bf_and_cb $X }.";
+		const char* sample =	"$X := bf_and_cb $X $X.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto and_cb = lib
@@ -591,15 +591,12 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::constant
 			| tau_parser::bf_and_cb;
 		CHECK( and_cb.has_value() );
 	}
 
 	TEST_CASE("bf_or_cb") {
-		const char* sample =	"$X := { $X bf_or_cb $X }.";
+		const char* sample =	"$X := bf_or_cb $X $X.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto or_cb = lib
@@ -608,15 +605,12 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::constant
 			| tau_parser::bf_or_cb;
 		CHECK( or_cb.has_value() );
 	}
 
 	TEST_CASE("bf_xor_cb") {
-		const char* sample =	"$X := { $X bf_xor_cb $X }.";
+		const char* sample =	"$X := bf_xor_cb $X $X.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto xor_cb = lib
@@ -625,15 +619,12 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::constant
 			| tau_parser::bf_xor_cb;
 		CHECK( xor_cb.has_value() );
 	}
 
 	TEST_CASE("bf_neg_cb") {
-		const char* sample =	"$X := { bf_neg_cb $X }.";
+		const char* sample =	"$X := bf_neg_cb $X.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto neg_cb = lib
@@ -642,9 +633,6 @@ TEST_SUITE("parsing callbacks ") {
 			| tau_parser::rule
 			| tau_parser::bf_rule
 			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::constant
 			| tau_parser::bf_neg_cb;
 		CHECK( neg_cb.has_value() );
 	}
