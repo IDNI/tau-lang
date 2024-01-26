@@ -201,7 +201,7 @@ source_binding         => type ws colon ws source.
 type                   => chars | null.
 
 # source related definition
-source0                => alnum | space | char_escape_encode | char_punct.
+source0                => alnum | space | punct.
 source                 => (source0)+.
 
 # callbacks
