@@ -52,7 +52,3 @@ target_link_libraries(debug-tau_normalizer-tau ${TAU_OBJECT_LIB_NAME} ${IDNI_PAR
 add_executable(debug-tau_normalizer-bdd debug-tau_normalizer-bdd.cpp)
 target_setup(debug-tau_normalizer-bdd)
 target_link_libraries(debug-tau_normalizer-bdd ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
-
-add_executable(debug-bdd_binding debug-bdd_binding.cpp)
-target_setup(debug-bdd_binding)
-target_link_libraries(debug-bdd_binding ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})

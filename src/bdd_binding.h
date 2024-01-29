@@ -25,7 +25,7 @@
 
 using namespace idni::rewriter;
 
-#ifdef DEBUG // DEBUG bdd printers taken from out.h
+// bdd printers taken from out.h
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
 
 template<typename B, auto o = bdd_options<>::create()>
@@ -56,7 +56,6 @@ ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
 	}
 	return os;
 }
-#endif // DEBUG
 
 namespace idni::tau {
 
@@ -171,17 +170,10 @@ struct bdd_factory {
 				tau_node_terminal_extractor<
 					tau_ba<bdd_binding>, bdd_binding>,
 				n);
-		DBG(std::cout << "bdd source: \"" << src << "\"\n";)
 		// check source cache
 		if (auto cn = cache.find(src); cn != cache.end()) return
-#ifdef DEBUG
-			std::cout << "bdd cached: \"" << cn->second << "\"\n",
-#endif // DEBUG
 			cn->second;
 		auto x = parse(src); // parse bdd from source
-#ifdef DEBUG
-		std::cout << "bdd:        \"" << x << "\"\n";
-#endif // DEBUG
 		auto nn = make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(
 			tau_sym<tau_ba<bdd_binding>, bdd_binding>(x), {});
 		return cache.emplace(src, nn).first->second; // cache and return
