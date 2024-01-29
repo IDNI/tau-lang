@@ -17,6 +17,7 @@ set(TESTS
 	normalizer2
 	type_system
 	bindings
+	bdd_binding
 	iterators
 	traversal
 	tau
