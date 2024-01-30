@@ -34,22 +34,22 @@ RULE(TAU_DISTRIBUTE_1, "($X &&& ($Y ||| $Z)) := (($X &&& $Y) ||| ($X &&& $Z)).")
 RULE(TAU_PUSH_NEGATION_INWARDS_0, "!!! ($X &&& $Y) := (!!! $X ||| !!! $Y).")
 RULE(TAU_PUSH_NEGATION_INWARDS_1, "!!! ($X ||| $Y) := (!!! $X &&& !!! $Y).")
 RULE(TAU_ELIM_DOUBLE_NEGATION_0, "!!! !!! $X :=  $X.")
-RULE(TAU_SIMPLIFY_ONE_0, "( T ||| $X ) := T.")
-RULE(TAU_SIMPLIFY_ONE_1, "( $X ||| T ) := T.")
-RULE(TAU_SIMPLIFY_ONE_2, "( T &&& $X ) := $X.")
-RULE(TAU_SIMPLIFY_ONE_3, "( $X &&& T ) := $X.")
-RULE(TAU_SIMPLIFY_ONE_4, "!!! T := F.")
-RULE(TAU_SIMPLIFY_ZERO_0, "( F &&& $X ) := F.")
-RULE(TAU_SIMPLIFY_ZERO_1, "( $X &&& F ) := F.")
-RULE(TAU_SIMPLIFY_ZERO_2, "( F ||| $X ) := $X.")
-RULE(TAU_SIMPLIFY_ZERO_3, "( $X ||| F ) := $X.")
-RULE(TAU_SIMPLIFY_ZERO_4, "!!! F := T.")
+RULE(TAU_SIMPLIFY_ONE_0, "( {T} ||| $X ) := {T}.")
+RULE(TAU_SIMPLIFY_ONE_1, "( $X ||| {T} ) := {T}.")
+RULE(TAU_SIMPLIFY_ONE_2, "( {T} &&& $X ) := $X.")
+RULE(TAU_SIMPLIFY_ONE_3, "( $X &&& {T} ) := $X.")
+RULE(TAU_SIMPLIFY_ONE_4, "!!! {T} := {F}.")
+RULE(TAU_SIMPLIFY_ZERO_0, "( {F} &&& $X ) := {F}.")
+RULE(TAU_SIMPLIFY_ZERO_1, "( $X &&& {F} ) := {F}.")
+RULE(TAU_SIMPLIFY_ZERO_2, "( {F} ||| $X ) := $X.")
+RULE(TAU_SIMPLIFY_ZERO_3, "( $X ||| {F} ) := $X.")
+RULE(TAU_SIMPLIFY_ZERO_4, "!!! {F} := {T}.")
 RULE(TAU_SIMPLIFY_SELF_0, "( $X &&& $X ) := $X.")
 RULE(TAU_SIMPLIFY_SELF_1, "( $X ||| $X ) := $X.")
-RULE(TAU_SIMPLIFY_SELF_2, "( $X &&& !!! $X ) := F.")
-RULE(TAU_SIMPLIFY_SELF_3, "( $X ||| !!! $X ) := T.")
-RULE(TAU_SIMPLIFY_SELF_4, "( !!! $X &&& $X ) := F.")
-RULE(TAU_SIMPLIFY_SELF_5, "( !!! $X ||| $X ) := T.")
+RULE(TAU_SIMPLIFY_SELF_2, "( $X &&& !!! $X ) := {F}.")
+RULE(TAU_SIMPLIFY_SELF_3, "( $X ||| !!! $X ) := {T}.")
+RULE(TAU_SIMPLIFY_SELF_4, "( !!! $X &&& $X ) := {F}.")
+RULE(TAU_SIMPLIFY_SELF_5, "( !!! $X ||| $X ) := {T}.")
 
 RULE(TAU_COLLAPSE_POSITIVES_0, "($X &&& $Y) := tau_collapse_positives_cb $X $Y.")
 RULE(TAU_COLLAPSE_POSITIVES_1, "($X &&& ($Y &&& $Z)) := tau_collapse_positives_cb $X $Y $Z.")
@@ -116,6 +116,13 @@ static auto collapse_positives_tau = make_library<BAs...>(
 // TODO (HIGH) give a proper implementation for <=>, == and != operators
 template<typename...BAs>
 auto operator<=>(const tau_sym<BAs...>& l, const tau_sym<BAs...>& r) {
+	/*auto check = std::addressof(l)<=>std::addressof(r);
+	std::cout << "l  <=> r = ";
+	if (check == std::strong_ordering::less) std::cout << "less" << std::endl;
+	else if (check == std::strong_ordering::equal) std::cout << "equal" << std::endl;
+	else if (check == std::strong_ordering::greater) std::cout << "greater" << std::endl;
+	else std::cout << "unordered" << std::endl;
+	return check;*/
 	return std::addressof(l)<=>std::addressof(r);
 	/*auto cmp = overloaded(*/
 		/*[](const tau_source_sym& l, const tau_source_sym& r) -> std::partial_ordering {*/
@@ -380,17 +387,19 @@ std::string clause_to_string(const tau_spec<BAs...>& clause,
 template<typename... BAs>
 void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
 		std::optional<wff<tau_ba<BAs...>, BAs...>>& positive, std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives) {
-	auto is_negative = [&collapsed] (const auto& n) {
-		auto check = collapsed | tau_parser::tau | tau_parser::tau_neg;
+	auto is_negative = [] (const auto& n) {
+		auto check = n | tau_parser::tau | tau_parser::tau_neg;
 		return check.has_value();
 	};
-	auto is_positive = [&collapsed] (const auto& n) {
-		auto check = collapsed | tau_parser::tau | tau_parser::tau_neg;
-		return !check.has_value();
+	auto is_positive = [] (const auto& n) {
+		auto check = n | tau_parser::tau | tau_parser::tau_neg;
+		// auto T = n | tau_parser::tau | tau_parser::tau_t; // it's true already, we should retunr wff T....
+		// auto F = n | tau_parser::tau | tau_parser::tau_f; // it's false already, we should retunr wff F....
+		return !check.has_value(); //&& !T.has_value() && !F.has_value();
 	};
 	negatives = select_top(collapsed, is_negative);
 	auto positives = collapsed->child | std::views::filter(is_positive) |  std::views::take(1);
-	if (positives.size() > 0) positive = positives[0];
+	for(auto p: positives) positive = p;
 }
 
 template<typename... BAs>
@@ -398,11 +407,7 @@ std::pair<std::optional<tau_spec<BAs...>>, std::vector<tau_spec<BAs...>>> get_po
 		const tau_spec<BAs...> collapsed) {
 	std::optional<wff<tau_ba<BAs...>, BAs...>> positive;
 	std::vector<wff<tau_ba<BAs...>, BAs...>> negatives;
-	for (auto& negative: select_all(collapsed, is_non_terminal<tau_parser::tau_neg, tau_ba<BAs...>, BAs...>)) {
-		negatives.push_back(negative);
-	}
-	if (auto check = collapsed->child[0] | tau_parser::tau; check.has_value())
-		positive = check.value();
+	get_positive_and_negative_literals(collapsed, positive, negatives);
 	return {positive, negatives};
 }
 
@@ -413,6 +418,7 @@ struct tau_spec_vars {
 		auto pos = io
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| tau_parser::var_pos
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 			| optional_value_extractor<size_t>;
 		auto var_name = (io
@@ -637,18 +643,15 @@ bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
 			| collapse_positives_tau<tau_ba<BAs...>, BAs...>);
 
 	auto [positive, negatives] = get_positive_and_negative_literals(collapsed);
-
-	if (!positive.has_value() && negatives.size() == 0) {
-		std::basic_stringstream<char> str;
-		bindings<tau_ba<BAs...>, BAs...> reversed_bindings;
-		str << clause << ".";
-		auto main = str.str();
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(main, reversed_bindings).main;
-		return ((normalized | tau_parser::wff_t).has_value()) ? true : false;
-	}
-
 	auto [inputs, outputs] = get_io_vars(collapsed);
 	size_t loopback = max(inputs.loopback, outputs.loopback);
+
+	if (inputs.name.empty() && outputs.name.empty()) {
+		auto check = clause | tau_parser::wff | tau_parser::wff_t;
+		print_sp_tau_node(std::cout, clause);
+		return check.has_value() ? true : false;
+	}
+
 	auto etas = get_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
 	for (size_t current = 1; ; ++current) {
 		auto [eta, extracted_bindings] = get_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
