@@ -334,8 +334,8 @@ private:
 		q(nt(74), (nt(76)));
 		// tau_body => tau_positives_upwards_cb.
 		q(nt(74), (nt(77)));
-		// tau => open_brace ws wff ws close_brace.
-		q(nt(75), (nt(42)+nt(14)+nt(78)+nt(14)+nt(43)));
+		// tau => open_bracket ws wff ws close_bracket.
+		q(nt(75), (nt(40)+nt(14)+nt(78)+nt(14)+nt(41)));
 		// tau => capture.
 		q(nt(75), (nt(55)));
 		// tau => tau_and.
