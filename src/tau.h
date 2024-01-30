@@ -388,18 +388,24 @@ template<typename... BAs>
 void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
 		std::optional<wff<tau_ba<BAs...>, BAs...>>& positive, std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives) {
 	auto is_negative = [] (const auto& n) {
-		auto check = n | tau_parser::tau | tau_parser::tau_neg;
+		auto check = n | tau_parser::tau | tau_parser::tau_neg | tau_parser::wff;
 		return check.has_value();
 	};
 	auto is_positive = [] (const auto& n) {
-		auto check = n | tau_parser::tau | tau_parser::tau_neg;
-		// auto T = n | tau_parser::tau | tau_parser::tau_t; // it's true already, we should retunr wff T....
-		// auto F = n | tau_parser::tau | tau_parser::tau_f; // it's false already, we should retunr wff F....
-		return !check.has_value(); //&& !T.has_value() && !F.has_value();
+		auto check = n | tau_parser::tau | tau_parser::wff;
+		return !check.has_value();
 	};
 	negatives = select_top(collapsed, is_negative);
-	auto positives = collapsed->child | std::views::filter(is_positive) |  std::views::take(1);
-	for(auto p: positives) positive = p;
+	positive = find_top(collapsed, is_positive);
+
+	#ifdef DEBUG
+	if (positive.has_value()) std::cout << "(I) positive: " << positive.value() << std::endl;
+	if (!negatives.empty()) {
+		std::cout << "(I) negatives: ";
+		for (auto& n: negatives) std::cout << n << ", ";
+		std::cout << std::endl;
+	}
+	#endif // DEBUG
 }
 
 template<typename... BAs>
@@ -470,6 +476,12 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const tau_sp
 			| optional_value_extractor<size_t>;
 		(type == tau_parser::in ? inputs : outputs).add(variable);
 	}
+
+	#ifdef DEBUG
+	std::cout << "(I) inputs: " ; for (auto& i: inputs.name) std::cout << i << ", "; std::cout << std::endl;
+	std::cout << "(I) outputs: " ; for (auto& o: outputs.name) std::cout << o << ", "; std::cout << std::endl;
+	#endif // DEBUG
+
 	return {inputs, outputs};
 }
 
@@ -504,7 +516,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>>  get_eta_nso_
 	auto print_boolean_existential_quantifiers = [] (size_t negatives) {
 		std::basic_stringstream<char> str;
 		for (size_t i = 1; i <= negatives; ++i) {
-			str << "bex $nn" << i;
+			str << "bex $nn" << i << " ";
 			if (i < negatives) str << ",";
 		}
 		return str.str();
@@ -533,6 +545,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>>  get_eta_nso_
 		}
 		return str.str();
 	};
+
 	extracted_bindings<tau_ba<BAs...>, BAs...> bindings;
 	size_t binding_seed = 0;
 	size_t loopback = max(inputs.loopback, outputs.loopback);
@@ -568,7 +581,6 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>>  get_eta_nso_
 	#ifdef DEBUG
 	std::cout << "(I) get_eta_nso_rr: " << nsorr.str() << std::endl;
 	#endif // DEBUG
-
 
 	return {nsorr.str(), bindings};
 }
@@ -648,19 +660,18 @@ bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
 
 	if (inputs.name.empty() && outputs.name.empty()) {
 		auto check = clause | tau_parser::wff | tau_parser::wff_t;
-		print_sp_tau_node(std::cout, clause);
 		return check.has_value() ? true : false;
 	}
 
 	auto etas = get_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
-	for (size_t current = 1; ; ++current) {
+	for (size_t current = 1; /* until return statement */ ; ++current) {
 		auto [eta, extracted_bindings] = get_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
 		bindings<tau_ba<BAs...>, BAs...> reversed_bindings; // TODO (LOW) reverse
 		auto check = get_check_nso_rr(outputs, loopback, current);
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), reversed_bindings).main;
 		if ((normalize | tau_parser::wff_f).has_value()) {
 			#ifdef DEBUG
-			std::cout << "(I) is_satisfiable_clause: " << clause << std::endl;
+			std::cout << "(I) is_satisfiable_clause: false" << std::endl;
 			#endif // DEBUG
 
 			return false;
@@ -687,6 +698,7 @@ bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
 		);
 	for(auto& clause: get_clauses(dnf)) {
 		if (is_satisfiable_clause(clause)) {
+
 			#ifdef DEBUG
 			std::cout << "(I) is_satisfiable: true" << std::endl;
 			#endif // DEBUG
@@ -694,6 +706,7 @@ bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
 			return true;
 		}
 	}
+
 	#ifdef DEBUG
 	std::cout << "(I) is_satisfiable: false" << std::endl;
 	#endif // DEBUG
