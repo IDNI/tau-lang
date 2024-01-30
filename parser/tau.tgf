@@ -90,12 +90,10 @@ tau_body               => tau | tau_collapse_positives_cb | tau_positives_upward
 
 
 # TODO (HIGH) check programatically that we do not have inappropriated element from wff in tau
-tau                    => open_bracket ws wff ws close_bracket | tau_and | tau_or | tau_neg | tau_t | tau_f | capture.
+tau                    => open_brace ws wff ws close_brace | tau_and | tau_or | tau_neg | capture.
 tau_and                => open_parenthesis ws tau ws tau_and_sym ws tau ws close_parenthesis.
 tau_or                 => open_parenthesis ws tau ws tau_or_sym ws tau ws close_parenthesis.
 tau_neg                => tau_neg_sym ws tau.
-tau_t                  => 'T'.
-tau_f                  => 'F'.
 
 # tau_op_sym
 tau_and_sym            => "&&&".
