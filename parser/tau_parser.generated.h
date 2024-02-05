@@ -8,7 +8,7 @@
 struct tau_parser {
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(229), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(232), cc), p(g, load_opts()) {}
 	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
 		const char* data, size_t size = 0, size_t max_l = 0,
 		char eof = std::char_traits<char>::eof())
@@ -53,8 +53,8 @@ struct tau_parser {
 		wff_cb_arg, bf_neq_cb_sym, bf_is_zero_cb_sym, bf_is_one_cb_sym, bf_remove_funiversal_cb_sym, bf_remove_fexistential_cb_sym, wff_remove_existential_cb_sym, wff_remove_bexistential_cb_sym, wff_remove_buniversal_cb_sym, bf_has_clashing_subformulas_cb_sym,
 		wff_has_clashing_subformulas_cb_sym, bf_has_subformula_cb_sym, wff_has_subformula_cb_sym, tau_collapse_positives_cb_sym, tau_cb_arg, _Rtau_collapse_positives_cb_22, _Rtau_collapse_positives_cb_23, tau_positives_upwards_cb_sym, input, inputs,
 		_Rinputs_24, _Rinputs_25, main, rule, rules, _Rrules_26, _Rrules_27, rec_relation, rec_relations, _Rrec_relations_28,
-		_Rrec_relations_29, nso_rr, library, builder, builder_head, builder_body, _Rbuilder_head_30, _Rbuilder_head_31, gssotc, start,
-		_Rstart_32, __neg_0, __neg_1, __neg_2, __neg_3, __neg_4, __neg_5,
+		_Rrec_relations_29, nso_rr, library, builder, builder_head, builder_body, _Rbuilder_head_30, _Rbuilder_head_31, bf_builder_body, wff_builder_body,
+		tau_builder_body, gssotc, start, _Rstart_32, __neg_0, __neg_1, __neg_2, __neg_3, __neg_4, __neg_5,
 	};
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -101,8 +101,8 @@ private:
 			"wff_cb_arg", "bf_neq_cb_sym", "bf_is_zero_cb_sym", "bf_is_one_cb_sym", "bf_remove_funiversal_cb_sym", "bf_remove_fexistential_cb_sym", "wff_remove_existential_cb_sym", "wff_remove_bexistential_cb_sym", "wff_remove_buniversal_cb_sym", "bf_has_clashing_subformulas_cb_sym",
 			"wff_has_clashing_subformulas_cb_sym", "bf_has_subformula_cb_sym", "wff_has_subformula_cb_sym", "tau_collapse_positives_cb_sym", "tau_cb_arg", "_Rtau_collapse_positives_cb_22", "_Rtau_collapse_positives_cb_23", "tau_positives_upwards_cb_sym", "input", "inputs",
 			"_Rinputs_24", "_Rinputs_25", "main", "rule", "rules", "_Rrules_26", "_Rrules_27", "rec_relation", "rec_relations", "_Rrec_relations_28",
-			"_Rrec_relations_29", "nso_rr", "library", "builder", "builder_head", "builder_body", "_Rbuilder_head_30", "_Rbuilder_head_31", "gssotc", "start",
-			"_Rstart_32", "__neg_0", "__neg_1", "__neg_2", "__neg_3", "__neg_4", "__neg_5",
+			"_Rrec_relations_29", "nso_rr", "library", "builder", "builder_head", "builder_body", "_Rbuilder_head_30", "_Rbuilder_head_31", "bf_builder_body", "wff_builder_body",
+			"tau_builder_body", "gssotc", "start", "_Rstart_32", "__neg_0", "__neg_1", "__neg_2", "__neg_3", "__neg_4", "__neg_5",
 		}) nts.get(nt);
 		return nts;
 	}
@@ -171,19 +171,19 @@ private:
 		// _Rchar_punct_4 => esc q_bqstr.
 		q(nt(25), (nt(18)+nt(21)));
 		// __neg_0 => q_char.
-		q(nt(231), (nt(19)));
+		q(nt(234), (nt(19)));
 		// __neg_1 => q_str.
-		q(nt(232), (nt(20)));
+		q(nt(235), (nt(20)));
 		// __neg_2 => q_bqstr.
-		q(nt(233), (nt(21)));
+		q(nt(236), (nt(21)));
 		// __neg_3 => _Rchar_punct_2.
-		q(nt(234), (nt(23)));
+		q(nt(237), (nt(23)));
 		// __neg_4 => _Rchar_punct_3.
-		q(nt(235), (nt(24)));
+		q(nt(238), (nt(24)));
 		// __neg_5 => _Rchar_punct_4.
-		q(nt(236), (nt(25)));
+		q(nt(239), (nt(25)));
 		// char_punct => punct & ~( __neg_0 ) & ~( __neg_1 ) & ~( __neg_2 ) & ~( __neg_3 ) & ~( __neg_4 ) & ~( __neg_5 ).
-		q(nt(22), (nt(7)) & ~(nt(231)) & ~(nt(232)) & ~(nt(233)) & ~(nt(234)) & ~(nt(235)) & ~(nt(236)));
+		q(nt(22), (nt(7)) & ~(nt(234)) & ~(nt(235)) & ~(nt(236)) & ~(nt(237)) & ~(nt(238)) & ~(nt(239)));
 		// char0 => space.
 		q(nt(26), (nt(2)));
 		// char0 => alnum.
@@ -782,8 +782,8 @@ private:
 		q(nt(221), (nt(218)+nt(14)+nt(212)));
 		// library => rules.
 		q(nt(222), (nt(214)));
-		// builder => ws builder_head ws bf_def ws builder_body ws dot.
-		q(nt(223), (nt(14)+nt(224)+nt(14)+nt(35)+nt(14)+nt(225)+nt(14)+nt(38)));
+		// builder => ws builder_head ws builder_body ws dot.
+		q(nt(223), (nt(14)+nt(224)+nt(14)+nt(225)+nt(14)+nt(38)));
 		// _Rbuilder_head_30 => ws_required capture.
 		q(nt(226), (nt(13)+nt(56)));
 		// _Rbuilder_head_31 => null.
@@ -792,26 +792,32 @@ private:
 		q(nt(227), (nt(226)+nt(227)));
 		// builder_head => open_parenthesis ws capture _Rbuilder_head_31 ws close_parenthesis.
 		q(nt(224), (nt(39)+nt(14)+nt(56)+nt(227)+nt(14)+nt(40)));
-		// builder_body => tau.
-		q(nt(225), (nt(76)));
-		// builder_body => wff.
-		q(nt(225), (nt(79)));
-		// builder_body => bf.
-		q(nt(225), (nt(134)));
+		// builder_body => bf_builder_body.
+		q(nt(225), (nt(228)));
+		// builder_body => wff_builder_body.
+		q(nt(225), (nt(229)));
+		// builder_body => tau_builder_body.
+		q(nt(225), (nt(230)));
+		// bf_builder_body => bf_def ws bf.
+		q(nt(228), (nt(35)+nt(14)+nt(134)));
+		// wff_builder_body => wff_def ws wff.
+		q(nt(229), (nt(36)+nt(14)+nt(79)));
+		// tau_builder_body => tau_def ws tau.
+		q(nt(230), (nt(37)+nt(14)+nt(76)));
 		// gssotc => ws tau ws semicolon.
-		q(nt(228), (nt(14)+nt(76)+nt(14)+nt(47)));
+		q(nt(231), (nt(14)+nt(76)+nt(14)+nt(47)));
 		// _Rstart_32 => inputs.
-		q(nt(230), (nt(209)));
+		q(nt(233), (nt(209)));
 		// _Rstart_32 => nso_rr.
-		q(nt(230), (nt(221)));
+		q(nt(233), (nt(221)));
 		// _Rstart_32 => library.
-		q(nt(230), (nt(222)));
+		q(nt(233), (nt(222)));
 		// _Rstart_32 => builder.
-		q(nt(230), (nt(223)));
+		q(nt(233), (nt(223)));
 		// _Rstart_32 => gssotc.
-		q(nt(230), (nt(228)));
+		q(nt(233), (nt(231)));
 		// start => _Rstart_32 ws.
-		q(nt(229), (nt(230)+nt(14)));
+		q(nt(232), (nt(233)+nt(14)));
 		return q;
 	}
 };
