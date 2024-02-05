@@ -253,7 +253,7 @@ wff_remove_buniversal_cb_sym        => "wff_remove_buniversal_cb".
 bf_remove_fexistential_cb_sym       => "bf_remove_fexistential_cb".
 bf_remove_funiversal_cb_sym         => "bf_remove_funiversal_cb".
 
-# bultin_args
+# bultin_args, type is neede to capture appropriate typed arguments
 bf_cb_arg              => bf.
 wff_cb_arg             => wff.
 
