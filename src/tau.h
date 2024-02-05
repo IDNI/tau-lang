@@ -29,39 +29,39 @@ using namespace idni::tau;
 namespace idni::tau {
 
 // tau rules
-RULE(TAU_DISTRIBUTE_0, "(($X ||| $Y) &&& $Z) := (($X &&& $Z) ||| ($Y &&& $Z)).")
-RULE(TAU_DISTRIBUTE_1, "($X &&& ($Y ||| $Z)) := (($X &&& $Y) ||| ($X &&& $Z)).")
-RULE(TAU_PUSH_NEGATION_INWARDS_0, "!!! ($X &&& $Y) := (!!! $X ||| !!! $Y).")
-RULE(TAU_PUSH_NEGATION_INWARDS_1, "!!! ($X ||| $Y) := (!!! $X &&& !!! $Y).")
-RULE(TAU_ELIM_DOUBLE_NEGATION_0, "!!! !!! $X :=  $X.")
-RULE(TAU_SIMPLIFY_ONE_0, "( {T} ||| $X ) := {T}.")
-RULE(TAU_SIMPLIFY_ONE_1, "( $X ||| {T} ) := {T}.")
-RULE(TAU_SIMPLIFY_ONE_2, "( {T} &&& $X ) := $X.")
-RULE(TAU_SIMPLIFY_ONE_3, "( $X &&& {T} ) := $X.")
-RULE(TAU_SIMPLIFY_ONE_4, "!!! {T} := {F}.")
-RULE(TAU_SIMPLIFY_ZERO_0, "( {F} &&& $X ) := {F}.")
-RULE(TAU_SIMPLIFY_ZERO_1, "( $X &&& {F} ) := {F}.")
-RULE(TAU_SIMPLIFY_ZERO_2, "( {F} ||| $X ) := $X.")
-RULE(TAU_SIMPLIFY_ZERO_3, "( $X ||| {F} ) := $X.")
-RULE(TAU_SIMPLIFY_ZERO_4, "!!! {F} := {T}.")
-RULE(TAU_SIMPLIFY_SELF_0, "( $X &&& $X ) := $X.")
-RULE(TAU_SIMPLIFY_SELF_1, "( $X ||| $X ) := $X.")
-RULE(TAU_SIMPLIFY_SELF_2, "( $X &&& !!! $X ) := {F}.")
-RULE(TAU_SIMPLIFY_SELF_3, "( $X ||| !!! $X ) := {T}.")
-RULE(TAU_SIMPLIFY_SELF_4, "( !!! $X &&& $X ) := {F}.")
-RULE(TAU_SIMPLIFY_SELF_5, "( !!! $X ||| $X ) := {T}.")
+RULE(TAU_DISTRIBUTE_0, "(($X ||| $Y) &&& $Z) :::= (($X &&& $Z) ||| ($Y &&& $Z)).")
+RULE(TAU_DISTRIBUTE_1, "($X &&& ($Y ||| $Z)) :::= (($X &&& $Y) ||| ($X &&& $Z)).")
+RULE(TAU_PUSH_NEGATION_INWARDS_0, "!!! ($X &&& $Y) :::= (!!! $X ||| !!! $Y).")
+RULE(TAU_PUSH_NEGATION_INWARDS_1, "!!! ($X ||| $Y) :::= (!!! $X &&& !!! $Y).")
+RULE(TAU_ELIM_DOUBLE_NEGATION_0, "!!! !!! $X :::=  $X.")
+RULE(TAU_SIMPLIFY_ONE_0, "( {T} ||| $X ) :::= {T}.")
+RULE(TAU_SIMPLIFY_ONE_1, "( $X ||| {T} ) :::= {T}.")
+RULE(TAU_SIMPLIFY_ONE_2, "( {T} &&& $X ) :::= $X.")
+RULE(TAU_SIMPLIFY_ONE_3, "( $X &&& {T} ) :::= $X.")
+RULE(TAU_SIMPLIFY_ONE_4, "!!! {T} :::= {F}.")
+RULE(TAU_SIMPLIFY_ZERO_0, "( {F} &&& $X ) :::= {F}.")
+RULE(TAU_SIMPLIFY_ZERO_1, "( $X &&& {F} ) :::= {F}.")
+RULE(TAU_SIMPLIFY_ZERO_2, "( {F} ||| $X ) :::= $X.")
+RULE(TAU_SIMPLIFY_ZERO_3, "( $X ||| {F} ) :::= $X.")
+RULE(TAU_SIMPLIFY_ZERO_4, "!!! {F} :::= {T}.")
+RULE(TAU_SIMPLIFY_SELF_0, "( $X &&& $X ) :::= $X.")
+RULE(TAU_SIMPLIFY_SELF_1, "( $X ||| $X ) :::= $X.")
+RULE(TAU_SIMPLIFY_SELF_2, "( $X &&& !!! $X ) :::= {F}.")
+RULE(TAU_SIMPLIFY_SELF_3, "( $X ||| !!! $X ) :::= {T}.")
+RULE(TAU_SIMPLIFY_SELF_4, "( !!! $X &&& $X ) :::= {F}.")
+RULE(TAU_SIMPLIFY_SELF_5, "( !!! $X ||| $X ) :::= {T}.")
 
-RULE(TAU_COLLAPSE_POSITIVES_0, "($X &&& $Y) := tau_collapse_positives_cb $X $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_1, "($X &&& ($Y &&& $Z)) := tau_collapse_positives_cb $X $Y $Z.")
-RULE(TAU_COLLAPSE_POSITIVES_2, "($X &&& ($Y &&& $Z)) := tau_collapse_positives_cb $X $Z $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_3, "($X &&& ($Y &&& $Z)) := tau_collapse_positives_cb $Y $Z $X.")
-RULE(TAU_COLLAPSE_POSITIVES_4, "(($X &&& $Y) &&& $Z) := tau_collapse_positives_cb $Y $Z $X.")
-RULE(TAU_COLLAPSE_POSITIVES_5, "(($X &&& $Y) &&& $Z) := tau_collapse_positives_cb $X $Z $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_6, "(($X &&& $Y) &&& $Z) := tau_collapse_positives_cb $X $Y $Z.")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "($X &&& ($Y &&& $Z)) := tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "($X &&& ($Y &&& $Z)) := tau_positives_upwards_cb $Z ($Z &&& ($X &&& $Y)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "(($X &&& $Y) &&& $Z) := tau_positives_upwards_cb $X ($X &&& ($Y &&& $Z)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_3, "(($X &&& $Y) &&& $Z) := tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
+RULE(TAU_COLLAPSE_POSITIVES_0, "($X &&& $Y) :::= tau_collapse_positives_cb $X $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_1, "($X &&& ($Y &&& $Z)) :::= tau_collapse_positives_cb $X $Y $Z.")
+RULE(TAU_COLLAPSE_POSITIVES_2, "($X &&& ($Y &&& $Z)) :::= tau_collapse_positives_cb $X $Z $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_3, "($X &&& ($Y &&& $Z)) :::= tau_collapse_positives_cb $Y $Z $X.")
+RULE(TAU_COLLAPSE_POSITIVES_4, "(($X &&& $Y) &&& $Z) :::= tau_collapse_positives_cb $Y $Z $X.")
+RULE(TAU_COLLAPSE_POSITIVES_5, "(($X &&& $Y) &&& $Z) :::= tau_collapse_positives_cb $X $Z $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_6, "(($X &&& $Y) &&& $Z) :::= tau_collapse_positives_cb $X $Y $Z.")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "($X &&& ($Y &&& $Z)) :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "($X &&& ($Y &&& $Z)) :::= tau_positives_upwards_cb $Z ($Z &&& ($X &&& $Y)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "(($X &&& $Y) &&& $Z) :::= tau_positives_upwards_cb $X ($X &&& ($Y &&& $Z)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_3, "(($X &&& $Y) &&& $Z) :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
 
 template<typename... BAs>
 static auto to_dnf_tau = make_library<BAs...>(
@@ -267,9 +267,9 @@ struct tau_factory {
 
 	tau_factory(base_factory_t& bf) : bf(bf) {}
 
-	sp_tau_node<tau_ba<BAs...>, BAs...> build(const std::string type_name, const sp_tau_node<tau_ba<BAs...>, BAs...>& n) {
+	tau_spec<BAs...> build(const std::string type_name, const tau_spec<BAs...>& n) {
 		if (auto nn = bf.build(type_name, n); nn != n) return nn;
-		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<tau_spec<BAs...>>;
 		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
 		factory_binder<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...> fb(*this);
 		auto form = make_nso_rr_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(var, fb).main;
@@ -328,7 +328,7 @@ tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const b
 }
 
 template<typename... BAs>
-void get_clauses(const tau_spec<BAs...>& n, std::vector<sp_tau_node<tau_ba<BAs...>, BAs...>>& clauses) {
+void get_clauses(const tau_spec<BAs...>& n, std::vector<tau_spec<BAs...>>& clauses) {
 	if (auto check = n | tau_parser::tau_or; !check.has_value() && is_non_terminal(tau_parser::tau, n)) clauses.push_back(n);
 	else for (auto& c: n->child)
 		if (is_non_terminal(tau_parser::tau_or, c)) get_clauses(c ,clauses);
@@ -354,7 +354,7 @@ using extracted_bindings = std::map<std::variant<BAs...>, std::string>;
 template<typename... BAs>
 std::string clause_to_string(const tau_spec<BAs...>& clause,
 		extracted_bindings<tau_ba<BAs...>, BAs...>& extracted_bindings,
-		size_t& binding_seed) {
+		size_t binding_seed = 0) {
 	std::basic_stringstream<char> str;
 
 	auto visitor = overloaded(
@@ -377,16 +377,16 @@ std::string clause_to_string(const tau_spec<BAs...>& clause,
 
 	post_order_tree_traverser<
 			print_t,
-			all_t<sp_tau_node<tau_ba<BAs...>, BAs...>>,
-			sp_tau_node<tau_ba<BAs...>, BAs...>>(
-		print, all<sp_tau_node<tau_ba<BAs...>, BAs...>>)(clause);
+			all_t<tau_spec<BAs...>>,
+			tau_spec<BAs...>>(
+		print, all<tau_spec<BAs...>>)(clause);
 
 	return str.str();
 }
 
 template<typename... BAs>
 void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
-		std::optional<wff<tau_ba<BAs...>, BAs...>>& positive, std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives) {
+		std::optional<tau_spec<BAs...>>& positive, std::vector<tau_spec<BAs...>>& negatives) {
 	auto is_negative = [] (const auto& n) {
 		auto check = n | tau_parser::tau | tau_parser::tau_neg | tau_parser::wff;
 		return check.has_value();
@@ -395,6 +395,7 @@ void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
 		auto check = n | tau_parser::tau | tau_parser::wff;
 		return !check.has_value();
 	};
+
 	negatives = select_top(collapsed, is_negative);
 	positive = find_top(collapsed, is_positive);
 
@@ -411,8 +412,8 @@ void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
 template<typename... BAs>
 std::pair<std::optional<tau_spec<BAs...>>, std::vector<tau_spec<BAs...>>> get_positive_and_negative_literals(
 		const tau_spec<BAs...> collapsed) {
-	std::optional<wff<tau_ba<BAs...>, BAs...>> positive;
-	std::vector<wff<tau_ba<BAs...>, BAs...>> negatives;
+	std::optional<tau_spec<BAs...>> positive;
+	std::vector<tau_spec<BAs...>> negatives;
 	get_positive_and_negative_literals(collapsed, positive, negatives);
 	return {positive, negatives};
 }
@@ -420,7 +421,7 @@ std::pair<std::optional<tau_spec<BAs...>>, std::vector<tau_spec<BAs...>>> get_po
 template<typename...BAs>
 struct tau_spec_vars {
 
-	void add(const sp_tau_node<tau_ba<BAs...>, BAs...>& io) {
+	void add(const tau_spec<BAs...>& io) {
 		auto pos = io
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| tau_parser::var_pos
@@ -429,7 +430,7 @@ struct tau_spec_vars {
 			| optional_value_extractor<size_t>;
 		auto var_name = (io
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
-			| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>)->child[0];
+			| optional_value_extractor<tau_spec<BAs...>>)->child[0];
 		switch (pos) {
 			case tau_parser::current_pos:
 				name.emplace(var_name);
@@ -461,7 +462,7 @@ struct tau_spec_vars {
 		}
 	}
 
-	std::set<wff<tau_ba<BAs...>, BAs...>> name;
+	std::set<tau_spec<BAs...>> name;
 	size_t loopback = 0;
 };
 
@@ -487,8 +488,8 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const tau_sp
 
 template<typename... BAs>
 std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>>  get_eta_nso_rr(
-		const std::optional<wff<tau_ba<BAs...>, BAs...>>& positive,
-		const std::vector<wff<tau_ba<BAs...>, BAs...>>& negatives,
+		const std::optional<tau_spec<BAs...>>& positive,
+		const std::vector<tau_spec<BAs...>>& negatives,
 		const tau_spec_vars<BAs...>& inputs,
 		const tau_spec_vars<BAs...>& outputs) {
 	auto print_vars = [] (const auto& vars) {
@@ -641,6 +642,47 @@ std::string get_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopbac
 	return main.str();
 }
 
+template<typename... BAs>
+std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_nso_rr(const tau_spec<BAs...>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+	auto universally_quantify_vars = [] (const auto& vars, size_t index) {
+		std::basic_stringstream<char> str;
+		for (const auto& var: vars.name) {
+			str << "all " << var << "[" << index << "] ";
+		}
+		return str.str();
+	};
+	auto existentially_quantify_vars = [] (const auto& vars, size_t index) {
+		std::basic_stringstream<char> str;
+		for (const auto& var: vars.name) {
+			str << "ex " << var << "[" << index << "] ";
+		}
+		return str.str();
+	};
+
+	std::basic_stringstream<char> main;
+	extracted_bindings<tau_ba<BAs...>, BAs...> ext_bindings;
+	bindings<BAs...> bindings;
+
+	auto wff = positive | tau_parser::wff | optional_value_extractor<tau_spec<BAs...>>;
+
+	//
+
+	// print quantifiers related to free variables
+	for (size_t i = 1; i <= loopback; ++i) {
+		main << universally_quantify_vars(inputs, i);
+		main << existentially_quantify_vars(outputs, i);
+	}
+
+	// print the main wff
+	main << clause_to_string(wff, ext_bindings)	<< ".\n";
+
+	#ifdef DEBUG
+	std::cout << "(I) get_main_nso_wo_rr: " << main.str() << std::endl;
+	#endif // DEBUG
+
+	return {main.str(), ext_bindings};
+}
+
 
 template<typename... BAs>
 bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
@@ -661,6 +703,26 @@ bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
 	if (inputs.name.empty() && outputs.name.empty()) {
 		auto check = clause | tau_parser::wff | tau_parser::wff_t;
 		return check.has_value() ? true : false;
+	}
+
+	if (negatives.empty() && positive.has_value()) {
+		auto [main_wo_rr, ext_bindings] = get_wff_main_nso_rr<BAs...>(positive.value(), inputs, outputs, loopback);
+		bindings<BAs...> reversed_bindings; // TODO (LOW) reverse
+		auto normalize = normalizer<BAs...>(main_wo_rr, reversed_bindings).main;
+
+		if ((normalize | tau_parser::wff_f).has_value()) {
+			#ifdef DEBUG
+			std::cout << "(I) is_satisfiable_clause: false" << std::endl;
+			#endif // DEBUG
+
+			return false;
+		}
+
+		#ifdef DEBUG
+		std::cout << "(I) is_satisfiable_clause: false" << std::endl;
+		#endif // DEBUG
+
+		return true;
 	}
 
 	auto etas = get_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
@@ -694,8 +756,8 @@ bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
 	auto dnf = tau_spec |
 		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
 			to_dnf_tau<tau_ba<BAs...>, BAs...>
-			| simplify_tau<tau_ba<BAs...>, BAs...>
-		);
+			| simplify_tau<tau_ba<BAs...>, BAs...>);
+
 	for(auto& clause: get_clauses(dnf)) {
 		if (is_satisfiable_clause(clause)) {
 

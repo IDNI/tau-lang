@@ -37,8 +37,9 @@ chars                  => alpha (alnum)*.
 digits                 => digit+.
 
 # common symbols
-definition             => ":=". # for rewriting rules and bf rec. relations definition
-double_definition      => "::=". # for wff rec. relations definition
+bf_def             	   => ":=". # for rewriting rules and bf rec. relations bf_def and rules
+wff_def                => "::=". # for wff rec. relations bf_def and rules
+tau_def                => ":::=". # for tau rules
 dot                    => '.'.
 open_parenthesis       => '('.
 close_parenthesis      => ')'.
@@ -64,27 +65,27 @@ shift                  => capture minus num.
 num                    => digits.
 
 
-variable               => var | io_var.
+variable               => var | io_var | pos_var.
 io_var                 => in | out.
 in                     => in_var_name var_pos.
 out                    => out_var_name var_pos.
 var_pos                => current_pos | absolute_pos | relative_pos.
 bool_variable          => '?' chars.
 # TODO (HIGH) capture t is reserved for timed variables, so we should check that is not used here
-capture                => capture_var | pos_var.
+capture                => capture_var.
 capture_var            => '$' chars.
 # TODO (MEDIUM) remove '?' from timed variables
 # TODO (MEDIUM) avoid i_ and o_ in variables
 var                    => chars.
 pos_var                => 't'.
-current_pos            => open_bracket pos_var close_bracket.
-absolute_pos           => open_bracket num close_bracket.
-relative_pos           => open_bracket pos_var minus num close_bracket.
-in_var_name            => "?i_" chars.
-out_var_name           => "?o_" chars.
+current_pos            => open_bracket ws pos_var ws close_bracket.
+absolute_pos           => open_bracket ws num ws close_bracket.
+relative_pos           => open_bracket ws pos_var ws minus ws num ws close_bracket.
+in_var_name            => "i_" chars.
+out_var_name           => "o_" chars.
 
 # tau
-tau_rule               => tau_matcher ws definition ws tau_body ws dot.
+tau_rule               => tau_matcher ws tau_def ws tau_body ws dot.
 tau_matcher            => tau.
 tau_body               => tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
 
@@ -101,8 +102,8 @@ tau_or_sym             => "|||".
 tau_neg_sym            => "!!!".
 
 # wff
-wff_rule               => wff_matcher ws double_definition ws wff_body ws dot.
-wff_rec_relation       => wff_ref ws double_definition ws wff ws dot.
+wff_rule               => wff_matcher ws wff_def ws wff_body ws dot.
+wff_rec_relation       => wff_ref ws wff_def ws wff ws dot.
 
 wff_matcher            => wff.
 wff_body               => wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
@@ -155,8 +156,8 @@ wff_t                  => 'T'.
 wff_f                  => 'F'.
 
 # bf
-bf_rule                => bf_matcher ws definition ws bf_body ws dot.
-bf_rec_relation        => bf_ref ws definition ws bf ws dot.
+bf_rule                => bf_matcher ws bf_def ws bf_body ws dot.
+bf_rec_relation        => bf_ref ws bf_def ws bf ws dot.
 
 bf_matcher             => bf.
 bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
@@ -164,8 +165,8 @@ bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_su
 			| bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
 bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_or
 			| bf_all | bf_ex | bf_t | bf_f | variable | capture.
-bf_ref                 => sym ws offsets ws bf_ref_args.
-bf_ref_args            => open_parenthesis (ws variable)* ws close_parenthesis.
+bf_ref                 => sym offsets bf_ref_args.
+bf_ref_args            => open_parenthesis ws variable (ws variable)* ws close_parenthesis.
 bf_and                 => open_parenthesis ws bf ws bf_and_sym ws bf ws close_parenthesis.
 bf_or                  => open_parenthesis ws bf ws bf_or_sym ws bf ws close_parenthesis.
 bf_xor                 => open_parenthesis ws bf ws bf_xor_sym ws bf ws close_parenthesis.
@@ -198,7 +199,7 @@ named_binding          => chars.
 source_binding         => type ws colon ws source.
 type                   => chars | null.
 
-# source related definition
+# source related bf_def
 source0                => alnum | space | punct.
 source                 => (source0)+.
 
@@ -280,7 +281,7 @@ input                  => in ws colon ws open_brace ws source_binding ws close_b
 
 # main posibilities
 inputs                 => ws less ws input (ws input)* ws dot.
-main                   => wff ws dot.
+main                   => ws wff ws dot.
 rule                   => wff_rule | bf_rule | tau_rule.
 rules                  => (ws rule)*.
 rec_relation           => bf_rec_relation | wff_rec_relation.
@@ -288,7 +289,8 @@ rec_relations          => (ws rec_relation)*.
 nso_rr                 => rec_relations ws main.
 library                => rules.
 # each builder is define on its own string
-builder                => ws builder_head ws definition ws builder_body ws dot.
+# TODO explit builders by type: bf, wff, and tau
+builder                => ws builder_head ws bf_def ws builder_body ws dot.
 builder_head           => open_parenthesis ws capture (ws_required capture)* ws close_parenthesis.
 builder_body           => wff | bf | tau.
 gssotc                 => ws tau ws semicolon.

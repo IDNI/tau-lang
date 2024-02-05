@@ -46,7 +46,7 @@ TEST_SUITE("rec relations execution") {
 
 	TEST_CASE("nso_rr wff_rec_relation") {
 		const char* sample =
-			"g [0] (Y) ::= T."
+			"g[0](Y) ::= T."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
