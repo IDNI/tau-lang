@@ -290,8 +290,11 @@ nso_rr                 => rec_relations ws main.
 library                => rules.
 # each builder is define on its own string
 # TODO explit builders by type: bf, wff, and tau
-builder                => ws builder_head ws bf_def ws builder_body ws dot.
+builder                => ws builder_head ws builder_body ws dot.
 builder_head           => open_parenthesis ws capture (ws_required capture)* ws close_parenthesis.
-builder_body           => wff | bf | tau.
+builder_body           => bf_builder_body | wff_builder_body | tau_builder_body.
+bf_builder_body        => bf_def ws bf.
+wff_builder_body       => wff_def ws wff.
+tau_builder_body       => tau_def ws tau.
 gssotc                 => ws tau ws semicolon.
 start                  => (nso_rr | gssotc | library | builder | inputs) ws.
