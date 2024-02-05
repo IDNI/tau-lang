@@ -846,8 +846,8 @@ template<typename... BAs>
 tau_rec_relation<BAs...> make_rec_relation(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rec_relation: return make_rule<tau_parser::bf_rec_relation, tau_parser::bf_ref, tau_parser::bf, BAs...>(rule);
-	case tau_parser::wff_rec_relation: return make_rule<tau_parser::wff_rec_relation, tau_parser::wff_ref, tau_parser::wff, BAs...>(rule);
+	case tau_parser::bf_rec_relation: return make_rule<tau_parser::bf_rec_relation, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
+	case tau_parser::wff_rec_relation: return make_rule<tau_parser::wff_rec_relation, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
 	default: assert(false); return {};
 	};
 }
