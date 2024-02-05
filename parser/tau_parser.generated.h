@@ -55,7 +55,7 @@ struct tau_parser {
 		inputs, _Rinputs_26, _Rinputs_27, main, rule, rules, _Rrules_28, _Rrules_29, rec_relation, rec_relations,
 		_Rrec_relations_30, _Rrec_relations_31, nso_rr, library, builder, builder_head, builder_body, _Rbuilder_head_32, _Rbuilder_head_33, bf_builder_body,
 		wff_builder_body, tau_builder_body, gssotc, start, _Rstart_34, __neg_0, __neg_1, __neg_2, __neg_3, __neg_4,
-		__neg_5, __neg_6, __neg_7,
+		__neg_5,
 	};
 	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
 private:
@@ -104,7 +104,7 @@ private:
 			"inputs", "_Rinputs_26", "_Rinputs_27", "main", "rule", "rules", "_Rrules_28", "_Rrules_29", "rec_relation", "rec_relations",
 			"_Rrec_relations_30", "_Rrec_relations_31", "nso_rr", "library", "builder", "builder_head", "builder_body", "_Rbuilder_head_32", "_Rbuilder_head_33", "bf_builder_body",
 			"wff_builder_body", "tau_builder_body", "gssotc", "start", "_Rstart_34", "__neg_0", "__neg_1", "__neg_2", "__neg_3", "__neg_4",
-			"__neg_5", "__neg_6", "__neg_7",
+			"__neg_5",
 		}) nts.get(nt);
 		return nts;
 	}
@@ -702,18 +702,10 @@ private:
 		q(nt(196), (t(38)+t(43)+t(28)+t(51)+t(37)+t(52)+t(29)+t(54)+t(37)+t(28)+t(43)+t(37)+t(6)+t(27)+t(47)+t(26)+t(37)+t(49)+t(26)+t(27)+t(35)+t(36)+t(28)+t(48)+t(38)));
 		// bf_remove_funiversal_cb_sym => 'b' 'f' '_' 'r' 'e' 'm' 'o' 'v' 'e' '_' 'f' 'u' 'n' 'i' 'v' 'e' 'r' 's' 'a' 'l' '_' 'c' 'b'.
 		q(nt(195), (t(38)+t(43)+t(28)+t(51)+t(37)+t(52)+t(29)+t(54)+t(37)+t(28)+t(43)+t(7)+t(49)+t(27)+t(54)+t(37)+t(51)+t(47)+t(35)+t(36)+t(28)+t(48)+t(38)));
-		// bf_cb_arg => capture.
-		q(nt(186), (nt(56)));
-		// __neg_6 => capture.
-		q(nt(241), (nt(56)));
-		// bf_cb_arg => ~( __neg_6 ) & bf.
-		q(nt(186), ~(nt(241)) & (nt(134)));
-		// wff_cb_arg => capture.
-		q(nt(191), (nt(56)));
-		// __neg_7 => capture.
-		q(nt(242), (nt(56)));
-		// wff_cb_arg => ~( __neg_7 ) & wff.
-		q(nt(191), ~(nt(242)) & (nt(78)));
+		// bf_cb_arg => bf.
+		q(nt(186), (nt(134)));
+		// wff_cb_arg => wff.
+		q(nt(191), (nt(78)));
 		// bf_and_cb_sym => 'b' 'f' '_' 'a' 'n' 'd' '_' 'c' 'b'.
 		q(nt(185), (t(38)+t(43)+t(28)+t(35)+t(49)+t(55)+t(28)+t(48)+t(38)));
 		// bf_or_cb_sym => 'b' 'f' '_' 'o' 'r' '_' 'c' 'b'.
