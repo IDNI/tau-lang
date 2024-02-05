@@ -1,6 +1,3 @@
-// This file is generated from a file parser/tau.tgf by
-//       https://github.com/IDNI/parser/tools/tgf
-//
 #ifndef __TAU_PARSER_H__
 #define __TAU_PARSER_H__
 #include <string.h>
@@ -278,8 +275,8 @@ private:
 		q(nt(52), (nt(56)));
 		// offset => shift.
 		q(nt(52), (nt(57)));
-		// shift => capture minus num.
-		q(nt(57), (nt(56)+nt(45)+nt(55)));
+		// shift => capture ws minus ws num.
+		q(nt(57), (nt(56)+nt(14)+nt(45)+nt(14)+nt(55)));
 		// num => digits.
 		q(nt(55), (nt(33)));
 		// variable => var.
