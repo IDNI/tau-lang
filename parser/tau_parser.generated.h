@@ -778,8 +778,8 @@ private:
 		q(nt(220), (nt(219)+nt(220)));
 		// rec_relations => _Rrec_relations_29.
 		q(nt(218), (nt(220)));
-		// nso_rr => rec_relations ws main.
-		q(nt(221), (nt(218)+nt(14)+nt(212)));
+		// nso_rr => rec_relations main.
+		q(nt(221), (nt(218)+nt(212)));
 		// library => rules.
 		q(nt(222), (nt(214)));
 		// builder => ws builder_head ws builder_body ws dot.

@@ -286,7 +286,7 @@ rule                   => wff_rule | bf_rule | tau_rule.
 rules                  => (ws rule)*.
 rec_relation           => bf_rec_relation | wff_rec_relation.
 rec_relations          => (ws rec_relation)*.
-nso_rr                 => rec_relations ws main.
+nso_rr                 => rec_relations main.
 library                => rules.
 # each builder is define on its own string
 # TODO explit builders by type: bf, wff, and tau
