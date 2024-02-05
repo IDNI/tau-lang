@@ -450,9 +450,9 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<st
 }
 
 template <typename... BAs>
-nso_rr<BAs...> replace_captures_by_step(nso_rr<BAs...>& form, int step) {
+nso_rr<BAs...> replace_captures_by_shift(nso_rr<BAs...>& form, int step) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	for(auto& n: select_all(form.main, is_non_terminal<tau_parser::step, BAs...>)) {
+	for(auto& n: select_all(form.main, is_non_terminal<tau_parser::shift, BAs...>)) {
 		auto digits = make_node<tau_sym<BAs...>>(step, {});
 		auto num = make_node<tau_sym<BAs...>>(tau_parser::num, {digits});
 		if (auto c = n | tau_parser::capture; c.has_value()) {
@@ -466,7 +466,7 @@ nso_rr<BAs...> replace_captures_by_step(nso_rr<BAs...>& form, int step) {
 }
 
 template <typename... BAs>
-nso_rr<BAs...> apply_rec_relations_by_step(nso_rr<BAs...>& form) {
+nso_rr<BAs...> apply_rec_relations_by_shift(nso_rr<BAs...>& form) {
 	// TODO (LOW) exit if no rec. relations
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 
@@ -495,8 +495,8 @@ nso_rr<BAs...> apply_rec_relations_by_step(nso_rr<BAs...>& form) {
 
 template <typename... BAs>
 nso_rr<BAs...> prepare_main_for_step(nso_rr<BAs...>& form, int step) {
-	auto nform = replace_captures_by_step<BAs...>(form, step);
-	return apply_rec_relations_by_step<BAs...>(nform);
+	auto nform = replace_captures_by_shift<BAs...>(form, step);
+	return apply_rec_relations_by_shift<BAs...>(nform);
 }
 
 template <typename... BAs>

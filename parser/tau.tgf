@@ -60,7 +60,6 @@ sym                    => chars.
 # TODO (HIGH) check programatically that no shift is use in a rec_relation defs
 offsets                => open_bracket ws offset (ws comma ws offset)* ws close_bracket.
 offset                 => num | capture | shift.
-step                   => num | capture | shift.
 shift                  => capture minus num.
 num                    => digits.
 
@@ -116,7 +115,7 @@ wff                    => wff_ref | wff_and | wff_neg | wff_xor | wff_conditiona
 			| wff_t | wff_f | capture | bool_variable | wff_ball | wff_bex
 			| bf_eq | bf_neq | bf_less | bf_less_equal | bf_greater.
 wff_ref                => sym ws offsets ws wff_ref_args.
-wff_ref_args           => open_parenthesis (ws variable)* ws close_parenthesis.
+wff_ref_args           => open_parenthesis (ws (variable | capture))* ws close_parenthesis.
 wff_and                => open_parenthesis ws wff ws wff_and_sym ws wff ws close_parenthesis.
 wff_or                 => open_parenthesis ws wff ws wff_or_sym ws wff ws close_parenthesis.
 wff_xor                => open_parenthesis ws wff ws wff_xor_sym ws wff ws close_parenthesis.
@@ -166,7 +165,7 @@ bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_su
 bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_or
 			| bf_all | bf_ex | bf_t | bf_f | variable | capture.
 bf_ref                 => sym offsets bf_ref_args.
-bf_ref_args            => open_parenthesis ws variable (ws variable)* ws close_parenthesis.
+bf_ref_args            => open_parenthesis (ws (variable | capture))* ws close_parenthesis.
 bf_and                 => open_parenthesis ws bf ws bf_and_sym ws bf ws close_parenthesis.
 bf_or                  => open_parenthesis ws bf ws bf_or_sym ws bf ws close_parenthesis.
 bf_xor                 => open_parenthesis ws bf ws bf_xor_sym ws bf ws close_parenthesis.
