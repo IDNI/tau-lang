@@ -52,7 +52,7 @@ TEST_SUITE("parsing basic nso_rr") {
 
 	TEST_CASE("nso_rr wff_rec_relation") {
 		const char* sample =
-			"g [0] (Y) ::= T."
+			"g[0](Y) ::= T."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -62,7 +62,7 @@ TEST_SUITE("parsing basic nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation") {
 		const char* sample =
-			"g [0] (Y) := 1."
+			"g[0](Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
