@@ -25,7 +25,7 @@ set(TAU_SOURCES
 	iterators.cpp
 )
 
-set(CLI_SOURCES main.cpp)
+set(CLI_SOURCES main.cpp ../external/parser/src/cli.cpp)
 
 #
 # object library
