@@ -13,9 +13,11 @@
 
 #include <iostream>
 
+#include "cli.h"
 #include "normalizer2.h"
 
 using namespace std;
+using namespace idni;
 using namespace idni::tau;
 
 // Trought all the code we would use the following tags to denote different
@@ -97,8 +99,43 @@ using namespace idni::tau;
 //
 // Just convert the current comments into proper doxygen description.
 
-int main(int /*argc*/, char** /*argv*/) {
-	// TODO (MEDIUM) tau main method, parse command line arguments, read input file,...
+cli::commands tau_commands() {
+	cli::commands cmds;
+	cmds["help"] = cli::command("help",
+		"detailed information about options");
+	return cmds;
+}
+
+cli::options tau_options() {
+	cli::options opts;
+	opts["help"] = cli::option("help", 'h', false)
+		.set_description("detailed information about options");
+	return opts;
+}
+
+// TODO (MEDIUM) add command to read input file,...
+int main(int argc, char** argv) {
+	vector<string> args;
+	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
+
+	cli cl("tau_lang", args, tau_commands(), "help", tau_options());
+	cl.set_description("Tau language");
+
+	if (cl.process_args() != 0) return cl.status();
+
+	auto opts = cl.get_processed_options();
+	auto cmd  = cl.get_processed_command();
+
+	// error if command is invalid
+	if (!cmd.ok()) return cl.error("invalid command", true);
+
+	// if --help/-h option is true, print help end exit
+	if (cmd.name() == "help" || opts["help"].get<bool>())
+		return cl.help(), 0;
+
+	// if cmd's --help/-h option is true, print cmd's help and exit
+	if (cmd.get<bool>("help")) return cl.help(cmd), 0;
+
 	// normalize, print output, etc.
 	return 0;
 }
