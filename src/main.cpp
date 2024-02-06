@@ -12,6 +12,7 @@
 // modified over time by the Author.
 
 #include <iostream>
+#include <fstream>
 
 #include "cli.h"
 #include "normalizer2.h"
@@ -19,6 +20,7 @@
 using namespace std;
 using namespace idni;
 using namespace idni::tau;
+using namespace idni::rewriter;
 
 // Trought all the code we would use the following tags to denote different
 // types of tasks or notes.
@@ -103,6 +105,16 @@ cli::commands tau_commands() {
 	cli::commands cmds;
 	cmds["help"] = cli::command("help",
 		"detailed information about options");
+	auto& run = cmds["run"] = cli::command("run",
+		"run a tau program");
+	run.add_option(cli::option("program", 'p', "@stdin")
+		.set_description("program to run"));
+	run.add_option(cli::option("help", 'h', false)
+		.set_description("detailed information about run options"));
+	run.add_option(cli::option("input", 'i', "@null")
+		.set_description("program's input"));
+	run.add_option(cli::option("output", 'o', "@stdout")
+		.set_description("program's output"));
 	return cmds;
 }
 
@@ -113,12 +125,67 @@ cli::options tau_options() {
 	return opts;
 }
 
+bool is_stdin(const string& s)  { return s == "@stdin" || s == "-"; }
+bool is_stdout(const string& s) { return s == "@stdout"; }
+bool is_null(const string& s)   { return s == "@null"; }
+int error(const string& s) {
+	cerr << s << "\n";
+	return 1;
+}
+int run_tau(const string& program, const string& input, const string& output) {
+	if (program == input)
+		return error("program and input cannot be the same");
+	else if (program == output)
+		return error("program and output cannot be the same");
+	else if (input == output && !is_null(input))
+		return error("input and output cannot be the same");
+
+	sp_tau_source_node prg_node, in_node, out_node;
+
+	if (is_null(program)) return error("program cannot be null");
+	else if (is_stdin(program)) prg_node = make_tau_source(cin);
+	else prg_node = make_tau_source_from_file(program);
+
+	if (is_null(input)) ;
+	else if (is_stdin(input)) in_node = make_tau_source(cin);
+	else in_node = make_tau_source_from_file(input);
+
+	// read input
+	if (in_node) {
+		DBG(cout << "input: `" << in_node << "`\n");
+	}
+
+	// read program
+	if (!prg_node) return error("cannot read program");
+	DBG(cout << "program: `" << prg_node << "`\n");
+
+	// run program
+	// TODO (MEDIUM) program execution
+	out_node = prg_node; // simulate execution by setting out_node to prg
+
+	ostream *out = 0;
+	ofstream outf;
+	if (is_null(output)) ;
+	else if (is_stdout(output)) out = &cout;
+	else if (!(outf = ofstream(output)).is_open())
+		return error("cannot open output file");
+	else out = &outf;
+
+	// write output
+	if (out && out_node) {
+		DBG(cout << "output: `" << out_node << "`\n");
+		*out << out_node;
+	}
+
+	return 0;
+}
+
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
 
-	cli cl("tau_lang", args, tau_commands(), "help", tau_options());
+	cli cl("tau", args, tau_commands(), "run", tau_options());
 	cl.set_description("Tau language");
 
 	if (cl.process_args() != 0) return cl.status();
@@ -136,6 +203,11 @@ int main(int argc, char** argv) {
 	// if cmd's --help/-h option is true, print cmd's help and exit
 	if (cmd.get<bool>("help")) return cl.help(cmd), 0;
 
-	// normalize, print output, etc.
+	// run command
+	if (cmd.name() == "run") return run_tau(
+		cmd.get<string>("program"),
+		cmd.get<string>("input"),
+		cmd.get<string>("output"));
+
 	return 0;
 }
