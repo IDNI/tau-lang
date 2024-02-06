@@ -893,24 +893,11 @@ auto drop_location = [](const parse_symbol_t& n) -> symbol_t { return n.first; }
 template <typename parse_symbol_t, typename symbol_t>
 using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
-// make a tree from the given source code string.
-template<typename parser_t, typename transformer_t, typename parse_symbol_t,
-	typename symbol_t>
-sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/,
-	const std::string source)
+template<typename parser_t>
+void check_parser_result(const std::string& source,
+	const typename parser_t::forest_type* f,
+	parser_t& parser)
 {
-	using parse_forest = idni::forest<parse_symbol_t>;
-	//using parse_tree = typename parse_forest::tree;
-	using sp_parse_tree = typename parse_forest::sptree;
-	//using parse_graph = typename parse_forest::graph;
-
-	sp_parse_tree t;
-	static parser_t parser;
-	auto f = parser.parse(source.c_str(), source.size());
-	// MARK output the error if the parser failed
-	// avoiding doctest issues, uncomment for errors
-	// if (!f || !parser.found())
-	// 	std::cerr << parser.get_error().to_str() << std::endl;
 #ifdef DEBUG
 	if (!f || !parser.found())
 		std::cerr << "# source: `" << source << "`\n"
@@ -934,27 +921,80 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& /*transformer*/,
 		}
 	}
 #endif // DEBUG
-	auto get_tree = [&f, &t] (auto& g) {
-			f->remove_recursive_nodes(g);
-			f->remove_binarization(g);
-			t = g.extract_trees();
-			// MARK output the parsed tree
-			// #ifdef OUTPUT_PARSED_TREES
-			//t->to_print(std::cout);
-			// #endif // OUTPUT_PARSED_TREES
-			return false;
-		};
-	f->extract_graphs(f->root(), get_tree);
+}
 
-	map_transformer<drop_location_t<parse_symbol_t, symbol_t>,
-		sp_parse_tree, sp_node<symbol_t>> transform(
+// make a tree from the given source code forest.
+template<typename parser_t, typename transformer_t, typename parse_symbol_t,
+	typename symbol_t>
+sp_node<symbol_t> make_node_from_forest(const transformer_t& /*transformer*/,
+	forest<parse_symbol_t>* f)
+{
+	auto t = f->get_tree();
+	using sp_parse_tree = decltype(t);
+
+	map_transformer<
+		drop_location_t<parse_symbol_t, symbol_t>,
+		sp_parse_tree,
+		sp_node<symbol_t>> transform(
 			drop_location<parse_symbol_t, symbol_t>);
 	return post_order_traverser<
-			map_transformer<drop_location_t<parse_symbol_t, symbol_t>, sp_parse_tree, sp_node<symbol_t>>,
-			all_t<sp_parse_tree>,
-			sp_parse_tree, sp_node<symbol_t>>
-		(transform, all<sp_parse_tree>)(t);
+		map_transformer<
+			drop_location_t<parse_symbol_t, symbol_t>,
+			sp_parse_tree,
+			sp_node<symbol_t>>,
+		all_t<sp_parse_tree>,
+		sp_parse_tree,
+		sp_node<symbol_t>>(transform, all<sp_parse_tree>)(t);
 }
+
+// make a tree from the given source code string.
+template<typename parser_t, typename transformer_t, typename parse_symbol_t,
+	typename symbol_t>
+sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
+	const std::string source)
+{
+	// TODO (LOW) we have three static parser_t instances in various
+	// make_node_from_* functions
+	static parser_t parser;
+	auto f = parser.parse(source.c_str(), source.size());
+#ifdef DEBUG
+	check_parser_result<parser_t>(source, f.get(), parser);
+#endif // DEBUG
+	return make_node_from_forest<parser_t, transformer_t,
+		parse_symbol_t, symbol_t>(transformer, f.get());
+}
+
+// make a tree from the given source code stream.
+template<typename parser_t, typename transformer_t, typename parse_symbol_t,
+	typename symbol_t>
+sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
+	std::istream& is)
+{
+	static parser_t parser;
+	auto f = parser.parse(is);
+#ifdef DEBUG
+	check_parser_result<parser_t>("<@stdin>", f.get(), parser);
+#endif // DEBUG
+	return make_node_from_forest<parser_t, transformer_t,
+		parse_symbol_t, symbol_t>(transformer, f.get());
+}
+
+// make a tree from the given source code file.
+template<typename parser_t, typename transformer_t, typename parse_symbol_t,
+	typename symbol_t>
+sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
+	const std::string& filename)
+{
+	static parser_t parser;
+	auto f = parser.parse(filename, MMAP_READ);
+#ifdef DEBUG
+	check_parser_result<parser_t>(
+		std::string("<")+filename+">", f.get(), parser);
+#endif // DEBUG
+	return make_node_from_forest<parser_t, transformer_t,
+		parse_symbol_t, symbol_t>(transformer, f.get());
+}
+
 } // namespace idni::rewriter
 
 //

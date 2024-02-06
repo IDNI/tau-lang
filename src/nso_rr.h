@@ -844,7 +844,7 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 // creates a specific rule from a generic rule.
 template<typename... BAs>
 tau_rule<BAs...> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::nonterminal type_t, sp_tau_node<BAs...>& rule) {
-	print_sp_tau_node(std::cout, rule); std::cout << std::endl;
+	DBG(print_sp_tau_node(std::cout, rule); std::cout << std::endl;)
 	auto elements = rule | rule_t || type_t;
 	return { elements[0], elements[1] };
 }
@@ -891,15 +891,35 @@ sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
 
 // make a tau source from the given source code string.
 sp_tau_source_node make_tau_source(const std::string& source) {
-	using parse_lit = idni::lit<char, char>;
-	using parse_location = std::array<size_t, 2UL>;
-	using parse_symbol = std::pair<parse_lit, parse_location>;
+	using parse_symbol = tau_parser::node_type;
 	return make_node_from_string<
-			tau_parser,
-			drop_location_t<parse_symbol, tau_source_sym>,
-			parse_symbol,
-			tau_source_sym>(
-		drop_location<parse_symbol, tau_source_sym>, source);
+		tau_parser,
+		drop_location_t<parse_symbol, tau_source_sym>,
+		parse_symbol,
+		tau_source_sym>(
+			drop_location<parse_symbol, tau_source_sym>, source);
+}
+
+// make a tau source from the given source code stream.
+sp_tau_source_node make_tau_source(std::istream& is) {
+	using parse_symbol = tau_parser::node_type;
+	return make_node_from_stream<
+		tau_parser,
+		drop_location_t<parse_symbol, tau_source_sym>,
+		parse_symbol,
+		tau_source_sym>(
+			drop_location<parse_symbol, tau_source_sym>, is);
+}
+
+// make a tau source from the given source code stream.
+sp_tau_source_node make_tau_source_from_file(const std::string& filename) {
+	using parse_symbol = tau_parser::node_type;
+	return make_node_from_file<
+		tau_parser,
+		drop_location_t<parse_symbol, tau_source_sym>,
+		parse_symbol,
+		tau_source_sym>(
+			drop_location<parse_symbol, tau_source_sym>, filename);
 }
 
 template<typename...BAs>
@@ -1694,7 +1714,7 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>&
 	std::visit(idni::tau::overloaded {
 		[&stream](const idni::tau::tau_source_sym& t) {
 			if (!t.nt()) stream << t.t();
-		}, [&stream](const std::variant<BAs...>& bae) {
+		}, [&stream](const std::variant<BAs...>& /*bae*/) {
 			// TODO (HIGH) implement operator<< for tau_ba
 			// stream << bae;
 		}, [&stream](const size_t& n) { stream << n; }}, rs);
