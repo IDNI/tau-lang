@@ -821,9 +821,9 @@ nso_rr<BAs...> resolve_types(const nso_rr<BAs...> f) {
 	return { resolve_types(f.rec_relations), resolve_type(f.main) };
 }
 
-// creates a specific rule from a generic rule, also used for rec. relations
-template<size_t rule_t, size_t matcher_t, size_t body_t, typename... BAs>
-tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
+// creates a specific rule from a generic rule
+template<typename... BAs>
+tau_rule<BAs...> make_rule(tau_parser::nonterminal rule_t, tau_parser::nonterminal matcher_t, tau_parser::nonterminal body_t, sp_tau_node<BAs...>& rule) {
 	auto matcher = rule | rule_t | matcher_t| only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 	auto body = rule | rule_t | body_t | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 	return { matcher, body };
@@ -834,11 +834,19 @@ template<typename... BAs>
 tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rule: return make_rule<tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
-	case tau_parser::wff_rule: return make_rule<tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
-	case tau_parser::tau_rule: return make_rule<tau_parser::tau_rule, tau_parser::tau_matcher, tau_parser::tau_body, BAs...>(rule);
+	case tau_parser::bf_rule: return make_rule<BAs...>(tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, rule);
+	case tau_parser::wff_rule: return make_rule<BAs...>(tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, rule);
+	case tau_parser::tau_rule: return make_rule<BAs...>(tau_parser::tau_rule, tau_parser::tau_matcher, tau_parser::tau_body, rule);
 	default: assert(false); return {};
 	};
+}
+
+// creates a specific rule from a generic rule.
+template<typename... BAs>
+tau_rule<BAs...> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::nonterminal type_t, sp_tau_node<BAs...>& rule) {
+	print_sp_tau_node(std::cout, rule); std::cout << std::endl;
+	auto elements = rule | rule_t || type_t;
+	return { elements[0], elements[1] };
 }
 
 // creates a specific rule from a generic rule.
@@ -846,8 +854,8 @@ template<typename... BAs>
 tau_rec_relation<BAs...> make_rec_relation(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rec_relation: return make_rule<tau_parser::bf_rec_relation, tau_parser::bf_matcher, tau_parser::bf_body, BAs...>(rule);
-	case tau_parser::wff_rec_relation: return make_rule<tau_parser::wff_rec_relation, tau_parser::wff_matcher, tau_parser::wff_body, BAs...>(rule);
+	case tau_parser::bf_rec_relation: return make_rec_relation<BAs...>(tau_parser::bf_rec_relation, tau_parser::bf, rule);
+	case tau_parser::wff_rec_relation: return make_rec_relation<BAs...>(tau_parser::wff_rec_relation, tau_parser::wff, rule);
 	default: assert(false); return {};
 	};
 }
@@ -1683,12 +1691,13 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_sym& 
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>& rs) {
 	// using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
-	auto print = overload(
+	std::visit(idni::tau::overloaded {
 		[&stream](const idni::tau::tau_source_sym& t) {
-			if (t.nt()) stream << t.t(); },
-		[&stream](const std::variant<BAs...>& bae) { stream << bae; },
-		[&stream](const size_t& n) { stream << n; });
-	std::visit(print, rs);
+			if (!t.nt()) stream << t.t();
+		}, [&stream](const std::variant<BAs...>& bae) {
+			// TODO (HIGH) implement operator<< for tau_ba
+			// stream << bae;
+		}, [&stream](const size_t& n) { stream << n; }}, rs);
 	return stream;
 }
 
@@ -1713,7 +1722,9 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::bindings<BAs...>
 // IDEA maybe it should be move to out.h
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n){
-	return stream << idni::tau::make_string(idni::tau::tau_node_terminal_extractor<BAs...>, n);
+	stream << n->value;
+	for (const auto& c : n->child) stream << c;
+	return stream;
 }
 
 // outputs a sp_tau_source_node to a stream, using the stringify transformer
