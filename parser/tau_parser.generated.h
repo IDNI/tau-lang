@@ -6,30 +6,36 @@
 #include <string.h>
 #include "parser.h"
 struct tau_parser {
+	using char_type     = char;
+	using terminal_type = char;
+	using traits_type   = std::char_traits<char_type>;
+	using int_type      = typename traits_type::int_type;
+	using symbol_type   = idni::lit<char_type, terminal_type>;
+	using location_type = std::array<size_t, 2>;
+	using node_type     = std::pair<symbol_type, location_type>;
+	using parser_type   = idni::parser<char_type, terminal_type>;
+	using options       = parser_type::options;
+	using parse_options = parser_type::parse_options;
+	using forest_type   = parser_type::pforest;
+	using input_type    = parser_type::input;
+	using decoder_type  = parser_type::input::decoder_type;
+	using encoder_type  = std::function<std::basic_string<char_type>(
+			const std::vector<terminal_type>&)>;
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
 		g(nts, load_prods(), nt(235), cc), p(g, load_opts()) {}
-	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		const char* data, size_t size = 0, size_t max_l = 0,
-		char eof = std::char_traits<char>::eof())
-			{ return p.parse(data, size, max_l, eof); }
-	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		std::basic_istream<char>& is, size_t max_l = 0,
-		char eof = std::char_traits<char>::eof())
-			{ return p.parse(is, max_l, eof); }
-	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		std::string fn, mmap_mode m, size_t max_l = 0,
-		char eof = std::char_traits<char>::eof())
-			{ return p.parse(fn, m, max_l, eof); }
+	std::unique_ptr<forest_type> parse(const char_type* data, size_t size=0,
+		parse_options po = {}) { return p.parse(data, size, po); }
+	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,
+		parse_options po = {}) { return p.parse(is, po); }
+	std::unique_ptr<forest_type> parse(std::string fn, mmap_mode m,
+		parse_options po = {}) { return p.parse(fn, m, po); }
 #ifndef WIN32
-	std::unique_ptr<typename idni::parser<char, char>::pforest> parse(
-		int fd, size_t max_l = 0,
-		char eof = std::char_traits<char>::eof())
-			{ return p.parse(fd, max_l, eof); }
+	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})
+		{ return p.parse(fd, po); }
 #endif //WIN32
 	bool found() { return p.found(); }
-	typename idni::parser<char, char>::error get_error()
-		{ return p.get_error(); }
+	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
 		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, eol, 
 		ws_comment, _Rws_comment_0, _Rws_comment_1, ws_required, ws, hex_escape, unicode_escape, char_escape_encode, esc, q_char, 
@@ -60,9 +66,11 @@ struct tau_parser {
 		__neg_23, __neg_24, __neg_25, __neg_26, __neg_27, __neg_28, __neg_29, __neg_30, __neg_31, __neg_32, 
 		__neg_33, __neg_34, __neg_35, __neg_36, __neg_37, __neg_38, 
 	};
-	size_t id(const std::basic_string<char>& name) { return nts.get(name); }
+	size_t id(const std::basic_string<char_type>& name) {
+		return nts.get(name);
+	}
 private:
-	std::vector<char> ts{
+	std::vector<terminal_type> ts{
 		'\0', '\n', '\r', '\t', '#', '\\', 'x', 'u', '\'', 
 		'"', '`', ':', '=', '.', '(', ')', '[', ']', '{', 
 		'}', '-', ';', '<', ',', '?', '$', 't', 'i', '_', 
@@ -70,18 +78,19 @@ private:
 		'T', 'F', '+', '~', 'f', '1', '0', 'h', 's', 'c', 
 		'n', 'g', 'r', 'm', 'w', 'v', 'd', 'q', 'z', 'p', 
 	};
-	idni::nonterminals<char, char> nts{};
-	idni::char_class_fns<char> cc;
-	idni::grammar<char, char> g;
-	idni::parser<char, char> p;
-	idni::prods<char, char> t(size_t tid) {
-		return idni::prods<char, char>(ts[tid]);
+	idni::nonterminals<char_type, terminal_type> nts{};
+	idni::char_class_fns<terminal_type> cc;
+	idni::grammar<char_type, terminal_type> g;
+	parser_type p;
+	idni::prods<char_type, terminal_type> t(size_t tid) {
+		return idni::prods<char_type, terminal_type>(ts[tid]);
 	}
-	idni::prods<char, char> nt(size_t ntid) {
-		return idni::prods<char, char>(idni::lit<char, char>(ntid, &nts));
+	idni::prods<char_type, terminal_type> nt(size_t ntid) {
+		return idni::prods<char_type, terminal_type>(
+			symbol_type(ntid, &nts));
 	}
-	idni::nonterminals<char, char> load_nonterminals() const {
-		idni::nonterminals<char, char> nts{};
+	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
+		idni::nonterminals<char_type, terminal_type> nts{};
 		for (const auto& nt : {
 			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "eol", 
 			"ws_comment", "_Rws_comment_0", "_Rws_comment_1", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", 
@@ -114,8 +123,8 @@ private:
 		}) nts.get(nt);
 		return nts;
 	}
-	idni::char_class_fns<char> load_cc() {
-		return idni::predefined_char_classes<char, char>({
+	idni::char_class_fns<terminal_type> load_cc() {
+		return idni::predefined_char_classes<char_type, terminal_type>({
 			"eof",
 			"space",
 			"digit",
@@ -126,12 +135,13 @@ private:
 			"printable",
 		}, nts);
 	}
-	idni::parser<char, char>::options load_opts() {
-		idni::parser<char, char>::options o;
+	options load_opts() {
+		options o;
 		return o;
 	}
-	idni::prods<char, char> load_prods() {
-		idni::prods<char, char> q, nul(idni::lit<char, char>{});
+	idni::prods<char_type, terminal_type> load_prods() {
+		idni::prods<char_type, terminal_type> q,
+			nul(symbol_type{});
 		// eol => '\n'.
 		q(nt(9), (t(1)));
 		// eol => '\r'.
