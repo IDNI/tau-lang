@@ -109,6 +109,8 @@ cli::commands tau_commands() {
 		"run a tau program");
 	run.add_option(cli::option("program", 'p', "@stdin")
 		.set_description("program to run"));
+	run.add_option(cli::option("evaluate", 'e', "")
+		.set_description("program to be evaluated (alternative to -p)"));
 	run.add_option(cli::option("help", 'h', false)
 		.set_description("detailed information about run options"));
 	run.add_option(cli::option("input", 'i', "@null")
@@ -132,17 +134,26 @@ int error(const string& s) {
 	cerr << s << "\n";
 	return 1;
 }
-int run_tau(const string& program, const string& input, const string& output) {
-	if (program == input)
-		return error("program and input cannot be the same");
-	else if (program == output)
-		return error("program and output cannot be the same");
-	else if (input == output && !is_null(input))
+// runs tau program or an evaluate string using input and output
+int run_tau(const string& program, const string& input, const string& output,
+	const string& evaluate = "")
+{
+	bool eval = evaluate.size();
+	if (input == output && !is_null(input))
 		return error("input and output cannot be the same");
+	if (eval && program.size() && !is_null(program) && !is_stdin(program))
+		return error("cannot use both --program and --evaluate");
+	if (!eval) {
+		if (program == input)
+			return error("program and input cannot be the same");
+		if (program == output)
+			return error("program and output cannot be the same");
+	}
 
 	sp_tau_source_node prg_node, in_node, out_node;
 
-	if (is_null(program)) return error("program cannot be null");
+	if (eval) prg_node = make_tau_source(evaluate);
+	else if (is_null(program)) return error("program cannot be null");
 	else if (is_stdin(program)) prg_node = make_tau_source(cin);
 	else prg_node = make_tau_source_from_file(program);
 
@@ -207,7 +218,8 @@ int main(int argc, char** argv) {
 	if (cmd.name() == "run") return run_tau(
 		cmd.get<string>("program"),
 		cmd.get<string>("input"),
-		cmd.get<string>("output"));
+		cmd.get<string>("output"),
+		cmd.get<string>("evaluate"));
 
 	return 0;
 }
