@@ -111,68 +111,8 @@ static auto collapse_positives_tau = make_library<BAs...>(
 // the implementation of "Deducing this" on gcc.
 // See also (https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html)
 // and https://devblogs.microsoft.com/cppblog/cpp23-deducing-this/ for how to use
-// "Deducing this" on CRTP..
+// "Deducing this" on CRTP.
 
-// TODO (HIGH) give a proper implementation for <=>, == and != operators
-template<typename...BAs>
-auto operator<=>(const tau_sym<BAs...>& l, const tau_sym<BAs...>& r) {
-	/*auto check = std::addressof(l)<=>std::addressof(r);
-	std::cout << "l  <=> r = ";
-	if (check == std::strong_ordering::less) std::cout << "less" << std::endl;
-	else if (check == std::strong_ordering::equal) std::cout << "equal" << std::endl;
-	else if (check == std::strong_ordering::greater) std::cout << "greater" << std::endl;
-	else std::cout << "unordered" << std::endl;
-	return check;*/
-	return std::addressof(l)<=>std::addressof(r);
-	/*auto cmp = overloaded(*/
-		/*[](const tau_source_sym& l, const tau_source_sym& r) -> std::partial_ordering {*/
-		/*[](const tau_source_sym& l, const tau_source_sym& r) -> std::strong_ordering {
-			return l<=>r;*/
-			/*std::strong_ordering strong = l<=> r;
-			if (strong == std::strong_ordering::less) {
-				return std::partial_ordering::less;
-			} else if (strong == std::strong_ordering::equal) {
-				return std::partial_ordering::equivalent;
-			} else  {
-				return std::partial_ordering::greater;
-			}*/
-		/*}, [](const tau_source_sym&, const auto&) -> std::partial_ordering { return std::partial_ordering::greater; },*/
-		/*}, [](const tau_source_sym&, const auto&) -> std::strong_ordering { return std::strong_ordering::greater; },*/
-		/*[](const auto&, const tau_source_sym&) -> std::partial_ordering { return std::strong_ordering::less; },*/
-		/*[](const auto&, const tau_source_sym&) -> std::strong_ordering { return std::strong_ordering::less; },*/
-		/*[](const size_t& l, const size_t& r) -> std::partial_ordering {*/
-		/*[](const size_t& l, const size_t& r) -> std::strong_ordering {
-			return l<=>r;*/
-			/*std::strong_ordering strong = l<=> r;
-			if (strong == std::strong_ordering::less) {
-				return std::partial_ordering::less;
-			} else if (strong == std::strong_ordering::equal) {
-				return std::partial_ordering::equivalent;
-			} else  {
-				return std::partial_ordering::greater;
-			}*/
-		/*},*/
-		/*[](const size_t&, const auto&) -> std::partial_ordering { return std::partial_ordering::greater; },*/
-		/*[](const size_t&, const auto&) -> std::strong_ordering { return std::strong_ordering::greater; },*/
-		/*[](const auto&, const size_t&) -> std::partial_ordering { return std::partial_ordering::less; },*/
-		/*[](const auto&, const size_t&) -> std::strong_ordering { return std::strong_ordering::less; },*/
-		// we could allow unordered BAs by defining here the order of the BAs as follows
-		// []<typename T>(const T& l, const T& r) -> std::partial_ordering {
-		//		if ((l & ~r == false) | (l ^ ~r != false)) return std::partial_ordering::less;
-		//		if (l ^ r == false) return std::partial_ordering::equivalent;
-		//		if ((l & ~r != false) | (l ^ ~r == false)) return std::partial_ordering::greater;
-		//		return std::partial_ordering::unordered;
-		// otherwise, we need the following:
-		/*[]<typename T>(const T& l, const T& r) -> std::partial_ordering {*/
-		/*[]<typename T>(const T& l, const T& r) -> std::strong_ordering {
-			return std::addressof(l)<=>std::addressof(r);*/
-			//return l<=>r;
-		/*},*/
-		/*[](const auto&, const auto&) -> std::partial_ordering { return std::partial_ordering::unordered; }*/
-		/*[](const auto&, const auto&) -> std::partial_ordering { throw std::logic_error("bad type"); }
-	);
-	return std::visit(cmp, l, r);*/
-}
 
 template<typename...BAs>
 struct tau_ba {
