@@ -838,6 +838,7 @@ template <typename node_t, typename is_ignore_t, typename is_capture_t,
 	typename is_skip_t>
 node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, is_capture_t& c, is_skip_t& sk) {
 	auto [p , s] = r;
+
 	environment<node_t> u;
 	pattern_matcher_with_skip<node_t, is_ignore_t, is_capture_t, is_skip_t>
 		matcher {p, u, i, c, sk};
