@@ -353,9 +353,10 @@ struct repeat_all {
 		auto nn = n;
 		std::set<sp_tau_node<BAs...>> visited;
 		while (true) {
-			nn = s(nn);
-			if (visited.contains(nn)) break;
-			visited.insert(nn);
+			for (auto& l: s.libraries) nn = l(nn);
+			auto nnn = s(nn);
+			if (nnn == nn) break;
+			nn = nnn;
 		}
 		return nn;
 	}
@@ -480,12 +481,14 @@ nso_rr<BAs...> apply_rec_relations_by_shift(nso_rr<BAs...>& form) {
 			off += get<size_t>(((current.value() | tau_parser::num).value())->value);
 			current = current.value() | tau_parser::shift;
 		}
+
 		auto digits = make_node<tau_sym<BAs...>>(off, {});
-		auto num = make_node<tau_sym<BAs...>>(tau_parser::num, {digits});
-		auto nshift = make_node<tau_sym<BAs...>>(tau_parser::shift, {
+		auto num = make_node<tau_sym<BAs...>>(tau_source_sym(tau_parser::num), {digits});
+		auto nshift = make_node<tau_sym<BAs...>>(tau_source_sym(tau_parser::shift), {
 			shift | tau_parser::capture | optional_value_extractor<sp_tau_node<BAs...>>,
 			shift | tau_parser::minus | optional_value_extractor<sp_tau_node<BAs...>>,
 			num});
+			
 		changes[shift] = nshift;
 	}
 
