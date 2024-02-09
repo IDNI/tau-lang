@@ -488,7 +488,7 @@ nso_rr<BAs...> apply_rec_relations_by_shift(nso_rr<BAs...>& form) {
 			shift | tau_parser::capture | optional_value_extractor<sp_tau_node<BAs...>>,
 			shift | tau_parser::minus | optional_value_extractor<sp_tau_node<BAs...>>,
 			num});
-			
+
 		changes[shift] = nshift;
 	}
 
