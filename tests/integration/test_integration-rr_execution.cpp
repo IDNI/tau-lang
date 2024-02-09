@@ -391,3 +391,100 @@ TEST_SUITE("mutual rec cases") {
 	}
 
 }
+
+TEST_SUITE("multiple rec relations") {
+
+	TEST_CASE("wff_rec_relation: case 1") {
+		const char* sample =
+			"g[0]($Y) ::= T."
+			"h[0]($Y) ::= F."
+			"(g[0](Y) && h[0](Y)).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("wff_rec_relation: case 2") {
+		const char* sample =
+			"g[0]($Y) ::= T."
+			"g[$n]($Y) ::= g[$n - 1]($Y)."
+			"h[0]($Y) ::= F."
+			"h[$n]($Y) ::= h[$n - 1]($Y)."
+			"(g[1](Y) && h[1](Y)).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("wff_rec_relation: case 3") {
+		const char* sample =
+			"g[0]($Y) ::= T."
+			"g[$n]($Y) ::= g[$n - 1]($Y)."
+			"h[0]($Y) ::= T."
+			"h[$n]($Y) ::= h[$n - 1]($Y)."
+			"(g[1](Y) && h[1](Y)).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+
+	TEST_CASE("bf_rec_relation: case 1") {
+		const char* sample =
+			"g[0]($Y) := 0."
+			"h[0]($Y) := 1."
+			"((g[0](Y) | h[0](Y)) = 0).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("bf_rec_relation: case 2") {
+		const char* sample =
+			"g[0]($Y) := 1."
+			"g[$n]($Y) := g[$n - 1]($Y)."
+			"h[0]($Y) := 0."
+			"h[$n]($Y) := h[$n - 1]($Y)."
+			"((g[1](Y) & h[1](Y)) = 0).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("bf_rec_relation: case 3") {
+		const char* sample =
+			"g[0]($Y) := 1."
+			"g[$n]($Y) := g[$n - 1]($Y)."
+			"h[0]($Y) := 1."
+			"h[$n]($Y) := h[$n - 1]($Y)."
+			"((g[1](Y) & h[1](Y)) = 0).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula).main;
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+}

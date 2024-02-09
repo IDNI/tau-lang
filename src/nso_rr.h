@@ -1661,7 +1661,6 @@ sp_tau_node<BAs...> nso_rr_apply(const tau_rule<BAs...>& r, const sp_tau_node<BA
 	std::cout << "(T): rule.second = "; print_sp_tau_node(std::cout, r.second); std::cout << std::endl;
 	std::cout << "(T): n           = " << n; std::cout << std::endl;
 	std::cout << "(T): n           = "; print_sp_tau_node(std::cout, n); std::cout << std::endl;
-
 	#endif // DEBUG
 
 	// apply the rule
