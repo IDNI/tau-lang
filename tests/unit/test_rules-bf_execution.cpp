@@ -264,7 +264,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
@@ -282,7 +282,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
@@ -300,7 +300,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
@@ -318,7 +318,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | tau_parser::bf_eq
 			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
 		CHECK( check.has_value() );
 	}
@@ -336,7 +336,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff | tau_parser::wff_f;
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 
@@ -353,7 +353,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff | tau_parser::wff_t;
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 
@@ -370,7 +370,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff
 			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_t;
 		CHECK( check.has_value() );
 	}
@@ -388,7 +388,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff
 			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
@@ -404,7 +404,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule);
 		auto result = nso_rr_apply(tau_rule, sample_statement);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff
 			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
@@ -420,7 +420,7 @@ TEST_SUITE("executing bf rules") {
 		auto tau_rule = make_rule(rule);
 		auto result = nso_rr_apply(tau_rule, sample_statement);
 		auto check = result
-			| tau_parser::nso_rr | tau_parser::main | tau_parser::wff
+			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff
 			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
