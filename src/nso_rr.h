@@ -875,7 +875,7 @@ template<typename... BAs>
 rec_relations<BAs...> make_rec_relations(sp_tau_node<BAs...>& tau_source) {
 	rules<BAs...> rs;
 	// TODO (LOW) change call to select by operator|| and operator|
-	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rec_relation, BAs...>))
+	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::nso_rec_relation, BAs...>))
 		rs.push_back(make_rec_relation<BAs...>(r));
 	return rs;
 }
@@ -971,7 +971,7 @@ library<BAs...> make_library(const std::string& source) {
 template<typename binder_t, typename... BAs>
 nso_rr<BAs...> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
 	auto src = make_tau_code<BAs...>(tau_source);
-	auto unbinded_main = src | tau_parser::nso_rr | tau_parser::main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto unbinded_main = src | tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
 	auto binded_main = post_order_traverser<
 			binder_t,
 			all_t<sp_tau_node<BAs...>>,

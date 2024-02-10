@@ -224,7 +224,7 @@ struct tau_factory {
 template<typename binder_t, typename... BAs>
 tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
 	auto src = make_tau_code<tau_ba<BAs...>, BAs...>(tau_source);
-	auto unbinded_form = src | tau_parser::gssotc | tau_parser::tau | optional_value_extractor<tau_spec<BAs...>>;
+	auto unbinded_form = src | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<tau_spec<BAs...>>;
 	auto binded_form = post_order_traverser<
 			binder_t,
 			all_t<tau_spec<BAs...>>,
@@ -641,7 +641,7 @@ bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
 	size_t loopback = max(inputs.loopback, outputs.loopback);
 
 	if (inputs.name.empty() && outputs.name.empty()) {
-		auto check = clause | tau_parser::wff | tau_parser::wff_t;
+		auto check = clause | tau_parser::tau_wff | tau_parser::wff | tau_parser::wff_t;
 		return check.has_value() ? true : false;
 	}
 

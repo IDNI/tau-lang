@@ -160,7 +160,7 @@ TEST_SUITE("builders execution") {
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
 	auto bfs = frml
-		| tau_parser::nso_rr | tau_parser::main | tau_parser::wff
+		| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff
 		| tau_parser::bf_eq || tau_parser::bf;
 	auto X = bfs[0] | tau_parser::variable
 		| optional_value_extractor<sp_tau_node<Bool>>;

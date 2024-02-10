@@ -34,7 +34,7 @@ TEST_SUITE("operator|") {
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib
-			| tau_parser::main;
+			| tau_parser::nso_main;
 		CHECK( !args );
 	}
 
