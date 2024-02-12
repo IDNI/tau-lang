@@ -305,4 +305,4 @@ gssotc_rr              => gssotc_rec_relations gssotc_main.
 gssotc_rec_relations   => (ws gssotc_rec_relation)*.
 gssotc_rec_relation    => tau_rec_relation.
 gssotc_main            => ws tau ws semicolon.
-start                  => ( inputs| builder | library | nso_rr | gssotc_rr) ws.
+start                  => (inputs | builder | library | nso_rr | gssotc_rr) ws.

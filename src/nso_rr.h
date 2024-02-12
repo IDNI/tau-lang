@@ -58,6 +58,9 @@ using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
 template <typename... BAs>
 using sp_tau_node = sp_node<tau_sym<BAs...>>;
 
+template<typename... BAs>
+using nso = sp_tau_node<BAs...>;
+
 template <typename... BAs>
 using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
 
