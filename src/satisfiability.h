@@ -23,6 +23,90 @@ using namespace idni::tau;
 
 namespace idni::tau {
 
+template <typename... BAs>
+struct is_equivalent_predicate {
+
+	is_equivalent_predicate(nso<BAs...> node) : node(node) {
+		node_free_variables = free_variables(node);
+	}
+
+	bool operator()(nso<BAs...>& n) {
+		std::set<nso<BAs...>> free_vars = free_variables(n);
+		free_vars.insert(node_free_variables.begin(), node_free_variables.end());
+		nso<BAs...> wff = build_wff_equiv<BAs...>(node, n);
+		for(auto& v: free_vars) wff = build_wff_all<BAs...>(v, wff);
+		rules<nso<BAs...>> rls;
+		rr<nso<BAs...>> form{rls, wff};
+		auto norm_form = normalizer(form);
+		auto check = norm_form.main | tau_parser::wff | tau_parser::wff_t;
+		return check.has_value();
+	}
+
+	nso<BAs...> node;
+	std::set<nso<BAs...>> node_free_variables;
+private:
+
+	std::set<nso<BAs...>> free_variables(nso<BAs...>& n) {
+		auto captures = select_all(n, is_non_terminal<tau_parser::capture, BAs...>);
+		std::set<nso<BAs...>> vars(captures.begin(), captures.end());
+		return vars;
+	}
+};
+
+template <typename... BAs>
+rr<nso<BAs...>> replace_captures_by_shift(rr<nso<BAs...>>& form, int step) {
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+	for(auto& n: select_all(form.main, is_non_terminal<tau_parser::shift, BAs...>)) {
+		auto digits = make_node<tau_sym<BAs...>>(step, {});
+		auto num = make_node<tau_sym<BAs...>>(tau_parser::num, {digits});
+		if (auto c = n | tau_parser::capture; c.has_value()) {
+			changes[c.value()] = num;
+		} else if (auto c = n | tau_parser::shift | tau_parser::capture; c.has_value()) {
+			changes[c.value()] = num;
+		}
+	}
+	auto nmain = replace<nso<BAs...>>(form.main, changes);
+	return { form.rec_relations, nmain };
+}
+
+template <typename... BAs>
+rr<nso<BAs...>> apply_rec_relations_by_shift(rr<nso<BAs...>>& form) {
+	// TODO (LOW) exit if no rec. relations
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+
+	auto nmain = form.main
+		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(form.rec_relations));
+
+	for (const auto& shift: select_top(nmain, is_non_terminal<tau_parser::shift, BAs...>)) {
+		int off = 0;
+		std::optional<nso<BAs...>> current(shift);
+		while (current.has_value()) {
+			off += get<size_t>(((current.value() | tau_parser::num).value())->value);
+			current = current.value() | tau_parser::shift;
+		}
+
+		auto digits = make_node<tau_sym<BAs...>>(off, {});
+		auto num = make_node<tau_sym<BAs...>>(tau_source_sym(tau_parser::num), {digits});
+		auto nshift = make_node<tau_sym<BAs...>>(tau_source_sym(tau_parser::shift), {
+			shift | tau_parser::capture | optional_value_extractor<nso<BAs...>>,
+			shift | tau_parser::minus | optional_value_extractor<nso<BAs...>>,
+			num});
+
+		changes[shift] = nshift;
+	}
+
+	auto nnmain = replace<nso<BAs...>>(nmain, changes);
+	return { form.rec_relations, nnmain };
+}
+
+
+template <typename... BAs>
+rr<nso<BAs...>> prepare_main_for_step(rr<nso<BAs...>>& form, int step) {
+	auto nform = replace_captures_by_shift<BAs...>(form, step);
+	return apply_rec_relations_by_shift<BAs...>(nform);
+}
+
+
 template<typename... BAs>
 void get_clauses(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& clauses) {
 	if (auto check = n | tau_parser::tau_or; !check.has_value() && is_non_terminal(tau_parser::tau, n)) clauses.push_back(n);

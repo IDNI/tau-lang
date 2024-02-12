@@ -450,71 +450,71 @@ nso<BAs...> operator|(const nso<BAs...>& n, const repeat_each<step_t, BAs...>& r
 	return r(n);
 }
 
-template <typename... BAs>
-rr<nso<BAs...>> replace_captures_by_shift(rr<nso<BAs...>>& form, int step) {
-	std::map<nso<BAs...>, nso<BAs...>> changes;
-	for(auto& n: select_all(form.main, is_non_terminal<tau_parser::shift, BAs...>)) {
-		auto digits = make_node<tau_sym<BAs...>>(step, {});
-		auto num = make_node<tau_sym<BAs...>>(tau_parser::num, {digits});
-		if (auto c = n | tau_parser::capture; c.has_value()) {
-			changes[c.value()] = num;
-		} else if (auto c = n | tau_parser::shift | tau_parser::capture; c.has_value()) {
-			changes[c.value()] = num;
-		}
+// executes the normalizer on the given source code taking into account the
+// bindings provided.
+template<typename... BAs>
+rr<nso<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
+	auto form_source = make_tau_source(source);
+	auto form = make_nso_rr_using_bindings(form_source, binds);
+	return normalizer(form);
+}
+
+// executes the normalizer on the given source code taking into account the
+// provided factory.
+template<typename factory_t, typename... BAs>
+rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
+	auto form_source = make_tau_source(source);
+	auto form = make_nso_rr_using_factory(form_source, factory);
+	return normalizer(form);
+}
+
+template<typename... BAs>
+static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) {
+	auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
+	return check.empty();
+};
+
+template<typename... BAs>
+using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
+
+template<typename... BAs>
+nso<BAs...> apply_definitions(const nso<BAs...>& form) {
+	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
+}
+
+template<typename... BAs>
+nso<BAs...> apply_definitions(const rr<nso<BAs...>>& form) {
+	auto nmain = apply_definitions(form.main);
+	rec_relations<nso<BAs...>> nrec_relations;
+	for (const auto& r : form.rec_relations) {
+		auto [matcher, body] = r;
+		nrec_relations.emplace_back(matcher, apply_definitions(body));
 	}
-	auto nmain = replace<nso<BAs...>>(form.main, changes);
-	return { form.rec_relations, nmain };
+	return nmain;
 }
 
+// REVIEW (HIGH) review overall execution
 template <typename... BAs>
-rr<nso<BAs...>> apply_rec_relations_by_shift(rr<nso<BAs...>>& form) {
-	// TODO (LOW) exit if no rec. relations
-	std::map<nso<BAs...>, nso<BAs...>> changes;
-
-	auto nmain = form.main
-		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(form.rec_relations));
-
-	for (const auto& shift: select_top(nmain, is_non_terminal<tau_parser::shift, BAs...>)) {
-		int off = 0;
-		std::optional<nso<BAs...>> current(shift);
-		while (current.has_value()) {
-			off += get<size_t>(((current.value() | tau_parser::num).value())->value);
-			current = current.value() | tau_parser::shift;
-		}
-
-		auto digits = make_node<tau_sym<BAs...>>(off, {});
-		auto num = make_node<tau_sym<BAs...>>(tau_source_sym(tau_parser::num), {digits});
-		auto nshift = make_node<tau_sym<BAs...>>(tau_source_sym(tau_parser::shift), {
-			shift | tau_parser::capture | optional_value_extractor<nso<BAs...>>,
-			shift | tau_parser::minus | optional_value_extractor<nso<BAs...>>,
-			num});
-
-		changes[shift] = nshift;
-	}
-
-	auto nnmain = replace<nso<BAs...>>(nmain, changes);
-	return { form.rec_relations, nnmain };
-}
-
-template <typename... BAs>
-rr<nso<BAs...>> prepare_main_for_step(rr<nso<BAs...>>& form, int step) {
-	auto nform = replace_captures_by_shift<BAs...>(form, step);
-	return apply_rec_relations_by_shift<BAs...>(nform);
-}
-
-template <typename... BAs>
-rr<nso<BAs...>> normalizer_step(rr<nso<BAs...>>& form, int stp = 0) {
+rr<nso<BAs...>> normalizer(const rr<nso<BAs...>>& form) {
+	// IDEA extract this to an operator| overload
+	// apply defs to nso_rr
 
 	#ifdef DEBUG
-	std::cout << "(I): -- Begin normalizer step" << std::endl;
+	std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;
+	std::cout << "(I): -- Apply once definitions" << std::endl;
 	std::cout << "(F): " << form.main << std::endl;
 	#endif // DEBUG
 
-	rr<nso<BAs...>> nform = prepare_main_for_step<BAs...>(form, stp);
+	auto nmain = apply_definitions(form);
 
-	nso<BAs...> nmain = nform.main
+	#ifdef DEBUG
+	std::cout << "(I): -- Begin normalizer loop" << std::endl;
+	std::cout << "(F): " << nmain << std::endl;
+	#endif // DEBUG
+
+	nso<BAs...> normalized = nmain
 			| repeat_all<step<BAs...>, BAs...>(
-				step<BAs...>(nform.rec_relations))
+				step<BAs...>(form.rec_relations))
 			| repeat_all<step<BAs...>, BAs...>(
 				step<BAs...>(apply_defs<BAs...>))
 			| repeat_all<step<BAs...>, BAs...>(
@@ -540,118 +540,15 @@ rr<nso<BAs...>> normalizer_step(rr<nso<BAs...>>& form, int stp = 0) {
 				| clause_simplify_wff<BAs...>);
 
 	#ifdef DEBUG
-	std::cout << "(I): -- End normalizer step" << std::endl;
+	std::cout << "(I): -- End normalizer loop" << std::endl;
 	#endif // DEBUG
-
-	return { form.rec_relations, nmain };
-}
-
-// executes the normalizer on the given source code taking into account the
-// bindings provided.
-template<typename... BAs>
-rr<nso<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
-	auto form_source = make_tau_source(source);
-	auto form = make_nso_rr_using_bindings(form_source, binds);
-	return normalizer(form);
-}
-
-// executes the normalizer on the given source code taking into account the
-// provided factory.
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
-	auto form_source = make_tau_source(source);
-	auto form = make_nso_rr_using_factory(form_source, factory);
-	return normalizer(form);
-}
-
-template <typename... BAs>
-struct is_equivalent_predicate {
-
-	is_equivalent_predicate(nso<BAs...> node) : node(node) {
-		node_free_variables = free_variables(node);
-	}
-
-	bool operator()(nso<BAs...>& n) {
-		std::set<nso<BAs...>> free_vars = free_variables(n);
-		free_vars.insert(node_free_variables.begin(), node_free_variables.end());
-		nso<BAs...> wff = build_wff_equiv<BAs...>(node, n);
-		for(auto& v: free_vars) wff = build_wff_all<BAs...>(v, wff);
-		rules<nso<BAs...>> rls;
-		rr<nso<BAs...>> form{rls, wff};
-		auto norm_form = normalizer(form);
-		auto check = norm_form.main | tau_parser::wff | tau_parser::wff_t;
-		return check.has_value();
-	}
-
-	nso<BAs...> node;
-	std::set<nso<BAs...>> node_free_variables;
-private:
-
-	std::set<nso<BAs...>> free_variables(nso<BAs...>& n) {
-		auto captures = select_all(n, is_non_terminal<tau_parser::capture, BAs...>);
-		std::set<nso<BAs...>> vars(captures.begin(), captures.end());
-		return vars;
-	}
-};
-
-template<typename... BAs>
-static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) {
-	auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
-	return check.empty();
-//	if (is_non_terminal<tau_parser::bf_eq, BAs...>(n) || is_non_terminal<tau_parser::bf_neq, BAs...>(n)) {
-//		auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
-//		return check.empty();
-//	}
-//	return true;
-};
-
-template<typename... BAs>
-using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
-
-template<typename... BAs>
-nso<BAs...> apply_definitions(const nso<BAs...>& form) {
-	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
-}
-
-template<typename... BAs>
-rr<nso<BAs...>> apply_definitions(const rr<nso<BAs...>>& form) {
-	auto nmain = apply_definitions(form.main);
-	rec_relations<nso<BAs...>> nrec_relations;
-	for (const auto& r : form.rec_relations) {
-		auto [matcher, body] = r;
-		nrec_relations.emplace_back(matcher, apply_definitions(body));
-	}
-	return rr<nso<BAs...>>{ nrec_relations, nmain };
-}
-
-// REVIEW (HIGH) review overall execution
-template <typename... BAs>
-rr<nso<BAs...>> normalizer(const rr<nso<BAs...>>& form) {
-	// IDEA extract this to an operator| overload
-	// apply defs to nso_rr
-
-	#ifdef DEBUG
-	std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;
-	std::cout << "(I): -- Apply once definitions" << std::endl;
-	std::cout << "(F): " << form.main << std::endl;
-	#endif // DEBUG
-
-	auto nform = apply_definitions(form);
-
-	std::vector<nso<BAs...>> previous;
-	rr<nso<BAs...>> current = normalizer_step(nform);
-	auto is_equivalent = is_equivalent_predicate<BAs...>(current.main);
-	for (int i = 1; std::find_if(previous.rend(), previous.rbegin(),  is_equivalent) == previous.rend(); i++) {
-		previous.push_back(current.main);
-		current = normalizer_step(current, i);
-	}
 
 	#ifdef DEBUG
 	std::cout << "(I): -- End normalizer" << std::endl;
-	std::cout << "(O): " << current.main << std::endl;
+	std::cout << "(O): " << normalized << std::endl;
 	#endif // DEBUG
 
-	return current;
+	return { form.rec_relations, normalized };
 }
 
 template <typename... BAs>
