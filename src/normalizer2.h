@@ -655,7 +655,7 @@ nso_rr<BAs...> normalizer(const nso_rr<BAs...>& form) {
 }
 
 template <typename... BAs>
-nso_rr<BAs...> normalizer(const wff<BAs...>& form) {
+nso_rr<BAs...> normalizer(const nso<BAs...>& form) {
 	nso_rr<BAs...> nso(form);
 	return normalizer(nso);
 }

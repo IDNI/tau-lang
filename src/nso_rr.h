@@ -84,10 +84,6 @@ using rules = std::vector<tau_rule<BAs...>>;
 template <typename... BAs>
 using rec_relations = std::vector<tau_rule<BAs...>>;
 
-// defines the main statement of a tau nso_rr.
-template <typename... BAs>
-using statement = sp_tau_node<BAs...>;
-
 // a library is a set of rules to be applied in the rewriting process of the tau
 // language, the order of the rules is important.
 template <typename... BAs>
@@ -96,10 +92,6 @@ using library = rules<BAs...>;
 // bindings map tau_source constants (strings) into elements of the boolean algebras.
 template<typename... BAs>
 using bindings = std::map<std::string, std::variant<BAs...>>;
-
-
-template<typename...BAs>
-using wff = sp_tau_node<BAs...>;
 
 template<class... Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
@@ -130,11 +122,11 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<BAs...> n, size_t 
 template<typename... BAs>
 struct nso_rr {
 
-	nso_rr(const rules<BAs...>& rec_relations, const statement<BAs...>& main) : rec_relations(rec_relations), main(main) {};
-	nso_rr(const statement<BAs...>& main) : main(main) {};
+	nso_rr(const rules<BAs...>& rec_relations, const nso<BAs...>& main) : rec_relations(rec_relations), main(main) {};
+	nso_rr(const nso<BAs...>& main) : main(main) {};
 
 	rules<BAs...> rec_relations;
-	statement<BAs...> main;
+	nso<BAs...> main;
 };
 
 //
