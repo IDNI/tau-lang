@@ -16,6 +16,7 @@ set(TAU_HEADERS
 	out.h
 	nso_rr.h
 	seq.h
+	satisfiability.h
 	tau.h
 	iterators.h
 )
