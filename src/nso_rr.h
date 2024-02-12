@@ -61,8 +61,8 @@ using sp_tau_node = sp_node<tau_sym<BAs...>>;
 template<typename... BAs>
 using nso = sp_tau_node<BAs...>;
 
-template <typename... BAs>
-using tau_rec_relation = rule<sp_node<tau_sym<BAs...>>>;
+template <typename node_t>
+using rec_relation = rule<node_t>;
 
 // IDEA maybe we could define a wrapper for recursive rules and rewriting rules that
 // call the appropriate apply method. This would play also nice with the builders
@@ -78,8 +78,8 @@ using rules = std::vector<rule<nso<BAs...>>>;
 
 // defines a vector of rec. relations in the tau language, the order is important as it defines
 // the order of the rec relations in the rewriting process of the tau language.
-template <typename... BAs>
-using rec_relations = std::vector<rule<nso<BAs...>>>;
+template <typename node_t>
+using rec_relations = std::vector<rec_relation<node_t>>;
 
 // a library is a set of rules to be applied in the rewriting process of the tau
 // language, the order of the rules is important.
@@ -814,6 +814,7 @@ nso_rr<BAs...> resolve_types(const nso_rr<BAs...> f) {
 }
 
 // creates a specific rule from a generic rule
+// TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
 rule<nso<BAs...>> make_rule(tau_parser::nonterminal rule_t, tau_parser::nonterminal matcher_t, tau_parser::nonterminal body_t, sp_tau_node<BAs...>& rule) {
 	auto matcher = rule | rule_t | matcher_t| only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
@@ -822,6 +823,7 @@ rule<nso<BAs...>> make_rule(tau_parser::nonterminal rule_t, tau_parser::nontermi
 }
 
 // creates a specific rule from a generic rule
+// TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
 rule<nso<BAs...>> make_rule(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
@@ -834,8 +836,9 @@ rule<nso<BAs...>> make_rule(sp_tau_node<BAs...>& rule) {
 }
 
 // creates a specific rule from a generic rule.
+// TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rule<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::nonterminal type_t, sp_tau_node<BAs...>& rule) {
+rec_relation<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::nonterminal type_t, sp_tau_node<BAs...>& rule) {
 	DBG(print_sp_tau_node(std::cout, rule); std::cout << std::endl;)
 	auto elements = rule | rule_t || type_t;
 	return { elements[0], elements[1] };
@@ -843,7 +846,7 @@ rule<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::
 
 // creates a specific rule from a generic rule.
 template<typename... BAs>
-tau_rec_relation<BAs...> make_rec_relation(sp_tau_node<BAs...>& rule) {
+rec_relation<nso<BAs...>> make_rec_relation(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
 	case tau_parser::bf_rec_relation: return make_rec_relation<BAs...>(tau_parser::bf_rec_relation, tau_parser::bf, rule);
@@ -853,6 +856,7 @@ tau_rec_relation<BAs...> make_rec_relation(sp_tau_node<BAs...>& rule) {
 }
 
 // create a set of rules from a given tau source.
+// TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
 rules<BAs...> make_rules(sp_tau_node<BAs...>& tau_source) {
 	rules<BAs...> rs;
@@ -863,9 +867,10 @@ rules<BAs...> make_rules(sp_tau_node<BAs...>& tau_source) {
 }
 
 // create a set of relations from a given tau source.
+// TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rec_relations<BAs...> make_rec_relations(sp_tau_node<BAs...>& tau_source) {
-	rules<BAs...> rs;
+rec_relations<nso<BAs...>> make_rec_relations(sp_tau_node<BAs...>& tau_source) {
+	rec_relations<nso<BAs...>> rs;
 	// TODO (LOW) change call to select by operator|| and operator|
 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::nso_rec_relation, BAs...>))
 		rs.push_back(make_rec_relation<BAs...>(r));
