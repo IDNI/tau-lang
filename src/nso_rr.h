@@ -1750,6 +1750,15 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_sym& 
 	return stream;
 }
 
+// << for BAs... variant
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& rs) {
+	std::visit(idni::tau::overloaded {
+		[&os](const auto& a) { os << a; }
+	}, rs);
+	return os;
+}
+
 // << for tau_sym
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>& rs) {
@@ -1757,10 +1766,9 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>&
 	std::visit(idni::tau::overloaded {
 		[&stream](const idni::tau::tau_source_sym& t) {
 			if (!t.nt()) stream << t.t();
-		}, [&stream](const std::variant<BAs...>& /*bae*/) {
-			// TODO (HIGH) implement operator<< for tau_ba
-			// stream << bae;
-		}, [&stream](const size_t& n) { stream << n; }}, rs);
+		},
+		[&stream](const auto& a) { stream << a; }
+	}, rs);
 	return stream;
 }
 
