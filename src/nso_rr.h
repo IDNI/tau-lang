@@ -62,9 +62,6 @@ template<typename... BAs>
 using nso = sp_tau_node<BAs...>;
 
 template <typename... BAs>
-using tau_rule = rule<sp_node<tau_sym<BAs...>>>;
-
-template <typename... BAs>
 using tau_rec_relation = rule<sp_node<tau_sym<BAs...>>>;
 
 // IDEA maybe we could define a wrapper for recursive rules and rewriting rules that
@@ -72,17 +69,17 @@ using tau_rec_relation = rule<sp_node<tau_sym<BAs...>>>;
 // defined in the normalizer.
 
 template <typename... BAs>
-using builder = tau_rule<BAs...>;
+using builder = rule<nso<BAs...>>;
 
 // defines a vector of rules in the tau language, the order is important as it defines
 // the order of the rules in the rewriting process of the tau language.
 template <typename... BAs>
-using rules = std::vector<tau_rule<BAs...>>;
+using rules = std::vector<rule<nso<BAs...>>>;
 
 // defines a vector of rec. relations in the tau language, the order is important as it defines
 // the order of the rec relations in the rewriting process of the tau language.
 template <typename... BAs>
-using rec_relations = std::vector<tau_rule<BAs...>>;
+using rec_relations = std::vector<rule<nso<BAs...>>>;
 
 // a library is a set of rules to be applied in the rewriting process of the tau
 // language, the order of the rules is important.
@@ -818,7 +815,7 @@ nso_rr<BAs...> resolve_types(const nso_rr<BAs...> f) {
 
 // creates a specific rule from a generic rule
 template<typename... BAs>
-tau_rule<BAs...> make_rule(tau_parser::nonterminal rule_t, tau_parser::nonterminal matcher_t, tau_parser::nonterminal body_t, sp_tau_node<BAs...>& rule) {
+rule<nso<BAs...>> make_rule(tau_parser::nonterminal rule_t, tau_parser::nonterminal matcher_t, tau_parser::nonterminal body_t, sp_tau_node<BAs...>& rule) {
 	auto matcher = rule | rule_t | matcher_t| only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 	auto body = rule | rule_t | body_t | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 	return { matcher, body };
@@ -826,7 +823,7 @@ tau_rule<BAs...> make_rule(tau_parser::nonterminal rule_t, tau_parser::nontermin
 
 // creates a specific rule from a generic rule
 template<typename... BAs>
-tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
+rule<nso<BAs...>> make_rule(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
 	case tau_parser::bf_rule: return make_rule<BAs...>(tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, rule);
@@ -838,7 +835,7 @@ tau_rule<BAs...> make_rule(sp_tau_node<BAs...>& rule) {
 
 // creates a specific rule from a generic rule.
 template<typename... BAs>
-tau_rule<BAs...> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::nonterminal type_t, sp_tau_node<BAs...>& rule) {
+rule<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::nonterminal type_t, sp_tau_node<BAs...>& rule) {
 	DBG(print_sp_tau_node(std::cout, rule); std::cout << std::endl;)
 	auto elements = rule | rule_t || type_t;
 	return { elements[0], elements[1] };
@@ -1606,7 +1603,7 @@ private:
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template<typename predicate_t, typename... BAs>
-sp_tau_node<BAs...> nso_rr_apply_if(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
+sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
 	// IDEA maybe we could traverse only once
 	auto nn = apply_with_skip_if<
 			sp_tau_node<BAs...>,
@@ -1646,7 +1643,7 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rules<BAs...>& rs, const sp_tau_node<B
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> nso_rr_apply(const tau_rule<BAs...>& r, const sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
 
 	#ifdef DEBUG
