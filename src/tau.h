@@ -118,7 +118,7 @@ template<typename...BAs>
 struct tau_ba {
 
 	tau_ba(nso_rr<tau_ba<BAs...>, BAs...>& form) : form(form.main) {}
-	tau_ba(wff<tau_ba<BAs...>, BAs...>& main) : form(main) {}
+	tau_ba(nso<tau_ba<BAs...>, BAs...>& main) : form(main) {}
 
 	auto operator<=>(const tau_ba<BAs...>& other) {
 		return form <=> other.form;
@@ -167,7 +167,7 @@ struct tau_ba {
 		return (normalized | tau_parser::wff_t).has_value();
 	}
 
-	wff<tau_ba<BAs...>, BAs...> form;
+	nso<tau_ba<BAs...>, BAs...> form;
 };
 
 // TODO (HIGH) give a proper implementation for <=>, == and != operators
@@ -254,7 +254,7 @@ gsstoc_rec_relations<BAs...> make_gssotc_rec_relations(gssotc<BAs...>& tau_sourc
 template<typename binder_t, typename... BAs>
 tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
 	auto src = make_tau_code<tau_ba<BAs...>, BAs...>(tau_source);
-	auto unbinded_main = src | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<wff<tau_ba<BAs...>, BAs...>>;
+	auto unbinded_main = src | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
 	auto binded_main = post_order_traverser<
 			binder_t,
 			all_t<gssotc<BAs...>>,
