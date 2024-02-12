@@ -208,13 +208,10 @@ using tau_spec = rr<gssotc<BAs...>>;
 template <typename... BAs>
 using gssotc_rule = rule<gssotc<BAs...>>;
 
-template <typename... BAs>
-using gssotc_rec_relation = rule<gssotc<BAs...>>;
-
 // defines a vector of rec. relations in the tau language, the order is important as it defines
 // the order of the rec relations in the rewriting process of the tau language.
 template <typename... BAs>
-using gsstoc_rec_relations = std::vector<gssotc_rec_relation<BAs...>>;
+using gssotc_rec_relation = rule<gssotc<BAs...>>;
 
 template<typename base_factory_t, typename...BAs>
 struct tau_factory {
