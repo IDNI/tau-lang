@@ -301,4 +301,10 @@ tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const b
 
 } // namespace idni::tau
 
+// << for printing tau_ba's form
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& os, const idni::tau::tau_ba<BAs...>& rs) {
+	return os << rs.form;
+}
+
 #endif // __TAU_H__

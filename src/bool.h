@@ -56,4 +56,8 @@ Bool Bool::operator~() const {
 	return (this->b == true) ? zero() : one();
 }
 
+std::ostream& operator<<(std::ostream& os, const Bool& b) {
+	return os << (b.b ? 1 : 0);
+}
+
 #endif

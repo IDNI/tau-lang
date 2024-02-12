@@ -25,9 +25,7 @@
 
 using namespace idni::rewriter;
 
-// bdd printers taken from out.h
-ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }
-
+// bdd printer taken from out.h
 template<typename B, auto o = bdd_options<>::create()>
 ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
 	if (f == bdd_handle<B, o>::htrue) return os << '1';
