@@ -938,6 +938,10 @@ private:
 		q(nt(243), (nt(247)));
 		// gssotc_rec_relation => tau_rec_relation.
 		q(nt(245), (nt(78)));
+		// gssotc_rec_relation => wff_rec_relation.
+		q(nt(245), (nt(103)));
+		// gssotc_rec_relation => bf_rec_relation.
+		q(nt(245), (nt(172)));
 		// gssotc_main => ws tau ws semicolon.
 		q(nt(244), (nt(14)+nt(75)+nt(14)+nt(47)));
 		// _Rstart_42 => inputs.

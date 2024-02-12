@@ -63,7 +63,88 @@ TEST_SUITE("rec relations execution: simple cases") {
 	}
 }
 
-// TODO (HIGH) add type clashing definitions between bf, wff and tau if needed
+
+TEST_SUITE("tau_rec_relations execution: types") {
+
+	TEST_CASE("clashing names, gssotc wins") {
+		const char* sample =
+			"g[0]($Y) := 0."
+			"g[0]($Y) ::= F."
+			"g[0]($Y) :::= {T}." // TODO (HIGH) remove { } for wff and use - for neg of tau formulas
+			"g[0](Y);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("clashing names, gssotc wins y2") {
+		const char* sample =
+			"g[0]($Y) := 1."
+			"g[0]($Y) ::= T."
+			"g[0]($Y) :::= {F}."
+			"g[0](Y);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("clashing names, nso wins") {
+		const char* sample =
+			"g[0]($Y) := 0."
+			"g[0]($Y) ::= T."
+			"g[0]($Y) :::= {F}."
+			"{g[0](Y)};";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("clashing names, nso wins y2") {
+		const char* sample =
+			"g[0]($Y) := 1."
+			"g[0]($Y) ::= F."
+			"g[0]($Y) :::= {T}."
+			"{g[0](Y)};";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	// TODO (HIGH) this test fails with the rule g[0]($Y) := 0, check why
+	TEST_CASE("clashing names, bf wins") {
+		const char* sample =
+			"g[0]($Y) := 1."
+			"g[0]($Y) ::= T."
+			"g[0]($Y) :::= {T}."
+			"{(g[0](Y) = 0)};";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("clashing names, bf wins") {
+		const char* sample =
+			"g[0]($Y) := 1."
+			"g[0]($Y) ::= F."
+			"g[0]($Y) :::= {F}."
+			"{(g[0](Y) = 0)};";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+	}
+}
 
 TEST_SUITE("2d cases") {
 
@@ -81,7 +162,7 @@ TEST_SUITE("2d cases") {
 	TEST_CASE("tau_rec_relation 2d: two substitutions 1st coord.") {
 		const char* sample =
 			"g[0, 0]($Y) :::= {T}."
-			"g[$n, 0]($Y) :::= g[$n - 1, 0]($Y)."
+			"g[$n, 0]($Y) :::= g[$n - 1, 0]($Y)." // TODO (HIGH) remove captures maybe rewriting the rule adding dollars
 			"g[1, 0](Y);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;

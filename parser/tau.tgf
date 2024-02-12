@@ -97,11 +97,13 @@ tau                    => tau_wff | tau_ref | tau_and | tau_or | tau_neg | captu
 tau_and                => open_parenthesis ws tau ws tau_and_sym ws tau ws close_parenthesis.
 tau_or                 => open_parenthesis ws tau ws tau_or_sym ws tau ws close_parenthesis.
 tau_neg                => tau_neg_sym ws tau.
+# TODO (HIGH) simply consider wff without { and }
 tau_wff                => open_brace ws wff ws close_brace.
 
 # tau_op_sym
 tau_and_sym            => "&&&".
 tau_or_sym             => "|||".
+# TODO (HIGH) replace by -
 tau_neg_sym            => "!!!".
 
 # wff
@@ -303,6 +305,6 @@ nso_rec_relation       => bf_rec_relation | wff_rec_relation.
 nso_main               => ws wff ws dot.
 gssotc_rr              => gssotc_rec_relations gssotc_main.
 gssotc_rec_relations   => (ws gssotc_rec_relation)*.
-gssotc_rec_relation    => tau_rec_relation.
+gssotc_rec_relation    => tau_rec_relation | wff_rec_relation | bf_rec_relation.
 gssotc_main            => ws tau ws semicolon.
 start                  => (inputs | builder | library | nso_rr | gssotc_rr) ws.

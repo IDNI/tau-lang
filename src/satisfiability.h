@@ -499,7 +499,7 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 		}
 
 		#ifdef DEBUG
-		std::cout << "(I) is_satisfiable_clause: false" << std::endl;
+		std::cout << "(I) is_satisfiable_clause: true" << std::endl;
 		#endif // DEBUG
 
 		return true;

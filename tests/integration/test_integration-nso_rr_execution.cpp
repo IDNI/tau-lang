@@ -83,7 +83,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 	}
 }
 
-TEST_SUITE("rec relations execution: types") {
+TEST_SUITE("rec_relations execution: types") {
 
 	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: wff wins") {
 		const char* sample =

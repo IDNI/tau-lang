@@ -483,10 +483,10 @@ nso<BAs...> apply_definitions(const nso<BAs...>& form) {
 }
 
 template<typename... BAs>
-nso<BAs...> apply_definitions(const rr<nso<BAs...>>& form) {
-	auto nmain = apply_definitions(form.main);
+nso<BAs...> apply_definitions(const rr<nso<BAs...>>& rr_nso) {
+	auto nmain = apply_definitions(rr_nso.main);
 	rec_relations<nso<BAs...>> nrec_relations;
-	for (const auto& r : form.rec_relations) {
+	for (const auto& r : rr_nso.rec_relations) {
 		auto [matcher, body] = r;
 		nrec_relations.emplace_back(matcher, apply_definitions(body));
 	}
@@ -495,17 +495,17 @@ nso<BAs...> apply_definitions(const rr<nso<BAs...>>& form) {
 
 // REVIEW (HIGH) review overall execution
 template <typename... BAs>
-rr<nso<BAs...>> normalizer(const rr<nso<BAs...>>& form) {
+rr<nso<BAs...>> normalizer(const rr<nso<BAs...>>& rr_nso) {
 	// IDEA extract this to an operator| overload
 	// apply defs to nso_rr
 
 	#ifdef DEBUG
 	std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;
 	std::cout << "(I): -- Apply once definitions" << std::endl;
-	std::cout << "(F): " << form.main << std::endl;
+	std::cout << "(F): " << rr_nso.main << std::endl;
 	#endif // DEBUG
 
-	auto nmain = apply_definitions(form);
+	auto nmain = apply_definitions(rr_nso);
 
 	#ifdef DEBUG
 	std::cout << "(I): -- Begin normalizer loop" << std::endl;
@@ -514,7 +514,7 @@ rr<nso<BAs...>> normalizer(const rr<nso<BAs...>>& form) {
 
 	nso<BAs...> normalized = nmain
 			| repeat_all<step<BAs...>, BAs...>(
-				step<BAs...>(form.rec_relations))
+				step<BAs...>(rr_nso.rec_relations))
 			| repeat_all<step<BAs...>, BAs...>(
 				step<BAs...>(apply_defs<BAs...>))
 			| repeat_all<step<BAs...>, BAs...>(
@@ -548,7 +548,7 @@ rr<nso<BAs...>> normalizer(const rr<nso<BAs...>>& form) {
 	std::cout << "(O): " << normalized << std::endl;
 	#endif // DEBUG
 
-	return { form.rec_relations, normalized };
+	return { rr_nso.rec_relations, normalized };
 }
 
 template <typename... BAs>
@@ -556,7 +556,6 @@ rr<nso<BAs...>> normalizer(const nso<BAs...>& form) {
 	rr<nso<BAs...>> nso(form);
 	return normalizer(nso);
 }
-
 
 } // namespace idni::tau
 
