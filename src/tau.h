@@ -200,16 +200,30 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 }
 
 template<typename...BAs>
-using tau_spec = wff<tau_ba<BAs...>, BAs...>;
+using tau_spec = nso_rr<tau_ba<BAs...>, BAs...>;
+
+template<typename...BAs>
+using gssotc = nso<tau_ba<BAs...>, BAs...>;
+
+template <typename... BAs>
+using gssotc_rule = rule<gssotc<BAs...>>;
+
+template <typename... BAs>
+using gssotc_rec_relation = rule<gssotc<BAs...>>;
+
+// defines a vector of rec. relations in the tau language, the order is important as it defines
+// the order of the rec relations in the rewriting process of the tau language.
+template <typename... BAs>
+using gsstoc_rec_relations = std::vector<gssotc_rec_relation<BAs...>>;
 
 template<typename base_factory_t, typename...BAs>
 struct tau_factory {
 
 	tau_factory(base_factory_t& bf) : bf(bf) {}
 
-	tau_spec<BAs...> build(const std::string type_name, const tau_spec<BAs...>& n) {
+	gssotc<BAs...> build(const std::string type_name, const gssotc<BAs...>& n) {
 		if (auto nn = bf.build(type_name, n); nn != n) return nn;
-		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<tau_spec<BAs...>>;
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<gssotc<BAs...>>;
 		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
 		factory_binder<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...> fb(*this);
 		auto form = make_nso_rr_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(var, fb).main;
@@ -220,17 +234,36 @@ struct tau_factory {
 	base_factory_t& bf;
 };
 
+// creates a specific rule from a generic rule.
+template<typename... BAs>
+gssotc_rec_relation<BAs...> make_gssotc_rec_relation(gssotc<BAs...>& rule) {
+	return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::tau_rec_relation, tau_parser::tau, rule);
+}
+
+// create a set of relations from a given tau source.
+template<typename... BAs>
+gsstoc_rec_relations<BAs...> make_gssotc_rec_relations(gssotc<BAs...>& tau_source) {
+	gsstoc_rec_relations<BAs...> rs;
+	// TODO (LOW) change call to select by operator|| and operator|
+	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::gssotc_rec_relation, tau_ba<BAs...>, BAs...>))
+		rs.push_back(make_gssotc_rec_relation<BAs...>(r));
+	return rs;
+}
+
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
 tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
 	auto src = make_tau_code<tau_ba<BAs...>, BAs...>(tau_source);
-	auto unbinded_form = src | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<tau_spec<BAs...>>;
-	auto binded_form = post_order_traverser<
+	auto unbinded_main = src | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<wff<tau_ba<BAs...>, BAs...>>;
+	auto binded_main = post_order_traverser<
 			binder_t,
-			all_t<tau_spec<BAs...>>,
-			tau_spec<BAs...>>(
-		binder, all<tau_spec<BAs...>>)(unbinded_form);
-	return binded_form;
+			all_t<gssotc<BAs...>>,
+			gssotc<BAs...>>(
+		binder, all<gssotc<BAs...>>)(unbinded_main);
+	auto gssotc_rr = make_gssotc_rec_relations(src);
+	// TODO (HIGH) should we include also nso rec relations?
+	//auto rec_relations = make_rec_relations(src);
+	return { gssotc_rr, binded_main };
 }
 
 // make a nso_rr from the given tau source and bindings.
@@ -268,15 +301,15 @@ tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const b
 }
 
 template<typename... BAs>
-void get_clauses(const tau_spec<BAs...>& n, std::vector<tau_spec<BAs...>>& clauses) {
+void get_clauses(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& clauses) {
 	if (auto check = n | tau_parser::tau_or; !check.has_value() && is_non_terminal(tau_parser::tau, n)) clauses.push_back(n);
 	else for (auto& c: n->child)
 		if (is_non_terminal(tau_parser::tau_or, c)) get_clauses(c ,clauses);
 }
 
 template<typename... BAs>
-std::vector<tau_spec<BAs...>> get_clauses(const tau_spec<BAs...>& n) {
-	std::vector<tau_spec<BAs...>> clauses;
+std::vector<gssotc<BAs...>> get_clauses(const gssotc<BAs...>& n) {
+	std::vector<gssotc<BAs...>> clauses;
 	get_clauses(n, clauses);
 
 	#ifdef DEBUG
@@ -292,7 +325,7 @@ template<typename... BAs>
 using extracted_bindings = std::map<std::variant<BAs...>, std::string>;
 
 template<typename... BAs>
-std::string clause_to_string(const tau_spec<BAs...>& clause,
+std::string clause_to_string(const gssotc<BAs...>& clause,
 		extracted_bindings<tau_ba<BAs...>, BAs...>& extracted_bindings,
 		size_t binding_seed = 0) {
 	std::basic_stringstream<char> str;
@@ -317,16 +350,16 @@ std::string clause_to_string(const tau_spec<BAs...>& clause,
 
 	post_order_tree_traverser<
 			print_t,
-			all_t<tau_spec<BAs...>>,
-			tau_spec<BAs...>>(
-		print, all<tau_spec<BAs...>>)(clause);
+			all_t<gssotc<BAs...>>,
+			gssotc<BAs...>>(
+		print, all<gssotc<BAs...>>)(clause);
 
 	return str.str();
 }
 
 template<typename... BAs>
-void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
-		std::optional<tau_spec<BAs...>>& positive, std::vector<tau_spec<BAs...>>& negatives) {
+void get_positive_and_negative_literals(const gssotc<BAs...> collapsed,
+		std::optional<gssotc<BAs...>>& positive, std::vector<gssotc<BAs...>>& negatives) {
 	auto is_negative = [] (const auto& n) {
 		auto check = n | tau_parser::tau | tau_parser::tau_neg | tau_parser::wff;
 		return check.has_value();
@@ -350,10 +383,10 @@ void get_positive_and_negative_literals(const tau_spec<BAs...> collapsed,
 }
 
 template<typename... BAs>
-std::pair<std::optional<tau_spec<BAs...>>, std::vector<tau_spec<BAs...>>> get_positive_and_negative_literals(
-		const tau_spec<BAs...> collapsed) {
-	std::optional<tau_spec<BAs...>> positive;
-	std::vector<tau_spec<BAs...>> negatives;
+std::pair<std::optional<gssotc<BAs...>>, std::vector<gssotc<BAs...>>> get_positive_and_negative_literals(
+		const gssotc<BAs...> collapsed) {
+	std::optional<gssotc<BAs...>> positive;
+	std::vector<gssotc<BAs...>> negatives;
 	get_positive_and_negative_literals(collapsed, positive, negatives);
 	return {positive, negatives};
 }
@@ -361,7 +394,7 @@ std::pair<std::optional<tau_spec<BAs...>>, std::vector<tau_spec<BAs...>>> get_po
 template<typename...BAs>
 struct tau_spec_vars {
 
-	void add(const tau_spec<BAs...>& io) {
+	void add(const gssotc<BAs...>& io) {
 		auto pos = io
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| tau_parser::var_pos
@@ -370,7 +403,7 @@ struct tau_spec_vars {
 			| optional_value_extractor<size_t>;
 		auto var_name = (io
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
-			| optional_value_extractor<tau_spec<BAs...>>)->child[0];
+			| optional_value_extractor<gssotc<BAs...>>)->child[0];
 		switch (pos) {
 			case tau_parser::current_pos:
 				name.emplace(var_name);
@@ -402,12 +435,12 @@ struct tau_spec_vars {
 		}
 	}
 
-	std::set<tau_spec<BAs...>> name;
+	std::set<gssotc<BAs...>> name;
 	size_t loopback = 0;
 };
 
 template<typename... BAs>
-std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const tau_spec<BAs...> collapsed) {
+std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const gssotc<BAs...> collapsed) {
 	tau_spec_vars<BAs...> inputs;
 	tau_spec_vars<BAs...> outputs;
 	for (const auto& variable: select_top(collapsed, is_non_terminal<tau_parser::io_var, tau_ba<BAs...>, BAs...>)) {
@@ -428,8 +461,8 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const tau_sp
 
 template<typename... BAs>
 std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>>  get_eta_nso_rr(
-		const std::optional<tau_spec<BAs...>>& positive,
-		const std::vector<tau_spec<BAs...>>& negatives,
+		const std::optional<gssotc<BAs...>>& positive,
+		const std::vector<gssotc<BAs...>>& negatives,
 		const tau_spec_vars<BAs...>& inputs,
 		const tau_spec_vars<BAs...>& outputs) {
 	auto print_vars = [] (const auto& vars) {
@@ -583,7 +616,7 @@ std::string get_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopbac
 }
 
 template<typename... BAs>
-std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_nso_rr(const tau_spec<BAs...>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_nso_rr(const gssotc<BAs...>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
 	auto universally_quantify_vars = [] (const auto& vars, size_t index) {
 		std::basic_stringstream<char> str;
 		for (const auto& var: vars.name) {
@@ -603,7 +636,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_
 	extracted_bindings<tau_ba<BAs...>, BAs...> ext_bindings;
 	bindings<BAs...> bindings;
 
-	auto wff = positive | tau_parser::wff | optional_value_extractor<tau_spec<BAs...>>;
+	auto wff = positive | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
 
 	//
 
@@ -625,7 +658,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_
 
 
 template<typename... BAs>
-bool is_satisfiable_clause(const tau_spec<BAs...>& clause) {
+bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 
 	#ifdef DEBUG
 	std::cout << "(I) is_satisfiable_clause: " << clause << std::endl;
@@ -693,8 +726,10 @@ bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
 	std::cout << "(I) is_satisfiable: " << tau_spec << std::endl;
 	#endif // DEBUG
 
-	auto dnf = tau_spec |
-		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+	auto dnf = tau_spec.main
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			step<tau_ba<BAs...>, BAs...>(tau_spec.rec_relations))
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
 			to_dnf_tau<tau_ba<BAs...>, BAs...>
 			| simplify_tau<tau_ba<BAs...>, BAs...>);
 

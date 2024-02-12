@@ -296,7 +296,7 @@ template<typename... BAs>
 struct step {
 	step(library<BAs...> lib): lib(lib) {}
 
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
 		return nso_rr_apply(lib, n);
 	}
 
@@ -311,7 +311,7 @@ struct steps {
 		libraries.push_back(library);
 	}
 
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
 		if (libraries.empty()) return n;
 		auto nn = n;
 		for (auto& lib : libraries) nn = lib(nn);
@@ -327,10 +327,10 @@ struct repeat_each {
 	repeat_each(steps<step_t, BAs...> s) : s(s) {}
 	repeat_each(step_t s) : s(steps<step_t, BAs...>(s)) {}
 
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
 		auto nn = n;
 		for (auto& l: s.libraries) {
-			std::set<sp_tau_node<BAs...>> visited;
+			std::set<nso<BAs...>> visited;
 			while (true) {
 				nn = l(nn);
 				if (visited.find(nn) != visited.end()) break;
@@ -349,9 +349,9 @@ struct repeat_all {
 	repeat_all(steps<step_t, BAs...> s) : s(s) {}
 	repeat_all(step_t s) : s(steps<step_t, BAs...>(s)) {}
 
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
 		auto nn = n;
-		std::set<sp_tau_node<BAs...>> visited;
+		std::set<nso<BAs...>> visited;
 		while (true) {
 			for (auto& l: s.libraries) nn = l(nn);
 			auto nnn = s(nn);
@@ -370,7 +370,7 @@ struct repeat_once {
 	repeat_once(steps<step_t, BAs...> s) : s(s) {}
 	repeat_once(step_t s) : s(steps<step_t, BAs...>(s)) {}
 
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) const {
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
 		auto nn = n;
 		for(auto& l: s.libraries) {
 			nn = l(nn);
@@ -425,34 +425,34 @@ steps<step<library<BAs...>, BAs...>, BAs...> operator|(const steps<step<library<
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const library<BAs...>& l) {
+nso<BAs...> operator|(const nso<BAs...>& n, const library<BAs...>& l) {
 	auto s = step<BAs...>(l);
 	return s(n);
 }
 
 template<typename step_t, typename... BAs>
-sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const steps<step_t, BAs...>& s) {
+nso<BAs...> operator|(const nso<BAs...>& n, const steps<step_t, BAs...>& s) {
 	return s(n);
 }
 
 template<typename step_t, typename... BAs>
-sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_once<step_t, BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const repeat_once<step_t, BAs...>& r) {
 	return r(n);
 }
 
 template<typename step_t, typename... BAs>
-sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_all<step_t, BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const repeat_all<step_t, BAs...>& r) {
 	return r(n);
 }
 
 template<typename step_t, typename... BAs>
-sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& n, const repeat_each<step_t, BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const repeat_each<step_t, BAs...>& r) {
 	return r(n);
 }
 
 template <typename... BAs>
 nso_rr<BAs...> replace_captures_by_shift(nso_rr<BAs...>& form, int step) {
-	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+	std::map<nso<BAs...>, nso<BAs...>> changes;
 	for(auto& n: select_all(form.main, is_non_terminal<tau_parser::shift, BAs...>)) {
 		auto digits = make_node<tau_sym<BAs...>>(step, {});
 		auto num = make_node<tau_sym<BAs...>>(tau_parser::num, {digits});
@@ -462,21 +462,21 @@ nso_rr<BAs...> replace_captures_by_shift(nso_rr<BAs...>& form, int step) {
 			changes[c.value()] = num;
 		}
 	}
-	auto nmain = replace<sp_tau_node<BAs...>>(form.main, changes);
+	auto nmain = replace<nso<BAs...>>(form.main, changes);
 	return { form.rec_relations, nmain };
 }
 
 template <typename... BAs>
 nso_rr<BAs...> apply_rec_relations_by_shift(nso_rr<BAs...>& form) {
 	// TODO (LOW) exit if no rec. relations
-	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+	std::map<nso<BAs...>, nso<BAs...>> changes;
 
 	auto nmain = form.main
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(form.rec_relations));
 
 	for (const auto& shift: select_top(nmain, is_non_terminal<tau_parser::shift, BAs...>)) {
 		int off = 0;
-		std::optional<sp_tau_node<BAs...>> current(shift);
+		std::optional<nso<BAs...>> current(shift);
 		while (current.has_value()) {
 			off += get<size_t>(((current.value() | tau_parser::num).value())->value);
 			current = current.value() | tau_parser::shift;
@@ -485,14 +485,14 @@ nso_rr<BAs...> apply_rec_relations_by_shift(nso_rr<BAs...>& form) {
 		auto digits = make_node<tau_sym<BAs...>>(off, {});
 		auto num = make_node<tau_sym<BAs...>>(tau_source_sym(tau_parser::num), {digits});
 		auto nshift = make_node<tau_sym<BAs...>>(tau_source_sym(tau_parser::shift), {
-			shift | tau_parser::capture | optional_value_extractor<sp_tau_node<BAs...>>,
-			shift | tau_parser::minus | optional_value_extractor<sp_tau_node<BAs...>>,
+			shift | tau_parser::capture | optional_value_extractor<nso<BAs...>>,
+			shift | tau_parser::minus | optional_value_extractor<nso<BAs...>>,
 			num});
 
 		changes[shift] = nshift;
 	}
 
-	auto nnmain = replace<sp_tau_node<BAs...>>(nmain, changes);
+	auto nnmain = replace<nso<BAs...>>(nmain, changes);
 	return { form.rec_relations, nnmain };
 }
 
@@ -512,7 +512,7 @@ nso_rr<BAs...> normalizer_step(nso_rr<BAs...>& form, int stp = 0) {
 
 	nso_rr<BAs...> nform = prepare_main_for_step<BAs...>(form, stp);
 
-	sp_tau_node<BAs...> nmain = nform.main
+	nso<BAs...> nmain = nform.main
 			| repeat_all<step<BAs...>, BAs...>(
 				step<BAs...>(nform.rec_relations))
 			| repeat_all<step<BAs...>, BAs...>(
@@ -567,14 +567,14 @@ nso_rr<BAs...> normalizer(std::string& source, factory_t& factory) {
 template <typename... BAs>
 struct is_equivalent_predicate {
 
-	is_equivalent_predicate(sp_tau_node<BAs...> node) : node(node) {
+	is_equivalent_predicate(nso<BAs...> node) : node(node) {
 		node_free_variables = free_variables(node);
 	}
 
-	bool operator()(sp_tau_node<BAs...>& n) {
-		std::set<sp_tau_node<BAs...>> free_vars = free_variables(n);
+	bool operator()(nso<BAs...>& n) {
+		std::set<nso<BAs...>> free_vars = free_variables(n);
 		free_vars.insert(node_free_variables.begin(), node_free_variables.end());
-		sp_tau_node<BAs...> wff = build_wff_equiv<BAs...>(node, n);
+		nso<BAs...> wff = build_wff_equiv<BAs...>(node, n);
 		for(auto& v: free_vars) wff = build_wff_all<BAs...>(v, wff);
 		rules<BAs...> rls;
 		nso_rr<BAs...> form{rls, wff};
@@ -583,19 +583,19 @@ struct is_equivalent_predicate {
 		return check.has_value();
 	}
 
-	sp_tau_node<BAs...> node;
-	std::set<sp_tau_node<BAs...>> node_free_variables;
+	nso<BAs...> node;
+	std::set<nso<BAs...>> node_free_variables;
 private:
 
-	std::set<sp_tau_node<BAs...>> free_variables(sp_tau_node<BAs...>& n) {
+	std::set<nso<BAs...>> free_variables(nso<BAs...>& n) {
 		auto captures = select_all(n, is_non_terminal<tau_parser::capture, BAs...>);
-		std::set<sp_tau_node<BAs...>> vars(captures.begin(), captures.end());
+		std::set<nso<BAs...>> vars(captures.begin(), captures.end());
 		return vars;
 	}
 };
 
 template<typename... BAs>
-static const auto is_not_eq_or_neq_to_zero_predicate = [](const sp_tau_node<BAs...>& n) {
+static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) {
 	auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
 	return check.empty();
 //	if (is_non_terminal<tau_parser::bf_eq, BAs...>(n) || is_non_terminal<tau_parser::bf_neq, BAs...>(n)) {
@@ -609,7 +609,7 @@ template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
 template<typename... BAs>
-sp_tau_node<BAs...> apply_definitions(const sp_tau_node<BAs...>& form) {
+nso<BAs...> apply_definitions(const nso<BAs...>& form) {
 	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
 }
 
@@ -638,7 +638,7 @@ nso_rr<BAs...> normalizer(const nso_rr<BAs...>& form) {
 
 	auto nform = apply_definitions(form);
 
-	std::vector<sp_tau_node<BAs...>> previous;
+	std::vector<nso<BAs...>> previous;
 	nso_rr<BAs...> current = normalizer_step(nform);
 	auto is_equivalent = is_equivalent_predicate<BAs...>(current.main);
 	for (int i = 1; std::find_if(previous.rend(), previous.rbegin(),  is_equivalent) == previous.rend(); i++) {
