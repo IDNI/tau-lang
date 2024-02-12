@@ -19,7 +19,7 @@
 #include "../../src/nso_rr.h"
 #include "../../src/bdd_handle.h"
 #include "../../src/normalizer2.h"
-#include "../../src/tau.h"
+#include "../../src/satisfiability.h"
 
 #include "test_integration_helpers-tau.h"
 
