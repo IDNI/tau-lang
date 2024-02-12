@@ -235,15 +235,17 @@ struct tau_factory {
 };
 
 // creates a specific rule from a generic rule.
+// TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-gssotc_rec_relation<BAs...> make_gssotc_rec_relation(gssotc<BAs...>& rule) {
+rec_relation<gssotc<BAs...>> make_gssotc_rec_relation(gssotc<BAs...>& rule) {
 	return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::tau_rec_relation, tau_parser::tau, rule);
 }
 
 // create a set of relations from a given tau source.
 template<typename... BAs>
-gsstoc_rec_relations<BAs...> make_gssotc_rec_relations(gssotc<BAs...>& tau_source) {
-	gsstoc_rec_relations<BAs...> rs;
+// TODO (LOW) should depend in node_t instead of BAs...
+rec_relations<gssotc<BAs...>> make_gssotc_rec_relations(gssotc<BAs...>& tau_source) {
+	rec_relations<gssotc<BAs...>> rs;
 	// TODO (LOW) change call to select by operator|| and operator|
 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::gssotc_rec_relation, tau_ba<BAs...>, BAs...>))
 		rs.push_back(make_gssotc_rec_relation<BAs...>(r));
