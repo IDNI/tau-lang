@@ -73,8 +73,8 @@ using builder = rule<nso<BAs...>>;
 
 // defines a vector of rules in the tau language, the order is important as it defines
 // the order of the rules in the rewriting process of the tau language.
-template <typename... BAs>
-using rules = std::vector<rule<nso<BAs...>>>;
+template <typename node_t>
+using rules = std::vector<rule<node_t>>;
 
 // defines a vector of rec. relations in the tau language, the order is important as it defines
 // the order of the rec relations in the rewriting process of the tau language.
@@ -83,8 +83,8 @@ using rec_relations = std::vector<rec_relation<node_t>>;
 
 // a library is a set of rules to be applied in the rewriting process of the tau
 // language, the order of the rules is important.
-template <typename... BAs>
-using library = rules<BAs...>;
+template <typename node_t>
+using library = rules<node_t>;
 
 // bindings map tau_source constants (strings) into elements of the boolean algebras.
 template<typename... BAs>
@@ -119,10 +119,10 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<BAs...> n, size_t 
 template<typename... BAs>
 struct nso_rr {
 
-	nso_rr(const rules<BAs...>& rec_relations, const nso<BAs...>& main) : rec_relations(rec_relations), main(main) {};
+	nso_rr(const rules<nso<BAs...>>& rec_relations, const nso<BAs...>& main) : rec_relations(rec_relations), main(main) {};
 	nso_rr(const nso<BAs...>& main) : main(main) {};
 
-	rules<BAs...> rec_relations;
+	rules<nso<BAs...>> rec_relations;
 	nso<BAs...> main;
 };
 
@@ -792,8 +792,8 @@ sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
 
 // resolve all the unresolved types in the given rules.
 template<typename... BAs>
-rules<BAs...> resolve_types(const rules<BAs...> rs) {
-	rules<BAs...> nrs;
+rules<nso<BAs...>> resolve_types(const rules<nso<BAs...>> rs) {
+	rules<nso<BAs...>> nrs;
 	for (const auto& r : rs) {
 		auto nr = resolve_types(r);
 		nrs.push_back(nr);
@@ -803,7 +803,7 @@ rules<BAs...> resolve_types(const rules<BAs...> rs) {
 
 // resolve all the unresolved types in the given library.
 template<typename binder_t, typename... BAs>
-library<BAs...> resolve_types(const library<BAs...> lib) {
+library<nso<BAs...>> resolve_types(const library<nso<BAs...>> lib) {
 	return { resolve_types(lib.system) };
 }
 
@@ -858,8 +858,8 @@ rec_relation<nso<BAs...>> make_rec_relation(sp_tau_node<BAs...>& rule) {
 // create a set of rules from a given tau source.
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rules<BAs...> make_rules(sp_tau_node<BAs...>& tau_source) {
-	rules<BAs...> rs;
+rules<nso<BAs...>> make_rules(sp_tau_node<BAs...>& tau_source) {
+	rules<nso<BAs...>> rs;
 	// TODO (LOW) change call to select by operator|| and operator|
 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::rule, BAs...>))
 		rs.push_back(make_rule<BAs...>(r));
@@ -938,6 +938,7 @@ sp_tau_node<BAs...> process_digits(sp_tau_node<BAs...>& tau_source){
 
 // create tau code from tau source
 template<typename... BAs>
+// TODO (LOW) should depend on node_t instead of BAs...
 sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 	tauify<BAs...> tf;
 	map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>> transform(tf);
@@ -951,15 +952,17 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 }
 
 // make a library from the given tau source.
+// TODO (LOW) should depend on node_t instead of BAs...
 template<typename... BAs>
-library<BAs...> make_library(sp_tau_source_node& tau_source) {
+library<nso<BAs...>> make_library(sp_tau_source_node& tau_source) {
 	auto lib = make_tau_code<BAs...>(tau_source);
 	return make_rules(lib);
 }
 
 // make a library from the given tau source string.
+// TODO (LOW) should depend on node_t instead of BAs...
 template<typename... BAs>
-library<BAs...> make_library(const std::string& source) {
+library<nso<BAs...>> make_library(const std::string& source) {
 	auto tau_source = make_tau_source(source);
 	return make_library<BAs...>(tau_source);
 }
@@ -1638,7 +1641,7 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r, const sp_tau_nod
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template<typename predicate_t, typename... BAs>
-sp_tau_node<BAs...> nso_rr_apply_if(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
+sp_tau_node<BAs...> nso_rr_apply_if(const rules<nso<BAs...>>& rs, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
 	if (rs.empty()) return n;
 	sp_tau_node<BAs...> nn = n;
 	for (auto& r : rs) nn = nso_rr_apply_if<predicate_t, BAs...>(r, nn, predicate);
@@ -1721,7 +1724,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> nso_rr_apply(const rules<BAs...>& rs, const sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs, const sp_tau_node<BAs...>& n) {
 	if (rs.empty()) return n;
 	sp_tau_node<BAs...> nn = n;
 	for (auto& r : rs) nn = nso_rr_apply<BAs...>(r, nn);
@@ -1736,7 +1739,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rules<BAs...>& rs, const sp_tau_node<BAs.
 
 // << for rules
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream, const idni::tau::rules<BAs...>& rs) {
+std::ostream& operator<<(std::ostream& stream, const idni::tau::rules<idni::tau::nso<BAs...>>& rs) {
 	for (const auto& r : rs) stream << r << "\n";
 	return stream;
 }
