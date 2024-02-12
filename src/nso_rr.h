@@ -116,14 +116,14 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<BAs...> n, size_t 
 // (unless '0' or '1') are uninstantiated.
 
 // TODO (LOW) replace nso_rr with a pair of rules and main
-template<typename... BAs>
-struct nso_rr {
+template<typename type_t>
+struct rr {
 
-	nso_rr(const rules<nso<BAs...>>& rec_relations, const nso<BAs...>& main) : rec_relations(rec_relations), main(main) {};
-	nso_rr(const nso<BAs...>& main) : main(main) {};
+	rr(const rules<type_t>& rec_relations, const type_t& main) : rec_relations(rec_relations), main(main) {};
+	rr(const type_t& main) : main(main) {};
 
-	rules<nso<BAs...>> rec_relations;
-	nso<BAs...> main;
+	rules<type_t> rec_relations;
+	type_t main;
 };
 
 //
@@ -809,7 +809,7 @@ library<nso<BAs...>> resolve_types(const library<nso<BAs...>> lib) {
 
 // resolve all the unresolved types in the given nso_rr.
 template<typename binder_t, typename... BAs>
-nso_rr<BAs...> resolve_types(const nso_rr<BAs...> f) {
+rr<nso<BAs...>> resolve_types(const rr<nso<BAs...>> f) {
 	return { resolve_types(f.rec_relations), resolve_type(f.main) };
 }
 
@@ -969,7 +969,7 @@ library<nso<BAs...>> make_library(const std::string& source) {
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-nso_rr<BAs...> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
+rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
 	auto src = make_tau_code<BAs...>(tau_source);
 	auto unbinded_main = src | tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
 	auto binded_main = post_order_traverser<
@@ -983,7 +983,7 @@ nso_rr<BAs...> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-nso_rr<BAs...> make_nso_rr_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
+rr<nso<BAs...>> make_nso_rr_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
 	name_binder<BAs...> nb(bindings);
 	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
 	return make_nso_rr_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
@@ -991,21 +991,21 @@ nso_rr<BAs...> make_nso_rr_using_bindings(sp_tau_source_node& tau_source, const 
 
 // make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
-nso_rr<BAs...> make_nso_rr_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
+rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
 	bind_transformer<factory_t, BAs...> bs(factory);
 	return make_nso_rr_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
-nso_rr<BAs...> make_nso_rr_using_factory(const std::string& source, factory_t& factory) {
+rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& source, factory_t& factory) {
 	auto tau_source = make_tau_source(source);
 	return make_nso_rr_using_factory<factory_t, BAs...>(tau_source, factory);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-nso_rr<BAs...> make_nso_rr_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
+rr<nso<BAs...>> make_nso_rr_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
 	auto tau_source = make_tau_source(source);
 	name_binder<BAs...> nb(bindings);
 	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
@@ -1766,7 +1766,7 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>&
 
 // << for formulas
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream, const idni::tau::nso_rr<BAs...>& f) {
+std::ostream& operator<<(std::ostream& stream, const idni::tau::rr<idni::tau::nso<BAs...>>& f) {
 	return stream << f.rec_relations << f.main << "\n";
 }
 
