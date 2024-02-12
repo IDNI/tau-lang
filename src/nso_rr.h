@@ -11,8 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#ifndef __PROGRAM_H__
-#define __PROGRAM_H__
+#ifndef __NSO_RR_H__
+#define __NSO_RR_H__
 
 #include <map>
 #include <variant>
@@ -1803,4 +1803,4 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_node&
 	return stream << std::make_shared<idni::tau::tau_source_node>(n);
 }
 
-#endif // __PROGRAM_H__
+#endif // __NSO_RR_H__
