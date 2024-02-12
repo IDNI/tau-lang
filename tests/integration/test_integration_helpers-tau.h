@@ -48,11 +48,11 @@ struct bdd_test_factory {
 	std::map<std::string, sp_tau_node<tau_ba<bdd_test>, bdd_test>> cache;
 };
 
-nso_rr<tau_ba<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
+rr<nso<tau_ba<bdd_test>, bdd_test>> normalize_test_tau(const char* src) {
 	bdd_test_factory bf;
 	tau_factory<bdd_test_factory, bdd_test> fb(bf);
 	factory_binder<tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test> fbinder(fb);
-	nso_rr<tau_ba<bdd_test>, bdd_test> nso_rr = make_nso_rr_using_factory<
+	rr<nso<tau_ba<bdd_test>, bdd_test>> nso_rr = make_nso_rr_using_factory<
 			factory_binder<tau_factory<bdd_test_factory, bdd_test>,tau_ba<bdd_test>, bdd_test>,
 			tau_ba<bdd_test>, bdd_test>(src, fbinder);
 

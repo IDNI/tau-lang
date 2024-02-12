@@ -117,7 +117,7 @@ static auto collapse_positives_tau = make_library<BAs...>(
 template<typename...BAs>
 struct tau_ba {
 
-	tau_ba(nso_rr<tau_ba<BAs...>, BAs...>& form) : form(form.main) {}
+	tau_ba(rr<nso<tau_ba<BAs...>, BAs...>>& form) : form(form.main) {}
 	tau_ba(nso<tau_ba<BAs...>, BAs...>& main) : form(main) {}
 
 	auto operator<=>(const tau_ba<BAs...>& other) {
@@ -200,10 +200,10 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 }
 
 template<typename...BAs>
-using tau_spec = nso_rr<tau_ba<BAs...>, BAs...>;
+using gssotc = nso<tau_ba<BAs...>, BAs...>;
 
 template<typename...BAs>
-using gssotc = nso<tau_ba<BAs...>, BAs...>;
+using tau_spec = rr<gssotc<BAs...>>;
 
 template <typename... BAs>
 using gssotc_rule = rule<gssotc<BAs...>>;
