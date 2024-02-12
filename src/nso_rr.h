@@ -112,10 +112,7 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<BAs...> n, size_t 
 }
 #endif // DEBUG
 
-// a nso_rr is a set of rules and a main, the boolean algebra constants
-// (unless '0' or '1') are uninstantiated.
-
-// TODO (LOW) replace nso_rr with a pair of rules and main
+// an rr is a set of rules and a main.
 template<typename type_t>
 struct rr {
 
