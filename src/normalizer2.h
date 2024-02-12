@@ -294,13 +294,13 @@ static auto bf_positives_upwards = make_library<BAs...>(
 // TODO (MEDIUM) clean execution api code
 template<typename... BAs>
 struct step {
-	step(library<BAs...> lib): lib(lib) {}
+	step(library<nso<BAs...>> lib): lib(lib) {}
 
 	nso<BAs...> operator()(const nso<BAs...>& n) const {
 		return nso_rr_apply(lib, n);
 	}
 
-	library<BAs...> lib;
+	library<nso<BAs...>> lib;
 };
 
 template<typename step_t, typename...BAs>
@@ -383,7 +383,7 @@ struct repeat_once {
 
 
 template<typename...BAs>
-steps<step<BAs...>, BAs...> operator|(const library<BAs...>& l, const library<BAs...>& r) {
+steps<step<BAs...>, BAs...> operator|(const library<nso<BAs...>>& l, const library<nso<BAs...>>& r) {
 	auto s = steps<step<BAs...>, BAs...>(step<BAs...>(l));
 	s.libraries.push_back(r);
 	return s;
@@ -411,21 +411,21 @@ steps<step_t, BAs...> operator|(const steps<step_t, BAs...>& s, const step_t& l)
 }
 
 template<typename step_t, typename... BAs>
-steps<step_t, BAs...> operator|(const steps<step_t, BAs...>& s, const library<BAs...>& l) {
+steps<step_t, BAs...> operator|(const steps<step_t, BAs...>& s, const library<nso<BAs...>>& l) {
 	auto ns = s;
 	ns.libraries.push_back(l);
 	return ns;
 }
 
 template<typename... BAs>
-steps<step<library<BAs...>, BAs...>, BAs...> operator|(const steps<step<library<BAs...>, BAs...>, BAs...>& s, const library<BAs...>& l) {
+steps<step<library<nso<BAs...>>, BAs...>, BAs...> operator|(const steps<step<library<nso<BAs...>>, BAs...>, BAs...>& s, const library<nso<BAs...>>& l) {
 	auto ns = s;
 	ns.libraries.push_back(l);
 	return ns;
 }
 
 template<typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const library<BAs...>& l) {
+nso<BAs...> operator|(const nso<BAs...>& n, const library<nso<BAs...>>& l) {
 	auto s = step<BAs...>(l);
 	return s(n);
 }
@@ -576,7 +576,7 @@ struct is_equivalent_predicate {
 		free_vars.insert(node_free_variables.begin(), node_free_variables.end());
 		nso<BAs...> wff = build_wff_equiv<BAs...>(node, n);
 		for(auto& v: free_vars) wff = build_wff_all<BAs...>(v, wff);
-		rules<BAs...> rls;
+		rules<nso<BAs...>> rls;
 		nso_rr<BAs...> form{rls, wff};
 		auto norm_form = normalizer(form);
 		auto check = norm_form.main | tau_parser::wff | tau_parser::wff_t;
@@ -616,7 +616,7 @@ nso<BAs...> apply_definitions(const nso<BAs...>& form) {
 template<typename... BAs>
 nso_rr<BAs...> apply_definitions(const nso_rr<BAs...>& form) {
 	auto nmain = apply_definitions(form.main);
-	rules<BAs...> nrec_relations;
+	rec_relations<nso<BAs...>> nrec_relations;
 	for (const auto& r : form.rec_relations) {
 		auto [matcher, body] = r;
 		nrec_relations.emplace_back(matcher, apply_definitions(body));
