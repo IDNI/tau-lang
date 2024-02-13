@@ -37,7 +37,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
 		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
-		auto result = normalizer<bdd_test>(sample_formula).main;
+		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}

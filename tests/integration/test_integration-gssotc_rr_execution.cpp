@@ -162,7 +162,7 @@ TEST_SUITE("2d cases") {
 	TEST_CASE("tau_rec_relation 2d: two substitutions 1st coord.") {
 		const char* sample =
 			"g[0, 0]($Y) :::= {T}."
-			"g[$n, 0]($Y) :::= g[$n - 1, 0]($Y)." // TODO (HIGH) remove captures maybe rewriting the rule adding dollars
+			"g[$n, 0]($Y) :::= g[$n - 1, 0]($Y)."
 			"g[1, 0](Y);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;

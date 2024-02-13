@@ -483,21 +483,122 @@ nso<BAs...> apply_definitions(const nso<BAs...>& form) {
 }
 
 template<typename... BAs>
-nso<BAs...> apply_definitions(const rr<nso<BAs...>>& rr_nso) {
+rr<nso<BAs...>> apply_definitions(const rr<nso<BAs...>>& rr_nso) {
 	auto nmain = apply_definitions(rr_nso.main);
 	rec_relations<nso<BAs...>> nrec_relations;
 	for (const auto& r : rr_nso.rec_relations) {
 		auto [matcher, body] = r;
 		nrec_relations.emplace_back(matcher, apply_definitions(body));
 	}
-	return nmain;
+	return { nrec_relations, nmain };
+}
+
+template<typename ... BAs>
+nso<BAs...> normalizer_step(const nso<BAs...>& form) {
+	return form
+		| repeat_all<step<BAs...>, BAs...>(
+			step<BAs...>(apply_defs<BAs...>))
+		| repeat_all<step<BAs...>, BAs...>(
+			step<BAs...>(elim_for_all<BAs...>))
+		| repeat_each<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| clause_simplify_wff<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			bf_positives_upwards<BAs...>
+			| squeeze_positives<BAs...>
+			| wff_remove_existential<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			bf_elim_quantifiers<BAs...>
+			| to_dnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			clause_simplify_bf<BAs...>
+			| trivialities<BAs...>
+			| to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| clause_simplify_wff<BAs...>);
+}
+
+template<typename... BAs>
+auto get_vars_from_nso(const nso<BAs...>& n) {
+	return select_all(n, is_var_or_capture<BAs...>);
+}
+
+template <typename... BAs>
+bool are_equivalent_nso(nso<BAs...> n1, nso<BAs...> n2) {
+	auto vars1 = get_vars_from_nso(n1);
+	auto vars2 = get_vars_from_nso(n2);
+	std::set<nso<BAs...>> vars(vars1.begin(), vars1.end());
+	vars.insert(vars2.begin(), vars2.end());
+
+	nso<BAs...> wff = build_wff_equiv<BAs...>(n1, n2);
+	if (vars.empty()) {
+		auto check = normalizer_step(wff) | tau_parser::wff_t;
+		return check.has_value();
+	}
+
+	for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
+	rr<nso<BAs...>> nso_rr{wff};
+	auto normalized = normalizer(nso_rr);
+	auto check = normalized | tau_parser::wff_t;
+	return check.has_value();
+}
+
+template <typename... BAs>
+auto is_equivalent_to_some_previous(const nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
+	return std::any_of(previous.begin(), previous.end(), [n] (const nso<BAs...>& p) {
+		return are_equivalent_nso<BAs...>(n, p);
+	});
+}
+
+template <typename... BAs>
+size_t get_max_loopback_in_rr(const nso<BAs...>& form) {
+	size_t max = 0;
+	for (const auto& offset: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>)) {
+		auto current = offset
+			| tau_parser::offset
+			| tau_parser::num
+			| only_child_extractor<BAs...>
+			| offset_extractor<BAs...>;
+		max = current.has_value() ? std::max(max, current.value()) : max;
+	}
+	return max;
+}
+
+template<typename... BAs>
+nso<BAs...> build_num_from_num(nso<BAs...> num, size_t value) {
+	auto nts = std::get<tau_source_sym>(num->value).nts;
+	auto digits = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {});
+	return make_node<tau_sym<BAs...>>( tau_sym<BAs...>(tau_source_sym(tau_parser::num, nts)), {digits});
+}
+
+template<typename... BAs>
+nso<BAs...> build_shift_from_shift(nso<BAs...> shift, size_t step) {
+	auto num = shift | tau_parser::num | optional_value_extractor<nso<BAs...>>;
+	auto offset = num | only_child_extractor<BAs...> | offset_extractor<BAs...> | optional_value_extractor<size_t>;
+	if (step == offset) return shift | tau_parser::capture | optional_value_extractor<nso<BAs...>>;
+	std::map<nso<BAs...>, nso<BAs...>> changes{{num, build_num_from_num<BAs...>(num, step - offset)}};
+	return replace<nso<BAs...>>(shift, changes);
+}
+
+template<typename... BAs>
+nso<BAs...> set_main_to_step(const nso<BAs...>& form, size_t step) {
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+	for (const auto& offset: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>)) {
+		auto shift = offset | tau_parser::shift;
+		if (!shift.has_value()) continue;
+		auto nshift = build_shift_from_shift<BAs...>(shift.value(), step);
+		changes[shift.value()] = nshift;
+	}
+	return replace<nso<BAs...>>(form, changes);
 }
 
 // REVIEW (HIGH) review overall execution
 template <typename... BAs>
-rr<nso<BAs...>> normalizer(const rr<nso<BAs...>>& rr_nso) {
+nso<BAs...> normalizer(const rr<nso<BAs...>>& rr_nso) {
 	// IDEA extract this to an operator| overload
-	// apply defs to nso_rr
 
 	#ifdef DEBUG
 	std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;
@@ -505,50 +606,36 @@ rr<nso<BAs...>> normalizer(const rr<nso<BAs...>>& rr_nso) {
 	std::cout << "(F): " << rr_nso.main << std::endl;
 	#endif // DEBUG
 
-	auto nmain = apply_definitions(rr_nso);
+	auto applied_defs = apply_definitions(rr_nso);
+	auto loopback = get_max_loopback_in_rr(applied_defs.main);
 
-	#ifdef DEBUG
-	std::cout << "(I): -- Begin normalizer loop" << std::endl;
-	std::cout << "(F): " << nmain << std::endl;
-	#endif // DEBUG
+	std::vector<nso<BAs...>> previous;
+	nso<BAs...> current;
 
-	nso<BAs...> normalized = nmain
-			| repeat_all<step<BAs...>, BAs...>(
-				step<BAs...>(rr_nso.rec_relations))
-			| repeat_all<step<BAs...>, BAs...>(
-				step<BAs...>(apply_defs<BAs...>))
-			| repeat_all<step<BAs...>, BAs...>(
-				step<BAs...>(elim_for_all<BAs...>))
-			| repeat_each<step<BAs...>, BAs...>(
-				to_dnf_wff<BAs...>
-				| simplify_wff<BAs...>
-				| clause_simplify_wff<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(
-				bf_positives_upwards<BAs...>
-				| squeeze_positives<BAs...>
-				| wff_remove_existential<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(
-				bf_elim_quantifiers<BAs...>
-				| to_dnf_bf<BAs...>
-				| simplify_bf<BAs...>
-				| apply_cb<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(
-				clause_simplify_bf<BAs...>
-				| trivialities<BAs...>
-				| to_dnf_wff<BAs...>
-				| simplify_wff<BAs...>
-				| clause_simplify_wff<BAs...>);
+	for (int i = loopback; ; i++) {
+		current = set_main_to_step(applied_defs.main, i)
+			| repeat_all<step<BAs...>, BAs...>(step<BAs...>(applied_defs.rec_relations));
 
-	#ifdef DEBUG
-	std::cout << "(I): -- End normalizer loop" << std::endl;
-	#endif // DEBUG
+		#ifdef DEBUG
+		std::cout << "(I): -- Begin normalizer step" << std::endl;
+		std::cout << "(F): " << current << std::endl;
+		#endif // DEBUG
+
+		current = normalizer_step(current);
+		if (is_equivalent_to_some_previous(current, previous)) break;
+		else previous.push_back(current);
+
+		#ifdef DEBUG
+		std::cout << "(I): -- End normalizer step" << std::endl;
+		#endif // DEBUG
+	}
 
 	#ifdef DEBUG
 	std::cout << "(I): -- End normalizer" << std::endl;
-	std::cout << "(O): " << normalized << std::endl;
+	std::cout << "(O): " << current << std::endl;
 	#endif // DEBUG
 
-	return { rr_nso.rec_relations, normalized };
+	return current;
 }
 
 template <typename... BAs>
