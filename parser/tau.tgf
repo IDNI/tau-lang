@@ -63,7 +63,6 @@ offset                 => num | capture | shift.
 shift                  => capture ws minus ws num.
 num                    => digits.
 
-
 variable               => var | io_var | pos_var.
 io_var                 => in | out.
 in                     => in_var_name var_pos.
@@ -71,6 +70,7 @@ out                    => out_var_name var_pos.
 var_pos                => current_pos | absolute_pos | relative_pos.
 bool_variable          => '?' chars.
 # TODO (HIGH) capture t is reserved for timed variables, so we should check that is not used here
+# TODO (HIGH) remove captures maybe rewriting the rule adding dollars
 capture                => capture_var.
 capture_var            => '$' chars.
 # TODO (MEDIUM) remove '?' from timed variables

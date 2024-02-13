@@ -23,35 +23,7 @@ using namespace idni::tau;
 
 namespace idni::tau {
 
-template <typename... BAs>
-struct is_equivalent_predicate {
 
-	is_equivalent_predicate(nso<BAs...> node) : node(node) {
-		node_free_variables = free_variables(node);
-	}
-
-	bool operator()(nso<BAs...>& n) {
-		std::set<nso<BAs...>> free_vars = free_variables(n);
-		free_vars.insert(node_free_variables.begin(), node_free_variables.end());
-		nso<BAs...> wff = build_wff_equiv<BAs...>(node, n);
-		for(auto& v: free_vars) wff = build_wff_all<BAs...>(v, wff);
-		rules<nso<BAs...>> rls;
-		rr<nso<BAs...>> form{rls, wff};
-		auto norm_form = normalizer(form);
-		auto check = norm_form.main | tau_parser::wff | tau_parser::wff_t;
-		return check.has_value();
-	}
-
-	nso<BAs...> node;
-	std::set<nso<BAs...>> node_free_variables;
-private:
-
-	std::set<nso<BAs...>> free_variables(nso<BAs...>& n) {
-		auto captures = select_all(n, is_non_terminal<tau_parser::capture, BAs...>);
-		std::set<nso<BAs...>> vars(captures.begin(), captures.end());
-		return vars;
-	}
-};
 
 template <typename... BAs>
 rr<nso<BAs...>> replace_captures_by_shift(rr<nso<BAs...>>& form, int step) {
