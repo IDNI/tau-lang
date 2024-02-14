@@ -423,7 +423,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_
 template<typename... BAs>
 bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 
-	DBG(std::cout << "(I) is_satisfiable_clause: " << clause << std::endl;)
+	DBG(std::cout << "(I) -- Checking is_satisfiable_clause: " << clause << std::endl;)
 
 	auto collapsed = clause |
 		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
@@ -435,13 +435,14 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 	size_t loopback = max(inputs.loopback, outputs.loopback);
 
 	if (inputs.name.empty() && outputs.name.empty()) {
-		DBG(std::cout << "(C) " << collapsed << std::endl;)
+		DBG(std::cout << "(I) -- No variables case" << std::endl;)
+		DBG(std::cout << "(F) " << collapsed << std::endl;)
 		auto check = collapsed | tau_parser::tau_wff | tau_parser::wff | tau_parser::wff_t;
 		if (check.has_value()) {
-			DBG(std::cout << "(I) is_satisfiable_clause: true" << std::endl;)
+			DBG(std::cout << "(I) -- Check is_satisfiable_clause: true" << std::endl;)
 			return true;
 		} else {
-			DBG(std::cout << "(I) is_satisfiable_clause: false" << std::endl;)
+			DBG(std::cout << "(I) -- Check is_satisfiable_clause: false" << std::endl;)
 			return false;
 		}
 		return check.has_value() ? true : false;
@@ -453,11 +454,11 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 		auto normalize = normalizer<BAs...>(main_wo_rr, reversed_bindings).main;
 
 		if ((normalize | tau_parser::wff_f).has_value()) {
-			DBG(std::cout << "(I) is_satisfiable_clause: false" << std::endl;)
+			DBG(std::cout << "(I) -- Check is_satisfiable_clause: false" << std::endl;)
 			return false;
 		}
 
-		DBG(std::cout << "(I) is_satisfiable_clause: true" << std::endl;)
+		DBG(std::cout << "(I) -- Check is_satisfiable_clause: true" << std::endl;)
 		return true;
 	}
 
@@ -468,7 +469,7 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 		auto check = get_check_nso_rr(outputs, loopback, current);
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), reversed_bindings).main;
 		if ((normalize | tau_parser::wff_f).has_value()) {
-			DBG(std::cout << "(I) is_satisfiable_clause: false" << std::endl);
+			DBG(std::cout << "(I) --Check is_satisfiable_clause: false" << std::endl);
 			return false;
 		}
 		for (size_t previous = 1; previous < current; ++previous) {
@@ -500,8 +501,7 @@ auto is_gssotc_equivalent_to_any_of(const gssotc<BAs...>& n, std::vector<gssotc<
 // check satisfability of a tau_spec (boolean combination case)
 template<typename...BAs>
 bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
-	DBG(std::cout << "(I) -- Begin is_tau_spec_satisfiable tau_spec " << tau_spec << std::endl;)
-	// TODO (LOW) change << for tau_spec
+	DBG(std::cout << "(I) -- Begin is_tau_spec_satisfiable tau_spec " << std::endl;)
 	DBG(std::cout << tau_spec << std::endl;)
 
 	auto loopback = get_max_loopback_in_rr(tau_spec.main);
@@ -514,6 +514,7 @@ bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
 
 		DBG(std::cout << "(I): -- Begin is_tau_spec_satisfiable step" << std::endl;)
 		DBG(std::cout << "(F): " << current << std::endl;)
+		DBG(std::cout << "(I) -- Converting to dnf and simplifying" << std::endl;)
 
 		auto dnf = current
 			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
@@ -524,13 +525,11 @@ bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
 			DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: false" << std::endl);
 			return false;
 		}
-
-		if (is_gssotc_equivalent_to_any_of(current, previous)) break;
-		else previous.push_back(current);
+		if (is_gssotc_equivalent_to_any_of(current, previous)) {
+			DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: true" << std::endl);
+			return true;
+		} else previous.push_back(current);
 	}
-
-	DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: true" << std::endl);
-	return true;
 }
 
 } // namespace idni::tau
