@@ -894,6 +894,7 @@ auto drop_location = [](const parse_symbol_t& n) -> symbol_t { return n.first; }
 template <typename parse_symbol_t, typename symbol_t>
 using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
+// FIXME maybe better not define the function at all if DEBUG is not defined
 template<typename parser_t>
 void check_parser_result(const std::string& source,
 	const typename parser_t::forest_type* f,

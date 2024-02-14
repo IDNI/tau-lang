@@ -95,23 +95,6 @@ struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-#ifdef DEBUG
-template <typename...BAs>
-std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<BAs...> n, size_t l = 0) {
-	os << "{";
-	// for (size_t t = 0; t < l; t++) os << " ";
-	std::visit(overloaded {
-			[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
-			[&os](std::variant<BAs...>) {
-				os << "...BAs..."; },
-			[&os](size_t v) { os << v; }},
-		n->value);
-	for (auto& d : n->child) print_sp_tau_node(os, d, l + 1);
-	os << "}";
-	return os;
-}
-#endif // DEBUG
-
 // an rr is a set of rules and a main.
 template<typename type_t>
 struct rr {
@@ -1387,25 +1370,6 @@ private:
 	static constexpr auto _neq = [](const auto& l) -> bool { return !(l == false); };
 	static constexpr auto _is_one = [](const auto& l) -> bool { return l == true; };
 	static constexpr auto _is_zero = [](const auto& l) -> bool { return l == false; };
-
-	// TODO (LOW) move this code somewhere else so it could be use everywhere
-	#ifdef DEBUG
-	template<class... Ts>
-	struct overloaded : Ts... { using Ts::operator()...; };
-	template<class... Ts>
-	overloaded(Ts...) -> overloaded<Ts...>;
-
-	std::ostream& print_sp(std::ostream &os, sp_tau_node<BAs...> n) {
-		os << "{";
-		std::visit(overloaded{
-			[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
-			[&os](auto v) { os << "..."; }
-		}, n->value);
-		for (auto& d : n->child) print_sp(os, d);
-		os << "}";
-		return os;
-	}
-	#endif
 
 	void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves) {
 		if (auto check = n | branch; !check.has_value() && is_non_terminal(skip, n)) leaves.push_back(n);
