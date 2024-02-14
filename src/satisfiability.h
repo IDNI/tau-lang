@@ -78,7 +78,6 @@ rr<nso<BAs...>> prepare_main_for_step(rr<nso<BAs...>>& form, int step) {
 	return apply_rec_relations_by_shift<BAs...>(nform);
 }
 
-
 template<typename... BAs>
 void get_clauses(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& clauses) {
 	if (auto check = n | tau_parser::tau_or; !check.has_value() && is_non_terminal(tau_parser::tau, n)) clauses.push_back(n);
