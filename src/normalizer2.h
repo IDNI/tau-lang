@@ -527,7 +527,7 @@ auto get_vars_from_nso(const nso<BAs...>& n) {
 }
 
 template <typename... BAs>
-bool are_equivalent_nso(nso<BAs...> n1, nso<BAs...> n2) {
+bool is_nso_equivalent_to(nso<BAs...> n1, nso<BAs...> n2) {
 	auto vars1 = get_vars_from_nso(n1);
 	auto vars2 = get_vars_from_nso(n2);
 	std::set<nso<BAs...>> vars(vars1.begin(), vars1.end());
@@ -547,9 +547,9 @@ bool are_equivalent_nso(nso<BAs...> n1, nso<BAs...> n2) {
 }
 
 template <typename... BAs>
-auto is_equivalent_to_some_previous(const nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
+auto is_nso_equivalent_to_any_of(const nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
 	return std::any_of(previous.begin(), previous.end(), [n] (const nso<BAs...>& p) {
-		return are_equivalent_nso<BAs...>(n, p);
+		return is_nso_equivalent_to<BAs...>(n, p);
 	});
 }
 
@@ -618,7 +618,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& rr_nso) {
 		DBG(std::cout << "(F): " << current << std::endl;)
 
 		current = normalizer_step(current);
-		if (is_equivalent_to_some_previous(current, previous)) break;
+		if (is_nso_equivalent_to_any_of(current, previous)) break;
 		else previous.push_back(current);
 
 		DBG(std::cout << "(I): -- End normalizer step" << std::endl;)

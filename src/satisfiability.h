@@ -23,8 +23,6 @@ using namespace idni::tau;
 
 namespace idni::tau {
 
-
-
 template <typename... BAs>
 rr<nso<BAs...>> replace_captures_by_shift(rr<nso<BAs...>>& form, int step) {
 	std::map<nso<BAs...>, nso<BAs...>> changes;
@@ -422,7 +420,6 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_
 	return {main.str(), ext_bindings};
 }
 
-
 template<typename... BAs>
 bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 
@@ -438,7 +435,15 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 	size_t loopback = max(inputs.loopback, outputs.loopback);
 
 	if (inputs.name.empty() && outputs.name.empty()) {
-		auto check = clause | tau_parser::tau_wff | tau_parser::wff | tau_parser::wff_t;
+		DBG(std::cout << "(C) " << collapsed << std::endl;)
+		auto check = collapsed | tau_parser::tau_wff | tau_parser::wff | tau_parser::wff_t;
+		if (check.has_value()) {
+			DBG(std::cout << "(I) is_satisfiable_clause: true" << std::endl;)
+			return true;
+		} else {
+			DBG(std::cout << "(I) is_satisfiable_clause: false" << std::endl;)
+			return false;
+		}
 		return check.has_value() ? true : false;
 	}
 
@@ -474,27 +479,58 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 	}
 }
 
+template <typename... BAs>
+bool is_gssotc_equivalent_to(gssotc<BAs...> n1, gssotc<BAs...> n2) {
+	// TODO (HIGH) write the proper equiv formula
+	gssotc<BAs...> tau = build_tau_neg(
+		build_tau_and<tau_ba<BAs...>, BAs...>(
+			build_tau_or(build_tau_neg(n1), n2),
+			build_tau_or(build_tau_neg(n2), n1)));
+	gssotc<BAs...> neg_tau = build_tau_neg<tau_ba<BAs...>, BAs...>(tau);
+	return !is_satisfiable_clause(neg_tau);
+}
+
+template <typename... BAs>
+auto is_gssotc_equivalent_to_any_of(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& previous) {
+	return std::any_of(previous.begin(), previous.end(), [n] (const gssotc<BAs...>& p) {
+		return is_gssotc_equivalent_to<BAs...>(n, p);
+	});
+}
+
 // check satisfability of a tau_spec (boolean combination case)
 template<typename...BAs>
-bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
-	DBG(std::cout << "(I) is_satisfiable: " << tau_spec << std::endl;)
+bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
+	DBG(std::cout << "(I) -- Begin is_tau_spec_satisfiable tau_spec " << tau_spec << std::endl;)
+	// TODO (LOW) change << for tau_spec
+	DBG(std::cout << tau_spec << std::endl;)
 
-	auto dnf = tau_spec.main
-		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-			step<tau_ba<BAs...>, BAs...>(tau_spec.rec_relations))
-		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-			to_dnf_tau<tau_ba<BAs...>, BAs...>
-			| simplify_tau<tau_ba<BAs...>, BAs...>);
+	auto loopback = get_max_loopback_in_rr(tau_spec.main);
 
-	for(auto& clause: get_clauses(dnf)) {
-		if (is_satisfiable_clause(clause)) {
-			DBG(std::cout << "(I) is_satisfiable: true" << std::endl);
-			return true;
+	std::vector<gssotc<BAs...>> previous;
+
+	for (int i = loopback; ; i++) {
+		auto current = set_main_to_step<tau_ba<BAs...>, BAs...>(tau_spec.main, i)
+			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(tau_spec.rec_relations));
+
+		DBG(std::cout << "(I): -- Begin is_tau_spec_satisfiable step" << std::endl;)
+		DBG(std::cout << "(F): " << current << std::endl;)
+
+		auto dnf = current
+			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+				to_dnf_tau<tau_ba<BAs...>, BAs...>
+				| simplify_tau<tau_ba<BAs...>, BAs...>);
+
+		if (!is_satisfiable_clause(dnf)) {
+			DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: false" << std::endl);
+			return false;
 		}
+
+		if (is_gssotc_equivalent_to_any_of(current, previous)) break;
+		else previous.push_back(current);
 	}
 
-	DBG(std::cout << "(I) is_satisfiable: false" << std::endl);
-	return false;
+	DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: true" << std::endl);
+	return true;
 }
 
 } // namespace idni::tau
