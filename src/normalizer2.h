@@ -600,11 +600,9 @@ template <typename... BAs>
 nso<BAs...> normalizer(const rr<nso<BAs...>>& rr_nso) {
 	// IDEA extract this to an operator| overload
 
-	#ifdef DEBUG
-	std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;
-	std::cout << "(I): -- Apply once definitions" << std::endl;
-	std::cout << "(F): " << rr_nso.main << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << std::endl << "(I): -- Begin normalizer" << std::endl;)
+	DBG(std::cout << "(I): -- Apply once definitions" << std::endl;)
+	DBG(std::cout << "(F): " << rr_nso.main << std::endl;)
 
 	auto applied_defs = apply_definitions(rr_nso);
 	auto loopback = get_max_loopback_in_rr(applied_defs.main);
@@ -616,24 +614,18 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& rr_nso) {
 		current = set_main_to_step(applied_defs.main, i)
 			| repeat_all<step<BAs...>, BAs...>(step<BAs...>(applied_defs.rec_relations));
 
-		#ifdef DEBUG
-		std::cout << "(I): -- Begin normalizer step" << std::endl;
-		std::cout << "(F): " << current << std::endl;
-		#endif // DEBUG
+		DBG(std::cout << "(I): -- Begin normalizer step" << std::endl;)
+		DBG(std::cout << "(F): " << current << std::endl;)
 
 		current = normalizer_step(current);
 		if (is_equivalent_to_some_previous(current, previous)) break;
 		else previous.push_back(current);
 
-		#ifdef DEBUG
-		std::cout << "(I): -- End normalizer step" << std::endl;
-		#endif // DEBUG
+		DBG(std::cout << "(I): -- End normalizer step" << std::endl;)
 	}
 
-	#ifdef DEBUG
-	std::cout << "(I): -- End normalizer" << std::endl;
-	std::cout << "(O): " << current << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I): -- End normalizer" << std::endl;)
+	DBG(std::cout << "(O): " << current << std::endl;)
 
 	return current;
 }

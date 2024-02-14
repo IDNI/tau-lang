@@ -847,7 +847,6 @@ rule<nso<BAs...>> make_rule(sp_tau_node<BAs...>& rule) {
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
 rec_relation<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::nonterminal type_t, sp_tau_node<BAs...>& rule) {
-	DBG(print_sp_tau_node(std::cout, rule); std::cout << std::endl;)
 	auto elements = rule | rule_t || type_t;
 	return { elements[0], elements[1] };
 }
@@ -1636,9 +1635,7 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r, const sp_tau_nod
 		}
 		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
 
-		#ifdef DEBUG
-		std::cout << "(C): " << cnn << std::endl;
-		#endif // DEBUG
+		DBG(std::cout << "(C): " << cnn << std::endl;)
 
 		return cnn;
 	}
@@ -1660,15 +1657,6 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rules<nso<BAs...>>& rs, const sp_tau_n
 template<typename... BAs>
 sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
-
-	#ifdef DEBUG
-	std::cout << "--------------------------------------------------------------------------------------------" << std::endl;
-	std::cout << "(T): rule        = " << r.first << "=" << r.second << std::endl;
-	std::cout << "(T): rule.first  = "; print_sp_tau_node(std::cout, r.first); std::cout << std::endl;
-	std::cout << "(T): rule.second = "; print_sp_tau_node(std::cout, r.second); std::cout << std::endl;
-	std::cout << "(T): n           = " << n; std::cout << std::endl;
-	std::cout << "(T): n           = "; print_sp_tau_node(std::cout, n); std::cout << std::endl;
-	#endif // DEBUG
 
 	// apply the rule
 	auto nn = apply_with_skip<
@@ -1699,9 +1687,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 				auto right = args[1] | only_child_extractor<BAs...> | offset_extractor<BAs...> | optional_value_extractor<size_t>;
 				if (left < right) {
 
-					#ifdef DEBUG
-					std::cout << "(C): " << n << std::endl;
-					#endif // DEBUG
+					DBG(std::cout << "(C): " << n << std::endl;)
 
 					return n;
 				}
@@ -1717,10 +1703,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 	if (!changes.empty()) {
 		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
 
-		#ifdef DEBUG
-		std::cout << "(C): " << cnn << std::endl;
-		print_sp_tau_node(std::cout, cnn); std::cout << std::endl;
-		#endif // DEBUG
+		DBG(std::cout << "(C): " << cnn << std::endl;)
 
 		return cnn;
 	}
