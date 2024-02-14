@@ -34,7 +34,7 @@ struct bdd_parser {
 	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})
 		{ return p.parse(fd, po); }
 #endif //WIN32
-	bool found() { return p.found(); }
+	bool found(int start = -1) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
 		nul, space, alpha, alnum, start, ws, bdd, ws_required, disjunction, bdd2, 
@@ -123,8 +123,8 @@ private:
 		q(nt(17), (t(6)));
 		// exclusive_or => bdd3 ws _Rexclusive_or_0 ws bdd4.
 		q(nt(12), (nt(11)+nt(5)+nt(17)+nt(5)+nt(13)));
-		// negation => bdd5 ws '\''.
-		q(nt(14), (nt(15)+nt(5)+t(7)));
+		// negation => bdd4 ws '\''.
+		q(nt(14), (nt(13)+nt(5)+t(7)));
 		// literal => var.
 		q(nt(16), (nt(18)));
 		// literal => T.

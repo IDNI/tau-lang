@@ -15,7 +15,7 @@ disjunction             => bdd  ws '|' ws         bdd2.
 conjunction             => bdd2 ws '&' ws         bdd3.
 conjunction             => bdd2 ws_required       bdd3.
 exclusive_or            => bdd3 ws ('^' | '+') ws bdd4.
-negation                => bdd5 ws "'".
+negation                => bdd4 ws "'".
 
 literal                 => var | T | F.
 

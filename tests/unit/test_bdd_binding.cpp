@@ -51,10 +51,181 @@ sp_bdd_node make_bdd_statement(const sp_tau_source_node& source) {
 			transform, all<sp_tau_source_node>)(source);
 }
 
+sp_bdd_node build_binding(const char* src) {
+	bdd_init<Bool>();
+	auto st = make_bdd_statement(make_source_binding_node(src));
+	bdd_factory bf;
+	return bf.build("bdd", st);
+}
+
+bdd_binding& get_binding(const sp_bdd_node& n) {
+	return std::get<bdd_binding>(std::get<std::variant<
+			tau_ba<bdd_binding>, bdd_binding>>(n->value));
+}
+
+bdd_binding& build_and_get_binding(const char* src) {
+	return get_binding(build_binding(src));
+}
+
+#define SAMPLES_SIZE (sizeof(samples) / sizeof(char *))
+
 TEST_SUITE("bdd binding") {
 
-	TEST_CASE("bdd factory build") {
-		bdd_init<Bool>();
+	TEST_CASE("bdd true") {
+		const char* sample = "1";
+		const char* expected = "1";
+		auto& v = build_and_get_binding(sample);
+		std::stringstream ss;
+		ss << v;
+		CHECK(ss.str() == expected);
+	}
+
+	TEST_CASE("bdd false") {
+		const char* sample = "0";
+		const char* expected = "0";
+		auto& v = build_and_get_binding(sample);
+		std::stringstream ss;
+		ss << v;
+		CHECK(ss.str() == expected);
+	}
+
+	TEST_CASE("bdd negation") {
+		const char* samples[] = {
+			"0'", "1'", "0''", "1''", "0'''", "1'''"
+		};
+		const char* expecteds[] = {
+			"1", "0", "0", "1", "1", "0"
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+
+	TEST_CASE("bdd and") {
+		const char* samples[] = {
+			"0 0", "0 1", "1 0", "1 1",
+			"0&0", "0&1", "1&0", "1&1"
+		};
+		const char* expecteds[] = {
+			"0", "0", "0", "1",
+			"0", "0", "0", "1"
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+	TEST_CASE("bdd or") {
+		const char* samples[] = {
+			"0|0", "0|1", "1|0", "1|1"
+		};
+		const char* expecteds[] = {
+			"0", "1", "1", "1"
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+	TEST_CASE("bdd xor") {
+		const char* samples[] = {
+			"0^0", "0^1", "1^0", "1^1",
+			"0+0", "0+1", "1+0", "1+1"
+		};
+		const char* expecteds[] = {
+			"0", "1", "1", "0",
+			"0", "1", "1", "0"
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+	TEST_CASE("bdd variable") {
+		const char* samples[] = {
+			"p", "X", "a1"
+		};
+		const char* expecteds[] = {
+			"p", "X", "a1"
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+	TEST_CASE("bdd variable negation") {
+		const char* samples[] = {
+			"v'", "X''", "a1'''"
+		};
+		const char* expecteds[] = {
+			"v'", "X", "a1'"
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+	TEST_CASE("bdd variable and") {
+		const char* samples[] = {
+			"v 0", "v 1", "0 v", "1 v", "v v",
+			"v&0", "v&1", "0&v", "1&v", "v&v"
+		};
+		const char* expecteds[] = {
+			"0", "v", "0", "v", "v",
+			"0", "v", "0", "v", "v"
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+	TEST_CASE("bdd variable or") {
+		const char* samples[] = {
+			"v|0", "v|1", "0|v", "1|v", "v|v"
+		};
+		const char* expecteds[] = {
+			"v", "1", "v", "1", "v"
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+	TEST_CASE("bdd variable xor") {
+		const char* samples[] = {
+			"v^0", "0^v", "v^1", "1^v",
+			"v+0", "0+v", "v+1", "1+v"
+		};
+		const char* expecteds[] = {
+			"v", "v", "v'", "v'",
+			"v", "v", "v'", "v'"
+
+		};
+		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
+			std::stringstream ss;
+			ss << build_and_get_binding(samples[i]);
+			CHECK(ss.str() == expecteds[i]);
+		}
+	}
+
+	TEST_CASE("bdd all syntax") {
 	 	const char* sample = "z' | x y | a&b+c | 1^d | d^e&0'";
 		const char* expected = "a b c d e' x y' z | a b c d e' x' z | "
 			"a b c d' x y' z | a b c d' x' z | a b c' x y' z | "
@@ -63,14 +234,10 @@ TEST_SUITE("bdd binding") {
 			"a b' c' d' x y' z | a b' c' d' x' z | "
 			"a' d e' x y' z | a' d e' x' z | a' d' x y' z | "
 			"a' d' x' z | x y z | z'";
-		auto st = make_bdd_statement(make_source_binding_node(sample));
-		bdd_factory bf;
-		auto bbv = bf.build("bdd", st);
-		auto& v = std::get<bdd_binding>(std::get<std::variant<
-			tau_ba<bdd_binding>, bdd_binding>>(bbv->value));
+		auto& v = build_and_get_binding(sample);
 		std::stringstream ss;
 		ss << v;
-	 	CHECK(ss.str() == expected);
+		CHECK(ss.str() == expected);
 	}
 
 }
