@@ -958,9 +958,9 @@ sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
 	// make_node_from_* functions
 	static parser_t parser;
 	auto f = parser.parse(source.c_str(), source.size());
-#ifdef DEBUG
-	check_parser_result<parser_t>(source, f.get(), parser);
-#endif // DEBUG
+
+	DBG(check_parser_result<parser_t>(source, f.get(), parser);)
+
 	return make_node_from_forest<parser_t, transformer_t,
 		parse_symbol_t, symbol_t>(transformer, f.get());
 }
@@ -973,9 +973,9 @@ sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 {
 	static parser_t parser;
 	auto f = parser.parse(is);
-#ifdef DEBUG
-	check_parser_result<parser_t>("<@stdin>", f.get(), parser);
-#endif // DEBUG
+
+	DBG(check_parser_result<parser_t>("<@stdin>", f.get(), parser);)
+
 	return make_node_from_forest<parser_t, transformer_t,
 		parse_symbol_t, symbol_t>(transformer, f.get());
 }
@@ -988,10 +988,9 @@ sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 {
 	static parser_t parser;
 	auto f = parser.parse(filename, MMAP_READ);
-#ifdef DEBUG
-	check_parser_result<parser_t>(
-		std::string("<")+filename+">", f.get(), parser);
-#endif // DEBUG
+
+	DBG(check_parser_result<parser_t>(std::string("<")+filename+">", f.get(), parser);)
+
 	return make_node_from_forest<parser_t, transformer_t,
 		parse_symbol_t, symbol_t>(transformer, f.get());
 }

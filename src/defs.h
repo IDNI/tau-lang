@@ -16,8 +16,6 @@
 
 typedef int sym_t;
 
-#define OUTPUT_PARSED_TREES
-
 // basic macro for conditional execution of code
 #ifdef DEBUG
 #define DBG(x) x
@@ -25,11 +23,13 @@ typedef int sym_t;
 #else
 #define DBG(x)
 #endif
+
 #include <algorithm>
 #include <iostream>
 
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
+
 using namespace std;
 
 template<typename B> struct zero {
@@ -47,4 +47,4 @@ template<typename T, typename V> bool has(const T& t, const V& v) {
 template<typename T, typename V> bool hasv(const T& t, const V& v) {
 	return std::find(t.begin(), t.end(), v) != t.end();
 }
-#endif
+#endif // __DEF_H__

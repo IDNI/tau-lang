@@ -91,11 +91,9 @@ std::vector<gssotc<BAs...>> get_clauses(const gssotc<BAs...>& n) {
 	std::vector<gssotc<BAs...>> clauses;
 	get_clauses(n, clauses);
 
-	#ifdef DEBUG
-	std::cout << "(I) clauses: " ;
-	for (auto& c: clauses) std::cout << c << ", ";
-	std::cout << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I) clauses: " ;)
+	DBG(for (auto& c: clauses) std::cout << c << ", ";)
+	DBG(std::cout << std::endl;)
 
 	return clauses;
 }
@@ -230,10 +228,8 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const gssotc
 		(type == tau_parser::in ? inputs : outputs).add(variable);
 	}
 
-	#ifdef DEBUG
-	std::cout << "(I) inputs: " ; for (auto& i: inputs.name) std::cout << i << ", "; std::cout << std::endl;
-	std::cout << "(I) outputs: " ; for (auto& o: outputs.name) std::cout << o << ", "; std::cout << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I) inputs: " ; for (auto& i: inputs.name) std::cout << i << ", "; std::cout << std::endl;)
+	DBG(std::cout << "(I) outputs: " ; for (auto& o: outputs.name) std::cout << o << ", "; std::cout << std::endl;)
 
 	return {inputs, outputs};
 }
@@ -331,9 +327,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>>  get_eta_nso_
 		}
 	// add main
 
-	#ifdef DEBUG
-	std::cout << "(I) get_eta_nso_rr: " << nsorr.str() << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I) get_eta_nso_rr: " << nsorr.str() << std::endl;)
 
 	return {nsorr.str(), bindings};
 }
@@ -359,9 +353,7 @@ std::string get_check_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopba
 	check << existentially_quantify_vars(outputs, loopback) <<
 		" (eta[" << current << "](" << print_vars(outputs) << ").\n";
 
-	#ifdef DEBUG
-	std::cout << "(I) get_check_nso_rr: " << check.str() << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I) get_check_nso_rr: " << check.str() << std::endl;)
 
 	return check.str();
 }
@@ -387,9 +379,7 @@ std::string get_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopbac
 	main << universally_quantify_vars(outputs, loopback) <<
 		" (eta[" << current << "](" << print_vars(outputs) << ") <-> eta[" << previous << "]).\n";
 
-	#ifdef DEBUG
-	std::cout << "(I) get_main_nso_rr: " << main.str() << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I) get_main_nso_rr: " << main.str() << std::endl;)
 
 	return main.str();
 }
@@ -428,9 +418,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_
 	// print the main wff
 	main << clause_to_string(wff, ext_bindings)	<< ".\n";
 
-	#ifdef DEBUG
-	std::cout << "(I) get_main_nso_wo_rr: " << main.str() << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I) get_main_nso_wo_rr: " << main.str() << std::endl;)
 
 	return {main.str(), ext_bindings};
 }
@@ -439,9 +427,7 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_
 template<typename... BAs>
 bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 
-	#ifdef DEBUG
-	std::cout << "(I) is_satisfiable_clause: " << clause << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I) is_satisfiable_clause: " << clause << std::endl;)
 
 	auto collapsed = clause |
 		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
@@ -463,17 +449,11 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 		auto normalize = normalizer<BAs...>(main_wo_rr, reversed_bindings).main;
 
 		if ((normalize | tau_parser::wff_f).has_value()) {
-			#ifdef DEBUG
-			std::cout << "(I) is_satisfiable_clause: false" << std::endl;
-			#endif // DEBUG
-
+			DBG(std::cout << "(I) is_satisfiable_clause: false" << std::endl;)
 			return false;
 		}
 
-		#ifdef DEBUG
-		std::cout << "(I) is_satisfiable_clause: true" << std::endl;
-		#endif // DEBUG
-
+		DBG(std::cout << "(I) is_satisfiable_clause: true" << std::endl;)
 		return true;
 	}
 
@@ -484,10 +464,7 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 		auto check = get_check_nso_rr(outputs, loopback, current);
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), reversed_bindings).main;
 		if ((normalize | tau_parser::wff_f).has_value()) {
-			#ifdef DEBUG
-			std::cout << "(I) is_satisfiable_clause: false" << std::endl;
-			#endif // DEBUG
-
+			DBG(std::cout << "(I) is_satisfiable_clause: false" << std::endl);
 			return false;
 		}
 		for (size_t previous = 1; previous < current; ++previous) {
@@ -501,9 +478,7 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 // check satisfability of a tau_spec (boolean combination case)
 template<typename...BAs>
 bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
-	#ifdef DEBUG
-	std::cout << "(I) is_satisfiable: " << tau_spec << std::endl;
-	#endif // DEBUG
+	DBG(std::cout << "(I) is_satisfiable: " << tau_spec << std::endl;)
 
 	auto dnf = tau_spec.main
 		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
@@ -514,19 +489,12 @@ bool is_satisfiable(const tau_spec<BAs...>& tau_spec) {
 
 	for(auto& clause: get_clauses(dnf)) {
 		if (is_satisfiable_clause(clause)) {
-
-			#ifdef DEBUG
-			std::cout << "(I) is_satisfiable: true" << std::endl;
-			#endif // DEBUG
-
+			DBG(std::cout << "(I) is_satisfiable: true" << std::endl);
 			return true;
 		}
 	}
 
-	#ifdef DEBUG
-	std::cout << "(I) is_satisfiable: false" << std::endl;
-	#endif // DEBUG
-
+	DBG(std::cout << "(I) is_satisfiable: false" << std::endl);
 	return false;
 }
 
