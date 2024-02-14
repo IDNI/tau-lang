@@ -36,7 +36,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("tau_rec_relation: direct substitution y2") {
@@ -47,7 +47,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("tau_rec_relation: two substitutions") {
@@ -59,7 +59,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
 
@@ -76,7 +76,7 @@ TEST_SUITE("tau_rec_relations execution: types") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("clashing names, gssotc wins y2") {
@@ -89,7 +89,7 @@ TEST_SUITE("tau_rec_relations execution: types") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("clashing names, nso wins") {
@@ -102,7 +102,7 @@ TEST_SUITE("tau_rec_relations execution: types") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("clashing names, nso wins y2") {
@@ -115,7 +115,7 @@ TEST_SUITE("tau_rec_relations execution: types") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	// TODO (HIGH) this test fails with the rule g[0]($Y) := 0, check why
@@ -129,7 +129,7 @@ TEST_SUITE("tau_rec_relations execution: types") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("clashing names, bf wins") {
@@ -142,7 +142,7 @@ TEST_SUITE("tau_rec_relations execution: types") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
 
@@ -156,7 +156,7 @@ TEST_SUITE("2d cases") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("tau_rec_relation 2d: two substitutions 1st coord.") {
@@ -168,7 +168,7 @@ TEST_SUITE("2d cases") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("tau_rec_relation 2d: two substitutions 2nd coord.") {
@@ -180,7 +180,7 @@ TEST_SUITE("2d cases") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
 
@@ -195,7 +195,7 @@ TEST_SUITE("rec relations execution: several relations") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("complex substitution, tau_rec_relation case.") {
@@ -209,7 +209,7 @@ TEST_SUITE("rec relations execution: several relations") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 }
@@ -225,7 +225,7 @@ TEST_SUITE("rec relations execution: longer offsets") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("tau_rec_relation: case 2") {
@@ -238,7 +238,7 @@ TEST_SUITE("rec relations execution: longer offsets") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
 
@@ -255,7 +255,7 @@ TEST_SUITE("mutual rec cases") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("tau_rec_relation: case 2") {
@@ -269,7 +269,7 @@ TEST_SUITE("mutual rec cases") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
 
@@ -284,7 +284,7 @@ TEST_SUITE("multiple rec relations") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("tau_rec_relation: case 2") {
@@ -298,7 +298,7 @@ TEST_SUITE("multiple rec relations") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( !is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
 	TEST_CASE("tau_rec_relation: case 3") {
@@ -312,6 +312,6 @@ TEST_SUITE("multiple rec relations") {
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
-		CHECK( is_satisfiable<bdd_test>(sample_formula) );
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
