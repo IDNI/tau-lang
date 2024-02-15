@@ -171,7 +171,7 @@ struct tau_spec_vars {
 	void add(const gssotc<BAs...>& io) {
 		auto pos = io
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
-			| tau_parser::var_pos
+			| tau_parser::offset
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 			| optional_value_extractor<size_t>;
@@ -179,26 +179,20 @@ struct tau_spec_vars {
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| optional_value_extractor<gssotc<BAs...>>)->child[0];
 		switch (pos) {
-			case tau_parser::current_pos:
+			case tau_parser::capture:
 				name.emplace(var_name);
 				break;
-			case tau_parser::absolute_pos:
+			case tau_parser::num:
 				name.emplace(var_name);
 				loopback = max(loopback,
 					io | only_child_extractor<tau_ba<BAs...>, BAs...>
-					| tau_parser::var_pos
-					| tau_parser::absolute_pos
-					| tau_parser::num
-					| only_child_extractor<tau_ba<BAs...>, BAs...>
 					| offset_extractor<tau_ba<BAs...>, BAs...>
 					| optional_value_extractor<size_t>);
 				break;
-			case tau_parser::relative_pos:
+			case tau_parser::shift:
 				name.emplace(var_name);
 				loopback = max(loopback,
 					io | only_child_extractor<tau_ba<BAs...>, BAs...>
-					| tau_parser::var_pos
-					| tau_parser::relative_pos
 					| tau_parser::num
 					| only_child_extractor<tau_ba<BAs...>, BAs...>
 					| offset_extractor<tau_ba<BAs...>, BAs...>

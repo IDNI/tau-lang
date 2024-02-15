@@ -65,9 +65,8 @@ num                    => digits.
 
 variable               => var | io_var | pos_var.
 io_var                 => in | out.
-in                     => in_var_name var_pos.
-out                    => out_var_name var_pos.
-var_pos                => current_pos | absolute_pos | relative_pos.
+in                     => in_var_name open_bracket offset close_bracket.
+out                    => out_var_name open_bracket offset close_bracket.
 bool_variable          => '?' chars.
 # TODO (HIGH) capture t is reserved for timed variables, so we should check that is not used here
 # TODO (HIGH) remove captures maybe rewriting the rule adding dollars
@@ -76,10 +75,6 @@ capture_var            => '$' chars.
 # TODO (MEDIUM) remove '?' from timed variables
 # TODO (MEDIUM) avoid i_ and o_ in variables
 var                    => chars.
-pos_var                => 't'.
-current_pos            => open_bracket ws pos_var ws close_bracket.
-absolute_pos           => open_bracket ws num ws close_bracket.
-relative_pos           => open_bracket ws pos_var ws minus ws num ws close_bracket.
 in_var_name            => "i_" chars.
 out_var_name           => "o_" chars.
 
