@@ -846,8 +846,8 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, i
 
 	#ifdef DEBUG
 	if (nn != n) {
-		std::cout << "(R): " << p << " = " << s << std::endl;
-		std::cout << "(F): " << nn << std::endl;
+		std::cout << "(R) " << p << " = " << s << std::endl;
+		std::cout << "(F) " << nn << std::endl;
 	}
 	#endif // DEBUG
 
@@ -867,8 +867,8 @@ node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n, is_ignore_t& i
 
 	#ifdef DEBUG
 	if (nn != n) {
-		std::cout << "(R): " << p << " = " << s << std::endl;
-		std::cout << "(F): " << nn << std::endl;
+		std::cout << "(R) " << p << " = " << s << std::endl;
+		std::cout << "(F) " << nn << std::endl;
 	}
 	#endif // DEBUG
 
