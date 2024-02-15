@@ -421,9 +421,9 @@ std::pair<std::string, extracted_bindings<tau_ba<BAs...>, BAs...>> get_wff_main_
 }
 
 template<typename... BAs>
-bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
+bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 
-	DBG(std::cout << "(I) -- Checking is_satisfiable_clause: " << clause << std::endl;)
+	DBG(std::cout << "(I) -- Checking is_gssotc_clause_satisfiable: " << clause << std::endl;)
 
 	auto collapsed = clause |
 		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
@@ -439,10 +439,10 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 		DBG(std::cout << "(F) " << collapsed << std::endl;)
 		auto check = collapsed | tau_parser::tau_wff | tau_parser::wff | tau_parser::wff_t;
 		if (check.has_value()) {
-			DBG(std::cout << "(I) -- Check is_satisfiable_clause: true" << std::endl;)
+			DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: true" << std::endl;)
 			return true;
 		} else {
-			DBG(std::cout << "(I) -- Check is_satisfiable_clause: false" << std::endl;)
+			DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: false" << std::endl;)
 			return false;
 		}
 		return check.has_value() ? true : false;
@@ -454,11 +454,11 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 		auto normalize = normalizer<BAs...>(main_wo_rr, reversed_bindings).main;
 
 		if ((normalize | tau_parser::wff_f).has_value()) {
-			DBG(std::cout << "(I) -- Check is_satisfiable_clause: false" << std::endl;)
+			DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: false" << std::endl;)
 			return false;
 		}
 
-		DBG(std::cout << "(I) -- Check is_satisfiable_clause: true" << std::endl;)
+		DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: true" << std::endl;)
 		return true;
 	}
 
@@ -469,7 +469,7 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 		auto check = get_check_nso_rr(outputs, loopback, current);
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), reversed_bindings).main;
 		if ((normalize | tau_parser::wff_f).has_value()) {
-			DBG(std::cout << "(I) --Check is_satisfiable_clause: false" << std::endl);
+			DBG(std::cout << "(I) --Check is_gssotc_clause_satisfiable: false" << std::endl);
 			return false;
 		}
 		for (size_t previous = 1; previous < current; ++previous) {
@@ -480,15 +480,23 @@ bool is_satisfiable_clause(const gssotc<BAs...>& clause) {
 	}
 }
 
+template<typename... BAs>
+bool is_gssotc_satisfiable(const gssotc<BAs...>& form) {
+	auto dnf = form
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			to_dnf_tau<tau_ba<BAs...>, BAs...>
+			| simplify_tau<tau_ba<BAs...>, BAs...>);
+
+	auto clauses = get_clauses(dnf);
+	for (auto& clause: clauses) {
+		if (is_gssotc_clause_satisfiable(clause)) return true;
+	}
+	return false;
+}
+
 template <typename... BAs>
 bool is_gssotc_equivalent_to(gssotc<BAs...> n1, gssotc<BAs...> n2) {
-	// TODO (HIGH) write the proper equiv formula
-	gssotc<BAs...> tau = build_tau_neg(
-		build_tau_and<tau_ba<BAs...>, BAs...>(
-			build_tau_or(build_tau_neg(n1), n2),
-			build_tau_or(build_tau_neg(n2), n1)));
-	gssotc<BAs...> neg_tau = build_tau_neg<tau_ba<BAs...>, BAs...>(tau);
-	return !is_satisfiable_clause(neg_tau);
+	return !is_gssotc_satisfiable(build_tau_neg(build_tau_equiv(n1, n2)));
 }
 
 template <typename... BAs>
@@ -512,16 +520,11 @@ bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
 		auto current = set_main_to_step<tau_ba<BAs...>, BAs...>(tau_spec.main, i)
 			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(tau_spec.rec_relations));
 
-		DBG(std::cout << "(I): -- Begin is_tau_spec_satisfiable step" << std::endl;)
-		DBG(std::cout << "(F): " << current << std::endl;)
+		DBG(std::cout << "(I) -- Begin is_tau_spec_satisfiable step" << std::endl;)
+		DBG(std::cout << "(F) " << current << std::endl;)
 		DBG(std::cout << "(I) -- Converting to dnf and simplifying" << std::endl;)
 
-		auto dnf = current
-			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-				to_dnf_tau<tau_ba<BAs...>, BAs...>
-				| simplify_tau<tau_ba<BAs...>, BAs...>);
-
-		if (!is_satisfiable_clause(dnf)) {
+		if (!is_gssotc_satisfiable(current)) {
 			DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: false" << std::endl);
 			return false;
 		}

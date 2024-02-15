@@ -1292,6 +1292,16 @@ sp_tau_node<BAs...> build_tau_or(const sp_tau_node<BAs...>& l, const sp_tau_node
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> build_tau_equiv(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	return build_tau_and<BAs...>(build_tau_or(build_tau_neg(l), r), build_tau_or(build_tau_neg(r), l));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_tau_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	return build_tau_or<BAs...>(build_tau_and(build_tau_neg(l), r), build_tau_and(build_tau_neg(r), l));
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> build_tau_neg(const sp_tau_node<BAs...>& l) {
 	std::vector<sp_tau_node<BAs...>> args{l};
 	return tau_apply_builder<BAs...>(bldr_tau_neg<BAs...>, args);
@@ -1599,7 +1609,7 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r, const sp_tau_nod
 		}
 		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
 
-		DBG(std::cout << "(C): " << cnn << std::endl;)
+		DBG(std::cout << "(C) " << cnn << std::endl;)
 
 		return cnn;
 	}
@@ -1651,7 +1661,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 				auto right = args[1] | only_child_extractor<BAs...> | offset_extractor<BAs...> | optional_value_extractor<size_t>;
 				if (left < right) {
 
-					DBG(std::cout << "(C): " << n << std::endl;)
+					DBG(std::cout << "(C) " << n << std::endl;)
 
 					return n;
 				}
@@ -1667,7 +1677,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 	if (!changes.empty()) {
 		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
 
-		DBG(std::cout << "(C): " << cnn << std::endl;)
+		DBG(std::cout << "(C) " << cnn << std::endl;)
 
 		return cnn;
 	}
