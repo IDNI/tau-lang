@@ -63,7 +63,7 @@ offset                 => num | capture | shift.
 shift                  => capture ws minus ws num.
 num                    => digits.
 
-variable               => var | io_var | pos_var.
+variable               => var | io_var.
 io_var                 => in | out.
 in                     => in_var_name open_bracket offset close_bracket.
 out                    => out_var_name open_bracket offset close_bracket.
