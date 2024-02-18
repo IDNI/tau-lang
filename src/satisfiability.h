@@ -41,35 +41,6 @@ std::vector<gssotc<BAs...>> get_gssotc_clauses(const gssotc<BAs...>& n) {
 }
 
 template<typename... BAs>
-std::string build_string_from_clause(const gssotc<BAs...>& clause, bindings<tau_ba<BAs...>, BAs...> bindings, size_t binding_seed = 0) {
-
-	std::basic_stringstream<char> str;
-	std::map<std::variant<tau_ba<BAs...>, BAs...>, std::string> extracted_bindings;
-
-	auto visitor = overloaded(
-		[&str] (const tau_source_sym& l) {
-			if (!l.nt()) str << l.t(); },
-		[&str, &extracted_bindings, &binding_seed] (const std::variant<tau_ba<BAs...>, BAs...>& bae) {
-			if (extracted_bindings.contains(bae)) str << extracted_bindings[bae];
-			else {
-				auto binding = "taubinding" + std::to_string(binding_seed++);
-				extracted_bindings[bae] = binding;
-				str << binding;
-			}},
-		[&str] (const size_t& n) { str << n; });
-
-	auto print = [&str, &visitor] (const auto& e) {
-		std::visit(visitor, e->value);
-		return e;
-	};
-	using print_t = decltype(print);
-
-	post_order_tree_traverser<print_t, all_t<gssotc<BAs...>>, gssotc<BAs...>>(print, all<gssotc<BAs...>>)(clause);
-	for (auto& [k, v]: extracted_bindings) { bindings.insert({v, k}); }
-	return str.str();
-}
-
-template<typename... BAs>
 std::pair<std::optional<gssotc<BAs...>>, std::vector<gssotc<BAs...>>> get_positive_and_negative_literals(const gssotc<BAs...> collapsed,
 		std::optional<gssotc<BAs...>>& positive, std::vector<gssotc<BAs...>>& negatives) {
 	auto is_negative = [] (const auto& n) {
@@ -164,41 +135,88 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const gssotc
 }
 
 template<typename... BAs>
+std::string build_string_from_clause(const gssotc<BAs...>& clause, bindings<tau_ba<BAs...>, BAs...> bindings, size_t binding_seed = 0) {
+
+	std::basic_stringstream<char> str;
+	std::map<std::variant<tau_ba<BAs...>, BAs...>, std::string> extracted_bindings;
+
+	auto visitor = overloaded(
+		[&str] (const tau_source_sym& l) {
+			if (!l.nt()) str << l.t(); },
+		[&str, &extracted_bindings, &binding_seed] (const std::variant<tau_ba<BAs...>, BAs...>& bae) {
+			if (extracted_bindings.contains(bae)) str << extracted_bindings[bae];
+			else {
+				auto binding = "taubinding" + std::to_string(binding_seed++);
+				extracted_bindings[bae] = binding;
+				str << binding;
+			}},
+		[&str] (const size_t& n) { str << n; });
+
+	auto print = [&str, &visitor] (const auto& e) {
+		std::visit(visitor, e->value);
+		return e;
+	};
+	using print_t = decltype(print);
+
+	post_order_tree_traverser<print_t, all_t<gssotc<BAs...>>, gssotc<BAs...>>(print, all<gssotc<BAs...>>)(clause);
+	for (auto& [k, v]: extracted_bindings) { bindings.insert({v, k}); }
+	return str.str();
+}
+
+template<typename... BAs>
+std::string build_args_from_vars(const tau_spec_vars<BAs...>& vars, size_t index) {
+	std::basic_stringstream<char> str;
+	for (const auto& var: vars.name) {
+		str << var << "[" << index << "]";
+		if (var != *vars.name.rbegin()) str << ", ";
+	}
+	return str.str();
+}
+
+template<typename... BAs>
+std::string build_args_from_vars(const tau_spec_vars<BAs...>& vars) {
+	std::basic_stringstream<char> str;
+	for (const auto& var: vars.name) {
+		str << var;
+		if (var != *vars.name.rbegin()) str << ", ";
+	}
+	return str.str();
+}
+
+template<typename... BAs>
+std::string build_universal_quantifiers(const tau_spec_vars<BAs...>& vars, size_t index) {
+	std::basic_stringstream<char> str;
+	for (const auto& var: vars.name) {
+		str << "all " << var << "[" << index << "] ";
+	}
+	return str.str();
+}
+
+template<typename... BAs>
+std::string build_existential_quantifiers(const tau_spec_vars<BAs...>& vars, size_t index) {
+	std::basic_stringstream<char> str;
+	for (const auto& var: vars.name) {
+		str << "ex " << var << "[" << index << "] ";
+	}
+	return str.str();
+}
+
+template<typename... BAs>
+std::string build_boolean_existential_quantifiers(size_t size) {
+	std::basic_stringstream<char> str;
+	for (size_t i = 1; i <= size; ++i) {
+		str << "bex $nn" << i;
+		if (i < size) str << ",";
+	}
+	return str.str();
+}
+
+template<typename... BAs>
 std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>>  build_eta_nso_rr(
 		const std::optional<gssotc<BAs...>>& positive,
 		const std::vector<gssotc<BAs...>>& negatives,
 		const tau_spec_vars<BAs...>& inputs,
 		const tau_spec_vars<BAs...>& outputs) {
-	auto print_vars = [] (const auto& vars) {
-		std::basic_stringstream<char> str;
-		for (const auto& var: vars.name) {
-			str << var;
-			if (var != *vars.name.rbegin()) str << ", ";
-		}
-		return str.str();
-	};
-	auto universally_quantify_vars = [] (const auto& vars, size_t loopback) {
-		std::basic_stringstream<char> str;
-		for (const auto& var: vars.name) {
-			str << "all " << var << "[" << loopback << "] ";
-		}
-		return str.str();
-	};
-	auto existentially_quantify_vars = [] (const auto& vars, size_t loopback) {
-		std::basic_stringstream<char> str;
-		for (const auto& var: vars.name) {
-			str << "ex " << var << "[" << loopback << "] ";
-		}
-		return str.str();
-	};
-	auto print_boolean_existential_quantifiers = [] (size_t negatives) {
-		std::basic_stringstream<char> str;
-		for (size_t i = 1; i <= negatives; ++i) {
-			str << "bex $nn" << i << " ";
-			if (i < negatives) str << ",";
-		}
-		return str.str();
-	};
 	auto print_t = [] (size_t negatives) {
 		std::basic_stringstream<char> str;
 		for (size_t i = 1; i <= negatives; ++i) {
@@ -228,19 +246,19 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>>  build_eta_nso_rr(
 	size_t binding_seed = 0;
 	size_t loopback = max(inputs.loopback, outputs.loopback);
 	std::basic_stringstream<char> nsorr;
-	nsorr << "eta[t](" << print_vars(outputs) << ") := ";
+	nsorr << "eta[t](" << build_args_from_vars(outputs) << ") := ";
 		// add call to etas
 		if (negatives.size() > 0) {
-			nsorr << "etas[t](" << print_vars(outputs) << print_t(outputs.name.size()) << ").\n";
+			nsorr << "etas[t](" << build_args_from_vars(outputs) << print_t(outputs.name.size()) << ").\n";
 		}
-	nsorr << "etas[t](" << print_vars(outputs) << print_negative_vars(outputs.name.size()) <<") := ";
+	nsorr << "etas[t](" << build_args_from_vars(outputs) << print_negative_vars(outputs.name.size()) <<") := ";
 		// quantify input and output variables
 		for (size_t i = 1; i <= loopback; ++i) {
-			nsorr << universally_quantify_vars(inputs, i);
-			nsorr << existentially_quantify_vars(outputs, i);
+			nsorr << build_universal_quantifiers(inputs, i);
+			nsorr << build_existential_quantifiers(outputs, i);
 		}
 		// boolean quantify new negative vars
-		nsorr << print_boolean_existential_quantifiers(outputs.name.size());
+		nsorr << build_boolean_existential_quantifiers(outputs.name.size());
 		// add positive literal if it exists
 		if (positive.has_value()) {
 			nsorr << build_string_from_clause(positive.value(), bindings, binding_seed);
@@ -252,7 +270,7 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>>  build_eta_nso_rr(
 				nsorr << "(( $n" << i << " && " << "$nn" << i << " ) &&& " << build_string_from_clause(negatives[i], bindings, binding_seed) << ") &&& ";
 			}
 			// add recursive call with t-1
-			nsorr << "etas[t-1](" << print_vars(outputs) << print_new_negative_vars(outputs.name.size()) << ").\n";
+			nsorr << "etas[t-1](" << build_args_from_vars(outputs) << print_new_negative_vars(outputs.name.size()) << ").\n";
 		}
 	// add main
 
@@ -261,26 +279,12 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>>  build_eta_nso_rr(
 	return {nsorr.str(), bindings};
 }
 
+
 template<typename... BAs>
 std::string build_check_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopback, size_t current) {
-	auto print_vars = [] (const auto& vars) {
-		std::basic_stringstream<char> str;
-		for (const auto& var: vars.name) {
-			str << var;
-			if (var != *vars.name.rbegin()) str << ", ";
-		}
-		return str.str();
-	};
-	auto existentially_quantify_vars = [] (const auto& vars, size_t loopback) {
-		std::basic_stringstream<char> str;
-		for (const auto& var: vars.name) {
-			str << "ex " << var << "[" << loopback << "] ";
-		}
-		return str.str();
-	};
 	std::basic_stringstream<char> check;
-	check << existentially_quantify_vars(outputs, loopback) <<
-		" (eta[" << current << "](" << print_vars(outputs) << ").\n";
+	check << build_existential_quantifiers(outputs, loopback) <<
+		" (eta[" << current << "](" << build_args_from_vars(outputs) << ").\n";
 
 	DBG(std::cout << "(I) build_check_nso_rr: " << check.str() << std::endl;)
 
@@ -289,47 +293,15 @@ std::string build_check_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loop
 
 template<typename... BAs>
 std::string build_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopback, size_t current, size_t previous) {
-	auto print_vars = [] (const auto& vars) {
-		std::basic_stringstream<char> str;
-		for (const auto& var: vars.name) {
-			str << var;
-			if (var != *vars.name.rbegin()) str << ", ";
-		}
-		return str.str();
-	};
-	auto universally_quantify_vars = [] (const auto& vars, size_t loopback) {
-		std::basic_stringstream<char> str;
-		for (const auto& var: vars.name) {
-			str << "all " << var << "[" << loopback << "] ";
-		}
-		return str.str();
-	};
 	std::basic_stringstream<char> main;
-	main << universally_quantify_vars(outputs, loopback) <<
-		" (eta[" << current << "](" << print_vars(outputs) << ") <-> eta[" << previous << "]).\n";
+	main << build_universal_quantifiers(outputs, loopback) <<
+		" (eta[" << current << "](" << build_args_from_vars(outputs) << ") <-> eta[" << previous << "]).\n";
 
 	DBG(std::cout << "(I) build_main_nso_rr: " << main.str() << std::endl;)
 
 	return main.str();
 }
 
-template<typename... BAs>
-std::string build_universal_quantifiers(const tau_spec_vars<BAs...>& vars, size_t index) {
-	std::basic_stringstream<char> str;
-	for (const auto& var: vars.name) {
-		str << "all " << var << "[" << index << "] ";
-	}
-	return str.str();
-}
-
-template<typename... BAs>
-std::string build_existential_quantifiers(const tau_spec_vars<BAs...>& vars, size_t index) {
-	std::basic_stringstream<char> str;
-	for (const auto& var: vars.name) {
-		str << "ex " << var << "[" << index << "] ";
-	}
-	return str.str();
-}
 
 template<typename... BAs>
 std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff(const gssotc<BAs...>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
@@ -377,7 +349,6 @@ bool is_gssotc_clause_satisfiable_no_negatives(const gssotc<BAs...>& clause,  co
 
 	DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: true" << std::endl;)
 	return true;
-
 }
 
 
@@ -407,7 +378,7 @@ bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 	auto etas = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
 	for (size_t current = 1; /* until return statement */ ; ++current) {
 		auto [eta, extracted_bindings] = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
-		bindings<tau_ba<BAs...>, BAs...> reversed_bindings; // TODO (LOW) reverse
+		bindings<tau_ba<BAs...>, BAs...> reversed_bindings;
 		auto check = build_check_nso_rr(outputs, loopback, current);
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), reversed_bindings).main;
 		if ((normalize | tau_parser::wff_f).has_value()) {
