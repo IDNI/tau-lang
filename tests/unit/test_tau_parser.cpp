@@ -616,13 +616,6 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
-
-
-
-
-
-
-
 }
 
 TEST_SUITE("parsing builders") {
@@ -694,11 +687,93 @@ TEST_SUITE("parsing captures") {
 }
 
 TEST_SUITE("parsing inputs") {
-	// TODO (LOW) write tests for inputs parsing
+
+//offsets                => open_bracket ws offset (ws comma ws offset)* ws close_bracket.
+//offset                 => num | capture | shift | (variable & ~io_var).
+//shift                  => (capture | (variable & ~io_var)) ws minus ws num.
+
+	TEST_CASE("fix loopback") {
+		const char* sample = "( i_test[0] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
+
+	TEST_CASE("capture loopback") {
+		const char* sample = "( i_test[$n] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
+
+	TEST_CASE("variable loopback") {
+		const char* sample = "( i_test[t] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
+
+	TEST_CASE("shift capture loopback") {
+		const char* sample = "( i_test[$n - 1] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
+
+	TEST_CASE("shift variable loopback") {
+		const char* sample = "( i_test[t - 1] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
 }
 
 TEST_SUITE("parsing outputs") {
-	// TODO (LOW) write tests for outputs parsing
+
+	TEST_CASE("fix loopback") {
+		const char* sample = "( o_test[0] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
+
+	TEST_CASE("capture loopback") {
+		const char* sample = "( o_test[$n] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
+
+	TEST_CASE("variable loopback") {
+		const char* sample = "( o_test[t] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
+
+	TEST_CASE("shift capture loopback") {
+		const char* sample = "( o_test[$n - 1] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
+
+	TEST_CASE("shift variable loopback") {
+		const char* sample = "( o_test[t - 1] = 0 ).";
+		auto src = make_tau_source(sample);
+		auto frml = make_statement(src);
+		auto input = frml | tau_parser::nso_rr | tau_parser::nso_main;
+		CHECK( input.has_value() );
+	}
 }
 
 TEST_SUITE("parsing offsets"){
