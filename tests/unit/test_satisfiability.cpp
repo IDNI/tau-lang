@@ -123,17 +123,54 @@ TEST_SUITE("get_gssotc_literals") {
 	}
 }
 
-/*TEST_SUITE("get_gssotc_clauses") {
-	TEST_CASE("get_gssotc_clauses") {
-		const char* sample = "{ ( i_keyboard[t] = o_console[t] ) };";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto nso_rr = frml | tau_parser::nso_rr | tau_parser::nso_main ;
-		CHECK( nso_rr.has_value() );
+TEST_SUITE("get_gssotc_clauses") {
+
+	TEST_CASE("one clause") {
+		const char* sample = "{ T };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		std::vector<gssotc<bdd_test>> literals;
+		get_gssotc_clauses<bdd_test>(sample_formula.main, literals);
+		CHECK( literals.size() == 1 );
+	}
+
+	TEST_CASE("two clauses y1") {
+		const char* sample = "({ T } ||| !!! { T });";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		std::vector<gssotc<bdd_test>> literals;
+		get_gssotc_clauses<bdd_test>(sample_formula.main, literals);
+		CHECK( literals.size() == 2 );
+	}
+
+	TEST_CASE("two clauses y2") {
+		const char* sample = "({ T } ||| (!!! { T } &&& { T}));";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		std::vector<gssotc<bdd_test>> literals;
+		get_gssotc_clauses<bdd_test>(sample_formula.main, literals);
+		CHECK( literals.size() == 2 );
+	}
+
+	TEST_CASE("three clauses") {
+		const char* sample = "({ T } ||| (!!! { T } ||| { T}));";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		std::vector<gssotc<bdd_test>> literals;
+		get_gssotc_clauses<bdd_test>(sample_formula.main, literals);
+		CHECK( literals.size() == 3 );
 	}
 }
 
-TEST_SUITE("get_gssotc_io_vars") {
+/*TEST_SUITE("get_gssotc_io_vars") {
 	TEST_CASE("get_gssotc_io_vars") {
 		const char* sample = "{ ( i_keyboard[t] = o_console[t] ) };";
 		auto src = make_tau_source(sample);
