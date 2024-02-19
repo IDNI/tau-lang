@@ -164,7 +164,7 @@ std::string build_string_from_clause(const gssotc<BAs...>& clause, bindings<tau_
 
 	auto visitor = overloaded(
 		[&str] (const tau_source_sym& l) {
-			if (!l.nt()) str << l.t(); },
+			if (!l.nt() && !l.is_null()) str << l.t(); },
 		[&str, &extracted_bindings, &binding_seed] (const std::variant<tau_ba<BAs...>, BAs...>& bae) {
 			if (extracted_bindings.contains(bae)) str << extracted_bindings[bae];
 			else {
@@ -339,7 +339,7 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff(c
 			main << build_existential_quantifiers(outputs, i);
 		}
 		// print the main wff
-		main << build_string_from_clause(wff, bindings)	<< ".\n";
+		main << build_string_from_clause(wff, bindings)	<< ".";
 	} else main << "T.";
 
 	DBG(std::cout << "(I) get_main_nso_wo_rr: " << main.str() << std::endl;)
@@ -363,7 +363,10 @@ bool is_gssotc_clause_satisfiable_no_vars(const gssotc<BAs...>& collapsed) {
 template<typename... BAs>
 bool is_gssotc_clause_satisfiable_no_negatives(const std::optional<gssotc<BAs...>>& positive,  const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
 
+	// TODO (HIGH) fix formula to be normalized, must include a phi call and a phi definition
 	auto [main_wo_rr, bindings] = build_main_nso_rr_wff<BAs...>(positive, inputs, outputs, loopback);
+	DBG(std::cout << "(I) -- Check normalizer" << std::endl;)
+	DBG(std::cout << main_wo_rr << std::endl;)
 	auto normalize = normalizer<tau_ba<BAs...>, BAs...>(main_wo_rr, bindings).main;
 
 	if ((normalize | tau_parser::wff_f).has_value()) {
