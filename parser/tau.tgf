@@ -59,8 +59,8 @@ sym                    => chars.
 # offsets
 # TODO (HIGH) check programatically that no shift is use in a rec_relation defs
 offsets                => open_bracket ws offset (ws comma ws offset)* ws close_bracket.
-offset                 => num | capture | shift | variable & ~io_var.
-shift                  => (capture | variable & ~io_var) ws minus ws num.
+offset                 => num | capture | shift | (variable & ~io_var).
+shift                  => (capture | (variable & ~io_var)) ws minus ws num.
 num                    => digits.
 
 variable               => var | io_var.
@@ -78,11 +78,11 @@ in_var_name            => "i_" chars.
 out_var_name           => "o_" chars.
 
 # tau
-tau_rule               => tau_matcher ws tau_def ws tau_body ws dot.
+tau_rule               => tau_matcher ws tau_def ws tau_body ws dot ws.
 tau_matcher            => tau.
 tau_body               => tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
 tau_rec_relation	   => (tau & ~tau_and & ~tau_neg & ~tau_or & ~tau_wff & ~capture)
-			ws tau_def ws tau ws dot.
+			ws tau_def ws tau ws dot ws.
 tau_ref                => sym ws offsets ws tau_ref_args.
 tau_ref_args           => open_parenthesis (ws (variable | capture))* ws close_parenthesis.
 
@@ -103,7 +103,7 @@ tau_or_sym             => "|||".
 tau_neg_sym            => "!!!".
 
 # wff
-wff_rule               => wff_matcher ws wff_def ws wff_body ws dot.
+wff_rule               => wff_matcher ws wff_def ws wff_body ws dot ws.
 wff_matcher            => wff.
 wff_body               => wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
 			| wff_has_subformula_cb | wff_remove_existential_cb
@@ -112,7 +112,7 @@ wff_rec_relation       => (wff & ~wff_and & ~wff_neg & ~wff_xor & ~wff_condition
             & ~wff_or & ~wff_all & ~wff_ex & ~wff_imply & ~wff_equiv
             & ~wff_t & ~wff_f & ~capture & ~bool_variable & ~wff_ball & ~wff_bex
             & ~bf_eq & ~ bf_neq & ~bf_less & ~bf_less_equal & ~bf_greater)
-            ws wff_def ws wff ws dot.
+            ws wff_def ws wff ws dot ws.
 
 wff                    => wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
 			| wff_or | wff_all | wff_ex | wff_imply | wff_equiv
@@ -159,7 +159,7 @@ wff_t                  => 'T'.
 wff_f                  => 'F'.
 
 # bf
-bf_rule                => bf_matcher ws bf_def ws bf_body ws dot.
+bf_rule                => bf_matcher ws bf_def ws bf_body ws dot ws.
 bf_matcher             => bf.
 bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
 			| bf_has_subformula_cb | bf_remove_funiversal_cb | bf_remove_fexistential_cb
@@ -168,7 +168,7 @@ bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_o
 			| bf_all | bf_ex | bf_t | bf_f | variable | capture.
 bf_rec_relation        => (bf & ~bf_and & ~bf_neg & ~bf_xor & ~bf_or & ~bf_all & ~bf_ex
             & ~bf_t & ~bf_f & ~capture & ~bf_constant & ~bf_eq & ~bf_neq & ~variable)
-            ws bf_def ws bf ws dot.
+            ws bf_def ws bf ws dot ws.
 bf_ref                 => sym offsets bf_ref_args.
 bf_ref_args            => open_parenthesis (ws (variable | capture))* ws close_parenthesis.
 bf_and                 => open_parenthesis ws bf ws bf_and_sym ws bf ws close_parenthesis.
@@ -281,11 +281,11 @@ tau_collapse_positives_cb_sym  => "tau_collapse_positives_cb".
 tau_positives_upwards_cb_sym   => "tau_positives_upwards_cb".
 
 # input definition
-inputs                 => ws less ws input (ws input)* ws dot.
+inputs                 => ws less ws input (ws input)* ws dot ws.
 input                  => in ws colon ws open_brace ws source_binding ws close_brace.
 # each builder is define on its own string
 # TODO explit builders by type: bf, wff, and tau
-builder                => ws builder_head ws builder_body ws dot.
+builder                => ws builder_head ws builder_body ws dot ws.
 builder_head           => open_parenthesis ws capture (ws_required capture)* ws close_parenthesis.
 builder_body           => bf_builder_body | wff_builder_body | tau_builder_body.
 bf_builder_body        => bf_def ws bf.
@@ -298,7 +298,7 @@ rule                   => wff_rule | bf_rule | tau_rule.
 nso_rr                 => nso_rec_relations nso_main.
 nso_rec_relations      => (ws nso_rec_relation)*.
 nso_rec_relation       => bf_rec_relation | wff_rec_relation.
-nso_main               => ws wff ws dot.
+nso_main               => ws wff ws dot ws.
 gssotc_rr              => gssotc_rec_relations gssotc_main.
 gssotc_rec_relations   => (ws gssotc_rec_relation)*.
 gssotc_rec_relation    => tau_rec_relation | wff_rec_relation | bf_rec_relation.
