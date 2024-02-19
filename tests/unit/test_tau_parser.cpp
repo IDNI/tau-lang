@@ -688,10 +688,6 @@ TEST_SUITE("parsing captures") {
 
 TEST_SUITE("parsing inputs") {
 
-//offsets                => open_bracket ws offset (ws comma ws offset)* ws close_bracket.
-//offset                 => num | capture | shift | (variable & ~io_var).
-//shift                  => (capture | (variable & ~io_var)) ws minus ws num.
-
 	TEST_CASE("fix loopback") {
 		const char* sample = "( i_test[0] = 0 ).";
 		auto src = make_tau_source(sample);
@@ -1075,11 +1071,6 @@ TEST_SUITE("parsing bf formulas ") {
 			| tau_parser::bf_ex;
 		CHECK( ex_rule.has_value() );
 	}
-
-	// TODO (LOW) write test bf refs
-	TEST_CASE("bf_ref") {
-		// CHECK( false );
-	}
 }
 
 TEST_SUITE("parsing bindings ") {
@@ -1257,36 +1248,29 @@ TEST_SUITE("parsing callbacks ") {
 		CHECK( neg_cb.has_value() );
 	}
 
-	// TODO (MEDIUM) write tests for parsing bf_is_zero_cb
-	// TODO (MEDIUM) write tests for parsing bf_is_one_cb
-	// TODO (MEDIUM) write tests for parsing bf_has_clashing_subformulas_cb
-	// TODO (MEDIUM) write tests for parsing bf_has_subformula_cb
-	// TODO (MEDIUM) write tests for parsing bf_remove_fexistential_cb
-	// TODO (MEDIUM) write tests for parsing bf_remove_funiversal_cb
+	// TODO (VERY_LOW) write tests for parsing bf_is_zero_cb
+	// TODO (VERY_LOW) write tests for parsing bf_is_one_cb
+	// TODO (VERY_LOW) write tests for parsing bf_has_clashing_subformulas_cb
+	// TODO (VERY_LOW) write tests for parsing bf_has_subformula_cb
+	// TODO (VERY_LOW) write tests for parsing bf_remove_fexistential_cb
+	// TODO (VERY_LOW) write tests for parsing bf_remove_funiversal_cb
 
-	// TODO (MEDIUM) write tests for parsing bf_eq_cb
-	// TODO (MEDIUM) write tests for parsing bf_neq_cb
-	// TODO (MEDIUM) write tests for parsing wff_remove_existential_cb
-	// TODO (MEDIUM) write tests for parsing wff_remove_bexistential_cb
-	// TODO (MEDIUM) write tests for parsing wff_remove_buniversal_cb.
-	// TODO (MEDIUM) write tests for parsing wff_has_clashing_subformulas_cb
-	// TODO (MEDIUM) write tests for parsing wff_has_subformula_cb
+	// TODO (VERY_LOW) write tests for parsing bf_eq_cb
+	// TODO (VERY_LOW) write tests for parsing bf_neq_cb
+	// TODO (VERY_LOW) write tests for parsing wff_remove_existential_cb
+	// TODO (VERY_LOW) write tests for parsing wff_remove_bexistential_cb
+	// TODO (VERY_LOW) write tests for parsing wff_remove_buniversal_cb.
+	// TODO (VERY_LOW) write tests for parsing wff_has_clashing_subformulas_cb
+	// TODO (VERY_LOW) write tests for parsing wff_has_subformula_cb
 	//
 	// Callbacks are a crucial part of the execution of the normalizer and should
 	// be tested properly. However, they are extensively tested inderectly in
-	// other unit/integration tests. However, it is better to have explicit tests
-	// for each of them.
+	// other unit/integration tests. In any case, it is better to have explicit tests
+	// for each of them parsing.
 }
 
 TEST_SUITE("parsing rules") {
 	// TODO (VERY_LOW) writes tests for rules parsing
 	//
-	// It is categorized as LOW because we have lot of tests parsing specific rules
-}
-
-TEST_SUITE("parsing rec relations") {
-	// TODO (MEDIUM) writes tests for recursive relations execution
-	//
-	// The tests should range from simple direct substitutions to more complex
-	// substitutions (involving multiple variables and indexes).
+	// It is categorized as VERY_LOW because we have lot of tests parsing specific rules
 }
