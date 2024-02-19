@@ -326,28 +326,29 @@ std::string build_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopb
 
 
 template<typename... BAs>
-std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff(const gssotc<BAs...>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff(const std::optional<gssotc<BAs...>>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
 	std::basic_stringstream<char> main;
 	bindings<tau_ba<BAs...>, BAs...> bindings;
 
-	auto wff = positive | tau_parser::tau_wff | tau_parser::wff| optional_value_extractor<gssotc<BAs...>>;
+	if (positive.has_value()) {
+		auto wff = positive | tau_parser::tau_wff | tau_parser::wff| optional_value_extractor<gssotc<BAs...>>;
 
-	// print quantifiers related to free variables
-	for (size_t i = 1; i <= loopback; ++i) {
-		main << build_universal_quantifiers(inputs, i);
-		main << build_existential_quantifiers(outputs, i);
-	}
-	// print the main wff
-	main << build_string_from_clause(wff, bindings)	<< ".\n";
+		// print quantifiers related to free variables
+		for (size_t i = 1; i <= loopback; ++i) {
+			main << build_universal_quantifiers(inputs, i);
+			main << build_existential_quantifiers(outputs, i);
+		}
+		// print the main wff
+		main << build_string_from_clause(wff, bindings)	<< ".\n";
+	} else main << "T.";
 
 	DBG(std::cout << "(I) get_main_nso_wo_rr: " << main.str() << std::endl;)
+
 	return {main.str(), bindings};
 }
 
 template<typename... BAs>
 bool is_gssotc_clause_satisfiable_no_vars(const gssotc<BAs...>& collapsed) {
-	DBG(std::cout << "(I) -- No variables case" << std::endl;)
-	DBG(std::cout << "(F) " << collapsed << std::endl;)
 	auto check = collapsed | tau_parser::tau_wff | tau_parser::wff | tau_parser::wff_t;
 	if (check.has_value()) {
 		DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: true" << std::endl;)
@@ -360,8 +361,9 @@ bool is_gssotc_clause_satisfiable_no_vars(const gssotc<BAs...>& collapsed) {
 }
 
 template<typename... BAs>
-bool is_gssotc_clause_satisfiable_no_negatives(const gssotc<BAs...>& clause,  const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
-	auto [main_wo_rr, bindings] = build_main_nso_rr_wff<BAs...>(clause, inputs, outputs, loopback);
+bool is_gssotc_clause_satisfiable_no_negatives(const std::optional<gssotc<BAs...>>& positive,  const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+
+	auto [main_wo_rr, bindings] = build_main_nso_rr_wff<BAs...>(positive, inputs, outputs, loopback);
 	auto normalize = normalizer<tau_ba<BAs...>, BAs...>(main_wo_rr, bindings).main;
 
 	if ((normalize | tau_parser::wff_f).has_value()) {
@@ -374,27 +376,7 @@ bool is_gssotc_clause_satisfiable_no_negatives(const gssotc<BAs...>& clause,  co
 }
 
 template<typename... BAs>
-bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
-
-	DBG(std::cout << "(I) -- Checking is_gssotc_clause_satisfiable: " << clause << std::endl;)
-
-	auto collapsed = clause |
-		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-			simplify_tau<tau_ba<BAs...>, BAs...>
-			| collapse_positives_tau<tau_ba<BAs...>, BAs...>);
-
-	auto [positive, negatives] = get_gssotc_positive_negative_literals(collapsed);
-	auto [inputs, outputs] = get_gssotc_io_vars(collapsed);
-	size_t loopback = max(inputs.loopback, outputs.loopback);
-
-	if (inputs.name.empty() && outputs.name.empty()) {
-		return is_gssotc_clause_satisfiable_no_vars(collapsed);
-	}
-
-	if (negatives.empty() && positive.has_value()) {
-		return is_gssotc_clause_satisfiable_no_negatives(positive.value(), inputs, outputs, loopback);
-	}
-
+bool is_gssotc_clause_satisfiable_general(const std::optional<gssotc<BAs...>>& positive, const std::vector<gssotc<BAs...>> negatives,  const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
 	auto etas = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
 	for (size_t current = 1; /* until return statement */ ; ++current) {
 		auto [eta, extracted_bindings] = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
@@ -414,11 +396,49 @@ bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 }
 
 template<typename... BAs>
+bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
+
+	DBG(std::cout << "(I) -- Checking is_gssotc_clause_satisfiable"; std::cout << std::endl;)
+	DBG(std::cout << clause << std::endl;)
+
+	auto collapsed = clause |
+		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			simplify_tau<tau_ba<BAs...>, BAs...>
+			| collapse_positives_tau<tau_ba<BAs...>, BAs...>);
+
+	auto [positive, negatives] = get_gssotc_positive_negative_literals(collapsed);
+	auto [inputs, outputs] = get_gssotc_io_vars(collapsed);
+	size_t loopback = max(inputs.loopback, outputs.loopback);
+
+	if (inputs.name.empty() && outputs.name.empty()) {
+
+		DBG(std::cout << "(I) -- No variables case" << std::endl;)
+		DBG(std::cout << "(F) " << collapsed << std::endl;)
+
+		return is_gssotc_clause_satisfiable_no_vars(collapsed);
+	} else if (negatives.empty() && positive.has_value()) {
+
+		DBG(std::cout << "(I) -- No negatives case" << std::endl;)
+		DBG(std::cout << clause << std::endl;)
+
+		return is_gssotc_clause_satisfiable_no_negatives(positive, inputs, outputs, loopback);
+	}
+
+	DBG(std::cout << "(I) -- General case" << std::endl;)
+	DBG(std::cout << clause << std::endl;)
+
+	return is_gssotc_clause_satisfiable_general(positive, negatives, inputs, outputs, loopback);
+}
+
+template<typename... BAs>
 bool is_gssotc_satisfiable(const gssotc<BAs...>& form) {
 	auto dnf = form
 		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
 			to_dnf_tau<tau_ba<BAs...>, BAs...>
 			| simplify_tau<tau_ba<BAs...>, BAs...>);
+
+	DBG(std::cout << "(I) -- Converting to dnf and simplifying" << std::endl;)
+	DBG(std::cout << dnf << std::endl;)
 
 	auto clauses = get_gssotc_clauses(dnf);
 	for (auto& clause: clauses) {
@@ -446,6 +466,7 @@ bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
 	DBG(std::cout << tau_spec << std::endl;)
 
 	auto loopback = get_max_loopback_in_rr(tau_spec.main);
+	DBG(std::cout << "(I) Max loopback: " << loopback << std::endl;)
 
 	std::vector<gssotc<BAs...>> previous;
 
@@ -454,8 +475,7 @@ bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
 			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(tau_spec.rec_relations));
 
 		DBG(std::cout << "(I) -- Begin is_tau_spec_satisfiable step" << std::endl;)
-		DBG(std::cout << "(F) " << current << std::endl;)
-		DBG(std::cout << "(I) -- Converting to dnf and simplifying" << std::endl;)
+		DBG(std::cout << current << std::endl;)
 
 		if (!is_gssotc_satisfiable(current)) {
 			DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: false" << std::endl);
