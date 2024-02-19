@@ -59,8 +59,8 @@ sym                    => chars.
 # offsets
 # TODO (HIGH) check programatically that no shift is use in a rec_relation defs
 offsets                => open_bracket ws offset (ws comma ws offset)* ws close_bracket.
-offset                 => num | capture | shift.
-shift                  => capture ws minus ws num.
+offset                 => num | capture | shift | variable & ~io_var.
+shift                  => (capture | variable & ~io_var) ws minus ws num.
 num                    => digits.
 
 variable               => var | io_var.
@@ -72,7 +72,6 @@ bool_variable          => '?' chars.
 # TODO (HIGH) remove captures maybe rewriting the rule adding dollars
 capture                => capture_var.
 capture_var            => '$' chars.
-# TODO (MEDIUM) remove '?' from timed variables
 # TODO (MEDIUM) avoid i_ and o_ in variables
 var                    => chars.
 in_var_name            => "i_" chars.
@@ -93,12 +92,14 @@ tau_and                => open_parenthesis ws tau ws tau_and_sym ws tau ws close
 tau_or                 => open_parenthesis ws tau ws tau_or_sym ws tau ws close_parenthesis.
 tau_neg                => tau_neg_sym ws tau.
 # TODO (HIGH) simply consider wff without { and }
+# we introduce '{' and '}' to avoid confusion with wff negation
+# see the next TODO for an alternative
 tau_wff                => open_brace ws wff ws close_brace.
 
 # tau_op_sym
 tau_and_sym            => "&&&".
 tau_or_sym             => "|||".
-# TODO (HIGH) replace by -
+# TODO (HIGH) replace by - or other symbol to avoid confusion with wff negation
 tau_neg_sym            => "!!!".
 
 # wff
