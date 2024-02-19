@@ -115,71 +115,95 @@ static auto collapse_positives_tau = make_library<BAs...>(
 
 
 template<typename...BAs>
+struct tau_ba;
+
+template<typename...BAs>
+bool is_satisfiable(const rr<nso<tau_ba<BAs...>, BAs...>>& tau_spec);
+
+template<typename...BAs>
 struct tau_ba {
 
-	tau_ba(rr<nso<tau_ba<BAs...>, BAs...>>& form) : form(form.main) {}
-	tau_ba(nso<tau_ba<BAs...>, BAs...>& main) : form(main) {}
+	tau_ba(rules<nso<tau_ba<BAs...>, BAs...>>& rec_relations, nso<tau_ba<BAs...>, BAs...>& main) : rr_nso({rec_relations, main}) {}
+	tau_ba(nso<tau_ba<BAs...>, BAs...>& main) : rr_nso({main}) {}
 
-	auto operator<=>(const tau_ba<BAs...>& other) {
-		return form <=> other.form;
-	}
-
-	bool operator==(const tau_ba<BAs...>& other) const {
-		return form == other.form;
-	}
-
-	bool operator!=(const tau_ba<BAs...>& other) const {
-		return form != other.form;
-	}
+	auto operator<=>(const tau_ba<BAs...>&) const = default;
+	//bool operator==(const tau_ba<BAs...>&) const = default;
 
 	tau_ba<BAs...> operator~() const {
-		auto nform = build_wff_neg<tau_ba<BAs...>, BAs...>(form);
-		return tau_ba<BAs...>(nform);
+		nso<tau_ba<BAs...>, BAs...> nmain = build_tau_neg<tau_ba<BAs...>, BAs...>(rr_nso.main);
+		auto nrec_relations = rr_nso.rec_relations;
+		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const {
-		auto nform = build_wff_and<tau_ba<BAs...>, BAs...>(form, other.form);
-		return tau_ba<BAs...>(nform);
+		nso<tau_ba<BAs...>, BAs...> nmain = build_tau_and<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
+		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const {
-		auto nform = build_wff_or<tau_ba<BAs...>, BAs...>(form, other.form);
-		return tau_ba<BAs...>(nform);
+		nso<tau_ba<BAs...>, BAs...> nmain = build_tau_or<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
+		tau_ba<BAs...> nrr_nso(nrec_relations, nmain);
+		return nrr_nso;
 	}
 
 	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const {
-		auto nform = build_wff_xor<tau_ba<BAs...>, BAs...>(form, other.form);
-		return tau_ba<BAs...>(nform);
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
+		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const {
-		auto nform = build_wff_xor<tau_ba<BAs...>, BAs...>(form, other.form);
-		return tau_ba<BAs...>(nform);
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
+		rules<nso<tau_ba<BAs...>, BAs...>> nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
+		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	bool is_zero() const {
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(form);
-		return (normalized | tau_parser::wff_f).has_value();
+		//TODO (MEDIUM) show equivalence with F instead
+		return !is_satisfiable(rr_nso);
 	}
 
 	bool is_one() const {
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(form);
-		return (normalized | tau_parser::wff_t).has_value();
+		//TODO (MEDIUM) show equivalence with T instead
+		return is_satisfiable(rr_nso);
 	}
 
-	nso<tau_ba<BAs...>, BAs...> form;
+	// the type is ewquivalent to tau_spec<BAs...>
+	const rr<nso<tau_ba<BAs...>, BAs...>> rr_nso;
+
+	private:
+
+	nso<tau_ba<BAs...>, BAs...> rename(const nso<tau_ba<BAs...>, BAs...>& form) const  {
+		// TODO (MEDIUM) implement properly
+		return form;
+	}
+
+	rule<rr<nso<tau_ba<BAs...>, BAs...>>> rename(const rule<nso<tau_ba<BAs...>, BAs...>>& rule) const {
+		// TODO (MEDIUM) implement properly
+		return rule;
+	}
+
+	rules<nso<tau_ba<BAs...>, BAs...>> merge(const rules<nso<tau_ba<BAs...>, BAs...>>& rs1, const rules<nso<tau_ba<BAs...>, BAs...>>& rs2) const {
+		// TODO (MEDIUM) implement properly calling renaming
+		rules<nso<tau_ba<BAs...>, BAs...>> nrs;
+		nrs.insert(nrs.end(), rs1.begin(), rs1.end());
+		nrs.insert(nrs.end(), rs2.begin(), rs2.end());
+		return nrs;
+	}
 };
 
-// TODO (HIGH) give a proper implementation for <=> operator
+/*// TODO (HIGH) give a proper implementation for <=> operator
 template<typename...BAs>
 auto operator<=>(const tau_ba<BAs...>& l, const tau_ba<BAs...>& r) {
 	return std::addressof(l)<=>std::addressof(r);
-}
+}*/
 
 // TODO (HIGH) give a proper implementation for == operator
 template<typename...BAs>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
-	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.form).main;
+	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.rr_nso);
 	auto is_one = (normalized | tau_parser::wff_t).has_value();
 	auto is_zero = (normalized | tau_parser::wff_f).has_value();
 	return b ? is_one : is_zero ;
@@ -313,7 +337,7 @@ tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const b
 // << for printing tau_ba's form
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& os, const idni::tau::tau_ba<BAs...>& rs) {
-	return os << rs.form;
+	return os << rs.rr_nso;
 }
 
 #endif // __TAU_H__

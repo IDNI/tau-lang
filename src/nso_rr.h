@@ -102,6 +102,8 @@ struct rr {
 	rr(const rules<type_t>& rec_relations, const type_t& main) : rec_relations(rec_relations), main(main) {};
 	rr(const type_t& main) : main(main) {};
 
+	auto operator<=>(const rr&) const = default;
+
 	rules<type_t> rec_relations;
 	type_t main;
 };
