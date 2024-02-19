@@ -28,14 +28,13 @@ using namespace idni::tau;
 namespace idni::tau {
 
 template<typename... BAs>
-std::vector<gssotc<BAs...>> get_gssotc_clauses(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& clauses) {
-	if (auto check = n | tau_parser::tau_or; check.has_value() && is_non_terminal(tau_parser::tau, n)) {
+void get_gssotc_clauses(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& clauses) {
+	if (auto check = n | tau_parser::tau_or; check.has_value()) {
 		for (auto& c: check || tau_parser::tau) get_gssotc_clauses(c , clauses);
-		return clauses;
+	} else {
+		clauses.push_back(n);
+		DBG(std::cout << "(I) found get_gssotc_clause: " << n << std::endl;)
 	}
-	clauses.push_back(n);
-	DBG(std::cout << "(I) found get_gssotc_clause: " << n << std::endl;)
-	return clauses;
 }
 
 template<typename... BAs>
