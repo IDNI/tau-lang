@@ -63,14 +63,13 @@ TEST_SUITE("rec relations execution: simple cases") {
 	}
 }
 
-
 TEST_SUITE("tau_rec_relations execution: types") {
 
 	TEST_CASE("clashing names, gssotc wins") {
 		const char* sample =
 			"g[0]($Y) := 0."
 			"g[0]($Y) ::= F."
-			"g[0]($Y) :::= {T}." // TODO (HIGH) remove { } for wff and use - for neg of tau formulas
+			"g[0]($Y) :::= {T}."
 			"g[0](Y);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;

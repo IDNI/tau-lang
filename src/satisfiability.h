@@ -18,6 +18,10 @@
 
 #include "tau.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
+
 using namespace std;
 using namespace idni::tau;
 
@@ -25,11 +29,12 @@ namespace idni::tau {
 
 template<typename... BAs>
 std::vector<gssotc<BAs...>> get_gssotc_clauses(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& clauses) {
-	if (auto check = n | tau_parser::tau_or; !check.has_value() && is_non_terminal(tau_parser::tau, n)) {
-		DBG(std::cout << "(I) found get_gssotc_clause: " << n << std::endl;)
-		clauses.push_back(n);
+	if (auto check = n | tau_parser::tau_or; check.has_value() && is_non_terminal(tau_parser::tau, n)) {
+		for (auto& c: check || tau_parser::tau) get_gssotc_clauses(c , clauses);
+		return clauses;
 	}
-	else for (auto& c: n->child) if (is_non_terminal(tau_parser::tau_or, c)) get_gssotc_clauses(c ,clauses);
+	clauses.push_back(n);
+	DBG(std::cout << "(I) found get_gssotc_clause: " << n << std::endl;)
 	return clauses;
 }
 
@@ -41,19 +46,48 @@ std::vector<gssotc<BAs...>> get_gssotc_clauses(const gssotc<BAs...>& n) {
 }
 
 template<typename... BAs>
-std::pair<std::optional<gssotc<BAs...>>, std::vector<gssotc<BAs...>>> get_positive_and_negative_literals(const gssotc<BAs...> collapsed,
-		std::optional<gssotc<BAs...>>& positive, std::vector<gssotc<BAs...>>& negatives) {
-	auto is_negative = [] (const auto& n) {
-		auto check = n | tau_parser::tau | tau_parser::tau_neg | tau_parser::wff;
-		return check.has_value();
-	};
-	auto is_positive = [] (const auto& n) {
-		auto check = n | tau_parser::tau | tau_parser::wff;
-		return !check.has_value();
-	};
+void get_gssotc_literals(const gssotc<BAs...>& clause, std::vector<gssotc<BAs...>>& literals) {
+	if (auto check = clause | tau_parser::tau_and; check.has_value())
+		for (auto& c: check || tau_parser::tau) get_gssotc_literals(c , literals);
+	else {
+		literals.push_back(clause);
+		DBG(std::cout << "(I) found get_gssotc_clause: " << clause << std::endl;)
+	}
+}
 
-	negatives = select_top(collapsed, is_negative);
-	positive = find_top(collapsed, is_positive);
+template<typename... BAs>
+std::vector<gssotc<BAs...>> get_gssotc_literals(const gssotc<BAs...>& clause) {
+	std::vector<gssotc<BAs...>> literals;
+	get_gssotc_literals(clause, literals);
+	return literals;
+}
+
+template<typename... BAs>
+static const auto is_gssotc_positive_literal = [] (const gssotc<BAs...>& n) {
+	auto check = n | tau_parser::tau_wff;
+	return check.has_value();
+};
+template<typename... BAs>
+using is_gssotc_positive_literal_t = decltype(is_gssotc_positive_literal<BAs...>);
+
+template<typename... BAs>
+static const auto is_gssotc_negative_literal = [] (const gssotc<BAs...>& n) {
+	auto check = n | tau_parser::tau_neg | tau_parser::wff;
+	return check.has_value();
+};
+
+template<typename... BAs>
+using is_gssotc_negative_literal_t = decltype(is_gssotc_negative_literal<BAs...>);
+
+template<typename... BAs>
+std::pair<std::optional<gssotc<BAs...>>, std::vector<gssotc<BAs...>>> get_gssotc_positive_negative_literals(const gssotc<BAs...> clause) {
+	std::optional<gssotc<BAs...>> positive;
+	std::vector<gssotc<BAs...>> negatives;
+
+	for(auto& l: get_gssotc_literals(clause)) {
+		if (is_gssotc_positive_literal<BAs...>(l)) positive = {l};
+		else negatives.push_back(l);
+	}
 
 	#ifdef DEBUG
 	if (positive.has_value()) std::cout << "(I) positive: " << positive.value() << std::endl;
@@ -62,15 +96,6 @@ std::pair<std::optional<gssotc<BAs...>>, std::vector<gssotc<BAs...>>> get_positi
 	}
 	#endif // DEBUG
 
-	return {positive, negatives};
-}
-
-template<typename... BAs>
-std::pair<std::optional<gssotc<BAs...>>, std::vector<gssotc<BAs...>>> get_positive_and_negative_literals(
-		const gssotc<BAs...> collapsed) {
-	std::optional<gssotc<BAs...>> positive;
-	std::vector<gssotc<BAs...>> negatives;
-	get_positive_and_negative_literals(collapsed, positive, negatives);
 	return {positive, negatives};
 }
 
@@ -87,10 +112,8 @@ struct tau_spec_vars {
 		auto var_name = (io
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| optional_value_extractor<gssotc<BAs...>>)->child[0];
+		name.emplace(var_name);
 		switch (pos) {
-			case tau_parser::capture:
-				name.emplace(var_name);
-				break;
 			case tau_parser::num:
 				name.emplace(var_name);
 				loopback = max(loopback,
@@ -108,7 +131,7 @@ struct tau_spec_vars {
 					| optional_value_extractor<size_t>);
 				break;
 			default:
-				throw std::logic_error("bad timed pos");
+				break;
 		}
 	}
 
@@ -117,7 +140,7 @@ struct tau_spec_vars {
 };
 
 template<typename... BAs>
-std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_io_vars(const gssotc<BAs...> collapsed) {
+std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_gssotc_io_vars(const gssotc<BAs...> collapsed) {
 	tau_spec_vars<BAs...> inputs;
 	tau_spec_vars<BAs...> outputs;
 	for (const auto& variable: select_top(collapsed, is_non_terminal<tau_parser::io_var, tau_ba<BAs...>, BAs...>)) {
@@ -308,7 +331,7 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff(c
 	std::basic_stringstream<char> main;
 	bindings<tau_ba<BAs...>, BAs...> bindings;
 
-	auto wff = positive | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
+	auto wff = positive | tau_parser::tau_wff | tau_parser::wff| optional_value_extractor<gssotc<BAs...>>;
 
 	// print quantifiers related to free variables
 	for (size_t i = 1; i <= loopback; ++i) {
@@ -351,8 +374,6 @@ bool is_gssotc_clause_satisfiable_no_negatives(const gssotc<BAs...>& clause,  co
 	return true;
 }
 
-
-
 template<typename... BAs>
 bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 
@@ -363,8 +384,8 @@ bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 			simplify_tau<tau_ba<BAs...>, BAs...>
 			| collapse_positives_tau<tau_ba<BAs...>, BAs...>);
 
-	auto [positive, negatives] = get_positive_and_negative_literals(collapsed);
-	auto [inputs, outputs] = get_io_vars(collapsed);
+	auto [positive, negatives] = get_gssotc_positive_negative_literals(collapsed);
+	auto [inputs, outputs] = get_gssotc_io_vars(collapsed);
 	size_t loopback = max(inputs.loopback, outputs.loopback);
 
 	if (inputs.name.empty() && outputs.name.empty()) {

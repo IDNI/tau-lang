@@ -170,12 +170,13 @@ struct tau_ba {
 	nso<tau_ba<BAs...>, BAs...> form;
 };
 
-// TODO (HIGH) give a proper implementation for <=>, == and != operators
+// TODO (HIGH) give a proper implementation for <=> operator
 template<typename...BAs>
 auto operator<=>(const tau_ba<BAs...>& l, const tau_ba<BAs...>& r) {
 	return std::addressof(l)<=>std::addressof(r);
 }
 
+// TODO (HIGH) give a proper implementation for == operator
 template<typename...BAs>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
 	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.form).main;
@@ -183,6 +184,8 @@ bool operator==(const tau_ba<BAs...>& other, const bool& b) {
 	auto is_zero = (normalized | tau_parser::wff_f).has_value();
 	return b ? is_one : is_zero ;
 }
+
+// TODO (HIGH) give a proper implementation for != operator
 
 template<typename...BAs>
 bool operator==(const bool& b, const tau_ba<BAs...>& other) {
