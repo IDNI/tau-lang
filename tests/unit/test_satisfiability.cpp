@@ -170,12 +170,49 @@ TEST_SUITE("get_gssotc_clauses") {
 	}
 }
 
-/*TEST_SUITE("get_gssotc_io_vars") {
-	TEST_CASE("get_gssotc_io_vars") {
-		const char* sample = "{ ( i_keyboard[t] = o_console[t] ) };";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto nso_rr = frml | tau_parser::nso_rr | tau_parser::nso_main ;
-		CHECK( nso_rr.has_value() );
+TEST_SUITE("get_gssotc_io_vars") {
+
+	TEST_CASE("none") {
+		const char* sample = "{ T };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		std::vector<gssotc<bdd_test>> literals;
+		auto [inputs, outputs] = get_gssotc_io_vars<bdd_test>(sample_formula.main);
+		CHECK( (inputs.name.size() == 0 && outputs.name.size() == 0) );
 	}
-}*/
+
+	TEST_CASE("one input") {
+		const char* sample = "{ (i_keyboard[t] = 0) };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		std::vector<gssotc<bdd_test>> literals;
+		auto [inputs, outputs] = get_gssotc_io_vars<bdd_test>(sample_formula.main);
+		CHECK( (inputs.name.size() == 1 && outputs.name.size() == 0) );
+	}
+
+	TEST_CASE("one output") {
+		const char* sample = "{ (o_console[t] = 0) };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		std::vector<gssotc<bdd_test>> literals;
+		auto [inputs, outputs] = get_gssotc_io_vars<bdd_test>(sample_formula.main);
+		CHECK( (inputs.name.size() == 0 && outputs.name.size() == 1) );
+	}
+
+	TEST_CASE("one input and one output") {
+		const char* sample = "{ (i_keyboard[t] = o_console[t])  };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		std::vector<gssotc<bdd_test>> literals;
+		auto [inputs, outputs] = get_gssotc_io_vars<bdd_test>(sample_formula.main);
+		CHECK( (inputs.name.size() == 1 && outputs.name.size() == 1) );
+	}
+}
