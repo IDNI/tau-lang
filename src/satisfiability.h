@@ -102,9 +102,11 @@ template<typename...BAs>
 struct tau_spec_vars {
 
 	void add(const gssotc<BAs...>& io) {
-		auto pos = io
+		auto offset = io
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| tau_parser::offset
+			| optional_value_extractor<gssotc<BAs...>>;
+		auto pos = offset
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 			| optional_value_extractor<size_t>;
@@ -114,16 +116,15 @@ struct tau_spec_vars {
 		name.emplace(var_name);
 		switch (pos) {
 			case tau_parser::num:
-				name.emplace(var_name);
 				loopback = max(loopback,
-					io | only_child_extractor<tau_ba<BAs...>, BAs...>
+					offset | tau_parser::num
+					| only_child_extractor<tau_ba<BAs...>, BAs...>
 					| offset_extractor<tau_ba<BAs...>, BAs...>
 					| optional_value_extractor<size_t>);
 				break;
 			case tau_parser::shift:
-				name.emplace(var_name);
 				loopback = max(loopback,
-					io | only_child_extractor<tau_ba<BAs...>, BAs...>
+					offset | tau_parser::shift
 					| tau_parser::num
 					| only_child_extractor<tau_ba<BAs...>, BAs...>
 					| offset_extractor<tau_ba<BAs...>, BAs...>
