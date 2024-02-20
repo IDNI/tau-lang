@@ -90,6 +90,7 @@ TEST_SUITE("get_gssotc_literals") {
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
 		auto [positive, negatives] = get_gssotc_positive_negative_literals<bdd_test>(sample_formula.main);
 		CHECK( positive.has_value() );
+		CHECK( negatives.size() == 0 );
 	}
 
 	TEST_CASE("one literal: false") {
@@ -100,6 +101,7 @@ TEST_SUITE("get_gssotc_literals") {
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
 		auto [positive, negatives] = get_gssotc_positive_negative_literals<bdd_test>(sample_formula.main);
 		CHECK( !positive.has_value() );
+		CHECK( negatives.size() == 1 );
 	}
 
 	TEST_CASE("two literals: true") {
@@ -110,6 +112,7 @@ TEST_SUITE("get_gssotc_literals") {
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
 		auto [positive, negatives] = get_gssotc_positive_negative_literals<bdd_test>(sample_formula.main);
 		CHECK( positive.has_value() );
+		CHECK( negatives.size() == 1 );
 	}
 
 	TEST_CASE("two literals: false") {
@@ -120,6 +123,7 @@ TEST_SUITE("get_gssotc_literals") {
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
 		auto [positive, negatives] = get_gssotc_positive_negative_literals<bdd_test>(sample_formula.main);
 		CHECK( !positive.has_value() );
+		CHECK( negatives.size() == 2 );
 	}
 }
 
