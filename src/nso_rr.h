@@ -1731,7 +1731,7 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>&
 	// using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
 	std::visit(idni::tau::overloaded {
 		[&stream](const idni::tau::tau_source_sym& t) {
-			if (!t.nt()) stream << t.t();
+			if (!t.nt() && !t.is_null()) stream << t.t();
 		},
 		[&stream](const auto& a) { stream << a; }
 	}, rs);
