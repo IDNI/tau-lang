@@ -216,3 +216,61 @@ TEST_SUITE("get_gssotc_io_vars") {
 		CHECK( (inputs.name.size() == 1 && outputs.name.size() == 1) );
 	}
 }
+
+TEST_SUITE("tau_spec_vars") {
+
+	TEST_CASE("num") {
+		const char* sample = "{ (i_keyboard[0] = 0)  };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<bdd_test>, bdd_test>);
+		tau_spec_vars<bdd_test> vars; vars.add(variable.value());
+		CHECK( (vars.name.size() == 1 && vars.loopback == 0) );
+	}
+
+	TEST_CASE("capture") {
+		const char* sample = "{ (i_keyboard[$t] = 0)  };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<bdd_test>, bdd_test>);
+		tau_spec_vars<bdd_test> vars; vars.add(variable.value());
+		CHECK( (vars.name.size() == 1 && vars.loopback == 0) );
+	}
+
+	TEST_CASE("variable") {
+		const char* sample = "{ (i_keyboard[t] = 0)  };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<bdd_test>, bdd_test>);
+		tau_spec_vars<bdd_test> vars; vars.add(variable.value());
+		CHECK( (vars.name.size() == 1 && vars.loopback == 0) );
+	}
+
+	TEST_CASE("shift capture") {
+		const char* sample = "{ (i_keyboard[$t - 1] = 0)  };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<bdd_test>, bdd_test>);
+		tau_spec_vars<bdd_test> vars; vars.add(variable.value());
+		CHECK( (vars.name.size() == 1 && vars.loopback == 1) );
+	}
+
+	TEST_CASE("shift variable") {
+		const char* sample = "{ (i_keyboard[t - 1] = 0)  };";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<bdd_test>, bdd_test>);
+		tau_spec_vars<bdd_test> vars; vars.add(variable.value());
+		CHECK( (vars.name.size() == 1 && vars.loopback == 1) );
+	}
+}
