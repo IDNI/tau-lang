@@ -23,6 +23,7 @@
 #include "../../src/debug_helpers.h"
 #endif // DEBUG
 
+// TODO (LOW) consider move this test to integration tests
 #include "../integration/test_integration_helpers-tau.h"
 
 using namespace idni::rewriter;
@@ -81,6 +82,9 @@ TEST_SUITE("get_gssotc_literals") {
 		get_gssotc_literals<bdd_test>(sample_formula.main, literals);
 		CHECK( literals.size() == 2 );
 	}
+}
+
+TEST_SUITE("get_gssotc_positive_negative_literals") {
 
 	TEST_CASE("one literal: true") {
 		const char* sample = "{ T };";
