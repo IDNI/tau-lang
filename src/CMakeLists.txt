@@ -19,6 +19,7 @@ set(TAU_HEADERS
 	satisfiability.h
 	tau.h
 	iterators.h
+	executor.h
 )
 
 set(TAU_SOURCES

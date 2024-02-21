@@ -22,6 +22,7 @@ set(TESTS
 	traversal
 	tau
 	satisfiability
+	executor
 )
 
 foreach(X IN LISTS TESTS)
