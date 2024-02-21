@@ -18,10 +18,6 @@
 
 #include "tau.h"
 
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
-
 using namespace std;
 using namespace idni::tau;
 
