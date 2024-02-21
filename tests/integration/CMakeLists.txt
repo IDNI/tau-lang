@@ -7,6 +7,7 @@ set(TESTS
 	test_integration-nso_rr_execution
 	test_integration-gssotc_rr_execution
 	test_integration-tau1
+	test_integration-executor
 )
 
 foreach(N IN LISTS TESTS)
