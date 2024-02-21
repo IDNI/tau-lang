@@ -19,10 +19,6 @@
 #include "../../src/bdd_handle.h"
 #include "../../src/normalizer2.h"
 
-#ifdef DEBUG
-#include "../../src/debug_helpers.h"
-#endif // DEBUG
-
 // TODO (LOW) consider move this test to integration tests
 #include "../integration/test_integration_helpers-tau.h"
 
@@ -282,4 +278,3 @@ TEST_SUITE("tau_spec_vars") {
 		CHECK( (vars.name.size() == 1 && vars.loopback == 1) );
 	}
 }
-

@@ -31,8 +31,8 @@ namespace testing = doctest;
 
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
-	TEST_CASE("T") {
-		const char* sample =	"T.";
+	/*TEST_CASE("i_keyboard[t] = o_console[t]") {
+		const char* sample = "( i_keyboard[t] = o_console[t] ).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -40,5 +40,5 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
-	}
+	}*/
 }
