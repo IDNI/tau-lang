@@ -282,3 +282,4 @@ TEST_SUITE("tau_spec_vars") {
 		CHECK( (vars.name.size() == 1 && vars.loopback == 1) );
 	}
 }
+

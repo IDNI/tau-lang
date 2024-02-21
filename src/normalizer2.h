@@ -585,7 +585,7 @@ nso<BAs...> build_shift_from_shift(nso<BAs...> shift, size_t step) {
 }
 
 template<typename... BAs>
-nso<BAs...> set_main_to_step(const nso<BAs...>& form, size_t step) {
+nso<BAs...> build_main_step(const nso<BAs...>& form, size_t step) {
 	std::map<nso<BAs...>, nso<BAs...>> changes;
 	for (const auto& offset: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>)) {
 		auto shift = offset | tau_parser::shift;
@@ -612,7 +612,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& rr_nso) {
 	nso<BAs...> current;
 
 	for (int i = loopback; ; i++) {
-		current = set_main_to_step(applied_defs.main, i)
+		current = build_main_step(applied_defs.main, i)
 			| repeat_all<step<BAs...>, BAs...>(step<BAs...>(applied_defs.rec_relations));
 
 		DBG(std::cout << "(I) -- Begin normalizer step" << std::endl;)

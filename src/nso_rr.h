@@ -420,6 +420,11 @@ std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, con
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
 }
 
+template <typename... BAs>
+std::optional<size_t> operator|(const sp_tau_node<BAs...>& o, const non_terminal_extractor_t<BAs...> e) {
+	return e(o);
+}
+
 // returns an optional containing the offset of the node if possible
 template<typename... BAs>
 static const auto offset_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<size_t> {
@@ -440,6 +445,11 @@ template <typename... BAs>
 std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, const offset_extractor_t<BAs...> e) {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
+}
+
+template <typename... BAs>
+std::optional<size_t> operator|(const sp_tau_node<BAs...>& o, const offset_extractor_t<BAs...> e) {
+	return e(o);
 }
 
 // returns an optional containing the bas... of the node if possible
@@ -1140,11 +1150,11 @@ static auto bldr_bf_constant = make_builder<BAs...>(BLDR_BF_CONSTANT);
 
 // tau builder
 template<typename... BAs>
-static auto bldr_tau_and = make_builder<BAs...>(BLDR_WFF_AND);
+static auto bldr_tau_and = make_builder<BAs...>(BLDR_TAU_AND);
 template<typename... BAs>
-static auto bldr_tau_or = make_builder<BAs...>(BLDR_WFF_OR);
+static auto bldr_tau_or = make_builder<BAs...>(BLDR_TAU_OR);
 template<typename... BAs>
-static auto bldr_tau_neg = make_builder<BAs...>(BLDR_WFF_NEG);
+static auto bldr_tau_neg = make_builder<BAs...>(BLDR_TAU_NEG);
 
 // wff factory method for building wff formulas
 template<typename... BAs>
