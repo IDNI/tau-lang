@@ -526,21 +526,6 @@ auto get_vars_from_nso(const nso<BAs...>& n) {
 	return select_top(n, is_var_or_capture<BAs...>);
 }
 
-template <typename...BAs>
-std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<BAs...> n, size_t l = 0) {
-	os << "{";
-	// for (size_t t = 0; t < l; t++) os << " ";
-	std::visit(overloaded {
-			[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
-			[&os](std::variant<BAs...>) {
-				os << "...BAs..."; },
-			[&os](size_t v) { os << v; }},
-		n->value);
-	for (auto& d : n->child) print_sp_tau_node(os, d, l + 1);
-	os << "}";
-	return os;
-}
-
 template <typename... BAs>
 bool is_nso_equivalent_to(nso<BAs...> n1, nso<BAs...> n2) {
 	auto vars1 = get_vars_from_nso(n1);
@@ -556,7 +541,6 @@ bool is_nso_equivalent_to(nso<BAs...> n1, nso<BAs...> n2) {
 
 	for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
 
-	print_sp_tau_node(std::cout, wff); std::cout << std::endl;
 
 	rr<nso<BAs...>> nso_rr{wff};
 	auto normalized = normalizer(nso_rr);
