@@ -475,7 +475,7 @@ bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
 	std::vector<gssotc<BAs...>> previous;
 
 	for (int i = loopback; ; i++) {
-		auto current = set_main_to_step<tau_ba<BAs...>, BAs...>(tau_spec.main, i)
+		auto current = build_main_step<tau_ba<BAs...>, BAs...>(tau_spec.main, i)
 			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(tau_spec.rec_relations));
 
 		DBG(std::cout << "(I) -- Begin is_tau_spec_satisfiable step" << std::endl;)
