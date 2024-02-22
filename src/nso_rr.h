@@ -1398,10 +1398,14 @@ private:
 	static constexpr auto _is_one = [](const auto& l) -> bool { return l == true; };
 	static constexpr auto _is_zero = [](const auto& l) -> bool { return l == false; };
 
+	// TODO (MEDIUM) unify this code with get_gssotc_clause and get_gssotc_literals
 	void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves) {
-		if (auto check = n | branch; !check.has_value() && is_non_terminal(skip, n)) leaves.push_back(n);
-		else for (auto& c: n->child)
-			if (is_non_terminal(branch, c)) get_leaves(c, branch, skip, leaves);
+		if (auto check = n | branch; check.has_value()) {
+			for (auto& c: check || skip) get_leaves(c, branch, skip, leaves);
+		} else {
+			leaves.push_back(n);
+			DBG(std::cout << "(I) found get_gssotc_clause: " << n << std::endl;)
+		}
 	}
 
 	std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip) {

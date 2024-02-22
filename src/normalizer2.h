@@ -493,6 +493,7 @@ rr<nso<BAs...>> apply_definitions(const rr<nso<BAs...>>& rr_nso) {
 	return { nrec_relations, nmain };
 }
 
+// IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 	return form
@@ -516,6 +517,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		| repeat_all<step<BAs...>, BAs...>(
 			clause_simplify_bf<BAs...>
 			| trivialities<BAs...>
+			| simplify_bf<BAs...>
 			| to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>
 			| clause_simplify_wff<BAs...>);

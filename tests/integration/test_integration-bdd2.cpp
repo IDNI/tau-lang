@@ -31,14 +31,16 @@ namespace testing = doctest;
 
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
-	/*TEST_CASE("i_keyboard[t] = o_console[t]") {
+	TEST_CASE("i_keyboard[t] = o_console[t]") {
 		const char* sample = "( i_keyboard[t] = o_console[t] ).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
 		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
 		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result |  tau_parser::wff_t;
-		CHECK( check.has_value() );
-	}*/
+		auto check1 = result |  tau_parser::wff_f;
+		auto check2 = result |  tau_parser::wff_t;
+		CHECK( !check1.has_value() );
+		CHECK( !check2.has_value() );
+	}
 }

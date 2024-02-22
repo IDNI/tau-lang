@@ -154,6 +154,8 @@ TEST_SUITE("builders parsing") {
 	}
 }
 
+// TODO (HIGH) check builded structures deeply in execution tests
+
 TEST_SUITE("builders execution") {
 
 	const char* sample = " ( X = 0 ) .";
