@@ -525,6 +525,11 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 
 template<typename... BAs>
 auto get_vars_from_nso(const nso<BAs...>& n) {
+	// FIXME (HIGH) this should capture all the variables in the formula
+	//
+	// We have to split this method into get free and get bound variables,
+	// and also to get all variables (the ones that are part of another,
+	// p.e. i_keyboard[t]).
 	return select_top(n, is_var_or_capture<BAs...>);
 }
 
@@ -542,7 +547,6 @@ bool is_nso_equivalent_to(nso<BAs...> n1, nso<BAs...> n2) {
 	}
 
 	for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
-
 
 	rr<nso<BAs...>> nso_rr{wff};
 	auto normalized = normalizer(nso_rr);
