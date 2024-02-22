@@ -669,7 +669,7 @@ struct name_binder {
 	name_binder(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		// FIXME check if the node is a named binding one
+		// FIXME (LOW) check if the node is a named binding one
 		auto bn = make_string_with_skip<
 				tau_node_terminal_extractor_t<BAs...>,
 				not_whitespace_predicate_t<BAs...>,
@@ -695,7 +695,7 @@ struct factory_binder {
 	factory_binder(factory_t& factory) : factory(factory) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		// FIXME check that the node is a factory binding one
+		// FIXME (LOW) check that the node is a factory binding one
 		if(auto type = find_top(n, is_non_terminal<tau_parser::type, BAs...>); type) {
 			// the factory take two arguments, the first is the type and the
 			// second is the node representing the constant.
