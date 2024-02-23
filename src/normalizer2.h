@@ -566,7 +566,7 @@ auto get_vars_from_nso(const nso<BAs...>& n) {
 }
 
 template<typename... BAs>
-auto get_free_vars_from_nso(nso<BAs...>& n) {
+auto get_free_vars_from_nso(const nso<BAs...>& n) {
 	DBG(std::cout << "(I) -- Begin get_free_vars_from_nso of " << n << std::endl;)
 	std::set<nso<BAs...>> free_vars;
 	free_vars_collector<BAs...> collector(free_vars);
