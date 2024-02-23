@@ -123,38 +123,38 @@ bool is_satisfiable(const rr<nso<tau_ba<BAs...>, BAs...>>& tau_spec);
 template<typename...BAs>
 struct tau_ba {
 
-	tau_ba(rules<nso<tau_ba<BAs...>, BAs...>>& rec_relations, nso<tau_ba<BAs...>, BAs...>& main) : rr_nso({rec_relations, main}) {}
-	tau_ba(nso<tau_ba<BAs...>, BAs...>& main) : rr_nso({main}) {}
+	tau_ba(rules<nso<tau_ba<BAs...>, BAs...>>& rec_relations, nso<tau_ba<BAs...>, BAs...>& main) : nso_rr({rec_relations, main}) {}
+	tau_ba(nso<tau_ba<BAs...>, BAs...>& main) : nso_rr({main}) {}
 
 	auto operator<=>(const tau_ba<BAs...>&) const = default;
 	//bool operator==(const tau_ba<BAs...>&) const = default;
 
 	tau_ba<BAs...> operator~() const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_neg<tau_ba<BAs...>, BAs...>(rr_nso.main);
-		auto nrec_relations = rr_nso.rec_relations;
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_neg<tau_ba<BAs...>, BAs...>(nso_rr.main);
+		auto nrec_relations = nso_rr.rec_relations;
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_and<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
-		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_and<tau_ba<BAs...>, BAs...>(nso_rr.main, other.nso_rr.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_or<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
-		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
-		tau_ba<BAs...> nrr_nso(nrec_relations, nmain);
-		return nrr_nso;
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_or<tau_ba<BAs...>, BAs...>(nso_rr.main, other.nso_rr.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
+		tau_ba<BAs...> nnso_rr(nrec_relations, nmain);
+		return nnso_rr;
 	}
 
 	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
-		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor<tau_ba<BAs...>, BAs...>(nso_rr.main, other.nso_rr.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
@@ -164,28 +164,28 @@ struct tau_ba {
 
 	bool is_zero() const {
 		// TODO (HIGH) replace by satisfability in the future
-		auto vars = get_free_vars_from_nso(rr_nso.main);
-		auto wff = rr_nso.main;
+		auto vars = get_free_vars_from_nso(nso_rr.main);
+		auto wff = nso_rr.main;
 		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
-		auto nrr_nso = rr<nso<tau_ba<BAs...>, BAs...>>(rr_nso.rec_relations, wff);
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nrr_nso);
+		auto nnso_rr = rr<nso<tau_ba<BAs...>, BAs...>>(nso_rr.rec_relations, wff);
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nnso_rr);
 		auto check = normalized | tau_parser::wff_f;
 		return check.has_value();
 	}
 
 	bool is_one() const {
 		// TODO (HIGH) replace by satisfability in the future
-		auto vars = get_free_vars_from_nso(rr_nso.main);
-		auto wff = build_wff_neg(rr_nso.main);
+		auto vars = get_free_vars_from_nso(nso_rr.main);
+		auto wff = build_wff_neg(nso_rr.main);
 		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
-		auto nrr_nso = rr<nso<tau_ba<BAs...>, BAs...>>(rr_nso.rec_relations, wff);
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nrr_nso);
+		auto nnso_rr = rr<nso<tau_ba<BAs...>, BAs...>>(nso_rr.rec_relations, wff);
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nnso_rr);
 		auto check = normalized | tau_parser::wff_f;
 		return check.has_value();
 	}
 
 	// the type is ewquivalent to tau_spec<BAs...>
-	const rr<nso<tau_ba<BAs...>, BAs...>> rr_nso;
+	const rr<nso<tau_ba<BAs...>, BAs...>> nso_rr;
 
 	private:
 
@@ -217,7 +217,7 @@ auto operator<=>(const tau_ba<BAs...>& l, const tau_ba<BAs...>& r) {
 // TODO (HIGH) give a proper implementation for == operator
 template<typename...BAs>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
-	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.rr_nso);
+	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.nso_rr);
 	auto is_one = (normalized | tau_parser::wff_t).has_value();
 	auto is_zero = (normalized | tau_parser::wff_f).has_value();
 	return b ? is_one : is_zero ;
@@ -351,7 +351,7 @@ tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const b
 // << for printing tau_ba's form
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& os, const idni::tau::tau_ba<BAs...>& rs) {
-	return os << rs.rr_nso;
+	return os << rs.nso_rr;
 }
 
 #endif // __TAU_H__

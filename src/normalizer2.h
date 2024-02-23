@@ -484,10 +484,10 @@ nso<BAs...> apply_definitions(const nso<BAs...>& form) {
 }
 
 template<typename... BAs>
-rr<nso<BAs...>> apply_definitions(const rr<nso<BAs...>>& rr_nso) {
-	auto nmain = apply_definitions(rr_nso.main);
+rr<nso<BAs...>> apply_definitions(const rr<nso<BAs...>>& nso_rr) {
+	auto nmain = apply_definitions(nso_rr.main);
 	rec_relations<nso<BAs...>> nrec_relations;
-	for (const auto& r : rr_nso.rec_relations) {
+	for (const auto& r : nso_rr.rec_relations) {
 		auto [matcher, body] = r;
 		nrec_relations.emplace_back(matcher, apply_definitions(body));
 	}
@@ -648,14 +648,14 @@ nso<BAs...> build_main_step(const nso<BAs...>& form, size_t step) {
 
 // REVIEW (HIGH) review overall execution
 template <typename... BAs>
-nso<BAs...> normalizer(const rr<nso<BAs...>>& rr_nso) {
+nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	// IDEA extract this to an operator| overload
 
 	DBG(std::cout << std::endl << "(I) -- Begin normalizer" << std::endl;)
 	DBG(std::cout << "(I) -- Apply once definitions" << std::endl;)
-	DBG(std::cout << "(F) " << rr_nso.main << std::endl;)
+	DBG(std::cout << "(F) " << nso_rr.main << std::endl;)
 
-	auto applied_defs = apply_definitions(rr_nso);
+	auto applied_defs = apply_definitions(nso_rr);
 	auto loopback = get_max_loopback_in_rr(applied_defs.main);
 
 	std::vector<nso<BAs...>> previous;
@@ -683,8 +683,8 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& rr_nso) {
 
 template <typename... BAs>
 nso<BAs...> normalizer(const nso<BAs...>& form) {
-	rr<nso<BAs...>> rr_nso(form);
-	return normalizer(rr_nso);
+	rr<nso<BAs...>> nso_rr(form);
+	return normalizer(nso_rr);
 }
 
 } // namespace idni::tau
