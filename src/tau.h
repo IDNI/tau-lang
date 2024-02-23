@@ -161,8 +161,7 @@ struct tau_ba {
 	}
 
 	bool is_zero() const {
-		// FIXME (HIGH) we should consider only the free vars
-		auto vars = get_vars_from_nso(rr_nso.main);
+		auto vars = get_free_vars_from_nso(rr_nso.main);
 		auto wff = rr_nso.main;
 		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
 		auto rr_nso = rr<nso<tau_ba<BAs...>, BAs...>>(rr_nso.rec_relations, wff);
@@ -172,9 +171,8 @@ struct tau_ba {
 	}
 
 	bool is_one() const {
-		// FIXME (HIGH) we should consider only the free vars
 		// TODO (MEDIUM) merge with is_zero implementation
-		auto vars = get_vars_from_nso(rr_nso.main);
+		auto vars = get_free_vars_from_nso(rr_nso.main);
 		auto wff = build_wff_neg(rr_nso.main);
 		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
 		auto rr_nso = rr<nso<tau_ba<BAs...>, BAs...>>(rr_nso.rec_relations, wff);

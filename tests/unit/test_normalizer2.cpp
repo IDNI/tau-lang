@@ -89,27 +89,30 @@ TEST_SUITE("steps parsing") {
 	}
 }
 
-TEST_SUITE("steps"){
+// TODO (VERY LOW) write tests to check make_tau_source
+// TODO (VERY LOW) write tests to check make_tau_source_from_file
+// TODO (VERY LOW) write tests to check process_digits
+// TODO (VERY LOW) write tests to check make_tau_code
+// TODO (VERY LOW) write tests to check make_library
+// TODO (VERY LOW) write tests to check make_nso_rr_using_binder
+// TODO (VERY LOW) write tests to check make_nso_rr_using_bindings
+// TODO (VERY LOW) write tests to check make_nso_rr_using_factory
+// TODO (VERY LOW) write tests to check make_builder
+
+// TODO (VERY LOW) write tests to check tau_apply_builder
+// TODO (VERY LOW) write tests to check trim
+// TODO (VERY LOW) write tests to check wrap
+
+// TODO (VERY LOW) write tests to check nso_rr_apply_if
+// TODO (VERY LOW) write tests to check nso_rr_apply
+
+// TODO (VERY LOW) write tests to check operator<< (all versions)
+
+
 // TODO (LOW) write tests to check steps
-
-}
-
-TEST_SUITE("repeat_each"){
 // TODO (LOW) write tests to check repeat_each
-
-}
-
-TEST_SUITE("repeat_all"){
 // TODO (LOW) write tests to check repeat_all
-
-}
-
-TEST_SUITE("repeat"){
 // TODO (LOW) write tests to check repeat
-
-}
-
-TEST_SUITE("operator|"){
 // TODO (LOW) write tests to check operator| (all versions)
 
-}
+// TODO (LOW) write tests to check get_free_vars_from_nso

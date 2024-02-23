@@ -63,16 +63,15 @@ offset                 => num | capture | shift | (variable & ~io_var).
 shift                  => (capture | (variable & ~io_var)) ws minus ws num.
 num                    => digits.
 
+# IDEA maybe use quantified_variable => (variable | capture) in quantifiers
+# to cimplify the code.
 variable               => var | io_var.
 io_var                 => in | out.
 in                     => in_var_name open_bracket offset close_bracket.
 out                    => out_var_name open_bracket offset close_bracket.
 bool_variable          => '?' chars.
-# TODO (HIGH) capture t is reserved for timed variables, so we should check that is not used here
-# TODO (HIGH) remove captures maybe rewriting the rule adding dollars
 capture                => capture_var.
 capture_var            => '$' chars.
-# TODO (MEDIUM) avoid i_ and o_ in variables
 var                    => chars.
 in_var_name            => "i_" chars.
 out_var_name           => "o_" chars.
