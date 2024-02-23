@@ -130,37 +130,40 @@ struct tau_ba {
 	//bool operator==(const tau_ba<BAs...>&) const = default;
 
 	tau_ba<BAs...> operator~() const {
-		nso<tau_ba<BAs...>, BAs...> nmain = build_tau_neg<tau_ba<BAs...>, BAs...>(rr_nso.main);
+		// TODO (HIGH) replace by ...tau... in the future
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_neg<tau_ba<BAs...>, BAs...>(rr_nso.main);
 		auto nrec_relations = rr_nso.rec_relations;
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const {
-		nso<tau_ba<BAs...>, BAs...> nmain = build_tau_and<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
+		// TODO (HIGH) replace by ...tau... in the future
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_and<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
 		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const {
-		nso<tau_ba<BAs...>, BAs...> nmain = build_tau_or<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
+		// TODO (HIGH) replace by ...tau... in the future
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_or<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
 		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
 		tau_ba<BAs...> nrr_nso(nrec_relations, nmain);
 		return nrr_nso;
 	}
 
-	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const {
+	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const {
+		// TODO (HIGH) replace by ...tau... in the future
 		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
 		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
-	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const {
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor<tau_ba<BAs...>, BAs...>(rr_nso.main, other.rr_nso.main);
-		rules<nso<tau_ba<BAs...>, BAs...>> nrec_relations = merge(rr_nso.rec_relations, other.rr_nso.rec_relations);
-		return tau_ba<BAs...>(nrec_relations, nmain);
+	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const {
+		return *this + other;
 	}
 
 	bool is_zero() const {
+		// TODO (HIGH) replace by satisfability in the future
 		auto vars = get_free_vars_from_nso(rr_nso.main);
 		auto wff = rr_nso.main;
 		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
@@ -171,7 +174,7 @@ struct tau_ba {
 	}
 
 	bool is_one() const {
-		// TODO (MEDIUM) merge with is_zero implementation
+		// TODO (HIGH) replace by satisfability in the future
 		auto vars = get_free_vars_from_nso(rr_nso.main);
 		auto wff = build_wff_neg(rr_nso.main);
 		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);

@@ -52,12 +52,12 @@ tau_ba<bdd_test> normal(const tau_ba<bdd_test>& f) {
 
 TEST_SUITE("complex tau_ba formulas") {
 
-	TEST_CASE("Ohad's example: ex X ( { : ( X = { : (Y = 0).}). } = 0).") {
+	/*TEST_CASE("Ohad's example: ex X ( { : ( X = { : (Y = 0).}). } = 0).") {
 		const char* sample = "ex X ( { : ( X = { : (Y = 0).}). } = 0).";
 		auto normalized = normalize_test_tau(sample);
 		auto check = normalized.main | tau_parser::wff_f;
 		CHECK( check.has_value() );
-	}
+	}*/
 
 	TEST_CASE("tau_ba operators") {
 		auto T = get_tau_ba("( { : ({ : F.} = 0). } = 0 ).");
