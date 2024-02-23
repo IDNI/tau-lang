@@ -59,16 +59,36 @@ TEST_SUITE("complex tau_ba formulas") {
 		CHECK( check.has_value() );
 	}*/
 
-	TEST_CASE("tau_ba operators") {
-		auto T = get_tau_ba("( { : ({ : F.} = 0). } = 0 ).");
-		auto F = get_tau_ba("( { : ({ : T.} = 0). } = 0 ).");
-		auto TorF  = T | F;
-		auto TandF = T & F;
-		cout << "T: "     << T     << " \n\tnormal: " << normal(T)     << "\n";
-		cout << "F: "     << F     << " \n\tnormal: " << normal(F)     << "\n";
-		cout << "T | F: " << TorF  << " \n\tnormal: " << normal(TorF)  << "\n";
-		cout << "T & F: " << TandF << " \n\tnormal: " << normal(TandF) << "\n";
+	static auto T = get_tau_ba("( { : ({ : F.} = 0). } = 0 ).");
+	static auto F = get_tau_ba("( { : ({ : T.} = 0). } = 0 ).");
 
-		CHECK( true );
+	TEST_CASE("T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>(T.rr_nso);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>(F.rr_nso);
+		auto check = normalized | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("T | F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T|F).rr_nso);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("T & F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T&F).rr_nso);
+		auto check = normalized | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("T & T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T&T).rr_nso);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
 	}
 }
