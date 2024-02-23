@@ -25,6 +25,8 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+// TODO (MEDIUM) split into test_builder-parsing and test_builder-execution
+
 TEST_SUITE("builders parsing") {
 
 	TEST_CASE("BLDR_WFF_EQ") {
