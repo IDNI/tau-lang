@@ -25,6 +25,7 @@
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
+using namespace idni::rewriter;
 
 namespace idni::tau {
 
@@ -523,41 +524,83 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| clause_simplify_wff<BAs...>);
 }
 
+// TODO (LOW) refactor and clean this structure
+template<typename... BAs>
+struct free_vars_collector {
+
+	free_vars_collector(std::set<nso<BAs...>>& free_vars) : free_vars(free_vars) {}
+
+	nso<BAs...> operator()(const nso<BAs...>& n) {
+		if (is_quantifier<BAs...>(n)) {
+			// IDEA using quantified_variable => variable | capture would simplify the code
+			auto var = find_top(n, is_var_or_capture<BAs...>);
+			if (var.has_value()) {
+				if (auto it = free_vars.find(var.value()); it != free_vars.end())
+					free_vars.erase(it);
+			}
+			DBG(std::cout << "(I) -- removing quantified var: " << var.value() << std::endl;)
+		}
+		if (is_var_or_capture<BAs...>(n)) {
+			if (auto check = n
+						| tau_parser::io_var | only_child_extractor<BAs...> | tau_parser::offset
+						| only_child_extractor<BAs...>;
+					check.has_value() && is_var_or_capture<BAs...>(check.value())) {
+				auto var = check.value();
+				if (auto it = free_vars.find(var); it != free_vars.end()) {
+					free_vars.erase(it);
+					DBG(std::cout << "(I) -- removing var: " << var << std::endl;)
+				}
+			}
+			free_vars.insert(n);
+			DBG(std::cout << "(I) -- inserting var: " << n << std::endl;)
+		}
+		return n;
+	}
+
+	std::set<nso<BAs...>>& free_vars;
+};
+
 template<typename... BAs>
 auto get_vars_from_nso(const nso<BAs...>& n) {
-	// FIXME (HIGH) this should capture all the variables in the formula
-	//
-	// We have to split this method into get free and get bound variables,
-	// and also to get all variables (the ones that are part of another,
-	// p.e. i_keyboard[t]).
 	return select_top(n, is_var_or_capture<BAs...>);
 }
 
+template<typename... BAs>
+auto get_free_vars_from_nso(nso<BAs...>& n) {
+	DBG(std::cout << "(I) -- Begin get_free_vars_from_nso of " << n << std::endl;)
+	std::set<nso<BAs...>> free_vars;
+	free_vars_collector<BAs...> collector(free_vars);
+	post_order_traverser<
+			identity_t<nso<BAs...>>,
+			free_vars_collector<BAs...>,
+			nso<BAs...>>(
+		idni::rewriter::identity<nso<BAs...>>, collector)(n);
+	DBG(std::cout << "(I) -- Begin get_free_vars_from_nso" << std::endl;)
+	return free_vars;
+}
+
 template <typename... BAs>
-bool is_nso_equivalent_to(nso<BAs...> n1, nso<BAs...> n2) {
-	auto vars1 = get_vars_from_nso(n1);
-	auto vars2 = get_vars_from_nso(n2);
-	std::set<nso<BAs...>> vars(vars1.begin(), vars1.end());
-	vars.insert(vars2.begin(), vars2.end());
+bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
+	DBG(std::cout << "(I) -- Begin are_nso_equivalent"<< std::endl;)
+	DBG(std::cout << "(I) -- n1 " << n1 << std::endl;)
+	DBG(std::cout << "(I) -- n2 " << n2 << std::endl;)
 
 	nso<BAs...> wff = build_wff_equiv<BAs...>(n1, n2);
-	if (vars.empty()) {
-		auto check = normalizer_step(wff) | tau_parser::wff_t;
-		return check.has_value();
-	}
-
+	auto vars = get_free_vars_from_nso(wff);
 	for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
+	DBG(std::cout << "(I) -- wff: " << wff << std::endl;)
 
-	rr<nso<BAs...>> nso_rr{wff};
-	auto normalized = normalizer(nso_rr);
+	auto normalized = normalizer_step<BAs...>(wff);
 	auto check = normalized | tau_parser::wff_t;
+	DBG(std::cout << "(I) -- End are_nso_equivalent: " << check.has_value() << std::endl;)
+
 	return check.has_value();
 }
 
 template <typename... BAs>
-auto is_nso_equivalent_to_any_of(const nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
-	return std::any_of(previous.begin(), previous.end(), [n] (const nso<BAs...>& p) {
-		return is_nso_equivalent_to<BAs...>(n, p);
+auto is_nso_equivalent_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
+	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
+		return are_nso_equivalent<BAs...>(n, p);
 	});
 }
 
@@ -639,9 +682,9 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& rr_nso) {
 }
 
 template <typename... BAs>
-rr<nso<BAs...>> normalizer(const nso<BAs...>& form) {
-	rr<nso<BAs...>> nso(form);
-	return normalizer(nso);
+nso<BAs...> normalizer(const nso<BAs...>& form) {
+	rr<nso<BAs...>> rr_nso(form);
+	return normalizer(rr_nso);
 }
 
 } // namespace idni::tau

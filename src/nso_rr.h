@@ -183,11 +183,23 @@ template<typename... BAs>
 using is_capture_t = decltype(is_capture<BAs...>);
 
 template<typename... BAs>
-static const auto is_var_or_capture = [](const sp_tau_node<BAs...>& n) {
+static const auto is_var_or_capture = [](const nso<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value)
 		&& get<tau_source_sym>(n->value).nt()
 		&& (( get<tau_source_sym>(n->value).n() == tau_parser::capture)
 			|| ( get<tau_source_sym>(n->value).n() == tau_parser::variable));
+};
+
+template<typename... BAs>
+static const auto is_quantifier = [](const nso<BAs...>& n) {
+	if (!std::holds_alternative<tau_source_sym>(n->value) || !get<tau_source_sym>(n->value).nt()) return false;
+	auto nt = get<tau_source_sym>(n->value).n();
+	return nt == tau_parser::bf_all
+		|| nt == tau_parser::bf_ex
+		|| nt == tau_parser::wff_all
+		|| nt == tau_parser::wff_ex
+		|| nt == tau_parser::wff_ball
+		|| nt == tau_parser::wff_bex;
 };
 
 template<typename... BAs>

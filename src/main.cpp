@@ -46,8 +46,6 @@ using namespace idni::rewriter;
 // Global tasks
 //
 
-// TODO (IMPORTANT) normalizer
-
 // TODO (IMPORTANT) satisfability
 
 // TODO (IMPORTANT) execution
