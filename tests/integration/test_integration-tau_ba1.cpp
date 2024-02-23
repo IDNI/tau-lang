@@ -45,6 +45,9 @@ TEST_SUITE("operators: negation") {
 	}
 }
 
+// TODO (HIGH) add tests for is_zero
+// TODO (HIGH) add tests for is_one
+
 TEST_SUITE("operators: conjunction") {
 
 	TEST_CASE("(({ : T. } & { : T. }) = 0)") {

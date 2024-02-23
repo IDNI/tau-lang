@@ -167,8 +167,8 @@ struct tau_ba {
 		auto vars = get_free_vars_from_nso(rr_nso.main);
 		auto wff = rr_nso.main;
 		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
-		auto rr_nso = rr<nso<tau_ba<BAs...>, BAs...>>(rr_nso.rec_relations, wff);
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
+		auto nrr_nso = rr<nso<tau_ba<BAs...>, BAs...>>(rr_nso.rec_relations, wff);
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nrr_nso);
 		auto check = normalized | tau_parser::wff_f;
 		return check.has_value();
 	}
@@ -178,8 +178,8 @@ struct tau_ba {
 		auto vars = get_free_vars_from_nso(rr_nso.main);
 		auto wff = build_wff_neg(rr_nso.main);
 		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
-		auto rr_nso = rr<nso<tau_ba<BAs...>, BAs...>>(rr_nso.rec_relations, wff);
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
+		auto nrr_nso = rr<nso<tau_ba<BAs...>, BAs...>>(rr_nso.rec_relations, wff);
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nrr_nso);
 		auto check = normalized | tau_parser::wff_f;
 		return check.has_value();
 	}
