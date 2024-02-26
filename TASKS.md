@@ -50,6 +50,7 @@
 	- [ ] (HIGH) Remove '(' and ')' from grammar
 	- [ ] (MEDIUM) Improve typing syntax
 	- [ ] (LOW) Collapse the grammar avoiding something -> "whatever"
+	- [ ] (MEDIUM) Remove captures from the user input
 
 # CLI improvements
 
