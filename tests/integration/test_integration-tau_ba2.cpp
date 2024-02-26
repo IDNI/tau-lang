@@ -28,55 +28,35 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-tau_ba<bdd_test> get_tau_ba(const char* src) {
-	bdd_test_factory bf;
-	tau_factory<bdd_test_factory, bdd_test> fb(bf);
-	factory_binder<tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test> fbinder(fb);
-	rr<nso<tau_ba<bdd_test>, bdd_test>> nso_rr = make_nso_rr_using_factory<
-			factory_binder<tau_factory<bdd_test_factory, bdd_test>,tau_ba<bdd_test>, bdd_test>,
-			tau_ba<bdd_test>, bdd_test>(src, fbinder);
-	auto value = nso_rr.main
-		| tau_parser::bf_eq
-		| tau_parser::bf
-		| tau_parser::bf_constant
-		| tau_parser::constant
-		| only_child_extractor<tau_ba<bdd_test>, bdd_test>;
-	return get<tau_ba<bdd_test>>(get<variant<
-			tau_ba<bdd_test>, bdd_test>>(value.value()->value));
-}
+static auto T = get_tau_ba("( { : ({ : F.} = 0). } = 0 ).");
+static auto F = get_tau_ba("( { : ({ : T.} = 0). } = 0 ).");
 
-tau_ba<bdd_test> normal(const tau_ba<bdd_test>& f) {
-	auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>(f.nso_rr);
-	return normalized;
-}
+TEST_SUITE("tau_ba operators: negation") {
 
-TEST_SUITE("complex tau_ba formulas") {
-
-	/*TEST_CASE("Ohad's example: ex X ( { : ( X = { : (Y = 0).}). } = 0).") {
-		const char* sample = "ex X ( { : ( X = { : (Y = 0).}). } = 0).";
-		auto normalized = normalize_test_tau(sample);
-		auto check = normalized.main | tau_parser::wff_f;
-		CHECK( check.has_value() );
-	}*/
-
-	static auto T = get_tau_ba("( { : ({ : F.} = 0). } = 0 ).");
-	static auto F = get_tau_ba("( { : ({ : T.} = 0). } = 0 ).");
-
-	TEST_CASE("T") {
-		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>(T.nso_rr);
+	TEST_CASE("negation of F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((~F).nso_rr);
 		auto check = normalized | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("F") {
-		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>(F.nso_rr);
+	TEST_CASE("negation of T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((~T).nso_rr);
+		auto check = normalized | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+}
+
+TEST_SUITE("tau_ba operators: conjunction") {
+
+	TEST_CASE("F & F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((F&F).nso_rr);
 		auto check = normalized | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("T | F") {
-		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T|F).nso_rr);
-		auto check = normalized | tau_parser::wff_t;
+	TEST_CASE("F & T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((F&T).nso_rr);
+		auto check = normalized | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 
@@ -90,5 +70,106 @@ TEST_SUITE("complex tau_ba formulas") {
 		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T&T).nso_rr);
 		auto check = normalized | tau_parser::wff_t;
 		CHECK( check.has_value() );
+	}
+}
+
+TEST_SUITE("tau_ba operators: disjunction") {
+
+	TEST_CASE("F | F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((F|F).nso_rr);
+		auto check = normalized | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("F | T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((F|T).nso_rr);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+
+	}
+
+	TEST_CASE("T | F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T|F).nso_rr);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("T | T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T|T).nso_rr);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+}
+
+TEST_SUITE("tau_ba operators: exclusive or") {
+
+	TEST_CASE("F + F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((F+F).nso_rr);
+		auto check = normalized | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("F + T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((F+T).nso_rr);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("T + F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T+F).nso_rr);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("T + T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T+T).nso_rr);
+		auto check = normalized | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("F ^ F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((F^F).nso_rr);
+		auto check = normalized | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("F ^ T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((F^T).nso_rr);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("T ^ F") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T^F).nso_rr);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("T ^ T") {
+		auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>((T^T).nso_rr);
+		auto check = normalized | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+}
+
+TEST_SUITE("tau_ba check: is_one") {
+
+	TEST_CASE("F is not one") {
+		CHECK( !F.is_one() );
+	}
+
+	TEST_CASE("T is one") {
+		CHECK( T.is_one() );
+	}
+}
+
+TEST_SUITE("tau_ba check: is_zero") {
+
+	TEST_CASE("F is zero") {
+		CHECK( F.is_zero() );
+	}
+
+	TEST_CASE("T is not zero") {
+		CHECK( !T.is_zero() );
 	}
 }

@@ -166,7 +166,7 @@ struct tau_ba {
 		// TODO (HIGH) replace by satisfability in the future
 		auto vars = get_free_vars_from_nso(nso_rr.main);
 		auto wff = nso_rr.main;
-		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
+		for(auto& v: vars) wff = build_wff_all<tau_ba<BAs...>, BAs...>(v, wff);
 		auto nnso_rr = rr<nso<tau_ba<BAs...>, BAs...>>(nso_rr.rec_relations, wff);
 		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nnso_rr);
 		auto check = normalized | tau_parser::wff_f;
@@ -177,7 +177,7 @@ struct tau_ba {
 		// TODO (HIGH) replace by satisfability in the future
 		auto vars = get_free_vars_from_nso(nso_rr.main);
 		auto wff = build_wff_neg(nso_rr.main);
-		for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
+		for(auto& v: vars) wff = build_wff_all<tau_ba<BAs...>, BAs...>(v, wff);
 		auto nnso_rr = rr<nso<tau_ba<BAs...>, BAs...>>(nso_rr.rec_relations, wff);
 		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nnso_rr);
 		auto check = normalized | tau_parser::wff_f;
