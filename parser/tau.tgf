@@ -368,7 +368,7 @@ output                 => output_sym ws_required digits.
 
 # symbols
 output_sym             => "output".
-selection              => "selection".
+selection_sym          => "selection".
 instantiate_sym        => "instantiate".
 substitute_sym         => "substitute".
 normalize_sym          => "normalize".
