@@ -20,6 +20,8 @@
 # structure
 #
 
+# TODO (HIGH) allow comments in the programs, formulas, ...
+
 # whitespace and comments
 eol                    => '\n' | '\r' | eof.
 ws_comment             => '#' (printable | '\t')* eol.
