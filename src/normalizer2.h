@@ -497,7 +497,9 @@ rr<nso<BAs...>> apply_definitions(const rr<nso<BAs...>>& nso_rr) {
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 nso<BAs...> normalizer_step(const nso<BAs...>& form) {
-	return form
+	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(form); it != cache.end()) return it->second;
+	auto result = form
 		| repeat_all<step<BAs...>, BAs...>(
 			step<BAs...>(apply_defs<BAs...>))
 		| repeat_all<step<BAs...>, BAs...>(
@@ -522,6 +524,8 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>
 			| clause_simplify_wff<BAs...>);
+	cache[form] = result;
+	return result;
 }
 
 // TODO (LOW) refactor and clean this structure
