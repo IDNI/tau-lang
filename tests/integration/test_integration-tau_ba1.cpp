@@ -28,6 +28,8 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+
+
 TEST_SUITE("operators: negation") {
 
 	TEST_CASE("(~ { : F. } = 0)") {

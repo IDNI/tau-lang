@@ -5,6 +5,7 @@ set(TESTS
 	test_integration-bdd2
 	test_integration-tau_ba1
 	test_integration-tau_ba2
+	test_integration-tau_ba3
 	test_integration-nso_rr_execution
 	test_integration-gssotc_rr_execution
 	test_integration-tau1
