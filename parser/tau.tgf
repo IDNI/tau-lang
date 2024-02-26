@@ -322,9 +322,11 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) ws.
 # TODO do the same with the other starting points: library, inputs, builder.
 # IDEA in the future nso_rr could be seen also as a starting point and also gssotc_rr
 # depending on the use case of the grammar.
-cli                    => normalize | bf_substitute | wff_substitute | bf_instantiate | wff_instantiate | rr_nso | wff | bf | help | version.
+cli                    => normalize | bf_substitute | wff_substitute | bf_instantiate | wff_instantiate | file | rr_nso | wff | bf | help | version.
 normalize              => ws normalize_sym ws_required (q_nso_rr | q_wff | output | wff_selection) ws dot ws.
-bf_instantiate            => ws instantiate_sym ws_required
+# TODO (HIGH) add support for file paths
+file                   => ws file_sym q_str chars q_str ws dot ws.
+bf_instantiate         => ws instantiate_sym ws_required
             # variable to be instantiated
             (q_var | bf_var_selection | output) ws_rewuired
             # bf to be used for instantiation
@@ -370,3 +372,4 @@ substitute_sym         => "substitute".
 normalize_sym          => "normalize".
 help_sym               => "help".
 version_sym            => "version".
+file_sym			   => "read".
