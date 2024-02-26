@@ -127,7 +127,6 @@ struct tau_ba {
 	tau_ba(nso<tau_ba<BAs...>, BAs...>& main) : nso_rr({main}) {}
 
 	auto operator<=>(const tau_ba<BAs...>&) const = default;
-	//bool operator==(const tau_ba<BAs...>&) const = default;
 
 	tau_ba<BAs...> operator~() const {
 		// TODO (HIGH) replace by ...tau... in the future

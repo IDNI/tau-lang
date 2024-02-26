@@ -585,6 +585,11 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 	DBG(std::cout << "(I) -- n1 " << n1 << std::endl;)
 	DBG(std::cout << "(I) -- n2 " << n2 << std::endl;)
 
+	if (n1 == n2) {
+		DBG(std::cout << "(I) -- End are_nso_equivalent: true" << std::endl;)
+		return true;
+	}
+
 	nso<BAs...> wff = build_wff_equiv<BAs...>(n1, n2);
 	auto vars = get_free_vars_from_nso(wff);
 	for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
