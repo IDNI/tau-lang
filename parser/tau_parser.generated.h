@@ -61,12 +61,14 @@ struct tau_parser {
 		bf_has_subformula_cb_sym, wff_has_subformula_cb_sym, tau_collapse_positives_cb_sym, tau_cb_arg, _Rtau_collapse_positives_cb_33, _Rtau_collapse_positives_cb_34, tau_positives_upwards_cb_sym, inputs, input, _Rinputs_35, 
 		_Rinputs_36, builder, builder_head, builder_body, _Rbuilder_head_37, _Rbuilder_head_38, bf_builder_body, wff_builder_body, tau_builder_body, library, 
 		rules, rule, _Rrules_39, _Rrules_40, nso_rr, nso_rec_relations, nso_main, nso_rec_relation, _Rnso_rec_relations_41, _Rnso_rec_relations_42, 
-		gssotc_rr, gssotc_rec_relations, gssotc_main, gssotc_rec_relation, _Rgssotc_rec_relations_43, _Rgssotc_rec_relations_44, start, _Rstart_45, __neg_0, __neg_1, 
-		__neg_2, __neg_3, __neg_4, __neg_5, __neg_6, __neg_7, __neg_8, __neg_9, __neg_10, __neg_11, 
-		__neg_12, __neg_13, __neg_14, __neg_15, __neg_16, __neg_17, __neg_18, __neg_19, __neg_20, __neg_21, 
-		__neg_22, __neg_23, __neg_24, __neg_25, __neg_26, __neg_27, __neg_28, __neg_29, __neg_30, __neg_31, 
-		__neg_32, __neg_33, __neg_34, __neg_35, __neg_36, __neg_37, __neg_38, __neg_39, __neg_40, __neg_41, 
-		__neg_42, __neg_43, __neg_44, __neg_45, 
+		gssotc_rr, gssotc_rec_relations, gssotc_main, gssotc_rec_relation, _Rgssotc_rec_relations_43, _Rgssotc_rec_relations_44, start, _Rstart_45, cli, normalize, 
+		substitute, help, version, normalize_sym, q_nso_rr, output, selection, _Rnormalize_46, instantiate, instantiate_sym, 
+		ws_rewuired, q_wff, q_bf, _Rinstantiate_47, _Rinstantiate_48, substitute_sym, _Rsubstitute_49, _Rsubstitute_50, wsdot, output_sym, 
+		selection_sym, help_sym, version_sym, __neg_0, __neg_1, __neg_2, __neg_3, __neg_4, __neg_5, __neg_6, 
+		__neg_7, __neg_8, __neg_9, __neg_10, __neg_11, __neg_12, __neg_13, __neg_14, __neg_15, __neg_16, 
+		__neg_17, __neg_18, __neg_19, __neg_20, __neg_21, __neg_22, __neg_23, __neg_24, __neg_25, __neg_26, 
+		__neg_27, __neg_28, __neg_29, __neg_30, __neg_31, __neg_32, __neg_33, __neg_34, __neg_35, __neg_36, 
+		__neg_37, __neg_38, __neg_39, __neg_40, __neg_41, __neg_42, __neg_43, __neg_44, __neg_45, 
 	};
 	size_t id(const std::basic_string<char_type>& name) {
 		return nts.get(name);
@@ -118,12 +120,14 @@ private:
 			"bf_has_subformula_cb_sym", "wff_has_subformula_cb_sym", "tau_collapse_positives_cb_sym", "tau_cb_arg", "_Rtau_collapse_positives_cb_33", "_Rtau_collapse_positives_cb_34", "tau_positives_upwards_cb_sym", "inputs", "input", "_Rinputs_35", 
 			"_Rinputs_36", "builder", "builder_head", "builder_body", "_Rbuilder_head_37", "_Rbuilder_head_38", "bf_builder_body", "wff_builder_body", "tau_builder_body", "library", 
 			"rules", "rule", "_Rrules_39", "_Rrules_40", "nso_rr", "nso_rec_relations", "nso_main", "nso_rec_relation", "_Rnso_rec_relations_41", "_Rnso_rec_relations_42", 
-			"gssotc_rr", "gssotc_rec_relations", "gssotc_main", "gssotc_rec_relation", "_Rgssotc_rec_relations_43", "_Rgssotc_rec_relations_44", "start", "_Rstart_45", "__neg_0", "__neg_1", 
-			"__neg_2", "__neg_3", "__neg_4", "__neg_5", "__neg_6", "__neg_7", "__neg_8", "__neg_9", "__neg_10", "__neg_11", 
-			"__neg_12", "__neg_13", "__neg_14", "__neg_15", "__neg_16", "__neg_17", "__neg_18", "__neg_19", "__neg_20", "__neg_21", 
-			"__neg_22", "__neg_23", "__neg_24", "__neg_25", "__neg_26", "__neg_27", "__neg_28", "__neg_29", "__neg_30", "__neg_31", 
-			"__neg_32", "__neg_33", "__neg_34", "__neg_35", "__neg_36", "__neg_37", "__neg_38", "__neg_39", "__neg_40", "__neg_41", 
-			"__neg_42", "__neg_43", "__neg_44", "__neg_45", 
+			"gssotc_rr", "gssotc_rec_relations", "gssotc_main", "gssotc_rec_relation", "_Rgssotc_rec_relations_43", "_Rgssotc_rec_relations_44", "start", "_Rstart_45", "cli", "normalize", 
+			"substitute", "help", "version", "normalize_sym", "q_nso_rr", "output", "selection", "_Rnormalize_46", "instantiate", "instantiate_sym", 
+			"ws_rewuired", "q_wff", "q_bf", "_Rinstantiate_47", "_Rinstantiate_48", "substitute_sym", "_Rsubstitute_49", "_Rsubstitute_50", "wsdot", "output_sym", 
+			"selection_sym", "help_sym", "version_sym", "__neg_0", "__neg_1", "__neg_2", "__neg_3", "__neg_4", "__neg_5", "__neg_6", 
+			"__neg_7", "__neg_8", "__neg_9", "__neg_10", "__neg_11", "__neg_12", "__neg_13", "__neg_14", "__neg_15", "__neg_16", 
+			"__neg_17", "__neg_18", "__neg_19", "__neg_20", "__neg_21", "__neg_22", "__neg_23", "__neg_24", "__neg_25", "__neg_26", 
+			"__neg_27", "__neg_28", "__neg_29", "__neg_30", "__neg_31", "__neg_32", "__neg_33", "__neg_34", "__neg_35", "__neg_36", 
+			"__neg_37", "__neg_38", "__neg_39", "__neg_40", "__neg_41", "__neg_42", "__neg_43", "__neg_44", "__neg_45", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -193,19 +197,19 @@ private:
 		// _Rchar_punct_4 => esc q_bqstr.
 		q(nt(25), (nt(18)+nt(21)));
 		// __neg_0 => q_char.
-		q(nt(248), (nt(19)));
+		q(nt(273), (nt(19)));
 		// __neg_1 => q_str.
-		q(nt(249), (nt(20)));
+		q(nt(274), (nt(20)));
 		// __neg_2 => q_bqstr.
-		q(nt(250), (nt(21)));
+		q(nt(275), (nt(21)));
 		// __neg_3 => _Rchar_punct_2.
-		q(nt(251), (nt(23)));
+		q(nt(276), (nt(23)));
 		// __neg_4 => _Rchar_punct_3.
-		q(nt(252), (nt(24)));
+		q(nt(277), (nt(24)));
 		// __neg_5 => _Rchar_punct_4.
-		q(nt(253), (nt(25)));
+		q(nt(278), (nt(25)));
 		// char_punct => punct & ~( __neg_0 ) & ~( __neg_1 ) & ~( __neg_2 ) & ~( __neg_3 ) & ~( __neg_4 ) & ~( __neg_5 ).
-		q(nt(22), (nt(7)) & ~(nt(248)) & ~(nt(249)) & ~(nt(250)) & ~(nt(251)) & ~(nt(252)) & ~(nt(253)));
+		q(nt(22), (nt(7)) & ~(nt(273)) & ~(nt(274)) & ~(nt(275)) & ~(nt(276)) & ~(nt(277)) & ~(nt(278)));
 		// char0 => space.
 		q(nt(26), (nt(2)));
 		// char0 => alnum.
@@ -293,9 +297,9 @@ private:
 		// offsets => open_bracket ws offset _Roffsets_9 ws close_bracket.
 		q(nt(51), (nt(41)+nt(14)+nt(52)+nt(54)+nt(14)+nt(42)));
 		// __neg_6 => io_var.
-		q(nt(254), (nt(59)));
+		q(nt(279), (nt(59)));
 		// _Roffset_10 => variable & ~( __neg_6 ).
-		q(nt(60), (nt(58)) & ~(nt(254)));
+		q(nt(60), (nt(58)) & ~(nt(279)));
 		// offset => num.
 		q(nt(52), (nt(55)));
 		// offset => capture.
@@ -305,9 +309,9 @@ private:
 		// offset => _Roffset_10.
 		q(nt(52), (nt(60)));
 		// __neg_7 => io_var.
-		q(nt(255), (nt(59)));
+		q(nt(280), (nt(59)));
 		// _Rshift_11 => variable & ~( __neg_7 ).
-		q(nt(61), (nt(58)) & ~(nt(255)));
+		q(nt(61), (nt(58)) & ~(nt(280)));
 		// _Rshift_12 => capture.
 		q(nt(62), (nt(56)));
 		// _Rshift_12 => _Rshift_11.
@@ -351,17 +355,17 @@ private:
 		// tau_body => tau_positives_upwards_cb.
 		q(nt(72), (nt(75)));
 		// __neg_8 => capture.
-		q(nt(256), (nt(56)));
+		q(nt(281), (nt(56)));
 		// __neg_9 => tau_and.
-		q(nt(257), (nt(77)));
+		q(nt(282), (nt(77)));
 		// __neg_10 => tau_neg.
-		q(nt(258), (nt(78)));
+		q(nt(283), (nt(78)));
 		// __neg_11 => tau_or.
-		q(nt(259), (nt(79)));
+		q(nt(284), (nt(79)));
 		// __neg_12 => tau_wff.
-		q(nt(260), (nt(80)));
+		q(nt(285), (nt(80)));
 		// _Rtau_rec_relation_13 => ~( __neg_8 ) & tau & ~( __neg_9 ) & ~( __neg_10 ) & ~( __neg_11 ) & ~( __neg_12 ).
-		q(nt(81), ~(nt(256)) & (nt(73)) & ~(nt(257)) & ~(nt(258)) & ~(nt(259)) & ~(nt(260)));
+		q(nt(81), ~(nt(281)) & (nt(73)) & ~(nt(282)) & ~(nt(283)) & ~(nt(284)) & ~(nt(285)));
 		// tau_rec_relation => _Rtau_rec_relation_13 ws tau_def ws tau ws dot ws.
 		q(nt(76), (nt(81)+nt(14)+nt(37)+nt(14)+nt(73)+nt(14)+nt(38)+nt(14)));
 		// tau_ref => sym ws offsets ws tau_ref_args.
@@ -425,47 +429,47 @@ private:
 		// wff_body => wff_remove_buniversal_cb.
 		q(nt(93), (nt(100)));
 		// __neg_13 => capture.
-		q(nt(261), (nt(56)));
+		q(nt(286), (nt(56)));
 		// __neg_14 => bool_variable.
-		q(nt(262), (nt(68)));
+		q(nt(287), (nt(68)));
 		// __neg_15 => wff_and.
-		q(nt(263), (nt(102)));
+		q(nt(288), (nt(102)));
 		// __neg_16 => wff_neg.
-		q(nt(264), (nt(103)));
+		q(nt(289), (nt(103)));
 		// __neg_17 => wff_xor.
-		q(nt(265), (nt(104)));
+		q(nt(290), (nt(104)));
 		// __neg_18 => wff_conditional.
-		q(nt(266), (nt(105)));
+		q(nt(291), (nt(105)));
 		// __neg_19 => wff_or.
-		q(nt(267), (nt(106)));
+		q(nt(292), (nt(106)));
 		// __neg_20 => wff_all.
-		q(nt(268), (nt(107)));
+		q(nt(293), (nt(107)));
 		// __neg_21 => wff_ex.
-		q(nt(269), (nt(108)));
+		q(nt(294), (nt(108)));
 		// __neg_22 => wff_imply.
-		q(nt(270), (nt(109)));
+		q(nt(295), (nt(109)));
 		// __neg_23 => wff_equiv.
-		q(nt(271), (nt(110)));
+		q(nt(296), (nt(110)));
 		// __neg_24 => wff_t.
-		q(nt(272), (nt(111)));
+		q(nt(297), (nt(111)));
 		// __neg_25 => wff_f.
-		q(nt(273), (nt(112)));
+		q(nt(298), (nt(112)));
 		// __neg_26 => wff_ball.
-		q(nt(274), (nt(113)));
+		q(nt(299), (nt(113)));
 		// __neg_27 => wff_bex.
-		q(nt(275), (nt(114)));
+		q(nt(300), (nt(114)));
 		// __neg_28 => bf_eq.
-		q(nt(276), (nt(115)));
+		q(nt(301), (nt(115)));
 		// __neg_29 => bf_neq.
-		q(nt(277), (nt(116)));
+		q(nt(302), (nt(116)));
 		// __neg_30 => bf_less.
-		q(nt(278), (nt(117)));
+		q(nt(303), (nt(117)));
 		// __neg_31 => bf_less_equal.
-		q(nt(279), (nt(118)));
+		q(nt(304), (nt(118)));
 		// __neg_32 => bf_greater.
-		q(nt(280), (nt(119)));
+		q(nt(305), (nt(119)));
 		// _Rwff_rec_relation_17 => ~( __neg_13 ) & ~( __neg_14 ) & wff & ~( __neg_15 ) & ~( __neg_16 ) & ~( __neg_17 ) & ~( __neg_18 ) & ~( __neg_19 ) & ~( __neg_20 ) & ~( __neg_21 ) & ~( __neg_22 ) & ~( __neg_23 ) & ~( __neg_24 ) & ~( __neg_25 ) & ~( __neg_26 ) & ~( __neg_27 ) & ~( __neg_28 ) & ~( __neg_29 ) & ~( __neg_30 ) & ~( __neg_31 ) & ~( __neg_32 ).
-		q(nt(120), ~(nt(261)) & ~(nt(262)) & (nt(90)) & ~(nt(263)) & ~(nt(264)) & ~(nt(265)) & ~(nt(266)) & ~(nt(267)) & ~(nt(268)) & ~(nt(269)) & ~(nt(270)) & ~(nt(271)) & ~(nt(272)) & ~(nt(273)) & ~(nt(274)) & ~(nt(275)) & ~(nt(276)) & ~(nt(277)) & ~(nt(278)) & ~(nt(279)) & ~(nt(280)));
+		q(nt(120), ~(nt(286)) & ~(nt(287)) & (nt(90)) & ~(nt(288)) & ~(nt(289)) & ~(nt(290)) & ~(nt(291)) & ~(nt(292)) & ~(nt(293)) & ~(nt(294)) & ~(nt(295)) & ~(nt(296)) & ~(nt(297)) & ~(nt(298)) & ~(nt(299)) & ~(nt(300)) & ~(nt(301)) & ~(nt(302)) & ~(nt(303)) & ~(nt(304)) & ~(nt(305)));
 		// wff_rec_relation => _Rwff_rec_relation_17 ws wff_def ws wff ws dot ws.
 		q(nt(101), (nt(120)+nt(14)+nt(36)+nt(14)+nt(90)+nt(14)+nt(38)+nt(14)));
 		// wff => capture.
@@ -649,33 +653,33 @@ private:
 		// bf => bf_f.
 		q(nt(141), (nt(169)));
 		// __neg_33 => capture.
-		q(nt(281), (nt(56)));
+		q(nt(306), (nt(56)));
 		// __neg_34 => variable.
-		q(nt(282), (nt(58)));
+		q(nt(307), (nt(58)));
 		// __neg_35 => bf_eq.
-		q(nt(283), (nt(115)));
+		q(nt(308), (nt(115)));
 		// __neg_36 => bf_neq.
-		q(nt(284), (nt(116)));
+		q(nt(309), (nt(116)));
 		// __neg_37 => bf_constant.
-		q(nt(285), (nt(161)));
+		q(nt(310), (nt(161)));
 		// __neg_38 => bf_and.
-		q(nt(286), (nt(162)));
+		q(nt(311), (nt(162)));
 		// __neg_39 => bf_neg.
-		q(nt(287), (nt(163)));
+		q(nt(312), (nt(163)));
 		// __neg_40 => bf_xor.
-		q(nt(288), (nt(164)));
+		q(nt(313), (nt(164)));
 		// __neg_41 => bf_or.
-		q(nt(289), (nt(165)));
+		q(nt(314), (nt(165)));
 		// __neg_42 => bf_all.
-		q(nt(290), (nt(166)));
+		q(nt(315), (nt(166)));
 		// __neg_43 => bf_ex.
-		q(nt(291), (nt(167)));
+		q(nt(316), (nt(167)));
 		// __neg_44 => bf_t.
-		q(nt(292), (nt(168)));
+		q(nt(317), (nt(168)));
 		// __neg_45 => bf_f.
-		q(nt(293), (nt(169)));
+		q(nt(318), (nt(169)));
 		// _Rbf_rec_relation_25 => ~( __neg_33 ) & ~( __neg_34 ) & ~( __neg_35 ) & ~( __neg_36 ) & bf & ~( __neg_37 ) & ~( __neg_38 ) & ~( __neg_39 ) & ~( __neg_40 ) & ~( __neg_41 ) & ~( __neg_42 ) & ~( __neg_43 ) & ~( __neg_44 ) & ~( __neg_45 ).
-		q(nt(171), ~(nt(281)) & ~(nt(282)) & ~(nt(283)) & ~(nt(284)) & (nt(141)) & ~(nt(285)) & ~(nt(286)) & ~(nt(287)) & ~(nt(288)) & ~(nt(289)) & ~(nt(290)) & ~(nt(291)) & ~(nt(292)) & ~(nt(293)));
+		q(nt(171), ~(nt(306)) & ~(nt(307)) & ~(nt(308)) & ~(nt(309)) & (nt(141)) & ~(nt(310)) & ~(nt(311)) & ~(nt(312)) & ~(nt(313)) & ~(nt(314)) & ~(nt(315)) & ~(nt(316)) & ~(nt(317)) & ~(nt(318)));
 		// bf_rec_relation => _Rbf_rec_relation_25 ws bf_def ws bf ws dot ws.
 		q(nt(170), (nt(171)+nt(14)+nt(35)+nt(14)+nt(141)+nt(14)+nt(38)+nt(14)));
 		// bf_ref => sym offsets bf_ref_args.
@@ -954,6 +958,80 @@ private:
 		q(nt(247), (nt(240)));
 		// start => _Rstart_45 ws.
 		q(nt(246), (nt(247)+nt(14)));
+		// cli => nso_rr.
+		q(nt(248), (nt(234)));
+		// cli => normalize.
+		q(nt(248), (nt(249)));
+		// cli => substitute.
+		q(nt(248), (nt(250)));
+		// cli => help.
+		q(nt(248), (nt(251)));
+		// cli => version.
+		q(nt(248), (nt(252)));
+		// _Rnormalize_46 => q_nso_rr.
+		q(nt(257), (nt(254)));
+		// _Rnormalize_46 => output.
+		q(nt(257), (nt(255)));
+		// _Rnormalize_46 => selection.
+		q(nt(257), (nt(256)));
+		// normalize => ws normalize_sym ws_required _Rnormalize_46 ws dot ws.
+		q(nt(249), (nt(14)+nt(253)+nt(13)+nt(257)+nt(14)+nt(38)+nt(14)));
+		// _Rinstantiate_47 => selection.
+		q(nt(263), (nt(256)));
+		// _Rinstantiate_47 => q_wff.
+		q(nt(263), (nt(261)));
+		// _Rinstantiate_47 => q_bf.
+		q(nt(263), (nt(262)));
+		// _Rinstantiate_48 => q_nso_rr.
+		q(nt(264), (nt(254)));
+		// _Rinstantiate_48 => output.
+		q(nt(264), (nt(255)));
+		// _Rinstantiate_48 => selection.
+		q(nt(264), (nt(256)));
+		// instantiate => ws instantiate_sym ws_required var ws_rewuired _Rinstantiate_47 ws_required _Rinstantiate_48 ws dot ws.
+		q(nt(258), (nt(14)+nt(259)+nt(13)+nt(63)+nt(260)+nt(263)+nt(13)+nt(264)+nt(14)+nt(38)+nt(14)));
+		// _Rsubstitute_49 => output.
+		q(nt(266), (nt(255)));
+		// _Rsubstitute_49 => selection.
+		q(nt(266), (nt(256)));
+		// _Rsubstitute_49 => q_wff.
+		q(nt(266), (nt(261)));
+		// _Rsubstitute_50 => output.
+		q(nt(267), (nt(255)));
+		// _Rsubstitute_50 => selection.
+		q(nt(267), (nt(256)));
+		// _Rsubstitute_50 => q_wff.
+		q(nt(267), (nt(261)));
+		// substitute => ws substitute_sym ws_required _Rsubstitute_49 ws ws_required _Rsubstitute_50 wsdot ws.
+		q(nt(250), (nt(14)+nt(265)+nt(13)+nt(266)+nt(14)+nt(13)+nt(267)+nt(268)+nt(14)));
+		// q_nso_rr => q_char ws nso_rr ws q_char.
+		q(nt(254), (nt(19)+nt(14)+nt(234)+nt(14)+nt(19)));
+		// q_wff => q_char ws wff ws q_char.
+		q(nt(261), (nt(19)+nt(14)+nt(90)+nt(14)+nt(19)));
+		// q_bf => q_char ws bf ws q_char.
+		q(nt(262), (nt(19)+nt(14)+nt(141)+nt(14)+nt(19)));
+		// output => output_sym ws_required digits.
+		q(nt(255), (nt(269)+nt(13)+nt(33)));
+		// selection => selection_sym ws_required digits.
+		q(nt(256), (nt(270)+nt(13)+nt(33)));
+		// help => ws help_sym ws dot ws.
+		q(nt(251), (nt(14)+nt(271)+nt(14)+nt(38)+nt(14)));
+		// version => ws version_sym ws dot ws.
+		q(nt(252), (nt(14)+nt(272)+nt(14)+nt(38)+nt(14)));
+		// output_sym => 'o' 'u' 't' 'p' 'u' 't'.
+		q(nt(269), (t(28)+t(7)+t(54)+t(58)+t(7)+t(54)));
+		// selection_sym => 's' 'e' 'l' 'e' 'c' 't' 'i' 'o' 'n'.
+		q(nt(270), (t(46)+t(36)+t(35)+t(36)+t(47)+t(54)+t(26)+t(28)+t(48)));
+		// instantiate_sym => 'i' 'n' 's' 't' 'a' 'n' 't' 'i' 'a' 't' 'e'.
+		q(nt(259), (t(26)+t(48)+t(46)+t(54)+t(34)+t(48)+t(54)+t(26)+t(34)+t(54)+t(36)));
+		// substitute_sym => 's' 'u' 'b' 's' 't' 'i' 't' 'u' 't' 'e'.
+		q(nt(265), (t(46)+t(7)+t(37)+t(46)+t(54)+t(26)+t(54)+t(7)+t(54)+t(36)));
+		// normalize_sym => 'n' 'o' 'r' 'm' 'a' 'l' 'i' 'z' 'e'.
+		q(nt(253), (t(48)+t(28)+t(50)+t(51)+t(34)+t(35)+t(26)+t(57)+t(36)));
+		// help_sym => 'h' 'e' 'l' 'p'.
+		q(nt(271), (t(45)+t(36)+t(35)+t(58)));
+		// version_sym => 'v' 'e' 'r' 's' 'i' 'o' 'n'.
+		q(nt(272), (t(53)+t(36)+t(50)+t(46)+t(26)+t(28)+t(48)));
 		return q;
 	}
 };

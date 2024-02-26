@@ -1,3 +1,16 @@
+# LICENSE
+# This software is free for use and redistribution while including this
+# license notice, unless:
+# 1. is used for commercial or non-personal purposes, or
+# 2. used for a product which includes or associated with a blockchain or other
+# decentralized database technology, or
+# 3. used for a product which includes or associated with the issuance or use
+# of cryptographic or electronic currencies/coins/tokens.
+# On all of the mentiTd cases, an explicit and written permission is required
+# from the Author (Ohad Asor).
+# Contact ohad@idni.org for requesting a permission. This license may be
+# modified over time by the Author.
+
 @use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
 #
@@ -303,3 +316,34 @@ gssotc_rec_relations   => (ws gssotc_rec_relation)*.
 gssotc_rec_relation    => tau_rec_relation | wff_rec_relation | bf_rec_relation.
 gssotc_main            => ws tau ws semicolon.
 start                  => (inputs | builder | library | nso_rr | gssotc_rr) ws.
+
+# cli related rules
+# use cli as starting point for parsing
+# TODO do the same with the other starting points: library, inputs, builder.
+# IDEA in the future nso_rr could be seen also as a starting point and also gssotc_rr
+# depending on the use case of the grammar.
+cli                    => normalize | substitute | nso_rr | help | version.
+normalize              => ws normalize_sym ws_required (q_nso_rr | output | selection) ws dot ws.
+instantiate            => ws instantiate_sym ws_required
+            var ws_rewuired                            # variable to be instantiated
+            (q_wff | q_bf | selection) ws_required     # wff or bf to be used for instantiation
+			(q_nso_rr | output | selection) ws dot ws. # nso_rr or output or selection where to instantiate
+substitute             => ws substitute_sym
+            ws_required (q_wff | output | selection) ws         # wff or output or selection to be used for substitution
+            ws_required (q_wff | output | selection) wsdot ws.  # wff or output or selection where to substitute
+q_nso_rr               => q_char ws nso_rr ws q_char.
+q_wff                  => q_char ws wff ws q_char.
+q_bf                   => q_char ws bf ws q_char.
+output                 => output_sym ws_required digits.
+selection              => selection_sym ws_required digits.
+help                   => ws help_sym ws dot ws.
+version                => ws version_sym ws dot ws.
+
+# symbols
+output_sym             => "output".
+selection_sym          => "selection".
+instantiate_sym        => "instantiate".
+substitute_sym         => "substitute".
+normalize_sym          => "normalize".
+help_sym               => "help".
+version_sym            => "version".
