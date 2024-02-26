@@ -62,13 +62,21 @@ There are a lot examples of Tau programs in the `examples/tau` directory.
 In the Tau language we could represent boolean functions essentially following the grammar:
 
 ```
-bf -> elem | (bf "&" bf) | "~" bf | (bf "^" bf) | (bf "+" bf) | (bf "|" bf)
+bf -> elem | "("bf "&" bf")" | "~" bf | "("bf "^" bf")" | "("bf "+" bf")" | "("bf "|" bf")"
 	| fall var bf | fex var bf
 elem -> var | const | bf_ref
 const -> 0 | 1 | { B }
 ```
 
-where `elem` stands for an element of one of the boolean algebras, `bf` for a boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `~`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
+where `elem` stands for an element of one of the boolean algebras, `bf` for a boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function recursive relation (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `~`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
+
+For example, the following is a valid boolean function:
+
+```
+(X & Y | (Z ^ 0))
+```
+
+where `X`, `Y` and `Z` are variables.
 
 ## Functional quantifiers
 
@@ -95,13 +103,13 @@ We would go further about the meaning of captures in subsequent sections, for th
 Well formed formulas are given in the Tau language by the following grammar:
 
 ```
-wff -> (wff "&&" wff) | "!" wff | (wff "^" wff) | (wff "||" wff) | (wff "->" wff)
-	| (wff "<->" wff) | (wff "?" wff ":" wff) | all var wff | ex var wff
+wff -> "("wff "&&" wff")" | "!" wff | "("wff "^" wff")" | "("wff "||" wff")" | "("wff "->" wff")"
+	| "("wff "<->" wff")" | "("wff "?" wff ":" wff")" | all var wff | ex var wff
 	| ball bool_var wff | bex bool_var wff | wff_ref
-	| (bf "=" bf) | (bf "!=" bf) | (bf "<" bf) | (bf "<=" bf) | (bf ">" bf) | T | F.
+	| "("bf "=" bf")" | "("bf "!=" bf")" | "("bf "<" bf")" | "("bf "<=" bf")" | "("bf ">" bf")" | T | F.
 ```
 
-where `wff` stands for a sub-well formed formula, `wff_ref` stands for a reference to a well formed formula (see recursive relations Section), `T` stands for the true constant and `F` stands for the false constant. As usual, the operators `&`, `!`, `^`,  `|`, `->`,
+where `wff` stands for a sub-well formed formula, `wff_ref` stands for a reference to a well formed recursive relation (see recursive relations Section), `T` stands for the true constant and `F` stands for the false constant. As usual, the operators `&`, `!`, `^`,  `|`, `->`,
 `<->` and `?` stands for conjunction, negation, exclusive-or, disjunction, implication, equivalence and conditional (in the usual sense) respectively.
 
 Also, `all` stands for the universal quantifier and `ex` for the existential one, whereas `ball` stands for boolean universal quantifier and `bex` stands for boolean existential quantifier. The difference between the boolean and the regular quantifiers is that the boolean ones depend on a boolean variable, i.e. a variable whose values are exactly `T` of `F`. The use of such quantifiers is to simplify the writing of complex formulas.
@@ -110,7 +118,33 @@ Finally, the operators `=`, `!=`, `<`, `<=` and `>` stands for equality, inequal
 
 Finally, `=` stands for equality, `!=` for inequality, `<` for less than, `<=` for less or equal than, `>` for greater than (all of them in one of the underlying boolean algebras) and `T` for true and `F` for false.
 
+For example, the following is a valid well formed formula:
+
+```
+(X && Y || ((Z ^ 0) = 0)) -> (X ? Y : Z)
+```
+
+where `X`, `Y` and `Z` are variables.
+
 As in the caes of `bf`, we have two types of qantifiers and the varibles could be of the above types. As announced, we would clarify both of them in a forthcoming Section.
+
+## Variables, variables, variables,...
+
+Tau specifications, as deal with program specifications, could freely include input and output variables. The disctintion between input and output variables is made by the use of the `i_` and `o_` prefix. For instance, in a Tau specification we could have variables named `ì_keyboard` or `o_terminal`. Moreover, the variables must have a timestamp, i.e. you could have
+`i_keyboard[t]` that denotes the value of the variable `i_keyboard` at time `t`. Also you could have `i_keyboard[t-1]` that denotes the value of the variable `i_keyboard` at time `t-1` or `ì_keyboard[3]` that denotes the value of variable at
+time `3` of the specification.
+
+Free variables used in recursive relations must be preceed by a `$` symbol, for example `$X` or `$Y`. The use of `$` symbol is to avoid name clashes with the variables of the specification. They could be used freely inside the body of the definitions.
+
+## Tau formulas
+
+Tau formulas are given by the following grammar:
+
+```
+tau => "{" wff "}" | tau_ref | "("tau "&&&" tau")" | "("tau "|||" tau")" | "!!!" tau.
+```
+
+where `tau` stands for a tau formula, `tau_wff` stands for a well formed formula, `tau_ref` stands for a reference to a well formed formula, `tau_and` stands for a conjunction of two tau formulas, `tau_or` stands for a disjunction of two tau formulas, `tau_neg` stands for a negation of a tau formula and `capture` stands for a capture/variable.
 
 ## Recursive relations
 
@@ -128,19 +162,57 @@ wff_rec_relation -> wff_ref "::=" wff.
 wff_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
 ```
 
+anf finally, in the case of tau formulas, the grammar is:
+
+```
+tau_rec_relation -> tau_ref ":::=" tau.
+tau_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
+```
+
 where `bf_rec_relation` stands for a boolean function recursive relation, `bf_ref` stands for a reference to a boolean function (see boolean functions Section), `wff_rec_relation` stands for a well formed formula recursive relation, `wff_ref` stands for a reference to a well formed formula (see well formed formulas Section), `sym` stands for a symbol, `offset` stands for an offset and `capture` stands for a capture/variable.
 
-## Variables, variables, variables,...
+Examples of recursive relations are:
 
-Tau specifications, as deal with program specifications, could freely include input and output variables. The disctintion between input and output variables is made by the use of the `i_` and `o_` prefix. For instance, in a Tau specification we could have variables named `ì_keyboard` or `o_terminal`. Moreover, the variables must have a timestamp, i.e. you could have
-`i_keyboard[t]` that denotes the value of the variable `i_keyboard` at time `t`. Also you could have `i_keyboard[t-1]` that denotes the value of the variable `i_keyboard` at time `t-1` or `ì_keyboard[3]` that denotes the value of variable at
-time `3` of the specification.
+```
+g[0]($Y) := 1.
+g[$n]($Y) := g[$n - 1]($Y).
+```
 
-Free variables used in recursive relations must be preceed by a `$` symbol, for example `$X` or `$Y`. The use of `$` symbol is to avoid name clashes with the variables of the specification. They could be used freely inside the body of the definitions.
+for the case of boolean functions,
+
+```
+g[0]($Y) ::= T.
+g[$n]($Y) ::= h[$n - 1]($Y).
+h[0]($Y) ::= F.
+h[$n]($Y) ::= g[$n - 1]($Y).
+```
+
+and finally, for the case of well formed formulas:
+
+```
+g[0]($Y) :::= {T}.
+g[$n]($Y) :::= g[$n - 1]($Y).
+```
 
 ## Tau programs
 
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+Taking into account all the previous definitions and considerations, Tau programs are given by the following grammar:
+
+```
+tau_program => (tau_rec_relation)* tau.
+```
+
+where `tau_rec_relation` stands for a tau recursive relations and `tau` stands for a tau formula.
+
+Thus, they are a collection of Tau recursive relations and a main formula, p.e.:
+
+```
+g[0]($Y) :::= {T}.
+g[$n]($Y) :::= g[$n - 1]($Y).
+g[1](Y);
+```
+
+TODO (HIGH) add tau recursive relations
 
 ## Type resolution
 
@@ -156,8 +228,7 @@ In both cases, if there is a missmatch between the types, an error is raised dur
 
 ## Reserved symbols
 
-Tau language has a set of reserved symbols that cannot be used as identifiers. In particular, no symbol could have the prefix `tau` as is used for internal pourposes. Moreover, no capture or variable could be `t` as also is used
-internally to denote the current instant of execution. Also, `T` and `F` are reserved for true and false values respectively.
+Tau language has a set of reserved symbols that cannot be used as identifiers. In particular, `T` and `F` are reserved for true and false values respectively in well formed formulas and `0` and `1` stand for the corresponding Boolean Algebra in boolean function formulas.
 
 # Understanding Tau language execution
 
