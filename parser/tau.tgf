@@ -92,11 +92,11 @@ in_var_name            => "i_" chars.
 out_var_name           => "o_" chars.
 
 # tau
-tau_rule               => tau_matcher ws tau_def ws tau_body ws dot ws.
+tau_rule               => tau_matcher ws tau_def ws tau_body ws dot.
 tau_matcher            => tau.
 tau_body               => tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
 tau_rec_relation	   => (tau & ~tau_and & ~tau_neg & ~tau_or & ~tau_wff & ~capture)
-            ws tau_def ws tau ws dot ws.
+            ws tau_def ws tau ws dot.
 tau_ref                => sym ws offsets ws tau_ref_args.
 tau_ref_args           => open_parenthesis (ws (variable | capture))* ws close_parenthesis.
 
@@ -117,7 +117,7 @@ tau_or_sym             => "|||".
 tau_neg_sym            => "!!!".
 
 # wff
-wff_rule               => wff_matcher ws wff_def ws wff_body ws dot ws.
+wff_rule               => wff_matcher ws wff_def ws wff_body ws dot.
 wff_matcher            => wff.
 wff_body               => wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformulas_cb
             | wff_has_subformula_cb | wff_remove_existential_cb
@@ -126,7 +126,7 @@ wff_rec_relation       => (wff & ~wff_and & ~wff_neg & ~wff_xor & ~wff_condition
             & ~wff_or & ~wff_all & ~wff_ex & ~wff_imply & ~wff_equiv
             & ~wff_t & ~wff_f & ~capture & ~bool_variable & ~wff_ball & ~wff_bex
             & ~bf_eq & ~ bf_neq & ~bf_less & ~bf_less_equal & ~bf_greater & ~bf_segment & ~bf_not_less_equal)
-            ws wff_def ws wff ws dot ws.
+            ws wff_def ws wff ws dot.
 
 wff                    => wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
             | wff_or | wff_all | wff_ex | wff_imply | wff_equiv
@@ -176,7 +176,7 @@ wff_t                  => 'T'.
 wff_f                  => 'F'.
 
 # bf
-bf_rule                => bf_matcher ws bf_def ws bf_body ws dot ws.
+bf_rule                => bf_matcher ws bf_def ws bf_body ws dot.
 bf_matcher             => bf.
 bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
             | bf_has_subformula_cb | bf_remove_funiversal_cb | bf_remove_fexistential_cb
@@ -185,7 +185,7 @@ bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_o
             | bf_all | bf_ex | bf_t | bf_f | variable | capture | bf_splitter.
 bf_rec_relation        => (bf & ~bf_and & ~bf_neg & ~bf_xor & ~bf_or & ~bf_all & ~bf_ex
             & ~bf_t & ~bf_f & ~capture & ~bf_constant & ~bf_eq & ~bf_neq & ~variable & ~bf_splitter)
-            ws bf_def ws bf ws dot ws.
+            ws bf_def ws bf ws dot.
 bf_ref                 => sym offsets bf_ref_args.
 bf_ref_args            => open_parenthesis (ws (variable | capture))* ws close_parenthesis.
 bf_and                 => open_parenthesis ws bf ws bf_and_sym ws bf ws close_parenthesis.
@@ -301,11 +301,11 @@ tau_collapse_positives_cb_sym  => "tau_collapse_positives_cb".
 tau_positives_upwards_cb_sym   => "tau_positives_upwards_cb".
 
 # input definition
-inputs                 => ws less ws input (ws input)* ws dot ws.
+inputs                 => ws less ws input (ws input)* ws dot.
 input                  => in ws colon ws open_brace ws source_binding ws close_brace.
 # each builder is define on its own string
 # TODO explit builders by type: bf, wff, and tau
-builder                => ws builder_head ws builder_body ws dot ws.
+builder                => ws builder_head ws builder_body ws dot.
 builder_head           => open_parenthesis ws capture (ws_required capture)* ws close_parenthesis.
 builder_body           => bf_builder_body | wff_builder_body | tau_builder_body.
 bf_builder_body        => bf_def ws bf.
@@ -318,7 +318,7 @@ rule                   => wff_rule | bf_rule | tau_rule.
 nso_rr                 => nso_rec_relations nso_main.
 nso_rec_relations      => (ws nso_rec_relation)*.
 nso_rec_relation       => bf_rec_relation | wff_rec_relation.
-nso_main               => ws wff ws dot ws.
+nso_main               => ws wff ws dot.
 gssotc_rr              => gssotc_rec_relations gssotc_main.
 gssotc_rec_relations   => (ws gssotc_rec_relation)*.
 gssotc_rec_relation    => tau_rec_relation | wff_rec_relation | bf_rec_relation.
@@ -331,37 +331,37 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) ws.
 # IDEA in the future nso_rr could be seen also as a starting point and also gssotc_rr
 # depending on the use case of the grammar.
 cli                    => normalize | bf_substitute | wff_substitute | bf_instantiate | wff_instantiate | file | rr_nso | wff | bf | help | version.
-normalize              => ws normalize_sym ws_required (q_nso_rr | q_wff | output | wff_selection) ws dot ws.
+normalize              => ws normalize_sym ws_required (q_nso_rr | q_wff | output | wff_selection) ws dot.
 # TODO (HIGH) add support for file paths
-file                   => ws file_sym q_str chars q_str ws dot ws.
+file                   => ws file_sym q_str chars q_str ws dot.
 bf_instantiate         => ws instantiate_sym ws_required
             # variable to be instantiated
             (q_var | bf_var_selection | output) ws_rewuired
             # bf to be used for instantiation
             (q_bf | bf_selection | output) ws_required
             # nso_rr or output or selection where to instantiate
-            (bf_selection | output) ws dot ws.
+            (bf_selection | output) ws dot.
 wff_instantiate        => ws instantiate_sym ws_required
             # variable to be instantiated
             (q_var | wff_var_selection | output) ws_rewuired
             # wff to be used for instantiation
             (q_wff | wff_selection | output) ws_required
             # nso_rr or output or selection where to instantiate
-            (wff_selection | output) ws dot ws.
+            (wff_selection | output) ws dot.
 bf_substitute          => ws substitute_sym ws_required
             # wff or output or selection to be used for substitution
             (q_bf | output | bf_selection) ws_required
             # wff or output or selection where to substitute
-            (output | wff_selection | bf_selection) ws dot ws.
+            (output | wff_selection | bf_selection) ws dot.
 wff_substitute         => ws substitute_sym ws_required
             # bf or output or selection to be used for substitution
             (q_wff | output | wff_selection) ws_required
             # bf or output or selection where to substitute
-            (output | wff_selection) ws dot ws.
-help                   => ws help_sym ws dot ws.
-version                => ws version_sym ws dot ws.
+            (output | wff_selection) ws dot.
+help                   => ws help_sym ws dot.
+version                => ws version_sym ws dot.
 
-wff_selection 		   => selection_sym ws_required digits.
+wff_selection          => selection_sym ws_required digits.
 bf_selection           => selection_sym ws_required digits.
 bf_var_selection       => selection_sym ws_required digits.
 wff_var_selection      => selection_sym ws_required digits.
@@ -380,4 +380,4 @@ substitute_sym         => "substitute".
 normalize_sym          => "normalize".
 help_sym               => "help".
 version_sym            => "version".
-file_sym			   => "read".
+file_sym               => "read".
