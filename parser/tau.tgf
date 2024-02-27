@@ -125,7 +125,7 @@ wff_body               => wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformu
 wff_rec_relation       => (wff & ~wff_and & ~wff_neg & ~wff_xor & ~wff_conditional
             & ~wff_or & ~wff_all & ~wff_ex & ~wff_imply & ~wff_equiv
             & ~wff_t & ~wff_f & ~capture & ~bool_variable & ~wff_ball & ~wff_bex
-            & ~bf_eq & ~ bf_neq & ~bf_less & ~bf_less_equal & ~bf_greater)
+            & ~bf_eq & ~ bf_neq & ~bf_less & ~bf_less_equal & ~bf_greater & ~bf_segment & ~bf_not_less_equal)
             ws wff_def ws wff ws dot ws.
 
 wff                    => wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
@@ -182,9 +182,9 @@ bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_su
             | bf_has_subformula_cb | bf_remove_funiversal_cb | bf_remove_fexistential_cb
             | bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb.
 bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_or
-            | bf_all | bf_ex | bf_t | bf_f | variable | capture.
+            | bf_all | bf_ex | bf_t | bf_f | variable | capture | bf_splitter.
 bf_rec_relation        => (bf & ~bf_and & ~bf_neg & ~bf_xor & ~bf_or & ~bf_all & ~bf_ex
-            & ~bf_t & ~bf_f & ~capture & ~bf_constant & ~bf_eq & ~bf_neq & ~variable)
+            & ~bf_t & ~bf_f & ~capture & ~bf_constant & ~bf_eq & ~bf_neq & ~variable & ~bf_splitter)
             ws bf_def ws bf ws dot ws.
 bf_ref                 => sym offsets bf_ref_args.
 bf_ref_args            => open_parenthesis (ws (variable | capture))* ws close_parenthesis.
@@ -194,6 +194,7 @@ bf_xor                 => open_parenthesis ws bf ws bf_xor_sym ws bf ws close_pa
 bf_neg                 => bf_neg_sym ws bf.
 bf_all                 => bf_all_sym ws_required (variable | capture) ws_required bf.
 bf_ex                  => bf_ex_sym ws_required (variable | capture) ws_required bf.
+bf_splitter            => bf_splitter_sym ws open_parenthesis ws bf ws close_parenthesis.
 
 # bf_op_sym
 bf_and_sym             => '&'.
@@ -208,6 +209,7 @@ bf_not_less_equal_sym  => "!<=".
 bf_greater_sym         => '>'.
 bf_all_sym             => "fall".
 bf_ex_sym              => "fex".
+bf_splitter_sym        => "S".
 bf_t                   => '1'.
 bf_f                   => '0'.
 
