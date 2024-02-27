@@ -1,5 +1,7 @@
 ![The TAU logo](/docs/tau_logo.svg)
 
+TODO (HIGH) add executor related info: splitter, bf_not_less_equal, ...
+
 Tau advances formal methods by removing coding from the process, while expanding its industrial capability, reliability and ease of maintenance. Tau enables you to automatically create the most complex, provably correct software, by simply writing sentences about what you want the software to do.
 
 Tau Language is able to embed and extend the most powerful decidable knowledge representation languages, logics, and Boolean algebras to describe states in the specification. Tau Language is able to embed and extend the most powerful decidable knowledge representation languages and logics to describe states in the Tau specification.
