@@ -27,7 +27,7 @@
 #include <compare>
 
 #include "forest.h"
-#include "parser.h"
+#include "parser_instance.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -894,37 +894,6 @@ auto drop_location = [](const parse_symbol_t& n) -> symbol_t { return n.first; }
 template <typename parse_symbol_t, typename symbol_t>
 using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
-// FIXME (LOW) maybe better not define the function at all if DEBUG is not defined
-template<typename parser_t>
-void check_parser_result(const std::string& source,
-	const typename parser_t::forest_type* f,
-	parser_t& parser)
-{
-#ifdef DEBUG
-	if (!f || !parser.found())
-		std::cerr << "# source: `" << source << "`\n"
-	 		<< parser.get_error().to_str() << "\n";
-	else if (f->is_ambiguous()) {
-		std::cerr << "# source: `" << source << "`\n"
-			<< "# n trees: " << f->count_trees() << "\n"
-			<< "# ambiguous nodes:\n";
-		for (auto& n : f->ambiguous_nodes()) {
-			std::cerr << "\t `" << n.first.first << "` ["
-				<< n.first.second[0] << "," << n.first.second[1]
-				<< "]\n";
-			size_t d = 0;
-			for (auto ns : n.second) {
-				std::cerr << "\t\t " << d++ << "\t";
-				for (auto nt : ns) std::cerr << " `" << nt.first
-					<< "`[" << nt.second[0] << ","
-					<< nt.second[1] << "] ";
-				std::cerr << "\n";
-			}
-		}
-	}
-#endif // DEBUG
-}
-
 // make a tree from the given source code forest.
 template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 	typename symbol_t>
@@ -955,13 +924,8 @@ template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
 	const std::string source)
 {
-	// TODO (LOW) we have three static parser_t instances in various
-	// make_node_from_* functions
-	static parser_t parser;
-	auto f = parser.parse(source.c_str(), source.size());
-
-	DBG(check_parser_result<parser_t>(source, f.get(), parser);)
-
+	auto f = parser_instance<parser_t>().parse(source.c_str(), source.size());
+	DBG(check_parser_result<parser_t>(source, f.get());)
 	return make_node_from_forest<parser_t, transformer_t,
 		parse_symbol_t, symbol_t>(transformer, f.get());
 }
@@ -972,11 +936,8 @@ template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 	std::istream& is)
 {
-	static parser_t parser;
-	auto f = parser.parse(is);
-
-	DBG(check_parser_result<parser_t>("<@stdin>", f.get(), parser);)
-
+	auto f = parser_instance<parser_t>().parse(is);
+	DBG(check_parser_result<parser_t>("<@stdin>", f.get());)
 	return make_node_from_forest<parser_t, transformer_t,
 		parse_symbol_t, symbol_t>(transformer, f.get());
 }
@@ -987,11 +948,9 @@ template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 	const std::string& filename)
 {
-	static parser_t parser;
-	auto f = parser.parse(filename, MMAP_READ);
-
-	DBG(check_parser_result<parser_t>(std::string("<")+filename+">", f.get(), parser);)
-
+	auto f = parser_instance<parser_t>().parse(filename);
+	DBG(check_parser_result<parser_t>(
+		std::string("<")+filename+">", f.get());)
 	return make_node_from_forest<parser_t, transformer_t,
 		parse_symbol_t, symbol_t>(transformer, f.get());
 }
