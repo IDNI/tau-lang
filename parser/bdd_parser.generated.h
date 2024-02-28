@@ -37,9 +37,9 @@ struct bdd_parser {
 	bool found(int start = -1) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
-		nul, space, alpha, alnum, start, ws, bdd, ws_required, disjunction, bdd2, 
-		conjunction, bdd3, exclusive_or, bdd4, negation, bdd5, literal, _Rexclusive_or_0, var, T, 
-		F, _Rvar_1, _Rvar_2, 
+		nul, space, alpha, alnum, start, _, bdd, __, _R__0, disjunction, 
+		bdd2, conjunction, bdd3, exclusive_or, bdd4, negation, bdd5, literal, _Rexclusive_or_1, var, 
+		T, F, _Rvar_2, _Rvar_3, 
 	};
 	size_t id(const std::basic_string<char_type>& name) {
 		return nts.get(name);
@@ -66,9 +66,9 @@ private:
 	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
 		idni::nonterminals<char_type, terminal_type> nts{};
 		for (const auto& nt : {
-			"", "space", "alpha", "alnum", "start", "ws", "bdd", "ws_required", "disjunction", "bdd2", 
-			"conjunction", "bdd3", "exclusive_or", "bdd4", "negation", "bdd5", "literal", "_Rexclusive_or_0", "var", "T", 
-			"F", "_Rvar_1", "_Rvar_2", 
+			"", "space", "alpha", "alnum", "start", "_", "bdd", "__", "_R__0", "disjunction", 
+			"bdd2", "conjunction", "bdd3", "exclusive_or", "bdd4", "negation", "bdd5", "literal", "_Rexclusive_or_1", "var", 
+			"T", "F", "_Rvar_2", "_Rvar_3", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -86,66 +86,68 @@ private:
 	idni::prods<char_type, terminal_type> load_prods() {
 		idni::prods<char_type, terminal_type> q,
 			nul(symbol_type{});
-		// start => ws bdd ws.
+		// start => _ bdd _.
 		q(nt(4), (nt(5)+nt(6)+nt(5)));
-		// ws_required => space ws.
+		// __ => space _.
 		q(nt(7), (nt(1)+nt(5)));
-		// ws => null.
-		q(nt(5), (nul));
-		// ws => ws_required.
-		q(nt(5), (nt(7)));
+		// _R__0 => null.
+		q(nt(8), (nul));
+		// _R__0 => __.
+		q(nt(8), (nt(7)));
+		// _ => _R__0.
+		q(nt(5), (nt(8)));
 		// bdd => disjunction.
-		q(nt(6), (nt(8)));
-		// bdd => bdd2.
 		q(nt(6), (nt(9)));
+		// bdd => bdd2.
+		q(nt(6), (nt(10)));
 		// bdd2 => conjunction.
-		q(nt(9), (nt(10)));
+		q(nt(10), (nt(11)));
 		// bdd2 => bdd3.
-		q(nt(9), (nt(11)));
+		q(nt(10), (nt(12)));
 		// bdd3 => exclusive_or.
-		q(nt(11), (nt(12)));
+		q(nt(12), (nt(13)));
 		// bdd3 => bdd4.
-		q(nt(11), (nt(13)));
+		q(nt(12), (nt(14)));
 		// bdd4 => negation.
-		q(nt(13), (nt(14)));
+		q(nt(14), (nt(15)));
 		// bdd4 => bdd5.
-		q(nt(13), (nt(15)));
-		// bdd5 => '(' ws bdd ws ')'.
-		q(nt(15), (t(1)+nt(5)+nt(6)+nt(5)+t(2)));
+		q(nt(14), (nt(16)));
+		// bdd5 => '(' _ bdd _ ')'.
+		q(nt(16), (t(1)+nt(5)+nt(6)+nt(5)+t(2)));
 		// bdd5 => literal.
-		q(nt(15), (nt(16)));
-		// disjunction => bdd ws '|' ws bdd2.
-		q(nt(8), (nt(6)+nt(5)+t(3)+nt(5)+nt(9)));
-		// conjunction => bdd2 ws '&' ws bdd3.
-		q(nt(10), (nt(9)+nt(5)+t(4)+nt(5)+nt(11)));
-		// conjunction => bdd2 ws_required bdd3.
-		q(nt(10), (nt(9)+nt(7)+nt(11)));
-		// _Rexclusive_or_0 => '+'.
-		q(nt(17), (t(5)));
-		// _Rexclusive_or_0 => '^'.
-		q(nt(17), (t(6)));
-		// exclusive_or => bdd3 ws _Rexclusive_or_0 ws bdd4.
-		q(nt(12), (nt(11)+nt(5)+nt(17)+nt(5)+nt(13)));
-		// negation => bdd4 ws '\''.
-		q(nt(14), (nt(13)+nt(5)+t(7)));
+		q(nt(16), (nt(17)));
+		// disjunction => bdd _ '|' _ bdd2.
+		q(nt(9), (nt(6)+nt(5)+t(3)+nt(5)+nt(10)));
+		// conjunction => bdd2 _ '&' _ bdd3.
+		q(nt(11), (nt(10)+nt(5)+t(4)+nt(5)+nt(12)));
+		// conjunction => bdd2 __ bdd3.
+		q(nt(11), (nt(10)+nt(7)+nt(12)));
+		// _Rexclusive_or_1 => '+'.
+		q(nt(18), (t(5)));
+		// _Rexclusive_or_1 => '^'.
+		q(nt(18), (t(6)));
+		// exclusive_or => bdd3 _ _Rexclusive_or_1 _ bdd4.
+		q(nt(13), (nt(12)+nt(5)+nt(18)+nt(5)+nt(14)));
+		// negation => bdd4 _ '\''.
+		q(nt(15), (nt(14)+nt(5)+t(7)));
 		// literal => var.
-		q(nt(16), (nt(18)));
+		q(nt(17), (nt(19)));
 		// literal => T.
-		q(nt(16), (nt(19)));
+		q(nt(17), (nt(20)));
 		// literal => F.
-		q(nt(16), (nt(20)));
-		// _Rvar_1 => alnum.
-		q(nt(21), (nt(3)));
-		// _Rvar_2 => null.
-		q(nt(22), (nul));
-		// _Rvar_2 => _Rvar_1 _Rvar_2.
-		q(nt(22), (nt(21)+nt(22)));
-		// var => alpha _Rvar_2.
-		q(nt(18), (nt(2)+nt(22)));
+		q(nt(17), (nt(21)));
+		// _Rvar_2 => alnum.
+		q(nt(22), (nt(3)));
+		// _Rvar_3 => null.
+		q(nt(23), (nul));
+		// _Rvar_3 => _Rvar_2 _Rvar_3.
+		q(nt(23), (nt(22)+nt(23)));
+		// var => alpha _Rvar_3.
+		q(nt(19), (nt(2)+nt(23)));
 		// T => '1'.
-		q(nt(19), (t(8)));
+		q(nt(20), (t(8)));
 		// F => '0'.
-		q(nt(20), (t(9)));
+		q(nt(21), (t(9)));
 		return q;
 	}
 };
