@@ -15,14 +15,14 @@
 #include <fstream>
 
 #include "cli.h"
+#include "repl.h"
 #include "normalizer2.h"
+#include "parser_instance.h"
 
 using namespace std;
 using namespace idni;
 using namespace idni::tau;
 using namespace idni::rewriter;
-
-
 
 cli::commands tau_commands() {
 	cli::commands cmds;
@@ -40,6 +40,9 @@ cli::commands tau_commands() {
 		.set_description("program's input"));
 	run.add_option(cli::option("output", 'o', "@stdout")
 		.set_description("program's output"));
+	auto& repl = cmds["repl"] = cli::command("repl", "Tau REPL");
+	repl.add_option(cli::option("help", 'h', false)
+		.set_description("detailed information about repl options"));
 	return cmds;
 }
 
@@ -114,12 +117,59 @@ int run_tau(const string& program, const string& input, const string& output,
 	return 0;
 }
 
+#ifdef DEBUG
+std::ostream& print_sp_tau_source_node_tree(std::ostream &os,
+	tau::sp_tau_source_node n, bool ws = false, size_t l = 0)
+{
+	bool enter = true;
+	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
+	std::visit(tau::overloaded {
+		[&os, &ws, &enter, &indent](const tau::tau_source_sym& v) {
+			if (!ws && v.nt() && (v.n() == tau_parser::ws ||
+					v.n() == tau_parser::ws_required)) {
+				enter = false;
+				return;
+			}
+			indent();
+			if (v.nt()) os << parser_instance<tau_parser>()
+				.name(v.n()) << "(" << v.n() << ")";
+			else if (v.is_null()) os << "null";
+			else os << v.t();
+		}
+	}, n->value);
+	if (!enter) return os;
+	if (n->child.size()) os << " {\n";
+	for (auto& c : n->child) print_sp_tau_source_node_tree(os, c, ws, l+1);
+	if (n->child.size()) indent(), os << "}";
+	return os << "\n";
+}
+#endif // DEBUG
+
+struct repl_evaluator {
+	static int eval(const std::string& src) {
+		if (src == "q" || src == "quit" || src == "exit") return 1;
+		auto f = parser_instance<tau_parser>()
+			.parse(src.c_str(), src.size(), {
+				.start = tau_parser::cli });
+		DBG(check_parser_result<tau_parser>(src,f.get(),tau_parser::cli);)
+		auto n = make_node_from_forest<tau_parser,
+			rewriter::drop_location_t<tau_parser::node_type,
+				tau::tau_source_sym>,
+			tau_parser::node_type,
+			tau::tau_source_sym>(
+				drop_location<tau_parser::node_type,
+					tau::tau_source_sym>, f.get());
+		DBG(print_sp_tau_source_node_tree(std::cout<<"\n", n) << "\n";)
+		return 0;
+	}
+};
+
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
 
-	cli cl("tau", args, tau_commands(), "run", tau_options());
+	cli cl("tau", args, tau_commands(), "repl", tau_options());
 	cl.set_description("Tau language");
 
 	if (cl.process_args() != 0) return cl.status();
@@ -143,6 +193,12 @@ int main(int argc, char** argv) {
 		cmd.get<string>("input"),
 		cmd.get<string>("output"),
 		cmd.get<string>("evaluate"));
+
+	// repl command
+	if (cmd.name() == "repl") {
+		repl<repl_evaluator> re("tau> ", ".tau_history");
+		return re.run();
+	}
 
 	return 0;
 }
