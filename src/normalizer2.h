@@ -660,7 +660,7 @@ template <typename... BAs>
 nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	// IDEA extract this to an operator| overload
 
-	DBG(std::cout << std::endl << "(I) -- Begin normalizer" << std::endl;)
+	DBG(std::cout << "(I) -- Begin normalizer" << std::endl;)
 	DBG(std::cout << "(I) -- Apply once definitions" << std::endl;)
 	DBG(std::cout << "(F) " << nso_rr.main << std::endl;)
 
