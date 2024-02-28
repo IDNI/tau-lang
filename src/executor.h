@@ -51,13 +51,21 @@ struct executor {
 };
 
 template <typename...BAs>
+gssotc<BAs...> get_normal_order_form(const gssotc<BAs...>& form) {
+	// replace equality with segment
+	// replace inequalities with disjunctions of not less equeals
+	return form;
+}
+
+template <typename...BAs>
 compiled_gssotc_clause<BAs...> compile_gssotc_clause(const gssotc<BAs...>& clause) {
 	// TODO (HIGH) implement
 	auto collapsed = clause |
 		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
 			simplify_tau<tau_ba<BAs...>, BAs...>
 			| collapse_positives_tau<tau_ba<BAs...>, BAs...>);
-
+	// it should be befor the simplification to dnf...
+	auto nof = get_normal_order_form(collapsed);
 	return compiled_gssotc_clause<BAs...>{};
 }
 
