@@ -156,7 +156,7 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_gssotc_io_vars(const
 }
 
 template<typename... BAs>
-std::string build_string_from_clause(const gssotc<BAs...>& clause, bindings<tau_ba<BAs...>, BAs...> bindings, size_t binding_seed = 0) {
+std::string build_string_from_clause(const gssotc<BAs...>& clause, bindings<tau_ba<BAs...>, BAs...>& bindings, size_t binding_seed = 0) {
 
 	std::basic_stringstream<char> str;
 	std::map<std::variant<tau_ba<BAs...>, BAs...>, std::string> extracted_bindings;
@@ -436,16 +436,15 @@ bool is_gssotc_clause_satisfiable_general(const std::optional<gssotc<BAs...>>& p
 	auto etas = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
 	for (size_t current = 1; /* until return statement */ ; ++current) {
 		auto [eta, extracted_bindings] = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
-		bindings<tau_ba<BAs...>, BAs...> reversed_bindings;
 		auto check = build_check_nso_rr(outputs, loopback, current);
-		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), reversed_bindings).main;
+		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), extracted_bindings).main;
 		if ((normalize | tau_parser::wff_f).has_value()) {
 			DBG(std::cout << "(I) --Check is_gssotc_clause_satisfiable: false" << std::endl);
 			return false;
 		}
 		for (size_t previous = 1; previous < current; ++previous) {
 			auto main = build_main_nso_rr(outputs, loopback, current, previous);
-			auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(main), reversed_bindings).main;
+			auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(main), extracted_bindings).main;
 			if ((normalize | tau_parser::wff_t).has_value()) return true;
 		}
 	}
