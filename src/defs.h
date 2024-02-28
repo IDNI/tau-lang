@@ -47,4 +47,17 @@ template<typename T, typename V> bool has(const T& t, const V& v) {
 template<typename T, typename V> bool hasv(const T& t, const V& v) {
 	return std::find(t.begin(), t.end(), v) != t.end();
 }
+
+//-----------------------------------------------------------------------------
+// GIT_* macros are populated at compile time by -D or they're set to "n/a"
+#ifndef GIT_DESCRIBED
+#define GIT_DESCRIBED   "n/a"
+#endif
+#ifndef GIT_COMMIT_HASH
+#define GIT_COMMIT_HASH "n/a"
+#endif
+#ifndef GIT_BRANCH
+#define GIT_BRANCH      "n/a"
+#endif
+
 #endif // __DEF_H__
