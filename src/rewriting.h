@@ -894,13 +894,13 @@ auto drop_location = [](const parse_symbol_t& n) -> symbol_t { return n.first; }
 template <typename parse_symbol_t, typename symbol_t>
 using drop_location_t = decltype(drop_location<parse_symbol_t, symbol_t>);
 
-// make a tree from the given source code forest.
+// make a tree from the given source code forest and provided root node.
 template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 	typename symbol_t>
 sp_node<symbol_t> make_node_from_forest(const transformer_t& /*transformer*/,
-	forest<parse_symbol_t>* f)
+	forest<parse_symbol_t>* f, const parse_symbol_t& root)
 {
-	auto t = f->get_tree();
+	auto t = f->get_tree(root);
 	using sp_parse_tree = decltype(t);
 
 	map_transformer<
@@ -916,6 +916,16 @@ sp_node<symbol_t> make_node_from_forest(const transformer_t& /*transformer*/,
 		all_t<sp_parse_tree>,
 		sp_parse_tree,
 		sp_node<symbol_t>>(transform, all<sp_parse_tree>)(t);
+}
+
+// make a tree from the given source code forest.
+template<typename parser_t, typename transformer_t, typename parse_symbol_t,
+	typename symbol_t>
+sp_node<symbol_t> make_node_from_forest(const transformer_t& transformer,
+	forest<parse_symbol_t>* f)
+{
+	return make_node_from_forest<parser_t, transformer_t, parse_symbol_t,
+		symbol_t>(transformer, f, f->root());
 }
 
 // make a tree from the given source code string.
