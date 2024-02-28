@@ -23,7 +23,7 @@ struct tau_parser {
 			const std::vector<terminal_type>&)>;
 	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(251), cc), p(g, load_opts()) {}
+		g(nts, load_prods(), nt(240), cc), p(g, load_opts()) {}
 	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,
 		parse_options po = {}) { return p.parse(data, size, po); }
 	std::unique_ptr<forest_type> parse(std::basic_istream<char_type>& is,
@@ -37,41 +37,40 @@ struct tau_parser {
 	bool found(int start = -1) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
-		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, eol, 
-		ws_comment, _Rws_comment_0, _Rws_comment_1, ws_required, ws, hex_escape, unicode_escape, char_escape_encode, esc, q_char, 
-		q_str, q_bqstr, char_punct, _Rchar_punct_2, _Rchar_punct_3, _Rchar_punct_4, char0, char_, string_char, bqstring_char, 
-		chars, _Rchars_5, _Rchars_6, digits, _Rdigits_7, bf_def, wff_def, tau_def, dot, open_parenthesis, 
-		close_parenthesis, open_bracket, close_bracket, open_brace, close_brace, minus, colon, semicolon, less, comma, 
-		sym, offsets, offset, _Roffsets_8, _Roffsets_9, num, capture, shift, variable, io_var, 
-		_Roffset_10, _Rshift_11, _Rshift_12, var, in, out, in_var_name, out_var_name, bool_variable, capture_var, 
-		tau_rule, tau_matcher, tau_body, tau, tau_collapse_positives_cb, tau_positives_upwards_cb, tau_rec_relation, tau_and, tau_neg, tau_or, 
-		tau_wff, _Rtau_rec_relation_13, tau_ref, tau_ref_args, _Rtau_ref_args_14, _Rtau_ref_args_15, _Rtau_ref_args_16, tau_and_sym, tau_or_sym, tau_neg_sym, 
-		wff, wff_rule, wff_matcher, wff_body, bf_eq_cb, bf_neq_cb, wff_has_clashing_subformulas_cb, wff_has_subformula_cb, wff_remove_existential_cb, wff_remove_bexistential_cb, 
-		wff_remove_buniversal_cb, wff_rec_relation, wff_and, wff_neg, wff_xor, wff_conditional, wff_or, wff_all, wff_ex, wff_imply, 
-		wff_equiv, wff_t, wff_f, wff_ball, wff_bex, bf_eq, bf_neq, bf_less, bf_less_equal, bf_greater, 
-		bf_segment, bf_not_less_equal, _Rwff_rec_relation_17, wff_ref, wff_ref_args, _Rwff_ref_args_18, _Rwff_ref_args_19, _Rwff_ref_args_20, wff_and_sym, wff_or_sym, 
-		wff_xor_sym, wff_conditional_sym, wff_neg_sym, wff_imply_sym, wff_equiv_sym, wff_all_sym, _Rwff_all_21, wff_ex_sym, _Rwff_ex_22, wff_ball_sym, 
-		_Rwff_ball_23, wff_bex_sym, _Rwff_bex_24, bf, bf_equality_sym, bf_nequality_sym, bf_less_sym, bf_less_equal_sym, bf_not_less_equal_sym, bf_greater_sym, 
-		bf_rule, bf_matcher, bf_body, bf_is_zero_cb, bf_is_one_cb, bf_has_clashing_subformulas_cb, bf_has_subformula_cb, bf_remove_funiversal_cb, bf_remove_fexistential_cb, bf_and_cb, 
-		bf_or_cb, bf_xor_cb, bf_neg_cb, bf_ref, bf_constant, bf_and, bf_neg, bf_xor, bf_or, bf_all, 
-		bf_ex, bf_t, bf_f, bf_splitter, bf_rec_relation, _Rbf_rec_relation_25, bf_ref_args, _Rbf_ref_args_26, _Rbf_ref_args_27, _Rbf_ref_args_28, 
-		bf_and_sym, bf_or_sym, bf_xor_sym, bf_neg_sym, bf_all_sym, _Rbf_all_29, bf_ex_sym, _Rbf_ex_30, bf_splitter_sym, constant, 
-		binding, source_binding, named_binding, type, source, source0, _Rsource_31, _Rsource_32, bf_and_cb_sym, bf_cb_arg, 
-		bf_or_cb_sym, bf_xor_cb_sym, bf_neg_cb_sym, bf_eq_cb_sym, wff_cb_arg, bf_neq_cb_sym, bf_is_zero_cb_sym, bf_is_one_cb_sym, bf_remove_funiversal_cb_sym, bf_remove_fexistential_cb_sym, 
-		wff_remove_existential_cb_sym, wff_remove_bexistential_cb_sym, wff_remove_buniversal_cb_sym, bf_has_clashing_subformulas_cb_sym, wff_has_clashing_subformulas_cb_sym, bf_has_subformula_cb_sym, wff_has_subformula_cb_sym, tau_collapse_positives_cb_sym, tau_cb_arg, _Rtau_collapse_positives_cb_33, 
-		_Rtau_collapse_positives_cb_34, tau_positives_upwards_cb_sym, inputs, input, _Rinputs_35, _Rinputs_36, builder, builder_head, builder_body, _Rbuilder_head_37, 
-		_Rbuilder_head_38, bf_builder_body, wff_builder_body, tau_builder_body, library, rules, rule, _Rrules_39, _Rrules_40, nso_rr, 
-		nso_rec_relations, nso_main, nso_rec_relation, _Rnso_rec_relations_41, _Rnso_rec_relations_42, gssotc_rr, gssotc_rec_relations, gssotc_main, gssotc_rec_relation, _Rgssotc_rec_relations_43, 
-		_Rgssotc_rec_relations_44, start, _Rstart_45, cli, normalize, bf_substitute, wff_substitute, bf_instantiate, wff_instantiate, file, 
-		rr_nso, help, version, normalize_sym, q_nso_rr, q_wff, output, wff_selection, _Rnormalize_46, file_sym, 
-		instantiate_sym, q_var, bf_var_selection, _Rbf_instantiate_47, ws_rewuired, q_bf, bf_selection, _Rbf_instantiate_48, _Rbf_instantiate_49, wff_var_selection, 
-		_Rwff_instantiate_50, _Rwff_instantiate_51, _Rwff_instantiate_52, substitute_sym, _Rbf_substitute_53, _Rbf_substitute_54, _Rwff_substitute_55, _Rwff_substitute_56, help_sym, version_sym, 
-		selection_sym, output_sym, __neg_0, __neg_1, __neg_2, __neg_3, __neg_4, __neg_5, __neg_6, __neg_7, 
-		__neg_8, __neg_9, __neg_10, __neg_11, __neg_12, __neg_13, __neg_14, __neg_15, __neg_16, __neg_17, 
-		__neg_18, __neg_19, __neg_20, __neg_21, __neg_22, __neg_23, __neg_24, __neg_25, __neg_26, __neg_27, 
-		__neg_28, __neg_29, __neg_30, __neg_31, __neg_32, __neg_33, __neg_34, __neg_35, __neg_36, __neg_37, 
-		__neg_38, __neg_39, __neg_40, __neg_41, __neg_42, __neg_43, __neg_44, __neg_45, __neg_46, __neg_47, 
-		__neg_48, 
+		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, comment, 
+		_Rcomment_0, _Rcomment_1, _Rcomment_2, __, _R___3, _, _R__4, bf_def, wff_def, tau_def, 
+		dot, open_parenthesis, close_parenthesis, open_bracket, close_bracket, open_brace, close_brace, minus, colon, semicolon, 
+		less, comma, apostrophe, quote, chars, _Rchars_5, _Rchars_6, digits, _Rdigits_7, sym, 
+		offsets, offset, _Roffsets_8, _Roffsets_9, num, capture, shift, variable, io_var, _Roffset_10, 
+		_Rshift_11, _Rshift_12, var, in, out, in_var_name, out_var_name, bool_variable, capture_var, tau_rule, 
+		tau_matcher, tau_body, tau, tau_collapse_positives_cb, tau_positives_upwards_cb, tau_rec_relation, tau_and, tau_neg, tau_or, tau_wff, 
+		_Rtau_rec_relation_13, tau_ref, tau_ref_args, _Rtau_ref_args_14, _Rtau_ref_args_15, _Rtau_ref_args_16, tau_and_sym, tau_or_sym, tau_neg_sym, wff, 
+		wff_rule, wff_matcher, wff_body, bf_eq_cb, bf_neq_cb, wff_has_clashing_subformulas_cb, wff_has_subformula_cb, wff_remove_existential_cb, wff_remove_bexistential_cb, wff_remove_buniversal_cb, 
+		wff_rec_relation, wff_and, wff_neg, wff_xor, wff_conditional, wff_or, wff_all, wff_ex, wff_imply, wff_equiv, 
+		wff_t, wff_f, wff_ball, wff_bex, bf_eq, bf_neq, bf_less, bf_less_equal, bf_greater, bf_segment, 
+		bf_not_less_equal, _Rwff_rec_relation_17, wff_ref, wff_ref_args, _Rwff_ref_args_18, _Rwff_ref_args_19, _Rwff_ref_args_20, wff_and_sym, wff_or_sym, wff_xor_sym, 
+		wff_conditional_sym, wff_neg_sym, wff_imply_sym, wff_equiv_sym, wff_all_sym, _Rwff_all_21, wff_ex_sym, _Rwff_ex_22, wff_ball_sym, _Rwff_ball_23, 
+		wff_bex_sym, _Rwff_bex_24, bf, bf_equality_sym, bf_nequality_sym, bf_less_sym, bf_less_equal_sym, bf_not_less_equal_sym, bf_greater_sym, bf_rule, 
+		bf_matcher, bf_body, bf_is_zero_cb, bf_is_one_cb, bf_has_clashing_subformulas_cb, bf_has_subformula_cb, bf_remove_funiversal_cb, bf_remove_fexistential_cb, bf_and_cb, bf_or_cb, 
+		bf_xor_cb, bf_neg_cb, bf_ref, bf_constant, bf_and, bf_neg, bf_xor, bf_or, bf_all, bf_ex, 
+		bf_t, bf_f, bf_splitter, bf_rec_relation, _Rbf_rec_relation_25, bf_ref_args, _Rbf_ref_args_26, _Rbf_ref_args_27, _Rbf_ref_args_28, bf_and_sym, 
+		bf_or_sym, bf_xor_sym, bf_neg_sym, bf_all_sym, _Rbf_all_29, bf_ex_sym, _Rbf_ex_30, bf_splitter_sym, constant, binding, 
+		source_binding, named_binding, type, source, source0, _Rsource_31, _Rsource_32, bf_and_cb_sym, bf_cb_arg, bf_or_cb_sym, 
+		bf_xor_cb_sym, bf_neg_cb_sym, bf_eq_cb_sym, wff_cb_arg, bf_neq_cb_sym, bf_is_zero_cb_sym, bf_is_one_cb_sym, bf_remove_funiversal_cb_sym, bf_remove_fexistential_cb_sym, wff_remove_existential_cb_sym, 
+		wff_remove_bexistential_cb_sym, wff_remove_buniversal_cb_sym, bf_has_clashing_subformulas_cb_sym, wff_has_clashing_subformulas_cb_sym, bf_has_subformula_cb_sym, wff_has_subformula_cb_sym, tau_collapse_positives_cb_sym, tau_cb_arg, _Rtau_collapse_positives_cb_33, _Rtau_collapse_positives_cb_34, 
+		tau_positives_upwards_cb_sym, inputs, input, _Rinputs_35, _Rinputs_36, builder, builder_head, builder_body, _Rbuilder_head_37, _Rbuilder_head_38, 
+		bf_builder_body, wff_builder_body, tau_builder_body, library, rules, rule, _Rrules_39, _Rrules_40, nso_rr, nso_rec_relations, 
+		nso_main, nso_rec_relation, _Rnso_rec_relations_41, _Rnso_rec_relations_42, gssotc_rr, gssotc_rec_relations, gssotc_main, gssotc_rec_relation, _Rgssotc_rec_relations_43, _Rgssotc_rec_relations_44, 
+		start, _Rstart_45, cli, cli_command, _Rcli_46, _Rcli_47, _Rcli_48, normalize, bf_substitute, wff_substitute, 
+		bf_instantiate, wff_instantiate, file, rr_nso, help, version, quit, _Rcli_command_49, normalize_sym, q_nso_rr, 
+		q_wff, output, wff_selection, _Rnormalize_50, file_sym, instantiate_sym, q_var, bf_var_selection, _Rbf_instantiate_51, q_bf, 
+		bf_selection, _Rbf_instantiate_52, _Rbf_instantiate_53, wff_var_selection, _Rwff_instantiate_54, _Rwff_instantiate_55, _Rwff_instantiate_56, substitute_sym, _Rbf_substitute_57, _Rbf_substitute_58, 
+		_Rwff_substitute_59, _Rwff_substitute_60, help_sym, cli_cmd, _Rhelp_61, version_sym, quit_sym, selection_sym, output_sym, __neg_0, 
+		__neg_1, __neg_2, __neg_3, __neg_4, __neg_5, __neg_6, __neg_7, __neg_8, __neg_9, __neg_10, 
+		__neg_11, __neg_12, __neg_13, __neg_14, __neg_15, __neg_16, __neg_17, __neg_18, __neg_19, __neg_20, 
+		__neg_21, __neg_22, __neg_23, __neg_24, __neg_25, __neg_26, __neg_27, __neg_28, __neg_29, __neg_30, 
+		__neg_31, __neg_32, __neg_33, __neg_34, __neg_35, __neg_36, __neg_37, __neg_38, __neg_39, __neg_40, 
+		__neg_41, __neg_42, __neg_43, __neg_44, __neg_45, 
 	};
 	size_t id(const std::basic_string<char_type>& name) {
 		return nts.get(name);
@@ -81,13 +80,12 @@ struct tau_parser {
 	}
 private:
 	std::vector<terminal_type> ts{
-		'\0', '\n', '\r', '\t', '#', '\\', 'x', 'u', '\'', 
-		'"', '`', ':', '=', '.', '(', ')', '[', ']', '{', 
-		'}', '-', ';', '<', ',', '?', '$', 'i', '_', 'o', 
-		'&', '|', '!', '^', '>', 'a', 'l', 'e', 'b', 'T', 
-		'F', '+', '~', 'f', 'S', '1', '0', 'h', 's', 'c', 
-		'n', 'g', 'r', 'm', 'w', 'v', 't', 'd', 'q', 'z', 
-		'p', 
+		'\0', '\t', '\n', '\r', '#', ':', '=', '.', '(', 
+		')', '[', ']', '{', '}', '-', ';', '<', ',', '\'', 
+		'"', '?', '$', 'i', '_', 'o', '&', '|', '!', '^', 
+		'>', 'a', 'l', 'e', 'x', 'b', 'T', 'F', '+', '~', 
+		'f', 'S', '1', '0', 'h', 's', 'c', 'n', 'g', 'u', 
+		'r', 'm', 'w', 'v', 't', 'd', 'q', 'z', 'p', 
 	};
 	idni::nonterminals<char_type, terminal_type> nts{};
 	idni::char_class_fns<terminal_type> cc;
@@ -103,41 +101,40 @@ private:
 	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
 		idni::nonterminals<char_type, terminal_type> nts{};
 		for (const auto& nt : {
-			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "eol", 
-			"ws_comment", "_Rws_comment_0", "_Rws_comment_1", "ws_required", "ws", "hex_escape", "unicode_escape", "char_escape_encode", "esc", "q_char", 
-			"q_str", "q_bqstr", "char_punct", "_Rchar_punct_2", "_Rchar_punct_3", "_Rchar_punct_4", "char0", "char_", "string_char", "bqstring_char", 
-			"chars", "_Rchars_5", "_Rchars_6", "digits", "_Rdigits_7", "bf_def", "wff_def", "tau_def", "dot", "open_parenthesis", 
-			"close_parenthesis", "open_bracket", "close_bracket", "open_brace", "close_brace", "minus", "colon", "semicolon", "less", "comma", 
-			"sym", "offsets", "offset", "_Roffsets_8", "_Roffsets_9", "num", "capture", "shift", "variable", "io_var", 
-			"_Roffset_10", "_Rshift_11", "_Rshift_12", "var", "in", "out", "in_var_name", "out_var_name", "bool_variable", "capture_var", 
-			"tau_rule", "tau_matcher", "tau_body", "tau", "tau_collapse_positives_cb", "tau_positives_upwards_cb", "tau_rec_relation", "tau_and", "tau_neg", "tau_or", 
-			"tau_wff", "_Rtau_rec_relation_13", "tau_ref", "tau_ref_args", "_Rtau_ref_args_14", "_Rtau_ref_args_15", "_Rtau_ref_args_16", "tau_and_sym", "tau_or_sym", "tau_neg_sym", 
-			"wff", "wff_rule", "wff_matcher", "wff_body", "bf_eq_cb", "bf_neq_cb", "wff_has_clashing_subformulas_cb", "wff_has_subformula_cb", "wff_remove_existential_cb", "wff_remove_bexistential_cb", 
-			"wff_remove_buniversal_cb", "wff_rec_relation", "wff_and", "wff_neg", "wff_xor", "wff_conditional", "wff_or", "wff_all", "wff_ex", "wff_imply", 
-			"wff_equiv", "wff_t", "wff_f", "wff_ball", "wff_bex", "bf_eq", "bf_neq", "bf_less", "bf_less_equal", "bf_greater", 
-			"bf_segment", "bf_not_less_equal", "_Rwff_rec_relation_17", "wff_ref", "wff_ref_args", "_Rwff_ref_args_18", "_Rwff_ref_args_19", "_Rwff_ref_args_20", "wff_and_sym", "wff_or_sym", 
-			"wff_xor_sym", "wff_conditional_sym", "wff_neg_sym", "wff_imply_sym", "wff_equiv_sym", "wff_all_sym", "_Rwff_all_21", "wff_ex_sym", "_Rwff_ex_22", "wff_ball_sym", 
-			"_Rwff_ball_23", "wff_bex_sym", "_Rwff_bex_24", "bf", "bf_equality_sym", "bf_nequality_sym", "bf_less_sym", "bf_less_equal_sym", "bf_not_less_equal_sym", "bf_greater_sym", 
-			"bf_rule", "bf_matcher", "bf_body", "bf_is_zero_cb", "bf_is_one_cb", "bf_has_clashing_subformulas_cb", "bf_has_subformula_cb", "bf_remove_funiversal_cb", "bf_remove_fexistential_cb", "bf_and_cb", 
-			"bf_or_cb", "bf_xor_cb", "bf_neg_cb", "bf_ref", "bf_constant", "bf_and", "bf_neg", "bf_xor", "bf_or", "bf_all", 
-			"bf_ex", "bf_t", "bf_f", "bf_splitter", "bf_rec_relation", "_Rbf_rec_relation_25", "bf_ref_args", "_Rbf_ref_args_26", "_Rbf_ref_args_27", "_Rbf_ref_args_28", 
-			"bf_and_sym", "bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_all_sym", "_Rbf_all_29", "bf_ex_sym", "_Rbf_ex_30", "bf_splitter_sym", "constant", 
-			"binding", "source_binding", "named_binding", "type", "source", "source0", "_Rsource_31", "_Rsource_32", "bf_and_cb_sym", "bf_cb_arg", 
-			"bf_or_cb_sym", "bf_xor_cb_sym", "bf_neg_cb_sym", "bf_eq_cb_sym", "wff_cb_arg", "bf_neq_cb_sym", "bf_is_zero_cb_sym", "bf_is_one_cb_sym", "bf_remove_funiversal_cb_sym", "bf_remove_fexistential_cb_sym", 
-			"wff_remove_existential_cb_sym", "wff_remove_bexistential_cb_sym", "wff_remove_buniversal_cb_sym", "bf_has_clashing_subformulas_cb_sym", "wff_has_clashing_subformulas_cb_sym", "bf_has_subformula_cb_sym", "wff_has_subformula_cb_sym", "tau_collapse_positives_cb_sym", "tau_cb_arg", "_Rtau_collapse_positives_cb_33", 
-			"_Rtau_collapse_positives_cb_34", "tau_positives_upwards_cb_sym", "inputs", "input", "_Rinputs_35", "_Rinputs_36", "builder", "builder_head", "builder_body", "_Rbuilder_head_37", 
-			"_Rbuilder_head_38", "bf_builder_body", "wff_builder_body", "tau_builder_body", "library", "rules", "rule", "_Rrules_39", "_Rrules_40", "nso_rr", 
-			"nso_rec_relations", "nso_main", "nso_rec_relation", "_Rnso_rec_relations_41", "_Rnso_rec_relations_42", "gssotc_rr", "gssotc_rec_relations", "gssotc_main", "gssotc_rec_relation", "_Rgssotc_rec_relations_43", 
-			"_Rgssotc_rec_relations_44", "start", "_Rstart_45", "cli", "normalize", "bf_substitute", "wff_substitute", "bf_instantiate", "wff_instantiate", "file", 
-			"rr_nso", "help", "version", "normalize_sym", "q_nso_rr", "q_wff", "output", "wff_selection", "_Rnormalize_46", "file_sym", 
-			"instantiate_sym", "q_var", "bf_var_selection", "_Rbf_instantiate_47", "ws_rewuired", "q_bf", "bf_selection", "_Rbf_instantiate_48", "_Rbf_instantiate_49", "wff_var_selection", 
-			"_Rwff_instantiate_50", "_Rwff_instantiate_51", "_Rwff_instantiate_52", "substitute_sym", "_Rbf_substitute_53", "_Rbf_substitute_54", "_Rwff_substitute_55", "_Rwff_substitute_56", "help_sym", "version_sym", 
-			"selection_sym", "output_sym", "__neg_0", "__neg_1", "__neg_2", "__neg_3", "__neg_4", "__neg_5", "__neg_6", "__neg_7", 
-			"__neg_8", "__neg_9", "__neg_10", "__neg_11", "__neg_12", "__neg_13", "__neg_14", "__neg_15", "__neg_16", "__neg_17", 
-			"__neg_18", "__neg_19", "__neg_20", "__neg_21", "__neg_22", "__neg_23", "__neg_24", "__neg_25", "__neg_26", "__neg_27", 
-			"__neg_28", "__neg_29", "__neg_30", "__neg_31", "__neg_32", "__neg_33", "__neg_34", "__neg_35", "__neg_36", "__neg_37", 
-			"__neg_38", "__neg_39", "__neg_40", "__neg_41", "__neg_42", "__neg_43", "__neg_44", "__neg_45", "__neg_46", "__neg_47", 
-			"__neg_48", 
+			"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "comment", 
+			"_Rcomment_0", "_Rcomment_1", "_Rcomment_2", "__", "_R___3", "_", "_R__4", "bf_def", "wff_def", "tau_def", 
+			"dot", "open_parenthesis", "close_parenthesis", "open_bracket", "close_bracket", "open_brace", "close_brace", "minus", "colon", "semicolon", 
+			"less", "comma", "apostrophe", "quote", "chars", "_Rchars_5", "_Rchars_6", "digits", "_Rdigits_7", "sym", 
+			"offsets", "offset", "_Roffsets_8", "_Roffsets_9", "num", "capture", "shift", "variable", "io_var", "_Roffset_10", 
+			"_Rshift_11", "_Rshift_12", "var", "in", "out", "in_var_name", "out_var_name", "bool_variable", "capture_var", "tau_rule", 
+			"tau_matcher", "tau_body", "tau", "tau_collapse_positives_cb", "tau_positives_upwards_cb", "tau_rec_relation", "tau_and", "tau_neg", "tau_or", "tau_wff", 
+			"_Rtau_rec_relation_13", "tau_ref", "tau_ref_args", "_Rtau_ref_args_14", "_Rtau_ref_args_15", "_Rtau_ref_args_16", "tau_and_sym", "tau_or_sym", "tau_neg_sym", "wff", 
+			"wff_rule", "wff_matcher", "wff_body", "bf_eq_cb", "bf_neq_cb", "wff_has_clashing_subformulas_cb", "wff_has_subformula_cb", "wff_remove_existential_cb", "wff_remove_bexistential_cb", "wff_remove_buniversal_cb", 
+			"wff_rec_relation", "wff_and", "wff_neg", "wff_xor", "wff_conditional", "wff_or", "wff_all", "wff_ex", "wff_imply", "wff_equiv", 
+			"wff_t", "wff_f", "wff_ball", "wff_bex", "bf_eq", "bf_neq", "bf_less", "bf_less_equal", "bf_greater", "bf_segment", 
+			"bf_not_less_equal", "_Rwff_rec_relation_17", "wff_ref", "wff_ref_args", "_Rwff_ref_args_18", "_Rwff_ref_args_19", "_Rwff_ref_args_20", "wff_and_sym", "wff_or_sym", "wff_xor_sym", 
+			"wff_conditional_sym", "wff_neg_sym", "wff_imply_sym", "wff_equiv_sym", "wff_all_sym", "_Rwff_all_21", "wff_ex_sym", "_Rwff_ex_22", "wff_ball_sym", "_Rwff_ball_23", 
+			"wff_bex_sym", "_Rwff_bex_24", "bf", "bf_equality_sym", "bf_nequality_sym", "bf_less_sym", "bf_less_equal_sym", "bf_not_less_equal_sym", "bf_greater_sym", "bf_rule", 
+			"bf_matcher", "bf_body", "bf_is_zero_cb", "bf_is_one_cb", "bf_has_clashing_subformulas_cb", "bf_has_subformula_cb", "bf_remove_funiversal_cb", "bf_remove_fexistential_cb", "bf_and_cb", "bf_or_cb", 
+			"bf_xor_cb", "bf_neg_cb", "bf_ref", "bf_constant", "bf_and", "bf_neg", "bf_xor", "bf_or", "bf_all", "bf_ex", 
+			"bf_t", "bf_f", "bf_splitter", "bf_rec_relation", "_Rbf_rec_relation_25", "bf_ref_args", "_Rbf_ref_args_26", "_Rbf_ref_args_27", "_Rbf_ref_args_28", "bf_and_sym", 
+			"bf_or_sym", "bf_xor_sym", "bf_neg_sym", "bf_all_sym", "_Rbf_all_29", "bf_ex_sym", "_Rbf_ex_30", "bf_splitter_sym", "constant", "binding", 
+			"source_binding", "named_binding", "type", "source", "source0", "_Rsource_31", "_Rsource_32", "bf_and_cb_sym", "bf_cb_arg", "bf_or_cb_sym", 
+			"bf_xor_cb_sym", "bf_neg_cb_sym", "bf_eq_cb_sym", "wff_cb_arg", "bf_neq_cb_sym", "bf_is_zero_cb_sym", "bf_is_one_cb_sym", "bf_remove_funiversal_cb_sym", "bf_remove_fexistential_cb_sym", "wff_remove_existential_cb_sym", 
+			"wff_remove_bexistential_cb_sym", "wff_remove_buniversal_cb_sym", "bf_has_clashing_subformulas_cb_sym", "wff_has_clashing_subformulas_cb_sym", "bf_has_subformula_cb_sym", "wff_has_subformula_cb_sym", "tau_collapse_positives_cb_sym", "tau_cb_arg", "_Rtau_collapse_positives_cb_33", "_Rtau_collapse_positives_cb_34", 
+			"tau_positives_upwards_cb_sym", "inputs", "input", "_Rinputs_35", "_Rinputs_36", "builder", "builder_head", "builder_body", "_Rbuilder_head_37", "_Rbuilder_head_38", 
+			"bf_builder_body", "wff_builder_body", "tau_builder_body", "library", "rules", "rule", "_Rrules_39", "_Rrules_40", "nso_rr", "nso_rec_relations", 
+			"nso_main", "nso_rec_relation", "_Rnso_rec_relations_41", "_Rnso_rec_relations_42", "gssotc_rr", "gssotc_rec_relations", "gssotc_main", "gssotc_rec_relation", "_Rgssotc_rec_relations_43", "_Rgssotc_rec_relations_44", 
+			"start", "_Rstart_45", "cli", "cli_command", "_Rcli_46", "_Rcli_47", "_Rcli_48", "normalize", "bf_substitute", "wff_substitute", 
+			"bf_instantiate", "wff_instantiate", "file", "rr_nso", "help", "version", "quit", "_Rcli_command_49", "normalize_sym", "q_nso_rr", 
+			"q_wff", "output", "wff_selection", "_Rnormalize_50", "file_sym", "instantiate_sym", "q_var", "bf_var_selection", "_Rbf_instantiate_51", "q_bf", 
+			"bf_selection", "_Rbf_instantiate_52", "_Rbf_instantiate_53", "wff_var_selection", "_Rwff_instantiate_54", "_Rwff_instantiate_55", "_Rwff_instantiate_56", "substitute_sym", "_Rbf_substitute_57", "_Rbf_substitute_58", 
+			"_Rwff_substitute_59", "_Rwff_substitute_60", "help_sym", "cli_cmd", "_Rhelp_61", "version_sym", "quit_sym", "selection_sym", "output_sym", "__neg_0", 
+			"__neg_1", "__neg_2", "__neg_3", "__neg_4", "__neg_5", "__neg_6", "__neg_7", "__neg_8", "__neg_9", "__neg_10", 
+			"__neg_11", "__neg_12", "__neg_13", "__neg_14", "__neg_15", "__neg_16", "__neg_17", "__neg_18", "__neg_19", "__neg_20", 
+			"__neg_21", "__neg_22", "__neg_23", "__neg_24", "__neg_25", "__neg_26", "__neg_27", "__neg_28", "__neg_29", "__neg_30", 
+			"__neg_31", "__neg_32", "__neg_33", "__neg_34", "__neg_35", "__neg_36", "__neg_37", "__neg_38", "__neg_39", "__neg_40", 
+			"__neg_41", "__neg_42", "__neg_43", "__neg_44", "__neg_45", 
 		}) nts.get(nt);
 		return nts;
 	}
@@ -160,970 +157,976 @@ private:
 	idni::prods<char_type, terminal_type> load_prods() {
 		idni::prods<char_type, terminal_type> q,
 			nul(symbol_type{});
-		// eol => '\n'.
-		q(nt(9), (t(1)));
-		// eol => '\r'.
-		q(nt(9), (t(2)));
-		// eol => eof.
-		q(nt(9), (nt(1)));
-		// _Rws_comment_0 => '\t'.
-		q(nt(11), (t(3)));
-		// _Rws_comment_0 => printable.
-		q(nt(11), (nt(8)));
-		// _Rws_comment_1 => null.
-		q(nt(12), (nul));
-		// _Rws_comment_1 => _Rws_comment_0 _Rws_comment_1.
-		q(nt(12), (nt(11)+nt(12)));
-		// ws_comment => '#' _Rws_comment_1 eol.
-		q(nt(10), (t(4)+nt(12)+nt(9)));
-		// ws_required => space ws.
-		q(nt(13), (nt(2)+nt(14)));
-		// ws_required => ws_comment ws.
-		q(nt(13), (nt(10)+nt(14)));
-		// ws => null.
-		q(nt(14), (nul));
-		// ws => ws_required.
-		q(nt(14), (nt(13)));
-		// hex_escape => '\\' '\\' 'x' xdigit xdigit.
-		q(nt(15), (t(5)+t(5)+t(6)+nt(4)+nt(4)));
-		// unicode_escape => '\\' '\\' 'u' xdigit xdigit xdigit xdigit.
-		q(nt(16), (t(5)+t(5)+t(7)+nt(4)+nt(4)+nt(4)+nt(4)));
-		// char_escape_encode => hex_escape.
-		q(nt(17), (nt(15)));
-		// char_escape_encode => unicode_escape.
-		q(nt(17), (nt(16)));
-		// esc => '\\' '\\' '\\' '\\'.
-		q(nt(18), (t(5)+t(5)+t(5)+t(5)));
-		// q_char => '\''.
-		q(nt(19), (t(8)));
-		// q_str => '"'.
-		q(nt(20), (t(9)));
-		// q_bqstr => '`'.
-		q(nt(21), (t(10)));
-		// _Rchar_punct_2 => esc q_char.
-		q(nt(23), (nt(18)+nt(19)));
-		// _Rchar_punct_3 => esc q_str.
-		q(nt(24), (nt(18)+nt(20)));
-		// _Rchar_punct_4 => esc q_bqstr.
-		q(nt(25), (nt(18)+nt(21)));
-		// __neg_0 => q_char.
-		q(nt(292), (nt(19)));
-		// __neg_1 => q_str.
-		q(nt(293), (nt(20)));
-		// __neg_2 => q_bqstr.
-		q(nt(294), (nt(21)));
-		// __neg_3 => _Rchar_punct_2.
-		q(nt(295), (nt(23)));
-		// __neg_4 => _Rchar_punct_3.
-		q(nt(296), (nt(24)));
-		// __neg_5 => _Rchar_punct_4.
-		q(nt(297), (nt(25)));
-		// char_punct => punct & ~( __neg_0 ) & ~( __neg_1 ) & ~( __neg_2 ) & ~( __neg_3 ) & ~( __neg_4 ) & ~( __neg_5 ).
-		q(nt(22), (nt(7)) & ~(nt(292)) & ~(nt(293)) & ~(nt(294)) & ~(nt(295)) & ~(nt(296)) & ~(nt(297)));
-		// char0 => space.
-		q(nt(26), (nt(2)));
-		// char0 => alnum.
-		q(nt(26), (nt(6)));
-		// char0 => char_escape_encode.
-		q(nt(26), (nt(17)));
-		// char0 => char_punct.
-		q(nt(26), (nt(22)));
-		// char_ => esc q_char.
-		q(nt(27), (nt(18)+nt(19)));
-		// char_ => q_str.
-		q(nt(27), (nt(20)));
-		// char_ => q_bqstr.
-		q(nt(27), (nt(21)));
-		// char_ => char0.
-		q(nt(27), (nt(26)));
-		// string_char => esc q_str.
-		q(nt(28), (nt(18)+nt(20)));
-		// string_char => q_char.
-		q(nt(28), (nt(19)));
-		// string_char => q_bqstr.
-		q(nt(28), (nt(21)));
-		// string_char => char0.
-		q(nt(28), (nt(26)));
-		// bqstring_char => esc q_bqstr.
-		q(nt(29), (nt(18)+nt(21)));
-		// bqstring_char => q_char.
-		q(nt(29), (nt(19)));
-		// bqstring_char => q_str.
-		q(nt(29), (nt(20)));
-		// bqstring_char => char0.
-		q(nt(29), (nt(26)));
-		// _Rchars_5 => alnum.
-		q(nt(31), (nt(6)));
-		// _Rchars_6 => null.
-		q(nt(32), (nul));
-		// _Rchars_6 => _Rchars_5 _Rchars_6.
-		q(nt(32), (nt(31)+nt(32)));
-		// chars => alpha _Rchars_6.
-		q(nt(30), (nt(5)+nt(32)));
-		// _Rdigits_7 => digit.
-		q(nt(34), (nt(3)));
-		// _Rdigits_7 => digit _Rdigits_7.
-		q(nt(34), (nt(3)+nt(34)));
-		// digits => _Rdigits_7.
-		q(nt(33), (nt(34)));
+		// _Rcomment_0 => '\t'.
+		q(nt(10), (t(1)));
+		// _Rcomment_0 => printable.
+		q(nt(10), (nt(8)));
+		// _Rcomment_1 => null.
+		q(nt(11), (nul));
+		// _Rcomment_1 => _Rcomment_0 _Rcomment_1.
+		q(nt(11), (nt(10)+nt(11)));
+		// _Rcomment_2 => '\n'.
+		q(nt(12), (t(2)));
+		// _Rcomment_2 => '\r'.
+		q(nt(12), (t(3)));
+		// _Rcomment_2 => eof.
+		q(nt(12), (nt(1)));
+		// comment => '#' _Rcomment_1 _Rcomment_2.
+		q(nt(9), (t(4)+nt(11)+nt(12)));
+		// _R___3 => space.
+		q(nt(14), (nt(2)));
+		// _R___3 => comment.
+		q(nt(14), (nt(9)));
+		// __ => _R___3 _.
+		q(nt(13), (nt(14)+nt(15)));
+		// _R__4 => null.
+		q(nt(16), (nul));
+		// _R__4 => __.
+		q(nt(16), (nt(13)));
+		// _ => _R__4.
+		q(nt(15), (nt(16)));
 		// bf_def => ':' '='.
-		q(nt(35), (t(11)+t(12)));
+		q(nt(17), (t(5)+t(6)));
 		// wff_def => ':' ':' '='.
-		q(nt(36), (t(11)+t(11)+t(12)));
+		q(nt(18), (t(5)+t(5)+t(6)));
 		// tau_def => ':' ':' ':' '='.
-		q(nt(37), (t(11)+t(11)+t(11)+t(12)));
+		q(nt(19), (t(5)+t(5)+t(5)+t(6)));
 		// dot => '.'.
-		q(nt(38), (t(13)));
+		q(nt(20), (t(7)));
 		// open_parenthesis => '('.
-		q(nt(39), (t(14)));
+		q(nt(21), (t(8)));
 		// close_parenthesis => ')'.
-		q(nt(40), (t(15)));
+		q(nt(22), (t(9)));
 		// open_bracket => '['.
-		q(nt(41), (t(16)));
+		q(nt(23), (t(10)));
 		// close_bracket => ']'.
-		q(nt(42), (t(17)));
+		q(nt(24), (t(11)));
 		// open_brace => '{'.
-		q(nt(43), (t(18)));
+		q(nt(25), (t(12)));
 		// close_brace => '}'.
-		q(nt(44), (t(19)));
+		q(nt(26), (t(13)));
 		// minus => '-'.
-		q(nt(45), (t(20)));
+		q(nt(27), (t(14)));
 		// colon => ':'.
-		q(nt(46), (t(11)));
+		q(nt(28), (t(5)));
 		// semicolon => ';'.
-		q(nt(47), (t(21)));
+		q(nt(29), (t(15)));
 		// less => '<'.
-		q(nt(48), (t(22)));
+		q(nt(30), (t(16)));
 		// comma => ','.
-		q(nt(49), (t(23)));
+		q(nt(31), (t(17)));
+		// apostrophe => '\''.
+		q(nt(32), (t(18)));
+		// quote => '"'.
+		q(nt(33), (t(19)));
+		// _Rchars_5 => alnum.
+		q(nt(35), (nt(6)));
+		// _Rchars_6 => null.
+		q(nt(36), (nul));
+		// _Rchars_6 => _Rchars_5 _Rchars_6.
+		q(nt(36), (nt(35)+nt(36)));
+		// chars => alpha _Rchars_6.
+		q(nt(34), (nt(5)+nt(36)));
+		// _Rdigits_7 => digit.
+		q(nt(38), (nt(3)));
+		// _Rdigits_7 => digit _Rdigits_7.
+		q(nt(38), (nt(3)+nt(38)));
+		// digits => _Rdigits_7.
+		q(nt(37), (nt(38)));
 		// sym => chars.
-		q(nt(50), (nt(30)));
-		// _Roffsets_8 => ws comma ws offset.
-		q(nt(53), (nt(14)+nt(49)+nt(14)+nt(52)));
+		q(nt(39), (nt(34)));
+		// _Roffsets_8 => _ comma _ offset.
+		q(nt(42), (nt(15)+nt(31)+nt(15)+nt(41)));
 		// _Roffsets_9 => null.
-		q(nt(54), (nul));
+		q(nt(43), (nul));
 		// _Roffsets_9 => _Roffsets_8 _Roffsets_9.
-		q(nt(54), (nt(53)+nt(54)));
-		// offsets => open_bracket ws offset _Roffsets_9 ws close_bracket.
-		q(nt(51), (nt(41)+nt(14)+nt(52)+nt(54)+nt(14)+nt(42)));
-		// __neg_6 => io_var.
-		q(nt(298), (nt(59)));
-		// _Roffset_10 => variable & ~( __neg_6 ).
-		q(nt(60), (nt(58)) & ~(nt(298)));
+		q(nt(43), (nt(42)+nt(43)));
+		// offsets => open_bracket _ offset _Roffsets_9 _ close_bracket.
+		q(nt(40), (nt(23)+nt(15)+nt(41)+nt(43)+nt(15)+nt(24)));
+		// __neg_0 => io_var.
+		q(nt(289), (nt(48)));
+		// _Roffset_10 => variable & ~( __neg_0 ).
+		q(nt(49), (nt(47)) & ~(nt(289)));
 		// offset => num.
-		q(nt(52), (nt(55)));
+		q(nt(41), (nt(44)));
 		// offset => capture.
-		q(nt(52), (nt(56)));
+		q(nt(41), (nt(45)));
 		// offset => shift.
-		q(nt(52), (nt(57)));
+		q(nt(41), (nt(46)));
 		// offset => _Roffset_10.
-		q(nt(52), (nt(60)));
-		// __neg_7 => io_var.
-		q(nt(299), (nt(59)));
-		// _Rshift_11 => variable & ~( __neg_7 ).
-		q(nt(61), (nt(58)) & ~(nt(299)));
+		q(nt(41), (nt(49)));
+		// __neg_1 => io_var.
+		q(nt(290), (nt(48)));
+		// _Rshift_11 => variable & ~( __neg_1 ).
+		q(nt(50), (nt(47)) & ~(nt(290)));
 		// _Rshift_12 => capture.
-		q(nt(62), (nt(56)));
+		q(nt(51), (nt(45)));
 		// _Rshift_12 => _Rshift_11.
-		q(nt(62), (nt(61)));
-		// shift => _Rshift_12 ws minus ws num.
-		q(nt(57), (nt(62)+nt(14)+nt(45)+nt(14)+nt(55)));
+		q(nt(51), (nt(50)));
+		// shift => _Rshift_12 _ minus _ num.
+		q(nt(46), (nt(51)+nt(15)+nt(27)+nt(15)+nt(44)));
 		// num => digits.
-		q(nt(55), (nt(33)));
+		q(nt(44), (nt(37)));
 		// variable => io_var.
-		q(nt(58), (nt(59)));
+		q(nt(47), (nt(48)));
 		// variable => var.
-		q(nt(58), (nt(63)));
+		q(nt(47), (nt(52)));
 		// io_var => in.
-		q(nt(59), (nt(64)));
+		q(nt(48), (nt(53)));
 		// io_var => out.
-		q(nt(59), (nt(65)));
+		q(nt(48), (nt(54)));
 		// in => in_var_name open_bracket offset close_bracket.
-		q(nt(64), (nt(66)+nt(41)+nt(52)+nt(42)));
+		q(nt(53), (nt(55)+nt(23)+nt(41)+nt(24)));
 		// out => out_var_name open_bracket offset close_bracket.
-		q(nt(65), (nt(67)+nt(41)+nt(52)+nt(42)));
+		q(nt(54), (nt(56)+nt(23)+nt(41)+nt(24)));
 		// bool_variable => '?' chars.
-		q(nt(68), (t(24)+nt(30)));
+		q(nt(57), (t(20)+nt(34)));
 		// capture => capture_var.
-		q(nt(56), (nt(69)));
+		q(nt(45), (nt(58)));
 		// capture_var => '$' chars.
-		q(nt(69), (t(25)+nt(30)));
+		q(nt(58), (t(21)+nt(34)));
 		// var => chars.
-		q(nt(63), (nt(30)));
+		q(nt(52), (nt(34)));
 		// in_var_name => 'i' '_' chars.
-		q(nt(66), (t(26)+t(27)+nt(30)));
+		q(nt(55), (t(22)+t(23)+nt(34)));
 		// out_var_name => 'o' '_' chars.
-		q(nt(67), (t(28)+t(27)+nt(30)));
-		// tau_rule => tau_matcher ws tau_def ws tau_body ws dot.
-		q(nt(70), (nt(71)+nt(14)+nt(37)+nt(14)+nt(72)+nt(14)+nt(38)));
+		q(nt(56), (t(24)+t(23)+nt(34)));
+		// tau_rule => tau_matcher _ tau_def _ tau_body _ dot.
+		q(nt(59), (nt(60)+nt(15)+nt(19)+nt(15)+nt(61)+nt(15)+nt(20)));
 		// tau_matcher => tau.
-		q(nt(71), (nt(73)));
+		q(nt(60), (nt(62)));
 		// tau_body => tau.
-		q(nt(72), (nt(73)));
+		q(nt(61), (nt(62)));
 		// tau_body => tau_collapse_positives_cb.
-		q(nt(72), (nt(74)));
+		q(nt(61), (nt(63)));
 		// tau_body => tau_positives_upwards_cb.
-		q(nt(72), (nt(75)));
-		// __neg_8 => capture.
-		q(nt(300), (nt(56)));
-		// __neg_9 => tau_and.
-		q(nt(301), (nt(77)));
-		// __neg_10 => tau_neg.
-		q(nt(302), (nt(78)));
-		// __neg_11 => tau_or.
-		q(nt(303), (nt(79)));
-		// __neg_12 => tau_wff.
-		q(nt(304), (nt(80)));
-		// _Rtau_rec_relation_13 => ~( __neg_8 ) & tau & ~( __neg_9 ) & ~( __neg_10 ) & ~( __neg_11 ) & ~( __neg_12 ).
-		q(nt(81), ~(nt(300)) & (nt(73)) & ~(nt(301)) & ~(nt(302)) & ~(nt(303)) & ~(nt(304)));
-		// tau_rec_relation => _Rtau_rec_relation_13 ws tau_def ws tau ws dot.
-		q(nt(76), (nt(81)+nt(14)+nt(37)+nt(14)+nt(73)+nt(14)+nt(38)));
-		// tau_ref => sym ws offsets ws tau_ref_args.
-		q(nt(82), (nt(50)+nt(14)+nt(51)+nt(14)+nt(83)));
+		q(nt(61), (nt(64)));
+		// __neg_2 => capture.
+		q(nt(291), (nt(45)));
+		// __neg_3 => tau_and.
+		q(nt(292), (nt(66)));
+		// __neg_4 => tau_neg.
+		q(nt(293), (nt(67)));
+		// __neg_5 => tau_or.
+		q(nt(294), (nt(68)));
+		// __neg_6 => tau_wff.
+		q(nt(295), (nt(69)));
+		// _Rtau_rec_relation_13 => ~( __neg_2 ) & tau & ~( __neg_3 ) & ~( __neg_4 ) & ~( __neg_5 ) & ~( __neg_6 ).
+		q(nt(70), ~(nt(291)) & (nt(62)) & ~(nt(292)) & ~(nt(293)) & ~(nt(294)) & ~(nt(295)));
+		// tau_rec_relation => _Rtau_rec_relation_13 _ tau_def _ tau _ dot.
+		q(nt(65), (nt(70)+nt(15)+nt(19)+nt(15)+nt(62)+nt(15)+nt(20)));
+		// tau_ref => sym _ offsets _ tau_ref_args.
+		q(nt(71), (nt(39)+nt(15)+nt(40)+nt(15)+nt(72)));
 		// _Rtau_ref_args_14 => capture.
-		q(nt(84), (nt(56)));
+		q(nt(73), (nt(45)));
 		// _Rtau_ref_args_14 => variable.
-		q(nt(84), (nt(58)));
+		q(nt(73), (nt(47)));
 		// _Rtau_ref_args_15 => _Rtau_ref_args_14.
-		q(nt(85), (nt(84)));
+		q(nt(74), (nt(73)));
 		// _Rtau_ref_args_16 => null.
-		q(nt(86), (nul));
+		q(nt(75), (nul));
 		// _Rtau_ref_args_16 => _Rtau_ref_args_15 _Rtau_ref_args_16.
-		q(nt(86), (nt(85)+nt(86)));
-		// tau_ref_args => open_parenthesis ws _Rtau_ref_args_16 ws close_parenthesis.
-		q(nt(83), (nt(39)+nt(14)+nt(86)+nt(14)+nt(40)));
+		q(nt(75), (nt(74)+nt(75)));
+		// tau_ref_args => open_parenthesis _ _Rtau_ref_args_16 _ close_parenthesis.
+		q(nt(72), (nt(21)+nt(15)+nt(75)+nt(15)+nt(22)));
 		// tau => capture.
-		q(nt(73), (nt(56)));
+		q(nt(62), (nt(45)));
 		// tau => tau_and.
-		q(nt(73), (nt(77)));
+		q(nt(62), (nt(66)));
 		// tau => tau_neg.
-		q(nt(73), (nt(78)));
+		q(nt(62), (nt(67)));
 		// tau => tau_or.
-		q(nt(73), (nt(79)));
+		q(nt(62), (nt(68)));
 		// tau => tau_wff.
-		q(nt(73), (nt(80)));
+		q(nt(62), (nt(69)));
 		// tau => tau_ref.
-		q(nt(73), (nt(82)));
-		// tau_and => open_parenthesis ws tau ws tau_and_sym ws tau ws close_parenthesis.
-		q(nt(77), (nt(39)+nt(14)+nt(73)+nt(14)+nt(87)+nt(14)+nt(73)+nt(14)+nt(40)));
-		// tau_or => open_parenthesis ws tau ws tau_or_sym ws tau ws close_parenthesis.
-		q(nt(79), (nt(39)+nt(14)+nt(73)+nt(14)+nt(88)+nt(14)+nt(73)+nt(14)+nt(40)));
-		// tau_neg => tau_neg_sym ws tau.
-		q(nt(78), (nt(89)+nt(14)+nt(73)));
-		// tau_wff => open_brace ws wff ws close_brace.
-		q(nt(80), (nt(43)+nt(14)+nt(90)+nt(14)+nt(44)));
+		q(nt(62), (nt(71)));
+		// tau_and => open_parenthesis _ tau _ tau_and_sym _ tau _ close_parenthesis.
+		q(nt(66), (nt(21)+nt(15)+nt(62)+nt(15)+nt(76)+nt(15)+nt(62)+nt(15)+nt(22)));
+		// tau_or => open_parenthesis _ tau _ tau_or_sym _ tau _ close_parenthesis.
+		q(nt(68), (nt(21)+nt(15)+nt(62)+nt(15)+nt(77)+nt(15)+nt(62)+nt(15)+nt(22)));
+		// tau_neg => tau_neg_sym _ tau.
+		q(nt(67), (nt(78)+nt(15)+nt(62)));
+		// tau_wff => open_brace _ wff _ close_brace.
+		q(nt(69), (nt(25)+nt(15)+nt(79)+nt(15)+nt(26)));
 		// tau_and_sym => '&' '&' '&'.
-		q(nt(87), (t(29)+t(29)+t(29)));
+		q(nt(76), (t(25)+t(25)+t(25)));
 		// tau_or_sym => '|' '|' '|'.
-		q(nt(88), (t(30)+t(30)+t(30)));
+		q(nt(77), (t(26)+t(26)+t(26)));
 		// tau_neg_sym => '!' '!' '!'.
-		q(nt(89), (t(31)+t(31)+t(31)));
-		// wff_rule => wff_matcher ws wff_def ws wff_body ws dot.
-		q(nt(91), (nt(92)+nt(14)+nt(36)+nt(14)+nt(93)+nt(14)+nt(38)));
+		q(nt(78), (t(27)+t(27)+t(27)));
+		// wff_rule => wff_matcher _ wff_def _ wff_body _ dot.
+		q(nt(80), (nt(81)+nt(15)+nt(18)+nt(15)+nt(82)+nt(15)+nt(20)));
 		// wff_matcher => wff.
-		q(nt(92), (nt(90)));
+		q(nt(81), (nt(79)));
 		// wff_body => wff.
-		q(nt(93), (nt(90)));
+		q(nt(82), (nt(79)));
 		// wff_body => bf_eq_cb.
-		q(nt(93), (nt(94)));
+		q(nt(82), (nt(83)));
 		// wff_body => bf_neq_cb.
-		q(nt(93), (nt(95)));
+		q(nt(82), (nt(84)));
 		// wff_body => wff_has_clashing_subformulas_cb.
-		q(nt(93), (nt(96)));
+		q(nt(82), (nt(85)));
 		// wff_body => wff_has_subformula_cb.
-		q(nt(93), (nt(97)));
+		q(nt(82), (nt(86)));
 		// wff_body => wff_remove_existential_cb.
-		q(nt(93), (nt(98)));
+		q(nt(82), (nt(87)));
 		// wff_body => wff_remove_bexistential_cb.
-		q(nt(93), (nt(99)));
+		q(nt(82), (nt(88)));
 		// wff_body => wff_remove_buniversal_cb.
-		q(nt(93), (nt(100)));
-		// __neg_13 => capture.
-		q(nt(305), (nt(56)));
-		// __neg_14 => bool_variable.
-		q(nt(306), (nt(68)));
-		// __neg_15 => wff_and.
-		q(nt(307), (nt(102)));
-		// __neg_16 => wff_neg.
-		q(nt(308), (nt(103)));
-		// __neg_17 => wff_xor.
-		q(nt(309), (nt(104)));
-		// __neg_18 => wff_conditional.
-		q(nt(310), (nt(105)));
-		// __neg_19 => wff_or.
-		q(nt(311), (nt(106)));
-		// __neg_20 => wff_all.
-		q(nt(312), (nt(107)));
-		// __neg_21 => wff_ex.
-		q(nt(313), (nt(108)));
-		// __neg_22 => wff_imply.
-		q(nt(314), (nt(109)));
-		// __neg_23 => wff_equiv.
-		q(nt(315), (nt(110)));
-		// __neg_24 => wff_t.
-		q(nt(316), (nt(111)));
-		// __neg_25 => wff_f.
-		q(nt(317), (nt(112)));
-		// __neg_26 => wff_ball.
-		q(nt(318), (nt(113)));
-		// __neg_27 => wff_bex.
-		q(nt(319), (nt(114)));
-		// __neg_28 => bf_eq.
-		q(nt(320), (nt(115)));
-		// __neg_29 => bf_neq.
-		q(nt(321), (nt(116)));
-		// __neg_30 => bf_less.
-		q(nt(322), (nt(117)));
-		// __neg_31 => bf_less_equal.
-		q(nt(323), (nt(118)));
-		// __neg_32 => bf_greater.
-		q(nt(324), (nt(119)));
-		// __neg_33 => bf_segment.
-		q(nt(325), (nt(120)));
-		// __neg_34 => bf_not_less_equal.
-		q(nt(326), (nt(121)));
-		// _Rwff_rec_relation_17 => ~( __neg_13 ) & ~( __neg_14 ) & wff & ~( __neg_15 ) & ~( __neg_16 ) & ~( __neg_17 ) & ~( __neg_18 ) & ~( __neg_19 ) & ~( __neg_20 ) & ~( __neg_21 ) & ~( __neg_22 ) & ~( __neg_23 ) & ~( __neg_24 ) & ~( __neg_25 ) & ~( __neg_26 ) & ~( __neg_27 ) & ~( __neg_28 ) & ~( __neg_29 ) & ~( __neg_30 ) & ~( __neg_31 ) & ~( __neg_32 ) & ~( __neg_33 ) & ~( __neg_34 ).
-		q(nt(122), ~(nt(305)) & ~(nt(306)) & (nt(90)) & ~(nt(307)) & ~(nt(308)) & ~(nt(309)) & ~(nt(310)) & ~(nt(311)) & ~(nt(312)) & ~(nt(313)) & ~(nt(314)) & ~(nt(315)) & ~(nt(316)) & ~(nt(317)) & ~(nt(318)) & ~(nt(319)) & ~(nt(320)) & ~(nt(321)) & ~(nt(322)) & ~(nt(323)) & ~(nt(324)) & ~(nt(325)) & ~(nt(326)));
-		// wff_rec_relation => _Rwff_rec_relation_17 ws wff_def ws wff ws dot.
-		q(nt(101), (nt(122)+nt(14)+nt(36)+nt(14)+nt(90)+nt(14)+nt(38)));
+		q(nt(82), (nt(89)));
+		// __neg_7 => capture.
+		q(nt(296), (nt(45)));
+		// __neg_8 => bool_variable.
+		q(nt(297), (nt(57)));
+		// __neg_9 => wff_and.
+		q(nt(298), (nt(91)));
+		// __neg_10 => wff_neg.
+		q(nt(299), (nt(92)));
+		// __neg_11 => wff_xor.
+		q(nt(300), (nt(93)));
+		// __neg_12 => wff_conditional.
+		q(nt(301), (nt(94)));
+		// __neg_13 => wff_or.
+		q(nt(302), (nt(95)));
+		// __neg_14 => wff_all.
+		q(nt(303), (nt(96)));
+		// __neg_15 => wff_ex.
+		q(nt(304), (nt(97)));
+		// __neg_16 => wff_imply.
+		q(nt(305), (nt(98)));
+		// __neg_17 => wff_equiv.
+		q(nt(306), (nt(99)));
+		// __neg_18 => wff_t.
+		q(nt(307), (nt(100)));
+		// __neg_19 => wff_f.
+		q(nt(308), (nt(101)));
+		// __neg_20 => wff_ball.
+		q(nt(309), (nt(102)));
+		// __neg_21 => wff_bex.
+		q(nt(310), (nt(103)));
+		// __neg_22 => bf_eq.
+		q(nt(311), (nt(104)));
+		// __neg_23 => bf_neq.
+		q(nt(312), (nt(105)));
+		// __neg_24 => bf_less.
+		q(nt(313), (nt(106)));
+		// __neg_25 => bf_less_equal.
+		q(nt(314), (nt(107)));
+		// __neg_26 => bf_greater.
+		q(nt(315), (nt(108)));
+		// __neg_27 => bf_segment.
+		q(nt(316), (nt(109)));
+		// __neg_28 => bf_not_less_equal.
+		q(nt(317), (nt(110)));
+		// _Rwff_rec_relation_17 => ~( __neg_7 ) & ~( __neg_8 ) & wff & ~( __neg_9 ) & ~( __neg_10 ) & ~( __neg_11 ) & ~( __neg_12 ) & ~( __neg_13 ) & ~( __neg_14 ) & ~( __neg_15 ) & ~( __neg_16 ) & ~( __neg_17 ) & ~( __neg_18 ) & ~( __neg_19 ) & ~( __neg_20 ) & ~( __neg_21 ) & ~( __neg_22 ) & ~( __neg_23 ) & ~( __neg_24 ) & ~( __neg_25 ) & ~( __neg_26 ) & ~( __neg_27 ) & ~( __neg_28 ).
+		q(nt(111), ~(nt(296)) & ~(nt(297)) & (nt(79)) & ~(nt(298)) & ~(nt(299)) & ~(nt(300)) & ~(nt(301)) & ~(nt(302)) & ~(nt(303)) & ~(nt(304)) & ~(nt(305)) & ~(nt(306)) & ~(nt(307)) & ~(nt(308)) & ~(nt(309)) & ~(nt(310)) & ~(nt(311)) & ~(nt(312)) & ~(nt(313)) & ~(nt(314)) & ~(nt(315)) & ~(nt(316)) & ~(nt(317)));
+		// wff_rec_relation => _Rwff_rec_relation_17 _ wff_def _ wff _ dot.
+		q(nt(90), (nt(111)+nt(15)+nt(18)+nt(15)+nt(79)+nt(15)+nt(20)));
 		// wff => capture.
-		q(nt(90), (nt(56)));
+		q(nt(79), (nt(45)));
 		// wff => bool_variable.
-		q(nt(90), (nt(68)));
+		q(nt(79), (nt(57)));
 		// wff => wff_and.
-		q(nt(90), (nt(102)));
+		q(nt(79), (nt(91)));
 		// wff => wff_neg.
-		q(nt(90), (nt(103)));
+		q(nt(79), (nt(92)));
 		// wff => wff_xor.
-		q(nt(90), (nt(104)));
+		q(nt(79), (nt(93)));
 		// wff => wff_conditional.
-		q(nt(90), (nt(105)));
+		q(nt(79), (nt(94)));
 		// wff => wff_or.
-		q(nt(90), (nt(106)));
+		q(nt(79), (nt(95)));
 		// wff => wff_all.
-		q(nt(90), (nt(107)));
+		q(nt(79), (nt(96)));
 		// wff => wff_ex.
-		q(nt(90), (nt(108)));
+		q(nt(79), (nt(97)));
 		// wff => wff_imply.
-		q(nt(90), (nt(109)));
+		q(nt(79), (nt(98)));
 		// wff => wff_equiv.
-		q(nt(90), (nt(110)));
+		q(nt(79), (nt(99)));
 		// wff => wff_t.
-		q(nt(90), (nt(111)));
+		q(nt(79), (nt(100)));
 		// wff => wff_f.
-		q(nt(90), (nt(112)));
+		q(nt(79), (nt(101)));
 		// wff => wff_ball.
-		q(nt(90), (nt(113)));
+		q(nt(79), (nt(102)));
 		// wff => wff_bex.
-		q(nt(90), (nt(114)));
+		q(nt(79), (nt(103)));
 		// wff => bf_eq.
-		q(nt(90), (nt(115)));
+		q(nt(79), (nt(104)));
 		// wff => bf_neq.
-		q(nt(90), (nt(116)));
+		q(nt(79), (nt(105)));
 		// wff => bf_less.
-		q(nt(90), (nt(117)));
+		q(nt(79), (nt(106)));
 		// wff => bf_less_equal.
-		q(nt(90), (nt(118)));
+		q(nt(79), (nt(107)));
 		// wff => bf_greater.
-		q(nt(90), (nt(119)));
+		q(nt(79), (nt(108)));
 		// wff => bf_segment.
-		q(nt(90), (nt(120)));
+		q(nt(79), (nt(109)));
 		// wff => bf_not_less_equal.
-		q(nt(90), (nt(121)));
+		q(nt(79), (nt(110)));
 		// wff => wff_ref.
-		q(nt(90), (nt(123)));
-		// wff_ref => sym ws offsets ws wff_ref_args.
-		q(nt(123), (nt(50)+nt(14)+nt(51)+nt(14)+nt(124)));
+		q(nt(79), (nt(112)));
+		// wff_ref => sym _ offsets _ wff_ref_args.
+		q(nt(112), (nt(39)+nt(15)+nt(40)+nt(15)+nt(113)));
 		// _Rwff_ref_args_18 => capture.
-		q(nt(125), (nt(56)));
+		q(nt(114), (nt(45)));
 		// _Rwff_ref_args_18 => variable.
-		q(nt(125), (nt(58)));
+		q(nt(114), (nt(47)));
 		// _Rwff_ref_args_19 => _Rwff_ref_args_18.
-		q(nt(126), (nt(125)));
+		q(nt(115), (nt(114)));
 		// _Rwff_ref_args_20 => null.
-		q(nt(127), (nul));
+		q(nt(116), (nul));
 		// _Rwff_ref_args_20 => _Rwff_ref_args_19 _Rwff_ref_args_20.
-		q(nt(127), (nt(126)+nt(127)));
-		// wff_ref_args => open_parenthesis ws _Rwff_ref_args_20 ws close_parenthesis.
-		q(nt(124), (nt(39)+nt(14)+nt(127)+nt(14)+nt(40)));
-		// wff_and => open_parenthesis ws wff ws wff_and_sym ws wff ws close_parenthesis.
-		q(nt(102), (nt(39)+nt(14)+nt(90)+nt(14)+nt(128)+nt(14)+nt(90)+nt(14)+nt(40)));
-		// wff_or => open_parenthesis ws wff ws wff_or_sym ws wff ws close_parenthesis.
-		q(nt(106), (nt(39)+nt(14)+nt(90)+nt(14)+nt(129)+nt(14)+nt(90)+nt(14)+nt(40)));
-		// wff_xor => open_parenthesis ws wff ws wff_xor_sym ws wff ws close_parenthesis.
-		q(nt(104), (nt(39)+nt(14)+nt(90)+nt(14)+nt(130)+nt(14)+nt(90)+nt(14)+nt(40)));
-		// wff_conditional => open_parenthesis ws wff ws wff_conditional_sym ws wff ws colon ws wff ws close_parenthesis.
-		q(nt(105), (nt(39)+nt(14)+nt(90)+nt(14)+nt(131)+nt(14)+nt(90)+nt(14)+nt(46)+nt(14)+nt(90)+nt(14)+nt(40)));
-		// wff_neg => wff_neg_sym ws wff.
-		q(nt(103), (nt(132)+nt(14)+nt(90)));
-		// wff_imply => open_parenthesis ws wff ws wff_imply_sym ws wff ws close_parenthesis.
-		q(nt(109), (nt(39)+nt(14)+nt(90)+nt(14)+nt(133)+nt(14)+nt(90)+nt(14)+nt(40)));
-		// wff_equiv => open_parenthesis ws wff ws wff_equiv_sym ws wff ws close_parenthesis.
-		q(nt(110), (nt(39)+nt(14)+nt(90)+nt(14)+nt(134)+nt(14)+nt(90)+nt(14)+nt(40)));
+		q(nt(116), (nt(115)+nt(116)));
+		// wff_ref_args => open_parenthesis _ _Rwff_ref_args_20 _ close_parenthesis.
+		q(nt(113), (nt(21)+nt(15)+nt(116)+nt(15)+nt(22)));
+		// wff_and => open_parenthesis _ wff _ wff_and_sym _ wff _ close_parenthesis.
+		q(nt(91), (nt(21)+nt(15)+nt(79)+nt(15)+nt(117)+nt(15)+nt(79)+nt(15)+nt(22)));
+		// wff_or => open_parenthesis _ wff _ wff_or_sym _ wff _ close_parenthesis.
+		q(nt(95), (nt(21)+nt(15)+nt(79)+nt(15)+nt(118)+nt(15)+nt(79)+nt(15)+nt(22)));
+		// wff_xor => open_parenthesis _ wff _ wff_xor_sym _ wff _ close_parenthesis.
+		q(nt(93), (nt(21)+nt(15)+nt(79)+nt(15)+nt(119)+nt(15)+nt(79)+nt(15)+nt(22)));
+		// wff_conditional => open_parenthesis _ wff _ wff_conditional_sym _ wff _ colon _ wff _ close_parenthesis.
+		q(nt(94), (nt(21)+nt(15)+nt(79)+nt(15)+nt(120)+nt(15)+nt(79)+nt(15)+nt(28)+nt(15)+nt(79)+nt(15)+nt(22)));
+		// wff_neg => wff_neg_sym _ wff.
+		q(nt(92), (nt(121)+nt(15)+nt(79)));
+		// wff_imply => open_parenthesis _ wff _ wff_imply_sym _ wff _ close_parenthesis.
+		q(nt(98), (nt(21)+nt(15)+nt(79)+nt(15)+nt(122)+nt(15)+nt(79)+nt(15)+nt(22)));
+		// wff_equiv => open_parenthesis _ wff _ wff_equiv_sym _ wff _ close_parenthesis.
+		q(nt(99), (nt(21)+nt(15)+nt(79)+nt(15)+nt(123)+nt(15)+nt(79)+nt(15)+nt(22)));
 		// _Rwff_all_21 => capture.
-		q(nt(136), (nt(56)));
+		q(nt(125), (nt(45)));
 		// _Rwff_all_21 => variable.
-		q(nt(136), (nt(58)));
-		// wff_all => wff_all_sym ws_required _Rwff_all_21 ws_required wff.
-		q(nt(107), (nt(135)+nt(13)+nt(136)+nt(13)+nt(90)));
+		q(nt(125), (nt(47)));
+		// wff_all => wff_all_sym __ _Rwff_all_21 __ wff.
+		q(nt(96), (nt(124)+nt(13)+nt(125)+nt(13)+nt(79)));
 		// _Rwff_ex_22 => capture.
-		q(nt(138), (nt(56)));
+		q(nt(127), (nt(45)));
 		// _Rwff_ex_22 => variable.
-		q(nt(138), (nt(58)));
-		// wff_ex => wff_ex_sym ws_required _Rwff_ex_22 ws_required wff.
-		q(nt(108), (nt(137)+nt(13)+nt(138)+nt(13)+nt(90)));
+		q(nt(127), (nt(47)));
+		// wff_ex => wff_ex_sym __ _Rwff_ex_22 __ wff.
+		q(nt(97), (nt(126)+nt(13)+nt(127)+nt(13)+nt(79)));
 		// _Rwff_ball_23 => capture.
-		q(nt(140), (nt(56)));
+		q(nt(129), (nt(45)));
 		// _Rwff_ball_23 => bool_variable.
-		q(nt(140), (nt(68)));
-		// wff_ball => wff_ball_sym ws_required _Rwff_ball_23 ws_required wff.
-		q(nt(113), (nt(139)+nt(13)+nt(140)+nt(13)+nt(90)));
+		q(nt(129), (nt(57)));
+		// wff_ball => wff_ball_sym __ _Rwff_ball_23 __ wff.
+		q(nt(102), (nt(128)+nt(13)+nt(129)+nt(13)+nt(79)));
 		// _Rwff_bex_24 => capture.
-		q(nt(142), (nt(56)));
+		q(nt(131), (nt(45)));
 		// _Rwff_bex_24 => bool_variable.
-		q(nt(142), (nt(68)));
-		// wff_bex => wff_bex_sym ws_required _Rwff_bex_24 ws_required wff.
-		q(nt(114), (nt(141)+nt(13)+nt(142)+nt(13)+nt(90)));
-		// bf_eq => open_parenthesis ws bf ws bf_equality_sym ws bf ws close_parenthesis.
-		q(nt(115), (nt(39)+nt(14)+nt(143)+nt(14)+nt(144)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_neq => open_parenthesis ws bf ws bf_nequality_sym ws bf ws close_parenthesis.
-		q(nt(116), (nt(39)+nt(14)+nt(143)+nt(14)+nt(145)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_less => open_parenthesis ws bf ws bf_less_sym ws bf ws close_parenthesis.
-		q(nt(117), (nt(39)+nt(14)+nt(143)+nt(14)+nt(146)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_less_equal => open_parenthesis ws bf ws bf_less_equal_sym ws bf ws close_parenthesis.
-		q(nt(118), (nt(39)+nt(14)+nt(143)+nt(14)+nt(147)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_not_less_equal => open_parenthesis ws bf ws bf_not_less_equal_sym ws bf ws close_parenthesis.
-		q(nt(121), (nt(39)+nt(14)+nt(143)+nt(14)+nt(148)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_greater => open_parenthesis ws bf ws bf_greater_sym ws bf ws close_parenthesis.
-		q(nt(119), (nt(39)+nt(14)+nt(143)+nt(14)+nt(149)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_segment => open_parenthesis ws bf ws bf_less_equal_sym ws bf ws bf_less_equal_sym ws bf ws close_parenthesis.
-		q(nt(120), (nt(39)+nt(14)+nt(143)+nt(14)+nt(147)+nt(14)+nt(143)+nt(14)+nt(147)+nt(14)+nt(143)+nt(14)+nt(40)));
+		q(nt(131), (nt(57)));
+		// wff_bex => wff_bex_sym __ _Rwff_bex_24 __ wff.
+		q(nt(103), (nt(130)+nt(13)+nt(131)+nt(13)+nt(79)));
+		// bf_eq => open_parenthesis _ bf _ bf_equality_sym _ bf _ close_parenthesis.
+		q(nt(104), (nt(21)+nt(15)+nt(132)+nt(15)+nt(133)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_neq => open_parenthesis _ bf _ bf_nequality_sym _ bf _ close_parenthesis.
+		q(nt(105), (nt(21)+nt(15)+nt(132)+nt(15)+nt(134)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_less => open_parenthesis _ bf _ bf_less_sym _ bf _ close_parenthesis.
+		q(nt(106), (nt(21)+nt(15)+nt(132)+nt(15)+nt(135)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_less_equal => open_parenthesis _ bf _ bf_less_equal_sym _ bf _ close_parenthesis.
+		q(nt(107), (nt(21)+nt(15)+nt(132)+nt(15)+nt(136)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_not_less_equal => open_parenthesis _ bf _ bf_not_less_equal_sym _ bf _ close_parenthesis.
+		q(nt(110), (nt(21)+nt(15)+nt(132)+nt(15)+nt(137)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_greater => open_parenthesis _ bf _ bf_greater_sym _ bf _ close_parenthesis.
+		q(nt(108), (nt(21)+nt(15)+nt(132)+nt(15)+nt(138)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_segment => open_parenthesis _ bf _ bf_less_equal_sym _ bf _ bf_less_equal_sym _ bf _ close_parenthesis.
+		q(nt(109), (nt(21)+nt(15)+nt(132)+nt(15)+nt(136)+nt(15)+nt(132)+nt(15)+nt(136)+nt(15)+nt(132)+nt(15)+nt(22)));
 		// wff_and_sym => '&' '&'.
-		q(nt(128), (t(29)+t(29)));
+		q(nt(117), (t(25)+t(25)));
 		// wff_or_sym => '|' '|'.
-		q(nt(129), (t(30)+t(30)));
+		q(nt(118), (t(26)+t(26)));
 		// wff_xor_sym => '^'.
-		q(nt(130), (t(32)));
+		q(nt(119), (t(28)));
 		// wff_conditional_sym => '?'.
-		q(nt(131), (t(24)));
+		q(nt(120), (t(20)));
 		// wff_neg_sym => '!'.
-		q(nt(132), (t(31)));
+		q(nt(121), (t(27)));
 		// wff_imply_sym => '-' '>'.
-		q(nt(133), (t(20)+t(33)));
+		q(nt(122), (t(14)+t(29)));
 		// wff_equiv_sym => '<' '-' '>'.
-		q(nt(134), (t(22)+t(20)+t(33)));
+		q(nt(123), (t(16)+t(14)+t(29)));
 		// wff_all_sym => 'a' 'l' 'l'.
-		q(nt(135), (t(34)+t(35)+t(35)));
+		q(nt(124), (t(30)+t(31)+t(31)));
 		// wff_ex_sym => 'e' 'x'.
-		q(nt(137), (t(36)+t(6)));
+		q(nt(126), (t(32)+t(33)));
 		// wff_ball_sym => 'b' 'a' 'l' 'l'.
-		q(nt(139), (t(37)+t(34)+t(35)+t(35)));
+		q(nt(128), (t(34)+t(30)+t(31)+t(31)));
 		// wff_bex_sym => 'b' 'e' 'x'.
-		q(nt(141), (t(37)+t(36)+t(6)));
+		q(nt(130), (t(34)+t(32)+t(33)));
 		// wff_t => 'T'.
-		q(nt(111), (t(38)));
+		q(nt(100), (t(35)));
 		// wff_f => 'F'.
-		q(nt(112), (t(39)));
-		// bf_rule => bf_matcher ws bf_def ws bf_body ws dot.
-		q(nt(150), (nt(151)+nt(14)+nt(35)+nt(14)+nt(152)+nt(14)+nt(38)));
+		q(nt(101), (t(36)));
+		// bf_rule => bf_matcher _ bf_def _ bf_body _ dot.
+		q(nt(139), (nt(140)+nt(15)+nt(17)+nt(15)+nt(141)+nt(15)+nt(20)));
 		// bf_matcher => bf.
-		q(nt(151), (nt(143)));
+		q(nt(140), (nt(132)));
 		// bf_body => bf.
-		q(nt(152), (nt(143)));
+		q(nt(141), (nt(132)));
 		// bf_body => bf_is_zero_cb.
-		q(nt(152), (nt(153)));
+		q(nt(141), (nt(142)));
 		// bf_body => bf_is_one_cb.
-		q(nt(152), (nt(154)));
+		q(nt(141), (nt(143)));
 		// bf_body => bf_has_clashing_subformulas_cb.
-		q(nt(152), (nt(155)));
+		q(nt(141), (nt(144)));
 		// bf_body => bf_has_subformula_cb.
-		q(nt(152), (nt(156)));
+		q(nt(141), (nt(145)));
 		// bf_body => bf_remove_funiversal_cb.
-		q(nt(152), (nt(157)));
+		q(nt(141), (nt(146)));
 		// bf_body => bf_remove_fexistential_cb.
-		q(nt(152), (nt(158)));
+		q(nt(141), (nt(147)));
 		// bf_body => bf_and_cb.
-		q(nt(152), (nt(159)));
+		q(nt(141), (nt(148)));
 		// bf_body => bf_or_cb.
-		q(nt(152), (nt(160)));
+		q(nt(141), (nt(149)));
 		// bf_body => bf_xor_cb.
-		q(nt(152), (nt(161)));
+		q(nt(141), (nt(150)));
 		// bf_body => bf_neg_cb.
-		q(nt(152), (nt(162)));
+		q(nt(141), (nt(151)));
 		// bf => capture.
-		q(nt(143), (nt(56)));
+		q(nt(132), (nt(45)));
 		// bf => variable.
-		q(nt(143), (nt(58)));
+		q(nt(132), (nt(47)));
 		// bf => bf_ref.
-		q(nt(143), (nt(163)));
+		q(nt(132), (nt(152)));
 		// bf => bf_constant.
-		q(nt(143), (nt(164)));
+		q(nt(132), (nt(153)));
 		// bf => bf_and.
-		q(nt(143), (nt(165)));
+		q(nt(132), (nt(154)));
 		// bf => bf_neg.
-		q(nt(143), (nt(166)));
+		q(nt(132), (nt(155)));
 		// bf => bf_xor.
-		q(nt(143), (nt(167)));
+		q(nt(132), (nt(156)));
 		// bf => bf_or.
-		q(nt(143), (nt(168)));
+		q(nt(132), (nt(157)));
 		// bf => bf_all.
-		q(nt(143), (nt(169)));
+		q(nt(132), (nt(158)));
 		// bf => bf_ex.
-		q(nt(143), (nt(170)));
+		q(nt(132), (nt(159)));
 		// bf => bf_t.
-		q(nt(143), (nt(171)));
+		q(nt(132), (nt(160)));
 		// bf => bf_f.
-		q(nt(143), (nt(172)));
+		q(nt(132), (nt(161)));
 		// bf => bf_splitter.
-		q(nt(143), (nt(173)));
-		// __neg_35 => capture.
-		q(nt(327), (nt(56)));
-		// __neg_36 => variable.
-		q(nt(328), (nt(58)));
-		// __neg_37 => bf_eq.
-		q(nt(329), (nt(115)));
-		// __neg_38 => bf_neq.
-		q(nt(330), (nt(116)));
-		// __neg_39 => bf_constant.
-		q(nt(331), (nt(164)));
-		// __neg_40 => bf_and.
-		q(nt(332), (nt(165)));
-		// __neg_41 => bf_neg.
-		q(nt(333), (nt(166)));
-		// __neg_42 => bf_xor.
-		q(nt(334), (nt(167)));
-		// __neg_43 => bf_or.
-		q(nt(335), (nt(168)));
-		// __neg_44 => bf_all.
-		q(nt(336), (nt(169)));
-		// __neg_45 => bf_ex.
-		q(nt(337), (nt(170)));
-		// __neg_46 => bf_t.
-		q(nt(338), (nt(171)));
-		// __neg_47 => bf_f.
-		q(nt(339), (nt(172)));
-		// __neg_48 => bf_splitter.
-		q(nt(340), (nt(173)));
-		// _Rbf_rec_relation_25 => ~( __neg_35 ) & ~( __neg_36 ) & ~( __neg_37 ) & ~( __neg_38 ) & bf & ~( __neg_39 ) & ~( __neg_40 ) & ~( __neg_41 ) & ~( __neg_42 ) & ~( __neg_43 ) & ~( __neg_44 ) & ~( __neg_45 ) & ~( __neg_46 ) & ~( __neg_47 ) & ~( __neg_48 ).
-		q(nt(175), ~(nt(327)) & ~(nt(328)) & ~(nt(329)) & ~(nt(330)) & (nt(143)) & ~(nt(331)) & ~(nt(332)) & ~(nt(333)) & ~(nt(334)) & ~(nt(335)) & ~(nt(336)) & ~(nt(337)) & ~(nt(338)) & ~(nt(339)) & ~(nt(340)));
-		// bf_rec_relation => _Rbf_rec_relation_25 ws bf_def ws bf ws dot.
-		q(nt(174), (nt(175)+nt(14)+nt(35)+nt(14)+nt(143)+nt(14)+nt(38)));
+		q(nt(132), (nt(162)));
+		// __neg_29 => capture.
+		q(nt(318), (nt(45)));
+		// __neg_30 => variable.
+		q(nt(319), (nt(47)));
+		// __neg_31 => bf_eq.
+		q(nt(320), (nt(104)));
+		// __neg_32 => bf_neq.
+		q(nt(321), (nt(105)));
+		// __neg_33 => bf_constant.
+		q(nt(322), (nt(153)));
+		// __neg_34 => bf_and.
+		q(nt(323), (nt(154)));
+		// __neg_35 => bf_neg.
+		q(nt(324), (nt(155)));
+		// __neg_36 => bf_xor.
+		q(nt(325), (nt(156)));
+		// __neg_37 => bf_or.
+		q(nt(326), (nt(157)));
+		// __neg_38 => bf_all.
+		q(nt(327), (nt(158)));
+		// __neg_39 => bf_ex.
+		q(nt(328), (nt(159)));
+		// __neg_40 => bf_t.
+		q(nt(329), (nt(160)));
+		// __neg_41 => bf_f.
+		q(nt(330), (nt(161)));
+		// __neg_42 => bf_splitter.
+		q(nt(331), (nt(162)));
+		// _Rbf_rec_relation_25 => ~( __neg_29 ) & ~( __neg_30 ) & ~( __neg_31 ) & ~( __neg_32 ) & bf & ~( __neg_33 ) & ~( __neg_34 ) & ~( __neg_35 ) & ~( __neg_36 ) & ~( __neg_37 ) & ~( __neg_38 ) & ~( __neg_39 ) & ~( __neg_40 ) & ~( __neg_41 ) & ~( __neg_42 ).
+		q(nt(164), ~(nt(318)) & ~(nt(319)) & ~(nt(320)) & ~(nt(321)) & (nt(132)) & ~(nt(322)) & ~(nt(323)) & ~(nt(324)) & ~(nt(325)) & ~(nt(326)) & ~(nt(327)) & ~(nt(328)) & ~(nt(329)) & ~(nt(330)) & ~(nt(331)));
+		// bf_rec_relation => _Rbf_rec_relation_25 _ bf_def _ bf _ dot.
+		q(nt(163), (nt(164)+nt(15)+nt(17)+nt(15)+nt(132)+nt(15)+nt(20)));
 		// bf_ref => sym offsets bf_ref_args.
-		q(nt(163), (nt(50)+nt(51)+nt(176)));
+		q(nt(152), (nt(39)+nt(40)+nt(165)));
 		// _Rbf_ref_args_26 => capture.
-		q(nt(177), (nt(56)));
+		q(nt(166), (nt(45)));
 		// _Rbf_ref_args_26 => variable.
-		q(nt(177), (nt(58)));
+		q(nt(166), (nt(47)));
 		// _Rbf_ref_args_27 => _Rbf_ref_args_26.
-		q(nt(178), (nt(177)));
+		q(nt(167), (nt(166)));
 		// _Rbf_ref_args_28 => null.
-		q(nt(179), (nul));
+		q(nt(168), (nul));
 		// _Rbf_ref_args_28 => _Rbf_ref_args_27 _Rbf_ref_args_28.
-		q(nt(179), (nt(178)+nt(179)));
-		// bf_ref_args => open_parenthesis ws _Rbf_ref_args_28 ws close_parenthesis.
-		q(nt(176), (nt(39)+nt(14)+nt(179)+nt(14)+nt(40)));
-		// bf_and => open_parenthesis ws bf ws bf_and_sym ws bf ws close_parenthesis.
-		q(nt(165), (nt(39)+nt(14)+nt(143)+nt(14)+nt(180)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_or => open_parenthesis ws bf ws bf_or_sym ws bf ws close_parenthesis.
-		q(nt(168), (nt(39)+nt(14)+nt(143)+nt(14)+nt(181)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_xor => open_parenthesis ws bf ws bf_xor_sym ws bf ws close_parenthesis.
-		q(nt(167), (nt(39)+nt(14)+nt(143)+nt(14)+nt(182)+nt(14)+nt(143)+nt(14)+nt(40)));
-		// bf_neg => bf_neg_sym ws bf.
-		q(nt(166), (nt(183)+nt(14)+nt(143)));
+		q(nt(168), (nt(167)+nt(168)));
+		// bf_ref_args => open_parenthesis _ _Rbf_ref_args_28 _ close_parenthesis.
+		q(nt(165), (nt(21)+nt(15)+nt(168)+nt(15)+nt(22)));
+		// bf_and => open_parenthesis _ bf _ bf_and_sym _ bf _ close_parenthesis.
+		q(nt(154), (nt(21)+nt(15)+nt(132)+nt(15)+nt(169)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_or => open_parenthesis _ bf _ bf_or_sym _ bf _ close_parenthesis.
+		q(nt(157), (nt(21)+nt(15)+nt(132)+nt(15)+nt(170)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_xor => open_parenthesis _ bf _ bf_xor_sym _ bf _ close_parenthesis.
+		q(nt(156), (nt(21)+nt(15)+nt(132)+nt(15)+nt(171)+nt(15)+nt(132)+nt(15)+nt(22)));
+		// bf_neg => bf_neg_sym _ bf.
+		q(nt(155), (nt(172)+nt(15)+nt(132)));
 		// _Rbf_all_29 => capture.
-		q(nt(185), (nt(56)));
+		q(nt(174), (nt(45)));
 		// _Rbf_all_29 => variable.
-		q(nt(185), (nt(58)));
-		// bf_all => bf_all_sym ws_required _Rbf_all_29 ws_required bf.
-		q(nt(169), (nt(184)+nt(13)+nt(185)+nt(13)+nt(143)));
+		q(nt(174), (nt(47)));
+		// bf_all => bf_all_sym __ _Rbf_all_29 __ bf.
+		q(nt(158), (nt(173)+nt(13)+nt(174)+nt(13)+nt(132)));
 		// _Rbf_ex_30 => capture.
-		q(nt(187), (nt(56)));
+		q(nt(176), (nt(45)));
 		// _Rbf_ex_30 => variable.
-		q(nt(187), (nt(58)));
-		// bf_ex => bf_ex_sym ws_required _Rbf_ex_30 ws_required bf.
-		q(nt(170), (nt(186)+nt(13)+nt(187)+nt(13)+nt(143)));
-		// bf_splitter => bf_splitter_sym ws open_parenthesis ws bf ws close_parenthesis.
-		q(nt(173), (nt(188)+nt(14)+nt(39)+nt(14)+nt(143)+nt(14)+nt(40)));
+		q(nt(176), (nt(47)));
+		// bf_ex => bf_ex_sym __ _Rbf_ex_30 __ bf.
+		q(nt(159), (nt(175)+nt(13)+nt(176)+nt(13)+nt(132)));
+		// bf_splitter => bf_splitter_sym _ open_parenthesis _ bf _ close_parenthesis.
+		q(nt(162), (nt(177)+nt(15)+nt(21)+nt(15)+nt(132)+nt(15)+nt(22)));
 		// bf_and_sym => '&'.
-		q(nt(180), (t(29)));
+		q(nt(169), (t(25)));
 		// bf_or_sym => '|'.
-		q(nt(181), (t(30)));
+		q(nt(170), (t(26)));
 		// bf_xor_sym => '+'.
-		q(nt(182), (t(40)));
+		q(nt(171), (t(37)));
 		// bf_neg_sym => '~'.
-		q(nt(183), (t(41)));
+		q(nt(172), (t(38)));
 		// bf_equality_sym => '='.
-		q(nt(144), (t(12)));
+		q(nt(133), (t(6)));
 		// bf_nequality_sym => '!' '='.
-		q(nt(145), (t(31)+t(12)));
+		q(nt(134), (t(27)+t(6)));
 		// bf_less_sym => '<'.
-		q(nt(146), (t(22)));
+		q(nt(135), (t(16)));
 		// bf_less_equal_sym => '<' '='.
-		q(nt(147), (t(22)+t(12)));
+		q(nt(136), (t(16)+t(6)));
 		// bf_not_less_equal_sym => '!' '<' '='.
-		q(nt(148), (t(31)+t(22)+t(12)));
+		q(nt(137), (t(27)+t(16)+t(6)));
 		// bf_greater_sym => '>'.
-		q(nt(149), (t(33)));
+		q(nt(138), (t(29)));
 		// bf_all_sym => 'f' 'a' 'l' 'l'.
-		q(nt(184), (t(42)+t(34)+t(35)+t(35)));
+		q(nt(173), (t(39)+t(30)+t(31)+t(31)));
 		// bf_ex_sym => 'f' 'e' 'x'.
-		q(nt(186), (t(42)+t(36)+t(6)));
+		q(nt(175), (t(39)+t(32)+t(33)));
 		// bf_splitter_sym => 'S'.
-		q(nt(188), (t(43)));
+		q(nt(177), (t(40)));
 		// bf_t => '1'.
-		q(nt(171), (t(44)));
+		q(nt(160), (t(41)));
 		// bf_f => '0'.
-		q(nt(172), (t(45)));
-		// bf_constant => open_brace ws constant ws close_brace.
-		q(nt(164), (nt(43)+nt(14)+nt(189)+nt(14)+nt(44)));
+		q(nt(161), (t(42)));
+		// bf_constant => open_brace _ constant _ close_brace.
+		q(nt(153), (nt(25)+nt(15)+nt(178)+nt(15)+nt(26)));
 		// constant => capture.
-		q(nt(189), (nt(56)));
+		q(nt(178), (nt(45)));
 		// constant => binding.
-		q(nt(189), (nt(190)));
+		q(nt(178), (nt(179)));
 		// binding => source_binding.
-		q(nt(190), (nt(191)));
+		q(nt(179), (nt(180)));
 		// binding => named_binding.
-		q(nt(190), (nt(192)));
+		q(nt(179), (nt(181)));
 		// named_binding => chars.
-		q(nt(192), (nt(30)));
-		// source_binding => type ws colon ws source.
-		q(nt(191), (nt(193)+nt(14)+nt(46)+nt(14)+nt(194)));
+		q(nt(181), (nt(34)));
+		// source_binding => type _ colon _ source.
+		q(nt(180), (nt(182)+nt(15)+nt(28)+nt(15)+nt(183)));
 		// type => null.
-		q(nt(193), (nul));
+		q(nt(182), (nul));
 		// type => chars.
-		q(nt(193), (nt(30)));
+		q(nt(182), (nt(34)));
 		// source0 => space.
-		q(nt(195), (nt(2)));
+		q(nt(184), (nt(2)));
 		// source0 => alnum.
-		q(nt(195), (nt(6)));
+		q(nt(184), (nt(6)));
 		// source0 => punct.
-		q(nt(195), (nt(7)));
+		q(nt(184), (nt(7)));
 		// _Rsource_31 => source0.
-		q(nt(196), (nt(195)));
+		q(nt(185), (nt(184)));
 		// _Rsource_32 => _Rsource_31.
-		q(nt(197), (nt(196)));
+		q(nt(186), (nt(185)));
 		// _Rsource_32 => _Rsource_31 _Rsource_32.
-		q(nt(197), (nt(196)+nt(197)));
+		q(nt(186), (nt(185)+nt(186)));
 		// source => _Rsource_32.
-		q(nt(194), (nt(197)));
-		// bf_and_cb => bf_and_cb_sym ws_required bf_cb_arg ws_required bf_cb_arg.
-		q(nt(159), (nt(198)+nt(13)+nt(199)+nt(13)+nt(199)));
-		// bf_or_cb => bf_or_cb_sym ws_required bf_cb_arg ws_required bf_cb_arg.
-		q(nt(160), (nt(200)+nt(13)+nt(199)+nt(13)+nt(199)));
-		// bf_xor_cb => bf_xor_cb_sym ws_required bf_cb_arg ws_required bf_cb_arg.
-		q(nt(161), (nt(201)+nt(13)+nt(199)+nt(13)+nt(199)));
-		// bf_neg_cb => bf_neg_cb_sym ws_required bf_cb_arg.
-		q(nt(162), (nt(202)+nt(13)+nt(199)));
-		// bf_eq_cb => bf_eq_cb_sym ws bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-		q(nt(94), (nt(203)+nt(14)+nt(199)+nt(13)+nt(204)+nt(13)+nt(204)));
-		// bf_neq_cb => bf_neq_cb_sym ws bf_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-		q(nt(95), (nt(205)+nt(14)+nt(199)+nt(13)+nt(204)+nt(13)+nt(204)));
-		// bf_is_zero_cb => bf_is_zero_cb_sym ws bf_cb_arg ws_required bf_cb_arg.
-		q(nt(153), (nt(206)+nt(14)+nt(199)+nt(13)+nt(199)));
-		// bf_is_one_cb => bf_is_one_cb_sym ws bf_cb_arg ws_required bf_cb_arg.
-		q(nt(154), (nt(207)+nt(14)+nt(199)+nt(13)+nt(199)));
-		// bf_remove_funiversal_cb => bf_remove_funiversal_cb_sym ws bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-		q(nt(157), (nt(208)+nt(14)+nt(199)+nt(13)+nt(199)+nt(13)+nt(199)+nt(13)+nt(199)));
-		// bf_remove_fexistential_cb => bf_remove_fexistential_cb_sym ws bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-		q(nt(158), (nt(209)+nt(14)+nt(199)+nt(13)+nt(199)+nt(13)+nt(199)+nt(13)+nt(199)));
-		// wff_remove_existential_cb => wff_remove_existential_cb_sym ws wff_cb_arg ws_required wff_cb_arg.
-		q(nt(98), (nt(210)+nt(14)+nt(204)+nt(13)+nt(204)));
-		// wff_remove_bexistential_cb => wff_remove_bexistential_cb_sym ws wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-		q(nt(99), (nt(211)+nt(14)+nt(204)+nt(13)+nt(204)+nt(13)+nt(204)+nt(13)+nt(204)));
-		// wff_remove_buniversal_cb => wff_remove_buniversal_cb_sym ws wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-		q(nt(100), (nt(212)+nt(14)+nt(204)+nt(13)+nt(204)+nt(13)+nt(204)+nt(13)+nt(204)));
-		// bf_has_clashing_subformulas_cb => bf_has_clashing_subformulas_cb_sym ws bf_cb_arg ws_required bf_cb_arg.
-		q(nt(155), (nt(213)+nt(14)+nt(199)+nt(13)+nt(199)));
-		// wff_has_clashing_subformulas_cb => wff_has_clashing_subformulas_cb_sym ws wff_cb_arg ws_required wff_cb_arg.
-		q(nt(96), (nt(214)+nt(14)+nt(204)+nt(13)+nt(204)));
-		// bf_has_subformula_cb => bf_has_subformula_cb_sym ws bf_cb_arg ws_required bf_cb_arg ws_required bf_cb_arg.
-		q(nt(156), (nt(215)+nt(14)+nt(199)+nt(13)+nt(199)+nt(13)+nt(199)));
-		// wff_has_subformula_cb => wff_has_subformula_cb_sym ws wff_cb_arg ws_required wff_cb_arg ws_required wff_cb_arg.
-		q(nt(97), (nt(216)+nt(14)+nt(204)+nt(13)+nt(204)+nt(13)+nt(204)));
+		q(nt(183), (nt(186)));
+		// bf_and_cb => bf_and_cb_sym __ bf_cb_arg __ bf_cb_arg.
+		q(nt(148), (nt(187)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// bf_or_cb => bf_or_cb_sym __ bf_cb_arg __ bf_cb_arg.
+		q(nt(149), (nt(189)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// bf_xor_cb => bf_xor_cb_sym __ bf_cb_arg __ bf_cb_arg.
+		q(nt(150), (nt(190)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// bf_neg_cb => bf_neg_cb_sym __ bf_cb_arg.
+		q(nt(151), (nt(191)+nt(13)+nt(188)));
+		// bf_eq_cb => bf_eq_cb_sym __ bf_cb_arg __ wff_cb_arg __ wff_cb_arg.
+		q(nt(83), (nt(192)+nt(13)+nt(188)+nt(13)+nt(193)+nt(13)+nt(193)));
+		// bf_neq_cb => bf_neq_cb_sym __ bf_cb_arg __ wff_cb_arg __ wff_cb_arg.
+		q(nt(84), (nt(194)+nt(13)+nt(188)+nt(13)+nt(193)+nt(13)+nt(193)));
+		// bf_is_zero_cb => bf_is_zero_cb_sym __ bf_cb_arg __ bf_cb_arg.
+		q(nt(142), (nt(195)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// bf_is_one_cb => bf_is_one_cb_sym __ bf_cb_arg __ bf_cb_arg.
+		q(nt(143), (nt(196)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// bf_remove_funiversal_cb => bf_remove_funiversal_cb_sym __ bf_cb_arg __ bf_cb_arg __ bf_cb_arg __ bf_cb_arg.
+		q(nt(146), (nt(197)+nt(13)+nt(188)+nt(13)+nt(188)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// bf_remove_fexistential_cb => bf_remove_fexistential_cb_sym __ bf_cb_arg __ bf_cb_arg __ bf_cb_arg __ bf_cb_arg.
+		q(nt(147), (nt(198)+nt(13)+nt(188)+nt(13)+nt(188)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// wff_remove_existential_cb => wff_remove_existential_cb_sym __ wff_cb_arg __ wff_cb_arg.
+		q(nt(87), (nt(199)+nt(13)+nt(193)+nt(13)+nt(193)));
+		// wff_remove_bexistential_cb => wff_remove_bexistential_cb_sym __ wff_cb_arg __ wff_cb_arg __ wff_cb_arg __ wff_cb_arg.
+		q(nt(88), (nt(200)+nt(13)+nt(193)+nt(13)+nt(193)+nt(13)+nt(193)+nt(13)+nt(193)));
+		// wff_remove_buniversal_cb => wff_remove_buniversal_cb_sym __ wff_cb_arg __ wff_cb_arg __ wff_cb_arg __ wff_cb_arg.
+		q(nt(89), (nt(201)+nt(13)+nt(193)+nt(13)+nt(193)+nt(13)+nt(193)+nt(13)+nt(193)));
+		// bf_has_clashing_subformulas_cb => bf_has_clashing_subformulas_cb_sym __ bf_cb_arg __ bf_cb_arg.
+		q(nt(144), (nt(202)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// wff_has_clashing_subformulas_cb => wff_has_clashing_subformulas_cb_sym __ wff_cb_arg __ wff_cb_arg.
+		q(nt(85), (nt(203)+nt(13)+nt(193)+nt(13)+nt(193)));
+		// bf_has_subformula_cb => bf_has_subformula_cb_sym __ bf_cb_arg __ bf_cb_arg __ bf_cb_arg.
+		q(nt(145), (nt(204)+nt(13)+nt(188)+nt(13)+nt(188)+nt(13)+nt(188)));
+		// wff_has_subformula_cb => wff_has_subformula_cb_sym __ wff_cb_arg __ wff_cb_arg __ wff_cb_arg.
+		q(nt(86), (nt(205)+nt(13)+nt(193)+nt(13)+nt(193)+nt(13)+nt(193)));
 		// bf_has_clashing_subformulas_cb_sym => 'b' 'f' '_' 'h' 'a' 's' '_' 'c' 'l' 'a' 's' 'h' 'i' 'n' 'g' '_' 's' 'u' 'b' 'f' 'o' 'r' 'm' 'u' 'l' 'a' 's' '_' 'c' 'b'.
-		q(nt(213), (t(37)+t(42)+t(27)+t(46)+t(34)+t(47)+t(27)+t(48)+t(35)+t(34)+t(47)+t(46)+t(26)+t(49)+t(50)+t(27)+t(47)+t(7)+t(37)+t(42)+t(28)+t(51)+t(52)+t(7)+t(35)+t(34)+t(47)+t(27)+t(48)+t(37)));
+		q(nt(202), (t(34)+t(39)+t(23)+t(43)+t(30)+t(44)+t(23)+t(45)+t(31)+t(30)+t(44)+t(43)+t(22)+t(46)+t(47)+t(23)+t(44)+t(48)+t(34)+t(39)+t(24)+t(49)+t(50)+t(48)+t(31)+t(30)+t(44)+t(23)+t(45)+t(34)));
 		// bf_has_subformula_cb_sym => 'b' 'f' '_' 'h' 'a' 's' '_' 's' 'u' 'b' 'f' 'o' 'r' 'm' 'u' 'l' 'a' '_' 'c' 'b'.
-		q(nt(215), (t(37)+t(42)+t(27)+t(46)+t(34)+t(47)+t(27)+t(47)+t(7)+t(37)+t(42)+t(28)+t(51)+t(52)+t(7)+t(35)+t(34)+t(27)+t(48)+t(37)));
+		q(nt(204), (t(34)+t(39)+t(23)+t(43)+t(30)+t(44)+t(23)+t(44)+t(48)+t(34)+t(39)+t(24)+t(49)+t(50)+t(48)+t(31)+t(30)+t(23)+t(45)+t(34)));
 		// wff_has_clashing_subformulas_cb_sym => 'w' 'f' 'f' '_' 'h' 'a' 's' '_' 'c' 'l' 'a' 's' 'h' 'i' 'n' 'g' '_' 's' 'u' 'b' 'f' 'o' 'r' 'm' 'u' 'l' 'a' 's' '_' 'c' 'b'.
-		q(nt(214), (t(53)+t(42)+t(42)+t(27)+t(46)+t(34)+t(47)+t(27)+t(48)+t(35)+t(34)+t(47)+t(46)+t(26)+t(49)+t(50)+t(27)+t(47)+t(7)+t(37)+t(42)+t(28)+t(51)+t(52)+t(7)+t(35)+t(34)+t(47)+t(27)+t(48)+t(37)));
+		q(nt(203), (t(51)+t(39)+t(39)+t(23)+t(43)+t(30)+t(44)+t(23)+t(45)+t(31)+t(30)+t(44)+t(43)+t(22)+t(46)+t(47)+t(23)+t(44)+t(48)+t(34)+t(39)+t(24)+t(49)+t(50)+t(48)+t(31)+t(30)+t(44)+t(23)+t(45)+t(34)));
 		// wff_has_subformula_cb_sym => 'w' 'f' 'f' '_' 'h' 'a' 's' '_' 's' 'u' 'b' 'f' 'o' 'r' 'm' 'u' 'l' 'a' '_' 'c' 'b'.
-		q(nt(216), (t(53)+t(42)+t(42)+t(27)+t(46)+t(34)+t(47)+t(27)+t(47)+t(7)+t(37)+t(42)+t(28)+t(51)+t(52)+t(7)+t(35)+t(34)+t(27)+t(48)+t(37)));
+		q(nt(205), (t(51)+t(39)+t(39)+t(23)+t(43)+t(30)+t(44)+t(23)+t(44)+t(48)+t(34)+t(39)+t(24)+t(49)+t(50)+t(48)+t(31)+t(30)+t(23)+t(45)+t(34)));
 		// wff_remove_existential_cb_sym => 'w' 'f' 'f' '_' 'r' 'e' 'm' 'o' 'v' 'e' '_' 'e' 'x' 'i' 's' 't' 'e' 'n' 't' 'i' 'a' 'l' '_' 'c' 'b'.
-		q(nt(210), (t(53)+t(42)+t(42)+t(27)+t(51)+t(36)+t(52)+t(28)+t(54)+t(36)+t(27)+t(36)+t(6)+t(26)+t(47)+t(55)+t(36)+t(49)+t(55)+t(26)+t(34)+t(35)+t(27)+t(48)+t(37)));
+		q(nt(199), (t(51)+t(39)+t(39)+t(23)+t(49)+t(32)+t(50)+t(24)+t(52)+t(32)+t(23)+t(32)+t(33)+t(22)+t(44)+t(53)+t(32)+t(46)+t(53)+t(22)+t(30)+t(31)+t(23)+t(45)+t(34)));
 		// wff_remove_bexistential_cb_sym => 'w' 'f' 'f' '_' 'r' 'e' 'm' 'o' 'v' 'e' '_' 'b' 'e' 'x' 'i' 's' 't' 'e' 'n' 't' 'i' 'a' 'l' '_' 'c' 'b'.
-		q(nt(211), (t(53)+t(42)+t(42)+t(27)+t(51)+t(36)+t(52)+t(28)+t(54)+t(36)+t(27)+t(37)+t(36)+t(6)+t(26)+t(47)+t(55)+t(36)+t(49)+t(55)+t(26)+t(34)+t(35)+t(27)+t(48)+t(37)));
+		q(nt(200), (t(51)+t(39)+t(39)+t(23)+t(49)+t(32)+t(50)+t(24)+t(52)+t(32)+t(23)+t(34)+t(32)+t(33)+t(22)+t(44)+t(53)+t(32)+t(46)+t(53)+t(22)+t(30)+t(31)+t(23)+t(45)+t(34)));
 		// wff_remove_buniversal_cb_sym => 'w' 'f' 'f' '_' 'r' 'e' 'm' 'o' 'v' 'e' '_' 'b' 'u' 'n' 'i' 'v' 'e' 'r' 's' 'a' 'l' '_' 'c' 'b'.
-		q(nt(212), (t(53)+t(42)+t(42)+t(27)+t(51)+t(36)+t(52)+t(28)+t(54)+t(36)+t(27)+t(37)+t(7)+t(49)+t(26)+t(54)+t(36)+t(51)+t(47)+t(34)+t(35)+t(27)+t(48)+t(37)));
+		q(nt(201), (t(51)+t(39)+t(39)+t(23)+t(49)+t(32)+t(50)+t(24)+t(52)+t(32)+t(23)+t(34)+t(48)+t(46)+t(22)+t(52)+t(32)+t(49)+t(44)+t(30)+t(31)+t(23)+t(45)+t(34)));
 		// bf_remove_fexistential_cb_sym => 'b' 'f' '_' 'r' 'e' 'm' 'o' 'v' 'e' '_' 'f' 'e' 'x' 'i' 's' 't' 'e' 'n' 't' 'i' 'a' 'l' '_' 'c' 'b'.
-		q(nt(209), (t(37)+t(42)+t(27)+t(51)+t(36)+t(52)+t(28)+t(54)+t(36)+t(27)+t(42)+t(36)+t(6)+t(26)+t(47)+t(55)+t(36)+t(49)+t(55)+t(26)+t(34)+t(35)+t(27)+t(48)+t(37)));
+		q(nt(198), (t(34)+t(39)+t(23)+t(49)+t(32)+t(50)+t(24)+t(52)+t(32)+t(23)+t(39)+t(32)+t(33)+t(22)+t(44)+t(53)+t(32)+t(46)+t(53)+t(22)+t(30)+t(31)+t(23)+t(45)+t(34)));
 		// bf_remove_funiversal_cb_sym => 'b' 'f' '_' 'r' 'e' 'm' 'o' 'v' 'e' '_' 'f' 'u' 'n' 'i' 'v' 'e' 'r' 's' 'a' 'l' '_' 'c' 'b'.
-		q(nt(208), (t(37)+t(42)+t(27)+t(51)+t(36)+t(52)+t(28)+t(54)+t(36)+t(27)+t(42)+t(7)+t(49)+t(26)+t(54)+t(36)+t(51)+t(47)+t(34)+t(35)+t(27)+t(48)+t(37)));
+		q(nt(197), (t(34)+t(39)+t(23)+t(49)+t(32)+t(50)+t(24)+t(52)+t(32)+t(23)+t(39)+t(48)+t(46)+t(22)+t(52)+t(32)+t(49)+t(44)+t(30)+t(31)+t(23)+t(45)+t(34)));
 		// bf_cb_arg => bf.
-		q(nt(199), (nt(143)));
+		q(nt(188), (nt(132)));
 		// wff_cb_arg => wff.
-		q(nt(204), (nt(90)));
+		q(nt(193), (nt(79)));
 		// bf_and_cb_sym => 'b' 'f' '_' 'a' 'n' 'd' '_' 'c' 'b'.
-		q(nt(198), (t(37)+t(42)+t(27)+t(34)+t(49)+t(56)+t(27)+t(48)+t(37)));
+		q(nt(187), (t(34)+t(39)+t(23)+t(30)+t(46)+t(54)+t(23)+t(45)+t(34)));
 		// bf_or_cb_sym => 'b' 'f' '_' 'o' 'r' '_' 'c' 'b'.
-		q(nt(200), (t(37)+t(42)+t(27)+t(28)+t(51)+t(27)+t(48)+t(37)));
+		q(nt(189), (t(34)+t(39)+t(23)+t(24)+t(49)+t(23)+t(45)+t(34)));
 		// bf_xor_cb_sym => 'b' 'f' '_' 'x' 'o' 'r' '_' 'c' 'b'.
-		q(nt(201), (t(37)+t(42)+t(27)+t(6)+t(28)+t(51)+t(27)+t(48)+t(37)));
+		q(nt(190), (t(34)+t(39)+t(23)+t(33)+t(24)+t(49)+t(23)+t(45)+t(34)));
 		// bf_neg_cb_sym => 'b' 'f' '_' 'n' 'e' 'g' '_' 'c' 'b'.
-		q(nt(202), (t(37)+t(42)+t(27)+t(49)+t(36)+t(50)+t(27)+t(48)+t(37)));
+		q(nt(191), (t(34)+t(39)+t(23)+t(46)+t(32)+t(47)+t(23)+t(45)+t(34)));
 		// bf_eq_cb_sym => 'b' 'f' '_' 'e' 'q' '_' 'c' 'b'.
-		q(nt(203), (t(37)+t(42)+t(27)+t(36)+t(57)+t(27)+t(48)+t(37)));
+		q(nt(192), (t(34)+t(39)+t(23)+t(32)+t(55)+t(23)+t(45)+t(34)));
 		// bf_neq_cb_sym => 'b' 'f' '_' 'n' 'e' 'q' '_' 'c' 'b'.
-		q(nt(205), (t(37)+t(42)+t(27)+t(49)+t(36)+t(57)+t(27)+t(48)+t(37)));
+		q(nt(194), (t(34)+t(39)+t(23)+t(46)+t(32)+t(55)+t(23)+t(45)+t(34)));
 		// bf_is_zero_cb_sym => 'b' 'f' '_' 'i' 's' '_' 'z' 'e' 'r' 'o' '_' 'c' 'b'.
-		q(nt(206), (t(37)+t(42)+t(27)+t(26)+t(47)+t(27)+t(58)+t(36)+t(51)+t(28)+t(27)+t(48)+t(37)));
+		q(nt(195), (t(34)+t(39)+t(23)+t(22)+t(44)+t(23)+t(56)+t(32)+t(49)+t(24)+t(23)+t(45)+t(34)));
 		// bf_is_one_cb_sym => 'b' 'f' '_' 'i' 's' '_' 'o' 'n' 'e' '_' 'c' 'b'.
-		q(nt(207), (t(37)+t(42)+t(27)+t(26)+t(47)+t(27)+t(28)+t(49)+t(36)+t(27)+t(48)+t(37)));
-		// _Rtau_collapse_positives_cb_33 => tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg ws_required tau_cb_arg.
-		q(nt(219), (nt(217)+nt(13)+nt(218)+nt(13)+nt(218)+nt(13)+nt(218)));
-		// _Rtau_collapse_positives_cb_34 => tau_collapse_positives_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
-		q(nt(220), (nt(217)+nt(13)+nt(218)+nt(13)+nt(218)));
+		q(nt(196), (t(34)+t(39)+t(23)+t(22)+t(44)+t(23)+t(24)+t(46)+t(32)+t(23)+t(45)+t(34)));
+		// _Rtau_collapse_positives_cb_33 => tau_collapse_positives_cb_sym __ tau_cb_arg __ tau_cb_arg __ tau_cb_arg.
+		q(nt(208), (nt(206)+nt(13)+nt(207)+nt(13)+nt(207)+nt(13)+nt(207)));
+		// _Rtau_collapse_positives_cb_34 => tau_collapse_positives_cb_sym __ tau_cb_arg __ tau_cb_arg.
+		q(nt(209), (nt(206)+nt(13)+nt(207)+nt(13)+nt(207)));
 		// tau_collapse_positives_cb => _Rtau_collapse_positives_cb_33.
-		q(nt(74), (nt(219)));
+		q(nt(63), (nt(208)));
 		// tau_collapse_positives_cb => _Rtau_collapse_positives_cb_34.
-		q(nt(74), (nt(220)));
-		// tau_positives_upwards_cb => tau_positives_upwards_cb_sym ws_required tau_cb_arg ws_required tau_cb_arg.
-		q(nt(75), (nt(221)+nt(13)+nt(218)+nt(13)+nt(218)));
+		q(nt(63), (nt(209)));
+		// tau_positives_upwards_cb => tau_positives_upwards_cb_sym __ tau_cb_arg __ tau_cb_arg.
+		q(nt(64), (nt(210)+nt(13)+nt(207)+nt(13)+nt(207)));
 		// tau_cb_arg => capture.
-		q(nt(218), (nt(56)));
+		q(nt(207), (nt(45)));
 		// tau_cb_arg => tau.
-		q(nt(218), (nt(73)));
+		q(nt(207), (nt(62)));
 		// tau_collapse_positives_cb_sym => 't' 'a' 'u' '_' 'c' 'o' 'l' 'l' 'a' 'p' 's' 'e' '_' 'p' 'o' 's' 'i' 't' 'i' 'v' 'e' 's' '_' 'c' 'b'.
-		q(nt(217), (t(55)+t(34)+t(7)+t(27)+t(48)+t(28)+t(35)+t(35)+t(34)+t(59)+t(47)+t(36)+t(27)+t(59)+t(28)+t(47)+t(26)+t(55)+t(26)+t(54)+t(36)+t(47)+t(27)+t(48)+t(37)));
+		q(nt(206), (t(53)+t(30)+t(48)+t(23)+t(45)+t(24)+t(31)+t(31)+t(30)+t(57)+t(44)+t(32)+t(23)+t(57)+t(24)+t(44)+t(22)+t(53)+t(22)+t(52)+t(32)+t(44)+t(23)+t(45)+t(34)));
 		// tau_positives_upwards_cb_sym => 't' 'a' 'u' '_' 'p' 'o' 's' 'i' 't' 'i' 'v' 'e' 's' '_' 'u' 'p' 'w' 'a' 'r' 'd' 's' '_' 'c' 'b'.
-		q(nt(221), (t(55)+t(34)+t(7)+t(27)+t(59)+t(28)+t(47)+t(26)+t(55)+t(26)+t(54)+t(36)+t(47)+t(27)+t(7)+t(59)+t(53)+t(34)+t(51)+t(56)+t(47)+t(27)+t(48)+t(37)));
-		// _Rinputs_35 => ws input.
-		q(nt(224), (nt(14)+nt(223)));
+		q(nt(210), (t(53)+t(30)+t(48)+t(23)+t(57)+t(24)+t(44)+t(22)+t(53)+t(22)+t(52)+t(32)+t(44)+t(23)+t(48)+t(57)+t(51)+t(30)+t(49)+t(54)+t(44)+t(23)+t(45)+t(34)));
+		// _Rinputs_35 => _ input.
+		q(nt(213), (nt(15)+nt(212)));
 		// _Rinputs_36 => null.
-		q(nt(225), (nul));
+		q(nt(214), (nul));
 		// _Rinputs_36 => _Rinputs_35 _Rinputs_36.
-		q(nt(225), (nt(224)+nt(225)));
-		// inputs => ws less ws input _Rinputs_36 ws dot.
-		q(nt(222), (nt(14)+nt(48)+nt(14)+nt(223)+nt(225)+nt(14)+nt(38)));
-		// input => in ws colon ws open_brace ws source_binding ws close_brace.
-		q(nt(223), (nt(64)+nt(14)+nt(46)+nt(14)+nt(43)+nt(14)+nt(191)+nt(14)+nt(44)));
-		// builder => ws builder_head ws builder_body ws dot.
-		q(nt(226), (nt(14)+nt(227)+nt(14)+nt(228)+nt(14)+nt(38)));
-		// _Rbuilder_head_37 => ws_required capture.
-		q(nt(229), (nt(13)+nt(56)));
+		q(nt(214), (nt(213)+nt(214)));
+		// inputs => _ less _ input _Rinputs_36 _ dot.
+		q(nt(211), (nt(15)+nt(30)+nt(15)+nt(212)+nt(214)+nt(15)+nt(20)));
+		// input => in _ colon _ open_brace _ source_binding _ close_brace.
+		q(nt(212), (nt(53)+nt(15)+nt(28)+nt(15)+nt(25)+nt(15)+nt(180)+nt(15)+nt(26)));
+		// builder => _ builder_head _ builder_body _ dot.
+		q(nt(215), (nt(15)+nt(216)+nt(15)+nt(217)+nt(15)+nt(20)));
+		// _Rbuilder_head_37 => __ capture.
+		q(nt(218), (nt(13)+nt(45)));
 		// _Rbuilder_head_38 => null.
-		q(nt(230), (nul));
+		q(nt(219), (nul));
 		// _Rbuilder_head_38 => _Rbuilder_head_37 _Rbuilder_head_38.
-		q(nt(230), (nt(229)+nt(230)));
-		// builder_head => open_parenthesis ws capture _Rbuilder_head_38 ws close_parenthesis.
-		q(nt(227), (nt(39)+nt(14)+nt(56)+nt(230)+nt(14)+nt(40)));
+		q(nt(219), (nt(218)+nt(219)));
+		// builder_head => open_parenthesis _ capture _Rbuilder_head_38 _ close_parenthesis.
+		q(nt(216), (nt(21)+nt(15)+nt(45)+nt(219)+nt(15)+nt(22)));
 		// builder_body => bf_builder_body.
-		q(nt(228), (nt(231)));
+		q(nt(217), (nt(220)));
 		// builder_body => wff_builder_body.
-		q(nt(228), (nt(232)));
+		q(nt(217), (nt(221)));
 		// builder_body => tau_builder_body.
-		q(nt(228), (nt(233)));
-		// bf_builder_body => bf_def ws bf.
-		q(nt(231), (nt(35)+nt(14)+nt(143)));
-		// wff_builder_body => wff_def ws wff.
-		q(nt(232), (nt(36)+nt(14)+nt(90)));
-		// tau_builder_body => tau_def ws tau.
-		q(nt(233), (nt(37)+nt(14)+nt(73)));
+		q(nt(217), (nt(222)));
+		// bf_builder_body => bf_def _ bf.
+		q(nt(220), (nt(17)+nt(15)+nt(132)));
+		// wff_builder_body => wff_def _ wff.
+		q(nt(221), (nt(18)+nt(15)+nt(79)));
+		// tau_builder_body => tau_def _ tau.
+		q(nt(222), (nt(19)+nt(15)+nt(62)));
 		// library => rules.
-		q(nt(234), (nt(235)));
-		// _Rrules_39 => ws rule.
-		q(nt(237), (nt(14)+nt(236)));
+		q(nt(223), (nt(224)));
+		// _Rrules_39 => _ rule.
+		q(nt(226), (nt(15)+nt(225)));
 		// _Rrules_40 => null.
-		q(nt(238), (nul));
+		q(nt(227), (nul));
 		// _Rrules_40 => _Rrules_39 _Rrules_40.
-		q(nt(238), (nt(237)+nt(238)));
+		q(nt(227), (nt(226)+nt(227)));
 		// rules => _Rrules_40.
-		q(nt(235), (nt(238)));
+		q(nt(224), (nt(227)));
 		// rule => tau_rule.
-		q(nt(236), (nt(70)));
+		q(nt(225), (nt(59)));
 		// rule => wff_rule.
-		q(nt(236), (nt(91)));
+		q(nt(225), (nt(80)));
 		// rule => bf_rule.
-		q(nt(236), (nt(150)));
+		q(nt(225), (nt(139)));
 		// nso_rr => nso_rec_relations nso_main.
-		q(nt(239), (nt(240)+nt(241)));
-		// _Rnso_rec_relations_41 => ws nso_rec_relation.
-		q(nt(243), (nt(14)+nt(242)));
+		q(nt(228), (nt(229)+nt(230)));
+		// _Rnso_rec_relations_41 => _ nso_rec_relation.
+		q(nt(232), (nt(15)+nt(231)));
 		// _Rnso_rec_relations_42 => null.
-		q(nt(244), (nul));
+		q(nt(233), (nul));
 		// _Rnso_rec_relations_42 => _Rnso_rec_relations_41 _Rnso_rec_relations_42.
-		q(nt(244), (nt(243)+nt(244)));
+		q(nt(233), (nt(232)+nt(233)));
 		// nso_rec_relations => _Rnso_rec_relations_42.
-		q(nt(240), (nt(244)));
+		q(nt(229), (nt(233)));
 		// nso_rec_relation => wff_rec_relation.
-		q(nt(242), (nt(101)));
+		q(nt(231), (nt(90)));
 		// nso_rec_relation => bf_rec_relation.
-		q(nt(242), (nt(174)));
-		// nso_main => ws wff ws dot.
-		q(nt(241), (nt(14)+nt(90)+nt(14)+nt(38)));
+		q(nt(231), (nt(163)));
+		// nso_main => _ wff _ dot.
+		q(nt(230), (nt(15)+nt(79)+nt(15)+nt(20)));
 		// gssotc_rr => gssotc_rec_relations gssotc_main.
-		q(nt(245), (nt(246)+nt(247)));
-		// _Rgssotc_rec_relations_43 => ws gssotc_rec_relation.
-		q(nt(249), (nt(14)+nt(248)));
+		q(nt(234), (nt(235)+nt(236)));
+		// _Rgssotc_rec_relations_43 => _ gssotc_rec_relation.
+		q(nt(238), (nt(15)+nt(237)));
 		// _Rgssotc_rec_relations_44 => null.
-		q(nt(250), (nul));
+		q(nt(239), (nul));
 		// _Rgssotc_rec_relations_44 => _Rgssotc_rec_relations_43 _Rgssotc_rec_relations_44.
-		q(nt(250), (nt(249)+nt(250)));
+		q(nt(239), (nt(238)+nt(239)));
 		// gssotc_rec_relations => _Rgssotc_rec_relations_44.
-		q(nt(246), (nt(250)));
+		q(nt(235), (nt(239)));
 		// gssotc_rec_relation => tau_rec_relation.
-		q(nt(248), (nt(76)));
+		q(nt(237), (nt(65)));
 		// gssotc_rec_relation => wff_rec_relation.
-		q(nt(248), (nt(101)));
+		q(nt(237), (nt(90)));
 		// gssotc_rec_relation => bf_rec_relation.
-		q(nt(248), (nt(174)));
-		// gssotc_main => ws tau ws semicolon.
-		q(nt(247), (nt(14)+nt(73)+nt(14)+nt(47)));
+		q(nt(237), (nt(163)));
+		// gssotc_main => _ tau _ semicolon.
+		q(nt(236), (nt(15)+nt(62)+nt(15)+nt(29)));
 		// _Rstart_45 => inputs.
-		q(nt(252), (nt(222)));
+		q(nt(241), (nt(211)));
 		// _Rstart_45 => builder.
-		q(nt(252), (nt(226)));
+		q(nt(241), (nt(215)));
 		// _Rstart_45 => library.
-		q(nt(252), (nt(234)));
+		q(nt(241), (nt(223)));
 		// _Rstart_45 => nso_rr.
-		q(nt(252), (nt(239)));
+		q(nt(241), (nt(228)));
 		// _Rstart_45 => gssotc_rr.
-		q(nt(252), (nt(245)));
-		// start => _Rstart_45 ws.
-		q(nt(251), (nt(252)+nt(14)));
-		// cli => wff.
-		q(nt(253), (nt(90)));
-		// cli => bf.
-		q(nt(253), (nt(143)));
-		// cli => normalize.
-		q(nt(253), (nt(254)));
-		// cli => bf_substitute.
-		q(nt(253), (nt(255)));
-		// cli => wff_substitute.
-		q(nt(253), (nt(256)));
-		// cli => bf_instantiate.
-		q(nt(253), (nt(257)));
-		// cli => wff_instantiate.
-		q(nt(253), (nt(258)));
-		// cli => file.
-		q(nt(253), (nt(259)));
-		// cli => rr_nso.
-		q(nt(253), (nt(260)));
-		// cli => help.
-		q(nt(253), (nt(261)));
-		// cli => version.
-		q(nt(253), (nt(262)));
-		// _Rnormalize_46 => q_nso_rr.
-		q(nt(268), (nt(264)));
-		// _Rnormalize_46 => q_wff.
-		q(nt(268), (nt(265)));
-		// _Rnormalize_46 => output.
+		q(nt(241), (nt(234)));
+		// start => _Rstart_45 _.
+		q(nt(240), (nt(241)+nt(15)));
+		// _Rcli_46 => _ dot _ cli_command.
+		q(nt(244), (nt(15)+nt(20)+nt(15)+nt(243)));
+		// _Rcli_47 => null.
+		q(nt(245), (nul));
+		// _Rcli_47 => _Rcli_46 _Rcli_47.
+		q(nt(245), (nt(244)+nt(245)));
+		// _Rcli_48 => _ dot.
+		q(nt(246), (nt(15)+nt(20)));
+		// cli => _ cli_command _Rcli_47 _Rcli_48 _.
+		q(nt(242), (nt(15)+nt(243)+nt(245)+nt(246)+nt(15)));
+		// __neg_43 => help.
+		q(nt(332), (nt(254)));
+		// __neg_44 => version.
+		q(nt(333), (nt(255)));
+		// __neg_45 => quit.
+		q(nt(334), (nt(256)));
+		// _Rcli_command_49 => bf & ~( __neg_43 ) & ~( __neg_44 ) & ~( __neg_45 ).
+		q(nt(257), (nt(132)) & ~(nt(332)) & ~(nt(333)) & ~(nt(334)));
+		// cli_command => wff.
+		q(nt(243), (nt(79)));
+		// cli_command => normalize.
+		q(nt(243), (nt(247)));
+		// cli_command => bf_substitute.
+		q(nt(243), (nt(248)));
+		// cli_command => wff_substitute.
+		q(nt(243), (nt(249)));
+		// cli_command => bf_instantiate.
+		q(nt(243), (nt(250)));
+		// cli_command => wff_instantiate.
+		q(nt(243), (nt(251)));
+		// cli_command => file.
+		q(nt(243), (nt(252)));
+		// cli_command => rr_nso.
+		q(nt(243), (nt(253)));
+		// cli_command => help.
+		q(nt(243), (nt(254)));
+		// cli_command => version.
+		q(nt(243), (nt(255)));
+		// cli_command => quit.
+		q(nt(243), (nt(256)));
+		// cli_command => _Rcli_command_49.
+		q(nt(243), (nt(257)));
+		// _Rnormalize_50 => q_nso_rr.
+		q(nt(263), (nt(259)));
+		// _Rnormalize_50 => q_wff.
+		q(nt(263), (nt(260)));
+		// _Rnormalize_50 => output.
+		q(nt(263), (nt(261)));
+		// _Rnormalize_50 => wff_selection.
+		q(nt(263), (nt(262)));
+		// normalize => normalize_sym __ _Rnormalize_50.
+		q(nt(247), (nt(258)+nt(13)+nt(263)));
+		// file => file_sym quote chars quote.
+		q(nt(252), (nt(264)+nt(33)+nt(34)+nt(33)));
+		// _Rbf_instantiate_51 => output.
+		q(nt(268), (nt(261)));
+		// _Rbf_instantiate_51 => q_var.
 		q(nt(268), (nt(266)));
-		// _Rnormalize_46 => wff_selection.
+		// _Rbf_instantiate_51 => bf_var_selection.
 		q(nt(268), (nt(267)));
-		// normalize => ws normalize_sym ws_required _Rnormalize_46 ws dot.
-		q(nt(254), (nt(14)+nt(263)+nt(13)+nt(268)+nt(14)+nt(38)));
-		// file => ws file_sym q_str chars q_str ws dot.
-		q(nt(259), (nt(14)+nt(269)+nt(20)+nt(30)+nt(20)+nt(14)+nt(38)));
-		// _Rbf_instantiate_47 => output.
-		q(nt(273), (nt(266)));
-		// _Rbf_instantiate_47 => q_var.
-		q(nt(273), (nt(271)));
-		// _Rbf_instantiate_47 => bf_var_selection.
-		q(nt(273), (nt(272)));
-		// _Rbf_instantiate_48 => output.
-		q(nt(277), (nt(266)));
-		// _Rbf_instantiate_48 => q_bf.
-		q(nt(277), (nt(275)));
-		// _Rbf_instantiate_48 => bf_selection.
-		q(nt(277), (nt(276)));
-		// _Rbf_instantiate_49 => output.
-		q(nt(278), (nt(266)));
-		// _Rbf_instantiate_49 => bf_selection.
-		q(nt(278), (nt(276)));
-		// bf_instantiate => ws instantiate_sym ws_required _Rbf_instantiate_47 ws_rewuired _Rbf_instantiate_48 ws_required _Rbf_instantiate_49 ws dot.
-		q(nt(257), (nt(14)+nt(270)+nt(13)+nt(273)+nt(274)+nt(277)+nt(13)+nt(278)+nt(14)+nt(38)));
-		// _Rwff_instantiate_50 => output.
-		q(nt(280), (nt(266)));
-		// _Rwff_instantiate_50 => q_var.
-		q(nt(280), (nt(271)));
-		// _Rwff_instantiate_50 => wff_var_selection.
-		q(nt(280), (nt(279)));
-		// _Rwff_instantiate_51 => q_wff.
-		q(nt(281), (nt(265)));
-		// _Rwff_instantiate_51 => output.
-		q(nt(281), (nt(266)));
-		// _Rwff_instantiate_51 => wff_selection.
-		q(nt(281), (nt(267)));
-		// _Rwff_instantiate_52 => output.
-		q(nt(282), (nt(266)));
-		// _Rwff_instantiate_52 => wff_selection.
-		q(nt(282), (nt(267)));
-		// wff_instantiate => ws instantiate_sym ws_required _Rwff_instantiate_50 ws_rewuired _Rwff_instantiate_51 ws_required _Rwff_instantiate_52 ws dot.
-		q(nt(258), (nt(14)+nt(270)+nt(13)+nt(280)+nt(274)+nt(281)+nt(13)+nt(282)+nt(14)+nt(38)));
-		// _Rbf_substitute_53 => output.
-		q(nt(284), (nt(266)));
-		// _Rbf_substitute_53 => q_bf.
-		q(nt(284), (nt(275)));
-		// _Rbf_substitute_53 => bf_selection.
-		q(nt(284), (nt(276)));
-		// _Rbf_substitute_54 => output.
-		q(nt(285), (nt(266)));
-		// _Rbf_substitute_54 => wff_selection.
-		q(nt(285), (nt(267)));
-		// _Rbf_substitute_54 => bf_selection.
-		q(nt(285), (nt(276)));
-		// bf_substitute => ws substitute_sym ws_required _Rbf_substitute_53 ws_required _Rbf_substitute_54 ws dot.
-		q(nt(255), (nt(14)+nt(283)+nt(13)+nt(284)+nt(13)+nt(285)+nt(14)+nt(38)));
-		// _Rwff_substitute_55 => q_wff.
-		q(nt(286), (nt(265)));
-		// _Rwff_substitute_55 => output.
-		q(nt(286), (nt(266)));
-		// _Rwff_substitute_55 => wff_selection.
-		q(nt(286), (nt(267)));
-		// _Rwff_substitute_56 => output.
-		q(nt(287), (nt(266)));
-		// _Rwff_substitute_56 => wff_selection.
-		q(nt(287), (nt(267)));
-		// wff_substitute => ws substitute_sym ws_required _Rwff_substitute_55 ws_required _Rwff_substitute_56 ws dot.
-		q(nt(256), (nt(14)+nt(283)+nt(13)+nt(286)+nt(13)+nt(287)+nt(14)+nt(38)));
-		// help => ws help_sym ws dot.
-		q(nt(261), (nt(14)+nt(288)+nt(14)+nt(38)));
-		// version => ws version_sym ws dot.
-		q(nt(262), (nt(14)+nt(289)+nt(14)+nt(38)));
-		// wff_selection => selection_sym ws_required digits.
-		q(nt(267), (nt(290)+nt(13)+nt(33)));
-		// bf_selection => selection_sym ws_required digits.
-		q(nt(276), (nt(290)+nt(13)+nt(33)));
-		// bf_var_selection => selection_sym ws_required digits.
-		q(nt(272), (nt(290)+nt(13)+nt(33)));
-		// wff_var_selection => selection_sym ws_required digits.
-		q(nt(279), (nt(290)+nt(13)+nt(33)));
-		// q_nso_rr => q_char ws nso_rr ws q_char.
-		q(nt(264), (nt(19)+nt(14)+nt(239)+nt(14)+nt(19)));
-		// q_wff => q_char ws wff ws q_char.
-		q(nt(265), (nt(19)+nt(14)+nt(90)+nt(14)+nt(19)));
-		// q_bf => q_char ws bf ws q_char.
-		q(nt(275), (nt(19)+nt(14)+nt(143)+nt(14)+nt(19)));
-		// q_var => q_char ws var ws q_char.
-		q(nt(271), (nt(19)+nt(14)+nt(63)+nt(14)+nt(19)));
-		// output => output_sym ws_required digits.
-		q(nt(266), (nt(291)+nt(13)+nt(33)));
-		// output_sym => 'o' 'u' 't' 'p' 'u' 't'.
-		q(nt(291), (t(28)+t(7)+t(55)+t(59)+t(7)+t(55)));
-		// selection_sym => 's' 'e' 'l' 'e' 'c' 't' 'i' 'o' 'n'.
-		q(nt(290), (t(47)+t(36)+t(35)+t(36)+t(48)+t(55)+t(26)+t(28)+t(49)));
-		// instantiate_sym => 'i' 'n' 's' 't' 'a' 'n' 't' 'i' 'a' 't' 'e'.
-		q(nt(270), (t(26)+t(49)+t(47)+t(55)+t(34)+t(49)+t(55)+t(26)+t(34)+t(55)+t(36)));
-		// substitute_sym => 's' 'u' 'b' 's' 't' 'i' 't' 'u' 't' 'e'.
-		q(nt(283), (t(47)+t(7)+t(37)+t(47)+t(55)+t(26)+t(55)+t(7)+t(55)+t(36)));
-		// normalize_sym => 'n' 'o' 'r' 'm' 'a' 'l' 'i' 'z' 'e'.
-		q(nt(263), (t(49)+t(28)+t(51)+t(52)+t(34)+t(35)+t(26)+t(58)+t(36)));
+		// _Rbf_instantiate_52 => output.
+		q(nt(271), (nt(261)));
+		// _Rbf_instantiate_52 => q_bf.
+		q(nt(271), (nt(269)));
+		// _Rbf_instantiate_52 => bf_selection.
+		q(nt(271), (nt(270)));
+		// _Rbf_instantiate_53 => output.
+		q(nt(272), (nt(261)));
+		// _Rbf_instantiate_53 => bf_selection.
+		q(nt(272), (nt(270)));
+		// bf_instantiate => instantiate_sym __ _Rbf_instantiate_51 __ _Rbf_instantiate_52 __ _Rbf_instantiate_53.
+		q(nt(250), (nt(265)+nt(13)+nt(268)+nt(13)+nt(271)+nt(13)+nt(272)));
+		// _Rwff_instantiate_54 => output.
+		q(nt(274), (nt(261)));
+		// _Rwff_instantiate_54 => q_var.
+		q(nt(274), (nt(266)));
+		// _Rwff_instantiate_54 => wff_var_selection.
+		q(nt(274), (nt(273)));
+		// _Rwff_instantiate_55 => q_wff.
+		q(nt(275), (nt(260)));
+		// _Rwff_instantiate_55 => output.
+		q(nt(275), (nt(261)));
+		// _Rwff_instantiate_55 => wff_selection.
+		q(nt(275), (nt(262)));
+		// _Rwff_instantiate_56 => output.
+		q(nt(276), (nt(261)));
+		// _Rwff_instantiate_56 => wff_selection.
+		q(nt(276), (nt(262)));
+		// wff_instantiate => instantiate_sym __ _Rwff_instantiate_54 __ _Rwff_instantiate_55 __ _Rwff_instantiate_56.
+		q(nt(251), (nt(265)+nt(13)+nt(274)+nt(13)+nt(275)+nt(13)+nt(276)));
+		// _Rbf_substitute_57 => output.
+		q(nt(278), (nt(261)));
+		// _Rbf_substitute_57 => q_bf.
+		q(nt(278), (nt(269)));
+		// _Rbf_substitute_57 => bf_selection.
+		q(nt(278), (nt(270)));
+		// _Rbf_substitute_58 => output.
+		q(nt(279), (nt(261)));
+		// _Rbf_substitute_58 => wff_selection.
+		q(nt(279), (nt(262)));
+		// _Rbf_substitute_58 => bf_selection.
+		q(nt(279), (nt(270)));
+		// bf_substitute => substitute_sym __ _Rbf_substitute_57 __ _Rbf_substitute_58.
+		q(nt(248), (nt(277)+nt(13)+nt(278)+nt(13)+nt(279)));
+		// _Rwff_substitute_59 => q_wff.
+		q(nt(280), (nt(260)));
+		// _Rwff_substitute_59 => output.
+		q(nt(280), (nt(261)));
+		// _Rwff_substitute_59 => wff_selection.
+		q(nt(280), (nt(262)));
+		// _Rwff_substitute_60 => output.
+		q(nt(281), (nt(261)));
+		// _Rwff_substitute_60 => wff_selection.
+		q(nt(281), (nt(262)));
+		// wff_substitute => substitute_sym __ _Rwff_substitute_59 __ _Rwff_substitute_60.
+		q(nt(249), (nt(277)+nt(13)+nt(280)+nt(13)+nt(281)));
+		// _Rhelp_61 => null.
+		q(nt(284), (nul));
+		// _Rhelp_61 => __ cli_cmd.
+		q(nt(284), (nt(13)+nt(283)));
+		// help => help_sym _Rhelp_61.
+		q(nt(254), (nt(282)+nt(284)));
+		// version => version_sym.
+		q(nt(255), (nt(285)));
+		// quit => quit_sym.
+		q(nt(256), (nt(286)));
+		// wff_selection => selection_sym __ digits.
+		q(nt(262), (nt(287)+nt(13)+nt(37)));
+		// bf_selection => selection_sym __ digits.
+		q(nt(270), (nt(287)+nt(13)+nt(37)));
+		// bf_var_selection => selection_sym __ digits.
+		q(nt(267), (nt(287)+nt(13)+nt(37)));
+		// wff_var_selection => selection_sym __ digits.
+		q(nt(273), (nt(287)+nt(13)+nt(37)));
+		// q_nso_rr => apostrophe _ nso_rr _ apostrophe.
+		q(nt(259), (nt(32)+nt(15)+nt(228)+nt(15)+nt(32)));
+		// q_wff => apostrophe _ wff _ apostrophe.
+		q(nt(260), (nt(32)+nt(15)+nt(79)+nt(15)+nt(32)));
+		// q_bf => apostrophe _ bf _ apostrophe.
+		q(nt(269), (nt(32)+nt(15)+nt(132)+nt(15)+nt(32)));
+		// q_var => apostrophe _ var _ apostrophe.
+		q(nt(266), (nt(32)+nt(15)+nt(52)+nt(15)+nt(32)));
+		// output => output_sym __ digits.
+		q(nt(261), (nt(288)+nt(13)+nt(37)));
+		// cli_cmd => normalize_sym.
+		q(nt(283), (nt(258)));
+		// cli_cmd => file_sym.
+		q(nt(283), (nt(264)));
+		// cli_cmd => instantiate_sym.
+		q(nt(283), (nt(265)));
+		// cli_cmd => substitute_sym.
+		q(nt(283), (nt(277)));
+		// cli_cmd => help_sym.
+		q(nt(283), (nt(282)));
+		// cli_cmd => version_sym.
+		q(nt(283), (nt(285)));
+		// cli_cmd => quit_sym.
+		q(nt(283), (nt(286)));
+		// cli_cmd => selection_sym.
+		q(nt(283), (nt(287)));
+		// cli_cmd => output_sym.
+		q(nt(283), (nt(288)));
+		// help_sym => 'h'.
+		q(nt(282), (t(43)));
 		// help_sym => 'h' 'e' 'l' 'p'.
-		q(nt(288), (t(46)+t(36)+t(35)+t(59)));
+		q(nt(282), (t(43)+t(32)+t(31)+t(57)));
+		// version_sym => 'v'.
+		q(nt(285), (t(52)));
 		// version_sym => 'v' 'e' 'r' 's' 'i' 'o' 'n'.
-		q(nt(289), (t(54)+t(36)+t(51)+t(47)+t(26)+t(28)+t(49)));
+		q(nt(285), (t(52)+t(32)+t(49)+t(44)+t(22)+t(24)+t(46)));
+		// quit_sym => 'e' 'x' 'i' 't'.
+		q(nt(286), (t(32)+t(33)+t(22)+t(53)));
+		// quit_sym => 'q'.
+		q(nt(286), (t(55)));
+		// quit_sym => 'q' 'u' 'i' 't'.
+		q(nt(286), (t(55)+t(48)+t(22)+t(53)));
+		// output_sym => 'o'.
+		q(nt(288), (t(24)));
+		// output_sym => 'o' 'u' 't' 'p' 'u' 't'.
+		q(nt(288), (t(24)+t(48)+t(53)+t(57)+t(48)+t(53)));
+		// selection_sym => 's'.
+		q(nt(287), (t(44)));
+		// selection_sym => 's' 'e' 'l' 'e' 'c' 't' 'i' 'o' 'n'.
+		q(nt(287), (t(44)+t(32)+t(31)+t(32)+t(45)+t(53)+t(22)+t(24)+t(46)));
+		// instantiate_sym => 'i'.
+		q(nt(265), (t(22)));
+		// instantiate_sym => 'i' 'n' 's' 't' 'a' 'n' 't' 'i' 'a' 't' 'e'.
+		q(nt(265), (t(22)+t(46)+t(44)+t(53)+t(30)+t(46)+t(53)+t(22)+t(30)+t(53)+t(32)));
+		// substitute_sym => 's'.
+		q(nt(277), (t(44)));
+		// substitute_sym => 's' 'u' 'b' 's' 't' 'i' 't' 'u' 't' 'e'.
+		q(nt(277), (t(44)+t(48)+t(34)+t(44)+t(53)+t(22)+t(53)+t(48)+t(53)+t(32)));
+		// normalize_sym => 'n'.
+		q(nt(258), (t(46)));
+		// normalize_sym => 'n' 'o' 'r' 'm' 'a' 'l' 'i' 'z' 'e'.
+		q(nt(258), (t(46)+t(24)+t(49)+t(50)+t(30)+t(31)+t(22)+t(56)+t(32)));
+		// file_sym => 'r'.
+		q(nt(264), (t(49)));
 		// file_sym => 'r' 'e' 'a' 'd'.
-		q(nt(269), (t(51)+t(36)+t(34)+t(56)));
+		q(nt(264), (t(49)+t(32)+t(30)+t(54)));
 		return q;
 	}
 };
