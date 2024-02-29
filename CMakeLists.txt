@@ -10,16 +10,18 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
-option(TAU_BUILD_DOC               "Build documentation"         OFF)
-option(TAU_BUILD_STATIC_LIBRARY    "Build static library"        OFF)
-option(TAU_BUILD_SHARED_LIBRARY    "Build shared library"        OFF)
-option(TAU_BUILD_EXECUTABLE        "Build executable"            OFF)
-option(TAU_BUILD_SHARED_EXECUTABLE "Build shared executable"     OFF)
-option(TAU_BUILD_TESTS             "Build tests"                 OFF)
-option(TAU_BUILD_INTEGRATION       "Build integration tests"     OFF)
-option(TAU_BUILD_REGRESSION        "Build regression tests"      OFF)
-#option(TAU_BUILD_EXAMPLES          "Build examples"              OFF)
-option(TAU_GENERATE_PARSER         "Generates parser from TGF"   OFF)
+option(TAU_BUILD_DOC               "Build documentation"                   OFF)
+option(TAU_BUILD_STATIC_LIBRARY    "Build static library"                  OFF)
+option(TAU_BUILD_SHARED_LIBRARY    "Build shared library"                  OFF)
+option(TAU_BUILD_EXECUTABLE        "Build executable"                      OFF)
+option(TAU_BUILD_SHARED_EXECUTABLE "Build shared executable"               OFF)
+option(TAU_BUILD_TESTS             "Build tests"                           OFF)
+option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
+option(TAU_BUILD_REGRESSION        "Build regression tests"                OFF)
+#option(TAU_BUILD_EXAMPLES          "Build examples"                        OFF)
+# TODO (LOW) remove a singular TAU_GENERATE_PARSER in a near future
+option(TAU_GENERATE_PARSER         "Generates parsers from TGF (obsolete)" OFF)
+option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 set_property(CACHE TAU_BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_LIBRARY    PROPERTY STRINGS "OFF" "ON")
@@ -30,6 +32,7 @@ set_property(CACHE TAU_BUILD_INTEGRATION       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REGRESSION        PROPERTY STRINGS "OFF" "ON")
 #set_property(CACHE TAU_BUILD_EXAMPLES          PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSER         PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
 
 if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 	AND NOT TAU_BUILD_EXECUTABLE AND NOT TAU_BUILD_SHARED_EXECUTABLE
@@ -50,7 +53,7 @@ message(STATUS "TAU_BUILD_SHARED_EXECUTABLE: ${TAU_BUILD_SHARED_EXECUTABLE}")
 message(STATUS "TAU_BUILD_TESTS: ${TAU_BUILD_TESTS}")
 message(STATUS "TAU_BUILD_REGRESSION: ${TAU_BUILD_REGRESSION}")
 #message(STATUS "TAU_BUILD_EXAMPLES: ${TAU_BUILD_EXAMPLES}")
-message(STATUS "TAU_GENERATE_PARSER: ${GENERATE_PARSER}")
+message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 
 #
 # Adding parser library's git submodule
@@ -66,7 +69,7 @@ set(IDNI_PARSER_OBJECT_LIB "idni_parsero")
 #
 # Generate C++ parser from TGF if requested
 #
-if (TAU_GENERATE_PARSER)
+if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf" tau_parser)
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/bdd.tgf" bdd_parser)
