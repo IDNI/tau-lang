@@ -13,23 +13,25 @@
 
 @use_char_class space, alpha, alnum.
 
-start                   => ws bdd ws.
+start                   => _ bdd _.
 
-ws_required             => space ws.
-ws                      => ws_required | null.
+__                      => space _.   # whitespace
+_                       => [ __ ].    # optional whitespace
 
+# operators with implicit precedence
 bdd                     => disjunction  | bdd2.
 bdd2                    => conjunction  | bdd3.
 bdd3                    => exclusive_or | bdd4.
 bdd4                    => negation     | bdd5.
-bdd5                    => literal      | '(' ws bdd ws ')'.
+bdd5                    => literal      | '(' _ bdd _ ')'.
 
-disjunction             => bdd  ws '|' ws         bdd2.
-conjunction             => bdd2 ws '&' ws         bdd3.
-conjunction             => bdd2 ws_required       bdd3.
-exclusive_or            => bdd3 ws ('^' | '+') ws bdd4.
-negation                => bdd4 ws "'".
+disjunction             => bdd  _ '|' _         bdd2.
+conjunction             => bdd2 _ '&' _         bdd3.
+conjunction             => bdd2 __              bdd3.
+exclusive_or            => bdd3 _ ('^' | '+') _ bdd4.
+negation                => bdd4 _ "'".
 
+# literals
 literal                 => var | T | F.
 
 var                     => alpha (alnum)*.

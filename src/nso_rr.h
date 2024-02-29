@@ -215,11 +215,9 @@ auto is_non_essential_terminal = [] (const size_t n) {
 		|| n == tau_parser::alnum
 		|| n == tau_parser::punct
 		|| n == tau_parser::printable
-		|| n == tau_parser::eol
-		|| n == tau_parser::ws_required
-		|| n == tau_parser::ws_comment
-		|| n == tau_parser::ws
-		|| n == tau_parser::esc
+		|| n == tau_parser::comment
+		|| n == tau_parser::__
+		|| n == tau_parser::_
 		|| n == tau_parser::open_parenthesis
 		|| n == tau_parser::close_parenthesis
 		|| n == tau_parser::open_bracket
@@ -667,7 +665,8 @@ template<typename... BAs>
 static const auto not_whitespace_predicate = [](const sp_tau_node<BAs...>& n) {
 	return n->value.index() != 0
 		|| !get<0>(n->value).nt()
-		|| get<0>(n->value).n() != tau_parser::ws;
+		|| (get<0>(n->value).n() != tau_parser::_ &&
+			get<0>(n->value).n() != tau_parser::__);
 };
 
 template<typename... BAs>
