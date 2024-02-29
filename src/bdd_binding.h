@@ -14,12 +14,13 @@
 #ifndef __BDD_BINDING_H__
 #define __BDD_BINDING_H__
 
-#include "../src/nso_rr.h"
-#include "../src/bdd_handle.h"
-#include "../src/babdd.h"
-#include "../src/rewriting.h"
-#include "../src/tau.h"
-#include "../src/dict.h"
+#include "nso_rr.h"
+#include "bdd_handle.h"
+#include "babdd.h"
+#include "rewriting.h"
+#include "tau.h"
+#include "dict.h"
+#include "parser_instance.h"
 
 #include "../parser/bdd_parser.generated.h"
 
@@ -125,7 +126,7 @@ struct bdd_factory {
 
 	// parses a bdd from a string
 	bdd_binding parse(const std::string& src) {
-		static bdd_parser p;
+		auto& p = parser_instance<bdd_parser>();
 		auto f = p.parse(src.c_str(), src.size());
 #ifdef DEBUG
 		if (!f || !p.found()) {
