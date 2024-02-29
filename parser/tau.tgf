@@ -311,7 +311,7 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 # TODO do the same with the other starting points: library, inputs, builder.
 # IDEA in the future nso_rr could be seen also as a starting point and also gssotc_rr
 # depending on the use case of the grammar.
-cli                    => _ cli_command (_ dot _ cli_command)* (_ dot) _.
+cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
 cli_command            => normalize | bf_substitute | wff_substitute
 			| bf_instantiate | wff_instantiate | file | rr_nso | wff
 			| (bf & ~help & ~version & ~quit)

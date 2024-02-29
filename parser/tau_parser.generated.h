@@ -933,6 +933,8 @@ private:
 		q(nt(245), (nul));
 		// _Rcli_47 => _Rcli_46 _Rcli_47.
 		q(nt(245), (nt(244)+nt(245)));
+		// _Rcli_48 => null.
+		q(nt(246), (nul));
 		// _Rcli_48 => _ dot.
 		q(nt(246), (nt(15)+nt(20)));
 		// cli => _ cli_command _Rcli_47 _Rcli_48 _.
