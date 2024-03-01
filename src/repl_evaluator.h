@@ -10,29 +10,13 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __BOOL_H__
-#define __BOOL_H__
+#ifndef __REPL_EVALUATOR_H__
+#define __REPL_EVALUATOR_H__
+#include <string>
 
-struct Bool {
-	Bool();
-	Bool(bool b);
+namespace idni {
 
-	static const Bool& zero();
-	static const Bool& one();
+struct repl_evaluator { int eval(const std::string& src); };
 
-	Bool operator&(const Bool& x) const;
-	Bool operator|(const Bool& x) const;
-	Bool operator^(const Bool& x) const;
-	Bool operator+(const Bool& x) const;
-	Bool operator~() const;
-	auto operator<=>(const Bool& x) const = default;
-
-	bool is_zero() const;
-	bool is_one() const;
-
-	bool b;
-};
-
-std::ostream& operator<<(std::ostream& os, const Bool& b);
-
-#endif
+} // idni namespace
+#endif // __REPL_EVALUATOR_H__

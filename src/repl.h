@@ -25,13 +25,14 @@
 namespace idni {
 
 // repl with prompt, history (persisted to file) and terminal input handling
-// evaluator_t must be a class with a static method int eval(const std::string&)
+// evaluator_t must be a class with a method int eval(const std::string&)
 // which allows to plug own evaluation logic. The method should return non-zero
 // if the repl should exit.
 template <typename evaluator_t>
 struct repl {
-	repl(std::string prompt = "> ", std::string history_file = ".history")
-		: prompt_(prompt), history_file_(history_file)
+	repl(const evaluator_t& re, std::string prompt = "> ",
+		std::string history_file = ".history")
+		: re_(re), prompt_(prompt), history_file_(history_file)
 	{
 		// save terminal state and set terminal to raw mode
 		tcgetattr(STDIN_FILENO, &orig_attrs_);
@@ -92,7 +93,7 @@ struct repl {
 					refresh_input();
 			}
 			if (s.empty()) continue;
-			if (evaluator_t::eval(s)) break; // exit loop if nonzero
+			if (re_.eval(s)) break; // exit loop if nonzero
 			clear();
 		}
 		return 0;
@@ -185,6 +186,7 @@ private:
 			out(ss.str().c_str(), ss.str().size());
 		}
 	}
+	evaluator_t re_;
 	std::string prompt_;
 	std::string history_file_;
 	std::vector<char> input_;
