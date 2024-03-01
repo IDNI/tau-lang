@@ -12,7 +12,7 @@
 // modified over time by the Author.
 #ifndef __PARSER_INSTANCE_H__
 #define __PARSER_INSTANCE_H__
-
+#include <iostream>
 namespace idni {
 
 template <typename parser_t>

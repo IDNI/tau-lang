@@ -23,11 +23,16 @@ set(TAU_HEADERS
 )
 
 set(TAU_SOURCES
+	bool.cpp
 	dict.cpp
 	iterators.cpp
+	nso_rr.cpp
 )
 
-set(CLI_SOURCES main.cpp ../external/parser/src/cli.cpp)
+set(CLI_SOURCES
+	main.cpp
+	repl_evaluator.cpp
+	../external/parser/src/cli.cpp)
 
 #
 # object library
@@ -52,6 +57,8 @@ target_setup(${TAU_STATIC_LIB_NAME})
 target_link_libraries(${TAU_STATIC_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
+	$<BUILD_INTERFACE:${TAU}/parser>
+	$<BUILD_INTERFACE:${TAU}/external/parser/src>
 )
 set_target_properties(${TAU_STATIC_LIB_NAME} PROPERTIES
 	OUTPUT_NAME ${PROJECT_LIB_NAME})
@@ -91,6 +98,7 @@ if(TAU_BUILD_EXECUTABLE)
         target_link_libraries(${TAU_EXECUTABLE_NAME} ${TAU_STATIC_LIB_NAME})
 	target_include_directories(${TAU_EXECUTABLE_NAME} PUBLIC
 		$<BUILD_INTERFACE:${TAU}/src>
+		$<BUILD_INTERFACE:${TAU}/parser>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
 	)
 endif(TAU_BUILD_EXECUTABLE)
@@ -105,6 +113,7 @@ if(TAU_BUILD_SHARED_EXECUTABLE)
         target_link_libraries(${TAU_EXE_SHARED_NAME} ${TAU_SHARED_LIB_NAME})
 	target_include_directories(${TAU_EXE_SHARED_NAME} PUBLIC
 		$<BUILD_INTERFACE:${TAU}/src>
+		$<BUILD_INTERFACE:${TAU}/parser>
 		$<BUILD_INTERFACE:${TAU}/external/parser/src>
 	)
 endif(TAU_BUILD_SHARED_EXECUTABLE)
