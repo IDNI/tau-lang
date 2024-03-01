@@ -1026,6 +1026,7 @@ const std::string BLDR_WFF_EQ = "( $X ) ::= ($X = 0).";
 const std::string BLDR_WFF_NEQ = "( $X ) ::= ($X != 0).";
 const std::string BLDR_BF_LESS = "( $X $Y ) ::= ($X < $Y).";
 const std::string BLDR_BF_LESS_EQUAL = "( $X $Y ) ::= ($X <= $Y).";
+const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) ::= ($X !<= $Y).";
 const std::string BLDR_BF_GREATER = "( $X $Y ) ::= ($X > $Y).";
 const std::string BLDR_WFF_AND = "( $X $Y ) ::= ($X && $Y).";
 const std::string BLDR_WFF_OR = "( $X $Y ) ::= ($X || $Y).";
@@ -1095,6 +1096,8 @@ template<typename... BAs>
 static auto bldr_bf_less = make_builder<BAs...>(BLDR_BF_LESS);
 template<typename... BAs>
 static auto bldr_bf_less_equal = make_builder<BAs...>(BLDR_BF_LESS_EQUAL);
+template<typename... BAs>
+static auto bldr_bf_not_less_equal = make_builder<BAs...>(BLDR_BF_NOT_LESS_EQUAL);
 template<typename... BAs>
 static auto bldr_bf_greater = make_builder<BAs...>(BLDR_BF_GREATER);
 template<typename... BAs>
