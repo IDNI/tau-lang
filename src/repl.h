@@ -19,7 +19,6 @@
 #include <termios.h>
 
 // TODO (LOW) add windows and mac support (only linux terminal works)
-// TODO (LOW) support ctrl-left and ctrl-right (esc seq 49) for word navigation
 // TODO (LOW) support for multi-line inputs if necessary
 
 namespace idni {
@@ -67,9 +66,18 @@ struct repl {
 				else if (ch == 8 || ch == 127) backspace();
 				else if (ch == 27) { // escape seq
 					char c;
-					if (in(c) != 1 || c != 91) continue;
-					if (in(c) != 1)	continue;
-					if (c == 51) {
+					if (in(c) != 1 || c != 91 || in(c) != 1)
+						continue;
+					if (c == 49) { // ctrl
+						if (in(c) != 1 || c != 59 ||
+							in(c) != 1 || c != 53 ||
+							in(c) != 1) continue;
+						if      (c == 65) ctrl_up();
+						else if (c == 66) ctrl_down();
+						else if (c == 67) ctrl_right();
+						else if (c == 68) ctrl_left();
+					}
+					else if (c == 51) {
 						if (in(c)==1 && c==126) del();
 					}
 					else if (c == 65) up();
@@ -86,6 +94,7 @@ struct repl {
 				else if (ch == 10) { // enter
 					if (input_.size() == 0) continue;
 					s = store();
+					out("\n", 1);
 					break; // exit input loop to evaluate
 				} else  // not a control ch. add to input
 					input_.insert(
@@ -101,7 +110,9 @@ struct repl {
 private:
 	// reads a character from stdin
 	int in(char& c) {
-		return read(STDIN_FILENO, &c, 1);
+		int r = read(STDIN_FILENO, &c, 1);
+		if (r == 1) std::cerr << "read " << (int)c << "\n";
+		return r;
 	}
 	// writes data to stdout
 	void out(const char* data, size_t size) {
@@ -119,6 +130,8 @@ private:
 		//if (pos_ > input_.size())
 		pos_ = input_.size();
 	}
+	// clears the input line (set to empty)
+	void set() { input_.clear(), pos_ = 0; }
 	void clear() { // clears the input line
 		input_.clear(), pos_ = 0, refresh_input();
 	}
@@ -135,10 +148,24 @@ private:
 	void right() { // move cursor right
 		if (pos_ < input_.size()) pos_++, refresh_input();
 	}
-	void home() { // move cursor to the beginning
+	void ctrl_left() { // move cursor word left
+		if (pos_ == 0) return;
+		pos_--;
+		while (pos_ > 0 && !std::isalnum(input_[pos_]))     pos_--;
+		while (pos_ > 0 &&  std::isalnum(input_[pos_ - 1])) pos_--;
+		refresh_input();
+	}
+	void ctrl_right() { // move cursor word right
+		if (pos_ == input_.size()) return;
+		pos_++;
+		while (pos_<input_.size() && !std::isalnum(input_[pos_-1]))pos_++;
+		while (pos_<input_.size() &&  std::isalnum(input_[pos_]))pos_++;
+		refresh_input();
+	}
+	void home() { // move cursor to the beginning of the line
 		if (pos_) pos_ = 0, refresh_input();
 	}
-	void end() { // move cursor to the end
+	void end() { // move cursor to the end of the line
 		if (pos_ < input_.size()) pos_ = input_.size(), refresh_input();
 	}
 	void up() { // previous history input
@@ -150,9 +177,17 @@ private:
 	}
 	void down() { // next history input
 		if (hpos_ == history_.size()) return;
-		if (++hpos_ == history_.size()) input_.clear(), pos_ = 0;
+		if (++hpos_ == history_.size()) set();
 		else set(history_[hpos_]);
 		refresh_input();
+	}
+	void ctrl_up() { // go to first input in history
+		if (history_.size() == 0 || hpos_ == 0) return;
+		set(history_[hpos_ = 0]), refresh_input();
+	}
+	void ctrl_down() { // go beyond the end of history into a new input
+		if (hpos_ == history_.size()) return;
+		hpos_ = history_.size(), set(), refresh_input();
 	}
 	// store current input into history and return the input as a string
 	const std::string& store() {
