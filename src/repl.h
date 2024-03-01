@@ -109,11 +109,7 @@ struct repl {
 	}
 private:
 	// reads a character from stdin
-	int in(char& c) {
-		int r = read(STDIN_FILENO, &c, 1);
-		if (r == 1) std::cerr << "read " << (int)c << "\n";
-		return r;
-	}
+	int in(char& c) { return read(STDIN_FILENO, &c, 1); }
 	// writes data to stdout
 	void out(const char* data, size_t size) {
 		write(STDOUT_FILENO, data, size);
@@ -121,14 +117,11 @@ private:
 	// returns the current input as a string
 	std::string get() {
 		std::stringstream ss;
-		ss.write(input_.data(), input_.size());
-		return ss.str();
+		return ss.write(input_.data(), input_.size()), ss.str();
 	}
 	// sets the current input from a string
 	void set(const std::string& s) {
-		input_.assign(s.begin(), s.end());
-		//if (pos_ > input_.size())
-		pos_ = input_.size();
+		input_.assign(s.begin(), s.end()), pos_ = input_.size();
 	}
 	// clears the input line (set to empty)
 	void set() { input_.clear(), pos_ = 0; }
