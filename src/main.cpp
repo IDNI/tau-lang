@@ -41,6 +41,8 @@ cli::commands tau_commands() {
 	auto& repl = cmds["repl"] = cli::command("repl", "Tau REPL");
 	repl.add_option(cli::option("help", 'h', false)
 		.set_description("detailed information about repl options"));
+	repl.add_option(cli::option("evaluate", 'e', "")
+		.set_description("repl command to evaluate"));
 	return cmds;
 }
 
@@ -140,7 +142,9 @@ int main(int argc, char** argv) {
 
 	// repl command
 	if (cmd.name() == "repl") {
+		std::string e = cmd.get<string>("evaluate");
 		repl_evaluator re;
+		if (e.size()) return re.eval(e), 0;
 		repl<repl_evaluator> r(re, "tau> ", ".tau_history");
 		return r.run();
 	}
