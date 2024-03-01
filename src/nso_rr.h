@@ -29,6 +29,9 @@
 #include "bool.h"
 #include "rewriting.h"
 #include "../parser/tau_parser.generated.h"
+#ifdef DEBUG
+#	include "parser_instance.h"
+#endif
 
 using namespace idni::rewriter;
 
@@ -267,6 +270,11 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& n, const
 
 template <typename... BAs>
 std::optional<sp_tau_node<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& n, const size_t nt) {
+#ifdef DEBUG
+	if (!n.has_value()) std::cout
+		<< "\nWarning: value-less optional | tau_parser::"
+		<< parser_instance<tau_parser>().name(nt) << "\n";
+#endif
 	return n ? n.value() | nt : n;
 }
 
