@@ -1045,6 +1045,7 @@ const std::string BLDR_BF_AND = "( $X $Y ) := ($X & $Y).";
 const std::string BLDR_BF_OR = "( $X $Y ) := ($X | $Y).";
 const std::string BLDR_BF_XOR = "( $X $Y ) := ($X + $Y).";
 const std::string BLDR_BF_NEG = "( $X ) := ~ $X.";
+const std::string BLDR_BF_SPLITTER = "( $X ) := S($X).";
 const std::string BLDR_BF_ALL = "( $X $Y ) := fall $X $Y.";
 const std::string BLDR_BF_EX = "( $X $Y ) := fex $X $Y.";
 const std::string BLDR_BF_CONSTANT = "( $X ) := { $X }.";
@@ -1092,6 +1093,8 @@ template<typename... BAs>
 static auto bldr_bf_xor = make_builder<BAs...>(BLDR_BF_XOR);
 template<typename... BAs>
 static auto bldr_bf_neg = make_builder<BAs...>(BLDR_BF_NEG);
+template<typename... BAs>
+static auto bldr_bf_splitter = make_builder<BAs...>(BLDR_BF_SPLITTER);
 template<typename... BAs>
 static auto bldr_bf_less = make_builder<BAs...>(BLDR_BF_LESS);
 template<typename... BAs>

@@ -119,6 +119,12 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
 	}
 
+	TEST_CASE("BLDR_BF_SPLITTER") {
+		auto bldr = make_builder<Bool>(BLDR_BF_SPLITTER);
+		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
+		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
+	}
+
 	TEST_CASE("BLDR_BF_LESS") {
 		auto bldr = make_builder<Bool>(BLDR_BF_LESS);
 		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
@@ -272,6 +278,13 @@ TEST_SUITE("builders execution") {
 		auto bldr = make_builder<Bool>(BLDR_BF_NEG);
 		std::vector<sp_tau_node<Bool>> args = {F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_neg;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("BLDR_BF_SPLITTER") {
+		auto bldr = make_builder<Bool>(BLDR_BF_SPLITTER);
+		std::vector<sp_tau_node<Bool>> args = {F};
+		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_splitter;
 		CHECK( check.has_value() );
 	}
 
