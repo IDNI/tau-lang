@@ -47,7 +47,7 @@ struct tau_parser {
 		_Rtau_rec_relation_13, tau_ref, tau_ref_args, _Rtau_ref_args_14, _Rtau_ref_args_15, _Rtau_ref_args_16, tau_and_sym, tau_or_sym, tau_neg_sym, wff, 
 		wff_rule, wff_matcher, wff_body, bf_eq_cb, bf_neq_cb, wff_has_clashing_subformulas_cb, wff_has_subformula_cb, wff_remove_existential_cb, wff_remove_bexistential_cb, wff_remove_buniversal_cb, 
 		wff_rec_relation, wff_and, wff_neg, wff_xor, wff_conditional, wff_or, wff_all, wff_ex, wff_imply, wff_equiv, 
-		wff_t, wff_f, wff_ball, wff_bex, bf_eq, bf_neq, bf_less, bf_less_equal, bf_greater, bf_segment, 
+		wff_t, wff_f, wff_ball, wff_bex, bf_eq, bf_neq, bf_less, bf_less_equal, bf_greater, bf_interval, 
 		bf_not_less_equal, _Rwff_rec_relation_17, wff_ref, wff_ref_args, _Rwff_ref_args_18, _Rwff_ref_args_19, _Rwff_ref_args_20, wff_and_sym, wff_or_sym, wff_xor_sym, 
 		wff_conditional_sym, wff_neg_sym, wff_imply_sym, wff_equiv_sym, wff_all_sym, _Rwff_all_21, wff_ex_sym, _Rwff_ex_22, wff_ball_sym, _Rwff_ball_23, 
 		wff_bex_sym, _Rwff_bex_24, bf, bf_equality_sym, bf_nequality_sym, bf_less_sym, bf_less_equal_sym, bf_not_less_equal_sym, bf_greater_sym, bf_rule, 
@@ -111,7 +111,7 @@ private:
 			"_Rtau_rec_relation_13", "tau_ref", "tau_ref_args", "_Rtau_ref_args_14", "_Rtau_ref_args_15", "_Rtau_ref_args_16", "tau_and_sym", "tau_or_sym", "tau_neg_sym", "wff", 
 			"wff_rule", "wff_matcher", "wff_body", "bf_eq_cb", "bf_neq_cb", "wff_has_clashing_subformulas_cb", "wff_has_subformula_cb", "wff_remove_existential_cb", "wff_remove_bexistential_cb", "wff_remove_buniversal_cb", 
 			"wff_rec_relation", "wff_and", "wff_neg", "wff_xor", "wff_conditional", "wff_or", "wff_all", "wff_ex", "wff_imply", "wff_equiv", 
-			"wff_t", "wff_f", "wff_ball", "wff_bex", "bf_eq", "bf_neq", "bf_less", "bf_less_equal", "bf_greater", "bf_segment", 
+			"wff_t", "wff_f", "wff_ball", "wff_bex", "bf_eq", "bf_neq", "bf_less", "bf_less_equal", "bf_greater", "bf_interval", 
 			"bf_not_less_equal", "_Rwff_rec_relation_17", "wff_ref", "wff_ref_args", "_Rwff_ref_args_18", "_Rwff_ref_args_19", "_Rwff_ref_args_20", "wff_and_sym", "wff_or_sym", "wff_xor_sym", 
 			"wff_conditional_sym", "wff_neg_sym", "wff_imply_sym", "wff_equiv_sym", "wff_all_sym", "_Rwff_all_21", "wff_ex_sym", "_Rwff_ex_22", "wff_ball_sym", "_Rwff_ball_23", 
 			"wff_bex_sym", "_Rwff_bex_24", "bf", "bf_equality_sym", "bf_nequality_sym", "bf_less_sym", "bf_less_equal_sym", "bf_not_less_equal_sym", "bf_greater_sym", "bf_rule", 
@@ -415,7 +415,7 @@ private:
 		q(nt(314), (nt(107)));
 		// __neg_26 => bf_greater.
 		q(nt(315), (nt(108)));
-		// __neg_27 => bf_segment.
+		// __neg_27 => bf_interval.
 		q(nt(316), (nt(109)));
 		// __neg_28 => bf_not_less_equal.
 		q(nt(317), (nt(110)));
@@ -463,7 +463,7 @@ private:
 		q(nt(79), (nt(107)));
 		// wff => bf_greater.
 		q(nt(79), (nt(108)));
-		// wff => bf_segment.
+		// wff => bf_interval.
 		q(nt(79), (nt(109)));
 		// wff => bf_not_less_equal.
 		q(nt(79), (nt(110)));
@@ -533,7 +533,7 @@ private:
 		q(nt(110), (nt(21)+nt(15)+nt(132)+nt(15)+nt(137)+nt(15)+nt(132)+nt(15)+nt(22)));
 		// bf_greater => open_parenthesis _ bf _ bf_greater_sym _ bf _ close_parenthesis.
 		q(nt(108), (nt(21)+nt(15)+nt(132)+nt(15)+nt(138)+nt(15)+nt(132)+nt(15)+nt(22)));
-		// bf_segment => open_parenthesis _ bf _ bf_less_equal_sym _ bf _ bf_less_equal_sym _ bf _ close_parenthesis.
+		// bf_interval => open_parenthesis _ bf _ bf_less_equal_sym _ bf _ bf_less_equal_sym _ bf _ close_parenthesis.
 		q(nt(109), (nt(21)+nt(15)+nt(132)+nt(15)+nt(136)+nt(15)+nt(132)+nt(15)+nt(136)+nt(15)+nt(132)+nt(15)+nt(22)));
 		// wff_and_sym => '&' '&'.
 		q(nt(117), (t(25)+t(25)));
@@ -565,6 +565,8 @@ private:
 		q(nt(139), (nt(140)+nt(15)+nt(17)+nt(15)+nt(141)+nt(15)+nt(20)));
 		// bf_matcher => bf.
 		q(nt(140), (nt(132)));
+		// bf_body => bf_not_less_equal.
+		q(nt(141), (nt(110)));
 		// bf_body => bf.
 		q(nt(141), (nt(132)));
 		// bf_body => bf_is_zero_cb.
