@@ -314,7 +314,7 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
 cli_command            => normalize | bf_substitute | wff_substitute
 			| bf_instantiate | wff_instantiate | file | rr_nso | wff
-			| (bf & ~help & ~version & ~quit)
+			| output_cmd | (bf & ~help & ~version & ~quit)
 			| help | version | quit.
 
 normalize              => normalize_sym __ (q_nso_rr | q_wff | output | wff_selection).
@@ -358,6 +358,11 @@ q_wff                  => apostrophe _ wff    _ apostrophe.
 q_bf                   => apostrophe _ bf     _ apostrophe.
 q_var                  => apostrophe _ var    _ apostrophe.
 output                 => output_sym __ digits.
+
+output_cmd             => list_outputs | clear_outputs | view_output.
+list_outputs           => output_sym.
+view_output            => output.
+clear_outputs          => output_sym __ ("c" | "clear").
 
 cli_cmd                => help_sym | version_sym | quit_sym | output_sym
                         | selection_sym | instantiate_sym | substitute_sym

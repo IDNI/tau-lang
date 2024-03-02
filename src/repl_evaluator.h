@@ -14,9 +14,21 @@
 #define __REPL_EVALUATOR_H__
 #include <string>
 
-namespace idni {
+#include "bdd_binding.h"
 
-struct repl_evaluator { int eval(const std::string& src); };
+namespace idni::tau {
 
-} // idni namespace
+
+struct repl_evaluator {
+	int eval(const std::string& src);
+	using outputs_mem = std::vector<std::variant<
+		nso<tau_ba<bdd_binding>, bdd_binding>,
+		rr<nso<tau_ba<bdd_binding>, bdd_binding>>,
+		gssotc<tau_ba<bdd_binding>, bdd_binding>,
+		rr<gssotc<tau_ba<bdd_binding>, bdd_binding>>>>;
+private:
+	outputs_mem m;
+};
+
+} // idni::tau namespace
 #endif // __REPL_EVALUATOR_H__
