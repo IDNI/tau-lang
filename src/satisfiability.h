@@ -419,18 +419,21 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff_n
 }
 
 template<typename... BAs>
-bool is_gssotc_clause_satisfiable_no_vars(const gssotc<BAs...>& clause) {
-	auto wwf = clause | tau_parser::tau_wff | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
-	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(wwf);
+bool is_gssotc_clause_satisfiable_no_outputs(const gssotc<BAs...>& clause, const tau_spec_vars<BAs...>& inputs) {
+	auto wff = clause | tau_parser::tau_wff | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
+	bindings<tau_ba<BAs...>, BAs...> bindings;
+	std::basic_stringstream<char> main;
+	main << build_universal_quantifiers(inputs) << wff << ".";
+	std::string str = main.str();
+	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(str, bindings).main;
 	auto check = normalized | tau_parser::wff_t;
 	if (check.has_value()) {
 		DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: true" << std::endl;)
 		return true;
-	} else {
-		DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: false" << std::endl;)
-		return false;
 	}
-	return check.has_value() ? true : false;
+
+	DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: false" << std::endl;)
+	return false;
 }
 
 template<typename... BAs>
@@ -501,7 +504,7 @@ std::string build_phi_general_case_nso_rr(const std::optional<gssotc<BAs...>>& p
 	auto wff = positive | tau_parser::tau_wff | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
 	auto nwff = get_loopback_adjusted_nso<BAs...>(wff, loopback);
 
-	gen_phi << "phi[t](" << build_args_from_vars(inputs, 1) << ") ::= ";
+	gen_phi << "phi[t](" << build_args_from_vars(outputs, 1) << ") ::= ";
 	for (size_t i = 1; i < loopback + 1; ++i) {
 		gen_phi << build_universal_quantifiers(inputs, i);
 		gen_phi << build_existential_quantifiers(outputs, i);
@@ -519,10 +522,10 @@ std::string build_phi_base_case_nso_rr(const std::optional<gssotc<BAs...>>& posi
 	std::basic_stringstream<char> base_phi;
 
 	auto wff = positive | tau_parser::tau_wff | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
-	auto nwff = get_loopback_adjusted_nso<BAs...>(wff, loopback);
+	auto nwff = get_loopback_adjusted_nso<BAs...>(wff, loopback + 1);
 
-	base_phi << "phi[" << loopback + 1 << "](" << build_args_from_vars(inputs, 1) << ") ::= ";
-	for (size_t i = 1; i < loopback + 1; ++i) {
+	base_phi << "phi[" << loopback + 1 << "](" << build_args_from_vars(outputs, 1) << ") ::= ";
+	for (size_t i = 2; i <= loopback + 1; ++i) {
 		base_phi << build_universal_quantifiers(inputs, i);
 		base_phi << build_existential_quantifiers(outputs, i);
 	}
@@ -595,12 +598,13 @@ bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 	auto [inputs, outputs] = get_gssotc_io_vars(collapsed);
 	size_t loopback = max(inputs.loopback, outputs.loopback);
 
-	if (inputs.name.empty() && outputs.name.empty()) {
+	// TODO (HIGH) Case no output variables but input variables
+	if (outputs.name.empty()) {
 
 		DBG(std::cout << "(I) -- No variables case" << std::endl;)
 		DBG(std::cout << "(F) " << collapsed << std::endl;)
 
-		return is_gssotc_clause_satisfiable_no_vars(collapsed);
+		return is_gssotc_clause_satisfiable_no_outputs(collapsed, inputs);
 	} else if (negatives.empty() && positive.has_value() && loopback == 0) {
 
 		DBG(std::cout << "(I) -- No negatives and no loopback case" << std::endl;)
