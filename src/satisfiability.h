@@ -138,6 +138,31 @@ struct tau_spec_vars {
 };
 
 template<typename... BAs>
+std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_gssotc_shifted_io_vars(const gssotc<BAs...> collapsed) {
+	tau_spec_vars<BAs...> inputs;
+	tau_spec_vars<BAs...> outputs;
+	for (const auto& variable: select_top(collapsed, is_non_terminal<tau_parser::io_var, tau_ba<BAs...>, BAs...>)) {
+		auto type = variable
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
+			| optional_value_extractor<size_t>;
+		auto shift = variable
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| tau_parser::offset
+			| tau_parser::shift;
+		if (shift.has_value()) {
+			(type == tau_parser::in ? inputs : outputs).add(variable);
+		}
+	}
+
+	DBG(std::cout << "(I) inputs: " ; for (auto& i: inputs.name) std::cout << i << ", "; std::cout << std::endl;)
+	DBG(std::cout << "(I) outputs: " ; for (auto& o: outputs.name) std::cout << o << ", "; std::cout << std::endl;)
+
+	return {inputs, outputs};
+}
+
+
+template<typename... BAs>
 std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_gssotc_io_vars(const gssotc<BAs...> collapsed) {
 	tau_spec_vars<BAs...> inputs;
 	tau_spec_vars<BAs...> outputs;
@@ -155,11 +180,10 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_gssotc_io_vars(const
 	return {inputs, outputs};
 }
 
-template<typename... BAs>
-std::string build_string_from_clause(const gssotc<BAs...>& clause, bindings<tau_ba<BAs...>, BAs...>& bindings, size_t binding_seed = 0) {
+/*template<typename... BAs>
+std::string build_string_from_clause(const gssotc<BAs...>& clause) {
 
 	std::basic_stringstream<char> str;
-	std::map<std::variant<tau_ba<BAs...>, BAs...>, std::string> extracted_bindings;
 
 	auto visitor = overloaded(
 		[&str] (const tau_source_sym& l) {
@@ -182,7 +206,7 @@ std::string build_string_from_clause(const gssotc<BAs...>& clause, bindings<tau_
 	post_order_tree_traverser<print_t, all_t<gssotc<BAs...>>, gssotc<BAs...>>(print, all<gssotc<BAs...>>)(clause);
 	for (auto& [k, v]: extracted_bindings) { bindings.insert({v, k}); }
 	return str.str();
-}
+}*/
 
 template<typename... BAs>
 std::string build_args_from_vars(const tau_spec_vars<BAs...>& vars, size_t index) {
@@ -200,6 +224,21 @@ std::string build_args_from_vars(const tau_spec_vars<BAs...>& vars) {
 	for (const auto& var: vars.name) {
 		str << var;
 		if (var != *vars.name.rbegin()) str << ", ";
+	}
+	return str.str();
+}
+
+template<typename... BAs>
+std::string build_args_from_vars(const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs) {
+	std::basic_stringstream<char> str;
+	for (const auto& var: inputs.vars) {
+		str << var;
+		if (var != *inputs.name.rbegin()) str << ", ";
+	}
+	if (!inputs.vars.empty() && !outputs.vars.empty()) str << ", ";
+	for (const auto& var: outputs.vars) {
+		str << var;
+		if (var != *outputs.name.rbegin()) str << ", ";
 	}
 	return str.str();
 }
@@ -282,7 +321,6 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>>  build_eta_nso_rr(
 	};
 
 	bindings<tau_ba<BAs...>, BAs...> bindings;
-	size_t binding_seed = 0;
 	size_t loopback = max(inputs.loopback, outputs.loopback);
 	std::basic_stringstream<char> nsorr;
 	nsorr << "eta[t](" << build_args_from_vars(outputs) << ") := ";
@@ -300,13 +338,13 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>>  build_eta_nso_rr(
 		nsorr << build_boolean_existential_quantifiers(outputs.name.size());
 		// add positive literal if it exists
 		if (positive.has_value()) {
-			nsorr << build_string_from_clause(positive.value(), bindings, binding_seed);
+			nsorr << positive.value();
 			if (negatives.size() > 0) nsorr << " && ";
 		}
 		// generate a disjunction of all negations conjucted with the max_loopback variables and
 		if (negatives.size() > 0) {
 			for (size_t i = 0; i < negatives.size(); ++i) {
-				nsorr << "(( $n" << i << " && " << "$nn" << i << " ) &&& " << build_string_from_clause(negatives[i], bindings, binding_seed) << ") &&& ";
+				nsorr << "(( $n" << i << " && " << "$nn" << i << " ) &&& " << negatives[i] << ") &&& ";
 			}
 			// add recursive call with t-1
 			nsorr << "etas[t-1](" << build_args_from_vars(outputs) << print_new_negative_vars(outputs.name.size()) << ").\n";
@@ -373,7 +411,7 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff_n
 	main << build_universal_quantifiers(inputs);
 	main << build_existential_quantifiers(outputs);
 	// print the main wff
-	main << build_string_from_clause(wff, bindings)	<< ".";
+	main << wff	<< ".\n";
 
 	DBG(std::cout << "(I) get_main_nso_wo_rr: " << main.str() << std::endl;)
 
@@ -414,15 +452,107 @@ bool is_gssotc_clause_satisfiable_no_negatives_no_loopback(const std::optional<g
 }
 
 template<typename... BAs>
-bool is_gssotc_clause_satisfiable_no_negatives(const std::optional<gssotc<BAs...>>& positive,  const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+gssotc<BAs...> get_loopback_adjusted_nso(const gssotc<BAs...>& positive, size_t loopback) {
+	std::map<gssotc<BAs...>, gssotc<BAs...>> changes;
 
-	// TODO (HIGH) fix formula to be normalized, must include a phi call and a phi definition
-	auto [main_wo_rr, bindings] = build_main_nso_rr_wff<BAs...>(positive, inputs, outputs, loopback);
+	for (const auto& io: select_top(positive, is_non_terminal<tau_parser::io_var, tau_ba<BAs...>, BAs...>)) {
+		auto shift = io
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| tau_parser::offset
+			| tau_parser::shift;
+		if (shift.has_value()) {
+			auto num = io
+				| only_child_extractor<tau_ba<BAs...>, BAs...>
+				| tau_parser::offset
+				| tau_parser::shift
+				| tau_parser::num;
+			auto val = num
+				| only_child_extractor<tau_ba<BAs...>, BAs...>
+				| offset_extractor<tau_ba<BAs...>, BAs...>
+				| optional_value_extractor<size_t>;
+			auto nval = loopback + 1 - val;
+			auto nnum = build_num_from_num<tau_ba<BAs...>, BAs...>(shift.value(), nval);
+			changes[shift.value()] = nnum;
+		}
+	}
+	return replace<gssotc<BAs...>>(positive, changes);
+}
+
+template<typename... BAs>
+std::string build_phi_invocation(const std::optional<gssotc<BAs...>>& positive, size_t loopback) {
+	std::basic_stringstream<char> phi;
+	auto npositive = get_loopback_adjusted_nso<BAs...>(positive.value(), loopback);
+	phi << npositive;
+	return phi.str();
+}
+
+template<typename... BAs>
+std::string build_phi_main_nso_rr(const std::optional<gssotc<BAs...>>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+	std::basic_stringstream<char> main_phi;
+	main_phi << build_universal_quantifiers(inputs, 1);
+	main_phi << " phi[t](" << build_args_from_vars(inputs, 1) << ").\n";
+	return main_phi.str();
+}
+
+template<typename... BAs>
+std::string build_phi_general_case_nso_rr(const std::optional<gssotc<BAs...>>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+	std::basic_stringstream<char> gen_phi;
+
+	auto wff = positive | tau_parser::tau_wff | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
+	auto nwff = get_loopback_adjusted_nso<BAs...>(wff, loopback);
+
+	gen_phi << "phi[t](" << build_args_from_vars(inputs, 1) << ") ::= ";
+	for (size_t i = 1; i < loopback + 1; ++i) {
+		gen_phi << build_universal_quantifiers(inputs, i);
+		gen_phi << build_existential_quantifiers(outputs, i);
+	}
+	gen_phi << "( phi[t-1](" << build_args_from_vars(inputs, loopback + 1) << ") ";
+	gen_phi << "&& " << nwff << " ).\n";
+
+	DBG(std::cout << "(I) -- Result build_phi_general_case_nso_rr:\n" << gen_phi.str() << "\n";)
+
+	return gen_phi.str();
+}
+
+template<typename... BAs>
+std::string build_phi_base_case_nso_rr(const std::optional<gssotc<BAs...>>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+	std::basic_stringstream<char> base_phi;
+
+	auto wff = positive | tau_parser::tau_wff | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
+	auto nwff = get_loopback_adjusted_nso<BAs...>(wff, loopback);
+
+	base_phi << "phi[" << loopback + 1 << "](" << build_args_from_vars(inputs, 1) << ") ::= ";
+	for (size_t i = 1; i < loopback + 1; ++i) {
+		base_phi << build_universal_quantifiers(inputs, i);
+		base_phi << build_existential_quantifiers(outputs, i);
+	}
+	// print the main wff
+	base_phi << nwff << ".\n";
+
+	DBG(std::cout << "(I) -- Result build_phi_base_case_nso_rr:\n" << base_phi.str() << "\n";)
+
+	return base_phi.str();
+}
+
+
+template<typename... BAs>
+bool is_gssotc_clause_satisfiable_no_negatives_with_loopback(const std::optional<gssotc<BAs...>>& positive,  const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+	std::basic_stringstream<char> nso_rr;
+
+	nso_rr
+		<< build_phi_base_case_nso_rr<BAs...>(positive, inputs, outputs, loopback)
+		<< build_phi_general_case_nso_rr<BAs...>(positive, inputs, outputs, loopback)
+		<< build_phi_main_nso_rr<BAs...>(positive, inputs, outputs, loopback);
+
 	DBG(std::cout << "(I) -- Check normalizer" << std::endl;)
-	DBG(std::cout << main_wo_rr << std::endl;)
-	auto normalize = normalizer<tau_ba<BAs...>, BAs...>(main_wo_rr, bindings).main;
+	DBG(std::cout << nso_rr.str() << std::endl;)
 
-	if ((normalize | tau_parser::wff_f).has_value()) {
+	// TODO (MEDIUM) remove bindings from the following code
+	bindings<tau_ba<BAs...>, BAs...> bindings;
+	std::string source = nso_rr.str();
+	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(source, bindings).main;
+
+	if ((normalized | tau_parser::wff_f).has_value()) {
 		DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: false" << std::endl;)
 		return false;
 	}
@@ -479,10 +609,10 @@ bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 		return is_gssotc_clause_satisfiable_no_negatives_no_loopback(positive, inputs, outputs);
 	} else if (negatives.empty() && positive.has_value()) {
 
-		DBG(std::cout << "(I) -- No negatives case" << std::endl;)
+		DBG(std::cout << "(I) -- No negatives with loopback case" << std::endl;)
 		DBG(std::cout << clause << std::endl;)
 
-		return is_gssotc_clause_satisfiable_no_negatives(positive, inputs, outputs, loopback);
+		return is_gssotc_clause_satisfiable_no_negatives_with_loopback(positive, inputs, outputs, loopback);
 	}
 
 
