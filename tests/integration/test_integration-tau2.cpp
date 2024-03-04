@@ -91,7 +91,7 @@ TEST_SUITE("simple tau formulas: no negatives") {
 	}
 }
 
-/*TEST_SUITE("simple tau formulas: negatives, no loopbacks") {
+TEST_SUITE("simple tau formulas: negatives, no loopbacks") {
 
 	TEST_CASE("{(i_keyboard[t] != o_console[t])}") {
 		const char* sample = "{ ( i_keyboard[t] != o_console[t] ) };";
@@ -177,4 +177,4 @@ TEST_SUITE("simple tau formulas: negatives, positive, loopbacks") {
 		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
-}*/
+}
