@@ -371,7 +371,7 @@ cli_cmd                => help_sym | version_sym | quit_sym | output_sym
 # cli symbols
 help_sym               => "h" | "help".
 version_sym            => "v" | "version".
-quit_sym               => "q" | "quit" | "exit".
+quit_sym               => "q" | "e" | "quit" | "exit".
 output_sym             => "o" | "output".
 selection_sym          => "s" | "selection".
 instantiate_sym        => "i" | "instantiate".

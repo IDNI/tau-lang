@@ -1119,6 +1119,8 @@ private:
 		q(nt(286), (t(52)));
 		// version_sym => 'v' 'e' 'r' 's' 'i' 'o' 'n'.
 		q(nt(286), (t(52)+t(32)+t(49)+t(44)+t(21)+t(23)+t(46)));
+		// quit_sym => 'e'.
+		q(nt(287), (t(32)));
 		// quit_sym => 'e' 'x' 'i' 't'.
 		q(nt(287), (t(32)+t(33)+t(21)+t(53)));
 		// quit_sym => 'q'.
