@@ -22,10 +22,10 @@ namespace idni::tau {
 struct repl_evaluator {
 	int eval(const std::string& src);
 	using outputs_mem = std::vector<std::variant<
-		nso<tau_ba<bdd_binding>, bdd_binding>,
-		rr<nso<tau_ba<bdd_binding>, bdd_binding>>,
-		gssotc<tau_ba<bdd_binding>, bdd_binding>,
-		rr<gssotc<tau_ba<bdd_binding>, bdd_binding>>>>;
+		nso<bdd_binding>,
+		rr<nso<bdd_binding>>,
+		gssotc<bdd_binding>,
+		rr<gssotc<bdd_binding>>>>;
 private:
 	outputs_mem m;
 };

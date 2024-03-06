@@ -935,7 +935,7 @@ template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
 	const std::string source, idni::parser<>::parse_options options = {}) {
 	auto f = parser_instance<parser_t>().parse(source.c_str(), source.size(), options);
-	DBG(check_parser_result<parser_t>(source, f.get());)
+	//DBG(check_parser_result<parser_t>(source, f.get());)
 	return make_node_from_forest<
 			parser_t,
 			transformer_t,
