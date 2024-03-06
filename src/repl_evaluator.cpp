@@ -60,6 +60,15 @@ void help(size_t nt = tau_parser::help_sym) {
 	}
 }
 
+ sp_tau_node<bdd_binding> normalizer_cmd(const sp_tau_node<bdd_binding>& n) {
+	auto wff = n | tau_parser::q_wff | tau_parser::wff;
+	if (wff.has_value()) {
+		auto result = normalizer<bdd_binding>(wff.value());
+		std::cout << "normalized: " << result << "\n";
+		return result;
+	}
+	return n;
+}
 
 struct bdd_binding_factory {
 
@@ -82,11 +91,28 @@ struct bdd_binding_factory {
 	std::map<std::string, sp_tau_node<bdd_binding>> cache;
 };
 
-int repl_evaluator::eval(const std::string& src) {
-	auto tau_src = make_tau_source(src);
+// make a nso_rr from the given tau source and binder.
+nso<bdd_binding> make_cli(const std::string src) {
+	auto cli_src = make_tau_source(src, { .start = tau_parser::cli });
 	bdd_binding_factory bf;
 	factory_binder<bdd_binding_factory, bdd_binding> fb(bf);
-	auto tau_spec = make_nso_rr_using_factory<factory_binder<bdd_binding_factory, bdd_binding>, bdd_binding>(tau_src, fb);
+	return make_tau_code<bdd_binding>(cli_src);
+}
+
+int repl_evaluator::eval(const std::string& src) {
+	auto tau_spec = make_cli(src);
+	auto command = tau_spec | tau_parser::cli_command | only_child_extractor<bdd_binding>;
+	auto command_type = command | non_terminal_extractor<bdd_binding> | optional_value_extractor<size_t>;
+	switch (command_type) {
+	case tau_parser::help: help(); break;
+	case tau_parser::version: version(); break;
+	case tau_parser::quit: return -1;
+	case tau_parser::normalize: {
+		auto normalized = normalizer_cmd(command.value());
+		m.push_back(normalized); break;
+	}
+	default: cout << "Unknown command\n"; break;
+	}
 	return 0;
 }
 
