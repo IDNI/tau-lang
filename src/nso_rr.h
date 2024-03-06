@@ -28,6 +28,7 @@
 //#include "tree.h"
 #include "bool.h"
 #include "rewriting.h"
+#include "parser.h"
 #include "../parser/tau_parser.generated.h"
 #ifdef DEBUG
 #	include "parser_instance.h"
@@ -873,7 +874,7 @@ rec_relations<nso<BAs...>> make_rec_relations(sp_tau_node<BAs...>& tau_source) {
 sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source);
 
 // make a tau source from the given source code string.
-sp_tau_source_node make_tau_source(const std::string& source);
+sp_tau_source_node make_tau_source(const std::string& source, idni::parser<>::parse_options options = {});
 
 // make a tau source from the given source code stream.
 sp_tau_source_node make_tau_source(std::istream& is);

@@ -28,6 +28,7 @@
 
 #include "forest.h"
 #include "parser_instance.h"
+#include "parser.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -932,12 +933,15 @@ sp_node<symbol_t> make_node_from_forest(const transformer_t& transformer,
 template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 	typename symbol_t>
 sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
-	const std::string source)
-{
-	auto f = parser_instance<parser_t>().parse(source.c_str(), source.size());
+	const std::string source, idni::parser<>::parse_options options = {}) {
+	auto f = parser_instance<parser_t>().parse(source.c_str(), source.size(), options);
 	DBG(check_parser_result<parser_t>(source, f.get());)
-	return make_node_from_forest<parser_t, transformer_t,
-		parse_symbol_t, symbol_t>(transformer, f.get());
+	return make_node_from_forest<
+			parser_t,
+			transformer_t,
+			parse_symbol_t,
+			symbol_t>(
+		transformer, f.get());
 }
 
 // make a tree from the given source code stream.
@@ -948,8 +952,12 @@ sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 {
 	auto f = parser_instance<parser_t>().parse(is);
 	DBG(check_parser_result<parser_t>("<@stdin>", f.get());)
-	return make_node_from_forest<parser_t, transformer_t,
-		parse_symbol_t, symbol_t>(transformer, f.get());
+	return make_node_from_forest<
+			parser_t,
+			transformer_t,
+			parse_symbol_t,
+			symbol_t>(
+		transformer, f.get());
 }
 
 // make a tree from the given source code file.
