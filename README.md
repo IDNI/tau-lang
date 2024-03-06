@@ -55,6 +55,17 @@ where `tau_example.tau` is a Tau program.
 
 There are a lot examples of Tau programs in the `examples/tau` directory.
 
+# Tha Tau CLI
+
+The Tau CLI is a command line interface that allows you to interact with the Tau language. It is a simple and easy to use tool that allows you to write and execute Tau programs on the go.
+
+The commands provided by the Tau CLI are:
+
+* `help [command]`: shows a general help message or the help message of a specific command. It has an abbreviated form `h`.
+* `version`: shows the version of the Tau CLI. It has an abbreviated form `v`. The version of the Tau CLI corresponds to the repo commit.
+* `quit|exit`: exits the Tau CLI. It has an abbreviated form `q` or `e`.
+* `normalize quoted_wff`: normalizes a quoted well formed formula, p.e. `normalize ((X && Y) || T})`. It has an abbreviated form `n`.
+
 # Understanding Tau language
 
 "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
