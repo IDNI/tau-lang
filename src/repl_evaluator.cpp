@@ -60,175 +60,33 @@ void help(size_t nt = tau_parser::help_sym) {
 	}
 }
 
-void list_outputs(repl_evaluator::outputs_mem& m) {
-	if (!m.size()) { cout << "no outputs\n"; return; }
-	for (size_t i = 0; i < m.size(); i++)
-		cout << "output " << i << ": " << m[i] << "\n";
-}
 
-void clear_outputs(repl_evaluator::outputs_mem& m) {
-	m.clear();
-	cout << "outputs cleared\n";
-}
+struct bdd_binding_factory {
 
-void normalize_nso_rr(sp_tau_source_node src, repl_evaluator::outputs_mem& m) {
-	bdd_factory bf;
-	tau_factory<bdd_factory, bdd_binding> fb(bf);
-	factory_binder<decltype(fb),
-		tau_ba<bdd_binding>, bdd_binding> fbinder(fb);
-	auto nso_rr = make_nso_rr_using_factory<decltype(fbinder),
-			tau_ba<bdd_binding>, bdd_binding>(src, fbinder);
-	auto n = normalizer<tau_ba<bdd_binding>, bdd_binding>(nso_rr);
-	cout << n << "\n";
-	//? // do not add into memory if the last memory value is the same
-	//? if (m.size() && holds_alternative<decltype(n)>(m.back()) &&
-	//? 	get<decltype(n)>(m.back()) == n) return;
-	m.push_back(n); // add to memory
-}
+	sp_tau_node<bdd_binding> build(const std::string type_name, const sp_tau_node<bdd_binding>& n) {
+		if (type_name != "bdd") return n;
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<bdd_binding>>;
+		std::string var = make_string_with_skip<
+			tau_node_terminal_extractor_t<bdd_binding>,
+			not_whitespace_predicate_t<bdd_binding>,
+			sp_tau_node<bdd_binding>>(
+				tau_node_terminal_extractor<bdd_binding>,
+				not_whitespace_predicate<bdd_binding>, source);
+		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
+		auto ref = bdd<Bool>::bit(index++);
+		auto nn =  make_node<tau_sym<bdd_binding>>(bdd_handle<Bool>::get(ref), {});
+		return cache.emplace(var, nn).first->second;
+	}
 
-void normalize_wff(sp_tau_source_node src, repl_evaluator::outputs_mem& m) {
-	auto form = make_tau_code<tau_ba<bdd_binding>, bdd_binding>(src)
-		 | tau_parser::wff
-		 | optional_value_extractor<sp_bdd_node>;
-	bdd_factory bf;
-	tau_factory<bdd_factory, bdd_binding> fb(bf);
-	factory_binder<decltype(fb),
-		tau_ba<bdd_binding>, bdd_binding> fbinder(fb);
-	bind_transformer<decltype(fbinder),
-		tau_ba<bdd_binding>, bdd_binding> bs(fbinder);
-	auto nso = post_order_traverser<
-			decltype(bs),
-			all_t<sp_bdd_node>,
-			sp_bdd_node>(bs, all<sp_bdd_node>)(form);
-	auto n = normalizer<tau_ba<bdd_binding>, bdd_binding>(nso);
-	//? // do not add into memory if the last memory value is the same
-	//? if (m.size() && holds_alternative<decltype(n)>(m.back()) &&
-	//? 	get<decltype(n)>(m.back()) == n) return;
-	m.push_back(n); // add to memory
-}
-
-sp_tau_source_node extract_tau_source(tau_parser::forest_type* f,
-	const tau_parser::node_type& n)
-{
-	return make_node_from_forest<
-		tau_parser,
-		drop_location_t<
-			tau_parser::node_type,
-			tau_source_sym>,
-		tau_parser::node_type,
-		tau_source_sym>(
-			drop_location<
-				tau_parser::node_type,
-				tau_source_sym>,
-			f, n);
-}
-
-sp_tau_source_node extract_tau_source(tau_parser::forest_type* f) {
-	return extract_tau_source(f, f->root());
-}
-
-// traverses a tree and resolves repl commands. runs them with required
-// elements extracted from their subtree
-// returns non-zero if the repl should quit
-int traverse(tau_parser::forest_type* f, repl_evaluator::outputs_mem& m) {
-	int quit = 0;
-	struct context { // to keep track of where we are in the tree
-		bool
-			h = false, // normalize
-			n = false, // help
-			o = false  // view output
-			;
-	} x;
-	auto cb_enter = [&f, &m, &x, &quit] (const auto& n) {
-		if (!n.first.nt()) return; // skip if terminal
-		auto nt = n.first.n(); // get nonterminal id
-		if      (nt == tau_parser::quit)    cout << "\nQuit.", quit = 1;
-		else if (nt == tau_parser::version) version();
-		else if (nt == tau_parser::list_outputs) list_outputs(m);
-		else if (nt == tau_parser::clear_outputs) clear_outputs(m);
-		// set flags for nodes we need to know we are in their subtree
-		else if (nt == tau_parser::help)        x.h = true;
-		else if (nt == tau_parser::normalize)   x.n = true;
-		else if (nt == tau_parser::view_output) x.o = true;
-	};
-	auto cb_exit = [&f, &m, &x] (const auto& n, const auto&) {
-		if (!n.first.nt()) return; // skip if terminal
-		auto nt = n.first.n(); // get nonterminal id
-		if (x.n) { // normalize
-			if (nt == tau_parser::q_nso_rr) {
-				x.n = false,
-				normalize_nso_rr(extract_tau_source(f, n), m);
-			} else if (nt == tau_parser::q_wff) {
-				x.n = false,
-				normalize_wff(extract_tau_source(f, n), m);
-			}
-		} else if (x.h) { // help
-			static const std::set<size_t> cli_symbols{
-				tau_parser::version_sym,
-				tau_parser::quit_sym,
-				tau_parser::output_sym,
-				tau_parser::selection_sym,
-				tau_parser::instantiate_sym,
-				tau_parser::substitute_sym,
-				tau_parser::normalize_sym,
-				tau_parser::file_sym
-			};
-			if (nt == tau_parser::help) help(), x.h = false;
-			else if (cli_symbols.find(nt) != cli_symbols.end())
-				help(nt), x.h = false;
-		} else if (x.o) { // view output
-			if (nt == tau_parser::digits) {
-				bool err;
-				size_t i = terminals_to_int<char>(*f, n, err);
-				if (err) cerr << "integer out of range\n";
-				else if (i < m.size()) cout << i << ": " << m[i] << "\n";
-				else cerr << "output " << i << " does not exist\n";
-				x.o = false;
-			}
-		}
-	};
-	f->traverse(cb_enter, cb_exit);
-	return quit;
-}
-
-#ifdef DEBUG
-std::ostream& print_sp_tau_source_node_tree(std::ostream &os,
-	tau::sp_tau_source_node n, bool ws = false, size_t l = 0)
-{
-	bool enter = true;
-	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
-	std::visit(tau::overloaded {
-		[&os, &ws, &enter, &indent](const tau::tau_source_sym& v) {
-			if (!ws && v.nt() && (v.n() == tau_parser::_ ||
-					v.n() == tau_parser::__)) {
-				enter = false;
-				return;
-			}
-			indent();
-			if (v.nt()) os << parser_instance<tau_parser>()
-				.name(v.n()) << "(" << v.n() << ")";
-			else if (v.is_null()) os << "null";
-			else os << v.t();
-		}
-	}, n->value);
-	if (!enter) return os;
-	if (n->child.size()) os << " {\n";
-	for (auto& c : n->child) print_sp_tau_source_node_tree(os, c, ws, l+1);
-	if (n->child.size()) indent(), os << "}";
-	return os << "\n";
-}
-#endif // DEBUG
+	size_t index = 0;
+	std::map<std::string, sp_tau_node<bdd_binding>> cache;
+};
 
 int repl_evaluator::eval(const std::string& src) {
-	// parse input with cli as a starting symbol
-	auto f = parser_instance<tau_parser>()
-		.parse(src.c_str(), src.size(), {
-			.start = tau_parser::cli });
-	DBG(check_parser_result<tau_parser>(src, f.get(), tau_parser::cli);)
-	DBG(print_sp_tau_source_node_tree(std::cerr << "\n",
-		extract_tau_source(f.get())) << "\n";)
-	// run forest traversal to resolve commands
-	if (traverse(f.get(), m)) return 1;
+	auto tau_src = make_tau_source(src);
+	bdd_binding_factory bf;
+	factory_binder<bdd_binding_factory, bdd_binding> fb(bf);
+	auto tau_spec = make_nso_rr_using_factory<factory_binder<bdd_binding_factory, bdd_binding>, bdd_binding>(tau_src, fb);
 	return 0;
 }
 

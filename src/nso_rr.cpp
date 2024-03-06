@@ -11,6 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "nso_rr.h"
+#include "parser_instance.h"
+#include "parser.h"
 
 namespace idni::tau {
 
@@ -70,25 +72,25 @@ sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
 }
 
 // make a tau source from the given source code string.
-sp_tau_source_node make_tau_source(const std::string& source) {
+sp_tau_source_node make_tau_source(const std::string& source, idni::parser<>::parse_options options) {
 	using parse_symbol = tau_parser::node_type;
 	return make_node_from_string<
 		tau_parser,
 		drop_location_t<parse_symbol, tau_source_sym>,
 		parse_symbol,
 		tau_source_sym>(
-			drop_location<parse_symbol, tau_source_sym>, source);
+			drop_location<parse_symbol, tau_source_sym>, source, options);
 }
 
 // make a tau source from the given source code stream.
 sp_tau_source_node make_tau_source(std::istream& is) {
 	using parse_symbol = tau_parser::node_type;
 	return make_node_from_stream<
-		tau_parser,
-		drop_location_t<parse_symbol, tau_source_sym>,
-		parse_symbol,
-		tau_source_sym>(
-			drop_location<parse_symbol, tau_source_sym>, is);
+			tau_parser,
+			drop_location_t<parse_symbol, tau_source_sym>,
+			parse_symbol,
+			tau_source_sym>(
+		drop_location<parse_symbol, tau_source_sym>, is);
 }
 
 // make a tau source from the given source code stream.
