@@ -56,6 +56,18 @@ message(STATUS "TAU_BUILD_REGRESSION: ${TAU_BUILD_REGRESSION}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 
 #
+# Adding Boost log library
+#
+find_package(Boost REQUIRED COMPONENTS log)
+if (Boost_FOUND)
+	message(STATUS "Boost version: ${Boost_VERSION}")
+	message(STATUS "Boost include dirs: ${Boost_INCLUDE_DIRS}")
+	message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
+else()
+	message(FATAL_ERROR "Boost not found")
+endif()
+
+#
 # Adding parser library's git submodule
 #
 include(add-git-submodule)

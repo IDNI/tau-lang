@@ -10,8 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #include <iostream>
 #include <fstream>
+#include <boost/log/trivial.hpp>
 
 #include "cli.h"
 #include "repl.h"
