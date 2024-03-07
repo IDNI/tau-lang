@@ -182,5 +182,28 @@ struct bdd_factory {
 	std::map<std::string, sp_bdd_node> cache;
 };
 
+struct bdd_binding_factory {
+
+	sp_tau_node<bdd_binding> build(const std::string type_name, const sp_tau_node<bdd_binding>& n) {
+		if (type_name != "bdd") return n;
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<bdd_binding>>;
+		std::string var = make_string_with_skip<
+			tau_node_terminal_extractor_t<bdd_binding>,
+			not_whitespace_predicate_t<bdd_binding>,
+			sp_tau_node<bdd_binding>>(
+				tau_node_terminal_extractor<bdd_binding>,
+				not_whitespace_predicate<bdd_binding>, source);
+		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
+		auto ref = bdd<Bool>::bit(index++);
+		auto nn =  make_node<tau_sym<bdd_binding>>(bdd_handle<Bool>::get(ref), {});
+		return cache.emplace(var, nn).first->second;
+	}
+
+	size_t index = 0;
+	std::map<std::string, sp_tau_node<bdd_binding>> cache;
+};
+
 } // namespace idni::tau
+
+
 #endif // __BDD_BINDING_H__

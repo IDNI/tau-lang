@@ -490,7 +490,7 @@ std::string build_phi_invocation(const std::optional<gssotc<BAs...>>& positive, 
 }
 
 template<typename... BAs>
-std::string build_phi_main_nso_rr(const std::optional<gssotc<BAs...>>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
+std::string build_phi_main_nso_rr(const std::optional<gssotc<BAs...>>& /* positive */, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& /*outputs*/, size_t /*loopback*/) {
 	std::basic_stringstream<char> main_phi;
 	main_phi << build_universal_quantifiers(inputs, 1);
 	main_phi << " phi[t](" << build_args_from_vars(inputs, 1) << ").\n";
