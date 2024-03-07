@@ -28,23 +28,23 @@ void check_parser_result(const std::string& source,
 {
 	auto& p = parser_instance<parser_t>();
 	if (!f || !p.found(start))
-		std::cerr << "# source: `" << source << "`\n"
+		BOOST_LOG_TRIVIAL(error) << "# source: `" << source << "`\n"
 	 		<< p.get_error().to_str() << "\n";
 	else if (f->is_ambiguous()) {
-		std::cerr << "# source: `" << source << "`\n"
+		BOOST_LOG_TRIVIAL(error) << "# source: `" << source << "`\n"
 			<< "# n trees: " << f->count_trees() << "\n"
 			<< "# ambiguous nodes:\n";
 		for (auto& n : f->ambiguous_nodes()) {
-			std::cerr << "\t `" << n.first.first << "` ["
+			BOOST_LOG_TRIVIAL(error) << "\t `" << n.first.first << "` ["
 				<< n.first.second[0] << "," << n.first.second[1]
 				<< "]\n";
 			size_t d = 0;
 			for (auto ns : n.second) {
-				std::cerr << "\t\t " << d++ << "\t";
-				for (auto nt : ns) std::cerr << " `" << nt.first
+				BOOST_LOG_TRIVIAL(error) << "\t\t " << d++ << "\t";
+				for (auto nt : ns) BOOST_LOG_TRIVIAL(error) << " `" << nt.first
 					<< "`[" << nt.second[0] << ","
 					<< nt.second[1] << "] ";
-				std::cerr << "\n";
+				BOOST_LOG_TRIVIAL(error) << "\n";
 			}
 		}
 	}

@@ -25,6 +25,7 @@
 #include <optional>
 #include <variant>
 #include <compare>
+#include <boost/log/trivial.hpp>
 
 #include "forest.h"
 #include "parser_instance.h"
@@ -845,12 +846,10 @@ node_t apply_with_skip(const rule<node_t>& r, const node_t& n, is_ignore_t& i, i
 		matcher {p, u, i, c, sk};
 	auto nn = apply(s, n, matcher);
 
-	#ifdef DEBUG
 	if (nn != n) {
-		std::cout << "(R) " << p << " = " << s << std::endl;
-		std::cout << "(F) " << nn << std::endl;
+		BOOST_LOG_TRIVIAL(debug) << "(R) " << p << " = " << s;
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << nn;
 	}
-	#endif // DEBUG
 
 	return nn;
 }
@@ -866,12 +865,10 @@ node_t apply_with_skip_if(const rule<node_t>& r, const node_t& n, is_ignore_t& i
 		matcher {p, u, i, c, sk, predicate};
 	auto nn = apply(s, n, matcher);
 
-	#ifdef DEBUG
 	if (nn != n) {
-		std::cout << "(R) " << p << " = " << s << std::endl;
-		std::cout << "(F) " << nn << std::endl;
+		BOOST_LOG_TRIVIAL(debug) << "(R) " << p << " = " << s;
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << nn;
 	}
-	#endif // DEBUG
 
 	return nn;
 }
