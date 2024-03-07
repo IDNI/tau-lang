@@ -18,6 +18,10 @@
 #include "nso_rr.h"
 #include "bdd_binding.h"
 
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
+
 namespace idni::tau {
 
 using namespace idni::rewriter;
@@ -71,8 +75,6 @@ gssotc<bdd_binding> normalizer_cmd(const gssotc<bdd_binding>& n) {
 	return n;
 }
 
-
-
 // make a nso_rr from the given tau source and binder.
 sp_tau_node<tau_ba<bdd_binding>, bdd_binding> make_cli(const std::string src) {
 	auto cli_src = make_tau_source(src, { .start = tau_parser::cli });
@@ -93,6 +95,21 @@ int repl_evaluator::eval(const std::string& src) {
 	case tau_parser::normalize: {
 		auto normalized = normalizer_cmd(command.value());
 		m.push_back(normalized); break;
+	}
+	case tau_parser::toggle_debug: {
+	    boost::log::core::get()->set_filter	(
+			boost::log::trivial::severity >= boost::log::trivial::debug
+		); break;
+	}
+	case tau_parser::toggle_trace: {
+		boost::log::core::get()->set_filter	(
+			boost::log::trivial::severity >= boost::log::trivial::trace
+		); break;
+	}
+	case tau_parser::toggle_info: {
+		boost::log::core::get()->set_filter	(
+			boost::log::trivial::severity >= boost::log::trivial::info
+		); break;
 	}
 	default: cout << "Unknown command\n"; break;
 	}

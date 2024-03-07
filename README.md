@@ -64,7 +64,10 @@ The commands provided by the Tau CLI are:
 * `help [command]`: shows a general help message or the help message of a specific command. It has an abbreviated form `h`.
 * `version`: shows the version of the Tau CLI. It has an abbreviated form `v`. The version of the Tau CLI corresponds to the repo commit.
 * `quit|exit`: exits the Tau CLI. It has an abbreviated form `q` or `e`.
-* `normalize quoted_wff`: normalizes a quoted well formed formula, p.e. `normalize ((X && Y) || T)`. It has an abbreviated form `n`.
+* `normalize quoted_wff`: normalizes a quoted well formed formula, p.e. `normalize '((X && Y) || T)'`. It has an abbreviated form `n`.
+* `toogle info` set the ouput level to the usual info level.
+* `toogle debug` set the ouput level to the debug level.
+* `toogle trace` set the ouput level to the trace level.
 
 # Understanding Tau language
 
