@@ -315,6 +315,7 @@ cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
 cli_command            => normalize | bf_substitute | wff_substitute
 			| bf_instantiate | wff_instantiate | file | rr_nso | wff
 			| output_cmd | (bf & ~help & ~version & ~quit)
+            | toggle_debug | toggle_trace | toggle_info
 			| help | version | quit.
 
 normalize              => normalize_sym __ (q_nso_rr | q_wff | output | wff_selection).
@@ -344,6 +345,9 @@ wff_substitute         => substitute_sym __
                           (q_wff | output | wff_selection) __
                           # bf or output or selection where to substitute
                           (output | wff_selection).
+toggle_debug           => "toggle" __ "debug".
+toggle_trace           => "toggle" __ "trace".
+toggle_info            => "toggle" __ "info".
 help                   => help_sym [ __ cli_cmd ].
 version                => version_sym.
 quit                   => quit_sym.
