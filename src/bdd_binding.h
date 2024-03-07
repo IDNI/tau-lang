@@ -99,22 +99,19 @@ struct bdd_factory {
 			// shortcuts for current and previous stack elements
 			#define CURR (x.back())
 			#define PREV (x[x.size() - 2])
-			if (nt == bdd_parser::negation)
-				//std::cout << "CURR: " << CURR << " = "
-				//	<< ~CURR << \n",
+			if (nt == bdd_parser::negation) {
+				BOOST_LOG_TRIVIAL(trace) << "CURR: " << CURR << " = " << ~CURR;
 				CURR = ~CURR;
-			else if (nt == bdd_parser::conjunction)
-				//std::cout << PREV << " & " << CURR << " = "
-				//	<< (PREV & CURR) << "\n",
+			} else if (nt == bdd_parser::conjunction) {
+				BOOST_LOG_TRIVIAL(trace) << PREV << " & " << CURR << " = " << (PREV & CURR);
 				PREV = PREV & CURR, x.pop_back();
-			else if (nt == bdd_parser::disjunction)
-				//std::cout << PREV << " | " << CURR << " = "
-				//	<< (PREV | CURR) << "\n",
+			} else if (nt == bdd_parser::disjunction) {
+				BOOST_LOG_TRIVIAL(trace) << PREV << " | " << CURR << " = " << (PREV | CURR);
 				PREV = PREV | CURR, x.pop_back();
-			else if (nt == bdd_parser::exclusive_or)
-				//std::cout << PREV << " ^ " << CURR << " = "
-				//	<< (PREV ^ CURR) << "\n",
+			} else if (nt == bdd_parser::exclusive_or) {
+				BOOST_LOG_TRIVIAL(trace) << PREV << " ^ " << CURR << " = " << (PREV ^ CURR);
 				PREV = PREV ^ CURR, x.pop_back();
+			}
 			#undef CURR
 			#undef PREV
 		};
@@ -130,25 +127,25 @@ struct bdd_factory {
 		auto f = p.parse(src.c_str(), src.size());
 #ifdef DEBUG
 		if (!f || !p.found()) {
-			std::cerr << "# bdd source: `" << src << "`\n"
-				<< p.get_error().to_str() << "\n";
+			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src << "`\n"
+				<< p.get_error().to_str();
 			return bdd_handle<Bool>::hfalse;
 		} else if (f->is_ambiguous()) {
-			std::cerr << "# bdd source: `" << src << "`\n"
+			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src << "`\n"
 				<< "# n trees: " << f->count_trees() << "\n"
 				<< "# ambiguous nodes:\n";
 			for (auto& n : f->ambiguous_nodes()) {
-				std::cerr << "\t `" << n.first.first << "` ["
+				BOOST_LOG_TRIVIAL(error) << "\t `" << n.first.first << "` ["
 					<< n.first.second[0] << ","
 					<< n.first.second[1] << "]\n";
 				size_t d = 0;
 				for (auto ns : n.second) {
-					std::cerr << "\t\t " << d++ << "\t";
-					for (auto nt : ns) std::cerr << " `"
+					BOOST_LOG_TRIVIAL(error) << "\t\t " << d++ << "\t";
+					for (auto nt : ns) BOOST_LOG_TRIVIAL(error) << " `"
 						<< nt.first << "`["
 						<< nt.second[0] << ","
 						<< nt.second[1] << "] ";
-					std::cerr << "\n";
+					BOOST_LOG_TRIVIAL(error);
 				}
 			}
 			return bdd_handle<Bool>::hfalse;

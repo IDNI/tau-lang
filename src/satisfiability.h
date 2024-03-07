@@ -29,7 +29,7 @@ void get_gssotc_clauses(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& cl
 		for (auto& c: check || tau_parser::tau) get_gssotc_clauses(c , clauses);
 	} else {
 		clauses.push_back(n);
-		DBG(std::cout << "(I) found get_gssotc_clause: " << n << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) found get_gssotc_clause: " << n;
 	}
 }
 
@@ -46,7 +46,7 @@ void get_gssotc_literals(const gssotc<BAs...>& clause, std::vector<gssotc<BAs...
 		for (auto& c: check || tau_parser::tau) get_gssotc_literals(c , literals);
 	else {
 		literals.push_back(clause);
-		DBG(std::cout << "(I) found get_gssotc_clause: " << clause << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) found get_gssotc_clause: " << clause;
 	}
 }
 
@@ -85,9 +85,9 @@ std::pair<std::optional<gssotc<BAs...>>, std::vector<gssotc<BAs...>>> get_gssotc
 	}
 
 	#ifdef DEBUG
-	if (positive.has_value()) std::cout << "(I) positive: " << positive.value() << std::endl;
+	if (positive.has_value()) BOOST_LOG_TRIVIAL(trace) << "(I) positive: " << positive.value();
 	if (!negatives.empty()) {
-		for (auto& n: negatives) std::cout << "(I) negative: " << n << std::endl;
+		for (auto& n: negatives) BOOST_LOG_TRIVIAL(trace) << "(I) negative: " << n;
 	}
 	#endif // DEBUG
 
@@ -155,8 +155,8 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_gssotc_shifted_io_va
 		}
 	}
 
-	DBG(std::cout << "(I) inputs: " ; for (auto& i: inputs.name) std::cout << i << ", "; std::cout << std::endl;)
-	DBG(std::cout << "(I) outputs: " ; for (auto& o: outputs.name) std::cout << o << ", "; std::cout << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) inputs:\n" ; for (auto& i: inputs.name) BOOST_LOG_TRIVIAL(trace) << i;
+	BOOST_LOG_TRIVIAL(trace) << "(I) outputs:\n" ; for (auto& o: outputs.name) BOOST_LOG_TRIVIAL(trace) << o;
 
 	return {inputs, outputs};
 }
@@ -174,8 +174,8 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_gssotc_io_vars(const
 		(type == tau_parser::in ? inputs : outputs).add(variable);
 	}
 
-	DBG(std::cout << "(I) inputs: " ; for (auto& i: inputs.name) std::cout << i << ", "; std::cout << std::endl;)
-	DBG(std::cout << "(I) outputs: " ; for (auto& o: outputs.name) std::cout << o << ", "; std::cout << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) inputs:\n" ; for (auto& i: inputs.name) BOOST_LOG_TRIVIAL(trace) << i;
+	BOOST_LOG_TRIVIAL(trace) << "(I) outputs:\n" ; for (auto& o: outputs.name) BOOST_LOG_TRIVIAL(trace) << o;
 
 	return {inputs, outputs};
 }
@@ -351,7 +351,7 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>>  build_eta_nso_rr(
 		}
 	// add main
 
-	DBG(std::cout << "(I) build_eta_nso_rr: " << nsorr.str() << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) build_eta_nso_rr: " << nsorr.str();
 
 	return {nsorr.str(), bindings};
 }
@@ -363,7 +363,7 @@ std::string build_check_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loop
 	check << build_existential_quantifiers(outputs, loopback) <<
 		" (eta[" << current << "](" << build_args_from_vars(outputs) << ").\n";
 
-	DBG(std::cout << "(I) build_check_nso_rr: " << check.str() << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) build_check_nso_rr: " << check.str();
 
 	return check.str();
 }
@@ -374,7 +374,7 @@ std::string build_main_nso_rr(const tau_spec_vars<BAs...>& outputs, size_t loopb
 	main << build_universal_quantifiers(outputs, loopback) <<
 		" (eta[" << current << "](" << build_args_from_vars(outputs) << ") <-> eta[" << previous << "]).\n";
 
-	DBG(std::cout << "(I) build_main_nso_rr: " << main.str() << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) build_main_nso_rr: " << main.str();
 
 	return main.str();
 }
@@ -395,7 +395,7 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff(c
 	// print the main wff
 	main << build_string_from_clause(wff, bindings)	<< ".";
 
-	DBG(std::cout << "(I) get_main_nso_wo_rr: " << main.str() << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) get_main_nso_wo_rr: " << main.str();
 
 	return {main.str(), bindings};
 }
@@ -413,7 +413,7 @@ std::pair<std::string, bindings<tau_ba<BAs...>, BAs...>> build_main_nso_rr_wff_n
 	// print the main wff
 	main << wff	<< ".\n";
 
-	DBG(std::cout << "(I) get_main_nso_wo_rr: " << main.str() << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) get_main_nso_wo_rr: " << main.str();
 
 	return {main.str(), bindings};
 }
@@ -428,11 +428,11 @@ bool is_gssotc_clause_satisfiable_no_outputs(const gssotc<BAs...>& clause, const
 	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(str, bindings).main;
 	auto check = normalized | tau_parser::wff_t;
 	if (check.has_value()) {
-		DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: true" << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: true";
 		return true;
 	}
 
-	DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: false" << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: false";
 	return false;
 }
 
@@ -441,16 +441,16 @@ bool is_gssotc_clause_satisfiable_no_negatives_no_loopback(const std::optional<g
 
 	// TODO (HIGH) fix formula to be normalized, must include a phi call and a phi definition
 	auto [main_wo_rr, bindings] = build_main_nso_rr_wff_no_loopbacks<BAs...>(positive, inputs, outputs);
-	DBG(std::cout << "(I) -- Check normalizer" << std::endl;)
-	DBG(std::cout << main_wo_rr << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Check normalizer";
+	BOOST_LOG_TRIVIAL(trace) << main_wo_rr;
 	auto normalize = normalizer<tau_ba<BAs...>, BAs...>(main_wo_rr, bindings).main;
 
 	if ((normalize | tau_parser::wff_f).has_value()) {
-		DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: false" << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: false";
 		return false;
 	}
 
-	DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: true" << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: true";
 	return true;
 }
 
@@ -512,7 +512,7 @@ std::string build_phi_general_case_nso_rr(const std::optional<gssotc<BAs...>>& p
 	gen_phi << "( phi[t-1](" << build_args_from_vars(inputs, loopback + 1) << ") ";
 	gen_phi << "&& " << nwff << " ).\n";
 
-	DBG(std::cout << "(I) -- Result build_phi_general_case_nso_rr:\n" << gen_phi.str() << "\n";)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Result build_phi_general_case_nso_rr:\n" << gen_phi.str() << "\n";
 
 	return gen_phi.str();
 }
@@ -532,7 +532,7 @@ std::string build_phi_base_case_nso_rr(const std::optional<gssotc<BAs...>>& posi
 	// print the main wff
 	base_phi << nwff << ".\n";
 
-	DBG(std::cout << "(I) -- Result build_phi_base_case_nso_rr:\n" << base_phi.str() << "\n";)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Result build_phi_base_case_nso_rr:\n" << base_phi.str() << "\n";
 
 	return base_phi.str();
 }
@@ -547,8 +547,8 @@ bool is_gssotc_clause_satisfiable_no_negatives_with_loopback(const std::optional
 		<< build_phi_general_case_nso_rr<BAs...>(positive, inputs, outputs, loopback)
 		<< build_phi_main_nso_rr<BAs...>(positive, inputs, outputs, loopback);
 
-	DBG(std::cout << "(I) -- Check normalizer" << std::endl;)
-	DBG(std::cout << nso_rr.str() << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Check normalizer";
+	BOOST_LOG_TRIVIAL(trace) << nso_rr.str();
 
 	// TODO (MEDIUM) remove bindings from the following code
 	bindings<tau_ba<BAs...>, BAs...> bindings;
@@ -556,11 +556,11 @@ bool is_gssotc_clause_satisfiable_no_negatives_with_loopback(const std::optional
 	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(source, bindings).main;
 
 	if ((normalized | tau_parser::wff_f).has_value()) {
-		DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: false" << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: false";
 		return false;
 	}
 
-	DBG(std::cout << "(I) -- Check is_gssotc_clause_satisfiable: true" << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: true";
 	return true;
 }
 
@@ -572,7 +572,7 @@ bool is_gssotc_clause_satisfiable_general(const std::optional<gssotc<BAs...>>& p
 		auto check = build_check_nso_rr(outputs, loopback, current);
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), extracted_bindings).main;
 		if ((normalize | tau_parser::wff_f).has_value()) {
-			DBG(std::cout << "(I) --Check is_gssotc_clause_satisfiable: false" << std::endl);
+			BOOST_LOG_TRIVIAL(trace) << "(I) --Check is_gssotc_clause_satisfiable: false";
 			return false;
 		}
 		for (size_t previous = 1; previous < current; ++previous) {
@@ -586,8 +586,8 @@ bool is_gssotc_clause_satisfiable_general(const std::optional<gssotc<BAs...>>& p
 template<typename... BAs>
 bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 
-	DBG(std::cout << "(I) -- Checking is_gssotc_clause_satisfiable"; std::cout << std::endl;)
-	DBG(std::cout << clause << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Checking is_gssotc_clause_satisfiable";
+	BOOST_LOG_TRIVIAL(trace) << clause;
 
 	auto collapsed = clause |
 		repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
@@ -601,27 +601,27 @@ bool is_gssotc_clause_satisfiable(const gssotc<BAs...>& clause) {
 	// TODO (HIGH) Case no output variables but input variables
 	if (outputs.name.empty()) {
 
-		DBG(std::cout << "(I) -- No variables case" << std::endl;)
-		DBG(std::cout << "(F) " << collapsed << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- No variables case";
+		BOOST_LOG_TRIVIAL(trace) << "(F) " << collapsed;
 
 		return is_gssotc_clause_satisfiable_no_outputs(collapsed, inputs);
 	} else if (negatives.empty() && positive.has_value() && loopback == 0) {
 
-		DBG(std::cout << "(I) -- No negatives and no loopback case" << std::endl;)
-		DBG(std::cout << clause << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- No negatives and no loopback case";
+		BOOST_LOG_TRIVIAL(trace) << clause;
 
 		return is_gssotc_clause_satisfiable_no_negatives_no_loopback(positive, inputs, outputs);
 	} else if (negatives.empty() && positive.has_value()) {
 
-		DBG(std::cout << "(I) -- No negatives with loopback case" << std::endl;)
-		DBG(std::cout << clause << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- No negatives with loopback case";
+		BOOST_LOG_TRIVIAL(trace) << clause;
 
 		return is_gssotc_clause_satisfiable_no_negatives_with_loopback(positive, inputs, outputs, loopback);
 	}
 
 
-	DBG(std::cout << "(I) -- General case" << std::endl;)
-	DBG(std::cout << clause << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- General case";
+	BOOST_LOG_TRIVIAL(trace) << clause;
 
 	return is_gssotc_clause_satisfiable_general(positive, negatives, inputs, outputs, loopback);
 }
@@ -633,8 +633,8 @@ bool is_gssotc_satisfiable(const gssotc<BAs...>& form) {
 			to_dnf_tau<tau_ba<BAs...>, BAs...>
 			| simplify_tau<tau_ba<BAs...>, BAs...>);
 
-	DBG(std::cout << "(I) -- Converting to dnf and simplifying" << std::endl;)
-	DBG(std::cout << dnf << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Converting to dnf and simplifying";
+	BOOST_LOG_TRIVIAL(trace) << dnf;
 
 	auto clauses = get_gssotc_clauses(dnf);
 	for (auto& clause: clauses) {
@@ -658,11 +658,11 @@ auto is_gssotc_equivalent_to_any_of(const gssotc<BAs...>& n, std::vector<gssotc<
 // check satisfability of a tau_spec (boolean combination case)
 template<typename...BAs>
 bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
-	DBG(std::cout << "(I) -- Begin is_tau_spec_satisfiable tau_spec " << std::endl;)
-	DBG(std::cout << tau_spec << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin is_tau_spec_satisfiable tau_spec ";
+	BOOST_LOG_TRIVIAL(trace) << tau_spec;
 
 	auto loopback = get_max_loopback_in_rr(tau_spec.main);
-	DBG(std::cout << "(I) Max loopback: " << loopback << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) Max loopback: " << loopback;
 
 	std::vector<gssotc<BAs...>> previous;
 
@@ -670,15 +670,15 @@ bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
 		auto current = build_main_step<tau_ba<BAs...>, BAs...>(tau_spec.main, i)
 			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(tau_spec.rec_relations));
 
-		DBG(std::cout << "(I) -- Begin is_tau_spec_satisfiable step" << std::endl;)
-		DBG(std::cout << current << std::endl;)
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin is_tau_spec_satisfiable step";
+		BOOST_LOG_TRIVIAL(trace) << current;
 
 		if (!is_gssotc_satisfiable(current)) {
-			DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: false" << std::endl);
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- End is_tau_spec_satisfiable: false";
 			return false;
 		}
 		if (is_gssotc_equivalent_to_any_of(current, previous)) {
-			DBG(std::cout << "(I) -- End is_tau_spec_satisfiable: true" << std::endl);
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- End is_tau_spec_satisfiable: true";
 			return true;
 		} else previous.push_back(current);
 	}

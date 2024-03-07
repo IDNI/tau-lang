@@ -271,11 +271,11 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& n, const
 
 template <typename... BAs>
 std::optional<sp_tau_node<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& n, const size_t nt) {
-#ifdef DEBUG
-	if (!n.has_value()) std::cout
-		<< "\nWarning: value-less optional | tau_parser::"
-		<< parser_instance<tau_parser>().name(nt) << "\n";
-#endif
+	#ifdef DEBUG
+	if (!n.has_value()) BOOST_LOG_TRIVIAL(warning)
+		<< "value-less optional | tau_parser::"
+		<< parser_instance<tau_parser>().name(nt);
+	#endif // DEBUG
 	return n ? n.value() | nt : n;
 }
 
@@ -1371,7 +1371,7 @@ private:
 			for (auto& c: check || skip) get_leaves(c, branch, skip, leaves);
 		} else {
 			leaves.push_back(n);
-			DBG(std::cout << "(I) found get_gssotc_clause: " << n << std::endl;)
+			BOOST_LOG_TRIVIAL(trace) << "(I) found get_gssotc_clause: " << n;
 		}
 	}
 
@@ -1592,7 +1592,7 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r, const sp_tau_nod
 		}
 		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
 
-		DBG(std::cout << "(C) " << cnn << std::endl;)
+		BOOST_LOG_TRIVIAL(debug) << "(C) " << cnn;
 
 		return cnn;
 	}
@@ -1643,9 +1643,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 				auto left = args[0] | only_child_extractor<BAs...> | offset_extractor<BAs...> | optional_value_extractor<size_t>;
 				auto right = args[1] | only_child_extractor<BAs...> | offset_extractor<BAs...> | optional_value_extractor<size_t>;
 				if (left < right) {
-
-					DBG(std::cout << "(C) " << n << std::endl;)
-
+					BOOST_LOG_TRIVIAL(debug) << "(C) " << n;
 					return n;
 				}
 				auto nts = std::get<tau_source_sym>(nn->value).nts;
@@ -1659,9 +1657,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 	// apply the changes and print info
 	if (!changes.empty()) {
 		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
-
-		DBG(std::cout << "(C) " << cnn << std::endl;)
-
+		BOOST_LOG_TRIVIAL(debug) << "(C) " << cnn;
 		return cnn;
 	}
 

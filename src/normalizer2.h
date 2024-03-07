@@ -16,6 +16,7 @@
 
 #include <string>
 #include <optional>
+#include <boost/log/trivial.hpp>
 
 #include "rewriting.h"
 #include "nso_rr.h"
@@ -542,7 +543,7 @@ struct free_vars_collector {
 				if (auto it = free_vars.find(var.value()); it != free_vars.end())
 					free_vars.erase(it);
 			}
-			DBG(std::cout << "(I) -- removing quantified var: " << var.value() << std::endl;)
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << var.value();
 		}
 		if (is_var_or_capture<BAs...>(n)) {
 			if (auto check = n
@@ -552,11 +553,11 @@ struct free_vars_collector {
 				auto var = check.value();
 				if (auto it = free_vars.find(var); it != free_vars.end()) {
 					free_vars.erase(it);
-					DBG(std::cout << "(I) -- removing var: " << var << std::endl;)
+					BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << var;
 				}
 			}
 			free_vars.insert(n);
-			DBG(std::cout << "(I) -- inserting var: " << n << std::endl;)
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- inserting var: " << n;
 		}
 		return n;
 	}
@@ -571,7 +572,7 @@ auto get_vars_from_nso(const nso<BAs...>& n) {
 
 template<typename... BAs>
 auto get_free_vars_from_nso(const nso<BAs...>& n) {
-	DBG(std::cout << "(I) -- Begin get_free_vars_from_nso of " << n << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso of " << n;
 	std::set<nso<BAs...>> free_vars;
 	free_vars_collector<BAs...> collector(free_vars);
 	post_order_traverser<
@@ -579,29 +580,29 @@ auto get_free_vars_from_nso(const nso<BAs...>& n) {
 			free_vars_collector<BAs...>,
 			nso<BAs...>>(
 		idni::rewriter::identity<nso<BAs...>>, collector)(n);
-	DBG(std::cout << "(I) -- Begin get_free_vars_from_nso" << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso";
 	return free_vars;
 }
 
 template <typename... BAs>
 bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
-	DBG(std::cout << "(I) -- Begin are_nso_equivalent"<< std::endl;)
-	DBG(std::cout << "(I) -- n1 " << n1 << std::endl;)
-	DBG(std::cout << "(I) -- n2 " << n2 << std::endl;)
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_nso_equivalent";
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
 
 	if (n1 == n2) {
-		DBG(std::cout << "(I) -- End are_nso_equivalent: true" << std::endl;)
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: true";
 		return true;
 	}
 
 	nso<BAs...> wff = build_wff_equiv<BAs...>(n1, n2);
 	auto vars = get_free_vars_from_nso(wff);
 	for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
-	DBG(std::cout << "(I) -- wff: " << wff << std::endl;)
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << wff;
 
 	auto normalized = normalizer_step<BAs...>(wff);
 	auto check = normalized | tau_parser::wff_t;
-	DBG(std::cout << "(I) -- End are_nso_equivalent: " << check.has_value() << std::endl;)
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << check.has_value();
 
 	return check.has_value();
 }
@@ -660,9 +661,8 @@ template <typename... BAs>
 nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	// IDEA extract this to an operator| overload
 
-	DBG(std::cout << "(I) -- Begin normalizer" << std::endl;)
-	DBG(std::cout << "(I) -- Apply once definitions" << std::endl;)
-	DBG(std::cout << "(F) " << nso_rr.main << std::endl;)
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer";
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions";
 
 	auto applied_defs = apply_definitions(nso_rr);
 	auto loopback = get_max_loopback_in_rr(applied_defs.main);
@@ -674,18 +674,18 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 		current = build_main_step(applied_defs.main, i)
 			| repeat_all<step<BAs...>, BAs...>(step<BAs...>(applied_defs.rec_relations));
 
-		DBG(std::cout << "(I) -- Begin normalizer step" << std::endl;)
-		DBG(std::cout << "(F) " << current << std::endl;)
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer step";
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 
 		current = normalizer_step(current);
 		if (is_nso_equivalent_to_any_of(current, previous)) break;
 		else previous.push_back(current);
 
-		DBG(std::cout << "(I) -- End normalizer step" << std::endl;)
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer step";
 	}
 
-	DBG(std::cout << "(I) -- End normalizer" << std::endl;)
-	DBG(std::cout << "(O) " << current << std::endl;)
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";
+	BOOST_LOG_TRIVIAL(debug) << "(O) " << current;
 
 	return current;
 }
