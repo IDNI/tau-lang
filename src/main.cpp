@@ -17,9 +17,11 @@
 #include "repl.h"
 #include "repl_evaluator.h"
 #include "normalizer2.h"
+#include "bdd_binding.h"
 
 using namespace std;
 using namespace idni;
+using namespace idni::rewriter;
 using namespace idni::tau;
 
 cli::commands tau_commands() {
@@ -60,6 +62,7 @@ int error(const string& s) {
 	cerr << s << "\n";
 	return 1;
 }
+
 // runs tau program or an evaluate string using input and output
 int run_tau(const string& program, const string& input, const string& output,
 	const string& evaluate = "")
@@ -143,7 +146,7 @@ int main(int argc, char** argv) {
 	// repl command
 	if (cmd.name() == "repl") {
 		std::string e = cmd.get<string>("evaluate");
-		repl_evaluator re;
+		idni::tau::repl_evaluator re;
 		if (e.size()) return re.eval(e), 0;
 		repl<repl_evaluator> r(re, "tau> ", ".tau_history");
 		return r.run();

@@ -214,6 +214,7 @@ private:
 			out(ss.str().c_str(), ss.str().size());
 		}
 	}
+	
 	evaluator_t re_;
 	std::string prompt_;
 	std::string history_file_;

@@ -10,22 +10,21 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #ifndef __REPL_EVALUATOR_H__
 #define __REPL_EVALUATOR_H__
-#include <string>
 
+#include <string>
+#include <vector>
 #include "bdd_binding.h"
 
 namespace idni::tau {
 
-
 struct repl_evaluator {
 	int eval(const std::string& src);
 	using outputs_mem = std::vector<std::variant<
-		nso<bdd_binding>,
-		rr<nso<bdd_binding>>,
-		gssotc<bdd_binding>,
-		rr<gssotc<bdd_binding>>>>;
+		nso<tau_ba<bdd_binding>, bdd_binding>,
+		rr<nso<tau_ba<bdd_binding>, bdd_binding>>>>;
 private:
 	outputs_mem m;
 };
