@@ -70,6 +70,7 @@ endif()
 #
 # Adding parser library's git submodule
 #
+option(PARSER_BUILD_STATIC_LIBRARY "build only static library" ON)
 include(add-git-submodule)
 add_git_submodule("external/parser")
 set(IDNI_PARSER_OBJECT_LIB "idni_parsero")
