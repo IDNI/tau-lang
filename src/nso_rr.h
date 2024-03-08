@@ -932,16 +932,23 @@ library<nso<BAs...>> make_library(const std::string& source) {
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
-	auto src = make_tau_code<BAs...>(tau_source);
-	auto unbinded_main = src | tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
-	auto binded_main = post_order_traverser<
+rr<nso<BAs...>> make_nso_rr_using_binder(const sp_tau_node<BAs...>& tau_source, binder_t& binder) {
+	auto binded = post_order_traverser<
 			binder_t,
 			all_t<sp_tau_node<BAs...>>,
 			sp_tau_node<BAs...>>(
-		binder, all<sp_tau_node<BAs...>>)(unbinded_main);
-	auto rules = make_rec_relations<BAs...>(src);
-	return { rules, binded_main };
+		binder, all<sp_tau_node<BAs...>>)(tau_source);
+	auto main = binded | tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto rules = make_rec_relations<BAs...>(binded);
+	return { rules, main };
+}
+
+
+// make a nso_rr from the given tau source and binder.
+template<typename binder_t, typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
+	auto code = make_tau_code<BAs...>(tau_source);
+	return make_nso_rr_using_binder<binder_t, BAs...>(code, binder);
 }
 
 // make a nso_rr from the given tau source and bindings.
@@ -957,6 +964,12 @@ template<typename factory_t, typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
 	bind_transformer<factory_t, BAs...> bs(factory);
 	return make_nso_rr_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
+}
+
+template<typename factory_t, typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& rr_nso, factory_t& factory) {
+	bind_transformer<factory_t, BAs...> bs(factory);
+	return make_nso_rr_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(rr_nso, bs);
 }
 
 // make a nso_rr from the given tau source and bindings.
