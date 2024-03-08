@@ -29,7 +29,7 @@ namespace idni {
 // if the repl should exit.
 template <typename evaluator_t>
 struct repl {
-	repl(const evaluator_t& re, std::string prompt = "> ",
+	repl(evaluator_t& re, std::string prompt = "> ",
 		std::string history_file = ".history")
 		: re_(re), prompt_(prompt), history_file_(history_file)
 	{
@@ -107,15 +107,19 @@ struct repl {
 		}
 		return 0;
 	}
+	// sets the prompt
+	void prompt(const std::string& p) { prompt_ = p, refresh_input(); }
+	// returns the current prompt
+	std::string prompt() const { return prompt_; }
 private:
 	// reads a character from stdin
-	int in(char& c) { return read(STDIN_FILENO, &c, 1); }
+	int in(char& c) const { return read(STDIN_FILENO, &c, 1); }
 	// writes data to stdout
-	void out(const char* data, size_t size) {
+	void out(const char* data, size_t size) const {
 		write(STDOUT_FILENO, data, size);
 	}
 	// returns the current input as a string
-	std::string get() {
+	std::string get() const {
 		std::stringstream ss;
 		return ss.write(input_.data(), input_.size()), ss.str();
 	}
@@ -192,19 +196,19 @@ private:
 		if (file) file << history_[hpos_ - 1] << '\n';
 		return history_[hpos_ - 1];
 	}
-	void refresh_input() { // refresh input line
+	void refresh_input() const { // refresh input line
 		out("\r\033[K", 4); // clear input
-#ifdef DEBUG
-		std::stringstream ss;
-		ss << "[";
-		ss << "hpos: " << hpos_ << ", ";
-		ss << "history: " << history_.size() << ", ";
-		ss << "pos: " << pos_ << ", ";
-		ss << "size: " << input_.size() << ", ";
-		ss << "end: " << (pos_ >= input_.size() ? "yes" : "no");
-		ss << "] ";
-		out(ss.str().c_str(), ss.str().size());
-#endif // DEBUG
+//#ifdef DEBUG
+//		std::stringstream ss;
+//		ss << "[";
+//		ss << "hpos: " << hpos_ << ", ";
+//		ss << "history: " << history_.size() << ", ";
+//		ss << "pos: " << pos_ << ", ";
+//		ss << "size: " << input_.size() << ", ";
+//		ss << "end: " << (pos_ >= input_.size() ? "yes" : "no");
+//		ss << "] ";
+//		out(ss.str().c_str(), ss.str().size());
+//#endif // DEBUG
 		out(prompt_.c_str(), prompt_.size()); // print prompt
 		// print input
 		if (input_.size()) out(input_.data(), input_.size());
@@ -214,8 +218,7 @@ private:
 			out(ss.str().c_str(), ss.str().size());
 		}
 	}
-	
-	evaluator_t re_;
+	evaluator_t& re_;
 	std::string prompt_;
 	std::string history_file_;
 	std::vector<char> input_;
