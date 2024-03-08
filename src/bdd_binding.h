@@ -125,7 +125,7 @@ struct bdd_factory {
 	bdd_binding parse(const std::string& src) {
 		auto& p = parser_instance<bdd_parser>();
 		auto f = p.parse(src.c_str(), src.size());
-#ifdef DEBUG
+#ifdef SHOW_GRAMMAR_ERRORS
 		if (!f || !p.found()) {
 			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src << "`\n"
 				<< p.get_error().to_str();
@@ -150,7 +150,7 @@ struct bdd_factory {
 			}
 			return bdd_handle<Bool>::hfalse;
 		}
-#endif // DEBUG
+#endif // SHOW_GRAMMAR_ERRORS
 		return transform(*f); // transform the forest into bdd
 	}
 
