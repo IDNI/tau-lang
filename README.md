@@ -45,6 +45,8 @@ If you want to produce the documentation of the source code you need to install 
 
 # Running Tau programs
 
+TODO (HIGH) rewrite this section according to Tomas' cli options
+
 Once you have compiled the source code you could run the `tau` executable to execute a Tau programs. The `tau` executable is located in the `build-Release` or `build-Debug` directory (depending in your build). You could run the `tau` executable as follows:
 
 ```bash
@@ -71,9 +73,15 @@ The commands provided by the Tau CLI are:
 
 # Understanding Tau language
 
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+The Tau Language is a declarative language that allows you to specify the behavior of a program in a clear and concise way. It is based on the most powerful decidable knowledge representation languages and logics, and it is able to embed and extend the most powerful decidable knowledge representation languages and logics to describe your programs.
+
+The syntax is close to that of Mathematical Logic. However, is not neccesary to have a deep understanding of Mathematical Logic to use the Tau Language, as you don't need a deep Mathematical Logic undertsanding to use Prolog or Datalog.
+
+In the following Subsections we will explain the main ingredients of the Tau Language.
 
 ## Boolean functions
+
+TODO (HIGH) what is a boolean functions
 
 In the Tau language we could represent boolean functions essentially following the grammar:
 
@@ -96,6 +104,8 @@ where `X`, `Y` and `Z` are variables.
 
 ## Functional quantifiers
 
+TODO (HIGH) what is a functional quantifier
+
 As show in the `bf` grammar, we consider two types of `bf` qantifiers: the existential one `fex`and the universal one `fall`. Both depend in a variable and a `bf` formula. The formula could be whatever we derive from the previious grammar, whereas the varibles could be of the following types:
 
 - regular variables, they are just a sequence of `chars` (no especial symbols). They stand for regular variables in a formula, like the ones in predicate logic, and
@@ -115,6 +125,8 @@ fall x f(x, X) := f(0,X) & f(1, X).
 We would go further about the meaning of captures in subsequent sections, for the time being, just keep in mind that functional quatifiers depend on variables and they essentially quantify over the given boolean algebra.
 
 ## Well-formed formulas
+
+TODO (HIGH) what is a well formed formula
 
 Well formed formulas are given in the Tau language by the following grammar:
 
@@ -164,6 +176,8 @@ where `tau` stands for a tau formula, `tau_wff` stands for a well formed formula
 
 ## Recursive relations
 
+TODO (HIGH) what is a recursive relation, what is its purpose
+
 Recursive ralations are introduced to simplify the writing of well formed formulas. They are given by the following grammar:
 
 ```
@@ -211,6 +225,8 @@ g[$n]($Y) :::= g[$n - 1]($Y).
 ```
 
 ## Tau programs
+
+TODO (HIGH) explain what is a specification
 
 Taking into account all the previous definitions and considerations, Tau programs are given by the following grammar:
 
