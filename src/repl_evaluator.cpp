@@ -65,28 +65,45 @@ void help(size_t nt = tau_parser::help_sym) {
 	}
 }
 
-gssotc<bdd_binding> normalizer_cmd(const gssotc<bdd_binding>& n) {
-	auto wff = n | tau_parser::q_wff | tau_parser::wff;
-	if (wff.has_value()) {
-		auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(wff.value());
+// make wff
+
+// make rr_wff
+
+nso<tau_ba<bdd_binding>, bdd_binding> normalizer_cmd(const nso<tau_ba<bdd_binding>, bdd_binding>& n) {
+	tau_bdd_binding_factory bf;
+	tau_factory<tau_bdd_binding_factory, bdd_binding> tf(bf);
+	factory_binder<tau_factory<tau_bdd_binding_factory, bdd_binding>, tau_ba<bdd_binding>, bdd_binding> fb(tf);
+	auto eval = make_nso_rr_using_factory<
+			factory_binder<tau_factory<tau_bdd_binding_factory, bdd_binding>, tau_ba<bdd_binding>, bdd_binding>,
+			tau_ba<bdd_binding>, bdd_binding>(
+		n, fb);
+	auto type = n
+		| only_child_extractor<tau_ba<bdd_binding>, bdd_binding>
+		| non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>
+		| optional_value_extractor<size_t>;
+	switch(type) {
+	case tau_parser::q_wff: {
+		auto wff = n | tau_parser::q_wff | optional_value_extractor<nso<tau_ba<bdd_binding>, bdd_binding>>;
+		auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(wff);
 		std::cout << "normalized: " << result << "\n";
 		return result;
 	}
-	return n;
-}
-
-// make a nso_rr from the given tau source and binder.
-sp_tau_node<tau_ba<bdd_binding>, bdd_binding> make_cli(const std::string src) {
-	auto cli_src = make_tau_source(src, { .start = tau_parser::cli });
-	bdd_binding_factory bf;
-	tau_factory<bdd_binding_factory, bdd_binding> tbf(bf);
-	factory_binder<tau_factory<bdd_binding_factory, bdd_binding>, tau_ba<bdd_binding>, bdd_binding> fb(tbf);
-	return make_tau_code<tau_ba<bdd_binding>, bdd_binding>(cli_src);
+	case tau_parser::q_nso_rr: {
+		auto nso_rr = n | tau_parser::q_nso_rr | optional_value_extractor<nso<tau_ba<bdd_binding>, bdd_binding>>;
+		auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(nso_rr);
+		std::cout << "normalized: " << result << "\n";
+		return result;
+	}
+	default: {
+		std::cout << "Unsupported type to normalize.\n";
+		return n;
+	}}
 }
 
 int repl_evaluator::eval(const std::string& src) {
-	auto tau_spec = make_cli(src);
-	auto command = tau_spec | tau_parser::cli_command | only_child_extractor<tau_ba<bdd_binding>, bdd_binding>;
+	auto cli_src = make_tau_source(src, { .start = tau_parser::cli });
+	auto cli_code = make_tau_code<tau_ba<bdd_binding>, bdd_binding>(cli_src);
+	auto command = cli_code | tau_parser::cli_command | only_child_extractor<tau_ba<bdd_binding>, bdd_binding>;
 	auto command_type = command | non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding> | optional_value_extractor<size_t>;
 	switch (command_type) {
 	case tau_parser::help: help(); break;
