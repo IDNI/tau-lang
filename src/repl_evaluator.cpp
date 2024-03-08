@@ -70,24 +70,20 @@ void help(size_t nt = tau_parser::help_sym) {
 // make rr_wff
 
 nso<tau_ba<bdd_binding>, bdd_binding> normalizer_cmd(const nso<tau_ba<bdd_binding>, bdd_binding>& n) {
-	tau_bdd_binding_factory bf;
-	tau_factory<tau_bdd_binding_factory, bdd_binding> tf(bf);
-	factory_binder<tau_factory<tau_bdd_binding_factory, bdd_binding>, tau_ba<bdd_binding>, bdd_binding> fb(tf);
-	auto eval = make_nso_rr_using_factory<
-			factory_binder<tau_factory<tau_bdd_binding_factory, bdd_binding>, tau_ba<bdd_binding>, bdd_binding>,
-			tau_ba<bdd_binding>, bdd_binding>(
-		n, fb);
-	auto type = n
+	/*auto type = n
 		| only_child_extractor<tau_ba<bdd_binding>, bdd_binding>
 		| non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>
 		| optional_value_extractor<size_t>;
 	switch(type) {
-	case tau_parser::q_wff: {
-		auto wff = n | tau_parser::q_wff | optional_value_extractor<nso<tau_ba<bdd_binding>, bdd_binding>>;
-		auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(wff);
-		std::cout << "normalized: " << result << "\n";
-		return result;
-	}
+	case tau_parser::q_wff: {*/
+		auto wff = n | tau_parser::q_wff | tau_parser::wff;
+		if (wff.has_value()) {
+			auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(wff.value());
+			std::cout << "normalized: " << result << "\n";
+			return result;
+		}
+		std::cout << "Unsupported type to normalize.\n"; return n;
+	/*}
 	case tau_parser::q_nso_rr: {
 		auto nso_rr = n | tau_parser::q_nso_rr | optional_value_extractor<nso<tau_ba<bdd_binding>, bdd_binding>>;
 		auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(nso_rr);
@@ -97,7 +93,7 @@ nso<tau_ba<bdd_binding>, bdd_binding> normalizer_cmd(const nso<tau_ba<bdd_bindin
 	default: {
 		std::cout << "Unsupported type to normalize.\n";
 		return n;
-	}}
+	}}*/
 }
 
 int repl_evaluator::eval(const std::string& src) {

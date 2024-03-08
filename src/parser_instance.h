@@ -21,7 +21,7 @@ parser_t& parser_instance() {
 	return instance;
 }
 
-#ifdef DEBUG
+#ifdef SHOW_GRAMMAR_ERRORS
 template <typename parser_t>
 void check_parser_result(const std::string& source,
 	const typename parser_t::forest_type* f, int start = -1)
@@ -49,7 +49,12 @@ void check_parser_result(const std::string& source,
 		}
 	}
 }
-#endif // DEBUG
+#else
+template <typename parser_t>
+void check_parser_result(const std::string& , const typename parser_t::forest_type*, int ) { }
+template <typename parser_t>
+void check_parser_result(const std::string& , const typename parser_t::forest_type*) { }
+#endif // SHOW_GRAMMAR_ERRORS
 
 } // namespace idni
 #endif // __PARSER_INSTANCE_H__
