@@ -13,7 +13,7 @@ on:
 env:
   # TODO (LOW) we have to build release and debug versions of the project and
   # run tests for both of them
-  
+
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Debug
 
@@ -26,6 +26,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Install boost
+      uses: MarkusJx/install-boost@v2.4.5
+      id: install-boost
+      with:
+          # A list of supported versions can be found here:
+          # https://github.com/MarkusJx/prebuilt-boost/blob/main/versions-manifest.json
+          boost_version: 1.83.0
+          arch: x86
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
