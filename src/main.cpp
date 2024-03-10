@@ -11,6 +11,49 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
+// General improvements
+
+// TODO (IMPORTANT) semantic checks
+	// TODO (HIGH) no capture allowed in Tau source
+	// TODO (MEDIUM) type checkings
+// TODO (MEDIUM) declare a static const lambda instead of a predicates if possible
+// TODO (LOW) split code into h/cpp files
+//TODO (IMPORTANT) error and runtime error handling
+	//TODO (IMPORTANT) parsing errors reporting
+	//TODO (IMPORTANT) semantic errors reporting
+	//TODO (IMPORTANT) runtime errors reporting
+	//TODO (IMPORTANT) internal errors reporting
+// TODO (MEDIUM) simplify bindings API
+// TODO (HIGH) allow typing in variables
+
+// Documentation related tasks
+
+// TODO (LOW) tau Language API documentation
+	// TODO (LOW) rewriter
+	// TODO (LOW) nso
+	// TODO (LOW) tau
+	// TODO (LOW) normalizer
+	// TODO (LOW) satisfability
+	// TODO (LOW) executor
+// TODO (LOW) CLI
+	// TODO (VERY LOW) CONTRIBUTING.md
+	// TODO (VERY LOW) CODE_OF_CONDUCT.md
+	// TODO (VERY LOW) LICENSE
+
+// Tasks related to the Tau language rewriting rules and their use
+
+// TODO (HIGH) the callback to remove quantifiers call builder_xor that relais
+// on xor, which is removed at the beginning only. Change the builder_xor to
+// use the xor definition directly
+
+// TODO (HIGH) we apply too much rules. Review the apply methods to apply the
+// trivialities directly in the apply methods instead of calling them as
+// separate steps
+
+// TODO (MEDIUM) change the execution API to use tuples instead of vectors
+// so we could give more fine grained executions.
+
+
 #include <iostream>
 #include <fstream>
 #include <boost/log/core.hpp>

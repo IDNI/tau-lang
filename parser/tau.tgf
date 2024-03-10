@@ -20,8 +20,9 @@
 # structure
 #
 
-# TODO (HIGH) allow comments in the programs, formulas, ...
-
+# TODO (HIGH) remove '(' and ')' from grammar, operator precedence is in this order: ' * | +.
+# TODO (HIGH) remove '{' and '}' from grammar, wff negation is in this form: '!' wff.
+# TODO (LOW) allow comments in the programs, formulas, ...
 # whitespace and comments
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
 __                     => (space | comment) _.   # whitespace
@@ -52,7 +53,6 @@ digits                 => digit+.
 sym                    => chars.
 
 # offsets
-# TODO (HIGH) check programatically that no shift is use in a rec_relation defs
 offsets                => open_bracket _ offset (_ comma _ offset)* _ close_bracket.
 offset                 => num | capture | shift | (variable & ~io_var).
 shift                  => (capture | (variable & ~io_var)) _ minus _ num.
@@ -85,8 +85,8 @@ tau                    => tau_wff | tau_ref | tau_and | tau_or | tau_neg | captu
 tau_and                => open_parenthesis _ tau _ tau_and_sym _ tau _ close_parenthesis.
 tau_or                 => open_parenthesis _ tau _ tau_or_sym  _ tau _ close_parenthesis.
 tau_neg                => tau_neg_sym _ tau.
-# TODO (HIGH) simply consider wff without { and }
-# we introduce '{' and '}' to avoid confusion with wff negation
+# TODO (HIGH) simply consider wff without { and }.  we introduce '{' and '}' to avoid
+# confusion with wff negation
 # see the next TODO for an alternative
 tau_wff                => open_brace _ wff _ close_brace.
 
@@ -285,7 +285,6 @@ tau_positives_upwards_cb_sym   => "tau_positives_upwards_cb".
 inputs                 => _ less _ input (_ input)* _ dot.
 input                  => in _ colon _ open_brace _ source_binding _ close_brace.
 # each builder is define on its own string
-# TODO explit builders by type: bf, wff, and tau
 builder                => _ builder_head _ builder_body _ dot.
 builder_head           => open_parenthesis _ capture (__ capture)* _ close_parenthesis.
 builder_body           => bf_builder_body | wff_builder_body | tau_builder_body.
@@ -306,10 +305,9 @@ gssotc_rec_relation    => tau_rec_relation | wff_rec_relation | bf_rec_relation.
 gssotc_main            => _ tau _ semicolon.
 start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 
-# cli related rules
-# use cli as starting point for parsing
-# TODO do the same with the other starting points: library, inputs, builder.
-# IDEA in the future nso_rr could be seen also as a starting point and also gssotc_rr
+# cli related rules, using cli as starting point for parsing
+
+# TODO do the same with the other starting points: library, inputs, builder, nso_rr, nso, gssotc, gssotc_rr...
 # depending on the use case of the grammar.
 cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
 cli_command            => normalize | bf_substitute | wff_substitute
@@ -319,8 +317,7 @@ cli_command            => normalize | bf_substitute | wff_substitute
 			| help | version | quit.
 
 normalize              => normalize_sym __ (q_nso_rr | q_wff | output | wff_selection).
-# TODO (HIGH) add support for file paths
-file                   => file_sym quote chars quote.
+file                   => file_sym quote file_path quote.
 bf_instantiate         => instantiate_sym __
                           # variable to be instantiated
                           (q_var | bf_var_selection | output) __
@@ -345,6 +342,9 @@ wff_substitute         => substitute_sym __
                           (q_wff | output | wff_selection) __
                           # bf or output or selection where to substitute
                           (output | wff_selection).
+# TODO (HIGH) implement Tomas' idea of using 'set ...' instead of 'toggle' for
+# cofiguration commands
+# TODO (HIGH) implement 'set charvar...' to set length of variables to char instead to chars
 toggle_debug           => "toggle" __ "debug".
 toggle_trace           => "toggle" __ "trace".
 toggle_info            => "toggle" __ "info".
@@ -362,6 +362,8 @@ q_wff                  => apostrophe _ wff    _ apostrophe.
 q_bf                   => apostrophe _ bf     _ apostrophe.
 q_var                  => apostrophe _ var    _ apostrophe.
 output                 => output_sym __ digits.
+# TODO (HIGH) add support for file paths
+file_path              => chars.
 
 output_cmd             => list_outputs | clear_outputs | view_output.
 list_outputs           => output_sym.

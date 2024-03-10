@@ -11,12 +11,50 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
+// TODO (HIGH) subformula selection for wff
+// TODO (MEDIUM) convert selection to dnf
+// TODO (MEDIUM) convert selection to cnf
+// TODO (MEDIUM) convert selection to nnf
+// TODO (MEDIUM) convert selection to bdd
+// TODO (MEDIUM) convert selection to anf
+// TODO (MEDIUM) convert selection to minterm
+
+// TODO (HIGH) eliminate selected quantifier(s) in standard way
+// TODO (MEDIUM) eliminate selected quantifier(s) in differential way
+// TODO (MEDIUM) eliminate selected quantifier(s) in minterm way
+// TODO (MEDIUM) eliminate selected quantifier(s) in order way
+
+// TODO (HIGH) replace all occurrences of a variable in the selection with proper formula
+// TODO (MEDIUM) convert to order normal form wrt selected (single) var
+
+// TODO (HIGH) subformula selection for bf
+// TODO (MEDIUM) convert selection to dnf
+// TODO (MEDIUM) convert selection to cnf
+// TODO (MEDIUM) convert selection to nnf
+// TODO (MEDIUM) convert selection to bdd
+// TODO (MEDIUM) convert selection to anf
+// TODO (MEDIUM) convert selection to minterm
+
+// TODO (HIGH) subst for a var in the selection
+// TODO (MEDIUM) subst for a func in the selection
+
+// TODO (MEDIUM) auto-find expressions that make something zero
+	// TODO (MEDIUM) by x+f(x) (for univar)
+	// TODO (MEDIUM) by the LGRS (for multivar)
+
+// TODO (MEDIUM) find an expression expressing a single solution
+// TODO (MEDIUM) expand quantification over bf/sbf into first order quantification wrt a selected set of vars
+// TODO (MEDIUM) strong normalization of selected subformulas
+// TODO (HIGH) use only required parenthesis in the output or at least be able
+// to say something like `pretty(%)`  after executing a given command.
+
 #ifndef __REPL_EVALUATOR_H__
 #define __REPL_EVALUATOR_H__
 
 #include <string>
 #include <vector>
 #include "bdd_binding.h"
+
 
 namespace idni::tau {
 
@@ -29,5 +67,5 @@ private:
 	outputs_mem m;
 };
 
-} // idni::tau namespace
-#endif // __REPL_EVALUATOR_H__
+} //idni::tau namespace
+#endif //__REPL_EVALUATOR_H__
