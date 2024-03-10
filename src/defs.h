@@ -60,24 +60,4 @@ template<typename T, typename V> bool hasv(const T& t, const V& v) {
 #define GIT_BRANCH      "n/a"
 #endif
 
-//-----------------------------------------------------------------------------
-// use: os << COLOR BLUE << "blue text" << COLOR CLEAR;
-// or:  os << COLOR BRIGHT AND WHITE << "bright and white text" << COLOR CLEAR;
-#define COLOR      "\033["
-#define BRIGHT     "1"
-#define UNDERLINED "4"
-#define FLASHING   "5"
-#define AND        ";"
-#define CLEAR      "0m"
-#define BLACK      "30m"
-#define RED        "31m"
-#define GREEN      "32m"
-#define YELLOW     "33m"
-#define BROWN      "33m"
-#define BLUE       "34m"
-#define PURPLE     "35m"
-#define CYAN       "36m"
-#define WHITE      "37m"
-#define GRAY       "37m"
-
 #endif // __DEF_H__
