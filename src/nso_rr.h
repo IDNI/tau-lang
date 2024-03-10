@@ -11,6 +11,12 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
+// TODO (LOW) rename file to msnso_rr.h
+// TODO (MEDIUM) fix proper types (alias) at this level of abstraction
+//
+// We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
+// bindings, etc... instead of sp_tau_node,...
+
 #ifndef __NSO_RR_H__
 #define __NSO_RR_H__
 
@@ -38,12 +44,6 @@ using namespace idni::rewriter;
 
 namespace idni::tau {
 
-// TODO (LOW) rename file to msnso_rr.h
-
-// TODO (MEDIUM) fix proper types (alias) at this level of abstraction
-//
-// We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
-// bindings, etc... instead of sp_tau_node,...
 
 //
 // types related to the tau language
@@ -1233,6 +1233,8 @@ sp_tau_node<BAs...> build_bf_or(const sp_tau_node<BAs...>& l, const sp_tau_node<
 	return tau_apply_builder<BAs...>(bldr_bf_or<BAs...>, args);
 }
 
+// TODO (HIGH) this method should be removed, if used we create expressions that
+// are not normalized.
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
