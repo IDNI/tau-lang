@@ -387,8 +387,8 @@ normalize_sym          => "n" | "normalize".
 file_sym               => "r" | "read".
 clear_sym              => "c" | "clear".
 
-absolute_output_sym    => "%".
-relative_output_sym    => "&".
+absolute_output_sym    => "&".
+relative_output_sym    => "%".
 
 # cofiguration commands
 # TODO (HIGH) implement 'set charvar...' to set length of variables to char instead to chars
