@@ -419,32 +419,36 @@ std::optional<size_t> operator|(const sp_tau_node<BAs...>& o, const non_terminal
 	return e(o);
 }
 
-// returns an optional containing the offset of the node if possible
-template<typename... BAs>
-static const auto offset_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<size_t> {
+// returns an optional containing size_t of the node if possible
+template <typename... BAs>
+static const auto size_t_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<size_t> {
 	if (std::holds_alternative<size_t>(n->value))
-		return std::optional<size_t>(get<size_t>(n->value));
+		return std::optional<size_t>(std::get<size_t>(n->value));
 	return std::optional<size_t>();
 };
-
 template<typename... BAs>
-using offset_extractor_t = decltype(offset_extractor<BAs...>);
+using size_t_extractor_t = decltype(size_t_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const offset_extractor_t<BAs...> e) {
+std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const size_t_extractor_t<BAs...> e) {
 	return v | std::ranges::views::transform(e);
 }
 
 template <typename... BAs>
-std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, const offset_extractor_t<BAs...> e) {
-	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+std::optional<size_t> operator|(const std::optional<sp_tau_node<BAs...>>& o, const size_t_extractor_t<BAs...> e) {
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
 }
 
 template <typename... BAs>
-std::optional<size_t> operator|(const sp_tau_node<BAs...>& o, const offset_extractor_t<BAs...> e) {
+std::optional<size_t> operator|(const sp_tau_node<BAs...>& o, const size_t_extractor_t<BAs...> e) {
 	return e(o);
 }
+
+// returns an optional containing the offset of the node if possible
+template <typename...BAs>
+static const auto& offset_extractor = size_t_extractor<BAs...>;
+template <typename...BAs>
+using offset_extractor_t = size_t_extractor_t<BAs...>;
 
 // returns an optional containing the bas... of the node if possible
 template<typename... BAs>
