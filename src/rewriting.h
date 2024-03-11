@@ -932,7 +932,7 @@ template<typename parser_t, typename transformer_t, typename parse_symbol_t,
 sp_node<symbol_t> make_node_from_string(const transformer_t& transformer,
 	const std::string source, idni::parser<>::parse_options options = {}) {
 	auto f = parser_instance<parser_t>().parse(source.c_str(), source.size(), options);
-	DBG(check_parser_result<parser_t>(source, f.get(), options.start);)
+	check_parser_result<parser_t>(source, f.get(), options.start);
 	return make_node_from_forest<
 			parser_t,
 			transformer_t,
@@ -948,7 +948,7 @@ sp_node<symbol_t> make_node_from_stream(const transformer_t& transformer,
 	std::istream& is)
 {
 	auto f = parser_instance<parser_t>().parse(is);
-	DBG(check_parser_result<parser_t>("<@stdin>", f.get());)
+	check_parser_result<parser_t>("<@stdin>", f.get());
 	return make_node_from_forest<
 			parser_t,
 			transformer_t,
@@ -964,8 +964,7 @@ sp_node<symbol_t> make_node_from_file(const transformer_t& transformer,
 	const std::string& filename)
 {
 	auto f = parser_instance<parser_t>().parse(filename);
-	DBG(check_parser_result<parser_t>(
-		std::string("<")+filename+">", f.get());)
+	check_parser_result<parser_t>(std::string("<")+filename+">", f.get());
 	return make_node_from_forest<parser_t, transformer_t,
 		parse_symbol_t, symbol_t>(transformer, f.get());
 }
