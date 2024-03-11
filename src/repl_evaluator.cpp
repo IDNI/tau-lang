@@ -34,6 +34,7 @@ bool error = false;
 
 #define TC_STATUS        TC.BG_CYAN()
 #define TC_STATUS_OUTPUT TC(color::GREEN, color::BG_CYAN, color::BRIGHT)
+#define TC_ERROR         TC(color::RED,   color::BRIGHT)
 #define TC_PROMPT        TC(color::WHITE, color::BRIGHT)
 #define TC_OUTPUT        TC.GREEN()
 
@@ -41,13 +42,13 @@ void reprompt(repl_evaluator& re) {
 	std::stringstream ss;
 	if (re.opt.status) {
 		ss << TC_STATUS << "[";
-		ss << " " << TC_STATUS_OUTPUT
-			<< "o:" << re.m.size() << TC.CLEAR() << TC_STATUS;
+		ss << " " << TC_STATUS_OUTPUT << "o:" << re.m.size()
+			<< TC.CLEAR() << TC_STATUS;
 		if (re.opt.severity != trivial::error)
 			ss << " " << to_string(re.opt.severity);
-		if (error) ss << " error";
 		ss << " ]" << TC.CLEAR() << " ";
 	}
+	if (error) ss << TC_ERROR << "error" << TC.CLEAR() << " ";
 	ss << TC_PROMPT << "tau>" << TC.CLEAR() << " ";
 	if (re.r) re.r->prompt(ss.str());
 }
@@ -97,11 +98,28 @@ void help(size_t nt = tau_parser::help_sym) {
 	}
 }
 
-void print_output(size_t i, const typename repl_evaluator::outputs& m) {
-	cout << TC_OUTPUT << i << TC.CLEAR();
-	if (i < m.size()) cout << ": " << m[i];
-	else cout << " does not exist";
+void print_output(size_t id, const typename repl_evaluator::outputs& m, bool relative = false) {
+	size_t abs_id = id;
+	cout << TC_OUTPUT <<(relative ? (abs_id = m.size() - id - 1, "&") : "%")
+		<< id << TC.CLEAR();
+	id < m.size() ? (cout << ": " << m[abs_id])
+		: (cout << " does not exist");
 	cout << "\n";
+}
+
+void print_output_cmd(sp_tau_node<tau_ba<bdd_binding>, bdd_binding> command,
+	const typename repl_evaluator::outputs& m)
+{
+	auto out = command | tau_parser::output;
+	auto out_type = out
+		| only_child_extractor<tau_ba<bdd_binding>, bdd_binding>
+		| non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>
+		| optional_value_extractor<size_t>;
+	auto out_id = out | out_type | tau_parser::output_id
+		| optional_value_extractor<
+			sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>;
+	size_t id = digits(out_id);
+	print_output(id, m, out_type == tau_parser::relative_output);
 }
 
 void list_outputs(typename repl_evaluator::outputs& m) {
@@ -261,15 +279,7 @@ int eval_cmd(sp_tau_node<tau_ba<bdd_binding>, bdd_binding> n, repl_evaluator& re
 	case tau_parser::toggle:        toggle_cmd(command.value(), re); break;
 	case tau_parser::list_outputs:  list_outputs(re.m); break;
 	case tau_parser::clear_outputs: clear_outputs(re.m); break;
-	case tau_parser::print_output: {
-		auto out_id = command
-			| tau_parser::output
-			| tau_parser::output_id
-			| optional_value_extractor<
-				sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>;
-		print_output(digits(out_id), re.m), cout << "\n";
-		break;
-	}
+	case tau_parser::print_output:  print_output_cmd(command.value(), re.m); break;
 	case tau_parser::normalize: {
 		auto normalized = normalizer_cmd(command.value());
 		store_output(normalized, re.m);
@@ -304,9 +314,10 @@ int repl_evaluator::eval(const std::string& src) {
 }
 
 // undef terminal color macros valid only for this file
-#undef TC_OUTPUT
 #undef TC_STATUS
 #undef TC_STATUS_OUTPUT
+#undef TC_ERROR
 #undef TC_PROMPT
+#undef TC_OUTPUT
 
 } // idni::tau namespace
