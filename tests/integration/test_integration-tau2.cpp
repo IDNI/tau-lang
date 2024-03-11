@@ -60,8 +60,8 @@ TEST_SUITE("simple tau formulas: no negatives, no loopbacks") {
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
-	TEST_CASE("{(i_keyboard[t] = ~i_keyboard[t])}") {
-		const char* sample = "{ ( i_keyboard[t] = ~i_keyboard[t] ) };";
+	TEST_CASE("{(i_keyboard[t] = i_keyboard[t]')}") {
+		const char* sample = "{ ( i_keyboard[t] = i_keyboard[t]' ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -81,8 +81,8 @@ TEST_SUITE("simple tau formulas: no negatives") {
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
-	TEST_CASE("{(i_keyboard[t-1] = ~i_keyboard[t-1])}") {
-		const char* sample = "{ ( i_keyboard[t-1] = ~i_keyboard[t-1] ) };";
+	TEST_CASE("{(i_keyboard[t-1] = i_keyboard[t-1]')}") {
+		const char* sample = "{ ( i_keyboard[t-1] = i_keyboard[t-1]' ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);

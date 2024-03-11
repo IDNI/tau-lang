@@ -172,7 +172,7 @@ bf_ref_args            => open_parenthesis (_ (variable | capture))* _ close_par
 bf_and                 => open_parenthesis  _ bf _ bf_and_sym _ bf _ close_parenthesis.
 bf_or                  => open_parenthesis  _ bf _ bf_or_sym  _ bf _ close_parenthesis.
 bf_xor                 => open_parenthesis  _ bf _ bf_xor_sym _ bf _ close_parenthesis.
-bf_neg                 => bf_neg_sym _ bf.
+bf_neg                 => bf _ bf_neg_sym.
 bf_all                 => bf_all_sym __ (variable | capture) __ bf.
 bf_ex                  => bf_ex_sym  __ (variable | capture) __ bf.
 bf_splitter            => bf_splitter_sym _ open_parenthesis _ bf _ close_parenthesis.
@@ -181,7 +181,7 @@ bf_splitter            => bf_splitter_sym _ open_parenthesis _ bf _ close_parent
 bf_and_sym             => '&'.
 bf_or_sym              => '|'.
 bf_xor_sym             => '+'.
-bf_neg_sym             => '~'.
+bf_neg_sym             => apostrophe.
 bf_equality_sym        => "=".
 bf_nequality_sym       => "!=".
 bf_less_sym            => '<'.
