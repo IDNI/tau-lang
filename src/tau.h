@@ -223,7 +223,6 @@ bool operator==(const tau_ba<BAs...>& other, const bool& b) {
 }
 
 // TODO (HIGH) give a proper implementation for != operator
-
 template<typename...BAs>
 bool operator==(const bool& b, const tau_ba<BAs...>& other) {
 	return other == b;

@@ -1168,8 +1168,8 @@ sp_tau_node<BAs...> build_wff_or(const sp_tau_node<BAs...>& l, const sp_tau_node
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_xor<BAs...>, args);
+	return build_wff_or<BAs...>(build_wff_and(build_wff_neg(l), r),
+		build_wff_and(build_wff_neg(r), l));
 }
 
 template<typename... BAs>
@@ -1233,18 +1233,16 @@ sp_tau_node<BAs...> build_bf_or(const sp_tau_node<BAs...>& l, const sp_tau_node<
 	return tau_apply_builder<BAs...>(bldr_bf_or<BAs...>, args);
 }
 
-// TODO (HIGH) this method should be removed, if used we create expressions that
-// are not normalized.
-template<typename... BAs>
-sp_tau_node<BAs...> build_bf_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
-	return tau_apply_builder<BAs...>(bldr_bf_xor<BAs...>, args);
-}
-
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_neg(const sp_tau_node<BAs...>& l) {
 	std::vector<sp_tau_node<BAs...>> args {trim(l)};
 	return tau_apply_builder<BAs...>(bldr_bf_neg<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	return build_bf_or<BAs...>(build_bf_and(build_bf_neg(l), r),
+		build_bf_and(build_bf_neg(r), l));
 }
 
 template<typename... BAs>
@@ -1441,7 +1439,7 @@ private:
 					| optional_value_extractor<sp_tau_node<BAs...>>;
 				auto fall = build_bf_all<BAs...>(var, f);
 				wff_changes[check_eq.value()] = build_wff_eq<BAs...>(fall) | tau_parser::bf_eq | optional_value_extractor<sp_tau_node<BAs...>>;
-				auto x_plus_fx = build_bf_xor<BAs...>(wrap(tau_parser::bf, var), f) | tau_parser::bf_xor | optional_value_extractor<sp_tau_node<BAs...>>;
+				auto x_plus_fx = build_bf_xor<BAs...>(wrap(tau_parser::bf, var), f) | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 				for (auto& neq: select_all(n, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
 					auto g_i = neq | tau_parser::bf	| optional_value_extractor<sp_tau_node<BAs...>>;
 					std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> gi_changes;
