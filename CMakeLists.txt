@@ -58,6 +58,7 @@ message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 #
 # Adding Boost log library
 #
+set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS log)
 if (Boost_FOUND)
 	message(STATUS "Boost version: ${Boost_VERSION}")
