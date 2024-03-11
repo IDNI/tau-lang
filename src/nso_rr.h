@@ -1046,17 +1046,10 @@ sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, sp_tau_node<BAs...>& n) {
 // definitions of wff builder rules
 const std::string BLDR_WFF_EQ = "( $X ) ::= ($X = 0).";
 const std::string BLDR_WFF_NEQ = "( $X ) ::= ($X != 0).";
-const std::string BLDR_BF_LESS = "( $X $Y ) ::= ($X < $Y).";
-const std::string BLDR_BF_LESS_EQUAL = "( $X $Y ) ::= ($X <= $Y).";
 const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) ::= ($X !<= $Y).";
-const std::string BLDR_BF_GREATER = "( $X $Y ) ::= ($X > $Y).";
 const std::string BLDR_WFF_AND = "( $X $Y ) ::= ($X && $Y).";
 const std::string BLDR_WFF_OR = "( $X $Y ) ::= ($X || $Y).";
-const std::string BLDR_WFF_XOR = "( $X $Y ) ::= ($X ^ $Y).";
-const std::string BLDR_WFF_CONDITIONAL = "( $X $Y $Z ) ::= ($X ? $Y : $Z).";
 const std::string BLDR_WFF_NEG = "( $X ) ::= ! $X.";
-const std::string BLDR_WFF_IMPLY = "( $X $Y ) ::= ($X -> $Y).";
-const std::string BLDR_WFF_EQUIV = "( $X $Y ) ::= ( $X <-> $Y ).";
 const std::string BLDR_WFF_ALL = "( $X $Y ) ::= all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) ::= ex $X $Y.";
 const std::string BLDR_WFF_BALL = "( $X $Y ) ::= ball $X $Y.";
@@ -1065,7 +1058,6 @@ const std::string BLDR_WFF_BEX = "( $X $Y ) ::= bex $X $Y.";
 // definitions of bf builder rules
 const std::string BLDR_BF_AND = "( $X $Y ) := ($X & $Y).";
 const std::string BLDR_BF_OR = "( $X $Y ) := ($X | $Y).";
-const std::string BLDR_BF_XOR = "( $X $Y ) := ($X + $Y).";
 const std::string BLDR_BF_NEG = "( $X ) := ~ $X.";
 const std::string BLDR_BF_SPLITTER = "( $X ) := S($X).";
 const std::string BLDR_BF_ALL = "( $X $Y ) := fall $X $Y.";
@@ -1088,15 +1080,7 @@ static auto bldr_wff_and = make_builder<BAs...>(BLDR_WFF_AND);
 template<typename... BAs>
 static auto bldr_wff_or = make_builder<BAs...>(BLDR_WFF_OR);
 template<typename... BAs>
-static auto bldr_wff_xor = make_builder<BAs...>(BLDR_WFF_XOR);
-template<typename... BAs>
-static auto bldr_wff_conditional = make_builder<BAs...>(BLDR_WFF_CONDITIONAL);
-template<typename... BAs>
 static auto bldr_wff_neg = make_builder<BAs...>(BLDR_WFF_NEG);
-template<typename... BAs>
-static auto bldr_wff_imply = make_builder<BAs...>(BLDR_WFF_IMPLY);
-template<typename... BAs>
-static auto bldr_wff_equiv = make_builder<BAs...>(BLDR_WFF_EQUIV);
 template<typename... BAs>
 static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
 template<typename... BAs>
@@ -1112,19 +1096,11 @@ static auto bldr_bf_and = make_builder<BAs...>(BLDR_BF_AND);
 template<typename... BAs>
 static auto bldr_bf_or = make_builder<BAs...>(BLDR_BF_OR);
 template<typename... BAs>
-static auto bldr_bf_xor = make_builder<BAs...>(BLDR_BF_XOR);
-template<typename... BAs>
 static auto bldr_bf_neg = make_builder<BAs...>(BLDR_BF_NEG);
 template<typename... BAs>
 static auto bldr_bf_splitter = make_builder<BAs...>(BLDR_BF_SPLITTER);
 template<typename... BAs>
-static auto bldr_bf_less = make_builder<BAs...>(BLDR_BF_LESS);
-template<typename... BAs>
-static auto bldr_bf_less_equal = make_builder<BAs...>(BLDR_BF_LESS_EQUAL);
-template<typename... BAs>
 static auto bldr_bf_not_less_equal = make_builder<BAs...>(BLDR_BF_NOT_LESS_EQUAL);
-template<typename... BAs>
-static auto bldr_bf_greater = make_builder<BAs...>(BLDR_BF_GREATER);
 template<typename... BAs>
 static auto bldr_bf_all = make_builder<BAs...>(BLDR_BF_ALL);
 template<typename... BAs>
@@ -1173,12 +1149,6 @@ sp_tau_node<BAs...> build_wff_xor(const sp_tau_node<BAs...>& l, const sp_tau_nod
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_conditional(const sp_tau_node<BAs...>& x, const sp_tau_node<BAs...>& y, const sp_tau_node<BAs...>& z) {
-	std::vector<sp_tau_node<BAs...>> args {trim(x), trim(y), trim(z)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_conditional<BAs...>, args);
-}
-
-template<typename... BAs>
 sp_tau_node<BAs...> build_wff_neg(const sp_tau_node<BAs...>& l) {
 	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
 	return tau_apply_builder<BAs...>(bldr_wff_neg<BAs...>, args);
@@ -1186,14 +1156,17 @@ sp_tau_node<BAs...> build_wff_neg(const sp_tau_node<BAs...>& l) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_imply(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_imply<BAs...>, args);
+	return build_wff_or<BAs...>(build_wff_neg<BAs...>(l), r);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_conditional(const sp_tau_node<BAs...>& x, const sp_tau_node<BAs...>& y, const sp_tau_node<BAs...>& z) {
+	return build_wff_and<BAs...>(build_wff_imply<BAs...>(x, y), build_wff_imply<BAs...>(build_wff_neg<BAs...>(x), z));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_equiv(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_equiv<BAs...>, args);
+	return build_wff_and<BAs...>(build_wff_imply<BAs...>(l, r), build_wff_imply<BAs...>(r, l));
 }
 
 template<typename... BAs>
@@ -1247,20 +1220,23 @@ sp_tau_node<BAs...> build_bf_xor(const sp_tau_node<BAs...>& l, const sp_tau_node
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
-	return tau_apply_builder<BAs...>(bldr_bf_less<BAs...>, args);
+	return build_bf_or<BAs...>(
+		build_wff_eq<BAs...>(build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r))),
+		build_wff_neq(build_bf_xor<BAs...>(l, build_bf_neg<BAs...>(r))));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less_equal(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
-	return tau_apply_builder<BAs...>(bldr_bf_less_equal<BAs...>, args);
+	return build_wff_eq<BAs...>(build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r)));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_greater(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
-	return tau_apply_builder<BAs...>(bldr_bf_greater<BAs...>, args);
+	return build_bf_or<BAs...>(
+		build_bf_or<BAs...>(
+			build_wff_neq<BAs...>(l, build_bf_neg<BAs...>(r)),
+			build_wff_eq<BAs...>(l, r)),
+			build_bf_xor<BAs...>(l, build_bf_eq<BAs...>(l, r)));
 }
 
 template<typename... BAs>
