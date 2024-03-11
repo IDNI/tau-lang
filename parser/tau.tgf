@@ -64,7 +64,7 @@ variable               => var | io_var.
 io_var                 => in | out.
 in                     => in_var_name open_bracket offset close_bracket.
 out                    => out_var_name open_bracket offset close_bracket.
-bool_variable          => chars.
+bool_variable          => chars & ~wff_t & ~wff_f.
 capture                => capture_var.
 capture_var            => '$' chars.
 var                    => chars.
@@ -310,11 +310,13 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 # TODO do the same with the other starting points: library, inputs, builder, nso_rr, nso, gssotc, gssotc_rr...
 # depending on the use case of the grammar.
 cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
-cli_command            => normalize | bf_substitute | wff_substitute
-			| bf_instantiate | wff_instantiate | file | rr_nso | wff
-			| output_cmd | (bf & ~help & ~version & ~quit)
-            | toggle_debug | toggle_trace | toggle_info
-			| help | version | quit.
+cli_command            => normalize
+			| bf_substitute | wff_substitute
+			| bf_instantiate | wff_instantiate
+			| rr_nso | wff
+			| (bf & ~help & ~version & ~quit & ~get & ~list_outputs)
+			| list_outputs | clear_outputs | print_output
+			| file | toggle | set | get | help | version | quit.
 
 normalize              => normalize_sym __ (q_nso_rr | q_wff | output | wff_selection).
 file                   => file_sym quote file_path quote.
@@ -342,13 +344,9 @@ wff_substitute         => substitute_sym __
                           (q_wff | output | wff_selection) __
                           # bf or output or selection where to substitute
                           (output | wff_selection).
-# TODO (HIGH) implement Tomas' idea of using 'set ...' instead of 'toggle' for
-# cofiguration commands
-# TODO (HIGH) implement 'set charvar...' to set length of variables to char instead to chars
-toggle_debug           => "toggle" __ "debug".
-toggle_trace           => "toggle" __ "trace".
-toggle_info            => "toggle" __ "info".
-help                   => help_sym [ __ cli_cmd ].
+
+
+help                   => help_sym [ __ cli_cmd_sym ].
 version                => version_sym.
 quit                   => quit_sym.
 
@@ -361,18 +359,19 @@ q_nso_rr               => apostrophe _ nso_rr _ apostrophe.
 q_wff                  => apostrophe _ wff    _ apostrophe.
 q_bf                   => apostrophe _ bf     _ apostrophe.
 q_var                  => apostrophe _ var    _ apostrophe.
-output                 => output_sym __ digits.
 # TODO (HIGH) add support for file paths
 file_path              => chars.
+output                 => output_sym __ output_id.
+output_id              => digits.
 
-output_cmd             => list_outputs | clear_outputs | view_output.
 list_outputs           => output_sym.
-view_output            => output.
 clear_outputs          => output_sym __ ("c" | "clear").
+print_output           => output.
 
-cli_cmd                => help_sym | version_sym | quit_sym | output_sym
+cli_cmd_sym            => help_sym | version_sym | quit_sym | output_sym
                         | selection_sym | instantiate_sym | substitute_sym
-                        | normalize_sym | file_sym.
+                        | normalize_sym | file_sym
+			| get_sym | set_sym | toggle_sym.
 
 # cli symbols
 help_sym               => "h" | "help".
@@ -384,3 +383,32 @@ instantiate_sym        => "i" | "instantiate".
 substitute_sym         => "s" | "substitute".
 normalize_sym          => "n" | "normalize".
 file_sym               => "r" | "read".
+
+# cofiguration commands
+# TODO (HIGH) implement 'set charvar...' to set length of variables to char instead to chars
+
+# get option_sym / set option_sym [ = ] value / toggle option_sym
+get                    => get_sym [ __ option ].
+set                    => set_sym __ option (__ | _ '=' _) option_value.
+toggle                 => toggle_sym __ bool_option.
+
+get_sym                => "get".
+set_sym                => "set".
+toggle_sym             => "toggle".
+
+# options and their names
+option                 => bool_option | severity_opt. # | string_option | integer_option.
+bool_option            => status_opt | colors_opt.
+status_opt             => "s" | "status".
+colors_opt             => "c" | "color" | "colors".
+severity_opt           => "sev" | "severity".
+
+# option values
+option_value           => option_value_true | option_value_false | severity.
+option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
+option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".
+severity               => error_sym | debug_sym | trace_sym | info_sym.
+error_sym              => "e" | "error".
+info_sym               => "i" | "info".
+debug_sym              => "d" | "debug".
+trace_sym              => "t" | "trace".

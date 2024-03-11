@@ -116,7 +116,9 @@ private:
 	int in(char& c) const { return read(STDIN_FILENO, &c, 1); }
 	// writes data to stdout
 	void out(const char* data, size_t size) const {
-		write(STDOUT_FILENO, data, size);
+		size_t written = write(STDOUT_FILENO, data, size);
+		// TODO (HIGH) handle write errors
+		DBG(assert(written == size);)
 	}
 	// returns the current input as a string
 	std::string get() const {

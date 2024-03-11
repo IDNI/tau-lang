@@ -71,8 +71,7 @@ using namespace std;
 using namespace idni;
 using namespace idni::rewriter;
 using namespace idni::tau;
-
-namespace logging = boost::log;
+using namespace boost::log;
 
 cli::commands tau_commands() {
 	cli::commands cmds;
@@ -170,17 +169,10 @@ int run_tau(const string& program, const string& input, const string& output,
 	return 0;
 }
 
-void init_logging()
-{
-    boost::log::core::get()->set_filter
-    (
-        boost::log::trivial::severity >= boost::log::trivial::debug
-    );
-
-	boost::log::add_console_log(
-        std::cout,
-        boost::log::keywords::format = boost::log::expressions::stream << boost::log::expressions::smessage
-    );
+void init_logging() {
+	core::get()->set_filter(trivial::severity >= trivial::debug);
+	add_console_log(cout, keywords::format =
+		expressions::stream << expressions::smessage);
 }
 
 // TODO (MEDIUM) add command to read input file,...
@@ -210,10 +202,11 @@ int main(int argc, char** argv) {
 
 	// repl command
 	if (cmd.name() == "repl") {
-		std::string e = cmd.get<string>("evaluate");
-		idni::tau::repl_evaluator re;
+		string e = cmd.get<string>("evaluate");
+		repl_evaluator re;
 		if (e.size()) return re.eval(e), 0;
 		repl<repl_evaluator> r(re, "tau> ", ".tau_history");
+		re.set_repl(r);
 		return r.run();
 	}
 

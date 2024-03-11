@@ -53,18 +53,35 @@
 
 #include <string>
 #include <vector>
+
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+
 #include "bdd_binding.h"
+#include "repl.h"
 
 
 namespace idni::tau {
 
 struct repl_evaluator {
-	int eval(const std::string& src);
-	using outputs_mem = std::vector<std::variant<
+	struct options {
+		options() {};
+		bool status  = true;
+		bool colors  = true;
+		boost::log::trivial::severity_level
+			severity = boost::log::trivial::error;
+	} opt;
+	using output = std::variant<
 		nso<tau_ba<bdd_binding>, bdd_binding>,
-		rr<nso<tau_ba<bdd_binding>, bdd_binding>>>>;
-private:
-	outputs_mem m;
+		rr<nso<tau_ba<bdd_binding>, bdd_binding>>>;
+	using outputs = std::vector<output>;
+
+	repl_evaluator(options opt = options{});
+	void set_repl(repl<repl_evaluator>& r_);
+	int eval(const std::string& src);
+
+	outputs m;
+	repl<repl_evaluator>* r = 0;
 };
 
 } //idni::tau namespace
