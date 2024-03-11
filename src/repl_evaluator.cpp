@@ -41,12 +41,13 @@ bool error = false;
 void reprompt(repl_evaluator& re) {
 	std::stringstream ss;
 	if (re.opt.status) {
-		ss << TC_STATUS << "[";
-		ss << " " << TC_STATUS_OUTPUT << "o:" << re.m.size()
-			<< TC.CLEAR() << TC_STATUS;
+		std::stringstream status;
+		if (re.m.size()) status << " " << TC_STATUS_OUTPUT << "&"
+			<< re.m.size()-1 << TC.CLEAR() << TC_STATUS;
 		if (re.opt.severity != trivial::error)
-			ss << " " << to_string(re.opt.severity);
-		ss << " ]" << TC.CLEAR() << " ";
+			status << " " << to_string(re.opt.severity);
+		if (status.tellp()) ss << TC_STATUS << "["
+			<< status.str() << " ]" << TC.CLEAR() << " ";
 	}
 	if (error) ss << TC_ERROR << "error" << TC.CLEAR() << " ";
 	ss << TC_PROMPT << "tau>" << TC.CLEAR() << " ";
@@ -99,12 +100,16 @@ void help(size_t nt = tau_parser::help_sym) {
 }
 
 void print_output(size_t id, const typename repl_evaluator::outputs& m, bool relative = false) {
-	size_t abs_id = id;
-	cout << TC_OUTPUT <<(relative ? (abs_id = m.size() - id - 1, "&") : "%")
-		<< id << TC.CLEAR();
-	id < m.size() ? (cout << ": " << m[abs_id])
-		: (cout << " does not exist");
-	cout << "\n";
+	size_t abs_id = relative ? m.size() - id - 1 : id;
+	size_t rel_id = relative ? id : m.size() - id - 1;
+	if (abs_id >= m.size()) {
+		cout << "output " << TC_OUTPUT << (relative ? "%" : "&") << id
+			<< TC.CLEAR() << " does not exist\n";
+		return;
+	}
+	cout << TC_OUTPUT << "&" << abs_id << TC.CLEAR() << " / "
+		<< TC_OUTPUT << "%" << rel_id << TC.CLEAR()
+		<< ": " << m[abs_id] << "\n";
 }
 
 void print_output_cmd(sp_tau_node<tau_ba<bdd_binding>, bdd_binding> command,

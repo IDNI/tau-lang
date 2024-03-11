@@ -1202,10 +1202,10 @@ private:
 		q(nt(303), (t(45)));
 		// clear_sym => 'c' 'l' 'e' 'a' 'r'.
 		q(nt(303), (t(45)+t(31)+t(32)+t(30)+t(49)));
-		// absolute_output_sym => '%'.
-		q(nt(297), (t(58)));
-		// relative_output_sym => '&'.
-		q(nt(301), (t(24)));
+		// absolute_output_sym => '&'.
+		q(nt(297), (t(24)));
+		// relative_output_sym => '%'.
+		q(nt(301), (t(58)));
 		// _Rget_64 => null.
 		q(nt(308), (nul));
 		// _Rget_64 => __ option.
