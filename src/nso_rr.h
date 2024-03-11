@@ -490,16 +490,8 @@ static const auto only_child_extractor = [](const sp_tau_node<BAs...>& n) -> std
 template<typename... BAs>
 using only_child_extractor_t = decltype(only_child_extractor<BAs...>);
 
-// TODO (LOW) merge both implementations using a new template parameter
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const only_child_extractor_t<BAs...> e) {
-	std::vector<sp_tau_node<BAs...>> nv;
-	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
-	return nv;
-}
-
-template <typename... BAs>
-std::vector<sp_tau_node<BAs...>> operator||(const std::set<sp_tau_node<BAs...>>& v, const only_child_extractor_t<BAs...> e) {
 	std::vector<sp_tau_node<BAs...>> nv;
 	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
 	return nv;
@@ -562,8 +554,6 @@ struct tauify {
 		return nn;
 	}
 };
-
-// TODO (LOW) change this extractor so it uses the next one
 
 // extracts terminal from sp_tau_node
 template <typename... BAs>
@@ -1023,11 +1013,6 @@ builder<BAs...> make_builder(const std::string& source) {
 	return make_builder<BAs...>(tau_source);
 }
 
-// apply the given builder to the given expression
-// TODO (MEDIUM) it should return the child, it currtently returns the parent
-//
-// i.e. rightnow it retuns a a bf or wff nso_rr, but we are interested in the child
-// thus it, a wwf_eq nso_rr, or wff_neq nso_rr,...
 template<typename... BAs>
 sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_tau_node<BAs...>>& n) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
@@ -1466,8 +1451,7 @@ private:
 		return args[0];
 	}
 
-	// TODO (MEDIUM) make a cleaner implementation
-	//
+	// TODO (LOW) make a cleaner implementation
 	// we should merge the two following methods and split the logic in
 	// meaningful methods
 	sp_tau_node<BAs...> apply_wff_clashing_subformulas_check(const sp_tau_node<BAs...>& n) {
