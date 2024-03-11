@@ -118,7 +118,7 @@ private:
 	void out(const char* data, size_t size) const {
 		size_t written = write(STDOUT_FILENO, data, size);
 		// TODO (HIGH) handle write errors
-		DBG(assert(written == size);)
+		if (written != size) std::cerr << "write error\n";
 	}
 	// returns the current input as a string
 	std::string get() const {

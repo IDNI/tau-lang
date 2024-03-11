@@ -32,15 +32,15 @@ namespace testing = doctest;
 
 TEST_SUITE("operators: negation") {
 
-	TEST_CASE("(~ { : F. } = 0)") {
-		const char* sample = "( ~ { : F. } = 0 ).";
+	TEST_CASE("({ : F. }' = 0)") {
+		const char* sample = "( { : F. }' = 0 ).";
 		auto normalized = normalize_test_tau(sample);
 		auto check = normalized.main | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("(~ { : T. } = 0)") {
-		const char* sample = "( ~ { : T. } = 0 ).";
+	TEST_CASE("({ : T. }' = 0)") {
+		const char* sample = "( { : T. }' = 0 ).";
 		auto normalized = normalize_test_tau(sample);
 		auto check = normalized.main | tau_parser::wff_t;
 		CHECK( check.has_value() );
