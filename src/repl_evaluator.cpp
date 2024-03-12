@@ -99,32 +99,48 @@ void help(size_t nt = tau_parser::help_sym) {
 	}
 }
 
-void print_output(size_t id, const typename repl_evaluator::outputs& m, bool relative = false) {
-	size_t abs_id = relative ? m.size() - id - 1 : id;
-	size_t rel_id = relative ? id : m.size() - id - 1;
-	if (abs_id >= m.size()) {
-		cout << "output " << TC_OUTPUT << (relative ? "%" : "&") << id
-			<< TC.CLEAR() << " does not exist\n";
-		return;
-	}
-	cout << TC_OUTPUT << "&" << abs_id << TC.CLEAR() << " / "
-		<< TC_OUTPUT << "%" << rel_id << TC.CLEAR()
-		<< ": " << m[abs_id] << "\n";
+void print_output(size_t id, const typename repl_evaluator::outputs& m) {
+	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << " / "
+		<< TC_OUTPUT << "%" << (m.size() - id - 1) << TC.CLEAR()
+		<< ": " << m[id] << "\n";
+}
+
+struct output_ref {
+	size_t id = 0;
+	size_t abs_id = 0;
+	size_t rel_id = 0;
+	bool relative = false;
+	bool out_of_range = false;
+};
+
+output_ref get_output_ref(sp_tau_node<tau_ba<bdd_binding>, bdd_binding> n,
+	const typename repl_evaluator::outputs& m, bool silent = false)
+{
+	auto out_type = n
+		| only_child_extractor<tau_ba<bdd_binding>, bdd_binding>
+		| non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>
+		| optional_value_extractor<size_t>;
+	auto out_id = n | out_type | tau_parser::output_id
+		| optional_value_extractor<
+			sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>;
+	output_ref o;
+	o.relative = out_type == tau_parser::relative_output;
+	o.id = digits(out_id);
+	o.abs_id = o.relative ? m.size() - o.id - 1 : o.id;
+	o.rel_id = o.relative ? o.id : m.size() - o.id - 1;
+	o.out_of_range = o.abs_id >= m.size();
+	if (!silent && o.out_of_range)
+		cout << "output " << TC_OUTPUT << (o.relative ? "%" : "&")
+			<< o.id << TC.CLEAR() << " does not exist\n";
+	return o;
 }
 
 void print_output_cmd(sp_tau_node<tau_ba<bdd_binding>, bdd_binding> command,
 	const typename repl_evaluator::outputs& m)
 {
-	auto out = command | tau_parser::output;
-	auto out_type = out
-		| only_child_extractor<tau_ba<bdd_binding>, bdd_binding>
-		| non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>
-		| optional_value_extractor<size_t>;
-	auto out_id = out | out_type | tau_parser::output_id
-		| optional_value_extractor<
-			sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>;
-	size_t id = digits(out_id);
-	print_output(id, m, out_type == tau_parser::relative_output);
+	auto o = get_output_ref(command, m);
+	if (o.out_of_range) return;
+	print_output(o.abs_id, m);
 }
 
 void list_outputs(typename repl_evaluator::outputs& m) {
@@ -141,7 +157,7 @@ void store_output(typename repl_evaluator::output o,
 	typename repl_evaluator::outputs& m)
 {
 	// do not add into memory if the last memory value is the same ?
-	if (m.size() && m.back() == o) return;
+	// if (m.size() && m.back() == o) return;
 	m.push_back(o);
 }
 
@@ -149,31 +165,43 @@ void store_output(typename repl_evaluator::output o,
 
 // make rr_wff
 
-nso<tau_ba<bdd_binding>, bdd_binding> normalizer_cmd(const nso<tau_ba<bdd_binding>, bdd_binding>& n) {
-	/*auto type = n
+nso<tau_ba<bdd_binding>, bdd_binding> normalizer_cmd(
+	const nso<tau_ba<bdd_binding>, bdd_binding>& n,
+	typename repl_evaluator::outputs& m)
+{
+	auto normal = [&m] (auto& n) {
+		auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(n);
+		std::cout << "normalized: " << result << "\n";
+		store_output(result, m);
+		return result;
+	};
+	auto type = n | tau_parser::normalize_arg
 		| only_child_extractor<tau_ba<bdd_binding>, bdd_binding>
 		| non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>
 		| optional_value_extractor<size_t>;
+	auto arg = (n | tau_parser::normalize_arg | type).value();
 	switch(type) {
-	case tau_parser::q_wff: {*/
-		auto wff = n | tau_parser::q_wff | tau_parser::wff;
-		if (wff.has_value()) {
-			auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(wff.value());
-			std::cout << "normalized: " << result << "\n";
-			return result;
-		}
+	case tau_parser::q_wff: {
+		auto wff = arg | tau_parser::wff;
+		if (wff.has_value()) return normal(wff.value());
 		std::cout << "Unsupported type to normalize.\n"; return n;
-	/*}
-	case tau_parser::q_nso_rr: {
-		auto nso_rr = n | tau_parser::q_nso_rr | optional_value_extractor<nso<tau_ba<bdd_binding>, bdd_binding>>;
-		auto result = normalizer<tau_ba<bdd_binding>, bdd_binding>(nso_rr);
-		std::cout << "normalized: " << result << "\n";
-	return result;
+	}
+	// case tau_parser::q_nso_rr: {
+	// 	auto nso_rr = n | tau_parser::q_nso_rr | optional_value_extractor<nso<tau_ba<bdd_binding>, bdd_binding>>;
+	// 	return normal(nso_rr);
+	// }
+	case tau_parser::output: {
+		auto o = get_output_ref(arg, m);
+		if (o.out_of_range) return n;
+		auto& ov = m[o.abs_id];
+		if (std::holds_alternative<rr<nso<tau_ba<bdd_binding>, bdd_binding>>>(ov))
+			return normal(std::get<rr<nso<tau_ba<bdd_binding>, bdd_binding>>>(ov));
+		return normal(std::get<nso<tau_ba<bdd_binding>, bdd_binding>>(ov));
 	}
 	default: {
 		std::cout << "Unsupported type to normalize.\n";
 		return n;
-	}}*/
+	}}
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -264,17 +292,15 @@ int eval_cmd(sp_tau_node<tau_ba<bdd_binding>, bdd_binding> n, repl_evaluator& re
 	auto command_type = command
 		| non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>
 		| optional_value_extractor<size_t>;
-	//std::cout << "command.value(): " << command.value() << "\n";
-	//DBG(print_sp_tau_node_tree<tau_ba<bdd_binding>, bdd_binding>(cout << "command.value(): ", command.value()) << "\n";)
+	//std::cout << "eval_cmd: " << command.value() << "\n";
+	//print_sp_tau_node_tree<tau_ba<bdd_binding>, bdd_binding>(cout << "cmd tree: ", command.value()) << "\n";
 	switch (command_type) {
 	case tau_parser::quit: return cout << "Quit.\n", 1;
 	case tau_parser::help: {
 		auto optarg = command | tau_parser::cli_cmd_sym
 			| only_child_extractor<tau_ba<bdd_binding>, bdd_binding>
 			| non_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>;
-		if (optarg.has_value())
-			//cout << "help: " << optarg.value() << "\n",
-			help(optarg.value());
+		if (optarg.has_value()) help(optarg.value());
 		else help();
 		break;
 	}
@@ -284,12 +310,10 @@ int eval_cmd(sp_tau_node<tau_ba<bdd_binding>, bdd_binding> n, repl_evaluator& re
 	case tau_parser::toggle:        toggle_cmd(command.value(), re); break;
 	case tau_parser::list_outputs:  list_outputs(re.m); break;
 	case tau_parser::clear_outputs: clear_outputs(re.m); break;
-	case tau_parser::print_output:  print_output_cmd(command.value(), re.m); break;
-	case tau_parser::normalize: {
-		auto normalized = normalizer_cmd(command.value());
-		store_output(normalized, re.m);
+	case tau_parser::print_output:  print_output_cmd(command.value(), re.m);
 		break;
-	}
+	case tau_parser::normalize:     normalizer_cmd(command.value(), re.m);
+		break;
 	default:
 		cout << "Unknown command\n";
 		error = true;

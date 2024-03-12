@@ -318,7 +318,8 @@ cli_command            => normalize
                         | list_outputs | clear_outputs | print_output
                         | file | toggle | set | get | help | version | quit.
 
-normalize              => normalize_sym __ (q_nso_rr | q_wff | output | wff_selection).
+normalize              => normalize_sym __ normalize_arg.
+normalize_arg          => q_nso_rr | q_wff | output | wff_selection.
 file                   => file_sym quote file_path quote.
 bf_instantiate         => instantiate_sym __
                           # variable to be instantiated
