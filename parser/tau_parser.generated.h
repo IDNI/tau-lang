@@ -1149,8 +1149,12 @@ private:
 		q(nt(290), (nt(293)));
 		// cli_cmd_sym => selection_sym.
 		q(nt(290), (nt(294)));
+		// cli_cmd_sym => absolute_output_sym.
+		q(nt(290), (nt(297)));
 		// cli_cmd_sym => output_sym.
 		q(nt(290), (nt(298)));
+		// cli_cmd_sym => relative_output_sym.
+		q(nt(290), (nt(301)));
 		// cli_cmd_sym => get_sym.
 		q(nt(290), (nt(304)));
 		// cli_cmd_sym => set_sym.
