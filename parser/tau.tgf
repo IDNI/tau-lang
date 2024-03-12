@@ -371,7 +371,8 @@ list_outputs           => output_sym | absolute_output_sym | relative_output_sym
 clear_outputs          => (output_sym __ | absolute_output_sym | relative_output_sym) clear_sym.
 print_output           => output.
 
-cli_cmd_sym            => help_sym | version_sym | quit_sym | output_sym
+cli_cmd_sym            => help_sym | version_sym | quit_sym
+			| output_sym | absolute_output_sym | relative_output_sym
                         | selection_sym | instantiate_sym | substitute_sym
                         | normalize_sym | file_sym
                         | get_sym | set_sym | toggle_sym.

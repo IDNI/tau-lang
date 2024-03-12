@@ -12,7 +12,6 @@
 // modified over time by the Author.
 #ifndef __REPL_EVALUATOR_TMPL_H__
 #define __REPL_EVALUATOR_TMPL_H__
-#include "defs.h" // for GIT_DESCRIBED
 #include "repl_evaluator.h"
 #include "parser_instance.h"
 #include "normalizer2.h"
@@ -22,6 +21,8 @@
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/utility/setup/console.hpp>
 
 namespace idni::tau {
 
@@ -29,8 +30,8 @@ namespace idni::tau {
 // to access them within your local function/method scope, use:
 //     using namespace _repl_evaluator;
 namespace _repl_evaluator {
-	term::colors TC;
-	bool error = false;
+	static term::colors TC;
+	static bool error = false;
 }
 
 #define TC_STATUS        TC.BG_CYAN()
@@ -69,44 +70,6 @@ std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
 	return os << "\n";
 }
 #endif // DEBUG
-
-void version() { cout << "Tau version: " << GIT_DESCRIBED << "\n"; }
-
-// TODO (LOW) write proper help messages
-void help(size_t nt = tau_parser::help_sym) {
-	switch (nt) {
-	case tau_parser::help_sym: cout
-		<< "Commands:\n"
-		<< "  h, help.        print this help\n"
-		<< "  v, version.     print version\n"
-		<< "  q, quit, exit   exit the repl\n";
-		break;
-	case tau_parser::version_sym: cout
-		<< "Command v, version prints out current Tau commit id.\n";
-		break;
-	case tau_parser::quit_sym: cout
-		<< "Command q, quit, exit exits the repl.\n";
-		break;
-	case tau_parser::output_sym: cout
-		<< "Command o, output ...\n";
-		break;
-	case tau_parser::selection_sym: cout
-		<< "Command s, selection ...\n";
-		break;
-	case tau_parser::instantiate_sym: cout
-		<< "Command i, instantiate ...\n";
-		break;
-	case tau_parser::substitute_sym: cout
-		<< "Command s, substitute ...\n";
-		break;
-	case tau_parser::normalize_sym: cout
-		<< "Command n, normalize ...\n";
-		break;
-	case tau_parser::file_sym: cout
-		<< "Command r, read ...\n";
-		break;
-	}
-}
 
 template <typename... BAs>
 void reprompt(repl_evaluator<BAs...>& re) {
@@ -337,6 +300,9 @@ void toggle_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 	default: cout << ": unknown bool option\n"; _repl_evaluator::error = true; break;
 	}
 }
+
+void version();
+void help(size_t nt = tau_parser::help_sym);
 
 template <typename... BAs>
 int eval_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
