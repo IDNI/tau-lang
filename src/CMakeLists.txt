@@ -31,7 +31,6 @@ set(TAU_SOURCES
 
 set(CLI_SOURCES
 	main.cpp
-	repl_evaluator.cpp
 	../external/parser/src/cli.cpp)
 
 #
