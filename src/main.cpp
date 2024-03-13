@@ -203,9 +203,9 @@ int main(int argc, char** argv) {
 	// repl command
 	if (cmd.name() == "repl") {
 		string e = cmd.get<string>("evaluate");
-		repl_evaluator re;
+		repl_evaluator<tau_ba<bdd_binding>, bdd_binding> re;
 		if (e.size()) return re.eval(e), 0;
-		repl<repl_evaluator> r(re, "tau> ", ".tau_history");
+		repl<decltype(re)> r(re, "tau> ", ".tau_history");
 		re.set_repl(r);
 		return r.run();
 	}

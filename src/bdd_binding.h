@@ -130,26 +130,30 @@ struct bdd_factory {
 			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src << "`\n"
 				<< p.get_error().to_str();
 			return bdd_handle<Bool>::hfalse;
-		} else if (f->is_ambiguous()) {
+		}
+#ifdef DEBUG
+		else if (f->is_ambiguous()) {
 			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src << "`\n"
 				<< "# n trees: " << f->count_trees() << "\n"
-				<< "# ambiguous nodes:\n";
+				<< "# ambiguous nodes:";
 			for (auto& n : f->ambiguous_nodes()) {
 				BOOST_LOG_TRIVIAL(error) << "\t `" << n.first.first << "` ["
 					<< n.first.second[0] << ","
-					<< n.first.second[1] << "]\n";
+					<< n.first.second[1] << "]";
 				size_t d = 0;
 				for (auto ns : n.second) {
-					BOOST_LOG_TRIVIAL(error) << "\t\t " << d++ << "\t";
-					for (auto nt : ns) BOOST_LOG_TRIVIAL(error) << " `"
-						<< nt.first << "`["
-						<< nt.second[0] << ","
+					std::stringstream ss;
+					ss << "\t\t " << d++ << "\t";
+					for (auto nt : ns) ss
+						<< " `" << nt.first
+						<< "`[" << nt.second[0] << ","
 						<< nt.second[1] << "] ";
-					BOOST_LOG_TRIVIAL(error);
+					BOOST_LOG_TRIVIAL(error) << ss.str();
 				}
 			}
 			return bdd_handle<Bool>::hfalse;
 		}
+#endif // DEBUG
 #endif // SHOW_GRAMMAR_ERRORS
 		return transform(*f); // transform the forest into bdd
 	}

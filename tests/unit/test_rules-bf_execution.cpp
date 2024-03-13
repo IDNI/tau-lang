@@ -306,7 +306,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_NEG") {
-		const char* sample = "( ~ { l } = 0 ).";
+		const char* sample = "( { l }' = 0 ).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
