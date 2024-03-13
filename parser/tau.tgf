@@ -104,9 +104,9 @@ wff_body               => wff | bf_eq_cb | bf_neq_cb | wff_has_clashing_subformu
                         | wff_remove_bexistential_cb | wff_remove_buniversal_cb.
 wff_rec_relation       => (wff & ~wff_and & ~wff_neg & ~wff_xor & ~wff_conditional &
                           ~wff_or & ~wff_all & ~wff_ex & ~wff_imply & ~wff_equiv &
-			  ~wff_t & ~wff_f & ~capture & ~bool_variable & ~wff_ball &
-			  ~wff_bex & ~bf_eq & ~ bf_neq & ~bf_less & ~bf_less_equal &
-			  ~bf_greater & ~bf_interval & ~bf_not_less_equal)
+                          ~wff_t & ~wff_f & ~capture & ~bool_variable & ~wff_ball &
+                          ~wff_bex & ~bf_eq & ~ bf_neq & ~bf_less & ~bf_less_equal &
+                          ~bf_greater & ~bf_interval & ~bf_not_less_equal)
                           _ wff_def _ wff _ dot.
 
 wff                    => wff_ref | wff_and | wff_neg | wff_xor | wff_conditional
@@ -139,7 +139,7 @@ bf_less                => open_parenthesis _ bf _ bf_less_sym           _ bf _ c
 bf_less_equal          => open_parenthesis _ bf _ bf_less_equal_sym     _ bf _ close_parenthesis.
 bf_not_less_equal      => open_parenthesis _ bf _ bf_not_less_equal_sym _ bf _ close_parenthesis.
 bf_greater             => open_parenthesis _ bf _ bf_greater_sym        _ bf _ close_parenthesis.
-bf_interval             => open_parenthesis _ bf _ bf_less_equal_sym     _ bf _ bf_less_equal_sym _ bf _ close_parenthesis.
+bf_interval            => open_parenthesis _ bf _ bf_less_equal_sym     _ bf _ bf_less_equal_sym _ bf _ close_parenthesis.
 
 # wff_op_sym
 wff_and_sym            => "&&".
@@ -172,7 +172,7 @@ bf_ref_args            => open_parenthesis (_ (variable | capture))* _ close_par
 bf_and                 => open_parenthesis  _ bf _ bf_and_sym _ bf _ close_parenthesis.
 bf_or                  => open_parenthesis  _ bf _ bf_or_sym  _ bf _ close_parenthesis.
 bf_xor                 => open_parenthesis  _ bf _ bf_xor_sym _ bf _ close_parenthesis.
-bf_neg                 => bf_neg_sym _ bf.
+bf_neg                 => bf _ bf_neg_sym.
 bf_all                 => bf_all_sym __ (variable | capture) __ bf.
 bf_ex                  => bf_ex_sym  __ (variable | capture) __ bf.
 bf_splitter            => bf_splitter_sym _ open_parenthesis _ bf _ close_parenthesis.
@@ -181,7 +181,7 @@ bf_splitter            => bf_splitter_sym _ open_parenthesis _ bf _ close_parent
 bf_and_sym             => '&'.
 bf_or_sym              => '|'.
 bf_xor_sym             => '+'.
-bf_neg_sym             => '~'.
+bf_neg_sym             => apostrophe.
 bf_equality_sym        => "=".
 bf_nequality_sym       => "!=".
 bf_less_sym            => '<'.
@@ -309,14 +309,15 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 # depending on the use case of the grammar.
 cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
 cli_command            => normalize
-			| bf_substitute | wff_substitute
-			| bf_instantiate | wff_instantiate
-			| rr_nso | wff
-			| (bf & ~help & ~version & ~quit & ~get & ~list_outputs)
-			| list_outputs | clear_outputs | print_output
-			| file | toggle | set | get | help | version | quit.
+                        | bf_substitute | wff_substitute
+                        | bf_instantiate | wff_instantiate
+                        | rr_nso | wff
+                        | (bf & ~help & ~version & ~quit & ~get & ~list_outputs)
+                        | list_outputs | clear_outputs | print_output
+                        | file | toggle | set | get | help | version | quit.
 
-normalize              => normalize_sym __ (q_nso_rr | q_wff | output | wff_selection).
+normalize              => normalize_sym __ normalize_arg.
+normalize_arg          => q_nso_rr | q_wff | output | wff_selection.
 file                   => file_sym quote file_path quote.
 bf_instantiate         => instantiate_sym __
                           # variable to be instantiated
@@ -359,17 +360,20 @@ q_bf                   => apostrophe _ bf     _ apostrophe.
 q_var                  => apostrophe _ var    _ apostrophe.
 # TODO (HIGH) add support for file paths
 file_path              => chars.
-output                 => output_sym __ output_id.
+output                 => absolute_output | relative_output.
+absolute_output        => (absolute_output_sym | output_sym __) output_id.
+relative_output        => relative_output_sym output_id.
 output_id              => digits.
 
-list_outputs           => output_sym.
-clear_outputs          => output_sym __ ("c" | "clear").
+list_outputs           => output_sym | absolute_output_sym | relative_output_sym.
+clear_outputs          => (output_sym __ | absolute_output_sym | relative_output_sym) clear_sym.
 print_output           => output.
 
-cli_cmd_sym            => help_sym | version_sym | quit_sym | output_sym
+cli_cmd_sym            => help_sym | version_sym | quit_sym
+			| output_sym | absolute_output_sym | relative_output_sym
                         | selection_sym | instantiate_sym | substitute_sym
                         | normalize_sym | file_sym
-			| get_sym | set_sym | toggle_sym.
+                        | get_sym | set_sym | toggle_sym.
 
 # cli symbols
 help_sym               => "h" | "help".
@@ -381,6 +385,10 @@ instantiate_sym        => "i" | "instantiate".
 substitute_sym         => "s" | "substitute".
 normalize_sym          => "n" | "normalize".
 file_sym               => "r" | "read".
+clear_sym              => "c" | "clear".
+
+absolute_output_sym    => "&".
+relative_output_sym    => "%".
 
 # cofiguration commands
 # TODO (HIGH) implement 'set charvar...' to set length of variables to char instead to chars

@@ -1052,7 +1052,7 @@ const std::string BLDR_WFF_BEX = "( $X $Y ) ::= bex $X $Y.";
 // definitions of bf builder rules
 const std::string BLDR_BF_AND = "( $X $Y ) := ($X & $Y).";
 const std::string BLDR_BF_OR = "( $X $Y ) := ($X | $Y).";
-const std::string BLDR_BF_NEG = "( $X ) := ~ $X.";
+const std::string BLDR_BF_NEG = "( $X ) := $X'.";
 const std::string BLDR_BF_SPLITTER = "( $X ) := S($X).";
 const std::string BLDR_BF_ALL = "( $X $Y ) := fall $X $Y.";
 const std::string BLDR_BF_EX = "( $X $Y ) := fex $X $Y.";

@@ -982,8 +982,8 @@ TEST_SUITE("parsing wwf formulas ") {
 
 TEST_SUITE("parsing bf formulas ") {
 
-	TEST_CASE("~") {
-		const char* sample = "~ Z := Z.";
+	TEST_CASE("'") {
+		const char* sample = "Z' := Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto neg_rule = lib

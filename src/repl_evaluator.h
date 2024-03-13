@@ -60,9 +60,9 @@
 #include "bdd_binding.h"
 #include "repl.h"
 
-
 namespace idni::tau {
 
+template <typename... BAs>
 struct repl_evaluator {
 	struct options {
 		options() {};
@@ -77,12 +77,13 @@ struct repl_evaluator {
 	using outputs = std::vector<output>;
 
 	repl_evaluator(options opt = options{});
-	void set_repl(repl<repl_evaluator>& r_);
+	void set_repl(repl<repl_evaluator<BAs...>>& r_);
 	int eval(const std::string& src);
 
 	outputs m;
-	repl<repl_evaluator>* r = 0;
+	repl<repl_evaluator<BAs...>>* r = 0;
 };
 
 } //idni::tau namespace
+#include "repl_evaluator.tmpl.h"
 #endif //__REPL_EVALUATOR_H__
