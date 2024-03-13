@@ -19,6 +19,10 @@
 #include "bdd_binding.h"
 #include "term_colors.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
+
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
@@ -40,36 +44,6 @@ namespace _repl_evaluator {
 #define TC_PROMPT        TC(color::WHITE, color::BRIGHT)
 #define TC_OUTPUT        TC.GREEN()
 
-#ifdef DEBUG
-// print the tree of tau nodes for repl input debugging
-template <typename... BAs>
-std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
-	size_t l = 0, bool ws = false)
-{
-	bool enter = true;
-	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
-	std::visit(overloaded{
-		[&os, &ws, &enter, &indent](tau_source_sym v) {
-			if (v.nt() && (v.n() == tau_parser::_ ||
-					v.n() == tau_parser::__)) {
-				enter = false;
-				return;
-			}
-			indent();
-			if (v.nt()) os << parser_instance<tau_parser>()
-				.name(v.n()) << "(" << v.n() << ")";
-			else if (v.is_null()) os << "null";
-			else os << v.t();
-		},
-		[&os](const auto& v) { os << v; }
-	}, n->value);
-	if (!enter) return os;
-	if (n->child.size()) os << " {\n";
-	for (auto& c : n->child) print_sp_tau_node_tree<BAs...>(os, c, l + 1, ws);
-	if (n->child.size()) indent(), os << "}";
-	return os << "\n";
-}
-#endif // DEBUG
 
 template <typename... BAs>
 void reprompt(repl_evaluator<BAs...>& re) {

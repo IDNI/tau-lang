@@ -21,6 +21,10 @@
 #include "rewriting.h"
 #include "nso_rr.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
+
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
@@ -383,13 +387,13 @@ struct repeat_once {
 
 template<typename... BAs>
 void get_bf_literals(const nso<BAs...>& clause, std::vector<nso<BAs...>>& literals) {
-	BOOST_LOG_TRIVIAL(debug) << "(I) get_bf_literals of: " << clause;
+	BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
 	for (auto& c: clause || tau_parser::bf) {
 		if (auto check = c | tau_parser::bf_and; check.has_value())
 			get_bf_literals(check.value() , literals);
 		else {
 			literals.push_back(c);
-			BOOST_LOG_TRIVIAL(debug) << "(I) found literal: " << c;
+			BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << c;
 		}
 	}
 }
@@ -454,9 +458,11 @@ bool has_dnf_clause_clashing_literals(const nso<BAs...>& clause) {
 
 template<typename... BAs>
 nso<BAs...> build_bf_dnf_from_clauses(const std::vector<nso<BAs...>>& clauses) {
-	auto result =  _0<BAs...>;
+	// we just have a literal or a variable
 	if (clauses.empty()) return _0<BAs...>;
+	// we have remove the bf above the bf_and so we need to add it back
 	if (clauses.size() == 1) return wrap<BAs...>(tau_parser::bf, clauses[0]);
+	// again we need to add the bf above the bf_and
 	auto n = wrap<BAs...>(tau_parser::bf, clauses[0]);
 	for (auto& clause: clauses) n = build_bf_or(n, wrap<BAs...>(tau_parser::bf, clause));
 	return n;
@@ -479,7 +485,9 @@ struct simplify_bf_dnf {
 		if (clauses.empty()) return n;
 		for (const auto& clause: clauses) {
 			auto simplified = simplify_bf_dnf_formula(clause);
-			if (simplified != clause) changes[clause] = simplified;
+			// we have removed the bf above the bf_and so we need to trim the
+			// simplified clause we want to replace the original clause with
+			if (simplified != clause) changes[clause] = trim(simplified);
 		}
 		return replace(n, changes);
 	}
@@ -645,7 +653,8 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>
-			| clause_simplify_wff<BAs...>);
+			| clause_simplify_wff<BAs...>)
+		| trivialities<BAs...>;
 	cache[form] = result;
 	return result;
 }
