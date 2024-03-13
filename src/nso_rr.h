@@ -238,7 +238,6 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 		|| nt == tau_parser::bf_neq_cb
 		|| nt == tau_parser::bf_is_one_cb
 		|| nt == tau_parser::bf_is_zero_cb
-		|| nt == tau_parser::bf_has_clashing_subformulas_cb
 		|| nt == tau_parser::wff_has_clashing_subformulas_cb
 		|| nt == tau_parser::bf_has_subformula_cb
 		|| nt == tau_parser::wff_has_subformula_cb
@@ -1027,10 +1026,16 @@ sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, sp_tau_node<BAs...>& n) {
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, const sp_tau_node<BAs...>& n) {
 	auto nts = std::get<tau_source_sym>(n->value).nts;
 	return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_source_sym(t, nts)), {n});
 }
+
+// definitions of basic bf and wff
+const std::string BLDR_BF_0 = "( $X ) := 0.";
+const std::string BLDR_BF_1 = "( $X ) := 1.";
+const std::string BLDR_WFF_F = "( $X ) ::= F.";
+const std::string BLDR_WFF_T = "( $X ) ::= T.";
 
 // definitions of wff builder rules
 const std::string BLDR_WFF_EQ = "( $X ) ::= ($X = 0).";
@@ -1054,10 +1059,19 @@ const std::string BLDR_BF_EX = "( $X $Y ) := fex $X $Y.";
 const std::string BLDR_BF_CONSTANT = "( $X ) := { $X }.";
 
 // definitions of tau builder rules
-// definitions of bf builder rules
 const std::string BLDR_TAU_AND = "( $X $Y ) :::= ($X &&& $Y).";
 const std::string BLDR_TAU_OR = "( $X $Y ) :::= ($X ||| $Y).";
 const std::string BLDR_TAU_NEG = "( $X ) :::= !!! $X.";
+
+// basic bf and wff builders
+template<typename... BAs>
+static auto bldr_bf_0 = make_builder<BAs...>(BLDR_BF_0);
+template<typename... BAs>
+static auto bldr_bf_1 = make_builder<BAs...>(BLDR_BF_1);
+template<typename... BAs>
+static auto bldr_wff_F = make_builder<BAs...>(BLDR_WFF_F);
+template<typename... BAs>
+static auto bldr_wff_T = make_builder<BAs...>(BLDR_WFF_F);
 
 // wff builder
 template<typename... BAs>
@@ -1104,6 +1118,19 @@ template<typename... BAs>
 static auto bldr_tau_or = make_builder<BAs...>(BLDR_TAU_OR);
 template<typename... BAs>
 static auto bldr_tau_neg = make_builder<BAs...>(BLDR_TAU_NEG);
+
+// basic bf and wff constants
+template<typename... BAs>
+static const sp_tau_node<BAs...> _0 = bldr_bf_0<BAs...>.second;
+
+template<typename... BAs>
+static const sp_tau_node<BAs...> _1 = bldr_bf_1<BAs...>.second;
+
+template<typename... BAs>
+static const sp_tau_node<BAs...> _F = bldr_wff_F<BAs...>.second;
+
+template<typename... BAs>
+static const sp_tau_node<BAs...> _T = bldr_wff_T<BAs...>.second;
 
 // wff factory method for building wff formulas
 template<typename... BAs>
@@ -1289,7 +1316,6 @@ struct callback_applier {
 			case tau_parser::bf_neq_cb: return apply_equality_relation(_neq, n);
 			case tau_parser::bf_is_one_cb: return apply_constant_check(_is_one, n);
 			case tau_parser::bf_is_zero_cb: return apply_constant_check(_is_zero, n);
-			case tau_parser::bf_has_clashing_subformulas_cb: return apply_bf_clashing_subformulas_check(n);
 			case tau_parser::bf_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::bf_cb_arg);
 			case tau_parser::wff_has_clashing_subformulas_cb: return apply_wff_clashing_subformulas_check(n);
 			case tau_parser::wff_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::wff_cb_arg);
@@ -1467,26 +1493,7 @@ private:
 		for (auto& negation: negatives) {
 			auto negated = negation | tau_parser::wff | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 			for (auto& positive: positives)
-				if (are_equal(positive, negated))
-					return args[1];
-		}
-		return args[0];
-	}
-
-	sp_tau_node<BAs...> apply_bf_clashing_subformulas_check(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::bf_cb_arg || only_child_extractor<BAs...>;
-		std::vector<sp_tau_node<BAs...>> positives, negatives;
-		for (auto& op: select_all(args[0], all<sp_tau_node<BAs...>>))
-			if (is_non_terminal<tau_parser::bf_and>(op))
-				for (auto& c: op->child)
-					if (auto check = c | tau_parser::bf_and; !check.has_value() && is_non_terminal<tau_parser::bf>(c)) {
-						auto cc = c | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
-						(is_non_terminal<tau_parser::bf_neg>(cc) ? negatives : positives).push_back(cc);
-					}
-		for (auto& negation: negatives) {
-			auto negated = negation | tau_parser::bf | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
-			for (auto& positive: positives)
-				if (are_equal(positive, negated))
+				if (positive == negated)
 					return args[1];
 		}
 		return args[0];

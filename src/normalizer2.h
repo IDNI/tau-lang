@@ -74,7 +74,6 @@ RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 
 // speed up callbacks
-RULE(BF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X & $Y ) :=  bf_has_clashing_subformulas_cb ( $X & $Y ) 0.")
 RULE(BF_CALLBACK_HAS_SUBFORMULA_0, "( $X & $Y ) := bf_has_subformula_cb ( $X & $Y ) 0 0.")
 RULE(WFF_CALLBACK_CLASHING_SUBFORMULAS_0, "( $X && $Y ) ::=  wff_has_clashing_subformulas_cb ( $X && $Y ) F.")
 RULE(WFF_CALLBACK_HAS_SUBFORMULA_0, "( $X && $Y ) ::= wff_has_subformula_cb ( $X && $Y ) F F.")
@@ -242,16 +241,15 @@ static auto apply_cb = make_library<BAs...>(
 
 template<typename... BAs>
 static auto apply_speed_up_cb = make_library<BAs...>(
-	BF_CALLBACK_CLASHING_SUBFORMULAS_0
-	+ BF_CALLBACK_HAS_SUBFORMULA_0
+
+	BF_CALLBACK_HAS_SUBFORMULA_0
 	+ WFF_CALLBACK_CLASHING_SUBFORMULAS_0
 	+ WFF_CALLBACK_HAS_SUBFORMULA_0
 );
 
 template<typename... BAs>
 static auto clause_simplify_bf = make_library<BAs...>(
-	BF_CALLBACK_CLASHING_SUBFORMULAS_0
-	+ BF_CALLBACK_HAS_SUBFORMULA_0
+	BF_CALLBACK_HAS_SUBFORMULA_0
 );
 
 template<typename... BAs>
@@ -383,6 +381,117 @@ struct repeat_once {
 	steps<step_t, BAs...> s;
 };
 
+template<typename... BAs>
+void get_bf_literals(const nso<BAs...>& clause, std::vector<nso<BAs...>>& literals) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) get_bf_literals of: " << clause;
+	for (auto& c: clause || tau_parser::bf) {
+		if (auto check = c | tau_parser::bf_and; check.has_value())
+			get_bf_literals(check.value() , literals);
+		else {
+			literals.push_back(c);
+			BOOST_LOG_TRIVIAL(debug) << "(I) found literal: " << c;
+		}
+	}
+}
+
+template<typename... BAs>
+std::vector<nso<BAs...>> get_bf_literals(const nso<BAs...>& clause) {
+	std::vector<nso<BAs...>> literals;
+	get_bf_literals(clause, literals);
+	return literals;
+}
+
+template<typename... BAs>
+std::pair<std::vector<nso<BAs...>>, std::vector<nso<BAs...>>> get_bf_positive_negative_literals(const nso<BAs...> clause) {
+	std::vector<nso<BAs...>> positives;
+	std::vector<nso<BAs...>> negatives;
+
+	for(auto& l: get_bf_literals(clause)) {
+		if (auto check = l | tau_parser::bf_neg; !check.has_value()) positives.push_back(l);
+		else negatives.push_back(l);
+	}
+
+	#ifdef DEBUG
+	if (!positives.empty()) {
+		for (auto& n: positives) BOOST_LOG_TRIVIAL(trace) << "(I) negative: " << n;
+	}
+	if (!negatives.empty()) {
+		for (auto& n: negatives) BOOST_LOG_TRIVIAL(trace) << "(I) negative: " << n;
+	}
+	#endif // DEBUG
+
+	return {positives, negatives};
+}
+
+template<typename... BAs>
+void get_bf_dnf_clauses(const nso<BAs...>& n, std::vector<nso<BAs...>>& clauses) {
+	if (auto check = n | tau_parser::bf_or; check.has_value()) {
+		for (auto& c: check || tau_parser::tau) get_bf_dnf_clauses(c , clauses);
+	} else {
+		clauses.push_back(n);
+		BOOST_LOG_TRIVIAL(trace) << "(I) found get_gssotc_clause: " << n;
+	}
+}
+
+template<typename... BAs>
+std::vector<nso<BAs...>> get_bf_dnf_clauses(const nso<BAs...>& n) {
+	std::vector<nso<BAs...>> clauses;
+	for (const auto& clause: select_top(n, is_non_terminal<tau_parser::bf_and, BAs...>))
+		clauses.push_back(clause);
+	return clauses;
+}
+
+template<typename... BAs>
+bool has_dnf_clause_clashing_literals(const nso<BAs...>& clause) {
+	auto [positives, negatives] = get_bf_positive_negative_literals(clause);
+	for (auto& negation: negatives) {
+		auto negated = negation | tau_parser::bf_neg | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+		for (auto& positive: positives)
+			if (positive == negated) return true;
+	}
+	return false;
+}
+
+template<typename... BAs>
+nso<BAs...> build_bf_dnf_from_clauses(const std::vector<nso<BAs...>>& clauses) {
+	auto result =  _0<BAs...>;
+	if (clauses.empty()) return _0<BAs...>;
+	if (clauses.size() == 1) return wrap<BAs...>(tau_parser::bf, clauses[0]);
+	auto n = wrap<BAs...>(tau_parser::bf, clauses[0]);
+	for (auto& clause: clauses) n = build_bf_or(n, wrap<BAs...>(tau_parser::bf, clause));
+	return n;
+}
+
+template<typename...BAs>
+nso<BAs...> simplify_bf_dnf_formula(const nso<BAs...>& n) {
+	std::vector<nso<BAs...>> nclauses;
+	for (auto& clause: get_bf_dnf_clauses(n))
+		if (!has_dnf_clause_clashing_literals(clause)) nclauses.push_back(clause);
+	return build_bf_dnf_from_clauses(nclauses);
+}
+
+template<typename... BAs>
+struct simplify_bf_dnf {
+
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
+		std::map<nso<BAs...>, nso<BAs...>> changes;
+		auto clauses = get_bf_dnf_clauses(n);
+		if (clauses.empty()) return n;
+		for (const auto& clause: clauses) {
+			auto simplified = simplify_bf_dnf_formula(clause);
+			if (simplified != clause) changes[clause] = simplified;
+		}
+		return replace(n, changes);
+	}
+};
+
+template<typename... BAs>
+struct simplify_wff_dnf {
+
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
+		return n;
+	}
+};
 
 template<typename...BAs>
 steps<step<BAs...>, BAs...> operator|(const library<nso<BAs...>>& l, const library<nso<BAs...>>& r) {
@@ -452,6 +561,16 @@ nso<BAs...> operator|(const nso<BAs...>& n, const repeat_each<step_t, BAs...>& r
 	return r(n);
 }
 
+template<typename... BAs>
+nso<BAs...> operator|(const nso<BAs...>& n, const simplify_bf_dnf<BAs...>& r) {
+	return r(n);
+}
+
+template<typename... BAs>
+nso<BAs...> operator|(const nso<BAs...>& n, const simplify_wff_dnf<BAs...>& r) {
+	return r(n);
+}
+
 // executes the normalizer on the given source code taking into account the
 // bindings provided.
 template<typename... BAs>
@@ -518,12 +637,14 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>)
+		| simplify_bf_dnf<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
-			clause_simplify_bf<BAs...>
+			simplify_bf<BAs...>
 			| trivialities<BAs...>
 			| simplify_bf<BAs...>
 			| to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>
+			| trivialities<BAs...>
 			| clause_simplify_wff<BAs...>);
 	cache[form] = result;
 	return result;

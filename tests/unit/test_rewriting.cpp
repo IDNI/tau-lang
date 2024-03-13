@@ -135,7 +135,7 @@ TEST_SUITE("make_node") {
 
 TEST_SUITE("post_order_traverser") {
 
-	template <typename node_t>
+	template<typename node_t>
 	struct collect_predicate {
 		vector<node_t> nodes;
 		bool operator()(node_t n) {
@@ -144,7 +144,7 @@ TEST_SUITE("post_order_traverser") {
 		}
 	};
 
-	template <typename wrapped_t, typename node_t>
+	template<typename wrapped_t, typename node_t>
 	struct collect_visitor {
 
 		collect_visitor(wrapped_t& wrapped) : wrapped(wrapped) { }
