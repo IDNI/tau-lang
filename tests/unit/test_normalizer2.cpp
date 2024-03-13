@@ -53,7 +53,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("apply_speed_up_cb") {
-		CHECK( apply_speed_up_cb<Bool>.size() == 4 );
+		CHECK( apply_speed_up_cb<Bool>.size() == 3 );
 	}
 
 	TEST_CASE("squeeze_positives") {
@@ -61,7 +61,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("clause_simplify_bf") {
-		CHECK( clause_simplify_bf<Bool>.size() == 2 );
+		CHECK( clause_simplify_bf<Bool>.size() == 1 );
 	}
 
 	TEST_CASE("clause_simplify_wff") {

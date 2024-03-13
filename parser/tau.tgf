@@ -159,7 +159,7 @@ wff_f                  => 'F'.
 # bf
 bf_rule                => bf_matcher _ bf_def _ bf_body _ dot.
 bf_matcher             => bf.
-bf_body                => bf | bf_is_zero_cb | bf_is_one_cb | bf_has_clashing_subformulas_cb
+bf_body                => bf | bf_is_zero_cb | bf_is_one_cb
                         | bf_has_subformula_cb | bf_remove_funiversal_cb | bf_remove_fexistential_cb
                         | bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb | bf_not_less_equal.
 bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_or
@@ -243,13 +243,11 @@ wff_remove_bexistential_cb  => wff_remove_bexistential_cb_sym __ wff_cb_arg __ w
 wff_remove_buniversal_cb    => wff_remove_buniversal_cb_sym   __ wff_cb_arg __ wff_cb_arg __ wff_cb_arg __ wff_cb_arg.
 
 # extra callbacks to speed up computations
-bf_has_clashing_subformulas_cb  => bf_has_clashing_subformulas_cb_sym  __ bf_cb_arg  __ bf_cb_arg.
 wff_has_clashing_subformulas_cb => wff_has_clashing_subformulas_cb_sym __ wff_cb_arg __ wff_cb_arg.
 bf_has_subformula_cb            => bf_has_subformula_cb_sym            __ bf_cb_arg  __ bf_cb_arg  __ bf_cb_arg.
 wff_has_subformula_cb           => wff_has_subformula_cb_sym           __ wff_cb_arg __ wff_cb_arg __ wff_cb_arg.
 
 # callback symbols
-bf_has_clashing_subformulas_cb_sym  => "bf_has_clashing_subformulas_cb".
 bf_has_subformula_cb_sym            => "bf_has_subformula_cb".
 wff_has_clashing_subformulas_cb_sym => "wff_has_clashing_subformulas_cb".
 wff_has_subformula_cb_sym           => "wff_has_subformula_cb".
