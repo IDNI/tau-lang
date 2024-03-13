@@ -1,4 +1,4 @@
-![The TAU logo](/docs/tau_logo.svg)
+![The TAU logo](/docs/tau_logo.png)
 
 TODO (HIGH) add executor related info: splitter, bf_not_less_equal, ...
 
