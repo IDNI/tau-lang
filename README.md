@@ -78,7 +78,7 @@ TODO (HIGH) what is a boolean functions
 In the Tau language we could represent boolean functions essentially following the grammar:
 
 ```
-bf -> elem | "("bf "&" bf")" | "~" bf | "("bf "^" bf")" | "("bf "+" bf")" | "("bf "|" bf")"
+bf -> elem | "("bf "&" bf")" | bf "'" | "("bf "^" bf")" | "("bf "+" bf")" | "("bf "|" bf")"
 	| fall var bf | fex var bf
 elem -> var | const | bf_ref
 const -> 0 | 1 | { B }
