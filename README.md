@@ -84,7 +84,7 @@ elem -> var | const | bf_ref
 const -> 0 | 1 | { B }
 ```
 
-where `elem` stands for an element of one of the boolean algebras, `bf` for a boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function recursive relation (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `~`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
+where `elem` stands for an element of one of the boolean algebras, `bf` for a boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function recursive relation (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `'`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
 
 For example, the following is a valid boolean function:
 
