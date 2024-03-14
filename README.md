@@ -47,25 +47,17 @@ If you want to produce the documentation of the source code you need to install 
 
 TODO (HIGH) rewrite this section according to Tomas' cli options
 
-Once you have compiled the source code you could run the `tau` executable to execute a Tau programs. The `tau` executable is located in the `build-Release` or `build-Debug` directory (depending in your build). You could run the `tau` executable as follows:
+Once you have compiled the source code you could run the `tau` executable to execute Tau programss. The `tau` executable is located in the `build-Release` or `build-Debug` directory (depending in your build).
 
-```bash
-./tau tau_example.tau
-```
+# Tha Tau REPL
 
-where `tau_example.tau` is a Tau program.
+The Tau REPL is a command line interface that allows you to interact with the Tau language. It is a simple and easy to use tool that allows you to write and execute Tau programs on the go.
 
-There are a lot examples of Tau programs in the `examples/tau` directory.
-
-# Tha Tau CLI
-
-The Tau CLI is a command line interface that allows you to interact with the Tau language. It is a simple and easy to use tool that allows you to write and execute Tau programs on the go.
-
-The commands provided by the Tau CLI are:
+The commands provided by the Tau REPL are:
 
 * `help [command]`: shows a general help message or the help message of a specific command. It has an abbreviated form `h`.
-* `version`: shows the version of the Tau CLI. It has an abbreviated form `v`. The version of the Tau CLI corresponds to the repo commit.
-* `quit|exit`: exits the Tau CLI. It has an abbreviated form `q` or `e`.
+* `version`: shows the version of the Tau REPL. It has an abbreviated form `v`. The version of the Tau REPL corresponds to the repo commit.
+* `quit|exit`: exits the Tau REPL. It has an abbreviated form `q` or `e`.
 * `normalize quoted_wff`: normalizes a quoted well formed formula, p.e. `normalize '((X && Y) || T)'`. It has an abbreviated form `n`.
 * `toogle info` set the ouput level to the usual info level.
 * `toogle debug` set the ouput level to the debug level.
