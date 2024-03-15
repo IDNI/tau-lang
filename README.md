@@ -1,10 +1,16 @@
 ![The TAU logo](/docs/tau_logo.png)
 
-TODO (HIGH) add executor related info: splitter, bf_not_less_equal, ...
+TODO (MEDIUM) add executor related info: splitter, !<= for bf, ...
+
+TODO (HIGH) more structured and to the point
+
+** This repo is under active development and you cuold expect daily new features, improvements and fixes. **
 
 Tau advances formal methods by removing coding from the process, while expanding its industrial capability, reliability and ease of maintenance. Tau enables you to automatically create the most complex, provably correct software, by simply writing sentences about what you want the software to do.
 
 Tau Language is able to embed and extend the most powerful decidable knowledge representation languages, logics, and Boolean algebras to describe states in the specification. Tau Language is able to embed and extend the most powerful decidable knowledge representation languages and logics to describe states in the Tau specification.
+
+This README.md file only tries to give you a brief operative overview of the Tau Language so you could understand the main points without being to precise (actually deliberatedly imprecise just for the sake of ideas exposition). For a more detailed explanation of the Tau Language and all its details, please refer to the TABA book (Theories and Applications of Boolean Algebras by Ohad Ashor).
 
 # Compiling the source code
 
@@ -45,7 +51,7 @@ If you want to produce the documentation of the source code you need to install 
 
 # Running Tau programs
 
-TODO (HIGH) rewrite this section according to Tomas' cli options
+TODO (HIGH) rewrite this section according to tklip's repl options
 
 Once you have compiled the source code you could run the `tau` executable to execute Tau programss. The `tau` executable is located in the `build-Release` or `build-Debug` directory (depending in your build).
 
@@ -65,15 +71,22 @@ The commands provided by the Tau REPL are:
 
 # Understanding Tau language
 
-The Tau Language is a declarative language that allows you to specify the behavior of a program in a clear and concise way. It is based on the most powerful decidable knowledge representation languages and logics, and it is able to embed and extend the most powerful decidable knowledge representation languages and logics to describe your programs.
+The Tau Language is a declarative language that allows you to specify the behavior of a program in a clear and concise way.
 
-The syntax is close to that of Mathematical Logic. However, is not neccesary to have a deep understanding of Mathematical Logic to use the Tau Language, as you don't need a deep Mathematical Logic undertsanding to use Prolog or Datalog.
+The syntax is the syntax is an extension of the syntax of the first order theory of boolean algebras. It can extend other languages in a decidable way if your starting point is decidable, otherwise it would inherit its character from the underlying one.
 
 In the following Subsections we will explain the main ingredients of the Tau Language.
 
 ## Boolean functions
 
-TODO (HIGH) what is a boolean functions
+In usual progremming languages, constants usually came in the form of integers, strings,... in the case of the Tau Laguage they came in the form of constants in Boolean Algebras.
+
+Almost everyone related to Computer Science is familiar with the classical Boolean algebra given by
+'0' and '1'. But the Tau Language goes beyond that simple notion of Boolean Algebra and allows you to consider more elaboted ones as the Lindenbaum-Tarski algebra of a given logic (formulas of a given logic considering conjunction, negation, exclusive or,...or for example equality -which would stand for equivalence in the given logic-), finite Boolean algebras (which would stand for algebras over finite bit representations), define your own Boolean Algebras and so on. If your input/output Boolean Algebras are decideble, your are safe, Tau Language extension would also be decidable.
+
+Taking into account the previous considerations, the Tau Language allows you to define Boolean functions in a clear and concise way. A Boolean function is a Boolean combination of constants and variables.
+
+If you follow the analogy with the usual programming languages, and you consider integer inputs and outputs, Boolean functions would correspond to evaluate polynomials over the integers.
 
 In the Tau language we could represent boolean functions essentially following the grammar:
 
@@ -86,7 +99,7 @@ const -> 0 | 1 | { B }
 
 where `elem` stands for an element of one of the boolean algebras, `bf` for a boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function recursive relation (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `'`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
 
-For example, the following is a valid boolean function:
+For example, the following is a valid exxpression in terms of Boolean function:
 
 ```
 (X & Y | (Z ^ 0))
@@ -96,29 +109,34 @@ where `X`, `Y` and `Z` are variables.
 
 ## Functional quantifiers
 
-TODO (HIGH) what is a functional quantifier
+Assuming that you are familiar with the concept of quantifiers in predicate logic, the concept of functional quantifiers is not so different. In the case of functional quantifiers we are quantifying over the given Boolean Algebra, i.e. we are considering the set of all the possible values of the given Boolean Algebra. So, existential functional quantifiers would stand for the existentce of an input in the Boolean algebra such that the Boolean function satifies something. Whereas in the case of a universal functional quantifier we are considering that for all possible inputs in the Boolean algebra something follows.
 
-As show in the `bf` grammar, we consider two types of `bf` qantifiers: the existential one `fex`and the universal one `fall`. Both depend in a variable and a `bf` formula. The formula could be whatever we derive from the previious grammar, whereas the varibles could be of the following types:
+In general, eliminating such a quantifiers could be a hards task, and most of the times impossible. However, in the case of Boolean algebras, the elimination of such quantifiers is possible and it could be done in a decidable way if the underlying Boolean algebra is decidable.
+
+The formula could be whatever we derive from the previious grammar, whereas the varibles could be of the following types:
 
 - regular variables, they are just a sequence of `chars` (no especial symbols). They stand for regular variables in a formula, like the ones in predicate logic, and
 - captures, they are a sequence of `chars`preceed by a `$`. They behave in the same way as PROLOG variables.
 
-Functional existential quantifiers get converted as follows:
+In order to eliminate the quantifiers, we could use the following rules:
+
+* functional existential quantifiers get transformed as follows:
 
 ```
 fex x f(x, X) := f(0,X) | f(1, X).
 ```
 
-whereas universal functional quantifiers get converted in the following way:
+whereas universal functional quantifiers get transformed in the following way:
 ```
 fall x f(x, X) := f(0,X) & f(1, X).
 ```
 
-We would go further about the meaning of captures in subsequent sections, for the time being, just keep in mind that functional quatifiers depend on variables and they essentially quantify over the given boolean algebra.
+We would go further about the meaning of captures in subsequent sections, for the time being, just keep in mind that functional quatifiers depend on variables and they essentially quantify over the given Boolean algebra regarding a given Boolean function.
 
 ## Well-formed formulas
 
-TODO (HIGH) what is a well formed formula
+However, nothing is that simple in usual programming languages, we have decissions,... In the case of the Tau Language, well formed formulas deal with that. They provide us an extra logical layer on basic
+computations (given by Boolean formulas) allowing us to use conditional and similar constructioons.
 
 Well formed formulas are given in the Tau language by the following grammar:
 
@@ -168,9 +186,9 @@ where `tau` stands for a tau formula, `tau_wff` stands for a well formed formula
 
 ## Recursive relations
 
-TODO (HIGH) what is a recursive relation, what is its purpose
+Last, in usual programming languages you have loops, recursion and so on. In the case of the Tau Language, recursive relations are used to this end. Obviously, they could not go as far as the usual programming languages (we will fall into the undecideble side), but they are enough to express the most complex specifications.
 
-Recursive ralations are introduced to simplify the writing of well formed formulas. They are given by the following grammar:
+They are given by the following grammar:
 
 ```
 bf_rec_relation -> bf_ref ":=" bf.
