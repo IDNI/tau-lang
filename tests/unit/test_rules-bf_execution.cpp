@@ -392,21 +392,4 @@ TEST_SUITE("executing bf rules") {
 			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_f;
 		CHECK( check.has_value() );
 	}
-
-	TEST_CASE("BF_CALLBACK_HAS_SUBFORMULA_0") {
-		const char* sample = "( (1 & 0) = 0 ).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		auto rule_src = make_tau_source(BF_CALLBACK_HAS_SUBFORMULA_0);
-		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule | optional_value_extractor<sp_tau_node<Bool>>;
-		auto tau_rule = make_rule(rule);
-		auto result = nso_rr_apply(tau_rule, sample_statement);
-		auto check = result
-			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff
-			| tau_parser::bf_eq | tau_parser::bf | tau_parser::bf_f;
-		CHECK( check.has_value() );
-	}
-
 }

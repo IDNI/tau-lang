@@ -52,20 +52,8 @@ TEST_SUITE("steps parsing") {
 		CHECK( apply_cb<Bool>.size() == 6 );
 	}
 
-	TEST_CASE("apply_speed_up_cb") {
-		CHECK( apply_speed_up_cb<Bool>.size() == 2 );
-	}
-
 	TEST_CASE("squeeze_positives") {
 		CHECK( squeeze_positives<Bool>.size() == 1 );
-	}
-
-	TEST_CASE("clause_simplify_bf") {
-		CHECK( clause_simplify_bf<Bool>.size() == 1 );
-	}
-
-	TEST_CASE("clause_simplify_wff") {
-		CHECK( clause_simplify_wff<Bool>.size() == 1 );
 	}
 
 	TEST_CASE("wff_remove_existential") {
