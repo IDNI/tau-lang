@@ -10,7 +10,7 @@ Tau advances formal methods by removing coding from the process, while expanding
 
 Tau Language is able to embed and extend the most powerful decidable knowledge representation languages, logics, and Boolean algebras to describe states in the specification. Tau Language is able to embed and extend the most powerful decidable knowledge representation languages and logics to describe states in the Tau specification.
 
-This README.md file only tries to give you a brief operative overview of the Tau Language so you could understand the main points without being to precise (actually deliberatedly imprecise just for the sake of ideas exposition). For a more detailed explanation of the Tau Language and all its details, please refer to the TABA book (Theories and Applications of Boolean Algebras by Ohad Ashor).
+This README.md file only tries to give you a brief operative overview of the Tau Language so you could understand the main points without being to precise (actually deliberatedly imprecise just for the sake of ideas exposition). For a more detailed explanation of the Tau Language and all its details, please refer to the TABA book ([Theories and Applications of Boolean Algebras by Ohad Ashor](./docs/taba.pdf)).
 
 # Compiling the source code
 
