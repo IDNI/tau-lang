@@ -22,13 +22,54 @@
 
 namespace idni::tau {
 
-// TODO (HIGH) write onf (as executor step, all universal quantyifiers have been removed)
-// TODO (HIGH) write dnf (using rules)
-// TODO (HIGH) write cnf (using rules)
-// TODO (MEDIUM) write anf (using?)
-// TODO (MEDIUM) write nnf (using?)
-// TODO (MEDIUM) write pnf (using?)
-// TODO (MEDIUM) write minterm (using?)
+template<typename...BAs>
+nso<BAs...> onf(const nso<BAs...>& nso) {
+	// TODO (HIGH) write onf (as executor step, all universal quantyifiers have been removed)
+	std::cout << "Not implemented yet." << std::endl;
+	return nso;
+}
+
+template<typename...BAs>
+nso<BAs...> dnf(const nso<BAs...>& nso) {
+	// TODO (MEDIUM) write dnf (using rules)
+	std::cout << "Not implemented yet." << std::endl;
+	return nso;
+}
+
+template<typename...BAs>
+nso<BAs...> cnf(const nso<BAs...>& nso) {
+	// TODO (MEDIUM) write cnf (using rules)
+	std::cout << "Not implemented yet." << std::endl;
+	return nso;
+}
+
+template<typename...BAs>
+nso<BAs...> anf(const nso<BAs...>& nso) {
+	// TODO (MEDIUM) write anf (using?)
+	std::cout << "Not implemented yet." << std::endl;
+	return nso;
+}
+
+template<typename...BAs>
+nso<BAs...> nnf(const nso<BAs...>& nso) {
+	// TODO (MEDIUM) write nnf (using?)
+	std::cout << "Not implemented yet." << std::endl;
+	return nso;
+}
+
+template<typename...BAs>
+nso<BAs...> pnf(const nso<BAs...>& nso) {
+	// TODO (MEDIUM) write pnf (using?)
+	std::cout << "Not implemented yet." << std::endl;
+	return nso;
+}
+
+template<typename...BAs>
+nso<BAs...> minterm(const nso<BAs...>& nso) {
+	std::cout << "Not implemented yet." << std::endl;
+	// TODO (MEDIUM) write minterm (using?)
+	return nso;
+}
 
 } // namespace idni::tau
 

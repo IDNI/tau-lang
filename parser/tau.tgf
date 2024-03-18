@@ -308,7 +308,7 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 # TODO do the same with the other starting points: library, inputs, builder, nso_rr, nso, gssotc, gssotc_rr...
 # depending on the use case of the grammar.
 cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
-cli_command            => normalize
+cli_command            => normalize | onf | dnf | cnf | anf | nnf | pnf | minterm
                         | bf_substitute | wff_substitute
                         | bf_instantiate | wff_instantiate
                         | rr_nso | wff
@@ -316,8 +316,18 @@ cli_command            => normalize
                         | list_outputs | clear_outputs | print_output
                         | file | toggle | set | get | help | version | quit.
 
-normalize              => normalize_sym __ normalize_arg.
-normalize_arg          => q_nso_rr | q_wff | output | wff_selection.
+normalize              => normalize_sym __ form_arg.
+onf                    => onf_sym __ var_arg form_arg.
+dnf                    => dnf_sym __ form_arg.
+cnf                    => cnf_sym __ form_arg.
+anf                    => anf_sym __ form_arg.
+nnf                    => nnf_sym __ form_arg.
+pnf                    => pnf_sym __ form_arg.
+minterm                => minterm_sym __ form_arg.
+
+# (HIGH) remove null once implemeted
+var_arg                => chars | null.
+form_arg               => q_nso_rr | q_wff | output | wff_selection.
 file                   => file_sym quote file_path quote.
 bf_instantiate         => instantiate_sym __
                           # variable to be instantiated
@@ -386,6 +396,13 @@ substitute_sym         => "s" | "substitute".
 normalize_sym          => "n" | "normalize".
 file_sym               => "r" | "read".
 clear_sym              => "c" | "clear".
+onf_sym                => "onf".
+dnf_sym                => "dnf".
+cnf_sym                => "cnf".
+anf_sym                => "anf".
+nnf_sym                => "nnf".
+pnf_sym                => "pnf".
+minterm_sym            => "minterm".
 
 absolute_output_sym    => "&".
 relative_output_sym    => "%".
