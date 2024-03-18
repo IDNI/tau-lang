@@ -80,7 +80,7 @@ TEST_SUITE("steps parsing") {
 // TODO (HIGH) write tests to check simplify_dnfs
 // TODO (HIGH) write tests to check simplify_dnf
 // TODO (HIGH) write tests to check build_dnf_from_clauses
-// TODO (HIGH) write tests to check has_dnf_clause_clashing_literals
+// TODO (HIGH) write tests to check simplify_dnf_clause
 // TODO (HIGH) write tests to check get_dnf_clauses
 // TODO (HIGH) write tests to check get_positive_negative_literals
 // TODO (HIGH) write tests to check get_literals
