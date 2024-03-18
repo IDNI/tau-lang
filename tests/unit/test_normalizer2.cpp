@@ -53,7 +53,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("apply_speed_up_cb") {
-		CHECK( apply_speed_up_cb<Bool>.size() == 3 );
+		CHECK( apply_speed_up_cb<Bool>.size() == 2 );
 	}
 
 	TEST_CASE("squeeze_positives") {
@@ -65,7 +65,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("clause_simplify_wff") {
-		CHECK( clause_simplify_wff<Bool>.size() == 2 );
+		CHECK( clause_simplify_wff<Bool>.size() == 1 );
 	}
 
 	TEST_CASE("wff_remove_existential") {
@@ -88,6 +88,14 @@ TEST_SUITE("steps parsing") {
 		CHECK( trivialities<Bool>.size() == 4 );
 	}
 }
+
+// TODO (HIGH) write tests to check simplify_dnfs
+// TODO (HIGH) write tests to check simplify_dnf
+// TODO (HIGH) write tests to check build_dnf_from_clauses
+// TODO (HIGH) write tests to check has_dnf_clause_clashing_literals
+// TODO (HIGH) write tests to check get_dnf_clauses
+// TODO (HIGH) write tests to check get_positive_negative_literals
+// TODO (HIGH) write tests to check get_literals
 
 // TODO (VERY LOW) write tests to check make_tau_source
 // TODO (VERY LOW) write tests to check make_tau_source_from_file
