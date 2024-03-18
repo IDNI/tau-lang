@@ -550,9 +550,15 @@ bool has_dnf_clause_clashing_literals(const nso<BAs...>& clause) {
 template<tau_parser::nonterminal type, typename... BAs>
 nso<BAs...> build_dnf_from_clauses(const std::vector<nso<BAs...>>& clauses) {
 	if constexpr (type == tau_parser::bf) {
-		if (clauses.empty()) return _0<BAs...>;
+		if (clauses.empty()) {
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << _0<BAs...>;
+			return _0<BAs...>;
+		}
 	} else {
-		if (clauses.empty()) return _F<BAs...>;
+		if (clauses.empty()) {
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << _F<BAs...>;
+			return _F<BAs...>;
+		}
 	}
 	if (clauses.empty()) return _0<BAs...>;
 	if (clauses.size() == 1) return clauses[0];
@@ -561,19 +567,20 @@ nso<BAs...> build_dnf_from_clauses(const std::vector<nso<BAs...>>& clauses) {
 		if constexpr (type == tau_parser::bf) dnf = build_bf_or(dnf, clause);
 		else dnf = build_wff_or(dnf, clause);
 
-	BOOST_LOG_TRIVIAL(trace) << "(I) builded dnf: " << dnf << " clashing: ";
-
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << dnf;
 	return dnf;
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
 nso<BAs...> simplify_dnf(const nso<BAs...>& form) {
 	std::vector<nso<BAs...>> nclauses;
-	BOOST_LOG_TRIVIAL(debug) << "(S) simplifying: " << form;
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying";
 	for (auto& clause: get_dnf_clauses<type, BAs...>(form))
 		if (!has_dnf_clause_clashing_literals<type, BAs...>(clause)) nclauses.push_back(clause);
 		else BOOST_LOG_TRIVIAL(debug) << "(S) removing: " << clause;
-	return build_dnf_from_clauses<type, BAs...>(nclauses);
+	auto dnf = build_dnf_from_clauses<type, BAs...>(nclauses);
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End simplifying";
+	return dnf;
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
@@ -581,11 +588,10 @@ struct simplify_dnfs {
 
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
 		std::map<nso<BAs...>, nso<BAs...>> changes;
+		// for all type dnfs do...
 		for (auto& dnf: select_top(form, is_non_terminal<type, BAs...>)) {
 			auto simplified = simplify_dnf<type, BAs...>(dnf);
-			if (simplified != dnf) {
-				changes[dnf] = simplified;
-			}
+			if (simplified != dnf) changes[dnf] = simplified;
 		}
 		return replace(form, changes);
 	}
