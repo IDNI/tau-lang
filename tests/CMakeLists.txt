@@ -44,11 +44,3 @@ if (TAU_BUILD_TESTS)
 	enable_testing()
 	add_subdirectory(unit)
 endif ()
-
-add_executable(runner-normalizer-bdd runner-normalizer-bdd.cpp)
-target_setup(runner-normalizer-bdd)
-target_link_libraries(runner-normalizer-bdd ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
-
-add_executable(runner-normalizer-tau_over_bdd runner-normalizer-tau_over_bdd.cpp)
-target_setup(runner-normalizer-tau_over_bdd)
-target_link_libraries(runner-normalizer-tau_over_bdd ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB})
