@@ -51,9 +51,7 @@ If you want to produce the documentation of the source code you need to install 
 
 # Running Tau programs
 
-TODO (HIGH) rewrite this section according to tklip's repl options
-
-Once you have compiled the source code you could run the `tau` executable to execute Tau programss. The `tau` executable is located in the `build-Release` or `build-Debug` directory (depending in your build).
+Once you have compiled the source code you could run the `tau` executable to execute Tau programs. The `tau` executable is located in the `build-Release` or `build-Debug` directory (depending on your build).
 
 # Tha Tau REPL
 
@@ -61,13 +59,21 @@ The Tau REPL is a command line interface that allows you to interact with the Ta
 
 The commands provided by the Tau REPL are:
 
-* `help [command]`: shows a general help message or the help message of a specific command. It has an abbreviated form `h`.
+* `help [<command>]`: shows a general help message or the help message of a specific command. It has an abbreviated form `h`.
 * `version`: shows the version of the Tau REPL. It has an abbreviated form `v`. The version of the Tau REPL corresponds to the repo commit.
-* `quit|exit`: exits the Tau REPL. It has an abbreviated form `q` or `e`.
-* `normalize quoted_wff`: normalizes a quoted well formed formula, p.e. `normalize '((X && Y) || T)'`. It has an abbreviated form `n`.
-* `toogle info` set the ouput level to the usual info level.
-* `toogle debug` set the ouput level to the debug level.
-* `toogle trace` set the ouput level to the trace level.
+* `quit` or `exit`: exits the Tau REPL. It has an abbreviated form `q` or `e`.
+* `normalize <quoted_wff>`: normalizes a quoted well formed formula, p.e. `normalize '((X && Y) || T)'`. It has an abbreviated form `n`.
+* `output [<id>]` or `&[<id>]`: manages outputs of previous commands. It has an abbreviated form `o`.
+* `%[<relid>]`: manages outputs of previous commands, counting from the last.
+* `get [<option>]`: shows all configurable settings and their values or a single one if its name is provided.
+* `set <option> [=] <value>`: sets a configurable option to a desired value.
+* `toggle <option>`: toggle an option between on/off.
+
+Tau REPL options:
+
+* `color`: Can be on/off. Controls usage of terminal colors in its output. It's on by default.
+* `status`: Can be on/off. Controls status visibility in the prompt. It's on by default.
+* `severity`: Possible values are trace/debug/info/error. Value determines how much information will REPL provide. This is set to error by default.
 
 # Understanding Tau language
 
@@ -99,7 +105,7 @@ const -> 0 | 1 | { B }
 
 where `elem` stands for an element of one of the boolean algebras, `bf` for a boolean functions, `var`stands for a variable, `const` stands for a constant, `bf_ref` stands for a reference to a boolean function recursive relation (see recursive relations Section), `B` stands for a boolean constant, `fall` is the universal functional quantifier and `fex` is the existential functional quantifier. As usual, the operators `&`, `'`, `^` and `|` stands for conjunction, negation, exclusive-or and disjunction respectively.
 
-For example, the following is a valid exxpression in terms of Boolean function:
+For example, the following is a valid expression in terms of Boolean function:
 
 ```
 (X & Y | (Z ^ 0))
