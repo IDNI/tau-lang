@@ -158,11 +158,11 @@ nso<BAs...> normalizer_cmd(
 		store_output(result, m);
 		return result;
 	};
-	auto type = n | tau_parser::normalize_arg
+	auto type = n | tau_parser::form_arg
 		| only_child_extractor<BAs...>
 		| non_terminal_extractor<BAs...>
 		| optional_value_extractor<size_t>;
-	auto arg = (n | tau_parser::normalize_arg | type).value();
+	auto arg = (n | tau_parser::form_arg | type).value();
 	switch(type) {
 	case tau_parser::q_wff: {
 		auto wff = arg | tau_parser::wff;
@@ -303,10 +303,15 @@ int eval_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 	case tau_parser::toggle:        toggle_cmd(command.value(), re); break;
 	case tau_parser::list_outputs:  list_outputs(re.m); break;
 	case tau_parser::clear_outputs: clear_outputs(re.m); break;
-	case tau_parser::print_output:  print_output_cmd(command.value(), re.m);
-		break;
-	case tau_parser::normalize:     normalizer_cmd(command.value(), re.m);
-		break;
+	case tau_parser::print_output:  print_output_cmd(command.value(), re.m); break;
+	case tau_parser::normalize:     normalizer_cmd(command.value(), re.m); break;
+	case tau_parser::onf:		    onf(command.value()); break; //TODO (HIGH) include var
+	case tau_parser::dnf:		  	dnf(command.value()); break;
+	case tau_parser::cnf:		  	cnf(command.value()); break;
+	case tau_parser::anf:		  	anf(command.value()); break;
+	case tau_parser::nnf:		  	nnf(command.value()); break;
+	case tau_parser::pnf:		  	pnf(command.value()); break;
+	case tau_parser::minterm:	  	minterm(command.value()); break;
 	default:
 		cout << "Unknown command\n";
 		_repl_evaluator::error = true;
