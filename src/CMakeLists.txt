@@ -20,6 +20,7 @@ set(TAU_HEADERS
 	tau.h
 	iterators.h
 	executor.h
+	normal_forms.h
 )
 
 set(TAU_SOURCES
