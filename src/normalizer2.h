@@ -77,10 +77,6 @@ RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 
-// speed up callbacks
-RULE(BF_CALLBACK_HAS_SUBFORMULA_0, "( $X & $Y ) := bf_has_subformula_cb ( $X & $Y ) 0 0.")
-RULE(WFF_CALLBACK_HAS_SUBFORMULA_0, "( $X && $Y ) ::= wff_has_subformula_cb ( $X && $Y ) F F.")
-
 // wff rules
 RULE(WFF_DISTRIBUTE_0, "(($X || $Y) && $Z) ::= (($X && $Z) || ($Y && $Z)).")
 RULE(WFF_DISTRIBUTE_1, "($X && ($Y || $Z)) ::= (($X && $Y) || ($X && $Z)).")
@@ -240,23 +236,6 @@ static auto apply_cb = make_library<BAs...>(
 	+ BF_CALLBACK_NEG
 	+ BF_CALLBACK_EQ
  	+ BF_CALLBACK_NEQ
-);
-
-template<typename... BAs>
-static auto apply_speed_up_cb = make_library<BAs...>(
-
-	BF_CALLBACK_HAS_SUBFORMULA_0
-	+ WFF_CALLBACK_HAS_SUBFORMULA_0
-);
-
-template<typename... BAs>
-static auto clause_simplify_bf = make_library<BAs...>(
-	BF_CALLBACK_HAS_SUBFORMULA_0
-);
-
-template<typename... BAs>
-static auto clause_simplify_wff = make_library<BAs...>(
-	WFF_CALLBACK_HAS_SUBFORMULA_0
 );
 
 template<typename... BAs>
@@ -684,8 +663,8 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			step<BAs...>(elim_for_all<BAs...>))
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>
-			| clause_simplify_wff<BAs...>)
+			| simplify_wff<BAs...>)
+		| simplify_wff_dnfs<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			bf_positives_upwards<BAs...>
 			| squeeze_positives<BAs...>
@@ -697,14 +676,9 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| apply_cb<BAs...>)
 		| simplify_bf_dnfs<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
-			simplify_bf<BAs...>
-			| trivialities<BAs...>
+			trivialities<BAs...>
 			| simplify_bf<BAs...>
-			| to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>
-			| trivialities<BAs...>
-			| clause_simplify_wff<BAs...>)
-		| trivialities<BAs...>;
+			| simplify_wff<BAs...>);
 	cache[form] = result;
 	return result;
 }
