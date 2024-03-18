@@ -533,21 +533,6 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != result );
 	}
 
-	TEST_CASE("WFF_CALLBACK_CLASHING_SUBFORMULAS_0") {
-		const char* sample = "( T && ! T ).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		auto rule_src = make_tau_source(WFF_CALLBACK_CLASHING_SUBFORMULAS_0);
-		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto result = nso_rr_apply(tau_rule, sample_statement);
-		auto check = result
-			| tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | tau_parser::wff_f;
-		CHECK( check.has_value() );
-	}
-
 	TEST_CASE("WFF_CALLBACK_HAS_SUBFORMULA_0") {
 		const char* sample = "(T && T).";
 		auto sample_src = make_tau_source(sample);
