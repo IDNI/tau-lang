@@ -15,6 +15,7 @@
 #include "repl_evaluator.h"
 #include "parser_instance.h"
 #include "normalizer2.h"
+#include "normal_forms.h"
 #include "nso_rr.h"
 #include "bdd_binding.h"
 #include "term_colors.h"
