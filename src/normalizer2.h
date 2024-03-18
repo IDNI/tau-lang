@@ -431,14 +431,14 @@ nso<BAs...> operator|(const nso<BAs...>& n, const repeat_each<step_t, BAs...>& r
 
 
 template<tau_parser::nonterminal type, typename... BAs>
-void get_literals(const nso<BAs...>& clause, std::vector<nso<BAs...>>& literals) {
+void get_literals(const nso<BAs...>& clause, std::set<nso<BAs...>>& literals) {
 	BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
 	if constexpr (type == tau_parser::bf) {
 		if (auto check = clause | tau_parser::bf_and; check.has_value())
 			for (auto& c : check || tau_parser::bf)
 				get_literals<type, BAs...>(c, literals);
 		else {
-			literals.push_back(clause);
+			literals.insert(clause);
 			BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << clause;
 		}
 	} else {
@@ -446,39 +446,39 @@ void get_literals(const nso<BAs...>& clause, std::vector<nso<BAs...>>& literals)
 			for (auto& c : check || tau_parser::wff)
 				get_literals<type, BAs...>(c , literals);
 		else {
-			literals.push_back(clause);
+			literals.insert(clause);
 			BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << clause;
 		}
 	}
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
-std::vector<nso<BAs...>> get_literals(const nso<BAs...>& clause) {
-	std::vector<nso<BAs...>> literals;
+std::set<nso<BAs...>> get_literals(const nso<BAs...>& clause) {
+	std::set<nso<BAs...>> literals;
 	get_literals<type, BAs...>(clause, literals);
 	return literals;
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
-std::pair<std::vector<nso<BAs...>>, std::vector<nso<BAs...>>> get_positive_negative_literals(const nso<BAs...> clause) {
-	std::vector<nso<BAs...>> positives;
-	std::vector<nso<BAs...>> negatives;
+std::pair<std::set<nso<BAs...>>, std::set<nso<BAs...>>> get_positive_negative_literals(const nso<BAs...> clause) {
+	std::set<nso<BAs...>> positives;
+	std::set<nso<BAs...>> negatives;
 
 	for(auto& l: get_literals<type, BAs...>(clause)) {
 		if constexpr (type == tau_parser::bf) {
 			if (auto check = l | tau_parser::bf_neg; !check.has_value()) {
-				positives.push_back(l);
+				positives.insert(l);
 				BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
 			} else {
-				negatives.push_back(l);
+				negatives.insert(l);
 				BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
 			}
 		} else {
 			if (auto check = l | tau_parser::wff_neg; !check.has_value()) {
-				positives.push_back(l);
+				positives.insert(l);
 				BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
 			} else {
-				negatives.push_back(l);
+				negatives.insert(l);
 				BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
 			}
 		}
@@ -488,16 +488,16 @@ std::pair<std::vector<nso<BAs...>>, std::vector<nso<BAs...>>> get_positive_negat
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
-std::vector<nso<BAs...>> get_dnf_clauses(const nso<BAs...>& n) {
-	std::vector<nso<BAs...>> clauses;
+std::set<nso<BAs...>> get_dnf_clauses(const nso<BAs...>& n) {
+	std::set<nso<BAs...>> clauses;
 	if constexpr (type == tau_parser::bf)
 		for (const auto& clause: select_top(n, is_non_terminal<tau_parser::bf_and, BAs...>)){
-			clauses.push_back(wrap<BAs...>(type, clause));
+			clauses.insert(wrap<BAs...>(type, clause));
 			BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause << std::endl;
 		}
 	else
 		for (const auto& clause: select_top(n, is_non_terminal<tau_parser::wff_and, BAs...>)) {
-			clauses.push_back(wrap<BAs...>(type, clause));
+			clauses.insert(wrap<BAs...>(type, clause));
 			BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause << std::endl;
 		}
 
@@ -505,23 +505,45 @@ std::vector<nso<BAs...>> get_dnf_clauses(const nso<BAs...>& n) {
 	if (clauses.empty()) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << n << std::endl;
 	#endif // DEBUG
 
-	return clauses.empty() ? std::vector<nso<BAs...>>{n} : clauses;
+	return clauses.empty() ? std::set<nso<BAs...>>{n} : clauses;
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
-bool has_dnf_clause_clashing_literals(const nso<BAs...>& clause) {
+std::optional<nso<BAs...>> build_dnf_clause_from_literals(const std::set<nso<BAs...>>& positives, const std::set<nso<BAs...>>& negatives) {
+	if (positives.empty() && negatives.empty()) {
+		BOOST_LOG_TRIVIAL(debug) << "(F) {}";
+		return {};
+	}
+
+	std::vector<nso<BAs...>> literals;
+	literals.insert(literals.end(), positives.begin(), positives.end());
+	literals.insert(literals.end(), negatives.begin(), negatives.end());
+
+	if (literals.size() == 1) return literals[0];
+	auto clause = literals[0];
+	for (size_t i = 1; i < literals.size(); ++i)
+		if constexpr (type == tau_parser::bf) clause = build_bf_and(clause, literals[i]);
+		else clause = build_wff_and(clause, literals[i]);
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) " << clause;
+	return { clause };
+}
+
+
+template<tau_parser::nonterminal type, typename... BAs>
+std::optional<nso<BAs...>> simplify_dnf_clause(const nso<BAs...>& clause) {
 	auto [positives, negatives] = get_positive_negative_literals<type, BAs...>(clause);
 	if constexpr (type == tau_parser::bf) {
 		for (auto& negation: negatives) {
 			auto negated = negation | tau_parser::bf_neg | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
 			for (auto& positive: positives) {
-				BOOST_LOG_TRIVIAL(trace) << "(I) are clauses " << positive << " and " << negation << " clashing? ";
+				BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing? ";
 				if (positive == _0<BAs...>) {
 					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
-					return true;
+					return {};
 				} else if (positive == negated) {
 					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
-					return true;
+					return {};
 				} else {
 					BOOST_LOG_TRIVIAL(trace) << "no" << std::endl;
 				}
@@ -531,24 +553,24 @@ bool has_dnf_clause_clashing_literals(const nso<BAs...>& clause) {
 		for (auto& negation: negatives) {
 			auto negated = negation | tau_parser::wff_neg | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
 			for (auto& positive: positives) {
-				BOOST_LOG_TRIVIAL(trace) << "(I) are clauses " << positive << " and " << negation << " clashing: ";
+				BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing: ";
 				if (positive == _F<BAs...>) {
 					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
-					return true;
+					return {};
 				} if (positive == negated) {
 					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
-					return true;
+					return {};
 				} else {
 					BOOST_LOG_TRIVIAL(trace) << "no" << std::endl;
 				}
 			}
 		}
 	}
-	return false;
+	return build_dnf_clause_from_literals<type, BAs...>(positives, negatives);
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
-nso<BAs...> build_dnf_from_clauses(const std::vector<nso<BAs...>>& clauses) {
+nso<BAs...> build_dnf_from_clauses(const std::set<nso<BAs...>>& clauses) {
 	if constexpr (type == tau_parser::bf) {
 		if (clauses.empty()) {
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << _0<BAs...>;
@@ -560,9 +582,8 @@ nso<BAs...> build_dnf_from_clauses(const std::vector<nso<BAs...>>& clauses) {
 			return _F<BAs...>;
 		}
 	}
-	if (clauses.empty()) return _0<BAs...>;
-	if (clauses.size() == 1) return clauses[0];
-	auto dnf = clauses[0];
+	if (clauses.size() == 1) return *clauses.begin();
+	auto dnf = *clauses.begin();
 	for (auto& clause: clauses)
 		if constexpr (type == tau_parser::bf) dnf = build_bf_or(dnf, clause);
 		else dnf = build_wff_or(dnf, clause);
@@ -573,12 +594,11 @@ nso<BAs...> build_dnf_from_clauses(const std::vector<nso<BAs...>>& clauses) {
 
 template<tau_parser::nonterminal type, typename... BAs>
 nso<BAs...> simplify_dnf(const nso<BAs...>& form) {
-	std::vector<nso<BAs...>> nclauses;
+	std::set<nso<BAs...>> clauses;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying";
 	for (auto& clause: get_dnf_clauses<type, BAs...>(form))
-		if (!has_dnf_clause_clashing_literals<type, BAs...>(clause)) nclauses.push_back(clause);
-		else BOOST_LOG_TRIVIAL(debug) << "(S) removing: " << clause;
-	auto dnf = build_dnf_from_clauses<type, BAs...>(nclauses);
+		if (auto dnf = simplify_dnf_clause<type, BAs...>(clause); dnf) clauses.insert(dnf.value());
+	auto dnf = build_dnf_from_clauses<type, BAs...>(clauses);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End simplifying";
 	return dnf;
 }
