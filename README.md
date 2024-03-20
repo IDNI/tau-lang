@@ -14,7 +14,7 @@ This README.md file only tries to give you a brief operative overview of the Tau
 
 # Compiling the source code
 
-To compile the source code you need a recent C++ compiler, say GCC 13.1.0 compiler suite, as the source code use recent features introduced in C++23 standard. You also need at least a cmake version 3.22.1 installed in your system. No extra libraries are required to compile the source code.
+To compile the source code you need a recent C++ compiler, say GCC 13.1.0 compiler suite, as the source code use recent features introduced in C++23 standard. You also need at least a cmake version 3.22.1 installed in your system. Only a recent version of boost libraries are required to compile the source code.
 
 ## Basic compilation
 
