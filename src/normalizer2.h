@@ -474,7 +474,7 @@ std::pair<std::set<nso<BAs...>>, std::set<nso<BAs...>>> get_positive_negative_li
 				BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
 			}
 		} else {
-			if (auto check = l | tau_parser::wff_neg; !check.has_value()) {
+			if (auto check = l | tau_parser::bf_neq; !check.has_value()) {
 				positives.insert(l);
 				BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
 			} else {
@@ -488,24 +488,26 @@ std::pair<std::set<nso<BAs...>>, std::set<nso<BAs...>>> get_positive_negative_li
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
-std::set<nso<BAs...>> get_dnf_clauses(const nso<BAs...>& n) {
-	std::set<nso<BAs...>> clauses;
+std::set<nso<BAs...>> get_dnf_clauses(const nso<BAs...>& n, std::set<nso<BAs...>> clauses = {}) {
 	if constexpr (type == tau_parser::bf)
-		for (const auto& clause: select_top(n, is_non_terminal<tau_parser::bf_and, BAs...>)){
-			clauses.insert(wrap<BAs...>(type, clause));
-			BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause << std::endl;
-		}
+		if (auto check = n | tau_parser::bf_or; check.has_value())
+			for (auto& clause: check || tau_parser::bf)
+				clauses = get_dnf_clauses<type, BAs...>(clause, clauses);
+		else
+			clauses.insert(n);
 	else
-		for (const auto& clause: select_top(n, is_non_terminal<tau_parser::wff_and, BAs...>)) {
-			clauses.insert(wrap<BAs...>(type, clause));
-			BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause << std::endl;
-		}
+		if (auto check = n | tau_parser::wff_or; check.has_value())
+			for (auto& clause: check || tau_parser::wff)
+				clauses = get_dnf_clauses<type, BAs...>(clause, clauses);
+		else
+			clauses.insert(n);
 
 	#ifdef DEBUG
 	if (clauses.empty()) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << n << std::endl;
+	else for (auto& clause: clauses) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause;
 	#endif // DEBUG
 
-	return clauses.empty() ? std::set<nso<BAs...>>{n} : clauses;
+	return clauses;
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
@@ -595,7 +597,7 @@ nso<BAs...> build_dnf_from_clauses(const std::set<nso<BAs...>>& clauses) {
 template<tau_parser::nonterminal type, typename... BAs>
 nso<BAs...> simplify_dnf(const nso<BAs...>& form) {
 	std::set<nso<BAs...>> clauses;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying";
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying of " << form;
 	for (auto& clause: get_dnf_clauses<type, BAs...>(form))
 		if (auto dnf = simplify_dnf_clause<type, BAs...>(clause); dnf) clauses.insert(dnf.value());
 	auto dnf = build_dnf_from_clauses<type, BAs...>(clauses);
