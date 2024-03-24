@@ -1,2 +1,8 @@
-# quantify over X and Y and check = and !=
-(((((( A & X ) & Y) + ((B & X) & Y))) + ((( C & ~ X) & Y)+(( D & ~ X) & ~Y))) = 0).
+# TODO (HIGH) speed up this case, simplified cases are:
+# 	((A & (X & Y)) = 0)
+# 	(( (A & (X & Y)) + (B & (X & Y'))) = 0)
+# the problems start with the following case:
+# 	((( (A & (X & Y)) + (B & (X & Y')) ) + (C & (X' & Y))) = 0)
+# The issue seems to be related to dnf conversion that takes to long.
+#
+((((( A & X ) & Y)+((B & X) & Y))+((( C & X') & Y)+(( D & X') & Y'))) = 0)
