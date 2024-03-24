@@ -847,6 +847,10 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions";
 
 	auto applied_defs = apply_definitions(nso_rr);
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << applied_defs;
+
 	auto loopback = get_max_loopback_in_rr(applied_defs.main);
 
 	std::vector<nso<BAs...>> previous;
