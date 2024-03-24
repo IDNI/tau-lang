@@ -553,13 +553,14 @@ std::optional<nso<BAs...>> simplify_dnf_clause(const nso<BAs...>& clause) {
 		}
 	} else {
 		for (auto& negation: negatives) {
-			auto negated = negation | tau_parser::wff_neg | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
+			auto neq_bf = negation | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
 			for (auto& positive: positives) {
+				auto eq_bf = positive | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
 				BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing: ";
-				if (positive == _F<BAs...>) {
+				if (eq_bf == _F<BAs...>) {
 					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
 					return {};
-				} if (positive == negated) {
+				} if (eq_bf == neq_bf) {
 					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
 					return {};
 				} else {
