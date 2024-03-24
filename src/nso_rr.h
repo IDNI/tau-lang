@@ -1589,7 +1589,13 @@ template<typename predicate_t, typename... BAs>
 sp_tau_node<BAs...> nso_rr_apply_if(const rules<nso<BAs...>>& rs, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
 	if (rs.empty()) return n;
 	sp_tau_node<BAs...> nn = n;
-	for (auto& r : rs) nn = nso_rr_apply_if<predicate_t, BAs...>(r, nn, predicate);
+	for (auto& r : rs) {
+		auto nnn = nso_rr_apply_if<predicate_t, BAs...>(r, nn, predicate);
+		while (nnn != nn) {
+			nn = nnn;
+			nnn = nso_rr_apply_if<predicate_t, BAs...>(r, nn, predicate);
+		}
+	}
 	return nn;
 }
 
