@@ -62,7 +62,7 @@
 
 namespace idni::tau {
 
-template <typename... BAs>
+template <typename factory_t, typename... BAs>
 struct repl_evaluator {
 	struct options {
 		options() {};
@@ -70,18 +70,21 @@ struct repl_evaluator {
 		bool colors  = true;
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::error;
-	} opt;
+	};
+
 	using output = std::variant<
-		nso<tau_ba<bdd_binding>, bdd_binding>,
-		rr<nso<tau_ba<bdd_binding>, bdd_binding>>>;
+		nso<tau_ba<BAs...>, BAs...>,
+		rr<nso<tau_ba<BAs...>, BAs...>>>;
 	using outputs = std::vector<output>;
 
-	repl_evaluator(options opt = options{});
-	void set_repl(repl<repl_evaluator<BAs...>>& r_);
+	repl_evaluator(factory_t& factory, options opt = options{});
+	void set_repl(repl<repl_evaluator<factory_t, BAs...>>& r_);
 	int eval(const std::string& src);
 
 	outputs m;
-	repl<repl_evaluator<BAs...>>* r = 0;
+	factory_t factory;
+	options opt;
+	repl<repl_evaluator<factory_t, BAs...>>* r = 0;
 };
 
 } //idni::tau namespace
