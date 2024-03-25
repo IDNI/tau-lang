@@ -247,10 +247,10 @@ TODO (HIGH) explain what is a specification
 Taking into account all the previous definitions and considerations, Tau programs are given by the following grammar:
 
 ```
-tau_program => (tau_rec_relation)* tau.
+tau_program => (tau_rec_relation | wff_rec_relation | bf_rec_relation)* tau.
 ```
 
-where `tau_rec_relation` stands for a tau recursive relations and `tau` stands for a tau formula.
+where `tau_rec_relation` stands for a tau recursive relations, `wff_rec_relation`for a wff recursive relation, `bf_rec_relation` for a bf recursive relation and `tau` stands for a tau formula.
 
 Thus, they are a collection of Tau recursive relations and a main formula, p.e.:
 
