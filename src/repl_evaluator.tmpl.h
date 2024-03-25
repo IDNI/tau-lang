@@ -17,7 +17,6 @@
 #include "normalizer2.h"
 #include "normal_forms.h"
 #include "nso_rr.h"
-#include "bdd_binding.h"
 #include "term_colors.h"
 
 #ifdef DEBUG
@@ -46,8 +45,8 @@ namespace _repl_evaluator {
 #define TC_OUTPUT        TC.GREEN()
 
 
-template <typename... BAs>
-void reprompt(repl_evaluator<BAs...>& re) {
+template <typename factory_t, typename... BAs>
+void reprompt(repl_evaluator<factory_t, BAs...>& re) {
 	using namespace _repl_evaluator;
 	using namespace boost::log;
 	std::stringstream ss;
@@ -73,8 +72,8 @@ size_t digits(sp_tau_node<BAs...> n) {
 		| optional_value_extractor<size_t>;
 }
 
-template <typename... BAs>
-void print_output(size_t id, const typename repl_evaluator<BAs...>::outputs& m) {
+template <typename factory_t, typename... BAs>
+void print_output(size_t id, const typename repl_evaluator<factory_t, BAs...>::outputs& m) {
 	using namespace _repl_evaluator;
 	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << " / "
 		<< TC_OUTPUT << "%" << (m.size() - id - 1) << TC.CLEAR()
@@ -89,21 +88,20 @@ struct output_ref {
 	bool out_of_range = false;
 };
 
-template <typename... BAs>
-output_ref get_output_ref(sp_tau_node<BAs...> n,
-	const typename repl_evaluator<BAs...>::outputs& m, bool silent = false)
+template <typename factory_t, typename... BAs>
+output_ref get_output_ref(sp_tau_node<tau_ba<BAs...>, BAs...> n,
+	const typename repl_evaluator<factory_t, BAs...>::outputs& m, bool silent = false)
 {
 	using namespace _repl_evaluator;
 	auto out_type = n
-		| only_child_extractor<BAs...>
-		| non_terminal_extractor<BAs...>
+		| only_child_extractor<tau_ba<BAs...>, BAs...>
+		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 	auto out_id = n | out_type | tau_parser::output_id
-		| optional_value_extractor<
-			sp_tau_node<BAs...>>;
+		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
 	output_ref o;
 	o.relative = out_type == tau_parser::relative_output;
-	o.id = digits<BAs...>(out_id);
+	o.id = digits<tau_ba<BAs...>, BAs...>(out_id);
 	o.abs_id = o.relative ? m.size() - o.id - 1 : o.id;
 	o.rel_id = o.relative ? o.id : m.size() - o.id - 1;
 	o.out_of_range = o.abs_id >= m.size();
@@ -113,30 +111,30 @@ output_ref get_output_ref(sp_tau_node<BAs...> n,
 	return o;
 }
 
-template <typename... BAs>
-void print_output_cmd(sp_tau_node<BAs...> command,
-	const typename repl_evaluator<BAs...>::outputs& m)
+template <typename factory_t, typename... BAs>
+void print_output_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> command,
+	const typename repl_evaluator<factory_t, BAs...>::outputs& m)
 {
-	auto o = get_output_ref<BAs...>(command, m);
+	auto o = get_output_ref<factory_t, BAs...>(command, m);
 	if (o.out_of_range) return;
-	print_output<BAs...>(o.abs_id, m);
+	print_output<factory_t, BAs...>(o.abs_id, m);
 }
 
-template <typename... BAs>
-void list_outputs(typename repl_evaluator<BAs...>::outputs& m) {
+template <typename factory_t, typename... BAs>
+void list_outputs(typename repl_evaluator<factory_t, BAs...>::outputs& m) {
 	if (!m.size()) cout << "no outputs\n";
-	else for (size_t i = 0; i < m.size(); i++) print_output(i, m);
+	else for (size_t i = 0; i < m.size(); i++) print_output<factory_t, BAs...>(i, m);
 }
 
-template <typename... BAs>
-void clear_outputs(typename repl_evaluator<BAs...>::outputs& m) {
+template <typename factory_t, typename... BAs>
+void clear_outputs(typename repl_evaluator<factory_t, BAs...>::outputs& m) {
 	m.clear();
 	cout << "outputs cleared\n";
 }
 
-template <typename... BAs>
-void store_output(typename repl_evaluator<BAs...>::output o,
-	typename repl_evaluator<BAs...>::outputs& m)
+template <typename factory_t, typename... BAs>
+void store_output(typename repl_evaluator<factory_t, BAs...>::output o,
+	typename repl_evaluator<factory_t, BAs...>::outputs& m)
 {
 	// do not add into memory if the last memory value is the same ?
 	// if (m.size() && m.back() == o) return;
@@ -147,20 +145,20 @@ void store_output(typename repl_evaluator<BAs...>::output o,
 
 // make rr_wff
 
-template <typename... BAs>
-nso<BAs...> normalizer_cmd(
-	const nso<BAs...>& n,
-	typename repl_evaluator<BAs...>::outputs& m)
+template <typename factory_t, typename... BAs>
+nso<tau_ba<BAs...>, BAs...> normalizer_cmd(
+	const nso<tau_ba<BAs...>, BAs...>& n,
+	typename repl_evaluator<factory_t, BAs...>::outputs& m)
 {
 	auto normal = [&m] (auto& n) {
-		auto result = normalizer<BAs...>(n);
+		auto result = normalizer<tau_ba<BAs...>, BAs...>(n);
 		std::cout << "normalized: " << result << "\n";
-		store_output(result, m);
+		store_output<factory_t, BAs...>(result, m);
 		return result;
 	};
 	auto type = n | tau_parser::form_arg
-		| only_child_extractor<BAs...>
-		| non_terminal_extractor<BAs...>
+		| only_child_extractor<tau_ba<BAs...>, BAs...>
+		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 	auto arg = (n | tau_parser::form_arg | type).value();
 	switch(type) {
@@ -174,12 +172,12 @@ nso<BAs...> normalizer_cmd(
 	// 	return normal(nso_rr);
 	// }
 	case tau_parser::output: {
-		auto o = get_output_ref(arg, m);
+		auto o = get_output_ref<factory_t, BAs...>(arg, m);
 		if (o.out_of_range) return n;
 		auto& ov = m[o.abs_id];
-		if (std::holds_alternative<rr<nso<BAs...>>>(ov))
-			return normal(std::get<rr<nso<BAs...>>>(ov));
-		return normal(std::get<nso<BAs...>>(ov));
+		if (std::holds_alternative<rr<nso<tau_ba<BAs...>, BAs...>>>(ov))
+			return normal(std::get<rr<nso<tau_ba<BAs...>, BAs...>>>(ov));
+		return normal(std::get<nso<tau_ba<BAs...>, BAs...>>(ov));
 	}
 	default: {
 		std::cout << "Unsupported type to normalize.\n";
@@ -188,13 +186,12 @@ nso<BAs...> normalizer_cmd(
 }
 
 // make a nso_rr from the given tau source and binder.
-template <typename... BAs>
-sp_tau_node<BAs...> make_cli(const std::string src) {
+template <typename factory_t, typename... BAs>
+sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string src, factory_t& factory) {
 	auto cli_src = make_tau_source(src, { .start = tau_parser::cli });
-	bdd_binding_factory bf;
-	tau_factory<bdd_binding_factory, bdd_binding> tbf(bf);
-	factory_binder<tau_factory<bdd_binding_factory, bdd_binding>, BAs...> fb(tbf);
-	return make_tau_code<BAs...>(cli_src);
+	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
+	tau_factory<factory_t, BAs...> tf(factory);
+	return bind_tau_code_using_factory<tau_factory<factory_t, BAs...>, tau_ba<BAs...>, BAs...>(cli_code, tf);
 }
 
 template <typename... BAs>
@@ -206,8 +203,8 @@ size_t get_opt(sp_tau_node<BAs...> n) {
 		| optional_value_extractor<size_t>;
 }
 
-template <typename... BAs>
-void get_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
+template <typename factory_t, typename... BAs>
+void get_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n, repl_evaluator<factory_t, BAs...>& re) {
 	static auto pbool = [] (bool b) { return b ? "on" : "off"; };
 	static std::map<size_t,	std::function<void()>> printers = {
 	{ tau_parser::status_opt,   [&re]() {
@@ -221,13 +218,13 @@ void get_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 	printers[get_opt(option.value())]();
 }
 
-template <typename... BAs>
-void set_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
+template <typename factory_t, typename... BAs>
+void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n, repl_evaluator<factory_t, BAs...>& re) {
 	using namespace boost::log;
 	auto option = n | tau_parser::option;
 	auto v  = n | tau_parser::option_value;
-	auto vt = v | only_child_extractor<BAs...>
-		| non_terminal_extractor<BAs...>
+	auto vt = v | only_child_extractor<tau_ba<BAs...>, BAs...>
+		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 	auto get_bool_value = [&v, &vt](bool& val) {
 		if      (vt == tau_parser::option_value_true) val = true;
@@ -245,13 +242,13 @@ void set_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 		if (!sev.has_value()) {
 			cout << "error: invalid severity value\n"; return; }
 		auto sev_type = sev
-			| only_child_extractor<BAs...>
-			| non_terminal_extractor<BAs...>
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 			| optional_value_extractor<size_t>;
 		switch (sev_type) {
 		case tau_parser::error_sym: re.opt.severity=trivial::error;break;
-		case tau_parser::debug_sym:re.opt.severity=trivial::debug;break;
-		case tau_parser::trace_sym:re.opt.severity=trivial::trace;break;
+		case tau_parser::debug_sym: re.opt.severity=trivial::debug;break;
+		case tau_parser::trace_sym: re.opt.severity=trivial::trace;break;
 		case tau_parser::info_sym: re.opt.severity=trivial::info; break;
 		default: cout << "error: invalid severity value\n"; return;
 		}
@@ -263,11 +260,11 @@ void set_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 	get_cmd(n, re);
 }
 
-template <typename... BAs>
-void toggle_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
+template <typename factory_t, typename... BAs>
+void toggle_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n, repl_evaluator<factory_t, BAs...>& re) {
 	auto toggle_type = n | tau_parser::bool_option
-		| only_child_extractor<BAs...>
-		| non_terminal_extractor<BAs...>
+		| only_child_extractor<tau_ba<BAs...>, BAs...>
+		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 	switch (toggle_type) {
 	case tau_parser::colors_opt: _repl_evaluator::TC.set(re.opt.colors = !re.opt.colors); break;
@@ -279,11 +276,11 @@ void toggle_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 void version();
 void help(size_t nt = tau_parser::help_sym);
 
-template <typename... BAs>
-int eval_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
-	auto command = n | only_child_extractor<BAs...>;
+template <typename factory_t, typename... BAs>
+int eval_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n, repl_evaluator<factory_t, BAs...>& re) {
+	auto command = n | only_child_extractor<tau_ba<BAs...>, BAs...>;
 	auto command_type = command
-		| non_terminal_extractor<BAs...>
+		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 	//std::cout << "eval_cmd: " << command.value() << "\n";
 	//print_sp_tau_node_tree<BAs...>(cout << "cmd tree: ", command.value()) << "\n";
@@ -291,8 +288,8 @@ int eval_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 	case tau_parser::quit: return cout << "Quit.\n", 1;
 	case tau_parser::help: {
 		auto optarg = command | tau_parser::cli_cmd_sym
-			| only_child_extractor<BAs...>
-			| non_terminal_extractor<BAs...>;
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| non_terminal_extractor<tau_ba<BAs...>, BAs...>;
 		if (optarg.has_value()) help(optarg.value());
 		else help();
 		break;
@@ -301,10 +298,10 @@ int eval_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 	case tau_parser::get:           get_cmd(command.value(), re); break;
 	case tau_parser::set:           set_cmd(command.value(), re); break;
 	case tau_parser::toggle:        toggle_cmd(command.value(), re); break;
-	case tau_parser::list_outputs:  list_outputs(re.m); break;
-	case tau_parser::clear_outputs: clear_outputs(re.m); break;
-	case tau_parser::print_output:  print_output_cmd(command.value(), re.m); break;
-	case tau_parser::normalize:     normalizer_cmd(command.value(), re.m); break;
+	case tau_parser::list_outputs:  list_outputs<factory_t, BAs...>(re.m); break;
+	case tau_parser::clear_outputs: clear_outputs<factory_t, BAs...>(re.m); break;
+	case tau_parser::print_output:  print_output_cmd<factory_t, BAs...>(command.value(), re.m); break;
+	case tau_parser::normalize:     normalizer_cmd<factory_t, BAs...>(command.value(), re.m); break;
 	case tau_parser::onf:		    onf(command.value()); break; //TODO (HIGH) include var
 	case tau_parser::dnf:		  	dnf(command.value()); break;
 	case tau_parser::cnf:		  	cnf(command.value()); break;
@@ -320,26 +317,26 @@ int eval_cmd(sp_tau_node<BAs...> n, repl_evaluator<BAs...>& re) {
 	return 0;
 }
 
-template <typename... BAs>
-repl_evaluator<BAs...>::repl_evaluator(options opt) : opt(opt) {
+template <typename factory_t, typename... BAs>
+repl_evaluator<factory_t, BAs...>::repl_evaluator(factory_t& factory, options opt) : factory(factory), opt(opt) {
 	_repl_evaluator::TC.set(opt.colors);
 }
 
-template <typename... BAs>
-void repl_evaluator<BAs...>::set_repl(repl<repl_evaluator<BAs...>>& r_) {
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::set_repl(repl<repl_evaluator<factory_t, BAs...>>& r_) {
 	r = &r_;
 	reprompt(*this);
 }
 
-template <typename... BAs>
-int repl_evaluator<BAs...>::eval(const std::string& src) {
-	auto tau_spec = make_cli<BAs...>(src);
+template <typename factory_t, typename... BAs>
+int repl_evaluator<factory_t, BAs...>::eval(const std::string& src) {
+	auto tau_spec = make_cli<factory_t, BAs...>(src, factory);
 	auto commands = tau_spec || tau_parser::cli_command;
 	int quit = 0;
 	_repl_evaluator::error = false;
 	for (const auto& cmd : commands)
-		if (quit = eval_cmd<BAs...>(cmd, *this); quit) break;
-	if (!quit) reprompt<BAs...>(*this);
+		if (quit = eval_cmd<factory_t, BAs...>(cmd, *this); quit) break;
+	if (!quit) reprompt<factory_t, BAs...>(*this);
 	return quit;
 }
 

@@ -203,7 +203,8 @@ int main(int argc, char** argv) {
 	// repl command
 	if (cmd.name() == "repl") {
 		string e = cmd.get<string>("evaluate");
-		repl_evaluator<tau_ba<bdd_binding>, bdd_binding> re;
+		tau_bdd_binding_factory f;
+		repl_evaluator<tau_bdd_binding_factory, bdd_binding> re(f);
 		if (e.size()) return re.eval(e), 0;
 		repl<decltype(re)> r(re, "tau> ", ".tau_history");
 		re.set_repl(r);
