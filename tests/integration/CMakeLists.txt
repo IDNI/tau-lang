@@ -8,6 +8,8 @@ set(TESTS
 	test_integration-tau_ba3
 	test_integration-nso_rr_execution
 	test_integration-gssotc_rr_execution
+	test_integration-nso_rr_partial_eval
+	test_integration-gssotc_rr_partial_eval
 	test_integration-tau1
 	test_integration-tau2
 	test_integration-executor

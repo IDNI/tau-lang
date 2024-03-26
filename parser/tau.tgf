@@ -77,8 +77,10 @@ tau_matcher            => tau.
 tau_body               => tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
 tau_rec_relation       => (tau & ~tau_and & ~tau_neg & ~tau_or & ~tau_wff & ~capture)
                           _ tau_def _ tau _ dot.
-tau_ref                => sym _ offsets _ tau_ref_args.
-tau_ref_args           => open_parenthesis (_ (variable | capture))* _ close_parenthesis.
+tau_ref                => sym _ [offsets] _ tau_ref_args.
+# TODO (MEDIUM) properly deal with _ and __ to separate the arguments
+tau_ref_args           => open_parenthesis (_ tau_ref_arg)* _ close_parenthesis.
+tau_ref_arg            => variable | capture | bf.
 
 
 tau                    => tau_wff | tau_ref | tau_and | tau_or | tau_neg | capture.
@@ -114,8 +116,10 @@ wff                    => wff_ref | wff_and | wff_neg | wff_xor | wff_conditiona
                         | wff_t | wff_f | capture | bool_variable | wff_ball | wff_bex
                         | bf_eq | bf_neq | bf_less | bf_less_equal | bf_not_less_equal
                         | bf_greater | bf_interval | bf_not_less_equal.
-wff_ref                => sym _ offsets _ wff_ref_args.
-wff_ref_args           => open_parenthesis (_ (variable | capture))* _ close_parenthesis.
+wff_ref                => sym _ [offsets] _ wff_ref_args.
+# TODO (MEDIUM) properly deal with _ and __ to separate the arguments
+wff_ref_args           => open_parenthesis (_ wff_ref_arg)* _ close_parenthesis.
+wff_ref_arg            =>variable | capture | bf.
 wff_and                => open_parenthesis _ wff _ wff_and_sym _ wff _ close_parenthesis.
 wff_or                 => open_parenthesis _ wff _ wff_or_sym  _ wff _ close_parenthesis.
 wff_xor                => open_parenthesis _ wff _ wff_xor_sym _ wff _ close_parenthesis.
@@ -167,8 +171,10 @@ bf                     => bf_ref | bf_constant | bf_and | bf_neg | bf_xor | bf_o
 bf_rec_relation        => (bf & ~bf_and & ~bf_neg & ~bf_xor & ~bf_or & ~bf_all & ~bf_ex &
                           ~bf_t & ~bf_f & ~capture & ~bf_constant & ~bf_eq & ~bf_neq & ~variable & ~bf_splitter)
                           _ bf_def _ bf _ dot.
-bf_ref                 => sym offsets bf_ref_args.
-bf_ref_args            => open_parenthesis (_ (variable | capture))* _ close_parenthesis.
+bf_ref                 => sym [offsets] bf_ref_args.
+# TODO (MEDIUM) properly deal with _ and __ to separate the arguments
+bf_ref_args            => open_parenthesis (_ bf_ref_arg)* _ close_parenthesis.
+bf_ref_arg             => variable | capture | bf.
 bf_and                 => open_parenthesis  _ bf _ bf_and_sym _ bf _ close_parenthesis.
 bf_or                  => open_parenthesis  _ bf _ bf_or_sym  _ bf _ close_parenthesis.
 bf_xor                 => open_parenthesis  _ bf _ bf_xor_sym _ bf _ close_parenthesis.

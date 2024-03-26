@@ -26,6 +26,31 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+TEST_SUITE("function execution: simple cases") {
+
+	TEST_CASE("tau_rec_relation: direct substitution y1") {
+		const char* sample =
+			"g($Y) :::= {T}."
+			"g(Y);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
+	}
+
+	TEST_CASE("tau_rec_relation: direct substitution y2") {
+		const char* sample =
+			"g($Y) :::= {F}."
+			"g(Y);";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
+		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
+	}
+}
+
 TEST_SUITE("rec relations execution: simple cases") {
 
 	TEST_CASE("tau_rec_relation: direct substitution y1") {
@@ -117,8 +142,7 @@ TEST_SUITE("tau_rec_relations execution: types") {
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
-	// TODO (HIGH) this test fails with the rule g[0]($Y) := 0, check why
-	TEST_CASE("clashing names, bf wins") {
+	TEST_CASE("clashing names, bf wins, base case 1") {
 		const char* sample =
 			"g[0]($Y) := 1."
 			"g[0]($Y) ::= T."

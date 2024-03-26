@@ -618,6 +618,9 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	}
 }
 
+// TODO (MEDIUM) ass tests for multiple arguments in functions and rec relation wwf
+// TODO (MEDIUM) ass tests for multiple arguments in functions and rec relation bf
+
 TEST_SUITE("parsing builders") {
 
 	TEST_CASE("one capture") {
