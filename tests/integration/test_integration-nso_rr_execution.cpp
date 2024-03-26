@@ -27,6 +27,63 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+TEST_SUITE("function execution: simple cases") {
+
+	TEST_CASE("wff_rec_relation: direct substitution") {
+		const char* sample =
+			"g($Y) ::= T."
+			"g(Y).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("bf_rec_relation: direct substitution") {
+		const char* sample =
+			"g($Y) := 1."
+			"(g(Y) = 0).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula);
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("wff_rec_relation: two substitutions") {
+		const char* sample =
+			"h($Y) ::= T."
+			"g($Y) ::= h($Y)."
+			"g(Y).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula);
+		auto check = result |  tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("bf_rec_relation: two substitutions") {
+		const char* sample =
+			"h($Y) := 1."
+			"g($Y) := h($Y)."
+			"(g(Y) = 0).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		factory_binder<bdd_test_factory, bdd_test> fb(bf);
+		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto result = normalizer<bdd_test>(sample_formula);
+		auto check = result |  tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+}
+
 TEST_SUITE("rec relations execution: simple cases") {
 
 	TEST_CASE("wff_rec_relation: direct substitution") {
@@ -390,7 +447,6 @@ TEST_SUITE("mutual rec cases") {
 		auto check = result |  tau_parser::wff_t; // wff_f
 		CHECK( check.has_value() );
 	}
-
 }
 
 TEST_SUITE("multiple rec relations") {
@@ -486,5 +542,12 @@ TEST_SUITE("multiple rec relations") {
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
+	}
+}
+
+TEST_SUITE("bf_rec_relations: partial evaluation") {
+
+	TEST_CASE("some test"){
+		CHECK( true );
 	}
 }
