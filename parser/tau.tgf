@@ -313,57 +313,60 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 
 # TODO do the same with the other starting points: library, inputs, builder, nso_rr, nso, gssotc, gssotc_rr...
 # depending on the use case of the grammar.
-cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
-cli_command            => normalize | onf | dnf | cnf | anf | nnf | pnf | minterm
-                        | bf_substitute | wff_substitute
-                        | bf_instantiate | wff_instantiate
-                        | rr_nso | wff
-                        | (bf & ~help & ~version & ~quit & ~get & ~list_outputs)
-                        | list_outputs | clear_outputs | print_output
-                        | file | toggle | set | get | help | version | quit.
-
-normalize              => normalize_sym __ form_arg.
-onf                    => onf_sym __ var_arg form_arg.
-dnf                    => dnf_sym __ form_arg.
-cnf                    => cnf_sym __ form_arg.
-anf                    => anf_sym __ form_arg.
-nnf                    => nnf_sym __ form_arg.
-pnf                    => pnf_sym __ form_arg.
-minterm                => minterm_sym __ form_arg.
-
 # (HIGH) remove null once implemeted
 var_arg                => chars | null.
 form_arg               => q_nso_rr | q_wff | output | wff_selection.
 file                   => file_sym quote file_path quote.
-bf_instantiate         => instantiate_sym __
+cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
+cli_command            => onf_cmd | dnf_cmd | cnf_cmd
+                        | anf_cmd | nnf_cmd | pnf_cmd | mnf_cmd
+                        | rr_nso | wff | (bf & ~help & ~version & ~quit & ~get & ~list_outputs)
+                        | wff_substitute_cmd | wff_instantiate_cmd
+                        | bf_substitute_cmd | bf_instantiate_cmd
+                        | normalize_cmd
+                        | list_outputs_cmd | clear_outputs_cmd | print_output_cmd
+                        | file_cmd | toggle_cmd | set_cmd | get_cmd | help_cmd | version_cmd | quit_cmd.
+
+normalize_cmd           => normalize_cmd_sym __ form_arg.
+bf_instantiate_cmd      => instantiate_cmd_sym __
                           # variable to be instantiated
                           (q_var | bf_var_selection | output) __
-                          # bf to be used for instantiation
+                          # wff to be used for instantiation
                           (q_bf | bf_selection | output) __
                           # nso_rr or output or selection where to instantiate
                           (bf_selection | output).
-wff_instantiate        => instantiate_sym __
+wff_instantiate_cmd     => instantiate_cmd_sym __
                           # variable to be instantiated
                           (q_var | wff_var_selection | output) __
                           # wff to be used for instantiation
                           (q_wff | wff_selection | output) __
                           # nso_rr or output or selection where to instantiate
                           (wff_selection | output).
-bf_substitute          => substitute_sym __
-                          # wff or output or selection to be used for substitution
-                          (q_bf | output | bf_selection) __
-                          # wff or output or selection where to substitute
-                          (output | wff_selection | bf_selection).
-wff_substitute         => substitute_sym __
+bf_substitute_cmd      => substitute_cmd_sym __
                           # bf or output or selection to be used for substitution
-                          (q_wff | output | wff_selection) __
+                          (q_bf | output | bf_selection) __
                           # bf or output or selection where to substitute
-                          (output | wff_selection).
+                          (output | bf_selection | bf_selection)
+                          # nso_rr or output or selection where to substitute
+                          (bf_selection | output).
+wff_substitute_cmd     => substitutecmd__sym __
+                          # wff or output or selection to be used for substitution
+                          (q_wff | output | wff_selection) __
+                          # wff or output or selection where to substitute
+                          (output | wff_selection)
+                          # nso_rr or output or selection where to substitute
+                          (wff_selection | output).
+onf_cmd                => onf_cmd_sym __ var_arg form_arg.
+dnf_cmd                => dnf_cmd_sym __ form_arg.
+cnf_cmd                => cnf_cmd_sym __ form_arg.
+anf_cmd                => anf_cmd_sym __ form_arg.
+nnf_cmd                => nnf_cmd_sym __ form_arg.
+pnf_cmd                => pnf_cmd_sym __ form_arg.
+mnf_cmd                => mnf_cmd_sym __ form_arg.
 
-
-help                   => help_sym [ __ cli_cmd_sym ].
-version                => version_sym.
-quit                   => quit_sym.
+help_cmd               => help_cmd_sym [ __ cli_cmd_sym ].
+version_cmd            => version_cmd_sym.
+quit_cmd               => quit_cmd_sym.
 
 wff_selection          => selection_sym __ digits.
 bf_selection           => selection_sym __ digits.
@@ -374,6 +377,7 @@ q_nso_rr               => apostrophe _ nso_rr _ apostrophe.
 q_wff                  => apostrophe _ wff    _ apostrophe.
 q_bf                   => apostrophe _ bf     _ apostrophe.
 q_var                  => apostrophe _ var    _ apostrophe.
+
 # TODO (HIGH) add support for file paths
 file_path              => chars.
 output                 => absolute_output | relative_output.
@@ -381,35 +385,35 @@ absolute_output        => (absolute_output_sym | output_sym __) output_id.
 relative_output        => relative_output_sym output_id.
 output_id              => digits.
 
-list_outputs           => output_sym | absolute_output_sym | relative_output_sym.
-clear_outputs          => (output_sym __ | absolute_output_sym | relative_output_sym) clear_sym.
-print_output           => output.
+list_outputs_cmd       => output_sym | absolute_output_sym | relative_output_sym.
+clear_outputs_cmd      => (output_sym __ | absolute_output_sym | relative_output_sym) clear_sym.
+print_output_cmd       => output.
 
-cli_cmd_sym            => help_sym | version_sym | quit_sym
+cli_cmd_sym            => help_cmd_sym | version_cmd_sym | quit_cmd_sym
 			| output_sym | absolute_output_sym | relative_output_sym
-                        | selection_sym | instantiate_sym | substitute_sym
-                        | normalize_sym | file_sym
-                        | get_sym | set_sym | toggle_sym.
+                        | selection_sym | instantiate_cmd_sym | substitute_cmd_sym
+                        | normalize_cmd_sym | file_cmd_sym
+                        | get_cmd_sym | set_cmd_sym | toggle_cmd_sym.
 
 # cli symbols
-help_sym               => "h" | "help".
-version_sym            => "v" | "version".
-quit_sym               => "q" | "e" | "quit" | "exit".
-output_sym             => "o" | "output".
-selection_sym          => "s" | "selection".
+help_cmd_sym           => "h" | "help".
+version_cmd_sym        => "v" | "version".
+quit_cmd_sym           => "q" | "e" | "quit" | "exit".
 instantiate_sym        => "i" | "instantiate".
 substitute_sym         => "s" | "substitute".
-normalize_sym          => "n" | "normalize".
-file_sym               => "r" | "read".
-clear_sym              => "c" | "clear".
-onf_sym                => "onf".
-dnf_sym                => "dnf".
-cnf_sym                => "cnf".
-anf_sym                => "anf".
-nnf_sym                => "nnf".
-pnf_sym                => "pnf".
-minterm_sym            => "minterm".
+normalize_cmd_sym      => "n" | "normalize".
+file_cmd_sym           => "r" | "read".
+clear_cmd_sym          => "c" | "clear".
+onf_cmd_sym            => "onf".
+dnf_cmd_sym            => "dnf".
+cnf_cmd_sym            => "cnf".
+anf_cmd_sym            => "anf".
+nnf_cmd_sym            => "nnf".
+pnf_cmd_sym            => "pnf".
+mnf_cmd_sym            => "mnf".
 
+selection_sym          => "s" | "selection".
+output_sym             => "o" | "output".
 absolute_output_sym    => "&".
 relative_output_sym    => "%".
 
@@ -417,13 +421,13 @@ relative_output_sym    => "%".
 # TODO (HIGH) implement 'set charvar...' to set length of variables to char instead to chars
 
 # get option_sym / set option_sym [ = ] value / toggle option_sym
-get                    => get_sym [ __ option ].
-set                    => set_sym __ option (__ | _ '=' _) option_value.
-toggle                 => toggle_sym __ bool_option.
+get_cmd                => get_cmd_sym [ __ option ].
+set_cmd                => set_cmd_sym __ option (__ | _ '=' _) option_value.
+toggle_cmd             => toggle_cmd_sym __ bool_option.
 
-get_sym                => "get".
-set_sym                => "set".
-toggle_sym             => "toggle".
+get_cmd_sym            => "get".
+set_cmd_sym            => "set".
+toggle_cmd_sym         => "toggle".
 
 # options and their names
 option                 => bool_option | severity_opt. # | string_option | integer_option.

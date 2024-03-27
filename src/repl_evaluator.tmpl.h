@@ -274,7 +274,8 @@ void toggle_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n, repl_evaluator<factory_t,
 }
 
 void version();
-void help(size_t nt = tau_parser::help_sym);
+void help(size_t nt = tau_parser::help_cmd_sym);
+void not_implemented_yet();
 
 template <typename factory_t, typename... BAs>
 int eval_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n, repl_evaluator<factory_t, BAs...>& re) {
@@ -294,21 +295,25 @@ int eval_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n, repl_evaluator<factory_t, BA
 		else help();
 		break;
 	}
-	case tau_parser::version:       version(); break;
-	case tau_parser::get:           get_cmd(command.value(), re); break;
-	case tau_parser::set:           set_cmd(command.value(), re); break;
-	case tau_parser::toggle:        toggle_cmd(command.value(), re); break;
-	case tau_parser::list_outputs:  list_outputs<factory_t, BAs...>(re.m); break;
-	case tau_parser::clear_outputs: clear_outputs<factory_t, BAs...>(re.m); break;
-	case tau_parser::print_output:  print_output_cmd<factory_t, BAs...>(command.value(), re.m); break;
-	case tau_parser::normalize:     normalizer_cmd<factory_t, BAs...>(command.value(), re.m); break;
-	case tau_parser::onf:		    onf(command.value()); break; //TODO (HIGH) include var
-	case tau_parser::dnf:		  	dnf(command.value()); break;
-	case tau_parser::cnf:		  	cnf(command.value()); break;
-	case tau_parser::anf:		  	anf(command.value()); break;
-	case tau_parser::nnf:		  	nnf(command.value()); break;
-	case tau_parser::pnf:		  	pnf(command.value()); break;
-	case tau_parser::minterm:	  	minterm(command.value()); break;
+	case tau_parser::version_cmd:       	version(); break;
+	case tau_parser::get_cmd:           	get_cmd(command.value(), re); break;
+	case tau_parser::set_cmd:           	set_cmd(command.value(), re); break;
+	case tau_parser::toggle_cmd:        	toggle_cmd(command.value(), re); break;
+	case tau_parser::list_outputs:  		list_outputs<factory_t, BAs...>(re.m); break;
+	case tau_parser::clear_outputs_cmd: 	clear_outputs<factory_t, BAs...>(re.m); break;
+	case tau_parser::print_output_cmd:  	print_output_cmd<factory_t, BAs...>(command.value(), re.m); break;
+	case tau_parser::normalize_cmd: 		normalizer_cmd<factory_t, BAs...>(command.value(), re.m); break;
+	case tau_parser::bf_substitute_cmd:		not_implemented_yet(); break;
+	case tau_parser::bf_instantiate_cmd:	not_implemented_yet(); break;
+	case tau_parser::wff_substitute_cmd:	not_implemented_yet(); break;
+	case tau_parser::wff_instantiate_cmd:	not_implemented_yet(); break;
+	case tau_parser::onf_cmd:				not_implemented_yet(); break;
+	case tau_parser::dnf_cmd:				not_implemented_yet(); break;
+	case tau_parser::cnf_cmd:				not_implemented_yet(); break;
+	case tau_parser::anf_cmd:				not_implemented_yet(); break;
+	case tau_parser::nnf_cmd:				not_implemented_yet(); break;
+	case tau_parser::pnf_cmd:				not_implemented_yet(); break;
+	case tau_parser::mnf_cmd:	  			not_implemented_yet(); break;
 	default:
 		cout << "Unknown command\n";
 		_repl_evaluator::error = true;
