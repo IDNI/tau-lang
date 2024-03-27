@@ -24,7 +24,7 @@ namespace idni::tau {
 
 template<typename...BAs>
 nso<BAs...> onf(const nso<BAs...>& nso) {
-	// TODO (HIGH) write onf (as executor step, all universal quantyifiers have been removed)
+	// TODO (HIGH) write onf_cmd (as executor step, all universal quantyifiers have been removed)
 	std::cout << "Not implemented yet." << std::endl;
 	return nso;
 }

@@ -28,7 +28,7 @@ void help(size_t nt) {
 	static const std::string bool_available_options = std::string{} +
 		"Available options:\n" + bool_options;
 	switch (nt) {
-	case tau_parser::help_sym: cout
+	case tau_parser::help_cmd_sym: cout
 		<< "Commands:\n"
 		<< "  help or h              print this help\n"
 		<< "  quit, q, exit or e     exit the repl\n"
@@ -36,7 +36,7 @@ void help(size_t nt) {
 		<< "\n"
 		<< "Formula commands:\n"
 		<< "  normalize or n         normalize formula\n"
-		<< "  onf                    convert to order normal form\n"
+		<< "  onf_cmd                    convert to order normal form\n"
 		<< "  dnf                    convert to disjunctive normal form\n"
 		<< "  cnf                    convert to conjunctive normal form\n"
 		<< "  anf                    convert to algebraic normal form\n"
@@ -54,10 +54,10 @@ void help(size_t nt) {
 		<< "  set                    set option's value\n"
 		<< "  toggle                 toggle option's value\n";
 		break;
-	case tau_parser::version_sym: cout
+	case tau_parser::version_cmd_sym: cout
 		<< "version or v prints out current Tau commit id\n";
 		break;
-	case tau_parser::quit_sym: cout
+	case tau_parser::quit_cmd_sym: cout
 		<< "q, quit, e or exit exits the repl\n";
 		break;
 	case tau_parser::output_sym: cout
@@ -86,13 +86,13 @@ void help(size_t nt) {
 	case tau_parser::selection_sym: cout
 		<< "Command s, selection ...\n";
 		break;
-	case tau_parser::instantiate_sym: cout
+	case tau_parser::instantiate_cmd_sym: cout
 		<< "Command i, instantiate ...\n";
 		break;
-	case tau_parser::substitute_sym: cout
+	case tau_parser::substitute_cmd_sym: cout
 		<< "Command s, substitute ...\n";
 		break;
-	case tau_parser::normalize_sym: cout
+	case tau_parser::normalize_cmd_sym: cout
 		<< "normalize or n command normalizes a formula, prints it and\n"
 		<< "saves it into memory of previous outputs\n"
 		<< "\n"
@@ -101,26 +101,30 @@ void help(size_t nt) {
 		<< "  normalize '<WFF>'      normalizes the given WFF formula\n"
 		<< "  normalize <output>     normalizes the output with the given id\n";
 		break;
-	case tau_parser::file_sym: cout
+	case tau_parser::file_cmd_sym: cout
 		<< "Command r, read ...\n";
 		break;
-	case tau_parser::get_sym: cout
+	case tau_parser::get_cmd_sym: cout
 		<< "get if used alone prints all options and their values\n"
 		<< "get <option>        prints the value of the given option\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case tau_parser::set_sym: cout
+	case tau_parser::set_cmd_sym: cout
 		<< "set <option> [=] <value> sets option value\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case tau_parser::toggle_sym: cout
+	case tau_parser::toggle_cmd_sym: cout
 		<< "toggle <option> toggles option value\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
 	}
+}
+
+void not_implemented_yet() {
+	std::cout << "Not implemented yet.\n";
 }
 
 } // namespace idni::tau
