@@ -8,7 +8,7 @@ TODO (HIGH) more structured and to the point
 
 Tau advances formal methods by removing coding from the process, while expanding its industrial capability, reliability and ease of maintenance. Tau enables you to automatically create the most complex, provably correct software, by simply writing sentences about what you want the software to do.
 
-Tau Language is able to embed and extend the most powerful decidable knowledge representation languages, logics, and Boolean algebras to describe states in the specification. Tau Language is able to embed and extend the most powerful decidable knowledge representation languages and logics to describe states in the Tau specification.
+Tau Language is able to embed and extend the most powerful decidable knowledge representation languages, logics, and Boolean algebras to describe states in the specification.
 
 This README.md file only tries to give you a brief operative overview of Tau Language so you could understand the main points without being too precise (actually deliberately imprecise just for the sake of ideas exposition). For a more detailed explanation of Tau Language and all its details, please refer to the TABA book ([Theories and Applications of Boolean Algebras by Ohad Ashor](./docs/taba.pdf)).
 
