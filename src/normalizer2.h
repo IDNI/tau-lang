@@ -40,8 +40,8 @@ namespace idni::tau {
 // IDEA (MEDIUM) add commutative rule and halve the number of rules if is performance friendly
 
 // bf rules
-RULE(BF_DISTRIBUTE_0, "(($X | $Y) & $Z) := (($X & $Z) | ($Y & $Z)).")
-RULE(BF_DISTRIBUTE_1, "($X & ($Y | $Z)) := (($X & $Y) | ($X & $Z)).")
+RULE(BF_TO_DNF_0, "(($X | $Y) & $Z) := (($X & $Z) | ($Y & $Z)).")
+RULE(BF_TO_DNF_1, "($X & ($Y | $Z)) := (($X & $Y) | ($X & $Z)).")
 RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := ($X' | $Y').")
 RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := ($X' & $Y').")
 RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
@@ -78,8 +78,8 @@ RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 
 // wff rules
-RULE(WFF_DISTRIBUTE_0, "(($X || $Y) && $Z) ::= (($X && $Z) || ($Y && $Z)).")
-RULE(WFF_DISTRIBUTE_1, "($X && ($Y || $Z)) ::= (($X && $Y) || ($X && $Z)).")
+RULE(WFF_TO_DNF_0, "(($X || $Y) && $Z) ::= (($X && $Z) || ($Y && $Z)).")
+RULE(WFF_TO_DNF_1, "($X && ($Y || $Z)) ::= (($X && $Y) || ($X && $Z)).")
 RULE(WFF_PUSH_NEGATION_INWARDS_0, "! ($X && $Y) ::= (! $X || ! $Y).")
 RULE(WFF_PUSH_NEGATION_INWARDS_1, "! ($X || $Y) ::= (! $X && ! $Y).")
 RULE(WFF_PUSH_NEGATION_INWARDS_2, "! ($X = 0) ::= ($X != 0).")
@@ -170,8 +170,8 @@ static auto elim_for_all = make_library<BAs...>(
 
 template<typename... BAs>
 static auto to_dnf_wff = make_library<BAs...>(
-	WFF_DISTRIBUTE_0
-	+ WFF_DISTRIBUTE_1
+	WFF_TO_DNF_0
+	+ WFF_TO_DNF_1
 	+ WFF_PUSH_NEGATION_INWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_1
 	+ WFF_PUSH_NEGATION_INWARDS_2
@@ -181,8 +181,8 @@ static auto to_dnf_wff = make_library<BAs...>(
 
 template<typename... BAs>
 static auto to_dnf_bf = make_library<BAs...>(
-	BF_DISTRIBUTE_0
-	+ BF_DISTRIBUTE_1
+	BF_TO_DNF_0
+	+ BF_TO_DNF_1
 	+ BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
 	+ BF_ELIM_DOUBLE_NEGATION_0
@@ -270,6 +270,8 @@ static auto bf_positives_upwards = make_library<BAs...>(
 	+ BF_POSITIVE_LITERAL_UPWARDS_3
 	+ BF_POSITIVE_LITERAL_UPWARDS_4
 );
+
+
 
 // TODO (MEDIUM) clean execution api code
 template<typename... BAs>
@@ -429,7 +431,6 @@ nso<BAs...> operator|(const nso<BAs...>& n, const repeat_each<step_t, BAs...>& r
 	return r(n);
 }
 
-
 template<tau_parser::nonterminal type, typename... BAs>
 void get_literals(const nso<BAs...>& clause, std::set<nso<BAs...>>& literals) {
 	BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
@@ -533,7 +534,7 @@ std::optional<nso<BAs...>> build_dnf_clause_from_literals(const std::set<nso<BAs
 
 
 template<tau_parser::nonterminal type, typename... BAs>
-std::optional<nso<BAs...>> simplify_dnf_clause(const nso<BAs...>& clause) {
+std::optional<nso<BAs...>> to_minterm(const nso<BAs...>& clause) {
 	auto [positives, negatives] = get_positive_negative_literals<type, BAs...>(clause);
 	if constexpr (type == tau_parser::bf) {
 		for (auto& negation: negatives) {
@@ -596,24 +597,24 @@ nso<BAs...> build_dnf_from_clauses(const std::set<nso<BAs...>>& clauses) {
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
-nso<BAs...> simplify_dnf(const nso<BAs...>& form) {
+nso<BAs...> to_mnf(const nso<BAs...>& form) {
 	std::set<nso<BAs...>> clauses;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying of " << form;
 	for (auto& clause: get_dnf_clauses<type, BAs...>(form))
-		if (auto dnf = simplify_dnf_clause<type, BAs...>(clause); dnf) clauses.insert(dnf.value());
+		if (auto dnf = to_minterm<type, BAs...>(clause); dnf) clauses.insert(dnf.value());
 	auto dnf = build_dnf_from_clauses<type, BAs...>(clauses);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End simplifying";
 	return dnf;
 }
 
 template<tau_parser::nonterminal type, typename... BAs>
-struct simplify_dnfs {
+struct to_mnfs {
 
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		// for all type dnfs do...
 		for (auto& dnf: select_top(form, is_non_terminal<type, BAs...>)) {
-			auto simplified = simplify_dnf<type, BAs...>(dnf);
+			auto simplified = to_mnf<type, BAs...>(dnf);
 			if (simplified != dnf) changes[dnf] = simplified;
 		}
 		return replace(form, changes);
@@ -621,21 +622,32 @@ struct simplify_dnfs {
 };
 
 template<typename... BAs>
-using simplify_bf_dnfs = simplify_dnfs<tau_parser::bf, BAs...>;
+using to_mnf_bf = to_mnfs<tau_parser::bf, BAs...>;
 
 template<typename... BAs>
-using simplify_wff_dnfs = simplify_dnfs<tau_parser::wff, BAs...>;
-
+using to_mnf_wff = to_mnfs<tau_parser::wff, BAs...>;
 
 template<typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const simplify_bf_dnfs<BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const to_mnf_bf<BAs...>& r) {
 	return r(n);
 }
 
 template<typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const simplify_wff_dnfs<BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const to_mnf_wff<BAs...>& r) {
 	return r(n);
 }
+
+// TODO (MEDIUM) implement the removal supeefluous vars
+// If some var is an input in the tau lang, but is redundant,we dont even read that input.
+// In order to know if a formula is independent in some var (it may appear, but it's still
+// be independant independent of it, p.e. xy+xy' is just x, same for xy|xy'...) we could
+// use the derivative (f(x) does not depend on x iff f(0)+f(1)=0). So we go over all atomic
+// formulas that contain a certain var, and if for all of them f(0)+f(1)=0, then it's completely
+// independent in that var. Moreover, ofc we want to push quantifiers inside and simplify atomic
+// formulas to not mention vars that they dont depend on (otherwise imagine doing quantifier
+// elimination for y in xy+xy' which doesnt even depend on y).
+// The way to do it is as follows. we do one-step bdd conversion, wrt x only.
+// so f(x)=xf(1)+x'f(0). now f doesnt depend on x iff f(1)=f(0)
 
 // executes the normalizer on the given source code taking into account the
 // bindings provided.
@@ -693,7 +705,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>)
-		| simplify_wff_dnfs<BAs...>()
+		| to_mnf_wff<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			bf_positives_upwards<BAs...>
 			| squeeze_positives<BAs...>
@@ -703,7 +715,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>)
-		| simplify_bf_dnfs<BAs...>()
+		| to_mnf_bf<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			trivialities<BAs...>
 			| simplify_bf<BAs...>

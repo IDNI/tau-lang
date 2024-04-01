@@ -27,8 +27,8 @@ namespace testing = doctest;
 
 TEST_SUITE("parsing bf rules") {
 
-	TEST_CASE("BF_DISTRIBUTE_0") {
-		auto src_rule = make_tau_source(BF_DISTRIBUTE_0);
+	TEST_CASE("BF_TO_DNF_0") {
+		auto src_rule = make_tau_source(BF_TO_DNF_0);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
 			| tau_parser::library
@@ -38,8 +38,8 @@ TEST_SUITE("parsing bf rules") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("BF_DISTRIBUTE_1") {
-		auto src_rule = make_tau_source(BF_DISTRIBUTE_1);
+	TEST_CASE("BF_TO_DNF_1") {
+		auto src_rule = make_tau_source(BF_TO_DNF_1);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
 			| tau_parser::library

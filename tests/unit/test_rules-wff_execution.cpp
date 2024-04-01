@@ -27,8 +27,8 @@ namespace testing = doctest;
 
 TEST_SUITE("executing wff rules") {
 
-	TEST_CASE("WFF_DISTRIBUTE_0") {
-		auto src_rule = make_tau_source(WFF_DISTRIBUTE_0);
+	TEST_CASE("WFF_TO_DNF_0") {
+		auto src_rule = make_tau_source(WFF_TO_DNF_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
@@ -38,8 +38,8 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("WFF_DISTRIBUTE_1") {
-		auto src_rule = make_tau_source(WFF_DISTRIBUTE_1);
+	TEST_CASE("WFF_TO_DNF_1") {
+		auto src_rule = make_tau_source(WFF_TO_DNF_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());

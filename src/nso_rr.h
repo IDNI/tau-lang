@@ -1064,6 +1064,7 @@ const std::string BLDR_WFF_T = "( $X ) ::= T.";
 const std::string BLDR_WFF_EQ = "( $X ) ::= ($X = 0).";
 const std::string BLDR_WFF_NEQ = "( $X ) ::= ($X != 0).";
 const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) ::= ($X !<= $Y).";
+const std::string BDLR_BF_INTERVAL = "( $X $Y $Z ) ::= ($X <= $Y <= $Z).";
 const std::string BLDR_WFF_AND = "( $X $Y ) ::= ($X && $Y).";
 const std::string BLDR_WFF_OR = "( $X $Y ) ::= ($X || $Y).";
 const std::string BLDR_WFF_NEG = "( $X ) ::= ! $X.";
@@ -1127,6 +1128,8 @@ template<typename... BAs>
 static auto bldr_bf_splitter = make_builder<BAs...>(BLDR_BF_SPLITTER);
 template<typename... BAs>
 static auto bldr_bf_not_less_equal = make_builder<BAs...>(BLDR_BF_NOT_LESS_EQUAL);
+template<typename... BAs>
+static auto bldr_bf_interval = make_builder<BAs...>(BDLR_BF_INTERVAL);
 template<typename... BAs>
 static auto bldr_bf_all = make_builder<BAs...>(BLDR_BF_ALL);
 template<typename... BAs>
@@ -1267,6 +1270,12 @@ sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l, const sp_tau_nod
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less_equal(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	return build_wff_eq<BAs...>(build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r)));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_interval(const sp_tau_node<BAs...>& x, const sp_tau_node<BAs...>& y, const sp_tau_node<BAs...>& z) {
+	std::vector<sp_tau_node<BAs...>> args {trim(x), trim(y), trim(z)};
+	return tau_apply_builder<BAs...>(bldr_bf_interval<BAs...>, args);
 }
 
 template<typename... BAs>
