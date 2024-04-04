@@ -125,6 +125,12 @@ private:
 	void toggle_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
 
 	sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string& src);
+	size_t digits(sp_tau_node<tau_ba<BAs...>, BAs...> n);
+
+
+	void version();
+	void help(size_t nt = 0);
+	void not_implemented_yet();
 
 	outputs m;
 	factory_t factory;
@@ -132,4 +138,7 @@ private:
 };
 
 } //idni::tau namespace
+
+#include "repl_evaluator.tmpl.h"
+
 #endif //__REPL_EVALUATOR_H__
