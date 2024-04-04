@@ -40,101 +40,106 @@ namespace idni::tau {
 // IDEA (MEDIUM) add commutative rule and halve the number of rules if is performance friendly
 
 // bf rules
-RULE(BF_DISTRIBUTE_0, "(($X | $Y) & $Z) := (($X & $Z) | ($Y & $Z)).")
-RULE(BF_DISTRIBUTE_1, "($X & ($Y | $Z)) := (($X & $Y) | ($X & $Z)).")
-RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := ($X' | $Y').")
-RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := ($X' & $Y').")
+RULE(BF_DISTRIBUTE_0, "($X | $Y) & $Z := $X & $Z | $Y & $Z.")
+RULE(BF_DISTRIBUTE_1, "$X & ($Y | $Z) := $X & $Y | $X & $Z.")
+RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := ($X)' | ($Y)'.")
+RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := ($X)' & ($Y)'.")
 RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
-RULE(BF_SIMPLIFY_ONE_0, "( 1 | $X ) := 1.")
-RULE(BF_SIMPLIFY_ONE_1, "( $X | 1 ) := 1.")
-RULE(BF_SIMPLIFY_ONE_2, "( 1 & $X ) := $X.")
-RULE(BF_SIMPLIFY_ONE_3, "( $X & 1 ) := $X.")
+RULE(BF_SIMPLIFY_ONE_0, "1 | $X := 1.")
+RULE(BF_SIMPLIFY_ONE_1, "$X | 1 := 1.")
+RULE(BF_SIMPLIFY_ONE_2, "1 & $X := $X.")
+RULE(BF_SIMPLIFY_ONE_3, "$X & 1 := $X.")
 RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
-RULE(BF_SIMPLIFY_ZERO_0, "( 0 & $X ) := 0.")
-RULE(BF_SIMPLIFY_ZERO_1, "( $X & 0 ) := 0.")
-RULE(BF_SIMPLIFY_ZERO_2, "( 0 | $X ) := $X.")
-RULE(BF_SIMPLIFY_ZERO_3, "( $X | 0 ) := $X.")
+RULE(BF_SIMPLIFY_ZERO_0, "0 & $X := 0.")
+RULE(BF_SIMPLIFY_ZERO_1, "$X & 0 := 0.")
+RULE(BF_SIMPLIFY_ZERO_2, "0 | $X := $X.")
+RULE(BF_SIMPLIFY_ZERO_3, "$X | 0 := $X.")
 RULE(BF_SIMPLIFY_ZERO_4, "0' := 1.")
-RULE(BF_SIMPLIFY_SELF_0, "( $X & $X ) := $X.")
-RULE(BF_SIMPLIFY_SELF_1, "( $X | $X ) := $X.")
-RULE(BF_SIMPLIFY_SELF_2, "( $X & $X' ) := 0.")
-RULE(BF_SIMPLIFY_SELF_3, "( $X | $X' ) := 1.")
-RULE(BF_SIMPLIFY_SELF_4, "( $X' & $X ) := 0.")
-RULE(BF_SIMPLIFY_SELF_5, "( $X' | $X ) := 1.")
+RULE(BF_SIMPLIFY_SELF_0, "$X & $X := $X.")
+RULE(BF_SIMPLIFY_SELF_1, "$X | $X := $X.")
+RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
+RULE(BF_SIMPLIFY_SELF_3, "$X | $X' := 1.")
+RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
+RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
 
 RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "fall $X $Y := bf_remove_funiversal_cb $X $Y 1 0.")
 RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "fex $X $Y := bf_remove_fexistential_cb $X $Y 1 0.")
-RULE(BF_SKIP_CONSTANTS_0, "({ $X } & $Y) := ($Y & { $X }).")
+RULE(BF_SKIP_CONSTANTS_0, "{ $X } & $Y := $Y & { $X }.")
 
 // bf definitions
-RULE(BF_DEF_XOR, "( $X + $Y ) := (( $X & $Y' ) | ( $X' & $Y )).")
+RULE(BF_DEF_XOR, "$X + $Y := $X & ($Y)' | ($X)' & $Y.")
 
 // bf callbacks
-RULE(BF_CALLBACK_AND, "( { $X } & { $Y } ) := bf_and_cb $X $Y.")
-RULE(BF_CALLBACK_OR, "( { $X } | { $Y } ) := bf_or_cb $X $Y.")
-RULE(BF_CALLBACK_XOR, "( { $X } + { $Y } ) := bf_xor_cb $X $Y.")
+RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
+RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
+RULE(BF_CALLBACK_XOR, "{ $X } + { $Y } := bf_xor_cb $X $Y.")
 RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 
 // wff rules
-RULE(WFF_DISTRIBUTE_0, "(($X || $Y) && $Z) ::= (($X && $Z) || ($Y && $Z)).")
-RULE(WFF_DISTRIBUTE_1, "($X && ($Y || $Z)) ::= (($X && $Y) || ($X && $Z)).")
-RULE(WFF_PUSH_NEGATION_INWARDS_0, "! ($X && $Y) ::= (! $X || ! $Y).")
-RULE(WFF_PUSH_NEGATION_INWARDS_1, "! ($X || $Y) ::= (! $X && ! $Y).")
-RULE(WFF_PUSH_NEGATION_INWARDS_2, "! ($X = 0) ::= ($X != 0).")
-RULE(WFF_PUSH_NEGATION_INWARDS_3, "! ($X != 0) ::= ($X = 0).")
+RULE(WFF_DISTRIBUTE_0, "($X || $Y) && $Z ::= $X && $Z || $Y && $Z.")
+RULE(WFF_DISTRIBUTE_1, "$X && ($Y || $Z) ::= $X && $Y || $X && $Z.")
+RULE(WFF_PUSH_NEGATION_INWARDS_0, "!($X && $Y) ::= ! $X || !($Y).")
+RULE(WFF_PUSH_NEGATION_INWARDS_1, "!($X || $Y) ::= ! $X && !($Y).")
+RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
+RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
 RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
-RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X ! $Y.")
-RULE(WFF_SIMPLIFY_ONE_0, "( T || $X ) ::= T.")
-RULE(WFF_SIMPLIFY_ONE_1, "( $X || T ) ::= T.")
-RULE(WFF_SIMPLIFY_ONE_2, "( T && $X ) ::= $X.")
-RULE(WFF_SIMPLIFY_ONE_3, "( $X && T ) ::= $X.")
+RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !($Y).")
+RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
+RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
+RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
+RULE(WFF_SIMPLIFY_ONE_3, "$X && T ::= $X.")
 RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
-RULE(WFF_SIMPLIFY_ZERO_0, "( F && $X ) ::= F.")
-RULE(WFF_SIMPLIFY_ZERO_1, "( $X && F ) ::= F.")
-RULE(WFF_SIMPLIFY_ZERO_2, "( F || $X ) ::= $X.")
-RULE(WFF_SIMPLIFY_ZERO_3, "( $X || F ) ::= $X.")
+RULE(WFF_SIMPLIFY_ZERO_0, "F && $X ::= F.")
+RULE(WFF_SIMPLIFY_ZERO_1, "$X && F ::= F.")
+RULE(WFF_SIMPLIFY_ZERO_2, "F || $X ::= $X.")
+RULE(WFF_SIMPLIFY_ZERO_3, "$X || F ::= $X.")
 RULE(WFF_SIMPLIFY_ZERO_4, "! F ::= T.")
-RULE(WFF_SIMPLIFY_SELF_0, "( $X && $X ) ::= $X.")
-RULE(WFF_SIMPLIFY_SELF_1, "( $X || $X ) ::= $X.")
-RULE(WFF_SIMPLIFY_SELF_2, "( $X && ! $X ) ::= F.")
-RULE(WFF_SIMPLIFY_SELF_3, "( $X || ! $X ) ::= T.")
-RULE(WFF_SIMPLIFY_SELF_4, "( ! $X && $X ) ::= F.")
-RULE(WFF_SIMPLIFY_SELF_5, "( ! $X || $X ) ::= T.")
+RULE(WFF_SIMPLIFY_SELF_0, "$X && $X ::= $X.")
+RULE(WFF_SIMPLIFY_SELF_1, "$X || $X ::= $X.")
+RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
+RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
+RULE(WFF_SIMPLIFY_SELF_4, "!($X) && $X ::= F.")
+RULE(WFF_SIMPLIFY_SELF_5, "!($X) || $X ::= T.")
 
 // wff definitions of xor, ->, <- and <->.
-RULE(WFF_DEF_XOR, "( $X ^ $Y ) ::= (( $X && ! $Y ) || ( ! $X && $Y )).")
-RULE(WFF_DEF_CONDITIONAL, "( $X ? $Y : $Z) ::= (($X -> $Y) && (! $X -> $Z)).")
-RULE(WFF_DEF_IMPLY, "( $X -> $Y ) ::= ( ! $X || $Y).")
-RULE(WFF_DEF_EQUIV, "( $X <-> $Y ) ::= (( $X -> $Y ) && ( $Y -> $X )).")
+RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !($Y) || !($X) && $Y.")
+RULE(WFF_DEF_CONDITIONAL, "$X ? $Y : $Z ::= ($X -> $Y) && (!($X) -> $Z).")
+RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !($X) || $Y.")
+RULE(WFF_DEF_EQUIV, "$X <-> $Y ::= ($X -> $Y) && ($Y -> $X).")
 RULE(WFF_DEF_BEX_0, "bex $X $Y ::= wff_remove_bexistential_cb $X $Y T F.")
 RULE(WFF_DEF_BALL_0, "ball $X $Y ::=  wff_remove_buniversal_cb $X $Y T F.")
 
 // additional wff dewfinitions (include wff formulas)
-RULE(BF_DEF_LESS_EQUAL, "( $X <= $Y ) ::= ( ($X & $Y') = 0).")
-RULE(BF_DEF_LESS, "( $X < $Y ) ::= (( ($X & $Y') = 0) && ( ($X + $Y') != 0)).")
-RULE(BF_DEF_GREATER, "( $X > $Y ) ::= ((( $X & $Y' ) != 0) || (( $X + $Y') = 0)).")
+RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & ($Y)' = 0.")
+RULE(BF_DEF_LESS, "$X < $Y ::= ($X & ($Y)' = 0) && ($X + ($Y)' != 0).")
+RULE(BF_DEF_GREATER, "$X > $Y ::= ($X & ($Y)' != 0) || ($X + ($Y)' = 0).")
 // we must expand the xor as its definition has been allready processed
-RULE(BF_DEF_EQ, "( $X = $Y ) ::= ((( $X & $Y' ) | ( $X' & $Y )) = 0).")
-RULE(BF_DEF_NEQ, "( $X != $Y ) ::= ((( $X & $Y' ) | ( $X' & $Y )) != 0).")
+RULE(BF_DEF_EQ, "$X = $Y ::= $X & ($Y)' | ($X)' & $Y = 0.")
+RULE(BF_DEF_NEQ, "$X != $Y ::= $X & ($Y)' | ($X)' & $Y != 0.")
 
 // wff callbacks
-RULE(BF_CALLBACK_EQ, "( { $X } = 0 ) ::= bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
-RULE(BF_CALLBACK_NEQ, "( { $X } != 0 ) ::= bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
+RULE(BF_CALLBACK_EQ, "{ $X } = 0 ::= bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
+RULE(BF_CALLBACK_NEQ, "{ $X } != 0 ::= bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
 
-RULE(BF_EQ_SIMPLIFY_0, "( 1 = 0 ) ::=  F.")
-RULE(BF_EQ_SIMPLIFY_1, "( 0 = 0 ) ::= T.")
-RULE(BF_NEQ_SIMPLIFY_0, "( 0 != 0 ) ::= F.")
-RULE(BF_NEQ_SIMPLIFY_1, "( 1 != 0 ) ::= T.")
+RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
+RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
+RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
+RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
 
-RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "(($X != 0) && (($Y = 0) && ($Z != 0))) ::= (($Y = 0) && (($X != 0) && ($Z != 0))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "(($X != 0) && (($Y != 0) && ($Z = 0))) ::= (($Z = 0) && (($X != 0) && ($Y != 0))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "((($X = 0) && ( $Y != 0)) && ($Z != 0)) ::= (($X = 0) && (($Y != 0) && ($Z != 0))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "((($X != 0) && ( $Y = 0)) && ($Z != 0)) ::= (($Y = 0) && (($X != 0) && ($Z != 0))).")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "(($X != 0) && ( $Y = 0)) ::= (($Y = 0) && ($X != 0)).")
-RULE(BF_SQUEEZE_POSITIVES_0, "(( $X = 0 ) && ($Y = 0)) ::= (( $X | $Y ) = 0).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "($X != 0) && ($Y  = 0) && ($Z != 0) ::= ($Y = 0) && ($X != 0) && ($Z != 0).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "($X != 0) && ($Y != 0) && ($Z  = 0) ::= ($Z = 0) && ($X != 0) && ($Y != 0).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "($Z != 0) && ($X  = 0) && ($Y != 0) ::= ($Z != 0) && ($X = 0) && ($Y != 0).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "($Z != 0) && ($X != 0) && ($Y  = 0) ::= ($Z != 0) && ($Y = 0) && ($X != 0).")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "($X != 0) && ($Y  = 0) ::= ($Y = 0) && ($X != 0).")
+RULE(BF_SQUEEZE_POSITIVES_0, "($X = 0) && ($Y = 0) ::= $X || $Y = 0.")
 RULE(WFF_REMOVE_EX_0, "ex $X $Y ::= wff_remove_existential_cb $X $Y.")
+
+RULE(BF_ELIM_PARENTHESIS,  "($X)   := $X.")
+RULE(WFF_ELIM_PARENTHESIS, "($X)  ::= $X.")
+//QUESTION do we need also the following rule? if so, where and when to apply
+//RULE(TAU_ELIM_PARENTHESIS, "($X) :::= $X.")
 
 // TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
@@ -143,7 +148,8 @@ template<typename... BAs>
 // TODO (LOW) rename library with rwsys or another name
 static auto apply_defs = make_library<BAs...>(
 	// wff defs
-	WFF_DEF_XOR
+	WFF_ELIM_PARENTHESIS
+	+ WFF_DEF_XOR
 	+ WFF_DEF_CONDITIONAL
 	+ WFF_DEF_IMPLY
 	+ WFF_DEF_EQUIV
@@ -156,7 +162,8 @@ static auto apply_defs = make_library<BAs...>(
 template<typename... BAs>
 static auto apply_defs_once = make_library<BAs...>(
 	// wff defs
-	BF_DEF_LESS_EQUAL
+	BF_ELIM_PARENTHESIS
+	+ BF_DEF_LESS_EQUAL
 	+ BF_DEF_LESS
 	+ BF_DEF_GREATER
 	+ BF_DEF_EQ
@@ -177,20 +184,24 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_ELIM_DOUBLE_NEGATION_0
+	+ WFF_ELIM_PARENTHESIS
 );
 
 template<typename... BAs>
 static auto to_dnf_bf = make_library<BAs...>(
-	BF_DISTRIBUTE_0
+	BF_CALLBACK_NEG
+	+ BF_DISTRIBUTE_0
 	+ BF_DISTRIBUTE_1
 	+ BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
 	+ BF_ELIM_DOUBLE_NEGATION_0
+	+ BF_ELIM_PARENTHESIS
 );
 
 template<typename... BAs>
 static auto simplify_bf = make_library<BAs...>(
-	BF_SIMPLIFY_ONE_0
+	BF_ELIM_PARENTHESIS
+	+ BF_SIMPLIFY_ONE_0
 	+ BF_SIMPLIFY_ONE_1
 	+ BF_SIMPLIFY_ONE_2
 	+ BF_SIMPLIFY_ONE_3
@@ -210,7 +221,8 @@ static auto simplify_bf = make_library<BAs...>(
 
 template<typename... BAs>
 static auto simplify_wff = make_library<BAs...>(
-	WFF_SIMPLIFY_ONE_0
+	WFF_ELIM_PARENTHESIS
+	+ WFF_SIMPLIFY_ONE_0
 	+ WFF_SIMPLIFY_ONE_1
 	+ WFF_SIMPLIFY_ONE_2
 	+ WFF_SIMPLIFY_ONE_3
@@ -230,7 +242,8 @@ static auto simplify_wff = make_library<BAs...>(
 
 template<typename... BAs>
 static auto apply_cb = make_library<BAs...>(
-	BF_CALLBACK_AND
+	BF_ELIM_PARENTHESIS
+	+ BF_CALLBACK_AND
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR
 	+ BF_CALLBACK_NEG
@@ -240,23 +253,27 @@ static auto apply_cb = make_library<BAs...>(
 
 template<typename... BAs>
 static auto squeeze_positives = make_library<BAs...>(
-	BF_SQUEEZE_POSITIVES_0
+	BF_ELIM_PARENTHESIS
+	+ BF_SQUEEZE_POSITIVES_0
 );
 
 template<typename... BAs>
 static auto wff_remove_existential = make_library<BAs...>(
-	WFF_REMOVE_EX_0
+	WFF_ELIM_PARENTHESIS
+	+ WFF_REMOVE_EX_0
 );
 
 template<typename... BAs>
 static auto bf_elim_quantifiers = make_library<BAs...>(
-	BF_FUNCTIONAL_QUANTIFIERS_0
+	BF_ELIM_PARENTHESIS
+	+ BF_FUNCTIONAL_QUANTIFIERS_0
 	+ BF_FUNCTIONAL_QUANTIFIERS_1
 );
 
 template<typename... BAs>
 static auto trivialities = make_library<BAs...>(
-	BF_EQ_SIMPLIFY_0
+	BF_ELIM_PARENTHESIS
+	+ BF_EQ_SIMPLIFY_0
 	+ BF_EQ_SIMPLIFY_1
 	+ BF_NEQ_SIMPLIFY_0
 	+ BF_NEQ_SIMPLIFY_1
@@ -264,7 +281,8 @@ static auto trivialities = make_library<BAs...>(
 
 template<typename... BAs>
 static auto bf_positives_upwards = make_library<BAs...>(
-	BF_POSITIVE_LITERAL_UPWARDS_0
+	BF_ELIM_PARENTHESIS
+	+ BF_POSITIVE_LITERAL_UPWARDS_0
 	+ BF_POSITIVE_LITERAL_UPWARDS_1
 	+ BF_POSITIVE_LITERAL_UPWARDS_2
 	+ BF_POSITIVE_LITERAL_UPWARDS_3

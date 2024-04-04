@@ -29,39 +29,39 @@ using namespace idni::tau;
 namespace idni::tau {
 
 // tau rules
-RULE(TAU_DISTRIBUTE_0, "(($X ||| $Y) &&& $Z) :::= (($X &&& $Z) ||| ($Y &&& $Z)).")
-RULE(TAU_DISTRIBUTE_1, "($X &&& ($Y ||| $Z)) :::= (($X &&& $Y) ||| ($X &&& $Z)).")
-RULE(TAU_PUSH_NEGATION_INWARDS_0, "!!! ($X &&& $Y) :::= (!!! $X ||| !!! $Y).")
-RULE(TAU_PUSH_NEGATION_INWARDS_1, "!!! ($X ||| $Y) :::= (!!! $X &&& !!! $Y).")
+RULE(TAU_DISTRIBUTE_0, "($X ||| $Y) &&& $Z :::= $X &&& $Z ||| $Y &&& $Z.")
+RULE(TAU_DISTRIBUTE_1, "$X &&& ($Y ||| $Z) :::= $X &&& $Y ||| $X &&& $Z.")
+RULE(TAU_PUSH_NEGATION_INWARDS_0, "!!! ($X &&& $Y) :::= !!! $X ||| !!! $Y.")
+RULE(TAU_PUSH_NEGATION_INWARDS_1, "!!! ($X ||| $Y) :::= !!! $X &&& !!! $Y.")
 RULE(TAU_ELIM_DOUBLE_NEGATION_0, "!!! !!! $X :::=  $X.")
-RULE(TAU_SIMPLIFY_ONE_0, "( {T} ||| $X ) :::= {T}.")
-RULE(TAU_SIMPLIFY_ONE_1, "( $X ||| {T} ) :::= {T}.")
-RULE(TAU_SIMPLIFY_ONE_2, "( {T} &&& $X ) :::= $X.")
-RULE(TAU_SIMPLIFY_ONE_3, "( $X &&& {T} ) :::= $X.")
+RULE(TAU_SIMPLIFY_ONE_0, "{T} ||| $X :::= {T}.")
+RULE(TAU_SIMPLIFY_ONE_1, "$X ||| {T} :::= {T}.")
+RULE(TAU_SIMPLIFY_ONE_2, "{T} &&& $X :::= $X.")
+RULE(TAU_SIMPLIFY_ONE_3, "$X &&& {T} :::= $X.")
 RULE(TAU_SIMPLIFY_ONE_4, "!!! {T} :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_0, "( {F} &&& $X ) :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_1, "( $X &&& {F} ) :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_2, "( {F} ||| $X ) :::= $X.")
-RULE(TAU_SIMPLIFY_ZERO_3, "( $X ||| {F} ) :::= $X.")
+RULE(TAU_SIMPLIFY_ZERO_0, "{F} &&& $X :::= {F}.")
+RULE(TAU_SIMPLIFY_ZERO_1, "$X &&& {F} :::= {F}.")
+RULE(TAU_SIMPLIFY_ZERO_2, "{F} ||| $X :::= $X.")
+RULE(TAU_SIMPLIFY_ZERO_3, "$X ||| {F} :::= $X.")
 RULE(TAU_SIMPLIFY_ZERO_4, "!!! {F} :::= {T}.")
-RULE(TAU_SIMPLIFY_SELF_0, "( $X &&& $X ) :::= $X.")
-RULE(TAU_SIMPLIFY_SELF_1, "( $X ||| $X ) :::= $X.")
-RULE(TAU_SIMPLIFY_SELF_2, "( $X &&& !!! $X ) :::= {F}.")
-RULE(TAU_SIMPLIFY_SELF_3, "( $X ||| !!! $X ) :::= {T}.")
-RULE(TAU_SIMPLIFY_SELF_4, "( !!! $X &&& $X ) :::= {F}.")
-RULE(TAU_SIMPLIFY_SELF_5, "( !!! $X ||| $X ) :::= {T}.")
+RULE(TAU_SIMPLIFY_SELF_0, "$X &&& $X :::= $X.")
+RULE(TAU_SIMPLIFY_SELF_1, "$X ||| $X :::= $X.")
+RULE(TAU_SIMPLIFY_SELF_2, "$X &&& !!! $X :::= {F}.")
+RULE(TAU_SIMPLIFY_SELF_3, "$X ||| !!! $X :::= {T}.")
+RULE(TAU_SIMPLIFY_SELF_4, "!!! $X &&& $X :::= {F}.")
+RULE(TAU_SIMPLIFY_SELF_5, "!!! $X ||| $X :::= {T}.")
 
-RULE(TAU_COLLAPSE_POSITIVES_0, "($X &&& $Y) :::= tau_collapse_positives_cb $X $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_1, "($X &&& ($Y &&& $Z)) :::= tau_collapse_positives_cb $X $Y $Z.")
-RULE(TAU_COLLAPSE_POSITIVES_2, "($X &&& ($Y &&& $Z)) :::= tau_collapse_positives_cb $X $Z $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_3, "($X &&& ($Y &&& $Z)) :::= tau_collapse_positives_cb $Y $Z $X.")
-RULE(TAU_COLLAPSE_POSITIVES_4, "(($X &&& $Y) &&& $Z) :::= tau_collapse_positives_cb $Y $Z $X.")
-RULE(TAU_COLLAPSE_POSITIVES_5, "(($X &&& $Y) &&& $Z) :::= tau_collapse_positives_cb $X $Z $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_6, "(($X &&& $Y) &&& $Z) :::= tau_collapse_positives_cb $X $Y $Z.")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "($X &&& ($Y &&& $Z)) :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "($X &&& ($Y &&& $Z)) :::= tau_positives_upwards_cb $Z ($Z &&& ($X &&& $Y)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "(($X &&& $Y) &&& $Z) :::= tau_positives_upwards_cb $X ($X &&& ($Y &&& $Z)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_3, "(($X &&& $Y) &&& $Z) :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
+RULE(TAU_COLLAPSE_POSITIVES_0, "$X &&& $Y :::= tau_collapse_positives_cb $X $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_1, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $X $Y $Z.")
+RULE(TAU_COLLAPSE_POSITIVES_2, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $X $Z $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_3, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $Y $Z $X.")
+RULE(TAU_COLLAPSE_POSITIVES_4, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $Y $Z $X.")
+RULE(TAU_COLLAPSE_POSITIVES_5, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $X $Z $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_6, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $X $Y $Z.")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "$X &&& ($Y &&& $Z) :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "$X &&& ($Y &&& $Z) :::= tau_positives_upwards_cb $Z ($Z &&& ($X &&& $Y)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "($X &&& $Y) &&& $Z :::= tau_positives_upwards_cb $X ($X &&& ($Y &&& $Z)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_3, "($X &&& $Y) &&& $Z :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
 
 template<typename... BAs>
 static auto to_dnf_tau = make_library<BAs...>(
@@ -349,7 +349,7 @@ tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const b
 // << for printing tau_ba's form
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& os, const idni::tau::tau_ba<BAs...>& rs) {
-	return os << rs.nso_rr;
+	return os << " : " << rs.nso_rr;
 }
 
 #endif // __TAU_H__
