@@ -13,8 +13,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "../../src/doctest.h"
-#include "../../src/bool.h"
+#include "doctest.h"
+#include "bool.h"
 
 namespace testing = doctest;
 

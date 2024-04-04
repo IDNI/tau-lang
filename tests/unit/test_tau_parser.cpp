@@ -13,10 +13,10 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "../../src/doctest.h"
-#include "../../src/defs.h"
-#include "../../src/nso_rr.h"
-#include "../../src/bool.h"
+#include "doctest.h"
+#include "defs.h"
+#include "nso_rr.h"
+#include "bool.h"
 
 #include "test_helpers.h"
 

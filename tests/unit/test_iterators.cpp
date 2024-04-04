@@ -14,8 +14,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 //#include "unittest.hpp"
-#include "../../src/iterators.h"
-#include "../../src/doctest.h"
+#include "iterators.h"
+#include "doctest.h"
 
 namespace testing = doctest;
 

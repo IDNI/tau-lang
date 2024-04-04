@@ -15,11 +15,11 @@
 
 #include <cassert>
 
-#include "../../src/doctest.h"
-#include "../../src/nso_rr.h"
-#include "../../src/bdd_handle.h"
-#include "../../src/normalizer2.h"
-#include "../../src/satisfiability.h"
+#include "doctest.h"
+#include "nso_rr.h"
+#include "bdd_handle.h"
+#include "normalizer2.h"
+#include "satisfiability.h"
 
 #include "test_integration_helpers-tau.h"
 
