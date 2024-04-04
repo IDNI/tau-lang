@@ -35,8 +35,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "T.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -46,8 +45,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -57,8 +55,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(T && F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -68,8 +65,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(T ^ F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -79,8 +75,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(T ? T : F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -90,8 +85,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(F ? T : F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -101,8 +95,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(F || F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -112,8 +105,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "! F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -123,8 +115,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(F -> F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -134,8 +125,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(F <-> F).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -145,8 +135,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "((1 & 0) = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -156,8 +145,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "((1 | 0) = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -167,8 +155,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "((1 + 0) != 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -178,8 +165,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(0' = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -189,8 +175,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 		const char* sample = "(1' = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -212,8 +197,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 		const char* sample = "( { bdd : X } != 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -224,8 +208,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 		const char* sample = "( { bdd : X }  = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -236,8 +219,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 		const char* sample = "( ({bdd : Y}' & {bdd : Y}) = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -248,8 +230,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 		const char* sample = "( ({bdd : Y}' | {bdd : Y}) != 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -262,8 +243,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "(fall P P = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -273,8 +253,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "(fall P P != 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -284,8 +263,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "(fex P P = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -295,8 +273,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "(fex P P != 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -306,8 +283,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "ex P (P != 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -317,8 +293,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "all P (P != 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -328,8 +303,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "ex P (P = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -339,8 +313,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "all P (P = 0).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -350,8 +323,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "bex P P.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -361,8 +333,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "ball P P.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -372,8 +343,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "ball P bex Q (P || Q).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -383,8 +353,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		const char* sample = "bex P ball Q (P || Q).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );

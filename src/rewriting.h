@@ -63,6 +63,10 @@ struct node {
 			that.child.begin(), that.child.end());
 	}
 
+	std::shared_ptr<node> operator[](size_t i) {
+		return child[i];
+	}
+
 	// the value of the node and pointers to the children, we follow the same
 	// notation as in forest<...>::tree to be able to reuse the code with
 	// forest<...>::tree.
