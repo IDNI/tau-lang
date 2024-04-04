@@ -17,6 +17,30 @@
 namespace idni::tau {
 #ifdef DEBUG
 
+template <typename node_t>
+std::ostream& print_sp_tau_source_node_tree(std::ostream &os, sp_node<node_t> n,
+	size_t l = 0, bool ws = false)
+{
+	bool enter = true;
+	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
+	auto& v = n->value;
+	if (v.nt() && (v.n() == tau_parser::_ ||
+			v.n() == tau_parser::__)) {
+		enter = false;
+	} else {
+		indent();
+		if (v.nt()) os << parser_instance<tau_parser>()
+			.name(v.n()) << "(" << v.n() << ")";
+		else if (v.is_null()) os << "null";
+		else os << v.t();
+	}
+	if (!enter) return os;
+	if (n->child.size()) os << " {\n";
+	for (auto& c : n->child) print_sp_tau_source_node_tree<node_t>(os, c, l + 1, ws);
+	if (n->child.size()) indent(), os << "}";
+	return os << "\n";
+}
+
 // print the tree of tau nodes for general debugging
 template<typename...BAs>
 std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
@@ -37,7 +61,7 @@ std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
 			else if (v.is_null()) os << "null";
 			else os << v.t();
 		},
-		[&os](const auto& v) { os << v; }
+		[&os, &indent](const auto& v) { indent(), os << v; }
 	}, n->value);
 	if (!enter) return os;
 	if (n->child.size()) os << " {\n";
