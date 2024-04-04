@@ -29,6 +29,7 @@ namespace idni {
 // if the repl should exit.
 template <typename evaluator_t>
 struct repl {
+
 	repl(evaluator_t& re, std::string prompt = "> ",
 		std::string history_file = ".history")
 		: re_(re), prompt_(prompt), history_file_(history_file)
@@ -48,10 +49,12 @@ struct repl {
 		while (std::getline(hf, s)) if (s.size()) history_.push_back(s);
 		hpos_ = history_.size();
 	}
+
 	~repl() {
 		// return terminal to its original state
 		tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs_);
 	}
+
 	int run() {
 		refresh_input();
 		while (1) {
@@ -103,50 +106,64 @@ struct repl {
 			}
 			if (s.empty()) continue;
 			if (re_.eval(s)) break; // exit loop if nonzero
+			else prompt(re_.prompt());
 			clear();
 		}
 		return 0;
 	}
+
 	// sets the prompt
 	void prompt(const std::string& p) { prompt_ = p, refresh_input(); }
+
 	// returns the current prompt
 	std::string prompt() const { return prompt_; }
 private:
+
 	// reads a character from stdin
 	int in(char& c) const { return read(STDIN_FILENO, &c, 1); }
+
 	// writes data to stdout
 	void out(const char* data, size_t size) const {
 		size_t written = write(STDOUT_FILENO, data, size);
 		// TODO (HIGH) handle write errors
 		if (written != size) std::cerr << "write error\n";
 	}
+
 	// returns the current input as a string
 	std::string get() const {
 		std::stringstream ss;
 		return ss.write(input_.data(), input_.size()), ss.str();
 	}
+
 	// sets the current input from a string
 	void set(const std::string& s) {
 		input_.assign(s.begin(), s.end()), pos_ = input_.size();
 	}
+
 	// clears the input line (set to empty)
 	void set() { input_.clear(), pos_ = 0; }
+
 	void clear() { // clears the input line
 		input_.clear(), pos_ = 0, refresh_input();
 	}
+
 	void backspace() { // delete character before the cursor
 		if (pos_) input_.erase(input_.begin() + --pos_),refresh_input();
 	}
+
 	void del() { // delete character after the cursor
 		if (pos_ < input_.size())
 			input_.erase(input_.begin() + pos_), refresh_input();
 	}
+
 	void left() { // move cursor left
 		if (pos_) pos_--, refresh_input();
 	}
+
 	void right() { // move cursor right
 		if (pos_ < input_.size()) pos_++, refresh_input();
 	}
+
 	void ctrl_left() { // move cursor word left
 		if (pos_ == 0) return;
 		pos_--;
@@ -154,6 +171,7 @@ private:
 		while (pos_ > 0 &&  std::isalnum(input_[pos_ - 1])) pos_--;
 		refresh_input();
 	}
+
 	void ctrl_right() { // move cursor word right
 		if (pos_ == input_.size()) return;
 		pos_++;
@@ -161,12 +179,15 @@ private:
 		while (pos_<input_.size() &&  std::isalnum(input_[pos_]))pos_++;
 		refresh_input();
 	}
+
 	void home() { // move cursor to the beginning of the line
 		if (pos_) pos_ = 0, refresh_input();
 	}
+
 	void end() { // move cursor to the end of the line
 		if (pos_ < input_.size()) pos_ = input_.size(), refresh_input();
 	}
+
 	void up() { // previous history input
 		if (history_.size() == 0 || hpos_ == 0) return;
 		// push current input into history if we are at the end
@@ -174,20 +195,24 @@ private:
 			history_.push_back(get());
 		set(history_[--hpos_]), refresh_input();
 	}
+
 	void down() { // next history input
 		if (hpos_ == history_.size()) return;
 		if (++hpos_ == history_.size()) set();
 		else set(history_[hpos_]);
 		refresh_input();
 	}
+
 	void ctrl_up() { // go to first input in history
 		if (history_.size() == 0 || hpos_ == 0) return;
 		set(history_[hpos_ = 0]), refresh_input();
 	}
+
 	void ctrl_down() { // go beyond the end of history into a new input
 		if (hpos_ == history_.size()) return;
 		hpos_ = history_.size(), set(), refresh_input();
 	}
+
 	// store current input into history and return the input as a string
 	const std::string& store() {
 		auto s = get();
@@ -220,6 +245,7 @@ private:
 			out(ss.str().c_str(), ss.str().size());
 		}
 	}
+
 	evaluator_t& re_;
 	std::string prompt_;
 	std::string history_file_;

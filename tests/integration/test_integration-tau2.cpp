@@ -34,8 +34,7 @@ TEST_SUITE("simple tau formulas: no negatives, no loopbacks, no vars") {
 		const char* sample = "{(0 = 0)};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
@@ -43,8 +42,7 @@ TEST_SUITE("simple tau formulas: no negatives, no loopbacks, no vars") {
 		const char* sample = "{(1 = 0)};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
@@ -55,8 +53,7 @@ TEST_SUITE("simple tau formulas: no negatives, no loopbacks") {
 		const char* sample = "{ ( i_keyboard[t] = o_console[t] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
@@ -64,8 +61,7 @@ TEST_SUITE("simple tau formulas: no negatives, no loopbacks") {
 		const char* sample = "{ ( i_keyboard[t] = i_keyboard[t]' ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
@@ -76,8 +72,7 @@ TEST_SUITE("simple tau formulas: no negatives") {
 		const char* sample = "{ ( i_keyboard[t-1] = o_console[t] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
@@ -85,8 +80,7 @@ TEST_SUITE("simple tau formulas: no negatives") {
 		const char* sample = "{ ( i_keyboard[t-1] = i_keyboard[t-1]' ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
@@ -97,8 +91,7 @@ TEST_SUITE("simple tau formulas: negatives, no loopbacks") {
 		const char* sample = "{ ( i_keyboard[t] != o_console[t] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
@@ -106,8 +99,7 @@ TEST_SUITE("simple tau formulas: negatives, no loopbacks") {
 		const char* sample = "{ ( i_keyboard[t] != i_keyboard[t] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
@@ -118,8 +110,7 @@ TEST_SUITE("simple tau formulas: negatives") {
 		const char* sample = "{ ( i_keyboard[t-1] != o_console[t] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
@@ -127,8 +118,7 @@ TEST_SUITE("simple tau formulas: negatives") {
 		const char* sample = "{ ( i_keyboard[t-1] != i_keyboard[t-1] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
@@ -141,8 +131,7 @@ TEST_SUITE("simple tau formulas: negatives, positive, no loopbacks") {
 		const char* sample = "{ ( i_keyboard[t-1] != o_console[t] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
@@ -150,8 +139,7 @@ TEST_SUITE("simple tau formulas: negatives, positive, no loopbacks") {
 		const char* sample = "{ ( i_keyboard[t-1] != i_keyboard[t-1] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
@@ -164,8 +152,7 @@ TEST_SUITE("simple tau formulas: negatives, positive, loopbacks") {
 		const char* sample = "{ ( i_keyboard[t-1] != o_console[t] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
@@ -173,8 +160,7 @@ TEST_SUITE("simple tau formulas: negatives, positive, loopbacks") {
 		const char* sample = "{ ( i_keyboard[t-1] != i_keyboard[t-1] ) };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
-		auto sample_formula = make_tau_spec_using_factory<factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
 		CHECK( !is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }

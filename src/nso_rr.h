@@ -929,12 +929,13 @@ library<nso<BAs...>> make_library(const std::string& source) {
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& tau_source, binder_t& binder) {
+sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& tau_code, binder_t& binder) {
+	bind_transformer<binder_t, BAs...> bs(binder);
 	auto binded = post_order_traverser<
-			binder_t,
+			bind_transformer<binder_t, BAs...>,
 			all_t<sp_tau_node<BAs...>>,
 			sp_tau_node<BAs...>>(
-		binder, all<sp_tau_node<BAs...>>)(tau_source);
+		bs, all<sp_tau_node<BAs...>>)(tau_code);
 	return binded;
 }
 
@@ -942,16 +943,14 @@ sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& tau_so
 template<typename... BAs>
 sp_tau_node<BAs...> bind_tau_code_using_bindings(sp_tau_node<BAs...>& tau_code, const bindings<BAs...>& bindings) {
 	name_binder<BAs...> nb(bindings);
-	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
-	return bind_tau_code_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_code, bs);
+	return bind_tau_code_using_binder<name_binder<BAs...>, BAs...>(tau_code, nb);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
 sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& tau_code, factory_t& factory) {
 	factory_binder<factory_t, BAs...> fb(factory);
-	bind_transformer<factory_binder<factory_t, BAs...>, BAs...> bs(fb);
-	return bind_tau_code_using_binder<bind_transformer<factory_binder<factory_t, BAs...>, BAs...>, BAs...>(tau_code, bs);
+	return bind_tau_code_using_binder<factory_binder<factory_t, BAs...>, BAs...>(tau_code, fb);
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -974,22 +973,20 @@ rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_
 template<typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
 	name_binder<BAs...> nb(bindings);
-	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
-	return make_nso_rr_using_binder<bind_transformer<name_binder<BAs...>, BAs...>, BAs...>(tau_source, bs);
+	return make_nso_rr_using_binder<name_binder<BAs...>, BAs...>(tau_source, nb);
 }
-
 
 // make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
-	bind_transformer<factory_t, BAs...> bs(factory);
-	return make_nso_rr_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_source, bs);
+	factory_binder<factory_t, BAs...> fb(factory);
+	return make_nso_rr_using_binder<factory_binder<factory_t, BAs...>, BAs...>(tau_source, fb);
 }
 
 template<typename factory_t, typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& tau_code, factory_t& factory) {
-	bind_transformer<factory_t, BAs...> bs(factory);
-	return make_nso_rr_using_binder<bind_transformer<factory_t, BAs...>, BAs...>(tau_code, bs);
+	factory_binder<factory_t, BAs...> fb(factory);
+	return make_nso_rr_using_binder<factory_binder<factory_t, BAs...>, BAs...>(tau_code,fb);
 }
 
 // make a nso_rr from the given tau source and bindings.
@@ -1068,6 +1065,7 @@ const std::string BLDR_WFF_T = "( $X ) ::= T.";
 const std::string BLDR_WFF_EQ = "( $X ) ::= $X = 0.";
 const std::string BLDR_WFF_NEQ = "( $X ) ::= $X != 0.";
 const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) ::= $X !<= $Y.";
+const std::string BDLR_BF_INTERVAL = "( $X $Y $Z ) ::= $X <= $Y <= $Z.";
 const std::string BLDR_WFF_AND = "( $X $Y ) ::= $X && $Y.";
 const std::string BLDR_WFF_OR = "( $X $Y ) ::= $X || $Y.";
 const std::string BLDR_WFF_NEG = "( $X ) ::= ! $X.";
@@ -1131,6 +1129,8 @@ template<typename... BAs>
 static auto bldr_bf_splitter = make_builder<BAs...>(BLDR_BF_SPLITTER);
 template<typename... BAs>
 static auto bldr_bf_not_less_equal = make_builder<BAs...>(BLDR_BF_NOT_LESS_EQUAL);
+template<typename... BAs>
+static auto bldr_bf_interval = make_builder<BAs...>(BDLR_BF_INTERVAL);
 template<typename... BAs>
 static auto bldr_bf_all = make_builder<BAs...>(BLDR_BF_ALL);
 template<typename... BAs>
@@ -1271,6 +1271,12 @@ sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l, const sp_tau_nod
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less_equal(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	return build_wff_eq<BAs...>(build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r)));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_interval(const sp_tau_node<BAs...>& x, const sp_tau_node<BAs...>& y, const sp_tau_node<BAs...>& z) {
+	std::vector<sp_tau_node<BAs...>> args {trim(x), trim(y), trim(z)};
+	return tau_apply_builder<BAs...>(bldr_bf_interval<BAs...>, args);
 }
 
 template<typename... BAs>

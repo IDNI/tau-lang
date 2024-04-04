@@ -35,8 +35,7 @@ TEST_SUITE("function execution: simple cases") {
 			"g(Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -48,8 +47,7 @@ TEST_SUITE("function execution: simple cases") {
 			"g(Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -62,8 +60,7 @@ TEST_SUITE("function execution: simple cases") {
 			"g(Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -76,8 +73,7 @@ TEST_SUITE("function execution: simple cases") {
 			"g(Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -92,8 +88,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 			"g[0](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -105,8 +100,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 			"g[0](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -119,8 +113,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 			"g[1](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -133,8 +126,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 			"g[1](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -150,8 +142,7 @@ TEST_SUITE("rec_relations execution: types") {
 			"g[0](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -164,8 +155,7 @@ TEST_SUITE("rec_relations execution: types") {
 			"g[0](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -180,8 +170,7 @@ TEST_SUITE("2d cases") {
 			"g[0, 0](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -193,8 +182,7 @@ TEST_SUITE("2d cases") {
 			"g[0, 0](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -207,8 +195,7 @@ TEST_SUITE("2d cases") {
 			"g[1, 0](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -221,8 +208,7 @@ TEST_SUITE("2d cases") {
 			"g[1, 0](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -235,8 +221,7 @@ TEST_SUITE("2d cases") {
 			"g[0, 1](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -249,8 +234,7 @@ TEST_SUITE("2d cases") {
 			"g[0, 1](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -266,8 +250,7 @@ TEST_SUITE("rec relations execution: several relations") {
 			"g[0, 0](Y) && h[0, 0](1).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -280,8 +263,7 @@ TEST_SUITE("rec relations execution: several relations") {
 			"g[0, 0](Y) & h[0,0](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -296,8 +278,7 @@ TEST_SUITE("rec relations execution: several relations") {
 			"g[1, 0](Y) && h[0,1](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -312,8 +293,7 @@ TEST_SUITE("rec relations execution: several relations") {
 			"g[1, 0](Y) & h[0,1](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -329,8 +309,7 @@ TEST_SUITE("rec relations execution: longer offsets") {
 			"g[4](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -344,8 +323,7 @@ TEST_SUITE("rec relations execution: longer offsets") {
 			"g[5](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -359,8 +337,7 @@ TEST_SUITE("rec relations execution: longer offsets") {
 			"g[4](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -374,8 +351,7 @@ TEST_SUITE("rec relations execution: longer offsets") {
 			"g[5](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -393,8 +369,7 @@ TEST_SUITE("mutual rec cases") {
 			"g[4](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -409,8 +384,7 @@ TEST_SUITE("mutual rec cases") {
 			"g[5](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f; // wff_t
 		CHECK( check.has_value() );
@@ -425,8 +399,7 @@ TEST_SUITE("mutual rec cases") {
 			"g[4](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -441,8 +414,7 @@ TEST_SUITE("mutual rec cases") {
 			"g[5](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t; // wff_f
 		CHECK( check.has_value() );
@@ -458,8 +430,7 @@ TEST_SUITE("multiple rec relations") {
 			"g[0](Y) && h[0](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -474,8 +445,7 @@ TEST_SUITE("multiple rec relations") {
 			"g[1](Y) && h[1](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -490,8 +460,7 @@ TEST_SUITE("multiple rec relations") {
 			"g[1](Y) && h[1](Y).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -505,8 +474,7 @@ TEST_SUITE("multiple rec relations") {
 			"g[0](Y) | h[0](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -521,8 +489,7 @@ TEST_SUITE("multiple rec relations") {
 			"g[1](Y) & h[1](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -537,8 +504,7 @@ TEST_SUITE("multiple rec relations") {
 			"g[1](Y) & h[1](Y) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		factory_binder<bdd_test_factory, bdd_test> fb(bf);
-		auto sample_formula = make_nso_rr_using_factory<factory_binder<bdd_test_factory_t, bdd_test>, bdd_test>(sample_src, fb);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );

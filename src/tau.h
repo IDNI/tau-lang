@@ -261,8 +261,7 @@ struct tau_factory {
 		if (auto nn = bf.build(type_name, n); nn != n) return nn;
 		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<gssotc<BAs...>>;
 		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
-		factory_binder<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...> fb(*this);
-		auto form = make_nso_rr_using_factory<factory_binder<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(var, fb).main;
+		auto form = make_nso_rr_using_factory<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...>(var, *this).main;
 		tau_ba<BAs...> t(form);
 		return make_node<tau_sym<tau_ba<BAs...>, BAs...>>(t, {});
 	}
@@ -298,16 +297,12 @@ rec_relations<gssotc<BAs...>> make_gssotc_rec_relations(gssotc<BAs...>& tau_sour
 template<typename binder_t, typename... BAs>
 tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
 	auto src = make_tau_code<tau_ba<BAs...>, BAs...>(tau_source);
-	auto unbinded_main = src | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
-	auto binded_main = post_order_traverser<
-			binder_t,
-			all_t<gssotc<BAs...>>,
-			gssotc<BAs...>>(
-		binder, all<gssotc<BAs...>>)(unbinded_main);
-	auto gssotc_rr = make_gssotc_rec_relations(src);
-	auto nso_rr = make_rec_relations(src);
+	auto binded = bind_tau_code_using_binder<binder_t, tau_ba<BAs...>, BAs...>(src, binder);
+	auto main = binded | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	auto gssotc_rr = make_gssotc_rec_relations(binded);
+	auto nso_rr = make_rec_relations(binded);
 	gssotc_rr.insert(gssotc_rr.end(), nso_rr.begin(), nso_rr.end());
-	return { gssotc_rr, binded_main };
+	return { gssotc_rr, main };
 }
 
 // make a nso_rr from the given tau source and bindings.
@@ -321,8 +316,8 @@ tau_spec<BAs...> make_tau_spec_using_bindings(sp_tau_source_node& tau_source, co
 // make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
 tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
-	bind_transformer<factory_t, tau_ba<BAs...>, BAs...> bs(factory);
-	return make_tau_spec_using_binder<bind_transformer<factory_t, tau_ba<BAs...>,  BAs...>, BAs...>(tau_source, bs);
+	factory_binder<factory_t, tau_ba<BAs...>, BAs...> bs(factory);
+	return make_tau_spec_using_binder<factory_binder<factory_t, tau_ba<BAs...>, BAs...>, BAs...>(tau_source, bs);
 }
 
 // make a nso_rr from the given tau source and bindings.
@@ -337,11 +332,7 @@ template<typename... BAs>
 tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
 	auto tau_source = make_tau_source(source);
 	name_binder<BAs...> nb(bindings);
-	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
-	return make_tau_spec_using_bindings<
-			bind_transformer<name_binder<BAs...>, BAs...>,
-			BAs...>(
-		tau_source, bs);
+	return make_tau_spec_using_binder<name_binder<BAs...>, BAs...>(tau_source, nb);
 }
 
 } // namespace idni::tau

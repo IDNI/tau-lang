@@ -51,21 +51,17 @@ struct bdd_test_factory {
 rr<nso<tau_ba<bdd_test>, bdd_test>> normalize_test_tau(const char* src) {
 	bdd_test_factory bf;
 	tau_factory<bdd_test_factory, bdd_test> fb(bf);
-	factory_binder<tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test> fbinder(fb);
 	rr<nso<tau_ba<bdd_test>, bdd_test>> nso_rr = make_nso_rr_using_factory<
-			factory_binder<tau_factory<bdd_test_factory, bdd_test>,tau_ba<bdd_test>, bdd_test>,
-			tau_ba<bdd_test>, bdd_test>(src, fbinder);
-
+			tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test>(src, fb);
 	return normalizer<tau_ba<bdd_test>, bdd_test>(nso_rr);
 }
 
 tau_ba<bdd_test> get_tau_ba(const char* src) {
 	bdd_test_factory bf;
-	tau_factory<bdd_test_factory, bdd_test> fb(bf);
-	factory_binder<tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test> fbinder(fb);
+	tau_factory<bdd_test_factory, bdd_test> tf(bf);
 	rr<nso<tau_ba<bdd_test>, bdd_test>> nso_rr = make_nso_rr_using_factory<
-			factory_binder<tau_factory<bdd_test_factory, bdd_test>,tau_ba<bdd_test>, bdd_test>,
-			tau_ba<bdd_test>, bdd_test>(src, fbinder);
+			tau_factory<bdd_test_factory, bdd_test>,
+			tau_ba<bdd_test>, bdd_test>(src, tf);
 	auto value = nso_rr.main
 		| tau_parser::bf_eq
 		| tau_parser::bf
@@ -76,9 +72,9 @@ tau_ba<bdd_test> get_tau_ba(const char* src) {
 			tau_ba<bdd_test>, bdd_test>>(value.value()->value));
 }
 
-tau_ba<bdd_test> normal(const tau_ba<bdd_test>& f) {
+/*tau_ba<bdd_test> normal(const tau_ba<bdd_test>& f) {
 	auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>(f.nso_rr);
 	return normalized;
-}
+}*/
 
 #endif // __TEST_INTEGRATION_HELPERS_TAU_H__
