@@ -54,7 +54,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T && F") {
-		const char* sample = "(T && F).";
+		const char* sample = "T && F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -65,7 +65,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T ^ F") {
-		const char* sample = "(T ^ F).";
+		const char* sample = "T ^ F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -76,7 +76,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("T ? T : F") {
-		const char* sample = "(T ? T : F).";
+		const char* sample = "T ? T : F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -87,7 +87,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F ? T : F") {
-		const char* sample = "(F ? T : F).";
+		const char* sample = "F ? T : F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -98,7 +98,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F || F") {
-		const char* sample = "(F || F).";
+		const char* sample = "F || F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -120,7 +120,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F -> F") {
-		const char* sample = "(F -> F).";
+		const char* sample = "F -> F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -131,7 +131,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("F <-> F") {
-		const char* sample = "(F <-> F).";
+		const char* sample = "F <-> F.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -142,7 +142,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("1 & 0 = 0.") {
-		const char* sample = "((1 & 0) = 0).";
+		const char* sample = "1 & 0 = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -153,7 +153,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("1 | 0 = 0.") {
-		const char* sample = "((1 | 0) = 0).";
+		const char* sample = "1 | 0 = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -164,7 +164,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("1 + 0 != 0.") {
-		const char* sample = "((1 + 0) != 0).";
+		const char* sample = "1 + 0 != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -186,7 +186,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	}
 
 	TEST_CASE("1' = 0.") {
-		const char* sample = "(1' = 0).";
+		const char* sample = "1' = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -209,7 +209,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("{ bdd : X } != 0") {
 		bdd_init<Bool>();
-		const char* sample = "( { bdd : X } != 0).";
+		const char* sample = "{ bdd : X } != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -221,7 +221,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("{ bdd : X } = 0") {
 		bdd_init<Bool>();
-		const char* sample = "( { bdd : X }  = 0).";
+		const char* sample = "{ bdd : X } = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -231,9 +231,9 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("({bdd : Y}' & {bdd : Y}) = 0") {
+	TEST_CASE("{ bdd : Y }' & { bdd : Y } = 0") {
 		bdd_init<Bool>();
-		const char* sample = "( ({bdd : Y}' & {bdd : Y}) = 0).";
+		const char* sample = "{ bdd : Y }' & { bdd : Y } = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -243,9 +243,9 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("({bdd : Y}' | {bdd : Y}) != 0") {
+	TEST_CASE("{ bdd : Y }' | { bdd : Y } != 0") {
 		bdd_init<Bool>();
-		const char* sample = "( ({bdd : Y}' | {bdd : Y}) != 0).";
+		const char* sample = "{ bdd : Y }' | { bdd : Y } != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -259,7 +259,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 
 	TEST_CASE("fall P P = 0") {
-		const char* sample = "(fall P P = 0).";
+		const char* sample = "fall P P = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -270,7 +270,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("fall P P != 0") {
-		const char* sample = "(fall P P != 0).";
+		const char* sample = "fall P P != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -281,7 +281,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("fex P P = 0") {
-		const char* sample = "(fex P P = 0).";
+		const char* sample = "fex P P = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -292,7 +292,7 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 	}
 
 	TEST_CASE("fex P P != 0") {
-		const char* sample = "(fex P P != 0).";
+		const char* sample = "fex P P != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -302,8 +302,8 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("ex P (P != 0)") {
-		const char* sample = "ex P (P != 0).";
+	TEST_CASE("ex P P != 0") {
+		const char* sample = "ex P P != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -313,8 +313,8 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("all P (P != 0)") {
-		const char* sample = "all P (P != 0).";
+	TEST_CASE("all P P != 0") {
+		const char* sample = "all P P != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -324,8 +324,8 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("ex P (P = 0)") {
-		const char* sample = "ex P (P = 0).";
+	TEST_CASE("ex P P = 0") {
+		const char* sample = "ex P P = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -335,8 +335,8 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("all P (P = 0)") {
-		const char* sample = "all P (P = 0).";
+	TEST_CASE("all P P = 0") {
+		const char* sample = "all P P = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -368,8 +368,8 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("ball P bex Q (P || Q)") {
-		const char* sample = "ball P bex Q (P || Q).";
+	TEST_CASE("ball P bex Q P || Q") {
+		const char* sample = "ball P bex Q P || Q.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -379,8 +379,8 @@ TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("bex P ball Q (P || Q)") {
-		const char* sample = "bex P ball Q (P || Q).";
+	TEST_CASE("bex P ball Q P || Q") {
+		const char* sample = "bex P ball Q P || Q.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);

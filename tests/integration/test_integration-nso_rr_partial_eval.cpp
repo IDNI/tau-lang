@@ -31,7 +31,7 @@ TEST_SUITE("rec relations partial evaluation: simple cases") {
 
 	TEST_CASE("wff_rec_relation") {
 		const char* sample =
-			"h[0]($X $Y) ::= ($X != $Y)."
+			"h[0]($X $Y) ::= $X != $Y."
 			"g[$n]($Y) ::= h[$n-1]($Y 0)."
 			"g[1](1).";
 		auto sample_src = make_tau_source(sample);
@@ -45,9 +45,9 @@ TEST_SUITE("rec relations partial evaluation: simple cases") {
 
 	TEST_CASE("bf_rec_relation") {
 		const char* sample =
-			"h[0]($X $Y) := ($X + $Y)."
+			"h[0]($X $Y) := $X + $Y."
 			"g[$n]($Y) := h[$n-1]($Y 0)."
-			"(g[1](0) = 0).";
+			"g[1](0) = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);
@@ -62,7 +62,7 @@ TEST_SUITE("functions partial evaluation: simple cases") {
 
 	TEST_CASE("wff_rec_relation") {
 		const char* sample =
-			"h($X $Y) ::= ($X = $Y)."
+			"h($X $Y) ::= $X = $Y."
 			"g($Y) ::= h($Y 0)."
 			"g(0).";
 		auto sample_src = make_tau_source(sample);
@@ -76,9 +76,9 @@ TEST_SUITE("functions partial evaluation: simple cases") {
 
 	TEST_CASE("bf_rec_relation") {
 		const char* sample =
-			"h($X $Y) := ($X + $Y)."
+			"h($X $Y) := $X + $Y."
 			"g($Y) := h($Y 0)."
-			"(g(1) = 1).";
+			"g(1) = 1.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, bdd_test> fb(bf);

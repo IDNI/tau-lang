@@ -43,7 +43,7 @@ TEST_SUITE("parsing only main") {
 
 	TEST_CASE("nso_rr main") {
 		const char* sample =
-			" ( Z = 0 ) .";
+			" Z = 0 .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 			auto nso_rr = frml | tau_parser::nso_rr | tau_parser::nso_main ;
@@ -168,7 +168,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation y1") {
 		const char* sample =
-			"g[0](Y) := T."
+			"g[0](Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -178,7 +178,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation y2") {
 		const char* sample =
-			"g[0]($Y) := T."
+			"g[0]($Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -188,7 +188,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation y3") {
 		const char* sample =
-			"g[$N](Y) := T."
+			"g[$N](Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -198,7 +198,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation y4") {
 		const char* sample =
-			"g[$N]($Y) := T."
+			"g[$N]($Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -208,7 +208,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation y5") {
 		const char* sample =
-			"g[$N - 1](Y) := T."
+			"g[$N - 1](Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -509,7 +509,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr bf_rec_relation y1") {
 		const char* sample =
-			"g[0, 0](Y) := T."
+			"g[0, 0](Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -519,7 +519,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr bf_rec_relation y2") {
 		const char* sample =
-			"g[0, 0]($Y) := T."
+			"g[0, 0]($Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -529,7 +529,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr bf_rec_relation y3") {
 		const char* sample =
-			"g[$N, 0](Y) := T."
+			"g[$N, 0](Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -539,7 +539,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr bf_rec_relation y4") {
 		const char* sample =
-			"g[$N, 0]($Y) := T."
+			"g[$N, 0]($Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -549,7 +549,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr bf_rec_relation y5") {
 		const char* sample =
-			"g[$N - 1, 0](Y) := T."
+			"g[$N - 1, 0](Y) := 1."
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -794,7 +794,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("&&") {
-		const char* sample = "(( Z = 0 ) && ( X = 0 )).";
+		const char* sample = "( Z = 0 ) && ( X = 0 ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto and_formula = frml
@@ -806,7 +806,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("||") {
-		const char* sample = "(( Z = 0 ) || ( X = 0 )).";
+		const char* sample = "( Z = 0 ) || ( X = 0 ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto or_formula = frml
@@ -818,7 +818,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("^") {
-		const char* sample = "(( Z = 0 ) ^ ( X = 0 )).";
+		const char* sample = "( Z = 0 ) ^ ( X = 0 ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto xor_formula = frml
@@ -830,7 +830,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("?") {
-		const char* sample = "($Z ? $Z : $Z).";
+		const char* sample = "$Z ? $Z : $Z.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto xor_formula = frml
@@ -842,7 +842,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("= 0") {
-		const char* sample = "( Z = 0 ).";
+		const char* sample = " Z = 0 .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto eq_formula = frml
@@ -854,7 +854,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("!= 0") {
-		const char* sample = "( Z != 0 ).";
+		const char* sample = " Z != 0 .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto eq_formula = frml
@@ -865,7 +865,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( eq_formula.has_value() );
 	}
 	TEST_CASE("<") {
-		const char* sample = "( Z < Z ).";
+		const char* sample = " Z < Z .";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto less_rule = lib
@@ -877,7 +877,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("<=") {
-		const char* sample = "( Z <= Z ).";
+		const char* sample = " Z <= Z .";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto less_equal_rule = lib
@@ -889,7 +889,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE(">") {
-		const char* sample = "(Z > Z).";
+		const char* sample = "Z > Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto greater_rule = lib
@@ -901,7 +901,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("->") {
-		const char* sample = "($Z -> $Z) ::= $Z.";
+		const char* sample = "$Z -> $Z ::= $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto imply_rule = lib
@@ -916,7 +916,7 @@ TEST_SUITE("parsing wwf formulas ") {
 	}
 
 	TEST_CASE("<->") {
-		const char* sample = "($Z <-> $Z) ::= $Z.";
+		const char* sample = "$Z <-> $Z ::= $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto equiv_rule = lib
@@ -1001,7 +1001,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("&") {
-		const char* sample = "(Z & Z) := Z.";
+		const char* sample = "Z & Z := Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto and_rule = lib
@@ -1016,7 +1016,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("|") {
-		const char* sample = "(Z | Z) := Z.";
+		const char* sample = "Z | Z := Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto or_rule = lib
@@ -1031,7 +1031,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("+") {
-		const char* sample = "(Z + Z) := Z.";
+		const char* sample = "Z + Z := Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto xor_rule = lib

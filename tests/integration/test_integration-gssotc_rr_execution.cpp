@@ -213,7 +213,7 @@ TEST_SUITE("rec relations execution: several relations") {
 		const char* sample =
 			"g[0, 0]($Y) :::= {T}."
 			"h[0, 0]($Y) :::= {T}."
-			"(g[0, 0](Y) &&& h[0, 0](T));";
+			"g[0, 0](Y) &&& h[0, 0](1);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -227,7 +227,7 @@ TEST_SUITE("rec relations execution: several relations") {
 			"g[$n, 0]($Y) :::= g[$n - 1, 0]($Y)."
 			"h[0, 0]($Y) :::= {T}."
 			"h[0, $m]($Y) :::= h[0, $m - 1]($Y)."
-			"(g[1, 0](Y) &&& h[0,1](Y));";
+			"g[1, 0](Y) &&& h[0,1](Y);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -302,7 +302,7 @@ TEST_SUITE("multiple rec relations") {
 		const char* sample =
 			"g[0]($Y) :::= {T}."
 			"h[0]($Y) :::= {F}."
-			"(g[0](Y) &&& h[0](Y));";
+			"g[0](Y) &&& h[0](Y);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -316,7 +316,7 @@ TEST_SUITE("multiple rec relations") {
 			"g[$n]($Y) :::= g[$n - 1]($Y)."
 			"h[0]($Y) :::= {F}."
 			"h[$n]($Y) :::= h[$n - 1]($Y)."
-			"(g[1](Y) &&& h[1](Y));";
+			"g[1](Y) &&& h[1](Y);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -330,7 +330,7 @@ TEST_SUITE("multiple rec relations") {
 			"g[$n]($Y) :::= g[$n - 1]($Y)."
 			"h[0]($Y) :::= {T}."
 			"h[$n]($Y) :::= h[$n - 1]($Y)."
-			"(g[1](Y) &&& h[1](Y));";
+			"g[1](Y) &&& h[1](Y);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);

@@ -13,8 +13,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "../../src/doctest.h"
-#include "../../src/rewriting.h"
+#include "doctest.h"
+#include "rewriting.h"
 
 using namespace idni::rewriter;
 using namespace std;

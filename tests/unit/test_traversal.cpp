@@ -30,7 +30,7 @@ namespace testing = doctest;
 TEST_SUITE("operator|") {
 
 	TEST_CASE("match zero nodes") {
-		const char* sample =	"($Z & $Z) := $Z.";
+		const char* sample = "$Z & $Z := $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib
@@ -39,7 +39,7 @@ TEST_SUITE("operator|") {
 	}
 
 	TEST_CASE("match one node") {
-		const char* sample =	"($Z & $Z) := $Z.";
+		const char* sample = "$Z & $Z := $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib
@@ -52,7 +52,7 @@ TEST_SUITE("operator|") {
 TEST_SUITE("operator||") {
 
 	TEST_CASE("match zero nodes") {
-		const char* sample =	"($Z & $Z) := $Z.";
+		const char* sample = "$Z & $Z := $Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib
@@ -65,7 +65,7 @@ TEST_SUITE("operator||") {
 	}
 
 	TEST_CASE("match one node") {
-		const char* sample =	"(Z & Z) := Z.";
+		const char* sample = "Z & Z := Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib
@@ -77,7 +77,7 @@ TEST_SUITE("operator||") {
 	}
 
 	TEST_CASE("match several nodes") {
-		const char* sample =	"(Z & Z) := Z.";
+		const char* sample = "Z & Z := Z.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto args = lib

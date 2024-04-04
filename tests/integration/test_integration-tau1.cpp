@@ -50,7 +50,7 @@ TEST_SUITE("simple tau formulas: no variables") {
 	}
 
 	TEST_CASE("{T} &&& {T}") {
-		const char* sample = "({T} &&& {T});";
+		const char* sample = "{T} &&& {T};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -59,7 +59,7 @@ TEST_SUITE("simple tau formulas: no variables") {
 	}
 
 	TEST_CASE("{F} &&& {F}") {
-		const char* sample = "({F} &&& {F});";
+		const char* sample = "{F} &&& {F};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -68,7 +68,7 @@ TEST_SUITE("simple tau formulas: no variables") {
 	}
 
 	TEST_CASE("{T} &&& {F}") {
-		const char* sample = "({T} &&& {F});";
+		const char* sample = "{T} &&& {F};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -77,7 +77,7 @@ TEST_SUITE("simple tau formulas: no variables") {
 	}
 
 	TEST_CASE("{F} &&& {T}") {
-		const char* sample = "({F} &&& {T});";
+		const char* sample = "{F} &&& {T};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -86,7 +86,7 @@ TEST_SUITE("simple tau formulas: no variables") {
 	}
 
 	TEST_CASE("{T} ||| {T}") {
-		const char* sample = "({T} ||| {T});";
+		const char* sample = "{T} ||| {T};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -95,7 +95,7 @@ TEST_SUITE("simple tau formulas: no variables") {
 	}
 
 	TEST_CASE("{F} ||| {F}") {
-		const char* sample = "({F} ||| {F});";
+		const char* sample = "{F} ||| {F};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test> fb(bf);
@@ -104,7 +104,7 @@ TEST_SUITE("simple tau formulas: no variables") {
 	}
 
 	TEST_CASE("{T} ||| {F}") {
-		const char* sample = "({T} ||| {F});";
+		const char* sample = "{T} ||| {F};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test> fb(bf);
@@ -113,7 +113,7 @@ TEST_SUITE("simple tau formulas: no variables") {
 	}
 
 	TEST_CASE("{F} ||| {T}") {
-		const char* sample = "({F} ||| {T});";
+		const char* sample = "{F} ||| {T};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>,  bdd_test> fb(bf);
