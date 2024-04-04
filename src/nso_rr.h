@@ -31,6 +31,9 @@
 #include <ranges>
 #include <variant>
 
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+
 //#include "tree.h"
 #include "bool.h"
 #include "rewriting.h"
@@ -329,7 +332,7 @@ template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const tau_parser::nonterminal nt) {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
 	std::vector<sp_tau_node<BAs...>> nv; nv.reserve(v.size());
-	for (const auto& n: v
+	for (const auto& n : v
 			| std::ranges::views::transform(get_nodes<BAs...>(nt))
 			| std::ranges::views::join)
 		nv.push_back(n);
@@ -353,7 +356,8 @@ using value_extractor_t = decltype(value_extractor<BAs...>);
 template <typename... BAs>
 std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const value_extractor_t<BAs...> e) {
 	std::vector<std::variant<BAs...>> nv;
-	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
+	for (const auto& n : v | std::ranges::views::transform(e))
+		if (n.has_value()) nv.push_back(n.value());
 	return nv;
 }
 
@@ -1061,11 +1065,11 @@ const std::string BLDR_WFF_F = "( $X ) ::= F.";
 const std::string BLDR_WFF_T = "( $X ) ::= T.";
 
 // definitions of wff builder rules
-const std::string BLDR_WFF_EQ = "( $X ) ::= ($X = 0).";
-const std::string BLDR_WFF_NEQ = "( $X ) ::= ($X != 0).";
-const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) ::= ($X !<= $Y).";
-const std::string BLDR_WFF_AND = "( $X $Y ) ::= ($X && $Y).";
-const std::string BLDR_WFF_OR = "( $X $Y ) ::= ($X || $Y).";
+const std::string BLDR_WFF_EQ = "( $X ) ::= $X = 0.";
+const std::string BLDR_WFF_NEQ = "( $X ) ::= $X != 0.";
+const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) ::= $X !<= $Y.";
+const std::string BLDR_WFF_AND = "( $X $Y ) ::= $X && $Y.";
+const std::string BLDR_WFF_OR = "( $X $Y ) ::= $X || $Y.";
 const std::string BLDR_WFF_NEG = "( $X ) ::= ! $X.";
 const std::string BLDR_WFF_ALL = "( $X $Y ) ::= all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) ::= ex $X $Y.";
@@ -1073,8 +1077,8 @@ const std::string BLDR_WFF_BALL = "( $X $Y ) ::= ball $X $Y.";
 const std::string BLDR_WFF_BEX = "( $X $Y ) ::= bex $X $Y.";
 
 // definitions of bf builder rules
-const std::string BLDR_BF_AND = "( $X $Y ) := ($X & $Y).";
-const std::string BLDR_BF_OR = "( $X $Y ) := ($X | $Y).";
+const std::string BLDR_BF_AND = "( $X $Y ) := $X & $Y.";
+const std::string BLDR_BF_OR = "( $X $Y ) := $X | $Y.";
 const std::string BLDR_BF_NEG = "( $X ) := $X'.";
 const std::string BLDR_BF_SPLITTER = "( $X ) := S($X).";
 const std::string BLDR_BF_ALL = "( $X $Y ) := fall $X $Y.";
@@ -1082,8 +1086,8 @@ const std::string BLDR_BF_EX = "( $X $Y ) := fex $X $Y.";
 const std::string BLDR_BF_CONSTANT = "( $X ) := { $X }.";
 
 // definitions of tau builder rules
-const std::string BLDR_TAU_AND = "( $X $Y ) :::= ($X &&& $Y).";
-const std::string BLDR_TAU_OR = "( $X $Y ) :::= ($X ||| $Y).";
+const std::string BLDR_TAU_AND = "( $X $Y ) :::= $X &&& $Y.";
+const std::string BLDR_TAU_OR = "( $X $Y ) :::= $X ||| $Y.";
 const std::string BLDR_TAU_NEG = "( $X ) :::= !!! $X.";
 
 // basic bf and wff builders
@@ -1696,7 +1700,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs, const sp_tau_node
 // << for rules
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::rules<idni::tau::nso<BAs...>>& rs) {
-	for (const auto& r : rs) stream << r << "\n";
+	for (const auto& r : rs) stream << r;
 	return stream;
 }
 
@@ -1728,7 +1732,7 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>&
 // << for formulas
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::rr<idni::tau::nso<BAs...>>& f) {
-	return stream << f.rec_relations << f.main << "\n";
+	return stream << f.rec_relations << f.main << '.';
 }
 
 // << for bindings

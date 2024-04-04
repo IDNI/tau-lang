@@ -72,7 +72,9 @@ sp_tau_source_node clean_tau_source(const sp_tau_source_node& tau_source) {
 }
 
 // make a tau source from the given source code string.
-sp_tau_source_node make_tau_source(const std::string& source, idni::parser<>::parse_options options) {
+sp_tau_source_node make_tau_source(const std::string& source,
+	tau_parser::parse_options options)
+{
 	using parse_symbol = tau_parser::node_type;
 	return make_node_from_string<
 		tau_parser,
