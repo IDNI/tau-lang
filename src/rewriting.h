@@ -25,6 +25,8 @@
 #include <optional>
 #include <variant>
 #include <compare>
+#include <concepts>
+#include <tuple>
 #include <boost/log/trivial.hpp>
 
 #include "forest.h"
@@ -61,6 +63,10 @@ struct node {
 			that.child.begin(), that.child.end());
 	}
 
+	std::shared_ptr<node> operator[](size_t i) {
+		return child[i];
+	}
+
 	// the value of the node and pointers to the children, we follow the same
 	// notation as in forest<...>::tree to be able to reuse the code with
 	// forest<...>::tree.
@@ -82,6 +88,16 @@ sp_node<symbol_t> make_node(const symbol_t& s, const std::vector<sp_node<symbol_
 	}
 	return cache.emplace(key, std::make_shared<node<symbol_t>>(s, ns)).first->second;
 }
+
+/*template<typename symbol_t, typename...TPs>
+sp_node<symbol_t> operator|(const sp_node<symbol_t>& n, std::tuple<TPs...> transformers) {
+	auto result = n;
+	std::apply([&result](auto&&...transformer) {
+		((result = transformer(result)), ...);
+	}, transformers);
+	return result;
+}*/
+
 
 // simple function objects to be used as default values for the traversers.
 template <typename node_t>
