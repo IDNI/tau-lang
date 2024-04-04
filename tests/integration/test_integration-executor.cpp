@@ -13,8 +13,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "../../src/doctest.h"
-#include "../../src/executor.h"
+#include "doctest.h"
+#include "executor.h"
 
 TEST_SUITE("executor") {
 

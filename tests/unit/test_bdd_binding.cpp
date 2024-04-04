@@ -13,7 +13,7 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "../../src/doctest.h"
+#include "doctest.h"
 
 #include "../src/bdd_binding.h"
 
