@@ -418,7 +418,7 @@ size_t get_opt(sp_tau_node<BAs...> n) {
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n) {
-/*	using namespace boost::log;
+	using namespace boost::log;
 	auto option = n | tau_parser::option;
 	auto v  = n | tau_parser::option_value;
 	auto vt = v | only_child_extractor<tau_ba<BAs...>, BAs...>
@@ -431,11 +431,11 @@ void repl_evaluator<factory_t, BAs...>::set_cmd(sp_tau_node<tau_ba<BAs...>, BAs.
 		return val;
 	};
 	static std::map<size_t,	std::function<void()>> setters = {
-	{ tau_parser::status_opt,   [&r, &get_bool_value]() {
-		get_bool_value(opt.status); } },
-	{ tau_parser::colors_opt,   [&r, &get_bool_value]() {
-		details::TC.set(get_bool_value(opt.colors)); } },
-	{ tau_parser::severity_opt, [&r, &v, &vt]() {
+	{ tau_parser::status_opt,   [&]() {
+		get_bool_value(this->opt.status); } },
+	{ tau_parser::colors_opt,   [&]() {
+		details::TC.set(get_bool_value(this->opt.colors)); } },
+	{ tau_parser::severity_opt, [&]() {
 		auto sev = v | tau_parser::severity;
 		if (!sev.has_value()) {
 			cout << "error: invalid severity value\n"; return; }
@@ -444,10 +444,10 @@ void repl_evaluator<factory_t, BAs...>::set_cmd(sp_tau_node<tau_ba<BAs...>, BAs.
 			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 			| optional_value_extractor<size_t>;
 		switch (sev_type) {
-		case tau_parser::error_sym: opt.severity = trivial::error; break;
-		case tau_parser::debug_sym: opt.severity = trivial::debug; break;
-		case tau_parser::trace_sym: opt.severity = trivial::trace; break;
-		case tau_parser::info_sym: opt.severity = trivial::info; break;
+		case tau_parser::error_sym: this->opt.severity = trivial::error; break;
+		case tau_parser::debug_sym: this->opt.severity = trivial::debug; break;
+		case tau_parser::trace_sym: this->opt.severity = trivial::trace; break;
+		case tau_parser::info_sym: 	this->opt.severity = trivial::info; break;
 		default: cout << "error: invalid severity value\n"; return;
 		}
 		boost::log::core::get()->set_filter(
@@ -455,7 +455,7 @@ void repl_evaluator<factory_t, BAs...>::set_cmd(sp_tau_node<tau_ba<BAs...>, BAs.
 		}
 	}};
 	setters[get_opt(option.value())]();
-	get_cmd(n, r);*/
+	get_cmd(n);
 }
 
 template <typename factory_t, typename... BAs>
