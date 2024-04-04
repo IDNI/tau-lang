@@ -58,5 +58,5 @@ bw-output
 # private directory for a local stuff
 .local
 
-# tau cli history file
-.tau_history
+# cli history files
+.*_history
