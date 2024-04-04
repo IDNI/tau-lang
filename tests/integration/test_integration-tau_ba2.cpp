@@ -28,8 +28,8 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-static auto T = get_tau_ba("( { : ({ : F.} = 0). } = 0 ).");
-static auto F = get_tau_ba("( { : ({ : T.} = 0). } = 0 ).");
+static auto T = get_tau_ba("{ : { : F.} = 0. } = 0.");
+static auto F = get_tau_ba("{ : { : T.} = 0. } = 0.");
 
 TEST_SUITE("tau_ba operators: negation") {
 

@@ -58,7 +58,7 @@ TEST_SUITE("get_gssotc_literals") {
 	}
 
 	TEST_CASE("two literals y1") {
-		const char* sample = "({ T } &&& !!! { T });";
+		const char* sample = "{ T } &&& !!! { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -69,7 +69,7 @@ TEST_SUITE("get_gssotc_literals") {
 	}
 
 	TEST_CASE("two literals y2") {
-		const char* sample = "(!!! { T } &&& !!! { T });";
+		const char* sample = "!!! { T } &&& !!! { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -105,7 +105,7 @@ TEST_SUITE("get_gssotc_positive_negative_literals") {
 	}
 
 	TEST_CASE("two literals: true") {
-		const char* sample = "({ T } &&& !!! { T });";
+		const char* sample = "{ T } &&& !!! { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -116,7 +116,7 @@ TEST_SUITE("get_gssotc_positive_negative_literals") {
 	}
 
 	TEST_CASE("two literals: false") {
-		const char* sample = "(!!! { T } &&& !!! { T });";
+		const char* sample = "!!! { T } &&& !!! { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -141,7 +141,7 @@ TEST_SUITE("get_gssotc_clauses") {
 	}
 
 	TEST_CASE("two clauses y1") {
-		const char* sample = "({ T } ||| !!! { T });";
+		const char* sample = "{ T } ||| !!! { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -152,7 +152,7 @@ TEST_SUITE("get_gssotc_clauses") {
 	}
 
 	TEST_CASE("two clauses y2") {
-		const char* sample = "({ T } ||| (!!! { T } &&& { T}));";
+		const char* sample = "{ T } ||| !!! { T } &&& { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -163,7 +163,7 @@ TEST_SUITE("get_gssotc_clauses") {
 	}
 
 	TEST_CASE("three clauses") {
-		const char* sample = "({ T } ||| (!!! { T } ||| { T}));";
+		const char* sample = "{ T } ||| !!! { T } ||| { T};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -188,7 +188,7 @@ TEST_SUITE("get_gssotc_io_vars") {
 	}
 
 	TEST_CASE("one input") {
-		const char* sample = "{ (i_keyboard[t] = 0) };";
+		const char* sample = "{ i_keyboard[t] = 0 };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -199,7 +199,7 @@ TEST_SUITE("get_gssotc_io_vars") {
 	}
 
 	TEST_CASE("one output") {
-		const char* sample = "{ (o_console[t] = 0) };";
+		const char* sample = "{ o_console[t] = 0 };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -210,7 +210,7 @@ TEST_SUITE("get_gssotc_io_vars") {
 	}
 
 	TEST_CASE("one input and one output") {
-		const char* sample = "{ (i_keyboard[t] = o_console[t])  };";
+		const char* sample = "{ i_keyboard[t] = o_console[t] };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -224,7 +224,7 @@ TEST_SUITE("get_gssotc_io_vars") {
 TEST_SUITE("tau_spec_vars") {
 
 	TEST_CASE("num") {
-		const char* sample = "{ (i_keyboard[0] = 0)  };";
+		const char* sample = "{ i_keyboard[0] = 0 };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -246,7 +246,7 @@ TEST_SUITE("tau_spec_vars") {
 	}
 
 	TEST_CASE("variable") {
-		const char* sample = "{ (i_keyboard[t] = 0)  };";
+		const char* sample = "{ i_keyboard[t] = 0 };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -257,7 +257,7 @@ TEST_SUITE("tau_spec_vars") {
 	}
 
 	TEST_CASE("shift capture") {
-		const char* sample = "{ (i_keyboard[$t - 1] = 0)  };";
+		const char* sample = "{ i_keyboard[$t - 1] = 0 };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);
@@ -268,7 +268,7 @@ TEST_SUITE("tau_spec_vars") {
 	}
 
 	TEST_CASE("shift variable") {
-		const char* sample = "{ (i_keyboard[t - 1] = 0)  };";
+		const char* sample = "{ i_keyboard[t - 1] = 0 };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		factory_binder<bdd_test_factory, tau_ba<bdd_test>, bdd_test> fb(bf);

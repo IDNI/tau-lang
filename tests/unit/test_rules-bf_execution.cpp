@@ -252,7 +252,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_AND") {
-		const char* sample = "( ({l} & { r } ) = 0 ).";
+		const char* sample = " { l } & { r } = 0 .";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -270,7 +270,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_OR") {
-		const char* sample = "( ({l} | { r } ) = 0 ).";
+		const char* sample = " { l } | { r } = 0 .";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -288,7 +288,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_XOR") {
-		const char* sample = "( ({l} + { r } ) = 0 ).";
+		const char* sample = " { l } + { r } = 0 .";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
@@ -306,7 +306,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_NEG") {
-		const char* sample = "( { l }' = 0 ).";
+		const char* sample = " { l }' = 0 .";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -324,7 +324,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_EQ") {
-		const char* sample = "( { l } = 0 ).";
+		const char* sample = " { l } = 0 .";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -341,7 +341,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_NEQ") {
-		const char* sample = "( { l } != 0 ).";
+		const char* sample = " { l } != 0 .";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -358,7 +358,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ONE") {
-		const char* sample = "( { l } = 0 ).";
+		const char* sample = " { l } = 0 .";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
@@ -376,7 +376,7 @@ TEST_SUITE("executing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ZERO") {
-		const char* sample = "( { l } = 0 ).";
+		const char* sample = " { l } = 0 .";
 		auto sample_src = make_tau_source(sample);
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(false) };
