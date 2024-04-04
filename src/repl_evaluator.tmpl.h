@@ -185,7 +185,7 @@ repl_evaluator<factory_t, BAs...>::output_ref repl_evaluator<factory_t, BAs...>:
 	auto idx = digits(out_id);
 	auto is_relative = (out_type == tau_parser::relative_output);
 	auto pos = is_relative ? m.size() - idx - 1 : idx;
-	if (pos >= m.size()) {
+	if ((pos >= m.size()) && silent ) {
 		if (pos >= m.size()) cout << "output " << TC_OUTPUT << (is_relative ? "%" : "&")
 			<< idx << TC.CLEAR() << " does not exist\n";
 		return {};
@@ -378,6 +378,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::no
 		std::cout << "normalized: " << result << "\n";
 		return result;
 	}
+	return n;
 }
 
 // make a nso_rr from the given tau source and binder.
