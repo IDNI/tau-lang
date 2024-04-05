@@ -67,18 +67,21 @@ namespace idni::tau {
 
 template <typename factory_t, typename... BAs>
 struct repl_evaluator {
+	friend struct repl<repl_evaluator<factory_t, BAs...>>;
 	// TODO (MEDIUM) remove variant as only nso are needed
 	using output = std::variant<
 		nso<tau_ba<BAs...>, BAs...>,
 		rr<nso<tau_ba<BAs...>, BAs...>>>;
 	using outputs = std::vector<output>;
 
-	using output_ref = std::optional<std::pair<sp_tau_node<tau_ba<BAs...>, BAs...>, size_t>>;
+	using output_ref = std::optional<std::pair<
+				sp_tau_node<tau_ba<BAs...>, BAs...>, size_t>>;
 
 	struct options {
 		options() {};
-		bool status  = true;
-		bool colors  = true;
+		bool status     = true;
+		bool colors     = true;
+		bool debug_repl = false;
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::error;
 	};
@@ -89,37 +92,55 @@ struct repl_evaluator {
 
 private:
 
-	repl_evaluator<factory_t, BAs...>::output_ref get_output_ref(const nso<tau_ba<BAs...>, BAs...>& n, bool silent = false);
+	repl_evaluator<factory_t, BAs...>::output_ref get_output_ref(
+		const nso<tau_ba<BAs...>, BAs...>& n, bool silent = false);
 	void print_output(size_t id);
 
-	void list_outputs();
-	void clear_outputs();
+	void list_outputs_cmd();
+	void clear_outputs_cmd();
 	void store_output(repl_evaluator<factory_t, BAs...>::output o);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> get_wff(const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> get_wff(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_onf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_dnf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_cnf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_nnf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_mnf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_onf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_dnf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_cnf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_nnf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_mnf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_dnf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_cnf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_nnf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_mnf_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_dnf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_cnf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_nnf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_mnf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_substitute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_substitute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_instantiate_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_instantiate_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_substitute_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_substitute_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_instantiate_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_instantiate_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	int eval_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
-	void print_output_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
+	void print_output_cmd(
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
 	void get_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
 	void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
 	void toggle_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
@@ -128,13 +149,14 @@ private:
 	size_t digits(sp_tau_node<tau_ba<BAs...>, BAs...> n);
 
 
-	void version();
-	void help(size_t nt = 0);
+	void version_cmd();
+	void help_cmd(size_t nt = tau_parser::help_cmd_sym);
 	void not_implemented_yet();
 
 	outputs m;
 	factory_t factory;
 	options opt;
+	repl<repl_evaluator<factory_t, BAs...>>* r = 0;
 };
 
 } //idni::tau namespace

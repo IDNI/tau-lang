@@ -363,11 +363,11 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 # depending on the use case of the grammar.
 cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
 
-cli_command            => help | version | quit.
-cli_command            => get | set | toggle.
-cli_command            => list_outputs | clear_outputs | print_output.
+cli_command            => help_cmd | version_cmd | quit_cmd.
+cli_command            => get_cmd | set_cmd | toggle_cmd.
+cli_command            => list_outputs_cmd | clear_outputs_cmd | print_output_cmd.
 cli_command            => file.
-cli_command            => normalize
+cli_command            => normalize_cmd
                         | wff_onf_cmd | wff_dnf_cmd | wff_cnf_cmd
                         | wff_anf_cmd | wff_nnf_cmd | wff_pnf_cmd | wff_mnf_cmd
                         | bf_dnf_cmd | bf_cnf_cmd | bf_anf_cmd
@@ -378,16 +378,6 @@ cli_command            => bf.
 cli_command            => wff.
 cli_command            => rr_nso.
 
-normalize              => normalize_sym __ form_arg.
-onf                    => onf_sym __ var_arg form_arg.
-dnf                    => dnf_sym __ form_arg.
-cnf                    => cnf_sym __ form_arg.
-anf                    => anf_sym __ form_arg.
-nnf                    => nnf_sym __ form_arg.
-pnf                    => pnf_sym __ form_arg.
-minterm                => minterm_sym __ form_arg.
-
-# (HIGH) remove null once implemeted
 file                   => file_sym quote file_path quote.
 
 normalize_cmd           => normalize_cmd_sym __ (nso_rr | wff | output | wff_selection).
@@ -495,10 +485,11 @@ toggle_cmd_sym         => "toggle".
 
 # options and their names
 option                 => bool_option | severity_opt. # | string_option | integer_option.
-bool_option            => status_opt | colors_opt.
+bool_option            => status_opt | colors_opt | debug_repl_opt.
 status_opt             => "s" | "status".
 colors_opt             => "c" | "color" | "colors".
 severity_opt           => "sev" | "severity".
+debug_repl_opt         => "d" | "dr" | "dbg" | "debug" | "debug-repl".
 
 # option values
 option_value           => option_value_true | option_value_false | severity.
