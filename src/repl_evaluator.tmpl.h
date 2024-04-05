@@ -310,8 +310,6 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto nso_rr = n | tau_parser::nso_rr; nso_rr) {
-		print_sp_tau_node_tree<tau_ba<BAs...>, BAs...>(std::cout
-			<< "nso_rr: ", nso_rr.value()) << std::endl;
 		auto n_nso_rr = make_nso_rr_using_factory<
 			factory_t, tau_ba<BAs...>, BAs...>(
 				nso_rr.value(), factory);
@@ -443,8 +441,10 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 		| optional_value_extractor<size_t>;
 	if (opt.debug_repl) {
 		std::cout << "command: " << command.value() << "\n";
+#ifdef DEBUG
 		print_sp_tau_node_tree<tau_ba<BAs...>, BAs...>(cout
 			<< "command parsed tree: ", command.value()) << "\n";
+#endif
 	}
 
 	std::optional<sp_tau_node<tau_ba<BAs...>, BAs...>> result;
