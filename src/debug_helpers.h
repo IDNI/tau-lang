@@ -42,7 +42,7 @@ std::ostream& print_sp_tau_source_node_tree(std::ostream &os, sp_node<node_t> n,
 }
 
 // print the tree of tau nodes for general debugging
-template<typename...BAs>
+template <typename... BAs>
 std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
 	size_t l = 0, bool ws = false)
 {
