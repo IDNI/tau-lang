@@ -272,12 +272,20 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& n, const
 }
 
 template <typename... BAs>
-std::optional<sp_tau_node<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& n, const size_t nt) {
-	#ifdef DEBUG
+std::optional<sp_tau_node<BAs...>> operator|(
+	const std::optional<sp_tau_node<BAs...>>& n, const size_t nt)
+{
+#ifdef DEBUG
+	static auto last_nt = nt;
+	auto x = n ? n.value() | nt : n;
 	if (!n.has_value()) BOOST_LOG_TRIVIAL(warning)
-		<< "value-less optional | tau_parser::"
+		<< "value-less optional tau_parser::"
+		<< parser_instance<tau_parser>().name(last_nt)
+		<< " | tau_parser::"
 		<< parser_instance<tau_parser>().name(nt);
-	#endif // DEBUG
+	last_nt = nt;
+	return x;
+#endif // DEBUG
 	return n ? n.value() | nt : n;
 }
 
