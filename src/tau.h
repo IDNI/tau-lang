@@ -275,9 +275,9 @@ template<typename... BAs>
 rec_relation<gssotc<BAs...>> make_gssotc_rec_relation(gssotc<BAs...>& rule) {
 	auto type = only_child_extractor<tau_ba<BAs...>, BAs...>(rule) | non_terminal_extractor<tau_ba<BAs...>, BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::bf_rec_relation, tau_parser::bf, rule);
-	case tau_parser::wff_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::wff_rec_relation, tau_parser::wff, rule);
-	case tau_parser::tau_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::tau_rec_relation, tau_parser::tau, rule);
+	case tau_parser::bf_rec_relation:  return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::bf_rec_relation,  tau_parser::bf_ref,  tau_parser::bf,  rule);
+	case tau_parser::wff_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::wff_rec_relation, tau_parser::wff_ref, tau_parser::wff, rule);
+	case tau_parser::tau_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::tau_rec_relation, tau_parser::tau_ref, tau_parser::tau, rule);
 	default: assert(false); return {};
 	};
 }

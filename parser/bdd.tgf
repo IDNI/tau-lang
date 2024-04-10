@@ -11,7 +11,9 @@
 # Contact ohad@idni.org for requesting a permission. This license may be
 # modified over time by the Author.
 
-@use_char_class space, alpha, alnum.
+@use char class space, alpha, alnum.
+@inline char classes.
+@trim _, __.
 
 start                   => _ bdd _.
 
@@ -23,7 +25,7 @@ bdd                     => disjunction  | bdd2.
 bdd2                    => conjunction  | bdd3.
 bdd3                    => exclusive_or | bdd4.
 bdd4                    => negation     | bdd5.
-bdd5                    => literal      | '(' _ bdd _ ')'.
+bdd5                    => lit          | '(' _ bdd _ ')'.
 
 disjunction             => bdd  _ '|' _         bdd2.
 conjunction             => bdd2 _ '&' _         bdd3.
@@ -32,7 +34,7 @@ exclusive_or            => bdd3 _ ('^' | '+') _ bdd4.
 negation                => bdd4 _ "'".
 
 # literals
-literal                 => var | T | F.
+lit                     => var | T | F.
 
 var                     => alpha (alnum)*.
 T                       => '1'.

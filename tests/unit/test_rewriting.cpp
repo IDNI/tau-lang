@@ -14,7 +14,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "rewriting.h"
+#include "parser.h"
 
 using namespace idni::rewriter;
 using namespace std;
