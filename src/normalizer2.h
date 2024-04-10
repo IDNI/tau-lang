@@ -18,7 +18,7 @@
 #include <optional>
 #include <boost/log/trivial.hpp>
 
-#include "rewriting.h"
+#include "parser.h"
 #include "nso_rr.h"
 
 #ifdef DEBUG

@@ -11,7 +11,7 @@
 # Contact ohad@idni.org for requesting a permission. This license may be
 # modified over time by the Author.
 
-@use_char_class eof, space, digit, xdigit, alpha, alnum, punct, printable.
+@use char class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
 #
 # as a rule of thumb, to ease navigation of the corresponding tree, the
@@ -122,8 +122,7 @@ out_var_name           => "o_" chars.
 tau_rule               => tau_matcher _ tau_def _ tau_body _ dot.
 tau_matcher            => tau.
 tau_body               => tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
-tau_rec_relation       => (tau & ~tau_and & ~tau_neg & ~tau_or & ~tau_wff & ~capture)
-                          _ tau_def _ tau _ dot.
+tau_rec_relation       => tau_ref _ tau_def _ tau _ dot.
 tau_ref                => sym _ [offsets] _ tau_ref_args.
 # TODO (MEDIUM) properly deal with _ and __ to separate the arguments
 tau_ref_args           => open_parenthesis (_ tau_ref_arg)* _ close_parenthesis.
@@ -154,12 +153,7 @@ wff_body               => wff_has_clashing_subformulas_cb
                         | wff_has_subformula_cb | wff_remove_existential_cb
                         | wff_remove_bexistential_cb | wff_remove_buniversal_cb.
 wff_body               => wff.
-wff_rec_relation       => (wff & ~wff_and & ~wff_neg & ~wff_xor & ~wff_conditional &
-                          ~wff_or & ~wff_all & ~wff_ex & ~wff_imply & ~wff_equiv &
-                          ~wff_t & ~wff_f & ~capture & ~bool_variable & ~wff_ball &
-                          ~wff_bex & ~bf_eq & ~ bf_neq & ~bf_less & ~bf_less_equal &
-                          ~bf_greater & ~bf_interval & ~bf_not_less_equal)
-                          _ wff_def _ wff _ dot.
+wff_rec_relation       => wff_ref _ wff_def _ wff _ dot.
 
 wff                    => wff_ref.
 wff                    => wff_conditional.
@@ -232,15 +226,13 @@ bf                     => capture.
 bf                     => variable.
 bf                     => open_parenthesis _ bf _ close_parenthesis.
 
-bf_rec_relation        => (bf & ~bf_and & ~bf_neg & ~bf_xor & ~bf_or & ~bf_all & ~bf_ex &
-                          ~bf_t & ~bf_f & ~capture & ~bf_constant & ~bf_eq & ~bf_neq & ~variable & ~bf_splitter)
-                          _ bf_def _ bf _ dot.
+bf_rec_relation        => bf_ref _ bf_def _ bf _ dot.
 bf_ref                 => sym [offsets] bf_ref_args.
 # TODO (MEDIUM) properly deal with _ and __ to separate the arguments
 bf_ref_args            => open_parenthesis (_ bf_ref_arg)* _ close_parenthesis.
 bf_ref_arg             => bf.
 bf_ref_arg             => capture | variable.
-bf_and                 => bf _ bf_and_sym _ bf.
+bf_and                 => bf _ [ bf_and_sym _ ] bf.
 bf_or                  => bf _ bf_or_sym  _ bf.
 bf_xor                 => bf _ bf_xor_sym _ bf.
 bf_neg                 => bf _ bf_neg_sym.
@@ -380,7 +372,10 @@ cli_command            => rr_nso.
 
 file                   => file_sym quote file_path quote.
 
-normalize_cmd           => normalize_cmd_sym __ (nso_rr | wff | output | wff_selection).
+normalize_cmd           => normalize_cmd_sym __ normalize_cmd_arg.
+normalize_cmd_arg       => wff.
+normalize_cmd_arg       => nso_rr.
+normalize_cmd_arg       => output | wff_selection.
 bf_instantiate_cmd      => instantiate_cmd_sym __
                           # variable to be instantiated
                           variable __

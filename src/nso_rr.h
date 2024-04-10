@@ -36,9 +36,9 @@
 
 //#include "tree.h"
 #include "bool.h"
-#include "rewriting.h"
 #include "parser.h"
 #include "../parser/tau_parser.generated.h"
+#include "rewriting.h"
 #ifdef DEBUG
 #	include "parser_instance.h"
 #endif
@@ -828,7 +828,7 @@ template<typename... BAs>
 rule<nso<BAs...>> make_rule(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rule: return make_rule<BAs...>(tau_parser::bf_rule, tau_parser::bf_matcher, tau_parser::bf_body, rule);
+	case tau_parser::bf_rule:  return make_rule<BAs...>(tau_parser::bf_rule,  tau_parser::bf_matcher,  tau_parser::bf_body,  rule);
 	case tau_parser::wff_rule: return make_rule<BAs...>(tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, rule);
 	case tau_parser::tau_rule: return make_rule<BAs...>(tau_parser::tau_rule, tau_parser::tau_matcher, tau_parser::tau_body, rule);
 	default: assert(false); return {};
@@ -838,9 +838,16 @@ rule<nso<BAs...>> make_rule(sp_tau_node<BAs...>& rule) {
 // creates a specific rule from a generic rule.
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rec_relation<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t, tau_parser::nonterminal type_t, sp_tau_node<BAs...>& rule) {
-	auto elements = rule | rule_t || type_t;
-	return { elements[0], elements[1] };
+rec_relation<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t,
+	tau_parser::nonterminal ref_type_t, tau_parser::nonterminal type_t,
+	sp_tau_node<BAs...>& rule)
+{
+	return {
+		make_node<tau_sym<BAs...>>(
+			parser_instance<tau_parser>().literal(type_t),
+			{ (rule | rule_t | ref_type_t).value() }),
+		(rule | rule_t | type_t).value()
+	};
 }
 
 // creates a specific rule from a generic rule.
@@ -848,8 +855,8 @@ template<typename... BAs>
 rec_relation<nso<BAs...>> make_rec_relation(sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rec_relation: return make_rec_relation<BAs...>(tau_parser::bf_rec_relation, tau_parser::bf, rule);
-	case tau_parser::wff_rec_relation: return make_rec_relation<BAs...>(tau_parser::wff_rec_relation, tau_parser::wff, rule);
+	case tau_parser::bf_rec_relation:  return make_rec_relation<BAs...>(tau_parser::bf_rec_relation,  tau_parser::bf_ref,  tau_parser::bf,  rule);
+	case tau_parser::wff_rec_relation: return make_rec_relation<BAs...>(tau_parser::wff_rec_relation, tau_parser::wff_ref, tau_parser::wff, rule);
 	default: assert(false); return {};
 	};
 }
