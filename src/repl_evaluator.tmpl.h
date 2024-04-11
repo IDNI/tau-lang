@@ -304,22 +304,23 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::normalizer_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	if (auto wff = n | tau_parser::wff; wff) {
+	auto arg = n | tau_parser::normalize_cmd_arg;
+	if (auto wff = arg | tau_parser::wff; wff) {
 		// TODOD (HIGH) binding
 		auto result = normalizer<tau_ba<BAs...>, BAs...>(wff.value());
 		std::cout << "normalized: " << result << "\n";
 		return result;
-	} else if (auto nso_rr = n | tau_parser::nso_rr; nso_rr) {
+	} else if (auto nso_rr = arg | tau_parser::nso_rr; nso_rr) {
 		auto n_nso_rr = make_nso_rr_using_factory<
 			factory_t, tau_ba<BAs...>, BAs...>(
-				nso_rr.value(), factory);
-		auto result= normalizer<tau_ba<BAs...>, BAs...>(nso_rr.value());
+				arg.value(), factory);
+		auto result= normalizer<tau_ba<BAs...>, BAs...>(n_nso_rr);
 		std::cout << "normalized: " << result << "\n";
 		return result;
-	} else if (auto output = n | tau_parser::output; output) {
+	} else if (auto output = arg | tau_parser::output; output) {
 		// TODOD (HIGH) binding
 		auto [value, _] = get_output_ref(output.value()).value();
-		auto result = normalizer<tau_ba<BAs...>, BAs...>(wff.value());
+		auto result = normalizer<tau_ba<BAs...>, BAs...>(value);
 		std::cout << "normalized: " << result << "\n";
 		return result;
 	}
@@ -332,7 +333,16 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 	repl_evaluator<factory_t, BAs...>::make_cli(
 		const std::string& src)
 {
-	auto cli_src = make_tau_source(src, { .start = tau_parser::cli });
+	std::string filt = src;
+	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
+		return c == 22;
+	}), filt.end());
+	std::cout << "src: `" << filt << "`\n";
+	auto cli_src = make_tau_source(filt, {
+		.start = tau_parser::cli,
+		//.debug = opt.debug_repl
+	});
+	if (!cli_src) return 0;
 	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
 	tau_factory<factory_t, BAs...> tf(factory);
 	return bind_tau_code_using_factory<tau_factory<factory_t, BAs...>,
@@ -345,12 +355,14 @@ void repl_evaluator<factory_t, BAs...>::get_cmd(
 {
 	static std::string pbool[] = { "off", "on" };
 	static std::map<size_t,	std::function<void()>> printers = {
+#ifdef DEBUG
+	{ tau_parser::debug_repl_opt, [this]() {
+		cout << "debug-repl:  " << pbool[opt.debug_repl] << "\n"; } },
+#endif
 	{ tau_parser::status_opt,   [this]() {
 		cout << "status:      " << pbool[opt.status] << "\n"; } },
 	{ tau_parser::colors_opt,   [this]() {
 		cout << "colors:      " << pbool[opt.colors] << "\n"; } },
-	{ tau_parser::debug_repl_opt, [this]() {
-		cout << "debug-repl:  " << opt.debug_repl << "\n"; } },
 	{ tau_parser::severity_opt, [this]() {
 		cout << "severity:    " << opt.severity << "\n"; } }};
 	auto option = n | tau_parser::option;
@@ -385,10 +397,12 @@ void repl_evaluator<factory_t, BAs...>::set_cmd(
 		return val;
 	};
 	static std::map<size_t,	std::function<void()>> setters = {
-	{ tau_parser::status_opt,   [&]() {
-		get_bool_value(opt.status); } },
+#ifdef DEBUG
 	{ tau_parser::debug_repl_opt, [&]() {
 		get_bool_value(opt.debug_repl); } },
+#endif
+	{ tau_parser::status_opt,   [&]() {
+		get_bool_value(opt.status); } },
 	{ tau_parser::colors_opt,   [&]() {
 		details::TC.set(get_bool_value(opt.colors)); } },
 	{ tau_parser::severity_opt, [&]() {
@@ -423,10 +437,12 @@ void repl_evaluator<factory_t, BAs...>::toggle_cmd(
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 	switch (toggle_type) {
+#ifdef DEBUG
+	case tau_parser::debug_repl_opt: opt.debug_repl = !opt.debug_repl;break;
+#endif
 	case tau_parser::colors_opt:
 		details::TC.set(opt.colors = !opt.colors); break;
 	case tau_parser::status_opt: opt.status = !opt.status; break;
-	case tau_parser::debug_repl_opt: opt.debug_repl = !opt.debug_repl;break;
 	default: cout << ": unknown bool option\n"; details::error = true;break;
 	}
 }
@@ -439,18 +455,24 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	auto command_type = command
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
+#ifdef DEBUG
 	if (opt.debug_repl) {
 		std::cout << "command: " << command.value() << "\n";
-#ifdef DEBUG
 		print_sp_tau_node_tree<tau_ba<BAs...>, BAs...>(cout
 			<< "command parsed tree: ", command.value()) << "\n";
-#endif
 	}
-
+#endif
 	std::optional<sp_tau_node<tau_ba<BAs...>, BAs...>> result;
 	using p = tau_parser;
 	switch (command_type) {
 	case p::quit_cmd: return cout << "Quit.\n", 1;
+	case p::clear_cmd: std::system(
+#ifdef _WIN32
+			"cls"
+#else
+			"clear"
+#endif
+		); break;
 	case p::help_cmd: {
 		// TODO (LOW) extract this fragment of code into a help_cmd function
 		auto optarg = command | tau_parser::cli_cmd_sym
@@ -485,10 +507,10 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::bf_nnf_cmd:         result = bf_nnf_cmd(command.value()); break;
 	case p::bf_pnf_cmd:         not_implemented_yet(); break;
 	case p::bf_mnf_cmd:         result = bf_mnf_cmd(command.value()); break;
-	default:
-		cout << "Unknown command\n";
-		details::error = true;
-		break;
+	case p::bf:                 result = command; break;
+	case p::wff:                result = command; break;
+	case p::nso_rr:	            result = command; break;
+	default: details::error = true, cout << "\nUnknown command\n"; break;
 	}
 
 	if (result) store_output(result.value());
@@ -524,12 +546,14 @@ std::string repl_evaluator<factory_t, BAs...>::prompt() {
 
 template <typename factory_t, typename... BAs>
 int repl_evaluator<factory_t, BAs...>::eval(const std::string& src) {
-	auto tau_spec = make_cli(src);
-	auto commands = tau_spec || tau_parser::cli_command;
-	int quit = 0;
 	details::error = false;
-	for (const auto& cmd : commands)
-		if (quit = eval_cmd(cmd); quit) break;
+	auto tau_spec = make_cli(src);
+	int quit = 0;
+	if (tau_spec) {
+		auto commands = tau_spec || tau_parser::cli_command;
+		for (const auto& cmd : commands)
+			if (quit = eval_cmd(cmd); quit) break;
+	}
 	return quit;
 }
 
@@ -541,6 +565,9 @@ void repl_evaluator<factory_t, BAs...>::version_cmd() {
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::help_cmd(size_t nt) {
 	static const std::string bool_options =
+#ifdef DEBUG
+		"  debug-repl             show REPL commands on/off\n"
+#endif
 		"  status                 show status        on/off\n"
 		"  colors                 use term colors    on/off\n";
 	static const std::string all_available_options = std::string{} +
