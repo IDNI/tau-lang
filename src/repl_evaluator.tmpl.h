@@ -337,7 +337,6 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
 		return c == 22;
 	}), filt.end());
-	std::cout << "src: `" << filt << "`\n";
 	auto cli_src = make_tau_source(filt, {
 		.start = tau_parser::cli,
 		//.debug = opt.debug_repl
