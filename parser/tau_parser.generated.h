@@ -209,8 +209,6 @@ private:
 		q(nt(10), (t(1)));
 		//       __E_comment_1(11)    => null.
 		q(nt(11), (nul));
-		//       __E_comment_1(11)    => __E_comment_0(10).
-		q(nt(11), (nt(10)));
 		//       __E_comment_1(11)    => __E_comment_0(10) __E_comment_1(11).
 		q(nt(11), (nt(10)+nt(11)));
 		//       __E_comment_2(12)    => '\n'.
@@ -333,8 +331,6 @@ private:
 		q(nt(66), (nt(6)));
 		//       __E_chars_6(67)      => null.
 		q(nt(67), (nul));
-		//       __E_chars_6(67)      => __E_chars_5(66).
-		q(nt(67), (nt(66)));
 		//       __E_chars_6(67)      => __E_chars_5(66) __E_chars_6(67).
 		q(nt(67), (nt(66)+nt(67)));
 		//       chars(65)            => alpha(5) __E_chars_6(67).
@@ -351,8 +347,6 @@ private:
 		q(nt(73), (nt(15)+nt(28)+nt(15)+nt(72)));
 		//       __E_offsets_9(74)    => null.
 		q(nt(74), (nul));
-		//       __E_offsets_9(74)    => __E_offsets_8(73).
-		q(nt(74), (nt(73)));
 		//       __E_offsets_9(74)    => __E_offsets_8(73) __E_offsets_9(74).
 		q(nt(74), (nt(73)+nt(74)));
 		//       offsets(71)          => open_bracket(20) _(15) offset(72) __E_offsets_9(74) _(15) close_bracket(21).
@@ -405,8 +399,6 @@ private:
 		q(nt(90), (nt(3)));
 		//       __E_charvar_15(91)   => null.
 		q(nt(91), (nul));
-		//       __E_charvar_15(91)   => __E_charvar_14(90).
-		q(nt(91), (nt(90)));
 		//       __E_charvar_15(91)   => __E_charvar_14(90) __E_charvar_15(91).
 		q(nt(91), (nt(90)+nt(91)));
 		//       charvar(83)          => __E_charvar_13(89) __E_charvar_15(91).
@@ -443,8 +435,6 @@ private:
 		q(nt(104), (nt(15)+nt(105)));
 		//       __E_tau_ref_args_18(106) => null.
 		q(nt(106), (nul));
-		//       __E_tau_ref_args_18(106) => __E_tau_ref_args_17(104).
-		q(nt(106), (nt(104)));
 		//       __E_tau_ref_args_18(106) => __E_tau_ref_args_17(104) __E_tau_ref_args_18(106).
 		q(nt(106), (nt(104)+nt(106)));
 		//       tau_ref_args(103)    => open_parenthesis(18) __E_tau_ref_args_18(106) _(15) close_parenthesis(19).
@@ -557,8 +547,6 @@ private:
 		q(nt(145), (nt(15)+nt(146)));
 		//       __E_wff_ref_args_21(147) => null.
 		q(nt(147), (nul));
-		//       __E_wff_ref_args_21(147) => __E_wff_ref_args_20(145).
-		q(nt(147), (nt(145)));
 		//       __E_wff_ref_args_21(147) => __E_wff_ref_args_20(145) __E_wff_ref_args_21(147).
 		q(nt(147), (nt(145)+nt(147)));
 		//       wff_ref_args(144)    => open_parenthesis(18) __E_wff_ref_args_21(147) _(15) close_parenthesis(19).
@@ -687,8 +675,6 @@ private:
 		q(nt(176), (nt(15)+nt(177)));
 		//       __E_bf_ref_args_28(178) => null.
 		q(nt(178), (nul));
-		//       __E_bf_ref_args_28(178) => __E_bf_ref_args_27(176).
-		q(nt(178), (nt(176)));
 		//       __E_bf_ref_args_28(178) => __E_bf_ref_args_27(176) __E_bf_ref_args_28(178).
 		q(nt(178), (nt(176)+nt(178)));
 		//       bf_ref_args(175)     => open_parenthesis(18) __E_bf_ref_args_28(178) _(15) close_parenthesis(19).
@@ -847,8 +833,6 @@ private:
 		q(nt(216), (nt(15)+nt(215)));
 		//       __E_inputs_37(217)   => null.
 		q(nt(217), (nul));
-		//       __E_inputs_37(217)   => __E_inputs_36(216).
-		q(nt(217), (nt(216)));
 		//       __E_inputs_37(217)   => __E_inputs_36(216) __E_inputs_37(217).
 		q(nt(217), (nt(216)+nt(217)));
 		//       inputs(214)          => _(15) less(27) _(15) input(215) __E_inputs_37(217) _(15) dot(17).
@@ -861,8 +845,6 @@ private:
 		q(nt(221), (nt(13)+nt(76)));
 		//       __E_builder_head_39(222) => null.
 		q(nt(222), (nul));
-		//       __E_builder_head_39(222) => __E_builder_head_38(221).
-		q(nt(222), (nt(221)));
 		//       __E_builder_head_39(222) => __E_builder_head_38(221) __E_builder_head_39(222).
 		q(nt(222), (nt(221)+nt(222)));
 		//       builder_head(219)    => open_parenthesis(18) _(15) capture(76) __E_builder_head_39(222) _(15) close_parenthesis(19).
@@ -885,8 +867,6 @@ private:
 		q(nt(228), (nt(15)+nt(229)));
 		//       __E_rules_41(230)    => null.
 		q(nt(230), (nul));
-		//       __E_rules_41(230)    => __E_rules_40(228).
-		q(nt(230), (nt(228)));
 		//       __E_rules_41(230)    => __E_rules_40(228) __E_rules_41(230).
 		q(nt(230), (nt(228)+nt(230)));
 		//       rules(227)           => __E_rules_41(230).
@@ -903,8 +883,6 @@ private:
 		q(nt(234), (nt(15)+nt(235)));
 		//       __E_nso_rec_relations_43(236) => null.
 		q(nt(236), (nul));
-		//       __E_nso_rec_relations_43(236) => __E_nso_rec_relations_42(234).
-		q(nt(236), (nt(234)));
 		//       __E_nso_rec_relations_43(236) => __E_nso_rec_relations_42(234) __E_nso_rec_relations_43(236).
 		q(nt(236), (nt(234)+nt(236)));
 		//       nso_rec_relations(232) => __E_nso_rec_relations_43(236).
@@ -921,8 +899,6 @@ private:
 		q(nt(240), (nt(15)+nt(241)));
 		//       __E_gssotc_rec_relations_45(242) => null.
 		q(nt(242), (nul));
-		//       __E_gssotc_rec_relations_45(242) => __E_gssotc_rec_relations_44(240).
-		q(nt(242), (nt(240)));
 		//       __E_gssotc_rec_relations_45(242) => __E_gssotc_rec_relations_44(240) __E_gssotc_rec_relations_45(242).
 		q(nt(242), (nt(240)+nt(242)));
 		//       gssotc_rec_relations(238) => __E_gssotc_rec_relations_45(242).
@@ -951,8 +927,6 @@ private:
 		q(nt(247), (nt(15)+nt(17)+nt(15)+nt(246)));
 		//       __E_cli_48(248)      => null.
 		q(nt(248), (nul));
-		//       __E_cli_48(248)      => __E_cli_47(247).
-		q(nt(248), (nt(247)));
 		//       __E_cli_48(248)      => __E_cli_47(247) __E_cli_48(248).
 		q(nt(248), (nt(247)+nt(248)));
 		//       __E_cli_49(249)      => _(15) dot(17).
