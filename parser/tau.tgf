@@ -353,8 +353,7 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 
 # TODO do the same with the other starting points: library, inputs, builder, nso_rr, nso, gssotc, gssotc_rr...
 # depending on the use case of the grammar.
-cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
-
+cli                    => _ cli_command (_ dot _ cli_command)*.
 cli_command            => help_cmd | version_cmd | quit_cmd | clear_cmd.
 cli_command            => get_cmd | set_cmd | toggle_cmd.
 cli_command            => list_outputs_cmd | clear_outputs_cmd | print_output_cmd.
