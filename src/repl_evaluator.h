@@ -81,7 +81,12 @@ struct repl_evaluator {
 		options() {};
 		bool status     = true;
 		bool colors     = true;
-		bool debug_repl = false;
+		bool debug_repl =
+#ifdef DEBUG
+					true;
+#else
+					false;
+#endif
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::error;
 	};
