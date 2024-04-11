@@ -30,16 +30,7 @@
 #include <boost/log/expressions.hpp>
 #include <boost/log/utility/setup/console.hpp>
 
-
 namespace idni::tau {
-
-// internal namespace for globals scoped to this file
-// to access them within your local function/method scope, use:
-//     using namespace details;
-namespace details {
-	static idni::term::colors TC;
-	static bool error = false;
-}
 
 #define TC_STATUS        TC.BG_CYAN()
 #define TC_STATUS_OUTPUT TC(color::GREEN, color::BG_CYAN, color::BRIGHT)
@@ -65,9 +56,8 @@ size_t  repl_evaluator<factory_t, BAs...>::digits(
 template <typename factory_t, typename... BAs>
 repl_evaluator<factory_t, BAs...>::output_ref
 	repl_evaluator<factory_t, BAs...>::get_output_ref(
-		const nso<tau_ba<BAs...>, BAs...>& n, bool silent)
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& n, bool silent)
 {
-	using namespace details;
 	auto out_type = n
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
@@ -76,13 +66,13 @@ repl_evaluator<factory_t, BAs...>::output_ref
 		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
 	auto idx = digits(out_id);
 	auto is_relative = (out_type == tau_parser::relative_output);
-	auto pos = is_relative ? m.size() - idx - 1 : idx;
-	if ((pos >= m.size()) && silent ) {
-		if (pos >= m.size() && !silent) cout << "output " << TC_OUTPUT
+	if (idx >= m.size()) {
+		if (!silent) cout << "output " << TC_OUTPUT
 			<< (is_relative ? "%" : "&")
 			<< idx << TC.CLEAR() << " does not exist\n";
 		return {};
 	}
+	auto pos = is_relative ? m.size() - 1 - idx : idx;
 	if (auto check = m[pos];
 		std::holds_alternative<nso<tau_ba<BAs...>, BAs...>>(check))
 	{
@@ -93,7 +83,6 @@ repl_evaluator<factory_t, BAs...>::output_ref
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::print_output(size_t id) {
-	using namespace details;
 	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << " / "
 		<< TC_OUTPUT << "%" << (m.size() - id - 1) << TC.CLEAR()
 		<< ": " << m[id] << "\n";
@@ -127,6 +116,7 @@ void repl_evaluator<factory_t, BAs...>::store_output(
 	// do not add into memory if the last memory value is the same ?
 	// if (m.size() && m.back() == o) return;
 	m.push_back(o);
+	print_output(m.size() - 1);
 }
 
 template <typename factory_t, typename... BAs>
@@ -314,17 +304,21 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		auto n_nso_rr = make_nso_rr_using_factory<
 			factory_t, tau_ba<BAs...>, BAs...>(
 				arg.value(), factory);
-		auto result= normalizer<tau_ba<BAs...>, BAs...>(n_nso_rr);
+		auto result = normalizer<tau_ba<BAs...>, BAs...>(n_nso_rr);
 		std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto output = arg | tau_parser::output; output) {
 		// TODOD (HIGH) binding
-		auto [value, _] = get_output_ref(output.value()).value();
-		auto result = normalizer<tau_ba<BAs...>, BAs...>(value);
-		std::cout << "normalized: " << result << "\n";
-		return result;
+		auto ref = get_output_ref(output.value());
+		if (ref) {
+			auto [value, _] = ref.value();
+			auto result = normalizer<tau_ba<BAs...>, BAs...>(value);
+			std::cout << "normalized: " << result << "\n";
+			return result;
+		}
+		return {};
 	}
-	return n;
+	return arg;
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -403,7 +397,7 @@ void repl_evaluator<factory_t, BAs...>::set_cmd(
 	{ tau_parser::status_opt,   [&]() {
 		get_bool_value(opt.status); } },
 	{ tau_parser::colors_opt,   [&]() {
-		details::TC.set(get_bool_value(opt.colors)); } },
+		TC.set(get_bool_value(opt.colors)); } },
 	{ tau_parser::severity_opt, [&]() {
 		auto sev = v | tau_parser::severity;
 		if (!sev.has_value()) {
@@ -440,9 +434,9 @@ void repl_evaluator<factory_t, BAs...>::toggle_cmd(
 	case tau_parser::debug_repl_opt: opt.debug_repl = !opt.debug_repl;break;
 #endif
 	case tau_parser::colors_opt:
-		details::TC.set(opt.colors = !opt.colors); break;
+		TC.set(opt.colors = !opt.colors); break;
 	case tau_parser::status_opt: opt.status = !opt.status; break;
-	default: cout << ": unknown bool option\n"; details::error = true;break;
+	default: cout << ": unknown bool option\n"; error = true;break;
 	}
 }
 
@@ -509,7 +503,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::bf:                 result = command; break;
 	case p::wff:                result = command; break;
 	case p::nso_rr:	            result = command; break;
-	default: details::error = true, cout << "\nUnknown command\n"; break;
+	default: error = true, cout << "\nUnknown command\n"; break;
 	}
 
 	if (result) store_output(result.value());
@@ -520,12 +514,11 @@ template <typename factory_t, typename... BAs>
 repl_evaluator<factory_t, BAs...>::repl_evaluator(factory_t& factory,
 	options opt) : factory(factory), opt(opt)
 {
-	details::TC.set(opt.colors);
+	TC.set(opt.colors);
 }
 
 template <typename factory_t, typename... BAs>
 std::string repl_evaluator<factory_t, BAs...>::prompt() {
-	using namespace details;
 	using namespace boost::log;
 	std::stringstream ss;
 	if (opt.status) {
@@ -537,7 +530,7 @@ std::string repl_evaluator<factory_t, BAs...>::prompt() {
 		if (status.tellp()) ss << TC_STATUS << "["
 			<< status.str() << " ]" << TC.CLEAR() << " ";
 	}
-	if (details::error) ss << TC_ERROR << "error" << TC.CLEAR() << " ";
+	if (error) ss << TC_ERROR << "error" << TC.CLEAR() << " ";
 	ss << TC_PROMPT << "tau>" << TC.CLEAR() << " ";
 	if (r) r->prompt(ss.str());
 	return ss.str();
@@ -545,7 +538,7 @@ std::string repl_evaluator<factory_t, BAs...>::prompt() {
 
 template <typename factory_t, typename... BAs>
 int repl_evaluator<factory_t, BAs...>::eval(const std::string& src) {
-	details::error = false;
+	error = false;
 	auto tau_spec = make_cli(src);
 	int quit = 0;
 	if (tau_spec) {
@@ -553,6 +546,7 @@ int repl_evaluator<factory_t, BAs...>::eval(const std::string& src) {
 		for (const auto& cmd : commands)
 			if (quit = eval_cmd(cmd); quit) break;
 	}
+	if (!quit) prompt();
 	return quit;
 }
 

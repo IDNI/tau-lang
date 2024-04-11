@@ -98,7 +98,8 @@ struct repl_evaluator {
 private:
 
 	repl_evaluator<factory_t, BAs...>::output_ref get_output_ref(
-		const nso<tau_ba<BAs...>, BAs...>& n, bool silent = false);
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
+		bool silent = false);
 	void print_output(size_t id);
 
 	void list_outputs_cmd();
@@ -160,8 +161,10 @@ private:
 
 	outputs m;
 	factory_t factory;
-	options opt;
+	options opt{};
 	repl<repl_evaluator<factory_t, BAs...>>* r = 0;
+	idni::term::colors TC{};
+	bool error = false;
 };
 
 } //idni::tau namespace
