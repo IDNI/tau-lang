@@ -113,6 +113,7 @@ private:
 	}
 	grammar_type::options load_grammar_opts() {
 		grammar_type::options o;
+		o.transform_negation = false;
 		o.trim_terminals = false;
 		o.inline_char_classes = true;
 		o.auto_disambiguate = true;

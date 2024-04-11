@@ -355,7 +355,7 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 # depending on the use case of the grammar.
 cli                    => _ cli_command (_ dot _ cli_command)* [_ dot] _.
 
-cli_command            => help_cmd | version_cmd | quit_cmd.
+cli_command            => help_cmd | version_cmd | quit_cmd | clear_cmd.
 cli_command            => get_cmd | set_cmd | toggle_cmd.
 cli_command            => list_outputs_cmd | clear_outputs_cmd | print_output_cmd.
 cli_command            => file.
@@ -368,7 +368,7 @@ cli_command            => normalize_cmd
                         | bf_instantiate | wff_instantiate.
 cli_command            => bf.
 cli_command            => wff.
-cli_command            => rr_nso.
+cli_command            => nso_rr.
 
 file                   => file_sym quote file_path quote.
 
@@ -421,6 +421,7 @@ wff_mnf_cmd               => mnf_cmd_sym __ (wff | output | wff_selection).
 help_cmd               => help_cmd_sym [ __ cli_cmd_sym ].
 version_cmd            => version_cmd_sym.
 quit_cmd               => quit_cmd_sym.
+clear_cmd              => clear_cmd_sym.
 
 wff_selection          => selection_sym __ digits.
 bf_selection           => selection_sym __ digits.
@@ -439,6 +440,7 @@ clear_outputs_cmd      => (output_sym __ | absolute_output_sym | relative_output
 print_output_cmd       => output.
 
 cli_cmd_sym            => help_cmd_sym | version_cmd_sym | quit_cmd_sym
+                        | clear_cmd_sym
 			| output_sym | absolute_output_sym | relative_output_sym
                         | selection_sym | instantiate_cmd_sym | substitute_cmd_sym
                         | normalize_cmd_sym | file_cmd_sym
