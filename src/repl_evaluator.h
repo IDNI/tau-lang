@@ -156,7 +156,7 @@ private:
 
 
 	void version_cmd();
-	void help_cmd(size_t nt = tau_parser::help_cmd_sym);
+	void help_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void not_implemented_yet();
 
 	outputs m;
