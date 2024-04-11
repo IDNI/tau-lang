@@ -207,6 +207,7 @@ int main(int argc, char** argv) {
 		repl_evaluator<tau_bdd_binding_factory, bdd_binding> re(f);
 		if (e.size()) return re.eval(e), 0;
 		repl<decltype(re)> r(re, "tau> ", ".tau_history");
+		re.prompt();
 		return r.run();
 	}
 
