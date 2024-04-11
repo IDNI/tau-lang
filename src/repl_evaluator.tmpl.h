@@ -92,7 +92,9 @@ template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::print_output_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
-	auto o = get_output_ref(command);
+	auto n = command | tau_parser::output;
+	if (!n) return;
+	auto o = get_output_ref(n.value());
 	if (!o) return;
 	print_output(o.value().second);
 }
@@ -335,7 +337,8 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 		.start = tau_parser::cli,
 		//.debug = opt.debug_repl
 	});
-	if (!cli_src) return 0;
+	if (!cli_src) // flush! new line and return null if invalid source
+		return (std::cout << std::endl), nullptr;
 	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
 	tau_factory<factory_t, BAs...> tf(factory);
 	return bind_tau_code_using_factory<tau_factory<factory_t, BAs...>,
