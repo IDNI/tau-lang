@@ -31,8 +31,6 @@ std::function<bool(const size_t n)> is_non_essential_terminal =
 		|| n == tau_parser::comment
 		|| n == tau_parser::__
 		|| n == tau_parser::_
-		|| n == tau_parser::open_parenthesis
-		|| n == tau_parser::close_parenthesis
 		|| n == tau_parser::open_bracket
 		|| n == tau_parser::close_bracket
 		|| n == tau_parser::open_brace
