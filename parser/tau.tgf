@@ -359,12 +359,12 @@ cli_command            => get_cmd | set_cmd | toggle_cmd.
 cli_command            => list_outputs_cmd | clear_outputs_cmd | print_output_cmd.
 cli_command            => file.
 cli_command            => normalize_cmd
-                        | wff_onf_cmd | wff_dnf_cmd | wff_cnf_cmd
-                        | wff_anf_cmd | wff_nnf_cmd | wff_pnf_cmd | wff_mnf_cmd
                         | bf_dnf_cmd | bf_cnf_cmd | bf_anf_cmd
                         | bf_nnf_cmd | bf_pnf_cmd | bf_mnf_cmd
                         | bf_substitute | wff_substitute
-                        | bf_instantiate | wff_instantiate.
+                        | bf_instantiate | wff_instantiate
+                        | wff_onf_cmd | wff_dnf_cmd | wff_cnf_cmd
+                        | wff_anf_cmd | wff_nnf_cmd | wff_pnf_cmd | wff_mnf_cmd.
 cli_command            => bf.
 cli_command            => wff.
 cli_command            => nso_rr.
