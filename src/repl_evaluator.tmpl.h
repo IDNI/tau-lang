@@ -455,7 +455,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	if (opt.debug_repl) {
 		std::cout << "command: " << command.value() << "\n";
 		print_sp_tau_node_tree<tau_ba<BAs...>, BAs...>(cout
-			<< "command parsed tree: ", command.value()) << "\n";
+			<< "tree: ", command.value()) << "\n";
 	}
 #endif
 	std::optional<sp_tau_node<tau_ba<BAs...>, BAs...>> result;
@@ -469,15 +469,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 			"clear"
 #endif
 		); break;
-	case p::help_cmd: {
-		// TODO (LOW) extract this fragment of code into a help_cmd function
-		auto optarg = command | tau_parser::cli_cmd_sym
-			| only_child_extractor<tau_ba<BAs...>, BAs...>
-			| non_terminal_extractor<tau_ba<BAs...>, BAs...>;
-		if (optarg.has_value()) help_cmd(optarg.value());
-		else help_cmd();
-		break;
-	}
+	case p::help_cmd:           help_cmd(command.value()); break;
 	case p::version_cmd:        version_cmd(); break;
 	case p::get_cmd:            get_cmd(command.value()); break;
 	case p::set_cmd:            set_cmd(command.value()); break;
@@ -559,7 +551,9 @@ void repl_evaluator<factory_t, BAs...>::version_cmd() {
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::help_cmd(size_t nt) {
+void repl_evaluator<factory_t, BAs...>::help_cmd(
+	const sp_tau_node<tau_ba<BAs...>, BAs...>& n)
+{
 	static const std::string bool_options =
 #ifdef DEBUG
 		"  debug-repl             show REPL commands on/off\n"
@@ -571,6 +565,11 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(size_t nt) {
 		"  severity               severity           error/info/debug/trace\n";
 	static const std::string bool_available_options = std::string{} +
 		"Available options:\n" + bool_options;
+	auto arg = n | tau_parser::cli_cmd_sym
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| non_terminal_extractor<tau_ba<BAs...>, BAs...>;
+	size_t nt = arg ? arg.value()
+			: static_cast<size_t>(tau_parser::help_cmd_sym);
 	switch (nt) {
 	case tau_parser::help_cmd_sym: cout
 		<< "Commands:\n"
