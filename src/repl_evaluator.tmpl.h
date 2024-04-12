@@ -580,15 +580,15 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "Formula commands:\n"
 		<< "  normalize or n         normalize formula\n"
 
-		// not yet publicly available
-
-		/*<< "  onf_cmd                    convert to order normal form\n"
+		<< "\n"
+		<< "Normal form commands:\n"
+		<< "  onf                    convert to order normal form\n"
 		<< "  dnf                    convert to disjunctive normal form\n"
 		<< "  cnf                    convert to conjunctive normal form\n"
-		<< "  anf                    convert to algebraic normal form\n"
+		//<< "  anf                    convert to algebraic normal form\n"
 		<< "  nnf                    convert to negation normal form\n"
-		<< "  pnf                    convert to prenex normal form\n"
-		<< "  minterm                convert to minterm normal form\n"*/
+		//<< "  pnf                    convert to prenex normal form\n"
+		<< "  mnf                    convert to minterm normal form\n"
 
 		<< "\n"
 		<< "Output commands:\n"
@@ -666,6 +666,45 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "toggle <option> toggles option value\n"
 		<< "\n"
 		<< bool_available_options;
+		break;
+	case tau_parser::dnf_cmd_sym: cout
+		<< "dnf command converts a boolean formula or a well formed formula to disjunctive normal form\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  dnf '<BF>'             converts the given BF to DNF\n"
+		<< "  dnf '<WFF>'            converts the given BF to DNF\n"
+		<< "  dnf <output>           converts the output with the given id to DNF\n";
+		break;
+	case tau_parser::cnf_cmd_sym: cout
+		<< "cnf command converts a boolean formula or a well formed formula to conjunctive normal form\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  cnf '<BF>'             converts the given BF to CNF\n"
+		<< "  cnf '<WFF>'            converts the given BF to CNF\n"
+		<< "  cnf <output>           converts the output with the given id to CNF\n";
+		break;
+	case tau_parser::nnf_cmd_sym: cout
+		<< "nnf command converts a boolean formula or a well formed formula to negation normal form\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  nnf '<BF>'             converts the given BF to NNF\n"
+		<< "  nnf '<WFF>'            converts the given BF to NNF\n"
+		<< "  nnf <output>           converts the output with the given id to NNF\n";
+		break;
+	case tau_parser::mnf_cmd_sym: cout
+		<< "mnf command converts a boolean formula or a well formed formula to minterm normal form\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  mnf '<BF>'             converts the given BF to MNF\n"
+		<< "  mnf '<WFF>'            converts the given BF to MNF\n"
+		<< "  mnf <output>           converts the output with the given id to MNF\n";
+		break;
+	case tau_parser::onf_cmd_sym: cout
+		<< "onf command converts a well formed formula to order normal form\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  onf '<VAR>' '<WFF>'    converts the given WFF to ONF\n"
+		<< "  onf '<VAR>' <output>   converts the output with the given id to ONF\n";
 		break;
 	}
 }
