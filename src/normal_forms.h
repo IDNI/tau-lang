@@ -23,10 +23,10 @@
 namespace idni::tau {
 
 // conjunctive normal form
-RULE(BF_TO_CNF_0, "(($X & $Y) | $Z) := (($X | $Z) & ($Y | $Z)).")
-RULE(BF_TO_CNF_1, "($X | ($Y & $Z)) := (($X | $Y) & ($X | $Z)).")
-RULE(WFF_TO_CNF_0, "(($X && $Y) || $Z) ::= (($X || $Z) && ($Y || $Z)).")
-RULE(WFF_TO_CNF_1, "($X || ($Y && $Z)) ::= (($X || $Y) && ($X || $Z)).")
+RULE(BF_TO_CNF_0, "($X & $Y) | $Z := ($X | $Z) & ($Y | $Z).")
+RULE(BF_TO_CNF_1, "$X | ($Y & $Z) := ($X | $Y) & ($X | $Z).")
+RULE(WFF_TO_CNF_0, "($X && $Y) || $Z ::= ($X || $Z) && ($Y || $Z).")
+RULE(WFF_TO_CNF_1, "$X || ($Y && $Z) ::= ($X || $Y) && ($X || $Z).")
 
 template<typename... BAs>
 static auto to_cnf_wff = make_library<BAs...>(
