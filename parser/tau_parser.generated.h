@@ -1251,6 +1251,16 @@ private:
 		q(nt(324), (nt(342)));
 		//       cli_cmd_sym(324)     => toggle_cmd_sym(343).
 		q(nt(324), (nt(343)));
+		//       cli_cmd_sym(324)     => cnf_cmd_sym(304).
+		q(nt(324), (nt(304)));
+		//       cli_cmd_sym(324)     => dnf_cmd_sym(302).
+		q(nt(324), (nt(302)));
+		//       cli_cmd_sym(324)     => nnf_cmd_sym(308).
+		q(nt(324), (nt(308)));
+		//       cli_cmd_sym(324)     => mnf_cmd_sym(312).
+		q(nt(324), (nt(312)));
+		//       cli_cmd_sym(324)     => onf_cmd_sym(314).
+		q(nt(324), (nt(314)));
 		//       help_cmd_sym(322)    => 'h'.
 		q(nt(322), (t(42)));
 		//       help_cmd_sym(322)    => 'h' 'e' 'l' 'p'.

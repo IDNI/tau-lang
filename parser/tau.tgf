@@ -443,7 +443,8 @@ cli_cmd_sym            => help_cmd_sym | version_cmd_sym | quit_cmd_sym
 			| output_sym | absolute_output_sym | relative_output_sym
                         | selection_sym | instantiate_cmd_sym | substitute_cmd_sym
                         | normalize_cmd_sym | file_cmd_sym
-                        | get_cmd_sym | set_cmd_sym | toggle_cmd_sym.
+                        | get_cmd_sym | set_cmd_sym | toggle_cmd_sym
+                        | cnf_cmd_sym | dnf_cmd_sym | nnf_cmd_sym | mnf_cmd_sym | onf_cmd_sym.
 
 # cli symbols
 help_cmd_sym           => "h" | "help".
