@@ -576,6 +576,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  help or h              print this help\n"
 		<< "  quit, q, exit or e     exit the repl\n"
 		<< "  version or v           print version\n"
+		<< "  clear                  clear the screen\n"
 		<< "\n"
 		<< "Formula commands:\n"
 		<< "  normalize or n         normalize formula\n"
@@ -606,6 +607,9 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		break;
 	case tau_parser::quit_cmd_sym: cout
 		<< "q, quit, e or exit exits the repl\n";
+		break;
+	case tau_parser::clear_cmd_sym: cout
+		<< "clear clears the screen\n";
 		break;
 	case tau_parser::output_sym: cout
 		<< "output or out command manages outputs of previous commands\n"
