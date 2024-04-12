@@ -1119,8 +1119,8 @@ private:
 		q(nt(315), (nt(282)));
 		//       __E_wff_onf_cmd_65(315) => wff_selection(283).
 		q(nt(315), (nt(283)));
-		//       wff_onf_cmd(271)     => onf_cmd_sym(314) __(13) variable(79) __E_wff_onf_cmd_65(315).
-		q(nt(271), (nt(314)+nt(13)+nt(79)+nt(315)));
+		//       wff_onf_cmd(271)     => onf_cmd_sym(314) __(13) variable(79) __(13) __E_wff_onf_cmd_65(315).
+		q(nt(271), (nt(314)+nt(13)+nt(79)+nt(13)+nt(315)));
 		//       __E_wff_dnf_cmd_66(316) => wff(112).
 		q(nt(316), (nt(112)));
 		//       __E_wff_dnf_cmd_66(316) => output(282).
