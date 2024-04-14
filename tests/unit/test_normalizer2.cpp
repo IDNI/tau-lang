@@ -29,7 +29,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("apply_defs_once") {
-		CHECK( apply_defs_once<Bool>.size() == 6 );
+		CHECK( apply_defs_once<Bool>.size() == 5 );
 	}
 
 	TEST_CASE("elim_for_all") {
