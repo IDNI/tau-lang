@@ -52,6 +52,7 @@ TEST_SUITE("applying defs once rules") {
 		CHECK( true );
 	}
 
+	// TODO (MEDIUM) check result, could we normalize this to F? use a rule?
 	TEST_CASE("X & (Y | Z) < 0") {
 		const char* sample = "X & (Y | Z) < 0.";
 		auto normalized = normalize_test_tau(sample);
@@ -78,6 +79,7 @@ TEST_SUITE("applying defs once rules") {
 		CHECK( true );
 	}
 
+	// TODO (MEDIUM) check result, could we normalize this to F? use a rule?
 	TEST_CASE("X & (Y | Z) > 1") {
 		const char* sample = "X & (Y | Z) > 1.";
 		auto normalized = normalize_test_tau(sample);

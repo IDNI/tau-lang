@@ -956,9 +956,9 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( ex_formula.has_value() );
 	}
 
-	TEST_CASE("ball") {
+	TEST_CASE("bool_all") {
 		const char* sample =
-			"ball Z Z.";
+			"bool_all ?Z ?Z.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto all_formula = frml
@@ -969,9 +969,9 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( all_formula.has_value() );
 	}
 
-	TEST_CASE("bex") {
+	TEST_CASE("bool_ex") {
 		const char* sample =
-			"bex Z Z.";
+			"bool_ex ?Z ?Z.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto ex_formula = frml
