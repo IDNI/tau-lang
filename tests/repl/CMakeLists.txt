@@ -92,8 +92,5 @@ add_test(NAME test_repl-help_onf_cmd
 set_tests_properties(test_repl-help_onf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "onf command converts")
 
-
-
-
 # sample for comparing output with a file
 #add_test(NAME test_name COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> | diff - test_name.dump")

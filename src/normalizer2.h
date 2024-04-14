@@ -42,8 +42,8 @@ namespace idni::tau {
 // bf rules
 RULE(BF_TO_DNF_0, "($X | $Y) & $Z := $X & $Z | $Y & $Z.")
 RULE(BF_TO_DNF_1, "$X & ($Y | $Z) := $X & $Y | $X & $Z.")
-RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := ($X)' | ($Y)'.")
-RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := ($X)' & ($Y)'.")
+RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := $X' | $Y'.")
+RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
 RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
 RULE(BF_SIMPLIFY_ONE_0, "1 | $X := 1.")
 RULE(BF_SIMPLIFY_ONE_1, "$X | 1 := 1.")
@@ -80,8 +80,8 @@ RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 // wff rules
 RULE(WFF_TO_DNF_0, "($X || $Y) && $Z ::= $X && $Z || $Y && $Z.")
 RULE(WFF_TO_DNF_1, "$X && ($Y || $Z) ::= $X && $Y || $X && $Z.")
-RULE(WFF_PUSH_NEGATION_INWARDS_0, "!($X && $Y) ::= ! $X || !($Y).")
-RULE(WFF_PUSH_NEGATION_INWARDS_1, "!($X || $Y) ::= ! $X && !($Y).")
+RULE(WFF_PUSH_NEGATION_INWARDS_0, "!($X && $Y) ::= ! $X || !$Y.")
+RULE(WFF_PUSH_NEGATION_INWARDS_1, "!($X || $Y) ::= ! $X && !$Y.")
 RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
 RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
@@ -162,8 +162,7 @@ static auto apply_defs = make_library<BAs...>(
 template<typename... BAs>
 static auto apply_defs_once = make_library<BAs...>(
 	// wff defs
-	BF_ELIM_PARENTHESIS
-	+ BF_DEF_LESS_EQUAL
+	BF_DEF_LESS_EQUAL
 	+ BF_DEF_LESS
 	+ BF_DEF_GREATER
 	+ BF_DEF_EQ
