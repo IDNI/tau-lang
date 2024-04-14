@@ -67,8 +67,8 @@ wff_imply_sym          => "->".
 wff_equiv_sym          => "<->".
 wff_all_sym            => "all".
 wff_ex_sym             => "ex".
-wff_ball_sym           => "ball".
-wff_bex_sym            => "bex".
+wff_ball_sym           => "bool_all".
+wff_bex_sym            => "bool_ex".
 wff_t                  => 'T'.
 wff_f                  => 'F'.
 
@@ -109,7 +109,7 @@ variable               => charvar | io_var.
 io_var                 => in | out.
 in                     => in_var_name open_bracket offset close_bracket.
 out                    => out_var_name open_bracket offset close_bracket.
-bool_variable          => charvar. #chars & ~wff_t & ~wff_f.
+bool_variable          => '?' charvar. #chars & ~wff_t & ~wff_f.
 charvar                => (alpha & ~'T' & ~'F') (digit)*.
 
 capture                => capture_var.

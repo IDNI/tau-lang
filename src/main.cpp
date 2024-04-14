@@ -18,11 +18,11 @@
 	// TODO (MEDIUM) type checkings
 // TODO (MEDIUM) declare a static const lambda instead of a predicates if possible
 // TODO (LOW) split code into h/cpp files
-//TODO (IMPORTANT) error and runtime error handling
-	//TODO (IMPORTANT) parsing errors reporting
-	//TODO (IMPORTANT) semantic errors reporting
-	//TODO (IMPORTANT) runtime errors reporting
-	//TODO (IMPORTANT) internal errors reporting
+// TODO (IMPORTANT) error and runtime error handling
+	// TODO (IMPORTANT) parsing errors reporting
+	// TODO (IMPORTANT) semantic errors reporting
+	// TODO (IMPORTANT) runtime errors reporting
+	// TODO (IMPORTANT) internal errors reporting
 // TODO (MEDIUM) simplify bindings API
 // TODO (HIGH) allow typing in variables
 
@@ -52,7 +52,6 @@
 
 // TODO (MEDIUM) change the execution API to use tuples instead of vectors
 // so we could give more fine grained executions.
-
 
 #include <iostream>
 #include <fstream>
