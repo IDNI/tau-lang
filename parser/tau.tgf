@@ -46,6 +46,7 @@ quote                  => '"'.
 
 # tau symbols
 tau_def                => ":::=". # for tau rules
+tau_builder_def        => "=:::".
 
 # tau_op_sym
 tau_and_sym            => "&&&".
@@ -56,6 +57,7 @@ tau_neg_sym            => "!!!".
 
 # wff symbols
 wff_def                => "::=". # for wff rec. relations bf_def and rules
+wff_builder_def        => "=::".
 
 # wff_op_sym
 wff_and_sym            => "&&".
@@ -74,6 +76,7 @@ wff_f                  => 'F'.
 
 # bf symbols
 bf_def                 => ":=". # for rewriting rules and bf rec. relations bf_def and rules
+bf_builder_def         => "=:".
 
 # bf_op_sym
 bf_and_sym             => '&'.
@@ -332,9 +335,9 @@ input                  => in _ colon _ open_brace _ source_binding _ close_brace
 builder                => _ builder_head _ builder_body _ dot.
 builder_head           => open_parenthesis _ capture (__ capture)* _ close_parenthesis.
 builder_body           => bf_builder_body | wff_builder_body | tau_builder_body.
-bf_builder_body        => bf_def _ bf.
-wff_builder_body       => wff_def _ wff.
-tau_builder_body       => tau_def _ tau.
+bf_builder_body        => bf_builder_def _ bf.
+wff_builder_body       => wff_builder_def _ wff.
+tau_builder_body       => tau_builder_def _ tau.
 # main posibilities
 library                => rules.
 rules                  => (_ rule)*.

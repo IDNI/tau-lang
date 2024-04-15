@@ -1071,37 +1071,37 @@ sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, const sp_tau_node<BAs...>& n
 }
 
 // definitions of basic bf and wff
-const std::string BLDR_BF_0 = "( $X ) := 0.";
-const std::string BLDR_BF_1 = "( $X ) := 1.";
-const std::string BLDR_WFF_F = "( $X ) ::= F.";
-const std::string BLDR_WFF_T = "( $X ) ::= T.";
+const std::string BLDR_BF_0 = "( $X ) =: 0.";
+const std::string BLDR_BF_1 = "( $X ) =: 1.";
+const std::string BLDR_WFF_F = "( $X ) =:: F.";
+const std::string BLDR_WFF_T = "( $X ) =:: T.";
 
 // definitions of wff builder rules
-const std::string BLDR_WFF_EQ = "( $X ) ::= $X = 0.";
-const std::string BLDR_WFF_NEQ = "( $X ) ::= $X != 0.";
-const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) ::= $X !<= $Y.";
-const std::string BDLR_BF_INTERVAL = "( $X $Y $Z ) ::= $X <= $Y <= $Z.";
-const std::string BLDR_WFF_AND = "( $X $Y ) ::= $X && $Y.";
-const std::string BLDR_WFF_OR = "( $X $Y ) ::= $X || $Y.";
-const std::string BLDR_WFF_NEG = "( $X ) ::= ! $X.";
-const std::string BLDR_WFF_ALL = "( $X $Y ) ::= all $X $Y.";
-const std::string BLDR_WFF_EX = "( $X $Y ) ::= ex $X $Y.";
-const std::string BLDR_WFF_BALL = "( $X $Y ) ::= ball $X $Y.";
-const std::string BLDR_WFF_BEX = "( $X $Y ) ::= bex $X $Y.";
+const std::string BLDR_WFF_EQ = "( $X ) =:: $X = 0.";
+const std::string BLDR_WFF_NEQ = "( $X ) =:: $X != 0.";
+const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) =:: $X !<= $Y.";
+const std::string BDLR_BF_INTERVAL = "( $X $Y $Z ) =:: $X <= $Y <= $Z.";
+const std::string BLDR_WFF_AND = "( $X $Y ) =:: $X && $Y.";
+const std::string BLDR_WFF_OR = "( $X $Y ) =:: $X || $Y.";
+const std::string BLDR_WFF_NEG = "( $X ) =:: ! $X.";
+const std::string BLDR_WFF_ALL = "( $X $Y ) =:: all $X $Y.";
+const std::string BLDR_WFF_EX = "( $X $Y ) =:: ex $X $Y.";
+const std::string BLDR_WFF_BALL = "( $X $Y ) =:: ball $X $Y.";
+const std::string BLDR_WFF_BEX = "( $X $Y ) =:: bex $X $Y.";
 
 // definitions of bf builder rules
-const std::string BLDR_BF_AND = "( $X $Y ) := $X & $Y.";
-const std::string BLDR_BF_OR = "( $X $Y ) := $X | $Y.";
-const std::string BLDR_BF_NEG = "( $X ) := $X'.";
-const std::string BLDR_BF_SPLITTER = "( $X ) := S($X).";
-const std::string BLDR_BF_ALL = "( $X $Y ) := fall $X $Y.";
-const std::string BLDR_BF_EX = "( $X $Y ) := fex $X $Y.";
-const std::string BLDR_BF_CONSTANT = "( $X ) := { $X }.";
+const std::string BLDR_BF_AND = "( $X $Y ) =: $X & $Y.";
+const std::string BLDR_BF_OR = "( $X $Y ) =: $X | $Y.";
+const std::string BLDR_BF_NEG = "( $X ) =: $X'.";
+const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
+const std::string BLDR_BF_ALL = "( $X $Y ) =: fall $X $Y.";
+const std::string BLDR_BF_EX = "( $X $Y ) =: fex $X $Y.";
+const std::string BLDR_BF_CONSTANT = "( $X ) =: { $X }.";
 
 // definitions of tau builder rules
-const std::string BLDR_TAU_AND = "( $X $Y ) :::= $X &&& $Y.";
-const std::string BLDR_TAU_OR = "( $X $Y ) :::= $X ||| $Y.";
-const std::string BLDR_TAU_NEG = "( $X ) :::= !!! $X.";
+const std::string BLDR_TAU_AND = "( $X $Y ) =::: $X &&& $Y.";
+const std::string BLDR_TAU_OR = "( $X $Y ) =::: $X ||| $Y.";
+const std::string BLDR_TAU_NEG = "( $X ) =::: !!! $X.";
 
 // basic bf and wff builders
 template<typename... BAs>

@@ -624,14 +624,14 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 TEST_SUITE("parsing builders") {
 
 	TEST_CASE("one capture") {
-		const char* sample = "( $X ) ::= ($X && $X).";
+		const char* sample = "( $X ) =:: ($X && $X).";
 		auto src = make_builder<Bool>(sample);
 		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(src.first) );
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
 	}
 
 	TEST_CASE("two capture") {
-		const char* sample = "( $X $Y ) ::= ($X && $Y).";
+		const char* sample = "( $X $Y ) =:: ($X && $Y).";
 		auto src = make_builder<Bool>(sample);
 		auto left = src.first;
 		auto right = src.first;
