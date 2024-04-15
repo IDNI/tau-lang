@@ -462,14 +462,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	using p = tau_parser;
 	switch (command_type) {
 	case p::quit_cmd: return cout << "Quit.\n", 1;
-	case p::clear_cmd: std::system(
-#ifdef _WIN32
-			"cls"
-#else
-			"clear"
-#endif
-		); break;
-	// cli basic commands
+	case p::clear_cmd:          if (r) r->clear(); break;
 	case p::help_cmd:           help_cmd(command.value()); break;
 	case p::version_cmd:        version_cmd(); break;
 	case p::get_cmd:            get_cmd(command.value()); break;
