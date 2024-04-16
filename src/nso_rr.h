@@ -206,12 +206,15 @@ static const auto is_quantifier = [](const nso<BAs...>& n) {
 		|| nt == tau_parser::wff_bex;
 };
 
+std::function<bool(const size_t n)>& get_is_non_essential_terminal();
+std::function<bool(const tau_source_sym& n)>& get_is_non_essential_sym();
+
 template<typename... BAs>
 using is_var_or_capture_t = decltype(is_var_or_capture<BAs...>);
 
-extern std::function<bool(const size_t n)> is_non_essential_terminal;
+extern std::function<bool(const size_t n)>& is_non_essential_terminal;
 
-extern std::function<bool(const tau_source_sym&)> is_non_essential_sym;
+extern std::function<bool(const tau_source_sym&)>& is_non_essential_sym;
 
 extern std::function<bool(const sp_tau_source_node&)> is_non_essential_source;
 
@@ -220,7 +223,7 @@ using is_non_essential_source_t = decltype(is_non_essential_source);
 template<typename...BAs>
 auto is_non_essential = [] (const sp_tau_node<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value)) return false;
-	return is_non_essential_sym(std::get<tau_source_sym>(n->value));
+	return get_is_non_essential_sym()(std::get<tau_source_sym>(n->value));
 };
 
 template<typename...BAs>
