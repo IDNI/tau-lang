@@ -11,44 +11,53 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include "nso_rr.h"
-#include "parser_instance.h"
-#include "parser.h"
 
 namespace idni::tau {
 
-std::function<bool(const size_t n)> is_non_essential_terminal =
-	[] (const size_t n)
-{
-	return n == tau_parser::nul
-		|| n == tau_parser::eof
-		|| n == tau_parser::space
-		|| n == tau_parser::digit
-		|| n == tau_parser::xdigit
-		|| n == tau_parser::alpha
-		|| n == tau_parser::alnum
-		|| n == tau_parser::punct
-		|| n == tau_parser::printable
-		|| n == tau_parser::comment
-		|| n == tau_parser::__
-		|| n == tau_parser::_
-		|| n == tau_parser::open_bracket
-		|| n == tau_parser::close_bracket
-		|| n == tau_parser::open_brace
-		|| n == tau_parser::close_brace;
-};
+std::function<bool(const size_t n)>& get_is_non_essential_terminal() {
+	static std::function<bool(const size_t n)> fn = [](const size_t n)
+	{
+		return n == tau_parser::nul
+			|| n == tau_parser::eof
+			|| n == tau_parser::space
+			|| n == tau_parser::digit
+			|| n == tau_parser::xdigit
+			|| n == tau_parser::alpha
+			|| n == tau_parser::alnum
+			|| n == tau_parser::punct
+			|| n == tau_parser::printable
+			|| n == tau_parser::comment
+			|| n == tau_parser::__
+			|| n == tau_parser::_
+			|| n == tau_parser::open_bracket
+			|| n == tau_parser::close_bracket
+			|| n == tau_parser::open_brace
+			|| n == tau_parser::close_brace;
+	};
+	return fn;
+}
 
-std::function<bool(const tau_source_sym&)> is_non_essential_sym =
-	[] (const tau_source_sym& n)
-{
-	if (!n.nt()) return false;
-	return  is_non_essential_terminal(n.n());
-};
+std::function<bool(const size_t n)>& is_non_essential_terminal =
+	get_is_non_essential_terminal();
+
+std::function<bool(const tau_source_sym& n)>& get_is_non_essential_sym() {
+	static std::function<bool(const tau_source_sym& n)> fn =
+		[](const tau_source_sym&n)
+	{
+		if (!n.nt()) return false;
+		return get_is_non_essential_terminal()(n.n());
+	};
+	return fn;
+}
+
+std::function<bool(const tau_source_sym&)>& is_non_essential_sym =
+	get_is_non_essential_sym();
 
 std::function<bool(const sp_tau_source_node&)> is_non_essential_source =
 	[] (const sp_tau_source_node& n)
 {
 	if (!n->value.nt()) return false;
-	return  is_non_essential_terminal(n->value.n());
+	return get_is_non_essential_terminal()(n->value.n());
 };
 
 // extracts terminal from sp_tau_source_node
