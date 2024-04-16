@@ -39,9 +39,6 @@
 #include "parser.h"
 #include "../parser/tau_parser.generated.h"
 #include "rewriting.h"
-#ifdef DEBUG
-#	include "parser_instance.h"
-#endif
 
 using namespace idni::rewriter;
 
@@ -132,7 +129,7 @@ std::function<bool(const sp_tau_node<BAs...>&)> is_non_terminal_node() {
 }
 
 // check if the node is the given non terminal
-template <typename...BAs>
+template <typename... BAs>
 bool is_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
 	return is_non_terminal_node<BAs...>(n) && get<tau_source_sym>(n->value).n() == nt;
 }
@@ -1771,9 +1768,20 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::bindings<BAs...>
 //
 // IDEA maybe it should be move to out.h
 template <typename... BAs>
+std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
+	size_t parent = tau_parser::start, bool passthrough = false);
+
+template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n){
+	return pp(stream, n);
+}
+
+// old operator<< renamed to print_terminals and replaced by
+// pp pretty priniter
+template <typename... BAs>
+std::ostream& print_terminals(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n){
 	stream << n->value;
-	for (const auto& c : n->child) stream << c;
+	for (const auto& c : n->child) print_terminals<BAs...>(stream, c);
 	return stream;
 }
 
@@ -1785,5 +1793,210 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_source_no
 
 // << tau_source_node (make it shared to make use of the previous operator)
 std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_node& n);
+
+template <typename... BAs>
+std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
+	size_t parent, bool passthrough)
+{
+//#define DEBUG_PP
+//#ifdef DEBUG_PP
+	//auto& p = idni::parser_instance<tau_parser>();
+//	auto dbg = [&stream, &p](const auto& c) {
+//		if (std::holds_alternative<idni::tau::tau_source_sym>(c->value)) {
+//			auto tss = std::get<idni::tau::tau_source_sym>(c->value);
+//			if (tss.nt()) stream << " NT:" << p.name(tss.n()) << " ";
+//			else if (tss.is_null()) stream << " <NULL> ";
+//			else stream << " T:'" << tss.t() << "' ";
+//		} else stream << " NONLIT:`" <<c->value << "` ";
+//	};
+//	stream << "\n";
+//	dbg(n);
+//	stream << "    child.size: " << n->child.size() << "\n";
+//	for (const auto& c : n->child)
+//		stream << "\t", dbg(c), stream << "\n";
+//#endif // DEBUG_PP
+	static auto is_to_wrap = [](const idni::tau::sp_tau_node<BAs...>& n,
+		size_t parent)
+	{
+		static const std::set<size_t> no_wrap_for = {
+			tau_parser::bf_splitter,
+			tau_parser::bf_ref,
+			tau_parser::bf_neg,
+			tau_parser::bf_constant,
+			tau_parser::bf_t,
+			tau_parser::bf_f,
+			tau_parser::wff_ref,
+			tau_parser::wff_neg,
+			tau_parser::wff_t,
+			tau_parser::wff_f,
+			tau_parser::tau_ref,
+			tau_parser::capture,
+			tau_parser::variable,
+			tau_parser::bool_variable,
+			tau_parser::start
+		};
+		// lower number = higher priority
+		static const std::map<size_t, size_t> prio = {
+			{ tau_parser::start,                        0 },
+			// tau
+			{ tau_parser::tau_or,                     100 },
+			{ tau_parser::tau_and,                    110 },
+			{ tau_parser::tau_neg,                    120 },
+			{ tau_parser::tau_wff,                    130 },
+			// wff
+			{ tau_parser::wff_conditional,            200 },
+			{ tau_parser::wff_ball,                   210 },
+			{ tau_parser::wff_bex,                    220 },
+			{ tau_parser::wff_all,                    230 },
+			{ tau_parser::wff_ex,                     240 },
+			{ tau_parser::wff_imply,                  250 },
+			{ tau_parser::wff_equiv,                  260 },
+			{ tau_parser::wff_or,                     270 },
+			{ tau_parser::wff_and,                    280 },
+			{ tau_parser::wff_xor,                    290 },
+			{ tau_parser::wff_neg,                    300 },
+			{ tau_parser::bf_interval,                310 },
+			{ tau_parser::bf_neq,                     320 },
+			{ tau_parser::bf_eq,                      330 },
+			{ tau_parser::bf_not_less_equal,          340 },
+			{ tau_parser::bf_greater,                 350 },
+			{ tau_parser::bf_less_equal,              360 },
+			{ tau_parser::bf_less,                    370 },
+			// bf
+			{ tau_parser::bf_all,                     400 },
+			{ tau_parser::bf_ex,                      410 },
+			{ tau_parser::bf_or,                      420 },
+			{ tau_parser::bf_and,                     430 },
+			{ tau_parser::bf_xor,                     440 },
+			{ tau_parser::bf_neg,                     450 },
+			// does not need wrapping = the lowest priority to wrap
+			{ tau_parser::open_parenthesis,           500 }
+		};
+		if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
+			auto tss = std::get<idni::tau::tau_source_sym>(n->value);
+			if (!tss.nt() || no_wrap_for.find(tss.n()) !=
+						no_wrap_for.end()) return false;
+			// tau_parser& p = idni::parser_instance<tau_parser>();
+			// std::cerr
+			// 	<< p.name(parent) << " vs " << p.name(tss.n())
+			// 	//<< "(" << parent << ")
+			// 	<< " " << prio.at(parent)
+			// 	<< (prio.at(parent) > prio.at(tss.n())
+			// 		? " > " : " <= ")
+			// 	<< prio.at(tss.n())
+			// 	// << " (" << tss.n() << ")"
+			// 	<< "\n";
+			return prio.at(parent) > prio.at(tss.n());
+		}
+		return false;
+	};
+
+	if (passthrough) { // passthrough
+		//auto ch = get_children(n->child);
+		for (const auto& c : n->child)
+			pp(stream, c, parent);
+		return stream;
+	}
+
+	if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
+		auto tss = std::get<idni::tau::tau_source_sym>(n->value);
+		if (tss.nt()) { //stream << " " << p.name(tss.n()) << ":";
+			switch (tss.n()) {
+			// skip whitespace since we reformat our way
+			case tau_parser::_:
+			case tau_parser::__:
+				break;
+			// wrappable by parenthesis
+			case tau_parser::bf:
+			case tau_parser::wff:
+			case tau_parser::tau:
+			{
+				auto& ch = n->child;
+				if (ch.size() > 1) pp(stream, ch[1], parent);
+				else {
+					bool wrap = is_to_wrap(ch[0], parent);
+					if (wrap) stream << "(";
+					for (const auto& c : ch)
+						pp(stream, c, parent);
+					if (wrap) stream << ")";
+				}
+			} break;
+			// negation (unary)
+			case tau_parser::bf_neg:
+			case tau_parser::wff_neg:
+			case tau_parser::tau_neg:
+			{
+				//auto ch = get_children(n->child);
+				for (const auto& c : n->child)
+					pp(stream, c, tss.n());
+			} break;
+			// binary operators
+			case tau_parser::bf_and:
+			case tau_parser::bf_or:
+			case tau_parser::bf_xor:
+			case tau_parser::bf_eq:
+			case tau_parser::bf_neq:
+			case tau_parser::bf_less:
+			case tau_parser::bf_less_equal:
+			case tau_parser::bf_not_less_equal:
+			case tau_parser::bf_greater:
+			case tau_parser::bf_interval:
+			case tau_parser::wff_and:
+			case tau_parser::wff_or:
+			case tau_parser::wff_xor:
+			case tau_parser::wff_imply:
+			case tau_parser::wff_equiv:
+			case tau_parser::wff_conditional:
+			case tau_parser::tau_and:
+			case tau_parser::tau_or:
+			{
+				auto& ch = n->child;
+				auto l = ch.size();
+				for (size_t i = 0; i != l; ++i)
+					if (i == 0 || i == 3
+						|| (i >= (l==2 ?1 :2) && l < 4))
+							pp(stream,
+								ch[i], tss.n());
+					else if (tss.n() == tau_parser::bf_and)
+						stream << " & ";
+					else print_terminals(
+						stream << " ", ch[i]) << " ";
+			} break;
+			// quantifiers
+			case tau_parser::bf_all:
+			case tau_parser::bf_ex:
+			case tau_parser::wff_all:
+			case tau_parser::wff_ex:
+			case tau_parser::wff_ball:
+			case tau_parser::wff_bex:
+			{
+				auto& ch = n->child;
+				print_terminals(stream, ch[0]);
+				pp(stream << " ", ch[1], tss.n());
+				pp(stream << " ", ch[2], tss.n());
+			} break;
+			// just print terminals for these
+			case tau_parser::capture:
+			case tau_parser::variable:
+			case tau_parser::bf_ref:
+			case tau_parser::wff_ref:
+			case tau_parser::tau_ref:
+			case tau_parser::binding:
+			case tau_parser::bf_f:
+			case tau_parser::bf_t:
+			case tau_parser::wff_f:
+			case tau_parser::wff_t:
+				print_terminals(stream, n);
+				break;
+			// for the rest skip value and just passthrough to child
+			default: for (const auto& c : n->child)
+					pp(stream, c, parent, true);
+				break;
+			}
+		}
+		else if (!tss.is_null()) stream << tss.t();
+	} else stream << n->value << " ";
+	return stream;
+}
 
 #endif // __NSO_RR_H__

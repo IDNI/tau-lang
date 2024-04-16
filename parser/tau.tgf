@@ -13,6 +13,8 @@
 
 @use char class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
+@trim _, __.
+
 #
 # as a rule of thumb, to ease navigation of the corresponding tree, the
 # non-terminals shouldn't appear in * or + expressions. Otherwise,
@@ -166,14 +168,14 @@ wff                    => wff_all.
 wff                    => wff_ex.
 wff                    => wff_imply.
 wff                    => wff_equiv.
-wff                    => bf_interval.
-wff                    => bf_neq | bf_eq | bf_not_less_equal | bf_greater
-                        | bf_less_equal | bf_less.
 wff                    => wff_or.
 wff                    => wff_and.
 wff                    => wff_xor.
 wff                    => wff_neg.
 wff                    => wff_t | wff_f.
+wff                    => bf_interval.
+wff                    => bf_neq | bf_eq | bf_not_less_equal | bf_greater
+                        | bf_less_equal | bf_less.
 wff                    => capture.
 wff                    => bool_variable.
 wff                    => open_parenthesis _ wff _ close_parenthesis.

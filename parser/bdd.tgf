@@ -13,7 +13,7 @@
 
 @use char class space, alpha, alnum.
 @inline char classes.
-@trim _, __.
+#@trim _, __.
 
 start                   => _ bdd _.
 
