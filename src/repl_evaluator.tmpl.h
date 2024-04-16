@@ -469,6 +469,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 			"clear"
 #endif
 		); break;
+	// cli basic commands
 	case p::help_cmd:           help_cmd(command.value()); break;
 	case p::version_cmd:        version_cmd(); break;
 	case p::get_cmd:            get_cmd(command.value()); break;
@@ -477,11 +478,14 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::list_outputs_cmd:   list_outputs_cmd(); break;
 	case p::clear_outputs_cmd:  clear_outputs_cmd(); break;
 	case p::print_output_cmd:   print_output_cmd(command.value()); break;
+	// normalization
 	case p::normalize_cmd:      result = normalizer_cmd(command.value()); break;
+	// substitution and instantiation
 	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command.value()); break;
 	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command.value()); break;
 	case p::wff_substitute_cmd: result = wff_substitute_cmd(command.value()); break;
 	case p::wff_instantiate_cmd:result = wff_instantiate_cmd(command.value()); break;
+	// wff normal forms
 	case p::wff_onf_cmd:        result = wff_onf_cmd(command.value()); break;
 	case p::wff_dnf_cmd:        result = wff_dnf_cmd(command.value()); break;
 	case p::wff_cnf_cmd:        result = wff_cnf_cmd(command.value()); break;
@@ -489,15 +493,25 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::wff_nnf_cmd:        result = wff_cnf_cmd(command.value()); break;
 	case p::wff_pnf_cmd:        not_implemented_yet(); break;
 	case p::wff_mnf_cmd:        result = wff_mnf_cmd(command.value()); break;
+	// bf normal forms
 	case p::bf_dnf_cmd:         result = bf_dnf_cmd(command.value()); break;
 	case p::bf_cnf_cmd:         result = bf_cnf_cmd(command.value()); break;
 	case p::bf_anf_cmd:         not_implemented_yet(); break;
 	case p::bf_nnf_cmd:         result = bf_nnf_cmd(command.value()); break;
 	case p::bf_pnf_cmd:         not_implemented_yet(); break;
 	case p::bf_mnf_cmd:         result = bf_mnf_cmd(command.value()); break;
+	// store the given formula as output for future references
 	case p::bf:                 result = command; break;
 	case p::wff:                result = command; break;
 	case p::nso_rr:	            result = command; break;
+	// definition of rec relations to be included during normalization
+	case p::def_bf_cmd:         not_implemented_yet(); break;
+	case p::def_wff_cmd:        not_implemented_yet(); break;
+	case p::def_tau_cmd:        not_implemented_yet(); break;
+	case p::def_list_cmd:       not_implemented_yet(); break;
+	case p::def_clear_cmd:      not_implemented_yet(); break;
+	case p::def_del_cmd:        not_implemented_yet(); break;
+	// error handling
 	default: error = true, cout << "\nUnknown command\n"; break;
 	}
 

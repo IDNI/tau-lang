@@ -367,7 +367,8 @@ cli_command            => normalize_cmd
                         | bf_substitute | wff_substitute
                         | bf_instantiate | wff_instantiate
                         | wff_onf_cmd | wff_dnf_cmd | wff_cnf_cmd
-                        | wff_anf_cmd | wff_nnf_cmd | wff_pnf_cmd | wff_mnf_cmd.
+                        | wff_anf_cmd | wff_nnf_cmd | wff_pnf_cmd | wff_mnf_cmd
+                        | def_wff_cmd | def_bf_cmd | def_tau_cmd | def_list_cmd | def_del_cmd.
 cli_command            => bf.
 cli_command            => wff.
 cli_command            => nso_rr.
@@ -420,6 +421,13 @@ wff_nnf_cmd               => nnf_cmd_sym __ (wff | output | wff_selection).
 wff_pnf_cmd               => pnf_cmd_sym __ (wff | output | wff_selection).
 wff_mnf_cmd               => mnf_cmd_sym __ (wff | output | wff_selection).
 
+def_wff_cmd               => def_cmd_sym __ wff_rec_relation.
+def_bf_cmd                => def_cmd_sym __ bf_rec_relation.
+def_tau_cmd               => def_cmd_sym __ tau_rec_relation.
+def_list_cmd              => def_cmd_sym __ "list".
+def_del_cmd               => def_cmd_sym __ "del" __ digits.
+def_clear_cmd             => def_cmd_sym __ "clear".
+
 help_cmd               => help_cmd_sym [ __ cli_cmd_sym ].
 version_cmd            => version_cmd_sym.
 quit_cmd               => quit_cmd_sym.
@@ -465,6 +473,8 @@ anf_cmd_sym            => "anf".
 nnf_cmd_sym            => "nnf".
 pnf_cmd_sym            => "pnf".
 mnf_cmd_sym            => "mnf".
+
+def_cmd_sym            => "def".
 
 selection_sym          => "s" | "selection".
 output_sym             => "o" | "output".

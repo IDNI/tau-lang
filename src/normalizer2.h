@@ -133,7 +133,7 @@ RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "($X != 0) && ($Y != 0) && ($Z  = 0) ::= ($Z
 RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "($Z != 0) && ($X  = 0) && ($Y != 0) ::= ($Z != 0) && ($X = 0) && ($Y != 0).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "($Z != 0) && ($X != 0) && ($Y  = 0) ::= ($Z != 0) && ($Y = 0) && ($X != 0).")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "($X != 0) && ($Y  = 0) ::= ($Y = 0) && ($X != 0).")
-RULE(BF_SQUEEZE_POSITIVES_0, "($X = 0) && ($Y = 0) ::= $X || $Y = 0.")
+RULE(BF_SQUEEZE_POSITIVES_0, "($X = 0) && ($Y = 0) ::= $X | $Y = 0.")
 RULE(WFF_REMOVE_EX_0, "ex $X $Y ::= wff_remove_existential_cb $X $Y.")
 
 RULE(BF_ELIM_PARENTHESIS,  "($X)   := $X.")

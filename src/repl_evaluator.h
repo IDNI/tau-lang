@@ -140,9 +140,10 @@ private:
 	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_instantiate_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
-
 	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
+
+	
 
 	int eval_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
 	void print_output_cmd(
