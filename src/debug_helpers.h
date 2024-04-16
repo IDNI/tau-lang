@@ -69,6 +69,22 @@ std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
 	if (n->child.size()) indent(), os << "}";
 	return os << "\n";
 }
+
+template <typename node_t>
+std::ostream& ptree(std::ostream &os, sp_node<node_t> n, size_t l = 0,
+	bool ws = true)
+{
+	return print_sp_tau_source_node_tree<node_t>(os, n, l, ws);
+}
+
+template <typename... BAs>
+std::ostream& ptree(std::ostream &os, sp_tau_node<BAs...> n, size_t l = 0,
+	bool ws = true)
+{
+	return print_sp_tau_node_tree<BAs...>(os, n, l, ws);
+}
+
+
 #endif // DEBUG
 } // namespace idni::tau
 
