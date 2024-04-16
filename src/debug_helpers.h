@@ -41,7 +41,7 @@ std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
 {
 	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
 	std::visit(overloaded{
-		[&os, &ws, &enter, &indent](tau_source_sym v) {
+		[&os, &indent](tau_source_sym v) {
 			indent();
 			if (v.nt()) os << parser_instance<tau_parser>()
 				.name(v.n()) << "(" << v.n() << ")";
