@@ -816,7 +816,7 @@ rr<nso<BAs...>> resolve_types(const rr<nso<BAs...>> f) {
 // creates a specific rule from a generic rule
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rule<nso<BAs...>> make_rule(tau_parser::nonterminal rule_t, tau_parser::nonterminal matcher_t, tau_parser::nonterminal body_t, sp_tau_node<BAs...>& rule) {
+rule<nso<BAs...>> make_rule(tau_parser::nonterminal rule_t, tau_parser::nonterminal matcher_t, tau_parser::nonterminal body_t, const sp_tau_node<BAs...>& rule) {
 	auto matcher = rule | rule_t | matcher_t| only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 	auto body = rule | rule_t | body_t | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 	return { matcher, body };
@@ -825,12 +825,12 @@ rule<nso<BAs...>> make_rule(tau_parser::nonterminal rule_t, tau_parser::nontermi
 // creates a specific rule from a generic rule
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rule<nso<BAs...>> make_rule(sp_tau_node<BAs...>& rule) {
+rule<nso<BAs...>> make_rule(const sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rule:  return make_rule<BAs...>(tau_parser::bf_rule,  tau_parser::bf_matcher,  tau_parser::bf_body,  rule);
-	case tau_parser::wff_rule: return make_rule<BAs...>(tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, rule);
-	case tau_parser::tau_rule: return make_rule<BAs...>(tau_parser::tau_rule, tau_parser::tau_matcher, tau_parser::tau_body, rule);
+	case tau_parser::bf_rule:  return make_rule<BAs...>(tau_parser::bf_rule,  tau_parser::bf_matcher,  tau_parser::bf_body,  rule); break;
+	case tau_parser::wff_rule: return make_rule<BAs...>(tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, rule); break;
+	case tau_parser::tau_rule: return make_rule<BAs...>(tau_parser::tau_rule, tau_parser::tau_matcher, tau_parser::tau_body, rule); break;
 	default: assert(false); return {};
 	};
 }
@@ -838,9 +838,9 @@ rule<nso<BAs...>> make_rule(sp_tau_node<BAs...>& rule) {
 // creates a specific rule from a generic rule.
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rec_relation<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t,
+rec_relation<nso<BAs...>> make_rec_relation(const tau_parser::nonterminal rule_t,
 	tau_parser::nonterminal ref_type_t, tau_parser::nonterminal type_t,
-	sp_tau_node<BAs...>& rule)
+	const sp_tau_node<BAs...>& rule)
 {
 	return {
 		make_node<tau_sym<BAs...>>(
@@ -852,11 +852,12 @@ rec_relation<nso<BAs...>> make_rec_relation(tau_parser::nonterminal rule_t,
 
 // creates a specific rule from a generic rule.
 template<typename... BAs>
-rec_relation<nso<BAs...>> make_rec_relation(sp_tau_node<BAs...>& rule) {
+rec_relation<nso<BAs...>> make_rec_relation(const sp_tau_node<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rec_relation:  return make_rec_relation<BAs...>(tau_parser::bf_rec_relation,  tau_parser::bf_ref,  tau_parser::bf,  rule);
-	case tau_parser::wff_rec_relation: return make_rec_relation<BAs...>(tau_parser::wff_rec_relation, tau_parser::wff_ref, tau_parser::wff, rule);
+	case tau_parser::bf_rec_relation:  return make_rec_relation<BAs...>(tau_parser::bf_rec_relation,  tau_parser::bf_ref,  tau_parser::bf,  rule); break;
+	case tau_parser::wff_rec_relation: return make_rec_relation<BAs...>(tau_parser::wff_rec_relation, tau_parser::wff_ref, tau_parser::wff, rule); break;
+	case tau_parser::tau_rec_relation: return make_rec_relation<BAs...>(tau_parser::tau_rec_relation, tau_parser::tau_ref, tau_parser::tau, rule); break;
 	default: assert(false); return {};
 	};
 }
