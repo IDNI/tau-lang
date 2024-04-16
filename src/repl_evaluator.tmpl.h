@@ -15,7 +15,6 @@
 #define __REPL_EVALUATOR_TMPL_H__
 
 #include "repl_evaluator.h"
-#include "parser_instance.h"
 #include "normalizer2.h"
 #include "normal_forms.h"
 #include "nso_rr.h"
@@ -300,14 +299,14 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto wff = arg | tau_parser::wff; wff) {
 		// TODOD (HIGH) binding
 		auto result = normalizer<tau_ba<BAs...>, BAs...>(wff.value());
-		std::cout << "normalized: " << result << "\n";
+		//std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto nso_rr = arg | tau_parser::nso_rr; nso_rr) {
 		auto n_nso_rr = make_nso_rr_using_factory<
 			factory_t, tau_ba<BAs...>, BAs...>(
 				arg.value(), factory);
 		auto result = normalizer<tau_ba<BAs...>, BAs...>(n_nso_rr);
-		std::cout << "normalized: " << result << "\n";
+		//std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto output = arg | tau_parser::output; output) {
 		// TODOD (HIGH) binding
@@ -315,7 +314,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		if (ref) {
 			auto [value, _] = ref.value();
 			auto result = normalizer<tau_ba<BAs...>, BAs...>(value);
-			std::cout << "normalized: " << result << "\n";
+			//std::cout << "normalized: " << result << "\n";
 			return result;
 		}
 		return {};
@@ -507,7 +506,10 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	// error handling
 	default: error = true, cout << "\nUnknown command\n"; break;
 	}
-
+#ifdef DEBUG
+	if (opt.debug_repl && result) ptree<tau_ba<BAs...>, BAs...>(
+		std::cout << "result tree: ", result.value()) << "\n";
+#endif
 	if (result) store_output(result.value());
 	return 0;
 }
