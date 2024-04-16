@@ -41,27 +41,58 @@ struct bdd_parser {
 	std::unique_ptr<forest_type> parse(int fd, parse_options po = {})
 		{ return p.parse(fd, po); }
 #endif //WIN32
-	sptree_type parse_and_shape(forest_type* f) {
+	sptree_type shape(forest_type* f, const node_type& n) {
 		idni::tree_shaping_options opt;
 		opt.to_trim = g.opt.to_trim;
 		opt.to_trim_children = g.opt.to_trim_children;
 		opt.trim_terminals = g.opt.trim_terminals;
 		opt.to_inline = g.opt.to_inline;
 		opt.inline_char_classes = g.opt.inline_char_classes;
-		return f->get_shaped_tree(opt);
+		return f->get_shaped_tree(n, opt);
 	}
 	sptree_type parse_and_shape(const char_type* data, size_t size,
-		parse_options po = {}) {
-			return parse_and_shape(p.parse(data, size, po).get()); }
+		const node_type& n, parse_options po = {})
+	{
+		return shape(p.parse(data, size, po).get(), n);
+	}
+	sptree_type parse_and_shape(const char_type* data, size_t size,
+		parse_options po = {})
+	{
+		auto f = p.parse(data, size, po);
+		return shape(f.get(), f->root());
+	}
 	sptree_type parse_and_shape(std::basic_istream<char_type>& is,
-		parse_options po = {}) {
-				return parse_and_shape(p.parse(is, po).get()); }
+		const node_type& n, parse_options po = {})
+	{
+		return shape(p.parse(is, po).get(), n);
+	}
+	sptree_type parse_and_shape(std::basic_istream<char_type>& is,
+		parse_options po = {})
+	{
+		auto f = p.parse(is, po);
+		return shape(f.get(), f->root());
+	}
 	sptree_type parse_and_shape(const std::string& fn,
-		parse_options po = {}) {
-				return parse_and_shape(p.parse(fn, po).get()); }
+		const node_type& n, parse_options po = {})
+	{
+		return shape(p.parse(fn, po).get(), n);
+	}
+	sptree_type parse_and_shape(const std::string& fn,
+		parse_options po = {})
+	{
+		auto f = p.parse(fn, po);
+		return shape(f.get(), f->root());
+	}
 #ifndef WIN32
+	sptree_type parse_and_shape(int fd, const node_type& n, parse_options po = {})
+	{
+		return shape(p.parse(fd, po).get(), n);
+	}
 	sptree_type parse_and_shape(int fd, parse_options po = {})
-		{ return parse_and_shape(p.parse(fd, po).get()); }
+	{
+		auto f = p.parse(fd, po);
+		return shape(f.get(), f->root());
+	}
 #endif //WIN32
 	bool found(size_t start = SIZE_MAX) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
