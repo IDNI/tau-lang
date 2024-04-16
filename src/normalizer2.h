@@ -67,7 +67,7 @@ RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "fex $X $Y := bf_remove_fexistential_cb $X $Y 
 RULE(BF_SKIP_CONSTANTS_0, "{ $X } & $Y := $Y & { $X }.")
 
 // bf definitions
-RULE(BF_DEF_XOR, "$X + $Y := $X & ($Y)' | ($X)' & $Y.")
+RULE(BF_DEF_XOR, "$X + $Y := $X & $Y' | $X' & $Y.")
 
 // bf callbacks
 RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
@@ -85,7 +85,7 @@ RULE(WFF_PUSH_NEGATION_INWARDS_1, "!($X || $Y) ::= ! $X && !$Y.")
 RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
 RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
-RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !($Y).")
+RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
 RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
 RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
@@ -100,24 +100,24 @@ RULE(WFF_SIMPLIFY_SELF_0, "$X && $X ::= $X.")
 RULE(WFF_SIMPLIFY_SELF_1, "$X || $X ::= $X.")
 RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
 RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
-RULE(WFF_SIMPLIFY_SELF_4, "!($X) && $X ::= F.")
-RULE(WFF_SIMPLIFY_SELF_5, "!($X) || $X ::= T.")
+RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
+RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
 
 // wff definitions of xor, ->, <- and <->.
-RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !($Y) || !($X) && $Y.")
-RULE(WFF_DEF_CONDITIONAL, "$X ? $Y : $Z ::= ($X -> $Y) && (!($X) -> $Z).")
-RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !($X) || $Y.")
+RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !$Y || !$X && $Y.")
+RULE(WFF_DEF_CONDITIONAL, "$X ? $Y : $Z ::= ($X -> $Y) && (!$X -> $Z).")
+RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !$X || $Y.")
 RULE(WFF_DEF_EQUIV, "$X <-> $Y ::= ($X -> $Y) && ($Y -> $X).")
 RULE(WFF_DEF_BEX_0, "bool_ex $X $Y ::= wff_remove_bexistential_cb $X $Y T F.")
 RULE(WFF_DEF_BALL_0, "bool_all $X $Y ::=  wff_remove_buniversal_cb $X $Y T F.")
 
 // additional wff dewfinitions (include wff formulas)
-RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & ($Y)' = 0.")
-RULE(BF_DEF_LESS, "$X < $Y ::= ($X & ($Y)' = 0) && ($X + ($Y)' != 0).")
-RULE(BF_DEF_GREATER, "$X > $Y ::= ($X & ($Y)' != 0) || ($X + ($Y)' = 0).")
+RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & $Y' = 0.")
+RULE(BF_DEF_LESS, "$X < $Y ::= ($X & $Y' = 0) && ($X + $Y' != 0).")
+RULE(BF_DEF_GREATER, "$X > $Y ::= ($X & $Y' != 0) || ($X + $Y' = 0).")
 // we must expand the xor as its definition has been allready processed
-RULE(BF_DEF_EQ, "$X = $Y ::= $X & ($Y)' | ($X)' & $Y = 0.")
-RULE(BF_DEF_NEQ, "$X != $Y ::= $X & ($Y)' | ($X)' & $Y != 0.")
+RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
+RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
 
 // wff callbacks
 RULE(BF_CALLBACK_EQ, "{ $X } = 0 ::= bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
@@ -138,18 +138,57 @@ RULE(WFF_REMOVE_EX_0, "ex $X $Y ::= wff_remove_existential_cb $X $Y.")
 
 RULE(BF_ELIM_PARENTHESIS,  "($X)   := $X.")
 RULE(WFF_ELIM_PARENTHESIS, "($X)  ::= $X.")
-//QUESTION do we need also the following rule? if so, where and when to apply
-//RULE(TAU_ELIM_PARENTHESIS, "($X) :::= $X.")
+RULE(TAU_ELIM_PARENTHESIS, "($X) :::= $X.")
 
 // TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
-// bf
+template<typename... BAs>
+static auto elim_parenthesis = make_library<BAs...>(
+	BF_ELIM_PARENTHESIS
+	+ WFF_ELIM_PARENTHESIS
+	+ TAU_ELIM_PARENTHESIS
+);
+
+template<typename step_t, typename... BAs>
+struct repeat_all;
+template<typename... BAs>
+struct step;
+
+template<typename... BAs>
+rule<nso<BAs...>> matcher_apply(const rule<nso<BAs...>>& r,
+	const library<nso<BAs...>>& rules)
+{
+	return rule<nso<BAs...>>{
+		r.first | repeat_all<step<BAs...>, BAs...>(step<BAs...>(rules)),
+		r.second};
+}
+
+template<typename... BAs>
+library<nso<BAs...>> matchers_apply(const library<nso<BAs...>>& lib,
+	const library<nso<BAs...>>& rules)
+{
+	library<nso<BAs...>> result;
+	for (const auto& l : lib) result.push_back(matcher_apply(l, rules));
+	return result;
+}
+
+template<typename... BAs>
+library<nso<BAs...>> make_library_matchers_apply(const std::string& source,
+	const library<nso<BAs...>>& rules)
+{
+	return matchers_apply(make_library<BAs...>(source), rules);
+}
+
+template<typename... BAs>
+library<nso<BAs...>> make_library_elim_parenthesis(const std::string& source) {
+	return make_library_matchers_apply<BAs...>(source, elim_parenthesis<BAs...>);
+}
+
 template<typename... BAs>
 // TODO (LOW) rename library with rwsys or another name
-static auto apply_defs = make_library<BAs...>(
+static auto apply_defs = make_library_elim_parenthesis<BAs...>(
 	// wff defs
-	WFF_ELIM_PARENTHESIS
-	+ WFF_DEF_XOR
+	WFF_DEF_XOR
 	+ WFF_DEF_CONDITIONAL
 	+ WFF_DEF_IMPLY
 	+ WFF_DEF_EQUIV
@@ -160,7 +199,7 @@ static auto apply_defs = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto apply_defs_once = make_library<BAs...>(
+static auto apply_defs_once = make_library_elim_parenthesis<BAs...>(
 	// wff defs
 	BF_DEF_LESS_EQUAL
 	+ BF_DEF_LESS
@@ -170,12 +209,12 @@ static auto apply_defs_once = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto elim_for_all = make_library<BAs...>(
+static auto elim_for_all = make_library_elim_parenthesis<BAs...>(
 	WFF_ELIM_FORALL
 );
 
 template<typename... BAs>
-static auto to_dnf_wff = make_library<BAs...>(
+static auto to_dnf_wff = make_library_elim_parenthesis<BAs...>(
 	WFF_TO_DNF_0
 	+ WFF_TO_DNF_1
 	+ WFF_PUSH_NEGATION_INWARDS_0
@@ -187,19 +226,17 @@ static auto to_dnf_wff = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto to_dnf_bf = make_library<BAs...>(
+static auto to_dnf_bf = make_library_elim_parenthesis<BAs...>(
 	BF_TO_DNF_0
 	+ BF_TO_DNF_1
 	+ BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
 	+ BF_ELIM_DOUBLE_NEGATION_0
-	+ BF_ELIM_PARENTHESIS
 );
 
 template<typename... BAs>
-static auto simplify_bf = make_library<BAs...>(
-	BF_ELIM_PARENTHESIS
-	+ BF_SIMPLIFY_ONE_0
+static auto simplify_bf = make_library_elim_parenthesis<BAs...>(
+	BF_SIMPLIFY_ONE_0
 	+ BF_SIMPLIFY_ONE_1
 	+ BF_SIMPLIFY_ONE_2
 	+ BF_SIMPLIFY_ONE_3
@@ -218,9 +255,8 @@ static auto simplify_bf = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto simplify_wff = make_library<BAs...>(
-	WFF_ELIM_PARENTHESIS
-	+ WFF_SIMPLIFY_ONE_0
+static auto simplify_wff = make_library_elim_parenthesis<BAs...>(
+	WFF_SIMPLIFY_ONE_0
 	+ WFF_SIMPLIFY_ONE_1
 	+ WFF_SIMPLIFY_ONE_2
 	+ WFF_SIMPLIFY_ONE_3
@@ -239,9 +275,8 @@ static auto simplify_wff = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto apply_cb = make_library<BAs...>(
-	BF_ELIM_PARENTHESIS
-	+ BF_CALLBACK_AND
+static auto apply_cb = make_library_elim_parenthesis<BAs...>(
+	BF_CALLBACK_AND
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR
 	+ BF_CALLBACK_NEG
@@ -250,44 +285,37 @@ static auto apply_cb = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto squeeze_positives = make_library<BAs...>(
-	BF_ELIM_PARENTHESIS
-	+ BF_SQUEEZE_POSITIVES_0
+static auto squeeze_positives = make_library_elim_parenthesis<BAs...>(
+	BF_SQUEEZE_POSITIVES_0
 );
 
 template<typename... BAs>
-static auto wff_remove_existential = make_library<BAs...>(
-	WFF_ELIM_PARENTHESIS
-	+ WFF_REMOVE_EX_0
+static auto wff_remove_existential = make_library_elim_parenthesis<BAs...>(
+	WFF_REMOVE_EX_0
 );
 
 template<typename... BAs>
-static auto bf_elim_quantifiers = make_library<BAs...>(
-	BF_ELIM_PARENTHESIS
-	+ BF_FUNCTIONAL_QUANTIFIERS_0
+static auto bf_elim_quantifiers = make_library_elim_parenthesis<BAs...>(
+	BF_FUNCTIONAL_QUANTIFIERS_0
 	+ BF_FUNCTIONAL_QUANTIFIERS_1
 );
 
 template<typename... BAs>
-static auto trivialities = make_library<BAs...>(
-	BF_ELIM_PARENTHESIS
-	+ BF_EQ_SIMPLIFY_0
+static auto trivialities = make_library_elim_parenthesis<BAs...>(
+	BF_EQ_SIMPLIFY_0
 	+ BF_EQ_SIMPLIFY_1
 	+ BF_NEQ_SIMPLIFY_0
 	+ BF_NEQ_SIMPLIFY_1
 );
 
 template<typename... BAs>
-static auto bf_positives_upwards = make_library<BAs...>(
-	BF_ELIM_PARENTHESIS
-	+ BF_POSITIVE_LITERAL_UPWARDS_0
+static auto bf_positives_upwards = make_library_elim_parenthesis<BAs...>(
+	BF_POSITIVE_LITERAL_UPWARDS_0
 	+ BF_POSITIVE_LITERAL_UPWARDS_1
 	+ BF_POSITIVE_LITERAL_UPWARDS_2
 	+ BF_POSITIVE_LITERAL_UPWARDS_3
 	+ BF_POSITIVE_LITERAL_UPWARDS_4
 );
-
-
 
 // TODO (MEDIUM) clean execution api code
 template<typename... BAs>
@@ -693,17 +721,24 @@ template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
 template<typename... BAs>
+auto apply_elim_parenthesis = repeat_all<step<BAs...>, BAs...>(
+	step<BAs...>(elim_parenthesis<BAs...>));
+
+template<typename... BAs>
 nso<BAs...> apply_definitions(const nso<BAs...>& form) {
 	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
 }
 
 template<typename... BAs>
 rr<nso<BAs...>> apply_definitions(const rr<nso<BAs...>>& nso_rr) {
-	auto nmain = apply_definitions(nso_rr.main);
+	auto nmain = apply_definitions(nso_rr.main
+		| apply_elim_parenthesis<BAs...>);
 	rec_relations<nso<BAs...>> nrec_relations;
 	for (const auto& r : nso_rr.rec_relations) {
 		auto [matcher, body] = r;
-		nrec_relations.emplace_back(matcher, apply_definitions(body));
+		nrec_relations.emplace_back(matcher
+				| apply_elim_parenthesis<BAs...>,
+			apply_definitions(body));
 	}
 	return { nrec_relations, nmain };
 }
@@ -714,8 +749,10 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 	static std::map<nso<BAs...>, nso<BAs...>> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 	auto result = form
+		| apply_elim_parenthesis<BAs...>
 		| repeat_all<step<BAs...>, BAs...>(
 			step<BAs...>(apply_defs<BAs...>))
+		| apply_elim_parenthesis<BAs...>
 		| repeat_all<step<BAs...>, BAs...>(
 			step<BAs...>(elim_for_all<BAs...>))
 		| repeat_each<step<BAs...>, BAs...>(
@@ -724,6 +761,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		| to_mnf_wff<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			bf_positives_upwards<BAs...>
+			| elim_parenthesis<BAs...>
 			| squeeze_positives<BAs...>
 			| wff_remove_existential<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
