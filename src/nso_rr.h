@@ -1972,11 +1972,30 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::wff_ex:
 			case tau_parser::wff_ball:
 			case tau_parser::wff_bex:
+			// callbacks
+			case tau_parser::bf_and_cb:
+			case tau_parser::bf_or_cb:
+			case tau_parser::bf_xor_cb:
+			case tau_parser::bf_neg_cb:
+			case tau_parser::bf_eq_cb:
+			case tau_parser::bf_neq_cb:
+			case tau_parser::bf_is_zero_cb:
+			case tau_parser::bf_is_one_cb:
+			case tau_parser::bf_remove_funiversal_cb:
+			case tau_parser::bf_remove_fexistential_cb:
+			case tau_parser::wff_remove_existential_cb:
+			case tau_parser::wff_remove_bexistential_cb:
+			case tau_parser::wff_remove_buniversal_cb:
+			case tau_parser::wff_has_clashing_subformulas_cb:
+			case tau_parser::bf_has_subformula_cb:
+			case tau_parser::wff_has_subformula_cb:
+			case tau_parser::tau_collapse_positives_cb:
+			case tau_parser::tau_positives_upwards_cb:
 			{
 				auto& ch = n->child;
 				print_terminals(stream, ch[0]);
-				pp(stream << " ", ch[1], tss.n());
-				pp(stream << " ", ch[2], tss.n());
+				for (size_t i = 1; i < ch.size(); ++i)
+					pp(stream << " ", ch[i], tss.n());
 			} break;
 			// just print terminals for these
 			case tau_parser::capture:
