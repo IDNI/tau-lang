@@ -1803,7 +1803,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 {
 //#define DEBUG_PP
 //#ifdef DEBUG_PP
-	//auto& p = idni::parser_instance<tau_parser>();
+//auto& p = idni::parser_instance<tau_parser>();
 //	auto dbg = [&stream, &p](const auto& c) {
 //		if (std::holds_alternative<idni::tau::tau_source_sym>(c->value)) {
 //			auto tss = std::get<idni::tau::tau_source_sym>(c->value);
@@ -1936,7 +1936,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::tau:
 			{
 				auto& ch = n->child;
-				if (ch.size() > 1) pp(stream, ch[1], parent);
+				if (ch.size() > 1)
+					pp(stream << "(", ch[1], parent) << ")";
 				else {
 					bool wrap = is_to_wrap(ch[0], parent);
 					if (wrap) stream << "(";
