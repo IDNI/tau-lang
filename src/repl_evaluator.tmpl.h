@@ -446,52 +446,53 @@ template <typename factory_t, typename... BAs>
 int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& n)
 {
-	auto command = n | only_child_extractor<tau_ba<BAs...>, BAs...>;
+	auto command = (n | only_child_extractor<tau_ba<BAs...>, BAs...>)
+		.value() | apply_elim_parenthesis<tau_ba<BAs...>, BAs...>;
 	auto command_type = command
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 #ifdef DEBUG
 	if (opt.debug_repl) {
-		std::cout << "command: " << command.value() << "\n";
+		std::cout << "command: " << command << "\n";
 		print_sp_tau_node_tree<tau_ba<BAs...>, BAs...>(cout
-			<< "tree: ", command.value()) << "\n";
+			<< "tree: ", command) << "\n";
 	}
 #endif
 	std::optional<sp_tau_node<tau_ba<BAs...>, BAs...>> result;
 	using p = tau_parser;
 	switch (command_type) {
-	case p::quit_cmd: return cout << "Quit.\n", 1;
+	case p::quit_cmd:           return cout << "Quit.\n", 1;
 	case p::clear_cmd:          if (r) r->clear(); break;
-	case p::help_cmd:           help_cmd(command.value()); break;
+	case p::help_cmd:           help_cmd(command); break;
 	case p::version_cmd:        version_cmd(); break;
-	case p::get_cmd:            get_cmd(command.value()); break;
-	case p::set_cmd:            set_cmd(command.value()); break;
-	case p::toggle_cmd:         toggle_cmd(command.value()); break;
+	case p::get_cmd:            get_cmd(command); break;
+	case p::set_cmd:            set_cmd(command); break;
+	case p::toggle_cmd:         toggle_cmd(command); break;
 	case p::list_outputs_cmd:   list_outputs_cmd(); break;
 	case p::clear_outputs_cmd:  clear_outputs_cmd(); break;
-	case p::print_output_cmd:   print_output_cmd(command.value()); break;
+	case p::print_output_cmd:   print_output_cmd(command); break;
 	// normalization
-	case p::normalize_cmd:      result = normalizer_cmd(command.value()); break;
+	case p::normalize_cmd:      result = normalizer_cmd(command); break;
 	// substitution and instantiation
-	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command.value()); break;
-	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command.value()); break;
-	case p::wff_substitute_cmd: result = wff_substitute_cmd(command.value()); break;
-	case p::wff_instantiate_cmd:result = wff_instantiate_cmd(command.value()); break;
+	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command); break;
+	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command); break;
+	case p::wff_substitute_cmd: result = wff_substitute_cmd(command); break;
+	case p::wff_instantiate_cmd:result = wff_instantiate_cmd(command); break;
 	// wff normal forms
-	case p::wff_onf_cmd:        result = wff_onf_cmd(command.value()); break;
-	case p::wff_dnf_cmd:        result = wff_dnf_cmd(command.value()); break;
-	case p::wff_cnf_cmd:        result = wff_cnf_cmd(command.value()); break;
+	case p::wff_onf_cmd:        result = wff_onf_cmd(command); break;
+	case p::wff_dnf_cmd:        result = wff_dnf_cmd(command); break;
+	case p::wff_cnf_cmd:        result = wff_cnf_cmd(command); break;
 	case p::wff_anf_cmd:        not_implemented_yet(); break;
-	case p::wff_nnf_cmd:        result = wff_cnf_cmd(command.value()); break;
+	case p::wff_nnf_cmd:        result = wff_cnf_cmd(command); break;
 	case p::wff_pnf_cmd:        not_implemented_yet(); break;
-	case p::wff_mnf_cmd:        result = wff_mnf_cmd(command.value()); break;
+	case p::wff_mnf_cmd:        result = wff_mnf_cmd(command); break;
 	// bf normal forms
-	case p::bf_dnf_cmd:         result = bf_dnf_cmd(command.value()); break;
-	case p::bf_cnf_cmd:         result = bf_cnf_cmd(command.value()); break;
+	case p::bf_dnf_cmd:         result = bf_dnf_cmd(command); break;
+	case p::bf_cnf_cmd:         result = bf_cnf_cmd(command); break;
 	case p::bf_anf_cmd:         not_implemented_yet(); break;
-	case p::bf_nnf_cmd:         result = bf_nnf_cmd(command.value()); break;
+	case p::bf_nnf_cmd:         result = bf_nnf_cmd(command); break;
 	case p::bf_pnf_cmd:         not_implemented_yet(); break;
-	case p::bf_mnf_cmd:         result = bf_mnf_cmd(command.value()); break;
+	case p::bf_mnf_cmd:         result = bf_mnf_cmd(command); break;
 	// store the given formula as output for future references
 	case p::bf:                 result = command; break;
 	case p::wff:                result = command; break;
