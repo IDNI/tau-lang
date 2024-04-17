@@ -1941,8 +1941,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 				else {
 					bool wrap = is_to_wrap(ch[0], parent);
 					if (wrap) stream << "(";
-					for (const auto& c : ch)
-						pp(stream, c, parent);
+					pp(stream, ch[0], parent);
 					if (wrap) stream << ")";
 				}
 			} break;
@@ -2022,6 +2021,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// just print terminals for these
 			case tau_parser::capture:
 			case tau_parser::variable:
+			case tau_parser::bool_variable:
 			case tau_parser::bf_ref:
 			case tau_parser::wff_ref:
 			case tau_parser::tau_ref:
