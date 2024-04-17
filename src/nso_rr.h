@@ -1801,23 +1801,23 @@ template <typename... BAs>
 std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 	size_t parent, bool passthrough)
 {
-//#define DEBUG_PP
-//#ifdef DEBUG_PP
-//auto& p = idni::parser_instance<tau_parser>();
-//	auto dbg = [&stream, &p](const auto& c) {
-//		if (std::holds_alternative<idni::tau::tau_source_sym>(c->value)) {
-//			auto tss = std::get<idni::tau::tau_source_sym>(c->value);
-//			if (tss.nt()) stream << " NT:" << p.name(tss.n()) << " ";
-//			else if (tss.is_null()) stream << " <NULL> ";
-//			else stream << " T:'" << tss.t() << "' ";
-//		} else stream << " NONLIT:`" <<c->value << "` ";
-//	};
-//	stream << "\n";
-//	dbg(n);
-//	stream << "    child.size: " << n->child.size() << "\n";
-//	for (const auto& c : n->child)
-//		stream << "\t", dbg(c), stream << "\n";
-//#endif // DEBUG_PP
+// #define DEBUG_PP
+// #ifdef DEBUG_PP
+// auto& p = idni::parser_instance<tau_parser>();
+// 	auto dbg = [&stream, &p](const auto& c) {
+// 		if (std::holds_alternative<idni::tau::tau_source_sym>(c->value)) {
+// 			auto tss = std::get<idni::tau::tau_source_sym>(c->value);
+// 			if (tss.nt()) stream << " NT:" << p.name(tss.n()) << " ";
+// 			else if (tss.is_null()) stream << " <NULL> ";
+// 			else stream << " T:'" << tss.t() << "' ";
+// 		} else stream << " NONLIT:`" <<c->value << "` ";
+// 	};
+// 	stream << "\n";
+// 	dbg(n);
+// 	stream << "    child.size: " << n->child.size() << "\n";
+// 	for (const auto& c : n->child)
+// 		stream << "\t", dbg(c), stream << "\n";
+// #endif // DEBUG_PP
 	static auto is_to_wrap = [](const idni::tau::sp_tau_node<BAs...>& n,
 		size_t parent)
 	{
@@ -1975,16 +1975,15 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::tau_or:
 			{
 				auto& ch = n->child;
-				auto l = ch.size();
-				for (size_t i = 0; i != l; ++i)
-					if (i == 0 || i == 3
-						|| (i >= (l==2 ?1 :2) && l < 4))
-							pp(stream,
-								ch[i], tss.n());
-					else if (tss.n() == tau_parser::bf_and)
+				pp(stream, ch[0], tss.n());
+				size_t l = ch.size();
+				if (l == 2) {
+					if (tss.n() == tau_parser::bf_and)
 						stream << " & ";
-					else print_terminals(
-						stream << " ", ch[i]) << " ";
+					else if (tss.n() == tau_parser::wff_and)
+						stream << " && ";
+				} else print_terminals(stream<<" ", ch[1])<<" ";
+				pp(stream, ch[l-1], tss.n());
 			} break;
 			// quantifiers
 			case tau_parser::bf_all:
