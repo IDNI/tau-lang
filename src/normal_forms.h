@@ -23,10 +23,10 @@
 namespace idni::tau {
 
 // conjunctive normal form
-RULE(BF_TO_CNF_0, "($X & $Y) | $Z := ($X | $Z) & ($Y | $Z).")
-RULE(BF_TO_CNF_1, "$X | ($Y & $Z) := ($X | $Y) & ($X | $Z).")
-RULE(WFF_TO_CNF_0, "($X && $Y) || $Z ::= ($X || $Z) && ($Y || $Z).")
-RULE(WFF_TO_CNF_1, "$X || ($Y && $Z) ::= ($X || $Y) && ($X || $Z).")
+RULE(BF_TO_CNF_0, "$X & $Y | $Z := ($X | $Z) & ($Y | $Z).")
+RULE(BF_TO_CNF_1, "$X | $Y & $Z := ($X | $Y) & ($X | $Z).")
+RULE(WFF_TO_CNF_0, "$X && $Y || $Z ::= ($X || $Z) && ($Y || $Z).")
+RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
 
 template<typename... BAs>
 static auto to_cnf_wff = make_library_elim_parenthesis<BAs...>(
@@ -85,18 +85,24 @@ nso<BAs...> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 
 template<size_t type, typename...BAs>
 nso<BAs...> dnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff)
-		return n | repeat_each<step<BAs...>, BAs...>(step<BAs...>(to_dnf_wff<BAs...>));
-	else
-		return n | repeat_each<step<BAs...>, BAs...>(step<BAs...>(to_dnf_bf<BAs...>));
+	if constexpr (type == tau_parser::wff) return n
+		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
+			to_dnf_wff<BAs...>));
+	else return n
+		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
+			to_dnf_bf<BAs...>));
 }
 
 template<size_t type, typename...BAs>
 nso<BAs...> cnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff)
-		return n | repeat_each<step<BAs...>, BAs...>(step<BAs...>(to_cnf_wff<BAs...>));
-	else
-		return n | repeat_each<step<BAs...>, BAs...>(step<BAs...>(to_cnf_bf<BAs...>));
+	if constexpr (type == tau_parser::wff) return n
+		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
+			to_cnf_wff<BAs...>))
+		| apply_elim_parenthesis<BAs...>;
+	else return n
+		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
+			to_cnf_bf<BAs...>))
+		| apply_elim_parenthesis<BAs...>;
 }
 
 template<size_t type, typename...BAs>

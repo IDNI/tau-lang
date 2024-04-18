@@ -113,8 +113,8 @@ RULE(WFF_DEF_BALL_0, "bool_all $X $Y ::=  wff_remove_buniversal_cb $X $Y T F.")
 
 // additional wff dewfinitions (include wff formulas)
 RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & $Y' = 0.")
-RULE(BF_DEF_LESS, "$X < $Y ::= ($X & $Y' = 0) && ($X + $Y' != 0).")
-RULE(BF_DEF_GREATER, "$X > $Y ::= ($X & $Y' != 0) || ($X + $Y' = 0).")
+RULE(BF_DEF_LESS, "$X < $Y ::= $X & $Y' = 0 && $X + $Y' != 0.")
+RULE(BF_DEF_GREATER, "$X > $Y ::= $X & $Y' != 0 || $X + $Y' = 0.")
 // we must expand the xor as its definition has been allready processed
 RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
 RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
