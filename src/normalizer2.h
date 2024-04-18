@@ -222,7 +222,6 @@ static auto to_dnf_wff = make_library_elim_parenthesis<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_ELIM_DOUBLE_NEGATION_0
-	+ WFF_ELIM_PARENTHESIS
 );
 
 template<typename... BAs>
