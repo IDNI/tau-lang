@@ -1841,6 +1841,39 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		// lower number = higher priority
 		static const std::map<size_t, size_t> prio = {
 			{ tau_parser::start,                             0 },
+			// cli commands
+			{ tau_parser::help_cmd,                         50 },
+			{ tau_parser::file,                             50 },
+			{ tau_parser::normalize_cmd,                    50 },
+			{ tau_parser::bf_instantiate_cmd,               50 },
+			{ tau_parser::bf_substitute_cmd,                50 },
+			{ tau_parser::bf_dnf_cmd,                       50 },
+			{ tau_parser::bf_cnf_cmd,                       50 },
+			{ tau_parser::bf_anf_cmd,                       50 },
+			{ tau_parser::bf_nnf_cmd,                       50 },
+			{ tau_parser::bf_pnf_cmd,                       50 },
+			{ tau_parser::bf_mnf_cmd,                       50 },
+			{ tau_parser::wff_instantiate_cmd,              50 },
+			{ tau_parser::wff_substitute_cmd,               50 },
+			{ tau_parser::wff_onf_cmd,                      50 },
+			{ tau_parser::wff_dnf_cmd,                      50 },
+			{ tau_parser::wff_cnf_cmd,                      50 },
+			{ tau_parser::wff_anf_cmd,                      50 },
+			{ tau_parser::wff_nnf_cmd,                      50 },
+			{ tau_parser::wff_pnf_cmd,                      50 },
+			{ tau_parser::wff_mnf_cmd,                      50 },
+			{ tau_parser::def_wff_cmd,                      50 },
+			{ tau_parser::def_bf_cmd,                       50 },
+			{ tau_parser::def_tau_cmd,                      50 },
+			{ tau_parser::def_list_cmd,                     50 },
+			{ tau_parser::def_del_cmd,                      50 },
+			{ tau_parser::def_clear_cmd,                    50 },
+			{ tau_parser::wff_selection,                    50 },
+			{ tau_parser::bf_selection,                     50 },
+			{ tau_parser::bf_var_selection,                 50 },
+			{ tau_parser::wff_var_selection,                50 },
+			{ tau_parser::list_outputs_cmd,                 50 },
+			{ tau_parser::clear_outputs_cmd,                50 },
 			// tau
 			{ tau_parser::tau_collapse_positives_cb,       100 },
 			{ tau_parser::tau_positives_upwards_cb,        110 },
@@ -1926,10 +1959,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		auto tss = std::get<idni::tau::tau_source_sym>(n->value);
 		if (tss.nt()) { //stream << " " << p.name(tss.n()) << ":";
 			switch (tss.n()) {
-			// skip whitespace since we reformat our way
-			case tau_parser::_:
-			case tau_parser::__:
-				break;
 			// wrappable by parenthesis
 			case tau_parser::bf:
 			case tau_parser::wff:
@@ -1949,11 +1978,9 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_neg:
 			case tau_parser::wff_neg:
 			case tau_parser::tau_neg:
-			{
-				//auto ch = get_children(n->child);
 				for (const auto& c : n->child)
 					pp(stream, c, tss.n());
-			} break;
+				break;
 			// binary operators
 			case tau_parser::bf_and:
 			case tau_parser::bf_or:
@@ -2011,6 +2038,39 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::wff_has_subformula_cb:
 			case tau_parser::tau_collapse_positives_cb:
 			case tau_parser::tau_positives_upwards_cb:
+			// cli commands
+			case tau_parser::help_cmd:
+			case tau_parser::file:
+			case tau_parser::normalize_cmd:
+			case tau_parser::bf_instantiate_cmd:
+			case tau_parser::bf_substitute_cmd:
+			case tau_parser::bf_dnf_cmd:
+			case tau_parser::bf_cnf_cmd:
+			case tau_parser::bf_anf_cmd:
+			case tau_parser::bf_nnf_cmd:
+			case tau_parser::bf_pnf_cmd:
+			case tau_parser::bf_mnf_cmd:
+			case tau_parser::wff_instantiate_cmd:
+			case tau_parser::wff_substitute_cmd:
+			case tau_parser::wff_onf_cmd:
+			case tau_parser::wff_dnf_cmd:
+			case tau_parser::wff_cnf_cmd:
+			case tau_parser::wff_anf_cmd:
+			case tau_parser::wff_nnf_cmd:
+			case tau_parser::wff_pnf_cmd:
+			case tau_parser::wff_mnf_cmd:
+			case tau_parser::def_wff_cmd:
+			case tau_parser::def_bf_cmd:
+			case tau_parser::def_tau_cmd:
+			case tau_parser::def_list_cmd:
+			case tau_parser::def_del_cmd:
+			case tau_parser::def_clear_cmd:
+			case tau_parser::wff_selection:
+			case tau_parser::bf_selection:
+			case tau_parser::bf_var_selection:
+			case tau_parser::wff_var_selection:
+			case tau_parser::list_outputs_cmd:
+			case tau_parser::clear_outputs_cmd:
 			{
 				auto& ch = n->child;
 				print_terminals(stream, ch[0]);
