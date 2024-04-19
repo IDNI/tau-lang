@@ -143,7 +143,11 @@ private:
 	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
-	
+	void def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_list_cmd();
+	void def_clear_cmd();
+
 
 	int eval_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
 	void print_output_cmd(
@@ -163,9 +167,11 @@ private:
 	outputs m;
 	factory_t factory;
 	options opt{};
+	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<factory_t, BAs...>>* r = 0;
-	idni::term::colors TC{};
+	rec_relations<gssotc<BAs...>> definitions;
 	bool error = false;
+	idni::term::colors TC{};
 };
 
 } //idni::tau namespace
