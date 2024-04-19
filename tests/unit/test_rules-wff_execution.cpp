@@ -35,7 +35,6 @@ std::tuple<sp_tau_node<Bool>, sp_tau_node<Bool>, sp_tau_node<Bool>>
 		| tau_parser::rules
 		| tau_parser::rule;
 	auto tau_rule = make_rule(rule.value());
-	tau_rule.first = tau_rule.first | apply_elim_parenthesis<Bool>;
 	auto [matcher, body] = tau_rule;
 	auto result = nso_rr_apply(tau_rule, matcher);
 	return { matcher, body, result };

@@ -446,8 +446,8 @@ template <typename factory_t, typename... BAs>
 int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& n)
 {
-	auto command = (n | only_child_extractor<tau_ba<BAs...>, BAs...>)
-		.value() | apply_elim_parenthesis<tau_ba<BAs...>, BAs...>;
+	auto command = (n
+		| only_child_extractor<tau_ba<BAs...>, BAs...>).value();
 	auto command_type = command
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;

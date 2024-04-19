@@ -15,6 +15,10 @@
 
 @trim _, __.
 
+@inline bf > bf_parenthesis > bf,
+	wff > wff_parenthesis > wff,
+	tau > tau_parenthesis > tau.
+
 #
 # as a rule of thumb, to ease navigation of the corresponding tree, the
 # non-terminals shouldn't appear in * or + expressions. Otherwise,
@@ -140,8 +144,9 @@ tau                    => tau_and.
 tau                    => tau_neg.
 tau                    => tau_wff.
 tau                    => capture.
-tau                    => open_parenthesis _ tau _ close_parenthesis.
+tau                    => tau_parenthesis.
 
+tau_parenthesis        => open_parenthesis _ tau _ close_parenthesis.
 tau_and                => tau _ tau_and_sym _ tau.
 tau_or                 => tau _ tau_or_sym  _ tau.
 tau_neg                => tau_neg_sym _ tau.
@@ -178,8 +183,9 @@ wff                    => bf_neq | bf_eq | bf_not_less_equal | bf_greater
                         | bf_less_equal | bf_less.
 wff                    => capture.
 wff                    => bool_variable.
-wff                    => open_parenthesis _ wff _ close_parenthesis.
+wff                    => wff_parenthesis.
 
+wff_parenthesis        => open_parenthesis _ wff _ close_parenthesis.
 wff_ref                => sym _ [offsets] _ wff_ref_args.
 # TODO (MEDIUM) properly deal with _ and __ to separate the arguments
 wff_ref_args           => open_parenthesis (_ wff_ref_arg)* _ close_parenthesis.
@@ -229,8 +235,9 @@ bf                     => bf_constant.
 bf                     => bf_t | bf_f.
 bf                     => capture.
 bf                     => variable.
-bf                     => open_parenthesis _ bf _ close_parenthesis.
+bf                     => bf_parenthesis.
 
+bf_parenthesis         => open_parenthesis _ bf _ close_parenthesis.
 bf_rec_relation        => bf_ref _ bf_def _ bf _ dot.
 bf_ref                 => sym [offsets] bf_ref_args.
 # TODO (MEDIUM) properly deal with _ and __ to separate the arguments

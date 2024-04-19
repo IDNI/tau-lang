@@ -29,7 +29,7 @@ RULE(WFF_TO_CNF_0, "$X && $Y || $Z ::= ($X || $Z) && ($Y || $Z).")
 RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
 
 template<typename... BAs>
-static auto to_cnf_wff = make_library_elim_parenthesis<BAs...>(
+static auto to_cnf_wff = make_library<BAs...>(
 	WFF_TO_CNF_0
 	+ WFF_TO_CNF_1
 	+ WFF_PUSH_NEGATION_INWARDS_0
@@ -40,7 +40,7 @@ static auto to_cnf_wff = make_library_elim_parenthesis<BAs...>(
 );
 
 template<typename... BAs>
-static auto to_cnf_bf = make_library_elim_parenthesis<BAs...>(
+static auto to_cnf_bf = make_library<BAs...>(
 	BF_TO_CNF_0
 	+ BF_TO_CNF_1
 	+ BF_PUSH_NEGATION_INWARDS_0
@@ -49,7 +49,7 @@ static auto to_cnf_bf = make_library_elim_parenthesis<BAs...>(
 );
 
 template<typename...BAs>
-static auto to_nnf_wff = make_library_elim_parenthesis<BAs...>(
+static auto to_nnf_wff = make_library<BAs...>(
 	WFF_PUSH_NEGATION_INWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_1
 	+ WFF_PUSH_NEGATION_INWARDS_2
@@ -58,7 +58,7 @@ static auto to_nnf_wff = make_library_elim_parenthesis<BAs...>(
 );
 
 template<typename...BAs>
-static auto to_nnf_bf = make_library_elim_parenthesis<BAs...>(
+static auto to_nnf_bf = make_library<BAs...>(
 	BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
 	+ BF_ELIM_DOUBLE_NEGATION_0
@@ -97,12 +97,10 @@ template<size_t type, typename...BAs>
 nso<BAs...> cnf(const nso<BAs...>& n) {
 	if constexpr (type == tau_parser::wff) return n
 		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-			to_cnf_wff<BAs...>))
-		| apply_elim_parenthesis<BAs...>;
+			to_cnf_wff<BAs...>));
 	else return n
 		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-			to_cnf_bf<BAs...>))
-		| apply_elim_parenthesis<BAs...>;
+			to_cnf_bf<BAs...>));
 }
 
 template<size_t type, typename...BAs>
