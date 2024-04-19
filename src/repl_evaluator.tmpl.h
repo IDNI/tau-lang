@@ -298,14 +298,19 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	auto arg = n | tau_parser::normalize_cmd_arg;
 	if (auto wff = arg | tau_parser::wff; wff) {
 		// TODOD (HIGH) binding
-		auto result = normalizer<tau_ba<BAs...>, BAs...>(wff.value());
+		rr<gssotc<BAs...>> rr_wff = { definitions, wff.value() };
+		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
 		//std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto nso_rr = arg | tau_parser::nso_rr; nso_rr) {
 		auto n_nso_rr = make_nso_rr_using_factory<
 			factory_t, tau_ba<BAs...>, BAs...>(
 				arg.value(), factory);
-		auto result = normalizer<tau_ba<BAs...>, BAs...>(n_nso_rr);
+		rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs;
+		rrs.insert(rrs.end(), n_nso_rr.rec_relations.begin(), n_nso_rr.rec_relations.end());
+		rrs.insert(rrs.end(), definitions.begin(), definitions.end());
+		rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = { rrs, n_nso_rr.main };
+		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
 		//std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto output = arg | tau_parser::output; output) {
@@ -313,13 +318,36 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		auto ref = get_output_ref(output.value());
 		if (ref) {
 			auto [value, _] = ref.value();
-			auto result = normalizer<tau_ba<BAs...>, BAs...>(value);
+			rr<gssotc<BAs...>> rr_output = { definitions, value };
+			auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_output);
 			//std::cout << "normalized: " << result << "\n";
 			return result;
 		}
 		return {};
 	}
 	return arg;
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto rule = make_rec_relation<tau_ba<BAs...>, BAs...>(n);
+	definitions.emplace_back(rule);
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_list_cmd() {
+	for (size_t i = 0; i < definitions.size(); i++)	cout << "[" << i << "]" << definitions[i] << "\n";
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_clear_cmd() {
+	definitions.clear();
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto idx = digits(n | tau_parser::digits | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>);
+	definitions.erase(definitions.begin() + idx);
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -498,12 +526,10 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::wff:                result = command; break;
 	case p::nso_rr:	            result = command; break;
 	// definition of rec relations to be included during normalization
-	case p::def_bf_cmd:         not_implemented_yet(); break;
-	case p::def_wff_cmd:        not_implemented_yet(); break;
-	case p::def_tau_cmd:        not_implemented_yet(); break;
-	case p::def_list_cmd:       not_implemented_yet(); break;
-	case p::def_clear_cmd:      not_implemented_yet(); break;
-	case p::def_del_cmd:        not_implemented_yet(); break;
+	case p::def_rule_cmd:       def_rule_cmd(command); break;
+	case p::def_list_cmd:       def_list_cmd(); break;
+	case p::def_clear_cmd:      def_clear_cmd(); break;
+	case p::def_del_cmd:        def_del_cmd(command); break;
 	// error handling
 	default: error = true, cout << "\nUnknown command\n"; break;
 	}
