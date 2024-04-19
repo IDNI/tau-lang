@@ -31,8 +31,8 @@
 
 namespace idni::tau {
 
-#define TC_STATUS        TC.BG_CYAN()
-#define TC_STATUS_OUTPUT TC(color::GREEN, color::BG_CYAN, color::BRIGHT)
+#define TC_STATUS        TC.BG_LIGHT_CYAN()
+#define TC_STATUS_OUTPUT TC(color::GREEN, color::BG_LIGHT_CYAN, color::BRIGHT)
 #define TC_ERROR         TC(color::RED,   color::BRIGHT)
 #define TC_PROMPT        TC(color::WHITE, color::BRIGHT)
 #define TC_OUTPUT        TC.GREEN()
@@ -82,7 +82,7 @@ repl_evaluator<factory_t, BAs...>::output_ref
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::print_output(size_t id) {
-	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << " / "
+	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << "/"
 		<< TC_OUTPUT << "%" << (m.size() - id - 1) << TC.CLEAR()
 		<< ": " << m[id] << "\n";
 }
@@ -356,6 +356,7 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 	repl_evaluator<factory_t, BAs...>::make_cli(
 		const std::string& src)
 {
+	// remove ascii char 22 if exists in the input
 	std::string filt = src;
 	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
 		return c == 22;
@@ -365,7 +366,7 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 		//.debug = opt.debug_repl
 	});
 	if (!cli_src) // flush! new line and return null if invalid source
-		return (std::cout << std::endl), nullptr;
+		return (std::cout << std::endl), error = true, nullptr;
 	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
 	tau_factory<factory_t, BAs...> tf(factory);
 	return bind_tau_code_using_factory<tau_factory<factory_t, BAs...>,
@@ -392,6 +393,20 @@ void repl_evaluator<factory_t, BAs...>::get_cmd(
 	if (!option.has_value()) { for (auto& [_, v] : printers) v(); return; }
 	printers[get_opt(option.value())]();
 
+}
+
+template <typename factory_t, typename... BAs>
+boost::log::trivial::severity_level
+	repl_evaluator<factory_t, BAs...>::nt2severity(size_t nt) const
+{
+	switch (nt) {
+		case tau_parser::error_sym: return boost::log::trivial::error;
+		case tau_parser::debug_sym: return boost::log::trivial::debug;
+		case tau_parser::trace_sym: return boost::log::trivial::trace;
+		case tau_parser::info_sym:  return boost::log::trivial::info;
+		default: std::cerr << "error: invalid severity value\n";
+	}
+	return boost::log::trivial::error;
 }
 
 template <typename... BAs>
@@ -432,17 +447,10 @@ void repl_evaluator<factory_t, BAs...>::set_cmd(
 		auto sev = v | tau_parser::severity;
 		if (!sev.has_value()) {
 			cout << "error: invalid severity value\n"; return; }
-		auto sev_type = sev
+		opt.severity = nt2severity(sev
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
-			| optional_value_extractor<size_t>;
-		switch (sev_type) {
-		case tau_parser::error_sym: opt.severity = trivial::error;break;
-		case tau_parser::debug_sym: opt.severity = trivial::debug;break;
-		case tau_parser::trace_sym: opt.severity = trivial::trace;break;
-		case tau_parser::info_sym:  opt.severity = trivial::info; break;
-		default: cout << "error: invalid severity value\n"; return;
-		}
+			| optional_value_extractor<size_t>);
 		boost::log::core::get()->set_filter(
 			boost::log::trivial::severity >= opt.severity);
 		}
@@ -546,6 +554,8 @@ repl_evaluator<factory_t, BAs...>::repl_evaluator(factory_t& factory,
 	options opt) : factory(factory), opt(opt)
 {
 	TC.set(opt.colors);
+	boost::log::core::get()->set_filter(
+		boost::log::trivial::severity >= opt.severity);
 }
 
 template <typename factory_t, typename... BAs>
@@ -561,8 +571,7 @@ std::string repl_evaluator<factory_t, BAs...>::prompt() {
 		if (status.tellp()) ss << TC_STATUS << "["
 			<< status.str() << " ]" << TC.CLEAR() << " ";
 	}
-	if (error) ss << TC_ERROR << "error" << TC.CLEAR() << " ";
-	ss << TC_PROMPT << "tau>" << TC.CLEAR() << " ";
+	ss << (error ? TC_ERROR : TC_PROMPT) << "tau>" << TC.CLEAR() << " ";
 	if (r) r->prompt(ss.str());
 	return ss.str();
 }

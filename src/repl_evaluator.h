@@ -81,14 +81,15 @@ struct repl_evaluator {
 		options() {};
 		bool status     = true;
 		bool colors     = true;
-		bool debug_repl =
 #ifdef DEBUG
-					true;
+		bool debug_repl = true;
+		boost::log::trivial::severity_level
+			severity = boost::log::trivial::debug;
 #else
-					false;
-#endif
+		bool debug_repl = false;
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::error;
+#endif
 	};
 
 	repl_evaluator(factory_t& factory, options opt = options{});
@@ -97,14 +98,40 @@ struct repl_evaluator {
 
 private:
 
+	int eval_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
+
+	// helpers
+	sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string& src);
+	size_t digits(sp_tau_node<tau_ba<BAs...>, BAs...> n);
+	boost::log::trivial::severity_level nt2severity(size_t nt) const;
 	repl_evaluator<factory_t, BAs...>::output_ref get_output_ref(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
 		bool silent = false);
+	void store_output(repl_evaluator<factory_t, BAs...>::output o);
 	void print_output(size_t id);
 
+	// commands
+	void not_implemented_yet();
+
+	void version_cmd();
+	void help_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+
+	void get_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
+	void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
+	void toggle_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
+
+	void print_output_cmd(
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
 	void list_outputs_cmd();
 	void clear_outputs_cmd();
-	void store_output(repl_evaluator<factory_t, BAs...>::output o);
+
+	void def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_list_cmd();
+	void def_clear_cmd();
+
+	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(
 		const nso<tau_ba<BAs...>, BAs...>& n);
@@ -139,30 +166,6 @@ private:
 		const nso<tau_ba<BAs...>, BAs...>& n);
 	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_instantiate_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-
-	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-
-	void def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void def_list_cmd();
-	void def_clear_cmd();
-
-
-	int eval_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
-	void print_output_cmd(
-		const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
-	void get_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
-	void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
-	void toggle_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
-
-	sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string& src);
-	size_t digits(sp_tau_node<tau_ba<BAs...>, BAs...> n);
-
-
-	void version_cmd();
-	void help_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void not_implemented_yet();
 
 	outputs m;
 	factory_t factory;
