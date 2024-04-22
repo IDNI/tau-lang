@@ -374,8 +374,8 @@ cli_command            => file.
 cli_command            => normalize_cmd | execute_cmd
                         | bf_dnf_cmd | bf_cnf_cmd | bf_anf_cmd
                         | bf_nnf_cmd | bf_pnf_cmd | bf_mnf_cmd
-                        | bf_substitute | wff_substitute
-                        | bf_instantiate | wff_instantiate
+                        | bf_substitute_cmd | wff_substitute_cmd
+                        | bf_instantiate_cmd | wff_instantiate_cmd
                         | wff_onf_cmd | wff_dnf_cmd | wff_cnf_cmd
                         | wff_anf_cmd | wff_nnf_cmd | wff_pnf_cmd | wff_mnf_cmd
                         | def_rule_cmd | def_list_cmd | def_del_cmd | def_clear_cmd.
@@ -389,6 +389,7 @@ normalize_cmd_arg       => nso_rr.
 normalize_cmd_arg       => output | wff_selection.
 
 execute_cmd             => execute_cmd_sym __ execute_cmd_arg.
+execute_cmd_arg         => tau.
 execute_cmd_arg         => gssotc_rr.
 
 file                   => file_sym quote file_path quote.
@@ -474,8 +475,8 @@ cli_cmd_sym            => help_cmd_sym | version_cmd_sym | quit_cmd_sym
 help_cmd_sym           => "h" | "help".
 version_cmd_sym        => "v" | "version".
 quit_cmd_sym           => "q" | "e" | "quit" | "exit".
-instantiate_sym        => "i" | "instantiate".
-substitute_sym         => "s" | "substitute".
+instantiate_cmd_sym    => "i" | "instantiate".
+substitute_cmd_sym     => "s" | "substitute".
 file_cmd_sym           => "r" | "read".
 clear_cmd_sym          => "c" | "clear".
 

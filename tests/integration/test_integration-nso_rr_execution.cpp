@@ -510,10 +510,3 @@ TEST_SUITE("multiple rec relations") {
 		CHECK( check.has_value() );
 	}
 }
-
-TEST_SUITE("bf_rec_relations: partial evaluation") {
-
-	TEST_CASE("some test"){
-		CHECK( true );
-	}
-}

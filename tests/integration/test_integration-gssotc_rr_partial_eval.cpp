@@ -35,8 +35,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 			"g[1](0);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory btf;
-		tau_factory<bdd_test_factory, bdd_test> tf(btf);
-		auto sample_formula = make_tau_spec_using_factory<tau_factory<bdd_test_factory, bdd_test>, bdd_test>(sample_src, tf);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, btf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
@@ -50,8 +49,7 @@ TEST_SUITE("functions partial evaluation: simple cases") {
 			"g(0);";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory btf;
-		tau_factory<bdd_test_factory, bdd_test> tf(btf);
-		auto sample_formula = make_tau_spec_using_factory<tau_factory<bdd_test_factory, bdd_test>, bdd_test>(sample_src, tf);
+		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, btf);
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 }
