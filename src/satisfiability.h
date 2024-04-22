@@ -212,7 +212,7 @@ template<typename... BAs>
 std::string build_args_from_vars(const tau_spec_vars<BAs...>& vars, size_t index) {
 	std::basic_stringstream<char> str;
 	for (const auto& var: vars.name) {
-		str << var << "[" << index << "]";
+		print_terminals(str, var) << "[" << index << "]";
 		if (var != *vars.name.rbegin()) str << ", ";
 	}
 	return str.str();
@@ -222,7 +222,7 @@ template<typename... BAs>
 std::string build_args_from_vars(const tau_spec_vars<BAs...>& vars) {
 	std::basic_stringstream<char> str;
 	for (const auto& var: vars.name) {
-		str << var;
+		print_terminals(str, var);
 		if (var != *vars.name.rbegin()) str << ", ";
 	}
 	return str.str();
@@ -232,12 +232,12 @@ template<typename... BAs>
 std::string build_args_from_vars(const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs) {
 	std::basic_stringstream<char> str;
 	for (const auto& var: inputs.vars) {
-		str << var;
+		print_terminals(str, var);
 		if (var != *inputs.name.rbegin()) str << ", ";
 	}
 	if (!inputs.vars.empty() && !outputs.vars.empty()) str << ", ";
 	for (const auto& var: outputs.vars) {
-		str << var;
+		print_terminals(str, var);
 		if (var != *outputs.name.rbegin()) str << ", ";
 	}
 	return str.str();
@@ -247,7 +247,7 @@ template<typename... BAs>
 std::string build_universal_quantifiers(const tau_spec_vars<BAs...>& vars, size_t index) {
 	std::basic_stringstream<char> str;
 	for (const auto& var: vars.name) {
-		str << "all " << var << "[" << index << "] ";
+		print_terminals(str << "all ", var) << "[" << index << "] ";
 	}
 	return str.str();
 }
@@ -256,7 +256,7 @@ template<typename... BAs>
 std::string build_universal_quantifiers(const tau_spec_vars<BAs...>& vars) {
 	std::basic_stringstream<char> str;
 	for (const auto& var: vars.vars) {
-		str << "all " << var << " ";
+		print_terminals(str << "all ", var) << " ";
 	}
 	return str.str();
 }
@@ -265,7 +265,7 @@ template<typename... BAs>
 std::string build_existential_quantifiers(const tau_spec_vars<BAs...>& vars, size_t index) {
 	std::basic_stringstream<char> str;
 	for (const auto& var: vars.name) {
-		str << "ex " << var << "[" << index << "] ";
+		print_terminals(str << "ex ", var) << "[" << index << "] ";
 	}
 	return str.str();
 }
@@ -274,7 +274,7 @@ template<typename... BAs>
 std::string build_existential_quantifiers(const tau_spec_vars<BAs...>& vars) {
 	std::basic_stringstream<char> str;
 	for (const auto& var: vars.vars) {
-		str << "ex " << var << " ";
+		print_terminals(str << "ex ", var) << " ";
 	}
 	return str.str();
 }

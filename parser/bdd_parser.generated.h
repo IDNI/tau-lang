@@ -29,7 +29,7 @@ struct bdd_parser {
 			const std::vector<terminal_type>&)>;
 	bdd_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
-		g(nts, load_prods(), nt(6), cc, load_grammar_opts()),
+		g(nts, load_prods(), nt(4), cc, load_grammar_opts()),
 		p(g, load_opts()) {}
 	std::unique_ptr<forest_type> parse(const char_type* data, size_t size,
 		parse_options po = {}) { return p.parse(data, size, po); }
@@ -97,7 +97,7 @@ struct bdd_parser {
 	bool found(size_t start = SIZE_MAX) { return p.found(start); }
 	typename parser_type::error get_error() { return p.get_error(); }
 	enum nonterminal {
-		nul, space, alpha, alnum, _, __, start, bdd, __E___0, disjunction, 
+		nul, space, alpha, alnum, start, _, bdd, __, __E___0, disjunction, 
 		bdd2, conjunction, bdd3, exclusive_or, bdd4, negation, bdd5, lit, __E_exclusive_or_1, var, 
 		T, F, __E_var_2, __E_var_3, 
 	};
@@ -129,7 +129,7 @@ private:
 	idni::nonterminals<char_type, terminal_type> load_nonterminals() const {
 		idni::nonterminals<char_type, terminal_type> nts{};
 		for (const auto& nt : {
-			"", "space", "alpha", "alnum", "_", "__", "start", "bdd", "__E___0", "disjunction", 
+			"", "space", "alpha", "alnum", "start", "_", "bdd", "__", "__E___0", "disjunction", 
 			"bdd2", "conjunction", "bdd3", "exclusive_or", "bdd4", "negation", "bdd5", "lit", "__E_exclusive_or_1", "var", 
 			"T", "F", "__E_var_2", "__E_var_3", 
 		}) nts.get(nt);
@@ -148,7 +148,6 @@ private:
 		o.trim_terminals = false;
 		o.inline_char_classes = true;
 		o.auto_disambiguate = true;
-		o.to_trim = { 4, 5 };
 		return o;
 	}
 	options load_opts() {
@@ -158,20 +157,20 @@ private:
 	idni::prods<char_type, terminal_type> load_prods() {
 		idni::prods<char_type, terminal_type> q,
 			nul(symbol_type{});
-		//       start(6)             => _(4) bdd(7) _(4).
-		q(nt(6), (nt(4)+nt(7)+nt(4)));
-		//       __(5)                => space(1) _(4).
-		q(nt(5), (nt(1)+nt(4)));
-		//       __E___0(8)           => __(5).
-		q(nt(8), (nt(5)));
+		//       start(4)             => _(5) bdd(6) _(5).
+		q(nt(4), (nt(5)+nt(6)+nt(5)));
+		//       __(7)                => space(1) _(5).
+		q(nt(7), (nt(1)+nt(5)));
+		//       __E___0(8)           => __(7).
+		q(nt(8), (nt(7)));
 		//       __E___0(8)           => null.
 		q(nt(8), (nul));
-		//       _(4)                 => __E___0(8).
-		q(nt(4), (nt(8)));
-		//       bdd(7)               => disjunction(9).
-		q(nt(7), (nt(9)));
-		//       bdd(7)               => bdd2(10).
-		q(nt(7), (nt(10)));
+		//       _(5)                 => __E___0(8).
+		q(nt(5), (nt(8)));
+		//       bdd(6)               => disjunction(9).
+		q(nt(6), (nt(9)));
+		//       bdd(6)               => bdd2(10).
+		q(nt(6), (nt(10)));
 		//       bdd2(10)             => conjunction(11).
 		q(nt(10), (nt(11)));
 		//       bdd2(10)             => bdd3(12).
@@ -186,22 +185,22 @@ private:
 		q(nt(14), (nt(16)));
 		//       bdd5(16)             => lit(17).
 		q(nt(16), (nt(17)));
-		//       bdd5(16)             => '(' _(4) bdd(7) _(4) ')'.
-		q(nt(16), (t(1)+nt(4)+nt(7)+nt(4)+t(2)));
-		//       disjunction(9)       => bdd(7) _(4) '|' _(4) bdd2(10).
-		q(nt(9), (nt(7)+nt(4)+t(3)+nt(4)+nt(10)));
-		//       conjunction(11)      => bdd2(10) _(4) '&' _(4) bdd3(12).
-		q(nt(11), (nt(10)+nt(4)+t(4)+nt(4)+nt(12)));
-		//       conjunction(11)      => bdd2(10) __(5) bdd3(12).
-		q(nt(11), (nt(10)+nt(5)+nt(12)));
+		//       bdd5(16)             => '(' _(5) bdd(6) _(5) ')'.
+		q(nt(16), (t(1)+nt(5)+nt(6)+nt(5)+t(2)));
+		//       disjunction(9)       => bdd(6) _(5) '|' _(5) bdd2(10).
+		q(nt(9), (nt(6)+nt(5)+t(3)+nt(5)+nt(10)));
+		//       conjunction(11)      => bdd2(10) _(5) '&' _(5) bdd3(12).
+		q(nt(11), (nt(10)+nt(5)+t(4)+nt(5)+nt(12)));
+		//       conjunction(11)      => bdd2(10) __(7) bdd3(12).
+		q(nt(11), (nt(10)+nt(7)+nt(12)));
 		//       __E_exclusive_or_1(18) => '^'.
 		q(nt(18), (t(5)));
 		//       __E_exclusive_or_1(18) => '+'.
 		q(nt(18), (t(6)));
-		//       exclusive_or(13)     => bdd3(12) _(4) __E_exclusive_or_1(18) _(4) bdd4(14).
-		q(nt(13), (nt(12)+nt(4)+nt(18)+nt(4)+nt(14)));
-		//       negation(15)         => bdd4(14) _(4) '\''.
-		q(nt(15), (nt(14)+nt(4)+t(7)));
+		//       exclusive_or(13)     => bdd3(12) _(5) __E_exclusive_or_1(18) _(5) bdd4(14).
+		q(nt(13), (nt(12)+nt(5)+nt(18)+nt(5)+nt(14)));
+		//       negation(15)         => bdd4(14) _(5) '\''.
+		q(nt(15), (nt(14)+nt(5)+t(7)));
 		//       lit(17)              => var(19).
 		q(nt(17), (nt(19)));
 		//       lit(17)              => T(20).
