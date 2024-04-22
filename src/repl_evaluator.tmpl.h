@@ -18,6 +18,7 @@
 #include "normalizer2.h"
 #include "normal_forms.h"
 #include "nso_rr.h"
+#include "tau.h"
 #include "term_colors.h"
 
 #ifdef DEBUG
@@ -297,10 +298,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 {
 	auto arg = n | tau_parser::normalize_cmd_arg;
 	if (auto wff = arg | tau_parser::wff; wff) {
-		// TODOD (HIGH) binding
 		rr<gssotc<BAs...>> rr_wff = { definitions, wff.value() };
 		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
-		//std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto nso_rr = arg | tau_parser::nso_rr; nso_rr) {
 		auto n_nso_rr = make_nso_rr_using_factory<
@@ -314,19 +313,35 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		//std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto output = arg | tau_parser::output; output) {
-		// TODOD (HIGH) binding
 		auto ref = get_output_ref(output.value());
 		if (ref) {
 			auto [value, _] = ref.value();
 			rr<gssotc<BAs...>> rr_output = { definitions, value };
 			auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_output);
-			//std::cout << "normalized: " << result << "\n";
 			return result;
 		}
 		return {};
 	}
 	return arg;
 }
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto form = n | tau_parser::execute_cmd_arg;
+	if (auto check = form | tau_parser::tau; check) {
+		auto n_gssotc = make_tau_spec_using_factory<factory_t, BAs...>(form.value(), factory);
+		// TODO (HIGH) call executor
+	} else if (auto check = form | tau_parser::gssotc_rr; check) {
+		auto n_gssotc_rr = make_tau_spec_using_factory<factory_t, BAs...>(form.value(), factory);
+		rec_relations<gssotc<BAs...>> rrs;
+		rrs.insert(rrs.end(), n_gssotc_rr.rec_relations.begin(), n_gssotc_rr.rec_relations.end());
+		rrs.insert(rrs.end(), definitions.begin(), definitions.end());
+		tau_spec<BAs...> rr_gssotc = { rrs, n_gssotc_rr.main };
+		// TODO (HIGH) call executor
+	}
+	not_implemented_yet();
+}
+
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
@@ -371,7 +386,7 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
 	tau_factory<factory_t, BAs...> tf(factory);
 	return bind_tau_code_using_factory<tau_factory<factory_t, BAs...>,
-					tau_ba<BAs...>, BAs...>(cli_code, tf);
+		tau_ba<BAs...>, BAs...>(cli_code, tf);
 }
 
 template <typename factory_t, typename... BAs>
@@ -511,7 +526,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	// normalization
 	case p::normalize_cmd:      result = normalizer_cmd(command); break;
 	// execution
-	case p::execute_cmd:        not_implemented_yet(); break;
+	case p::execute_cmd:        execute_cmd(command); break;
 	// substitution and instantiation
 	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command); break;
 	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command); break;

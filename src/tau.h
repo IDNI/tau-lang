@@ -295,9 +295,8 @@ rec_relations<gssotc<BAs...>> make_gssotc_rec_relations(gssotc<BAs...>& tau_sour
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
-	auto src = make_tau_code<tau_ba<BAs...>, BAs...>(tau_source);
-	auto binded = bind_tau_code_using_binder<binder_t, tau_ba<BAs...>, BAs...>(src, binder);
+tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_node<tau_ba<BAs...>, BAs...>& tau_source, binder_t& binder) {
+	auto binded = bind_tau_code_using_binder<binder_t, tau_ba<BAs...>, BAs...>(tau_source, binder);
 	auto main = binded | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
 	auto gssotc_rr = make_gssotc_rec_relations(binded);
 	auto nso_rr = make_rec_relations(binded);
@@ -305,26 +304,60 @@ tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& tau_source, bind
 	return { gssotc_rr, main };
 }
 
+// make a nso_rr from the given tau source and binder.
+template<typename binder_t, typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
+	auto src = make_tau_code<tau_ba<BAs...>, BAs...>(tau_source);
+	return make_tau_spec_using_binder<binder_t, BAs...>(src, binder);
+}
+
+// make a nso_rr from the given tau source and binder.
+template<typename binder_t, typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_binder(std::string& tau_source, binder_t& binder) {
+	auto src = make_tau_source(tau_source);
+	return make_tau_spec_using_binder<binder_t, BAs...>(src, binder);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_bindings(sp_tau_node<tau_ba<BAs...>, BAs...>& tau_source, const bindings<BAs...>& bindings) {
+	name_binder<tau_ba<BAs...>, BAs...> nb(bindings);
+	return make_tau_spec_using_binder<name_binder<tau_ba<BAs...>, BAs...>, BAs...>(tau_source, nb);
+}
+
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
 tau_spec<BAs...> make_tau_spec_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
-	name_binder<tau_ba<BAs...>, BAs...> nb(bindings);
-	bind_transformer<name_binder<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...> bs(nb);
-	return make_tau_spec_using_binder<bind_transformer<name_binder<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>, BAs...>(tau_source, bs);
+	auto src = make_tau_code<tau_ba<BAs...>, BAs...>(tau_source);
+	return make_tau_spec_using_bindings<BAs...>(src, bindings);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_bindings(std::string& tau_source, const bindings<BAs...>& bindings) {
+	auto src = make_tau_source(tau_source);
+	return make_tau_spec_using_bindings<tau_ba<BAs...>, BAs...>(src, bindings);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
+tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_node<tau_ba<BAs...>, BAs...>& tau_source, factory_t& factory) {
 	factory_binder<factory_t, tau_ba<BAs...>, BAs...> bs(factory);
 	return make_tau_spec_using_binder<factory_binder<factory_t, tau_ba<BAs...>, BAs...>, BAs...>(tau_source, bs);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
+tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
+	auto src = make_tau_code<tau_ba<BAs...>, BAs...>(tau_source);
+	return make_tau_spec_using_factory<factory_t, BAs...>(src, factory);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename factory_t, typename... BAs>
 tau_spec<BAs...> make_tau_spec_using_factory(const std::string& source, factory_t& factory) {
 	auto tau_source = make_tau_source(source);
-	return make_tau_spec_using_factory<factory_t, tau_ba<BAs...>, BAs...>(tau_source, factory);
+	return make_tau_spec_using_factory<factory_t, BAs...>(tau_source, factory);
 }
 
 // make a nso_rr from the given tau source and bindings.

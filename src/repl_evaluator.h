@@ -133,8 +133,7 @@ private:
 	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> execute_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
+	void execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(
 		const nso<tau_ba<BAs...>, BAs...>& n);
