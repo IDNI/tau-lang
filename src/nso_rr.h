@@ -1845,6 +1845,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::help_cmd,                         50 },
 			{ tau_parser::file,                             50 },
 			{ tau_parser::normalize_cmd,                    50 },
+			{ tau_parser::execute_cmd,                    50 },
 			{ tau_parser::bf_instantiate_cmd,               50 },
 			{ tau_parser::bf_substitute_cmd,                50 },
 			{ tau_parser::bf_dnf_cmd,                       50 },
@@ -1862,9 +1863,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::wff_nnf_cmd,                      50 },
 			{ tau_parser::wff_pnf_cmd,                      50 },
 			{ tau_parser::wff_mnf_cmd,                      50 },
-			{ tau_parser::def_wff_cmd,                      50 },
-			{ tau_parser::def_bf_cmd,                       50 },
-			{ tau_parser::def_tau_cmd,                      50 },
+			{ tau_parser::def_rule_cmd,                     50 },
 			{ tau_parser::def_list_cmd,                     50 },
 			{ tau_parser::def_del_cmd,                      50 },
 			{ tau_parser::def_clear_cmd,                    50 },
@@ -2042,6 +2041,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::help_cmd:
 			case tau_parser::file:
 			case tau_parser::normalize_cmd:
+			case tau_parser::execute_cmd:
 			case tau_parser::bf_instantiate_cmd:
 			case tau_parser::bf_substitute_cmd:
 			case tau_parser::bf_dnf_cmd:
@@ -2059,9 +2059,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::wff_nnf_cmd:
 			case tau_parser::wff_pnf_cmd:
 			case tau_parser::wff_mnf_cmd:
-			case tau_parser::def_wff_cmd:
-			case tau_parser::def_bf_cmd:
-			case tau_parser::def_tau_cmd:
+			case tau_parser::def_rule_cmd:
 			case tau_parser::def_list_cmd:
 			case tau_parser::def_del_cmd:
 			case tau_parser::def_clear_cmd:

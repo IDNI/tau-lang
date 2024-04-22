@@ -330,7 +330,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
-	auto rule = make_rec_relation<tau_ba<BAs...>, BAs...>(n);
+	auto r = n | tau_parser::def_rule_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	auto rule = make_rec_relation<tau_ba<BAs...>, BAs...>(r);
 	definitions.emplace_back(rule);
 }
 
@@ -509,6 +510,8 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::print_output_cmd:   print_output_cmd(command); break;
 	// normalization
 	case p::normalize_cmd:      result = normalizer_cmd(command); break;
+	// execution
+	case p::execute_cmd:        not_implemented_yet(); break;
 	// substitution and instantiation
 	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command); break;
 	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command); break;
