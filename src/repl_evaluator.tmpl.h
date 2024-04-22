@@ -18,6 +18,7 @@
 #include "normalizer2.h"
 #include "normal_forms.h"
 #include "nso_rr.h"
+#include "tau.h"
 #include "term_colors.h"
 
 #ifdef DEBUG
@@ -31,8 +32,8 @@
 
 namespace idni::tau {
 
-#define TC_STATUS        TC.BG_CYAN()
-#define TC_STATUS_OUTPUT TC(color::GREEN, color::BG_CYAN, color::BRIGHT)
+#define TC_STATUS        TC.BG_LIGHT_CYAN()
+#define TC_STATUS_OUTPUT TC(color::GREEN, color::BG_LIGHT_CYAN, color::BRIGHT)
 #define TC_ERROR         TC(color::RED,   color::BRIGHT)
 #define TC_PROMPT        TC(color::WHITE, color::BRIGHT)
 #define TC_OUTPUT        TC.GREEN()
@@ -82,7 +83,7 @@ repl_evaluator<factory_t, BAs...>::output_ref
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::print_output(size_t id) {
-	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << " / "
+	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << "/"
 		<< TC_OUTPUT << "%" << (m.size() - id - 1) << TC.CLEAR()
 		<< ": " << m[id] << "\n";
 }
@@ -297,29 +298,72 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 {
 	auto arg = n | tau_parser::normalize_cmd_arg;
 	if (auto wff = arg | tau_parser::wff; wff) {
-		// TODOD (HIGH) binding
-		auto result = normalizer<tau_ba<BAs...>, BAs...>(wff.value());
-		//std::cout << "normalized: " << result << "\n";
+		rr<gssotc<BAs...>> rr_wff = { definitions, wff.value() };
+		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
 		return result;
 	} else if (auto nso_rr = arg | tau_parser::nso_rr; nso_rr) {
 		auto n_nso_rr = make_nso_rr_using_factory<
 			factory_t, tau_ba<BAs...>, BAs...>(
 				arg.value(), factory);
-		auto result = normalizer<tau_ba<BAs...>, BAs...>(n_nso_rr);
+		rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs;
+		rrs.insert(rrs.end(), n_nso_rr.rec_relations.begin(), n_nso_rr.rec_relations.end());
+		rrs.insert(rrs.end(), definitions.begin(), definitions.end());
+		rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = { rrs, n_nso_rr.main };
+		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
 		//std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto output = arg | tau_parser::output; output) {
-		// TODOD (HIGH) binding
 		auto ref = get_output_ref(output.value());
 		if (ref) {
 			auto [value, _] = ref.value();
-			auto result = normalizer<tau_ba<BAs...>, BAs...>(value);
-			//std::cout << "normalized: " << result << "\n";
+			rr<gssotc<BAs...>> rr_output = { definitions, value };
+			auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_output);
 			return result;
 		}
 		return {};
 	}
 	return arg;
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto form = n | tau_parser::execute_cmd_arg;
+	if (auto check = form | tau_parser::tau; check) {
+		auto n_gssotc = make_tau_spec_using_factory<factory_t, BAs...>(form.value(), factory);
+		// TODO (HIGH) call executor
+	} else if (auto check = form | tau_parser::gssotc_rr; check) {
+		auto n_gssotc_rr = make_tau_spec_using_factory<factory_t, BAs...>(form.value(), factory);
+		rec_relations<gssotc<BAs...>> rrs;
+		rrs.insert(rrs.end(), n_gssotc_rr.rec_relations.begin(), n_gssotc_rr.rec_relations.end());
+		rrs.insert(rrs.end(), definitions.begin(), definitions.end());
+		tau_spec<BAs...> rr_gssotc = { rrs, n_gssotc_rr.main };
+		// TODO (HIGH) call executor
+	}
+	not_implemented_yet();
+}
+
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto r = n | tau_parser::def_rule_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	auto rule = make_rec_relation<tau_ba<BAs...>, BAs...>(r);
+	definitions.emplace_back(rule);
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_list_cmd() {
+	for (size_t i = 0; i < definitions.size(); i++)	cout << "[" << i << "]" << definitions[i] << "\n";
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_clear_cmd() {
+	definitions.clear();
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto idx = digits(n | tau_parser::digits | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>);
+	definitions.erase(definitions.begin() + idx);
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -328,6 +372,7 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 	repl_evaluator<factory_t, BAs...>::make_cli(
 		const std::string& src)
 {
+	// remove ascii char 22 if exists in the input
 	std::string filt = src;
 	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
 		return c == 22;
@@ -337,11 +382,11 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 		//.debug = opt.debug_repl
 	});
 	if (!cli_src) // flush! new line and return null if invalid source
-		return (std::cout << std::endl), nullptr;
+		return (std::cout << std::endl), error = true, nullptr;
 	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
 	tau_factory<factory_t, BAs...> tf(factory);
 	return bind_tau_code_using_factory<tau_factory<factory_t, BAs...>,
-					tau_ba<BAs...>, BAs...>(cli_code, tf);
+		tau_ba<BAs...>, BAs...>(cli_code, tf);
 }
 
 template <typename factory_t, typename... BAs>
@@ -364,6 +409,20 @@ void repl_evaluator<factory_t, BAs...>::get_cmd(
 	if (!option.has_value()) { for (auto& [_, v] : printers) v(); return; }
 	printers[get_opt(option.value())]();
 
+}
+
+template <typename factory_t, typename... BAs>
+boost::log::trivial::severity_level
+	repl_evaluator<factory_t, BAs...>::nt2severity(size_t nt) const
+{
+	switch (nt) {
+		case tau_parser::error_sym: return boost::log::trivial::error;
+		case tau_parser::debug_sym: return boost::log::trivial::debug;
+		case tau_parser::trace_sym: return boost::log::trivial::trace;
+		case tau_parser::info_sym:  return boost::log::trivial::info;
+		default: std::cerr << "error: invalid severity value\n";
+	}
+	return boost::log::trivial::error;
 }
 
 template <typename... BAs>
@@ -404,17 +463,10 @@ void repl_evaluator<factory_t, BAs...>::set_cmd(
 		auto sev = v | tau_parser::severity;
 		if (!sev.has_value()) {
 			cout << "error: invalid severity value\n"; return; }
-		auto sev_type = sev
+		opt.severity = nt2severity(sev
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
-			| optional_value_extractor<size_t>;
-		switch (sev_type) {
-		case tau_parser::error_sym: opt.severity = trivial::error;break;
-		case tau_parser::debug_sym: opt.severity = trivial::debug;break;
-		case tau_parser::trace_sym: opt.severity = trivial::trace;break;
-		case tau_parser::info_sym:  opt.severity = trivial::info; break;
-		default: cout << "error: invalid severity value\n"; return;
-		}
+			| optional_value_extractor<size_t>);
 		boost::log::core::get()->set_filter(
 			boost::log::trivial::severity >= opt.severity);
 		}
@@ -446,63 +498,64 @@ template <typename factory_t, typename... BAs>
 int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& n)
 {
-	auto command = n | only_child_extractor<tau_ba<BAs...>, BAs...>;
+	auto command = (n
+		| only_child_extractor<tau_ba<BAs...>, BAs...>).value();
 	auto command_type = command
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 #ifdef DEBUG
 	if (opt.debug_repl) {
-		std::cout << "command: " << command.value() << "\n";
+		std::cout << "command: " << command << "\n";
 		print_sp_tau_node_tree<tau_ba<BAs...>, BAs...>(cout
-			<< "tree: ", command.value()) << "\n";
+			<< "tree: ", command) << "\n";
 	}
 #endif
 	std::optional<sp_tau_node<tau_ba<BAs...>, BAs...>> result;
 	using p = tau_parser;
 	switch (command_type) {
-	case p::quit_cmd: return cout << "Quit.\n", 1;
+	case p::quit_cmd:           return cout << "Quit.\n", 1;
 	case p::clear_cmd:          if (r) r->clear(); break;
-	case p::help_cmd:           help_cmd(command.value()); break;
+	case p::help_cmd:           help_cmd(command); break;
 	case p::version_cmd:        version_cmd(); break;
-	case p::get_cmd:            get_cmd(command.value()); break;
-	case p::set_cmd:            set_cmd(command.value()); break;
-	case p::toggle_cmd:         toggle_cmd(command.value()); break;
+	case p::get_cmd:            get_cmd(command); break;
+	case p::set_cmd:            set_cmd(command); break;
+	case p::toggle_cmd:         toggle_cmd(command); break;
 	case p::list_outputs_cmd:   list_outputs_cmd(); break;
 	case p::clear_outputs_cmd:  clear_outputs_cmd(); break;
-	case p::print_output_cmd:   print_output_cmd(command.value()); break;
+	case p::print_output_cmd:   print_output_cmd(command); break;
 	// normalization
-	case p::normalize_cmd:      result = normalizer_cmd(command.value()); break;
+	case p::normalize_cmd:      result = normalizer_cmd(command); break;
+	// execution
+	case p::execute_cmd:        execute_cmd(command); break;
 	// substitution and instantiation
-	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command.value()); break;
-	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command.value()); break;
-	case p::wff_substitute_cmd: result = wff_substitute_cmd(command.value()); break;
-	case p::wff_instantiate_cmd:result = wff_instantiate_cmd(command.value()); break;
+	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command); break;
+	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command); break;
+	case p::wff_substitute_cmd: result = wff_substitute_cmd(command); break;
+	case p::wff_instantiate_cmd:result = wff_instantiate_cmd(command); break;
 	// wff normal forms
-	case p::wff_onf_cmd:        result = wff_onf_cmd(command.value()); break;
-	case p::wff_dnf_cmd:        result = wff_dnf_cmd(command.value()); break;
-	case p::wff_cnf_cmd:        result = wff_cnf_cmd(command.value()); break;
+	case p::wff_onf_cmd:        result = wff_onf_cmd(command); break;
+	case p::wff_dnf_cmd:        result = wff_dnf_cmd(command); break;
+	case p::wff_cnf_cmd:        result = wff_cnf_cmd(command); break;
 	case p::wff_anf_cmd:        not_implemented_yet(); break;
-	case p::wff_nnf_cmd:        result = wff_cnf_cmd(command.value()); break;
+	case p::wff_nnf_cmd:        result = wff_cnf_cmd(command); break;
 	case p::wff_pnf_cmd:        not_implemented_yet(); break;
-	case p::wff_mnf_cmd:        result = wff_mnf_cmd(command.value()); break;
+	case p::wff_mnf_cmd:        result = wff_mnf_cmd(command); break;
 	// bf normal forms
-	case p::bf_dnf_cmd:         result = bf_dnf_cmd(command.value()); break;
-	case p::bf_cnf_cmd:         result = bf_cnf_cmd(command.value()); break;
+	case p::bf_dnf_cmd:         result = bf_dnf_cmd(command); break;
+	case p::bf_cnf_cmd:         result = bf_cnf_cmd(command); break;
 	case p::bf_anf_cmd:         not_implemented_yet(); break;
-	case p::bf_nnf_cmd:         result = bf_nnf_cmd(command.value()); break;
+	case p::bf_nnf_cmd:         result = bf_nnf_cmd(command); break;
 	case p::bf_pnf_cmd:         not_implemented_yet(); break;
-	case p::bf_mnf_cmd:         result = bf_mnf_cmd(command.value()); break;
+	case p::bf_mnf_cmd:         result = bf_mnf_cmd(command); break;
 	// store the given formula as output for future references
 	case p::bf:                 result = command; break;
 	case p::wff:                result = command; break;
 	case p::nso_rr:	            result = command; break;
 	// definition of rec relations to be included during normalization
-	case p::def_bf_cmd:         not_implemented_yet(); break;
-	case p::def_wff_cmd:        not_implemented_yet(); break;
-	case p::def_tau_cmd:        not_implemented_yet(); break;
-	case p::def_list_cmd:       not_implemented_yet(); break;
-	case p::def_clear_cmd:      not_implemented_yet(); break;
-	case p::def_del_cmd:        not_implemented_yet(); break;
+	case p::def_rule_cmd:       def_rule_cmd(command); break;
+	case p::def_list_cmd:       def_list_cmd(); break;
+	case p::def_clear_cmd:      def_clear_cmd(); break;
+	case p::def_del_cmd:        def_del_cmd(command); break;
 	// error handling
 	default: error = true, cout << "\nUnknown command\n"; break;
 	}
@@ -519,6 +572,8 @@ repl_evaluator<factory_t, BAs...>::repl_evaluator(factory_t& factory,
 	options opt) : factory(factory), opt(opt)
 {
 	TC.set(opt.colors);
+	boost::log::core::get()->set_filter(
+		boost::log::trivial::severity >= opt.severity);
 }
 
 template <typename factory_t, typename... BAs>
@@ -534,8 +589,7 @@ std::string repl_evaluator<factory_t, BAs...>::prompt() {
 		if (status.tellp()) ss << TC_STATUS << "["
 			<< status.str() << " ]" << TC.CLEAR() << " ";
 	}
-	if (error) ss << TC_ERROR << "error" << TC.CLEAR() << " ";
-	ss << TC_PROMPT << "tau>" << TC.CLEAR() << " ";
+	ss << (error ? TC_ERROR : TC_PROMPT) << "tau>" << TC.CLEAR() << " ";
 	if (r) r->prompt(ss.str());
 	return ss.str();
 }

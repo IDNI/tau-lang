@@ -39,9 +39,6 @@
 #include "parser.h"
 #include "../parser/tau_parser.generated.h"
 #include "rewriting.h"
-#ifdef DEBUG
-#	include "parser_instance.h"
-#endif
 
 using namespace idni::rewriter;
 
@@ -132,7 +129,7 @@ std::function<bool(const sp_tau_node<BAs...>&)> is_non_terminal_node() {
 }
 
 // check if the node is the given non terminal
-template <typename...BAs>
+template <typename... BAs>
 bool is_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
 	return is_non_terminal_node<BAs...>(n) && get<tau_source_sym>(n->value).n() == nt;
 }
@@ -209,12 +206,15 @@ static const auto is_quantifier = [](const nso<BAs...>& n) {
 		|| nt == tau_parser::wff_bex;
 };
 
+std::function<bool(const size_t n)>& get_is_non_essential_terminal();
+std::function<bool(const tau_source_sym& n)>& get_is_non_essential_sym();
+
 template<typename... BAs>
 using is_var_or_capture_t = decltype(is_var_or_capture<BAs...>);
 
-extern std::function<bool(const size_t n)> is_non_essential_terminal;
+extern std::function<bool(const size_t n)>& is_non_essential_terminal;
 
-extern std::function<bool(const tau_source_sym&)> is_non_essential_sym;
+extern std::function<bool(const tau_source_sym&)>& is_non_essential_sym;
 
 extern std::function<bool(const sp_tau_source_node&)> is_non_essential_source;
 
@@ -223,7 +223,7 @@ using is_non_essential_source_t = decltype(is_non_essential_source);
 template<typename...BAs>
 auto is_non_essential = [] (const sp_tau_node<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value)) return false;
-	return is_non_essential_sym(std::get<tau_source_sym>(n->value));
+	return get_is_non_essential_sym()(std::get<tau_source_sym>(n->value));
 };
 
 template<typename...BAs>
@@ -945,34 +945,33 @@ library<nso<BAs...>> make_library(const std::string& source) {
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& tau_code, binder_t& binder) {
+sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& code, binder_t& binder) {
 	bind_transformer<binder_t, BAs...> bs(binder);
-	auto binded = post_order_traverser<
+	return post_order_traverser<
 			bind_transformer<binder_t, BAs...>,
 			all_t<sp_tau_node<BAs...>>,
 			sp_tau_node<BAs...>>(
-		bs, all<sp_tau_node<BAs...>>)(tau_code);
-	return binded;
+		bs, all<sp_tau_node<BAs...>>)(code);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-sp_tau_node<BAs...> bind_tau_code_using_bindings(sp_tau_node<BAs...>& tau_code, const bindings<BAs...>& bindings) {
+sp_tau_node<BAs...> bind_tau_code_using_bindings(sp_tau_node<BAs...>& code, const bindings<BAs...>& bindings) {
 	name_binder<BAs...> nb(bindings);
-	return bind_tau_code_using_binder<name_binder<BAs...>, BAs...>(tau_code, nb);
+	return bind_tau_code_using_binder<name_binder<BAs...>, BAs...>(code, nb);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename factory_t, typename... BAs>
-sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& tau_code, factory_t& factory) {
+sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code, factory_t& factory) {
 	factory_binder<factory_t, BAs...> fb(factory);
-	return bind_tau_code_using_binder<factory_binder<factory_t, BAs...>, BAs...>(tau_code, fb);
+	return bind_tau_code_using_binder<factory_binder<factory_t, BAs...>, BAs...>(code, fb);
 }
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_binder(const sp_tau_node<BAs...>& tau_code, binder_t& binder) {
-	auto binded = bind_tau_code_using_binder<binder_t, BAs...>(tau_code, binder);
+rr<nso<BAs...>> make_nso_rr_using_binder(const sp_tau_node<BAs...>& code, binder_t& binder) {
+	auto binded = bind_tau_code_using_binder<binder_t, BAs...>(code, binder);
 	auto main = binded | tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
 	auto rules = make_rec_relations<BAs...>(binded);
 	return { rules, main };
@@ -980,48 +979,57 @@ rr<nso<BAs...>> make_nso_rr_using_binder(const sp_tau_node<BAs...>& tau_code, bi
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& tau_source, binder_t& binder) {
-	auto tau_code = make_tau_code<BAs...>(tau_source);
-	return make_nso_rr_using_binder<binder_t, BAs...>(tau_code, binder);
+rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& source, binder_t& binder) {
+	auto code = make_tau_code<BAs...>(source);
+	return make_nso_rr_using_binder<binder_t, BAs...>(code, binder);
+}
+
+// make a nso_rr from the given tau source and binder.
+template<typename binder_t, typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_binder(std::string& input, binder_t& binder) {
+	auto source = make_tau_source(input);
+	return make_nso_rr_using_binder<binder_t, BAs...>(source, binder);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_bindings(sp_tau_source_node& tau_source, const bindings<BAs...>& bindings) {
+rr<nso<BAs...>> make_nso_rr_using_bindings(const sp_tau_node<BAs...>& code, const bindings<BAs...>& bindings) {
 	name_binder<BAs...> nb(bindings);
-	return make_nso_rr_using_binder<name_binder<BAs...>, BAs...>(tau_source, nb);
-}
-
-// make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& tau_source, factory_t& factory) {
-	factory_binder<factory_t, BAs...> fb(factory);
-	return make_nso_rr_using_binder<factory_binder<factory_t, BAs...>, BAs...>(tau_source, fb);
-}
-
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& tau_code, factory_t& factory) {
-	factory_binder<factory_t, BAs...> fb(factory);
-	return make_nso_rr_using_binder<factory_binder<factory_t, BAs...>, BAs...>(tau_code,fb);
-}
-
-// make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& source, factory_t& factory) {
-	auto tau_source = make_tau_source(source);
-	return make_nso_rr_using_factory<factory_t, BAs...>(tau_source, factory);
+	return make_nso_rr_using_binder<name_binder<BAs...>, BAs...>(code, nb);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_bindings(const std::string& source, const bindings<BAs...>& bindings) {
-	auto tau_source = make_tau_source(source);
-	name_binder<BAs...> nb(bindings);
-	bind_transformer<name_binder<BAs...>, BAs...> bs(nb);
-	return make_nso_rr_using_bindings<
-			bind_transformer<name_binder<BAs...>, BAs...>,
-			BAs...>(
-		tau_source, bs);
+rr<nso<BAs...>> make_nso_rr_using_bindings(sp_tau_source_node& source, const bindings<BAs...>& bindings) {
+	auto code = make_tau_code<BAs...>(source);
+	return make_nso_rr_using_bindings<BAs...>(code, bindings);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_bindings(const std::string& input, const bindings<BAs...>& bindings) {
+	auto source = make_tau_source(input);
+	return make_nso_rr_using_bindings<BAs...>(source, bindings);
+}
+
+template<typename factory_t, typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code, factory_t& factory) {
+	factory_binder<factory_t, BAs...> fb(factory);
+	return make_nso_rr_using_binder<factory_binder<factory_t, BAs...>, BAs...>(code,fb);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename factory_t, typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& source, factory_t& factory) {
+	auto code = make_tau_code<BAs...>(source);
+	return make_nso_rr_using_factory<factory_t, BAs...>(code, factory);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename factory_t, typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input, factory_t& factory) {
+	auto source = make_tau_source(input);
+	return make_nso_rr_using_factory<factory_t, BAs...>(source, factory);
 }
 
 // creates a specific builder from a sp_tau_node.
@@ -1771,9 +1779,20 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::bindings<BAs...>
 //
 // IDEA maybe it should be move to out.h
 template <typename... BAs>
+std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
+	size_t parent = tau_parser::start, bool passthrough = false);
+
+template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n){
+	return pp(stream, n);
+}
+
+// old operator<< renamed to print_terminals and replaced by
+// pp pretty priniter
+template <typename... BAs>
+std::ostream& print_terminals(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n){
 	stream << n->value;
-	for (const auto& c : n->child) stream << c;
+	for (const auto& c : n->child) print_terminals<BAs...>(stream, c);
 	return stream;
 }
 
@@ -1785,5 +1804,308 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_source_no
 
 // << tau_source_node (make it shared to make use of the previous operator)
 std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_node& n);
+
+template <typename... BAs>
+std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
+	size_t parent, bool passthrough)
+{
+// #define DEBUG_PP
+// #ifdef DEBUG_PP
+// auto& p = idni::parser_instance<tau_parser>();
+// 	auto dbg = [&stream, &p](const auto& c) {
+// 		if (std::holds_alternative<idni::tau::tau_source_sym>(c->value)) {
+// 			auto tss = std::get<idni::tau::tau_source_sym>(c->value);
+// 			if (tss.nt()) stream << " NT:" << p.name(tss.n()) << " ";
+// 			else if (tss.is_null()) stream << " <NULL> ";
+// 			else stream << " T:'" << tss.t() << "' ";
+// 		} else stream << " NONLIT:`" <<c->value << "` ";
+// 	};
+// 	stream << "\n";
+// 	dbg(n);
+// 	stream << "    child.size: " << n->child.size() << "\n";
+// 	for (const auto& c : n->child)
+// 		stream << "\t", dbg(c), stream << "\n";
+// #endif // DEBUG_PP
+	static auto is_to_wrap = [](const idni::tau::sp_tau_node<BAs...>& n,
+		size_t parent)
+	{
+		static const std::set<size_t> no_wrap_for = {
+			tau_parser::bf_splitter,
+			tau_parser::bf_ref,
+			tau_parser::bf_neg,
+			tau_parser::bf_constant,
+			tau_parser::bf_t,
+			tau_parser::bf_f,
+			tau_parser::wff_ref,
+			tau_parser::wff_neg,
+			tau_parser::wff_t,
+			tau_parser::wff_f,
+			tau_parser::tau_ref,
+			tau_parser::capture,
+			tau_parser::variable,
+			tau_parser::bool_variable,
+			tau_parser::start
+		};
+		// lower number = higher priority
+		static const std::map<size_t, size_t> prio = {
+			{ tau_parser::start,                             0 },
+			// cli commands
+			{ tau_parser::help_cmd,                         50 },
+			{ tau_parser::file,                             50 },
+			{ tau_parser::normalize_cmd,                    50 },
+			{ tau_parser::execute_cmd,                    50 },
+			{ tau_parser::bf_instantiate_cmd,               50 },
+			{ tau_parser::bf_substitute_cmd,                50 },
+			{ tau_parser::bf_dnf_cmd,                       50 },
+			{ tau_parser::bf_cnf_cmd,                       50 },
+			{ tau_parser::bf_anf_cmd,                       50 },
+			{ tau_parser::bf_nnf_cmd,                       50 },
+			{ tau_parser::bf_pnf_cmd,                       50 },
+			{ tau_parser::bf_mnf_cmd,                       50 },
+			{ tau_parser::wff_instantiate_cmd,              50 },
+			{ tau_parser::wff_substitute_cmd,               50 },
+			{ tau_parser::wff_onf_cmd,                      50 },
+			{ tau_parser::wff_dnf_cmd,                      50 },
+			{ tau_parser::wff_cnf_cmd,                      50 },
+			{ tau_parser::wff_anf_cmd,                      50 },
+			{ tau_parser::wff_nnf_cmd,                      50 },
+			{ tau_parser::wff_pnf_cmd,                      50 },
+			{ tau_parser::wff_mnf_cmd,                      50 },
+			{ tau_parser::def_rule_cmd,                     50 },
+			{ tau_parser::def_list_cmd,                     50 },
+			{ tau_parser::def_del_cmd,                      50 },
+			{ tau_parser::def_clear_cmd,                    50 },
+			{ tau_parser::wff_selection,                    50 },
+			{ tau_parser::bf_selection,                     50 },
+			{ tau_parser::bf_var_selection,                 50 },
+			{ tau_parser::wff_var_selection,                50 },
+			{ tau_parser::list_outputs_cmd,                 50 },
+			{ tau_parser::clear_outputs_cmd,                50 },
+			// tau
+			{ tau_parser::tau_collapse_positives_cb,       100 },
+			{ tau_parser::tau_positives_upwards_cb,        110 },
+
+			{ tau_parser::tau_or,                          200 },
+			{ tau_parser::tau_and,                         210 },
+			{ tau_parser::tau_neg,                         220 },
+			{ tau_parser::tau_wff,                         230 },
+			// wff
+			{ tau_parser::bf_eq_cb,                        300 },
+			{ tau_parser::bf_neq_cb,                       310 },
+			{ tau_parser::wff_has_clashing_subformulas_cb, 320 },
+			{ tau_parser::wff_has_subformula_cb,           330 },
+			{ tau_parser::wff_remove_existential_cb,       340 },
+			{ tau_parser::wff_remove_bexistential_cb,      350 },
+			{ tau_parser::wff_remove_buniversal_cb,        360 },
+
+			{ tau_parser::wff_conditional,                 400 },
+			{ tau_parser::wff_ball,                        410 },
+			{ tau_parser::wff_bex,                         420 },
+			{ tau_parser::wff_all,                         430 },
+			{ tau_parser::wff_ex,                          440 },
+			{ tau_parser::wff_imply,                       450 },
+			{ tau_parser::wff_equiv,                       460 },
+			{ tau_parser::wff_or,                          470 },
+			{ tau_parser::wff_and,                         480 },
+			{ tau_parser::wff_xor,                         490 },
+			{ tau_parser::wff_neg,                         500 },
+			{ tau_parser::bf_interval,                     510 },
+			{ tau_parser::bf_neq,                          520 },
+			{ tau_parser::bf_eq,                           530 },
+			{ tau_parser::bf_not_less_equal,               540 },
+			{ tau_parser::bf_greater,                      550 },
+			{ tau_parser::bf_less_equal,                   560 },
+			{ tau_parser::bf_less,                         570 },
+			// bf
+			{ tau_parser::bf_is_zero_cb,                   600 },
+			{ tau_parser::bf_is_one_cb,                    610 },
+			{ tau_parser::bf_has_subformula_cb,            620 },
+			{ tau_parser::bf_remove_funiversal_cb,         630 },
+			{ tau_parser::bf_remove_fexistential_cb,       640 },
+			{ tau_parser::bf_or_cb,                        650 },
+			{ tau_parser::bf_and_cb,                       660 },
+			{ tau_parser::bf_xor_cb,                       670 },
+			{ tau_parser::bf_neg_cb,                       680 },
+
+			{ tau_parser::bf_all,                          700 },
+			{ tau_parser::bf_ex,                           710 },
+			{ tau_parser::bf_or,                           720 },
+			{ tau_parser::bf_and,                          730 },
+			{ tau_parser::bf_xor,                          740 },
+			{ tau_parser::bf_neg,                          750 },
+			// does not need wrapping = the lowest priority to wrap
+			{ tau_parser::open_parenthesis,               1000 }
+		};
+		if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
+			auto tss = std::get<idni::tau::tau_source_sym>(n->value);
+			if (!tss.nt() || no_wrap_for.find(tss.n()) !=
+						no_wrap_for.end()) return false;
+			// tau_parser& p = idni::parser_instance<tau_parser>();
+			// std::cerr
+			// 	<< p.name(parent) << " vs " << p.name(tss.n())
+			// 	//<< "(" << parent << ")
+			// 	<< " " << prio.at(parent)
+			// 	<< (prio.at(parent) > prio.at(tss.n())
+			// 		? " > " : " <= ")
+			// 	<< prio.at(tss.n())
+			// 	// << " (" << tss.n() << ")"
+			// 	<< "\n";
+			return prio.at(parent) > prio.at(tss.n());
+		}
+		return false;
+	};
+
+	if (passthrough) { // passthrough
+		//auto ch = get_children(n->child);
+		for (const auto& c : n->child)
+			pp(stream, c, parent);
+		return stream;
+	}
+
+	if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
+		auto tss = std::get<idni::tau::tau_source_sym>(n->value);
+		if (tss.nt()) { //stream << " " << p.name(tss.n()) << ":";
+			switch (tss.n()) {
+			// wrappable by parenthesis
+			case tau_parser::bf:
+			case tau_parser::wff:
+			case tau_parser::tau:
+			{
+				auto& ch = n->child;
+				if (ch.size() > 1)
+					pp(stream << "(", ch[1], parent) << ")";
+				else {
+					bool wrap = is_to_wrap(ch[0], parent);
+					if (wrap) stream << "(";
+					pp(stream, ch[0], parent);
+					if (wrap) stream << ")";
+				}
+			} break;
+			// negation (unary)
+			case tau_parser::bf_neg:
+			case tau_parser::wff_neg:
+			case tau_parser::tau_neg:
+				for (const auto& c : n->child)
+					pp(stream, c, tss.n());
+				break;
+			// binary operators
+			case tau_parser::bf_and:
+			case tau_parser::bf_or:
+			case tau_parser::bf_xor:
+			case tau_parser::bf_eq:
+			case tau_parser::bf_neq:
+			case tau_parser::bf_less:
+			case tau_parser::bf_less_equal:
+			case tau_parser::bf_not_less_equal:
+			case tau_parser::bf_greater:
+			case tau_parser::bf_interval:
+			case tau_parser::wff_and:
+			case tau_parser::wff_or:
+			case tau_parser::wff_xor:
+			case tau_parser::wff_imply:
+			case tau_parser::wff_equiv:
+			case tau_parser::wff_conditional:
+			case tau_parser::tau_and:
+			case tau_parser::tau_or:
+			{
+				auto& ch = n->child;
+				pp(stream, ch[0], tss.n());
+				size_t l = ch.size();
+				if (l == 2) {
+					if (tss.n() == tau_parser::bf_and)
+						stream << " & ";
+					else if (tss.n() == tau_parser::wff_and)
+						stream << " && ";
+				} else print_terminals(stream<<" ", ch[1])<<" ";
+				pp(stream, ch[l-1], tss.n());
+			} break;
+			// quantifiers
+			case tau_parser::bf_all:
+			case tau_parser::bf_ex:
+			case tau_parser::wff_all:
+			case tau_parser::wff_ex:
+			case tau_parser::wff_ball:
+			case tau_parser::wff_bex:
+			// callbacks
+			case tau_parser::bf_and_cb:
+			case tau_parser::bf_or_cb:
+			case tau_parser::bf_xor_cb:
+			case tau_parser::bf_neg_cb:
+			case tau_parser::bf_eq_cb:
+			case tau_parser::bf_neq_cb:
+			case tau_parser::bf_is_zero_cb:
+			case tau_parser::bf_is_one_cb:
+			case tau_parser::bf_remove_funiversal_cb:
+			case tau_parser::bf_remove_fexistential_cb:
+			case tau_parser::wff_remove_existential_cb:
+			case tau_parser::wff_remove_bexistential_cb:
+			case tau_parser::wff_remove_buniversal_cb:
+			case tau_parser::wff_has_clashing_subformulas_cb:
+			case tau_parser::bf_has_subformula_cb:
+			case tau_parser::wff_has_subformula_cb:
+			case tau_parser::tau_collapse_positives_cb:
+			case tau_parser::tau_positives_upwards_cb:
+			// cli commands
+			case tau_parser::help_cmd:
+			case tau_parser::file:
+			case tau_parser::normalize_cmd:
+			case tau_parser::execute_cmd:
+			case tau_parser::bf_instantiate_cmd:
+			case tau_parser::bf_substitute_cmd:
+			case tau_parser::bf_dnf_cmd:
+			case tau_parser::bf_cnf_cmd:
+			case tau_parser::bf_anf_cmd:
+			case tau_parser::bf_nnf_cmd:
+			case tau_parser::bf_pnf_cmd:
+			case tau_parser::bf_mnf_cmd:
+			case tau_parser::wff_instantiate_cmd:
+			case tau_parser::wff_substitute_cmd:
+			case tau_parser::wff_onf_cmd:
+			case tau_parser::wff_dnf_cmd:
+			case tau_parser::wff_cnf_cmd:
+			case tau_parser::wff_anf_cmd:
+			case tau_parser::wff_nnf_cmd:
+			case tau_parser::wff_pnf_cmd:
+			case tau_parser::wff_mnf_cmd:
+			case tau_parser::def_rule_cmd:
+			case tau_parser::def_list_cmd:
+			case tau_parser::def_del_cmd:
+			case tau_parser::def_clear_cmd:
+			case tau_parser::wff_selection:
+			case tau_parser::bf_selection:
+			case tau_parser::bf_var_selection:
+			case tau_parser::wff_var_selection:
+			case tau_parser::list_outputs_cmd:
+			case tau_parser::clear_outputs_cmd:
+			{
+				auto& ch = n->child;
+				print_terminals(stream, ch[0]);
+				for (size_t i = 1; i < ch.size(); ++i)
+					pp(stream << " ", ch[i], tss.n());
+			} break;
+			// just print terminals for these
+			case tau_parser::capture:
+			case tau_parser::variable:
+			case tau_parser::bool_variable:
+			case tau_parser::bf_ref:
+			case tau_parser::wff_ref:
+			case tau_parser::tau_ref:
+			case tau_parser::binding:
+			case tau_parser::bf_f:
+			case tau_parser::bf_t:
+			case tau_parser::wff_f:
+			case tau_parser::wff_t:
+				print_terminals(stream, n);
+				break;
+			// for the rest skip value and just passthrough to child
+			default: for (const auto& c : n->child)
+					pp(stream, c, parent, true);
+				break;
+			}
+		}
+		else if (!tss.is_null()) stream << tss.t();
+	} else stream << n->value << " ";
+	return stream;
+}
 
 #endif // __NSO_RR_H__

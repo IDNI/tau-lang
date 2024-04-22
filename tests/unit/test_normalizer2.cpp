@@ -25,7 +25,7 @@ namespace testing = doctest;
 TEST_SUITE("steps parsing") {
 
 	TEST_CASE("apply_defs") {
-		CHECK( apply_defs<Bool>.size() == 8 );
+		CHECK( apply_defs<Bool>.size() == 7 );
 	}
 
 	TEST_CASE("apply_defs_once") {
@@ -37,39 +37,39 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("to_dnf_wff") {
-		CHECK( to_dnf_wff<Bool>.size() == 8 );
+		CHECK( to_dnf_wff<Bool>.size() == 7 );
 	}
 
 	TEST_CASE("simplify_bf") {
-		CHECK( simplify_bf<Bool>.size() == 17 );
+		CHECK( simplify_bf<Bool>.size() == 16 );
 	}
 
 	TEST_CASE("simplify_wff") {
-		CHECK( simplify_wff<Bool>.size() == 17 );
+		CHECK( simplify_wff<Bool>.size() == 16 );
 	}
 
 	TEST_CASE("apply_cb") {
-		CHECK( apply_cb<Bool>.size() == 7 );
+		CHECK( apply_cb<Bool>.size() == 6 );
 	}
 
 	TEST_CASE("squeeze_positives") {
-		CHECK( squeeze_positives<Bool>.size() == 2 );
+		CHECK( squeeze_positives<Bool>.size() == 1 );
 	}
 
 	TEST_CASE("wff_remove_existential") {
-		CHECK( wff_remove_existential<Bool>.size() == 2 );
+		CHECK( wff_remove_existential<Bool>.size() == 1 );
 	}
 
 	TEST_CASE("bf_positives_upwards") {
-		CHECK( bf_positives_upwards<Bool>.size() == 6 );
+		CHECK( bf_positives_upwards<Bool>.size() == 5 );
 	}
 
 	TEST_CASE("bf_elim_quantifiers") {
-		CHECK( bf_elim_quantifiers<Bool>.size() == 3 );
+		CHECK( bf_elim_quantifiers<Bool>.size() == 2 );
 	}
 
 	TEST_CASE("trivialities") {
-		CHECK( trivialities<Bool>.size() == 5 );
+		CHECK( trivialities<Bool>.size() == 4 );
 	}
 }
 
