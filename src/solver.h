@@ -18,8 +18,9 @@
 #include "satisfiability.h"
 #include "normal_forms.h"
 
-// In what follows we use the algorithms and notations of Section 3.2 of the
-// TABA book (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
+// in what follows we use the algorithms and notations of TABA book (cf.
+// Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
+// for the details.
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -30,28 +31,22 @@ template<typename...BAs>
 using clause = nso<BAs...>;
 
 template<typename...BAs>
+using var = nso<BAs...>;
+
+template<typename...BAs>
 using bound = std::variant<BAs...>;
 
 template<typename...BAs>
-struct onf_clause {
-	std::vector<bound<BAs...>> lowers; // c's in the book
-	std::vector<bound<BAs...>> uppers; // d's in the book
-	std::pair<bound<BAs...>, bound<BAs...>> interval;
-};
+using bounds = std::vector<bound<BAs...>>;
 
 template<typename...BAs>
 struct nlgeqs_clause {
-	std::vector<bound<BAs...>> lowers; // c's in the book
-	std::vector<bound<BAs...>> uppers; // d's in the book
+	bounds<BAs...> lowers; // c's in the TABA book (cf. Section 3.2)
+	bounds<BAs...> uppers; // d's in the TABA book (cf. Section 3.2)
 };
 
 template<typename...BAs>
 using splitter_set = std::set<std::variant<BAs...>>;
-
-template<typename...BAs>
-onf_clause<BAs...> to_onf_clause(clause<BAs...> clause) {
-	return {};
-}
 
 template<typename...BAs>
 static constexpr auto _leq = overloaded([]<typename T>(const T& l, const T& r) -> bool {
@@ -74,29 +69,52 @@ static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) ->
 			return l | r;
 	}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
 
-static constexpr auto _is_zero = [](const auto& l) -> bool { return l == false; };
-static constexpr auto _is_geq_zero = [](const auto& l) -> bool { return l == false; };
-static constexpr auto _is_leq_one = [](const auto& l) -> bool { return l == false; };
-
 template<typename...BAs>
 static constexpr auto _neg = [](const auto& l) -> std::variant<BAs...> { return ~l; };
 
+static constexpr auto _is_zero = [](const auto& l) -> bool { return l == false; };
+
+static constexpr auto _is_geq_zero = [](const auto& l) -> bool { return l == false; };
+
+static constexpr auto _is_leq_one = [](const auto& l) -> bool { return l == false; };
+
+// general comment regarding const use, we don't use const to decorate the splitters
+// us they could involve side effects, and we don't want to restrict the user in
+// any way. The user should be able to use any kind of splitter he/she wants.
+
+// following Lemma 3.4 of TABA book we could compute maximal and minilmal solutions.
+// However, in our case, as we have used the LGRS to remove the equality from
+// our initial system, we have a = 0 and b = 1. Thus, there are no maximal
+// or minimal solutions. We can directly compute the solution using the splitters.
+//
+// the following code only makes sense if we have maximal and minimal solutions, i.e.
+// if we have a != 0 and b != 1, otherwise the checks are trivially satisfied.
+//
 // template<typename...BAs>
 // bool has_clause_maximal_solution(nlgeqs_clause<BAs...> clause) {
-// 	auto b = clause.interval.second; // always 1, makes no sense to check
+// 	auto b = clause.interval.second;
 // 	for (auto& c_i: clause.lowers) if (std::visit(_leq<BAs...>, c_i, b)) return false;
 // 	return true;
 // }
 //
 // template<typename...BAs>
 // bool has_clause_minimal_solution(nlgeqs_clause<BAs...> clause) {
-// 	auto a = clause.interval.first; // always 0, make no sense to check
+// 	auto a = clause.interval.first;
 // 	for (auto& d_i: clause.uppers) if (std::visit(_leq<BAs...>, a, d_i)) return false;
 // 	return true;
 // }
 
+// compute the splitter set of a system on negations of inequalities.
 template<typename...BAs>
 splitter_set<BAs...> compute_splitter_set(const nlgeqs_clause<BAs...>& clause) {
+	// we follow Lemma 3.3 of TABA book taking into account the following: instead
+	// of computing a set T of pairs of A's and B's according to the Lemma, we
+	// directly compute C^AD^B and store it into the splitter set if not null,
+	// otherwise we ommit it.
+	//
+	// that way we avoid computing the corresponding product C^AD^B again and also
+	// could avoid computing splitters twice when different A's and B's have the
+	// same product.
 	splitter_set<BAs...> ss;
 	for (size_t i = 0; i < clause.lowers.size(); ++i) {
 		for (size_t j = 0; j < clause.uppers.size(); ++j) {
@@ -135,7 +153,7 @@ splitter_set<BAs...> compute_splitter_set(const nlgeqs_clause<BAs...>& clause) {
 }
 
 template<typename splitter_t, typename...BAs>
-std::optional<std::variant<BAs...>> solve_clause_using_splitter(nlgeqs_clause<BAs...> clause, splitter_t splitter) {
+std::optional<std::variant<BAs...>> solve_clause_using_splitter(const nlgeqs_clause<BAs...>& clause, splitter_t& splitter) {
 	// Following Lemma 3.4 of TABA book we could compute maximal and minilmal solutions.
 	// However, in our case, as we have used the LGRS to remove the equality from
 	// our initial system, we have a = 0 and b = 1. Thus, there are no maximal
@@ -157,51 +175,67 @@ std::optional<std::variant<BAs...>> solve_clause_using_splitter(nlgeqs_clause<BA
 	return result;
 }
 
-template<typename splitter_t, typename...BAs>
-std::optional<std::variant<BAs...>> solve_clause_using_splitter(clause<BAs...> clause, splitter_t splitter) {
-	// split the method in several steps
+template<typename...BAs>
+std::pair<var<BAs...>, nso<BAs...>> eliminate_equality(const nso<BAs...>& clause) {
 	auto var = find_top(clause, is_non_terminal<tau_parser::var, BAs...>)
 		|optional_value_extractor<sp_tau_node<BAs...>>;
 	auto f = find_top(clause, is_non_terminal<tau_parser::bf_eq, BAs...>)
 		| tau_parser::bf
 		| optional_value_extractor<sp_tau_node<BAs...>>;
 	auto x_plus_fx = trim(build_bf_xor<BAs...>(wrap(tau_parser::bf, var), f));
-	auto lgrs = replace(clause, {{var, x_plus_fx}});
-	auto simplified = lgrs
+	auto form = replace(clause, {{var, x_plus_fx}})
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>)
 		| to_mnf_bf<BAs...>();
+	return {var, form};
+}
 
-	nlgeqs_clause<BAs...> nlg_eqs;
-
-	auto f_0 = replace(simplified,  {{var, _0<BAs...>}})
+template<typename...BAs>
+bounds<BAs...> compute_lower_bounds(const var<BAs...> v, const nso<BAs...>& clause) {
+	bounds<BAs...> lowers;
+	auto f_0 = replace(clause,  {{v, _0<BAs...>}})
 		| repeat_each<step<BAs...>, BAs...>(
 			simplify_bf<BAs...>
 			| apply_cb<BAs...>)
 		| to_mnf_bf<BAs...>();
-	auto f_1 = replace(simplified, {{var, _1<BAs...>}})
-		| repeat_each<step<BAs...>, BAs...>(
-			simplify_bf<BAs...>
-			| apply_cb<BAs...>)
-		| to_mnf_bf<BAs...>();
-
-	// check consistence f(0)f(1) = 0
-
 	for (auto& neq: select_all(f_0, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
-		auto c_i = neq | tau_parser::bf | only_child_extractor<sp_tau_node<BAs...>>
-			| ba_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
-		nlg_eqs.lowers.push_back(c_i);
+		auto c_i = neq
+			| tau_parser::bf
+			| only_child_extractor<sp_tau_node<BAs...>>
+			| ba_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		lowers.push_back(c_i);
 	}
+	return lowers;
+}
+
+template<typename...BAs>
+bounds<BAs...> compute_upper_bounds(const var<BAs...>& v, const nso<BAs...>& clause) {
+	bounds<BAs...> uppers;
+	auto f_1 = replace(clause, {{v, _1<BAs...>}})
+		| repeat_each<step<BAs...>, BAs...>(
+			simplify_bf<BAs...>
+			| apply_cb<BAs...>)
+		| to_mnf_bf<BAs...>();
 
 	for (auto& neq: select_all(f_1, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
-		auto neg_d_i = neq | tau_parser::bf | only_child_extractor<sp_tau_node<BAs...>>
-			| ba_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
+		auto neg_d_i = neq
+			| tau_parser::bf
+			| only_child_extractor<sp_tau_node<BAs...>>
+			| ba_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
 		auto d_i = std::visit(_neg<BAs...>, neg_d_i);
-		nlg_eqs.uppers.push_back(d_i);
+		uppers.push_back(d_i);
 	}
+	return uppers;
+}
 
+template<typename splitter_t, typename...BAs>
+std::optional<std::variant<BAs...>> solve_clause_using_splitter(const clause<BAs...>& clause, splitter_t splitter) {
+	auto [var, simplified] = eliminate_equality(clause);
+	auto nlg_eqs = { compute_lower_bounds(var, simplified), compute_upper_bounds(var, simplified) };
 	return solve_clause_using_splitter(nlg_eqs, splitter);
 }
 
@@ -210,7 +244,7 @@ std::optional<std::variant<BAs...>> solve_clause_using_splitter(clause<BAs...> c
 // for the time beeing, we don't assume that the formula has been simplified, in dnf form,
 // or in any other form. We may drop such assumption in the future.
 template<typename splitter_t, typename...BAs>
-std::optional<std::variant<BAs...>> solve_using_splitter(nso<BAs...> nso, splitter_t splitter) {
+std::optional<std::variant<BAs...>> solve_using_splitter(const nso<BAs...>& nso, splitter_t splitter) {
 	// we apply once definitions.
 	auto nso_with_defs = apply_definitions(nso);
 	auto form = nso_with_defs
@@ -233,13 +267,10 @@ std::optional<std::variant<BAs...>> solve_using_splitter(nso<BAs...> nso, splitt
 			trivialities<BAs...>
 			| simplify_bf<BAs...>
 			| simplify_wff<BAs...>);
-
 	// finally, for each clause we try to find a solution using the splitter
-	for (auto& clause: get_dnf_clauses<tau_parser::wff>(form)) {
-		if (auto solution = solve_clause_using_splitter(clause, splitter); solution.has_value()) {
+	for (auto& clause: get_dnf_clauses<tau_parser::wff>(form))
+		if (auto solution = solve_clause_using_splitter(clause, splitter); solution.has_value())
 			return solution.value();
-		}
-	}
 	// we were unable to compute a proper splitter at some point which was crucial
 	// for computing the solution, so we return {}. This is a failure.
 	return {};
