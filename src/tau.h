@@ -269,6 +269,15 @@ struct tau_factory {
 	base_factory_t& bf;
 };
 
+template<typename...BAs>
+struct tau_ba_plitter {
+
+	gssotc<BAs...> split(const gssotc<BAs...>& n) {
+		// TODo (HIGH) implement tau_ba splitter
+	}
+
+};
+
 // creates a specific rule from a generic rule.
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>

@@ -20,6 +20,8 @@
 #include "nso_rr.h"
 #include "tau.h"
 #include "term_colors.h"
+#include "satisfiability.h"
+#include "solver.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -342,6 +344,18 @@ void repl_evaluator<factory_t, BAs...>::execute_cmd(const nso<tau_ba<BAs...>, BA
 	not_implemented_yet();
 }
 
+template <typename factory_t, typename... BAs>
+std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::solve_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto form = n | tau_parser::solve_cmd_arg;
+	if (auto check = form | tau_parser::wff; check) {
+		std::cout << "solving wff\n";
+		// TODO (HIGH) call solver
+	} else {
+		std::cout << "solving unimplemented type\n";
+		// TODO (HIGH) call solver
+	}
+	return {};
+}
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
@@ -527,6 +541,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::normalize_cmd:      result = normalizer_cmd(command); break;
 	// execution
 	case p::execute_cmd:        execute_cmd(command); break;
+	case p::solve_cmd:          solve_cmd(command); break;
 	// substitution and instantiation
 	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command); break;
 	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command); break;
