@@ -371,7 +371,7 @@ cli_command            => help_cmd | version_cmd | quit_cmd | clear_cmd.
 cli_command            => get_cmd | set_cmd | toggle_cmd.
 cli_command            => list_outputs_cmd | clear_outputs_cmd | print_output_cmd.
 cli_command            => file.
-cli_command            => normalize_cmd | execute_cmd
+cli_command            => normalize_cmd | execute_cmd | solve_cmd
                         | bf_dnf_cmd | bf_cnf_cmd | bf_anf_cmd
                         | bf_nnf_cmd | bf_pnf_cmd | bf_mnf_cmd
                         | bf_substitute_cmd | wff_substitute_cmd
@@ -387,6 +387,10 @@ normalize_cmd           => normalize_cmd_sym __ normalize_cmd_arg.
 normalize_cmd_arg       => wff.
 normalize_cmd_arg       => nso_rr.
 normalize_cmd_arg       => output | wff_selection.
+
+solve_cmd               => solve_cmd_sym __ solve_cmd_arg.
+solve_cmd_arg           => wff.
+solve_cmd_arg           => output | wff_selection.
 
 execute_cmd             => execute_cmd_sym __ execute_cmd_arg.
 execute_cmd_arg         => tau.
@@ -483,6 +487,7 @@ clear_cmd_sym          => "c" | "clear".
 normalize_cmd_sym      => "n" | "normalize".
 # TODO (LOW) also use 'e'... after removing the exit command variant.
 execute_cmd_sym        => "execute".
+solve_cmd_sym          => "solve".
 
 onf_cmd_sym            => "onf".
 dnf_cmd_sym            => "dnf".

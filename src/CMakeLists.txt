@@ -21,6 +21,7 @@ set(TAU_HEADERS
 	iterators.h
 	executor.h
 	normal_forms.h
+	solver.h
 )
 
 set(TAU_SOURCES

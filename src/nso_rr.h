@@ -1853,7 +1853,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::help_cmd,                         50 },
 			{ tau_parser::file,                             50 },
 			{ tau_parser::normalize_cmd,                    50 },
-			{ tau_parser::execute_cmd,                    50 },
+			{ tau_parser::execute_cmd,                      50 },
+			{ tau_parser::solve_cmd,                        50 },
 			{ tau_parser::bf_instantiate_cmd,               50 },
 			{ tau_parser::bf_substitute_cmd,                50 },
 			{ tau_parser::bf_dnf_cmd,                       50 },
@@ -1938,8 +1939,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		};
 		if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
 			auto tss = std::get<idni::tau::tau_source_sym>(n->value);
-			if (!tss.nt() || no_wrap_for.find(tss.n()) !=
-						no_wrap_for.end()) return false;
+			if (!tss.nt() || no_wrap_for.find(tss.n()) != no_wrap_for.end())
+				return false;
 			// tau_parser& p = idni::parser_instance<tau_parser>();
 			// std::cerr
 			// 	<< p.name(parent) << " vs " << p.name(tss.n())
@@ -2050,6 +2051,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::file:
 			case tau_parser::normalize_cmd:
 			case tau_parser::execute_cmd:
+			case tau_parser::solve_cmd:
 			case tau_parser::bf_instantiate_cmd:
 			case tau_parser::bf_substitute_cmd:
 			case tau_parser::bf_dnf_cmd:

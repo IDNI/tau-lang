@@ -135,6 +135,9 @@ private:
 
 	void execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 
+	std::optional<nso<tau_ba<BAs...>, BAs...>> solve_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_wff(

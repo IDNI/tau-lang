@@ -225,6 +225,14 @@ struct tau_bdd_binding_factory {
 	std::map<std::string, sp_tau_node<tau_ba<bdd_binding>, bdd_binding>> cache;
 };
 
+struct tau_bdd_splitter {
+
+	sp_tau_node<tau_ba<bdd_binding>, bdd_binding> split(const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>&) {
+		// TODO (HIGH) implement
+		return nullptr;
+	}
+};
+
 } // namespace idni::tau
 
 
