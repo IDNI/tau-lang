@@ -270,10 +270,10 @@ struct tau_factory {
 };
 
 template<typename...BAs>
-struct tau_ba_plitter {
+struct tau_splitter {
 
-	gssotc<BAs...> split(const gssotc<BAs...>& n) {
-		// TODo (HIGH) implement tau_ba splitter
+	std::variant<tau_ba<BAs...>, BAs...> operator()(const std::variant<tau_ba<BAs...>, BAs...>& n) {
+		// TODO (HIGH) implement tau_ba splitter
 	}
 
 };
