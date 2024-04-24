@@ -180,7 +180,7 @@ wff                    => wff_xor.
 wff                    => wff_neg.
 wff                    => wff_t | wff_f.
 wff                    => bf_interval.
-wff                    => bf_neq | bf_eq | bf_not_less_equal | bf_greater
+wff                    => bf_neq | bf_eq | bf_nleq_lower| bf_nleq_upper | bf_greater
                         | bf_less_equal | bf_less.
 wff                    => capture.
 wff                    => bool_variable.
@@ -213,17 +213,17 @@ bf_eq                  => bf _ bf_equality_sym       _ bf.
 bf_neq                 => bf _ bf_nequality_sym      _ bf.
 bf_less                => bf _ bf_less_sym           _ bf.
 bf_less_equal          => bf _ bf_less_equal_sym     _ bf.
-bf_nleq_lower          => bf _ bf_nleq_sym           _ var.
-bf_nleq_upper          => var _ bf_nleq_sym          _ bf.
+bf_nleq_lower          => bf _ bf_not_less_equal_sym _ (variable | capture) .
+bf_nleq_upper          => (variable | capture)       _ bf_not_less_equal_sym _ bf.
 bf_greater             => bf _ bf_greater_sym        _ bf.
-bf_interval            => bf _ bf_less_equal_sym     _ var _ bf_less_equal_sym _ bf.
+bf_interval            => bf _ bf_less_equal_sym     _ (variable | capture) _ bf_less_equal_sym _ bf.
 
 # bf
 bf_rule                => bf_matcher _ bf_def _ bf_body _ dot.
 bf_matcher             => bf.
 bf_body                => bf | bf_is_zero_cb | bf_is_one_cb
                         | bf_has_subformula_cb | bf_remove_funiversal_cb | bf_remove_fexistential_cb
-                        | bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb | bf_not_less_equal.
+                        | bf_and_cb | bf_or_cb | bf_xor_cb | bf_neg_cb | bf_nleq_lower | bf_nleq_upper.
 
 bf                     => bf_splitter.
 bf                     => bf_ref.

@@ -20,6 +20,9 @@
 #include "debug_helpers.h"
 #endif // DEBUG
 
+using namespace idni::rewriter;
+using namespace idni::tau;
+
 namespace idni::tau {
 
 // conjunctive normal form
@@ -72,15 +75,49 @@ nso<BAs...> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 		}
 		return false;
 	};
-	auto quantifier = find_bottom(n, pred);
-	if (quantifier.has_value()) {
-		std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0<BAs...>}};
-		std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1<BAs...>}};
-		auto f_0 = replace(quantifier.value(), changes_0);
-		auto f_1 = replace(quantifier.value(), changes_1);
-		return build_bf_interval(f_0, var, f_1);
+	if (auto quantifier = find_bottom(n, pred); quantifier.has_value()) {
+		auto sub_formula = quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>>;
+		return onf_subformula(sub_formula, var);
 	}
 	return n;
+}
+
+template<typename...BAs>
+nso<BAs...> onf_subformula(const nso<BAs...>& n, const nso<BAs...>& var) {
+	auto eq = find_bottom(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
+	std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0<BAs...>}};
+	auto f_0 = replace((eq || tau_parser::bf)[0],  changes_0)
+		| repeat_each<step<BAs...>, BAs...>(
+			simplify_bf<BAs...>
+			| apply_cb<BAs...>)
+		| to_mnf_bf<BAs...>();
+	std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1<BAs...>}};
+	auto f_1 = replace((eq || tau_parser::bf)[0],  changes_1)
+		| repeat_each<step<BAs...>, BAs...>(
+			simplify_bf<BAs...>
+			| apply_cb<BAs...>)
+		| to_mnf_bf<BAs...>();
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+	auto eq_change = trim(build_bf_interval(f_0, var, f_1));
+	changes[eq | optional_value_extractor<nso<BAs...>>] = eq_change;
+	for (auto& neq: select_all(n, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
+		auto bounds = neq || tau_parser::bf;
+		std::map<nso<BAs...>, nso<BAs...>> changes_neq_0 = {{var, _0<BAs...>}};
+		auto f_0 = replace(bounds[0],  changes_neq_0)
+			| repeat_each<step<BAs...>, BAs...>(
+				simplify_bf<BAs...>
+				| apply_cb<BAs...>)
+			| to_mnf_bf<BAs...>();
+		std::map<nso<BAs...>, nso<BAs...>> changes_neq_1 = {{var, _1<BAs...>}};
+		auto f_1 = replace(bounds[0],  changes_neq_1)
+			| repeat_each<step<BAs...>, BAs...>(
+				simplify_bf<BAs...>
+				| apply_cb<BAs...>)
+			| to_mnf_bf<BAs...>();
+		auto nleq_change = build_bf_or(build_bf_nleq_lower(f_0, var), build_bf_nleq_upper(f_1, var));
+		changes[neq] = nleq_change;
+	}
+	return replace(n, changes);
 }
 
 template<size_t type, typename...BAs>

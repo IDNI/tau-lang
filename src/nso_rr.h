@@ -1090,6 +1090,8 @@ const std::string BLDR_WFF_EQ = "( $X ) =:: $X = 0.";
 const std::string BLDR_WFF_NEQ = "( $X ) =:: $X != 0.";
 const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) =:: $X !<= $Y.";
 const std::string BDLR_BF_INTERVAL = "( $X $Y $Z ) =:: $X <= $Y <= $Z.";
+const std::string BDLR_BF_NLEQ_UPPER = "( $X $Y ) =:: $X !<= $Y.";
+const std::string BDLR_BF_NLEQ_LOWWER = "( $X $Y ) =:: $Y !<= $X.";
 const std::string BLDR_WFF_AND = "( $X $Y ) =:: $X && $Y.";
 const std::string BLDR_WFF_OR = "( $X $Y ) =:: $X || $Y.";
 const std::string BLDR_WFF_NEG = "( $X ) =:: ! $X.";
@@ -1155,6 +1157,10 @@ template<typename... BAs>
 static auto bldr_bf_not_less_equal = make_builder<BAs...>(BLDR_BF_NOT_LESS_EQUAL);
 template<typename... BAs>
 static auto bldr_bf_interval = make_builder<BAs...>(BDLR_BF_INTERVAL);
+template<typename... BAs>
+static auto bldr_bf_nleq_upper = make_builder<BAs...>(BDLR_BF_NLEQ_UPPER);
+template<typename... BAs>
+static auto bldr_bf_nleq_lowwer = make_builder<BAs...>(BDLR_BF_NLEQ_LOWWER);
 template<typename... BAs>
 static auto bldr_bf_all = make_builder<BAs...>(BLDR_BF_ALL);
 template<typename... BAs>
@@ -1301,6 +1307,18 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_interval(const sp_tau_node<BAs...>& x, const sp_tau_node<BAs...>& y, const sp_tau_node<BAs...>& z) {
 	std::vector<sp_tau_node<BAs...>> args {trim(x), trim(y), trim(z)};
 	return tau_apply_builder<BAs...>(bldr_bf_interval<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_nleq_lower(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
+	return tau_apply_builder<BAs...>(bldr_bf_nleq_lowwer<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_nleq_upper(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
+	return tau_apply_builder<BAs...>(bldr_bf_nleq_upper<BAs...>, args);
 }
 
 template<typename... BAs>
@@ -1913,7 +1931,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_interval,                     510 },
 			{ tau_parser::bf_neq,                          520 },
 			{ tau_parser::bf_eq,                           530 },
-			{ tau_parser::bf_not_less_equal,               540 },
+			{ tau_parser::bf_nleq_lower,                   540 },
+			{ tau_parser::bf_nleq_upper,                   540 },
 			{ tau_parser::bf_greater,                      550 },
 			{ tau_parser::bf_less_equal,                   560 },
 			{ tau_parser::bf_less,                         570 },
@@ -1997,7 +2016,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_neq:
 			case tau_parser::bf_less:
 			case tau_parser::bf_less_equal:
-			case tau_parser::bf_not_less_equal:
+			case tau_parser::bf_nleq_lower:
+			case tau_parser::bf_nleq_upper:
 			case tau_parser::bf_greater:
 			case tau_parser::bf_interval:
 			case tau_parser::wff_and:

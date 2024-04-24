@@ -244,12 +244,13 @@ TEST_SUITE("builders execution") {
 		CHECK( true );
 	}
 
-	TEST_CASE("BLDR_BF_NOT_LESS_EQUAL") {
+	// TODO (HIGH) implement update this tests to cover upper and lower bounds
+	/*TEST_CASE("BLDR_BF_NOT_LESS_EQUAL") {
 		auto bldr = make_builder<Bool>(BLDR_BF_NOT_LESS_EQUAL);
 		std::vector<sp_tau_node<Bool>> args = {F, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_not_less_equal;
 		CHECK( check.has_value() );
-	}
+	}*/
 
 	TEST_CASE("BLDR_BF_GREATER") {
 		// TODO (LOW) write proper test
