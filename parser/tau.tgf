@@ -213,9 +213,10 @@ bf_eq                  => bf _ bf_equality_sym       _ bf.
 bf_neq                 => bf _ bf_nequality_sym      _ bf.
 bf_less                => bf _ bf_less_sym           _ bf.
 bf_less_equal          => bf _ bf_less_equal_sym     _ bf.
-bf_not_less_equal      => bf _ bf_not_less_equal_sym _ bf.
+bf_nleq_lower          => bf _ bf_nleq_sym           _ var.
+bf_nleq_upper          => var _ bf_nleq_sym          _ bf.
 bf_greater             => bf _ bf_greater_sym        _ bf.
-bf_interval            => bf _ bf_less_equal_sym     _ bf _ bf_less_equal_sym _ bf.
+bf_interval            => bf _ bf_less_equal_sym     _ var _ bf_less_equal_sym _ bf.
 
 # bf
 bf_rule                => bf_matcher _ bf_def _ bf_body _ dot.
