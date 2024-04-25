@@ -331,14 +331,8 @@ template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	auto form = n | tau_parser::execute_cmd_arg;
 	if (auto check = form | tau_parser::tau; check) {
-		auto n_gssotc = make_tau_spec_using_factory<factory_t, BAs...>(form.value(), factory);
 		// TODO (HIGH) call executor
 	} else if (auto check = form | tau_parser::gssotc_rr; check) {
-		auto n_gssotc_rr = make_tau_spec_using_factory<factory_t, BAs...>(form.value(), factory);
-		rec_relations<gssotc<BAs...>> rrs;
-		rrs.insert(rrs.end(), n_gssotc_rr.rec_relations.begin(), n_gssotc_rr.rec_relations.end());
-		rrs.insert(rrs.end(), definitions.begin(), definitions.end());
-		tau_spec<BAs...> rr_gssotc = { rrs, n_gssotc_rr.main };
 		// TODO (HIGH) call executor
 	}
 	not_implemented_yet();
@@ -348,10 +342,8 @@ template <typename factory_t, typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::solve_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	auto form = n | tau_parser::solve_cmd_arg;
 	if (auto check = form | tau_parser::wff; check) {
-		std::cout << "solving wff\n";
 		// TODO (HIGH) call solver
 	} else {
-		std::cout << "solving unimplemented type\n";
 		// TODO (HIGH) call solver
 	}
 	return {};
