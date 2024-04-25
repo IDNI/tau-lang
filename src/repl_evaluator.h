@@ -120,8 +120,7 @@ private:
 	void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
 	void toggle_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
 
-	void print_output_cmd(
-		const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
+	void print_output_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
 	void list_outputs_cmd();
 	void clear_outputs_cmd();
 
@@ -137,6 +136,10 @@ private:
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> solve_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
+
+	void is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void is_unsatisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(
 		const nso<tau_ba<BAs...>, BAs...>& n);

@@ -176,7 +176,7 @@ std::optional<std::variant<BAs...>> solve_clause_using_splitter(const nlgeqs_cla
 }
 
 template<typename...BAs>
-std::pair<var<BAs...>, nso<BAs...>> eliminate_equality(const nso<BAs...>& clause) {
+std::pair<var<BAs...>, std::optional<nso<BAs...>>> eliminate_equality(const nso<BAs...>& clause) {
 	auto var = find_top(clause, is_non_terminal<tau_parser::var, BAs...>)
 		|optional_value_extractor<sp_tau_node<BAs...>>;
 	auto f = find_top(clause, is_non_terminal<tau_parser::bf_eq, BAs...>)
