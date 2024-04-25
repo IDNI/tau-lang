@@ -357,6 +357,21 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::so
 	return {};
 }
 
+template<typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	// TODO (HIGH) call satisfiability
+}
+
+template<typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	// TODO (HIGH) call satisfiability
+}
+
+template<typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	// TODO (HIGH) call satisfiability
+}
+
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	auto r = n | tau_parser::def_rule_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
@@ -547,6 +562,10 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command); break;
 	case p::wff_substitute_cmd: result = wff_substitute_cmd(command); break;
 	case p::wff_instantiate_cmd:result = wff_instantiate_cmd(command); break;
+	// formula checks
+	case p::is_satisfiable_cmd:    not_implemented_yet(); break;
+	case p::is_valid_cmd:          not_implemented_yet(); break;
+	case p:: is_unsatisfiable_cmd: not_implemented_yet(); break;
 	// wff normal forms
 	case p::wff_onf_cmd:        result = wff_onf_cmd(command); break;
 	case p::wff_dnf_cmd:        result = wff_dnf_cmd(command); break;
@@ -656,10 +675,11 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  version or v           print version\n"
 		<< "  clear                  clear the screen\n"
 		<< "\n"
+
 		<< "Formula commands:\n"
 		<< "  normalize or n         normalize formula\n"
-
 		<< "\n"
+
 		<< "Normal form commands:\n"
 		<< "  onf                    convert to order normal form\n"
 		<< "  dnf                    convert to disjunctive normal form\n"
@@ -668,17 +688,53 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  nnf                    convert to negation normal form\n"
 		//<< "  pnf                    convert to prenex normal form\n"
 		<< "  mnf                    convert to minterm normal form\n"
+		<< "\n"
 
+		//<< "Substitution and instantiation commands:\n"
+		//<< "  substitute             substitute a formula\n"
+		//<< "  instantiate            instantiate a formula\n"
+		//<< "\n"
+
+		<< "Validity commands:\n"
+		<< "  sat                   check satisfiability\n"
+		<< "  valid                 check validity\n"
+		<< "  unsat				    check unsatisfiability\n"
 		<< "\n"
+
+		<< "Execute commands:\n"
+		<< "  execute                execute a tau code\n"
+		<< "\n"
+
+		<< "Solver commands:\n"
+		<< "  solve                  solve a formula\n"
+		<< "\n"
+
+		<< "Definition commands:\n"
+		<< "  def                   define a rec. relation\n"
+		<< "  def list              list all rec. relations\n"
+		<< "  def clear             clear all rec. relations\n"
+		<< "  def del <id>          delete rec. relation\n"
+
 		<< "Output commands:\n"
-		<< "  output or o            output control\n"
-		<< "  &                      output_ref. or short alias of output command\n"
-		<< "  %                      output ref. or relative output control\n"
+		//<< "  output or o            output control\n"
+		<< "  output clear           clear output memory\n"
+		<< "  output <output_id>     print output\n"
+		<< "  output list            list all outputs\n"
 		<< "\n"
+		//<< "  &                      output_ref. or short alias of output command\n"
+		//<< "  %                      output ref. or relative output control\n"
+		//<< "\n"
+
+		//<< "Selection commands:\n"
+		//<< "  selection or s         selection control\n"
+
 		<< "Settings commands:\n"
 		<< "  get                    get options' values\n"
 		<< "  set                    set option's value\n"
-		<< "  toggle                 toggle option's value\n";
+		<< "  toggle                 toggle option's value\n"
+
+		<< "Examples:\n"
+		<< "  help or h examples     show examples related to the Tau Language syntax.\n";
 		break;
 	case tau_parser::version_cmd_sym: cout
 		<< "version or v prints out current Tau commit id\n";
@@ -688,50 +744,6 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		break;
 	case tau_parser::clear_cmd_sym: cout
 		<< "clear clears the screen\n";
-		break;
-	case tau_parser::output_sym: cout
-		<< "output or out command manages outputs of previous commands\n"
-		<< "\n"
-		<< "  output                 lists all outputs\n"
-		<< "  output <output_id>     prints output\n"
-		<< "  output clear           clears output memory\n";
-		break;
-	case tau_parser::absolute_output_sym: cout
-		<< "& is a short alias of output command\n"
-		<< "\n"
-		<< "  &                      lists all outputs\n"
-		<< "  &clear                 clears output memory\n"
-		<< "  &<output_id>           is a reference to a previous output\n"
-		<< "                         if used as a command it prints the output\n";
-		break;
-	case tau_parser::relative_output_sym: cout
-		<< "% same as & but output_id is relative to the latest\n"
-		<< "\n"
-		<< "  %                      lists all outputs\n"
-		<< "  %clear                 clears output memory\n"
-		<< "  %<relative_output_id>  is a reference to a previous output\n"
-		<< "                         if used as a command it prints the output\n";
-		break;
-	case tau_parser::selection_sym: cout
-		<< "Command s, selection ...\n";
-		break;
-	case tau_parser::instantiate_cmd_sym: cout
-		<< "Command i, instantiate ...\n";
-		break;
-	case tau_parser::substitute_cmd_sym: cout
-		<< "Command s, substitute ...\n";
-		break;
-	case tau_parser::normalize_cmd_sym: cout
-		<< "normalize or n command normalizes a formula, prints it and\n"
-		<< "saves it into memory of previous outputs\n"
-		<< "\n"
-		<< "usage:\n"
-		<< "  normalize '<NSORR>'    normalizes the given NSO RR\n"
-		<< "  normalize '<WFF>'      normalizes the given WFF formula\n"
-		<< "  normalize <output>     normalizes the output with the given id\n";
-		break;
-	case tau_parser::file_cmd_sym: cout
-		<< "Command r, read ...\n";
 		break;
 	case tau_parser::get_cmd_sym: cout
 		<< "get if used alone prints all options and their values\n"
@@ -749,46 +761,147 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "\n"
 		<< bool_available_options;
 		break;
+	case tau_parser::output_sym: cout
+		<< "output or out command manages outputs of previous commands\n"
+		<< "\n"
+		<< "  output                 lists all outputs\n"
+		<< "  output <output_id>     prints output\n"
+		<< "  output clear           clears output memory\n";
+		break;
+
+	//case tau_parser::absolute_output_sym: cout
+	//	<< "& is a short alias of output command\n"
+	//	<< "\n"
+	//	<< "  &                      lists all outputs\n"
+	//	<< "  &clear                 clears output memory\n"
+	//	<< "  &<output_id>           is a reference to a previous output\n"
+	//	<< "                         if used as a command it prints the output\n";
+	//	break;
+	//case tau_parser::relative_output_sym: cout
+	//	<< "% same as & but output_id is relative to the latest\n"
+	//	<< "\n"
+	//	<< "  %                      lists all outputs\n"
+	//	<< "  %clear                 clears output memory\n"
+	//	<< "  %<relative_output_id>  is a reference to a previous output\n"
+	//	<< "                         if used as a command it prints the output\n";
+	//	break;
+
+	//case tau_parser::selection_sym: cout
+	//	<< "Command s, selection ...\n";
+	//	break;
+
+	//case tau_parser::file_cmd_sym: cout
+	//	<< "Command r, read ...\n";
+	//	break;
+
+	case tau_parser::normalize_cmd_sym: cout
+		<< "normalize or n command normalizes a formula, prints it and\n"
+		<< "saves it into memory of previous outputs\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  normalize '<NSORR>'    normalizes the given NSO RR\n"
+		<< "  normalize '<WFF>'      normalizes the given WFF formula\n";
+	//	<< "  normalize <output>     normalizes the output with the given id\n"
+	//	<< "  normalize <selection>  normalizes the selection\n";
+		break;
+
+	case tau_parser::execute_cmd_sym: cout
+		<< "Command e, execute ...\n";
+		break;
+
+	case tau_parser::solve_cmd_sym: cout
+		<< "Command s, solve ...\n";
+		break;
+
+	case tau_parser::is_satisfiable_cmd_sym: cout
+		<< "Command sat, is_satisfiable ...\n";
+		break;
+	case tau_parser::is_valid_cmd_sym: cout
+		<< "Command valid, is_valid ...\n";
+		break;
+	case tau_parser::is_unsatisfiable_cmd_sym: cout
+		<< "Command unsat, is_unsatisfiable ...\n";
+		break;
+
 	case tau_parser::dnf_cmd_sym: cout
 		<< "dnf command converts a boolean formula or a well formed formula to disjunctive normal form\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  dnf '<BF>'             converts the given BF to DNF\n"
-		<< "  dnf '<WFF>'            converts the given BF to DNF\n"
-		<< "  dnf <output>           converts the output with the given id to DNF\n";
+		<< "  dnf '<WFF>'            converts the given BF to DNF\n";
+	//	<< "  dnf <output>           converts the output with the given id to DNF\n";
 		break;
 	case tau_parser::cnf_cmd_sym: cout
 		<< "cnf command converts a boolean formula or a well formed formula to conjunctive normal form\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  cnf '<BF>'             converts the given BF to CNF\n"
-		<< "  cnf '<WFF>'            converts the given BF to CNF\n"
-		<< "  cnf <output>           converts the output with the given id to CNF\n";
+		<< "  cnf '<WFF>'            converts the given BF to CNF\n";
+	//	<< "  cnf <output>           converts the output with the given id to CNF\n";
 		break;
+	//case tau_parser::anf_cmd_sym: cout
+	//	<< "cnf command converts a boolean formula or a well formed formula to algebraic normal form\n"
+	//	<< "\n"
+	//	<< "usage:\n"
+	//	<< "  anf '<BF>'             converts the given BF to ANF\n"
+	//	<< "  anf '<WFF>'            converts the given BF to ANF\n"
+	//	<< "  anf <output>           converts the output with the given id to ANF\n";
+	//	break;
 	case tau_parser::nnf_cmd_sym: cout
 		<< "nnf command converts a boolean formula or a well formed formula to negation normal form\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  nnf '<BF>'             converts the given BF to NNF\n"
-		<< "  nnf '<WFF>'            converts the given BF to NNF\n"
-		<< "  nnf <output>           converts the output with the given id to NNF\n";
+		<< "  nnf '<WFF>'            converts the given BF to NNF\n";
+	//	<< "  nnf <output>           converts the output with the given id to NNF\n";
 		break;
+	//case tau_parser::pnf_cmd_sym: cout
+	//	<< "cnf command converts a boolean formula or a well formed formula to prenex normal form\n"
+	//	<< "\n"
+	//	<< "usage:\n"
+	//	<< "  pnf '<BF>'             converts the given BF to PNF\n"
+	//	<< "  pnf '<WFF>'            converts the given BF to PNF\n"
+	//	<< "  pnf <output>           converts the output with the given id to PNF\n";
+	//	break;
 	case tau_parser::mnf_cmd_sym: cout
 		<< "mnf command converts a boolean formula or a well formed formula to minterm normal form\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  mnf '<BF>'             converts the given BF to MNF\n"
-		<< "  mnf '<WFF>'            converts the given BF to MNF\n"
-		<< "  mnf <output>           converts the output with the given id to MNF\n";
+		<< "  mnf '<WFF>'            converts the given BF to MNF\n";
+	//	<< "  mnf <output>           converts the output with the given id to MNF\n";
 		break;
 	case tau_parser::onf_cmd_sym: cout
 		<< "onf command converts a well formed formula to order normal form\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  onf '<VAR>' '<WFF>'    converts the given WFF to ONF\n"
-		<< "  onf '<VAR>' <output>   converts the output with the given id to ONF\n";
+		<< "  onf '<VAR>' '<WFF>'    converts the given WFF to ONF\n";
+	//	<< "  onf '<VAR>' <output>   converts the output with the given id to ONF\n";
+		break;
+
+	//case tau_parser::substitute_cmd_sym: cout
+	//	<< "Command s, substitute ...\n";
+	//	break;
+	//case tau_parser::instantiate_cmd_sym: cout
+	//	<< "Command i, instantiate ...\n";
+	//	break;
+
+	case tau_parser::def_cmd_sym: cout
+		<< "defines a rec. relation\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  def '<TAU>'      defines a tau rec. relation\n"
+		<< "  def '<WFF>'      defines a wff rec. relation\n"
+		<< "  def '<BF>'       defines a bf rec. relation\n"
+		<< "  def list         list definitions\n"
+		<< "  def clear        clear all definitions\n"
+		<< "  def del <id>     delete <id> definition\n";
+		break;
+	case tau_parser::examples_sym: cout
+		<< "examples\n";
 		break;
 	}
+
 }
 
 // undef terminal color macros valid only for this file

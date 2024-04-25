@@ -117,7 +117,7 @@ nso<BAs...> onf_subformula(const nso<BAs...>& n, const nso<BAs...>& var) {
 		auto nleq_change = build_bf_or(build_bf_nleq_lower(f_0, var), build_bf_nleq_upper(f_1, var));
 		changes[neq] = nleq_change;
 	}
-	return replace(n, changes);
+	return replace(n, changes) | repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>);
 }
 
 template<size_t type, typename...BAs>
