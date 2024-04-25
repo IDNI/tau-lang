@@ -176,14 +176,15 @@ std::optional<std::variant<BAs...>> solve_clause_using_splitter(const nlgeqs_cla
 }
 
 template<typename...BAs>
-std::pair<var<BAs...>, std::optional<nso<BAs...>>> eliminate_equality(const nso<BAs...>& clause) {
-	auto var = find_top(clause, is_non_terminal<tau_parser::var, BAs...>)
-		|optional_value_extractor<sp_tau_node<BAs...>>;
-	auto f = find_top(clause, is_non_terminal<tau_parser::bf_eq, BAs...>)
-		| tau_parser::bf
-		| optional_value_extractor<sp_tau_node<BAs...>>;
-	auto x_plus_fx = trim(build_bf_xor<BAs...>(wrap(tau_parser::bf, var), f));
-	auto form = replace(clause, {{var, x_plus_fx}})
+std::pair<var<BAs...>, std::optional<nso<BAs...>>> eliminate_interval(const nso<BAs...>& clause) {
+	auto interval = find_top(clause, is_non_terminal<tau_parser::bf_interval, BAs...>);
+	auto var = interval | tau_parser::var | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto bounds = interval || tau_parser::bf;
+	// given a <= x <= b we can replace it by x = a x + b x'
+	auto subs = trim(build_bf_xor<BAs...>(
+		build_bf_and<BAs...>(bounds[0], var),
+		build_bf_and<BAs...>(bounds[1], build_bf_neg<BAs...>(var))));
+	auto form = replace(clause, {{var, subs}})
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
@@ -200,7 +201,7 @@ bounds<BAs...> compute_lower_bounds(const var<BAs...> v, const nso<BAs...>& clau
 			simplify_bf<BAs...>
 			| apply_cb<BAs...>)
 		| to_mnf_bf<BAs...>();
-	for (auto& neq: select_all(f_0, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
+	for (auto& neq: select_all(f_0, is_non_terminal<tau_parser::bf_nleq_lower, BAs...>)) {
 		auto c_i = neq
 			| tau_parser::bf
 			| only_child_extractor<sp_tau_node<BAs...>>
@@ -220,7 +221,7 @@ bounds<BAs...> compute_upper_bounds(const var<BAs...>& v, const nso<BAs...>& cla
 			| apply_cb<BAs...>)
 		| to_mnf_bf<BAs...>();
 
-	for (auto& neq: select_all(f_1, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
+	for (auto& neq: select_all(f_1, is_non_terminal<tau_parser::bf_nleq_upper, BAs...>)) {
 		auto neg_d_i = neq
 			| tau_parser::bf
 			| only_child_extractor<sp_tau_node<BAs...>>
@@ -234,7 +235,7 @@ bounds<BAs...> compute_upper_bounds(const var<BAs...>& v, const nso<BAs...>& cla
 
 template<typename splitter_t, typename...BAs>
 std::optional<std::variant<BAs...>> solve_clause_using_splitter(const clause<BAs...>& clause, splitter_t splitter) {
-	auto [var, simplified] = eliminate_equality(clause);
+	auto [var, simplified] = eliminate_interval(clause);
 	auto nlg_eqs = { compute_lower_bounds(var, simplified), compute_upper_bounds(var, simplified) };
 	return solve_clause_using_splitter(nlg_eqs, splitter);
 }
@@ -245,30 +246,11 @@ std::optional<std::variant<BAs...>> solve_clause_using_splitter(const clause<BAs
 // or in any other form. We may drop such assumption in the future.
 template<typename splitter_t, typename...BAs>
 std::optional<std::variant<BAs...>> solve_using_splitter(const nso<BAs...>& nso, splitter_t splitter) {
-	// we apply once definitions.
-	auto nso_with_defs = apply_definitions(nso);
-	auto form = nso_with_defs
-		| repeat_all<step<BAs...>, BAs...>(
-			// also we apply xor,... definitions
-			step<BAs...>(apply_defs<BAs...>))
-		| repeat_each<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>)
-		| to_mnf_wff<BAs...>()
-		| repeat_all<step<BAs...>, BAs...>(
-			bf_positives_upwards<BAs...>
-			| squeeze_positives<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			to_dnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
-		| to_mnf_bf<BAs...>()
-		| repeat_all<step<BAs...>, BAs...>(
-			trivialities<BAs...>
-			| simplify_bf<BAs...>
-			| simplify_wff<BAs...>);
+	auto var = find_top(nso, is_non_terminal<tau_parser::var, BAs...>)
+		| optional_value_extractor<sp_tau_node<BAs...>>;
+	auto onf = onf_subformula(nso, var);
 	// finally, for each clause we try to find a solution using the splitter
-	for (auto& clause: get_dnf_clauses<tau_parser::wff>(form))
+	for (auto& clause: get_dnf_clauses<tau_parser::wff>(onf))
 		if (auto solution = solve_clause_using_splitter(clause, splitter); solution.has_value())
 			return solution.value();
 	// we were unable to compute a proper splitter at some point which was crucial
