@@ -476,7 +476,9 @@ relative_output        => relative_output_sym output_id.
 output_id              => digits.
 
 list_outputs_cmd       => output_sym | absolute_output_sym | relative_output_sym.
+# TODO (VERY_HIGH) there is no def for clear_sym... maybe we should add it
 clear_outputs_cmd      => (output_sym __ | absolute_output_sym | relative_output_sym) clear_sym.
+# TODO (VERY_HIGH) we are missing id for output
 print_output_cmd       => output.
 
 cli_cmd_sym            => help_cmd_sym | version_cmd_sym | quit_cmd_sym
@@ -532,6 +534,7 @@ examples_sym            => "examples".
 
 # get option_sym / set option_sym [ = ] value / toggle option_sym
 get_cmd                => get_cmd_sym [ __ option ].
+# TODO (VERY_HIGH) fix this, we could say 'set severity true'... use another case for this
 set_cmd                => set_cmd_sym __ option (__ | _ '=' _) option_value.
 toggle_cmd             => toggle_cmd_sym __ bool_option.
 

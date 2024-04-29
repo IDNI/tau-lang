@@ -23,6 +23,7 @@ set(TESTS
 	tau
 	satisfiability
 	executor
+	normal_forms
 )
 
 foreach(X IN LISTS TESTS)

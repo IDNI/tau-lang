@@ -81,24 +81,24 @@ TEST_SUITE("steps parsing") {
 // TODO (HIGH) write tests to check get_positive_negative_literals
 // TODO (HIGH) write tests to check get_literals
 
-// TODO (VERY LOW) write tests to check make_tau_source
-// TODO (VERY LOW) write tests to check make_tau_source_from_file
-// TODO (VERY LOW) write tests to check process_digits
-// TODO (VERY LOW) write tests to check make_tau_code
-// TODO (VERY LOW) write tests to check make_library
-// TODO (VERY LOW) write tests to check make_nso_rr_using_binder
-// TODO (VERY LOW) write tests to check make_nso_rr_using_bindings
-// TODO (VERY LOW) write tests to check make_nso_rr_using_factory
-// TODO (VERY LOW) write tests to check make_builder
+// TODO (VERY_LOW) write tests to check make_tau_source
+// TODO (VERY_LOW) write tests to check make_tau_source_from_file
+// TODO (VERY_LOW) write tests to check process_digits
+// TODO (VERY_LOW) write tests to check make_tau_code
+// TODO (VERY_LOW) write tests to check make_library
+// TODO (VERY_LOW) write tests to check make_nso_rr_using_binder
+// TODO (VERY_LOW) write tests to check make_nso_rr_using_bindings
+// TODO (VERY_LOW) write tests to check make_nso_rr_using_factory
+// TODO (VERY_LOW) write tests to check make_builder
 
-// TODO (VERY LOW) write tests to check tau_apply_builder
-// TODO (VERY LOW) write tests to check trim
-// TODO (VERY LOW) write tests to check wrap
+// TODO (VERY_LOW) write tests to check tau_apply_builder
+// TODO (VERY_LOW) write tests to check trim
+// TODO (VERY_LOW) write tests to check wrap
 
-// TODO (VERY LOW) write tests to check nso_rr_apply_if
-// TODO (VERY LOW) write tests to check nso_rr_apply
+// TODO (VERY_LOW) write tests to check nso_rr_apply_if
+// TODO (VERY_LOW) write tests to check nso_rr_apply
 
-// TODO (VERY LOW) write tests to check operator<< (all versions)
+// TODO (VERY_LOW) write tests to check operator<< (all versions)
 
 
 // TODO (LOW) write tests to check steps

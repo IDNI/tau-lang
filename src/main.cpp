@@ -35,10 +35,10 @@
 	// TODO (LOW) normalizer
 	// TODO (LOW) satisfability
 	// TODO (LOW) executor
-// TODO (LOW) CLI
-	// TODO (VERY LOW) CONTRIBUTING.md
-	// TODO (VERY LOW) CODE_OF_CONDUCT.md
-	// TODO (VERY LOW) LICENSE
+	// TODO (LOW) CLI
+	// TODO (VERY_LOW) CONTRIBUTING.md
+	// TODO (VERY_LOW) CODE_OF_CONDUCT.md
+	// TODO (VERY_LOW) LICENSE
 
 // Tasks related to the Tau language rewriting rules and their use
 
