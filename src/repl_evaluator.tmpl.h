@@ -341,10 +341,9 @@ void repl_evaluator<factory_t, BAs...>::execute_cmd(const nso<tau_ba<BAs...>, BA
 template <typename factory_t, typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::solve_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	auto form = n | tau_parser::solve_cmd_arg;
+	// TODO (VERY_HIGH) call solver
 	if (auto check = form | tau_parser::wff; check) {
-		// TODO (HIGH) call solver
 	} else {
-		// TODO (HIGH) call solver
 	}
 	return {};
 }
@@ -891,6 +890,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		break;
 	case tau_parser::examples_sym: cout
 		<< "examples\n";
+		// TODO (VERY_HIGH) show examples
 		break;
 	}
 

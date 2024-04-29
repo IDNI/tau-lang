@@ -5,7 +5,6 @@ add_test(NAME test_repl-quit_cmd-full
 	COMMAND bash -c "echo 'quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-quit_cmd-full PROPERTIES
 	PASS_REGULAR_EXPRESSION "Quit.")
-
 add_test(NAME test_repl-quit_cmd-shortened
 	COMMAND bash -c "echo 'q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-quit_cmd-shortened PROPERTIES
@@ -16,7 +15,6 @@ add_test(NAME test_repl-version_cmd-full
 	COMMAND bash -c "echo 'version. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-version_cmd-full PROPERTIES
 	PASS_REGULAR_EXPRESSION "Tau version")
-
 add_test(NAME test_repl-version_cmd-shortened
 	COMMAND bash -c "echo 'v. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-version_cmd-shortened PROPERTIES
@@ -27,7 +25,6 @@ add_test(NAME test_repl-help_cmd-full
 	COMMAND bash -c "echo 'help. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_cmd-full PROPERTIES
 	PASS_REGULAR_EXPRESSION "Commands")
-
 add_test(NAME test_repl-help_cmd-shortened
 	COMMAND bash -c "echo 'h. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_cmd-shortened PROPERTIES
@@ -41,6 +38,7 @@ add_test(NAME test_repl-help_shortened_normalize_cmd
 	COMMAND bash -c "echo 'h normalize. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_shortened_normalize_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "normalizes the given NSO RR")
+
 add_test(NAME test_repl-help_normalize_cmd_shortened
 	COMMAND bash -c "echo 'help n. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_normalize_cmd_shortened PROPERTIES
@@ -54,18 +52,22 @@ add_test(NAME test_repl-help_shortened-dnf_cmd
 	COMMAND bash -c "echo 'h dnf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_shortened-dnf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "dnf command converts")
+
 add_test(NAME test_repl-help_shortened-cnf_cmd
 	COMMAND bash -c "echo 'h cnf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_shortened-cnf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "cnf command converts")
+
 add_test(NAME test_repl-help_shortened-nnf_cmd
 	COMMAND bash -c "echo 'h nnf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_shortened-nnf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "nnf command converts")
+
 add_test(NAME test_repl-help_shortened-mnf_cmd
 	COMMAND bash -c "echo 'h mnf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_shortened-mnf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "mnf command converts")
+
 add_test(NAME test_repl-help_shortened-onf_cmd
 	COMMAND bash -c "echo 'h onf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_shortened-onf_cmd PROPERTIES
@@ -75,22 +77,35 @@ add_test(NAME test_repl-help_dnf_cmd
 	COMMAND bash -c "echo 'help dnf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_dnf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "dnf command converts")
+
 add_test(NAME test_repl-help_cnf_cmd
 	COMMAND bash -c "echo 'help cnf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_cnf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "cnf command converts")
+
 add_test(NAME test_repl-help_nnf_cmd
 	COMMAND bash -c "echo 'help nnf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_nnf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "nnf command converts")
+
 add_test(NAME test_repl-help_mnf_cmd
 	COMMAND bash -c "echo 'help mnf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_mnf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "mnf command converts")
+
 add_test(NAME test_repl-help_onf_cmd
 	COMMAND bash -c "echo 'help onf. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_onf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "onf command converts")
+
+# TODO (VERY_HIGH) add tests for get/set commands
+# TODO (VERY_HIGH) add tests for normalize command
+# TODO (VERY_HIGH) add tests for sat/unsat/valid command
+# TODO (VERY_HIGH) add tests for solving command
+# TODO (VERY_HIGH) add tests for configuration commands
+# TODO (VERY_HIGH) add tests for examples command
+# TODO (VERY_HIGH) add tests for outputs command
+
 
 # sample for comparing output with a file
 #add_test(NAME test_name COMMAND bash -c "$<TARGET_FILE:${TAU_EXECUTABLE_NAME}> | diff - test_name.dump")
