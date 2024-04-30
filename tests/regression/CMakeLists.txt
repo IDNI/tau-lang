@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	test_regression-issue_applying_once_defs
+	test_regression-issue_bf_and_not_trimmed
 )
 
 foreach(N IN LISTS TESTS)

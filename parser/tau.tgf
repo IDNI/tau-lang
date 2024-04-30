@@ -13,7 +13,7 @@
 
 @use char class eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
-@trim _, __.
+@trim _, __, bf_and_sym.
 
 @inline bf > bf_parenthesis > bf,
 	wff > wff_parenthesis > wff,
@@ -381,9 +381,7 @@ cli_command            => normalize_cmd | execute_cmd | solve_cmd
                         | bf_substitute_cmd | wff_substitute_cmd
                         | bf_instantiate_cmd | wff_instantiate_cmd
                         | def_rule_cmd | def_list_cmd | def_del_cmd | def_clear_cmd.
-cli_command            => bf.
-cli_command            => wff.
-cli_command            => nso_rr.
+
 
 normalize_cmd          => normalize_cmd_sym __ normalize_cmd_arg.
 normalize_cmd_arg      => wff.
