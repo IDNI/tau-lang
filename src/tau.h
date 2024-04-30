@@ -16,7 +16,7 @@
 
 #include <iostream>
 
-#include "normalizer2.h"
+#include "normalizer.h"
 
 using namespace std;
 using namespace idni::tau;

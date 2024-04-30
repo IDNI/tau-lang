@@ -16,7 +16,7 @@
 #include "doctest.h"
 #include "nso_rr.h"
 #include "bdd_handle.h"
-#include "normalizer2.h"
+#include "normalizer.h"
 #include "tau.h"
 
 #include "../integration/test_integration_helpers-tau.h"

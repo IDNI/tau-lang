@@ -17,7 +17,7 @@
 #include "nso_rr.h"
 #include "bool.h"
 #include "bdd_handle.h"
-#include "normalizer2.h"
+#include "normalizer.h"
 #include "test_helpers.h"
 
 #include "debug_helpers.h"

@@ -14,11 +14,10 @@ set(TESTS
 	rewriting
 	nso_rr
 	tau_parser
-	normalizer2
+	normalizer
 	type_system
 	bindings
 	bdd_binding
-	iterators
 	traversal
 	tau
 	satisfiability

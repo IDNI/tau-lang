@@ -14,7 +14,7 @@
 #ifndef __NORMAL_FORMS_H__
 #define __NORMAL_FORMS_H__
 
-#include "normalizer2.h"
+#include "normalizer.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"

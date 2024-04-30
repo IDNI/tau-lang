@@ -15,7 +15,7 @@
 #define __REPL_EVALUATOR_TMPL_H__
 
 #include "repl_evaluator.h"
-#include "normalizer2.h"
+#include "normalizer.h"
 #include "normal_forms.h"
 #include "nso_rr.h"
 #include "tau.h"
