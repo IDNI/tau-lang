@@ -33,7 +33,7 @@ TEST_SUITE("cpp operators") {
 	TEST_CASE("Ohad's example: ex X ( { : ( X = { : (Y = 0).}). } = 0).") {
 		const char* sample = "ex X ( { : ( X = { : (Y = 0).}). } = 0).";
 		auto normalized = normalize_test_tau(sample);
-		auto check = normalized.main | tau_parser::wff_f;
+		auto check = normalized | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 }
