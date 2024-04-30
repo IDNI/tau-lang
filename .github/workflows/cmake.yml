@@ -1,9 +1,5 @@
 name: CMake
 
-# TODO (HIGH) fix workflow to use gcc-13 when it is available on github actions
-#
-# check issue: https://github.com/actions/runner-images/issues/8555
-
 on:
   push:
     branches: [ "main" ]
@@ -16,6 +12,9 @@ env:
 
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Debug
+
+  # Customize the compiler version
+  GCC_VERSION: 13
 
 jobs:
   build:
@@ -37,17 +36,34 @@ jobs:
           platform_version: 22.04
           arch: x86
 
-    - name: Install Act dependencies
-      # if running locally with act install cmake since act runner does not have it
-      if: ${{ env.ACT }}
-      run: apt-get update && apt-get install cmake -y
+    - name: Act dependencies and setup
+      # if running locally with act,
+      # install cmake since act runner does not have it
+      # and set the GCC_VERSION to 12 (the highest supported by act runner)
+      if: ${{env.ACT}}
+      run: |
+        echo "GCC_VERSION=12" >> $GITHUB_ENV
+        export GCC_VERSION=12
+        apt-get update && apt-get install cmake gcc-$GCC_VERSION g++-$GCC_VERSION -y
+
+    - name: Update gcc and g++ alternatives to a selected compiler version
+      run: |
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-$GCC_VERSION 60
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-$GCC_VERSION 60
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DTAU_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DBoost_INCLUDE_DIR=${{steps.install-boost.outputs.BOOST_ROOT}}/include -DBoost_LIBRARY_DIRS=${{steps.install-boost.outputs.BOOST_ROOT}}/lib
+      run: |
+        cmake -B ${{github.workspace}}/build \
+          -DTAU_BUILD_TESTS=ON \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          -DCMAKE_C_COMPILER=/usr/bin/gcc \
+          -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
+          -DBoost_INCLUDE_DIR=${{steps.install-boost.outputs.BOOST_ROOT}}/include \
+          -DBoost_LIBRARY_DIRS=${{steps.install-boost.outputs.BOOST_ROOT}}/lib
       env:
-        BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
+        BOOST_ROOT: ${{steps.install-boost.outputs.BOOST_ROOT}}
 
     - name: Build
       # Build your program with the given configuration
