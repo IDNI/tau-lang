@@ -18,7 +18,7 @@
 #include "../src/babdd.h"
 #include "../src/bdd_handle.h"
 #include "../src/bool.h"
-#include "../src/normalizer2.h"
+#include "../src/normalizer.h"
 #include "../src/tau.h"
 
 using namespace idni::rewriter;

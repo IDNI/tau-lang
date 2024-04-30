@@ -14,7 +14,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "normalizer2.h"
+#include "normalizer.h"
 #include "bdd_handle.h"
 
 using namespace idni::rewriter;

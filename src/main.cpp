@@ -63,7 +63,7 @@
 #include "cli.h"
 #include "repl.h"
 #include "repl_evaluator.h"
-#include "normalizer2.h"
+#include "normalizer.h"
 #include "bdd_binding.h"
 
 using namespace std;

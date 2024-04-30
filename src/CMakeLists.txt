@@ -1,24 +1,19 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
-	anf.h
-	ba.h
 	babdd.h
 	barr.h
+	bdd_binding.h
 	bdd_handle.h
-	defs.h
 	bool.h
+	defs.h
 	rewriting.h
 	dict.h
-	msba.h
 	normalizer.h
-	normalizer2.h
 	out.h
 	nso_rr.h
-	seq.h
 	satisfiability.h
 	tau.h
-	iterators.h
 	executor.h
 	normal_forms.h
 	solver.h
@@ -27,8 +22,8 @@ set(TAU_HEADERS
 set(TAU_SOURCES
 	bool.cpp
 	dict.cpp
-	iterators.cpp
 	nso_rr.cpp
+	repl_evaluator.cpp
 )
 
 set(CLI_SOURCES

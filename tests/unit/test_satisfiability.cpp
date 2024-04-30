@@ -17,7 +17,7 @@
 #include "satisfiability.h"
 #include "bool.h"
 #include "bdd_handle.h"
-#include "normalizer2.h"
+#include "normalizer.h"
 
 // TODO (LOW) consider move this test to integration tests
 #include "../integration/test_integration_helpers-tau.h"
