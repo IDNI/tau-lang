@@ -17,10 +17,12 @@ set(TAU_HEADERS
 	executor.h
 	normal_forms.h
 	solver.h
+	variant_ba.h
 )
 
 set(TAU_SOURCES
 	bool_ba.cpp
+	variant_ba.cpp
 	dict.cpp
 	nso_rr.cpp
 	repl_evaluator.cpp
