@@ -11,7 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 #include <ostream>
-#include "bool.h"
+#include "bool_ba.h"
 
 Bool::Bool() : b(false) {}
 Bool::Bool(bool b) : b(b) {}

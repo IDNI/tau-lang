@@ -14,7 +14,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "bool.h"
+#include "bool_ba.h"
 #include "bdd_handle.h"
 
 namespace testing = doctest;

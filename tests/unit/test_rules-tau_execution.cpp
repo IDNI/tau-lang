@@ -16,7 +16,7 @@
 #include "doctest.h"
 #include "tau.h"
 #include "nso_rr.h"
-#include "bool.h"
+#include "bool_ba.h"
 #include "bdd_handle.h"
 #include "normalizer.h"
 #include "tau.h"

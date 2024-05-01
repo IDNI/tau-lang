@@ -13,7 +13,7 @@
 #ifndef __BABDD_H__
 #define __BABDD_H__
 #include "defs.h"
-#include "bool.h"
+#include "bool_ba.h"
 #include <vector>
 #include <map>
 #include <set>

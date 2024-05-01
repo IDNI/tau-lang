@@ -15,7 +15,7 @@
 
 #include "doctest.h"
 #include "satisfiability.h"
-#include "bool.h"
+#include "bool_ba.h"
 #include "bdd_handle.h"
 #include "normalizer.h"
 

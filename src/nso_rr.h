@@ -35,7 +35,7 @@
 #include <boost/log/trivial.hpp>
 
 //#include "tree.h"
-#include "bool.h"
+#include "bool_ba.h"
 #include "parser.h"
 #include "../parser/tau_parser.generated.h"
 #include "rewriting.h"
