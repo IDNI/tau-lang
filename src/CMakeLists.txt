@@ -5,7 +5,7 @@ set(TAU_HEADERS
 	barr.h
 	bdd_binding.h
 	bdd_handle.h
-	bool.h
+	bool_ba.h
 	defs.h
 	rewriting.h
 	dict.h
@@ -20,7 +20,7 @@ set(TAU_HEADERS
 )
 
 set(TAU_SOURCES
-	bool.cpp
+	bool_ba.cpp
 	dict.cpp
 	nso_rr.cpp
 	repl_evaluator.cpp

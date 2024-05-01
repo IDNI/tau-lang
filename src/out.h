@@ -19,7 +19,7 @@
 
 #include "barr.h"
 #include "dict.h"
-#include "bool.h"
+#include "bool_ba.h"
 #include "anf.h"
 
 ostream& operator<<(ostream& os, const Bool& b) { return os << (b.b ? 1 : 0); }

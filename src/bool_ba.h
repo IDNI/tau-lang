@@ -10,8 +10,8 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-#ifndef __BOOL_H__
-#define __BOOL_H__
+#ifndef __BOOL_BA_H__
+#define __BOOL_BA_H__
 
 struct Bool {
 	Bool();
@@ -35,4 +35,4 @@ struct Bool {
 
 std::ostream& operator<<(std::ostream& os, const Bool& b);
 
-#endif
+#endif // __BOOL_BA_H__

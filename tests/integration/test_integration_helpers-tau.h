@@ -17,7 +17,7 @@
 #include "../src/nso_rr.h"
 #include "../src/babdd.h"
 #include "../src/bdd_handle.h"
-#include "../src/bool.h"
+#include "../src/bool_ba.h"
 #include "../src/normalizer.h"
 #include "../src/tau.h"
 
