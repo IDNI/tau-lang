@@ -712,11 +712,16 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>)
+		| repeat_each<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>)
 		| to_mnf_bf<BAs...>()
+		| to_mnf_wff<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			trivialities<BAs...>
 			| simplify_bf<BAs...>
-			| simplify_wff<BAs...>);
+			| simplify_wff<BAs...>)
+		;
 	cache[form] = result;
 	return result;
 }
