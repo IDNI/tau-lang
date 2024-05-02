@@ -20,6 +20,8 @@
 
 #include "parser.h"
 #include "nso_rr.h"
+#include "bdd_handle.h"
+#include "variant_ba.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -632,6 +634,50 @@ nso<BAs...> operator|(const nso<BAs...>& n, const to_mnf_bf<BAs...>& r) {
 template<typename... BAs>
 nso<BAs...> operator|(const nso<BAs...>& n, const to_mnf_wff<BAs...>& r) {
 	return r(n);
+}
+
+template<typename...BAs>
+hbdd<variant_ba<BAs...>> bf_to_bdd(const nso<BAs...>& n, std::map<nso<BAs...>, hbdd<variant_ba<BAs...>>>& vars) {
+	// convert n to bdd over variant_ba<BAs...>
+	// TODO (MEDIUM) write to_bdd (using?)
+	std::cout << "Not implemented yet." << std::endl;
+	return hbdd<variant_ba<BAs...>>();
+}
+
+template<typename...BAs>
+nso<BAs...> bf_from_bdd(const hbdd<variant_ba<BAs...>>& b, std::map<nso<BAs...>, hbdd<variant_ba<BAs...>>>& vars) {
+	// TODO (MEDIUM) write from_bdd (using?)
+	std::cout << "Not implemented yet." << std::endl;
+	return nso<BAs...>();
+}
+
+template<typename...BAs>
+nso<BAs...> minimize_bf(const nso<BAs...>& n) {
+	std::map<nso<BAs...>, hbdd<variant_ba<BAs...>>> vars;
+	auto bdd = bf_to_bdd(n, vars);
+	return bf_from_bdd(bdd, vars);
+}
+
+template<typename...BAs>
+hbdd<Bool> wff_to_bdd(const nso<BAs...>& n, std::map<nso<BAs...>, hbdd<Bool>>& vars) {
+	// convert n to bdd over variant_ba<BAs...>
+	// TODO (MEDIUM) write to_bdd (using?)
+	std::cout << "Not implemented yet." << std::endl;
+	return hbdd<Bool>();
+}
+
+template<typename...BAs>
+nso<BAs...> wff_from_bdd(const hbdd<Bool>& b, std::map<nso<BAs...>, hbdd<Bool>>& vars) {
+	// TODO (MEDIUM) write from_bdd (using?)
+	std::cout << "Not implemented yet." << std::endl;
+	return nso<BAs...>();
+}
+
+template<typename...BAs>
+nso<BAs...> minimize_wff(const nso<BAs...>& n) {
+	std::map<nso<BAs...>, hbdd<Bool>> vars;
+	auto bdd = wff_to_bdd(n, vars);
+	return wff_from_bdd(bdd, vars);
 }
 
 // TODO (MEDIUM) implement the removal supeefluous vars
