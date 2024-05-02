@@ -22,7 +22,6 @@ set(TAU_HEADERS
 
 set(TAU_SOURCES
 	bool_ba.cpp
-	variant_ba.cpp
 	dict.cpp
 	nso_rr.cpp
 	repl_evaluator.cpp
