@@ -10,10 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #ifndef __BABDD_H__
 #define __BABDD_H__
-#include "defs.h"
-#include "bool_ba.h"
+
 #include <vector>
 #include <map>
 #include <set>
@@ -25,6 +25,10 @@
 #include <memory>
 #include <functional>
 #include <cmath>
+
+#include "defs.h"
+#include "bool_ba.h"
+
 using namespace std;
 
 typedef int32_t int_t;

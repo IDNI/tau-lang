@@ -10,17 +10,14 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
 #ifndef __VARIANT_BA_H__
 #define __VARIANT_BA_H__
 
 #include <variant>
 #include <ostream>
 
-// TODO (LOW) move to a proper place and unify with that of nso_rr.h
-template<class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+#include "utils.h"
 
 template<typename...BAs>
 struct variant_ba {
@@ -226,7 +223,7 @@ bool operator!=(const bool& l, const variant_ba<BAs...>& r) {
 	return r != l;
 }
 
-/*template<typename...BAs>
+template<typename...BAs>
 std::ostream& operator<<(std::ostream& os, const variant_ba<BAs...>& b) {
 	return std::visit(overloaded(
 			[&os]<typename T>(const bool& l) -> std::ostream& {
@@ -237,9 +234,10 @@ std::ostream& operator<<(std::ostream& os, const variant_ba<BAs...>& b) {
 						[&os]<typename B>(const B& l) -> std::ostream& {
 							return os << l;
 						}
-					), l);
-			}
+					), l);},
+			[&os](const auto&) -> std::ostream& {
+				throw std::logic_error("wrong types");}
 		), b.v);
-}*/
+}
 
 #endif // __VARIANT_BA_H__

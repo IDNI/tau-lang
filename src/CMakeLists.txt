@@ -17,6 +17,7 @@ set(TAU_HEADERS
 	solver.h
 	variant_ba.h
 	product_ba.h
+	utils.h
 )
 
 set(TAU_SOURCES
