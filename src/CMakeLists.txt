@@ -2,7 +2,6 @@ set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
 	babdd.h
-	barr.h
 	bdd_binding.h
 	bdd_handle.h
 	bool_ba.h
@@ -10,7 +9,6 @@ set(TAU_HEADERS
 	rewriting.h
 	dict.h
 	normalizer.h
-	out.h
 	nso_rr.h
 	satisfiability.h
 	tau.h
