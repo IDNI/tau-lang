@@ -22,36 +22,36 @@
 
 // product boolean algebra
 template <typename...BAS>
-struct ba_product: std::tuple<BAS...> {
+struct product_ba: std::tuple<BAS...> {
 
-	ba_product(): std::tuple<BAS...>() {}
-	ba_product(BAS... bas): std::tuple<BAS...>(bas...) {}
+	product_ba(): std::tuple<BAS...>() {}
+	product_ba(BAS... bas): std::tuple<BAS...>(bas...) {}
 
-	auto operator<=>(const ba_product<BAS...>& that) const = default;
+	auto operator<=>(const product_ba<BAS...>& that) const = default;
 
-	ba_product<BAS...> operator~() {
-		ba_product<BAS...> result;
+	product_ba<BAS...> operator~() {
+		product_ba<BAS...> result;
 		auto __not = [](auto a, auto& c ) { return c = ~a; };
 		(__not(get<BAS>(*this), get<BAS>(result)), ...);
 		return result;
 	}
 
-	ba_product<BAS...> operator&(ba_product<BAS...>& that) {
-		ba_product<BAS...> result;
+	product_ba<BAS...> operator&(product_ba<BAS...>& that) {
+		product_ba<BAS...> result;
 		auto __and = [](auto a, auto b, auto& c ) { return c = (a & b); };
 		(__and(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
 		return result;
 	}
 
-	ba_product<BAS...> operator|(ba_product<BAS...>& that) {
-		ba_product<BAS...> result;
+	product_ba<BAS...> operator|(product_ba<BAS...>& that) {
+		product_ba<BAS...> result;
 		auto __or = [](auto a, auto b, auto& c ) { return c = (a | b); };
 		(__or(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
 		return result;
 	}
 
-	ba_product<BAS...> operator^(ba_product<BAS...>& that) {
-		ba_product<BAS...> result;
+	product_ba<BAS...> operator^(product_ba<BAS...>& that) {
+		product_ba<BAS...> result;
 		auto __xor = [](auto a, auto b, auto& c ) { return c = (a ^ b); };
 		(__xor(get<BAS>(*this), get<BAS>(that), get<BAS>(result)), ...);
 		return result;

@@ -16,6 +16,7 @@ set(TAU_HEADERS
 	normal_forms.h
 	solver.h
 	variant_ba.h
+	product_ba.h
 )
 
 set(TAU_SOURCES
