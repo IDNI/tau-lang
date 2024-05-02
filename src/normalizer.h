@@ -715,6 +715,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| to_mnf_bf<BAs...>()
 		| to_mnf_wff<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(

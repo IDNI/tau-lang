@@ -37,6 +37,7 @@
 //#include "tree.h"
 #include "bool_ba.h"
 #include "parser.h"
+#include "utils.h"
 #include "../parser/tau_parser.generated.h"
 #include "rewriting.h"
 
@@ -93,11 +94,6 @@ using library = rules<node_t>;
 // bindings map tau_source constants (strings) into elements of the boolean algebras.
 template<typename... BAs>
 using bindings = std::map<std::string, std::variant<BAs...>>;
-
-template<class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 // an rr is a set of rules and a main.
 template<typename type_t>
@@ -1758,7 +1754,7 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_sym& 
 // << for BAs... variant
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& rs) {
-	std::visit(idni::tau::overloaded {
+	std::visit(overloaded {
 		[&os](const auto& a) { os << a; }
 	}, rs);
 	return os;
@@ -1768,7 +1764,7 @@ std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& rs) {
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_sym<BAs...>& rs) {
 	// using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
-	std::visit(idni::tau::overloaded {
+	std::visit(overloaded {
 		[&stream](const idni::tau::tau_source_sym& t) {
 			if (!t.nt() && !t.is_null()) stream << t.t();
 		},
