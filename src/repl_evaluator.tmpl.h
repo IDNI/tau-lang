@@ -349,19 +349,19 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::so
 }
 
 template<typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+void repl_evaluator<factory_t, BAs...>::is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>&) {
 	// TODO (HIGH) call satisfiability
 	not_implemented_yet();
 }
 
 template<typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+void repl_evaluator<factory_t, BAs...>::is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>&) {
 	// TODO (HIGH) call satisfiability
 	not_implemented_yet();
 }
 
 template<typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>&) {
 	// TODO (HIGH) call satisfiability
 	not_implemented_yet();
 }
