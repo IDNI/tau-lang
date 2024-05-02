@@ -28,8 +28,8 @@ struct variant_ba {
 	variant_ba(const std::variant<BAs...>& v) : v(v) {};
 	variant_ba(const bool v) : v(v) {};
 
-	static const variant_ba& zero() { static const variant_ba v(false); return v; }
-	static const variant_ba& one() { static const variant_ba v(true); return v; }
+	static const variant_ba<BAs...>& zero() { static const variant_ba<BAs...> v(false); return v; }
+	static const variant_ba<BAs...>& one() { static const variant_ba<BAs...> v(true); return v; }
 
 	variant_ba<BAs...> operator&(const variant_ba<BAs...>& x) const {
 		return std::visit(overloaded(
@@ -37,115 +37,143 @@ struct variant_ba {
 					auto res = l & r;
 					variant_ba<BAs...> v(res);
 					return v;},
-				[]<typename T>(const bool& l, const T& r) -> variant_ba<BAs...> {
+				[]<typename T>(const bool& l, const std::variant<T>& r) -> variant_ba<BAs...> {
 					if (l) {
 						variant_ba<BAs...> v(r);
 						return v;
 					}
 					variant_ba<BAs...> v(false);
 					return v;},
-				[]<typename T>(const T& l, const bool& r) -> variant_ba<BAs...> {
+				[]<typename T>(const std::variant<T>& l, const bool& r) -> variant_ba<BAs...> {
 					if (r) {
 						variant_ba<BAs...> v(l);
 						return v;
 					}
 					variant_ba<BAs...> v(false);
 					return v;},
-				[]<typename T>(const T& l, const T& r) -> variant_ba<BAs...> {
-					auto res = l & r;
-					variant_ba<BAs...> v(res);
-					return v;},
-				[](const auto&, const auto&) -> std::variant<BAs...> {
+				[]<typename T>(const std::variant<T>& l, const std::variant<T>& r) -> variant_ba<BAs...> {
+					return std::visit(overloaded(
+							[]<typename B>(const B& l, const B& r) -> std::variant<B> {
+								auto res = l & r;
+								std::variant<B> v(res);
+								return v;}
+						), l, r);},
+				[](const auto&, const auto&) -> variant_ba<BAs...> {
 					throw std::logic_error("wrong types"); }
 			), v, x.v);
 	}
 
-	variant_ba operator|(const variant_ba& x) const {
+	variant_ba<BAs...> operator|(const variant_ba<BAs...>& x) const {
 		return std::visit(overloaded(
 				[]<typename T>(const bool& l, const bool& r) -> variant_ba<BAs...> {
 					auto res = l | r;
 					variant_ba<BAs...> v(res);
 					return v;},
-				[]<typename T>(const bool& l, const T& r) -> variant_ba<BAs...> {
+				[]<typename T>(const bool& l, const std::variant<T>& r) -> variant_ba<BAs...> {
 					if (l) {
 						variant_ba<BAs...> v(true);
 						return v;
 					}
 					variant_ba<BAs...> v(r);
 					return v;},
-				[]<typename T>(const T& l, const bool& r) -> variant_ba<BAs...> {
+				[]<typename T>(const std::variant<T>& l, const bool& r) -> variant_ba<BAs...> {
 					if (r) {
 						variant_ba<BAs...> v(true);
 						return v;
 					}
 					variant_ba<BAs...> v(l);
 					return v;},
-				[]<typename T>(const T& l, const T& r) -> variant_ba<BAs...> {
-					auto res = l | r;
-					variant_ba<BAs...> v(res);
-					return v;},
-				[](const auto&, const auto&) -> std::variant<BAs...> {
+				[]<typename T>(const std::variant<T>& l, const std::variant<T>& r) -> variant_ba<BAs...> {
+					return std::visit(overloaded(
+							[]<typename B>(const B& l, const B& r) -> std::variant<B> {
+								auto res = l | r;
+								std::variant<B> v(res);
+								return v;}
+						), l, r);},
+				[](const auto&, const auto&) -> variant_ba<BAs...> {
 					throw std::logic_error("wrong types"); }
 			), v, x.v);
 	}
 
 
-	variant_ba operator^(const variant_ba& x) const {
+	variant_ba<BAs...> operator^(const variant_ba<BAs...>& x) const {
 		return std::visit(overloaded(
 				[]<typename T>(const bool& l, const bool& r) -> variant_ba<BAs...> {
 					auto res = l ^ r;
 					variant_ba<BAs...> v(res);
 					return v;},
-				[]<typename T>(const bool& l, const T& r) -> variant_ba<BAs...> {
+				[]<typename T>(const bool& l, const std::variant<T>& r) -> variant_ba<BAs...> {
 					if (l) {
-						variant_ba<BAs...> v(~r);
+						auto res = std::visit(overloaded(
+								[]<typename B>(const B& r) -> B {
+									return ~r;
+								}
+							), r);
+						variant_ba<BAs...> v(res);
 						return v;
 					}
 					variant_ba<BAs...> v(r);
 					return v;},
-				[]<typename T>(const T& l, const bool& r) -> variant_ba<BAs...> {
+				[]<typename T>(const std::variant<T>& l, const bool& r) -> variant_ba<BAs...> {
 					if (r) {
-						variant_ba<BAs...> v(~l);
+						auto res = std::visit(overloaded(
+								[]<typename B>(const B& l) -> B {
+									return ~l;
+								}
+							), l);
+						variant_ba<BAs...> v(res);
 						return v;
 					}
 					variant_ba<BAs...> v(l);
 					return v;},
-				[]<typename T>(const T& l, const T& r) -> variant_ba<BAs...> {
-					auto res = l ^ r;
-					variant_ba<BAs...> v(res);
-					return v;},
-				[](const auto&, const auto&) -> std::variant<BAs...> {
+				[]<typename T>(const std::variant<T>& l, const std::variant<T>& r) -> variant_ba<BAs...> {
+					return std::visit(overloaded(
+							[]<typename B>(const B& l, const B& r) -> std::variant<B> {
+								auto res = l ^ r;
+								std::variant<B> v(res);
+								return v;}
+						), l, r);},
+				[](const auto&, const auto&) -> variant_ba<BAs...> {
 					throw std::logic_error("wrong types"); }
 			), v, x.v);
 	}
 
-	variant_ba operator+(const variant_ba& x) const {
+	variant_ba<BAs...> operator+(const variant_ba<BAs...>& x) const {
 		return *this ^ x;
 	}
 
-	variant_ba operator~() const {
+	variant_ba<BAs...> operator~() const {
 		return std::visit(overloaded(
 				[]<typename T>(const bool& l) -> variant_ba<BAs...> {
 					variant_ba<BAs...> v(!l);
 					return v;},
-				[]<typename T>(const T& l) -> variant_ba<BAs...> {
-					variant_ba<BAs...> v(~l);
-					return v;},
-				[](const auto&) -> std::variant<BAs...> {
+				[]<typename T>(const std::variant<T>& l) -> variant_ba<BAs...> {
+					return std::visit(overloaded(
+							[]<typename B>(const B& l) -> std::variant<B> {
+								auto res = ~l;
+								std::variant<B> v(res);
+								return v;}
+						), l);},
+				[](const auto&) -> variant_ba<BAs...> {
 					throw std::logic_error("wrong types"); }
 			), v);
 	}
 
-	auto operator<=>(const variant_ba& x) const = default;
+	auto operator<=>(const variant_ba<BAs...>& x) const = default;
 
 	bool is_zero() const {
 		return std::visit(overloaded(
 				[]<typename T>(const bool& l) -> bool {
 					return !l;
 				},
-				[]<typename T>(const T& l) -> bool {
-					return l.is_zero();
-				}
+				[]<typename T>(const std::variant<T>& l) -> bool {
+					return std::visit(overloaded(
+							[]<typename B>(const B& l) -> bool {
+								return l.is_zero();
+							}
+						), l);},
+				[](const auto&) -> variant_ba<BAs...> {
+					throw std::logic_error("wrong types");}
 			), v);
 	}
 
@@ -154,8 +182,12 @@ struct variant_ba {
 				[]<typename T>(const bool& l) -> bool {
 					return l;
 				},
-				[]<typename T>(const T& l) -> bool {
-					return l.is_one();
+				[]<typename T>(const std::variant<T>& l) -> bool {
+					return std::visit(overloaded(
+							[]<typename B>(const B& l) -> bool {
+								return l.is_one();
+							}
+						), l);
 				}
 			), v);
 	}
@@ -164,15 +196,50 @@ struct variant_ba {
 };
 
 template<typename...BAs>
+bool operator==(const variant_ba<BAs...>& l, const bool& r) {
+	if (std::holds_alternative<bool>(l.v))
+		return std::get<bool>(l.v) == r;
+	if (r) 	return std::visit(overloaded(
+			[](const auto& l) -> bool {
+				return l.is_one();
+			}
+		), std::get<std::variant<BAs...>>(l.v));
+	return std::visit(overloaded(
+			[](const auto& l) -> bool {
+				return l.is_zero();
+			}
+		), std::get<std::variant<BAs...>>(l.v));
+}
+
+template<typename...BAs>
+bool operator==(const bool& l, const variant_ba<BAs...>& r) {
+	return r == l;
+}
+
+template<typename...BAs>
+bool operator!=(const variant_ba<BAs...>& l, const bool& r) {
+	return !(l == r);
+}
+
+template<typename...BAs>
+bool operator!=(const bool& l, const variant_ba<BAs...>& r) {
+	return r != l;
+}
+
+/*template<typename...BAs>
 std::ostream& operator<<(std::ostream& os, const variant_ba<BAs...>& b) {
 	return std::visit(overloaded(
 			[&os]<typename T>(const bool& l) -> std::ostream& {
 				return os << (l ? 1 : 0);
 			},
-			[&os]<typename T>(const T& l) -> std::ostream& {
-				return os << l;
+			[&os]<typename T>(const std::variant<T>& l) -> std::ostream& {
+				return std::visit(overloaded(
+						[&os]<typename B>(const B& l) -> std::ostream& {
+							return os << l;
+						}
+					), l);
 			}
 		), b.v);
-}
+}*/
 
 #endif // __VARIANT_BA_H__
