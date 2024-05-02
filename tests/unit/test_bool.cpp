@@ -18,7 +18,7 @@
 
 namespace testing = doctest;
 
-TEST_SUITE("operator==") {
+TEST_SUITE("bool boolean algebra") {
 
 	TEST_CASE("Bool == bool") {
 		CHECK( Bool(true) == true );
