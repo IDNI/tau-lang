@@ -351,16 +351,19 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::so
 template<typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	// TODO (HIGH) call satisfiability
+	not_implemented_yet();
 }
 
 template<typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	// TODO (HIGH) call satisfiability
+	not_implemented_yet();
 }
 
 template<typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	// TODO (HIGH) call satisfiability
+	not_implemented_yet();
 }
 
 template <typename factory_t, typename... BAs>
@@ -554,9 +557,9 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::wff_substitute_cmd: result = wff_substitute_cmd(command); break;
 	case p::wff_instantiate_cmd:result = wff_instantiate_cmd(command); break;
 	// formula checks
-	case p::is_satisfiable_cmd:    not_implemented_yet(); break;
-	case p::is_valid_cmd:          not_implemented_yet(); break;
-	case p:: is_unsatisfiable_cmd: not_implemented_yet(); break;
+	case p::is_satisfiable_cmd:   is_satisfiable_cmd(command); break;
+	case p::is_valid_cmd:         is_valid_cmd(command); break;
+	case p::is_unsatisfiable_cmd: is_unsatisfiable_cmd(command); break;
 	// wff normal forms
 	case p::wff_onf_cmd:        result = wff_onf_cmd(command); break;
 	case p::wff_dnf_cmd:        result = wff_dnf_cmd(command); break;

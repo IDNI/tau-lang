@@ -14,7 +14,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "ba.h"
+#include "product_ba.h"
 
 namespace testing = doctest;
 
@@ -43,8 +43,8 @@ TEST_SUITE("product boolean algebra") {
 
 	TEST_CASE("the product of one 0/1 boolean algebra is the correct boolean algebra") {
 
-		ba_product<ba_01> F(ba_01(false));
-		ba_product<ba_01> T(ba_01(true));
+		product_ba<ba_01> F(ba_01(false));
+		product_ba<ba_01> T(ba_01(true));
 
 		CHECK( ~F == T); CHECK( ~T == F);
 
@@ -60,10 +60,10 @@ TEST_SUITE("product boolean algebra") {
 
 	TEST_CASE("the product of two 0/1 boolean algebra is the correct boolean algebra") {
 
-		ba_product<ba_01, ba_01p> FF(ba_01(false), ba_01p(false));
-		ba_product<ba_01, ba_01p> FT(ba_01(false), ba_01p(true));
-		ba_product<ba_01, ba_01p> TF(ba_01(true), ba_01p(false));
-		ba_product<ba_01, ba_01p> TT(ba_01(true), ba_01p(true));
+		product_ba<ba_01, ba_01p> FF(ba_01(false), ba_01p(false));
+		product_ba<ba_01, ba_01p> FT(ba_01(false), ba_01p(true));
+		product_ba<ba_01, ba_01p> TF(ba_01(true), ba_01p(false));
+		product_ba<ba_01, ba_01p> TT(ba_01(true), ba_01p(true));
 
 		CHECK( ~FF == TT); CHECK( ~FT == TF);
 		CHECK( ~TF == FT); CHECK( ~TT == FF);
