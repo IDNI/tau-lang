@@ -124,7 +124,7 @@ struct tau_parser {
 		rule, __E_rules_45, nso_rr, nso_rec_relations, nso_main, __E_nso_rec_relations_46, nso_rec_relation, __E_nso_rec_relations_47, gssotc_rr, gssotc_rec_relations, 
 		gssotc_main, __E_gssotc_rec_relations_48, gssotc_rec_relation, __E_gssotc_rec_relations_49, start, __E_start_50, cli, cli_command, __E_cli_51, __E_cli_52, 
 		help_cmd, version_cmd, quit_cmd, clear_cmd, get_cmd, set_cmd, toggle_cmd, memory_list_cmd, memory_clear_cmd, memory_print_cmd, 
-		memory_store_cmd, memory_del_cmd, file, normalize_cmd, execute_cmd, solve_cmd, is_satisfiable_cmd, is_valid_cmd, is_unsatisfiable_cmd, bf_dnf_cmd, 
+		memory_del_cmd, memory_store_cmd, file, normalize_cmd, execute_cmd, solve_cmd, is_satisfiable_cmd, is_valid_cmd, is_unsatisfiable_cmd, bf_dnf_cmd, 
 		bf_cnf_cmd, bf_anf_cmd, bf_nnf_cmd, bf_pnf_cmd, bf_mnf_cmd, wff_onf_cmd, wff_dnf_cmd, wff_cnf_cmd, wff_anf_cmd, wff_nnf_cmd, 
 		wff_pnf_cmd, wff_mnf_cmd, bf_substitute_cmd, wff_substitute_cmd, bf_instantiate_cmd, wff_instantiate_cmd, def_rule_cmd, def_list_cmd, def_del_cmd, def_clear_cmd, 
 		normalize_cmd_sym, normalize_cmd_arg, memory, wff_selection, solve_cmd_sym, solve_cmd_arg, execute_cmd_sym, execute_cmd_arg, is_satisfiable_cmd_sym, is_satisfiable_cmd_arg, 
@@ -134,7 +134,7 @@ struct tau_parser {
 		mnf_cmd_sym, __E_bf_mnf_cmd_68, onf_cmd_sym, __E_wff_onf_cmd_69, __E_wff_dnf_cmd_70, __E_wff_cnf_cmd_71, __E_wff_anf_cmd_72, __E_wff_nnf_cmd_73, __E_wff_pnf_cmd_74, __E_wff_mnf_cmd_75, 
 		def_cmd_sym, def_rule_cmd_arg, __E_def_rule_cmd_arg_76, def_cmd_list, def_cmd_del, def_cmf_clear, help_cmd_sym, __E_help_cmd_77, cli_cmd_sym, version_cmd_sym, 
 		quit_cmd_sym, clear_cmd_sym, selection_sym, bf_var_selection, wff_var_selection, absolute_memory, relative_memory, __E_absolute_memory_78, absolute_memory_sym, memory_sym, 
-		memory_id, relative_memory_sym, memory_cmd_sym, memory_clear_cmd_sym, memory_store_cmd_arg, __E_memory_store_cmd_arg_79, memory_del_cmd_sym, file_cmd_sym, examples_sym, get_cmd_sym, 
+		memory_id, relative_memory_sym, memory_cmd_sym, memory_clear_cmd_sym, memory_del_cmd_sym, memory_store_cmd_arg, __E_memory_store_cmd_arg_79, file_cmd_sym, examples_sym, get_cmd_sym, 
 		set_cmd_sym, toggle_cmd_sym, __E_get_cmd_80, option, __E_set_cmd_81, option_value, bool_option, severity_opt, status_opt, colors_opt, 
 		debug_repl_opt, option_value_true, option_value_false, severity, error_sym, debug_sym, trace_sym, info_sym, __N_0, __N_1, 
 		__N_2, __N_3, 
@@ -198,7 +198,7 @@ private:
 			"rule", "__E_rules_45", "nso_rr", "nso_rec_relations", "nso_main", "__E_nso_rec_relations_46", "nso_rec_relation", "__E_nso_rec_relations_47", "gssotc_rr", "gssotc_rec_relations", 
 			"gssotc_main", "__E_gssotc_rec_relations_48", "gssotc_rec_relation", "__E_gssotc_rec_relations_49", "start", "__E_start_50", "cli", "cli_command", "__E_cli_51", "__E_cli_52", 
 			"help_cmd", "version_cmd", "quit_cmd", "clear_cmd", "get_cmd", "set_cmd", "toggle_cmd", "memory_list_cmd", "memory_clear_cmd", "memory_print_cmd", 
-			"memory_store_cmd", "memory_del_cmd", "file", "normalize_cmd", "execute_cmd", "solve_cmd", "is_satisfiable_cmd", "is_valid_cmd", "is_unsatisfiable_cmd", "bf_dnf_cmd", 
+			"memory_del_cmd", "memory_store_cmd", "file", "normalize_cmd", "execute_cmd", "solve_cmd", "is_satisfiable_cmd", "is_valid_cmd", "is_unsatisfiable_cmd", "bf_dnf_cmd", 
 			"bf_cnf_cmd", "bf_anf_cmd", "bf_nnf_cmd", "bf_pnf_cmd", "bf_mnf_cmd", "wff_onf_cmd", "wff_dnf_cmd", "wff_cnf_cmd", "wff_anf_cmd", "wff_nnf_cmd", 
 			"wff_pnf_cmd", "wff_mnf_cmd", "bf_substitute_cmd", "wff_substitute_cmd", "bf_instantiate_cmd", "wff_instantiate_cmd", "def_rule_cmd", "def_list_cmd", "def_del_cmd", "def_clear_cmd", 
 			"normalize_cmd_sym", "normalize_cmd_arg", "memory", "wff_selection", "solve_cmd_sym", "solve_cmd_arg", "execute_cmd_sym", "execute_cmd_arg", "is_satisfiable_cmd_sym", "is_satisfiable_cmd_arg", 
@@ -208,7 +208,7 @@ private:
 			"mnf_cmd_sym", "__E_bf_mnf_cmd_68", "onf_cmd_sym", "__E_wff_onf_cmd_69", "__E_wff_dnf_cmd_70", "__E_wff_cnf_cmd_71", "__E_wff_anf_cmd_72", "__E_wff_nnf_cmd_73", "__E_wff_pnf_cmd_74", "__E_wff_mnf_cmd_75", 
 			"def_cmd_sym", "def_rule_cmd_arg", "__E_def_rule_cmd_arg_76", "def_cmd_list", "def_cmd_del", "def_cmf_clear", "help_cmd_sym", "__E_help_cmd_77", "cli_cmd_sym", "version_cmd_sym", 
 			"quit_cmd_sym", "clear_cmd_sym", "selection_sym", "bf_var_selection", "wff_var_selection", "absolute_memory", "relative_memory", "__E_absolute_memory_78", "absolute_memory_sym", "memory_sym", 
-			"memory_id", "relative_memory_sym", "memory_cmd_sym", "memory_clear_cmd_sym", "memory_store_cmd_arg", "__E_memory_store_cmd_arg_79", "memory_del_cmd_sym", "file_cmd_sym", "examples_sym", "get_cmd_sym", 
+			"memory_id", "relative_memory_sym", "memory_cmd_sym", "memory_clear_cmd_sym", "memory_del_cmd_sym", "memory_store_cmd_arg", "__E_memory_store_cmd_arg_79", "file_cmd_sym", "examples_sym", "get_cmd_sym", 
 			"set_cmd_sym", "toggle_cmd_sym", "__E_get_cmd_80", "option", "__E_set_cmd_81", "option_value", "bool_option", "severity_opt", "status_opt", "colors_opt", 
 			"debug_repl_opt", "option_value_true", "option_value_false", "severity", "error_sym", "debug_sym", "trace_sym", "info_sym", "__N_0", "__N_1", 
 			"__N_2", "__N_3", 
@@ -1032,9 +1032,9 @@ private:
 		q(nt(257), (nt(268)));
 		//       cli_command(257)     => memory_print_cmd(269).
 		q(nt(257), (nt(269)));
-		//       cli_command(257)     => memory_store_cmd(270).
+		//       cli_command(257)     => memory_del_cmd(270).
 		q(nt(257), (nt(270)));
-		//       cli_command(257)     => memory_del_cmd(271).
+		//       cli_command(257)     => memory_store_cmd(271).
 		q(nt(257), (nt(271)));
 		//       cli_command(257)     => file(272).
 		q(nt(257), (nt(272)));
@@ -1092,12 +1092,6 @@ private:
 		q(nt(257), (nt(298)));
 		//       cli_command(257)     => def_clear_cmd(299).
 		q(nt(257), (nt(299)));
-		//       cli_command(257)     => bf(14).
-		q(nt(257), (nt(14)));
-		//       cli_command(257)     => wff(16).
-		q(nt(257), (nt(16)));
-		//       cli_command(257)     => nso_rr(242).
-		q(nt(257), (nt(242)));
 		//       normalize_cmd(273)   => normalize_cmd_sym(300) __(10) normalize_cmd_arg(301).
 		q(nt(273), (nt(300)+nt(10)+nt(301)));
 		//       normalize_cmd_arg(301) => wff(16).
@@ -1356,18 +1350,18 @@ private:
 		q(nt(268), (nt(372)+nt(10)+nt(373)));
 		//       memory_print_cmd(269) => memory_cmd_sym(372) __(10) memory(302).
 		q(nt(269), (nt(372)+nt(10)+nt(302)));
-		//       memory_store_cmd(270) => memory_cmd_sym(372) __(10) memory_store_cmd_arg(374).
-		q(nt(270), (nt(372)+nt(10)+nt(374)));
-		//       __E_memory_store_cmd_arg_79(375) => bf(14).
-		q(nt(375), (nt(14)));
-		//       __E_memory_store_cmd_arg_79(375) => wff(16).
-		q(nt(375), (nt(16)));
-		//       __E_memory_store_cmd_arg_79(375) => tau(18).
-		q(nt(375), (nt(18)));
-		//       memory_store_cmd_arg(374) => __E_memory_store_cmd_arg_79(375).
-		q(nt(374), (nt(375)));
-		//       memory_del_cmd(271)  => memory_cmd_sym(372) memory_del_cmd_sym(376) __(10) memory(302).
-		q(nt(271), (nt(372)+nt(376)+nt(10)+nt(302)));
+		//       memory_del_cmd(270)  => memory_cmd_sym(372) __(10) memory_del_cmd_sym(374) __(10) memory(302).
+		q(nt(270), (nt(372)+nt(10)+nt(374)+nt(10)+nt(302)));
+		//       memory_store_cmd(271) => memory_cmd_sym(372) __(10) memory_store_cmd_arg(375).
+		q(nt(271), (nt(372)+nt(10)+nt(375)));
+		//       __E_memory_store_cmd_arg_79(376) => bf(14).
+		q(nt(376), (nt(14)));
+		//       __E_memory_store_cmd_arg_79(376) => wff(16).
+		q(nt(376), (nt(16)));
+		//       __E_memory_store_cmd_arg_79(376) => tau(18).
+		q(nt(376), (nt(18)));
+		//       memory_store_cmd_arg(375) => __E_memory_store_cmd_arg_79(376).
+		q(nt(375), (nt(376)));
 		//       cli_cmd_sym(358)     => help_cmd_sym(356).
 		q(nt(358), (nt(356)));
 		//       cli_cmd_sym(358)     => version_cmd_sym(359).
@@ -1490,10 +1484,12 @@ private:
 		q(nt(373), (t(47)));
 		//       memory_clear_cmd_sym(373) => 'c' 'l' 'e' 'a' 'r'.
 		q(nt(373), (t(47)+t(27)+t(28)+t(26)+t(45)));
-		//       memory_del_cmd_sym(376) => 'd'.
-		q(nt(376), (t(53)));
-		//       memory_del_cmd_sym(376) => 'd' 'e' 'l'.
-		q(nt(376), (t(53)+t(28)+t(27)));
+		//       memory_del_cmd_sym(374) => 'd'.
+		q(nt(374), (t(53)));
+		//       memory_del_cmd_sym(374) => 'd' 'e' 'l'.
+		q(nt(374), (t(53)+t(28)+t(27)));
+		//       memory_del_cmd_sym(374) => 'd' 'e' 'l' 'e' 't' 'e'.
+		q(nt(374), (t(53)+t(28)+t(27)+t(28)+t(52)+t(28)));
 		//       memory_cmd_sym(372)  => 'm'.
 		q(nt(372), (t(46)));
 		//       memory_cmd_sym(372)  => 'm' 'e' 'm'.

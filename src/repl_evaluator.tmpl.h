@@ -95,6 +95,7 @@ template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::memory_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
+	if (m.size() == 0) cout << "memory is empty\n";
 	auto n = command | tau_parser::memory;
 	if (!n) return;
 	auto idx = get_memory_index(n.value(), m.size());
@@ -111,8 +112,11 @@ void repl_evaluator<factory_t, BAs...>::memory_list_cmd() {
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::memory_clear_cmd() {
-	m.clear();
-	cout << "memorys cleared\n";
+	if (m.size() == 0) cout << "memory is empty\n";
+	else {
+		m.clear();
+		cout << "memory cleared\n";
+	}
 }
 
 template <typename factory_t, typename... BAs>
@@ -138,6 +142,7 @@ void repl_evaluator<factory_t, BAs...>::memory_store_cmd(
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::memory_del_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
+	if (m.size() == 0) cout << "memory is empty\n";
 	auto n = command | tau_parser::memory;
 	if (!n) return;
 	auto idx = get_memory_index(n.value(), m.size());

@@ -370,7 +370,7 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 cli                    => _ cli_command (_ dot _ cli_command)*.
 cli_command            => help_cmd | version_cmd | quit_cmd | clear_cmd.
 cli_command            => get_cmd | set_cmd | toggle_cmd.
-cli_command            => memory_list_cmd | memory_clear_cmd | memory_print_cmd | memory_store_cmd | memory_del_cmd.
+cli_command            => memory_list_cmd | memory_clear_cmd | memory_print_cmd | memory_del_cmd | memory_store_cmd.
 cli_command            => file.
 cli_command            => normalize_cmd | execute_cmd | solve_cmd
                         | is_satisfiable_cmd | is_valid_cmd | is_unsatisfiable_cmd
@@ -381,9 +381,6 @@ cli_command            => normalize_cmd | execute_cmd | solve_cmd
                         | bf_substitute_cmd | wff_substitute_cmd
                         | bf_instantiate_cmd | wff_instantiate_cmd
                         | def_rule_cmd | def_list_cmd | def_del_cmd | def_clear_cmd.
-cli_command            => bf.
-cli_command            => wff.
-cli_command            => nso_rr.
 
 normalize_cmd          => normalize_cmd_sym __ normalize_cmd_arg.
 normalize_cmd_arg      => wff.
@@ -477,11 +474,11 @@ memory_id              => digits.
 memory_list_cmd        => memory_cmd_sym.
 memory_clear_cmd       => memory_cmd_sym __ memory_clear_cmd_sym.
 memory_print_cmd       => memory_cmd_sym __ memory.
+# IDEA maybe allow several comma separated refs
+memory_del_cmd         => memory_cmd_sym __ memory_del_cmd_sym __ memory.
 memory_store_cmd       => memory_cmd_sym __ memory_store_cmd_arg.
 # IDEA maybe allow several comma separated formulas
 memory_store_cmd_arg   => (bf | wff | tau).
-# IDEA maybe allow several comma separated refs
-memory_del_cmd         => memory_cmd_sym memory_del_cmd_sym __ memory.
 
 cli_cmd_sym            => help_cmd_sym | version_cmd_sym | quit_cmd_sym
                         | clear_cmd_sym
@@ -526,7 +523,7 @@ def_cmd_del            => "del".
 def_cmf_clear          => "clear".
 
 memory_clear_cmd_sym   => "c" | "clear".
-memory_del_cmd_sym     => "d" | "del".
+memory_del_cmd_sym     => "d" | "del" | "delete".
 memory_cmd_sym         => "m" | "mem" | "memory".
 memory_sym             => "m".
 absolute_memory_sym    => "&".
