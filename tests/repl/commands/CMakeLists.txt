@@ -176,11 +176,11 @@ set_tests_properties(test_repl-memory_store_cmd-tau PROPERTIES
 
 # memory delete command
 add_test(NAME test_repl-memory_delete_cmd-empty
-	COMMAND bash -c "echo 'memory delete &0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+	COMMAND bash -c "echo 'memory delete @0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-memory_delete_cmd-empty PROPERTIES
 	PASS_REGULAR_EXPRESSION "memory is empty")
 add_test(NAME test_repl-memory_delete_cmd-non_empty_absolute
-	COMMAND bash -c "echo 'm 0. memory delete &0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+	COMMAND bash -c "echo 'm 0. memory delete @0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-memory_delete_cmd-non_empty_absolute PROPERTIES
 	PASS_REGULAR_EXPRESSION "deleted index")
 add_test(NAME test_repl-memory_delete_cmd-non_empty_relative
@@ -190,7 +190,7 @@ set_tests_properties(test_repl-memory_delete_cmd-non_empty_relative PROPERTIES
 
 # memory print command
 add_test(NAME test_repl-memory_print_cmd-empty_absolute
-	COMMAND bash -c "echo 'memory &0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+	COMMAND bash -c "echo 'memory @0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-memory_print_cmd-empty_absolute PROPERTIES
 	PASS_REGULAR_EXPRESSION "memory is empty")
 add_test(NAME test_repl-memory_print_cmd-empty_relative
@@ -198,7 +198,7 @@ add_test(NAME test_repl-memory_print_cmd-empty_relative
 set_tests_properties(test_repl-memory_print_cmd-empty_relative PROPERTIES
 	PASS_REGULAR_EXPRESSION "memory is empty")
 add_test(NAME test_repl-memory_print_cmd-non_empty_absolute
-	COMMAND bash -c "echo 'm 0. memory &0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+	COMMAND bash -c "echo 'm 0. memory @0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-memory_print_cmd-non_empty_absolute PROPERTIES
 	FAIL_REGULAR_EXPRESSION "memory is empty")
 add_test(NAME test_repl-memory_print_cmd-non_empty_relative
