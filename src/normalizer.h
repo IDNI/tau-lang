@@ -626,58 +626,82 @@ using to_mnf_bf = to_mnfs<tau_parser::bf, BAs...>;
 template<typename... BAs>
 using to_mnf_wff = to_mnfs<tau_parser::wff, BAs...>;
 
-template<typename... BAs>
+template<typename...BAs>
 nso<BAs...> operator|(const nso<BAs...>& n, const to_mnf_bf<BAs...>& r) {
 	return r(n);
 }
 
-template<typename... BAs>
+template<typename...BAs>
 nso<BAs...> operator|(const nso<BAs...>& n, const to_mnf_wff<BAs...>& r) {
 	return r(n);
 }
 
+// we assume no functional quantifiers are present and all defs have being applyed
 template<typename...BAs>
-hbdd<variant_ba<BAs...>> bf_to_bdd(const nso<BAs...>& n, std::map<nso<BAs...>, hbdd<variant_ba<BAs...>>>& vars) {
-	// convert n to bdd over variant_ba<BAs...>
-	// TODO (MEDIUM) write to_bdd (using?)
-	std::cout << "Not implemented yet." << std::endl;
-	return hbdd<variant_ba<BAs...>>();
+struct reduce_bf {
+
+	nso<BAs...> operator()(const nso<BAs...>& n) {
+		auto form = n;
+		for (auto& var: select_all(form, is_non_terminal<tau_parser::var, BAs...>)) {
+			auto [a, b] = split_using_var(var, n);
+			if (are_equivalent(a, b)) form = a;
+		}
+		return form;
+	}
+
+private:
+
+	nso<BAs...> split_using_var(const nso<BAs...>& var, const nso<BAs...>& form) {
+		auto a = replace(form, { {var, trim(_0<BAs...>)} });
+		auto b = replace(form, { {var, trim(_1<BAs...>)}});
+		return std::make_pair(a, b);
+	}
+
+	nso<BAs...> are_equivalent(const nso<BAs...>& a, const nso<BAs...>& b) {
+		return bf_to_bdd(a) == bf_to_bdd(b);
+	}
+
+	nso<BAs...> bf_to_bdd(const std::vector<nso<BAs...>>& vars, const nso<BAs...>& form) {
+		if (vars.empty()) return form | repeat_all(apply_cb<BAs...>);
+		auto var = vars.back();
+		std::vector<nso<BAs...>> rest(vars.begin(), vars.end() - 1);
+		auto a = replace(form, { {var, trinm(_0<BAs...>)}});
+		auto b = replace(form, { {var, trim(_1<BAs...>)}});
+		auto a_bdd = bf_to_bdd(rest, a);
+		auto b_bdd = bf_to_bdd(rest, b);
+		return build_xor_bdd(
+			build_and_bdd(wrap(tau_parser::bf, var), a_bdd),
+			build_and_bdd(build_not_bdd(wrap(tau_parser::bf, var), b_bdd)));
+	}
+};
+
+template<typename...BAs>
+nso<BAs...> operator|(const nso<BAs...>& n, const reduce_bf<BAs...>& r) {
+	return r(n);
 }
 
 template<typename...BAs>
-nso<BAs...> bf_from_bdd(const hbdd<variant_ba<BAs...>>& b, std::map<nso<BAs...>, hbdd<variant_ba<BAs...>>>& vars) {
-	// TODO (MEDIUM) write from_bdd (using?)
-	std::cout << "Not implemented yet." << std::endl;
-	return nso<BAs...>();
-}
-
-template<typename...BAs>
-nso<BAs...> minimize_bf(const nso<BAs...>& n) {
-	std::map<nso<BAs...>, hbdd<variant_ba<BAs...>>> vars;
-	auto bdd = bf_to_bdd(n, vars);
-	return bf_from_bdd(bdd, vars);
-}
-
-template<typename...BAs>
-hbdd<Bool> wff_to_bdd(const nso<BAs...>& n, std::map<nso<BAs...>, hbdd<Bool>>& vars) {
-	// convert n to bdd over variant_ba<BAs...>
-	// TODO (MEDIUM) write to_bdd (using?)
-	std::cout << "Not implemented yet." << std::endl;
-	return hbdd<Bool>();
-}
-
-template<typename...BAs>
-nso<BAs...> wff_from_bdd(const hbdd<Bool>& b, std::map<nso<BAs...>, hbdd<Bool>>& vars) {
-	// TODO (MEDIUM) write from_bdd (using?)
-	std::cout << "Not implemented yet." << std::endl;
-	return nso<BAs...>();
+nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...>& a, const nso<BAs...>& b) {
+	// TODO (HIGH) check formulas, should depend on the type
+	if (type == tau_parser::bf_eq) return build_wff_or(build_wff_and(a, b), build_wff_and(build_wff_neg(a), build_wff_neg(b)));
+	else return build_wff_and(build_wff_or(a, build_wff_neg(b)), build_wff_or(build_wff_neg(a), b));
 }
 
 template<typename...BAs>
 nso<BAs...> minimize_wff(const nso<BAs...>& n) {
-	std::map<nso<BAs...>, hbdd<Bool>> vars;
-	auto bdd = wff_to_bdd(n, vars);
-	return wff_from_bdd(bdd, vars);
+	auto form = n;
+	for (auto& var: select_all(n, is_non_terminal<tau_parser::var, BAs...>)) {
+		for (auto& c: get_dnf_clauses<tau_parser::wff, BAs...>(n)) {
+			for (auto& l: get_literals<tau_parser::wff, BAs...>(c)) {
+				auto type = (l | tau_parser::bf_eq) ? tau_parser::bf_eq : tau_parser::bf_neq;
+				auto [a, b] = split_bf_using_var(var, n);
+				// TODO (HIGH) take into account if we have eq or neq
+				auto nl = build_split_wff_using(type, a, b);
+			}
+		}
+	}
+	// TODO (HIGH) change the return value
+	return n;
 }
 
 // TODO (MEDIUM) implement the removal supeefluous vars

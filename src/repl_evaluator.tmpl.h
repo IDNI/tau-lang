@@ -312,7 +312,6 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		rrs.insert(rrs.end(), definitions.begin(), definitions.end());
 		rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = { rrs, n_nso_rr.main };
 		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
-		//std::cout << "normalized: " << result << "\n";
 		return result;
 	} else if (auto output = arg | tau_parser::output; output) {
 		auto ref = get_output_ref(output.value());
