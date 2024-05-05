@@ -183,34 +183,11 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 }
 
 template <typename factory_t, typename... BAs>
-std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::onf_cmd(const nso<tau_ba<BAs...>, BAs...>& n)
-{
-	auto var = n | tau_parser::variable
-		| optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
-	auto arg = n | tau_parser::onf_cmd_arg
-		| only_child_extractor<tau_ba<BAs...>, BAs...>
-		| optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
-	auto type = arg
-		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
-		| optional_value_extractor<size_t>;
-	switch (type) {
-	case tau_parser::wff: return onf<tau_ba<BAs...>, BAs...>(arg, var);
-	case tau_parser::memory:
-		if (auto check = memory_retrieve(arg); check) {
-			auto [value, _] = check.value();
-			return onf<tau_ba<BAs...>, BAs...>(value, var);
-		}
-	}
-	return {};
-}
-
-template <typename factory_t, typename... BAs>
 std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>>
-	repl_evaluator<factory_t, BAs...>::get_nf_type_and_arg(
+	repl_evaluator<factory_t, BAs...>::get_type_and_arg(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto arg = n | tau_parser::nf_cmd_arg
+	auto arg = n
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
 	auto type = arg
@@ -229,17 +206,30 @@ std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>>
 	}
 }
 
+template <typename factory_t, typename... BAs>
+std::optional<nso<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<factory_t, BAs...>::onf_cmd(const nso<tau_ba<BAs...>, BAs...>& n)
+{
+	auto arg = n | tau_parser::onf_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	auto var = n | tau_parser::variable	| optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	if(auto check = get_type_and_arg(arg); check) {
+		auto [_, value] = check.value();
+		return onf<tau_ba<BAs...>, BAs...>(value, var);
+	}
+	return {};
+}
 
 template <typename factory_t, typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::dnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	if (auto check = get_nf_type_and_arg(n); check) {
-		auto [type, arg] = check.value();
+	auto arg = n | tau_parser::nf_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
 		switch (type) {
-		case tau_parser::wff: return dnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(arg);
-		case tau_parser::bf: return dnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(arg);
+		case tau_parser::wff: return dnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return dnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(value);
 		}
 	}
 	return {};
@@ -250,11 +240,12 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::cnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	if (auto check = get_nf_type_and_arg(n); check) {
-		auto [type, arg] = check.value();
+	auto arg = n | tau_parser::nf_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
 		switch (type) {
-		case tau_parser::wff: return cnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(arg);
-		case tau_parser::bf: return cnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(arg);
+		case tau_parser::wff: return cnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return cnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(value);
 		}
 	}
 	return {};
@@ -265,11 +256,12 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::nnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	if (auto check = get_nf_type_and_arg(n); check) {
-		auto [type, arg] = check.value();
+	auto arg = n | tau_parser::nf_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
 		switch (type) {
-		case tau_parser::wff: return nnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(arg);
-		case tau_parser::bf: return nnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(arg);
+		case tau_parser::wff: return nnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return nnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(value);
 		}
 	}
 	return {};
@@ -280,11 +272,12 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::mnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	if (auto check = get_nf_type_and_arg(n); check) {
-		auto [type, arg] = check.value();
+	auto arg = n | tau_parser::nf_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
 		switch (type) {
-		case tau_parser::wff: return mnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(arg);
-		case tau_parser::bf: return mnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(arg);
+		case tau_parser::wff: return mnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return mnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(value);
 		}
 	}
 	return {};
