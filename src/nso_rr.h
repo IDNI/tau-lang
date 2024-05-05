@@ -892,7 +892,7 @@ sp_tau_source_node make_tau_source(std::istream& is);
 sp_tau_source_node make_tau_source_from_file(const std::string& filename);
 
 template<typename...BAs>
-sp_tau_node<BAs...> process_digits(sp_tau_node<BAs...>& tau_source){
+sp_tau_node<BAs...> process_digits(const sp_tau_node<BAs...>& tau_source){
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 	for(auto& n: select_top(tau_source, is_non_terminal<tau_parser::digits, BAs...>)){
 		auto offset = make_string_with_skip<
@@ -1894,8 +1894,11 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_selection,                     50 },
 			{ tau_parser::bf_var_selection,                 50 },
 			{ tau_parser::wff_var_selection,                50 },
-			{ tau_parser::list_outputs_cmd,                 50 },
-			{ tau_parser::clear_outputs_cmd,                50 },
+			{ tau_parser::memory_list_cmd,                  50 },
+			{ tau_parser::memory_clear_cmd,                 50 },
+			{ tau_parser::memory_print_cmd,                 50 },
+			{ tau_parser::memory_store_cmd,                 50 },
+			{ tau_parser::memory_del_cmd,                 50 },
 			// tau
 			{ tau_parser::tau_collapse_positives_cb,       100 },
 			{ tau_parser::tau_positives_upwards_cb,        110 },
@@ -2093,8 +2096,11 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_selection:
 			case tau_parser::bf_var_selection:
 			case tau_parser::wff_var_selection:
-			case tau_parser::list_outputs_cmd:
-			case tau_parser::clear_outputs_cmd:
+			case tau_parser::memory_list_cmd:
+			case tau_parser::memory_clear_cmd:
+			case tau_parser::memory_print_cmd:
+			case tau_parser::memory_store_cmd:
+			case tau_parser::memory_del_cmd:
 			{
 				auto& ch = n->child;
 				print_terminals(stream, ch[0]);

@@ -45,7 +45,7 @@
 // TODO (MEDIUM) find an expression expressing a single solution
 // TODO (MEDIUM) expand quantification over bf/sbf into first order quantification wrt a selected set of vars
 // TODO (MEDIUM) strong normalization of selected subformulas
-// TODO (HIGH) use only required parenthesis in the output or at least be able
+// TODO (HIGH) use only required parenthesis in the memory or at least be able
 // to say something like `pretty(%)`  after executing a given command.
 
 #ifndef __REPL_EVALUATOR_H__
@@ -68,13 +68,10 @@ namespace idni::tau {
 template <typename factory_t, typename... BAs>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<factory_t, BAs...>>;
-	// TODO (MEDIUM) remove variant as only nso are needed
-	using output = std::variant<
-		nso<tau_ba<BAs...>, BAs...>,
-		rr<nso<tau_ba<BAs...>, BAs...>>>;
-	using outputs = std::vector<output>;
+	using memory = nso<tau_ba<BAs...>, BAs...>;
+	using memorys = std::vector<memory>;
 
-	using output_ref = std::optional<std::pair<
+	using memory_ref = std::optional<std::pair<
 				sp_tau_node<tau_ba<BAs...>, BAs...>, size_t>>;
 
 	struct options {
@@ -102,13 +99,12 @@ private:
 
 	// helpers
 	sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string& src);
-	size_t digits(sp_tau_node<tau_ba<BAs...>, BAs...> n);
 	boost::log::trivial::severity_level nt2severity(size_t nt) const;
-	repl_evaluator<factory_t, BAs...>::output_ref get_output_ref(
+
+	repl_evaluator<factory_t, BAs...>::memory_ref memory_retrieve(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
 		bool silent = false);
-	void store_output(repl_evaluator<factory_t, BAs...>::output o);
-	void print_output(size_t id);
+	void memory_store(repl_evaluator<factory_t, BAs...>::memory o);
 
 	// commands
 	void not_implemented_yet();
@@ -120,9 +116,11 @@ private:
 	void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
 	void toggle_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
 
-	void print_output_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
-	void list_outputs_cmd();
-	void clear_outputs_cmd();
+	void memory_print_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
+	void memory_store_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
+	void memory_del_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
+	void memory_list_cmd();
+	void memory_clear_cmd();
 
 	void def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
@@ -175,7 +173,7 @@ private:
 	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_instantiate_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
-	outputs m;
+	memorys m;
 	factory_t factory;
 	options opt{};
 	// TODO (MEDIUM) this dependency should be removed

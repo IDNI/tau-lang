@@ -370,7 +370,7 @@ start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
 cli                    => _ cli_command (_ dot _ cli_command)*.
 cli_command            => help_cmd | version_cmd | quit_cmd | clear_cmd.
 cli_command            => get_cmd | set_cmd | toggle_cmd.
-cli_command            => list_outputs_cmd | clear_outputs_cmd | print_output_cmd.
+cli_command            => memory_list_cmd | memory_clear_cmd | memory_print_cmd | memory_store_cmd | memory_del_cmd.
 cli_command            => file.
 cli_command            => normalize_cmd | execute_cmd | solve_cmd
                         | is_satisfiable_cmd | is_valid_cmd | is_unsatisfiable_cmd
@@ -388,11 +388,11 @@ cli_command            => nso_rr.
 normalize_cmd          => normalize_cmd_sym __ normalize_cmd_arg.
 normalize_cmd_arg      => wff.
 normalize_cmd_arg      => nso_rr.
-normalize_cmd_arg      => output | wff_selection.
+normalize_cmd_arg      => memory | wff_selection.
 
 solve_cmd              => solve_cmd_sym __ solve_cmd_arg.
 solve_cmd_arg          => wff.
-solve_cmd_arg          => output | wff_selection.
+solve_cmd_arg          => memory | wff_selection.
 
 execute_cmd            => execute_cmd_sym __ execute_cmd_arg.
 execute_cmd_arg        => tau.
@@ -413,43 +413,43 @@ bf_instantiate_cmd      => instantiate_cmd_sym __
                           # variable to be instantiated
                           variable __
                           # wff to be used for instantiation
-                          (bf | bf_selection | output) __
-                          # nso_rr or output or selection where to instantiate
-                          (bf_selection | output).
+                          (bf | bf_selection | memory) __
+                          # nso_rr or memory or selection where to instantiate
+                          (bf_selection | memory).
 wff_instantiate_cmd     => instantiate_cmd_sym __
                           # variable to be instantiated
                           variable __
                           # wff to be used for instantiation
-                          (wff | wff_selection | output) __
-                          # nso_rr or output or selection where to instantiate
-                          (wff_selection | output).
+                          (wff | wff_selection | memory) __
+                          # nso_rr or memory or selection where to instantiate
+                          (wff_selection | memory).
 bf_substitute_cmd      => substitute_cmd_sym __
-                          # bf or output or selection to be used for substitution
-                          (bf | output | bf_selection) __
-                          # bf or output or selection where to substitute
-                          (output | bf_selection | bf_selection)
-                          # nso_rr or output or selection where to substitute
-                          (bf_selection | output).
+                          # bf or memory or selection to be used for substitution
+                          (bf | memory | bf_selection) __
+                          # bf or memory or selection where to substitute
+                          (memory | bf_selection | bf_selection)
+                          # nso_rr or memory or selection where to substitute
+                          (bf_selection | memory).
 wff_substitute_cmd     => substitutecmd__sym __
-                          # wff or output or selection to be used for substitution
-                          (wff | output | wff_selection) __
-                          # wff or output or selection where to substitute
-                          (output | wff_selection)
-                          # nso_rr or output or selection where to substitute
-                          (wff_selection | output).
-bf_dnf_cmd             => dnf_cmd_sym __ (bf | output | bf_selection).
-bf_cnf_cmd             => cnf_cmd_sym __ (bf | output | bf_selection).
-bf_anf_cmd             => anf_cmd_sym __ (bf | output | bf_selection).
-bf_nnf_cmd             => nnf_cmd_sym __ (bf | output | bf_selection).
-bf_pnf_cmd             => pnf_cmd_sym __ (bf | output | bf_selection).
-bf_mnf_cmd             => mnf_cmd_sym __ (bf | output | bf_selection).
-wff_onf_cmd            => onf_cmd_sym __ variable __ (wff | output | wff_selection).
-wff_dnf_cmd            => dnf_cmd_sym __ (wff | output | wff_selection).
-wff_cnf_cmd            => cnf_cmd_sym __ (wff | output | wff_selection).
-wff_anf_cmd            => anf_cmd_sym __ (wff | output | wff_selection).
-wff_nnf_cmd            => nnf_cmd_sym __ (wff | output | wff_selection).
-wff_pnf_cmd            => pnf_cmd_sym __ (wff | output | wff_selection).
-wff_mnf_cmd            => mnf_cmd_sym __ (wff | output | wff_selection).
+                          # wff or memory or selection to be used for substitution
+                          (wff | memory | wff_selection) __
+                          # wff or memory or selection where to substitute
+                          (memory | wff_selection)
+                          # nso_rr or memory or selection where to substitute
+                          (wff_selection | memory).
+bf_dnf_cmd             => dnf_cmd_sym __ (bf | memory | bf_selection).
+bf_cnf_cmd             => cnf_cmd_sym __ (bf | memory | bf_selection).
+bf_anf_cmd             => anf_cmd_sym __ (bf | memory | bf_selection).
+bf_nnf_cmd             => nnf_cmd_sym __ (bf | memory | bf_selection).
+bf_pnf_cmd             => pnf_cmd_sym __ (bf | memory | bf_selection).
+bf_mnf_cmd             => mnf_cmd_sym __ (bf | memory | bf_selection).
+wff_onf_cmd            => onf_cmd_sym __ variable __ (wff | memory | wff_selection).
+wff_dnf_cmd            => dnf_cmd_sym __ (wff | memory | wff_selection).
+wff_cnf_cmd            => cnf_cmd_sym __ (wff | memory | wff_selection).
+wff_anf_cmd            => anf_cmd_sym __ (wff | memory | wff_selection).
+wff_nnf_cmd            => nnf_cmd_sym __ (wff | memory | wff_selection).
+wff_pnf_cmd            => pnf_cmd_sym __ (wff | memory | wff_selection).
+wff_mnf_cmd            => mnf_cmd_sym __ (wff | memory | wff_selection).
 
 def_rule_cmd           => def_cmd_sym __ def_rule_cmd_arg.
 def_rule_cmd_arg       => (bf_rec_relation | wff_rec_relation | tau_rec_relation).
@@ -462,28 +462,30 @@ version_cmd            => version_cmd_sym.
 quit_cmd               => quit_cmd_sym.
 clear_cmd              => clear_cmd_sym.
 
-# TODO (HIGH) selection should take outputs as arguments
-wff_selection          => selection_sym __ digits.
-bf_selection           => selection_sym __ digits.
-bf_var_selection       => selection_sym __ digits.
-wff_var_selection      => selection_sym __ digits.
+wff_selection          => selection_sym __ memory.
+bf_selection           => selection_sym __ memory.
+bf_var_selection       => selection_sym __ memory.
+wff_var_selection      => selection_sym __ memory.
 
 # TODO (HIGH) add support for file paths
 file_path              => chars.
-output                 => absolute_output | relative_output.
-absolute_output        => (absolute_output_sym | output_sym __) output_id.
-relative_output        => relative_output_sym output_id.
-output_id              => digits.
+memory                 => absolute_memory | relative_memory.
+absolute_memory        => (absolute_memory_sym | memory_sym __) memory_id.
+relative_memory        => relative_memory_sym memory_id.
+memory_id              => digits.
 
-list_outputs_cmd       => output_sym | absolute_output_sym | relative_output_sym.
-# TODO (VERY_HIGH) there is no def for clear_sym... maybe we should add it
-clear_outputs_cmd      => (output_sym __ | absolute_output_sym | relative_output_sym) clear_sym.
-# TODO (VERY_HIGH) we are missing id for output
-print_output_cmd       => output.
+memory_list_cmd        => memory_cmd_sym.
+memory_clear_cmd       => memory_cmd_sym __ memory_clear_cmd_sym.
+memory_print_cmd       => memory_cmd_sym __ memory.
+memory_store_cmd       => memory_cmd_sym __ memory_store_cmd_arg.
+# IDEA maybe allow several comma separated formulas
+memory_store_cmd_arg   => (bf | wff | tau).
+# IDEA maybe allow several comma separated refs
+memory_del_cmd         => memory_cmd_sym memory_del_cmd_sym __ memory.
 
 cli_cmd_sym            => help_cmd_sym | version_cmd_sym | quit_cmd_sym
                         | clear_cmd_sym
-			| output_sym | absolute_output_sym | relative_output_sym
+			| memory_cmd_sym
                         | selection_sym | instantiate_cmd_sym | substitute_cmd_sym
                         | def_cmd_sym
                         | normalize_cmd_sym | execute_cmd_sym | file_cmd_sym
@@ -523,10 +525,14 @@ def_cmd_list           => "list".
 def_cmd_del            => "del".
 def_cmf_clear          => "clear".
 
+memory_clear_cmd_sym   => "c" | "clear".
+memory_del_cmd_sym     => "d" | "del".
+memory_cmd_sym         => "m" | "mem" | "memory".
+memory_sym             => "m".
+absolute_memory_sym    => "&".
+relative_memory_sym    => "%".
+
 selection_sym          => "s" | "selection".
-output_sym             => "o" | "output".
-absolute_output_sym    => "&".
-relative_output_sym    => "%".
 
 examples_sym            => "examples".
 # cofiguration commands

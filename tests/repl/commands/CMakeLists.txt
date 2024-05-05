@@ -110,6 +110,8 @@ add_test(NAME test_repl-help_onf_cmd
 set_tests_properties(test_repl-help_onf_cmd PROPERTIES
 	PASS_REGULAR_EXPRESSION "onf command converts")
 
+# TODO (HIGH) add tests for help definition, memory,...
+
 #
 # normal forms commands
 #
