@@ -155,7 +155,8 @@ private:
 		'=', '&', '|', '!', '^', '?', '>', 'a', 'l', 'e', 
 		'x', 'b', 'o', '_', 'T', 'F', '+', 'f', 'S', '1', 
 		'0', '$', 'i', 'h', 's', 'u', 'r', 'm', 'c', 'w', 
-		'n', 'g', 'v', 't', 'd', 'q', 'z', 'p', 'y', '%', 
+		'n', 'g', 'v', 't', 'd', 'q', 'z', 'p', 'y', '@', 
+		'%', 
 	};
 	idni::nonterminals<char_type, terminal_type> nts{};
 	idni::char_class_fns<terminal_type> cc;
@@ -1498,10 +1499,10 @@ private:
 		q(nt(372), (t(46)+t(28)+t(46)+t(31)+t(45)+t(57)));
 		//       memory_sym(369)      => 'm'.
 		q(nt(369), (t(46)));
-		//       absolute_memory_sym(368) => '&'.
-		q(nt(368), (t(20)));
+		//       absolute_memory_sym(368) => '@'.
+		q(nt(368), (t(58)));
 		//       relative_memory_sym(371) => '%'.
-		q(nt(371), (t(58)));
+		q(nt(371), (t(59)));
 		//       selection_sym(362)   => 's'.
 		q(nt(362), (t(43)));
 		//       selection_sym(362)   => 's' 'e' 'l' 'e' 'c' 't' 'i' 'o' 'n'.

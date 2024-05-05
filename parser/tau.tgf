@@ -526,7 +526,7 @@ memory_clear_cmd_sym   => "c" | "clear".
 memory_del_cmd_sym     => "d" | "del" | "delete".
 memory_cmd_sym         => "m" | "mem" | "memory".
 memory_sym             => "m".
-absolute_memory_sym    => "&".
+absolute_memory_sym    => "@".
 relative_memory_sym    => "%".
 
 selection_sym          => "s" | "selection".
