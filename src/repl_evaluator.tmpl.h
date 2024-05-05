@@ -45,82 +45,105 @@ void repl_evaluator<factory_t, BAs...>::not_implemented_yet() {
 	std::cout << "Not implemented yet.\n";
 }
 
-template <typename factory_t, typename... BAs>
-size_t  repl_evaluator<factory_t, BAs...>::digits(
-	sp_tau_node<tau_ba<BAs...>, BAs...> n)
-{
+template<typename... BAs>
+size_t  digits(const sp_tau_node<tau_ba<BAs...>, BAs...>& n) {
 	return process_digits(n)
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| size_t_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 }
 
-template <typename factory_t, typename... BAs>
-repl_evaluator<factory_t, BAs...>::output_ref
-	repl_evaluator<factory_t, BAs...>::get_output_ref(
-		const sp_tau_node<tau_ba<BAs...>, BAs...>& n, bool silent)
-{
-	auto out_type = n
+template<typename... BAs>
+std::optional<size_t> get_memory_index(const sp_tau_node<tau_ba<BAs...>, BAs...>& n, const size_t size, bool silent = false) {
+	auto mem_type = n
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
-	auto out_id = n | out_type | tau_parser::output_id
+	auto mem_id = n | mem_type | tau_parser::memory_id
 		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
-	auto idx = digits(out_id);
-	auto is_relative = (out_type == tau_parser::relative_output);
-	if (idx >= m.size()) {
-		if (!silent) cout << "output " << TC_OUTPUT
+	auto idx = digits(mem_id);
+	auto is_relative = (mem_type == tau_parser::relative_memory);
+	if (idx >= size) {
+		if (!silent) cout << "memory " << TC_OUTPUT
 			<< (is_relative ? "%" : "&")
 			<< idx << TC.CLEAR() << " does not exist\n";
 		return {};
 	}
-	auto pos = is_relative ? m.size() - 1 - idx : idx;
-	if (auto check = m[pos];
-		std::holds_alternative<nso<tau_ba<BAs...>, BAs...>>(check))
-	{
-		return {{std::get<nso<tau_ba<BAs...>, BAs...>>(m[pos]), pos}};
-	}
+	auto pos = is_relative ? size - 1 - idx : idx;
+	return pos;
+}
+
+
+template <typename factory_t, typename... BAs>
+repl_evaluator<factory_t, BAs...>::memory_ref
+	repl_evaluator<factory_t, BAs...>::memory_retrieve(
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& n, bool silent)
+{
+	if (auto pos = get_memory_index(n, m.size()); pos.has_value(), silent)
+		return {{m[pos.value()], pos.value()}};
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::print_output(size_t id) {
+template<typename... BAs>
+void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id, const size_t size) {
 	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << "/"
-		<< TC_OUTPUT << "%" << (m.size() - id - 1) << TC.CLEAR()
-		<< ": " << m[id] << "\n";
+		<< TC_OUTPUT << "%" << (size - id - 1) << TC.CLEAR()
+		<< ": " << mem << "\n";
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::print_output_cmd(
+void repl_evaluator<factory_t, BAs...>::memory_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
-	auto n = command | tau_parser::output;
+	auto n = command | tau_parser::memory;
 	if (!n) return;
-	auto o = get_output_ref(n.value());
-	if (!o) return;
-	print_output(o.value().second);
+	auto idx = get_memory_index(n.value(), m.size());
+	if (!idx) return;
+	print_memory(m[idx.value()], idx.value(), m.size());
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::list_outputs_cmd() {
-	if (!m.size()) cout << "no outputs\n";
-	else for (size_t i = 0; i < m.size(); i++) print_output(i);
+void repl_evaluator<factory_t, BAs...>::memory_list_cmd() {
+	if (!m.size()) cout << "memory is empty\n";
+	else for (size_t i = 0; i < m.size(); i++)
+		print_memory(m[i], i, m.size());
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::clear_outputs_cmd() {
+void repl_evaluator<factory_t, BAs...>::memory_clear_cmd() {
 	m.clear();
-	cout << "outputs cleared\n";
+	cout << "memorys cleared\n";
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::store_output(
-	typename repl_evaluator<factory_t, BAs...>::output o)
+void repl_evaluator<factory_t, BAs...>::memory_store(
+	typename repl_evaluator<factory_t, BAs...>::memory o)
 {
-	// do not add into memory if the last memory value is the same ?
-	// if (m.size() && m.back() == o) return;
+	// do not add into memory if the last memory value is the same
+	if (m.size() && m.back() == o) return;
 	m.push_back(o);
-	print_output(m.size() - 1);
+	print_memory(m.back(), m.size() - 1, m.size());
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::memory_store_cmd(
+	const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
+	auto form = command
+		| tau_parser::memory_store_cmd_arg
+		| only_child_extractor<tau_ba<BAs...>, BAs...>
+		| optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	memory_store(form);
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::memory_del_cmd(
+	const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
+	auto n = command | tau_parser::memory;
+	if (!n) return;
+	auto idx = get_memory_index(n.value(), m.size());
+	if (!idx) return;
+	m.erase(m.begin() + idx.value());
+	cout << "deleted index " << idx.value() << " from memory\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -129,8 +152,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	if (auto bf = n | tau_parser::bf; bf) return bf.value();
-	else if (auto output = n | tau_parser::output; output) {
-		auto [value, _] = get_output_ref(output.value()).value();
+	else if (auto memory = n | tau_parser::memory; memory) {
+		auto [value, _] = memory_retrieve(memory.value()).value();
 		return value;
 	}
 	return {};
@@ -141,8 +164,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	if (auto wff = n | tau_parser::wff; wff) return wff.value();
-	else if (auto output = n | tau_parser::output; output) {
-		auto [value, _] = get_output_ref(output.value()).value();
+	else if (auto memory = n | tau_parser::memory; memory) {
+		auto [value, _] = memory_retrieve(memory.value()).value();
 		return value;
 	}
 	return {};
@@ -313,12 +336,12 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = { rrs, n_nso_rr.main };
 		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
 		return result;
-	} else if (auto output = arg | tau_parser::output; output) {
-		auto ref = get_output_ref(output.value());
+	} else if (auto memory = arg | tau_parser::memory; memory) {
+		auto ref = memory_retrieve(memory.value());
 		if (ref) {
 			auto [value, _] = ref.value();
-			rr<gssotc<BAs...>> rr_output = { definitions, value };
-			auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_output);
+			rr<gssotc<BAs...>> rr_memory = { definitions, value };
+			auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_memory);
 			return result;
 		}
 		return {};
@@ -542,9 +565,11 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::get_cmd:            get_cmd(command); break;
 	case p::set_cmd:            set_cmd(command); break;
 	case p::toggle_cmd:         toggle_cmd(command); break;
-	case p::list_outputs_cmd:   list_outputs_cmd(); break;
-	case p::clear_outputs_cmd:  clear_outputs_cmd(); break;
-	case p::print_output_cmd:   print_output_cmd(command); break;
+	case p::memory_list_cmd:    memory_list_cmd(); break;
+	case p::memory_clear_cmd:   memory_clear_cmd(); break;
+	case p::memory_print_cmd:   memory_print_cmd(command); break;
+	case p::memory_store_cmd:   memory_store_cmd(command); break;
+	case p::memory_del_cmd:     memory_del_cmd(command); break;
 	// normalization
 	case p::normalize_cmd:      result = normalizer_cmd(command); break;
 	// execution
@@ -574,7 +599,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::bf_nnf_cmd:         result = bf_nnf_cmd(command); break;
 	case p::bf_pnf_cmd:         not_implemented_yet(); break;
 	case p::bf_mnf_cmd:         result = bf_mnf_cmd(command); break;
-	// store the given formula as output for future references
+	// store the given formula as memory for future references
 	case p::bf:                 result = command; break;
 	case p::wff:                result = command; break;
 	case p::nso_rr:	            result = command; break;
@@ -590,7 +615,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	if (opt.debug_repl && result) ptree<tau_ba<BAs...>, BAs...>(
 		std::cout << "result tree: ", result.value()) << "\n";
 #endif
-	if (result) store_output(result.value());
+	if (result) memory_store(result.value());
 	return 0;
 }
 
@@ -708,16 +733,6 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  def clear             clear all rec. relations\n"
 		<< "  def del <id>          delete rec. relation\n"
 
-		<< "Output commands:\n"
-		//<< "  output or o            output control\n"
-		<< "  output clear           clear output memory\n"
-		<< "  output <output_id>     print output\n"
-		<< "  output list            list all outputs\n"
-		<< "\n"
-		//<< "  &                      output_ref. or short alias of output command\n"
-		//<< "  %                      output ref. or relative output control\n"
-		//<< "\n"
-
 		//<< "Selection commands:\n"
 		//<< "  selection or s         selection control\n"
 
@@ -754,30 +769,17 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau_parser::output_sym: cout
-		<< "output or out command manages outputs of previous commands\n"
+	case tau_parser::memory_cmd_sym: cout
+		<< "memory command manages stored or previous commands results\n"
 		<< "\n"
-		<< "  output                 lists all outputs\n"
-		<< "  output <output_id>     prints output\n"
-		<< "  output clear           clears output memory\n";
+		<< "  memory                 lists all stored or output results\n"
+		<< "  memory <memory_id>     prints the given stored or output result\n"
+		<< "  memory clear           clears memory\n"
+		<< "  memory <formula>       store the given formula in the memory\n"
+		<< "  memory del <memory_id> deletes the given stored or output result\n"
+		<< "  %<memory_id>           provides relative access to memory\n"
+		<< "  &<memory_id>           provides absolute access to memory\n";
 		break;
-
-	//case tau_parser::absolute_output_sym: cout
-	//	<< "& is a short alias of output command\n"
-	//	<< "\n"
-	//	<< "  &                      lists all outputs\n"
-	//	<< "  &clear                 clears output memory\n"
-	//	<< "  &<output_id>           is a reference to a previous output\n"
-	//	<< "                         if used as a command it prints the output\n";
-	//	break;
-	//case tau_parser::relative_output_sym: cout
-	//	<< "% same as & but output_id is relative to the latest\n"
-	//	<< "\n"
-	//	<< "  %                      lists all outputs\n"
-	//	<< "  %clear                 clears output memory\n"
-	//	<< "  %<relative_output_id>  is a reference to a previous output\n"
-	//	<< "                         if used as a command it prints the output\n";
-	//	break;
 
 	//case tau_parser::selection_sym: cout
 	//	<< "Command s, selection ...\n";
@@ -789,12 +791,12 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 
 	case tau_parser::normalize_cmd_sym: cout
 		<< "normalize or n command normalizes a formula, prints it and\n"
-		<< "saves it into memory of previous outputs\n"
+		<< "saves it into memory of previous memorys\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  normalize '<NSORR>'    normalizes the given NSO RR\n"
 		<< "  normalize '<WFF>'      normalizes the given WFF formula\n";
-	//	<< "  normalize <output>     normalizes the output with the given id\n"
+	//	<< "  normalize <memory>     normalizes the memory with the given id\n"
 	//	<< "  normalize <selection>  normalizes the selection\n";
 		break;
 
@@ -822,7 +824,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "usage:\n"
 		<< "  dnf '<BF>'             converts the given BF to DNF\n"
 		<< "  dnf '<WFF>'            converts the given BF to DNF\n";
-	//	<< "  dnf <output>           converts the output with the given id to DNF\n";
+	//	<< "  dnf <memory>           converts the memory with the given id to DNF\n";
 		break;
 	case tau_parser::cnf_cmd_sym: cout
 		<< "cnf command converts a boolean formula or a well formed formula to conjunctive normal form\n"
@@ -830,7 +832,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "usage:\n"
 		<< "  cnf '<BF>'             converts the given BF to CNF\n"
 		<< "  cnf '<WFF>'            converts the given BF to CNF\n";
-	//	<< "  cnf <output>           converts the output with the given id to CNF\n";
+	//	<< "  cnf <memory>           converts the memory with the given id to CNF\n";
 		break;
 	//case tau_parser::anf_cmd_sym: cout
 	//	<< "cnf command converts a boolean formula or a well formed formula to algebraic normal form\n"
@@ -838,7 +840,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 	//	<< "usage:\n"
 	//	<< "  anf '<BF>'             converts the given BF to ANF\n"
 	//	<< "  anf '<WFF>'            converts the given BF to ANF\n"
-	//	<< "  anf <output>           converts the output with the given id to ANF\n";
+	//	<< "  anf <memory>           converts the memory with the given id to ANF\n";
 	//	break;
 	case tau_parser::nnf_cmd_sym: cout
 		<< "nnf command converts a boolean formula or a well formed formula to negation normal form\n"
@@ -846,7 +848,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "usage:\n"
 		<< "  nnf '<BF>'             converts the given BF to NNF\n"
 		<< "  nnf '<WFF>'            converts the given BF to NNF\n";
-	//	<< "  nnf <output>           converts the output with the given id to NNF\n";
+	//	<< "  nnf <memory>           converts the memory with the given id to NNF\n";
 		break;
 	//case tau_parser::pnf_cmd_sym: cout
 	//	<< "cnf command converts a boolean formula or a well formed formula to prenex normal form\n"
@@ -854,7 +856,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 	//	<< "usage:\n"
 	//	<< "  pnf '<BF>'             converts the given BF to PNF\n"
 	//	<< "  pnf '<WFF>'            converts the given BF to PNF\n"
-	//	<< "  pnf <output>           converts the output with the given id to PNF\n";
+	//	<< "  pnf <memory>           converts the memory with the given id to PNF\n";
 	//	break;
 	case tau_parser::mnf_cmd_sym: cout
 		<< "mnf command converts a boolean formula or a well formed formula to minterm normal form\n"
@@ -862,14 +864,14 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "usage:\n"
 		<< "  mnf '<BF>'             converts the given BF to MNF\n"
 		<< "  mnf '<WFF>'            converts the given BF to MNF\n";
-	//	<< "  mnf <output>           converts the output with the given id to MNF\n";
+	//	<< "  mnf <memory>           converts the memory with the given id to MNF\n";
 		break;
 	case tau_parser::onf_cmd_sym: cout
 		<< "onf command converts a well formed formula to order normal form\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  onf '<VAR>' '<WFF>'    converts the given WFF to ONF\n";
-	//	<< "  onf '<VAR>' <output>   converts the output with the given id to ONF\n";
+	//	<< "  onf '<VAR>' <memory>   converts the memory with the given id to ONF\n";
 		break;
 
 	//case tau_parser::substitute_cmd_sym: cout
@@ -890,6 +892,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  def clear        clear all definitions\n"
 		<< "  def del <id>     delete <id> definition\n";
 		break;
+
 	case tau_parser::examples_sym: cout
 		<< "examples\n";
 		// TODO (VERY_HIGH) show examples
