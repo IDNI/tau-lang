@@ -100,8 +100,12 @@ void repl_evaluator<factory_t, BAs...>::memory_print_cmd(
 	auto n = command | tau_parser::memory;
 	if (!n) return;
 	auto idx = get_memory_index(n.value(), m.size());
-	if (!idx) return;
-	print_memory(m[idx.value()], idx.value(), m.size());
+	if (idx) {
+		print_memory(m[idx.value()], idx.value(), m.size());
+		return;
+	}
+	cout << "error: memory location does not exist\n";
+	return;
 }
 
 template <typename factory_t, typename... BAs>
@@ -147,7 +151,10 @@ void repl_evaluator<factory_t, BAs...>::memory_del_cmd(
 	auto n = command | tau_parser::memory;
 	if (!n) return;
 	auto idx = get_memory_index(n.value(), m.size());
-	if (!idx) return;
+	if (!idx) {
+		cout << "error: memory location does not exist\n";
+		return;
+	}
 	m.erase(m.begin() + idx.value());
 	cout << "deleted index " << idx.value() << " from memory\n";
 }
@@ -410,15 +417,14 @@ void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(const nso<tau_ba<BA
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
-	auto r = n | tau_parser::def_rule_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
-	auto rule = make_rec_relation<tau_ba<BAs...>, BAs...>(r);
+void repl_evaluator<factory_t, BAs...>::def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto rule = make_gssotc_rec_relation<BAs...>(n);
 	definitions.emplace_back(rule);
 }
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_list_cmd() {
-	for (size_t i = 0; i < definitions.size(); i++)	cout << "[" << i << "]" << definitions[i] << "\n";
+	for (size_t i = 0; i < definitions.size(); i++)	cout << "[" << i << "] " << definitions[i] << "\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -427,9 +433,33 @@ void repl_evaluator<factory_t, BAs...>::def_clear_cmd() {
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
-	auto idx = digits(n | tau_parser::digits | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>);
-	definitions.erase(definitions.begin() + idx);
+void repl_evaluator<factory_t, BAs...>::def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& command) {
+	if (definitions.size() == 0) cout << "definitions are empty\n";
+	auto n = command | tau_parser::memory;
+	if (!n) return;
+	auto idx = get_memory_index(n.value(), definitions.size());
+	if (!idx) {
+		cout << "error: definition does not exist\n";
+		return;
+	}
+	definitions.erase(definitions.begin() + idx.value());
+	cout << "deleted index " << idx.value() << " from definitions\n";
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_print_cmd(
+	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
+{
+	if (definitions.size() == 0) cout << "definitions are empty\n";
+	auto n = command | tau_parser::memory;
+	if (!n) return;
+	auto idx = get_memory_index(n.value(), definitions.size());
+	if (idx) {
+		cout << definitions[idx.value()] << "\n";
+		return;
+	}
+	cout << "error: memory location does not exist\n";
+	return;
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -618,10 +648,11 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::wff:                result = command; break;
 	case p::nso_rr:	            result = command; break;
 	// definition of rec relations to be included during normalization
-	case p::def_rule_cmd:       def_rule_cmd(command); break;
+	case p::def_rr_cmd:         def_rr_cmd(command); break;
 	case p::def_list_cmd:       def_list_cmd(); break;
 	case p::def_clear_cmd:      def_clear_cmd(); break;
 	case p::def_del_cmd:        def_del_cmd(command); break;
+	case p::def_print_cmd:      def_print_cmd(command); break;
 	// error handling
 	default: error = true, cout << "\nUnknown command\n"; break;
 	}

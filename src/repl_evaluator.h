@@ -124,8 +124,9 @@ private:
 	void memory_list_cmd();
 	void memory_clear_cmd();
 
-	void def_rule_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_print_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_list_cmd();
 	void def_clear_cmd();
 

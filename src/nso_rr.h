@@ -834,26 +834,29 @@ rule<nso<BAs...>> make_rule(const sp_tau_node<BAs...>& rule) {
 // creates a specific rule from a generic rule.
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rec_relation<nso<BAs...>> make_rec_relation(const tau_parser::nonterminal rule_t,
+rec_relation<nso<BAs...>> make_rec_relation(
 	tau_parser::nonterminal ref_type_t, tau_parser::nonterminal type_t,
 	const sp_tau_node<BAs...>& rule)
 {
 	return {
 		make_node<tau_sym<BAs...>>(
 			parser_instance<tau_parser>().literal(type_t),
-			{ (rule | rule_t | ref_type_t).value() }),
-		(rule | rule_t | type_t).value()
+			{ (rule | ref_type_t).value() }),
+		(rule |  type_t).value()
 	};
 }
 
 // creates a specific rule from a generic rule.
 template<typename... BAs>
 rec_relation<nso<BAs...>> make_rec_relation(const sp_tau_node<BAs...>& rule) {
-	auto type = only_child_extractor<BAs...>(rule) | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
+	auto rr = rule | tau_parser::nso_rec_relation_form
+		| only_child_extractor<BAs...>
+		| optional_value_extractor<nso<BAs...>>;
+	auto type = rr | non_terminal_extractor<BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rec_relation:  return make_rec_relation<BAs...>(tau_parser::bf_rec_relation,  tau_parser::bf_ref,  tau_parser::bf,  rule); break;
-	case tau_parser::wff_rec_relation: return make_rec_relation<BAs...>(tau_parser::wff_rec_relation, tau_parser::wff_ref, tau_parser::wff, rule); break;
-	case tau_parser::tau_rec_relation: return make_rec_relation<BAs...>(tau_parser::tau_rec_relation, tau_parser::tau_ref, tau_parser::tau, rule); break;
+	case tau_parser::bf_rec_relation:  return make_rec_relation<BAs...>(tau_parser::bf_ref,  tau_parser::bf,  rr); break;
+	case tau_parser::wff_rec_relation: return make_rec_relation<BAs...>(tau_parser::wff_ref, tau_parser::wff, rr); break;
+	case tau_parser::tau_rec_relation: return make_rec_relation<BAs...>(tau_parser::tau_ref, tau_parser::tau, rr); break;
 	default: assert(false); return {};
 	};
 }
@@ -1880,7 +1883,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::onf_cmd,                          50 },
 			{ tau_parser::wff_instantiate_cmd,              50 },
 			{ tau_parser::wff_substitute_cmd,               50 },
-			{ tau_parser::def_rule_cmd,                     50 },
+			{ tau_parser::def_rr_cmd,                       50 },
 			{ tau_parser::def_list_cmd,                     50 },
 			{ tau_parser::def_del_cmd,                      50 },
 			{ tau_parser::def_clear_cmd,                    50 },
@@ -2076,7 +2079,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::onf_cmd:
 			case tau_parser::wff_instantiate_cmd:
 			case tau_parser::wff_substitute_cmd:
-			case tau_parser::def_rule_cmd:
+			case tau_parser::def_rr_cmd:
 			case tau_parser::def_list_cmd:
 			case tau_parser::def_del_cmd:
 			case tau_parser::def_clear_cmd:

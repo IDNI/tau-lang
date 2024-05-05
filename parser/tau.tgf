@@ -131,7 +131,7 @@ out_var_name           => "o_" chars.
 tau_rule               => tau_matcher _ tau_def _ tau_body _ dot.
 tau_matcher            => tau.
 tau_body               => tau | tau_collapse_positives_cb | tau_positives_upwards_cb.
-tau_rec_relation       => tau_ref _ tau_def _ tau _ dot.
+tau_rec_relation       => tau_ref _ tau_def _ tau.
 tau_ref                => sym _ [offsets] _ tau_ref_args.
 # TODO (MEDIUM) properly deal with _ and __ to separate the arguments
 tau_ref_args           => open_parenthesis (_ tau_ref_arg)* _ close_parenthesis.
@@ -164,7 +164,7 @@ wff_body               => wff_has_clashing_subformulas_cb
                         | wff_has_subformula_cb | wff_remove_existential_cb
                         | wff_remove_bexistential_cb | wff_remove_buniversal_cb.
 wff_body               => wff.
-wff_rec_relation       => wff_ref _ wff_def _ wff _ dot.
+wff_rec_relation       => wff_ref _ wff_def _ wff.
 
 wff                    => wff_ref.
 wff                    => wff_conditional.
@@ -240,7 +240,7 @@ bf                     => variable.
 bf                     => bf_parenthesis.
 
 bf_parenthesis         => open_parenthesis _ bf _ close_parenthesis.
-bf_rec_relation        => bf_ref _ bf_def _ bf _ dot.
+bf_rec_relation        => bf_ref _ bf_def _ bf.
 bf_ref                 => sym [offsets] bf_ref_args.
 # TODO (MEDIUM) properly deal with _ and __ to separate the arguments
 bf_ref_args            => open_parenthesis (_ bf_ref_arg)* _ close_parenthesis.
@@ -349,25 +349,28 @@ builder_body           => bf_builder_body | wff_builder_body | tau_builder_body.
 bf_builder_body        => bf_builder_def _ bf.
 wff_builder_body       => wff_builder_def _ wff.
 tau_builder_body       => tau_builder_def _ tau.
+
 # main posibilities
-library                => rules.
-rules                  => (_ rule)*.
-rule                   => wff_rule | bf_rule | tau_rule.
-nso_rr                 => nso_rec_relations nso_main.
-nso_rec_relations      => (_ nso_rec_relation)*.
-nso_rec_relation       => bf_rec_relation | wff_rec_relation.
-nso_main               => _ wff _ dot.
-gssotc_rr              => gssotc_rec_relations gssotc_main.
-gssotc_rec_relations   => (_ gssotc_rec_relation)*.
-gssotc_rec_relation    => tau_rec_relation | wff_rec_relation | bf_rec_relation.
-gssotc_main            => _ tau _ semicolon.
-start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
+library                  => rules.
+rules                    => (_ rule)*.
+rule                     => wff_rule | bf_rule | tau_rule.
+nso_rr                   => nso_rec_relations nso_main.
+nso_rec_relations        => (_ nso_rec_relation)*.
+nso_rec_relation         => nso_rec_relation_form _ dot.
+nso_rec_relation_form    => (bf_rec_relation | wff_rec_relation).
+nso_main                 => _ wff _ dot.
+gssotc_rr                => gssotc_rec_relations gssotc_main.
+gssotc_rec_relations     => (_ gssotc_rec_relation)*.
+gssotc_rec_relation      => gssotc_rec_relation_form _ dot.
+gssotc_rec_relation_form => (tau_rec_relation | wff_rec_relation | bf_rec_relation).
+gssotc_main              => _ tau _ semicolon.
+start                    => (inputs | builder | library | nso_rr | gssotc_rr) _.
 
 # cli related rules, using cli as starting point for parsing
 
 # TODO do the same with the other starting points: library, inputs, builder, nso_rr, nso, gssotc, gssotc_rr...
 # depending on the use case of the grammar.
-cli                    => _ cli_command (_ dot _ cli_command)*.
+cli                    => _ cli_command _ (_ dot _ cli_command)*.
 cli_command            => help_cmd | version_cmd | quit_cmd | clear_cmd.
 cli_command            => get_cmd | set_cmd | toggle_cmd.
 cli_command            => memory_list_cmd | memory_clear_cmd | memory_print_cmd | memory_del_cmd | memory_store_cmd.
@@ -377,16 +380,16 @@ cli_command            => normalize_cmd | execute_cmd | solve_cmd
                         | dnf_cmd | cnf_cmd | anf_cmd | nnf_cmd | pnf_cmd | mnf_cmd | onf_cmd
                         | bf_substitute_cmd | wff_substitute_cmd
                         | bf_instantiate_cmd | wff_instantiate_cmd
-                        | def_rule_cmd | def_list_cmd | def_del_cmd | def_clear_cmd.
+                        | def_rr_cmd | def_list_cmd | def_del_cmd | def_clear_cmd | def_print_cmd.
 
 normalize_cmd          => normalize_cmd_sym __ normalize_cmd_arg.
 normalize_cmd_arg      => wff.
 normalize_cmd_arg      => nso_rr.
-normalize_cmd_arg      => memory | wff_selection.
+normalize_cmd_arg      => memory. # not yet | wff_selection.
 
 solve_cmd              => solve_cmd_sym __ solve_cmd_arg.
 solve_cmd_arg          => wff.
-solve_cmd_arg          => memory | wff_selection.
+solve_cmd_arg          => memory. # not yet | wff_selection.
 
 execute_cmd            => execute_cmd_sym __ execute_cmd_arg.
 execute_cmd_arg        => tau.
@@ -438,15 +441,16 @@ nnf_cmd             => nnf_cmd_sym __ nf_cmd_arg.
 pnf_cmd             => pnf_cmd_sym __ nf_cmd_arg.
 mnf_cmd             => mnf_cmd_sym __ nf_cmd_arg.
 nf_cmd_arg          => bf | wff | memory.
-onf_cmd            => onf_cmd_sym __ variable __ onf_cmd_arg.
-onf_cmd_arg        => wff | memory.
+onf_cmd             => onf_cmd_sym __ variable __ onf_cmd_arg.
+onf_cmd_arg         => wff | memory.
 
 
-def_rule_cmd           => def_cmd_sym __ def_rule_cmd_arg.
-def_rule_cmd_arg       => (bf_rec_relation | wff_rec_relation | tau_rec_relation).
-def_list_cmd           => def_cmd_sym __ def_cmd_list.
-def_del_cmd            => def_cmd_sym __ def_cmd_del __ digits.
+def_rr_cmd             => def_cmd_sym __ gssotc_rec_relation_form.
+def_list_cmd           => def_cmd_sym.
+# TODO (LOW) rename memory to repl_indx or seomthing like that
+def_del_cmd            => def_cmd_sym __ def_cmd_del __ memory.
 def_clear_cmd          => def_cmd_sym __ def_cmf_clear.
+def_print_cmd          => def_cmd_sym __ memory.
 
 help_cmd               => help_cmd_sym [ __ cli_cmd_sym ].
 version_cmd            => version_cmd_sym.
@@ -512,8 +516,7 @@ pnf_cmd_sym            => "pnf".
 mnf_cmd_sym            => "mnf".
 
 def_cmd_sym            => "def".
-def_cmd_list           => "list".
-def_cmd_del            => "del".
+def_cmd_del            => "d" | "del" | "delete".
 def_cmf_clear          => "clear".
 
 memory_clear_cmd_sym   => "c" | "clear".

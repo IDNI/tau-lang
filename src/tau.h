@@ -281,12 +281,15 @@ struct tau_splitter {
 // creates a specific rule from a generic rule.
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rec_relation<gssotc<BAs...>> make_gssotc_rec_relation(gssotc<BAs...>& rule) {
-	auto type = only_child_extractor<tau_ba<BAs...>, BAs...>(rule) | non_terminal_extractor<tau_ba<BAs...>, BAs...> | optional_value_extractor<size_t>;
+rec_relation<gssotc<BAs...>> make_gssotc_rec_relation(const gssotc<BAs...>& rule) {
+	auto rr = rule | tau_parser::gssotc_rec_relation_form
+		| only_child_extractor<tau_ba<BAs...>, BAs...>
+		| optional_value_extractor<gssotc<BAs...>>;
+	auto type = rr | non_terminal_extractor<tau_ba<BAs...>, BAs...> | optional_value_extractor<size_t>;
 	switch (type) {
-	case tau_parser::bf_rec_relation:  return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::bf_rec_relation,  tau_parser::bf_ref,  tau_parser::bf,  rule);
-	case tau_parser::wff_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::wff_rec_relation, tau_parser::wff_ref, tau_parser::wff, rule);
-	case tau_parser::tau_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::tau_rec_relation, tau_parser::tau_ref, tau_parser::tau, rule);
+	case tau_parser::bf_rec_relation:  return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::bf_ref,  tau_parser::bf,  rr);
+	case tau_parser::wff_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::wff_ref, tau_parser::wff, rr);
+	case tau_parser::tau_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::tau_ref, tau_parser::tau, rr);
 	default: assert(false); return {};
 	};
 }
@@ -294,7 +297,7 @@ rec_relation<gssotc<BAs...>> make_gssotc_rec_relation(gssotc<BAs...>& rule) {
 // create a set of relations from a given tau source.
 template<typename... BAs>
 // TODO (LOW) should depend in node_t instead of BAs...
-rec_relations<gssotc<BAs...>> make_gssotc_rec_relations(gssotc<BAs...>& tau_source) {
+rec_relations<gssotc<BAs...>> make_gssotc_rec_relations(const gssotc<BAs...>& tau_source) {
 	rec_relations<gssotc<BAs...>> rs;
 	// TODO (LOW) change call to select by operator|| and operator|
 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::gssotc_rec_relation, tau_ba<BAs...>, BAs...>))

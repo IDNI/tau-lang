@@ -59,7 +59,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -69,7 +69,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -79,7 +79,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -89,7 +89,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -99,7 +99,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -109,7 +109,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -119,7 +119,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -129,7 +129,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -139,7 +139,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -149,7 +149,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -159,7 +159,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 }
@@ -172,7 +172,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -182,7 +182,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -192,7 +192,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -202,7 +202,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -212,7 +212,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -222,7 +222,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -232,7 +232,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -242,7 +242,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -252,7 +252,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -262,7 +262,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -272,7 +272,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 }
@@ -400,7 +400,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -410,7 +410,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -420,7 +420,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -430,7 +430,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -440,7 +440,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -450,7 +450,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -460,7 +460,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -470,7 +470,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -480,7 +480,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -490,7 +490,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -500,7 +500,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::wff_rec_relation;
+		auto wff_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::wff_rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 }
@@ -513,7 +513,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -523,7 +523,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -533,7 +533,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -543,7 +543,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -553,7 +553,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -563,7 +563,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -573,7 +573,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -583,7 +583,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -593,7 +593,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -603,7 +603,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -613,7 +613,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			" T .";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::bf_rec_relation;
+		auto bf_rec_relation = frml | tau_parser::nso_rr | tau_parser::nso_rec_relations | tau_parser::nso_rec_relation | tau_parser::nso_rec_relation_form | tau_parser::bf_rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 }
