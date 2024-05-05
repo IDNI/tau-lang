@@ -933,18 +933,21 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "defines a rec. relation\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  def <TAU_RR>         defines a tau rec. relation\n"
-		<< "  def <WFF_RR>         defines a wff rec. relation\n"
-		<< "  def <BF_RR>          defines a bf rec. relation\n"
-		<< "  def                  list definitions\n"
-		<< "  def <rr_id>          print rec relation with given id\n"
-		<< "  def clear            clear all definitions\n"
-		<< "  def del <id>         delete <id> definition\n";
+		<< "  def <TAU_RR>             defines a tau rec. relation\n"
+		<< "  def <WFF_RR>             defines a wff rec. relation\n"
+		<< "  def <BF_RR>              defines a bf rec. relation\n"
+		<< "  def                      list definitions\n"
+		<< "  def <rr_id>              print rec relation with given id\n"
+		<< "  def clear                clear all definitions\n"
+		<< "  def del <definition_id>  delete <id> definition\n"
+		<< "  %<definition_id>         provides relative access to memory\n"
+		<< "  &<definition_id>         provides absolute access to memory\n";
+
 		break;
 
 	case tau_parser::examples_sym: cout
 		<< "examples\n";
-		// TODO (VERY_HIGH) show examples
+		// TODO (HIGH) show examples
 		break;
 	}
 
