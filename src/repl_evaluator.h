@@ -105,6 +105,8 @@ private:
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
 		bool silent = false);
 	void memory_store(repl_evaluator<factory_t, BAs...>::memory o);
+	std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>> get_nf_type_and_arg(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	// commands
 	void not_implemented_yet();
@@ -144,24 +146,15 @@ private:
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_wff(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_onf_cmd(
+	std::optional<nso<tau_ba<BAs...>, BAs...>> onf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_dnf_cmd(
+	std::optional<nso<tau_ba<BAs...>, BAs...>> dnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_cnf_cmd(
+	std::optional<nso<tau_ba<BAs...>, BAs...>> cnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_nnf_cmd(
+	std::optional<nso<tau_ba<BAs...>, BAs...>> nnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_mnf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_dnf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_cnf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_nnf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_mnf_cmd(
+	std::optional<nso<tau_ba<BAs...>, BAs...>> mnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_substitute_cmd(
