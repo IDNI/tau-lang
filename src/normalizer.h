@@ -640,6 +640,8 @@ nso<BAs...> operator|(const nso<BAs...>& n, const to_mnf_wff<BAs...>& r) {
 template<typename...BAs>
 struct reduce_bf {
 
+	using vars = std::vector<nso<BAs...>>;
+
 	nso<BAs...> operator()(const nso<BAs...>& n) {
 		auto form = n;
 		for (auto& var: select_all(form, is_non_terminal<tau_parser::var, BAs...>)) {
@@ -651,22 +653,25 @@ struct reduce_bf {
 
 private:
 
-	nso<BAs...> split_using_var(const nso<BAs...>& var, const nso<BAs...>& form) {
+	nso<BAs...> split_using_var(const vars& var, const nso<BAs...>& form) {
 		auto a = replace(form, { {var, trim(_0<BAs...>)} });
 		auto b = replace(form, { {var, trim(_1<BAs...>)}});
 		return std::make_pair(a, b);
+	}
+
+	std::pair<nso<BAs...>, vars> split_vars(const vars& vs) {
+		vars rest(vs.begin(), vs.end() - 1);
+		return { vs.back(), rest };
 	}
 
 	nso<BAs...> are_equivalent(const nso<BAs...>& a, const nso<BAs...>& b) {
 		return bf_to_bdd(a) == bf_to_bdd(b);
 	}
 
-	nso<BAs...> bf_to_bdd(const std::vector<nso<BAs...>>& vars, const nso<BAs...>& form) {
-		if (vars.empty()) return form | repeat_all(apply_cb<BAs...>);
-		auto var = vars.back();
-		std::vector<nso<BAs...>> rest(vars.begin(), vars.end() - 1);
-		auto a = replace(form, { {var, trinm(_0<BAs...>)}});
-		auto b = replace(form, { {var, trim(_1<BAs...>)}});
+	nso<BAs...> bf_to_bdd(const vars& vs, const nso<BAs...>& form) {
+		if (vs.empty()) return form | repeat_all(apply_cb<BAs...>);
+		auto [var, rest] = split_vars(vs);
+		auto [a, b] = split_using_var(var, form);
 		auto a_bdd = bf_to_bdd(rest, a);
 		auto b_bdd = bf_to_bdd(rest, b);
 		return build_xor_bdd(
