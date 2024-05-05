@@ -1871,21 +1871,15 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::solve_cmd,                        50 },
 			{ tau_parser::bf_instantiate_cmd,               50 },
 			{ tau_parser::bf_substitute_cmd,                50 },
-			{ tau_parser::bf_dnf_cmd,                       50 },
-			{ tau_parser::bf_cnf_cmd,                       50 },
-			{ tau_parser::bf_anf_cmd,                       50 },
-			{ tau_parser::bf_nnf_cmd,                       50 },
-			{ tau_parser::bf_pnf_cmd,                       50 },
-			{ tau_parser::bf_mnf_cmd,                       50 },
+			{ tau_parser::dnf_cmd,                          50 },
+			{ tau_parser::cnf_cmd,                          50 },
+			{ tau_parser::anf_cmd,                          50 },
+			{ tau_parser::nnf_cmd,                          50 },
+			{ tau_parser::pnf_cmd,                          50 },
+			{ tau_parser::mnf_cmd,                          50 },
+			{ tau_parser::onf_cmd,                          50 },
 			{ tau_parser::wff_instantiate_cmd,              50 },
 			{ tau_parser::wff_substitute_cmd,               50 },
-			{ tau_parser::wff_onf_cmd,                      50 },
-			{ tau_parser::wff_dnf_cmd,                      50 },
-			{ tau_parser::wff_cnf_cmd,                      50 },
-			{ tau_parser::wff_anf_cmd,                      50 },
-			{ tau_parser::wff_nnf_cmd,                      50 },
-			{ tau_parser::wff_pnf_cmd,                      50 },
-			{ tau_parser::wff_mnf_cmd,                      50 },
 			{ tau_parser::def_rule_cmd,                     50 },
 			{ tau_parser::def_list_cmd,                     50 },
 			{ tau_parser::def_del_cmd,                      50 },
@@ -2073,21 +2067,15 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::solve_cmd:
 			case tau_parser::bf_instantiate_cmd:
 			case tau_parser::bf_substitute_cmd:
-			case tau_parser::bf_dnf_cmd:
-			case tau_parser::bf_cnf_cmd:
-			case tau_parser::bf_anf_cmd:
-			case tau_parser::bf_nnf_cmd:
-			case tau_parser::bf_pnf_cmd:
-			case tau_parser::bf_mnf_cmd:
+			case tau_parser::dnf_cmd:
+			case tau_parser::cnf_cmd:
+			case tau_parser::anf_cmd:
+			case tau_parser::nnf_cmd:
+			case tau_parser::pnf_cmd:
+			case tau_parser::mnf_cmd:
+			case tau_parser::onf_cmd:
 			case tau_parser::wff_instantiate_cmd:
 			case tau_parser::wff_substitute_cmd:
-			case tau_parser::wff_onf_cmd:
-			case tau_parser::wff_dnf_cmd:
-			case tau_parser::wff_cnf_cmd:
-			case tau_parser::wff_anf_cmd:
-			case tau_parser::wff_nnf_cmd:
-			case tau_parser::wff_pnf_cmd:
-			case tau_parser::wff_mnf_cmd:
 			case tau_parser::def_rule_cmd:
 			case tau_parser::def_list_cmd:
 			case tau_parser::def_del_cmd:

@@ -374,10 +374,7 @@ cli_command            => memory_list_cmd | memory_clear_cmd | memory_print_cmd 
 cli_command            => file.
 cli_command            => normalize_cmd | execute_cmd | solve_cmd
                         | is_satisfiable_cmd | is_valid_cmd | is_unsatisfiable_cmd
-                        | bf_dnf_cmd | bf_cnf_cmd | bf_anf_cmd
-                        | bf_nnf_cmd | bf_pnf_cmd | bf_mnf_cmd
-                        | wff_onf_cmd | wff_dnf_cmd | wff_cnf_cmd
-                        | wff_anf_cmd | wff_nnf_cmd | wff_pnf_cmd | wff_mnf_cmd
+                        | dnf_cmd | cnf_cmd | anf_cmd | nnf_cmd | pnf_cmd | mnf_cmd | onf_cmd
                         | bf_substitute_cmd | wff_substitute_cmd
                         | bf_instantiate_cmd | wff_instantiate_cmd
                         | def_rule_cmd | def_list_cmd | def_del_cmd | def_clear_cmd.
@@ -434,19 +431,16 @@ wff_substitute_cmd     => substitutecmd__sym __
                           (memory | wff_selection)
                           # nso_rr or memory or selection where to substitute
                           (wff_selection | memory).
-bf_dnf_cmd             => dnf_cmd_sym __ (bf | memory | bf_selection).
-bf_cnf_cmd             => cnf_cmd_sym __ (bf | memory | bf_selection).
-bf_anf_cmd             => anf_cmd_sym __ (bf | memory | bf_selection).
-bf_nnf_cmd             => nnf_cmd_sym __ (bf | memory | bf_selection).
-bf_pnf_cmd             => pnf_cmd_sym __ (bf | memory | bf_selection).
-bf_mnf_cmd             => mnf_cmd_sym __ (bf | memory | bf_selection).
-wff_onf_cmd            => onf_cmd_sym __ variable __ (wff | memory | wff_selection).
-wff_dnf_cmd            => dnf_cmd_sym __ (wff | memory | wff_selection).
-wff_cnf_cmd            => cnf_cmd_sym __ (wff | memory | wff_selection).
-wff_anf_cmd            => anf_cmd_sym __ (wff | memory | wff_selection).
-wff_nnf_cmd            => nnf_cmd_sym __ (wff | memory | wff_selection).
-wff_pnf_cmd            => pnf_cmd_sym __ (wff | memory | wff_selection).
-wff_mnf_cmd            => mnf_cmd_sym __ (wff | memory | wff_selection).
+dnf_cmd             => dnf_cmd_sym __ nf_cmd_arg.
+cnf_cmd             => cnf_cmd_sym __ nf_cmd_arg.
+anf_cmd             => anf_cmd_sym __ nf_cmd_arg.
+nnf_cmd             => nnf_cmd_sym __ nf_cmd_arg.
+pnf_cmd             => pnf_cmd_sym __ nf_cmd_arg.
+mnf_cmd             => mnf_cmd_sym __ nf_cmd_arg.
+nf_cmd_arg          => bf | wff | memory.
+onf_cmd            => onf_cmd_sym __ variable __ onf_cmd_arg.
+onf_cmd_arg        => wff | memory.
+
 
 def_rule_cmd           => def_cmd_sym __ def_rule_cmd_arg.
 def_rule_cmd_arg       => (bf_rec_relation | wff_rec_relation | tau_rec_relation).
