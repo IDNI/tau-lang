@@ -349,32 +349,28 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::normalizer_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto arg = n | tau_parser::normalize_cmd_arg;
-	if (auto wff = arg | tau_parser::wff; wff) {
-		rr<gssotc<BAs...>> rr_wff = { definitions, wff.value() };
-		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
-		return result;
-	} else if (auto nso_rr = arg | tau_parser::nso_rr; nso_rr) {
-		auto n_nso_rr = make_nso_rr_using_factory<
-			factory_t, tau_ba<BAs...>, BAs...>(
-				arg.value(), factory);
-		rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs;
-		rrs.insert(rrs.end(), n_nso_rr.rec_relations.begin(), n_nso_rr.rec_relations.end());
-		rrs.insert(rrs.end(), definitions.begin(), definitions.end());
-		rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = { rrs, n_nso_rr.main };
-		auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
-		return result;
-	} else if (auto memory = arg | tau_parser::memory; memory) {
-		auto ref = memory_retrieve(memory.value());
-		if (ref) {
-			auto [value, _] = ref.value();
-			rr<gssotc<BAs...>> rr_memory = { definitions, value };
-			auto result = normalizer<tau_ba<BAs...>, BAs...>(rr_memory);
-			return result;
+	auto arg = n | tau_parser::normalize_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
+		switch (type) {
+		case tau_parser::wff: {
+			rr<gssotc<BAs...>> rr_wff = { definitions, value };
+			auto result_wff = normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
+			return result_wff;
 		}
-		return {};
+		case tau_parser::nso_rr: {
+			auto n_nso_rr = make_nso_rr_using_factory<factory_t, tau_ba<BAs...>, BAs...>(
+				value, factory);
+			rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs;
+			rrs.insert(rrs.end(), n_nso_rr.rec_relations.begin(), n_nso_rr.rec_relations.end());
+			rrs.insert(rrs.end(), definitions.begin(), definitions.end());
+			rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = { rrs, n_nso_rr.main };
+			auto result_nso_rr = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
+			return result_nso_rr;
+		}}
 	}
-	return arg;
+	cout << "error: invalid argument\n";
+	return {};
 }
 
 template <typename factory_t, typename... BAs>
