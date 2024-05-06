@@ -155,6 +155,13 @@ static auto apply_defs = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto apply_bf_defs = make_library<BAs...>(
+	BF_DEF_XOR
+	+ WFF_DEF_BEX_0
+	+ WFF_DEF_BALL_0
+);
+
+template<typename... BAs>
 static auto apply_defs_once = make_library<BAs...>(
 	// wff defs
 	BF_DEF_LESS_EQUAL
@@ -609,6 +616,7 @@ nso<BAs...> to_mnf(const nso<BAs...>& form) {
 template<tau_parser::nonterminal type, typename... BAs>
 struct to_mnfs {
 
+	// TODO (VERY_HIGH) properly implement it
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		// for all type dnfs do...
