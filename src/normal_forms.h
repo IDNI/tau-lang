@@ -127,7 +127,12 @@ nso<BAs...> dnf(const nso<BAs...>& n) {
 			to_dnf_wff<BAs...>));
 	else return n
 		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-			to_dnf_bf<BAs...>));
+			apply_bf_defs<BAs...>))
+		| repeat_all<step<BAs...>, BAs...>(
+			bf_elim_quantifiers<BAs...>
+			| to_dnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>);
 }
 
 template<size_t type, typename...BAs>
@@ -137,7 +142,12 @@ nso<BAs...> cnf(const nso<BAs...>& n) {
 			to_cnf_wff<BAs...>));
 	else return n
 		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-			to_cnf_bf<BAs...>));
+			apply_bf_defs<BAs...>))
+		| repeat_all<step<BAs...>, BAs...>(
+			bf_elim_quantifiers<BAs...>
+			| to_cnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>);
 }
 
 template<size_t type, typename...BAs>
@@ -154,9 +164,14 @@ nso<BAs...> nnf(const nso<BAs...>& n) {
 			step<BAs...>(to_nnf_wff<BAs...>)
 		);
 	else
-		return n | repeat_each<step<BAs...>, BAs...>(
-			step<BAs...>(to_nnf_bf<BAs...>)
-		);
+		return n
+			| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
+				apply_bf_defs<BAs...>))
+			| repeat_all<step<BAs...>, BAs...>(
+				bf_elim_quantifiers<BAs...>
+				| simplify_bf<BAs...>
+				| apply_cb<BAs...>
+				| to_nnf_bf<BAs...>);
 }
 
 template<size_t type, typename...BAs>
@@ -169,10 +184,19 @@ nso<BAs...> pnf(const nso<BAs...>& n) {
 template<size_t type, typename...BAs>
 nso<BAs...> mnf(const nso<BAs...>& n) {
 	if constexpr (type == tau_parser::wff)
+		// call mnf_wff
 		return n | repeat_each<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
 			| to_mnf_wff<BAs...>();
 	else
-		return n | repeat_each<step<BAs...>, BAs...>(to_dnf_bf<BAs...>)
+		return n
+			| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
+				apply_bf_defs<BAs...>))
+			| repeat_all<step<BAs...>, BAs...>(
+				bf_elim_quantifiers<BAs...>
+				| to_dnf_bf<BAs...>
+				| simplify_bf<BAs...>
+				| apply_cb<BAs...>
+				| simplify_bf<BAs...>)
 			| to_mnf_bf<BAs...>();
 }
 
