@@ -359,8 +359,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			return result_wff;
 		}
 		case tau_parser::nso_rr: {
-			auto n_nso_rr = make_nso_rr_using_factory<factory_t, tau_ba<BAs...>, BAs...>(
-				value, factory);
+			auto n_nso_rr = make_nso_rr_from_binded_code<tau_ba<BAs...>, BAs...>(value);
 			rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs;
 			rrs.insert(rrs.end(), n_nso_rr.rec_relations.begin(), n_nso_rr.rec_relations.end());
 			rrs.insert(rrs.end(), definitions.begin(), definitions.end());

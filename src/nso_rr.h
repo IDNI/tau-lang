@@ -967,13 +967,19 @@ sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code,
 	return bind_tau_code_using_binder<factory_binder<factory_t, BAs...>, BAs...>(code, fb);
 }
 
+// make a nso_rr from the given tau code
+template<typename... BAs>
+rr<nso<BAs...>> make_nso_rr_from_binded_code(sp_tau_node<BAs...>& code) {
+	auto main = code | tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto rules = make_rec_relations<BAs...>(code);
+	return { rules, main };
+}
+
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_binder(const sp_tau_node<BAs...>& code, binder_t& binder) {
 	auto binded = bind_tau_code_using_binder<binder_t, BAs...>(code, binder);
-	auto main = binded | tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
-	auto rules = make_rec_relations<BAs...>(binded);
-	return { rules, main };
+	return make_nso_rr_from_binded_code<BAs...>(binded);
 }
 
 // make a nso_rr from the given tau source and binder.
