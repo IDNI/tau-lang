@@ -155,6 +155,14 @@ static auto apply_defs = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto apply_wff_defs = make_library<BAs...>(
+	WFF_DEF_XOR
+	+ WFF_DEF_CONDITIONAL
+	+ WFF_DEF_IMPLY
+	+ WFF_DEF_EQUIV
+);
+
+template<typename... BAs>
 static auto apply_bf_defs = make_library<BAs...>(
 	BF_DEF_XOR
 	+ WFF_DEF_BEX_0
@@ -592,11 +600,11 @@ nso<BAs...> build_dnf_from_clauses(const std::set<nso<BAs...>>& clauses) {
 			return _F<BAs...>;
 		}
 	}
-	if (clauses.size() == 1) return *clauses.begin();
 	auto dnf = *clauses.begin();
-	for (auto& clause: clauses)
-		if constexpr (type == tau_parser::bf) dnf = build_bf_or(dnf, clause);
-		else dnf = build_wff_or(dnf, clause);
+	auto it = ++clauses.begin();
+	for (; it != clauses.end(); ++it)
+		if constexpr (type == tau_parser::bf) dnf = build_bf_or(dnf, *it);
+		else dnf = build_wff_or(dnf, *it);
 
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << dnf;
 	return dnf;

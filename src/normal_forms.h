@@ -68,21 +68,6 @@ static auto to_nnf_bf = make_library<BAs...>(
 );
 
 template<typename...BAs>
-nso<BAs...> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
-	auto pred = [&var](const auto& n) {
-		if (auto check = n | tau_parser::wff_ex | tau_parser::variable; check.has_value()) {
-			return (var == check.value());
-		}
-		return false;
-	};
-	if (auto quantifier = find_bottom(n, pred); quantifier.has_value()) {
-		auto sub_formula = quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>>;
-		return onf_subformula(sub_formula, var);
-	}
-	return n;
-}
-
-template<typename...BAs>
 nso<BAs...> onf_subformula(const nso<BAs...>& n, const nso<BAs...>& var) {
 	auto eq = find_bottom(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
 	std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0<BAs...>}};
@@ -120,32 +105,76 @@ nso<BAs...> onf_subformula(const nso<BAs...>& n, const nso<BAs...>& var) {
 	return replace(n, changes) | repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>);
 }
 
+template<typename...BAs>
+nso<BAs...> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
+	auto pred = [&var](const auto& n) {
+		if (auto check = n | tau_parser::wff_ex | tau_parser::variable; check.has_value()) {
+			return (var == check.value());
+		}
+		return false;
+	};
+	if (auto quantifier = find_bottom(n, pred); quantifier.has_value()) {
+		auto sub_formula = quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>>;
+		return onf_subformula(sub_formula, var);
+	}
+	return n;
+}
+
 template<size_t type, typename...BAs>
 nso<BAs...> dnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff) return n
-		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-			to_dnf_wff<BAs...>));
-	else return n
-		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-			apply_bf_defs<BAs...>))
+	if constexpr (type == tau_parser::wff) {
+		auto quantified = [](const auto& n) -> bool {
+			return (n | tau_parser::wff_ex).has_value() || (n | tau_parser::wff_all).has_value();
+		};
+		auto quantifier = find_bottom(n, quantified);
+		auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+		auto nform = apply_once_definitions(nn)
+			| repeat_each<step<BAs...>, BAs...>(
+				apply_wff_defs<BAs...>
+				| to_dnf_wff<BAs...>
+				| simplify_wff<BAs...>
+				| bf_positives_upwards<BAs...>
+				| squeeze_positives<BAs...>
+				| trivialities<BAs...>
+			);
+		// finally, we also simplify the bf part of the formula
+		return dnf<tau_parser::bf>(nform);
+	} else return n
 		| repeat_all<step<BAs...>, BAs...>(
-			bf_elim_quantifiers<BAs...>
-			| to_dnf_bf<BAs...>
+			apply_bf_defs<BAs...>
+			| bf_elim_quantifiers<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		| to_mnf_bf<BAs...>();
 }
 
 template<size_t type, typename...BAs>
 nso<BAs...> cnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff) return n
-		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-			to_cnf_wff<BAs...>));
-	else return n
-		| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-			apply_bf_defs<BAs...>))
+	if constexpr (type == tau_parser::wff) {
+		auto quantified = [](const auto& n) -> bool {
+			return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
+		};
+		auto quantifier = find_bottom(n, quantified);
+		auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+		auto nform = apply_once_definitions(nn)
+			| repeat_each<step<BAs...>, BAs...>(
+				apply_wff_defs<BAs...>
+				| to_cnf_wff<BAs...>
+				| simplify_wff<BAs...>
+				| bf_positives_upwards<BAs...>
+				| squeeze_positives<BAs...>
+				| trivialities<BAs...>
+			);
+		// finally, we also simplify the bf part of the formula
+		return cnf<tau_parser::bf>(nform);
+	} else return n
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_bf_defs<BAs...>
+			| bf_elim_quantifiers<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
-			bf_elim_quantifiers<BAs...>
-			| to_cnf_bf<BAs...>
+			to_cnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>);
 }
@@ -159,19 +188,32 @@ nso<BAs...> anf(const nso<BAs...>& n) {
 
 template<size_t type, typename...BAs>
 nso<BAs...> nnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff)
-		return n | repeat_each<step<BAs...>, BAs...>(
-			step<BAs...>(to_nnf_wff<BAs...>)
-		);
-	else
+	if constexpr (type == tau_parser::wff) {
+		auto quantified = [](const auto& n) -> bool {
+			return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
+		};
+		auto quantifier = find_bottom(n, quantified);
+		auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+		auto nform = apply_once_definitions(nn)
+			| repeat_each<step<BAs...>, BAs...>(
+				apply_wff_defs<BAs...>
+				| to_nnf_wff<BAs...>
+				| simplify_wff<BAs...>
+				| bf_positives_upwards<BAs...>
+				| squeeze_positives<BAs...>
+				| trivialities<BAs...>
+			);
+		// finally, we also simplify the bf part of the formula
+		return nnf<tau_parser::bf>(nform);
+	} else
 		return n
-			| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-				apply_bf_defs<BAs...>))
+			| repeat_each<step<BAs...>, BAs...>(
+				apply_bf_defs<BAs...>
+				| bf_elim_quantifiers<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
-				bf_elim_quantifiers<BAs...>
+				to_nnf_bf<BAs...>
 				| simplify_bf<BAs...>
-				| apply_cb<BAs...>
-				| to_nnf_bf<BAs...>);
+				| apply_cb<BAs...>);
 }
 
 template<size_t type, typename...BAs>
@@ -189,15 +231,13 @@ nso<BAs...> mnf(const nso<BAs...>& n) {
 			| to_mnf_wff<BAs...>();
 	else
 		return n
-			| repeat_each<step<BAs...>, BAs...>(step<BAs...>(
-				apply_bf_defs<BAs...>))
+			| repeat_each<step<BAs...>, BAs...>(
+				apply_bf_defs<BAs...>
+				| bf_elim_quantifiers<BAs...>)
 			| repeat_all<step<BAs...>, BAs...>(
-				bf_elim_quantifiers<BAs...>
-				| to_dnf_bf<BAs...>
+				to_dnf_bf<BAs...>
 				| simplify_bf<BAs...>
-				| apply_cb<BAs...>
-				| simplify_bf<BAs...>)
-			| to_mnf_bf<BAs...>();
+				| apply_cb<BAs...>);
 }
 
 } // namespace idni::tau
