@@ -48,6 +48,11 @@ CMakeCache.txt
 *.cmake
 *.nocmake
 !cmake/*
+!tests/repl/commands/*
+!tests/repl/execution/*
+!tests/repl/normal_forms/*
+!tests/repl/normalizer/*
+!tests/repl/satisfiability/*
 src/doctest.h
 Testing
 
