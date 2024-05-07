@@ -155,6 +155,14 @@ static auto apply_defs = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto apply_wff_defs = make_library<BAs...>(
+	WFF_DEF_XOR
+	+ WFF_DEF_CONDITIONAL
+	+ WFF_DEF_IMPLY
+	+ WFF_DEF_EQUIV
+);
+
+template<typename... BAs>
 static auto apply_bf_defs = make_library<BAs...>(
 	BF_DEF_XOR
 	+ WFF_DEF_BEX_0
