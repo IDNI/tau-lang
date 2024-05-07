@@ -27,7 +27,7 @@ struct tau_parser {
 	using decoder_type    = parser_type::input::decoder_type;
 	using encoder_type    = std::function<std::basic_string<char_type>(
 			const std::vector<terminal_type>&)>;
-	tau_parser() :
+ static tau_parser& instance() { static tau_parser i; return i; }	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
 		g(nts, load_prods(), nt(258), cc, load_grammar_opts()),
 		p(g, load_opts()) {}
@@ -1015,8 +1015,8 @@ private:
 		q(nt(263), (nul));
 		//       __E_cli_54(263)      => __E_cli_53(262) __E_cli_54(263).
 		q(nt(263), (nt(262)+nt(263)));
-		//       cli(260)             => _(9) cli_command(261) __E_cli_54(263).
-		q(nt(260), (nt(9)+nt(261)+nt(263)));
+		//       cli(260)             => _(9) cli_command(261) _(9) __E_cli_54(263).
+		q(nt(260), (nt(9)+nt(261)+nt(9)+nt(263)));
 		//       cli_command(261)     => help_cmd(264).
 		q(nt(261), (nt(264)));
 		//       cli_command(261)     => version_cmd(265).
@@ -1093,6 +1093,8 @@ private:
 		q(nt(300), (nt(16)));
 		//       normalize_cmd_arg(300) => nso_rr(242).
 		q(nt(300), (nt(242)));
+		//       normalize_cmd_arg(300) => bf(14).
+		q(nt(300), (nt(14)));
 		//       normalize_cmd_arg(300) => memory(301).
 		q(nt(300), (nt(301)));
 		//       solve_cmd(279)       => solve_cmd_sym(302) __(10) solve_cmd_arg(303).

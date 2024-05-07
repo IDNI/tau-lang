@@ -367,7 +367,15 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = { rrs, n_nso_rr.main };
 			auto result_nso_rr = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
 			return result_nso_rr;
-		}}
+		}
+		case tau_parser::bf: {
+			if(!check_no_rec_relations_present(value)) {
+				cout << "error: Boolean function must not contain a recurrence relation\n";
+				return {};
+			}
+			return bf_normalizer(value);
+		}
+		}
 	}
 	cout << "error: invalid argument\n";
 	return {};
