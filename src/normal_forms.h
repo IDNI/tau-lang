@@ -146,7 +146,8 @@ nso<BAs...> dnf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		| to_mnf_bf<BAs...>();
 }
 
 template<size_t type, typename...BAs>
