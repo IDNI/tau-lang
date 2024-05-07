@@ -757,17 +757,17 @@ template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
 template<typename... BAs>
-nso<BAs...> apply_definitions(const nso<BAs...>& form) {
+nso<BAs...> apply_once_definitions(const nso<BAs...>& form) {
 	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
 }
 
 template<typename... BAs>
-rr<nso<BAs...>> apply_definitions(const rr<nso<BAs...>>& nso_rr) {
-	auto nmain = apply_definitions(nso_rr.main);
+rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
+	auto nmain = apply_once_definitions(nso_rr.main);
 	rec_relations<nso<BAs...>> nrec_relations;
 	for (const auto& r : nso_rr.rec_relations) {
 		auto [matcher, body] = r;
-		nrec_relations.emplace_back(matcher, apply_definitions(body));
+		nrec_relations.emplace_back(matcher, apply_once_definitions(body));
 	}
 	return { nrec_relations, nmain };
 }
@@ -945,7 +945,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer";
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions";
 
-	auto applied_defs = apply_definitions(nso_rr);
+	auto applied_defs = apply_once_definitions(nso_rr);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << applied_defs;
