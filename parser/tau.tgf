@@ -385,6 +385,7 @@ cli_command            => normalize_cmd | execute_cmd | solve_cmd
 normalize_cmd          => normalize_cmd_sym __ normalize_cmd_arg.
 normalize_cmd_arg      => wff.
 normalize_cmd_arg      => nso_rr.
+normalize_cmd_arg      => bf.
 normalize_cmd_arg      => memory. # not yet | wff_selection.
 
 solve_cmd              => solve_cmd_sym __ solve_cmd_arg.

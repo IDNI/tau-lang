@@ -16,6 +16,7 @@
 
 #include <string>
 #include <optional>
+#include <boost/type.hpp>
 #include <boost/log/trivial.hpp>
 
 #include "parser.h"
@@ -943,6 +944,23 @@ nso<BAs...> build_main_step(const nso<BAs...>& form, size_t step) {
 		changes[shift.value()] = nshift;
 	}
 	return replace<nso<BAs...>>(form, changes);
+}
+
+// Normalizes a Boolean function having no recurrance relation
+template<typename... BAs>
+nso<BAs...> bf_normalizer (const nso<BAs...>& bf) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
+
+	auto result = bf | repeat_once<step<BAs...>, BAs...>(make_library<BAs...>(BF_DEF_XOR))
+			 | repeat_all<step<BAs...>, BAs...>(
+		              bf_elim_quantifiers<BAs...>
+		              | to_dnf_bf<BAs...>
+		              | simplify_bf<BAs...>
+		              | apply_cb<BAs...>);
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
+
+	return result;
 }
 
 // REVIEW (HIGH) review overall execution
