@@ -22,6 +22,7 @@
 #include "term_colors.h"
 #include "satisfiability.h"
 #include "solver.h"
+#include "repl_checks.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
