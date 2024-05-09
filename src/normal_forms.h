@@ -77,7 +77,6 @@ RULE(WFF_PUSH_NEGATION_INWARDS_1, "!($X || $Y) ::= ! $X && !$Y.")
 RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
 RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
-RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
 RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
 RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
@@ -95,15 +94,14 @@ RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
 RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
 RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
 
-// wff definitions of xor, ->, <- and <->.
+// wff definitions
 RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !$Y || !$X && $Y.")
 RULE(WFF_DEF_CONDITIONAL, "$X ? $Y : $Z ::= ($X -> $Y) && (!$X -> $Z).")
 RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !$X || $Y.")
 RULE(WFF_DEF_EQUIV, "$X <-> $Y ::= ($X -> $Y) && ($Y -> $X).")
 RULE(WFF_DEF_BEX_0, "bool_ex $X $Y ::= wff_remove_bexistential_cb $X $Y T F.")
 RULE(WFF_DEF_BALL_0, "bool_all $X $Y ::=  wff_remove_buniversal_cb $X $Y T F.")
-
-// additional wff dewfinitions (include wff formulas)
+// additional wff definitions (include wff formulas)
 RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & $Y' = 0.")
 RULE(BF_DEF_LESS, "$X < $Y ::= $X & $Y' = 0 && $X + $Y' != 0.")
 RULE(BF_DEF_GREATER, "$X > $Y ::= $X & $Y' != 0 || $X + $Y' = 0.")
@@ -115,35 +113,31 @@ RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
 RULE(BF_CALLBACK_EQ, "{ $X } = 0 ::= bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
 RULE(BF_CALLBACK_NEQ, "{ $X } != 0 ::= bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
 
+// trivialities
 RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
 RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
 RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
 RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
 
-RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "$X != 0 && $Y  = 0 && $Z != 0 ::= $Y = 0 && $X != 0 && $Z != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "$X != 0 && $Y != 0 && $Z  = 0 ::= $Z = 0 && $X != 0 && $Y != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "$Z != 0 && $X  = 0 && $Y != 0 ::= $X = 0 && $Z != 0 && $Y != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "$Z != 0 && $X != 0 && $Y  = 0 ::= $Z != 0 && $Y = 0 && $X != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "$X != 0 && $Y  = 0 ::= $Y = 0 && $X != 0.")
-
-// conjunctive normal form
+// bf conjunctive normal form
 RULE(BF_TO_CNF_0, "$X & $Y | $Z := ($X | $Z) & ($Y | $Z).")
 RULE(BF_TO_CNF_1, "$X | $Y & $Z := ($X | $Y) & ($X | $Z).")
+// wff conjunctive normal form
 RULE(WFF_TO_CNF_0, "$X && $Y || $Z ::= ($X || $Z) && ($Y || $Z).")
 RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
 
 RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != $Y ::= !($X = $Y).")
-
 RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
-RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 
-// tau rules
-RULE(TAU_DISTRIBUTE_0, "($X ||| $Y) &&& $Z :::= $X &&& $Z ||| $Y &&& $Z.")
-RULE(TAU_DISTRIBUTE_1, "$X &&& ($Y ||| $Z) :::= $X &&& $Y ||| $X &&& $Z.")
+// tau rules to dnf
+RULE(TAU_TO_DNF_0, "($X ||| $Y) &&& $Z :::= $X &&& $Z ||| $Y &&& $Z.")
+RULE(TAU_TO_DNF_1, "$X &&& ($Y ||| $Z) :::= $X &&& $Y ||| $X &&& $Z.")
 RULE(TAU_PUSH_NEGATION_INWARDS_0, "!!! ($X &&& $Y) :::= !!! $X ||| !!! $Y.")
 RULE(TAU_PUSH_NEGATION_INWARDS_1, "!!! ($X ||| $Y) :::= !!! $X &&& !!! $Y.")
 RULE(TAU_ELIM_DOUBLE_NEGATION_0, "!!! !!! $X :::=  $X.")
 RULE(TAU_SIMPLIFY_ONE_0, "{T} ||| $X :::= {T}.")
+
+// tau simplifications
 RULE(TAU_SIMPLIFY_ONE_1, "$X ||| {T} :::= {T}.")
 RULE(TAU_SIMPLIFY_ONE_2, "{T} &&& $X :::= $X.")
 RULE(TAU_SIMPLIFY_ONE_3, "$X &&& {T} :::= $X.")
@@ -159,41 +153,6 @@ RULE(TAU_SIMPLIFY_SELF_2, "$X &&& !!! $X :::= {F}.")
 RULE(TAU_SIMPLIFY_SELF_3, "$X ||| !!! $X :::= {T}.")
 RULE(TAU_SIMPLIFY_SELF_4, "!!! $X &&& $X :::= {F}.")
 RULE(TAU_SIMPLIFY_SELF_5, "!!! $X ||| $X :::= {T}.")
-
-template<typename... BAs>
-static auto bf_elim_quantifiers = make_library<BAs...>(
-	BF_FUNCTIONAL_QUANTIFIERS_0
-	+ BF_FUNCTIONAL_QUANTIFIERS_1
-);
-
-template<typename... BAs>
-static auto to_dnf_tau = make_library<BAs...>(
-	TAU_DISTRIBUTE_0
-	+ TAU_DISTRIBUTE_1
-	+ TAU_PUSH_NEGATION_INWARDS_0
-	+ TAU_PUSH_NEGATION_INWARDS_1
-	+ TAU_ELIM_DOUBLE_NEGATION_0
-);
-
-template<typename... BAs>
-static auto simplify_tau = make_library<BAs...>(
-	TAU_SIMPLIFY_ONE_0
-	+ TAU_SIMPLIFY_ONE_1
-	+ TAU_SIMPLIFY_ONE_2
-	+ TAU_SIMPLIFY_ONE_3
-	+ TAU_SIMPLIFY_ONE_4
-	+ TAU_SIMPLIFY_ZERO_0
-	+ TAU_SIMPLIFY_ZERO_1
-	+ TAU_SIMPLIFY_ZERO_2
-	+ TAU_SIMPLIFY_ZERO_3
-	+ TAU_SIMPLIFY_ZERO_4
-	+ TAU_SIMPLIFY_SELF_0
-	+ TAU_SIMPLIFY_SELF_1
-	+ TAU_SIMPLIFY_SELF_2
-	+ TAU_SIMPLIFY_SELF_3
-	+ TAU_SIMPLIFY_SELF_4
-	+ TAU_SIMPLIFY_SELF_5
-);
 
 template<typename... BAs>
 // TODO (LOW) rename library with rwsys or another name
@@ -234,6 +193,23 @@ static auto apply_defs_once = make_library<BAs...>(
 	+ BF_DEF_NEQ
 );
 
+template<typename... BAs>
+static auto to_dnf_bf = make_library<BAs...>(
+	BF_TO_DNF_0
+	+ BF_TO_DNF_1
+	+ BF_PUSH_NEGATION_INWARDS_0
+	+ BF_PUSH_NEGATION_INWARDS_1
+	+ BF_ELIM_DOUBLE_NEGATION_0
+);
+
+template<typename... BAs>
+static auto to_dnf_tau = make_library<BAs...>(
+	TAU_TO_DNF_0
+	+ TAU_TO_DNF_1
+	+ TAU_PUSH_NEGATION_INWARDS_0
+	+ TAU_PUSH_NEGATION_INWARDS_1
+	+ TAU_ELIM_DOUBLE_NEGATION_0
+);
 
 template<typename... BAs>
 static auto to_dnf_wff = make_library<BAs...>(
@@ -244,15 +220,6 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_ELIM_DOUBLE_NEGATION_0
-);
-
-template<typename... BAs>
-static auto to_dnf_bf = make_library<BAs...>(
-	BF_TO_DNF_0
-	+ BF_TO_DNF_1
-	+ BF_PUSH_NEGATION_INWARDS_0
-	+ BF_PUSH_NEGATION_INWARDS_1
-	+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -296,6 +263,26 @@ static auto simplify_wff = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto simplify_tau = make_library<BAs...>(
+	TAU_SIMPLIFY_ONE_0
+	+ TAU_SIMPLIFY_ONE_1
+	+ TAU_SIMPLIFY_ONE_2
+	+ TAU_SIMPLIFY_ONE_3
+	+ TAU_SIMPLIFY_ONE_4
+	+ TAU_SIMPLIFY_ZERO_0
+	+ TAU_SIMPLIFY_ZERO_1
+	+ TAU_SIMPLIFY_ZERO_2
+	+ TAU_SIMPLIFY_ZERO_3
+	+ TAU_SIMPLIFY_ZERO_4
+	+ TAU_SIMPLIFY_SELF_0
+	+ TAU_SIMPLIFY_SELF_1
+	+ TAU_SIMPLIFY_SELF_2
+	+ TAU_SIMPLIFY_SELF_3
+	+ TAU_SIMPLIFY_SELF_4
+	+ TAU_SIMPLIFY_SELF_5
+);
+
+template<typename... BAs>
 static auto apply_cb = make_library<BAs...>(
 	BF_CALLBACK_AND
 	+ BF_CALLBACK_OR
@@ -314,14 +301,10 @@ static auto trivialities = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto bf_positives_upwards = make_library<BAs...>(
-	BF_POSITIVE_LITERAL_UPWARDS_0
-	+ BF_POSITIVE_LITERAL_UPWARDS_1
-	+ BF_POSITIVE_LITERAL_UPWARDS_2
-	+ BF_POSITIVE_LITERAL_UPWARDS_3
-	+ BF_POSITIVE_LITERAL_UPWARDS_4
+static auto bf_elim_quantifiers = make_library<BAs...>(
+	BF_FUNCTIONAL_QUANTIFIERS_0
+	+ BF_FUNCTIONAL_QUANTIFIERS_1
 );
-
 
 template<typename... BAs>
 static auto to_mnf_wff = make_library<BAs...>(
@@ -365,11 +348,6 @@ static auto to_nnf_bf = make_library<BAs...>(
 	+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
-
-template<typename... BAs>
-static auto squeeze_positives = make_library<BAs...>(
-	WFF_SQUEEZE_POSITIVES_0
-);
 
 template<tau_parser::nonterminal type, typename... BAs>
 void get_literals(const nso<BAs...>& clause, std::set<nso<BAs...>>& literals) {
@@ -648,8 +626,6 @@ nso<BAs...> dnf(const nso<BAs...>& n) {
 				apply_wff_defs<BAs...>
 				| to_dnf_wff<BAs...>
 				| simplify_wff<BAs...>
-				| bf_positives_upwards<BAs...>
-				| squeeze_positives<BAs...>
 				| trivialities<BAs...>
 			);
 		// finally, we also simplify the bf part of the formula
@@ -678,8 +654,6 @@ nso<BAs...> cnf(const nso<BAs...>& n) {
 				apply_wff_defs<BAs...>
 				| to_cnf_wff<BAs...>
 				| simplify_wff<BAs...>
-				| bf_positives_upwards<BAs...>
-				| squeeze_positives<BAs...>
 				| trivialities<BAs...>
 			);
 		// finally, we also simplify the bf part of the formula
@@ -714,8 +688,6 @@ nso<BAs...> nnf(const nso<BAs...>& n) {
 				apply_wff_defs<BAs...>
 				| to_nnf_wff<BAs...>
 				| simplify_wff<BAs...>
-				| bf_positives_upwards<BAs...>
-				| squeeze_positives<BAs...>
 				| trivialities<BAs...>
 			);
 		// finally, we also simplify the bf part of the formula
