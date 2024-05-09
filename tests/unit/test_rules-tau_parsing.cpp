@@ -18,7 +18,7 @@
 #include "bool_ba.h"
 #include "bdd_handle.h"
 #include "normalizer.h"
-#include "tau.h"
+#include "satisfiability.h"
 #include "test_helpers.h"
 
 using namespace idni::rewriter;

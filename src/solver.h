@@ -189,7 +189,7 @@ std::pair<var<BAs...>, std::optional<nso<BAs...>>> eliminate_interval(const nso<
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>)
-		| to_mnf_bf<BAs...>();
+		| reduce_bf<BAs...>();
 	return {var, form};
 }
 
@@ -200,7 +200,7 @@ bounds<BAs...> compute_lower_bounds(const var<BAs...> v, const nso<BAs...>& clau
 		| repeat_each<step<BAs...>, BAs...>(
 			simplify_bf<BAs...>
 			| apply_cb<BAs...>)
-		| to_mnf_bf<BAs...>();
+		| reduce_bf<BAs...>();
 	for (auto& neq: select_all(f_0, is_non_terminal<tau_parser::bf_nleq_lower, BAs...>)) {
 		auto c_i = neq
 			| tau_parser::bf
@@ -219,7 +219,7 @@ bounds<BAs...> compute_upper_bounds(const var<BAs...>& v, const nso<BAs...>& cla
 		| repeat_each<step<BAs...>, BAs...>(
 			simplify_bf<BAs...>
 			| apply_cb<BAs...>)
-		| to_mnf_bf<BAs...>();
+		| reduce_bf<BAs...>();
 
 	for (auto& neq: select_all(f_1, is_non_terminal<tau_parser::bf_nleq_upper, BAs...>)) {
 		auto neg_d_i = neq
