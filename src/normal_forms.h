@@ -574,11 +574,11 @@ nso<BAs...> operator|(const nso<BAs...>& n, const reduce_wff_t<BAs...>& r) {
 }
 
 template<typename...BAs>
-struct onf {
+struct onf_wff {
 
-	onf(const nso<BAs...>& var) : var(var) {}
+	onf_wff(const nso<BAs...>& var) : var(var) {}
 
-	std::optional<nso<BAs...>> operator()(const nso<BAs...>& n) const {
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
 		auto pred = [this](const auto& n) {
 			if (auto check = n | tau_parser::wff_ex | tau_parser::variable; check.has_value()) {
 				return (var == check.value());
@@ -589,7 +589,7 @@ struct onf {
 			auto sub_formula = quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>>;
 			return onf_subformula(sub_formula);
 		}
-		return {};
+		return n;
 	}
 
 private:
@@ -634,14 +634,24 @@ private:
 	nso<BAs...> var;
 };
 
+
 template<typename... BAs>
-static const onf<BAs...> onf_wff;
-template<typename... BAs>
-using onf_wff_t = onf<BAs...>;
+using onf_wff_t = onf_wff<BAs...>;
 
 template<typename...BAs>
-std::optional<nso<BAs...>> operator|(const nso<BAs...>& n, const onf_wff_t<BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const onf_wff_t<BAs...>& r) {
 	return r(n);
+}
+
+template<typename...BAs>
+std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
+	return n
+		| apply_wff_defs<BAs...>
+		| onf_wff<BAs...>(var)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>);
 }
 
 template<typename...BAs>

@@ -99,6 +99,7 @@ static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) 
 template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
+// TODO (LOW) wthis should be converted into a struct
 template<typename... BAs>
 nso<BAs...> apply_once_definitions(const nso<BAs...>& form) {
 	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
