@@ -746,22 +746,24 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 
 // we assume no functional quantifiers are present and all defs have being applyed
 template<typename...BAs>
-struct to_bdd {
+struct to_bdds {
 
-	using vars = std::vector<nso<BAs...>>;
+	using vars = std::set<nso<BAs...>>;
 
 	nso<BAs...> operator()(const nso<BAs...>& n) {
-		auto form = n;
-		for (auto& var: select_all(form, is_non_terminal<tau_parser::var, BAs...>)) {
-			auto [a, b] = split_using_var(var, n);
-			if (are_equivalent(a, b)) form = a;
+		std::map<nso<BAs...>, nso<BAs...>> changes;
+		for (auto& bf: select_top(n, is_non_terminal<tau_parser::bf, BAs...>)) {
+			auto vars = select_all(bf, is_non_terminal<tau_parser::var, BAs...>);
+			auto vars_set = std::set<nso<BAs...>>(vars.begin(), vars.end());
+			auto bdd = bf_to_bdd(vars_set, bf);
+			changes[bf] = bdd;
 		}
-		return form;
+		return replace(n, changes);
 	}
 
 private:
 
-	nso<BAs...> split_using_var(const vars& var, const nso<BAs...>& form) {
+	std::pair<nso<BAs...>, nso<BAs...>> split_using_var(const vars& var, const nso<BAs...>& form) {
 		auto a = replace(form, { {var, trim(_0<BAs...>)} });
 		auto b = replace(form, { {var, trim(_1<BAs...>)}});
 		return std::make_pair(a, b);
@@ -772,30 +774,50 @@ private:
 		return { vs.back(), rest };
 	}
 
-	nso<BAs...> are_equivalent(const nso<BAs...>& a, const nso<BAs...>& b) {
-		return bf_to_bdd(a) == bf_to_bdd(b);
-	}
-
 	nso<BAs...> bf_to_bdd(const vars& vs, const nso<BAs...>& form) {
 		if (vs.empty()) return form | repeat_all(apply_cb<BAs...>);
 		auto [var, rest] = split_vars(vs);
 		auto [a, b] = split_using_var(var, form);
 		auto a_bdd = bf_to_bdd(rest, a);
 		auto b_bdd = bf_to_bdd(rest, b);
-		return build_xor_bdd(
-			build_and_bdd(wrap(tau_parser::bf, var), a_bdd),
-			build_and_bdd(build_not_bdd(wrap(tau_parser::bf, var), b_bdd)));
+		return (a_bdd == b_bdd) ? a_bdd	: build_bf_xor(
+			build_bf_and(wrap(tau_parser::bf, var), a_bdd),
+			build_bf_and(build_bf_neg(wrap(tau_parser::bf, var), b_bdd)));
 	}
 };
 
 template<typename... BAs>
-static const to_bdd<BAs...> to_bdd_bf;
+static const to_bdds<BAs...> to_bdds_bf;
 
 template<typename... BAs>
-using to_bdd_bf_t = to_bdd<BAs...>;
+using to_bdds_bf_t = to_bdds<BAs...>;
 
 template<typename...BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const to_bdd_bf_t<BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const to_bdds_bf_t<BAs...>& r) {
+	return r(n);
+}
+
+template<typename...BAs>
+struct snf {
+
+	nso<BAs...> operator()(const nso<BAs...>& n) {
+		return n;
+	}
+
+private:
+
+
+};
+
+// compute the strong normalized form of a wff
+template<typename...BAs>
+static const snf<BAs...> snf_wff;
+
+template<typename...BAs>
+using snf_wff_t = snf<BAs...>;
+
+template<typename...BAs>
+nso<BAs...> operator|(const nso<BAs...>& n, const snf_wff_t<BAs...>& r) {
 	return r(n);
 }
 
@@ -823,19 +845,6 @@ nso<BAs...> minimize_wff(const nso<BAs...>& n) {
 	return n;
 }
 
-// TODO (MEDIUM) implement the removal supeefluous vars
-// If some var is an input in the tau lang, but is redundant,we dont even read that input.
-// In order to know if a formula is independent in some var (it may appear, but it's still
-// be independant independent of it, p.e. xy+xy' is just x, same for xy|xy'...) we could
-// use the derivative (f(x) does not depend on x iff f(0)+f(1)=0). So we go over all atomic
-// formulas that contain a certain var, and if for all of them f(0)+f(1)=0, then it's completely
-// independent in that var. Moreover, ofc we want to push quantifiers inside and simplify atomic
-// formulas to not mention vars that they dont depend on (otherwise imagine doing quantifier
-// elimination for y in xy+xy' which doesnt even depend on y).
-// The way to do it is as follows. we do one-step bdd conversion, wrt x only.
-// so f(x)=xf(1)+x'f(0). now f doesnt depend on x iff f(1)=f(0)
-
-
 template<typename...BAs>
 nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 	// TODO (HIGH) this should be changed to use a proper mnf for wff
@@ -857,14 +866,6 @@ nso<BAs...> mnf_bf(const nso<BAs...>& n) {
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>);
-}
-
-// compute the strong normalized form of a wff
-template<typename...BAs>
-nso<BAs...> snf(const nso<BAs...>& n) {
-	auto mnf = mnf<tau_parser::wff>(n);
-	// TODO (MEDIUM) implement the snf
-	return n;
 }
 
 template<size_t type, typename...BAs>
