@@ -558,15 +558,15 @@ static const reduce<tau_parser::bf, BAs...> reduce_bf;
 template<typename... BAs>
 using reduce_bf_t = reduce<tau_parser::bf, BAs...>;
 
-template<typename... BAs>
-static const reduce<tau_parser::wff, BAs...> reduce_wff;
-template<typename... BAs>
-using reduce_wff_t = reduce<tau_parser::wff, BAs...>;
-
 template<typename...BAs>
 nso<BAs...> operator|(const nso<BAs...>& n, const reduce_bf_t<BAs...>& r) {
 	return r(n);
 }
+
+template<typename... BAs>
+static const reduce<tau_parser::wff, BAs...> reduce_wff;
+template<typename... BAs>
+using reduce_wff_t = reduce<tau_parser::wff, BAs...>;
 
 template<typename...BAs>
 nso<BAs...> operator|(const nso<BAs...>& n, const reduce_wff_t<BAs...>& r) {
@@ -633,7 +633,6 @@ private:
 
 	nso<BAs...> var;
 };
-
 
 template<typename... BAs>
 using onf_wff_t = onf_wff<BAs...>;
@@ -745,9 +744,9 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 			| apply_cb<BAs...>);
 }
 
-/*// we assume no functional quantifiers are present and all defs have being applyed
+// we assume no functional quantifiers are present and all defs have being applyed
 template<typename...BAs>
-struct reduce_bf {
+struct to_bdd {
 
 	using vars = std::vector<nso<BAs...>>;
 
@@ -787,12 +786,18 @@ private:
 			build_and_bdd(wrap(tau_parser::bf, var), a_bdd),
 			build_and_bdd(build_not_bdd(wrap(tau_parser::bf, var), b_bdd)));
 	}
-};*/
+};
 
-/*template<typename...BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const reduce_bf<BAs...>& r) {
+template<typename... BAs>
+static const to_bdd<BAs...> to_bdd_bf;
+
+template<typename... BAs>
+using to_bdd_bf_t = to_bdd<BAs...>;
+
+template<typename...BAs>
+nso<BAs...> operator|(const nso<BAs...>& n, const to_bdd_bf_t<BAs...>& r) {
 	return r(n);
-}*/
+}
 
 template<typename...BAs>
 nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...>& a, const nso<BAs...>& b) {
