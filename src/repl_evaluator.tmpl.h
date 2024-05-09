@@ -272,8 +272,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		switch (type) {
-		case tau_parser::wff: return nnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(value);
-		case tau_parser::bf: return nnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::wff: return nnf_wff<tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return nnf_bf<tau_ba<BAs...>, BAs...>(value);
 		}
 	}
 	return {};
@@ -288,8 +288,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		switch (type) {
-		case tau_parser::wff: return mnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(value);
-		case tau_parser::bf: return mnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::wff: return mnf_wff<tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return mnf_bf<tau_ba<BAs...>, BAs...>(value);
 		}
 	}
 	return {};

@@ -122,6 +122,7 @@ RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
 // bf conjunctive normal form
 RULE(BF_TO_CNF_0, "$X & $Y | $Z := ($X | $Z) & ($Y | $Z).")
 RULE(BF_TO_CNF_1, "$X | $Y & $Z := ($X | $Y) & ($X | $Z).")
+
 // wff conjunctive normal form
 RULE(WFF_TO_CNF_0, "$X && $Y || $Z ::= ($X || $Z) && ($Y || $Z).")
 RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
@@ -136,6 +137,10 @@ RULE(TAU_PUSH_NEGATION_INWARDS_0, "!!! ($X &&& $Y) :::= !!! $X ||| !!! $Y.")
 RULE(TAU_PUSH_NEGATION_INWARDS_1, "!!! ($X ||| $Y) :::= !!! $X &&& !!! $Y.")
 RULE(TAU_ELIM_DOUBLE_NEGATION_0, "!!! !!! $X :::=  $X.")
 RULE(TAU_SIMPLIFY_ONE_0, "{T} ||| $X :::= {T}.")
+
+// wff conjunctive normal form
+RULE(TAU_TO_CNF_0, "$X &&& $Y ||| $Z ::= ($X ||| $Z) &&& ($Y ||| $Z).")
+RULE(TAU_TO_CNF_1, "$X ||| $Y &&& $Z ::= ($X ||| $Y) &&& ($X ||| $Z).")
 
 // tau simplifications
 RULE(TAU_SIMPLIFY_ONE_1, "$X ||| {T} :::= {T}.")
@@ -324,6 +329,15 @@ static auto to_cnf_wff = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto to_cnf_tau = make_library<BAs...>(
+	TAU_TO_CNF_0
+	+ TAU_TO_CNF_1
+	+ TAU_PUSH_NEGATION_INWARDS_0
+	+ TAU_PUSH_NEGATION_INWARDS_1
+	+ TAU_ELIM_DOUBLE_NEGATION_0
+);
+
+template<typename... BAs>
 static auto to_cnf_bf = make_library<BAs...>(
 	BF_TO_CNF_0
 	+ BF_TO_CNF_1
@@ -342,6 +356,13 @@ static auto to_nnf_wff = make_library<BAs...>(
 );
 
 template<typename...BAs>
+static auto to_nnf_tau = make_library<BAs...>(
+	TAU_PUSH_NEGATION_INWARDS_0
+	+ TAU_PUSH_NEGATION_INWARDS_1
+	+ TAU_ELIM_DOUBLE_NEGATION_0
+);
+
+template<typename...BAs>
 static auto to_nnf_bf = make_library<BAs...>(
 	BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
@@ -356,7 +377,7 @@ struct reduce {
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		// for all type dnfs do...
 		for (auto& dnf: select_top(form, is_non_terminal<type, BAs...>)) {
-			auto simplified = to_mnf(dnf);
+			auto simplified = simplify(dnf);
 			if (simplified != dnf) changes[dnf] = simplified;
 		}
 		return replace(form, changes);
@@ -521,7 +542,7 @@ private:
 		return dnf;
 	}
 
-	nso<BAs...> to_mnf(const nso<BAs...>& form) const {
+	nso<BAs...> simplify(const nso<BAs...>& form) const {
 		std::set<nso<BAs...>> clauses;
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying of " << form;
 		for (auto& clause: get_dnf_clauses(form))
@@ -666,14 +687,7 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 			| apply_cb<BAs...>);
 }
 
-template<size_t type, typename...BAs>
-nso<BAs...> anf(const nso<BAs...>& n) {
-	// TODO (MEDIUM) write anf (using?)
-	std::cout << "Not implemented yet." << std::endl;
-	return n;
-}
-
-template<size_t type, typename...BAs>
+template<typename...BAs>
 nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 	auto quantified = [](const auto& n) -> bool {
 		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
@@ -701,13 +715,6 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 			to_nnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>);
-}
-
-template<size_t type, typename...BAs>
-nso<BAs...> pnf(const nso<BAs...>& n) {
-	// TODO (MEDIUM) write pnf (using?)
-	std::cout << "Not implemented yet." << std::endl;
-	return n;
 }
 
 /*// we assume no functional quantifiers are present and all defs have being applyed
@@ -796,25 +803,27 @@ nso<BAs...> minimize_wff(const nso<BAs...>& n) {
 // so f(x)=xf(1)+x'f(0). now f doesnt depend on x iff f(1)=f(0)
 
 
-template<size_t type, typename...BAs>
-nso<BAs...> mnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff)
-		// TODO (HIGH) this should be changed to use a proper mnf for wff
-		return apply_once_definitions(n)
-			| repeat_all<step<BAs...>, BAs...>(
-				apply_wff_defs<BAs...>
-			 	| to_dnf_wff<BAs...>
-				| to_mnf_wff<BAs...>)
-			| reduce_wff<BAs...>;
-	else
-		return n
-			| repeat_each<step<BAs...>, BAs...>(
-				apply_bf_defs<BAs...>
-				| bf_elim_quantifiers<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(
-				to_dnf_bf<BAs...>
-				| simplify_bf<BAs...>
-				| apply_cb<BAs...>);
+template<typename...BAs>
+nso<BAs...> mnf_wff(const nso<BAs...>& n) {
+	// TODO (HIGH) this should be changed to use a proper mnf for wff
+	return apply_once_definitions(n)
+		| repeat_all<step<BAs...>, BAs...>(
+			apply_wff_defs<BAs...>
+			| to_dnf_wff<BAs...>
+			| to_mnf_wff<BAs...>)
+		| reduce_wff<BAs...>;
+}
+
+template<typename...BAs>
+nso<BAs...> mnf_bf(const nso<BAs...>& n) {
+	return n
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_bf_defs<BAs...>
+			| bf_elim_quantifiers<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_dnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>);
 }
 
 // compute the strong normalized form of a wff
@@ -822,6 +831,20 @@ template<typename...BAs>
 nso<BAs...> snf(const nso<BAs...>& n) {
 	auto mnf = mnf<tau_parser::wff>(n);
 	// TODO (MEDIUM) implement the snf
+	return n;
+}
+
+template<size_t type, typename...BAs>
+nso<BAs...> anf(const nso<BAs...>& n) {
+	// TODO (MEDIUM) write anf (using?)
+	std::cout << "Not implemented yet." << std::endl;
+	return n;
+}
+
+template<typename...BAs>
+nso<BAs...> pnf(const nso<BAs...>& n) {
+	// TODO (MEDIUM) write pnf (using?)
+	std::cout << "Not implemented yet." << std::endl;
 	return n;
 }
 
