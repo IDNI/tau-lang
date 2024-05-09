@@ -222,7 +222,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	auto var = n | tau_parser::variable	| optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
 	if(auto check = get_type_and_arg(arg); check) {
 		auto [_, value] = check.value();
-		return value | onf<tau_ba<BAs...>, BAs...>(var);
+		return onf<tau_ba<BAs...>, BAs...>(var, value);
 	}
 	return {};
 }
