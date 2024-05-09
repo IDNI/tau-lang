@@ -236,8 +236,10 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		switch (type) {
-		case tau_parser::wff: return dnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(value);
-		case tau_parser::bf: return dnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::wff: return dnf_wff<tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return dnf_bf<tau_ba<BAs...>, BAs...>(value);
+		default:
+			cout << "error: invalid argument\n";
 		}
 	}
 	return {};
@@ -252,8 +254,10 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		switch (type) {
-		case tau_parser::wff: return cnf<tau_parser::wff, tau_ba<BAs...>, BAs...>(value);
-		case tau_parser::bf: return cnf<tau_parser::bf, tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::wff: return cnf_wff<tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return cnf_bf<tau_ba<BAs...>, BAs...>(value);
+		default:
+			cout << "error: invalid argument\n";
 		}
 	}
 	return {};
