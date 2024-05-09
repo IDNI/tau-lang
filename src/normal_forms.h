@@ -574,56 +574,74 @@ nso<BAs...> operator|(const nso<BAs...>& n, const reduce_wff_t<BAs...>& r) {
 }
 
 template<typename...BAs>
-nso<BAs...> onf_subformula(const nso<BAs...>& n, const nso<BAs...>& var) {
-	auto eq = find_bottom(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
-	std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0<BAs...>}};
-	auto f_0 = replace((eq || tau_parser::bf)[0],  changes_0)
-		| repeat_each<step<BAs...>, BAs...>(
-			simplify_bf<BAs...>
-			| apply_cb<BAs...>)
-		| reduce_bf<BAs...>;
-	std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1<BAs...>}};
-	auto f_1 = replace((eq || tau_parser::bf)[0],  changes_1)
-		| repeat_each<step<BAs...>, BAs...>(
-			simplify_bf<BAs...>
-			| apply_cb<BAs...>)
-		| reduce_bf<BAs...>;
-	std::map<nso<BAs...>, nso<BAs...>> changes;
-	auto eq_change = trim(build_bf_interval(f_0, var, f_1));
-	changes[eq | optional_value_extractor<nso<BAs...>>] = eq_change;
-	for (auto& neq: select_all(n, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
-		auto bounds = neq || tau_parser::bf;
-		std::map<nso<BAs...>, nso<BAs...>> changes_neq_0 = {{var, _0<BAs...>}};
-		auto f_0 = replace(bounds[0],  changes_neq_0)
-			| repeat_each<step<BAs...>, BAs...>(
-				simplify_bf<BAs...>
-				| apply_cb<BAs...>)
-			| reduce_bf<BAs...>;
-		std::map<nso<BAs...>, nso<BAs...>> changes_neq_1 = {{var, _1<BAs...>}};
-		auto f_1 = replace(bounds[0],  changes_neq_1)
-			| repeat_each<step<BAs...>, BAs...>(
-				simplify_bf<BAs...>
-				| apply_cb<BAs...>)
-			| reduce_bf<BAs...>;
-		auto nleq_change = build_bf_or(build_bf_nleq_lower(f_0, var), build_bf_nleq_upper(f_1, var));
-		changes[neq] = nleq_change;
+struct onf {
+
+	onf(const nso<BAs...>& var) : var(var) {}
+
+	std::optional<nso<BAs...>> operator()(const nso<BAs...>& n) const {
+		auto pred = [this](const auto& n) {
+			if (auto check = n | tau_parser::wff_ex | tau_parser::variable; check.has_value()) {
+				return (var == check.value());
+			}
+			return false;
+		};
+		if (auto quantifier = find_bottom(n, pred); quantifier.has_value()) {
+			auto sub_formula = quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>>;
+			return onf_subformula(sub_formula);
+		}
+		return {};
 	}
-	return replace(n, changes) | repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>);
-}
+
+private:
+
+	nso<BAs...> onf_subformula(const nso<BAs...>& n) const {
+		auto eq = find_bottom(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
+		std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0<BAs...>}};
+		auto f_0 = replace((eq || tau_parser::bf)[0],  changes_0)
+			| repeat_each<step<BAs...>, BAs...>(
+				simplify_bf<BAs...>
+				| apply_cb<BAs...>)
+			| reduce_bf<BAs...>;
+		std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1<BAs...>}};
+		auto f_1 = replace((eq || tau_parser::bf)[0],  changes_1)
+			| repeat_each<step<BAs...>, BAs...>(
+				simplify_bf<BAs...>
+				| apply_cb<BAs...>)
+			| reduce_bf<BAs...>;
+		std::map<nso<BAs...>, nso<BAs...>> changes;
+		auto eq_change = trim(build_bf_interval(f_0, var, f_1));
+		changes[eq | optional_value_extractor<nso<BAs...>>] = eq_change;
+		for (auto& neq: select_all(n, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
+			auto bounds = neq || tau_parser::bf;
+			std::map<nso<BAs...>, nso<BAs...>> changes_neq_0 = {{var, _0<BAs...>}};
+			auto f_0 = replace(bounds[0],  changes_neq_0)
+				| repeat_each<step<BAs...>, BAs...>(
+					simplify_bf<BAs...>
+					| apply_cb<BAs...>)
+				| reduce_bf<BAs...>;
+			std::map<nso<BAs...>, nso<BAs...>> changes_neq_1 = {{var, _1<BAs...>}};
+			auto f_1 = replace(bounds[0],  changes_neq_1)
+				| repeat_each<step<BAs...>, BAs...>(
+					simplify_bf<BAs...>
+					| apply_cb<BAs...>)
+				| reduce_bf<BAs...>;
+			auto nleq_change = build_bf_or(build_bf_nleq_lower(f_0, var), build_bf_nleq_upper(f_1, var));
+			changes[neq] = nleq_change;
+		}
+		return replace(n, changes) | repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>);
+	}
+
+	nso<BAs...> var;
+};
+
+template<typename... BAs>
+static const onf<BAs...> onf_wff;
+template<typename... BAs>
+using onf_wff_t = onf<BAs...>;
 
 template<typename...BAs>
-nso<BAs...> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
-	auto pred = [&var](const auto& n) {
-		if (auto check = n | tau_parser::wff_ex | tau_parser::variable; check.has_value()) {
-			return (var == check.value());
-		}
-		return false;
-	};
-	if (auto quantifier = find_bottom(n, pred); quantifier.has_value()) {
-		auto sub_formula = quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>>;
-		return onf_subformula(sub_formula, var);
-	}
-	return n;
+std::optional<nso<BAs...>> operator|(const nso<BAs...>& n, const onf_wff_t<BAs...>& r) {
+	return r(n);
 }
 
 template<typename...BAs>
