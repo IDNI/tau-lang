@@ -348,183 +348,6 @@ static auto to_nnf_bf = make_library<BAs...>(
 	+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
-
-template<tau_parser::nonterminal type, typename... BAs>
-void get_literals(const nso<BAs...>& clause, std::set<nso<BAs...>>& literals) {
-	BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
-	if constexpr (type == tau_parser::bf) {
-		if (auto check = clause | tau_parser::bf_and; check.has_value())
-			for (auto& c : check || tau_parser::bf)
-				get_literals<type, BAs...>(c, literals);
-		else {
-			literals.insert(clause);
-			BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << clause;
-		}
-	} else {
-		if (auto check = clause | tau_parser::wff_and; check.has_value())
-			for (auto& c : check || tau_parser::wff)
-				get_literals<type, BAs...>(c , literals);
-		else {
-			literals.insert(clause);
-			BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << clause;
-		}
-	}
-}
-
-template<tau_parser::nonterminal type, typename... BAs>
-std::set<nso<BAs...>> get_literals(const nso<BAs...>& clause) {
-	std::set<nso<BAs...>> literals;
-	get_literals<type, BAs...>(clause, literals);
-	return literals;
-}
-
-template<tau_parser::nonterminal type, typename... BAs>
-std::pair<std::set<nso<BAs...>>, std::set<nso<BAs...>>> get_positive_negative_literals(const nso<BAs...> clause) {
-	std::set<nso<BAs...>> positives;
-	std::set<nso<BAs...>> negatives;
-
-	for(auto& l: get_literals<type, BAs...>(clause)) {
-		if constexpr (type == tau_parser::bf) {
-			if (auto check = l | tau_parser::bf_neg; !check.has_value()) {
-				positives.insert(l);
-				BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
-			} else {
-				negatives.insert(l);
-				BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
-			}
-		} else {
-			if (auto check = l | tau_parser::bf_neq; !check.has_value()) {
-				positives.insert(l);
-				BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
-			} else {
-				negatives.insert(l);
-				BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
-			}
-		}
-	}
-
-	return {positives, negatives};
-}
-
-template<tau_parser::nonterminal type, typename... BAs>
-std::set<nso<BAs...>> get_dnf_clauses(const nso<BAs...>& n, std::set<nso<BAs...>> clauses = {}) {
-	if constexpr (type == tau_parser::bf)
-		if (auto check = n | tau_parser::bf_or; check.has_value())
-			for (auto& clause: check || tau_parser::bf)
-				clauses = get_dnf_clauses<type, BAs...>(clause, clauses);
-		else
-			clauses.insert(n);
-	else
-		if (auto check = n | tau_parser::wff_or; check.has_value())
-			for (auto& clause: check || tau_parser::wff)
-				clauses = get_dnf_clauses<type, BAs...>(clause, clauses);
-		else
-			clauses.insert(n);
-
-	#ifdef DEBUG
-	if (clauses.empty()) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << n << std::endl;
-	else for (auto& clause: clauses) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause;
-	#endif // DEBUG
-
-	return clauses;
-}
-
-template<tau_parser::nonterminal type, typename... BAs>
-std::optional<nso<BAs...>> build_dnf_clause_from_literals(const std::set<nso<BAs...>>& positives, const std::set<nso<BAs...>>& negatives) {
-	if (positives.empty() && negatives.empty()) {
-		BOOST_LOG_TRIVIAL(debug) << "(F) {}";
-		return {};
-	}
-
-	std::vector<nso<BAs...>> literals;
-	literals.insert(literals.end(), positives.begin(), positives.end());
-	literals.insert(literals.end(), negatives.begin(), negatives.end());
-
-	if (literals.size() == 1) return literals[0];
-	auto clause = literals[0];
-	for (size_t i = 1; i < literals.size(); ++i)
-		if constexpr (type == tau_parser::bf) clause = build_bf_and(clause, literals[i]);
-		else clause = build_wff_and(clause, literals[i]);
-
-	BOOST_LOG_TRIVIAL(debug) << "(I) " << clause;
-	return { clause };
-}
-
-template<tau_parser::nonterminal type, typename... BAs>
-std::optional<nso<BAs...>> to_minterm(const nso<BAs...>& clause) {
-	auto [positives, negatives] = get_positive_negative_literals<type, BAs...>(clause);
-	if constexpr (type == tau_parser::bf) {
-		for (auto& negation: negatives) {
-			auto negated = negation | tau_parser::bf_neg | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
-			for (auto& positive: positives) {
-				BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing? ";
-				if (positive == _0<BAs...>) {
-					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
-					return {};
-				} else if (positive == negated) {
-					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
-					return {};
-				} else {
-					BOOST_LOG_TRIVIAL(trace) << "no" << std::endl;
-				}
-			}
-		}
-	} else {
-		for (auto& negation: negatives) {
-			auto neq_bf = negation | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
-			for (auto& positive: positives) {
-				auto eq_bf = positive | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
-				BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing: ";
-				if (eq_bf == _F<BAs...>) {
-					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
-					return {};
-				} if (eq_bf == neq_bf) {
-					BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
-					return {};
-				} else {
-					BOOST_LOG_TRIVIAL(trace) << "no" << std::endl;
-				}
-			}
-		}
-	}
-	return build_dnf_clause_from_literals<type, BAs...>(positives, negatives);
-}
-
-template<tau_parser::nonterminal type, typename... BAs>
-nso<BAs...> build_dnf_from_clauses(const std::set<nso<BAs...>>& clauses) {
-	if constexpr (type == tau_parser::bf) {
-		if (clauses.empty()) {
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << _0<BAs...>;
-			return _0<BAs...>;
-		}
-	} else {
-		if (clauses.empty()) {
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << _F<BAs...>;
-			return _F<BAs...>;
-		}
-	}
-	auto dnf = *clauses.begin();
-	auto it = ++clauses.begin();
-	for (; it != clauses.end(); ++it)
-		if constexpr (type == tau_parser::bf) dnf = build_bf_or(dnf, *it);
-		else dnf = build_wff_or(dnf, *it);
-
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << dnf;
-	return dnf;
-}
-
-template<tau_parser::nonterminal type, typename... BAs>
-nso<BAs...> to_mnf(const nso<BAs...>& form) {
-	std::set<nso<BAs...>> clauses;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying of " << form;
-	for (auto& clause: get_dnf_clauses<type, BAs...>(form))
-		if (auto dnf = to_minterm<type, BAs...>(clause); dnf) clauses.insert(dnf.value());
-	auto dnf = build_dnf_from_clauses<type, BAs...>(clauses);
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End simplifying";
-	return dnf;
-}
-
-
 template<tau_parser::nonterminal type, typename... BAs>
 struct reduce {
 
@@ -533,10 +356,179 @@ struct reduce {
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		// for all type dnfs do...
 		for (auto& dnf: select_top(form, is_non_terminal<type, BAs...>)) {
-			auto simplified = to_mnf<type, BAs...>(dnf);
+			auto simplified = to_mnf(dnf);
 			if (simplified != dnf) changes[dnf] = simplified;
 		}
 		return replace(form, changes);
+	}
+
+private:
+
+	void get_literals(const nso<BAs...>& clause, std::set<nso<BAs...>>& literals) const {
+		BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
+		if constexpr (type == tau_parser::bf) {
+			if (auto check = clause | tau_parser::bf_and; check.has_value())
+				for (auto& c : check || tau_parser::bf)
+					get_literals(c, literals);
+			else {
+				literals.insert(clause);
+				BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << clause;
+			}
+		} else {
+			if (auto check = clause | tau_parser::wff_and; check.has_value())
+				for (auto& c : check || tau_parser::wff)
+					get_literals(c , literals);
+			else {
+				literals.insert(clause);
+				BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << clause;
+			}
+		}
+	}
+
+	std::set<nso<BAs...>> get_literals(const nso<BAs...>& clause) const {
+		std::set<nso<BAs...>> literals;
+		get_literals(clause, literals);
+		return literals;
+	}
+
+	std::pair<std::set<nso<BAs...>>, std::set<nso<BAs...>>> get_positive_negative_literals(const nso<BAs...> clause) const {
+		std::set<nso<BAs...>> positives;
+		std::set<nso<BAs...>> negatives;
+
+		for(auto& l: get_literals(clause)) {
+			if constexpr (type == tau_parser::bf) {
+				if (auto check = l | tau_parser::bf_neg; !check.has_value()) {
+					positives.insert(l);
+					BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
+				} else {
+					negatives.insert(l);
+					BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
+				}
+			} else {
+				if (auto check = l | tau_parser::bf_neq; !check.has_value()) {
+					positives.insert(l);
+					BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
+				} else {
+					negatives.insert(l);
+					BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
+				}
+			}
+		}
+
+		return {positives, negatives};
+	}
+
+	std::set<nso<BAs...>> get_dnf_clauses(const nso<BAs...>& n, std::set<nso<BAs...>> clauses = {}) const {
+		if constexpr (type == tau_parser::bf)
+			if (auto check = n | tau_parser::bf_or; check.has_value())
+				for (auto& clause: check || tau_parser::bf)
+					clauses = get_dnf_clauses(clause, clauses);
+			else
+				clauses.insert(n);
+		else
+			if (auto check = n | tau_parser::wff_or; check.has_value())
+				for (auto& clause: check || tau_parser::wff)
+					clauses = get_dnf_clauses(clause, clauses);
+			else
+				clauses.insert(n);
+
+		#ifdef DEBUG
+		if (clauses.empty()) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << n << std::endl;
+		else for (auto& clause: clauses) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause;
+		#endif // DEBUG
+
+		return clauses;
+	}
+
+	std::optional<nso<BAs...>> build_dnf_clause_from_literals(const std::set<nso<BAs...>>& positives, const std::set<nso<BAs...>>& negatives) const {
+		if (positives.empty() && negatives.empty()) {
+			BOOST_LOG_TRIVIAL(debug) << "(F) {}";
+			return {};
+		}
+
+		std::vector<nso<BAs...>> literals;
+		literals.insert(literals.end(), positives.begin(), positives.end());
+		literals.insert(literals.end(), negatives.begin(), negatives.end());
+
+		if (literals.size() == 1) return literals[0];
+		auto clause = literals[0];
+		for (size_t i = 1; i < literals.size(); ++i)
+			if constexpr (type == tau_parser::bf) clause = build_bf_and(clause, literals[i]);
+			else clause = build_wff_and(clause, literals[i]);
+
+		BOOST_LOG_TRIVIAL(debug) << "(I) " << clause;
+		return { clause };
+	}
+
+	std::optional<nso<BAs...>> to_minterm(const nso<BAs...>& clause) const {
+		auto [positives, negatives] = get_positive_negative_literals(clause);
+		if constexpr (type == tau_parser::bf) {
+			for (auto& negation: negatives) {
+				auto negated = negation | tau_parser::bf_neg | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+				for (auto& positive: positives) {
+					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing? ";
+					if (positive == _0<BAs...>) {
+						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
+						return {};
+					} else if (positive == negated) {
+						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
+						return {};
+					} else {
+						BOOST_LOG_TRIVIAL(trace) << "no" << std::endl;
+					}
+				}
+			}
+		} else {
+			for (auto& negation: negatives) {
+				auto neq_bf = negation | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+				for (auto& positive: positives) {
+					auto eq_bf = positive | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing: ";
+					if (eq_bf == _F<BAs...>) {
+						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
+						return {};
+					} if (eq_bf == neq_bf) {
+						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
+						return {};
+					} else {
+						BOOST_LOG_TRIVIAL(trace) << "no" << std::endl;
+					}
+				}
+			}
+		}
+		return build_dnf_clause_from_literals(positives, negatives);
+	}
+
+	nso<BAs...> build_dnf_from_clauses(const std::set<nso<BAs...>>& clauses) const {
+		if constexpr (type == tau_parser::bf) {
+			if (clauses.empty()) {
+				BOOST_LOG_TRIVIAL(debug) << "(F) " << _0<BAs...>;
+				return _0<BAs...>;
+			}
+		} else {
+			if (clauses.empty()) {
+				BOOST_LOG_TRIVIAL(debug) << "(F) " << _F<BAs...>;
+				return _F<BAs...>;
+			}
+		}
+		auto dnf = *clauses.begin();
+		auto it = ++clauses.begin();
+		for (; it != clauses.end(); ++it)
+			if constexpr (type == tau_parser::bf) dnf = build_bf_or(dnf, *it);
+			else dnf = build_wff_or(dnf, *it);
+
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << dnf;
+		return dnf;
+	}
+
+	nso<BAs...> to_mnf(const nso<BAs...>& form) const {
+		std::set<nso<BAs...>> clauses;
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying of " << form;
+		for (auto& clause: get_dnf_clauses(form))
+			if (auto dnf = to_minterm(clause); dnf) clauses.insert(dnf.value());
+		auto dnf = build_dnf_from_clauses(clauses);
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End simplifying";
+		return dnf;
 	}
 };
 
@@ -613,24 +605,27 @@ nso<BAs...> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 	return n;
 }
 
-template<size_t type, typename...BAs>
-nso<BAs...> dnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff) {
-		auto quantified = [](const auto& n) -> bool {
-			return (n | tau_parser::wff_ex).has_value() || (n | tau_parser::wff_all).has_value();
-		};
-		auto quantifier = find_bottom(n, quantified);
-		auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
-		auto nform = apply_once_definitions(nn)
-			| repeat_each<step<BAs...>, BAs...>(
-				apply_wff_defs<BAs...>
-				| to_dnf_wff<BAs...>
-				| simplify_wff<BAs...>
-				| trivialities<BAs...>
-			);
-		// finally, we also simplify the bf part of the formula
-		return dnf<tau_parser::bf>(nform);
-	} else return n
+template<typename...BAs>
+nso<BAs...> dnf_wff(const nso<BAs...>& n) {
+	auto quantified = [](const auto& n) -> bool {
+		return (n | tau_parser::wff_ex).has_value() || (n | tau_parser::wff_all).has_value();
+	};
+	auto quantifier = find_bottom(n, quantified);
+	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+	auto nform = apply_once_definitions(nn)
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_wff_defs<BAs...>
+			| to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>
+		);
+	// finally, we also simplify the bf part of the formula
+	return dnf_bf(nform);
+}
+
+template<typename...BAs>
+nso<BAs...> dnf_bf(const nso<BAs...>& n) {
+	return n
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_bf_defs<BAs...>
 			| bf_elim_quantifiers<BAs...>)
@@ -641,24 +636,27 @@ nso<BAs...> dnf(const nso<BAs...>& n) {
 		| reduce_bf<BAs...>;
 }
 
-template<size_t type, typename...BAs>
-nso<BAs...> cnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff) {
-		auto quantified = [](const auto& n) -> bool {
-			return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
-		};
-		auto quantifier = find_bottom(n, quantified);
-		auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
-		auto nform = apply_once_definitions(nn)
-			| repeat_each<step<BAs...>, BAs...>(
-				apply_wff_defs<BAs...>
-				| to_cnf_wff<BAs...>
-				| simplify_wff<BAs...>
-				| trivialities<BAs...>
-			);
-		// finally, we also simplify the bf part of the formula
-		return cnf<tau_parser::bf>(nform);
-	} else return n
+template<typename...BAs>
+nso<BAs...> cnf_wff(const nso<BAs...>& n) {
+	auto quantified = [](const auto& n) -> bool {
+		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
+	};
+	auto quantifier = find_bottom(n, quantified);
+	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+	auto nform = apply_once_definitions(nn)
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_wff_defs<BAs...>
+			| to_cnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>
+		);
+	// finally, we also simplify the bf part of the formula
+	return cnf_bf(nform);
+}
+
+template<typename...BAs>
+nso<BAs...> cnf_bf(const nso<BAs...>& n) {
+	return n
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_bf_defs<BAs...>
 			| bf_elim_quantifiers<BAs...>)
@@ -676,31 +674,33 @@ nso<BAs...> anf(const nso<BAs...>& n) {
 }
 
 template<size_t type, typename...BAs>
-nso<BAs...> nnf(const nso<BAs...>& n) {
-	if constexpr (type == tau_parser::wff) {
-		auto quantified = [](const auto& n) -> bool {
-			return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
-		};
-		auto quantifier = find_bottom(n, quantified);
-		auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
-		auto nform = apply_once_definitions(nn)
-			| repeat_each<step<BAs...>, BAs...>(
-				apply_wff_defs<BAs...>
-				| to_nnf_wff<BAs...>
-				| simplify_wff<BAs...>
-				| trivialities<BAs...>
-			);
-		// finally, we also simplify the bf part of the formula
-		return nnf<tau_parser::bf>(nform);
-	} else
-		return n
-			| repeat_each<step<BAs...>, BAs...>(
-				apply_bf_defs<BAs...>
-				| bf_elim_quantifiers<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(
-				to_nnf_bf<BAs...>
-				| simplify_bf<BAs...>
-				| apply_cb<BAs...>);
+nso<BAs...> nnf_wff(const nso<BAs...>& n) {
+	auto quantified = [](const auto& n) -> bool {
+		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
+	};
+	auto quantifier = find_bottom(n, quantified);
+	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+	auto nform = apply_once_definitions(nn)
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_wff_defs<BAs...>
+			| to_nnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>
+		);
+	// finally, we also simplify the bf part of the formula
+	return nnf_wff<tau_parser::bf>(nform);
+}
+
+template<typename...BAs>
+nso<BAs...> nnf_bf(const nso<BAs...>& n) {
+	return n
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_bf_defs<BAs...>
+			| bf_elim_quantifiers<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_nnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>);
 }
 
 template<size_t type, typename...BAs>
@@ -709,9 +709,6 @@ nso<BAs...> pnf(const nso<BAs...>& n) {
 	std::cout << "Not implemented yet." << std::endl;
 	return n;
 }
-
-
-
 
 /*// we assume no functional quantifiers are present and all defs have being applyed
 template<typename...BAs>
