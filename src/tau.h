@@ -17,6 +17,7 @@
 #include <iostream>
 
 #include "normalizer.h"
+#include "normal_forms.h"
 
 using namespace std;
 using namespace idni::tau;
@@ -28,91 +29,11 @@ using namespace idni::tau;
 
 namespace idni::tau {
 
-// tau rules
-RULE(TAU_DISTRIBUTE_0, "($X ||| $Y) &&& $Z :::= $X &&& $Z ||| $Y &&& $Z.")
-RULE(TAU_DISTRIBUTE_1, "$X &&& ($Y ||| $Z) :::= $X &&& $Y ||| $X &&& $Z.")
-RULE(TAU_PUSH_NEGATION_INWARDS_0, "!!! ($X &&& $Y) :::= !!! $X ||| !!! $Y.")
-RULE(TAU_PUSH_NEGATION_INWARDS_1, "!!! ($X ||| $Y) :::= !!! $X &&& !!! $Y.")
-RULE(TAU_ELIM_DOUBLE_NEGATION_0, "!!! !!! $X :::=  $X.")
-RULE(TAU_SIMPLIFY_ONE_0, "{T} ||| $X :::= {T}.")
-RULE(TAU_SIMPLIFY_ONE_1, "$X ||| {T} :::= {T}.")
-RULE(TAU_SIMPLIFY_ONE_2, "{T} &&& $X :::= $X.")
-RULE(TAU_SIMPLIFY_ONE_3, "$X &&& {T} :::= $X.")
-RULE(TAU_SIMPLIFY_ONE_4, "!!! {T} :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_0, "{F} &&& $X :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_1, "$X &&& {F} :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_2, "{F} ||| $X :::= $X.")
-RULE(TAU_SIMPLIFY_ZERO_3, "$X ||| {F} :::= $X.")
-RULE(TAU_SIMPLIFY_ZERO_4, "!!! {F} :::= {T}.")
-RULE(TAU_SIMPLIFY_SELF_0, "$X &&& $X :::= $X.")
-RULE(TAU_SIMPLIFY_SELF_1, "$X ||| $X :::= $X.")
-RULE(TAU_SIMPLIFY_SELF_2, "$X &&& !!! $X :::= {F}.")
-RULE(TAU_SIMPLIFY_SELF_3, "$X ||| !!! $X :::= {T}.")
-RULE(TAU_SIMPLIFY_SELF_4, "!!! $X &&& $X :::= {F}.")
-RULE(TAU_SIMPLIFY_SELF_5, "!!! $X ||| $X :::= {T}.")
-
-RULE(TAU_COLLAPSE_POSITIVES_0, "$X &&& $Y :::= tau_collapse_positives_cb $X $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_1, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $X $Y $Z.")
-RULE(TAU_COLLAPSE_POSITIVES_2, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $X $Z $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_3, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $Y $Z $X.")
-RULE(TAU_COLLAPSE_POSITIVES_4, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $Y $Z $X.")
-RULE(TAU_COLLAPSE_POSITIVES_5, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $X $Z $Y.")
-RULE(TAU_COLLAPSE_POSITIVES_6, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $X $Y $Z.")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "$X &&& ($Y &&& $Z) :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "$X &&& ($Y &&& $Z) :::= tau_positives_upwards_cb $Z ($Z &&& ($X &&& $Y)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "($X &&& $Y) &&& $Z :::= tau_positives_upwards_cb $X ($X &&& ($Y &&& $Z)).")
-RULE(TAU_PUSH_POSITIVES_UPWARDS_3, "($X &&& $Y) &&& $Z :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
-
-template<typename... BAs>
-static auto to_dnf_tau = make_library<BAs...>(
-	TAU_DISTRIBUTE_0
-	+ TAU_DISTRIBUTE_1
-	+ TAU_PUSH_NEGATION_INWARDS_0
-	+ TAU_PUSH_NEGATION_INWARDS_1
-	+ TAU_ELIM_DOUBLE_NEGATION_0
-);
-
-template<typename... BAs>
-static auto simplify_tau = make_library<BAs...>(
-	TAU_SIMPLIFY_ONE_0
-	+ TAU_SIMPLIFY_ONE_1
-	+ TAU_SIMPLIFY_ONE_2
-	+ TAU_SIMPLIFY_ONE_3
-	+ TAU_SIMPLIFY_ONE_4
-	+ TAU_SIMPLIFY_ZERO_0
-	+ TAU_SIMPLIFY_ZERO_1
-	+ TAU_SIMPLIFY_ZERO_2
-	+ TAU_SIMPLIFY_ZERO_3
-	+ TAU_SIMPLIFY_ZERO_4
-	+ TAU_SIMPLIFY_SELF_0
-	+ TAU_SIMPLIFY_SELF_1
-	+ TAU_SIMPLIFY_SELF_2
-	+ TAU_SIMPLIFY_SELF_3
-	+ TAU_SIMPLIFY_SELF_4
-	+ TAU_SIMPLIFY_SELF_5
-);
-
-template<typename... BAs>
-static auto collapse_positives_tau = make_library<BAs...>(
-	TAU_COLLAPSE_POSITIVES_0
-	+ TAU_COLLAPSE_POSITIVES_1
-	+ TAU_COLLAPSE_POSITIVES_2
-	+ TAU_COLLAPSE_POSITIVES_3
-	+ TAU_COLLAPSE_POSITIVES_4
-	+ TAU_COLLAPSE_POSITIVES_5
-	+ TAU_COLLAPSE_POSITIVES_6
-	+ TAU_PUSH_POSITIVES_UPWARDS_0
-	+ TAU_PUSH_POSITIVES_UPWARDS_1
-	+ TAU_PUSH_POSITIVES_UPWARDS_2
-	+ TAU_PUSH_POSITIVES_UPWARDS_3
-);
-
 // Check https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102609 to follow up on
 // the implementation of "Deducing this" on gcc.
 // See also (https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html)
 // and https://devblogs.microsoft.com/cppblog/cpp23-deducing-this/ for how to use
 // "Deducing this" on CRTP.
-
 
 template<typename...BAs>
 struct tau_ba;

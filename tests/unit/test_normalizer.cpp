@@ -73,8 +73,9 @@ TEST_SUITE("steps parsing") {
 	}
 }
 
-// TODO (HIGH) write tests to check to_mnfs
-// TODO (HIGH) write tests to check to_mnf
+
+
+
 // TODO (HIGH) write tests to check build_dnf_from_clauses
 // TODO (HIGH) write tests to check to_minterm
 // TODO (HIGH) write tests to check get_dnf_clauses

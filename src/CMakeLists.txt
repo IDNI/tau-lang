@@ -10,6 +10,7 @@ set(TAU_HEADERS
 	dict.h
 	normalizer.h
 	nso_rr.h
+	execution.h
 	satisfiability.h
 	tau.h
 	executor.h
