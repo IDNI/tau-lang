@@ -19,7 +19,7 @@
 #include "bool_ba.h"
 #include "bdd_handle.h"
 #include "normalizer.h"
-#include "tau.h"
+#include "satisfiability.h"
 #include "test_helpers.h"
 
 using namespace idni::rewriter;
@@ -29,8 +29,8 @@ namespace testing = doctest;
 
 TEST_SUITE("executing tau rules") {
 
-	TEST_CASE("TAU_DISTRIBUTE_0") {
-		auto src_rule = make_tau_source(TAU_DISTRIBUTE_0);
+	TEST_CASE("TAU_TO_DNF_0") {
+		auto src_rule = make_tau_source(TAU_TO_DNF_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
@@ -40,8 +40,8 @@ TEST_SUITE("executing tau rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("TAU_DISTRIBUTE_1") {
-		auto src_rule = make_tau_source(TAU_DISTRIBUTE_1);
+	TEST_CASE("TAU_TO_DNF_1") {
+		auto src_rule = make_tau_source(TAU_TO_DNF_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());

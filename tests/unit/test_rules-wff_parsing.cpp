@@ -430,8 +430,8 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("BF_SQUEEZE_POSITIVES_0") {
-		auto src_rule = make_tau_source(BF_SQUEEZE_POSITIVES_0);
+	TEST_CASE("WFF_SQUEEZE_POSITIVES_0") {
+		auto src_rule = make_tau_source(WFF_SQUEEZE_POSITIVES_0);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
 			| tau_parser::library

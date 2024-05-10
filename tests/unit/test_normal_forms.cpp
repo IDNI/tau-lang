@@ -20,4 +20,6 @@ namespace testing = doctest;
 
 TEST_SUITE("normal forms") {
 	// TODO (VERY_HIGH) test normal forms
+	// TODO (HIGH) write tests to check to_mnfs
+	// TODO (HIGH) write tests to check simplify
 }

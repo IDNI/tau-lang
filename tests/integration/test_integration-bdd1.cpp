@@ -192,6 +192,8 @@ TEST_SUITE("formulas: variables, no bindings and no quantifiers") {
 
 TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
+	// TODO (MEDIUM) check if we need to add more tests for bindings
+
 	TEST_CASE("{ bdd : X } != 0") {
 		bdd_init<Bool>();
 		const char* sample = "{ bdd : X } != 0.";

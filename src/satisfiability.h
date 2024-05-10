@@ -23,6 +23,35 @@ using namespace idni::tau;
 
 namespace idni::tau {
 
+// TODO (HIGH) check if we could use regular rules instead of callback rules
+
+RULE(TAU_COLLAPSE_POSITIVES_0, "$X &&& $Y :::= tau_collapse_positives_cb $X $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_1, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $X $Y $Z.")
+RULE(TAU_COLLAPSE_POSITIVES_2, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $X $Z $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_3, "$X &&& ($Y &&& $Z) :::= tau_collapse_positives_cb $Y $Z $X.")
+RULE(TAU_COLLAPSE_POSITIVES_4, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $Y $Z $X.")
+RULE(TAU_COLLAPSE_POSITIVES_5, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $X $Z $Y.")
+RULE(TAU_COLLAPSE_POSITIVES_6, "($X &&& $Y) &&& $Z :::= tau_collapse_positives_cb $X $Y $Z.")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_0, "$X &&& ($Y &&& $Z) :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_1, "$X &&& ($Y &&& $Z) :::= tau_positives_upwards_cb $Z ($Z &&& ($X &&& $Y)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_2, "($X &&& $Y) &&& $Z :::= tau_positives_upwards_cb $X ($X &&& ($Y &&& $Z)).")
+RULE(TAU_PUSH_POSITIVES_UPWARDS_3, "($X &&& $Y) &&& $Z :::= tau_positives_upwards_cb $Y ($Y &&& ($X &&& $Z)).")
+
+template<typename... BAs>
+static auto collapse_positives_tau = make_library<BAs...>(
+	TAU_COLLAPSE_POSITIVES_0
+	+ TAU_COLLAPSE_POSITIVES_1
+	+ TAU_COLLAPSE_POSITIVES_2
+	+ TAU_COLLAPSE_POSITIVES_3
+	+ TAU_COLLAPSE_POSITIVES_4
+	+ TAU_COLLAPSE_POSITIVES_5
+	+ TAU_COLLAPSE_POSITIVES_6
+	+ TAU_PUSH_POSITIVES_UPWARDS_0
+	+ TAU_PUSH_POSITIVES_UPWARDS_1
+	+ TAU_PUSH_POSITIVES_UPWARDS_2
+	+ TAU_PUSH_POSITIVES_UPWARDS_3
+);
+
 template<typename... BAs>
 void get_gssotc_clauses(const gssotc<BAs...>& n, std::vector<gssotc<BAs...>>& clauses) {
 	if (auto check = n | tau_parser::tau_or; check.has_value()) {
