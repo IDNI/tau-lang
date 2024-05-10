@@ -970,6 +970,12 @@ sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code,
 // make a nso_rr from the given tau code
 template<typename... BAs>
 rr<nso<BAs...>> make_nso_rr_from_binded_code(sp_tau_node<BAs...>& code) {
+	if (is_non_terminal(tau_parser::bf, code))
+		return { {}, code };
+
+	if (is_non_terminal(tau_parser::nso_rec_relations, code))
+		return {make_rec_relations<BAs...>(code), {}};
+
 	auto main = code | tau_parser::nso_rr | tau_parser::nso_main | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
 	auto rules = make_rec_relations<BAs...>(code);
 	return { rules, main };
