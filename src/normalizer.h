@@ -281,9 +281,9 @@ nso<BAs...> build_main_step(const nso<BAs...>& form, size_t step) {
 	return replace<nso<BAs...>>(form, changes);
 }
 
-// Normalizes a Boolean function having no recurrance relation
+// Normalizes a Boolean function having no recurrence relation
 template<typename... BAs>
-nso<BAs...> bf_normalizer (const nso<BAs...>& bf) {
+nso<BAs...> bf_normalizer_without_rec_relation (const nso<BAs...>& bf) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
 
 	auto result = bf | repeat_once<step<BAs...>, BAs...>(make_library<BAs...>(BF_DEF_XOR))
@@ -292,6 +292,29 @@ nso<BAs...> bf_normalizer (const nso<BAs...>& bf) {
 		              | to_dnf_bf<BAs...>
 		              | simplify_bf<BAs...>
 		              | apply_cb<BAs...>);
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
+
+	return result;
+}
+
+// Normalizes a Boolean function in which recurrence relations are present
+template<typename... BAs>
+nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin calculate recurrence relation";
+
+	auto bf_unfolded = bf.main | repeat_all<step<BAs...>, BAs...>(step<BAs...>(bf.rec_relations));
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End calculate recurrence relation";
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
+
+	auto result = bf_unfolded | repeat_once<step<BAs...>, BAs...>(make_library<BAs...>(BF_DEF_XOR))
+			 | repeat_all<step<BAs...>, BAs...>(
+			      bf_elim_quantifiers<BAs...>
+			      | to_dnf_bf<BAs...>
+			      | simplify_bf<BAs...>
+			      | apply_cb<BAs...>);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 
