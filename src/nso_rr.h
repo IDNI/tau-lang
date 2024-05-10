@@ -1417,32 +1417,38 @@ private:
 		std::variant<BAs...> v(res);
 		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	};
+
 	// binary operations
 	static constexpr auto _and = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
 			auto res = l & r;
 			std::variant<BAs...> v(res);
 			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
 	static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
 			auto res = l | r;
 			std::variant<BAs...> v(res);
 			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
 	static constexpr auto _xor = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
 			auto res = l | r;
 			std::variant<BAs...> v(res);
 			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
 	static constexpr auto _imply = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
 			auto res = ~l | r;
 			std::variant<BAs...> v(res);
 			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
 	static constexpr auto _equiv = overloaded([]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
 			auto res = (~l | r) & (~r | l);
 			std::variant<BAs...> v(res);
 			return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
 	// ternary operators
 	static constexpr auto _eq = [](const auto& l) -> bool { return l == false; };
 	static constexpr auto _neq = [](const auto& l) -> bool { return !(l == false); };
