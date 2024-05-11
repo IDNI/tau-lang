@@ -27,7 +27,7 @@ struct tau_parser {
 	using decoder_type    = parser_type::input::decoder_type;
 	using encoder_type    = std::function<std::basic_string<char_type>(
 			const std::vector<terminal_type>&)>;
- static tau_parser& instance() { static tau_parser i; return i; }	tau_parser() :
+	tau_parser() :
 		nts(load_nonterminals()), cc(load_cc()),
 		g(nts, load_prods(), nt(258), cc, load_grammar_opts()),
 		p(g, load_opts()) {}
