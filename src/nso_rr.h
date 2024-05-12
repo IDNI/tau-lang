@@ -1133,7 +1133,7 @@ static auto bldr_bf_1 = make_builder<BAs...>(BLDR_BF_1);
 template<typename... BAs>
 static auto bldr_wff_F = make_builder<BAs...>(BLDR_WFF_F);
 template<typename... BAs>
-static auto bldr_wff_T = make_builder<BAs...>(BLDR_WFF_F);
+static auto bldr_wff_T = make_builder<BAs...>(BLDR_WFF_T);
 
 // wff builder
 template<typename... BAs>
