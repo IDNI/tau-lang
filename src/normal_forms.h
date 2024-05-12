@@ -680,8 +680,7 @@ nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
-		| reduce_bf<BAs...>;
+			| apply_cb<BAs...>);
 }
 
 template<typename...BAs>
