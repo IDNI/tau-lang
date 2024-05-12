@@ -1,5 +1,5 @@
 #
-# order normal form tests
+# order normal form (cnf) tests
 #
 
 #
@@ -33,12 +33,14 @@ set_tests_properties(test_repl-normal_forms-cnf_wff_dist_left PROPERTIES
 #
 # bf
 #
+
+# 0
 add_test(NAME test_repl-normal_forms-cnf_bf_1
 	COMMAND bash -c "echo 'cnf 1. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-normal_forms-cnf_bf_1 PROPERTIES
 	PASS_REGULAR_EXPRESSION ": 1")
 
-# F
+# 1
 add_test(NAME test_repl-normal_forms-cnf_bf_0
 	COMMAND bash -c "echo 'cnf 0. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-normal_forms-cnf_bf_0 PROPERTIES
