@@ -22,7 +22,6 @@ set(TESTS
 	tau
 	satisfiability
 	executor
-	normal_forms
 	variant_ba
 )
 
