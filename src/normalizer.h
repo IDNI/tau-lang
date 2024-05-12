@@ -136,8 +136,8 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| wff_remove_existential<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			bf_elim_quantifiers<BAs...>
-			| to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
+			| to_dnf_bf<BAs...>
 			| apply_cb<BAs...>)
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
