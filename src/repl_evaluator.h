@@ -157,6 +157,8 @@ private:
 		const nso<tau_ba<BAs...>, BAs...>& n);
 	std::optional<nso<tau_ba<BAs...>, BAs...>> mnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<nso<tau_ba<BAs...>, BAs...>> snf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
