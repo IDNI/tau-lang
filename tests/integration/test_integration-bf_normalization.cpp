@@ -138,6 +138,18 @@ TEST_SUITE("Normalize Boolean function with recurrence relation | Simple SAT pro
 		auto check = result |  tau_parser::bf_t;
 		CHECK( check.has_value() );
 	}
+
+	TEST_CASE("Equalities") {
+		const char* sample = "fall x fex y fall v fex w ((x' | y) & (y' | x) &  (v' | w) & (w' | v))";
+		tau_parser::parse_options options;
+		options.start = tau_parser::bf;
+		auto sample_src = make_tau_source(sample, options);
+		bdd_test_factory bf;
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
+		auto check = result |  tau_parser::bf_t;
+		CHECK( check.has_value() );
+	}
 }
 
 TEST_SUITE("Normalize Boolean function with recurrence relation") {
@@ -158,6 +170,29 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		sample_formula.rec_relations = rec_formula.rec_relations;
 		auto result = bf_normalizer_with_rec_relation<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::variable;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("Dependend recurrence relations") {
+		const char* rec =
+			"h[$n]($X) := g[$n - 1]($X)'."
+			"h[0]($X) := $X."
+			"g[$n]($Y) := h[$n - 1]($Y)'."
+			"g[0]($Y) := Y'.";
+
+		tau_parser::parse_options options;
+		options.start = tau_parser::nso_rec_relations;
+		auto rec_src = make_tau_source(rec, options);
+		bdd_test_factory bf;
+		auto rec_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(rec_src, bf);
+
+		const char* sample = "h[8](Y)";
+		options.start = tau_parser::bf;
+		auto sample_src = make_tau_source(sample, options);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		sample_formula.rec_relations = rec_formula.rec_relations;
+		auto result = bf_normalizer_with_rec_relation<bdd_test>(sample_formula);
+		auto check = result |  tau_parser::bf_neg;
 		CHECK( check.has_value() );
 	}
 }
