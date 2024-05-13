@@ -195,12 +195,13 @@ struct bdd_binding_factory {
 				tau_node_terminal_extractor<bdd_binding>,
 				not_whitespace_predicate<bdd_binding>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
+		bdd_init<Bool>();
 		auto ref = bdd<Bool>::bit(index++);
 		auto nn =  make_node<tau_sym<bdd_binding>>(bdd_handle<Bool>::get(ref), {});
 		return cache.emplace(var, nn).first->second;
 	}
 
-	size_t index = 0;
+	size_t index = 1;
 	std::map<std::string, sp_tau_node<bdd_binding>> cache;
 };
 
@@ -216,12 +217,13 @@ struct tau_bdd_binding_factory {
 				tau_node_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>,
 				not_whitespace_predicate<tau_ba<bdd_binding>, bdd_binding>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
+		bdd_init<Bool>();
 		auto ref = bdd<Bool>::bit(index++);
 		auto nn =  make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(bdd_handle<Bool>::get(ref), {});
 		return cache.emplace(var, nn).first->second;
 	}
 
-	size_t index = 0;
+	size_t index = 1;
 	std::map<std::string, sp_tau_node<tau_ba<bdd_binding>, bdd_binding>> cache;
 };
 

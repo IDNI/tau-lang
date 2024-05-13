@@ -39,7 +39,7 @@ struct bdd_test_factory {
 		return cache.emplace(var, nn).first->second;
 	}
 
-	size_t index = 0;
+	size_t index = 1;
 	std::map<std::string, sp_tau_node<bdd_test>> cache;
 };
 
