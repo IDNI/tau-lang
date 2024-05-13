@@ -297,6 +297,22 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 
 template <typename factory_t, typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<factory_t, BAs...>::snf_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n)
+{
+	auto arg = n | tau_parser::nf_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
+		switch (type) {
+		case tau_parser::wff: return snf_wff<tau_ba<BAs...>, BAs...>(value);
+		case tau_parser::bf: return snf_bf<tau_ba<BAs...>, BAs...>(value);
+		}
+	}
+	return {};
+}
+
+template <typename factory_t, typename... BAs>
+std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::bf_substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
@@ -652,6 +668,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::nnf_cmd:            result = cnf_cmd(command); break;
 	case p::pnf_cmd:            not_implemented_yet(); break;
 	case p::mnf_cmd:            result = mnf_cmd(command); break;
+	case p::snf_cmd:            result = snf_cmd(command); break;
 	// store the given formula as memory for future references
 	case p::bf:                 result = command; break;
 	case p::wff:                result = command; break;
