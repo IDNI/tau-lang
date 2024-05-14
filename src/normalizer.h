@@ -120,8 +120,10 @@ rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 nso<BAs...> normalizer_step(const nso<BAs...>& form) {
+	#ifndef DEBUG
 	static std::map<nso<BAs...>, nso<BAs...>> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
+	#endif // DEBUG
 	auto result = form
 		| repeat_all<step<BAs...>, BAs...>(
 			step<BAs...>(apply_defs<BAs...>))
@@ -150,7 +152,9 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			| simplify_bf<BAs...>
 			| simplify_wff<BAs...>)
 		;
+	#ifndef DEBUG
 	cache[form] = result;
+	#endif // DEBUG
 	return result;
 }
 

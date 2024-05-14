@@ -680,7 +680,9 @@ nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 template<typename...BAs>
@@ -702,6 +704,39 @@ nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 }
 
 template<typename...BAs>
+nso<BAs...> snf_bf(const nso<BAs...>& n) {
+	// TODO (HIGH) give a proper implementation (call to_bdd...)
+	return n
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_bf_defs<BAs...>
+			| bf_elim_quantifiers<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_cnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
+}
+
+template<typename...BAs>
+nso<BAs...> snf_wff(const nso<BAs...>& n) {
+	// TODO (HIGH) give a proper implementation (call to_snf...)
+	auto quantified = [](const auto& n) -> bool {
+		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
+	};
+	auto quantifier = find_bottom(n, quantified);
+	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+	auto nform = apply_once_definitions(nn)
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_wff_defs<BAs...>
+			| to_cnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>
+		);
+	return nform;
+}
+
+template<typename...BAs>
 nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 	return n
 		| repeat_each<step<BAs...>, BAs...>(
@@ -710,7 +745,9 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 template<typename...BAs>
@@ -740,7 +777,9 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_nnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 // we assume no functional quantifiers are present and all defs have being applyed
@@ -798,7 +837,7 @@ nso<BAs...> operator|(const nso<BAs...>& n, const to_bdds_bf_t<BAs...>& r) {
 
 // TODO (HIGH) We need an implementation for wff and another for tau
 template<typename...BAs>
-struct snf_wff {
+struct to_snf {
 
 	using var = nso<BAs...>;
 	using vars = std::set<var>;
@@ -937,13 +976,13 @@ private:
 
 // compute the strong normalized form of a wff
 template<typename...BAs>
-static const snf_wff<BAs...> to_snf_wff;
+static const to_snf<BAs...> to_snf_wff;
 
 template<typename...BAs>
-using snf_wff_t = snf_wff<BAs...>;
+using to_snf_wff_t = to_snf<BAs...>;
 
 template<typename...BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const snf_wff_t<BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const to_snf_wff_t<BAs...>& r) {
 	return r(n);
 }
 
@@ -991,7 +1030,9 @@ nso<BAs...> mnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 template<size_t type, typename...BAs>

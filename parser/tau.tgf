@@ -441,6 +441,7 @@ anf_cmd             => anf_cmd_sym __ nf_cmd_arg.
 nnf_cmd             => nnf_cmd_sym __ nf_cmd_arg.
 pnf_cmd             => pnf_cmd_sym __ nf_cmd_arg.
 mnf_cmd             => mnf_cmd_sym __ nf_cmd_arg.
+snf_cmd             => snf_cmd_sym __ nf_cmd_arg.
 nf_cmd_arg          => bf | wff | memory.
 onf_cmd             => onf_cmd_sym __ variable __ onf_cmd_arg.
 onf_cmd_arg         => wff | memory.
@@ -488,7 +489,8 @@ cli_cmd_sym            => help_cmd_sym | version_cmd_sym | quit_cmd_sym
                         | solve_cmd_sym | is_satisfiable_cmd_sym | is_valid_cmd_sym
                         | is_unsatisfiable_cmd_sym | examples_sym
                         | get_cmd_sym | set_cmd_sym | toggle_cmd_sym
-                        | cnf_cmd_sym | dnf_cmd_sym | nnf_cmd_sym | mnf_cmd_sym | onf_cmd_sym.
+                        | cnf_cmd_sym | dnf_cmd_sym | nnf_cmd_sym | mnf_cmd_sym
+                        | onf_cmd_sym | snf_cmd_sym.
 
 # cli symbols
 help_cmd_sym           => "h" | "help".
@@ -515,6 +517,7 @@ anf_cmd_sym            => "anf".
 nnf_cmd_sym            => "nnf".
 pnf_cmd_sym            => "pnf".
 mnf_cmd_sym            => "mnf".
+snf_cmd_sym            => "snf".
 
 def_cmd_sym            => "def".
 def_cmd_del            => "d" | "del" | "delete".

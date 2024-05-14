@@ -13,7 +13,7 @@ include(test_repl-version_cmd.cmake)
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
-# TODO (VERY_HIGH) add tests for definition command
+# TODO (VERY_HIGH) add tests  definition command
 # TODO (VERY_HIGH) add tests for sat/unsat/valid command
 # TODO (VERY_HIGH) add tests for solving command
 # TODO (VERY_HIGH) add tests for configuration commands

@@ -52,26 +52,18 @@ TEST_SUITE("normal forms: onf") {
 	}
 }
 
-TEST_SUITE("normal forms: dnf") {
+// TODO (MEDIUM) add tests for reduce_bf/wff
+// TODO (MEDIUM) add tests for to_bdd_bf
+// TODO (MEDIUM) add tests for minimize
 
-}
 
-TEST_SUITE("normal forms: cnf") {
-
-}
-
-TEST_SUITE("normal forms: nnf") {
-
-}
-
-TEST_SUITE("normal forms: sno_bf") {
-
-}
-
-TEST_SUITE("normal forms: sno_wff") {
-
-}
-
-TEST_SUITE("normal forms: mnn_bf") {
-
-}
+// TODO (MEDIUM) add tests for dnf_bf
+// TODO (MEDIUM) add tests for dnf_wff
+// TODO (MEDIUM) add tests for cnf_bf
+// TODO (MEDIUM) add tests for cnf_wff
+// TODO (MEDIUM) add tests for nnf_bf
+// TODO (MEDIUM) add tests for nnf_bf
+// TODO (MEDIUM) add tests for sno_wwf
+// TODO (MEDIUM) add tests for sno_wff
+// TODO (MEDIUM) add tests for mnn_bf
+// TODO (MEDIUM) add tests for mnn_wff
