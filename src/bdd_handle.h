@@ -563,7 +563,9 @@ ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
 		}
 		ss.insert(t.str());
 	}
+	bool first = true;
 	for (auto& s : ss) {
+		if (first) os << " ", first = false;
 		os << s;
 		if (--n) os << " | ";
 	}

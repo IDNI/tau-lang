@@ -198,9 +198,9 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 }
 
 TEST_SUITE("BDD expressions") {
-	TEST_CASE("X and X") {
+	TEST_CASE("X or Y") {
 		bdd_init<Bool>();
-		const char* sample = "{ bdd : X } & { bdd : X }";
+		const char* sample = "{bdd : X} | {bdd : Y}";
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
