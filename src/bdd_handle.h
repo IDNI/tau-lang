@@ -15,6 +15,7 @@
 #define __BDD_HANDLE_H__
 
 #include "babdd.h"
+#include "dict.h"
 
 template<typename B, auto o> struct bdd_handle;
 template<typename B, auto o = bdd_options<>::create()>
@@ -537,6 +538,36 @@ bdd<B, o>::initializer::initializer() {
 template<bdd_options o>
 bdd<Bool, o>::initializer::initializer() {
 	bdd_init<Bool, o>();
+}
+
+// bdd printer taken from out.h
+template<typename B, auto o = bdd_options<>::create()>
+ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
+	if (f == bdd_handle<B, o>::htrue) return os << '1';
+	if (f == bdd_handle<B, o>::hfalse) return os << '0';
+	set<pair<B, vector<int_t>>> dnf = f->dnf();
+	size_t n = dnf.size();
+	set<string> ss;
+	for (auto& c : dnf) {
+		set<string> s;
+		assert(!(c.first == false));
+		stringstream t;
+		if (!(c.first == true)) t << '{' << c.first << '}';
+		for (int_t v : c.second)
+			if (v < 0) s.insert(string(dict(-v)) + "'"s);
+			else s.insert(dict(v));
+		bool first = true;
+		for (auto& x : s) {
+			if (!first) t << " "; else first = false;
+			t << x;
+		}
+		ss.insert(t.str());
+	}
+	for (auto& s : ss) {
+		os << s;
+		if (--n) os << " | ";
+	}
+	return os;
 }
 
 #endif

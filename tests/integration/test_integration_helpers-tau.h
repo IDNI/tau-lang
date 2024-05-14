@@ -20,6 +20,7 @@
 #include "../src/bool_ba.h"
 #include "../src/normalizer.h"
 #include "../src/tau.h"
+#include "dict.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -37,14 +38,14 @@ struct bdd_test_factory {
 				tau_node_terminal_extractor<tau_ba<bdd_test>, bdd_test>,
 				not_whitespace_predicate<tau_ba<bdd_test>, bdd_test>, n);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
-		auto ref = bdd<Bool>::bit(index++);
-		auto sp = bdd_handle<Bool>::get(ref);
-		tau_sym<tau_ba<bdd_test>, bdd_test> ts(sp);
+		// Make sure that variable name is saved in dict.h for printing
+		int v = dict(var);
+		auto ref = bdd_handle<Bool>::bit(true, v);
+		tau_sym<tau_ba<bdd_test>, bdd_test> ts(ref);
 		auto nn =  make_node<tau_sym<tau_ba<bdd_test>, bdd_test>>(ts, {});
 		return cache.emplace(var, nn).first->second;
 	}
 
-	size_t index = 0;
 	std::map<std::string, sp_tau_node<tau_ba<bdd_test>, bdd_test>> cache;
 };
 
