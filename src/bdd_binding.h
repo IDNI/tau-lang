@@ -26,36 +26,6 @@
 
 using namespace idni::rewriter;
 
-// bdd printer taken from out.h
-template<typename B, auto o = bdd_options<>::create()>
-ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
-	if (f == bdd_handle<B, o>::htrue) return os << '1';
-	if (f == bdd_handle<B, o>::hfalse) return os << '0';
-	set<pair<B, vector<int_t>>> dnf = f->dnf();
-	size_t n = dnf.size();
-	set<string> ss;
-	for (auto& c : dnf) {
-		set<string> s;
-		assert(!(c.first == false));
-		stringstream t;
-		if (!(c.first == true)) t << '{' << c.first << '}';
-		for (int_t v : c.second)
-			if (v < 0) s.insert(string(dict(-v)) + "'"s);
-			else s.insert(dict(v));
-		bool first = true;
-		for (auto& x : s) {
-			if (!first) t << " "; else first = false;
-			t << x;
-		}
-		ss.insert(t.str());
-	}
-	for (auto& s : ss) {
-		os << s;
-		if (--n) os << " | ";
-	}
-	return os;
-}
-
 namespace idni::tau {
 
 using bdd_binding = hbdd<Bool>;
@@ -196,12 +166,13 @@ struct bdd_binding_factory {
 				not_whitespace_predicate<bdd_binding>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		bdd_init<Bool>();
-		auto ref = bdd<Bool>::bit(index++);
-		auto nn =  make_node<tau_sym<bdd_binding>>(bdd_handle<Bool>::get(ref), {});
+		// Make sure that variable name is saved in dict.h for printing
+		int v = dict(var);
+		auto ref = bdd_handle<Bool>::bit(true, v);
+		auto nn =  make_node<tau_sym<bdd_binding>>(ref, {});
 		return cache.emplace(var, nn).first->second;
 	}
 
-	size_t index = 1;
 	std::map<std::string, sp_tau_node<bdd_binding>> cache;
 };
 
@@ -218,12 +189,13 @@ struct tau_bdd_binding_factory {
 				not_whitespace_predicate<tau_ba<bdd_binding>, bdd_binding>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		bdd_init<Bool>();
-		auto ref = bdd<Bool>::bit(index++);
-		auto nn =  make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(bdd_handle<Bool>::get(ref), {});
+		// Make sure that variable name is saved in dict.h for printing
+		int v = dict(var);
+		auto ref = bdd_handle<Bool>::bit(true, v);
+		auto nn =  make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(ref, {});
 		return cache.emplace(var, nn).first->second;
 	}
 
-	size_t index = 1;
 	std::map<std::string, sp_tau_node<tau_ba<bdd_binding>, bdd_binding>> cache;
 };
 

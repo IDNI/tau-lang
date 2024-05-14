@@ -196,3 +196,18 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		CHECK( check.has_value() );
 	}
 }
+
+TEST_SUITE("BDD expressions") {
+	TEST_CASE("X and X") {
+		bdd_init<Bool>();
+		const char* sample = "{ bdd : X } & { bdd : X }";
+		tau_parser::parse_options options;
+		options.start = tau_parser::bf;
+		auto sample_src = make_tau_source(sample, options);
+		bdd_test_factory bf;
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
+		auto check = result |  tau_parser::bf_constant;
+		CHECK( check.has_value() );
+	}
+}
