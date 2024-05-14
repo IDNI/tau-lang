@@ -680,7 +680,9 @@ nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 template<typename...BAs>
@@ -711,7 +713,9 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 template<typename...BAs>
@@ -741,7 +745,9 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 template<typename...BAs>
@@ -771,7 +777,9 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_nnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 // we assume no functional quantifiers are present and all defs have being applyed
@@ -1022,7 +1030,9 @@ nso<BAs...> mnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>);
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
 }
 
 template<size_t type, typename...BAs>
