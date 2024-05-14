@@ -52,6 +52,11 @@ TEST_SUITE("normal forms: onf") {
 	}
 }
 
+// TODO (MEDIUM) add tests for reduce_bf/wff
+// TODO (MEDIUM) add tests for to_bdd_bf
+// TODO (MEDIUM) add tests for minimize
+
+
 // TODO (MEDIUM) add tests for dnf_bf
 // TODO (MEDIUM) add tests for dnf_wff
 // TODO (MEDIUM) add tests for cnf_bf

@@ -145,8 +145,8 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
-		//| reduce_bf<BAs...>
-		//| reduce_wff<BAs...>
+		| reduce_bf<BAs...>
+		| reduce_wff<BAs...>
 		| repeat_all<step<BAs...>, BAs...>(
 			trivialities<BAs...>
 			| simplify_bf<BAs...>
