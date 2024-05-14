@@ -166,6 +166,10 @@ struct bdd_binding_factory {
 				not_whitespace_predicate<bdd_binding>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		bdd_init<Bool>();
+		// Trim whitespaces from var
+		auto is_not_space = [](char c) {return !isspace(c);};
+		auto var_trim = var | ranges::views::filter(is_not_space);
+		var = {var_trim.begin(), var_trim.end()};
 		// Make sure that variable name is saved in dict.h for printing
 		int v = dict(var);
 		auto ref = bdd_handle<Bool>::bit(true, v);
@@ -189,6 +193,10 @@ struct tau_bdd_binding_factory {
 				not_whitespace_predicate<tau_ba<bdd_binding>, bdd_binding>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		bdd_init<Bool>();
+		// Trim whitespaces from var
+		auto is_not_space = [](char c) {return !isspace(c);};
+		auto var_trim = var | ranges::views::filter(is_not_space);
+		var = {var_trim.begin(), var_trim.end()};
 		// Make sure that variable name is saved in dict.h for printing
 		int v = dict(var);
 		auto ref = bdd_handle<Bool>::bit(true, v);
