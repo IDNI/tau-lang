@@ -161,15 +161,16 @@ void repl_evaluator<factory_t, BAs...>::memory_del_cmd(
 }
 
 template <typename factory_t, typename... BAs>
-std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::get_bf(
+std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::get_bf(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	if (auto bf = n | tau_parser::bf; bf) return bf.value();
-	else if (auto memory = n | tau_parser::memory; memory) {
-		if (auto check = memory_retrieve(memory.value()); check) {
+	if (is_non_terminal(tau_parser::bf, n))
+		return std::optional(n);
+	else if (is_non_terminal(tau_parser::memory, n)) {
+		if (auto check = memory_retrieve(n); check) {
 			auto [value, _] = check.value();
-			return value;
+			if (is_non_terminal(tau_parser::bf, value)) return std::optional(value);
+			else return {};
 		}
 	}
 	return {};
@@ -180,11 +181,11 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::get_wff(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	if (auto wff = n | tau_parser::wff; wff) return wff.value();
-	else if (auto memory = n | tau_parser::memory; memory) {
-		if (auto check = memory_retrieve(memory.value()); check) {
+	if (is_non_terminal(tau_parser::wff, n)) return std::optional(n);
+	else if (is_non_terminal(tau_parser::memory, n)) {
+		if (auto check = memory_retrieve(n); check) {
 			auto [value, _] = check.value();
-			return value;
+			return std::optional(value);
 		}
 	}
 	return {};
@@ -316,12 +317,16 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::bf_substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto thiz = get_bf(n->child[1]).value();
-	auto in = get_bf(n->child[2]).value();
-	auto with = get_bf(n->child[3]).value();
+	auto thiz = get_bf(n->child[1]);
+	auto in = get_bf(n->child[2]);
+	auto with = get_bf(n->child[3]);
+	// Check for correct argument types
+	if (!thiz || !in || !with) {
+		cout << "error: invalid argument\n"; return {};
+	}
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
-		changes = {{thiz, with}};
-	return replace(in, changes);
+		changes = {{thiz.value(), with.value()}};
+	return replace(in.value(), changes);
 }
 
 template <typename factory_t, typename... BAs>
@@ -329,12 +334,16 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::wff_substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto thiz = get_wff(n->child[1]).value();
-	auto in = get_wff(n->child[2]).value();
-	auto with = get_wff(n->child[3]).value();
+	auto thiz = get_wff(n->child[1]);
+	auto in = get_wff(n->child[2]);
+	auto with = get_wff(n->child[3]);
+	// Check for correct argument types
+	if (!thiz || !in || !with){
+		cout << "error: invalid argument\n"; return {};
+	}
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
-		changes = {{thiz, with}};
-	return replace(in, changes);
+		changes = {{thiz.value(), with.value()}};
+	return replace(in.value(), changes);
 }
 
 template <typename factory_t, typename... BAs>
