@@ -425,14 +425,14 @@ bf_substitute_cmd      => substitute_cmd_sym __
                           # bf or memory or selection to be used for substitution
                           (bf | memory | bf_selection) __
                           # bf or memory or selection where to substitute
-                          (memory | bf_selection | bf_selection)
+                          (memory | bf_selection) __
                           # nso_rr or memory or selection where to substitute
                           (bf_selection | memory).
-wff_substitute_cmd     => substitutecmd__sym __
+wff_substitute_cmd     => substitute_cmd_sym __
                           # wff or memory or selection to be used for substitution
                           (wff | memory | wff_selection) __
                           # wff or memory or selection where to substitute
-                          (memory | wff_selection)
+                          (memory | wff_selection) __
                           # nso_rr or memory or selection where to substitute
                           (wff_selection | memory).
 dnf_cmd             => dnf_cmd_sym __ nf_cmd_arg.
