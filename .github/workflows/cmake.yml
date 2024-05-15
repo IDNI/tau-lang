@@ -51,6 +51,9 @@ jobs:
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-$GCC_VERSION 60
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-$GCC_VERSION 60
 
+    - name: Initialize git submodules
+      run: git submodule update --init --recursive
+
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
