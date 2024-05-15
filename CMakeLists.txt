@@ -65,11 +65,10 @@ else()
 endif()
 
 #
-# Adding parser library's git submodule
+# Adding parser library submodule directory
 #
 option(PARSER_BUILD_STATIC_LIBRARY "build only static library" ON)
-include(add-git-submodule)
-add_git_submodule("external/parser")
+add_subdirectory("external/parser")
 set(IDNI_PARSER_OBJECT_LIB "idni_parsero")
 
 # TODO (LOW) make it run automatically on grammar modifications
