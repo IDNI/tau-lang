@@ -163,12 +163,9 @@ struct bdd_binding_factory {
 	sp_tau_node<bdd_binding> build(const std::string type_name, const sp_tau_node<bdd_binding>& n) {
 		if (type_name != "bdd") return n;
 		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<bdd_binding>>;
-		std::string var = make_string_with_skip<
-			tau_node_terminal_extractor_t<bdd_binding>,
-			not_whitespace_predicate_t<bdd_binding>,
-			sp_tau_node<bdd_binding>>(
-				tau_node_terminal_extractor<bdd_binding>,
-				not_whitespace_predicate<bdd_binding>, source);
+		std::string var = make_string<
+			tau_node_terminal_extractor_t<bdd_binding>,sp_tau_node<bdd_binding>>(
+				tau_node_terminal_extractor<bdd_binding>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		auto ref = bdd<Bool>::bit(index++);
 		auto nn =  make_node<tau_sym<bdd_binding>>(bdd_handle<Bool>::get(ref), {});
@@ -184,12 +181,10 @@ struct tau_bdd_binding_factory {
 	sp_tau_node<tau_ba<bdd_binding>, bdd_binding> build(const std::string type_name, const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n) {
 		if (type_name != "bdd") return n;
 		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>;
-		std::string var = make_string_with_skip<
+		std::string var = make_string<
 			tau_node_terminal_extractor_t<tau_ba<bdd_binding>, bdd_binding>,
-			not_whitespace_predicate_t<tau_ba<bdd_binding>, bdd_binding>,
 			sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>(
-				tau_node_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>,
-				not_whitespace_predicate<tau_ba<bdd_binding>, bdd_binding>, source);
+				tau_node_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>, source);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		auto ref = bdd<Bool>::bit(index++);
 		auto nn =  make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(bdd_handle<Bool>::get(ref), {});

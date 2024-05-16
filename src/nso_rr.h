@@ -580,20 +580,13 @@ struct stringify {
 	const extractor_t& extractor;
 };
 
-// converts a sp_tau_node<...> to a string skipping the nodes that satisfy the
-// given predicate.
-template <typename extractor_t, typename predicate_t, typename node_t>
-std::string make_string_with_skip(const extractor_t& extractor, predicate_t& skip, const node_t& n) {
-	std::basic_stringstream<char> ss;
-	stringify<extractor_t, node_t> sy(extractor, ss);
-	post_order_tree_traverser<stringify<extractor_t, node_t>, predicate_t, node_t>(sy, skip)(n);
-	return ss.str();
-}
-
 // converts a sp_tau_node<...> to a string.
 template <typename extractor_t, typename node_t>
 std::string make_string(const extractor_t& extractor, const node_t& n) {
-	return make_string_with_skip<extractor_t, all_t<node_t>, node_t>(extractor, all<node_t>, n);
+	std::basic_stringstream<char> ss;
+	stringify<extractor_t, node_t> sy(extractor, ss);
+	post_order_tree_traverser<stringify<extractor_t, node_t>, all_t<node_t>, node_t>(sy, all<node_t>)(n);
+	return ss.str();
 }
 
 // bind the given, using a binder, the constants of the a given sp_tau_node<...>.
@@ -643,12 +636,10 @@ struct name_binder {
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		// FIXME (LOW) check if the node is a named binding one
-		auto bn = make_string_with_skip<
+		auto bn = make_string<
 				tau_node_terminal_extractor_t<BAs...>,
-				not_whitespace_predicate_t<BAs...>,
 				sp_tau_node<BAs...>>(
-			tau_node_terminal_extractor<BAs...>,
-			not_whitespace_predicate<BAs...>, n);
+			tau_node_terminal_extractor<BAs...>, n);
 		auto s = bs.find(bn);
 		if (s != bs.end()) {
 			tau_sym<BAs...> ts = s->second;
@@ -672,12 +663,10 @@ struct factory_binder {
 		if(auto type = find_top(n, is_non_terminal<tau_parser::type, BAs...>); type) {
 			// the factory take two arguments, the first is the type and the
 			// second is the node representing the constant.
-			auto type_name = make_string_with_skip<
+			auto type_name = make_string<
 					tau_node_terminal_extractor_t<BAs...>,
-					not_whitespace_predicate_t<BAs...>,
 					sp_tau_node<BAs...>>(
-				tau_node_terminal_extractor<BAs...>,
-				not_whitespace_predicate<BAs...>, type.value());
+				tau_node_terminal_extractor<BAs...>, type.value());
 			return factory.build(type_name, n);
 		}
 		return n;
@@ -707,12 +696,10 @@ struct factory_binder {
 template<typename... BAs>
 static const auto is_unresolved_predicate = [](const sp_tau_node<BAs...>& n) {
 	if (!is_non_terminal<tau_parser::type, BAs...>(n)) return false;
-	auto type_name = make_string_with_skip<
+	auto type_name = make_string<
 			tau_node_terminal_extractor_t<BAs...>,
-			not_whitespace_predicate_t<BAs...>,
 			sp_tau_node<BAs...>>(
-			tau_node_terminal_extractor<BAs...>,
-		not_whitespace_predicate<BAs...>, n);
+			tau_node_terminal_extractor<BAs...>, n);
 	return type_name.empty();
 };
 
@@ -723,12 +710,10 @@ using is_unresolved_predicate_t = decltype(is_unresolved_predicate<BAs...>);
 template<typename... BAs>
 static const auto is_resolved_predicate = [](const sp_tau_node<BAs...>& n) {
 	if (!is_non_terminal<tau_parser::type, BAs...>(n)) return false;
-	auto type_name = make_string_with_skip<
+	auto type_name = make_string<
 			tau_node_terminal_extractor_t<BAs...>,
-			not_whitespace_predicate_t<BAs...>,
 			sp_tau_node<BAs...>>(
-			tau_node_terminal_extractor<BAs...>,
-		not_whitespace_predicate<BAs...>, n);
+			tau_node_terminal_extractor<BAs...>, n);
 	return !type_name.empty();
 };
 
@@ -876,12 +861,10 @@ template<typename...BAs>
 sp_tau_node<BAs...> process_digits(const sp_tau_node<BAs...>& tau_source){
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 	for(auto& n: select_top(tau_source, is_non_terminal<tau_parser::digits, BAs...>)){
-		auto offset = make_string_with_skip<
+		auto offset = make_string<
 				tau_node_terminal_extractor_t<BAs...>,
-				not_whitespace_predicate_t<BAs...>,
 				sp_tau_node<BAs...>>(
-			tau_node_terminal_extractor<BAs...>,
-			not_whitespace_predicate<BAs...>, n);
+			tau_node_terminal_extractor<BAs...>,  n);
 		auto num = std::stoul(offset);
 		auto nn = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(num), {});
 		changes[n] = nn;
@@ -1631,10 +1614,8 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r, const sp_tau_nod
 	// IDEA maybe we could traverse only once
 	auto nn = apply_if<
 			sp_tau_node<BAs...>,
-			none_t<sp_tau_node<BAs...>>,
 			is_capture_t<BAs...>,
-			predicate_t>(r, n , none<sp_tau_node<BAs...>>,
-					is_capture<BAs...>, predicate);
+			predicate_t>(r, n ,	is_capture<BAs...>, predicate);
 	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
 		callback_applier<BAs...> cb_applier;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
@@ -1672,12 +1653,7 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rules<nso<BAs...>>& rs, const sp_tau_n
 template<typename... BAs>
 sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
-	auto nn = apply<sp_tau_node<BAs...>,
-			none_t<sp_tau_node<BAs...>>,
-			is_capture_t<BAs...>>(r, n,
-				none<sp_tau_node<BAs...>>,
-				is_capture<BAs...>);
-
+	auto nn = apply_rule<sp_tau_node<BAs...>, is_capture_t<BAs...>>(r, n, is_capture<BAs...>);
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 
 	// compute changes from callbacks
