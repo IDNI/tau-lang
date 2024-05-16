@@ -15,13 +15,11 @@ option(TAU_BUILD_STATIC_LIBRARY    "Build static library"                  OFF)
 option(TAU_BUILD_SHARED_LIBRARY    "Build shared library"                  OFF)
 option(TAU_BUILD_EXECUTABLE        "Build executable"                      OFF)
 option(TAU_BUILD_SHARED_EXECUTABLE "Build shared executable"               OFF)
-option(TAU_BUILD_TESTS             "Build tests"                           OFF)
+option(TAU_BUILD_TESTS             "Build all tests"                       OFF)
+option(TAU_BUILD_UNIT_TESTS        "Build unit tests"                      OFF)
 option(TAU_BUILD_REPL_TESTS        "Build repl tests"                      OFF)
 option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
 option(TAU_BUILD_REGRESSION        "Build regression tests"                OFF)
-#option(TAU_BUILD_EXAMPLES          "Build examples"                        OFF)
-# TODO (LOW) remove a singular TAU_GENERATE_PARSER in a near future
-option(TAU_GENERATE_PARSER         "Generates parsers from TGF (obsolete)" OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 set_property(CACHE TAU_BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
@@ -32,13 +30,23 @@ set_property(CACHE TAU_BUILD_TESTS             PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_INTEGRATION       PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REGRESSION        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REPL_TESTS        PROPERTY STRINGS "OFF" "ON")
-#set_property(CACHE TAU_BUILD_EXAMPLES          PROPERTY STRINGS "OFF" "ON")
-set_property(CACHE TAU_GENERATE_PARSER         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
+
+if(TAU_BUILD_TESTS)
+	set(TAU_BUILD_UNIT_TESTS ON)
+	set(TAU_BUILD_REPL_TESTS ON)
+	set(TAU_BUILD_INTEGRATION ON)
+	set(TAU_BUILD_REGRESSION ON)
+endif()
+
+if(TAU_BUILD_REPL_TESTS)
+	set(TAU_BUILD_EXECUTABLE ON)
+endif()
 
 if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 	AND NOT TAU_BUILD_EXECUTABLE AND NOT TAU_BUILD_SHARED_EXECUTABLE
-	AND NOT TAU_BUILD_TESTS) # AND NOT TAU_BUILD_EXAMPLES)
+	AND NOT TAU_BUILD_UNIT_TESTS AND NOT TAU_BUILD_REGRESSION
+	AND NOT TAU_BUILD_INTEGRATION AND NOT TAU_BUILD_REPL_TESTS)
 		set(TAU_BUILD_EXECUTABLE ON)
 endif()
 
@@ -47,8 +55,10 @@ message(STATUS "TAU_BUILD_SHARED_LIBRARY: ${TAU_BUILD_SHARED_LIBRARY}")
 message(STATUS "TAU_BUILD_EXECUTABLE: ${TAU_BUILD_EXECUTABLE}")
 message(STATUS "TAU_BUILD_SHARED_EXECUTABLE: ${TAU_BUILD_SHARED_EXECUTABLE}")
 message(STATUS "TAU_BUILD_TESTS: ${TAU_BUILD_TESTS}")
+message(STATUS "TAU_BUILD_UNIT_TESTS: ${TAU_BUILD_UNIT_TESTS}")
+message(STATUS "TAU_BUILD_REPL_TESTS: ${TAU_BUILD_REPL_TESTS}")
 message(STATUS "TAU_BUILD_REGRESSION: ${TAU_BUILD_REGRESSION}")
-#message(STATUS "TAU_BUILD_EXAMPLES: ${TAU_BUILD_EXAMPLES}")
+message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 
 #
@@ -92,16 +102,13 @@ include(tau-common)
 #
 add_subdirectory("src")
 
-#if (TAU_BUILD_EXAMPLES)
-#	add_subdirectory("examples")
-#endif(TAU_BUILD_EXAMPLES)
-
 #
 # Testing
 #
-if (TAU_BUILD_TESTS)
-	enable_testing()
-	add_subdirectory(tests)
+if (TAU_BUILD_UNIT_TESTS OR TAU_BUILD_REGRESSION
+	OR TAU_BUILD_INTEGRATION OR TAU_BUILD_REPL_TESTS)
+		enable_testing()
+		add_subdirectory(tests)
 endif ()
 
 #
