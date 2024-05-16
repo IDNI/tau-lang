@@ -791,7 +791,7 @@ struct to_bdds {
 	nso<BAs...> operator()(const nso<BAs...>& n) {
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		for (auto& bf: select_top(n, is_non_terminal<tau_parser::bf, BAs...>)) {
-			auto vars = select_all(bf, is_non_terminal<tau_parser::var, BAs...>);
+			auto vars = select_all(bf, is_non_terminal<tau_parser::variable, BAs...>);
 			auto vars_set = std::set<nso<BAs...>>(vars.begin(), vars.end());
 			auto bdd = bf_to_bdd(vars_set, bf);
 			changes[bf] = bdd;
@@ -877,14 +877,14 @@ private:
 	exponent get_exponent(const vars& vs, const nso<BAs...>& n) {
 		exponent exp;
 		auto wff = n | tau_parser::wff;
-		auto all_vs = select_top(wff, is_non_terminal<tau_parser::var, BAs...>);
+		auto all_vs = select_top(wff, is_non_terminal<tau_parser::variable, BAs...>);
 		// we set all variables to true in the exponent
 		for (auto& v: all_vs) exp[v] = true;
 		// we change the negated ones to false
 		auto negs = select_top(wff, is_non_terminal<tau_parser::bf_neg, BAs...>);
 		for (auto& v: negs)
 			if (auto check = v | is_non_terminal<tau_parser::bf_neg, BAs...>
-					| is_non_terminal<tau_parser::var, BAs...>; check)
+					| is_non_terminal<tau_parser::variable, BAs...>; check)
 				exp[check.value()] = false;
 		return exp;
 	}
@@ -996,7 +996,7 @@ nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...
 template<typename...BAs>
 nso<BAs...> minimize_wff(const nso<BAs...>& n) {
 	auto form = n;
-	for (auto& var: select_all(n, is_non_terminal<tau_parser::var, BAs...>)) {
+	for (auto& var: select_all(n, is_non_terminal<tau_parser::variable, BAs...>)) {
 		for (auto& c: get_dnf_clauses<tau_parser::wff, BAs...>(n)) {
 			for (auto& l: get_literals<tau_parser::wff, BAs...>(c)) {
 				auto type = (l | tau_parser::bf_eq) ? tau_parser::bf_eq : tau_parser::bf_neq;
