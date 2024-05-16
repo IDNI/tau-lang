@@ -97,6 +97,7 @@ endif()
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
 include(tau-common)
+
 #
 # Adding src dir
 #

@@ -46,7 +46,7 @@ endfunction()
 
 # setups a target: sets COMPILE and LINK options, adds warnings, c++20 req...
 function(target_setup target)
-	target_compile_features(${target} PRIVATE cxx_std_20)
+	target_compile_features(${target} PRIVATE cxx_std_23)
 	if(NOT MSVC)
 		target_compile_options(${target} PRIVATE
 			-W -Wall -Wextra -Wpedantic
