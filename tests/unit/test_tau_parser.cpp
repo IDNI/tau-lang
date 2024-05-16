@@ -1187,8 +1187,7 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::constant
 			| tau_parser::binding
 			| tau_parser::source_binding
-			| tau_parser::type
-			| tau_parser::chars;
+			| tau_parser::type;
 		CHECK( type.has_value() );
 	}
 }
