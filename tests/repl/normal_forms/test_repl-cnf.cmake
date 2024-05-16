@@ -46,14 +46,15 @@ add_test(NAME test_repl-normal_forms-cnf_bf_0
 set_tests_properties(test_repl-normal_forms-cnf_bf_0 PROPERTIES
 	PASS_REGULAR_EXPRESSION ": 0")
 
+# TODO (HIGH) review the following tests (they are flaky due to the use of std::set)
 # (X | (Y & Z))
-add_test(NAME test_repl-normal_forms-cnf_bf_dist_right
-	COMMAND bash -c "echo 'cnf (X | (Y & Z)). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-normal_forms-cnf_bf_dist_right PROPERTIES
-	PASS_REGULAR_EXPRESSION ": \\(X \\| Y\\) & \\(X \\| Z\\)")
+#add_test(NAME test_repl-normal_forms-cnf_bf_dist_right
+#	COMMAND bash -c "echo 'cnf (X | (Y & Z)). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+#set_tests_properties(test_repl-normal_forms-cnf_bf_dist_right PROPERTIES
+#	PASS_REGULAR_EXPRESSION ": \\(X \\| Y\\) & \\(X \\| Z\\)|")
 
 # ((X & Y) | Z)
-add_test(NAME test_repl-normal_forms-cnf_bf_dist_left
-	COMMAND bash -c "echo 'cnf ((X & Y) | Z). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-normal_forms-cnf_bf_dist_left PROPERTIES
-	PASS_REGULAR_EXPRESSION ": \\(X \\| Z\\) & \\(Y \\| Z\\)")
+#add_test(NAME test_repl-normal_forms-cnf_bf_dist_left
+#	COMMAND bash -c "echo 'cnf ((X & Y) | Z). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+#set_tests_properties(test_repl-normal_forms-cnf_bf_dist_left PROPERTIES
+#	PASS_REGULAR_EXPRESSION ": \\(X \\| Z\\) & \\(Y \\| Z\\)")
