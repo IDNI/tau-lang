@@ -791,14 +791,14 @@ TEST_SUITE("pattern_matcher") {
 
 	struct is_capture_predicate {
 
-		bool operator()(const sp_node<char>& n) {
+		bool operator()(const sp_node<char>& n) const {
 			return n->value == 'X' || n->value == 'Y' || n->value == 'Z';
 		}
 	};
 
 	struct is_ignore_predicate {
 
-		bool operator()(const sp_node<char>& n) {
+		bool operator()(const sp_node<char>& n) const {
 			return n->value == 'I';
 		}
 	};
@@ -985,14 +985,14 @@ TEST_SUITE("apply") {
 
 	struct is_capture_predicate {
 
-		bool operator()(const sp_node<char>& n) {
+		bool operator()(const sp_node<char>& n) const {
 			return n->value == 'X' || n->value == 'Y' || n->value == 'Z';
 		}
 	};
 
 	struct is_ignore_predicate {
 
-		bool operator()(const sp_node<char>& n) {
+		bool operator()(const sp_node<char>& n) const {
 			return n->value == 'I';
 		}
 	};

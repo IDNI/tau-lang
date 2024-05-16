@@ -1628,15 +1628,13 @@ private:
 // IDEA maybe this could be operator|
 template<typename predicate_t, typename... BAs>
 sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r, const sp_tau_node<BAs...>& n, predicate_t& predicate) {
-	auto noskip = [](const auto&) { return false; };
 	// IDEA maybe we could traverse only once
-	auto nn = apply_with_skip_if<
+	auto nn = apply_if<
 			sp_tau_node<BAs...>,
 			none_t<sp_tau_node<BAs...>>,
 			is_capture_t<BAs...>,
-			decltype(noskip),
 			predicate_t>(r, n , none<sp_tau_node<BAs...>>,
-					is_capture<BAs...>, noskip, predicate);
+					is_capture<BAs...>, predicate);
 	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
 		callback_applier<BAs...> cb_applier;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
@@ -1674,14 +1672,11 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rules<nso<BAs...>>& rs, const sp_tau_n
 template<typename... BAs>
 sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<BAs...>& n) {
 	// IDEA maybe we could traverse only once
-
-	// apply the rule
-	auto noskip = [](const auto&) { return false; };
-	auto nn = apply_with_skip<sp_tau_node<BAs...>,
+	auto nn = apply<sp_tau_node<BAs...>,
 			none_t<sp_tau_node<BAs...>>,
-			is_capture_t<BAs...>, decltype(noskip)>(r, n,
+			is_capture_t<BAs...>>(r, n,
 				none<sp_tau_node<BAs...>>,
-				is_capture<BAs...>, noskip);
+				is_capture<BAs...>);
 
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 
