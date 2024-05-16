@@ -1740,6 +1740,19 @@ sp_tau_node<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs, const sp_tau_node
 // operators << to pretty print the tau language related types
 //
 
+template <typename node_t>
+std::ostream& operator<<(std::ostream& stream,
+	const idni::rewriter::rule<node_t>& r)
+{
+	using namespace idni::tau;
+	bool istau = (r.first | tau_parser::tau_matcher)
+		|| (r.first | tau_parser::tau_ref);
+	bool iswff = (r.first | tau_parser::wff_matcher)
+		|| (r.first | tau_parser::wff_ref);
+	return stream << r.first << " " << (istau ? ":::" : iswff ? "::" : ":")
+		<< "= "	<< r.second << ".";
+}
+
 // << for rules
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream, const idni::tau::rules<idni::tau::nso<BAs...>>& rs) {
