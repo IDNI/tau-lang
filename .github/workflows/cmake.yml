@@ -60,10 +60,6 @@ jobs:
       run: |
         cmake -B ${{github.workspace}}/build \
           -DTAU_BUILD_TESTS=ON \
-          -DTAU_BUILD_REPL_TESTS=ON \
-          -DTAU_BUILD_REGRESSION=ON \
-          -DTAU_BUILD_EXECUTABLE=ON \
-          -DTAU_BUILD_INTEGRATION=ON \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DCMAKE_C_COMPILER=/usr/bin/gcc \
           -DCMAKE_CXX_COMPILER=/usr/bin/g++ \

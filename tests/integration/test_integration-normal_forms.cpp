@@ -33,7 +33,7 @@ TEST_SUITE("normal forms: onf") {
 		bdd_test_factory bf;
 		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto nts = std::get<tau_source_sym>(sample_formula.main->value).nts;
-		auto var = make_node<tau_sym<bdd_test>>(tau_source_sym(tau_parser::var, nts), {});
+		auto var = make_node<tau_sym<bdd_test>>(tau_source_sym(tau_parser::variable, nts), {});
 		auto result = onf(sample_formula.main, var);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -45,7 +45,7 @@ TEST_SUITE("normal forms: onf") {
 		bdd_test_factory bf;
 		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto nts = std::get<tau_source_sym>(sample_formula.main->value).nts;
-		auto var = make_node<tau_sym<bdd_test>>(tau_source_sym(tau_parser::var, nts), {});
+		auto var = make_node<tau_sym<bdd_test>>(tau_source_sym(tau_parser::variable, nts), {});
 		auto result = onf(sample_formula.main, var);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
