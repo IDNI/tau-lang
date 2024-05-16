@@ -20,7 +20,6 @@
 #include "rewriting.h"
 #include "tau.h"
 #include "dict.h"
-#include "parser_instance.h"
 
 #include "../parser/bdd_parser.generated.h"
 
@@ -67,20 +66,21 @@ inline static std::map<int_t, bdd_binding> var_cache{};
 struct bdd_factory {
 
 	using parse_forest = idni::parser<char, char>::pforest;
+	using parse_result = idni::parser<char, char>::result;
 
 	// transform a parse forest into a bdd
-	bdd_binding transform(const parse_forest& f) {
+	bdd_binding transform(const parse_result& r) {
 		std::vector<bdd_binding> x; // stack
-		auto cb_enter = [&x, &f] (const auto& n) {
-			if (!n.first.nt()) return; // skip if terminal
-			auto nt = n.first.n(); // get nonterminal id
+		auto cb_enter = [&x, &r] (const auto& n) {
+			if (!n->first.nt()) return; // skip if terminal
+			auto nt = n->first.n(); // get nonterminal id
 			static auto T = bdd_handle<Bool>::htrue;
 			static auto F = bdd_handle<Bool>::hfalse;
 			if      (nt == bdd_parser::T) x.push_back(T);
 			else if (nt == bdd_parser::F) x.push_back(F);
 			else if (nt == bdd_parser::var) {
 				// get var id from var node's terminals
-				auto v = dict(terminals_to_str(f, n));
+				auto v = dict(r.get_terminals(n));
 				// use cached var if exists
 				if (auto cn = var_cache.find(v);
 					cn != var_cache.end())
@@ -94,8 +94,8 @@ struct bdd_factory {
 			}
 		};
 		auto cb_exit = [&x] (const auto& n, const auto&) {
-			if (!n.first.nt()) return; // skip if terminal
-			auto nt = n.first.n(); // get nonterminal id
+			if (!n->first.nt()) return; // skip if terminal
+			auto nt = n->first.n(); // get nonterminal id
 			// shortcuts for current and previous stack elements
 			#define CURR (x.back())
 			#define PREV (x[x.size() - 2])
@@ -115,7 +115,7 @@ struct bdd_factory {
 			#undef CURR
 			#undef PREV
 		};
-		f.traverse(cb_enter, cb_exit); // run traversal
+		r.get_forest()->traverse(cb_enter, cb_exit); // run traversal
 		// return the current element of the stack if any or hfalse
 		DBG(assert(x.size() <= 1);)
 		return x.size() ? x.back() : bdd_handle<Bool>::hfalse;
@@ -123,39 +123,14 @@ struct bdd_factory {
 
 	// parses a bdd from a string
 	bdd_binding parse(const std::string& src) {
-		auto& p = parser_instance<bdd_parser>();
-		auto f = p.parse(src.c_str(), src.size());
-#ifdef SHOW_GRAMMAR_ERRORS
-		if (!f || !p.found()) {
-			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src << "`\n"
-				<< p.get_error().to_str();
+		auto& p = bdd_parser::instance();
+		auto r = p.parse(src.c_str(), src.size());
+		if (!r.found) {
+			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src
+				<< "`\n" << r.parse_error;
 			return bdd_handle<Bool>::hfalse;
 		}
-#ifdef DEBUG
-		else if (f->is_ambiguous()) {
-			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src << "`\n"
-				<< "# n trees: " << f->count_trees() << "\n"
-				<< "# ambiguous nodes:";
-			for (auto& n : f->ambiguous_nodes()) {
-				BOOST_LOG_TRIVIAL(error) << "\t `" << n.first.first << "` ["
-					<< n.first.second[0] << ","
-					<< n.first.second[1] << "]";
-				size_t d = 0;
-				for (auto ns : n.second) {
-					std::stringstream ss;
-					ss << "\t\t " << d++ << "\t";
-					for (auto nt : ns) ss
-						<< " `" << nt.first
-						<< "`[" << nt.second[0] << ","
-						<< nt.second[1] << "] ";
-					BOOST_LOG_TRIVIAL(error) << ss.str();
-				}
-			}
-			return bdd_handle<Bool>::hfalse;
-		}
-#endif // DEBUG
-#endif // SHOW_GRAMMAR_ERRORS
-		return transform(*f); // transform the forest into bdd
+		return transform(r); // transform the forest into bdd
 	}
 
 	// builds a bdd bounded node parsed from terminals of a source binding
