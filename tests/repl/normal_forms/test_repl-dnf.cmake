@@ -50,10 +50,10 @@ PASS_REGULAR_EXPRESSION ": 0")
 add_test(NAME test_repl-normal_forms-dnf_bf_dist_right
 COMMAND bash -c "echo 'dnf (X & (Y | Z)). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-normal_forms-dnf_bf_dist_right PROPERTIES
-PASS_REGULAR_EXPRESSION ": X & Y \\| X & Z")
+PASS_REGULAR_EXPRESSION ": Y & X \\| X & Z")
 
 # ((X & Y) | Z)
 add_test(NAME test_repl-normal_forms-dnf_bf_dist_left
 COMMAND bash -c "echo 'dnf ((X | Y) & Z). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-normal_forms-dnf_bf_dist_left PROPERTIES
-PASS_REGULAR_EXPRESSION ": X & Z \\| Y & Z")
+PASS_REGULAR_EXPRESSION ": Z & Y \\| Z & X")
