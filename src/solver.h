@@ -178,7 +178,8 @@ std::optional<std::variant<BAs...>> solve_clause_using_splitter(const nlgeqs_cla
 template<typename...BAs>
 std::pair<var<BAs...>, std::optional<nso<BAs...>>> eliminate_interval(const nso<BAs...>& clause) {
 	auto interval = find_top(clause, is_non_terminal<tau_parser::bf_interval, BAs...>);
-	auto var = interval | tau_parser::var | optional_value_extractor<sp_tau_node<BAs...>>;
+	auto var = interval | tau_parser::variable
+		| optional_value_extractor<sp_tau_node<BAs...>>;
 	auto bounds = interval || tau_parser::bf;
 	// given a <= x <= b we can replace it by x = a x + b x'
 	auto subs = trim(build_bf_xor<BAs...>(
@@ -246,13 +247,13 @@ std::optional<std::variant<BAs...>> solve_clause_using_splitter(const clause<BAs
 // or in any other form. We may drop such assumption in the future.
 template<typename splitter_t, typename...BAs>
 std::optional<std::variant<BAs...>> solve_using_splitter(const nso<BAs...>& nso, splitter_t splitter) {
-	auto var = find_top(nso, is_non_terminal<tau_parser::var, BAs...>)
+	auto var = find_top(nso, is_non_terminal<tau_parser::variable, BAs...>)
 		| optional_value_extractor<sp_tau_node<BAs...>>;
 	auto onf = onf_subformula(nso, var);
 	// finally, for each clause we try to find a solution using the splitter
 	for (auto& clause: get_dnf_clauses<tau_parser::wff>(onf))
-		if (auto solution = solve_clause_using_splitter(clause, splitter); solution.has_value())
-			return solution.value();
+		if (auto solution = solve_clause_using_splitter(clause, splitter);
+			solution.has_value()) return solution.value();
 	// we were unable to compute a proper splitter at some point which was crucial
 	// for computing the solution, so we return {}. This is a failure.
 	return {};
