@@ -1711,9 +1711,9 @@ sp_tau_node<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs, const sp_tau_node
 // operators << to pretty print the tau language related types
 //
 
-template <typename node_t>
+template <typename...BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::rule<node_t>& r)
+	const idni::rewriter::rule<idni::tau::sp_tau_node<BAs...>>& r)
 {
 	using namespace idni::tau;
 	bool istau = (r.first | tau_parser::tau_matcher)
