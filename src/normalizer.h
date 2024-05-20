@@ -117,6 +117,28 @@ rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
 	return { nrec_relations, nmain };
 }
 
+template<typename... BAs>
+struct remove_one_wff_existential {
+
+	nso<BAs...> operator()(const nso<BAs...>& n) const {
+		auto nn = n
+			| repeat_all<step<BAs...>, BAs...>(
+				simplify_bf<BAs...>
+				| to_dnf_bf<BAs...>
+				| apply_cb<BAs...>
+				| to_dnf_wff<BAs...>
+				| simplify_wff<BAs...>
+				| bf_positives_upwards<BAs...>
+				| squeeze_positives<BAs...>);
+		return nn | wff_remove_existential<BAs...>;
+	}
+};
+
+template<typename... BAs>
+nso<BAs...> operator|(const nso<BAs...>& form, const remove_one_wff_existential<BAs...>& r) {
+	return r(form);
+}
+
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 nso<BAs...> normalizer_step(const nso<BAs...>& form) {
@@ -129,18 +151,8 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			step<BAs...>(apply_defs<BAs...>))
 		| repeat_all<step<BAs...>, BAs...>(
 			step<BAs...>(elim_for_all<BAs...>))
-		| repeat_each<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			bf_positives_upwards<BAs...>
-			| squeeze_positives<BAs...>
-			| wff_remove_existential<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			bf_elim_quantifiers<BAs...>
-			| simplify_bf<BAs...>
-			| to_dnf_bf<BAs...>
-			| apply_cb<BAs...>)
+		| repeat_all<remove_one_wff_existential<BAs...>, BAs...>(
+			remove_one_wff_existential<BAs...>())
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>)
@@ -290,12 +302,13 @@ template<typename... BAs>
 nso<BAs...> bf_normalizer_without_rec_relation (const nso<BAs...>& bf) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
 
-	auto result = bf | repeat_all<step<BAs...>, BAs...>( apply_bf_defs<BAs...> | bf_elim_quantifiers<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(
-				to_dnf_bf<BAs...>
-				| simplify_bf<BAs...>
-				| apply_cb<BAs...>)
-			| reduce_bf<BAs...>;
+	auto result = bf
+		| repeat_all<step<BAs...>, BAs...>( apply_bf_defs<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_dnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>)
+		| reduce_bf<BAs...>;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 
@@ -314,13 +327,12 @@ nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
 
 	auto result = bf_unfolded | repeat_all<step<BAs...>, BAs...>(
-					apply_bf_defs<BAs...>
-					| bf_elim_quantifiers<BAs...>)
-				  | repeat_all<step<BAs...>, BAs...>(
-					to_dnf_bf<BAs...>
+		apply_bf_defs<BAs...>)
+			| repeat_all<step<BAs...>, BAs...>(
+				to_dnf_bf<BAs...>
 					| simplify_bf<BAs...>
 					| apply_cb<BAs...>)
-				  | reduce_bf<BAs...>;
+				| reduce_bf<BAs...>;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 

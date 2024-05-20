@@ -92,8 +92,6 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         |                                     bool_variable.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
-                        | ("fall" __ q_var __ bf)            :bf_all
-                        | ("fex"  __ q_var __ bf)            :bf_ex
                         | (sym [_ offsets] _ ref_args)       :bf_ref
                         | (bf _       '|'  _  bf)            :bf_or
                         | (bf _       '+'  _  bf)            :bf_xor

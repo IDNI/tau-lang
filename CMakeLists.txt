@@ -77,7 +77,8 @@ endif()
 #
 # Adding parser library submodule directory
 #
-option(PARSER_BUILD_STATIC_LIBRARY "build only static library" ON)
+option(BOOST_LOG_TRIVIAL 			"Build logging in parser" 	ON)
+option(PARSER_BUILD_STATIC_LIBRARY 	"Build only static library" ON)
 add_subdirectory("external/parser")
 set(IDNI_PARSER_OBJECT_LIB "idni_parsero")
 

@@ -126,20 +126,6 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 	}
 }
 
-TEST_SUITE("Normalize Boolean function with recurrence relation | Simple SAT problems") {
-	TEST_CASE("4 variables") {
-		const char* sample = "fex x fex y fex v fex w (x' & y & v & w')";
-		tau_parser::parse_options options;
-		options.start = tau_parser::bf;
-		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
-		auto check = result |  tau_parser::bf_t;
-		CHECK( check.has_value() );
-	}
-}
-
 TEST_SUITE("Normalize Boolean function with recurrence relation") {
 	TEST_CASE("Alternating negation") {
 		const char* rec =
