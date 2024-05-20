@@ -64,10 +64,6 @@ TEST_SUITE("steps parsing") {
 		CHECK( bf_positives_upwards<Bool>.size() == 5 );
 	}
 
-	TEST_CASE("bf_elim_quantifiers") {
-		CHECK( bf_elim_quantifiers<Bool>.size() == 2 );
-	}
-
 	TEST_CASE("trivialities") {
 		CHECK( trivialities<Bool>.size() == 4 );
 	}
