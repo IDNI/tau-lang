@@ -403,6 +403,25 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 }
 
 template <typename factory_t, typename... BAs>
+std::optional<nso<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<factory_t, BAs...>::qelim_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n)
+{
+	auto arg = n | tau_parser::wff_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
+		switch (type) {
+		case tau_parser::wff: {
+			auto nn = value | remove_one_wff_existential<tau_ba<BAs...>, BAs...>();
+			return nn;
+		}
+		}
+	}
+	cout << "error: invalid argument\n";
+	return {};
+}
+
+template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	auto form = n | tau_parser::execute_cmd_arg;
 	if (auto check = form | tau_parser::tau; check) {
@@ -678,6 +697,8 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::def_clear_cmd:      def_clear_cmd(); break;
 	case p::def_del_cmd:        def_del_cmd(command); break;
 	case p::def_print_cmd:      def_print_cmd(command); break;
+	// qelim
+	case p::qelim_cmd:          result = qelim_cmd(command); break;
 	// error handling
 	default: error = true, cout << "\nUnknown command\n"; break;
 	}

@@ -130,6 +130,9 @@ private:
 	void def_list_cmd();
 	void def_clear_cmd();
 
+	std::optional<nso<tau_ba<BAs...>, BAs...>> qelim_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+
 	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
