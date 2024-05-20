@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 # if the results are the proper ones.
 
 include(test_repl-definition_cmd.cmake)
+include(test_repl-qelim_cmd.cmake)
 include(test_repl-help_cmd.cmake)
 include(test_repl-memory_cmd.cmake)
 include(test_repl-normal_forms_cmd.cmake)
