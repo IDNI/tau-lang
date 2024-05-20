@@ -242,6 +242,8 @@ cli_command            =>
         | (memory_sym __ memory)                              :memory_print_cmd
         | (memory_sym __
 		(bf | wff | tau):memory_store_cmd_arg)        :memory_store_cmd
+#qelim
+        | ("qelim" __ wff_cmd_arg)                           :qelim_cmd
 # option commands
         | ("get":get_sym  [__ option])                        :get_cmd
 # TODO (VERY_HIGH) fix this, we could say 'set severity true'... use another case for this
