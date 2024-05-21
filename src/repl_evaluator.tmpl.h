@@ -170,7 +170,10 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::ge
 		if (auto check = memory_retrieve(n); check) {
 			auto [value, _] = check.value();
 			if (is_non_terminal(tau_parser::bf, value)) return std::optional(value);
-			else return {};
+			else {
+				cout << "error: argument has wrong type\n";
+				return {};
+			}
 		}
 	}
 	return {};
@@ -185,7 +188,11 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	else if (is_non_terminal(tau_parser::memory, n)) {
 		if (auto check = memory_retrieve(n); check) {
 			auto [value, _] = check.value();
-			return std::optional(value);
+			if (is_non_terminal(tau_parser::wff, value)) return optional(value);
+			else {
+				cout << "error: argument has wrong type\n";
+				return {};
+			}
 		}
 	}
 	return {};
@@ -326,7 +333,18 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	}
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
-	return replace(in.value(), changes);
+
+	set free_vars = get_free_vars_from_nso(thiz.value());
+	// A variable should only be replaced if it is not quantified
+	auto quantified_vars_skipper = [&](auto x) {
+		if (is_quantifier<tau_ba<BAs...>, BAs...>(x)) {
+			auto var = find_top(x, is_var_or_capture<tau_ba<BAs...>, BAs...>);
+			if (var && free_vars.contains(var.value()))
+				return false;
+		}
+		return true;
+	};
+	return replace_if(in.value(), changes, quantified_vars_skipper);
 }
 
 template <typename factory_t, typename... BAs>
@@ -343,7 +361,18 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	}
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
-	return replace(in.value(), changes);
+
+	set free_vars = get_free_vars_from_nso(thiz.value());
+	// A variable should only be replaced if it is not quantified
+	auto quantified_vars_skipper = [&](auto x) {
+		if (is_quantifier<tau_ba<BAs...>, BAs...>(x)) {
+			auto var = find_top(x, is_var_or_capture<tau_ba<BAs...>, BAs...>);
+			if (var && free_vars.contains(var.value()))
+				return false;
+		}
+		return true;
+	};
+	return replace_if(in.value(), changes, quantified_vars_skipper);
 }
 
 template <typename factory_t, typename... BAs>

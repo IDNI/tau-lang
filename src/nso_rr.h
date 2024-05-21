@@ -187,7 +187,8 @@ static const auto is_var_or_capture = [](const nso<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value)
 		&& get<tau_source_sym>(n->value).nt()
 		&& (( get<tau_source_sym>(n->value).n() == tau_parser::capture)
-			|| ( get<tau_source_sym>(n->value).n() == tau_parser::variable));
+			|| ( get<tau_source_sym>(n->value).n() == tau_parser::variable)
+				|| ( get<tau_source_sym>(n->value).n() == tau_parser::bool_variable));
 };
 
 template<typename... BAs>
