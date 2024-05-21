@@ -26,11 +26,8 @@ namespace testing = doctest;
 sp_tau_source_node make_source_binding_node(const string& source) {
 	vector<sp_node<tau_source_sym>> source_nodes;
 	for (auto& c : source) source_nodes.push_back(
-		make_node<tau_source_sym>(tau_parser::source0, {
-			make_node<tau_source_sym>(tau_parser::alnum, {
-				make_node<tau_source_sym>(tau_source_sym(c), {})
-			})
-		}));
+		make_node<tau_source_sym>(tau_source_sym(c), {})
+	);
 	return make_node<tau_source_sym>(tau_parser::binding, {
 		make_node<tau_source_sym>(tau_parser::source_binding, {
 			make_node<tau_source_sym>(tau_parser::source,

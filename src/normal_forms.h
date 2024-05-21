@@ -57,10 +57,6 @@ RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
 // bf definitions
 RULE(BF_DEF_XOR, "$X + $Y := $X & $Y' | $X' & $Y.")
 
-// remove functional quantifiers
-RULE(BF_FUNCTIONAL_QUANTIFIERS_0, "fall $X $Y := bf_remove_funiversal_cb $X $Y 1 0.")
-RULE(BF_FUNCTIONAL_QUANTIFIERS_1, "fex $X $Y := bf_remove_fexistential_cb $X $Y 1 0.")
-
 // bf callbacks
 RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
 RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
@@ -101,10 +97,12 @@ RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !$X || $Y.")
 RULE(WFF_DEF_EQUIV, "$X <-> $Y ::= ($X -> $Y) && ($Y -> $X).")
 RULE(WFF_DEF_BEX_0, "bool_ex $X $Y ::= wff_remove_bexistential_cb $X $Y T F.")
 RULE(WFF_DEF_BALL_0, "bool_all $X $Y ::=  wff_remove_buniversal_cb $X $Y T F.")
+
 // additional wff definitions (include wff formulas)
 RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & $Y' = 0.")
 RULE(BF_DEF_LESS, "$X < $Y ::= $X & $Y' = 0 && $X + $Y' != 0.")
 RULE(BF_DEF_GREATER, "$X > $Y ::= $X & $Y' != 0 || $X + $Y' = 0.")
+
 // we must expand the xor as its definition has been allready processed
 RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
 RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
@@ -303,12 +301,6 @@ static auto trivialities = make_library<BAs...>(
 	+ BF_EQ_SIMPLIFY_1
 	+ BF_NEQ_SIMPLIFY_0
 	+ BF_NEQ_SIMPLIFY_1
-);
-
-template<typename... BAs>
-static auto bf_elim_quantifiers = make_library<BAs...>(
-	BF_FUNCTIONAL_QUANTIFIERS_0
-	+ BF_FUNCTIONAL_QUANTIFIERS_1
 );
 
 template<typename... BAs>
@@ -675,8 +667,7 @@ template<typename...BAs>
 nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 	return n
 		| repeat_all<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>
-			| bf_elim_quantifiers<BAs...>)
+			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
@@ -708,8 +699,7 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 	// TODO (HIGH) give a proper implementation (call to_bdd...)
 	return n
 		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>
-			| bf_elim_quantifiers<BAs...>)
+			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
 			| simplify_bf<BAs...>
@@ -740,8 +730,7 @@ template<typename...BAs>
 nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 	return n
 		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>
-			| bf_elim_quantifiers<BAs...>)
+			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
 			| simplify_bf<BAs...>
@@ -772,8 +761,7 @@ template<typename...BAs>
 nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 	return n
 		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>
-			| bf_elim_quantifiers<BAs...>)
+			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_nnf_bf<BAs...>
 			| simplify_bf<BAs...>
@@ -1025,8 +1013,7 @@ template<typename...BAs>
 nso<BAs...> mnf_bf(const nso<BAs...>& n) {
 	return n
 		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>
-			| bf_elim_quantifiers<BAs...>)
+			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>

@@ -60,13 +60,13 @@ std::optional<size_t> get_memory_index(const sp_tau_node<tau_ba<BAs...>, BAs...>
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
-	auto mem_id = n | mem_type | tau_parser::memory_id
-		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
-	auto idx = digits(mem_id);
-	auto is_relative = (mem_type == tau_parser::relative_memory);
+	auto is_relative = (mem_type == tau_parser::rel_memory);
+	size_t idx = 0;
+	auto mem_id = n | mem_type | tau_parser::memory_id;
+	if (mem_id) idx = digits(mem_id.value());
 	if (idx >= size) {
 		if (!silent) cout << "memory " << TC_OUTPUT
-			<< (is_relative ? "%" : "&")
+			<< (is_relative ? "%" : "%-")
 			<< idx << TC.CLEAR() << " does not exist\n";
 		return {};
 	}
@@ -87,10 +87,13 @@ repl_evaluator<factory_t, BAs...>::memory_ref
 }
 
 template<typename... BAs>
-void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id, const size_t size) {
-	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << "/"
-		<< TC_OUTPUT << "%" << (size - id - 1) << TC.CLEAR()
-		<< ": " << mem << "\n";
+void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id,
+	const size_t size, bool print_relative_index = true)
+{
+	cout << TC_OUTPUT << "%-" << id << TC.CLEAR();
+	if (print_relative_index) cout << "/" << TC_OUTPUT
+					<< "%" << (size - id - 1) << TC.CLEAR();
+	cout << ": " << mem << "\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -111,7 +114,7 @@ void repl_evaluator<factory_t, BAs...>::memory_print_cmd(
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::memory_list_cmd() {
-	if (!m.size()) cout << "memory is empty\n";
+	if (m.size() == 0) cout << "memory is empty\n";
 	else for (size_t i = 0; i < m.size(); i++)
 		print_memory(m[i], i, m.size());
 }
@@ -119,10 +122,7 @@ void repl_evaluator<factory_t, BAs...>::memory_list_cmd() {
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::memory_clear_cmd() {
 	if (m.size() == 0) cout << "memory is empty\n";
-	else {
-		m.clear();
-		cout << "memory cleared\n";
-	}
+	else m.clear(), cout << "memory cleared\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -132,7 +132,7 @@ void repl_evaluator<factory_t, BAs...>::memory_store(
 	// do not add into memory if the last memory value is the same
 	if (m.size() && m.back() == o) return;
 	m.push_back(o);
-	print_memory(m.back(), m.size() - 1, m.size());
+	print_memory(m.back(), m.size() - 1, m.size(), false);
 }
 
 template <typename factory_t, typename... BAs>
@@ -441,6 +441,30 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 }
 
 template <typename factory_t, typename... BAs>
+std::optional<nso<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<factory_t, BAs...>::qelim_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n)
+{
+	auto arg = get_wff(n->child[1]);
+	if (arg) return apply_once_definitions(arg.value())
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			step<tau_ba<BAs...>, BAs...>(apply_defs<tau_ba<BAs...>, BAs...>))
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			step<tau_ba<BAs...>, BAs...>(elim_for_all<tau_ba<BAs...>, BAs...>))
+		| remove_one_wff_existential<tau_ba<BAs...>, BAs...>()
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			to_dnf_wff<tau_ba<BAs...>, BAs...>
+			| simplify_wff<tau_ba<BAs...>, BAs...>
+			| trivialities<tau_ba<BAs...>, BAs...>
+			| simplify_bf<tau_ba<BAs...>, BAs...>
+			| simplify_wff<tau_ba<BAs...>, BAs...>)
+		| reduce_bf<tau_ba<BAs...>, BAs...>
+		| reduce_wff<tau_ba<BAs...>, BAs...>;
+	cout << "error: invalid argument\n";
+	return {};
+}
+
+template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	auto form = n | tau_parser::execute_cmd_arg;
 	if (auto check = form | tau_parser::tau; check) {
@@ -483,16 +507,19 @@ template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	auto rule = make_gssotc_rec_relation<BAs...>(n);
 	definitions.emplace_back(rule);
+	cout << "[" << definitions.size()-1 << "] " << definitions.back() << "\n";
 }
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_list_cmd() {
+	if (definitions.size() == 0) cout << "definitions are empty\n";
 	for (size_t i = 0; i < definitions.size(); i++)	cout << "[" << i << "] " << definitions[i] << "\n";
 }
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_clear_cmd() {
 	definitions.clear();
+	cout << "definitions cleared\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -586,9 +613,12 @@ boost::log::trivial::severity_level
 
 template <typename... BAs>
 size_t get_opt(sp_tau_node<BAs...> n) {
-	auto bool_opt = n | tau_parser::bool_option;
-	if (bool_opt.has_value()) n = bool_opt.value();
-	return n| only_child_extractor<BAs...>
+	sp_tau_node<BAs...> value;
+	if (auto bool_opt = n | tau_parser::bool_option; bool_opt)
+		value =  bool_opt.value();
+	else if (auto enum_opt = n | tau_parser::enum_option; enum_opt)
+		value =  enum_opt.value();
+	return value | only_child_extractor<BAs...>
 		| non_terminal_extractor<BAs...>
 		| optional_value_extractor<size_t>;
 }
@@ -690,14 +720,14 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::execute_cmd:        execute_cmd(command); break;
 	case p::solve_cmd:          solve_cmd(command); break;
 	// substitution and instantiation
-	case p::bf_substitute_cmd:  result = bf_substitute_cmd(command); break;
-	case p::bf_instantiate_cmd: result = bf_instantiate_cmd(command); break;
-	case p::wff_substitute_cmd: result = wff_substitute_cmd(command); break;
-	case p::wff_instantiate_cmd:result = wff_instantiate_cmd(command); break;
+	case p::bf_subst_cmd:       result = bf_substitute_cmd(command); break;
+	case p::bf_inst_cmd:        result = bf_instantiate_cmd(command); break;
+	case p::wff_subst_cmd:      result = wff_substitute_cmd(command); break;
+	case p::wff_inst_cmd:       result = wff_instantiate_cmd(command); break;
 	// formula checks
-	case p::is_satisfiable_cmd:   is_satisfiable_cmd(command); break;
-	case p::is_valid_cmd:         is_valid_cmd(command); break;
-	case p::is_unsatisfiable_cmd: is_unsatisfiable_cmd(command); break;
+	case p::sat_cmd:            is_satisfiable_cmd(command); break;
+	case p::valid_cmd:          is_valid_cmd(command); break;
+	case p::unsat_cmd:          is_unsatisfiable_cmd(command); break;
 	// normal forms
 	case p::onf_cmd:            result = onf_cmd(command); break;
 	case p::dnf_cmd:            result = dnf_cmd(command); break;
@@ -707,16 +737,14 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::pnf_cmd:            not_implemented_yet(); break;
 	case p::mnf_cmd:            result = mnf_cmd(command); break;
 	case p::snf_cmd:            result = snf_cmd(command); break;
-	// store the given formula as memory for future references
-	case p::bf:                 result = command; break;
-	case p::wff:                result = command; break;
-	case p::nso_rr:	            result = command; break;
 	// definition of rec relations to be included during normalization
 	case p::def_rr_cmd:         def_rr_cmd(command); break;
 	case p::def_list_cmd:       def_list_cmd(); break;
 	case p::def_clear_cmd:      def_clear_cmd(); break;
 	case p::def_del_cmd:        def_del_cmd(command); break;
 	case p::def_print_cmd:      def_print_cmd(command); break;
+	// qelim
+	case p::qelim_cmd:          result = qelim_cmd(command); break;
 	// error handling
 	default: error = true, cout << "\nUnknown command\n"; break;
 	}
@@ -743,7 +771,7 @@ std::string repl_evaluator<factory_t, BAs...>::prompt() {
 	std::stringstream ss;
 	if (opt.status) {
 		std::stringstream status;
-		if (m.size()) status << " " << TC_STATUS_OUTPUT << "&"
+		if (m.size()) status << " " << TC_STATUS_OUTPUT << "%-"
 			<< m.size()-1 << TC.CLEAR() << TC_STATUS;
 		if (opt.severity != trivial::error)
 			status << " " << to_string(opt.severity);
@@ -789,13 +817,13 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		"  severity               severity           error/info/debug/trace\n";
 	static const std::string bool_available_options = std::string{} +
 		"Available options:\n" + bool_options;
-	auto arg = n | tau_parser::cli_cmd_sym
+	auto arg = n | tau_parser::help_arg
 			| only_child_extractor<tau_ba<BAs...>, BAs...>
 			| non_terminal_extractor<tau_ba<BAs...>, BAs...>;
 	size_t nt = arg ? arg.value()
-			: static_cast<size_t>(tau_parser::help_cmd_sym);
+			: static_cast<size_t>(tau_parser::help_sym);
 	switch (nt) {
-	case tau_parser::help_cmd_sym: cout
+	case tau_parser::help_sym: cout
 		<< "Commands:\n"
 		<< "  help or h              print this help\n"
 		<< "  quit, q, exit or e     exit the repl\n"
@@ -855,32 +883,32 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "Examples:\n"
 		<< "  help or h examples     show examples related to the Tau Language syntax.\n";
 		break;
-	case tau_parser::version_cmd_sym: cout
+	case tau_parser::version_sym: cout
 		<< "version or v prints out current Tau commit id\n";
 		break;
-	case tau_parser::quit_cmd_sym: cout
+	case tau_parser::quit_sym: cout
 		<< "q, quit, e or exit exits the repl\n";
 		break;
-	case tau_parser::clear_cmd_sym: cout
+	case tau_parser::clear_sym: cout
 		<< "clear clears the screen\n";
 		break;
-	case tau_parser::get_cmd_sym: cout
+	case tau_parser::get_sym: cout
 		<< "get if used alone prints all options and their values\n"
 		<< "get <option>        prints the value of the given option\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case tau_parser::set_cmd_sym: cout
+	case tau_parser::set_sym: cout
 		<< "set <option> [=] <value> sets option value\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case tau_parser::toggle_cmd_sym: cout
+	case tau_parser::toggle_sym: cout
 		<< "toggle <option> toggles option value\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau_parser::memory_cmd_sym: cout
+	case tau_parser::memory_sym: cout
 		<< "memory command manages stored or previous commands results\n"
 		<< "\n"
 		<< "  memory                 lists all stored or output results\n"
@@ -900,7 +928,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 	//	<< "Command r, read ...\n";
 	//	break;
 
-	case tau_parser::normalize_cmd_sym: cout
+	case tau_parser::normalize_sym: cout
 		<< "normalize or n command normalizes a formula, prints it and\n"
 		<< "saves it into memory of previous memorys\n"
 		<< "\n"
@@ -912,25 +940,25 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 	//	<< "  normalize <selection>  normalizes the selection\n";
 		break;
 
-	case tau_parser::execute_cmd_sym: cout
+	case tau_parser::execute_sym: cout
 		<< "Command e, execute ...\n";
 		break;
 
-	case tau_parser::solve_cmd_sym: cout
+	case tau_parser::solve_sym: cout
 		<< "Command s, solve ...\n";
 		break;
 
-	case tau_parser::is_satisfiable_cmd_sym: cout
+	case tau_parser::sat_sym: cout
 		<< "Command sat, is_satisfiable ...\n";
 		break;
-	case tau_parser::is_valid_cmd_sym: cout
+	case tau_parser::valid_sym: cout
 		<< "Command valid, is_valid ...\n";
 		break;
-	case tau_parser::is_unsatisfiable_cmd_sym: cout
+	case tau_parser::unsat_sym: cout
 		<< "Command unsat, is_unsatisfiable ...\n";
 		break;
 
-	case tau_parser::dnf_cmd_sym: cout
+	case tau_parser::dnf_sym: cout
 		<< "dnf command converts a boolean formula or a well formed formula to disjunctive normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -938,7 +966,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  dnf <WFF>            converts the given BF to DNF\n"
 		<< "  dnf <memory>         converts the memory with the given id to DNF\n";
 		break;
-	case tau_parser::cnf_cmd_sym: cout
+	case tau_parser::cnf_sym: cout
 		<< "cnf command converts a boolean formula or a well formed formula to conjunctive normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -946,7 +974,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  cnf <WFF>            converts the given BF to CNF\n"
 		<< "  cnf <memory>         converts the memory with the given id to CNF\n";
 		break;
-	//case tau_parser::anf_cmd_sym: cout
+	//case tau_parser::anf_sym: cout
 	//	<< "cnf command converts a boolean formula or a well formed formula to algebraic normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
@@ -954,7 +982,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 	//	<< "  anf <WFF>            converts the given BF to ANF\n"
 	//	<< "  anf <memory>         converts the memory with the given id to ANF\n";
 	//	break;
-	case tau_parser::nnf_cmd_sym: cout
+	case tau_parser::nnf_sym: cout
 		<< "nnf command converts a boolean formula or a well formed formula to negation normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -962,7 +990,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  nnf <WFF>            converts the given BF to NNF\n"
 		<< "  nnf <memory>         converts the memory with the given id to NNF\n";
 		break;
-	//case tau_parser::pnf_cmd_sym: cout
+	//case tau_parser::pnf_sym: cout
 	//	<< "cnf command converts a boolean formula or a well formed formula to prenex normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
@@ -970,7 +998,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 	//	<< "  pnf <WFF>            converts the given BF to PNF\n"
 	//	<< "  pnf <memory>           converts the memory with the given id to PNF\n";
 	//	break;
-	case tau_parser::mnf_cmd_sym: cout
+	case tau_parser::mnf_sym: cout
 		<< "mnf command converts a boolean formula or a well formed formula to minterm normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -978,7 +1006,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  mnf <WFF>            converts the given BF to MNF\n"
 		<< "  mnf <memory>         converts the memory with the given id to MNF\n";
 		break;
-	case tau_parser::onf_cmd_sym: cout
+	case tau_parser::onf_sym: cout
 		<< "onf command converts a well formed formula to order normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -993,7 +1021,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 	//	<< "Command i, instantiate ...\n";
 	//	break;
 
-	case tau_parser::def_cmd_sym: cout
+	case tau_parser::def_sym: cout
 		<< "defines a rec. relation\n"
 		<< "\n"
 		<< "usage:\n"

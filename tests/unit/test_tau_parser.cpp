@@ -1044,36 +1044,6 @@ TEST_SUITE("parsing bf formulas ") {
 			| tau_parser::bf_xor;
 		CHECK( xor_rule.has_value() );
 	}
-
-	TEST_CASE("fall") {
-		const char* sample = "fall Z Z := Z.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto all_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_matcher
-			| tau_parser::bf
-			| tau_parser::bf_all;
-		CHECK( all_rule.has_value() );
-	}
-
-	TEST_CASE("fex") {
-		const char* sample = "fex Z Z := Z.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto ex_rule = lib
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_matcher
-			| tau_parser::bf
-			| tau_parser::bf_ex;
-		CHECK( ex_rule.has_value() );
-	}
 }
 
 TEST_SUITE("parsing bindings ") {
@@ -1187,8 +1157,7 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::constant
 			| tau_parser::binding
 			| tau_parser::source_binding
-			| tau_parser::type
-			| tau_parser::chars;
+			| tau_parser::type;
 		CHECK( type.has_value() );
 	}
 }

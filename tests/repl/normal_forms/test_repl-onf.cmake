@@ -3,38 +3,19 @@
 #
 
 # T
-add_test(NAME test_repl-normal_forms-onf_T
-	COMMAND bash -c "echo 'onf X T. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-normal_forms-onf_T PROPERTIES
-	PASS_REGULAR_EXPRESSION "T")
+add_repl_test(normal_forms-onf_T "onf X T" "T")
 
 # F
-add_test(NAME test_repl-normal_forms-onf_F
-	COMMAND bash -c "echo 'onf X F. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-normal_forms-onf_F PROPERTIES
-	PASS_REGULAR_EXPRESSION "F")
+add_repl_test(normal_forms-onf_F "onf X F" "F")
 
 # X=0
-add_test(NAME test_repl-normal_forms-onf_X_eq_0
-	COMMAND bash -c "echo 'onf X (X = 0). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-normal_forms-onf_X_eq_0 PROPERTIES
-	PASS_REGULAR_EXPRESSION "F")
+add_repl_test(normal_forms-onf_X_eq_0 "onf X (X = 0)" "F")
 
 # Y=0
-add_test(NAME test_repl-normal_forms-onf_Y_eq_0
-	COMMAND bash -c "echo 'onf X (Y = 0). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-normal_forms-onf_Y_eq_0 PROPERTIES
-	PASS_REGULAR_EXPRESSION "Y")
+add_repl_test(normal_forms-onf_Y_eq_0 "onf X (Y = 0)" "Y")
 
 # X!=0
-add_test(NAME test_repl-normal_forms-onf_X_neq_0
-	COMMAND bash -c "echo 'onf X (X != 0). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-normal_forms-onf_X_neq_0 PROPERTIES
-	PASS_REGULAR_EXPRESSION "F")
+add_repl_test(normal_forms-onf_X_neq_0 "onf X (X != 0)" "F")
 
 # Y!=0
-add_test(NAME test_repl-normal_forms-onf_Y_neq_0
-	COMMAND bash -c "echo 'onf X (Y != 0). quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
-set_tests_properties(test_repl-normal_forms-onf_Y_neq_0 PROPERTIES
-	PASS_REGULAR_EXPRESSION "Y")
-
+add_repl_test(normal_forms-onf_Y_neq_0 "onf X (Y != 0)" "Y")
