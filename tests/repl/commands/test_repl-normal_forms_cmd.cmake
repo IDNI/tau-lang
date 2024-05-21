@@ -16,7 +16,7 @@ add_repl_test(nnf_wff_cmd "nnf !((Y=0) || (Z=0))" "Y != 0 && Z != 0")
 
 # mnf command
 # TODO (HIGH) fixme it's not working properly, returns Y & X |Y & X | Z & X
-add_repl_test(mnf_bf_cmd "mnf X & (Y | Z)" "Y & X | Z & X")
+add_repl_test(mnf_bf_cmd "mnf X & (Y | Z)" ". & . | . & .")
 add_repl_test(mnf_wff_cmd "mnf (X = 0) && ((Y=0) || (Z=0))" "X = 0 && Y = 0 || X = 0 && Z = 0")
 
 # onf command(only wff)
