@@ -205,11 +205,10 @@ auto get_free_vars_from_nso(const nso<BAs...>& n) {
 	std::set<nso<BAs...>> free_vars;
 	free_vars_collector<BAs...> collector(free_vars);
 	post_order_traverser<
-			identity_t<nso<BAs...>>,
 			free_vars_collector<BAs...>,
-			nso<BAs...>>(
-		idni::rewriter::identity<nso<BAs...>>, collector)(n);
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso";
+			all_t<nso<BAs...>>,
+			nso<BAs...>>(collector, all<nso<BAs...>>)(n);
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
 	return free_vars;
 }
 

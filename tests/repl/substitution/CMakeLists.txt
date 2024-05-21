@@ -15,11 +15,10 @@ add_test(NAME test_repl-substitution_cmd_bf2
 set_tests_properties(test_repl-substitution_cmd_bf2 PROPERTIES
         PASS_REGULAR_EXPRESSION ": \\(a & y & z\\) \\+ \\(b & \\(y & z\\)'\\)")
 
-# TODO: Quantified variable is replaced by substitution.
 add_test(NAME test_repl-substitution_cmd_bf3
         COMMAND bash -c "echo 'm fex k h & k. m v & w. s k @0 @1. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-substitution_cmd_bf3 PROPERTIES
-        PASS_REGULAR_EXPRESSION ": fex k h & v & w")
+        PASS_REGULAR_EXPRESSION ": fex k h & k")
 
 # TODO: Variable is placed into scope of quantifier.
 add_test(NAME test_repl-substitution_cmd_bf4
@@ -50,11 +49,10 @@ add_test(NAME test_repl-substitution_cmd_wff2
 set_tests_properties(test_repl-substitution_cmd_wff2 PROPERTIES
         PASS_REGULAR_EXPRESSION ": \\(\\?a && \\?y && \\?z\\) \\^ \\(\\?b && \\(\\?y && \\?z\\)\\)")
 
-# TODO: Quantified variable is replaced by substitution.
 add_test(NAME test_repl-substitution_cmd_wff3
         COMMAND bash -c "echo 'm bool_ex ?k ?h && ?k. m ?v && ?w. s ?k @0 @1. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-substitution_cmd_wff3 PROPERTIES
-        PASS_REGULAR_EXPRESSION ": bool_ex \\?k \\?h && \\?v && \\?w")
+        PASS_REGULAR_EXPRESSION ": bool_ex \\?k \\?h && \\?k")
 
 add_test(NAME test_repl-substitution_cmd_wff4
         COMMAND bash -c "echo 'm ex x x=0 && y=0. m ?x. s ?y @0 @1. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
@@ -72,10 +70,9 @@ add_test(NAME test_repl-substitution_cmd_wff6
 set_tests_properties(test_repl-substitution_cmd_wff6 PROPERTIES
         PASS_REGULAR_EXPRESSION ": \\(\\?x || \\?w && \\?b\\) && \\?b")
 
-# TODO: We can substitute a bf into a wff
 add_test(NAME test_repl-substitution_cmd_wff7
         COMMAND bash -c "echo 'm ?x && ?y. m 0. s ?x @0 @1. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-substitution_cmd_wff7 PROPERTIES
-        PASS_REGULAR_EXPRESSION ": 0 && \\?y")
+        PASS_REGULAR_EXPRESSION "error: argument has wrong type")
 
 
