@@ -407,16 +407,21 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::qelim_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto arg = n | tau_parser::wff_cmd_arg | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
-	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
-		switch (type) {
-		case tau_parser::wff: {
-			auto nn = value | remove_one_wff_existential<tau_ba<BAs...>, BAs...>();
-			return nn;
-		}
-		}
-	}
+	auto arg = get_wff(n);
+	if (arg) return apply_once_definitions(arg.value())
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			step<tau_ba<BAs...>, BAs...>(apply_defs<tau_ba<BAs...>, BAs...>))
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			step<tau_ba<BAs...>, BAs...>(elim_for_all<tau_ba<BAs...>, BAs...>))
+		| remove_one_wff_existential<tau_ba<BAs...>, BAs...>()
+		| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+			to_dnf_wff<tau_ba<BAs...>, BAs...>
+			| simplify_wff<tau_ba<BAs...>, BAs...>
+			| trivialities<tau_ba<BAs...>, BAs...>
+			| simplify_bf<tau_ba<BAs...>, BAs...>
+			| simplify_wff<tau_ba<BAs...>, BAs...>)
+		| reduce_bf<tau_ba<BAs...>, BAs...>
+		| reduce_wff<tau_ba<BAs...>, BAs...>;
 	cout << "error: invalid argument\n";
 	return {};
 }
