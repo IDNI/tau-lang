@@ -243,7 +243,7 @@ cli_command            =>
         | (memory_sym __
 		(bf | wff | tau):memory_store_cmd_arg)        :memory_store_cmd
 #qelim
-        | ("qelim" __ wff_cmd_arg)                           :qelim_cmd
+        | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
         | ("get":get_sym  [__ option])                        :get_cmd
 # TODO (VERY_HIGH) fix this, we could say 'set severity true'... use another case for this
@@ -333,7 +333,7 @@ severity               => ("e" | "error"):error_sym
         sat_sym, unsat_sym, dnf_sym, cnf_sym, anf_sym, nnf_sym, pnf_sym, snf_sym,
         mnf_sym, onf_sym, examples_sym, del_sym, severity_opt, status_opt,
         colors_opt, debug_repl_opt, option_value_true, option_value_false,
-        error_sym, debug_sym, trace_sym, info_sym.
+        error_sym, debug_sym, trace_sym, info_sym, qelim_sym.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, q_bool_var, src_c, tau_cb, wff_cb, bf_cb,
