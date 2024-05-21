@@ -64,7 +64,6 @@ TEST_SUITE("make_library") {
 // TODO (LOW) write tests for non_terminal_extractor
 // TODO (LOW) write tests for ba_extractor
 // TODO (LOW) write tests for stringify
-// TODO (LOW) write tests for make_string_with_skip
 // TODO (LOW) write tests for make_string
 //
 // All of them are extensively tested inderectly in other unit/integration tests.

@@ -24,7 +24,7 @@ std::ostream& print_sp_tau_source_node_tree(std::ostream &os, sp_node<node_t> n,
 	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
 	auto& v = n->value;
 	indent();
-	if (v.nt()) os << parser_instance<tau_parser>()
+	if (v.nt()) os << tau_parser::instance()
 		.name(v.n()) << "(" << v.n() << ")";
 	else if (v.is_null()) os << "null";
 	else os << v.t();
@@ -43,7 +43,7 @@ std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
 	std::visit(overloaded{
 		[&os, &indent](tau_source_sym v) {
 			indent();
-			if (v.nt()) os << parser_instance<tau_parser>()
+			if (v.nt()) os << tau_parser::instance()
 				.name(v.n()) << "(" << v.n() << ")";
 			else if (v.is_null()) os << "null";
 			else os << v.t();

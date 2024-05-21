@@ -9,10 +9,10 @@ add_repl_test(substitution_cmd_bf1 "m x. m 1. s x %-0 %-1" ": 1")
 
 add_repl_test(substitution_cmd_bf2 "m ax + bx'. m y&z. s x %-0 %-1" ": \\(a & y & z\\) \\+ \\(b & \\(y & z\\)'\\)")
 
-#add_repl_test(substitution_cmd_bf3 "m fex k h & k. m v & w. s k %-0 %-1" ": fex k h & k")
+add_repl_test(substitution_cmd_bf3 "m fex k h & k. m v & w. s k %-0 %-1" ": fex k h & k")
 
 # TODO: Variable is placed into scope of quantifier.
-#add_repl_test(substitution_cmd_bf4 "m fex x x & y. m x. s y %-0 %-1" ": fex x x & x")
+add_repl_test(substitution_cmd_bf4 "m fex x x & y. m x. s y %-0 %-1" ": fex x x & x")
 
 add_repl_test(substitution_cmd_bf5 "m (x | (w & z)) & z. m b. s z %-0 %-1" ": \\(x | w & b\\) & b")
 

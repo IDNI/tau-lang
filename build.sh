@@ -30,6 +30,9 @@ if [ $? -ne 0 ]; then
 	fi
 fi
 
+# TODO disabling ninja for now - it's not working properly
+NINJA_BIN=""
+
 if [ -z $NINJA_BIN ]; then
 	echo "Using make build system"
 	cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" ${@:2}

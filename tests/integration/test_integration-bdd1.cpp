@@ -263,46 +263,6 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 
-	TEST_CASE("fall P P = 0") {
-		const char* sample = "fall P P = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("fall P P != 0") {
-		const char* sample = "fall P P != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("fex P P = 0") {
-		const char* sample = "fex P P = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("fex P P != 0") {
-		const char* sample = "fex P P != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
-	}
-
 	TEST_CASE("ex P P != 0") {
 		const char* sample = "ex P P != 0.";
 		auto sample_src = make_tau_source(sample);

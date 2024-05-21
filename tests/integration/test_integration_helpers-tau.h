@@ -31,12 +31,10 @@ struct bdd_test_factory {
 
 	sp_tau_node<tau_ba<bdd_test>, bdd_test> build(const std::string type_name, const sp_tau_node<tau_ba<bdd_test>, bdd_test>& n) {
 		if (type_name != "bdd") return n;
-		std::string var = make_string_with_skip<
+		std::string var = make_string<
 			tau_node_terminal_extractor_t<tau_ba<bdd_test>, bdd_test>,
-			not_whitespace_predicate_t<tau_ba<bdd_test>, bdd_test>,
 			sp_tau_node<tau_ba<bdd_test>, bdd_test>>(
-				tau_node_terminal_extractor<tau_ba<bdd_test>, bdd_test>,
-				not_whitespace_predicate<tau_ba<bdd_test>, bdd_test>, n);
+				tau_node_terminal_extractor<tau_ba<bdd_test>, bdd_test>, n);
 		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		// Trim whitespaces from var
 		auto is_not_space = [](char c) {return !isspace(c);};

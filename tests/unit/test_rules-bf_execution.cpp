@@ -203,32 +203,6 @@ TEST_SUITE("executing bf rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("BF_FUNCTIONAL_QUANTIFIERS_0") {
-		auto src_rule = make_tau_source(BF_FUNCTIONAL_QUANTIFIERS_0);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = nso_rr_apply(tau_rule, matcher);
-		auto args = result  | tau_parser::bf_and || tau_parser::bf;
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(result) );
-		CHECK( args.size() == 2 );
-		CHECK( args[0] == args[1] );
-	}
-
-	TEST_CASE("BF_FUNCTIONAL_QUANTIFIERS_1") {
-		auto src_rule = make_tau_source(BF_FUNCTIONAL_QUANTIFIERS_1);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = nso_rr_apply(tau_rule, matcher);
-		auto args = result  | tau_parser::bf_or ||tau_parser::bf;
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(result) );
-		CHECK( args.size() == 2 );
-		CHECK( args[0] == args[1] );
-	}
-
 	TEST_CASE("BF_DEF_XOR") {
 		auto src_rule = make_tau_source(BF_DEF_XOR);
 		auto statement = make_statement(src_rule);
