@@ -182,7 +182,7 @@ std::pair<var<BAs...>, std::optional<nso<BAs...>>> eliminate_interval(const nso<
 		| optional_value_extractor<sp_tau_node<BAs...>>;
 	auto bounds = interval || tau_parser::bf;
 	// given a <= x <= b we can replace it by x = a x + b x'
-	auto subs = trim(build_bf_xor<BAs...>(
+	auto subs = trim(build_bf_xor_from_def<BAs...>(
 		build_bf_and<BAs...>(bounds[0], var),
 		build_bf_and<BAs...>(bounds[1], build_bf_neg<BAs...>(var))));
 	auto form = replace(clause, {{var, subs}})
