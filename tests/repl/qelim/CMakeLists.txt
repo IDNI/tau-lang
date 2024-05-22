@@ -1,10 +1,5 @@
-cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
-
-# In these tests cases we check the results obtained in the satisfiability command.
-# The output of the tests cases must be validated against expected results.
-
 #
-# sample
+# qelim
 #
 
-#add_repl_test(test_name "test_command" "test_regexp")
+add_repl_test(qelim_cmd-form_1 "qelim all x ex y x=y" "!\\(ex x F\\)")
