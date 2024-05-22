@@ -1069,6 +1069,7 @@ const std::string BDLR_BF_NLEQ_LOWWER = "( $X $Y ) =:: $Y !<= $X.";
 const std::string BLDR_WFF_AND = "( $X $Y ) =:: $X && $Y.";
 const std::string BLDR_WFF_OR = "( $X $Y ) =:: $X || $Y.";
 const std::string BLDR_WFF_NEG = "( $X ) =:: ! $X.";
+const std::string BLDR_WFF_XOR = "( $X $Y ) =:: $X ^ $Y.";
 const std::string BLDR_WFF_ALL = "( $X $Y ) =:: all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) =:: ex $X $Y.";
 const std::string BLDR_WFF_BALL = "( $X $Y ) =:: ball $X $Y.";
@@ -1108,6 +1109,8 @@ template<typename... BAs>
 static auto bldr_wff_or = make_builder<BAs...>(BLDR_WFF_OR);
 template<typename... BAs>
 static auto bldr_wff_neg = make_builder<BAs...>(BLDR_WFF_NEG);
+template<typename... BAs>
+static auto bldr_wff_xor = make_builder<BAs...>(BLDR_WFF_XOR);
 template<typename... BAs>
 static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
 template<typename... BAs>
@@ -1199,9 +1202,15 @@ sp_tau_node<BAs...> build_wff_or(const sp_tau_node<BAs...>& l, const sp_tau_node
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+sp_tau_node<BAs...> build_wff_xor_from_def(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	return build_wff_or<BAs...>(build_wff_and(build_wff_neg(l), r),
 		build_wff_and(build_wff_neg(r), l));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
+	return tau_apply_builder<BAs...>(bldr_wff_xor<BAs...>, args);
 }
 
 template<typename... BAs>
