@@ -806,7 +806,7 @@ private:
 		auto [a, b] = split_using_var(var, form);
 		auto a_bdd = bf_to_bdd(rest, a);
 		auto b_bdd = bf_to_bdd(rest, b);
-		return (a_bdd == b_bdd) ? a_bdd	: build_bf_xor(
+		return (a_bdd == b_bdd) ? a_bdd	: build_bf_xor_from_def(
 			build_bf_and(wrap(tau_parser::bf, var), a_bdd),
 			build_bf_and(build_bf_neg(wrap(tau_parser::bf, var), b_bdd)));
 	}

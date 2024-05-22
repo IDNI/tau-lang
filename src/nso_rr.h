@@ -1078,6 +1078,7 @@ const std::string BLDR_WFF_BEX = "( $X $Y ) =:: bex $X $Y.";
 const std::string BLDR_BF_AND = "( $X $Y ) =: $X & $Y.";
 const std::string BLDR_BF_OR = "( $X $Y ) =: $X | $Y.";
 const std::string BLDR_BF_NEG = "( $X ) =: $X'.";
+const std::string BLDR_BF_XOR = "( $X $Y ) =: $X + $Y.";
 const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
 const std::string BLDR_BF_CONSTANT = "( $X ) =: { $X }.";
 
@@ -1123,6 +1124,8 @@ template<typename... BAs>
 static auto bldr_bf_or = make_builder<BAs...>(BLDR_BF_OR);
 template<typename... BAs>
 static auto bldr_bf_neg = make_builder<BAs...>(BLDR_BF_NEG);
+template<typename... BAs>
+static auto bldr_bf_xor = make_builder<BAs...>(BLDR_BF_XOR);
 template<typename... BAs>
 static auto bldr_bf_splitter = make_builder<BAs...>(BLDR_BF_SPLITTER);
 template<typename... BAs>
@@ -1266,16 +1269,22 @@ sp_tau_node<BAs...> build_bf_neg(const sp_tau_node<BAs...>& l) {
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+sp_tau_node<BAs...> build_bf_xor_from_def(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	return build_bf_or<BAs...>(build_bf_and(build_bf_neg(l), r),
 		build_bf_and(build_bf_neg(r), l));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_xor(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
+	return tau_apply_builder<BAs...>(bldr_bf_xor<BAs...>, args);
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	return build_bf_or<BAs...>(
 		build_wff_eq<BAs...>(build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r))),
-		build_wff_neq(build_bf_xor<BAs...>(l, build_bf_neg<BAs...>(r))));
+		build_wff_neq(build_bf_xor_from_def<BAs...>(l, build_bf_neg<BAs...>(r))));
 }
 
 template<typename... BAs>
@@ -1303,13 +1312,8 @@ sp_tau_node<BAs...> build_bf_nleq_upper(const sp_tau_node<BAs...>& l, const sp_t
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_greater(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	return build_bf_or<BAs...>(
-		build_bf_or<BAs...>(
-			build_wff_neq<BAs...>(l, build_bf_neg<BAs...>(r)),
-			build_wff_eq<BAs...>(l, r)),
-			build_bf_xor<BAs...>(l, build_bf_eq<BAs...>(l, r)));
+	return build_wff_neg(build_bf_less_eq<BAs...>(l, r));
 }
-
 
 // tau factory method for building tau formulas
 template<typename... BAs>
