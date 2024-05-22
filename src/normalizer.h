@@ -92,21 +92,6 @@ rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
 }
 
 template<typename... BAs>
-static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) {
-	auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
-	return check.empty();
-};
-
-template<typename... BAs>
-using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
-
-// TODO (LOW) wthis should be converted into a struct
-template<typename... BAs>
-nso<BAs...> apply_once_definitions(const nso<BAs...>& form) {
-	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
-}
-
-template<typename... BAs>
 rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
 	auto nmain = apply_once_definitions(nso_rr.main);
 	rec_relations<nso<BAs...>> nrec_relations;

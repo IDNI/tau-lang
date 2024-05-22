@@ -634,9 +634,24 @@ nso<BAs...> operator|(const nso<BAs...>& n, const onf_wff_t<BAs...>& r) {
 	return r(n);
 }
 
+template<typename... BAs>
+static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) {
+	auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
+	return check.empty();
+};
+
+template<typename... BAs>
+using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
+
+// TODO (LOW) wthis should be converted into a struct
+template<typename... BAs>
+nso<BAs...> apply_once_definitions(const nso<BAs...>& form) {
+	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
+}
+
 template<typename...BAs>
 std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
-	return n
+	return apply_once_definitions(n)
 		| apply_wff_defs<BAs...>
 		| onf_wff<BAs...>(var)
 		| repeat_all<step<BAs...>, BAs...>(
@@ -665,7 +680,7 @@ nso<BAs...> dnf_wff(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> dnf_bf(const nso<BAs...>& n) {
-	return n
+	return apply_once_definitions(n)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
@@ -695,9 +710,22 @@ nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 }
 
 template<typename...BAs>
+nso<BAs...> cnf_bf(const nso<BAs...>& n) {
+	return n
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_bf_defs<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_cnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
+}
+
+template<typename...BAs>
 nso<BAs...> snf_bf(const nso<BAs...>& n) {
 	// TODO (HIGH) give a proper implementation (call to_bdd...)
-	return n
+	return apply_once_definitions(n)
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
@@ -716,23 +744,22 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 	};
 	auto quantifier = find_bottom(n, quantified);
 	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
-	auto nform = apply_once_definitions(nn)
+	return apply_once_definitions(nn)
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_wff_defs<BAs...>
 			| to_cnf_wff<BAs...>
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>
 		);
-	return nform;
 }
 
 template<typename...BAs>
-nso<BAs...> cnf_bf(const nso<BAs...>& n) {
-	return n
+nso<BAs...> nnf_bf(const nso<BAs...>& n) {
+	return apply_once_definitions(n)
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
-			to_cnf_bf<BAs...>
+			to_nnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
@@ -754,20 +781,7 @@ nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
-	return nnf_wff<tau_parser::bf>(nform);
-}
-
-template<typename...BAs>
-nso<BAs...> nnf_bf(const nso<BAs...>& n) {
-	return n
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			to_nnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf<BAs...>;
+	return nnf_bf(nform);
 }
 
 // we assume no functional quantifiers are present and all defs have being applyed
@@ -1011,7 +1025,7 @@ nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> mnf_bf(const nso<BAs...>& n) {
-	return n
+	return apply_once_definitions(n)
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(

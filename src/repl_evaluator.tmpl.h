@@ -733,7 +733,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::dnf_cmd:            result = dnf_cmd(command); break;
 	case p::cnf_cmd:            result = cnf_cmd(command); break;
 	case p::anf_cmd:            not_implemented_yet(); break;
-	case p::nnf_cmd:            result = cnf_cmd(command); break;
+	case p::nnf_cmd:            result = nnf_cmd(command); break;
 	case p::pnf_cmd:            not_implemented_yet(); break;
 	case p::mnf_cmd:            result = mnf_cmd(command); break;
 	case p::snf_cmd:            result = snf_cmd(command); break;
