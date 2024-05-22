@@ -73,7 +73,7 @@ struct tau_ba {
 
 	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor<tau_ba<BAs...>, BAs...>(nso_rr.main, other.nso_rr.main);
+		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor_from_def<tau_ba<BAs...>, BAs...>(nso_rr.main, other.nso_rr.main);
 		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}

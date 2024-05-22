@@ -826,6 +826,46 @@ private:
 	}
 };
 
+template<typename...BAs>
+struct to_wff_bdd {
+
+	using literal = nso<BAs...>;
+	using literals = std::set<literal>;
+
+	static auto is_literal = is_non_terminal<tau_parser::bf_eq, BAs...>;
+
+	nso<BAs...> operator()(const nso<BAs...>& n) {
+		std::map<nso<BAs...>, nso<BAs...>> changes;
+		auto lits = select_all(n, is_literal);
+		auto lits_set = std::set<nso<BAs...>>(lits.begin(), lits.end());
+		auto bdd = wff_to_bdd(lits_set, n);
+	}
+
+private:
+
+	std::pair<nso<BAs...>, nso<BAs...>> split_using_lit(const literals& lit, const nso<BAs...>& form) {
+		auto a = replace(form, { {lit, trim(_F<BAs...>)} });
+		auto b = replace(form, { {lit, trim(_T<BAs...>)}});
+		return std::make_pair(a, b);
+	}
+
+	std::pair<nso<BAs...>, literals> split_lits(const literals& lits) {
+		literals rest(lits.begin(), lits.end() - 1);
+		return { lits.back(), rest };
+	}
+
+	nso<BAs...> wff_to_bdd(const literals& lits, const nso<BAs...>& form) {
+		if (lits.empty()) return form | repeat_all(apply_cb<BAs...>) /* TODO (HIGH) check how to simplify this */;
+		auto [lit, rest] = split_lits(lits);
+		auto [a, b] = split_using_lit(lit, form);
+		auto a_bdd = wff_to_bdd(rest, a);
+		auto b_bdd = wff_to_bdd(rest, b);
+		return (a_bdd == b_bdd) ? a_bdd	: build_wff_xor_from_def(
+			build_wff_and(wrap(tau_parser::wff, lit), a_bdd),
+			build_wff_and(build_wff_neg(wrap(tau_parser::wff, lit), b_bdd)));
+	}
+};
+
 template<typename... BAs>
 static const to_bdds<BAs...> to_bdds_bf;
 
