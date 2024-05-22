@@ -130,8 +130,9 @@ void repl_evaluator<factory_t, BAs...>::memory_store(
 	typename repl_evaluator<factory_t, BAs...>::memory o)
 {
 	// do not add into memory if the last memory value is the same
-	if (m.size() && m.back() == o) return;
-	m.push_back(o);
+
+	if (!(m.size() && m.back() == o))
+		m.push_back(o);
 	print_memory(m.back(), m.size() - 1, m.size(), false);
 }
 
