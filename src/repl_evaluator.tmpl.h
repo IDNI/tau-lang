@@ -833,6 +833,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 
 		<< "Formula commands:\n"
 		<< "  normalize or n         normalize formula\n"
+		<< "  qelim                  inner most quantifier elimination\n"
 		<< "\n"
 
 		<< "Normal form commands:\n"
@@ -940,6 +941,14 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 	//	<< "  normalize <selection>  normalizes the selection\n";
 		break;
 
+	case tau_parser::qelim_sym: cout
+		<< "qelim command eliminates inner most quantifier, prints it and\n"
+		<< "saves it into memory of previous memorys\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  qelim <WFF>            eliminates inner most quantifier in the given WFF\n";
+		break;
+
 	case tau_parser::execute_sym: cout
 		<< "Command e, execute ...\n";
 		break;
@@ -975,11 +984,11 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  cnf <memory>         converts the memory with the given id to CNF\n";
 		break;
 	//case tau_parser::anf_sym: cout
-	//	<< "cnf command converts a boolean formula or a well formed formula to algebraic normal form\n"
+	//	<< "anf command converts a boolean formula or a well formed formula to algebraic normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
 	//	<< "  anf <BF>             converts the given BF to ANF\n"
-	//	<< "  anf <WFF>            converts the given BF to ANF\n"
+	//	<< "  anf <WFF>            converts the given WFF to ANF\n"
 	//	<< "  anf <memory>         converts the memory with the given id to ANF\n";
 	//	break;
 	case tau_parser::nnf_sym: cout
@@ -991,7 +1000,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  nnf <memory>         converts the memory with the given id to NNF\n";
 		break;
 	//case tau_parser::pnf_sym: cout
-	//	<< "cnf command converts a boolean formula or a well formed formula to prenex normal form\n"
+	//	<< "pnf command converts a boolean formula or a well formed formula to prenex normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
 	//	<< "  pnf <BF>             converts the given BF to PNF\n"

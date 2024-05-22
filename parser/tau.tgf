@@ -272,7 +272,7 @@ help_arg               => help_sym | version_sym | quit_sym
                         | inst_sym | subst_sym | normalize_sym | execute_sym
                         | solve_sym | valid_sym | sat_sym | unsat_sym
                         | dnf_sym | cnf_sym | anf_sym | snf_sym
-                        | nnf_sym | pnf_sym | mnf_sym | onf_sym
+                        | nnf_sym | pnf_sym | mnf_sym | onf_sym | qelim_sym
                         | ("example" 's'?):examples_sym.
 
 # memory
