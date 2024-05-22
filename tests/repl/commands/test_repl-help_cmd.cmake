@@ -10,6 +10,16 @@ add_repl_test(help_cmd-shortened "h" "Commands")
 add_repl_test(help_normalize_command_cmd-full "help normalize" "normalizes the given NSO RR")
 add_repl_test(help_shortened_normalize_cmd "h normalize" "normalizes the given NSO RR")
 
+# help qelim command
+add_test(NAME test_repl-help_qelim_command_cmd-full
+	COMMAND bash -c "echo 'help qelim. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+set_tests_properties(test_repl-help_qelim_command_cmd-full PROPERTIES
+	PASS_REGULAR_EXPRESSION "qelim command eliminates inner most quantifier")
+add_test(NAME test_repl-help_shortened_qelim_cmd
+	COMMAND bash -c "echo 'h qelim. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+set_tests_properties(test_repl-help_shortened_qelim_cmd PROPERTIES
+	PASS_REGULAR_EXPRESSION "qelim command eliminates inner most quantifier")
+
 # help normalize command with shortened command
 add_repl_test(help_normalize_cmd_shortened "help n" "normalizes the given NSO RR")
 add_repl_test(help_shortened_normalize_cmd-shortened "h n" "normalizes the given NSO RR")
