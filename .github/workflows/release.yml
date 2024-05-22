@@ -7,11 +7,8 @@ on:
     branches: [ "main" ]
 
 env:
-  # TODO (LOW) we have to build release and debug versions of the project and
-  # run tests for both of them
-
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Debug
+  BUILD_TYPE: Release
 
   # Customize the compiler version
   GCC_VERSION: 13
