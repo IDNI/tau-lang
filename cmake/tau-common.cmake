@@ -31,11 +31,10 @@ if(USED_CMAKE_GENERATOR MATCHES "Ninja")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
 endif()
 
-set(DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3")
-set(RELEASE_OPTIONS "-O3;-DNDEBUG")
+set(DEBUG_OPTIONS "-O0;-DDEBUG;-ggdb3;-flto=auto")
+set(RELEASE_OPTIONS "-O3;-DNDEBUG;-flto=auto")
 set(COMPILE_OPTIONS
 	"$<IF:$<CONFIG:Debug>,${DEBUG_OPTIONS},${RELEASE_OPTIONS}>"
-	"$<$<CONFIG:Release>:-flto=auto>"
 )
 set(LINK_OPTIONS "-flto=auto")
 
