@@ -1,4 +1,4 @@
 #!/bin/bash
 
 cd build-Debug
-ctest -j N --output-on-failure $@
+ctest -j 1 --output-on-failure $@

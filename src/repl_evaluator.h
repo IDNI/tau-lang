@@ -105,8 +105,8 @@ private:
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
 		bool silent = false);
 	void memory_store(repl_evaluator<factory_t, BAs...>::memory o);
-	std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>> get_type_and_arg(
-		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>>
+		get_type_and_arg(const nso<tau_ba<BAs...>, BAs...>& n);
 
 	// commands
 	void not_implemented_yet();

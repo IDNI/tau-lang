@@ -18,9 +18,8 @@ env:
 
 jobs:
   build:
-    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
-    # You can convert this to a matrix build if you need cross-platform coverage.
-    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    # TODO maybe set to a specific runner version to ensure the build environment is consistent
+    # requires to take care of Act runner version because it does not have 24.04 runner
     runs-on: ubuntu-latest
 
     steps:
@@ -46,7 +45,8 @@ jobs:
         export GCC_VERSION=12
         apt-get update && apt-get install cmake gcc-$GCC_VERSION g++-$GCC_VERSION -y
 
-    - name: Update gcc and g++ alternatives to a selected compiler version
+    - name: Act update gcc and g++ alternatives to a selected compiler version
+      if: ${{env.ACT}}
       run: |
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-$GCC_VERSION 60
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-$GCC_VERSION 60

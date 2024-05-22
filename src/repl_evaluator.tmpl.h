@@ -60,13 +60,13 @@ std::optional<size_t> get_memory_index(const sp_tau_node<tau_ba<BAs...>, BAs...>
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
-	auto mem_id = n | mem_type | tau_parser::memory_id
-		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
 	auto is_relative = (mem_type == tau_parser::rel_memory);
-	size_t idx = mem_id ? digits(mem_id) : 0;
+	size_t idx = 0;
+	auto mem_id = n | mem_type | tau_parser::memory_id;
+	if (mem_id) idx = digits(mem_id.value());
 	if (idx >= size) {
 		if (!silent) cout << "memory " << TC_OUTPUT
-			<< (is_relative ? "%" : "&")
+			<< (is_relative ? "%" : "%-")
 			<< idx << TC.CLEAR() << " does not exist\n";
 		return {};
 	}
@@ -87,10 +87,13 @@ repl_evaluator<factory_t, BAs...>::memory_ref
 }
 
 template<typename... BAs>
-void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id, const size_t size) {
-	cout << TC_OUTPUT << "&" << id << TC.CLEAR() << "/"
-		<< TC_OUTPUT << "%" << (size - id - 1) << TC.CLEAR()
-		<< ": " << mem << "\n";
+void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id,
+	const size_t size, bool print_relative_index = true)
+{
+	cout << TC_OUTPUT << "%-" << id << TC.CLEAR();
+	if (print_relative_index) cout << "/" << TC_OUTPUT
+					<< "%" << (size - id - 1) << TC.CLEAR();
+	cout << ": " << mem << "\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -111,7 +114,7 @@ void repl_evaluator<factory_t, BAs...>::memory_print_cmd(
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::memory_list_cmd() {
-	if (!m.size()) cout << "memory is empty\n";
+	if (m.size() == 0) cout << "memory is empty\n";
 	else for (size_t i = 0; i < m.size(); i++)
 		print_memory(m[i], i, m.size());
 }
@@ -119,10 +122,7 @@ void repl_evaluator<factory_t, BAs...>::memory_list_cmd() {
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::memory_clear_cmd() {
 	if (m.size() == 0) cout << "memory is empty\n";
-	else {
-		m.clear();
-		cout << "memory cleared\n";
-	}
+	else m.clear(), cout << "memory cleared\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -132,7 +132,7 @@ void repl_evaluator<factory_t, BAs...>::memory_store(
 	// do not add into memory if the last memory value is the same
 	if (m.size() && m.back() == o) return;
 	m.push_back(o);
-	print_memory(m.back(), m.size() - 1, m.size());
+	print_memory(m.back(), m.size() - 1, m.size(), false);
 }
 
 template <typename factory_t, typename... BAs>
@@ -575,9 +575,12 @@ boost::log::trivial::severity_level
 
 template <typename... BAs>
 size_t get_opt(sp_tau_node<BAs...> n) {
-	auto bool_opt = n | tau_parser::bool_option;
-	if (bool_opt.has_value()) n = bool_opt.value();
-	return n| only_child_extractor<BAs...>
+	sp_tau_node<BAs...> value;
+	if (auto bool_opt = n | tau_parser::bool_option; bool_opt)
+		value =  bool_opt.value();
+	else if (auto enum_opt = n | tau_parser::enum_option; enum_opt)
+		value =  enum_opt.value();
+	return value | only_child_extractor<BAs...>
 		| non_terminal_extractor<BAs...>
 		| optional_value_extractor<size_t>;
 }
@@ -730,7 +733,7 @@ std::string repl_evaluator<factory_t, BAs...>::prompt() {
 	std::stringstream ss;
 	if (opt.status) {
 		std::stringstream status;
-		if (m.size()) status << " " << TC_STATUS_OUTPUT << "&"
+		if (m.size()) status << " " << TC_STATUS_OUTPUT << "%-"
 			<< m.size()-1 << TC.CLEAR() << TC_STATUS;
 		if (opt.severity != trivial::error)
 			status << " " << to_string(opt.severity);

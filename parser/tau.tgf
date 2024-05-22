@@ -120,7 +120,8 @@ ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 # 3.- to create new subformulas in other rules, for instance, to create a
 # new formula that is the substitution of a variable by a constant.
 
-# bultin_args, type is neede to capture appropriate typed arguments, do not try to simplify this
+# bultin_args, type is needed to capture appropriate typed arguments
+# do not try to simplify this
 bf_cb_args1            => __ bf:bf_cb_arg.
 bf_cb_args2            => bf_cb_args1 bf_cb_args1.
 bf_cb_args3            => bf_cb_args2 bf_cb_args1.
@@ -154,10 +155,11 @@ bf_cb  => ("bf_is_zero_cb"              bf_cb_args2) :bf_is_zero_cb
         | ("bf_xor_cb"                  bf_cb_args2) :bf_xor_cb
         | ("bf_neg_cb"                  bf_cb_args1) :bf_neg_cb.
 
-charvar                => (alpha & ~'T' & ~'F') (digit)*.
+# variables
+charvar                => (alpha & ~'T' & ~'F') digit*.
 bool_variable          => '?' charvar.
 variable               => charvar | (in | out):io_var.
-in                     => ("i_" chars):in_var_name '[' offset ']'.
+in                     => ("i_" chars):in_var_name  '[' offset ']'.
 out                    => ("o_" chars):out_var_name '[' offset ']'.
 capture                => '$' charvar.
 q_bool_var             => capture | bool_variable.
@@ -171,8 +173,8 @@ num                    => digits.
 
 #constants
 constant               => binding | capture.
-binding                => ( (chars _ | _):type ':' _ source ):source_binding
-                        | chars                              :named_binding.
+binding                => ((chars _ | _):type ':' _ source):source_binding
+                        | chars                            :named_binding.
 source                 => (alnum | punct):src_c [ (src_c | space)* src_c ].
 
 # common elements
