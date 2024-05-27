@@ -499,7 +499,11 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const
 }
 
 template <typename T>
-static const auto optional_value_extractor = [](const std::optional<T>& o) -> T {return o.value();} ;
+static const auto optional_value_extractor = [](const std::optional<T>& o) -> T{
+	if (!o) BOOST_LOG_TRIVIAL(error)
+		<< "parse tree traversal: bad optional access";
+	return o.value();
+};
 
 template <typename T>
 using optional_value_extractor_t = decltype(optional_value_extractor<T>);
