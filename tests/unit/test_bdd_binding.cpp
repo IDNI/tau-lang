@@ -101,7 +101,6 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-
 	TEST_CASE("bdd and") {
 		const char* samples[] = {
 			"0 0", "0 1", "1 0", "1 1",
@@ -169,7 +168,7 @@ TEST_SUITE("bdd binding") {
 			"p", "X", "a1"
 		};
 		vector<string> expecteds = {
-			" p", " X", " a1"
+			"p", "X", "a1"
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
@@ -183,7 +182,7 @@ TEST_SUITE("bdd binding") {
 			"v'", "X''", "a1'''"
 		};
 		vector<string> expecteds = {
-			" v'", " X", " a1'"
+			"v'", "X", "a1'"
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
@@ -198,8 +197,8 @@ TEST_SUITE("bdd binding") {
 			"v&0", "v&1", "0&v", "1&v", "v&v", "v&w"
 		};
 		vector<string> expecteds = {
-			"0", " v", "0", " v", " v", " v w",
-			"0", " v", "0", " v", " v", " v w"
+			"0", "v", "0", "v", "v", "v w",
+			"0", "v", "0", "v", "v", "v w"
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
@@ -213,7 +212,7 @@ TEST_SUITE("bdd binding") {
 			"v|0", "v|1", "0|v", "1|v", "v|v", "v|w"
 		};
 		vector<string> expecteds = {
-			" v", "1", " v", "1", " v", " v | v' w"
+			"v", "1", "v", "1", "v", "v | v' w"
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
@@ -228,8 +227,8 @@ TEST_SUITE("bdd binding") {
 			"v+0", "0+v", "v+1", "1+v", "v+v", "v+w"
 		};
 		vector<string> expecteds = {
-			" v", " v", " v'", " v'", "0", " v w' | v' w",
-			" v", " v", " v'", " v'", "0", " v w' | v' w"
+			"v", "v", "v'", "v'", "0", "v w' | v' w",
+			"v", "v", "v'", "v'", "0", "v w' | v' w"
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
@@ -244,8 +243,8 @@ TEST_SUITE("bdd binding") {
 			"1|w&v", "1|(w&v)", "(1|w)&v"
 		};
 		vector<string> expecteds = {
-			" v", " v", "0",
-			"1", "1", " v"
+			"v", "v", "0",
+			"1", "1", "v"
 		};
 		for (size_t i = 0; i != SAMPLES_SIZE; ++i) {
 			stringstream ss;
@@ -254,11 +253,10 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-
 	TEST_CASE("bdd all syntax") {
 	 	const char* sample = "z' | x b (1'^(a b) | 0+c | a) ^ d "
 					"| d^e&1";
-		string expected = " a b d e' x z | a b d' x z | a' b c d e'"
+		string expected = "a b d e' x z | a b d' x z | a' b c d e'"
 			" x z | a' b c d' x z | a' b c' d x z | a' b c' d' e x "
 			"z | b' d x z | b' d' e x z | d x' z | d' e x' z | z'";
 		stringstream ss;

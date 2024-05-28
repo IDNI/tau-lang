@@ -63,7 +63,6 @@ struct bdd_factory {
 		case bdd_parser::variable: {
 			// get var id from var node's terminals
 			auto var_name = n | get_terminals;
-			BOOST_LOG_TRIVIAL(trace) << "variable: '" << var_name << "'";
 			auto v = dict(var_name);
 			// use cached var if exists
 			if (auto cn = var_cache.find(v);
