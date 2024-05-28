@@ -286,13 +286,7 @@ template<typename... BAs>
 nso<BAs...> bf_normalizer_without_rec_relation (const nso<BAs...>& bf) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
 
-	auto result = bf
-		| repeat_all<step<BAs...>, BAs...>( apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			to_dnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
-		| reduce_bf<BAs...>;
+	auto result = bf_to_reduced_dnf(bf);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 
@@ -310,13 +304,7 @@ nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
 
-	auto result = bf_unfolded | repeat_all<step<BAs...>, BAs...>(
-		apply_bf_defs<BAs...>)
-			| repeat_all<step<BAs...>, BAs...>(
-				to_dnf_bf<BAs...>
-					| simplify_bf<BAs...>
-					| apply_cb<BAs...>)
-				| reduce_bf<BAs...>;
+	auto result = bf_to_reduced_dnf(bf_unfolded);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 
