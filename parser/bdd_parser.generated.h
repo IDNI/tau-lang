@@ -13,14 +13,14 @@ using terminal_type = char;
 
 inline std::vector<std::string> symbol_names{
 	"", "space", "alpha", "digit", "start", "_", "bdd", "group", "__E_bdd_0", "variable", 
-	"__E_bdd_1", "__E___E_bdd_1_2", "negation", "__E_bdd_3", "disjunction", "__E_bdd_4", "conjunction", "__E_bdd_5", "__E___E_bdd_5_6", "exclusive_disjunction", 
+	"__E_bdd_1", "__E___E_bdd_1_2", "negation", "__E_bdd_3", "disjunction", "__E_bdd_4", "exclusive_disjunction", "__E_bdd_5", "__E___E_bdd_5_6", "conjunction", 
 	"__E_bdd_7", "__E___E_bdd_7_8", "one", "zero", "__E___9", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
-	'\0', '(', ')', '\'', '|', '&', '^', '+', '1', 
+	'\0', '(', ')', '\'', '|', '^', '+', '&', '1', 
 	'0', 
 };
 
@@ -93,25 +93,25 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(14), (NT(15)));
 //G14:  bdd(6)               => disjunction(14).
 	p(NT(6), (NT(14)));
-//G15:  __E___E_bdd_5_6(18)  => _(5).
-	p(NT(18), (NT(5)));
-//G16:  __E___E_bdd_5_6(18)  => _(5) '&' _(5).
-	p(NT(18), (NT(5)+T(5)+NT(5)));
-//G17:  __E_bdd_5(17)        => bdd(6) __E___E_bdd_5_6(18) bdd(6).
-	p(NT(17), (NT(6)+NT(18)+NT(6)));
-//G18:  conjunction(16)      => __E_bdd_5(17).
+//G15:  __E___E_bdd_5_6(18)  => '^'.
+	p(NT(18), (T(5)));
+//G16:  __E___E_bdd_5_6(18)  => '+'.
+	p(NT(18), (T(6)));
+//G17:  __E_bdd_5(17)        => bdd(6) _(5) __E___E_bdd_5_6(18) _(5) bdd(6).
+	p(NT(17), (NT(6)+NT(5)+NT(18)+NT(5)+NT(6)));
+//G18:  exclusive_disjunction(16) => __E_bdd_5(17).
 	p(NT(16), (NT(17)));
-//G19:  bdd(6)               => conjunction(16).
+//G19:  bdd(6)               => exclusive_disjunction(16).
 	p(NT(6), (NT(16)));
-//G20:  __E___E_bdd_7_8(21)  => '^'.
-	p(NT(21), (T(6)));
-//G21:  __E___E_bdd_7_8(21)  => '+'.
-	p(NT(21), (T(7)));
-//G22:  __E_bdd_7(20)        => bdd(6) _(5) __E___E_bdd_7_8(21) _(5) bdd(6).
-	p(NT(20), (NT(6)+NT(5)+NT(21)+NT(5)+NT(6)));
-//G23:  exclusive_disjunction(19) => __E_bdd_7(20).
+//G20:  __E___E_bdd_7_8(21)  => _(5).
+	p(NT(21), (NT(5)));
+//G21:  __E___E_bdd_7_8(21)  => _(5) '&' _(5).
+	p(NT(21), (NT(5)+T(7)+NT(5)));
+//G22:  __E_bdd_7(20)        => bdd(6) __E___E_bdd_7_8(21) bdd(6).
+	p(NT(20), (NT(6)+NT(21)+NT(6)));
+//G23:  conjunction(19)      => __E_bdd_7(20).
 	p(NT(19), (NT(20)));
-//G24:  bdd(6)               => exclusive_disjunction(19).
+//G24:  bdd(6)               => conjunction(19).
 	p(NT(6), (NT(19)));
 //G25:  one(22)              => '1'.
 	p(NT(22), (T(8)));
@@ -140,7 +140,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 struct bdd_parser : public idni::parser<char, char> {
 	enum nonterminal {
 		nul, space, alpha, digit, start, _, bdd, group, __E_bdd_0, variable, 
-		__E_bdd_1, __E___E_bdd_1_2, negation, __E_bdd_3, disjunction, __E_bdd_4, conjunction, __E_bdd_5, __E___E_bdd_5_6, exclusive_disjunction, 
+		__E_bdd_1, __E___E_bdd_1_2, negation, __E_bdd_3, disjunction, __E_bdd_4, exclusive_disjunction, __E_bdd_5, __E___E_bdd_5_6, conjunction, 
 		__E_bdd_7, __E___E_bdd_7_8, one, zero, __E___9, 
 	};
 	static bdd_parser& instance() {
