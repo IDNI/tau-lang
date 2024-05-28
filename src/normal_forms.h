@@ -246,6 +246,12 @@ static auto simplify_bf = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto simplify_bf_more = make_library<BAs...>(
+	BF_ELIM_DOUBLE_NEGATION_0 +
+	BF_DEF_XOR
+);
+
+template<typename... BAs>
 static auto simplify_wff = make_library<BAs...>(
 	WFF_SIMPLIFY_ONE_0
 	+ WFF_SIMPLIFY_ONE_1
@@ -782,6 +788,182 @@ nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 		);
 	// finally, we also simplify the bf part of the formula
 	return nnf_bf(nform);
+}
+
+// Reduce currrent dnf due to update by coeff and variable assignment i
+inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t p, bool surface = true) {
+		for (size_t j=0; j < paths.size(); ++j) {
+			// Get Hamming distance between i and path and position of last difference
+			// while different irrelevant variables make assignments incompatible
+			int_t dist = 0, pos = 0;
+			for (int_t k=0; k < p; ++k) {
+				if (i[k] == paths[j][k]) continue;
+				else if (dist == 2) break;
+				else if (i[k] == 2 || paths[j][k] == 2) { dist = 0; break; }
+				else dist += 1, pos = k;
+			}
+			if (dist == 1) {
+				// Remove i from paths if recursion depth is greater 0
+				if(!surface) {
+					paths[j] = {};
+					// Resolve variable
+					i[pos] = 2;
+					if(ranges::all_of(i, [](const auto el) {return el == 2;}))
+						return paths = {}, true;
+					// Continue with resulting assignment
+					reduce_paths(i, paths, false);
+				} else {
+					// Resolve variable
+					paths[j][pos] = 2;
+					if(ranges::all_of(paths[j], [](const auto el) {return el == 2;}))
+						return paths = {}, true;
+					// Continue with resulting assignment
+					reduce_paths(paths[j], paths, false);
+				}
+				return true;
+			}
+		}
+		return false;
+}
+
+// Ordering function for variables from nso formula
+inline auto lex_var_comp = [](const auto x, const auto y) {
+	const auto cx = x->child[0], cy = y->child[0];
+	for (size_t k=0; k < cx->child.size(); ++k) {
+		if (!(k < cy->child.size())) return false;
+		char cxv = get<char>(get<tau_source_sym>(cx->child[k]->value));
+		char cyv = get<char>(get<tau_source_sym>(cy->child[k]->value));
+		if (cxv > cyv) return false;
+	}
+	return x != y;
+};
+
+// Starting from variable at position p+1 in vars note in i which variables are present in vars
+// but not in free variables of fm
+template<typename... BAs>
+void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const int_t p) {
+	auto cvars = select_all(fm, is_non_terminal<tau_parser::variable, BAs...>);
+	sort(cvars.begin(), cvars.end(), lex_var_comp);
+
+	// Set irrelevant vars in assignment i to 2
+	int_t v_iter = p+1, cv_iter = 0;
+	while (v_iter < (int_t)vars.size()) {
+		if (cv_iter < (int_t)cvars.size() && vars[v_iter] == cvars[cv_iter]) {
+			++v_iter, ++cv_iter;
+		} else {
+			i[v_iter] = 2;
+			++v_iter;
+		}
+	}
+}
+
+// Create assignment in formula and reduce resulting clause
+template<typename... BAs>
+bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, vector<int_t>& i, auto& dnf, int_t p) {
+	// Check if all variables are assigned
+	if((int_t)vars.size() == p) {
+		// Do not add to dnf if the coefficient is 0
+		if(is_non_terminal(tau_parser::bf_f, fm->child[0]))
+			return false;
+		if(ranges::all_of(i, [](const auto el) {return el == 2;})) {
+			bool t = is_non_terminal(tau_parser::bf_t, fm->child[0]);
+			return t ? t : (dnf.emplace(fm, vector(0, i)), false);
+		}
+
+		auto it = dnf.find(fm);
+		if (it == dnf.end()) return dnf.emplace(fm, vector(p==0?0:1, i)), false;
+		else if (!reduce_paths(i, it->second, p)) {
+			// Place coefficient together with variable assignment if no reduction happend
+			it->second.push_back(i);
+		} else erase_if(it->second, [](const auto& v){return v.empty();});
+		return it->second.empty() && is_non_terminal(tau_parser::bf_t, fm->child[0]);
+	}
+	// variable was already eliminated
+	if (i[p] == 2) {
+		if (assign_and_reduce(fm, vars, i, dnf, p+1)) return true;
+		i[p] = 0;
+		return false;
+	}
+	// Substitute 1 and 0 for v and simplify
+	const auto& v = vars[p];
+	map<nso<BAs...>, nso<BAs...>> c = {{v, _1_trimmed<BAs...>}};
+	auto fm_v1 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(
+			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
+	c = {{v, _0_trimmed<BAs...>}};
+	auto fm_v0 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(
+			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
+
+	elim_vars_in_assignment<BAs...>(fm_v1, vars, i, p);
+	if(fm_v1 == fm_v0) {
+		i[p] = 2;
+		if (assign_and_reduce(fm_v1, vars, i, dnf, p+1)) return true;
+		i[p] = 0;
+	} else {
+		i[p] = 1;
+		if (assign_and_reduce(fm_v1, vars, i, dnf, p+1)) return true;
+		i[p] = 0;
+
+		elim_vars_in_assignment<BAs...>(fm_v0, vars, i, p);
+		i[p] = -1;
+		if (assign_and_reduce(fm_v0, vars, i, dnf, p+1)) return true;
+		i[p] = 0;
+	}
+	return false;
+}
+
+// Given a BF b, calculate the DNF corresponding to the pathes to true in the BDD of b
+// where the variable order is assumed to be the order in which the variables occur in b
+template<typename... BAs>
+nso<BAs...> bf_to_reduced_dnf (const nso<BAs...>& fm) {
+	// Function can only be applied to a BF
+	assert(is_non_terminal(tau_parser::bf, fm));
+
+	// This defines the variable order used to calculate DNF
+	// It is made canonical by sorting the variables
+	auto vars = select_all(fm, is_non_terminal<tau_parser::variable, BAs...>);
+	sort(vars.begin(), vars.end(), lex_var_comp);
+
+	vector<int_t> i (vars.size()); // Record assignments of vars
+
+	// Resulting DNF - make it ordered for consistency
+	// Key is coefficient, value is possible variable assignments for coefficient
+	map<nso<BAs...>, vector<vector<int_t>>> dnf;
+
+	//Simplify formula as initial step
+	auto fm_simp = fm | repeat_all<step<BAs...>, BAs...>(
+			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
+
+	if(assign_and_reduce(fm_simp, vars, i, dnf, 0))
+		return _1<BAs...>;
+	if(dnf.empty()) return _0<BAs...>;
+
+	// Convert map structure dnf back to rewrite tree
+	nso<BAs...> reduced_dnf;
+	bool first = true;
+	for (const auto& [coeff, paths] : dnf) {
+		bool t = is_non_terminal(tau_parser::bf_t, coeff->child[0]);
+		if (paths.empty()) {
+			assert(!t);
+			if (first) reduced_dnf = coeff;
+			else reduced_dnf = build_bf_or(reduced_dnf, coeff);
+			continue;
+		}
+		for (const auto& path : paths) {
+			bool first_var = true;
+			nso<BAs...> var_path;
+			for (size_t k=0; k < vars.size(); ++k) {
+				if (path[k] == 2) continue;
+				if (first_var) var_path = path[k] == 1 ? wrap(tau_parser::bf, vars[k]) :
+												build_bf_neg(wrap(tau_parser::bf, vars[k])), first_var = false;
+				else var_path = path[k] == 1 ? build_bf_and(var_path, wrap(tau_parser::bf, vars[k])) :
+							build_bf_and(var_path, build_bf_neg(wrap(tau_parser::bf, vars[k])));
+			}
+			if (first) reduced_dnf = t ? var_path : build_bf_and(coeff, var_path), first = false;
+			else reduced_dnf = t ? build_bf_or(reduced_dnf, var_path) :
+				build_bf_or(reduced_dnf, build_bf_and(coeff, var_path));
+		}
+	}
+	return reduced_dnf;
 }
 
 // we assume no functional quantifiers are present and all defs have being applyed
