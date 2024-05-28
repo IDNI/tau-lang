@@ -260,8 +260,7 @@ TEST_SUITE("bdd binding") {
 					"| d^e&1";
 		string expected = " a b d e' x z | a b d' x z | a' b c d e'"
 			" x z | a' b c d' x z | a' b c' d x z | a' b c' d' e x "
-			"z | b' d e' x z | b' d' e x z | d e' x' z | d' e x' z "
-			"| z'";
+			"z | b' d x z | b' d' e x z | d x' z | d' e x' z | z'";
 		stringstream ss;
 		ss << build_and_get_binding(sample);
 		CHECK(ss.str() == expected);

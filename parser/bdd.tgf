@@ -18,8 +18,8 @@ bdd    => ( '(' _ bdd _ ')'                ) :group
         | ( alpha digit*                   ) :variable
         | ( bdd _ "'"                      ) :negation
         | ( bdd _ '|' _ bdd                ) :disjunction
-        | ( bdd (_ | _ '&' _) bdd          ) :conjunction
         | ( bdd _ ('^' | '+') _ bdd        ) :exclusive_disjunction
+        | ( bdd (_ | _ '&' _) bdd          ) :conjunction
         | '1'                                :one
         | '0'                                :zero.
 _      => [ space _ ].
