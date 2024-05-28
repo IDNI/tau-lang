@@ -565,7 +565,7 @@ ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
 	}
 	bool first = true;
 	for (auto& s : ss) {
-		if (first) os << " ", first = false;
+		if (!first) os << " ", first = false;
 		os << s;
 		if (--n) os << " | ";
 	}
