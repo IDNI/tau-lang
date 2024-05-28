@@ -14,6 +14,8 @@
 #ifndef __BDD_BINDING_H__
 #define __BDD_BINDING_H__
 
+#include <boost/log/trivial.hpp>
+
 #include "nso_rr.h"
 #include "bdd_handle.h"
 #include "babdd.h"
@@ -37,70 +39,76 @@ struct bdd_factory {
 
 	using parse_forest = idni::parser<char, char>::pforest;
 	using parse_result = idni::parser<char, char>::result;
+	using traverser_t  = traverser<tau_sym<bdd_binding>, bdd_parser>;
+	static constexpr const auto& get_only_child =
+			traverser_t::get_only_child_extractor();
+	static constexpr const auto& get_terminals =
+			traverser_t::get_terminal_extractor();
+	static constexpr const auto& get_nonterminal =
+			traverser_t::get_nonterminal_extractor();
 
-	// transform a parse forest into a bdd
-	bdd_binding transform(const parse_result& r) {
-		std::vector<bdd_binding> x; // stack
-		auto cb_enter = [&x, &r] (const auto& n) {
-			if (!n->first.nt()) return; // skip if terminal
-			auto nt = n->first.n(); // get nonterminal id
-			static auto T = bdd_handle<Bool>::htrue;
-			static auto F = bdd_handle<Bool>::hfalse;
-			if      (nt == bdd_parser::T) x.push_back(T);
-			else if (nt == bdd_parser::F) x.push_back(F);
-			else if (nt == bdd_parser::var) {
-				// get var id from var node's terminals
-				auto v = dict(r.get_terminals(n));
-				// use cached var if exists
-				if (auto cn = var_cache.find(v);
-					cn != var_cache.end())
-						x.push_back(cn->second);
-				else {// otherwise create a new var and cache it
-					auto ref = bdd<Bool>::bit(v);
-					x.push_back(var_cache.emplace(v,
-						bdd_handle<Bool>::get(ref))
-							.first->second);
-				}
+	// evaluates a parsed bdd terminal node recursively
+	bdd_binding eval_node(const traverser_t& t) {
+		//BOOST_LOG_TRIVIAL(debug) << "eval_node";
+		auto n  = t | get_only_child;
+		auto nt = n | get_nonterminal;
+		switch (nt) {
+		case bdd_parser::zero: return bdd_handle<Bool>::hfalse;
+		case bdd_parser::one:  return bdd_handle<Bool>::htrue;
+		case bdd_parser::negation: {
+			auto e = eval_node(n | get_only_child);
+			BOOST_LOG_TRIVIAL(trace) << e << "' = " << ~e;
+			return ~e;
+		}
+		case bdd_parser::variable: {
+			// get var id from var node's terminals
+			auto var_name = n | get_terminals;
+			BOOST_LOG_TRIVIAL(trace) << "variable: '" << var_name << "'";
+			auto v = dict(var_name);
+			// use cached var if exists
+			if (auto cn = var_cache.find(v);
+				cn != var_cache.end())
+					return cn->second;
+			// otherwise create a new var and cache it
+			auto ref = bdd<Bool>::bit(v);
+			return var_cache.emplace(v, bdd_handle<Bool>::get(ref))
+				.first->second;
+		}
+		default:
+			auto o = (n || bdd_parser::bdd)();
+			auto l = eval_node(o[0]), r = eval_node(o[1]);
+			switch (nt) {
+			case bdd_parser::disjunction:
+				BOOST_LOG_TRIVIAL(trace)
+					<< l << " | " << r << " -> " << (l | r);
+				return l | r;
+			case bdd_parser::exclusive_disjunction:
+				BOOST_LOG_TRIVIAL(trace)
+					<< l << " ^ " << r << " -> " << (l ^ r);
+				return l ^ r;
+			case bdd_parser::conjunction:
+				BOOST_LOG_TRIVIAL(trace)
+					<< l << " & " << r << " -> " << (l & r);
+				return l & r;
+			default: return bdd_handle<Bool>::hfalse;
 			}
-		};
-		auto cb_exit = [&x] (const auto& n, const auto&) {
-			if (!n->first.nt()) return; // skip if terminal
-			auto nt = n->first.n(); // get nonterminal id
-			// shortcuts for current and previous stack elements
-			#define CURR (x.back())
-			#define PREV (x[x.size() - 2])
-			if (nt == bdd_parser::negation) {
-				BOOST_LOG_TRIVIAL(trace) << "CURR: " << CURR << " = " << ~CURR;
-				CURR = ~CURR;
-			} else if (nt == bdd_parser::conjunction) {
-				BOOST_LOG_TRIVIAL(trace) << PREV << " & " << CURR << " = " << (PREV & CURR);
-				PREV = PREV & CURR, x.pop_back();
-			} else if (nt == bdd_parser::disjunction) {
-				BOOST_LOG_TRIVIAL(trace) << PREV << " | " << CURR << " = " << (PREV | CURR);
-				PREV = PREV | CURR, x.pop_back();
-			} else if (nt == bdd_parser::exclusive_or) {
-				BOOST_LOG_TRIVIAL(trace) << PREV << " ^ " << CURR << " = " << (PREV ^ CURR);
-				PREV = PREV ^ CURR, x.pop_back();
-			}
-			#undef CURR
-			#undef PREV
-		};
-		r.get_forest()->traverse(cb_enter, cb_exit); // run traversal
-		// return the current element of the stack if any or hfalse
-		DBG(assert(x.size() <= 1);)
-		return x.size() ? x.back() : bdd_handle<Bool>::hfalse;
+		}
 	}
-
 	// parses a bdd from a string
 	bdd_binding parse(const std::string& src) {
 		auto& p = bdd_parser::instance();
 		auto r = p.parse(src.c_str(), src.size());
 		if (!r.found) {
-			BOOST_LOG_TRIVIAL(error) << "# bdd source: `" << src
-				<< "`\n" << r.parse_error;
+			BOOST_LOG_TRIVIAL(error) << "# bdd binding: `"
+				<< src << "`\n" << r.parse_error;
 			return bdd_handle<Bool>::hfalse;
 		}
-		return transform(r); // transform the forest into bdd
+		char dummy = 0;
+		auto root = make_node_from_tree<bdd_parser, char,
+			tau_sym<bdd_binding>>(dummy, r.get_shaped_tree());
+		auto t = traverser_t(root) | bdd_parser::bdd;
+		if (t.has_value()) return eval_node(t);
+		return bdd_handle<Bool>::hfalse;
 	}
 
 	// builds a bdd bounded node parsed from terminals of a source binding
