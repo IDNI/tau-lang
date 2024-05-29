@@ -827,23 +827,18 @@ inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t 
 }
 
 // Ordering function for variables from nso formula
-inline auto lex_var_comp = [](const auto x, const auto y) {
-	const auto cx = x->child[0], cy = y->child[0];
-	for (size_t k=0; k < cx->child.size(); ++k) {
-		if (!(k < cy->child.size())) return false;
-		char cxv = get<char>(get<tau_source_sym>(cx->child[k]->value));
-		char cyv = get<char>(get<tau_source_sym>(cy->child[k]->value));
-		if (cxv > cyv) return false;
-	}
-	return x != y;
+template<typename... BAs>
+auto lex_var_comp = [](const auto x, const auto y) {
+	auto xx = make_string(tau_node_terminal_extractor<BAs...>, x);
+	auto yy = make_string(tau_node_terminal_extractor<BAs...>, y);
+	return xx < yy;
 };
 
-// Starting from variable at position p+1 in vars note in i which variables are present in vars
-// but not in free variables of fm
+// Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template<typename... BAs>
 void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const int_t p) {
 	auto cvars = select_all(fm, is_non_terminal<tau_parser::variable, BAs...>);
-	sort(cvars.begin(), cvars.end(), lex_var_comp);
+	sort(cvars.begin(), cvars.end(), lex_var_comp<BAs...>);
 
 	// Set irrelevant vars in assignment i to 2
 	int_t v_iter = p+1, cv_iter = 0;
@@ -866,8 +861,8 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 		if(is_non_terminal(tau_parser::bf_f, fm->child[0]))
 			return false;
 		if(ranges::all_of(i, [](const auto el) {return el == 2;})) {
-			bool t = is_non_terminal(tau_parser::bf_t, fm->child[0]);
-			return t ? t : (dnf.emplace(fm, vector(0, i)), false);
+			//bool t = is_non_terminal(tau_parser::bf_t, fm->child[0]);
+			return dnf.emplace(fm, vector(0, i)), true;
 		}
 
 		auto it = dnf.find(fm);
@@ -876,7 +871,7 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 			// Place coefficient together with variable assignment if no reduction happend
 			it->second.push_back(i);
 		} else erase_if(it->second, [](const auto& v){return v.empty();});
-		return it->second.empty() && is_non_terminal(tau_parser::bf_t, fm->child[0]);
+		return it->second.empty();
 	}
 	// variable was already eliminated
 	if (i[p] == 2) {
@@ -920,8 +915,8 @@ nso<BAs...> bf_to_reduced_dnf (const nso<BAs...>& fm) {
 
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
-	auto vars = select_all(fm, is_non_terminal<tau_parser::variable, BAs...>);
-	sort(vars.begin(), vars.end(), lex_var_comp);
+	auto vars = select_top(fm, is_non_terminal<tau_parser::variable, BAs...>);
+	sort(vars.begin(), vars.end(), lex_var_comp<BAs...>);
 
 	vector<int_t> i (vars.size()); // Record assignments of vars
 
@@ -933,8 +928,10 @@ nso<BAs...> bf_to_reduced_dnf (const nso<BAs...>& fm) {
 	auto fm_simp = fm | repeat_all<step<BAs...>, BAs...>(
 			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
 
-	if(assign_and_reduce(fm_simp, vars, i, dnf, 0))
-		return _1<BAs...>;
+	if(assign_and_reduce(fm_simp, vars, i, dnf, 0)) {
+		assert(dnf.size() == 1);
+		return dnf.begin()->first;
+	}
 	if(dnf.empty()) return _0<BAs...>;
 
 	// Convert map structure dnf back to rewrite tree
@@ -964,6 +961,24 @@ nso<BAs...> bf_to_reduced_dnf (const nso<BAs...>& fm) {
 		}
 	}
 	return reduced_dnf;
+}
+
+// The needed class in order to make bf_to_reduce_dnf work with rule applying process
+template<typename... BAs>
+struct bf_reduce_canonical {
+	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+		std::map<nso<BAs...>, nso<BAs...>> changes = {};
+		for (const auto& bf: select_top(fm, is_non_terminal<tau_parser::bf, BAs...>)) {
+			auto dnf = bf_to_reduced_dnf(bf);
+			if (dnf != bf) changes[bf] = dnf;
+		}
+		if (changes.empty()) return fm;
+		else return replace(fm, changes);
+	}
+};
+template<typename... BAs>
+nso<BAs...> operator|(const nso<BAs...>& fm, const bf_reduce_canonical<BAs...>& r) {
+	return r(fm);
 }
 
 // we assume no functional quantifiers are present and all defs have being applyed
