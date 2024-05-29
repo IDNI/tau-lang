@@ -937,7 +937,7 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "usage:\n"
 		<< "  normalize <NSORR>      normalizes the given NSO RR\n"
 		<< "  normalize <WFF>        normalizes the given WFF formula\n"
-	//	<< "  normalize <BF>         normalizes the given WFF formula\n";
+		<< "  normalize <BF>         normalizes the given WFF formula\n"
 		<< "  normalize <memory>     normalizes the memory with the given id\n";
 	//	<< "  normalize <selection>  normalizes the selection\n";
 		break;
