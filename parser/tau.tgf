@@ -89,7 +89,8 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "<="  _ bf)               :bf_less_equal
                         | (bf    _ "<"   _ bf)               :bf_less
                         |                                     capture
-                        |                                     bool_variable.
+                        |                                     bool_variable
+                        |                                     uninterpreted_constant.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | (sym [_ offsets] _ ref_args)       :bf_ref
@@ -101,7 +102,8 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | '1'                                :bf_t
                         | '0'                                :bf_f
                         |                                     capture
-                        |                                     variable.
+                        |                                     variable
+                        |                                     uninterpreted_constant.
 
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
@@ -172,6 +174,7 @@ shift                  => (capture | (variable & ~io_var)) _ '-' _ num.
 num                    => digits.
 
 #constants
+uninterpreted_constant => '<' _ (chars* ':' chars):uninter_const_name _ '>'.
 constant               => binding | capture.
 binding                => ((chars _ | _):type ':' _ source):source_binding
                         | chars                            :named_binding.
