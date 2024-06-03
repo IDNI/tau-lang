@@ -811,14 +811,14 @@ inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t 
 					if(ranges::all_of(i, [](const auto el) {return el == 2;}))
 						return paths = {}, true;
 					// Continue with resulting assignment
-					reduce_paths(i, paths, false);
+					reduce_paths(i, paths, p, false);
 				} else {
 					// Resolve variable
 					paths[j][pos] = 2;
 					if(ranges::all_of(paths[j], [](const auto el) {return el == 2;}))
 						return paths = {}, true;
 					// Continue with resulting assignment
-					reduce_paths(paths[j], paths, false);
+					reduce_paths(paths[j], paths, p, false);
 				}
 				return true;
 			}
@@ -906,10 +906,10 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	return false;
 }
 
-// Given a BF b, calculate the DNF corresponding to the pathes to true in the BDD of b
-// where the variable order is assumed to be the order in which the variables occur in b
+// Given a BF b, calculate the Boole normal form (DNF corresponding to the pathes to true in the BDD) of b
+// where the variable order is given by the function lex_var_comp
 template<typename... BAs>
-nso<BAs...> bf_to_reduced_dnf (const nso<BAs...>& fm) {
+nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm) {
 	// Function can only be applied to a BF
 	assert(is_non_terminal(tau_parser::bf, fm));
 
@@ -969,7 +969,7 @@ struct bf_reduce_canonical {
 	nso<BAs...> operator() (const nso<BAs...>& fm) const {
 		std::map<nso<BAs...>, nso<BAs...>> changes = {};
 		for (const auto& bf: select_top(fm, is_non_terminal<tau_parser::bf, BAs...>)) {
-			auto dnf = bf_to_reduced_dnf(bf);
+			auto dnf = bf_boole_normal_form(bf);
 			if (dnf != bf) changes[bf] = dnf;
 		}
 		if (changes.empty()) return fm;
