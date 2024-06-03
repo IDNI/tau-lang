@@ -1850,6 +1850,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			tau_parser::capture,
 			tau_parser::variable,
 			tau_parser::bool_variable,
+			tau_parser::uninterpreted_constant,
 			tau_parser::ref_args,
 			tau_parser::start
 		};
