@@ -1395,13 +1395,6 @@ struct callback_applier {
 
 private:
 	// unary operation
-	/*static constexpr auto _normalize = overloaded( // Hacky trick to get tau_ba type here
-		[]<typename tau_ba_t = std::tuple_element_t<0, std::tuple<BAs...>>>(const tau_ba_t& l) -> sp_tau_node<BAs...> {
-		auto res = l.normalize();
-		std::variant<BAs...> v(res);
-		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
-	}, [](const auto& l) -> sp_tau_node<BAs...>{return l;});*/
-
 	static constexpr auto _neg = [](const auto& l) -> sp_tau_node<BAs...> {
 		auto res = ~l;
 		std::variant<BAs...> v(res);
@@ -1598,6 +1591,8 @@ private:
 	}
 
 	sp_tau_node<BAs...> apply_normalization (const sp_tau_node<BAs...>& n) {
+		// A bit hacky way to get the tau_ba type at this point
+		// since it relies on the tau_ba being the first type in BAs...
 		using tau_ba_t = std::tuple_element_t<0, std::tuple<BAs...>>;
 		auto ba_element = n | tau_parser::bf_cb_arg | tau_parser::bf | only_child_extractor<BAs...> | ba_extractor<BAs...>;
 		if (ba_element.has_value() && std::holds_alternative<tau_ba_t>(ba_element.value())) {
