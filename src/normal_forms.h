@@ -62,6 +62,7 @@ RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
 RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
 RULE(BF_CALLBACK_XOR, "{ $X } + { $Y } := bf_xor_cb $X $Y.")
 RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
+RULE(BF_CALLBACK_NORMALIZE, "{ $X } := bf_normalize_cb $X.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 
@@ -297,8 +298,29 @@ static auto apply_cb = make_library<BAs...>(
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR
 	+ BF_CALLBACK_NEG
-	+ BF_CALLBACK_EQ
- 	+ BF_CALLBACK_NEQ
+	//+ BF_CALLBACK_EQ
+ 	//+ BF_CALLBACK_NEQ
+);
+
+template<typename... BAs>
+static auto apply_normalize = make_library<BAs...>(
+	BF_CALLBACK_NORMALIZE
+);
+
+template<typename... BAs>
+static auto elim_bf_constant_01 = make_library<BAs...>(
+	BF_CALLBACK_IS_ONE
+	+ BF_CALLBACK_IS_ZERO
+);
+
+template<typename... BAs>
+static auto elim_eqs = make_library<BAs...>(
+	BF_CALLBACK_EQ
+	+ BF_CALLBACK_NEQ
+	+ BF_EQ_SIMPLIFY_0
+	+ BF_EQ_SIMPLIFY_1
+	+ BF_NEQ_SIMPLIFY_0
+	+ BF_NEQ_SIMPLIFY_1
 );
 
 template<typename... BAs>
@@ -857,16 +879,21 @@ template<typename... BAs>
 bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, vector<int_t>& i, auto& dnf, int_t p) {
 	// Check if all variables are assigned
 	if((int_t)vars.size() == p) {
+		// Normalize tau subformulas
+		auto fm_simp = fm | repeat_once<step<BAs...>, BAs...>(apply_normalize<BAs...>)
+							| repeat_once<step<BAs...>, BAs...>(elim_bf_constant_01<BAs...>)
+							| repeat_all<step<BAs...>, BAs...>(simplify_bf<BAs...>);
+
 		// Do not add to dnf if the coefficient is 0
-		if(is_non_terminal(tau_parser::bf_f, fm->child[0]))
+		if(is_non_terminal(tau_parser::bf_f, fm_simp->child[0]))
 			return false;
 		if(ranges::all_of(i, [](const auto el) {return el == 2;})) {
 			//bool t = is_non_terminal(tau_parser::bf_t, fm->child[0]);
-			return dnf.emplace(fm, vector(0, i)), true;
+			return dnf.emplace(fm_simp, vector(0, i)), true;
 		}
 
-		auto it = dnf.find(fm);
-		if (it == dnf.end()) return dnf.emplace(fm, vector(p==0?0:1, i)), false;
+		auto it = dnf.find(fm_simp);
+		if (it == dnf.end()) return dnf.emplace(fm_simp, vector(p==0?0:1, i)), false;
 		else if (!reduce_paths(i, it->second, p)) {
 			// Place coefficient together with variable assignment if no reduction happend
 			it->second.push_back(i);

@@ -218,6 +218,7 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 		|| nt == tau_parser::bf_neq_cb
 		|| nt == tau_parser::bf_is_one_cb
 		|| nt == tau_parser::bf_is_zero_cb
+		|| nt == tau_parser::bf_normalize_cb
 		|| nt == tau_parser::wff_has_clashing_subformulas_cb
 		|| nt == tau_parser::bf_has_subformula_cb
 		|| nt == tau_parser::wff_has_subformula_cb
@@ -1377,6 +1378,7 @@ struct callback_applier {
 			case tau_parser::bf_neq_cb: return apply_equality_relation(_neq, n);
 			case tau_parser::bf_is_one_cb: return apply_constant_check(_is_one, n);
 			case tau_parser::bf_is_zero_cb: return apply_constant_check(_is_zero, n);
+			case tau_parser::bf_normalize_cb: return apply_normalization(n);
 			case tau_parser::bf_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::bf_cb_arg);
 			case tau_parser::wff_has_clashing_subformulas_cb: return apply_wff_clashing_subformulas_check(n);
 			case tau_parser::wff_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::wff_cb_arg);
@@ -1393,6 +1395,13 @@ struct callback_applier {
 
 private:
 	// unary operation
+	/*static constexpr auto _normalize = overloaded( // Hacky trick to get tau_ba type here
+		[]<typename tau_ba_t = std::tuple_element_t<0, std::tuple<BAs...>>>(const tau_ba_t& l) -> sp_tau_node<BAs...> {
+		auto res = l.normalize();
+		std::variant<BAs...> v(res);
+		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	}, [](const auto& l) -> sp_tau_node<BAs...>{return l;});*/
+
 	static constexpr auto _neg = [](const auto& l) -> sp_tau_node<BAs...> {
 		auto res = ~l;
 		std::variant<BAs...> v(res);
@@ -1586,6 +1595,19 @@ private:
 		auto ba_element = args[0] | tau_parser::bf_constant | tau_parser::constant
 			| only_child_extractor<BAs...> |  ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
 		return std::visit(op, ba_element) ? args[1] : args[0];
+	}
+
+	sp_tau_node<BAs...> apply_normalization (const sp_tau_node<BAs...>& n) {
+		using tau_ba_t = std::tuple_element_t<0, std::tuple<BAs...>>;
+		auto ba_element = n | tau_parser::bf_cb_arg | tau_parser::bf | only_child_extractor<BAs...> | ba_extractor<BAs...>;
+		if (ba_element.has_value() && std::holds_alternative<tau_ba_t>(ba_element.value())) {
+			auto res = std::get<tau_ba_t>(ba_element.value()).normalize();
+			std::variant<BAs...> v(res);
+			auto nn (make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {}));
+			std::vector<sp_tau_node<BAs...>> arg { nn };
+			return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
+		}
+		else return n;
 	}
 
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
@@ -2110,6 +2132,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_neq_cb:      prefix("bf_neq_cb"); break;
 			case tau_parser::bf_is_zero_cb:  prefix("bf_is_zero_cb"); break;
 			case tau_parser::bf_is_one_cb:   prefix("bf_is_one_cb"); break;
+			case tau_parser::bf_normalize_cb:prefix("bf_normalize_cb"); break;
 			case tau_parser::bf_remove_funiversal_cb:    prefix("bf_remove_funiversal_cb"); break;
 			case tau_parser::bf_remove_fexistential_cb:  prefix("bf_remove_fexistential_cb"); break;
 			case tau_parser::wff_remove_existential_cb:  prefix("wff_remove_existential_cb"); break;

@@ -82,6 +82,11 @@ struct tau_ba {
 		return *this + other;
 	}
 
+	tau_ba normalize() const {
+		nso<tau_ba, BAs...> res = normalizer<tau_ba, BAs...>(nso_rr);
+		return tau_ba(res);
+	}
+
 	bool is_zero() const {
 		// TODO (HIGH) replace by satisfability in the future
 		auto vars = get_free_vars_from_nso(nso_rr.main);
@@ -135,11 +140,12 @@ auto operator<=>(const tau_ba<BAs...>& l, const tau_ba<BAs...>& r) {
 }*/
 
 // TODO (HIGH) give a proper implementation for == operator
+// We assume "other" to be normalized already
 template<typename...BAs>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
-	auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.nso_rr);
-	auto is_one = (normalized | tau_parser::wff_t).has_value();
-	auto is_zero = (normalized | tau_parser::wff_f).has_value();
+	//auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.nso_rr);
+	auto is_one = (other.nso_rr.main | tau_parser::wff_t).has_value();
+	auto is_zero = (other.nso_rr.main | tau_parser::wff_f).has_value();
 	return b ? is_one : is_zero ;
 }
 
