@@ -7,11 +7,11 @@ mkfifo $pipe
 (sleep 10 && while IFS= read -r line
 do
   echo "$line"
-  # execute commands every 5 seconds
-  sleep 5
+  # execute commands every 1 seconds
+  # use '#' to get extra time
+  sleep 1
 done) < $1 > $pipe &
 
-#tail $pipe
 ./../build-Release/tau < $pipe
 
 rm $pipe
