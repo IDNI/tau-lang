@@ -208,3 +208,17 @@ TEST_SUITE("BDD expressions") {
 		CHECK( check.has_value() );
 	}
 }
+
+TEST_SUITE("Uninterpreted constant symbole") {
+	TEST_CASE("XOR") {
+		const char* sample = "<uninter:const>x + <uninter:const>x'";
+		tau_parser::parse_options options;
+		options.start = tau_parser::bf;
+		auto sample_src = make_tau_source(sample, options);
+		bdd_test_factory bf;
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
+		auto check = result |  tau_parser::uninterpreted_constant;
+		CHECK( check.has_value() );
+	}
+}

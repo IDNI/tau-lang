@@ -1850,6 +1850,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			tau_parser::capture,
 			tau_parser::variable,
 			tau_parser::bool_variable,
+			tau_parser::uninterpreted_constant,
 			tau_parser::ref_args,
 			tau_parser::start
 		};
@@ -2168,8 +2169,11 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::type:
 			case tau_parser::source:
 			case tau_parser::named_binding:
+			case tau_parser::uninter_const_name:
 				print_terminals(stream, n);
 				break;
+			// constants
+			case tau_parser::uninterpreted_constant: wrap("<", ">"); break;
 			// simple symbols
 			case tau_parser::bf_f:  stream << '0'; break;
 			case tau_parser::bf_t:  stream << '1'; break;
