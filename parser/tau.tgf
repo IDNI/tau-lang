@@ -251,7 +251,8 @@ cli_command            =>
 # TODO (VERY_HIGH) fix this, we could say 'set severity true'... use another case for this
         | ("set":set_sym   __ option
                                 (__ | _ '=' _) option_value)  :set_cmd
-        | ("toggle":toggle_sym __ bool_option)                :toggle_cmd.
+        | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
+        | comment.
 
 # command arguments
 #
