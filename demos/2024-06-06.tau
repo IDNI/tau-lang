@@ -1,0 +1,73 @@
+# Unifying access to memory or arguments in normal forms, sample tests cases
+# involving absolute memory access, relative memory access, and argument access
+# and dealing with wff anf bf formulas.
+#
+#
+#
+
+dnf (X | Y) & Z # convert to dnf a simple formula given as argument, stored in memory
+mem (X | Y) & Z # store a simple formula in memory
+dnf %1 # convert to dnf the formula stored in memory, absolute access
+dnf %-1 # convert to dnf the formula stored in memory, relative access
+mem clear # clear memory
+#
+
+cnf (X = 0 && Y = 0) || Z = 0 # convert to cnf a simple formula given as argument, stored in memory
+mem (X = 0 && Y = 0) || Z = 0 # store a simple formula in memory
+cnf %1 # convert to cnf the formula stored in memory, absolute access
+cnf %-1	# convert to cnf the formula stored in memory, relative access
+mem clear # clear memory
+#
+
+# Memory command refactor, addition of relative and absolute access.
+#
+#
+#
+
+mem (X | Y) & Z	# store a simple formula in memory
+mem (X | Y) | Z	# store a simple formula in memory
+mem (X & Y) & Z	# store a simple formula in memory
+mem %0 # print the formula stored in memory, absolute access
+mem %1 # print the formula stored in memory, absolute access
+mem %-0 # print the formula stored in memory, relative access
+mem %-1	# print the formula stored in memory, relative access
+mem	# print all stored formulas
+mem del %-0	# delete the formula stored in memory, relative access
+mem # print all stored formulas
+mem del %0 # delete the formula stored in memory, absolute access
+mem # print all stored formulas
+mem clear # clear memory
+mem # print all stored formulas
+#
+
+# Improvements and fixes in def command, now with relative and absolute access
+# as in memory command.
+#
+#
+#
+
+def g($Y) :::= {T} # define a tau rule
+def g($Y) ::= T	# define a predicate
+def g($Y) := 1 # define a function
+def	# list all definitions
+def g($Y) := 1. def	# fix extra '.' when multiple commands are executed in the same line
+def del %-0 # delete a definition, relative access
+def # list all definitions
+def del %0 # delete a definition, absolute access
+def # list all definitions
+def clear # clear all definitions
+def	# list all definitions
+#
+
+# Qelim command, addition of the command to eliminate quantifiers from a formula.
+#
+#
+set severity debug # let us show some details of the process
+qelim all X (X = 0)	# eliminate one quantifier from a simple formula given as argument
+mem all X (X = 0) # store a simple formula in memory
+qelim %1 # eliminate one quantifier from the formula stored in memory, absolute access
+qelim %-2 # eliminate one quantifier from the formula stored in memory, relative access
+#
+
+# Ending demo
+quit
