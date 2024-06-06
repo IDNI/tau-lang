@@ -746,6 +746,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::def_print_cmd:      def_print_cmd(command); break;
 	// qelim
 	case p::qelim_cmd:          result = qelim_cmd(command); break;
+	case p::comment:            break;
 	// error handling
 	default: error = true, cout << "\nUnknown command\n"; break;
 	}
