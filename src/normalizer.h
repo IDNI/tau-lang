@@ -14,6 +14,7 @@
 #ifndef __NORMALIZER2_H__
 #define __NORMALIZER2_H__
 
+#include <format>
 #include <string>
 #include <optional>
 #include <boost/type.hpp>
@@ -207,6 +208,24 @@ auto get_free_vars_from_nso(const nso<BAs...>& n) {
 			nso<BAs...>>(collector, all<nso<BAs...>>)(n);
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
 	return free_vars;
+}
+
+// Given a nso<BAs...> produce a number such that the variable x_i is
+// neither a bool_variable nor a variable nor a capture
+template<typename... BAs>
+int_t get_new_var_id (const nso<BAs...> fm) {
+	auto var_nodes = get_vars_from_nso<BAs...>(fm);
+	set vars {1};
+	for (auto var : var_nodes) {
+		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, var); tmp[0] == 'x') {
+			tmp.erase(0,1);
+			if (!tmp.empty()) vars.insert(stoi(tmp));
+		} else if (tmp[0] == '?' && tmp[1] == 'x') {
+			tmp.erase(0,2);
+			if (!tmp.empty()) vars.insert(stoi(tmp));
+		}
+	}
+	return *vars.rbegin() + 1;
 }
 
 template <typename... BAs>

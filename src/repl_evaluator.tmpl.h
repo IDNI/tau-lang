@@ -163,7 +163,7 @@ void repl_evaluator<factory_t, BAs...>::memory_del_cmd(
 
 template <typename factory_t, typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::get_bf(
-		const nso<tau_ba<BAs...>, BAs...>& n)
+		const nso<tau_ba<BAs...>, BAs...>& n, bool suppress_error)
 {
 	if (is_non_terminal(tau_parser::bf, n))
 		return std::optional(n);
@@ -172,11 +172,12 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<factory_t, BAs...>::ge
 			auto [value, _] = check.value();
 			if (is_non_terminal(tau_parser::bf, value)) return std::optional(value);
 			else {
-				cout << "error: argument has wrong type\n";
+				if(!suppress_error) cout << "error: argument has wrong type\n";
 				return {};
 			}
 		}
 	}
+	if(!suppress_error) cout << "error: argument has wrong type\n";
 	return {};
 }
 
@@ -196,6 +197,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			}
 		}
 	}
+	cout << "error: argument has wrong type\n";
 	return {};
 }
 
@@ -325,9 +327,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::bf_substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto thiz = get_bf(n->child[1]);
-	auto in = get_bf(n->child[2]);
-	auto with = get_bf(n->child[3]);
+	auto in = get_bf(trim(n->child[1]));
+	auto thiz = get_bf(trim(n->child[2]));
+	auto with = get_bf(trim(n->child[3]));
 	// Check for correct argument types
 	if (!thiz || !in || !with) {
 		cout << "error: invalid argument\n"; return {};
@@ -335,27 +337,28 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
 
-	set free_vars = get_free_vars_from_nso(thiz.value());
-	// A variable should only be replaced if it is not quantified
-	auto quantified_vars_skipper = [&](auto x) {
-		if (is_quantifier<tau_ba<BAs...>, BAs...>(x)) {
-			auto var = find_top(x, is_var_or_capture<tau_ba<BAs...>, BAs...>);
-			if (var && free_vars.contains(var.value()))
-				return false;
-		}
-		return true;
-	};
-	return replace_if(in.value(), changes, quantified_vars_skipper);
+	return replace(in.value(), changes);
 }
 
 template <typename factory_t, typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::wff_substitute_cmd(
+	repl_evaluator<factory_t, BAs...>::substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto thiz = get_wff(n->child[1]);
-	auto in = get_wff(n->child[2]);
-	auto with = get_wff(n->child[3]);
+	// Since the memory command cannot be type-checked we do it here
+	// First try to get bf
+	auto in = get_bf(trim(n->child[1]), true);
+	if (in) return bf_substitute_cmd(n);
+	// First argument was not a bf so it must be a wff
+	in = get_wff(trim(n->child[1]));
+	// Now sort out the remaining argument types
+	auto thiz = get_bf(trim(n->child[2]), true);
+	optional<nso<tau_ba<BAs...>, BAs...>> with;
+	if (thiz) with = get_bf(trim(n->child[3]));
+	else {
+		thiz = get_wff(trim(n->child[2]));
+		with = get_wff(trim(n->child[3]));
+	}
 	// Check for correct argument types
 	if (!thiz || !in || !with){
 		cout << "error: invalid argument\n"; return {};
@@ -363,17 +366,72 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
 
-	set free_vars = get_free_vars_from_nso(thiz.value());
+	set free_vars_thiz = get_free_vars_from_nso(thiz.value());
+	set free_vars_with = get_free_vars_from_nso(with.value());
+	vector<nso<tau_ba<BAs...>, BAs...>> var_stack = {};
+	auto var_id = get_new_var_id(in.value());
+	set<nso<tau_ba<BAs...>, BAs...>> marked_quants;
+
 	// A variable should only be replaced if it is not quantified
 	auto quantified_vars_skipper = [&](auto x) {
 		if (is_quantifier<tau_ba<BAs...>, BAs...>(x)) {
 			auto var = find_top(x, is_var_or_capture<tau_ba<BAs...>, BAs...>);
-			if (var && free_vars.contains(var.value()))
+			if (var && free_vars_thiz.contains(var.value()))
 				return false;
 		}
 		return true;
 	};
-	return replace_if(in.value(), changes, quantified_vars_skipper);
+	// If we encounter a variable in "with" that would be captured by a quantifier
+	// the quantified variable needs to be changed
+	auto quantified_var_adder = [&](auto x) {
+		if(!quantified_vars_skipper(x))
+			return false;
+		if (is_quantifier<tau_ba<BAs...>, BAs...>(x)) {
+			auto var = find_top(x, is_var_or_capture<tau_ba<BAs...>, BAs...>);
+			if (var && free_vars_with.contains(var.value())) {
+				assert(!(is_non_terminal<tau_ba<BAs...>, BAs...>(tau_parser::capture, var.value())));
+				marked_quants.insert(x);
+				bool var_t = is_non_terminal<tau_ba<BAs...>, BAs...>(tau_parser::variable, var.value());
+				auto unused_var = var_t ? build_bf_var<tau_ba<BAs...>, BAs...>(format("x{}", var_id++))
+											: build_wff_var<tau_ba<BAs...>, BAs...>(format("x{}", var_id++));
+				// Case where variable is captured by two or more quantifiers
+				if (changes.contains(var.value())) {
+					var_stack.emplace_back(var.value());
+					var_stack.emplace_back(changes[var.value()]);
+					changes[var.value()] = unused_var;
+				} else {
+					changes.emplace(var.value(), unused_var);
+					var_stack.emplace_back(var.value());
+				}
+			}
+		}
+		return true;
+	};
+	// After a quantifier is encountered on the way up in post_order_traverser
+	// it needs to be removed from changes
+	auto scoped_replace = [&](auto x, auto& c) {
+		nso<tau_ba<BAs...>, BAs...> res;
+		if (auto iter = changes.find(x); iter != changes.end())
+			res = iter->second;
+		else if (c.empty()) res = x;
+		else res = make_node(x->value, move(c));
+
+		if (marked_quants.contains(x)) {
+			assert(!var_stack.empty());
+			if (auto iter = changes.find(var_stack.back()); iter != changes.end()) {
+				var_stack.pop_back();
+				changes.erase(iter);
+			} else {
+				assert(var_stack.size() >= 2);
+				changes[var_stack.end()[-2]] = var_stack.back();
+				var_stack.pop_back();
+				var_stack.pop_back();
+			}
+		}
+		return res;
+	};
+	return post_order_recursive_traverser<nso<tau_ba<BAs...>, BAs...>>()
+					(in.value(), quantified_var_adder, scoped_replace);
 }
 
 template <typename factory_t, typename... BAs>
@@ -721,9 +779,8 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::execute_cmd:        execute_cmd(command); break;
 	case p::solve_cmd:          solve_cmd(command); break;
 	// substitution and instantiation
-	case p::bf_subst_cmd:       result = bf_substitute_cmd(command); break;
 	case p::bf_inst_cmd:        result = bf_instantiate_cmd(command); break;
-	case p::wff_subst_cmd:      result = wff_substitute_cmd(command); break;
+	case p::subst_cmd:			result = substitute_cmd(command); break;
 	case p::wff_inst_cmd:       result = wff_instantiate_cmd(command); break;
 	// formula checks
 	case p::sat_cmd:            is_satisfiable_cmd(command); break;

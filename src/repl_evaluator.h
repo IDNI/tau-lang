@@ -146,7 +146,7 @@ private:
 	void is_unsatisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(
-		const nso<tau_ba<BAs...>, BAs...>& n);
+		const nso<tau_ba<BAs...>, BAs...>& n, bool suppress_error=false);
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_wff(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
@@ -165,7 +165,7 @@ private:
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_substitute_cmd(
+	std::optional<nso<tau_ba<BAs...>, BAs...>> substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_instantiate_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
