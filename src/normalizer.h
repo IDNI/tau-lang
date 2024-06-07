@@ -14,7 +14,6 @@
 #ifndef __NORMALIZER2_H__
 #define __NORMALIZER2_H__
 
-#include <format>
 #include <string>
 #include <optional>
 #include <boost/type.hpp>
