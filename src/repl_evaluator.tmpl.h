@@ -392,8 +392,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 				assert(!(is_non_terminal<tau_ba<BAs...>, BAs...>(tau_parser::capture, var.value())));
 				marked_quants.insert(x);
 				bool var_t = is_non_terminal<tau_ba<BAs...>, BAs...>(tau_parser::variable, var.value());
-				auto unused_var = var_t ? build_bf_var<tau_ba<BAs...>, BAs...>(format("x{}", var_id++))
-											: build_wff_var<tau_ba<BAs...>, BAs...>(format("x{}", var_id++));
+				ostringstream ss; ss << "x" << var_id; ++var_id;
+				auto unused_var = var_t ? build_bf_var<tau_ba<BAs...>, BAs...>(ss.str())
+											: build_wff_var<tau_ba<BAs...>, BAs...>(ss.str());
 				// Case where variable is captured by two or more quantifiers
 				if (changes.contains(var.value())) {
 					var_stack.emplace_back(var.value());
