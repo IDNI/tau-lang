@@ -14,6 +14,8 @@
 #ifndef __NORMAL_FORMS_H__
 #define __NORMAL_FORMS_H__
 
+#include <list>
+
 #include "nso_rr.h"
 #include "execution.h"
 
@@ -1024,42 +1026,164 @@ private:
 };
 
 template<typename...BAs>
-struct to_wff_bdd {
+struct to_wff_snf {
 
+	using var = nso<BAs...>;
+	using vars = std::set<var>;
+	using exponent = std::map<var, bool>;
+	using constant = std::variant<BAs...>;
 	using literal = nso<BAs...>;
-	using literals = std::set<literal>;
+	using literals = std::list<literal>;
 
-	static auto is_literal = is_non_terminal<tau_parser::bf_eq, BAs...>;
 
-	nso<BAs...> operator()(const nso<BAs...>& n) {
-		std::map<nso<BAs...>, nso<BAs...>> changes;
-		auto lits = select_all(n, is_literal);
-		auto lits_set = std::set<nso<BAs...>>(lits.begin(), lits.end());
-		auto bdd = wff_to_bdd(lits_set, n);
+	nso<BAs...> operator()(const nso<BAs...>& form) {
+		auto nform = form;
+		auto lits = select_all(nform, is_non_terminal<tau_parser::bf_eq, BAs...>);
+		std::list<nso<BAs...>> used, remaining(lits.begin(), lits.end());
+		auto nnform = wff_to_snf(used, remaining, nform);
+		while (nnform != nform) {
+			nform = nnform;
+			lits = select_all(nform, is_non_terminal<tau_parser::bf_eq, BAs...>);
+			used.clear();
+			remaining.clear();
+			remaining.insert(lits.begin(), lits.end());
+			nnform = wff_to_snf(used, remaining, nform);
+		}
+		return nnform;
 	}
 
 private:
 
+	static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
+			return l | r;
+	}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
+
+	static constexpr auto _and = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
+			return l & r;
+	}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
+
+	static constexpr auto _neg = overloaded([]<typename T>(const T& l) -> std::variant<BAs...> {
+			return ~l;
+	}, [](const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
+	static constexpr auto _neq_zero = overloaded([]<typename T>(const T& l) -> bool {
+			return l != false;
+	}, [](const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+
+
+	exponent get_exponent(const nso<BAs...>& n) {
+		// TODO (HIGH) use one pass only strategy
+		exponent exp;
+		auto wff = n | tau_parser::wff;
+		auto all_vs = select_top(wff, is_non_terminal<tau_parser::variable, BAs...>);
+		// we set all variables to true in the exponent
+		for (auto& v: all_vs) exp[v] = true;
+		// we change the negated ones to false
+		auto negs = select_top(wff, is_non_terminal<tau_parser::wff_neg, BAs...>);
+		for (auto& v: negs)
+			if (auto check = v | is_non_terminal<tau_parser::wff_neg, BAs...>
+					| is_non_terminal<tau_parser::bf_eq, BAs...>; check)
+				exp[check.value()] = false;
+		return exp;
+	}
+
+	std::optional<constant> get_constant(const nso<BAs...>& literal) {
+		return find_top(literal, is_non_terminal<tau_parser::constant, BAs...>);
+	}
+
+	std::pair<std::optional<constant>, exponent> get_constant_and_exponent(const vars& vs, const nso<BAs...>& n) {
+		return { get_constant(n), get_exponent(vs, n) };
+	}
+
 	std::pair<nso<BAs...>, nso<BAs...>> split_using_lit(const literals& lit, const nso<BAs...>& form) {
-		auto a = replace(form, { {lit, trim(_F<BAs...>)} });
-		auto b = replace(form, { {lit, trim(_T<BAs...>)}});
+		auto a = replace(form, { {lit, trim(_F<BAs...>)} }); // TODO (HIGH) simplify this
+		auto b = replace(form, { {lit, trim(_T<BAs...>)}}); // TODO (HIGH) simplify this
 		return std::make_pair(a, b);
 	}
 
-	std::pair<nso<BAs...>, literals> split_lits(const literals& lits) {
-		literals rest(lits.begin(), lits.end() - 1);
-		return { lits.back(), rest };
+	// squeezed positives, negatives...
+	std::pair<std::set<nso<BAs...>>, std::set<nso<BAs...>>> squeeze_positives(const literals& lits) {
+		std::set<nso<BAs...>> squeezed, negatives;
+		for (auto& a: lits) {
+			for (auto& b: lits) {
+				auto ca = a | tau_parser::bf_eq | optional_value_extractor<sp_tau_node<BAs...>>;
+				auto cb = b | tau_parser::bf_eq | optional_value_extractor<sp_tau_node<BAs...>>;
+				if (!ca.has_value() && !cb.has_value()) {
+					auto [ca_c, ca_e] = get_constant_and_exponent(a);
+					auto [cb_c, cb_e] = get_constant_and_exponent(b);
+					if (ca_e == cb_e) {
+						// create a new node with the conjunction of both constants
+						auto c = std::visit(_and, ca_c, cb_c);
+						// TODO (HIGH) create a new node with the same exponent and the new constant
+						nso<BAs...> squeezed_lit;
+						squeezed.insert(squeezed_lit);
+					}
+				}
+			}
+			// TODO (HIGH) if negative literal, add it to the list of negatives
+		}
+		return squeezed;
 	}
 
-	nso<BAs...> wff_to_bdd(const literals& lits, const nso<BAs...>& form) {
-		if (lits.empty()) return form | repeat_all(apply_cb<BAs...>) /* TODO (HIGH) check how to simplify this */;
-		auto [lit, rest] = split_lits(lits);
-		auto [a, b] = split_using_lit(lit, form);
-		auto a_bdd = wff_to_bdd(rest, a);
-		auto b_bdd = wff_to_bdd(rest, b);
-		return (a_bdd == b_bdd) ? a_bdd	: build_wff_xor_from_def(
-			build_wff_and(wrap(tau_parser::wff, lit), a_bdd),
-			build_wff_and(build_wff_neg(wrap(tau_parser::wff, lit), b_bdd)));
+	std::optional<literals> normalize(const literals& lits) {
+	    literals positives, negatives, nnegatives;
+		std::partition_copy(lits.begin(), lits.end(), std::back_inserter(negatives),
+			std::back_inserter(positives), is_non_terminal<tau_parser::wff_neg, BAs...>);
+
+		for (auto& p1: positives) {
+			auto [c1, e1] = get_constant_and_exponent(p1);
+			for (auto& p2: positives) {
+				auto [c2, e2] = get_constant_and_exponent(p2);
+				if (e1 == e2) {
+					auto cte = std::visit(_or, c1, c2);
+					std::vector<sp_tau_node<BAs...>> arg { cte };
+					auto nn = tau_apply_builder(bldr_bf_constant<BAs...>, arg);
+					// TODO (HIGH) create a new positive literal with the constant
+				} else return {};
+			}
+		}
+
+		positives.insert(positives.end(), nnegatives.begin(), nnegatives.end());
+		return positives;
+	}
+
+	/*bool unsatisfiable(const literals& negatives) {
+		for (auto& pos: negatives) {
+			auto [pc, pe] = get_constant_and_exponent(pos);
+			for (auto& neg: negatives) {
+				auto [nc, ne] = get_constant_and_exponent(neg);
+				if (pe == ne && pc == nc) return true;
+			}
+		}
+		for (auto& lit: lits) {
+			if (auto check = lit | tau_parser::wff_neg; !check.has_value()) {
+				auto negated = lit | tau_parser::wff_neg | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
+				if (std::find(lits.begin(), lits.end(), negated) == lits.end()) return false;
+			}
+		}
+		return true;
+	}*/
+
+	std::optional<nso<BAs...>> snf_from_bdd_path(const literals& used, const nso<BAs...>& form) {
+		auto squeezed = squeeze_positives(used);
+		if (auto normalized = normalize(squeezed); normalized) return build_clause_from_bdd_path(normalized.value(), {});
+		return {};
+	}
+
+	std::optional<nso<BAs...>> wff_to_snf(const literals& used, const literals& remaining, const nso<BAs...>& form) {
+		if (auto check = find_top(form, is_non_terminal<tau_parser::bf_eq, BAs...>); !check.has_value() || remaining.empty())
+			// we are at the end of a path of the subyacent bdd
+			return snf_from_bdd_path(used, form);
+		auto [a, b] = split_using_lit(remaining.front(), form);
+		std::list<nso<BAs...>> nremaining(remaining.begin() +1, remaining.end());
+		auto a_used = used; a_used.push_back(remaining.front());
+		auto b_used = used; b_used.push_back(build_wff_neg(wrap(tau_parser::wff, remaining.front())));
+		auto a_snf = wff_to_snf(a_used, nremaining, a);
+		auto b_snf = wff_to_snf(b_used, nremaining, b);
+		// TODO (HIGH) fix this it needs to take into account the optionals
+		return build_wff_or(a_snf, b_snf);
 	}
 };
 
@@ -1074,151 +1198,8 @@ nso<BAs...> operator|(const nso<BAs...>& n, const to_bdds_bf_t<BAs...>& r) {
 	return r(n);
 }
 
-// TODO (HIGH) We need an implementation for wff and another for tau
 template<typename...BAs>
-struct to_snf {
-
-	using var = nso<BAs...>;
-	using vars = std::set<var>;
-	using exponent = std::map<var, bool>;
-	using constant = std::variant<BAs...>;
-	using literal = nso<BAs...>;
-
-	struct data {
-		nso<BAs...> phi;
-		std::set<nso<BAs...>> positives;
-		std::set<nso<BAs...>> negatives;
-	};
-
-	nso<BAs...> operator()(const nso<BAs...>& n) {
-		// simplify everything so we could remove later cases...
-		// we start with phi and empty positives and negatives
-		auto vars = select_all(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
-		auto vars_set = std::set<nso<BAs...>>(vars.begin(), vars.end());
-		return step(vars, {n, {}, {}}).phi;
-	}
-
-private:
-
-	// TODO (MEDIUM) this is shared with solver, we should move it to a common place
-	static constexpr auto _leq = overloaded([]<typename T>(const T& l, const T& r) -> bool {
-			return (~l & r = false);
-		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
-
-	static constexpr auto _geq = overloaded([]<typename T>(const T& l, const T& r) -> bool {
-			return !(~l & r = false) || ((l & ~r) | (~l & r) = false);
-		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
-
-	static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) -> bool {
-			return l | r;
-	}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
-
-	exponent get_exponent(const vars& vs, const nso<BAs...>& n) {
-		exponent exp;
-		auto wff = n | tau_parser::wff;
-		auto all_vs = select_top(wff, is_non_terminal<tau_parser::variable, BAs...>);
-		// we set all variables to true in the exponent
-		for (auto& v: all_vs) exp[v] = true;
-		// we change the negated ones to false
-		auto negs = select_top(wff, is_non_terminal<tau_parser::bf_neg, BAs...>);
-		for (auto& v: negs)
-			if (auto check = v | is_non_terminal<tau_parser::bf_neg, BAs...>
-					| is_non_terminal<tau_parser::variable, BAs...>; check)
-				exp[check.value()] = false;
-		return exp;
-	}
-
-	std::optional<constant> get_constant(const nso<BAs...>& literal) {
-		return find_top(literal, is_non_terminal<tau_parser::constant, BAs...>);
-	}
-
-	std::pair<std::optional<constant>, exponent> get_constant_and_exponent(const vars& vs, const nso<BAs...>& n) {
-		return { get_constant(n), get_exponent(vs, n) };
-	}
-
-	bool is_disjunction_coefficients_less_equal(const vars& vs, const std::set<nso<BAs...>>& literals, constant& c, exponent& A) {
-		// IDEA maybe use variant_ba
-		std::variant<BAs...> disjunction;
-		for (auto& l: literals) {
-			auto [c_j, A_j] = get_constant_and_exponent(vs, l);
-			auto cte = l | tau_parser::constant | ba_extractor<BAs...>;
-			disjunction = std::visit(_or, disjunction, cte);
-		}
-		return (std::visit(_leq, disjunction, c));
-	}
-
-	bool is_disjunction_coefficients_greater_equal(const vars& vs, const std::set<nso<BAs...>>& literals, constant& c, exponent& A) {
-		// IDEA maybe use variant_ba
-		std::variant<BAs...> disjunction;
-		for (auto& l: literals) {
-			auto [c_j, A_j] = get_constant_and_exponent(vs, l);
-			auto cte = l | tau_parser::constant | ba_extractor<BAs...>;
-			disjunction = std::visit(_or, disjunction, cte);
-		}
-		return (std::visit(_geq, disjunction, c));
-	}
-
-	// compute new data using negatives
-	data compute_phi(vars& vs, literal& l, data& d, constant& c_i, exponent& A_i) {
-		auto ndata = d;
-		for (auto n: ndata.negatives) {
-			nso<BAs...> phi;
-			if (get_exponent(vs, n) == A_i) {
-				if (are_coefficient_less_equal(vs, ndata.negatives, c_i, A_i)) {
-					phi = _F<BAs...>; break;
-				} else if (is_disjunction_coefficients_greater_equal(vs, ndata.positives, c_i, A_i)) {
-					phi = _T<BAs...>; break;
-				} else {
-					std::map<nso<BAs...>, nso<BAs...>> changes;
-					// negation would also work as we have negation over the literal
-					changes[l] = _T<BAs...>;
-					auto npositives = ndata.positives;
-					npositives.insert(l);
-					ndata = step(vs, { replace(ndata.phi, changes), npositives, d.negatives });
-				}
-			}
-		}
-		return ndata.phi;
-	}
-
-	// compute new data using positives
-	data compute_chi(vars& vs, literal& l, data& d, constant& c_i, exponent& A_i) {
-		auto ndata = d;
-		for (auto n: ndata.positives) {
-			nso<BAs...> chi;
-			if (get_exponent(vs, n) == A_i) {
-				if (are_coefficient_greater_equal(vs, ndata.negatives, c_i)) {
-					chi = _F<BAs...>; break;
-				} else if (is_disjunction_coefficients_less_equal(vs, ndata.positives, c_i)) {
-					chi = _T<BAs...>; break;
-				} else {
-					std::map<nso<BAs...>, nso<BAs...>> changes;
-					// negation would also work as we have negation over the literal
-					changes[l] = _F<BAs...>;
-					auto nnegatives = ndata.positives;
-					nnegatives.insert(l);
-					ndata = step(vs, { replace(ndata.phi, changes), d.positives, nnegatives });
-				}
-			}
-		}
-		return ndata.phi;
-	}
-
-	data step(vars& vs, data& d) {
-		std::map<nso<BAs...>, nso<BAs...>> changes;
-		auto literal = find(d.phi, is_non_terminal<tau_parser::bf_eq, BAs...>);
-		auto [c_i, A_i] = get_constant_and_exponent(vs, literal);
-		auto phi = compute_phi(vs, d, c_i, A_i), chi = compute_chi(vs, d, c_i, A_i);
-		return { build_wff_conditional(literal, phi.phi, chi.phi), d.positives, d.negatives };
-	}
-};
-
-// compute the strong normalized form of a wff
-template<typename...BAs>
-static const to_snf<BAs...> to_snf_wff;
-
-template<typename...BAs>
-using to_snf_wff_t = to_snf<BAs...>;
+using to_snf_wff_t = to_wff_snf<BAs...>;
 
 template<typename...BAs>
 nso<BAs...> operator|(const nso<BAs...>& n, const to_snf_wff_t<BAs...>& r) {
