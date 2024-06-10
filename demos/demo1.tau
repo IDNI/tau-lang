@@ -70,17 +70,59 @@ qelim %1 # eliminate one quantifier from the formula stored in memory, absolute 
 qelim %-2 # eliminate one quantifier from the formula stored in memory, relative access
 #
 
-# Example says that the formula for all x exists a y such that x is equal to y and
-# for all v exists w such that v is equal to w is satisfiable.
-# This uses the new quantifier elimination algorithm shown again below and the
-# new Boolean function normalization procedure
-n all x ex y all v ex w ((x' | y) & (y' | x) &  (v' | w) & (w' | v)) != 0
+
+# The following example shows that the proposition
+# "for all x there exists a y such that x is equal to y and
+#  for all v there exists a w such that v is equal to w"
+# is true in the theory of countable atomless Boolean algebra. This is because
+# we assume non-typed variables to be of this type by default.
+# In fact, our procedure can decide validity for any formula
+# in the first order theory of countable atomless Boolean algebra.
+# The example uses the new quantifier elimination algorithm shown again below and the
+# new Boolean function normalizer.
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+n all x ex y all v ex w x = y && v = w
 
 # The new Boolean function normalization procedure is able to minimize redundant parts of a formula
+#
+#
+#
+#
+#
 n xyzvw | xyzv | xyz | xy | x
 
 # It also gives canonical output meaning that two equivalent but syntactically different Boolean functions will be
 # normalized to the same syntactical expression. The following is a simple example of this.
+#
+#
+#
+#
+#
+#
+#
+#
+#
 n xa + ya'
 n a'y + ax
 

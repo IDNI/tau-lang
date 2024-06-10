@@ -189,7 +189,8 @@ std::pair<var<BAs...>, std::optional<nso<BAs...>>> eliminate_interval(const nso<
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
 		| reduce_bf<BAs...>();
 	return {var, form};
 }
@@ -200,7 +201,8 @@ bounds<BAs...> compute_lower_bounds(const var<BAs...> v, const nso<BAs...>& clau
 	auto f_0 = replace(clause,  {{v, _0<BAs...>}})
 		| repeat_each<step<BAs...>, BAs...>(
 			simplify_bf<BAs...>
-			| apply_cb<BAs...>)
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
 		| reduce_bf<BAs...>();
 	for (auto& neq: select_all(f_0, is_non_terminal<tau_parser::bf_nleq_lower, BAs...>)) {
 		auto c_i = neq
@@ -219,7 +221,8 @@ bounds<BAs...> compute_upper_bounds(const var<BAs...>& v, const nso<BAs...>& cla
 	auto f_1 = replace(clause, {{v, _1<BAs...>}})
 		| repeat_each<step<BAs...>, BAs...>(
 			simplify_bf<BAs...>
-			| apply_cb<BAs...>)
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
 		| reduce_bf<BAs...>();
 
 	for (auto& neq: select_all(f_1, is_non_terminal<tau_parser::bf_nleq_upper, BAs...>)) {
