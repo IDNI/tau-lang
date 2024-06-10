@@ -1179,6 +1179,18 @@ static const sp_tau_node<BAs...> _T = bldr_wff_T<BAs...>.second;
 template<typename... BAs>
 static const sp_tau_node<BAs...> _T_trimmed = trim(_T<BAs...>);
 
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_var(const std::string& v) {
+	auto var = make_builder<BAs...>("( $X ) =: " + v + ".").second;
+	return trim<BAs...>(var);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_var(const std::string& v) {
+	auto var = make_builder<BAs...>("( $X ) =:: ?" + v + ".").second;
+	return trim<BAs...>(var);
+}
+
 // wff factory method for building wff formulas
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_eq(const sp_tau_node<BAs...>& l) {
@@ -1864,7 +1876,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::execute_cmd,                      50 },
 			{ tau_parser::solve_cmd,                        50 },
 			{ tau_parser::bf_inst_cmd,                      50 },
-			{ tau_parser::bf_subst_cmd,                     50 },
 			{ tau_parser::dnf_cmd,                          50 },
 			{ tau_parser::cnf_cmd,                          50 },
 			{ tau_parser::anf_cmd,                          50 },
@@ -1873,7 +1884,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::mnf_cmd,                          50 },
 			{ tau_parser::onf_cmd,                          50 },
 			{ tau_parser::wff_inst_cmd,                     50 },
-			{ tau_parser::wff_subst_cmd,                    50 },
+			{ tau_parser::subst_cmd,                        50 },
 			{ tau_parser::def_rr_cmd,                       50 },
 			{ tau_parser::def_list_cmd,                     50 },
 			{ tau_parser::def_del_cmd,                      50 },
@@ -2137,8 +2148,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::normalize_cmd: prefix("normalize"); break;
 			case tau_parser::bf_inst_cmd:
 			case tau_parser::wff_inst_cmd:  prefix("instantiate"); break;
-			case tau_parser::bf_subst_cmd:
-			case tau_parser::wff_subst_cmd: prefix("substitute"); break;
+			case tau_parser::subst_cmd:     prefix("substitute"); break;
 			case tau_parser::dnf_cmd:       prefix("dnf"); break;
 			case tau_parser::cnf_cmd:       prefix("cnf"); break;
 			case tau_parser::anf_cmd:       prefix("anf"); break;
