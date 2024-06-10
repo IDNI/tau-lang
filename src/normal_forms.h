@@ -951,9 +951,9 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm) {
 			for (size_t k=0; k < vars.size(); ++k) {
 				if (path[k] == 2) continue;
 				if (first_var) var_path = path[k] == 1 ? wrap(tau_parser::bf, vars[k]) :
-												build_bf_neg(wrap(tau_parser::bf, vars[k])), first_var = false;
+					build_bf_neg(wrap(tau_parser::bf, vars[k])), first_var = false;
 				else var_path = path[k] == 1 ? build_bf_and(var_path, wrap(tau_parser::bf, vars[k])) :
-							build_bf_and(var_path, build_bf_neg(wrap(tau_parser::bf, vars[k])));
+					build_bf_and(var_path, build_bf_neg(wrap(tau_parser::bf, vars[k])));
 			}
 			if (first) reduced_dnf = t ? var_path : build_bf_and(coeff, var_path), first = false;
 			else reduced_dnf = t ? build_bf_or(reduced_dnf, var_path) :
