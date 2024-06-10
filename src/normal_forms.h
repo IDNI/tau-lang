@@ -298,8 +298,6 @@ static auto apply_cb = make_library<BAs...>(
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR
 	+ BF_CALLBACK_NEG
-	//+ BF_CALLBACK_EQ
- 	//+ BF_CALLBACK_NEQ
 );
 
 template<typename... BAs>
@@ -620,13 +618,15 @@ private:
 		auto f_0 = replace((eq || tau_parser::bf)[0],  changes_0)
 			| repeat_each<step<BAs...>, BAs...>(
 				simplify_bf<BAs...>
-				| apply_cb<BAs...>)
+				| apply_cb<BAs...>
+				| elim_eqs<BAs...>)
 			| reduce_bf<BAs...>;
 		std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1<BAs...>}};
 		auto f_1 = replace((eq || tau_parser::bf)[0],  changes_1)
 			| repeat_each<step<BAs...>, BAs...>(
 				simplify_bf<BAs...>
-				| apply_cb<BAs...>)
+				| apply_cb<BAs...>
+				| elim_eqs<BAs...>)
 			| reduce_bf<BAs...>;
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		auto eq_change = trim(build_bf_interval(f_0, var, f_1));
@@ -637,13 +637,15 @@ private:
 			auto f_0 = replace(bounds[0],  changes_neq_0)
 				| repeat_each<step<BAs...>, BAs...>(
 					simplify_bf<BAs...>
-					| apply_cb<BAs...>)
+					| apply_cb<BAs...>
+					| elim_eqs<BAs...>)
 				| reduce_bf<BAs...>;
 			std::map<nso<BAs...>, nso<BAs...>> changes_neq_1 = {{var, _1<BAs...>}};
 			auto f_1 = replace(bounds[0],  changes_neq_1)
 				| repeat_each<step<BAs...>, BAs...>(
 					simplify_bf<BAs...>
-					| apply_cb<BAs...>)
+					| apply_cb<BAs...>
+					| elim_eqs<BAs...>)
 				| reduce_bf<BAs...>;
 			auto nleq_change = build_bf_or(build_bf_nleq_lower(f_0, var), build_bf_nleq_upper(f_1, var));
 			changes[neq] = nleq_change;
@@ -714,7 +716,8 @@ nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
 }
@@ -745,7 +748,8 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
 }
@@ -759,7 +763,8 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
 }
@@ -789,7 +794,8 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_nnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
 }
@@ -1039,7 +1045,7 @@ private:
 	}
 
 	nso<BAs...> bf_to_bdd(const vars& vs, const nso<BAs...>& form) {
-		if (vs.empty()) return form | repeat_all(apply_cb<BAs...>);
+		if (vs.empty()) return form | repeat_all(apply_cb<BAs...> | elim_eqs<BAs...>);
 		auto [var, rest] = split_vars(vs);
 		auto [a, b] = split_using_var(var, form);
 		auto a_bdd = bf_to_bdd(rest, a);
@@ -1079,7 +1085,7 @@ private:
 	}
 
 	nso<BAs...> wff_to_bdd(const literals& lits, const nso<BAs...>& form) {
-		if (lits.empty()) return form | repeat_all(apply_cb<BAs...>) /* TODO (HIGH) check how to simplify this */;
+		if (lits.empty()) return form | repeat_all(apply_cb<BAs...> | elim_eqs<BAs...>) /* TODO (HIGH) check how to simplify this */;
 		auto [lit, rest] = split_lits(lits);
 		auto [a, b] = split_using_lit(lit, form);
 		auto a_bdd = wff_to_bdd(rest, a);
@@ -1295,7 +1301,8 @@ nso<BAs...> mnf_bf(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
-			| apply_cb<BAs...>)
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
 }
