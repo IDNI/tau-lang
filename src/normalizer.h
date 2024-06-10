@@ -104,17 +104,12 @@ rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
 
 template<typename... BAs>
 struct remove_one_wff_existential {
-
 	nso<BAs...> operator()(const nso<BAs...>& n) const {
-		auto nn = n
-			| repeat_all<step<BAs...>, BAs...>(
-				simplify_bf<BAs...>
-				| to_dnf_bf<BAs...>
-				| apply_cb<BAs...>
-				| to_dnf_wff<BAs...>
-				| simplify_wff<BAs...>
-				| bf_positives_upwards<BAs...>
-				| squeeze_positives<BAs...>);
+		auto nn = n | repeat_each<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>)
+			| bf_positives_upwards<BAs...>
+			| squeeze_positives<BAs...>;
 		return nn | wff_remove_existential<BAs...>;
 	}
 };
@@ -138,16 +133,16 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			step<BAs...>(elim_for_all<BAs...>))
 		| repeat_all<remove_one_wff_existential<BAs...>, BAs...>(
 			remove_one_wff_existential<BAs...>())
+		| bf_reduce_canonical<BAs...>()
+		| repeat_once<step<BAs...>, BAs...>(elim_eqs<BAs...>)
 		| repeat_each<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| bf_reduce_canonical<BAs...>()
 		| reduce_wff<BAs...>
-		| repeat_all<step<BAs...>, BAs...>(
-			trivialities<BAs...>
-			//| simplify_bf<BAs...>
-			| simplify_wff<BAs...>)
+		//| repeat_all<step<BAs...>, BAs...>(
+		//	trivialities<BAs...>
+		//	| simplify_wff<BAs...>)
 		;
 	#ifndef DEBUG
 	cache[form] = result;
@@ -338,6 +333,9 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions";
 
 	auto applied_defs = apply_once_definitions(nso_rr);
+
+	if (nso_rr.rec_relations.empty())
+		return normalizer_step(nso_rr.main);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << applied_defs;
