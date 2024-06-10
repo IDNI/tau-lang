@@ -127,7 +127,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 }
 
 
-TEST_SUITE("Normalize Boolean function with recurrence relation | Simple SAT problems") {
+TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT problems") {
 	TEST_CASE("4 variables") {
 		const char* sample = "ex x ex y ex v ex w (x' & y & v & w') != 0.";
 		auto sample_src = make_tau_source(sample);
@@ -138,7 +138,7 @@ TEST_SUITE("Normalize Boolean function with recurrence relation | Simple SAT pro
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("Equalities") {
+	TEST_CASE("Quantifier Alternation") {
 		const char* sample = "all x ex y all v ex w ((x' | y) & (y' | x) &  (v' | w) & (w' | v)) != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
