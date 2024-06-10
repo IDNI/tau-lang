@@ -28,12 +28,14 @@ sp_tau_source_node make_source_binding_node(const string& source) {
 	for (auto& c : source) source_nodes.push_back(
 		make_node<tau_source_sym>(tau_source_sym(c), {})
 	);
-	return make_node<tau_source_sym>(tau_parser::binding, {
-		make_node<tau_source_sym>(tau_parser::source_binding, {
-			make_node<tau_source_sym>(tau_parser::source,
-				source_nodes)
-		})
-	});
+	auto& p = tau_parser::instance();
+	return make_node<tau_source_sym>(p.literal(tau_parser::binding),
+		{ make_node<tau_source_sym>(
+				p.literal(tau_parser::source_binding),
+			{ make_node<tau_source_sym>(
+				p.literal(tau_parser::source), source_nodes)
+			})
+		});
 }
 
 sp_bdd_node make_bdd_statement(const sp_tau_source_node& source) {
