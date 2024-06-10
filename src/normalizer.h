@@ -136,14 +136,8 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		| bf_reduce_canonical<BAs...>()
 		| repeat_once<step<BAs...>, BAs...>(elim_eqs<BAs...>)
 		| repeat_each<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>)
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_wff<BAs...>
-		//| repeat_all<step<BAs...>, BAs...>(
-		//	trivialities<BAs...>
-		//	| simplify_wff<BAs...>)
-		;
+			to_dnf_wff<BAs...> | simplify_wff<BAs...>)
+		| reduce_wff<BAs...>;
 	#ifndef DEBUG
 	cache[form] = result;
 	#endif // DEBUG
@@ -335,7 +329,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	auto applied_defs = apply_once_definitions(nso_rr);
 
 	if (nso_rr.rec_relations.empty())
-		return normalizer_step(nso_rr.main);
+		return normalizer_step(applied_defs.main);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << applied_defs;

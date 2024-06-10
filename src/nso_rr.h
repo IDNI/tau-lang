@@ -1606,10 +1606,13 @@ private:
 		// A bit hacky way to get the tau_ba type at this point
 		// since it relies on the tau_ba being the first type in BAs...
 		// In case only one type is present, we cannot have a tau_ba
-		if constexpr (std::tuple_size_v<std::tuple<BAs...>> == 1) return n;
+		if constexpr (std::tuple_size_v<std::tuple<BAs...>> == 1) {
+			auto res = n | tau_parser::bf_cb_arg | only_child_extractor<BAs...>;
+			return res.value();
+		}
 		else {
 			using tau_ba_t = std::tuple_element_t<0, std::tuple<BAs...>>;
-			auto ba_element = n | tau_parser::bf_cb_arg | tau_parser::bf
+			auto ba_element = n | tau_parser::bf_cb_arg | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant
 						| only_child_extractor<BAs...> | ba_extractor<BAs...>;
 			if (ba_element.has_value() && std::holds_alternative<tau_ba_t>(ba_element.value())) {
 				auto res = std::get<tau_ba_t>(ba_element.value()).normalize();
@@ -1617,7 +1620,10 @@ private:
 				auto nn (make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {}));
 				std::vector<sp_tau_node<BAs...>> arg { nn };
 				return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
-			} else return n;
+			} else {
+				auto res = n | tau_parser::bf_cb_arg | only_child_extractor<BAs...>;
+				return res.value();
+			}
 		}
 	}
 
