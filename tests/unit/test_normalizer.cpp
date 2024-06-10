@@ -49,7 +49,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("apply_cb") {
-		CHECK( apply_cb<Bool>.size() == 6 );
+		CHECK( apply_cb<Bool>.size() == 4 );
 	}
 
 	TEST_CASE("squeeze_positives") {
