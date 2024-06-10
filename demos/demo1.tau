@@ -1,11 +1,12 @@
+## Demo of features, improvements and fixes corresponding to May 2024 development update
+
 # Unifying access to memory or arguments in normal forms, sample tests cases
 # involving absolute memory access, relative memory access, and argument access
-# and dealing with wff anf bf formulas.
-#
-#
-#
+# when dealing with wff anf bf formulas.
 
-dnf (X | Y) & Z # convert to dnf a simple formula given as argument, stored in memory
+# Here you could see the conversion to dnf of a simple formula passed as argument.
+dnf (X | Y) & Z
+# Let us store the simple forumula in memory
 mem (X | Y) & Z # store a simple formula in memory
 dnf %1 # convert to dnf the formula stored in memory, absolute access
 dnf %-1 # convert to dnf the formula stored in memory, relative access
@@ -68,6 +69,20 @@ mem all X (X = 0) # store a simple formula in memory
 qelim %1 # eliminate one quantifier from the formula stored in memory, absolute access
 qelim %-2 # eliminate one quantifier from the formula stored in memory, relative access
 #
+
+# Example says that the formula for all x exists a y such that x is equal to y and
+# for all v exists w such that v is equal to w is satisfiable.
+# This uses the new quantifier elimination algorithm shown again below and the
+# new Boolean function normalization procedure
+n all x ex y all v ex w ((x' | y) & (y' | x) &  (v' | w) & (w' | v)) != 0
+
+# The new Boolean function normalization procedure is able to minimize redundant parts of a formula
+n xyzvw | xyzv | xyz | xy | x
+
+# It also gives canonical output meaning that two equivalent but syntactically different Boolean functions will be
+# normalized to the same syntactical expression. The following is a simple example of this.
+n xa + ya'
+n a'y + ax
 
 # Ending demo
 quit
