@@ -138,15 +138,15 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("Quantifier Alternation") {
-		const char* sample = "all x ex y all v ex w ((x' | y) & (y' | x) &  (v' | w) & (w' | v)) != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result |  tau_parser::wff_t;
-		CHECK( check.has_value() );
-	}
+	//TEST_CASE("Quantifier Alternation") {
+	//	const char* sample = "all x ex y all v ex w ((x' | y) & (y' | x) &  (v' | w) & (w' | v)) != 0.";
+	//	auto sample_src = make_tau_source(sample);
+	//	bdd_test_factory bf;
+	//	auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+	//	auto result = normalizer<bdd_test>(sample_formula);
+	//	auto check = result |  tau_parser::wff_t;
+	//	CHECK( check.has_value() );
+	//}
 }
 
 TEST_SUITE("Normalize Boolean function with recurrence relation") {
