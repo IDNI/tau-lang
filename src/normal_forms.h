@@ -1242,7 +1242,7 @@ private:
 				return ne == pe;
 			});
 			// accumulate the constants using conjuntcion
-			if (!same_exponent.size() > 1) {
+			if (same_exponent.size() > 1) {
 				auto cte = std::accumulate(same_exponent.begin(), same_exponent.end(), *same_exponent.begin(), [](auto& l, auto& r) {
 					return std::visit(_and, l, r);
 				});
