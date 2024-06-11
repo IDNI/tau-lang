@@ -33,6 +33,8 @@ struct Bool {
 	bool b;
 };
 
+Bool normalize (const Bool& b);
+
 std::ostream& operator<<(std::ostream& os, const Bool& b);
 
 #endif // __BOOL_BA_H__
