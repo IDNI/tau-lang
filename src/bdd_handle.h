@@ -49,6 +49,9 @@ hbdd<B, o> operator^(const hbdd<B, o> &x, const hbdd<B, o> &y) {
 template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 
+template<typename B, auto o = bdd_options<>::create()>
+hbdd<B, o> normalize (const hbdd<B, o>& x) {return x;}
+
 /*template<typename B, auto o = bdd_options<>::create()>
 auto operator<=>(const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	if (((x & ~y) == false) | ((x ^ ~y) != false)) return std::partial_ordering::less;

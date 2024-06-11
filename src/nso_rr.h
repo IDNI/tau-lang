@@ -34,7 +34,6 @@
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 
-//#include "tree.h"
 #include "bool_ba.h"
 #include "parser.h"
 #include "utils.h"
@@ -1390,7 +1389,7 @@ struct callback_applier {
 			case tau_parser::bf_neq_cb: return apply_equality_relation(_neq, n);
 			case tau_parser::bf_is_one_cb: return apply_constant_check(_is_one, n);
 			case tau_parser::bf_is_zero_cb: return apply_constant_check(_is_zero, n);
-			case tau_parser::bf_normalize_cb: return apply_normalization(n);
+			case tau_parser::bf_normalize_cb: return apply_unary_operation(_normalize, n);
 			case tau_parser::bf_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::bf_cb_arg);
 			case tau_parser::wff_has_clashing_subformulas_cb: return apply_wff_clashing_subformulas_check(n);
 			case tau_parser::wff_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::wff_cb_arg);
@@ -1407,6 +1406,12 @@ struct callback_applier {
 
 private:
 	// unary operation
+	static constexpr auto _normalize = [](const auto& n) -> sp_tau_node<BAs...> {
+		auto res = normalize(n);
+		std::variant<BAs...> v(res);
+		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	};
+
 	static constexpr auto _neg = [](const auto& l) -> sp_tau_node<BAs...> {
 		auto res = ~l;
 		std::variant<BAs...> v(res);
@@ -1600,31 +1605,6 @@ private:
 		auto ba_element = args[0] | tau_parser::bf_constant | tau_parser::constant
 			| only_child_extractor<BAs...> |  ba_extractor<BAs...> | optional_value_extractor<std::variant<BAs...>>;
 		return std::visit(op, ba_element) ? args[1] : args[0];
-	}
-
-	sp_tau_node<BAs...> apply_normalization (const sp_tau_node<BAs...>& n) {
-		// A bit hacky way to get the tau_ba type at this point
-		// since it relies on the tau_ba being the first type in BAs...
-		// In case only one type is present, we cannot have a tau_ba
-		if constexpr (std::tuple_size_v<std::tuple<BAs...>> == 1) {
-			auto res = n | tau_parser::bf_cb_arg | only_child_extractor<BAs...>;
-			return res.value();
-		}
-		else {
-			using tau_ba_t = std::tuple_element_t<0, std::tuple<BAs...>>;
-			auto ba_element = n | tau_parser::bf_cb_arg | tau_parser::bf | tau_parser::bf_constant | tau_parser::constant
-						| only_child_extractor<BAs...> | ba_extractor<BAs...>;
-			if (ba_element.has_value() && std::holds_alternative<tau_ba_t>(ba_element.value())) {
-				auto res = std::get<tau_ba_t>(ba_element.value()).normalize();
-				std::variant<BAs...> v(res);
-				auto nn (make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {}));
-				std::vector<sp_tau_node<BAs...>> arg { nn };
-				return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
-			} else {
-				auto res = n | tau_parser::bf_cb_arg | only_child_extractor<BAs...>;
-				return res.value();
-			}
-		}
 	}
 
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {

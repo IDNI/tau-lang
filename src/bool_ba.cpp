@@ -41,6 +41,10 @@ bool Bool::is_one() const {
 	return b;
 }
 
+Bool normalize(const Bool &b) {
+	return b;
+}
+
 std::ostream& operator<<(std::ostream& os, const Bool& b) {
 	return os << (b.b ? 1 : 0);
 }

@@ -82,11 +82,6 @@ struct tau_ba {
 		return *this + other;
 	}
 
-	tau_ba normalize() const {
-		nso<tau_ba, BAs...> res = normalizer<tau_ba, BAs...>(nso_rr);
-		return tau_ba(res);
-	}
-
 	bool is_zero() const {
 		// TODO (HIGH) replace by satisfability in the future
 		auto vars = get_free_vars_from_nso(nso_rr.main);
@@ -163,6 +158,12 @@ bool operator!=(const tau_ba<BAs...>& other, const bool& b) {
 template<typename...BAs>
 bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
+}
+
+template<typename... BAs>
+auto normalize (const tau_ba<BAs...>& fm) {
+	auto res = normalizer<tau_ba<BAs...>, BAs...>(fm.nso_rr);
+	return tau_ba<BAs...>(res);
 }
 
 template<typename...BAs>
