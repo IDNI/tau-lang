@@ -1272,22 +1272,8 @@ private:
 	}
 };
 
-template<typename... BAs>
-static const to_bdds<BAs...> to_bdds_bf;
-
-template<typename... BAs>
-using to_bdds_bf_t = to_bdds<BAs...>;
-
 template<typename...BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const to_bdds_bf_t<BAs...>& r) {
-	return r(n);
-}
-
-template<typename...BAs>
-using to_snf_wff_t = to_wff_snf<BAs...>;
-
-template<typename...BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const to_snf_wff_t<BAs...>& r) {
+nso<BAs...> operator|(const nso<BAs...>& n, const to_snf<BAs...>& r) {
 	return r(n);
 }
 
