@@ -15,6 +15,7 @@
 #define __NORMAL_FORMS_H__
 
 #include <list>
+#include <numeric>
 
 #include "nso_rr.h"
 #include "execution.h"
@@ -1190,66 +1191,70 @@ private:
 
 	// squeezed positives, negatives...
 	std::pair<std::set<nso<BAs...>>, std::set<nso<BAs...>>> squeeze_positives(const literals& lits) {
-		std::set<nso<BAs...>> squeezed, negatives;
-		for (auto& a: lits) {
-			for (auto& b: lits) {
-				auto ca = a | tau_parser::bf_eq | optional_value_extractor<sp_tau_node<BAs...>>;
-				auto cb = b | tau_parser::bf_eq | optional_value_extractor<sp_tau_node<BAs...>>;
-				if (!ca.has_value() && !cb.has_value()) {
-					auto [ca_c, ca_e] = get_constant_and_exponent(a);
-					auto [cb_c, cb_e] = get_constant_and_exponent(b);
-					if (ca_e == cb_e) {
-						// create a new node with the conjunction of both constants
-						auto c = std::visit(_and, ca_c, cb_c);
-						// TODO (HIGH) create a new node with the same exponent and the new constant
-						nso<BAs...> squeezed_lit;
-						squeezed.insert(squeezed_lit);
-					}
-				}
-			}
-			// TODO (HIGH) if negative literal, add it to the list of negatives
+		std::set<nso<BAs...>> positives, negatives;
+		auto is_negative = [](const nso<BAs...>& n) {
+			return (n | tau_parser::wff | tau_parser::bf_neq).has_value();
+		};
+
+		std::partition_copy(lits.begin(), lits.end(), std::inserter(negatives, negatives.end()),
+			std::inserter(positives, positives.end()), is_negative);
+
+		std::map<exponent, std::set<literal>> partition;
+		for (auto& p: positives) {
+			auto [_, e] = get_constant_and_exponent(p);
+			if (partition.contains(e)) partition[e].insert(p);
+			else partition[e] = { p };
 		}
+
+		std::set<nso<BAs...>> squeezed;
+
+		for (auto& ps: partition) {
+			auto [representative, _class] = ps;
+			if (_class.size() > 1) {
+				auto cte = std::accumulate(_class.begin(), _class.end(), *_class.begin(), [](auto& l, auto& r) {
+					return std::visit(_or, l, r);
+				});
+				std::variant v(cte);
+				auto n = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+				squeezed.insert(n);
+			} else squeezed.insert(representative);
+		}
+
+		squeezed.insert(negatives.begin(), negatives.end());
 		return squeezed;
 	}
 
+	// applying Corollary 3.1 from TABA book
 	std::optional<literals> normalize(const literals& lits) {
 	    literals positives, negatives, nnegatives;
-		std::partition_copy(lits.begin(), lits.end(), std::back_inserter(negatives),
-			std::back_inserter(positives), is_non_terminal<tau_parser::wff_neg, BAs...>);
+		auto is_negative = [](const nso<BAs...>& n) {
+			return (n | tau_parser::wff | tau_parser::bf_neq).has_value();
+		};
 
-		for (auto& p1: positives) {
-			auto [c1, e1] = get_constant_and_exponent(p1);
-			for (auto& p2: positives) {
-				auto [c2, e2] = get_constant_and_exponent(p2);
-				if (e1 == e2) {
-					auto cte = std::visit(_or, c1, c2);
-					std::vector<sp_tau_node<BAs...>> arg { cte };
-					auto nn = tau_apply_builder(bldr_bf_constant<BAs...>, arg);
-					// TODO (HIGH) create a new positive literal with the constant
-				} else return {};
-			}
+		std::partition_copy(lits.begin(), lits.end(), std::inserter(negatives, negatives.end()),
+			std::inserter(positives, positives.end()), is_negative);
+
+		for (auto& n: negatives) {
+			auto [nc, ne] = get_constant_and_exponent(n);
+			// get positives with the same exponent
+			auto same_exponent = std::find_if(positives.begin(), positives.end(), [&](const auto& p) {
+				auto [_, pe] = get_constant_and_exponent(p);
+				return ne == pe;
+			});
+			// accumulate the constants using conjuntcion
+			if (!same_exponent.size() > 1) {
+				auto cte = std::accumulate(same_exponent.begin(), same_exponent.end(), *same_exponent.begin(), [](auto& l, auto& r) {
+					return std::visit(_and, l, r);
+				});
+				std::variant v(cte);
+				auto n = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+				nnegatives.insert(n);
+			} else nnegatives.insert(n);
 		}
 
 		positives.insert(positives.end(), nnegatives.begin(), nnegatives.end());
 		return positives;
 	}
-
-	/*bool unsatisfiable(const literals& negatives) {
-		for (auto& pos: negatives) {
-			auto [pc, pe] = get_constant_and_exponent(pos);
-			for (auto& neg: negatives) {
-				auto [nc, ne] = get_constant_and_exponent(neg);
-				if (pe == ne && pc == nc) return true;
-			}
-		}
-		for (auto& lit: lits) {
-			if (auto check = lit | tau_parser::wff_neg; !check.has_value()) {
-				auto negated = lit | tau_parser::wff_neg | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>;
-				if (std::find(lits.begin(), lits.end(), negated) == lits.end()) return false;
-			}
-		}
-		return true;
-	}*/
 
 	std::optional<nso<BAs...>> snf_from_bdd_path(const literals& used, const nso<BAs...>& form) {
 		auto squeezed = squeeze_positives(used);
