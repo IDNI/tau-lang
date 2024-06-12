@@ -1,0 +1,9 @@
+# This is a sample demo script for the Tau REPL.
+# The character `#` is used to comment the code.
+# You could execute all commands available in the Tau REPL, p.e.
+
+version
+
+# Remember to always end the script with the quit command.
+
+quit

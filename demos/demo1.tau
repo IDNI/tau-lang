@@ -1,76 +1,89 @@
-## Demo of features, improvements and fixes corresponding to May 2024 development update
-
-# Unifying access to memory or arguments in normal forms, sample tests cases
-# involving absolute memory access, relative memory access, and argument access
-# when dealing with wff anf bf formulas.
-
-# Here you could see the conversion to dnf of a simple formula passed as argument.
-dnf (X | Y) & Z
-# Let us store the simple forumula in memory
-mem (X | Y) & Z # store a simple formula in memory
-dnf %1 # convert to dnf the formula stored in memory, absolute access
-dnf %-1 # convert to dnf the formula stored in memory, relative access
-mem clear # clear memory
+#
+# In the Tau REPL you have a memory at your dispose. There you could store
+# formulas on demand. Also, results from computations are stored in it by default.
+#
+# The memory works like an array, the first formula stored or result is at position 0.
+# In order to access the elements of the memory, you could use a relative (from the end)
+# or absolute (from the begining) notation.
+#
+# All the results obtained in the REPL are automatically stored in the memory at the
+# end, unless equal to the last result.
 #
 
-cnf (X = 0 && Y = 0) || Z = 0 # convert to cnf a simple formula given as argument, stored in memory
-mem (X = 0 && Y = 0) || Z = 0 # store a simple formula in memory
-cnf %1 # convert to cnf the formula stored in memory, absolute access
-cnf %-1	# convert to cnf the formula stored in memory, relative access
-mem clear # clear memory
-#
-
-# Memory command refactor, addition of relative and absolute access.
-#
-#
-#
-
-mem (X | Y) & Z	# store a simple formula in memory
-mem (X | Y) | Z	# store a simple formula in memory
-mem (X & Y) & Z	# store a simple formula in memory
-mem %0 # print the formula stored in memory, absolute access
-mem %1 # print the formula stored in memory, absolute access
-mem %-0 # print the formula stored in memory, relative access
-mem %-1	# print the formula stored in memory, relative access
+mem (X | Y) & Z	# store a Boolean function in memory
+mem (X | Y) | Z	# store a Boolean function in memory
+mem (X & Y) & Z	# store a Boolean function in memory
+mem %0 # print the formula stored in memory, relative access
+mem %1 # print the formula stored in memory, relative access
+mem %-0 # print the formula stored in memory, absolute access
+mem %-1	# print the formula stored in memory, absolute access
 mem	# print all stored formulas
-mem del %-0	# delete the formula stored in memory, relative access
+mem del %-0	# delete the formula stored in memory, absolute access
 mem # print all stored formulas
-mem del %0 # delete the formula stored in memory, absolute access
+mem del %0 # delete the formula stored in memory, relative access
 mem # print all stored formulas
 mem clear # clear memory
-mem # print all stored formulas
+mem # print all stored formulas (empty!)
 #
 
-# Improvements and fixes in def command, now with relative and absolute access
-# as in memory command.
 #
+# The above notation used to access the memory could also be use in the commands.
+# For example, the following commands will compute the dnf of Boolean functions passed
+# as argument or as a memory position.
 #
+
+dnf (X | Y | W) & Z # compute the dnf of a Boolean function
+mem (X | Y) & Z # store a Boolean function in memory
+dnf %1 # convert to dnf the formula stored in memory, relative access
+dnf %-1 # convert to dnf the formula stored in memory, absolute access
+mem clear # clear memory
+#
+
+#
+# Same happens when using formulas. The following command will convert formulas to cnf.
+#
+
+cnf (X = 0 && Y = 0 && W = 0) || Z = 0 # convert to cnf a formula given as argument
+mem (X = 0 && Y = 0) || Z = 0 # store a formula in memory
+cnf %1 # convert to cnf the formula stored in memory, relative access
+cnf %-1	# convert to cnf the formula stored in memory, absolute access
+mem clear # clear memory
+#
+
+#
+# Apart from the memory, you could define your own functions, predicates and tau rules.
+# They are also stored in an array-like structure. The first definition is at position 0.
+# To manipulate available definitions you could use the same notation as for the memory.
+# In order to use them, you should just invoke them by their name.
 #
 
 def g($Y) :::= {T} # define a tau rule
 def g($Y) ::= T	# define a predicate
 def g($Y) := 1 # define a function
 def	# list all definitions
-def g($Y) := 1. def	# fix extra '.' when multiple commands are executed in the same line
-def del %-0 # delete a definition, relative access
+def del %-0 # delete a definition, absolute access
 def # list all definitions
-def del %0 # delete a definition, absolute access
+def del %0 # delete a definition, relative access
 def # list all definitions
 def clear # clear all definitions
 def	# list all definitions
+def g($Y) := 1 # define a function
+n all x g(x) != 0 # use the function in a formula
 #
 
-# Qelim command, addition of the command to eliminate quantifiers from a formula.
 #
+# The qelim command eliminate the inner quantifier from a formula.
 #
+
 set severity debug # let us show some details of the process
 qelim all X (X = 0)	# eliminate one quantifier from a simple formula given as argument
 mem all X (X = 0) # store a simple formula in memory
-qelim %1 # eliminate one quantifier from the formula stored in memory, absolute access
-qelim %-2 # eliminate one quantifier from the formula stored in memory, relative access
+qelim %1 # eliminate one quantifier from the formula stored in memory, relative access
+qelim %-2 # eliminate one quantifier from the formula stored in memory, absolute access
+mem clear # clear memory
 #
 
-
+#
 # The following example shows that the proposition
 # "for all x there exists a y such that x is equal to y and
 #  for all v there exists a w such that v is equal to w"
@@ -81,47 +94,19 @@ qelim %-2 # eliminate one quantifier from the formula stored in memory, relative
 # The example uses the new quantifier elimination algorithm shown again below and the
 # new Boolean function normalizer.
 #
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-n all x ex y all v ex w x = y && v = w
 
+n all x ex y all v ex w x = y && v = w
+#
+
+#
 # The new Boolean function normalization procedure is able to minimize redundant parts of a formula
 #
-#
-#
-#
-#
+
 n xyzvw | xyzv | xyz | xy | x
 
+#
 # It also gives canonical output meaning that two equivalent but syntactically different Boolean functions will be
 # normalized to the same syntactical expression. The following is a simple example of this.
-#
-#
-#
-#
-#
-#
-#
-#
 #
 n xa + ya'
 n a'y + ax
