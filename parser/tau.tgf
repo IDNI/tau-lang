@@ -50,15 +50,11 @@ builder_body           => ("=:"   _ bf) :bf_builder_body
 # tau, wff and bf expressions
 #
 tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
-# TODO (HIGH) simply consider wff without { and }.
-# we introduce '{' and '}' to avoid confusion with wff negation
-# see the next TODO for an alternative
-                        | ('{' _ wff _ '}')                  :tau_wff
+                        | ( wff )                            :tau_wff
                         | (sym [_ offsets] _ ref_args)       :tau_ref
                         | (tau _ "|||" _ tau)                :tau_or
                         | (tau _ "&&&" _ tau)                :tau_and
-# TODO (HIGH) replace by - or other symbol to avoid confusion with wff negation
-                        | ("!!!" _ tau)                      :tau_neg
+                        | ("~" _ tau)                        :tau_neg
                         |                                     capture.
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
