@@ -280,9 +280,8 @@ help_arg               => help_sym | version_sym | quit_sym
 
 # memory
 #
-memory                 => ( "%" :rel_memory_sym [digits:memory_id]):rel_memory
-                        | (("%-":abs_memory_sym
-                                        | memory_sym __) memory_id):abs_memory.
+memory                 => (("%-" :rel_memory_sym [digits:memory_id] | '%')):rel_memory
+                        | ( '%' :abs_memory_sym memory_id):abs_memory.
 
 # selection reference
 #
