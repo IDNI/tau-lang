@@ -32,6 +32,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/utility/setup/console.hpp>
+#include <limits>
 
 namespace idni::tau {
 
@@ -61,16 +62,21 @@ std::optional<size_t> get_memory_index(const sp_tau_node<tau_ba<BAs...>, BAs...>
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 	auto is_relative = (mem_type == tau_parser::rel_memory);
-	size_t idx = 0;
+	size_t idx = std::numeric_limits<size_t>::max();
 	auto mem_id = n | mem_type | tau_parser::memory_id;
 	if (mem_id) idx = digits(mem_id.value());
-	if (idx >= size) {
-		if (!silent) cout << "memory " << TC_OUTPUT
-			<< (is_relative ? "%" : "%-")
-			<< idx << TC.CLEAR() << " does not exist\n";
+	if (((idx > size) && (idx != std::numeric_limits<size_t>::max())) || (size == 0) || (idx == 0)) {
+		if (!silent) {
+			cout << "memory " << TC_OUTPUT;
+			if ((idx = std::numeric_limits<size_t>::max())) cout << "%";
+			else cout << (is_relative ? "%" : "%-")
+				<< idx << TC.CLEAR() << " does not exist\n";
+		}
 		return {};
 	}
-	auto pos = is_relative ? size - 1 - idx : idx;
+	auto pos = is_relative
+		? (idx == std::numeric_limits<size_t>::max() ? size - 1 : size - idx -1)
+		: idx -1;
 	return {pos};
 }
 
@@ -90,9 +96,13 @@ template<typename... BAs>
 void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id,
 	const size_t size, bool print_relative_index = true)
 {
-	cout << TC_OUTPUT << "%-" << id << TC.CLEAR();
-	if (print_relative_index) cout << "/" << TC_OUTPUT
-					<< "%" << (size - id - 1) << TC.CLEAR();
+	cout << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();
+	if (print_relative_index) {
+		cout << "/" << TC_OUTPUT;
+		if (size - id == 1) cout << "%";
+		else cout << "%-" << size - id - 1;
+		cout << TC.CLEAR();
+	}
 	cout << ": " << mem << "\n";
 }
 
@@ -573,7 +583,7 @@ void repl_evaluator<factory_t, BAs...>::def_rr_cmd(const nso<tau_ba<BAs...>, BAs
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_list_cmd() {
 	if (definitions.size() == 0) cout << "definitions are empty\n";
-	for (size_t i = 0; i < definitions.size(); i++)	cout << "[" << i << "] " << definitions[i] << "\n";
+	for (size_t i = 0; i < definitions.size(); i++)	cout << "[" << i + 1 << "] " << definitions[i] << "\n";
 }
 
 template <typename factory_t, typename... BAs>

@@ -52,8 +52,8 @@ inline std::vector<std::string> symbol_names{
 	"memory_del_cmd", "__E_cli_command_151", "memory_clear_cmd", "__E_cli_command_152", "memory_print_cmd", "__E_cli_command_153", "memory_store_cmd", "__E_cli_command_154", "memory_store_cmd_arg", "__E___E_cli_command_154_155", 
 	"qelim_cmd", "__E_cli_command_156", "qelim_sym", "get_cmd", "__E_cli_command_157", "get_sym", "__E___E_cli_command_157_158", "option", "set_cmd", "__E_cli_command_159", 
 	"set_sym", "__E___E_cli_command_159_160", "option_value", "toggle_cmd", "__E_cli_command_161", "toggle_sym", "bool_option", "bf_selection", "wff_selection", "abs_memory_sym", 
-	"rel_memory_sym", "selection_sym", "examples_sym", "__E_help_arg_162", "__E___E_help_arg_162_163", "rel_memory", "__E_memory_164", "__E___E_memory_164_165", "memory_id", "abs_memory", 
-	"__E_memory_166", "__E___E_memory_166_167", "bf_var_selection", "wff_var_selection", "enum_option", "severity_opt", "__E_option_168", "status_opt", "__E_bool_option_169", "colors_opt", 
+	"rel_memory_sym", "selection_sym", "examples_sym", "__E_help_arg_162", "__E___E_help_arg_162_163", "rel_memory", "__E_memory_164", "__E___E_memory_164_165", "__E___E___E_memory_164_165_166", "memory_id", 
+	"abs_memory", "__E_memory_167", "bf_var_selection", "wff_var_selection", "enum_option", "severity_opt", "__E_option_168", "status_opt", "__E_bool_option_169", "colors_opt", 
 	"__E_bool_option_170", "debug_repl_opt", "__E_bool_option_171", "option_value_true", "option_value_false", "severity", "error_sym", "__E_severity_172", "info_sym", "__E_severity_173", 
 	"debug_sym", "__E_severity_174", "trace_sym", "__E_severity_175", "bf_all", "bf_ex", "__N_0", "__N_1", "__N_2", "__N_3", 
 };
@@ -1353,32 +1353,32 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(402), (NT(403)));
 //G601: help_arg(283)        => examples_sym(402).
 	p(NT(283), (NT(402)));
-//G602: rel_memory_sym(400)  => '%'.
-	p(NT(400), (T(58)));
-//G603: memory_id(408)       => digits(242).
-	p(NT(408), (NT(242)));
-//G604: __E___E_memory_164_165(407) => memory_id(408).
-	p(NT(407), (NT(408)));
-//G605: __E___E_memory_164_165(407) => null.
-	p(NT(407), (nul));
-//G606: __E_memory_164(406)  => rel_memory_sym(400) __E___E_memory_164_165(407).
-	p(NT(406), (NT(400)+NT(407)));
-//G607: rel_memory(405)      => __E_memory_164(406).
+//G602: rel_memory_sym(400)  => '%' '-'.
+	p(NT(400), (T(58)+T(21)));
+//G603: memory_id(409)       => digits(242).
+	p(NT(409), (NT(242)));
+//G604: __E___E___E_memory_164_165_166(408) => memory_id(409).
+	p(NT(408), (NT(409)));
+//G605: __E___E___E_memory_164_165_166(408) => null.
+	p(NT(408), (nul));
+//G606: __E___E_memory_164_165(407) => rel_memory_sym(400) __E___E___E_memory_164_165_166(408).
+	p(NT(407), (NT(400)+NT(408)));
+//G607: __E___E_memory_164_165(407) => '%'.
+	p(NT(407), (T(58)));
+//G608: __E_memory_164(406)  => __E___E_memory_164_165(407).
+	p(NT(406), (NT(407)));
+//G609: rel_memory(405)      => __E_memory_164(406).
 	p(NT(405), (NT(406)));
-//G608: memory(361)          => rel_memory(405).
+//G610: memory(361)          => rel_memory(405).
 	p(NT(361), (NT(405)));
-//G609: abs_memory_sym(399)  => '%' '-'.
-	p(NT(399), (T(58)+T(21)));
-//G610: __E___E_memory_166_167(411) => abs_memory_sym(399).
-	p(NT(411), (NT(399)));
-//G611: __E___E_memory_166_167(411) => memory_sym(368) __(72).
-	p(NT(411), (NT(368)+NT(72)));
-//G612: __E_memory_166(410)  => __E___E_memory_166_167(411) memory_id(408).
-	p(NT(410), (NT(411)+NT(408)));
-//G613: abs_memory(409)      => __E_memory_166(410).
-	p(NT(409), (NT(410)));
-//G614: memory(361)          => abs_memory(409).
-	p(NT(361), (NT(409)));
+//G611: abs_memory_sym(399)  => '%'.
+	p(NT(399), (T(58)));
+//G612: __E_memory_167(411)  => abs_memory_sym(399) memory_id(409).
+	p(NT(411), (NT(399)+NT(409)));
+//G613: abs_memory(410)      => __E_memory_167(411).
+	p(NT(410), (NT(411)));
+//G614: memory(361)          => abs_memory(410).
+	p(NT(361), (NT(410)));
 //G615: selection_sym(401)   => 's'.
 	p(NT(401), (T(36)));
 //G616: selection_sym(401)   => 's' 'e' 'l' 'e' 'c' 't' 'i' 'o' 'n'.
@@ -1545,8 +1545,8 @@ struct tau_parser : public idni::parser<char, char> {
 		memory_del_cmd, __E_cli_command_151, memory_clear_cmd, __E_cli_command_152, memory_print_cmd, __E_cli_command_153, memory_store_cmd, __E_cli_command_154, memory_store_cmd_arg, __E___E_cli_command_154_155, 
 		qelim_cmd, __E_cli_command_156, qelim_sym, get_cmd, __E_cli_command_157, get_sym, __E___E_cli_command_157_158, option, set_cmd, __E_cli_command_159, 
 		set_sym, __E___E_cli_command_159_160, option_value, toggle_cmd, __E_cli_command_161, toggle_sym, bool_option, bf_selection, wff_selection, abs_memory_sym, 
-		rel_memory_sym, selection_sym, examples_sym, __E_help_arg_162, __E___E_help_arg_162_163, rel_memory, __E_memory_164, __E___E_memory_164_165, memory_id, abs_memory, 
-		__E_memory_166, __E___E_memory_166_167, bf_var_selection, wff_var_selection, enum_option, severity_opt, __E_option_168, status_opt, __E_bool_option_169, colors_opt, 
+		rel_memory_sym, selection_sym, examples_sym, __E_help_arg_162, __E___E_help_arg_162_163, rel_memory, __E_memory_164, __E___E_memory_164_165, __E___E___E_memory_164_165_166, memory_id, 
+		abs_memory, __E_memory_167, bf_var_selection, wff_var_selection, enum_option, severity_opt, __E_option_168, status_opt, __E_bool_option_169, colors_opt, 
 		__E_bool_option_170, debug_repl_opt, __E_bool_option_171, option_value_true, option_value_false, severity, error_sym, __E_severity_172, info_sym, __E_severity_173, 
 		debug_sym, __E_severity_174, trace_sym, __E_severity_175, bf_all, bf_ex, __N_0, __N_1, __N_2, __N_3, 
 	};
