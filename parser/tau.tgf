@@ -54,7 +54,7 @@ tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
                         | (sym [_ offsets] _ ref_args)       :tau_ref
                         | (tau _ "|||" _ tau)                :tau_or
                         | (tau _ "&&&" _ tau)                :tau_and
-                        | ("~" _ tau)                        :tau_neg
+                        | ("-" _ tau)                        :tau_neg
                         |                                     capture.
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
