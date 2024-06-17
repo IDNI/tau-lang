@@ -577,7 +577,7 @@ template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
 	auto rule = make_gssotc_rec_relation<BAs...>(n);
 	definitions.emplace_back(rule);
-	cout << "[" << definitions.size()-1 << "] " << definitions.back() << "\n";
+	cout << "[" << definitions.size() << "] " << definitions.back() << "\n";
 }
 
 template <typename factory_t, typename... BAs>
