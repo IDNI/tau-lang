@@ -159,11 +159,11 @@ bf_cb  => ("bf_is_zero_cb"              bf_cb_args2) :bf_is_zero_cb
         | ("bf_normalize_cb"            bf_cb_args1) :bf_normalize_cb.
 
 # variables
-charvar                => (alpha & ~'T' & ~'F') digit*.
+charvar                => (alpha & ~'T' & ~'F' & ~'i' & ~'o') digit*.
 bool_variable          => '?' charvar.
 variable               => charvar | (in | out):io_var.
-in                     => ("i_" chars):in_var_name  '[' offset ']'.
-out                    => ("o_" chars):out_var_name '[' offset ']'.
+in                     => ("i" digits):in_var_name  '[' offset ']'.
+out                    => ("o" digits):out_var_name '[' offset ']'.
 capture                => '$' charvar.
 q_bool_var             => capture | bool_variable.
 q_var                  => capture | variable.

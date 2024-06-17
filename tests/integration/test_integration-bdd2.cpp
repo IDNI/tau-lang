@@ -31,8 +31,8 @@ namespace testing = doctest;
 
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
-	TEST_CASE("i_keyboard[t] = o_console[t]") {
-		const char* sample = "( i_keyboard[t] = o_console[t] ).";
+	TEST_CASE("i1[t] = o1[t]") {
+		const char* sample = "( i1[t] = o1[t] ).";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
