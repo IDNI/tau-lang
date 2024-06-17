@@ -2041,7 +2041,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		auto wrap = [&](const std::string& pref, const std::string& postf) {
 			stream << pref, pass(), stream << postf;
 		};
-		if (tss.nt()) { //stream << "*" << tss.nts << "-" << tau_parser::instance().name(tss.n()) << ":";
+		if (tss.nt()) { //stream << "*" /*<< tss.nts << "-"*/ << tau_parser::instance().name(tss.n()) << ":";
 			switch (tss.n()) {
 			case tau_parser::gssotc_main: postfix_nows(";"); break;
 			case tau_parser::gssotc_rec_relation:
@@ -2214,7 +2214,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			}
 		}
 		else if (!tss.is_null()) stream << tss.t();
-	} else stream << n->value << " ";
+	} else stream << n->value;
 	return stream;
 }
 
