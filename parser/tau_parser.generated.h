@@ -20,8 +20,8 @@ inline std::vector<std::string> symbol_names{
 	"rule", "__E___E___E_library_11_12_13", "wff_rule", "bf_rule", "tau_rule", "__E___E_library_11_14", "tau_matcher", "tau_body", "__E_tau_rule_15", "tau_cb", 
 	"wff_matcher", "wff_body", "__E_wff_rule_16", "wff_cb", "bf_matcher", "bf_body", "__E_bf_rule_17", "bf_cb", "builder_head", "builder_body", 
 	"capture", "__E_builder_head_18", "__", "__E_builder_head_19", "bf_builder_body", "__E_builder_body_20", "wff_builder_body", "__E_builder_body_21", "tau_builder_body", "__E_builder_body_22", 
-	"tau_parenthesis", "__E_tau_23", "tau_wff", "__E_tau_24", "__E_tau_25", "sym", "__E___E_tau_25_26", "offsets", "ref_args", "tau_or", 
-	"__E_tau_27", "tau_and", "__E_tau_28", "tau_neg", "__E_tau_29", "wff_parenthesis", "__E_wff_30", "wff_conditional", "__E_wff_31", "wff_ball", 
+	"tau_parenthesis", "__E_tau_23", "__E_tau_24", "sym", "__E___E_tau_24_25", "offsets", "ref_args", "tau_or", "__E_tau_26", "tau_and", 
+	"__E_tau_27", "tau_neg", "__E_tau_28", "tau_wff", "__E_tau_29", "wff_parenthesis", "__E_wff_30", "wff_conditional", "__E_wff_31", "wff_ball", 
 	"__E_wff_32", "q_bool_var", "wff_bex", "__E_wff_33", "wff_all", "__E_wff_34", "q_var", "wff_ex", "__E_wff_35", "__E_wff_36", 
 	"__E___E_wff_36_37", "wff_imply", "__E_wff_38", "wff_equiv", "__E_wff_39", "wff_or", "__E_wff_40", "wff_xor", "__E_wff_41", "wff_and", 
 	"__E_wff_42", "wff_neg", "__E_wff_43", "wff_t", "wff_f", "bf_interval", "__E_wff_44", "bf_neq", "__E_wff_45", "bf_eq", 
@@ -92,8 +92,8 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		},
 		.to_trim_children_terminals = {
 			11, 12, 18, 22, 26, 27, 28, 30, 34, 44,
-			46, 52, 53, 54, 68, 74, 76, 78, 80, 82,
-			87, 88, 89, 91, 93, 95, 97, 99, 102, 104,
+			46, 52, 53, 54, 68, 74, 76, 78, 80, 85,
+			86, 87, 89, 91, 93, 95, 97, 99, 102, 104,
 			107, 111, 113, 115, 117, 119, 121, 123, 124, 125,
 			127, 129, 131, 133, 135, 137, 139, 142, 143, 145,
 			149, 151, 153, 156, 158, 161, 162, 184, 187, 189,
@@ -307,42 +307,42 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(80), (NT(81)));
 //G78:  tau(20)              => tau_parenthesis(80).
 	p(NT(20), (NT(80)));
-//G79:  __E_tau_24(83)       => wff(32).
-	p(NT(83), (NT(32)));
-//G80:  tau_wff(82)          => __E_tau_24(83).
-	p(NT(82), (NT(83)));
-//G81:  tau(20)              => tau_wff(82).
-	p(NT(20), (NT(82)));
-//G82:  __E___E_tau_25_26(86) => _(16) offsets(87).
-	p(NT(86), (NT(16)+NT(87)));
-//G83:  __E___E_tau_25_26(86) => null.
-	p(NT(86), (nul));
-//G84:  __E_tau_25(84)       => sym(85) __E___E_tau_25_26(86) _(16) ref_args(88).
-	p(NT(84), (NT(85)+NT(86)+NT(16)+NT(88)));
-//G85:  tau_ref(38)          => __E_tau_25(84).
-	p(NT(38), (NT(84)));
-//G86:  tau(20)              => tau_ref(38).
+//G79:  __E___E_tau_24_25(84) => _(16) offsets(85).
+	p(NT(84), (NT(16)+NT(85)));
+//G80:  __E___E_tau_24_25(84) => null.
+	p(NT(84), (nul));
+//G81:  __E_tau_24(82)       => sym(83) __E___E_tau_24_25(84) _(16) ref_args(86).
+	p(NT(82), (NT(83)+NT(84)+NT(16)+NT(86)));
+//G82:  tau_ref(38)          => __E_tau_24(82).
+	p(NT(38), (NT(82)));
+//G83:  tau(20)              => tau_ref(38).
 	p(NT(20), (NT(38)));
-//G87:  __E_tau_27(90)       => tau(20) _(16) '|' '|' '|' _(16) tau(20).
-	p(NT(90), (NT(20)+NT(16)+T(10)+T(10)+T(10)+NT(16)+NT(20)));
-//G88:  tau_or(89)           => __E_tau_27(90).
+//G84:  __E_tau_26(88)       => tau(20) _(16) '|' '|' '|' _(16) tau(20).
+	p(NT(88), (NT(20)+NT(16)+T(10)+T(10)+T(10)+NT(16)+NT(20)));
+//G85:  tau_or(87)           => __E_tau_26(88).
+	p(NT(87), (NT(88)));
+//G86:  tau(20)              => tau_or(87).
+	p(NT(20), (NT(87)));
+//G87:  __E_tau_27(90)       => tau(20) _(16) '&' '&' '&' _(16) tau(20).
+	p(NT(90), (NT(20)+NT(16)+T(11)+T(11)+T(11)+NT(16)+NT(20)));
+//G88:  tau_and(89)          => __E_tau_27(90).
 	p(NT(89), (NT(90)));
-//G89:  tau(20)              => tau_or(89).
+//G89:  tau(20)              => tau_and(89).
 	p(NT(20), (NT(89)));
-//G90:  __E_tau_28(92)       => tau(20) _(16) '&' '&' '&' _(16) tau(20).
-	p(NT(92), (NT(20)+NT(16)+T(11)+T(11)+T(11)+NT(16)+NT(20)));
-//G91:  tau_and(91)          => __E_tau_28(92).
+//G90:  __E_tau_28(92)       => '-' _(16) tau(20).
+	p(NT(92), (T(12)+NT(16)+NT(20)));
+//G91:  tau_neg(91)          => __E_tau_28(92).
 	p(NT(91), (NT(92)));
-//G92:  tau(20)              => tau_and(91).
+//G92:  tau(20)              => tau_neg(91).
 	p(NT(20), (NT(91)));
-//G93:  __E_tau_29(94)       => '-' _(16) tau(20).
-	p(NT(94), (T(12)+NT(16)+NT(20)));
-//G94:  tau_neg(93)          => __E_tau_29(94).
-	p(NT(93), (NT(94)));
-//G95:  tau(20)              => tau_neg(93).
-	p(NT(20), (NT(93)));
-//G96:  tau(20)              => capture(70).
+//G93:  tau(20)              => capture(70).
 	p(NT(20), (NT(70)));
+//G94:  __E_tau_29(94)       => wff(32).
+	p(NT(94), (NT(32)));
+//G95:  tau_wff(93)          => __E_tau_29(94).
+	p(NT(93), (NT(94)));
+//G96:  tau(20)              => tau_wff(93).
+	p(NT(20), (NT(93)));
 //G97:  __E_wff_30(96)       => '(' _(16) wff(32) _(16) ')'.
 	p(NT(96), (T(8)+NT(16)+NT(32)+NT(16)+T(9)));
 //G98:  wff_parenthesis(95)  => __E_wff_30(96).
@@ -379,12 +379,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(107), (NT(108)));
 //G114: wff(32)              => wff_ex(107).
 	p(NT(32), (NT(107)));
-//G115: __E___E_wff_36_37(110) => _(16) offsets(87).
-	p(NT(110), (NT(16)+NT(87)));
+//G115: __E___E_wff_36_37(110) => _(16) offsets(85).
+	p(NT(110), (NT(16)+NT(85)));
 //G116: __E___E_wff_36_37(110) => null.
 	p(NT(110), (nul));
-//G117: __E_wff_36(109)      => sym(85) __E___E_wff_36_37(110) _(16) ref_args(88).
-	p(NT(109), (NT(85)+NT(110)+NT(16)+NT(88)));
+//G117: __E_wff_36(109)      => sym(83) __E___E_wff_36_37(110) _(16) ref_args(86).
+	p(NT(109), (NT(83)+NT(110)+NT(16)+NT(86)));
 //G118: wff_ref(39)          => __E_wff_36(109).
 	p(NT(39), (NT(109)));
 //G119: wff(32)              => wff_ref(39).
@@ -499,12 +499,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(145), (NT(146)));
 //G174: bf(41)               => bf_splitter(145).
 	p(NT(41), (NT(145)));
-//G175: __E___E_bf_54_55(148) => _(16) offsets(87).
-	p(NT(148), (NT(16)+NT(87)));
+//G175: __E___E_bf_54_55(148) => _(16) offsets(85).
+	p(NT(148), (NT(16)+NT(85)));
 //G176: __E___E_bf_54_55(148) => null.
 	p(NT(148), (nul));
-//G177: __E_bf_54(147)       => sym(85) __E___E_bf_54_55(148) _(16) ref_args(88).
-	p(NT(147), (NT(85)+NT(148)+NT(16)+NT(88)));
+//G177: __E_bf_54(147)       => sym(83) __E___E_bf_54_55(148) _(16) ref_args(86).
+	p(NT(147), (NT(83)+NT(148)+NT(16)+NT(86)));
 //G178: bf_ref(40)           => __E_bf_54(147).
 	p(NT(40), (NT(147)));
 //G179: bf(41)               => bf_ref(40).
@@ -571,8 +571,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(164), (NT(165)+NT(168)));
 //G210: __E_ref_args_62(164) => null.
 	p(NT(164), (nul));
-//G211: ref_args(88)         => '(' __E_ref_args_62(164) _(16) ')'.
-	p(NT(88), (T(8)+NT(164)+NT(16)+T(9)));
+//G211: ref_args(86)         => '(' __E_ref_args_62(164) _(16) ')'.
+	p(NT(86), (T(8)+NT(164)+NT(16)+T(9)));
 //G212: bf_cb_arg(170)       => bf(41).
 	p(NT(170), (NT(41)));
 //G213: bf_cb_args1(169)     => __(72) bf_cb_arg(170).
@@ -775,8 +775,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(236), (nul));
 //G312: __E_offsets_93(236)  => __E_offsets_92(235) __E_offsets_93(236).
 	p(NT(236), (NT(235)+NT(236)));
-//G313: offsets(87)          => '[' _(16) offset(232) __E_offsets_93(236) _(16) ']'.
-	p(NT(87), (T(49)+NT(16)+NT(232)+NT(236)+NT(16)+T(50)));
+//G313: offsets(85)          => '[' _(16) offset(232) __E_offsets_93(236) _(16) ']'.
+	p(NT(85), (T(49)+NT(16)+NT(232)+NT(236)+NT(16)+T(50)));
 //G314: offset(232)          => num(237).
 	p(NT(232), (NT(237)));
 //G315: offset(232)          => capture(70).
@@ -863,8 +863,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(258), (NT(3)+NT(258)));
 //G356: digits(242)          => __E_digits_106(258).
 	p(NT(242), (NT(258)));
-//G357: sym(85)              => chars(231).
-	p(NT(85), (NT(231)));
+//G357: sym(83)              => chars(231).
+	p(NT(83), (NT(231)));
 //G358: __E_comment_107(260) => printable(8).
 	p(NT(260), (NT(8)));
 //G359: __E_comment_107(260) => '\t'.
@@ -1513,8 +1513,8 @@ struct tau_parser : public idni::parser<char, char> {
 		rule, __E___E___E_library_11_12_13, wff_rule, bf_rule, tau_rule, __E___E_library_11_14, tau_matcher, tau_body, __E_tau_rule_15, tau_cb, 
 		wff_matcher, wff_body, __E_wff_rule_16, wff_cb, bf_matcher, bf_body, __E_bf_rule_17, bf_cb, builder_head, builder_body, 
 		capture, __E_builder_head_18, __, __E_builder_head_19, bf_builder_body, __E_builder_body_20, wff_builder_body, __E_builder_body_21, tau_builder_body, __E_builder_body_22, 
-		tau_parenthesis, __E_tau_23, tau_wff, __E_tau_24, __E_tau_25, sym, __E___E_tau_25_26, offsets, ref_args, tau_or, 
-		__E_tau_27, tau_and, __E_tau_28, tau_neg, __E_tau_29, wff_parenthesis, __E_wff_30, wff_conditional, __E_wff_31, wff_ball, 
+		tau_parenthesis, __E_tau_23, __E_tau_24, sym, __E___E_tau_24_25, offsets, ref_args, tau_or, __E_tau_26, tau_and, 
+		__E_tau_27, tau_neg, __E_tau_28, tau_wff, __E_tau_29, wff_parenthesis, __E_wff_30, wff_conditional, __E_wff_31, wff_ball, 
 		__E_wff_32, q_bool_var, wff_bex, __E_wff_33, wff_all, __E_wff_34, q_var, wff_ex, __E_wff_35, __E_wff_36, 
 		__E___E_wff_36_37, wff_imply, __E_wff_38, wff_equiv, __E_wff_39, wff_or, __E_wff_40, wff_xor, __E_wff_41, wff_and, 
 		__E_wff_42, wff_neg, __E_wff_43, wff_t, wff_f, bf_interval, __E_wff_44, bf_neq, __E_wff_45, bf_eq, 

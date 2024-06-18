@@ -50,12 +50,12 @@ builder_body           => ("=:"   _ bf) :bf_builder_body
 # tau, wff and bf expressions
 #
 tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
-                        | ( wff )                            :tau_wff
                         | (sym [_ offsets] _ ref_args)       :tau_ref
                         | (tau _ "|||" _ tau)                :tau_or
                         | (tau _ "&&&" _ tau)                :tau_and
                         | ("-" _ tau)                        :tau_neg
-                        |                                     capture.
+                        |                                     capture
+                        | ( wff )                            :tau_wff.
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("bool_all"   __ q_bool_var __ wff):wff_ball
