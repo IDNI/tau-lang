@@ -67,7 +67,7 @@ std::optional<size_t> get_memory_index(const sp_tau_node<tau_ba<BAs...>, BAs...>
 	if (mem_id) idx = digits(mem_id.value());
 	if (((idx > size) && (idx != std::numeric_limits<size_t>::max())) || (size == 0) || (idx == 0)) {
 		if (!silent) {
-			cout << "memory " << TC_OUTPUT;
+			cout << "history " << TC_OUTPUT;
 			if ((idx = std::numeric_limits<size_t>::max())) cout << "%";
 			else cout << (is_relative ? "%" : "%-")
 				<< idx << TC.CLEAR() << " does not exist\n";
@@ -88,7 +88,7 @@ repl_evaluator<factory_t, BAs...>::memory_ref
 {
 	if (auto pos = get_memory_index(n, m.size(), silent); pos.has_value())
 		return {{m[pos.value()], pos.value()}};
-	cout << "error: memory location does not exist\n";
+	cout << "error: history location does not exist\n";
 	return {};
 }
 
@@ -107,10 +107,10 @@ void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id,
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::memory_print_cmd(
+void repl_evaluator<factory_t, BAs...>::history_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
-	if (m.size() == 0) cout << "memory is empty\n";
+	if (m.size() == 0) cout << "history is empty\n";
 	auto n = command | tau_parser::memory;
 	if (!n) return;
 	auto idx = get_memory_index(n.value(), m.size());
@@ -118,21 +118,15 @@ void repl_evaluator<factory_t, BAs...>::memory_print_cmd(
 		print_memory(m[idx.value()], idx.value(), m.size());
 		return;
 	}
-	cout << "error: memory location does not exist\n";
+	cout << "error: history location does not exist\n";
 	return;
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::memory_list_cmd() {
-	if (m.size() == 0) cout << "memory is empty\n";
+void repl_evaluator<factory_t, BAs...>::history_list_cmd() {
+	if (m.size() == 0) cout << "history is empty\n";
 	else for (size_t i = 0; i < m.size(); i++)
 		print_memory(m[i], i, m.size());
-}
-
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::memory_clear_cmd() {
-	if (m.size() == 0) cout << "memory is empty\n";
-	else m.clear(), cout << "memory cleared\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -147,28 +141,13 @@ void repl_evaluator<factory_t, BAs...>::memory_store(
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::memory_store_cmd(
+void repl_evaluator<factory_t, BAs...>::history_store_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	auto form = command
-		| tau_parser::memory_store_cmd_arg
+		| tau_parser::history_store_cmd_arg
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
 	memory_store(form);
-}
-
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::memory_del_cmd(
-	const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
-	if (m.size() == 0) cout << "memory is empty\n";
-	auto n = command | tau_parser::memory;
-	if (!n) return;
-	auto idx = get_memory_index(n.value(), m.size());
-	if (!idx) {
-		cout << "error: memory location does not exist\n";
-		return;
-	}
-	m.erase(m.begin() + idx.value());
-	cout << "deleted index " << idx.value() << " from memory\n";
 }
 
 template <typename factory_t, typename... BAs>
@@ -587,26 +566,6 @@ void repl_evaluator<factory_t, BAs...>::def_list_cmd() {
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::def_clear_cmd() {
-	definitions.clear();
-	cout << "definitions cleared\n";
-}
-
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& command) {
-	if (definitions.size() == 0) cout << "definitions are empty\n";
-	auto n = command | tau_parser::memory;
-	if (!n) return;
-	auto idx = get_memory_index(n.value(), definitions.size());
-	if (!idx) {
-		cout << "error: definition does not exist\n";
-		return;
-	}
-	definitions.erase(definitions.begin() + idx.value());
-	cout << "deleted index " << idx.value() << " from definitions\n";
-}
-
-template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
@@ -779,11 +738,9 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::get_cmd:            get_cmd(command); break;
 	case p::set_cmd:            set_cmd(command); break;
 	case p::toggle_cmd:         toggle_cmd(command); break;
-	case p::memory_list_cmd:    memory_list_cmd(); break;
-	case p::memory_clear_cmd:   memory_clear_cmd(); break;
-	case p::memory_print_cmd:   memory_print_cmd(command); break;
-	case p::memory_store_cmd:   memory_store_cmd(command); break;
-	case p::memory_del_cmd:     memory_del_cmd(command); break;
+	case p::history_list_cmd:   history_list_cmd(); break;
+	case p::history_print_cmd:  history_print_cmd(command); break;
+	case p::history_store_cmd:  history_store_cmd(command); break;
 	// normalization
 	case p::normalize_cmd:      result = normalizer_cmd(command); break;
 	// execution
@@ -809,8 +766,6 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	// definition of rec relations to be included during normalization
 	case p::def_rr_cmd:         def_rr_cmd(command); break;
 	case p::def_list_cmd:       def_list_cmd(); break;
-	case p::def_clear_cmd:      def_clear_cmd(); break;
-	case p::def_del_cmd:        def_del_cmd(command); break;
 	case p::def_print_cmd:      def_print_cmd(command); break;
 	// qelim
 	case p::qelim_cmd:          result = qelim_cmd(command); break;
@@ -979,16 +934,14 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau_parser::memory_sym: cout
-		<< "memory command manages stored or previous commands results\n"
+	case tau_parser::history_sym: cout
+		<< "history command manages stored or previous commands results\n"
 		<< "\n"
-		<< "  memory                 lists all stored or output results\n"
-		<< "  memory <memory_id>     prints the given stored or output result\n"
-		<< "  memory clear           clears memory\n"
-		<< "  memory <formula>       store the given formula in the memory\n"
-		<< "  memory del <memory_id> deletes the given stored or output result\n"
-		<< "  %<memory_id>           provides relative access to memory\n"
-		<< "  &<memory_id>           provides absolute access to memory\n";
+		<< "  history or hist              lists all stored or output results\n"
+		<< "  history or hist <memory_id>  prints the given stored or output result\n"
+		<< "  <formula>                    store the given formula in the memory\n"
+		<< "  %<memory_id>                 provides relative access to memory\n"
+		<< "  &<memory_id>                 provides absolute access to memory\n";
 		break;
 
 	//case tau_parser::selection_sym: cout
@@ -1104,15 +1057,13 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "defines a rec. relation\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  def <TAU_RR>             defines a tau rec. relation\n"
-		<< "  def <WFF_RR>             defines a wff rec. relation\n"
-		<< "  def <BF_RR>              defines a bf rec. relation\n"
-		<< "  def                      list definitions\n"
-		<< "  def <rr_id>              print rec relation with given id\n"
-		<< "  def clear                clear all definitions\n"
-		<< "  def del <definition_id>  delete <id> definition\n"
-		<< "  %<definition_id>         provides relative access to memory\n"
-		<< "  &<definition_id>         provides absolute access to memory\n";
+		<< "  <TAU_RR>                     defines a tau rec. relation\n"
+		<< "  <WFF_RR>                     defines a wff rec. relation\n"
+		<< "  <BF_RR>                      defines a bf rec. relation\n"
+		<< "  defs or definitions          list definitions\n"
+		<< "  defs or definitions <rr_id>  print rec relation with given id\n"
+		<< "  %<definition_id>             provides relative access to memory\n"
+		<< "  &<definition_id>             provides absolute access to memory\n";
 
 		break;
 
