@@ -232,20 +232,13 @@ cli_command            =>
         | ("snf":snf_sym __ nf_cmd_arg)                       :snf_cmd
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # rec relations
-        | ("def":def_sym)                                     :def_list_cmd
-        | (      def_sym __ gssotc_rec_relation_form)         :def_rr_cmd
-# TODO (LOW) rename memory to repl_indx or seomthing like that
-        | (      def_sym __ ("d" | "del" | "delete"):del_sym
-                                                    __ memory):def_del_cmd
-        | (      def_sym __ clear_sym)                        :def_clear_cmd
+        | (("defs" | "definitions"):def_sym)                  :def_list_cmd
+        | (gssotc_rec_relation_form)                          :def_rr_cmd
         | (      def_sym __ memory)                           :def_print_cmd
 # outputs
-        | (("m" | "mem" | "memory"):memory_sym)               :memory_list_cmd
-	| (memory_sym __ del_sym __ memory)                   :memory_del_cmd
-        | (memory_sym __ clear_sym)                           :memory_clear_cmd
-        | (memory_sym __ memory)                              :memory_print_cmd
-        | (memory_sym __
-		(bf | wff | tau):memory_store_cmd_arg)        :memory_store_cmd
+        | (("hist" | "history"):history_sym)                  :history_list_cmd
+	| (history_sym __ memory)                             :history_print_cmd
+        | ((bf | wff | tau):history_store_cmd_arg)            :history_store_cmd
 #qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
@@ -270,7 +263,7 @@ normalize_cmd_arg      => memory | bf | wff | nso_rr.
 #
 help_arg               => help_sym | version_sym | quit_sym
                         | clear_sym | get_sym | set_sym | toggle_sym | file_sym
-                        | memory_sym | abs_memory_sym | rel_memory_sym
+                        | history_sym | abs_memory_sym | rel_memory_sym
                         | selection_sym | def_sym
                         | inst_sym | subst_sym | normalize_sym | execute_sym
                         | solve_sym | valid_sym | sat_sym | unsat_sym
@@ -332,7 +325,7 @@ severity               => ("e" | "error"):error_sym
         bf_remove_fexistential_cb, bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb,
         offsets, shift, source_binding, cli, help_sym, version_sym, quit_sym,
         clear_sym, get_sym, set_sym, set_cmd, toggle_sym, file_sym,
-        memory_sym, abs_memory_sym, rel_memory_sym, selection_sym, def_sym,
+        history_sym, abs_memory_sym, rel_memory_sym, selection_sym, def_sym,
         inst_sym, subst_sym, normalize_sym, execute_sym, solve_sym, valid_sym,
         sat_sym, unsat_sym, dnf_sym, cnf_sym, anf_sym, nnf_sym, pnf_sym, snf_sym,
         mnf_sym, onf_sym, examples_sym, del_sym, severity_opt, status_opt,

@@ -1894,17 +1894,13 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::subst_cmd,                        50 },
 			{ tau_parser::def_rr_cmd,                       50 },
 			{ tau_parser::def_list_cmd,                     50 },
-			{ tau_parser::def_del_cmd,                      50 },
-			{ tau_parser::def_clear_cmd,                    50 },
 			{ tau_parser::wff_selection,                    50 },
 			{ tau_parser::bf_selection,                     50 },
 			{ tau_parser::bf_var_selection,                 50 },
 			{ tau_parser::wff_var_selection,                50 },
-			{ tau_parser::memory_list_cmd,                  50 },
-			{ tau_parser::memory_clear_cmd,                 50 },
-			{ tau_parser::memory_print_cmd,                 50 },
-			{ tau_parser::memory_store_cmd,                 50 },
-			{ tau_parser::memory_del_cmd,                   50 },
+			{ tau_parser::history_list_cmd,                 50 },
+			{ tau_parser::history_print_cmd,                50 },
+			{ tau_parser::history_store_cmd,                50 },
 			// tau
 			{ tau_parser::tau_collapse_positives_cb,       100 },
 			{ tau_parser::tau_positives_upwards_cb,        110 },
@@ -2168,13 +2164,9 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::def_print_cmd:
 			case tau_parser::def_rr_cmd:    prefix("def"); break;
 			case tau_parser::def_list_cmd:  stream << "def"; break;
-			case tau_parser::def_clear_cmd: stream << "def clear"; break;
-			case tau_parser::def_del_cmd:   prefix("def delete"); break;
-			case tau_parser::memory_list_cmd:  stream << "memory"; break;
-			case tau_parser::memory_clear_cmd: stream << "memory clear"; break;
-			case tau_parser::memory_print_cmd:
-			case tau_parser::memory_store_cmd: prefix("memory"); break;
-			case tau_parser::memory_del_cmd:   prefix("memory delete"); break;
+			case tau_parser::history_list_cmd:  stream << "history"; break;
+			case tau_parser::history_print_cmd:
+			case tau_parser::history_store_cmd: prefix("history"); break;
 			case tau_parser::get_cmd:       prefix("get"); break;
 			case tau_parser::set_cmd:       prefix("set"); break;
 			case tau_parser::toggle_cmd:    prefix("toggle"); break;

@@ -118,17 +118,13 @@ private:
 	void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
 	void toggle_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
 
-	void memory_print_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
-	void memory_store_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
-	void memory_del_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
-	void memory_list_cmd();
-	void memory_clear_cmd();
+	void history_print_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
+	void history_store_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
+	void history_list_cmd();
 
 	void def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void def_del_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_print_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_list_cmd();
-	void def_clear_cmd();
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> qelim_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);

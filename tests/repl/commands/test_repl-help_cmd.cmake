@@ -44,10 +44,8 @@ add_repl_test(help_mnf_cmd "help mnf" "mnf command converts")
 add_repl_test(help_shortened-onf_cmd "h onf" "onf command convert")
 add_repl_test(help_onf_cmd "help onf" "onf command converts")
 
-# help memory command
-add_repl_test(help_shortened-memory_cmd "h memory" "memory command")
-add_repl_test(help_memory_cmd "help memory" "memory command")
-add_repl_test(help_shortened-memory_shortened_m_cmd "h m" "memory command")
-add_repl_test(help-memory_shortened_m_cmd "help m" "memory command")
-add_repl_test(help_shortened-memory_shortened_mem_cmd "h mem" "memory command")
-add_repl_test(help-memory_shortened_mem_cmd "help mem" "memory command")
+# help history command
+add_repl_test(help_shortened-history_cmd "h history" "history command")
+add_repl_test(help_history_cmd "help history" "history command")
+add_repl_test(help_shortened-history_shortened_m_cmd "h hist" "history command")
+add_repl_test(help-history_shortened_m_cmd "help hist" "history command")
