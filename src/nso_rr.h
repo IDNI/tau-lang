@@ -1090,7 +1090,7 @@ const std::string BLDR_BF_CONSTANT = "( $X ) =: { $X }.";
 // definitions of tau builder rules
 const std::string BLDR_TAU_AND = "( $X $Y ) =::: $X &&& $Y.";
 const std::string BLDR_TAU_OR = "( $X $Y ) =::: $X ||| $Y.";
-const std::string BLDR_TAU_NEG = "( $X ) =::: !!! $X.";
+const std::string BLDR_TAU_NEG = "( $X ) =::: - $X.";
 
 // basic bf and wff builders
 template<typename... BAs>
@@ -2086,7 +2086,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::ref_args:
 				stream << "(", sep(","), stream << ")"; break;
 			// negation (unary)
-			case tau_parser::tau_neg: prefix_nows("!!!"); break;
+			case tau_parser::tau_neg: prefix_nows("-"); break;
 			case tau_parser::wff_neg: prefix_nows("!");   break;
 			case tau_parser::bf_neg:  postfix_nows("'");  break;
 			// binary operators

@@ -120,8 +120,8 @@ TEST_SUITE("simple tau formulas: no variables") {
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
-	TEST_CASE("!!! {F}") {
-		const char* sample = "!!! {F};";
+	TEST_CASE("- {F}") {
+		const char* sample = "- {F};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory btf;
 		tau_factory<bdd_test_factory,  bdd_test> tf(btf);
@@ -129,8 +129,8 @@ TEST_SUITE("simple tau formulas: no variables") {
 		CHECK( is_tau_spec_satisfiable<bdd_test>(sample_formula) );
 	}
 
-	TEST_CASE("!!! {T}") {
-		const char* sample = "!!! {T};";
+	TEST_CASE("- {T}") {
+		const char* sample = "- {T};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory btf;
 		tau_factory<bdd_test_factory,  bdd_test> tf(btf);
