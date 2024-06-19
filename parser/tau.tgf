@@ -58,7 +58,7 @@ tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
                         | (tau _ "|||" _ tau)                :tau_or
                         | (tau _ "&&&" _ tau)                :tau_and
 # TODO (HIGH) replace by - or other symbol to avoid confusion with wff negation
-                        | ("!!!" _ tau)                      :tau_neg
+                        | ('-' _ tau)                      :tau_neg
                         |                                     capture.
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional

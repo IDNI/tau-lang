@@ -62,8 +62,8 @@ inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
 	'\0', ';', '.', ':', '=', '<', '{', '}', '(', 
-	')', '|', '&', '!', '?', 'b', 'o', 'l', '_', 'a', 
-	'e', 'x', '-', '>', '^', 'T', 'F', 'S', '+', '\'', 
+	')', '|', '&', '-', '?', 'b', 'o', 'l', '_', 'a', 
+	'e', 'x', '>', '^', '!', 'T', 'F', 'S', '+', '\'', 
 	'1', '0', ',', 't', 'u', 'c', 'p', 's', 'i', 'v', 
 	'w', 'r', 'd', 'f', 'q', 'n', 'h', 'g', 'm', 'z', 
 	'[', ']', '$', '\t', '\n', '\r', '#', '/', 'y', '%', 
@@ -335,8 +335,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(91), (NT(92)));
 //G92:  tau(20)              => tau_and(91).
 	p(NT(20), (NT(91)));
-//G93:  __E_tau_29(94)       => '!' '!' '!' _(16) tau(20).
-	p(NT(94), (T(12)+T(12)+T(12)+NT(16)+NT(20)));
+//G93:  __E_tau_29(94)       => '-' _(16) tau(20).
+	p(NT(94), (T(12)+NT(16)+NT(20)));
 //G94:  tau_neg(93)          => __E_tau_29(94).
 	p(NT(93), (NT(94)));
 //G95:  tau(20)              => tau_neg(93).
@@ -390,13 +390,13 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G119: wff(32)              => wff_ref(39).
 	p(NT(32), (NT(39)));
 //G120: __E_wff_38(112)      => wff(32) _(16) '-' '>' _(16) wff(32).
-	p(NT(112), (NT(32)+NT(16)+T(21)+T(22)+NT(16)+NT(32)));
+	p(NT(112), (NT(32)+NT(16)+T(12)+T(21)+NT(16)+NT(32)));
 //G121: wff_imply(111)       => __E_wff_38(112).
 	p(NT(111), (NT(112)));
 //G122: wff(32)              => wff_imply(111).
 	p(NT(32), (NT(111)));
 //G123: __E_wff_39(114)      => wff(32) _(16) '<' '-' '>' _(16) wff(32).
-	p(NT(114), (NT(32)+NT(16)+T(5)+T(21)+T(22)+NT(16)+NT(32)));
+	p(NT(114), (NT(32)+NT(16)+T(5)+T(12)+T(21)+NT(16)+NT(32)));
 //G124: wff_equiv(113)       => __E_wff_39(114).
 	p(NT(113), (NT(114)));
 //G125: wff(32)              => wff_equiv(113).
@@ -408,7 +408,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G128: wff(32)              => wff_or(115).
 	p(NT(32), (NT(115)));
 //G129: __E_wff_41(118)      => wff(32) _(16) '^' _(16) wff(32).
-	p(NT(118), (NT(32)+NT(16)+T(23)+NT(16)+NT(32)));
+	p(NT(118), (NT(32)+NT(16)+T(22)+NT(16)+NT(32)));
 //G130: wff_xor(117)         => __E_wff_41(118).
 	p(NT(117), (NT(118)));
 //G131: wff(32)              => wff_xor(117).
@@ -420,7 +420,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G134: wff(32)              => wff_and(119).
 	p(NT(32), (NT(119)));
 //G135: __E_wff_43(122)      => '!' _(16) wff(32).
-	p(NT(122), (T(12)+NT(16)+NT(32)));
+	p(NT(122), (T(23)+NT(16)+NT(32)));
 //G136: wff_neg(121)         => __E_wff_43(122).
 	p(NT(121), (NT(122)));
 //G137: wff(32)              => wff_neg(121).
@@ -440,7 +440,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G144: wff(32)              => bf_interval(125).
 	p(NT(32), (NT(125)));
 //G145: __E_wff_45(128)      => bf(41) _(16) '!' '=' _(16) bf(41).
-	p(NT(128), (NT(41)+NT(16)+T(12)+T(4)+NT(16)+NT(41)));
+	p(NT(128), (NT(41)+NT(16)+T(23)+T(4)+NT(16)+NT(41)));
 //G146: bf_neq(127)          => __E_wff_45(128).
 	p(NT(127), (NT(128)));
 //G147: wff(32)              => bf_neq(127).
@@ -452,19 +452,19 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G150: wff(32)              => bf_eq(129).
 	p(NT(32), (NT(129)));
 //G151: __E_wff_47(132)      => bf(41) _(16) '!' '<' '=' _(16) q_var(106).
-	p(NT(132), (NT(41)+NT(16)+T(12)+T(5)+T(4)+NT(16)+NT(106)));
+	p(NT(132), (NT(41)+NT(16)+T(23)+T(5)+T(4)+NT(16)+NT(106)));
 //G152: bf_nleq_lower(131)   => __E_wff_47(132).
 	p(NT(131), (NT(132)));
 //G153: wff(32)              => bf_nleq_lower(131).
 	p(NT(32), (NT(131)));
 //G154: __E_wff_48(134)      => q_var(106) _(16) '!' '<' '=' _(16) bf(41).
-	p(NT(134), (NT(106)+NT(16)+T(12)+T(5)+T(4)+NT(16)+NT(41)));
+	p(NT(134), (NT(106)+NT(16)+T(23)+T(5)+T(4)+NT(16)+NT(41)));
 //G155: bf_nleq_upper(133)   => __E_wff_48(134).
 	p(NT(133), (NT(134)));
 //G156: wff(32)              => bf_nleq_upper(133).
 	p(NT(32), (NT(133)));
 //G157: __E_wff_49(136)      => bf(41) _(16) '>' _(16) bf(41).
-	p(NT(136), (NT(41)+NT(16)+T(22)+NT(16)+NT(41)));
+	p(NT(136), (NT(41)+NT(16)+T(21)+NT(16)+NT(41)));
 //G158: bf_greater(135)      => __E_wff_49(136).
 	p(NT(135), (NT(136)));
 //G159: wff(32)              => bf_greater(135).
@@ -802,7 +802,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G325: __E_shift_95(240)    => __E___E_shift_95_96(241).
 	p(NT(240), (NT(241)));
 //G326: shift(238)           => __E_shift_95(240) _(16) '-' _(16) num(237).
-	p(NT(238), (NT(240)+NT(16)+T(21)+NT(16)+NT(237)));
+	p(NT(238), (NT(240)+NT(16)+T(12)+NT(16)+NT(237)));
 //G327: num(237)             => digits(231).
 	p(NT(237), (NT(231)));
 //G328: __E___E_uninterpreted_constant_97_98(244) => chars(245).
@@ -814,7 +814,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G331: uninter_const_name(242) => __E_uninterpreted_constant_97(243).
 	p(NT(242), (NT(243)));
 //G332: uninterpreted_constant(142) => '<' uninter_const_name(242) _(16) '>'.
-	p(NT(142), (T(5)+NT(242)+NT(16)+T(22)));
+	p(NT(142), (T(5)+NT(242)+NT(16)+T(21)));
 //G333: constant(160)        => binding(246).
 	p(NT(160), (NT(246)));
 //G334: constant(160)        => capture(70).
@@ -1328,7 +1328,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G588: help_arg(283)        => examples_sym(393).
 	p(NT(283), (NT(393)));
 //G589: rel_memory_sym(391)  => '%' '-'.
-	p(NT(391), (T(58)+T(21)));
+	p(NT(391), (T(58)+T(12)));
 //G590: memory_id(400)       => digits(231).
 	p(NT(400), (NT(231)));
 //G591: __E___E___E_memory_160_161_162(399) => memory_id(400).

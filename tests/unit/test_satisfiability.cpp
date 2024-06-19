@@ -56,7 +56,7 @@ TEST_SUITE("get_gssotc_literals") {
 	}
 
 	TEST_CASE("two literals y1") {
-		const char* sample = "{ T } &&& !!! { T };";
+		const char* sample = "{ T } &&& - { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
@@ -66,7 +66,7 @@ TEST_SUITE("get_gssotc_literals") {
 	}
 
 	TEST_CASE("two literals y2") {
-		const char* sample = "!!! { T } &&& !!! { T };";
+		const char* sample = "- { T } &&& - { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
@@ -89,7 +89,7 @@ TEST_SUITE("get_gssotc_positive_negative_literals") {
 	}
 
 	TEST_CASE("one literal: false") {
-		const char* sample = "!!! { T };";
+		const char* sample = "- { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
@@ -99,7 +99,7 @@ TEST_SUITE("get_gssotc_positive_negative_literals") {
 	}
 
 	TEST_CASE("two literals: true") {
-		const char* sample = "{ T } &&& !!! { T };";
+		const char* sample = "{ T } &&& - { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
@@ -109,7 +109,7 @@ TEST_SUITE("get_gssotc_positive_negative_literals") {
 	}
 
 	TEST_CASE("two literals: false") {
-		const char* sample = "!!! { T } &&& !!! { T };";
+		const char* sample = "- { T } &&& - { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
@@ -132,7 +132,7 @@ TEST_SUITE("get_gssotc_clauses") {
 	}
 
 	TEST_CASE("two clauses y1") {
-		const char* sample = "{ T } ||| !!! { T };";
+		const char* sample = "{ T } ||| - { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
@@ -142,7 +142,7 @@ TEST_SUITE("get_gssotc_clauses") {
 	}
 
 	TEST_CASE("two clauses y2") {
-		const char* sample = "{ T } ||| !!! { T } &&& { T };";
+		const char* sample = "{ T } ||| - { T } &&& { T };";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
@@ -152,7 +152,7 @@ TEST_SUITE("get_gssotc_clauses") {
 	}
 
 	TEST_CASE("three clauses") {
-		const char* sample = "{ T } ||| !!! { T } ||| { T};";
+		const char* sample = "{ T } ||| - { T } ||| { T};";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
