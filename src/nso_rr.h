@@ -2137,8 +2137,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::tau_positives_upwards_cb:   prefix("tau_positives_upwards_cb"); break;
 			// cli commands
 			case tau_parser::cli:           sep("."); break;
-			case tau_parser::rel_memory:    prefix_nows("%"); break;
-			case tau_parser::abs_memory:    prefix_nows("%-"); break;
+			case tau_parser::rel_memory:    prefix_nows("%-"); break;
+			case tau_parser::abs_memory:    prefix_nows("%"); break;
 			case tau_parser::quit_cmd:      stream << "quit"; break;
 			case tau_parser::version_cmd:   stream << "version"; break;
 			case tau_parser::clear_cmd:     stream << "clear"; break;
