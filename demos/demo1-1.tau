@@ -1,0 +1,79 @@
+# The Tau REPL keeps track of all the results in a history store. There, you can
+# also store tau formulas and Boolean functions.
+
+# The history works like an array; the first stored formula or the first result
+# is at position 1. To access the elements of the history, you can use a relative
+# (from the end) or absolute (from the beginning) notation. The relative notation
+# is "%-position", simply "%" for the last result, whereas the absolute notation
+# is "%position".
+
+# We can store several functions in the history store by simply typing them:
+
+(X | Y) & Z	 # as usual | stands for disjunction and & stands for conjunction
+(X Y) | Z	 # conjunctions could be ommited
+(X + Y) & Z' # ' stands for complementation
+(Y + 1) | 0  # 1 and 0 stands for the corresponding constants in the Boolean algebra
+
+# To recover from history, we can use the following commands:
+
+hist %   # last stored formula...
+hist %-1 # ...the previous one
+hist %1  # the first stored formula
+
+# Also we could output the whole content of the history store:
+
+hist # print all stored formulas
+
+# As previously commented, apart of Boolean functions, we can also store tau formulas
+# with free variables
+
+X = 0 && Y = 0 || Z = 0    # || and && stand for local disjunction and conjunction
+X = 0 ^ Y = 0 ^ !(Z = 0)   # ^ stands for exclusive or and ! stands for negation
+(X = 0 -> Y = 0) <-> Z = 0 # <-> stands for equivalence and -> stands for implication
+X = 0 ? Y = 0 : Z = 0      # ? stands for if-then-else or conditional operator
+
+# We can also use quantifiers
+
+all X ex Y X = 0 && Y = 0  # all and ex stands for universal and existential quantifiers
+
+# and include constants from the Lindenbaum-Tarski algebra of Propositional Logic
+# represented by BDDs
+
+{bdd : X} & Y | Z
+
+# The '{type : ... }` syntax denotes constants in the supported types (Boolean algebras).
+# In the above example, as we have a constant in the BDD Boolean algebra corresponding
+# to the simple Boolean function X.
+
+# We can include formulas with temporal variables (i... are input variables and
+# o... are output variables)
+
+o1[t] = i1[t] || o2[t] != i2[t]   # as before, || stands for disjunction
+o1[t] = i1[t] && o2[t] = i2[t]    # as before, && stands for conjunction
+o1[t] = i1[t] && ! o2[t] = i2[t]  # as before, ! stands for negation
+
+# Also, we can include formulas with global operators (i.e., operators that involve
+# specifications)
+
+{o1[t] = i1[t] || o2[t] != i2[t]} &&& {o1[t] != 0} # &&& stands for global conjunction
+{o1[t] = i1[t] && o2[t] = i2[t]} ||| {o1[t] != 0}  # ||| stands for global disjunction
+- {o1[t] = i1[t] && ! o2[t] = i2[t]}               # - stands for global negation
+
+# We can also have formulas that involve constants over the Tau Boolean algebra
+# itself as the Tau Language is the first language that speaks about its own sentences.
+
+({ : i1[t]'o1[t] = 0. } i1[t] = 0) ? (o1[t] = 0) : (o1[t] = 1)
+
+# In the above example, as we have a constant in the Tau Boolean algebra, the type
+# could be ommited. This allow us to write Tau specifications that talk about
+# Tau specifications themselves. Also note, that we could use this notation
+# recursively to define Tau specifications that talk about Tau specifications
+# that talk about Tau specifications, and so on.
+
+# The syntax for constants would be clarify in the future in order to have
+# a cleaner one.
+
+# Obviously, we could have formulas that involving all the above mentioned elements
+# at the same time
+
+quit  # quit the Tau REPL
