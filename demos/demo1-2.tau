@@ -1,0 +1,22 @@
+# The above notations used to access the history can also be used in the commands.
+# For example, the following commands will compute the DNF of a Boolean function
+# passed as an argument or as a memory position.
+
+(X | Y) & Z 		# store a Boolean function
+(X | Y') & Z		# store another Boolean function
+dnf %-1 			# convert to DNF the first formula in history
+dnf %1				# also convert to DNF the first formula in history
+(X | Y) & Z'		# store another Boolean function
+dnf %				# convert to DNF the last formula in history
+dnf (X | Y | W) & Z # simply compute the DNF of the given Boolean function
+
+# The same happens when using formulas. The following command will convert
+# formulas to CNF.
+
+(X Y ) | Z			# store a formula
+cnf %				# convert to CNF the last formula in history
+cnf %-1				# convert to CNF the same formula
+cnf %1				# convert to CNF the first formula in history
+cnf (X Y) | Z		# convert to CNF the given formula
+
+quit # quit the Tau REPL

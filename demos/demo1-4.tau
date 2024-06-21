@@ -1,0 +1,31 @@
+# Let us demonstrate several commands related to normalization and its inner workings.
+
+# The qelim command eliminate the inner quantifier from a formula.
+
+qelim all X (X = 0) # eliminate one quantifier from a simple formula given as argument
+
+# As before, you can also pass a formula stored in history.
+
+# Finally, the following example ilustrates the use of the new Boolean
+# function normalize and the new quantifier elimination algorithm.
+# It uses the normalize command to prove the validity of a formula in the
+# first order theory of atomless Boolean algebra. This is because we assume
+# non-typed variables to be of this type by default. In fact, our procedure can
+# decide the validity for any formula in the first order theory of atomless
+# Boolean algebra.
+
+n all x ex y all v ex w x'y = 0 && v + w = 0
+
+# The new Boolean function normalization procedure can minimize redundant parts
+# of a formula
+
+n xyzvw | xyzv | xyz | xy | x
+
+# It also gives canonical output, meaning two equivalent but syntactically different
+# Boolean functions will be normalized to the same syntactical expression. The
+# following is a simple example of this.
+
+n xa + ya'
+n a'y + ax
+
+quit # quit the Tau REPL
