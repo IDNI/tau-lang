@@ -1180,6 +1180,18 @@ template<typename... BAs>
 static const sp_tau_node<BAs...> _T_trimmed = trim(_T<BAs...>);
 
 template<typename... BAs>
+sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
+	auto cte = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	std::vector<sp_tau_node<BAs...>> arg { cte };
+	return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
+}
+
+template<typename... BAs>
+std::optional<sp_tau_node<BAs...>> build_bf_constant(const std::optional<std::variant<BAs...>>& o) {
+	return o.has_value() ? build_bf_constant(o.value()) : std::optional<sp_tau_node<BAs...>>();
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> build_bf_var(const std::string& v) {
 	auto var = make_builder<BAs...>("( $X ) =: " + v + ".").second;
 	return trim<BAs...>(var);

@@ -764,29 +764,12 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
-			to_cnf_bf<BAs...>
+			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
-}
-
-template<typename...BAs>
-nso<BAs...> snf_wff(const nso<BAs...>& n) {
-	// TODO (HIGH) give a proper implementation (call to_snf...)
-	auto quantified = [](const auto& n) -> bool {
-		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
-	};
-	auto quantifier = find_bottom(n, quantified);
-	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
-	return apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_cnf_wff<BAs...>
-			| simplify_wff<BAs...>
-			| trivialities<BAs...>
-		);
 }
 
 template<typename...BAs>
@@ -1110,177 +1093,222 @@ nso<BAs...> operator|(const nso<BAs...>& n, const to_bdds_bf_t<BAs...>& r) {
 	return r(n);
 }
 
-// TODO (HIGH) We need an implementation for wff and another for tau
+// We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
+// We implicitly transformed into BDD form and transform it into SNF without
+// explicitly writing its BDD form.
 template<typename...BAs>
-struct to_snf {
+struct to_snf_step {
 
 	using var = nso<BAs...>;
 	using vars = std::set<var>;
-	using exponent = std::map<var, bool>;
+	using exponent = std::set<var>;
 	using constant = std::variant<BAs...>;
 	using literal = nso<BAs...>;
 	using literals = std::list<literal>;
+	using bdd_path = std::pair<literals, literals>;
+	using partition_by_exponent = std::map<exponent, std::set<literal>>;
 
 
-	nso<BAs...> operator()(const nso<BAs...>& form) {
-		auto nform = form;
-		auto lits = select_all(nform, is_non_terminal<tau_parser::bf_eq, BAs...>);
-		std::list<nso<BAs...>> used, remaining(lits.begin(), lits.end());
-		auto nnform = wff_to_snf(used, remaining, nform);
-		while (nnform != nform) {
-			nform = nnform;
-			lits = select_all(nform, is_non_terminal<tau_parser::bf_eq, BAs...>);
-			used.clear();
-			remaining.clear();
-			remaining.insert(lits.begin(), lits.end());
-			nnform = wff_to_snf(used, remaining, nform);
-		}
-		return nnform;
+	nso<BAs...> operator()(const nso<BAs...>& form) const {
+		// select all literals, i.e. wff equalities or it negations.
+		static const auto is_literal = [](const auto& n) -> bool {
+			return (n | tau_parser::wff | tau_parser::bf_eq).has_value();
+		};
+		auto literals = select_all(form, is_literal);
+		// we call recursively to select a path in the BDD distinguishing
+		// between the two possible values of the literal.
+		std::list<nso<BAs...>> remaining(literals.begin(), literals.end());
+		return traverse({}, remaining, form);
+		// for each choosen path we squeeze the positive literals
+		// we apply corollary 3.1
+		// remove all atomic formulas with zero coefficinets
+		// and discard the path if the resulting formula is unsatisfiable
+		// finally, we return the resulting formula
+		return form;
 	}
 
 private:
 
 	static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l | r;
-	}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
-
+	}, [](const auto&, const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
 	static constexpr auto _and = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l & r;
-	}, [](const auto&, const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
-
+	}, [](const auto&, const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
 	static constexpr auto _neg = overloaded([]<typename T>(const T& l) -> std::variant<BAs...> {
 			return ~l;
-	}, [](const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+	}, [](const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
 	static constexpr auto _neq_zero = overloaded([]<typename T>(const T& l) -> bool {
 			return l != false;
-	}, [](const auto&) -> sp_tau_node<BAs...> { throw std::logic_error("wrong types"); });
+	}, [](const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
-
-	exponent get_exponent(const nso<BAs...>& n) {
-		// TODO (HIGH) use one pass only strategy
-		exponent exp;
-		auto wff = n | tau_parser::wff;
-		auto all_vs = select_top(wff, is_non_terminal<tau_parser::variable, BAs...>);
-		// we set all variables to true in the exponent
-		for (auto& v: all_vs) exp[v] = true;
-		// we change the negated ones to false
-		auto negs = select_top(wff, is_non_terminal<tau_parser::wff_neg, BAs...>);
-		for (auto& v: negs)
-			if (auto check = v | is_non_terminal<tau_parser::wff_neg, BAs...>
-					| is_non_terminal<tau_parser::bf_eq, BAs...>; check)
-				exp[check.value()] = false;
-		return exp;
+	nso<BAs...> bdd_path_to_snf(const bdd_path& path, const nso<BAs...>& form) const {
+		// we simplify the constant part of the formula
+		// TODO (HIGH) fix simplification
+		auto simplified = form | repeat_all(apply_cb<BAs...> | elim_eqs<BAs...>);
+		// we squeeze the positive literals
+		auto squeezed = squeeze_positives(path.first);
+		// we apply corollary 3.1
+		return normalize({squeezed, path.second});
 	}
 
-	std::optional<constant> get_constant(const nso<BAs...>& literal) {
-		return find_top(literal, is_non_terminal<tau_parser::constant, BAs...>);
+	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
+		if (remaining.empty()) return bdd_path_to_snf(path, form);
+		auto lit = remaining.front();
+		literals nremaining(++remaining.begin(), remaining.end());
+		bdd_path t_path{path.first, path.second};
+		t_path.first.push_back(lit);
+		bdd_path f_path{path.first, path.second};
+		f_path.second.push_back(build_wff_neg(lit));
+		auto [t, f] = split_using_lit(lit, form);
+		auto t_snf = traverse(t_path, nremaining, t);
+		auto f_snf = traverse(f_path, nremaining, f);
+		return build_wff_or(t_snf, f_snf);
 	}
 
-	std::pair<std::optional<constant>, exponent> get_constant_and_exponent(const vars& vs, const nso<BAs...>& n) {
-		return { get_constant(n), get_exponent(vs, n) };
+	exponent get_exponent(const nso<BAs...>& n) const {
+		auto is_bf_literal = [](const auto& n) -> bool {
+			return (n | tau_parser::wff | tau_parser::bf_eq).has_value()
+				|| (n | tau_parser::wff | tau_parser::bf_neg).has_value();
+		};
+		auto all_vs = select_top(n, is_bf_literal);
+		return exponent(all_vs.begin(), all_vs.end());
 	}
 
-	std::pair<nso<BAs...>, nso<BAs...>> split_using_lit(const literals& lit, const nso<BAs...>& form) {
-		auto a = replace(form, { {lit, trim(_F<BAs...>)} }); // TODO (HIGH) simplify this
-		auto b = replace(form, { {lit, trim(_T<BAs...>)}}); // TODO (HIGH) simplify this
+	std::optional<constant> get_constant(const nso<BAs...>& literal) const {
+		return find_top(literal, is_non_terminal<tau_parser::constant, BAs...>)
+			| only_child_extractor<BAs...> | ba_extractor<BAs...>;
+	}
+
+	std::pair<nso<BAs...>, nso<BAs...>> split_using_lit(const literal& lit, const nso<BAs...>& form) const {
+		std::map<nso<BAs...>, nso<BAs...>> changes_T = {{lit, _T<BAs...>}};
+		std::map<nso<BAs...>, nso<BAs...>> changes_F = {{lit, _F<BAs...>}};
+		auto a = replace<nso<BAs...>>(form, changes_T);
+		auto b = replace<nso<BAs...>>(form, changes_F);
 		return std::make_pair(a, b);
 	}
 
-	// squeezed positives, negatives...
-	std::pair<std::set<nso<BAs...>>, std::set<nso<BAs...>>> squeeze_positives(const literals& lits) {
-		std::set<nso<BAs...>> positives, negatives;
-		auto is_negative = [](const nso<BAs...>& n) {
-			return (n | tau_parser::wff | tau_parser::bf_neq).has_value();
-		};
-
-		std::partition_copy(lits.begin(), lits.end(), std::inserter(negatives, negatives.end()),
-			std::inserter(positives, positives.end()), is_negative);
-
+	partition_by_exponent get_partition_by_exponent(const literals& lits) const {
 		std::map<exponent, std::set<literal>> partition;
-		for (auto& p: positives) {
-			auto [_, e] = get_constant_and_exponent(p);
-			if (partition.contains(e)) partition[e].insert(p);
-			else partition[e] = { p };
+		for (auto& l: lits) {
+			auto e = get_exponent(l);
+			if (partition.contains(e)) partition[e].insert(l);
+			else partition[e] = { l };
 		}
+		return partition;
+	}
 
-		std::set<nso<BAs...>> squeezed;
+	std::optional<nso<BAs...>> squeeze_same_exponent_positives(const std::set<literal>& positives, const exponent& exp) const {
+		// if positives is empty we return nothing
+		if (positives.empty()) return {};
+		// find first element with non trivial constant
+		auto first = std::find_if(positives.begin(), positives.end(), [&](const auto& l) {
+			return get_constant(l).has_value();
+		});
+		// if there is no such element we return the first element
+		if (first == positives.end()) return std::optional<nso<BAs...>>(*positives.begin());
+		// otherwise...
+		auto cte = std::accumulate(++positives.begin(), positives.end(), *first, [&](const auto& l, const auto& r) {
+			auto l_cte = get_constant(l), r_cte = get_constant(r);
+			if (l_cte && r_cte)
+				return build_bf_constant(std::visit(_or, l_cte.value(), r_cte.value()));
+			return l;
+		});
 
-		for (auto& ps: partition) {
-			auto [representative, _class] = ps;
-			if (_class.size() > 1) {
-				auto cte = std::accumulate(_class.begin(), _class.end(), *_class.begin(), [](auto& l, auto& r) {
-					return std::visit(_or, l, r);
-				});
-				std::variant v(cte);
-				auto n = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
-				squeezed.insert(n);
-			} else squeezed.insert(representative);
-		}
+		// return the conjunction of all the same exponent literals and the accumulated constant
+		auto bf = std::accumulate(exp.begin(), exp.end(), cte, [](const auto& l, const auto& r) {
+			return build_bf_and(l, r);
+		});
+		return build_wff_neq(bf);
+	}
 
-		squeezed.insert(negatives.begin(), negatives.end());
+	// squeezed positives into one literal if possible.
+	literals squeeze_positives(const literals& lits) const {
+		literals squeezed;
+		for (auto& [exponent, literals]: get_partition_by_exponent(lits))
+			if (auto squeezed_literal = squeeze_same_exponent_positives(literals, exponent); squeezed_literal)
+				squeezed.insert(squeezed.end(), squeezed_literal.value());
 		return squeezed;
 	}
 
-	// applying Corollary 3.1 from TABA book
-	std::optional<literals> normalize(const literals& lits) {
-	    literals positives, negatives, nnegatives;
-		auto is_negative = [](const nso<BAs...>& n) {
-			return (n | tau_parser::wff | tau_parser::bf_neq).has_value();
-		};
-
-		std::partition_copy(lits.begin(), lits.end(), std::inserter(negatives, negatives.end()),
-			std::inserter(positives, positives.end()), is_negative);
-
-		for (auto& n: negatives) {
-			auto [nc, ne] = get_constant_and_exponent(n);
-			// get positives with the same exponent
-			auto same_exponent = std::find_if(positives.begin(), positives.end(), [&](const auto& p) {
-				auto [_, pe] = get_constant_and_exponent(p);
-				return ne == pe;
+	// normalize each bdd path applying Corollary 3.1 from TABA book
+	nso<BAs...> normalize(const bdd_path& path) const {
+		if (path.first.empty())
+			return std::accumulate(path.second.begin(), path.second.end(), _T<BAs...>, [](const auto& l, const auto& r) {
+				return build_wff_and(l, r);
 			});
-			// accumulate the constants using conjuntcion
-			if (same_exponent.size() > 1) {
-				auto cte = std::accumulate(same_exponent.begin(), same_exponent.end(), *same_exponent.begin(), [](auto& l, auto& r) {
-					return std::visit(_and, l, r);
-				});
-				std::variant v(cte);
-				auto n = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
-				nnegatives.insert(n);
-			} else nnegatives.insert(n);
+		// the literals of the final term include the positive literals...
+		literals lits(path.first.begin(), path.first.end());
+		// ... and for each negatice literal include the result of
+		// ...
+		auto partition = get_partition_by_exponent(path.first);
+		for (auto& n: path.second) {
+			auto n_exp = get_exponent(n);
+			// if no positive literal has the same exponent as n, we add n to the literals
+			if (!partition.contains(n_exp)) {
+				lits.push_back(n);
+			}
+			// otherwise we compute the conjunction of all the positive literals negated
+			auto cte = std::accumulate(++partition[n_exp].begin(), partition[n_exp].end(), *partition[n_exp].begin(), [&](const auto& l, const auto& r) {
+				auto l_cte = get_constant(l).value();
+				auto r_cte = get_constant(r).value();
+				std::variant<BAs...> n_cte(std::visit(_or, l_cte, r_cte));
+				return build_bf_constant(n_cte);
+			});
+			auto cte_neg = build_bf_neg(cte);
+			// now we conjunct the previous result with the constant of n
+			auto n_cte = build_bf_constant(get_constant(n)).value();
+			auto nn_cte = build_bf_and(cte_neg, n_cte);
+			auto term = std::accumulate(++n_exp.begin(), n_exp.end(), *n_exp.begin(), [](const auto& l, const auto& r) {
+					return build_wff_and(l, r);
+			});
+			auto nn = build_wff_and(nn_cte, term);
+			auto nnn = build_wff_neq(nn);
+			lits.insert(lits.end(), nnn);
 		}
 
-		positives.insert(positives.end(), nnegatives.begin(), nnegatives.end());
-		return positives;
-	}
-
-	std::optional<nso<BAs...>> snf_from_bdd_path(const literals& used, const nso<BAs...>& form) {
-		auto squeezed = squeeze_positives(used);
-		if (auto normalized = normalize(squeezed); normalized) return build_clause_from_bdd_path(normalized.value(), {});
-		return {};
-	}
-
-	std::optional<nso<BAs...>> wff_to_snf(const literals& used, const literals& remaining, const nso<BAs...>& form) {
-		if (auto check = find_top(form, is_non_terminal<tau_parser::bf_eq, BAs...>); !check.has_value() || remaining.empty())
-			// we are at the end of a path of the subyacent bdd
-			return snf_from_bdd_path(used, form);
-		auto [a, b] = split_using_lit(remaining.front(), form);
-		std::list<nso<BAs...>> nremaining(remaining.begin() +1, remaining.end());
-		auto a_used = used; a_used.push_back(remaining.front());
-		auto b_used = used; b_used.push_back(build_wff_neg(wrap(tau_parser::wff, remaining.front())));
-		auto a_snf = wff_to_snf(a_used, nremaining, a);
-		auto b_snf = wff_to_snf(b_used, nremaining, b);
-		// TODO (HIGH) fix this it needs to take into account the optionals
-		return build_wff_or(a_snf, b_snf);
+		// return the conjunction of all the terms
+		return std::accumulate(lits.begin(), lits.end(), _T<BAs...>, [](const auto& l, const auto& r) {
+			return build_wff_and(l, r);
+		});
 	}
 };
 
-template<typename...BAs>
+/*template<typename...BAs>
 nso<BAs...> operator|(const nso<BAs...>& n, const to_snf<BAs...>& r) {
 	return r(n);
+}*/
+
+// We mostly follow the Remark 3.5 from the TABA book. However, we deviate at
+// some points. In particular, we assume that the formula is in MNF,
+// instead of in MNF+BDD. The reason behind this is that we want to avoid the
+// construction of the BDD form and then traverse it. Our aim is to build the
+// BDD form and traverse it afterwards.
+template<typename...BAs>
+nso<BAs...> snf_wff(const nso<BAs...>& n) {
+	return n | repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
 }
+
+/*template<typename...BAs>
+nso<BAs...> snf_wff(const nso<BAs...>& n) {
+	// TODO (HIGH) give a proper implementation (call to_snf...)
+	auto quantified = [](const auto& n) -> bool {
+		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
+	};
+	auto quantifier = find_bottom(n, quantified);
+	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+	return apply_once_definitions(nn)
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_wff_defs<BAs...>
+			| to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>)
+		| reduce_wff<BAs...>
+		| to_snf_wff<BAs...>;
+}*/
 
 template<typename...BAs>
 nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...>& a, const nso<BAs...>& b) {
