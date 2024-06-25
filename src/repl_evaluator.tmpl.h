@@ -554,7 +554,7 @@ void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(const nso<tau_ba<BA
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
-	auto rule = make_gssotc_rec_relation<BAs...>(n);
+	auto rule = make_rec_relation<tau_ba<BAs...>, BAs...>(n);
 	definitions.emplace_back(rule);
 	cout << "[" << definitions.size() << "] " << definitions.back() << "\n";
 }
