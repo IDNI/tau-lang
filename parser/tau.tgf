@@ -205,13 +205,13 @@ cli_command            =>
         | ("c" | "clear")  :clear_sym                         :clear_cmd
         | (("h" | "help")  :help_sym   [__ help_arg])         :help_cmd
         | ("file"          :file_sym    __ q_string)          :file_cmd
-        | ("valid"         :valid_sym   __ gssotc_rr)         :valid_cmd
-        | ("sat"           :sat_sym     __ gssotc_rr)         :sat_cmd
-        | ("unsat"         :unsat_sym   __ gssotc_rr)         :unsat_cmd
+        | ("valid"         :valid_sym   __ nso_rr)            :valid_cmd
+        | ("sat"           :sat_sym     __ nso_rr)            :sat_cmd
+        | ("unsat"         :unsat_sym   __ nso_rr)            :unsat_cmd
         | ("solve"         :solve_sym   __
                                 wff_cmd_arg:solve_cmd_arg)    :solve_cmd
         | (("e" | "execute"):execute_sym __
-                (tau | gssotc_rr):execute_cmd_arg)            :execute_cmd
+                (wff | nso_rr):execute_cmd_arg)            :execute_cmd
         | (("n" | "normalize")
                         :normalize_sym __ normalize_cmd_arg)  :normalize_cmd
         | (("i" | "inst" | "instantiate")
@@ -233,12 +233,12 @@ cli_command            =>
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # rec relations
         | (("defs" | "definitions"):def_sym)                  :def_list_cmd
-        | (gssotc_rec_relation_form)                          :def_rr_cmd
+        | (nso_rec_relation_form)                             :def_rr_cmd
         | (      def_sym __ memory)                           :def_print_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
 	| (history_sym __ memory)                             :history_print_cmd
-        | ((bf | wff | tau):history_store_cmd_arg)            :history_store_cmd
+        | ((bf | wff ):history_store_cmd_arg)            :history_store_cmd
 #qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
