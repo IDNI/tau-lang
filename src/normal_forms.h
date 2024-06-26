@@ -594,23 +594,28 @@ nso<BAs...> operator|(const nso<BAs...>& n, const reduce_wff_t<BAs...>& r) {
 	return r(n);
 }
 
+// return the inner quantifier or the top wff if the formula is not quantified
+template<typename...BAs>
+std::pair<std::optional<nso<BAs...>>, nso<BAs...>> get_inner_quantified_wff(const nso<BAs...>& n) {
+	// TODO (LOW) extract to a utils file
+	auto quantified = [](const auto& n) -> bool {
+		return (n | tau_parser::wff_ex).has_value() || (n | tau_parser::wff_all).has_value();
+	};
+	if (auto quantifier = find_bottom(n, quantified); quantifier) {
+		return { quantifier | tau_parser::variable | optional_value_extractor<nso<BAs...>>,
+			quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> };
+	}
+	return { {}, n };
+}
+
 template<typename...BAs>
 struct onf_wff {
 
 	onf_wff(const nso<BAs...>& var) : var(var) {}
 
 	nso<BAs...> operator()(const nso<BAs...>& n) const {
-		auto pred = [this](const auto& n) {
-			if (auto check = n | tau_parser::wff_ex | tau_parser::variable; check.has_value()) {
-				return (var == check.value());
-			}
-			return false;
-		};
-		if (auto quantifier = find_bottom(n, pred); quantifier.has_value()) {
-			auto sub_formula = quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>>;
-			return onf_subformula(sub_formula);
-		}
-		return n;
+		auto [var, nn] = get_inner_quantified_wff(n);
+		return onf_subformula(nn);
 	}
 
 private:
@@ -695,11 +700,7 @@ std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 
 template<typename...BAs>
 nso<BAs...> dnf_wff(const nso<BAs...>& n) {
-	auto quantified = [](const auto& n) -> bool {
-		return (n | tau_parser::wff_ex).has_value() || (n | tau_parser::wff_all).has_value();
-	};
-	auto quantifier = find_bottom(n, quantified);
-	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+	auto [_, nn] = get_inner_quantified_wff(n);
 	auto nform = apply_once_definitions(nn)
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_wff_defs<BAs...>
@@ -727,12 +728,8 @@ nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> cnf_wff(const nso<BAs...>& n) {
-	auto quantified = [](const auto& n) -> bool {
-		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
-	};
-	auto quantifier = find_bottom(n, quantified);
-	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
-	auto nform = apply_once_definitions(nn)
+	auto [_, nn] = get_inner_quantified_wff(n);
+	auto wff = apply_once_definitions(nn)
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_wff_defs<BAs...>
 			| to_cnf_wff<BAs...>
@@ -740,7 +737,7 @@ nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
-	return cnf_bf(nform);
+	return cnf_bf(wff);
 }
 
 template<typename...BAs>
@@ -788,11 +785,7 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> nnf_wff(const nso<BAs...>& n) {
-	auto quantified = [](const auto& n) -> bool {
-		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
-	};
-	auto quantifier = find_bottom(n, quantified);
-	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
+	auto [_, nn] = get_inner_quantified_wff(n);
 	auto nform = apply_once_definitions(nn)
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_wff_defs<BAs...>
@@ -1336,8 +1329,8 @@ nso<BAs...> minimize_wff(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> mnf_wff(const nso<BAs...>& n) {
-	// TODO (HIGH) this should be changed to use a proper mnf for wff
-	return apply_once_definitions(n)
+	auto [_, nn] = get_inner_quantified_wff(n);
+	return apply_once_definitions(nn)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_wff_defs<BAs...>
 			| to_dnf_wff<BAs...>
