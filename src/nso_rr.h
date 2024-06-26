@@ -2125,8 +2125,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// quantifiers
 			case tau_parser::wff_all:        prefix("all"); break;
 			case tau_parser::wff_ex:         prefix("ex"); break;
-			case tau_parser::wff_ball:       prefix("bool_all"); break;
-			case tau_parser::wff_bex:        prefix("bool_ex"); break;
+			case tau_parser::wff_ball:       prefix("b_all"); break;
+			case tau_parser::wff_bex:        prefix("b_ex"); break;
 			// callbacks
 			case tau_parser::bf_and_cb:      prefix("bf_and_cb"); break;
 			case tau_parser::bf_or_cb:       prefix("bf_or_cb"); break;
