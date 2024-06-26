@@ -53,22 +53,22 @@ tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
 # TODO (HIGH) simply consider wff without { and }.
 # we introduce '{' and '}' to avoid confusion with wff negation
 # see the next TODO for an alternative
+#
                         | ('{' _ wff _ '}')                  :tau_wff
                         | (sym [_ offsets] _ ref_args)       :tau_ref
                         | (tau _ "|||" _ tau)                :tau_or
                         | (tau _ "&&&" _ tau)                :tau_and
-# TODO (HIGH) replace by - or other symbol to avoid confusion with wff negation
-                        | ('-' _ tau)                      :tau_neg
+                        | ('-' _ tau)                        :tau_neg
                         |                                     capture.
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ "|||" _ wff)                :global_or
                         | (wff _ "&&&" _ wff)                :global_and
                         | ('-' _ wff)                        :global_neg
-                        | (("sometimes" | "<>") _ wff)       :temporal_ex
-                        | (("always" | "[]") _ wff)          :temporal_all
+                        | (("sometimes" | "<>") _ wff)       :wff_sometimes
+                        | (("always" | "[]") _ wff)          :wff_always
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
-                        | ("bool_all"   __ q_bool_var __ wff):wff_ball
-                        | ("bool_ex"    __ q_bool_var __ wff):wff_bex
+                        | ("b_all"   __ q_bool_var __ wff)   :wff_ball
+                        | ("b_ex"    __ q_bool_var __ wff)   :wff_bex
                         | ("all"        __ q_var      __ wff):wff_all
                         | ("ex"         __ q_var      __ wff):wff_ex
                         | (sym [_ offsets] _ ref_args)       :wff_ref
@@ -339,7 +339,7 @@ severity               => ("e" | "error"):error_sym
         colors_opt, debug_repl_opt, option_value_true, option_value_false,
         error_sym, debug_sym, trace_sym, info_sym, qelim_sym, uninterpreted_constant,
         subst_cmd, bf_normalize_cb, wff_typed, bf_typed, global_or, global_and, global_neg,
-        temporal_ex, temporal_all.
+        wff_sometimes, wff_always.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, q_bool_var, src_c, tau_cb, wff_cb, bf_cb,
