@@ -23,6 +23,7 @@ set(TESTS
 	satisfiability
 	executor
 	variant_ba
+	normal_forms
 )
 
 foreach(X IN LISTS TESTS)
