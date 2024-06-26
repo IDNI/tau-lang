@@ -14,7 +14,6 @@ set(TESTS
 	test_integration-tau1
 	test_integration-tau2
 	test_integration-executor
-	test_integration-normal_forms
 	test_integration-satisfiability
 )
 

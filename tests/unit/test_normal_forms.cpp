@@ -33,7 +33,7 @@ using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("strong normal forms for wff") {
+TEST_SUITE("normal forms: snf for wff") {
 
 	TEST_CASE("case1") {
 		/*const char* sample = "{ T };";
@@ -47,16 +47,34 @@ TEST_SUITE("strong normal forms for wff") {
 	}
 }
 
-TEST_SUITE("order normal form") {
+TEST_SUITE("normal forms: onf") {
 
-	TEST_CASE("case1") {
-		/*const char* sample = "{ T };";
+	/* TEST_CASE("T") {
+		const char* sample = "T.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
-		std::vector<gssotc<bdd_test>> literals;
-		get_gssotc_literals<bdd_test>(sample_formula.main, literals);
-		CHECK( literals.size() == 1 );*/
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nts = std::get<tau_source_sym>(sample_formula.main->value).nts;
+		auto var = make_node<tau_sym<bdd_test>>(tau_source_sym(tau_parser::variable, nts), {});
+		auto result = onf(sample_formula.main, var);
+		auto check = result | tau_parser::wff_t;
+		CHECK( check.has_value() );
 		CHECK( true );
-	}
+	}*/
 }
+
+// TODO (MEDIUM) add tests for reduce_bf/wff
+// TODO (MEDIUM) add tests for to_bdd_bf
+// TODO (MEDIUM) add tests for minimize
+
+
+// TODO (MEDIUM) add tests for dnf_bf
+// TODO (MEDIUM) add tests for dnf_wff
+// TODO (MEDIUM) add tests for cnf_bf
+// TODO (MEDIUM) add tests for cnf_wff
+// TODO (MEDIUM) add tests for nnf_bf
+// TODO (MEDIUM) add tests for nnf_bf
+// TODO (MEDIUM) add tests for sno_wwf
+// TODO (MEDIUM) add tests for sno_wff
+// TODO (MEDIUM) add tests for mnn_bf
+// TODO (MEDIUM) add tests for mnn_wff
