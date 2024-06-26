@@ -19,11 +19,11 @@ add_repl_test(substitution_cmd_wff1 "?x. T. s %-1[?x/ %]" ": T")
 
 add_repl_test(substitution_cmd_wff2 "?a && ?x ^ ?b && !?x. ?y && ?z. s %1[?x / %2]" ": \\(\\?a && \\?y && \\?z\\) \\^ \\(\\?b && !\\(\\?y && \\?z\\)\\)")
 
-add_repl_test(substitution_cmd_wff3 "bool_ex ?k ?h && ?k. ?v && ?w. s %1[?k / %2]" ": bool_ex \\?k \\?h && \\?k")
+add_repl_test(substitution_cmd_wff3 "b_ex ?k ?h && ?k. ?v && ?w. s %1[?k / %2]" ": b_ex \\?k \\?h && \\?k")
 
 add_repl_test(substitution_cmd_wff4 "ex x x=0 && y=0. ?x. s %1[?y / %2]" ": ex x x = 0 && y = 0")
 
-add_repl_test(substitution_cmd_wff5 "bool_ex ?x ?x && ?y. ?x. s %1[?y / %2]" ": bool_ex \\?x2 \\?x2 && \\?x")
+add_repl_test(substitution_cmd_wff5 "b_ex ?x ?x && ?y. ?x. s %1[?y / %2]" ": b_ex \\?x2 \\?x2 && \\?x")
 
 add_repl_test(substitution_cmd_wff6 "(?x || (?w && ?z)) && ?z. ?b. s %1[?z / %2]" ": \\(\\?x || \\?w && \\?b\\) && \\?b")
 
@@ -31,12 +31,12 @@ add_repl_test(substitution_cmd_wff7 "?x && ?y. 0. s %1[?x / %2]" "error: argumen
 
 add_repl_test(substitution_cmd_wff8 "s (ex x x=0 && y=0) && x=0 [y=0/x=0]" ": \\(ex x2 x2 = 0 && x = 0\\) && x = 0")
 
-add_repl_test(substitution_cmd_wff9 "s (bool_ex ?x ?x && ?y) && ?x [?y/?x || a=0]" ": \\(bool_ex \\?x2 \\?x2 && \\(\\?x || a = 0\\)\\) && \\?x")
+add_repl_test(substitution_cmd_wff9 "s (b_ex ?x ?x && ?y) && ?x [?y/?x || a=0]" ": \\(b_ex \\?x2 \\?x2 && \\(\\?x || a = 0\\)\\) && \\?x")
 
-add_repl_test(substitution_cmd_wff10 "s (bool_ex ?x ?x && ?y && bool_all ?y ?y) && ?x && ?y [?x && ?y /?x || a=0]"
-        ": \\(bool_ex \\?x \\?x && \\?y && \\(bool_all \\?y \\?y\\)\\) && \\(\\?x || a = 0\\)")
+add_repl_test(substitution_cmd_wff10 "s (b_ex ?x ?x && ?y && b_all ?y ?y) && ?x && ?y [?x && ?y /?x || a=0]"
+        ": \\(b_ex \\?x \\?x && \\?y && \\(b_all \\?y \\?y\\)\\) && \\(\\?x || a = 0\\)")
 
-add_repl_test(substitution_cmd_wff11 "s bool_ex ?x bool_ex ?x ?x && ?y [?y/?x]" ": bool_ex \\?x2 bool_ex \\?x3 \\?x3 && \\?x")
+add_repl_test(substitution_cmd_wff11 "s b_ex ?x b_ex ?x ?x && ?y [?y/?x]" ": b_ex \\?x2 b_ex \\?x3 \\?x3 && \\?x")
 
 add_repl_test(substitution_cmd_wff12 "s (ex x x=0 && y=0) && x=0 [y/x]" ": \\(ex x2 x2 = 0 && x = 0\\) && x = 0")
 
