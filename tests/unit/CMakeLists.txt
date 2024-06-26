@@ -20,7 +20,6 @@ set(TESTS
 	bdd_binding
 	traversal
 	tau
-	satisfiability
 	executor
 	variant_ba
 	normal_forms
