@@ -845,7 +845,7 @@ rules<nso<BAs...>> make_rules(sp_tau_node<BAs...>& tau_source) {
 // create a set of relations from a given tau source.
 // TODO (LOW) should depend in node_t instead of BAs...
 template<typename... BAs>
-rec_relations<nso<BAs...>> make_rec_relations(sp_tau_node<BAs...>& tau_source) {
+rec_relations<nso<BAs...>> make_rec_relations(const sp_tau_node<BAs...>& tau_source) {
 	rec_relations<nso<BAs...>> rs;
 	// TODO (LOW) change call to select by operator|| and operator|
 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::nso_rec_relation, BAs...>))
