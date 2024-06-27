@@ -64,8 +64,6 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ "|||" _ wff)                :global_or
                         | (wff _ "&&&" _ wff)                :global_and
                         | ('-' _ wff)                        :global_neg
-                        | (("sometimes" | "<>") _ wff)       :wff_sometimes
-                        | (("always" | "[]") _ wff)          :wff_always
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("b_all"   __ q_bool_var __ wff)   :wff_ball
                         | ("b_ex"    __ q_bool_var __ wff)   :wff_bex
@@ -77,6 +75,8 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff   _ "||"  _ wff)              :wff_or
                         | (wff   _ '^'   _ wff)              :wff_xor
                         | (wff   _ "&&"  _ wff)              :wff_and
+                        | (("sometimes" | "<>") _ wff)       :wff_sometimes
+                        | (("always" | "[]") _ wff)          :wff_always
                         | ('!'   _ wff)                      :wff_neg
                         | 'T'                                :wff_t
                         | 'F'                                :wff_f
