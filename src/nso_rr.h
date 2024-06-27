@@ -1873,6 +1873,9 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			tau_parser::bf_constant,
 			tau_parser::bf_t,
 			tau_parser::bf_f,
+			tau_parser::global_neg,
+			tau_parser::wff_sometimes,
+			tau_parser::wff_always,
 			tau_parser::wff_ref,
 			tau_parser::wff_neg,
 			tau_parser::wff_t,
@@ -1930,6 +1933,9 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::wff_remove_bexistential_cb,      350 },
 			{ tau_parser::wff_remove_buniversal_cb,        360 },
 
+			{tau_parser::global_or,                        370 },
+			{tau_parser::global_and,                       380 },
+			{tau_parser::global_neg,                       390 },
 			{ tau_parser::wff_conditional,                 400 },
 			{ tau_parser::wff_ball,                        410 },
 			{ tau_parser::wff_bex,                         420 },
@@ -1940,6 +1946,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::wff_or,                          470 },
 			{ tau_parser::wff_and,                         480 },
 			{ tau_parser::wff_xor,                         490 },
+            {tau_parser::wff_sometimes,                    491 },
+		    {tau_parser::wff_always,                       492 },
 			{ tau_parser::wff_neg,                         500 },
 			{ tau_parser::bf_interval,                     510 },
 			{ tau_parser::bf_neq,                          520 },
@@ -1973,6 +1981,11 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::tau_rec_relation,                800 },
 			{ tau_parser::ref_args,                        800 }
 		};
+		static const std::set<size_t> wrap_child_for = {
+			tau_parser::global_or,
+			tau_parser::global_and,
+			tau_parser::global_neg
+			};
 		if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
 			auto tss = std::get<idni::tau::tau_source_sym>(n->value);
 			if (!tss.nt() || no_wrap_for.find(tss.n()) != no_wrap_for.end())
@@ -1995,7 +2008,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// 	<< prio.at(tss.n())
 			// 	// << " (" << tss.n() << ")"
 			// 	<< "\n";
-			return prio.at(parent) > prio.at(tss.n());
+			return prio.at(parent) > prio.at(tss.n()) ?
+						true : wrap_child_for.contains(parent);
 		}
 		return false;
 	};
@@ -2097,13 +2111,19 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 				stream << "[", sep(","), stream << "]"; break;
 			case tau_parser::ref_args:
 				stream << "(", sep(","), stream << ")"; break;
-			// negation (unary)
+			// unary operators
 			case tau_parser::tau_neg: prefix_nows("-"); break;
+			case tau_parser::global_neg: prefix_nows("-"); break;
 			case tau_parser::wff_neg: prefix_nows("!");   break;
 			case tau_parser::bf_neg:  postfix_nows("'");  break;
+			case tau_parser::wff_sometimes: prefix("sometimes"); break;
+			case tau_parser::wff_always:    prefix("always"); break;
+			//
 			// binary operators
 			case tau_parser::tau_or:         infix("|||"); break;
 			case tau_parser::tau_and:        infix("&&&"); break;
+			case tau_parser::global_or:      infix("|||"); break;
+			case tau_parser::global_and:     infix("&&&"); break;
 			case tau_parser::bf_and:         infix("&"); break;
 			case tau_parser::bf_or:          infix("|"); break;
 			case tau_parser::bf_xor:         infix("+"); break;
