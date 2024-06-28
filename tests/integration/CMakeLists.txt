@@ -15,6 +15,7 @@ set(TESTS
 	test_integration-tau2
 	test_integration-executor
 	test_integration-satisfiability
+	test_integration-normal_forms
 )
 
 foreach(N IN LISTS TESTS)
