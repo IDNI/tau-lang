@@ -447,7 +447,7 @@ private:
 					BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
 				}
 			} else {
-				if (auto check = l | tau_parser::bf_neq; !check.has_value()) {
+				if (auto check = l | tau_parser::wff_neg; !check.has_value()) {
 					positives.insert(l);
 					BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
 				} else {
@@ -506,7 +506,10 @@ private:
 		auto [positives, negatives] = get_positive_negative_literals(clause);
 		if constexpr (type == tau_parser::bf) {
 			for (auto& negation: negatives) {
-				auto negated = negation | tau_parser::bf_neg | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+				auto negated = negation
+					| tau_parser::bf_neg
+					| tau_parser::bf
+					| optional_value_extractor<sp_tau_node<BAs...>>;
 				for (auto& positive: positives) {
 					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing? ";
 					if (positive == _0<BAs...>) {
@@ -522,9 +525,21 @@ private:
 			}
 		} else {
 			for (auto& negation: negatives) {
-				auto neq_bf = negation | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+				#ifdef DEBUG
+				print_sp_tau_node_tree(cout, negation);
+				#endif // DEBUG
+				auto neq_bf = negation
+					| tau_parser::wff_neg
+					| tau_parser::wff
+					| optional_value_extractor<sp_tau_node<BAs...>>;
 				for (auto& positive: positives) {
-					auto eq_bf = positive | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+					#ifdef DEBUG
+					print_sp_tau_node_tree(cout, positive);
+					#endif // DEBUG
+					auto eq_bf = positive
+						| first_child_extractor<BAs...>
+						| tau_parser::bf
+						| optional_value_extractor<sp_tau_node<BAs...>>;
 					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing: ";
 					if (eq_bf == _F<BAs...>) {
 						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
@@ -1335,6 +1350,8 @@ nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 			apply_wff_defs<BAs...>
 			| to_dnf_wff<BAs...>
 			| to_mnf_wff<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_mnf_wff<BAs...>)
 		| reduce_wff<BAs...>;
 }
 
