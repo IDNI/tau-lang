@@ -498,6 +498,37 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const
 	return e(o);
 }
 
+// returns the first child of a node
+template <typename... BAs>
+static const auto first_child_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<sp_tau_node<BAs...>> {
+	if (n->child.size() == 0) return std::optional<sp_tau_node<BAs...>>();
+	return std::optional<sp_tau_node<BAs...>>(n->child[0]);
+};
+
+template<typename... BAs>
+using first_child_extractor_t = decltype(first_child_extractor<BAs...>);
+
+template <typename... BAs>
+std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const first_child_extractor_t<BAs...> e) {
+	std::vector<sp_tau_node<BAs...>> nv;
+	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
+	return nv;
+}
+
+template <typename... BAs>
+std::optional<sp_tau_node<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& o, const first_child_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return o.has_value() ? e(o.value()) : std::optional<sp_tau_node<BAs...>>();
+}
+
+// IDEA maybe unify all the implementations dealing with operator| and operator|| for extractors
+template <typename... BAs>
+std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const first_child_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return e(o);
+}
+
+
 template <typename T>
 static const auto optional_value_extractor = [](const std::optional<T>& o) -> T{
 	if (!o) BOOST_LOG_TRIVIAL(error)
