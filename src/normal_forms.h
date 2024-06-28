@@ -1101,16 +1101,17 @@ struct to_snf_step {
 		static const auto is_literal = [](const auto& n) -> bool {
 			return (n | tau_parser::wff | tau_parser::bf_eq).has_value();
 		};
-		auto literals = select_all(form, is_literal);
-		// we call recursively to select a path in the BDD distinguishing
-		// between the two possible values of the literal.
-		std::list<nso<BAs...>> remaining(literals.begin(), literals.end());
-		return traverse({}, remaining, form);
-		// for each choosen path we squeeze the positive literals
-		// we apply corollary 3.1
-		// remove all atomic formulas with zero coefficinets
-		// and discard the path if the resulting formula is unsatisfiable
-		// finally, we return the resulting formula
+		if (auto literals = select_all(form, is_literal); !literals.empty()) {
+			// we call recursively to select a path in the BDD distinguishing
+			// between the two possible values of the literal.
+			std::list<nso<BAs...>> remaining(literals.begin(), literals.end());
+			return traverse({}, remaining, form);
+			// for each choosen path we squeeze the positive literals
+			// we apply corollary 3.1
+			// remove all atomic formulas with zero coefficinets
+			// and discard the path if the resulting formula is unsatisfiable
+			// finally, we return the resulting formula
+		}
 		return form;
 	}
 
@@ -1144,7 +1145,13 @@ private:
 
 	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
+		#ifdef DEBUG
+		print_sp_tau_node_tree(cout, form);
+		#endif // DEBUG
 		auto lit = remaining.front();
+		#ifdef DEBUG
+		print_sp_tau_node_tree(cout, lit);
+		#endif // DEBUG
 		literals nremaining(++remaining.begin(), remaining.end());
 		bdd_path t_path{path.first, path.second};
 		t_path.first.push_back(lit);
@@ -1152,7 +1159,13 @@ private:
 		f_path.second.push_back(build_wff_neg(lit));
 		auto [t, f] = split_using_lit(lit, form);
 		auto t_snf = traverse(t_path, nremaining, t);
+		#ifdef DEBUG
+		print_sp_tau_node_tree(cout, t_snf);
+		#endif // DEBUG
 		auto f_snf = traverse(f_path, nremaining, f);
+		#ifdef DEBUG
+		print_sp_tau_node_tree(cout, f_snf);
+		#endif // DEBUG
 		return build_wff_or(t_snf, f_snf);
 	}
 
