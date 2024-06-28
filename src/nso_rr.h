@@ -1980,6 +1980,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_greater,                      550 },
 			{ tau_parser::bf_less_equal,                   560 },
 			{ tau_parser::bf_less,                         570 },
+			{ tau_parser::wff,                             580 },
 			// bf
 			{ tau_parser::bf_is_zero_cb,                   600 },
 			{ tau_parser::bf_is_one_cb,                    610 },

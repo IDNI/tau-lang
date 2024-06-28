@@ -132,6 +132,29 @@ RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
 RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != $Y ::= !($X = $Y).")
 RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
 
+RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "$X != 0 && $Y  = 0 && $Z != 0 ::= $Y = 0 && $X != 0 && $Z != 0.")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "$X != 0 && $Y != 0 && $Z  = 0 ::= $Z = 0 && $X != 0 && $Y != 0.")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "$Z != 0 && $X  = 0 && $Y != 0 ::= $X = 0 && $Z != 0 && $Y != 0.")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "$Z != 0 && $X != 0 && $Y  = 0 ::= $Z != 0 && $Y = 0 && $X != 0.")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "$X != 0 && $Y  = 0 ::= $Y = 0 && $X != 0.")
+RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
+
+// TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
+
+template<typename... BAs>
+static auto bf_positives_upwards = make_library<BAs...>(
+	BF_POSITIVE_LITERAL_UPWARDS_0
+	+ BF_POSITIVE_LITERAL_UPWARDS_1
+	+ BF_POSITIVE_LITERAL_UPWARDS_2
+	+ BF_POSITIVE_LITERAL_UPWARDS_3
+	+ BF_POSITIVE_LITERAL_UPWARDS_4
+);
+
+template<typename... BAs>
+static auto squeeze_positives = make_library<BAs...>(
+	WFF_SQUEEZE_POSITIVES_0
+);
+
 // tau rules to dnf
 RULE(TAU_TO_DNF_0, "($X ||| $Y) &&& $Z :::= $X &&& $Z ||| $Y &&& $Z.")
 RULE(TAU_TO_DNF_1, "$X &&& ($Y ||| $Z) :::= $X &&& $Y ||| $X &&& $Z.")
@@ -335,8 +358,14 @@ static auto trivialities = make_library<BAs...>(
 template<typename... BAs>
 static auto to_mnf_wff = make_library<BAs...>(
 	WFF_PUSH_NEGATION_UPWARDS_0
-	+ WFF_UNSQUEEZE_POSITIVES_0
 );
+
+template<typename... BAs>
+static auto unsqueeze_positives_wff = make_library<BAs...>(
+	WFF_UNSQUEEZE_POSITIVES_0
+);
+
+
 
 template<typename... BAs>
 static auto to_cnf_wff = make_library<BAs...>(
@@ -1095,11 +1124,10 @@ struct to_snf_step {
 	using bdd_path = std::pair<literals, literals>;
 	using partition_by_exponent = std::map<exponent, std::set<literal>>;
 
-
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
 		// select all literals, i.e. wff equalities or it negations.
 		static const auto is_literal = [](const auto& n) -> bool {
-			return (n | tau_parser::wff | tau_parser::bf_eq).has_value();
+			return (n | tau_parser::bf_eq).has_value();
 		};
 		if (auto literals = select_all(form, is_literal); !literals.empty()) {
 			// we call recursively to select a path in the BDD distinguishing
@@ -1136,37 +1164,56 @@ private:
 	nso<BAs...> bdd_path_to_snf(const bdd_path& path, const nso<BAs...>& form) const {
 		// we simplify the constant part of the formula
 		// TODO (HIGH) fix simplification
-		auto simplified = form | repeat_all(apply_cb<BAs...> | elim_eqs<BAs...>);
+		auto simplified = form
+			| repeat_all(
+				apply_cb<BAs...>
+				| elim_eqs<BAs...>
+				| simplify_wff<BAs...>
+				| trivialities<BAs...>);
 		// we squeeze the positive literals
 		auto squeezed = squeeze_positives(path.first);
 		// we apply corollary 3.1
-		return normalize({squeezed, path.second});
+		return build_wff_and(normalize({squeezed, path.second}), form)
+			| repeat_all(
+				apply_cb<BAs...>
+				| elim_eqs<BAs...>
+				| simplify_wff<BAs...>
+				| trivialities<BAs...>);
+;
 	}
 
 	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
 		#ifdef DEBUG
-		print_sp_tau_node_tree(cout, form);
+		std::cout << "form: " << form << std::endl;
 		#endif // DEBUG
 		auto lit = remaining.front();
 		#ifdef DEBUG
-		print_sp_tau_node_tree(cout, lit);
+		std::cout << "lit: " << lit << std::endl;
 		#endif // DEBUG
 		literals nremaining(++remaining.begin(), remaining.end());
 		bdd_path t_path{path.first, path.second};
 		t_path.first.push_back(lit);
 		bdd_path f_path{path.first, path.second};
-		f_path.second.push_back(build_wff_neg(lit));
+		f_path.second.push_back(lit);
 		auto [t, f] = split_using_lit(lit, form);
+		#ifdef DEBUG
+		std::cout << "t: " << t << std::endl;
+		std::cout << "f: " << f << std::endl;
+		#endif // DEBUG
 		auto t_snf = traverse(t_path, nremaining, t);
 		#ifdef DEBUG
-		print_sp_tau_node_tree(cout, t_snf);
+		std::cout << "t_snf: " << t_snf << std::endl;
 		#endif // DEBUG
 		auto f_snf = traverse(f_path, nremaining, f);
 		#ifdef DEBUG
-		print_sp_tau_node_tree(cout, f_snf);
+		std::cout << "f_snf: " << f_snf << std::endl;
 		#endif // DEBUG
-		return build_wff_or(t_snf, f_snf);
+		auto result = build_wff_or(t_snf, f_snf);
+		#ifdef DEBUG
+		std::cout << "result: " << result << std::endl;
+		#endif // DEBUG
+		return result;
 	}
 
 	exponent get_exponent(const nso<BAs...>& n) const {
@@ -1238,7 +1285,7 @@ private:
 	nso<BAs...> normalize(const bdd_path& path) const {
 		if (path.first.empty())
 			return std::accumulate(path.second.begin(), path.second.end(), _T<BAs...>, [](const auto& l, const auto& r) {
-				return build_wff_and(l, r);
+				return build_wff_and(l, build_wff_neg(r));
 			});
 		// the literals of the final term include the positive literals...
 		literals lits(path.first.begin(), path.first.end());
@@ -1249,7 +1296,7 @@ private:
 			auto n_exp = get_exponent(n);
 			// if no positive literal has the same exponent as n, we add n to the literals
 			if (!partition.contains(n_exp)) {
-				lits.push_back(n);
+				lits.push_back(build_wff_neg(n));
 			}
 			// otherwise we compute the conjunction of all the positive literals negated
 			auto cte = std::accumulate(++partition[n_exp].begin(), partition[n_exp].end(), *partition[n_exp].begin(), [&](const auto& l, const auto& r) {
@@ -1304,25 +1351,27 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 // BDD form and traverse it afterwards.
 template<typename...BAs>
 nso<BAs...> snf_wff(const nso<BAs...>& n) {
-	return n | repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
+	auto [_, nn] = get_inner_quantified_wff(n);
+	return apply_once_definitions(nn)
+		| repeat_all<step<BAs...>, BAs...>(
+			apply_wff_defs<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>
+			| unsqueeze_positives_wff<BAs...>
+			| to_dnf_wff<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>)
+		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
+		| repeat_all<step<BAs...>, BAs...>(
+			simplify_wff<BAs...>
+			| trivialities<BAs...>
+			| squeeze_positives<BAs...>
+			| bf_positives_upwards<BAs...>
+			| to_dnf_wff<BAs...>);
 }
 
 /*template<typename...BAs>
 nso<BAs...> snf_wff(const nso<BAs...>& n) {
-	// TODO (HIGH) give a proper implementation (call to_snf...)
-	auto quantified = [](const auto& n) -> bool {
-		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
-	};
-	auto quantifier = find_bottom(n, quantified);
-	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
-	return apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>
-			| trivialities<BAs...>)
-		| reduce_wff<BAs...>
-		| to_snf_wff<BAs...>;
+
 }*/
 
 template<typename...BAs>
