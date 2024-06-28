@@ -525,17 +525,11 @@ private:
 			}
 		} else {
 			for (auto& negation: negatives) {
-				#ifdef DEBUG
-				print_sp_tau_node_tree(cout, negation);
-				#endif // DEBUG
 				auto neq_bf = negation
 					| tau_parser::wff_neg
 					| tau_parser::wff
 					| optional_value_extractor<sp_tau_node<BAs...>>;
 				for (auto& positive: positives) {
-					#ifdef DEBUG
-					print_sp_tau_node_tree(cout, positive);
-					#endif // DEBUG
 					auto eq_bf = positive
 						| first_child_extractor<BAs...>
 						| tau_parser::bf
@@ -762,21 +756,6 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>
-			| elim_eqs<BAs...>)
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf<BAs...>;
-}
-
-template<typename...BAs>
-nso<BAs...> snf_bf(const nso<BAs...>& n) {
-	// TODO (HIGH) give a proper implementation (call to_bdd...)
-	return apply_once_definitions(n)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
@@ -1285,10 +1264,25 @@ private:
 	}
 };
 
-/*template<typename...BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const to_snf<BAs...>& r) {
+template<typename...BAs>
+nso<BAs...> operator|(const nso<BAs...>& n, const to_snf_step<BAs...>& r) {
 	return r(n);
-}*/
+}
+
+template<typename...BAs>
+nso<BAs...> snf_bf(const nso<BAs...>& n) {
+	// TODO (HIGH) give a proper implementation (call to_bdd...)
+	return apply_once_definitions(n)
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_bf_defs<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_dnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
+}
 
 // We mostly follow the Remark 3.5 from the TABA book. However, we deviate at
 // some points. In particular, we assume that the formula is in MNF,
