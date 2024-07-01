@@ -87,7 +87,7 @@ struct remove_one_wff_existential {
 			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>)
 			| bf_positives_upwards<BAs...>
-			| squeeze_positives<BAs...>;
+			| wff_squeeze_positives<BAs...>;
 		return nn | wff_remove_existential<BAs...>;
 	}
 };
