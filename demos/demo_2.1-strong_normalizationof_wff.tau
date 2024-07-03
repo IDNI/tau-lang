@@ -1,0 +1,22 @@
+# Let us demonstrate the workings of strong normalization for wff
+
+# First, let us consider few trivial cases to check the basics
+snf T
+snf F
+snf x = 0
+snf x != 0
+
+# Let us now consider more interesting cases. In particular, let us review how
+# the strong normalization algorithm converts into BDD the passed formulas:
+snf x = 0 || y = 0
+snf x = 0 || y = 0 || z = 0
+
+# Let us check how the algorithm squeeze the positives satisfactorily
+snf {bdd: x} x = 0 && {bdd: y} x = 0
+
+# Let us now show how the algorithm appply the Corollary 3.1 from Taba book
+# to further normalize the formulas:
+snf {bdd:x} x = 0 && {bdd:y} x != 0
+snf {bdd:x} x = 0 && {bdd:y} x = 0 && {bdd:z} x != 0
+
+quit # quit the Tau REPL

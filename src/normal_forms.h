@@ -1207,7 +1207,6 @@ private:
 	}
 
 	std::optional<constant> get_constant(const nso<BAs...>& literal) const {
-		std::cout << "get_constant input : " << literal << std::endl;
 		return find_top(literal, is_non_terminal<tau_parser::constant, BAs...>)
 			| only_child_extractor<BAs...> | ba_extractor<BAs...>;
 	}
