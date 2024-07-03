@@ -5,6 +5,10 @@ snf T
 snf F
 snf x = 0
 snf x != 0
+snf x | y = 0
+snf x & y = 0
+snf x | y != 0
+snf x & y != 0
 
 # Let us now consider more interesting cases. In particular, let us review how
 # the strong normalization algorithm converts into BDD the passed formulas:

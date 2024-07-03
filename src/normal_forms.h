@@ -1182,6 +1182,8 @@ private:
 	}
 
 	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
+		static std::map<std::tuple<bdd_path, literals, nso<BAs...>>, nso<BAs...>> cache;
+		if (auto it = cache.find({path, remaining, form}); it != cache.end()) return it->second;
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
 		auto lit = *remaining.begin();
 		literals nremaining(++remaining.begin(), remaining.end());
@@ -1194,7 +1196,9 @@ private:
 		}
 		auto t_snf = traverse(t_path, nremaining, t);
 		auto f_snf = traverse(f_path, nremaining, f);
-		return build_wff_or(t_snf, f_snf);
+		auto result = build_wff_or(t_snf, f_snf);
+		cache[{path, remaining, form}] = result;
+		return result;
 	}
 
 	exponent get_exponent(const nso<BAs...>& n) const {
@@ -1290,7 +1294,7 @@ private:
 		literals lits(squeezed.begin(), squeezed.end());
 		// ... and for each negatice literal include the result of
 		// ...
-		auto partition = get_partition_by_exponent(path.first);
+		auto partition = get_partition_by_exponent(squeezed);
 		for (auto& n: path.second) {
 			auto n_exp = get_exponent(n);
 			// if no positive literal has the same exponent as n, we add n to the literals
