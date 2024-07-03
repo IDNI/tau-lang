@@ -1370,7 +1370,9 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 			| unsqueeze_positives_wff<BAs...>
 			| to_dnf_wff<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>)
-		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
+		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
+		| repeat_all<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>);
 		/*| repeat_all<step<BAs...>, BAs...>(
 			wff_squeeze_positives<BAs...>
 			| bf_positives_upwards<BAs...>);*/
