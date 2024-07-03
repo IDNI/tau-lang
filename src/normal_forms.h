@@ -1124,9 +1124,6 @@ struct to_snf_step {
 	using partition_by_exponent = std::map<exponent, std::set<literal>>;
 
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
-		#ifdef DEBUG
-		std::cout << "snf step input: " << form << std::endl;
-		#endif // DEBUG
 		auto nform = form
 			| repeat_all<step<BAs...>, BAs...>(
 				apply_cb<BAs...>
@@ -1141,21 +1138,11 @@ struct to_snf_step {
 			// we call recursively to select a path in the BDD distinguishing
 			// between the two possible values of the literal.
 			std::set<nso<BAs...>> remaining(literals.begin(), literals.end());
-			auto result =  traverse({}, remaining, nform)
+			return traverse({}, remaining, nform)
 				| repeat_all<step<BAs...>, BAs...>(
 					simplify_wff<BAs...>
 					| trivialities<BAs...>);
-			#ifdef DEBUG
-			std::cout << "snf step input: " << nform << std::endl;
-			print_sp_tau_node_tree(std::cout, nform);
-			std::cout << "snf step result : " << result << std::endl;
-			print_sp_tau_node_tree(std::cout, result);
-			#endif // DEBUG
-			return result;
 		}
-		#ifdef DEBUG
-		std::cout << "snf step result : " << nform << std::endl;
-		#endif // DEBUG
 		return nform;
 	}
 
@@ -1180,52 +1167,25 @@ private:
 	nso<BAs...> bdd_path_to_snf(const bdd_path& path, const nso<BAs...>& form) const {
 		// we simplify the constant part of the formula
 		// TODO (HIGH) fix simplification
-		#ifdef DEBUG
-		std::cout << "path.first size: " << path.first.size() << std::endl;
-		std::cout << "path.second size: " << path.second.size() << std::endl;
-		#endif // DEBUG
 		auto simplified = form
 			| repeat_all(
 				apply_cb<BAs...>
 				| elim_eqs<BAs...>
 				| simplify_wff<BAs...>
 				| trivialities<BAs...>);
-		// we squeeze the positive literals
-		/*#ifdef DEBUG
-		std::cout << "squeezed: " ;
-		for (auto& s: squeezed) std::cout << s << "";
-		std::cout << std::endl;
-		#endif // DEBUG*/
-		// we apply corollary 3.1
-		auto result =  build_wff_and(normalize(path), form)
+		return build_wff_and(normalize(path), form)
 			| repeat_all(
 				apply_cb<BAs...>
 				| elim_eqs<BAs...>
 				| simplify_wff<BAs...>
 				| trivialities<BAs...>);
-		#ifdef DEBUG
-		std::cout << "bdd_path_to_snf step result: " << result << std::endl;
-		#endif // DEBUG
-		return result;
 	}
 
 	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
-		#ifdef DEBUG
-		std::cout << "remaining: " << remaining.size() << std::endl;
-		std::cout << "path: " << path.first.size() << " " << path.second.size() << std::endl;
-		std::cout << "form: " << form << std::endl;
-		#endif // DEBUG
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
 		auto lit = *remaining.begin();
-		#ifdef DEBUG
-		std::cout << "lit: " << lit << std::endl;
-		#endif // DEBUG
 		literals nremaining(++remaining.begin(), remaining.end());
 		auto [t, f] = split_using_lit(lit, form);
-		#ifdef DEBUG
-		std::cout << "t: " << t << std::endl;
-		std::cout << "f: " << f << std::endl;
-		#endif // DEBUG
 		bdd_path t_path{path.first, path.second};
 		bdd_path f_path{path.first, path.second};
 		if (t != f) {
@@ -1233,47 +1193,23 @@ private:
 			f_path.second.insert(lit);
 		}
 		auto t_snf = traverse(t_path, nremaining, t);
-		#ifdef DEBUG
-		std::cout << "t_snf: " << t_snf << std::endl;
-		#endif // DEBUG
 		auto f_snf = traverse(f_path, nremaining, f);
-		#ifdef DEBUG
-		std::cout << "f_snf: " << f_snf << std::endl;
-		#endif // DEBUG
-		auto result = build_wff_or(t_snf, f_snf);
-		#ifdef DEBUG
-		std::cout << "result: " << result << std::endl;
-		#endif // DEBUG
-		return result;
+		return build_wff_or(t_snf, f_snf);
 	}
 
 	exponent get_exponent(const nso<BAs...>& n) const {
-		#ifdef DEBUG
-		std::cout << "get_exponent: " << n << std::endl;
-		#endif // DEBUG
 		auto is_bf_literal = [](const auto& n) -> bool {
 			return (n | tau_parser::variable).has_value()
 				|| (n | tau_parser::bf_neg | tau_parser::variable).has_value();
 		};
 		auto all_vs = select_top(n, is_bf_literal);
-		auto result = exponent(all_vs.begin(), all_vs.end());
-		#ifdef DEBUG
-		std::cout << "get_exponent result: ";
-		for(auto r : result) std::cout << r << " ";
-		std::cout << std::endl;
-		#endif // DEBUG
-		return result;
+		return exponent(all_vs.begin(), all_vs.end());
 	}
 
 	std::optional<constant> get_constant(const nso<BAs...>& literal) const {
 		std::cout << "get_constant input : " << literal << std::endl;
-		auto result = find_top(literal, is_non_terminal<tau_parser::constant, BAs...>)
+		return find_top(literal, is_non_terminal<tau_parser::constant, BAs...>)
 			| only_child_extractor<BAs...> | ba_extractor<BAs...>;
-		#ifdef DEBUG
-		if (result) std::cout << "get_constant: " << literal << " -> " << result.value() << std::endl;
-		else std::cout << "get_constant: " << literal << " -> none" << std::endl;
-		#endif // DEBUG
-		return result;
 	}
 
 	std::pair<nso<BAs...>, nso<BAs...>> split_using_lit(const literal& lit, const nso<BAs...>& form) const {
@@ -1385,17 +1321,10 @@ private:
 			auto nn = build_bf_and(nn_cte, term);
 			auto nnn = build_wff_neq(nn);
 			lits.insert(nnn);
-			#ifdef DEBUG
-			std::cout << "normalize nnn: " << nnn << std::endl;
-			#endif // DEBUG
 		}
 
 		// return the conjunction of all the terms
-		auto result =  build_wff_and(lits);
-		#ifdef DEBUG
-		std::cout << "normalize result: " << result << std::endl;
-		#endif // DEBUG
-		return result;
+		return build_wff_and(lits);
 	}
 };
 
