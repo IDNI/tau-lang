@@ -131,6 +131,7 @@ RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
 
 RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != $Y ::= !($X = $Y).")
 RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
+RULE(WFF_UNSQUEEZE_NEGATIVES_0, "$X | $Y != 0 ::= $X != 0 || $Y != 0.")
 
 RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "$X != 0 && $Y  = 0 && $Z != 0 ::= $Y = 0 && $X != 0 && $Z != 0.")
 RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "$X != 0 && $Y != 0 && $Z  = 0 ::= $Z = 0 && $X != 0 && $Y != 0.")
@@ -361,8 +362,9 @@ static auto to_mnf_wff = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto unsqueeze_positives_wff = make_library<BAs...>(
+static auto unsqueeze_wff = make_library<BAs...>(
 	WFF_UNSQUEEZE_POSITIVES_0
+	+ WFF_UNSQUEEZE_NEGATIVES_0
 );
 
 template<typename... BAs>
@@ -1367,7 +1369,7 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			simplify_wff<BAs...>
 			| trivialities<BAs...>
-			| unsqueeze_positives_wff<BAs...>
+			| unsqueeze_wff<BAs...>
 			| to_dnf_wff<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>)
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
