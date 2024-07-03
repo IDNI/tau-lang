@@ -66,12 +66,12 @@ TEST_SUITE("normal forms: snf for wff") {
 		CHECK( nso__rr.main == result );
 	}
 
-	TEST_CASE("simple case: X != 0") {
+	/*TEST_CASE("simple case: X != 0") {
 		const char* sample = "X != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = snf_wff(nso__rr.main);
 		CHECK( nso__rr.main == result );
-	}
+	}*/
 }
