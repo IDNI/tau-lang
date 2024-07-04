@@ -105,7 +105,7 @@ rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
 template<typename... BAs>
 struct remove_one_wff_existential {
 	nso<BAs...> operator()(const nso<BAs...>& n) const {
-		auto nn = n | repeat_each<step<BAs...>, BAs...>(
+		auto nn = n | repeat_all<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>)
 			| bf_positives_upwards<BAs...>
@@ -135,7 +135,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			remove_one_wff_existential<BAs...>())
 		| bf_reduce_canonical<BAs...>()
 		| repeat_once<step<BAs...>, BAs...>(elim_eqs<BAs...>)
-		| repeat_each<step<BAs...>, BAs...>(
+		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...> | simplify_wff<BAs...>)
 		| reduce_wff<BAs...>;
 	#ifndef DEBUG
