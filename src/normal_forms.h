@@ -109,9 +109,6 @@ RULE(WFF_PUSH_SOMETIMES_INWARDS,"sometimes($X || $Y) ::= (sometimes $X) || (some
 RULE(WFF_PUSH_ALWAYS_INWARDS,   "always($X && $Y) ::= (always $X) && (always $Y).")
 
 // wff definitions
-RULE(WFF_DEF_GLOBAL_AND, "$X &&& $Y ::= $X && $Y.")
-RULE(WFF_DEF_GLOBAL_OR,  "$X ||| $Y ::= (always $X) || (always $Y).")
-RULE(WFF_DEF_GLOBAL_NEG, "- $X ::= sometimes (! $X).")
 RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !$Y || !$X && $Y.")
 RULE(WFF_DEF_CONDITIONAL, "$X ? $Y : $Z ::= ($X -> $Y) && (!$X -> $Z).")
 RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !$X || $Y.")
@@ -186,9 +183,6 @@ static auto apply_defs = make_library<BAs...>(
 	+ WFF_DEF_CONDITIONAL
 	+ WFF_DEF_IMPLY
 	+ WFF_DEF_EQUIV
-	+ WFF_DEF_GLOBAL_AND
-	+ WFF_DEF_GLOBAL_OR
-	+ WFF_DEF_GLOBAL_NEG
 	// bf defs
 	+ BF_DEF_XOR
 	+ WFF_DEF_BEX_0
@@ -201,9 +195,6 @@ static auto apply_wff_defs = make_library<BAs...>(
 	+ WFF_DEF_CONDITIONAL
 	+ WFF_DEF_IMPLY
 	+ WFF_DEF_EQUIV
-	+ WFF_DEF_GLOBAL_AND
-	+ WFF_DEF_GLOBAL_OR
-	+ WFF_DEF_GLOBAL_NEG
 );
 
 template<typename... BAs>
