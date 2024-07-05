@@ -101,8 +101,10 @@ RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
 RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
 RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
 RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
+RULE(WFF_SIMPLIFY_SOMETIMES_3,  "(sometimes $X) && (always $X) ::= always $X.")
 RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
 RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
+RULE(WFF_SIMPLIFY_ALWAYS_3,		"(always $X) && (sometimes $X) ::= always $X.")
 RULE(WFF_PUSH_SOMETIMES_INWARDS,"sometimes($X || $Y) ::= (sometimes $X) || (sometimes $Y).")
 RULE(WFF_PUSH_ALWAYS_INWARDS,   "always($X && $Y) ::= (always $X) && (always $Y).")
 
@@ -304,8 +306,10 @@ static auto simplify_wff = make_library<BAs...>(
 	+ WFF_SIMPLIFY_SELF_5
 	+ WFF_SIMPLIFY_SOMETIMES_1
 	+ WFF_SIMPLIFY_SOMETIMES_2
+	+ WFF_SIMPLIFY_SOMETIMES_3
 	+ WFF_SIMPLIFY_ALWAYS_1
 	+ WFF_SIMPLIFY_ALWAYS_2
+	+ WFF_SIMPLIFY_ALWAYS_3
 );
 
 template<typename... BAs>
