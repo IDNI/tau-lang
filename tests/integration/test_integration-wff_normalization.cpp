@@ -39,7 +39,7 @@ TEST_SUITE("wff_sometimes") {
 			| reduce_wff<bdd_test>;
 		stringstream ss;
 		ss << simp_res;
-		CHECK((ss.str() == "?x && sometimes o1[t] = 0" || ss.str() == "sometimes o1[t] = 0 && ?x"));
+		CHECK((ss.str() == "?x && (sometimes o1[t] = 0)" || ss.str() == "(sometimes o1[t] = 0) && ?x"));
 	}
 
 	TEST_CASE("push_in_2") {
@@ -55,7 +55,7 @@ TEST_SUITE("wff_sometimes") {
 	}
 
 	TEST_CASE("push_in_3") {
-		const char* sample = "sometimes (always (o1[t] = 0 || sometimes(o1[t] = 0)) && always (o1[t] = 0) ).";
+		const char* sample = "sometimes (always o1[t] = 0 || (sometimes o1[t] = 0)) && (always o1[t] = 0).";
 		auto src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -69,7 +69,7 @@ TEST_SUITE("wff_sometimes") {
 	}
 
 	TEST_CASE("pull_out_1") {
-		const char* sample = "sometimes (T && ?x) || sometimes T && ?x || sometimes ?x.";
+		const char* sample = "(sometimes T && ?x) || (sometimes T && ?x) || (sometimes ?x).";
 		auto src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -79,11 +79,11 @@ TEST_SUITE("wff_sometimes") {
 			| reduce_wff<bdd_test>;
 		stringstream ss;
 		ss << simp_res;
-		CHECK((ss.str() == "always ?x || sometimes ?x" || ss.str() == "sometimes ?x || always ?x"));
+		CHECK(ss.str() == "sometimes ?x");
 	}
 
 	TEST_CASE("pull_out_2") {
-		const char* sample = "always ?x && ?x && sometimes(?x && ?x).";
+		const char* sample = "(always ?x) && ?x && (sometimes ?x && ?x).";
 		auto src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
