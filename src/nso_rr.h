@@ -1052,6 +1052,11 @@ sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> trim2(const sp_tau_node<BAs...>& n) {
+	return n->child[0]->child[0];
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, const sp_tau_node<BAs...>& n) {
 	auto nts = std::get<tau_source_sym>(n->value).nts;
 	return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_source_sym(t, nts)), {n});
@@ -1078,6 +1083,8 @@ const std::string BLDR_WFF_ALL = "( $X $Y ) =:: all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) =:: ex $X $Y.";
 const std::string BLDR_WFF_BALL = "( $X $Y ) =:: ball $X $Y.";
 const std::string BLDR_WFF_BEX = "( $X $Y ) =:: bex $X $Y.";
+const std::string BLDR_WFF_SOMETIMES = "( $X ) =:: sometimes $X.";
+const std::string BLDR_WFF_ALWAYS = "( $X ) =:: always $X.";
 
 // definitions of bf builder rules
 const std::string BLDR_BF_AND = "( $X $Y ) =: $X & $Y.";
@@ -1123,6 +1130,10 @@ template<typename... BAs>
 static auto bldr_wff_ball = make_builder<BAs...>(BLDR_WFF_BALL);
 template<typename... BAs>
 static auto bldr_wff_bex = make_builder<BAs...>(BLDR_WFF_BEX);
+template<typename... BAs>
+static auto bldr_wff_sometimes = make_builder<BAs...>(BLDR_WFF_SOMETIMES);
+template<typename... BAs>
+static auto bldr_wff_always = make_builder<BAs...>(BLDR_WFF_ALWAYS);
 
 // bf builder
 template<typename... BAs>
@@ -1284,6 +1295,18 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_wff_bex(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	std::vector<sp_tau_node<BAs...>> args {l, trim(r)} ;
 	return tau_apply_builder<BAs...>(bldr_wff_bex<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_sometimes(const sp_tau_node<BAs...>& l) {
+	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
+	return tau_apply_builder<BAs...>(bldr_wff_sometimes<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_always(const sp_tau_node<BAs...>& l) {
+	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
+	return tau_apply_builder<BAs...>(bldr_wff_always<BAs...>, args);
 }
 
 // bf factory method for building bf formulas
