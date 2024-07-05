@@ -1220,7 +1220,7 @@ nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
 
 // Assumes a single DNF clause and normalizes the "always" parts into one
 template<typename... BAs>
-void pull_always_out(const nso<BAs...>& fm, auto& changes) {
+nso<BAs...> pull_always_out(const nso<BAs...>& fm) {
 	std::map<nso<BAs...>, nso<BAs...>> l_changes = {};
 	std::vector<nso<BAs...>> collected_always_fms;
 	for (const auto& _and : select_all_until(fm,
@@ -1241,14 +1241,15 @@ void pull_always_out(const nso<BAs...>& fm, auto& changes) {
 			}
 		}
 	}
+	if (collected_always_fms.empty()) return fm;
 	nso<BAs...> always_part;
 	bool first = true;
 	for (const auto& fa : collected_always_fms) {
 		if (first) {first = false; always_part = fa;}
 		else always_part = build_wff_and(always_part, fa);
 	}
-	auto always_removed = l_changes.empty() ? fm : replace(fm, l_changes);
-	changes[fm] = build_wff_and(build_wff_always(always_part), always_removed);
+	assert(!l_changes.empty());
+	return build_wff_and(build_wff_always(always_part), replace(fm, l_changes));
 }
 
 // We assume that there is no nesting of "sometimes" and "always" in fm
@@ -1268,12 +1269,14 @@ nso<BAs...> pull_sometimes_always_out(nso<BAs...> fm) {
 				changes[_or->child[i]] = _F<BAs...>;
 				collected_fms.push_back(trim2(_or->child[i]));
 			} else {
-				pull_always_out(_or->child[i], changes);
+				auto r = pull_always_out(_or->child[i]);
+				if (_or->child[i] != r) changes[_or->child[i]] = r;
 			}
 		}
 	}
 	if (no_disjunction) {
-		pull_always_out(fm, changes);
+		auto r = pull_always_out(fm);
+		if (fm != r) changes[fm] = r;
 	}
 	if (!changes.empty()) fm = replace(fm, changes);
 	// Merge collected formulas under "sometimes"
@@ -1288,6 +1291,22 @@ nso<BAs...> pull_sometimes_always_out(nso<BAs...> fm) {
 		fm = build_wff_or(fm, r);
 	}
 	return fm;
+}
+
+// The needed class in order to make sometimes/always normalization work with normalizer
+template<typename... BAs>
+struct sometimes_always_normalization {
+	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+		auto res = push_sometimes_always_in(fm)
+					| repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>)
+					| reduce_wff<BAs...>;
+		return pull_sometimes_always_out(res)
+				| repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>);
+	}
+};
+template<typename... BAs>
+nso<BAs...> operator|(const nso<BAs...>& fm, const sometimes_always_normalization<BAs...>& r) {
+	return r(fm);
 }
 
 // we assume no functional quantifiers are present and all defs have being applyed

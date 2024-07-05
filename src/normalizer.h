@@ -135,9 +135,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 			remove_one_wff_existential<BAs...>())
 		| bf_reduce_canonical<BAs...>()
 		| repeat_once<step<BAs...>, BAs...>(elim_eqs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...> | simplify_wff<BAs...>)
-		| reduce_wff<BAs...>;
+		| sometimes_always_normalization<BAs...>();
 	#ifndef DEBUG
 	cache[form] = result;
 	#endif // DEBUG
