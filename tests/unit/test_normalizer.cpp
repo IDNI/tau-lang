@@ -25,7 +25,7 @@ namespace testing = doctest;
 TEST_SUITE("steps parsing") {
 
 	TEST_CASE("apply_defs") {
-		CHECK( apply_defs<Bool>.size() == 7 );
+		CHECK( apply_defs<Bool>.size() == 10 );
 	}
 
 	TEST_CASE("apply_defs_once") {
@@ -37,7 +37,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("to_dnf_wff") {
-		CHECK( to_dnf_wff<Bool>.size() == 7 );
+		CHECK( to_dnf_wff<Bool>.size() == 11 );
 	}
 
 	TEST_CASE("simplify_bf") {
@@ -45,7 +45,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("simplify_wff") {
-		CHECK( simplify_wff<Bool>.size() == 16 );
+		CHECK( simplify_wff<Bool>.size() == 26 );
 	}
 
 	TEST_CASE("apply_cb") {
