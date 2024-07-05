@@ -30,6 +30,7 @@
 #include <functional>
 #include <ranges>
 #include <variant>
+#include <numeric>
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
@@ -497,6 +498,37 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
 	return e(o);
 }
+
+// returns the first child of a node
+template <typename... BAs>
+static const auto first_child_extractor = [](const sp_tau_node<BAs...>& n) -> std::optional<sp_tau_node<BAs...>> {
+	if (n->child.size() == 0) return std::optional<sp_tau_node<BAs...>>();
+	return std::optional<sp_tau_node<BAs...>>(n->child[0]);
+};
+
+template<typename... BAs>
+using first_child_extractor_t = decltype(first_child_extractor<BAs...>);
+
+template <typename... BAs>
+std::vector<sp_tau_node<BAs...>> operator||(const std::vector<sp_tau_node<BAs...>>& v, const first_child_extractor_t<BAs...> e) {
+	std::vector<sp_tau_node<BAs...>> nv;
+	for (const auto& n: v | std::ranges::views::transform(e)) if (n.has_value()) nv.push_back(n.value());
+	return nv;
+}
+
+template <typename... BAs>
+std::optional<sp_tau_node<BAs...>> operator|(const std::optional<sp_tau_node<BAs...>>& o, const first_child_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return o.has_value() ? e(o.value()) : std::optional<sp_tau_node<BAs...>>();
+}
+
+// IDEA maybe unify all the implementations dealing with operator| and operator|| for extractors
+template <typename... BAs>
+std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const first_child_extractor_t<BAs...> e) {
+	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
+	return e(o);
+}
+
 
 template <typename T>
 static const auto optional_value_extractor = [](const std::optional<T>& o) -> T{
@@ -1198,6 +1230,35 @@ sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> build_bf_and_constant(const std::set<std::variant<BAs...>>& ctes) {
+	auto _and = [](const std::variant<BAs...>& l, const std::variant<BAs...>& r) -> std::variant<BAs...> {
+			return l & r;
+	};
+
+	if (ctes.empty()) return _1<BAs...>;
+
+	auto cte = std::accumulate(++ctes.begin(), ctes.end(), *ctes.begin(), [&](const auto& l, const auto& r) {
+		return std::visit(_and, l, r);
+	});
+	return build_bf_constant<BAs...>(cte);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_or_constant(const std::set<std::variant<BAs...>>& ctes) {
+	auto _or = [](const std::variant<BAs...>& l, const std::variant<BAs...>& r) -> std::variant<BAs...> {
+			return l | r;
+	};
+
+	if (ctes.empty()) return _0<BAs...>;
+
+	auto cte = std::accumulate(++ctes.begin(), ctes.end(), *ctes.begin(), [&](const auto& l, const auto& r) {
+		return std::visit(_or, l, r);
+	});
+
+	return build_bf_constant<BAs...>(cte);
+}
+
+template<typename... BAs>
 std::optional<sp_tau_node<BAs...>> build_bf_constant(const std::optional<std::variant<BAs...>>& o) {
 	return o.has_value() ? build_bf_constant(o.value()) : std::optional<sp_tau_node<BAs...>>();
 }
@@ -1235,11 +1296,24 @@ sp_tau_node<BAs...> build_wff_and(const sp_tau_node<BAs...>& l, const sp_tau_nod
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> build_wff_and(const std::set<sp_tau_node<BAs...>>& wffs) {
+	return std::accumulate(wffs.begin(), wffs.end(), _T<BAs...>, [](const auto& l, const auto& r) {
+		return build_wff_and(l, r);
+	});
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> build_wff_or(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
 	return tau_apply_builder<BAs...>(bldr_wff_or<BAs...>, args);
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_or(const std::set<sp_tau_node<BAs...>>& wffs) {
+	return std::accumulate(wffs.begin(), wffs.end(), _F<BAs...>, [](const auto& l, const auto& r) {
+		return build_wff_or(l, r);
+	});
+}
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_xor_from_def(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	return build_wff_or<BAs...>(build_wff_and(build_wff_neg(l), r),
@@ -1317,9 +1391,23 @@ sp_tau_node<BAs...> build_bf_and(const sp_tau_node<BAs...>& l, const sp_tau_node
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> build_bf_and(const std::set<sp_tau_node<BAs...>>& bfs) {
+	return std::accumulate(bfs.begin(), bfs.end(), _1<BAs...>, [](const auto& l, const auto& r) {
+		return build_bf_and(l, r);
+	});
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> build_bf_or(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
 	return tau_apply_builder<BAs...>(bldr_bf_or<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_or(const std::set<sp_tau_node<BAs...>>& bfs) {
+	return std::accumulate(bfs.begin(), bfs.end(), _0<BAs...>, [](const auto& l, const auto& r) {
+		return build_bf_or(l, r);
+	});
 }
 
 template<typename... BAs>
@@ -1974,6 +2062,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_greater,                      550 },
 			{ tau_parser::bf_less_equal,                   560 },
 			{ tau_parser::bf_less,                         570 },
+			{ tau_parser::wff,                             580 },
 			// bf
 			{ tau_parser::bf_is_zero_cb,                   600 },
 			{ tau_parser::bf_is_one_cb,                    610 },

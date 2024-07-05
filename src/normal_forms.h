@@ -145,6 +145,30 @@ RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
 
 RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != $Y ::= !($X = $Y).")
 RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
+RULE(WFF_UNSQUEEZE_NEGATIVES_0, "$X | $Y != 0 ::= $X != 0 || $Y != 0.")
+
+RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "$X != 0 && $Y  = 0 && $Z != 0 ::= $Y = 0 && $X != 0 && $Z != 0.")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "$X != 0 && $Y != 0 && $Z  = 0 ::= $Z = 0 && $X != 0 && $Y != 0.")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "$Z != 0 && $X  = 0 && $Y != 0 ::= $X = 0 && $Z != 0 && $Y != 0.")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "$Z != 0 && $X != 0 && $Y  = 0 ::= $Z != 0 && $Y = 0 && $X != 0.")
+RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "$X != 0 && $Y  = 0 ::= $Y = 0 && $X != 0.")
+RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
+
+// TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
+
+template<typename... BAs>
+static auto bf_positives_upwards = make_library<BAs...>(
+	BF_POSITIVE_LITERAL_UPWARDS_0
+	+ BF_POSITIVE_LITERAL_UPWARDS_1
+	+ BF_POSITIVE_LITERAL_UPWARDS_2
+	+ BF_POSITIVE_LITERAL_UPWARDS_3
+	+ BF_POSITIVE_LITERAL_UPWARDS_4
+);
+
+template<typename... BAs>
+static auto wff_squeeze_positives = make_library<BAs...>(
+	WFF_SQUEEZE_POSITIVES_0
+);
 
 // tau rules to dnf
 RULE(TAU_TO_DNF_0, "($X ||| $Y) &&& $Z :::= $X &&& $Z ||| $Y &&& $Z.")
@@ -361,9 +385,21 @@ static auto trivialities = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto simplify_snf = repeat_all<step<BAs...>, BAs...>(
+	apply_cb<BAs...>
+	| elim_eqs<BAs...>
+	| simplify_wff<BAs...>
+	| trivialities<BAs...>);
+
+template<typename... BAs>
 static auto to_mnf_wff = make_library<BAs...>(
 	WFF_PUSH_NEGATION_UPWARDS_0
-	+ WFF_UNSQUEEZE_POSITIVES_0
+);
+
+template<typename... BAs>
+static auto unsqueeze_wff = make_library<BAs...>(
+	WFF_UNSQUEEZE_POSITIVES_0
+	+ WFF_UNSQUEEZE_NEGATIVES_0
 );
 
 template<typename... BAs>
@@ -481,7 +517,7 @@ private:
 					BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
 				}
 			} else {
-				if (auto check = l | tau_parser::bf_neq; !check.has_value()) {
+				if (auto check = l | tau_parser::wff_neg; !check.has_value()) {
 					positives.insert(l);
 					BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
 				} else {
@@ -540,7 +576,10 @@ private:
 		auto [positives, negatives] = get_positive_negative_literals(clause);
 		if constexpr (type == tau_parser::bf) {
 			for (auto& negation: negatives) {
-				auto negated = negation | tau_parser::bf_neg | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+				auto negated = negation
+					| tau_parser::bf_neg
+					| tau_parser::bf
+					| optional_value_extractor<sp_tau_node<BAs...>>;
 				for (auto& positive: positives) {
 					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing? ";
 					if (positive == _0<BAs...>) {
@@ -556,9 +595,15 @@ private:
 			}
 		} else {
 			for (auto& negation: negatives) {
-				auto neq_bf = negation | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+				auto neq_bf = negation
+					| tau_parser::wff_neg
+					| tau_parser::wff
+					| optional_value_extractor<sp_tau_node<BAs...>>;
 				for (auto& positive: positives) {
-					auto eq_bf = positive | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+					auto eq_bf = positive
+						| first_child_extractor<BAs...>
+						| tau_parser::bf
+						| optional_value_extractor<sp_tau_node<BAs...>>;
 					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing: ";
 					if (eq_bf == _F<BAs...>) {
 						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
@@ -781,21 +826,6 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 			apply_bf_defs<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>
-			| elim_eqs<BAs...>)
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf<BAs...>;
-}
-
-template<typename...BAs>
-nso<BAs...> snf_bf(const nso<BAs...>& n) {
-	// TODO (HIGH) give a proper implementation (call to_bdd...)
-	return apply_once_definitions(n)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			to_dnf_bf<BAs...>
 			| simplify_bf<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
@@ -1300,102 +1330,8 @@ nso<BAs...> operator|(const nso<BAs...>& fm, const sometimes_always_normalizatio
 	return r(fm);
 }
 
-// we assume no functional quantifiers are present and all defs have being applyed
-template<typename...BAs>
-struct to_bdds {
-
-	using vars = std::set<nso<BAs...>>;
-
-	nso<BAs...> operator()(const nso<BAs...>& n) {
-		std::map<nso<BAs...>, nso<BAs...>> changes;
-		for (auto& bf: select_top(n, is_non_terminal<tau_parser::bf, BAs...>)) {
-			auto vars = select_all(bf, is_non_terminal<tau_parser::variable, BAs...>);
-			auto vars_set = std::set<nso<BAs...>>(vars.begin(), vars.end());
-			auto bdd = bf_to_bdd(vars_set, bf);
-			changes[bf] = bdd;
-		}
-		return replace(n, changes);
-	}
-
-private:
-
-	std::pair<nso<BAs...>, nso<BAs...>> split_using_var(const vars& var, const nso<BAs...>& form) {
-		auto a = replace(form, { {var, trim(_0<BAs...>)} });
-		auto b = replace(form, { {var, trim(_1<BAs...>)}});
-		return std::make_pair(a, b);
-	}
-
-	std::pair<nso<BAs...>, vars> split_vars(const vars& vs) {
-		vars rest(vs.begin(), vs.end() - 1);
-		return { vs.back(), rest };
-	}
-
-	nso<BAs...> bf_to_bdd(const vars& vs, const nso<BAs...>& form) {
-		if (vs.empty()) return form | repeat_all(apply_cb<BAs...> | elim_eqs<BAs...>);
-		auto [var, rest] = split_vars(vs);
-		auto [a, b] = split_using_var(var, form);
-		auto a_bdd = bf_to_bdd(rest, a);
-		auto b_bdd = bf_to_bdd(rest, b);
-		return (a_bdd == b_bdd) ? a_bdd	: build_bf_xor_from_def(
-			build_bf_and(wrap(tau_parser::bf, var), a_bdd),
-			build_bf_and(build_bf_neg(wrap(tau_parser::bf, var), b_bdd)));
-	}
-};
-
-template<typename...BAs>
-struct to_wff_bdd {
-
-	using literal = nso<BAs...>;
-	using literals = std::set<literal>;
-
-	static auto is_literal = is_non_terminal<tau_parser::bf_eq, BAs...>;
-
-	nso<BAs...> operator()(const nso<BAs...>& n) {
-		std::map<nso<BAs...>, nso<BAs...>> changes;
-		auto lits = select_all(n, is_literal);
-		auto lits_set = std::set<nso<BAs...>>(lits.begin(), lits.end());
-		auto bdd = wff_to_bdd(lits_set, n);
-	}
-
-private:
-
-	std::pair<nso<BAs...>, nso<BAs...>> split_using_lit(const literals& lit, const nso<BAs...>& form) {
-		auto a = replace(form, { {lit, trim(_F<BAs...>)} });
-		auto b = replace(form, { {lit, trim(_T<BAs...>)}});
-		return std::make_pair(a, b);
-	}
-
-	std::pair<nso<BAs...>, literals> split_lits(const literals& lits) {
-		literals rest(lits.begin(), lits.end() - 1);
-		return { lits.back(), rest };
-	}
-
-	nso<BAs...> wff_to_bdd(const literals& lits, const nso<BAs...>& form) {
-		if (lits.empty()) return form | repeat_all(apply_cb<BAs...> | elim_eqs<BAs...>) /* TODO (HIGH) check how to simplify this */;
-		auto [lit, rest] = split_lits(lits);
-		auto [a, b] = split_using_lit(lit, form);
-		auto a_bdd = wff_to_bdd(rest, a);
-		auto b_bdd = wff_to_bdd(rest, b);
-		return (a_bdd == b_bdd) ? a_bdd	: build_wff_xor_from_def(
-			build_wff_and(wrap(tau_parser::wff, lit), a_bdd),
-			build_wff_and(build_wff_neg(wrap(tau_parser::wff, lit), b_bdd)));
-	}
-};
-
-template<typename... BAs>
-static const to_bdds<BAs...> to_bdds_bf;
-
-template<typename... BAs>
-using to_bdds_bf_t = to_bdds<BAs...>;
-
-template<typename...BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const to_bdds_bf_t<BAs...>& r) {
-	return r(n);
-}
-
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
-// We implicitly transformed into BDD form and transform it into SNF without
-// explicitly writing its BDD form.
+// We implicitly transformed into BDD form and compute one step of the SNF transformation.
 template<typename...BAs>
 struct to_snf_step {
 
@@ -1404,26 +1340,21 @@ struct to_snf_step {
 	using exponent = std::set<var>;
 	using constant = std::variant<BAs...>;
 	using literal = nso<BAs...>;
-	using literals = std::list<literal>;
-	using bdd_path = std::pair<literals, literals>;
-	using partition_by_exponent = std::map<exponent, std::set<literal>>;
-
+	using literals = std::set<literal>;
+	using bdd_path = std::pair<literals /* positive */, literals /* negatives */>;
+	using partition_by_exponent = std::map<exponent, literals>;
 
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
-		// select all literals, i.e. wff equalities or it negations.
+		// we select all literals, i.e. wff equalities or it negations.
 		static const auto is_literal = [](const auto& n) -> bool {
-			return (n | tau_parser::wff | tau_parser::bf_eq).has_value();
+			return (n | tau_parser::bf_eq).has_value();
 		};
-		auto literals = select_all(form, is_literal);
-		// we call recursively to select a path in the BDD distinguishing
-		// between the two possible values of the literal.
-		std::list<nso<BAs...>> remaining(literals.begin(), literals.end());
-		return traverse({}, remaining, form);
-		// for each choosen path we squeeze the positive literals
-		// we apply corollary 3.1
-		// remove all atomic formulas with zero coefficinets
-		// and discard the path if the resulting formula is unsatisfiable
-		// finally, we return the resulting formula
+		if (auto literals = select_all(form, is_literal); !literals.empty()) {
+			// we call the recursive method traverse to traverse all the paths
+			// of the BDD.
+			std::set<nso<BAs...>> remaining(literals.begin(), literals.end());
+			return traverse({}, remaining, form);
+		}
 		return form;
 	}
 
@@ -1448,31 +1379,34 @@ private:
 	nso<BAs...> bdd_path_to_snf(const bdd_path& path, const nso<BAs...>& form) const {
 		// we simplify the constant part of the formula
 		// TODO (HIGH) fix simplification
-		auto simplified = form | repeat_all(apply_cb<BAs...> | elim_eqs<BAs...>);
-		// we squeeze the positive literals
-		auto squeezed = squeeze_positives(path.first);
-		// we apply corollary 3.1
-		return normalize({squeezed, path.second});
+		auto simplified = form | simplify_snf<BAs...>;
+		return build_wff_and(normalize(path), form) | simplify_snf<BAs...>;
 	}
 
 	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
+		static std::map<std::tuple<bdd_path, literals, nso<BAs...>>, nso<BAs...>> cache;
+		if (auto it = cache.find({path, remaining, form}); it != cache.end()) return it->second;
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
-		auto lit = remaining.front();
+		auto lit = *remaining.begin();
 		literals nremaining(++remaining.begin(), remaining.end());
-		bdd_path t_path{path.first, path.second};
-		t_path.first.push_back(lit);
-		bdd_path f_path{path.first, path.second};
-		f_path.second.push_back(build_wff_neg(lit));
 		auto [t, f] = split_using_lit(lit, form);
+		bdd_path t_path{path.first, path.second};
+		bdd_path f_path{path.first, path.second};
+		if (t != f) {
+			t_path.first.insert(lit);
+			f_path.second.insert(lit);
+		}
 		auto t_snf = traverse(t_path, nremaining, t);
 		auto f_snf = traverse(f_path, nremaining, f);
-		return build_wff_or(t_snf, f_snf);
+		auto result = build_wff_or(t_snf, f_snf);
+		cache[{path, remaining, form}] = result;
+		return result;
 	}
 
 	exponent get_exponent(const nso<BAs...>& n) const {
 		auto is_bf_literal = [](const auto& n) -> bool {
-			return (n | tau_parser::wff | tau_parser::bf_eq).has_value()
-				|| (n | tau_parser::wff | tau_parser::bf_neg).has_value();
+			return (n | tau_parser::variable).has_value()
+				|| (n | tau_parser::bf_neg | tau_parser::variable).has_value();
 		};
 		auto all_vs = select_top(n, is_bf_literal);
 		return exponent(all_vs.begin(), all_vs.end());
@@ -1486,8 +1420,8 @@ private:
 	std::pair<nso<BAs...>, nso<BAs...>> split_using_lit(const literal& lit, const nso<BAs...>& form) const {
 		std::map<nso<BAs...>, nso<BAs...>> changes_T = {{lit, _T<BAs...>}};
 		std::map<nso<BAs...>, nso<BAs...>> changes_F = {{lit, _F<BAs...>}};
-		auto a = replace<nso<BAs...>>(form, changes_T);
-		auto b = replace<nso<BAs...>>(form, changes_F);
+		auto a = replace<nso<BAs...>>(form, changes_T) | simplify_snf<BAs...>;
+		auto b = replace<nso<BAs...>>(form, changes_F) | simplify_snf<BAs...>;
 		return std::make_pair(a, b);
 	}
 
@@ -1511,7 +1445,8 @@ private:
 		// if there is no such element we return the first element
 		if (first == positives.end()) return std::optional<nso<BAs...>>(*positives.begin());
 		// otherwise...
-		auto cte = std::accumulate(++positives.begin(), positives.end(), *first, [&](const auto& l, const auto& r) {
+		auto first_cte = build_bf_constant(get_constant(*first).value());
+		auto cte = std::accumulate(++positives.begin(), positives.end(), first_cte, [&](const auto& l, const auto& r) {
 			auto l_cte = get_constant(l), r_cte = get_constant(r);
 			if (l_cte && r_cte)
 				return build_bf_constant(std::visit(_or, l_cte.value(), r_cte.value()));
@@ -1522,7 +1457,7 @@ private:
 		auto bf = std::accumulate(exp.begin(), exp.end(), cte, [](const auto& l, const auto& r) {
 			return build_bf_and(l, r);
 		});
-		return build_wff_neq(bf);
+		return build_wff_eq(bf);
 	}
 
 	// squeezed positives into one literal if possible.
@@ -1530,57 +1465,84 @@ private:
 		literals squeezed;
 		for (auto& [exponent, literals]: get_partition_by_exponent(lits))
 			if (auto squeezed_literal = squeeze_same_exponent_positives(literals, exponent); squeezed_literal)
-				squeezed.insert(squeezed.end(), squeezed_literal.value());
+				squeezed.insert(squeezed_literal.value());
 		return squeezed;
+	}
+
+	bool have_only_1_ctes(const literals& lits) const {
+		return std::find_if(lits.begin(), lits.end(), [&](const auto& l) {
+			return !get_constant(l).has_value();
+		}) != lits.end();
 	}
 
 	// normalize each bdd path applying Corollary 3.1 from TABA book
 	nso<BAs...> normalize(const bdd_path& path) const {
-		if (path.first.empty())
-			return std::accumulate(path.second.begin(), path.second.end(), _T<BAs...>, [](const auto& l, const auto& r) {
-				return build_wff_and(l, r);
-			});
+		if (path.first.empty()) return build_wff_neg(build_wff_or(path.second));
+
 		// the literals of the final term include the positive literals...
-		literals lits(path.first.begin(), path.first.end());
+		// maybe squeeze positives with same exponent
+		auto squeezed = squeeze_positives(path.first);
+
+		literals lits(squeezed.begin(), squeezed.end());
 		// ... and for each negatice literal include the result of
 		// ...
-		auto partition = get_partition_by_exponent(path.first);
+		auto partition = get_partition_by_exponent(squeezed);
 		for (auto& n: path.second) {
 			auto n_exp = get_exponent(n);
 			// if no positive literal has the same exponent as n, we add n to the literals
-			if (!partition.contains(n_exp)) {
-				lits.push_back(n);
+			if (partition[n_exp].size() == 0) {
+				lits.insert(build_wff_neg(n)); continue;
 			}
+
+			if (have_only_1_ctes(partition[n_exp])) return _F<BAs...>;
+
+			// extract to a method
 			// otherwise we compute the conjunction of all the positive literals negated
-			auto cte = std::accumulate(++partition[n_exp].begin(), partition[n_exp].end(), *partition[n_exp].begin(), [&](const auto& l, const auto& r) {
+			auto first_cte = build_bf_constant(get_constant(*partition[n_exp].begin()).value());
+			auto cte = std::accumulate(++partition[n_exp].begin(), partition[n_exp].end(), first_cte, [&](const auto& l, const auto& r) {
 				auto l_cte = get_constant(l).value();
 				auto r_cte = get_constant(r).value();
 				std::variant<BAs...> n_cte(std::visit(_or, l_cte, r_cte));
 				return build_bf_constant(n_cte);
 			});
 			auto cte_neg = build_bf_neg(cte);
+
 			// now we conjunct the previous result with the constant of n
-			auto n_cte = build_bf_constant(get_constant(n)).value();
-			auto nn_cte = build_bf_and(cte_neg, n_cte);
-			auto term = std::accumulate(++n_exp.begin(), n_exp.end(), *n_exp.begin(), [](const auto& l, const auto& r) {
-					return build_wff_and(l, r);
+			auto n_cte = build_bf_constant(get_constant(n));
+			auto nn_cte = n_cte ? build_bf_and(cte_neg, n_cte.value()) : cte_neg;
+			auto term = n_exp.empty() ? _T<BAs...> : std::accumulate(++n_exp.begin(), n_exp.end(), *n_exp.begin(), [](const auto& l, const auto& r) {
+					return build_bf_and(l, r);
 			});
-			auto nn = build_wff_and(nn_cte, term);
+			auto nn = build_bf_and(nn_cte, term);
 			auto nnn = build_wff_neq(nn);
-			lits.insert(lits.end(), nnn);
+			lits.insert(nnn);
 		}
 
 		// return the conjunction of all the terms
-		return std::accumulate(lits.begin(), lits.end(), _T<BAs...>, [](const auto& l, const auto& r) {
-			return build_wff_and(l, r);
-		});
+		return build_wff_and(lits);
 	}
 };
 
-/*template<typename...BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const to_snf<BAs...>& r) {
+template<typename...BAs>
+nso<BAs...> operator|(const nso<BAs...>& n, const to_snf_step<BAs...>& r) {
 	return r(n);
-}*/
+}
+
+template<typename...BAs>
+nso<BAs...> snf_bf(const nso<BAs...>& n) {
+	// TODO (HIGH) give a proper implementation (call to_bdd...)
+	return apply_once_definitions(n)
+		| repeat_each<step<BAs...>, BAs...>(
+			apply_bf_defs<BAs...>)
+		| bf_reduce_canonical<BAs...>()
+		| repeat_all<step<BAs...>, BAs...>(
+			to_dnf_bf<BAs...>
+			| simplify_bf<BAs...>
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>)
+		// TODO (MEDIUM) review after we fully normalize bf & wff
+		| reduce_bf<BAs...>;
+}
 
 // We mostly follow the Remark 3.5 from the TABA book. However, we deviate at
 // some points. In particular, we assume that the formula is in MNF,
@@ -1589,26 +1551,44 @@ nso<BAs...> operator|(const nso<BAs...>& n, const to_snf<BAs...>& r) {
 // BDD form and traverse it afterwards.
 template<typename...BAs>
 nso<BAs...> snf_wff(const nso<BAs...>& n) {
-	return n | repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
-}
-
-/*template<typename...BAs>
-nso<BAs...> snf_wff(const nso<BAs...>& n) {
-	// TODO (HIGH) give a proper implementation (call to_snf...)
-	auto quantified = [](const auto& n) -> bool {
-		return (n | tau_parser::wff_ex) || (n | tau_parser::wff_all);
-	};
-	auto quantifier = find_bottom(n, quantified);
-	auto nn = quantifier ? quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> : n;
-	return apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_dnf_wff<BAs...>
+	auto [_, nn] = get_inner_quantified_wff(n);
+	auto wo_defs = apply_once_definitions(nn)
+		| repeat_each<step<BAs...>, BAs...>(apply_wff_defs<BAs...>);
+	// in the first step we apply compute the SNF of the formula, as a result we get
+	// the formula in SNF with positive equal exponent literals sqeezed.
+	auto first_step = wo_defs
+		| repeat_all<step<BAs...>, BAs...>(
+			unsqueeze_wff<BAs...>
+			| apply_cb<BAs...>
+			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>)
-		| reduce_wff<BAs...>
-		| to_snf_wff<BAs...>;
-}*/
+			| trivialities<BAs...>
+			| to_dnf_wff<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>)
+		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
+	// in the second step we compute the SNF of the negation of the the result
+	// of the first step in order to squeeze the negative equal exponent literals.
+	// Note that in this case we don't need to unsqueeze the formula.
+	auto second_step = build_wff_neg(first_step)
+		| repeat_all<step<BAs...>, BAs...>(
+			apply_cb<BAs...>
+			| elim_eqs<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>
+			| to_dnf_wff<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>)
+		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
+	// finally we return the negation to get the SNF of the original formula with both
+	// positive and negative equal exponent literals squeezed.
+	return build_wff_neg(second_step)
+		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			apply_cb<BAs...>
+			| elim_eqs<BAs...>
+			| simplify_wff<BAs...>
+			| trivialities<BAs...>
+			| to_dnf_wff<BAs...>);
+}
 
 template<typename...BAs>
 nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...>& a, const nso<BAs...>& b) {
@@ -1642,6 +1622,8 @@ nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 			apply_wff_defs<BAs...>
 			| to_dnf_wff<BAs...>
 			| to_mnf_wff<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(
+			to_mnf_wff<BAs...>)
 		| reduce_wff<BAs...>;
 }
 
