@@ -38,30 +38,8 @@ using namespace idni::rewriter;
 
 namespace idni::tau {
 
-RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "$X != 0 && $Y  = 0 && $Z != 0 ::= $Y = 0 && $X != 0 && $Z != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "$X != 0 && $Y != 0 && $Z  = 0 ::= $Z = 0 && $X != 0 && $Y != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "$Z != 0 && $X  = 0 && $Y != 0 ::= $X = 0 && $Z != 0 && $Y != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "$Z != 0 && $X != 0 && $Y  = 0 ::= $Z != 0 && $Y = 0 && $X != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "$X != 0 && $Y  = 0 ::= $Y = 0 && $X != 0.")
 RULE(WFF_REMOVE_EX_0, "ex $X $Y ::= wff_remove_existential_cb $X $Y.")
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
-RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
-
-// TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
-
-template<typename... BAs>
-static auto bf_positives_upwards = make_library<BAs...>(
-	BF_POSITIVE_LITERAL_UPWARDS_0
-	+ BF_POSITIVE_LITERAL_UPWARDS_1
-	+ BF_POSITIVE_LITERAL_UPWARDS_2
-	+ BF_POSITIVE_LITERAL_UPWARDS_3
-	+ BF_POSITIVE_LITERAL_UPWARDS_4
-);
-
-template<typename... BAs>
-static auto squeeze_positives = make_library<BAs...>(
-	WFF_SQUEEZE_POSITIVES_0
-);
 
 template<typename... BAs>
 static auto elim_for_all = make_library<BAs...>(
@@ -109,7 +87,7 @@ struct remove_one_wff_existential {
 			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>)
 			| bf_positives_upwards<BAs...>
-			| squeeze_positives<BAs...>;
+			| wff_squeeze_positives<BAs...>;
 		return nn | wff_remove_existential<BAs...>;
 	}
 };

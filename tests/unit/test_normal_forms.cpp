@@ -20,7 +20,11 @@
 #include "normalizer.h"
 
 // TODO (LOW) consider move this test to integration tests
-#include "../integration/test_integration_helpers-tau.h"
+#include "test_helpers.h"
+
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -33,18 +37,104 @@ using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("normal forms: snf for wff") {
+TEST_SUITE("normal forms: mnf for wffs") {
 
-	TEST_CASE("case1") {
-		/*const char* sample = "{ T };";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<bdd_test_factory, bdd_test>(sample_src, bf);
-		std::vector<gssotc<bdd_test>> literals;
-		get_gssotc_literals<bdd_test>(sample_formula.main, literals);
-		CHECK( literals.size() == 1 );*/
-		CHECK( true );
+	TEST_CASE("simple case: T") {
+		const char* sample = "T.";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		auto result = mnf_wff(statement);
+		auto check = result
+			| tau_parser::nso_rr
+			| tau_parser::nso_main
+			| tau_parser::wff
+			| tau_parser::wff_t;
+		CHECK( check.has_value() );
 	}
+
+	TEST_CASE("simple case: F") {
+		const char* sample = "F.";
+		auto src = make_tau_source(sample);
+		auto statement = make_statement(src);
+		auto result = mnf_wff(statement);
+		auto check = result
+			| tau_parser::nso_rr
+			| tau_parser::nso_main
+			| tau_parser::wff
+			| tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("simple case: X = 0") {
+		const char* sample = "X = 0.";
+		auto src = make_tau_source(sample);
+		auto statement = (make_statement(src)
+			| tau_parser::nso_rr
+			| tau_parser::nso_main
+			| tau_parser::wff).value();
+		auto result = mnf_wff(statement);
+		CHECK( statement == result );
+	}
+
+	TEST_CASE("simple case: X != 0") {
+		const char* sample = "X != 0.";
+		auto src = make_tau_source(sample);
+		auto statement = (make_statement(src)
+			| tau_parser::nso_rr
+			| tau_parser::nso_main
+			| tau_parser::wff).value();
+		auto result = mnf_wff(statement);
+		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
+		auto check_neg = select_all(result, is_non_terminal<tau_parser::wff_neg, Bool>);
+		CHECK( check_eq.size() == 1 );
+		CHECK( check_neg.size() == 1 );
+	}
+
+	TEST_CASE("simple case: X = 0 && Y = 0") {
+		const char* sample = "X = 0 && Y = 0.";
+		auto src = make_tau_source(sample);
+		auto statement = (make_statement(src)
+			| tau_parser::nso_rr
+			| tau_parser::nso_main
+			| tau_parser::wff).value();
+		auto result = mnf_wff(statement);
+		auto check_and = select_all(result, is_non_terminal<tau_parser::wff_and, Bool>);
+		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
+		CHECK( check_and.size() == 1 );
+		CHECK( check_eq.size() == 2 );
+	}
+
+	TEST_CASE("simple case: X != 0 && Y != 0") {
+		const char* sample = "X != 0 && Y != 0.";
+		auto src = make_tau_source(sample);
+		auto statement = (make_statement(src)
+			| tau_parser::nso_rr
+			| tau_parser::nso_main
+			| tau_parser::wff).value();
+		auto result = mnf_wff(statement);
+		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
+		auto check_neg = select_all(result, is_non_terminal<tau_parser::wff_neg, Bool>);
+		auto check_and = select_all(result, is_non_terminal<tau_parser::wff_and, Bool>);
+		CHECK( check_eq.size() == 2 );
+		CHECK( check_neg.size() == 2 );
+		CHECK( check_and.size() == 1 );
+	}
+
+	TEST_CASE("simple case: X = 0 || Y = 0") {
+		const char* sample = "X = 0 || Y = 0.";
+		auto src = make_tau_source(sample);
+		auto statement = (make_statement(src)
+			| tau_parser::nso_rr
+			| tau_parser::nso_main
+			| tau_parser::wff).value();
+		auto result = mnf_wff(statement);
+		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
+		auto check_or = select_all(result, is_non_terminal<tau_parser::wff_or, Bool>);
+		CHECK( check_eq.size() == 2 );
+		CHECK( check_or.size() == 1 );
+	}
+
+
 }
 
 TEST_SUITE("normal forms: onf") {

@@ -53,7 +53,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("squeeze_positives") {
-		CHECK( squeeze_positives<Bool>.size() == 1 );
+		CHECK( wff_squeeze_positives<Bool>.size() == 1 );
 	}
 
 	TEST_CASE("wff_remove_existential") {
