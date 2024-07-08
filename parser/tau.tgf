@@ -53,14 +53,16 @@ tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
 # TODO (HIGH) simply consider wff without { and }.
 # we introduce '{' and '}' to avoid confusion with wff negation
 # see the next TODO for an alternative
+#
                         | ('{' _ wff _ '}')                  :tau_wff
                         | (sym [_ offsets] _ ref_args)       :tau_ref
                         | (tau _ "|||" _ tau)                :tau_or
                         | (tau _ "&&&" _ tau)                :tau_and
-# TODO (HIGH) replace by - or other symbol to avoid confusion with wff negation
-                        | ('-' _ tau)                      :tau_neg
+                        | ('-' _ tau)                        :tau_neg
                         |                                     capture.
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
+                        | (("sometimes" | "<>") _ wff)       :wff_sometimes
+                        | (("always" | "[]") _ wff)          :wff_always
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("b_all"   __ q_bool_var __ wff)   :wff_ball
                         | ("b_ex"    __ q_bool_var __ wff)   :wff_bex
@@ -333,7 +335,7 @@ severity               => ("e" | "error"):error_sym
         mnf_sym, onf_sym, examples_sym, del_sym, severity_opt, status_opt,
         colors_opt, debug_repl_opt, option_value_true, option_value_false,
         error_sym, debug_sym, trace_sym, info_sym, qelim_sym, uninterpreted_constant,
-        subst_cmd, bf_normalize_cb, wff_typed, bf_typed.
+        subst_cmd, bf_normalize_cb, wff_typed, bf_typed, wff_sometimes, wff_always.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, q_bool_var, src_c, tau_cb, wff_cb, bf_cb,

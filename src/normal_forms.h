@@ -76,23 +76,37 @@ RULE(WFF_PUSH_NEGATION_INWARDS_0, "!($X && $Y) ::= ! $X || !$Y.")
 RULE(WFF_PUSH_NEGATION_INWARDS_1, "!($X || $Y) ::= ! $X && !$Y.")
 RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
+RULE(WFF_PUSH_NEGATION_INWARDS_4, "! always $X ::= sometimes (! $X).")
+RULE(WFF_PUSH_NEGATION_INWARDS_5, "! sometimes $X ::= always (! $X).")
 RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
 RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
 RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
 RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
 RULE(WFF_SIMPLIFY_ONE_3, "$X && T ::= $X.")
 RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
+RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
+RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
 RULE(WFF_SIMPLIFY_ZERO_0, "F && $X ::= F.")
 RULE(WFF_SIMPLIFY_ZERO_1, "$X && F ::= F.")
 RULE(WFF_SIMPLIFY_ZERO_2, "F || $X ::= $X.")
 RULE(WFF_SIMPLIFY_ZERO_3, "$X || F ::= $X.")
 RULE(WFF_SIMPLIFY_ZERO_4, "! F ::= T.")
+RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
+RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
 RULE(WFF_SIMPLIFY_SELF_0, "$X && $X ::= $X.")
 RULE(WFF_SIMPLIFY_SELF_1, "$X || $X ::= $X.")
 RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
 RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
 RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
 RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
+RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
+RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
+RULE(WFF_SIMPLIFY_SOMETIMES_3,  "(sometimes $X) && (always $X) ::= always $X.")
+RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
+RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
+RULE(WFF_SIMPLIFY_ALWAYS_3,		"(always $X) && (sometimes $X) ::= always $X.")
+RULE(WFF_PUSH_SOMETIMES_INWARDS,"sometimes($X || $Y) ::= (sometimes $X) || (sometimes $Y).")
+RULE(WFF_PUSH_ALWAYS_INWARDS,   "always($X && $Y) ::= (always $X) && (always $Y).")
 
 // wff definitions
 RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !$Y || !$X && $Y.")
@@ -250,7 +264,11 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_1
 	+ WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
+	+ WFF_PUSH_NEGATION_INWARDS_4
+	+ WFF_PUSH_NEGATION_INWARDS_5
 	+ WFF_ELIM_DOUBLE_NEGATION_0
+	+ WFF_PUSH_ALWAYS_INWARDS
+	+ WFF_PUSH_SOMETIMES_INWARDS
 );
 
 template<typename... BAs>
@@ -286,17 +304,27 @@ static auto simplify_wff = make_library<BAs...>(
 	+ WFF_SIMPLIFY_ONE_2
 	+ WFF_SIMPLIFY_ONE_3
 	+ WFF_SIMPLIFY_ONE_4
+	+ WFF_SIMPLIFY_ONE_5
+	+ WFF_SIMPLIFY_ONE_6
 	+ WFF_SIMPLIFY_ZERO_0
 	+ WFF_SIMPLIFY_ZERO_1
 	+ WFF_SIMPLIFY_ZERO_2
 	+ WFF_SIMPLIFY_ZERO_3
 	+ WFF_SIMPLIFY_ZERO_4
+	+ WFF_SIMPLIFY_ZERO_5
+	+ WFF_SIMPLIFY_ZERO_6
 	+ WFF_SIMPLIFY_SELF_0
 	+ WFF_SIMPLIFY_SELF_1
 	+ WFF_SIMPLIFY_SELF_2
 	+ WFF_SIMPLIFY_SELF_3
 	+ WFF_SIMPLIFY_SELF_4
 	+ WFF_SIMPLIFY_SELF_5
+	+ WFF_SIMPLIFY_SOMETIMES_1
+	+ WFF_SIMPLIFY_SOMETIMES_2
+	+ WFF_SIMPLIFY_SOMETIMES_3
+	+ WFF_SIMPLIFY_ALWAYS_1
+	+ WFF_SIMPLIFY_ALWAYS_2
+	+ WFF_SIMPLIFY_ALWAYS_3
 );
 
 template<typename... BAs>
@@ -390,7 +418,11 @@ static auto to_cnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_1
 	+ WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
+	+ WFF_PUSH_NEGATION_INWARDS_4
+	+ WFF_PUSH_NEGATION_INWARDS_5
 	+ WFF_ELIM_DOUBLE_NEGATION_0
+	+ WFF_PUSH_ALWAYS_INWARDS
+	+ WFF_PUSH_SOMETIMES_INWARDS
 );
 
 template<typename... BAs>
@@ -417,6 +449,8 @@ static auto to_nnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_1
 	+ WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
+	+ WFF_PUSH_NEGATION_INWARDS_4
+	+ WFF_PUSH_NEGATION_INWARDS_5
 	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
@@ -1028,6 +1062,292 @@ struct bf_reduce_canonical {
 };
 template<typename... BAs>
 nso<BAs...> operator|(const nso<BAs...>& fm, const bf_reduce_canonical<BAs...>& r) {
+	return r(fm);
+}
+
+// Assumes a sometimes formula in dnf with negation pushed in containing no wff_or with max nesting depth 1
+template<typename... BAs>
+nso<BAs...> extract_sometimes (nso<BAs...> fm) {
+	// Extract the i-th child of c assuming that the child is not an always or sometimes statement
+	auto extract = [](const auto& c, int_t i, auto& ex, auto& st) {
+		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(c->child[i])) &&
+					!is_non_terminal(tau_parser::wff_always, trim(c->child[i])));
+		if (auto t = find_top(c->child[i], is_non_terminal<tau_parser::io_var, BAs...>); !t.has_value())
+			ex.push_back(c->child[i]);
+		else st.push_back(c->child[i]);
+	};
+
+	std::map<nso<BAs...>, nso<BAs...>> l_changes = {};
+	// Collect remaining nested "sometimes" formulas
+	vector<nso<BAs...>> sometimes_extractions = {};
+	for (const auto &inner_st: select_top(trim2(fm), is_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
+		l_changes[inner_st] = _T_trimmed<BAs...>;
+		sometimes_extractions.push_back(inner_st);
+	}
+	// Collect remaining nested "always" formulas
+	vector<nso<BAs...>> always_extractions = {};
+	for (const auto &inner_aw: select_top(trim2(fm), is_non_terminal<tau_parser::wff_always, BAs...>)) {
+		l_changes[inner_aw] = _T_trimmed<BAs...>;
+		always_extractions.push_back(inner_aw);
+	}
+	// Apply always/sometimes extractions to fm
+	if (!l_changes.empty()) fm = replace(fm, l_changes);
+
+	vector<nso<BAs...>> extracted = {}, staying = {};
+	bool no_conjunction = true;
+	// Now extract from all conjuncts
+	for (const nso<BAs...> &c: select_all(fm, is_non_terminal<tau_parser::wff_and, BAs...>)) {
+		no_conjunction = false;
+		assert(c->child.size() == 2);
+		if (!is_non_terminal(tau_parser::wff_and, trim(c->child[0])))
+			extract(c, 0, extracted, staying);
+		if (!is_non_terminal(tau_parser::wff_and, trim(c->child[1])))
+			extract(c, 1, extracted, staying);
+	}
+	if (no_conjunction)
+		extract(trim(fm), 0, extracted, staying);
+
+	// From here we build the formula which we will return
+	nso<BAs...> extracted_fm;
+	if (extracted.empty()) extracted_fm = _T<BAs...>;
+	else {
+		bool first = true;
+		for (const auto &e: extracted) {
+			if (first) { first = false; extracted_fm = e; }
+			else extracted_fm = build_wff_and(extracted_fm, e);
+		}
+	}
+	for (const auto &se: sometimes_extractions)
+		extracted_fm = build_wff_and(extracted_fm, wrap(tau_parser::wff, se));
+	for (const auto &ae : always_extractions)
+		extracted_fm = build_wff_and(extracted_fm, wrap(tau_parser::wff, ae));
+	nso<BAs...> staying_fm;
+	if (staying.empty()) return extracted_fm;
+	else {
+		bool first = true;
+		for (const auto &s: staying) {
+			if (first) { first = false; staying_fm = s; }
+			else staying_fm = build_wff_and(staying_fm, s);
+		}
+	}
+	if (extracted_fm == _T<BAs...>) return build_wff_sometimes(staying_fm);
+	return build_wff_and(build_wff_sometimes(staying_fm), extracted_fm);
+}
+
+// Assumes an always formula in cnf with negation pushed in containing no wff_and with max nesting depth 1
+template<typename... BAs>
+nso<BAs...> extract_always (nso<BAs...> fm) {
+	// Extract the i-th child of c assuming that the child is not an always or sometimes statement
+	auto extract = [](const auto& c, int_t i, auto& ex, auto& st) {
+		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(c->child[i])) &&
+					!is_non_terminal(tau_parser::wff_always, trim(c->child[i])));
+		if (auto t = find_top(c->child[i], is_non_terminal<tau_parser::io_var, BAs...>); !t.has_value())
+			ex.push_back(c->child[i]);
+		else st.push_back(c->child[i]);
+	};
+
+	std::map<nso<BAs...>, nso<BAs...>> l_changes = {};
+	// Collect remaining nested "sometimes" formulas
+	vector<nso<BAs...>> sometimes_extractions = {};
+	for (const auto &inner_st: select_top(trim2(fm), is_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
+		l_changes[inner_st] = _F_trimmed<BAs...>;
+		sometimes_extractions.push_back(inner_st);
+	}
+	// Collect remaining nested "always" formulas
+	vector<nso<BAs...>> always_extractions = {};
+	for (const auto &inner_aw: select_top(trim2(fm), is_non_terminal<tau_parser::wff_always, BAs...>)) {
+		l_changes[inner_aw] = _F_trimmed<BAs...>;
+		always_extractions.push_back(inner_aw);
+	}
+	// Apply always/sometimes extractions to flat_st
+	if (!l_changes.empty()) fm = replace(fm, l_changes);
+
+	// Now extract from all disjuncts
+	vector<nso<BAs...>> extracted = {}, staying = {};
+	bool no_disjunction = true;
+	for (const nso<BAs...> &c: select_all(fm, is_non_terminal<tau_parser::wff_or, BAs...>)) {
+		no_disjunction = false;
+		assert(c->child.size() == 2);
+		if (!is_non_terminal(tau_parser::wff_or, trim(c->child[0])))
+			extract(c, 0, extracted, staying);
+		if (!is_non_terminal(tau_parser::wff_or, trim(c->child[1])))
+			extract(c, 1, extracted, staying);
+	}
+	if (no_disjunction)
+		extract(trim(fm), 0, extracted, staying);
+
+	// From here we build the formula to return based on the extractions
+	nso<BAs...> extracted_fm;
+	if (extracted.empty()) extracted_fm = _F<BAs...>;
+	else {
+		bool first = true;
+		for (const auto &e: extracted) {
+			if (first) { first = false; extracted_fm = e; }
+			else extracted_fm = build_wff_or(extracted_fm, e);
+		}
+	}
+	for (const auto &se: sometimes_extractions)
+		extracted_fm = build_wff_or(extracted_fm, wrap(tau_parser::wff, se));
+	for (const auto &ae : always_extractions)
+		extracted_fm = build_wff_or(extracted_fm, wrap(tau_parser::wff, ae));
+	nso<BAs...> staying_fm;
+	if (staying.empty()) return extracted_fm;
+	else {
+		bool first = true;
+		for (const auto &s: staying) {
+			if (first) { first = false; staying_fm = s; }
+			else staying_fm = build_wff_or(staying_fm, s);
+		}
+	}
+	if (extracted_fm == _F<BAs...>) return build_wff_always(staying_fm);
+	return build_wff_or(build_wff_always(staying_fm), extracted_fm);
+}
+
+// Recursively extract non-dependend formulas under sometimes
+template<typename... BAs>
+nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
+	std::map<nso<BAs...>, nso<BAs...>> g_changes = {};
+	for (const auto &st : select_top_until(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>,
+								is_non_terminal<tau_parser::wff_always, BAs...>)) {
+		// Recursively denest sometimes and always statements contained in sometimes statement st
+		auto flat_st = build_wff_sometimes(push_sometimes_always_in(st->child[0]));
+		// Simplyfy current formula and convert to DNF
+		flat_st = flat_st | repeat_each<step<BAs...>, BAs...>(simplify_wff<BAs...> | to_dnf_wff<BAs...>);
+		if (flat_st != st) g_changes[st] = trim(flat_st);
+	}
+	// Apply changes
+	if (!g_changes.empty()) {
+		fm = replace(fm, g_changes);
+		g_changes = {};
+	}
+	for (const auto &st : select_top_until(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>,
+								is_non_terminal<tau_parser::wff_always, BAs...>)) {
+		// Here a formula under "sometimes" is of the form (phi_1 && ... && phi_n)
+		// Pull out each phi_i that does not contain a time variable or is "sometimes/always"
+		auto simp_st = trim(extract_sometimes(wrap(tau_parser::wff, st)));
+		if (st != simp_st) g_changes[st] = simp_st;
+	}
+	// Apply changes
+	if (!g_changes.empty()) {
+		fm = replace(fm, g_changes);
+		g_changes = {};
+	}
+	for (const auto& aw : select_top_until(fm, is_non_terminal<tau_parser::wff_always, BAs...>,
+								is_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
+		// Recursively denest sometimes and always statements contained in always statement aw
+		auto flat_aw = build_wff_always(push_sometimes_always_in(aw->child[0]));
+		// Simplyfy current formula and convert to CNF
+		flat_aw = flat_aw | repeat_each<step<BAs...>, BAs...>(simplify_wff<BAs...> | to_cnf_wff<BAs...>);
+		if (flat_aw != aw) g_changes[aw] = trim(flat_aw);
+	}
+	// Apply changes
+	if (!g_changes.empty()) {
+		fm = replace(fm, g_changes);
+		g_changes = {};
+	}
+	for (const auto& aw : select_top_until(fm, is_non_terminal<tau_parser::wff_always, BAs...>,
+								is_non_terminal<tau_parser::wff_sometimes, BAs...> )) {
+		// Here the formula under "always" is of the form (phi_1 || ... || phi_n)
+		// Pull out each phi_i that does not contain a time variable or is "sometimes/always"
+		auto simp_aw = trim(extract_always(wrap(tau_parser::wff, aw)));
+		if (aw != simp_aw) g_changes[aw] = simp_aw;
+	}
+	// Apply changes and return
+	if (!g_changes.empty()) return replace(fm, g_changes);
+	return fm;
+}
+
+// Assumes a single DNF clause and normalizes the "always" parts into one
+template<typename... BAs>
+nso<BAs...> pull_always_out(const nso<BAs...>& fm) {
+	std::map<nso<BAs...>, nso<BAs...>> l_changes = {};
+	std::vector<nso<BAs...>> collected_always_fms;
+	// Collect all always statments
+	for (const auto& _and : select_all_until(fm,
+								is_non_terminal<tau_parser::wff_and, BAs...>,
+								is_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
+		assert(_and->child.size() == 2);
+		for (int i = 0; i < 2; ++i) {
+			if (is_non_terminal(tau_parser::wff_and, trim(_and->child[i])))
+				continue;
+			if (is_non_terminal(tau_parser::wff_sometimes, trim(_and->child[i])))
+				continue;
+			if (is_non_terminal(tau_parser::wff_always, trim(_and->child[i]))) {
+				l_changes[_and->child[i]] = _T<BAs...>;
+				collected_always_fms.push_back(trim2(_and->child[i]));
+			} else {
+				l_changes[_and->child[i]] = _T<BAs...>;
+				collected_always_fms.push_back(_and->child[i]);
+			}
+		}
+	}
+	if (collected_always_fms.empty()) return fm;
+	// Rebuild formula based on the extraction
+	nso<BAs...> always_part;
+	bool first = true;
+	for (const auto& fa : collected_always_fms) {
+		if (first) {first = false; always_part = fa;}
+		else always_part = build_wff_and(always_part, fa);
+	}
+	assert(!l_changes.empty());
+	return build_wff_and(build_wff_always(always_part), replace(fm, l_changes));
+}
+
+// We assume that there is no nesting of "sometimes" and "always" in fm
+template<typename... BAs>
+nso<BAs...> pull_sometimes_always_out(nso<BAs...> fm) {
+	fm = fm | repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>);
+	std::map<nso<BAs...>, nso<BAs...>> changes = {};
+	std::vector<nso<BAs...>> collected_fms;
+	bool no_disjunction = true;
+	// Collect all disjuncts which are sometimes statements and call pull_always_out on the others
+	for (const auto& _or : select_all(fm, is_non_terminal<tau_parser::wff_or, BAs...>)) {
+		no_disjunction = false;
+		assert(_or->child.size() == 2);
+		for (int i = 0; i < 2; ++i) {
+			if (is_non_terminal(tau_parser::wff_or, trim(_or->child[i])))
+				continue;
+			if (is_non_terminal(tau_parser::wff_sometimes, trim(_or->child[i]))) {
+				changes[_or->child[i]] = _F<BAs...>;
+				collected_fms.push_back(trim2(_or->child[i]));
+			} else {
+				auto r = pull_always_out(_or->child[i]);
+				if (_or->child[i] != r) changes[_or->child[i]] = r;
+			}
+		}
+	}
+	if (no_disjunction) {
+		auto r = pull_always_out(fm);
+		if (fm != r) changes[fm] = r;
+	}
+	if (!changes.empty()) fm = replace(fm, changes);
+	// Merge collected formulas under "sometimes"
+	if (!collected_fms.empty()) {
+		nso<BAs...> r;
+		bool first = true;
+		for (const auto& f : collected_fms) {
+			if (first) { first = false; r = f ;}
+			else r = build_wff_or(r, f);
+		}
+		r = build_wff_sometimes(r);
+		fm = build_wff_or(fm, r);
+	}
+	return fm;
+}
+
+// The needed class in order to make sometimes/always normalization work with normalizer
+template<typename... BAs>
+struct sometimes_always_normalization {
+	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+		auto res = push_sometimes_always_in(fm)
+					| repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>)
+					| reduce_wff<BAs...>;
+		return pull_sometimes_always_out(res)
+				| repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>);
+	}
+};
+template<typename... BAs>
+nso<BAs...> operator|(const nso<BAs...>& fm, const sometimes_always_normalization<BAs...>& r) {
 	return r(fm);
 }
 
