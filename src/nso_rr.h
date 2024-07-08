@@ -1084,6 +1084,11 @@ sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> trim2(const sp_tau_node<BAs...>& n) {
+	return n->child[0]->child[0];
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, const sp_tau_node<BAs...>& n) {
 	auto nts = std::get<tau_source_sym>(n->value).nts;
 	return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_source_sym(t, nts)), {n});
@@ -1110,6 +1115,8 @@ const std::string BLDR_WFF_ALL = "( $X $Y ) =:: all $X $Y.";
 const std::string BLDR_WFF_EX = "( $X $Y ) =:: ex $X $Y.";
 const std::string BLDR_WFF_BALL = "( $X $Y ) =:: ball $X $Y.";
 const std::string BLDR_WFF_BEX = "( $X $Y ) =:: bex $X $Y.";
+const std::string BLDR_WFF_SOMETIMES = "( $X ) =:: sometimes $X.";
+const std::string BLDR_WFF_ALWAYS = "( $X ) =:: always $X.";
 
 // definitions of bf builder rules
 const std::string BLDR_BF_AND = "( $X $Y ) =: $X & $Y.";
@@ -1155,6 +1162,10 @@ template<typename... BAs>
 static auto bldr_wff_ball = make_builder<BAs...>(BLDR_WFF_BALL);
 template<typename... BAs>
 static auto bldr_wff_bex = make_builder<BAs...>(BLDR_WFF_BEX);
+template<typename... BAs>
+static auto bldr_wff_sometimes = make_builder<BAs...>(BLDR_WFF_SOMETIMES);
+template<typename... BAs>
+static auto bldr_wff_always = make_builder<BAs...>(BLDR_WFF_ALWAYS);
 
 // bf builder
 template<typename... BAs>
@@ -1358,6 +1369,18 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_wff_bex(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	std::vector<sp_tau_node<BAs...>> args {l, trim(r)} ;
 	return tau_apply_builder<BAs...>(bldr_wff_bex<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_sometimes(const sp_tau_node<BAs...>& l) {
+	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
+	return tau_apply_builder<BAs...>(bldr_wff_sometimes<BAs...>, args);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_always(const sp_tau_node<BAs...>& l) {
+	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
+	return tau_apply_builder<BAs...>(bldr_wff_always<BAs...>, args);
 }
 
 // bf factory method for building bf formulas
@@ -2018,6 +2041,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::wff_remove_bexistential_cb,      350 },
 			{ tau_parser::wff_remove_buniversal_cb,        360 },
 
+			{tau_parser::wff_sometimes,                    380 },
+			{tau_parser::wff_always,                       390 },
 			{ tau_parser::wff_conditional,                 400 },
 			{ tau_parser::wff_ball,                        410 },
 			{ tau_parser::wff_bex,                         420 },
@@ -2062,6 +2087,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::tau_rec_relation,                800 },
 			{ tau_parser::ref_args,                        800 }
 		};
+		static const std::set<size_t> wrap_child_for = {
+			};
 		if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
 			auto tss = std::get<idni::tau::tau_source_sym>(n->value);
 			if (!tss.nt() || no_wrap_for.find(tss.n()) != no_wrap_for.end())
@@ -2084,7 +2111,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// 	<< prio.at(tss.n())
 			// 	// << " (" << tss.n() << ")"
 			// 	<< "\n";
-			return prio.at(parent) > prio.at(tss.n());
+			return prio.at(parent) > prio.at(tss.n()) ?
+						true : wrap_child_for.contains(parent);
 		}
 		return false;
 	};
@@ -2186,10 +2214,13 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 				stream << "[", sep(","), stream << "]"; break;
 			case tau_parser::ref_args:
 				stream << "(", sep(","), stream << ")"; break;
-			// negation (unary)
+			// unary operators
 			case tau_parser::tau_neg: prefix_nows("-"); break;
 			case tau_parser::wff_neg: prefix_nows("!");   break;
 			case tau_parser::bf_neg:  postfix_nows("'");  break;
+			case tau_parser::wff_sometimes: prefix("sometimes"); break;
+			case tau_parser::wff_always:    prefix("always"); break;
+			//
 			// binary operators
 			case tau_parser::tau_or:         infix("|||"); break;
 			case tau_parser::tau_and:        infix("&&&"); break;
