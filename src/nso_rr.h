@@ -1291,6 +1291,11 @@ sp_tau_node<BAs...> build_wff_neq(const sp_tau_node<BAs...>& l) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_and(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	// first we consider the trivial cases
+	if (l == _F<BAs...> || r == _F<BAs...>) return _F<BAs...>;
+	if (l == _T<BAs...>) return r;
+	if (r == _T<BAs...>) return l;
+	// then we consider the general case
 	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
 	return tau_apply_builder<BAs...>(bldr_wff_and<BAs...>, args);
 }
@@ -1304,6 +1309,11 @@ sp_tau_node<BAs...> build_wff_and(const std::set<sp_tau_node<BAs...>>& wffs) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_or(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	// first we consider the trivial cases
+	if (l == _F<BAs...>) return r;
+	if (r == _F<BAs...>) return l;
+	if (l == _T<BAs...> || r == _T<BAs...>) return _T<BAs...>;
+	// then we consider the general case
 	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
 	return tau_apply_builder<BAs...>(bldr_wff_or<BAs...>, args);
 }
@@ -1328,6 +1338,10 @@ sp_tau_node<BAs...> build_wff_xor(const sp_tau_node<BAs...>& l, const sp_tau_nod
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_neg(const sp_tau_node<BAs...>& l) {
+	// first we consider the trivial cases
+	if (l == _F<BAs...>) return _T<BAs...>;
+	if (l == _T<BAs...>) return _F<BAs...>;
+	// then we consider the general case
 	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
 	return tau_apply_builder<BAs...>(bldr_wff_neg<BAs...>, args);
 }
@@ -1386,6 +1400,11 @@ sp_tau_node<BAs...> build_wff_always(const sp_tau_node<BAs...>& l) {
 // bf factory method for building bf formulas
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_and(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	// first we consider the trivial cases
+	if (l == _0<BAs...> || r == _0<BAs...>) return _0<BAs...>;
+	if (l == _1<BAs...>) return r;
+	if (r == _1<BAs...>) return l;
+	// then we consider the general case
 	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
 	return tau_apply_builder<BAs...>(bldr_bf_and<BAs...>, args);
 }
@@ -1399,6 +1418,11 @@ sp_tau_node<BAs...> build_bf_and(const std::set<sp_tau_node<BAs...>>& bfs) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_or(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	// first we consider the trivial cases
+	if (l == _0<BAs...>) return r;
+	if (r == _0<BAs...>) return l;
+	if (l == _1<BAs...> || r == _1<BAs...>) return _1<BAs...>;
+	// then we consider the general case
 	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
 	return tau_apply_builder<BAs...>(bldr_bf_or<BAs...>, args);
 }
@@ -1412,6 +1436,10 @@ sp_tau_node<BAs...> build_bf_or(const std::set<sp_tau_node<BAs...>>& bfs) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_neg(const sp_tau_node<BAs...>& l) {
+	// first we consider the trivial cases
+	if (l == _0<BAs...>) return _1<BAs...>;
+	if (l == _1<BAs...>) return _0<BAs...>;
+	// then we consider the general case
 	std::vector<sp_tau_node<BAs...>> args {trim(l)};
 	return tau_apply_builder<BAs...>(bldr_bf_neg<BAs...>, args);
 }
