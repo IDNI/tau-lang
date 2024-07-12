@@ -1231,9 +1231,9 @@ sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_and_constant(const std::set<std::variant<BAs...>>& ctes) {
-	auto _and = [](const std::variant<BAs...>& l, const std::variant<BAs...>& r) -> std::variant<BAs...> {
+	static constexpr auto _and = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l & r;
-	};
+	}, [](const auto&, const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
 	if (ctes.empty()) return _1<BAs...>;
 
@@ -1245,9 +1245,9 @@ sp_tau_node<BAs...> build_bf_and_constant(const std::set<std::variant<BAs...>>& 
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_or_constant(const std::set<std::variant<BAs...>>& ctes) {
-	auto _or = [](const std::variant<BAs...>& l, const std::variant<BAs...>& r) -> std::variant<BAs...> {
+	static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l | r;
-	};
+	}, [](const auto&, const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
 	if (ctes.empty()) return _0<BAs...>;
 
