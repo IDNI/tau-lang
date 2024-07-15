@@ -68,6 +68,14 @@ RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
 RULE(BF_CALLBACK_NORMALIZE, "{ $X } := bf_normalize_cb $X.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
+RULE(BF_PUSH_CTES_UPWARDS_0, "$X & ({ $Y } & $Z) := { $Y } & ($X & $Z).")
+RULE(BF_PUSH_CTES_UPWARDS_1, "$X & ($Y & { $Z }) := { $Z } & ($X & $Y).")
+RULE(BF_PUSH_CTES_UPWARDS_2, "($X & { $Y }) & $Z := { $Y } & ($X & $Z).")
+RULE(BF_PUSH_CTES_UPWARDS_3, "$X & ($Y & { $Z }) := { $Z } & ($X & $Y).")
+RULE(BF_PUSH_CTES_UPWARDS_4, "$X | ({ $Y } | $Z) := { $Y } | ($X | $Z).")
+RULE(BF_PUSH_CTES_UPWARDS_5, "$X | ($Y | { $Z }) := { $Z } | ($X | $Y).")
+RULE(BF_PUSH_CTES_UPWARDS_6, "($X | { $Y }) | $Z := { $Y } | ($X | $Z).")
+RULE(BF_PUSH_CTES_UPWARDS_7, "$X | ($Y | { $Z }) := { $Z } | ($X | $Y).")
 
 // wff rules
 RULE(WFF_TO_DNF_0, "($X || $Y) && $Z ::= $X && $Z || $Y && $Z.")
@@ -134,6 +142,10 @@ RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
 RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
 RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
 RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
+RULE(BF_EQ_AND_SIMPLIFY_0, "$X != 0 && $X = 0 ::= F.")
+RULE(BF_EQ_AND_SIMPLIFY_1, "$X = 0 && $X != 0 ::= F.")
+RULE(BF_EQ_OR_SIMPLIFY_0, "$X != 0 || $X = 0 ::= T.")
+RULE(BF_EQ_OR_SIMPLIFY_1, "$X = 0 || $X != 0 ::= T.")
 
 // bf conjunctive normal form
 RULE(BF_TO_CNF_0, "$X & $Y | $Z := ($X | $Z) & ($Y | $Z).")
@@ -353,6 +365,14 @@ static auto apply_cb = make_library<BAs...>(
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR
 	+ BF_CALLBACK_NEG
+	/*+ BF_PUSH_CTES_UPWARDS_0
+	+ BF_PUSH_CTES_UPWARDS_1
+	+ BF_PUSH_CTES_UPWARDS_2
+	+ BF_PUSH_CTES_UPWARDS_3
+	+ BF_PUSH_CTES_UPWARDS_4
+	+ BF_PUSH_CTES_UPWARDS_5
+	+ BF_PUSH_CTES_UPWARDS_6
+	+ BF_PUSH_CTES_UPWARDS_7*/
 );
 
 template<typename... BAs>
@@ -374,6 +394,10 @@ static auto elim_eqs = make_library<BAs...>(
 	+ BF_EQ_SIMPLIFY_1
 	+ BF_NEQ_SIMPLIFY_0
 	+ BF_NEQ_SIMPLIFY_1
+	+ BF_EQ_AND_SIMPLIFY_0
+	+ BF_EQ_AND_SIMPLIFY_1
+	+ BF_EQ_OR_SIMPLIFY_0
+	+ BF_EQ_OR_SIMPLIFY_1
 );
 
 template<typename... BAs>
@@ -394,6 +418,14 @@ static auto simplify_snf = repeat_all<step<BAs...>, BAs...>(
 template<typename... BAs>
 static auto to_mnf_wff = make_library<BAs...>(
 	WFF_PUSH_NEGATION_UPWARDS_0
+);
+
+template<typename... BAs>
+static auto to_mnf_snf_wff = make_library<BAs...>(
+	WFF_PUSH_NEGATION_UPWARDS_0
+	+ WFF_PUSH_NEGATION_INWARDS_0
+	+ WFF_PUSH_NEGATION_INWARDS_1
+	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -1358,15 +1390,16 @@ struct to_snf_step {
 
 	using var = nso<BAs...>;
 	using vars = std::set<var>;
-	using exponent = std::set<var>;
 	using constant = std::variant<BAs...>;
+	using exponent = std::set<var>;
 	using literal = nso<BAs...>;
 	using literals = std::set<literal>;
 	using bdd_path = std::pair<literals /* positive */, literals /* negatives */>;
-	using partition_by_exponent = std::map<exponent, literals>;
+	using partition = std::map<exponent, literals>;
 
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
 		// we select all literals, i.e. wff equalities or it negations.
+		std::cout << "form: " << form << std::endl;
 		static const auto is_literal = [](const auto& n) -> bool {
 			return (n | tau_parser::bf_eq).has_value();
 		};
@@ -1374,7 +1407,8 @@ struct to_snf_step {
 			// we call the recursive method traverse to traverse all the paths
 			// of the BDD.
 			std::set<nso<BAs...>> remaining(literals.begin(), literals.end());
-			return traverse({}, remaining, form);
+			return traverse({}, remaining, form)
+				| bf_reduce_canonical<BAs...>() | reduce_wff<BAs...>;
 		}
 		return form;
 	}
@@ -1395,7 +1429,13 @@ private:
 
 	static constexpr auto _neq_zero = overloaded([]<typename T>(const T& l) -> bool {
 			return l != false;
-	}, [](const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
+	}, [](const auto&) -> bool { throw std::logic_error("wrong types"); });
+
+	static constexpr auto _leq = overloaded([]<typename T>(const T& l, const T& r) -> bool {
+			auto result =  (l & ~r);
+			std::cout << "l: " << l << " r: " << r << " result: " << result << std::endl;
+			return result == false;
+	}, [](const auto&, const auto&) -> bool { throw std::logic_error("wrong types"); });
 
 	nso<BAs...> bdd_path_to_snf(const bdd_path& path, const nso<BAs...>& form) const {
 		// we simplify the constant part of the formula
@@ -1405,22 +1445,27 @@ private:
 	}
 
 	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
+		// we only cache rtesults in release mode
+		#ifndef DEBUG
 		static std::map<std::tuple<bdd_path, literals, nso<BAs...>>, nso<BAs...>> cache;
 		if (auto it = cache.find({path, remaining, form}); it != cache.end()) return it->second;
+		#endif // DEBUG
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
 		auto lit = *remaining.begin();
 		literals nremaining(++remaining.begin(), remaining.end());
 		auto [t, f] = split_using_lit(lit, form);
 		bdd_path t_path{path.first, path.second};
+		if (t == f) return traverse(t_path, nremaining, t);
 		bdd_path f_path{path.first, path.second};
-		if (t != f) {
-			t_path.first.insert(lit);
-			f_path.second.insert(lit);
-		}
+		t_path.first.insert(lit);
+		f_path.second.insert(lit);
 		auto t_snf = traverse(t_path, nremaining, t);
 		auto f_snf = traverse(f_path, nremaining, f);
 		auto result = build_wff_or(t_snf, f_snf);
+		// we only cache rtesults in release mode
+		#ifndef DEBUG
 		cache[{path, remaining, form}] = result;
+		#endif // DEBUG
 		return result;
 	}
 
@@ -1433,8 +1478,8 @@ private:
 		return exponent(all_vs.begin(), all_vs.end());
 	}
 
-	std::optional<constant> get_constant(const nso<BAs...>& literal) const {
-		return find_top(literal, is_non_terminal<tau_parser::constant, BAs...>)
+	std::optional<constant> get_constant(const literal& lit) const {
+		return find_top(lit, is_non_terminal<tau_parser::constant, BAs...>)
 			| only_child_extractor<BAs...> | ba_extractor<BAs...>;
 	}
 
@@ -1446,25 +1491,19 @@ private:
 		return std::make_pair(a, b);
 	}
 
-	partition_by_exponent get_partition_by_exponent(const literals& lits) const {
-		std::map<exponent, std::set<literal>> partition;
-		for (auto& l: lits) {
-			auto e = get_exponent(l);
-			if (partition.contains(e)) partition[e].insert(l);
-			else partition[e] = { l };
-		}
-		return partition;
+	partition make_partition_by_exponent(const literals& s) const {
+		partition p;
+		for (auto& e: s) p[get_exponent(e)].insert(e);
+		return p;
 	}
 
-	std::optional<nso<BAs...>> squeeze_same_exponent_positives(const std::set<literal>& positives, const exponent& exp) const {
-		// if positives is empty we return nothing
-		if (positives.empty()) return {};
+	nso<BAs...> squeeze_positives(const std::set<literal>& positives, const exponent& exp) const {
 		// find first element with non trivial constant
 		auto first = std::find_if(positives.begin(), positives.end(), [&](const auto& l) {
 			return get_constant(l).has_value();
 		});
 		// if there is no such element we return the first element
-		if (first == positives.end()) return std::optional<nso<BAs...>>(*positives.begin());
+		if (first == positives.end()) return nso<BAs...>(*positives.begin());
 		// otherwise...
 		auto first_cte = build_bf_constant(get_constant(*first).value());
 		auto cte = std::accumulate(++positives.begin(), positives.end(), first_cte, [&](const auto& l, const auto& r) {
@@ -1475,71 +1514,136 @@ private:
 		});
 
 		// return the conjunction of all the same exponent literals and the accumulated constant
-		auto bf = std::accumulate(exp.begin(), exp.end(), cte, [](const auto& l, const auto& r) {
+		auto term = std::accumulate(exp.begin(), exp.end(), cte, [](const auto& l, const auto& r) {
 			return build_bf_and(l, r);
 		});
-		return build_wff_eq(bf);
+		// return the corresponding wff
+		return build_wff_eq(term);
 	}
 
 	// squeezed positives into one literal if possible.
-	literals squeeze_positives(const literals& lits) const {
-		literals squeezed;
-		for (auto& [exponent, literals]: get_partition_by_exponent(lits))
-			if (auto squeezed_literal = squeeze_same_exponent_positives(literals, exponent); squeezed_literal)
-				squeezed.insert(squeezed_literal.value());
+	std::map<exponent, literal> squeeze_positives(const literals& lits) const {
+		std::map<exponent, literal> squeezed;
+		for (auto& [exponent, literals]: make_partition_by_exponent(lits))
+			squeezed[exponent] = squeeze_positives(literals, exponent);
 		return squeezed;
 	}
 
-	bool have_only_1_ctes(const literals& lits) const {
-		return std::find_if(lits.begin(), lits.end(), [&](const auto& l) {
-			return !get_constant(l).has_value();
-		}) != lits.end();
+	bool is_less_eq_than(const literal& l, const literal& r) const {
+		auto l_cte = get_constant(l).value();
+		auto r_cte = get_constant(r).value();
+		return std::visit(_leq, l_cte, r_cte);
 	}
 
-	// normalize each bdd path applying Corollary 3.1 from TABA book
-	nso<BAs...> normalize(const bdd_path& path) const {
-		if (path.first.empty()) return build_wff_neg(build_wff_or(path.second));
+	literals mins(const literals& ls) const {
+		std::cout << "compute mins of: ";
+		for (auto& l: ls) std::cout << l << " ";
+		std:: cout << std::endl;
+		static auto _explicit_constant = [&](const auto& l) {
+			return get_constant(l).has_value();
+		};
 
-		// the literals of the final term include the positive literals...
-		// maybe squeeze positives with same exponent
-		auto squeezed = squeeze_positives(path.first);
+		auto first = std::find_if(ls.begin(), ls.end(), _explicit_constant);
+		if (first == ls.end()) return {*ls.begin()};
 
-		literals lits(squeezed.begin(), squeezed.end());
-		// ... and for each negatice literal include the result of
-		// ...
-		auto partition = get_partition_by_exponent(squeezed);
-		for (auto& n: path.second) {
-			auto n_exp = get_exponent(n);
-			// if no positive literal has the same exponent as n, we add n to the literals
-			if (partition[n_exp].size() == 0) {
-				lits.insert(build_wff_neg(n)); continue;
+		literals mins = { *first };
+		literals remaining(++first, ls.end());
+
+		while (!remaining.empty()) {
+			std::cout << "remaining: ";
+			for (auto& l: remaining) std::cout << l << " ";
+			std:: cout << std::endl;
+
+			first = std::find_if(remaining.begin(), remaining.end(), _explicit_constant);
+			if (first == remaining.end()) break;
+			bool add_first = true;
+			literals bigger;
+			std::cout << "first: " << *first << std::endl;
+			for (auto& m: mins) {
+				std::cout << "m: " << m << std::endl;
+				if (is_less_eq_than(*first, m)) bigger.insert(m);
+				else if (is_less_eq_than(m, *first)) {
+					add_first = false; break;
+				}
 			}
+			std::cout << "bigger: ";
+			for (auto& l: bigger) std::cout << l << " ";
+			std:: cout << std::endl;
+			for (auto& b: bigger) mins.erase(b);
+			remaining.erase(first);
+			if (add_first) mins.insert(*first);
+		}
+		std::cout << "mins: ";
+		for (auto& l: mins) std::cout << l << " ";
+		std:: cout << std::endl;
+		return mins;
+	}
 
-			if (have_only_1_ctes(partition[n_exp])) return _F<BAs...>;
+	partition squeeze_negatives(const literals& lits) const {
+		partition squeezed;
+		for (auto& [exponent, literals]: make_partition_by_exponent(lits))
+			squeezed[exponent] = mins(literals);
+		return squeezed;
+	}
 
-			// extract to a method
-			// otherwise we compute the conjunction of all the positive literals negated
-			auto first_cte = build_bf_constant(get_constant(*partition[n_exp].begin()).value());
-			auto cte = std::accumulate(++partition[n_exp].begin(), partition[n_exp].end(), first_cte, [&](const auto& l, const auto& r) {
-				auto l_cte = get_constant(l).value();
-				auto r_cte = get_constant(r).value();
-				std::variant<BAs...> n_cte(std::visit(_or, l_cte, r_cte));
-				return build_bf_constant(n_cte);
-			});
-			auto cte_neg = build_bf_neg(cte);
-
-			// now we conjunct the previous result with the constant of n
-			auto n_cte = build_bf_constant(get_constant(n));
-			auto nn_cte = n_cte ? build_bf_and(cte_neg, n_cte.value()) : cte_neg;
-			auto term = n_exp.empty() ? _T<BAs...> : std::accumulate(++n_exp.begin(), n_exp.end(), *n_exp.begin(), [](const auto& l, const auto& r) {
-					return build_bf_and(l, r);
-			});
+	literal normalize(const literals& negatives, const literal& positive, const exponent& exp) const {
+		// we tacitely assume that the positive literal has a constant
+		// different from 1. Otherwise, the normalizer should already
+		// return F.
+		auto neg_positive_cte = build_bf_neg(build_bf_constant(get_constant(positive).value()));
+		// now we conjunct the previous result with the constant of n
+		literals lits; lits.insert(positive);
+		for (auto& negative: negatives) {
+			auto n_cte = build_bf_constant(get_constant(negative));
+			auto nn_cte = n_cte ? build_bf_and(neg_positive_cte, n_cte.value()) : neg_positive_cte;
+			auto term = build_bf_and(exp);
 			auto nn = build_bf_and(nn_cte, term);
-			auto nnn = build_wff_neq(nn);
-			lits.insert(nnn);
+			lits.insert(build_wff_neq(nn));
+		}
+		return build_wff_and(lits);
+	}
+
+	// normalize each bdd path applying Corollary 3.1 from TABA book with few
+	// improvements related to the handling of negative literals.
+	nso<BAs...> normalize(const bdd_path& path) const {
+		// if we have no positive literals we return the conjunction of all the
+		// negative literals negated. PLease note that we store the positive
+		// versions of the literals in the second component of the path. Thus,
+		// we need to negate them or, equivalently, to build the conjunction of
+		// them, we compute the negation of the the disjunction.
+		if (path.first.empty()) {
+			literals negs;
+			for (auto& [_, lits]: squeeze_negatives(path.second))
+				negs.insert(lits.begin(), lits.end());
+			return build_wff_neg(build_wff_or(negs));
 		}
 
-		// return the conjunction of all the terms
+		// otherwise, let us consider lits the set of literals to be returned
+		// conjuncted.
+		literals lits;
+		// first we squeezed positive literals...
+		auto squeezed_positives = squeeze_positives(path.first);
+		// ... and also the negative literals
+		auto squeezed_negatives = squeeze_negatives(path.second);
+		// for every negative class (same exponent) of literals...
+		for (auto& [negative_exponent, negatives]: squeezed_negatives) {
+			// - if no positive literal has the same exponent as n, we add n to
+			//   the literals
+			if (!squeezed_positives.contains(negative_exponent)) {
+				lits.insert(build_wff_neg(build_wff_or(negatives))); continue;
+			}
+			// - if the positive literal has 1 as constant we return F,
+			if (!get_constant(squeezed_positives[negative_exponent]).has_value())
+				return _F<BAs...>;
+            // otherwise we compute the new negated literal following the Corollary 3.1
+			// from TABA book.
+			lits.insert(normalize(negatives, squeezed_positives.at(negative_exponent), negative_exponent));
+		}
+
+		// we also add the positive terms...
+		for (auto [_, positive]: squeezed_positives)
+			lits.insert(positive);
+		// and return the conjunction of all the lits
 		return build_wff_and(lits);
 	}
 };
@@ -1584,31 +1688,35 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>
-			| to_dnf_wff<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>)
-		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
+			| to_mnf_snf_wff<BAs...>)
+		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
+		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
+		| repeat_all<step<BAs...>, BAs...>(simplify_snf<BAs...>);
 	// in the second step we compute the SNF of the negation of the the result
 	// of the first step in order to squeeze the negative equal exponent literals.
 	// Note that in this case we don't need to unsqueeze the formula.
+	std::cout << "First step: " << first_step << std::endl;
 	auto second_step = build_wff_neg(first_step)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>
-			| to_dnf_wff<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>)
+			| to_mnf_snf_wff<BAs...>)
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
+		//| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
+		//| repeat_all<step<BAs...>, BAs...>(simplify_snf<BAs...>);
 	// finally we return the negation to get the SNF of the original formula with both
 	// positive and negative equal exponent literals squeezed.
+	std::cout << "Second step: " << second_step << std::endl;
 	return build_wff_neg(second_step)
-		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>
-			| to_dnf_wff<BAs...>);
+			| to_dnf_wff<BAs...>)
+			| bf_reduce_canonical<BAs...>();
 }
 
 template<typename...BAs>
