@@ -37,9 +37,7 @@ TEST_SUITE("wff_sometimes") {
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
-		stringstream ss;
-		ss << simp_res;
-		CHECK((ss.str() == "?x && (sometimes o1[t] = 0)" || ss.str() == "(sometimes o1[t] = 0) && ?x"));
+		CHECK((simp_res == "?x && (sometimes o1[t] = 0)" || simp_res == "(sometimes o1[t] = 0) && ?x"));
 	}
 
 	TEST_CASE("push_in_2") {
@@ -63,9 +61,7 @@ TEST_SUITE("wff_sometimes") {
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
-		stringstream ss;
-		ss << simp_res;
-		CHECK( ss.str() == "always o1[t] = 0" );
+		CHECK( simp_res == "always o1[t] = 0" );
 	}
 
 	TEST_CASE("pull_out_1") {
@@ -77,9 +73,7 @@ TEST_SUITE("wff_sometimes") {
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
-		stringstream ss;
-		ss << simp_res;
-		CHECK(ss.str() == "sometimes ?x");
+		CHECK(simp_res == "sometimes ?x");
 	}
 
 	TEST_CASE("pull_out_2") {
@@ -91,8 +85,6 @@ TEST_SUITE("wff_sometimes") {
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
-		stringstream ss;
-		ss << simp_res;
-		CHECK(ss.str() == "always ?x");
+		CHECK(simp_res == "always ?x");
 	}
 }
