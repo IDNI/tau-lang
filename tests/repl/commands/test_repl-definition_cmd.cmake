@@ -3,7 +3,7 @@
 #
 
 # definition command wff_tule
-add_repl_test(def_wff_cmd "g($Y) ::= T" "[1]")
+add_repl_test(def_wff_cmd "g($Y) := T" "[1]")
 
 # definition command bf_rule
 add_repl_test(def_bf_cmd "g($Y) := 1" "[1]")
