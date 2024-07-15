@@ -466,12 +466,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			auto result_wff = normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
 			return result_wff;
 		}
-		case tau_parser::nso_rr: {
+		case tau_parser::rr: {
 			auto n_nso_rr = make_nso_rr_from_binded_code<tau_ba<BAs...>, BAs...>(value);
 			rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs;
 			rrs.insert(rrs.end(), n_nso_rr.rec_relations.begin(), n_nso_rr.rec_relations.end());
 			rrs.insert(rrs.end(), definitions.begin(), definitions.end());
 			rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = { rrs, n_nso_rr.main };
+			rr_nso = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_nso);
 			auto result_nso_rr = normalizer<tau_ba<BAs...>, BAs...>(rr_nso);
 			return result_nso_rr;
 		}
@@ -518,7 +519,7 @@ void repl_evaluator<factory_t, BAs...>::execute_cmd(const nso<tau_ba<BAs...>, BA
 	auto form = n | tau_parser::execute_cmd_arg;
 	if (auto check = form | tau_parser::tau; check) {
 		// TODO (HIGH) call executor
-	} else if (auto check = form | tau_parser::gssotc_rr; check) {
+	} else if (auto check = form | tau_parser::rr; check) {
 		// TODO (HIGH) call executor
 	}
 	not_implemented_yet();
@@ -554,8 +555,7 @@ void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(const nso<tau_ba<BA
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
-	auto rule = make_rec_relation<tau_ba<BAs...>, BAs...>(n);
-	definitions.emplace_back(rule);
+	definitions.emplace_back(n->child[0]->child[1], n->child[0]->child[1]);
 	cout << "[" << definitions.size() << "] " << definitions.back() << "\n";
 }
 

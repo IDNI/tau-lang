@@ -543,18 +543,18 @@ private:
 			if constexpr (type == tau_parser::bf) {
 				if (auto check = l | tau_parser::bf_neg; !check.has_value()) {
 					positives.insert(l);
-					BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
+					BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l;
 				} else {
 					negatives.insert(l);
-					BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
+					BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l;
 				}
 			} else {
 				if (auto check = l | tau_parser::wff_neg; !check.has_value()) {
 					positives.insert(l);
-					BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l << std::endl;
+					BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l;
 				} else {
 					negatives.insert(l);
-					BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l << std::endl;
+					BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l;
 				}
 			}
 		}

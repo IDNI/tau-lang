@@ -15,22 +15,15 @@
 
 # start symbol
 #
-start                  => (inputs | builder | library | nso_rr | gssotc_rr) _.
-
+start                  => (inputs | builder | library | rr) _.
 
 # main posibilities
 #
-gssotc_rr              => gssotc_rec_relations (_ tau _ ';'):gssotc_main.
-gssotc_rec_relations   => (_ gssotc_rec_relation)*.
-gssotc_rec_relation    => (bf_rec_relation | wff_rec_relation | tau_rec_relation)
-                                :gssotc_rec_relation_form _ '.'.
-nso_rr                 => nso_rec_relations    (_ wff _ '.'):nso_main.
-nso_rec_relations      => (_ nso_rec_relation)*.
-nso_rec_relation       => (bf_rec_relation | wff_rec_relation)
-                                :nso_rec_relation_form _ '.'.
-tau_rec_relation       => tau_ref _ ":::=" _ tau.
-wff_rec_relation       => wff_ref _  "::=" _ wff.
-bf_rec_relation        => bf_ref  _   ":=" _ bf.
+rr                     => rec_relations _ wff:main _ '.'.
+rec_relations          => (_ rec_relation _ '.')*.
+rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
+ref                    => sym [_ offsets] _ ref_args.
+ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 inputs                 => _ '<' { _ input } _ '.'.
 input                  => in _ ':' _ '{' _ source_binding _ '}'.
@@ -50,10 +43,6 @@ builder_body           => ("=:"   _ bf) :bf_builder_body
 # tau, wff and bf expressions
 #
 tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
-# TODO (HIGH) simply consider wff without { and }.
-# we introduce '{' and '}' to avoid confusion with wff negation
-# see the next TODO for an alternative
-#
                         | ('{' _ wff _ '}')                  :tau_wff
                         | (sym [_ offsets] _ ref_args)       :tau_ref
                         | (tau _ "|||" _ tau)                :tau_or
@@ -66,9 +55,9 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
                         | ("b_all"   __ q_bool_var __ wff)   :wff_ball
                         | ("b_ex"    __ q_bool_var __ wff)   :wff_bex
-                        | ("all"        __ q_var      __ wff):wff_all
-                        | ("ex"         __ q_var      __ wff):wff_ex
-                        | (sym [_ offsets] _ ref_args)       :wff_ref
+                        | ("all"     __ q_var      __ wff)   :wff_all
+                        | ("ex"      __ q_var      __ wff)   :wff_ex
+                        | ref                                :wff_ref
                         | (wff   _ "->"  _ wff)              :wff_imply
                         | (wff   _ "<->" _ wff)              :wff_equiv
                         | (wff   _ "||"  _ wff)              :wff_or
@@ -95,7 +84,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         |                                     uninterpreted_constant.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
-                        | (sym [_ offsets] _ ref_args)       :bf_ref
+                        | ref                                :bf_ref
                         | (bf _       '|'  _  bf)            :bf_or
                         | (bf _       '+'  _  bf)            :bf_xor
                         | (bf ( _ | _ '&' _ ) bf)            :bf_and
@@ -106,8 +95,6 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     capture
                         |                                     variable
                         |                                     uninterpreted_constant.
-
-ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 # callbacks
 
@@ -199,7 +186,7 @@ _                      => [ __ ].                # optional whitespace
 # cli related rules, using cli as starting point for parsing
 #
 # TODO do the same with the other starting points: library, inputs, builder,
-# nso_rr, nso, gssotc, gssotc_rr... depending on the use case of the grammar.
+# rr... depending on the use case of the grammar.
 cli                    => _ cli_command _ ('.' _ cli_command _)*.
 cli_command            =>
           ("q" | "quit")   :quit_sym                          :quit_cmd
@@ -207,13 +194,13 @@ cli_command            =>
         | ("c" | "clear")  :clear_sym                         :clear_cmd
         | (("h" | "help")  :help_sym   [__ help_arg])         :help_cmd
         | ("file"          :file_sym    __ q_string)          :file_cmd
-        | ("valid"         :valid_sym   __ nso_rr)            :valid_cmd
-        | ("sat"           :sat_sym     __ nso_rr)            :sat_cmd
-        | ("unsat"         :unsat_sym   __ nso_rr)            :unsat_cmd
+        | ("valid"         :valid_sym   __ rr)                :valid_cmd
+        | ("sat"           :sat_sym     __ rr)                :sat_cmd
+        | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
         | ("solve"         :solve_sym   __
                                 wff_cmd_arg:solve_cmd_arg)    :solve_cmd
         | (("e" | "execute"):execute_sym __
-                (wff_typed | nso_rr):execute_cmd_arg)            :execute_cmd
+                (wff_typed | rr):execute_cmd_arg)             :execute_cmd
         | (("n" | "normalize")
                         :normalize_sym __ normalize_cmd_arg)  :normalize_cmd
         | (("i" | "inst" | "instantiate")
@@ -235,12 +222,12 @@ cli_command            =>
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # rec relations
         | (("defs" | "definitions"):def_sym)                  :def_list_cmd
-        | (nso_rec_relation_form)                             :def_rr_cmd
+        | rec_relation                                        :def_rr_cmd
         | (      def_sym __ memory)                           :def_print_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
 	| (history_sym __ memory)                             :history_print_cmd
-        | ((bf_typed | wff_typed ):history_store_cmd_arg)            :history_store_cmd
+        | ((bf_typed | wff_typed ):history_store_cmd_arg)     :history_store_cmd
 #qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
@@ -253,7 +240,7 @@ cli_command            =>
 
 # command arguments
 #
-bf_typed               => bf | bf _ ':' _ "bf".
+bf_typed               => bf  | bf  _ ':' _ "bf".
 wff_typed              => wff | wff _ ':' _ "wff".
 bf_cmd_arg             => memory | bf_selection  | bf_typed.
 bf_cmd_out_arg         => memory | bf_selection.
@@ -261,7 +248,7 @@ wff_cmd_arg            => memory | wff_selection | wff_typed.
 wff_cmd_out_arg        => memory | wff_selection.
 nf_cmd_arg             => memory | bf_typed | wff_typed.
 onf_cmd_arg            => memory | wff_typed.
-normalize_cmd_arg      => memory | bf_typed | wff_typed | nso_rr.
+normalize_cmd_arg      => memory | bf_typed | wff_typed | rr.
 
 # symbols usable for detailed help message
 #
