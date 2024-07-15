@@ -774,6 +774,37 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 		});
 		return from_dnf(r);
 	}
+
+	// remove the leftmost single clause in the bdd
+	static bdd_ref rm_clause(bdd_ref x) {
+		if (leaf(x)) return F;
+		const bdd_node_t& n = get_node(x);
+		if (n.l == F) return add(n.v, rm_clause(n.h), F);
+		if (leaf(n.h)) return add(n.v, n.h, rm_clause(n.l));
+		return add(n.v, rm_clause(n.h), n.l);
+	}
+
+	// Find highest variable name in bdd
+	static uint highest_var(bdd_ref x) {
+		const bdd& xx = get(x);
+		if (xx.leaf()) return 0;
+		const bdd_node_t& n = std::get<bdd_node_t>(xx);
+		return max(n.v, max(highest_var(n.h), highest_var(n.l)));
+	}
+
+	// Find a variable not present in x
+	static bdd_ref split_clause(bdd_ref x) {
+		if constexpr (!o.has_inv_order()) {
+			// First variable is smallest
+			if(leaf(x)) return bdd_and(x, bit(1));
+			return bdd_and(x, bit(highest_var(x) + 1));
+		} else {
+			// First variable is highest
+			if(leaf(x)) return bdd_and(x, bit(1));
+			const bdd_node_t& n = get_node(x);
+			return bdd_and(x, bit(n.v + 1));
+		}
+	}
 };
 
 template<typename B, bdd_options o>
@@ -1324,6 +1355,36 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			}
 		});
 		return from_dnf(r);
+	}
+
+	// remove the leftmost single clause in the bdd
+	static bdd_ref rm_clause(bdd_ref x) {
+		if (leaf(x)) return F;
+		const bdd& n = get(x);
+		if (n.l == F) return add(n.v, rm_clause(n.h), F);
+		if (leaf(n.h)) return add(n.v, n.h, rm_clause(n.l));
+		return add(n.v, rm_clause(n.h), n.l);
+	}
+
+	// Find highest variable in bdd
+	static uint_t highest_var(bdd_ref x) {
+		if (leaf(x)) return 0;
+		const bdd& n = get(x);
+		return max(n.v, max(highest_var(n.h), highest_var(n.l)));
+	}
+
+	// Find a variable not present in x
+	static bdd_ref split_clause(bdd_ref x) {
+		if constexpr (!o.has_inv_order()) {
+			// First variable is smallest
+			if(leaf(x)) return bdd_and(x, bit(1));
+			return bdd_and(x, bit(highest_var(x) + 1));
+		} else {
+			// First variable is highest
+			if(leaf(x)) return bdd_and(x, bit(1));
+			const bdd& n = get(x);
+			return bdd_and(x, bit(n.v + 1));
+		}
 	}
 };
 

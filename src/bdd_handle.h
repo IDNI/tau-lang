@@ -52,6 +52,9 @@ hbdd<B, o> operator~(const hbdd<B, o>& x) { return ~(*x); }
 template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> normalize (const hbdd<B, o>& x) {return x;}
 
+template<typename B, auto o = bdd_options<>::create()>
+hbdd<B, o> splitter (const hbdd<B, o>& x) { return x->splitter(); }
+
 /*template<typename B, auto o = bdd_options<>::create()>
 auto operator<=>(const hbdd<B, o>& x, const hbdd<B, o>& y) {
 	if (((x & ~y) == false) | ((x ^ ~y) != false)) return std::partial_ordering::less;
@@ -268,6 +271,13 @@ struct bdd_handle {
 						(bit(true, z.first) & ~*this));
 		return r;
 	}
+
+	hbdd<B, o> splitter () {
+		bdd_ref s = bdd<B,o>::rm_clause(b);
+		if (s != bdd<B, o>::F && s != b) return get(s);
+		else return get(bdd<B,o>::split_clause(b));
+	}
+
 #ifndef DEBUG
 private:
 #endif
@@ -433,6 +443,13 @@ struct bdd_handle<Bool, o> {
 						  (bit(true, z.first) & ~*this));
 		return r;
 	}
+
+	hbdd<Bool, o> splitter () {
+		bdd_ref s = bdd<Bool,o>::rm_clause(b);
+		if (s != bdd<Bool, o>::F && s != b) return get(s);
+		else return get(bdd<Bool,o>::split_clause(b));
+	}
+
 #ifndef DEBUG
 	private:
 #endif
@@ -490,7 +507,7 @@ template<typename B, auto o = bdd_options<>::create()> void bdd_init() {
 	bdd_handle<B, o>::htrue = bdd_handle<B, o>::get(bdd<B, o>::T);
 }
 
-template<typename B, bdd_options o> void create_universe(B a) {
+template<typename B, bdd_options o> void create_universe(B) {
 	auto one = get_one<B>();
 	if constexpr (!o.has_inv_out()) {
 		auto zero = ~one;
@@ -504,7 +521,7 @@ template<typename B, bdd_options o> void create_universe(B a) {
 	}
 }
 
-template<typename B, bdd_options o> void create_universe(Bool /*a*/) {
+template<typename B, bdd_options o> void create_universe(Bool) {
 	const auto &T = bdd<Bool, o>::T;
 	const auto &F = bdd<Bool, o>::F;
 	auto &V = bdd<Bool, o>::V;
