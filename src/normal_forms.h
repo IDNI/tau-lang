@@ -1287,9 +1287,11 @@ nso<BAs...> pull_always_out(const nso<BAs...>& fm) {
 	std::map<nso<BAs...>, nso<BAs...>> l_changes = {};
 	std::vector<nso<BAs...>> collected_always_fms;
 	// Collect all always statments
+	bool no_conjunction = true;
 	for (const auto& _and : select_all_until(fm,
 								is_non_terminal<tau_parser::wff_and, BAs...>,
 								is_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
+		no_conjunction = false;
 		assert(_and->child.size() == 2);
 		for (int i = 0; i < 2; ++i) {
 			if (is_non_terminal(tau_parser::wff_and, trim(_and->child[i])))
@@ -1303,6 +1305,12 @@ nso<BAs...> pull_always_out(const nso<BAs...>& fm) {
 				l_changes[_and->child[i]] = _T<BAs...>;
 				collected_always_fms.push_back(_and->child[i]);
 			}
+		}
+	}
+	if (no_conjunction) {
+		if (!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>).has_value()) {
+			l_changes[fm] = _T<BAs...>;
+			collected_always_fms.push_back(fm);
 		}
 	}
 	if (collected_always_fms.empty()) return fm;
