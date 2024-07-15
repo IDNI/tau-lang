@@ -91,7 +91,8 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		},
 		.trim_terminals = true,
 		.dont_trim_terminals_of = {
-			26, 137, 213, 219, 221, 223, 232, 238, 240, 241
+			24, 26, 137, 213, 219, 221, 223, 232, 238, 240,
+			241
 		},
 		.to_inline = {
 			{ 18, 86, 18 },
