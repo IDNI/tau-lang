@@ -18,6 +18,8 @@
 #include "../src/babdd.h"
 #include "dict.h"
 
+#include "test_integration_helpers.h"
+
 using namespace idni::rewriter;
 using namespace idni::tau;
 
