@@ -17,11 +17,8 @@ snf {bdd: x} x = 0 && {bdd: y} x = 0
 # Let us now show how the algorithm appply the Corollary 3.1 from Taba book
 # to further normalize the formulas:
 snf {bdd:x} x = 0 && {bdd:y} x != 0
-
-# and also squeeze the positives in combination with the Corollary 3.1 and BDD
 snf {bdd:x} x = 0 && {bdd:y} x = 0 && {bdd:z} x != 0
 snf {bdd:x} x = 0 || {bdd:z} x != 0
-snf {bdd:x} x = 0 && {bdd:y} x = 0 || {bdd:z} y != 0
-snf {bdd:x} x != 0 && {bdd:x}{bdd:y} x != 0
+snf {bdd:x} x != 0 && ({bdd:x}{bdd:y}) x != 0
 
 quit # quit the Tau REPL
