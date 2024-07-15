@@ -1700,21 +1700,6 @@ private:
 		return replace<sp_tau_node<BAs...>>(wff, changes);
 	}
 
-	// TODO (LOW) this should be promoted to a predicate if needed elsewhere
-	bool are_equal(sp_tau_node<BAs...>& p, sp_tau_node<BAs...>& n) {
-		if (p->value == n->value) {
-			auto p_it = p->child.begin();
-			auto n_it = n->child.begin();
-			while (p_it != p->child.end() && n_it != n->child.end()) {
-				if (*p_it == *n_it) { ++p_it; ++n_it; continue; }
-				if (are_equal(*p_it, *n_it)) { ++p_it; ++n_it; continue; }
-				return false;
-			}
-			return true;
-		}
-		return false;
-	}
-
 	sp_tau_node<BAs...> apply_has_subformula_check(sp_tau_node<BAs...> n, const tau_parser::nonterminal& cb_arg_t) {
 		auto args = n || cb_arg_t || only_child_extractor<BAs...>;
 		for (auto& subformula: select_all(args[0], all<sp_tau_node<BAs...>>))
