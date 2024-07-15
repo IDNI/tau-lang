@@ -1044,7 +1044,6 @@ std::pair<std::string, size_t> get_ref_name_and_arity(
 	if (auto ref_as_child = n | tau_parser::ref; ref_as_child)
 		ref = ref_as_child.value();
 	auto ofs = ref | tau_parser::offsets || tau_parser::offset;
-	std::cout << "ofs.size(): " << ofs.size() << "\n";
 	return { make_string(tau_node_terminal_extractor<BAs...>,
 					(ref | tau_parser::sym).value()),
 		ofs.size() };
