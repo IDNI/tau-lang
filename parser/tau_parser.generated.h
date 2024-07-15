@@ -55,8 +55,7 @@ inline std::vector<std::string> symbol_names{
 	"selection_sym", "examples_sym", "__E_help_arg_162", "__E___E_help_arg_162_163", "rel_memory", "__E_memory_164", "__E___E_memory_164_165", "__E___E___E_memory_164_165_166", "memory_id", "abs_memory", 
 	"__E_memory_167", "bf_var_selection", "wff_var_selection", "enum_option", "severity_opt", "__E_option_168", "status_opt", "__E_bool_option_169", "colors_opt", "__E_bool_option_170", 
 	"debug_repl_opt", "__E_bool_option_171", "option_value_true", "option_value_false", "severity", "error_sym", "__E_severity_172", "info_sym", "__E_severity_173", "debug_sym", 
-	"__E_severity_174", "trace_sym", "__E_severity_175", "bf_all", "bf_ex", "del_sym", "__N_0", "__N_1", "__N_2", "__N_3", 
-	"__N_4", "__N_5", 
+	"__E_severity_174", "trace_sym", "__E_severity_175", "__N_0", "__N_1", "__N_2", "__N_3", "__N_4", "__N_5", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
@@ -91,22 +90,10 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.to_trim = {
 			16, 72
 		},
-		.to_trim_children_terminals = {
-			11, 12, 18, 22, 26, 27, 28, 30, 34, 44,
-			46, 52, 53, 54, 68, 74, 76, 78, 80, 82,
-			87, 88, 89, 91, 93, 95, 97, 100, 103, 105,
-			108, 110, 113, 117, 119, 121, 123, 125, 127, 129,
-			130, 131, 133, 135, 137, 139, 141, 143, 145, 148,
-			149, 151, 155, 157, 159, 162, 164, 167, 168, 190,
-			193, 195, 197, 199, 201, 203, 205, 207, 209, 211,
-			213, 215, 217, 219, 221, 223, 225, 227, 244, 271,
-			276, 279, 282, 286, 292, 296, 299, 302, 305, 310,
-			314, 317, 322, 325, 327, 336, 339, 342, 345, 348,
-			351, 354, 357, 361, 370, 378, 381, 384, 387, 389,
-			394, 398, 399, 400, 401, 414, 416, 418, 420, 422,
-			423, 425, 427, 429, 431, 433, 434, 435
+		.trim_terminals = true,
+		.dont_trim_terminals_of = {
+			85, 147, 229, 235, 237, 239, 248, 254, 256, 257
 		},
-		.trim_terminals = false,
 		.to_inline = {
 			{ 20, 80, 20 },
 			{ 32, 95, 32 },
@@ -746,16 +733,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(227), (NT(228)));
 //G296: bf_cb(67)            => bf_normalize_cb(227).
 	p(NT(67), (NT(227)));
-//G297: __N_0(436)           => 'F'.
-	p(NT(436), (T(33)));
-//G298: __N_1(437)           => 'T'.
-	p(NT(437), (T(32)));
-//G299: __N_2(438)           => 'i'.
-	p(NT(438), (T(18)));
-//G300: __N_3(439)           => 'o'.
-	p(NT(439), (T(14)));
-//G301: __E_charvar_91(230)  => ~( __N_0(436) ) & ~( __N_1(437) ) & ~( __N_2(438) ) & ~( __N_3(439) ) & alpha(5).	 # conjunctive
-	p(NT(230), ~(NT(436)) & ~(NT(437)) & ~(NT(438)) & ~(NT(439)) & (NT(5)));
+//G297: __N_0(433)           => 'F'.
+	p(NT(433), (T(33)));
+//G298: __N_1(434)           => 'T'.
+	p(NT(434), (T(32)));
+//G299: __N_2(435)           => 'i'.
+	p(NT(435), (T(18)));
+//G300: __N_3(436)           => 'o'.
+	p(NT(436), (T(14)));
+//G301: __E_charvar_91(230)  => ~( __N_0(433) ) & ~( __N_1(434) ) & ~( __N_2(435) ) & ~( __N_3(436) ) & alpha(5).	 # conjunctive
+	p(NT(230), ~(NT(433)) & ~(NT(434)) & ~(NT(435)) & ~(NT(436)) & (NT(5)));
 //G302: __E_charvar_92(231)  => null.
 	p(NT(231), (nul));
 //G303: __E_charvar_92(231)  => digit(3) __E_charvar_92(231).
@@ -810,18 +797,18 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(238), (NT(70)));
 //G328: offset(238)          => shift(244).
 	p(NT(238), (NT(244)));
-//G329: __N_4(440)           => io_var(232).
-	p(NT(440), (NT(232)));
-//G330: __E_offset_98(245)   => variable(169) & ~( __N_4(440) ).	 # conjunctive
-	p(NT(245), (NT(169)) & ~(NT(440)));
+//G329: __N_4(437)           => io_var(232).
+	p(NT(437), (NT(232)));
+//G330: __E_offset_98(245)   => variable(169) & ~( __N_4(437) ).	 # conjunctive
+	p(NT(245), (NT(169)) & ~(NT(437)));
 //G331: offset(238)          => __E_offset_98(245).
 	p(NT(238), (NT(245)));
 //G332: __E_shift_99(246)    => capture(70).
 	p(NT(246), (NT(70)));
-//G333: __N_5(441)           => io_var(232).
-	p(NT(441), (NT(232)));
-//G334: __E___E_shift_99_100(247) => variable(169) & ~( __N_5(441) ).	 # conjunctive
-	p(NT(247), (NT(169)) & ~(NT(441)));
+//G333: __N_5(438)           => io_var(232).
+	p(NT(438), (NT(232)));
+//G334: __E___E_shift_99_100(247) => variable(169) & ~( __N_5(438) ).	 # conjunctive
+	p(NT(247), (NT(169)) & ~(NT(438)));
 //G335: __E_shift_99(246)    => __E___E_shift_99_100(247).
 	p(NT(246), (NT(247)));
 //G336: shift(244)           => __E_shift_99(246) _(16) '-' _(16) num(243).
@@ -1551,8 +1538,7 @@ struct tau_parser : public idni::parser<char, char> {
 		selection_sym, examples_sym, __E_help_arg_162, __E___E_help_arg_162_163, rel_memory, __E_memory_164, __E___E_memory_164_165, __E___E___E_memory_164_165_166, memory_id, abs_memory, 
 		__E_memory_167, bf_var_selection, wff_var_selection, enum_option, severity_opt, __E_option_168, status_opt, __E_bool_option_169, colors_opt, __E_bool_option_170, 
 		debug_repl_opt, __E_bool_option_171, option_value_true, option_value_false, severity, error_sym, __E_severity_172, info_sym, __E_severity_173, debug_sym, 
-		__E_severity_174, trace_sym, __E_severity_175, bf_all, bf_ex, del_sym, __N_0, __N_1, __N_2, __N_3, 
-		__N_4, __N_5, 
+		__E_severity_174, trace_sym, __E_severity_175, __N_0, __N_1, __N_2, __N_3, __N_4, __N_5, 
 	};
 	static tau_parser& instance() {
 		static tau_parser inst;

@@ -284,9 +284,7 @@ std::string build_universal_quantifiers(const tau_spec_vars<BAs...>& vars, size_
 template<typename... BAs>
 std::string build_universal_quantifiers(const tau_spec_vars<BAs...>& vars) {
 	std::basic_stringstream<char> str;
-	for (const auto& var: vars.vars) {
-		print_terminals(str << "all ", var) << " ";
-	}
+	for (const auto& var: vars.vars) str << "all " << var << " ";
 	return str.str();
 }
 
@@ -302,9 +300,7 @@ std::string build_existential_quantifiers(const tau_spec_vars<BAs...>& vars, siz
 template<typename... BAs>
 std::string build_existential_quantifiers(const tau_spec_vars<BAs...>& vars) {
 	std::basic_stringstream<char> str;
-	for (const auto& var: vars.vars) {
-		print_terminals(str << "ex ", var) << " ";
-	}
+	for (const auto& var: vars.vars) str << "ex " << var << " ";
 	return str.str();
 }
 

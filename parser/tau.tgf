@@ -309,33 +309,10 @@ severity               => ("e" | "error"):error_sym
 #
 @trim _, __.              # trim whitespace
 
-# remove terminals we don't need after parsing
-@trim children terminals
-        gssotc_main, nso_main, gssotc_rec_relation, nso_rec_relation,
-        tau_rec_relation, wff_rec_relation, bf_rec_relation, inputs, input,
-        tau_rule, wff_rule, bf_rule, builder, builder_head,
-        tau_builder_body, wff_builder_body, bf_builder_body,
-        tau_parenthesis, tau_or, tau_and, tau_neg, tau_wff,
-        wff_parenthesis, wff_conditional, wff_ball, wff_bex, wff_all, wff_ex,
-        wff_imply, wff_equiv, wff_or, wff_xor, wff_and, wff_neg, wff_t, wff_f,
-        bf_interval, bf_neq, bf_eq, bf_nleq_lower, bf_nleq_upper, bf_greater,
-        bf_less_equal, bf_less, bf_parenthesis, bf_splitter, bf_all, bf_ex,
-        bf_or, bf_xor, bf_and, bf_neg, bf_constant, bf_t, bf_f, ref_args,
-        tau_collapse_positives_cb, tau_positives_upwards_cb,
-        bf_eq_cb, bf_neq_cb, wff_has_clashing_subformulas_cb,
-        wff_has_subformula_cb, wff_remove_existential_cb,
-        wff_remove_bexistential_cb, wff_remove_buniversal_cb, bf_is_zero_cb,
-        bf_is_one_cb, bf_has_subformula_cb, bf_remove_funiversal_cb,
-        bf_remove_fexistential_cb, bf_and_cb, bf_or_cb, bf_xor_cb, bf_neg_cb,
-        offsets, shift, source_binding, cli, help_sym, version_sym, quit_sym,
-        clear_sym, get_sym, set_sym, set_cmd, toggle_sym, file_sym,
-        history_sym, abs_memory_sym, rel_memory_sym, selection_sym, def_sym,
-        inst_sym, subst_sym, normalize_sym, execute_sym, solve_sym, valid_sym,
-        sat_sym, unsat_sym, dnf_sym, cnf_sym, anf_sym, nnf_sym, pnf_sym, snf_sym,
-        mnf_sym, onf_sym, examples_sym, del_sym, severity_opt, status_opt,
-        colors_opt, debug_repl_opt, option_value_true, option_value_false,
-        error_sym, debug_sym, trace_sym, info_sym, qelim_sym, uninterpreted_constant,
-        subst_cmd, bf_normalize_cb, wff_typed, bf_typed, wff_sometimes, wff_always.
+# remove all terminals except those we need after parsing
+@trim all terminals except children of
+	sym, digits, type, source, named_binding,
+	charvar, in_var_name, out_var_name, bool_variable, uninter_const_name.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, q_bool_var, src_c, tau_cb, wff_cb, bf_cb,
