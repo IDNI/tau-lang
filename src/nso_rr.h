@@ -1660,13 +1660,14 @@ private:
 		auto wff = args[1];
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		for (auto l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
-			auto eq = find_top(wff, is_non_terminal<tau_parser::bf_eq, BAs...>);
+			auto eq = find_top(l, is_non_terminal<tau_parser::bf_eq, BAs...>);
 			auto f = eq | tau_parser::bf;
 			std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0_trimmed<BAs...>}};
 			std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1_trimmed<BAs...>}};
 			auto f_0 = f ? replace(f.value(), changes_0) : _0<BAs...>;
 			auto f_1 = f ? replace(f.value(), changes_1) : _0<BAs...>;
-			if (auto neqs = select_all(wff, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
+			nso<BAs...> nl = _T<BAs...>;
+			if (auto neqs = select_all(l, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
 				auto nneqs = _T<BAs...>;
 				for (auto& neq: neqs) {
 					auto g = neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
@@ -1676,12 +1677,25 @@ private:
 						build_bf_and(build_bf_neg(f_1),	g_1),
 						build_bf_and(build_bf_neg(f_0),	g_0))));
 				}
-				auto nl = build_wff_and(build_wff_eq(build_bf_and(f_0, f_1)), nneqs);
-				changes[l] = nl;
+				nl = build_wff_and(build_wff_eq(build_bf_and(f_0, f_1)), nneqs);
 			} else if (f) {
-				auto nl = build_wff_eq(build_bf_and(f_0, f_1));
-				changes[l] = nl;
+				nl = build_wff_eq(build_bf_and(f_0, f_1));
 			}
+			// TODO review this hsack to deal with the case where we have literals
+			// that are not equal neither not equal we are just adding back all of then
+			auto is_non_eq_literal = [](nso<BAs...> n) {
+				if (auto check = n | tau_parser::wff_and; !check && is_non_terminal<tau_parser::wff>(n)) {
+					if (auto is_eq = n | tau_parser::bf_eq, is_neq = n | tau_parser::bf_neq;
+							(!is_eq.has_value() && !is_neq.has_value())) {
+						return true;
+					}
+				}
+				return false;
+			};
+			for (auto& lit: select_all(l, is_non_eq_literal)) {
+				nl = nl == _T<BAs...> ? lit : build_wff_and(nl, lit);
+			}
+			changes[l] = nl;
 		}
 		return replace<sp_tau_node<BAs...>>(wff, changes);
 	}
