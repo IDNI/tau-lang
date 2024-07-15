@@ -10,6 +10,7 @@ set(TESTS
 	normal_forms
 	nso_rr_execution
 	nso_rr_partial_eval
+	nso_rr_fixed_point
 	bf_normalization
 	wff_normalization
 

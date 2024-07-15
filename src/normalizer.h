@@ -237,6 +237,14 @@ size_t get_max_loopback_in_rr(const nso<BAs...>& form) {
 }
 
 template<typename... BAs>
+nso<BAs...> build_num(size_t value) {
+	return make_node<tau_sym<BAs...>>(tau_parser::instance()
+		.literal(tau_parser::num), {
+			make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {})
+		});
+}
+
+template<typename... BAs>
 nso<BAs...> build_num_from_num(nso<BAs...> num, size_t value) {
 	auto nts = std::get<tau_source_sym>(num->value).nts;
 	auto digits = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {});
@@ -294,6 +302,87 @@ nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
 	return result;
 }
 
+// enumerates index in main with step i - used for finding a fixed point
+template <typename... BAs>
+nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i, size_t offset_arity) {
+	auto r = form;
+	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+	std::vector<sp_tau_node<BAs...>> ofs;
+	ofs.push_back(make_node<tau_sym<BAs...>>(
+		tau_parser::instance().literal(tau_parser::offset),
+		{ build_num<BAs...>(i) }));
+	for (size_t o = 1; o < offset_arity; ++o)
+		ofs.push_back(make_node<tau_sym<BAs...>>(
+			tau_parser::instance().literal(tau_parser::offset),
+			{ 0 }));
+
+	auto ref = r | tau_parser::wff_ref | tau_parser::ref
+		| optional_value_extractor<sp_tau_node<BAs...>>;
+
+	changes[ref] = make_node<tau_sym<BAs...>>(ref->value,
+		{
+			ref->child[0],
+			make_node<tau_sym<BAs...>>(
+				tau_parser::instance()
+					.literal(tau_parser::offsets),
+				ofs
+			),
+			ref->child[1]
+		}
+
+	);
+	r = replace(r, changes);
+	BOOST_LOG_TRIVIAL(debug) << "(F*) " << r;
+	//DBG(ptree<BAs...>(std::cout << "enumerated main ", r) << "\n";)
+	return build_main_step(r, i);
+}
+
+template <typename... BAs>
+nso<BAs...> find_fixed_point(const rr<nso<BAs...>>& nso_rr, size_t offset_arity) {
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Finding fixed point";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr.main;
+
+	// TODO check for dependence loop
+
+	std::vector<nso<BAs...>> previous;
+	nso<BAs...> current;
+
+	auto eos = "(I) -- End enumeration step";
+	for (int i = 0; ; i++) {
+		current = build_enumerated_main_step<BAs...>(nso_rr.main, i, offset_arity)
+			| repeat_all<step<BAs...>, BAs...>(step<BAs...>(
+				nso_rr.rec_relations));
+
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin enumeration step";
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Normalize step";
+		current = normalizer_step(current);
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+
+		if (previous.size()
+			&& are_nso_equivalent<BAs...>(current, previous.back()))
+		{
+			BOOST_LOG_TRIVIAL(debug) << eos
+				<< " - fixed point found at step: " << i;
+			return current;
+		}
+		else if (previous.size() > 1
+			&& is_nso_equivalent_to_any_of(current, previous))
+		{
+			BOOST_LOG_TRIVIAL(debug) << eos
+				<< " - loop (no fixed point) detected at step: "
+				<< i;
+			return _F<BAs...>;
+		}
+		BOOST_LOG_TRIVIAL(debug) << eos
+			<< " - no fixed point resolution at step: "
+			<< i << " incrementing";
+		previous.push_back(current);
+	}
+}
+
 // REVIEW (HIGH) review overall execution
 template <typename... BAs>
 nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
@@ -309,6 +398,35 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << applied_defs;
+
+	//DBG(ptree<BAs...>(std::cout << "main ", applied_defs.main) << "\n";)
+
+	// if rr main is a fixed point search
+	// if main has no offsets and there exists a rr with offsets
+	auto ref = applied_defs.main | tau_parser::wff_ref | tau_parser::ref;
+	if (ref && !(ref | tau_parser::offsets).has_value()) {
+		rr_types types;
+		auto names = get_rr_types(types, applied_defs);
+		for (const auto& r : applied_defs.rec_relations) {
+			// #ifdef DEBUG
+			// ptree<BAs...>(std::cout << "rrel left: ", r.first) << "\n",
+			// ptree<BAs...>(std::cout << "rrel right: ", r.second) << "\n",
+			// #endif
+			get_rr_types(types, r.first);
+			get_rr_types(types, r.second);
+		}
+		auto fn = get_ref_name(ref.value());
+		auto it = types.find(fn);
+		if (it != types.end()) {
+			size_t offset_arity = it->second.second;
+			if (offset_arity > 0) {
+				auto fp = find_fixed_point<BAs...>(applied_defs, offset_arity);
+				BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";
+				BOOST_LOG_TRIVIAL(debug) << "(O) " << fp << "\n";
+				return fp;
+			}
+		}
+	}
 
 	auto loopback = get_max_loopback_in_rr(applied_defs.main);
 
