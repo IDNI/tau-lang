@@ -1727,23 +1727,6 @@ nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...
 }
 
 template<typename...BAs>
-nso<BAs...> minimize_wff(const nso<BAs...>& n) {
-	auto form = n;
-	for (auto& var: select_all(n, is_non_terminal<tau_parser::variable, BAs...>)) {
-		for (auto& c: get_dnf_clauses<tau_parser::wff, BAs...>(n)) {
-			for (auto& l: get_literals<tau_parser::wff, BAs...>(c)) {
-				auto type = (l | tau_parser::bf_eq) ? tau_parser::bf_eq : tau_parser::bf_neq;
-				auto [a, b] = split_bf_using_var(var, n);
-				// TODO (HIGH) take into account if we have eq or neq
-				auto nl = build_split_wff_using(type, a, b);
-			}
-		}
-	}
-	// TODO (HIGH) change the return value
-	return n;
-}
-
-template<typename...BAs>
 nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
 	return apply_once_definitions(nn)
