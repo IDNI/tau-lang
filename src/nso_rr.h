@@ -195,9 +195,7 @@ template<typename... BAs>
 static const auto is_quantifier = [](const nso<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value) || !get<tau_source_sym>(n->value).nt()) return false;
 	auto nt = get<tau_source_sym>(n->value).n();
-	return nt == tau_parser::bf_all
-		|| nt == tau_parser::bf_ex
-		|| nt == tau_parser::wff_all
+	return nt == tau_parser::wff_all
 		|| nt == tau_parser::wff_ex
 		|| nt == tau_parser::wff_ball
 		|| nt == tau_parser::wff_bex;
@@ -2101,8 +2099,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_xor_cb,                       670 },
 			{ tau_parser::bf_neg_cb,                       680 },
 
-			{ tau_parser::bf_all,                          700 },
-			{ tau_parser::bf_ex,                           710 },
 			{ tau_parser::bf_or,                           720 },
 			{ tau_parser::bf_and,                          730 },
 			{ tau_parser::bf_xor,                          740 },
@@ -2211,6 +2207,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::tau_builder_body: prefix("=:::"); break;
 			case tau_parser::inputs:           prefix("<"); break;
 			case tau_parser::input: infix(": {"); stream << " }"; break;
+			case tau_parser::in:
+			case tau_parser::out: infix_nows("[");stream << "]"; break;
 			// wrappable by parenthesis
 			case tau_parser::bf:
 			case tau_parser::wff:
@@ -2330,8 +2328,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::set_cmd:       prefix("set"); break;
 			case tau_parser::toggle_cmd:    prefix("toggle"); break;
 			// just print terminals for these
+			case tau_parser::in_var_name:
+			case tau_parser::out_var_name:
+			case tau_parser::chars:
 			case tau_parser::capture:
-			case tau_parser::variable:
 			case tau_parser::bool_variable:
 			case tau_parser::sym:
 			case tau_parser::num:
