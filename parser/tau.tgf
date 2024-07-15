@@ -187,7 +187,7 @@ _                      => [ __ ].                # optional whitespace
 #
 # TODO do the same with the other starting points: library, inputs, builder,
 # rr... depending on the use case of the grammar.
-cli                    => _ cli_command _ ('.' _ cli_command _)*.
+cli                    => _ | _ cli_command _ ('.' _ cli_command _)*.
 cli_command            =>
           ("q" | "quit")   :quit_sym                          :quit_cmd
         | ("v" | "version"):version_sym                       :version_cmd
@@ -204,12 +204,12 @@ cli_command            =>
         | (("n" | "normalize")
                         :normalize_sym __ normalize_cmd_arg)  :normalize_cmd
         | (("i" | "inst" | "instantiate")
-                :inst_sym  __ variable    __ wff_cmd_arg __
+                :inst_sym  __ variable __ wff_cmd_arg __
                                         wff_cmd_out_arg)      :wff_inst_cmd
         | (("s" | "subst" | "substitute")
                 :subst_sym __ nf_cmd_arg _ '[' _
                    nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')       :subst_cmd
-        | (      inst_sym  __ variable   __ bf_cmd_arg  __
+        | (      inst_sym  __ variable __ bf_cmd_arg  __
                                         bf_cmd_out_arg)       :bf_inst_cmd
 # normal forms
         | ("dnf":dnf_sym __ nf_cmd_arg)                       :dnf_cmd
@@ -236,7 +236,7 @@ cli_command            =>
         | ("set":set_sym   __ option
                                 (__ | _ '=' _) option_value)  :set_cmd
         | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
-        | comment.
+        .
 
 # command arguments
 #
@@ -294,7 +294,7 @@ severity               => ("e" | "error"):error_sym
 
 # shaping of the parsed tree
 #
-@trim _, __.              # trim whitespace
+@trim _, __.  # trim whitespace
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
