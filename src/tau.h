@@ -206,99 +206,99 @@ struct tau_splitter {
 
 };
 
-// creates a specific rule from a generic rule.
-// TODO (LOW) should depend in node_t instead of BAs...
-template<typename... BAs>
-rec_relation<gssotc<BAs...>> make_gssotc_rec_relation(const gssotc<BAs...>& rule) {
-	auto rr = rule | tau_parser::gssotc_rec_relation_form
-		| only_child_extractor<tau_ba<BAs...>, BAs...>
-		| optional_value_extractor<gssotc<BAs...>>;
-	auto type = rr | non_terminal_extractor<tau_ba<BAs...>, BAs...> | optional_value_extractor<size_t>;
-	switch (type) {
-	case tau_parser::bf_rec_relation:  return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::bf_ref,  tau_parser::bf,  rr);
-	case tau_parser::wff_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::wff_ref, tau_parser::wff, rr);
-	case tau_parser::tau_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::tau_ref, tau_parser::tau, rr);
-	default: assert(false); return {};
-	};
-}
+// // creates a specific rule from a generic rule.
+// // TODO (LOW) should depend in node_t instead of BAs...
+// template<typename... BAs>
+// rec_relation<gssotc<BAs...>> make_gssotc_rec_relation(const gssotc<BAs...>& rule) {
+// 	auto rr = rule | tau_parser::gssotc_rec_relation_form
+// 		| only_child_extractor<tau_ba<BAs...>, BAs...>
+// 		| optional_value_extractor<gssotc<BAs...>>;
+// 	auto type = rr | non_terminal_extractor<tau_ba<BAs...>, BAs...> | optional_value_extractor<size_t>;
+// 	switch (type) {
+// 	case tau_parser::bf_rec_relation:  return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::bf_ref,  tau_parser::bf,  rr);
+// 	case tau_parser::wff_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::wff_ref, tau_parser::wff, rr);
+// 	case tau_parser::tau_rec_relation: return make_rec_relation<tau_ba<BAs...>, BAs...>(tau_parser::tau_ref, tau_parser::tau, rr);
+// 	default: assert(false); return {};
+// 	};
+// }
 
-// create a set of relations from a given tau source.
-template<typename... BAs>
-// TODO (LOW) should depend in node_t instead of BAs...
-rec_relations<gssotc<BAs...>> make_gssotc_rec_relations(const gssotc<BAs...>& tau_source) {
-	rec_relations<gssotc<BAs...>> rs;
-	// TODO (LOW) change call to select by operator|| and operator|
-	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::gssotc_rec_relation, tau_ba<BAs...>, BAs...>))
-		rs.push_back(make_gssotc_rec_relation<BAs...>(r));
-	return rs;
-}
+// // create a set of relations from a given tau source.
+// template<typename... BAs>
+// // TODO (LOW) should depend in node_t instead of BAs...
+// rec_relations<gssotc<BAs...>> make_gssotc_rec_relations(const gssotc<BAs...>& tau_source) {
+// 	rec_relations<gssotc<BAs...>> rs;
+// 	// TODO (LOW) change call to select by operator|| and operator|
+// 	for (auto& r: select_top(tau_source, is_non_terminal<tau_parser::gssotc_rec_relation, tau_ba<BAs...>, BAs...>))
+// 		rs.push_back(make_gssotc_rec_relation<BAs...>(r));
+// 	return rs;
+// }
 
-// make a nso_rr from the given tau source and binder.
-template<typename binder_t, typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_node<tau_ba<BAs...>, BAs...>& code, binder_t& binder) {
-	auto binded = bind_tau_code_using_binder<binder_t, tau_ba<BAs...>, BAs...>(code, binder);
-	auto main = binded | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
-	auto gssotc_rr = make_gssotc_rec_relations(binded);
-	auto nso_rr = make_rec_relations(binded);
-	gssotc_rr.insert(gssotc_rr.end(), nso_rr.begin(), nso_rr.end());
-	return { gssotc_rr, main };
-}
+// // make a nso_rr from the given tau source and binder.
+// template<typename binder_t, typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_node<tau_ba<BAs...>, BAs...>& code, binder_t& binder) {
+// 	auto binded = bind_tau_code_using_binder<binder_t, tau_ba<BAs...>, BAs...>(code, binder);
+// 	auto main = binded | tau_parser::gssotc_rr | tau_parser::gssotc_main | tau_parser::tau | optional_value_extractor<nso<tau_ba<BAs...>, BAs...>>;
+// 	auto gssotc_rr = make_gssotc_rec_relations(binded);
+// 	auto nso_rr = make_rec_relations(binded);
+// 	gssotc_rr.insert(gssotc_rr.end(), nso_rr.begin(), nso_rr.end());
+// 	return { gssotc_rr, main };
+// }
 
-// make a nso_rr from the given tau source and binder.
-template<typename binder_t, typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& source, binder_t& binder) {
-	auto code = make_tau_code<tau_ba<BAs...>, BAs...>(source);
-	return make_tau_spec_using_binder<binder_t, BAs...>(code, binder);
-}
+// // make a nso_rr from the given tau source and binder.
+// template<typename binder_t, typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_binder(sp_tau_source_node& source, binder_t& binder) {
+// 	auto code = make_tau_code<tau_ba<BAs...>, BAs...>(source);
+// 	return make_tau_spec_using_binder<binder_t, BAs...>(code, binder);
+// }
 
-// make a nso_rr from the given tau source and binder.
-template<typename binder_t, typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_binder(std::string& input, binder_t& binder) {
-	auto source = make_tau_source(input);
-	return make_tau_spec_using_binder<binder_t, BAs...>(source, binder);
-}
+// // make a nso_rr from the given tau source and binder.
+// template<typename binder_t, typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_binder(std::string& input, binder_t& binder) {
+// 	auto source = make_tau_source(input);
+// 	return make_tau_spec_using_binder<binder_t, BAs...>(source, binder);
+// }
 
-// make a nso_rr from the given tau source and bindings.
-template<typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_bindings(sp_tau_node<tau_ba<BAs...>, BAs...>& code, const bindings<BAs...>& bindings) {
-	name_binder<tau_ba<BAs...>, BAs...> nb(bindings);
-	return make_tau_spec_using_binder<name_binder<tau_ba<BAs...>, BAs...>, BAs...>(code, nb);
-}
+// // make a nso_rr from the given tau source and bindings.
+// template<typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_bindings(sp_tau_node<tau_ba<BAs...>, BAs...>& code, const bindings<BAs...>& bindings) {
+// 	name_binder<tau_ba<BAs...>, BAs...> nb(bindings);
+// 	return make_tau_spec_using_binder<name_binder<tau_ba<BAs...>, BAs...>, BAs...>(code, nb);
+// }
 
-// make a nso_rr from the given tau source and bindings.
-template<typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_bindings(sp_tau_source_node& source, const bindings<BAs...>& bindings) {
-	auto code = make_tau_code<tau_ba<BAs...>, BAs...>(source);
-	return make_tau_spec_using_bindings<BAs...>(code, bindings);
-}
+// // make a nso_rr from the given tau source and bindings.
+// template<typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_bindings(sp_tau_source_node& source, const bindings<BAs...>& bindings) {
+// 	auto code = make_tau_code<tau_ba<BAs...>, BAs...>(source);
+// 	return make_tau_spec_using_bindings<BAs...>(code, bindings);
+// }
 
-// make a nso_rr from the given tau source and bindings.
-template<typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& input, const bindings<BAs...>& bindings) {
-	auto source = make_tau_source(input);
-	return make_tau_spec_using_bindings<tau_ba<BAs...>, BAs...>(source, bindings);
-}
+// // make a nso_rr from the given tau source and bindings.
+// template<typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_bindings(const std::string& input, const bindings<BAs...>& bindings) {
+// 	auto source = make_tau_source(input);
+// 	return make_tau_spec_using_bindings<tau_ba<BAs...>, BAs...>(source, bindings);
+// }
 
-// make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_node<tau_ba<BAs...>, BAs...>& code, factory_t& factory) {
-	factory_binder<factory_t, tau_ba<BAs...>, BAs...> bs(factory);
-	return make_tau_spec_using_binder<factory_binder<factory_t, tau_ba<BAs...>, BAs...>, BAs...>(code, bs);
-}
+// // make a nso_rr from the given tau source and bindings.
+// template<typename factory_t, typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_node<tau_ba<BAs...>, BAs...>& code, factory_t& factory) {
+// 	factory_binder<factory_t, tau_ba<BAs...>, BAs...> bs(factory);
+// 	return make_tau_spec_using_binder<factory_binder<factory_t, tau_ba<BAs...>, BAs...>, BAs...>(code, bs);
+// }
 
-// make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_source_node& source, factory_t& factory) {
-	auto code = make_tau_code<tau_ba<BAs...>, BAs...>(source);
-	return make_tau_spec_using_factory<factory_t, BAs...>(code, factory);
-}
+// // make a nso_rr from the given tau source and bindings.
+// template<typename factory_t, typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_factory(sp_tau_source_node& source, factory_t& factory) {
+// 	auto code = make_tau_code<tau_ba<BAs...>, BAs...>(source);
+// 	return make_tau_spec_using_factory<factory_t, BAs...>(code, factory);
+// }
 
-// make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-tau_spec<BAs...> make_tau_spec_using_factory(const std::string& input, factory_t& factory) {
-	auto source = make_tau_source(input);
-	return make_tau_spec_using_factory<factory_t, BAs...>(source, factory);
-}
+// // make a nso_rr from the given tau source and bindings.
+// template<typename factory_t, typename... BAs>
+// tau_spec<BAs...> make_tau_spec_using_factory(const std::string& input, factory_t& factory) {
+// 	auto source = make_tau_source(input);
+// 	return make_tau_spec_using_factory<factory_t, BAs...>(source, factory);
+// }
 
 } // namespace idni::tau
 

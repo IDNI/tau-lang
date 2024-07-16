@@ -24,7 +24,7 @@ fi
 pipe=$(mktemp -u)
 mkfifo $pipe
 
-echo "You are executing a Tau demo script. Please press any key to contionue step by step over it."
+echo "You are executing a Tau demo script. Please press any key to continue step by step over it."
 
 # wait 10 secs till tau is up and running
 (sleep 10 && while IFS= read -r line

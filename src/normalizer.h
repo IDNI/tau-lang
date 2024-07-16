@@ -281,7 +281,8 @@ template<typename... BAs>
 nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin calculate recurrence relation";
 
-	auto bf_unfolded = bf.main | repeat_all<step<BAs...>, BAs...>(step<BAs...>(bf.rec_relations));
+	auto bf_unfolded = bf.main | repeat_all<step<BAs...>, BAs...>(
+						step<BAs...>(bf.rec_relations));
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End calculate recurrence relation";
 
@@ -292,6 +293,103 @@ nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 
 	return result;
+}
+
+// enumerates index in main with step i - used for finding a fixed point
+template <typename... BAs>
+nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
+	size_t offset_arity)
+{
+	auto r = form;
+	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+	std::vector<sp_tau_node<BAs...>> ofs; // create offsets node
+	ofs.push_back(make_node<tau_sym<BAs...>>(
+		tau_parser::instance().literal(tau_parser::offset),
+		{ build_num<BAs...>(i) }));
+	for (size_t o = 1; o < offset_arity; ++o)
+		ofs.push_back(make_node<tau_sym<BAs...>>(
+			tau_parser::instance().literal(tau_parser::offset),
+			{ 0 }));
+	// create enumerated replacement
+	auto ref = r | tau_parser::wff_ref | tau_parser::ref
+		| optional_value_extractor<sp_tau_node<BAs...>>;
+	changes[ref] = make_node<tau_sym<BAs...>>(ref->value, {
+		ref->child[0],
+		make_node<tau_sym<BAs...>>(tau_parser::instance()
+			.literal(tau_parser::offsets), ofs),
+		ref->child[1]
+	});
+	r = replace(r, changes);
+	BOOST_LOG_TRIVIAL(debug) << "(F*) " << r;
+	//DBG(ptree<BAs...>(std::cout << "enumerated main ", r) << "\n";)
+	return build_main_step(r, i);
+}
+
+template <typename... BAs>
+nso<BAs...> find_fixed_point(const rr<nso<BAs...>>& nso_rr,
+	size_t offset_arity)
+{
+	static auto fallback = _F<BAs...>;
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Finding fixed point";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr.main;
+
+	std::vector<nso<BAs...>> previous;
+	nso<BAs...> current, main;
+	auto is_main_predicate = [&main](const sp_tau_node<BAs...>& n) {
+		return main == n;
+	};
+	auto eos = "(I) -- End enumeration step";
+	for (int i = 0; ; i++) {
+		current = main = build_enumerated_main_step<BAs...>(
+						nso_rr.main, i, offset_arity);
+		bool changed;
+		do { // apply rec relation rules and check for cycle dependency
+			changed = false;
+			for (const auto& r : nso_rr.rec_relations) {
+				auto prev = current;
+				current = nso_rr_apply<BAs...>(r, prev);
+				if (current != prev) changed = true;
+				auto cycle = select_all(current,
+							is_main_predicate);
+				if (cycle.size() && changed) {
+					BOOST_LOG_TRIVIAL(debug) <<
+						"(I) -- Cannot calculate fixed "
+						"point. Cyclic recurence.";
+					return fallback;
+				}
+			}
+			//std::cout << "last:    " << last << "\n";
+			//std::cout << "current: " << current << "\n";
+		} while (changed);
+
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin enumeration step";
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Normalize step";
+		current = normalizer_step(current);
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+
+		if (previous.size()
+			&& are_nso_equivalent<BAs...>(current, previous.back()))
+		{
+			BOOST_LOG_TRIVIAL(debug) << eos
+				<< " - fixed point found at step: " << i;
+			return current;
+		}
+		else if (previous.size() > 1
+			&& is_nso_equivalent_to_any_of(current, previous))
+		{
+			BOOST_LOG_TRIVIAL(debug) << eos
+				<< " - loop (no fixed point) detected at step: "
+				<< i;
+			return fallback;
+		}
+		BOOST_LOG_TRIVIAL(debug) << eos
+			<< " - no fixed point resolution at step: "
+			<< i << " incrementing";
+		previous.push_back(current);
+	}
 }
 
 // REVIEW (HIGH) review overall execution
@@ -310,6 +408,28 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << applied_defs;
 
+	//DBG(ptree<BAs...>(std::cout << "main ", applied_defs.main) << "\n";)
+
+	// if rr main is a fixed point search
+	// if main has no offsets and there exists a rr with offsets
+	auto ref = applied_defs.main | tau_parser::wff_ref | tau_parser::ref;
+	if (ref && !(ref | tau_parser::offsets).has_value()) {
+		rr_types types;
+		get_rr_types(types, applied_defs);
+		auto fn = get_ref_name(ref.value());
+		auto it = types.find(fn);
+		if (it != types.end()) {
+			size_t offset_arity = it->second.second;
+			if (offset_arity) {
+				auto fp = find_fixed_point<BAs...>(applied_defs,
+								offset_arity);
+				BOOST_LOG_TRIVIAL(debug)<<"(I) -- End normalizer";
+				BOOST_LOG_TRIVIAL(debug)<<"(O) " << fp << "\n";
+				return fp;
+			}
+		}
+	}
+
 	auto loopback = get_max_loopback_in_rr(applied_defs.main);
 
 	std::vector<nso<BAs...>> previous;
@@ -317,7 +437,8 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 
 	for (int i = loopback; ; i++) {
 		current = build_main_step(applied_defs.main, i)
-			| repeat_all<step<BAs...>, BAs...>(step<BAs...>(applied_defs.rec_relations));
+			| repeat_all<step<BAs...>, BAs...>(
+				step<BAs...>(applied_defs.rec_relations));
 
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer step";
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;

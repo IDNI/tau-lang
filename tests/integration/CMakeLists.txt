@@ -1,25 +1,29 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	test_integration-bdd1
-	test_integration-bdd2
-	test_integration-tau_ba1
-	test_integration-tau_ba2
-	test_integration-tau_ba3
-	test_integration-nso_rr_execution
-	test_integration-gssotc_rr_execution
-	test_integration-nso_rr_partial_eval
-	test_integration-gssotc_rr_partial_eval
-	test_integration-bf_normalization
-	test_integration-tau1
-	test_integration-tau2
-	test_integration-executor
-	test_integration-satisfiability
-	test_integration-wff_normalization
-	test_integration-normal_forms
+	bdd1
+	bdd2
+	tau_ba1
+	tau_ba2
+	tau_ba3
+	executor
+	normal_forms
+	nso_rr_execution
+	nso_rr_partial_eval
+	nso_rr_fixed_point
+	bf_normalization
+	wff_normalization
+
+	# tests depending on a deprecated syntax
+	#gssotc_rr_execution
+	#gssotc_rr_partial_eval
+	#satisfiability
+	#tau1
+	#tau2
 )
 
-foreach(N IN LISTS TESTS)
+foreach(TEST IN LISTS TESTS)
+	set(N "test_integration-${TEST}")
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
 	target_link_libraries(${N} ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} doctest)

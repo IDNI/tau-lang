@@ -25,6 +25,5 @@ bdd    => ( '(' _ bdd _ ')'                ) :group
 _      => [ space _ ].
 
 @trim _.
-@trim children terminals
-        disjunction, exclusive_disjunction, conjunction, negation, one, zero.
+@trim all terminals except children of variable.
 @inline char classes, bdd > group > bdd.
