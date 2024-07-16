@@ -82,4 +82,17 @@ TEST_SUITE("fixed point") {
 		CHECK( check.has_value() );
 	}
 
+	TEST_CASE("wff_rec_relation detect cycle") {
+		const char* sample =
+			"f[$n](x) := g[$n](x)."
+			"g[$n](x) := f[$n](x)."
+			"g(x).";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto result = normalizer<bdd_test>(sample_formula);
+		auto check = result | tau_parser::wff_f;
+		CHECK( check.has_value() );
+	}
+
 }
