@@ -153,12 +153,13 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 	TEST_CASE("Alternating negation") {
 		const char* rec =
 			"h[$n]($X) := h[$n - 1]($X)'."
-			"h[0]($X) := $X.";
+			"h[0]($X)  := $X.";
 		tau_parser::parse_options options;
-		options.start = tau_parser::nso_rec_relations;
+		options.start = tau_parser::rec_relations;
 		auto rec_src = make_tau_source(rec, options);
 		bdd_test_factory bf;
 		auto rec_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(rec_src, bf);
+		rec_formula = infer_ref_types(rec_formula);
 
 		const char* sample = "h[8](Y)";
 		options.start = tau_parser::bf;
@@ -178,10 +179,11 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 	 		"g[0]($Y) := Y'.";
 
 	 	tau_parser::parse_options options;
-	 	options.start = tau_parser::nso_rec_relations;
+	 	options.start = tau_parser::rec_relations;
 	 	auto rec_src = make_tau_source(rec, options);
 	 	bdd_test_factory bf;
 	 	auto rec_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(rec_src, bf);
+		rec_formula = infer_ref_types(rec_formula);
 
 	 	const char* sample = "h[8](Y)";
 	 	options.start = tau_parser::bf;

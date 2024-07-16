@@ -45,8 +45,8 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		auto statement = make_statement(src);
 		auto result = mnf_wff(statement);
 		auto check = result
-			| tau_parser::nso_rr
-			| tau_parser::nso_main
+			| tau_parser::rr
+			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -58,8 +58,8 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		auto statement = make_statement(src);
 		auto result = mnf_wff(statement);
 		auto check = result
-			| tau_parser::nso_rr
-			| tau_parser::nso_main
+			| tau_parser::rr
+			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -69,8 +69,8 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::nso_rr
-			| tau_parser::nso_main
+			| tau_parser::rr
+			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = mnf_wff(statement);
 		CHECK( statement == result );
@@ -80,8 +80,8 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X != 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::nso_rr
-			| tau_parser::nso_main
+			| tau_parser::rr
+			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = mnf_wff(statement);
 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
@@ -94,8 +94,8 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 && Y = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::nso_rr
-			| tau_parser::nso_main
+			| tau_parser::rr
+			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = mnf_wff(statement);
 		auto check_and = select_all(result, is_non_terminal<tau_parser::wff_and, Bool>);
@@ -108,8 +108,8 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X != 0 && Y != 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::nso_rr
-			| tau_parser::nso_main
+			| tau_parser::rr
+			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = mnf_wff(statement);
 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
@@ -124,8 +124,8 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 || Y = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::nso_rr
-			| tau_parser::nso_main
+			| tau_parser::rr
+			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = mnf_wff(statement);
 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);

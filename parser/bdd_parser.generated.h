@@ -40,10 +40,10 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.to_trim = {
 			5
 		},
-		.to_trim_children_terminals = {
-			12, 14, 16, 19, 22, 23
+		.trim_terminals = true,
+		.dont_trim_terminals_of = {
+			9
 		},
-		.trim_terminals = false,
 		.to_inline = {
 			{ 6, 7, 6 }
 		},
