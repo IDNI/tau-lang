@@ -1399,7 +1399,6 @@ struct to_snf_step {
 
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
 		// we select all literals, i.e. wff equalities or it negations.
-		std::cout << "form: " << form << std::endl;
 		static const auto is_literal = [](const auto& n) -> bool {
 			return (n | tau_parser::bf_eq).has_value();
 		};
@@ -1432,9 +1431,7 @@ private:
 	}, [](const auto&) -> bool { throw std::logic_error("wrong types"); });
 
 	static constexpr auto _leq = overloaded([]<typename T>(const T& l, const T& r) -> bool {
-			auto result =  (l & ~r);
-			std::cout << "l: " << l << " r: " << r << " result: " << result << std::endl;
-			return result == false;
+			return (l & ~r) == false;
 	}, [](const auto&, const auto&) -> bool { throw std::logic_error("wrong types"); });
 
 	nso<BAs...> bdd_path_to_snf(const bdd_path& path, const nso<BAs...>& form) const {
@@ -1472,7 +1469,7 @@ private:
 	exponent get_exponent(const nso<BAs...>& n) const {
 		auto is_bf_literal = [](const auto& n) -> bool {
 			return (n | tau_parser::variable).has_value()
-				|| (n | tau_parser::bf_neg | tau_parser::variable).has_value();
+				|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
 		};
 		auto all_vs = select_top(n, is_bf_literal);
 		return exponent(all_vs.begin(), all_vs.end());
@@ -1536,9 +1533,6 @@ private:
 	}
 
 	literals mins(const literals& ls) const {
-		std::cout << "compute mins of: ";
-		for (auto& l: ls) std::cout << l << " ";
-		std:: cout << std::endl;
 		static auto _explicit_constant = [&](const auto& l) {
 			return get_constant(l).has_value();
 		};
@@ -1550,32 +1544,20 @@ private:
 		literals remaining(++first, ls.end());
 
 		while (!remaining.empty()) {
-			std::cout << "remaining: ";
-			for (auto& l: remaining) std::cout << l << " ";
-			std:: cout << std::endl;
-
 			first = std::find_if(remaining.begin(), remaining.end(), _explicit_constant);
 			if (first == remaining.end()) break;
 			bool add_first = true;
 			literals bigger;
-			std::cout << "first: " << *first << std::endl;
 			for (auto& m: mins) {
-				std::cout << "m: " << m << std::endl;
 				if (is_less_eq_than(*first, m)) bigger.insert(m);
 				else if (is_less_eq_than(m, *first)) {
 					add_first = false; break;
 				}
 			}
-			std::cout << "bigger: ";
-			for (auto& l: bigger) std::cout << l << " ";
-			std:: cout << std::endl;
 			for (auto& b: bigger) mins.erase(b);
 			remaining.erase(first);
 			if (add_first) mins.insert(*first);
 		}
-		std::cout << "mins: ";
-		for (auto& l: mins) std::cout << l << " ";
-		std:: cout << std::endl;
 		return mins;
 	}
 
@@ -1695,7 +1677,6 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 	// in the second step we compute the SNF of the negation of the the result
 	// of the first step in order to squeeze the negative equal exponent literals.
 	// Note that in this case we don't need to unsqueeze the formula.
-	std::cout << "First step: " << first_step << std::endl;
 	auto second_step = build_wff_neg(first_step)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_cb<BAs...>
@@ -1708,14 +1689,13 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 		//| repeat_all<step<BAs...>, BAs...>(simplify_snf<BAs...>);
 	// finally we return the negation to get the SNF of the original formula with both
 	// positive and negative equal exponent literals squeezed.
-	std::cout << "Second step: " << second_step << std::endl;
 	return build_wff_neg(second_step)
+		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
-			| to_dnf_wff<BAs...>)
+			| trivialities<BAs...>)
 			| bf_reduce_canonical<BAs...>();
 }
 
