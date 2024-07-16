@@ -1410,6 +1410,14 @@ template<typename... BAs>
 static const sp_tau_node<BAs...> _T_trimmed = trim(_T<BAs...>);
 
 template<typename... BAs>
+nso<BAs...> build_num(size_t value) {
+	return make_node<tau_sym<BAs...>>(tau_parser::instance()
+		.literal(tau_parser::num), {
+			make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {})
+		});
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
 	auto cte = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	std::vector<sp_tau_node<BAs...>> arg { cte };
@@ -2042,10 +2050,7 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 					BOOST_LOG_TRIVIAL(debug) << "(T) " << n;
 					return n;
 				}
-				auto nts = std::get<tau_source_sym>(nn->value).nts;
-				auto digits  = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(left-right), {});
-				auto new_num = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_source_sym(tau_parser::num, nts)), {digits});
-				changes[shift] = new_num;
+				changes[shift] = build_num<BAs...>(left-right);
 			}
 		}
 	}
