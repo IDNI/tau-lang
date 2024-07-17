@@ -27,72 +27,99 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-TEST_SUITE("fixed point") {
+bdd_test_factory bf;
 
-	TEST_CASE("wff_rec_relation simple") {
+nso<bdd_test> fp_test(const char* sample) {
+	auto sample_src = make_tau_source(sample);
+	auto sample_formula = make_nso_rr_using_factory<
+		bdd_test_factory_t, bdd_test>(sample_src, bf);
+	return normalizer<bdd_test>(sample_formula);
+}
+
+std::optional<nso<bdd_test>> fp_test_wff_f(const char* sample) {
+	auto result = fp_test(sample);
+	return result | tau_parser::wff_f;
+}
+
+TEST_SUITE("rec relations fixed point") {
+
+	TEST_CASE("simple") {
 		const char* sample =
 			"g[0]($Y) := T."
 			"g[1]($Y) := T."
 			"g(Y).";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
+		auto result = fp_test(sample);
 		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("wff_rec_relation loop returns F for now") {
+	TEST_CASE("loop fallbacks to F for now") {
 		const char* sample =
 			"g[$n]($x) := !g[$n-1]($x)."
 			"g[0]($x)  := T."
 			"g(x).";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
+		auto result = fp_test(sample);
 		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("wff_rec_relation referring itself") {
+	TEST_CASE("referring itself") {
 		const char* sample =
 			"f[$n]($x) := f[$n-1]($x) && $x = 1."
 			"f[0](x)   := T."
 			"f(x).";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
+		auto result = fp_test(sample);
 		auto check = result | tau_parser::wff_always;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("wff_rec_relation multiple") {
+	TEST_CASE("multiple") {
 		const char* sample =
 			"g[$n]($x) := !g[$n-1]($x)."
 			"g[0]($x)  := T."
 			"f[$n]($x) := f[$n-1]($x) || g[$n]($x)."
 			"f(x).";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
+		auto result = fp_test(sample);
 		auto check = result | tau_parser::wff_always;
 		CHECK( check.has_value() );
 	}
+}
 
-	TEST_CASE("wff_rec_relation detect cycle") {
+TEST_SUITE("rec relations well foundedness") {
+
+	TEST_CASE("shift in header") {
+		const char* sample =
+			"f[n-1](x) := f[n-2](x)."
+			"f(x).";
+		CHECK( fp_test_wff_f(sample).has_value() );
+	}
+
+	TEST_CASE("left fixed, right relative") {
+		const char* sample =
+			"f[0](x) := f[$n](x)."
+			"f(x).";
+		CHECK( fp_test_wff_f(sample).has_value() );
+	}
+
+	TEST_CASE("left < right") {
+		const char* sample =
+			"f[1](x) := f[2](x)."
+			"f(x).";
+		CHECK( fp_test_wff_f(sample).has_value() );
+	}
+
+	TEST_CASE("detect cycle direct") {
+		const char* sample =
+			"f[$n](x) := f[$n](x)."
+			"f(x).";
+		CHECK( fp_test_wff_f(sample).has_value() );
+	}
+
+	TEST_CASE("detect cycle indirect") {
 		const char* sample =
 			"f[$n](x) := g[$n](x)."
 			"g[$n](x) := f[$n](x)."
 			"g(x).";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( fp_test_wff_f(sample).has_value() );
 	}
-
 }
