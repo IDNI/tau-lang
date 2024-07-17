@@ -28,27 +28,18 @@ ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 inputs                 => _ '<' { _ input } _ '.'.
 input                  => in _ ':' _ '{' _ source_binding _ '}'.
 
-library                => ((_ (wff_rule | bf_rule | tau_rule):rule)*):rules.
-tau_rule               => tau:tau_matcher _ ":::=" _ (tau | tau_cb):tau_body _ '.'.
-wff_rule               => wff:wff_matcher _  "::=" _ (wff | wff_cb):wff_body _ '.'.
-bf_rule                => bf :bf_matcher  _   ":=" _ (bf  | bf_cb) :bf_body  _ '.'.
+library                => ((_ (wff_rule | bf_rule):rule)*):rules.
+wff_rule               => wff:wff_matcher _ "::=" _ (wff | wff_cb):wff_body _ '.'.
+bf_rule                => bf :bf_matcher  _  ":=" _ (bf  | bf_cb) :bf_body  _ '.'.
 
 builder                => _ builder_head _ builder_body _ '.'.
 builder_head           => '(' _ capture (__ capture)* _ ')'.
-builder_body           => ("=:"   _ bf) :bf_builder_body
-                        | ("=::"  _ wff):wff_builder_body
-                        | ("=:::" _ tau):tau_builder_body.
+builder_body           => ("=:"  _ bf) :bf_builder_body
+                        | ("=::" _ wff):wff_builder_body.
 
 
-# tau, wff and bf expressions
+# wff and bf expressions
 #
-tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
-                        | ('{' _ wff _ '}')                  :tau_wff
-                        | (sym [_ offsets] _ ref_args)       :tau_ref
-                        | (tau _ "|||" _ tau)                :tau_or
-                        | (tau _ "&&&" _ tau)                :tau_and
-                        | ('-' _ tau)                        :tau_neg
-                        |                                     capture.
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (("sometimes" | "<>") _ wff)       :wff_sometimes
                         | (("always" | "[]") _ wff)          :wff_always
@@ -96,57 +87,6 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     variable
                         |                                     uninterpreted_constant.
 
-# callbacks
-
-# callbacks must be used in the following cases:
-#
-# 1.- underlying boolean algebras operations: and, or, xor, neg, less,
-# less_equal, greater, subs, eq, neq, is_zero, is_one,... In this case, no
-# other way we have to call the uderlying operations of the boolean algebra
-# 2.- speed up computations: has_clashing_subformulas, has_subformula,
-# remove_existential... In this case, we could use the the callback to
-# avoid the creation of intermediate formulas. For instance, if we want
-# to check if a formula has a subformula, we could use the callback to
-# avoid the creation of the subformulas to check that point.
-# 3.- to create new subformulas in other rules, for instance, to create a
-# new formula that is the substitution of a variable by a constant.
-
-# bultin_args, type is needed to capture appropriate typed arguments
-# do not try to simplify this
-bf_cb_args1            => __ bf:bf_cb_arg.
-bf_cb_args2            => bf_cb_args1 bf_cb_args1.
-bf_cb_args3            => bf_cb_args2 bf_cb_args1.
-bf_cb_args4            => bf_cb_args3 bf_cb_args1.
-wff_cb_args1           => __ wff:wff_cb_arg.
-wff_cb_args2           => wff_cb_args1 wff_cb_args1.
-wff_cb_args3           => wff_cb_args2 wff_cb_args1.
-wff_cb_args4           => wff_cb_args3 wff_cb_args1.
-tau_cb_args1           => __ (capture | tau):tau_cb_arg.
-tau_cb_args2           => tau_cb_args1 tau_cb_args1.
-tau_cb_args3           => tau_cb_args2 tau_cb_args1.
-
-tau_cb => ("tau_collapse_positives_cb" (tau_cb_args3 | tau_cb_args2))
-                                                     :tau_collapse_positives_cb
-        | ("tau_positives_upwards_cb"   tau_cb_args2):tau_positives_upwards_cb.
-wff_cb => ("bf_eq_cb"  bf_cb_args1 wff_cb_args2)     :bf_eq_cb
-        | ("bf_neq_cb" bf_cb_args1 wff_cb_args2)     :bf_neq_cb
-        | ("wff_has_clashing_subformulas_cb" wff_cb_args2)
-                                                :wff_has_clashing_subformulas_cb
-        | ("wff_has_subformula_cb"      wff_cb_args3):wff_has_subformula_cb
-        | ("wff_remove_existential_cb"  wff_cb_args2):wff_remove_existential_cb
-        | ("wff_remove_bexistential_cb" wff_cb_args4):wff_remove_bexistential_cb
-        | ("wff_remove_buniversal_cb"   wff_cb_args4):wff_remove_buniversal_cb.
-bf_cb  => ("bf_is_zero_cb"              bf_cb_args2) :bf_is_zero_cb
-        | ("bf_is_one_cb"               bf_cb_args2) :bf_is_one_cb
-        | ("bf_has_subformula_cb"       bf_cb_args3) :bf_has_subformula_cb
-        | ("bf_remove_funiversal_cb"    bf_cb_args4) :bf_remove_funiversal_cb
-        | ("bf_remove_fexistential_cb"  bf_cb_args4) :bf_remove_fexistential_cb
-        | ("bf_and_cb"                  bf_cb_args2) :bf_and_cb
-        | ("bf_or_cb"                   bf_cb_args2) :bf_or_cb
-        | ("bf_xor_cb"                  bf_cb_args2) :bf_xor_cb
-        | ("bf_neg_cb"                  bf_cb_args1) :bf_neg_cb
-        | ("bf_normalize_cb"            bf_cb_args1) :bf_normalize_cb.
-
 # variables
 charvar                => (alpha & ~'T' & ~'F' & ~'i' & ~'o') digit*.
 bool_variable          => '?' charvar.
@@ -179,6 +119,52 @@ sym                    => chars.
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
 __                     => (space | comment) _.   # whitespace
 _                      => [ __ ].                # optional whitespace
+
+
+# callbacks
+
+# callbacks must be used in the following cases:
+#
+# 1.- underlying boolean algebras operations: and, or, xor, neg, less,
+# less_equal, greater, subs, eq, neq, is_zero, is_one,... In this case, no
+# other way we have to call the uderlying operations of the boolean algebra
+# 2.- speed up computations: has_clashing_subformulas, has_subformula,
+# remove_existential... In this case, we could use the the callback to
+# avoid the creation of intermediate formulas. For instance, if we want
+# to check if a formula has a subformula, we could use the callback to
+# avoid the creation of the subformulas to check that point.
+# 3.- to create new subformulas in other rules, for instance, to create a
+# new formula that is the substitution of a variable by a constant.
+
+# bultin_args, type is needed to capture appropriate typed arguments
+# do not try to simplify this
+bf_cb_args1            => __ bf:bf_cb_arg.
+bf_cb_args2            => bf_cb_args1 bf_cb_args1.
+bf_cb_args3            => bf_cb_args2 bf_cb_args1.
+bf_cb_args4            => bf_cb_args3 bf_cb_args1.
+wff_cb_args1           => __ wff:wff_cb_arg.
+wff_cb_args2           => wff_cb_args1 wff_cb_args1.
+wff_cb_args3           => wff_cb_args2 wff_cb_args1.
+wff_cb_args4           => wff_cb_args3 wff_cb_args1.
+
+wff_cb => ("bf_eq_cb"  bf_cb_args1 wff_cb_args2)     :bf_eq_cb
+        | ("bf_neq_cb" bf_cb_args1 wff_cb_args2)     :bf_neq_cb
+        | ("wff_has_clashing_subformulas_cb" wff_cb_args2)
+                                                :wff_has_clashing_subformulas_cb
+        | ("wff_has_subformula_cb"      wff_cb_args3):wff_has_subformula_cb
+        | ("wff_remove_existential_cb"  wff_cb_args2):wff_remove_existential_cb
+        | ("wff_remove_bexistential_cb" wff_cb_args4):wff_remove_bexistential_cb
+        | ("wff_remove_buniversal_cb"   wff_cb_args4):wff_remove_buniversal_cb.
+bf_cb  => ("bf_is_zero_cb"              bf_cb_args2) :bf_is_zero_cb
+        | ("bf_is_one_cb"               bf_cb_args2) :bf_is_one_cb
+        | ("bf_has_subformula_cb"       bf_cb_args3) :bf_has_subformula_cb
+        | ("bf_remove_funiversal_cb"    bf_cb_args4) :bf_remove_funiversal_cb
+        | ("bf_remove_fexistential_cb"  bf_cb_args4) :bf_remove_fexistential_cb
+        | ("bf_and_cb"                  bf_cb_args2) :bf_and_cb
+        | ("bf_or_cb"                   bf_cb_args2) :bf_or_cb
+        | ("bf_xor_cb"                  bf_cb_args2) :bf_xor_cb
+        | ("bf_neg_cb"                  bf_cb_args1) :bf_neg_cb
+        | ("bf_normalize_cb"            bf_cb_args1) :bf_normalize_cb.
 
 
 ################################################################################
@@ -295,10 +281,33 @@ severity               => ("e" | "error"):error_sym
 @inline char classes, chars, q_var, q_bool_var, src_c, tau_cb, wff_cb, bf_cb,
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
-        tau_cb_args1, tau_cb_args2, tau_cb_args3,
 	inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
 	normalize_cmd_arg,
         bf_typed, wff_typed,
         bf  > bf_parenthesis  > bf,
-        wff > wff_parenthesis > wff,
+        wff > wff_parenthesis > wff.
+
+
+
+################################################################################
+# deprecating syntax - in process of integration into wff layer
+#
+rule                   => tau_rule.
+tau_rule               => tau:tau_matcher _ ":::=" _ (tau | tau_cb):tau_body _ '.'.
+builder_body           => ("=:::" _ tau):tau_builder_body.
+tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
+                        | ('{' _ wff _ '}')                  :tau_wff
+                        | (sym [_ offsets] _ ref_args)       :tau_ref
+                        | (tau _ "|||" _ tau)                :tau_or
+                        | (tau _ "&&&" _ tau)                :tau_and
+                        | ('-' _ tau)                        :tau_neg
+                        |                                     capture.
+tau_cb_args1           => __ (capture | tau):tau_cb_arg.
+tau_cb_args2           => tau_cb_args1 tau_cb_args1.
+tau_cb_args3           => tau_cb_args2 tau_cb_args1.
+tau_cb => ("tau_collapse_positives_cb" (tau_cb_args3 | tau_cb_args2))
+                                                     :tau_collapse_positives_cb
+        | ("tau_positives_upwards_cb"   tau_cb_args2):tau_positives_upwards_cb.
+@inline
+        tau_cb_args1, tau_cb_args2, tau_cb_args3,
         tau > tau_parenthesis > tau.
