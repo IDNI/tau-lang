@@ -555,14 +555,14 @@ void repl_evaluator<factory_t, BAs...>::def_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
 	if (definitions.size() == 0) cout << "definitions are empty\n";
-	auto n = command | tau_parser::memory;
-	if (!n) return;
-	auto idx = get_memory_index(n.value(), definitions.size());
-	if (idx) {
-		cout << definitions[idx.value()] << "\n";
+	auto num = command | tau_parser::number;
+	if (!num) return;
+	auto i = digits(num.value());
+	if (i && i <= definitions.size()) {
+		cout << definitions[i-1] << "\n";
 		return;
 	}
-	cout << "error: memory location does not exist\n";
+	cout << "error: definition [" << i << "] does not exist\n";
 	return;
 }
 
@@ -930,12 +930,6 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "  %<memory_id>                 provides relative access to memory\n"
 		<< "  &<memory_id>                 provides absolute access to memory\n";
 		break;
-	//case tau_parser::selection_sym: cout
-	//	<< "Command s, selection ...\n";
-	//	break;
-	//case tau_parser::file_cmd_sym: cout
-	//	<< "Command r, read ...\n";
-	//	break;
 	case tau_parser::normalize_sym: cout
 		<< "normalize or n command normalizes a formula, prints it and\n"
 		<< "saves it into memory of previous memorys\n"
@@ -1064,13 +1058,10 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "defines a rec. relation\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  <TAU_RR>                     defines a tau rec. relation\n"
 		<< "  <WFF_RR>                     defines a wff rec. relation\n"
 		<< "  <BF_RR>                      defines a bf rec. relation\n"
 		<< "  defs or definitions          list definitions\n"
-		<< "  defs or definitions <rr_id>  print rec relation with given id\n"
-		<< "  %<definition_id>             provides relative access to memory\n"
-		<< "  &<definition_id>             provides absolute access to memory\n";
+		<< "  defs or definitions <rr_id>  print rec relation with given id\n";
 		break;
 	case tau_parser::examples_sym: cout
 		<< "examples\n";
