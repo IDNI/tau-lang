@@ -200,7 +200,7 @@ cli_command            =>
         | ("solve"         :solve_sym   __ wff_cmd_arg)       :solve_cmd
         | (("e" | "execute"):execute_sym __ (wff_typed | rr)) :execute_cmd
         | (("n" | "normalize")
-                        :normalize_sym __ normalize_cmd_arg)  :normalize_cmd
+                :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
         | (("s" | "subst" | "substitute")
                 :subst_sym __ nf_cmd_arg _ '[' _
                 	nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
@@ -217,12 +217,12 @@ cli_command            =>
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # rec relations
         | (("defs" | "definitions"):def_sym)                  :def_list_cmd
-        | rec_relation                                        :def_rr_cmd
-        | (      def_sym __ memory)                           :def_print_cmd
+        | (                         def_sym __ number)        :def_print_cmd
+        |                           rec_relation              :def_rr_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
-	| (history_sym __ memory)                             :history_print_cmd
-        | (bf_typed | wff_typed)                              :history_store_cmd
+	| (                     history_sym __ memory)        :history_print_cmd
+        | (                     bf_typed | wff_typed)         :history_store_cmd
 #qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
@@ -235,6 +235,7 @@ cli_command            =>
 
 # command arguments
 #
+number                 => digits.
 bf_typed               => bf  | bf  _ ':' _ "bf".
 wff_typed              => wff | wff _ ':' _ "wff".
 bf_cmd_arg             => memory | bf_typed.
@@ -261,8 +262,9 @@ help_arg               => help_sym | version_sym | quit_sym
 
 # memory
 #
-memory                 => (("%-":rel_memory_sym [digits:memory_id] | '%')):rel_memory
-                        | ( '%' :abs_memory_sym memory_id):abs_memory.
+memory                 => ( "%"
+                          | "%-":rel_memory_sym [digits:memory_id]):rel_memory                                 :rel_memory
+                        | ( "%" :abs_memory_sym         memory_id) :abs_memory.
 
 # options and their values
 #
