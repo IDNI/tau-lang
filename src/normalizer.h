@@ -192,6 +192,64 @@ int_t get_new_var_id (const nso<BAs...> fm) {
 	return *vars.rbegin() + 1;
 }
 
+static inline std::vector<std::string> rr_v{"dummy"};
+static inline std::map<std::string, size_t> rr_m{};
+inline size_t rr_dict(const std::string& s) {
+	if (auto it = rr_m.find(s); it != rr_m.end()) return it->second;
+	return rr_m.emplace(s, rr_v.size()), rr_v.push_back(s), rr_v.size() - 1;
+};
+
+// ref offset info. first is offset type (num/capture/shift/variable)
+// and second is value of num, rr_dict id of capture or 0 for shift and variable
+using offset_t = std::pair<size_t, size_t>;
+// extracts ref info. returns pair of rr_dict id of ref symbol
+// and vector of its offsets (offset_t)
+template <typename... BAs>
+std::pair<size_t, std::vector<offset_t>> get_ref_info(
+	const sp_tau_node<BAs...>& ref)
+{
+	//ptree<BAs...>(std::cout << "ref? ", ref) << "\n";
+	std::pair<size_t, std::vector<offset_t>> ret{
+		rr_dict(get_ref_name(ref)), {} };
+	auto offsets = ref | tau_parser::offsets || tau_parser::offset;
+	//BOOST_LOG_TRIVIAL(debug) << "(T) -- get_ref " << ref << " " << ret.first << " offsets.size: " << offsets.size();
+	for (const auto& offset : offsets) {
+		auto t = offset	| only_child_extractor<BAs...>
+				| non_terminal_extractor<BAs...>
+				| optional_value_extractor<size_t>;
+		int_t d = 0;
+		if (t == tau_parser::num)
+			d = offset | tau_parser::num
+				| only_child_extractor<BAs...>
+				| size_t_extractor<BAs...>
+				| optional_value_extractor<size_t>;
+		else if (t == tau_parser::capture)
+			d = rr_dict(make_string(
+				tau_node_terminal_extractor<BAs...>,
+				(offset | tau_parser::capture).value()));
+		ret.second.emplace_back(t, d);
+		break; // consider only first offset for now
+		// TODO (LOW) support multiindex offsets
+		// need to find a canonical way of enumeration first
+	}
+	return ret;
+};
+
+template <typename... BAs>
+std::optional<sp_tau_node<BAs...>> get_ref(const sp_tau_node<BAs...>& n) {
+	auto ref = std::optional<sp_tau_node<BAs...>>(n);
+	while (ref.has_value()
+		&& (tau_parser::ref != (ref.value()
+			| non_terminal_extractor<BAs...>
+			| optional_value_extractor<size_t>)))
+				ref = ref | only_child_extractor<BAs...>;
+	if (!ref.has_value() || tau_parser::ref != (ref.value()
+			| non_terminal_extractor<BAs...>
+			| optional_value_extractor<size_t>))
+				return std::optional<sp_tau_node<BAs...>>();
+	return ref;
+}
+
 template <typename... BAs>
 bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_nso_equivalent";
@@ -199,8 +257,21 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
 
 	if (n1 == n2) {
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: true";
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: true (equiv nodes)";
 		return true;
+	}
+
+	// equivalence of references
+	auto r1opt = get_ref(n1), r2opt = get_ref(n2);
+	if (r1opt && r2opt) { // both are refs
+		bool equiv = get_ref_info(r1opt.value())
+						== get_ref_info(r2opt.value());
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: "<<equiv<<" (equiv refs)";
+		return equiv;
+	}
+	if (r1opt || r2opt) { // one is a ref
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: false (ref and not ref)";
+		return false;
 	}
 
 	nso<BAs...> wff = build_wff_equiv<BAs...>(n1, n2);
@@ -237,18 +308,11 @@ size_t get_max_loopback_in_rr(const nso<BAs...>& form) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_num_from_num(nso<BAs...> num, size_t value) {
-	auto nts = std::get<tau_source_sym>(num->value).nts;
-	auto digits = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {});
-	return make_node<tau_sym<BAs...>>( tau_sym<BAs...>(tau_source_sym(tau_parser::num, nts)), {digits});
-}
-
-template<typename... BAs>
 nso<BAs...> build_shift_from_shift(nso<BAs...> shift, size_t step) {
 	auto num = shift | tau_parser::num | optional_value_extractor<nso<BAs...>>;
 	auto offset = num | only_child_extractor<BAs...> | offset_extractor<BAs...> | optional_value_extractor<size_t>;
 	if (step == offset) return shift | tau_parser::capture | optional_value_extractor<nso<BAs...>>;
-	std::map<nso<BAs...>, nso<BAs...>> changes{{num, build_num_from_num<BAs...>(num, step - offset)}};
+	std::map<nso<BAs...>, nso<BAs...>> changes{{num, build_num<BAs...>(step - offset)}};
 	return replace<nso<BAs...>>(shift, changes);
 }
 
@@ -326,6 +390,64 @@ nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
 }
 
 template <typename... BAs>
+bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
+	std::unordered_map<size_t, std::set<size_t>> graph;
+	std::unordered_map<size_t, bool> visited, visiting;
+	std::function<bool(size_t)> is_cyclic = [&](size_t n) {
+		if (visiting[n]) return true;
+		if (visited[n]) return false;
+		visiting[n] = true;
+		for (const auto& neighbor : graph[n])
+			if (is_cyclic(neighbor)) return true;
+		visiting[n] = false;
+		visited[n]  = true;
+		return false;
+	};
+	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
+		const auto& r = nso_rr.rec_relations[ri];
+		auto left = get_ref_info(get_ref(r.first).value());
+		for (const auto& [ot, _] : left.second)
+			if (ot == tau_parser::shift) {
+				BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation " << r.first << " cannot contain an offset shift";
+				return false; // head ref cannot have shift
+			}
+		if (left.second.size() == 0) continue; // no offsets
+		// take only first offset for consideration
+		offset_t ho = left.second.front();
+		//BOOST_LOG_TRIVIAL(debug) << "(T) -- head offset " << ho.first << " / " << ho.second;
+		for (const auto& ref : select_all(r.second,
+			is_non_terminal<tau_parser::ref, BAs...>))
+		{
+			auto right = get_ref_info(ref);
+			if (right.second.size() == 0) continue; // no offsets
+			auto& bo = right.second.front();
+			//BOOST_LOG_TRIVIAL(debug) << "(T) -- body offset " << bo.first << " / " << bo.second;
+			if (ho == bo) graph[left.first].insert(right.first);
+			else if (ho.first == tau_parser::num) {
+				if (bo.first == tau_parser::capture) {
+					BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation " << r.first << " (having a fixed offset) cannot depend on a relative offset " << r.second;
+					return false; // left num right capture
+				}
+				if (bo.first == tau_parser::num
+					&& ho.second < bo.second) {
+						BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation " << r.first << " cannot depend on a future state " << r.second;
+						return false; // l num < r num
+				}
+			}
+		}
+		visited[left.first]  = false;
+		visiting[left.first] = false;
+	}
+	for (const auto& [left, _] : graph)
+		if (!visited[left] && is_cyclic(left)) {
+			BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation is cyclic";
+			return false;
+		}
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation is well founded";
+	return true;
+}
+
+template <typename... BAs>
 nso<BAs...> find_fixed_point(const rr<nso<BAs...>>& nso_rr,
 	size_t offset_arity)
 {
@@ -335,32 +457,30 @@ nso<BAs...> find_fixed_point(const rr<nso<BAs...>>& nso_rr,
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr.main;
 
 	std::vector<nso<BAs...>> previous;
-	nso<BAs...> current, main;
-	auto is_main_predicate = [&main](const sp_tau_node<BAs...>& n) {
-		return main == n;
-	};
+	nso<BAs...> current;
 	auto eos = "(I) -- End enumeration step";
-	for (int i = 0; ; i++) {
-		current = main = build_enumerated_main_step<BAs...>(
+
+	std::vector<size_t> loopbacks;
+	for (const auto& r : nso_rr.rec_relations)
+		loopbacks.push_back(get_max_loopback_in_rr(r.second));
+	for (size_t i = 0; ; i++) {
+		current = build_enumerated_main_step<BAs...>(
 						nso_rr.main, i, offset_arity);
 		bool changed;
 		do { // apply rec relation rules and check for cycle dependency
 			changed = false;
-			for (const auto& r : nso_rr.rec_relations) {
+			for (size_t ri = 0;
+				ri != nso_rr.rec_relations.size(); ++ri)
+			{
+				const auto& r = nso_rr.rec_relations[ri];
+				if (loopbacks[ri] > i) {
+					BOOST_LOG_TRIVIAL(debug) << "(I) -- current step " << i << " < " << loopbacks[ri] << " loopback, skipping " << r;
+					continue; // skip steps depending on future fixed offsets
+				}
 				auto prev = current;
 				current = nso_rr_apply<BAs...>(r, prev);
 				if (current != prev) changed = true;
-				auto cycle = select_all(current,
-							is_main_predicate);
-				if (cycle.size() && changed) {
-					BOOST_LOG_TRIVIAL(debug) <<
-						"(I) -- Cannot calculate fixed "
-						"point. Cyclic recurence.";
-					return fallback;
-				}
 			}
-			//std::cout << "last:    " << last << "\n";
-			//std::cout << "current: " << current << "\n";
 		} while (changed);
 
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin enumeration step";
@@ -421,8 +541,10 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 		if (it != types.end()) {
 			size_t offset_arity = it->second.second;
 			if (offset_arity) {
-				auto fp = find_fixed_point<BAs...>(applied_defs,
-								offset_arity);
+				auto fp = _F<BAs...>;
+				if (is_well_founded(applied_defs))
+					fp = find_fixed_point<BAs...>(
+						applied_defs, offset_arity);
 				BOOST_LOG_TRIVIAL(debug)<<"(I) -- End normalizer";
 				BOOST_LOG_TRIVIAL(debug)<<"(O) " << fp << "\n";
 				return fp;
