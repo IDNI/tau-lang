@@ -539,7 +539,7 @@ void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(const nso<tau_ba<BA
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n) {
-	definitions.emplace_back(n->child[0]->child[1], n->child[0]->child[1]);
+	definitions.emplace_back(n->child[0]->child[0], n->child[0]->child[1]);
 	cout << "[" << definitions.size() << "] " << definitions.back() << "\n";
 }
 
