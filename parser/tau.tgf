@@ -197,20 +197,15 @@ cli_command            =>
         | ("valid"         :valid_sym   __ rr)                :valid_cmd
         | ("sat"           :sat_sym     __ rr)                :sat_cmd
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
-        | ("solve"         :solve_sym   __
-                                wff_cmd_arg:solve_cmd_arg)    :solve_cmd
-        | (("e" | "execute"):execute_sym __
-                (wff_typed | rr):execute_cmd_arg)             :execute_cmd
+        | ("solve"         :solve_sym   __ wff_cmd_arg)       :solve_cmd
+        | (("e" | "execute"):execute_sym __ (wff_typed | rr)) :execute_cmd
         | (("n" | "normalize")
                         :normalize_sym __ normalize_cmd_arg)  :normalize_cmd
-        | (("i" | "inst" | "instantiate")
-                :inst_sym  __ variable __ wff_cmd_arg __
-                                        wff_cmd_out_arg)      :wff_inst_cmd
         | (("s" | "subst" | "substitute")
                 :subst_sym __ nf_cmd_arg _ '[' _
-                   nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')       :subst_cmd
-        | (      inst_sym  __ variable __ bf_cmd_arg  __
-                                        bf_cmd_out_arg)       :bf_inst_cmd
+                	nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
+        | (("i" | "inst" | "instantiate")
+                :inst_sym __ inst_args)                       :inst_cmd
 # normal forms
         | ("dnf":dnf_sym __ nf_cmd_arg)                       :dnf_cmd
         | ("cnf":cnf_sym __ nf_cmd_arg)                       :cnf_cmd
@@ -227,7 +222,7 @@ cli_command            =>
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
 	| (history_sym __ memory)                             :history_print_cmd
-        | ((bf_typed | wff_typed ):history_store_cmd_arg)     :history_store_cmd
+        | (bf_typed | wff_typed)                              :history_store_cmd
 #qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
@@ -242,13 +237,15 @@ cli_command            =>
 #
 bf_typed               => bf  | bf  _ ':' _ "bf".
 wff_typed              => wff | wff _ ':' _ "wff".
-bf_cmd_arg             => memory | bf_selection  | bf_typed.
-bf_cmd_out_arg         => memory | bf_selection.
-wff_cmd_arg            => memory | wff_selection | wff_typed.
-wff_cmd_out_arg        => memory | wff_selection.
+bf_cmd_arg             => memory | bf_typed.
+wff_cmd_arg            => memory | wff_typed.
 nf_cmd_arg             => memory | bf_typed | wff_typed.
 onf_cmd_arg            => memory | wff_typed.
 normalize_cmd_arg      => memory | bf_typed | wff_typed | rr.
+inst_args              =>
+          bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
+        | wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
+        | wff_cmd_arg _ '[' _ bool_variable _ '/' _ wff_cmd_arg _ ']'.
 
 # symbols usable for detailed help message
 #
@@ -264,17 +261,8 @@ help_arg               => help_sym | version_sym | quit_sym
 
 # memory
 #
-memory                 => (("%-" :rel_memory_sym [digits:memory_id] | '%')):rel_memory
+memory                 => (("%-":rel_memory_sym [digits:memory_id] | '%')):rel_memory
                         | ( '%' :abs_memory_sym memory_id):abs_memory.
-
-# selection reference
-#
-selection_sym          => "s" | "selection".
-# TODO (HIGH) selection should take outputs as arguments
-wff_selection          => selection_sym __ digits.
-bf_selection           => selection_sym __ digits.
-bf_var_selection       => selection_sym __ digits.
-wff_var_selection      => selection_sym __ digits.
 
 # options and their values
 #
@@ -306,7 +294,8 @@ severity               => ("e" | "error"):error_sym
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
         tau_cb_args1, tau_cb_args2, tau_cb_args3,
-        bf_cmd_arg, bf_cmd_out_arg, wff_cmd_arg, wff_cmd_out_arg,
+	inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
+	normalize_cmd_arg,
         bf_typed, wff_typed,
         bf  > bf_parenthesis  > bf,
         wff > wff_parenthesis > wff,
