@@ -462,9 +462,11 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			return result_nso_rr;
 		}
 		case tau_parser::bf: {
-			if(!check_no_rec_relations_present(value)) {
+			if (!check_no_rec_relations_present(value)) {
 				rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs(definitions.begin(), definitions.end());
-				rr<nso<tau_ba<BAs...>, BAs...>> rr_bf = {rrs, value};
+				rr<nso<tau_ba<BAs...>, BAs...>> rr_bf =
+					infer_ref_types<tau_ba<BAs...>, BAs...>(
+						{ rrs, value });
 				return bf_normalizer_with_rec_relation(rr_bf);
 			}
 			return bf_normalizer_without_rec_relation(value);
