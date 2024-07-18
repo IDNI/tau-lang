@@ -447,6 +447,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		switch (type) {
 		case tau_parser::wff: {
 			rr<gssotc<BAs...>> rr_wff = { definitions, value };
+			rr_wff = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_wff);
 			auto result_wff = normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
 			return result_wff;
 		}
