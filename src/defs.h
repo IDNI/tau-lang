@@ -22,6 +22,7 @@ typedef int sym_t;
 #include <cxxabi.h>
 #else
 #define DBG(x)
+#define CACHE
 #endif
 
 #include <algorithm>
