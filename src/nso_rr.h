@@ -1277,8 +1277,8 @@ sp_tau_node<BAs...> trim2(const sp_tau_node<BAs...>& n) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, const sp_tau_node<BAs...>& n) {
-	auto nts = std::get<tau_source_sym>(n->value).nts;
-	return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(tau_source_sym(t, nts)), {n});
+	return make_node<tau_sym<BAs...>>(
+		tau_parser::instance().literal(t), { n });
 }
 
 // definitions of basic bf and wff
@@ -1411,10 +1411,8 @@ static const sp_tau_node<BAs...> _T_trimmed = trim(_T<BAs...>);
 
 template<typename... BAs>
 nso<BAs...> build_num(size_t value) {
-	return make_node<tau_sym<BAs...>>(tau_parser::instance()
-		.literal(tau_parser::num), {
-			make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {})
-		});
+	return wrap(tau_parser::num,
+		make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {}));
 }
 
 template<typename... BAs>
@@ -2220,7 +2218,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::normalize_cmd,                    50 },
 			{ tau_parser::execute_cmd,                      50 },
 			{ tau_parser::solve_cmd,                        50 },
-			{ tau_parser::bf_inst_cmd,                      50 },
 			{ tau_parser::dnf_cmd,                          50 },
 			{ tau_parser::cnf_cmd,                          50 },
 			{ tau_parser::anf_cmd,                          50 },
@@ -2228,14 +2225,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::pnf_cmd,                          50 },
 			{ tau_parser::mnf_cmd,                          50 },
 			{ tau_parser::onf_cmd,                          50 },
-			{ tau_parser::wff_inst_cmd,                     50 },
+			{ tau_parser::inst_cmd,                         50 },
 			{ tau_parser::subst_cmd,                        50 },
 			{ tau_parser::def_rr_cmd,                       50 },
 			{ tau_parser::def_list_cmd,                     50 },
-			{ tau_parser::wff_selection,                    50 },
-			{ tau_parser::bf_selection,                     50 },
-			{ tau_parser::bf_var_selection,                 50 },
-			{ tau_parser::wff_var_selection,                50 },
 			{ tau_parser::history_list_cmd,                 50 },
 			{ tau_parser::history_print_cmd,                50 },
 			{ tau_parser::history_store_cmd,                50 },
@@ -2493,9 +2486,15 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::solve_cmd:     prefix("solve"); break;
 			case tau_parser::execute_cmd:   prefix("execute"); break;
 			case tau_parser::normalize_cmd: prefix("normalize"); break;
-			case tau_parser::bf_inst_cmd:
-			case tau_parser::wff_inst_cmd:  prefix("instantiate"); break;
-			case tau_parser::subst_cmd:     prefix("substitute"); break;
+			case tau_parser::inst_cmd:
+			case tau_parser::subst_cmd:
+				stream << (tss.n() == tau_parser::inst_cmd
+						? "instantiate" : "substitute");
+				pp(stream << " ",   ch[1], tss.n());
+				pp(stream << " [",  ch[2], tss.n());
+				pp(stream << " / ", ch[3], tss.n());
+				stream << "]";
+				break;
 			case tau_parser::dnf_cmd:       prefix("dnf"); break;
 			case tau_parser::cnf_cmd:       prefix("cnf"); break;
 			case tau_parser::anf_cmd:       prefix("anf"); break;
