@@ -250,11 +250,37 @@ std::optional<sp_tau_node<BAs...>> get_ref(const sp_tau_node<BAs...>& n) {
 	return ref;
 }
 
+// Check that the Tau formula does not use Boolean combinations of models
+template<typename ...BAs>
+bool has_no_boolean_combs_of_models(const nso<BAs...>& fm) {
+	if (is_non_terminal(tau_parser::wff_always, trim(fm))) {
+		// check that there is no wff_always or wff_sometimes in the subtree
+		if (find_top(trim2(fm), is_non_terminal<tau_parser::wff_always, BAs...>))
+			return false;
+		if (find_top(trim2(fm), is_non_terminal<tau_parser::wff_sometimes, BAs...>))
+			return false;
+	} else {
+		if (find_top(fm, is_non_terminal<tau_parser::wff_always, BAs...>))
+			return false;
+		if (find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>))
+			return false;
+	}
+	return true;
+}
+
 template <typename... BAs>
 bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_nso_equivalent";
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
+
+	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
+	assert((has_no_boolean_combs_of_models(n1) && has_no_boolean_combs_of_models(n2)));
+
+	if (is_non_terminal(tau_parser::wff_always, trim(n1)))
+		n1 = trim2(n1);
+	if (is_non_terminal(tau_parser::wff_always, trim(n2)))
+		n2 = trim2(n2);
 
 	if (n1 == n2) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: true (equiv nodes)";
