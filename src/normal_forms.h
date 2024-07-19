@@ -1486,10 +1486,10 @@ private:
 
 	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
 		// we only cache results in release mode
-		#ifndef DEBUG
+		#ifdef CACHE
 		static std::map<std::tuple<bdd_path, literals, nso<BAs...>>, nso<BAs...>> cache;
 		if (auto it = cache.find({path, remaining, form}); it != cache.end()) return it->second;
-		#endif // DEBUG
+		#endif // CACHE
 
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
 
@@ -1500,9 +1500,9 @@ private:
 
 		if (f == _F<BAs...> && t == _F<BAs...>) {
 			// we only cache results in release mode
-			#ifndef DEBUG
+			#ifdef CACHE
 			cache[{path, remaining, form}] = _F<BAs...>;
-			#endif // DEBUG
+			#endif // CACHE
 			return _F<BAs...>;
 		}
 
@@ -1523,24 +1523,24 @@ private:
 		}
 
 		if (f_snf == _F<BAs...>) {
-			#ifndef DEBUG
+			#ifdef CACHE
 			cache[{path, remaining, form}] = t_snf;
-			#endif // DEBUG
+			#endif // CACHE
 			return t_snf;
 		}
 
 		if (t_snf == _F<BAs...>) {
-			#ifndef DEBUG
+			#ifdef CACHE
 			cache[{path, remaining, form}] = f_snf;
-			#endif // DEBUG
+			#endif // CACHE
 			return f_snf;
 		}
 
 		auto result = build_wff_or(t_snf, f_snf);
 		// we only cache results in release mode
-		#ifndef DEBUG
+		#ifdef CACHE
 		cache[{path, remaining, form}] = result;
-		#endif // DEBUG
+		#endif // CACHE
 		return result;
 	}
 
