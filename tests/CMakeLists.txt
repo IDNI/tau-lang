@@ -45,6 +45,18 @@ if (TAU_BUILD_UNIT_TESTS)
 	add_subdirectory(unit)
 endif ()
 
+
+#
+# Experimental testing
+#
+set(TAU_BUILD_UNIT_TESTS ON CACHE STRING "build the tau-lang unit suite ON")
+set_property(CACHE TAU_BUILD_UNIT_TESTS PROPERTY STRINGS "OFF" "ON")
+
+if (TAU_BUILD_UNIT_TESTS)
+	enable_testing()
+	add_subdirectory(experimental)
+endif ()
+
 #
 # REPL testing
 #
