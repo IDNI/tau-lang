@@ -163,9 +163,7 @@ private:
 		const nso<tau_ba<BAs...>, BAs...>& n);
 	std::optional<nso<tau_ba<BAs...>, BAs...>> substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_instantiate_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> wff_instantiate_cmd(
+	std::optional<nso<tau_ba<BAs...>, BAs...>> instantiate_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	memorys m;

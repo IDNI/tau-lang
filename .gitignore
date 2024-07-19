@@ -65,3 +65,5 @@ bw-output
 
 # cli history files
 .*_history
+
+/.cache/*
