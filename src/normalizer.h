@@ -83,12 +83,19 @@ rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
 template<typename... BAs>
 struct remove_one_wff_existential {
 	nso<BAs...> operator()(const nso<BAs...>& n) const {
-		auto nn = n | repeat_all<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>)
-			| bf_positives_upwards<BAs...>
-			| wff_squeeze_positives<BAs...>;
-		return nn | wff_remove_existential<BAs...>;
+		auto ex_quantifier = [](const auto& n) -> bool {
+			return (n | tau_parser::wff | tau_parser::wff_ex).has_value();
+		};
+		if (auto wff = find_bottom(n, ex_quantifier); wff) {
+			auto removed = wff.value()
+				| repeat_all<step<BAs...>, BAs...>(
+					to_dnf_wff<BAs...>
+					| simplify_wff<BAs...>)
+				| wff_remove_existential<BAs...>;
+			std::map<nso<BAs...>, nso<BAs...>> changes{{wff.value(), removed}};
+			return replace(n, changes);
+		}
+		return n;
 	}
 };
 
@@ -100,23 +107,23 @@ nso<BAs...> operator|(const nso<BAs...>& form, const remove_one_wff_existential<
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 nso<BAs...> normalizer_step(const nso<BAs...>& form) {
-	#ifndef DEBUG
+	#ifdef CACHE
 	static std::map<nso<BAs...>, nso<BAs...>> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
-	#endif // DEBUG
+	#endif // CACHE
 	auto result = form
-		| repeat_all<step<BAs...>, BAs...>(
-			step<BAs...>(apply_defs<BAs...>))
-		| repeat_all<step<BAs...>, BAs...>(
-			step<BAs...>(elim_for_all<BAs...>))
-		| repeat_all<remove_one_wff_existential<BAs...>, BAs...>(
-			remove_one_wff_existential<BAs...>())
+		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(apply_defs<BAs...>))
+		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(elim_for_all<BAs...>))
+		| repeat_all<steps<step<BAs...>, BAs...>, BAs...>(steps<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>
+			| wff_remove_existential<BAs...>))
 		| bf_reduce_canonical<BAs...>()
 		| repeat_once<step<BAs...>, BAs...>(elim_eqs<BAs...>)
 		| sometimes_always_normalization<BAs...>();
-	#ifndef DEBUG
+	#ifdef CACHE
 	cache[form] = result;
-	#endif // DEBUG
+	#endif // CACHE
 	return result;
 }
 

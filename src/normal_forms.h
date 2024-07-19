@@ -168,20 +168,6 @@ RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 
 // TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
-template<typename... BAs>
-static auto bf_positives_upwards = make_library<BAs...>(
-	BF_POSITIVE_LITERAL_UPWARDS_0
-	+ BF_POSITIVE_LITERAL_UPWARDS_1
-	+ BF_POSITIVE_LITERAL_UPWARDS_2
-	+ BF_POSITIVE_LITERAL_UPWARDS_3
-	+ BF_POSITIVE_LITERAL_UPWARDS_4
-);
-
-template<typename... BAs>
-static auto wff_squeeze_positives = make_library<BAs...>(
-	WFF_SQUEEZE_POSITIVES_0
-);
-
 // tau rules to dnf
 RULE(TAU_TO_DNF_0, "($X ||| $Y) &&& $Z :::= $X &&& $Z ||| $Y &&& $Z.")
 RULE(TAU_TO_DNF_1, "$X &&& ($Y ||| $Z) :::= $X &&& $Y ||| $X &&& $Z.")
