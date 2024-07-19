@@ -1394,8 +1394,8 @@ struct to_snf_step {
 	using exponent = std::set<var>;
 	using literal = nso<BAs...>;
 	using literals = std::set<literal>;
-	using bdd_path = std::pair<literals /* positive */, literals /* negatives */>;
 	using partition = std::map<exponent, literals>;
+	using bdd_path = std::pair<partition /* positive */, partition /* negatives */>;
 
 	nso<BAs...> operator()(const nso<BAs...>& form) const {
 		// we select all literals, i.e. wff equalities or it negations.
@@ -1406,7 +1406,8 @@ struct to_snf_step {
 			// we call the recursive method traverse to traverse all the paths
 			// of the BDD.
 			std::set<nso<BAs...>> remaining(literals.begin(), literals.end());
-			return traverse({}, remaining, form)
+			bdd_path path;
+			return traverse(path, remaining, form)
 				| bf_reduce_canonical<BAs...>() | reduce_wff<BAs...>;
 		}
 		return form;
@@ -1441,25 +1442,102 @@ private:
 		return build_wff_and(normalize(path), form) | simplify_snf<BAs...>;
 	}
 
+	bdd_path add_to_negative_path(const bdd_path& path, const literal& lit) const {
+		bdd_path npath;
+		npath.first = path.first;
+		auto lit_exp = get_exponent(lit);
+
+		for (auto& [exp, negatives]: path.second)
+			if (exp != lit_exp) npath.second[exp] = negatives;
+		if (!path.second.contains(lit_exp)) npath.second[lit_exp] = { lit };
+		else {
+			bool insert = true;
+			for (auto& n: path.second.at(lit_exp)){
+				// careful with the order of the statements
+				if (is_less_eq_than(n, lit)) insert = false;
+				if (is_less_eq_than(lit, n)) continue;
+				npath.second[lit_exp].insert(n);
+			}
+			if (insert) npath.second[lit_exp].insert(lit);
+		}
+		return npath;
+	}
+
+	bdd_path add_to_positive_path(const bdd_path& path, const literal& lit) const {
+		bdd_path npath;
+		npath.second = path.second;
+		auto lit_exp = get_exponent(lit);
+
+		for (auto& [exp, positives]: path.first)
+			if (exp != lit_exp) npath.first[exp] = positives;
+		if (!path.first.contains(lit_exp)) npath.first[lit_exp] = { lit };
+		else {
+			bool insert = true;
+			for (auto& n: path.first.at(lit_exp)) {
+				// careful with the order of the statements
+				if (is_less_eq_than(lit, n)) insert = false;
+				if (is_less_eq_than(n, lit)) continue;
+				npath.first[lit_exp].insert(n);
+			}
+			if (insert) npath.first[lit_exp].insert(lit);
+		}
+		return npath;
+	}
+
 	nso<BAs...> traverse(const bdd_path& path, const literals& remaining, const nso<BAs...>& form) const {
-		// we only cache rtesults in release mode
+		// we only cache results in release mode
 		#ifndef DEBUG
 		static std::map<std::tuple<bdd_path, literals, nso<BAs...>>, nso<BAs...>> cache;
 		if (auto it = cache.find({path, remaining, form}); it != cache.end()) return it->second;
 		#endif // DEBUG
+
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
+
 		auto lit = *remaining.begin();
+		auto exponent = get_exponent(lit);
+		auto f = normalize_negative(path, lit) == _F<BAs...> ? _F<BAs...> : replace_with(lit, _F<BAs...>, form);
+		auto t = normalize_positive(path, lit) == _F<BAs...> ? _F<BAs...> : replace_with(lit, _T<BAs...>, form);
+
+		if (f == _F<BAs...> && t == _F<BAs...>) {
+			// we only cache results in release mode
+			#ifndef DEBUG
+			cache[{path, remaining, form}] = _F<BAs...>;
+			#endif // DEBUG
+			return _F<BAs...>;
+		}
+
 		literals nremaining(++remaining.begin(), remaining.end());
-		auto [t, f] = split_using_lit(lit, form);
-		bdd_path t_path{path.first, path.second};
-		if (t == f) return traverse(t_path, nremaining, t);
-		bdd_path f_path{path.first, path.second};
-		t_path.first.insert(lit);
-		f_path.second.insert(lit);
-		auto t_snf = traverse(t_path, nremaining, t);
-		auto f_snf = traverse(f_path, nremaining, f);
+
+		if (f == t) return traverse(path, nremaining, t);
+
+		auto t_snf = _F<BAs...>, f_snf = _F<BAs...>;
+
+		if (f != _F<BAs...>) {
+			auto f_path = add_to_negative_path(path, lit);
+			f_snf = traverse(f_path, nremaining, f);
+		}
+
+		if (t != _F<BAs...>) {
+			auto t_path = add_to_positive_path(path, lit);
+			t_snf = traverse(t_path, nremaining, t);
+		}
+
+		if (f_snf == _F<BAs...>) {
+			#ifndef DEBUG
+			cache[{path, remaining, form}] = t_snf;
+			#endif // DEBUG
+			return t_snf;
+		}
+
+		if (t_snf == _F<BAs...>) {
+			#ifndef DEBUG
+			cache[{path, remaining, form}] = f_snf;
+			#endif // DEBUG
+			return f_snf;
+		}
+
 		auto result = build_wff_or(t_snf, f_snf);
-		// we only cache rtesults in release mode
+		// we only cache results in release mode
 		#ifndef DEBUG
 		cache[{path, remaining, form}] = result;
 		#endif // DEBUG
@@ -1480,12 +1558,9 @@ private:
 			| only_child_extractor<BAs...> | ba_extractor<BAs...>;
 	}
 
-	std::pair<nso<BAs...>, nso<BAs...>> split_using_lit(const literal& lit, const nso<BAs...>& form) const {
-		std::map<nso<BAs...>, nso<BAs...>> changes_T = {{lit, _T<BAs...>}};
-		std::map<nso<BAs...>, nso<BAs...>> changes_F = {{lit, _F<BAs...>}};
-		auto a = replace<nso<BAs...>>(form, changes_T) | simplify_snf<BAs...>;
-		auto b = replace<nso<BAs...>>(form, changes_F) | simplify_snf<BAs...>;
-		return std::make_pair(a, b);
+	nso<BAs...> replace_with(const literal& lit, const nso<BAs...>& by, const nso<BAs...> form) const {
+		std::map<nso<BAs...>, nso<BAs...>> changes = {{lit, by}};
+		return replace<nso<BAs...>>(form, changes) | simplify_snf<BAs...>;
 	}
 
 	partition make_partition_by_exponent(const literals& s) const {
@@ -1519,20 +1594,22 @@ private:
 	}
 
 	// squeezed positives into one literal if possible.
-	std::map<exponent, literal> squeeze_positives(const literals& lits) const {
+	std::map<exponent, literal> squeeze_positives(const partition& positives) const {
 		std::map<exponent, literal> squeezed;
-		for (auto& [exponent, literals]: make_partition_by_exponent(lits))
+		for (auto& [exponent, literals]: positives)
 			squeezed[exponent] = squeeze_positives(literals, exponent);
 		return squeezed;
 	}
 
 	bool is_less_eq_than(const literal& l, const literal& r) const {
-		auto l_cte = get_constant(l).value();
-		auto r_cte = get_constant(r).value();
-		return std::visit(_leq, l_cte, r_cte);
+		auto l_cte = get_constant(l);
+		auto r_cte = get_constant(r);
+		if (!l_cte) return !r_cte;
+		if (!r_cte) return true;
+		return std::visit(_leq, l_cte.value(), r_cte.value());
 	}
 
-	literals mins(const literals& ls) const {
+	/*literals mins(const literals& ls) const {
 		static auto _explicit_constant = [&](const auto& l) {
 			return get_constant(l).has_value();
 		};
@@ -1561,12 +1638,12 @@ private:
 		return mins;
 	}
 
-	partition squeeze_negatives(const literals& lits) const {
+	partition squeeze_negatives(const partition& negatives) const {
 		partition squeezed;
-		for (auto& [exponent, literals]: make_partition_by_exponent(lits))
+		for (auto& [exponent, literals]: negatives)
 			squeezed[exponent] = mins(literals);
 		return squeezed;
-	}
+	}*/
 
 	literal normalize(const literals& negatives, const literal& positive, const exponent& exp) const {
 		// we tacitely assume that the positive literal has a constant
@@ -1595,7 +1672,7 @@ private:
 		// them, we compute the negation of the the disjunction.
 		if (path.first.empty()) {
 			literals negs;
-			for (auto& [_, lits]: squeeze_negatives(path.second))
+			for (auto& [_, lits]: path.second)
 				negs.insert(lits.begin(), lits.end());
 			return build_wff_neg(build_wff_or(negs));
 		}
@@ -1605,10 +1682,10 @@ private:
 		literals lits;
 		// first we squeezed positive literals...
 		auto squeezed_positives = squeeze_positives(path.first);
-		// ... and also the negative literals
-		auto squeezed_negatives = squeeze_negatives(path.second);
+		// ...the negatives are already squeezed (by order)
+		// auto squeezed_negatives = squeeze_negatives();
 		// for every negative class (same exponent) of literals...
-		for (auto& [negative_exponent, negatives]: squeezed_negatives) {
+		for (auto& [negative_exponent, negatives]: path.second) {
 			// - if no positive literal has the same exponent as n, we add n to
 			//   the literals
 			if (!squeezed_positives.contains(negative_exponent)) {
@@ -1627,6 +1704,24 @@ private:
 			lits.insert(positive);
 		// and return the conjunction of all the lits
 		return build_wff_and(lits);
+	}
+
+	bdd_path get_relative_path(const bdd_path& path, const literal& lit) const {
+		bdd_path relative_path;
+		auto exp = get_exponent(lit);
+		if (path.first.contains(exp)) relative_path.first[exp] = path.first.at(exp);
+		if (path.second.contains(exp)) relative_path.second[exp] = path.second.at(exp);
+		return relative_path;
+	}
+
+	nso<BAs...> normalize_positive(const bdd_path& path, const literal& positive) const {
+		auto relative_path = get_relative_path(path, positive);
+		return normalize(add_to_positive_path(relative_path, positive));
+	}
+
+	nso<BAs...> normalize_negative(const bdd_path& path, const literal& negative) const {
+		auto relative_path = get_relative_path(path, negative);
+		return normalize(add_to_negative_path(relative_path, negative));
 	}
 };
 
@@ -1689,7 +1784,7 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 		//| repeat_all<step<BAs...>, BAs...>(simplify_snf<BAs...>);
 	// finally we return the negation to get the SNF of the original formula with both
 	// positive and negative equal exponent literals squeezed.
-	return build_wff_neg(second_step)
+	auto result = build_wff_neg(second_step)
 		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_cb<BAs...>
@@ -1697,6 +1792,7 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>)
 			| bf_reduce_canonical<BAs...>();
+	return result;
 }
 
 template<typename...BAs>
