@@ -1846,6 +1846,16 @@ private:
 		return build_bf_or<BAs...>(left, right);
 	}
 
+	std::optional<sp_tau_node<BAs...>> squeeze_positives(const sp_tau_node<BAs...> n) {
+		if (auto positives = select_top(n, is_non_terminal<tau_parser::bf_eq, BAs...>); positives.size() > 0) {
+			std::set<sp_tau_node<BAs...>> bfs;
+			for (auto& p: positives)
+				bfs.insert(p | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>);
+			return build_bf_or<BAs...>(bfs);
+		}
+		return {};
+	}
+
 	sp_tau_node<BAs...> apply_wff_remove_existential(const sp_tau_node<BAs...>& n) {
 		// Following Corollary 2.3 from Taba book from Ohad
 		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
@@ -1853,8 +1863,7 @@ private:
 		auto wff = args[1];
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		for (auto l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
-			auto eq = find_top(l, is_non_terminal<tau_parser::bf_eq, BAs...>);
-			auto f = eq | tau_parser::bf;
+			auto f = squeeze_positives(l);
 			std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0_trimmed<BAs...>}};
 			std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1_trimmed<BAs...>}};
 			auto f_0 = f ? replace(f.value(), changes_0) : _0<BAs...>;
@@ -1880,7 +1889,7 @@ private:
 				if (auto check = n | tau_parser::wff_and; !check && is_non_terminal<tau_parser::wff>(n)) {
 					if (auto is_eq = n | tau_parser::bf_eq, is_neq = n | tau_parser::bf_neq;
 							(!is_eq.has_value() && !is_neq.has_value())) {
-						return true;
+								return true;
 					}
 				}
 				return false;
