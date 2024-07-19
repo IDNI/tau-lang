@@ -20,6 +20,7 @@ set(TAU_HEADERS
 	product_ba.h
 	utils.h
 	repl_checks.h
+	experimental/execution.h
 )
 
 set(TAU_SOURCES
