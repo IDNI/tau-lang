@@ -696,10 +696,13 @@ template<typename...BAs>
 std::pair<std::optional<nso<BAs...>>, nso<BAs...>> get_inner_quantified_wff(const nso<BAs...>& n) {
 	// TODO (LOW) extract to a utils file
 	auto quantified = [](const auto& n) -> bool {
-		return (n | tau_parser::wff_ex).has_value() || (n | tau_parser::wff_all).has_value();
+		return is_non_terminal<tau_parser::wff_ex, BAs...>(n)
+			|| is_non_terminal<tau_parser::wff_all, BAs...>(n)
+			|| is_non_terminal<tau_parser::wff_sometimes, BAs...>(n)
+			|| is_non_terminal<tau_parser::wff_always, BAs...>(n);
 	};
 	if (auto quantifier = find_bottom(n, quantified); quantifier) {
-		return { quantifier | tau_parser::variable | optional_value_extractor<nso<BAs...>>,
+		return { quantifier | tau_parser::variable,
 			quantifier | tau_parser::wff | optional_value_extractor<nso<BAs...>> };
 	}
 	return { {}, n };
@@ -786,6 +789,7 @@ nso<BAs...> apply_once_definitions(const nso<BAs...>& form) {
 
 template<typename...BAs>
 std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
+	// FIXME take into account quiantifiers
 	return apply_once_definitions(n)
 		| apply_wff_defs<BAs...>
 		| onf_wff<BAs...>(var)
@@ -806,7 +810,9 @@ nso<BAs...> dnf_wff(const nso<BAs...>& n) {
 			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
-	return dnf_bf(nform);
+	auto dnf = dnf_bf(nform);
+	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, dnf}};
+	return replace(n, changes);
 }
 
 template<typename...BAs>
@@ -825,7 +831,7 @@ nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> cnf_wff(const nso<BAs...>& n) {
-	auto [_, nn] = get_inner_quantified_wff(n);
+	auto [var, nn] = get_inner_quantified_wff(n);
 	auto wff = apply_once_definitions(nn)
 		| repeat_each<step<BAs...>, BAs...>(
 			apply_wff_defs<BAs...>
@@ -834,7 +840,9 @@ nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
-	return cnf_bf(wff);
+	auto cnf = cnf_bf(wff);
+	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, cnf}};
+	return replace(n, changes);
 }
 
 template<typename...BAs>
@@ -876,7 +884,9 @@ nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
-	return nnf_bf(nform);
+	auto nnf = nnf_bf(nform);
+	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, nnf}};
+	return replace(n, changes);
 }
 
 // Reduce currrent dnf due to update by coeff and variable assignment i
@@ -1770,7 +1780,7 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 		//| repeat_all<step<BAs...>, BAs...>(simplify_snf<BAs...>);
 	// finally we return the negation to get the SNF of the original formula with both
 	// positive and negative equal exponent literals squeezed.
-	auto result = build_wff_neg(second_step)
+	auto snf = build_wff_neg(second_step)
 		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_cb<BAs...>
@@ -1778,7 +1788,8 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>)
 			| bf_reduce_canonical<BAs...>();
-	return result;
+	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, snf}};
+	return replace(n, changes);
 }
 
 template<typename...BAs>
@@ -1791,7 +1802,7 @@ nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...
 template<typename...BAs>
 nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	return apply_once_definitions(nn)
+	auto mnf = apply_once_definitions(nn)
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_wff_defs<BAs...>
 			| to_dnf_wff<BAs...>
@@ -1799,6 +1810,8 @@ nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 		| repeat_all<step<BAs...>, BAs...>(
 			to_mnf_wff<BAs...>)
 		| reduce_wff<BAs...>;
+	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, mnf}};
+	return replace(n, changes);
 }
 
 template<typename...BAs>
