@@ -19,6 +19,8 @@
 
 namespace testing = doctest;
 
+using namespace idni::tau;
+
 TEST_SUITE("variant Boolen algebra") {
 
 	TEST_CASE("variant Bool == Bool") {
