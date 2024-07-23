@@ -22,7 +22,6 @@
 #include "../src/tau.h"
 #include "dict.h"
 
-#include "test_integration_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -76,10 +75,5 @@ tau_ba<bdd_test> get_tau_ba(const char* src) {
 	return get<tau_ba<bdd_test>>(get<variant<
 			tau_ba<bdd_test>, bdd_test>>(value.value()->value));
 }
-
-/*tau_ba<bdd_test> normal(const tau_ba<bdd_test>& f) {
-	auto normalized = normalizer<tau_ba<bdd_test>, bdd_test>(f.nso_rr);
-	return normalized;
-}*/
 
 #endif // __TEST_INTEGRATION_HELPERS_TAU_H__

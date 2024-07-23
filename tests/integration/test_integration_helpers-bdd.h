@@ -16,9 +16,12 @@
 
 #include "../src/nso_rr.h"
 #include "../src/babdd.h"
+#include "../src/nso_rr.h"
+#include "../src/bdd_handle.h"
+#include "../src/bool_ba.h"
+#include "../src/normalizer.h"
 #include "dict.h"
 
-#include "test_integration_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
