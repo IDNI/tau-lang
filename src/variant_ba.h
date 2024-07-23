@@ -69,6 +69,25 @@ bool operator==(const std::variant<BAs...>& l, const bool& r) {
 }
 
 template<typename...BAs>
+bool is_zero(const std::variant<BAs...>& l) {
+	return std::visit(overloaded(
+			[](const auto& l) -> bool {
+				return l.is_zero();
+			}
+		), l);
+}
+
+template<typename...BAs>
+bool is_one(const std::variant<BAs...>& l) {
+	return std::visit(overloaded(
+			[](const auto& l) -> bool {
+				return l.is_one();
+			}
+		), l);
+}
+
+
+template<typename...BAs>
 bool operator==(const bool& l, const std::variant<BAs...>& r) {
 	return r == l;
 }
