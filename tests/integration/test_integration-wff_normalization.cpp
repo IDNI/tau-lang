@@ -20,7 +20,7 @@
 #include "normalizer.h"
 
 #include "test_integration_helpers-bdd.h"
-#include "../unit/test_helpers.h"
+//#include "../unit/test_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -37,7 +37,8 @@ TEST_SUITE("wff_sometimes") {
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
-		CHECK((simp_res == "?x && (sometimes o1[t] = 0)" || simp_res == "(sometimes o1[t] = 0) && ?x"));
+		std::stringstream ss; ss << simp_res;
+		CHECK((ss.str() == "?x && (sometimes o1[t] = 0)" || ss.str() == "(sometimes o1[t] = 0) && ?x"));
 	}
 
 	TEST_CASE("push_in_2") {
@@ -61,7 +62,8 @@ TEST_SUITE("wff_sometimes") {
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
-		CHECK( simp_res == "always o1[t] = 0" );
+		std::stringstream ss; ss << simp_res ;
+		CHECK( ss.str() == "always o1[t] = 0" );
 	}
 
 	TEST_CASE("pull_out_1") {
@@ -73,7 +75,8 @@ TEST_SUITE("wff_sometimes") {
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
-		CHECK(simp_res == "sometimes ?x");
+		std::stringstream ss; ss << simp_res;
+		CHECK(ss.str() == "sometimes ?x");
 	}
 
 	TEST_CASE("pull_out_2") {
@@ -85,6 +88,7 @@ TEST_SUITE("wff_sometimes") {
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
-		CHECK(simp_res == "always ?x");
+		std::stringstream ss; ss << simp_res;
+		CHECK(ss.str() == "always ?x");
 	}
 }

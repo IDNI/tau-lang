@@ -142,6 +142,25 @@ std::function<bool(const sp_tau_node<BAs...>&)> is_non_terminal(const size_t nt)
 	return [nt](const sp_tau_node<BAs...>& n) { return is_non_terminal<BAs...>(nt, n); };
 }
 
+// check if the node is the given non terminal
+template <typename... BAs>
+bool is_child_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
+	auto child = n | only_child_extractor<BAs...>;
+	return child.has_value() && is_non_terminal<BAs...>(nt, child.value());
+}
+
+// check if the node is the given non terminal (template approach)
+template <size_t nt, typename...BAs>
+bool is_child_non_terminal(const sp_tau_node<BAs...>& n) {
+	return is_child_non_terminal<BAs...>(nt, n);
+}
+
+// factory method for is_non_terminal predicate
+template<typename... BAs>
+std::function<bool(const sp_tau_node<BAs...>&)> is_child_non_terminal(const size_t nt) {
+	return [nt](const sp_tau_node<BAs...>& n) { return is_child_non_terminal<BAs...>(nt, n); };
+}
+
 // check if a node is a terminal
 template<typename... BAs>
 bool is_terminal_node(const sp_tau_node<BAs...>& n) {
@@ -1713,6 +1732,226 @@ sp_tau_node<BAs...> build_tau_neg(const sp_tau_node<BAs...>& l) {
 	return tau_apply_builder<BAs...>(bldr_tau_neg<BAs...>, args);
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	auto bf_constant_and = [](const auto& l, const auto& r) -> nso<BAs...> {
+		auto lc = l
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		auto rc = r
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_constant<BAs...>(lc & rc );
+	};
+
+	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l)
+			&& is_child_non_terminal<tau_parser::bf_constant, BAs...>(r))
+		return bf_constant_and(l, r);
+	if (is_non_terminal<tau_parser::bf>(l)
+			&& is_non_terminal<tau_parser::bf, BAs...>(r))
+		return build_bf_and<BAs...>(l, r);
+	if (is_non_terminal<tau_parser::bf>(l)
+			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
+		auto rr = r
+			| tau_parser::bf_eq
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_eq<BAs...>(l & rr);
+	}
+	if (is_non_terminal<tau_parser::bf>(l)
+		&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
+		auto rr = r
+			| tau_parser::bf_neq
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_eq<BAs...>(l & rr);
+	}
+	if (is_non_terminal<tau_parser::wff>(l)
+			&& is_non_terminal<tau_parser::wff, BAs...>(r))
+		return build_wff_and<BAs...>(l, r);
+	throw std::logic_error("wrong types");
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	auto bf_constant_or = [](const auto& l, const auto& r) -> nso<BAs...> {
+		auto lc = l
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		auto rc = r
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_constant<BAs...>(lc | rc);
+	};
+
+	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l)
+			&& is_child_non_terminal<tau_parser::bf_constant, BAs...>(r))
+		return bf_constant_or(l, r);
+	if (is_non_terminal<tau_parser::bf>(l)
+			&& is_non_terminal<tau_parser::bf, BAs...>(r))
+		return build_bf_or<BAs...>(l, r);
+	if (is_non_terminal<tau_parser::bf>(l)
+			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
+		auto rr = r
+			| tau_parser::bf_eq
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_eq<BAs...>(l | rr);
+	}
+	if (is_non_terminal<tau_parser::bf>(l)
+			&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
+		auto rr = r
+			| tau_parser::bf_neq
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_eq<BAs...>(l | rr);
+	}
+	if (is_non_terminal<tau_parser::wff>(l)
+			&& is_non_terminal<tau_parser::wff, BAs...>(r))
+		return build_wff_or<BAs...>(l, r);
+	throw std::logic_error("wrong types");
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator~(const sp_tau_node<BAs...>& l) {
+	auto bf_constant_neg = [](const auto& l) -> nso<BAs...> {
+		auto lc = l
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_constant<BAs...>(~lc);
+	};
+
+	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l))
+		return bf_constant_neg(l);
+	if (is_non_terminal<tau_parser::bf>(l))
+		return build_bf_neg<BAs...>(l);
+	if (is_child_non_terminal<tau_parser::bf_eq, BAs...>(l)) {
+		auto ll = l
+			| tau_parser::bf_eq
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_eq<BAs...>(~ll);
+	}
+	if (is_child_non_terminal<tau_parser::bf_neq, BAs...>(l)) {
+		auto ll = l
+			| tau_parser::bf_neq
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_eq<BAs...>(~ll);
+	}
+	if (is_non_terminal<tau_parser::wff>(l))
+		return build_wff_neg<BAs...>(l);
+	throw std::logic_error("wrong types");
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	auto bf_constant_xor = [](const auto& l, const auto& r) -> nso<BAs...> {
+		auto lc = l
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		auto rc = r
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_constant<BAs...>(lc ^ rc);
+	};
+
+	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l)
+			&& is_child_non_terminal<tau_parser::bf_constant, BAs...>(r))
+		return bf_constant_xor(l, r);
+	if (is_non_terminal<tau_parser::bf>(l)
+			&& is_non_terminal<tau_parser::bf, BAs...>(r))
+		return build_bf_xor<BAs...>(l, r);
+	if (is_non_terminal<tau_parser::bf>(l)
+			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
+		auto rr = r
+			| tau_parser::bf_eq
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_eq<BAs...>(l ^ rr);
+	}
+	if (is_non_terminal<tau_parser::bf>(l)
+			&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
+		auto rr = r
+			| tau_parser::bf_neq
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return build_bf_eq<BAs...>(l ^ rr);
+	}
+	if (is_non_terminal<tau_parser::wff>(l)
+			&& is_non_terminal<tau_parser::wff, BAs...>(r))
+		return build_wff_xor<BAs...>(l, r);
+	throw std::logic_error("wrong types");
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator+(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	return l ^ r;
+}
+
+template<typename... BAs>
+bool is_zero(const sp_tau_node<BAs...>& l) {
+	auto bf_constant_is_zero = [](const auto& l) -> bool {
+		auto lc = l
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return is_zero(lc);
+	};
+
+	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l))
+		return bf_constant_is_zero(l);
+	if (is_non_terminal<tau_parser::bf>(l))
+		return l == _0<BAs...>;
+	if (is_non_terminal<tau_parser::wff>(l))
+		return l == _F<BAs...>;
+	throw std::logic_error("wrong types");
+}
+
+template<typename... BAs>
+bool is_one(const sp_tau_node<BAs...>& l) {
+	auto bf_constant_is_one = [](const auto& l) -> bool {
+		auto lc = l
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+		return is_one(lc);
+	};
+
+	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l))
+		return bf_constant_is_one(l);
+	if (is_non_terminal<tau_parser::bf>(l))
+		return l == _1<BAs...>;
+	if (is_non_terminal<tau_parser::wff>(l))
+		return l == _T<BAs...>;
+	throw std::logic_error("wrong types");
+}
+
+template<typename... BAs>
+bool operator==(const sp_tau_node<BAs...>& l, const bool& r) {
+	return r ? is_one(l) : is_zero(l);
+}
+
+template<typename... BAs>
+bool operator==(const bool l, const sp_tau_node<BAs...>& r) {
+	return r == l;
+}
 
 // IDEA convert to a const static applier and change all the code accordingly
 //
