@@ -128,6 +128,8 @@ RULE(WFF_DEF_BALL_0, "b_all $X $Y ::=  wff_remove_buniversal_cb $X $Y T F.")
 RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & $Y' = 0.")
 RULE(BF_DEF_LESS, "$X < $Y ::= $X & $Y' = 0 && $X + $Y' != 0.")
 RULE(BF_DEF_GREATER, "$X > $Y ::= $X & $Y' != 0 || $X + $Y' = 0.")
+RULE(BF_DEF_INTERVAL, "$X <= $Y <= $Z ::= ($X & $Y' = 0) && ($Y & $Z' = 0).")
+RULE(BF_DEF_NOT_LESS_EQUAL, "$X !<= $Y ::= ($X & $Y' != 0).")
 
 // we must expand the xor as its definition has been allready processed
 RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
@@ -232,6 +234,8 @@ static auto apply_defs_once = make_library<BAs...>(
 	BF_DEF_LESS_EQUAL
 	+ BF_DEF_LESS
 	+ BF_DEF_GREATER
+	+ BF_DEF_INTERVAL
+	+ BF_DEF_NOT_LESS_EQUAL
 	+ BF_DEF_EQ
 	+ BF_DEF_NEQ
 );
@@ -478,6 +482,9 @@ static auto to_nnf_bf = make_library<BAs...>(
 	+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
+template<typename... BAs>
+struct bf_reduce_canonical;
+
 template<tau_parser::nonterminal type, typename... BAs>
 struct reduce {
 
@@ -708,54 +715,62 @@ std::pair<std::optional<nso<BAs...>>, nso<BAs...>> get_inner_quantified_wff(cons
 template<typename...BAs>
 struct onf_wff {
 
-	onf_wff(const nso<BAs...>& var) : var(var) {}
+	onf_wff(const nso<BAs...>& _var) {
+		if (!is_non_terminal(tau_parser::bf, _var))
+			var = wrap(tau_parser::bf, _var);
+		else var = _var;
+	}
 
 	nso<BAs...> operator()(const nso<BAs...>& n) const {
 		auto [var, nn] = get_inner_quantified_wff(n);
-		return onf_subformula(nn);
+		// We assume that the formula is in DNF. In particular nn is in DNF
+		// For each disjunct calculate the onf
+		map<nso<BAs...>, nso<BAs...>> changes;
+		bool no_disjunction = true;
+		for (const auto& disjunct : select_all(nn, is_non_terminal<tau_parser::wff_or, BAs...>)) {
+			no_disjunction = false;
+            assert(disjunct->child.size() == 2);
+			if (!is_non_terminal(tau_parser::wff_or, trim(disjunct->child[0])))
+				changes[trim(disjunct->child[0])]= onf_subformula(trim(disjunct->child[0]));
+            if (!is_non_terminal(tau_parser::wff_or, trim(disjunct->child[1])))
+                changes[trim(disjunct->child[1])]= onf_subformula(trim(disjunct->child[1]));
+		}
+		if(no_disjunction) {
+			changes[nn] = onf_subformula(nn);
+		}
+		return replace(nn, changes);
 	}
 
 private:
-
 	nso<BAs...> onf_subformula(const nso<BAs...>& n) const {
+		auto has_var = [&](const auto& node){ return node == var; };
+
 		auto eq = find_bottom(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
-		std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0<BAs...>}};
-		auto f_0 = replace((eq || tau_parser::bf)[0],  changes_0)
-			| repeat_each<step<BAs...>, BAs...>(
-				simplify_bf<BAs...>
-				| apply_cb<BAs...>
-				| elim_eqs<BAs...>)
-			| reduce_bf<BAs...>;
-		std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1<BAs...>}};
-		auto f_1 = replace((eq || tau_parser::bf)[0],  changes_1)
-			| repeat_each<step<BAs...>, BAs...>(
-				simplify_bf<BAs...>
-				| apply_cb<BAs...>
-				| elim_eqs<BAs...>)
-			| reduce_bf<BAs...>;
 		std::map<nso<BAs...>, nso<BAs...>> changes;
-		auto eq_change = trim(build_bf_interval(f_0, var, f_1));
-		changes[eq | optional_value_extractor<nso<BAs...>>] = eq_change;
-		for (auto& neq: select_all(n, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
-			auto bounds = neq || tau_parser::bf;
-			std::map<nso<BAs...>, nso<BAs...>> changes_neq_0 = {{var, _0<BAs...>}};
-			auto f_0 = replace(bounds[0],  changes_neq_0)
-				| repeat_each<step<BAs...>, BAs...>(
-					simplify_bf<BAs...>
-					| apply_cb<BAs...>
-					| elim_eqs<BAs...>)
-				| reduce_bf<BAs...>;
-			std::map<nso<BAs...>, nso<BAs...>> changes_neq_1 = {{var, _1<BAs...>}};
-			auto f_1 = replace(bounds[0],  changes_neq_1)
-				| repeat_each<step<BAs...>, BAs...>(
-					simplify_bf<BAs...>
-					| apply_cb<BAs...>
-					| elim_eqs<BAs...>)
-				| reduce_bf<BAs...>;
-			auto nleq_change = build_bf_or(build_bf_nleq_lower(f_0, var), build_bf_nleq_upper(f_1, var));
-			changes[neq] = nleq_change;
+		if (eq && find_top(trim(eq.value()), has_var)) {
+			auto eq_v = eq.value();
+			assert(is_non_terminal(tau_parser::bf_f, trim(eq_v->child[1])));
+			std::map<nso<BAs...>, nso<BAs...>> l_changes = {{var, _0<BAs...>}};
+			auto f_0 = replace(trim(eq_v),  l_changes);
+			f_0 = f_0 | bf_reduce_canonical<BAs...>();
+			l_changes = {{var, _1<BAs...>}};
+			auto f_1 = replace(build_bf_neg(trim(eq_v)),  l_changes)
+				| bf_reduce_canonical<BAs...>();
+
+			changes[eq_v] = trim(build_bf_interval(f_0, var, f_1));
 		}
-		return replace(n, changes) | repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>);
+		for (const auto& neq: select_all(n, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
+			assert(is_non_terminal(tau_parser::bf_f, trim(neq->child[1])));
+			if (!find_top(trim(neq), has_var)) continue;
+			std::map<nso<BAs...>, nso<BAs...>> l_changes = {{var, _0<BAs...>}};
+			auto f_0 = replace(trim(neq), l_changes)
+				| bf_reduce_canonical<BAs...>();
+			l_changes = {{var, _1<BAs...>}};
+			auto f_1 = replace(build_bf_neg(trim(neq)), l_changes)
+				| bf_reduce_canonical<BAs...>();
+			changes[neq] = trim(build_wff_or(build_bf_nleq_lower(f_0, var), build_bf_nleq_upper(f_1, var)));
+		}
+		return replace(n, changes);
 	}
 
 	nso<BAs...> var;
@@ -771,6 +786,8 @@ nso<BAs...> operator|(const nso<BAs...>& n, const onf_wff_t<BAs...>& r) {
 
 template<typename... BAs>
 static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) {
+	if (!(is_non_terminal(tau_parser::bf_eq, trim(n)) || is_non_terminal(tau_parser::bf_neq, trim(n))))
+		return true;
 	auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
 	return check.empty();
 };
@@ -787,7 +804,8 @@ nso<BAs...> apply_once_definitions(const nso<BAs...>& form) {
 template<typename...BAs>
 std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 	return apply_once_definitions(n)
-		| apply_wff_defs<BAs...>
+		| apply_defs<BAs...> // needed to remove some definitions in bf's
+		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
 		| onf_wff<BAs...>(var)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
