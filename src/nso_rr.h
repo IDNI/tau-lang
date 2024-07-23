@@ -1443,28 +1443,21 @@ sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_and_constant(const std::set<std::variant<BAs...>>& ctes) {
-	static constexpr auto _and = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
-			return l & r;
-	}, [](const auto&, const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
-
 	if (ctes.empty()) return _1<BAs...>;
 
 	auto cte = std::accumulate(++ctes.begin(), ctes.end(), *ctes.begin(), [&](const auto& l, const auto& r) {
-		return std::visit(_and, l, r);
+		return l & r;
 	});
+
 	return build_bf_constant<BAs...>(cte);
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_or_constant(const std::set<std::variant<BAs...>>& ctes) {
-	static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
-			return l | r;
-	}, [](const auto&, const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
-
 	if (ctes.empty()) return _0<BAs...>;
 
 	auto cte = std::accumulate(++ctes.begin(), ctes.end(), *ctes.begin(), [&](const auto& l, const auto& r) {
-		return std::visit(_or, l, r);
+		return l | r;
 	});
 
 	return build_bf_constant<BAs...>(cte);
@@ -1953,6 +1946,17 @@ bool operator==(const bool l, const sp_tau_node<BAs...>& r) {
 	return r == l;
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> operator<<(const sp_tau_node<BAs...>& n, const std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>>& changes) {
+	return replace(n, changes);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> operator<<(const sp_tau_node<BAs...>& n, const std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>>& change) {
+	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes{change};
+	return replace(n, changes);
+}
+
 // IDEA convert to a const static applier and change all the code accordingly
 //
 // however, the logic is quite complez a lot of private functions doesn't make
@@ -1988,6 +1992,8 @@ struct callback_applier {
 	}
 
 private:
+	// TODO (MEDIUM) simplify following methods using the new node and ba_variant operators
+	
 	// unary operation
 	static constexpr auto _normalize = [](const auto& n) -> sp_tau_node<BAs...> {
 		auto res = normalize(n);
