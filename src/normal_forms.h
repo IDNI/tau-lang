@@ -771,7 +771,7 @@ private:
 			l_changes = {{var, _1<BAs...>}};
 			auto f_1 = replace(build_bf_neg(trim(neq)), l_changes)
 				| bf_reduce_canonical<BAs...>();
-			changes[neq] = trim(build_wff_or(build_bf_nleq_lower(f_0, var), build_bf_nleq_upper(f_1, var)));
+			changes[neq] = trim(build_wff_or(build_bf_nleq_upper(f_0, var), build_bf_nleq_lower(f_1, var)));
 		}
 		return replace(n, changes);
 	}
