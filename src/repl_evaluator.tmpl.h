@@ -608,10 +608,11 @@ void repl_evaluator<factory_t, BAs...>::get_cmd(
 		cout << "colors:      " << pbool[opt.colors] << "\n"; } },
 	{ tau_parser::severity_opt, [this]() {
 		cout << "severity:    " << opt.severity << "\n"; } }};
-	auto option = n | tau_parser::option;
+	auto option = n | tau_parser::bool_option;
+	if (option.has_value()) option = n;
+	else option = n | tau_parser::option;
 	if (!option.has_value()) { for (auto& [_, v] : printers) v(); return; }
-	printers[get_opt(option.value())]();
-
+	else printers[get_opt(option.value())]();
 }
 
 template <typename factory_t, typename... BAs>
@@ -698,6 +699,7 @@ void repl_evaluator<factory_t, BAs...>::toggle_cmd(
 	case tau_parser::status_opt: opt.status = !opt.status; break;
 	default: cout << ": unknown bool option\n"; error = true;break;
 	}
+	get_cmd(n);
 }
 
 template <typename factory_t, typename... BAs>
