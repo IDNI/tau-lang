@@ -128,12 +128,6 @@ struct tau_ba {
 	}
 };
 
-/*// TODO (HIGH) give a proper implementation for <=> operator
-template<typename...BAs>
-auto operator<=>(const tau_ba<BAs...>& l, const tau_ba<BAs...>& r) {
-	return std::addressof(l)<=>std::addressof(r);
-}*/
-
 // TODO (HIGH) give a proper implementation for == operator
 // We assume "other" to be normalized already
 template<typename...BAs>
