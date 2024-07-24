@@ -209,34 +209,6 @@ std::pair<tau_spec_vars<BAs...>, tau_spec_vars<BAs...>> get_gssotc_io_vars(const
 	return {inputs, outputs};
 }
 
-/*template<typename... BAs>
-std::string build_string_from_clause(const gssotc<BAs...>& clause) {
-
-	std::basic_stringstream<char> str;
-
-	auto visitor = overloaded(
-		[&str] (const tau_source_sym& l) {
-			if (!l.nt() && !l.is_null()) str << l.t(); },
-		[&str, &extracted_bindings, &binding_seed] (const std::variant<tau_ba<BAs...>, BAs...>& bae) {
-			if (extracted_bindings.contains(bae)) str << extracted_bindings[bae];
-			else {
-				auto binding = "taubinding" + std::to_string(binding_seed++);
-				extracted_bindings[bae] = binding;
-				str << binding;
-			}},
-		[&str] (const size_t& n) { str << n; });
-
-	auto print = [&str, &visitor] (const auto& e) {
-		std::visit(visitor, e->value);
-		return e;
-	};
-	using print_t = decltype(print);
-
-	post_order_tree_traverser<print_t, all_t<gssotc<BAs...>>, gssotc<BAs...>>(print, all<gssotc<BAs...>>)(clause);
-	for (auto& [k, v]: extracted_bindings) { bindings.insert({v, k}); }
-	return str.str();
-}*/
-
 template<typename... BAs>
 std::string build_args_from_vars(const tau_spec_vars<BAs...>& vars, size_t index) {
 	std::basic_stringstream<char> str;
