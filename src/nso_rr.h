@@ -1101,10 +1101,16 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 		todo_names.insert(get_ref_name(ref));
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::wff_ref, BAs...>))
-		done_names.insert(get_ref_type(types, ref, tau_parser::wff));
+	{
+		auto fn = get_ref_type(types, ref, tau_parser::wff);
+		done_names.insert(fn), todo_names.erase(fn);
+	}
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::bf_ref, BAs...>))
-		done_names.insert(get_ref_type(types, ref, tau_parser::bf));
+	{
+		auto fn = get_ref_type(types, ref, tau_parser::bf);
+		done_names.insert(fn), todo_names.erase(fn);
+	}
 	return { done_names, todo_names };
 }
 
@@ -1118,7 +1124,7 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 		std::set<std::string>, std::set<std::string>>& names)
 	{
 		for (const auto& fn : names.first)
-			done_names.insert(fn);
+			done_names.insert(fn), todo_names.erase(fn);
 		for (const auto& fn : names.second)
 	 		if (done_names.find(fn) == done_names.end())
 				todo_names.insert(fn);
@@ -1165,7 +1171,7 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		std::set<std::string>, std::set<std::string>>& names)
 	{
 		for (const auto& fn : names.first)
-			done_names.insert(fn);
+			done_names.insert(fn), todo_names.erase(fn);
 		for (const auto& fn : names.second)
 	 		if (done_names.find(fn) == done_names.end())
 				todo_names.insert(fn);
