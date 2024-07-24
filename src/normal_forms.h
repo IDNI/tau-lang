@@ -1623,42 +1623,6 @@ private:
 		return std::visit(_leq, l_cte.value(), r_cte.value());
 	}
 
-	/*literals mins(const literals& ls) const {
-		static auto _explicit_constant = [&](const auto& l) {
-			return get_constant(l).has_value();
-		};
-
-		auto first = std::find_if(ls.begin(), ls.end(), _explicit_constant);
-		if (first == ls.end()) return {*ls.begin()};
-
-		literals mins = { *first };
-		literals remaining(++first, ls.end());
-
-		while (!remaining.empty()) {
-			first = std::find_if(remaining.begin(), remaining.end(), _explicit_constant);
-			if (first == remaining.end()) break;
-			bool add_first = true;
-			literals bigger;
-			for (auto& m: mins) {
-				if (is_less_eq_than(*first, m)) bigger.insert(m);
-				else if (is_less_eq_than(m, *first)) {
-					add_first = false; break;
-				}
-			}
-			for (auto& b: bigger) mins.erase(b);
-			remaining.erase(first);
-			if (add_first) mins.insert(*first);
-		}
-		return mins;
-	}
-
-	partition squeeze_negatives(const partition& negatives) const {
-		partition squeezed;
-		for (auto& [exponent, literals]: negatives)
-			squeezed[exponent] = mins(literals);
-		return squeezed;
-	}*/
-
 	literal normalize(const literals& negatives, const literal& positive, const exponent& exp) const {
 		// we tacitely assume that the positive literal has a constant
 		// different from 1. Otherwise, the normalizer should already

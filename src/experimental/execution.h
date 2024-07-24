@@ -32,13 +32,6 @@ using namespace idni::rewriter;
 
 namespace idni::tau::experimental {
 
-/*template<typename N, typename...Fs>
-N operator|(const N& n, const std::tuple<Fs...>& fs) {
-	N nn = n;
-	for (auto& f : fs) nn = f(nn);
-	return nn;
-}*/
-
 template<typename N>
 N operator|(const N& n, const std::function<N(N)>& f) {
 	return f(n);
