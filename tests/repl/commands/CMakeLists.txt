@@ -3,14 +3,17 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 # In these tests cases we only test that the commands is executed, we don't check
 # if the results are the proper ones.
 
-include(test_repl-definition_cmd.cmake)
-include(test_repl-qelim_cmd.cmake)
-include(test_repl-help_cmd.cmake)
-include(test_repl-history_cmd.cmake)
-include(test_repl-normal_forms_cmd.cmake)
-include(test_repl-normalize_cmd.cmake)
 include(test_repl-quit_cmd.cmake)
 include(test_repl-version_cmd.cmake)
+include(test_repl-get_cmd.cmake)
+include(test_repl-set_cmd.cmake)
+include(test_repl-toggle_cmd.cmake)
+include(test_repl-help_cmd.cmake)
+include(test_repl-history_cmd.cmake)
+include(test_repl-definition_cmd.cmake)
+include(test_repl-qelim_cmd.cmake)
+include(test_repl-normal_forms_cmd.cmake)
+include(test_repl-normalize_cmd.cmake)
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command

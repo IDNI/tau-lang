@@ -142,25 +142,6 @@ std::function<bool(const sp_tau_node<BAs...>&)> is_non_terminal(const size_t nt)
 	return [nt](const sp_tau_node<BAs...>& n) { return is_non_terminal<BAs...>(nt, n); };
 }
 
-// check if the node is the given non terminal
-template <typename... BAs>
-bool is_child_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
-	auto child = n | only_child_extractor<BAs...>;
-	return child.has_value() && is_non_terminal<BAs...>(nt, child.value());
-}
-
-// check if the node is the given non terminal (template approach)
-template <size_t nt, typename...BAs>
-bool is_child_non_terminal(const sp_tau_node<BAs...>& n) {
-	return is_child_non_terminal<BAs...>(nt, n);
-}
-
-// factory method for is_non_terminal predicate
-template<typename... BAs>
-std::function<bool(const sp_tau_node<BAs...>&)> is_child_non_terminal(const size_t nt) {
-	return [nt](const sp_tau_node<BAs...>& n) { return is_child_non_terminal<BAs...>(nt, n); };
-}
-
 // check if a node is a terminal
 template<typename... BAs>
 bool is_terminal_node(const sp_tau_node<BAs...>& n) {
@@ -514,6 +495,25 @@ template <typename... BAs>
 std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const only_child_extractor_t<BAs...> e) {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
 	return e(o);
+}
+
+// check if the node is the given non terminal
+template <typename... BAs>
+bool is_child_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
+	auto child = n | only_child_extractor<BAs...>;
+	return child.has_value() && is_non_terminal<BAs...>(nt, child.value());
+}
+
+// check if the node is the given non terminal (template approach)
+template <size_t nt, typename...BAs>
+bool is_child_non_terminal(const sp_tau_node<BAs...>& n) {
+	return is_child_non_terminal<BAs...>(nt, n);
+}
+
+// factory method for is_non_terminal predicate
+template<typename... BAs>
+std::function<bool(const sp_tau_node<BAs...>&)> is_child_non_terminal(const size_t nt) {
+	return [nt](const sp_tau_node<BAs...>& n) { return is_child_non_terminal<BAs...>(nt, n); };
 }
 
 // returns the first child of a node
@@ -1101,10 +1101,16 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 		todo_names.insert(get_ref_name(ref));
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::wff_ref, BAs...>))
-		done_names.insert(get_ref_type(types, ref, tau_parser::wff));
+	{
+		auto fn = get_ref_type(types, ref, tau_parser::wff);
+		done_names.insert(fn), todo_names.erase(fn);
+	}
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::bf_ref, BAs...>))
-		done_names.insert(get_ref_type(types, ref, tau_parser::bf));
+	{
+		auto fn = get_ref_type(types, ref, tau_parser::bf);
+		done_names.insert(fn), todo_names.erase(fn);
+	}
 	return { done_names, todo_names };
 }
 
@@ -1118,7 +1124,7 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 		std::set<std::string>, std::set<std::string>>& names)
 	{
 		for (const auto& fn : names.first)
-			done_names.insert(fn);
+			done_names.insert(fn), todo_names.erase(fn);
 		for (const auto& fn : names.second)
 	 		if (done_names.find(fn) == done_names.end())
 				todo_names.insert(fn);
@@ -1165,7 +1171,7 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		std::set<std::string>, std::set<std::string>>& names)
 	{
 		for (const auto& fn : names.first)
-			done_names.insert(fn);
+			done_names.insert(fn), todo_names.erase(fn);
 		for (const auto& fn : names.second)
 	 		if (done_names.find(fn) == done_names.end())
 				todo_names.insert(fn);
@@ -1993,7 +1999,7 @@ struct callback_applier {
 
 private:
 	// TODO (MEDIUM) simplify following methods using the new node and ba_variant operators
-	
+
 	// unary operation
 	static constexpr auto _normalize = [](const auto& n) -> sp_tau_node<BAs...> {
 		auto res = normalize(n);
