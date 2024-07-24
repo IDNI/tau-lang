@@ -142,25 +142,6 @@ std::function<bool(const sp_tau_node<BAs...>&)> is_non_terminal(const size_t nt)
 	return [nt](const sp_tau_node<BAs...>& n) { return is_non_terminal<BAs...>(nt, n); };
 }
 
-// check if the node is the given non terminal
-template <typename... BAs>
-bool is_child_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
-	auto child = n | only_child_extractor<BAs...>;
-	return child.has_value() && is_non_terminal<BAs...>(nt, child.value());
-}
-
-// check if the node is the given non terminal (template approach)
-template <size_t nt, typename...BAs>
-bool is_child_non_terminal(const sp_tau_node<BAs...>& n) {
-	return is_child_non_terminal<BAs...>(nt, n);
-}
-
-// factory method for is_non_terminal predicate
-template<typename... BAs>
-std::function<bool(const sp_tau_node<BAs...>&)> is_child_non_terminal(const size_t nt) {
-	return [nt](const sp_tau_node<BAs...>& n) { return is_child_non_terminal<BAs...>(nt, n); };
-}
-
 // check if a node is a terminal
 template<typename... BAs>
 bool is_terminal_node(const sp_tau_node<BAs...>& n) {
@@ -514,6 +495,25 @@ template <typename... BAs>
 std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o, const only_child_extractor_t<BAs...> e) {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
 	return e(o);
+}
+
+// check if the node is the given non terminal
+template <typename... BAs>
+bool is_child_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
+	auto child = n | only_child_extractor<BAs...>;
+	return child.has_value() && is_non_terminal<BAs...>(nt, child.value());
+}
+
+// check if the node is the given non terminal (template approach)
+template <size_t nt, typename...BAs>
+bool is_child_non_terminal(const sp_tau_node<BAs...>& n) {
+	return is_child_non_terminal<BAs...>(nt, n);
+}
+
+// factory method for is_non_terminal predicate
+template<typename... BAs>
+std::function<bool(const sp_tau_node<BAs...>&)> is_child_non_terminal(const size_t nt) {
+	return [nt](const sp_tau_node<BAs...>& n) { return is_child_non_terminal<BAs...>(nt, n); };
 }
 
 // returns the first child of a node
@@ -1993,7 +1993,7 @@ struct callback_applier {
 
 private:
 	// TODO (MEDIUM) simplify following methods using the new node and ba_variant operators
-	
+
 	// unary operation
 	static constexpr auto _normalize = [](const auto& n) -> sp_tau_node<BAs...> {
 		auto res = normalize(n);
