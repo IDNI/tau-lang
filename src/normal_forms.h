@@ -1617,26 +1617,18 @@ private:
 		std::map<exponent, literal> nonredundant;
 
 		for (auto& [exp, lit]: positives) {
-			std::cout << " positive lit: " << lit << std::endl;
-			std::cout << " positive exp: "; for (auto& e: exp) std::cout << e << " "; std::cout << std::endl;
 			bool insert = true;
 			std::set<exponent> to_remove;
 			for (auto& [e, l]: nonredundant) {
-				std::cout << " non-redundant lit: " << l << std::endl;
-				std::cout << " non-redundant exp: "; for (auto& ee: e) std::cout << ee << " "; std::cout << std::endl;
 				if (is_less_eq_than(lit, exp, l, e)) {
-					std::cout << " positive is less than non-redundant" << std::endl;
 					insert = false; break;
 				} else if (is_less_eq_than(l, e, lit, exp)) {
-					std::cout << " non-redundant is less than positive, removing " << l << std::endl;
 					to_remove.insert(e);
 				}
 			}
 			if (insert) nonredundant[exp] = lit;
 			for (auto& e: to_remove) nonredundant.erase(e);
 		}
-
-		std::cout << " final non-redundant: "; for (auto& [e, l]: nonredundant) std::cout << l << " "; std::cout << std::endl;
 
 		return nonredundant;
 	}
@@ -1648,17 +1640,11 @@ private:
 			for(auto& lit: lits) {
 				bool insert = true;
 				std::set<exponent> to_remove;
-				std::cout << " negative lit: " << lit << std::endl;
-				std::cout << " negative exp: "; for (auto& e: exp) std::cout << e << " "; std::cout << std::endl;
 				for (auto& [e, ls]: nonredundant) {
 					for( auto &l: ls) {
-						std::cout << " non-redundant lit: " << l << std::endl;
-						std::cout << " non-redundant exp: "; for (auto& ee: e) std::cout << ee << " "; std::cout << std::endl;
 						if (is_less_eq_than(l, e, lit, exp)) {
-							std::cout << " non-redundant is less than negative" << std::endl;
 							insert = false; break;
 						} else if (is_less_eq_than(lit, exp, l, e)) {
-							std::cout << " negative is less than non-redundant, removing " << l << std::endl;
 							to_remove.insert(e);
 						}
 					}
@@ -1667,8 +1653,6 @@ private:
 				for (auto& e: to_remove) nonredundant.erase(e);
 			}
 		}
-
-		std::cout << " final non-redundant: "; for (auto& [e, ls]: nonredundant) for (auto& l: ls) std::cout << l << " "; std::cout << std::endl;
 
 		return nonredundant;
 	}

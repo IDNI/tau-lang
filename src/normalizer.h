@@ -302,7 +302,7 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: "<<equiv<<" (equiv refs)";
 		return equiv;
 	}
-	if (r1opt || r2opt) { // one is a ref
+	else if (r1opt || r2opt) { // one is a ref
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: false (ref and not ref)";
 		return false;
 	}
@@ -436,6 +436,7 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 		visited[n]  = true;
 		return false;
 	};
+	bool has_relative_rule = false;
 	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
 		const auto& r = nso_rr.rec_relations[ri];
 		auto left = get_ref_info(get_ref(r.first).value());
@@ -443,6 +444,8 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 			if (ot == tau_parser::shift) {
 				BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation " << r.first << " cannot contain an offset shift";
 				return false; // head ref cannot have shift
+			} else if (ot == tau_parser::capture) {
+				has_relative_rule = true;
 			}
 		if (left.second.size() == 0) continue; // no offsets
 		// take only first offset for consideration
@@ -471,6 +474,11 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 		visited[left.first]  = false;
 		visiting[left.first] = false;
 	}
+	if (!has_relative_rule) {
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation has no rules other than initial conditions";
+		return false;
+	}
+
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
 			BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation is cyclic";
@@ -493,10 +501,17 @@ nso<BAs...> find_fixed_point(const rr<nso<BAs...>>& nso_rr,
 	nso<BAs...> current;
 	auto eos = "(I) -- End enumeration step";
 
+	size_t max_loopback = 0;
 	std::vector<size_t> loopbacks;
-	for (const auto& r : nso_rr.rec_relations)
-		loopbacks.push_back(get_max_loopback_in_rr(r.second));
-	for (size_t i = 0; ; i++) {
+	for (const auto& r : nso_rr.rec_relations) {
+		size_t loopback = std::max(get_max_loopback_in_rr(r.first),
+					get_max_loopback_in_rr(r.second));
+		loopbacks.push_back(loopback);
+		max_loopback = std::max(max_loopback, loopback);
+	}
+	BOOST_LOG_TRIVIAL(debug) << "(I) max loopback " << max_loopback;
+
+	for (size_t i = max_loopback; ; i++) {
 		current = build_enumerated_main_step<BAs...>(
 						nso_rr.main, i, offset_arity);
 		bool changed;
@@ -534,8 +549,8 @@ nso<BAs...> find_fixed_point(const rr<nso<BAs...>>& nso_rr,
 			&& is_nso_equivalent_to_any_of(current, previous))
 		{
 			BOOST_LOG_TRIVIAL(debug) << eos
-				<< " - loop (no fixed point) detected at step: "
-				<< i;
+				<< " - loop (no fixed point) "
+					"detected at step: " << i;
 			return fallback;
 		}
 		BOOST_LOG_TRIVIAL(debug) << eos
@@ -606,7 +621,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	}
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";
-	BOOST_LOG_TRIVIAL(debug) << "(O) " << current;
+	BOOST_LOG_TRIVIAL(debug) << "(O) " << current << "\n";
 
 	return current;
 }
