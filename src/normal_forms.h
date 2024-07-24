@@ -1607,12 +1607,80 @@ private:
 		return build_wff_eq(term);
 	}
 
-	// squeezed positives into one literal if possible.
+	bool is_less_eq_than(const literal& ll, const exponent& le, const literal& rl, const exponent& re) const {
+		return std::includes(le.begin(), le.end(), re.begin(), re.end())
+			 && is_less_eq_than(ll, rl);
+	}
+
+	// remove redundant positives
+	std::map<exponent, literal> remove_redundant_positives(const std::map<exponent, literal>& positives) const {
+		std::map<exponent, literal> nonredundant;
+
+		for (auto& [exp, lit]: positives) {
+			std::cout << " positive lit: " << lit << std::endl;
+			std::cout << " positive exp: "; for (auto& e: exp) std::cout << e << " "; std::cout << std::endl;
+			bool insert = true;
+			std::set<exponent> to_remove;
+			for (auto& [e, l]: nonredundant) {
+				std::cout << " non-redundant lit: " << l << std::endl;
+				std::cout << " non-redundant exp: "; for (auto& ee: e) std::cout << ee << " "; std::cout << std::endl;
+				if (is_less_eq_than(lit, exp, l, e)) {
+					std::cout << " positive is less than non-redundant" << std::endl;
+					insert = false; break;
+				} else if (is_less_eq_than(l, e, lit, exp)) {
+					std::cout << " non-redundant is less than positive, removing " << l << std::endl;
+					to_remove.insert(e);
+				}
+			}
+			if (insert) nonredundant[exp] = lit;
+			for (auto& e: to_remove) nonredundant.erase(e);
+		}
+
+		std::cout << " final non-redundant: "; for (auto& [e, l]: nonredundant) std::cout << l << " "; std::cout << std::endl;
+
+		return nonredundant;
+	}
+
+	partition remove_redundant_negatives(const partition& negatives) const {
+		partition nonredundant;
+
+		for (auto& [exp, lits]: negatives) {
+			for(auto& lit: lits) {
+				bool insert = true;
+				std::set<exponent> to_remove;
+				std::cout << " negative lit: " << lit << std::endl;
+				std::cout << " negative exp: "; for (auto& e: exp) std::cout << e << " "; std::cout << std::endl;
+				for (auto& [e, ls]: nonredundant) {
+					for( auto &l: ls) {
+						std::cout << " non-redundant lit: " << l << std::endl;
+						std::cout << " non-redundant exp: "; for (auto& ee: e) std::cout << ee << " "; std::cout << std::endl;
+						if (is_less_eq_than(l, e, lit, exp)) {
+							std::cout << " non-redundant is less than negative" << std::endl;
+							insert = false; break;
+						} else if (is_less_eq_than(lit, exp, l, e)) {
+							std::cout << " negative is less than non-redundant, removing " << l << std::endl;
+							to_remove.insert(e);
+						}
+					}
+				}
+				if (insert) nonredundant[exp].insert(lit);
+				for (auto& e: to_remove) nonredundant.erase(e);
+			}
+		}
+
+		std::cout << " final non-redundant: "; for (auto& [e, ls]: nonredundant) for (auto& l: ls) std::cout << l << " "; std::cout << std::endl;
+
+		return nonredundant;
+	}
+
+	// squeezed positives as much as possible possible.
 	std::map<exponent, literal> squeeze_positives(const partition& positives) const {
+		// first we squeeze positives by exponent
 		std::map<exponent, literal> squeezed;
 		for (auto& [exponent, literals]: positives)
 			squeezed[exponent] = squeeze_positives(literals, exponent);
-		return squeezed;
+		// then we remove redundant positives
+		return remove_redundant_positives(squeezed);
 	}
 
 	bool is_less_eq_than(const literal& l, const literal& r) const {
@@ -1650,38 +1718,42 @@ private:
 		// them, we compute the negation of the the disjunction.
 		if (path.first.empty()) {
 			literals negs;
-			for (auto& [_, lits]: path.second)
+			for (auto& [_, lits]: remove_redundant_negatives(path.second))
 				negs.insert(lits.begin(), lits.end());
 			return build_wff_neg(build_wff_or(negs));
 		}
 
 		// otherwise, let us consider lits the set of literals to be returned
 		// conjuncted.
-		literals lits;
+		partition squeezed_negatives;
 		// first we squeezed positive literals...
 		auto squeezed_positives = squeeze_positives(path.first);
 		// ...the negatives are already squeezed (by order)
-		// auto squeezed_negatives = squeeze_negatives();
 		// for every negative class (same exponent) of literals...
 		for (auto& [negative_exponent, negatives]: path.second) {
 			// - if no positive literal has the same exponent as n, we add n to
 			//   the literals
 			if (!squeezed_positives.contains(negative_exponent)) {
-				lits.insert(build_wff_neg(build_wff_or(negatives))); continue;
+				squeezed_negatives[negative_exponent].insert(build_wff_neg(build_wff_or(negatives))); continue;
 			}
 			// - if the positive literal has 1 as constant we return F,
 			if (!get_constant(squeezed_positives[negative_exponent]).has_value())
 				return _F<BAs...>;
             // otherwise we compute the new negated literal following the Corollary 3.1
 			// from TABA book.
-			lits.insert(normalize(negatives, squeezed_positives.at(negative_exponent), negative_exponent));
+			squeezed_negatives[negative_exponent].insert(normalize(negatives, squeezed_positives.at(negative_exponent), negative_exponent));
 		}
+		// we remove redundant negatives
+		squeezed_negatives = remove_redundant_negatives(squeezed_negatives);
+		// and add the positive terms...
+		literals result;
+		for (auto [_, negatives]: squeezed_negatives)
+			result.insert(negatives.begin(), negatives.end());
 
-		// we also add the positive terms...
 		for (auto [_, positive]: squeezed_positives)
-			lits.insert(positive);
+			result.insert(positive);
 		// and return the conjunction of all the lits
-		return build_wff_and(lits);
+		return build_wff_and(result);
 	}
 
 	bdd_path get_relative_path(const bdd_path& path, const literal& lit) const {
