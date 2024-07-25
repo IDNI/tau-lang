@@ -1076,14 +1076,14 @@ std::string get_ref_type(rr_types& types, const sp_tau_node<BAs...>& ref,
 	auto [fn, arity] = get_ref_name_and_arity(ref);
 	auto it = types.find(fn);
 	if (it != types.end() && it->second.first != t) {
-		BOOST_LOG_TRIVIAL(error) << "(E) -- Type mismatch "
+		BOOST_LOG_TRIVIAL(error) << "Type mismatch "
 			<< fn << "() : " << type2str(it->second.first) << "/"
 			<< it->second.second;
 		return "";
 	}
 	if (it == types.end()) {
 		types[fn] = { t, arity };
-		BOOST_LOG_TRIVIAL(info) << "(I) -- Found type of "
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Found type of "
 			<< fn << "() : " << type2str(t) << "/" << arity;
 		return fn;
 	}
@@ -1140,7 +1140,7 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 
 template<typename... BAs>
 rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
-	BOOST_LOG_TRIVIAL(info) << "(I) -- Begin type inferrence"; // << ": " << nso_rr;
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin type inferrence"; // << ": " << nso_rr;
 	// for (auto& r : nso_rr.rec_relations)
 	// 	ptree<BAs...>(std::cout << "rule left: ", r.first) << "\n",
 	// 	ptree<BAs...>(std::cout << "rule right: ", r.second) << "\n";
@@ -1245,9 +1245,9 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 	if (todo_names.size()) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
-		BOOST_LOG_TRIVIAL(error) << "(E) Unknown recurrence relation ref type for:" << ss.str();
+		BOOST_LOG_TRIVIAL(error) << "Unknown recurrence relation ref type for:" << ss.str();
 	}
-	BOOST_LOG_TRIVIAL(info) << "(I) -- End type inferrence"; // << ": " << nn;
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End type inferrence"; // << ": " << nn;
 	return nn;
 }
 
