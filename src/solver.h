@@ -218,7 +218,7 @@ minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>
 }
 
 template<typename...BAs>
-solution<BAs...> solve(const minterm_system<BAs...>& sys) {
+solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& sys) {
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
@@ -245,7 +245,7 @@ solution<BAs...> solve(const inequality_system<BAs...>& sys) {
 	// for each possible choice of H_i's, we try to solve the minterm system
 	// using tthe above solve method.
 	for (auto& ms: minterm_system_range(sys)) {
-		auto solution = solve(ms);
+		auto solution = solve_minterm_system(ms);
 		if (!solution.empty()) return solution;
 	}
 	return {};
