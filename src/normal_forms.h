@@ -399,11 +399,20 @@ static auto trivialities = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto push_neg_for_snf = make_library<BAs...>(
+	WFF_PUSH_NEGATION_UPWARDS_0
+	+ WFF_PUSH_NEGATION_INWARDS_0
+	+ WFF_PUSH_NEGATION_INWARDS_1
+	+ WFF_ELIM_DOUBLE_NEGATION_0
+);
+
+template<typename... BAs>
 static auto simplify_snf = repeat_all<step<BAs...>, BAs...>(
 	apply_cb<BAs...>
 	| elim_eqs<BAs...>
 	| simplify_wff<BAs...>
-	| trivialities<BAs...>);
+	| trivialities<BAs...>
+	| push_neg_for_snf<BAs...>);
 
 template<typename... BAs>
 static auto to_mnf_wff = make_library<BAs...>(
@@ -411,10 +420,9 @@ static auto to_mnf_wff = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto to_mnf_snf_wff = make_library<BAs...>(
-	WFF_PUSH_NEGATION_UPWARDS_0
-	+ WFF_PUSH_NEGATION_INWARDS_0
-	+ WFF_PUSH_NEGATION_INWARDS_1
+static auto fix_neg_in_snf = make_library<BAs...>(
+	WFF_PUSH_NEGATION_INWARDS_2
+	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
@@ -1572,9 +1580,9 @@ private:
 			| only_child_extractor<BAs...> | ba_extractor<BAs...>;
 	}
 
-	nso<BAs...> replace_with(const literal& lit, const nso<BAs...>& by, const nso<BAs...> form) const {
-		std::map<nso<BAs...>, nso<BAs...>> changes = {{lit, by}};
-		return replace<nso<BAs...>>(form, changes) | simplify_snf<BAs...>;
+	nso<BAs...> replace_with(const nso<BAs...>& node, const nso<BAs...>& with, const nso<BAs...> in) const {
+		std::map<nso<BAs...>, nso<BAs...>> changes = {{node, with}};
+		return replace<nso<BAs...>>(in, changes) | simplify_snf<BAs...>;
 	}
 
 	partition make_partition_by_exponent(const literals& s) const {
@@ -1792,41 +1800,28 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 		| repeat_each<step<BAs...>, BAs...>(apply_wff_defs<BAs...>);
 	// in the first step we apply compute the SNF of the formula, as a result we get
 	// the formula in SNF with positive equal exponent literals sqeezed.
-	auto first_step = wo_defs
+	auto first_step = build_wff_neg(wo_defs)
 		| repeat_all<step<BAs...>, BAs...>(
 			unsqueeze_wff<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>
-			| to_mnf_snf_wff<BAs...>)
-		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
-		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(simplify_snf<BAs...>);
+			| push_neg_for_snf<BAs...>)
+		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
 	// in the second step we compute the SNF of the negation of the the result
 	// of the first step in order to squeeze the negative equal exponent literals.
 	// Note that in this case we don't need to unsqueeze the formula.
 	auto second_step = build_wff_neg(first_step)
+		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
 		| repeat_all<step<BAs...>, BAs...>(
 			apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
 			| trivialities<BAs...>
-			| to_mnf_snf_wff<BAs...>)
-		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
-		//| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
-		//| repeat_all<step<BAs...>, BAs...>(simplify_snf<BAs...>);
-	// finally we return the negation to get the SNF of the original formula with both
-	// positive and negative equal exponent literals squeezed.
-	auto snf = build_wff_neg(second_step)
-		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			apply_cb<BAs...>
-			| elim_eqs<BAs...>
-			| simplify_wff<BAs...>
-			| trivialities<BAs...>)
-			| bf_reduce_canonical<BAs...>();
-	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, snf}};
+			| fix_neg_in_snf<BAs...>)
+		| bf_reduce_canonical<BAs...>();
+	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, second_step}};
 	return replace(n, changes);
 }
 
