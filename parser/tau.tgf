@@ -204,10 +204,6 @@ cli_command            =>
         | (("defs" | "definitions"):def_sym)                  :def_list_cmd
         | (                         def_sym __ number)        :def_print_cmd
         |                           rec_relation              :def_rr_cmd
-# outputs
-        | (("hist" | "history"):history_sym)                  :history_list_cmd
-	| (                     history_sym __ memory)        :history_print_cmd
-        | (                     bf_typed | wff_typed)         :history_store_cmd
 #qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
@@ -216,6 +212,10 @@ cli_command            =>
         | ("set":set_sym   __ option
                                 (__ | _ '=' _) option_value)  :set_cmd
         | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
+# outputs
+        | (("hist" | "history"):history_sym)                  :history_list_cmd
+        | (                     history_sym __ memory)        :history_print_cmd
+        | (                     bf_typed | wff_typed)         :history_store_cmd
         .
 
 # command arguments

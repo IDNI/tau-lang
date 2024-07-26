@@ -442,7 +442,7 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 		auto left = get_ref_info(get_ref(r.first).value());
 		for (const auto& [ot, _] : left.second)
 			if (ot == tau_parser::shift) {
-				BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation " << r.first << " cannot contain an offset shift";
+				BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " cannot contain an offset shift";
 				return false; // head ref cannot have shift
 			} else if (ot == tau_parser::capture) {
 				has_relative_rule = true;
@@ -461,12 +461,12 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 			if (ho == bo) graph[left.first].insert(right.first);
 			else if (ho.first == tau_parser::num) {
 				if (bo.first == tau_parser::capture) {
-					BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation " << r.first << " (having a fixed offset) cannot depend on a relative offset " << r.second;
+					BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " (having a fixed offset) cannot depend on a relative offset " << r.second;
 					return false; // left num right capture
 				}
 				if (bo.first == tau_parser::num
 					&& ho.second < bo.second) {
-						BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation " << r.first << " cannot depend on a future state " << r.second;
+						BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " cannot depend on a future state " << r.second;
 						return false; // l num < r num
 				}
 			}
@@ -475,13 +475,13 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 		visiting[left.first] = false;
 	}
 	if (!has_relative_rule) {
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation has no rules other than initial conditions";
+		BOOST_LOG_TRIVIAL(error) << "Recurrence relation has no rules other than initial conditions";
 		return false;
 	}
 
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
-			BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation is cyclic";
+			BOOST_LOG_TRIVIAL(error) << "Recurrence relation is cyclic";
 			return false;
 		}
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation is well founded";
