@@ -1,5 +1,5 @@
 #
-# set command
+# toggle command
 #
 
 add_repl_test(toggle_cmd-status "toggle status" "off")
