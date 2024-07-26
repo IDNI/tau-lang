@@ -37,13 +37,13 @@ template<typename...BAs>
 using inequality = nso<BAs...>;
 
 template<typename...BAs>
-using system = std::pair<equality<BAs...>, std::set<inequality<BAs...>>;
+using system = std::pair<equality<BAs...>, std::set<inequality<BAs...>>>;
 
 template<typename...BAs>
 using inequality_system = std::set<inequality<BAs...>>;
 
 template<typename...BAs>
-using minterm_system = std:set<nso<BAs...>>;
+using minterm_system = std::set<nso<BAs...>>;
 
 template<typename...BAs>
 using solution = std::map<var<BAs...>, nso<BAs...>>;
@@ -120,7 +120,6 @@ solution<BAs...> solve(const system<BAs...>& sys) {
 	solution<BAs...> combined_solution;
 	return combined_solution;
 }
-
 
 } // idni::tau namespace
 #endif // __SOLVER_H__
