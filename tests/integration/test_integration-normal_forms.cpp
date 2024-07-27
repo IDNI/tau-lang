@@ -121,7 +121,6 @@ TEST_SUITE("normal forms: snf for wff") {
 	}
 
 	// TODO (MEDIUM) fix this test
-
 	/*TEST_CASE("simple case: {bdd: a} x = 0 && {bdd:a}' x = 0") {
 		const char* sample = "{bdd: a} x = 0 && {bdd:a}' x = 0.";
 		auto sample_src = make_tau_source(sample);
