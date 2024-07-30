@@ -36,6 +36,7 @@
 #include <boost/log/trivial.hpp>
 
 #include "bool_ba.h"
+#include "splitter_types.h"
 #include "parser.h"
 #include "utils.h"
 #include "../parser/tau_parser.generated.h"
@@ -1475,14 +1476,20 @@ std::optional<sp_tau_node<BAs...>> build_bf_constant(const std::optional<std::va
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_var(const std::string& v) {
-	auto var = make_builder<BAs...>("( $X ) =: " + v + ".").second;
+sp_tau_node<BAs...> build_bf_var(const std::string& name) {
+	auto var = make_builder<BAs...>("( $X ) =: " + name + ".").second;
 	return trim<BAs...>(var);
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_var(const std::string& v) {
-	auto var = make_builder<BAs...>("( $X ) =:: ?" + v + ".").second;
+sp_tau_node<BAs...> build_wff_var(const std::string& name) {
+	auto var = make_builder<BAs...>("( $X ) =:: ?" + name + ".").second;
+	return trim<BAs...>(var);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_uniter_const(const std::string& name) {
+	auto var = make_builder<BAs...>("( $X ) =:: <:" + name + ">.").second;
 	return trim<BAs...>(var);
 }
 
@@ -1961,6 +1968,23 @@ template<typename... BAs>
 sp_tau_node<BAs...> operator<<(const sp_tau_node<BAs...>& n, const std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>>& change) {
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes{change};
 	return replace(n, changes);
+}
+
+// Splitter function for a nso tau_parser::bf_constant node holding a BA constant
+template<typename... BAs>
+sp_tau_node<BAs...> splitter(const sp_tau_node<BAs...>& n, splitter_type st = splitter_type::upper) {
+	// Lambda for calling splitter on n
+	auto _splitter = [&st](const auto& n) -> sp_tau_node<BAs...> {
+		auto res = splitter(n, st);
+		std::variant<BAs...> v(res);
+		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	};
+
+	assert(std::holds_alternative<std::variant<BAs...>>(trim2(n)->value));
+	auto ba_constant = get<std::variant<BAs...>>(trim2(n)->value);
+	sp_tau_node<BAs...> nn(std::visit(_splitter, ba_constant));
+	std::vector<sp_tau_node<BAs...>> arg { nn };
+	return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
 }
 
 // IDEA convert to a const static applier and change all the code accordingly

@@ -16,6 +16,7 @@
 
 #include "babdd.h"
 #include "dict.h"
+#include "splitter_types.h"
 
 template<typename B, auto o> struct bdd_handle;
 template<typename B, auto o = bdd_options<>::create()>
@@ -53,7 +54,8 @@ template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> normalize (const hbdd<B, o>& x) {return x;}
 
 template<typename B, auto o = bdd_options<>::create()>
-hbdd<B, o> splitter (const hbdd<B, o>& x) { return x->splitter(); }
+hbdd<B, o> splitter (const hbdd<B, o>& x, splitter_type st) { return x->splitter(st); }
+
 
 #ifdef DEBUG
 template<typename B, auto o = bdd_options<>::create()>
@@ -263,10 +265,25 @@ struct bdd_handle {
 		return r;
 	}
 
-	hbdd<B, o> splitter () {
-		bdd_ref s = bdd<B,o>::rm_clause(b);
-		if (s != bdd<B, o>::F && s != b) return get(s);
-		else return get(bdd<B,o>::split_clause(b));
+	hbdd<B, o> splitter (splitter_type st) {
+		switch(st) {
+		case splitter_type::lower: {
+			bdd_ref s = bdd<B, o>::rm_all_except_one_clause(b);
+			if (s != bdd<B, o>::F && s != b) return get(s);
+			break;
+		}
+		case splitter_type::middle: {
+			bdd_ref s = bdd<B, o>::rm_half_clauses(b);
+			if (s != bdd<B, o>::F && s != b) return get(s);
+			break;
+		}
+		case splitter_type::upper: {
+			bdd_ref s = bdd<B,o>::rm_clause(b);
+			if (s != bdd<B, o>::F && s != b) return get(s);
+			break;
+		}
+		}
+		return get(bdd<B,o>::split_clause(b));
 	}
 
 #ifndef DEBUG
@@ -435,10 +452,25 @@ struct bdd_handle<Bool, o> {
 		return r;
 	}
 
-	hbdd<Bool, o> splitter () {
-		bdd_ref s = bdd<Bool,o>::rm_clause(b);
-		if (s != bdd<Bool, o>::F && s != b) return get(s);
-		else return get(bdd<Bool,o>::split_clause(b));
+	hbdd<Bool, o> splitter (splitter_type st) {
+		switch(st) {
+		case splitter_type::lower: {
+			bdd_ref s = bdd<Bool, o>::rm_all_except_one_clause(b);
+			if (s != bdd<Bool, o>::F && s != b) return get(s);
+			break;
+		}
+		case splitter_type::middle: {
+			bdd_ref s = bdd<Bool, o>::rm_half_clauses(b);
+			if (s != bdd<Bool, o>::F && s != b) return get(s);
+			break;
+		}
+		case splitter_type::upper: {
+			bdd_ref s = bdd<Bool,o>::rm_clause(b);
+			if (s != bdd<Bool, o>::F && s != b) return get(s);
+			break;
+		}
+		}
+		return get(bdd<Bool,o>::split_clause(b));
 	}
 
 #ifndef DEBUG
