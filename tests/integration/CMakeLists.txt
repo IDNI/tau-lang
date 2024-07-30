@@ -13,6 +13,7 @@ set(TESTS
 	nso_rr_fixed_point
 	bf_normalization
 	wff_normalization
+	splitter
 
 	# tests depending on a deprecated syntax
 	#gssotc_rr_execution

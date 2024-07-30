@@ -85,7 +85,7 @@ TEST_SUITE("BDD_Splitter") {
 		auto a3 = bdd_handle<Bool>::bit(true, 3);
 
 		auto d1 = a1 | a2 | a3;
-		CHECK(splitter(d1) == (a1 | a2));
+		CHECK(splitter(d1, splitter_type::upper) == (a1 | a2));
 	}
 
 	TEST_CASE("DNF_clause_deletion2") {
@@ -95,7 +95,7 @@ TEST_SUITE("BDD_Splitter") {
 		auto a3 = bdd_handle<Bool>::bit(false, 3);
 
 		auto d1 = a1 | a2 | a3;
-		CHECK(splitter(d1) == (a1 | a2));
+		CHECK(splitter(d1, splitter_type::upper) == (a1 | a2));
 	}
 
 	TEST_CASE("single_DNF_clause") {
@@ -106,6 +106,6 @@ TEST_SUITE("BDD_Splitter") {
 		auto a4 = bdd_handle<Bool>::bit(true, 4);
 
 		auto d1 = a1 & a2 & a3;
-		CHECK(splitter(d1) == (d1 & a4));
+		CHECK(splitter(d1, splitter_type::upper) == (d1 & a4));
 	}
 }

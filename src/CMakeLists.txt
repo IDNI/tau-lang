@@ -16,6 +16,8 @@ set(TAU_HEADERS
 	executor.h
 	normal_forms.h
 	solver.h
+	splitter.h
+	splitter_types.h
 	variant_ba.h
 	product_ba.h
 	utils.h

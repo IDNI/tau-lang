@@ -199,6 +199,22 @@ int_t get_new_var_id (const nso<BAs...> fm) {
 	return *vars.rbegin() + 1;
 }
 
+
+// Given a nso<BAs...> produce a number i such that the uninterpreted constant const_i is
+// not present
+template<typename... BAs>
+int_t get_new_uniter_const_id (const nso<BAs...> fm) {
+	auto uniter_consts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
+	set ids {0};
+	for (auto uniter_const : uniter_consts) {
+		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, uniter_const); tmp.find(":const") != string::npos) {
+			string id = tmp.substr(6, tmp.size()-1);
+			if (!tmp.empty()) ids.insert(stoi(id));
+		}
+	}
+	return *ids.rbegin() + 1;
+}
+
 static inline std::vector<std::string> rr_v{"dummy"};
 static inline std::map<std::string, size_t> rr_m{};
 inline size_t rr_dict(const std::string& s) {
