@@ -325,13 +325,31 @@ minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>
 }
 
 template<typename...BAs>
+nso<BAs...> get_constant(const minterm<BAs...>& m) {
+	auto cte = find_top(m, is_child_non_terminal<tau_parser::constant, BAs...>);
+	return cte ? cte : _1<BAs...>;
+}
+
+template<typename...BAs>
+nso<BAs...> get_minterm(const minterm<BAs...>& m) {
+	auto cte = find_top(m, is_child_non_terminal<tau_parser::constant, BAs...>);
+	return cte ? replace_with(cte.value(), _1<BAs...>, m) : m;
+}
+
+template<typename...BAs>
 solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& sys) {
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
 	if (!has_solution(sys)) return {};
-	
-	return {};
+	equality<BAs...> eq = _F<BAs...>;
+	for (auto& neq: make_minterm_system_disjoint(sys)) {
+		auto cte = get_constant(neq);
+		auto minterm = get_minterm(neq);
+		eq = eq | (cte & ~minterm);
+	}
+	eq = build_wff_eq(eq);
+	return find_solution(eq);
 }
 
 template<typename...BAs>
