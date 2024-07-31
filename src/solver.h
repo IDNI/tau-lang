@@ -17,7 +17,6 @@
 #include <stack>
 
 #include "tau.h"
-#include "satisfiability.h"
 #include "normal_forms.h"
 
 // in what follows we use the algorithms and notations of TABA book (cf.
@@ -95,7 +94,6 @@ solution<BAs...> lgrs(const equality<BAs...>& f) {
 	return phi;
 }
 
-// TODO (HIGH) implement members
 template<typename...BAs>
 class minterm_iterator {
 public:
@@ -110,21 +108,79 @@ public:
 	class sentinel {};
 	static constexpr sentinel end{};
 
-	minterm_iterator(const nso<BAs...>& f);
+	minterm_iterator(const nso<BAs...>& f) {
+		if (auto vars = find(f, is_child_non_terminal<tau_parser::variable, BAs...>); vars.empty()) {
+			for (auto& v : vars) choices.push_back({v, false, _F<BAs...>});
+			update_choices(f, 0);
+			update_current();
+		}
+	}
+
 	minterm_iterator();
-	minterm_iterator<BAs...> &operator++();
-	minterm_iterator<BAs...> operator++(int);
-	bool operator==(const minterm_iterator<BAs...>&) const;
-	bool operator!=(const minterm_iterator<BAs...>& that) const;
-	bool operator==(const sentinel& that) const;
-	bool operator!=(const sentinel& that) const;
-	const minterm<BAs...>& operator*() const;
+
+	minterm_iterator<BAs...>& operator++() {
+		size_t i = choices.size() - 1;
+		while (--i > 0) if (choices[i].value ^= true) break;
+		if (i == 0) choices[0].value = true;
+		auto next_partial = replace_with(choices[i].partial, choices[i].var, _1<BAs...>);
+		update_choices(next_partial, ++i);
+		update_current();
+		return *this;
+	}
+
+	minterm_iterator<BAs...> operator++(int) {
+		// TODO (MEDIUM) check if this is correct
+		return *this;
+	}
+
+	bool operator==(const minterm_iterator<BAs...>& that) const {
+		return choices == that.choices;
+	}
+
+	bool operator!=(const minterm_iterator<BAs...>& that) const {
+		return !(*this == that);
+	}
+
+	bool operator==(const sentinel& that) const {
+		return find(choices.rbegin(), choices.rend(), [](const choice& c) { return !c.value;}) == choices.end();
+	}
+
+	bool operator!=(const sentinel& that) const {
+		return !(*this == that);
+	}
+
+	const minterm<BAs...>& operator*() const {
+		return current;
+	}
 
 private:
-	using choice = std::pair<nso<BAs...>, typename std::vector<nso<BAs...>>::iterator>;
-	static const std::vector<nso<BAs...>> bools {_0<BAs...>, _1<BAs...>};
-	std::stack<choice> choices;
-	nso<BAs...> f;
+	struct choice {
+		var<BAs...> var;
+		bool value;
+		nso<BAs...> partial;
+	};
+
+	std::vector<choice> choices;
+	minterm<BAs...> current;
+
+	template<typename first_it, typename last_it>
+	void update_choices(const nso<BAs...>& f, const first_it& first, const last_it& last) {
+		if (first == last) return;
+		auto next_current = f;
+		for (auto& it = first; it != last; ++it) {
+			it->value = false;
+			it->partial = next_current;
+			next_current = replace_with(next_current, it->var, _0<BAs...>);
+		}
+	}
+
+	void update_current() {
+		auto f = choices.back().partial;
+		auto current =  choices.back().value
+			? replace_with(f, choices.back().var, _1<BAs...>)
+			: replace_with(f, choices.back().var, _0<BAs...>);
+		for (auto& c: choices) current = c.var & current;
+	}
 };
 
 template<typename...BAs>
@@ -150,9 +206,8 @@ private:
 	nso<BAs...> f;
 };
 
-// TODO (HIGH) implement members
 template<typename...BAs>
-class minterm_system_iterator {
+class minterm_inequality_system_iterator {
 public:
 	// iterator traits
 	using difference_type = size_t;
@@ -165,40 +220,75 @@ public:
 	class sentinel {};
 	static constexpr sentinel end{};
 
-	minterm_system_iterator(const inequality_system<BAs...>& sys);
-	minterm_system_iterator();
-	minterm_system_iterator<BAs...> &operator++();
-	minterm_system_iterator<BAs...> operator++(int);
-	bool operator==(const minterm_system_iterator<BAs...>&) const;
-	bool operator!=(const minterm_system_iterator<BAs...>& that) const;
-	bool operator==(const sentinel &that) const;
-	bool operator!=(const sentinel &that) const;
-	const minterm_system<BAs...>& operator*() const;
+	minterm_inequality_system_iterator(const inequality_system<BAs...>& sys) {
+		for (auto& ineq: sys) {
+			auto f = ineq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+			ranges.push_back(minterm_range(f));
+		}
+		for (auto& range: ranges) minterm_iterators.push_back(range.begin());
+	}
+
+	minterm_inequality_system_iterator();
+
+	minterm_inequality_system_iterator<BAs...> &operator++() {
+		size_t i = minterm_iterators.size() - 1;
+		while (--i > 0) {
+			if (++minterm_iterators[i] != ranges[i].end()) break;
+			else minterm_iterators[i] = ranges[i].begin();
+		}
+		if (i == 0) minterm_iterators[0] = ranges[0].end();
+		for (auto& it: minterm_iterators) *it = build_wff_neq(*it);
+		return *this;
+	}
+
+	minterm_inequality_system_iterator<BAs...> operator++(int) {
+		// TODO (MEDIUM) check if this is correct
+		return *this;
+	}
+
+	bool operator==(const minterm_inequality_system_iterator<BAs...>& that) const {
+		return this.ranges == that.ranges && this.minterm_iterators == that.minterm_iterators;
+	}
+
+	bool operator!=(const minterm_inequality_system_iterator<BAs...>& that) const {
+		return !(*this == that);
+	}
+
+	bool operator==(const sentinel &that) const {
+		return minterm_iterators.front() == ranges.front().end();
+	}
+
+	bool operator!=(const sentinel &that) const {
+		return !(*this == that);
+	}
+
+	const minterm_system<BAs...>& operator*() const {
+		return current;
+	}
 
 private:
-	// IDEA maybe is better to keep a vector of minterm ranges instead of
-	// the original inequality system
-	inequality_system<BAs...>& sys;
-	std::vector<minterm_iterator<BAs...>> minter_iterators;
+	std::vector<minterm_range<BAs...>> ranges;
+	std::vector<minterm_iterator<BAs...>> minterm_iterators;
+	minterm_system<BAs...> current;
 };
 
 template<typename...BAs>
-class minterm_system_range {
+class minterm_inequality_system_range {
 public:
 
-	explicit minterm_system_range(const inequality_system<BAs...>& sys);
+	explicit minterm_inequality_system_range(const inequality_system<BAs...>& sys);
 
 	bool empty() {
 		return sys.size() == 0;
 	}
 
-	minterm_system_iterator<BAs...> begin() {
-		minterm_system_iterator<BAs...> begin(sys);
+	minterm_inequality_system_iterator<BAs...> begin() {
+		minterm_inequality_system_iterator<BAs...> begin(sys);
 		return begin;
 	}
 
-	minterm_system_iterator<BAs...>::sentinel end() {
-		return minterm_system_iterator<BAs...>::end;
+	minterm_inequality_system_iterator<BAs...>::sentinel end() {
+		return minterm_inequality_system_iterator<BAs...>::end;
 	}
 
 private:
@@ -207,14 +297,31 @@ private:
 
 template<typename...BAs>
 bool has_solution(const minterm_system<BAs...>& sys) {
-	// TODO (HIGH) implement this function
-	return false;
+	auto bs = _1<BAs...>;
+	for (auto& m: sys) bs = bs & get_constant(m);
+	return bs != _0<BAs...>;
+}
+
+template<typename...BAs>
+minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint, const minterm<BAs...>& m) {
+	minterm_system<BAs...> new_disjoint = disjoint;
+	auto new_m = m;
+	for (auto& d: disjoint) {
+		if (auto d_cte = get_constant(d), m_cte = get_constant(m); d_cte & m_cte != false) {
+			if (d_cte & ~m_cte == false) { /* insert ~m_cte d */}
+			else if (m_cte & ~d_cte == false) { /* insert d and update new_m to ~d_cte & m */}
+			else { /* call splitter */}
+		} else new_disjoint.insert(d);
+	}
+	new_disjoint.insert(new_m);
+	return new_disjoint;
 }
 
 template<typename...BAs>
 minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys) {
-	// TODO (HIGH) implement this function
-	return sys;
+	minterm_system<BAs...> disjoints;
+	for (auto& it = sys.begin(); it != sys.end(); ++it) disjoints = add_minterm_to_disjoint(disjoints, *it);
+	return disjoints;
 }
 
 template<typename...BAs>
@@ -223,7 +330,7 @@ solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& sys) {
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
 	if (!has_solution(sys)) return {};
-		// TODO (HIGH) implement this block
+	
 	return {};
 }
 
