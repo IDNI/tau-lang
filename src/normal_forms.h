@@ -1801,6 +1801,7 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 	// in the first step we apply compute the SNF of the formula, as a result we get
 	// the formula in SNF with positive equal exponent literals sqeezed.
 	auto first_step = build_wff_neg(wo_defs)
+		| bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			unsqueeze_wff<BAs...>
 			| apply_cb<BAs...>
