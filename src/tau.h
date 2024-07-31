@@ -17,7 +17,7 @@
 #include <iostream>
 
 #include "normalizer.h"
-#include "normal_forms.h"
+#include "splitter.h"
 
 using namespace std;
 using namespace idni::tau;
@@ -160,6 +160,12 @@ auto normalize (const tau_ba<BAs...>& fm) {
 	return tau_ba<BAs...>(res);
 }
 
+template<typename... BAs>
+auto splitter (const tau_ba<BAs...>& fm, splitter_type st) {
+	auto s = tau_splitter(fm.nso_rr.main, st);
+	return tau_ba<BAs...>(s);
+}
+
 template<typename...BAs>
 using gssotc = nso<tau_ba<BAs...>, BAs...>;
 
@@ -189,15 +195,6 @@ struct tau_factory {
 	}
 
 	base_factory_t& bf;
-};
-
-template<typename...BAs>
-struct tau_splitter {
-
-	std::variant<tau_ba<BAs...>, BAs...> operator()(const std::variant<tau_ba<BAs...>, BAs...>& n) {
-		// TODO (HIGH) implement tau_ba splitter
-	}
-
 };
 
 // // creates a specific rule from a generic rule.

@@ -83,8 +83,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | '1'                                :bf_t
                         | '0'                                :bf_f
                         |                                     capture
-                        |                                     variable
-                        |                                     uninterpreted_constant.
+                        |                                     variable.
 
 # variables
 charvar                => (alpha & ~'T' & ~'F' & ~'i' & ~'o') digit*.
