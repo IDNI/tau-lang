@@ -307,10 +307,16 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 	minterm_system<BAs...> new_disjoint = disjoint;
 	auto new_m = m;
 	for (auto& d: disjoint) {
-		if (auto d_cte = get_constant(d), m_cte = get_constant(m); d_cte & m_cte != false) {
-			if (d_cte & ~m_cte == false) { /* insert ~m_cte d */}
-			else if (m_cte & ~d_cte == false) { /* insert d and update new_m to ~d_cte & m */}
-			else { /* call splitter */}
+		if (auto d_cte = get_constant(d), new_m_cte = get_constant(new_m); d_cte & new_m_cte != false) {
+			if (d_cte & ~new_m_cte != false) new_disjoint.insert(~new_m_cte & d);
+			else if (new_m_cte & ~d_cte != false) {
+				new_disjoint.insert(d);
+				new_m = ~d_cte & new_m;
+			} else {
+				auto s = splitter(d_cte | tau_parser::bf_constant | optional_value_extractor<nso<BAs...>>);
+				new_disjoint.insert(s & d);
+				new_m = ~s & new_m;
+			}
 		} else new_disjoint.insert(d);
 	}
 	new_disjoint.insert(new_m);
