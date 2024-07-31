@@ -784,6 +784,25 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 		return add(n.v, rm_clause(n.h), n.l);
 	}
 
+	// remove all except a single clause in the bdd
+	static bdd_ref rm_all_except_one_clause(bdd_ref x) {
+		if (leaf(x)) return F;
+		const bdd_node_t& n = get_node(x);
+		if (n.h == T) return add(n.v, T, F);
+		if (n.l == T) return add(n.v, F, T);
+		if (n.h == F) return add(n.v, F, rm_all_except_one_clause(n.l));
+		return add(n.v, rm_all_except_one_clause(n.h), F);
+	}
+
+	// remove half of all clauses in the bdd on average
+	// by simply returning the high node
+	static bdd_ref rm_half_clauses(bdd_ref x) {
+		if (leaf(x)) return F;
+		const bdd_node_t& n = get_node(x);
+		if (n.l == F) return add(n.v, rm_half_clauses(n.h), n.l);
+		return add(n.v, n.h, F);
+	}
+
 	// Find highest variable name in bdd
 	static uint highest_var(bdd_ref x) {
 		const bdd& xx = get(x);
@@ -1364,6 +1383,25 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if (n.l == F) return add(n.v, rm_clause(n.h), F);
 		if (leaf(n.h)) return add(n.v, n.h, rm_clause(n.l));
 		return add(n.v, rm_clause(n.h), n.l);
+	}
+
+	// remove all except a single clause in the bdd
+	static bdd_ref rm_all_except_one_clause(bdd_ref x) {
+		if (leaf(x)) return F;
+		const bdd& n = get(x);
+		if (n.h == T) return add(n.v, T, F);
+		if (n.l == T) return add(n.v, F, T);
+		if (n.h == F) return add(n.v, F, rm_all_except_one_clause(n.l));
+		return add(n.v, rm_all_except_one_clause(n.h), F);
+	}
+
+	// remove half of all clauses in the bdd on average
+	// by simply returning the high node
+	static bdd_ref rm_half_clauses(bdd_ref x) {
+		if (leaf(x)) return F;
+		const bdd& n = get(x);
+		if (n.l == F) return add(n.v, rm_half_clauses(n.h), n.l);
+		return add(n.v, n.h, F);
 	}
 
 	// Find highest variable in bdd
