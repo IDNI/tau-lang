@@ -1987,6 +1987,24 @@ sp_tau_node<BAs...> splitter(const sp_tau_node<BAs...>& n, splitter_type st = sp
 	return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
 }
 
+// TODO (MEDIUM) unify this code with get_gssotc_clause and get_gssotc_literals
+template<typename ...BAs>
+void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves) {
+    if (auto check = n | branch; check.has_value()) {
+        for (auto& c: check || skip) get_leaves(c, branch, skip, leaves);
+    } else {
+        leaves.push_back(n);
+        BOOST_LOG_TRIVIAL(trace) << "(I) found get_gssotc_clause: " << n;
+    }
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip) {
+    std::vector<sp_tau_node<BAs...>> leaves;
+    get_leaves(n, branch, skip, leaves);
+    return leaves;
+}
+
 // IDEA convert to a const static applier and change all the code accordingly
 //
 // however, the logic is quite complez a lot of private functions doesn't make
@@ -2073,22 +2091,6 @@ private:
 	static constexpr auto _neq = [](const auto& l) -> bool { return !(l == false); };
 	static constexpr auto _is_one = [](const auto& l) -> bool { return l == true; };
 	static constexpr auto _is_zero = [](const auto& l) -> bool { return l == false; };
-
-	// TODO (MEDIUM) unify this code with get_gssotc_clause and get_gssotc_literals
-	void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves) {
-		if (auto check = n | branch; check.has_value()) {
-			for (auto& c: check || skip) get_leaves(c, branch, skip, leaves);
-		} else {
-			leaves.push_back(n);
-			BOOST_LOG_TRIVIAL(trace) << "(I) found get_gssotc_clause: " << n;
-		}
-	}
-
-	std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip) {
-		std::vector<sp_tau_node<BAs...>> leaves;
-		get_leaves(n, branch, skip, leaves);
-		return leaves;
-	}
 
 	std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>> get_quantifier_remove_constituents(const tau_parser::nonterminal type, const sp_tau_node<BAs...>& n) {
 		auto args = n || type || only_child_extractor<BAs...>;

@@ -28,6 +28,7 @@
 
 #include "defs.h"
 #include "bool_ba.h"
+#include "dict.h"
 
 using namespace std;
 
@@ -530,6 +531,8 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 	static bdd_node_t get_node(bdd_ref x) { return std::get<bdd_node_t>(get(x)); }
 
 	static bdd_ref bit(int_t v) {
+		// Avoid later name clash by adding any new variable to dictionary
+		dict(v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
 
@@ -1078,6 +1081,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	static bdd_ref bit(int_t v) {
+		// Avoid later name clash by adding any new variable to dictionary
+		dict(v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
 
