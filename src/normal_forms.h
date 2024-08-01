@@ -1517,8 +1517,8 @@ private:
 
 		auto lit = *remaining.begin();
 		auto exponent = get_exponent(lit);
-		auto f = normalize_negative(path, lit) == _F<BAs...> ? _F<BAs...> : replace_with(lit, _F<BAs...>, form);
-		auto t = normalize_positive(path, lit) == _F<BAs...> ? _F<BAs...> : replace_with(lit, _T<BAs...>, form);
+		auto f = normalize_negative(path, lit) == _F<BAs...> ? _F<BAs...> : replace_with(lit, _F<BAs...>, form) | simplify_snf<BAs...>;
+		auto t = normalize_positive(path, lit) == _F<BAs...> ? _F<BAs...> : replace_with(lit, _T<BAs...>, form) | simplify_snf<BAs...>;
 
 		if (f == _F<BAs...> && t == _F<BAs...>) {
 			// we only cache results in release mode
@@ -1578,11 +1578,6 @@ private:
 	std::optional<constant> get_constant(const literal& lit) const {
 		return find_top(lit, is_non_terminal<tau_parser::constant, BAs...>)
 			| only_child_extractor<BAs...> | ba_extractor<BAs...>;
-	}
-
-	nso<BAs...> replace_with(const nso<BAs...>& node, const nso<BAs...>& with, const nso<BAs...> in) const {
-		std::map<nso<BAs...>, nso<BAs...>> changes = {{node, with}};
-		return replace<nso<BAs...>>(in, changes) | simplify_snf<BAs...>;
 	}
 
 	partition make_partition_by_exponent(const literals& s) const {
