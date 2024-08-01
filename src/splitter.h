@@ -108,8 +108,18 @@ nso<BAs...> split(const nso<BAs...> &fm, const auto fm_type, const split_sym spl
 
 // Find a Boolean function which implies f
 template<typename... BAs>
-nso<BAs...> good_splitter_using_function(const nso<BAs...> &f, splitter_type st, const nso<BAs...> &original_fm) {
+nso<BAs...> good_splitter_using_function(const nso<BAs...> &f, splitter_type st, const nso<BAs...> &original_fm,
+                                         const auto &bf_constants) {
 	assert(is_non_terminal(tau_parser::bf, f));
+	// Try to disjunct function with constant to produce splitter
+	for (const auto &bf_c: bf_constants) {
+		auto s = build_bf_and(f, bf_c);
+		map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
+		auto new_fm = replace(original_fm, changes);
+		/*if(!are_nso_equivalent(original_fm, new_fm))*/
+		return new_fm;
+	}
+
 	// First check if we have more then one disjunct
 	vector<nso<BAs...> > m;
 	size_t i = 0;
@@ -145,11 +155,21 @@ nso<BAs...> good_splitter_using_function(const nso<BAs...> &f, splitter_type st,
 // Find a Boolean function which is implied by f
 template<typename... BAs>
 nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_type st,
-                                                 const nso<BAs...> &original_fm) {
+                                                 const nso<BAs...> &original_fm, const auto &bf_constants) {
 	assert(is_non_terminal(tau_parser::bf, f));
+	// Try to disjunct function with constant to produce splitter
+	for (const auto &bf_c: bf_constants) {
+		auto s = build_bf_or(f, bf_c);
+		map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
+		auto new_fm = replace(original_fm, changes);
+		/*if(!are_nso_equivalent(original_fm, new_fm))*/
+		return new_fm;
+	}
+
 	// Convert Boolean function to CNF
 	auto f_cnf = f | repeat_all<step<BAs...>, BAs...>(to_cnf_bf<BAs...>);
 
+	// Try to remove a conjunt to produce splitter
 	vector<nso<BAs...> > m;
 	size_t i = 0;
 	do {
@@ -162,7 +182,7 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 		}
 	} while (++i < m.size());
 
-	// Find possible coefficient in each disjunct of f
+	// Try to split coefficient in each conjunct of f
 	vector<nso<BAs...> > clauses = get_leaves(f, tau_parser::bf_and, tau_parser::bf);
 	// In case f is just a single clause
 	if (clauses.empty()) clauses.push_back(f);
@@ -191,6 +211,10 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 template<typename... BAs>
 nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
 	// TODO: Add equivalence check once quantifier elimination is reliable
+
+	// Collect coefficients to produce splitters
+	auto bf_constants = select_top(fm, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
+
 	fm = snf_wff(fm);
 	// Collect all occurances of "||" while assuming that fm is in DNF
 	auto or_occurances = select_all(fm, is_non_terminal<tau_parser::wff_or, BAs...>);
@@ -210,7 +234,7 @@ nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
 		for (const auto &eq: eqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(eq->child[1])));
 			auto f = eq->child[0];
-			if (auto s = good_reverse_splitter_using_function(f, st, clause); s != clause) {
+			if (auto s = good_reverse_splitter_using_function(f, st, clause, bf_constants); s != clause) {
 				map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
 				return replace(fm, c);
 			}
@@ -220,7 +244,7 @@ nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
 		for (const auto &neq: neqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(neq->child[1])));
 			auto f = neq->child[0];
-			if (auto s = good_splitter_using_function(f, st, clause); s != clause) {
+			if (auto s = good_splitter_using_function(f, st, clause, bf_constants); s != clause) {
 				map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
 				return replace(fm, c);
 			}
