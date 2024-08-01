@@ -1812,7 +1812,7 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_eq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_eq<BAs...>(l & rr);
 	}
@@ -1820,7 +1820,7 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 		&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_neq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_eq<BAs...>(l & rr);
 	}
@@ -1858,7 +1858,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_eq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_bf_eq<BAs...>(l | rr);
 	}
@@ -1866,7 +1866,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_neq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_bf_eq<BAs...>(l | rr);
 	}
@@ -1895,14 +1895,14 @@ sp_tau_node<BAs...> operator~(const sp_tau_node<BAs...>& l) {
 	if (is_child_non_terminal<tau_parser::bf_eq, BAs...>(l)) {
 		auto ll = l
 			| tau_parser::bf_eq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_eq<BAs...>(~ll);
 	}
 	if (is_child_non_terminal<tau_parser::bf_neq, BAs...>(l)) {
 		auto ll = l
 			| tau_parser::bf_neq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_eq<BAs...>(~ll);
 	}
@@ -1939,7 +1939,7 @@ sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_eq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_bf_eq<BAs...>(l ^ rr);
 	}
@@ -1947,7 +1947,7 @@ sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_neq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_bf_eq<BAs...>(l ^ rr);
 	}
