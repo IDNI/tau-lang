@@ -135,7 +135,7 @@ TEST_SUITE("rec relations execution: simple cases") {
 
 TEST_SUITE("rec_relations execution: types") {
 
-	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: wff wins") {
+	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: type mismatch") {
 		const char* sample =
 			"g[0]($Y) := 0."
 			"g[0]($Y) := T."
@@ -144,11 +144,11 @@ TEST_SUITE("rec_relations execution: types") {
 		bdd_test_factory bf;
 		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result |  tau_parser::wff_t;
+		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: bf wins") {
+	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: type mismatch") {
 		const char* sample =
 			"g[0]($Y) := 0."
 			"g[0]($Y) := T."
@@ -157,7 +157,7 @@ TEST_SUITE("rec_relations execution: types") {
 		bdd_test_factory bf;
 		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
 		auto result = normalizer<bdd_test>(sample_formula);
-		auto check = result |  tau_parser::wff_t;
+		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 }
