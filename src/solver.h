@@ -19,7 +19,7 @@
 #include "tau.h"
 #include "normal_forms.h"
 
-// in what follows we use the algorithms and notations of TABA book (cf.
+// In what follows we use the algorithms and notations of TABA book (cf.
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.
 
@@ -67,8 +67,8 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 	if (auto x = find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); x) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		auto g = replace_with(f, x, _1<BAs...>);
-		auto h = replace_with(f, x, _0<BAs...>);
+		auto g = replace_with(x, _1<BAs...>, f);
+		auto h = replace_with(x, _0<BAs...>, f);
 		if (has_no_var(f) && has_no_var(g)) return {{x, h}};
 		auto restricted = find_solution(g & h);
 		auto full = restricted;
@@ -109,28 +109,33 @@ public:
 	static constexpr sentinel end{};
 
 	minterm_iterator(const nso<BAs...>& f) {
-		if (auto vars = find(f, is_child_non_terminal<tau_parser::variable, BAs...>); vars.empty()) {
-			for (auto& v : vars) choices.push_back({v, false, _F<BAs...>});
-			update_choices(f, 0);
-			update_current();
-		}
+		if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
+			// we start with the full bf...
+			auto partial_bf = f;
+			// ... and the first variable (for computing the first partial minterm)
+			auto partial_minterm = ~(*vars.begin());
+			for (auto& v : vars) {
+				// we add the current choice to the list of choices...
+				choices.emplace_back(v, false, partial_bf, partial_minterm);
+				// ... and compute new values for the next one
+				partial_bf = replace_with(v, _0<BAs...>, partial_bf) | simplify_bf<BAs...>;
+				partial_minterm = partial_minterm & ~v;
+			}
+			if (auto minterm = make_current_minterm(); minterm != _0<BAs...>) current = minterm;
+			else compute_next_choice();
+		} else exhausted = true;
 	}
 
 	minterm_iterator();
 
 	minterm_iterator<BAs...>& operator++() {
-		size_t i = choices.size() - 1;
-		while (--i > 0) if (choices[i].value ^= true) break;
-		if (i == 0) choices[0].value = true;
-		auto next_partial = replace_with(choices[i].partial, choices[i].var, _1<BAs...>);
-		update_choices(next_partial, ++i);
-		update_current();
+		if (exhausted) return *this;
+		compute_next_choice();
 		return *this;
 	}
 
 	minterm_iterator<BAs...> operator++(int) {
-		// TODO (MEDIUM) check if this is correct
-		return *this;
+		return ++*this;
 	}
 
 	bool operator==(const minterm_iterator<BAs...>& that) const {
@@ -141,12 +146,12 @@ public:
 		return !(*this == that);
 	}
 
-	bool operator==(const sentinel& that) const {
-		return find(choices.rbegin(), choices.rend(), [](const choice& c) { return !c.value;}) == choices.end();
+	bool operator==(const sentinel&) const {
+		return exhausted;
 	}
 
-	bool operator!=(const sentinel& that) const {
-		return !(*this == that);
+	bool operator!=(const sentinel&) const {
+		return !exhausted;
 	}
 
 	const minterm<BAs...>& operator*() const {
@@ -157,29 +162,45 @@ private:
 	struct choice {
 		var<BAs...> var;
 		bool value;
-		nso<BAs...> partial;
+		nso<BAs...> partial_bf;
+		nso<BAs...> partial_minterm;
 	};
 
 	std::vector<choice> choices;
 	minterm<BAs...> current;
+	bool exhausted = false;
 
-	template<typename first_it, typename last_it>
-	void update_choices(const nso<BAs...>& f, const first_it& first, const last_it& last) {
-		if (first == last) return;
-		auto next_current = f;
-		for (auto& it = first; it != last; ++it) {
-			it->value = false;
-			it->partial = next_current;
-			next_current = replace_with(next_current, it->var, _0<BAs...>);
-		}
+	nso<BAs...> make_current_minterm() {
+		auto cte =  choices.back().value
+			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
+			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
+		return (cte & choices.back().partial_minterm) | simplify_bf<BAs...>;
 	}
 
-	void update_current() {
-		auto f = choices.back().partial;
-		auto current =  choices.back().value
-			? replace_with(f, choices.back().var, _1<BAs...>)
-			: replace_with(f, choices.back().var, _0<BAs...>);
-		for (auto& c: choices) current = c.var & current;
+	void compute_next_choice() {
+		if (exhausted) return;
+		// update the choices from right to left
+		size_t last_changed_value = choices.size();
+		while (last_changed_value > 0)  if (choices[--last_changed_value].value ^= true) break;
+		// if all choices are exhausted, we are done
+		if (last_changed_value == 0 && choices[0].value == false) { exhausted = true; return; }
+		// otherwise we check if the current choice is valid
+		update_choices_from(last_changed_value);
+		if (auto minterm = make_current_minterm(); minterm != _0<BAs...>) { current = minterm; return; }
+		compute_next_choice();
+	}
+
+	void update_choices_from(size_t start) {
+		auto partial_bf = choices[start].partial_bf;
+		auto partial_minterm = _1<BAs...>;
+		for (size_t i = start; i < choices.size(); ++i) {
+			choices[i].partial_bf = partial_bf;
+			choices[i].partial_minterm = (choices[i].value ? ~choices[i].var : choices[i].var) & partial_minterm;
+			partial_minterm = choices[i].partial_minterm;
+			partial_bf = choices[i].value
+				? replace_with(choices[i].var, _1<BAs...>, partial_bf) | simplify_bf<BAs...>
+				: replace_with(choices[i].var, _0<BAs...>, partial_bf) | simplify_bf<BAs...>;
+		}
 	}
 };
 
@@ -393,7 +414,10 @@ solution<BAs...> solve(const system<BAs...>& sys) {
 	// the LGRS is reproductive (cf. remark 1.2). So to solve the
 	// original system we only need to solve {h_i (T) ̸= 0}i∈I and the solution
 	// to the original system is then ϕ (T).
-	//
+
+	// TODO (HIGH) check for constant equalities/inequalities and remove them if
+	// they are true, return empty solution otherwise
+
 	if (!sys.first) return solve(sys.second);
 	auto phi = lgrs(sys.first.value());
 	inequality_system<BAs...> inequalities;

@@ -36,6 +36,7 @@
 #include <boost/log/trivial.hpp>
 
 #include "bool_ba.h"
+#include "variant_ba.h"
 #include "splitter_types.h"
 #include "parser.h"
 #include "utils.h"
@@ -1745,13 +1746,15 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
 		auto rc = r
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_constant<BAs...>(lc & rc );
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
+		return build_bf_constant<BAs...>(lc & rc);
 	};
 
 	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l)
@@ -1766,7 +1769,7 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_eq
 			| only_child_extractor<BAs...>
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_eq<BAs...>(l & rr);
+		return build_wff_eq<BAs...>(l & rr);
 	}
 	if (is_non_terminal<tau_parser::bf>(l)
 		&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
@@ -1774,7 +1777,7 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_neq
 			| only_child_extractor<BAs...>
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_eq<BAs...>(l & rr);
+		return build_wff_eq<BAs...>(l & rr);
 	}
 	if (is_non_terminal<tau_parser::wff>(l)
 			&& is_non_terminal<tau_parser::wff, BAs...>(r))
@@ -1789,12 +1792,14 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
 		auto rc = r
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
 		return build_bf_constant<BAs...>(lc | rc);
 	};
 
@@ -1833,7 +1838,8 @@ sp_tau_node<BAs...> operator~(const sp_tau_node<BAs...>& l) {
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
 		return build_bf_constant<BAs...>(~lc);
 	};
 
@@ -1846,14 +1852,14 @@ sp_tau_node<BAs...> operator~(const sp_tau_node<BAs...>& l) {
 			| tau_parser::bf_eq
 			| only_child_extractor<BAs...>
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_eq<BAs...>(~ll);
+		return build_wff_eq<BAs...>(~ll);
 	}
 	if (is_child_non_terminal<tau_parser::bf_neq, BAs...>(l)) {
 		auto ll = l
 			| tau_parser::bf_neq
 			| only_child_extractor<BAs...>
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_eq<BAs...>(~ll);
+		return build_wff_eq<BAs...>(~ll);
 	}
 	if (is_non_terminal<tau_parser::wff>(l))
 		return build_wff_neg<BAs...>(l);
@@ -1867,12 +1873,14 @@ sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
 		auto rc = r
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
 		return build_bf_constant<BAs...>(lc ^ rc);
 	};
 
@@ -1916,7 +1924,8 @@ bool is_zero(const sp_tau_node<BAs...>& l) {
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
 		return is_zero(lc);
 	};
 
@@ -1936,7 +1945,8 @@ bool is_one(const sp_tau_node<BAs...>& l) {
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
 		return is_one(lc);
 	};
 
@@ -2345,6 +2355,13 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<B
 	}
 
 	return nn;
+}
+
+// TODO (LOW) move it to a more appropriate place (parser)
+template<typename... BAs>
+nso<BAs...> replace_with(const nso<BAs...>& node, const nso<BAs...>& with, const nso<BAs...> in) {
+	std::map<nso<BAs...>, nso<BAs...>> changes = {{node, with}};
+	return replace<nso<BAs...>>(in, changes);
 }
 
 // apply the given rules to the given expression
