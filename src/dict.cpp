@@ -15,6 +15,7 @@
 #include <vector>
 #include <map>
 #include <sstream>
+#include <cassert>
 
 #include "dict.h"
 
@@ -29,11 +30,18 @@ sym_t dict(const char* s) {
 }
 
 const char* dict(sym_t n) {
-	if ((size_t)n >= v.size()) {
+	assert((size_t)n <= v.size());
+	if ((size_t)n == v.size()) {
 		static string tmp;
-		stringstream ss;
-		ss << "x[" << n << "]";
-		return (tmp = ss.str()).c_str();
+		do {
+			stringstream ss;
+			ss << "x" << n;
+			if (auto it = m.find(ss.str()); it == m.end()) {
+				dict(ss.str());
+				return (tmp = ss.str()).c_str();
+			}
+			++n;
+		} while (true);
 	}
 	return v[n].c_str();
 }
