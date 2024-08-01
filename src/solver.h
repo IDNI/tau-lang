@@ -141,13 +141,8 @@ public:
 		return ++*this;
 	}
 
-	bool operator==(const minterm_iterator<BAs...>& that) const {
-		return choices == that.choices;
-	}
-
-	bool operator!=(const minterm_iterator<BAs...>& that) const {
-		return !(*this == that);
-	}
+	bool operator==(const minterm_iterator<BAs...>& that) const = default;
+	bool operator!=(const minterm_iterator<BAs...>& that) const = default;
 
 	bool operator==(const sentinel&) const {
 		return exhausted;
@@ -167,6 +162,9 @@ private:
 		bool value;
 		nso<BAs...> partial_bf;
 		nso<BAs...> partial_minterm;
+
+		bool operator==(const choice&) const = default;
+		bool operator!=(const choice&) const = default;
 	};
 
 	std::vector<choice> choices;
@@ -224,9 +222,12 @@ public:
 		return begin;
 	}
 
-	minterm_iterator<BAs...>::sentinel end() {
+	minterm_iterator<BAs...>::sentinel end() const {
 		return minterm_iterator<BAs...>::end;
 	}
+
+	bool operator==(const minterm_range<BAs...>&) const = default;
+	bool operator!=(const minterm_range<BAs...>&) const = default;
 
 private:
 	const nso<BAs...> f;
@@ -247,45 +248,43 @@ public:
 	static constexpr sentinel end{};
 
 	minterm_inequality_system_iterator(const inequality_system<BAs...>& sys) {
+		if (sys.empty()) { exhausted = true; return; }
+		// for each inequality in the system, we create a minterm range
 		for (auto& ineq: sys) {
-			auto f = ineq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+			auto f = ineq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 			ranges.push_back(minterm_range(f));
 		}
-		for (auto& range: ranges) minterm_iterators.push_back(range.begin());
+		// we initialize the minterm iterators
+		for (auto& range: ranges) {
+			minterm_iterators.push_back(range.begin());
+			if (minterm_iterators.back() == range.end()) {
+				exhausted = true;
+				break;
+			}
+		}
 	}
 
 	minterm_inequality_system_iterator();
 
 	minterm_inequality_system_iterator<BAs...> &operator++() {
-		size_t i = minterm_iterators.size() - 1;
-		while (--i > 0) {
-			if (++minterm_iterators[i] != ranges[i].end()) break;
-			else minterm_iterators[i] = ranges[i].begin();
-		}
-		if (i == 0) minterm_iterators[0] = ranges[0].end();
-		for (auto& it: minterm_iterators) *it = build_wff_neq(*it);
+		if (exhausted) return *this;
+		make_next_choice();
 		return *this;
 	}
 
 	minterm_inequality_system_iterator<BAs...> operator++(int) {
-		// TODO (MEDIUM) check if this is correct
-		return *this;
+		return ++*this;
 	}
 
-	bool operator==(const minterm_inequality_system_iterator<BAs...>& that) const {
-		return this.ranges == that.ranges && this.minterm_iterators == that.minterm_iterators;
+	bool operator==(const minterm_inequality_system_iterator<BAs...>& that) const = default;
+	bool operator!=(const minterm_inequality_system_iterator<BAs...>& that) const = default;
+
+	bool operator==(const sentinel&) const {
+		return exhausted;
 	}
 
-	bool operator!=(const minterm_inequality_system_iterator<BAs...>& that) const {
-		return !(*this == that);
-	}
-
-	bool operator==(const sentinel &that) const {
-		return minterm_iterators.front() == ranges.front().end();
-	}
-
-	bool operator!=(const sentinel &that) const {
-		return !(*this == that);
+	bool operator!=(const sentinel&) const {
+		return !exhausted;
 	}
 
 	const minterm_system<BAs...>& operator*() const {
@@ -296,6 +295,28 @@ private:
 	std::vector<minterm_range<BAs...>> ranges;
 	std::vector<minterm_iterator<BAs...>> minterm_iterators;
 	minterm_system<BAs...> current;
+	bool exhausted = false;
+
+	minterm_system<BAs...> make_current_minterm_system() {
+		minterm_system<BAs...> minterms;
+		for (auto& it: minterm_iterators) minterms.insert(*it);
+		return minterms;
+	}
+
+	void make_next_choice() {
+		if (exhausted) return;
+		size_t last_changed_value = minterm_iterators.size();
+		while (last_changed_value > 0) {
+			--last_changed_value;
+			if (++minterm_iterators[last_changed_value] == ranges[last_changed_value].end())
+				minterm_iterators[last_changed_value] = ranges[last_changed_value].begin();
+			else break;
+		}
+		if (last_changed_value == 0 && minterm_iterators[0] == ranges[0].begin()) {
+			exhausted = true; return;
+		}
+		current = make_current_minterm_system();
+	}
 };
 
 template<typename...BAs>
