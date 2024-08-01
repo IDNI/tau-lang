@@ -15,6 +15,7 @@ set(TESTS
 	wff_normalization
 	splitter
 	splitter2
+    solver
 
 	# tests depending on a deprecated syntax
 	#gssotc_rr_execution
