@@ -121,8 +121,11 @@ public:
 				partial_bf = replace_with(v, _0<BAs...>, partial_bf) | simplify_bf<BAs...>;
 				partial_minterm = partial_minterm & ~v;
 			}
+			// if the current choices correspond to a proper minterm, we update the current
+			// minterm, otherwise we compute the next valid choice
 			if (auto minterm = make_current_minterm(); minterm != _0<BAs...>) current = minterm;
-			else compute_next_choice();
+			else make_next_choice();
+		// otherwise, i.e. no vars, we return an empty iterator as we have no vars.
 		} else exhausted = true;
 	}
 
@@ -130,7 +133,7 @@ public:
 
 	minterm_iterator<BAs...>& operator++() {
 		if (exhausted) return *this;
-		compute_next_choice();
+		make_next_choice();
 		return *this;
 	}
 
@@ -177,17 +180,19 @@ private:
 		return (cte & choices.back().partial_minterm) | simplify_bf<BAs...>;
 	}
 
-	void compute_next_choice() {
+	void make_next_choice() {
 		if (exhausted) return;
 		// update the choices from right to left
 		size_t last_changed_value = choices.size();
 		while (last_changed_value > 0)  if (choices[--last_changed_value].value ^= true) break;
 		// if all choices are exhausted, we are done
 		if (last_changed_value == 0 && choices[0].value == false) { exhausted = true; return; }
-		// otherwise we check if the current choice is valid
+		// we update the choices from the last changed value till the end
 		update_choices_from(last_changed_value);
+		// if the current minterm is valid, we update current field, otherwise...
 		if (auto minterm = make_current_minterm(); minterm != _0<BAs...>) { current = minterm; return; }
-		compute_next_choice();
+		// ... we try again with the next choice
+		make_next_choice();
 	}
 
 	void update_choices_from(size_t start) {
@@ -208,7 +213,7 @@ template<typename...BAs>
 class minterm_range {
 public:
 
-	explicit minterm_range(const nso<BAs...>& f);
+	explicit minterm_range(const nso<BAs...>& f): f (f) {}
 
 	bool empty() {
 		return false;
@@ -224,7 +229,7 @@ public:
 	}
 
 private:
-	nso<BAs...> f;
+	const nso<BAs...> f;
 };
 
 template<typename...BAs>
@@ -297,7 +302,7 @@ template<typename...BAs>
 class minterm_inequality_system_range {
 public:
 
-	explicit minterm_inequality_system_range(const inequality_system<BAs...>& sys);
+	explicit minterm_inequality_system_range(const inequality_system<BAs...>& sys): sys(sys) {};
 
 	bool empty() {
 		return sys.size() == 0;

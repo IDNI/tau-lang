@@ -28,7 +28,7 @@ namespace testing = doctest;
 
 TEST_SUITE("minterm_iterator") {
 
-	TEST_CASE("++operator with no vars") {
+	TEST_CASE("with no vars") {
 		const char* sample = "0 = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -38,7 +38,7 @@ TEST_SUITE("minterm_iterator") {
 		CHECK ( it == minterm_iterator<bdd_test>::end );
 	}
 
-	TEST_CASE("++operator with one minterm") {
+	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -48,7 +48,7 @@ TEST_SUITE("minterm_iterator") {
 		CHECK ( ++it == minterm_iterator<bdd_test>::end );
 	}
 
-	TEST_CASE("++operator with two minterms") {
+	TEST_CASE("with two vars") {
 		const char* sample = "x | y = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -59,7 +59,7 @@ TEST_SUITE("minterm_iterator") {
 		CHECK ( ++it != minterm_iterator<bdd_test>::end );
 		CHECK ( ++it == minterm_iterator<bdd_test>::end );
 	}
-	TEST_CASE("++operator with two minterms") {
+	TEST_CASE("with three vars") {
 		const char* sample = "x | y | z = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -78,17 +78,55 @@ TEST_SUITE("minterm_iterator") {
 
 TEST_SUITE("minterm_range") {
 
-	/*TEST_CASE("one minterm") {
-		const char* sample = "x.";
+	TEST_CASE("no var") {
+		const char* sample = "0 = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		minterm_iterator<bdd_test> range(sample_formula.main);
-		CHECK (true);
-	}*/
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
+		minterm_range<bdd_test> range(sample_formula);
+		CHECK ( range.begin() == range.end() );
+	}
 
-	TEST_CASE("two minterms") {
+	TEST_CASE("one var") {
+		const char* sample = "x = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
+		minterm_range<bdd_test> range(sample_formula);
+		CHECK ( range.begin() != range.end() );
+		CHECK ( ++range.begin() == range.end() );
+	}
 
+	TEST_CASE("two var") {
+		const char* sample = "x | y = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
+		minterm_range<bdd_test> range(sample_formula);
+		auto it = range.begin();
+		CHECK ( ++it != range.end() );
+		CHECK ( ++it != range.end() );
+		CHECK ( ++it == range.end() );
+	}
+
+	TEST_CASE("three var") {
+		const char* sample = "x | y | z = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
+		minterm_range<bdd_test> range(sample_formula);
+		auto it = range.begin();
+		CHECK ( ++it != range.end() );
+		CHECK ( ++it != range.end() );
+		CHECK ( ++it != range.end() );
+		CHECK ( ++it != range.end() );
+		CHECK ( ++it != range.end() );
+		CHECK ( ++it != range.end() );
+		CHECK ( ++it == range.end() );
 	}
 }
 
