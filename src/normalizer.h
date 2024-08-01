@@ -594,21 +594,24 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 
 	//DBG(ptree<BAs...>(std::cout << "main ", applied_defs.main) << "\n";)
 
+	rr_types types;
+	bool success = true;
+	get_rr_types(success, types, applied_defs);
+	if (!success) return _F<BAs...>;
+
 	// if rr main is a fixed point search
 	// if main has no offsets and there exists a rr with offsets
 	auto ref = applied_defs.main | tau_parser::wff_ref | tau_parser::ref;
 	if (ref && !(ref | tau_parser::offsets).has_value()) {
-		rr_types types;
-		get_rr_types(types, applied_defs);
 		auto fn = get_ref_name(ref.value());
 		auto it = types.find(fn);
 		if (it != types.end()) {
-			size_t offset_arity = it->second.second;
-			if (offset_arity) {
+			if (it->second.offset_arity) {
 				auto fp = _F<BAs...>;
 				if (is_well_founded(applied_defs))
 					fp = find_fixed_point<BAs...>(
-						applied_defs, offset_arity);
+						applied_defs,
+						it->second.offset_arity);
 				BOOST_LOG_TRIVIAL(debug)<<"(I) -- End normalizer";
 				BOOST_LOG_TRIVIAL(debug)<<"(O) " << fp << "\n";
 				return fp;
