@@ -1542,7 +1542,6 @@ sp_tau_node<BAs...> build_wff_uniter_const(const std::string& name) {
 // wff factory method for building wff formulas
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_eq(const sp_tau_node<BAs...>& l) {
-	auto tl = trim<BAs...>(l);
 	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
 	return tau_apply_builder<BAs...>(bldr_wff_eq<BAs...>, args);
 }
@@ -1812,7 +1811,7 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_eq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_eq<BAs...>(l & rr);
 	}
@@ -1820,7 +1819,7 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 		&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_neq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_eq<BAs...>(l & rr);
 	}
@@ -1858,7 +1857,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_eq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_bf_eq<BAs...>(l | rr);
 	}
@@ -1866,7 +1865,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_neq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_bf_eq<BAs...>(l | rr);
 	}
@@ -1895,14 +1894,14 @@ sp_tau_node<BAs...> operator~(const sp_tau_node<BAs...>& l) {
 	if (is_child_non_terminal<tau_parser::bf_eq, BAs...>(l)) {
 		auto ll = l
 			| tau_parser::bf_eq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_eq<BAs...>(~ll);
 	}
 	if (is_child_non_terminal<tau_parser::bf_neq, BAs...>(l)) {
 		auto ll = l
 			| tau_parser::bf_neq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_wff_eq<BAs...>(~ll);
 	}
@@ -1939,7 +1938,7 @@ sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_eq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_eq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_bf_eq<BAs...>(l ^ rr);
 	}
@@ -1947,7 +1946,7 @@ sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
 		auto rr = r
 			| tau_parser::bf_neq
-			| only_child_extractor<BAs...>
+			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
 		return build_bf_eq<BAs...>(l ^ rr);
 	}
@@ -2580,6 +2579,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::history_list_cmd,                 50 },
 			{ tau_parser::history_print_cmd,                50 },
 			{ tau_parser::history_store_cmd,                50 },
+			{ tau_parser::main,                             60 },
 			{ tau_parser::ref,                              80 },
 			{ tau_parser::wff,                              90 },
 			// tau
@@ -2818,7 +2818,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::tau_collapse_positives_cb:  prefix("tau_collapse_positives_cb"); break;
 			case tau_parser::tau_positives_upwards_cb:   prefix("tau_positives_upwards_cb"); break;
 			// cli commands
-			case tau_parser::cli:           sep("."); break;
+			case tau_parser::cli:           sep(". "); break;
 			case tau_parser::rel_memory:    prefix_nows("%-"); break;
 			case tau_parser::abs_memory:    prefix_nows("%"); break;
 			case tau_parser::quit_cmd:      stream << "quit"; break;

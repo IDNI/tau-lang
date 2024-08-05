@@ -18,6 +18,13 @@ namespace idni::tau {
 #ifdef DEBUG
 
 template <typename node_t>
+std::ostream& operator<<(std::ostream &os, std::map<sp_node<node_t>, sp_node<node_t>> m) {
+	os << "{";
+	for (auto& [k, v] : m) os << " {" << k << " <- " << v << "} ";
+	return os << "}\n";
+}
+
+template <typename node_t>
 std::ostream& print_sp_tau_source_node_tree(std::ostream &os, sp_node<node_t> n,
 	size_t l = 0)
 {
