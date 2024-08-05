@@ -324,3 +324,51 @@ TEST_SUITE("minterm_inequality_system_range") {
 		CHECK ( n == 49 );
 	}
 }
+
+TEST_SUITE("find_solution") {
+
+	TEST_CASE("with no vars") {
+		const char* sample = "0 = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
+		auto solution = find_solution(sample_formula);
+		CHECK ( solution.empty() );
+	}
+
+	TEST_CASE("one var: x = 0.") {
+		const char* sample = "x = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
+		auto solution = find_solution(sample_formula);
+		CHECK ( solution.size() == 1 );
+	}
+
+	TEST_CASE("one var: x | x' = 0.") {
+		const char* sample = "x | x' = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
+		auto solution = find_solution(sample_formula);
+		CHECK ( solution.size() == 0 );
+	}
+
+	TEST_CASE("two var: x | y = 0.") {
+		const char* sample = "x | y = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
+		auto solution = find_solution(sample_formula);
+		CHECK ( solution.size() == 2 );
+	}
+
+	TEST_CASE("two var: x & y = 0.") {
+		const char* sample = "x & y = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
+		auto solution = find_solution(sample_formula);
+		CHECK ( solution.size() == 2 );
+	}
+}
