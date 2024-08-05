@@ -91,7 +91,7 @@ TEST_SUITE("rec relations well foundedness") {
 
 	TEST_CASE("shift in header") {
 		const char* sample =
-			"f[n-1](x) := f[n-2](x)."
+			"f[$n-1](x) := f[$n-2](x)."
 			"f(x).";
 		CHECK( fp_test_wff_f(sample) );
 	}

@@ -19,6 +19,10 @@
 #include "tau.h"
 #include "normal_forms.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
+
 // In what follows we use the algorithms and notations of TABA book (cf.
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.
@@ -53,9 +57,24 @@ template<typename...BAs>
 using solution = std::map<var<BAs...>, nso<BAs...>>;
 
 template<typename...BAs>
+solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const nso<BAs...>& gh) {
+	solution<BAs...> solution;
+	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
+	#ifdef DEBUG
+	std::cout << "originals solution: " << solution << std::endl;
+	#endif // DEBUG
+	auto remaing = select_top(gh, is_child_non_terminal<tau_parser::variable, BAs...>);
+	for (auto& v: remaing) solution.erase(v);
+	#ifdef DEBUG
+	std::cout << "remaing solution: " << solution << std::endl;
+	#endif // DEBUG
+	return solution;
+}
+
+template<typename...BAs>
 solution<BAs...> find_solution(const equality<BAs...>& eq) {
 	auto has_no_var = [](const nso<BAs...>& f) {
-		return !find(f, is_child_non_terminal<tau_parser::variable, BAs...>);
+		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 	};
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
@@ -64,16 +83,45 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
 	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
-	if (auto x = find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); x) {
+	#ifdef DEBUG
+	std::cout << "f: " << f << std::endl;
+	#endif // DEBUG
+	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		auto g = replace_with(x, _1<BAs...>, f);
-		auto h = replace_with(x, _0<BAs...>, f);
-		if (has_no_var(f) && has_no_var(g)) return {{x, h}};
-		auto restricted = find_solution(g & h);
-		auto full = restricted;
-		full[x] = replace_with(h, restricted);
-		return full;
+		auto g = replace_with(vars[0], _1<BAs...>, f);
+		auto h = replace_with(vars[0], _0<BAs...>, f);
+		#ifdef DEBUG
+		std::cout << "g: " << g << std::endl;
+		std::cout << "h: " << h << std::endl;
+		#endif // DEBUG
+		auto gh = (g & h) | repeat_all<step<BAs...>, BAs...>(simplify_bf<BAs...>);
+		auto solution = make_removed_vars_solution(vars, gh);
+		#ifdef DEBUG
+		std::cout << "gh: " << gh << std::endl;
+		std::cout << "solution: " << solution << std::endl;
+		#endif // DEBUG
+		if (has_no_var(gh)) {
+			if (gh != _0<BAs...>) return {};
+			else {
+				solution[vars[0]] = _0<BAs...>;
+				#ifdef DEBUG
+				std::cout << "solution: " << solution << std::endl;
+				#endif // DEBUG
+				return solution;
+			}
+		}
+		if (auto restricted = find_solution(build_wff_eq(gh)); !restricted.empty()) {
+			#ifdef DEBUG
+			std::cout << "restricted: " << restricted << std::endl;
+			#endif // DEBUG
+			solution.insert(restricted.begin(), restricted.end());
+			solution[vars[0]] = replace(h, restricted) | repeat_all<step<BAs...>, BAs...>(simplify_bf<BAs...>);
+			#ifdef DEBUG
+			std::cout << "solution: " << solution << std::endl;
+			#endif // DEBUG
+			return solution;
+		}
 	}
 	return {};
 }
@@ -121,8 +169,11 @@ public:
 				partial_bf = replace_with(v, _0<BAs...>, partial_bf) | simplify_bf<BAs...>;
 				partial_minterm = partial_minterm & ~v;
 			}
+			// if the current choices correspond to a proper minterm, we update the current
+			// minterm, otherwise we compute the next valid choice
 			if (auto minterm = make_current_minterm(); minterm != _0<BAs...>) current = minterm;
-			else compute_next_choice();
+			else make_next_choice();
+		// otherwise, i.e. no vars, we return an empty iterator as we have no vars.
 		} else exhausted = true;
 	}
 
@@ -130,7 +181,7 @@ public:
 
 	minterm_iterator<BAs...>& operator++() {
 		if (exhausted) return *this;
-		compute_next_choice();
+		make_next_choice();
 		return *this;
 	}
 
@@ -138,13 +189,8 @@ public:
 		return ++*this;
 	}
 
-	bool operator==(const minterm_iterator<BAs...>& that) const {
-		return choices == that.choices;
-	}
-
-	bool operator!=(const minterm_iterator<BAs...>& that) const {
-		return !(*this == that);
-	}
+	bool operator==(const minterm_iterator<BAs...>& that) const = default;
+	bool operator!=(const minterm_iterator<BAs...>& that) const = default;
 
 	bool operator==(const sentinel&) const {
 		return exhausted;
@@ -164,6 +210,9 @@ private:
 		bool value;
 		nso<BAs...> partial_bf;
 		nso<BAs...> partial_minterm;
+
+		bool operator==(const choice&) const = default;
+		bool operator!=(const choice&) const = default;
 	};
 
 	std::vector<choice> choices;
@@ -177,17 +226,19 @@ private:
 		return (cte & choices.back().partial_minterm) | simplify_bf<BAs...>;
 	}
 
-	void compute_next_choice() {
+	void make_next_choice() {
 		if (exhausted) return;
 		// update the choices from right to left
 		size_t last_changed_value = choices.size();
 		while (last_changed_value > 0)  if (choices[--last_changed_value].value ^= true) break;
 		// if all choices are exhausted, we are done
 		if (last_changed_value == 0 && choices[0].value == false) { exhausted = true; return; }
-		// otherwise we check if the current choice is valid
+		// we update the choices from the last changed value till the end
 		update_choices_from(last_changed_value);
+		// if the current minterm is valid, we update current field, otherwise...
 		if (auto minterm = make_current_minterm(); minterm != _0<BAs...>) { current = minterm; return; }
-		compute_next_choice();
+		// ... we try again with the next choice
+		make_next_choice();
 	}
 
 	void update_choices_from(size_t start) {
@@ -208,7 +259,7 @@ template<typename...BAs>
 class minterm_range {
 public:
 
-	explicit minterm_range(const nso<BAs...>& f);
+	explicit minterm_range(const nso<BAs...>& f): f (f) {}
 
 	bool empty() {
 		return false;
@@ -219,12 +270,15 @@ public:
 		return begin;
 	}
 
-	minterm_iterator<BAs...>::sentinel end() {
+	minterm_iterator<BAs...>::sentinel end() const {
 		return minterm_iterator<BAs...>::end;
 	}
 
+	bool operator==(const minterm_range<BAs...>&) const = default;
+	bool operator!=(const minterm_range<BAs...>&) const = default;
+
 private:
-	nso<BAs...> f;
+	const nso<BAs...> f;
 };
 
 template<typename...BAs>
@@ -242,45 +296,43 @@ public:
 	static constexpr sentinel end{};
 
 	minterm_inequality_system_iterator(const inequality_system<BAs...>& sys) {
+		if (sys.empty()) { exhausted = true; return; }
+		// for each inequality in the system, we create a minterm range
 		for (auto& ineq: sys) {
-			auto f = ineq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+			auto f = ineq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 			ranges.push_back(minterm_range(f));
 		}
-		for (auto& range: ranges) minterm_iterators.push_back(range.begin());
+		// we initialize the minterm iterators
+		for (auto& range: ranges) {
+			minterm_iterators.push_back(range.begin());
+			if (minterm_iterators.back() == range.end()) {
+				exhausted = true;
+				break;
+			}
+		}
 	}
 
 	minterm_inequality_system_iterator();
 
 	minterm_inequality_system_iterator<BAs...> &operator++() {
-		size_t i = minterm_iterators.size() - 1;
-		while (--i > 0) {
-			if (++minterm_iterators[i] != ranges[i].end()) break;
-			else minterm_iterators[i] = ranges[i].begin();
-		}
-		if (i == 0) minterm_iterators[0] = ranges[0].end();
-		for (auto& it: minterm_iterators) *it = build_wff_neq(*it);
+		if (exhausted) return *this;
+		make_next_choice();
 		return *this;
 	}
 
 	minterm_inequality_system_iterator<BAs...> operator++(int) {
-		// TODO (MEDIUM) check if this is correct
-		return *this;
+		return ++*this;
 	}
 
-	bool operator==(const minterm_inequality_system_iterator<BAs...>& that) const {
-		return this.ranges == that.ranges && this.minterm_iterators == that.minterm_iterators;
+	bool operator==(const minterm_inequality_system_iterator<BAs...>& that) const = default;
+	bool operator!=(const minterm_inequality_system_iterator<BAs...>& that) const = default;
+
+	bool operator==(const sentinel&) const {
+		return exhausted;
 	}
 
-	bool operator!=(const minterm_inequality_system_iterator<BAs...>& that) const {
-		return !(*this == that);
-	}
-
-	bool operator==(const sentinel &that) const {
-		return minterm_iterators.front() == ranges.front().end();
-	}
-
-	bool operator!=(const sentinel &that) const {
-		return !(*this == that);
+	bool operator!=(const sentinel&) const {
+		return !exhausted;
 	}
 
 	const minterm_system<BAs...>& operator*() const {
@@ -291,13 +343,35 @@ private:
 	std::vector<minterm_range<BAs...>> ranges;
 	std::vector<minterm_iterator<BAs...>> minterm_iterators;
 	minterm_system<BAs...> current;
+	bool exhausted = false;
+
+	minterm_system<BAs...> make_current_minterm_system() {
+		minterm_system<BAs...> minterms;
+		for (auto& it: minterm_iterators) minterms.insert(*it);
+		return minterms;
+	}
+
+	void make_next_choice() {
+		if (exhausted) return;
+		size_t last_changed_value = minterm_iterators.size();
+		while (last_changed_value > 0) {
+			--last_changed_value;
+			if (++minterm_iterators[last_changed_value] == ranges[last_changed_value].end())
+				minterm_iterators[last_changed_value] = ranges[last_changed_value].begin();
+			else break;
+		}
+		if (last_changed_value == 0 && minterm_iterators[0] == ranges[0].begin()) {
+			exhausted = true; return;
+		}
+		current = make_current_minterm_system();
+	}
 };
 
 template<typename...BAs>
 class minterm_inequality_system_range {
 public:
 
-	explicit minterm_inequality_system_range(const inequality_system<BAs...>& sys);
+	explicit minterm_inequality_system_range(const inequality_system<BAs...>& sys): sys(sys) {};
 
 	bool empty() {
 		return sys.size() == 0;

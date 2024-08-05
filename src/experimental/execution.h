@@ -15,6 +15,7 @@
 #define __EXPERIMENTAL_EXECUTION_H__
 
 #include <string>
+#include <type_traits>
 #include <optional>
 #include <boost/log/trivial.hpp>
 
@@ -32,8 +33,16 @@ using namespace idni::rewriter;
 
 namespace idni::tau::experimental {
 
-template<typename N>
-N operator|(const N& n, const std::function<N(N)>& f) {
+// Check https://en.cppreference.com/w/cpp/utility/functional/function for more
+// information about std::function and how to use it.
+
+/*template<typename F, typename N>
+concept node_transformer = requires(F f, N n) {
+    { f(n) -> N };
+};*/
+
+template<typename N, typename F>
+auto operator|(const N& n, F f) {
 	return f(n);
 }
 
@@ -45,12 +54,12 @@ N operator|(const N& n, const std::tuple<Fs...>& fs) {
 }
 
 template<typename N, typename...Fs>
-auto operator|(const std::tuple<Fs...>& fs, const std::function<N(N)>& f) {
+auto operator|(const std::tuple<Fs...>& fs, std::function<N(const N&)>& f) {
 	return std::tuple_cat(fs, std::make_tuple(f));
 }
 
 template<typename N>
-auto operator|(const std::function<N(N)>& f, const std::function<N(N)>& g) {
+auto operator|(const std::function<N(const N&)>& f, const std::function<N(const N&)>& g) {
 	return make_tuple(f, g);
 }
 
@@ -60,33 +69,35 @@ struct repeat {
 	repeat(F f) : f(f) {}
 
 	N operator()(const N& n) const {
-		auto nn = n;
-		while (nn != f(nn)) nn = f(nn);
-		return nn;
+		auto current = n, next = f(current);
+		while (current != next) { current = next; next = f(current); }
+		return current;
 	}
 
 	F f;
 };
 
-template<typename N, typename F>
+template<typename N>
 struct for_all {
 
-	for_all(std::function<std::vector<N>(N)> s, F f) : s(s), f(f) {}
+	for_all(std::function<std::vector<N>(N)> s, std::function<N(const N&)> f) : s(s), f(f) {}
 
 	N operator()(const N& n) const {
-		auto nn = n;
-		for (auto nn = n; nn != f(nn); nn = f(nn));
-		return nn;
+		std::map<N, N> changes;
+		for (auto& ns: s(n)){
+			changes[n] = f(n);
+		}
+		return replace<N>(n, changes);
 	}
 
 	std::function<std::vector<N>(N)> s;
-	F f;
+	std::function<N(const N&)> f;
 };
 
 template<typename N>
 struct top {
 
-	top(std::function<bool(N)> p) : p(p) {}
+	top(std::function<bool(const N&)> p) : p(p) {}
 
 	std::vector<N> operator()(const N& n) const {
 		return select_top(n, p);
@@ -98,7 +109,7 @@ struct top {
 template<typename N>
 struct botton {
 
-	botton(std::function<bool(N)> p) : p(p) {}
+	botton(std::function<bool(const N&)> p) : p(p) {}
 
 	std::vector<N> operator()(const N& n) const {
 		return select_bottom(n, p);
@@ -110,7 +121,7 @@ struct botton {
 template<typename N>
 struct satisfying {
 
-	satisfying(std::function<bool(N)> p) : p(p) {}
+	satisfying(std::function<bool(const N&)> p) : p(p) {}
 
 	std::vector<N> operator()(const N& n) const {
 		return select_all(n, p);

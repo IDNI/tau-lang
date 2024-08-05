@@ -854,6 +854,7 @@ int repl_evaluator<factory_t, BAs...>::eval(const std::string& src) {
 		for (const auto& cmd : commands)
 			if (quit = eval_cmd(cmd); quit) break;
 	}
+	std::cout << std::endl;
 	if (!quit) prompt();
 	return quit;
 }
