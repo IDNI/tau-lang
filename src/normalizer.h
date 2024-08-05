@@ -82,19 +82,30 @@ rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
 
 template<typename... BAs>
 struct remove_one_wff_existential {
-	nso<BAs...> operator()(const nso<BAs...>& n) const {
-		auto ex_quantifier = [](const auto& n) -> bool {
-			return (n | tau_parser::wff | tau_parser::wff_ex).has_value();
-		};
-		if (auto wff = find_bottom(n, ex_quantifier); wff) {
-			auto removed = wff.value()
+	nso<BAs...> operator()(nso<BAs...> n) const {
+		auto inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
+		// As long as a quantifier is found
+		while (inner_fm) {
+			auto removed = inner_fm.value()
+				| bf_reduce_canonical<BAs...>()
 				| repeat_all<step<BAs...>, BAs...>(
 					to_dnf_wff<BAs...>
-					| simplify_wff<BAs...>)
-				| wff_remove_existential<BAs...>;
-			std::map<nso<BAs...>, nso<BAs...>> changes{{wff.value(), removed}};
-			return replace(n, changes);
+					| simplify_wff<BAs...>
+					| elim_trivial_eqs<BAs...>)
+				    | wff_remove_existential<BAs...>;
+			std::map<nso<BAs...>, nso<BAs...>> changes{{inner_fm.value(), removed}};
+			n = replace(n, changes);
+			inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
+			// In case a quantifier cannot be removed, quantifier elimination needs to stop
+			auto has_node = [&inner_fm](const auto& node){return node == inner_fm;};
+			if (find_top(removed, has_node))
+				break;
 		}
+		// If no more quantifier is found we still convert to DNF
+		n = n | bf_reduce_canonical<BAs...>()
+			  | repeat_all<step<BAs...>, BAs...>( to_dnf_wff<BAs...>
+													| simplify_wff<BAs...>
+													| elim_trivial_eqs<BAs...>);
 		return n;
 	}
 };
@@ -114,11 +125,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 	auto result = form
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(apply_defs<BAs...>))
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(elim_for_all<BAs...>))
-		| repeat_all<steps<step<BAs...>, BAs...>, BAs...>(steps<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>
-			| wff_remove_existential<BAs...>))
-		| bf_reduce_canonical<BAs...>()
+		| remove_one_wff_existential<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(elim_eqs<BAs...> | simplify_wff<BAs...>)
 		| sometimes_always_normalization<BAs...>();
 	#ifdef CACHE
@@ -340,6 +347,40 @@ template <typename... BAs>
 auto is_nso_equivalent_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
 	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
 		return are_nso_equivalent<BAs...>(n, p);
+	});
+}
+
+template<typename... BAs>
+bool are_bf_equal(nso<BAs...> n1, nso<BAs...> n2) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_bf_equal";
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
+
+	assert(is_non_terminal(tau_parser::bf, n1));
+	assert(is_non_terminal(tau_parser::bf, n2));
+
+	if (n1 == n2) {
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_bf_equal: true (equal bf)";
+		return true;
+	}
+
+	nso<BAs...> bf_equal_fm = build_wff_eq(build_bf_xor(n1, n2));
+
+	auto vars = get_free_vars_from_nso(bf_equal_fm);
+	for(auto& v: vars) bf_equal_fm = build_wff_all<BAs...>(v, bf_equal_fm);
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << bf_equal_fm;
+
+	auto normalized = normalizer_step<BAs...>(bf_equal_fm);
+	auto check = normalized | tau_parser::wff_t;
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_bf_equal: " << check.has_value();
+
+	return check.has_value();
+}
+
+template <typename... BAs>
+auto is_bf_same_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
+	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
+		return are_bf_equal<BAs...>(n, p);
 	});
 }
 

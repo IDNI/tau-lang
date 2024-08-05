@@ -377,6 +377,18 @@ static auto elim_bf_constant_01 = make_library<BAs...>(
 );
 
 template<typename... BAs>
+static auto elim_trivial_eqs = make_library<BAs...>(
+	BF_EQ_SIMPLIFY_0
+	+ BF_EQ_SIMPLIFY_1
+	+ BF_NEQ_SIMPLIFY_0
+	+ BF_NEQ_SIMPLIFY_1
+	+ BF_EQ_AND_SIMPLIFY_0
+	+ BF_EQ_AND_SIMPLIFY_1
+	+ BF_EQ_OR_SIMPLIFY_0
+	+ BF_EQ_OR_SIMPLIFY_1
+);
+
+template<typename... BAs>
 static auto elim_eqs = make_library<BAs...>(
 	BF_CALLBACK_EQ
 	+ BF_CALLBACK_NEQ
