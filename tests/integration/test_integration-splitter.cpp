@@ -88,7 +88,6 @@ TEST_CASE("Tau_splitter_2") {
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
 	auto s = tau_splitter(fm, splitter_type::middle);
-	cout << s << "\n";
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(check_uniter_const.has_value());
 }
@@ -109,7 +108,6 @@ TEST_CASE("Tau_splitter_4") {
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
 	auto s = tau_splitter(fm, splitter_type::middle);
-	cout << s << "\n";
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
 }
