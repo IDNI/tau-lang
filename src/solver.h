@@ -19,6 +19,10 @@
 #include "tau.h"
 #include "normal_forms.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
+
 // In what follows we use the algorithms and notations of TABA book (cf.
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.
@@ -53,9 +57,24 @@ template<typename...BAs>
 using solution = std::map<var<BAs...>, nso<BAs...>>;
 
 template<typename...BAs>
+solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const nso<BAs...>& gh) {
+	solution<BAs...> solution;
+	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
+	#ifdef DEBUG
+	std::cout << "originals solution: " << solution << std::endl;
+	#endif // DEBUG
+	auto remaing = select_top(gh, is_child_non_terminal<tau_parser::variable, BAs...>);
+	for (auto& v: remaing) solution.erase(v);
+	#ifdef DEBUG
+	std::cout << "remaing solution: " << solution << std::endl;
+	#endif // DEBUG
+	return solution;
+}
+
+template<typename...BAs>
 solution<BAs...> find_solution(const equality<BAs...>& eq) {
 	auto has_no_var = [](const nso<BAs...>& f) {
-		return !find(f, is_child_non_terminal<tau_parser::variable, BAs...>);
+		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 	};
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
@@ -64,16 +83,45 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
 	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
-	if (auto x = find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); x) {
+	#ifdef DEBUG
+	std::cout << "f: " << f << std::endl;
+	#endif // DEBUG
+	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		auto g = replace_with(x, _1<BAs...>, f);
-		auto h = replace_with(x, _0<BAs...>, f);
-		if (has_no_var(f) && has_no_var(g)) return {{x, h}};
-		auto restricted = find_solution(g & h);
-		auto full = restricted;
-		full[x] = replace_with(h, restricted);
-		return full;
+		auto g = replace_with(vars[0], _1<BAs...>, f);
+		auto h = replace_with(vars[0], _0<BAs...>, f);
+		#ifdef DEBUG
+		std::cout << "g: " << g << std::endl;
+		std::cout << "h: " << h << std::endl;
+		#endif // DEBUG
+		auto gh = (g & h) | repeat_all<step<BAs...>, BAs...>(simplify_bf<BAs...>);
+		auto solution = make_removed_vars_solution(vars, gh);
+		#ifdef DEBUG
+		std::cout << "gh: " << gh << std::endl;
+		std::cout << "solution: " << solution << std::endl;
+		#endif // DEBUG
+		if (has_no_var(gh)) {
+			if (gh != _0<BAs...>) return {};
+			else {
+				solution[vars[0]] = _0<BAs...>;
+				#ifdef DEBUG
+				std::cout << "solution: " << solution << std::endl;
+				#endif // DEBUG
+				return solution;
+			}
+		}
+		if (auto restricted = find_solution(build_wff_eq(gh)); !restricted.empty()) {
+			#ifdef DEBUG
+			std::cout << "restricted: " << restricted << std::endl;
+			#endif // DEBUG
+			solution.insert(restricted.begin(), restricted.end());
+			solution[vars[0]] = replace(h, restricted) | repeat_all<step<BAs...>, BAs...>(simplify_bf<BAs...>);
+			#ifdef DEBUG
+			std::cout << "solution: " << solution << std::endl;
+			#endif // DEBUG
+			return solution;
+		}
 	}
 	return {};
 }
