@@ -43,8 +43,9 @@
 #include "../parser/tau_parser.generated.h"
 #include "rewriting.h"
 
-using namespace idni::rewriter;
 
+
+using namespace idni::rewriter;
 namespace idni::tau {
 
 
@@ -1801,6 +1802,12 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 		return build_bf_constant<BAs...>(lc & rc);
 	};
 
+	// trivial cases
+	if ( l == _0<BAs...> || r == _0<BAs...> ) return _0<BAs...>;
+	if ( l == _1<BAs...> ) return r;
+	if ( r == _1<BAs...> ) return l;
+
+	// more elaborate cases
 	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l)
 			&& is_child_non_terminal<tau_parser::bf_constant, BAs...>(r))
 		return bf_constant_and(l, r);
@@ -1821,7 +1828,7 @@ sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_neq
 			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_wff_eq<BAs...>(l & rr);
+		return build_wff_neq<BAs...>(l & rr);
 	}
 	if (is_non_terminal<tau_parser::wff>(l)
 			&& is_non_terminal<tau_parser::wff, BAs...>(r))
@@ -1847,6 +1854,12 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 		return build_bf_constant<BAs...>(lc | rc);
 	};
 
+	// trivial cases
+	if ( l == _1<BAs...> || r == _1<BAs...> ) return _1<BAs...>;
+	if ( l == _0<BAs...> ) return r;
+	if ( r == _0<BAs...> ) return l;
+
+	// more elaborate cases
 	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l)
 			&& is_child_non_terminal<tau_parser::bf_constant, BAs...>(r))
 		return bf_constant_or(l, r);
@@ -1859,7 +1872,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_eq
 			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_eq<BAs...>(l | rr);
+		return build_wff_eq<BAs...>(l | rr);
 	}
 	if (is_non_terminal<tau_parser::bf>(l)
 			&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
@@ -1867,7 +1880,7 @@ sp_tau_node<BAs...> operator|(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_neq
 			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_eq<BAs...>(l | rr);
+		return build_wff_neq<BAs...>(l | rr);
 	}
 	if (is_non_terminal<tau_parser::wff>(l)
 			&& is_non_terminal<tau_parser::wff, BAs...>(r))
@@ -1887,6 +1900,11 @@ sp_tau_node<BAs...> operator~(const sp_tau_node<BAs...>& l) {
 		return build_bf_constant<BAs...>(~lc);
 	};
 
+	// trivial cases
+	if (l == _0<BAs...>) return _1<BAs...>;
+	if (l == _1<BAs...>) return _0<BAs...>;
+
+	// more elaborate cases
 	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l))
 		return bf_constant_neg(l);
 	if (is_non_terminal<tau_parser::bf>(l))
@@ -1903,7 +1921,7 @@ sp_tau_node<BAs...> operator~(const sp_tau_node<BAs...>& l) {
 			| tau_parser::bf_neq
 			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_wff_eq<BAs...>(~ll);
+		return build_wff_neq<BAs...>(~ll);
 	}
 	if (is_non_terminal<tau_parser::wff>(l))
 		return build_wff_neg<BAs...>(l);
@@ -1928,6 +1946,11 @@ sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 		return build_bf_constant<BAs...>(lc ^ rc);
 	};
 
+	// trivial cases
+	if (l == _0<BAs...>) return r;
+	if (r == _0<BAs...>) return l;
+
+	// more elaborate cases
 	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l)
 			&& is_child_non_terminal<tau_parser::bf_constant, BAs...>(r))
 		return bf_constant_xor(l, r);
@@ -1940,7 +1963,7 @@ sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_eq
 			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_eq<BAs...>(l ^ rr);
+		return build_wff_eq<BAs...>(l ^ rr);
 	}
 	if (is_non_terminal<tau_parser::bf>(l)
 			&& is_child_non_terminal<tau_parser::bf_neq, BAs...>(r)) {
@@ -1948,7 +1971,7 @@ sp_tau_node<BAs...> operator^(const sp_tau_node<BAs...>& l, const sp_tau_node<BA
 			| tau_parser::bf_neq
 			| tau_parser::bf
 			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return build_bf_eq<BAs...>(l ^ rr);
+		return build_wff_neq<BAs...>(l ^ rr);
 	}
 	if (is_non_terminal<tau_parser::wff>(l)
 			&& is_non_terminal<tau_parser::wff, BAs...>(r))
@@ -1973,6 +1996,11 @@ bool is_zero(const sp_tau_node<BAs...>& l) {
 		return is_zero(lc);
 	};
 
+	// trivial cases
+	if (l == _0<BAs...>) return true;
+	if (l == _1<BAs...>) return false;
+
+	// more elaborate cases
 	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l))
 		return bf_constant_is_zero(l);
 	if (is_non_terminal<tau_parser::bf>(l))
@@ -1994,6 +2022,11 @@ bool is_one(const sp_tau_node<BAs...>& l) {
 		return is_one(lc);
 	};
 
+	// trivial cases
+	if (l == _0<BAs...>) return false;
+	if (l == _1<BAs...>) return true;
+
+	// more elaborate cases
 	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l))
 		return bf_constant_is_one(l);
 	if (is_non_terminal<tau_parser::bf>(l))
@@ -2192,6 +2225,7 @@ private:
 		auto wff = args[1];
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		for (auto l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
+			// TODO HIGH only if the leave has the quantified variable
 			auto f = squeeze_positives(l);
 			std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0_trimmed<BAs...>}};
 			std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1_trimmed<BAs...>}};
