@@ -470,19 +470,19 @@ TEST_SUITE("find_top_predicate") {
 TEST_SUITE("logical predicates") {
 
 	TEST_CASE("true_predicate: given a node, it always returns true") {
-		auto t = true_predicate<sp_node<char>>();
+		auto t = true_predicate<sp_node<char>>;
 		CHECK( t(n('a')) );
 	}
 
 	TEST_CASE("false_predicate: given a node, it always returns false") {
-		auto f = false_predicate<sp_node<char>>();
+		auto f = false_predicate<sp_node<char>>;
 		CHECK( !f(n('a')) );
 	}
 
 	TEST_CASE("and_predicate: given a true and a false predicate, it computes "
 			"the true table") {
-		auto t = true_predicate<sp_node<char>>();
-		auto f = false_predicate<sp_node<char>>();
+		auto t = true_predicate<sp_node<char>>;
+		auto f = false_predicate<sp_node<char>>;
 		CHECK( and_predicate(t, t)(d('a')) );
 		CHECK( !and_predicate(t, f)(d('a')) );
 		CHECK( !and_predicate(f, t)(d('a')) );
@@ -491,8 +491,8 @@ TEST_SUITE("logical predicates") {
 
 	TEST_CASE("or_predicate: given a true and a false predicate, it computes "
 			"the true table") {
-		auto t = true_predicate<sp_node<char>>();
-		auto f = false_predicate<sp_node<char>>();
+		auto t = true_predicate<sp_node<char>>;
+		auto f = false_predicate<sp_node<char>>;
 		CHECK( or_predicate(t, t)(d('a')) );
 		CHECK( or_predicate(t, f)(d('a')) );
 		CHECK( or_predicate(f, t)(d('a')) );
@@ -501,8 +501,8 @@ TEST_SUITE("logical predicates") {
 
 	TEST_CASE("neg_predicate: given a true and a false predicate, it computes "
 			"the true table") {
-		auto t = true_predicate<sp_node<char>>();
-		auto f = false_predicate<sp_node<char>>();
+		auto t = true_predicate<sp_node<char>>;
+		auto f = false_predicate<sp_node<char>>;
 		CHECK( !neg_predicate(t)(d('a')) );
 		CHECK( neg_predicate(f)(d('a')) );
 	}
@@ -1023,7 +1023,7 @@ TEST_SUITE("apply") {
 		rule<sp_node<char>> rule {pattern, environment};
 		sp_node<char> expected = n('a', {n('c', {n('d')}), n('b', {n('d')})});
 		is_capture_predicate is_capture;
-		auto replaced = apply_rule(rule, root, is_capture) ;
+		auto replaced = apply_rule(rule, root, is_capture);
 		CHECK( replaced == expected );
 	}
 }

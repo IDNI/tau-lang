@@ -28,9 +28,9 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-TEST_SUITE ("Tau_splitter_upper_tests") {
+TEST_SUITE("Tau_splitter_upper_tests") {
 TEST_CASE("Tau_splitter_1") {
-	const char* sample = "xyz = 0.";
+	const char *sample = "xyz = 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -38,8 +38,9 @@ TEST_CASE("Tau_splitter_1") {
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_2") {
-	const char* sample = "xyz != 0.";
+	const char *sample = "xyz != 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -47,8 +48,9 @@ TEST_CASE("Tau_splitter_2") {
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_3") {
-	const char* sample = "x = 0 && w != 0 || yz = 0.";
+	const char *sample = "x = 0 && w != 0 || yz = 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -56,8 +58,9 @@ TEST_CASE("Tau_splitter_3") {
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_4") {
-	const char* sample = "x = 0 && w != 0 || y|z != 0.";
+	const char *sample = "x = 0 && w != 0 || y|z != 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -67,9 +70,9 @@ TEST_CASE("Tau_splitter_4") {
 }
 }
 
-TEST_SUITE ("Tau_splitter_middle_tests") {
+TEST_SUITE("Tau_splitter_middle_tests") {
 TEST_CASE("Tau_splitter_1") {
-	const char* sample = "xyz = 0.";
+	const char *sample = "xyz = 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -78,18 +81,19 @@ TEST_CASE("Tau_splitter_1") {
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_2") {
-	const char* sample = "xyz != 0.";
+	const char *sample = "xyz != 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
 	auto s = tau_splitter(fm, splitter_type::middle);
-	cout << s << "\n";
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_3") {
-	const char* sample = "x = 0 && w != 0 || yz = 0.";
+	const char *sample = "x = 0 && w != 0 || yz = 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -97,21 +101,21 @@ TEST_CASE("Tau_splitter_3") {
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_4") {
-	const char* sample = "x = 0 && w != 0 || y|z != 0.";
+	const char *sample = "x = 0 && w != 0 || y|z != 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
 	auto s = tau_splitter(fm, splitter_type::middle);
-	cout << s << "\n";
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
 }
 }
 
-TEST_SUITE ("Tau_splitter_lower_tests") {
+TEST_SUITE("Tau_splitter_lower_tests") {
 TEST_CASE("Tau_splitter_1") {
-	const char* sample = "xyz = 0.";
+	const char *sample = "xyz = 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -119,8 +123,9 @@ TEST_CASE("Tau_splitter_1") {
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_2") {
-	const char* sample = "xyz != 0.";
+	const char *sample = "xyz != 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -128,8 +133,9 @@ TEST_CASE("Tau_splitter_2") {
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_3") {
-	const char* sample = "x = 0 && w != 0 || yz = 0.";
+	const char *sample = "x = 0 && w != 0 || yz = 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
@@ -137,13 +143,42 @@ TEST_CASE("Tau_splitter_3") {
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
 }
+
 TEST_CASE("Tau_splitter_4") {
-	const char* sample = "x = 0 && w != 0 || y|z != 0.";
+	const char *sample = "x = 0 && w != 0 || y|z != 0.";
 	auto src = make_tau_source(sample);
 	bdd_test_factory bf;
 	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
 	auto s = tau_splitter(fm, splitter_type::lower);
 	auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_test>);
 	CHECK(!check_uniter_const.has_value());
+}
+}
+
+TEST_SUITE("Tau_splitter_coeff") {
+TEST_CASE("Tau_splitter_coeff1") {
+	bdd_init<Bool>();
+	const char *sample = "{bdd : x3}&{bdd : y}w != 0.";
+	auto src = make_tau_source(sample);
+	bdd_test_factory bf;
+	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+	fm = normalizer(fm);
+	auto s = tau_splitter(fm, splitter_type::upper);
+	stringstream ss; ss << s;
+	cout << s;
+	CHECK(ss.str() == "always { x3 x4 y } & w != 0");
+}
+
+TEST_CASE("Tau_splitter_coeff2") {
+	bdd_init<Bool>();
+	const char *sample = "({bdd : x}|{bdd : y}) w != 0.";
+	auto src = make_tau_source(sample);
+	bdd_test_factory bf;
+	auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+	fm = normalizer(fm);
+	auto s = tau_splitter(fm, splitter_type::upper);
+	stringstream ss; ss << s;
+	cout << s;
+	CHECK((ss.str() == "always { x } & w != 0" || ss.str() == "always { y } & w != 0"));
 }
 }

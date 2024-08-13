@@ -15,12 +15,12 @@
 #define SPLITTER_H
 
 #include "normalizer.h"
+#include "nso_rr.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
 
 namespace idni::tau {
-
 enum class split_sym {
 	conjunction, disjunction
 };
@@ -108,8 +108,18 @@ nso<BAs...> split(const nso<BAs...> &fm, const auto fm_type, const split_sym spl
 
 // Find a Boolean function which implies f
 template<typename... BAs>
-nso<BAs...> good_splitter_using_function(const nso<BAs...> &f, splitter_type st, const nso<BAs...> &original_fm) {
+nso<BAs...> good_splitter_using_function(const nso<BAs...> &f, splitter_type st, const nso<BAs...> &original_fm,
+                                         const auto &bf_constants) {
 	assert(is_non_terminal(tau_parser::bf, f));
+	// Try to disjunct function with constant to produce splitter
+	for (const auto &bf_c: bf_constants) {
+		auto s = build_bf_and(f, bf_c);
+		map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
+		auto new_fm = replace(original_fm, changes);
+		if(!are_nso_equivalent(original_fm, new_fm))
+			return new_fm;
+	}
+
 	// First check if we have more then one disjunct
 	vector<nso<BAs...> > m;
 	size_t i = 0;
@@ -118,24 +128,48 @@ nso<BAs...> good_splitter_using_function(const nso<BAs...> &f, splitter_type st,
 		if (s != f) {
 			map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
 			auto new_fm = replace(original_fm, changes);
-			/*if(!are_nso_equivalent(original_fm, new_fm))*/
-			return new_fm;
+			if(!are_nso_equivalent(original_fm, new_fm))
+				return new_fm;
 		}
 	} while (++i < m.size());
 
-	// TODO: Try to split coefficient
-
+	// Find possible coefficient in each disjunct of f
+	vector<nso<BAs...> > clauses = get_leaves(f, tau_parser::bf_or, tau_parser::bf);
+	// In case f is just a single clause
+	if (clauses.empty()) clauses.push_back(f);
+	for (const auto &clause: clauses) {
+		auto coeff = find_top(clause, is_non_terminal<tau_parser::bf_constant, BAs...>);
+		if (!coeff) continue;
+		assert(is_non_terminal(tau_parser::bf_constant, coeff.value()));
+		auto s = splitter(coeff.value());
+		if (s != coeff.value()) {
+			map<nso<BAs...>, nso<BAs...> > changes = {{coeff.value(), trim(s)}};
+			auto new_fm = replace(original_fm, changes);
+			if(!are_nso_equivalent(original_fm, new_fm))
+				return new_fm;
+		}
+	}
 	return original_fm;
 }
 
 // Find a Boolean function which is implied by f
 template<typename... BAs>
 nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_type st,
-                                                 const nso<BAs...> &original_fm) {
+                                                 const nso<BAs...> &original_fm, const auto &bf_constants) {
 	assert(is_non_terminal(tau_parser::bf, f));
+	// Try to disjunct function with constant to produce splitter
+	for (const auto &bf_c: bf_constants) {
+		auto s = build_bf_or(f, bf_c);
+		map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
+		auto new_fm = replace(original_fm, changes);
+		if(!are_nso_equivalent(original_fm, new_fm))
+			return new_fm;
+	}
+
 	// Convert Boolean function to CNF
 	auto f_cnf = f | repeat_all<step<BAs...>, BAs...>(to_cnf_bf<BAs...>);
 
+	// Try to remove a conjunt to produce splitter
 	vector<nso<BAs...> > m;
 	size_t i = 0;
 	do {
@@ -143,13 +177,32 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 		if (s != f) {
 			map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
 			auto new_fm = replace(original_fm, changes);
-			/*if(!are_nso_equivalent(original_fm, new_fm))*/
-			return new_fm;
+			if(!are_nso_equivalent(original_fm, new_fm))
+				return new_fm;
 		}
 	} while (++i < m.size());
 
-	// TODO: Try to reverse split coefficient
-
+	// Try to split coefficient in each conjunct of f
+	vector<nso<BAs...> > clauses = get_leaves(f, tau_parser::bf_and, tau_parser::bf);
+	// In case f is just a single clause
+	if (clauses.empty()) clauses.push_back(f);
+	for (const auto &clause: clauses) {
+		auto coeff = find_top(clause, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
+		if (!coeff) continue;
+		// TODO: Optimization: Instead of negating the formula think about reverse splitter call
+		// If coefficient exists try to split the negation
+		auto neg_coeff = bf_boole_normal_form(build_bf_neg(coeff.value()));
+		assert(is_non_terminal(tau_parser::bf_constant, trim(neg_coeff)));
+		auto s = splitter(trim(neg_coeff), st);
+		// Negating s results in a reversed splitter for s
+		s = bf_boole_normal_form(build_bf_neg(s));
+		if (s != coeff.value()) {
+			map<nso<BAs...>, nso<BAs...> > changes = {{coeff.value(), s}};
+			auto new_fm = replace(original_fm, changes);
+			if(!are_nso_equivalent(original_fm, new_fm))
+				return new_fm;
+		}
+	}
 	return original_fm;
 }
 
@@ -157,13 +210,15 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
 nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
-	// TODO: Add equivalence check once quantifier elimination is reliable
-	fm = snf_wff(fm);
+	// Collect coefficients to produce splitters
+	auto bf_constants = select_top(fm, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
+
+	//fm = snf_wff(fm);
 	// Collect all occurances of "||" while assuming that fm is in DNF
 	auto or_occurances = select_all(fm, is_non_terminal<tau_parser::wff_or, BAs...>);
-	vector<nso<BAs...>> clauses;
+	vector<nso<BAs...> > clauses;
 	// Extract clauses from occurances of "||"
-	for (const auto& _or : or_occurances) {
+	for (const auto &_or: or_occurances) {
 		if (!is_non_terminal(tau_parser::wff_or, trim(_or->child[0])))
 			clauses.push_back(_or->child[0]);
 		if (!is_non_terminal(tau_parser::wff_or, trim(_or->child[1])))
@@ -177,9 +232,11 @@ nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
 		for (const auto &eq: eqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(eq->child[1])));
 			auto f = eq->child[0];
-			if (auto s = good_reverse_splitter_using_function(f, st, clause); s != clause) {
-				map<nso<BAs...>,nso<BAs...>> c = {{clause, s}};
-				return replace(fm, c);
+			if (auto s = good_reverse_splitter_using_function(f, st, clause, bf_constants); s != clause) {
+				map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
+				auto new_fm = replace(fm, c);
+				if (!are_nso_equivalent(new_fm, fm))
+					return new_fm;
 			}
 		}
 		// check for inequality parts
@@ -187,9 +244,11 @@ nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
 		for (const auto &neq: neqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(neq->child[1])));
 			auto f = neq->child[0];
-			if (auto s = good_splitter_using_function(f, st, clause); s != clause) {
-				map<nso<BAs...>,nso<BAs...>> c = {{clause, s}};
-				return replace(fm, c);
+			if (auto s = good_splitter_using_function(f, st, clause, bf_constants); s != clause) {
+				map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
+				auto new_fm = replace(fm, c);
+				if (!are_nso_equivalent(new_fm, fm))
+					return new_fm;
 			}
 		}
 	}
@@ -199,12 +258,8 @@ nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
 	size_t i = 0;
 	do {
 		auto s = split(fm, tau_parser::wff, split_sym::disjunction, st, m, i);
-		if (s != fm) return s;
+		if (!are_nso_equivalent(s, fm)) return s;
 	} while (++i < m.size());
-
-	//if(!eq) {
-	// TODO: Try Lemma 3.1
-	//}
 
 	// return bad splitter by conjuncting new uninterpreted constant
 	stringstream ss;

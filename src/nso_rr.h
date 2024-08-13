@@ -2074,6 +2074,24 @@ sp_tau_node<BAs...> splitter(const sp_tau_node<BAs...>& n, splitter_type st = sp
 	return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
 }
 
+// TODO (MEDIUM) unify this code with get_gssotc_clause and get_gssotc_literals
+template<typename ...BAs>
+void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves) {
+    if (auto check = n | branch; check.has_value()) {
+        for (auto& c: check || skip) get_leaves(c, branch, skip, leaves);
+    } else {
+        leaves.push_back(n);
+        BOOST_LOG_TRIVIAL(trace) << "(I) get_leaves: found clause: " << n;
+    }
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip) {
+    std::vector<sp_tau_node<BAs...>> leaves;
+    get_leaves(n, branch, skip, leaves);
+    return leaves;
+}
+
 // IDEA convert to a const static applier and change all the code accordingly
 //
 // however, the logic is quite complez a lot of private functions doesn't make
@@ -2161,22 +2179,6 @@ private:
 	static constexpr auto _is_one = [](const auto& l) -> bool { return l == true; };
 	static constexpr auto _is_zero = [](const auto& l) -> bool { return l == false; };
 
-	// TODO (MEDIUM) unify this code with get_gssotc_clause and get_gssotc_literals
-	void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves) {
-		if (auto check = n | branch; check.has_value()) {
-			for (auto& c: check || skip) get_leaves(c, branch, skip, leaves);
-		} else {
-			leaves.push_back(n);
-			BOOST_LOG_TRIVIAL(trace) << "(I) found get_gssotc_clause: " << n;
-		}
-	}
-
-	std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch, tau_parser::nonterminal skip) {
-		std::vector<sp_tau_node<BAs...>> leaves;
-		get_leaves(n, branch, skip, leaves);
-		return leaves;
-	}
-
 	std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>> get_quantifier_remove_constituents(const tau_parser::nonterminal type, const sp_tau_node<BAs...>& n) {
 		auto args = n || type || only_child_extractor<BAs...>;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
@@ -2223,15 +2225,42 @@ private:
 		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
 		auto var = args[0] | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 		auto wff = args[1];
+		auto is_var = [&var](const auto& node){return node == var;};
+		// if var does not appear in the formula, we can return the formula as is
+		if (!find_top(wff, is_var)) return wff;
 		std::map<nso<BAs...>, nso<BAs...>> changes;
-		for (auto l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
-			// TODO HIGH only if the leave has the quantified variable
+		for (const auto& l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
+			// if var does not appear in the clause, we can skip it
+			if (!find_top(l, is_var)) continue;
+			// Get each conjunct in clause
+            nso<BAs...> nl = _T<BAs...>;
+			bool is_quant_removable_in_clause = true;
+			for (const auto& conj : get_leaves(l, tau_parser::wff_and, tau_parser::wff)) {
+				// Check if conjunct is of form = 0 or != 0
+				if ((conj | tau_parser::bf_eq) || (conj | tau_parser::bf_neq))
+					continue;
+				// If the conjunct contains the quantified variable at this point
+				// we cannot resolve the quantifier in this clause
+				if (find_top(conj, is_var)) {
+					is_quant_removable_in_clause = false;
+					break;
+				}
+				// conjunct does not depend on var
+				nl = build_wff_and(nl, conj);
+			}
+			if (!is_quant_removable_in_clause) {
+				// Since we cannot remove the quantifier in this
+				// clause it needs to be maintained
+				changes[l] = build_wff_ex(var, l);
+				continue;
+			}
+
 			auto f = squeeze_positives(l);
 			std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0_trimmed<BAs...>}};
 			std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1_trimmed<BAs...>}};
 			auto f_0 = f ? replace(f.value(), changes_0) : _0<BAs...>;
 			auto f_1 = f ? replace(f.value(), changes_1) : _0<BAs...>;
-			nso<BAs...> nl = _T<BAs...>;
+
 			if (auto neqs = select_all(l, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
 				auto nneqs = _T<BAs...>;
 				for (auto& neq: neqs) {
@@ -2242,23 +2271,9 @@ private:
 						build_bf_and(build_bf_neg(f_1),	g_1),
 						build_bf_and(build_bf_neg(f_0),	g_0))));
 				}
-				nl = build_wff_and(build_wff_eq(build_bf_and(f_0, f_1)), nneqs);
+				nl = build_wff_and(nl, build_wff_and(build_wff_eq(build_bf_and(f_0, f_1)), nneqs));
 			} else if (f) {
-				nl = build_wff_eq(build_bf_and(f_0, f_1));
-			}
-			// TODO review this hsack to deal with the case where we have literals
-			// that are not equal neither not equal we are just adding back all of then
-			auto is_non_eq_literal = [](nso<BAs...> n) {
-				if (auto check = n | tau_parser::wff_and; !check && is_non_terminal<tau_parser::wff>(n)) {
-					if (auto is_eq = n | tau_parser::bf_eq, is_neq = n | tau_parser::bf_neq;
-							(!is_eq.has_value() && !is_neq.has_value())) {
-								return true;
-					}
-				}
-				return false;
-			};
-			for (auto& lit: select_all(l, is_non_eq_literal)) {
-				nl = nl == _T<BAs...> ? lit : build_wff_and(nl, lit);
+				nl = build_wff_and(nl, build_wff_eq(build_bf_and(f_0, f_1)));
 			}
 			changes[l] = nl;
 		}

@@ -10,6 +10,10 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
+
+#ifndef DICT_H
+#define DICT_H_
+
 #include "defs.h"
 #include <string>
 
@@ -17,3 +21,5 @@ sym_t dict(const char*);
 sym_t dict(const string&);
 const char* dict(sym_t);
 bool has(sym_t);
+
+#endif // DICT_H
