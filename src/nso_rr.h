@@ -2225,10 +2225,13 @@ private:
 		auto args = n || tau_parser::wff_cb_arg || only_child_extractor<BAs...>;
 		auto var = args[0] | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 		auto wff = args[1];
+		auto is_var = [&var](const auto& node){return node == var;};
+		// if var does not appear in the formula, we can return the formula as is
+		if (!find_top(wff, is_var)) return wff;
 		std::map<nso<BAs...>, nso<BAs...>> changes;
-		for (auto l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
-			// TODO: (HIGH) only if the leave has the quantified variable
-			auto is_var = [&var](const auto& node){return node == var;};
+		for (const auto& l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
+			// if var does not appear in the clause, we can skip it
+			if (!find_top(l, is_var)) continue;
 			// Get each conjunct in clause
             nso<BAs...> nl = _T<BAs...>;
 			bool is_quant_removable_in_clause = true;
