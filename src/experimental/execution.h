@@ -20,14 +20,11 @@
 #include <boost/log/trivial.hpp>
 
 #include "parser.h"
-#include "nso_rr.h"
-#include "normal_forms.h"
-#include "bdd_handle.h"
-#include "variant_ba.h"
+#include "rewriting.h"
 
-#ifdef DEBUG
+/*#ifdef DEBUG
 #include "debug_helpers.h"
-#endif // DEBUG
+#endif // DEBUG*/
 
 using namespace idni::rewriter;
 
@@ -36,98 +33,90 @@ namespace idni::tau::experimental {
 // Check https://en.cppreference.com/w/cpp/utility/functional/function for more
 // information about std::function and how to use it.
 
-/*template<typename F, typename N>
-concept node_transformer = requires(F f, N n) {
-    { f(n) -> N };
-};*/
-
 template<typename N, typename F>
-auto operator|(const N& n, F f) {
+auto operator|(const sp_node<N>& n, F f) {
 	return f(n);
 }
 
-template<typename N, typename...Fs>
-N operator|(const N& n, const std::tuple<Fs...>& fs) {
-	return std::apply([&](const auto&... funcs) {
-			return (..., funcs(n));
-	}, fs);
+template<typename N, typename F, typename S>
+auto operator|(const sp_node<N>& n, const std::pair<F, S>& p) {
+	return n | p.first | p.second;
 }
 
-template<typename N, typename...Fs>
-auto operator|(const std::tuple<Fs...>& fs, std::function<N(const N&)>& f) {
-	return std::tuple_cat(fs, std::make_tuple(f));
+template<typename F, typename S>
+auto operator|(const F f, const S s) {
+	return std::make_pair(f, s);
 }
 
-template<typename N>
-auto operator|(const std::function<N(const N&)>& f, const std::function<N(const N&)>& g) {
-	return make_tuple(f, g);
-}
-
-template<typename N, typename F>
+template<typename F>
 struct repeat {
 
 	repeat(F f) : f(f) {}
 
-	N operator()(const N& n) const {
-		auto current = n, next = f(current);
-		while (current != next) { current = next; next = f(current); }
+	auto operator()(const auto& n) const {
+		auto current = n;
+		auto next = f(current);
+		while (current != next) {
+			current = next;
+			next = f(current);
+		}
 		return current;
 	}
 
 	F f;
 };
 
-template<typename N>
-struct for_all {
+template<typename N, typename selector_t, typename function_t>
+struct apply_all {
 
-	for_all(std::function<std::vector<N>(N)> s, std::function<N(const N&)> f) : s(s), f(f) {}
+	apply_all(selector_t s, function_t f) : s(s), f(f) {}
 
 	N operator()(const N& n) const {
 		std::map<N, N> changes;
 		for (auto& ns: s(n)){
 			changes[n] = f(n);
 		}
-		return replace<N>(n, changes);
+		return replace(n, changes);
 	}
 
-	std::function<std::vector<N>(N)> s;
-	std::function<N(const N&)> f;
+	selector_t s;
+	function_t f;
 };
 
-template<typename N>
+template<typename N, typename predicate_t>
 struct top {
 
-	top(std::function<bool(const N&)> p) : p(p) {}
+	top(predicate_t p) : p(p) {}
 
 	std::vector<N> operator()(const N& n) const {
 		return select_top(n, p);
 	}
 
-	std::function<bool(N)> p;
+	predicate_t p;
 };
 
-template<typename N>
-struct botton {
+template<typename N, typename predicate_t>
+struct bottom {
 
-	botton(std::function<bool(const N&)> p) : p(p) {}
+	bottom(predicate_t p) : p(p) {}
 
-	std::vector<N> operator()(const N& n) const {
-		return select_bottom(n, p);
+	std::optional<N> operator()(const N& n) const {
+		return find_bottom(n, p);
 	}
 
-	std::function<bool(N)> p;
+	predicate_t p;
 };
 
-template<typename N>
+template<typename N, typename predicate_t>
 struct satisfying {
 
-	satisfying(std::function<bool(const N&)> p) : p(p) {}
+	satisfying(predicate_t p) : p(p) {}
 
 	std::vector<N> operator()(const N& n) const {
 		return select_all(n, p);
 	}
 
-	std::function<bool(N)> p;
+	predicate_t p;
 };
 
 } // namespace idni::tau::experimental
