@@ -26,141 +26,223 @@ namespace testing = doctest;
 
 namespace idni::tau::experimental {
 
-sp_node<char> n(const char& value) {
-	return make_node<char>(value, {});
-}
-
-sp_node<char> n(const char& value, const vector<sp_node<char>>& child) {
-	return make_node<char>(value, child);
-}
-
 sp_node<char> d(const char& value) {
 	vector<sp_node<char>> children;
-	return std::make_shared<node<char>>(value, children);
+	return make_node<char>(value, children);
 }
 
 sp_node<char> d(const char& value, const vector<sp_node<char>>& child) {
-	return std::make_shared<node<char>>(value, child);
+	return make_node<char>(value, child);
 }
 
-sp_node<char> f(const sp_node<char>& node) {
-	return node->value == 'a' ? d('b') : d('c');
+sp_node<char> func_value_is_a(const sp_node<char>& node) {
+	return node->value == 'a' ? d('T') : d('F');
 }
 
-sp_node<char> g(const sp_node<char>& node) {
-	return node->value == 'b' ? d('d') : d('e');
+sp_node<char> func_value_equals_to(const sp_node<char>& node, const char& value) {
+	return node->value == value ? d('T') : d('F');
 }
 
-sp_node<char> h(const sp_node<char>&, const sp_node<char>& node) {
-	return node->value == 'b' ? d('d') : d('e');
+bool func_is_true(const sp_node<char>& node) {
+	return node->value == 'T';
 }
-struct fo {
-	sp_node<char> operator()(const sp_node<char>& node) {
-		return node->value == 'a' ? d('b') : d('c');
+
+bool func_is_false(const sp_node<char>& node) {
+	return node->value == 'F';
+}
+
+struct struct_is_true {
+	bool operator()(const sp_node<char>& node) const {
+		return node->value == 'T';
 	}
 };
 
-TEST_SUITE("operator| on nodes") {
+struct struct_is_false {
+	bool operator()(const sp_node<char>& node) const {
+		return node->value == 'F';
+	}
+};
+
+struct struct_value_is_a {
+	sp_node<char> operator()(const sp_node<char>& node) const {
+		return node->value == 'a' ? d('T') : d('F');
+	}
+};
+
+struct struct_value_equals_to {
+	struct_value_equals_to(const char& value) : value(value) {}
+
+	sp_node<char> operator()(const sp_node<char>& node) const {
+		return node->value == value ? d('T') : d('F');
+	}
+
+	const char& value;
+};
+
+template <typename F>
+auto my_bind(F&& f) {
+	return std::bind(f, std::placeholders::_1);
+}
+
+TEST_SUITE("node operator| on nodes") {
 
 	TEST_CASE("pointer to function") {
-		auto check = d('a') | f;
-		CHECK(check->value == 'b');
+		auto check = d('a') | func_value_is_a;
+		CHECK(check->value == 'T');
 	}
 
 	TEST_CASE("lambda expression") {
-		auto check = d('a') | [](const sp_node<char>& node) {
-			return node->value == 'a' ? d('b') : d('c');
+		auto check = d('b') | [](const sp_node<char>& node) {
+			return node->value == 'a' ? d('T') : d('F');
 		};
-		CHECK(check->value == 'b');
+		CHECK(check->value == 'F');
 	}
 
-	// TODO (LOW) fix this tests
-	/*TEST_CASE("bind expression") {
-		auto check = d('a') | std::bind(g, d('d'), std::placeholders::_1);
-		CHECK(check->value == 'b');
-	}*/
-
-	TEST_CASE("functional object") {
-		auto check = d('a') | fo();
-		CHECK(check->value == 'b');
+	TEST_CASE("bind expression: case 1") {
+		auto check = d('a') | std::bind(func_value_equals_to, std::placeholders::_1, 'b');
+		CHECK(check->value == 'F');
 	}
+
+	TEST_CASE("bind expression: case 1") {
+		auto check = d('a') | std::bind(func_value_is_a, std::placeholders::_1);
+		CHECK(check->value == 'T');
+	}
+
+	TEST_CASE("functional object: case 1") {
+		auto check = d('a') | struct_value_is_a();
+		CHECK(check->value == 'T');
+	}
+
+	TEST_CASE("functional object:case 2") {
+		auto check = d('a') | struct_value_equals_to('a');
+		CHECK(check->value == 'T');
+	}
+
+	// TODO (LOW) There is a lot of more possibilities to apply functional objects,
+	// add more test cases to cover all of them. Check the following links for more
+	// information:
+	//
+	// - https://en.cppreference.com/w/cpp/utility/functional/function
+	// - https://en.cppreference.com/w/cpp/utility/functional/bind
+
 }
 
-TEST_SUITE("operator| on pointer to functions") {
-
-	/*TEST_CASE("pointer to function") {
-		auto check = d('a') | (f | g);
-		CHECK( check->value == 'd');
-	}*/
-
-	TEST_CASE("lambda expression") {
-		CHECK(true);
-	}
-
-	TEST_CASE("bind expression") {
-		CHECK(true);
-	}
-
-	TEST_CASE("functional object") {
-		CHECK(true);
-	}
-}
-
-TEST_SUITE("operator| on lambda expressions") {
+TEST_SUITE("node operator| on pointer to functions") {
 
 	TEST_CASE("pointer to function") {
-		CHECK(true);
+		auto check = d('a') | func_value_is_a | func_is_true;
+		CHECK( check );
 	}
 
 	TEST_CASE("lambda expression") {
-		CHECK(true);
+		auto check = d('a') | func_value_is_a | [](const sp_node<char>& node) {
+			return node->value == 'T';
+		};
+		CHECK( check );
 	}
 
 	TEST_CASE("bind expression") {
-		CHECK(true);
+		auto check = d('a') | func_value_is_a | std::bind(func_is_true, std::placeholders::_1);
+		CHECK( check );
 	}
 
 	TEST_CASE("functional object") {
-		CHECK(true);
+		auto check = d('a') | func_value_is_a | struct_is_true();
+		CHECK(check);
 	}
 }
 
-TEST_SUITE("operator| on bind expressions") {
+TEST_SUITE("function operator| on function") {
 
 	TEST_CASE("pointer to function") {
-		CHECK(true);
+		auto check = std::bind(func_value_is_a, std::placeholders::_1) | func_is_true;
+		CHECK( (d('a') | check));
 	}
 
 	TEST_CASE("lambda expression") {
-		CHECK(true);
+		auto check = func_value_is_a | [](const sp_node<char>& node) {
+			return node->value == 'T';
+		};
+		CHECK( (d('a') | check));
 	}
 
-	TEST_CASE("bind expression") {
-		CHECK(true);
+	TEST_CASE("bind expression: right") {
+		auto check = func_value_is_a | my_bind(func_is_true);
+		CHECK( (d('a') | check));
+	}
+
+	TEST_CASE("bind expression: left") {
+		auto check = my_bind(func_value_is_a) | func_is_true;
+		CHECK( (d('a') | check));
 	}
 
 	TEST_CASE("functional object") {
-		CHECK(true);
+		auto check = func_value_is_a | struct_is_true();
+		CHECK( (d('a') | check));
 	}
 }
 
-TEST_SUITE("operator| on funtional objects") {
+TEST_SUITE("repeat") {
 
-	TEST_CASE("pointer to function") {
-		CHECK(true);
+	TEST_CASE("of a pointer to function") {
+		auto check = d('a') | repeat(func_value_is_a);
+		CHECK( (check | func_is_false));
 	}
 
-	TEST_CASE("lambda expression") {
-		CHECK(true);
+	TEST_CASE("of a lambda expression") {
+		auto check = d('a') | repeat([](const sp_node<char>& node) {
+			return node->value == 'a' ? d('T') : d('F');
+		});
+		CHECK( (check | func_is_false));
 	}
 
-	TEST_CASE("bind expression") {
-		CHECK(true);
+	TEST_CASE("of a bind expression") {
+		auto check = d('a') | repeat(my_bind(func_value_is_a));
+		CHECK( (check | func_is_false));
 	}
 
-	TEST_CASE("functional object") {
-		CHECK(true);
+	TEST_CASE("of a functional object") {
+		auto check = d('a') | repeat(struct_value_is_a());
+		CHECK( (check | func_is_false));
 	}
+
+	TEST_CASE("chaining with pointer to a function") {
+		auto check = d('a')
+			| repeat(struct_value_is_a())
+			| func_value_is_a;
+		CHECK( (check | func_is_false));
+	}
+
+	TEST_CASE("chaining with a lambda expression") {
+		auto check = d('a')
+			| repeat(struct_value_is_a())
+			| [](const sp_node<char>& node) {
+				return node->value == 'a' ? d('T') : d('F');
+			};
+		CHECK( (check | func_is_false));
+	}
+
+	TEST_CASE("chaining with a bind expression") {
+		auto check = d('a')
+			| repeat(struct_value_is_a())
+			| my_bind(func_value_is_a);
+		CHECK( (check | func_is_false));
+	}
+
+	TEST_CASE("chaining with a functional object") {
+		auto check = d('a')
+			| repeat(struct_value_is_a())
+			| struct_value_is_a();
+		CHECK( (check | func_is_false));
+	}
+
+	TEST_CASE("chaining with itself") {
+		auto check = d('a')
+			| repeat(struct_value_is_a())
+			| repeat(struct_value_is_a());
+		CHECK( (check | func_is_false));
+	}
+
 }
 
 } // namespace idni::tau::experimental
