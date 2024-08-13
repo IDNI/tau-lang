@@ -88,11 +88,11 @@ struct remove_one_wff_existential {
 		while (inner_fm) {
 			auto removed = inner_fm.value()
 				| bf_reduce_canonical<BAs...>()
-				| repeat_all<step<BAs...>, BAs...>(
-					to_dnf_wff<BAs...>
-					| simplify_wff<BAs...>
-					| elim_trivial_eqs<BAs...>)
-				    | wff_remove_existential<BAs...>;
+				| repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+				| repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
+				| repeat_all<step<BAs...>, BAs...> ( simplify_wff<BAs...>
+														| elim_trivial_eqs<BAs...>)
+				| wff_remove_existential<BAs...>;
 			std::map<nso<BAs...>, nso<BAs...>> changes{{inner_fm.value(), removed}};
 			n = replace(n, changes);
 			inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
@@ -103,8 +103,9 @@ struct remove_one_wff_existential {
 		}
 		// If no more quantifier is found we still convert to DNF
 		n = n | bf_reduce_canonical<BAs...>()
-			  | repeat_all<step<BAs...>, BAs...>( to_dnf_wff<BAs...>
-													| simplify_wff<BAs...>
+			  | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+			  | repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
+			  | repeat_all<step<BAs...>, BAs...> ( simplify_wff<BAs...>
 													| elim_trivial_eqs<BAs...>);
 		return n;
 	}
@@ -126,8 +127,8 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(apply_defs<BAs...>))
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(elim_for_all<BAs...>))
 		| remove_one_wff_existential<BAs...>()
-		| repeat_all<step<BAs...>, BAs...>(elim_eqs<BAs...> | simplify_wff<BAs...>)
-		| sometimes_always_normalization<BAs...>();
+		| sometimes_always_normalization<BAs...>()
+		| repeat_all<step<BAs...>, BAs...>(elim_eqs<BAs...> | simplify_wff<BAs...>);
 	#ifdef CACHE
 	cache[form] = result;
 	#endif // CACHE
