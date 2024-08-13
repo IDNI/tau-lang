@@ -40,16 +40,14 @@ TEST_CASE("Tau_splitter_tau_coeff1") {
 	CHECK(ss.str() == "{  : x = 0. } & v != 0");
 }
 
-// TODO: Enable test case after normalizer works correctly
 TEST_CASE("Tau_splitter_tau_coeff2") {
-	const char *src = "{ : x|y = 0.}|v = 0.";
+	const char *src = "{ : x|y = 0.}&v = 0.";
 	bdd_test_factory bf;
 	tau_factory<bdd_test_factory, bdd_test> fb(bf);
 	auto fm = make_nso_rr_using_factory<
 		tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test>(src, fb).main;
 	auto s = tau_splitter(fm, splitter_type::upper);
 	stringstream ss; ss << s;
-	CHECK(true);
-	//CHECK(ss.str() == "{  : always x = 0. } | v = 0");
+	CHECK(ss.str() == "{  : x | y = 0. } & v | {  : x | y = 0. } = 0");
 }
 }
