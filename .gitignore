@@ -67,3 +67,4 @@ bw-output
 .*_history
 
 /.cache/*
+tests/benchmarks/data/*
