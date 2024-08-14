@@ -532,7 +532,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
-		dict(v);
+		dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
 
@@ -1082,7 +1082,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static bdd_ref bit(int_t v) {
 		// Avoid later name clash by adding any new variable to dictionary
-		dict(v);
+		dict(v>0?v:-v);
 		return v > 0 ? add(v, T, F) : add(-v, F, T);
 	}
 

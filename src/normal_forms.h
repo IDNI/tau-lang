@@ -942,18 +942,47 @@ nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 }
 
 // Reduce currrent dnf due to update by coeff and variable assignment i
-inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t p, bool surface = true) {
+inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t p, bool pathes_disjoint, bool surface = true) {
 		for (size_t j=0; j < paths.size(); ++j) {
 			// Get Hamming distance between i and path and position of last difference
 			// while different irrelevant variables make assignments incompatible
+			// If this happens continue checking if the rule c_1...c_jx | c_1...c_jx'd_1...d_n
+			// = c_1...c_jx | c_1...c_jd_1...d_n is applicable
 			int_t dist = 0, pos = 0;
+			bool hamming_check = true, subset_check = true;
+			bool subset_relation_decided = false, is_i_subset_of_path = true;
 			for (int_t k=0; k < p; ++k) {
 				if (i[k] == paths[j][k]) continue;
 				else if (dist == 2) break;
-				else if (i[k] == 2 || paths[j][k] == 2) { dist = 0; break; }
+				else if (i[k] == 2) {
+					hamming_check = false;
+					if (pathes_disjoint) break;
+					if (!subset_relation_decided) {
+						subset_relation_decided = true;
+						is_i_subset_of_path = true;
+					} else {
+						if (!is_i_subset_of_path) {
+							subset_check = false;
+							break;
+						}
+					}
+				}
+				else if (paths[j][k] == 2) {
+					hamming_check = false;
+					if(pathes_disjoint) break;
+					if (!subset_relation_decided) {
+						subset_relation_decided = true;
+						is_i_subset_of_path = false;
+					} else {
+						if (is_i_subset_of_path) {
+							subset_check = false;
+							break;
+						}
+					}
+				}
 				else dist += 1, pos = k;
 			}
-			if (dist == 1) {
+			if (hamming_check && dist == 1) {
 				// Remove i from paths if recursion depth is greater 0
 				if(!surface) {
 					paths[j] = {};
@@ -962,16 +991,25 @@ inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t 
 					if(ranges::all_of(i, [](const auto el) {return el == 2;}))
 						return paths = {}, true;
 					// Continue with resulting assignment
-					reduce_paths(i, paths, p, false);
+					reduce_paths(i, paths, p, pathes_disjoint, false);
 				} else {
 					// Resolve variable
 					paths[j][pos] = 2;
 					if(ranges::all_of(paths[j], [](const auto el) {return el == 2;}))
 						return paths = {}, true;
 					// Continue with resulting assignment
-					reduce_paths(paths[j], paths, p, false);
+					reduce_paths(paths[j], paths, p, pathes_disjoint, false);
 				}
 				return true;
+			}
+			if (!pathes_disjoint && subset_check && dist == 1) {
+				if (is_i_subset_of_path) {
+					// Resovle variable in paths
+					paths[j][pos] = 2;
+				} else {
+					// Resolve variable in i
+					i[pos] = 2;
+				}
 			}
 		}
 		return false;
@@ -988,7 +1026,7 @@ auto lex_var_comp = [](const auto x, const auto y) {
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template<typename... BAs>
 void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const int_t p) {
-	auto cvars = select_all(fm, is_non_terminal<tau_parser::variable, BAs...>);
+	auto cvars = select_all(fm, is_child_non_terminal<tau_parser::variable, BAs...>);
 	sort(cvars.begin(), cvars.end(), lex_var_comp<BAs...>);
 
 	// Set irrelevant vars in assignment i to 2
@@ -1005,7 +1043,7 @@ void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const in
 
 // Create assignment in formula and reduce resulting clause
 template<typename... BAs>
-bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, vector<int_t>& i, auto& dnf, int_t p) {
+bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, vector<int_t>& i, auto& dnf, int_t p, bool pathes_disjoint) {
 	// Check if all variables are assigned
 	if((int_t)vars.size() == p) {
 		// Normalize tau subformulas
@@ -1023,7 +1061,7 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 
 		auto it = dnf.find(fm_simp);
 		if (it == dnf.end()) return dnf.emplace(fm_simp, vector(p==0?0:1, i)), false;
-		else if (!reduce_paths(i, it->second, p)) {
+		else if (!reduce_paths(i, it->second, p, pathes_disjoint)) {
 			// Place coefficient together with variable assignment if no reduction happend
 			it->second.push_back(i);
 		} else erase_if(it->second, [](const auto& v){return v.empty();});
@@ -1031,32 +1069,32 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	}
 	// variable was already eliminated
 	if (i[p] == 2) {
-		if (assign_and_reduce(fm, vars, i, dnf, p+1)) return true;
+		if (assign_and_reduce(fm, vars, i, dnf, p+1, pathes_disjoint)) return true;
 		i[p] = 0;
 		return false;
 	}
 	// Substitute 1 and 0 for v and simplify
 	const auto& v = vars[p];
-	map<nso<BAs...>, nso<BAs...>> c = {{v, _1_trimmed<BAs...>}};
+	map<nso<BAs...>, nso<BAs...>> c = {{v, _1<BAs...>}};
 	auto fm_v1 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(
 			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
-	c = {{v, _0_trimmed<BAs...>}};
+	c = {{v, _0<BAs...>}};
 	auto fm_v0 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(
 			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
 
 	elim_vars_in_assignment<BAs...>(fm_v1, vars, i, p);
 	if(fm_v1 == fm_v0) {
 		i[p] = 2;
-		if (assign_and_reduce(fm_v1, vars, i, dnf, p+1)) return true;
+		if (assign_and_reduce(fm_v1, vars, i, dnf, p+1, pathes_disjoint)) return true;
 		i[p] = 0;
 	} else {
 		i[p] = 1;
-		if (assign_and_reduce(fm_v1, vars, i, dnf, p+1)) return true;
+		if (assign_and_reduce(fm_v1, vars, i, dnf, p+1, pathes_disjoint)) return true;
 		i[p] = 0;
 
 		elim_vars_in_assignment<BAs...>(fm_v0, vars, i, p);
 		i[p] = -1;
-		if (assign_and_reduce(fm_v0, vars, i, dnf, p+1)) return true;
+		if (assign_and_reduce(fm_v0, vars, i, dnf, p+1, pathes_disjoint)) return true;
 		i[p] = 0;
 	}
 	return false;
@@ -1065,13 +1103,13 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 // Given a BF b, calculate the Boole normal form (DNF corresponding to the pathes to true in the BDD) of b
 // where the variable order is given by the function lex_var_comp
 template<typename... BAs>
-nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm) {
+nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_pathes_disjoint = false) {
 	// Function can only be applied to a BF
 	assert(is_non_terminal(tau_parser::bf, fm));
 
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
-	auto vars = select_top(fm, is_non_terminal<tau_parser::variable, BAs...>);
+	auto vars = select_top(fm, is_child_non_terminal<tau_parser::variable, BAs...>);
 	sort(vars.begin(), vars.end(), lex_var_comp<BAs...>);
 
 	vector<int_t> i (vars.size()); // Record assignments of vars
@@ -1084,7 +1122,7 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm) {
 	auto fm_simp = fm | repeat_all<step<BAs...>, BAs...>(
 			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
 
-	if(assign_and_reduce(fm_simp, vars, i, dnf, 0)) {
+	if(assign_and_reduce(fm_simp, vars, i, dnf, 0, make_pathes_disjoint)) {
 		assert(dnf.size() == 1);
 		return dnf.begin()->first;
 	}
@@ -1106,10 +1144,10 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm) {
 			nso<BAs...> var_path;
 			for (size_t k=0; k < vars.size(); ++k) {
 				if (path[k] == 2) continue;
-				if (first_var) var_path = path[k] == 1 ? wrap(tau_parser::bf, vars[k]) :
-					build_bf_neg(wrap(tau_parser::bf, vars[k])), first_var = false;
-				else var_path = path[k] == 1 ? build_bf_and(var_path, wrap(tau_parser::bf, vars[k])) :
-					build_bf_and(var_path, build_bf_neg(wrap(tau_parser::bf, vars[k])));
+				if (first_var) var_path = path[k] == 1 ? vars[k] :
+					build_bf_neg(vars[k]), first_var = false;
+				else var_path = path[k] == 1 ? build_bf_and(var_path, vars[k]) :
+					build_bf_and(var_path, build_bf_neg(vars[k]));
 			}
 			if (first) reduced_dnf = t ? var_path : build_bf_and(coeff, var_path), first = false;
 			else reduced_dnf = t ? build_bf_or(reduced_dnf, var_path) :
