@@ -1,11 +1,22 @@
 #!/bin/bash
 
 BUILD_TYPE="${1:-Release}"
-if [ "${BUILD_TYPE}" == "Debug" ]; then
-	SUFFIX="Debug"
-else
-	SUFFIX="Release"
-fi
+case "${BUILD_TYPE}" in
+	"Debug")
+		SUFFIX="Debug"
+		;;
+	"Release")
+		SUFFIX="Release"
+		;;
+	"RelWithDebInfo")
+		SUFFIX="RelWithDebInfo"
+		;;
+	*)
+		echo "Unknown build type: ${BUILD_TYPE}"
+		exit 1
+		;;
+esac
+
 BUILD_DIR="build-${SUFFIX}"
 
 git submodule status | while read -r LINE; do
