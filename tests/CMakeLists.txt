@@ -45,13 +45,20 @@ if (TAU_BUILD_UNIT_TESTS)
 	add_subdirectory(unit)
 endif ()
 
-
 #
 # Experimental testing
 #
 if (TAU_BUILD_UNIT_TESTS)
 	enable_testing()
 	add_subdirectory(experimental)
+endif ()
+
+#
+# Benchmark testing
+#
+if (TAU_BUILD_BENCHMARK)
+	enable_testing()
+	add_subdirectory(benchmark)
 endif ()
 
 #
