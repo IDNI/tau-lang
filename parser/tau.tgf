@@ -284,28 +284,3 @@ severity               => ("e" | "error"):error_sym
         bf_typed, wff_typed,
         bf  > bf_parenthesis  > bf,
         wff > wff_parenthesis > wff.
-
-
-
-################################################################################
-# deprecating syntax - in process of integration into wff layer
-#
-rule                   => tau_rule.
-tau_rule               => tau:tau_matcher _ ":::=" _ (tau | tau_cb):tau_body _ '.'.
-builder_body           => ("=:::" _ tau):tau_builder_body.
-tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
-                        | ('{' _ wff _ '}')                  :tau_wff
-                        | (sym [_ offsets] _ ref_args)       :tau_ref
-                        | (tau _ "|||" _ tau)                :tau_or
-                        | (tau _ "&&&" _ tau)                :tau_and
-                        | ('-' _ tau)                        :tau_neg
-                        |                                     capture.
-tau_cb_args1           => __ (capture | tau):tau_cb_arg.
-tau_cb_args2           => tau_cb_args1 tau_cb_args1.
-tau_cb_args3           => tau_cb_args2 tau_cb_args1.
-tau_cb => ("tau_collapse_positives_cb" (tau_cb_args3 | tau_cb_args2))
-                                                     :tau_collapse_positives_cb
-        | ("tau_positives_upwards_cb"   tau_cb_args2):tau_positives_upwards_cb.
-@inline
-        tau_cb_args1, tau_cb_args2, tau_cb_args3,
-        tau > tau_parenthesis > tau.

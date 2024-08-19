@@ -170,35 +170,6 @@ RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 
 // TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
-// tau rules to dnf
-RULE(TAU_TO_DNF_0, "($X ||| $Y) &&& $Z :::= $X &&& $Z ||| $Y &&& $Z.")
-RULE(TAU_TO_DNF_1, "$X &&& ($Y ||| $Z) :::= $X &&& $Y ||| $X &&& $Z.")
-RULE(TAU_PUSH_NEGATION_INWARDS_0, "- ($X &&& $Y) :::= - $X ||| - $Y.")
-RULE(TAU_PUSH_NEGATION_INWARDS_1, "- ($X ||| $Y) :::= - $X &&& - $Y.")
-RULE(TAU_ELIM_DOUBLE_NEGATION_0, "- - $X :::=  $X.")
-RULE(TAU_SIMPLIFY_ONE_0, "{T} ||| $X :::= {T}.")
-
-// wff conjunctive normal form
-RULE(TAU_TO_CNF_0, "$X &&& $Y ||| $Z ::= ($X ||| $Z) &&& ($Y ||| $Z).")
-RULE(TAU_TO_CNF_1, "$X ||| $Y &&& $Z ::= ($X ||| $Y) &&& ($X ||| $Z).")
-
-// tau simplifications
-RULE(TAU_SIMPLIFY_ONE_1, "$X ||| {T} :::= {T}.")
-RULE(TAU_SIMPLIFY_ONE_2, "{T} &&& $X :::= $X.")
-RULE(TAU_SIMPLIFY_ONE_3, "$X &&& {T} :::= $X.")
-RULE(TAU_SIMPLIFY_ONE_4, "- {T} :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_0, "{F} &&& $X :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_1, "$X &&& {F} :::= {F}.")
-RULE(TAU_SIMPLIFY_ZERO_2, "{F} ||| $X :::= $X.")
-RULE(TAU_SIMPLIFY_ZERO_3, "$X ||| {F} :::= $X.")
-RULE(TAU_SIMPLIFY_ZERO_4, "- {F} :::= {T}.")
-RULE(TAU_SIMPLIFY_SELF_0, "$X &&& $X :::= $X.")
-RULE(TAU_SIMPLIFY_SELF_1, "$X ||| $X :::= $X.")
-RULE(TAU_SIMPLIFY_SELF_2, "$X &&& - $X :::= {F}.")
-RULE(TAU_SIMPLIFY_SELF_3, "$X ||| - $X :::= {T}.")
-RULE(TAU_SIMPLIFY_SELF_4, "- $X &&& $X :::= {F}.")
-RULE(TAU_SIMPLIFY_SELF_5, "- $X ||| $X :::= {T}.")
-
 template<typename... BAs>
 // TODO (LOW) rename library with rwsys or another name
 static auto apply_defs = make_library<BAs...>(
@@ -247,15 +218,6 @@ static auto to_dnf_bf = make_library<BAs...>(
 	+ BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
 	+ BF_ELIM_DOUBLE_NEGATION_0
-);
-
-template<typename... BAs>
-static auto to_dnf_tau = make_library<BAs...>(
-	TAU_TO_DNF_0
-	+ TAU_TO_DNF_1
-	+ TAU_PUSH_NEGATION_INWARDS_0
-	+ TAU_PUSH_NEGATION_INWARDS_1
-	+ TAU_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -341,26 +303,6 @@ static auto simplify_wff = make_library<BAs...>(
 	+ WFF_SIMPLIFY_ALWAYS_1
 	+ WFF_SIMPLIFY_ALWAYS_2
 	+ WFF_SIMPLIFY_ALWAYS_3
-);
-
-template<typename... BAs>
-static auto simplify_tau = make_library<BAs...>(
-	TAU_SIMPLIFY_ONE_0
-	+ TAU_SIMPLIFY_ONE_1
-	+ TAU_SIMPLIFY_ONE_2
-	+ TAU_SIMPLIFY_ONE_3
-	+ TAU_SIMPLIFY_ONE_4
-	+ TAU_SIMPLIFY_ZERO_0
-	+ TAU_SIMPLIFY_ZERO_1
-	+ TAU_SIMPLIFY_ZERO_2
-	+ TAU_SIMPLIFY_ZERO_3
-	+ TAU_SIMPLIFY_ZERO_4
-	+ TAU_SIMPLIFY_SELF_0
-	+ TAU_SIMPLIFY_SELF_1
-	+ TAU_SIMPLIFY_SELF_2
-	+ TAU_SIMPLIFY_SELF_3
-	+ TAU_SIMPLIFY_SELF_4
-	+ TAU_SIMPLIFY_SELF_5
 );
 
 template<typename... BAs>
@@ -474,15 +416,6 @@ static auto to_cnf_wff = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto to_cnf_tau = make_library<BAs...>(
-	TAU_TO_CNF_0
-	+ TAU_TO_CNF_1
-	+ TAU_PUSH_NEGATION_INWARDS_0
-	+ TAU_PUSH_NEGATION_INWARDS_1
-	+ TAU_ELIM_DOUBLE_NEGATION_0
-);
-
-template<typename... BAs>
 static auto to_cnf_bf = make_library<BAs...>(
 	BF_TO_CNF_0
 	+ BF_TO_CNF_1
@@ -500,13 +433,6 @@ static auto to_nnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_4
 	+ WFF_PUSH_NEGATION_INWARDS_5
 	+ WFF_ELIM_DOUBLE_NEGATION_0
-);
-
-template<typename...BAs>
-static auto to_nnf_tau = make_library<BAs...>(
-	TAU_PUSH_NEGATION_INWARDS_0
-	+ TAU_PUSH_NEGATION_INWARDS_1
-	+ TAU_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename...BAs>

@@ -12,58 +12,55 @@ using char_type     = char;
 using terminal_type = char;
 
 inline std::vector<std::string> symbol_names{
-	"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "start", 
-	"__E_start_0", "inputs", "builder", "library", "rr", "_", "rec_relations", "main", "wff", "__E_rec_relations_1", 
-	"rec_relation", "__E_rec_relations_2", "ref", "__E_rec_relation_3", "capture", "bf", "sym", "__E_ref_4", "offsets", "ref_args", 
-	"__E_ref_args_5", "__E___E_ref_args_5_6", "ref_arg", "__E___E_ref_args_5_7", "__E___E_ref_args_5_8", "__E_inputs_9", "__E_inputs_10", "input", "in", "source_binding", 
-	"rules", "__E_library_11", "__E___E_library_11_12", "rule", "__E___E___E_library_11_12_13", "wff_rule", "bf_rule", "__E___E_library_11_14", "wff_matcher", "wff_body", 
-	"__E_wff_rule_15", "wff_cb", "bf_matcher", "bf_body", "__E_bf_rule_16", "bf_cb", "builder_head", "builder_body", "__E_builder_head_17", "__", 
-	"__E_builder_head_18", "bf_builder_body", "__E_builder_body_19", "wff_builder_body", "__E_builder_body_20", "wff_parenthesis", "__E_wff_21", "wff_sometimes", "__E_wff_22", "__E___E_wff_22_23", 
-	"wff_always", "__E_wff_24", "__E___E_wff_24_25", "wff_conditional", "__E_wff_26", "wff_ball", "__E_wff_27", "q_bool_var", "wff_bex", "__E_wff_28", 
-	"wff_all", "__E_wff_29", "q_var", "wff_ex", "__E_wff_30", "wff_ref", "wff_imply", "__E_wff_31", "wff_equiv", "__E_wff_32", 
-	"wff_or", "__E_wff_33", "wff_xor", "__E_wff_34", "wff_and", "__E_wff_35", "wff_neg", "__E_wff_36", "wff_t", "wff_f", 
-	"bf_interval", "__E_wff_37", "bf_neq", "__E_wff_38", "bf_eq", "__E_wff_39", "bf_nleq", "__E_wff_40", "bf_greater", "__E_wff_41", 
-	"bf_less_equal", "__E_wff_42", "bf_less", "__E_wff_43", "bool_variable", "uninterpreted_constant", "bf_parenthesis", "__E_bf_44", "bf_splitter", "__E_bf_45", 
-	"bf_ref", "bf_or", "__E_bf_46", "bf_xor", "__E_bf_47", "bf_and", "__E_bf_48", "__E___E_bf_48_49", "bf_neg", "__E_bf_50", 
-	"bf_constant", "__E_bf_51", "constant", "bf_t", "bf_f", "variable", "charvar", "__E_charvar_52", "__E_charvar_53", "io_var", 
-	"__E_variable_54", "out", "in_var_name", "__E_in_55", "digits", "offset", "out_var_name", "__E_out_56", "__E_offsets_57", "__E_offsets_58", 
-	"num", "shift", "__E_offset_59", "__E_shift_60", "__E___E_shift_60_61", "uninter_const_name", "__E_uninterpreted_constant_62", "__E___E_uninterpreted_constant_62_63", "chars", "binding", 
-	"__E_binding_64", "type", "__E___E_binding_64_65", "source", "named_binding", "src_c", "__E_source_66", "__E_source_67", "__E___E_source_67_68", "__E___E_source_67_69", 
-	"__E_chars_70", "__E_digits_71", "comment", "__E_comment_72", "__E_comment_73", "__E_comment_74", "__E____75", "__E___76", "bf_cb_args1", "bf_cb_arg", 
-	"bf_cb_args2", "bf_cb_args3", "bf_cb_args4", "wff_cb_args1", "wff_cb_arg", "wff_cb_args2", "wff_cb_args3", "wff_cb_args4", "bf_eq_cb", "__E_wff_cb_77", 
-	"bf_neq_cb", "__E_wff_cb_78", "wff_has_clashing_subformulas_cb", "__E_wff_cb_79", "wff_has_subformula_cb", "__E_wff_cb_80", "wff_remove_existential_cb", "__E_wff_cb_81", "wff_remove_bexistential_cb", "__E_wff_cb_82", 
-	"wff_remove_buniversal_cb", "__E_wff_cb_83", "bf_is_zero_cb", "__E_bf_cb_84", "bf_is_one_cb", "__E_bf_cb_85", "bf_has_subformula_cb", "__E_bf_cb_86", "bf_remove_funiversal_cb", "__E_bf_cb_87", 
-	"bf_remove_fexistential_cb", "__E_bf_cb_88", "bf_and_cb", "__E_bf_cb_89", "bf_or_cb", "__E_bf_cb_90", "bf_xor_cb", "__E_bf_cb_91", "bf_neg_cb", "__E_bf_cb_92", 
-	"bf_normalize_cb", "__E_bf_cb_93", "cli", "cli_command", "__E_cli_94", "__E_cli_95", "quit_cmd", "quit_sym", "__E_cli_command_96", "version_cmd", 
-	"version_sym", "__E_cli_command_97", "clear_cmd", "clear_sym", "__E_cli_command_98", "help_cmd", "__E_cli_command_99", "help_sym", "__E___E_cli_command_99_100", "__E___E_cli_command_99_101", 
-	"help_arg", "file_cmd", "__E_cli_command_102", "file_sym", "q_string", "valid_cmd", "__E_cli_command_103", "valid_sym", "sat_cmd", "__E_cli_command_104", 
-	"sat_sym", "unsat_cmd", "__E_cli_command_105", "unsat_sym", "solve_cmd", "__E_cli_command_106", "solve_sym", "wff_cmd_arg", "execute_cmd", "__E_cli_command_107", 
-	"execute_sym", "__E___E_cli_command_107_108", "__E___E_cli_command_107_109", "wff_typed", "normalize_cmd", "__E_cli_command_110", "normalize_sym", "__E___E_cli_command_110_111", "normalize_cmd_arg", "subst_cmd", 
-	"__E_cli_command_112", "subst_sym", "__E___E_cli_command_112_113", "nf_cmd_arg", "inst_cmd", "__E_cli_command_114", "inst_sym", "__E___E_cli_command_114_115", "inst_args", "dnf_cmd", 
-	"__E_cli_command_116", "dnf_sym", "cnf_cmd", "__E_cli_command_117", "cnf_sym", "anf_cmd", "__E_cli_command_118", "anf_sym", "nnf_cmd", "__E_cli_command_119", 
-	"nnf_sym", "pnf_cmd", "__E_cli_command_120", "pnf_sym", "mnf_cmd", "__E_cli_command_121", "mnf_sym", "snf_cmd", "__E_cli_command_122", "snf_sym", 
-	"onf_cmd", "__E_cli_command_123", "onf_sym", "onf_cmd_arg", "def_list_cmd", "__E_cli_command_124", "def_sym", "__E___E_cli_command_124_125", "def_print_cmd", "__E_cli_command_126", 
-	"number", "def_rr_cmd", "qelim_cmd", "__E_cli_command_127", "qelim_sym", "get_cmd", "__E_cli_command_128", "get_sym", "__E___E_cli_command_128_129", "option", 
-	"set_cmd", "__E_cli_command_130", "set_sym", "__E___E_cli_command_130_131", "option_value", "toggle_cmd", "__E_cli_command_132", "toggle_sym", "bool_option", "history_list_cmd", 
-	"__E_cli_command_133", "history_sym", "__E___E_cli_command_133_134", "history_print_cmd", "__E_cli_command_135", "memory", "history_store_cmd", "__E_cli_command_136", "bf_typed", "bf_cmd_arg", 
-	"abs_memory_sym", "rel_memory_sym", "selection_sym", "examples_sym", "__E_help_arg_137", "__E___E_help_arg_137_138", "rel_memory", "__E_memory_139", "__E___E_memory_139_140", "memory_id", 
-	"abs_memory", "__E_memory_141", "enum_option", "severity_opt", "__E_option_142", "status_opt", "__E_bool_option_143", "colors_opt", "__E_bool_option_144", "debug_repl_opt", 
-	"__E_bool_option_145", "option_value_true", "option_value_false", "severity", "error_sym", "__E_severity_146", "info_sym", "__E_severity_147", "debug_sym", "__E_severity_148", 
-	"trace_sym", "__E_severity_149", "tau_cb", "tau_rule", "tau_matcher", "tau", "tau_body", "__E_tau_rule_150", "tau_builder_body", "__E_builder_body_151", 
-	"tau_parenthesis", "__E_tau_152", "tau_wff", "__E_tau_153", "tau_ref", "__E_tau_154", "__E___E_tau_154_155", "tau_or", "__E_tau_156", "tau_and", 
-	"__E_tau_157", "tau_neg", "__E_tau_158", "tau_cb_args1", "tau_cb_arg", "__E_tau_cb_args1_159", "tau_cb_args2", "tau_cb_args3", "tau_collapse_positives_cb", "__E_tau_cb_160", 
-	"__E___E_tau_cb_160_161", "tau_positives_upwards_cb", "__E_tau_cb_162", "__N_0", "__N_1", "__N_2", "__N_3", "__N_4", "__N_5", 
+	"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "start",
+	"__E_start_0", "inputs", "builder", "library", "rr", "_", "rec_relations", "main", "wff", "__E_rec_relations_1",
+	"rec_relation", "__E_rec_relations_2", "ref", "__E_rec_relation_3", "capture", "bf", "sym", "__E_ref_4", "offsets", "ref_args",
+	"__E_ref_args_5", "__E___E_ref_args_5_6", "ref_arg", "__E___E_ref_args_5_7", "__E___E_ref_args_5_8", "__E_inputs_9", "__E_inputs_10", "input", "in", "source_binding",
+	"rules", "__E_library_11", "__E___E_library_11_12", "rule", "__E___E___E_library_11_12_13", "wff_rule", "bf_rule", "__E___E_library_11_14", "wff_matcher", "wff_body",
+	"__E_wff_rule_15", "wff_cb", "bf_matcher", "bf_body", "__E_bf_rule_16", "bf_cb", "builder_head", "builder_body", "__E_builder_head_17", "__",
+	"__E_builder_head_18", "bf_builder_body", "__E_builder_body_19", "wff_builder_body", "__E_builder_body_20", "wff_parenthesis", "__E_wff_21", "wff_sometimes", "__E_wff_22", "__E___E_wff_22_23",
+	"wff_always", "__E_wff_24", "__E___E_wff_24_25", "wff_conditional", "__E_wff_26", "wff_ball", "__E_wff_27", "q_bool_var", "wff_bex", "__E_wff_28",
+	"wff_all", "__E_wff_29", "q_var", "wff_ex", "__E_wff_30", "wff_ref", "wff_imply", "__E_wff_31", "wff_equiv", "__E_wff_32",
+	"wff_or", "__E_wff_33", "wff_xor", "__E_wff_34", "wff_and", "__E_wff_35", "wff_neg", "__E_wff_36", "wff_t", "wff_f",
+	"bf_interval", "__E_wff_37", "bf_neq", "__E_wff_38", "bf_eq", "__E_wff_39", "bf_nleq", "__E_wff_40", "bf_greater", "__E_wff_41",
+	"bf_less_equal", "__E_wff_42", "bf_less", "__E_wff_43", "bool_variable", "uninterpreted_constant", "bf_parenthesis", "__E_bf_44", "bf_splitter", "__E_bf_45",
+	"bf_ref", "bf_or", "__E_bf_46", "bf_xor", "__E_bf_47", "bf_and", "__E_bf_48", "__E___E_bf_48_49", "bf_neg", "__E_bf_50",
+	"bf_constant", "__E_bf_51", "constant", "bf_t", "bf_f", "variable", "charvar", "__E_charvar_52", "__E_charvar_53", "io_var",
+	"__E_variable_54", "out", "in_var_name", "__E_in_55", "digits", "offset", "out_var_name", "__E_out_56", "__E_offsets_57", "__E_offsets_58",
+	"num", "shift", "__E_offset_59", "__E_shift_60", "__E___E_shift_60_61", "uninter_const_name", "__E_uninterpreted_constant_62", "__E___E_uninterpreted_constant_62_63", "chars", "binding",
+	"__E_binding_64", "type", "__E___E_binding_64_65", "source", "named_binding", "src_c", "__E_source_66", "__E_source_67", "__E___E_source_67_68", "__E___E_source_67_69",
+	"__E_chars_70", "__E_digits_71", "comment", "__E_comment_72", "__E_comment_73", "__E_comment_74", "__E____75", "__E___76", "bf_cb_args1", "bf_cb_arg",
+	"bf_cb_args2", "bf_cb_args3", "bf_cb_args4", "wff_cb_args1", "wff_cb_arg", "wff_cb_args2", "wff_cb_args3", "wff_cb_args4", "bf_eq_cb", "__E_wff_cb_77",
+	"bf_neq_cb", "__E_wff_cb_78", "wff_has_clashing_subformulas_cb", "__E_wff_cb_79", "wff_has_subformula_cb", "__E_wff_cb_80", "wff_remove_existential_cb", "__E_wff_cb_81", "wff_remove_bexistential_cb", "__E_wff_cb_82",
+	"wff_remove_buniversal_cb", "__E_wff_cb_83", "bf_is_zero_cb", "__E_bf_cb_84", "bf_is_one_cb", "__E_bf_cb_85", "bf_has_subformula_cb", "__E_bf_cb_86", "bf_remove_funiversal_cb", "__E_bf_cb_87",
+	"bf_remove_fexistential_cb", "__E_bf_cb_88", "bf_and_cb", "__E_bf_cb_89", "bf_or_cb", "__E_bf_cb_90", "bf_xor_cb", "__E_bf_cb_91", "bf_neg_cb", "__E_bf_cb_92",
+	"bf_normalize_cb", "__E_bf_cb_93", "cli", "cli_command", "__E_cli_94", "__E_cli_95", "quit_cmd", "quit_sym", "__E_cli_command_96", "version_cmd",
+	"version_sym", "__E_cli_command_97", "clear_cmd", "clear_sym", "__E_cli_command_98", "help_cmd", "__E_cli_command_99", "help_sym", "__E___E_cli_command_99_100", "__E___E_cli_command_99_101",
+	"help_arg", "file_cmd", "__E_cli_command_102", "file_sym", "q_string", "valid_cmd", "__E_cli_command_103", "valid_sym", "sat_cmd", "__E_cli_command_104",
+	"sat_sym", "unsat_cmd", "__E_cli_command_105", "unsat_sym", "solve_cmd", "__E_cli_command_106", "solve_sym", "wff_cmd_arg", "execute_cmd", "__E_cli_command_107",
+	"execute_sym", "__E___E_cli_command_107_108", "__E___E_cli_command_107_109", "wff_typed", "normalize_cmd", "__E_cli_command_110", "normalize_sym", "__E___E_cli_command_110_111", "normalize_cmd_arg", "subst_cmd",
+	"__E_cli_command_112", "subst_sym", "__E___E_cli_command_112_113", "nf_cmd_arg", "inst_cmd", "__E_cli_command_114", "inst_sym", "__E___E_cli_command_114_115", "inst_args", "dnf_cmd",
+	"__E_cli_command_116", "dnf_sym", "cnf_cmd", "__E_cli_command_117", "cnf_sym", "anf_cmd", "__E_cli_command_118", "anf_sym", "nnf_cmd", "__E_cli_command_119",
+	"nnf_sym", "pnf_cmd", "__E_cli_command_120", "pnf_sym", "mnf_cmd", "__E_cli_command_121", "mnf_sym", "snf_cmd", "__E_cli_command_122", "snf_sym",
+	"onf_cmd", "__E_cli_command_123", "onf_sym", "onf_cmd_arg", "def_list_cmd", "__E_cli_command_124", "def_sym", "__E___E_cli_command_124_125", "def_print_cmd", "__E_cli_command_126",
+	"number", "def_rr_cmd", "qelim_cmd", "__E_cli_command_127", "qelim_sym", "get_cmd", "__E_cli_command_128", "get_sym", "__E___E_cli_command_128_129", "option",
+	"set_cmd", "__E_cli_command_130", "set_sym", "__E___E_cli_command_130_131", "option_value", "toggle_cmd", "__E_cli_command_132", "toggle_sym", "bool_option", "history_list_cmd",
+	"__E_cli_command_133", "history_sym", "__E___E_cli_command_133_134", "history_print_cmd", "__E_cli_command_135", "memory", "history_store_cmd", "__E_cli_command_136", "bf_typed", "bf_cmd_arg",
+	"abs_memory_sym", "rel_memory_sym", "selection_sym", "examples_sym", "__E_help_arg_137", "__E___E_help_arg_137_138", "rel_memory", "__E_memory_139", "__E___E_memory_139_140", "memory_id",
+	"abs_memory", "__E_memory_141", "enum_option", "severity_opt", "__E_option_142", "status_opt", "__E_bool_option_143", "colors_opt", "__E_bool_option_144", "debug_repl_opt",
+	"__E_bool_option_145", "option_value_true", "option_value_false", "severity", "error_sym", "__E_severity_146", "info_sym", "__E_severity_147", "debug_sym", "__E_severity_148",
+	"trace_sym", "__E_severity_149", "tau_cb", "__N_0", "__N_1", "__N_2", "__N_3", "__N_4", "__N_5",
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
-	'\0', '.', ':', '=', ',', '(', ')', '<', '{', 
-	'}', 's', 'o', 'm', 'e', 't', 'i', '>', 'a', 'l', 
-	'w', 'y', '[', ']', '?', 'b', '_', 'x', '-', '|', 
-	'^', '&', '!', 'T', 'F', 'S', '+', '\'', '1', '0', 
-	'$', '\t', '\n', '\r', '#', 'f', 'q', 'c', 'n', 'h', 
-	'g', 'u', 'r', 'v', 'z', 'd', 'p', '/', '%', 
+	'\0', '.', ':', '=', ',', '(', ')', '<', '{',
+	'}', 's', 'o', 'm', 'e', 't', 'i', '>', 'a', 'l',
+	'w', 'y', '[', ']', '?', 'b', '_', 'x', '-', '|',
+	'^', '&', '!', 'T', 'F', 'S', '+', '\'', '1', '0',
+	'$', '\t', '\n', '\r', '#', 'f', 'q', 'c', 'n', 'h',
+	'g', 'u', 'r', 'v', 'z', 'd', 'p', '/', '%',
 };
 
 inline ::idni::char_class_fns<terminal_type> char_classes =
@@ -117,11 +114,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 			{ 303 },
 			{ 338 },
 			{ 339 },
-			{ 372 },
-			{ 375, 380, 375 },
-			{ 393 },
-			{ 396 },
-			{ 397 }
+			{ 372 }
 		},
 		.inline_char_classes = true
 	}
@@ -477,16 +470,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(25), (NT(24)));
 //G168: bf(25)               => variable(135).
 	p(NT(25), (NT(135)));
-//G169: __N_0(403)           => 'F'.
-	p(NT(403), (T(33)));
-//G170: __N_1(404)           => 'T'.
-	p(NT(404), (T(32)));
-//G171: __N_2(405)           => 'i'.
-	p(NT(405), (T(15)));
-//G172: __N_3(406)           => 'o'.
-	p(NT(406), (T(11)));
-//G173: __E_charvar_52(137)  => ~( __N_0(403) ) & ~( __N_1(404) ) & ~( __N_2(405) ) & ~( __N_3(406) ) & alpha(5).	 # conjunctive
-	p(NT(137), ~(NT(403)) & ~(NT(404)) & ~(NT(405)) & ~(NT(406)) & (NT(5)));
+//G169: __N_0(373)           => 'F'.
+	p(NT(373), (T(33)));
+//G170: __N_1(374)           => 'T'.
+	p(NT(374), (T(32)));
+//G171: __N_2(375)           => 'i'.
+	p(NT(375), (T(15)));
+//G172: __N_3(376)           => 'o'.
+	p(NT(376), (T(11)));
+//G173: __E_charvar_52(137)  => ~( __N_0(373) ) & ~( __N_1(374) ) & ~( __N_2(375) ) & ~( __N_3(376) ) & alpha(5).	 # conjunctive
+	p(NT(137), ~(NT(373)) & ~(NT(374)) & ~(NT(375)) & ~(NT(376)) & (NT(5)));
 //G174: __E_charvar_53(138)  => null.
 	p(NT(138), (nul));
 //G175: __E_charvar_53(138)  => digit(3) __E_charvar_53(138).
@@ -541,18 +534,18 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(145), (NT(24)));
 //G200: offset(145)          => shift(151).
 	p(NT(145), (NT(151)));
-//G201: __N_4(407)           => io_var(139).
-	p(NT(407), (NT(139)));
-//G202: __E_offset_59(152)   => variable(135) & ~( __N_4(407) ).	 # conjunctive
-	p(NT(152), (NT(135)) & ~(NT(407)));
+//G201: __N_4(377)           => io_var(139).
+	p(NT(377), (NT(139)));
+//G202: __E_offset_59(152)   => variable(135) & ~( __N_4(377) ).	 # conjunctive
+	p(NT(152), (NT(135)) & ~(NT(377)));
 //G203: offset(145)          => __E_offset_59(152).
 	p(NT(145), (NT(152)));
 //G204: __E_shift_60(153)    => capture(24).
 	p(NT(153), (NT(24)));
-//G205: __N_5(408)           => io_var(139).
-	p(NT(408), (NT(139)));
-//G206: __E___E_shift_60_61(154) => variable(135) & ~( __N_5(408) ).	 # conjunctive
-	p(NT(154), (NT(135)) & ~(NT(408)));
+//G205: __N_5(378)           => io_var(139).
+	p(NT(378), (NT(139)));
+//G206: __E___E_shift_60_61(154) => variable(135) & ~( __N_5(378) ).	 # conjunctive
+	p(NT(154), (NT(135)) & ~(NT(378)));
 //G207: __E_shift_60(153)    => __E___E_shift_60_61(154).
 	p(NT(153), (NT(154)));
 //G208: shift(151)           => __E_shift_60(153) _(15) '-' _(15) num(150).
@@ -1317,94 +1310,6 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(370), (NT(371)));
 //G588: severity(363)        => trace_sym(370).
 	p(NT(363), (NT(370)));
-//G589: rule(43)             => tau_rule(373).
-	p(NT(43), (NT(373)));
-//G590: tau_matcher(374)     => tau(375).
-	p(NT(374), (NT(375)));
-//G591: __E_tau_rule_150(377) => tau(375).
-	p(NT(377), (NT(375)));
-//G592: __E_tau_rule_150(377) => tau_cb(372).
-	p(NT(377), (NT(372)));
-//G593: tau_body(376)        => __E_tau_rule_150(377).
-	p(NT(376), (NT(377)));
-//G594: tau_rule(373)        => tau_matcher(374) _(15) ':' ':' ':' '=' _(15) tau_body(376) _(15) '.'.
-	p(NT(373), (NT(374)+NT(15)+T(2)+T(2)+T(2)+T(3)+NT(15)+NT(376)+NT(15)+T(1)));
-//G595: __E_builder_body_151(379) => '=' ':' ':' ':' _(15) tau(375).
-	p(NT(379), (T(3)+T(2)+T(2)+T(2)+NT(15)+NT(375)));
-//G596: tau_builder_body(378) => __E_builder_body_151(379).
-	p(NT(378), (NT(379)));
-//G597: builder_body(57)     => tau_builder_body(378).
-	p(NT(57), (NT(378)));
-//G598: __E_tau_152(381)     => '(' _(15) tau(375) _(15) ')'.
-	p(NT(381), (T(5)+NT(15)+NT(375)+NT(15)+T(6)));
-//G599: tau_parenthesis(380) => __E_tau_152(381).
-	p(NT(380), (NT(381)));
-//G600: tau(375)             => tau_parenthesis(380).
-	p(NT(375), (NT(380)));
-//G601: __E_tau_153(383)     => '{' _(15) wff(18) _(15) '}'.
-	p(NT(383), (T(8)+NT(15)+NT(18)+NT(15)+T(9)));
-//G602: tau_wff(382)         => __E_tau_153(383).
-	p(NT(382), (NT(383)));
-//G603: tau(375)             => tau_wff(382).
-	p(NT(375), (NT(382)));
-//G604: __E___E_tau_154_155(386) => _(15) offsets(28).
-	p(NT(386), (NT(15)+NT(28)));
-//G605: __E___E_tau_154_155(386) => null.
-	p(NT(386), (nul));
-//G606: __E_tau_154(385)     => sym(26) __E___E_tau_154_155(386) _(15) ref_args(29).
-	p(NT(385), (NT(26)+NT(386)+NT(15)+NT(29)));
-//G607: tau_ref(384)         => __E_tau_154(385).
-	p(NT(384), (NT(385)));
-//G608: tau(375)             => tau_ref(384).
-	p(NT(375), (NT(384)));
-//G609: __E_tau_156(388)     => tau(375) _(15) '|' '|' '|' _(15) tau(375).
-	p(NT(388), (NT(375)+NT(15)+T(28)+T(28)+T(28)+NT(15)+NT(375)));
-//G610: tau_or(387)          => __E_tau_156(388).
-	p(NT(387), (NT(388)));
-//G611: tau(375)             => tau_or(387).
-	p(NT(375), (NT(387)));
-//G612: __E_tau_157(390)     => tau(375) _(15) '&' '&' '&' _(15) tau(375).
-	p(NT(390), (NT(375)+NT(15)+T(30)+T(30)+T(30)+NT(15)+NT(375)));
-//G613: tau_and(389)         => __E_tau_157(390).
-	p(NT(389), (NT(390)));
-//G614: tau(375)             => tau_and(389).
-	p(NT(375), (NT(389)));
-//G615: __E_tau_158(392)     => '-' _(15) tau(375).
-	p(NT(392), (T(27)+NT(15)+NT(375)));
-//G616: tau_neg(391)         => __E_tau_158(392).
-	p(NT(391), (NT(392)));
-//G617: tau(375)             => tau_neg(391).
-	p(NT(375), (NT(391)));
-//G618: tau(375)             => capture(24).
-	p(NT(375), (NT(24)));
-//G619: __E_tau_cb_args1_159(395) => capture(24).
-	p(NT(395), (NT(24)));
-//G620: __E_tau_cb_args1_159(395) => tau(375).
-	p(NT(395), (NT(375)));
-//G621: tau_cb_arg(394)      => __E_tau_cb_args1_159(395).
-	p(NT(394), (NT(395)));
-//G622: tau_cb_args1(393)    => __(59) tau_cb_arg(394).
-	p(NT(393), (NT(59)+NT(394)));
-//G623: tau_cb_args2(396)    => tau_cb_args1(393) tau_cb_args1(393).
-	p(NT(396), (NT(393)+NT(393)));
-//G624: tau_cb_args3(397)    => tau_cb_args2(396) tau_cb_args1(393).
-	p(NT(397), (NT(396)+NT(393)));
-//G625: __E___E_tau_cb_160_161(400) => tau_cb_args3(397).
-	p(NT(400), (NT(397)));
-//G626: __E___E_tau_cb_160_161(400) => tau_cb_args2(396).
-	p(NT(400), (NT(396)));
-//G627: __E_tau_cb_160(399)  => 't' 'a' 'u' '_' 'c' 'o' 'l' 'l' 'a' 'p' 's' 'e' '_' 'p' 'o' 's' 'i' 't' 'i' 'v' 'e' 's' '_' 'c' 'b' __E___E_tau_cb_160_161(400).
-	p(NT(399), (T(14)+T(17)+T(50)+T(25)+T(46)+T(11)+T(18)+T(18)+T(17)+T(55)+T(10)+T(13)+T(25)+T(55)+T(11)+T(10)+T(15)+T(14)+T(15)+T(52)+T(13)+T(10)+T(25)+T(46)+T(24)+NT(400)));
-//G628: tau_collapse_positives_cb(398) => __E_tau_cb_160(399).
-	p(NT(398), (NT(399)));
-//G629: tau_cb(372)          => tau_collapse_positives_cb(398).
-	p(NT(372), (NT(398)));
-//G630: __E_tau_cb_162(402)  => 't' 'a' 'u' '_' 'p' 'o' 's' 'i' 't' 'i' 'v' 'e' 's' '_' 'u' 'p' 'w' 'a' 'r' 'd' 's' '_' 'c' 'b' tau_cb_args2(396).
-	p(NT(402), (T(14)+T(17)+T(50)+T(25)+T(55)+T(11)+T(10)+T(15)+T(14)+T(15)+T(52)+T(13)+T(10)+T(25)+T(50)+T(55)+T(19)+T(17)+T(51)+T(54)+T(10)+T(25)+T(46)+T(24)+NT(396)));
-//G631: tau_positives_upwards_cb(401) => __E_tau_cb_162(402).
-	p(NT(401), (NT(402)));
-//G632: tau_cb(372)          => tau_positives_upwards_cb(401).
-	p(NT(372), (NT(401)));
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -1417,47 +1322,44 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 struct tau_parser : public idni::parser<char, char> {
 	enum nonterminal {
-		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, start, 
-		__E_start_0, inputs, builder, library, rr, _, rec_relations, main, wff, __E_rec_relations_1, 
-		rec_relation, __E_rec_relations_2, ref, __E_rec_relation_3, capture, bf, sym, __E_ref_4, offsets, ref_args, 
-		__E_ref_args_5, __E___E_ref_args_5_6, ref_arg, __E___E_ref_args_5_7, __E___E_ref_args_5_8, __E_inputs_9, __E_inputs_10, input, in, source_binding, 
-		rules, __E_library_11, __E___E_library_11_12, rule, __E___E___E_library_11_12_13, wff_rule, bf_rule, __E___E_library_11_14, wff_matcher, wff_body, 
-		__E_wff_rule_15, wff_cb, bf_matcher, bf_body, __E_bf_rule_16, bf_cb, builder_head, builder_body, __E_builder_head_17, __, 
-		__E_builder_head_18, bf_builder_body, __E_builder_body_19, wff_builder_body, __E_builder_body_20, wff_parenthesis, __E_wff_21, wff_sometimes, __E_wff_22, __E___E_wff_22_23, 
-		wff_always, __E_wff_24, __E___E_wff_24_25, wff_conditional, __E_wff_26, wff_ball, __E_wff_27, q_bool_var, wff_bex, __E_wff_28, 
-		wff_all, __E_wff_29, q_var, wff_ex, __E_wff_30, wff_ref, wff_imply, __E_wff_31, wff_equiv, __E_wff_32, 
-		wff_or, __E_wff_33, wff_xor, __E_wff_34, wff_and, __E_wff_35, wff_neg, __E_wff_36, wff_t, wff_f, 
-		bf_interval, __E_wff_37, bf_neq, __E_wff_38, bf_eq, __E_wff_39, bf_nleq, __E_wff_40, bf_greater, __E_wff_41, 
-		bf_less_equal, __E_wff_42, bf_less, __E_wff_43, bool_variable, uninterpreted_constant, bf_parenthesis, __E_bf_44, bf_splitter, __E_bf_45, 
-		bf_ref, bf_or, __E_bf_46, bf_xor, __E_bf_47, bf_and, __E_bf_48, __E___E_bf_48_49, bf_neg, __E_bf_50, 
-		bf_constant, __E_bf_51, constant, bf_t, bf_f, variable, charvar, __E_charvar_52, __E_charvar_53, io_var, 
-		__E_variable_54, out, in_var_name, __E_in_55, digits, offset, out_var_name, __E_out_56, __E_offsets_57, __E_offsets_58, 
-		num, shift, __E_offset_59, __E_shift_60, __E___E_shift_60_61, uninter_const_name, __E_uninterpreted_constant_62, __E___E_uninterpreted_constant_62_63, chars, binding, 
-		__E_binding_64, type, __E___E_binding_64_65, source, named_binding, src_c, __E_source_66, __E_source_67, __E___E_source_67_68, __E___E_source_67_69, 
-		__E_chars_70, __E_digits_71, comment, __E_comment_72, __E_comment_73, __E_comment_74, __E____75, __E___76, bf_cb_args1, bf_cb_arg, 
-		bf_cb_args2, bf_cb_args3, bf_cb_args4, wff_cb_args1, wff_cb_arg, wff_cb_args2, wff_cb_args3, wff_cb_args4, bf_eq_cb, __E_wff_cb_77, 
-		bf_neq_cb, __E_wff_cb_78, wff_has_clashing_subformulas_cb, __E_wff_cb_79, wff_has_subformula_cb, __E_wff_cb_80, wff_remove_existential_cb, __E_wff_cb_81, wff_remove_bexistential_cb, __E_wff_cb_82, 
-		wff_remove_buniversal_cb, __E_wff_cb_83, bf_is_zero_cb, __E_bf_cb_84, bf_is_one_cb, __E_bf_cb_85, bf_has_subformula_cb, __E_bf_cb_86, bf_remove_funiversal_cb, __E_bf_cb_87, 
-		bf_remove_fexistential_cb, __E_bf_cb_88, bf_and_cb, __E_bf_cb_89, bf_or_cb, __E_bf_cb_90, bf_xor_cb, __E_bf_cb_91, bf_neg_cb, __E_bf_cb_92, 
-		bf_normalize_cb, __E_bf_cb_93, cli, cli_command, __E_cli_94, __E_cli_95, quit_cmd, quit_sym, __E_cli_command_96, version_cmd, 
-		version_sym, __E_cli_command_97, clear_cmd, clear_sym, __E_cli_command_98, help_cmd, __E_cli_command_99, help_sym, __E___E_cli_command_99_100, __E___E_cli_command_99_101, 
-		help_arg, file_cmd, __E_cli_command_102, file_sym, q_string, valid_cmd, __E_cli_command_103, valid_sym, sat_cmd, __E_cli_command_104, 
-		sat_sym, unsat_cmd, __E_cli_command_105, unsat_sym, solve_cmd, __E_cli_command_106, solve_sym, wff_cmd_arg, execute_cmd, __E_cli_command_107, 
-		execute_sym, __E___E_cli_command_107_108, __E___E_cli_command_107_109, wff_typed, normalize_cmd, __E_cli_command_110, normalize_sym, __E___E_cli_command_110_111, normalize_cmd_arg, subst_cmd, 
-		__E_cli_command_112, subst_sym, __E___E_cli_command_112_113, nf_cmd_arg, inst_cmd, __E_cli_command_114, inst_sym, __E___E_cli_command_114_115, inst_args, dnf_cmd, 
-		__E_cli_command_116, dnf_sym, cnf_cmd, __E_cli_command_117, cnf_sym, anf_cmd, __E_cli_command_118, anf_sym, nnf_cmd, __E_cli_command_119, 
-		nnf_sym, pnf_cmd, __E_cli_command_120, pnf_sym, mnf_cmd, __E_cli_command_121, mnf_sym, snf_cmd, __E_cli_command_122, snf_sym, 
-		onf_cmd, __E_cli_command_123, onf_sym, onf_cmd_arg, def_list_cmd, __E_cli_command_124, def_sym, __E___E_cli_command_124_125, def_print_cmd, __E_cli_command_126, 
-		number, def_rr_cmd, qelim_cmd, __E_cli_command_127, qelim_sym, get_cmd, __E_cli_command_128, get_sym, __E___E_cli_command_128_129, option, 
-		set_cmd, __E_cli_command_130, set_sym, __E___E_cli_command_130_131, option_value, toggle_cmd, __E_cli_command_132, toggle_sym, bool_option, history_list_cmd, 
-		__E_cli_command_133, history_sym, __E___E_cli_command_133_134, history_print_cmd, __E_cli_command_135, memory, history_store_cmd, __E_cli_command_136, bf_typed, bf_cmd_arg, 
-		abs_memory_sym, rel_memory_sym, selection_sym, examples_sym, __E_help_arg_137, __E___E_help_arg_137_138, rel_memory, __E_memory_139, __E___E_memory_139_140, memory_id, 
-		abs_memory, __E_memory_141, enum_option, severity_opt, __E_option_142, status_opt, __E_bool_option_143, colors_opt, __E_bool_option_144, debug_repl_opt, 
-		__E_bool_option_145, option_value_true, option_value_false, severity, error_sym, __E_severity_146, info_sym, __E_severity_147, debug_sym, __E_severity_148, 
-		trace_sym, __E_severity_149, tau_cb, tau_rule, tau_matcher, tau, tau_body, __E_tau_rule_150, tau_builder_body, __E_builder_body_151, 
-		tau_parenthesis, __E_tau_152, tau_wff, __E_tau_153, tau_ref, __E_tau_154, __E___E_tau_154_155, tau_or, __E_tau_156, tau_and, 
-		__E_tau_157, tau_neg, __E_tau_158, tau_cb_args1, tau_cb_arg, __E_tau_cb_args1_159, tau_cb_args2, tau_cb_args3, tau_collapse_positives_cb, __E_tau_cb_160, 
-		__E___E_tau_cb_160_161, tau_positives_upwards_cb, __E_tau_cb_162, __N_0, __N_1, __N_2, __N_3, __N_4, __N_5, 
+		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, start,
+		__E_start_0, inputs, builder, library, rr, _, rec_relations, main, wff, __E_rec_relations_1,
+		rec_relation, __E_rec_relations_2, ref, __E_rec_relation_3, capture, bf, sym, __E_ref_4, offsets, ref_args,
+		__E_ref_args_5, __E___E_ref_args_5_6, ref_arg, __E___E_ref_args_5_7, __E___E_ref_args_5_8, __E_inputs_9, __E_inputs_10, input, in, source_binding,
+		rules, __E_library_11, __E___E_library_11_12, rule, __E___E___E_library_11_12_13, wff_rule, bf_rule, __E___E_library_11_14, wff_matcher, wff_body,
+		__E_wff_rule_15, wff_cb, bf_matcher, bf_body, __E_bf_rule_16, bf_cb, builder_head, builder_body, __E_builder_head_17, __,
+		__E_builder_head_18, bf_builder_body, __E_builder_body_19, wff_builder_body, __E_builder_body_20, wff_parenthesis, __E_wff_21, wff_sometimes, __E_wff_22, __E___E_wff_22_23,
+		wff_always, __E_wff_24, __E___E_wff_24_25, wff_conditional, __E_wff_26, wff_ball, __E_wff_27, q_bool_var, wff_bex, __E_wff_28,
+		wff_all, __E_wff_29, q_var, wff_ex, __E_wff_30, wff_ref, wff_imply, __E_wff_31, wff_equiv, __E_wff_32,
+		wff_or, __E_wff_33, wff_xor, __E_wff_34, wff_and, __E_wff_35, wff_neg, __E_wff_36, wff_t, wff_f,
+		bf_interval, __E_wff_37, bf_neq, __E_wff_38, bf_eq, __E_wff_39, bf_nleq, __E_wff_40, bf_greater, __E_wff_41,
+		bf_less_equal, __E_wff_42, bf_less, __E_wff_43, bool_variable, uninterpreted_constant, bf_parenthesis, __E_bf_44, bf_splitter, __E_bf_45,
+		bf_ref, bf_or, __E_bf_46, bf_xor, __E_bf_47, bf_and, __E_bf_48, __E___E_bf_48_49, bf_neg, __E_bf_50,
+		bf_constant, __E_bf_51, constant, bf_t, bf_f, variable, charvar, __E_charvar_52, __E_charvar_53, io_var,
+		__E_variable_54, out, in_var_name, __E_in_55, digits, offset, out_var_name, __E_out_56, __E_offsets_57, __E_offsets_58,
+		num, shift, __E_offset_59, __E_shift_60, __E___E_shift_60_61, uninter_const_name, __E_uninterpreted_constant_62, __E___E_uninterpreted_constant_62_63, chars, binding,
+		__E_binding_64, type, __E___E_binding_64_65, source, named_binding, src_c, __E_source_66, __E_source_67, __E___E_source_67_68, __E___E_source_67_69,
+		__E_chars_70, __E_digits_71, comment, __E_comment_72, __E_comment_73, __E_comment_74, __E____75, __E___76, bf_cb_args1, bf_cb_arg,
+		bf_cb_args2, bf_cb_args3, bf_cb_args4, wff_cb_args1, wff_cb_arg, wff_cb_args2, wff_cb_args3, wff_cb_args4, bf_eq_cb, __E_wff_cb_77,
+		bf_neq_cb, __E_wff_cb_78, wff_has_clashing_subformulas_cb, __E_wff_cb_79, wff_has_subformula_cb, __E_wff_cb_80, wff_remove_existential_cb, __E_wff_cb_81, wff_remove_bexistential_cb, __E_wff_cb_82,
+		wff_remove_buniversal_cb, __E_wff_cb_83, bf_is_zero_cb, __E_bf_cb_84, bf_is_one_cb, __E_bf_cb_85, bf_has_subformula_cb, __E_bf_cb_86, bf_remove_funiversal_cb, __E_bf_cb_87,
+		bf_remove_fexistential_cb, __E_bf_cb_88, bf_and_cb, __E_bf_cb_89, bf_or_cb, __E_bf_cb_90, bf_xor_cb, __E_bf_cb_91, bf_neg_cb, __E_bf_cb_92,
+		bf_normalize_cb, __E_bf_cb_93, cli, cli_command, __E_cli_94, __E_cli_95, quit_cmd, quit_sym, __E_cli_command_96, version_cmd,
+		version_sym, __E_cli_command_97, clear_cmd, clear_sym, __E_cli_command_98, help_cmd, __E_cli_command_99, help_sym, __E___E_cli_command_99_100, __E___E_cli_command_99_101,
+		help_arg, file_cmd, __E_cli_command_102, file_sym, q_string, valid_cmd, __E_cli_command_103, valid_sym, sat_cmd, __E_cli_command_104,
+		sat_sym, unsat_cmd, __E_cli_command_105, unsat_sym, solve_cmd, __E_cli_command_106, solve_sym, wff_cmd_arg, execute_cmd, __E_cli_command_107,
+		execute_sym, __E___E_cli_command_107_108, __E___E_cli_command_107_109, wff_typed, normalize_cmd, __E_cli_command_110, normalize_sym, __E___E_cli_command_110_111, normalize_cmd_arg, subst_cmd,
+		__E_cli_command_112, subst_sym, __E___E_cli_command_112_113, nf_cmd_arg, inst_cmd, __E_cli_command_114, inst_sym, __E___E_cli_command_114_115, inst_args, dnf_cmd,
+		__E_cli_command_116, dnf_sym, cnf_cmd, __E_cli_command_117, cnf_sym, anf_cmd, __E_cli_command_118, anf_sym, nnf_cmd, __E_cli_command_119,
+		nnf_sym, pnf_cmd, __E_cli_command_120, pnf_sym, mnf_cmd, __E_cli_command_121, mnf_sym, snf_cmd, __E_cli_command_122, snf_sym,
+		onf_cmd, __E_cli_command_123, onf_sym, onf_cmd_arg, def_list_cmd, __E_cli_command_124, def_sym, __E___E_cli_command_124_125, def_print_cmd, __E_cli_command_126,
+		number, def_rr_cmd, qelim_cmd, __E_cli_command_127, qelim_sym, get_cmd, __E_cli_command_128, get_sym, __E___E_cli_command_128_129, option,
+		set_cmd, __E_cli_command_130, set_sym, __E___E_cli_command_130_131, option_value, toggle_cmd, __E_cli_command_132, toggle_sym, bool_option, history_list_cmd,
+		__E_cli_command_133, history_sym, __E___E_cli_command_133_134, history_print_cmd, __E_cli_command_135, memory, history_store_cmd, __E_cli_command_136, bf_typed, bf_cmd_arg,
+		abs_memory_sym, rel_memory_sym, selection_sym, examples_sym, __E_help_arg_137, __E___E_help_arg_137_138, rel_memory, __E_memory_139, __E___E_memory_139_140, memory_id,
+		abs_memory, __E_memory_141, enum_option, severity_opt, __E_option_142, status_opt, __E_bool_option_143, colors_opt, __E_bool_option_144, debug_repl_opt,
+		__E_bool_option_145, option_value_true, option_value_false, severity, error_sym, __E_severity_146, info_sym, __E_severity_147, debug_sym, __E_severity_148,
+		trace_sym, __E_severity_149, tau_cb, __N_0, __N_1, __N_2, __N_3, __N_4, __N_5,
 	};
 	static tau_parser& instance() {
 		static tau_parser inst;

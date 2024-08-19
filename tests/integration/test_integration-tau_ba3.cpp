@@ -19,7 +19,6 @@
 #include "nso_rr.h"
 #include "bdd_handle.h"
 #include "normalizer.h"
-#include "satisfiability.h"
 
 #include "test_integration_helpers-tau.h"
 
