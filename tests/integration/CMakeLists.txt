@@ -6,7 +6,6 @@ set(TESTS
 	tau_ba1
 	tau_ba2
 	tau_ba3
-	executor
 	normal_forms
 	nso_rr_execution
 	nso_rr_partial_eval
@@ -18,6 +17,7 @@ set(TESTS
     solver
 
 	# tests depending on a deprecated syntax
+	#executor
 	#gssotc_rr_execution
 	#gssotc_rr_partial_eval
 	#satisfiability
