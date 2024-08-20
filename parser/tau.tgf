@@ -228,7 +228,7 @@ bf_cmd_arg             => memory | bf_typed.
 wff_cmd_arg            => memory | wff_typed.
 nf_cmd_arg             => memory | bf_typed | wff_typed.
 onf_cmd_arg            => memory | wff_typed.
-normalize_cmd_arg      => memory | bf_typed | wff_typed | rr.
+normalize_cmd_arg      => memory | rr | ref | bf_typed | wff_typed.
 inst_args              =>
           bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
         | wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
