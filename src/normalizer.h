@@ -116,10 +116,10 @@ nso<BAs...> operator|(const nso<BAs...>& form, const remove_one_wff_existential<
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 nso<BAs...> normalizer_step(const nso<BAs...>& form) {
-	#ifdef CACHE
+	#ifdef TAU_CACHE
 	static std::map<nso<BAs...>, nso<BAs...>> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
-	#endif // CACHE
+	#endif // TAU_CACHE
 	auto result = form
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(apply_defs<BAs...>))
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(elim_for_all<BAs...>))
@@ -129,9 +129,9 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		| bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(elim_eqs<BAs...>)
 		| sometimes_always_normalization<BAs...>();
-	#ifdef CACHE
+	#ifdef TAU_CACHE
 	cache[form] = result;
-	#endif // CACHE
+	#endif // TAU_CACHE
 	return result;
 }
 

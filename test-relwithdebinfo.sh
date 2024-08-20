@@ -1,4 +1,4 @@
 #!/bin/bash
 
-cd build-Release
+cd build-RelWithDebInfo
 ctest -j 8 --output-on-failure $@
