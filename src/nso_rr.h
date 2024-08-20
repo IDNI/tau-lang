@@ -42,8 +42,7 @@
 #include "utils.h"
 #include "../parser/tau_parser.generated.h"
 #include "rewriting.h"
-
-
+#include "benchmarking.h"
 
 using namespace idni::rewriter;
 namespace idni::tau {
@@ -2410,6 +2409,9 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rules<nso<BAs...>>& rs, const sp_tau_n
 // IDEA maybe this could be operator|
 template<typename... BAs>
 sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const sp_tau_node<BAs...>& n) {
+	#ifdef TAU_BENCHMARK
+	benchmarking::counters["rule_applications"] += 1;
+	#endif // TAU_BENCHMARK
 	// IDEA maybe we could traverse only once
 	auto nn = apply_rule<sp_tau_node<BAs...>, is_capture_t<BAs...>>(r, n, is_capture<BAs...>);
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
