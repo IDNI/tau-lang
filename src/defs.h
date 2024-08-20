@@ -18,11 +18,13 @@ typedef int sym_t;
 
 // basic macro for conditional execution of code
 #ifdef DEBUG
-#define DBG(x) x
-#include <cxxabi.h>
+#	define DBG(x) x
+#	include <cxxabi.h>
 #else
-#define DBG(x)
-#define TAU_CACHE
+#	define DBG(x)
+#	ifndef TAU_CACHE
+#		define TAU_CACHE
+#	endif
 #endif
 
 #include <algorithm>
