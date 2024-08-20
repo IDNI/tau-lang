@@ -55,7 +55,7 @@ TEST_SUITE("rec relations fixed point") {
 			"f[$n]($x) := f[$n-1]($x) && $x = 1."
 			"f[0](x)   := T."
 			"f(x).";
-		CHECK( fp_test(sample, tau_parser::wff_always) );
+		CHECK( fp_test(sample, tau_parser::bf_eq) );
 	}
 
 	TEST_CASE("multiple") {
@@ -72,7 +72,7 @@ TEST_SUITE("rec relations fixed point") {
 		const char* sample =
 			"f[$n]($x) := f[$n-1]($x)."
 			"f(x).";
-		CHECK( fp_test(sample, tau_parser::wff_always) );
+		CHECK( fp_test(sample, tau_parser::wff_ref) );
 	}
 
 	TEST_CASE("with initial conditions") {

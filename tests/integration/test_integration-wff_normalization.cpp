@@ -89,6 +89,6 @@ TEST_SUITE("wff_sometimes") {
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
 			| reduce_wff<bdd_test>;
 		std::stringstream ss; ss << simp_res;
-		CHECK(ss.str() == "always ?x");
+		CHECK(ss.str() == "?x");
 	}
 }
