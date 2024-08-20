@@ -476,6 +476,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 				normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
 			return result_wff;
 		}
+		case tau_parser::ref:
 		case tau_parser::rr: {
 			auto n_nso_rr = make_nso_rr_from_binded_code<
 						tau_ba<BAs...>, BAs...>(value);

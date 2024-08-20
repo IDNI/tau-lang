@@ -1029,8 +1029,9 @@ sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code,
 // make a nso_rr from the given tau code
 template<typename... BAs>
 rr<nso<BAs...>> make_nso_rr_from_binded_code(sp_tau_node<BAs...>& code) {
-	if (is_non_terminal(tau_parser::bf, code))
-		return { {}, code };
+	if (is_non_terminal(tau_parser::bf, code)
+		|| is_non_terminal(tau_parser::ref, code))
+			return { {}, code };
 
 	if (is_non_terminal(tau_parser::rec_relations, code))
 		return {make_rec_relations<BAs...>(code), {}};
@@ -1355,6 +1356,24 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		}
 		if (!changed) break; // fixed point
 	}
+
+	// infer main if unresolved ref
+	if (nn.main) {
+		//add_ref_names(get_rr_types(success, types, nn.main, true));
+		auto t = get_nt_type(nn.main);
+		BOOST_LOG_TRIVIAL(trace) << "(T) main " << nn.main << " is " << (type2str(t));
+		if (t == tau_parser::ref) {
+			// main is an unresolved ref
+			auto fn = get_ref_name(nn.main);
+			auto it = types.find(fn); // if we know type
+			if (it != types.end()) {  // update
+				BOOST_LOG_TRIVIAL(trace) << "(T) updating main: " << nn.main;
+				t = it->second.type;
+				update_ref(nn.main, t);
+			}
+		}
+	}
+
 	if (todo_names.size()) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
@@ -2714,8 +2733,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::wff_remove_bexistential_cb,      350 },
 			{ tau_parser::wff_remove_buniversal_cb,        360 },
 
-			{tau_parser::wff_sometimes,                    380 },
-			{tau_parser::wff_always,                       390 },
+			{ tau_parser::wff_sometimes,                   380 },
+			{ tau_parser::wff_always,                      390 },
 			{ tau_parser::wff_conditional,                 400 },
 			{ tau_parser::wff_ball,                        410 },
 			{ tau_parser::wff_bex,                         420 },
