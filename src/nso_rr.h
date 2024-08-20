@@ -1353,6 +1353,11 @@ sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, const sp_tau_node<BAs...>& n
 		tau_parser::instance().literal(t), { n });
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt, const sp_tau_node<BAs...>& c1, const sp_tau_node<BAs...>& c2) {
+	return make_node<tau_sym<BAs...>>(tau_parser::instance().literal(nt), { c1, c2 });
+}
+
 // definitions of basic bf and wff
 const std::string BLDR_BF_0 = "( $X ) =: 0.";
 const std::string BLDR_BF_1 = "( $X ) =: 1.";
@@ -1405,34 +1410,34 @@ template<typename... BAs>
 static auto bldr_wff_eq = make_builder<BAs...>(BLDR_WFF_EQ);
 template<typename... BAs>
 static auto bldr_wff_neq = make_builder<BAs...>(BLDR_WFF_NEQ);
-template<typename... BAs>
-static auto bldr_wff_and = make_builder<BAs...>(BLDR_WFF_AND);
-template<typename... BAs>
-static auto bldr_wff_or = make_builder<BAs...>(BLDR_WFF_OR);
-template<typename... BAs>
-static auto bldr_wff_neg = make_builder<BAs...>(BLDR_WFF_NEG);
+// template<typename... BAs>
+// static auto bldr_wff_and = make_builder<BAs...>(BLDR_WFF_AND);
+// template<typename... BAs>
+// static auto bldr_wff_or = make_builder<BAs...>(BLDR_WFF_OR);
+// template<typename... BAs>
+// static auto bldr_wff_neg = make_builder<BAs...>(BLDR_WFF_NEG);
 template<typename... BAs>
 static auto bldr_wff_xor = make_builder<BAs...>(BLDR_WFF_XOR);
-template<typename... BAs>
-static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
-template<typename... BAs>
-static auto bldr_wff_ex = make_builder<BAs...>(BLDR_WFF_EX);
+// template<typename... BAs>
+// static auto bldr_wff_all = make_builder<BAs...>(BLDR_WFF_ALL);
+// template<typename... BAs>
+// static auto bldr_wff_ex = make_builder<BAs...>(BLDR_WFF_EX);
 template<typename... BAs>
 static auto bldr_wff_ball = make_builder<BAs...>(BLDR_WFF_BALL);
 template<typename... BAs>
 static auto bldr_wff_bex = make_builder<BAs...>(BLDR_WFF_BEX);
-template<typename... BAs>
-static auto bldr_wff_sometimes = make_builder<BAs...>(BLDR_WFF_SOMETIMES);
-template<typename... BAs>
-static auto bldr_wff_always = make_builder<BAs...>(BLDR_WFF_ALWAYS);
+// template<typename... BAs>
+// static auto bldr_wff_sometimes = make_builder<BAs...>(BLDR_WFF_SOMETIMES);
+// template<typename... BAs>
+// static auto bldr_wff_always = make_builder<BAs...>(BLDR_WFF_ALWAYS);
 
 // bf builder
-template<typename... BAs>
-static auto bldr_bf_and = make_builder<BAs...>(BLDR_BF_AND);
-template<typename... BAs>
-static auto bldr_bf_or = make_builder<BAs...>(BLDR_BF_OR);
-template<typename... BAs>
-static auto bldr_bf_neg = make_builder<BAs...>(BLDR_BF_NEG);
+// template<typename... BAs>
+// static auto bldr_bf_and = make_builder<BAs...>(BLDR_BF_AND);
+// template<typename... BAs>
+// static auto bldr_bf_or = make_builder<BAs...>(BLDR_BF_OR);
+// template<typename... BAs>
+// static auto bldr_bf_neg = make_builder<BAs...>(BLDR_BF_NEG);
 template<typename... BAs>
 static auto bldr_bf_xor = make_builder<BAs...>(BLDR_BF_XOR);
 template<typename... BAs>
@@ -1449,12 +1454,12 @@ template<typename... BAs>
 static auto bldr_bf_constant = make_builder<BAs...>(BLDR_BF_CONSTANT);
 
 // tau builder
-template<typename... BAs>
-static auto bldr_tau_and = make_builder<BAs...>(BLDR_TAU_AND);
-template<typename... BAs>
-static auto bldr_tau_or = make_builder<BAs...>(BLDR_TAU_OR);
-template<typename... BAs>
-static auto bldr_tau_neg = make_builder<BAs...>(BLDR_TAU_NEG);
+// template<typename... BAs>
+// static auto bldr_tau_and = make_builder<BAs...>(BLDR_TAU_AND);
+// template<typename... BAs>
+// static auto bldr_tau_or = make_builder<BAs...>(BLDR_TAU_OR);
+// template<typename... BAs>
+// static auto bldr_tau_neg = make_builder<BAs...>(BLDR_TAU_NEG);
 
 // basic bf and wff constants
 template<typename... BAs>
@@ -1559,8 +1564,7 @@ sp_tau_node<BAs...> build_wff_and(const sp_tau_node<BAs...>& l, const sp_tau_nod
 	if (l == _T<BAs...>) return r;
 	if (r == _T<BAs...>) return l;
 	// then we consider the general case
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_and<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::wff_and, l, r));
 }
 
 template<typename... BAs>
@@ -1577,8 +1581,7 @@ sp_tau_node<BAs...> build_wff_or(const sp_tau_node<BAs...>& l, const sp_tau_node
 	if (r == _F<BAs...>) return l;
 	if (l == _T<BAs...> || r == _T<BAs...>) return _T<BAs...>;
 	// then we consider the general case
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_or<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::wff_or, l, r));
 }
 
 template<typename... BAs>
@@ -1605,8 +1608,7 @@ sp_tau_node<BAs...> build_wff_neg(const sp_tau_node<BAs...>& l) {
 	if (l == _F<BAs...>) return _T<BAs...>;
 	if (l == _T<BAs...>) return _F<BAs...>;
 	// then we consider the general case
-	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_neg<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::wff_neg, l));
 }
 
 template<typename... BAs>
@@ -1626,14 +1628,12 @@ sp_tau_node<BAs...> build_wff_equiv(const sp_tau_node<BAs...>& l, const sp_tau_n
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_all(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, trim(r)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_all<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::wff_all, l, r));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_ex(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
-	std::vector<sp_tau_node<BAs...>> args {l, trim(r)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_ex<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::wff_ex, l, r));
 }
 
 template<typename... BAs>
@@ -1650,14 +1650,12 @@ sp_tau_node<BAs...> build_wff_bex(const sp_tau_node<BAs...>& l, const sp_tau_nod
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_sometimes(const sp_tau_node<BAs...>& l) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_sometimes<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::wff_sometimes, l));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_always(const sp_tau_node<BAs...>& l) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_always<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::wff_always, l));
 }
 
 // bf factory method for building bf formulas
@@ -1668,8 +1666,7 @@ sp_tau_node<BAs...> build_bf_and(const sp_tau_node<BAs...>& l, const sp_tau_node
 	if (l == _1<BAs...>) return r;
 	if (r == _1<BAs...>) return l;
 	// then we consider the general case
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
-	return tau_apply_builder<BAs...>(bldr_bf_and<BAs...>, args);
+	return wrap(tau_parser::bf, wrap(tau_parser::bf_and, l, r));
 }
 
 template<typename... BAs>
@@ -1686,8 +1683,7 @@ sp_tau_node<BAs...> build_bf_or(const sp_tau_node<BAs...>& l, const sp_tau_node<
 	if (r == _0<BAs...>) return l;
 	if (l == _1<BAs...> || r == _1<BAs...>) return _1<BAs...>;
 	// then we consider the general case
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
-	return tau_apply_builder<BAs...>(bldr_bf_or<BAs...>, args);
+	return wrap(tau_parser::bf, wrap(tau_parser::bf_or, l, r));
 }
 
 template<typename... BAs>
@@ -1703,8 +1699,7 @@ sp_tau_node<BAs...> build_bf_neg(const sp_tau_node<BAs...>& l) {
 	if (l == _0<BAs...>) return _1<BAs...>;
 	if (l == _1<BAs...>) return _0<BAs...>;
 	// then we consider the general case
-	std::vector<sp_tau_node<BAs...>> args {trim(l)};
-	return tau_apply_builder<BAs...>(bldr_bf_neg<BAs...>, args);
+	return wrap(tau_parser::bf, wrap(tau_parser::bf_neg, l));
 }
 
 template<typename... BAs>
@@ -1755,7 +1750,7 @@ sp_tau_node<BAs...> build_bf_greater(const sp_tau_node<BAs...>& l, const sp_tau_
 }
 
 // tau factory method for building tau formulas
-template<typename... BAs>
+/*template<typename... BAs>
 sp_tau_node<BAs...> build_tau_and(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
 	std::vector<sp_tau_node<BAs...>> args{trim(l), trim(r)};
 	return tau_apply_builder<BAs...>(bldr_tau_and<BAs...>, args);
@@ -1781,7 +1776,7 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_tau_neg(const sp_tau_node<BAs...>& l) {
 	std::vector<sp_tau_node<BAs...>> args{trim(l)};
 	return tau_apply_builder<BAs...>(bldr_tau_neg<BAs...>, args);
-}
+}*/
 
 template<typename... BAs>
 sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
@@ -2119,8 +2114,8 @@ struct callback_applier {
 			case tau_parser::wff_remove_buniversal_cb: return apply_wff_remove_buniversal(n);
 			case tau_parser::bf_remove_funiversal_cb: return apply_bf_remove_funiversal(n);
 			case tau_parser::bf_remove_fexistential_cb: return apply_bf_remove_fexistential(n);
-			case tau_parser::tau_collapse_positives_cb: return apply_tau_collapse_positives(n);
-			case tau_parser::tau_positives_upwards_cb: return apply_tau_positives_upwards(n);
+			// case tau_parser::tau_collapse_positives_cb: return apply_tau_collapse_positives(n);
+			// case tau_parser::tau_positives_upwards_cb: return apply_tau_positives_upwards(n);
 			default: return n;
 		}
 	}
@@ -2344,7 +2339,7 @@ private:
 		return tmp;
 	}
 
-	sp_tau_node<BAs...> apply_tau_positives_upwards(const sp_tau_node<BAs...>& n) {
+	/*sp_tau_node<BAs...> apply_tau_positives_upwards(const sp_tau_node<BAs...>& n) {
 		auto args = n || tau_parser::tau_cb_arg || only_child_extractor<BAs...>;
 		if (auto check = args[0] | tau_parser::wff; check) return args[1];
 		return n;
@@ -2361,7 +2356,7 @@ private:
 				return build_tau_and<BAs...>(tau, arg3);
 			}
 		return n;
-	}
+	}*/
 };
 
 // apply one tau rule to the given expression
