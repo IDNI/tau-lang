@@ -44,10 +44,10 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (("sometimes" | "<>") _ wff)       :wff_sometimes
                         | (("always" | "[]") _ wff)          :wff_always
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
-                        | ("b_all"   __ q_bool_var __ wff)   :wff_ball
-                        | ("b_ex"    __ q_bool_var __ wff)   :wff_bex
-                        | ("all"     __ q_var      __ wff)   :wff_all
-                        | ("ex"      __ q_var      __ wff)   :wff_ex
+                        | ("b_all"   __ q_bool_vars __ wff)  :wff_ball
+                        | ("b_ex"    __ q_bool_vars __ wff)  :wff_bex
+                        | ("all"     __ q_vars      __ wff)  :wff_all
+                        | ("ex"      __ q_vars      __ wff)  :wff_ex
                         | ref                                :wff_ref
                         | (wff   _ "->"  _ wff)              :wff_imply
                         | (wff   _ "<->" _ wff)              :wff_equiv
@@ -92,6 +92,8 @@ variable               => charvar | (in | out):io_var.
 in                     => ("i" digits):in_var_name  '[' offset ']'.
 out                    => ("o" digits):out_var_name '[' offset ']'.
 capture                => '$' charvar.
+q_bool_vars            => q_bool_var (_ ',' _ q_bool_var)*.
+q_vars                 => q_var (_ ',' _ q_var)*.
 q_bool_var             => capture | bool_variable.
 q_var                  => capture | variable.
 

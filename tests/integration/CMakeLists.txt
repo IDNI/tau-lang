@@ -15,14 +15,8 @@ set(TESTS
 	wff_normalization
 	splitter
 	splitter2
-    solver
-
-	# tests depending on a deprecated syntax
-	#gssotc_rr_execution
-	#gssotc_rr_partial_eval
-	#satisfiability
-	#tau1
-	#tau2
+	solver
+	quantifiers
 )
 
 foreach(TEST IN LISTS TESTS)
