@@ -1209,7 +1209,7 @@ nso<BAs...> operator|(const nso<BAs...>& fm, const bf_reduce_canonical<BAs...>& 
 	return r(fm);
 }
 
-bool is_contained_in (const vector<int_t>& i, auto& paths) {
+inline bool is_contained_in (const vector<int_t>& i, auto& paths) {
 	// Check if there is a containment of i in any path of paths
 	for (auto& path : paths) {
 		bool is_contained = true, is_i_smaller, containment_dir_known = false;
@@ -1260,11 +1260,6 @@ nso<BAs...> reduce2_wff (const nso<BAs...>& fm, bool is_cnf = false, bool all_re
 	auto new_fm = fm | repeat_all<step<BAs...>, BAs...>(neq_to_eq<BAs...>);
 	vector<nso<BAs...>> vars = select_top(new_fm, is_var);
 	if (vars.empty()) return fm | repeat_all<step<BAs...>,BAs...>(simplify_wff<BAs...>);
-
-	// cout << "vars: " << "\n";
-	// for (const auto& var : vars) {
-	// 	cout << var << "\n";
-	// }
 
 	map<nso<BAs...>, int_t> var_pos;
 	for (int_t k=0; k < (int_t)vars.size(); ++k)
@@ -1320,17 +1315,13 @@ nso<BAs...> reduce2_wff (const nso<BAs...>& fm, bool is_cnf = false, bool all_re
 			}
 		} else paths.emplace_back(move(i));
 	}
-	// cout << "paths: " << "\n";
- //    for (const auto& path : paths) {
- //       cout << "[";
- //       for (auto el : path)
- //           cout << el << ",";
- //       cout << "]" << "\n";
- //    }
+
 	if (paths.empty()) {
 		if (unsat) return is_cnf ? _T<BAs...> : _F<BAs...>;
 		else return is_cnf ? _F<BAs...> : _T<BAs...>;
 	}
+	if (all_reductions) join_paths(paths);
+
 	nso<BAs...> reduced_wff;
 	bool first = true;
 	for (const auto& path : paths) {
@@ -1630,7 +1621,7 @@ nso<BAs...> pull_sometimes_always_out(nso<BAs...> fm) {
     		changes[pure_always_clause] = build_wff_or(pure_always_clause, no_temp_fm);
 			return replace(fm, changes);
     	}
-        no_temp_fm = build_wff_always(no_temp_fm);
+        //no_temp_fm = build_wff_always(no_temp_fm);
         fm = build_wff_or(fm, no_temp_fm);
 	}
 	return fm;
