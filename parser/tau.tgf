@@ -73,6 +73,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         |                                     bool_variable
                         |                                     uninterpreted_constant.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
+                        |                                     variable
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ref                                :bf_ref
                         | (bf _       '|'  _  bf)            :bf_or
@@ -82,11 +83,10 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('{' _ constant _ '}')             :bf_constant
                         | '1'                                :bf_t
                         | '0'                                :bf_f
-                        |                                     capture
-                        |                                     variable.
+                        |                                     capture.
 
 # variables
-charvar                => (alpha & ~'T' & ~'F' & ~'i' & ~'o') digit*.
+charvar                => (alpha & ~'T' & ~'F') digit*.
 bool_variable          => '?' charvar.
 variable               => charvar | (in | out):io_var.
 in                     => ("i" digits):in_var_name  '[' offset ']'.
