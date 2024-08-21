@@ -190,8 +190,7 @@ static const auto is_var_or_capture = [](const nso<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value)
 		&& get<tau_source_sym>(n->value).nt()
 		&& (( get<tau_source_sym>(n->value).n() == tau_parser::capture)
-			|| ( get<tau_source_sym>(n->value).n() == tau_parser::variable)
-				|| ( get<tau_source_sym>(n->value).n() == tau_parser::bool_variable));
+			|| ( get<tau_source_sym>(n->value).n() == tau_parser::variable));
 };
 
 template<typename... BAs>
@@ -199,9 +198,7 @@ static const auto is_quantifier = [](const nso<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value) || !get<tau_source_sym>(n->value).nt()) return false;
 	auto nt = get<tau_source_sym>(n->value).n();
 	return nt == tau_parser::wff_all
-		|| nt == tau_parser::wff_ex
-		|| nt == tau_parser::wff_ball
-		|| nt == tau_parser::wff_bex;
+		|| nt == tau_parser::wff_ex;
 };
 
 template<typename... BAs>
@@ -224,8 +221,6 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 		|| nt == tau_parser::bf_has_subformula_cb
 		|| nt == tau_parser::wff_has_subformula_cb
 		|| nt == tau_parser::wff_remove_existential_cb
-		|| nt == tau_parser::wff_remove_buniversal_cb
-		|| nt == tau_parser::wff_remove_bexistential_cb
 		|| nt == tau_parser::bf_remove_funiversal_cb
 		|| nt == tau_parser::bf_remove_fexistential_cb;
 };
@@ -908,9 +903,8 @@ struct quantifier_vars_transformer {
 	using p = tau_parser;
 	using node = sp_tau_node<BAs...>;
 	static constexpr std::array<p::nonterminal, 4>
-		quant_nts = { p::wff_ex, p::wff_all, p::wff_ball, p::wff_bex },
-		qvars_nts = { p::q_vars, p::q_vars,  p::q_bool_vars,
-							p::q_bool_vars };
+		quant_nts = { p::wff_ex, p::wff_all },
+		qvars_nts = { p::q_vars, p::q_vars };
 	node operator()(const node& n) {
 		if (auto it = changes.find(n); it != changes.end())
 			return it->second;
@@ -2199,8 +2193,6 @@ struct callback_applier {
 			case tau_parser::wff_has_clashing_subformulas_cb: return apply_wff_clashing_subformulas_check(n);
 			case tau_parser::wff_has_subformula_cb: return apply_has_subformula_check(n, tau_parser::wff_cb_arg);
 			case tau_parser::wff_remove_existential_cb: return apply_wff_remove_existential(n);
-			case tau_parser::wff_remove_bexistential_cb: return apply_wff_remove_bexistential(n);
-			case tau_parser::wff_remove_buniversal_cb: return apply_wff_remove_buniversal(n);
 			case tau_parser::bf_remove_funiversal_cb: return apply_bf_remove_funiversal(n);
 			case tau_parser::bf_remove_fexistential_cb: return apply_bf_remove_fexistential(n);
 			default: return n;
@@ -2269,16 +2261,6 @@ private:
 		right_changes[args[0] /* var */] = args[3] /* F */;
 		auto right = replace<sp_tau_node<BAs...>>(args[1] /* formula */, right_changes);
 		return {left, right};
-	}
-
-	sp_tau_node<BAs...> apply_wff_remove_buniversal(const sp_tau_node<BAs...>& n) {
-		auto [left, right] = get_quantifier_remove_constituents(tau_parser::wff_cb_arg, n);
-		return build_wff_and<BAs...>(left, right);
-	}
-
-	sp_tau_node<BAs...> apply_wff_remove_bexistential(const sp_tau_node<BAs...>& n) {
-		auto [left, right] = get_quantifier_remove_constituents(tau_parser::wff_cb_arg, n);
-		return build_wff_or<BAs...>(left, right);
 	}
 
 	sp_tau_node<BAs...> apply_bf_remove_funiversal(const sp_tau_node<BAs...>& n) {
@@ -2662,7 +2644,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			tau_parser::wff_f,
 			tau_parser::capture,
 			tau_parser::variable,
-			tau_parser::bool_variable,
 			tau_parser::uninterpreted_constant,
 			tau_parser::ref_args,
 			tau_parser::start
@@ -2699,14 +2680,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::wff_has_clashing_subformulas_cb, 320 },
 			{ tau_parser::wff_has_subformula_cb,           330 },
 			{ tau_parser::wff_remove_existential_cb,       340 },
-			{ tau_parser::wff_remove_bexistential_cb,      350 },
-			{ tau_parser::wff_remove_buniversal_cb,        360 },
 
 			{ tau_parser::wff_sometimes,                   380 },
 			{ tau_parser::wff_always,                      390 },
 			{ tau_parser::wff_conditional,                 400 },
-			{ tau_parser::wff_ball,                        410 },
-			{ tau_parser::wff_bex,                         420 },
 			{ tau_parser::wff_all,                         430 },
 			{ tau_parser::wff_ex,                          440 },
 			{ tau_parser::wff_imply,                       450 },
@@ -2830,8 +2807,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			switch (quant_nt) {
 			case tau_parser::wff_all:  stream << "all";   break;
 			case tau_parser::wff_ex:   stream << "ex";    break;
-			case tau_parser::wff_ball: stream << "b_all"; break;
-			case tau_parser::wff_bex:  stream << "b_ex";  break;
 			}
 			sp_tau_node<BAs...> expr;
 			size_t expr_nt;
@@ -2919,9 +2894,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::wff_conditional:infix2("?", ":"); break;
 			// quantifiers
 			case tau_parser::wff_all:
-			case tau_parser::wff_ex:
-			case tau_parser::wff_ball:
-			case tau_parser::wff_bex:        quant(); break;
+			case tau_parser::wff_ex:         quant(); break;
 			// callbacks
 			case tau_parser::bf_and_cb:      prefix("bf_and_cb"); break;
 			case tau_parser::bf_or_cb:       prefix("bf_or_cb"); break;
@@ -2935,8 +2908,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_remove_funiversal_cb:    prefix("bf_remove_funiversal_cb"); break;
 			case tau_parser::bf_remove_fexistential_cb:  prefix("bf_remove_fexistential_cb"); break;
 			case tau_parser::wff_remove_existential_cb:  prefix("wff_remove_existential_cb"); break;
-			case tau_parser::wff_remove_bexistential_cb: prefix("wff_remove_bexistential_cb"); break;
-			case tau_parser::wff_remove_buniversal_cb:   prefix("wff_remove_buniversal_cb"); break;
 			case tau_parser::wff_has_clashing_subformulas_cb: prefix("wff_has_clashing_subformulas_cb"); break;
 			case tau_parser::bf_has_subformula_cb:       prefix("bf_has_subformula_cb"); break;
 			case tau_parser::wff_has_subformula_cb:      prefix("wff_has_subformula_cb"); break;
@@ -2986,7 +2957,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::out_var_name:
 			case tau_parser::chars:
 			case tau_parser::capture:
-			case tau_parser::bool_variable:
 			case tau_parser::sym:
 			case tau_parser::num:
 			case tau_parser::type:

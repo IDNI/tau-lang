@@ -985,32 +985,6 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::wff_ex;
 		CHECK( ex_formula.has_value() );
 	}
-
-	TEST_CASE("b_all") {
-		const char* sample =
-			"b_all ?Z ?Z.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto all_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_ball;
-		CHECK( all_formula.has_value() );
-	}
-
-	TEST_CASE("b_ex") {
-		const char* sample =
-			"b_ex ?Z ?Z.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto ex_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_bex;
-		CHECK( ex_formula.has_value() );
-	}
 }
 
 TEST_SUITE("parsing bf formulas ") {
