@@ -20,7 +20,7 @@
 #include "nso_rr.h"
 #include "tau.h"
 #include "term_colors.h"
-#include "satisfiability.h"
+//#include "satisfiability.h"
 #include "solver.h"
 
 #ifdef DEBUG
@@ -537,7 +537,7 @@ void repl_evaluator<factory_t, BAs...>::execute_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto form = n->child[1];
-	if (auto check = form | tau_parser::tau; check) {
+	if (auto check = form | tau_parser::wff; check) {
 		// TODO (HIGH) call executor
 	} else if (auto check = form | tau_parser::rr; check) {
 		// TODO (HIGH) call executor
