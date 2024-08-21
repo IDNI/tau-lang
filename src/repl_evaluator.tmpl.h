@@ -484,16 +484,20 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
-		rr<nso<tau_ba<BAs...>, BAs...>> rr_ = type == tau_parser::rr
-			? make_nso_rr_from_binded_code<
+		bool contains_ref = contains(value, tau_parser::ref);
+		rr<nso<tau_ba<BAs...>, BAs...>> rr_ =
+			(contains_ref && type == tau_parser::rr)
+				? make_nso_rr_from_binded_code<
 						tau_ba<BAs...>, BAs...>(value)
-			: rr<nso<tau_ba<BAs...>, BAs...>>(value);
-		rr_.rec_relations.insert(rr_.rec_relations.end(),
-			definitions.begin(), definitions.end());
-		rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
-		if (get_type(rr_.main).value() != tau_parser::bf)
+				: rr<nso<tau_ba<BAs...>, BAs...>>(value);
+		if (contains_ref) {
+			rr_.rec_relations.insert(rr_.rec_relations.end(),
+				definitions.begin(), definitions.end());
+			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
+		}
+		if (!is_non_terminal(tau_parser::bf, rr_.main))
 			return normalizer<tau_ba<BAs...>, BAs...>(rr_);
-		if (contains(rr_.main, tau_parser::ref))
+		if (contains_ref)
 			return bf_normalizer_with_rec_relation(rr_);
 		return bf_normalizer_without_rec_relation(rr_.main);
 	}
