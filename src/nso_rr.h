@@ -899,6 +899,76 @@ sp_tau_node<BAs...> process_digits(const sp_tau_node<BAs...>& tau_source){
 	return replace<sp_tau_node<BAs...>>(tau_source, changes);
 }
 
+// } // include for ptree<BAs...>()
+// #include "debug_helpers.h"
+// namespace idni::tau {
+
+template<typename... BAs>
+struct quantifier_vars_transformer {
+	using p = tau_parser;
+	using node = sp_tau_node<BAs...>;
+	static constexpr std::array<p::nonterminal, 4>
+		quant_nts = { p::wff_ex, p::wff_all, p::wff_ball, p::wff_bex },
+		qvars_nts = { p::q_vars, p::q_vars,  p::q_bool_vars,
+							p::q_bool_vars };
+	node operator()(const node& n) {
+		if (auto it = changes.find(n); it != changes.end())
+			return it->second;
+		// if the node is any of quant_nts (all, ex, ball, bex)
+		for (size_t q = 0; q != 4; ++q)
+			if (is_non_terminal<BAs...>(quant_nts[q], n))
+		{
+			// ptree<BAs...>(std::cout << "QUANT: ", n) << "\n";
+			// use nonterminals according to quantifier's q
+			const p::nonterminal& quant_nt = quant_nts[q],
+				qvars_nt = qvars_nts[q];
+			// travers into q_vars node and access all var/capture children
+			auto q_vars = n | qvars_nt
+				| optional_value_extractor<node>;
+			std::vector<node>& vars = q_vars->child;
+			//  traverse to quantifier wff expression
+			node nn = n | p::wff | only_child_extractor<BAs...>
+				| optional_value_extractor<node>;
+			if (auto it = changes.find(nn); it != changes.end())
+				nn = it->second;
+			if (vars.size() == 0) continue; // no variable/capture
+			// for each variable
+			for (size_t vi = 0; vi != vars.size(); ++vi) {
+				// get var (in a reverse order of iteration)
+				auto& var = vars[vars.size() - 1 - vi];
+				// new expression node
+				auto expr = make_node<tau_sym<BAs...>>(
+					p::instance().literal(p::wff), { nn });
+				// create a new quantifier node with var and new children
+				nn = make_node<tau_sym<BAs...>>(
+					p::instance().literal(quant_nt),
+					{ var, expr });
+			}
+			changes[n] = nn;
+			return nn;
+		}
+
+		bool changed = false;
+		std::vector<sp_tau_node<BAs...>> child;
+		for (node& c : n->child)
+			if (changes.contains(c)) changed = true,
+						child.push_back(changes[c]);
+			else child.push_back(c);
+		node nn = make_node<tau_sym<BAs...>>(n->value, child);
+		if (changed) changes[n] = nn;
+		return nn;
+	}
+	std::map<node, node> changes;
+};
+
+template<typename...BAs>
+sp_tau_node<BAs...> process_quantifier_vars(const sp_tau_node<BAs...>& tau_code){
+	using node = sp_tau_node<BAs...>;
+	quantifier_vars_transformer<BAs...> transformer;
+	return post_order_traverser<quantifier_vars_transformer<BAs...>,
+		all_t<node>, node>(transformer, all<node>)(tau_code);
+}
+
 // create tau code from tau source
 template<typename... BAs>
 // TODO (LOW) should depend on node_t instead of BAs...
@@ -912,7 +982,7 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 		sp_node<tau_source_sym>,
 		sp_tau_node<BAs...>>(
 			transform, all<sp_tau_source_node>)(tau_source);
-	return process_digits(tau_code);
+	return process_quantifier_vars(process_digits(tau_code));
 }
 
 // make a library from the given tau source.
@@ -959,8 +1029,9 @@ sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code,
 // make a nso_rr from the given tau code
 template<typename... BAs>
 rr<nso<BAs...>> make_nso_rr_from_binded_code(sp_tau_node<BAs...>& code) {
-	if (is_non_terminal(tau_parser::bf, code))
-		return { {}, code };
+	if (is_non_terminal(tau_parser::bf, code)
+		|| is_non_terminal(tau_parser::ref, code))
+			return { {}, code };
 
 	if (is_non_terminal(tau_parser::rec_relations, code))
 		return {make_rec_relations<BAs...>(code), {}};
@@ -1038,10 +1109,6 @@ rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input, factory_t& f
 
 //------------------------------------------------------------------------------
 // rec relations type inference
-
-// } // include for ptree<BAs...>()
-// #include "debug_helpers.h"
-// namespace idni::tau {
 
 struct rr_type {
 	tau_parser::nonterminal type;
@@ -1289,6 +1356,24 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		}
 		if (!changed) break; // fixed point
 	}
+
+	// infer main if unresolved ref
+	if (nn.main) {
+		//add_ref_names(get_rr_types(success, types, nn.main, true));
+		auto t = get_nt_type(nn.main);
+		BOOST_LOG_TRIVIAL(trace) << "(T) main " << nn.main << " is " << (type2str(t));
+		if (t == tau_parser::ref) {
+			// main is an unresolved ref
+			auto fn = get_ref_name(nn.main);
+			auto it = types.find(fn); // if we know type
+			if (it != types.end()) {  // update
+				BOOST_LOG_TRIVIAL(trace) << "(T) updating main: " << nn.main;
+				t = it->second.type;
+				update_ref(nn.main, t);
+			}
+		}
+	}
+
 	if (todo_names.size()) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
@@ -2648,8 +2733,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::wff_remove_bexistential_cb,      350 },
 			{ tau_parser::wff_remove_buniversal_cb,        360 },
 
-			{tau_parser::wff_sometimes,                    380 },
-			{tau_parser::wff_always,                       390 },
+			{ tau_parser::wff_sometimes,                   380 },
+			{ tau_parser::wff_always,                      390 },
 			{ tau_parser::wff_conditional,                 400 },
 			{ tau_parser::wff_ball,                        410 },
 			{ tau_parser::wff_bex,                         420 },
@@ -2768,6 +2853,35 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		auto wrap = [&](const std::string& pref, const std::string& postf) {
 			stream << pref, pass(), stream << postf;
 		};
+		auto quant = [&]() {
+			using namespace idni::tau;
+			size_t quant_nt = tss.n();
+			auto qch = ch;
+			//std::cout << "(quant_nt=" << quant_nt << ")";
+			switch (quant_nt) {
+			case tau_parser::wff_all:  stream << "all";   break;
+			case tau_parser::wff_ex:   stream << "ex";    break;
+			case tau_parser::wff_ball: stream << "b_all"; break;
+			case tau_parser::wff_bex:  stream << "b_ex";  break;
+			}
+			sp_tau_node<BAs...> expr;
+			size_t expr_nt;
+			size_t counter = 0;
+			do {
+				pp(stream << " ", qch[0], quant_nt);
+				expr = qch[1]->child[0];
+				expr_nt = expr | non_terminal_extractor<BAs...>
+					| optional_value_extractor<size_t>;
+				//std::cout << "(expr_nt=" << expr_nt << ")";
+				if (expr_nt == quant_nt) {
+					stream << ",", qch = expr->child;
+				} else {
+					pp(stream << " ", expr, tss.n());
+					break;
+				}
+				if (++counter > 10) break;
+			} while (true);
+		};
 		if (tss.nt()) { //stream /*<< "*" << tss.nts << "-"*/ << tau_parser::instance().name(tss.n()) << ":";
 			switch (tss.n()) {
 			case tau_parser::main:
@@ -2842,10 +2956,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_interval:    infix2("<=", "<="); break;
 			case tau_parser::wff_conditional:infix2("?", ":"); break;
 			// quantifiers
-			case tau_parser::wff_all:        prefix("all"); break;
-			case tau_parser::wff_ex:         prefix("ex"); break;
-			case tau_parser::wff_ball:       prefix("b_all"); break;
-			case tau_parser::wff_bex:        prefix("b_ex"); break;
+			case tau_parser::wff_all:
+			case tau_parser::wff_ex:
+			case tau_parser::wff_ball:
+			case tau_parser::wff_bex:        quant(); break;
 			// callbacks
 			case tau_parser::bf_and_cb:      prefix("bf_and_cb"); break;
 			case tau_parser::bf_or_cb:       prefix("bf_or_cb"); break;
