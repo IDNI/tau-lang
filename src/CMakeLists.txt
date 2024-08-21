@@ -21,7 +21,6 @@ set(TAU_HEADERS
 	variant_ba.h
 	product_ba.h
 	utils.h
-	repl_checks.h
 	experimental/execution.h
 )
 
