@@ -121,8 +121,6 @@ RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !$Y || !$X && $Y.")
 RULE(WFF_DEF_CONDITIONAL, "$X ? $Y : $Z ::= ($X -> $Y) && (!$X -> $Z).")
 RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !$X || $Y.")
 RULE(WFF_DEF_EQUIV, "$X <-> $Y ::= ($X -> $Y) && ($Y -> $X).")
-RULE(WFF_DEF_BEX_0, "b_ex $X $Y ::= wff_remove_bexistential_cb $X $Y T F.")
-RULE(WFF_DEF_BALL_0, "b_all $X $Y ::=  wff_remove_buniversal_cb $X $Y T F.")
 
 // additional wff definitions (include wff formulas)
 RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & $Y' = 0.")
@@ -180,8 +178,6 @@ static auto apply_defs = make_library<BAs...>(
 	+ WFF_DEF_EQUIV
 	// bf defs
 	+ BF_DEF_XOR
-	+ WFF_DEF_BEX_0
-	+ WFF_DEF_BALL_0
 );
 
 template<typename... BAs>
@@ -195,8 +191,6 @@ static auto apply_wff_defs = make_library<BAs...>(
 template<typename... BAs>
 static auto apply_bf_defs = make_library<BAs...>(
 	BF_DEF_XOR
-	+ WFF_DEF_BEX_0
-	+ WFF_DEF_BALL_0
 );
 
 template<typename... BAs>
