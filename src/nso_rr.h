@@ -45,6 +45,7 @@
 #include "benchmarking.h"
 
 using namespace idni::rewriter;
+using namespace tau_parser_data;
 namespace idni::tau {
 
 
@@ -847,7 +848,6 @@ rule<nso<BAs...>> make_rule(const sp_tau_node<BAs...>& rule) {
 	switch (type) {
 	case tau_parser::bf_rule:  return make_rule<BAs...>(tau_parser::bf_rule,  tau_parser::bf_matcher,  tau_parser::bf_body,  rule); break;
 	case tau_parser::wff_rule: return make_rule<BAs...>(tau_parser::wff_rule, tau_parser::wff_matcher, tau_parser::wff_body, rule); break;
-	case tau_parser::tau_rule: return make_rule<BAs...>(tau_parser::tau_rule, tau_parser::tau_matcher, tau_parser::tau_body, rule); break;
 	default: assert(false); return {};
 	};
 }
@@ -1395,7 +1395,6 @@ builder<BAs...> make_builder(const sp_tau_node<BAs...>& builder) {
 	switch (type) {
 	case tau_parser::bf_builder_body: return { head, type_node | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>};
 	case tau_parser::wff_builder_body: return { head, type_node | tau_parser::wff | optional_value_extractor<sp_tau_node<BAs...>>};
-	case tau_parser::tau_builder_body: return { head, type_node | tau_parser::tau | optional_value_extractor<sp_tau_node<BAs...>>};
 	default: throw std::runtime_error("unknown builder type");
 	};
 }
@@ -2204,8 +2203,6 @@ struct callback_applier {
 			case tau_parser::wff_remove_buniversal_cb: return apply_wff_remove_buniversal(n);
 			case tau_parser::bf_remove_funiversal_cb: return apply_bf_remove_funiversal(n);
 			case tau_parser::bf_remove_fexistential_cb: return apply_bf_remove_fexistential(n);
-			case tau_parser::tau_collapse_positives_cb: return apply_tau_collapse_positives(n);
-			case tau_parser::tau_positives_upwards_cb: return apply_tau_positives_upwards(n);
 			default: return n;
 		}
 	}
@@ -2427,25 +2424,6 @@ private:
 		m[args[0]] = args[1];
 		auto tmp = replace<sp_tau_node<BAs...>>(args[2], m)| only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
 		return tmp;
-	}
-
-	sp_tau_node<BAs...> apply_tau_positives_upwards(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::tau_cb_arg || only_child_extractor<BAs...>;
-		if (auto check = args[0] | tau_parser::wff; check) return args[1];
-		return n;
-	}
-
-	sp_tau_node<BAs...> apply_tau_collapse_positives(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::tau_cb_arg || only_child_extractor<BAs...>;
-		if (auto check_1eft = args[0] | tau_parser::wff; check_1eft)
-			if (auto check_right = args[1] | tau_parser::wff; check_right) {
-				auto wff = build_wff_and<BAs...>(check_1eft.value(), check_right.value());
-				auto tau = make_node<tau_sym<BAs...>>(tau_parser::tau, { wff });
-				if (args.size() == 2) return tau;
-				auto arg3 = args[2] | only_child_extractor<BAs...> | optional_value_extractor<sp_tau_node<BAs...>>;
-				return build_tau_and<BAs...>(tau, arg3);
-			}
-		return n;
 	}
 };
 
@@ -2682,7 +2660,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			tau_parser::wff_neg,
 			tau_parser::wff_t,
 			tau_parser::wff_f,
-			tau_parser::tau_ref,
 			tau_parser::capture,
 			tau_parser::variable,
 			tau_parser::bool_variable,
@@ -2716,14 +2693,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::main,                             60 },
 			{ tau_parser::ref,                              80 },
 			{ tau_parser::wff,                              90 },
-			// tau
-			{ tau_parser::tau_collapse_positives_cb,       100 },
-			{ tau_parser::tau_positives_upwards_cb,        110 },
-
-			{ tau_parser::tau_or,                          200 },
-			{ tau_parser::tau_and,                         210 },
-			{ tau_parser::tau_neg,                         220 },
-			{ tau_parser::tau_wff,                         230 },
 			// wff
 			{ tau_parser::bf_eq_cb,                        300 },
 			{ tau_parser::bf_neq_cb,                       310 },
@@ -2888,12 +2857,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::builder:
 				postfix_nows("."); break;
 			case tau_parser::rec_relation: infix(":="); stream << "."; break;
-			case tau_parser::tau_rule: infix(":::="); stream << "."; break;
 			case tau_parser::wff_rule: infix("::=");  stream << "."; break;
 			case tau_parser::bf_rule:  infix(":=");   stream << "."; break;
 			case tau_parser::bf_builder_body:  prefix("=:"); break;
 			case tau_parser::wff_builder_body: prefix("=::"); break;
-			case tau_parser::tau_builder_body: prefix("=:::"); break;
 			case tau_parser::inputs:           prefix("<"); break;
 			case tau_parser::input: infix(": {"); stream << " }"; break;
 			case tau_parser::in:
@@ -2901,7 +2868,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// wrappable by parenthesis
 			case tau_parser::bf:
 			case tau_parser::wff:
-			case tau_parser::tau:
 			{
 				//assert(ch.size() <= 1);
 				//if (ch.size() > 1) wrap("(", ")");
@@ -2920,7 +2886,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// nodes to wrap
 			case tau_parser::bf_splitter: wrap("S(", ")"); break;
 			case tau_parser::bf_constant:
-			case tau_parser::tau_wff:
 				wrap("{ ", " }"); break;
 			case tau_parser::builder_head:
 				wrap("(" , ")"); break;
@@ -2929,15 +2894,12 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::ref_args:
 				stream << "(", sep(","), stream << ")"; break;
 			// unary operators
-			case tau_parser::tau_neg:        prefix_nows("-"); break;
 			case tau_parser::wff_neg:        prefix_nows("!"); break;
 			case tau_parser::bf_neg:         postfix_nows("'"); break;
 			case tau_parser::wff_sometimes:  prefix("sometimes"); break;
 			case tau_parser::wff_always:     prefix("always"); break;
 			//
 			// binary operators
-			case tau_parser::tau_or:         infix("|||"); break;
-			case tau_parser::tau_and:        infix("&&&"); break;
 			case tau_parser::bf_and:         infix("&"); break;
 			case tau_parser::bf_or:          infix("|"); break;
 			case tau_parser::bf_xor:         infix("+"); break;
@@ -2978,8 +2940,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::wff_has_clashing_subformulas_cb: prefix("wff_has_clashing_subformulas_cb"); break;
 			case tau_parser::bf_has_subformula_cb:       prefix("bf_has_subformula_cb"); break;
 			case tau_parser::wff_has_subformula_cb:      prefix("wff_has_subformula_cb"); break;
-			case tau_parser::tau_collapse_positives_cb:  prefix("tau_collapse_positives_cb"); break;
-			case tau_parser::tau_positives_upwards_cb:   prefix("tau_positives_upwards_cb"); break;
 			// cli commands
 			case tau_parser::cli:           sep(". "); break;
 			case tau_parser::rel_memory:    prefix_nows("%-"); break;

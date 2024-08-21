@@ -49,10 +49,7 @@ inline std::vector<std::string> symbol_names{
 	"__E_cli_command_139", "memory", "history_store_cmd", "__E_cli_command_140", "bf_typed", "bf_cmd_arg", "abs_memory_sym", "rel_memory_sym", "selection_sym", "examples_sym", 
 	"__E_help_arg_141", "__E___E_help_arg_141_142", "rel_memory", "__E_memory_143", "__E___E_memory_143_144", "memory_id", "abs_memory", "__E_memory_145", "enum_option", "severity_opt", 
 	"__E_option_146", "status_opt", "__E_bool_option_147", "colors_opt", "__E_bool_option_148", "debug_repl_opt", "__E_bool_option_149", "option_value_true", "option_value_false", "severity", 
-	"error_sym", "__E_severity_150", "info_sym", "__E_severity_151", "debug_sym", "__E_severity_152", "trace_sym", "__E_severity_153", "tau_cb", "tau_rule", 
-	"tau_matcher", "tau", "tau_body", "__E_tau_rule_154", "tau_builder_body", "__E_builder_body_155", "tau_parenthesis", "__E_tau_156", "tau_wff", "__E_tau_157", 
-	"tau_ref", "__E_tau_158", "__E___E_tau_158_159", "tau_or", "__E_tau_160", "tau_and", "__E_tau_161", "tau_neg", "__E_tau_162", "tau_cb_args1", 
-	"tau_cb_arg", "__E_tau_cb_args1_163", "tau_cb_args2", "tau_cb_args3", "tau_collapse_positives_cb", "__E_tau_cb_164", "__E___E_tau_cb_164_165", "tau_positives_upwards_cb", "__E_tau_cb_166", "__N_0", 
+	"error_sym", "__E_severity_150", "info_sym", "__E_severity_151", "debug_sym", "__E_severity_152", "trace_sym", "__E_severity_153", "tau_cb", "__N_0", 
 	"__N_1", "__N_2", "__N_3", 
 };
 
@@ -118,11 +115,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 			{ 309 },
 			{ 344 },
 			{ 345 },
-			{ 378 },
-			{ 381, 386, 381 },
-			{ 399 },
-			{ 402 },
-			{ 403 }
+			{ 378 }
 		},
 		.inline_char_classes = true
 	}
@@ -478,12 +471,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(25), (NT(135)));
 //G168: bf(25)               => capture(24).
 	p(NT(25), (NT(24)));
-//G169: __N_0(409)           => 'F'.
-	p(NT(409), (T(33)));
-//G170: __N_1(410)           => 'T'.
-	p(NT(410), (T(32)));
-//G171: __E_charvar_52(137)  => ~( __N_0(409) ) & ~( __N_1(410) ) & alpha(5).	 # conjunctive
-	p(NT(137), ~(NT(409)) & ~(NT(410)) & (NT(5)));
+//G169: __N_0(379)           => 'F'.
+	p(NT(379), (T(33)));
+//G170: __N_1(380)           => 'T'.
+	p(NT(380), (T(32)));
+//G171: __E_charvar_52(137)  => ~( __N_0(379) ) & ~( __N_1(380) ) & alpha(5).	 # conjunctive
+	p(NT(137), ~(NT(379)) & ~(NT(380)) & (NT(5)));
 //G172: __E_charvar_53(138)  => null.
 	p(NT(138), (nul));
 //G173: __E_charvar_53(138)  => digit(3) __E_charvar_53(138).
@@ -554,18 +547,18 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(145), (NT(24)));
 //G206: offset(145)          => shift(157).
 	p(NT(145), (NT(157)));
-//G207: __N_2(411)           => io_var(139).
-	p(NT(411), (NT(139)));
-//G208: __E_offset_63(158)   => variable(118) & ~( __N_2(411) ).	 # conjunctive
-	p(NT(158), (NT(118)) & ~(NT(411)));
+//G207: __N_2(381)           => io_var(139).
+	p(NT(381), (NT(139)));
+//G208: __E_offset_63(158)   => variable(118) & ~( __N_2(381) ).	 # conjunctive
+	p(NT(158), (NT(118)) & ~(NT(381)));
 //G209: offset(145)          => __E_offset_63(158).
 	p(NT(145), (NT(158)));
 //G210: __E_shift_64(159)    => capture(24).
 	p(NT(159), (NT(24)));
-//G211: __N_3(412)           => io_var(139).
-	p(NT(412), (NT(139)));
-//G212: __E___E_shift_64_65(160) => variable(118) & ~( __N_3(412) ).	 # conjunctive
-	p(NT(160), (NT(118)) & ~(NT(412)));
+//G211: __N_3(382)           => io_var(139).
+	p(NT(382), (NT(139)));
+//G212: __E___E_shift_64_65(160) => variable(118) & ~( __N_3(382) ).	 # conjunctive
+	p(NT(160), (NT(118)) & ~(NT(382)));
 //G213: __E_shift_64(159)    => __E___E_shift_64_65(160).
 	p(NT(159), (NT(160)));
 //G214: shift(157)           => __E_shift_64(159) _(15) '-' _(15) num(156).
@@ -1332,94 +1325,6 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(376), (NT(377)));
 //G595: severity(369)        => trace_sym(376).
 	p(NT(369), (NT(376)));
-//G596: rule(43)             => tau_rule(379).
-	p(NT(43), (NT(379)));
-//G597: tau_matcher(380)     => tau(381).
-	p(NT(380), (NT(381)));
-//G598: __E_tau_rule_154(383) => tau(381).
-	p(NT(383), (NT(381)));
-//G599: __E_tau_rule_154(383) => tau_cb(378).
-	p(NT(383), (NT(378)));
-//G600: tau_body(382)        => __E_tau_rule_154(383).
-	p(NT(382), (NT(383)));
-//G601: tau_rule(379)        => tau_matcher(380) _(15) ':' ':' ':' '=' _(15) tau_body(382) _(15) '.'.
-	p(NT(379), (NT(380)+NT(15)+T(2)+T(2)+T(2)+T(3)+NT(15)+NT(382)+NT(15)+T(1)));
-//G602: __E_builder_body_155(385) => '=' ':' ':' ':' _(15) tau(381).
-	p(NT(385), (T(3)+T(2)+T(2)+T(2)+NT(15)+NT(381)));
-//G603: tau_builder_body(384) => __E_builder_body_155(385).
-	p(NT(384), (NT(385)));
-//G604: builder_body(57)     => tau_builder_body(384).
-	p(NT(57), (NT(384)));
-//G605: __E_tau_156(387)     => '(' _(15) tau(381) _(15) ')'.
-	p(NT(387), (T(5)+NT(15)+NT(381)+NT(15)+T(6)));
-//G606: tau_parenthesis(386) => __E_tau_156(387).
-	p(NT(386), (NT(387)));
-//G607: tau(381)             => tau_parenthesis(386).
-	p(NT(381), (NT(386)));
-//G608: __E_tau_157(389)     => '{' _(15) wff(18) _(15) '}'.
-	p(NT(389), (T(8)+NT(15)+NT(18)+NT(15)+T(9)));
-//G609: tau_wff(388)         => __E_tau_157(389).
-	p(NT(388), (NT(389)));
-//G610: tau(381)             => tau_wff(388).
-	p(NT(381), (NT(388)));
-//G611: __E___E_tau_158_159(392) => _(15) offsets(28).
-	p(NT(392), (NT(15)+NT(28)));
-//G612: __E___E_tau_158_159(392) => null.
-	p(NT(392), (nul));
-//G613: __E_tau_158(391)     => sym(26) __E___E_tau_158_159(392) _(15) ref_args(29).
-	p(NT(391), (NT(26)+NT(392)+NT(15)+NT(29)));
-//G614: tau_ref(390)         => __E_tau_158(391).
-	p(NT(390), (NT(391)));
-//G615: tau(381)             => tau_ref(390).
-	p(NT(381), (NT(390)));
-//G616: __E_tau_160(394)     => tau(381) _(15) '|' '|' '|' _(15) tau(381).
-	p(NT(394), (NT(381)+NT(15)+T(28)+T(28)+T(28)+NT(15)+NT(381)));
-//G617: tau_or(393)          => __E_tau_160(394).
-	p(NT(393), (NT(394)));
-//G618: tau(381)             => tau_or(393).
-	p(NT(381), (NT(393)));
-//G619: __E_tau_161(396)     => tau(381) _(15) '&' '&' '&' _(15) tau(381).
-	p(NT(396), (NT(381)+NT(15)+T(30)+T(30)+T(30)+NT(15)+NT(381)));
-//G620: tau_and(395)         => __E_tau_161(396).
-	p(NT(395), (NT(396)));
-//G621: tau(381)             => tau_and(395).
-	p(NT(381), (NT(395)));
-//G622: __E_tau_162(398)     => '-' _(15) tau(381).
-	p(NT(398), (T(27)+NT(15)+NT(381)));
-//G623: tau_neg(397)         => __E_tau_162(398).
-	p(NT(397), (NT(398)));
-//G624: tau(381)             => tau_neg(397).
-	p(NT(381), (NT(397)));
-//G625: tau(381)             => capture(24).
-	p(NT(381), (NT(24)));
-//G626: __E_tau_cb_args1_163(401) => capture(24).
-	p(NT(401), (NT(24)));
-//G627: __E_tau_cb_args1_163(401) => tau(381).
-	p(NT(401), (NT(381)));
-//G628: tau_cb_arg(400)      => __E_tau_cb_args1_163(401).
-	p(NT(400), (NT(401)));
-//G629: tau_cb_args1(399)    => __(59) tau_cb_arg(400).
-	p(NT(399), (NT(59)+NT(400)));
-//G630: tau_cb_args2(402)    => tau_cb_args1(399) tau_cb_args1(399).
-	p(NT(402), (NT(399)+NT(399)));
-//G631: tau_cb_args3(403)    => tau_cb_args2(402) tau_cb_args1(399).
-	p(NT(403), (NT(402)+NT(399)));
-//G632: __E___E_tau_cb_164_165(406) => tau_cb_args3(403).
-	p(NT(406), (NT(403)));
-//G633: __E___E_tau_cb_164_165(406) => tau_cb_args2(402).
-	p(NT(406), (NT(402)));
-//G634: __E_tau_cb_164(405)  => 't' 'a' 'u' '_' 'c' 'o' 'l' 'l' 'a' 'p' 's' 'e' '_' 'p' 'o' 's' 'i' 't' 'i' 'v' 'e' 's' '_' 'c' 'b' __E___E_tau_cb_164_165(406).
-	p(NT(405), (T(14)+T(17)+T(50)+T(25)+T(46)+T(11)+T(18)+T(18)+T(17)+T(55)+T(10)+T(13)+T(25)+T(55)+T(11)+T(10)+T(15)+T(14)+T(15)+T(52)+T(13)+T(10)+T(25)+T(46)+T(24)+NT(406)));
-//G635: tau_collapse_positives_cb(404) => __E_tau_cb_164(405).
-	p(NT(404), (NT(405)));
-//G636: tau_cb(378)          => tau_collapse_positives_cb(404).
-	p(NT(378), (NT(404)));
-//G637: __E_tau_cb_166(408)  => 't' 'a' 'u' '_' 'p' 'o' 's' 'i' 't' 'i' 'v' 'e' 's' '_' 'u' 'p' 'w' 'a' 'r' 'd' 's' '_' 'c' 'b' tau_cb_args2(402).
-	p(NT(408), (T(14)+T(17)+T(50)+T(25)+T(55)+T(11)+T(10)+T(15)+T(14)+T(15)+T(52)+T(13)+T(10)+T(25)+T(50)+T(55)+T(19)+T(17)+T(51)+T(54)+T(10)+T(25)+T(46)+T(24)+NT(402)));
-//G638: tau_positives_upwards_cb(407) => __E_tau_cb_166(408).
-	p(NT(407), (NT(408)));
-//G639: tau_cb(378)          => tau_positives_upwards_cb(407).
-	p(NT(378), (NT(407)));
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -1469,10 +1374,7 @@ struct tau_parser : public idni::parser<char, char> {
 		__E_cli_command_139, memory, history_store_cmd, __E_cli_command_140, bf_typed, bf_cmd_arg, abs_memory_sym, rel_memory_sym, selection_sym, examples_sym, 
 		__E_help_arg_141, __E___E_help_arg_141_142, rel_memory, __E_memory_143, __E___E_memory_143_144, memory_id, abs_memory, __E_memory_145, enum_option, severity_opt, 
 		__E_option_146, status_opt, __E_bool_option_147, colors_opt, __E_bool_option_148, debug_repl_opt, __E_bool_option_149, option_value_true, option_value_false, severity, 
-		error_sym, __E_severity_150, info_sym, __E_severity_151, debug_sym, __E_severity_152, trace_sym, __E_severity_153, tau_cb, tau_rule, 
-		tau_matcher, tau, tau_body, __E_tau_rule_154, tau_builder_body, __E_builder_body_155, tau_parenthesis, __E_tau_156, tau_wff, __E_tau_157, 
-		tau_ref, __E_tau_158, __E___E_tau_158_159, tau_or, __E_tau_160, tau_and, __E_tau_161, tau_neg, __E_tau_162, tau_cb_args1, 
-		tau_cb_arg, __E_tau_cb_args1_163, tau_cb_args2, tau_cb_args3, tau_collapse_positives_cb, __E_tau_cb_164, __E___E_tau_cb_164_165, tau_positives_upwards_cb, __E_tau_cb_166, __N_0, 
+		error_sym, __E_severity_150, info_sym, __E_severity_151, debug_sym, __E_severity_152, trace_sym, __E_severity_153, tau_cb, __N_0, 
 		__N_1, __N_2, __N_3, 
 	};
 	static tau_parser& instance() {
