@@ -107,6 +107,11 @@ private:
 	void memory_store(repl_evaluator<factory_t, BAs...>::memory o);
 	std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>>
 		get_type_and_arg(const nso<tau_ba<BAs...>, BAs...>& n);
+	// returns nonterminal type of a node (as size_t and no value if not nt
+	std::optional<size_t> get_type(const nso<tau_ba<BAs...>, BAs...>& n);
+	// returns if a subtree of a node contains a nonterminal
+	bool contains(const nso<tau_ba<BAs...>, BAs...>& n,
+		tau_parser::nonterminal nt);
 
 	// commands
 	void not_implemented_yet();
