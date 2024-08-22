@@ -1163,8 +1163,7 @@ inline bool is_contained_in (const vector<int_t>& i, auto& paths) {
 	return false;
 }
 
-// Assume that fm is in DNF (or CNF -> set is_cnf to true) and quantifier free
-// and does not contain sometimes/always
+// Assume that fm is in DNF (or CNF -> set is_cnf to true)
 // Note that Boolean equations are not simplified!
 template<typename... BAs>
 nso<BAs...> reduce2_wff (const nso<BAs...>& fm, bool is_cnf = false, bool all_reductions = true) {
@@ -1172,9 +1171,9 @@ nso<BAs...> reduce2_wff (const nso<BAs...>& fm, bool is_cnf = false, bool all_re
 		using tp = tau_parser;
 		assert(!is_non_terminal(tp::bf_neq, n));
 		return is_child_non_terminal(tp::bf_eq, n) || is_child_non_terminal(tp::wff_ref, n) ||
-			is_child_non_terminal(tp::bool_variable, n) || is_child_non_terminal(tp::uninterpreted_constant, n) ||
-				is_child_non_terminal(tp::wff_sometimes, n) || is_child_non_terminal(tp::wff_always, n) ||
-					is_child_non_terminal(tp::wff_ex, n);
+			 is_child_non_terminal(tp::uninterpreted_constant, n) || is_child_non_terminal(tp::wff_ex, n) ||
+			 	is_child_non_terminal(tp::wff_sometimes, n) || is_child_non_terminal(tp::wff_always, n) ||
+			 		is_child_non_terminal(tp::wff_all, n);
 	};
 	// Pull negation out of equality
 	auto new_fm = fm | repeat_all<step<BAs...>, BAs...>(neq_to_eq<BAs...>);
