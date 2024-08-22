@@ -44,10 +44,8 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (("sometimes" | "<>") _ wff)       :wff_sometimes
                         | (("always" | "[]") _ wff)          :wff_always
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
-                        | ("b_all"   __ q_bool_var __ wff)   :wff_ball
-                        | ("b_ex"    __ q_bool_var __ wff)   :wff_bex
-                        | ("all"     __ q_var      __ wff)   :wff_all
-                        | ("ex"      __ q_var      __ wff)   :wff_ex
+                        | ("all"     __ q_vars      __ wff)  :wff_all
+                        | ("ex"      __ q_vars      __ wff)  :wff_ex
                         | ref                                :wff_ref
                         | (wff   _ "->"  _ wff)              :wff_imply
                         | (wff   _ "<->" _ wff)              :wff_equiv
@@ -70,9 +68,9 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "<="  _ bf)               :bf_less_equal
                         | (bf    _ "<"   _ bf)               :bf_less
                         |                                     capture
-                        |                                     bool_variable
                         |                                     uninterpreted_constant.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
+                        |                                     variable
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ref                                :bf_ref
                         | (bf _       '|'  _  bf)            :bf_or
@@ -82,17 +80,15 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('{' _ constant _ '}')             :bf_constant
                         | '1'                                :bf_t
                         | '0'                                :bf_f
-                        |                                     capture
-                        |                                     variable.
+                        |                                     capture.
 
 # variables
-charvar                => (alpha & ~'T' & ~'F' & ~'i' & ~'o') digit*.
-bool_variable          => '?' charvar.
+charvar                => (alpha & ~'T' & ~'F') digit*.
 variable               => charvar | (in | out):io_var.
 in                     => ("i" digits):in_var_name  '[' offset ']'.
 out                    => ("o" digits):out_var_name '[' offset ']'.
 capture                => '$' charvar.
-q_bool_var             => capture | bool_variable.
+q_vars                 => q_var (_ ',' _ q_var)*.
 q_var                  => capture | variable.
 
 # offsets
@@ -150,9 +146,7 @@ wff_cb => ("bf_eq_cb"  bf_cb_args1 wff_cb_args2)     :bf_eq_cb
         | ("wff_has_clashing_subformulas_cb" wff_cb_args2)
                                                 :wff_has_clashing_subformulas_cb
         | ("wff_has_subformula_cb"      wff_cb_args3):wff_has_subformula_cb
-        | ("wff_remove_existential_cb"  wff_cb_args2):wff_remove_existential_cb
-        | ("wff_remove_bexistential_cb" wff_cb_args4):wff_remove_bexistential_cb
-        | ("wff_remove_buniversal_cb"   wff_cb_args4):wff_remove_buniversal_cb.
+        | ("wff_remove_existential_cb"  wff_cb_args2):wff_remove_existential_cb.
 bf_cb  => ("bf_is_zero_cb"              bf_cb_args2) :bf_is_zero_cb
         | ("bf_is_one_cb"               bf_cb_args2) :bf_is_one_cb
         | ("bf_has_subformula_cb"       bf_cb_args3) :bf_has_subformula_cb
@@ -226,11 +220,10 @@ bf_cmd_arg             => memory | bf_typed.
 wff_cmd_arg            => memory | wff_typed.
 nf_cmd_arg             => memory | bf_typed | wff_typed.
 onf_cmd_arg            => memory | wff_typed.
-normalize_cmd_arg      => memory | bf_typed | wff_typed | rr.
+normalize_cmd_arg      => memory | rr | ref | bf_typed | wff_typed.
 inst_args              =>
           bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
-        | wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
-        | wff_cmd_arg _ '[' _ bool_variable _ '/' _ wff_cmd_arg _ ']'.
+        | wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
 
 # symbols usable for detailed help message
 #
@@ -273,10 +266,10 @@ severity               => ("e" | "error"):error_sym
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
 	sym, digits, type, source, named_binding, capture,
-	charvar, in_var_name, out_var_name, bool_variable, uninter_const_name.
+	charvar, in_var_name, out_var_name, uninter_const_name.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, q_var, q_bool_var, src_c, tau_cb, wff_cb, bf_cb,
+@inline char classes, chars, q_var, src_c, tau_cb, wff_cb, bf_cb,
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
 	inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
@@ -284,28 +277,3 @@ severity               => ("e" | "error"):error_sym
         bf_typed, wff_typed,
         bf  > bf_parenthesis  > bf,
         wff > wff_parenthesis > wff.
-
-
-
-################################################################################
-# deprecating syntax - in process of integration into wff layer
-#
-rule                   => tau_rule.
-tau_rule               => tau:tau_matcher _ ":::=" _ (tau | tau_cb):tau_body _ '.'.
-builder_body           => ("=:::" _ tau):tau_builder_body.
-tau                    => ('(' _ tau _ ')')                  :tau_parenthesis
-                        | ('{' _ wff _ '}')                  :tau_wff
-                        | (sym [_ offsets] _ ref_args)       :tau_ref
-                        | (tau _ "|||" _ tau)                :tau_or
-                        | (tau _ "&&&" _ tau)                :tau_and
-                        | ('-' _ tau)                        :tau_neg
-                        |                                     capture.
-tau_cb_args1           => __ (capture | tau):tau_cb_arg.
-tau_cb_args2           => tau_cb_args1 tau_cb_args1.
-tau_cb_args3           => tau_cb_args2 tau_cb_args1.
-tau_cb => ("tau_collapse_positives_cb" (tau_cb_args3 | tau_cb_args2))
-                                                     :tau_collapse_positives_cb
-        | ("tau_positives_upwards_cb"   tau_cb_args2):tau_positives_upwards_cb.
-@inline
-        tau_cb_args1, tau_cb_args2, tau_cb_args3,
-        tau > tau_parenthesis > tau.

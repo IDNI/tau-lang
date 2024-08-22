@@ -102,15 +102,6 @@ TEST_SUITE("normal forms: snf for wff") {
 		CHECK( nso__rr.main == result );
 	}
 
-	TEST_CASE("boolean vars: ?Y") {
-		const char* sample = "?Y.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
-		auto result = snf_wff(nso__rr.main);
-		CHECK( nso__rr.main == result );
-	}
-
 	TEST_CASE("rec. relations: f[0](X)") {
 		const char* sample = "f[0](X).";
 		auto sample_src = make_tau_source(sample);

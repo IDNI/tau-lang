@@ -6,7 +6,6 @@ set(TESTS
 	tau_ba1
 	tau_ba2
 	tau_ba3
-	executor
 	normal_forms
 	nso_rr_execution
 	nso_rr_partial_eval
@@ -15,14 +14,8 @@ set(TESTS
 	wff_normalization
 	splitter
 	splitter2
-    solver
-
-	# tests depending on a deprecated syntax
-	#gssotc_rr_execution
-	#gssotc_rr_partial_eval
-	#satisfiability
-	#tau1
-	#tau2
+	solver
+	quantifiers
 )
 
 foreach(TEST IN LISTS TESTS)

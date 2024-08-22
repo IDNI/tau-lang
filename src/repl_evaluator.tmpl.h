@@ -20,9 +20,8 @@
 #include "nso_rr.h"
 #include "tau.h"
 #include "term_colors.h"
-#include "satisfiability.h"
+//#include "satisfiability.h"
 #include "solver.h"
-#include "repl_checks.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -187,6 +186,23 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	}
 	cout << "error: argument has wrong type\n";
 	return {};
+}
+
+template <typename factory_t, typename... BAs>
+bool repl_evaluator<factory_t, BAs...>::contains(
+	const nso<tau_ba<BAs...>, BAs...>& n, tau_parser::nonterminal nt)
+{
+	auto pred = [nt](const auto& n) {
+		return is_non_terminal<tau_ba<BAs...>, BAs...>(nt, n); };
+	return find_top<decltype(pred), nso<tau_ba<BAs...>, BAs...>>(n, pred)
+								.has_value();
+}
+
+template <typename factory_t, typename... BAs>
+std::optional<size_t> repl_evaluator<factory_t, BAs...>::get_type(
+	const nso<tau_ba<BAs...>, BAs...>& n)
+{
+	return n | non_terminal_extractor<tau_ba<BAs...>, BAs...>;
 }
 
 template <typename factory_t, typename... BAs>
@@ -468,41 +484,22 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
-		switch (type) {
-		case tau_parser::wff: {
-			rr<gssotc<BAs...>> rr_wff = { definitions, value };
-			rr_wff = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_wff);
-			auto result_wff =
-				normalizer<tau_ba<BAs...>, BAs...>(rr_wff);
-			return result_wff;
+		bool contains_ref = contains(value, tau_parser::ref);
+		rr<nso<tau_ba<BAs...>, BAs...>> rr_ =
+			(contains_ref && type == tau_parser::rr)
+				? make_nso_rr_from_binded_code<
+						tau_ba<BAs...>, BAs...>(value)
+				: rr<nso<tau_ba<BAs...>, BAs...>>(value);
+		if (contains_ref) {
+			rr_.rec_relations.insert(rr_.rec_relations.end(),
+				definitions.begin(), definitions.end());
+			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
 		}
-		case tau_parser::rr: {
-			auto n_nso_rr = make_nso_rr_from_binded_code<
-						tau_ba<BAs...>, BAs...>(value);
-			rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs;
-			rrs.insert(rrs.end(), n_nso_rr.rec_relations.begin(),
-						n_nso_rr.rec_relations.end());
-			rrs.insert(rrs.end(), definitions.begin(),
-						definitions.end());
-			rr<nso<tau_ba<BAs...>, BAs...>> rr_nso = {
-							rrs, n_nso_rr.main };
-			rr_nso = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_nso);
-			auto result_nso_rr = normalizer<tau_ba<BAs...>, BAs...>(
-									rr_nso);
-			return result_nso_rr;
-		}
-		case tau_parser::bf: {
-			if (!check_no_rec_relations_present(value)) {
-				rec_relations<nso<tau_ba<BAs...>, BAs...>> rrs(
-					definitions.begin(), definitions.end());
-				rr<nso<tau_ba<BAs...>, BAs...>> rr_bf =
-					infer_ref_types<tau_ba<BAs...>, BAs...>(
-						{ rrs, value });
-				return bf_normalizer_with_rec_relation(rr_bf);
-			}
-			return bf_normalizer_without_rec_relation(value);
-		}
-		}
+		if (!is_non_terminal(tau_parser::bf, rr_.main))
+			return normalizer<tau_ba<BAs...>, BAs...>(rr_);
+		if (contains_ref)
+			return bf_normalizer_with_rec_relation(rr_);
+		return bf_normalizer_without_rec_relation(rr_.main);
 	}
 	cout << "error: invalid argument\n";
 	return {};
@@ -540,7 +537,7 @@ void repl_evaluator<factory_t, BAs...>::execute_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto form = n->child[1];
-	if (auto check = form | tau_parser::tau; check) {
+	if (auto check = form | tau_parser::wff; check) {
 		// TODO (HIGH) call executor
 	} else if (auto check = form | tau_parser::rr; check) {
 		// TODO (HIGH) call executor
