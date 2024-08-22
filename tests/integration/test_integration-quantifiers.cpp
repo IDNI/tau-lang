@@ -12,7 +12,7 @@
 // modified over time by the Author.
 
 // tests parsing, printing, normalization and printed result of
-// quantifiers: all, ex, b_all and b_ex
+// quantifiers: all, ex
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
@@ -60,34 +60,6 @@ test_cases all_ex_cases = {
 	{ "all x,y ex w,z x=w && y=z.", "all x, y ex w, z x = w && y = z.","T"},
 };
 
-test_cases bool_ex_cases = {
-	{ "b_ex ?P ?P.",                "b_ex ?P ?P.",                    "T" },
-	{ "b_ex ?P,?Q ?P&&?Q.",         "b_ex ?P, ?Q ?P && ?Q.",          "T" },
-	{ "b_ex ?P b_ex ?Q ?P&&?Q.",    "b_ex ?P, ?Q ?P && ?Q.",          "T" },
-};
-
-test_cases bool_all_cases = {
-	{ "b_all ?P ?P.",               "b_all ?P ?P.",                   "F" },
-	{ "b_all ?P,?Q ?P&&?Q.",        "b_all ?P, ?Q ?P && ?Q.",         "F" },
-	{ "b_all ?P b_all ?Q ?P&&?Q.",  "b_all ?P, ?Q ?P && ?Q.",         "F" },
-};
-
-test_cases bool_ex_all_cases = {
-	{ "b_ex ?P b_all ?Q ?P||?Q.",   "b_ex ?P b_all ?Q ?P || ?Q.",     "T" },
-	{ "b_ex ?P,?Q b_all ?R,?S (?P||?R)&&(?Q||?S).",
-		"b_ex ?P, ?Q b_all ?R, ?S (?P || ?R) && (?Q || ?S).",     "T" },
-	{ "b_ex ?P b_ex ?Q b_all ?R b_all ?S (?P||?R)&&(?Q||?S).",
-		"b_ex ?P, ?Q b_all ?R, ?S (?P || ?R) && (?Q || ?S).",     "T" },
-};
-
-test_cases bool_all_ex_cases = {
-	{ "b_all ?P b_ex ?Q ?P||?Q.",   "b_all ?P b_ex ?Q ?P || ?Q.",     "T" },
-	{ "b_all ?P,?Q b_ex ?R,?S (?P||?R)&&(?Q||?S).",
-		"b_all ?P, ?Q b_ex ?R, ?S (?P || ?R) && (?Q || ?S).",     "T" },
-	{ "b_all ?P b_all ?Q b_ex ?R b_ex ?S (?P||?R)&&(?Q||?S).",
-		"b_all ?P, ?Q b_ex ?R, ?S (?P || ?R) && (?Q || ?S).",     "T" },
-};
-
 ostream& operator<<(ostream& os, const test_case& tc) {
 	return os << "input source: \"" << tc[0]
 		<< "\"\n\texpected: \"" << tc[1]
@@ -127,11 +99,4 @@ TEST_SUITE("quantifiers") {
 	CASES("all",    all_cases);
 	CASES("ex all", ex_all_cases);
 	CASES("all ex", all_ex_cases);
-}
-
-TEST_SUITE("bool quantifiers") {
-	CASES("bool ex",     bool_ex_cases);
-	CASES("bool all",    bool_all_cases);
-	CASES("bool ex all", bool_ex_all_cases);
-	CASES("bool all ex", bool_all_ex_cases);
 }

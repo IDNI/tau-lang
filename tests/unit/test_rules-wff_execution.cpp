@@ -316,16 +316,4 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( matcher != result );
 	}
-
-	TEST_CASE("WFF_DEF_BEX_0") {
-		auto [ matcher, body, result ] = test_rule(WFF_DEF_BEX_0);
-		CHECK( matcher != body );
-		CHECK( matcher != result );
-	}
-
-	TEST_CASE("WFF_DEF_BALL_0") {
-		auto [ matcher, body, result ] = test_rule(WFF_DEF_BALL_0);
-		CHECK( matcher != body );
-		CHECK( matcher != result );
-	}
 }
