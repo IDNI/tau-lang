@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 function(add_valgrind_test test_name test_cmd)
 	add_test(NAME "test_repl-${test_name}"
-		COMMAND bash -c "echo \"${test_cmd}. q\" | valgrind --tool=callgrind --callgrind-out-file=${PROJECT_BINARY_DIR}/test_benchmark-${test_name}-${GIT_COMMIT_HASH}.callgrind $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
+		COMMAND bash -c "echo \"${test_cmd}. q\" | valgrind --tool=callgrind --callgrind-out-file=${PROJECT_BINARY_DIR}/test_benchmark-${test_name}-${GIT_COMMIT_HASH}.callgrind.out $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 endfunction()
 
 set(BENCHMARK_TESTS
