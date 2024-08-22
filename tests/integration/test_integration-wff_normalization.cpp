@@ -28,7 +28,7 @@ using namespace idni::tau;
 namespace testing = doctest;
 
 TEST_SUITE("wff_sometimes") {
-	TEST_CASE("push_in_1") {
+	/*TEST_CASE("push_in_1") {
 		const char* sample = "sometimes (?x && o1[t] = 0 && sometimes(?x && o1[t] = 0 && sometimes(?x && o1[t] = 0))).";
 		auto src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -39,7 +39,7 @@ TEST_SUITE("wff_sometimes") {
 			| reduce_wff<bdd_test>;
 		std::stringstream ss; ss << simp_res;
 		CHECK((ss.str() == "?x && (sometimes o1[t] = 0)" || ss.str() == "(sometimes o1[t] = 0) && ?x"));
-	}
+	}*/
 
 	TEST_CASE("push_in_2") {
 		const char* sample = "sometimes T.";
@@ -66,7 +66,7 @@ TEST_SUITE("wff_sometimes") {
 		CHECK( ss.str() == "always o1[t] = 0" );
 	}
 
-	TEST_CASE("pull_out_1") {
+	/*TEST_CASE("pull_out_1") {
 		const char* sample = "(sometimes T && ?x) || (sometimes T && ?x) || (sometimes ?x).";
 		auto src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -77,9 +77,9 @@ TEST_SUITE("wff_sometimes") {
 			| reduce_wff<bdd_test>;
 		std::stringstream ss; ss << simp_res;
 		CHECK(ss.str() == "sometimes ?x");
-	}
+	}*/
 
-	TEST_CASE("pull_out_2") {
+	/*TEST_CASE("pull_out_2") {
 		const char* sample = "(always ?x) && ?x && (sometimes ?x && ?x).";
 		auto src = make_tau_source(sample);
 		bdd_test_factory bf;
@@ -90,5 +90,5 @@ TEST_SUITE("wff_sometimes") {
 			| reduce_wff<bdd_test>;
 		std::stringstream ss; ss << simp_res;
 		CHECK(ss.str() == "?x");
-	}
+	}*/
 }

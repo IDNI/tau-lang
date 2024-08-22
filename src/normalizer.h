@@ -194,7 +194,7 @@ auto get_free_vars_from_nso(const nso<BAs...>& n) {
 template<typename... BAs>
 int_t get_new_var_id (const nso<BAs...> fm) {
 	auto var_nodes = get_vars_from_nso<BAs...>(fm);
-	set vars {1};
+	set vars{1};
 	for (auto var : var_nodes) {
 		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, var); tmp[0] == 'x') {
 			tmp.erase(0,1);
@@ -728,15 +728,17 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	fixed_point_transformer<BAs...> fpt(defs, types);
 	defs.main = post_order_traverser<decltype(fpt), all_t<nso<BAs...>>,
 		nso<BAs...>>(fpt, all<nso<BAs...>>)(defs.main);
-	if (fpt.changes.size())
+	if (fpt.changes.size()) {
 		defs.main = replace(defs.main, fpt.changes);
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. New main: " << defs.main;
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
+						"New main: " << defs.main;
+	}
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << defs;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions to main";
 	defs.main = apply_once_definitions(defs.main);
-	if (defs.rec_relations.empty()) return normalizer_step(defs.main);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions to main";
+	if (defs.rec_relations.empty()) return normalizer_step(defs.main);
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << defs;
 
 	std::vector<nso<BAs...>> previous;

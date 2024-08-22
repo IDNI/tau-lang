@@ -19,7 +19,6 @@
 #include "nso_rr.h"
 #include "bdd_handle.h"
 #include "normalizer.h"
-#include "satisfiability.h"
 
 #include "test_integration_helpers-tau.h"
 
@@ -38,27 +37,13 @@ TEST_SUITE("cpp operators") {
 	}
 }
 
-TEST_SUITE("allowing bool vars and unresolved rr's in normalization") {
-
-	TEST_CASE("?y.") {
-		const char* sample = "?y.";
-		auto normalized = normalize_test_tau(sample);
-		std::stringstream ss; ss << normalized;
-		CHECK( ss.str() == "?y" );
-	}
+TEST_SUITE("allowing unresolved rr's in normalization") {
 
 	TEST_CASE("f[0](x).") {
 		const char* sample = "f[0](x).";
 		auto normalized = normalize_test_tau(sample);
 		std::stringstream ss; ss << normalized;
 		CHECK( ss.str() == "f[0](x)" );
-	}
-
-	TEST_CASE("ex x ?y.") {
-		const char* sample = "ex x ?y.";
-		auto normalized = normalize_test_tau(sample);
-		std::stringstream ss; ss << normalized;
-		CHECK( ss.str() == "?y" );
 	}
 
 	TEST_CASE("ex x f[0](x).") {
@@ -80,19 +65,5 @@ TEST_SUITE("allowing bool vars and unresolved rr's in normalization") {
 		auto normalized = normalize_test_tau(sample);
 		std::stringstream ss; ss << normalized;
 		CHECK( ss.str() == "ex x f[0](x) && x != 0" );
-	}
-
-	TEST_CASE("ex x ?y && x = 0.") {
-		const char* sample = "ex x ?y && x = 0.";
-		auto normalized = normalize_test_tau(sample);
-		std::stringstream ss; ss << normalized;
-		CHECK( ss.str() == "?y" );
-	}
-
-	TEST_CASE("ex x ?y && x != 0.") {
-		const char* sample = "ex x ?y && x != 0.";
-		auto normalized = normalize_test_tau(sample);
-		std::stringstream ss; ss << normalized;
-		CHECK( ss.str() == "?y" );
 	}
 }
