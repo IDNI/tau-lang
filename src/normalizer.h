@@ -629,8 +629,8 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 		{
 			BOOST_LOG_TRIVIAL(debug) << eos
 				<< " - fixed point found at step: " << i;
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
-			return current;
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << previous.back();
+			return previous.back();
 		}
 		else if (previous.size() > 1
 			&& is_nso_equivalent_to_any_of(current, previous))
