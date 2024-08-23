@@ -437,7 +437,7 @@ nso<BAs...> bf_normalizer_without_rec_relation (const nso<BAs...>& bf) {
 // Normalizes a Boolean function in which recurrence relations are present
 template<typename... BAs>
 nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin calculate recurrence relation";
+	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Begin calculate recurrence relation";
 
 	auto bf_unfolded = bf.main | repeat_all<step<BAs...>, BAs...>(
 						step<BAs...>(bf.rec_relations));
@@ -480,12 +480,23 @@ nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
 
 template <typename... BAs>
 bool is_valid(const rr<nso<BAs...>>& nso_rr) {
+	for (const auto& main_offsets : select_all(nso_rr.main,
+		is_non_terminal<tau_parser::offsets, BAs...>))
+			if (find_top(main_offsets,
+				is_non_terminal<tau_parser::capture, BAs...>))
+	{
+		BOOST_LOG_TRIVIAL(error) << "Main " << nso_rr.main
+					<< " cannot contain a relative offset";
+		return false; // capture in main's offset
+	}
 	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
 		const auto& r = nso_rr.rec_relations[ri];
 		auto left = get_ref_info(get_ref(r.first).value());
 		for (const auto& [ot, _] : left.second)
 			if (ot == tau_parser::shift) {
-				BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " cannot contain an offset shift";
+				BOOST_LOG_TRIVIAL(error) << "Recurrence "
+					"relation " << r.first << " cannot "
+					"contain an offset shift";
 				return false; // head ref cannot have shift
 			}
 		if (left.second.size() == 0) continue; // no offsets
@@ -501,12 +512,20 @@ bool is_valid(const rr<nso<BAs...>>& nso_rr) {
 			//BOOST_LOG_TRIVIAL(debug) << "(T) -- body offset " << bo.first << " / " << bo.second;
 			if (ho.first == tau_parser::num) {
 				if (bo.first == tau_parser::capture) {
-					BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " (having a fixed offset) cannot depend on a relative offset " << r.second;
+					BOOST_LOG_TRIVIAL(error)
+						<< "Recurrence relation "
+						<< r.first << " (having a fixed"
+						" offset) cannot depend on a "
+						"relative offset " << r.second;
 					return false; // left num right capture
 				}
 				if (bo.first == tau_parser::num
 					&& ho.second < bo.second) {
-						BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " cannot depend on a future state " << r.second;
+						BOOST_LOG_TRIVIAL(error)
+							<<"Recurrence relation "
+							<< r.first << " cannot "
+							"depend on a future "
+							"state " << r.second;
 						return false; // l num < r num
 				}
 			}
@@ -554,15 +573,17 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 		visiting[left.first] = false;
 	}
 	if (!has_relative_rule) {
-		BOOST_LOG_TRIVIAL(error) << "Recurrence relation has no rules other than initial conditions";
+		BOOST_LOG_TRIVIAL(error) << "Recurrence relation has no rules "
+						"other than initial conditions";
 		return false;
 	}
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
-			BOOST_LOG_TRIVIAL(error) << "Recurrence relation is cyclic";
+			BOOST_LOG_TRIVIAL(error)
+					<< "Recurrence relation is cyclic";
 			return false;
 		}
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation is well founded";
+	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Recurrence relation is well founded";
 	return true;
 }
 
