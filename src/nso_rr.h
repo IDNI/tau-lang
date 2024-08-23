@@ -1167,8 +1167,11 @@ struct rr_type {
 	size_t args_arity = 0;
 	bool fp = false;
 };
-using rr_types = std::unordered_map<std::string, rr_type>;
 
+struct rr_types {
+	std::unordered_map<std::string, rr_type> types;
+	std::set<std::string> errors;
+};
 
 static auto type2str = [](const tau_parser::nonterminal& t) {
 	return tau_parser::instance().name(t);
@@ -1210,39 +1213,36 @@ std::pair<std::string, std::pair<size_t, size_t>> get_ref_name_and_arity(
 };
 
 template<typename... BAs>
-std::string get_ref_type(bool& success, rr_types& types,
+std::string get_ref_type(bool& success, rr_types& ts,
 	const sp_tau_node<BAs...>& ref, const tau_parser::nonterminal& t,
 	bool possible_fp = false)
 {
 	auto [fn, arity] = get_ref_name_and_arity(ref);
 	rr_type new_type(t, arity.first, arity.second,
-		possible_fp && arity.first == 0);
-	auto it = types.find(fn);
-	if (it != types.end()) {
+					possible_fp && arity.first == 0);
+	auto it = ts.types.find(fn);
+	if (it != ts.types.end()) {
 		auto& rt = it->second;
-		std::string err = "";
-		if (rt.type != t) err += "Type mismatch. ";
+		std::stringstream err;
+		if (rt.type != t) err << "Type mismatch. ";
 		if (rt.args_arity != arity.second)
-			err += "Argument arity mismatch. ";
-		if (rt.fp && arity.first) {
+			err << "Argument arity mismatch. ";
+		if (rt.fp && arity.first)
 			// found a real offset arity for a uncomplete type taken
 			// from main with a fp call => update offset arity
-			types[fn].offset_arity = arity.first;
-			types[fn].fp = false;
-		}
+			ts.types[fn].offset_arity = arity.first,
+			ts.types[fn].fp = false;
 		if (!rt.fp && !new_type.fp && rt.offset_arity != arity.first)
-			err += "Offset arity mismatch. ";
-		if (err.size()) {
-			success = false;
-			BOOST_LOG_TRIVIAL(error) << err << fn << "() : "
-					<< rr_type2str(new_type)
-					<< " declared as " << rr_type2str(rt);
-			return "";
-		}
+			err << "Offset arity mismatch. ";
+		if (err.tpos()) return
+			err << fn << "() : " << rr_type2str(new_type)
+				<< " declared as " << rr_type2str(rt),
+			ts.errors.insert(err.str()),
+			success = false, "";
 	} else {
-		types[fn] = new_type;
+		ts.types[fn] = new_type;
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Found type of " << fn
-					<< "() : " << rr_type2str(types[fn]);
+					<< "() : " << rr_type2str(ts.types[fn]);
 		return fn;
 	}
 	return "";
@@ -1250,7 +1250,7 @@ std::string get_ref_type(bool& success, rr_types& types,
 
 template<typename... BAs>
 std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
-	bool& success, rr_types& types, const sp_tau_node<BAs...>& n,
+	bool& success, rr_types& ts, const sp_tau_node<BAs...>& n,
 	bool possible_fp = false)
 {
 	std::set<std::string> done_names;
@@ -1261,14 +1261,14 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::wff_ref, BAs...>))
 	{
-		auto fn = get_ref_type(success, types, ref, tau_parser::wff,
+		auto fn = get_ref_type(success, ts, ref, tau_parser::wff,
 			possible_fp);
 		done_names.insert(fn), todo_names.erase(fn);
 	}
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::bf_ref, BAs...>))
 	{
-		auto fn = get_ref_type(success, types, ref, tau_parser::bf,
+		auto fn = get_ref_type(success, ts, ref, tau_parser::bf,
 			possible_fp);
 		done_names.insert(fn), todo_names.erase(fn);
 	}
@@ -1277,7 +1277,7 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 
 template<typename... BAs>
 std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
-	bool& success, rr_types& types, const rr<nso<BAs...>>& nso_rr)
+	bool& success, rr_types& ts, const rr<nso<BAs...>>& nso_rr)
 {
 	std::set<std::string> done_names;
 	std::set<std::string> todo_names;
@@ -1292,11 +1292,11 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 	};
 	// get types from relations if any
 	for (const auto& r : nso_rr.rec_relations)
-		add_ref_names(get_rr_types(success, types, r.first)),
-		add_ref_names(get_rr_types(success, types, r.second));
+		add_ref_names(get_rr_types(success, ts, r.first)),
+		add_ref_names(get_rr_types(success, ts, r.second));
 	// get type from main if any
 	if (nso_rr.main)
-		add_ref_names(get_rr_types(success, types, nso_rr.main, true));
+		add_ref_names(get_rr_types(success, ts, nso_rr.main, true));
 	return { done_names, todo_names };
 }
 
@@ -1308,7 +1308,7 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 	// 	ptree<BAs...>(std::cout << "rule right: ", r.second) << "\n";
 	// ptree<BAs...>(std::cout << "main: ", nso_rr.main) << "\n";
 	rr<nso<BAs...>> nn = nso_rr;
-	rr_types types;
+	rr_types ts;
 	std::set<std::string> done_names, todo_names;
 	bool success = true;
 	static auto get_nt_type = [](const sp_tau_node<BAs...>& r) {
@@ -1338,10 +1338,10 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 	};
 	// get types from relations if any
 	for (const auto& r : nn.rec_relations)
-		add_ref_names(get_rr_types(success, types, r.first)),
-		add_ref_names(get_rr_types(success, types, r.second));
+		add_ref_names(get_rr_types(success, ts, r.first)),
+		add_ref_names(get_rr_types(success, ts, r.second));
 	// get type from main if any
-	if (nn.main) add_ref_names(get_rr_types(success, types, nn.main, true));
+	if (nn.main) add_ref_names(get_rr_types(success, ts, nn.main, true));
 	// inference loop
 	for (;;) {
 		bool changed = false;
@@ -1352,8 +1352,8 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 			if (t == tau_parser::ref) {
 				// right side is unresolved ref
 				auto fn = get_ref_name(r.second);
-				auto it = types.find(fn); // if we know type
-				if (it != types.end()) {  // update
+				auto it = ts.types.find(fn); // if we know type
+				if (it != ts.types.end()) {  // update
 					BOOST_LOG_TRIVIAL(trace) << "(T) updating right side: " << r.second;
 					t = it->second.type;
 					update_ref(r.second, t);
@@ -1365,7 +1365,7 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 				if (get_nt_type(r.first) == tau_parser::ref) {
 					// left side is unresolved ref
 					BOOST_LOG_TRIVIAL(trace) << "(T) updating left side: " << r.first;
-					done(get_ref_type(success, types, r.first, t));
+					done(get_ref_type(success, ts, r.first, t));
 					update_ref(r.first, t);
 					changed = true;
 				}
@@ -1376,11 +1376,12 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 				// left side is an unresolved ref
 				if (lt == tau_parser::ref) {
 					auto fn = get_ref_name(r.first);
-					auto it = types.find(fn); // if we know
-					if (it != types.end()) { // type -> assign
+					auto it = ts.types.find(fn); // if we know
+					if (it != ts.types.end()) { // type -> assign
 						lt = it->second.type;
 						BOOST_LOG_TRIVIAL(trace) << "(T) updating known type of the left side: " << r.first;
-						done(get_ref_type(success, types, r.first, lt));
+						done(get_ref_type(success, ts,
+							r.first, lt));
 						update_ref(r.first, lt);
 						changed = true;
 					}
@@ -1407,8 +1408,8 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		if (t == tau_parser::ref) {
 			// main is an unresolved ref
 			auto fn = get_ref_name(nn.main);
-			auto it = types.find(fn); // if we know type
-			if (it != types.end()) {  // update
+			auto it = ts.types.find(fn); // if we know type
+			if (it != ts.types.end()) {  // update
 				BOOST_LOG_TRIVIAL(trace) << "(T) updating main: " << nn.main;
 				t = it->second.type;
 				update_ref(nn.main, t);
@@ -1416,10 +1417,13 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		}
 	}
 
+	for (const auto& err : ts.errors) BOOST_LOG_TRIVIAL(error) << err;
+
 	if (todo_names.size()) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
-		BOOST_LOG_TRIVIAL(error) << "Unknown recurrence relation ref type for:" << ss.str();
+		BOOST_LOG_TRIVIAL(error) << "Unknown recurrence relation ref "
+							"type for:" << ss.str();
 	}
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End type inferrence"; // << ": " << nn;
 	return nn;

@@ -486,7 +486,8 @@ bool is_valid(const rr<nso<BAs...>>& nso_rr) {
 				is_non_terminal<tau_parser::capture, BAs...>))
 	{
 		BOOST_LOG_TRIVIAL(error) << "Main " << nso_rr.main
-					<< " cannot contain a relative offset";
+					<< " cannot contain a relative offset "
+					<< main_offsets;
 		return false; // capture in main's offset
 	}
 	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
@@ -698,15 +699,15 @@ struct fixed_point_transformer {
 	}
 
 	std::pair<tau_parser::nonterminal, size_t> get_type_info(
-		const rr_types& types, const sp_tau_node<BAs...>& fp_ref)
+		const rr_types& ts, const sp_tau_node<BAs...>& fp_ref)
 	{
 		// size_t type = fp_ref | non_terminal_extractor<BAs...>
 		// 	| optional_value_extractor<size_t>;
 		auto ref = fp_ref | tau_parser::ref;
 		if (ref && !(ref | tau_parser::offsets).has_value()) {
 			auto fn = get_ref_name(ref.value());
-			auto it = types.find(fn);
-			if (it != types.end() && it->second.offset_arity)
+			auto it = ts.types.find(fn);
+			if (it != ts.types.end() && it->second.offset_arity)
 				return { it->second.type,
 						it->second.offset_arity };
 		}
