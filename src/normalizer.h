@@ -86,7 +86,15 @@ struct remove_one_wff_existential {
 		auto inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
 		// As long as a quantifier is found
 		while (inner_fm) {
-			auto removed = trim(inner_fm.value())->child[1]
+			auto has_var = [&inner_fm](const auto& node){return node == trim2(inner_fm.value());};
+			auto removed = trim(inner_fm.value())->child[1];
+                if (!find_top(removed, has_var)) {
+                	std::map<nso<BAs...>, nso<BAs...>> changes{{inner_fm.value(), removed}};
+					n = replace(n, changes);
+					inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
+                	continue;
+            }
+			removed = removed
 				// Reductions to prevent blow ups
 				// and DNF conversion needed for quantifier removal
 				| bf_reduce_canonical<BAs...>()
