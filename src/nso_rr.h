@@ -1104,6 +1104,45 @@ rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input, factory_t& f
 	return make_nso_rr_using_factory<factory_t, BAs...>(source, factory);
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
+	return n->child[0];
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> trim2(const sp_tau_node<BAs...>& n) {
+	return n->child[0]->child[0];
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const std::vector<sp_tau_node<BAs...>>& nn)
+{
+	return make_node<tau_sym<BAs...>>(
+		tau_parser::instance().literal(nt), nn);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const std::initializer_list<sp_tau_node<BAs...>> ch)
+{
+	return wrap(nt, std::vector<sp_tau_node<BAs...>>(ch));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const sp_tau_node<BAs...>& n)
+{
+	return wrap(nt, { n });
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const sp_tau_node<BAs...>& c1, const sp_tau_node<BAs...>& c2)
+{
+	return wrap(nt, { c1, c2 });
+}
+
 //------------------------------------------------------------------------------
 // rec relations type inference
 
@@ -1266,16 +1305,8 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		const tau_parser::nonterminal& t)
 	{
 		//ptree<BAs...>(std::cout << "updating ref: ", r) << "\n";
-		r = make_node<tau_sym<BAs...>>(
-			tau_parser::instance().literal(t),
-			{
-				make_node<tau_sym<BAs...>>(
-					tau_parser::instance().literal(
-						t == tau_parser::wff
-							? tau_parser::wff_ref
-							: tau_parser::bf_ref),
-					{ r })
-			});
+		r = wrap(t, wrap(t == tau_parser::wff
+			? tau_parser::wff_ref : tau_parser::bf_ref, r));
 		//ptree<BAs...>(std::cout << "updated ref: ", r) << "\n";
 	};
 	auto add_ref_names = [&done_names, &todo_names](const std::pair<
@@ -1345,8 +1376,7 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 				{
 					BOOST_LOG_TRIVIAL(trace) << "(T) updating capture: " << r.second;
 					//ptree<BAs...>(std::cout << "updating ref: ", r) << "\n";
-					r.second = make_node<tau_sym<BAs...>>(
-						tau_parser::instance().literal(lt), { r.second });
+					r.second = wrap(lt, r.second);
 					//ptree<BAs...>(std::cout << "updated ref: ", r) << "\n";
 				}
 			}
@@ -1416,27 +1446,6 @@ sp_tau_node<BAs...> tau_apply_builder(const builder<BAs...>& b, std::vector<sp_t
 	std::vector<sp_tau_node<BAs...>> vars = b.first || tau_parser::capture;
 	for (size_t i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
 	return replace<sp_tau_node<BAs...>>(b.second, changes);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
-	return n->child[0];
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> trim2(const sp_tau_node<BAs...>& n) {
-	return n->child[0]->child[0];
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> wrap(tau_parser::nonterminal t, const sp_tau_node<BAs...>& n) {
-	return make_node<tau_sym<BAs...>>(
-		tau_parser::instance().literal(t), { n });
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt, const sp_tau_node<BAs...>& c1, const sp_tau_node<BAs...>& c2) {
-	return make_node<tau_sym<BAs...>>(tau_parser::instance().literal(nt), { c1, c2 });
 }
 
 // definitions of basic bf and wff
@@ -2415,7 +2424,7 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r, const sp_tau_nod
 	auto nn = apply_if<
 			sp_tau_node<BAs...>,
 			is_capture_t<BAs...>,
-			predicate_t>(r, n ,	is_capture<BAs...>, predicate);
+			predicate_t>(r, n, is_capture<BAs...>, predicate);
 	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
 		callback_applier<BAs...> cb_applier;
 		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;

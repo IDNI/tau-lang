@@ -411,7 +411,9 @@ nso<BAs...> build_shift_from_shift(nso<BAs...> shift, size_t step) {
 template<typename... BAs>
 nso<BAs...> build_main_step(const nso<BAs...>& form, size_t step) {
 	std::map<nso<BAs...>, nso<BAs...>> changes;
-	for (const auto& offset: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>)) {
+	for (const auto& offset : select_top(form,
+				is_non_terminal<tau_parser::offsets, BAs...>))
+	{
 		auto shift = offset | tau_parser::shift;
 		if (!shift.has_value()) continue;
 		auto nshift = build_shift_from_shift<BAs...>(shift.value(), step);
@@ -459,23 +461,17 @@ nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
 	auto r = form;
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 	std::vector<sp_tau_node<BAs...>> ofs; // create offsets node
-	ofs.push_back(make_node<tau_sym<BAs...>>(
-		tau_parser::instance().literal(tau_parser::offset),
-		{ build_num<BAs...>(i) }));
+	ofs.push_back(wrap<BAs...>(tau_parser::offset, build_num<BAs...>(i)));
 	for (size_t o = 1; o < offset_arity; ++o)
-		ofs.push_back(make_node<tau_sym<BAs...>>(
-			tau_parser::instance().literal(tau_parser::offset),
-			{ 0 }));
+		ofs.push_back(wrap<BAs...>(tau_parser::offset,
+							build_num<BAs...>(0)));
+
 	// create enumerated replacement
 	auto ref = r | only_child_extractor<BAs...>
 		| tau_parser::ref
 		| optional_value_extractor<sp_tau_node<BAs...>>;
-	changes[ref] = make_node<tau_sym<BAs...>>(ref->value, {
-		ref->child[0],
-		make_node<tau_sym<BAs...>>(tau_parser::instance()
-			.literal(tau_parser::offsets), ofs),
-		ref->child[1]
-	});
+	changes[ref] = make_node<tau_sym<BAs...>>(ref->value, { ref->child[0],
+		wrap<BAs...>(tau_parser::offsets, ofs), ref->child[1] });
 	r = replace(r, changes);
 	BOOST_LOG_TRIVIAL(debug) << "(F*) " << r;
 	//DBG(ptree<BAs...>(std::cout << "enumerated main ", r) << "\n";)
@@ -646,6 +642,7 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 		previous.push_back(current);
 	}
+	return fallback;
 }
 
 // calculate fixed points called from main and replace them by their results
@@ -733,7 +730,6 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
 						"New main: " << defs.main;
 	}
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << defs;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions to main";
 	defs.main = apply_once_definitions(defs.main);

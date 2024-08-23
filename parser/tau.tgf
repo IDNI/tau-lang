@@ -97,7 +97,7 @@ offset                 => num | capture | shift | (variable & ~io_var).
 shift                  => (capture | (variable & ~io_var)) _ '-' _ num.
 num                    => digits.
 
-#constants
+# constants
 uninterpreted_constant => '<' ((chars | _ ) ':' chars):uninter_const_name _ '>'.
 constant               => binding | capture.
 binding                => ((chars _ | _):type ':' _ source):source_binding
@@ -269,7 +269,7 @@ severity               => ("e" | "error"):error_sym
 	charvar, in_var_name, out_var_name, uninter_const_name.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, q_var, src_c, tau_cb, wff_cb, bf_cb,
+@inline char classes, chars, q_var, src_c, wff_cb, bf_cb,
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
 	inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
