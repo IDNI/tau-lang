@@ -2285,7 +2285,7 @@ private:
 		auto wff = args[1];
 		auto is_var = [&var](const auto& node){return node == var;};
 		// if var does not appear in the formula, we can return the formula as is
-		if (!find_top(wff, is_var)) return wff;
+		// if (!find_top(wff, is_var)) return wff;
 		std::map<nso<BAs...>, nso<BAs...>> changes;
 		for (const auto& l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
 			// if var does not appear in the clause, we can skip it
