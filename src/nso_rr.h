@@ -2914,6 +2914,31 @@ sp_tau_node<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs,
 
 } // namespace idni::tau
 
+namespace idni::rewriter {
+
+//
+// sp_tau_node factory method
+//
+template <typename...BAs>
+struct make_node_hook<idni::tau::tau_sym<BAs...>> {
+	std::optional<idni::tau::sp_tau_node<BAs...>> operator()(const node<idni::tau::tau_sym<BAs...>>& /* n */) {
+		//throw std::logic_error("not implemented");
+		return std::optional<idni::tau::sp_tau_node<BAs...>>();
+	}
+};
+
+/*sp_node<tau_sym<BAs...>> make_node_hook(const tau_sym<BAs...>& s,
+	const std::vector<sp_node<tau_sym<BAs...>>>& ns) {
+	static std::map<node<tau_sym<BAs...>>, sp_node<tau_sym<BAs...>>> cache;
+	node<tau_sym<BAs...>> key{s, ns};
+	throw std::logic_error("not implemented");
+	if (auto it = cache.find(key); it != cache.end()) return it->second;
+	return cache.emplace(key, std::make_shared<tau_sym<BAs...>>(s, ns))
+			.first->second;
+}*/
+
+} // namespace idni::rewriter
+
 //
 // operators << to pretty print the tau language related types
 //
