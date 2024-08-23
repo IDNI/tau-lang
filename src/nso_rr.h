@@ -644,6 +644,45 @@ std::string make_string(const extractor_t& extractor, const node_t& n) {
 	return ss.str();
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
+	return n->child[0];
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> trim2(const sp_tau_node<BAs...>& n) {
+	return n->child[0]->child[0];
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const std::vector<sp_tau_node<BAs...>>& nn)
+{
+	return make_node<tau_sym<BAs...>>(
+		tau_parser::instance().literal(nt), nn);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const std::initializer_list<sp_tau_node<BAs...>> ch)
+{
+	return wrap(nt, std::vector<sp_tau_node<BAs...>>(ch));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const sp_tau_node<BAs...>& n)
+{
+	return wrap(nt, { n });
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const sp_tau_node<BAs...>& c1, const sp_tau_node<BAs...>& c2)
+{
+	return wrap(nt, { c1, c2 });
+}
+
 // bind the given, using a binder, the constants of the a given sp_tau_node<...>.
 template<typename binder_t, typename... BAs>
 struct bind_transformer {
@@ -905,22 +944,20 @@ template<typename... BAs>
 struct quantifier_vars_transformer {
 	using p = tau_parser;
 	using node = sp_tau_node<BAs...>;
-	static constexpr std::array<p::nonterminal, 4>
-		quant_nts = { p::wff_ex, p::wff_all },
-		qvars_nts = { p::q_vars, p::q_vars };
+	static constexpr std::array<p::nonterminal, 2>
+					quant_nts = { p::wff_ex, p::wff_all };
 	node operator()(const node& n) {
 		if (auto it = changes.find(n); it != changes.end())
 			return it->second;
 		// if the node is any of quant_nts (all, ex, ball, bex)
-		for (size_t q = 0; q != 4; ++q)
+		for (size_t q = 0; q != 2; ++q)
 			if (is_non_terminal<BAs...>(quant_nts[q], n))
 		{
 			// ptree<BAs...>(std::cout << "QUANT: ", n) << "\n";
 			// use nonterminals according to quantifier's q
-			const p::nonterminal& quant_nt = quant_nts[q],
-				qvars_nt = qvars_nts[q];
+			const p::nonterminal& quant_nt = quant_nts[q];
 			// travers into q_vars node and access all var/capture children
-			auto q_vars = n | qvars_nt
+			auto q_vars = n | p::q_vars
 				| optional_value_extractor<node>;
 			std::vector<node>& vars = q_vars->child;
 			//  traverse to quantifier wff expression
@@ -934,12 +971,9 @@ struct quantifier_vars_transformer {
 				// get var (in a reverse order of iteration)
 				auto& var = vars[vars.size() - 1 - vi];
 				// new expression node
-				auto expr = make_node<tau_sym<BAs...>>(
-					p::instance().literal(p::wff), { nn });
+				auto expr = wrap(p::wff, nn);
 				// create a new quantifier node with var and new children
-				nn = make_node<tau_sym<BAs...>>(
-					p::instance().literal(quant_nt),
-					{ var, expr });
+				nn = wrap(quant_nt, { var, expr });
 			}
 			changes[n] = nn;
 			return nn;
@@ -966,6 +1000,24 @@ sp_tau_node<BAs...> process_quantifier_vars(const sp_tau_node<BAs...>& tau_code)
 		all_t<node>, node>(transformer, all<node>)(tau_code);
 }
 
+template<typename...BAs>
+sp_tau_node<BAs...> process_offset_variables(
+	const sp_tau_node<BAs...>& tau_code)
+{
+	using p = tau_parser;
+	using node = sp_tau_node<BAs...>;
+	std::map<node, node> changes;
+	for (const auto& offset :
+		select_all(tau_code, is_non_terminal<p::offset, BAs...>))
+	{
+		for (const auto& var :
+			select_all(offset, is_non_terminal<p::variable, BAs...>))
+				changes[var] = wrap(p::capture, var->child);
+	}
+	if (changes.size()) return replace(tau_code, changes);
+	return tau_code;
+}
+
 // create tau code from tau source
 template<typename... BAs>
 // TODO (LOW) should depend on node_t instead of BAs...
@@ -979,7 +1031,9 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 		sp_node<tau_source_sym>,
 		sp_tau_node<BAs...>>(
 			transform, all<sp_tau_source_node>)(tau_source);
-	return process_quantifier_vars(process_digits(tau_code));
+	return process_offset_variables(
+		process_quantifier_vars(
+		process_digits(tau_code)));
 }
 
 // make a library from the given tau source.
@@ -1102,45 +1156,6 @@ template<typename factory_t, typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input, factory_t& factory) {
 	auto source = make_tau_source(input);
 	return make_nso_rr_using_factory<factory_t, BAs...>(source, factory);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
-	return n->child[0];
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> trim2(const sp_tau_node<BAs...>& n) {
-	return n->child[0]->child[0];
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
-	const std::vector<sp_tau_node<BAs...>>& nn)
-{
-	return make_node<tau_sym<BAs...>>(
-		tau_parser::instance().literal(nt), nn);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
-	const std::initializer_list<sp_tau_node<BAs...>> ch)
-{
-	return wrap(nt, std::vector<sp_tau_node<BAs...>>(ch));
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
-	const sp_tau_node<BAs...>& n)
-{
-	return wrap(nt, { n });
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
-	const sp_tau_node<BAs...>& c1, const sp_tau_node<BAs...>& c2)
-{
-	return wrap(nt, { c1, c2 });
 }
 
 //------------------------------------------------------------------------------
