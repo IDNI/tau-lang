@@ -152,8 +152,8 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 TEST_SUITE("Normalize Boolean function with recurrence relation") {
 	TEST_CASE("Alternating negation") {
 		const char* rec =
-			"h[$n]($X) := h[$n - 1]($X)'."
-			"h[0]($X)  := $X.";
+			"h[n]($X) := h[n - 1]($X)'."
+			"h[0]($X) := $X.";
 		tau_parser::parse_options options;
 		options.start = tau_parser::rec_relations;
 		auto rec_src = make_tau_source(rec, options);
@@ -173,9 +173,9 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 
 	TEST_CASE("Dependend recurrence relations") {
 	 	const char* rec =
-	 		"h[$n]($X) := g[$n - 1]($X)'."
+	 		"h[n]($X) := g[n - 1]($X)'."
 			"h[0]($X) := $X."
-	 		"g[$n]($Y) := h[$n - 1]($Y)'."
+	 		"g[n]($Y) := h[n - 1]($Y)'."
 	 		"g[0]($Y) := Y'.";
 
 	 	tau_parser::parse_options options;

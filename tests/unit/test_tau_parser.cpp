@@ -75,7 +75,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 
 	TEST_CASE("nso_rr wff_rec_relation y3") {
 		const char* sample =
-			"g[$N](Y) := T."
+			"g[N](Y) := T."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -85,7 +85,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 
 	TEST_CASE("nso_rr wff_rec_relation y4") {
 		const char* sample =
-			"g[$N]($Y) := T."
+			"g[N]($Y) := T."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -95,7 +95,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 
 	TEST_CASE("nso_rr wff_rec_relation y5") {
 		const char* sample =
-			"g[$N - 1](Y) := T."
+			"g[N - 1](Y) := T."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -128,7 +128,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 	TEST_CASE("nso_rr wff_rec_relation y8") {
 		const char* sample =
 			"h[0](Y) := T."
-			"g[0](Y) := h[$N](Y)."
+			"g[0](Y) := h[N](Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -139,7 +139,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 	TEST_CASE("nso_rr wff_rec_relation y9") {
 		const char* sample =
 			"h[0](Y) := T."
-			"g[0](Y) := h[$N]($Y)."
+			"g[0](Y) := h[N]($Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -150,7 +150,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 	TEST_CASE("nso_rr wff_rec_relation y10") {
 		const char* sample =
 			"h[0](Y) := T."
-			"g[0](Y) := h[$N - 1](Y)."
+			"g[0](Y) := h[N - 1](Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -161,7 +161,7 @@ TEST_SUITE("parsing basic wff nso_rr") {
 	TEST_CASE("nso_rr wff_rec_relation y11") {
 		const char* sample =
 			"h[0](Y) := T."
-			"g[0](Y) := h[$N - 1]($Y)."
+			"g[0](Y) := h[N - 1]($Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -194,7 +194,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation y3") {
 		const char* sample =
-			"g[$N](Y) := 1."
+			"g[N](Y) := 1."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -204,7 +204,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation y4") {
 		const char* sample =
-			"g[$N]($Y) := 1."
+			"g[N]($Y) := 1."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -214,7 +214,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 
 	TEST_CASE("nso_rr bf_rec_relation y5") {
 		const char* sample =
-			"g[$N - 1](Y) := 1."
+			"g[N - 1](Y) := 1."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -247,7 +247,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 	TEST_CASE("nso_rr bf_rec_relation y8") {
 		const char* sample =
 			"h[0](Y) := 1."
-			"g[0](Y) := h[$N](Y)."
+			"g[0](Y) := h[N](Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -258,7 +258,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 	TEST_CASE("nso_rr bf_rec_relation y9") {
 		const char* sample =
 			"h[0](Y) := 1."
-			"g[0](Y) := h[$N]($Y)."
+			"g[0](Y) := h[N]($Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -269,7 +269,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 	TEST_CASE("nso_rr bf_rec_relation y10") {
 		const char* sample =
 			"h[0](Y) := 1."
-			"g[0](Y) := h[$N - 1](Y)."
+			"g[0](Y) := h[N - 1](Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -280,7 +280,7 @@ TEST_SUITE("parsing basic bf nso_rr") {
 	TEST_CASE("nso_rr bf_rec_relation y11") {
 		const char* sample =
 			"h[0](Y) := 1."
-			"g[0](Y) := h[$N - 1]($Y)."
+			"g[0](Y) := h[N - 1]($Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -314,7 +314,7 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 	TEST_CASE("nso_rr wff_rec_relation in main y3") {
 		const char* sample =
 			"g[0]($Y) := T."
-			"g[$N](Y).";
+			"g[N](Y).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
@@ -324,7 +324,7 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 	TEST_CASE("nso_rr wff_rec_relation in main y4") {
 		const char* sample =
 			"g[0]($Y) := T."
-			"g[$N]($Y).";
+			"g[N]($Y).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
@@ -334,7 +334,7 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 	TEST_CASE("nso_rr wff_rec_relation in main y5") {
 		const char* sample =
 			"g[0]($Y) := T."
-			"g[$N - 1](Y).";
+			"g[N - 1](Y).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
@@ -344,7 +344,7 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 	TEST_CASE("nso_rr wff_rec_relation in main y6") {
 		const char* sample =
 			"g[0]($Y) := T."
-			"g[$N - 1]($Y).";
+			"g[N - 1]($Y).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
@@ -374,7 +374,7 @@ TEST_SUITE("parsing basic bf nso_rr in main") {
 
 	TEST_CASE("nso_rr bf_rec_relation in main y3") {
 		const char* sample =
-			"(g[$N, 0](Y) = 0).";
+			"(g[N, 0](Y) = 0).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
@@ -383,7 +383,7 @@ TEST_SUITE("parsing basic bf nso_rr in main") {
 
 	TEST_CASE("nso_rr bf_rec_relation in main y4") {
 		const char* sample =
-			"(g[$N, 0]($Y) = 0).";
+			"(g[N, 0]($Y) = 0).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
@@ -392,7 +392,7 @@ TEST_SUITE("parsing basic bf nso_rr in main") {
 
 	TEST_CASE("nso_rr bf_rec_relation in main y5") {
 		const char* sample =
-			"(g[$N - 1](Y) = 0).";
+			"(g[N - 1](Y) = 0).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
@@ -401,7 +401,7 @@ TEST_SUITE("parsing basic bf nso_rr in main") {
 
 	TEST_CASE("nso_rr bf_rec_relation in main y6") {
 		const char* sample =
-			"(g[$N - 1]($Y) = 0).";
+			"(g[N - 1]($Y) = 0).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
@@ -434,7 +434,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr wff_rec_relation y3") {
 		const char* sample =
-			"g[$N, 0](Y) := T."
+			"g[N, 0](Y) := T."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -444,7 +444,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr wff_rec_relation y4") {
 		const char* sample =
-			"g[$N, 0]($Y) := T."
+			"g[N, 0]($Y) := T."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -454,7 +454,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr wff_rec_relation y5") {
 		const char* sample =
-			"g[$N - 1, 0](Y) := T."
+			"g[N - 1, 0](Y) := T."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -487,7 +487,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 	TEST_CASE("nso_rr wff_rec_relation y8") {
 		const char* sample =
 			"h[0](Y)    := T."
-			"g[0, 0](Y) := h[$N](Y)."
+			"g[0, 0](Y) := h[N](Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -498,7 +498,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 	TEST_CASE("nso_rr wff_rec_relation y9") {
 		const char* sample =
 			"h[0](Y)    := T."
-			"g[0, 0](Y) := h[$N]($Y)."
+			"g[0, 0](Y) := h[N]($Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -509,7 +509,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 	TEST_CASE("nso_rr wff_rec_relation y10") {
 		const char* sample =
 			"h[0](Y)    := T."
-			"g[0, 0](Y) := h[$N - 1](Y)."
+			"g[0, 0](Y) := h[N - 1](Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -520,7 +520,7 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 	TEST_CASE("nso_rr wff_rec_relation y11") {
 		const char* sample =
 			"h[0](Y)    := T."
-			"g[0, 0](Y) := h[$N - 1]($Y)."
+			"g[0, 0](Y) := h[N - 1]($Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -553,7 +553,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr bf_rec_relation y3") {
 		const char* sample =
-			"g[$N, 0](Y) := 1."
+			"g[N, 0](Y) := 1."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -563,7 +563,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr bf_rec_relation y4") {
 		const char* sample =
-			"g[$N, 0]($Y) := 1."
+			"g[N, 0]($Y) := 1."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -573,7 +573,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 	TEST_CASE("nso_rr bf_rec_relation y5") {
 		const char* sample =
-			"g[$N - 1, 0](Y) := 1."
+			"g[N - 1, 0](Y) := 1."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -606,7 +606,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	TEST_CASE("nso_rr bf_rec_relation y8") {
 		const char* sample =
 			"h[0](Y)    := 1."
-			"g[0, 0](Y) := h[$N](Y)."
+			"g[0, 0](Y) := h[N](Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -617,7 +617,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	TEST_CASE("nso_rr bf_rec_relation y9") {
 		const char* sample =
 			"h[0](Y)    := 1."
-			"g[0, 0](Y) := h[$N]($Y)."
+			"g[0, 0](Y) := h[N]($Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -628,7 +628,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	TEST_CASE("nso_rr bf_rec_relation y10") {
 		const char* sample =
 			"h[0](Y)    := 1."
-			"g[0, 0](Y) := h[$N - 1](Y)."
+			"g[0, 0](Y) := h[N - 1](Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -639,7 +639,7 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 	TEST_CASE("nso_rr bf_rec_relation y11") {
 		const char* sample =
 			"h[0](Y)    := 1."
-			"g[0, 0](Y) := h[$N - 1]($Y)."
+			"g[0, 0](Y) := h[N - 1]($Y)."
 			"T.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
@@ -730,7 +730,7 @@ TEST_SUITE("parsing inputs") {
 	}
 
 	TEST_CASE("capture loopback") {
-		const char* sample = "( i1[$n] = 0 ).";
+		const char* sample = "( i1[n] = 0 ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto input = frml | tau_parser::rr | tau_parser::main;
@@ -746,7 +746,7 @@ TEST_SUITE("parsing inputs") {
 	}
 
 	TEST_CASE("shift capture loopback") {
-		const char* sample = "( i1[$n - 1] = 0 ).";
+		const char* sample = "( i1[n - 1] = 0 ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto input = frml | tau_parser::rr | tau_parser::main;
@@ -773,7 +773,7 @@ TEST_SUITE("parsing outputs") {
 	}
 
 	TEST_CASE("capture loopback") {
-		const char* sample = "( o1[$n] = 0 ).";
+		const char* sample = "( o1[n] = 0 ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto input = frml | tau_parser::rr | tau_parser::main;
@@ -789,7 +789,7 @@ TEST_SUITE("parsing outputs") {
 	}
 
 	TEST_CASE("shift capture loopback") {
-		const char* sample = "( o1[$n - 1] = 0 ).";
+		const char* sample = "( o1[n - 1] = 0 ).";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto input = frml | tau_parser::rr | tau_parser::main;

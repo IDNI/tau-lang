@@ -44,44 +44,44 @@ TEST_SUITE("rec relations fixed point") {
 
 	TEST_CASE("loop fallbacks to F for now") {
 		const char* sample =
-			"g[$n]($x) := !g[$n-1]($x)."
-			"g[0]($x)  := T."
+			"g[n]($x) := !g[n-1]($x)."
+			"g[0]($x) := T."
 			"g(x).";
 		CHECK( fp_test_wff_f(sample) );
 	}
 
 	TEST_CASE("referring itself") {
 		const char* sample =
-			"f[$n]($x) := f[$n-1]($x) && $x = 1."
-			"f[0](x)   := T."
+			"f[n]($x) := f[n-1]($x) && $x = 1."
+			"f[0](x)  := T."
 			"f(x).";
 		CHECK( fp_test(sample, tau_parser::bf_eq) );
 	}
 
 	TEST_CASE("multiple") {
 		const char* sample =
-			"f[0]($x)  := T."
-			"g[0]($x)  := F."
-			"f[$n]($x) := f[$n-1]($x) || g[$n]($x)."
-			"g[$n]($x) := !g[$n-1]($x)."
+			"f[0]($x) := T."
+			"g[0]($x) := F."
+			"f[n]($x) := f[n-1]($x) || g[n]($x)."
+			"g[n]($x) := !g[n-1]($x)."
 			"f(x).";
 		CHECK( fp_test(sample, tau_parser::wff_t) );
 	}
 
 	TEST_CASE("no initial condition") {
 		const char* sample =
-			"f[$n]($x) := f[$n-1]($x)."
+			"f[n]($x) := f[n-1]($x)."
 			"f(x).";
 		CHECK( fp_test(sample, tau_parser::wff_ref) );
 	}
 
 	TEST_CASE("with initial conditions") {
 		const char* sample =
-			"f[0]($x)  := F."
-			"f[2]($x)  := F."
-			"f[4]($x)  := F."
-			"f[8]($x)  := F."
-			"f[$n]($x) := T."
+			"f[0]($x) := F."
+			"f[2]($x) := F."
+			"f[4]($x) := F."
+			"f[8]($x) := F."
+			"f[n]($x) := T."
 			"f(x).";
 		CHECK( fp_test(sample, tau_parser::wff_t) );
 	}
@@ -91,14 +91,14 @@ TEST_SUITE("rec relations well foundedness") {
 
 	TEST_CASE("shift in header") {
 		const char* sample =
-			"f[$n-1](x) := f[$n-2](x)."
+			"f[n-1](x) := f[n-2](x)."
 			"f(x).";
 		CHECK( fp_test_wff_f(sample) );
 	}
 
 	TEST_CASE("left fixed, right relative") {
 		const char* sample =
-			"f[0](x) := f[$n](x)."
+			"f[0](x) := f[n](x)."
 			"f(x).";
 		CHECK( fp_test_wff_f(sample) );
 	}
@@ -112,15 +112,15 @@ TEST_SUITE("rec relations well foundedness") {
 
 	TEST_CASE("detect cycle direct") {
 		const char* sample =
-			"f[$n](x) := f[$n](x)."
+			"f[n](x) := f[n](x)."
 			"f(x).";
 		CHECK( fp_test_wff_f(sample) );
 	}
 
 	TEST_CASE("detect cycle indirect") {
 		const char* sample =
-			"f[$n](x) := g[$n](x)."
-			"g[$n](x) := f[$n](x)."
+			"f[n](x) := g[n](x)."
+			"g[n](x) := f[n](x)."
 			"g(x).";
 		CHECK( fp_test_wff_f(sample) );
 	}
