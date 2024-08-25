@@ -2836,20 +2836,24 @@ sp_tau_node<BAs...> nso_rr_apply_if(const rules<nso<BAs...>>& rs,
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r,
-	const sp_tau_node<BAs...>& n) {
+nso<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const nso<BAs...>& n) {
+
+	#ifdef TAU_CACHE
+	static std::map<std::pair<rule<nso<BAs...>>, nso<BAs...>>, nso<BAs...>> cache;
+	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
+	#endif // TAU_CACHE
+
 	#ifdef TAU_MEASURE
 	measures::increase_rule_counter<nso<BAs...>>(r);
 	#endif // TAU_MEASURE
 
 	// IDEA maybe we could traverse only once
-	auto nn = apply_rule<sp_tau_node<BAs...>, is_capture_t<BAs...>>(
-						r, n, is_capture<BAs...>);
+	auto nn = apply_rule<nso<BAs...>, is_capture_t<BAs...>>(r, n, is_capture<BAs...>);
 	#ifdef TAU_MEASURE
 	if (n != nn) measures::increase_rule_hit<nso<BAs...>>(r);
 	#endif // TAU_MEASURE
 
-	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
+	std::map<nso<BAs...>, nso<BAs...>> changes;
 
 	// compute changes from callbacks
 	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
@@ -2883,11 +2887,17 @@ sp_tau_node<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r,
 
 	// apply the changes and print info
 	if (!changes.empty()) {
-		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
+		auto cnn = replace<nso<BAs...>>(nn, changes);
 		BOOST_LOG_TRIVIAL(debug) << "(C) " << cnn;
+		#ifdef TAU_CACHE
+		cache[{r, n}] = cnn;
+		#endif // TAU_CACHE
 		return cnn;
 	}
 
+	#ifdef TAU_CACHE
+	cache[{r, n}] = nn;
+	#endif // TAU_CACHE
 	return nn;
 }
 
@@ -2903,12 +2913,20 @@ nso<BAs...> replace_with(const nso<BAs...>& node, const nso<BAs...>& with,
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-sp_tau_node<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs,
-	const sp_tau_node<BAs...>& n)
+nso<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs, const nso<BAs...>& n)
 {
+	#ifdef TAU_CACHE
+	static std::map<std::pair<rules<nso<BAs...>>, nso<BAs...>>, nso<BAs...>> cache;
+	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
+	#endif // TAU_CACHE
+
 	if (rs.empty()) return n;
-	sp_tau_node<BAs...> nn = n;
+	nso<BAs...> nn = n;
 	for (auto& r : rs) nn = nso_rr_apply<BAs...>(r, nn);
+
+	#ifdef TAU_CACHE
+	cache[{rs, n}] = nn;
+	#endif // TAU_CACHE
 	return nn;
 }
 
