@@ -2906,18 +2906,18 @@ template<typename... BAs>
 sp_tau_node<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs,
 	const sp_tau_node<BAs...>& n)
 {
-	#ifdef CACHE
-	static std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> cache;
-	if (auto it = cache.find(n); it != cache.end()) return it->second;
-	#endif // CACHE
+	#ifdef TAU_CACHE
+	static std::map<std::pair<rules<nso<BAs...>>, sp_tau_node<BAs...>>, sp_tau_node<BAs...>> cache;
+	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
+	#endif // TAU_CACHE
 
 	if (rs.empty()) return n;
 	sp_tau_node<BAs...> nn = n;
 	for (auto& r : rs) nn = nso_rr_apply<BAs...>(r, nn);
 
-	#ifdef CACHE
-	cache[n] = nn;
-	#endif // CACHE
+	#ifdef TAU_CACHE
+	cache[{rs, n}] = nn;
+	#endif // TAU_CACHE
 	return nn;
 }
 
