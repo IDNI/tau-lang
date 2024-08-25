@@ -72,7 +72,7 @@ template<typename...BAs>
 bool is_zero(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(
 			[](const auto& l) -> bool {
-				return l.is_zero();
+				return l == false;
 			}
 		), l);
 }
@@ -81,7 +81,7 @@ template<typename...BAs>
 bool is_one(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(
 			[](const auto& l) -> bool {
-				return l.is_one();
+				return l == true;
 			}
 		), l);
 }
