@@ -56,6 +56,10 @@ hbdd<B, o> normalize (const hbdd<B, o>& x) {return x;}
 template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> splitter (const hbdd<B, o>& x, splitter_type st) { return x->splitter(st); }
 
+template<typename B, auto o = bdd_options<>::create()>
+hbdd<B, o> bdd_bad_splitter (const bdd_handle<B, o>& x = bdd_handle<B, o>::htrue) {
+	return x->bad_splitter();
+}
 
 #ifdef DEBUG
 template<typename B, auto o = bdd_options<>::create()>
@@ -265,6 +269,10 @@ struct bdd_handle {
 		return r;
 	}
 
+	hbdd<B, o> bad_splitter () {
+		return get(bdd<B,o>::split_clause(b));
+	}
+
 	hbdd<B, o> splitter (splitter_type st) {
 		switch(st) {
 		case splitter_type::lower: {
@@ -283,7 +291,7 @@ struct bdd_handle {
 			break;
 		}
 		}
-		return get(bdd<B,o>::split_clause(b));
+		return bad_splitter();
 	}
 
 #ifndef DEBUG

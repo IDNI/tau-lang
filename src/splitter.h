@@ -206,6 +206,16 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 	return original_fm;
 }
 
+// Return a bad splitter for the provided formula
+// We assume the formula is fully normalized by normalizer
+template<typename... BAs>
+nso<BAs...> tau_bad_splitter(nso<BAs...> fm = _1<BAs...>) {
+	stringstream ss;
+	ss << "split" << get_new_uniter_const_id(fm);
+	auto new_uniter_const = wrap(tau_parser::wff, build_wff_uniter_const<BAs...>(ss.str()));
+	return fm = _1<BAs...> ? new_uniter_const : build_wff_and(fm, new_uniter_const);
+}
+
 // Return a splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
@@ -262,10 +272,7 @@ nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
 	} while (++i < m.size());
 
 	// return bad splitter by conjuncting new uninterpreted constant
-	stringstream ss;
-	ss << "split" << get_new_uniter_const_id(fm);
-	auto new_uniter_const = wrap(tau_parser::wff, build_wff_uniter_const<BAs...>(ss.str()));
-	return build_wff_and(fm, new_uniter_const);
+	return tau_bad_splitter(fm);
 }
 }
 #endif //SPLITTER_H

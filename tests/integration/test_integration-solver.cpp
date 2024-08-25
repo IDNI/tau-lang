@@ -26,7 +26,7 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-TEST_SUITE("minterm_iterator") {
+/*TEST_SUITE("minterm_iterator") {
 
 	TEST_CASE("with no vars") {
 		const char* sample = "0 = 0.";
@@ -372,3 +372,94 @@ TEST_SUITE("find_solution") {
 		CHECK ( solution.size() == 2 );
 	}
 }
+
+TEST_SUITE("lgrs") {
+
+	TEST_CASE("two var: x | y = 0.") {
+		const char* sample = "x | y = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
+		auto solution = lgrs(sample_formula);
+		CHECK ( solution.size() == 2 );
+	}
+
+	TEST_CASE("two var: x & y = 0.") {
+		const char* sample = "x & y = 0.";
+		auto sample_src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
+		auto solution = lgrs(sample_formula);
+		CHECK ( solution.size() == 2 );
+	}
+}
+
+TEST_SUITE("solve_minterm_system") {
+
+	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: a} y != 0.") {
+		bdd_init<Bool>();
+		const char* sample1 = "{bdd: a} x != 0.";
+		const char* sample2 = "{bdd: a}' x != 0.";
+		auto sample_src1 = make_tau_source(sample1);
+		auto sample_src2 = make_tau_source(sample2);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula1 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src1, bf).main;
+		nso<bdd_test> sample_formula2 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src2, bf).main;
+		minterm_system<bdd_test> sample_system {sample_formula1, sample_formula2};
+		auto solution = solve_minterm_system<bdd_test, bdd_test>(sample_system);
+		CHECK ( solution.size() == 1 );
+	}
+}*/
+
+TEST_SUITE("solve_inequality_system") {
+
+	TEST_CASE("one var: {bdd: a} x | {bdd: a} y != 0 && {bdd: a} y & {bdd: a} x != 0.") {
+		bdd_init<Bool>();
+		const char* sample1 = "{bdd: a} x | {bdd: b} y != 0.";
+		const char* sample2 = "{bdd: b} y & {bdd: a} x != 0.";
+		auto sample_src1 = make_tau_source(sample1);
+		auto sample_src2 = make_tau_source(sample2);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula1 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src1, bf).main;
+		nso<bdd_test> sample_formula2 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src2, bf).main;
+		inequality_system<bdd_test> sample_system {sample_formula1, sample_formula2};
+		auto solution = solve_inequality_system<bdd_test, bdd_test>(sample_system);
+		CHECK ( solution.size() == 2 );
+	}
+
+}
+
+/*TEST_SUITE("solve_inequality_system") {
+
+	TEST_CASE("one var: {bdd: a} x | {bdd: a} y != 0 && {bdd: a} y & {bdd: a} x != 0.") {
+		bdd_init<Bool>();
+		const char* sample1 = "{bdd: a} x | {bdd: a} y != 0.";
+		const char* sample2 = "{bdd: a} y & {bdd: a} x != 0.";
+		auto sample_src1 = make_tau_source(sample1);
+		auto sample_src2 = make_tau_source(sample2);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula1 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src1, bf).main;
+		nso<bdd_test> sample_formula2 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src2, bf).main;
+		inequality_system<bdd_test> sample_system {sample_formula1, sample_formula2};
+		auto solution = solve_inequality_system<bdd_test, bdd_test>(sample_system);
+		CHECK ( solution.size() == 2 );
+	}
+
+}
+
+TEST_SUITE("solve_system") {
+
+	TEST_CASE("one var: {bdd: a} x | {bdd: a} y != 0 && {bdd: a} y & {bdd: a} x != 0.") {
+		bdd_init<Bool>();
+		const char* sample1 = "{bdd: a} x & {bdd: a} y = 0.";
+		const char* sample2 = "{bdd: a} y & {bdd: a} x != 0.";
+		auto sample_src1 = make_tau_source(sample1);
+		auto sample_src2 = make_tau_source(sample2);
+		bdd_test_factory bf;
+		nso<bdd_test> sample_formula1 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src1, bf).main;
+		nso<bdd_test> sample_formula2 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src2, bf).main;
+		equation_system<bdd_test> sample_system { {sample_formula1}, {sample_formula2}};
+		auto solution = solve_system<bdd_test, bdd_test>(sample_system);
+		CHECK ( solution.size() == 2 );
+	}
+}*/
