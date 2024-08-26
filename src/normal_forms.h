@@ -61,15 +61,7 @@ RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_4, "! always $X ::= sometimes (! $X).")
 RULE(WFF_PUSH_NEGATION_INWARDS_5, "! sometimes $X ::= always (! $X).")
-RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
-RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
-RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
-RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
-RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
-RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
 RULE(WFF_SIMPLIFY_SOMETIMES_3,  "(sometimes $X) && (always $X) ::= always $X.")
-RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
-RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
 RULE(WFF_SIMPLIFY_ALWAYS_3,		"(always $X) && (sometimes $X) ::= always $X.")
 RULE(WFF_PUSH_SOMETIMES_INWARDS,"sometimes($X || $Y) ::= (sometimes $X) || (sometimes $Y).")
 RULE(WFF_PUSH_ALWAYS_INWARDS,   "always($X && $Y) ::= (always $X) && (always $Y).")
@@ -205,15 +197,7 @@ static auto simplify_bf_more = make_library<BAs...>(
 
 template<typename... BAs>
 static auto simplify_wff = make_library<BAs...>(
-	WFF_SIMPLIFY_ONE_5
-	+ WFF_SIMPLIFY_ONE_6
-	+ WFF_SIMPLIFY_ZERO_5
-	+ WFF_SIMPLIFY_ZERO_6
-	+ WFF_SIMPLIFY_SOMETIMES_1
-	+ WFF_SIMPLIFY_SOMETIMES_2
-	+ WFF_SIMPLIFY_SOMETIMES_3
-	+ WFF_SIMPLIFY_ALWAYS_1
-	+ WFF_SIMPLIFY_ALWAYS_2
+	WFF_SIMPLIFY_SOMETIMES_3
 	+ WFF_SIMPLIFY_ALWAYS_3
 );
 
