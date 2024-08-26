@@ -69,27 +69,10 @@ RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_4, "! always $X ::= sometimes (! $X).")
 RULE(WFF_PUSH_NEGATION_INWARDS_5, "! sometimes $X ::= always (! $X).")
-//RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
-//RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
-//RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
-//RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
-//RULE(WFF_SIMPLIFY_ONE_3, "$X && T ::= $X.")
-//RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
 RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
 RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
-//RULE(WFF_SIMPLIFY_ZERO_0, "F && $X ::= F.")
-//RULE(WFF_SIMPLIFY_ZERO_1, "$X && F ::= F.")
-//RULE(WFF_SIMPLIFY_ZERO_2, "F || $X ::= $X.")
-//RULE(WFF_SIMPLIFY_ZERO_3, "$X || F ::= $X.")
-//RULE(WFF_SIMPLIFY_ZERO_4, "! F ::= T.")
 RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
 RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
-//RULE(WFF_SIMPLIFY_SELF_0, "$X && $X ::= $X.")
-//RULE(WFF_SIMPLIFY_SELF_1, "$X || $X ::= $X.")
-//RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
-//RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
-//RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
-//RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
 RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
 RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
 RULE(WFF_SIMPLIFY_SOMETIMES_3,  "(sometimes $X) && (always $X) ::= always $X.")
@@ -222,7 +205,6 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_PUSH_NEGATION_INWARDS_4
 	+ WFF_PUSH_NEGATION_INWARDS_5
-	//+ WFF_ELIM_DOUBLE_NEGATION_0
 	+ WFF_PUSH_ALWAYS_INWARDS
 	+ WFF_PUSH_SOMETIMES_INWARDS
 );
@@ -235,26 +217,10 @@ static auto simplify_bf_more = make_library<BAs...>(
 
 template<typename... BAs>
 static auto simplify_wff = make_library<BAs...>(
-	//WFF_SIMPLIFY_ONE_0
-	//+ WFF_SIMPLIFY_ONE_1
-	//+ WFF_SIMPLIFY_ONE_2
-	//+ WFF_SIMPLIFY_ONE_3
-	//+ WFF_SIMPLIFY_ONE_4
 	WFF_SIMPLIFY_ONE_5
 	+ WFF_SIMPLIFY_ONE_6
-	//+ WFF_SIMPLIFY_ZERO_0
-	//+ WFF_SIMPLIFY_ZERO_1
-	//+ WFF_SIMPLIFY_ZERO_2
-	//+ WFF_SIMPLIFY_ZERO_3
-	//+ WFF_SIMPLIFY_ZERO_4
 	+ WFF_SIMPLIFY_ZERO_5
 	+ WFF_SIMPLIFY_ZERO_6
-	//+ WFF_SIMPLIFY_SELF_0
-	//+ WFF_SIMPLIFY_SELF_1
-	//+ WFF_SIMPLIFY_SELF_2
-	//+ WFF_SIMPLIFY_SELF_3
-	//+ WFF_SIMPLIFY_SELF_4
-	//+ WFF_SIMPLIFY_SELF_5
 	+ WFF_SIMPLIFY_SOMETIMES_1
 	+ WFF_SIMPLIFY_SOMETIMES_2
 	+ WFF_SIMPLIFY_SOMETIMES_3
@@ -317,7 +283,6 @@ static auto push_neg_for_snf = make_library<BAs...>(
 	WFF_PUSH_NEGATION_UPWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_1
-	//+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -337,7 +302,6 @@ template<typename... BAs>
 static auto fix_neg_in_snf = make_library<BAs...>(
 	WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
-	//+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -366,7 +330,6 @@ static auto to_cnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_PUSH_NEGATION_INWARDS_4
 	+ WFF_PUSH_NEGATION_INWARDS_5
-	//+ WFF_ELIM_DOUBLE_NEGATION_0
 	+ WFF_PUSH_ALWAYS_INWARDS
 	+ WFF_PUSH_SOMETIMES_INWARDS
 );
@@ -387,7 +350,6 @@ static auto to_nnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_PUSH_NEGATION_INWARDS_4
 	+ WFF_PUSH_NEGATION_INWARDS_5
-	//+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename...BAs>

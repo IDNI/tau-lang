@@ -82,114 +82,11 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	/*TEST_CASE("WFF_ELIM_DOUBLE_NEGATION_0") {
-		auto [ matcher, body, result ] =
-			test_rule(WFF_ELIM_DOUBLE_NEGATION_0);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}*/
-
 	TEST_CASE("WFF_ELIM_FORALL") {
 		auto [ matcher, body, result ] = test_rule(WFF_ELIM_FORALL);
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-
-	/*TEST_CASE("WFF_SIMPLIFY_ONE_0") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ONE_0);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ONE_1") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ONE_1);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ONE_2") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ONE_2);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ONE_3") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ONE_3);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ONE_4") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ONE_4);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ZERO_0") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ZERO_0);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ZERO_1") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ZERO_1);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ZERO_2") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ZERO_2);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ZERO_3") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ZERO_3);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_ZERO_4") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ZERO_4);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_SELF_0") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_SELF_0);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_SELF_1") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_SELF_1);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_SELF_2") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_SELF_2);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_SELF_3") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_SELF_3);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_SELF_4") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_SELF_4);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_SIMPLIFY_SELF_5") {
-		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_SELF_5);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}*/
 
 	TEST_CASE("WFF_DEF_XOR") {
 		auto [ matcher, body, result ] = test_rule(WFF_DEF_XOR);
