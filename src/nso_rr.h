@@ -1148,6 +1148,28 @@ sp_tau_node<BAs...> process_offset_variables(
 	return tau_code;
 }
 
+template<typename...BAs>
+sp_tau_node<BAs...> process_defs_input_variables(
+	const sp_tau_node<BAs...>& tau_code)
+{
+	using p = tau_parser;
+	using node = sp_tau_node<BAs...>;
+	std::map<node, node> changes;
+	for (const auto& def :
+		select_all(tau_code, is_non_terminal<p::rec_relation, BAs...>))
+	{
+		for (const auto& ref_arg : select_all(def->child[0],
+			is_non_terminal<p::ref_arg, BAs...>))
+				for (const auto& var : select_all(ref_arg,
+					is_non_terminal<p::variable, BAs...>))
+		{
+			changes[var] = wrap(p::capture, var->child);
+		}
+	}
+	if (changes.size()) return replace(tau_code, changes);
+	return tau_code;
+}
+
 // create tau code from tau source
 template<typename... BAs>
 // TODO (LOW) should depend on node_t instead of BAs...
@@ -1162,9 +1184,10 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 		sp_node<tau_source_sym>,
 		sp_tau_node<BAs...>>(
 			transform, all<sp_tau_source_node>)(tau_source);
-	return process_offset_variables(
+	return process_defs_input_variables(
+		process_offset_variables(
 		process_quantifier_vars(
-		process_digits(tau_code)));
+		process_digits(tau_code))));
 }
 
 // make a library from the given tau source.
