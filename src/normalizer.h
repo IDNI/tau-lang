@@ -46,11 +46,6 @@ static auto elim_for_all = make_library<BAs...>(
 	WFF_ELIM_FORALL
 );
 
-template<typename... BAs>
-static auto wff_remove_existential = make_library<BAs...>(
-	WFF_REMOVE_EX_0
-);
-
 // executes the normalizer on the given source code taking into account the
 // bindings provided.
 template<typename... BAs>
@@ -80,47 +75,6 @@ rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
 	return { nrec_relations, nmain };
 }
 
-template<typename... BAs>
-struct remove_one_wff_existential {
-	nso<BAs...> operator()(nso<BAs...> n) const {
-		auto inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
-		// As long as a quantifier is found
-		while (inner_fm) {
-			auto has_var = [&inner_fm](const auto& node){return node == trim2(inner_fm.value());};
-			auto removed = trim(inner_fm.value())->child[1];
-                if (!find_top(removed, has_var)) {
-                	std::map<nso<BAs...>, nso<BAs...>> changes{{inner_fm.value(), removed}};
-					n = replace(n, changes);
-					inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
-                	continue;
-            }
-			removed = removed
-				// Reductions to prevent blow ups
-				// and DNF conversion needed for quantifier removal
-				| bf_reduce_canonical<BAs...>()
-				| repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
-				| repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
-				| repeat_all<step<BAs...>, BAs...> (elim_trivial_eqs<BAs...>)
-				| wff_reduce_dnf<BAs...>();
-			removed = build_wff_ex(trim2(inner_fm.value()), removed)
-				| wff_remove_existential<BAs...>;
-			std::map<nso<BAs...>, nso<BAs...>> changes{{inner_fm.value(), removed}};
-			n = replace(n, changes);
-			inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
-			// In case a quantifier cannot be removed, quantifier elimination needs to stop
-			auto has_node = [&inner_fm](const auto& node){return node == inner_fm;};
-			if (find_top(removed, has_node))
-				break;
-		}
-		return n;
-	}
-};
-
-template<typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& form, const remove_one_wff_existential<BAs...>& r) {
-	return r(form);
-}
-
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 nso<BAs...> normalizer_step(const nso<BAs...>& form) {
@@ -130,9 +84,9 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 	#endif // TAU_CACHE
 	auto result = form
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(apply_defs<BAs...>))
-		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(elim_for_all<BAs...>))
-		| remove_one_wff_existential<BAs...>()
-		// After removal of existentials, only subformulas previously under the scope of a quantifier
+		// Push all quantifiers in and eliminate them
+		| (nso_transform<BAs...>)eliminate_quantifiers<BAs...>
+		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
 		// are reduced
 		| bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(elim_eqs<BAs...>)
