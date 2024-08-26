@@ -8,7 +8,6 @@ set(TESTS
 	rules-bf_parsing
 	rules-wff_execution
 	rules-wff_parsing
-	#rules-tau_execution
 	builders
 	rewriting
 	nso_rr
@@ -19,7 +18,6 @@ set(TESTS
 	bdd_binding
 	traversal
 	tau
-	#executor
 	variant_ba
 	normal_forms
 )
