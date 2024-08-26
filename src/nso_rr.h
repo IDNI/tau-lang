@@ -1179,7 +1179,8 @@ library<nso<BAs...>> make_library(sp_tau_source_node& tau_source) {
 // TODO (LOW) should depend on node_t instead of BAs...
 template<typename... BAs>
 library<nso<BAs...>> make_library(const std::string& source) {
-	auto tau_source = make_tau_source(source);
+	auto tau_source = make_tau_source(source, {
+						.start = tau_parser::library });
 	return make_library<BAs...>(tau_source);
 }
 
@@ -1257,7 +1258,7 @@ rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& source,
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_binder(std::string& input, binder_t& binder) {
-	auto source = make_tau_source(input);
+	auto source = make_tau_source(input, { .start = tau_parser::rr });
 	return make_nso_rr_using_binder<binder_t, BAs...>(source, binder);
 }
 
@@ -1284,7 +1285,7 @@ template<typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_bindings(const std::string& input,
 	const bindings<BAs...>& bindings)
 {
-	auto source = make_tau_source(input);
+	auto source = make_tau_source(input, { .start = tau_parser::rr });
 	return make_nso_rr_using_bindings<BAs...>(source, bindings);
 }
 
@@ -1311,7 +1312,7 @@ template<typename factory_t, typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input,
 	factory_t& factory)
 {
-	auto source = make_tau_source(input);
+	auto source = make_tau_source(input, { .start = tau_parser::rr });
 	return make_nso_rr_using_factory<factory_t, BAs...>(source, factory);
 }
 
@@ -1592,9 +1593,9 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 // creates a specific builder from a sp_tau_node.
 template<typename... BAs>
 builder<BAs...> make_builder(const sp_tau_node<BAs...>& builder) {
-	auto head = builder | tau_parser::builder | tau_parser::builder_head
+	auto head = builder | tau_parser::builder_head
 		| optional_value_extractor<sp_tau_node<BAs...>>;
-	auto type_node = builder | tau_parser::builder
+	auto type_node = builder
 		| tau_parser::builder_body | only_child_extractor<BAs...>;
 	auto type = type_node | non_terminal_extractor<BAs...>
 		| optional_value_extractor<size_t>;
@@ -1619,7 +1620,8 @@ builder<BAs...> make_builder(sp_tau_source_node& tau_source) {
 // make a builder from the given tau source string.
 template<typename... BAs>
 builder<BAs...> make_builder(const std::string& source) {
-	auto tau_source = make_tau_source(source);
+	auto tau_source = make_tau_source(source, {
+						.start = tau_parser::builder });
 	return make_builder<BAs...>(tau_source);
 }
 
