@@ -92,7 +92,6 @@ struct remove_one_wff_existential {
 				| bf_reduce_canonical<BAs...>()
 				| repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
 				| repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
-				| repeat_all<step<BAs...>, BAs...> (elim_trivial_eqs<BAs...>)
 				| wff_reduce_dnf<BAs...>();
 			removed = build_wff_ex(trim2(inner_fm.value()), removed)
 				| wff_remove_existential<BAs...>;

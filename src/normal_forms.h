@@ -104,10 +104,6 @@ RULE(BF_CALLBACK_EQ, "{ $X } = 0 ::= bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
 RULE(BF_CALLBACK_NEQ, "{ $X } != 0 ::= bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
 
 // trivialities
-RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
-RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
-RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
-RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
 RULE(BF_EQ_AND_SIMPLIFY_0, "$X != 0 && $X = 0 ::= F.")
 RULE(BF_EQ_AND_SIMPLIFY_1, "$X = 0 && $X != 0 ::= F.")
 RULE(BF_EQ_OR_SIMPLIFY_0, "$X != 0 || $X = 0 ::= T.")
@@ -249,33 +245,13 @@ static auto elim_bf_constant_01 = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto elim_trivial_eqs = make_library<BAs...>(
-	BF_EQ_SIMPLIFY_0
-	+ BF_EQ_SIMPLIFY_1
-	+ BF_NEQ_SIMPLIFY_0
-	+ BF_NEQ_SIMPLIFY_1
-);
-
-template<typename... BAs>
 static auto elim_eqs = make_library<BAs...>(
 	BF_CALLBACK_EQ
 	+ BF_CALLBACK_NEQ
-	+ BF_EQ_SIMPLIFY_0
-	+ BF_EQ_SIMPLIFY_1
-	+ BF_NEQ_SIMPLIFY_0
-	+ BF_NEQ_SIMPLIFY_1
 	+ BF_EQ_AND_SIMPLIFY_0
 	+ BF_EQ_AND_SIMPLIFY_1
 	+ BF_EQ_OR_SIMPLIFY_0
 	+ BF_EQ_OR_SIMPLIFY_1
-);
-
-template<typename... BAs>
-static auto trivialities = make_library<BAs...>(
-	BF_EQ_SIMPLIFY_0
-	+ BF_EQ_SIMPLIFY_1
-	+ BF_NEQ_SIMPLIFY_0
-	+ BF_NEQ_SIMPLIFY_1
 );
 
 template<typename... BAs>
@@ -290,7 +266,6 @@ static auto simplify_snf = repeat_all<step<BAs...>, BAs...>(
 	apply_cb<BAs...>
 	| elim_eqs<BAs...>
 	| simplify_wff<BAs...>
-	| trivialities<BAs...>
 	| push_neg_for_snf<BAs...>);
 
 template<typename... BAs>
@@ -689,8 +664,7 @@ std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 		| onf_wff<BAs...>(var)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>
-			| trivialities<BAs...>);
+			| simplify_wff<BAs...>);
 }
 
 template<typename...BAs>
@@ -701,7 +675,6 @@ nso<BAs...> dnf_wff(const nso<BAs...>& n) {
 			apply_wff_defs<BAs...>
 			| to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
 	auto dnf = dnf_bf(nform);
@@ -731,7 +704,6 @@ nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 			apply_wff_defs<BAs...>
 			| to_cnf_wff<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
 	auto cnf = cnf_bf(wff);
@@ -775,7 +747,6 @@ nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 			apply_wff_defs<BAs...>
 			| to_nnf_wff<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
 	auto nnf = nnf_bf(nform);
@@ -1885,7 +1856,6 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 			| push_neg_for_snf<BAs...>)
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
 	// in the second step we compute the SNF of the negation of the the result
@@ -1897,7 +1867,6 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 			apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 			| fix_neg_in_snf<BAs...>)
 		| bf_reduce_canonical<BAs...>();
 	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, second_step}};

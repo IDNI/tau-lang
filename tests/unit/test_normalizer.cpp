@@ -37,11 +37,11 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("to_dnf_wff") {
-		CHECK( to_dnf_wff<Bool>.size() == 11 );
+		CHECK( to_dnf_wff<Bool>.size() == 10 );
 	}
 
 	TEST_CASE("simplify_wff") {
-		CHECK( simplify_wff<Bool>.size() == 26 );
+		CHECK( simplify_wff<Bool>.size() == 10 );
 	}
 
 	TEST_CASE("apply_cb") {
@@ -50,10 +50,6 @@ TEST_SUITE("steps parsing") {
 
 	TEST_CASE("wff_remove_existential") {
 		CHECK( wff_remove_existential<Bool>.size() == 1 );
-	}
-
-	TEST_CASE("trivialities") {
-		CHECK( trivialities<Bool>.size() == 4 );
 	}
 }
 

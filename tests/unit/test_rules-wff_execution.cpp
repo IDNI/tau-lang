@@ -142,30 +142,6 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("BF_EQ_SIMPLIFY_0") {
-		auto [ matcher, body, result ] = test_rule(BF_EQ_SIMPLIFY_0);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_EQ_SIMPLIFY_1") {
-		auto [ matcher, body, result ] = test_rule(BF_EQ_SIMPLIFY_1);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_NEQ_SIMPLIFY_0") {
-		auto [ matcher, body, result ] = test_rule(BF_NEQ_SIMPLIFY_0);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_NEQ_SIMPLIFY_1") {
-		auto [ matcher, body, result ] = test_rule(BF_NEQ_SIMPLIFY_1);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
 	TEST_CASE("WFF_SQUEEZE_POSITIVES_0") {
 		auto [ matcher, body, result ] =
 			test_rule(WFF_SQUEEZE_POSITIVES_0);
