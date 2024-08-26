@@ -40,9 +40,9 @@ TEST_SUITE("steps parsing") {
 		CHECK( to_dnf_wff<Bool>.size() == 11 );
 	}
 
-	TEST_CASE("simplify_bf") {
+	/*TEST_CASE("simplify_bf") {
 		CHECK( simplify_bf<Bool>.size() == 16 );
-	}
+	}*/
 
 	TEST_CASE("simplify_wff") {
 		CHECK( simplify_wff<Bool>.size() == 26 );

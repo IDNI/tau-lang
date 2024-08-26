@@ -121,6 +121,12 @@ struct rr {
 
 // check if a node is a non terminal node
 template<typename... BAs>
+bool is_non_terminal_sym(const tau_sym<BAs...>& s) {
+	return std::holds_alternative<tau_source_sym>(s)
+		&& get<tau_source_sym>(s).nt();
+}
+
+template<typename... BAs>
 bool is_non_terminal_node(const sp_tau_node<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value)
 					&& get<tau_source_sym>(n->value).nt();
@@ -140,10 +146,21 @@ bool is_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
 				&& get<tau_source_sym>(n->value).n() == nt;
 }
 
+template <typename... BAs>
+bool is_non_terminal_sym(const size_t nt, const tau_sym<BAs...>& s) {
+	return is_non_terminal_sym<BAs...>(s)
+				&& get<tau_source_sym>(s).n() == nt;
+}
+
 // check if the node is the given non terminal (template approach)
 template <size_t nt, typename...BAs>
 bool is_non_terminal(const sp_tau_node<BAs...>& n) {
 	return is_non_terminal<BAs...>(nt, n);
+}
+
+template <size_t nt, typename...BAs>
+bool is_non_terminal_sym(const tau_sym<BAs...>& s) {
+	return is_non_terminal_sym<BAs...>(nt, s);
 }
 
 // factory method for is_non_terminal predicate
@@ -2930,30 +2947,241 @@ nso<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs, const nso<BAs...>& n)
 	return nn;
 }
 
+//
+// sp_tau_node factory method
+//
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_bf_or(const node<tau_sym<BAs...>>& n) {
+	//RULE(BF_SIMPLIFY_ONE_0, "1 | $X := 1.")
+	if (is_non_terminal_sym<tau_parser::bf_t>(n.child[0]->child[0]->child[0]->value))
+		return n.child[0]->child[0];
+	//RULE(BF_SIMPLIFY_ONE_1, "$X | 1 := 1.")
+	if (is_non_terminal_sym<tau_parser::bf_t>(n.child[0]->child[1]->child[0]->value))
+		return n.child[0]->child[1];
+	//RULE(BF_SIMPLIFY_ZERO_2, "0 | $X := $X.")
+	if (is_non_terminal_sym<tau_parser::bf_f>(n.child[0]->child[0]->child[0]->value))
+		return n.child[0]->child[1];
+	//RULE(BF_SIMPLIFY_ZERO_3, "$X | 0 := $X.")
+	if (is_non_terminal_sym<tau_parser::bf_f>(n.child[0]->child[1]->child[0]->value))
+		return n.child[0]->child[0];
+	//RULE(BF_SIMPLIFY_SELF_1, "$X | $X := $X.")
+	if (n.child[0]->child[0] == n.child[0]->child[1])
+		return n.child[0]->child[0];
+	//RULE(BF_SIMPLIFY_SELF_3, "$X | $X' := 1.")
+	if (auto negated = n.child[0]->child[1] | tau_parser::bf_neg |tau_parser::bf;
+			negated && negated.value() == n.child[0]->child[0])
+		return _1<BAs...>;
+	//RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
+	if (auto negated = n.child[0]->child[0] | tau_parser::bf_neg | tau_parser::bf;
+			negated && negated.value() == n.child[0]->child[1])
+		return _1<BAs...>;
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_bf_ba(const node<tau_sym<BAs...>>& n) {
+	//RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
+	//RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
+	//RULE(BF_CALLBACK_XOR, "{ $X } + { $Y } := bf_xor_cb $X $Y.")
+	//RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
+	//RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
+	//RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_bf_and(const node<tau_sym<BAs...>>& n) {
+	//RULE(BF_SIMPLIFY_ONE_2, "1 & $X := $X.")
+	if (is_non_terminal<tau_parser::bf_t>(n.child[0]->child[0]->child[0]))
+		return n.child[0]->child[1];
+	//RULE(BF_SIMPLIFY_ONE_3, "$X & 1 := $X.")
+	if (is_non_terminal<tau_parser::bf_t>(n.child[0]->child[1]->child[0]))
+		return n.child[0]->child[0];
+	//RULE(BF_SIMPLIFY_ZERO_0, "0 & $X := 0.")
+	if (is_non_terminal<tau_parser::bf_f>(n.child[0]->child[0]->child[0]))
+		return n.child[0]->child[0];
+	//RULE(BF_SIMPLIFY_ZERO_1, "$X & 0 := 0.")
+	if (is_non_terminal<tau_parser::bf_f>(n.child[0]->child[1]->child[0]))
+		return n.child[0]->child[1];
+	//RULE(BF_SIMPLIFY_SELF_0, "$X & $X := $X.")
+	if (n.child[0]->child[0] == n.child[0]->child[1])
+		return n.child[0]->child[0];
+	//RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
+	if (auto negated = n.child[0]->child[1] | tau_parser::bf_neg | tau_parser::bf;
+			negated && negated.value() == n.child[0]->child[0])
+		return _0<BAs...>;
+	//RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
+	if (auto negated = n.child[0]->child[0] | tau_parser::bf_neg | tau_parser::bf;
+			negated && negated.value() == n.child[0]->child[1])
+		return _0<BAs...>;
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_bf_neg(const node<tau_sym<BAs...>>& n) {
+	//RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
+	//RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
+	//RULE(BF_SIMPLIFY_ZERO_4, "0' := 1.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_bf(const node<tau_sym<BAs...>>& n) {
+	//RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
+	if (auto neg_one = n.child[0] | tau_parser::bf | tau_parser::bf_t;
+			neg_one && is_non_terminal<tau_parser::bf_neg>(n.child[0]))
+		return _0<BAs...>;
+	//RULE(BF_SIMPLIFY_ZERO_4, "0' := 1.")
+	if (auto neg_zero = n.child[0] | tau_parser::bf | tau_parser::bf_f;
+			neg_zero && is_non_terminal<tau_parser::bf_neg>(n.child[0]))
+		return _1<BAs...>;
+	//RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
+	if (auto double_neg = n.child[0] | tau_parser::bf | tau_parser::bf_neg; double_neg
+			&& is_non_terminal<tau_parser::bf_neg>(n.child[0]))
+		return double_neg.value()->child[0];
+	// if n is ref, capture, 0 or 1, we can return accordingly
+	if (n.child.size() != 1) return std::make_shared<node<tau_sym<BAs...>>>(n);
+	// otherwise we need to check the children
+	if (std::holds_alternative<tau_source_sym>(n.child[0]->value)
+		&& std::get<tau_source_sym>(n.child[0]->value).nt())
+		switch (std::get<tau_source_sym>(n.child[0]->value).n()) {
+			case tau_parser::bf_or:
+				return make_node_hook_bf_or<BAs...>(n);
+			case tau_parser::bf_and:
+				return make_node_hook_bf_and<BAs...>(n);
+			case tau_parser::bf_neg:
+				return make_node_hook_bf_neg<BAs...>(n);
+			default: return std::make_shared<node<tau_sym<BAs...>>>(n);
+		}
+	return make_node_hook_bf_ba<BAs...>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_and(const node<tau_sym<BAs...>>& n) {
+	//RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
+	//RULE(WFF_SIMPLIFY_ONE_3, "$X && T ::= $X.")
+	//RULE(WFF_SIMPLIFY_ZERO_0, "F && $X ::= F.")
+	//RULE(WFF_SIMPLIFY_ZERO_1, "$X && F ::= F.")
+	//RULE(WFF_SIMPLIFY_SELF_0, "$X && $X ::= $X.")
+	//RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
+	//RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
+	//RULE(BF_EQ_AND_SIMPLIFY_0, "$X != 0 && $X = 0 ::= F.")
+	//RULE(BF_EQ_AND_SIMPLIFY_1, "$X = 0 && $X != 0 ::= F.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_or(const node<tau_sym<BAs...>>& n) {
+	//RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
+	//RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
+	//RULE(WFF_SIMPLIFY_ZERO_2, "F || $X ::= $X.")
+	//RULE(WFF_SIMPLIFY_ZERO_3, "$X || F ::= $X.")
+	//RULE(WFF_SIMPLIFY_SELF_1, "$X || $X ::= $X.")
+	//RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
+	//RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
+	//RULE(BF_EQ_OR_SIMPLIFY_0, "$X != 0 || $X = 0 ::= T.")
+	//RULE(BF_EQ_OR_SIMPLIFY_1, "$X = 0 || $X != 0 ::= T.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_neg(const node<tau_sym<BAs...>>& n) {
+	//RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
+	//RULE(WFF_SIMPLIFY_ZERO_4, "! F ::= T.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_eq(const node<tau_sym<BAs...>>& n) {
+	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
+	//RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_neq(const node<tau_sym<BAs...>>& n) {
+	//RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
+	//RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_sometimes(const node<tau_sym<BAs...>>& n) {
+	//RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
+	//RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
+	//RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
+	//RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_always(const node<tau_sym<BAs...>>& n) {
+	//RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
+	//RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
+	//RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
+	//RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
+	return std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff(const node<tau_sym<BAs...>>& n) {
+	if (n.child.size() != 1) return std::make_shared<node<tau_sym<BAs...>>>(n);
+	switch (std::get<tau_source_sym>(n.child[0]->value).n()) {
+		case tau_parser::wff_and:
+			return make_node_hook_wff_and<BAs...>(n);
+		case tau_parser::wff_or:
+			return make_node_hook_wff_or<BAs...>(n);
+		case tau_parser::wff_neg:
+			return make_node_hook_wff_neg<BAs...>(n);
+		case tau_parser::bf_eq:
+			return make_node_hook_wff_eq<BAs...>(n);
+		case tau_parser::bf_neq:
+			return make_node_hook_wff_eq<BAs...>(n);
+		case tau_parser::wff_sometimes:
+			return make_node_hook_wff_sometimes<BAs...>(n);
+		case tau_parser::wff_always:
+			return make_node_hook_wff_always<BAs...>(n);
+		default: return std::make_shared<node<tau_sym<BAs...>>>(n);
+	}
+}
+
+
+template <typename...BAs>
+struct make_tau_node {
+	std::optional<sp_tau_node<BAs...>> operator()(const node<tau_sym<BAs...>>& n) {
+		//throw std::logic_error("not implemented");
+		static std::map<node<tau_sym<BAs...>>, sp_tau_node<BAs...>> cache;
+		if (auto it = cache.find(n); it != cache.end()) return it->second;
+		if (std::holds_alternative<tau_source_sym>(n.value)
+				&& std::get<tau_source_sym>(n.value).nt()) {
+			switch (std::get<tau_source_sym>(n.value).n()) {
+				case tau_parser::bf: {
+					auto nn = make_node_hook_bf<BAs...>(n);
+					return cache.emplace(n, nn).first->second;
+				}
+				case tau_parser::wff: {
+					auto nn = make_node_hook_wff<BAs...>(n);
+					return cache.emplace(n, nn).first->second;
+				}
+				default: return std::optional<sp_tau_node<BAs...>>();
+			}
+		}
+		return std::optional<sp_tau_node<BAs...>>();
+	}
+};
+
 } // namespace idni::tau
 
 namespace idni::rewriter {
 
-//
-// sp_tau_node factory method
-//
 template <typename...BAs>
 struct make_node_hook<idni::tau::tau_sym<BAs...>> {
-	std::optional<idni::tau::sp_tau_node<BAs...>> operator()(const node<idni::tau::tau_sym<BAs...>>& /* n */) {
-		//throw std::logic_error("not implemented");
-		return std::optional<idni::tau::sp_tau_node<BAs...>>();
+	std::optional<idni::tau::sp_tau_node<BAs...>> operator()(const node<idni::tau::tau_sym<BAs...>>& n) {
+		static idni::tau::make_tau_node<BAs...> hook;
+		return hook(n);
 	}
 };
-
-/*sp_node<tau_sym<BAs...>> make_node_hook(const tau_sym<BAs...>& s,
-	const std::vector<sp_node<tau_sym<BAs...>>>& ns) {
-	static std::map<node<tau_sym<BAs...>>, sp_node<tau_sym<BAs...>>> cache;
-	node<tau_sym<BAs...>> key{s, ns};
-	throw std::logic_error("not implemented");
-	if (auto it = cache.find(key); it != cache.end()) return it->second;
-	return cache.emplace(key, std::make_shared<tau_sym<BAs...>>(s, ns))
-			.first->second;
-}*/
 
 } // namespace idni::rewriter
 

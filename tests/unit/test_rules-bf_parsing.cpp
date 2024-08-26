@@ -49,7 +49,7 @@ TEST_SUITE("parsing bf rules") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("BF_SIMPLIFY_ONE_0") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_0") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_0);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -58,9 +58,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ONE_1") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_1") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_1);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -69,9 +69,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ONE_2") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_2") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_2);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -80,9 +80,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ONE_3") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_3") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_3);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -91,9 +91,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ONE_4") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_4") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_4);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -102,9 +102,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_0") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_0") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_0);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -113,9 +113,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_1") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_1") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_1);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -124,9 +124,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_2") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_2") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_2);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -135,9 +135,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_3") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_3") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_3);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -146,9 +146,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_4") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_4") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_4);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -157,9 +157,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_0") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_0") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_0);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -168,9 +168,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_1") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_1") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_1);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -179,9 +179,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_2") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_2") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_2);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -190,9 +190,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_3") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_3") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_3);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -201,9 +201,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_4") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_4") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_4);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -212,9 +212,9 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_5") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_5") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_5);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -223,7 +223,7 @@ TEST_SUITE("parsing bf rules") {
 			| tau_parser::rule
 			| tau_parser::bf_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
 	TEST_CASE("BF_DEF_XOR") {
 		auto src_rule = make_tau_source(BF_DEF_XOR);
