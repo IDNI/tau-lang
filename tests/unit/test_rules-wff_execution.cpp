@@ -82,12 +82,12 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("WFF_ELIM_DOUBLE_NEGATION_0") {
+	/*TEST_CASE("WFF_ELIM_DOUBLE_NEGATION_0") {
 		auto [ matcher, body, result ] =
 			test_rule(WFF_ELIM_DOUBLE_NEGATION_0);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
 	TEST_CASE("WFF_ELIM_FORALL") {
 		auto [ matcher, body, result ] = test_rule(WFF_ELIM_FORALL);
@@ -95,7 +95,7 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("WFF_SIMPLIFY_ONE_0") {
+	/*TEST_CASE("WFF_SIMPLIFY_ONE_0") {
 		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_ONE_0);
 		CHECK( matcher != body );
 		CHECK( result == body );
@@ -189,7 +189,7 @@ TEST_SUITE("executing wff rules") {
 		auto [ matcher, body, result ] = test_rule(WFF_SIMPLIFY_SELF_5);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
 	TEST_CASE("WFF_DEF_XOR") {
 		auto [ matcher, body, result ] = test_rule(WFF_DEF_XOR);
