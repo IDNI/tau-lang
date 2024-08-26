@@ -522,7 +522,6 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 				to_dnf_wff<tau_ba<BAs...>, BAs...>
 				| simplify_wff<tau_ba<BAs...>, BAs...>
 				| trivialities<tau_ba<BAs...>, BAs...>
-				//| simplify_bf<tau_ba<BAs...>, BAs...>
 				| simplify_wff<tau_ba<BAs...>, BAs...>)
 		| reduce_bf<tau_ba<BAs...>, BAs...>
 		| reduce_wff<tau_ba<BAs...>, BAs...>;

@@ -39,23 +39,6 @@ RULE(BF_TO_DNF_0, "($X | $Y) & $Z := $X & $Z | $Y & $Z.")
 RULE(BF_TO_DNF_1, "$X & ($Y | $Z) := $X & $Y | $X & $Z.")
 RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := $X' | $Y'.")
 RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
-//RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
-//RULE(BF_SIMPLIFY_ONE_0, "1 | $X := 1.")
-//RULE(BF_SIMPLIFY_ONE_1, "$X | 1 := 1.")
-//RULE(BF_SIMPLIFY_ONE_2, "1 & $X := $X.")
-//RULE(BF_SIMPLIFY_ONE_3, "$X & 1 := $X.")
-//RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
-//RULE(BF_SIMPLIFY_ZERO_0, "0 & $X := 0.")
-//RULE(BF_SIMPLIFY_ZERO_1, "$X & 0 := 0.")
-//RULE(BF_SIMPLIFY_ZERO_2, "0 | $X := $X.")
-//RULE(BF_SIMPLIFY_ZERO_3, "$X | 0 := $X.")
-//RULE(BF_SIMPLIFY_ZERO_4, "0' := 1.")
-//RULE(BF_SIMPLIFY_SELF_0, "$X & $X := $X.")
-//RULE(BF_SIMPLIFY_SELF_1, "$X | $X := $X.")
-//RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
-//RULE(BF_SIMPLIFY_SELF_3, "$X | $X' := 1.")
-//RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
-//RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
 
 // bf definitions
 RULE(BF_DEF_XOR, "$X + $Y := $X & $Y' | $X' & $Y.")
@@ -211,7 +194,6 @@ static auto to_dnf_bf = make_library<BAs...>(
 	+ BF_TO_DNF_1
 	+ BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
-	//+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -245,29 +227,9 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_SOMETIMES_INWARDS
 );
 
-//template<typename... BAs>
-//static auto simplify_bf = make_library<BAs...>(
-	//BF_SIMPLIFY_ONE_0
-	//+ BF_SIMPLIFY_ONE_1
-	//+BF_SIMPLIFY_ONE_2
-	//+ BF_SIMPLIFY_ONE_3
-	//BF_SIMPLIFY_ONE_4
-	//+ BF_SIMPLIFY_ZERO_0
-	//+ BF_SIMPLIFY_ZERO_1
-	//+ BF_SIMPLIFY_ZERO_2
-	//+ BF_SIMPLIFY_ZERO_3
-	//+ BF_SIMPLIFY_ZERO_4
-	//+ BF_SIMPLIFY_SELF_0
-	//+ BF_SIMPLIFY_SELF_1
-	//+ BF_SIMPLIFY_SELF_2
-	//+ BF_SIMPLIFY_SELF_3
-	//+ BF_SIMPLIFY_SELF_4
-	//+ BF_SIMPLIFY_SELF_5
-//);
 
 template<typename... BAs>
 static auto simplify_bf_more = make_library<BAs...>(
-	//BF_ELIM_DOUBLE_NEGATION_0 +
 	BF_DEF_XOR
 );
 
@@ -307,14 +269,6 @@ static auto apply_cb = make_library<BAs...>(
 	+ BF_CALLBACK_OR
 	+ BF_CALLBACK_XOR
 	+ BF_CALLBACK_NEG
-	/*+ BF_PUSH_CTES_UPWARDS_0
-	+ BF_PUSH_CTES_UPWARDS_1
-	+ BF_PUSH_CTES_UPWARDS_2
-	+ BF_PUSH_CTES_UPWARDS_3
-	+ BF_PUSH_CTES_UPWARDS_4
-	+ BF_PUSH_CTES_UPWARDS_5
-	+ BF_PUSH_CTES_UPWARDS_6
-	+ BF_PUSH_CTES_UPWARDS_7*/
 );
 
 template<typename... BAs>
@@ -334,10 +288,6 @@ static auto elim_trivial_eqs = make_library<BAs...>(
 	+ BF_EQ_SIMPLIFY_1
 	+ BF_NEQ_SIMPLIFY_0
 	+ BF_NEQ_SIMPLIFY_1
-	// + BF_EQ_AND_SIMPLIFY_0
-	// + BF_EQ_AND_SIMPLIFY_1
-	// + BF_EQ_OR_SIMPLIFY_0
-	// + BF_EQ_OR_SIMPLIFY_1
 );
 
 template<typename... BAs>
@@ -427,7 +377,6 @@ static auto to_cnf_bf = make_library<BAs...>(
 	+ BF_TO_CNF_1
 	+ BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
-	//+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename...BAs>
@@ -445,7 +394,6 @@ template<typename...BAs>
 static auto to_nnf_bf = make_library<BAs...>(
 	BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
-	//+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
