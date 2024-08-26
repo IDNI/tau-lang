@@ -1177,31 +1177,37 @@ inline bool is_contained_in (const vector<int_t>& i, auto& paths) {
 
 template<typename... BAs>
 vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff, const auto& is_var, int_t var_size, auto& var_pos,
-	bool& unsat, bool is_cnf, bool all_reductions) {
+	bool& decided, bool is_cnf, bool all_reductions) {
 	vector<vector<int_t>> paths;
 	using tp = tau_parser;
 	for (const auto& clause : get_leaves(new_fm, is_cnf ? (wff ? tp::wff_and : tp::bf_and) :
 							(wff ? tp::wff_or : tp::bf_or), wff ? tp::wff : tp::bf)) {
 		vector<int_t> i (var_size);
 		for (int_t k = 0; k < var_size; ++k) i[k] = 2;
-		bool clause_is_unsat = false;
+		bool clause_is_decided = false;
 		auto var_assigner = [&](const nso<BAs...>& n) {
-			if (clause_is_unsat) return false;
-			if (is_non_terminal(wff ? tp::wff_f : tp::bf, n)) {
-				clause_is_unsat = true;
+			if (clause_is_decided) return false;
+			if (!is_cnf && is_non_terminal(wff ? tp::wff_f : tp::bf_f, n)) {
+				clause_is_decided = true;
+				return false;
+			}
+			if (is_cnf && is_non_terminal(wff ? tp::wff_t : tp::bf_t, n)) {
+				clause_is_decided = true;
 				return false;
 			}
 			if (is_non_terminal(wff ? tp::wff_neg : tp::bf_neg, n)) {
 				auto v = trim(n);
 				// Check if v is a T/F or 1/0
                 if (v == _T<BAs...> || v == _1<BAs...>) {
-                    clause_is_unsat = true;
+                    if (!is_cnf) clause_is_decided = true;
                     return false;
-                } else if (v == _F<BAs...> || v == _0<BAs...>)
+                } else if (v == _F<BAs...> || v == _0<BAs...>) {
+                    if (is_cnf) clause_is_decided = true;
                     return false;
+                }
 				if (i[var_pos[v]] == 1) {
-					// clause is false
-					clause_is_unsat = true;
+					// clause is false for DNF, true for CNF
+					clause_is_decided = true;
 					return false;
 				}
 				i[var_pos[v]] = 0;
@@ -1209,8 +1215,8 @@ vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff, const a
 			}
 			if (is_var(n)) {
 				if (i[var_pos[n]] == 0) {
-					// clause is false
-					clause_is_unsat = true;
+					// clause is false for DNF, true for CNF
+					clause_is_decided = true;
 					return false;
 				}
 				i[var_pos[n]] = 1;
@@ -1220,9 +1226,9 @@ vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff, const a
 		};
 		post_order_traverser<identity_t<nso<BAs...>>, decltype(var_assigner), nso<BAs...>>
 			(rewriter::identity<nso<BAs...>>, var_assigner)(clause);
-		if (clause_is_unsat) continue;
+		if (clause_is_decided) continue;
 		// There is at least one satisfiable clause
-		unsat = false;
+		decided = false;
 		if (ranges::all_of(i, [](const auto el) {return el == 2;})) return {};
 
 		if (is_contained_in(i, paths)) continue;
@@ -1304,14 +1310,14 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 	for (int_t k=0; k < (int_t)vars.size(); ++k)
 		var_pos.emplace(vars[k], k);
 
-	bool unsat = true;
+	bool decided = true;
 	auto paths = wff ? collect_paths(new_fm, wff, is_var_wff, vars.size(), var_pos,
-				unsat, is_cnf, all_reductions) :
+				decided, is_cnf, all_reductions) :
 			   collect_paths(new_fm, wff, is_var_bf, vars.size(), var_pos,
-				unsat, is_cnf, all_reductions);
+				decided, is_cnf, all_reductions);
 
 	if (paths.empty()) {
-		if (unsat) return is_cnf ? (wff ? _T<BAs...> : _1<BAs...>) : (wff ? _F<BAs...> : _0<BAs...>);
+		if (decided) return is_cnf ? (wff ? _T<BAs...> : _1<BAs...>) : (wff ? _F<BAs...> : _0<BAs...>);
 		else return is_cnf ? (wff ? _F<BAs...> : _0<BAs...>) : (wff ? _T<BAs...> : _1<BAs...>);
 	}
 	if (all_reductions) join_paths(paths);
@@ -1630,6 +1636,143 @@ struct sometimes_always_normalization {
 template<typename... BAs>
 nso<BAs...> operator|(const nso<BAs...>& fm, const sometimes_always_normalization<BAs...>& r) {
 	return r(fm);
+}
+
+template<typename... BAs>
+nso<BAs...> wff_remove_existential(const nso<BAs...>& var, const nso<BAs...>& wff) {
+	auto squeeze_positives = [](const nso<BAs...>& n) -> std::optional<nso<BAs...>>{
+		if (auto positives = select_top(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
+				positives.size() > 0) {
+			std::set<sp_tau_node<BAs...>> bfs;
+			for (auto& p: positives)
+				bfs.insert(p | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>);
+			return build_bf_or<BAs...>(bfs);
+		}
+		return {};
+	};
+	// Following Corollary 2.3 from Taba book from Ohad
+	auto is_var = [&var](const auto& node){return node == var;};
+	// if var does not appear in the formula, we can return the formula as is
+	// if (!find_top(wff, is_var)) return wff;
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+	for (const auto& l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
+		// if var does not appear in the clause, we can skip it
+		if (!find_top(l, is_var)) continue;
+		// Get each conjunct in clause
+		nso<BAs...> nl = _T<BAs...>;
+		bool is_quant_removable_in_clause = true;
+		for (const auto& conj : get_leaves(l, tau_parser::wff_and, tau_parser::wff)) {
+			// Check if conjunct is of form = 0 or != 0
+			if ((conj | tau_parser::bf_eq) || (conj | tau_parser::bf_neq))
+				continue;
+			// If the conjunct contains the quantified variable at this point
+			// we cannot resolve the quantifier in this clause
+			if (find_top(conj, is_var)) {
+				is_quant_removable_in_clause = false;
+				break;
+			}
+			// conjunct does not depend on var
+			nl = build_wff_and(nl, conj);
+		}
+		if (!is_quant_removable_in_clause) {
+			// Since we cannot remove the quantifier in this
+			// clause it needs to be maintained
+			changes[l] = build_wff_ex(var, l);
+			continue;
+		}
+
+		auto f = squeeze_positives(l);
+		std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0_trimmed<BAs...>}};
+		std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1_trimmed<BAs...>}};
+		auto f_0 = f ? replace(f.value(), changes_0) : _0<BAs...>;
+		auto f_1 = f ? replace(f.value(), changes_1) : _0<BAs...>;
+
+		if (auto neqs = select_all(l, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
+			auto nneqs = _T<BAs...>;
+			for (auto& neq: neqs) {
+				auto g = neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+				auto g_0 = replace(g, changes_0);
+				auto g_1 = replace(g, changes_1);
+				nneqs = build_wff_and(nneqs, build_wff_neq(build_bf_or(
+					                      build_bf_and(build_bf_neg(f_1),	g_1),
+					                      build_bf_and(build_bf_neg(f_0),	g_0))));
+			}
+			nl = build_wff_and(nl, build_wff_and(build_wff_eq(build_bf_and(f_0, f_1)), nneqs));
+		} else if (f) {
+			nl = build_wff_and(nl, build_wff_eq(build_bf_and(f_0, f_1)));
+		}
+		changes[l] = nl;
+	}
+	return replace<nso<BAs...>>(wff, changes);
+}
+
+// Pushes all universal and existential quantifiers as deep as possible into the formula
+template<typename... BAs>
+nso<BAs...> eliminate_quantifiers(const nso<BAs...>& fm) {
+	// Lambda is applied to nodes of fm in post order
+	auto elim_quant = [](nso<BAs...> inner_fm, const auto& child) -> nso<BAs...> {
+		// Update node according to current children
+		if (inner_fm->child != child) inner_fm = make_node(inner_fm->value, child);
+		// Find out if current node is a quantifier
+		bool is_ex_quant;
+		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm))
+			is_ex_quant = true;
+		else if (is_child_non_terminal(tau_parser::wff_all, inner_fm))
+			is_ex_quant = false;
+		else return inner_fm;
+
+		auto has_var = [&inner_fm](const auto& node)
+					{return node == trim2(inner_fm);};
+		auto scoped_fm = trim(inner_fm)->child[1];
+		if (!find_top(scoped_fm, has_var)) {
+			// If the scoped formula does not contain
+			// the quantified variable, remove the quantifier
+			return scoped_fm;
+		}
+		// Scoped formula contains the quantified variable
+		if (is_ex_quant) {
+			scoped_fm = scoped_fm
+			    // Reductions to prevent blow ups
+			    | bf_reduce_canonical<BAs...>()
+			    | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+			    | repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
+			    | repeat_all<step<BAs...>, BAs...> (elim_trivial_eqs<BAs...>)
+			    | wff_reduce_dnf<BAs...>();
+			// Now resolve quantified varialbe in scoped_fm
+			return wff_remove_existential(trim2(inner_fm), scoped_fm);
+		} else {
+			scoped_fm = scoped_fm
+			    // Reductions to prevent blow ups
+			    | bf_reduce_canonical<BAs...>()
+			    | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+			    | repeat_all<step<BAs...>, BAs...>(nnf_to_cnf_wff<BAs...>)
+			    | repeat_all<step<BAs...>, BAs...> (elim_trivial_eqs<BAs...>)
+			    | wff_reduce_cnf<BAs...>();
+			auto clauses = get_leaves(scoped_fm, tau_parser::wff_and, tau_parser::wff);
+            nso<BAs...> res;
+			bool first = true;
+			for (const auto& clause : clauses) {
+				// Turn universal into existential quantifier and eliminate
+				auto new_clause = build_wff_neg(clause)
+									| repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+				new_clause = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_clause))
+									| repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+				if (first) { first = false; res = new_clause; }
+				else res = build_wff_and(res, new_clause);
+			}
+			return res;
+		}
+	};
+	auto is_not_bf = [](const nso<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
+	return post_order_recursive_traverser<nso<BAs...>>()(fm, is_not_bf, elim_quant);
+}
+
+template<typename... BAs>
+using nso_transform = nso<BAs...>(*)(const nso<BAs...>&);
+
+template<typename... BAs>
+nso<BAs...> operator| (const nso<BAs...>& fm, const nso_transform<BAs...> func) {
+	return func(fm);
 }
 
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
