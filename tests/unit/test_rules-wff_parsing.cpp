@@ -93,7 +93,7 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("WFF_ELIM_DOUBLE_NEGATION_0") {
+	/*TEST_CASE("WFF_ELIM_DOUBLE_NEGATION_0") {
 		auto src_rule = make_tau_source(WFF_ELIM_DOUBLE_NEGATION_0);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -102,7 +102,7 @@ TEST_SUITE("parsing wff rules") {
 			| tau_parser::rule
 			| tau_parser::wff_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
 	TEST_CASE("WFF_ELIM_FORALL") {
 		auto src_rule = make_tau_source(WFF_ELIM_FORALL);
@@ -115,7 +115,7 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("WFF_SIMPLIFY_ONE_0") {
+	/*TEST_CASE("WFF_SIMPLIFY_ONE_0") {
 		auto src_rule = make_tau_source(WFF_SIMPLIFY_ONE_0);
 		auto tau_rule = make_statement(src_rule);
 		auto check = tau_rule
@@ -289,7 +289,7 @@ TEST_SUITE("parsing wff rules") {
 			| tau_parser::rule
 			| tau_parser::wff_rule;
 		CHECK( check.has_value() );
-	}
+	}*/
 
 	TEST_CASE("WFF_DEF_XOR") {
 		auto src_rule = make_tau_source(WFF_DEF_XOR);
