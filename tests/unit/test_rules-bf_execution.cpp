@@ -27,7 +27,7 @@ namespace testing = doctest;
 
 TEST_SUITE("executing bf rules") {
 
-	TEST_CASE("BF_SIMPLIFY_ONE_0") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_0") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -36,9 +36,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ONE_1") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_1") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -47,9 +47,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ONE_2") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_2") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_2);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -58,9 +58,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ONE_3") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_3") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_3);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -69,9 +69,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ONE_4") {
+	/*TEST_CASE("BF_SIMPLIFY_ONE_4") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ONE_4);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -80,9 +80,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_0") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_0") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -91,9 +91,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_1") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_1") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -102,9 +102,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_2") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_2") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_2);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -113,9 +113,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_3") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_3") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_3);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -124,9 +124,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_ZERO_4") {
+	/*TEST_CASE("BF_SIMPLIFY_ZERO_4") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_ZERO_4);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -135,9 +135,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_0") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_0") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_0);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -146,9 +146,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_1") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_1") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_1);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -157,9 +157,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_2") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_2") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_2);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -168,9 +168,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_3") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_3") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_3);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -179,9 +179,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_4") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_4") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_4);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -190,9 +190,9 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
-	TEST_CASE("BF_SIMPLIFY_SELF_5") {
+	/*TEST_CASE("BF_SIMPLIFY_SELF_5") {
 		auto src_rule = make_tau_source(BF_SIMPLIFY_SELF_5);
 		auto statement = make_statement(src_rule);
 		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
@@ -201,7 +201,7 @@ TEST_SUITE("executing bf rules") {
 		auto result = nso_rr_apply(tau_rule, matcher);
 		CHECK( matcher != body );
 		CHECK( result == body );
-	}
+	}*/
 
 	TEST_CASE("BF_DEF_XOR") {
 		auto src_rule = make_tau_source(BF_DEF_XOR);

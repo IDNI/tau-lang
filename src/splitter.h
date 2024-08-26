@@ -67,7 +67,7 @@ nso<BAs...> split(const nso<BAs...> &fm, const auto fm_type, const split_sym spl
 			auto res = replace(fm, changes);
 			if (fm_type == tau_parser::wff)
 				return res | repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>);
-			else return res | repeat_all<step<BAs...>, BAs...>(simplify_bf<BAs...>);
+			else return res; // | repeat_all<step<BAs...>, BAs...>(simplify_bf<BAs...>);
 		}
 		break;
 	}
