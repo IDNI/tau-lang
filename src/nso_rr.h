@@ -3131,14 +3131,26 @@ sp_tau_node<BAs...> make_node_hook_wff_neg(const node<tau_sym<BAs...>>& n) {
 template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_wff_eq(const node<tau_sym<BAs...>>& n) {
 	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
+	if (is_non_terminal<tau_parser::bf_t>(n.child[0]->child[0]->child[0])
+			&& is_non_terminal<tau_parser::bf_f>(n.child[0]->child[1]->child[0]))
+		return _F<BAs...>;
 	//RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
+	if (is_non_terminal<tau_parser::bf_f>(n.child[0]->child[0]->child[0])
+			&& is_non_terminal<tau_parser::bf_f>(n.child[0]->child[1]->child[0]))
+		return _T<BAs...>;
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_wff_neq(const node<tau_sym<BAs...>>& n) {
 	//RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
+	if (is_non_terminal<tau_parser::bf_f>(n.child[0]->child[0]->child[0])
+			&& is_non_terminal<tau_parser::bf_f>(n.child[0]->child[1]->child[0]))
+		return _F<BAs...>;
 	//RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
+	if (is_non_terminal<tau_parser::bf_t>(n.child[0]->child[0]->child[0])
+			&& is_non_terminal<tau_parser::bf_f>(n.child[0]->child[1]->child[0]))
+		return _T<BAs...>;
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
@@ -3172,7 +3184,7 @@ sp_tau_node<BAs...> make_node_hook_wff(const node<tau_sym<BAs...>>& n) {
 		case tau_parser::bf_eq:
 			return make_node_hook_wff_eq<BAs...>(n);
 		case tau_parser::bf_neq:
-			return make_node_hook_wff_eq<BAs...>(n);
+			return make_node_hook_wff_neq<BAs...>(n);
 		case tau_parser::wff_sometimes:
 			return make_node_hook_wff_sometimes<BAs...>(n);
 		case tau_parser::wff_always:

@@ -199,50 +199,6 @@ TEST_SUITE("parsing wff rules") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("BF_EQ_SIMPLIFY_0") {
-		auto src_rule = make_tau_source(BF_EQ_SIMPLIFY_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BF_EQ_SIMPLIFY_1") {
-		auto src_rule = make_tau_source(BF_EQ_SIMPLIFY_1);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BF_NEQ_SIMPLIFY_0") {
-		auto src_rule = make_tau_source(BF_NEQ_SIMPLIFY_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BF_NEQ_SIMPLIFY_1") {
-		auto src_rule = make_tau_source(BF_NEQ_SIMPLIFY_1);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
-	}
-
 	TEST_CASE("WFF_SQUEEZE_POSITIVES_0") {
 		auto src_rule = make_tau_source(WFF_SQUEEZE_POSITIVES_0);
 		auto tau_rule = make_statement(src_rule);
