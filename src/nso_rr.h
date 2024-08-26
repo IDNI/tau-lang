@@ -3122,8 +3122,7 @@ sp_tau_node<BAs...> make_node_hook_wff_neg(const node<tau_sym<BAs...>>& n) {
 	if (is_non_terminal<tau_parser::wff_f>(n.child[0]->child[0]->child[0]))
 		return _T<BAs...>;
 	//RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
-	if (auto double_neg = n.child[0]->child[0] | tau_parser::wff_neg | tau_parser::wff;
-			double_neg && is_non_terminal<tau_parser::wff_neg>(n.child[0]))
+	if (auto double_neg = n.child[0]->child[0] | tau_parser::wff_neg | tau_parser::wff; double_neg)
 		return double_neg.value();
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
@@ -3157,18 +3156,36 @@ sp_tau_node<BAs...> make_node_hook_wff_neq(const node<tau_sym<BAs...>>& n) {
 template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_wff_sometimes(const node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
+	if (is_non_terminal<tau_parser::bf_t>(n.child[0]->child[0]->child[0]))
+		return _T<BAs...>;
 	//RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
+	if (is_non_terminal<tau_parser::bf_f>(n.child[0]->child[0]->child[0]))
+		return _F<BAs...>;
 	//RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
+	if (auto double_quantifier = n.child[0]->child[0] | tau_parser::wff_sometimes; double_quantifier)
+		return n.child[0]->child[0];
 	//RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
+	if (auto double_quantifier = n.child[0]->child[0] | tau_parser::wff_always;	double_quantifier)
+		return n.child[0]->child[0];
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_wff_always(const node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
+	if (is_non_terminal<tau_parser::bf_t>(n.child[0]->child[0]->child[0]))
+		return _T<BAs...>;
 	//RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
+	if (is_non_terminal<tau_parser::bf_f>(n.child[0]->child[0]->child[0]))
+		return _F<BAs...>;
 	//RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
+	if (auto double_quantifier = n.child[0]->child[0] | tau_parser::wff_always;
+			double_quantifier && is_non_terminal<tau_parser::wff_always>(n.child[0]))
+		return n.child[0]->child[0];
 	//RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
+	if (auto double_quantifier = n.child[0]->child[0] | tau_parser::wff_sometimes;
+			double_quantifier && is_non_terminal<tau_parser::wff_always>(n.child[0]))
+		return n.child[0]->child[0];
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
