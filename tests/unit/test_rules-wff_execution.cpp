@@ -142,48 +142,6 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("WFF_SQUEEZE_POSITIVES_0") {
-		auto [ matcher, body, result ] =
-			test_rule(WFF_SQUEEZE_POSITIVES_0);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_0") {
-		auto [ matcher, body, result ] =
-			test_rule(BF_POSITIVE_LITERAL_UPWARDS_0);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_1") {
-		auto [ matcher, body, result ] =
-			test_rule(BF_POSITIVE_LITERAL_UPWARDS_1);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_2") {
-		auto [ matcher, body, result ] =
-			test_rule(BF_POSITIVE_LITERAL_UPWARDS_2);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_3") {
-		auto [ matcher, body, result ] =
-			test_rule(BF_POSITIVE_LITERAL_UPWARDS_3);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_POSITIVE_LITERAL_UPWARDS_4") {
-		auto [ matcher, body, result ] =
-			test_rule(BF_POSITIVE_LITERAL_UPWARDS_4);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
 	TEST_CASE("WFF_REMOVE_EX_0") {
 		auto [ matcher, body, result ] = test_rule(WFF_REMOVE_EX_0);
 		CHECK( matcher != body );

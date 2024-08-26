@@ -105,12 +105,6 @@ RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != $Y ::= !($X = $Y).")
 RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
 RULE(WFF_UNSQUEEZE_NEGATIVES_0, "$X | $Y != 0 ::= $X != 0 || $Y != 0.")
 
-RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "$X != 0 && $Y  = 0 && $Z != 0 ::= $Y = 0 && $X != 0 && $Z != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "$X != 0 && $Y != 0 && $Z  = 0 ::= $Z = 0 && $X != 0 && $Y != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "$Z != 0 && $X  = 0 && $Y != 0 ::= $X = 0 && $Z != 0 && $Y != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "$Z != 0 && $X != 0 && $Y  = 0 ::= $Z != 0 && $Y = 0 && $X != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "$X != 0 && $Y  = 0 ::= $Y = 0 && $X != 0.")
-RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 
 // TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
