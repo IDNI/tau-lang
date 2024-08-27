@@ -13,11 +13,11 @@
 
 @use char classes eof, space, digit, xdigit, alpha, alnum, punct, printable.
 
-# start symbol
+# default start symbol
 #
-start                  => (inputs | builder | library | rr) _.
+start                  => rr _.
 
-# main posibilities
+# start symbol posibilities: rr, inputs, library, builder, cli (bellow)
 #
 rr                     => rec_relations _ wff:main _ '.'.
 rec_relations          => (_ rec_relation _ '.')*.
@@ -41,11 +41,11 @@ builder_body           => ("=:"  _ bf) :bf_builder_body
 # wff and bf expressions
 #
 wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
-                        | (("sometimes" | "<>") _ wff)       :wff_sometimes
-                        | (("always" | "[]") _ wff)          :wff_always
+                        | (("sometimes" | "<>")  _ wff)      :wff_sometimes
+                        | (("always"    | "[]")  _ wff)      :wff_always
                         | (wff _ '?' _ wff _ ':' _ wff)      :wff_conditional
-                        | ("all"     __ q_vars      __ wff)  :wff_all
-                        | ("ex"      __ q_vars      __ wff)  :wff_ex
+                        | ("all"     __ q_vars  __ wff)      :wff_all
+                        | ("ex"      __ q_vars  __ wff)      :wff_ex
                         | ref                                :wff_ref
                         | (wff   _ "->"  _ wff)              :wff_imply
                         | (wff   _ "<->" _ wff)              :wff_equiv
@@ -68,7 +68,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "<="  _ bf)               :bf_less_equal
                         | (bf    _ "<"   _ bf)               :bf_less
                         |                                     capture
-                        |                                     uninterpreted_constant.
+                        |                                uninterpreted_constant.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     variable
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
@@ -97,7 +97,7 @@ offset                 => num | capture | shift | (variable & ~io_var).
 shift                  => (capture | (variable & ~io_var)) _ '-' _ num.
 num                    => digits.
 
-#constants
+# constants
 uninterpreted_constant => '<' ((chars | _ ) ':' chars):uninter_const_name _ '>'.
 constant               => binding | capture.
 binding                => ((chars _ | _):type ':' _ source):source_binding
@@ -161,10 +161,8 @@ bf_cb  => ("bf_is_zero_cb"              bf_cb_args2) :bf_is_zero_cb
 
 ################################################################################
 
-# cli related rules, using cli as starting point for parsing
+# cli related rules, using cli as a starting point for parsing
 #
-# TODO do the same with the other starting points: library, inputs, builder,
-# rr... depending on the use case of the grammar.
 cli                    => _ | _ cli_command _ ('.' _ cli_command _)*.
 cli_command            =>
           ("q" | "quit")   :quit_sym                          :quit_cmd
@@ -197,11 +195,10 @@ cli_command            =>
         | (("defs" | "definitions"):def_sym)                  :def_list_cmd
         | (                         def_sym __ number)        :def_print_cmd
         |                           rec_relation              :def_rr_cmd
-#qelim
+# qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
         | ("get":get_sym  [__ option])                        :get_cmd
-# TODO (VERY_HIGH) fix this, we could say 'set severity true'... use another case for this
         | ("set":set_sym   __ option
                                 (__ | _ '=' _) option_value)  :set_cmd
         | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
@@ -269,7 +266,7 @@ severity               => ("e" | "error"):error_sym
 	charvar, in_var_name, out_var_name, uninter_const_name.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, q_var, src_c, tau_cb, wff_cb, bf_cb,
+@inline char classes, chars, q_var, src_c, wff_cb, bf_cb,
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
 	inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,

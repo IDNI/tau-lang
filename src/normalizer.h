@@ -50,7 +50,7 @@ static auto elim_for_all = make_library<BAs...>(
 // bindings provided.
 template<typename... BAs>
 rr<nso<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
-	auto form_source = make_tau_source(source);
+	auto form_source = make_tau_source(source, { .start = tau_parser::rr });
 	auto form = make_nso_rr_using_bindings(form_source, binds);
 	return normalizer(form);
 }
@@ -59,7 +59,7 @@ rr<nso<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
 // provided factory.
 template<typename factory_t, typename... BAs>
 rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
-	auto form_source = make_tau_source(source);
+	auto form_source = make_tau_source(source, { .start = tau_parser::rr });
 	auto form = make_nso_rr_using_factory(form_source, factory);
 	return normalizer(form);
 }
@@ -373,7 +373,9 @@ nso<BAs...> build_shift_from_shift(nso<BAs...> shift, size_t step) {
 template<typename... BAs>
 nso<BAs...> build_main_step(const nso<BAs...>& form, size_t step) {
 	std::map<nso<BAs...>, nso<BAs...>> changes;
-	for (const auto& offset: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>)) {
+	for (const auto& offset : select_top(form,
+				is_non_terminal<tau_parser::offsets, BAs...>))
+	{
 		auto shift = offset | tau_parser::shift;
 		if (!shift.has_value()) continue;
 		auto nshift = build_shift_from_shift<BAs...>(shift.value(), step);
@@ -397,7 +399,7 @@ nso<BAs...> bf_normalizer_without_rec_relation (const nso<BAs...>& bf) {
 // Normalizes a Boolean function in which recurrence relations are present
 template<typename... BAs>
 nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin calculate recurrence relation";
+	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Begin calculate recurrence relation";
 
 	auto bf_unfolded = bf.main | repeat_all<step<BAs...>, BAs...>(
 						step<BAs...>(bf.rec_relations));
@@ -421,23 +423,17 @@ nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
 	auto r = form;
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 	std::vector<sp_tau_node<BAs...>> ofs; // create offsets node
-	ofs.push_back(make_node<tau_sym<BAs...>>(
-		tau_parser::instance().literal(tau_parser::offset),
-		{ build_num<BAs...>(i) }));
+	ofs.push_back(wrap<BAs...>(tau_parser::offset, build_num<BAs...>(i)));
 	for (size_t o = 1; o < offset_arity; ++o)
-		ofs.push_back(make_node<tau_sym<BAs...>>(
-			tau_parser::instance().literal(tau_parser::offset),
-			{ 0 }));
+		ofs.push_back(wrap<BAs...>(tau_parser::offset,
+							build_num<BAs...>(0)));
+
 	// create enumerated replacement
 	auto ref = r | only_child_extractor<BAs...>
 		| tau_parser::ref
 		| optional_value_extractor<sp_tau_node<BAs...>>;
-	changes[ref] = make_node<tau_sym<BAs...>>(ref->value, {
-		ref->child[0],
-		make_node<tau_sym<BAs...>>(tau_parser::instance()
-			.literal(tau_parser::offsets), ofs),
-		ref->child[1]
-	});
+	changes[ref] = make_node<tau_sym<BAs...>>(ref->value, { ref->child[0],
+		wrap<BAs...>(tau_parser::offsets, ofs), ref->child[1] });
 	r = replace(r, changes);
 	BOOST_LOG_TRIVIAL(debug) << "(F*) " << r;
 	//DBG(ptree<BAs...>(std::cout << "enumerated main ", r) << "\n";)
@@ -446,12 +442,24 @@ nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
 
 template <typename... BAs>
 bool is_valid(const rr<nso<BAs...>>& nso_rr) {
+	for (const auto& main_offsets : select_all(nso_rr.main,
+		is_non_terminal<tau_parser::offsets, BAs...>))
+			if (find_top(main_offsets,
+				is_non_terminal<tau_parser::capture, BAs...>))
+	{
+		BOOST_LOG_TRIVIAL(error) << "Main " << nso_rr.main
+					<< " cannot contain a relative offset "
+					<< main_offsets;
+		return false; // capture in main's offset
+	}
 	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
 		const auto& r = nso_rr.rec_relations[ri];
 		auto left = get_ref_info(get_ref(r.first).value());
 		for (const auto& [ot, _] : left.second)
 			if (ot == tau_parser::shift) {
-				BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " cannot contain an offset shift";
+				BOOST_LOG_TRIVIAL(error) << "Recurrence "
+					"relation " << r.first << " cannot "
+					"contain an offset shift";
 				return false; // head ref cannot have shift
 			}
 		if (left.second.size() == 0) continue; // no offsets
@@ -467,12 +475,20 @@ bool is_valid(const rr<nso<BAs...>>& nso_rr) {
 			//BOOST_LOG_TRIVIAL(debug) << "(T) -- body offset " << bo.first << " / " << bo.second;
 			if (ho.first == tau_parser::num) {
 				if (bo.first == tau_parser::capture) {
-					BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " (having a fixed offset) cannot depend on a relative offset " << r.second;
+					BOOST_LOG_TRIVIAL(error)
+						<< "Recurrence relation "
+						<< r.first << " (having a fixed"
+						" offset) cannot depend on a "
+						"relative offset " << r.second;
 					return false; // left num right capture
 				}
 				if (bo.first == tau_parser::num
 					&& ho.second < bo.second) {
-						BOOST_LOG_TRIVIAL(error) << "Recurrence relation " << r.first << " cannot depend on a future state " << r.second;
+						BOOST_LOG_TRIVIAL(error)
+							<<"Recurrence relation "
+							<< r.first << " cannot "
+							"depend on a future "
+							"state " << r.second;
 						return false; // l num < r num
 				}
 			}
@@ -520,15 +536,17 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 		visiting[left.first] = false;
 	}
 	if (!has_relative_rule) {
-		BOOST_LOG_TRIVIAL(error) << "Recurrence relation has no rules other than initial conditions";
+		BOOST_LOG_TRIVIAL(error) << "Recurrence relation has no rules "
+						"other than initial conditions";
 		return false;
 	}
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
-			BOOST_LOG_TRIVIAL(error) << "Recurrence relation is cyclic";
+			BOOST_LOG_TRIVIAL(error)
+					<< "Recurrence relation is cyclic";
 			return false;
 		}
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation is well founded";
+	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Recurrence relation is well founded";
 	return true;
 }
 
@@ -608,6 +626,7 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 		previous.push_back(current);
 	}
+	return fallback;
 }
 
 // calculate fixed points called from main and replace them by their results
@@ -642,15 +661,15 @@ struct fixed_point_transformer {
 	}
 
 	std::pair<tau_parser::nonterminal, size_t> get_type_info(
-		const rr_types& types, const sp_tau_node<BAs...>& fp_ref)
+		const rr_types& ts, const sp_tau_node<BAs...>& fp_ref)
 	{
 		// size_t type = fp_ref | non_terminal_extractor<BAs...>
 		// 	| optional_value_extractor<size_t>;
 		auto ref = fp_ref | tau_parser::ref;
 		if (ref && !(ref | tau_parser::offsets).has_value()) {
 			auto fn = get_ref_name(ref.value());
-			auto it = types.find(fn);
-			if (it != types.end() && it->second.offset_arity)
+			auto it = ts.types.find(fn);
+			if (it != ts.types.end() && it->second.offset_arity)
 				return { it->second.type,
 						it->second.offset_arity };
 		}
@@ -695,7 +714,6 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
 						"New main: " << defs.main;
 	}
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << defs;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions to main";
 	defs.main = apply_once_definitions(defs.main);
