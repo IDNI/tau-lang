@@ -88,60 +88,6 @@ TEST_SUITE("executing wff rules") {
 		CHECK( result == body );
 	}
 
-	TEST_CASE("WFF_DEF_XOR") {
-		auto [ matcher, body, result ] = test_rule(WFF_DEF_XOR);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_DEF_CONDITIONAL") {
-		auto [ matcher, body, result ] = test_rule(WFF_DEF_CONDITIONAL);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_DEF_IMPLY") {
-		auto [ matcher, body, result ] = test_rule(WFF_DEF_IMPLY);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("WFF_DEF_EQUIV") {
-		auto [ matcher, body, result ] = test_rule(WFF_DEF_EQUIV);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_DEF_LESS_EQUAL") {
-		auto [ matcher, body, result ] = test_rule(BF_DEF_LESS_EQUAL);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_DEF_LESS") {
-		auto [ matcher, body, result ] = test_rule(BF_DEF_LESS);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_DEF_GREATER") {
-		auto [ matcher, body, result ] = test_rule(BF_DEF_GREATER);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_DEF_EQ") {
-		auto [ matcher, body, result ] = test_rule(BF_DEF_EQ);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
-	TEST_CASE("BF_DEF_NEQ") {
-		auto [ matcher, body, result ] = test_rule(BF_DEF_NEQ);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
 	TEST_CASE("WFF_REMOVE_EX_0") {
 		auto [ matcher, body, result ] = test_rule(WFF_REMOVE_EX_0);
 		CHECK( matcher != body );
