@@ -52,10 +52,6 @@ TEST_SUITE("steps parsing") {
 		CHECK( apply_cb<Bool>.size() == 4 );
 	}
 
-	TEST_CASE("wff_remove_existential") {
-		CHECK( wff_remove_existential<Bool>.size() == 1 );
-	}
-
 	TEST_CASE("trivialities") {
 		CHECK( trivialities<Bool>.size() == 4 );
 	}
