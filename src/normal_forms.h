@@ -1349,6 +1349,13 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 template<typename... BAs>
 struct wff_reduce_dnf {
 	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+#ifdef TAU_CACHE
+		static map<nso<BAs...>, nso<BAs...>> cache;
+		if (auto it=cache.find(fm); it!=cache.end()) return it->second;
+		auto r = reduce2(fm, tau_parser::wff);
+		cache.emplace(fm, r);
+		return cache.emplace(r, r).first->second;
+#endif //TAU_CACHE
 		return reduce2(fm, tau_parser::wff);
 	}
 };
@@ -1356,6 +1363,13 @@ struct wff_reduce_dnf {
 template<typename... BAs>
 struct wff_reduce_cnf {
 	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+#ifdef TAU_CACHE
+		static map<nso<BAs...>, nso<BAs...>> cache;
+		if (auto it=cache.find(fm); it!=cache.end()) return it->second;
+		auto r = reduce2(fm, tau_parser::wff, true);
+		cache.emplace(fm, r);
+		return cache.emplace(r, r).first->second;
+#endif //TAU_CACHE
 		return reduce2(fm, tau_parser::wff, true);
 	}
 };
@@ -1752,24 +1766,24 @@ nso<BAs...> eliminate_quantifiers(const nso<BAs...>& fm) {
 		// Scoped formula contains the quantified variable
 		if (is_ex_quant) {
 			scoped_fm = scoped_fm
-			    // Reductions to prevent blow ups
+			    // Reductions to prevent blow ups and achieve DNF
 			    | bf_reduce_canonical<BAs...>()
 			    | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
 			    | repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
 			    | repeat_all<step<BAs...>, BAs...> (elim_trivial_eqs<BAs...>)
 			    | wff_reduce_dnf<BAs...>();
-			// Now resolve quantified varialbe in scoped_fm
+			// Now resolve quantified variable in scoped_fm
 			return wff_remove_existential(trim2(inner_fm), scoped_fm);
 		} else {
 			scoped_fm = scoped_fm
-			    // Reductions to prevent blow ups
+			    // Reductions to prevent blow ups and achieve CNF
 			    | bf_reduce_canonical<BAs...>()
 			    | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
 			    | repeat_all<step<BAs...>, BAs...>(nnf_to_cnf_wff<BAs...>)
 			    | repeat_all<step<BAs...>, BAs...> (elim_trivial_eqs<BAs...>)
 			    | wff_reduce_cnf<BAs...>();
 			auto clauses = get_leaves(scoped_fm, tau_parser::wff_and, tau_parser::wff);
-            nso<BAs...> res;
+			nso<BAs...> res;
 			bool first = true;
 			for (const auto& clause : clauses) {
 				// Turn universal into existential quantifier and eliminate
