@@ -1068,7 +1068,17 @@ template<typename... BAs>
 nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoint = false) {
 	// Function can only be applied to a BF
 	assert(is_non_terminal(tau_parser::bf, fm));
-
+#ifdef TAU_CACHE
+	static map<nso<BAs...>, nso<BAs...>> bf_cache_disjoint;
+	static map<nso<BAs...>, nso<BAs...>> bf_cache_nondisjoint;
+	if (make_paths_disjoint) {
+		if (auto it = bf_cache_disjoint.find(fm);
+			it != bf_cache_disjoint.end()) return it->second;
+	} else {
+		if (auto it = bf_cache_nondisjoint.find(fm);
+			it != bf_cache_nondisjoint.end()) return it->second;
+	}
+#endif //TAU_CACHE
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
 	auto vars = select_top(fm, is_child_non_terminal<tau_parser::variable, BAs...>);
@@ -1120,6 +1130,16 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 				build_bf_or(reduced_dnf, build_bf_and(coeff, var_path));
 		}
 	}
+#ifdef TAU_CACHE
+	if (make_paths_disjoint) {
+		bf_cache_disjoint.emplace(fm, reduced_dnf);
+		bf_cache_disjoint.emplace(reduced_dnf, reduced_dnf);
+	}
+	else {
+		bf_cache_nondisjoint.emplace(fm, reduced_dnf);
+		bf_cache_nondisjoint.emplace(reduced_dnf, reduced_dnf);
+	}
+#endif //TAU_CACHE
 	return reduced_dnf;
 }
 
