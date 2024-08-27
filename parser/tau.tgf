@@ -173,7 +173,8 @@ cli_command            =>
         | ("valid"         :valid_sym   __ rr)                :valid_cmd
         | ("sat"           :sat_sym     __ rr)                :sat_cmd
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
-        | ("solve"         :solve_sym   __ wff_cmd_arg)       :solve_cmd
+        | ("solve"         :solve_sym   __
+                solve_cmd_arg (',' _ solve_cmd_arg)+)         :solve_cmd
         | (("e" | "execute"):execute_sym __ (wff_typed | rr)) :execute_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
@@ -218,6 +219,7 @@ wff_cmd_arg            => memory | wff_typed.
 nf_cmd_arg             => memory | bf_typed | wff_typed.
 onf_cmd_arg            => memory | wff_typed.
 normalize_cmd_arg      => memory | rr | ref | bf_typed | wff_typed.
+solve_cmd_arg          => memory | bf_eq | bf_neq.
 inst_args              =>
           bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
         | wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
