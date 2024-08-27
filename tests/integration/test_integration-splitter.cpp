@@ -19,7 +19,7 @@
 #include "nso_rr.h"
 #include "bdd_handle.h"
 #include "normalizer.h"
-#include "tau.h"
+#include "tau_ba.h"
 
 #include "test_integration_helpers-bdd.h"
 
