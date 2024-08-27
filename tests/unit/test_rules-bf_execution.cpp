@@ -27,17 +27,6 @@ namespace testing = doctest;
 
 TEST_SUITE("executing bf rules") {
 
-	TEST_CASE("BF_DEF_XOR") {
-		auto src_rule = make_tau_source(BF_DEF_XOR);
-		auto statement = make_statement(src_rule);
-		auto rule = statement | tau_parser::library| tau_parser::rules	| tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto [matcher, body] = tau_rule;
-		auto result = nso_rr_apply(tau_rule, matcher);
-		CHECK( matcher != body );
-		CHECK( result == body );
-	}
-
 	TEST_CASE("BF_CALLBACK_AND") {
 		const char* sample = " { l } & { r } = 0 .";
 		auto sample_src = make_tau_source(sample);

@@ -70,17 +70,6 @@ rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
 }
 
 template<typename... BAs>
-rr<nso<BAs...>> apply_once_definitions(const rr<nso<BAs...>>& nso_rr) {
-	auto nmain = apply_once_definitions(nso_rr.main);
-	rec_relations<nso<BAs...>> nrec_relations;
-	for (const auto& r : nso_rr.rec_relations) {
-		auto [matcher, body] = r;
-		nrec_relations.emplace_back(matcher, apply_once_definitions(body));
-	}
-	return { nrec_relations, nmain };
-}
-
-template<typename... BAs>
 struct remove_one_wff_existential {
 	nso<BAs...> operator()(nso<BAs...> n) const {
 		auto inner_fm = find_bottom(n, is_child_non_terminal<tau_parser::wff_ex, BAs...>);
@@ -120,7 +109,6 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 	auto result = form
-		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(apply_defs<BAs...>))
 		| repeat_all<step<BAs...>, BAs...>(step<BAs...>(elim_for_all<BAs...>))
 		| remove_one_wff_existential<BAs...>()
 		// After removal of existentials, only subformulas previously under the scope of a quantifier
@@ -730,7 +718,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	rec_relations<nso<BAs...>> rrs;
 	for (const auto& r : nso_rr.rec_relations) {
 		auto [matcher, body] = r;
-		rrs.emplace_back(matcher, apply_once_definitions(body));
+		rrs.emplace_back(matcher, body);
 	}
 	rr<nso<BAs...>> defs{ rrs, nso_rr.main };
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions to rules";
@@ -752,8 +740,6 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 						"New main: " << defs.main;
 	}
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions to main";
-	defs.main = apply_once_definitions(defs.main);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions to main";
 	if (defs.rec_relations.empty()) return normalizer_step(defs.main);
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << defs;

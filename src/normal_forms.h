@@ -40,9 +40,6 @@ RULE(BF_TO_DNF_1, "$X & ($Y | $Z) := $X & $Y | $X & $Z.")
 RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := $X' | $Y'.")
 RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
 
-// bf definitions
-RULE(BF_DEF_XOR, "$X + $Y := $X & $Y' | $X' & $Y.")
-
 // bf callbacks
 RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
 RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
@@ -66,23 +63,6 @@ RULE(WFF_SIMPLIFY_ALWAYS_3,		"(always $X) && (sometimes $X) ::= always $X.")
 RULE(WFF_PUSH_SOMETIMES_INWARDS,"sometimes($X || $Y) ::= (sometimes $X) || (sometimes $Y).")
 RULE(WFF_PUSH_ALWAYS_INWARDS,   "always($X && $Y) ::= (always $X) && (always $Y).")
 
-// wff definitions
-RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !$Y || !$X && $Y.")
-RULE(WFF_DEF_CONDITIONAL, "$X ? $Y : $Z ::= ($X -> $Y) && (!$X -> $Z).")
-RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !$X || $Y.")
-RULE(WFF_DEF_EQUIV, "$X <-> $Y ::= ($X -> $Y) && ($Y -> $X).")
-
-// additional wff definitions (include wff formulas)
-RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & $Y' = 0.")
-RULE(BF_DEF_LESS, "$X < $Y ::= $X & $Y' = 0 && $X + $Y' != 0.")
-RULE(BF_DEF_GREATER, "$X > $Y ::= $X & $Y' != 0 || $X + $Y' = 0.")
-RULE(BF_DEF_INTERVAL, "$X <= $Y <= $Z ::= ($X & $Y' = 0) && ($Y & $Z' = 0).")
-RULE(BF_DEF_NOT_LESS_EQUAL, "$X !<= $Y ::= ($X & $Y' != 0).")
-
-// we must expand the xor as its definition has been allready processed
-RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
-RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
-
 // wff callbacks
 RULE(BF_CALLBACK_EQ, "{ $X } = 0 ::= bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
 RULE(BF_CALLBACK_NEQ, "{ $X } != 0 ::= bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
@@ -101,49 +81,13 @@ RULE(BF_TO_CNF_1, "$X | $Y & $Z := ($X | $Y) & ($X | $Z).")
 RULE(WFF_TO_CNF_0, "$X && $Y || $Z ::= ($X || $Z) && ($Y || $Z).")
 RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
 
-RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != $Y ::= !($X = $Y).")
+RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != 0 ::= !($X = 0).")
 RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
 RULE(WFF_UNSQUEEZE_NEGATIVES_0, "$X | $Y != 0 ::= $X != 0 || $Y != 0.")
 
 
 // TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
-template<typename... BAs>
-// TODO (LOW) rename library with rwsys or another name
-static auto apply_defs = make_library<BAs...>(
-	// wff defs
-	WFF_DEF_XOR
-	+ WFF_DEF_CONDITIONAL
-	+ WFF_DEF_IMPLY
-	+ WFF_DEF_EQUIV
-	// bf defs
-	+ BF_DEF_XOR
-);
-
-template<typename... BAs>
-static auto apply_wff_defs = make_library<BAs...>(
-	WFF_DEF_XOR
-	+ WFF_DEF_CONDITIONAL
-	+ WFF_DEF_IMPLY
-	+ WFF_DEF_EQUIV
-);
-
-template<typename... BAs>
-static auto apply_bf_defs = make_library<BAs...>(
-	BF_DEF_XOR
-);
-
-template<typename... BAs>
-static auto apply_defs_once = make_library<BAs...>(
-	// wff defs
-	BF_DEF_LESS_EQUAL
-	+ BF_DEF_LESS
-	+ BF_DEF_GREATER
-	+ BF_DEF_INTERVAL
-	+ BF_DEF_NOT_LESS_EQUAL
-	+ BF_DEF_EQ
-	+ BF_DEF_NEQ
-);
 
 template<typename... BAs>
 static auto to_dnf_bf = make_library<BAs...>(
@@ -181,12 +125,6 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_5
 	+ WFF_PUSH_ALWAYS_INWARDS
 	+ WFF_PUSH_SOMETIMES_INWARDS
-);
-
-
-template<typename... BAs>
-static auto simplify_bf_more = make_library<BAs...>(
-	BF_DEF_XOR
 );
 
 template<typename... BAs>
@@ -619,17 +557,10 @@ static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) 
 template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
-// TODO (LOW) wthis should be converted into a struct
-template<typename... BAs>
-nso<BAs...> apply_once_definitions(const nso<BAs...>& form) {
-	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
-}
-
 template<typename...BAs>
 std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 	// FIXME take into account quiantifiers
-	return apply_once_definitions(n)
-		| apply_defs<BAs...> // needed to remove some definitions in bf's
+	return n
 		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
 		| onf_wff<BAs...>(var)
 		| repeat_all<step<BAs...>, BAs...>(
@@ -640,10 +571,9 @@ std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 template<typename...BAs>
 nso<BAs...> dnf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	auto nform = apply_once_definitions(nn)
+	auto nform = nn
 		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_dnf_wff<BAs...>
+			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
@@ -654,12 +584,8 @@ nso<BAs...> dnf_wff(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> dnf_bf(const nso<BAs...>& n) {
-	return apply_once_definitions(n)
-		| repeat_all<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
+	return n | repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			//| simplify_bf<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
@@ -669,10 +595,8 @@ nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 template<typename...BAs>
 nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 	auto [var, nn] = get_inner_quantified_wff(n);
-	auto wff = apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_cnf_wff<BAs...>
+	auto wff = nn | repeat_each<step<BAs...>, BAs...>(
+			to_cnf_wff<BAs...>
 			| simplify_wff<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
@@ -684,8 +608,7 @@ nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 template<typename...BAs>
 nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 	return n
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
+
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
 			//| simplify_bf<BAs...>
@@ -697,10 +620,7 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> nnf_bf(const nso<BAs...>& n) {
-	return apply_once_definitions(n)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
+	return n | repeat_all<step<BAs...>, BAs...>(
 			to_nnf_bf<BAs...>
 			//| simplify_bf<BAs...>
 			| apply_cb<BAs...>
@@ -712,10 +632,8 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 template<typename...BAs>
 nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	auto nform = apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_nnf_wff<BAs...>
+	auto nform = nn | repeat_each<step<BAs...>, BAs...>(
+			to_nnf_wff<BAs...>
 			| simplify_wff<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
@@ -877,11 +795,9 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	// Substitute 1 and 0 for v and simplify
 	const auto& v = vars[p];
 	map<nso<BAs...>, nso<BAs...>> c = {{v, _1<BAs...>}};
-	auto fm_v1 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(
-			/* simplify_bf<BAs...> |*/ simplify_bf_more<BAs...> | apply_cb<BAs...>);
+	auto fm_v1 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(apply_cb<BAs...>);
 	c = {{v, _0<BAs...>}};
-	auto fm_v0 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(
-			/*simplify_bf<BAs...> |*/ simplify_bf_more<BAs...> | apply_cb<BAs...>);
+	auto fm_v0 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(apply_cb<BAs...>);
 
 	elim_vars_in_assignment<BAs...>(fm_v1, vars, i, p);
 	if(fm_v1 == fm_v0) {
@@ -920,8 +836,7 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 	map<nso<BAs...>, vector<vector<int_t>>> dnf;
 
 	//Simplify formula as initial step
-	auto fm_simp = fm | repeat_all<step<BAs...>, BAs...>(
-			/*simplify_bf<BAs...> |*/ simplify_bf_more<BAs...> | apply_cb<BAs...>);
+	auto fm_simp = fm | repeat_all<step<BAs...>, BAs...>(apply_cb<BAs...>);
 
 	if(assign_and_reduce(fm_simp, vars, i, dnf, 0)) {
 		assert(dnf.size() == 1);
@@ -1794,10 +1709,7 @@ nso<BAs...> operator|(const nso<BAs...>& n, const to_snf_step<BAs...>& r) {
 template<typename...BAs>
 nso<BAs...> snf_bf(const nso<BAs...>& n) {
 	// TODO (HIGH) give a proper implementation (call to_bdd...)
-	return apply_once_definitions(n)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| bf_reduce_canonical<BAs...>()
+	return n | bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			//| simplify_bf<BAs...>
@@ -1815,11 +1727,9 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 template<typename...BAs>
 nso<BAs...> snf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	auto wo_defs = apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(apply_wff_defs<BAs...>);
 	// in the first step we apply compute the SNF of the formula, as a result we get
 	// the formula in SNF with positive equal exponent literals sqeezed.
-	auto first_step = build_wff_neg(wo_defs)
+	auto first_step = build_wff_neg(nn)
 		| bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			unsqueeze_wff<BAs...>
@@ -1853,10 +1763,8 @@ nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...
 template<typename...BAs>
 nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	auto mnf = apply_once_definitions(nn)
-		| repeat_all<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_dnf_wff<BAs...>
+	auto mnf = nn | repeat_all<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>
 			| to_mnf_wff<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_mnf_wff<BAs...>)
@@ -1867,10 +1775,7 @@ nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> mnf_bf(const nso<BAs...>& n) {
-	return apply_once_definitions(n)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
+	return n | repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
 			//| simplify_bf<BAs...>
 			| apply_cb<BAs...>
