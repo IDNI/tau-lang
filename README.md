@@ -198,21 +198,21 @@ They are given by the following grammar:
 
 ```
 bf_rec_relation -> bf_ref ":=" bf.
-bf_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
+bf_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
 ```
 
 in the case of Boolean functions and in the case of well-formed general formulas, the grammar is:
 
 ```
 wff_rec_relation -> wff_ref "::=" wff.
-wff_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
+wff_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
 ```
 
 anf finally, in the case of tau formulas, the grammar is:
 
 ```
 tau_rec_relation -> tau_ref ":::=" tau.
-tau_ref -> sym "[" (offset)+  "]" "(" capture+ ")".
+tau_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
 ```
 
 where `bf_rec_relation` stands for a Boolean function recursive relation, `bf_ref` stands for a reference to a Boolean function (see Boolean functions Section), `wff_rec_relation` stands for a well formed formula recursive relation, `wff_ref` stands for a reference to a well formed formula (see well formed formulas Section), `sym` stands for a symbol, `offset` stands for an offset and `capture` stands for a capture/variable.
@@ -220,24 +220,24 @@ where `bf_rec_relation` stands for a Boolean function recursive relation, `bf_re
 Examples of recursive relations are:
 
 ```
-g[0]($Y) := 1.
-g[$n]($Y) := g[$n - 1]($Y).
+g[0](Y) := 1.
+g[n](Y) := g[n - 1](Y).
 ```
 
 for the case of Boolean functions,
 
 ```
-g[0]($Y) ::= T.
-g[$n]($Y) ::= h[$n - 1]($Y).
-h[0]($Y) ::= F.
-h[$n]($Y) ::= g[$n - 1]($Y).
+g[0](Y) ::= T.
+g[n](Y) ::= h[n - 1](Y).
+h[0](Y) ::= F.
+h[n](Y) ::= g[n - 1](Y).
 ```
 
 and finally, for the case of well formed formulas:
 
 ```
-g[0]($Y) :::= {T}.
-g[$n]($Y) :::= g[$n - 1]($Y).
+g[0](Y) :::= {T}.
+g[n](Y) :::= g[n - 1](Y).
 ```
 
 ## Tau programs
@@ -255,8 +255,8 @@ where `tau_rec_relation` stands for a tau recursive relations, `wff_rec_relation
 Thus, they are a collection of Tau recursive relations and a main formula, p.e.:
 
 ```
-g[0]($Y) :::= {T}.
-g[$n]($Y) :::= g[$n - 1]($Y).
+g[0](Y) :::= {T}.
+g[n](Y) :::= g[n - 1](Y).
 g[1](Y);
 ```
 

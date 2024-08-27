@@ -16,7 +16,7 @@
 
 #include <stack>
 
-#include "tau.h"
+#include "tau_ba.h"
 #include "normal_forms.h"
 
 #ifdef DEBUG

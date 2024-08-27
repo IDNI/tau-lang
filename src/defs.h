@@ -21,10 +21,7 @@ typedef int sym_t;
 #	define DBG(x) x
 #	include <cxxabi.h>
 #else
-#	define DBG(x)
-#	ifndef TAU_CACHE
-#		define TAU_CACHE
-#	endif
+#define DBG(x)
 #endif
 
 #include <algorithm>

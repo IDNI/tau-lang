@@ -20,7 +20,7 @@
 #include "bdd_handle.h"
 #include "babdd.h"
 #include "rewriting.h"
-#include "tau.h"
+#include "tau_ba.h"
 #include "dict.h"
 
 #include "../parser/bdd_parser.generated.h"

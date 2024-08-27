@@ -18,9 +18,8 @@
 #include "normalizer.h"
 #include "normal_forms.h"
 #include "nso_rr.h"
-#include "tau.h"
+#include "tau_ba.h"
 #include "term_colors.h"
-//#include "satisfiability.h"
 #include "solver.h"
 
 #ifdef DEBUG
@@ -490,15 +489,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 				? make_nso_rr_from_binded_code<
 						tau_ba<BAs...>, BAs...>(value)
 				: rr<nso<tau_ba<BAs...>, BAs...>>(value);
-		if (contains_ref) {
+		if (contains_ref)
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end());
+				definitions.begin(), definitions.end()),
 			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
-		}
 		if (!is_non_terminal(tau_parser::bf, rr_.main))
 			return normalizer<tau_ba<BAs...>, BAs...>(rr_);
-		if (contains_ref)
-			return bf_normalizer_with_rec_relation(rr_);
+		if (contains_ref) return bf_normalizer_with_rec_relation(rr_);
 		return bf_normalizer_without_rec_relation(rr_.main);
 	}
 	cout << "error: invalid argument\n";
