@@ -55,7 +55,7 @@ static auto wff_remove_existential = make_library<BAs...>(
 // bindings provided.
 template<typename... BAs>
 rr<nso<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
-	auto form_source = make_tau_source(source);
+	auto form_source = make_tau_source(source, { .start = tau_parser::rr });
 	auto form = make_nso_rr_using_bindings(form_source, binds);
 	return normalizer(form);
 }
@@ -64,7 +64,7 @@ rr<nso<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
 // provided factory.
 template<typename factory_t, typename... BAs>
 rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
-	auto form_source = make_tau_source(source);
+	auto form_source = make_tau_source(source, { .start = tau_parser::rr });
 	auto form = make_nso_rr_using_factory(form_source, factory);
 	return normalizer(form);
 }

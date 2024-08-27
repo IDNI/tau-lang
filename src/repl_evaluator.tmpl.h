@@ -18,9 +18,8 @@
 #include "normalizer.h"
 #include "normal_forms.h"
 #include "nso_rr.h"
-#include "tau.h"
+#include "tau_ba.h"
 #include "term_colors.h"
-//#include "satisfiability.h"
 #include "solver.h"
 
 #ifdef DEBUG

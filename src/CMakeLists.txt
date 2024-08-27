@@ -11,9 +11,7 @@ set(TAU_HEADERS
 	normalizer.h
 	nso_rr.h
 	execution.h
-	#satisfiability.h
 	tau.h
-	#executor.h
 	normal_forms.h
 	solver.h
 	splitter.h

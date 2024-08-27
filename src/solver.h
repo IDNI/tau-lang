@@ -16,8 +16,7 @@
 
 #include <stack>
 
-#include "tau.h"
-#include "nso_rr.h"
+#include "tau_ba.h"
 #include "normal_forms.h"
 #include "splitter.h"
 
