@@ -508,12 +508,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = get_wff(n->child[1]);
-	if (arg) return arg.value()
-		| repeat_all<step<tau_ba<BAs...>, BAs...>,
-			tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(
-				elim_for_all<tau_ba<BAs...>, BAs...>))
-		| (nso_transform<tau_ba<BAs...>, BAs...>)
-				eliminate_quantifiers<tau_ba<BAs...>, BAs...>
+	if (arg) return eliminate_quantifiers<tau_ba<BAs...>, BAs...>(arg.value())
 		| repeat_all<step<tau_ba<BAs...>, BAs...>,
 			tau_ba<BAs...>, BAs...>(
 				to_dnf_wff<tau_ba<BAs...>, BAs...>

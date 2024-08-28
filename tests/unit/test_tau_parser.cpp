@@ -855,19 +855,19 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::wff_xor;
+			| tau_parser::wff_or;
 		CHECK( xor_formula.has_value() );
 	}
 
 	TEST_CASE("?") {
-		const char* sample = "$Z ? $Z : $Z.";
+		const char* sample = "$X ? $Y : $Z.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto xor_formula = frml
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::wff_conditional;
+			| tau_parser::wff_and;
 		CHECK( xor_formula.has_value() );
 	}
 
@@ -895,43 +895,43 @@ TEST_SUITE("parsing wwf formulas ") {
 		CHECK( eq_formula.has_value() );
 	}
 	TEST_CASE("<") {
-		const char* sample = " Z < Z .";
+		const char* sample = " X < Y .";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto less_rule = lib
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::bf_less;
+			| tau_parser::wff_neg;
 		CHECK( less_rule.has_value() );
 	}
 
 	TEST_CASE("<=") {
-		const char* sample = " Z <= Z .";
+		const char* sample = " X <= Y .";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto less_equal_rule = lib
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::bf_less_equal;
+			| tau_parser::bf_eq;
 		CHECK( less_equal_rule.has_value() );
 	}
 
 	TEST_CASE(">") {
-		const char* sample = "Z > Z.";
+		const char* sample = "X > Y.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto greater_rule = lib
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::bf_greater;
+			| tau_parser::wff_neg;
 		CHECK( greater_rule.has_value() );
 	}
 
 	TEST_CASE("->") {
-		const char* sample = "$Z -> $Z ::= $Z.";
+		const char* sample = "$Z -> $X ::= $Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -941,12 +941,12 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
 			| tau_parser::wff
-			| tau_parser::wff_imply;
+			| tau_parser::wff_or;
 		CHECK( imply_rule.has_value() );
 	}
 
 	TEST_CASE("<->") {
-		const char* sample = "$Z <-> $Z ::= $Z.";
+		const char* sample = "$Z <-> $X ::= $Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -956,7 +956,7 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
 			| tau_parser::wff
-			| tau_parser::wff_equiv;
+			| tau_parser::wff_and;
 		CHECK( equiv_rule.has_value() );
 	}
 
@@ -1005,7 +1005,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("&") {
-		const char* sample = "Z & Z := Z.";
+		const char* sample = "Z & X := Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1020,7 +1020,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("|") {
-		const char* sample = "Z | Z := Z.";
+		const char* sample = "Z | X := Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1035,7 +1035,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("+") {
-		const char* sample = "Z + Z := Z.";
+		const char* sample = "Z + X := Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1045,7 +1045,7 @@ TEST_SUITE("parsing bf formulas ") {
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
-			| tau_parser::bf_xor;
+			| tau_parser::bf_or;
 		CHECK( xor_rule.has_value() );
 	}
 }

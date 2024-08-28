@@ -1885,23 +1885,18 @@ sp_tau_node<BAs...> build_wff_uniter_const(const std::string& name) {
 // wff factory method for building wff formulas
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_eq(const sp_tau_node<BAs...>& l) {
-	return wrap(tau_parser::wff, wrap(tau_parser::bf_neq, l, _0<BAs...>));
+	return wrap(tau_parser::wff, wrap<BAs...>(tau_parser::bf_eq, l, wrap<BAs...>(tau_parser::bf, wrap<BAs...>(tau_parser::bf_f, {}))));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_neq(const sp_tau_node<BAs...>& l) {
-	return wrap(tau_parser::wff, wrap(tau_parser::bf_neq, l, _0<BAs...>));
+	return wrap(tau_parser::wff, wrap<BAs...>(tau_parser::bf_neq, l, wrap<BAs...>(tau_parser::bf, wrap<BAs...>(tau_parser::bf_f, {}))));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_and(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	// first we consider the trivial cases
-	if (l == _F<BAs...> || r == _F<BAs...>) return _F<BAs...>;
-	if (l == _T<BAs...>) return r;
-	if (r == _T<BAs...>) return l;
-	// then we consider the general case
 	return wrap(tau_parser::wff, wrap(tau_parser::wff_and, l, r));
 }
 
@@ -1915,11 +1910,6 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_wff_or(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	// first we consider the trivial cases
-	if (l == _F<BAs...>) return r;
-	if (r == _F<BAs...>) return l;
-	if (l == _T<BAs...> || r == _T<BAs...>) return _T<BAs...>;
-	// then we consider the general case
 	return wrap(tau_parser::wff, wrap(tau_parser::wff_or, l, r));
 }
 
@@ -1931,10 +1921,6 @@ sp_tau_node<BAs...> build_wff_or(const std::set<sp_tau_node<BAs...>>& wffs) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_neg(const sp_tau_node<BAs...>& l) {
-	// first we consider the trivial cases
-	if (l == _F<BAs...>) return _T<BAs...>;
-	if (l == _T<BAs...>) return _F<BAs...>;
-	// then we consider the general case
 	return wrap(tau_parser::wff, wrap(tau_parser::wff_neg, l));
 }
 
@@ -1950,7 +1936,6 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_wff_xor(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
 	return build_wff_or(
 		build_wff_and(build_wff_neg(l), r),
 		build_wff_and(build_wff_neg(r), l));
@@ -2025,11 +2010,6 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_and(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	// first we consider the trivial cases
-	if (l == _0<BAs...> || r == _0<BAs...>) return _0<BAs...>;
-	if (l == _1<BAs...>) return r;
-	if (r == _1<BAs...>) return l;
-	// then we consider the general case
 	return wrap(tau_parser::bf, wrap(tau_parser::bf_and, l, r));
 }
 
@@ -2043,11 +2023,6 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_or(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	// first we consider the trivial cases
-	if (l == _0<BAs...>) return r;
-	if (r == _0<BAs...>) return l;
-	if (l == _1<BAs...> || r == _1<BAs...>) return _1<BAs...>;
-	// then we consider the general case
 	return wrap(tau_parser::bf, wrap(tau_parser::bf_or, l, r));
 }
 
@@ -2059,10 +2034,6 @@ sp_tau_node<BAs...> build_bf_or(const std::set<sp_tau_node<BAs...>>& bfs) {
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_neg(const sp_tau_node<BAs...>& l) {
-	// first we consider the trivial cases
-	if (l == _0<BAs...>) return _1<BAs...>;
-	if (l == _1<BAs...>) return _0<BAs...>;
-	// then we consider the general case
 	return wrap(tau_parser::bf, wrap(tau_parser::bf_neg, l));
 }
 
@@ -2079,10 +2050,9 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_xor(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)} ;
 	return build_bf_or<BAs...>(
 		build_bf_and<BAs...>(build_bf_neg<BAs...>(l), r),
-		build_bf_and<BAs...>(build_bf_neg<BAs...>(r), l));
+		build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r)));
 }
 
 template<typename... BAs>
@@ -2091,7 +2061,7 @@ sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l,
 {
 	return build_bf_or<BAs...>(build_wff_eq<BAs...>(
 			build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r))),
-			build_wff_neq(build_bf_xor_from_def<BAs...>(l,
+			build_wff_neq(build_bf_xor<BAs...>(l,
 					build_bf_neg<BAs...>(r))));
 }
 
@@ -2106,7 +2076,7 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_nleq(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	return build_wff_neg<BAs...>(build_bf_less_equal<BAs...>(l, r));
+	return build_wff_neq<BAs...>(build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r)));
 }
 
 template<typename... BAs>
@@ -3147,7 +3117,7 @@ sp_tau_node<BAs...> make_node_hook_bf(const node<tau_sym<BAs...>>& n) {
 	// if n is ref, capture, 0 or 1, we can return accordingly
 	if (n.child.size() != 1) return std::make_shared<node<tau_sym<BAs...>>>(n);
 	// otherwise we need to check the children
-	if (is_non_terminal_node<BAs...>(n))
+	if (is_non_terminal_node<BAs...>(n.child[0]))
 		switch (std::get<tau_source_sym>(n.child[0]->value).n()) {
 			case tau_parser::bf_or:
 				return make_node_hook_bf_or<BAs...>(n);
@@ -3268,9 +3238,9 @@ sp_tau_node<BAs...> make_node_hook_wff_neq(const node<tau_sym<BAs...>>& n) {
 	// TODO (HIGH) fix this simplification rule, it gives problems during creation
 	// of libraries
 	//RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
-	/*if (!is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+	if (!is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
 		return build_wff_neq<BAs...>(
-			build_wff_xor(first_argument_formula(n), second_argument_formula(n)));^*/
+			build_wff_xor(first_argument_formula(n), second_argument_formula(n)));
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
