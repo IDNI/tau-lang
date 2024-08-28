@@ -454,6 +454,17 @@ static auto to_nnf_bf = make_library<BAs...>(
 	+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
+// --------------------------------------------------------------
+// General operator for nso<BAs...> function application by pipe
+template<typename... BAs>
+using nso_transform = nso<BAs...>(*)(const nso<BAs...>&);
+
+template<typename... BAs>
+nso<BAs...> operator| (const nso<BAs...>& fm, const nso_transform<BAs...> func) {
+	return func(fm);
+}
+// --------------------------------------------------------------
+
 template<typename... BAs>
 struct bf_reduce_canonical;
 
@@ -1006,7 +1017,8 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	// Check if all variables are assigned
 	if((int_t)vars.size() == p) {
 		// Normalize tau subformulas
-		auto fm_simp = fm | repeat_once<step<BAs...>, BAs...>(apply_normalize<BAs...>)
+		auto fm_simp = fm
+					| (nso_transform<BAs...>)normalize_ba<BAs...>
 					| repeat_once<step<BAs...>, BAs...>(elim_bf_constant_01<BAs...>)
 		 			| repeat_all<step<BAs...>, BAs...>(to_nnf_bf<BAs...>)
 		 			| repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_bf<BAs...>);
@@ -1244,8 +1256,8 @@ vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff, const a
 			}
 			else return true;
 		};
-		post_order_traverser<identity_t<nso<BAs...>>, decltype(var_assigner), nso<BAs...>>
-			(rewriter::identity<nso<BAs...>>, var_assigner)(clause);
+		post_order_traverser<identity_t, decltype(var_assigner), nso<BAs...>>
+			(rewriter::identity, var_assigner)(clause);
 		if (clause_is_decided) continue;
 		// There is at least one satisfiable clause
 		decided = false;
@@ -1881,13 +1893,7 @@ nso<BAs...> eliminate_quantifiers(const nso<BAs...>& fm) {
 	return post_order_recursive_traverser<nso<BAs...>>()(fm, is_not_bf, elim_quant);
 }
 
-template<typename... BAs>
-using nso_transform = nso<BAs...>(*)(const nso<BAs...>&);
 
-template<typename... BAs>
-nso<BAs...> operator| (const nso<BAs...>& fm, const nso_transform<BAs...> func) {
-	return func(fm);
-}
 
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.
