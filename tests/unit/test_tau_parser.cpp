@@ -867,7 +867,7 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::wff_and;
+			| tau_parser::wff_or;
 		CHECK( xor_formula.has_value() );
 	}
 
@@ -894,6 +894,7 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::bf_neq;
 		CHECK( eq_formula.has_value() );
 	}
+
 	TEST_CASE("<") {
 		const char* sample = " X < Y .";
 		auto src = make_tau_source(sample);
@@ -902,7 +903,7 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::wff_neg;
+			| tau_parser::wff_and;
 		CHECK( less_rule.has_value() );
 	}
 
