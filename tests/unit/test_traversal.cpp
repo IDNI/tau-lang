@@ -30,7 +30,7 @@ namespace testing = doctest;
 TEST_SUITE("operator|") {
 
 	TEST_CASE("match zero nodes") {
-		const char* sample = "$Z & $Z := $Z.";
+		const char* sample = "$X & $Y := $Z.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
@@ -39,7 +39,7 @@ TEST_SUITE("operator|") {
 	}
 
 	TEST_CASE("match one node") {
-		const char* sample = "$Z & $Z := $Z.";
+		const char* sample = "$X & $Y := $Z.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
@@ -51,7 +51,7 @@ TEST_SUITE("operator|") {
 TEST_SUITE("operator||") {
 
 	TEST_CASE("match zero nodes") {
-		const char* sample = "$Z & $Z := $Z.";
+		const char* sample = "$X & $Y := $Z.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
@@ -63,7 +63,7 @@ TEST_SUITE("operator||") {
 	}
 
 	TEST_CASE("match one node") {
-		const char* sample = "Z & Z := Z.";
+		const char* sample = "X & Y := Z.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
@@ -74,7 +74,7 @@ TEST_SUITE("operator||") {
 	}
 
 	TEST_CASE("match several nodes") {
-		const char* sample = "Z & Z := Z.";
+		const char* sample = "X & Y := Z.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
@@ -86,6 +86,5 @@ TEST_SUITE("operator||") {
 			| tau_parser::bf_and
 			|| tau_parser::bf;
 		CHECK( args.size() == 2 );
-		CHECK( args[0] == args[1] );
 	}
 }

@@ -1953,7 +1953,7 @@ sp_tau_node<BAs...> build_wff_conditional(const sp_tau_node<BAs...>& x,
 	const sp_tau_node<BAs...>& y,
 	const sp_tau_node<BAs...>& z)
 {
-	return build_wff_and<BAs...>(build_wff_imply<BAs...>(x, y),
+	return build_wff_or<BAs...>(build_wff_imply<BAs...>(x, y),
 		build_wff_imply<BAs...>(build_wff_neg<BAs...>(x), z));
 }
 
@@ -2059,7 +2059,7 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	return build_bf_or<BAs...>(build_wff_eq<BAs...>(
+	return build_wff_and<BAs...>(build_wff_eq<BAs...>(
 			build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r))),
 			build_wff_neq(build_bf_xor<BAs...>(l,
 					build_bf_neg<BAs...>(r))));
@@ -3218,10 +3218,13 @@ sp_tau_node<BAs...> make_node_hook_wff_eq(const node<tau_sym<BAs...>>& n) {
 	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
 		return _T<BAs...>;
+	//RULE(BF_DEF_SIMPLIFY_N, "$X = 1 ::= $X' = 0.")
+	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+		return build_wff_eq<BAs...>(build_bf_neg(first_argument_formula(n)));
 	//RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
 	if (!is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
 		return build_wff_eq<BAs...>(
-			build_wff_xor(first_argument_formula(n), second_argument_formula(n)));
+			build_bf_xor(first_argument_formula(n), second_argument_formula(n)));
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
@@ -3237,10 +3240,13 @@ sp_tau_node<BAs...> make_node_hook_wff_neq(const node<tau_sym<BAs...>>& n) {
 		return _T<BAs...>;
 	// TODO (HIGH) fix this simplification rule, it gives problems during creation
 	// of libraries
+	//RULE(BF_DEF_SIMPLIFY_N, "$X != 1 ::= $X' != 0.")
+	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+		return build_wff_neq<BAs...>(build_bf_neg(first_argument_formula(n)));
 	//RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
 	if (!is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
 		return build_wff_neq<BAs...>(
-			build_wff_xor(first_argument_formula(n), second_argument_formula(n)));
+			build_bf_xor(first_argument_formula(n), second_argument_formula(n)));
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
@@ -3289,6 +3295,10 @@ sp_tau_node<BAs...> make_node_hook_wff_less(const node<tau_sym<BAs...>>& n) {
 	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
 		return _T<BAs...>;
+	//RULE(BF_DEF_SIMPLIFY_N, "$X < 1 ::= $X' != 0.")
+	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+		return build_wff_neq<BAs...>(build_bf_neg(first_argument_formula(n)));
+
 	return build_bf_less<BAs...>(first_argument_formula(n), second_argument_formula(n));
 }
 
@@ -3368,7 +3378,7 @@ template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_wff_conditional(const node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_CONDITIONAL_SIMPLIFY_0, "0 ? $X : $Y ::= $Y.")
 	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
-		return second_argument_formula(n);
+		return third_argument_formula(n);
 	//RULE(WFF_CONDITIONAL_SIMPLIFY_1, "1 ? $X : $Y ::= $X.")
 	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
 		return second_argument_formula(n);

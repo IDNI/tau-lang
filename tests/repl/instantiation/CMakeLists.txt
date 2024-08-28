@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 add_repl_test(instantiation_cmd_bf1 "x. 1. i %[x / %1]" ": 1")
 
-add_repl_test(instantiation_cmd_bf2 "ax + bx'. y&z. i %1[x / %2]" ": \\(a & y & z\\) \\+ \\(b & \\(y & z\\)'\\)")
+add_repl_test(instantiation_cmd_bf2 "ax + bx'. y&z. i %1[x / %2]" ": \\(a & y & z\\)' & b & \\(y & z\\)' | a & y & z & \\(b & \\(y & z\\)'\\)")
 
 add_repl_test(instantiation_cmd_bf3 "(x | (w & z)) & z. b. i %1[ z / %2]" ": \\(x | w & b\\) & b")
 
@@ -15,9 +15,9 @@ add_repl_test(instantiation_cmd_bf4 "x & y. T. i %1[x / %2]" "error: invalid arg
 
 # WFF Instantiation
 
-add_repl_test(instantiation_cmd_wff1 "x=0. 1. i %-1[x/ %]" ": 1 = 0")
+add_repl_test(instantiation_cmd_wff1 "x=0. 1. i %-1[x/ %]" ": F")
 
-add_repl_test(instantiation_cmd_wff2 "a=0 && x=0^ b=0 && !x=0. y & z. i %1[x/ %2]" ": \\(a = 0 && y & z = 0\\) \\^ \\(b = 0 && !y & z = 0\\)")
+add_repl_test(instantiation_cmd_wff2 "a=0 && x=0^ b=0 && !x=0. y & z. i %1[x/ %2]" ": !\\(a = 0 && y & z = 0\\) && b = 0 && !y & z = 0 || !\\(b = 0 && !y & z = 0\\) && a = 0 && y & z = 0")
 
 add_repl_test(instantiation_cmd_wff3 "ex k h=0 && k=0. v & w. i %1[k / %2]" ": ex k h = 0 && k = 0")
 
