@@ -650,11 +650,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 //G259: wff_cb(49)           => bf_neq_cb(186).
 	p(NT(49), (NT(186)));
 //G260: __E_wff_cb_78(189)   => 'w' 'f' 'f' '_' 'h' 'a' 's' '_' 'c' 'l' 'a' 's' 'h' 'i' 'n' 'g' '_' 's' 'u' 'b' 'f' 'o' 'r' 'm' 'u' 'l' 'a' 's' '_' 'c' 'b' wff_cb_args2(181).
-	p(NT(189), (T(19)+T(43)+T(43)+T(44)+T(48)+T(17)+T(10)+T(44)+T(46)+T(18)+T(17preprocess time: 1.46 ms
-preprocess size: 18984
-sorted sizes : 2428 4087 
-forest building time: 2.36 ms
-T(44)+T(46)+T(42)+NT(181)));
+	p(NT(189), (T(19)+T(43)+T(43)+T(44)+T(48)+T(17)+T(10)+T(44)+T(46)+T(18)+T(17)+T(10)+T(48)+T(15)+T(47)+T(49)+T(44)+T(10)+T(50)+T(42)+T(43)+T(11)+T(51)+T(12)+T(50)+T(18)+T(17)+T(10)+T(44)+T(46)+T(42)+NT(181)));
 //G261: wff_has_clashing_subformulas_cb(188) => __E_wff_cb_78(189).
 	p(NT(188), (NT(189)));
 //G262: wff_cb(49)           => wff_has_clashing_subformulas_cb(188).
