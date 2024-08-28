@@ -617,7 +617,6 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
-			//| simplify_bf<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
@@ -628,7 +627,6 @@ template<typename...BAs>
 nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 	return n | repeat_all<step<BAs...>, BAs...>(
 			to_nnf_bf<BAs...>
-			//| simplify_bf<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
@@ -1940,7 +1938,6 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 	return n | bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			//| simplify_bf<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
@@ -2005,7 +2002,6 @@ template<typename...BAs>
 nso<BAs...> mnf_bf(const nso<BAs...>& n) {
 	return n | repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			//| simplify_bf<BAs...>
 			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff

@@ -43,14 +43,7 @@ TEST_SUITE("parsing bf rules") {
 	}
 
 	TEST_CASE("BF_TO_DNF_1") {
-		auto src_rule = make_tau_source(BF_TO_DNF_1);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_TO_DNF_1, tau_parser::bf_rule) );
 	}
 
 	TEST_CASE("BF_CALLBACK_AND") {

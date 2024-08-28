@@ -704,7 +704,6 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 						"New main: " << defs.main;
 	}
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions to main";
 	if (defs.rec_relations.empty()) return normalizer_step(defs.main);
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << defs;
 
