@@ -145,8 +145,8 @@ auto get_free_vars_from_nso(const nso<BAs...>& n) {
 	free_vars_collector<BAs...> collector(free_vars);
 	post_order_traverser<
 			free_vars_collector<BAs...>,
-			all_t<nso<BAs...>>,
-			nso<BAs...>>(collector, all<nso<BAs...>>)(n);
+			all_t,
+			nso<BAs...>>(collector, all)(n);
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
 	return free_vars;
 }
@@ -707,8 +707,8 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<BAs...> fpt(defs, types);
-	defs.main = post_order_traverser<decltype(fpt), all_t<nso<BAs...>>,
-		nso<BAs...>>(fpt, all<nso<BAs...>>)(defs.main);
+	defs.main = post_order_traverser<decltype(fpt), all_t,
+		nso<BAs...>>(fpt, all)(defs.main);
 	if (fpt.changes.size()) {
 		defs.main = replace(defs.main, fpt.changes);
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "

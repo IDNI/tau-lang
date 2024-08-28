@@ -743,7 +743,7 @@ std::string make_string(const extractor_t& extractor, const node_t& n) {
 	std::basic_stringstream<char> ss;
 	stringify<extractor_t, node_t> sy(extractor, ss);
 	post_order_tree_traverser<stringify<extractor_t, node_t>,
-				all_t<node_t>, node_t>(sy, all<node_t>)(n);
+				all_t, node_t>(sy, all)(n);
 	return ss.str();
 }
 
@@ -1127,7 +1127,7 @@ sp_tau_node<BAs...> process_quantifier_vars(const sp_tau_node<BAs...>& tau_code)
 	using node = sp_tau_node<BAs...>;
 	quantifier_vars_transformer<BAs...> transformer;
 	return post_order_traverser<quantifier_vars_transformer<BAs...>,
-		all_t<node>, node>(transformer, all<node>)(tau_code);
+		all_t, node>(transformer, all)(tau_code);
 }
 
 template<typename...BAs>
@@ -1180,10 +1180,10 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 	auto tau_code = post_order_traverser<
 		map_transformer<tauify<BAs...>,
 				sp_tau_source_node, sp_tau_node<BAs...>>,
-		all_t<sp_tau_source_node>,
+		all_t,
 		sp_node<tau_source_sym>,
 		sp_tau_node<BAs...>>(
-			transform, all<sp_tau_source_node>)(tau_source);
+			transform, all)(tau_source);
 	return process_defs_input_variables(
 		process_offset_variables(
 		process_quantifier_vars(
@@ -1215,9 +1215,8 @@ sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& code,
 	bind_transformer<binder_t, BAs...> bs(binder);
 	return post_order_traverser<
 			bind_transformer<binder_t, BAs...>,
-			all_t<sp_tau_node<BAs...>>,
-			sp_tau_node<BAs...>>(
-		bs, all<sp_tau_node<BAs...>>)(code);
+			all_t,
+			sp_tau_node<BAs...>>(bs, all)(code);
 }
 
 // make a nso_rr from the given tau source and bindings.
@@ -2338,6 +2337,27 @@ sp_tau_node<BAs...> operator+(const sp_tau_node<BAs...>& l,
 	return l ^ r;
 }
 
+// This function traverses n and normalizes coefficients in a BF
+template<typename... BAs>
+sp_tau_node<BAs...> normalize_ba(const sp_tau_node<BAs...>& fm) {
+	assert(is_non_terminal(tau_parser::bf, fm));
+	auto norm_ba = [](const auto& n, const auto& c) {
+		if (!is_child_non_terminal(tau_parser::bf_constant, n))
+			return n->child == c ? n : make_node(n->value, c);
+		auto ba_elem = n
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
+		auto res = normalize_ba(ba_elem);
+		using p = tau_parser;
+		return wrap(p::bf, wrap(p::bf_constant, wrap(p::constant,
+			make_node<tau_sym<BAs...>>(tau_sym<BAs...>(res), {}))));
+	};
+	return post_order_recursive_traverser<sp_tau_node<BAs...>>()(fm, all, norm_ba);
+}
+
 template<typename... BAs>
 bool is_zero(const sp_tau_node<BAs...>& l) {
 	auto bf_constant_is_zero = [](const auto& l) -> bool {
@@ -2712,7 +2732,7 @@ private:
 	{
 		auto args = n || cb_arg_t || only_child_extractor<BAs...>;
 		for (auto& subformula :
-			select_all(args[0], all<sp_tau_node<BAs...>>))
+			select_all(args[0], all))
 				if (subformula == args[1]) return args[2];
 		return args[0];
 	}
@@ -2726,7 +2746,7 @@ private:
 		auto args = n || tau_parser::wff_cb_arg
 				|| only_child_extractor<BAs...>;
 		std::vector<sp_tau_node<BAs...>> positives, negatives;
-		for (auto& op: select_all(args[0], all<sp_tau_node<BAs...>>))
+		for (auto& op: select_all(args[0], all))
 			if (is_non_terminal<tau_parser::wff_and>(op))
 				for (auto& c: op->child)
 		{
