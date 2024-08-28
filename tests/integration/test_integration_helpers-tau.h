@@ -19,7 +19,7 @@
 #include "../src/bdd_handle.h"
 #include "../src/bool_ba.h"
 #include "../src/normalizer.h"
-#include "../src/tau.h"
+#include "../src/tau_ba.h"
 #include "dict.h"
 
 

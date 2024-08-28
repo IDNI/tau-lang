@@ -31,7 +31,7 @@ TEST_SUITE("operator|") {
 
 	TEST_CASE("match zero nodes") {
 		const char* sample = "$Z & $Z := $Z.";
-		auto src = make_tau_source(sample);
+		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
 			| tau_parser::main;
@@ -40,10 +40,9 @@ TEST_SUITE("operator|") {
 
 	TEST_CASE("match one node") {
 		const char* sample = "$Z & $Z := $Z.";
-		auto src = make_tau_source(sample);
+		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
-			| tau_parser::library
 			| tau_parser::rules;
 		CHECK( args.has_value() );
 	}
@@ -53,10 +52,9 @@ TEST_SUITE("operator||") {
 
 	TEST_CASE("match zero nodes") {
 		const char* sample = "$Z & $Z := $Z.";
-		auto src = make_tau_source(sample);
+		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
-			| tau_parser::library
 			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::wff_rule
@@ -66,10 +64,9 @@ TEST_SUITE("operator||") {
 
 	TEST_CASE("match one node") {
 		const char* sample = "Z & Z := Z.";
-		auto src = make_tau_source(sample);
+		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
-			| tau_parser::library
 			| tau_parser::rules
 			| tau_parser::rule
 			|| tau_parser::bf_rule;
@@ -78,10 +75,9 @@ TEST_SUITE("operator||") {
 
 	TEST_CASE("match several nodes") {
 		const char* sample = "Z & Z := Z.";
-		auto src = make_tau_source(sample);
+		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto lib = make_statement(src);
 		auto args = lib
-			| tau_parser::library
 			| tau_parser::rules
 			| tau_parser::rule
 			| tau_parser::bf_rule

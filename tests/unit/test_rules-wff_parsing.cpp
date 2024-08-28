@@ -25,93 +25,48 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+bool test_rule(const std::string& sample) {
+	auto src_rule = make_tau_source(sample, {
+						.start = tau_parser::library });
+	auto tau_rule = make_statement(src_rule);
+	auto check = tau_rule
+		| tau_parser::rules
+		| tau_parser::rule
+		| tau_parser::wff_rule;
+	return check.has_value();
+}
+
 TEST_SUITE("parsing wff rules") {
 
 	TEST_CASE("WFF_TO_DNF_0") {
-		auto src_rule = make_tau_source(WFF_TO_DNF_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(WFF_TO_DNF_0) );
 	}
 
 	TEST_CASE("WFF_TO_DNF_1") {
-		auto src_rule = make_tau_source(WFF_TO_DNF_1);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(WFF_TO_DNF_1) );
 	}
 
 	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_0") {
-		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(WFF_PUSH_NEGATION_INWARDS_0) );
 	}
 
 	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_1") {
-		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_1);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(WFF_PUSH_NEGATION_INWARDS_1) );
 	}
 
 	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_2") {
-		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_2);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(WFF_PUSH_NEGATION_INWARDS_2) );
 	}
 
 	TEST_CASE("WFF_PUSH_NEGATION_INWARDS_3") {
-		auto src_rule = make_tau_source(WFF_PUSH_NEGATION_INWARDS_3);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(WFF_PUSH_NEGATION_INWARDS_3) );
 	}
 
 	TEST_CASE("WFF_ELIM_FORALL") {
-		auto src_rule = make_tau_source(WFF_ELIM_FORALL);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(WFF_ELIM_FORALL) );
 	}
 
 	TEST_CASE("WFF_REMOVE_EX_0") {
-		auto src_rule = make_tau_source(WFF_REMOVE_EX_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(WFF_REMOVE_EX_0) );
 	}
 }

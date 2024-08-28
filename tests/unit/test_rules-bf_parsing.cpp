@@ -25,17 +25,21 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+bool test_rule(const std::string& sample, tau_parser::nonterminal rule_type) {
+	auto src_rule = make_tau_source(sample, {
+						.start = tau_parser::library });
+	auto tau_rule = make_statement(src_rule);
+	auto check = tau_rule
+		| tau_parser::rules
+		| tau_parser::rule
+		| rule_type;
+	return check.has_value();
+}
+
 TEST_SUITE("parsing bf rules") {
 
 	TEST_CASE("BF_TO_DNF_0") {
-		auto src_rule = make_tau_source(BF_TO_DNF_0);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_TO_DNF_0, tau_parser::bf_rule) );
 	}
 
 	TEST_CASE("BF_TO_DNF_1") {
@@ -50,90 +54,34 @@ TEST_SUITE("parsing bf rules") {
 	}
 
 	TEST_CASE("BF_CALLBACK_AND") {
-		auto src_rule = make_tau_source(BF_CALLBACK_AND);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_CALLBACK_AND, tau_parser::bf_rule) );
 	}
 
 	TEST_CASE("BF_CALLBACK_OR") {
-		auto src_rule = make_tau_source(BF_CALLBACK_OR);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_CALLBACK_OR, tau_parser::bf_rule) );
 	}
 
 	TEST_CASE("BF_CALLBACK_XOR") {
-		auto src_rule = make_tau_source(BF_CALLBACK_XOR);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_CALLBACK_XOR, tau_parser::bf_rule) );
 	}
 
 	TEST_CASE("BF_CALLBACK_NEG") {
-		auto src_rule = make_tau_source(BF_CALLBACK_NEG);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_CALLBACK_NEG, tau_parser::bf_rule) );
 	}
 
 	TEST_CASE("BF_CALLBACK_EQ") {
-		auto src_rule = make_tau_source(BF_CALLBACK_EQ);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_CALLBACK_EQ, tau_parser::wff_rule) );
 	}
 
 	TEST_CASE("BF_CALLBACK_NEQ") {
-		auto src_rule = make_tau_source(BF_CALLBACK_NEQ);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_CALLBACK_NEQ, tau_parser::wff_rule) );
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ZERO") {
-		auto src_rule = make_tau_source(BF_CALLBACK_IS_ZERO);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_CALLBACK_IS_ZERO, tau_parser::bf_rule) );
 	}
 
 	TEST_CASE("BF_CALLBACK_IS_ONE") {
-		auto src_rule = make_tau_source(BF_CALLBACK_IS_ONE);
-		auto tau_rule = make_statement(src_rule);
-		auto check = tau_rule
-			| tau_parser::library
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule;
-		CHECK( check.has_value() );
+		CHECK( test_rule(BF_CALLBACK_IS_ONE, tau_parser::bf_rule) );
 	}
 }

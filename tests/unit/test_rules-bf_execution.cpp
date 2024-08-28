@@ -25,6 +25,21 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+std::tuple<sp_tau_node<Bool>, sp_tau_node<Bool>, sp_tau_node<Bool>>
+	test_rule(const std::string& rule_str)
+{
+	auto src_rule = make_tau_source(rule_str, {
+						.start = tau_parser::library });
+	auto statement = make_statement(src_rule);
+	auto rule = statement
+		| tau_parser::rules
+		| tau_parser::rule;
+	auto tau_rule = make_rule(rule.value());
+	auto [matcher, body] = tau_rule;
+	auto result = nso_rr_apply(tau_rule, matcher);
+	return { matcher, body, result };
+}
+
 TEST_SUITE("executing bf rules") {
 
 	TEST_CASE("BF_CALLBACK_AND") {
@@ -33,10 +48,11 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_AND);
+		auto rule_src = make_tau_source(BF_CALLBACK_AND, {
+						.start = tau_parser::library });
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+			| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
@@ -51,10 +67,11 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_OR);
+		auto rule_src = make_tau_source(BF_CALLBACK_OR, {
+						.start = tau_parser::library });
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+			| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
@@ -69,10 +86,11 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_XOR);
+		auto rule_src = make_tau_source(BF_CALLBACK_XOR, {
+						.start = tau_parser::library });
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+			| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
@@ -87,10 +105,11 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_NEG);
+		auto rule_src = make_tau_source(BF_CALLBACK_NEG, {
+						.start = tau_parser::library });
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+			| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
@@ -105,10 +124,11 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_EQ);
+		auto rule_src = make_tau_source(BF_CALLBACK_EQ, {
+						.start = tau_parser::library });
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+			| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
@@ -122,10 +142,11 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_NEQ);
+		auto rule_src = make_tau_source(BF_CALLBACK_NEQ, {
+						.start = tau_parser::library });
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+			| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
@@ -139,10 +160,11 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(true) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_IS_ONE);
+		auto rule_src = make_tau_source(BF_CALLBACK_IS_ONE, {
+						.start = tau_parser::library });
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+			| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
@@ -157,10 +179,11 @@ TEST_SUITE("executing bf rules") {
 		auto sample_statement = make_statement(sample_src);
 		bindings<Bool> bs; bs["l"] = { Bool(false) };
 		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_IS_ZERO);
+		auto rule_src = make_tau_source(BF_CALLBACK_IS_ZERO, {
+						.start = tau_parser::library });
 		auto rule_statement = make_statement(rule_src);
 		auto rule = rule_statement
-			| tau_parser::library| tau_parser::rules | tau_parser::rule;
+			| tau_parser::rules | tau_parser::rule;
 		auto tau_rule = make_rule(rule.value());
 		auto result = nso_rr_apply(tau_rule, binded);
 		auto check = result
