@@ -1853,14 +1853,12 @@ sp_tau_node<BAs...> build_wff_uniter_const(const std::string& name) {
 // wff factory method for building wff formulas
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_eq(const sp_tau_node<BAs...>& l) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_eq<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::bf_eq, l, _0<BAs...>));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_neq(const sp_tau_node<BAs...>& l) {
-	std::vector<sp_tau_node<BAs...>> args {trim(l)} ;
-	return tau_apply_builder<BAs...>(bldr_wff_neq<BAs...>, args);
+	return wrap(tau_parser::wff, wrap(tau_parser::bf_neq, l, _0<BAs...>));
 }
 
 template<typename... BAs>
