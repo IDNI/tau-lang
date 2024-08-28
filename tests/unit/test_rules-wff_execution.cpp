@@ -28,10 +28,10 @@ namespace testing = doctest;
 std::tuple<sp_tau_node<Bool>, sp_tau_node<Bool>, sp_tau_node<Bool>>
 	test_rule(const std::string& rule_str)
 {
-	auto src_rule = make_tau_source(rule_str);
+	auto src_rule = make_tau_source(rule_str, {
+						.start = tau_parser::library });
 	auto statement = make_statement(src_rule);
 	auto rule = statement
-		| tau_parser::library
 		| tau_parser::rules
 		| tau_parser::rule;
 	auto tau_rule = make_rule(rule.value());

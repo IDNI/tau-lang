@@ -18,9 +18,8 @@
 #include "normalizer.h"
 #include "normal_forms.h"
 #include "nso_rr.h"
-#include "tau.h"
+#include "tau_ba.h"
 #include "term_colors.h"
-//#include "satisfiability.h"
 #include "solver.h"
 
 #ifdef DEBUG
@@ -438,7 +437,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		nso<tau_ba<BAs...>, BAs...> res;
 		if (auto iter = changes.find(x); iter != changes.end())
 			res = iter->second;
-		else if (c.empty()) res = x;
+		else if (x->child == c) res = x;
 		else res = make_node(x->value, move(c));
 
 		if (marked_quants.contains(x)) {
@@ -513,7 +512,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		| repeat_all<step<tau_ba<BAs...>, BAs...>,
 			tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(
 				elim_for_all<tau_ba<BAs...>, BAs...>))
-		| remove_one_wff_existential<tau_ba<BAs...>, BAs...>()
+		| (nso_transform<tau_ba<BAs...>, BAs...>)
+				eliminate_quantifiers<tau_ba<BAs...>, BAs...>
 		| repeat_all<step<tau_ba<BAs...>, BAs...>,
 			tau_ba<BAs...>, BAs...>(
 				to_dnf_wff<tau_ba<BAs...>, BAs...>

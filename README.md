@@ -220,24 +220,24 @@ where `bf_rec_relation` stands for a Boolean function recursive relation, `bf_re
 Examples of recursive relations are:
 
 ```
-g[0]($Y) := 1.
-g[n]($Y) := g[n - 1]($Y).
+g[0](Y) := 1.
+g[n](Y) := g[n - 1](Y).
 ```
 
 for the case of Boolean functions,
 
 ```
-g[0]($Y) ::= T.
-g[n]($Y) ::= h[n - 1]($Y).
-h[0]($Y) ::= F.
-h[n]($Y) ::= g[n - 1]($Y).
+g[0](Y) ::= T.
+g[n](Y) ::= h[n - 1](Y).
+h[0](Y) ::= F.
+h[n](Y) ::= g[n - 1](Y).
 ```
 
 and finally, for the case of well formed formulas:
 
 ```
-g[0]($Y) :::= {T}.
-g[n]($Y) :::= g[n - 1]($Y).
+g[0](Y) :::= {T}.
+g[n](Y) :::= g[n - 1](Y).
 ```
 
 ## Tau programs
@@ -255,8 +255,8 @@ where `tau_rec_relation` stands for a tau recursive relations, `wff_rec_relation
 Thus, they are a collection of Tau recursive relations and a main formula, p.e.:
 
 ```
-g[0]($Y) :::= {T}.
-g[n]($Y) :::= g[n - 1]($Y).
+g[0](Y) :::= {T}.
+g[n](Y) :::= g[n - 1](Y).
 g[1](Y);
 ```
 
