@@ -1088,8 +1088,7 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 	vector<nso<BAs...>> vars = select_top(new_fm, is_var_wff);
 	if (vars.empty()) {
 		if (wff) return fm | repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>);
-		else return fm | repeat_all<step<BAs...>, BAs...>(
-			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
+		else return fm | repeat_all<step<BAs...>, BAs...>(apply_cb<BAs...>);
 	}
 
 	map<nso<BAs...>, int_t> var_pos;
@@ -1536,7 +1535,6 @@ nso<BAs...> eliminate_quantifiers(const nso<BAs...>& fm) {
 			    | bf_reduce_canonical<BAs...>()
 			    | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
 			    | repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
-			    | repeat_all<step<BAs...>, BAs...> (elim_trivial_eqs<BAs...>)
 			    | wff_reduce_dnf<BAs...>();
 			// Now resolve quantified variable in scoped_fm
 			return wff_remove_existential(trim2(inner_fm), scoped_fm);
@@ -1546,7 +1544,6 @@ nso<BAs...> eliminate_quantifiers(const nso<BAs...>& fm) {
 			    | bf_reduce_canonical<BAs...>()
 			    | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
 			    | repeat_all<step<BAs...>, BAs...>(nnf_to_cnf_wff<BAs...>)
-			    | repeat_all<step<BAs...>, BAs...> (elim_trivial_eqs<BAs...>)
 			    | wff_reduce_cnf<BAs...>();
 			auto clauses = get_leaves(scoped_fm, tau_parser::wff_and, tau_parser::wff);
 			nso<BAs...> res;
