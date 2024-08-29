@@ -1167,14 +1167,11 @@ TEST_SUITE("parsing bindings ") {
 	}
 }
 
-// TODO (VERY_LOW) write tests for parsing bf_is_zero_cb
 // TODO (VERY_LOW) write tests for parsing bf_is_one_cb
 // TODO (VERY_LOW) write tests for parsing bf_has_clashing_subformulas_cb
 // TODO (VERY_LOW) write tests for parsing bf_has_subformula_cb
 // TODO (VERY_LOW) write tests for parsing bf_remove_fexistential_cb
 // TODO (VERY_LOW) write tests for parsing bf_remove_funiversal_cb
-// TODO (VERY_LOW) write tests for parsing bf_eq_cb
-// TODO (VERY_LOW) write tests for parsing bf_neq_cb
 // TODO (VERY_LOW) write tests for parsing wff_remove_existential_cb
 // TODO (VERY_LOW) write tests for parsing wff_remove_bexistential_cb
 // TODO (VERY_LOW) write tests for parsing wff_remove_buniversal_cb.
