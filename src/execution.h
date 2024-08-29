@@ -24,10 +24,6 @@
 #include "bdd_handle.h"
 #include "variant_ba.h"
 
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
-
 using namespace idni::rewriter;
 
 namespace idni::tau {

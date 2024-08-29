@@ -23,26 +23,32 @@ namespace idni::tau {
 
 template<typename...BAs>
 std::variant<BAs...> operator&(const std::variant<BAs...>& l, const std::variant<BAs...>& r) {
-	return std::visit(
-		[](const auto& l, const auto& r) -> std::variant<BAs...> {
-			return l & r;
-		}, l, r);
+	return std::visit(overloaded(
+			[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
+				return l & r;},
+			[](const auto&, const auto&) -> std::variant<BAs...> {
+				throw std::logic_error("wrong types");}
+		), l, r);
 }
 
 template<typename...BAs>
 std::variant<BAs...> operator|(const std::variant<BAs...>& l, const std::variant<BAs...>& r) {
-	return std::visit(
-		[](const auto& l, const auto& r) -> std::variant<BAs...> {
-			return l | r;
-		}, l, r);
+	return std::visit(overloaded(
+			[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
+				return l | r;},
+			[](const auto&, const auto&) -> std::variant<BAs...> {
+				throw std::logic_error("wrong types");}
+		), l, r);
 }
 
 template<typename...BAs>
 std::variant<BAs...> operator^(const std::variant<BAs...>& l, const std::variant<BAs...>& r) {
-	return std::visit(
-		[](const auto& l, const auto& r) -> std::variant<BAs...> {
-			return l ^ r;
-		}, l, r);
+	return std::visit(overloaded(
+			[]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
+				return l ^ r;},
+			[](const auto&, const auto&) -> std::variant<BAs...> {
+				throw std::logic_error("wrong types");}
+		), l, r);
 }
 
 template<typename...BAs>
@@ -53,10 +59,9 @@ std::variant<BAs...> operator+(const std::variant<BAs...>& l, const std::variant
 template<typename...BAs>
 std::variant<BAs...> operator~(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(
-			[](const auto& l) -> std::variant<BAs...> {
-				return ~l;
-			}
-		), l);
+		[](const auto& l) -> std::variant<BAs...> {
+			return ~l;
+		}), l);
 }
 
 template<typename...BAs>
