@@ -50,10 +50,6 @@ TEST_SUITE("parsing bf rules") {
 		CHECK( test_rule(BF_CALLBACK_AND, tau_parser::bf_rule) );
 	}
 
-	TEST_CASE("BF_CALLBACK_OR") {
-		CHECK( test_rule(BF_CALLBACK_OR, tau_parser::bf_rule) );
-	}
-
 	TEST_CASE("BF_CALLBACK_XOR") {
 		CHECK( test_rule(BF_CALLBACK_XOR, tau_parser::bf_rule) );
 	}
