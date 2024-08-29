@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mv *.measures tests/benchmarks/data/
-mv *.callgrind.out tests/benchmarks/data/
-mv build*/*.measures tests/benchmarks/data/
-mv build*/*.callgrind.out tests/benchmarks/data/
+mv *.measures tests/benchmark/data/  > /dev/null 2>&1
+mv *.callgrind.out tests/benchmark/data/  > /dev/null 2>&1
+mv build*/*.measures tests/benchmark/data/  > /dev/null 2>&1
+mv build*/*.callgrind.out tests/benchmark/data/  > /dev/null 2>&1

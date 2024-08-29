@@ -42,25 +42,6 @@ std::tuple<sp_tau_node<Bool>, sp_tau_node<Bool>, sp_tau_node<Bool>>
 
 TEST_SUITE("executing bf rules") {
 
-	TEST_CASE("BF_CALLBACK_XOR") {
-		const char* sample = " { l } + { r } = 0 .";
-		auto sample_src = make_tau_source(sample);
-		auto sample_statement = make_statement(sample_src);
-		bindings<Bool> bs; bs["l"] = { Bool(true) }; bs["r"] = { Bool(false) };
-		auto binded = make_named_bindings(sample_statement, bs);
-		auto rule_src = make_tau_source(BF_CALLBACK_XOR, {
-						.start = tau_parser::library });
-		auto rule_statement = make_statement(rule_src);
-		auto rule = rule_statement
-			| tau_parser::rules | tau_parser::rule;
-		auto tau_rule = make_rule(rule.value());
-		auto result = nso_rr_apply(tau_rule, binded);
-		auto check = result
-			| tau_parser::rr | tau_parser::main | tau_parser::wff | tau_parser::bf_eq
-			| tau_parser::bf | tau_parser::bf_constant | tau_parser::constant;
-		CHECK( check.has_value() );
-	}
-
 	TEST_CASE("BF_CALLBACK_NEG") {
 		const char* sample = " { l }' = 0 .";
 		auto sample_src = make_tau_source(sample);
