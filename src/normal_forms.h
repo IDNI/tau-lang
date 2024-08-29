@@ -41,7 +41,6 @@ RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := $X' | $Y'.")
 RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
 
 // bf callbacks
-RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
 RULE(BF_CALLBACK_XOR, "{ $X } + { $Y } := bf_xor_cb $X $Y.")
 RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
 RULE(BF_CALLBACK_NORMALIZE, "{ $X } := bf_normalize_cb $X.")
@@ -140,8 +139,7 @@ static auto simplify_wff = make_library<BAs...>(
 
 template<typename... BAs>
 static auto apply_cb = make_library<BAs...>(
-	BF_CALLBACK_AND
-	+ BF_CALLBACK_XOR
+	BF_CALLBACK_XOR
 	+ BF_CALLBACK_NEG
 );
 

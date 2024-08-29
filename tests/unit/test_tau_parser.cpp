@@ -1169,20 +1169,6 @@ TEST_SUITE("parsing bindings ") {
 
 TEST_SUITE("parsing callbacks ") {
 
-	TEST_CASE("bf_and_cb") {
-		const char* sample = "$X := bf_and_cb $X $X.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto and_cb = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf_and_cb;
-		CHECK( and_cb.has_value() );
-	}
-
 	TEST_CASE("bf_xor_cb") {
 		const char* sample = "$X := bf_xor_cb $X $X.";
 		auto src = make_tau_source(sample, {
