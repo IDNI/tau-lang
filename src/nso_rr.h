@@ -2833,53 +2833,6 @@ private:
 
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
-template<typename predicate_t, typename... BAs>
-sp_tau_node<BAs...> nso_rr_apply_if(const rule<nso<BAs...>>& r,
-	const sp_tau_node<BAs...>& n, predicate_t& predicate)
-{
-	// IDEA maybe we could traverse only once
-	auto nn = apply_if<
-			sp_tau_node<BAs...>,
-			is_capture_t<BAs...>,
-			predicate_t>(r, n, is_capture<BAs...>, predicate);
-	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
-		callback_applier<BAs...> cb_applier;
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-		for (auto& cb : cbs) {
-			auto nnn = cb_applier(cb);
-			changes[cb] = nnn;
-		}
-		auto cnn = replace<sp_tau_node<BAs...>>(nn, changes);
-
-		BOOST_LOG_TRIVIAL(debug) << "(C) " << cnn;
-
-		return cnn;
-	}
-	return nn;
-}
-
-// apply the given rules to the given expression
-// IDEA maybe this could be operator|
-template<typename predicate_t, typename... BAs>
-sp_tau_node<BAs...> nso_rr_apply_if(const rules<nso<BAs...>>& rs,
-	const sp_tau_node<BAs...>& n, predicate_t& predicate)
-{
-	if (rs.empty()) return n;
-	sp_tau_node<BAs...> nn = n;
-	for (auto& r : rs) {
-		auto nnn = nso_rr_apply_if<predicate_t, BAs...>(
-							r, nn, predicate);
-		while (nnn != nn) {
-			nn = nnn;
-			nnn = nso_rr_apply_if<predicate_t, BAs...>(
-							r, nn, predicate);
-		}
-	}
-	return nn;
-}
-
-// apply one tau rule to the given expression
-// IDEA maybe this could be operator|
 template<typename... BAs>
 nso<BAs...> nso_rr_apply(const rule<nso<BAs...>>& r, const nso<BAs...>& n) {
 
