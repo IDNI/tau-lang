@@ -256,11 +256,7 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value)
 			|| !get<tau_source_sym>(n->value).nt()) return false;
 	auto nt = get<tau_source_sym>(n->value).n();
-	return nt == tau_parser::bf_eq_cb
-		|| nt == tau_parser::bf_neq_cb
-		|| nt == tau_parser::bf_is_one_cb
-		|| nt == tau_parser::bf_is_zero_cb
-		|| nt == tau_parser::bf_normalize_cb
+	return nt == tau_parser::bf_normalize_cb
 		|| nt == tau_parser::wff_has_clashing_subformulas_cb
 		|| nt == tau_parser::bf_has_subformula_cb
 		|| nt == tau_parser::wff_has_subformula_cb
@@ -1717,7 +1713,6 @@ const std::string BLDR_BF_OR = "( $X $Y ) =: $X | $Y.";
 const std::string BLDR_BF_NEG = "( $X ) =: $X'.";
 const std::string BLDR_BF_XOR = "( $X $Y ) =: $X + $Y.";
 const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
-const std::string BLDR_BF_CONSTANT = "( $X ) =: { $X }.";
 
 // definitions of tau builder rules
 const std::string BLDR_TAU_AND = "( $X $Y ) =::: $X &&& $Y.";
@@ -1780,8 +1775,6 @@ template<typename... BAs>
 static auto bldr_bf_nleq_upper = make_builder<BAs...>(BDLR_BF_NLEQ_UPPER);
 template<typename... BAs>
 static auto bldr_bf_nleq_lowwer = make_builder<BAs...>(BDLR_BF_NLEQ_LOWWER);
-template<typename... BAs>
-static auto bldr_bf_constant = make_builder<BAs...>(BLDR_BF_CONSTANT);
 
 // tau builder
 // template<typename... BAs>
@@ -1825,8 +1818,9 @@ nso<BAs...> build_num(size_t value) {
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
 	auto cte = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
-	std::vector<sp_tau_node<BAs...>> arg { cte };
-	return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
+	return wrap(tau_parser::bf,
+		wrap(tau_parser::bf_constant,
+		wrap(tau_parser::constant, cte)));
 }
 
 template<typename... BAs>
@@ -2415,17 +2409,14 @@ sp_tau_node<BAs...> splitter(const sp_tau_node<BAs...>& n,
 	splitter_type st = splitter_type::upper)
 {
 	// Lambda for calling splitter on n
-	auto _splitter = [&st](const auto& n) -> sp_tau_node<BAs...> {
-		auto res = splitter(n, st);
-		std::variant<BAs...> v(res);
-		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	auto _splitter = [&st](const auto& n) -> std::variant<BAs...> {
+		return splitter(n, st);
 	};
 
 	assert(std::holds_alternative<std::variant<BAs...>>(trim2(n)->value));
 	auto ba_constant = get<std::variant<BAs...>>(trim2(n)->value);
-	sp_tau_node<BAs...> nn(std::visit(_splitter, ba_constant));
-	std::vector<sp_tau_node<BAs...>> arg { nn };
-	return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
+	std::variant<BAs...> v = std::visit(_splitter, ba_constant);
+	return build_bf_constant<BAs...>(v);
 }
 
 // TODO (MEDIUM) unify this code with get_gssotc_clause and get_gssotc_literals
@@ -2461,14 +2452,6 @@ struct callback_applier {
 		if (!is_callback<BAs...>(n)) return n;
 		auto nt = get<tau_source_sym>(n->value).n();
 		switch (nt) {
-		case tau_parser::bf_eq_cb:
-			return apply_equality_relation(_eq, n);
-		case tau_parser::bf_neq_cb:
-			return apply_equality_relation(_neq, n);
-		case tau_parser::bf_is_one_cb:
-			return apply_constant_check(_is_one, n);
-		case tau_parser::bf_is_zero_cb:
-			return apply_constant_check(_is_zero, n);
 		case tau_parser::bf_normalize_cb:
 			return apply_unary_operation(_normalize, n);
 		case tau_parser::bf_has_subformula_cb:
@@ -2491,12 +2474,8 @@ private:
 	// TODO (MEDIUM) simplify following methods using the new node and ba_variant operators
 
 	// unary operation
-	static constexpr auto _normalize = [](const auto& n)
-		-> sp_tau_node<BAs...>
-	{
-		auto res = normalize(n);
-		std::variant<BAs...> v(res);
-		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	static constexpr auto _normalize = [](const auto& n) -> std::variant<BAs...>{
+		return normalize(n);
 	};
 
 	// ternary operators
@@ -2504,10 +2483,6 @@ private:
 		[](const auto& l) -> bool { return l == false; };
 	static constexpr auto _neq =
 		[](const auto& l) -> bool { return !(l == false); };
-	static constexpr auto _is_one =
-		[](const auto& l) -> bool { return l == true; };
-	static constexpr auto _is_zero =
-		[](const auto& l) -> bool { return l == false; };
 
 	std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>>
 		get_quantifier_remove_constituents(
@@ -2691,8 +2666,7 @@ private:
 			|| ba_extractor<BAs...>;
 		sp_tau_node<BAs...> nn(
 			std::visit(op, ba_elements[0], ba_elements[1]));
-		std::vector<sp_tau_node<BAs...>> arg { nn };
-		return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
+		return build_bf_constant<BAs...>(nn);
 	}
 
 	sp_tau_node<BAs...> apply_unary_operation(const auto& op,
@@ -2700,9 +2674,8 @@ private:
 	{
 		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf
 			|| only_child_extractor<BAs...> || ba_extractor<BAs...>;
-		sp_tau_node<BAs...> nn(std::visit(op, ba_elements[0]));
-		std::vector<sp_tau_node<BAs...>> arg { nn };
-		return tau_apply_builder(bldr_bf_constant<BAs...>, arg);
+		std::variant<BAs...> v = std::visit(op, ba_elements[0]);
+		return build_bf_constant<BAs...>(v);
 	}
 
 	sp_tau_node<BAs...> apply_equality_relation(const auto& op,
@@ -2715,18 +2688,6 @@ private:
 		auto ba_element = bf_arg | ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
 		return std::visit(op, ba_element) ? wff_args[0] : wff_args[1];
-	}
-
-	sp_tau_node<BAs...> apply_constant_check(const auto& op,
-		const sp_tau_node<BAs...>& n)
-	{
-		auto args = n || tau_parser::bf_cb_arg
-					|| only_child_extractor<BAs...>;
-		auto ba_element = args[0] | tau_parser::bf_constant
-					| tau_parser::constant
-			| only_child_extractor<BAs...> |  ba_extractor<BAs...>
-				| optional_value_extractor<std::variant<BAs...>>;
-		return std::visit(op, ba_element) ? args[1] : args[0];
 	}
 
 	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
@@ -3098,6 +3059,20 @@ sp_tau_node<BAs...> make_node_hook_bf_xor(const node<tau_sym<BAs...>>& n) {
 	return  build_bf_xor<BAs...>(first_argument_formula(n), second_argument_formula(n));
 }
 
+template<typename...BAs>
+sp_tau_node<BAs...> make_node_hook_cte(const node<tau_sym<BAs...>>& n) {
+	auto l = first_argument_expression(n)
+		| tau_parser::constant
+		| only_child_extractor<BAs...>
+		| ba_extractor<BAs...>;
+	if (!l.has_value()) std::make_shared<node<tau_sym<BAs...>>>(n);
+	//RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 1.")
+	else if (l.value() == 0) return _0<BAs...>;
+	//RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
+	else if (l.value() == 1) return _1<BAs...>;
+	return build_bf_constant<BAs...>(l.value());
+}
+
 template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_bf(const node<tau_sym<BAs...>>& n) {
 	// if n is ref, capture, 0 or 1, we can return accordingly
@@ -3113,6 +3088,8 @@ sp_tau_node<BAs...> make_node_hook_bf(const node<tau_sym<BAs...>>& n) {
 				return make_node_hook_bf_neg<BAs...>(n);
 			case tau_parser::bf_xor:
 				return make_node_hook_bf_xor<BAs...>(n);
+			case tau_parser::bf_constant:
+				return make_node_hook_cte<BAs...>(n);
 			default: return std::make_shared<node<tau_sym<BAs...>>>(n);
 		}
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
@@ -3671,8 +3648,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::ref,                              80 },
 			{ tau_parser::wff,                              90 },
 			// wff
-			{ tau_parser::bf_eq_cb,                        300 },
-			{ tau_parser::bf_neq_cb,                       310 },
 			{ tau_parser::wff_has_clashing_subformulas_cb, 320 },
 			{ tau_parser::wff_has_subformula_cb,           330 },
 			{ tau_parser::wff_remove_existential_cb,       340 },
@@ -3697,8 +3672,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_less,                         570 },
 			{ tau_parser::wff,                             580 },
 			// bf
-			{ tau_parser::bf_is_zero_cb,                   600 },
-			{ tau_parser::bf_is_one_cb,                    610 },
 			{ tau_parser::bf_has_subformula_cb,            620 },
 			{ tau_parser::bf_remove_funiversal_cb,         630 },
 			{ tau_parser::bf_remove_fexistential_cb,       640 },
@@ -3896,10 +3869,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::wff_all:
 			case tau_parser::wff_ex:         quant(); break;
 			// callbacks
-			case tau_parser::bf_eq_cb:       prefix("bf_eq_cb"); break;
-			case tau_parser::bf_neq_cb:      prefix("bf_neq_cb"); break;
-			case tau_parser::bf_is_zero_cb:  prefix("bf_is_zero_cb"); break;
-			case tau_parser::bf_is_one_cb:   prefix("bf_is_one_cb"); break;
 			case tau_parser::bf_normalize_cb:prefix("bf_normalize_cb"); break;
 			case tau_parser::bf_remove_funiversal_cb:
 				prefix("bf_remove_funiversal_cb"); break;

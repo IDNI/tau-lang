@@ -45,20 +45,4 @@ TEST_SUITE("parsing bf rules") {
 	TEST_CASE("BF_TO_DNF_1") {
 		CHECK( test_rule(BF_TO_DNF_1, tau_parser::bf_rule) );
 	}
-
-	TEST_CASE("BF_CALLBACK_EQ") {
-		CHECK( test_rule(BF_CALLBACK_EQ, tau_parser::wff_rule) );
-	}
-
-	TEST_CASE("BF_CALLBACK_NEQ") {
-		CHECK( test_rule(BF_CALLBACK_NEQ, tau_parser::wff_rule) );
-	}
-
-	TEST_CASE("BF_CALLBACK_IS_ZERO") {
-		CHECK( test_rule(BF_CALLBACK_IS_ZERO, tau_parser::bf_rule) );
-	}
-
-	TEST_CASE("BF_CALLBACK_IS_ONE") {
-		CHECK( test_rule(BF_CALLBACK_IS_ONE, tau_parser::bf_rule) );
-	}
 }

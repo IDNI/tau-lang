@@ -42,8 +42,6 @@ RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
 
 // bf callbacks
 RULE(BF_CALLBACK_NORMALIZE, "{ $X } := bf_normalize_cb $X.")
-RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
-RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 
 // wff rules
 RULE(WFF_TO_DNF_0, "($X || $Y) && $Z ::= $X && $Z || $Y && $Z.")
@@ -58,10 +56,6 @@ RULE(WFF_SIMPLIFY_SOMETIMES_3,  "(sometimes $X) && (always $X) ::= always $X.")
 RULE(WFF_SIMPLIFY_ALWAYS_3,		"(always $X) && (sometimes $X) ::= always $X.")
 RULE(WFF_PUSH_SOMETIMES_INWARDS,"sometimes($X || $Y) ::= (sometimes $X) || (sometimes $Y).")
 RULE(WFF_PUSH_ALWAYS_INWARDS,   "always($X && $Y) ::= (always $X) && (always $Y).")
-
-// wff callbacks
-RULE(BF_CALLBACK_EQ, "{ $X } = 0 ::= bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
-RULE(BF_CALLBACK_NEQ, "{ $X } != 0 ::= bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
 
 // trivialities
 RULE(BF_EQ_AND_SIMPLIFY_0, "$X != 0 && $X = 0 ::= F.")
@@ -141,16 +135,8 @@ static auto apply_normalize = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto elim_bf_constant_01 = make_library<BAs...>(
-	BF_CALLBACK_IS_ONE
-	+ BF_CALLBACK_IS_ZERO
-);
-
-template<typename... BAs>
 static auto elim_eqs = make_library<BAs...>(
-	BF_CALLBACK_EQ
-	+ BF_CALLBACK_NEQ
-	+ BF_EQ_AND_SIMPLIFY_0
+	BF_EQ_AND_SIMPLIFY_0
 	+ BF_EQ_AND_SIMPLIFY_1
 	+ BF_EQ_OR_SIMPLIFY_0
 	+ BF_EQ_OR_SIMPLIFY_1
@@ -758,7 +744,6 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	if((int_t)vars.size() == p) {
 		// Normalize tau subformulas
 		auto fm_simp = fm | repeat_once<step<BAs...>, BAs...>(apply_normalize<BAs...>)
-					| repeat_once<step<BAs...>, BAs...>(elim_bf_constant_01<BAs...>)
 		 			| repeat_all<step<BAs...>, BAs...>(to_nnf_bf<BAs...>)
 		 			| repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_bf<BAs...>);
 		// Simplify coefficient

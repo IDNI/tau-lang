@@ -102,12 +102,6 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
-
-	TEST_CASE("BLDR_BF_CONSTANT") {
-		auto bldr = make_builder<Bool>(BLDR_BF_CONSTANT);
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
-	}
 }
 
 // TODO (HIGH) check builded structures deeply in execution tests
@@ -243,12 +237,5 @@ TEST_SUITE("builders execution") {
 	TEST_CASE("BLDR_BF_GREATER") {
 		// TODO (LOW) write proper test
 		CHECK( true );
-	}
-
-	TEST_CASE("BLDR_BF_CONSTANT") {
-		auto bldr = make_builder<Bool>(BLDR_BF_CONSTANT);
-		std::vector<sp_tau_node<Bool>> args = { F };
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_constant | tau_parser::constant;
-		CHECK( check.has_value() );
 	}
 }
