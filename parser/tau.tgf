@@ -152,7 +152,6 @@ bf_cb  => ("bf_is_zero_cb"              bf_cb_args2) :bf_is_zero_cb
         | ("bf_has_subformula_cb"       bf_cb_args3) :bf_has_subformula_cb
         | ("bf_remove_funiversal_cb"    bf_cb_args4) :bf_remove_funiversal_cb
         | ("bf_remove_fexistential_cb"  bf_cb_args4) :bf_remove_fexistential_cb
-        | ("bf_neg_cb"                  bf_cb_args1) :bf_neg_cb
         | ("bf_normalize_cb"            bf_cb_args1) :bf_normalize_cb.
 
 

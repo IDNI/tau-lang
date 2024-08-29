@@ -1167,42 +1167,24 @@ TEST_SUITE("parsing bindings ") {
 	}
 }
 
-TEST_SUITE("parsing callbacks ") {
-
-	TEST_CASE("bf_neg_cb") {
-		const char* sample = "$X := bf_neg_cb $X.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto neg_cb = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf_neg_cb;
-		CHECK( neg_cb.has_value() );
-	}
-
-	// TODO (VERY_LOW) write tests for parsing bf_is_zero_cb
-	// TODO (VERY_LOW) write tests for parsing bf_is_one_cb
-	// TODO (VERY_LOW) write tests for parsing bf_has_clashing_subformulas_cb
-	// TODO (VERY_LOW) write tests for parsing bf_has_subformula_cb
-	// TODO (VERY_LOW) write tests for parsing bf_remove_fexistential_cb
-	// TODO (VERY_LOW) write tests for parsing bf_remove_funiversal_cb
-
-	// TODO (VERY_LOW) write tests for parsing bf_eq_cb
-	// TODO (VERY_LOW) write tests for parsing bf_neq_cb
-	// TODO (VERY_LOW) write tests for parsing wff_remove_existential_cb
-	// TODO (VERY_LOW) write tests for parsing wff_remove_bexistential_cb
-	// TODO (VERY_LOW) write tests for parsing wff_remove_buniversal_cb.
-	// TODO (VERY_LOW) write tests for parsing wff_has_clashing_subformulas_cb
-	// TODO (VERY_LOW) write tests for parsing wff_has_subformula_cb
-	//
-	// Callbacks are a crucial part of the execution of the normalizer and should
-	// be tested properly. However, they are extensively tested inderectly in
-	// other unit/integration tests. In any case, it is better to have explicit tests
-	// for each of them parsing.
-}
+// TODO (VERY_LOW) write tests for parsing bf_is_zero_cb
+// TODO (VERY_LOW) write tests for parsing bf_is_one_cb
+// TODO (VERY_LOW) write tests for parsing bf_has_clashing_subformulas_cb
+// TODO (VERY_LOW) write tests for parsing bf_has_subformula_cb
+// TODO (VERY_LOW) write tests for parsing bf_remove_fexistential_cb
+// TODO (VERY_LOW) write tests for parsing bf_remove_funiversal_cb
+// TODO (VERY_LOW) write tests for parsing bf_eq_cb
+// TODO (VERY_LOW) write tests for parsing bf_neq_cb
+// TODO (VERY_LOW) write tests for parsing wff_remove_existential_cb
+// TODO (VERY_LOW) write tests for parsing wff_remove_bexistential_cb
+// TODO (VERY_LOW) write tests for parsing wff_remove_buniversal_cb.
+// TODO (VERY_LOW) write tests for parsing wff_has_clashing_subformulas_cb
+// TODO (VERY_LOW) write tests for parsing wff_has_subformula_cb
+//
+// Callbacks are a crucial part of the execution of the normalizer and should
+// be tested properly. However, they are extensively tested inderectly in
+// other unit/integration tests. In any case, it is better to have explicit tests
+// for each of them parsing.
 
 TEST_SUITE("parsing rules") {
 	// TODO (VERY_LOW) writes tests for rules parsing
