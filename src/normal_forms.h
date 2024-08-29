@@ -41,7 +41,6 @@ RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := $X' | $Y'.")
 RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
 
 // bf callbacks
-RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
 RULE(BF_CALLBACK_NORMALIZE, "{ $X } := bf_normalize_cb $X.")
 RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
 RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
@@ -137,11 +136,6 @@ static auto simplify_wff = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto apply_cb = make_library<BAs...>(
-	BF_CALLBACK_NEG
-);
-
-template<typename... BAs>
 static auto apply_normalize = make_library<BAs...>(
 	BF_CALLBACK_NORMALIZE
 );
@@ -171,8 +165,7 @@ static auto push_neg_for_snf = make_library<BAs...>(
 
 template<typename... BAs>
 static auto simplify_snf = repeat_all<step<BAs...>, BAs...>(
-	apply_cb<BAs...>
-	| elim_eqs<BAs...>
+	elim_eqs<BAs...>
 	| simplify_wff<BAs...>
 	| push_neg_for_snf<BAs...>);
 
@@ -586,7 +579,6 @@ template<typename...BAs>
 nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 	return n | repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
@@ -611,7 +603,6 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
@@ -621,7 +612,6 @@ template<typename...BAs>
 nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 	return n | repeat_all<step<BAs...>, BAs...>(
 			to_nnf_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
@@ -799,9 +789,9 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	// Substitute 1 and 0 for v and simplify
 	const auto& v = vars[p];
 	map<nso<BAs...>, nso<BAs...>> c = {{v, _1<BAs...>}};
-	auto fm_v1 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(apply_cb<BAs...>);
+	auto fm_v1 = replace(fm, c);
 	c = {{v, _0<BAs...>}};
-	auto fm_v0 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(apply_cb<BAs...>);
+	auto fm_v0 = replace(fm, c);
 
 	elim_vars_in_assignment<BAs...>(fm_v1, vars, i, p);
 	if(fm_v1 == fm_v0) {
@@ -850,7 +840,7 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 	map<nso<BAs...>, vector<vector<int_t>>> dnf;
 
 	//Simplify formula as initial step
-	auto fm_simp = fm | repeat_all<step<BAs...>, BAs...>(apply_cb<BAs...>);
+	auto fm_simp = fm;
 
 	if(assign_and_reduce(fm_simp, vars, i, dnf, 0)) {
 		assert(dnf.size() == 1);
@@ -1080,7 +1070,7 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 	vector<nso<BAs...>> vars = select_top(new_fm, is_var_wff);
 	if (vars.empty()) {
 		if (wff) return fm | repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>);
-		else return fm | repeat_all<step<BAs...>, BAs...>(apply_cb<BAs...>);
+		else return fm;
 	}
 
 	map<nso<BAs...>, int_t> var_pos;
@@ -1932,7 +1922,6 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 	return n | bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
@@ -1952,7 +1941,6 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 		| bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			unsqueeze_wff<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
 			| push_neg_for_snf<BAs...>)
@@ -1963,8 +1951,7 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 	auto second_step = build_wff_neg(first_step)
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
 		| repeat_all<step<BAs...>, BAs...>(
-			apply_cb<BAs...>
-			| elim_eqs<BAs...>
+			elim_eqs<BAs...>
 			| simplify_wff<BAs...>
 			| fix_neg_in_snf<BAs...>)
 		| bf_reduce_canonical<BAs...>();
@@ -1996,7 +1983,6 @@ template<typename...BAs>
 nso<BAs...> mnf_bf(const nso<BAs...>& n) {
 	return n | repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;

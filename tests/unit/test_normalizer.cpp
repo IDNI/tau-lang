@@ -35,12 +35,6 @@ TEST_SUITE("steps parsing") {
 	TEST_CASE("simplify_wff") {
 		CHECK( simplify_wff<Bool>.size() == 2 );
 	}
-
-	TEST_CASE("apply_cb") {
-		CHECK( apply_cb<Bool>.size() == 1 );
-	}
-
-
 }
 
 

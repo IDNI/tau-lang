@@ -72,10 +72,6 @@ TEST_SUITE("make_library") {
 TEST_SUITE("callbacks") {
 
 
-	// TODO (MEDIUM) write tests for execution bf_and_cb
-	// TODO (MEDIUM) write tests for execution bf_or_cb
-	// TODO (MEDIUM) write tests for execution bf_xor_cb
-	// TODO (MEDIUM) write tests for execution bf_neg_cb
 	// TODO (MEDIUM) write tests for execution bf_is_zero_cb
 	// TODO (MEDIUM) write tests for execution bf_is_one_cb
 	// TODO (MEDIUM) write tests for execution bf_has_clashing_subformulas_cb

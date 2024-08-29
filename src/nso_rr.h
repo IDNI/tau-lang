@@ -256,8 +256,7 @@ static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value)
 			|| !get<tau_source_sym>(n->value).nt()) return false;
 	auto nt = get<tau_source_sym>(n->value).n();
-	return nt == tau_parser::bf_neg_cb
-		|| nt == tau_parser::bf_eq_cb
+	return nt == tau_parser::bf_eq_cb
 		|| nt == tau_parser::bf_neq_cb
 		|| nt == tau_parser::bf_is_one_cb
 		|| nt == tau_parser::bf_is_zero_cb
@@ -2462,8 +2461,6 @@ struct callback_applier {
 		if (!is_callback<BAs...>(n)) return n;
 		auto nt = get<tau_source_sym>(n->value).n();
 		switch (nt) {
-		case tau_parser::bf_neg_cb:
-			return apply_unary_operation(_neg, n);
 		case tau_parser::bf_eq_cb:
 			return apply_equality_relation(_eq, n);
 		case tau_parser::bf_neq_cb:
@@ -2501,39 +2498,6 @@ private:
 		std::variant<BAs...> v(res);
 		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	};
-
-	static constexpr auto _neg = [](const auto& l) -> sp_tau_node<BAs...> {
-		auto res = ~l;
-		std::variant<BAs...> v(res);
-		return make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
-	};
-
-	static constexpr auto _xor = overloaded(
-		[]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
-			auto res = l | r;
-			std::variant<BAs...> v(res);
-			return make_node<tau_sym<BAs...>>(
-							tau_sym<BAs...>(v), {});
-		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> {
-			throw std::logic_error("wrong types"); });
-
-	static constexpr auto _imply = overloaded(
-		[]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
-			auto res = ~l | r;
-			std::variant<BAs...> v(res);
-			return make_node<tau_sym<BAs...>>(
-							tau_sym<BAs...>(v), {});
-		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> {
-			throw std::logic_error("wrong types"); });
-
-	static constexpr auto _equiv = overloaded(
-		[]<typename T>(const T& l, const T& r) -> sp_tau_node<BAs...> {
-			auto res = (~l | r) & (~r | l);
-			std::variant<BAs...> v(res);
-			return make_node<tau_sym<BAs...>>(
-							tau_sym<BAs...>(v), {});
-		}, [](const auto&, const auto&) -> sp_tau_node<BAs...> {
-			throw std::logic_error("wrong types"); });
 
 	// ternary operators
 	static constexpr auto _eq =
@@ -3049,6 +3013,16 @@ sp_tau_node<BAs...> make_node_hook_bf_and(const node<tau_sym<BAs...>>& n) {
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
+template<typename...BAs>
+sp_tau_node<BAs...> make_node_hook_cte_neg(const node<tau_sym<BAs...>>& n) {
+	auto l = first_argument_expression(n)
+		| tau_parser::constant
+		| only_child_extractor<BAs...>
+		| ba_extractor<BAs...>;
+	return l ? build_bf_constant<BAs...>(~l.value())
+		: std::make_shared<node<tau_sym<BAs...>>>(n);
+}
+
 template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_bf_neg(const node<tau_sym<BAs...>>& n) {
 	//RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
@@ -3063,6 +3037,9 @@ sp_tau_node<BAs...> make_node_hook_bf_neg(const node<tau_sym<BAs...>>& n) {
 	if (auto double_neg = logic_operator(n) | tau_parser::bf | tau_parser::bf_neg; double_neg
 			&& is_non_terminal<tau_parser::bf_neg>(logic_operator(n)))
 		return double_neg.value()->child[0];
+	//RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
+	if (is_non_terminal<tau_parser::bf_constant>(first_argument_expression(n)))
+		return make_node_hook_cte_neg(n);
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
@@ -3725,7 +3702,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_has_subformula_cb,            620 },
 			{ tau_parser::bf_remove_funiversal_cb,         630 },
 			{ tau_parser::bf_remove_fexistential_cb,       640 },
-			{ tau_parser::bf_neg_cb,                       680 },
 
 			{ tau_parser::bf_or,                           720 },
 			{ tau_parser::bf_and,                          730 },
@@ -3920,7 +3896,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::wff_all:
 			case tau_parser::wff_ex:         quant(); break;
 			// callbacks
-			case tau_parser::bf_neg_cb:      prefix("bf_neg_cb"); break;
 			case tau_parser::bf_eq_cb:       prefix("bf_eq_cb"); break;
 			case tau_parser::bf_neq_cb:      prefix("bf_neq_cb"); break;
 			case tau_parser::bf_is_zero_cb:  prefix("bf_is_zero_cb"); break;
