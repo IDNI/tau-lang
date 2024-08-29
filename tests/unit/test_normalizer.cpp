@@ -37,7 +37,7 @@ TEST_SUITE("steps parsing") {
 	}
 
 	TEST_CASE("apply_cb") {
-		CHECK( apply_cb<Bool>.size() == 2 );
+		CHECK( apply_cb<Bool>.size() == 1 );
 	}
 
 

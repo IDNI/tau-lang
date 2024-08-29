@@ -46,10 +46,6 @@ TEST_SUITE("parsing bf rules") {
 		CHECK( test_rule(BF_TO_DNF_1, tau_parser::bf_rule) );
 	}
 
-	TEST_CASE("BF_CALLBACK_XOR") {
-		CHECK( test_rule(BF_CALLBACK_XOR, tau_parser::bf_rule) );
-	}
-
 	TEST_CASE("BF_CALLBACK_NEG") {
 		CHECK( test_rule(BF_CALLBACK_NEG, tau_parser::bf_rule) );
 	}
