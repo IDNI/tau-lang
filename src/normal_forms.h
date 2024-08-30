@@ -220,6 +220,17 @@ static auto to_nnf_bf = make_library<BAs...>(
 	+ BF_PUSH_NEGATION_INWARDS_1
 );
 
+// --------------------------------------------------------------
+// General operator for nso<BAs...> function application by pipe
+template<typename... BAs>
+using nso_transform = nso<BAs...>(*)(const nso<BAs...>&);
+
+template<typename... BAs>
+nso<BAs...> operator| (const nso<BAs...>& fm, const nso_transform<BAs...> func) {
+	return func(fm);
+}
+// --------------------------------------------------------------
+
 template<typename... BAs>
 struct bf_reduce_canonical;
 
@@ -743,7 +754,8 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	// Check if all variables are assigned
 	if((int_t)vars.size() == p) {
 		// Normalize tau subformulas
-		auto fm_simp = fm | repeat_once<step<BAs...>, BAs...>(apply_normalize<BAs...>)
+		auto fm_simp = fm
+					| (nso_transform<BAs...>)normalize_ba<BAs...>
 		 			| repeat_all<step<BAs...>, BAs...>(to_nnf_bf<BAs...>)
 		 			| repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_bf<BAs...>);
 		// Simplify coefficient
@@ -977,8 +989,8 @@ vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff, const a
 			}
 			else return true;
 		};
-		post_order_traverser<identity_t<nso<BAs...>>, decltype(var_assigner), nso<BAs...>>
-			(rewriter::identity<nso<BAs...>>, var_assigner)(clause);
+		post_order_traverser<identity_t, decltype(var_assigner), nso<BAs...>>
+			(rewriter::identity, var_assigner)(clause);
 		if (clause_is_decided) continue;
 		// There is at least one satisfiable clause
 		decided = false;
@@ -1472,6 +1484,114 @@ nso<BAs...> wff_remove_existential(const nso<BAs...>& var, const nso<BAs...>& wf
 	return replace<nso<BAs...>>(wff, changes);
 }
 
+template<typename... BAs>
+nso<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_fm) {
+	scoped_fm = scoped_fm
+	            // Reductions to prevent blow ups and achieve DNF
+	            | bf_reduce_canonical<BAs...>()
+	            | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+	            | repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
+	            | wff_reduce_dnf<BAs...>();
+	auto clauses = get_leaves(scoped_fm, tau_parser::wff_or, tau_parser::wff);
+	nso<BAs...> res;
+	for (const auto& clause : clauses) {
+		// Check if every conjunct in clause is of form f = 0 or f != 0
+		auto conjuncts = get_leaves(clause, tau_parser::wff_and, tau_parser::wff);
+		bool all_equal_zero = true, all_unequal_zero = true;
+		for (const auto& c : conjuncts) {
+			if (!is_child_non_terminal(tau_parser::bf_eq, c))
+				all_equal_zero = false;
+			if (!is_child_non_terminal(tau_parser::bf_neq, c))
+				all_unequal_zero = false;
+		}
+		if (all_unequal_zero) {
+			nso<BAs...> new_conjunct;
+			// Push quantifier inside conjunction
+			for (const auto& c : conjuncts) {
+				auto new_c = wff_remove_existential(trim2(inner_fm), c);
+				if (new_conjunct) new_conjunct = build_wff_and(new_conjunct, new_c);
+				else new_conjunct = new_c;
+			}
+			if (res) res = build_wff_or(res, new_conjunct);
+			else res = new_conjunct;
+		}
+		if (all_equal_zero) {
+			nso<BAs...> new_func;
+			for (const auto& d: conjuncts) {
+				if (new_func) new_func = build_bf_or(new_func, trim2(d));
+				else new_func = trim2(d);
+			}
+			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
+			new_func = wff_remove_existential(trim2(inner_fm), new_func);
+			if (res) res = build_wff_or(res, new_func);
+			else res = new_func;
+		}
+		else {
+			// Resolve quantified variable in scoped_fm
+			if (res) res = build_wff_or(res, wff_remove_existential(trim2(inner_fm), clause));
+			else res = wff_remove_existential(trim2(inner_fm), clause);
+		}
+	}
+	return res;
+}
+
+template<typename... BAs>
+nso<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm) {
+	scoped_fm = scoped_fm
+	            // Reductions to prevent blow ups and achieve CNF
+	            | bf_reduce_canonical<BAs...>()
+	            | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+	            | repeat_all<step<BAs...>, BAs...>(nnf_to_cnf_wff<BAs...>)
+	            | wff_reduce_cnf<BAs...>();
+	auto clauses = get_leaves(scoped_fm, tau_parser::wff_and, tau_parser::wff);
+	nso<BAs...> res;
+	for (const auto &clause: clauses) {
+		// Check if every disjunct in clause is of form f = 0 or f != 0
+		auto disjuncts = get_leaves(clause, tau_parser::wff_or, tau_parser::wff);
+		bool all_equal_zero = true, all_unequal_zero = true;
+		for (const auto &d: disjuncts) {
+			if (!is_child_non_terminal(tau_parser::bf_eq, d))
+				all_equal_zero = false;
+			if (!is_child_non_terminal(tau_parser::bf_neq, d))
+				all_unequal_zero = false;
+		}
+		if (all_equal_zero) {
+			nso<BAs...> new_disjunct;
+			// Push quantifier inside disjunction
+			for (const auto &d: disjuncts) {
+				auto new_d = build_wff_neg(d) | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+				new_d = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_d))
+				        | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+				if (new_disjunct) new_disjunct = build_wff_or(new_disjunct, new_d);
+				else new_disjunct = new_d;
+			}
+			if (res) res = build_wff_and(res, new_disjunct);
+			else res = new_disjunct;
+		}
+		if (all_unequal_zero) {
+			nso<BAs...> new_func;
+			for (const auto &d: disjuncts) {
+				if (new_func) new_func = build_bf_or(new_func, trim2(d));
+				else new_func = trim2(d);
+			}
+			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
+			new_func = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_func))
+			           | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+			if (res) res = build_wff_and(res, new_func);
+			else res = new_func;
+		} else {
+			// Turn universal into existential quantifier and eliminate
+			auto new_clause = build_wff_neg(clause)
+			                  | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+			new_clause = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_clause))
+			             | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+			if (!res) res = new_clause;
+			else res = build_wff_and(res, new_clause);
+		}
+	}
+	return res;
+}
+
 // Pushes all universal and existential quantifiers as deep as possible into the formula
 template<typename... BAs>
 nso<BAs...> eliminate_quantifiers(const nso<BAs...>& fm) {
@@ -1496,48 +1616,14 @@ nso<BAs...> eliminate_quantifiers(const nso<BAs...>& fm) {
 			return scoped_fm;
 		}
 		// Scoped formula contains the quantified variable
-		if (is_ex_quant) {
-			scoped_fm = scoped_fm
-			    // Reductions to prevent blow ups and achieve DNF
-			    | bf_reduce_canonical<BAs...>()
-			    | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
-			    | repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
-			    | wff_reduce_dnf<BAs...>();
-			// Now resolve quantified variable in scoped_fm
-			return wff_remove_existential(trim2(inner_fm), scoped_fm);
-		} else {
-			scoped_fm = scoped_fm
-			    // Reductions to prevent blow ups and achieve CNF
-			    | bf_reduce_canonical<BAs...>()
-			    | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
-			    | repeat_all<step<BAs...>, BAs...>(nnf_to_cnf_wff<BAs...>)
-			    | wff_reduce_cnf<BAs...>();
-			auto clauses = get_leaves(scoped_fm, tau_parser::wff_and, tau_parser::wff);
-			nso<BAs...> res;
-			bool first = true;
-			for (const auto& clause : clauses) {
-				// Turn universal into existential quantifier and eliminate
-				auto new_clause = build_wff_neg(clause)
-									| repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
-				new_clause = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_clause))
-									| repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
-				if (first) { first = false; res = new_clause; }
-				else res = build_wff_and(res, new_clause);
-			}
-			return res;
-		}
+		if (is_ex_quant) return eliminate_existential_quantifier<BAs...>(inner_fm, scoped_fm);
+		else return eliminate_universal_quantifier<BAs...>(inner_fm, scoped_fm);
 	};
 	auto is_not_bf = [](const nso<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
 	return post_order_recursive_traverser<nso<BAs...>>()(fm, is_not_bf, elim_quant);
 }
 
-template<typename... BAs>
-using nso_transform = nso<BAs...>(*)(const nso<BAs...>&);
 
-template<typename... BAs>
-nso<BAs...> operator| (const nso<BAs...>& fm, const nso_transform<BAs...> func) {
-	return func(fm);
-}
 
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.

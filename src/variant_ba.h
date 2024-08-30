@@ -73,6 +73,15 @@ bool operator==(const std::variant<BAs...>& l, const bool& r) {
 		), l);
 }
 
+template<typename... BAs>
+std::variant<BAs...> normalize_ba(const std::variant<BAs...>& elem) {
+	return std::visit(overloaded(
+		[](const auto& el) {
+			return std::variant<BAs...>(normalize(el));
+		}
+	), elem);
+}
+
 template<typename...BAs>
 bool is_zero(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(

@@ -45,10 +45,10 @@ sp_bdd_node make_bdd_statement(const sp_tau_source_node& source) {
 		transform(tf);
 	return post_order_traverser<
 		map_transformer<tauify_bdd, sp_tau_source_node, sp_bdd_node>,
-		all_t<sp_tau_source_node>,
+		all_t,
 		sp_node<tau_source_sym>,
 		sp_bdd_node>(
-			transform, all<sp_tau_source_node>)(source);
+			transform, all)(source);
 }
 
 sp_bdd_node build_binding(const char* src) {
