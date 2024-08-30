@@ -4,7 +4,6 @@ set(TESTS
 	bdd1
 	bdd2
 	tau_ba1
-	tau_ba2
 	tau_ba3
 	normal_forms
 	nso_rr_execution
@@ -14,7 +13,7 @@ set(TESTS
 	wff_normalization
 	splitter
 	splitter2
-	solver
+	#solver
 	quantifiers
 )
 

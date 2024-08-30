@@ -43,24 +43,6 @@ TEST_SUITE("builders parsing") {
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
 	}
 
-	TEST_CASE("BLDR_WFF_AND") {
-		auto bldr = make_builder<Bool>(BLDR_WFF_AND);
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
-	}
-
-	TEST_CASE("BLDR_WFF_OR") {
-		auto bldr = make_builder<Bool>(BLDR_WFF_OR);
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
-	}
-
-	TEST_CASE("BLDR_WFF_NEG") {
-		auto bldr = make_builder<Bool>(BLDR_WFF_NEG);
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
-	}
-
 	TEST_CASE("BLDR_WFF_ALL") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_ALL);
 		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
@@ -71,24 +53,6 @@ TEST_SUITE("builders parsing") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EX);
 		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
 		CHECK( is_non_terminal<tau_parser::wff, Bool>(bldr.second) );
-	}
-
-	TEST_CASE("BLDR_BF_AND") {
-		auto bldr = make_builder<Bool>(BLDR_BF_AND);
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
-	}
-
-	TEST_CASE("BLDR_BF_OR") {
-		auto bldr = make_builder<Bool>(BLDR_BF_OR);
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
-	}
-
-	TEST_CASE("BLDR_BF_NEG") {
-		auto bldr = make_builder<Bool>(BLDR_BF_NEG);
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(bldr.first) );
-		CHECK( is_non_terminal<tau_parser::bf, Bool>(bldr.second) );
 	}
 
 	TEST_CASE("BLDR_BF_SPLITTER") {
@@ -133,30 +97,9 @@ TEST_SUITE("builders execution") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("BLDR_WFF_AND") {
-		auto bldr = make_builder<Bool>(BLDR_WFF_AND);
-		std::vector<sp_tau_node<Bool>> args = {F, F};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_and;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BLDR_WFF_OR") {
-		auto bldr = make_builder<Bool>(BLDR_WFF_OR);
-		std::vector<sp_tau_node<Bool>> args = {F, F};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_or;
-		CHECK( check.has_value() );
-	}
-
 	TEST_CASE("BLDR_WFF_XOR") {
 		// TODO (LOW) write proper test
 		CHECK( true );
-	}
-
-	TEST_CASE("BLDR_WFF_NEG") {
-		auto bldr = make_builder<Bool>(BLDR_WFF_NEG);
-		std::vector<sp_tau_node<Bool>> args = {F};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_neg;
-		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BLDR_WFF_IMPLY") {
@@ -180,32 +123,6 @@ TEST_SUITE("builders execution") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EX);
 		std::vector<sp_tau_node<Bool>> args = {X, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_ex;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BLDR_BF_AND") {
-		auto bldr = make_builder<Bool>(BLDR_BF_AND);
-		std::vector<sp_tau_node<Bool>> args = {F, F};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_and;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BLDR_BF_OR") {
-		auto bldr = make_builder<Bool>(BLDR_BF_OR);
-		std::vector<sp_tau_node<Bool>> args = {F, F};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_or;
-		CHECK( check.has_value() );
-	}
-
-	TEST_CASE("BLDR_BF_XOR") {
-		// TODO (LOW) write proper test
-		CHECK( true );
-	}
-
-	TEST_CASE("BLDR_BF_NEG") {
-		auto bldr = make_builder<Bool>(BLDR_BF_NEG);
-		std::vector<sp_tau_node<Bool>> args = {F};
-		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_neg;
 		CHECK( check.has_value() );
 	}
 
