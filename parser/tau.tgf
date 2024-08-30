@@ -85,11 +85,11 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
 
 # flags
 flag =>   (flagvar _ "!=" _ num | num _ "!=" _ flagvar)      :flag_neq
-	| (flagvar _ '='  _ num | num _ '='  _ flagvar)      :flag_eq
-	| (flagvar _ ">=" _ num | num _ ">=" _ flagvar)      :flag_greater_equal
-	| (flagvar _ ">"  _ num | num _ ">"  _ flagvar)      :flag_greater
-	| (flagvar _ "<=" _ num | num _ "<=" _ flagvar)      :flag_less_equal
-	| (flagvar _ "<"  _ num | num _ "<"  _ flagvar)      :flag_less.
+        | (flagvar _ '='  _ num | num _ '='  _ flagvar)      :flag_eq
+        | (flagvar _ ">=" _ num | num _ ">=" _ flagvar)      :flag_greater_equal
+        | (flagvar _ ">"  _ num | num _ ">"  _ flagvar)      :flag_greater
+        | (flagvar _ "<=" _ num | num _ "<=" _ flagvar)      :flag_less_equal
+        | (flagvar _ "<"  _ num | num _ "<"  _ flagvar)      :flag_less.
 
 # variables
 charvar                => (alpha & ~'T' & ~'F') digit*.
@@ -184,12 +184,12 @@ cli_command            =>
         | ("sat"           :sat_sym     __ rr)                :sat_cmd
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
         | ("solve"         :solve_sym   __ wff_cmd_arg)       :solve_cmd
-        | (("e" | "execute"):execute_sym __ (wff_typed | rr)) :execute_cmd
+        | (("e" | "execute"):execute_sym __ (wff | rr))       :execute_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
         | (("s" | "subst" | "substitute")
                 :subst_sym __ nf_cmd_arg _ '[' _
-                	nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
+                        nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
         | (("i" | "inst" | "instantiate")
                 :inst_sym __ inst_args)                       :inst_cmd
 # normal forms
@@ -215,19 +215,17 @@ cli_command            =>
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ memory)        :history_print_cmd
-        | (                     wff_typed | bf_typed)         :history_store_cmd
+        | (                     wff | bf)                     :history_store_cmd
         .
 
 # command arguments
 #
 number                 => digits.
-bf_typed               => bf  | bf  _ ':' _ "bf".
-wff_typed              => wff | wff _ ':' _ "wff".
-bf_cmd_arg             => memory | bf_typed.
-wff_cmd_arg            => memory | wff_typed.
-nf_cmd_arg             => memory | wff_typed | bf_typed.
-onf_cmd_arg            => memory | wff_typed.
-normalize_cmd_arg      => memory | rr | ref | wff_typed | bf_typed.
+bf_cmd_arg             => memory | bf.
+wff_cmd_arg            => memory | wff.
+nf_cmd_arg             => memory | wff | bf.
+onf_cmd_arg            => memory | wff.
+normalize_cmd_arg      => memory | rr | ref | wff | bf.
 inst_args              =>
           wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
         | bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
@@ -247,7 +245,7 @@ help_arg               => help_sym | version_sym | quit_sym
 # memory
 #
 memory                 => ( "%"
-                          | "%-":rel_memory_sym [digits:memory_id]):rel_memory                                 :rel_memory
+                          | "%-":rel_memory_sym [digits:memory_id]):rel_memory
                         | ( "%" :abs_memory_sym         memory_id) :abs_memory.
 
 # options and their values
@@ -281,6 +279,5 @@ severity               => ("e" | "error"):error_sym
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
-        bf_typed, wff_typed,
         bf  > bf_parenthesis  > bf,
         wff > wff_parenthesis > wff.
