@@ -31,7 +31,7 @@ TEST_SUITE("rec relations partial evaluation: simple cases") {
 
 	TEST_CASE("wff_rec_relation") {
 		const char* sample =
-			"h[0](X, Y) := X != Y."
+			"h[0](X, Y) := X + Y != 0."
 			"g[n](Y) := h[n-1](Y, 0)."
 			"g[1](1).";
 		auto sample_src = make_tau_source(sample);

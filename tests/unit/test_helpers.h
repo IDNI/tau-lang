@@ -29,10 +29,10 @@ sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {
 	map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>> transform(tf);
 	return post_order_traverser<
 			map_transformer<tauify<Bool>, sp_tau_source_node, sp_tau_node<Bool>>,
-			all_t<sp_tau_source_node>,
+			all_t,
 			sp_node<tau_source_sym>,
 			sp_tau_node<Bool>>(
-		transform, all<sp_tau_source_node>)(source);
+		transform, all)(source);
 }
 
 sp_tau_node<Bool> make_named_bindings(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
@@ -41,9 +41,9 @@ sp_tau_node<Bool> make_named_bindings(const sp_tau_node<Bool>& statement, const 
 	bind_transformer<name_binder<Bool>, Bool> binder(nb);
 	return post_order_traverser<
 			bind_transformer<name_binder<Bool>, Bool>,
-			all_t<sp_tau_node<Bool>>,
+			all_t,
 			sp_tau_node<Bool>>(
-		binder, all<sp_tau_node<Bool>>)(statement);
+		binder, all)(statement);
 }
 
 template<typename factory_t>
@@ -53,9 +53,9 @@ sp_tau_node<Bool> make_factory_bindings(const sp_tau_node<Bool>& statement, fact
 	bind_transformer<factory_binder<factory_t, Bool>, Bool> binder(fb);
 	return post_order_traverser<
 			bind_transformer<factory_binder<factory_t, Bool>, Bool>,
-			all_t<sp_tau_node<Bool>>,
+			all_t,
 			sp_tau_node<Bool>>(
-		binder, all<sp_tau_node<Bool>>)(statement);
+		binder, all)(statement);
 }
 
 std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<Bool> n, size_t l = 0) {

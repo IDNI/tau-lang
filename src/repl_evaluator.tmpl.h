@@ -437,7 +437,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		nso<tau_ba<BAs...>, BAs...> res;
 		if (auto iter = changes.find(x); iter != changes.end())
 			res = iter->second;
-		else if (c.empty()) res = x;
+		else if (x->child == c) res = x;
 		else res = make_node(x->value, move(c));
 
 		if (marked_quants.contains(x)) {
@@ -508,20 +508,11 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = get_wff(n->child[1]);
-	if (arg) return apply_once_definitions(arg.value())
-		| repeat_all<step<tau_ba<BAs...>, BAs...>,
-			tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(
-				apply_defs<tau_ba<BAs...>, BAs...>))
-		| repeat_all<step<tau_ba<BAs...>, BAs...>,
-			tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(
-				elim_for_all<tau_ba<BAs...>, BAs...>))
-		| remove_one_wff_existential<tau_ba<BAs...>, BAs...>()
+	if (arg) return eliminate_quantifiers<tau_ba<BAs...>, BAs...>(arg.value())
 		| repeat_all<step<tau_ba<BAs...>, BAs...>,
 			tau_ba<BAs...>, BAs...>(
 				to_dnf_wff<tau_ba<BAs...>, BAs...>
 				| simplify_wff<tau_ba<BAs...>, BAs...>
-				| trivialities<tau_ba<BAs...>, BAs...>
-				| simplify_bf<tau_ba<BAs...>, BAs...>
 				| simplify_wff<tau_ba<BAs...>, BAs...>)
 		| reduce_bf<tau_ba<BAs...>, BAs...>
 		| reduce_wff<tau_ba<BAs...>, BAs...>;

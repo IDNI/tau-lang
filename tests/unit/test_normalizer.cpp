@@ -24,40 +24,16 @@ namespace testing = doctest;
 
 TEST_SUITE("steps parsing") {
 
-	TEST_CASE("apply_defs") {
-		CHECK( apply_defs<Bool>.size() == 5 );
-	}
-
-	TEST_CASE("apply_defs_once") {
-		CHECK( apply_defs_once<Bool>.size() == 7 );
-	}
-
 	TEST_CASE("elim_for_all") {
 		CHECK( elim_for_all<Bool>.size() == 1 );
 	}
 
 	TEST_CASE("to_dnf_wff") {
-		CHECK( to_dnf_wff<Bool>.size() == 11 );
-	}
-
-	TEST_CASE("simplify_bf") {
-		CHECK( simplify_bf<Bool>.size() == 16 );
+		CHECK( to_dnf_wff<Bool>.size() == 10 );
 	}
 
 	TEST_CASE("simplify_wff") {
-		CHECK( simplify_wff<Bool>.size() == 26 );
-	}
-
-	TEST_CASE("apply_cb") {
-		CHECK( apply_cb<Bool>.size() == 4 );
-	}
-
-	TEST_CASE("wff_remove_existential") {
-		CHECK( wff_remove_existential<Bool>.size() == 1 );
-	}
-
-	TEST_CASE("trivialities") {
-		CHECK( trivialities<Bool>.size() == 4 );
+		CHECK( simplify_wff<Bool>.size() == 2 );
 	}
 }
 
