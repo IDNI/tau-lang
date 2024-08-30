@@ -2734,29 +2734,6 @@ nso<BAs...> nso_rr_apply(const rules<nso<BAs...>>& rs, const nso<BAs...>& n)
 	return nn;
 }
 
-#ifdef DEBUG
-template <typename... BAs>
-std::ostream& my_print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
-	size_t l = 0)
-{
-	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
-	std::visit(overloaded{
-		[&os, &indent](tau_source_sym v) {
-			indent();
-			if (v.nt()) os << tau_parser::instance()
-				.name(v.n()) << "(" << v.n() << ")";
-			else if (v.is_null()) os << "null";
-			else os << v.t();
-		},
-		[&os, &indent](const auto& v) { indent(), os << v; }
-	}, n->value);
-	if (n->child.size()) os << " {\n";
-	for (auto& c : n->child) my_print_sp_tau_node_tree<BAs...>(os, c, l + 1);
-	if (n->child.size()) indent(), os << "}";
-	return os << "\n";
-}
-#endif // DEBUG
-
 //
 // sp_tau_node factory methods
 //
@@ -2811,16 +2788,10 @@ sp_tau_node<BAs...> make_node_hook_cte_or(const node<tau_sym<BAs...>>& n) {
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-		//| optional_value_extractor<std::variant<BAs...>>;
 	auto r = second_argument_expression(n)
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-		//| optional_value_extractor<std::variant<BAs...>>;
-	#ifdef DEBUG
-	auto nn = std::make_shared<node<tau_sym<BAs...>>>(n);
-	my_print_sp_tau_node_tree<BAs...>(std::cout, nn);
-	#endif // DEBUG
 	return l && r ? build_bf_constant<BAs...>(l.value() | r.value())
 		: std::make_shared<node<tau_sym<BAs...>>>(n);
 }
@@ -2863,16 +2834,10 @@ sp_tau_node<BAs...> make_node_hook_cte_and(const node<tau_sym<BAs...>>& n) {
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-		//| optional_value_extractor<std::variant<BAs...>>;
 	auto r = second_argument_expression(n)
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-		//| optional_value_extractor<std::variant<BAs...>>;
-	#ifdef DEBUG
-	auto nn = std::make_shared<node<tau_sym<BAs...>>>(n);
-	my_print_sp_tau_node_tree<BAs...>(std::cout, nn);
-	#endif // DEBUG
 	return l && r ? build_bf_constant<BAs...>(l.value() & r.value())
 		: std::make_shared<node<tau_sym<BAs...>>>(n);
 }
@@ -2945,16 +2910,10 @@ sp_tau_node<BAs...> make_node_hook_cte_xor(const node<tau_sym<BAs...>>& n) {
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-		//| optional_value_extractor<std::variant<BAs...>>;
 	auto r = second_argument_expression(n)
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-		//| optional_value_extractor<std::variant<BAs...>>;
-	#ifdef DEBUG
-	auto nn = std::make_shared<node<tau_sym<BAs...>>>(n);
-	my_print_sp_tau_node_tree<BAs...>(std::cout, nn);
-	#endif // DEBUG
 	return l && r ? build_bf_constant<BAs...>(l.value() ^ r.value())
 		: std::make_shared<node<tau_sym<BAs...>>>(n);
 }
@@ -3108,7 +3067,6 @@ sp_tau_node<BAs...> make_node_hook_wff_neg(const node<tau_sym<BAs...>>& n) {
 
 template<typename...BAs>
 sp_tau_node<BAs...> make_node_hook_wff_eq_cte(const node<tau_sym<BAs...>>& n) {
-	my_print_sp_tau_node_tree<BAs...>(std::cout, std::make_shared<node<tau_sym<BAs...>>>(n));
 	auto l = n
 		| tau_parser::bf_eq
 		| tau_parser::bf
@@ -3144,10 +3102,8 @@ sp_tau_node<BAs...> make_node_hook_wff_eq(const node<tau_sym<BAs...>>& n) {
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 
-
 template<typename...BAs>
 sp_tau_node<BAs...> make_node_hook_wff_neq_cte(const node<tau_sym<BAs...>>& n) {
-	my_print_sp_tau_node_tree<BAs...>(std::cout, std::make_shared<node<tau_sym<BAs...>>>(n));
 	auto l = n
 		| tau_parser::bf_neq
 		| tau_parser::bf
