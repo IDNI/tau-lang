@@ -229,7 +229,7 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	TEST_CASE("{ bdd : Y } & { bdd : Z } != 0") {
 		bdd_init<Bool>();
-		const char* sample = "{ bdd : Y } | { bdd : Z } != 0.";
+		const char* sample = "{ bdd : Y } & { bdd : Z } != 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);

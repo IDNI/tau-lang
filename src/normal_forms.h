@@ -39,43 +39,9 @@ RULE(BF_TO_DNF_0, "($X | $Y) & $Z := $X & $Z | $Y & $Z.")
 RULE(BF_TO_DNF_1, "$X & ($Y | $Z) := $X & $Y | $X & $Z.")
 RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := $X' | $Y'.")
 RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
-RULE(BF_ELIM_DOUBLE_NEGATION_0, "$X'' :=  $X.")
-RULE(BF_SIMPLIFY_ONE_0, "1 | $X := 1.")
-RULE(BF_SIMPLIFY_ONE_1, "$X | 1 := 1.")
-RULE(BF_SIMPLIFY_ONE_2, "1 & $X := $X.")
-RULE(BF_SIMPLIFY_ONE_3, "$X & 1 := $X.")
-RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
-RULE(BF_SIMPLIFY_ZERO_0, "0 & $X := 0.")
-RULE(BF_SIMPLIFY_ZERO_1, "$X & 0 := 0.")
-RULE(BF_SIMPLIFY_ZERO_2, "0 | $X := $X.")
-RULE(BF_SIMPLIFY_ZERO_3, "$X | 0 := $X.")
-RULE(BF_SIMPLIFY_ZERO_4, "0' := 1.")
-RULE(BF_SIMPLIFY_SELF_0, "$X & $X := $X.")
-RULE(BF_SIMPLIFY_SELF_1, "$X | $X := $X.")
-RULE(BF_SIMPLIFY_SELF_2, "$X & $X' := 0.")
-RULE(BF_SIMPLIFY_SELF_3, "$X | $X' := 1.")
-RULE(BF_SIMPLIFY_SELF_4, "$X' & $X := 0.")
-RULE(BF_SIMPLIFY_SELF_5, "$X' | $X := 1.")
-
-// bf definitions
-RULE(BF_DEF_XOR, "$X + $Y := $X & $Y' | $X' & $Y.")
 
 // bf callbacks
-RULE(BF_CALLBACK_AND, "{ $X } & { $Y } := bf_and_cb $X $Y.")
-RULE(BF_CALLBACK_OR, "{ $X } | { $Y } := bf_or_cb $X $Y.")
-RULE(BF_CALLBACK_XOR, "{ $X } + { $Y } := bf_xor_cb $X $Y.")
-RULE(BF_CALLBACK_NEG, "{ $X }' := bf_neg_cb $X.")
 RULE(BF_CALLBACK_NORMALIZE, "{ $X } := bf_normalize_cb $X.")
-RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 0.")
-RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
-RULE(BF_PUSH_CTES_UPWARDS_0, "$X & ({ $Y } & $Z) := { $Y } & ($X & $Z).")
-RULE(BF_PUSH_CTES_UPWARDS_1, "$X & ($Y & { $Z }) := { $Z } & ($X & $Y).")
-RULE(BF_PUSH_CTES_UPWARDS_2, "($X & { $Y }) & $Z := { $Y } & ($X & $Z).")
-RULE(BF_PUSH_CTES_UPWARDS_3, "$X & ($Y & { $Z }) := { $Z } & ($X & $Y).")
-RULE(BF_PUSH_CTES_UPWARDS_4, "$X | ({ $Y } | $Z) := { $Y } | ($X | $Z).")
-RULE(BF_PUSH_CTES_UPWARDS_5, "$X | ($Y | { $Z }) := { $Z } | ($X | $Y).")
-RULE(BF_PUSH_CTES_UPWARDS_6, "($X | { $Y }) | $Z := { $Y } | ($X | $Z).")
-RULE(BF_PUSH_CTES_UPWARDS_7, "$X | ($Y | { $Z }) := { $Z } | ($X | $Y).")
 
 // wff rules
 RULE(WFF_TO_DNF_0, "($X || $Y) && $Z ::= $X && $Z || $Y && $Z.")
@@ -86,62 +52,12 @@ RULE(WFF_PUSH_NEGATION_INWARDS_2, "!($X = 0) ::= $X != 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_3, "!($X != 0) ::= $X = 0.")
 RULE(WFF_PUSH_NEGATION_INWARDS_4, "! always $X ::= sometimes (! $X).")
 RULE(WFF_PUSH_NEGATION_INWARDS_5, "! sometimes $X ::= always (! $X).")
-RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
-RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
-RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
-RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
-RULE(WFF_SIMPLIFY_ONE_3, "$X && T ::= $X.")
-RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
-RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
-RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
-RULE(WFF_SIMPLIFY_ZERO_0, "F && $X ::= F.")
-RULE(WFF_SIMPLIFY_ZERO_1, "$X && F ::= F.")
-RULE(WFF_SIMPLIFY_ZERO_2, "F || $X ::= $X.")
-RULE(WFF_SIMPLIFY_ZERO_3, "$X || F ::= $X.")
-RULE(WFF_SIMPLIFY_ZERO_4, "! F ::= T.")
-RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
-RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
-RULE(WFF_SIMPLIFY_SELF_0, "$X && $X ::= $X.")
-RULE(WFF_SIMPLIFY_SELF_1, "$X || $X ::= $X.")
-RULE(WFF_SIMPLIFY_SELF_2, "$X && ! $X ::= F.")
-RULE(WFF_SIMPLIFY_SELF_3, "$X || ! $X ::= T.")
-RULE(WFF_SIMPLIFY_SELF_4, "!$X && $X ::= F.")
-RULE(WFF_SIMPLIFY_SELF_5, "!$X || $X ::= T.")
-RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
-RULE(WFF_SIMPLIFY_SOMETIMES_2,  "sometimes always $X ::= always $X.")
 RULE(WFF_SIMPLIFY_SOMETIMES_3,  "(sometimes $X) && (always $X) ::= always $X.")
-RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
-RULE(WFF_SIMPLIFY_ALWAYS_2,     "always sometimes $X ::= sometimes $X.")
 RULE(WFF_SIMPLIFY_ALWAYS_3,		"(always $X) && (sometimes $X) ::= always $X.")
 RULE(WFF_PUSH_SOMETIMES_INWARDS,"sometimes($X || $Y) ::= (sometimes $X) || (sometimes $Y).")
 RULE(WFF_PUSH_ALWAYS_INWARDS,   "always($X && $Y) ::= (always $X) && (always $Y).")
 
-// wff definitions
-RULE(WFF_DEF_XOR, "$X ^ $Y ::= $X && !$Y || !$X && $Y.")
-RULE(WFF_DEF_CONDITIONAL, "$X ? $Y : $Z ::= ($X -> $Y) && (!$X -> $Z).")
-RULE(WFF_DEF_IMPLY, "$X -> $Y ::= !$X || $Y.")
-RULE(WFF_DEF_EQUIV, "$X <-> $Y ::= ($X -> $Y) && ($Y -> $X).")
-
-// additional wff definitions (include wff formulas)
-RULE(BF_DEF_LESS_EQUAL, "$X <= $Y ::= $X & $Y' = 0.")
-RULE(BF_DEF_LESS, "$X < $Y ::= $X & $Y' = 0 && $X + $Y' != 0.")
-RULE(BF_DEF_GREATER, "$X > $Y ::= $X & $Y' != 0 || $X + $Y' = 0.")
-RULE(BF_DEF_INTERVAL, "$X <= $Y <= $Z ::= ($X & $Y' = 0) && ($Y & $Z' = 0).")
-RULE(BF_DEF_NOT_LESS_EQUAL, "$X !<= $Y ::= ($X & $Y' != 0).")
-
-// we must expand the xor as its definition has been allready processed
-RULE(BF_DEF_EQ, "$X = $Y ::= $X & $Y' | $X' & $Y = 0.")
-RULE(BF_DEF_NEQ, "$X != $Y ::= $X & $Y' | $X' & $Y != 0.")
-
-// wff callbacks
-RULE(BF_CALLBACK_EQ, "{ $X } = 0 ::= bf_eq_cb $X T F.") // (T|F) is wff_(t|f)
-RULE(BF_CALLBACK_NEQ, "{ $X } != 0 ::= bf_neq_cb $X T F.") // (T|F) is wff_(t|f)
-
 // trivialities
-RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
-RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
-RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
-RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
 RULE(BF_EQ_AND_SIMPLIFY_0, "$X != 0 && $X = 0 ::= F.")
 RULE(BF_EQ_AND_SIMPLIFY_1, "$X = 0 && $X != 0 ::= F.")
 RULE(BF_EQ_OR_SIMPLIFY_0, "$X != 0 || $X = 0 ::= T.")
@@ -155,55 +71,13 @@ RULE(BF_TO_CNF_1, "$X | $Y & $Z := ($X | $Y) & ($X | $Z).")
 RULE(WFF_TO_CNF_0, "$X && $Y || $Z ::= ($X || $Z) && ($Y || $Z).")
 RULE(WFF_TO_CNF_1, "$X || $Y && $Z ::= ($X || $Y) && ($X || $Z).")
 
-RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != $Y ::= !($X = $Y).")
+RULE(WFF_PUSH_NEGATION_UPWARDS_0, "$X != 0 ::= !($X = 0).")
 RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
 RULE(WFF_UNSQUEEZE_NEGATIVES_0, "$X | $Y != 0 ::= $X != 0 || $Y != 0.")
 
-RULE(BF_POSITIVE_LITERAL_UPWARDS_0, "$X != 0 && $Y  = 0 && $Z != 0 ::= $Y = 0 && $X != 0 && $Z != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_1, "$X != 0 && $Y != 0 && $Z  = 0 ::= $Z = 0 && $X != 0 && $Y != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_2, "$Z != 0 && $X  = 0 && $Y != 0 ::= $X = 0 && $Z != 0 && $Y != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_3, "$Z != 0 && $X != 0 && $Y  = 0 ::= $Z != 0 && $Y = 0 && $X != 0.")
-RULE(BF_POSITIVE_LITERAL_UPWARDS_4, "$X != 0 && $Y  = 0 ::= $Y = 0 && $X != 0.")
-RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 
 // TODO (LOW) delete trivial quantified formulas (i.e. ∀x. F = no_x..., ).
 
-template<typename... BAs>
-// TODO (LOW) rename library with rwsys or another name
-static auto apply_defs = make_library<BAs...>(
-	// wff defs
-	WFF_DEF_XOR
-	+ WFF_DEF_CONDITIONAL
-	+ WFF_DEF_IMPLY
-	+ WFF_DEF_EQUIV
-	// bf defs
-	+ BF_DEF_XOR
-);
-
-template<typename... BAs>
-static auto apply_wff_defs = make_library<BAs...>(
-	WFF_DEF_XOR
-	+ WFF_DEF_CONDITIONAL
-	+ WFF_DEF_IMPLY
-	+ WFF_DEF_EQUIV
-);
-
-template<typename... BAs>
-static auto apply_bf_defs = make_library<BAs...>(
-	BF_DEF_XOR
-);
-
-template<typename... BAs>
-static auto apply_defs_once = make_library<BAs...>(
-	// wff defs
-	BF_DEF_LESS_EQUAL
-	+ BF_DEF_LESS
-	+ BF_DEF_GREATER
-	+ BF_DEF_INTERVAL
-	+ BF_DEF_NOT_LESS_EQUAL
-	+ BF_DEF_EQ
-	+ BF_DEF_NEQ
-);
 
 template<typename... BAs>
 static auto to_dnf_bf = make_library<BAs...>(
@@ -211,7 +85,12 @@ static auto to_dnf_bf = make_library<BAs...>(
 	+ BF_TO_DNF_1
 	+ BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
-	+ BF_ELIM_DOUBLE_NEGATION_0
+);
+
+template<typename... BAs>
+static auto nnf_to_dnf_bf = make_library<BAs...>(
+	BF_TO_DNF_0
+	+ BF_TO_DNF_1
 );
 
 template<typename... BAs>
@@ -240,81 +119,14 @@ static auto to_dnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_PUSH_NEGATION_INWARDS_4
 	+ WFF_PUSH_NEGATION_INWARDS_5
-	+ WFF_ELIM_DOUBLE_NEGATION_0
 	+ WFF_PUSH_ALWAYS_INWARDS
 	+ WFF_PUSH_SOMETIMES_INWARDS
 );
 
 template<typename... BAs>
-static auto simplify_bf = make_library<BAs...>(
-	BF_SIMPLIFY_ONE_0
-	+ BF_SIMPLIFY_ONE_1
-	+ BF_SIMPLIFY_ONE_2
-	+ BF_SIMPLIFY_ONE_3
-	+ BF_SIMPLIFY_ONE_4
-	+ BF_SIMPLIFY_ZERO_0
-	+ BF_SIMPLIFY_ZERO_1
-	+ BF_SIMPLIFY_ZERO_2
-	+ BF_SIMPLIFY_ZERO_3
-	+ BF_SIMPLIFY_ZERO_4
-	+ BF_SIMPLIFY_SELF_0
-	+ BF_SIMPLIFY_SELF_1
-	+ BF_SIMPLIFY_SELF_2
-	+ BF_SIMPLIFY_SELF_3
-	+ BF_SIMPLIFY_SELF_4
-	+ BF_SIMPLIFY_SELF_5
-);
-
-template<typename... BAs>
-static auto simplify_bf_more = make_library<BAs...>(
-	BF_ELIM_DOUBLE_NEGATION_0 +
-	BF_DEF_XOR
-);
-
-template<typename... BAs>
 static auto simplify_wff = make_library<BAs...>(
-	WFF_SIMPLIFY_ONE_0
-	+ WFF_SIMPLIFY_ONE_1
-	+ WFF_SIMPLIFY_ONE_2
-	+ WFF_SIMPLIFY_ONE_3
-	+ WFF_SIMPLIFY_ONE_4
-	+ WFF_SIMPLIFY_ONE_5
-	+ WFF_SIMPLIFY_ONE_6
-	+ WFF_SIMPLIFY_ZERO_0
-	+ WFF_SIMPLIFY_ZERO_1
-	+ WFF_SIMPLIFY_ZERO_2
-	+ WFF_SIMPLIFY_ZERO_3
-	+ WFF_SIMPLIFY_ZERO_4
-	+ WFF_SIMPLIFY_ZERO_5
-	+ WFF_SIMPLIFY_ZERO_6
-	+ WFF_SIMPLIFY_SELF_0
-	+ WFF_SIMPLIFY_SELF_1
-	+ WFF_SIMPLIFY_SELF_2
-	+ WFF_SIMPLIFY_SELF_3
-	+ WFF_SIMPLIFY_SELF_4
-	+ WFF_SIMPLIFY_SELF_5
-	+ WFF_SIMPLIFY_SOMETIMES_1
-	+ WFF_SIMPLIFY_SOMETIMES_2
-	+ WFF_SIMPLIFY_SOMETIMES_3
-	+ WFF_SIMPLIFY_ALWAYS_1
-	+ WFF_SIMPLIFY_ALWAYS_2
+	WFF_SIMPLIFY_SOMETIMES_3
 	+ WFF_SIMPLIFY_ALWAYS_3
-);
-
-template<typename... BAs>
-static auto apply_cb = make_library<BAs...>(
-	BF_CALLBACK_AND
-	+ BF_CALLBACK_OR
-	+ BF_CALLBACK_XOR
-	+ BF_CALLBACK_NEG
-	/*+ BF_PUSH_CTES_UPWARDS_0
-	+ BF_PUSH_CTES_UPWARDS_1
-	+ BF_PUSH_CTES_UPWARDS_2
-	+ BF_PUSH_CTES_UPWARDS_3
-	+ BF_PUSH_CTES_UPWARDS_4
-	+ BF_PUSH_CTES_UPWARDS_5
-	+ BF_PUSH_CTES_UPWARDS_6
-	+ BF_PUSH_CTES_UPWARDS_7*/
 );
 
 template<typename... BAs>
@@ -323,43 +135,11 @@ static auto apply_normalize = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto elim_bf_constant_01 = make_library<BAs...>(
-	BF_CALLBACK_IS_ONE
-	+ BF_CALLBACK_IS_ZERO
-);
-
-template<typename... BAs>
-static auto elim_trivial_eqs = make_library<BAs...>(
-	BF_EQ_SIMPLIFY_0
-	+ BF_EQ_SIMPLIFY_1
-	+ BF_NEQ_SIMPLIFY_0
-	+ BF_NEQ_SIMPLIFY_1
-	// + BF_EQ_AND_SIMPLIFY_0
-	// + BF_EQ_AND_SIMPLIFY_1
-	// + BF_EQ_OR_SIMPLIFY_0
-	// + BF_EQ_OR_SIMPLIFY_1
-);
-
-template<typename... BAs>
 static auto elim_eqs = make_library<BAs...>(
-	BF_CALLBACK_EQ
-	+ BF_CALLBACK_NEQ
-	+ BF_EQ_SIMPLIFY_0
-	+ BF_EQ_SIMPLIFY_1
-	+ BF_NEQ_SIMPLIFY_0
-	+ BF_NEQ_SIMPLIFY_1
-	+ BF_EQ_AND_SIMPLIFY_0
+	BF_EQ_AND_SIMPLIFY_0
 	+ BF_EQ_AND_SIMPLIFY_1
 	+ BF_EQ_OR_SIMPLIFY_0
 	+ BF_EQ_OR_SIMPLIFY_1
-);
-
-template<typename... BAs>
-static auto trivialities = make_library<BAs...>(
-	BF_EQ_SIMPLIFY_0
-	+ BF_EQ_SIMPLIFY_1
-	+ BF_NEQ_SIMPLIFY_0
-	+ BF_NEQ_SIMPLIFY_1
 );
 
 template<typename... BAs>
@@ -367,15 +147,12 @@ static auto push_neg_for_snf = make_library<BAs...>(
 	WFF_PUSH_NEGATION_UPWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_1
-	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
 static auto simplify_snf = repeat_all<step<BAs...>, BAs...>(
-	apply_cb<BAs...>
-	| elim_eqs<BAs...>
+	elim_eqs<BAs...>
 	| simplify_wff<BAs...>
-	| trivialities<BAs...>
 	| push_neg_for_snf<BAs...>);
 
 template<typename... BAs>
@@ -387,7 +164,6 @@ template<typename... BAs>
 static auto fix_neg_in_snf = make_library<BAs...>(
 	WFF_PUSH_NEGATION_INWARDS_2
 	+ WFF_PUSH_NEGATION_INWARDS_3
-	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename... BAs>
@@ -416,7 +192,6 @@ static auto to_cnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_PUSH_NEGATION_INWARDS_4
 	+ WFF_PUSH_NEGATION_INWARDS_5
-	+ WFF_ELIM_DOUBLE_NEGATION_0
 	+ WFF_PUSH_ALWAYS_INWARDS
 	+ WFF_PUSH_SOMETIMES_INWARDS
 );
@@ -427,7 +202,6 @@ static auto to_cnf_bf = make_library<BAs...>(
 	+ BF_TO_CNF_1
 	+ BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
-	+ BF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename...BAs>
@@ -438,15 +212,24 @@ static auto to_nnf_wff = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_3
 	+ WFF_PUSH_NEGATION_INWARDS_4
 	+ WFF_PUSH_NEGATION_INWARDS_5
-	+ WFF_ELIM_DOUBLE_NEGATION_0
 );
 
 template<typename...BAs>
 static auto to_nnf_bf = make_library<BAs...>(
 	BF_PUSH_NEGATION_INWARDS_0
 	+ BF_PUSH_NEGATION_INWARDS_1
-	+ BF_ELIM_DOUBLE_NEGATION_0
 );
+
+// --------------------------------------------------------------
+// General operator for nso<BAs...> function application by pipe
+template<typename... BAs>
+using nso_transform = nso<BAs...>(*)(const nso<BAs...>&);
+
+template<typename... BAs>
+nso<BAs...> operator| (const nso<BAs...>& fm, const nso_transform<BAs...> func) {
+	return func(fm);
+}
+// --------------------------------------------------------------
 
 template<typename... BAs>
 struct bf_reduce_canonical;
@@ -764,34 +547,24 @@ static const auto is_not_eq_or_neq_to_zero_predicate = [](const nso<BAs...>& n) 
 template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
-// TODO (LOW) wthis should be converted into a struct
-template<typename... BAs>
-nso<BAs...> apply_once_definitions(const nso<BAs...>& form) {
-	return nso_rr_apply_if(apply_defs_once<BAs...>, form, is_not_eq_or_neq_to_zero_predicate<BAs...>);
-}
-
 template<typename...BAs>
 std::optional<nso<BAs...>> onf(const nso<BAs...>& n, const nso<BAs...>& var) {
 	// FIXME take into account quiantifiers
-	return apply_once_definitions(n)
-		| apply_defs<BAs...> // needed to remove some definitions in bf's
+	return n
 		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
 		| onf_wff<BAs...>(var)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>
-			| trivialities<BAs...>);
+			| simplify_wff<BAs...>);
 }
 
 template<typename...BAs>
 nso<BAs...> dnf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	auto nform = apply_once_definitions(nn)
+	auto nform = nn
 		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_dnf_wff<BAs...>
+			to_dnf_wff<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
 	auto dnf = dnf_bf(nform);
@@ -801,13 +574,8 @@ nso<BAs...> dnf_wff(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> dnf_bf(const nso<BAs...>& n) {
-	return apply_once_definitions(n)
-		| repeat_all<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
+	return n | repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
@@ -816,12 +584,9 @@ nso<BAs...> dnf_bf(const nso<BAs...>& n) {
 template<typename...BAs>
 nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 	auto [var, nn] = get_inner_quantified_wff(n);
-	auto wff = apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_cnf_wff<BAs...>
+	auto wff = nn | repeat_each<step<BAs...>, BAs...>(
+			to_cnf_wff<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
 	auto cnf = cnf_bf(wff);
@@ -832,12 +597,9 @@ nso<BAs...> cnf_wff(const nso<BAs...>& n) {
 template<typename...BAs>
 nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 	return n
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
+
 		| repeat_all<step<BAs...>, BAs...>(
 			to_cnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
@@ -845,13 +607,8 @@ nso<BAs...> cnf_bf(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> nnf_bf(const nso<BAs...>& n) {
-	return apply_once_definitions(n)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
+	return n | repeat_all<step<BAs...>, BAs...>(
 			to_nnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
@@ -860,12 +617,9 @@ nso<BAs...> nnf_bf(const nso<BAs...>& n) {
 template<typename...BAs>
 nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	auto nform = apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_nnf_wff<BAs...>
+	auto nform = nn | repeat_each<step<BAs...>, BAs...>(
+			to_nnf_wff<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 		);
 	// finally, we also simplify the bf part of the formula
 	auto nnf = nnf_bf(nform);
@@ -991,15 +745,21 @@ void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const in
 	}
 }
 
+template<typename... BAs>
+nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf = false, bool all_reductions = true);
+
 // Create assignment in formula and reduce resulting clause
 template<typename... BAs>
 bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, vector<int_t>& i, auto& dnf, int_t p) {
 	// Check if all variables are assigned
 	if((int_t)vars.size() == p) {
 		// Normalize tau subformulas
-		auto fm_simp = fm | repeat_once<step<BAs...>, BAs...>(apply_normalize<BAs...>)
-							| repeat_once<step<BAs...>, BAs...>(elim_bf_constant_01<BAs...>)
-							| repeat_all<step<BAs...>, BAs...>(simplify_bf<BAs...>);
+		auto fm_simp = fm
+					| (nso_transform<BAs...>)normalize_ba<BAs...>
+		 			| repeat_all<step<BAs...>, BAs...>(to_nnf_bf<BAs...>)
+		 			| repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_bf<BAs...>);
+		// Simplify coefficient
+		fm_simp = reduce2(fm_simp, tau_parser::bf);
 
 		// Do not add to dnf if the coefficient is 0
 		if(is_non_terminal(tau_parser::bf_f, fm_simp->child[0]))
@@ -1026,11 +786,9 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	// Substitute 1 and 0 for v and simplify
 	const auto& v = vars[p];
 	map<nso<BAs...>, nso<BAs...>> c = {{v, _1<BAs...>}};
-	auto fm_v1 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(
-			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
+	auto fm_v1 = replace(fm, c);
 	c = {{v, _0<BAs...>}};
-	auto fm_v0 = replace(fm, c) | repeat_all<step<BAs...>, BAs...>(
-			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
+	auto fm_v0 = replace(fm, c);
 
 	elim_vars_in_assignment<BAs...>(fm_v1, vars, i, p);
 	if(fm_v1 == fm_v0) {
@@ -1056,7 +814,17 @@ template<typename... BAs>
 nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoint = false) {
 	// Function can only be applied to a BF
 	assert(is_non_terminal(tau_parser::bf, fm));
-
+#ifdef TAU_CACHE
+	static map<nso<BAs...>, nso<BAs...>> bf_cache_disjoint;
+	static map<nso<BAs...>, nso<BAs...>> bf_cache_nondisjoint;
+	if (make_paths_disjoint) {
+		if (auto it = bf_cache_disjoint.find(fm);
+			it != bf_cache_disjoint.end()) return it->second;
+	} else {
+		if (auto it = bf_cache_nondisjoint.find(fm);
+			it != bf_cache_nondisjoint.end()) return it->second;
+	}
+#endif //TAU_CACHE
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
 	auto vars = select_top(fm, is_child_non_terminal<tau_parser::variable, BAs...>);
@@ -1069,8 +837,7 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 	map<nso<BAs...>, vector<vector<int_t>>> dnf;
 
 	//Simplify formula as initial step
-	auto fm_simp = fm | repeat_all<step<BAs...>, BAs...>(
-			simplify_bf<BAs...> | simplify_bf_more<BAs...> | apply_cb<BAs...>);
+	auto fm_simp = fm;
 
 	if(assign_and_reduce(fm_simp, vars, i, dnf, 0)) {
 		assert(dnf.size() == 1);
@@ -1108,6 +875,16 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 				build_bf_or(reduced_dnf, build_bf_and(coeff, var_path));
 		}
 	}
+#ifdef TAU_CACHE
+	if (make_paths_disjoint) {
+		bf_cache_disjoint.emplace(fm, reduced_dnf);
+		bf_cache_disjoint.emplace(reduced_dnf, reduced_dnf);
+	}
+	else {
+		bf_cache_nondisjoint.emplace(fm, reduced_dnf);
+		bf_cache_nondisjoint.emplace(reduced_dnf, reduced_dnf);
+	}
+#endif //TAU_CACHE
 	return reduced_dnf;
 }
 
@@ -1169,44 +946,39 @@ inline bool is_contained_in (const vector<int_t>& i, auto& paths) {
 	return false;
 }
 
-// Assume that fm is in DNF (or CNF -> set is_cnf to true)
-// Note that Boolean equations are not simplified!
 template<typename... BAs>
-nso<BAs...> reduce2_wff (const nso<BAs...>& fm, bool is_cnf = false, bool all_reductions = true) {
-	auto is_var = [](const auto& n) {
-		using tp = tau_parser;
-		assert(!is_non_terminal(tp::bf_neq, n));
-		return is_child_non_terminal(tp::bf_eq, n) || is_child_non_terminal(tp::wff_ref, n) ||
-			 is_child_non_terminal(tp::uninterpreted_constant, n) || is_child_non_terminal(tp::wff_ex, n) ||
-			 	is_child_non_terminal(tp::wff_sometimes, n) || is_child_non_terminal(tp::wff_always, n) ||
-			 		is_child_non_terminal(tp::wff_all, n);
-	};
-	// Pull negation out of equality
-	auto new_fm = fm | repeat_all<step<BAs...>, BAs...>(neq_to_eq<BAs...>);
-	vector<nso<BAs...>> vars = select_top(new_fm, is_var);
-	if (vars.empty()) return fm | repeat_all<step<BAs...>,BAs...>(simplify_wff<BAs...>);
-
-	map<nso<BAs...>, int_t> var_pos;
-	for (int_t k=0; k < (int_t)vars.size(); ++k)
-		var_pos.emplace(vars[k], k);
-
+vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff, const auto& is_var, int_t var_size, auto& var_pos,
+	bool& decided, bool is_cnf, bool all_reductions) {
 	vector<vector<int_t>> paths;
-	bool unsat = true;
-	for (const auto& clause : get_leaves(new_fm, is_cnf ? tau_parser::wff_and : tau_parser::wff_or, tau_parser::wff)) {
-		vector<int_t> i (vars.size());
-		for (int_t k = 0; k < (int_t)vars.size(); ++k) i[k] = 2;
-		bool clause_is_unsat = false;
+	using tp = tau_parser;
+	for (const auto& clause : get_leaves(new_fm, is_cnf ? (wff ? tp::wff_and : tp::bf_and) :
+							(wff ? tp::wff_or : tp::bf_or), wff ? tp::wff : tp::bf)) {
+		vector<int_t> i (var_size);
+		for (int_t k = 0; k < var_size; ++k) i[k] = 2;
+		bool clause_is_decided = false;
 		auto var_assigner = [&](const nso<BAs...>& n) {
-			if (clause_is_unsat) return false;
-			if (is_non_terminal(tau_parser::wff_f, n)) {
-				clause_is_unsat = true;
+			if (clause_is_decided) return false;
+			if (!is_cnf && is_non_terminal(wff ? tp::wff_f : tp::bf_f, n)) {
+				clause_is_decided = true;
 				return false;
 			}
-			if (is_non_terminal(tau_parser::wff_neg, n)) {
+			if (is_cnf && is_non_terminal(wff ? tp::wff_t : tp::bf_t, n)) {
+				clause_is_decided = true;
+				return false;
+			}
+			if (is_non_terminal(wff ? tp::wff_neg : tp::bf_neg, n)) {
 				auto v = trim(n);
+				// Check if v is a T/F or 1/0
+                if (v == _T<BAs...> || v == _1<BAs...>) {
+                    if (!is_cnf) clause_is_decided = true;
+                    return false;
+                } else if (v == _F<BAs...> || v == _0<BAs...>) {
+                    if (is_cnf) clause_is_decided = true;
+                    return false;
+                }
 				if (i[var_pos[v]] == 1) {
-					// clause is false
-					clause_is_unsat = true;
+					// clause is false for DNF, true for CNF
+					clause_is_decided = true;
 					return false;
 				}
 				i[var_pos[v]] = 0;
@@ -1214,8 +986,8 @@ nso<BAs...> reduce2_wff (const nso<BAs...>& fm, bool is_cnf = false, bool all_re
 			}
 			if (is_var(n)) {
 				if (i[var_pos[n]] == 0) {
-					// clause is false
-					clause_is_unsat = true;
+					// clause is false for DNF, true for CNF
+					clause_is_decided = true;
 					return false;
 				}
 				i[var_pos[n]] = 1;
@@ -1223,31 +995,28 @@ nso<BAs...> reduce2_wff (const nso<BAs...>& fm, bool is_cnf = false, bool all_re
 			}
 			else return true;
 		};
-		post_order_traverser<identity_t<nso<BAs...>>, decltype(var_assigner), nso<BAs...>>
-			(rewriter::identity<nso<BAs...>>, var_assigner)(clause);
-		if (clause_is_unsat) continue;
-		if (ranges::all_of(i, [](const auto el) {return el == 2;}))
-			return is_cnf ? _F<BAs...> : _T<BAs...>;
+		post_order_traverser<identity_t, decltype(var_assigner), nso<BAs...>>
+			(rewriter::identity, var_assigner)(clause);
+		if (clause_is_decided) continue;
 		// There is at least one satisfiable clause
-		unsat = false;
+		decided = false;
+		if (ranges::all_of(i, [](const auto el) {return el == 2;})) return {};
+
 		if (is_contained_in(i, paths)) continue;
 		if (all_reductions) {
-			if (!reduce_paths(i, paths, vars.size())) paths.emplace_back(move(i));
+			if (!reduce_paths(i, paths, var_size)) paths.emplace_back(move(i));
 			else {
 				erase_if(paths, [](const auto& v){return v.empty();});
-				if (paths.empty())
-					return is_cnf ? _F<BAs...> : _T<BAs...>;
+				if (paths.empty()) return {};
 			}
 		} else paths.emplace_back(move(i));
 	}
+	return paths;
+}
 
-	if (paths.empty()) {
-		if (unsat) return is_cnf ? _T<BAs...> : _F<BAs...>;
-		else return is_cnf ? _F<BAs...> : _T<BAs...>;
-	}
-	if (all_reductions) join_paths(paths);
-
-	nso<BAs...> reduced_wff;
+template<typename... BAs>
+nso<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_cnf, bool wff) {
+	nso<BAs...> reduced_fm;
 	bool first = true;
 	for (const auto& path : paths) {
 		if (path.empty()) continue;
@@ -1256,33 +1025,102 @@ nso<BAs...> reduce2_wff (const nso<BAs...>& fm, bool is_cnf = false, bool all_re
         for (size_t k=0; k < vars.size(); ++k) {
             if (path[k] == 2) continue;
             if (first_var) var_path = path[k] == 1 ? vars[k] :
-                build_wff_neg(vars[k]), first_var = false;
+                wff ? build_wff_neg(vars[k]) : build_bf_neg(vars[k]), first_var = false;
             else {
-                if (!is_cnf)
-                    var_path = path[k] == 1 ? build_wff_and(var_path, vars[k]) :
-                        build_wff_and(var_path, build_wff_neg(vars[k]));
-                else var_path = path[k] == 1 ? build_wff_or(var_path, vars[k]) :
-                        build_wff_or(var_path, build_wff_neg(vars[k]));
+                if (!is_cnf) {
+	                if (wff)
+	                	var_path = path[k] == 1 ? build_wff_and(var_path, vars[k]) :
+				build_wff_and(var_path, build_wff_neg(vars[k]));
+                	else var_path = path[k] == 1 ? build_bf_and(var_path, vars[k]) :
+                		build_bf_and(var_path, build_bf_neg(vars[k]));
+                }
+                else {
+                	if (wff)
+				var_path = path[k] == 1 ? build_wff_or(var_path, vars[k]) :
+				build_wff_or(var_path, build_wff_neg(vars[k]));
+                	else var_path = path[k] == 1 ? build_bf_or(var_path, vars[k]) :
+                		build_bf_or(var_path, build_bf_neg(vars[k]));
+                }
             }
         }
-        if (first) reduced_wff = var_path, first = false;
-        else reduced_wff = is_cnf ? build_wff_and(reduced_wff, var_path)
-                            : build_wff_or(reduced_wff, var_path);
+        if (first) reduced_fm = var_path, first = false;
+        else reduced_fm = is_cnf ? ( wff ? build_wff_and(reduced_fm, var_path) : build_bf_and(reduced_fm, var_path))
+                            : ( wff ? build_wff_or(reduced_fm, var_path) : build_bf_or(reduced_fm, var_path));
 	}
-	return reduced_wff | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>);
+	return reduced_fm;
+}
+
+// Assume that fm is in DNF (or CNF -> set is_cnf to true)
+template<typename... BAs>
+nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_reductions) {
+	auto is_var_wff = [](const auto& n) {
+		using tp = tau_parser;
+		assert(!is_non_terminal(tp::bf_neq, n));
+		return is_child_non_terminal(tp::bf_eq, n) || is_child_non_terminal(tp::wff_ref, n) ||
+			 is_child_non_terminal(tp::uninterpreted_constant, n) || is_child_non_terminal(tp::wff_ex, n) ||
+			 	is_child_non_terminal(tp::wff_sometimes, n) || is_child_non_terminal(tp::wff_always, n) ||
+			 		is_child_non_terminal(tp::wff_all, n);
+	};
+	auto is_var_bf = [](const auto& n) {
+		using tp = tau_parser;
+		return is_child_non_terminal(tp::variable, n) || is_child_non_terminal(tp::bf_ref, n) ||
+			is_child_non_terminal(tp::bf_constant, n);
+	};
+	assert(is_non_terminal(type, fm));
+	// Pull negation out of equality
+	bool wff = type == tau_parser::wff;
+	auto new_fm = wff ? fm | repeat_all<step<BAs...>, BAs...>(neq_to_eq<BAs...>) : fm;
+	vector<nso<BAs...>> vars = select_top(new_fm, is_var_wff);
+	if (vars.empty()) {
+		if (wff) return fm | repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>);
+		else return fm;
+	}
+
+	map<nso<BAs...>, int_t> var_pos;
+	for (int_t k=0; k < (int_t)vars.size(); ++k)
+		var_pos.emplace(vars[k], k);
+
+	bool decided = true;
+	auto paths = wff ? collect_paths(new_fm, wff, is_var_wff, vars.size(), var_pos,
+				decided, is_cnf, all_reductions) :
+			   collect_paths(new_fm, wff, is_var_bf, vars.size(), var_pos,
+				decided, is_cnf, all_reductions);
+
+	if (paths.empty()) {
+		if (decided) return is_cnf ? (wff ? _T<BAs...> : _1<BAs...>) : (wff ? _F<BAs...> : _0<BAs...>);
+		else return is_cnf ? (wff ? _F<BAs...> : _0<BAs...>) : (wff ? _T<BAs...> : _1<BAs...>);
+	}
+	if (all_reductions) join_paths(paths);
+
+	auto reduced_fm = build_reduced_formula<BAs...>(paths, vars, is_cnf, wff);
+	return wff ? reduced_fm | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>) : reduced_fm;
 }
 
 template<typename... BAs>
 struct wff_reduce_dnf {
 	nso<BAs...> operator() (const nso<BAs...>& fm) const {
-		return reduce2_wff(fm);
+#ifdef TAU_CACHE
+		static map<nso<BAs...>, nso<BAs...>> cache;
+		if (auto it=cache.find(fm); it!=cache.end()) return it->second;
+		auto r = reduce2(fm, tau_parser::wff);
+		cache.emplace(fm, r);
+		return cache.emplace(r, r).first->second;
+#endif //TAU_CACHE
+		return reduce2(fm, tau_parser::wff);
 	}
 };
 
 template<typename... BAs>
 struct wff_reduce_cnf {
 	nso<BAs...> operator() (const nso<BAs...>& fm) const {
-		return reduce2_wff(fm, true);
+#ifdef TAU_CACHE
+		static map<nso<BAs...>, nso<BAs...>> cache;
+		if (auto it=cache.find(fm); it!=cache.end()) return it->second;
+		auto r = reduce2(fm, tau_parser::wff, true);
+		cache.emplace(fm, r);
+		return cache.emplace(r, r).first->second;
+#endif //TAU_CACHE
+		return reduce2(fm, tau_parser::wff, true);
 	}
 };
 
@@ -1583,6 +1421,215 @@ template<typename... BAs>
 nso<BAs...> operator|(const nso<BAs...>& fm, const sometimes_always_normalization<BAs...>& r) {
 	return r(fm);
 }
+
+template<typename... BAs>
+nso<BAs...> wff_remove_existential(const nso<BAs...>& var, const nso<BAs...>& wff) {
+	auto squeeze_positives = [](const nso<BAs...>& n) -> std::optional<nso<BAs...>>{
+		if (auto positives = select_top(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
+				positives.size() > 0) {
+			std::set<sp_tau_node<BAs...>> bfs;
+			for (auto& p: positives)
+				bfs.insert(p | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>);
+			return build_bf_or<BAs...>(bfs);
+		}
+		return {};
+	};
+	// Following Corollary 2.3 from Taba book from Ohad
+	auto is_var = [&var](const auto& node){return node == var;};
+	// if var does not appear in the formula, we can return the formula as is
+	// if (!find_top(wff, is_var)) return wff;
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+	for (const auto& l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
+		// if var does not appear in the clause, we can skip it
+		if (!find_top(l, is_var)) continue;
+		// Get each conjunct in clause
+		nso<BAs...> nl = _T<BAs...>;
+		bool is_quant_removable_in_clause = true;
+		for (const auto& conj : get_leaves(l, tau_parser::wff_and, tau_parser::wff)) {
+			// Check if conjunct is of form = 0 or != 0
+			if ((conj | tau_parser::bf_eq) || (conj | tau_parser::bf_neq))
+				continue;
+			// If the conjunct contains the quantified variable at this point
+			// we cannot resolve the quantifier in this clause
+			if (find_top(conj, is_var)) {
+				is_quant_removable_in_clause = false;
+				break;
+			}
+			// conjunct does not depend on var
+			nl = build_wff_and(nl, conj);
+		}
+		if (!is_quant_removable_in_clause) {
+			// Since we cannot remove the quantifier in this
+			// clause it needs to be maintained
+			changes[l] = build_wff_ex(var, l);
+			continue;
+		}
+
+		auto f = squeeze_positives(l);
+		std::map<nso<BAs...>, nso<BAs...>> changes_0 = {{var, _0_trimmed<BAs...>}};
+		std::map<nso<BAs...>, nso<BAs...>> changes_1 = {{var, _1_trimmed<BAs...>}};
+		auto f_0 = f ? replace(f.value(), changes_0) : _0<BAs...>;
+		auto f_1 = f ? replace(f.value(), changes_1) : _0<BAs...>;
+
+		if (auto neqs = select_all(l, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
+			auto nneqs = _T<BAs...>;
+			for (auto& neq: neqs) {
+				auto g = neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
+				auto g_0 = replace(g, changes_0);
+				auto g_1 = replace(g, changes_1);
+				nneqs = build_wff_and(nneqs, build_wff_neq(build_bf_or(
+					                      build_bf_and(build_bf_neg(f_1),	g_1),
+					                      build_bf_and(build_bf_neg(f_0),	g_0))));
+			}
+			nl = build_wff_and(nl, build_wff_and(build_wff_eq(build_bf_and(f_0, f_1)), nneqs));
+		} else if (f) {
+			nl = build_wff_and(nl, build_wff_eq(build_bf_and(f_0, f_1)));
+		}
+		changes[l] = nl;
+	}
+	return replace<nso<BAs...>>(wff, changes);
+}
+
+template<typename... BAs>
+nso<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_fm) {
+	scoped_fm = scoped_fm
+	            // Reductions to prevent blow ups and achieve DNF
+	            | bf_reduce_canonical<BAs...>()
+	            | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+	            | repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
+	            | wff_reduce_dnf<BAs...>();
+	auto clauses = get_leaves(scoped_fm, tau_parser::wff_or, tau_parser::wff);
+	nso<BAs...> res;
+	for (const auto& clause : clauses) {
+		// Check if every conjunct in clause is of form f = 0 or f != 0
+		auto conjuncts = get_leaves(clause, tau_parser::wff_and, tau_parser::wff);
+		bool all_equal_zero = true, all_unequal_zero = true;
+		for (const auto& c : conjuncts) {
+			if (!is_child_non_terminal(tau_parser::bf_eq, c))
+				all_equal_zero = false;
+			if (!is_child_non_terminal(tau_parser::bf_neq, c))
+				all_unequal_zero = false;
+		}
+		if (all_unequal_zero) {
+			nso<BAs...> new_conjunct;
+			// Push quantifier inside conjunction
+			for (const auto& c : conjuncts) {
+				auto new_c = wff_remove_existential(trim2(inner_fm), c);
+				if (new_conjunct) new_conjunct = build_wff_and(new_conjunct, new_c);
+				else new_conjunct = new_c;
+			}
+			if (res) res = build_wff_or(res, new_conjunct);
+			else res = new_conjunct;
+		}
+		if (all_equal_zero) {
+			nso<BAs...> new_func;
+			for (const auto& d: conjuncts) {
+				if (new_func) new_func = build_bf_or(new_func, trim2(d));
+				else new_func = trim2(d);
+			}
+			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
+			new_func = wff_remove_existential(trim2(inner_fm), new_func);
+			if (res) res = build_wff_or(res, new_func);
+			else res = new_func;
+		}
+		else {
+			// Resolve quantified variable in scoped_fm
+			if (res) res = build_wff_or(res, wff_remove_existential(trim2(inner_fm), clause));
+			else res = wff_remove_existential(trim2(inner_fm), clause);
+		}
+	}
+	return res;
+}
+
+template<typename... BAs>
+nso<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm) {
+	scoped_fm = scoped_fm
+	            // Reductions to prevent blow ups and achieve CNF
+	            | bf_reduce_canonical<BAs...>()
+	            | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+	            | repeat_all<step<BAs...>, BAs...>(nnf_to_cnf_wff<BAs...>)
+	            | wff_reduce_cnf<BAs...>();
+	auto clauses = get_leaves(scoped_fm, tau_parser::wff_and, tau_parser::wff);
+	nso<BAs...> res;
+	for (const auto &clause: clauses) {
+		// Check if every disjunct in clause is of form f = 0 or f != 0
+		auto disjuncts = get_leaves(clause, tau_parser::wff_or, tau_parser::wff);
+		bool all_equal_zero = true, all_unequal_zero = true;
+		for (const auto &d: disjuncts) {
+			if (!is_child_non_terminal(tau_parser::bf_eq, d))
+				all_equal_zero = false;
+			if (!is_child_non_terminal(tau_parser::bf_neq, d))
+				all_unequal_zero = false;
+		}
+		if (all_equal_zero) {
+			nso<BAs...> new_disjunct;
+			// Push quantifier inside disjunction
+			for (const auto &d: disjuncts) {
+				auto new_d = build_wff_neg(d) | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+				new_d = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_d))
+				        | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+				if (new_disjunct) new_disjunct = build_wff_or(new_disjunct, new_d);
+				else new_disjunct = new_d;
+			}
+			if (res) res = build_wff_and(res, new_disjunct);
+			else res = new_disjunct;
+		}
+		if (all_unequal_zero) {
+			nso<BAs...> new_func;
+			for (const auto &d: disjuncts) {
+				if (new_func) new_func = build_bf_or(new_func, trim2(d));
+				else new_func = trim2(d);
+			}
+			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
+			new_func = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_func))
+			           | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+			if (res) res = build_wff_and(res, new_func);
+			else res = new_func;
+		} else {
+			// Turn universal into existential quantifier and eliminate
+			auto new_clause = build_wff_neg(clause)
+			                  | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+			new_clause = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_clause))
+			             | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+			if (!res) res = new_clause;
+			else res = build_wff_and(res, new_clause);
+		}
+	}
+	return res;
+}
+
+// Pushes all universal and existential quantifiers as deep as possible into the formula
+template<typename... BAs>
+nso<BAs...> eliminate_quantifiers(const nso<BAs...>& fm) {
+	// Lambda is applied to nodes of fm in post order
+	auto elim_quant = [](nso<BAs...> inner_fm, const auto& child) -> nso<BAs...> {
+		// Update node according to current children
+		if (inner_fm->child != child) inner_fm = make_node(inner_fm->value, child);
+		// Find out if current node is a quantifier
+		bool is_ex_quant;
+		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm))
+			is_ex_quant = true;
+		else if (is_child_non_terminal(tau_parser::wff_all, inner_fm))
+			is_ex_quant = false;
+		else return inner_fm;
+
+		auto has_var = [&inner_fm](const auto& node)
+					{return node == trim2(inner_fm);};
+		auto scoped_fm = trim(inner_fm)->child[1];
+		if (!find_top(scoped_fm, has_var)) {
+			// If the scoped formula does not contain
+			// the quantified variable, remove the quantifier
+			return scoped_fm;
+		}
+		// Scoped formula contains the quantified variable
+		if (is_ex_quant) return eliminate_existential_quantifier<BAs...>(inner_fm, scoped_fm);
+		else return eliminate_universal_quantifier<BAs...>(inner_fm, scoped_fm);
+	};
+	auto is_not_bf = [](const nso<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
+	return post_order_recursive_traverser<nso<BAs...>>()(fm, is_not_bf, elim_quant);
+}
+
+
 
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.
@@ -1949,14 +1996,9 @@ nso<BAs...> operator|(const nso<BAs...>& n, const to_snf_step<BAs...>& r) {
 template<typename...BAs>
 nso<BAs...> snf_bf(const nso<BAs...>& n) {
 	// TODO (HIGH) give a proper implementation (call to_bdd...)
-	return apply_once_definitions(n)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| bf_reduce_canonical<BAs...>()
+	return n | bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
@@ -1970,18 +2012,14 @@ nso<BAs...> snf_bf(const nso<BAs...>& n) {
 template<typename...BAs>
 nso<BAs...> snf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	auto wo_defs = apply_once_definitions(nn)
-		| repeat_each<step<BAs...>, BAs...>(apply_wff_defs<BAs...>);
 	// in the first step we apply compute the SNF of the formula, as a result we get
 	// the formula in SNF with positive equal exponent literals sqeezed.
-	auto first_step = build_wff_neg(wo_defs)
+	auto first_step = build_wff_neg(nn)
 		| bf_reduce_canonical<BAs...>()
 		| repeat_all<step<BAs...>, BAs...>(
 			unsqueeze_wff<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 			| push_neg_for_snf<BAs...>)
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
 	// in the second step we compute the SNF of the negation of the the result
@@ -1990,10 +2028,8 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 	auto second_step = build_wff_neg(first_step)
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
 		| repeat_all<step<BAs...>, BAs...>(
-			apply_cb<BAs...>
-			| elim_eqs<BAs...>
+			elim_eqs<BAs...>
 			| simplify_wff<BAs...>
-			| trivialities<BAs...>
 			| fix_neg_in_snf<BAs...>)
 		| bf_reduce_canonical<BAs...>();
 	std::map<nso<BAs...>, nso<BAs...>> changes = {{nn, second_step}};
@@ -2010,10 +2046,8 @@ nso<BAs...> build_split_wff_using(tau_parser::nonterminal type, const nso<BAs...
 template<typename...BAs>
 nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
-	auto mnf = apply_once_definitions(nn)
-		| repeat_all<step<BAs...>, BAs...>(
-			apply_wff_defs<BAs...>
-			| to_dnf_wff<BAs...>
+	auto mnf = nn | repeat_all<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>
 			| to_mnf_wff<BAs...>)
 		| repeat_all<step<BAs...>, BAs...>(
 			to_mnf_wff<BAs...>)
@@ -2024,13 +2058,8 @@ nso<BAs...> mnf_wff(const nso<BAs...>& n) {
 
 template<typename...BAs>
 nso<BAs...> mnf_bf(const nso<BAs...>& n) {
-	return apply_once_definitions(n)
-		| repeat_each<step<BAs...>, BAs...>(
-			apply_bf_defs<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
+	return n | repeat_all<step<BAs...>, BAs...>(
 			to_dnf_bf<BAs...>
-			| simplify_bf<BAs...>
-			| apply_cb<BAs...>
 			| elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;

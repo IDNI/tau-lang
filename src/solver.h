@@ -99,10 +99,7 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 		std::cout << "g: " << g << std::endl;
 		std::cout << "h: " << h << std::endl;
 		#endif // DEBUG
-		auto gh = (g & h) | repeat_all<step<BAs...>, BAs...>(
-			elim_bf_constant_01<BAs...>
-			| simplify_bf<BAs...>);
-;
+		auto gh = (g & h);
 		auto solution = make_removed_vars_solution(vars, gh);
 		#ifdef DEBUG
 		std::cout << "gh: " << gh << std::endl;
@@ -175,7 +172,7 @@ public:
 				// we add the current choice to the list of choices...
 				choices.emplace_back(v, false, partial_bf, partial_minterm);
 				// ... and compute new values for the next one
-				partial_bf = replace_with(v, _0<BAs...>, partial_bf) | simplify_bf<BAs...>;
+				partial_bf = replace_with(v, _0<BAs...>, partial_bf);
 				partial_minterm = partial_minterm & ~v;
 			}
 			// if the current choices correspond to a proper minterm, we update the current
@@ -232,7 +229,7 @@ private:
 		auto cte =  choices.back().value
 			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
 			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
-		return (cte & choices.back().partial_minterm) | simplify_bf<BAs...>;
+		return (cte & choices.back().partial_minterm);
 	}
 
 	void make_next_choice() {
@@ -258,8 +255,8 @@ private:
 			choices[i].partial_minterm = (choices[i].value ? ~choices[i].var : choices[i].var) & partial_minterm;
 			partial_minterm = choices[i].partial_minterm;
 			partial_bf = choices[i].value
-				? replace_with(choices[i].var, _1<BAs...>, partial_bf) | simplify_bf<BAs...>
-				: replace_with(choices[i].var, _0<BAs...>, partial_bf) | simplify_bf<BAs...>;
+				? replace_with(choices[i].var, _1<BAs...>, partial_bf)
+				: replace_with(choices[i].var, _0<BAs...>, partial_bf);
 		}
 	}
 };

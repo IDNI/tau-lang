@@ -30,7 +30,7 @@ namespace testing = doctest;
 TEST_SUITE("make_library") {
 
 	TEST_CASE("make_library: one rule case") {
-		const auto sample = WFF_ELIM_DOUBLE_NEGATION_0;
+		const auto sample = BF_TO_DNF_0;
 		auto lib = make_library<Bool>(sample);
 		CHECK( lib.size() == 1 );
 	}
@@ -72,19 +72,11 @@ TEST_SUITE("make_library") {
 TEST_SUITE("callbacks") {
 
 
-	// TODO (MEDIUM) write tests for execution bf_and_cb
-	// TODO (MEDIUM) write tests for execution bf_or_cb
-	// TODO (MEDIUM) write tests for execution bf_xor_cb
-	// TODO (MEDIUM) write tests for execution bf_neg_cb
-	// TODO (MEDIUM) write tests for execution bf_is_zero_cb
-	// TODO (MEDIUM) write tests for execution bf_is_one_cb
 	// TODO (MEDIUM) write tests for execution bf_has_clashing_subformulas_cb
 	// TODO (MEDIUM) write tests for execution bf_has_subformula_cb
 	// TODO (MEDIUM) write tests for execution bf_remove_fexistential_cb
 	// TODO (MEDIUM) write tests for execution bf_remove_funiversal_cb
 
-	// TODO (MEDIUM) write tests for execution bf_eq_cb
-	// TODO (MEDIUM) write tests for execution bf_neq_cb
 	// TODO (MEDIUM) write tests for execution wff_remove_existential_cb
 	// TODO (MEDIUM) write tests for execution wff_remove_bexistential_cb
 	// TODO (MEDIUM) write tests for execution wff_remove_buniversal_cb.

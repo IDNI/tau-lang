@@ -20,6 +20,7 @@ set(TESTS
 	tau
 	variant_ba
 	normal_forms
+	make_node_hook
 )
 
 foreach(X IN LISTS TESTS)

@@ -126,8 +126,9 @@ struct bdd_factory {
 		if (auto cn = cache.find(src); cn != cache.end()) return
 			cn->second;
 		auto x = parse(src); // parse bdd from source
+		std::vector<sp_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>> children;
 		auto nn = make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(
-			tau_sym<tau_ba<bdd_binding>, bdd_binding>(x), {});
+			tau_sym<tau_ba<bdd_binding>, bdd_binding>(x), std::move(children));
 		return cache.emplace(src, nn).first->second; // cache and return
 	}
 

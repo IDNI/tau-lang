@@ -855,19 +855,19 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::wff_xor;
+			| tau_parser::wff_or;
 		CHECK( xor_formula.has_value() );
 	}
 
 	TEST_CASE("?") {
-		const char* sample = "$Z ? $Z : $Z.";
+		const char* sample = "$X ? $Y : $Z.";
 		auto src = make_tau_source(sample);
 		auto frml = make_statement(src);
 		auto xor_formula = frml
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::wff_conditional;
+			| tau_parser::wff_or;
 		CHECK( xor_formula.has_value() );
 	}
 
@@ -894,44 +894,45 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::bf_neq;
 		CHECK( eq_formula.has_value() );
 	}
+
 	TEST_CASE("<") {
-		const char* sample = " Z < Z .";
+		const char* sample = " X < Y .";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto less_rule = lib
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::bf_less;
+			| tau_parser::wff_and;
 		CHECK( less_rule.has_value() );
 	}
 
 	TEST_CASE("<=") {
-		const char* sample = " Z <= Z .";
+		const char* sample = " X <= Y .";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto less_equal_rule = lib
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::bf_less_equal;
+			| tau_parser::bf_eq;
 		CHECK( less_equal_rule.has_value() );
 	}
 
 	TEST_CASE(">") {
-		const char* sample = "Z > Z.";
+		const char* sample = "X > Y.";
 		auto src = make_tau_source(sample);
 		auto lib = make_statement(src);
 		auto greater_rule = lib
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::bf_greater;
+			| tau_parser::wff_neg;
 		CHECK( greater_rule.has_value() );
 	}
 
 	TEST_CASE("->") {
-		const char* sample = "$Z -> $Z ::= $Z.";
+		const char* sample = "$Z -> $X ::= $Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -941,12 +942,12 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
 			| tau_parser::wff
-			| tau_parser::wff_imply;
+			| tau_parser::wff_or;
 		CHECK( imply_rule.has_value() );
 	}
 
 	TEST_CASE("<->") {
-		const char* sample = "$Z <-> $Z ::= $Z.";
+		const char* sample = "$Z <-> $X ::= $Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -956,7 +957,7 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::wff_rule
 			| tau_parser::wff_matcher
 			| tau_parser::wff
-			| tau_parser::wff_equiv;
+			| tau_parser::wff_and;
 		CHECK( equiv_rule.has_value() );
 	}
 
@@ -1005,7 +1006,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("&") {
-		const char* sample = "Z & Z := Z.";
+		const char* sample = "Z & X := Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1020,7 +1021,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("|") {
-		const char* sample = "Z | Z := Z.";
+		const char* sample = "Z | X := Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1035,7 +1036,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 
 	TEST_CASE("+") {
-		const char* sample = "Z + Z := Z.";
+		const char* sample = "Z + X := Z.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1045,7 +1046,7 @@ TEST_SUITE("parsing bf formulas ") {
 			| tau_parser::bf_rule
 			| tau_parser::bf_matcher
 			| tau_parser::bf
-			| tau_parser::bf_xor;
+			| tau_parser::bf_or;
 		CHECK( xor_rule.has_value() );
 	}
 }
@@ -1166,84 +1167,21 @@ TEST_SUITE("parsing bindings ") {
 	}
 }
 
-TEST_SUITE("parsing callbacks ") {
-
-	TEST_CASE("bf_and_cb") {
-		const char* sample = "$X := bf_and_cb $X $X.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto and_cb = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf_and_cb;
-		CHECK( and_cb.has_value() );
-	}
-
-	TEST_CASE("bf_or_cb") {
-		const char* sample = "$X := bf_or_cb $X $X.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto or_cb = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf_or_cb;
-		CHECK( or_cb.has_value() );
-	}
-
-	TEST_CASE("bf_xor_cb") {
-		const char* sample = "$X := bf_xor_cb $X $X.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto xor_cb = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf_xor_cb;
-		CHECK( xor_cb.has_value() );
-	}
-
-	TEST_CASE("bf_neg_cb") {
-		const char* sample = "$X := bf_neg_cb $X.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto neg_cb = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf_neg_cb;
-		CHECK( neg_cb.has_value() );
-	}
-
-	// TODO (VERY_LOW) write tests for parsing bf_is_zero_cb
-	// TODO (VERY_LOW) write tests for parsing bf_is_one_cb
-	// TODO (VERY_LOW) write tests for parsing bf_has_clashing_subformulas_cb
-	// TODO (VERY_LOW) write tests for parsing bf_has_subformula_cb
-	// TODO (VERY_LOW) write tests for parsing bf_remove_fexistential_cb
-	// TODO (VERY_LOW) write tests for parsing bf_remove_funiversal_cb
-
-	// TODO (VERY_LOW) write tests for parsing bf_eq_cb
-	// TODO (VERY_LOW) write tests for parsing bf_neq_cb
-	// TODO (VERY_LOW) write tests for parsing wff_remove_existential_cb
-	// TODO (VERY_LOW) write tests for parsing wff_remove_bexistential_cb
-	// TODO (VERY_LOW) write tests for parsing wff_remove_buniversal_cb.
-	// TODO (VERY_LOW) write tests for parsing wff_has_clashing_subformulas_cb
-	// TODO (VERY_LOW) write tests for parsing wff_has_subformula_cb
-	//
-	// Callbacks are a crucial part of the execution of the normalizer and should
-	// be tested properly. However, they are extensively tested inderectly in
-	// other unit/integration tests. In any case, it is better to have explicit tests
-	// for each of them parsing.
-}
+// TODO (VERY_LOW) write tests for parsing bf_is_one_cb
+// TODO (VERY_LOW) write tests for parsing bf_has_clashing_subformulas_cb
+// TODO (VERY_LOW) write tests for parsing bf_has_subformula_cb
+// TODO (VERY_LOW) write tests for parsing bf_remove_fexistential_cb
+// TODO (VERY_LOW) write tests for parsing bf_remove_funiversal_cb
+// TODO (VERY_LOW) write tests for parsing wff_remove_existential_cb
+// TODO (VERY_LOW) write tests for parsing wff_remove_bexistential_cb
+// TODO (VERY_LOW) write tests for parsing wff_remove_buniversal_cb.
+// TODO (VERY_LOW) write tests for parsing wff_has_clashing_subformulas_cb
+// TODO (VERY_LOW) write tests for parsing wff_has_subformula_cb
+//
+// Callbacks are a crucial part of the execution of the normalizer and should
+// be tested properly. However, they are extensively tested inderectly in
+// other unit/integration tests. In any case, it is better to have explicit tests
+// for each of them parsing.
 
 TEST_SUITE("parsing rules") {
 	// TODO (VERY_LOW) writes tests for rules parsing
