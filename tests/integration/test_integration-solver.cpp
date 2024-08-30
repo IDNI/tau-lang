@@ -16,7 +16,7 @@
 #include "doctest.h"
 #include "nso_rr.h"
 #include "bdd_handle.h"
-#include "normalizer.h"
+#include "normal_forms.h"
 #include "solver.h"
 
 #include "test_integration_helpers-bdd.h"
@@ -27,16 +27,6 @@ using namespace idni::tau;
 namespace testing = doctest;
 
 /*TEST_SUITE("minterm_iterator") {
-
-	TEST_CASE("with no vars") {
-		const char* sample = "0 = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
-		minterm_iterator<bdd_test> it(sample_formula);
-		CHECK ( it == minterm_iterator<bdd_test>::end );
-	}
 
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
@@ -71,16 +61,6 @@ namespace testing = doctest;
 }
 
 TEST_SUITE("minterm_range") {
-
-	TEST_CASE("no var") {
-		const char* sample = "0 = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
-		minterm_range<bdd_test> range(sample_formula);
-		CHECK ( range.begin() == range.end() );
-	}
 
 	TEST_CASE("one var") {
 		const char* sample = "x = 0.";
@@ -124,16 +104,6 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		CHECK ( (it == minterm_inequality_system_iterator<bdd_test>::end) );
 	}
 
-	TEST_CASE("one inequality with no vars") {
-		const char* sample = "0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		inequality_system<bdd_test> sys; sys.insert(sample_formula);
-		minterm_inequality_system_iterator<bdd_test> it(sys);
-		CHECK ( it == minterm_inequality_system_iterator<bdd_test>::end );
-	}
-
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
 		auto sample_src = make_tau_source(sample);
@@ -163,17 +133,6 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		minterm_inequality_system_iterator<bdd_test> it(sys);
 		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<bdd_test>::end) n++;
 		CHECK ( n == 7 );
-	}
-
-	TEST_CASE("two inequalities with no vars") {
-		const char* sample = "0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		inequality_system<bdd_test> sys; sys.insert(sample_formula); sys.insert(sample_formula);
-		minterm_inequality_system_iterator<bdd_test> it(sys);
-		CHECK ( it == minterm_inequality_system_iterator<bdd_test>::end );
-
 	}
 
 	TEST_CASE("two inequalities with one var") {
@@ -227,17 +186,6 @@ TEST_SUITE("minterm_inequality_system_range") {
 		CHECK ( n == 0 );
 	}
 
-	TEST_CASE("one inequality with no vars") {
-		const char* sample = "0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		inequality_system<bdd_test> sys; sys.insert(sample_formula);
-		minterm_inequality_system_range<bdd_test> range(sys);
-		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
-		CHECK ( n == 0 );
-	}
-
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
 		auto sample_src = make_tau_source(sample);
@@ -269,17 +217,6 @@ TEST_SUITE("minterm_inequality_system_range") {
 		minterm_inequality_system_range<bdd_test> range(sys);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
 		CHECK ( n == 7 );
-	}
-
-	TEST_CASE("two inequalities with no vars") {
-		const char* sample = "0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		inequality_system<bdd_test> sys; sys.insert(sample_formula); sys.insert(sample_formula);
-		minterm_inequality_system_range<bdd_test> range(sys);
-		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
-		CHECK ( n == 0 );
 	}
 
 	TEST_CASE("two inequalities with one var") {
@@ -323,57 +260,59 @@ TEST_SUITE("minterm_inequality_system_range") {
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
 		CHECK ( n == 49 );
 	}
-}
+}*/
 
 TEST_SUITE("find_solution") {
 
-	TEST_CASE("with no vars") {
-		const char* sample = "0 = 0.";
-		auto sample_src = make_tau_source(sample);
+	bool test_find_solution(const char* sample) {
+		#ifdef DEBUG
+		std::cout << "FIND_SOLUTION: " << std::string(sample) << "\n";
+		#endif // DEBUG
+		auto src = make_tau_source(sample);
 		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.empty() );
+		nso<bdd_test> equality = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+		auto solution = find_solution(equality);
+		auto changes1 = solution;
+		auto sample1 = replace(equality, changes1);
+		auto check1 = snf_wff(sample1);
+		auto changes2 = solution;
+		auto sample2 = snf_wff(build_wff_neg(equality));
+		auto check2 = replace(sample2, changes2);
+		#ifdef DEBUG
+		std::cout << "SOLUTION: " << solution << "\n";
+		std::cout << "CHECK1: " << check1 << "\n";
+		std::cout << "CHECK2: " << check2 << "\n";
+		#endif // DEBUG
+		return (check1 == _T<bdd_test>) && (check2 == _F<bdd_test>);
 	}
 
 	TEST_CASE("one var: x = 0.") {
 		const char* sample = "x = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.size() == 1 );
-	}
-
-	TEST_CASE("one var: x | x' = 0.") {
-		const char* sample = "x | x' = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.size() == 0 );
+		CHECK ( test_find_solution(sample) );
 	}
 
 	TEST_CASE("two var: x | y = 0.") {
 		const char* sample = "x | y = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.size() == 2 );
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x | y' = 0.") {
+		const char* sample = "x | y' = 0.";
+		CHECK ( test_find_solution(sample) );
 	}
 
 	TEST_CASE("two var: x & y = 0.") {
 		const char* sample = "x & y = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.size() == 2 );
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x & y' = 0.") {
+		const char* sample = "x & y' = 0.";
+		CHECK ( test_find_solution(sample) );
 	}
 }
 
-TEST_SUITE("lgrs") {
+/*TEST_SUITE("lgrs") {
 
 	TEST_CASE("two var: x | y = 0.") {
 		const char* sample = "x | y = 0.";
@@ -409,7 +348,7 @@ TEST_SUITE("solve_minterm_system") {
 		auto solution = solve_minterm_system<bdd_test, bdd_test>(sample_system);
 		CHECK ( solution.size() == 1 );
 	}
-}*/
+}
 
 TEST_SUITE("solve_inequality_system") {
 
@@ -429,7 +368,7 @@ TEST_SUITE("solve_inequality_system") {
 
 }
 
-/*TEST_SUITE("solve_inequality_system") {
+TEST_SUITE("solve_inequality_system") {
 
 	TEST_CASE("one var: {bdd: a} x | {bdd: a} y != 0 && {bdd: a} y & {bdd: a} x != 0.") {
 		bdd_init<Bool>();

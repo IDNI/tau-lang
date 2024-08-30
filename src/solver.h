@@ -64,71 +64,60 @@ template<typename...BAs>
 solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const nso<BAs...>& gh) {
 	solution<BAs...> solution;
 	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
-	#ifdef DEBUG
-	std::cout << "originals solution: " << solution << std::endl;
-	#endif // DEBUG
 	auto remaing = select_top(gh, is_child_non_terminal<tau_parser::variable, BAs...>);
 	for (auto& v: remaing) solution.erase(v);
-	#ifdef DEBUG
-	std::cout << "remaing solution: " << solution << std::endl;
-	#endif // DEBUG
 	return solution;
 }
 
 template<typename...BAs>
 solution<BAs...> find_solution(const equality<BAs...>& eq) {
-	auto has_no_var = [](const nso<BAs...>& f) {
-		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
-	};
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
 	// Theorem 3.1. For f (x,X) = xg (X) + x′h (X), let Z be a zero of
 	// g (Z) h (Z) (which is guaranteed to exist by Boole’s consistency condition).
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
-	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+	auto has_no_var = [](const nso<BAs...>& f) {
+		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
+	};
+
 	#ifdef DEBUG
-	std::cout << "f: " << f << std::endl;
+	std::cout << "eq: " << eq << std::endl;
 	#endif // DEBUG
+
+	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
 		auto g = replace_with(vars[0], _1<BAs...>, f) | bf_reduce_canonical<BAs...>();
 		auto h = replace_with(vars[0], _0<BAs...>, f) | bf_reduce_canonical<BAs...>();
-		#ifdef DEBUG
-		std::cout << "g: " << g << std::endl;
-		std::cout << "h: " << h << std::endl;
-		#endif // DEBUG
 		auto gh = (g & h);
 		auto solution = make_removed_vars_solution(vars, gh);
-		#ifdef DEBUG
-		std::cout << "gh: " << gh << std::endl;
-		std::cout << "solution: " << solution << std::endl;
-		#endif // DEBUG
 		if (has_no_var(gh)) {
 			if (gh != _0<BAs...>) return {};
 			else {
-				solution[vars[0]] = h != _0<BAs...> ? h : ~g | bf_reduce_canonical<BAs...>();
+				auto changes = solution;
+				solution[vars[0]] = h != _0<BAs...> ? h : replace(~g, changes) | bf_reduce_canonical<BAs...>();
 				#ifdef DEBUG
-				std::cout << "solution: " << solution << std::endl;
+				std::cout << "solution: " << solution << "\n";
 				#endif // DEBUG
 				return solution;
 			}
 		}
 		if (auto restricted = find_solution(build_wff_eq(gh)); !restricted.empty()) {
-			#ifdef DEBUG
-			std::cout << "restricted: " << restricted << std::endl;
-			#endif // DEBUG
 			solution.insert(restricted.begin(), restricted.end());
 			if (auto nn = replace(h, restricted) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
 				solution[vars[0]] = nn;
 			else solution[vars[0]] = ~g | bf_reduce_canonical<BAs...>();
 			#ifdef DEBUG
-			std::cout << "solution: " << solution << std::endl;
+			std::cout << "solution: " << solution << "\n";
 			#endif // DEBUG
 			return solution;
 		}
 	}
+	#ifdef DEBUG
+	std::cout << "solution: {}\n";
+	#endif // DEBUG
 	return {};
 }
 
