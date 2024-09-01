@@ -867,7 +867,7 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::wff_or;
+			| tau_parser::wff_and;
 		CHECK( xor_formula.has_value() );
 	}
 

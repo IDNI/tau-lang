@@ -1903,7 +1903,7 @@ sp_tau_node<BAs...> build_wff_conditional(const sp_tau_node<BAs...>& x,
 	const sp_tau_node<BAs...>& y,
 	const sp_tau_node<BAs...>& z)
 {
-	return build_wff_or<BAs...>(build_wff_imply<BAs...>(x, y),
+	return build_wff_and<BAs...>(build_wff_imply<BAs...>(x, y),
 		build_wff_imply<BAs...>(build_wff_neg<BAs...>(x), z));
 }
 
@@ -2962,11 +2962,10 @@ sp_tau_node<BAs...> make_node_hook_cte(const node<tau_sym<BAs...>>& n) {
 	//RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 1.")
 	//RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 	if (l.has_value()) {
-		if (l.value() == false) return _F<BAs...>;
-		else if (l.value() == true) return _T<BAs...>;
+		if (l.value() == false) return _1<BAs...>;
+		else if (l.value() == true) return _0<BAs...>;
 	}
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
-
 }
 
 template<typename... BAs>
@@ -3372,17 +3371,13 @@ sp_tau_node<BAs...> make_node_hook_wff(const node<tau_sym<BAs...>>& n) {
 template <typename...BAs>
 struct make_tau_node {
 	std::optional<sp_tau_node<BAs...>> operator()(const node<tau_sym<BAs...>>& n) {
-		static std::map<node<tau_sym<BAs...>>, sp_tau_node<BAs...>> cache;
-		if (auto it = cache.find(n); it != cache.end()) return it->second;
 		if (is_non_terminal_node<BAs...>(n)) {
 			switch (get_non_terminal_node(n)) {
 				case tau_parser::bf: {
-					auto nn = make_node_hook_bf<BAs...>(n);
-					return cache.emplace(n, nn).first->second;
+					return make_node_hook_bf<BAs...>(n);
 				}
 				case tau_parser::wff: {
-					auto nn = make_node_hook_wff<BAs...>(n);
-					return cache.emplace(n, nn).first->second;
+					return make_node_hook_wff<BAs...>(n);
 				}
 				default: return std::optional<sp_tau_node<BAs...>>();
 			}
@@ -3607,6 +3602,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_or,                           720 },
 			{ tau_parser::bf_and,                          730 },
 			{ tau_parser::bf_xor,                          740 },
+			{ tau_parser::flag,                            745 },
 			{ tau_parser::bf_neg,                          750 },
 			{ tau_parser::bf,                              790 },
 
@@ -3785,6 +3781,12 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_less_equal:  infix("<="); break;
 			case tau_parser::bf_nleq:        infix("!<="); break;
 			case tau_parser::bf_greater:     infix(">"); break;
+			case tau_parser::flag_neq:           infix("!="); break;
+			case tau_parser::flag_eq:            infix("=");  break;
+			case tau_parser::flag_greater_equal: infix(">="); break;
+			case tau_parser::flag_greater:       infix(">");  break;
+			case tau_parser::flag_less_equal:    infix("<="); break;
+			case tau_parser::flag_less:          infix("<");  break;
 			case tau_parser::wff_and:        infix("&&"); break;
 			case tau_parser::wff_or:         infix("||"); break;
 			case tau_parser::wff_xor:        infix("^"); break;
