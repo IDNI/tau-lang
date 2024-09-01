@@ -3602,6 +3602,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_or,                           720 },
 			{ tau_parser::bf_and,                          730 },
 			{ tau_parser::bf_xor,                          740 },
+			{ tau_parser::flag,                            745 },
 			{ tau_parser::bf_neg,                          750 },
 			{ tau_parser::bf,                              790 },
 
@@ -3780,6 +3781,12 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_less_equal:  infix("<="); break;
 			case tau_parser::bf_nleq:        infix("!<="); break;
 			case tau_parser::bf_greater:     infix(">"); break;
+			case tau_parser::flag_neq:           infix("!="); break;
+			case tau_parser::flag_eq:            infix("=");  break;
+			case tau_parser::flag_greater_equal: infix(">="); break;
+			case tau_parser::flag_greater:       infix(">");  break;
+			case tau_parser::flag_less_equal:    infix("<="); break;
+			case tau_parser::flag_less:          infix("<");  break;
 			case tau_parser::wff_and:        infix("&&"); break;
 			case tau_parser::wff_or:         infix("||"); break;
 			case tau_parser::wff_xor:        infix("^"); break;
