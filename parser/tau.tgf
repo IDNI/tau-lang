@@ -214,13 +214,11 @@ cli_command            =>
 # command arguments
 #
 number                 => digits.
-bf_typed               => bf  | bf  _ ':' _ "bf".
-wff_typed              => wff | wff _ ':' _ "wff".
-bf_cmd_arg             => memory | bf_typed.
-wff_cmd_arg            => memory | wff_typed.
-nf_cmd_arg             => memory | bf_typed | wff_typed.
-onf_cmd_arg            => memory | wff_typed.
-normalize_cmd_arg      => memory | rr | ref | bf_typed | wff_typed.
+bf_cmd_arg             => memory | bf.
+wff_cmd_arg            => memory | wff.
+nf_cmd_arg             => memory | wff | bf.
+onf_cmd_arg            => memory | wff.
+normalize_cmd_arg      => memory | rr | ref | wff | bf.
 solve_cmd_arg          => memory | bf_eq | bf_neq.
 inst_args              =>
           wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
