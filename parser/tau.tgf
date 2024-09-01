@@ -80,10 +80,20 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('{' _ constant _ '}')             :bf_constant
                         | '1'                                :bf_t
                         | '0'                                :bf_f
+                        |                                     flag
                         |                                     capture.
+
+# flags
+flag =>   (flagvar _ "!=" _ num | num _ "!=" _ flagvar)      :flag_neq
+        | (flagvar _ '='  _ num | num _ '='  _ flagvar)      :flag_eq
+        | (flagvar _ ">=" _ num | num _ ">=" _ flagvar)      :flag_greater_equal
+        | (flagvar _ ">"  _ num | num _ ">"  _ flagvar)      :flag_greater
+        | (flagvar _ "<=" _ num | num _ "<=" _ flagvar)      :flag_less_equal
+        | (flagvar _ "<"  _ num | num _ "<"  _ flagvar)      :flag_less.
 
 # variables
 charvar                => (alpha & ~'T' & ~'F') digit*.
+flagvar                => charvar.
 variable               => charvar | (in | out):io_var.
 in                     => ("i" digits):in_var_name  '[' offset ']'.
 out                    => ("o" digits):out_var_name '[' offset ']'.
@@ -172,7 +182,7 @@ cli_command            =>
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
         | (("s" | "subst" | "substitute")
                 :subst_sym __ nf_cmd_arg _ '[' _
-                	nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
+                        nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
         | (("i" | "inst" | "instantiate")
                 :inst_sym __ inst_args)                       :inst_cmd
 # normal forms
@@ -198,7 +208,7 @@ cli_command            =>
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ memory)        :history_print_cmd
-        | (                     bf_typed | wff_typed)         :history_store_cmd
+        | (                     wff | bf)                     :history_store_cmd
         .
 
 # command arguments
@@ -213,8 +223,8 @@ onf_cmd_arg            => memory | wff_typed.
 normalize_cmd_arg      => memory | rr | ref | bf_typed | wff_typed.
 solve_cmd_arg          => memory | bf_eq | bf_neq.
 inst_args              =>
-          bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
-        | wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
+          wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
+        | bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
 
 # symbols usable for detailed help message
 #
@@ -231,7 +241,7 @@ help_arg               => help_sym | version_sym | quit_sym
 # memory
 #
 memory                 => ( "%"
-                          | "%-":rel_memory_sym [digits:memory_id]):rel_memory                                 :rel_memory
+                          | "%-":rel_memory_sym [digits:memory_id]):rel_memory
                         | ( "%" :abs_memory_sym         memory_id) :abs_memory.
 
 # options and their values
@@ -256,15 +266,14 @@ severity               => ("e" | "error"):error_sym
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-	sym, digits, type, source, named_binding, capture,
-	charvar, in_var_name, out_var_name, uninter_const_name.
+        sym, digits, type, source, named_binding, capture,
+        charvar, in_var_name, out_var_name, uninter_const_name.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, wff_cb, bf_cb,
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
-	inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
-	normalize_cmd_arg,
-        bf_typed, wff_typed,
+        inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
+        normalize_cmd_arg,
         bf  > bf_parenthesis  > bf,
         wff > wff_parenthesis > wff.
