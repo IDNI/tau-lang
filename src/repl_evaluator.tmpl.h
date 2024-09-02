@@ -21,6 +21,7 @@
 #include "tau_ba.h"
 #include "term_colors.h"
 #include "solver.h"
+#include "satisfiability.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -504,6 +505,34 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 
 template <typename factory_t, typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<factory_t, BAs...>::sat_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto arg = n->child[1];
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
+		bool contains_ref = contains(value, tau_parser::ref);
+		rr<nso<tau_ba<BAs...>, BAs...>> rr_ =
+			(contains_ref && type == tau_parser::rr)
+				? make_nso_rr_from_binded_code<
+						tau_ba<BAs...>, BAs...>(value)
+				: rr<nso<tau_ba<BAs...>, BAs...>>(value);
+		if (contains_ref)
+			rr_.rec_relations.insert(rr_.rec_relations.end(),
+				definitions.begin(), definitions.end()),
+			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
+		if (is_non_terminal(tau_parser::bf, rr_.main)) {
+			cout << "error: invalid argument";
+			return {};
+		}
+		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
+		return always_to_unbounded_continuation(normalized_fm);
+	}
+	cout << "error: invalid argument\n";
+	return {};
+}
+
+template <typename factory_t, typename... BAs>
+std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<factory_t, BAs...>::qelim_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
@@ -772,7 +801,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::subst_cmd:          result = substitute_cmd(command); break;
 	case p::inst_cmd:           result = instantiate_cmd(command); break;
 	// formula checks
-	case p::sat_cmd:            is_satisfiable_cmd(command); break;
+	case p::sat_cmd:            result = sat_cmd(command); break;
 	case p::valid_cmd:          is_valid_cmd(command); break;
 	case p::unsat_cmd:          is_unsatisfiable_cmd(command); break;
 	// normal forms

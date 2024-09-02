@@ -825,6 +825,16 @@ sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
 	return wrap(nt, { c1, c2 });
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const std::string& terminals) {
+	std::vector<sp_tau_node<BAs...>> children;
+	for (const auto& c : terminals)
+		children.emplace_back(make_node<tau_sym<BAs...>>(
+			tau_source_sym(c), {}));
+	return wrap(nt, children);
+}
+
 // bind the given, using a binder, the constants of the a given sp_tau_node<...>.
 template<typename binder_t, typename... BAs>
 struct bind_transformer {

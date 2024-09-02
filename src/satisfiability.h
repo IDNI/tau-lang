@@ -14,15 +14,186 @@
 #ifndef __SATISFIABILITY_H__
 #define __SATISFIABILITY_H__
 
-#include <iostream>
-
-#include "tau.h"
+#include "normalizer.h"
 
 using namespace std;
 using namespace idni::tau;
 
 namespace idni::tau {
 
+// Make all variable names equally long by appending 0's in front of stream number
+template<typename... BAs>
+vector<string> produce_io_var_names (const vector<nso<BAs...>>& io_vars) {
+	// Find max width in io_var names
+	size_t max_width = 0;
+	vector<string> new_names;
+	for (const nso<BAs...>& io_var : io_vars) {
+        stringstream name;
+		name << trim(trim2(io_var));
+		max_width = max(max_width, name.str().length());
+		new_names.emplace_back(name.str());
+	}
+	for (string& io_var : new_names) {
+		auto d = max_width - io_var.length();
+        io_var.insert(1, d, '0');
+	}
+	return new_names;
+}
+
+template<typename... BAs>
+int_t get_io_var_shift(const nso<BAs...>& io_var) {
+	// If there is a shift
+	if ((trim2(io_var)->child[1] | tau_parser::shift).has_value())
+		return size_t_extractor<BAs...>(trim2(io_var)->child[1]->child[0]->child[1]->child[0]).value();
+	return 0;
+}
+
+int_t get_max_shift(const auto& io_vars) {
+	int_t max_shift = 0;
+	for (const auto& v : io_vars)
+		max_shift = max(max_shift, get_io_var_shift(v));
+	return max_shift;
+}
+
+template<typename... BAs>
+nso<BAs...> build_inf_var(const string& name) {
+	return wrap(tau_parser::variable, wrap<BAs...>(tau_parser::charvar, "'" + name));
+}
+
+template<typename... BAs>
+nso<BAs...> transform_io_var(const nso<BAs...>& io_var, const string& io_var_name, int_t time_point) {
+	// Check if io_var has constant time point
+	if ((trim2(io_var)->child[1] | tau_parser::num).has_value()) {
+		stringstream time;
+		time << io_var_name << trim2(io_var)->child[1];
+		return build_inf_var<BAs...>(time.str());
+	}
+	auto shift = get_io_var_shift(io_var);
+	stringstream time;
+	time << io_var_name << (time_point - shift);
+	return build_inf_var<BAs...>(time.str());
+}
+
+template<typename... BAs>
+nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto &io_vars, const auto &io_var_names,
+                                                  int_t time_point) {
+	// This map is needed in order to get the minimal shift for streams with same name
+	map<string, int_t> quantifiable_o_vars;
+	set<pair<string, int_t>> initials;
+	for (size_t i = 0; i < io_vars.size(); ++i) {
+		// Skip input streams
+		if (io_vars[i] | tau_parser::io_var | tau_parser::in)
+			continue;
+		// Skip initial conditions
+		if (trim2(io_vars[i])->child[1] | tau_parser::num) {
+			initials.emplace(io_var_names[i], size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value());
+			continue;
+		}
+		auto shift = get_io_var_shift(io_vars[i]);
+		if (auto it = quantifiable_o_vars.find(io_var_names[i]); it != quantifiable_o_vars.end()) {
+			it->second = min(it->second, shift);
+		} else quantifiable_o_vars.emplace(io_var_names[i], shift);
+	}
+	for (const auto& [name, shift] : quantifiable_o_vars) {
+		// Do not quantify time steps which are predefined by initial conditions
+		if (initials.contains({name, time_point - shift}))
+			continue;
+		stringstream n;
+		n <<  name << time_point - shift;
+		auto var = build_inf_var<BAs...>(n.str());
+		fm = build_wff_ex(var, fm);
+	}
+	return fm;
+}
+
+template<typename... BAs>
+nso<BAs...> universally_quantify_input_streams(nso<BAs...> fm, const auto &io_vars, const auto &io_var_names,
+                                               int_t time_point) {
+	// This map is needed in order to get the minimal shift for streams with same name
+	map<string, int_t> quantifiable_i_vars;
+	set<pair<string, int_t>> initials;
+	for (size_t i = 0; i < io_vars.size(); ++i) {
+		// Skip output streams
+		if (io_vars[i] | tau_parser::io_var | tau_parser::out)
+			continue;
+		// Skip initial conditions
+		if (trim2(io_vars[i])->child[1] | tau_parser::num) {
+			initials.emplace(io_var_names[i], size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value());
+			continue;
+		}
+		auto shift = get_io_var_shift(io_vars[i]);
+		if (auto it = quantifiable_i_vars.find(io_var_names[i]); it != quantifiable_i_vars.end()) {
+			it->second = min(it->second, shift);
+		} else quantifiable_i_vars.emplace(io_var_names[i], shift);
+	}
+	for (const auto& [name, shift] : quantifiable_i_vars) {
+		// Do not quantify time steps which are predefined by initial conditions
+		if (initials.contains({name, time_point - shift}))
+			continue;
+		stringstream n;
+		n << name << time_point - shift;
+		auto var = build_inf_var<BAs...>(n.str());
+		fm = build_wff_all(var, fm);
+	}
+	return fm;
+}
+
+template<typename... BAs>
+nso<BAs...> build_step(const nso<BAs...> &fm, const auto &io_vars, const auto &io_var_names, int_t step_num,
+                       int_t time_point) {
+	if (step_num == 0) {
+		// cout << "At t = " << time_point << "\n";
+		map<nso<BAs...>, nso<BAs...>> changes;
+		for (size_t i = 0; i < io_vars.size(); ++i) {
+			auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point);
+			// cout << new_io_var << "\n";
+			changes[io_vars[i]] = new_io_var;
+		}
+		return replace(fm, changes);
+	}
+	// cout << "At t = " << time_point << "\n";
+	map<nso<BAs...>, nso<BAs...>> changes;
+    for (size_t i = 0; i < io_vars.size(); ++i) {
+        auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point);
+        // cout << new_io_var << "\n";
+        changes[io_vars[i]] = new_io_var;
+    }
+	nso<BAs...> current_step = replace(fm, changes);
+	nso<BAs...> prev_step = build_step(fm, io_vars, io_var_names, step_num - 1, time_point + 1);
+	prev_step = existentially_quantify_output_streams(prev_step, io_vars, io_var_names, time_point + 1);
+	prev_step = universally_quantify_input_streams(prev_step, io_vars, io_var_names, time_point + 1);
+	return build_wff_and(current_step, prev_step);
+}
+
+// We assume that the formula has run through the normalizer before
+// TODO: Flag resolution
+template<typename... BAs>
+nso<BAs...> always_to_unbounded_continuation (nso<BAs...> fm, bool enable_output=true) {
+	assert(has_no_boolean_combs_of_models(fm));
+	if (is_child_non_terminal(tau_parser::wff_always, fm))
+		fm = trim2(fm);
+	vector<nso<BAs...>> io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
+	auto new_io_var_names = produce_io_var_names(io_vars);
+	int_t time_point = get_max_shift(io_vars);
+	int_t step_num = 1;
+	nso<BAs...> unbounded_fm = build_step(fm, io_vars, new_io_var_names, step_num, time_point);
+	nso<BAs...> prev_unbounded_fm = build_step(fm, io_vars, new_io_var_names, 0, time_point);
+    cout << "Continuation at step " << step_num << "\n";
+    cout << unbounded_fm << "\n";
+	while(!are_nso_equivalent(prev_unbounded_fm, unbounded_fm)) {
+		prev_unbounded_fm = unbounded_fm;
+		++step_num;
+
+		unbounded_fm = build_step(fm, io_vars, new_io_var_names, step_num, time_point);
+		cout << "Continuation at step " << step_num << "\n";
+		cout << unbounded_fm << "\n";
+	}
+	if (enable_output)
+		cout << "Unbounded continuation of Tau formula reached fixpoint after " << step_num - 1 << " steps.\n";
+	return prev_unbounded_fm;
+}
+
+/*
 // TODO (HIGH) check if we could use regular rules instead of callback rules
 
 RULE(TAU_COLLAPSE_POSITIVES_0, "$X &&& $Y :::= tau_collapse_positives_cb $X $Y.")
@@ -487,7 +658,7 @@ std::string build_phi_invocation(const std::optional<gssotc<BAs...>>& positive, 
 }
 
 template<typename... BAs>
-std::string build_phi_main_nso_rr(const std::optional<gssotc<BAs...>>& /* positive */, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& /*outputs*/, size_t /*loopback*/) {
+std::string build_phi_main_nso_rr(const std::optional<gssotc<BAs...>>& positive, const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
 	std::basic_stringstream<char> main_phi;
 	main_phi << build_universal_quantifiers(inputs, 1);
 	main_phi << " phi[t](" << build_args_from_vars(inputs, 1) << ").\n";
@@ -564,7 +735,7 @@ bool is_gssotc_clause_satisfiable_no_negatives_with_loopback(const std::optional
 template<typename... BAs>
 bool is_gssotc_clause_satisfiable_general(const std::optional<gssotc<BAs...>>& positive, const std::vector<gssotc<BAs...>> negatives,  const tau_spec_vars<BAs...>& inputs, const tau_spec_vars<BAs...>& outputs, size_t loopback) {
 	auto etas = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
-	for (size_t current = 1; /* until return statement */ ; ++current) {
+	for (size_t current = 1;  until return statement ; ++current) {
 		auto [eta, extracted_bindings] = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
 		auto check = build_check_nso_rr(outputs, loopback, current);
 		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), extracted_bindings).main;
@@ -680,6 +851,7 @@ bool is_tau_spec_satisfiable(const tau_spec<BAs...>& tau_spec) {
 		} else previous.push_back(current);
 	}
 }
+*/
 
 } // namespace idni::tau
 
