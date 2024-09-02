@@ -122,18 +122,19 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 }
 
 template<typename...BAs>
-solution<BAs...> lgrs(const equality<BAs...>& f) {
+solution<BAs...> lgrs(const equality<BAs...>& eq) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
 	// in the following theorem (of Taba Book):
 	//
 	// Theorem 1.8. Let f : Bn → B be a BF, and assume f (Z) = 0
 	// for some Z ∈ Bn. Then the set {X ∈ Bn| (X) = 0} equals precisely
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
-	// the abuse of notation, this reads ϕ_i (X) = z_if (X)+x_if′ (X).
-	auto z = find_solution(f);
+	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
+	auto s = find_solution(eq);
+	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 	solution<BAs...> phi;
-	for (auto& [x_i, z_i] : z)
-		phi[x_i] = (z_i & f) + (x_i & ~f);
+	for (auto& [x_i, z_i] : s)
+		phi[x_i] = ((z_i & f) | (x_i & ~f)) | bf_reduce_canonical<BAs...>();
 	return phi;
 }
 
