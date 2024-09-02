@@ -281,6 +281,8 @@ TEST_SUITE("find_solution") {
 		#ifdef DEBUG
 		std::cout << "SOLUTION: " << solution << "\n";
 		std::cout << "CHECK1: " << check1 << "\n";
+		std::cout << "SAMPLE1: " << sample1 << "\n";
+		std::cout << "SAMPLE2: " << sample2 << "\n";
 		std::cout << "CHECK2: " << check2 << "\n";
 		#endif // DEBUG
 		return (check1 == _T<bdd_test>) && (check2 == _F<bdd_test>);
@@ -312,28 +314,44 @@ TEST_SUITE("find_solution") {
 	}
 }
 
-/*TEST_SUITE("lgrs") {
+TEST_SUITE("lgrs") {
+
+	bool test_lgrs(const char* sample) {
+		#ifdef DEBUG
+		std::cout << "LGRS: " << std::string(sample) << "\n";
+		#endif // DEBUG
+		auto src = make_tau_source(sample);
+		bdd_test_factory bf;
+		nso<bdd_test> equality = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+		auto solution = lgrs(equality);
+		auto changes1 = solution;
+		auto sample1 = replace(equality, changes1);
+		auto check1 = snf_wff(sample1) | bf_reduce_canonical<bdd_test>();
+		auto changes2 = solution;
+		auto sample2 = snf_wff(build_wff_neg(equality));
+		auto check2 = replace(sample2, changes2) | bf_reduce_canonical<bdd_test>();
+		#ifdef DEBUG
+		std::cout << "SOLUTION: " << solution << "\n";
+		std::cout << "CHECK1: " << check1 << "\n";
+		std::cout << "SAMPLE1: " << sample1 << "\n";
+		std::cout << "SAMPLE2: " << sample2 << "\n";
+		std::cout << "CHECK2: " << check2 << "\n";
+		#endif // DEBUG
+		return (check1 == _T<bdd_test>) && (check2 == _F<bdd_test>);
+	}
 
 	TEST_CASE("two var: x | y = 0.") {
 		const char* sample = "x | y = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = lgrs(sample_formula);
-		CHECK ( solution.size() == 2 );
+		CHECK ( test_lgrs(sample) );
 	}
 
 	TEST_CASE("two var: x & y = 0.") {
 		const char* sample = "x & y = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = lgrs(sample_formula);
-		CHECK ( solution.size() == 2 );
+		CHECK ( test_lgrs(sample) );
 	}
 }
 
-TEST_SUITE("solve_minterm_system") {
+/*TEST_SUITE("solve_minterm_system") {
 
 	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: a} y != 0.") {
 		bdd_init<Bool>();
