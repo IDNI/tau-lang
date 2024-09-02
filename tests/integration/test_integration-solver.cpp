@@ -26,7 +26,7 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-/*TEST_SUITE("minterm_iterator") {
+TEST_SUITE("minterm_iterator") {
 
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
@@ -260,32 +260,30 @@ TEST_SUITE("minterm_inequality_system_range") {
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
 		CHECK ( n == 49 );
 	}
-}*/
+}
+
+bool check_solution(const nso<bdd_test>& equation, std::map<nso<bdd_test>, nso<bdd_test>> solution) {
+	auto copy = solution;
+	auto substitution = replace(equation, copy);
+	auto check = snf_wff(substitution);
+	#ifdef DEBUG
+	std::cout << "checking solution: " << solution << "\n";
+	std::cout << "equation: " << equation << "\n";
+	std::cout << "substitution: " << substitution << "\n";
+	std::cout << "snf: " << check << "\n";
+	#endif // DEBUG
+	return check == _T<bdd_test>;
+}
 
 TEST_SUITE("find_solution") {
 
-	bool test_find_solution(const char* sample) {
+	bool test_find_solution(const char* src) {
 		#ifdef DEBUG
-		std::cout << "FIND_SOLUTION: " << std::string(sample) << "\n";
+		std::cout << "find solution: " << std::string(src) << "\n";
 		#endif // DEBUG
-		auto src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> equality = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
-		auto solution = find_solution(equality);
-		auto changes1 = solution;
-		auto sample1 = replace(equality, changes1);
-		auto check1 = snf_wff(sample1);
-		auto changes2 = solution;
-		auto sample2 = snf_wff(build_wff_neg(equality));
-		auto check2 = replace(sample2, changes2);
-		#ifdef DEBUG
-		std::cout << "SOLUTION: " << solution << "\n";
-		std::cout << "CHECK1: " << check1 << "\n";
-		std::cout << "SAMPLE1: " << sample1 << "\n";
-		std::cout << "SAMPLE2: " << sample2 << "\n";
-		std::cout << "CHECK2: " << check2 << "\n";
-		#endif // DEBUG
-		return (check1 == _T<bdd_test>) && (check2 == _F<bdd_test>);
+		auto equation = bdd_make_nso(src);
+		auto solution = find_solution(equation);
+		return ( check_solution(equation, solution));
 	}
 
 	TEST_CASE("one var: x = 0.") {
@@ -316,28 +314,13 @@ TEST_SUITE("find_solution") {
 
 TEST_SUITE("lgrs") {
 
-	bool test_lgrs(const char* sample) {
+	bool test_lgrs(const char* src) {
 		#ifdef DEBUG
-		std::cout << "LGRS: " << std::string(sample) << "\n";
+		std::cout << "lgrs: " << std::string(src) << "\n";
 		#endif // DEBUG
-		auto src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> equality = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
-		auto solution = lgrs(equality);
-		auto changes1 = solution;
-		auto sample1 = replace(equality, changes1);
-		auto check1 = snf_wff(sample1) | bf_reduce_canonical<bdd_test>();
-		auto changes2 = solution;
-		auto sample2 = snf_wff(build_wff_neg(equality));
-		auto check2 = replace(sample2, changes2) | bf_reduce_canonical<bdd_test>();
-		#ifdef DEBUG
-		std::cout << "SOLUTION: " << solution << "\n";
-		std::cout << "CHECK1: " << check1 << "\n";
-		std::cout << "SAMPLE1: " << sample1 << "\n";
-		std::cout << "SAMPLE2: " << sample2 << "\n";
-		std::cout << "CHECK2: " << check2 << "\n";
-		#endif // DEBUG
-		return (check1 == _T<bdd_test>) && (check2 == _F<bdd_test>);
+		auto equation = bdd_make_nso(src);
+		auto solution = lgrs(equation);
+		return ( check_solution(equation, solution) );
 	}
 
 	TEST_CASE("two var: x | y = 0.") {
@@ -351,72 +334,85 @@ TEST_SUITE("lgrs") {
 	}
 }
 
-/*TEST_SUITE("solve_minterm_system") {
+TEST_SUITE("solve_minterm_system") {
 
-	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: a} y != 0.") {
+	bool test_solve_minterm_system(const std::vector<std::string> minterms) {
 		bdd_init<Bool>();
-		const char* sample1 = "{bdd: a} x != 0.";
-		const char* sample2 = "{bdd: a}' x != 0.";
-		auto sample_src1 = make_tau_source(sample1);
-		auto sample_src2 = make_tau_source(sample2);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula1 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src1, bf).main;
-		nso<bdd_test> sample_formula2 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src2, bf).main;
-		minterm_system<bdd_test> sample_system {sample_formula1, sample_formula2};
-		auto solution = solve_minterm_system<bdd_test, bdd_test>(sample_system);
-		CHECK ( solution.size() == 1 );
+		#ifdef DEBUG
+		std::cout << "solve_minterm_system: ";
+		for (const auto& minterm : minterms) std::cout << minterm << " ";
+		std::cout << "\n";
+		#endif // DEBUG
+		minterm_system<bdd_test> system;
+		for (const auto& minterm: minterms)
+			system.insert(bdd_make_nso(minterm));
+		auto solution = solve_minterm_system<bdd_test, bdd_test>(system);
+		bool check = true;
+		for (const auto& equation: system)
+			check = check ? check_solution(equation, solution) : false;
+		return check;
+	}
+
+	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: a} x != 0.") {
+		const std::vector<std::string> sample =
+			{ "{bdd: a} x != 0.", "{bdd: a}' x != 0."};
+		CHECK ( test_solve_minterm_system(sample) );
 	}
 }
 
 TEST_SUITE("solve_inequality_system") {
 
-	TEST_CASE("one var: {bdd: a} x | {bdd: a} y != 0 && {bdd: a} y & {bdd: a} x != 0.") {
+	bool test_solve_inequality_system(const std::vector<std::string> inequalities) {
 		bdd_init<Bool>();
-		const char* sample1 = "{bdd: a} x | {bdd: b} y != 0.";
-		const char* sample2 = "{bdd: b} y & {bdd: a} x != 0.";
-		auto sample_src1 = make_tau_source(sample1);
-		auto sample_src2 = make_tau_source(sample2);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula1 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src1, bf).main;
-		nso<bdd_test> sample_formula2 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src2, bf).main;
-		inequality_system<bdd_test> sample_system {sample_formula1, sample_formula2};
-		auto solution = solve_inequality_system<bdd_test, bdd_test>(sample_system);
-		CHECK ( solution.size() == 2 );
+		#ifdef DEBUG
+		std::cout << "solve_inequality_system: ";
+		for (const auto& inequality : inequalities) std::cout << inequality << " ";
+		std::cout << "\n";
+		#endif // DEBUG
+		inequality_system<bdd_test> system;
+		for (const auto& inequality: inequalities)
+			system.insert(bdd_make_nso(inequality));
+		auto solution = solve_inequality_system<bdd_test, bdd_test>(system);
+		bool check = true;
+		for (const auto& equation: system)
+			check = check ? check_solution(equation, solution) : false;
+		return check;
 	}
 
-}
-
-TEST_SUITE("solve_inequality_system") {
-
 	TEST_CASE("one var: {bdd: a} x | {bdd: a} y != 0 && {bdd: a} y & {bdd: a} x != 0.") {
-		bdd_init<Bool>();
-		const char* sample1 = "{bdd: a} x | {bdd: a} y != 0.";
-		const char* sample2 = "{bdd: a} y & {bdd: a} x != 0.";
-		auto sample_src1 = make_tau_source(sample1);
-		auto sample_src2 = make_tau_source(sample2);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula1 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src1, bf).main;
-		nso<bdd_test> sample_formula2 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src2, bf).main;
-		inequality_system<bdd_test> sample_system {sample_formula1, sample_formula2};
-		auto solution = solve_inequality_system<bdd_test, bdd_test>(sample_system);
-		CHECK ( solution.size() == 2 );
+		const std::vector<std::string> sample =
+			{"{bdd: a} x | {bdd: b} y != 0." , "{bdd: b} y & {bdd: a} x != 0."};
+		CHECK( test_solve_inequality_system(sample) );
 	}
-
 }
 
 TEST_SUITE("solve_system") {
 
-	TEST_CASE("one var: {bdd: a} x | {bdd: a} y != 0 && {bdd: a} y & {bdd: a} x != 0.") {
+	bool test_solve_system(const std::string equality,
+			const std::vector<std::string> inequalities) {
 		bdd_init<Bool>();
-		const char* sample1 = "{bdd: a} x & {bdd: a} y = 0.";
-		const char* sample2 = "{bdd: a} y & {bdd: a} x != 0.";
-		auto sample_src1 = make_tau_source(sample1);
-		auto sample_src2 = make_tau_source(sample2);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula1 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src1, bf).main;
-		nso<bdd_test> sample_formula2 = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src2, bf).main;
-		equation_system<bdd_test> sample_system { {sample_formula1}, {sample_formula2}};
-		auto solution = solve_system<bdd_test, bdd_test>(sample_system);
-		CHECK ( solution.size() == 2 );
+		#ifdef DEBUG
+		std::cout << "solve_system: " << equality << " ";
+		for (const auto& inequality : inequalities) std::cout << inequality << " ";
+		std::cout << "\n";
+		#endif // DEBUG
+		equation_system<bdd_test> system;
+		if (equality.size() != 0) system.first = bdd_make_nso(equality);
+		for (const auto& inequality: inequalities)
+		system.second.insert(bdd_make_nso(inequality));
+		auto solution = solve_system<bdd_test, bdd_test>(system);
+		bool check = system.first
+			? check_solution(system.first.value(), solution)
+			: false;
+		for (const auto& equation: system.second)
+			check = check ? check_solution(equation, solution) : false;
+		return check;
 	}
-}*/
+
+	TEST_CASE("one var: {bdd: a} x | {bdd: a} y = 0 && {bdd: a} y & {bdd: a} x != 0.") {
+		const char* equality = "{bdd: a} x | {bdd: a} y = 0.";
+		const std::vector<std::string> inequalities =
+			{ "{bdd: a} y & x != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+}
