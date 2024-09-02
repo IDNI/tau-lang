@@ -137,6 +137,8 @@ private:
 	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
+	std::optional<nso<tau_ba<BAs...>, BAs...>> sat_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 	void execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> solve_cmd(
