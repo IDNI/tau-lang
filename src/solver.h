@@ -55,7 +55,7 @@ template<typename...BAs>
 using inequality_system = std::set<inequality<BAs...>>;
 
 template<typename...BAs>
-using minterm_system = std::set<nso<BAs...>>;
+using minterm_system = std::set<inequality<BAs...>>;
 
 template<typename...BAs>
 using solution = std::map<var<BAs...>, nso<BAs...>>;
@@ -81,9 +81,7 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 	};
 
-	#ifdef DEBUG
-	std::cout << "eq: " << eq << std::endl;
-	#endif // DEBUG
+	if (!(eq | tau_parser::bf_eq).has_value()) return {};
 
 	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
@@ -98,9 +96,6 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 			else {
 				auto changes = solution;
 				solution[vars[0]] = h != _0<BAs...> ? h : replace(~g, changes) | bf_reduce_canonical<BAs...>();
-				#ifdef DEBUG
-				std::cout << "solution: " << solution << "\n";
-				#endif // DEBUG
 				return solution;
 			}
 		}
@@ -109,15 +104,9 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 			if (auto nn = replace(h, restricted) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
 				solution[vars[0]] = nn;
 			else solution[vars[0]] = ~g | bf_reduce_canonical<BAs...>();
-			#ifdef DEBUG
-			std::cout << "solution: " << solution << "\n";
-			#endif // DEBUG
 			return solution;
 		}
 	}
-	#ifdef DEBUG
-	std::cout << "solution: {}\n";
-	#endif // DEBUG
 	return {};
 }
 
@@ -401,9 +390,6 @@ nso<BAs...> get_minterm(const minterm<BAs...>& m) {
 			&& !is_child_non_terminal<tau_parser::bf_and>(n);
 	};
 	auto literals = select_top(m, is_literal);
-	#ifdef DEBUG
-	std::cout << "get_minterm literals: "; for (auto& l: literals) std::cout << l << " "; std::cout << std::endl;
-	#endif // DEBUG
 	set<nso<BAs...>> all_literals(literals.begin(), literals.end());
 	return build_bf_and(all_literals);
 }
@@ -412,11 +398,6 @@ template<typename...BAs>
 bool has_solution(const minterm_system<BAs...>& sys) {
 	auto bs = _1<BAs...>;
 	for (auto& m: sys) bs = bs & get_constant(m);
-
-	#ifdef DEBUG
-	std::cout << "has_solution: " << bs << std::endl;
-	#endif // DEBUG
-
 	return bs != _0<BAs...>;
 }
 
@@ -434,13 +415,7 @@ template<typename B, typename...BAs>
 minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint, const minterm<BAs...>& m) {
 	minterm_system<BAs...> new_disjoint = disjoint;
 	auto new_m = m;
-	#ifdef DEBUG
-	std::cout << "add_minterm_to_disjoint m: " << m << std::endl;
-	#endif // DEBUG
 	for (auto& d: disjoint) {
-		#ifdef DEBUG
-		std::cout << "add_minterm_to_disjoint d: " << d << std::endl;
-		#endif // DEBUG
 		if (get_exponent(d) == get_exponent(m)) {
 			new_disjoint.insert(d);
 			continue;
@@ -466,11 +441,6 @@ template<typename B, typename...BAs>
 minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys) {
 	minterm_system<BAs...> disjoints;
 	for (auto it = sys.begin(); it != sys.end(); ++it) disjoints = add_minterm_to_disjoint<B, BAs...>(disjoints, *it);
-
-	#ifdef DEBUG
-	std::cout << "make_minterm_system_disjoint: "; for (auto& m: disjoints) std::cout << m << " "; std::cout << std::endl;
-	#endif // DEBUG
-
 	return disjoints;
 }
 
@@ -480,31 +450,18 @@ solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& sys) {
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
 	if (!has_solution(sys)) return {};
-	#ifdef DEBUG
-	std::cout << "solve_minterm_system sys: "; for (auto& m: sys) std::cout << m << " "; std::cout << std::endl;
-	#endif // DEBUG
-
 	equality<BAs...> eq = _0<BAs...>;
 	for (auto& neq: make_minterm_system_disjoint<B, BAs...>(sys)) {
-		# ifdef DEBUG
-		std::cout << "solve_minterm_system neq: " << neq << std::endl;
-		#endif // DEBUG
-		auto nf = neq | tau_parser::bf_neq | tau_parser::bf | bf_reduce_canonical<BAs...>()
+		auto nf = neq
+			| tau_parser::bf_neq
+			| tau_parser::bf
+			| bf_reduce_canonical<BAs...>()
 			| optional_value_extractor<nso<BAs...>>;
 		auto cte = get_constant(nf);
 		auto minterm = get_minterm(nf);
-		#ifdef DEBUG
-		std::cout << "solve_minterm_system cte: " << cte << std::endl;
-		std::cout << "solve_minterm_system minterm: " << minterm << std::endl;
-		#endif // DEBUG
 		eq = eq | (cte & ~minterm);
 	}
 	eq = build_wff_eq(eq);
-
-	#ifdef DEBUG
-	std::cout << "solve_minterm_system eq: " << eq << std::endl;
-	#endif // DEBUG
-
 	return find_solution(eq);
 }
 
