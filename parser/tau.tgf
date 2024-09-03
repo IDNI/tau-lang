@@ -112,7 +112,8 @@ uninterpreted_constant => '<' ((chars | _ ) ':' chars):uninter_const_name _ '>'.
 constant               => binding | capture.
 binding                => ((chars _ | _):type ':' _ source):source_binding
                         | chars                            :named_binding.
-source                 => (alnum | punct):src_c [ (src_c | space)* src_c ].
+source                 => src_c [ (src_c | space)* src_c ].
+src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
 # common elements
 chars                  => alpha alnum*.
