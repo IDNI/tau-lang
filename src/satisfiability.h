@@ -60,10 +60,11 @@ int_t get_max_initial(const auto& io_vars) {
 	return max_init;
 }
 
-// template<typename... BAs>
-// nso<BAs...> build_inf_var(const string& name) {
-// 	return wrap(tau_parser::variable, wrap<BAs...>(tau_parser::charvar, "'" + name));
-// }
+template<typename... BAs>
+nso<BAs...> build_inf_var(const string& name, const int_t time_point) {
+	stringstream var; var << name << ":" << time_point;
+	return wrap(tau_parser::variable, wrap<BAs...>(tau_parser::charvar, var.str()));
+}
 
 template<typename... BAs>
 nso<BAs...> transform_io_var(const nso<BAs...>& io_var, const string& io_var_name, int_t time_point) {
@@ -78,27 +79,24 @@ nso<BAs...> transform_io_var(const nso<BAs...>& io_var, const string& io_var_nam
 
 template<typename... BAs>
 nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto &io_vars, const auto &io_var_names,
-                                                  int_t time_point) {
+                                                  const auto& initials, int_t time_point) {
 	// This map is needed in order to get the minimal shift for streams with same name
-	set<string> quantifiable_o_vars;
-	set<pair<string, int_t>> initials;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
+	set<int_t> quantifiable_o_vars;
+	for (int_t i = 0; i < (int_t)io_vars.size(); ++i) {
 		// Skip input streams
 		if (io_vars[i] | tau_parser::io_var | tau_parser::in)
 			continue;
 		// Skip initial conditions
-		if (trim2(io_vars[i])->child[1] | tau_parser::num) {
-			initials.emplace(io_var_names[i], size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value());
+		if (trim2(io_vars[i])->child[1] | tau_parser::num)
 			continue;
-		}
-		quantifiable_o_vars.insert(io_var_names[i]);
+		quantifiable_o_vars.insert(i);
 	}
-	for (const auto& name : quantifiable_o_vars) {
+	for (const auto& pos : quantifiable_o_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
-		if (initials.contains({name, time_point}))
+		if (initials.contains({io_var_names[pos], time_point}))
 			continue;
 		stringstream n;
-		n <<  name << "[" << time_point << "]";
+		n <<  io_var_names[pos] << "[" << time_point << "]";
 		auto var = build_bf_var<BAs...>(n.str());
 		fm = build_wff_ex(var, fm);
 	}
@@ -107,60 +105,29 @@ nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto &io
 
 template<typename... BAs>
 nso<BAs...> universally_quantify_input_streams(nso<BAs...> fm, const auto &io_vars, const auto &io_var_names,
-                                               int_t time_point) {
+                                               const auto& initials, int_t time_point) {
 	// This map is needed in order to get the minimal shift for streams with same name
-	set<string> quantifiable_i_vars;
-	set<pair<string, int_t>> initials;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
+	set<int_t> quantifiable_i_vars;
+	for (int_t i = 0; i < (int_t)io_vars.size(); ++i) {
 		// Skip output streams
 		if (io_vars[i] | tau_parser::io_var | tau_parser::out)
 			continue;
 		// Skip initial conditions
-		if (trim2(io_vars[i])->child[1] | tau_parser::num) {
-			initials.emplace(io_var_names[i], size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value());
+		if (trim2(io_vars[i])->child[1] | tau_parser::num)
 			continue;
-		}
-		quantifiable_i_vars.insert(io_var_names[i]);
+		quantifiable_i_vars.insert(i);
 	}
-	for (const auto& name : quantifiable_i_vars) {
+	for (const auto& pos : quantifiable_i_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
-		if (initials.contains({name, time_point}))
+		if (initials.contains({io_var_names[pos], time_point}))
 			continue;
 		stringstream n;
-		n << name << "[" << time_point << "]";
+		n << io_var_names[pos] << "[" << time_point << "]";
 		auto var = build_bf_var<BAs...>(n.str());
 		fm = build_wff_all(var, fm);
 	}
 	return fm;
 }
-
-// template<typename... BAs>
-// nso<BAs...> build_step_old(const nso<BAs...> &fm, const auto &io_vars, const auto &io_var_names, int_t step_num,
-//                        int_t time_point) {
-// 	if (step_num == 0) {
-// 		// cout << "At t = " << time_point << "\n";
-// 		map<nso<BAs...>, nso<BAs...>> changes;
-// 		for (size_t i = 0; i < io_vars.size(); ++i) {
-// 			auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point);
-// 			// cout << new_io_var << "\n";
-// 			changes[io_vars[i]] = new_io_var;
-// 		}
-// 		return replace(fm, changes);
-// 	}
-// 	// cout << "At t = " << time_point << "\n";
-// 	map<nso<BAs...>, nso<BAs...>> changes;
-//     for (size_t i = 0; i < io_vars.size(); ++i) {
-//         auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point);
-//         // cout << new_io_var << "\n";
-//         changes[io_vars[i]] = new_io_var;
-//     }
-// 	nso<BAs...> current_step = replace(fm, changes);
-// 	nso<BAs...> prev_step = build_step(fm, io_vars, io_var_names, step_num - 1, time_point + 1);
-//
-// 	prev_step = existentially_quantify_output_streams(prev_step, io_vars, io_var_names, time_point + 1);
-// 	prev_step = universally_quantify_input_streams(prev_step, io_vars, io_var_names, time_point + 1);
-// 	return build_wff_and(current_step, prev_step);
-// }
 
 template<typename... BAs>
 nso<BAs...> build_initial_step(const nso<BAs...>& original_fm, const auto &io_vars, const auto &io_var_names,
@@ -174,8 +141,8 @@ nso<BAs...> build_initial_step(const nso<BAs...>& original_fm, const auto &io_va
 }
 
 template<typename... BAs>
-nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_fm, const auto &io_vars, const auto &io_var_names, int_t step_num,
-                       int_t time_point, nso<BAs...>& cached_fm) {
+nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_fm, const auto &io_vars, const auto &io_var_names,
+						const auto& initials, int_t step_num, int_t time_point, nso<BAs...>& cached_fm) {
 	// Use build_initial_step otherwise
 	assert(step_num > 0);
 	map<nso<BAs...>, nso<BAs...>> changes;
@@ -184,31 +151,50 @@ nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_f
         changes[io_vars[i]] = new_io_var;
     }
 	nso<BAs...> most_inner_step = replace(original_fm, changes);
-	auto q_most_inner_step = existentially_quantify_output_streams(most_inner_step, io_vars, io_var_names, time_point + step_num);
-	q_most_inner_step = universally_quantify_input_streams(q_most_inner_step, io_vars, io_var_names, time_point + step_num);
+	auto q_most_inner_step = existentially_quantify_output_streams(most_inner_step, io_vars, io_var_names, initials, time_point + step_num);
+	q_most_inner_step = universally_quantify_input_streams(q_most_inner_step, io_vars, io_var_names, initials, time_point + step_num);
 	changes = {{cached_fm, build_wff_and(cached_fm, q_most_inner_step)}};
 	cached_fm = most_inner_step;
 	return replace(prev_fm, changes);
 }
 
+template<typename... BAs>
+nso<BAs...> transform_initials(const nso<BAs...>& fm, const auto& io_vars, const auto& io_var_names) {
+	map<nso<BAs...>,nso<BAs...>> changes;
+	for (size_t i = 0; i < io_vars.size(); ++i) {
+		// If io_var is initial, add to changes
+		if (trim2(io_vars[i])->child[1] | tau_parser::num) {
+			int_t time_point = size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value();
+			changes.emplace(io_vars[i], build_inf_var<BAs...>(io_var_names[i], time_point));
+		}
+	}
+	return replace(fm, changes);
+}
+
 // We assume that the formula has run through the normalizer before
 // TODO: Flag resolution
 template<typename... BAs>
-nso<BAs...> always_to_unbounded_continuation (nso<BAs...> fm, bool enable_output=true) {
+nso<BAs...> always_to_unbounded_continuation (nso<BAs...> fm, bool enable_output=false) {
 	assert(has_no_boolean_combs_of_models(fm));
 	if (is_child_non_terminal(tau_parser::wff_always, fm))
 		fm = trim2(fm);
 	vector<nso<BAs...>> io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
 	auto new_io_var_names = produce_io_var_names(io_vars);
+	// Save positions of io_variables which are initial conditions
+	set<pair<string, int_t>> initials;
+	for (int_t i = 0; i < (int_t)io_vars.size(); ++i)
+		if (trim2(io_vars[i])->child[1] | tau_parser::num)
+			initials.emplace(new_io_var_names[i], size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value());
+
 	int_t time_point = get_max_shift(io_vars);
 	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars, new_io_var_names, time_point);
 	int_t step_num = 1;
 	nso<BAs...> cache = prev_unbounded_fm;
 	nso<BAs...> unbounded_fm =
-		build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, step_num, time_point, cache);
+		build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num, time_point, cache);
 
-    cout << "Continuation at step " << step_num << "\n";
-    cout << unbounded_fm << "\n";
+    // cout << "Continuation at step " << step_num << "\n";
+    // cout << unbounded_fm << "\n";
 
 	int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
 	if (time_point + 1 >= max_initial_condition) max_initial_condition = 1;
@@ -217,13 +203,13 @@ nso<BAs...> always_to_unbounded_continuation (nso<BAs...> fm, bool enable_output
 		++step_num;
 
 		unbounded_fm =
-			build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, step_num, time_point, cache);
-		cout << "Continuation at step " << step_num << "\n";
-		cout << unbounded_fm << "\n";
+			build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num, time_point, cache);
+		// cout << "Continuation at step " << step_num << "\n";
+		// cout << unbounded_fm << "\n";
 	}
 	if (enable_output)
 		cout << "Unbounded continuation of Tau formula reached fixpoint after " << step_num - 1 << " steps.\n";
-	return prev_unbounded_fm;
+	return transform_initials(prev_unbounded_fm, io_vars, new_io_var_names);
 }
 
 /*
