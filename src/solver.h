@@ -77,6 +77,10 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 	// g (Z) h (Z) (which is guaranteed to exist by Boole’s consistency condition).
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
+	#ifdef DEBUG
+	std::cout << "find solution: " << eq << "\n";
+	#endif // DEBUG
+
 	auto has_no_var = [](const nso<BAs...>& f) {
 		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 	};
@@ -111,7 +115,7 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 }
 
 template<typename...BAs>
-solution<BAs...> lgrs(const equality<BAs...>& eq) {
+solution<BAs...> lgrs(const equality<BAs...>& equality) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
 	// in the following theorem (of Taba Book):
 	//
@@ -119,11 +123,24 @@ solution<BAs...> lgrs(const equality<BAs...>& eq) {
 	// for some Z ∈ Bn. Then the set {X ∈ Bn| (X) = 0} equals precisely
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
-	auto s = find_solution(eq);
-	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+
+	auto s = find_solution(equality);
+	auto f = equality
+		| tau_parser::bf_eq
+		| tau_parser::bf
+		| optional_value_extractor<nso<BAs...>>;
 	solution<BAs...> phi;
 	for (auto& [x_i, z_i] : s)
-		phi[x_i] = ((z_i & f) | (x_i & ~f)) | bf_reduce_canonical<BAs...>();
+		phi[x_i] = ((z_i & f) | (x_i & ~f))
+			| bf_reduce_canonical<BAs...>();
+
+	#ifdef DEBUG
+	std::cout << "lgrs: " << equality << "\n";
+	std::cout << "solution: ";
+	for (const auto& [k, v] : phi) std::cout << k << " <- " << v << " ";
+	std::cout << "\n";
+	#endif // DEBUG
+
 	return phi;
 }
 
@@ -146,13 +163,13 @@ public:
 			// we start with the full bf...
 			auto partial_bf = f;
 			// ... and the first variable (for computing the first partial minterm)
-			auto partial_minterm = ~(*vars.begin());
+			auto partial_minterm = _1<BAs...>;
 			for (auto& v : vars) {
 				// we add the current choice to the list of choices...
-				choices.emplace_back(v, false, partial_bf, partial_minterm);
-				// ... and compute new values for the next one
-				partial_bf = replace_with(v, _0<BAs...>, partial_bf);
 				partial_minterm = partial_minterm & ~v;
+				choices.emplace_back(v, false, partial_bf, partial_minterm);
+				partial_bf = replace_with(v, _0<BAs...>, partial_bf);
+				// ... and compute new values for the next one
 			}
 			// if the current choices correspond to a proper minterm, we update the current
 			// minterm, otherwise we compute the next valid choice
@@ -205,10 +222,22 @@ private:
 	bool exhausted = false;
 
 	nso<BAs...> make_current_minterm() {
+		#ifdef DEBUG
+		std::cout << "current choices: \n";
+		for (auto& c: choices) std::cout
+			<< "var: " << c.var << ", "
+			<< "value: " << c.value << ", "
+			<< "partial_bf: " << c.partial_bf << ", "
+			<< "partial_minterm: " << c.partial_minterm << "\n";
+		#endif // DEBUG
 		auto cte =  choices.back().value
 			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
 			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
-		return (cte & choices.back().partial_minterm);
+		auto current = (cte & choices.back().partial_minterm);
+		#ifdef DEBUG
+		std::cout << "current " << current << "\n";
+		#endif // DEBUG
+		return current;
 	}
 
 	void make_next_choice() {
@@ -227,15 +256,16 @@ private:
 	}
 
 	void update_choices_from(size_t start) {
-		auto partial_bf = choices[start].partial_bf;
-		auto partial_minterm = _1<BAs...>;
+		if (start == 0) {
+			choices[0].partial_minterm = choices[0].value ? choices[0].var : ~choices[0].var;
+			++start;
+		}
 		for (size_t i = start; i < choices.size(); ++i) {
-			choices[i].partial_bf = partial_bf;
-			choices[i].partial_minterm = (choices[i].value ? ~choices[i].var : choices[i].var) & partial_minterm;
-			partial_minterm = choices[i].partial_minterm;
-			partial_bf = choices[i].value
-				? replace_with(choices[i].var, _1<BAs...>, partial_bf)
-				: replace_with(choices[i].var, _0<BAs...>, partial_bf);
+			choices[i].partial_minterm = (choices[i].value ? choices[i].var : ~choices[i].var)
+				& choices[i - 1].partial_minterm;
+			choices[i].partial_bf = choices[i - 1].value
+				? replace_with(choices[i - 1].var, _1<BAs...>, choices[i - 1].partial_bf)
+				: replace_with(choices[i - 1].var, _0<BAs...>, choices[i - 1].partial_bf);
 		}
 	}
 };
@@ -295,7 +325,7 @@ public:
 				break;
 			}
 		}
-		make_current_minterm_system();
+		current = make_current_minterm_system();
 	}
 
 	minterm_inequality_system_iterator();
@@ -334,6 +364,11 @@ private:
 	minterm_system<BAs...> make_current_minterm_system() {
 		minterm_system<BAs...> minterms;
 		for (auto& it: minterm_iterators) minterms.insert(build_wff_neq(*it));
+		#ifdef DEBUG
+		std::cout << "current minterm system: ";
+		for (const auto& minterm : minterms) std::cout << minterm << " ";
+		std::cout << "\n";
+		#endif // DEBUG
 		return minterms;
 	}
 
@@ -445,13 +480,21 @@ minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>
 }
 
 template<typename B, typename...BAs>
-solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& sys) {
+solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& system) {
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
-	if (!has_solution(sys)) return {};
+
+	#ifdef DEBUG
+	std::cout << "solve_minterm_system: ";
+	for (const auto& minterm : system) std::cout << minterm << " ";
+	std::cout << "\n";
+	#endif // DEBUG
+
+	// We know the system has a solution as we only iterate over non-negative
+	// minterms (which trivially satisfy the condition of Theorem 3.3)
 	equality<BAs...> eq = _0<BAs...>;
-	for (auto& neq: make_minterm_system_disjoint<B, BAs...>(sys)) {
+	for (auto& neq: make_minterm_system_disjoint<B, BAs...>(system)) {
 		auto nf = neq
 			| tau_parser::bf_neq
 			| tau_parser::bf
@@ -466,7 +509,7 @@ solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& sys) {
 }
 
 template<typename B, typename...BAs>
-solution<BAs...> solve_inequality_system(const inequality_system<BAs...>& sys) {
+solution<BAs...> solve_inequality_system(const inequality_system<BAs...>& system) {
 	// Following Taba book:
 	//
 	// To solve  {h_i (T) ̸= 0}i∈I (and hence the original system whose solution
@@ -482,15 +525,28 @@ solution<BAs...> solve_inequality_system(const inequality_system<BAs...>& sys) {
 	// exists, then such a choice exists.
 	// for each possible choice of H_i's, we try to solve the minterm system
 	// using tthe above solve method.
-	for (auto& ms: minterm_inequality_system_range(sys)) {
-		auto solution = solve_minterm_system<B, BAs...>(ms);
+
+	#ifdef DEBUG
+	std::cout << "solve_inequality_system: ";
+	for (const auto& inequality : system) std::cout << inequality << " ";
+	std::cout << "\n";
+	#endif // DEBUG
+
+	//for (auto& ms: minterm_inequality_system_range<BAs...>(system)) {
+	for (auto it = minterm_inequality_system_iterator<BAs...>(system); it != minterm_inequality_system_iterator<BAs...>::end; ++it) {
+		#ifdef DEBUG
+		std::cout << "minterm system: ";
+		for (const auto& minterm : *it) std::cout << minterm << " ";
+		std::cout << "\n";
+		#endif // DEBUG
+		auto solution = solve_minterm_system<B, BAs...>(*it);
 		if (!solution.empty()) return solution;
 	}
 	return {};
 }
 
 template<typename B, typename...BAs>
-solution<BAs...> solve_system(const equation_system<BAs...>& sys) {
+solution<BAs...> solve_system(const equation_system<BAs...>& system) {
 	// As in the Taba book, we consider
 	// 		f (X) = 0
 	//		{g_i (X) ̸= 0}i∈I
@@ -504,12 +560,24 @@ solution<BAs...> solve_system(const equation_system<BAs...>& sys) {
 	// TODO (HIGH) check for constant equalities/inequalities and remove them if
 	// they are true, return empty solution otherwise
 
-	if (!sys.first) return solve_inequality_system<B, BAs...>(sys.second);
-	auto phi = lgrs(sys.first.value());
+	#ifdef DEBUG
+	if (system.first.has_value())
+		std::cout << "solve_system: " << system.first.value() << " ";
+	for (const auto& inequality : system.second) std::cout << inequality << " ";
+	std::cout << "\n";
+	#endif // DEBUG
+
+	if (!system.first) return solve_inequality_system<B, BAs...>(system.second);
+	auto phi = lgrs(system.first.value());
 	inequality_system<BAs...> inequalities;
 	// for each inequality g_i we apply the transformation given by lgrs solution
 	// of the equality
-	for (auto& g_i: sys.second) inequalities.insert(replace(g_i, phi));
+	for (auto& g_i: system.second) {
+		auto nphi = phi, ng_i = replace(g_i, nphi);
+		if (ng_i == _F<BAs...>) return {};
+		else if (ng_i == _T<BAs...>) continue;
+		inequalities.insert(ng_i);
+	}
 	// and finally solve the given system  of inequalities
 	return solve_inequality_system<B, BAs...>(inequalities);
 }
