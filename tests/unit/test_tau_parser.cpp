@@ -1165,6 +1165,15 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::type;
 		CHECK( type.has_value() );
 	}
+
+	TEST_CASE("multiple constants") {
+		const char* sample = "{ type : binding } & { type : binding2 }";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::bf_and });
+		auto constants = make_statement(src) || tau_parser::bf
+						|| tau_parser::bf_constant;
+		CHECK( constants.size() == 2 );
+	}
 }
 
 // TODO (VERY_LOW) write tests for parsing bf_is_one_cb
