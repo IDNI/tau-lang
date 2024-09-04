@@ -78,7 +78,7 @@ nso<BAs...> transform_io_var(const nso<BAs...>& io_var, const string& io_var_nam
 }
 
 template<typename... BAs>
-nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto &io_vars, const auto &io_var_names,
+nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto& io_vars, const auto& io_var_names,
                                                   const auto& initials, int_t time_point) {
 	// This map is needed in order to get the minimal shift for streams with same name
 	set<int_t> quantifiable_o_vars;
@@ -104,7 +104,7 @@ nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto &io
 }
 
 template<typename... BAs>
-nso<BAs...> universally_quantify_input_streams(nso<BAs...> fm, const auto &io_vars, const auto &io_var_names,
+nso<BAs...> universally_quantify_input_streams(nso<BAs...> fm, const auto& io_vars, const auto& io_var_names,
                                                const auto& initials, int_t time_point) {
 	// This map is needed in order to get the minimal shift for streams with same name
 	set<int_t> quantifiable_i_vars;
@@ -130,6 +130,36 @@ nso<BAs...> universally_quantify_input_streams(nso<BAs...> fm, const auto &io_va
 }
 
 template<typename... BAs>
+nso<BAs...> calculate_flag(const nso<BAs...>& flag, int_t time_point) {
+	auto to_ba = [](const bool c){return c ? _1_trimmed<BAs...> : _0_trimmed<BAs...>;};
+	int_t condition;
+	bool is_left;
+	if (is_non_terminal(tau_parser::num, trim2(flag))) {
+		is_left = true;
+		condition = size_t_extractor<BAs...>(trim(trim2(flag))).value();
+	}
+	else {
+		is_left = false;
+		condition = size_t_extractor<BAs...>(trim(flag)->child[1]->child[0]).value();
+	}
+	if (flag | tau_parser::flag_neq)
+		return to_ba(condition != time_point);
+	if (flag | tau_parser::flag_eq)
+		return to_ba(condition == time_point);
+	if (flag | tau_parser::flag_greater_equal)
+		return is_left ? to_ba(condition >= time_point) : to_ba(time_point >= condition);
+	if (flag | tau_parser::flag_greater)
+		return is_left ? to_ba(condition > time_point) : to_ba(time_point > condition);
+	if (flag | tau_parser::flag_less_equal)
+		return is_left ? to_ba(condition <= time_point) : to_ba(time_point <= condition);
+	if (flag | tau_parser::flag_less)
+		return is_left ? to_ba(condition < time_point) : to_ba(time_point < condition);
+	// The above is exhaustive for possible children of flag
+	assert(false);
+	return {};
+}
+
+template<typename... BAs>
 nso<BAs...> build_initial_step(const nso<BAs...>& original_fm, const auto &io_vars, const auto &io_var_names,
                        int_t time_point) {
 	map<nso<BAs...>, nso<BAs...>> changes;
@@ -137,22 +167,28 @@ nso<BAs...> build_initial_step(const nso<BAs...>& original_fm, const auto &io_va
 		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point);
 		changes[io_vars[i]] = new_io_var;
 	}
+	auto flags = select_top(original_fm, is_non_terminal<tau_parser::flag, BAs...>);
+	// for (const auto& flag : flags)
+	// 	calculate_flag(flag, time_point);
 	return replace(original_fm, changes);
 }
 
 template<typename... BAs>
-nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_fm, const auto &io_vars, const auto &io_var_names,
-						const auto& initials, int_t step_num, int_t time_point, nso<BAs...>& cached_fm) {
+nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_fm, const auto& io_vars,
+                       const auto& io_var_names, const auto& initials, int_t step_num, int_t time_point,
+                       nso<BAs...>& cached_fm) {
 	// Use build_initial_step otherwise
 	assert(step_num > 0);
-	map<nso<BAs...>, nso<BAs...>> changes;
-    for (size_t i = 0; i < io_vars.size(); ++i) {
-        auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point + step_num);
-        changes[io_vars[i]] = new_io_var;
-    }
+	map<nso<BAs...>, nso<BAs...> > changes;
+	for (size_t i = 0; i < io_vars.size(); ++i) {
+		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point + step_num);
+		changes[io_vars[i]] = new_io_var;
+	}
 	nso<BAs...> most_inner_step = replace(original_fm, changes);
-	auto q_most_inner_step = existentially_quantify_output_streams(most_inner_step, io_vars, io_var_names, initials, time_point + step_num);
-	q_most_inner_step = universally_quantify_input_streams(q_most_inner_step, io_vars, io_var_names, initials, time_point + step_num);
+	auto q_most_inner_step = existentially_quantify_output_streams(most_inner_step, io_vars, io_var_names, initials,
+	                                                               time_point + step_num);
+	q_most_inner_step = universally_quantify_input_streams(q_most_inner_step, io_vars, io_var_names, initials,
+	                                                       time_point + step_num);
 	changes = {{cached_fm, build_wff_and(cached_fm, q_most_inner_step)}};
 	cached_fm = most_inner_step;
 	return replace(prev_fm, changes);
@@ -174,36 +210,39 @@ nso<BAs...> transform_initials(const nso<BAs...>& fm, const auto& io_vars, const
 // We assume that the formula has run through the normalizer before
 // TODO: Flag resolution
 template<typename... BAs>
-nso<BAs...> always_to_unbounded_continuation (nso<BAs...> fm, bool enable_output=false) {
+nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm, bool enable_output = true) {
 	assert(has_no_boolean_combs_of_models(fm));
 	if (is_child_non_terminal(tau_parser::wff_always, fm))
 		fm = trim2(fm);
-	vector<nso<BAs...>> io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
+	vector<nso<BAs...> > io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
 	auto new_io_var_names = produce_io_var_names(io_vars);
 	// Save positions of io_variables which are initial conditions
-	set<pair<string, int_t>> initials;
-	for (int_t i = 0; i < (int_t)io_vars.size(); ++i)
+	set<pair<string, int_t> > initials;
+	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
 		if (trim2(io_vars[i])->child[1] | tau_parser::num)
-			initials.emplace(new_io_var_names[i], size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value());
+			initials.emplace(new_io_var_names[i],
+			                 size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value());
 
 	int_t time_point = get_max_shift(io_vars);
 	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars, new_io_var_names, time_point);
 	int_t step_num = 1;
 	nso<BAs...> cache = prev_unbounded_fm;
 	nso<BAs...> unbounded_fm =
-		build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num, time_point, cache);
+			build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num, time_point,
+			           cache);
 
-    // cout << "Continuation at step " << step_num << "\n";
-    // cout << unbounded_fm << "\n";
+	// cout << "Continuation at step " << step_num << "\n";
+	// cout << unbounded_fm << "\n";
 
 	int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
 	if (time_point + 1 >= max_initial_condition) max_initial_condition = 1;
-	while(step_num < max_initial_condition || !are_nso_equivalent(prev_unbounded_fm, unbounded_fm)) {
+	while (step_num < max_initial_condition || !are_nso_equivalent(prev_unbounded_fm, unbounded_fm)) {
 		prev_unbounded_fm = unbounded_fm;
 		++step_num;
 
 		unbounded_fm =
-			build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num, time_point, cache);
+				build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num,
+				           time_point, cache);
 		// cout << "Continuation at step " << step_num << "\n";
 		// cout << unbounded_fm << "\n";
 	}
