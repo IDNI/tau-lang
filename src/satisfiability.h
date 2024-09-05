@@ -21,13 +21,39 @@ using namespace idni::tau;
 
 namespace idni::tau {
 
+// ------ Helpers for variables having io_var as child ---------------
+template<typename... BAs>
+auto is_io_initial (const nso<BAs...>& io_var) {
+	return (trim2(io_var)->child[1] | tau_parser::num).has_value();
+}
+
+template<typename... BAs>
+auto is_io_shift (const nso<BAs...>& io_var) {
+	return (trim2(io_var)->child[1] | tau_parser::shift).has_value();
+}
+
+template<typename... BAs>
+auto get_io_time_point (const nso<BAs...>& io_var) {
+	return size_t_extractor<BAs...>(trim2(trim2(io_var)->child[1])).value();
+}
+
+template<typename... BAs>
+auto get_io_shift (const nso<BAs...>& io_var) {
+	return size_t_extractor<BAs...>(trim2(io_var)->child[1]->child[0]->child[1]->child[0]).value();
+}
+
+template<typename... BAs>
+nso<BAs...> get_io_name (const nso<BAs...>& io_var) {
+	return trim(trim2(io_var));
+}
+// -----------------------------------------------
 // Make all variable names equally long by appending 0's in front of stream number
 template<typename... BAs>
 vector<string> produce_io_var_names (const vector<nso<BAs...>>& io_vars) {
 	vector<string> names;
 	for (const nso<BAs...>& io_var : io_vars) {
 		stringstream name;
-		name << trim(trim2(io_var));
+		name << get_io_name(io_var);
 		names.emplace_back(name.str());
 	}
 	return names;
@@ -36,8 +62,8 @@ vector<string> produce_io_var_names (const vector<nso<BAs...>>& io_vars) {
 template<typename... BAs>
 int_t get_io_var_shift(const nso<BAs...>& io_var) {
 	// If there is a shift
-	if ((trim2(io_var)->child[1] | tau_parser::shift).has_value())
-		return size_t_extractor<BAs...>(trim2(io_var)->child[1]->child[0]->child[1]->child[0]).value();
+	if (is_io_shift(io_var))
+		return get_io_shift(io_var);
 	return 0;
 }
 
@@ -52,8 +78,8 @@ template<typename... BAs>
 int_t get_max_initial(const auto& io_vars) {
 	int_t max_init = 0;
 	for (const nso<BAs...>& v : io_vars) {
-		if (trim2(v)->child[1] | tau_parser::num) {
-			int_t init = size_t_extractor<BAs...>(trim2(trim2(v)->child[1])).value();
+		if (is_io_initial(v)) {
+			int_t init = get_io_time_point(v);
 			max_init = max(max_init, init);
 		}
 	}
@@ -61,15 +87,21 @@ int_t get_max_initial(const auto& io_vars) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_inf_var(const string& name, const int_t time_point) {
-	stringstream var; var << name << ":" << time_point;
-	return wrap(tau_parser::variable, wrap<BAs...>(tau_parser::charvar, var.str()));
+int_t get_lookback_after_normalization(const auto& io_vars) {
+	int_t max_lookback = 0;
+	for (const auto& v : io_vars) {
+		if (is_io_initial(v) && !is_non_terminal(tau_parser::extra, trim(v)->child.back())) {
+			int_t lookback = get_io_time_point(v);
+			max_lookback = max(max_lookback, lookback);
+		}
+	}
+	return max_lookback;
 }
 
 template<typename... BAs>
 nso<BAs...> transform_io_var(const nso<BAs...>& io_var, const string& io_var_name, int_t time_point) {
 	// Check if io_var has constant time point
-	if ((trim2(io_var)->child[1] | tau_parser::num).has_value())
+	if (is_io_initial(io_var))
 		return io_var;
 	auto shift = get_io_var_shift(io_var);
 	stringstream time;
@@ -87,7 +119,7 @@ nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto& io
 		if (io_vars[i] | tau_parser::io_var | tau_parser::in)
 			continue;
 		// Skip initial conditions
-		if (trim2(io_vars[i])->child[1] | tau_parser::num)
+		if (is_io_initial(io_vars[i]))
 			continue;
 		quantifiable_o_vars.insert(i);
 	}
@@ -113,7 +145,7 @@ nso<BAs...> universally_quantify_input_streams(nso<BAs...> fm, const auto& io_va
 		if (io_vars[i] | tau_parser::io_var | tau_parser::out)
 			continue;
 		// Skip initial conditions
-		if (trim2(io_vars[i])->child[1] | tau_parser::num)
+		if (is_io_initial(io_vars[i]))
 			continue;
 		quantifiable_i_vars.insert(i);
 	}
@@ -194,26 +226,46 @@ nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_f
 	return replace(prev_fm, changes);
 }
 
+
 template<typename... BAs>
-nso<BAs...> transform_initials(const nso<BAs...>& fm, const auto& io_vars, const auto& io_var_names) {
+nso<BAs...> add_initial_info (const nso<BAs...>& fm) {
+	map<nso<BAs...>, nso<BAs...>> changes;
+	auto io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
+	for (const auto& io_var : io_vars)
+		if (trim2(io_var)->child[1] | tau_parser::num)
+			changes[io_var->child[0]] = build_extra(io_var->child[0], "init");
+
+	return replace(fm, changes);
+}
+
+template<typename... BAs>
+nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm) {
+	// Find lookback
+	auto current_io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
+	int_t lookback = get_lookback_after_normalization(current_io_vars);
+
 	map<nso<BAs...>,nso<BAs...>> changes;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
-		// If io_var is initial, add to changes
-		if (trim2(io_vars[i])->child[1] | tau_parser::num) {
-			int_t time_point = size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value();
-			changes.emplace(io_vars[i], build_inf_var<BAs...>(io_var_names[i], time_point));
+	for (const auto& io_var : current_io_vars) {
+		if (!is_non_terminal(tau_parser::extra, trim(io_var)->child.back())) {
+			int_t time_point = size_t_extractor<BAs...>(trim2(trim2(io_var)->child[1])).value();
+			stringstream name;
+			if (time_point - lookback == 0) name << trim(trim2(io_var)) << "[t]";
+			else name << trim(trim2(io_var)) << "[t" << time_point - lookback << "]";
+			auto new_io_var = build_bf_var<BAs...>(name.str());
+			changes.emplace(io_var, new_io_var);
 		}
 	}
 	return replace(fm, changes);
 }
 
 // We assume that the formula has run through the normalizer before
-// TODO: Flag resolution
+// TODO: Flag integration
 template<typename... BAs>
 nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm, bool enable_output = true) {
 	assert(has_no_boolean_combs_of_models(fm));
 	if (is_child_non_terminal(tau_parser::wff_always, fm))
 		fm = trim2(fm);
+	fm = add_initial_info(fm);
 	vector<nso<BAs...> > io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
 	auto new_io_var_names = produce_io_var_names(io_vars);
 	// Save positions of io_variables which are initial conditions
@@ -231,8 +283,8 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm, bool enable_output 
 			build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num, time_point,
 			           cache);
 
-	// cout << "Continuation at step " << step_num << "\n";
-	// cout << unbounded_fm << "\n";
+	cout << "Continuation at step " << step_num << "\n";
+	cout << unbounded_fm << "\n";
 
 	int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
 	if (time_point + 1 >= max_initial_condition) max_initial_condition = 1;
@@ -243,13 +295,22 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm, bool enable_output 
 		unbounded_fm =
 				build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num,
 				           time_point, cache);
-		// cout << "Continuation at step " << step_num << "\n";
-		// cout << unbounded_fm << "\n";
+		cout << "Continuation at step " << step_num << "\n";
+		cout << unbounded_fm << "\n";
 	}
 	if (enable_output)
 		cout << "Unbounded continuation of Tau formula reached fixpoint after " << step_num - 1 << " steps.\n";
-	return transform_initials(prev_unbounded_fm, io_vars, new_io_var_names);
+	prev_unbounded_fm = normalizer_step<BAs...>(prev_unbounded_fm);
+	return transform_back_non_initials(prev_unbounded_fm);
 }
+
+/*
+ *	Possible tests
+ *	(o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0 -> failing at the moment
+ *	o1[0] = 0 && o1[t] = 0 -> failing at the moment
+ *	o1[t] = i1[t] && o1[3] = 0 -> F
+ *	o1[t-1] = i1[t] -> F
+ */
 
 /*
 // TODO (HIGH) check if we could use regular rules instead of callback rules
