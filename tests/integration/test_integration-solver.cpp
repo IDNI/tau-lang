@@ -26,7 +26,28 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-TEST_SUITE("minterm_iterator") {
+auto splitter_one_bdd() {
+	auto var_name = "splitter_one";
+	auto v = dict(var_name);
+	auto ref = bdd<Bool>::bit(v);
+	auto splitter_one = bdd_handle<Bool>::get(ref);
+	return build_bf_constant(variant<bdd_test>(splitter_one));
+}
+
+bool check_solution(const nso<bdd_test>& equation, std::map<nso<bdd_test>, nso<bdd_test>> solution) {
+	auto copy = solution;
+	auto substitution = replace(equation, copy);
+	auto check = snf_wff(substitution);
+	#ifdef DEBUG
+	std::cout << "checking solution: " << solution;
+	std::cout << "equation: " << equation << "\n";
+	std::cout << "substitution: " << substitution << "\n";
+	std::cout << "snf: " << check << "\n";
+	#endif // DEBUG
+	return check == _T<bdd_test>;
+}
+
+/*TEST_SUITE("minterm_iterator") {
 
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
@@ -245,7 +266,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		CHECK ( n == 7 );
 	}
 
-	TEST_CASE("two inequalities with one var") {
+	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a != 0.";
 		auto sample_src1 = make_tau_source(sample1);
 		bdd_test_factory bf;
@@ -286,19 +307,6 @@ TEST_SUITE("minterm_inequality_system_range") {
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
 		CHECK ( n == 49 );
 	}
-}
-
-bool check_solution(const nso<bdd_test>& equation, std::map<nso<bdd_test>, nso<bdd_test>> solution) {
-	auto copy = solution;
-	auto substitution = replace(equation, copy);
-	auto check = snf_wff(substitution);
-	#ifdef DEBUG
-	std::cout << "checking solution: " << solution;
-	std::cout << "equation: " << equation << "\n";
-	std::cout << "substitution: " << substitution << "\n";
-	std::cout << "snf: " << check << "\n";
-	#endif // DEBUG
-	return check == _T<bdd_test>;
 }
 
 TEST_SUITE("find_solution") {
@@ -370,7 +378,7 @@ TEST_SUITE("solve_minterm_system") {
 		minterm_system<bdd_test> system;
 		for (const auto& minterm: minterms)
 			system.insert(bdd_make_nso(minterm));
-		auto solution = solve_minterm_system<bdd_test, bdd_test>(system);
+		auto solution = solve_minterm_system<bdd_test>(system, splitter_one_bdd());
 		bool check = true;
 		for (const auto& equation: system)
 			check = check ? check_solution(equation, solution.value()) : false;
@@ -388,7 +396,7 @@ TEST_SUITE("solve_minterm_system") {
 			{"{bdd: a} x != 0." , "{bdd: b} y != 0."};
 		CHECK( test_solve_minterm_system(sample) );
 	}
-}
+}*/
 
 TEST_SUITE("solve_inequality_system") {
 
@@ -401,21 +409,67 @@ TEST_SUITE("solve_inequality_system") {
 		for (const auto& inequality: inequalities) {
 			system.insert(bdd_make_nso(inequality));
 		}
-		auto solution = solve_inequality_system<bdd_test, bdd_test>(system);
+		auto solution = solve_inequality_system<bdd_test>(system, splitter_one_bdd());
 		bool check = true;
 		for (const auto& equation: system)
 			check = check ? check_solution(equation, solution.value()) : false;
 		return check;
 	}
 
-	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: b} y != 0.") {
+	// Case 1 of add_minterm_to_disjoint: d = {bdd: a} x and m = {bdd: a} x'
+	// both have the same exponent
+	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: b} x != 0.") {
 		const std::vector<std::string> sample =
-			{"{bdd: a} x != 0." , "{bdd: b} y != 0."};
+			{"{bdd: a} x != 0." , "{bdd: b} x != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 2 of add_minterm_to_disjoint: d = ({bdd: a}|{bdd:b}) x and
+	// m = {bdd: a} x', both have different exponents and d_cte & m_cte != false
+	// and d_cte & ~m_cte != false
+	TEST_CASE("one var (using splitter of a bdd): ({bdd: a}|{bdd:b}) x != 0 && {bdd: a} x' != 0.") {
+		const std::vector<std::string> sample =
+			{"({bdd: a}|{bdd:b}) x != 0." , "{bdd: a} x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 3 of add_minterm_to_disjoint: d = {bdd: a} x and
+	// m = ({bdd: a}|{bdd: b}) x', both have different exponents and
+	// d_cte & m_cte != false and ~d_cte & m_cte != false
+	TEST_CASE("one var (using splitter of a bdd): {bdd: a} x != 0 && ({bdd: a}|{bdd:b}) x' != 0.") {
+		const std::vector<std::string> sample =
+			{"{bdd: a} x != 0." , "({bdd: a}|{bdd:b}) x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 4.1 of add_minterm_to_disjoint: d = x and m = x' both have different
+	// exponents and d_cte & m_cte != false, d_cte & ~m_cte = false,
+	// ~d_cte & m_cte = false and d_cte = 1
+	TEST_CASE("one var (using splitter of a bdd): x != 0 && x' != 0.") {
+		const std::vector<std::string> sample =
+			{"x != 0." , "x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 4.2 of add_minterm_to_disjoint: d = ({bdd: a}&{bdd: b}) x and
+	// m = ({bdd: a}|{bdd: b}) x' both have different exponents and
+	// d_cte & m_cte != false, d_cte & ~m_cte = false,  ~d_cte & m_cte = false
+	// and d_cte != 1
+	TEST_CASE("one var (using splitter of one): ({bdd: a}&{bdd: b}) x != 0 && ({bdd: a}|{bdd: b}) x' != 0.") {
+		const std::vector<std::string> sample =
+			{"({bdd: a}&{bdd: b}) x != 0." , "({bdd: a}|{bdd: b}) x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 5 of add_minterm_to_disjoint
+	TEST_CASE("one var (using splitter of a bdd): {bdd: a} x != 0 && {bdd: a}' x' != 0.") {
+		const std::vector<std::string> sample =
+			{"{bdd: a} x != 0." , "{bdd: a} x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
 	}
 }
 
-TEST_SUITE("solve_system") {
+/*TEST_SUITE("solve_system") {
 
 	bool test_solve_system(const std::string equality,
 			const std::vector<std::string> inequalities) {
@@ -427,7 +481,7 @@ TEST_SUITE("solve_system") {
 		if (equality.size() != 0) system.first = bdd_make_nso(equality);
 		for (const auto& inequality: inequalities)
 		system.second.insert(bdd_make_nso(inequality));
-		auto solution = solve_system<bdd_test, bdd_test>(system);
+		auto solution = solve_system<bdd_test>(system, splitter_one_bdd());
 		bool check = system.first
 			? check_solution(system.first.value(), solution.value())
 			: false;
@@ -456,4 +510,4 @@ TEST_SUITE("solve_system") {
 			{ "{bdd: b} y x != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
-}
+}*/

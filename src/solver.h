@@ -444,41 +444,57 @@ std::set<nso<BAs...>> get_exponent(const nso<BAs...>& n) {
 	return std::set<nso<BAs...>>(all_vs.begin(), all_vs.end());
 }
 
-template<typename B, typename...BAs>
-minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint, const minterm<BAs...>& m) {
-	minterm_system<BAs...> new_disjoint = disjoint;
+template<typename...BAs>
+minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint,
+		const minterm<BAs...>& m, const sp_tau_node<BAs...>& splitter_one) {
+	minterm_system<BAs...> new_disjoint;
 	auto new_m = m;
 	for (auto& d: disjoint) {
+		// case 1
 		if (get_exponent(d) == get_exponent(m)) {
 			new_disjoint.insert(d);
 			continue;
 		}
-		if (auto d_cte = get_constant(d), new_m_cte = get_constant(new_m); (d_cte & new_m_cte) != false) {
-			if ((d_cte & ~new_m_cte) != false) new_disjoint.insert(~new_m_cte & d);
-			else if ((new_m_cte & ~d_cte) != false) {
+		if (auto d_cte = get_constant(d), new_m_cte = get_constant(new_m);
+				(d_cte & new_m_cte) != false) {
+			// case 2
+			if ((d_cte & ~new_m_cte) != false)
+				new_disjoint.insert(~new_m_cte & d);
+			// case 3
+			else if ((~d_cte & new_m_cte) != false) {
 				new_disjoint.insert(d);
 				new_m = ~d_cte & new_m;
+			// case 4
 			} else {
-				auto s = d_cte == _1<BAs...> ? tau_bad_splitter<BAs...>()
-					: splitter(d_cte | tau_parser::bf_constant | optional_value_extractor<nso<BAs...>>);
+				auto s = d_cte == _1<BAs...>
+					// case 4.1
+					? splitter_one
+					// case 4.2
+					: splitter(d_cte
+						| tau_parser::bf_constant
+						| optional_value_extractor<nso<BAs...>>);
 				new_disjoint.insert(s & d);
 				new_m = ~s & new_m;
 			}
+		// case 5
 		} else new_disjoint.insert(d);
 	}
 	new_disjoint.insert(new_m);
 	return new_disjoint;
 }
 
-template<typename B, typename...BAs>
-minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys) {
+template<typename...BAs>
+minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys,
+		const sp_tau_node<BAs...>& splitter_one) {
 	minterm_system<BAs...> disjoints;
-	for (auto it = sys.begin(); it != sys.end(); ++it) disjoints = add_minterm_to_disjoint<B, BAs...>(disjoints, *it);
+	for (auto it = sys.begin(); it != sys.end(); ++it)
+		disjoints = add_minterm_to_disjoint<BAs...>(disjoints, *it, splitter_one);
 	return disjoints;
 }
 
-template<typename B, typename...BAs>
-std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system) {
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system,
+		const sp_tau_node<BAs...>& splitter_one) {
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
@@ -492,7 +508,7 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 	// We know the system has a solution as we only iterate over non-negative
 	// minterms (which trivially satisfy the condition of Theorem 3.3)
 	equality<BAs...> eq = _0<BAs...>;
-	for (auto& neq: make_minterm_system_disjoint<B, BAs...>(system)) {
+	for (auto& neq: make_minterm_system_disjoint<BAs...>(system, splitter_one)) {
 		auto nf = neq
 			| tau_parser::bf_neq
 			| tau_parser::bf
@@ -506,8 +522,9 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 	return find_solution(eq);
 }
 
-template<typename B, typename...BAs>
-std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system) {
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system,
+		const sp_tau_node<BAs...>& splitter_one) {
 	// Following Taba book:
 	//
 	// To solve  {h_i (T) ̸= 0}i∈I (and hence the original system whose solution
@@ -537,14 +554,15 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 		for (const auto& minterm : *it) std::cout << minterm << " ";
 		std::cout << "\n";
 		#endif // DEBUG
-		auto solution = solve_minterm_system<B, BAs...>(*it);
+		auto solution = solve_minterm_system<BAs...>(*it, splitter_one);
 		if (solution.has_value()) return solution;
 	}
 	return {};
 }
 
-template<typename B, typename...BAs>
-std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system) {
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
+		const sp_tau_node<BAs...>& splitter_one) {
 	// As in the Taba book, we consider
 	// 		f (X) = 0
 	//		{g_i (X) ̸= 0}i∈I
@@ -565,7 +583,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	std::cout << "\n";
 	#endif // DEBUG
 
-	if (!system.first) return solve_inequality_system<B, BAs...>(system.second);
+	if (!system.first) return solve_inequality_system<BAs...>(system.second, splitter_one);
 	auto phi = lgrs(system.first.value());
 	if (!phi.has_value()) return {};
 	inequality_system<BAs...> inequalities;
@@ -578,12 +596,12 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		inequalities.insert(ng_i);
 	}
 	// and finally solve the given system  of inequalities
-	return solve_inequality_system<B, BAs...>(inequalities);
+	return solve_inequality_system<BAs...>(inequalities, splitter_one);
 }
 
 // This is the entry point for the solver. B denotes the default Boolean algebra
 // and BAs are the underlying Boolean algebras used in the system.
-template<typename B, typename...BAs>
+template<typename...BAs>
 std::optional<solution<BAs...>> solve(const equations<BAs...> eqs) {
 	return {};
 }
