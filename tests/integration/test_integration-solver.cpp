@@ -309,7 +309,7 @@ TEST_SUITE("find_solution") {
 		#endif // DEBUG
 		auto equation = bdd_make_nso(src);
 		auto solution = find_solution(equation);
-		return ( check_solution(equation, solution));
+		return ( check_solution(equation, solution.value()));
 	}
 
 	TEST_CASE("one var: x = 0.") {
@@ -346,7 +346,7 @@ TEST_SUITE("lgrs") {
 		#endif // DEBUG
 		auto equation = bdd_make_nso(src);
 		auto solution = lgrs(equation);
-		return ( check_solution(equation, solution) );
+		return ( check_solution(equation, solution.value()) );
 	}
 
 	TEST_CASE("two var: x | y = 0.") {
@@ -373,7 +373,7 @@ TEST_SUITE("solve_minterm_system") {
 		auto solution = solve_minterm_system<bdd_test, bdd_test>(system);
 		bool check = true;
 		for (const auto& equation: system)
-			check = check ? check_solution(equation, solution) : false;
+			check = check ? check_solution(equation, solution.value()) : false;
 		return check;
 	}
 
@@ -404,7 +404,7 @@ TEST_SUITE("solve_inequality_system") {
 		auto solution = solve_inequality_system<bdd_test, bdd_test>(system);
 		bool check = true;
 		for (const auto& equation: system)
-			check = check ? check_solution(equation, solution) : false;
+			check = check ? check_solution(equation, solution.value()) : false;
 		return check;
 	}
 
@@ -429,10 +429,10 @@ TEST_SUITE("solve_system") {
 		system.second.insert(bdd_make_nso(inequality));
 		auto solution = solve_system<bdd_test, bdd_test>(system);
 		bool check = system.first
-			? check_solution(system.first.value(), solution)
+			? check_solution(system.first.value(), solution.value())
 			: false;
 		for (const auto& equation: system.second)
-			check = check ? check_solution(equation, solution) : false;
+			check = check ? check_solution(equation, solution.value()) : false;
 		return check;
 	}
 
