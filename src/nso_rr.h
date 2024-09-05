@@ -94,7 +94,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 	if (!l_has_extra && !r_has_extra)
 		return (l->value == r->value && l->child == r->child);
 	if (l_has_extra && !r_has_extra) {
-		if (l->child.size() - 1 != r->child.size()) return false;
+		if (l->child.size() != r->child.size() + 1) return false;
 		for (int i = 0; i < (int_t)r->child.size(); ++i) {
 			if (!(l->child[i] == r->child[i]))
 				return false;
@@ -102,7 +102,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 		return l->value == r->value;
 	}
 	if (!l_has_extra && r_has_extra) {
-		if (l->child.size() != r->child.size() - 1) return false;
+		if (l->child.size() + 1 != r->child.size()) return false;
 		for (int i = 0; i < (int_t)l->child.size(); ++i) {
 			if (!(l->child[i] == r->child[i]))
 				return false;
@@ -111,8 +111,8 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 	}
 	if (l_has_extra && r_has_extra) {
 		if (l->child.size() != r->child.size()) return false;
-		for (int i = 0; i < (int_t)l->child.size() - 1; ++i) {
-			if (!(l->child[i] == r->child[i]))
+		for (int i = 1; i < ((int_t)l->child.size()); ++i) {
+			if (!(l->child[i-1] == r->child[i-1]))
 				return false;
 		}
 		return l->value == r->value;
@@ -1834,6 +1834,14 @@ static const sp_tau_node<BAs...> _T = bldr_wff_T<BAs...>.second;
 
 template<typename... BAs>
 static const sp_tau_node<BAs...> _T_trimmed = trim(_T<BAs...>);
+
+template<typename... BAs>
+nso<BAs...> build_extra (const nso<BAs...> n, const std::string &note) {
+	assert((!n->child.empty()) && (!is_non_terminal(tau_parser::extra, n->child.back())));
+	std::vector<nso<BAs...>> c (n->child);
+	c.emplace_back(wrap<BAs...>(tau_parser::extra, note));
+	return make_node(n->value, move(c));
+}
 
 template<typename... BAs>
 nso<BAs...> build_num(size_t value) {
@@ -3953,6 +3961,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::debug_sym: stream << "debug"; break;
 			case tau_parser::trace_sym: stream << "trace"; break;
 			case tau_parser::info_sym:  stream << "info"; break;
+			case tau_parser::extra: break; // We do not output this
 			// for the rest skip value and just passthrough to child
 			default: for (const auto& c : n->child)
 					pp(stream, c, parent);
