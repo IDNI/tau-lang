@@ -199,9 +199,6 @@ nso<BAs...> build_initial_step(const nso<BAs...>& original_fm, const auto &io_va
 		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point);
 		changes[io_vars[i]] = new_io_var;
 	}
-	auto flags = select_top(original_fm, is_non_terminal<tau_parser::flag, BAs...>);
-	// for (const auto& flag : flags)
-	// 	calculate_flag(flag, time_point);
 	return replace(original_fm, changes);
 }
 
@@ -225,7 +222,6 @@ nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_f
 	cached_fm = most_inner_step;
 	return replace(prev_fm, changes);
 }
-
 
 template<typename... BAs>
 nso<BAs...> add_initial_info (const nso<BAs...>& fm) {
@@ -279,37 +275,38 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm, bool enable_output 
 	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars, new_io_var_names, time_point);
 	int_t step_num = 1;
 	nso<BAs...> cache = prev_unbounded_fm;
-	nso<BAs...> unbounded_fm =
-			build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num, time_point,
-			           cache);
+	nso<BAs...> unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num,
+	                                      time_point, cache);
 
 	cout << "Continuation at step " << step_num << "\n";
 	cout << unbounded_fm << "\n";
 
 	int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
-	if (time_point + 1 >= max_initial_condition) max_initial_condition = 1;
-	while (step_num < max_initial_condition || !are_nso_equivalent(prev_unbounded_fm, unbounded_fm)) {
+	while (step_num < max(max_initial_condition, time_point) ||
+					!are_nso_equivalent(prev_unbounded_fm, unbounded_fm)) {
 		prev_unbounded_fm = unbounded_fm;
 		++step_num;
 
-		unbounded_fm =
-				build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num,
+		unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num,
 				           time_point, cache);
+
 		cout << "Continuation at step " << step_num << "\n";
 		cout << unbounded_fm << "\n";
 	}
 	if (enable_output)
 		cout << "Unbounded continuation of Tau formula reached fixpoint after " << step_num - 1 << " steps.\n";
 	prev_unbounded_fm = normalizer_step<BAs...>(prev_unbounded_fm);
+	cout << prev_unbounded_fm << "\n";
 	return transform_back_non_initials(prev_unbounded_fm);
 }
 
 /*
  *	Possible tests
- *	(o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0 -> failing at the moment
+ *	(o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0 -> failing at the moment, bug in always/sometimes normalization
  *	o1[0] = 0 && o1[t] = 0 -> failing at the moment
- *	o1[t] = i1[t] && o1[3] = 0 -> F
- *	o1[t-1] = i1[t] -> F
+ *	o1[t] = i1[t] && o1[3] = 0 -> F, passing
+ *	o1[t-1] = i1[t] -> F, passing
+ *	o1[t-2] = 0 && o1[1] = 0 -> should be o1[t-2] = 0 && o1[t-1] = 0 && o1[t] = 0 && o1[1] = 0, failing at the moment
  */
 
 /*
