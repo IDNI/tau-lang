@@ -36,6 +36,17 @@ static const std::vector<std::tuple<std::string, std::string, std::string>> samp
 	{ "Lucca's example", "luccas_example",
 		"ex a ex b ex c ex d ex f ex e (ax + bx' = cy + dy'"
 		"|| ax + bx' != ey + fy') <-> (ax + bx' = cy + gy')."},
+//	{ "Bernays–Schönfinkel 1", "bernays-schonfinkel1",
+//		"all x ex y all z ex w all u ex v ((x<y && y<z)"
+//		"|| (z<w && w<u)|| (u<v && v<x))."},
+	{ "Bernays–Schönfinkel 1 (simplified)", "bernays-schonfinkel_simplified",
+		"all x ex y all z ex w ((x<y && y<z) || (z<w && w<x))."},
+//	{ "Bernays–Schönfinkel 2", "bernays-schonfinkel2",
+//		"all x ex y all z ex w all u ex v ((x<y && y<z)"
+//		"|| (z<w && w<u)) -> (u<v && v<x)."},
+	{ "Bernays–Schönfinkel 3", "bernays-schonfinkel3",
+		"ex x all y ex z all w ex c all o (x<y && y>w)"
+		"&& (z>x || w<y) -> (o>y || z>c)."}
 //	{ "Ohad's example", "ohads_example",
 //		"all a all b all c all d all p all q all r all s all m"
 //		"all j all k all l (all x ex y f(x,y)=0 || (g(x,y)=0 &&"

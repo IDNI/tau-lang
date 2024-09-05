@@ -120,6 +120,10 @@ chars                  => alpha alnum*.
 digits                 => digit+.
 sym                    => chars.
 
+# Additional information storage
+# Important: Only append as last child exactly once!
+extra => chars.
+
 # whitespace and comments
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
 __                     => (space | comment) _.   # whitespace
