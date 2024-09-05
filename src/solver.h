@@ -35,10 +35,8 @@ namespace idni::tau {
 
 template<typename...BAs>
 using typed_nso = nso<BAs...>;
-
 template<typename...BAs>
 using var = nso<BAs...>;
-
 template<typename...BAs>
 using minterm = nso<BAs...>;
 
@@ -47,6 +45,12 @@ using equality = nso<BAs...>;
 
 template<typename...BAs>
 using inequality = nso<BAs...>;
+
+template<typename...BAs>
+using equation = nso<BAs...>;
+
+template<typename...BAs>
+using equations = std::set<nso<BAs...>>;
 
 template<typename...BAs>
 using equation_system = std::pair<std::optional<equality<BAs...>>, std::set<inequality<BAs...>>>;
@@ -70,7 +74,7 @@ solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& orig
 }
 
 template<typename...BAs>
-solution<BAs...> find_solution(const equality<BAs...>& eq) {
+std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
 	// Theorem 3.1. For f (x,X) = xg (X) + x′h (X), let Z be a zero of
@@ -103,9 +107,9 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 				return solution;
 			}
 		}
-		if (auto restricted = find_solution(build_wff_eq(gh)); !restricted.empty()) {
-			solution.insert(restricted.begin(), restricted.end());
-			if (auto nn = replace(h, restricted) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
+		if (auto restricted = find_solution(build_wff_eq(gh)); restricted.has_value()) {
+			solution.insert(restricted.value().begin(), restricted.value().end());
+			if (auto nn = replace(h, restricted.value()) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
 				solution[vars[0]] = nn;
 			else solution[vars[0]] = ~g | bf_reduce_canonical<BAs...>();
 			return solution;
@@ -115,7 +119,7 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 }
 
 template<typename...BAs>
-solution<BAs...> lgrs(const equality<BAs...>& equality) {
+std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
 	// in the following theorem (of Taba Book):
 	//
@@ -125,12 +129,13 @@ solution<BAs...> lgrs(const equality<BAs...>& equality) {
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
 
 	auto s = find_solution(equality);
+	if (!s.has_value()) return {};
 	auto f = equality
 		| tau_parser::bf_eq
 		| tau_parser::bf
 		| optional_value_extractor<nso<BAs...>>;
 	solution<BAs...> phi;
-	for (auto& [x_i, z_i] : s)
+	for (auto& [x_i, z_i] : s.value())
 		phi[x_i] = ((z_i & f) | (x_i & ~f))
 			| bf_reduce_canonical<BAs...>();
 
@@ -430,13 +435,6 @@ nso<BAs...> get_minterm(const minterm<BAs...>& m) {
 }
 
 template<typename...BAs>
-bool has_solution(const minterm_system<BAs...>& sys) {
-	auto bs = _1<BAs...>;
-	for (auto& m: sys) bs = bs & get_constant(m);
-	return bs != _0<BAs...>;
-}
-
-template<typename...BAs>
 std::set<nso<BAs...>> get_exponent(const nso<BAs...>& n) {
 	auto is_bf_literal = [](const auto& n) -> bool {
 		return (n | tau_parser::variable).has_value()
@@ -480,7 +478,7 @@ minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>
 }
 
 template<typename B, typename...BAs>
-solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& system) {
+std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system) {
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
@@ -509,7 +507,7 @@ solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& system) {
 }
 
 template<typename B, typename...BAs>
-solution<BAs...> solve_inequality_system(const inequality_system<BAs...>& system) {
+std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system) {
 	// Following Taba book:
 	//
 	// To solve  {h_i (T) ̸= 0}i∈I (and hence the original system whose solution
@@ -540,13 +538,13 @@ solution<BAs...> solve_inequality_system(const inequality_system<BAs...>& system
 		std::cout << "\n";
 		#endif // DEBUG
 		auto solution = solve_minterm_system<B, BAs...>(*it);
-		if (!solution.empty()) return solution;
+		if (solution.has_value()) return solution;
 	}
 	return {};
 }
 
 template<typename B, typename...BAs>
-solution<BAs...> solve_system(const equation_system<BAs...>& system) {
+std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system) {
 	// As in the Taba book, we consider
 	// 		f (X) = 0
 	//		{g_i (X) ̸= 0}i∈I
@@ -569,17 +567,25 @@ solution<BAs...> solve_system(const equation_system<BAs...>& system) {
 
 	if (!system.first) return solve_inequality_system<B, BAs...>(system.second);
 	auto phi = lgrs(system.first.value());
+	if (!phi.has_value()) return {};
 	inequality_system<BAs...> inequalities;
 	// for each inequality g_i we apply the transformation given by lgrs solution
 	// of the equality
 	for (auto& g_i: system.second) {
-		auto nphi = phi, ng_i = replace(g_i, nphi);
+		auto nphi = phi.value(), ng_i = replace(g_i, nphi);
 		if (ng_i == _F<BAs...>) return {};
 		else if (ng_i == _T<BAs...>) continue;
 		inequalities.insert(ng_i);
 	}
 	// and finally solve the given system  of inequalities
 	return solve_inequality_system<B, BAs...>(inequalities);
+}
+
+// This is the entry point for the solver. B denotes the default Boolean algebra
+// and BAs are the underlying Boolean algebras used in the system.
+template<typename B, typename...BAs>
+std::optional<solution<BAs...>> solve(const equations<BAs...> eqs) {
+	return {};
 }
 
 } // idni::tau namespace
