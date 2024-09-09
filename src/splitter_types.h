@@ -16,7 +16,7 @@
 
 // Define the possible types of splitters for a Boolean algebra constant
 enum class splitter_type {
-	lower, middle, upper
+	lower, middle, upper, bad
 };
 
 #endif //SPLITTER_TYPES_H

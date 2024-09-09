@@ -47,7 +47,7 @@ bool check_solution(const nso<bdd_test>& equation, std::map<nso<bdd_test>, nso<b
 	return check == _T<bdd_test>;
 }
 
-/*TEST_SUITE("minterm_iterator") {
+TEST_SUITE("minterm_iterator") {
 
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
@@ -396,7 +396,7 @@ TEST_SUITE("solve_minterm_system") {
 			{"{bdd: a} x != 0." , "{bdd: b} y != 0."};
 		CHECK( test_solve_minterm_system(sample) );
 	}
-}*/
+}
 
 TEST_SUITE("solve_inequality_system") {
 
@@ -469,7 +469,7 @@ TEST_SUITE("solve_inequality_system") {
 	}
 }
 
-/*TEST_SUITE("solve_system") {
+TEST_SUITE("solve_system") {
 
 	bool test_solve_system(const std::string equality,
 			const std::vector<std::string> inequalities) {
@@ -510,4 +510,4 @@ TEST_SUITE("solve_inequality_system") {
 			{ "{bdd: b} y x != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
-}*/
+}

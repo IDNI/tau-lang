@@ -177,6 +177,7 @@ void init_logging() {
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	init_logging();
+	bdd_init<Bool>();
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);

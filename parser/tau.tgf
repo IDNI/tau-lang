@@ -175,8 +175,8 @@ cli_command            =>
         | ("valid"         :valid_sym   __ rr)                :valid_cmd
         | ("sat"           :sat_sym     __ rr)                :sat_cmd
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
-        | ("solve"         :solve_sym   __
-                solve_cmd_arg (',' _ solve_cmd_arg)+)         :solve_cmd
+        | ("solve"
+                :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
         | (("e" | "execute"):execute_sym __ (wff_typed | rr)) :execute_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
@@ -216,10 +216,10 @@ cli_command            =>
 number                 => digits.
 bf_cmd_arg             => memory | bf.
 wff_cmd_arg            => memory | wff.
+solve_cmd_arg          => memory | wff.
 nf_cmd_arg             => memory | wff | bf.
 onf_cmd_arg            => memory | wff.
 normalize_cmd_arg      => memory | rr | ref | wff | bf.
-solve_cmd_arg          => memory | bf_eq | bf_neq.
 inst_args              =>
           wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
         | bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
@@ -272,6 +272,6 @@ severity               => ("e" | "error"):error_sym
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
-        normalize_cmd_arg,
+        normalize_cmd_arg, solve_cmd_arg,
         bf  > bf_parenthesis  > bf,
         wff > wff_parenthesis > wff.

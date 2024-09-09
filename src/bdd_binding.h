@@ -162,8 +162,8 @@ struct bdd_binding_factory {
 
 struct tau_bdd_binding_factory {
 
-	sp_tau_node<tau_ba<bdd_binding>, bdd_binding> build(const std::string type_name, const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n) {
-		if (type_name != "bdd") return n;
+	sp_tau_node<tau_ba<bdd_binding>, bdd_binding> build(const std::string type, const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n) {
+		if (type != "bdd") return n;
 		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>;
 		std::string var = make_string<
 			tau_node_terminal_extractor_t<tau_ba<bdd_binding>, bdd_binding>,
@@ -180,6 +180,17 @@ struct tau_bdd_binding_factory {
 		auto ref = bdd_handle<Bool>::bit(true, v);
 		auto nn =  make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(ref, {});
 		return cache.emplace(var, nn).first->second;
+	}
+
+	std::optional<sp_tau_node<tau_ba<bdd_binding>, bdd_binding>> splitter_one(const std::string& type) const {
+		if (type != "bdd") return {};
+		auto var_name = "splitter_one";
+		auto v = dict(var_name);
+		auto ref = bdd<Bool>::bit(v);
+		auto splitter_one = bdd_handle<Bool>::get(ref);
+		return build_bf_constant(std::variant<tau_ba<bdd_binding>, bdd_binding>(splitter_one));
+		//auto splitter = bdd_bad_splitter<Bool>();
+		//return make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(splitter, {});
 	}
 
 	std::map<std::string, sp_tau_node<tau_ba<bdd_binding>, bdd_binding>> cache;
