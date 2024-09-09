@@ -18,6 +18,7 @@ set(TAU_HEADERS
 	splitter.h
 	splitter_types.h
 	variant_ba.h
+	executor.h
 	product_ba.h
 	utils.h
 	experimental/execution.h

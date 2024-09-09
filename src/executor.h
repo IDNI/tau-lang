@@ -19,7 +19,7 @@
 #ifndef __EXECUTOR_H__
 #define __EXECUTOR_H__
 
-#include "tau.h"
+#include "tau_ba.h"
 #include "satisfiability.h"
 
 template<typename...BAs>
