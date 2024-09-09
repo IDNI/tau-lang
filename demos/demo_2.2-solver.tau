@@ -9,5 +9,7 @@ solve {bdd: a} x = 0
 solve x != 0 && x' != 0
 # Let us now add some more complex formulas, ones involving tau splitters
 solve {: a = 0.} x != 0 && {: b = 0.} x != 0
+# or for example
+solve {: x = 0.} a + {:y = 0.} b = 0
 # Let us now consider an example with few more variables
 solve a x + b y = 0
