@@ -134,7 +134,7 @@ private:
 	std::optional<nso<tau_ba<BAs...>, BAs...>> qelim_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> normalizer_cmd(
+	std::optional<nso<tau_ba<BAs...>, BAs...>> normalize_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	void execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);

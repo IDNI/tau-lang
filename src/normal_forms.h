@@ -39,6 +39,12 @@ RULE(BF_TO_DNF_0, "($X | $Y) & $Z := $X & $Z | $Y & $Z.")
 RULE(BF_TO_DNF_1, "$X & ($Y | $Z) := $X & $Y | $X & $Z.")
 RULE(BF_PUSH_NEGATION_INWARDS_0, "($X & $Y)' := $X' | $Y'.")
 RULE(BF_PUSH_NEGATION_INWARDS_1, "($X | $Y)' := $X' & $Y'.")
+// RULE(BF_PUSH_NEGATION_INWARDS_2, "($X != $Y)' := $X = $Y.")
+// RULE(BF_PUSH_NEGATION_INWARDS_3, "($X = $Y)' := $X != $Y.")
+// RULE(BF_PUSH_NEGATION_INWARDS_4, "($X >= $Y)' := $X < $Y.")
+// RULE(BF_PUSH_NEGATION_INWARDS_5, "($X > $Y)' := $X <= $Y.")
+// RULE(BF_PUSH_NEGATION_INWARDS_6, "($X <= $Y)' := $X > $Y.")
+// RULE(BF_PUSH_NEGATION_INWARDS_7, "($X < $Y)' := $X >= $Y.")
 
 // bf callbacks
 RULE(BF_CALLBACK_NORMALIZE, "{ $X } := bf_normalize_cb $X.")
@@ -1134,6 +1140,19 @@ nso<BAs...> operator|(const nso<BAs...>& fm, const wff_reduce_cnf<BAs...>& r) {
 	return r(fm);
 }
 
+// A formula has a temporal variable if either it contains an io_var with a variable or capture
+// or it contains a flag
+template<typename... BAs>
+bool has_temp_var (const nso<BAs...>& fm) {
+	auto io_vars = select_top(fm, is_non_terminal<tau_parser::io_var, BAs...>);
+	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::flag, BAs...>).has_value();
+	for (const auto& io_var : io_vars) {
+		if (!find_top(io_var, is_non_terminal<tau_parser::num, BAs...>))
+			return true;
+	}
+	return find_top(fm, is_non_terminal<tau_parser::flag, BAs...>).has_value();
+}
+
 // Assumes a sometimes formula in dnf with negation pushed in containing no wff_or with max nesting depth 1
 template<typename... BAs>
 nso<BAs...> extract_sometimes (nso<BAs...> fm) {
@@ -1159,7 +1178,7 @@ nso<BAs...> extract_sometimes (nso<BAs...> fm) {
 	for (const auto& clause : clauses) {
 		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(clause)) &&
 					!is_non_terminal(tau_parser::wff_always, trim(clause)));
-		if (auto t = find_top(clause, is_non_terminal<tau_parser::io_var, BAs...>); !t.has_value())
+		if(!has_temp_var(clause))
 			extracted.push_back(clause);
 		else staying.push_back(clause);
 	}
@@ -1217,7 +1236,8 @@ nso<BAs...> extract_always (nso<BAs...> fm) {
 	for (const auto& clause : clauses) {
 		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(clause)) &&
 					!is_non_terminal(tau_parser::wff_always, trim(clause)));
-		if (auto t = find_top(clause, is_non_terminal<tau_parser::io_var, BAs...>); !t.has_value())
+
+		if (!has_temp_var(clause))
 			extracted.push_back(clause);
 		else staying.push_back(clause);
 	}
@@ -1341,7 +1361,8 @@ nso<BAs...> pull_always_out(const nso<BAs...>& fm) {
 		else always_part = build_wff_and(always_part, fa);
 	}
 	assert(!l_changes.empty());
-	if (!find_top(fm, is_non_terminal<tau_parser::io_var, BAs...>)) {
+
+	if (!has_temp_var(fm)) {
 		// No input/output variable present, hence return without always
 		return build_wff_and(always_part, replace(fm, l_changes));
 	}
@@ -1360,9 +1381,9 @@ nso<BAs...> pull_sometimes_always_out(nso<BAs...> fm) {
 	if(clauses.empty()) clauses.push_back(fm);
 	for (const auto& clause : clauses) {
         auto r = pull_always_out(clause);
-        if (!find_top(r, is_non_terminal<tau_parser::io_var, BAs...>)) {
-            changes[clause] = _F<BAs...>;
-            collected_no_temp_fms.push_back(r);
+        if (!has_temp_var(r)) {
+        	changes[clause] = _F<BAs...>;
+        	collected_no_temp_fms.push_back(r);
         }
         else if (clause != r) {
         	if (is_child_non_terminal(tau_parser::wff_always, r))
@@ -1372,20 +1393,20 @@ nso<BAs...> pull_sometimes_always_out(nso<BAs...> fm) {
         	pure_always_clause = trim2(clause);
 	}
 	if (!changes.empty()) fm = replace(fm, changes);
-    if(!collected_no_temp_fms.empty()) {
-        nso<BAs...> no_temp_fm;
-        bool first = true;
-        for (const auto& f : collected_no_temp_fms) {
-            if (first) {first = false; no_temp_fm = f;}
-            else no_temp_fm = build_wff_or(no_temp_fm, f);
-        }
-    	if (pure_always_clause) {
-    		changes = {};
-    		changes[pure_always_clause] = build_wff_or(pure_always_clause, no_temp_fm);
+	if(!collected_no_temp_fms.empty()) {
+		nso<BAs...> no_temp_fm;
+		bool first = true;
+		for (const auto& f : collected_no_temp_fms) {
+			if (first) {first = false; no_temp_fm = f;}
+			else no_temp_fm = build_wff_or(no_temp_fm, f);
+		}
+		if (pure_always_clause) {
+			changes = {};
+			changes[pure_always_clause] = build_wff_or(pure_always_clause, no_temp_fm);
 			return replace(fm, changes);
-    	}
-        //no_temp_fm = build_wff_always(no_temp_fm);
-        fm = build_wff_or(fm, no_temp_fm);
+		}
+		//no_temp_fm = build_wff_always(no_temp_fm);
+		fm = build_wff_or(fm, no_temp_fm);
 	}
 	return fm;
 }

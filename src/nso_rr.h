@@ -70,6 +70,63 @@ using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
 template <typename... BAs>
 using sp_tau_node = sp_node<tau_sym<BAs...>>;
 
+template <typename... BAs>
+bool is_non_terminal(const size_t, const sp_tau_node<BAs...>&);
+
+// We overload the == operator for sp_tau_node in order to store additional data
+// which is not taken into account for the quality check
+template<typename... BAs>
+bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
+	if (r == nullptr && l == nullptr) return true;
+	if (r == nullptr || l == nullptr) return false;
+
+	if (std::addressof(*l) == std::addressof(*r)) return true;
+
+	bool l_has_extra = false;
+	if (!l->child.empty())
+		if (is_non_terminal(tau_parser::extra, l->child.back()))
+			l_has_extra = true;
+	bool r_has_extra = false;
+	if (!r->child.empty())
+		if (is_non_terminal(tau_parser::extra, r->child.back()))
+			r_has_extra = true;
+
+	if (!l_has_extra && !r_has_extra)
+		return (l->value == r->value && l->child == r->child);
+	if (l_has_extra && !r_has_extra) {
+		if (l->child.size() - 1 != r->child.size()) return false;
+		for (int i = 0; i < (int_t)r->child.size(); ++i) {
+			if (!(l->child[i] == r->child[i]))
+				return false;
+		}
+		return l->value == r->value;
+	}
+	if (!l_has_extra && r_has_extra) {
+		if (l->child.size() != r->child.size() - 1) return false;
+		for (int i = 0; i < (int_t)l->child.size(); ++i) {
+			if (!(l->child[i] == r->child[i]))
+				return false;
+		}
+		return l->value == r->value;
+	}
+	if (l_has_extra && r_has_extra) {
+		if (l->child.size() != r->child.size()) return false;
+		for (int i = 0; i < (int_t)l->child.size() - 1; ++i) {
+			if (!(l->child[i] == r->child[i]))
+				return false;
+		}
+		return l->value == r->value;
+	}
+	// All cases are covered above
+	assert(false);
+	return false;
+}
+
+template<typename... BAs>
+bool operator!=(const sp_tau_node<BAs...>& l, const sp_tau_node<BAs...>& r) {
+	return !(l == r);
+}
+
 template<typename... BAs>
 using nso = sp_tau_node<BAs...>;
 
@@ -299,17 +356,17 @@ template <typename... BAs>
 std::optional<sp_tau_node<BAs...>> operator|(
 	const std::optional<sp_tau_node<BAs...>>& n, const size_t nt)
 {
-#ifdef DEBUG
-	static auto last_nt = nt;
-	auto x = n ? n.value() | nt : n;
-	if (!n.has_value()) BOOST_LOG_TRIVIAL(warning)
-		<< "value-less optional tau_parser::"
-		<< tau_parser::instance().name(last_nt)
-		<< " | tau_parser::"
-		<< tau_parser::instance().name(nt);
-	last_nt = nt;
-	return x;
-#endif // DEBUG
+// #ifdef DEBUG
+// 	static auto last_nt = nt;
+// 	auto x = n ? n.value() | nt : n;
+// 	if (!n.has_value()) BOOST_LOG_TRIVIAL(warning)
+// 		<< "value-less optional tau_parser::"
+// 		<< tau_parser::instance().name(last_nt)
+// 		<< " | tau_parser::"
+// 		<< tau_parser::instance().name(nt);
+// 	last_nt = nt;
+// 	return x;
+// #endif // DEBUG
 	return n ? n.value() | nt : n;
 }
 

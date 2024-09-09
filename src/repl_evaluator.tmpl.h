@@ -477,7 +477,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 
 template <typename factory_t, typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::normalizer_cmd(
+	repl_evaluator<factory_t, BAs...>::normalize_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
@@ -770,7 +770,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::history_print_cmd:  history_print_cmd(command); break;
 	case p::history_store_cmd:  history_store_cmd(command); break;
 	// normalization
-	case p::normalize_cmd:      result = normalizer_cmd(command); break;
+	case p::normalize_cmd:      result = normalize_cmd(command); break;
 	// execution
 	case p::execute_cmd:        execute_cmd(command); break;
 	case p::solve_cmd:          solve_cmd(command); break;
