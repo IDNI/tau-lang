@@ -534,16 +534,22 @@ void repl_evaluator<factory_t, BAs...>::execute_cmd(
 }
 
 template <typename factory_t, typename... BAs>
-std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::solve_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n)
-{
-	auto form = n->child[1];
-	// TODO (VERY_HIGH) call solver
-	if (auto check = form | tau_parser::wff; check) {
-	} else {
-	}
-	return {};
+void repl_evaluator<factory_t, BAs...>::solve_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto type = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
+		?  make_string<tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
+				nso<tau_ba<BAs...>, BAs...>>(
+			tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, n)
+		: "bdd"; // only tau makes always sense
+	auto nn = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
+		? get_wff(n->child[2])
+		: get_wff(n->child[1]);
+	if (!nn) { cout << "error: invalid argument\n"; return; }
+	auto s = solve<factory_t, tau_ba<BAs...>, BAs...>(nn.value(), factory, type);
+	if (!s) { cout << "no solution\n"; return; }
+	std::cout << "solution: {" << "\n";
+	for (auto& [k, v] : s.value()) std::cout << "\t" << k << " <- " << v << "\n";
+	std::cout << "}\n";
 }
 
 template<typename factory_t, typename... BAs>
