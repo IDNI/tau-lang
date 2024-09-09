@@ -17,6 +17,10 @@
 #include <boost/log/utility/setup/console.hpp>
 #include <limits>
 #include <iostream>
+#include <chrono>
+#include <cstdlib>
+#include <thread>
+#include <unistd.h>
 
 #include "defs.h"
 #include "nso_rr.h"
@@ -32,11 +36,33 @@ using namespace idni;
 using namespace idni::rewriter;
 using namespace idni::tau;
 
+// using valgrind for memory leak detection
+//
+// valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes
+// --log-file=logs/test_benchmark-bernays-schonfinkel1.memcheck
+// ./build/test_benchmark-wff_normalization -t 600 -m 16384
+//
+// using callgrind for profiling
+//
+// valgrind --tool=callgrind --callgrind-out-file=logs/test_benchmark-bernays-schonfinkel1.callgrind
+// ./build/test_benchmark-wff_normalization -t 600 -m 16384
+
 static const std::vector<std::tuple<std::string, std::string, std::string>> samples = {
-	{ "Lucca's example", "luccas_example",
-		"ex a ex b ex c ex d ex f ex e (ax + bx' = cy + dy'"
-		"|| ax + bx' != ey + fy') <-> (ax + bx' = cy + gy')."},
-//	{ "Ohad's example", "ohads_example",
+//	{ "Lucca's example", "luccas_example", // OK
+//		"ex a ex b ex c ex d ex f ex e (ax + bx' = cy + dy'"
+//		"|| ax + bx' != ey + fy') <-> (ax + bx' = cy + gy')."},
+	{ "Bernays–Schönfinkel 1", "bernays-schonfinkel1", // OOM
+		"all x ex y all z ex w all u ex v ((x<y && y<z)"
+		"|| (z<w && w<u)|| (u<v && v<x))."}
+//	{ "Bernays–Schönfinkel 1 (simplified)", "bernays-schonfinkel_simplified", // OK
+//		"all x ex y all z ex w ((x<y && y<z) || (z<w && w<x))."},
+//	{ "Bernays–Schönfinkel 2", "bernays-schonfinkel2", // OOM
+//		"all x ex y all z ex w all u ex v ((x<y && y<z)"
+//		"|| (z<w && w<u)) -> (u<v && v<x)."},
+//	{ "Bernays–Schönfinkel 3", "bernays-schonfinkel3", // OK
+//		"ex x all y ex z all w ex c all o (x<y && y>w)"
+//		"&& (z>x || w<y) -> (o>y || z>c)."}
+//	{ "Ohad's example", "ohads_example", // ???
 //		"all a all b all c all d all p all q all r all s all m"
 //		"all j all k all l (all x ex y f(x,y)=0 || (g(x,y)=0 &&"
 //		"h(x,y)!=0)) && !(all y0 all y1 all z0 all z1 ex x"
@@ -102,10 +128,61 @@ int execute_benchmark(const std::string label, const std::string file, const std
 	return 0;
 }
 
-int main(int, char**) {
+// Function to get memory usage in bytes
+size_t get_memory_usage() {
+    std::ifstream statm("/proc/self/statm");
+    size_t size;
+    statm >> size;
+    return size * sysconf(_SC_PAGESIZE);
+}
+
+void exit_after_mb(size_t limit_mb) {
+    size_t limit_bytes = limit_mb * 1024 * 1024;
+    while (true) {
+        size_t memoryUsage = get_memory_usage();
+        if (memoryUsage > limit_bytes) {
+            std::cout << "Memory usage exceeded " << limit_mb << " MB. Exiting program.\n";
+            std::exit(1);
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1)); // Check every second
+    }
+}
+
+void exit_after_seconds(int limit_sec) {
+	std::this_thread::sleep_for(std::chrono::seconds(limit_sec));
+	std::cout << "Time limit exceeded " << limit_sec << " seconds. Exiting program.\n";
+	std::exit(1);
+}
+
+int main(int argc, char* argv[]) {
+	// parsing command line arguments
+	int time_limit = 60; // default time limit in seconds
+    size_t memory_limit = 8192; // default memory limit in MB
+
+    int opt;
+    while ((opt = getopt(argc, argv, "t:m:")) != -1) {
+        switch (opt) {
+            case 't':
+                time_limit = std::stoi(optarg);
+                break;
+            case 'm':
+                memory_limit = std::stoul(optarg);
+                break;
+            default:
+                std::cerr << "Usage: " << argv[0] << " [-t time_in_seconds] [-m memory_in_mb]\n";
+                return 1;
+        }
+    }
+
 	// removing output but errors
 	boost::log::core::get()->set_filter(
 		boost::log::trivial::severity >= boost::log::trivial::severity_level::error);
+
+	// exiting after 1 minute
+	std::thread(exit_after_seconds, time_limit).detach();
+
+	// exiting after 8192 MB
+	std::thread(exit_after_mb, memory_limit).detach();
 
 	// iterating over all samples
 	int return_code = 0;
