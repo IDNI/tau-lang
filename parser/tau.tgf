@@ -182,7 +182,7 @@ cli_command            =>
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
         | ("solve"
                 :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
-        | (("e" | "execute"):execute_sym __ (wff_typed | rr)) :execute_cmd
+        | (("e" | "execute"):execute_sym __ wff)              :execute_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
         | (("s" | "subst" | "substitute")
@@ -214,20 +214,20 @@ cli_command            =>
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ memory)        :history_print_cmd
         | (                     wff | bf)                     :history_store_cmd
-# io vars definitions
-        | (type __ charvar _ '=' _ input_stream)              :input_var_cmd
-        | (type __ charvar _ '=' _ output_stream)             :output_var_cmd
+# i/o stream definitions
+        | (type __ charvar _ '=' _ input_stream)              :def_input_cmd
+        | (type __ charvar _ '=' _ output_stream)             :def_output_cmd
         .
 
 # input/output streams
-input_stream           => input_file | keyboard.
-output_stream          => output_file | console.
-input_file             => "ifile" _ '(' _ file_name  _ ')'.
-output_file            => "ofile" _ '(' _ file_name  _ ')'.
-keyboard               => "keyboard".
-console                => "console".
-file_name              => q_string.
-q_string               => '"' printable+ '"'.
+input_stream           =>
+        # in the future itcp, iudp,...
+        ("ifile" _ '(' _ q_file_name  _ ')') | ("keyboard"):keyboard_sym.
+output_stream          =>
+        # in the future otcp, oudp,...
+        ("ofile" _ '(' _ q_file_name  _ ')') | ("console"):console_sym.
+q_file_name            => '"' file_name '"'.
+file_name              => printable+.
 
 # command arguments
 #
@@ -283,7 +283,8 @@ severity               => ("e" | "error"):error_sym
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
         sym, digits, type, source, named_binding, capture,
-        charvar, in_var_name, out_var_name, uninter_const_name.
+        charvar, in_var_name, out_var_name, uninter_const_name,
+        file_name.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, wff_cb, bf_cb,

@@ -65,6 +65,18 @@
 
 namespace idni::tau {
 
+template<typename... BAs>
+struct stream_ba {
+	bool input;
+	std::string file_name;
+	nso<BAs...> name;
+	std::string type;
+
+	auto operator<=>(const stream_ba&) const = default;
+	bool operator==(const stream_ba&) const = default;
+	bool operator!=(const stream_ba&) const = default;
+};
+
 template <typename factory_t, typename... BAs>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<factory_t, BAs...>>;
@@ -130,6 +142,8 @@ private:
 	void def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_print_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_list_cmd();
+	void def_input_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_output_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> qelim_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
@@ -176,6 +190,8 @@ private:
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<factory_t, BAs...>>* r = 0;
 	rec_relations<gssotc<BAs...>> definitions;
+	std::set<stream_ba<tau_ba<BAs...>, BAs...>> inputs;
+	std::set<stream_ba<tau_ba<BAs...>, BAs...>> outputs;
 	bool error = false;
 	idni::term::colors TC{};
 };
