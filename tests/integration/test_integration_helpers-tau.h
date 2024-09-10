@@ -52,28 +52,26 @@ struct bdd_test_factory {
 	std::map<std::string, sp_tau_node<tau_ba<bdd_test>, bdd_test>> cache;
 };
 
+rr<nso<tau_ba<bdd_test>, bdd_test>> tau_bdd_make_nso_rr(const char* src) {
+	auto sample_src = make_tau_source(src);
+	bdd_test_factory bf;
+	tau_factory<bdd_test_factory, bdd_test> fb(bf);
+	return make_nso_rr_using_factory<
+			tau_factory<bdd_test_factory, bdd_test>,
+			tau_ba<bdd_test>, bdd_test>(
+		src, fb);
+}
+
+nso<tau_ba<bdd_test>, bdd_test> tau_bdd_make_nso(const char* src) {
+	return tau_bdd_make_nso_rr(src).main;
+}
+
 nso<tau_ba<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
 	bdd_test_factory bf;
 	tau_factory<bdd_test_factory, bdd_test> fb(bf);
 	rr<nso<tau_ba<bdd_test>, bdd_test>> nso_rr = make_nso_rr_using_factory<
 			tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test>(src, fb);
 	return normalizer<tau_ba<bdd_test>, bdd_test>(nso_rr);
-}
-
-tau_ba<bdd_test> get_tau_ba(const char* src) {
-	bdd_test_factory bf;
-	tau_factory<bdd_test_factory, bdd_test> tf(bf);
-	rr<nso<tau_ba<bdd_test>, bdd_test>> nso_rr = make_nso_rr_using_factory<
-			tau_factory<bdd_test_factory, bdd_test>,
-			tau_ba<bdd_test>, bdd_test>(src, tf);
-	auto value = nso_rr.main
-		| tau_parser::bf_eq
-		| tau_parser::bf
-		| tau_parser::bf_constant
-		| tau_parser::constant
-		| only_child_extractor<tau_ba<bdd_test>, bdd_test>;
-	return get<tau_ba<bdd_test>>(get<variant<
-			tau_ba<bdd_test>, bdd_test>>(value.value()->value));
 }
 
 #endif // __TEST_INTEGRATION_HELPERS_TAU_H__

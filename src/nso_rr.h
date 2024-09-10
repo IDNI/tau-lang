@@ -3030,15 +3030,16 @@ sp_tau_node<BAs...> make_node_hook_bf_xor(const node<tau_sym<BAs...>>& n) {
 
 template<typename...BAs>
 sp_tau_node<BAs...> make_node_hook_cte(const node<tau_sym<BAs...>>& n) {
-	auto l = first_argument_expression(n)
+	auto l = n
+		| tau_parser::bf_constant
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
 	//RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 1.")
 	//RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 	if (l.has_value()) {
-		if (l.value() == false) return _1<BAs...>;
-		else if (l.value() == true) return _0<BAs...>;
+		if (l.value() == false) return _0<BAs...>;
+		else if (l.value() == true) return _1<BAs...>;
 	}
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }

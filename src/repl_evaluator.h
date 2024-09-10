@@ -140,10 +140,7 @@ private:
 	std::optional<nso<tau_ba<BAs...>, BAs...>> sat_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
 	void execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-
-	std::optional<nso<tau_ba<BAs...>, BAs...>> solve_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-
+	void solve_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void is_unsatisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);

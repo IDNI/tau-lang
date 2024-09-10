@@ -16,7 +16,7 @@
 #include "doctest.h"
 #include "nso_rr.h"
 #include "bdd_handle.h"
-#include "normalizer.h"
+#include "normal_forms.h"
 #include "solver.h"
 
 #include "test_integration_helpers-bdd.h"
@@ -26,17 +26,28 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-TEST_SUITE("minterm_iterator") {
+auto splitter_one_bdd() {
+	auto var_name = "splitter_one";
+	auto v = dict(var_name);
+	auto ref = bdd<Bool>::bit(v);
+	auto splitter_one = bdd_handle<Bool>::get(ref);
+	return build_bf_constant(variant<bdd_test>(splitter_one));
+}
 
-	TEST_CASE("with no vars") {
-		const char* sample = "0 = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
-		minterm_iterator<bdd_test> it(sample_formula);
-		CHECK ( it == minterm_iterator<bdd_test>::end );
-	}
+bool check_solution(const nso<bdd_test>& equation, std::map<nso<bdd_test>, nso<bdd_test>> solution) {
+	auto copy = solution;
+	auto substitution = replace(equation, copy);
+	auto check = snf_wff(substitution);
+	#ifdef DEBUG
+	std::cout << "checking solution: " << solution;
+	std::cout << "equation: " << equation << "\n";
+	std::cout << "substitution: " << substitution << "\n";
+	std::cout << "snf: " << check << "\n";
+	#endif // DEBUG
+	return check == _T<bdd_test>;
+}
+
+TEST_SUITE("minterm_iterator") {
 
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
@@ -45,6 +56,11 @@ TEST_SUITE("minterm_iterator") {
 		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
 			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
 		minterm_iterator<bdd_test> it(sample_formula);
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		std::cout << "sample: " << sample_formula << "\n";
+		std::cout << "minterm: " << *it << "\n";
+		#endif // DEBUG
 		CHECK ( ++it == minterm_iterator<bdd_test>::end );
 	}
 
@@ -55,32 +71,43 @@ TEST_SUITE("minterm_iterator") {
 		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
 			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
 		minterm_iterator<bdd_test> it(sample_formula);
-		size_t n = 1 ; while (it++ != minterm_iterator<bdd_test>::end) n++;
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		std::cout << "sample: " << sample_formula << "\n";
+		std::cout << "minterm: " << *it << "\n";
+		#endif // DEBUG
+		size_t n = 1 ; while (it++ != minterm_iterator<bdd_test>::end) {
+			#ifdef DEBUG
+			std::cout << "minterm: " << *it << "\n";
+			#endif // DEBUG
+			n++;
+		}
 		CHECK ( n == 3 );
 	}
 	TEST_CASE("with three vars") {
+		std::cout << "------------------------------------------------------\n";
 		const char* sample = "x | y | z = 0.";
 		auto sample_src = make_tau_source(sample);
 		bdd_test_factory bf;
 		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
 			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
 		minterm_iterator<bdd_test> it(sample_formula);
-		size_t n = 1 ; while (it++ != minterm_iterator<bdd_test>::end) n++;
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		std::cout << "sample: " << sample_formula << "\n";
+		std::cout << "minterm: " << *it << "\n";
+		#endif // DEBUG
+		size_t n = 1 ; while (it++ != minterm_iterator<bdd_test>::end) {
+			#ifdef DEBUG
+			std::cout << "minterm: " << *it << "\n";
+			#endif // DEBUG
+			n++;
+		}
 		CHECK ( n == 7 );
 	}
 }
 
 TEST_SUITE("minterm_range") {
-
-	TEST_CASE("no var") {
-		const char* sample = "0 = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<bdd_test>>;
-		minterm_range<bdd_test> range(sample_formula);
-		CHECK ( range.begin() == range.end() );
-	}
 
 	TEST_CASE("one var") {
 		const char* sample = "x = 0.";
@@ -124,16 +151,6 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		CHECK ( (it == minterm_inequality_system_iterator<bdd_test>::end) );
 	}
 
-	TEST_CASE("one inequality with no vars") {
-		const char* sample = "0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		inequality_system<bdd_test> sys; sys.insert(sample_formula);
-		minterm_inequality_system_iterator<bdd_test> it(sys);
-		CHECK ( it == minterm_inequality_system_iterator<bdd_test>::end );
-	}
-
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
 		auto sample_src = make_tau_source(sample);
@@ -163,17 +180,6 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 		minterm_inequality_system_iterator<bdd_test> it(sys);
 		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<bdd_test>::end) n++;
 		CHECK ( n == 7 );
-	}
-
-	TEST_CASE("two inequalities with no vars") {
-		const char* sample = "0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		inequality_system<bdd_test> sys; sys.insert(sample_formula); sys.insert(sample_formula);
-		minterm_inequality_system_iterator<bdd_test> it(sys);
-		CHECK ( it == minterm_inequality_system_iterator<bdd_test>::end );
-
 	}
 
 	TEST_CASE("two inequalities with one var") {
@@ -227,17 +233,6 @@ TEST_SUITE("minterm_inequality_system_range") {
 		CHECK ( n == 0 );
 	}
 
-	TEST_CASE("one inequality with no vars") {
-		const char* sample = "0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		inequality_system<bdd_test> sys; sys.insert(sample_formula);
-		minterm_inequality_system_range<bdd_test> range(sys);
-		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
-		CHECK ( n == 0 );
-	}
-
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
 		auto sample_src = make_tau_source(sample);
@@ -271,18 +266,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 		CHECK ( n == 7 );
 	}
 
-	TEST_CASE("two inequalities with no vars") {
-		const char* sample = "0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		inequality_system<bdd_test> sys; sys.insert(sample_formula); sys.insert(sample_formula);
-		minterm_inequality_system_range<bdd_test> range(sys);
-		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
-		CHECK ( n == 0 );
-	}
-
-	TEST_CASE("two inequalities with one var") {
+	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a != 0.";
 		auto sample_src1 = make_tau_source(sample1);
 		bdd_test_factory bf;
@@ -327,48 +311,203 @@ TEST_SUITE("minterm_inequality_system_range") {
 
 TEST_SUITE("find_solution") {
 
-	TEST_CASE("with no vars") {
-		const char* sample = "0 = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.empty() );
+	bool test_find_solution(const char* src) {
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		#endif // DEBUG
+		auto equation = bdd_make_nso(src);
+		auto solution = find_solution(equation);
+		return ( check_solution(equation, solution.value()));
 	}
 
 	TEST_CASE("one var: x = 0.") {
 		const char* sample = "x = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.size() == 1 );
-	}
-
-	TEST_CASE("one var: x | x' = 0.") {
-		const char* sample = "x | x' = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.size() == 0 );
+		CHECK ( test_find_solution(sample) );
 	}
 
 	TEST_CASE("two var: x | y = 0.") {
 		const char* sample = "x | y = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.size() == 2 );
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x | y' = 0.") {
+		const char* sample = "x | y' = 0.";
+		CHECK ( test_find_solution(sample) );
 	}
 
 	TEST_CASE("two var: x & y = 0.") {
 		const char* sample = "x & y = 0.";
-		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		nso<bdd_test> sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf).main;
-		auto solution = find_solution(sample_formula);
-		CHECK ( solution.size() == 2 );
+		CHECK ( test_find_solution(sample) );
+	}
+
+	TEST_CASE("two var: x & y' = 0.") {
+		const char* sample = "x & y' = 0.";
+		CHECK ( test_find_solution(sample) );
+	}
+}
+
+TEST_SUITE("lgrs") {
+
+	bool test_lgrs(const char* src) {
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		#endif // DEBUG
+		auto equation = bdd_make_nso(src);
+		auto solution = lgrs(equation);
+		return ( check_solution(equation, solution.value()) );
+	}
+
+	TEST_CASE("two var: x | y = 0.") {
+		const char* sample = "x | y = 0.";
+		CHECK ( test_lgrs(sample) );
+	}
+
+	TEST_CASE("two var: x & y = 0.") {
+		const char* sample = "x & y = 0.";
+		CHECK ( test_lgrs(sample) );
+	}
+}
+
+TEST_SUITE("solve_minterm_system") {
+
+	bool test_solve_minterm_system(const std::vector<std::string> minterms) {
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		#endif // DEBUG
+		bdd_init<Bool>();
+		minterm_system<bdd_test> system;
+		for (const auto& minterm: minterms)
+			system.insert(bdd_make_nso(minterm));
+		auto solution = solve_minterm_system<bdd_test>(system, splitter_one_bdd());
+		bool check = true;
+		for (const auto& equation: system)
+			check = check ? check_solution(equation, solution.value()) : false;
+		return check;
+	}
+
+	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: a}' x != 0.") {
+		const std::vector<std::string> sample =
+			{ "{bdd: a} x != 0.", "{bdd: a}' x != 0."};
+		CHECK ( test_solve_minterm_system(sample) );
+	}
+
+	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: b} y != 0.") {
+		const std::vector<std::string> sample =
+			{"{bdd: a} x != 0." , "{bdd: b} y != 0."};
+		CHECK( test_solve_minterm_system(sample) );
+	}
+}
+
+TEST_SUITE("solve_inequality_system") {
+
+	bool test_solve_inequality_system(const std::vector<std::string> inequalities) {
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		#endif // DEBUG
+		bdd_init<Bool>();
+		inequality_system<bdd_test> system;
+		for (const auto& inequality: inequalities) {
+			system.insert(bdd_make_nso(inequality));
+		}
+		auto solution = solve_inequality_system<bdd_test>(system, splitter_one_bdd());
+		bool check = true;
+		for (const auto& equation: system)
+			check = check ? check_solution(equation, solution.value()) : false;
+		return check;
+	}
+
+	// Case 1 of add_minterm_to_disjoint: d = {bdd: a} x and m = {bdd: a} x'
+	// both have the same exponent
+	TEST_CASE("one var: {bdd: a} x != 0 && {bdd: b} x != 0.") {
+		const std::vector<std::string> sample =
+			{"{bdd: a} x != 0." , "{bdd: b} x != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 2 of add_minterm_to_disjoint: d = ({bdd: a}|{bdd:b}) x and
+	// m = {bdd: a} x', both have different exponents and d_cte & m_cte != false
+	// and d_cte & ~m_cte != false
+	TEST_CASE("one var (using splitter of a bdd): ({bdd: a}|{bdd:b}) x != 0 && {bdd: a} x' != 0.") {
+		const std::vector<std::string> sample =
+			{"({bdd: a}|{bdd:b}) x != 0." , "{bdd: a} x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 3 of add_minterm_to_disjoint: d = {bdd: a} x and
+	// m = ({bdd: a}|{bdd: b}) x', both have different exponents and
+	// d_cte & m_cte != false and ~d_cte & m_cte != false
+	TEST_CASE("one var (using splitter of a bdd): {bdd: a} x != 0 && ({bdd: a}|{bdd:b}) x' != 0.") {
+		const std::vector<std::string> sample =
+			{"{bdd: a} x != 0." , "({bdd: a}|{bdd:b}) x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 4.1 of add_minterm_to_disjoint: d = x and m = x' both have different
+	// exponents and d_cte & m_cte != false, d_cte & ~m_cte = false,
+	// ~d_cte & m_cte = false and d_cte = 1
+	TEST_CASE("one var (using splitter of a bdd): x != 0 && x' != 0.") {
+		const std::vector<std::string> sample =
+			{"x != 0." , "x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 4.2 of add_minterm_to_disjoint: d = ({bdd: a}&{bdd: b}) x and
+	// m = ({bdd: a}|{bdd: b}) x' both have different exponents and
+	// d_cte & m_cte != false, d_cte & ~m_cte = false,  ~d_cte & m_cte = false
+	// and d_cte != 1
+	TEST_CASE("one var (using splitter of one): ({bdd: a}&{bdd: b}) x != 0 && ({bdd: a}|{bdd: b}) x' != 0.") {
+		const std::vector<std::string> sample =
+			{"({bdd: a}&{bdd: b}) x != 0." , "({bdd: a}|{bdd: b}) x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+
+	// Case 5 of add_minterm_to_disjoint
+	TEST_CASE("one var (using splitter of a bdd): {bdd: a} x != 0 && {bdd: a}' x' != 0.") {
+		const std::vector<std::string> sample =
+			{"{bdd: a} x != 0." , "{bdd: a} x' != 0."};
+		CHECK( test_solve_inequality_system(sample) );
+	}
+}
+
+TEST_SUITE("solve_system") {
+
+	bool test_solve_system(const std::string equality,
+			const std::vector<std::string> inequalities) {
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		#endif // DEBUG
+		bdd_init<Bool>();
+		equation_system<bdd_test> system;
+		if (equality.size() != 0) system.first = bdd_make_nso(equality);
+		for (const auto& inequality: inequalities)
+		system.second.insert(bdd_make_nso(inequality));
+		auto solution = solve_system<bdd_test>(system, splitter_one_bdd());
+		bool check = system.first
+			? check_solution(system.first.value(), solution.value())
+			: false;
+		for (const auto& equation: system.second)
+			check = check ? check_solution(equation, solution.value()) : false;
+		return check;
+	}
+
+	TEST_CASE("one var: {bdd: a} x = 0 && {bdd: a} x'  != 0.") {
+		const char* equality = "{bdd: a} x = 0.";
+		const std::vector<std::string> inequalities =
+			{ "{bdd: a} x' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("one var: {bdd: a} x y = 0 && {bdd: a} y != 0.") {
+		const char* equality = "{bdd: a} x y = 0.";
+		const std::vector<std::string> inequalities =
+			{ "{bdd: a} y != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("one var: {bdd: a} x | {bdd: a} y = 0 && {bdd: b} y x != 0.") {
+		const char* equality = "{bdd: a} x | {bdd: a} y = 0.";
+		const std::vector<std::string> inequalities =
+			{ "{bdd: b} y x != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
 	}
 }

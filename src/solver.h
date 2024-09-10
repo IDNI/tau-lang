@@ -18,6 +18,8 @@
 
 #include "tau_ba.h"
 #include "normal_forms.h"
+#include "bdd_handle.h"
+#include "splitter.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -33,8 +35,9 @@ using namespace idni::tau;
 namespace idni::tau {
 
 template<typename...BAs>
+using typed_nso = nso<BAs...>;
+template<typename...BAs>
 using var = nso<BAs...>;
-
 template<typename...BAs>
 using minterm = nso<BAs...>;
 
@@ -45,13 +48,19 @@ template<typename...BAs>
 using inequality = nso<BAs...>;
 
 template<typename...BAs>
-using system = std::pair<std::optional<equality<BAs...>>, std::set<inequality<BAs...>>>;
+using equation = nso<BAs...>;
+
+template<typename...BAs>
+using equations = std::set<nso<BAs...>>;
+
+template<typename...BAs>
+using equation_system = std::pair<std::optional<equality<BAs...>>, std::set<inequality<BAs...>>>;
 
 template<typename...BAs>
 using inequality_system = std::set<inequality<BAs...>>;
 
 template<typename...BAs>
-using minterm_system = std::set<nso<BAs...>>;
+using minterm_system = std::set<inequality<BAs...>>;
 
 template<typename...BAs>
 using solution = std::map<var<BAs...>, nso<BAs...>>;
@@ -60,66 +69,51 @@ template<typename...BAs>
 solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const nso<BAs...>& gh) {
 	solution<BAs...> solution;
 	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
-	#ifdef DEBUG
-	std::cout << "originals solution: " << solution << std::endl;
-	#endif // DEBUG
 	auto remaing = select_top(gh, is_child_non_terminal<tau_parser::variable, BAs...>);
 	for (auto& v: remaing) solution.erase(v);
-	#ifdef DEBUG
-	std::cout << "remaing solution: " << solution << std::endl;
-	#endif // DEBUG
 	return solution;
 }
 
 template<typename...BAs>
-solution<BAs...> find_solution(const equality<BAs...>& eq) {
-	auto has_no_var = [](const nso<BAs...>& f) {
-		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
-	};
+std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
 	// Theorem 3.1. For f (x,X) = xg (X) + x′h (X), let Z be a zero of
 	// g (Z) h (Z) (which is guaranteed to exist by Boole’s consistency condition).
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
-	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 	#ifdef DEBUG
-	std::cout << "f: " << f << std::endl;
+	std::cout << "find solution: " << eq << "\n";
 	#endif // DEBUG
+
+	auto has_no_var = [](const nso<BAs...>& f) {
+		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
+	};
+
+	if (!(eq | tau_parser::bf_eq).has_value()) return {};
+
+	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		auto g = replace_with(vars[0], _1<BAs...>, f);
-		auto h = replace_with(vars[0], _0<BAs...>, f);
-		#ifdef DEBUG
-		std::cout << "g: " << g << std::endl;
-		std::cout << "h: " << h << std::endl;
-		#endif // DEBUG
+		auto g = replace_with(vars[0], _1<BAs...>, f) | bf_reduce_canonical<BAs...>();
+		auto h = replace_with(vars[0], _0<BAs...>, f) | bf_reduce_canonical<BAs...>();
 		auto gh = (g & h);
 		auto solution = make_removed_vars_solution(vars, gh);
-		#ifdef DEBUG
-		std::cout << "gh: " << gh << std::endl;
-		std::cout << "solution: " << solution << std::endl;
-		#endif // DEBUG
 		if (has_no_var(gh)) {
 			if (gh != _0<BAs...>) return {};
 			else {
-				solution[vars[0]] = _0<BAs...>;
-				#ifdef DEBUG
-				std::cout << "solution: " << solution << std::endl;
-				#endif // DEBUG
+				auto changes = solution;
+				solution[vars[0]] = h != _0<BAs...> ? h : replace(~g, changes) | bf_reduce_canonical<BAs...>();
 				return solution;
 			}
 		}
-		if (auto restricted = find_solution(build_wff_eq(gh)); !restricted.empty()) {
-			#ifdef DEBUG
-			std::cout << "restricted: " << restricted << std::endl;
-			#endif // DEBUG
-			solution.insert(restricted.begin(), restricted.end());
-			solution[vars[0]] = replace(h, restricted);
-			#ifdef DEBUG
-			std::cout << "solution: " << solution << std::endl;
-			#endif // DEBUG
+		if (auto restricted = find_solution(build_wff_eq(gh)); restricted.has_value()) {
+			solution.insert(restricted.value().begin(), restricted.value().end());
+			auto restricted_copy = restricted;
+			if (auto nn = replace(h, restricted.value()) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
+				solution[vars[0]] = nn;
+			else solution[vars[0]] = replace(~g, restricted_copy.value()) | bf_reduce_canonical<BAs...>();
 			return solution;
 		}
 	}
@@ -127,18 +121,33 @@ solution<BAs...> find_solution(const equality<BAs...>& eq) {
 }
 
 template<typename...BAs>
-solution<BAs...> lgrs(const equality<BAs...>& f) {
+std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	// We would use Lowenheim’s General Reproductive Solution (LGRS) as given
 	// in the following theorem (of Taba Book):
 	//
 	// Theorem 1.8. Let f : Bn → B be a BF, and assume f (Z) = 0
 	// for some Z ∈ Bn. Then the set {X ∈ Bn| (X) = 0} equals precisely
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
-	// the abuse of notation, this reads ϕ_i (X) = z_if (X)+x_if′ (X).
-	auto z = find_solution(f);
+	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
+
+	auto s = find_solution(equality);
+	if (!s.has_value()) return {};
+	auto f = equality
+		| tau_parser::bf_eq
+		| tau_parser::bf
+		| optional_value_extractor<nso<BAs...>>;
 	solution<BAs...> phi;
-	for (auto& [x_i, z_i] : z)
-		phi[x_i] = (z_i & f) + (x_i & ~f);
+	for (auto& [x_i, z_i] : s.value())
+		phi[x_i] = ((z_i & f) | (x_i & ~f))
+			| bf_reduce_canonical<BAs...>();
+
+	#ifdef DEBUG
+	std::cout << "lgrs: " << equality << "\n";
+	std::cout << "solution: ";
+	for (const auto& [k, v] : phi) std::cout << k << " <- " << v << " ";
+	std::cout << "\n";
+	#endif // DEBUG
+
 	return phi;
 }
 
@@ -161,13 +170,13 @@ public:
 			// we start with the full bf...
 			auto partial_bf = f;
 			// ... and the first variable (for computing the first partial minterm)
-			auto partial_minterm = ~(*vars.begin());
+			auto partial_minterm = _1<BAs...>;
 			for (auto& v : vars) {
 				// we add the current choice to the list of choices...
-				choices.emplace_back(v, false, partial_bf, partial_minterm);
-				// ... and compute new values for the next one
-				partial_bf = replace_with(v, _0<BAs...>, partial_bf);
 				partial_minterm = partial_minterm & ~v;
+				choices.emplace_back(v, false, partial_bf, partial_minterm);
+				partial_bf = replace_with(v, _0<BAs...>, partial_bf);
+				// ... and compute new values for the next one
 			}
 			// if the current choices correspond to a proper minterm, we update the current
 			// minterm, otherwise we compute the next valid choice
@@ -220,10 +229,22 @@ private:
 	bool exhausted = false;
 
 	nso<BAs...> make_current_minterm() {
+		#ifdef DEBUG
+		std::cout << "current choices: \n";
+		for (auto& c: choices) std::cout
+			<< "var: " << c.var << ", "
+			<< "value: " << c.value << ", "
+			<< "partial_bf: " << c.partial_bf << ", "
+			<< "partial_minterm: " << c.partial_minterm << "\n";
+		#endif // DEBUG
 		auto cte =  choices.back().value
 			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
 			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
-		return (cte & choices.back().partial_minterm);
+		auto current = (cte & choices.back().partial_minterm);
+		#ifdef DEBUG
+		std::cout << "current " << current << "\n";
+		#endif // DEBUG
+		return current;
 	}
 
 	void make_next_choice() {
@@ -242,15 +263,16 @@ private:
 	}
 
 	void update_choices_from(size_t start) {
-		auto partial_bf = choices[start].partial_bf;
-		auto partial_minterm = _1<BAs...>;
+		if (start == 0) {
+			choices[0].partial_minterm = choices[0].value ? choices[0].var : ~choices[0].var;
+			++start;
+		}
 		for (size_t i = start; i < choices.size(); ++i) {
-			choices[i].partial_bf = partial_bf;
-			choices[i].partial_minterm = (choices[i].value ? ~choices[i].var : choices[i].var) & partial_minterm;
-			partial_minterm = choices[i].partial_minterm;
-			partial_bf = choices[i].value
-				? replace_with(choices[i].var, _1<BAs...>, partial_bf)
-				: replace_with(choices[i].var, _0<BAs...>, partial_bf);
+			choices[i].partial_minterm = (choices[i].value ? choices[i].var : ~choices[i].var)
+				& choices[i - 1].partial_minterm;
+			choices[i].partial_bf = choices[i - 1].value
+				? replace_with(choices[i - 1].var, _1<BAs...>, choices[i - 1].partial_bf)
+				: replace_with(choices[i - 1].var, _0<BAs...>, choices[i - 1].partial_bf);
 		}
 	}
 };
@@ -298,8 +320,8 @@ public:
 	minterm_inequality_system_iterator(const inequality_system<BAs...>& sys) {
 		if (sys.empty()) { exhausted = true; return; }
 		// for each inequality in the system, we create a minterm range
-		for (auto& ineq: sys) {
-			auto f = ineq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+		for (auto& neq: sys) {
+			auto f = neq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 			ranges.push_back(minterm_range(f));
 		}
 		// we initialize the minterm iterators
@@ -310,6 +332,7 @@ public:
 				break;
 			}
 		}
+		current = make_current_minterm_system();
 	}
 
 	minterm_inequality_system_iterator();
@@ -347,7 +370,12 @@ private:
 
 	minterm_system<BAs...> make_current_minterm_system() {
 		minterm_system<BAs...> minterms;
-		for (auto& it: minterm_iterators) minterms.insert(*it);
+		for (auto& it: minterm_iterators) minterms.insert(build_wff_neq(*it));
+		#ifdef DEBUG
+		std::cout << "current minterm system: ";
+		for (const auto& minterm : minterms) std::cout << minterm << " ";
+		std::cout << "\n";
+		#endif // DEBUG
 		return minterms;
 	}
 
@@ -391,27 +419,66 @@ private:
 };
 
 template<typename...BAs>
-bool has_solution(const minterm_system<BAs...>& sys) {
-	auto bs = _1<BAs...>;
-	for (auto& m: sys) bs = bs & get_constant(m);
-	return bs != _0<BAs...>;
+nso<BAs...> get_constant(const minterm<BAs...>& m) {
+	auto cte = find_top(m, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
+	return cte ? cte.value() : _1<BAs...>;
 }
 
 template<typename...BAs>
-minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint, const minterm<BAs...>& m) {
-	minterm_system<BAs...> new_disjoint = disjoint;
+nso<BAs...> get_minterm(const minterm<BAs...>& m) {
+	auto is_literal = [](const nso<BAs...> n) {
+		return is_non_terminal<tau_parser::bf>(n)
+			&& !is_child_non_terminal<tau_parser::bf_constant>(n)
+			&& !is_child_non_terminal<tau_parser::bf_and>(n);
+	};
+	auto literals = select_top(m, is_literal);
+	set<nso<BAs...>> all_literals(literals.begin(), literals.end());
+	return build_bf_and(all_literals);
+}
+
+template<typename...BAs>
+std::set<nso<BAs...>> get_exponent(const nso<BAs...>& n) {
+	auto is_bf_literal = [](const auto& n) -> bool {
+		return (n | tau_parser::variable).has_value()
+			|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
+	};
+	auto all_vs = select_top(n, is_bf_literal);
+	return std::set<nso<BAs...>>(all_vs.begin(), all_vs.end());
+}
+
+template<typename...BAs>
+minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint,
+		const minterm<BAs...>& m, const nso<BAs...>& splitter_one) {
+	minterm_system<BAs...> new_disjoint;
 	auto new_m = m;
 	for (auto& d: disjoint) {
-		if (auto d_cte = get_constant(d), new_m_cte = get_constant(new_m); d_cte & new_m_cte != false) {
-			if (d_cte & ~new_m_cte != false) new_disjoint.insert(~new_m_cte & d);
-			else if (new_m_cte & ~d_cte != false) {
+		// case 1
+		if (get_exponent(d) == get_exponent(m)) {
+			new_disjoint.insert(d);
+			continue;
+		}
+		if (auto d_cte = get_constant(d), new_m_cte = get_constant(new_m);
+				(d_cte & new_m_cte) != false) {
+			// case 2
+			if ((d_cte & ~new_m_cte) != false)
+				new_disjoint.insert(~new_m_cte & d);
+			// case 3
+			else if ((~d_cte & new_m_cte) != false) {
 				new_disjoint.insert(d);
 				new_m = ~d_cte & new_m;
+			// case 4
 			} else {
-				auto s = splitter(d_cte | tau_parser::bf_constant | optional_value_extractor<nso<BAs...>>);
+				auto s = d_cte == _1<BAs...>
+					// case 4.1
+					? splitter_one
+					// case 4.2
+					: splitter(d_cte
+						| tau_parser::bf_constant
+						| optional_value_extractor<nso<BAs...>>);
 				new_disjoint.insert(s & d);
 				new_m = ~s & new_m;
 			}
+		// case 5
 		} else new_disjoint.insert(d);
 	}
 	new_disjoint.insert(new_m);
@@ -419,34 +486,38 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 }
 
 template<typename...BAs>
-minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys) {
+minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys,
+		const nso<BAs...>& splitter_one) {
 	minterm_system<BAs...> disjoints;
-	for (auto& it = sys.begin(); it != sys.end(); ++it) disjoints = add_minterm_to_disjoint(disjoints, *it);
+	for (auto it = sys.begin(); it != sys.end(); ++it)
+		disjoints = add_minterm_to_disjoint<BAs...>(disjoints, *it, splitter_one);
 	return disjoints;
 }
 
 template<typename...BAs>
-nso<BAs...> get_constant(const minterm<BAs...>& m) {
-	auto cte = find_top(m, is_child_non_terminal<tau_parser::constant, BAs...>);
-	return cte ? cte : _1<BAs...>;
-}
-
-template<typename...BAs>
-nso<BAs...> get_minterm(const minterm<BAs...>& m) {
-	auto cte = find_top(m, is_child_non_terminal<tau_parser::constant, BAs...>);
-	return cte ? replace_with(cte.value(), _1<BAs...>, m) : m;
-}
-
-template<typename...BAs>
-solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& sys) {
+std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system,
+		const nso<BAs...>& splitter_one) {
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
-	if (!has_solution(sys)) return {};
-	equality<BAs...> eq = _F<BAs...>;
-	for (auto& neq: make_minterm_system_disjoint(sys)) {
-		auto cte = get_constant(neq);
-		auto minterm = get_minterm(neq);
+
+	#ifdef DEBUG
+	std::cout << "solve_minterm_system: ";
+	for (const auto& minterm : system) std::cout << minterm << " ";
+	std::cout << "\n";
+	#endif // DEBUG
+
+	// We know the system has a solution as we only iterate over non-negative
+	// minterms (which trivially satisfy the condition of Theorem 3.3)
+	equality<BAs...> eq = _0<BAs...>;
+	for (auto& neq: make_minterm_system_disjoint<BAs...>(system, splitter_one)) {
+		auto nf = neq
+			| tau_parser::bf_neq
+			| tau_parser::bf
+			| bf_reduce_canonical<BAs...>()
+			| optional_value_extractor<nso<BAs...>>;
+		auto cte = get_constant(nf);
+		auto minterm = get_minterm(nf);
 		eq = eq | (cte & ~minterm);
 	}
 	eq = build_wff_eq(eq);
@@ -454,7 +525,8 @@ solution<BAs...> solve_minterm_system(const minterm_system<BAs...>& sys) {
 }
 
 template<typename...BAs>
-solution<BAs...> solve(const inequality_system<BAs...>& sys) {
+std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system,
+		const nso<BAs...>& splitter_one) {
 	// Following Taba book:
 	//
 	// To solve  {h_i (T) ̸= 0}i∈I (and hence the original system whose solution
@@ -470,15 +542,29 @@ solution<BAs...> solve(const inequality_system<BAs...>& sys) {
 	// exists, then such a choice exists.
 	// for each possible choice of H_i's, we try to solve the minterm system
 	// using tthe above solve method.
-	for (auto& ms: minterm_system_range(sys)) {
-		auto solution = solve_minterm_system(ms);
-		if (!solution.empty()) return solution;
+
+	#ifdef DEBUG
+	std::cout << "solve_inequality_system: ";
+	for (const auto& inequality : system) std::cout << inequality << " ";
+	std::cout << "\n";
+	#endif // DEBUG
+
+	//for (auto& ms: minterm_inequality_system_range<BAs...>(system)) {
+	for (auto it = minterm_inequality_system_iterator<BAs...>(system); it != minterm_inequality_system_iterator<BAs...>::end; ++it) {
+		#ifdef DEBUG
+		std::cout << "minterm system: ";
+		for (const auto& minterm : *it) std::cout << minterm << " ";
+		std::cout << "\n";
+		#endif // DEBUG
+		auto solution = solve_minterm_system<BAs...>(*it, splitter_one);
+		if (solution.has_value()) return solution;
 	}
 	return {};
 }
 
 template<typename...BAs>
-solution<BAs...> solve(const system<BAs...>& sys) {
+std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
+		const nso<BAs...>& splitter_one) {
 	// As in the Taba book, we consider
 	// 		f (X) = 0
 	//		{g_i (X) ̸= 0}i∈I
@@ -492,14 +578,76 @@ solution<BAs...> solve(const system<BAs...>& sys) {
 	// TODO (HIGH) check for constant equalities/inequalities and remove them if
 	// they are true, return empty solution otherwise
 
-	if (!sys.first) return solve(sys.second);
-	auto phi = lgrs(sys.first.value());
+	#ifdef DEBUG
+	if (system.first.has_value())
+		std::cout << "solve_system: " << system.first.value() << " ";
+	for (const auto& inequality : system.second) std::cout << inequality << " ";
+	std::cout << "\n";
+	#endif // DEBUG
+
+	if (!system.first) return solve_inequality_system<BAs...>(system.second, splitter_one);
+	if (system.second.empty()) return find_solution(system.first.value());
+	auto phi = lgrs(system.first.value());
+	if (!phi.has_value()) return {};
 	inequality_system<BAs...> inequalities;
 	// for each inequality g_i we apply the transformation given by lgrs solution
 	// of the equality
-	for (auto& g_i: sys.second) inequalities.insert(replace(g_i, phi));
+	for (auto& g_i: system.second) {
+		auto nphi = phi.value(), ng_i = replace(g_i, nphi);
+		if (ng_i == _F<BAs...>) return {};
+		else if (ng_i == _T<BAs...>) continue;
+		inequalities.insert(ng_i);
+	}
 	// and finally solve the given system  of inequalities
-	return solve(inequalities);
+	return solve_inequality_system<BAs...>(inequalities, splitter_one);
+}
+
+template<typename...BAs>
+std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const nso<BAs...>& splitter_one) {
+	// split among equalities and inequalities
+	equation_system<BAs...> system;
+	for (const auto& eq: eqs) {
+		if (is_child_non_terminal<tau_parser::bf_eq, BAs...>(eq)) {
+			if (!system.first.has_value())
+				system.first = std::optional<equality<BAs...>>(eq);
+			else {
+				// squeeze the equalities
+				auto l = system.first.value()
+					| tau_parser::bf_eq
+					| tau_parser::bf
+					| optional_value_extractor<nso<BAs...>>;
+				auto r = eq
+					| tau_parser::bf_eq
+					| tau_parser::bf
+					| optional_value_extractor<nso<BAs...>>;
+				system.first = build_wff_eq(l | r);
+			}
+		}
+		else system.second.insert(eq);
+	}
+	return solve_system<BAs...>(system, splitter_one);
+}
+
+// entry point for the solver
+template<typename factory_t, typename...BAs>
+std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
+		const factory_t& factory, const std::string& type = "") {
+	auto splitter_one = factory.splitter_one(type);
+	if (!splitter_one.has_value()) return {};
+	auto dnf = dnf_wff(form);
+	for (auto& clause: get_leaves(form, tau_parser::wff_or, tau_parser::wff)) {
+		auto is_equation = [](const nso<BAs...>& n) {
+			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
+			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
+		};
+		auto eqs = select_top(clause, is_equation);
+		if (eqs.empty()) continue;
+		auto solution = solve<BAs...>(
+			std::set<nso<BAs...>>(eqs.begin(), eqs.end()),
+			splitter_one.value());
+		if (solution.has_value()) return solution;
+	}
+	return {};
 }
 
 } // idni::tau namespace
