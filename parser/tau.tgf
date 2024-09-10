@@ -210,13 +210,13 @@ cli_command            =>
         | ("set":set_sym   __ option
                                 (__ | _ '=' _) option_value)  :set_cmd
         | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
+# i/o stream definitions
+        | (type __ charvar _ '=' _ input_stream)              :def_input_cmd
+        | (type __ charvar _ '=' _ output_stream)             :def_output_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ memory)        :history_print_cmd
         | (                     wff | bf)                     :history_store_cmd
-# i/o stream definitions
-        | (type __ charvar _ '=' _ input_stream)              :def_input_cmd
-        | (type __ charvar _ '=' _ output_stream)             :def_output_cmd
         .
 
 # input/output streams
