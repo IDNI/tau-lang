@@ -214,7 +214,20 @@ cli_command            =>
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ memory)        :history_print_cmd
         | (                     wff | bf)                     :history_store_cmd
+# io vars definitions
+        | (type __ charvar _ '=' _ input_stream)              :input_var_cmd
+        | (type __ charvar _ '=' _ output_stream)             :output_var_cmd
         .
+
+# input/output streams
+input_stream           => input_file | keyboard.
+output_stream          => output_file | console.
+input_file             => "ifile" _ '(' _ file_name  _ ')'.
+output_file            => "ofile" _ '(' _ file_name  _ ')'.
+keyboard               => "keyboard".
+console                => "console".
+file_name              => q_string.
+q_string               => '"' printable+ '"'.
 
 # command arguments
 #
