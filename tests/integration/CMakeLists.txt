@@ -13,7 +13,7 @@ set(TESTS
 	wff_normalization
 	splitter
 	splitter2
-	#solver
+	solver
 	quantifiers
 )
 

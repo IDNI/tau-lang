@@ -54,6 +54,15 @@ struct bdd_test_factory {
 
 using bdd_test_factory_t = bdd_test_factory;
 
+rr<nso<bdd_test>> bdd_make_nso_rr(const std::string& src) {
+	auto sample_src = make_tau_source(src);
+	bdd_test_factory bf;
+	return make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+}
+
+nso<bdd_test> bdd_make_nso(const std::string& src) {
+	return bdd_make_nso_rr(src).main;
+}
 
 std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n, size_t l = 0) {
 	os << "{";
