@@ -615,16 +615,23 @@ void repl_evaluator<factory_t, BAs...>::def_rr_cmd(
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_list_cmd() {
-	if (definitions.size() == 0) cout << "definitions are empty\n";
+	if (definitions.size() == 0) cout << "rec. relations: empty\n";
+	else std::cout << "rec. relations::\n";
 	for (size_t i = 0; i < definitions.size(); i++)
-		cout << "[" << i + 1 << "] " << definitions[i] << "\n";
+		cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
+	if (inputs.size() == 0 && outputs.size() == 0) cout << "i/o variables: empty\n";
+	else std::cout << "i/o variables:\n";
+	for (auto& i : inputs)
+		cout << "    " << i.type << " " << i.name << " = ifile(\"" << i.file_name << "\")\n";
+	for (auto& o : outputs)
+		cout << "    " << o.type << " " << o.name << " = ofile(\"" << o.file_name << "\")\n";
 }
 
 template <typename factory_t, typename... BAs>
 void repl_evaluator<factory_t, BAs...>::def_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
-	if (definitions.size() == 0) cout << "definitions are empty\n";
+	if (definitions.size() == 0) cout << "rec. relations: empty\n";
 	auto num = command | tau_parser::number;
 	if (!num) return;
 	auto i = digits(num.value());
@@ -634,6 +641,34 @@ void repl_evaluator<factory_t, BAs...>::def_print_cmd(
 	}
 	cout << "error: definition [" << i << "] does not exist\n";
 	return;
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_input_cmd(
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
+	stream_ba<tau_ba<BAs...>, BAs...> sb;
+	sb.type = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
+	if (auto file_name = command | tau_parser::input_stream
+			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
+		sb.file_name = file_name;
+	else sb.file_name = "/dev/stdin";
+	sb.name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+	sb.input = true;
+	inputs.insert(sb);
+}
+
+template <typename factory_t, typename... BAs>
+void repl_evaluator<factory_t, BAs...>::def_output_cmd(
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
+	stream_ba<tau_ba<BAs...>, BAs...> sb;
+	sb.type = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
+	if (auto file_name = command | tau_parser::output_stream
+			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
+		sb.file_name = file_name;
+	else sb.file_name = "/dev/stdout";
+	sb.name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
+	sb.input = false;
+	outputs.insert(sb);
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -823,6 +858,9 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	case p::def_rr_cmd:         def_rr_cmd(command); break;
 	case p::def_list_cmd:       def_list_cmd(); break;
 	case p::def_print_cmd:      def_print_cmd(command); break;
+	// definitions of i/o streams
+	case p::def_input_cmd:      def_input_cmd(command); break;
+	case p::def_output_cmd:     def_output_cmd(command); break;
 	// qelim
 	case p::qelim_cmd:          result = qelim_cmd(command); break;
 	case p::comment:            break;
@@ -943,20 +981,20 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		//<< "  unsat				    check unsatisfiability\n"
 		//<< "\n"
 
-		//<< "Execute commands:\n"
-		//<< "  execute                execute a program that meets a tau spec\n"
-		//<< "\n"
+		<< "Execute commands:\n"
+		<< "  execute                execute a program that meets a tau spec\n"
+		<< "\n"
 
-		//<< "Solver commands:\n"
-		//<< "  solve                  solve a formula\n"
-		//<< "\n"
+		<< "Solver commands:\n"
+		<< "  solve                  solve a formula\n"
+		<< "\n"
 
 		<< "Definition commands:\n"
-		<< "  def                   manage defined recurrence relations\n"
+		<< "  def                    manage defined recurrence relations\n"
 		<< "\n"
 
 		//<< "Selection commands:\n"
-		//<< "  selection or s         selection control\n"
+		//<< "  selection or s       selection control\n"
 		//<< "\n"
 
 		<< "Settings commands:\n"

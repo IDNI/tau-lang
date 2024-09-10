@@ -677,6 +677,68 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o,
 	return e(o);
 }
 
+// adds terminal symbols to a given stream, used in conjuction with usual
+// traversals (see make_string_* methods).
+template <typename extractor_t, typename node_t>
+struct stringify {
+
+	stringify(const extractor_t& extractor,
+		std::basic_stringstream<char>& stream)
+			: stream(stream), extractor(extractor) {}
+
+	node_t operator()(const node_t& n) {
+		if (auto str = extractor(n); str) stream << str.value();
+		return n;
+	}
+
+	std::basic_stringstream<char>& stream;
+	const extractor_t& extractor;
+};
+
+// converts a sp_tau_node<...> to a string.
+template <typename extractor_t, typename node_t>
+std::string make_string(const extractor_t& extractor, const node_t& n) {
+	std::basic_stringstream<char> ss;
+	stringify<extractor_t, node_t> sy(extractor, ss);
+	post_order_tree_traverser<stringify<extractor_t, node_t>,
+				all_t, node_t>(sy, all)(n);
+	return ss.str();
+}
+
+// extracts terminal from sp_tau_node
+template <typename... BAs>
+auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n)
+	-> std::optional<char>
+{
+	if (n->value.index() == 0
+			&& !get<0>(n->value).nt()
+			&& !get<0>(n->value).is_null())
+		return std::optional<char>(get<0>(n->value).t());
+	return std::optional<char>();
+};
+
+template <typename... BAs>
+using tau_node_terminal_extractor_t =
+				decltype(tau_node_terminal_extractor<BAs...>);
+
+template<typename... BAs>
+auto extract_string = [](const sp_tau_node<BAs...>& n) {
+	return idni::tau::make_string(idni::tau::tau_node_terminal_extractor<BAs...>, n);
+};
+
+template<typename... BAs>
+using extract_string_t = decltype(extract_string<BAs...>);
+
+template<typename... BAs>
+std::string operator|(const sp_tau_node<BAs...>& n, const extract_string_t<BAs...> e) {
+	return e(n);
+}
+
+template<typename... BAs>
+std::string operator|(const std::optional<sp_tau_node<BAs...>>& n, const extract_string_t<BAs...> e) {
+	return n.has_value() ? e(n.value()) : "";
+}
+
 // check if the node is the given non terminal
 template <typename... BAs>
 bool is_child_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
@@ -792,56 +854,12 @@ struct tauify {
 	}
 };
 
-// extracts terminal from sp_tau_node
-template <typename... BAs>
-auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n)
-	-> std::optional<char>
-{
-	if (n->value.index() == 0
-			&& !get<0>(n->value).nt()
-			&& !get<0>(n->value).is_null())
-		return std::optional<char>(get<0>(n->value).t());
-	return std::optional<char>();
-};
-
-template <typename... BAs>
-using tau_node_terminal_extractor_t =
-				decltype(tau_node_terminal_extractor<BAs...>);
-
 // extracts terminal from sp_tau_source_node
 extern std::function<std::optional<char>(const sp_tau_source_node& n)>
 	tau_source_terminal_extractor;
 
 template <typename... BAs>
 using tau_source_terminal_extractor_t = decltype(tau_source_terminal_extractor);
-
-// adds terminal symbols to a given stream, used in conjuction with usual
-// traversals (see make_string_* methods).
-template <typename extractor_t, typename node_t>
-struct stringify {
-
-	stringify(const extractor_t& extractor,
-		std::basic_stringstream<char>& stream)
-			: stream(stream), extractor(extractor) {}
-
-	node_t operator()(const node_t& n) {
-		if (auto str = extractor(n); str) stream << str.value();
-		return n;
-	}
-
-	std::basic_stringstream<char>& stream;
-	const extractor_t& extractor;
-};
-
-// converts a sp_tau_node<...> to a string.
-template <typename extractor_t, typename node_t>
-std::string make_string(const extractor_t& extractor, const node_t& n) {
-	std::basic_stringstream<char> ss;
-	stringify<extractor_t, node_t> sy(extractor, ss);
-	post_order_tree_traverser<stringify<extractor_t, node_t>,
-				all_t, node_t>(sy, all)(n);
-	return ss.str();
-}
 
 template<typename... BAs>
 sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
