@@ -62,7 +62,7 @@
 
 #include "bdd_binding.h"
 #include "repl.h"
-#include "executor.h"
+#include "runner.h"
 
 namespace idni::tau {
 
@@ -142,7 +142,7 @@ private:
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> sat_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-	void execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void run_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void solve_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>& n);

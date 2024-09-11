@@ -182,7 +182,7 @@ cli_command            =>
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
         | ("solve"
                 :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
-        | (("e" | "execute"):execute_sym __ wff)              :execute_cmd
+        | (("r" | "run"):run_sym __ wff)                      :run_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
         | (("s" | "subst" | "substitute")
