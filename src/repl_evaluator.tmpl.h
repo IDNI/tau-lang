@@ -653,7 +653,6 @@ void repl_evaluator<factory_t, BAs...>::def_input_cmd(
 		sb.file_name = file_name;
 	else sb.file_name = "/dev/stdin";
 	sb.name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
-	sb.input = true;
 	inputs.insert(sb);
 }
 
@@ -667,7 +666,6 @@ void repl_evaluator<factory_t, BAs...>::def_output_cmd(
 		sb.file_name = file_name;
 	else sb.file_name = "/dev/stdout";
 	sb.name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
-	sb.input = false;
 	outputs.insert(sb);
 }
 
