@@ -550,7 +550,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 }
 
 template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::execute_cmd(
+void repl_evaluator<factory_t, BAs...>::run_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto form = n->child[1];
@@ -834,7 +834,7 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	// normalization
 	case p::normalize_cmd:      result = normalize_cmd(command); break;
 	// execution
-	case p::execute_cmd:        execute_cmd(command); break;
+	case p::run_cmd:            run_cmd(command); break;
 	case p::solve_cmd:          solve_cmd(command); break;
 	// substitution and instantiation
 	case p::subst_cmd:          result = substitute_cmd(command); break;
@@ -979,8 +979,8 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		//<< "  unsat				    check unsatisfiability\n"
 		//<< "\n"
 
-		<< "Execute commands:\n"
-		<< "  execute                execute a program that meets a tau spec\n"
+		<< "Run command:\n"
+		<< "  run                    run a program that meets a tau spec\n"
 		<< "\n"
 
 		<< "Solver commands:\n"
@@ -1057,8 +1057,8 @@ void repl_evaluator<factory_t, BAs...>::help_cmd(
 		<< "usage:\n"
 		<< "  qelim <WFF>            eliminates inner most quantifier in the given WFF\n";
 		break;
-	case tau_parser::execute_sym: cout
-		<< "Command e, execute ...\n";
+	case tau_parser::run_sym: cout
+		<< "Command r, run ...\n";
 		break;
 	case tau_parser::solve_sym: cout
 		<< "Command s, solve ...\n";

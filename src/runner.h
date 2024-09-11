@@ -100,7 +100,7 @@ void operator<<(outputs<BAs...>& out, const solution<BAs...>& sol) {
 }
 
 template<typename factory_t, typename...BAs>
-struct executor {
+struct interpreter {
 
 	using type = std::string;
 
@@ -108,13 +108,13 @@ struct executor {
 	// equations of the clause according to its type.
 	using system = std::map<type, nso<BAs...>>;
 
-	executor(factory_t factory, nso<BAs...> phi_inf): factory(factory) {
+	interpreter(factory_t factory, nso<BAs...> phi_inf): factory(factory) {
 		// 1.- split phi_inf in clauses
 		// 2.- for each clause, split it into several equation systems according to
 		// its type and store it in systems
 	}
 
-	std::optional<solution<BAs...>> operator()(const assignment<BAs...>& inputs) {
+	std::optional<solution<BAs...>> run(const assignment<BAs...>& inputs) {
 		// for each system in systems try to solve it, if it is not possible
 		// continue with the next system.
 		for (const auto& system: systems) {
@@ -142,17 +142,18 @@ struct executor {
 	// Set of all possible systems to be solved, each system corresponds to a
 	// different clause.
 	std::set<system> systems;
+	std::map<var<BAs...>, nso<BAs...>> previous;
 	factory_t factory;
 };
 
 template<typename factory_t, typename...BAs>
-void execute(const inputs<factory_t, BAs...>& in, const outputs<BAs...>& out,
+void run(const inputs<factory_t, BAs...>& in, const outputs<BAs...>& out,
 		nso<BAs...>& phi_inf) {
 	assignment<BAs...> inputs;
-	executor<factory_t, BAs...> exec(in.factory, phi_inf);
+	interpreter<factory_t, BAs...> i(in.factory, phi_inf);
 	while (!in.eoi()) {
 		in >> inputs;
-		auto solution = exec(inputs);
+		auto solution = i.run(inputs);
 		if (solution.has_value()) out << solution.value();
 		else {
 			std::cout << "no solution\n";

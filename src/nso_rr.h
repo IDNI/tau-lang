@@ -3645,7 +3645,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::help_cmd,                         50 },
 			{ tau_parser::file_cmd,                         50 },
 			{ tau_parser::normalize_cmd,                    50 },
-			{ tau_parser::execute_cmd,                      50 },
+			{ tau_parser::run_cmd,                          50 },
 			{ tau_parser::solve_cmd,                        50 },
 			{ tau_parser::dnf_cmd,                          50 },
 			{ tau_parser::cnf_cmd,                          50 },
@@ -3919,7 +3919,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::sat_cmd:       prefix("sat"); break;
 			case tau_parser::unsat_cmd:     prefix("unsat"); break;
 			case tau_parser::solve_cmd:     prefix("solve"); break;
-			case tau_parser::execute_cmd:   prefix("execute"); break;
+			case tau_parser::run_cmd:       prefix("run"); break;
 			case tau_parser::normalize_cmd: prefix("normalize"); break;
 			case tau_parser::inst_cmd:
 			case tau_parser::subst_cmd:

@@ -21,6 +21,7 @@ set(TESTS
 	variant_ba
 	normal_forms
 	make_node_hook
+	runner
 )
 
 foreach(X IN LISTS TESTS)

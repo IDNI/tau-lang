@@ -14,11 +14,11 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "executor.h"
+#include "runner.h"
 
-TEST_SUITE("executor") {
+TEST_SUITE("runner") {
 
-	TEST_CASE("executor") {
+	TEST_CASE("runner") {
 		CHECK( true );
 	}
 }
