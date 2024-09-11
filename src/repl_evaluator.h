@@ -62,20 +62,9 @@
 
 #include "bdd_binding.h"
 #include "repl.h"
+#include "executor.h"
 
 namespace idni::tau {
-
-template<typename... BAs>
-struct stream_ba {
-	bool input;
-	std::string file_name;
-	nso<BAs...> name;
-	std::string type;
-
-	auto operator<=>(const stream_ba&) const = default;
-	bool operator==(const stream_ba&) const = default;
-	bool operator!=(const stream_ba&) const = default;
-};
 
 template <typename factory_t, typename... BAs>
 struct repl_evaluator {

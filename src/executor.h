@@ -19,195 +19,148 @@
 #ifndef __EXECUTOR_H__
 #define __EXECUTOR_H__
 
+#include <fstream>
+
 #include "tau_ba.h"
+#include "solver.h"
 #include "satisfiability.h"
 
-template<typename...BAs>
-using tau_input = std::map<gssotc<BAs...>, std::variant<BAs...>>;
+namespace idni::tau {
 
-template<typename...BAs>
-using tau_inputs = std::vector<tau_input<BAs...>>;
+template<typename... BAs>
+struct stream_ba {
+	std::string file_name;
+	nso<BAs...> name;
+	std::string type;
 
-template<typename...BAs>
-using tau_output = std::pair<gssotc<BAs...>, std::variant<BAs...>>;
-
-template<typename...BAs>
-using tau_outputs = std::vector<tau_output<BAs...>>;
-
-template<typename factory_t, typename splitter_t, typename...BAs>
-struct executable {
-
-	std::variant<BAs...> execute(const tau_input<BAs...>& input) {
-		// check satisfiability
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin execute_step " << it;
-		BOOST_LOG_TRIVIAL(trace) << spec;
-
-		auto current = build_main_step<tau_ba<BAs...>, BAs...>(spec.main, it)
-			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(spec.rec_relations));
-
-		// compute output
-		auto output = execute_gssotc(current, inputs).value();
-		// update executable
-		inputs.push_back(input);
-		outputs.push_back(output);
-		it++;
-		return output;
-	}
-
-	tau_spec<BAs...> spec;
-	tau_inputs<BAs...> inputs;
-	tau_outputs<BAs...> outputs;
-	factory_t factory;
-	splitter_t splitter;
-	size_t it = 0;
-
-private:
-
-	std::optional<tau_outputs<BAs...>> execute_gssotc_clause_general(const gssotc<BAs...>& positive, const std::vector<gssotc<BAs...>>& negatives, const tau_input<BAs...>& input, const tau_output<BAs...>& output, size_t loopback) {
-		// TODO (HIGH) change this...
-		auto etas = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
-		for (size_t current = 1; /* until return statement */ ; ++current) {
-			auto [eta, extracted_bindings] = build_eta_nso_rr<BAs...>(positive, negatives, inputs, outputs);
-			auto check = build_check_nso_rr(outputs, loopback, current);
-			auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(check), extracted_bindings).main;
-			if ((normalize | tau_parser::wff_f).has_value()) {
-				BOOST_LOG_TRIVIAL(trace) << "(I) --Check is_gssotc_clause_satisfiable: false";
-				return false;
-			}
-			for (size_t previous = 1; previous < current; ++previous) {
-				auto main = build_main_nso_rr(outputs, loopback, current, previous);
-				auto normalize = normalizer<tau_ba<BAs...>, BAs...>(eta.append(main), extracted_bindings).main;
-				if ((normalize | tau_parser::wff_t).has_value()) return true;
-			}
-		}
-	}
-
-	std::optional<tau_outputs<BAs...>> execute_gssotc_clause_no_negatives_with_loopback(const gssotc<BAs...>& positive, const tau_input<BAs...>& input, const tau_output<BAs...>& output, size_t loopback) {
-		// TODO (HIGH) change this...
-		std::basic_stringstream<char> nso_rr;
-
-		nso_rr
-			<< build_phi_base_case_nso_rr<BAs...>(positive, inputs, outputs, loopback)
-			<< build_phi_general_case_nso_rr<BAs...>(positive, inputs, outputs, loopback)
-			<< build_phi_main_nso_rr<BAs...>(positive, inputs, outputs, loopback);
-
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Check normalizer";
-		BOOST_LOG_TRIVIAL(trace) << nso_rr.str();
-
-		// TODO (MEDIUM) remove bindings from the following code
-		bindings<tau_ba<BAs...>, BAs...> bindings;
-		std::string source = nso_rr.str();
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(source, bindings).main;
-
-		if ((normalized | tau_parser::wff_f).has_value()) {
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: false";
-			return false;
-		}
-
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: true";
-		return true;
-	}
-
-	std::optional<tau_outputs<BAs...>> execute_gssotc_clause_no_negatives_no_loopback(const gssotc<BAs...>& positive, const tau_input<BAs...>& input, const tau_output<BAs...>& output) {
-		// TODO (HIGH) change this...
-		auto [main_wo_rr, bindings] = build_main_nso_rr_wff_no_loopbacks<BAs...>(positive, inputs, outputs);
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Check normalizer";
-		BOOST_LOG_TRIVIAL(trace) << main_wo_rr;
-		auto normalize = normalizer<tau_ba<BAs...>, BAs...>(main_wo_rr, bindings).main;
-
-		if ((normalize | tau_parser::wff_f).has_value()) {
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: false";
-			return false;
-		}
-
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: true";
-		return true;
-	}
-
-	std::optional<tau_outputs<BAs...>> execute_gssotc_clause_no_outputs(const gssotc<BAs...>& clause, const tau_input<BAs...>& input) {
-		auto wff = clause | tau_parser::tau_wff | tau_parser::wff | optional_value_extractor<gssotc<BAs...>>;
-		bindings<tau_ba<BAs...>, BAs...> bindings;
-		std::basic_stringstream<char> main;
-		// TODO (HIGH) change this, the inputs are vars... in this case
-		main << build_universal_quantifiers(inputs) << wff << ".";
-		std::string str = main.str();
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(str, bindings).main;
-		if (auto check = normalized | tau_parser::wff_t; check.has_value()) {
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable_no_outputs: true";
-			return check;
-		}
-
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Check is_gssotc_clause_satisfiable: false";
-		return {};
-	}
-
-	std::optional<tau_outputs<BAs...>> execute_gssotc_clause(const gssotc<BAs...>& clause, const tau_inputs<BAs...>& input) {
-
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Executing gssotc clause";
-		BOOST_LOG_TRIVIAL(trace) << clause;
-
-		auto collapsed = clause |
-			repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-				simplify_tau<tau_ba<BAs...>, BAs...>
-				| collapse_positives_tau<tau_ba<BAs...>, BAs...>);
-
-		auto [positive, negatives] = get_gssotc_positive_negative_literals(collapsed);
-		auto [inputs, outputs] = get_gssotc_io_vars(collapsed);
-		size_t loopback = max(inputs.loopback, outputs.loopback);
-
-		// TODO (HIGH) Case no output variables but input variables
-		if (outputs.name.empty()) {
-
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- No variables case";
-			BOOST_LOG_TRIVIAL(trace) << "(F) " << collapsed;
-
-			return execute_gssotc_clause_no_outputs(collapsed, inputs);
-		} else if (negatives.empty() && positive.has_value() && loopback == 0) {
-
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- No negatives and no loopback case";
-			BOOST_LOG_TRIVIAL(trace) << clause;
-
-			return execute_gssotc_clause_no_negatives_with_loopback(positive, inputs, outputs);
-		} else if (negatives.empty() && positive.has_value()) {
-
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- No negatives with loopback case";
-			BOOST_LOG_TRIVIAL(trace) << clause;
-
-			return execute_gssotc_clause_no_negatives_with_loopback(positive, inputs, outputs, loopback);
-		}
-
-
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- General case";
-		BOOST_LOG_TRIVIAL(trace) << clause;
-
-		return execute_gssotc_clause_general(positive, negatives, inputs, outputs, loopback);
-	}
-
-	std::optional<tau_outputs<BAs...>> execute_gssotc(const gssotc<BAs...>& form, const tau_inputs<BAs...>& input) {
-		auto dnf = form
-			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-				to_dnf_tau<tau_ba<BAs...>, BAs...>
-				| simplify_tau<tau_ba<BAs...>, BAs...>);
-
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Converting to dnf and simplifying";
-		BOOST_LOG_TRIVIAL(trace) << dnf;
-
-		auto clauses = get_gssotc_clauses(dnf);
-		for (auto& clause: clauses)
-			if (auto check = execute_gssotc_clause(clause); check.has_value()) return check;
-		return {};
-	}
+	auto operator<=>(const stream_ba&) const = default;
+	bool operator==(const stream_ba&) const = default;
+	bool operator!=(const stream_ba&) const = default;
 };
 
-template<typename factory_t, typename splitter_t, typename...BAs>
-std::optional<executable<factory_t, splitter_t, BAs...>> execute(factory_t& factory, splitter_t& splitter, const tau_spec<BAs...>& spec) {
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin execute";
-	BOOST_LOG_TRIVIAL(trace) << spec;
+// Represents an solution of variables to values.
+template<typename...BAs>
+using assignment = solution<BAs...>;
 
-	if (is_tau_spec_satisfiable(spec)) {
-		return { .spec = spec, .factory = factory, .splitter = splitter };
+template<typename factory_t, typename...BAs>
+struct inputs {
+
+	inputs(factory_t factory, std::set<stream_ba<BAs...>>& streams): factory(factory) {
+		// open the corresponding streams for input and store them in streams
 	}
-	return {};
+
+	~inputs() {
+		// close the streams
+	}
+
+	// end of inputs
+	bool eoi() {
+		// check if all the streams are at the end of the file
+		return true;
+	}
+
+	assignment<BAs...> next() {
+		// read the next value from the streams and return it as an assignment,
+		// the vars are set according to the time_point so we could just
+		// replace them in the phi_inf clauses.
+		time_point++;
+		return {};
+	}
+
+	std::map<stream_ba<BAs...>, std::ifstream> streams;
+	size_t time_point = 0;
+	factory_t factory;
+};
+
+template<typename...BAs>
+struct outputs {
+
+	outputs(std::set<stream_ba<BAs...>>& streams) {
+		// open the corresponding streams for output and store them in streams
+	}
+
+	~outputs() {
+		// close the streams
+	}
+
+	std::map<stream_ba<BAs...>, std::ofstream> streams;
+};
+
+
+template<typename factory_t, typename...BAs>
+void operator>>(inputs<factory_t, BAs...>& in, assignment<BAs...>& out) {
+	out.clear();
+	// for each stream in in.streams, read the value from the file,
+	// parsed it and store it in out.
 }
+
+template<typename...BAs>
+void operator<<(outputs<BAs...>& out, const solution<BAs...>& sol) {
+	// for each stream in out.streams, write the value from the solution
+}
+
+template<typename factory_t, typename...BAs>
+struct executor {
+
+	using type = std::string;
+
+	// A system represent a clause to be solved. It maps the different
+	// equations of the clause according to its type.
+	using system = std::map<type, nso<BAs...>>;
+
+	executor(factory_t factory, nso<BAs...> phi_inf): factory(factory) {
+		// 1.- split phi_inf in clauses
+		// 2.- for each clause, split it into several equation systems according to
+		// its type and store it in systems
+	}
+
+	std::optional<solution<BAs...>> operator()(const assignment<BAs...>& inputs) {
+		// for each system in systems try to solve it, if it is not possible
+		// continue with the next system.
+		for (const auto& system: systems) {
+			std::map<type, solution<BAs...>> solutions;
+			bool solved = true;
+			for (const auto& [type, equations]: system) {
+				auto substituted = replace(equations, inputs);
+				auto solution = solve(substituted, factory, type);
+				if (solution.has_value()) solutions[type] = solution.value();
+				else {
+					solved = false;
+					break;
+				}
+			}
+			if (solved) {
+				solution<BAs...> output;
+				for (const auto& [type, solution]: solutions)
+					output.insert(solution.begin(), solution.end());
+				return output;
+			}
+		}
+		return {};
+	}
+
+	// Set of all possible systems to be solved, each system corresponds to a
+	// different clause.
+	std::set<system> systems;
+	factory_t factory;
+};
+
+template<typename factory_t, typename...BAs>
+void execute(const inputs<factory_t, BAs...>& in, const outputs<BAs...>& out,
+		nso<BAs...>& phi_inf) {
+	assignment<BAs...> inputs;
+	executor<factory_t, BAs...> exec(in.factory, phi_inf);
+	while (!in.eoi()) {
+		in >> inputs;
+		auto solution = exec(inputs);
+		if (solution.has_value()) out << solution.value();
+		else {
+			std::cout << "no solution\n";
+			return;
+		}
+	}
+}
+
+} // namespace idni::tau
 
 # endif //__EXECUTOR_H__
