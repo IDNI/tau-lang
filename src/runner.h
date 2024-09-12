@@ -47,15 +47,28 @@ struct inputs {
 
 	inputs(factory_t factory, std::set<stream_ba<BAs...>>& streams): factory(factory) {
 		// open the corresponding streams for input and store them in streams
+		for (const auto& stream: streams)
+			this->streams[stream] = std::ifstream(stream.file_name);
 	}
 
 	~inputs() {
 		// close the streams
+		for (const auto& [stream, file]: streams) file.close();
 	}
 
 	// end of inputs
-	bool eoi() {
+	bool eoi() const {
 		// check if all the streams are at the end of the file
+		for (const auto& [stream, file]: streams)
+			if (!file.eof()) return false;
+		return true;
+	}
+
+	// is good
+	bool good() const {
+		// check if all the streams are good
+		for (const auto& [stream, file]: streams)
+			if (!file.good()) return false;
 		return true;
 	}
 
@@ -63,6 +76,15 @@ struct inputs {
 		// read the next value from the streams and return it as an assignment,
 		// the vars are set according to the time_point so we could just
 		// replace them in the phi_inf clauses.
+		assignment<BAs...> inputs;
+		for (const auto& [stream, file]: streams) {
+			std::string line;
+			std::getline(file, line);
+			if (line.empty()) continue;
+			auto var = stream.name;
+			auto value = factory.value(line, stream.type);
+			inputs[var] = value;
+		}
 		time_point++;
 		return {};
 	}
