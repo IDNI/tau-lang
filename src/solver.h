@@ -629,11 +629,11 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const nso<BA
 }
 
 // entry point for the solver
-template<typename factory_t, typename...BAs>
+template<typename...BAs>
 std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
-		const factory_t& factory, const std::string& type = "") {
+		const std::string& type = "") {
+	static nso_factory<BAs...> factory;
 	auto splitter_one = factory.splitter_one(type);
-	if (!splitter_one.has_value()) return {};
 	auto dnf = dnf_wff(form);
 	for (auto& clause: get_leaves(form, tau_parser::wff_or, tau_parser::wff)) {
 		auto is_equation = [](const nso<BAs...>& n) {
@@ -643,8 +643,7 @@ std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
 		auto eqs = select_top(clause, is_equation);
 		if (eqs.empty()) continue;
 		auto solution = solve<BAs...>(
-			std::set<nso<BAs...>>(eqs.begin(), eqs.end()),
-			splitter_one.value());
+			std::set<nso<BAs...>>(eqs.begin(), eqs.end()), splitter_one);
 		if (solution.has_value()) return solution;
 	}
 	return {};

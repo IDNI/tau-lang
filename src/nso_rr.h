@@ -94,7 +94,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 	if (!l_has_extra && !r_has_extra)
 		return (l->value == r->value && l->child == r->child);
 	if (l_has_extra && !r_has_extra) {
-		if (l->child.size() - 1 != r->child.size()) return false;
+		if (l->child.size() != r->child.size() + 1) return false;
 		for (int i = 0; i < (int_t)r->child.size(); ++i) {
 			if (!(l->child[i] == r->child[i]))
 				return false;
@@ -102,7 +102,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 		return l->value == r->value;
 	}
 	if (!l_has_extra && r_has_extra) {
-		if (l->child.size() != r->child.size() - 1) return false;
+		if (l->child.size() + 1 != r->child.size()) return false;
 		for (int i = 0; i < (int_t)l->child.size(); ++i) {
 			if (!(l->child[i] == r->child[i]))
 				return false;
@@ -111,8 +111,8 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 	}
 	if (l_has_extra && r_has_extra) {
 		if (l->child.size() != r->child.size()) return false;
-		for (int i = 0; i < (int_t)l->child.size() - 1; ++i) {
-			if (!(l->child[i] == r->child[i]))
+		for (int i = 1; i < ((int_t)l->child.size()); ++i) {
+			if (!(l->child[i-1] == r->child[i-1]))
 				return false;
 		}
 		return l->value == r->value;
@@ -882,6 +882,16 @@ sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
 	return wrap(nt, { c1, c2 });
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const std::string& terminals) {
+	std::vector<sp_tau_node<BAs...>> children;
+	for (const auto& c : terminals)
+		children.emplace_back(make_node<tau_sym<BAs...>>(
+			tau_source_sym(c), {}));
+	return wrap(nt, children);
+}
+
 // bind the given, using a binder, the constants of the a given sp_tau_node<...>.
 template<typename binder_t, typename... BAs>
 struct bind_transformer {
@@ -946,30 +956,44 @@ struct name_binder {
 	const bindings<BAs...>& bs;
 };
 
+template<typename...BAs>
+struct nso_factory {
+
+	sp_tau_node<BAs...> parse(const std::string&,
+			const std::string&) const {
+		throw std::runtime_error("not implemented");
+	}
+
+	sp_tau_node<BAs...> binding(const sp_tau_node<BAs...>&,
+			const std::string&) const {
+		throw std::runtime_error("not implemented");
+	}
+
+	sp_tau_node<BAs...> splitter_one(const std::string&) const {
+		throw std::runtime_error("not implemented");
+	}
+};
+
 // binds the constants of a given binding using the multi-factory for the types
 // supported.
-template<typename factory_t, typename... BAs>
+template<typename... BAs>
 struct factory_binder {
 
-	factory_binder(factory_t& factory) : factory(factory) {}
-
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		// FIXME (LOW) check that the node is a factory binding one
+		static nso_factory<BAs...> factory;
 		if(auto type = find_top(n,
 			is_non_terminal<tau_parser::type, BAs...>); type)
 		{
 			// the factory take two arguments, the first is the type and the
 			// second is the node representing the constant.
-			auto type_name = make_string<
+			std::string type_name = make_string<
 					tau_node_terminal_extractor_t<BAs...>,
 					sp_tau_node<BAs...>>(
 				tau_node_terminal_extractor<BAs...>, type.value());
-			return factory.build(type_name, n);
+			return factory.binding(n, type_name);
 		}
 		return n;
 	}
-
-	factory_t& factory;
 };
 
 // TODO (HIGH) improve type resolution adding types to quantifiers.
@@ -1274,12 +1298,12 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 	map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>
 								transform(tf);
 	auto tau_code = post_order_traverser<
-		map_transformer<tauify<BAs...>,
+				map_transformer<tauify<BAs...>,
 				sp_tau_source_node, sp_tau_node<BAs...>>,
-		all_t,
-		sp_node<tau_source_sym>,
-		sp_tau_node<BAs...>>(
-			transform, all)(tau_source);
+			all_t,
+			sp_node<tau_source_sym>,
+			sp_tau_node<BAs...>>(
+		transform, all)(tau_source);
 	return process_defs_input_variables(
 		process_offset_variables(
 		process_quantifier_vars(
@@ -1326,13 +1350,11 @@ sp_tau_node<BAs...> bind_tau_code_using_bindings(sp_tau_node<BAs...>& code,
 }
 
 // make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code,
-	factory_t& factory)
+template<typename... BAs>
+sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code)
 {
-	factory_binder<factory_t, BAs...> fb(factory);
-	return bind_tau_code_using_binder<
-			factory_binder<factory_t, BAs...>, BAs...>(code, fb);
+	factory_binder<BAs...> fb;
+	return bind_tau_code_using_binder<factory_binder<BAs...>, BAs...>(code, fb);
 }
 
 // make a nso_rr from the given tau code
@@ -1407,31 +1429,28 @@ rr<nso<BAs...>> make_nso_rr_using_bindings(const std::string& input,
 	return make_nso_rr_using_bindings<BAs...>(source, bindings);
 }
 
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code,
-	factory_t& factory)
+template<typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code)
 {
-	factory_binder<factory_t, BAs...> fb(factory);
+	factory_binder<BAs...> fb;
 	return make_nso_rr_using_binder<
-			factory_binder<factory_t, BAs...>, BAs...>(code,fb);
+			factory_binder<BAs...>, BAs...>(code,fb);
 }
 
 // make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& source,
-	factory_t& factory)
+template<typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& source)
 {
 	auto code = make_tau_code<BAs...>(source);
-	return make_nso_rr_using_factory<factory_t, BAs...>(code, factory);
+	return make_nso_rr_using_factory<BAs...>(code);
 }
 
 // make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input,
-	factory_t& factory)
+template<typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input)
 {
 	auto source = make_tau_source(input, { .start = tau_parser::rr });
-	return make_nso_rr_using_factory<factory_t, BAs...>(source, factory);
+	return make_nso_rr_using_factory<BAs...>(source);
 }
 
 //------------------------------------------------------------------------------
@@ -1824,6 +1843,14 @@ static const sp_tau_node<BAs...> _T = bldr_wff_T<BAs...>.second;
 
 template<typename... BAs>
 static const sp_tau_node<BAs...> _T_trimmed = trim(_T<BAs...>);
+
+template<typename... BAs>
+nso<BAs...> build_extra (const nso<BAs...> n, const std::string &note) {
+	assert((!n->child.empty()) && (!is_non_terminal(tau_parser::extra, n->child.back())));
+	std::vector<nso<BAs...>> c (n->child);
+	c.emplace_back(wrap<BAs...>(tau_parser::extra, note));
+	return make_node(n->value, move(c));
+}
 
 template<typename... BAs>
 nso<BAs...> build_num(size_t value) {
@@ -3944,6 +3971,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::debug_sym: stream << "debug"; break;
 			case tau_parser::trace_sym: stream << "trace"; break;
 			case tau_parser::info_sym:  stream << "info"; break;
+			case tau_parser::extra: break; // We do not output this
 			// for the rest skip value and just passthrough to child
 			default: for (const auto& c : n->child)
 					pp(stream, c, parent);

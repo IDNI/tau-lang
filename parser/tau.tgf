@@ -178,7 +178,7 @@ cli_command            =>
         | (("h" | "help")  :help_sym   [__ help_arg])         :help_cmd
         | ("file"          :file_sym    __ q_string)          :file_cmd
         | ("valid"         :valid_sym   __ rr)                :valid_cmd
-        | ("sat"           :sat_sym     __ rr)                :sat_cmd
+        | ("sat"           :sat_sym     __ normalize_cmd_arg) :sat_cmd
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
         | ("solve"
                 :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
