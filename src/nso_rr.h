@@ -946,30 +946,40 @@ struct name_binder {
 	const bindings<BAs...>& bs;
 };
 
+template<typename...BAs>
+struct nso_factory {
+
+	sp_tau_node<BAs...> parse(const std::string&,
+			const std::string&) const {
+		throw std::runtime_error("not implemented");
+	}
+
+	sp_tau_node<BAs...> binding(const sp_tau_node<BAs...>&,
+			const std::string&) const {
+		throw std::runtime_error("not implemented");
+	}
+};
+
 // binds the constants of a given binding using the multi-factory for the types
 // supported.
-template<typename factory_t, typename... BAs>
+template<typename... BAs>
 struct factory_binder {
 
-	factory_binder(factory_t& factory) : factory(factory) {}
-
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		// FIXME (LOW) check that the node is a factory binding one
+		static nso_factory<BAs...> factory;
 		if(auto type = find_top(n,
 			is_non_terminal<tau_parser::type, BAs...>); type)
 		{
 			// the factory take two arguments, the first is the type and the
 			// second is the node representing the constant.
-			auto type_name = make_string<
+			std::string type_name = make_string<
 					tau_node_terminal_extractor_t<BAs...>,
 					sp_tau_node<BAs...>>(
 				tau_node_terminal_extractor<BAs...>, type.value());
-			return factory.build(type_name, n);
+			return factory.binding(n, type_name);
 		}
 		return n;
 	}
-
-	factory_t& factory;
 };
 
 // TODO (HIGH) improve type resolution adding types to quantifiers.
@@ -1274,12 +1284,12 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 	map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>
 								transform(tf);
 	auto tau_code = post_order_traverser<
-		map_transformer<tauify<BAs...>,
+				map_transformer<tauify<BAs...>,
 				sp_tau_source_node, sp_tau_node<BAs...>>,
-		all_t,
-		sp_node<tau_source_sym>,
-		sp_tau_node<BAs...>>(
-			transform, all)(tau_source);
+			all_t,
+			sp_node<tau_source_sym>,
+			sp_tau_node<BAs...>>(
+		transform, all)(tau_source);
 	return process_defs_input_variables(
 		process_offset_variables(
 		process_quantifier_vars(
@@ -1326,13 +1336,11 @@ sp_tau_node<BAs...> bind_tau_code_using_bindings(sp_tau_node<BAs...>& code,
 }
 
 // make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code,
-	factory_t& factory)
+template<typename... BAs>
+sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code)
 {
-	factory_binder<factory_t, BAs...> fb(factory);
-	return bind_tau_code_using_binder<
-			factory_binder<factory_t, BAs...>, BAs...>(code, fb);
+	factory_binder<BAs...> fb;
+	return bind_tau_code_using_binder<factory_binder<BAs...>, BAs...>(code, fb);
 }
 
 // make a nso_rr from the given tau code
@@ -1407,31 +1415,28 @@ rr<nso<BAs...>> make_nso_rr_using_bindings(const std::string& input,
 	return make_nso_rr_using_bindings<BAs...>(source, bindings);
 }
 
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code,
-	factory_t& factory)
+template<typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code)
 {
-	factory_binder<factory_t, BAs...> fb(factory);
+	factory_binder<BAs...> fb;
 	return make_nso_rr_using_binder<
-			factory_binder<factory_t, BAs...>, BAs...>(code,fb);
+			factory_binder<BAs...>, BAs...>(code,fb);
 }
 
 // make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& source,
-	factory_t& factory)
+template<typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& source)
 {
 	auto code = make_tau_code<BAs...>(source);
-	return make_nso_rr_using_factory<factory_t, BAs...>(code, factory);
+	return make_nso_rr_using_factory<BAs...>(code);
 }
 
 // make a nso_rr from the given tau source and bindings.
-template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input,
-	factory_t& factory)
+template<typename... BAs>
+rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input)
 {
 	auto source = make_tau_source(input, { .start = tau_parser::rr });
-	return make_nso_rr_using_factory<factory_t, BAs...>(source, factory);
+	return make_nso_rr_using_factory<BAs...>(source);
 }
 
 //------------------------------------------------------------------------------

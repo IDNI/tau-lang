@@ -34,8 +34,7 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	TEST_CASE("i1[t] = o1[t]") {
 		const char* sample = "( i1[t] = o1[t] ).";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check1 = result |  tau_parser::wff_f;
 		auto check2 = result |  tau_parser::wff_t;
