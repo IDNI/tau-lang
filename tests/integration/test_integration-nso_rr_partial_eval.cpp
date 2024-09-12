@@ -35,8 +35,7 @@ TEST_SUITE("rec relations partial evaluation: simple cases") {
 			"g[n](Y) := h[n-1](Y, 0)."
 			"g[1](1).";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -48,8 +47,7 @@ TEST_SUITE("rec relations partial evaluation: simple cases") {
 			"g[n](Y) := h[n-1](Y, 0)."
 			"g[1](0) = 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -64,8 +62,7 @@ TEST_SUITE("functions partial evaluation: simple cases") {
 			"g(Y) := h(Y, 0)."
 			"g(0).";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -77,8 +74,7 @@ TEST_SUITE("functions partial evaluation: simple cases") {
 			"g(Y) := h(Y, 0)."
 			"g(1) = 1.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );

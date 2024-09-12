@@ -27,12 +27,10 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-bdd_test_factory bf;
-
 bool fp_test(const char* sample, const size_t& nt) {
 	auto sample_src = make_tau_source(sample);
 	auto sample_formula = make_nso_rr_using_factory<
-		bdd_test_factory_t, bdd_test>(sample_src, bf);
+		bdd_test>(sample_src);
 	return (normalizer<bdd_test>(sample_formula) | nt).has_value();
 }
 

@@ -31,8 +31,7 @@ TEST_SUITE("wff_sometimes") {
 	/*TEST_CASE("push_in_1") {
 		const char* sample = "sometimes (?x && o1[t] = 0 && sometimes(?x && o1[t] = 0 && sometimes(?x && o1[t] = 0))).";
 		auto src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
 		auto result = push_sometimes_always_in(fm);
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
@@ -44,8 +43,7 @@ TEST_SUITE("wff_sometimes") {
 	TEST_CASE("push_in_2") {
 		const char* sample = "sometimes T.";
 		auto src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
 		auto result = push_sometimes_always_in(fm);
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
@@ -56,8 +54,7 @@ TEST_SUITE("wff_sometimes") {
 	TEST_CASE("push_in_3") {
 		const char* sample = "sometimes (always o1[t] = 0 || (sometimes o1[t] = 0)) && (always o1[t] = 0).";
 		auto src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
 		auto result = push_sometimes_always_in(fm);
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
@@ -69,8 +66,7 @@ TEST_SUITE("wff_sometimes") {
 	/*TEST_CASE("pull_out_1") {
 		const char* sample = "(sometimes T && ?x) || (sometimes T && ?x) || (sometimes ?x).";
 		auto src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
 		auto result = pull_sometimes_always_out(fm);
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
@@ -82,8 +78,7 @@ TEST_SUITE("wff_sometimes") {
 	/*TEST_CASE("pull_out_2") {
 		const char* sample = "(always ?x) && ?x && (sometimes ?x && ?x).";
 		auto src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto fm = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(src, bf).main;
+		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
 		auto result = pull_sometimes_always_out(fm);
 		auto simp_res = result
 			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)

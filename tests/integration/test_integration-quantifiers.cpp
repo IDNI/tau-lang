@@ -33,8 +33,6 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-bdd_test_factory bf;
-
 using test_case = array<string, 3>;
 using test_cases = vector<test_case>;
 
@@ -76,8 +74,7 @@ bool test(const test_case& tc) {
 	const auto& [ sample, exp, nexp ] = tc;
 	bool fail = false;
 	auto src = make_tau_source(sample.c_str());
-	auto formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(
-								src, bf);
+	auto formula = make_nso_rr_using_factory<bdd_test>(src);
 	auto got = to_str(formula);
 	if (got != exp) fail = true;
 	auto norm = normalizer<bdd_test>(formula);
