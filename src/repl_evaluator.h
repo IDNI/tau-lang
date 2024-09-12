@@ -65,9 +65,9 @@
 
 namespace idni::tau {
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 struct repl_evaluator {
-	friend struct repl<repl_evaluator<factory_t, BAs...>>;
+	friend struct repl<repl_evaluator<BAs...>>;
 	using memory = nso<tau_ba<BAs...>, BAs...>;
 	using memorys = std::vector<memory>;
 
@@ -89,7 +89,7 @@ struct repl_evaluator {
 #endif
 	};
 
-	repl_evaluator(factory_t& factory, options opt = options{});
+	repl_evaluator(options opt = options{});
 	int eval(const std::string& src);
 	std::string prompt();
 
@@ -101,10 +101,10 @@ private:
 	sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string& src);
 	boost::log::trivial::severity_level nt2severity(size_t nt) const;
 
-	repl_evaluator<factory_t, BAs...>::memory_ref memory_retrieve(
+	repl_evaluator<BAs...>::memory_ref memory_retrieve(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
 		bool silent = false);
-	void memory_store(repl_evaluator<factory_t, BAs...>::memory o);
+	void memory_store(repl_evaluator<BAs...>::memory o);
 	std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>>
 		get_type_and_arg(const nso<tau_ba<BAs...>, BAs...>& n);
 	// returns nonterminal type of a node (as size_t and no value if not nt
@@ -174,10 +174,9 @@ private:
 		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	memorys m;
-	factory_t factory;
 	options opt{};
 	// TODO (MEDIUM) this dependency should be removed
-	repl<repl_evaluator<factory_t, BAs...>>* r = 0;
+	repl<repl_evaluator<BAs...>>* r = 0;
 	rec_relations<gssotc<BAs...>> definitions;
 	bool error = false;
 	idni::term::colors TC{};
