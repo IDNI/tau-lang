@@ -40,8 +40,8 @@ namespace idni::tau {
 #define TC_PROMPT        TC(color::WHITE, color::BRIGHT)
 #define TC_OUTPUT        TC.GREEN()
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::not_implemented_yet() {
+template <typename... BAs>
+void repl_evaluator<BAs...>::not_implemented_yet() {
 	std::cout << "Not implemented yet.\n";
 }
 
@@ -84,9 +84,9 @@ std::optional<size_t> get_memory_index(
 }
 
 
-template <typename factory_t, typename... BAs>
-repl_evaluator<factory_t, BAs...>::memory_ref
-	repl_evaluator<factory_t, BAs...>::memory_retrieve(
+template <typename... BAs>
+repl_evaluator<BAs...>::memory_ref
+	repl_evaluator<BAs...>::memory_retrieve(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& n, bool silent)
 {
 	if (auto pos = get_memory_index(n, m.size(), silent); pos.has_value())
@@ -109,8 +109,8 @@ void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id,
 	cout << ": " << mem << "\n";
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::history_print_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::history_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
 	auto n = command | tau_parser::memory;
@@ -119,16 +119,16 @@ void repl_evaluator<factory_t, BAs...>::history_print_cmd(
 	if (idx) print_memory(m[idx.value()], idx.value(), m.size());
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::history_list_cmd() {
+template <typename... BAs>
+void repl_evaluator<BAs...>::history_list_cmd() {
 	if (m.size() == 0) cout << "history is empty\n";
 	else for (size_t i = 0; i < m.size(); i++)
 		print_memory(m[i], i, m.size());
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::memory_store(
-	typename repl_evaluator<factory_t, BAs...>::memory o)
+template <typename... BAs>
+void repl_evaluator<BAs...>::memory_store(
+	typename repl_evaluator<BAs...>::memory o)
 {
 	// do not add into memory if the last memory value is the same
 	if (!(m.size() && m.back() == o))
@@ -136,16 +136,16 @@ void repl_evaluator<factory_t, BAs...>::memory_store(
 	print_memory(m.back(), m.size() - 1, m.size(), false);
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::history_store_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::history_store_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
 	memory_store(command->child[0]);
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::get_bf(
+	repl_evaluator<BAs...>::get_bf(
 		const nso<tau_ba<BAs...>, BAs...>& n, bool suppress_error)
 {
 	if (is_non_terminal(tau_parser::bf, n))
@@ -166,9 +166,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::get_wff(
+	repl_evaluator<BAs...>::get_wff(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	if (is_non_terminal(tau_parser::wff, n)) return std::optional(n);
@@ -187,8 +187,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
-bool repl_evaluator<factory_t, BAs...>::contains(
+template <typename... BAs>
+bool repl_evaluator<BAs...>::contains(
 	const nso<tau_ba<BAs...>, BAs...>& n, tau_parser::nonterminal nt)
 {
 	auto pred = [nt](const auto& n) {
@@ -197,16 +197,16 @@ bool repl_evaluator<factory_t, BAs...>::contains(
 								.has_value();
 }
 
-template <typename factory_t, typename... BAs>
-std::optional<size_t> repl_evaluator<factory_t, BAs...>::get_type(
+template <typename... BAs>
+std::optional<size_t> repl_evaluator<BAs...>::get_type(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	return n | non_terminal_extractor<tau_ba<BAs...>, BAs...>;
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>>
-	repl_evaluator<factory_t, BAs...>::get_type_and_arg(
+	repl_evaluator<BAs...>::get_type_and_arg(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto type = n
@@ -225,9 +225,9 @@ std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>>
 	}
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::onf_cmd(
+	repl_evaluator<BAs...>::onf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
@@ -239,9 +239,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::dnf_cmd(
+	repl_evaluator<BAs...>::dnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
@@ -259,9 +259,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::cnf_cmd(
+	repl_evaluator<BAs...>::cnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
@@ -279,9 +279,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::nnf_cmd(
+	repl_evaluator<BAs...>::nnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
@@ -297,9 +297,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::mnf_cmd(
+	repl_evaluator<BAs...>::mnf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
@@ -315,9 +315,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::snf_cmd(
+	repl_evaluator<BAs...>::snf_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
@@ -333,9 +333,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::bf_substitute_cmd(
+	repl_evaluator<BAs...>::bf_substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto in = get_bf(n->child[1]);
@@ -351,9 +351,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return replace(in.value(), changes);
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::substitute_cmd(
+	repl_evaluator<BAs...>::substitute_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	// Since the memory command cannot be type-checked we do it here
@@ -460,9 +460,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			in.value(), quantified_var_adder, scoped_replace);
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::instantiate_cmd(
+	repl_evaluator<BAs...>::instantiate_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto var_type = static_cast<tau_parser::nonterminal>(n->child[2]
@@ -475,9 +475,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return substitute_cmd(nn);
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::normalize_cmd(
+	repl_evaluator<BAs...>::normalize_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
@@ -502,9 +502,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::qelim_cmd(
+	repl_evaluator<BAs...>::qelim_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = get_wff(n->child[1]);
@@ -520,8 +520,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::execute_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::execute_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto form = n->child[1];
@@ -533,9 +533,9 @@ void repl_evaluator<factory_t, BAs...>::execute_cmd(
 	not_implemented_yet();
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<factory_t, BAs...>::solve_cmd(
+	repl_evaluator<BAs...>::solve_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto form = n->child[1];
@@ -546,47 +546,47 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	return {};
 }
 
-template<typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::is_satisfiable_cmd(
+template<typename... BAs>
+void repl_evaluator<BAs...>::is_satisfiable_cmd(
 	const nso<tau_ba<BAs...>, BAs...>&)
 {
 	// TODO (HIGH) call satisfiability
 	not_implemented_yet();
 }
 
-template<typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::is_valid_cmd(
+template<typename... BAs>
+void repl_evaluator<BAs...>::is_valid_cmd(
 	const nso<tau_ba<BAs...>, BAs...>&)
 {
 	// TODO (HIGH) call satisfiability
 	not_implemented_yet();
 }
 
-template<typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::is_unsatisfiable_cmd(
+template<typename... BAs>
+void repl_evaluator<BAs...>::is_unsatisfiable_cmd(
 	const nso<tau_ba<BAs...>, BAs...>&)
 {
 	// TODO (HIGH) call satisfiability
 	not_implemented_yet();
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::def_rr_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::def_rr_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	definitions.emplace_back(n->child[0]->child[0], n->child[0]->child[1]);
 	cout << "[" << definitions.size() << "] " << definitions.back() << "\n";
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::def_list_cmd() {
+template <typename... BAs>
+void repl_evaluator<BAs...>::def_list_cmd() {
 	if (definitions.size() == 0) cout << "definitions are empty\n";
 	for (size_t i = 0; i < definitions.size(); i++)
 		cout << "[" << i + 1 << "] " << definitions[i] << "\n";
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::def_print_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::def_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
 	if (definitions.size() == 0) cout << "definitions are empty\n";
@@ -602,9 +602,9 @@ void repl_evaluator<factory_t, BAs...>::def_print_cmd(
 }
 
 // make a nso_rr from the given tau source and binder.
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 sp_tau_node<tau_ba<BAs...>, BAs...>
-	repl_evaluator<factory_t, BAs...>::make_cli(
+	repl_evaluator<BAs...>::make_cli(
 		const std::string& src)
 {
 	// remove ascii char 22 if exists in the input
@@ -619,13 +619,11 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 	if (!cli_src) // flush! new line and return null if invalid source
 		return (std::cout << std::endl), error = true, nullptr;
 	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
-	tau_factory<factory_t, BAs...> tf(factory);
-	return bind_tau_code_using_factory<tau_factory<factory_t, BAs...>,
-		tau_ba<BAs...>, BAs...>(cli_code, tf);
+	return bind_tau_code_using_factory<tau_ba<BAs...>, BAs...>(cli_code);
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::get_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::get_cmd(
 	sp_tau_node<tau_ba<BAs...>, BAs...> n)
 {
 	static std::string pbool[] = { "off", "on" };
@@ -647,9 +645,9 @@ void repl_evaluator<factory_t, BAs...>::get_cmd(
 	else printers[get_opt(option.value())]();
 }
 
-template <typename factory_t, typename... BAs>
+template <typename... BAs>
 boost::log::trivial::severity_level
-	repl_evaluator<factory_t, BAs...>::nt2severity(size_t nt) const
+	repl_evaluator<BAs...>::nt2severity(size_t nt) const
 {
 	switch (nt) {
 		case tau_parser::error_sym: return boost::log::trivial::error;
@@ -673,8 +671,8 @@ size_t get_opt(sp_tau_node<BAs...> n) {
 		| optional_value_extractor<size_t>;
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::set_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::set_cmd(
 	sp_tau_node<tau_ba<BAs...>, BAs...> n)
 {
 	using namespace boost::log;
@@ -714,8 +712,8 @@ void repl_evaluator<factory_t, BAs...>::set_cmd(
 	get_cmd(n);
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::toggle_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::toggle_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& n)
 {
 	auto toggle_type = n | tau_parser::bool_option
@@ -734,8 +732,8 @@ void repl_evaluator<factory_t, BAs...>::toggle_cmd(
 	get_cmd(n);
 }
 
-template <typename factory_t, typename... BAs>
-int repl_evaluator<factory_t, BAs...>::eval_cmd(
+template <typename... BAs>
+int repl_evaluator<BAs...>::eval_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& n)
 {
 	auto command = (n
@@ -802,17 +800,16 @@ int repl_evaluator<factory_t, BAs...>::eval_cmd(
 	return 0;
 }
 
-template <typename factory_t, typename... BAs>
-repl_evaluator<factory_t, BAs...>::repl_evaluator(factory_t& factory,
-	options opt) : factory(factory), opt(opt)
+template <typename... BAs>
+repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 {
 	TC.set(opt.colors);
 	boost::log::core::get()->set_filter(
 		boost::log::trivial::severity >= opt.severity);
 }
 
-template <typename factory_t, typename... BAs>
-std::string repl_evaluator<factory_t, BAs...>::prompt() {
+template <typename... BAs>
+std::string repl_evaluator<BAs...>::prompt() {
 	using namespace boost::log;
 	std::stringstream ss;
 	if (opt.status) {
@@ -829,8 +826,8 @@ std::string repl_evaluator<factory_t, BAs...>::prompt() {
 	return ss.str();
 }
 
-template <typename factory_t, typename... BAs>
-int repl_evaluator<factory_t, BAs...>::eval(const std::string& src) {
+template <typename... BAs>
+int repl_evaluator<BAs...>::eval(const std::string& src) {
 	error = false;
 	auto tau_spec = make_cli(src);
 	int quit = 0;
@@ -844,13 +841,13 @@ int repl_evaluator<factory_t, BAs...>::eval(const std::string& src) {
 	return quit;
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::version_cmd() {
+template <typename... BAs>
+void repl_evaluator<BAs...>::version_cmd() {
 	cout << "Tau version: " << GIT_DESCRIBED << "\n";
 }
 
-template <typename factory_t, typename... BAs>
-void repl_evaluator<factory_t, BAs...>::help_cmd(
+template <typename... BAs>
+void repl_evaluator<BAs...>::help_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& n)
 {
 	static const std::string bool_options =

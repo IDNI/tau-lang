@@ -136,20 +136,16 @@ struct bdd_factory {
 	std::map<std::string, sp_bdd_node> cache;
 };
 
-struct bdd_binding_factory {
+template<>
+struct nso_factory<bdd_binding> {
 
-	sp_tau_node<bdd_binding> build(const std::string type_name, const sp_tau_node<bdd_binding>& n) {
-		if (type_name != "bdd") return n;
-		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<bdd_binding>>;
-		std::string var = make_string<
-			tau_node_terminal_extractor_t<bdd_binding>,sp_tau_node<bdd_binding>>(
-				tau_node_terminal_extractor<bdd_binding>, source);
-		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
-		bdd_init<Bool>();
+	nso<bdd_binding> parse(const std::string& src, const std::string) {
+		static std::map<std::string, sp_tau_node<bdd_binding>> cache;
 		// Trim whitespaces from var
 		auto is_not_space = [](char c) {return !isspace(c);};
-		auto var_trim = var | ranges::views::filter(is_not_space);
-		var = {var_trim.begin(), var_trim.end()};
+		auto src_trim = src | ranges::views::filter(is_not_space);
+		std::string var = {src_trim.begin(), src_trim.end()};
+		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
 		// Make sure that variable name is saved in dict.h for printing
 		int v = dict(var);
 		auto ref = bdd_handle<Bool>::bit(true, v);
@@ -157,10 +153,35 @@ struct bdd_binding_factory {
 		return cache.emplace(var, nn).first->second;
 	}
 
-	std::map<std::string, sp_tau_node<bdd_binding>> cache;
+	nso<bdd_binding> binding(const nso<bdd_binding>& n, const std::string) {
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<nso<bdd_binding>>;
+		std::string src = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<bdd_binding>, source);
+		return parse("", src);
+	}
 };
 
-struct tau_bdd_binding_factory {
+template<>
+struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
+
+	gssotc<bdd_binding> parse(const std::string src, const std::string type_name) {
+		static bdd_factory bf;
+		static tau_ba_factory<tau_ba<bdd_binding>, bdd_binding> tf;
+		if (type_name == "bdd")	{
+			auto v = bf.parse(src);
+			std::variant<tau_ba<bdd_binding>, bdd_binding> vp{v};
+			return make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(
+				tau_sym<tau_ba<bdd_binding>, bdd_binding>(vp), {});
+		}
+		return tf.parse(src);
+	}
+
+	gssotc<bdd_binding> binding(const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n, const std::string type_name) {
+		if (type_name == "bdd") return bdd_factory().build(type_name, n);
+		return tau_ba_factory<tau_ba<bdd_binding>, bdd_binding>().binding(n);
+	}
+};
+
+/*struct tau_bdd_binding_factory {
 
 	sp_tau_node<tau_ba<bdd_binding>, bdd_binding> build(const std::string type_name, const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n) {
 		if (type_name != "bdd") return n;
@@ -183,7 +204,7 @@ struct tau_bdd_binding_factory {
 	}
 
 	std::map<std::string, sp_tau_node<tau_ba<bdd_binding>, bdd_binding>> cache;
-};
+};*/
 
 } // namespace idni::tau
 

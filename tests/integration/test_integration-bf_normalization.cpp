@@ -18,6 +18,7 @@
 #include "bool_ba.h"
 #include "bdd_handle.h"
 #include "normalizer.h"
+#include "bdd_binding.h"
 
 #include "test_integration_helpers-bdd.h"
 #include "../unit/test_helpers.h"
@@ -34,8 +35,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::bf_f;
 		CHECK( check.has_value() );
@@ -46,8 +46,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::bf_t;
 		CHECK( check.has_value() );
@@ -58,8 +57,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::bf_f;
 		CHECK( check.has_value() );
@@ -70,8 +68,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::bf_t;
 		CHECK( check.has_value() );
@@ -82,8 +79,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::variable;
 		CHECK( check.has_value() );
@@ -94,8 +90,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::variable;
 		CHECK( check.has_value() );
@@ -106,8 +101,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::bf_t;
 		CHECK( check.has_value() );
@@ -118,8 +112,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::bf_f;
 		CHECK( check.has_value() );
@@ -131,8 +124,7 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 	TEST_CASE("4 variables") {
 		const char* sample = "ex x ex y ex v ex w (x' & y & v & w') != 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = normalizer<bdd_test>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
@@ -157,14 +149,12 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		tau_parser::parse_options options;
 		options.start = tau_parser::rec_relations;
 		auto rec_src = make_tau_source(rec, options);
-		bdd_test_factory bf;
-		auto rec_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(rec_src, bf);
+		auto rec_formula = make_nso_rr_using_factory<bdd_test>(rec_src);
 		rec_formula = infer_ref_types(rec_formula);
-
 		const char* sample = "h[8](Y)";
-		options.start = tau_parser::bf;
+	 	options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		sample_formula.rec_relations = rec_formula.rec_relations;
 		auto result = bf_normalizer_with_rec_relation<bdd_test>(sample_formula);
 		auto check = result | tau_parser::variable;
@@ -181,14 +171,12 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 	 	tau_parser::parse_options options;
 	 	options.start = tau_parser::rec_relations;
 	 	auto rec_src = make_tau_source(rec, options);
-	 	bdd_test_factory bf;
-	 	auto rec_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(rec_src, bf);
+	 	auto rec_formula = make_nso_rr_using_factory<bdd_test>(rec_src);
 		rec_formula = infer_ref_types(rec_formula);
-
 	 	const char* sample = "h[8](Y)";
 	 	options.start = tau_parser::bf;
 	 	auto sample_src = make_tau_source(sample, options);
-	 	auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+	 	auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 	 	sample_formula.rec_relations = rec_formula.rec_relations;
 	 	auto result = bf_normalizer_with_rec_relation<bdd_test>(sample_formula);
 	 	auto check = result | tau_parser::variable;
@@ -203,8 +191,7 @@ TEST_SUITE("BDD expressions") {
 		tau_parser::parse_options options;
 		options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		bdd_test_factory bf;
-		auto sample_formula = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto sample_formula = make_nso_rr_using_factory<bdd_test>(sample_src);
 		auto result = bf_normalizer_without_rec_relation<bdd_test>(sample_formula.main);
 		auto check = result |  tau_parser::bf_constant;
 		CHECK( check.has_value() );
