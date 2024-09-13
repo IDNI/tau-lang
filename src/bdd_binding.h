@@ -35,17 +35,57 @@ using sp_bdd_node = sp_tau_node<tau_ba<bdd_binding>, bdd_binding>;
 // global static bdd variable cache
 inline static std::map<int_t, bdd_binding> var_cache{};
 
+template<typename...BAs>
 struct bdd_factory {
 
 	using parse_forest = idni::parser<char, char>::pforest;
 	using parse_result = idni::parser<char, char>::result;
-	using traverser_t  = traverser<tau_sym<bdd_binding>, bdd_parser>;
+	using traverser_t  = traverser<tau_sym<BAs...>, bdd_parser>;
 	static constexpr const auto& get_only_child =
 			traverser_t::get_only_child_extractor();
 	static constexpr const auto& get_terminals =
 			traverser_t::get_terminal_extractor();
 	static constexpr const auto& get_nonterminal =
 			traverser_t::get_nonterminal_extractor();
+	inline static std::map<std::string, nso<BAs...>> cache;
+
+	// parses a bdd from a string
+	nso<BAs...> parse(const std::string& src) {
+		// check source cache
+		if (auto cn = cache.find(src); cn != cache.end())
+			return cn->second;
+		auto& p = bdd_parser::instance();
+		auto r = p.parse(src.c_str(), src.size());
+		if (!r.found) {
+			BOOST_LOG_TRIVIAL(error) << "# bdd binding: `"
+				<< src << "`\n" << r.parse_error;
+			return build_node(bdd_handle<Bool>::hfalse);
+		}
+		char dummy = 0;
+		auto root = make_node_from_tree<bdd_parser, char,
+			tau_sym<BAs...>>(dummy, r.get_shaped_tree());
+		auto t = traverser_t(root) | bdd_parser::bdd;
+		if (t.has_value()) return build_node(eval_node(t));
+		return build_node(bdd_handle<Bool>::hfalse);
+	}
+
+	// builds a bdd bounded node parsed from terminals of a source binding
+	nso<BAs...> binding(const nso<BAs...>& sn) {
+		auto n = sn
+			| tau_parser::source_binding
+			| tau_parser::source
+			| optional_value_extractor<nso<BAs...>>;
+		std::string src = make_string(
+			tau_node_terminal_extractor<BAs...>, n);
+		return parse(src);
+	}
+
+private:
+
+	nso<BAs...> build_node(const bdd_binding& b) {
+		std::variant<BAs...> vp{b};
+		return make_node<tau_sym<BAs...>>(vp, {});
+	}
 
 	// evaluates a parsed bdd terminal node recursively
 	bdd_binding eval_node(const traverser_t& t) {
@@ -93,91 +133,39 @@ struct bdd_factory {
 			}
 		}
 	}
-	// parses a bdd from a string
-	bdd_binding parse(const std::string& src) {
-		auto& p = bdd_parser::instance();
-		auto r = p.parse(src.c_str(), src.size());
-		if (!r.found) {
-			BOOST_LOG_TRIVIAL(error) << "# bdd binding: `"
-				<< src << "`\n" << r.parse_error;
-			return bdd_handle<Bool>::hfalse;
-		}
-		char dummy = 0;
-		auto root = make_node_from_tree<bdd_parser, char,
-			tau_sym<bdd_binding>>(dummy, r.get_shaped_tree());
-		auto t = traverser_t(root) | bdd_parser::bdd;
-		if (t.has_value()) return eval_node(t);
-		return bdd_handle<Bool>::hfalse;
-	}
 
-	// builds a bdd bounded node parsed from terminals of a source binding
-	sp_bdd_node build(const std::string type_name, const sp_bdd_node& sn) {
-		if (type_name != "bdd") return sn;
-		auto n = sn | tau_parser::source_binding | tau_parser::source
-			| optional_value_extractor<sp_bdd_node>;
-		std::string src = make_string<
-			tau_node_terminal_extractor_t<
-				tau_ba<bdd_binding>, bdd_binding>,
-			sp_bdd_node>(
-				tau_node_terminal_extractor<
-					tau_ba<bdd_binding>, bdd_binding>,
-				n);
-		// check source cache
-		if (auto cn = cache.find(src); cn != cache.end()) return
-			cn->second;
-		auto x = parse(src); // parse bdd from source
-		std::vector<sp_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>> children;
-		auto nn = make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(
-			tau_sym<tau_ba<bdd_binding>, bdd_binding>(x), std::move(children));
-		return cache.emplace(src, nn).first->second; // cache and return
-	}
-
-	size_t index = 0;
-	std::map<std::string, sp_bdd_node> cache;
 };
 
+// using during testing
 template<>
 struct nso_factory<bdd_binding> {
+	inline static bdd_factory<bdd_binding> bf;
 
 	nso<bdd_binding> parse(const std::string& src, const std::string) {
-		static std::map<std::string, sp_tau_node<bdd_binding>> cache;
-		// Trim whitespaces from var
-		auto is_not_space = [](char c) {return !isspace(c);};
-		auto src_trim = src | ranges::views::filter(is_not_space);
-		std::string var = {src_trim.begin(), src_trim.end()};
-		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
-		// Make sure that variable name is saved in dict.h for printing
-		int v = dict(var);
-		auto ref = bdd_handle<Bool>::bit(true, v);
-		auto nn =  make_node<tau_sym<bdd_binding>>(ref, {});
-		return cache.emplace(var, nn).first->second;
+		return bf.parse(src);
 	}
 
 	nso<bdd_binding> binding(const nso<bdd_binding>& n, const std::string) {
-		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<nso<bdd_binding>>;
-		std::string src = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<bdd_binding>, source);
-		return parse("", src);
+		return bf.binding(n);
 	}
+
 };
 
+// using in repl
 template<>
 struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 
+	inline static bdd_factory<tau_ba<bdd_binding>, bdd_binding> bf;
+	inline static tau_ba_factory<bdd_binding> tf;
+
 	gssotc<bdd_binding> parse(const std::string src, const std::string type_name) {
-		static bdd_factory bf;
-		static tau_ba_factory<tau_ba<bdd_binding>, bdd_binding> tf;
-		if (type_name == "bdd")	{
-			auto v = bf.parse(src);
-			std::variant<tau_ba<bdd_binding>, bdd_binding> vp{v};
-			return make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(
-				tau_sym<tau_ba<bdd_binding>, bdd_binding>(vp), {});
-		}
+		if (type_name == "bdd")	return bf.parse(src);
 		return tf.parse(src);
 	}
 
 	gssotc<bdd_binding> binding(const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n, const std::string type_name) {
-		if (type_name == "bdd") return bdd_factory().build(type_name, n);
-		return tau_ba_factory<tau_ba<bdd_binding>, bdd_binding>().binding(n);
+		if (type_name == "bdd") return bf.binding(n);
+		return tf.binding(n);
 	}
 
 	gssotc<bdd_binding> splitter_one(const std::string& type_name) const {
@@ -190,42 +178,6 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 		return tau_bad_splitter<tau_ba<bdd_binding>, bdd_binding>();
 	}
 };
-
-/*struct tau_bdd_binding_factory {
-
-	sp_tau_node<tau_ba<bdd_binding>, bdd_binding> build(const std::string type, const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n) {
-		if (type != "bdd") return n;
-		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>;
-		std::string var = make_string<
-			tau_node_terminal_extractor_t<tau_ba<bdd_binding>, bdd_binding>,
-			sp_tau_node<tau_ba<bdd_binding>, bdd_binding>>(
-				tau_node_terminal_extractor<tau_ba<bdd_binding>, bdd_binding>, source);
-		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
-		bdd_init<Bool>();
-		// Trim whitespaces from var
-		auto is_not_space = [](char c) {return !isspace(c);};
-		auto var_trim = var | ranges::views::filter(is_not_space);
-		var = {var_trim.begin(), var_trim.end()};
-		// Make sure that variable name is saved in dict.h for printing
-		int v = dict(var);
-		auto ref = bdd_handle<Bool>::bit(true, v);
-		auto nn =  make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(ref, {});
-		return cache.emplace(var, nn).first->second;
-	}
-
-	std::optional<sp_tau_node<tau_ba<bdd_binding>, bdd_binding>> splitter_one(const std::string& type) const {
-		if (type != "bdd") return {};
-		auto var_name = "splitter_one";
-		auto v = dict(var_name);
-		auto ref = bdd<Bool>::bit(v);
-		auto splitter_one = bdd_handle<Bool>::get(ref);
-		return build_bf_constant(std::variant<tau_ba<bdd_binding>, bdd_binding>(splitter_one));
-		//auto splitter = bdd_bad_splitter<Bool>();
-		//return make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(splitter, {});
-	}
-
-	std::map<std::string, sp_tau_node<tau_ba<bdd_binding>, bdd_binding>> cache;
-};*/
 
 } // namespace idni::tau
 

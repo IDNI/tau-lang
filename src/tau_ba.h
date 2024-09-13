@@ -178,30 +178,8 @@ using gssotc = nso<tau_ba<BAs...>, BAs...>;
 template<typename...BAs>
 using tau_spec = rr<gssotc<BAs...>>;
 
-template<typename base_factory_t, typename...BAs>
-struct tau_factory {
 
-	tau_factory(base_factory_t& bf) : bf(bf) {}
-
-	gssotc<BAs...> build(const std::string type_name, const gssotc<BAs...>& n) {
-		if (auto nn = bf.build(type_name, n); nn != n) return nn;
-		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<gssotc<BAs...>>;
-		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
-		auto form = make_nso_rr_using_factory<tau_ba<BAs...>, BAs...>(var, *this).main;
-		tau_ba<BAs...> t(form);
-		return make_node<tau_sym<tau_ba<BAs...>, BAs...>>(t, {});
-	}
-
-	std::optional<gssotc<BAs...>> splitter_one(const std::string& type) const {
-		// this must be a bdd by default
-		if (auto nn = bf.splitter_one(type); nn.has_value()) return nn;
-		return tau_bad_splitter<tau_ba<BAs...>, BAs...>();
-	}
-
-	base_factory_t& bf;
-};
-
-template<typename base_factory_t, typename...BAs>
+template<typename...BAs>
 struct tau_ba_factory {
 
 	gssotc<BAs...> parse(const std::string& src) {
@@ -214,6 +192,10 @@ struct tau_ba_factory {
 		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<gssotc<BAs...>>;
 		std::string src = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
 		return parse(src);
+	}
+
+	std::optional<gssotc<BAs...>> splitter_one(const std::string& type) const {
+		return tau_bad_splitter<tau_ba<BAs...>, BAs...>();
 	}
 };
 
