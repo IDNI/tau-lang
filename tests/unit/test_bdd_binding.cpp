@@ -23,39 +23,10 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-sp_tau_source_node make_source_binding_node(const string& source) {
-	vector<sp_node<tau_source_sym>> source_nodes;
-	for (auto& c : source) source_nodes.push_back(
-		make_node<tau_source_sym>(tau_source_sym(c), {})
-	);
-	auto& p = tau_parser::instance();
-	return make_node<tau_source_sym>(p.literal(tau_parser::binding),
-		{ make_node<tau_source_sym>(
-				p.literal(tau_parser::source_binding),
-			{ make_node<tau_source_sym>(
-				p.literal(tau_parser::source), source_nodes)
-			})
-		});
-}
-
-sp_bdd_node make_bdd_statement(const sp_tau_source_node& source) {
-	using tauify_bdd = tauify<tau_ba<bdd_binding>, bdd_binding>;
-	tauify_bdd tf;
-	map_transformer<tauify_bdd, sp_tau_source_node, sp_bdd_node>
-		transform(tf);
-	return post_order_traverser<
-		map_transformer<tauify_bdd, sp_tau_source_node, sp_bdd_node>,
-		all_t,
-		sp_node<tau_source_sym>,
-		sp_bdd_node>(
-			transform, all)(source);
-}
-
 sp_bdd_node build_binding(const char* src) {
 	bdd_init<Bool>();
-	auto st = make_bdd_statement(make_source_binding_node(src));
-	bdd_factory bf;
-	return bf.build("bdd", st);
+	static bdd_factory<tau_ba<bdd_binding>, bdd_binding> bf;
+	return bf.parse(src);
 }
 
 bdd_binding& get_binding(const sp_bdd_node& n) {

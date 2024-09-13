@@ -9,7 +9,7 @@ add_repl_test(history_list_cmd-non_empty "1. history" ": 1")
 # history store command
 add_repl_test(history_store_cmd-bf "1" ": 1")
 add_repl_test(history_store_cmd-wff "T" ": T")
-add_repl_test(history_store_cmd-tau "{T}" "{ T }")
+add_repl_test(history_store_cmd-tau "{: T.}" "1")
 
 # history print command
 add_repl_test(history_print_cmd-empty_absolute "history %1" "history is empty")

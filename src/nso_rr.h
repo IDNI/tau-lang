@@ -1010,7 +1010,7 @@ struct factory_binder {
 				tau_node_terminal_extractor<BAs...>, type.value());
 			return factory.binding(n, type_name);
 		}
-		return n;
+		return factory.binding(n, "");
 	}
 };
 
