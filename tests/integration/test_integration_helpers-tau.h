@@ -19,6 +19,7 @@
 #include "../src/bdd_handle.h"
 #include "../src/bool_ba.h"
 #include "../src/normalizer.h"
+#include "../src/bdd_binding.h"
 #include "../src/tau_ba.h"
 #include "dict.h"
 
@@ -28,49 +29,9 @@ using namespace idni::tau;
 
 using bdd_test = hbdd<Bool>;
 
-struct bdd_test_factory {
-
-	sp_tau_node<tau_ba<bdd_test>, bdd_test> build(const std::string type_name, const sp_tau_node<tau_ba<bdd_test>, bdd_test>& n) {
-		if (type_name != "bdd") return n;
-		std::string var = make_string<
-			tau_node_terminal_extractor_t<tau_ba<bdd_test>, bdd_test>,
-			sp_tau_node<tau_ba<bdd_test>, bdd_test>>(
-				tau_node_terminal_extractor<tau_ba<bdd_test>, bdd_test>, n);
-		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
-		// Trim whitespaces from var
-		auto is_not_space = [](char c) {return !isspace(c);};
-		auto var_trim = var | ranges::views::filter(is_not_space);
-		var = {var_trim.begin(), var_trim.end()};
-		// Make sure that variable name is saved in dict.h for printing
-		int v = dict(var);
-		auto ref = bdd_handle<Bool>::bit(true, v);
-		tau_sym<tau_ba<bdd_test>, bdd_test> ts(ref);
-		auto nn =  make_node<tau_sym<tau_ba<bdd_test>, bdd_test>>(ts, {});
-		return cache.emplace(var, nn).first->second;
-	}
-
-	std::map<std::string, sp_tau_node<tau_ba<bdd_test>, bdd_test>> cache;
-};
-
-rr<nso<tau_ba<bdd_test>, bdd_test>> tau_bdd_make_nso_rr(const char* src) {
-	auto sample_src = make_tau_source(src);
-	bdd_test_factory bf;
-	tau_factory<bdd_test_factory, bdd_test> fb(bf);
-	return make_nso_rr_using_factory<
-			tau_factory<bdd_test_factory, bdd_test>,
-			tau_ba<bdd_test>, bdd_test>(
-		src, fb);
-}
-
-nso<tau_ba<bdd_test>, bdd_test> tau_bdd_make_nso(const char* src) {
-	return tau_bdd_make_nso_rr(src).main;
-}
-
 nso<tau_ba<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
-	bdd_test_factory bf;
-	tau_factory<bdd_test_factory, bdd_test> fb(bf);
 	rr<nso<tau_ba<bdd_test>, bdd_test>> nso_rr = make_nso_rr_using_factory<
-			tau_factory<bdd_test_factory, bdd_test>, tau_ba<bdd_test>, bdd_test>(src, fb);
+		tau_ba<bdd_test>, bdd_test>(src);
 	return normalizer<tau_ba<bdd_test>, bdd_test>(nso_rr);
 }
 

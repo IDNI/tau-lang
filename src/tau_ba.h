@@ -187,7 +187,7 @@ struct tau_factory {
 		if (auto nn = bf.build(type_name, n); nn != n) return nn;
 		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<gssotc<BAs...>>;
 		std::string var = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
-		auto form = make_nso_rr_using_factory<tau_factory<base_factory_t, BAs...>, tau_ba<BAs...>, BAs...>(var, *this).main;
+		auto form = make_nso_rr_using_factory<tau_ba<BAs...>, BAs...>(var, *this).main;
 		tau_ba<BAs...> t(form);
 		return make_node<tau_sym<tau_ba<BAs...>, BAs...>>(t, {});
 	}
@@ -199,6 +199,22 @@ struct tau_factory {
 	}
 
 	base_factory_t& bf;
+};
+
+template<typename base_factory_t, typename...BAs>
+struct tau_ba_factory {
+
+	gssotc<BAs...> parse(const std::string& src) {
+		auto form = make_nso_rr_using_factory<tau_ba<BAs...>, BAs...>(src).main;
+		tau_ba<BAs...> t(form);
+		return make_node<tau_sym<tau_ba<BAs...>, BAs...>>(t, {});
+	}
+
+	gssotc<BAs...> binding(const gssotc<BAs...>& n) {
+		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<gssotc<BAs...>>;
+		std::string src = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
+		return parse(src);
+	}
 };
 
 } // namespace idni::tau

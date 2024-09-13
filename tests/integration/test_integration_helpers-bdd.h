@@ -18,6 +18,7 @@
 #include "../src/babdd.h"
 #include "../src/nso_rr.h"
 #include "../src/bdd_handle.h"
+#include "../src/bdd_binding.h"
 #include "../src/bool_ba.h"
 #include "../src/normalizer.h"
 #include "dict.h"
@@ -26,50 +27,21 @@
 using namespace idni::rewriter;
 using namespace idni::tau;
 
-using bdd_test = hbdd<Bool>;
-
-struct bdd_test_factory {
-
-	sp_tau_node<bdd_test> build(const std::string type_name, const sp_tau_node<bdd_test>& n) {
-		if (type_name != "bdd") return n;
-		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<sp_tau_node<bdd_test>>;
-		std::string var = make_string<
-			tau_node_terminal_extractor_t<bdd_test>,
-			sp_tau_node<bdd_test>>(
-				tau_node_terminal_extractor<bdd_test>, source);
-		if (auto cn = cache.find(var); cn != cache.end()) return cn->second;
-		// Trim whitespaces from var
-		auto is_not_space = [](char c) {return !isspace(c);};
-		auto var_trim = var | ranges::views::filter(is_not_space);
-		var = {var_trim.begin(), var_trim.end()};
-		// Make sure that variable name is saved in dict.h for printing
-		int v = dict(var);
-		auto ref = bdd_handle<Bool>::bit(true, v);
-		auto nn =  make_node<tau_sym<bdd_test>>(ref, {});
-		return cache.emplace(var, nn).first->second;
-	}
-
-	std::map<std::string, sp_tau_node<bdd_test>> cache;
-};
-
-using bdd_test_factory_t = bdd_test_factory;
-
-rr<nso<bdd_test>> bdd_make_nso_rr(const std::string& src) {
+rr<nso<bdd_binding>> bdd_make_nso_rr(const std::string& src) {
 	auto sample_src = make_tau_source(src);
-	bdd_test_factory bf;
-	return make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+	return make_nso_rr_using_factory<bdd_binding>(sample_src);
 }
 
-nso<bdd_test> bdd_make_nso(const std::string& src) {
+nso<bdd_binding> bdd_make_nso(const std::string& src) {
 	return bdd_make_nso_rr(src).main;
 }
 
-std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n, size_t l = 0) {
+std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_binding> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
-		[&os](std::variant<bdd_test> v) {
+		[&os](std::variant<bdd_binding> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...bdd..."; }
@@ -79,11 +51,11 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n, size_
 	return os;
 }
 
-std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_test> n, size_t l = 0) {
+std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_binding> n, size_t l = 0) {
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },
-		[&os](std::variant<bdd_test> v) {
+		[&os](std::variant<bdd_binding> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...bdd..."; }
