@@ -237,19 +237,26 @@ nso<BAs...> add_initial_info (const nso<BAs...>& fm) {
 template<typename... BAs>
 nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm) {
 	// Find lookback
-	auto current_io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
+	auto current_io_vars = select_top(fm,
+			is_child_non_terminal<tau_parser::io_var, BAs...>);
 	int_t lookback = get_lookback_after_normalization(current_io_vars);
 
 	map<nso<BAs...>,nso<BAs...>> changes;
-	for (const auto& io_var : current_io_vars) {
-		if (!is_non_terminal(tau_parser::extra, trim(io_var)->child.back())) {
-			int_t time_point = size_t_extractor<BAs...>(trim2(trim2(io_var)->child[1])).value();
-			stringstream name;
-			if (time_point - lookback == 0) name << trim(trim2(io_var)) << "[t]";
-			else name << trim(trim2(io_var)) << "[t" << time_point - lookback << "]";
-			auto new_io_var = build_bf_var<BAs...>(name.str());
-			changes.emplace(io_var, new_io_var);
-		}
+	for (const auto& io_var : current_io_vars) if (!is_non_terminal(
+		tau_parser::extra, trim(io_var)->child.back()))
+	{
+		int_t time_point = size_t_extractor<BAs...>(
+			trim2(trim2(io_var)->child[1])).value();
+		stringstream name; name << trim(trim2(io_var));
+		auto n = name.str();
+		size_t pos = n.find_first_not_of('_');
+		// if transformed initial, remove _
+		if (pos && pos != std::string::npos) name.str({}),
+			name << n.substr(pos) << "[" << time_point << "]";
+		else // else transform back to non-initial
+			name << "[t", (time_point - lookback ? name
+				<< time_point - lookback : name << "") << "]";
+		changes.emplace(io_var, build_bf_var<BAs...>(name.str()));
 	}
 	return replace(fm, changes);
 }
@@ -257,56 +264,83 @@ nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm) {
 // We assume that the formula has run through the normalizer before
 // TODO: Flag integration
 template<typename... BAs>
-nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm, bool enable_output = true) {
+nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
+	bool enable_output = true)
+{
+	using p = tau_parser;
 	assert(has_no_boolean_combs_of_models(fm));
-	if (is_child_non_terminal(tau_parser::wff_always, fm))
-		fm = trim2(fm);
-	fm = add_initial_info(fm);
-	vector<nso<BAs...> > io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
+	if (is_child_non_terminal(p::wff_always, fm)) fm = trim2(fm);
+	vector<nso<BAs...> > io_vars = select_top(fm,
+				is_child_non_terminal<p::io_var, BAs...>);
 	auto new_io_var_names = produce_io_var_names(io_vars);
-	// Save positions of io_variables which are initial conditions
-	set<pair<string, int_t> > initials;
-	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
-		if (trim2(io_vars[i])->child[1] | tau_parser::num)
-			initials.emplace(new_io_var_names[i],
-			                 size_t_extractor<BAs...>(trim2(trim2(io_vars[i])->child[1])).value());
 
+	// Save positions of io_variables which are initial conditions
+	// and transform them to not clash with non initials
+	set<pair<string, int_t>> initials;
+	auto io_var_unclashing_name = [](std::string n,
+		const std::vector<std::string>& names)
+	{
+		std::set<std::string> names_set(names.begin(), names.end());
+		static const std::string prefix = "_";
+		while (names_set.find(n) != names_set.end()) n = prefix + n;
+		return n;
+	};
+	map<nso<BAs...>, nso<BAs...>> changes;
+	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
+		if (trim2(io_vars[i])->child[1] | p::num)
+	{
+		bool isout = new_io_var_names[i][0] == 'o';
+		auto new_name = io_var_unclashing_name(new_io_var_names[i],
+						new_io_var_names);
+		initials.emplace(new_name, size_t_extractor<BAs...>(
+				trim2(trim2(io_vars[i])->child[1])).value());
+		auto new_var = wrap<BAs...>(isout ? p::out_var_name
+						: p::in_var_name, new_name);
+		changes[io_vars[i]] = wrap(p::variable,	wrap(p::io_var,
+			wrap(isout ? p::out : p::in,
+				{ new_var, trim2(io_vars[i])->child[1] })));
+	}
+	fm = replace(fm, changes);
+
+	// Calculate fix point
 	int_t time_point = get_max_shift(io_vars);
-	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars, new_io_var_names, time_point);
+	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars,
+						new_io_var_names, time_point);
 	int_t step_num = 1;
 	nso<BAs...> cache = prev_unbounded_fm;
-	nso<BAs...> unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num,
-	                                      time_point, cache);
+	nso<BAs...> unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars,
+		new_io_var_names, initials, step_num, time_point, cache);
 
 	cout << "Continuation at step " << step_num << "\n";
 	cout << unbounded_fm << "\n";
 
 	int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
-	while (step_num < max(max_initial_condition, time_point) ||
-					!are_nso_equivalent(prev_unbounded_fm, unbounded_fm)) {
+	while (step_num < max(max_initial_condition, time_point)
+		|| !are_nso_equivalent(prev_unbounded_fm, unbounded_fm))
+	{
 		prev_unbounded_fm = unbounded_fm;
 		++step_num;
 
-		unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars, new_io_var_names, initials, step_num,
-				           time_point, cache);
+		unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars,
+			new_io_var_names, initials, step_num, time_point,cache);
 
 		cout << "Continuation at step " << step_num << "\n";
 		cout << unbounded_fm << "\n";
 	}
-	if (enable_output)
-		cout << "Unbounded continuation of Tau formula reached fixpoint after " << step_num - 1 << " steps.\n";
+	if (enable_output) cout << "Unbounded continuation of Tau formula "
+		"reached fixpoint after " << step_num - 1 << " steps.\n";
 	prev_unbounded_fm = normalizer_step<BAs...>(prev_unbounded_fm);
 	cout << prev_unbounded_fm << "\n";
 	return transform_back_non_initials(prev_unbounded_fm);
 }
 
 /*
- *	Possible tests
- *	(o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0 -> failing at the moment, bug in always/sometimes normalization
- *	o1[0] = 0 && o1[t] = 0 -> failing at the moment
- *	o1[t] = i1[t] && o1[3] = 0 -> F, passing
- *	o1[t-1] = i1[t] -> F, passing
- *	o1[t-2] = 0 && o1[1] = 0 -> should be o1[t-2] = 0 && o1[t-1] = 0 && o1[t] = 0 && o1[1] = 0, failing at the moment
+ *  Possible tests:
+ *  (o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0 -> failing at the moment, bug in always/sometimes normalization
+ *  o1[0] = 0 && o1[t] = 0 -> o1[0] = 0 && o1[t] = 0, passing
+ *  o1[t] = i1[t] && o1[3] = 0 -> F, passing
+ *  o1[t-1] = i1[t] -> F, passing
+ *  o1[t-2] = 0 && o1[1] = 0 -> should be o1[t-2] = 0 && o1[t-1] = 0 && o1[t] = 0 && o1[1] = 0, passing
  */
 
 /*

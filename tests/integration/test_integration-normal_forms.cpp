@@ -19,6 +19,7 @@
 #include "bdd_handle.h"
 #include "normalizer.h"
 #include "normal_forms.h"
+#include "bdd_binding.h"
 
 #include "test_integration_helpers-bdd.h"
 #include "../unit/test_helpers.h"
@@ -37,8 +38,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		#ifdef DEBUG
 		print_sp_tau_node_tree(std::cout, nso__rr.main);
 		#endif // DEBUG
@@ -50,8 +50,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("simple case: F") {
 		const char* sample = "F.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto check = nso__rr.main
 			| tau_parser::wff_f;
 		CHECK( check.has_value() );
@@ -60,8 +59,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("simple case: X = 0") {
 		const char* sample = "X = 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		CHECK( nso__rr.main == result );
 	}
@@ -69,8 +67,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("quantifiers: always X = 0") {
 		const char* sample = "always X = 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		CHECK( nso__rr.main == result );
 	}
@@ -78,8 +75,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("quantifiers: sometimes X = 0") {
 		const char* sample = "sometimes X = 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		CHECK( nso__rr.main == result );
 	}
@@ -87,8 +83,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("quantifiers: all X X = 0") {
 		const char* sample = "all X X = 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		CHECK( nso__rr.main == result );
 	}
@@ -96,8 +91,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("quantifiers: ex X X = 0") {
 		const char* sample = "ex X X = 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		CHECK( nso__rr.main == result );
 	}
@@ -105,8 +99,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("rec. relations: f[0](X)") {
 		const char* sample = "f[0](X).";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		CHECK( nso__rr.main == result );
 	}
@@ -115,8 +108,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	/*TEST_CASE("simple case: {bdd: a} x = 0 && {bdd:a}' x = 0") {
 		const char* sample = "{bdd: a} x = 0 && {bdd:a}' x = 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		std::stringstream ss; ss << result;
 		CHECK( ss.str() == "x = 0" );
@@ -125,8 +117,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("simple case: xy = 0 && x = 0") {
 		const char* sample = "xy = 0 && x = 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		std::stringstream ss; ss << result;
 		CHECK( ss.str() == "x = 0" );
@@ -135,8 +126,7 @@ TEST_SUITE("normal forms: snf for wff") {
 	TEST_CASE("simple case: xy != 0 && x != 0") {
 		const char* sample = "xy != 0 && x != 0.";
 		auto sample_src = make_tau_source(sample);
-		bdd_test_factory bf;
-		auto nso__rr = make_nso_rr_using_factory<bdd_test_factory_t, bdd_test>(sample_src, bf);
+		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		auto result = snf_wff(nso__rr.main);
 		std::stringstream ss; ss << result;
 		CHECK( ss.str() == "x & y != 0" );

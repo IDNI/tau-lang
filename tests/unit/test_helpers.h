@@ -23,6 +23,26 @@ namespace testing = doctest;
 
 // TODO (LOW) most of this functions could be remove and replace by the standart API
 
+
+namespace idni::tau {
+
+	template<>
+	struct nso_factory<Bool> {
+
+		sp_tau_node<Bool> parse(const std::string&,
+				const std::string&) const {
+			throw std::runtime_error("not implemented");
+		}
+
+		sp_tau_node<Bool> binding(const sp_tau_node<Bool>& n,
+				const std::string& type) const {
+			if (type != "bool") return n;
+			return make_node<tau_sym<Bool>>(Bool(true), {});
+		}
+	};
+	
+} // namespace idni::tau
+
 // helper functions
 sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {
 	tauify<Bool> tf;
@@ -36,7 +56,6 @@ sp_tau_node<Bool> make_statement(const sp_tau_source_node& source) {
 }
 
 sp_tau_node<Bool> make_named_bindings(const sp_tau_node<Bool>& statement, const bindings<Bool>& bs) {
-	//true_predicate<sp_tau_node<Bool>> always;
 	name_binder<Bool> nb(bs);
 	bind_transformer<name_binder<Bool>, Bool> binder(nb);
 	return post_order_traverser<
@@ -46,13 +65,11 @@ sp_tau_node<Bool> make_named_bindings(const sp_tau_node<Bool>& statement, const 
 		binder, all)(statement);
 }
 
-template<typename factory_t>
-sp_tau_node<Bool> make_factory_bindings(const sp_tau_node<Bool>& statement, factory_t& factory) {
-	//true_predicate<sp_tau_node<Bool>> always;
-	factory_binder<factory_t, Bool> fb(factory);
-	bind_transformer<factory_binder<factory_t, Bool>, Bool> binder(fb);
+sp_tau_node<Bool> make_factory_bindings(const sp_tau_node<Bool>& statement) {
+	factory_binder<Bool> fb;
+	bind_transformer<factory_binder<Bool>, Bool> binder(fb);
 	return post_order_traverser<
-			bind_transformer<factory_binder<factory_t, Bool>, Bool>,
+			bind_transformer<factory_binder<Bool>, Bool>,
 			all_t,
 			sp_tau_node<Bool>>(
 		binder, all)(statement);
