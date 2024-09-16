@@ -194,7 +194,7 @@ struct tau_ba_factory {
 		return parse(src);
 	}
 
-	std::optional<gssotc<BAs...>> splitter_one(const std::string& type) const {
+	gssotc<BAs...> splitter_one() const {
 		return tau_bad_splitter<tau_ba<BAs...>, BAs...>();
 	}
 };
