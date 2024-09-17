@@ -18,6 +18,7 @@
 #include <ostream>
 
 #include "utils.h"
+#include "splitter_types.h"
 
 namespace idni::tau {
 
@@ -82,11 +83,25 @@ std::variant<BAs...> normalize_ba(const std::variant<BAs...>& elem) {
 	), elem);
 }
 
+template<typename... BAs>
+std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem, splitter_type st) {
+	return std::visit(overloaded(
+		[&st](const auto& el) {
+			return std::variant<BAs...>(splitter(el, st));
+		}
+	), elem);
+}
+
+template<typename... BAs>
+std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem) {
+	return splitter_ba(elem, splitter_type::middle);
+}
+
 template<typename...BAs>
 bool is_zero(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(
 			[](const auto& l) -> bool {
-				return l.is_zero();
+				return l == false;
 			}
 		), l);
 }
@@ -95,11 +110,10 @@ template<typename...BAs>
 bool is_one(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(
 			[](const auto& l) -> bool {
-				return l.is_one();
+				return l == true;
 			}
 		), l);
 }
-
 
 template<typename...BAs>
 bool operator==(const bool& l, const std::variant<BAs...>& r) {

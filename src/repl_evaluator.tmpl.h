@@ -21,6 +21,7 @@
 #include "tau_ba.h"
 #include "term_colors.h"
 #include "solver.h"
+#include "satisfiability.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -534,16 +535,22 @@ void repl_evaluator<BAs...>::execute_cmd(
 }
 
 template <typename... BAs>
-std::optional<nso<tau_ba<BAs...>, BAs...>>
-	repl_evaluator<BAs...>::solve_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n)
-{
-	auto form = n->child[1];
-	// TODO (VERY_HIGH) call solver
-	if (auto check = form | tau_parser::wff; check) {
-	} else {
-	}
-	return {};
+void repl_evaluator<BAs...>::solve_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto type = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
+		?  make_string<tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
+				nso<tau_ba<BAs...>, BAs...>>(
+			tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, n)
+		: "bdd"; // only tau makes always sense
+	auto nn = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
+		? get_wff(n->child[2])
+		: get_wff(n->child[1]);
+	if (!nn) { cout << "error: invalid argument\n"; return; }
+	auto s = solve<tau_ba<BAs...>, BAs...>(nn.value(), type);
+	if (!s) { cout << "no solution\n"; return; }
+	std::cout << "solution: {" << "\n";
+	for (auto& [k, v] : s.value()) std::cout << "\t" << k << " <- " << v << "\n";
+	std::cout << "}\n";
 }
 
 template<typename... BAs>
@@ -560,6 +567,33 @@ void repl_evaluator<BAs...>::is_valid_cmd(
 {
 	// TODO (HIGH) call satisfiability
 	not_implemented_yet();
+}
+
+template<typename... BAs>
+std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n) {
+	auto arg = n->child[1];
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [type, value] = check.value();
+		bool contains_ref = contains(value, tau_parser::ref);
+		rr<nso<tau_ba<BAs...>, BAs...>> rr_ =
+			(contains_ref && type == tau_parser::rr)
+				? make_nso_rr_from_binded_code<
+						tau_ba<BAs...>, BAs...>(value)
+				: rr<nso<tau_ba<BAs...>, BAs...>>(value);
+		if (contains_ref)
+			rr_.rec_relations.insert(rr_.rec_relations.end(),
+				definitions.begin(), definitions.end()),
+			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
+		if (is_non_terminal(tau_parser::bf, rr_.main)) {
+			cout << "error: invalid argument";
+			return {};
+		}
+		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
+		return always_to_unbounded_continuation(normalized_fm);
+	}
+	cout << "error: invalid argument\n";
+	return {};
 }
 
 template<typename... BAs>
@@ -770,7 +804,7 @@ int repl_evaluator<BAs...>::eval_cmd(
 	case p::subst_cmd:          result = substitute_cmd(command); break;
 	case p::inst_cmd:           result = instantiate_cmd(command); break;
 	// formula checks
-	case p::sat_cmd:            is_satisfiable_cmd(command); break;
+	case p::sat_cmd:            result = sat_cmd(command); break;
 	case p::valid_cmd:          is_valid_cmd(command); break;
 	case p::unsat_cmd:          is_unsatisfiable_cmd(command); break;
 	// normal forms

@@ -154,6 +154,7 @@ struct nso_factory<bdd_binding> {
 // using in repl
 template<>
 struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
+
 	inline static bdd_factory<tau_ba<bdd_binding>, bdd_binding> bf;
 	inline static tau_ba_factory<bdd_binding> tf;
 
@@ -167,6 +168,15 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 		return tf.binding(n);
 	}
 
+	gssotc<bdd_binding> splitter_one(const std::string& type_name) const {
+		if (type_name == "bdd") {
+			auto ref =  bdd_bad_splitter<Bool>();
+			std::variant<tau_ba<bdd_binding>, bdd_binding> vp{ref};
+			return make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(
+				tau_sym<tau_ba<bdd_binding>, bdd_binding>(vp), {});
+		}
+		return tau_bad_splitter<tau_ba<bdd_binding>, bdd_binding>();
+	}
 };
 
 } // namespace idni::tau

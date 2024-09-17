@@ -13,6 +13,7 @@ set(TAU_HEADERS
 	execution.h
 	tau.h
 	normal_forms.h
+	satisfiability.h
 	solver.h
 	splitter.h
 	splitter_types.h
