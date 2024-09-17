@@ -25,6 +25,7 @@ namespace testing = doctest;
 
 
 namespace idni::tau {
+
 	template<>
 	struct nso_factory<Bool> {
 
@@ -39,6 +40,7 @@ namespace idni::tau {
 			return make_node<tau_sym<Bool>>(Bool(true), {});
 		}
 	};
+	
 } // namespace idni::tau
 
 // helper functions

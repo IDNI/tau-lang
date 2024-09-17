@@ -166,11 +166,18 @@ auto splitter (const tau_ba<BAs...>& fm, splitter_type st) {
 	return tau_ba<BAs...>(s);
 }
 
+template<typename... BAs>
+auto bad_splitter (const tau_ba<BAs...>& fm) {
+	auto s = tau_bad_splitter(fm.nso_rr.main);
+	return tau_ba<BAs...>(s);
+}
+
 template<typename...BAs>
 using gssotc = nso<tau_ba<BAs...>, BAs...>;
 
 template<typename...BAs>
 using tau_spec = rr<gssotc<BAs...>>;
+
 
 template<typename...BAs>
 struct tau_ba_factory {
@@ -185,6 +192,10 @@ struct tau_ba_factory {
 		auto source = n | tau_parser::source_binding | tau_parser::source | optional_value_extractor<gssotc<BAs...>>;
 		std::string src = idni::tau::make_string(idni::tau::tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, source);
 		return parse(src);
+	}
+
+	std::optional<gssotc<BAs...>> splitter_one(const std::string& type) const {
+		return tau_bad_splitter<tau_ba<BAs...>, BAs...>();
 	}
 };
 

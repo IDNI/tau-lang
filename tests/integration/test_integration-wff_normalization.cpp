@@ -17,6 +17,7 @@
 #include "nso_rr.h"
 #include "bool_ba.h"
 #include "bdd_handle.h"
+#include "bdd_binding.h"
 #include "normalizer.h"
 
 #include "test_integration_helpers-bdd.h"
@@ -31,11 +32,11 @@ TEST_SUITE("wff_sometimes") {
 	/*TEST_CASE("push_in_1") {
 		const char* sample = "sometimes (?x && o1[t] = 0 && sometimes(?x && o1[t] = 0 && sometimes(?x && o1[t] = 0))).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).main;
 		auto result = push_sometimes_always_in(fm);
 		auto simp_res = result
-			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
-			| reduce_wff<bdd_test>;
+			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
+			| reduce_wff<bdd_binding>;
 		std::stringstream ss; ss << simp_res;
 		CHECK((ss.str() == "?x && (sometimes o1[t] = 0)" || ss.str() == "(sometimes o1[t] = 0) && ?x"));
 	}*/
@@ -43,22 +44,22 @@ TEST_SUITE("wff_sometimes") {
 	TEST_CASE("push_in_2") {
 		const char* sample = "sometimes T.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).main;
 		auto result = push_sometimes_always_in(fm);
 		auto simp_res = result
-			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
-			| reduce_wff<bdd_test>;
+			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
+			| reduce_wff<bdd_binding>;
 		CHECK( (simp_res | tau_parser::wff_t).has_value() );
 	}
 
 	TEST_CASE("push_in_3") {
 		const char* sample = "sometimes (always o1[t] = 0 || (sometimes o1[t] = 0)) && (always o1[t] = 0).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).main;
 		auto result = push_sometimes_always_in(fm);
 		auto simp_res = result
-			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
-			| reduce_wff<bdd_test>;
+			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
+			| reduce_wff<bdd_binding>;
 		std::stringstream ss; ss << simp_res ;
 		CHECK( ss.str() == "always o1[t] = 0" );
 	}
@@ -66,11 +67,11 @@ TEST_SUITE("wff_sometimes") {
 	/*TEST_CASE("pull_out_1") {
 		const char* sample = "(sometimes T && ?x) || (sometimes T && ?x) || (sometimes ?x).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).main;
 		auto result = pull_sometimes_always_out(fm);
 		auto simp_res = result
-			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
-			| reduce_wff<bdd_test>;
+			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
+			| reduce_wff<bdd_binding>;
 		std::stringstream ss; ss << simp_res;
 		CHECK(ss.str() == "sometimes ?x");
 	}*/
@@ -78,11 +79,11 @@ TEST_SUITE("wff_sometimes") {
 	/*TEST_CASE("pull_out_2") {
 		const char* sample = "(always ?x) && ?x && (sometimes ?x && ?x).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<bdd_test>(src).main;
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).main;
 		auto result = pull_sometimes_always_out(fm);
 		auto simp_res = result
-			| repeat_all<step<bdd_test>, bdd_test>(simplify_wff<bdd_test>)
-			| reduce_wff<bdd_test>;
+			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
+			| reduce_wff<bdd_binding>;
 		std::stringstream ss; ss << simp_res;
 		CHECK(ss.str() == "?x");
 	}*/

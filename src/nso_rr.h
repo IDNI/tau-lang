@@ -94,7 +94,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 	if (!l_has_extra && !r_has_extra)
 		return (l->value == r->value && l->child == r->child);
 	if (l_has_extra && !r_has_extra) {
-		if (l->child.size() - 1 != r->child.size()) return false;
+		if (l->child.size() != r->child.size() + 1) return false;
 		for (int i = 0; i < (int_t)r->child.size(); ++i) {
 			if (!(l->child[i] == r->child[i]))
 				return false;
@@ -102,7 +102,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 		return l->value == r->value;
 	}
 	if (!l_has_extra && r_has_extra) {
-		if (l->child.size() != r->child.size() - 1) return false;
+		if (l->child.size() + 1 != r->child.size()) return false;
 		for (int i = 0; i < (int_t)l->child.size(); ++i) {
 			if (!(l->child[i] == r->child[i]))
 				return false;
@@ -111,8 +111,8 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 	}
 	if (l_has_extra && r_has_extra) {
 		if (l->child.size() != r->child.size()) return false;
-		for (int i = 0; i < (int_t)l->child.size() - 1; ++i) {
-			if (!(l->child[i] == r->child[i]))
+		for (int i = 1; i < ((int_t)l->child.size()); ++i) {
+			if (!(l->child[i-1] == r->child[i-1]))
 				return false;
 		}
 		return l->value == r->value;
@@ -882,6 +882,16 @@ sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
 	return wrap(nt, { c1, c2 });
 }
 
+template<typename... BAs>
+sp_tau_node<BAs...> wrap(tau_parser::nonterminal nt,
+	const std::string& terminals) {
+	std::vector<sp_tau_node<BAs...>> children;
+	for (const auto& c : terminals)
+		children.emplace_back(make_node<tau_sym<BAs...>>(
+			tau_source_sym(c), {}));
+	return wrap(nt, children);
+}
+
 // bind the given, using a binder, the constants of the a given sp_tau_node<...>.
 template<typename binder_t, typename... BAs>
 struct bind_transformer {
@@ -958,6 +968,10 @@ struct nso_factory {
 			const std::string&) const {
 		throw std::runtime_error("not implemented");
 	}
+
+	sp_tau_node<BAs...> splitter_one(const std::string&) const {
+		throw std::runtime_error("not implemented");
+	}
 };
 
 // binds the constants of a given binding using the multi-factory for the types
@@ -978,7 +992,7 @@ struct factory_binder {
 				tau_node_terminal_extractor<BAs...>, type.value());
 			return factory.binding(n, type_name);
 		}
-		return n;
+		return factory.binding(n, "");
 	}
 };
 
@@ -1829,6 +1843,14 @@ static const sp_tau_node<BAs...> _T = bldr_wff_T<BAs...>.second;
 
 template<typename... BAs>
 static const sp_tau_node<BAs...> _T_trimmed = trim(_T<BAs...>);
+
+template<typename... BAs>
+nso<BAs...> build_extra (const nso<BAs...> n, const std::string &note) {
+	assert((!n->child.empty()) && (!is_non_terminal(tau_parser::extra, n->child.back())));
+	std::vector<nso<BAs...>> c (n->child);
+	c.emplace_back(wrap<BAs...>(tau_parser::extra, note));
+	return make_node(n->value, move(c));
+}
 
 template<typename... BAs>
 nso<BAs...> build_num(size_t value) {
@@ -3017,15 +3039,16 @@ sp_tau_node<BAs...> make_node_hook_bf_xor(const node<tau_sym<BAs...>>& n) {
 
 template<typename...BAs>
 sp_tau_node<BAs...> make_node_hook_cte(const node<tau_sym<BAs...>>& n) {
-	auto l = first_argument_expression(n)
+	auto l = n
+		| tau_parser::bf_constant
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
 	//RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 1.")
 	//RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 	if (l.has_value()) {
-		if (l.value() == false) return _1<BAs...>;
-		else if (l.value() == true) return _0<BAs...>;
+		if (l.value() == false) return _0<BAs...>;
+		else if (l.value() == true) return _1<BAs...>;
 	}
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
@@ -3948,6 +3971,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::debug_sym: stream << "debug"; break;
 			case tau_parser::trace_sym: stream << "trace"; break;
 			case tau_parser::info_sym:  stream << "info"; break;
+			case tau_parser::extra: break; // We do not output this
 			// for the rest skip value and just passthrough to child
 			default: for (const auto& c : n->child)
 					pp(stream, c, parent);

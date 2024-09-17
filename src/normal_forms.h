@@ -907,9 +907,15 @@ struct bf_reduce_canonical {
 		else return replace(fm, changes);
 	}
 };
+
 template<typename... BAs>
 nso<BAs...> operator|(const nso<BAs...>& fm, const bf_reduce_canonical<BAs...>& r) {
 	return r(fm);
+}
+
+template<typename... BAs>
+std::optional<nso<BAs...>> operator|(const std::optional<nso<BAs...>>& fm, const bf_reduce_canonical<BAs...>& r) {
+	return fm.has_value() ? r(fm.value()) : std::optional<nso<BAs...>>{};
 }
 
 inline bool is_contained_in (const vector<int_t>& i, auto& paths) {

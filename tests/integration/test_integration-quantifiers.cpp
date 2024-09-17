@@ -20,6 +20,7 @@
 #include "nso_rr.h"
 #include "bool_ba.h"
 #include "bdd_handle.h"
+#include "bdd_binding.h"
 #include "normalizer.h"
 
 #include "test_integration_helpers-bdd.h"
@@ -74,10 +75,10 @@ bool test(const test_case& tc) {
 	const auto& [ sample, exp, nexp ] = tc;
 	bool fail = false;
 	auto src = make_tau_source(sample.c_str());
-	auto formula = make_nso_rr_using_factory<bdd_test>(src);
+	auto formula = make_nso_rr_using_factory<bdd_binding>(src);
 	auto got = to_str(formula);
 	if (got != exp) fail = true;
-	auto norm = normalizer<bdd_test>(formula);
+	auto norm = normalizer<bdd_binding>(formula);
 	auto ngot = to_str(norm);
 	if (fail || ngot != nexp) fail = true,
 		cout << tc << "\n\tgot:      \"" << got
