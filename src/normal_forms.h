@@ -1056,10 +1056,12 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 	auto is_var_wff = [](const auto& n) {
 		using tp = tau_parser;
 		assert(!is_non_terminal(tp::bf_neq, n));
-		return is_child_non_terminal(tp::bf_eq, n) || is_child_non_terminal(tp::wff_ref, n) ||
-			 is_child_non_terminal(tp::uninterpreted_constant, n) || is_child_non_terminal(tp::wff_ex, n) ||
-			 	is_child_non_terminal(tp::wff_sometimes, n) || is_child_non_terminal(tp::wff_always, n) ||
-			 		is_child_non_terminal(tp::wff_all, n);
+		return is_child_non_terminal(tp::bf_eq, n)
+			|| is_child_non_terminal(tp::wff_ref, n)
+			|| is_child_non_terminal(tp::wff_ex, n)
+			|| is_child_non_terminal(tp::wff_sometimes, n)
+			|| is_child_non_terminal(tp::wff_always, n)
+			|| is_child_non_terminal(tp::wff_all, n);
 	};
 	auto is_var_bf = [](const auto& n) {
 		using tp = tau_parser;
