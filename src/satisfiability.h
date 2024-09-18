@@ -128,7 +128,7 @@ nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto& io
 		if (initials.contains({io_var_names[pos], time_point}))
 			continue;
 		stringstream n;
-		n <<  io_var_names[pos] << "[" << time_point << "]";
+		n << io_var_names[pos] << "[" << time_point << "]";
 		auto var = build_bf_var<BAs...>(n.str());
 		fm = build_wff_ex(var, fm);
 	}
@@ -192,26 +192,42 @@ nso<BAs...> calculate_flag(const nso<BAs...>& flag, int_t time_point) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_initial_step(const nso<BAs...>& original_fm, const auto &io_vars, const auto &io_var_names,
-                       int_t time_point) {
+nso<BAs...> build_initial_step(const nso<BAs...>& original_fm,
+	const auto &io_vars, const auto &flags, const auto &io_var_names,
+        int_t time_point)
+{
 	map<nso<BAs...>, nso<BAs...>> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point);
+		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i],
+								time_point);
 		changes[io_vars[i]] = new_io_var;
+	}
+	for (auto& [ flag_iovar, flag ] : flags) {
+		changes[flag_iovar] = calculate_flag(flag, time_point);
+		BOOST_LOG_TRIVIAL(trace) << "(T) -- calculated flag: "
+				<< flag_iovar << " = " << changes[flag_iovar];
 	}
 	return replace(original_fm, changes);
 }
 
 template<typename... BAs>
-nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_fm, const auto& io_vars,
-                       const auto& io_var_names, const auto& initials, int_t step_num, int_t time_point,
-                       nso<BAs...>& cached_fm) {
+nso<BAs...> build_step(const nso<BAs...>& original_fm,
+	const nso<BAs...>& prev_fm, const auto& io_vars, const auto& flags,
+	const auto& io_var_names, const auto& initials, int_t step_num,
+	int_t time_point, nso<BAs...>& cached_fm)
+{
 	// Use build_initial_step otherwise
 	assert(step_num > 0);
 	map<nso<BAs...>, nso<BAs...> > changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point + step_num);
+		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i],
+							time_point + step_num);
 		changes[io_vars[i]] = new_io_var;
+	}
+	for (auto& [ flag_iovar, flag ] : flags) {
+		changes[flag_iovar] = calculate_flag(flag, time_point+step_num);
+		BOOST_LOG_TRIVIAL(trace) << "(T) -- calculated flag: "
+				<< flag_iovar << " = " << changes[flag_iovar];
 	}
 	nso<BAs...> most_inner_step = replace(original_fm, changes);
 	auto q_most_inner_step = existentially_quantify_output_streams(most_inner_step, io_vars, io_var_names, initials,
@@ -274,8 +290,29 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	auto new_io_var_names = produce_io_var_names(io_vars);
 
+	map<nso<BAs...>, nso<BAs...>> changes, flags;
+	// transform flags to their respective output streams
+	size_t flag_id = 0;
+	for (const auto& flag : select_top(fm,
+					is_non_terminal<p::flag, BAs...>))
+	{
+		auto offset_var = make_string(
+			tau_node_terminal_extractor<BAs...>,
+			(flag | only_child_extractor<BAs...>
+				| p::flagvar).value());
+		std::stringstream ss; ss << "_f" << flag_id++;
+		auto var = wrap<BAs...>(p::out_var_name, ss.str());
+		auto offset = wrap<BAs...>(p::offset,
+					wrap<BAs...>(p::capture, offset_var));
+		changes[flag] = wrap(p::variable, wrap(p::io_var,
+			wrap(p::out, { var, offset })));
+		flags[changes[flag]] = flag;
+	}
+	fm = replace(fm, changes);
+	changes.clear();
+
 	// Save positions of io_variables which are initial conditions
-	// and transform them to not clash with non initials
+	// and transform them to _<io_var> to not clash with non initials
 	set<pair<string, int_t>> initials;
 	auto io_var_unclashing_name = [](std::string n,
 		const std::vector<std::string>& names)
@@ -285,7 +322,6 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 		while (names_set.find(n) != names_set.end()) n = prefix + n;
 		return n;
 	};
-	map<nso<BAs...>, nso<BAs...>> changes;
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
 		if (trim2(io_vars[i])->child[1] | p::num)
 	{
@@ -304,12 +340,12 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 
 	// Calculate fix point
 	int_t time_point = get_max_shift(io_vars);
-	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars,
+	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars, flags,
 						new_io_var_names, time_point);
 	int_t step_num = 1;
 	nso<BAs...> cache = prev_unbounded_fm;
 	nso<BAs...> unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars,
-		new_io_var_names, initials, step_num, time_point, cache);
+		flags, new_io_var_names, initials, step_num, time_point, cache);
 
 	cout << "Continuation at step " << step_num << "\n";
 	cout << unbounded_fm << "\n";
@@ -321,7 +357,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 		prev_unbounded_fm = unbounded_fm;
 		++step_num;
 
-		unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars,
+		unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars, flags,
 			new_io_var_names, initials, step_num, time_point,cache);
 
 		cout << "Continuation at step " << step_num << "\n";
