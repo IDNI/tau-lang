@@ -1025,14 +1025,14 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(317), (NT(318)));
 //G446: cli_command(215)     => toggle_cmd(317).
 	p(NT(215), (NT(317)));
-//G447: __E_cli_command_129(322) => type(171) __(58) charvar(144) _(11) '=' _(11) input_stream(323).
-	p(NT(322), (NT(171)+NT(58)+NT(144)+NT(11)+T(3)+NT(11)+NT(323)));
+//G447: __E_cli_command_129(322) => type(171) __(58) in_var_name(150) _(11) '=' _(11) input_stream(323).
+	p(NT(322), (NT(171)+NT(58)+NT(150)+NT(11)+T(3)+NT(11)+NT(323)));
 //G448: def_input_cmd(321)   => __E_cli_command_129(322).
 	p(NT(321), (NT(322)));
 //G449: cli_command(215)     => def_input_cmd(321).
 	p(NT(215), (NT(321)));
-//G450: __E_cli_command_130(325) => type(171) __(58) charvar(144) _(11) '=' _(11) output_stream(326).
-	p(NT(325), (NT(171)+NT(58)+NT(144)+NT(11)+T(3)+NT(11)+NT(326)));
+//G450: __E_cli_command_130(325) => type(171) __(58) out_var_name(154) _(11) '=' _(11) output_stream(326).
+	p(NT(325), (NT(171)+NT(58)+NT(154)+NT(11)+T(3)+NT(11)+NT(326)));
 //G451: def_output_cmd(324)  => __E_cli_command_130(325).
 	p(NT(324), (NT(325)));
 //G452: cli_command(215)     => def_output_cmd(324).

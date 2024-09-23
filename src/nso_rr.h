@@ -2478,6 +2478,26 @@ std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n,
 	return leaves;
 }
 
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_dnf_wff_clauses(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::wff_or, tau_parser::wff);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_dnf_bf_clauses(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::bf_or, tau_parser::bf);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_cnf_wff_clause(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::wff_and, tau_parser::wff);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_cnf_bf_clause(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::bf_and, tau_parser::bf);
+}
+
 // IDEA convert to a const static applier and change all the code accordingly
 //
 // however, the logic is quite complez a lot of private functions doesn't make
