@@ -251,6 +251,73 @@ nso<BAs...> add_initial_info (const nso<BAs...>& fm) {
 }
 
 template<typename... BAs>
+nso<BAs...> transform_eventual_variables(const nso<BAs...>& fm_orig) {
+	using p = tau_parser;
+	auto sometimes = select_all(fm_orig,
+				is_non_terminal<p::wff_sometimes, BAs...>);
+	// if not more than 1 `sometimes` return original formula
+	if (sometimes.size() < 2) return fm_orig;
+	auto fm = fm_orig;
+	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
+	BOOST_LOG_TRIVIAL(trace) << fm;
+	// for each `sometimes psi` replace it with (N is the nth number of `sometimes`):
+	map<nso<BAs...>,nso<BAs...>> changes;
+	nso<BAs...> always_conjs = nullptr, sometimes_conjs = nullptr;
+	auto capture = wrap<BAs...>(p::capture, "t");
+	auto offset = wrap<BAs...>(p::offset, capture);
+	auto offset_prev = wrap<BAs...>(p::offset,
+		wrap<BAs...>(p::shift, { capture, build_num<BAs...>(1) }));
+	auto smt = sometimes[0];
+	for (size_t n = 0; ; ++n) {
+		std::stringstream ss; ss << "_e" << n;
+		auto iovar = wrap<BAs...>(p::out_var_name, ss.str());
+		auto eNt = wrap<BAs...>(p::bf,
+			wrap<BAs...>(p::variable,
+			wrap<BAs...>(p::io_var,
+			wrap<BAs...>(p::out, { iovar, offset }))));
+		auto eNt_prev = wrap<BAs...>(p::bf,
+			wrap<BAs...>(p::variable,
+			wrap<BAs...>(p::io_var,
+			wrap<BAs...>(p::out, { iovar, offset_prev }))));
+		auto eNt_is_zero      = build_wff_eq(eNt);
+		auto eNt_is_one       = build_wff_neq(eNt);
+		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
+		auto eNt_prev_is_one  = build_wff_neq(eNt_prev);
+		// transform `sometimes psi` to:
+		// (_eN[t] = 1 && _eN[t-1] = 0) -> psi (N is nth `sometimes`)
+		changes[smt] = build_wff_always(build_wff_imply(
+				build_wff_and(eNt_is_one, eNt_prev_is_zero),
+				smt->child[0]));
+		fm = replace(fm, changes);
+		changes.clear();
+		// for each _eN add conjunction
+		// 	always (_eN[t] = 0 && (_eN[t]   = 0 || _eN[t] = 1)
+		//                         && (_eN[t-1] = 1 -> _eN[t] = 1))
+		auto conj = build_wff_always(
+			build_wff_and(eNt_is_zero, build_wff_and(
+				build_wff_or(eNt_is_zero, eNt_is_one),
+				build_wff_imply(eNt_prev_is_one, eNt_is_one))));
+		if (always_conjs == nullptr) always_conjs = conj;
+		else always_conjs = build_wff_and(always_conjs, conj);
+		// create conjunctions for the transformed `sometimes`
+		// 	sometimes _eN[t] & _eN+1[t] & ... & _eN+M[t] = 1
+		if (sometimes_conjs == nullptr) sometimes_conjs = eNt;
+		else sometimes_conjs = build_bf_and(sometimes_conjs, eNt);
+		auto opt_smt = find_top(fm,
+				is_non_terminal<p::wff_sometimes, BAs...>);
+		if (!opt_smt.has_value()) break;
+		smt = opt_smt.value();
+	}
+	// conjunct all with replaced formula
+	auto ret = build_wff_and(fm,
+		build_wff_and(always_conjs,
+			build_wff_sometimes(build_wff_neq(sometimes_conjs))));
+	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
+	BOOST_LOG_TRIVIAL(trace) << ret;
+	return ret;
+}
+
+template<typename... BAs>
 nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm) {
 	// Find lookback
 	auto current_io_vars = select_top(fm,
@@ -278,7 +345,6 @@ nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm) {
 }
 
 // We assume that the formula has run through the normalizer before
-// TODO: Flag integration
 template<typename... BAs>
 nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 	bool enable_output = true)
