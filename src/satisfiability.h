@@ -267,6 +267,7 @@ nso<BAs...> transform_eventual_variables(const nso<BAs...>& fm_orig) {
 	auto offset = wrap<BAs...>(p::offset, capture);
 	auto offset_prev = wrap<BAs...>(p::offset,
 		wrap<BAs...>(p::shift, { capture, build_num<BAs...>(1) }));
+	auto offset0 = wrap<BAs...>(p::offset, build_num<BAs...>(0));
 	auto smt = sometimes[0];
 	for (size_t n = 0; ; ++n) {
 		std::stringstream ss; ss << "_e" << n;
@@ -279,10 +280,14 @@ nso<BAs...> transform_eventual_variables(const nso<BAs...>& fm_orig) {
 			wrap<BAs...>(p::variable,
 			wrap<BAs...>(p::io_var,
 			wrap<BAs...>(p::out, { iovar, offset_prev }))));
+		auto eN0_is_zero = build_wff_eq(wrap<BAs...>(p::bf,
+			wrap<BAs...>(p::variable,
+			wrap<BAs...>(p::io_var,
+			wrap<BAs...>(p::out, { iovar, offset0 })))));
 		auto eNt_is_zero      = build_wff_eq(eNt);
-		auto eNt_is_one       = build_wff_neq(eNt);
+		auto eNt_is_one       = build_wff_eq(build_bf_neg(eNt));
 		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
-		auto eNt_prev_is_one  = build_wff_neq(eNt_prev);
+		auto eNt_prev_is_one  = build_wff_eq(build_bf_neg(eNt_prev));
 		// transform `sometimes psi` to:
 		// (_eN[t] = 1 && _eN[t-1] = 0) -> psi (N is nth `sometimes`)
 		changes[smt] = build_wff_always(build_wff_imply(
@@ -291,10 +296,10 @@ nso<BAs...> transform_eventual_variables(const nso<BAs...>& fm_orig) {
 		fm = replace(fm, changes);
 		changes.clear();
 		// for each _eN add conjunction
-		// 	always (_eN[t] = 0 && (_eN[t]   = 0 || _eN[t] = 1)
+		// 	always (_eN[0] = 0 && (_eN[t]   = 0 || _eN[t] = 1)
 		//                         && (_eN[t-1] = 1 -> _eN[t] = 1))
 		auto conj = build_wff_always(
-			build_wff_and(eNt_is_zero, build_wff_and(
+			build_wff_and(eN0_is_zero, build_wff_and(
 				build_wff_or(eNt_is_zero, eNt_is_one),
 				build_wff_imply(eNt_prev_is_one, eNt_is_one))));
 		if (always_conjs == nullptr) always_conjs = conj;
@@ -310,8 +315,8 @@ nso<BAs...> transform_eventual_variables(const nso<BAs...>& fm_orig) {
 	}
 	// conjunct all with replaced formula
 	auto ret = build_wff_and(fm,
-		build_wff_and(always_conjs,
-			build_wff_sometimes(build_wff_neq(sometimes_conjs))));
+		build_wff_and(always_conjs, build_wff_sometimes(
+				build_wff_eq(build_bf_neg(sometimes_conjs)))));
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
 	BOOST_LOG_TRIVIAL(trace) << ret;
 	return ret;
