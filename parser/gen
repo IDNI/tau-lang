@@ -1,20 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 TGF_FILE=$1
-PARSER_NAME=$2
-PARSER_FILE=$3
 
 if [[ -z "$TGF_FILE" ]]; then
 	echo "provide an existing TGF file path"
 	exit 1
-fi
-if [[ -z "$PARSER_NAME" ]]; then
-	echo "provide a resulting parser name"
-	exit 2
-fi
-if [[ -z "$PARSER_FILE" ]]; then
-	echo "provide a resulting parser file path"
-	exit 3
 fi
 
 TGF_DIR="./external/parser"
@@ -28,6 +18,6 @@ if [[ ! -f "$TGF" ]]; then
 	cd "$D"
 fi
 
-echo "Generating $PARSER_NAME ..."
-$TGF "$TGF_FILE" gen --name "$PARSER_NAME" > "$PARSER_FILE"
+echo "Generating parser from $TGF_FILE ..."
+$TGF "$TGF_FILE" gen
 echo "Generation done"
