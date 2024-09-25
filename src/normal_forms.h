@@ -1141,6 +1141,8 @@ bool has_temp_var (const nso<BAs...>& fm) {
 	auto io_vars = select_top(fm, is_non_terminal<tau_parser::io_var, BAs...>);
 	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::flag, BAs...>).has_value();
 	for (const auto& io_var : io_vars) {
+		if (find_top(io_var, is_non_terminal<tau_parser::shift, BAs...>))
+			return true;
 		if (!find_top(io_var, is_non_terminal<tau_parser::num, BAs...>))
 			return true;
 	}
@@ -1413,7 +1415,9 @@ struct sometimes_always_normalization {
 			return is_child_non_terminal(tau_parser::wff_sometimes, n) ||
 				is_child_non_terminal(tau_parser::wff_always, n);
 		};
-		auto res = push_sometimes_always_in(fm)
+		// Scope formula under always if not already under sometimes or always
+		nso<BAs...> res = !st_aw(fm) ? build_wff_always(fm) : fm;
+		res = push_sometimes_always_in(res)
 					// conversion to DNF necessary for pull_sometimes_always_out
 					| repeat_each<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
 					| repeat_each<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
@@ -1426,7 +1430,10 @@ struct sometimes_always_normalization {
 		map<nso<BAs...>, nso<BAs...>> changes;
 		for (const auto& f : temp_inner) {
 			// Reduction done to normalize again now that sometimes/always are all the way out
-			changes[trim2(f)] = trim2(f) | wff_reduce_dnf<BAs...>();
+			changes[trim2(f)] = trim2(f)
+						| repeat_each<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+						| repeat_each<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
+						| wff_reduce_dnf<BAs...>();
 		}
 		return replace(res, changes);
 	}
