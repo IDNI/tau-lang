@@ -45,6 +45,8 @@ using assignment = solution<BAs...>;
 template<typename...BAs>
 struct inputs {
 
+	inputs() = default;
+
 	inputs(std::set<stream_ba<BAs...>>& streams) {
 		// open the corresponding streams for input and store them in streams
 		for (const auto& stream: streams)
@@ -53,7 +55,7 @@ struct inputs {
 
 	~inputs() {
 		// close the streams
-		for (const auto& [stream, file]: streams) file.close();
+		for (auto& [stream, file]: streams) file.close();
 	}
 
 	// end of inputs
@@ -82,6 +84,8 @@ struct inputs {
 template<typename...BAs>
 struct outputs {
 
+	outputs() = default;
+
 	outputs(std::set<stream_ba<BAs...>>& streams) {
 		// open the corresponding streams for output and store them in streams
 		for (const auto& stream: streams)
@@ -90,7 +94,7 @@ struct outputs {
 
 	~outputs() {
 		// close the streams
-		for (const auto& [stream, file]: streams) file.close();
+		for (auto& [stream, file]: streams) file.close();
 	}
 
 	// is good
@@ -108,59 +112,36 @@ struct outputs {
 	std::map<stream_ba<BAs...>, std::ofstream> streams;
 };
 
+// A type is a string representing the type of the system to be solved.
+using type = std::string;
+
+// A system represent a clause to be solved. It maps the different
+// equations of the clause according to its type.
+template<typename...BAs>
+using system = std::map<type, nso<BAs...>>;
+
+// Loopbacks, input, output and constants
+struct loopbacks {
+	size_t input = 0;
+	size_t output = 0;
+	size_t constant = 0;
+};
+
 template<typename...BAs>
 struct interpreter {
-	// A type is a string representing the type of the system to be solved.
-	using type = std::string;
-	// A system represent a clause to be solved. It maps the different
-	// equations of the clause according to its type.
-	using system = std::map<type, nso<BAs...>>;
-	// Loopbacks, input, output and constants
-	struct loopbacks {
-		size_t input = 0;
-		size_t output = 0;
-		size_t constant = 0;
-	};
 
-	interpreter(nso<BAs...> phi_inf, inputs<BAs...>& ins, outputs<BAs...>& outs): ins(ins), outs(outs) {
-		// compute the different systems to be solved
-		compute_systems(phi_inf, ins);
-		// compute input and output lookback
-		compute_lookbacks(phi_inf);
-		// compute initial memory
-		compute_initial_memory(phi_inf);
-		//after the bove, we have the interpreter ready to be used.
-	}
-
-	void compute_initial_memory(const nso<BAs...>& phi_inf) {
-		// compute th initial
-		size_t max_lookback = max(lbcks.input, lbcks.output, lbcks.constant);
-		// we include the max lookback in the memory to deal with the initial
-		// case.
-		for (; this->time_point < max_lookback; ++this->time_point) {
-			if (!ready()) return;
-			assignment<BAs...> current_inputs;
-			ins >> current_inputs;
-			for (const auto& [var, value]: current_inputs) {
-				auto timed_var = get_timed_var(var);
-				this->memory[timed_var] = value;
-			}
-			for (const auto& out: this->outs.streams) {
-				auto current_timed_output = get_timed_var(out.first.name);
-				if (!memory.contains(current_timed_output))
-					this->memory[current_timed_output] = _0<BAs...>;
-			}
-		}
-
-		if (this->error = error()) return;
-		this->time_point = max_lookback;
-	}
-
-	void step() {
+	assignment<BAs...> step(const assignment<BAs...>& inputs) {
 		// for each system in systems try to solve it, if it is not possible
 		// continue with the next system.
 		bool unsolvable = false;
-		for (const auto& system: systems) {
+		// update the memory with the inputs
+		for (const auto& [var, value]: inputs) {
+			auto timed_var = get_timed_var(var, this->time_point);
+			memory[timed_var] = value;
+		}
+		// for each system in systems try to solve it, if it is not possible
+		// continue with the next system.
+		for (const auto& system: this->systems) {
 			std::map<type, solution<BAs...>> solutions;
 			unsolvable = false;
 			// solve the equations fro each type in the system
@@ -173,43 +154,29 @@ struct interpreter {
 				else { unsolvable = true; break; }
 			}
 			if (!unsolvable) {
-				for (const auto& [type, solution]: solutions)
-					this->memory.insert(solution.begin(), solution.end());
-				break;
+				solution<BAs...> global;
+				for (const auto& [type, solution]: solutions) {
+					memory.insert(solution.begin(), solution.end());
+					for (const auto& [var, value]: solution) {
+						auto untimed_var = find_top(var, is_non_terminal<tau_parser::charvar, BAs...>);
+						global[untimed_var.value()] = value;
+					}
+				}
+				time_point += 1;
+				// TODO (HIGH) remove old values from memory
+				return global;
 			}
 		}
-		err = unsolvable;
-	}
-
-	bool ready() {
-		return ins.ready() && outs.ready() && !error();
-	}
-
-	bool error() const {
-		return err;
 	}
 
 	// store all the possible systems to be solved, each system corresponds to a
 	// different clause.
-	std::set<system> systems;
+	std::set<system<BAs...>> systems;
 	assignment<BAs...> memory;
-	inputs<BAs...> ins;
-	outputs<BAs...> outs;
-	loopbacks lbcks;
-	size_t time_point = 0;
-	bool err = false;
+	size_t lookback;
+	size_t time_point;
 
 private:
-
-	nso<BAs...> get_timed_var(const nso<BAs...>& var_name) {
-		auto type = is_non_terminal<tau_parser::in_var_name, BAs...>(var_name)
-			? tau_parser::in : tau_parser::out;
-		return wrap<BAs...>(tau_parser::io_var, {
-			type, {var_name,
-				wrap<BAs...>(tau_parser::offset,
-					wrap<BAs...>(tau_parser::num, {tau_sym<BAs...>(this->time_point)}))}});
-
-	}
 
 	nso<BAs...> update_inf(const nso<BAs...>& phi_inf) {
 		// update the phi_inf according to current time_point
@@ -226,49 +193,92 @@ private:
 		}
 		return replace(phi_inf, memory);
 	}
+};
 
-	void compute_loopbacks(const nso<BAs...>& phi_inf) {
-		// for each loopback in phi_inf, store the input and output lookbacks
-		// in a pair and return it.
-		loopbacks lbs;
-		for (const auto& io_var: select_top(phi_inf, is_non_terminal<tau_parser::io_var, BAs...>)) {
-			if (auto shift = io_var | tau_parser::in | tau_parser::offset | tau_parser::shift | tau_parser::num; shift) {
-				lbcks.input = max(lbs.input, shift | optional_value_extractor<size_t>);
-			} else if (auto shift = io_var | tau_parser::out | tau_parser::offset | tau_parser::shift | tau_parser::num; shift) {
-				lbcks.output = max(lbs.output, shift | optional_value_extractor<size_t>);
-			} else if (auto num = io_var | tau_parser::in | tau_parser::offset | tau_parser::num; num) {
-				lbcks.constant = max(lbs.constant, num | optional_value_extractor<size_t>);
-			}
+template<typename input_t, typename output_t, typename...BAs>
+assignment<BAs...> compute_initial_memory(const nso<BAs...>& phi_inf, const loopbacks& lbcks, input_t& ins, output_t& outs) {
+	// compute th initial
+	size_t max_lookback = max(lbcks.input, lbcks.output, lbcks.constant);
+	// we include the max lookback in the memory to deal with the initial
+	// case.
+	assignment<BAs...> memory;
+	for (size_t time_point = 0; time_point < max_lookback; ++time_point) {
+		//if (!ready()) return;
+		assignment<BAs...> current_inputs;
+		ins >> current_inputs;
+		for (const auto& [var, value]: current_inputs) {
+			auto timed_var = get_timed_var(var, time_point);
+			memory[timed_var] = value;
+		}
+		//for (const auto& out: outs.streams) {
+		//	auto current_timed_output = get_timed_var(out.first.name);
+		//	if (!memory.contains(current_timed_output))
+		//		memory[current_timed_output] = _0<BAs...>;
+		//}
+	}
+	return memory;
+}
+
+template<typename...BAs>
+loopbacks compute_loopbacks(const nso<BAs...>& phi_inf) {
+	// for each loopback in phi_inf, store the input and output lookbacks
+	// in a pair and return it.
+	loopbacks lbs;
+	for (const auto& io_var: select_top(phi_inf, is_non_terminal<tau_parser::io_var, BAs...>)) {
+		if (auto shift = io_var | tau_parser::in | tau_parser::offset | tau_parser::shift | tau_parser::num; shift) {
+			lbs.input = max(lbs.input, shift | optional_value_extractor<size_t>);
+		} else if (auto shift = io_var | tau_parser::out | tau_parser::offset | tau_parser::shift | tau_parser::num; shift) {
+			lbs.output = max(lbs.output, shift | optional_value_extractor<size_t>);
+		} else if (auto num = io_var | tau_parser::in | tau_parser::offset | tau_parser::num; num) {
+			lbs.constant = max(lbs.constant, num | optional_value_extractor<size_t>);
 		}
 	}
+	return lbs;
+}
 
-	void compute_systems(const nso<BAs...>& phi_inf, const inputs<BAs...>& in) {
-			static auto is_literal = [](const nso<BAs...>& n) {
-			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
-				|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
-		};
 
-		// split phi_inf in clauses
-		for (auto& clause: get_dnf_wwf_clauses(phi_inf)) {
-			// for each clause, split it into several equation systems according to
-			// its type and store it in systems
-			system clause_system;
-			for (auto& literal: select_top(clause, is_literal)) {
-				// for each literal, get the type and store it in the clause_system
-				// conjuncted with the other literals of the same type.
-				auto var = find_top(literal, is_child_non_terminal<tau_parser::variable, BAs...>);
-				for (const auto& stream: in.streams) {
-					if (var == stream.name) {
-						auto type = stream.type;
-						if (clause_system.find( stream.type) == clause_system.end())
-							clause_system[stream.type] = literal;
-						else clause_system[stream.type] = clause_system[stream.type] & literal;
-					}
+template<typename input_t, typename...BAs>
+std::set<system<BAs...>> copute_systems(const nso<BAs...>& phi_inf, const input_t& in) {
+	static auto is_literal = [](const nso<BAs...>& n) {
+		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
+			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
+	};
+
+	std::set<system<BAs...>> systems;
+	// split phi_inf in clauses
+	for (auto& clause: get_dnf_wwf_clauses(phi_inf)) {
+		// for each clause, split it into several equation systems according to
+		// its type and store it in systems
+		system<BAs...> clause_system;
+		for (auto& literal: select_top(clause, is_literal)) {
+			// for each literal, get the type and store it in the clause_system
+			// conjuncted with the other literals of the same type.
+			auto var = find_top(literal, is_child_non_terminal<tau_parser::variable, BAs...>);
+			for (const auto& stream: in.streams) {
+				if (var == stream.name) {
+					auto type = stream.type;
+					if (clause_system.find( stream.type) == clause_system.end())
+						clause_system[stream.type] = literal;
+					else clause_system[stream.type] = clause_system[stream.type] & literal;
 				}
 			}
-			systems.insert(clause_system);
 		}
+		systems.insert(clause_system);
 	}
+	return systems;
+}
+
+template<typename input_t, typename output_t, typename...BAs>
+interpreter<BAs...> make_interpreter(nso<BAs...> phi_inf, input_t& ins, output_t& outs) {
+	// compute the different systems to be solved
+	auto systems = compute_systems(phi_inf, ins);
+	// compute input and output lookback
+	auto lkbck = compute_lookbacks(phi_inf);
+	// compute initial memory
+	auto memory = compute_initial_memory(phi_inf, lkbck, ins, outs);
+	//after the bove, we have the interpreter ready to be used.
+	auto max = max(lkbck.input, lkbck.output, lkbck.constant);
+	return interpreter<BAs...>{ systems, memory, max, max };
 };
 
 template<typename...BAs>
@@ -300,10 +310,13 @@ void operator>>(const interpreter<BAs...>& state, assignment<BAs...>& outputs) {
 }
 
 template<typename...BAs>
-bool run(const inputs<BAs...>& ins, const outputs<BAs...>& outs, nso<BAs...>& phi_inf) {
-	assignment<BAs...> inputs;
-	interpreter<BAs...> i(phi_inf, ins, outs);
-	while (i.ready()) i.step();
+bool run(const nso<BAs...>& phi_inf, const inputs<BAs...>& ins, const outputs<BAs...>& outs) {
+	auto i = make_interpreter(phi_inf, ins, outs);
+	while (ins.ready()) {
+		assignment<BAs...> inputs;
+		ins >> inputs;
+		outs << i.step(inputs);
+	}
 	return i.error();
 }
 
