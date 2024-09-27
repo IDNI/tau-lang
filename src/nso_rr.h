@@ -978,16 +978,16 @@ template<typename...BAs>
 struct nso_factory {
 
 	sp_tau_node<BAs...> parse(const std::string&,
-			const std::string&) const {
+			const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
 
 	sp_tau_node<BAs...> binding(const sp_tau_node<BAs...>&,
-			const std::string&) const {
+			const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
 
-	sp_tau_node<BAs...> splitter_one() const {
+	sp_tau_node<BAs...> splitter_one(const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
 };
