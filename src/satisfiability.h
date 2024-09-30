@@ -141,7 +141,7 @@ int_t get_max_initial_flag(const auto &flags) {
 }
 
 template<typename... BAs>
-int_t get_max_initial(const auto& io_vars, const auto& flags) {
+int_t get_max_initial(const auto& io_vars) {
 	int_t max_init = 0;
 	for (const nso<BAs...>& v : io_vars) {
 		if (is_io_initial(v)) {
@@ -149,7 +149,6 @@ int_t get_max_initial(const auto& io_vars, const auto& flags) {
 			max_init = max(max_init, init);
 		}
 	}
-	max_init = max(max_init, get_max_initial_flag<BAs...>(flags));
 	return max_init;
 }
 
@@ -288,22 +287,6 @@ nso<BAs...> build_initial_step(const nso<BAs...>& original_fm,
 		changes[io_vars[i]] = new_io_var;
 	}
 	nso<BAs...> new_fm = replace(original_fm, changes);
-	// for (auto& [ flag_iovar, flag ] : flags) {
-	// 	// Add new variables to the collection of
-	// 	// Check if flag is still in initial phase
-	// 	if (!is_initial_flag_phase(flag, time_point))
-	// 		continue;
-	//
-	// 	// Add initial condition for flag at current time point
-	// 	// nso<BAs...> flag_init_cond =
-	// 	// 	transform_io_var(flag_iovar, get_io_name(flag_iovar), time_point);
-	// 	// flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
-	// 	// new_fm = build_wff_and(build_wff_eq(build_bf_xor(
-	// 	// 	flag_init_cond, calculate_flag(flag, time_point))), new_fm);
-	// 	// initials.emplace(get_io_name(flag_iovar), time_point);
-	// 	BOOST_LOG_TRIVIAL(trace) << "(T) -- calculated flag: "
-	// 			<< flag_iovar << " = " << changes[flag_iovar];
-	// }
 	return new_fm;
 }
 
@@ -322,22 +305,6 @@ nso<BAs...> build_step(const nso<BAs...>& original_fm,
 	}
 
 	nso<BAs...> most_inner_step = replace(original_fm, changes);
-	// for (auto& [ flag_iovar, flag ] : flags) {
-	// 	// Check if flag is still in initial phase
-	// 	if (!is_initial_flag_phase(flag, time_point))
-	// 		continue;
-	//
-	// 	// Add initial condition for flag at current time point
-	// 	// auto flag_init_cond =
-	// 	// 	transform_io_var(flag_iovar, get_io_name(flag_iovar), time_point + step_num);
-	// 	// flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
-	// 	// most_inner_step = build_wff_and(build_wff_eq(build_bf_xor(flag_init_cond,
-	// 	// 	calculate_flag(flag, time_point + step_num))), most_inner_step);
-	// 	// initials.emplace(get_io_name(flag_iovar), time_point + step_num);
-	// 	// BOOST_LOG_TRIVIAL(trace) << "(T) -- calculated flag: "
-	// 	// 		<< flag_iovar << " = " << changes[flag_iovar];
-	// }
-
 	auto q_most_inner_step = existentially_quantify_output_streams(most_inner_step, io_vars, initials,
 	                                                               time_point + step_num);
 	q_most_inner_step = universally_quantify_input_streams(q_most_inner_step, io_vars, initials,
@@ -467,7 +434,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 	if (is_child_non_terminal(p::wff_always, fm)) fm = trim2(fm);
 
 	map<nso<BAs...>, nso<BAs...>> changes, flags;
-	// transform flags to their respective output streams
+	// transform flags to their respective output streams and add required conditions
 	size_t flag_id = 0;
 	for (const auto& flag : select_top(fm,
 		is_non_terminal<p::flag, BAs...>))
@@ -495,49 +462,23 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 			flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
 			fm = build_wff_and(build_wff_eq(build_bf_xor(
 			flag_init_cond, calculate_flag(flag, t))), fm);
-			//initials.emplace(get_io_name(flag_iovar), t);
 			++t;
 		}
 	}
 	fm = replace(fm, changes);
-	cout << "Flag transform fm: " << fm << "\n";
 	changes.clear();
 
 	vector<nso<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
-	// auto new_io_var_names = produce_io_var_names(io_vars);
 
 	// Save positions of io_variables which are initial conditions
 	// and transform them to _<io_var> to not clash with non initials
 	set<pair<string, int_t>> initials;
 
-	// auto io_var_unclashing_name = [](std::string n,
-	// 	const std::vector<std::string>& names)
-	// {
-	// 	std::set<std::string> names_set(names.begin(), names.end());
-	// 	static const std::string prefix = "_";
-	// 	auto it = names_set.find(n);
-	// 	while (it != names_set.end()) {
-	// 		n = prefix + n;
-	// 		it = names_set.find(n);
-	// 	}
-	// 	return n;
-	// };
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
 		if (trim2(io_vars[i])->child[1] | p::num)
-	{
-		// bool isout = new_io_var_names[i][0] == 'o';
-		// auto new_name = io_var_unclashing_name(new_io_var_names[i],
-		// 				new_io_var_names);
-		initials.emplace(get_io_name(io_vars[i]), size_t_extractor<BAs...>(
+			initials.emplace(get_io_name(io_vars[i]), size_t_extractor<BAs...>(
 				trim2(trim2(io_vars[i])->child[1])).value());
-		// auto new_var = wrap<BAs...>(isout ? p::out_var_name
-		// 				: p::in_var_name, new_name);
-		// changes[io_vars[i]] = wrap(p::variable,	wrap(p::io_var,
-		// 	wrap(isout ? p::out : p::in,
-		// 		{ new_var, trim2(io_vars[i])->child[1] })));
-	}
-	// fm = replace(fm, changes);
 
 	// Calculate fix point
 	int_t time_point = get_max_shift(io_vars);
@@ -549,9 +490,10 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 
 	cout << "Continuation at step " << step_num << "\n";
 	cout << unbounded_fm << "\n";
-	// cout << "Normalized: " << normalizer_step<BAs...>(unbounded_fm) << "\n";
 
-	int_t max_initial_condition = get_max_initial<BAs...>(io_vars, flags);
+	int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
+	// Find fix point once all initial conditions have been passed and
+	// the time_point is greater equal the step_num
 	while (step_num < max(max_initial_condition, time_point)
 		|| !are_nso_equivalent(prev_unbounded_fm, unbounded_fm))
 	{
@@ -563,7 +505,6 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 
 		cout << "Continuation at step " << step_num << "\n";
 		cout << unbounded_fm << "\n";
-		// cout << "Normalized: " << normalizer_step<BAs...>(unbounded_fm) << "\n";
 	}
 	if (enable_output) cout << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps.\n";
@@ -575,7 +516,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 
 /*
  *  Possible tests:
- *  (o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0 -> failing at the moment, bug in always/sometimes normalization
+ *  (o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0, passing
  *  o1[0] = 0 && o1[t] = 0 -> o1[0] = 0 && o1[t] = 0, passing
  *  o1[t] = i1[t] && o1[3] = 0 -> F, passing
  *  o1[t-1] = i1[t] -> F, passing
