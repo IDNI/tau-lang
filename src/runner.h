@@ -38,141 +38,160 @@ template<typename...BAs>
 using assignment = std::map<nso<BAs...>, nso<BAs...>>;
 
 template<typename...BAs>
-struct inputs {
+struct finputs {
 
-	inputs() = default;
+	finputs() = default;
 
-	inputs(std::map<var_desc<BAs...>, std::ifstream>& streams): streams(streams) {}
+	finputs(std::map<nso<BAs...>, type>& types,
+			std::map<nso<BAs...>, std::ifstream>& streams): streams(streams), types(types) {}
 
-	inputs(std::map<var_desc<BAs...>, filename>& streams) {
+	finputs(std::map<nso<BAs...>, type>& types,
+			std::map<nso<BAs...>, filename>& streams): types(types) {
 		// open the corresponding streams for input and store them in streams
 		for (const auto& [vd, fn]: streams)
 			this->streams[vd] = std::ifstream(fn);
 	}
 
-	~inputs() {
+	~finputs() {
 		// close the streams
-		for (auto& [vd, file]: streams) file.close();
+		for (auto& [_, file]: streams) file.close();
 	}
 
-	// end of inputs
-	bool eoi() const {
-		// check if all the streams are at the end of the file
-		for (const auto& [stream, file]: streams)
-			if (!file.eof()) return false;
-		return true;
-	}
 
-	// is good
-	bool good() const {
-		// check if all the streams are good
-		for (const auto& [stream, file]: streams)
-			if (!file.good()) return false;
-		return true;
-	}
-
-	bool ready() {
-		return !eoi() && good();
-	}
-
-	std::map<var_desc<BAs...>, std::ifstream> streams;
-};
-
-template<typename...BAs>
-bool operator>>(const inputs<BAs...>& ins, assignment<BAs...>& inputs) {
-	// for each stream in in.streams, read the value from the file,
-	// parsed it and store it in out.
-	static nso_factory<BAs...> factory;
-	for (const auto& [vd, file]: ins.streams) {
-		std::string line;
-		std::getline(file, line);
-		if (!line.empty()) return false; // error
-		inputs[vd.first] = factory.parse(line, vd.second);
-	}
-	return true; // success
-}
-
-template<typename...BAs>
-struct outputs {
-
-	outputs() = default;
-
-	outputs(std::map<io_var_name<BAs...>, std::ofstream>& streams): streams(streams) {}
-
-	outputs(std::map<io_var_name<BAs...>, filename>& streams) {
-		// open the corresponding streams for output and store them in streams
-		for (const auto& [vn, fn]: streams)
-			this->streams[vn] = std::ofstream(fn);
-	}
-
-	~outputs() {
-		// close the streams
-		for (auto& [vn, file]: streams) file.close();
-	}
-
-	// is good
-	bool good() const {
-		// check if all the streams are good
-		for (const auto& [vn, file]: streams)
-			if (!file.good()) return false;
-		return true;
-	}
-
-	bool ready() {
-		return good();
-	}
-
-	std::map<io_var_name<BAs...>, std::ofstream> streams;
-};
-
-template<typename...BAs>
-bool operator<<(outputs<BAs...>& outs, const std::vector<assignment<BAs...>>& outputs) {
-	// for each stream in out.streams, write the value from the solution
-	for (const auto& output: outputs) {
-		for (const auto& [vn, file]: outs.streams) {
-			auto value = output.find(vn);
-			if (value == output.end()) return false; // error
-			file << value->second;
+	std::optional<assignment<BAs...>> read() {
+		// for each stream in in.streams, read the value from the file,
+		// parsed it and store it in out.
+		static nso_factory<BAs...> factory;
+		assignment<BAs...> current;
+		for (const auto& [var, file]: streams) {
+			std::string line;
+			std::getline(file, line);
+			// TODO MEDIUM add logging in case of error
+			if (!line.empty()) return {}; // error
+			current[var] = factory.parse(line, types[var]);
 		}
+		return current;
 	}
-	return true; // success
-}
+
+	std::map<nso<BAs...>, type> types;
+	std::map<nso<BAs...>, std::ifstream> streams;
+};
+
+template<typename...BAs>
+struct foutputs {
+
+	foutputs() = default;
+
+	foutputs(std::map<io_var_name<BAs...>, std::ofstream>& streams): streams(streams) {}
+
+	foutputs(std::map<io_var_name<BAs...>, filename>& streams) {
+		// open the corresponding streams for output and store them in streams
+		for (const auto& [var, file]: streams)
+			this->streams[var] = std::ofstream(file);
+	}
+
+	~foutputs() {
+		// close the streams
+		for (auto& [_, file]: streams) file.close();
+	}
+
+	bool write(const assignment<BAs...>& outputs) {
+		// sorting by time
+		auto sorted = sort(outputs);
+		// for each stream in out.streams, write the value from the solution
+		for (const auto& output: sorted) {
+			for (const auto& [var, value]: output)
+				if (auto stream = streams.find(var); stream)
+					stream->second << value;
+				else return false; // error
+		}
+		return true; // success
+	}
+
+	std::map<nso<BAs...>, std::ofstream> streams;
+
+private:
+
+	std::vector<assignment<BAs...>> sort(const solution<BAs...>& sol) {
+		auto compute_range = [](const solution<BAs...>& sol) {
+			size_t lower = std::numeric_limits<size_t>::max(), upper = 0;
+			for (const auto& [var, value]: sol) {
+				if (auto num = var
+						| tau_parser::io_var
+						| tau_parser::out
+						| tau_parser::offset
+						| tau_parser::num; num) {
+					lower = std::min(lower, num | offset_extractor<BAs...>
+						| optional_value_extractor<size_t>);
+					upper = std::max(upper, num | offset_extractor<BAs...>
+						| optional_value_extractor<size_t>);
+				}
+			}
+			return std::make_pair(lower, upper);
+		};
+
+		auto [lower, upper] = compute_range(sol);
+		std::vector<assignment<BAs...>> result(upper - lower + 1);
+
+		for (auto& [var, value]: sol) {
+			if (auto num = var
+					| tau_parser::variable
+					| tau_parser::io_var
+					| tau_parser::out
+					| tau_parser::offset
+					| tau_parser::num
+					| only_child_extractor<BAs...>
+					| offset_extractor<BAs...>; num) {
+				auto io_var = var | tau_parser::io_var | tau_parser::out
+					| tau_parser::out_var_name |  offset_extractor<BAs...>;
+
+				result[num | optional_value_extractor<size_t>][io_var] = value;
+			}
+		}
+		return result;
+	}
+};
 
 // A system represent a clause to be solved. It maps the different
 // equations of the clause according to its type.
 template<typename...BAs>
 using system = std::map<type, nso<BAs...>>;
 
-// Loopbacks, input, output and constants
-struct loopbacks {
-	size_t input = 0;
-	size_t output = 0;
-	size_t constant = 0;
-};
-
 template<typename...BAs>
-loopbacks compute_loopbacks(const nso<BAs...>& phi_inf) {
+size_t compute_initial_time_point(const nso<BAs...>& phi_inf) {
 	// for each loopback in phi_inf, store the input and output lookbacks
 	// in a pair and return it.
-	loopbacks lbs;
+	size_t initial_time_point = 0;
 	for (const auto& io_var: select_top(phi_inf, is_non_terminal<tau_parser::io_var, BAs...>)) {
-		if (auto shift = io_var | tau_parser::in | tau_parser::offset | tau_parser::shift | tau_parser::num; shift) {
-			lbs.input = max(lbs.input, shift | optional_value_extractor<size_t>);
-		} else if (auto shift = io_var | tau_parser::out | tau_parser::offset | tau_parser::shift | tau_parser::num; shift) {
-			lbs.output = max(lbs.output, shift | optional_value_extractor<size_t>);
-		} else if (auto num = io_var | tau_parser::in | tau_parser::offset | tau_parser::num; num) {
-			lbs.constant = max(lbs.constant, num | optional_value_extractor<size_t>);
+		if (auto shift = io_var
+				| tau_parser::in
+				| tau_parser::offset
+				| tau_parser::shift
+				| tau_parser::num; shift) {
+			initial_time_point = max(initial_time_point, shift | optional_value_extractor<size_t>);
+		} else if (auto shift = io_var
+				| tau_parser::out
+				| tau_parser::offset
+				| tau_parser::shift
+				| tau_parser::num; shift) {
+			initial_time_point = max(initial_time_point, shift | optional_value_extractor<size_t>);
+		} else if (auto num = io_var
+				| tau_parser::in
+				| tau_parser::offset
+				| tau_parser::num; num) {
+			initial_time_point = max(initial_time_point, num | optional_value_extractor<size_t>);
 		}
 	}
-	return lbs;
+	return initial_time_point;
 }
 
 template<typename...BAs>
 struct interpreter {
 
-	assignment<BAs...> timed_step(const assignment<BAs...>& inputs) {
+	assignment<BAs...> step(const assignment<BAs...>& inputs) {
 		// update the memory with the inputs
-		for (const auto& [var, value]: inputs) memory[var] = value;
+		for (const auto& [var, value]: inputs)
+			memory[build_in_var(var, time_point)] = value;
 		// for each system in systems try to solve it, if it is not possible
 		// continue with the next system.
 		bool unsolvable = false;
@@ -184,9 +203,8 @@ struct interpreter {
 			// solve the equations fro each type in the system
 			for (const auto& [type, equations]: system) {
 				// rewriting the inputs and inserting them into memory
-				auto nsystem = update_inf(equations);
-				auto substituted = replace(equations, memory);
-				auto solution = solve(substituted, type);
+				auto current = update_to_time_point(equations);
+				auto solution = solve(current, type);
 				if (solution.has_value()) solutions[type] = solution.value();
 				else { unsolvable = true; break; }
 			}
@@ -206,141 +224,105 @@ struct interpreter {
 		return {}; // error
 	}
 
-	std::vector<assignment<BAs...>> step(const assignment<BAs...>& inputs) {
-		// add time to inputs
-		assignment<BAs...> ninput;
-		for (const auto& [var, value]: inputs) {
-			auto timed_var = build_in_var(var, this->time_point);
-			ninput[timed_var] = value;
-		}
-
-		auto output = timed_step(ninput);
-		return to_vector_assigment(output);
-	}
-
 	// store all the possible systems to be solved, each system corresponds to a
 	// different clause.
 	std::set<system<BAs...>> systems;
 	assignment<BAs...> memory;
-	size_t lookback;
 	size_t time_point;
 
 private:
 
-	std::vector<assignment<BAs...>> to_vector_assigment(const solution<BAs...>& sol) {
-		auto compute_range = [](const solution<BAs...>& sol) {
-			size_t lower = std::numeric_limits<size_t>::max(), upper = 0;
-			for (const auto& [var, value]: sol) {
-				if (auto num = var | tau_parser::io_var | tau_parser::out
-					| tau_parser::offset | tau_parser::num; num) {
-					lower = std::min(lower, num | offset_extractor<BAs...> | optional_value_extractor<size_t>);
-					upper = std::max(upper, num | offset_extractor<BAs...> | optional_value_extractor<size_t>);
-				}
-			}
-			return std::make_pair(lower, upper);
-		};
-
-		auto [lower, upper] = compute_range(sol);
-		std::vector<assignment<BAs...>> result(upper - lower + 1);
-
-		for (auto& [var, value]: sol) {
-			if (auto num = var | tau_parser::io_var | tau_parser::out
-					| tau_parser::offset | tau_parser::num | only_child_extractor<BAs...>; num) {
-				auto io_var = var | tau_parser::io_var | tau_parser::out
-					| tau_parser::out_var_name |  offset_extractor<BAs...>;
-				result[num | offset_extractor<BAs...>  | optional_value_extractor<size_t>][io_var] = value;
-			}
-		}
-		return result;
-	}
-
-	nso<BAs...> update_inf(const nso<BAs...>& phi_inf) {
-		// update the phi_inf according to current time_point, i.e. for each
+	nso<BAs...> update_to_time_point(const nso<BAs...>& f) {
+		// update the f according to current time_point, i.e. for each
 		// input/ouput var which has a shift, we replace it with the value
 		// corresponding to the current time_point minnus the shift.
 		std::map<nso<BAs...>, nso<BAs...>> changes;
-		for (const auto& io_var: select_top(phi_inf, is_non_terminal<tau_parser::io_var, BAs...>))
-			if (auto shift = io_var | only_child_extractor<BAs...>
-						| tau_parser::offset | tau_parser::shift,
-					num = shift | only_child_extractor<BAs...>
+		for (const auto& io_var:
+				select_top(f, is_non_terminal<tau_parser::io_var, BAs...>))
+			if (auto shift = io_var
+						| only_child_extractor<BAs...>
+						| tau_parser::offset
+						| tau_parser::shift,
+					num = shift
+						| only_child_extractor<BAs...>
 						| offset_extractor<BAs...>; shift && num)
 				changes[shift.value()] = build_num<BAs...>(time_point - num.value());
-		return replace(phi_inf, memory);
+		return replace(f, memory);
 	}
 };
 
-template<typename input_t, typename output_t, typename...BAs>
-assignment<BAs...> compute_initial_memory(const nso<BAs...>& phi_inf, const loopbacks& lbcks, input_t& ins, output_t& outs) {
-	// compute the initial
-	size_t max_lookback = max(lbcks.input, lbcks.output, lbcks.constant);
+template<typename input_t, typename...BAs>
+std::optional<assignment<BAs...>> compute_initial_memory(const nso<BAs...>& phi_inf,
+		const size_t& initial_execution_time, input_t& inputs) {
 	// we include the max lookback in the memory to deal with the initial
 	// case.
 	assignment<BAs...> memory;
-	for (size_t time_point = 0; time_point < max_lookback; ++time_point) {
-		assignment<BAs...> current_inputs;
-		ins >> current_inputs;
-		for (const auto& [var, value]: current_inputs) {
-			auto timed_var = build_in_var(var, time_point);
-			memory[timed_var] = value;
-		}
+	for (size_t n = 0; n < initial_execution_time; ++n) {
+		assignment<BAs...> current;
+		if (auto current = inputs.read(); current)
+			for (const auto& [var, value]: current)
+				memory[build_in_variable_at_n(var, n)] = value;
+		else return {}; // error
 	}
 	return memory;
 }
 
-template<typename input_t, typename...BAs>
-std::set<system<BAs...>> compute_systems(const nso<BAs...>& phi_inf, const input_t& in) {
-	static auto is_literal = [](const nso<BAs...>& n) {
-		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
-			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
-	};
-
-	std::set<system<BAs...>> systems;
-	// split phi_inf in clauses
-	for (auto& clause: get_dnf_wwf_clauses(phi_inf)) {
-		// for each clause, split it into several equation systems according to
-		// its type and store it in systems
-		system<BAs...> clause_system;
-		for (auto& literal: select_top(clause, is_literal)) {
-			// for each literal, get the type and store it in the clause_system
-			// conjuncted with the other literals of the same type.
-			auto var = find_top(literal, is_child_non_terminal<tau_parser::variable, BAs...>);
-			for (const auto& stream: in.streams) {
-				if (var == stream.name) {
-					auto type = stream.type;
-					if (clause_system.find( stream.type) == clause_system.end())
-						clause_system[stream.type] = literal;
-					else clause_system[stream.type] = clause_system[stream.type] & literal;
-				}
-			}
+template<typename input_t, typename output_t, typename...BAs>
+std::set<system<BAs...>> compute_system(const nso<BAs...>& dnf_clause,
+		input_t& inputs, output_t& outputs) {
+	if (auto io_var = find_top(dnf_clause,
+			is_child_non_terminal<tau_parser::io_var, BAs...>); io_var) {
+		if (auto in_var_name = io_var
+				| tau_parser::in
+				| tau_parser::in_var_name; in_var_name) {
+			if(auto it = inputs.types.find(in_var_name); it)
+				return { { it->second , dnf_clause } };
+		} else if (auto out_var_name = io_var
+				| tau_parser::out
+				| tau_parser::out_var_name; out_var_name) {
+			if (auto it = outputs.types.find(out_var_name); it)
+				return { { it->second, dnf_clause } };
 		}
-		systems.insert(clause_system);
 	}
-	return systems;
+
+	return {}; // error
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-interpreter<BAs...> make_interpreter(nso<BAs...> phi_inf, input_t& ins, output_t& outs) {
+std::set<system<BAs...>> compute_systems(const nso<BAs...>& phi_inf,
+		input_t& inputs, output_t& outputs) {
+	std::set<system<BAs...>> systems;
+	// split phi_inf in clauses
+	for (auto& clause: get_dnf_wwf_clauses(phi_inf))
+		if (auto system = compute_system(clause, inputs, outputs); system)
+			systems.insert(system);
+		else return {}; // error
+	return systems;
+}
+
+template<typename input_t, typename...BAs>
+interpreter<BAs...> make_interpreter(nso<BAs...> phi_inf, input_t& inputs) {
 	// compute the different systems to be solved
-	auto systems = compute_systems(phi_inf, ins);
-	// compute input and output lookback
-	auto lkbck = compute_lookbacks(phi_inf);
+	auto systems = compute_systems(phi_inf, inputs);
+	// compute the initial time point for execution
+	size_t initial_execution_time = compute_initial_execution_time(phi_inf);
 	// compute initial memory
-	auto memory = compute_initial_memory(phi_inf, lkbck, ins, outs);
+	auto memory = compute_initial_memory(phi_inf, initial_execution_time, inputs);
 	//after the bove, we have the interpreter ready to be used.
-	auto max = max(lkbck.input, lkbck.output, lkbck.constant);
-	return interpreter<BAs...>{ systems, memory, max, max };
+	return interpreter<BAs...>{ systems, memory, initial_execution_time };
 };
 
 
-template<typename...BAs>
-bool run(const nso<BAs...>& phi_inf, const inputs<BAs...>& ins, const outputs<BAs...>& outs) {
-	auto i = make_interpreter(phi_inf, ins, outs);
-	while (ins.ready()) {
-		assignment<BAs...> inputs;
-		ins >> inputs;
-		outs << i.step(inputs);
+template<typename input_t, typename output_t, typename...BAs>
+void run(const nso<BAs...>& phi_inf, input_t& inputs, output_t& outputs) {
+	auto intrprtr = make_interpreter(phi_inf, inputs, outputs);
+	while (true) {
+		if (auto current = inputs.read(); inputs) {
+			if (auto output = intrprtr.step(current.value()); output.size()) {
+				if (!outputs.write(output)) return;
+			} else return;
+		} else return;
 	}
-	return i.error();
 }
 
 } // namespace idni::tau
