@@ -26,7 +26,8 @@
 std::string random_file(const std::string& extension = ".out", const std::string prefix = "/tmp/") {
     // define the characters to use in the random string
     const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const size_t length = 10; // length of the random string
+	// length of the random string
+    const size_t length = 10;
     // random number generator
     std::random_device rd;
     std::mt19937 generator(rd());
@@ -41,7 +42,7 @@ std::string random_file(const std::string& extension = ".out", const std::string
     return oss.str();
 }
 
-template<typename...BAs>
+/*template<typename...BAs>
 bool test_output(const outputs<bdd_binding>& outs,
 		const std::map<stream_ba<BAs...>, vector<nso<BAs...>>>& expected) {
 	// get the nso factory
@@ -129,3 +130,30 @@ TEST_SUITE("runner: simple cases") {
 	}
 
 }
+
+TEST_SUITE("runner: only outputs") {
+
+	TEST_CASE("o1[t] = 0") {
+		const char* phi_inf_str = "o1[t] = 0.";
+		auto phi_inf_src = make_tau_source(phi_inf_str);
+		nso<tau_ba<bdd_binding>, bdd_binding> phi_inf = make_nso_rr_using_factory<tau_ba<bdd_binding>, bdd_binding>(phi_inf_src).main;
+		auto o1 = phi_inf
+			| tau_parser::bf_eq
+			| tau_parser::bf
+			| tau_parser::variable
+			| tau_parser::io_var
+			| tau_parser::out
+			| tau_parser::out_var_name
+			| optional_value_extractor<nso<tau_ba<bdd_binding>, bdd_binding>>;
+		auto o1_0 = build_out_var(o1, 0);
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		std::cout << "sample: " << phi_inf << "\n";
+		std::cout << "out var: " << o1 << "\n";
+		#endif // DEBUG
+		interpreter<tau_ba<bdd_binding>, bdd_binding> interp;
+		auto output = interp.timed_step({});
+		CHECK ( output[o1_0] == _0<tau_ba<bdd_binding>, bdd_binding> );
+	}
+
+}*/

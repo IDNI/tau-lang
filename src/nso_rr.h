@@ -1871,17 +1871,174 @@ nso<BAs...> build_extra (const nso<BAs...> n, const std::string &note) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_num(size_t value) {
-	return wrap(tau_parser::num,
-		make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {}));
+nso<BAs...> build_num(size_t num) {
+	return wrap(
+		tau_parser::num, make_node<tau_sym<BAs...>>(
+			tau_sym<BAs...>(num), {}));
+}
+
+template<typename... BAs>
+nso<BAs...> build_charvar(const char& name) {
+	return wrap(
+		tau_parser::charvar, make_node<tau_sym<BAs...>>(
+			tau_sym<BAs...>(name), {}));
+}
+
+template<typename... BAs>
+nso<BAs...> build_variable(const char& name) {
+	return wrap(
+		tau_parser::variable, {
+			build_charvar<BAs...>(name) });
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_var_name(const size_t& index) {
+	return wrap(
+		tau_parser::in_var_name, {
+			tau_sym<BAs...>('i'), {},
+			tau_sym<BAs...>(index), {}});
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable(const size_t& index, size_t num) {
+	return build_in_variable(build_in_var_name<BAs...>(index), num);
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_offset_n(const nso<BAs...>& in_var_name, size_t num) {
+	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));
+
+	return wrap(
+		tau_parser::bf, wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var,	wrap(
+					tau_parser::in,
+						in_var_name, wrap(
+						tau_parser::offset,
+							build_num<BAs...>(num))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_offset_t(const nso<BAs...>& in_var_name, size_t num) {
+	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));
+
+	return wrap(
+		tau_parser::bf, wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var,	wrap(
+					tau_parser::in,
+						in_var_name, wrap(
+						tau_parser::offset,
+							build_variable<BAs...>('t'))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_offset_t_minus(const nso<BAs...>& in_var_name, size_t num) {
+	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));
+	assert(num > 0);
+
+	return wrap(
+		tau_parser::bf, wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var,	wrap(
+					tau_parser::in,
+						in_var_name, wrap(
+						tau_parser::offset, wrap(
+							tau_parser::shift,
+								build_variable<BAs...>('t'),
+								build_num<BAs...>(num)))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable(const nso<BAs...>& out_var_name, size_t num) {
+	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
+	return wrap(
+		tau_parser::bf,	wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var, wrap(
+					tau_parser::out,
+						out_var_name, wrap(
+						tau_parser::offset,
+							build_num<BAs...>(num))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_var_name(const size_t& index) {
+	return wrap(tau_parser::out_var_name, {
+		tau_sym<BAs...>('o'), {},
+		tau_sym<BAs...>(index), {}});
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable(const size_t& index, size_t num) {
+	return build_out_variable(build_out_var_name<BAs...>(index), num);
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_offset_n(const nso<BAs...>& out_var_name, size_t num) {
+	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
+
+	return wrap(
+		tau_parser::bf,	wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var, wrap(
+					tau_parser::out,
+						out_var_name, wrap(
+						tau_parser::offset,
+							build_num<BAs...>(num))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_offset_t(const nso<BAs...>& out_var_name, size_t num) {
+	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
+
+	return wrap(
+		tau_parser::bf,	wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var, wrap(
+					tau_parser::out,
+						out_var_name, wrap(
+						tau_parser::offset,
+							build_variable<BAs...>('t'))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_offset_t_minus(const nso<BAs...>& out_var_name, size_t num) {
+	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
+	assert(num > 0);
+
+	return wrap(
+		tau_parser::bf,	wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var, wrap(
+					tau_parser::out,
+						out_var_name, wrap(
+						tau_parser::offset, wrap(
+							tau_parser::shift,
+								build_variable<BAs...>('t'),
+								build_num<BAs...>(num)))))));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_var(const std::string& name) {
+	auto var = make_builder<BAs...>("( $X ) =: " + name + ".").second;
+	return trim<BAs...>(var);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_var(const std::string& name) {
+	auto var = make_builder<BAs...>("( $X ) =:: ?" + name + ".").second;
+	return trim<BAs...>(var);
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
 	auto cte = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
-	return wrap(tau_parser::bf,
-		wrap(tau_parser::bf_constant,
-		wrap(tau_parser::constant, cte)));
+	return wrap(
+		tau_parser::bf, wrap(
+			tau_parser::bf_constant, wrap(
+				tau_parser::constant,
+					cte)));
 }
 
 template<typename... BAs>
@@ -1914,18 +2071,6 @@ std::optional<sp_tau_node<BAs...>> build_bf_constant(
 {
 	return o.has_value() ? build_bf_constant(o.value())
 				: std::optional<sp_tau_node<BAs...>>();
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_bf_var(const std::string& name) {
-	auto var = make_builder<BAs...>("( $X ) =: " + name + ".").second;
-	return trim<BAs...>(var);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_wff_var(const std::string& name) {
-	auto var = make_builder<BAs...>("( $X ) =:: ?" + name + ".").second;
-	return trim<BAs...>(var);
 }
 
 template<typename... BAs>
