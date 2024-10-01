@@ -619,10 +619,10 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 		cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
 	if (inputs.size() == 0 && outputs.size() == 0) cout << "i/o variables: empty\n";
 	else std::cout << "i/o variables:\n";
-	for (auto& i : inputs)
-		cout << "    " << i.type << " " << i.name << " = ifile(\"" << i.file_name << "\")\n";
-	for (auto& o : outputs)
-		cout << "    " << o.type << " " << o.name << " = ofile(\"" << o.file_name << "\")\n";
+	for (auto& [d, f]: inputs)
+		cout << "    " << d.second << " " << d.first << " = ifile(\"" << f << "\")\n";
+	for (auto& [d, f]: outputs)
+		cout << "    " << d.second << " " << d.first << " = ofile(\"" << f << "\")\n";
 }
 
 template <typename... BAs>
@@ -644,27 +644,27 @@ void repl_evaluator<BAs...>::def_print_cmd(
 template <typename... BAs>
 void repl_evaluator< BAs...>::def_input_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
-	stream_ba<tau_ba<BAs...>, BAs...> sb;
-	sb.type = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
+	filename fn;
+	type t = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
 	if (auto file_name = command | tau_parser::input_stream
 			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
-		sb.file_name = file_name;
-	else sb.file_name = "/dev/stdin";
-	sb.name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
-	inputs.insert(sb);
+		fn = file_name;
+	else fn = "/dev/stdin";
+	auto var_name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+	inputs[{var_name, t}] = fn;
 }
 
 template <typename... BAs>
 void repl_evaluator< BAs...>::def_output_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
-	stream_ba<tau_ba<BAs...>, BAs...> sb;
-	sb.type = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
+	filename fn;
+	type t = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
 	if (auto file_name = command | tau_parser::output_stream
 			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
-		sb.file_name = file_name;
-	else sb.file_name = "/dev/stdout";
-	sb.name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
-	outputs.insert(sb);
+		fn = file_name;
+	else fn = "/dev/stdout";
+	auto var_name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
+	outputs[{var_name, t}] = fn;
 }
 
 // make a nso_rr from the given tau source and binder.
