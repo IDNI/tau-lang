@@ -163,7 +163,7 @@ TEST_SUITE("only outputs") {
 		auto memory = run_test(sample, 2);
 	}
 
-	TEST_CASE("o1[0] = {bdd: a} && o1[t] = o1[t-1]") {
+	TEST_CASE("o1[0] = {bdd: a} && o1[t] = o1[t-1]") { // replace second = by !=
 		const char* sample = "o1[0] = {bdd: a} && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
 	}
@@ -186,5 +186,17 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1]") {
 		const char* sample = "o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1].";
 		auto memory = run_test(sample, 4);
+	}
+
+	// f(f(f(x))) = f(x) using uninterpreted constants
+	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
+		const char* sample = "o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
+		auto memory = run_test(sample, 8);
+	}
+
+	// f(f(f(x))) = f(x) using constants OK!
+	TEST_CASE("o1[t] = {bdd:a} o1[t-1] + {bdd:b} o1[t-1]'") {
+		const char* sample = "o1[t] = {bdd:a} o1[t-1] + {bdd:b} o1[t-1]'.";
+		auto memory = run_test(sample, 8);
 	}
 }
