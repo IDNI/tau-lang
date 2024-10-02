@@ -186,8 +186,8 @@ struct interpreter {
 				auto memory_copy = memory;
 				auto current = replace(updated, memory_copy);
 				#ifdef DEBUG
-				std::cout << "step [updated]\n" << updated << "\n";
-				std::cout << "step [current]\n" << current << "\n";
+				std::cout << "step/updated: " << updated << "\n";
+				std::cout << "step/current: " << current << "\n";
 				#endif // DEBUG
 
 				auto solution = solve(current, type);

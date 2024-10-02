@@ -67,8 +67,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ ">"   _ bf)               :bf_greater
                         | (bf    _ "<="  _ bf)               :bf_less_equal
                         | (bf    _ "<"   _ bf)               :bf_less
-                        |                                     capture
-                        |                                uninterpreted_constant.
+                        |                                     capture.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     variable
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
@@ -81,7 +80,8 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | '1'                                :bf_t
                         | '0'                                :bf_f
                         |                                     flag
-                        |                                     capture.
+                        |                                     capture
+                        |                                     uninterpreted_constant.
 
 # flags
 flag =>   (flagvar _ "!=" _ num | num _ "!=" _ flagvar)      :flag_neq

@@ -131,8 +131,8 @@ set(IDNI_PARSER_OBJECT_LIB "idni_parsero")
 #
 if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf" tau_parser)
-	generate_parser("${PROJECT_SOURCE_DIR}/parser/bdd.tgf" bdd_parser)
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf")
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/bdd.tgf")
 endif()
 
 # load common cmake settings and load functions

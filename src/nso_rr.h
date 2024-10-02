@@ -2081,7 +2081,7 @@ std::optional<sp_tau_node<BAs...>> build_bf_constant(
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_wff_uniter_const(const std::string& name) {
-	auto var = make_builder<BAs...>("( $X ) =:: <:" + name + ">.").second;
+	auto var = make_builder<BAs...>("( $X ) =:: <:" + name + "> != 0.").second;
 	return trim<BAs...>(var);
 }
 

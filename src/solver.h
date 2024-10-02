@@ -506,7 +506,7 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 	// to compute one solution of the resulting system of equalities (squeezed).
 
 	#ifdef DEBUG
-	std::cout << "solve_minterm_system: ";
+	std::cout << "solve_minterm_system/system: ";
 	for (const auto& minterm : system) std::cout << minterm << " ";
 	std::cout << "\n";
 	#endif // DEBUG
@@ -553,7 +553,7 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 	// using tthe above solve method.
 
 	#ifdef DEBUG
-	std::cout << "solve_inequality_system: ";
+	std::cout << "solve_inequality_system/system: ";
 	for (const auto& inequality : system) std::cout << inequality << " ";
 	std::cout << "\n";
 	#endif // DEBUG
@@ -561,7 +561,7 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 	//for (auto& ms: minterm_inequality_system_range<BAs...>(system)) {
 	for (auto it = minterm_inequality_system_iterator<BAs...>(system); it != minterm_inequality_system_iterator<BAs...>::end; ++it) {
 		#ifdef DEBUG
-		std::cout << "minterm system: ";
+		std::cout << "solve_inequality_system/minterm system: ";
 		for (const auto& minterm : *it) std::cout << minterm << " ";
 		std::cout << "\n";
 		#endif // DEBUG
