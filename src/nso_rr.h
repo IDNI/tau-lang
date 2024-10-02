@@ -1275,10 +1275,10 @@ sp_tau_node<BAs...> process_offset_variables(
 	using p = tau_parser;
 	using node = sp_tau_node<BAs...>;
 	std::map<node, node> changes;
-	for (const auto& offset :
-		select_all(tau_code, is_non_terminal<p::offset, BAs...>))
+	for (const auto& offsets :
+		select_all(tau_code, is_non_terminal<p::offsets, BAs...>))
 	{
-		for (const auto& var : select_all(offset,
+		for (const auto& var : select_all(offsets,
 			is_non_terminal<p::variable, BAs...>))
 				changes[var] = wrap(p::capture, var->child);
 	}

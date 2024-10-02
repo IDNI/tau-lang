@@ -183,7 +183,8 @@ struct interpreter {
 			for (const auto& [type, equations]: system) {
 				// rewriting the inputs and inserting them into memory
 				auto updated = update_to_time_point(equations);
-				auto current = replace(updated, memory);
+				auto memory_copy = memory;
+				auto current = replace(updated, memory_copy);
 				#ifdef DEBUG
 				std::cout << "step [updated]\n" << updated << "\n";
 				std::cout << "step [current]\n" << current << "\n";
@@ -230,15 +231,11 @@ private:
 						| tau_parser::shift,
 					var = shift
 						| tau_parser::variable,
-					// FIXME (HIGH) we get a capture instead of a veriable here
-					// the above case never happens... but the case below yes.
-					capture = shift
-						| tau_parser::capture,
 					num = shift
 						| tau_parser::num
 						| only_child_extractor<BAs...>
 						| offset_extractor<BAs...>;
-							num && (var || capture))
+							num && var)
 				changes[shift.value()] = build_num<BAs...>(time_point - num.value());
 			else if (auto offset = io_var
 						| only_child_extractor<BAs...>
@@ -249,14 +246,12 @@ private:
 				changes[offset.value()] = wrap(
 					tau_parser::offset,
 						build_num<BAs...>(time_point));
-			// FIXME (HIGH) we get a capture instead of a veriable here
-			// the above case never happens... but the case below yes.
 			else if (auto offset = io_var
 						| only_child_extractor<BAs...>
 						| tau_parser::offset,
-					capture = offset
-						| tau_parser::capture;
-							capture)
+					variable = offset
+						| tau_parser::variable;
+							variable)
 				changes[offset.value()] = wrap(
 					tau_parser::offset,
 						build_num<BAs...>(time_point));
