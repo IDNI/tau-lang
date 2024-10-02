@@ -71,6 +71,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         |                                uninterpreted_constant.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     variable
+                        |                                     flag
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ref                                :bf_ref
                         | (bf _       '|'  _  bf)            :bf_or
@@ -80,7 +81,6 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('{' _ constant _ '}')             :bf_constant
                         | '1'                                :bf_t
                         | '0'                                :bf_f
-                        |                                     flag
                         |                                     capture.
 
 # flags
@@ -95,8 +95,8 @@ flag =>   (flagvar _ "!=" _ num | num _ "!=" _ flagvar)      :flag_neq
 charvar                => (alpha & ~'T' & ~'F') digit*.
 flagvar                => charvar.
 variable               => charvar | (in | out):io_var.
-in                     => ("i" digits):in_var_name  '[' offset ']'.
-out                    => ("o" digits):out_var_name '[' offset ']'.
+in                     => ("i" (digit+)):in_var_name  '[' offset ']'.
+out                    => ("o" (digit+)):out_var_name '[' offset ']'.
 capture                => '$' charvar.
 q_vars                 => q_var (_ ',' _ q_var)*.
 q_var                  => capture | variable.

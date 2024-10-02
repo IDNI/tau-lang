@@ -3732,10 +3732,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_remove_funiversal_cb,         630 },
 			{ tau_parser::bf_remove_fexistential_cb,       640 },
 
+			{ tau_parser::flag,                            710 },
 			{ tau_parser::bf_or,                           720 },
 			{ tau_parser::bf_and,                          730 },
 			{ tau_parser::bf_xor,                          740 },
-			{ tau_parser::flag,                            745 },
 			{ tau_parser::bf_neg,                          750 },
 			{ tau_parser::bf,                              790 },
 
