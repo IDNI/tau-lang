@@ -128,7 +128,7 @@ nso<BAs...> existentially_quantify_output_streams(nso<BAs...> fm, const auto& io
 		if (initials.contains({io_var_names[pos], time_point}))
 			continue;
 		stringstream n;
-		n <<  io_var_names[pos] << "[" << time_point << "]";
+		n << io_var_names[pos] << "[" << time_point << "]";
 		auto var = build_bf_var<BAs...>(n.str());
 		fm = build_wff_ex(var, fm);
 	}
@@ -192,26 +192,42 @@ nso<BAs...> calculate_flag(const nso<BAs...>& flag, int_t time_point) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_initial_step(const nso<BAs...>& original_fm, const auto &io_vars, const auto &io_var_names,
-                       int_t time_point) {
+nso<BAs...> build_initial_step(const nso<BAs...>& original_fm,
+	const auto &io_vars, const auto &flags, const auto &io_var_names,
+        int_t time_point)
+{
 	map<nso<BAs...>, nso<BAs...>> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point);
+		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i],
+								time_point);
 		changes[io_vars[i]] = new_io_var;
+	}
+	for (auto& [ flag_iovar, flag ] : flags) {
+		changes[flag_iovar] = calculate_flag(flag, time_point);
+		BOOST_LOG_TRIVIAL(trace) << "(T) -- calculated flag: "
+				<< flag_iovar << " = " << changes[flag_iovar];
 	}
 	return replace(original_fm, changes);
 }
 
 template<typename... BAs>
-nso<BAs...> build_step(const nso<BAs...>& original_fm, const nso<BAs...>& prev_fm, const auto& io_vars,
-                       const auto& io_var_names, const auto& initials, int_t step_num, int_t time_point,
-                       nso<BAs...>& cached_fm) {
+nso<BAs...> build_step(const nso<BAs...>& original_fm,
+	const nso<BAs...>& prev_fm, const auto& io_vars, const auto& flags,
+	const auto& io_var_names, const auto& initials, int_t step_num,
+	int_t time_point, nso<BAs...>& cached_fm)
+{
 	// Use build_initial_step otherwise
 	assert(step_num > 0);
 	map<nso<BAs...>, nso<BAs...> > changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i], time_point + step_num);
+		auto new_io_var = transform_io_var(io_vars[i], io_var_names[i],
+							time_point + step_num);
 		changes[io_vars[i]] = new_io_var;
+	}
+	for (auto& [ flag_iovar, flag ] : flags) {
+		changes[flag_iovar] = calculate_flag(flag, time_point+step_num);
+		BOOST_LOG_TRIVIAL(trace) << "(T) -- calculated flag: "
+				<< flag_iovar << " = " << changes[flag_iovar];
 	}
 	nso<BAs...> most_inner_step = replace(original_fm, changes);
 	auto q_most_inner_step = existentially_quantify_output_streams(most_inner_step, io_vars, io_var_names, initials,
@@ -232,6 +248,78 @@ nso<BAs...> add_initial_info (const nso<BAs...>& fm) {
 			changes[io_var->child[0]] = build_extra(io_var->child[0], "init");
 
 	return replace(fm, changes);
+}
+
+template<typename... BAs>
+nso<BAs...> transform_eventual_variables(const nso<BAs...>& fm_orig) {
+	using p = tau_parser;
+	auto sometimes = select_all(fm_orig,
+				is_non_terminal<p::wff_sometimes, BAs...>);
+	// if not more than 1 `sometimes` return original formula
+	if (sometimes.size() < 2) return fm_orig;
+	auto fm = fm_orig;
+	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
+	BOOST_LOG_TRIVIAL(trace) << fm;
+	// for each `sometimes psi` replace it with (N is the nth number of `sometimes`):
+	map<nso<BAs...>,nso<BAs...>> changes;
+	nso<BAs...> always_conjs = nullptr, sometimes_conjs = nullptr;
+	auto capture = wrap<BAs...>(p::capture, "t");
+	auto offset = wrap<BAs...>(p::offset, capture);
+	auto offset_prev = wrap<BAs...>(p::offset,
+		wrap<BAs...>(p::shift, { capture, build_num<BAs...>(1) }));
+	auto offset0 = wrap<BAs...>(p::offset, build_num<BAs...>(0));
+	auto smt = sometimes[0];
+	for (size_t n = 0; ; ++n) {
+		std::stringstream ss; ss << "_e" << n;
+		auto iovar = wrap<BAs...>(p::out_var_name, ss.str());
+		auto eNt = wrap<BAs...>(p::bf,
+			wrap<BAs...>(p::variable,
+			wrap<BAs...>(p::io_var,
+			wrap<BAs...>(p::out, { iovar, offset }))));
+		auto eNt_prev = wrap<BAs...>(p::bf,
+			wrap<BAs...>(p::variable,
+			wrap<BAs...>(p::io_var,
+			wrap<BAs...>(p::out, { iovar, offset_prev }))));
+		auto eN0_is_zero = build_wff_eq(wrap<BAs...>(p::bf,
+			wrap<BAs...>(p::variable,
+			wrap<BAs...>(p::io_var,
+			wrap<BAs...>(p::out, { iovar, offset0 })))));
+		auto eNt_is_zero      = build_wff_eq(eNt);
+		auto eNt_is_one       = build_wff_eq(build_bf_neg(eNt));
+		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
+		auto eNt_prev_is_one  = build_wff_eq(build_bf_neg(eNt_prev));
+		// transform `sometimes psi` to:
+		// (_eN[t] = 1 && _eN[t-1] = 0) -> psi (N is nth `sometimes`)
+		changes[smt] = build_wff_always(build_wff_imply(
+				build_wff_and(eNt_is_one, eNt_prev_is_zero),
+				smt->child[0]));
+		fm = replace(fm, changes);
+		changes.clear();
+		// for each _eN add conjunction
+		// 	always (_eN[0] = 0 && (_eN[t]   = 0 || _eN[t] = 1)
+		//                         && (_eN[t-1] = 1 -> _eN[t] = 1))
+		auto conj = build_wff_always(
+			build_wff_and(eN0_is_zero, build_wff_and(
+				build_wff_or(eNt_is_zero, eNt_is_one),
+				build_wff_imply(eNt_prev_is_one, eNt_is_one))));
+		if (always_conjs == nullptr) always_conjs = conj;
+		else always_conjs = build_wff_and(always_conjs, conj);
+		// create conjunctions for the transformed `sometimes`
+		// 	sometimes _eN[t] & _eN+1[t] & ... & _eN+M[t] = 1
+		if (sometimes_conjs == nullptr) sometimes_conjs = eNt;
+		else sometimes_conjs = build_bf_and(sometimes_conjs, eNt);
+		auto opt_smt = find_top(fm,
+				is_non_terminal<p::wff_sometimes, BAs...>);
+		if (!opt_smt.has_value()) break;
+		smt = opt_smt.value();
+	}
+	// conjunct all with replaced formula
+	auto ret = build_wff_and(fm,
+		build_wff_and(always_conjs, build_wff_sometimes(
+				build_wff_eq(build_bf_neg(sometimes_conjs)))));
+	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
+	BOOST_LOG_TRIVIAL(trace) << ret;
+	return ret;
 }
 
 template<typename... BAs>
@@ -262,7 +350,6 @@ nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm) {
 }
 
 // We assume that the formula has run through the normalizer before
-// TODO: Flag integration
 template<typename... BAs>
 nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 	bool enable_output = true)
@@ -274,8 +361,29 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	auto new_io_var_names = produce_io_var_names(io_vars);
 
+	map<nso<BAs...>, nso<BAs...>> changes, flags;
+	// transform flags to their respective output streams
+	size_t flag_id = 0;
+	for (const auto& flag : select_top(fm,
+					is_non_terminal<p::flag, BAs...>))
+	{
+		auto offset_var = make_string(
+			tau_node_terminal_extractor<BAs...>,
+			(flag | only_child_extractor<BAs...>
+				| p::flagvar).value());
+		std::stringstream ss; ss << "_f" << flag_id++;
+		auto var = wrap<BAs...>(p::out_var_name, ss.str());
+		auto offset = wrap<BAs...>(p::offset,
+					wrap<BAs...>(p::capture, offset_var));
+		changes[flag] = wrap(p::variable, wrap(p::io_var,
+			wrap(p::out, { var, offset })));
+		flags[changes[flag]] = flag;
+	}
+	fm = replace(fm, changes);
+	changes.clear();
+
 	// Save positions of io_variables which are initial conditions
-	// and transform them to not clash with non initials
+	// and transform them to _<io_var> to not clash with non initials
 	set<pair<string, int_t>> initials;
 	auto io_var_unclashing_name = [](std::string n,
 		const std::vector<std::string>& names)
@@ -285,7 +393,6 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 		while (names_set.find(n) != names_set.end()) n = prefix + n;
 		return n;
 	};
-	map<nso<BAs...>, nso<BAs...>> changes;
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
 		if (trim2(io_vars[i])->child[1] | p::num)
 	{
@@ -304,12 +411,12 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 
 	// Calculate fix point
 	int_t time_point = get_max_shift(io_vars);
-	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars,
+	nso<BAs...> prev_unbounded_fm = build_initial_step(fm, io_vars, flags,
 						new_io_var_names, time_point);
 	int_t step_num = 1;
 	nso<BAs...> cache = prev_unbounded_fm;
 	nso<BAs...> unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars,
-		new_io_var_names, initials, step_num, time_point, cache);
+		flags, new_io_var_names, initials, step_num, time_point, cache);
 
 	cout << "Continuation at step " << step_num << "\n";
 	cout << unbounded_fm << "\n";
@@ -321,7 +428,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm,
 		prev_unbounded_fm = unbounded_fm;
 		++step_num;
 
-		unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars,
+		unbounded_fm = build_step(fm, prev_unbounded_fm, io_vars, flags,
 			new_io_var_names, initials, step_num, time_point,cache);
 
 		cout << "Continuation at step " << step_num << "\n";
