@@ -251,6 +251,21 @@ bool has_no_boolean_combs_of_models(const nso<BAs...>& fm) {
 	return true;
 }
 
+template<typename... BAs>
+bool is_non_temp_nso_satisfiable (const nso<BAs...>& fm) {
+	assert(!has_temp_var(fm));
+	assert(!find_top(fm, is_non_terminal<tau_parser::wff_always, BAs...>));
+	assert(!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>));
+
+	auto new_fm = fm;
+	auto vars = get_free_vars_from_nso(new_fm);
+	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
+	auto normalized = normalizer_step<BAs...>(new_fm);
+	auto check = normalized | tau_parser::wff_t;
+
+	return check.has_value();
+}
+
 template <typename... BAs>
 bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_nso_equivalent";
