@@ -1321,7 +1321,7 @@ nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
 		if (aw != simp_aw) g_changes[aw] = simp_aw;
 	}
 	// Apply changes and return
-	if (!g_changes.empty()) return replace(fm, g_changes);
+	if (!g_changes.empty()) fm = replace(fm, g_changes);
 	return fm;
 }
 
@@ -1415,6 +1415,13 @@ struct sometimes_always_normalization {
 			return is_child_non_terminal(tau_parser::wff_sometimes, n) ||
 				is_child_non_terminal(tau_parser::wff_always, n);
 		};
+		// If there is no temporal quantifier and no temporal variable
+		// Just convert to DNF and return
+		if (!find_top(fm, st_aw).has_value() && !has_temp_var(fm)) {
+			return fm | repeat_each<step<BAs...>, BAs...>(to_nnf_wff<BAs...>)
+					  	| repeat_each<step<BAs...>, BAs...>(nnf_to_dnf_wff<BAs...>)
+						| wff_reduce_dnf<BAs...>();
+		}
 		// Scope formula under always if not already under sometimes or always
 		nso<BAs...> res = !st_aw(fm) ? build_wff_always(fm) : fm;
 		res = push_sometimes_always_in(res)
