@@ -515,6 +515,11 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 	// minterms (which trivially satisfy the condition of Theorem 3.3)
 	equality<BAs...> eq = _0<BAs...>;
 	for (auto& neq: make_minterm_system_disjoint<BAs...>(system, splitter_one)) {
+
+		#ifdef DEBUG
+		std::cout << "solve_minterm_system/neq: " << neq << "\n";
+		#endif // DEBUG
+
 		auto nf = neq
 			| tau_parser::bf_neq
 			| tau_parser::bf

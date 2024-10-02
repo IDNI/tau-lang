@@ -318,6 +318,11 @@ TEST_SUITE("find_solution") {
 		CHECK ( test_find_solution(sample) );
 	}
 
+	TEST_CASE("two var: x + y = 1.") {
+		const char* sample = "x + y = 1.";
+		CHECK ( test_find_solution(sample) );
+	}
+
 	TEST_CASE("two var: x & y = 0.") {
 		const char* sample = "x & y = 0.";
 		CHECK ( test_find_solution(sample) );
