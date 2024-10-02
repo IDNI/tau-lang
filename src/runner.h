@@ -186,11 +186,32 @@ struct interpreter {
 				auto memory_copy = memory;
 				auto current = replace(updated, memory_copy);
 				#ifdef DEBUG
+				std::cout << "step/type: " << type << "\n";
+				std::cout << "step/equations: " << equations << "\n";
 				std::cout << "step/updated: " << updated << "\n";
 				std::cout << "step/current: " << current << "\n";
+				std::cout << "step/memory: ";
+				for (const auto& [k, v]: memory) std::cout << k << " <- " << v << " ";
+				std::cout << "\n";
 				#endif // DEBUG
 
 				auto solution = solve(current, type);
+
+				#ifdef DEBUG
+				if (solution) {
+					std::cout << "step/solution: ";
+					if (solution.value().empty()) std::cout << "{}";
+					else for (const auto& [k, v]: solution.value()) std::cout << k << " <- " << v << " ";
+					std::cout << "\n";
+					auto copy = solution.value();
+					auto substituted = replace(current, copy);
+					auto check = snf_wff(substituted);
+					std::cout << "step/check: " << check << "\n";
+				} else {
+					std::cout << "step/solution: error\n";
+				}
+				#endif // DEBUG
+
 				if (solution.has_value()) solutions[type] = solution.value();
 				else { unsolvable = true; break; }
 			}
@@ -336,13 +357,13 @@ std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
 	};
 
 	#ifdef DEBUG
-	std::cout << "compute_systems [dnf]\n" << clause << "\n";
+	std::cout << "compute_systems/clause: " << clause << "\n";
 	#endif // DEBUG
 
 	system<BAs...> sys;
 	for (const auto& literal: select_top(clause, is_literal)) {
 		#ifdef DEBUG
-		std::cout << "compute_systems [literal]\n" << literal << "\n";
+		std::cout << "compute_systems/literal: " << literal << "\n";
 		#endif // DEBUG
 		if (auto l = compute_literal(literal, inputs, outputs); l) {
 			if (sys.find(l.value().first) == sys.end()) sys[l.value().first] = l.value().second;

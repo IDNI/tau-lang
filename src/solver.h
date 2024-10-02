@@ -87,14 +87,19 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
 	#ifdef DEBUG
-	std::cout << "find solution: " << eq << "\n";
+	std::cout << "find solution/eq: " << eq << "\n";
 	#endif // DEBUG
 
 	auto has_no_var = [](const nso<BAs...>& f) {
 		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 	};
 
-	if (!(eq | tau_parser::bf_eq).has_value()) return {};
+	if (!(eq | tau_parser::bf_eq).has_value()) {
+		#ifdef DEBUG
+		std::cout << "find solution/solution: {}\n";
+		#endif // DEBUG
+		return {};
+	}
 
 	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
@@ -105,10 +110,20 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 		auto gh = (g & h);
 		auto solution = make_removed_vars_solution(vars, gh);
 		if (has_no_var(gh)) {
-			if (gh != _0<BAs...>) return {};
+			if (gh != _0<BAs...>) {
+				#ifdef DEBUG
+				std::cout << "find solution/solution: {}\n";
+				#endif // DEBUG
+				return {};
+			}
 			else {
 				auto changes = solution;
 				solution[vars[0]] = h != _0<BAs...> ? h : replace(~g, changes) | bf_reduce_canonical<BAs...>();
+				#ifdef DEBUG
+				std::cout << "find solution/solution: ";
+				for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";
+				std::cout << "\n";
+				#endif // DEBUG
 				return solution;
 			}
 		}
@@ -118,9 +133,17 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 			if (auto nn = replace(h, restricted.value()) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
 				solution[vars[0]] = nn;
 			else solution[vars[0]] = replace(~g, restricted_copy.value()) | bf_reduce_canonical<BAs...>();
+			#ifdef DEBUG
+			std::cout << "find solution/solution: ";
+			for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";
+			std::cout << "\n";
+			#endif // DEBUG
 			return solution;
 		}
 	}
+	#ifdef DEBUG
+	std::cout << "find solution/solution: {}\n";
+	#endif // DEBUG
 	return {};
 }
 
@@ -146,8 +169,8 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 			| bf_reduce_canonical<BAs...>();
 
 	#ifdef DEBUG
-	std::cout << "lgrs: " << equality << "\n";
-	std::cout << "solution: ";
+	std::cout << "lgrs/equality: " << equality << "\n";
+	std::cout << "lgrs/solution: ";
 	for (const auto& [k, v] : phi) std::cout << k << " <- " << v << " ";
 	std::cout << "\n";
 	#endif // DEBUG
@@ -233,20 +256,12 @@ private:
 	bool exhausted = false;
 
 	nso<BAs...> make_current_minterm() {
-		#ifdef DEBUG
-		std::cout << "current choices: \n";
-		for (auto& c: choices) std::cout
-			<< "var: " << c.var << ", "
-			<< "value: " << c.value << ", "
-			<< "partial_bf: " << c.partial_bf << ", "
-			<< "partial_minterm: " << c.partial_minterm << "\n";
-		#endif // DEBUG
 		auto cte =  choices.back().value
 			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
 			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
 		auto current = (cte & choices.back().partial_minterm);
 		#ifdef DEBUG
-		std::cout << "current " << current << "\n";
+		std::cout << "make_current_minterm/current: " << current << "\n";
 		#endif // DEBUG
 		return current;
 	}
@@ -376,7 +391,7 @@ private:
 		minterm_system<BAs...> minterms;
 		for (auto& it: minterm_iterators) minterms.insert(build_wff_neq(*it));
 		#ifdef DEBUG
-		std::cout << "current minterm system: ";
+		std::cout << "make_current_minterm_system/minterms: ";
 		for (const auto& minterm : minterms) std::cout << minterm << " ";
 		std::cout << "\n";
 		#endif // DEBUG
@@ -589,7 +604,8 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 	#ifdef DEBUG
 	if (system.first.has_value())
-		std::cout << "solve_system: " << system.first.value() << " ";
+		std::cout << "solve_system/eq: " << system.first.value() << " ";
+	if (!system.second.empty()) std::cout << "solve_system/inequalities: ";
 	for (const auto& inequality : system.second) std::cout << inequality << " ";
 	std::cout << "\n";
 	#endif // DEBUG
