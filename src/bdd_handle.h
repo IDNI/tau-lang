@@ -290,7 +290,7 @@ struct bdd_handle {
 				if (s != bdd<B, o>::F && s != b) return get(s);
 				break;
 			}
-			default: {
+			case splitter_type::bad: {
 				return bad_splitter();
 			}
 		}
