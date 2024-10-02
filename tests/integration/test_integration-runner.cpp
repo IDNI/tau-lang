@@ -93,7 +93,7 @@ TEST_SUITE("only outputs") {
 
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
-		std::cout << "sample: " << phi_inf << "\n";
+		std::cout << "run_test/sample: " << phi_inf << "\n";
 		#endif // DEBUG
 
 		// prepare inputs, outputs and the interpreter
@@ -109,13 +109,17 @@ TEST_SUITE("only outputs") {
 			auto out = runner.step(in.value());
 
 			if (out.size() == 0) {
-				FAIL("empty output, check phi_inf formula: ", phi_inf); // no output
+				FAIL_CHECK("run_test/output[", i, "]: {}"); // no output
 			}
 
 			#ifdef DEBUG
-			std::cout << "step " << i << ": ";
-			for (const auto& [var, value]: out)
+			std::cout << "run_test/output[" << i << "]: ";
+			for (const auto& [var, value]: out) {
 				std::cout << var << " <- " << value << " ... ";
+				if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<bdd_binding>, bdd_binding>); io_vars) {
+					FAIL_CHECK("run_test/output[", i, "]: unexpected io_var ", io_vars.value());
+				}
+			}
 			std::cout << "\n";
 			#endif // DEBUG
 		}
@@ -132,45 +136,55 @@ TEST_SUITE("only outputs") {
 			expressions::stream << expressions::smessage);
 	}
 
+	// coonstant test cases
+
 	TEST_CASE("o1[t] = 0") {
 		const char* sample = "o1[t] = 0.";
 		auto memory = run_test(sample, 2);
-		// TODO (HIGH) add some checks
 	}
 
 	TEST_CASE("o1[t] = {bdd: a}") {
 		const char* sample = "o1[t] = {bdd: a}.";
 		auto memory = run_test(sample, 2);
-		// TODO (HIGH) add some checks
+	}
+
+	TEST_CASE("o1[0] = 1") {
+		const char* sample = "o1[0] = 1.";
+		auto memory = run_test(sample, 3);
+	}
+
+	TEST_CASE("o1[0] = {bdd: a}") {
+		const char* sample = "o1[0] = {bdd: a}.";
+		auto memory = run_test(sample, 3);
+	}
+
+	TEST_CASE("o1[0] = 1 && o1[t] = o1[t-1]") {
+		const char* sample = "o1[0] = 1 && o1[t] = o1[t-1].";
+		auto memory = run_test(sample, 2);
+	}
+
+	TEST_CASE("o1[0] = {bdd: a} && o1[t] = o1[t-1]") {
+		const char* sample = "o1[0] = {bdd: a} && o1[t] = o1[t-1].";
+		auto memory = run_test(sample, 3);
 	}
 
 	TEST_CASE("o1[t] | o2[t]= 0") {
 		const char* sample = "o1[t] | o2[t]= 0.";
 		auto memory = run_test(sample, 2);
-		// TODO (HIGH) add some checks
-	}
-
-	TEST_CASE("o1[t] + o1[t-1] = 1") {
-		const char* sample = "o1[t] + o1[t-1] = 1.";
-		auto memory = run_test(sample, 2);
-		// TODO (HIGH) add some checks
 	}
 
 	TEST_CASE("o1[t] & o1[t-1] = 1") {
 		const char* sample = "o1[t] & o1[t-1] = 1.";
 		auto memory = run_test(sample, 2);
-		// TODO (HIGH) add some checks
 	}
 
-//	TEST_CASE("o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1]") {
-//		const char* sample = "o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1].";
-//		auto memory = run_test(sample, 4);
-//		// TODO (HIGH) add some checks
-//	}
+	TEST_CASE("o1[t] + o1[t-1] = 1") {
+		const char* sample = "o1[t] + o1[t-1] = 1.";
+		auto memory = run_test(sample, 2);
+	}
 
-	TEST_CASE("o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1]") {
-		const char* sample = "o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1].";
+	TEST_CASE("o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1]") {
+		const char* sample = "o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1].";
 		auto memory = run_test(sample, 4);
-		// TODO (HIGH) add some checks
 	}
 }
