@@ -2077,10 +2077,10 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	return build_wff_and<BAs...>(build_wff_eq<BAs...>(
+	return build_wff_and<BAs...>(
+		build_wff_eq<BAs...>(
 			build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r))),
-			build_wff_neq(build_bf_xor<BAs...>(l,
-					build_bf_neg<BAs...>(r))));
+		build_wff_neq<BAs...>(build_bf_xor<BAs...>(l, r)));
 }
 
 template<typename... BAs>
