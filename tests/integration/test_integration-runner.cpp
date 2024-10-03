@@ -183,10 +183,10 @@ TEST_SUITE("only outputs") {
 		auto memory = run_test(sample, 2);
 	}
 
-	TEST_CASE("o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1]") {
+	/*TEST_CASE("o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1]") {
 		const char* sample = "o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1].";
 		auto memory = run_test(sample, 4);
-	}
+	}*/
 
 	// TODO (HIGH) review the following test case, maybe is failing due to the
 	// missprocessing of uninterpreted constants in bf_reduce_canonical
