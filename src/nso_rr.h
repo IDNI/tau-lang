@@ -2246,10 +2246,10 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	return build_wff_and<BAs...>(build_wff_eq<BAs...>(
+	return build_wff_and<BAs...>(
+		build_wff_eq<BAs...>(
 			build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r))),
-			build_wff_neq(build_bf_xor<BAs...>(l,
-					build_bf_neg<BAs...>(r))));
+		build_wff_neq<BAs...>(build_bf_xor<BAs...>(l, r)));
 }
 
 template<typename... BAs>
@@ -3841,6 +3841,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::history_list_cmd,                 50 },
 			{ tau_parser::history_print_cmd,                50 },
 			{ tau_parser::history_store_cmd,                50 },
+			{ tau_parser::sat_cmd,                        50 },
 			{ tau_parser::main,                             60 },
 			{ tau_parser::ref,                              80 },
 			{ tau_parser::wff,                              90 },
