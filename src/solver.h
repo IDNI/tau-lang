@@ -633,7 +633,8 @@ template<typename...BAs>
 std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
 		const std::string& type = "") {
 	static nso_factory<BAs...> factory;
-	auto splitter_one = factory.splitter_one(type);
+	auto one = build_bf_constant(factory.one(type));
+	auto splitter_one = splitter(one, splitter_type::bad);
 	auto dnf = dnf_wff(form);
 	for (auto& clause: get_leaves(form, tau_parser::wff_or, tau_parser::wff)) {
 		auto is_equation = [](const nso<BAs...>& n) {

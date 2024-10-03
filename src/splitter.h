@@ -64,10 +64,7 @@ nso<BAs...> split(const nso<BAs...> &fm, const auto fm_type, const split_sym spl
 				              : (clause_type == tau_parser::bf_or ? _0<BAs...> : _1<BAs...>));
 		if (i < mem.size()) {
 			map<nso<BAs...>, nso<BAs...> > changes = {{get_clause(mem[i]), sym}};
-			auto res = replace(fm, changes);
-			if (fm_type == tau_parser::wff)
-				return res | repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>);
-			else return res;
+			return replace(fm, changes);
 		}
 		break;
 	}
@@ -100,6 +97,10 @@ nso<BAs...> split(const nso<BAs...> &fm, const auto fm_type, const split_sym spl
 		}
 		if (i < mem.size()) return get_clause(mem[i]);
 		break;
+	}
+	case splitter_type::bad: {
+		// This case must not happen
+		assert(false);
 	}
 	}
 	// No split_sym is present in fm or i is out of bound
@@ -209,17 +210,20 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 // Return a bad splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
-nso<BAs...> tau_bad_splitter(nso<BAs...> fm = _1<BAs...>) {
+nso<BAs...> tau_bad_splitter(nso<BAs...> fm = _T<BAs...>) {
 	stringstream ss;
 	ss << "split" << get_new_uniter_const_id(fm);
 	auto new_uniter_const = wrap(tau_parser::wff, build_wff_uniter_const<BAs...>(ss.str()));
-	return fm = _1<BAs...> ? new_uniter_const : build_wff_and(fm, new_uniter_const);
+	return build_wff_and(fm, new_uniter_const);
 }
 
 // Return a splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
 nso<BAs...> tau_splitter(nso<BAs...> fm, splitter_type st) {
+	if (st == splitter_type::bad)
+		return tau_bad_splitter(fm);
+
 	// Collect coefficients to produce splitters
 	auto bf_constants = select_top(fm, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
 
