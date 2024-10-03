@@ -80,8 +80,8 @@ struct bdd_factory {
 		return parse(src);
 	}
 
-	std::variant<BAs...> one () const {
-		return std::variant<BAs...>(bdd_handle<Bool>::htrue);
+	std::variant<BAs...> splitter_one () const {
+		return std::variant<BAs...>(bdd_splitter_one<Bool>());
 	}
 
 private:
@@ -153,10 +153,9 @@ struct nso_factory<bdd_binding> {
 		return bf.binding(n);
 	}
 
-	auto one() const {
-		return bf.one();
+	nso<bdd_binding> splitter_one() const {
+		return build_bf_constant(bf.splitter_one());
 	}
-
 };
 
 // using in repl
@@ -176,9 +175,9 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 		return tf.binding(n);
 	}
 
-	std::variant<tau_ba<bdd_binding>, bdd_binding> one (const std::string& type_name) const {
-		if (type_name == "bdd") return bf.one();
-		else return tf.one();
+	gssotc<bdd_binding> splitter_one (const std::string& type_name) const {
+		if (type_name == "bdd") return build_bf_constant(bf.splitter_one());
+		else return build_bf_constant(tf.splitter_one());
 	}
 };
 
