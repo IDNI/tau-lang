@@ -658,6 +658,7 @@ template<typename...BAs>
 std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
 		const std::string& type = "") {
 	static nso_factory<BAs...> factory;
+	if (form == _T<BAs...>) return { solution<BAs...>() };
 	auto splitter_one = factory.splitter_one(type);
 	auto dnf = dnf_wff(form);
 	for (auto& clause: get_leaves(form, tau_parser::wff_or, tau_parser::wff)) {

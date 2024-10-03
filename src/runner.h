@@ -167,18 +167,27 @@ private:
 template<typename...BAs>
 struct interpreter {
 
+	interpreter(const std::set<system<BAs...>>& systems, assignment<BAs...>& memory, size_t& time_point):
+			systems(systems), memory(memory), time_point(time_point) {
+		// iniialize the variables
+		for (const auto& system: systems) {
+			for (const auto& [type, equations]: system) {
+				for (const auto& out_var_name:
+						select_top(equations, is_non_terminal<tau_parser::out_var_name, BAs...>))
+					outputs[system].insert(out_var_name);
+			}
+		}
+	}
+
 	assignment<BAs...> step(const assignment<BAs...>& inputs) {
 		// update the memory with the inputs
 		for (const auto& [var, value]: inputs)
 			memory[build_in_variable_at_n(var, time_point)] = value;
 		// for each system in systems try to solve it, if it is not possible
 		// continue with the next system.
-		bool unsolvable = false;
-		// for each system in systems try to solve it, if it is not possible
-		// continue with the next system.
 		for (const auto& system: this->systems) {
 			std::map<type, solution<BAs...>> solutions;
-			unsolvable = false;
+			bool solved = true;
 			// solve the equations fro each type in the system
 			for (const auto& [type, equations]: system) {
 				// rewriting the inputs and inserting them into memory
@@ -213,16 +222,26 @@ struct interpreter {
 				#endif // DEBUG
 
 				if (solution.has_value()) solutions[type] = solution.value();
-				else { unsolvable = true; break; }
+				else { solved = false; break; }
 			}
-			if (!unsolvable) {
+			if (solved) {
 				solution<BAs...> global;
+				// merge the solutions
 				for (const auto& [type, solution]: solutions) {
 					memory.insert(solution.begin(), solution.end());
 					for (const auto& [var, value]: solution) {
 						global[var] = value;
 					}
 				}
+				// complete solution according to the outputs
+				for (const auto &var: outputs[system]) {
+					auto timed_var = build_out_variable_at_n(var, time_point);
+					if (!global.contains(timed_var)) {
+						memory[timed_var] = _0<BAs...>;
+						global[timed_var] = _0<BAs...>;
+					}
+				}
+				// update the time_point
 				time_point += 1;
 				// TODO (HIGH) remove old values from memory
 				return global;
@@ -236,6 +255,7 @@ struct interpreter {
 	std::set<system<BAs...>> systems;
 	assignment<BAs...> memory;
 	size_t time_point;
+	std::map<system<BAs...>, std::set<nso<BAs...>>> outputs;
 
 private:
 
