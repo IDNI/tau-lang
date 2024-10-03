@@ -2306,6 +2306,38 @@ sp_tau_node<BAs...> build_bf_greater(const sp_tau_node<BAs...>& l,
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> build_bf_flag_greater_equal(const sp_tau_node<BAs...>& flagvar,
+	const sp_tau_node<BAs...>& num) {
+	return wrap(tau_parser::bf,
+			wrap(tau_parser::flag,
+				wrap(tau_parser::flag_greater_equal, {flagvar, num})));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_flag_greater(const sp_tau_node<BAs...>& flagvar,
+	const sp_tau_node<BAs...>& num) {
+	return wrap(tau_parser::bf,
+			wrap(tau_parser::flag,
+				wrap(tau_parser::flag_greater, {flagvar, num})));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_flag_less_equal(const sp_tau_node<BAs...>& flagvar,
+	const sp_tau_node<BAs...>& num) {
+	return wrap(tau_parser::bf,
+			wrap(tau_parser::flag,
+				wrap(tau_parser::flag_less_equal, {flagvar, num})));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_flag_less(const sp_tau_node<BAs...>& flagvar,
+	const sp_tau_node<BAs...>& num) {
+	return wrap(tau_parser::bf,
+			wrap(tau_parser::flag,
+				wrap(tau_parser::flag_less, {flagvar, num})));
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
@@ -3243,6 +3275,24 @@ sp_tau_node<BAs...> make_node_hook_cte(const node<tau_sym<BAs...>>& n) {
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_bf_flag(const node<tau_sym<BAs...>>& n) {
+	auto sp_n = make_shared<node<tau_sym<BAs...>>>(n);
+	if (is_child_non_terminal(tau_parser::flag_eq, trim(sp_n))) {
+		nso<BAs...> num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
+		nso<BAs...> flagvar = find_top(sp_n, is_non_terminal<tau_parser::flagvar, BAs...>).value();
+		return build_bf_and(build_bf_flag_less_equal(flagvar, num),
+								build_bf_flag_greater_equal(flagvar, num));
+		}
+	if (is_child_non_terminal(tau_parser::flag_neq, trim(sp_n))) {
+		nso<BAs...> num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
+		nso<BAs...> flagvar = find_top(sp_n, is_non_terminal<tau_parser::flagvar, BAs...>).value();
+		return build_bf_or(build_bf_flag_less(flagvar, num),
+								build_bf_flag_greater(flagvar, num));
+	}
+	return sp_n;
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_bf(const node<tau_sym<BAs...>>& n) {
 	// if n is ref, capture, 0 or 1, we can return accordingly
 	if (n.child.size() != 1) return std::make_shared<node<tau_sym<BAs...>>>(n);
@@ -3259,6 +3309,8 @@ sp_tau_node<BAs...> make_node_hook_bf(const node<tau_sym<BAs...>>& n) {
 				return make_node_hook_bf_xor<BAs...>(n);
 			case tau_parser::bf_constant:
 				return make_node_hook_cte<BAs...>(n);
+			case tau_parser::flag:
+				return make_node_hook_bf_flag<BAs...>(n);
 			default: return std::make_shared<node<tau_sym<BAs...>>>(n);
 		}
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
@@ -3874,10 +3926,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_remove_funiversal_cb,         630 },
 			{ tau_parser::bf_remove_fexistential_cb,       640 },
 
+			{ tau_parser::flag,                            710 },
 			{ tau_parser::bf_or,                           720 },
 			{ tau_parser::bf_and,                          730 },
 			{ tau_parser::bf_xor,                          740 },
-			{ tau_parser::flag,                            745 },
 			{ tau_parser::bf_neg,                          750 },
 			{ tau_parser::bf,                              790 },
 

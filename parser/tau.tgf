@@ -67,9 +67,11 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ ">"   _ bf)               :bf_greater
                         | (bf    _ "<="  _ bf)               :bf_less_equal
                         | (bf    _ "<"   _ bf)               :bf_less
-                        |                                     capture.
+                        |                                     capture
+                        |                                uninterpreted_constant.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     variable
+                        |                                     flag
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ref                                :bf_ref
                         | (bf _       '|'  _  bf)            :bf_or
@@ -79,9 +81,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('{' _ constant _ '}')             :bf_constant
                         | '1'                                :bf_t
                         | '0'                                :bf_f
-                        |                                     flag
-                        |                                     capture
-                        |                                     uninterpreted_constant.
+                        |                                     capture.
 
 # flags
 flag =>   (flagvar _ "!=" _ num | num _ "!=" _ flagvar)      :flag_neq
@@ -95,8 +95,8 @@ flag =>   (flagvar _ "!=" _ num | num _ "!=" _ flagvar)      :flag_neq
 charvar                => (alpha & ~'T' & ~'F') digit*.
 flagvar                => charvar.
 variable               => charvar | (in | out):io_var.
-in                     => ("i" digits):in_var_name  '[' offset ']'.
-out                    => ("o" digits):out_var_name '[' offset ']'.
+in                     => ("i" (digit+)):in_var_name  '[' offset ']'.
+out                    => ("o" (digit+)):out_var_name '[' offset ']'.
 capture                => '$' charvar.
 q_vars                 => q_var (_ ',' _ q_var)*.
 q_var                  => capture | variable.
@@ -180,9 +180,8 @@ cli_command            =>
         | ("valid"         :valid_sym   __ rr)                :valid_cmd
         | ("sat"           :sat_sym     __ normalize_cmd_arg) :sat_cmd
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
-        | ("solve"
-                :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
-        | (("r" | "run"):run_sym __ wff)                      :run_cmd
+        | ("solve"         :solve_sym   __ wff_cmd_arg)       :solve_cmd
+        | (("e" | "execute"):execute_sym __ (wff | rr))       :execute_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
         | (("s" | "subst" | "substitute")
@@ -210,31 +209,17 @@ cli_command            =>
         | ("set":set_sym   __ option
                                 (__ | _ '=' _) option_value)  :set_cmd
         | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
-# i/o stream definitions
-        | (type __ in_var_name _ '=' _ input_stream)              :def_input_cmd
-        | (type __ out_var_name _ '=' _ output_stream)             :def_output_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ memory)        :history_print_cmd
         | (                     wff | bf)                     :history_store_cmd
         .
 
-# input/output streams
-input_stream           =>
-        # in the future itcp, iudp,...
-        ("ifile" _ '(' _ q_file_name  _ ')') | ("keyboard"):keyboard_sym.
-output_stream          =>
-        # in the future otcp, oudp,...
-        ("ofile" _ '(' _ q_file_name  _ ')') | ("console"):console_sym.
-q_file_name            => '"' file_name '"'.
-file_name              => printable+.
-
 # command arguments
 #
 number                 => digits.
 bf_cmd_arg             => memory | bf.
 wff_cmd_arg            => memory | wff.
-solve_cmd_arg          => memory | wff.
 nf_cmd_arg             => memory | wff | bf.
 onf_cmd_arg            => memory | wff.
 normalize_cmd_arg      => memory | rr | ref | wff | bf.
@@ -283,14 +268,13 @@ severity               => ("e" | "error"):error_sym
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
         sym, digits, type, source, named_binding, capture,
-        charvar, in_var_name, out_var_name, uninter_const_name,
-        file_name.
+        charvar, in_var_name, out_var_name, uninter_const_name.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, wff_cb, bf_cb,
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
-        normalize_cmd_arg, solve_cmd_arg,
+        normalize_cmd_arg,
         bf  > bf_parenthesis  > bf,
         wff > wff_parenthesis > wff.
