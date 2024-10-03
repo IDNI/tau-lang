@@ -522,7 +522,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::execute_cmd(
+void repl_evaluator<BAs...>::run_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto form = n->child[1];
@@ -616,14 +616,20 @@ template <typename... BAs>
 void repl_evaluator<BAs...>::def_list_cmd() {
 	if (definitions.size() == 0) cout << "definitions are empty\n";
 	for (size_t i = 0; i < definitions.size(); i++)
-		cout << "[" << i + 1 << "] " << definitions[i] << "\n";
+		cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
+	if (inputs.size() == 0 && outputs.size() == 0) cout << "i/o variables: empty\n";
+	else std::cout << "i/o variables:\n";
+	for (auto& [d, f]: inputs)
+		cout << "    " << d.second << " " << d.first << " = ifile(\"" << f << "\")\n";
+	for (auto& [d, f]: outputs)
+		cout << "    " << d.second << " " << d.first << " = ofile(\"" << f << "\")\n";
 }
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
-	if (definitions.size() == 0) cout << "definitions are empty\n";
+	if (definitions.size() == 0) cout << "rec. relations: empty\n";
 	auto num = command | tau_parser::number;
 	if (!num) return;
 	auto i = digits(num.value());
@@ -633,6 +639,32 @@ void repl_evaluator<BAs...>::def_print_cmd(
 	}
 	cout << "error: definition [" << i << "] does not exist\n";
 	return;
+}
+
+template <typename... BAs>
+void repl_evaluator< BAs...>::def_input_cmd(
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
+	filename fn;
+	type t = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
+	if (auto file_name = command | tau_parser::input_stream
+			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
+		fn = file_name;
+	else fn = "/dev/stdin";
+	auto var_name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+	inputs[{var_name, t}] = fn;
+}
+
+template <typename... BAs>
+void repl_evaluator< BAs...>::def_output_cmd(
+		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
+	filename fn;
+	type t = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
+	if (auto file_name = command | tau_parser::output_stream
+			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
+		fn = file_name;
+	else fn = "/dev/stdout";
+	auto var_name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
+	outputs[{var_name, t}] = fn;
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -798,7 +830,7 @@ int repl_evaluator<BAs...>::eval_cmd(
 	// normalization
 	case p::normalize_cmd:      result = normalize_cmd(command); break;
 	// execution
-	case p::execute_cmd:        execute_cmd(command); break;
+	case p::run_cmd:            run_cmd(command); break;
 	case p::solve_cmd:          solve_cmd(command); break;
 	// substitution and instantiation
 	case p::subst_cmd:          result = substitute_cmd(command); break;
@@ -820,6 +852,9 @@ int repl_evaluator<BAs...>::eval_cmd(
 	case p::def_rr_cmd:         def_rr_cmd(command); break;
 	case p::def_list_cmd:       def_list_cmd(); break;
 	case p::def_print_cmd:      def_print_cmd(command); break;
+	// definitions of i/o streams
+	case p::def_input_cmd:      def_input_cmd(command); break;
+	case p::def_output_cmd:     def_output_cmd(command); break;
 	// qelim
 	case p::qelim_cmd:          result = qelim_cmd(command); break;
 	case p::comment:            break;
@@ -939,20 +974,20 @@ void repl_evaluator<BAs...>::help_cmd(
 		//<< "  unsat				    check unsatisfiability\n"
 		//<< "\n"
 
-		//<< "Execute commands:\n"
-		//<< "  execute                execute a program that meets a tau spec\n"
-		//<< "\n"
+		<< "Run command:\n"
+		<< "  run                    run a program that meets a tau spec\n"
+		<< "\n"
 
-		//<< "Solver commands:\n"
-		//<< "  solve                  solve a formula\n"
-		//<< "\n"
+		<< "Solver commands:\n"
+		<< "  solve                  solve a formula\n"
+		<< "\n"
 
 		<< "Definition commands:\n"
-		<< "  def                   manage defined recurrence relations\n"
+		<< "  def                    manage defined recurrence relations\n"
 		<< "\n"
 
 		//<< "Selection commands:\n"
-		//<< "  selection or s         selection control\n"
+		//<< "  selection or s       selection control\n"
 		//<< "\n"
 
 		<< "Settings commands:\n"
@@ -1017,8 +1052,8 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "usage:\n"
 		<< "  qelim <WFF>            eliminates inner most quantifier in the given WFF\n";
 		break;
-	case tau_parser::execute_sym: cout
-		<< "Command e, execute ...\n";
+	case tau_parser::run_sym: cout
+		<< "Command r, run ...\n";
 		break;
 	case tau_parser::solve_sym: cout
 		<< "Command s, solve ...\n";

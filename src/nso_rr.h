@@ -677,6 +677,68 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o,
 	return e(o);
 }
 
+// adds terminal symbols to a given stream, used in conjuction with usual
+// traversals (see make_string_* methods).
+template <typename extractor_t, typename node_t>
+struct stringify {
+
+	stringify(const extractor_t& extractor,
+		std::basic_stringstream<char>& stream)
+			: stream(stream), extractor(extractor) {}
+
+	node_t operator()(const node_t& n) {
+		if (auto str = extractor(n); str) stream << str.value();
+		return n;
+	}
+
+	std::basic_stringstream<char>& stream;
+	const extractor_t& extractor;
+};
+
+// converts a sp_tau_node<...> to a string.
+template <typename extractor_t, typename node_t>
+std::string make_string(const extractor_t& extractor, const node_t& n) {
+	std::basic_stringstream<char> ss;
+	stringify<extractor_t, node_t> sy(extractor, ss);
+	post_order_tree_traverser<stringify<extractor_t, node_t>,
+				all_t, node_t>(sy, all)(n);
+	return ss.str();
+}
+
+// extracts terminal from sp_tau_node
+template <typename... BAs>
+auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n)
+	-> std::optional<char>
+{
+	if (n->value.index() == 0
+			&& !get<0>(n->value).nt()
+			&& !get<0>(n->value).is_null())
+		return std::optional<char>(get<0>(n->value).t());
+	return std::optional<char>();
+};
+
+template <typename... BAs>
+using tau_node_terminal_extractor_t =
+				decltype(tau_node_terminal_extractor<BAs...>);
+
+template<typename... BAs>
+auto extract_string = [](const sp_tau_node<BAs...>& n) {
+	return idni::tau::make_string(idni::tau::tau_node_terminal_extractor<BAs...>, n);
+};
+
+template<typename... BAs>
+using extract_string_t = decltype(extract_string<BAs...>);
+
+template<typename... BAs>
+std::string operator|(const sp_tau_node<BAs...>& n, const extract_string_t<BAs...> e) {
+	return e(n);
+}
+
+template<typename... BAs>
+std::string operator|(const std::optional<sp_tau_node<BAs...>>& n, const extract_string_t<BAs...> e) {
+	return n.has_value() ? e(n.value()) : "";
+}
+
 // check if the node is the given non terminal
 template <typename... BAs>
 bool is_child_non_terminal(const size_t nt, const sp_tau_node<BAs...>& n) {
@@ -792,56 +854,12 @@ struct tauify {
 	}
 };
 
-// extracts terminal from sp_tau_node
-template <typename... BAs>
-auto tau_node_terminal_extractor = [](const sp_tau_node<BAs...>& n)
-	-> std::optional<char>
-{
-	if (n->value.index() == 0
-			&& !get<0>(n->value).nt()
-			&& !get<0>(n->value).is_null())
-		return std::optional<char>(get<0>(n->value).t());
-	return std::optional<char>();
-};
-
-template <typename... BAs>
-using tau_node_terminal_extractor_t =
-				decltype(tau_node_terminal_extractor<BAs...>);
-
 // extracts terminal from sp_tau_source_node
 extern std::function<std::optional<char>(const sp_tau_source_node& n)>
 	tau_source_terminal_extractor;
 
 template <typename... BAs>
 using tau_source_terminal_extractor_t = decltype(tau_source_terminal_extractor);
-
-// adds terminal symbols to a given stream, used in conjuction with usual
-// traversals (see make_string_* methods).
-template <typename extractor_t, typename node_t>
-struct stringify {
-
-	stringify(const extractor_t& extractor,
-		std::basic_stringstream<char>& stream)
-			: stream(stream), extractor(extractor) {}
-
-	node_t operator()(const node_t& n) {
-		if (auto str = extractor(n); str) stream << str.value();
-		return n;
-	}
-
-	std::basic_stringstream<char>& stream;
-	const extractor_t& extractor;
-};
-
-// converts a sp_tau_node<...> to a string.
-template <typename extractor_t, typename node_t>
-std::string make_string(const extractor_t& extractor, const node_t& n) {
-	std::basic_stringstream<char> ss;
-	stringify<extractor_t, node_t> sy(extractor, ss);
-	post_order_tree_traverser<stringify<extractor_t, node_t>,
-				all_t, node_t>(sy, all)(n);
-	return ss.str();
-}
 
 template<typename... BAs>
 sp_tau_node<BAs...> trim(const sp_tau_node<BAs...>& n) {
@@ -960,16 +978,16 @@ template<typename...BAs>
 struct nso_factory {
 
 	sp_tau_node<BAs...> parse(const std::string&,
-			const std::string&) const {
+			const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
 
 	sp_tau_node<BAs...> binding(const sp_tau_node<BAs...>&,
-			const std::string&) const {
+			const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
 
-	sp_tau_node<BAs...> one (const std::string&) const {
+	sp_tau_node<BAs...> one (const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
 };
@@ -1257,10 +1275,10 @@ sp_tau_node<BAs...> process_offset_variables(
 	using p = tau_parser;
 	using node = sp_tau_node<BAs...>;
 	std::map<node, node> changes;
-	for (const auto& offset :
-		select_all(tau_code, is_non_terminal<p::offset, BAs...>))
+	for (const auto& offsets :
+		select_all(tau_code, is_non_terminal<p::offsets, BAs...>))
 	{
-		for (const auto& var : select_all(offset,
+		for (const auto& var : select_all(offsets,
 			is_non_terminal<p::variable, BAs...>))
 				changes[var] = wrap(p::capture, var->child);
 	}
@@ -1853,17 +1871,180 @@ nso<BAs...> build_extra (const nso<BAs...> n, const std::string &note) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_num(size_t value) {
-	return wrap(tau_parser::num,
-		make_node<tau_sym<BAs...>>(tau_sym<BAs...>(value), {}));
+nso<BAs...> build_num(size_t num) {
+	return wrap(
+		tau_parser::num, make_node<tau_sym<BAs...>>(
+			tau_sym<BAs...>(num), {}));
+}
+
+template<typename... BAs>
+nso<BAs...> build_charvar(const char& name) {
+	return wrap(
+		tau_parser::charvar, make_node<tau_sym<BAs...>>(
+			tau_sym<BAs...>(name), {}));
+}
+
+template<typename... BAs>
+nso<BAs...> build_variable(const char& name) {
+	return wrap(
+		tau_parser::variable, {
+			build_charvar<BAs...>(name) });
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_var_name(const size_t& index) {
+	return wrap(
+		tau_parser::in_var_name, {
+			tau_sym<BAs...>('i'), {},
+			tau_sym<BAs...>(index), {}});
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_n(const nso<BAs...>& in_var_name, const size_t& num) {
+	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));
+
+	return wrap(
+		tau_parser::bf, wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var,	wrap(
+					tau_parser::in,
+						in_var_name, wrap(
+						tau_parser::offset,
+							build_num<BAs...>(num))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_n(const size_t& index, const size_t& num) {
+	return build_in_variable_at_(build_in_var_name<BAs...>(index), num);
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_t(const nso<BAs...>& in_var_name) {
+	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));
+
+	return wrap(
+		tau_parser::bf, wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var,	wrap(
+					tau_parser::in,
+						in_var_name, wrap(
+						tau_parser::offset,
+							build_variable<BAs...>('t'))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_t(const size_t& index) {
+	return build_in_variable_at_t(build_in_var_name<BAs...>(index));
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_t_minus(const nso<BAs...>& in_var_name, const size_t& num) {
+	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));
+	assert(num > 0);
+
+	return wrap(
+		tau_parser::bf, wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var,	wrap(
+					tau_parser::in,
+						in_var_name, wrap(
+						tau_parser::offset, wrap(
+							tau_parser::shift,
+								build_variable<BAs...>('t'),
+								build_num<BAs...>(num)))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_in_variable_at_t_minus(const size_t& index, const size_t& num) {
+	return build_in_variable_at_t_minus(build_in_var_name<BAs...>(index), num);
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_var_name(const size_t& index) {
+	return wrap(tau_parser::out_var_name, {
+		tau_sym<BAs...>('o'), {},
+		tau_sym<BAs...>(index), {}});
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_t(const nso<BAs...>& out_var_name) {
+	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
+	return wrap(
+		tau_parser::bf,	wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var, wrap(
+					tau_parser::out,
+						out_var_name, wrap(
+						tau_parser::offset,
+							build_variable<BAs...>('t'))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_t(const size_t& index) {
+	return build_out_variable_at_t(build_out_var_name<BAs...>(index));
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_n(const nso<BAs...>& out_var_name, const size_t& num) {
+	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
+
+	return wrap(
+		tau_parser::bf,	wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var, wrap(
+					tau_parser::out,
+						out_var_name, wrap(
+						tau_parser::offset,
+							build_num<BAs...>(num))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_n(const size_t& index, const size_t& num) {
+	return build_out_variable_at_n(build_out_var_name<BAs...>(index), num);
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_t_minus(const nso<BAs...>& out_var_name, const size_t& num) {
+	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
+	assert(num > 0);
+
+	return wrap(
+		tau_parser::bf,	wrap(
+			tau_parser::variable, wrap(
+				tau_parser::io_var, wrap(
+					tau_parser::out,
+						out_var_name, wrap(
+						tau_parser::offset, wrap(
+							tau_parser::shift,
+								build_variable<BAs...>('t'),
+								build_num<BAs...>(num)))))));
+}
+
+template<typename... BAs>
+nso<BAs...> build_out_variable_at_t_minus(const size_t& index, const size_t& num) {
+	return build_out_variable_at_t_minus(build_out_var_name<BAs...>(index), num);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_var(const std::string& name) {
+	auto var = make_builder<BAs...>("( $X ) =: " + name + ".").second;
+	return trim<BAs...>(var);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_var(const std::string& name) {
+	auto var = make_builder<BAs...>("( $X ) =:: ?" + name + ".").second;
+	return trim<BAs...>(var);
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
 	auto cte = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
-	return wrap(tau_parser::bf,
-		wrap(tau_parser::bf_constant,
-		wrap(tau_parser::constant, cte)));
+	return wrap(
+		tau_parser::bf, wrap(
+			tau_parser::bf_constant, wrap(
+				tau_parser::constant,
+					cte)));
 }
 
 template<typename... BAs>
@@ -1896,18 +2077,6 @@ std::optional<sp_tau_node<BAs...>> build_bf_constant(
 {
 	return o.has_value() ? build_bf_constant(o.value())
 				: std::optional<sp_tau_node<BAs...>>();
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_bf_var(const std::string& name) {
-	auto var = make_builder<BAs...>("( $X ) =: " + name + ".").second;
-	return trim<BAs...>(var);
-}
-
-template<typename... BAs>
-sp_tau_node<BAs...> build_wff_var(const std::string& name) {
-	auto var = make_builder<BAs...>("( $X ) =:: ?" + name + ".").second;
-	return trim<BAs...>(var);
 }
 
 template<typename... BAs>
@@ -2458,6 +2627,26 @@ std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n,
 	std::vector<sp_tau_node<BAs...>> leaves;
 	get_leaves(n, branch, skip, leaves);
 	return leaves;
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_dnf_wff_clauses(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::wff_or, tau_parser::wff);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_dnf_bf_clauses(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::bf_or, tau_parser::bf);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_cnf_wff_clause(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::wff_and, tau_parser::wff);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_cnf_bf_clause(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::bf_and, tau_parser::bf);
 }
 
 // IDEA convert to a const static applier and change all the code accordingly
@@ -3636,7 +3825,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::help_cmd,                         50 },
 			{ tau_parser::file_cmd,                         50 },
 			{ tau_parser::normalize_cmd,                    50 },
-			{ tau_parser::execute_cmd,                      50 },
+			{ tau_parser::run_cmd,                          50 },
 			{ tau_parser::solve_cmd,                        50 },
 			{ tau_parser::dnf_cmd,                          50 },
 			{ tau_parser::cnf_cmd,                          50 },
@@ -3911,7 +4100,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::sat_cmd:       prefix("sat"); break;
 			case tau_parser::unsat_cmd:     prefix("unsat"); break;
 			case tau_parser::solve_cmd:     prefix("solve"); break;
-			case tau_parser::execute_cmd:   prefix("execute"); break;
+			case tau_parser::run_cmd:       prefix("run"); break;
 			case tau_parser::normalize_cmd: prefix("normalize"); break;
 			case tau_parser::inst_cmd:
 			case tau_parser::subst_cmd:
