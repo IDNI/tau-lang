@@ -542,7 +542,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 			if (is_io_initial(io_var))
 				continue;
 			changes[io_var] = build_io_out_shift<BAs...>(
-												get_io_name(io_var), "t", 1);
+				get_io_name(io_var), "t", 1);
 		}
 		fm = replace(transformed_fm, changes);
 	} else fm = transformed_fm;
