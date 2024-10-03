@@ -64,7 +64,7 @@ TEST_SUITE("only outputs") {
 			return true; // success (always)
 		}
 
-		std::optional<type> type_of(const nso<BAs...>& var) {
+		std::optional<type> type_of(const nso<BAs...>&) {
 			return { "bdd" }; // bdd (always)
 		}
 	};
@@ -78,7 +78,7 @@ TEST_SUITE("only outputs") {
 			return inputs[current++];
 		}
 
-		std::optional<type> type_of(const nso<BAs...>& var) {
+		std::optional<type> type_of(const nso<BAs...>&) {
 			return { "bdd" }; // bdd (always)
 		}
 

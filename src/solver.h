@@ -118,7 +118,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 			}
 			else {
 				auto changes = solution;
-				solution[vars[0]] = h != _0<BAs...> ? h : replace(~g, changes) | bf_reduce_canonical<BAs...>();
+				solution[vars[0]] = h != _0<BAs...> ? replace(h, changes) : replace(~g, changes) | bf_reduce_canonical<BAs...>();
 				#ifdef DEBUG
 				std::cout << "find solution/solution: ";
 				for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";

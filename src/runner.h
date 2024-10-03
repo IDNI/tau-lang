@@ -364,8 +364,8 @@ std::optional<std::pair<type, nso<BAs...>>> compute_literal(const nso<BAs...>& l
 			if (auto t = outputs.type_of(out_var_name.value()); t)
 				return { make_pair(t.value() , literal) };
 		}
-	} else return {}; // error
-
+	}
+	return {}; // error
 }
 
 template<typename input_t, typename output_t, typename...BAs>
