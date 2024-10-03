@@ -80,6 +80,10 @@ struct bdd_factory {
 		return parse(src);
 	}
 
+	std::variant<BAs...> one () const {
+		return std::variant<BAs...>(bdd_handle<Bool>::htrue);
+	}
+
 private:
 
 	nso<BAs...> build_node(const bdd_binding& b) {
@@ -168,14 +172,9 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 		return tf.binding(n);
 	}
 
-	gssotc<bdd_binding> splitter_one(const std::string& type_name) const {
-		if (type_name == "bdd") {
-			auto ref =  bdd_bad_splitter<Bool>();
-			std::variant<tau_ba<bdd_binding>, bdd_binding> vp{ref};
-			return make_node<tau_sym<tau_ba<bdd_binding>, bdd_binding>>(
-				tau_sym<tau_ba<bdd_binding>, bdd_binding>(vp), {});
-		}
-		return tau_bad_splitter<tau_ba<bdd_binding>, bdd_binding>();
+	std::variant<tau_ba<bdd_binding>, bdd_binding> one (const std::string& type_name) const {
+		if (type_name == "bdd") return bf.one();
+		else return tf.one();
 	}
 };
 

@@ -54,11 +54,8 @@ template<typename B, auto o = bdd_options<>::create()>
 hbdd<B, o> normalize (const hbdd<B, o>& x) {return x;}
 
 template<typename B, auto o = bdd_options<>::create()>
-hbdd<B, o> splitter (const hbdd<B, o>& x, splitter_type st) { return x->splitter(st); }
-
-template<typename B, auto o = bdd_options<>::create()>
-hbdd<B, o> bdd_bad_splitter () {
-	return bdd_handle<B, o>::htrue->splitter(splitter_type::bad);
+hbdd<B, o> splitter (const hbdd<B, o>& x, splitter_type st) {
+	return x->splitter(st);
 }
 
 #ifdef DEBUG
@@ -269,10 +266,6 @@ struct bdd_handle {
 		return r;
 	}
 
-	hbdd<B, o> bad_splitter () {
-		return get(bdd<B,o>::split_clause(b));
-	}
-
 	hbdd<B, o> splitter (splitter_type st) {
 		switch(st) {
 			case splitter_type::lower: {
@@ -290,10 +283,11 @@ struct bdd_handle {
 				if (s != bdd<B, o>::F && s != b) return get(s);
 				break;
 			}
-			default: {
-				return bad_splitter();
+			case splitter_type::bad: {
+				return get(bdd<B,o>::split_clause(b));
 			}
 		}
+		return get(bdd<B,o>::split_clause(b));
 	}
 
 #ifndef DEBUG
@@ -478,6 +472,9 @@ struct bdd_handle<Bool, o> {
 			bdd_ref s = bdd<Bool,o>::rm_clause(b);
 			if (s != bdd<Bool, o>::F && s != b) return get(s);
 			break;
+		}
+		case splitter_type::bad: {
+			return get(bdd<Bool,o>::split_clause(b));
 		}
 		}
 		return get(bdd<Bool,o>::split_clause(b));

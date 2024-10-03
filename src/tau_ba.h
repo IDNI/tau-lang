@@ -166,12 +166,6 @@ auto splitter (const tau_ba<BAs...>& fm, splitter_type st) {
 	return tau_ba<BAs...>(s);
 }
 
-template<typename... BAs>
-auto bad_splitter (const tau_ba<BAs...>& fm) {
-	auto s = tau_bad_splitter(fm.nso_rr.main);
-	return tau_ba<BAs...>(s);
-}
-
 template<typename...BAs>
 using gssotc = nso<tau_ba<BAs...>, BAs...>;
 
@@ -194,8 +188,9 @@ struct tau_ba_factory {
 		return parse(src);
 	}
 
-	std::optional<gssotc<BAs...>> splitter_one(const std::string& type) const {
-		return tau_bad_splitter<tau_ba<BAs...>, BAs...>();
+	std::variant<tau_ba<BAs...>, BAs...> one () const {
+		auto one = _T<tau_ba<BAs...>, BAs...>;
+		return variant<tau_ba<BAs...>, BAs...>(tau_ba<BAs...>(one));
 	}
 };
 
