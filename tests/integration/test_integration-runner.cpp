@@ -88,6 +88,7 @@ TEST_SUITE("only outputs") {
 
 	assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 			const size_t& times) {
+		bdd_init<Bool>();
 		auto sample_src = make_tau_source(sample);
 		auto phi_inf = make_nso_rr_using_factory<tau_ba<bdd_binding>, bdd_binding>(sample_src).main;
 
