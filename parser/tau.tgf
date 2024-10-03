@@ -182,7 +182,7 @@ cli_command            =>
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
         | ("solve"
                 :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
-        | (("e" | "execute"):execute_sym __ (wff_typed | rr)) :execute_cmd
+        | (("r" | "run"):run_sym __ wff)                      :run_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
         | (("s" | "subst" | "substitute")
@@ -210,11 +210,24 @@ cli_command            =>
         | ("set":set_sym   __ option
                                 (__ | _ '=' _) option_value)  :set_cmd
         | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
+# i/o stream definitions
+        | (type __ in_var_name _ '=' _ input_stream)              :def_input_cmd
+        | (type __ out_var_name _ '=' _ output_stream)             :def_output_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ memory)        :history_print_cmd
         | (                     wff | bf)                     :history_store_cmd
         .
+
+# input/output streams
+input_stream           =>
+        # in the future itcp, iudp,...
+        ("ifile" _ '(' _ q_file_name  _ ')') | ("keyboard"):keyboard_sym.
+output_stream          =>
+        # in the future otcp, oudp,...
+        ("ofile" _ '(' _ q_file_name  _ ')') | ("console"):console_sym.
+q_file_name            => '"' file_name '"'.
+file_name              => printable+.
 
 # command arguments
 #
@@ -270,7 +283,8 @@ severity               => ("e" | "error"):error_sym
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
         sym, digits, type, source, named_binding, capture,
-        charvar, in_var_name, out_var_name, uninter_const_name.
+        charvar, in_var_name, out_var_name, uninter_const_name,
+        file_name.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, wff_cb, bf_cb,

@@ -62,6 +62,7 @@
 
 #include "bdd_binding.h"
 #include "repl.h"
+#include "runner.h"
 
 namespace idni::tau {
 
@@ -130,6 +131,8 @@ private:
 	void def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_print_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void def_list_cmd();
+	void def_input_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_output_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> qelim_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
@@ -139,7 +142,7 @@ private:
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> sat_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n);
-	void execute_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void run_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void solve_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
@@ -175,6 +178,8 @@ private:
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 	rec_relations<gssotc<BAs...>> definitions;
+	std::map<var_desc<tau_ba<BAs...>, BAs...>, filename> inputs;
+	std::map<var_desc<tau_ba<BAs...>, BAs...>, filename> outputs;
 	bool error = false;
 	idni::term::colors TC{};
 };

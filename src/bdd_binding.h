@@ -145,12 +145,16 @@ template<>
 struct nso_factory<bdd_binding> {
 	inline static bdd_factory<bdd_binding> bf;
 
-	nso<bdd_binding> parse(const std::string& src, const std::string) {
+	nso<bdd_binding> parse(const std::string& src, const std::string& = "") {
 		return bf.parse(src);
 	}
 
-	nso<bdd_binding> binding(const nso<bdd_binding>& n, const std::string) {
+	nso<bdd_binding> binding(const nso<bdd_binding>& n, const std::string& = "") {
 		return bf.binding(n);
+	}
+
+	auto one() const {
+		return bf.one();
 	}
 
 };
