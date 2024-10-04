@@ -363,9 +363,10 @@ nso<BAs...> transform_eventual_variables(const nso<BAs...>& fm_orig) {
 // }
 
 template<typename... BAs>
-nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const auto& io_vars,
-	const auto& initials, const int_t time_point) {
+nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& flag_initials,
+	const auto& io_vars, const auto& initials, const int_t time_point) {
 	nso<BAs...> phi_prev = build_initial_step(base_fm, io_vars, time_point);
+	phi_prev = build_wff_and(flag_initials, phi_prev);
 	int_t step_num = 1;
 	nso<BAs...> cache = phi_prev;
 	nso<BAs...> phi = build_step(base_fm, phi_prev, io_vars,
@@ -423,8 +424,9 @@ nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm, const int_t highe
 }
 
 template<typename... BAs>
-nso<BAs...> transform_flags_to_streams(nso<BAs...> fm, const int_t lookback) {
+nso<BAs...> transform_flags_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials, const int_t lookback) {
 	using p = tau_parser;
+	flag_initials = _T<BAs...>;
 	map<nso<BAs...>, nso<BAs...>> changes;
 	// transform flags to their respective output streams and add required conditions
 	size_t flag_id = 0;
@@ -470,8 +472,8 @@ nso<BAs...> transform_flags_to_streams(nso<BAs...> fm, const int_t lookback) {
 			nso<BAs...> flag_init_cond =
 			transform_io_var(flag_iovar, get_io_name(flag_iovar), t);
 			flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
-			fm = build_wff_and(build_wff_eq(build_bf_xor(
-			flag_init_cond, calculate_flag(flag, t))), fm);
+			flag_initials = build_wff_and(build_wff_eq(build_bf_xor(
+			flag_init_cond, calculate_flag(flag, t))), flag_initials);
 			++t;
 		}
 	}
@@ -533,8 +535,8 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	vector<nso<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
-	auto transformed_fm = transform_flags_to_streams(fm, lookback);
-
+	nso<BAs...> flag_initials;
+	auto transformed_fm = transform_flags_to_streams(fm, flag_initials, lookback);
 	if (lookback == 0 && fm != transformed_fm) {
 		map<nso<BAs...>, nso<BAs...>> changes;
 		for (const auto& io_var : io_vars) {
@@ -548,10 +550,10 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	} else fm = transformed_fm;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Removed flags";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << build_wff_and(fm, flag_initials);
 
-	io_vars = select_top(fm,
-				is_child_non_terminal<p::io_var, BAs...>);
+	io_vars = select_top(build_wff_and(fm, flag_initials),
+			is_child_non_terminal<p::io_var, BAs...>);
 
 	// Save positions of io_variables which are initial conditions
 	set<pair<string, int_t>> initials;
@@ -563,12 +565,12 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 
 	// Calculate fix point and get unbound continuation of fm
 	int_t time_point = get_max_shift(io_vars);
-	nso<BAs...> phi_inf = find_fixpoint_phi(fm, io_vars, initials, time_point);
+	nso<BAs...> phi_inf = find_fixpoint_phi(fm, flag_initials, io_vars, initials, time_point);
 	nso<BAs...> res;
 	if (is_raw_unbound_continuation_satisfiable(phi_inf)) {
 		int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
-		nso<BAs...> unbound_continuation = find_fixpoint_phi(fm, io_vars, initials,
-												time_point + point_after_inits);
+		nso<BAs...> unbound_continuation = find_fixpoint_phi(fm, flag_initials, io_vars, initials,
+									time_point + point_after_inits);
 		unbound_continuation = normalizer_step(unbound_continuation);
 		res = transform_back_non_initials(unbound_continuation, point_after_inits - 1);
 	} else res = _F<BAs...>;
