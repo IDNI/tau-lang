@@ -833,7 +833,10 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 #endif //TAU_CACHE
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
-	auto vars = select_top(fm, is_child_non_terminal<tau_parser::variable, BAs...>);
+	auto is_var = [](const nso<BAs...>& n){return
+		is_child_non_terminal(tau_parser::variable, n) ||
+			is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
+	auto vars = select_top(fm, is_var);
 	sort(vars.begin(), vars.end(), lex_var_comp<BAs...>);
 
 	vector<int_t> i (vars.size()); // Record assignments of vars
@@ -1071,8 +1074,10 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 	};
 	auto is_var_bf = [](const auto& n) {
 		using tp = tau_parser;
-		return is_child_non_terminal(tp::variable, n) || is_child_non_terminal(tp::bf_ref, n) ||
-			is_child_non_terminal(tp::bf_constant, n);
+		return is_child_non_terminal(tp::variable, n) ||
+				is_child_non_terminal(tp::bf_ref, n) ||
+				is_child_non_terminal(tp::bf_constant, n) ||
+				is_child_non_terminal(tp::uninterpreted_constant, n);
 	};
 	assert(is_non_terminal(type, fm));
 	// Pull negation out of equality
