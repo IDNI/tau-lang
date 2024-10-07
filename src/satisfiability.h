@@ -283,86 +283,6 @@ nso<BAs...> build_step(const nso<BAs...>& original_fm,
 }
 
 template<typename... BAs>
-nso<BAs...> transform_eventual_variables(const nso<BAs...>& fm_orig) {
-	using p = tau_parser;
-	auto sometimes = select_all(fm_orig,
-				is_non_terminal<p::wff_sometimes, BAs...>);
-	// if not more than 1 `sometimes` return original formula
-	if (sometimes.size() < 2) return fm_orig;
-	auto fm = fm_orig;
-	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
-	BOOST_LOG_TRIVIAL(trace) << fm;
-	// for each `sometimes psi` replace it with (N is the nth number of `sometimes`):
-	map<nso<BAs...>,nso<BAs...>> changes;
-	nso<BAs...> always_conjs = nullptr, sometimes_conjs = nullptr;
-	auto capture = wrap<BAs...>(p::capture, "t");
-	auto offset = wrap<BAs...>(p::offset, capture);
-	auto offset_prev = wrap<BAs...>(p::offset,
-		wrap<BAs...>(p::shift, { capture, build_num<BAs...>(1) }));
-	auto offset0 = wrap<BAs...>(p::offset, build_num<BAs...>(0));
-	auto smt = sometimes[0];
-	for (size_t n = 0; ; ++n) {
-		std::stringstream ss; ss << "_e" << n;
-		auto iovar = wrap<BAs...>(p::out_var_name, ss.str());
-		auto eNt = wrap<BAs...>(p::bf,
-			wrap<BAs...>(p::variable,
-			wrap<BAs...>(p::io_var,
-			wrap<BAs...>(p::out, { iovar, offset }))));
-		auto eNt_prev = wrap<BAs...>(p::bf,
-			wrap<BAs...>(p::variable,
-			wrap<BAs...>(p::io_var,
-			wrap<BAs...>(p::out, { iovar, offset_prev }))));
-		auto eN0_is_zero = build_wff_eq(wrap<BAs...>(p::bf,
-			wrap<BAs...>(p::variable,
-			wrap<BAs...>(p::io_var,
-			wrap<BAs...>(p::out, { iovar, offset0 })))));
-		auto eNt_is_zero      = build_wff_eq(eNt);
-		auto eNt_is_one       = build_wff_eq(build_bf_neg(eNt));
-		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
-		auto eNt_prev_is_one  = build_wff_eq(build_bf_neg(eNt_prev));
-		// transform `sometimes psi` to:
-		// (_eN[t] = 1 && _eN[t-1] = 0) -> psi (N is nth `sometimes`)
-		changes[smt] = build_wff_always(build_wff_imply(
-				build_wff_and(eNt_is_one, eNt_prev_is_zero),
-				smt->child[0]));
-		fm = replace(fm, changes);
-		changes.clear();
-		// for each _eN add conjunction
-		// 	always (_eN[0] = 0 && (_eN[t]   = 0 || _eN[t] = 1)
-		//                         && (_eN[t-1] = 1 -> _eN[t] = 1))
-		auto conj = build_wff_always(
-			build_wff_and(eN0_is_zero, build_wff_and(
-				build_wff_or(eNt_is_zero, eNt_is_one),
-				build_wff_imply(eNt_prev_is_one, eNt_is_one))));
-		if (always_conjs == nullptr) always_conjs = conj;
-		else always_conjs = build_wff_and(always_conjs, conj);
-		// create conjunctions for the transformed `sometimes`
-		// 	sometimes _eN[t] & _eN+1[t] & ... & _eN+M[t] = 1
-		if (sometimes_conjs == nullptr) sometimes_conjs = eNt;
-		else sometimes_conjs = build_bf_and(sometimes_conjs, eNt);
-		auto opt_smt = find_top(fm,
-				is_non_terminal<p::wff_sometimes, BAs...>);
-		if (!opt_smt.has_value()) break;
-		smt = opt_smt.value();
-	}
-	// conjunct all with replaced formula
-	auto ret = build_wff_and(fm,
-		build_wff_and(always_conjs, build_wff_sometimes(
-				build_wff_eq(build_bf_neg(sometimes_conjs)))));
-	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
-	BOOST_LOG_TRIVIAL(trace) << ret;
-	return ret;
-}
-
-// auto print_free_vars(const auto& fm) {
-// 	auto vars = get_free_vars_from_nso(fm);
-// 	for (const auto& v : vars) {
-// 		cout << v << ", ";
-// 	}
-// 	cout << "\n";
-// }
-
-template<typename... BAs>
 nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& flag_initials,
 	const auto& io_vars, const auto& initials, const int_t time_point) {
 	nso<BAs...> phi_prev = build_initial_step(base_fm, io_vars, time_point);
@@ -424,6 +344,24 @@ nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm, const int_t highe
 }
 
 template<typename... BAs>
+nso<BAs...> build_flag_on_lookback (const string& name, const string& var,
+									const int_t lookback) {
+	if (lookback >= 2)
+		return wrap(tau_parser::bf,
+				build_io_out_shift<BAs...>(name, var, lookback - 1));
+	else return wrap(tau_parser::bf, build_io_out<BAs...>(name, var));
+}
+
+template<typename... BAs>
+nso<BAs...> build_prev_flag_on_lookback (const string& name, const string& var, const int_t lookback) {
+	if (lookback >= 2)
+		return wrap(tau_parser::bf,
+				build_io_out_shift<BAs...>(name, var, lookback));
+	else return wrap(tau_parser::bf,
+				build_io_out_shift<BAs...>(name, var, 1));
+}
+
+template<typename... BAs>
 nso<BAs...> transform_flags_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials, const int_t lookback) {
 	using p = tau_parser;
 	flag_initials = _T<BAs...>;
@@ -437,29 +375,20 @@ nso<BAs...> transform_flags_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initial
 		std::stringstream ss; ss << "_f" << flag_id++;
 		auto flag_iovar = build_io_out<BAs...>(ss.str(), flagvar);
 		changes[flag] = lookback == 0 ? build_io_out_shift<BAs...>(
-										ss.str(), flagvar, 1) : flag_iovar;
+							ss.str(), flagvar, 1) : flag_iovar;
 
 		// Take lookback of formula into account for constructing rule
-		nso<BAs...> flag_rule1, flag_rule2;
-		if (lookback >= 2) {
-			flag_rule1 = wrap(tau_parser::bf,
-				build_io_out_shift<BAs...>(ss.str(), flagvar, lookback));
-			flag_rule2 = wrap(tau_parser::bf,
-				build_io_out_shift<BAs...>(ss.str(), flagvar, lookback - 1));
-		} else {
-			flag_rule1 = wrap(tau_parser::bf,
-				build_io_out_shift<BAs...>(ss.str(), flagvar, 1));
-			flag_rule2 = wrap(p::bf, flag_iovar);
-		}
+		nso<BAs...> flag_rule1 = build_flag_on_lookback<BAs...>(ss.str(), flagvar, lookback);
+		auto flag_rule2 = build_prev_flag_on_lookback<BAs...>(ss.str(), flagvar, lookback);
 		if (flag | p::flag_greater || flag | p::flag_greater_equal) {
-			// Add flag rule _fk[lookback-1] = 1 -> _fk[lookback] = 1
+			// Add flag rule _fk[lookback] = 1 -> _fk[lookback-1] = 1
 			auto flag_rule = build_wff_imply(build_wff_eq(build_bf_neg(flag_rule1)),
 				build_wff_eq(build_bf_neg(flag_rule2)));
 			// Conjunct flag rule with formula
 			fm = build_wff_and(fm, flag_rule);
 		} else {
 			// Flag is of type less or less_equal
-			// Add flag rule _fk[lookback-1] = 0 -> _fk[lookback] = 0
+			// Add flag rule _fk[lookback] = 0 -> _fk[lookback-1] = 0
 			auto flag_rule = build_wff_imply(build_wff_eq(flag_rule1),
 				build_wff_eq(flag_rule2));
 			// Conjunct flag rule with formula
@@ -520,6 +449,22 @@ bool is_raw_unbound_continuation_satisfiable (const nso<BAs...>& fm) {
 	return is_non_temp_nso_satisfiable(sat_fm);
 }
 
+// Shifts a formula of lookback 0 to previous time step
+template<typename... BAs>
+nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, const int_t shift) {
+	if (shift == 0) return fm;
+	map<nso<BAs...>, nso<BAs...>> changes;
+    for (const auto& io_var : io_vars) {
+        // Skip initial conditions
+        if (is_io_initial(io_var))
+            continue;
+    	int_t var_shift = get_io_var_shift(io_var);
+        changes[io_var] = build_io_out_shift<BAs...>(
+            get_io_name(io_var), "t", var_shift + shift);
+    }
+    return replace(fm, changes);
+}
+
 // We assume that the formula has run through the normalizer before
 // and is a single always statement
 template<typename... BAs>
@@ -537,17 +482,9 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	int_t lookback = get_max_shift(io_vars);
 	nso<BAs...> flag_initials;
 	auto transformed_fm = transform_flags_to_streams(fm, flag_initials, lookback);
-	if (lookback == 0 && fm != transformed_fm) {
-		map<nso<BAs...>, nso<BAs...>> changes;
-		for (const auto& io_var : io_vars) {
-			// Skip initial conditions
-			if (is_io_initial(io_var))
-				continue;
-			changes[io_var] = build_io_out_shift<BAs...>(
-				get_io_name(io_var), "t", 1);
-		}
-		fm = replace(transformed_fm, changes);
-	} else fm = transformed_fm;
+	if (lookback == 0 && fm != transformed_fm)
+		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
+	else fm = transformed_fm;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Removed flags";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << build_wff_and(fm, flag_initials);
@@ -575,6 +512,96 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 		res = transform_back_non_initials(unbound_continuation, point_after_inits - 1);
 	} else res = _F<BAs...>;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
+	return res;
+}
+
+template<typename... BAs>
+nso<BAs...> transform_to_eventual_variables(const nso<BAs...>& fm) {
+	using p = tau_parser;
+	auto smt_fms = select_top(fm, is_child_non_terminal<p::wff_sometimes, BAs...>);
+	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
+
+	int_t max_lookback = get_max_shift(
+		select_top(fm, is_child_non_terminal<p::io_var, BAs...>));
+
+	int_t aw_lookback = 0;
+	vector<nso<BAs...>> aw_io_vars;
+	if (aw_fm.has_value()) {
+		aw_io_vars = select_top(aw_fm.value(),
+			is_child_non_terminal<p::io_var, BAs...>);
+		aw_lookback = get_max_shift(aw_io_vars);
+	}
+
+	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
+	BOOST_LOG_TRIVIAL(trace) << fm;
+	nso<BAs...> ev_assm = _T<BAs...>;
+	nso<BAs...> ev_collection = _1<BAs...>;
+	for (size_t n = 0; n < smt_fms.size(); ++n) {
+		auto st_io_vars = select_top(smt_fms[n], is_child_non_terminal<p::io_var, BAs...>);
+		int_t st_lookback = get_max_shift(st_io_vars);
+
+		std::stringstream ss; ss << "_e" << n;
+		// Build the eventual var flags based on the maximal lookback
+		auto eNt_without_lookback = build_io_out<BAs...>(ss.str(), "t");
+		auto eNt = build_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
+		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
+
+		auto eN0_is_zero = build_wff_eq(wrap(p::bf,
+			build_io_out_const<BAs...>(ss.str(), 0)));
+		auto eNt_is_zero      = build_wff_eq(eNt);
+		auto eNt_is_one       = build_wff_eq(build_bf_neg(eNt));
+		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
+		auto eNt_prev_is_one  = build_wff_eq(build_bf_neg(eNt_prev));
+		// transform `sometimes psi` to:
+		// (_eN[t-1] = 0 && _eN[t] = 1) -> psi (N is nth `sometimes`)
+		auto shifted_sometimes = max_lookback == 0 ?
+			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars, 1) :
+			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars,
+				max_lookback - st_lookback);
+		ev_assm = build_wff_and(ev_assm, build_wff_imply(
+				build_wff_and(eNt_prev_is_zero, eNt_is_one),
+				shifted_sometimes));
+
+		// for each _eN add conjunction
+		// 	(_eN[0] = 0 && (_eN[t-1]   = 0 || _eN[t-1] = 1)
+		//                         && (_eN[t-1] = 1 -> _eN[t] = 1))
+		ev_assm = build_wff_and( ev_assm,
+				build_wff_and(eN0_is_zero, build_wff_and(
+				build_wff_or(eNt_prev_is_zero, eNt_prev_is_one),
+				build_wff_imply(eNt_prev_is_one, eNt_is_one))));
+
+		ev_collection = build_bf_and(ev_collection, eNt_without_lookback);
+	}
+	auto res = _T<BAs...>;
+	// Check if always part is present
+	if (aw_fm.has_value()) {
+		auto aw = trim2(aw_fm.value());
+		// Adjust lookback
+		aw = shift_io_vars_in_fm(aw, aw_io_vars, max_lookback - aw_lookback);
+		// Conjunct former always part and eventual variable assumptions
+		res = build_wff_always(
+			build_wff_and(aw, ev_assm));
+		// Conjunct new sometimes part if present
+		if (ev_assm != _T<BAs...>) {
+			// if the lookback of all parts is 0, we need to shift the always part
+			// to account for the modified lookback due to the eventual variables
+			if (max_lookback == 0) res = shift_io_vars_in_fm(res, aw_io_vars, 1);
+			res = build_wff_and(
+				res, build_wff_sometimes(
+					build_wff_eq(build_bf_neg(ev_collection))));
+		}
+	} else {
+		// Conjunct new sometimes part if present
+		if (ev_assm != _T<BAs...>) {
+			res = build_wff_always(ev_assm);
+			res = build_wff_and(
+				res, build_wff_sometimes(
+					build_wff_eq(build_bf_neg(ev_collection))));
+		} else return fm;
+	}
+
+	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
+	BOOST_LOG_TRIVIAL(trace) << res;
 	return res;
 }
 
