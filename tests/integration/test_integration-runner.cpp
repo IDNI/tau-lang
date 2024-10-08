@@ -94,7 +94,7 @@ TEST_SUITE("only outputs") {
 
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
-		std::cout << "run_test/sample: " << phi_inf << "\n";
+		std::cout << "run_test/sample: " << sample << "\n";
 		#endif // DEBUG
 
 		// prepare inputs, outputs and the interpreter
@@ -184,18 +184,22 @@ TEST_SUITE("only outputs") {
 		auto memory = run_test(sample, 2);
 	}
 
-	/*TEST_CASE("o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1]") {
-		const char* sample = "o1[0] = {bdd:a} && o1[t] & o1[t-1]' = 0 && o1[t] & o1[t-1] != 0 && o1[t] != o1[t-1].";
+	TEST_CASE("o1[0] = {bdd:a} && o1[t] < o1[t-1]") {
+		const char* sample = "o1[0] = {bdd:a} && o1[t] < o1[t-1].";
 		auto memory = run_test(sample, 4);
-	}*/
+	}
 
-	// TODO (HIGH) review the following test case, maybe is failing due to the
-	// missprocessing of uninterpreted constants in bf_reduce_canonical
+	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0"
+			* doctest::should_fail(true)) {
+		const char* sample = "<:a> o1[t] + <:b> o1[t]' = 0.";
+		auto memory = run_test(sample, 8);
+	}
+
 	// f(f(f(x))) = f(x) using uninterpreted constants
-	/*TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
+	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
 		const char* sample = "o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
-	}*/
+	}
 
 	// f(f(f(x))) = f(x) using constants
 	TEST_CASE("o1[t] = {bdd:a} o1[t-1] + {bdd:b} o1[t-1]'") {
