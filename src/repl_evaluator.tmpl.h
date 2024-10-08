@@ -250,7 +250,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		auto [type, value] = check.value();
 		switch (type) {
 		case tau_parser::wff:
-			return dnf_wff<tau_ba<BAs...>, BAs...>(value);
+			return to_dnf2(value);
 		case tau_parser::bf:
 			return dnf_bf<tau_ba<BAs...>, BAs...>(value);
 		default:
@@ -270,7 +270,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		auto [type, value] = check.value();
 		switch (type) {
 		case tau_parser::wff:
-			return cnf_wff<tau_ba<BAs...>, BAs...>(value);
+			return to_cnf2(value);
 		case tau_parser::bf:
 			return cnf_bf<tau_ba<BAs...>, BAs...>(value);
 		default:
