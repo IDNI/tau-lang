@@ -572,10 +572,10 @@ void repl_evaluator<BAs...>::is_valid_cmd(
 template<typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n) {
-	if (find_top(n, is_non_terminal<tau_parser::wff_sometimes, tau_ba<BAs...>, BAs...>)) {
-		cout << "Currently only support for always quantification.";
-		return {};
-	}
+	// if (find_top(n, is_non_terminal<tau_parser::wff_sometimes, tau_ba<BAs...>, BAs...>)) {
+	// 	cout << "Currently only support for always quantification.";
+	// 	return {};
+	// }
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
@@ -601,11 +601,10 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 		nso<tau_ba<BAs...>,BAs...> res;
 		// Convert each disjunct to unbounded continuation
 		for (auto& clause : clauses) {
-
-			if (res) res = build_wff_or(res, build_wff_always(always_to_unbounded_continuation(clause)));
-			else res = build_wff_always(always_to_unbounded_continuation(clause));
+			if (res) res = build_wff_or(res, build_wff_always(transform_to_execution(clause)));
+			else res = build_wff_always(transform_to_execution(clause));
 		}
-		return normalizer_step(res);
+		return res;
 	}
 	cout << "error: invalid argument\n";
 	return {};
