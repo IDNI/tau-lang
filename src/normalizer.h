@@ -298,16 +298,28 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 		return false;
 	}
 
-	nso<BAs...> wff = build_wff_equiv<BAs...>(n1, n2);
-	auto vars = get_free_vars_from_nso(wff);
-	for(auto& v: vars) wff = build_wff_all<BAs...>(v, wff);
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << wff;
+	nso<BAs...> imp1 = build_wff_imply<BAs...>(n1, n2);
+	nso<BAs...> imp2 = build_wff_imply<BAs...>(n2, n1);
+	auto vars = get_free_vars_from_nso(imp1);
 
-	auto normalized = normalizer_step<BAs...>(wff);
-	auto check = normalized | tau_parser::wff_t;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << check.has_value();
+	for(auto& v: vars) {
+		imp1 = build_wff_all<BAs...>(v, imp1);
+		imp2 = build_wff_all<BAs...>(v, imp2);
+	}
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << build_wff_and(imp1, imp2);
 
-	return check.has_value();
+	auto dir1 = normalizer_step<BAs...>(imp1);
+	assert((dir1 == _T<BAs...> || dir1 == _F<BAs...>));
+	if (dir1 == _F<BAs...>) {
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << dir1;
+		return false;
+	}
+	auto dir2 = normalizer_step<BAs...>(imp2);
+	bool res = (dir1 == _T<BAs...> && dir2 == _T<BAs...>);
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << res;
+
+	return res;
 }
 
 template <typename... BAs>
