@@ -189,6 +189,12 @@ TEST_SUITE("only outputs") {
 		auto memory = run_test(sample, 4);
 	}
 
+	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0"
+			* doctest::should_fail(true)) {
+		const char* sample = "<:a> o1[t] + <:b> o1[t]' = 0.";
+		auto memory = run_test(sample, 8);
+	}
+
 	// f(f(f(x))) = f(x) using uninterpreted constants
 	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
 		const char* sample = "o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
