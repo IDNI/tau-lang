@@ -1086,7 +1086,7 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 	auto new_fm = wff ? fm | repeat_all<step<BAs...>, BAs...>(neq_to_eq<BAs...>) : fm;
 	vector<nso<BAs...>> vars = select_top(new_fm, is_var_wff);
 	if (vars.empty()) {
-		if (wff) return fm | repeat_all<step<BAs...>, BAs...>(simplify_wff<BAs...>);
+		if (wff) return fm;
 		else return fm;
 	}
 
@@ -1168,7 +1168,7 @@ nso<BAs...> disjunct_cnfs_to_cnf (const nso<BAs...>& c1, const nso<BAs...>& c2) 
 }
 
 template<typename... BAs>
-nso<BAs...> push_negation_in(const nso<BAs...>& fm) {
+nso<BAs...> push_negation_one_in(const nso<BAs...>& fm) {
 	using p = tau_parser;
 	if (is_child_non_terminal(p::wff_neg, fm)) {
 		auto c = trim2(fm);
@@ -1192,13 +1192,23 @@ nso<BAs...> push_negation_in(const nso<BAs...>& fm) {
 	return fm;
 }
 
+template<typename... BAs>
+nso<BAs...> push_negation_in(const nso<BAs...>& fm) {
+	auto new_fm = push_negation_one_in(fm);
+	vector<nso<BAs...>> new_c;
+	for (const auto& c : new_fm->child) {
+		new_c.emplace_back(push_negation_in(c));
+	}
+	return make_node(new_fm->value, new_c);
+}
+
 // Conversion to dnf while applying reductions during the process
 template<typename... BAs>
 nso<BAs...> to_dnf2(nso<BAs...> fm, const int_t d=0) {
 	using p = tau_parser;
 	assert(is_non_terminal(p::wff, fm));
 
-	fm = push_negation_in(fm);
+	fm = push_negation_one_in(fm);
 
 	if (is_child_non_terminal(p::wff_and, fm)) {
 		fm = conjunct_dnfs_to_dnf(to_dnf2(trim(fm)->child[0], d+1),
@@ -1218,7 +1228,7 @@ nso<BAs...> to_cnf2(nso<BAs...> fm, const int_t d = 0) {
 		using p = tau_parser;
 	assert(is_non_terminal(p::wff, fm));
 
-	fm = push_negation_in(fm);
+	fm = push_negation_one_in(fm);
 
 	if (is_child_non_terminal(p::wff_or, fm)) {
 		fm = disjunct_cnfs_to_cnf(to_cnf2(trim(fm)->child[0], d+1),
@@ -1673,9 +1683,9 @@ nso<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 			nso<BAs...> new_disjunct;
 			// Push quantifier inside disjunction
 			for (const auto &d: disjuncts) {
-				auto new_d = build_wff_neg(d) | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+				auto new_d = build_wff_neg(d) | (nso_transform<BAs...>)push_negation_in;
 				new_d = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_d))
-				        | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+				        | (nso_transform<BAs...>)push_negation_in;
 				if (new_disjunct) new_disjunct = build_wff_or(new_disjunct, new_d);
 				else new_disjunct = new_d;
 			}
@@ -1690,15 +1700,15 @@ nso<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 			}
 			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
 			new_func = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_func))
-			           | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+			           | (nso_transform<BAs...>)push_negation_in;
 			if (res) res = build_wff_and(res, new_func);
 			else res = new_func;
 		} else {
 			// Turn universal into existential quantifier and eliminate
 			auto new_clause = build_wff_neg(clause)
-			                  | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+			                  | (nso_transform<BAs...>)push_negation_in;
 			new_clause = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_clause))
-			             | repeat_all<step<BAs...>, BAs...>(to_nnf_wff<BAs...>);
+                         | (nso_transform<BAs...>)push_negation_in;
 			if (!res) res = new_clause;
 			else res = build_wff_and(res, new_clause);
 		}
