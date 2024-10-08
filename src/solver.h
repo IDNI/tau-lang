@@ -114,7 +114,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 		// with x <- h(Z)
 		auto g = replace_with(vars[0], _1<BAs...>, f) | bf_reduce_canonical<BAs...>();
 		auto h = replace_with(vars[0], _0<BAs...>, f) | bf_reduce_canonical<BAs...>();
-		auto gh = (g & h);
+		auto gh = (g & h) | bf_reduce_canonical<BAs...>();
 		auto solution = make_removed_vars_solution(vars, gh);
 
 		#ifdef DEBUG
