@@ -87,7 +87,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
 	#ifdef DEBUG
-	std::cout << "find solution/eq: " << eq << "\n";
+	std::cout << "find_solution/eq: " << eq << "\n";
 	#endif // DEBUG
 
 	auto has_no_var = [](const nso<BAs...>& f) {
@@ -95,13 +95,20 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	};
 
 	if (!(eq | tau_parser::bf_eq).has_value()) {
+
 		#ifdef DEBUG
-		std::cout << "find solution/solution: {}\n";
+		std::cout << "find_solution/solution[no_eq]: {}\n";
 		#endif // DEBUG
+
 		return {};
 	}
 
 	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+
+	#ifdef DEBUG
+	std::cout << "find_solution/f: " << f << "\n";
+	#endif // DEBUG
+
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
@@ -109,21 +116,36 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 		auto h = replace_with(vars[0], _0<BAs...>, f) | bf_reduce_canonical<BAs...>();
 		auto gh = (g & h);
 		auto solution = make_removed_vars_solution(vars, gh);
+
+		#ifdef DEBUG
+		std::cout << "find_solution/var[0]: " << vars[0] << "\n";
+		std::cout << "find_solution/g: " << g << "\n";
+		std::cout << "find_solution/h: " << h << "\n";
+		std::cout << "find_solution/gh: " << gh << "\n";
+		std::cout << "find_solution/solution[removed_vars]: ";
+		for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";
+		std::cout << "\n";
+		#endif // DEBUG
+
 		if (has_no_var(gh)) {
 			if (gh != _0<BAs...>) {
+
 				#ifdef DEBUG
-				std::cout << "find solution/solution: {}\n";
+				std::cout << "find_solution/solution[gh_no_var,gh_!=_0]: {}\n";
 				#endif // DEBUG
+
 				return {};
 			}
 			else {
 				auto changes = solution;
 				solution[vars[0]] = h != _0<BAs...> ? replace(h, changes) : replace(~g, changes) | bf_reduce_canonical<BAs...>();
+
 				#ifdef DEBUG
-				std::cout << "find solution/solution: ";
+				std::cout << "find_solution/solution[gh_no_var,gh=0]: ";
 				for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";
 				std::cout << "\n";
 				#endif // DEBUG
+
 				return solution;
 			}
 		}
@@ -133,17 +155,21 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 			if (auto nn = replace(h, restricted.value()) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
 				solution[vars[0]] = nn;
 			else solution[vars[0]] = replace(~g, restricted_copy.value()) | bf_reduce_canonical<BAs...>();
+
 			#ifdef DEBUG
-			std::cout << "find solution/solution: ";
+			std::cout << "find_solution/solution[general]: ";
 			for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";
 			std::cout << "\n";
 			#endif // DEBUG
+
 			return solution;
 		}
 	}
+
 	#ifdef DEBUG
-	std::cout << "find solution/solution: {}\n";
+	std::cout << "find_solution/solution[no_var]: {}\n";
 	#endif // DEBUG
+
 	return {};
 }
 
@@ -173,6 +199,9 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	std::cout << "lgrs/solution: ";
 	for (const auto& [k, v] : phi) std::cout << k << " <- " << v << " ";
 	std::cout << "\n";
+	auto copy = phi;
+	auto check = snf_wff(replace(equality, copy));
+	std::cout << "lgrs/check: " << check << "\n";
 	#endif // DEBUG
 
 	return phi;
@@ -604,7 +633,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 	#ifdef DEBUG
 	if (system.first.has_value())
-		std::cout << "solve_system/eq: " << system.first.value() << " ";
+		std::cout << "solve_system/eq: " << system.first.value() << "\n";
 	if (!system.second.empty()) std::cout << "solve_system/inequalities: ";
 	for (const auto& inequality : system.second) std::cout << inequality << " ";
 	std::cout << "\n";
