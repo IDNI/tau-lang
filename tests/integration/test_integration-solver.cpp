@@ -40,10 +40,10 @@ bool check_solution(const nso<bdd_binding>& equation, std::map<nso<bdd_binding>,
 	auto substitution = replace(equation, copy);
 	auto check = snf_wff(substitution);
 	#ifdef DEBUG
-	std::cout << "checking solution: " << solution;
-	std::cout << "equation: " << equation << "\n";
-	std::cout << "substitution: " << substitution << "\n";
-	std::cout << "snf: " << check << "\n";
+	std::cout << "check_solution/solution: " << solution;
+	std::cout << "check_solution/equation: " << equation << "\n";
+	std::cout << "check_solution/substitution: " << substitution << "\n";
+	std::cout << "check_solution/check: " << check << "\n";
 	#endif // DEBUG
 	return check == _T<bdd_binding>;
 }
@@ -474,7 +474,7 @@ TEST_SUITE("solve_system") {
 			? check_solution(system.first.value(), solution.value())
 			: false;
 		for (const auto& equation: system.second)
-			check = check ? check_solution(equation, solution.value()) : false;
+			check = check && check_solution(equation, solution.value());
 		return check;
 	}
 
@@ -485,17 +485,45 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	TEST_CASE("one var: {bdd: a} x y = 0 && {bdd: a} y != 0.") {
+	TEST_CASE("two var: {bdd: a} x y = 0 && {bdd: a} y != 0.") {
 		const char* equality = "{bdd: a} x y = 0.";
 		const std::vector<std::string> inequalities =
 			{ "{bdd: a} y != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	TEST_CASE("one var: {bdd: a} x | {bdd: a} y = 0 && {bdd: b} y x != 0.") {
+	TEST_CASE("two var: {bdd: a} x | {bdd: a} y = 0 && {bdd: b} y x != 0.") {
 		const char* equality = "{bdd: a} x | {bdd: a} y = 0.";
 		const std::vector<std::string> inequalities =
 			{ "{bdd: b} y x != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: x < y.") {
+		const char* equality = "x & y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "x' & y | x & y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	/*TEST_CASE("two var: y = {bdd: a} && x < y.") {
+		const char* equality = "y' & { bdd: a } | y & { bdd: a' } | x y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "x' & y | x & y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}*/
+
+	TEST_CASE("two var: y < x && z < y.") {
+		const char* equality = "y & x' | z & y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y & x' | x & y' != 0.", "y & z' | z & y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: y < x && z < y && w < z.") {
+		const char* equality = "y & x' | z & y' | w & z' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y & x' | x & y' != 0.", "y & z' | z & y' != 0.", "w' & z | w & z' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 }
