@@ -184,8 +184,8 @@ TEST_SUITE("only outputs") {
 		auto memory = run_test(sample, 2);
 	}
 
-	TEST_CASE("o1[0] = {bdd:a} && o1[t] < o1[t-1]") {
-		const char* sample = "o1[0] = {bdd:a} && o1[t] < o1[t-1].";
+	TEST_CASE("o1[0] = {bdd:a} && o1[t] < o1[t-1] && o1[t] != 0") {
+		const char* sample = "o1[0] = {bdd:a} && o1[t] < o1[t-1] && o1[t] != 0.";
 		auto memory = run_test(sample, 4);
 	}
 
