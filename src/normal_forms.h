@@ -1057,6 +1057,7 @@ nso<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_
         else reduced_fm = is_cnf ? ( wff ? build_wff_and(reduced_fm, var_path) : build_bf_and(reduced_fm, var_path))
                             : ( wff ? build_wff_or(reduced_fm, var_path) : build_bf_or(reduced_fm, var_path));
 	}
+	assert(reduced_fm != nullptr);
 	return reduced_fm;
 }
 
@@ -1148,7 +1149,6 @@ nso<BAs...> operator|(const nso<BAs...>& fm, const wff_reduce_cnf<BAs...>& r) {
 	return r(fm);
 }
 
-
 template<typename... BAs>
 nso<BAs...> conjunct_dnfs_to_dnf (const nso<BAs...>& d1, const nso<BAs...>& d2) {
 	nso<BAs...> res = _F<BAs...>;
@@ -1194,52 +1194,78 @@ nso<BAs...> push_negation_one_in(const nso<BAs...>& fm) {
 
 template<typename... BAs>
 nso<BAs...> push_negation_in(const nso<BAs...>& fm) {
+#ifdef TAU_CACHE
+	static map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(fm); it != cache.end())
+		return it->second;
+#endif
 	auto new_fm = push_negation_one_in(fm);
 	vector<nso<BAs...>> new_c;
 	for (const auto& c : new_fm->child) {
 		new_c.emplace_back(push_negation_in(c));
 	}
+#ifdef TAU_CACHE
+	return cache.emplace(fm, make_node(new_fm->value, new_c)).first->second;
+#endif
 	return make_node(new_fm->value, new_c);
 }
 
 // Conversion to dnf while applying reductions during the process
 template<typename... BAs>
-nso<BAs...> to_dnf2(nso<BAs...> fm, const int_t d=0) {
+nso<BAs...> to_dnf2(const nso<BAs...>& fm, const int_t d=0) {
+#ifdef TAU_CACHE
+	static map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(fm); it != cache.end())
+		return it->second;
+#endif
 	using p = tau_parser;
 	assert(is_non_terminal(p::wff, fm));
 
-	fm = push_negation_one_in(fm);
+	auto new_fm = push_negation_one_in(fm);
 
-	if (is_child_non_terminal(p::wff_and, fm)) {
-		fm = conjunct_dnfs_to_dnf(to_dnf2(trim(fm)->child[0], d+1),
-			to_dnf2(trim(fm)->child[1], d+1));
+	if (is_child_non_terminal(p::wff_and, new_fm)) {
+		new_fm = conjunct_dnfs_to_dnf(to_dnf2(trim(new_fm)->child[0], d+1),
+			to_dnf2(trim(new_fm)->child[1], d+1));
 		// After reaching certain wff_and depths, perform simplification
-		if (d % 4 == 0) fm = fm | wff_reduce_dnf<BAs...>();
-	} else if (is_child_non_terminal(p::wff_or, fm))  {
-		fm = build_wff_or(to_dnf2(trim(fm)->child[0], d),
-					to_dnf2(trim(fm)->child[1], d));
+		if (d % 4 == 0) new_fm = new_fm | wff_reduce_dnf<BAs...>();
+	} else if (is_child_non_terminal(p::wff_or, new_fm))  {
+		new_fm = build_wff_or(to_dnf2(trim(new_fm)->child[0], d),
+					to_dnf2(trim(new_fm)->child[1], d));
 	}
-	return fm;
+	assert(fm != nullptr);
+#ifdef TAU_CACHE
+	return cache.emplace(fm, new_fm).first->second;
+#endif
+	return new_fm;
 }
 
 // Conversion to cnf while applying reductions during the process
 template<typename... BAs>
-nso<BAs...> to_cnf2(nso<BAs...> fm, const int_t d = 0) {
-		using p = tau_parser;
+nso<BAs...> to_cnf2(const nso<BAs...>& fm, const int_t d = 0) {
+#ifdef TAU_CACHE
+	static map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(fm); it != cache.end())
+		return it->second;
+#endif
+    using p = tau_parser;
 	assert(is_non_terminal(p::wff, fm));
 
-	fm = push_negation_one_in(fm);
+	auto new_fm = push_negation_one_in(fm);
 
-	if (is_child_non_terminal(p::wff_or, fm)) {
-		fm = disjunct_cnfs_to_cnf(to_cnf2(trim(fm)->child[0], d+1),
-			to_cnf2(trim(fm)->child[1], d+1));
+	if (is_child_non_terminal(p::wff_or, new_fm)) {
+		new_fm = disjunct_cnfs_to_cnf(to_cnf2(trim(new_fm)->child[0], d+1),
+			to_cnf2(trim(new_fm)->child[1], d+1));
 		// After reaching certain wff_and depths, perform simplification
-		if (d % 4 == 0) fm = fm | wff_reduce_cnf<BAs...>();
-	} else if (is_child_non_terminal(p::wff_and, fm))  {
-		fm = build_wff_and(to_cnf2(trim(fm)->child[0], d),
-					to_cnf2(trim(fm)->child[1], d));
+		if (d % 4 == 0) new_fm = new_fm | wff_reduce_cnf<BAs...>();
+	} else if (is_child_non_terminal(p::wff_and, new_fm))  {
+		new_fm = build_wff_and(to_cnf2(trim(new_fm)->child[0], d),
+					to_cnf2(trim(new_fm)->child[1], d));
 	}
-	return fm;
+	assert(fm != nullptr);
+#ifdef TAU_CACHE
+	return cache.emplace(fm, new_fm).first->second;
+#endif
+	return new_fm;
 }
 
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
