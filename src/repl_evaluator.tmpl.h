@@ -1051,7 +1051,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		break;
 	case tau_parser::normalize_sym: cout
 		<< "normalize or n command normalizes a formula, prints it and\n"
-		<< "saves it into memory of previous memorys\n"
+		<< "saves it into memory of previous memoris\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  normalize <NSORR>      normalizes the given NSO RR\n"
