@@ -109,20 +109,26 @@ TEST_SUITE("only outputs") {
 			// we execute the i-th step
 			auto out = runner.step(in.value());
 
+			#ifdef DEBUG
 			if (out.size() == 0) {
-				FAIL_CHECK("run_test/output[", i, "]: {}"); // no output
+				std::cout << "run_test/output[" << i << "]: {}"; // no output
+				runner.memory.clear();
+				break;
 			}
 
-			#ifdef DEBUG
 			std::cout << "run_test/output[" << i << "]: ";
 			for (const auto& [var, value]: out) {
 				std::cout << var << " <- " << value << " ... ";
 				if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<bdd_binding>, bdd_binding>); io_vars) {
-					FAIL_CHECK("run_test/output[", i, "]: unexpected io_var ", io_vars.value());
+					std::cout << "run_test/output[", i, "]: unexpected io_var ", io_vars.value();
+					runner.memory.clear();
+					break;
 				}
 			}
 			std::cout << "\n";
 			#endif // DEBUG
+
+			if (runner.memory.empty()) break;
 		}
 
 		return runner.memory;
@@ -142,68 +148,81 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[t] = 0") {
 		const char* sample = "o1[t] = 0.";
 		auto memory = run_test(sample, 2);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[t] = {bdd: a}") {
 		const char* sample = "o1[t] = {bdd: a}.";
 		auto memory = run_test(sample, 2);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[0] = 1") {
 		const char* sample = "o1[0] = 1.";
 		auto memory = run_test(sample, 3);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[0] = {bdd: a}") {
 		const char* sample = "o1[0] = {bdd: a}.";
 		auto memory = run_test(sample, 3);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[0] = 1 && o1[t] = o1[t-1]") {
 		const char* sample = "o1[0] = 1 && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 2);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[0] = {bdd: a} && o1[t] = o1[t-1]") { // replace second = by !=
 		const char* sample = "o1[0] = {bdd: a} && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[t] | o2[t]= 0") {
 		const char* sample = "o1[t] | o2[t]= 0.";
 		auto memory = run_test(sample, 2);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[t] & o1[t-1] = 1") {
 		const char* sample = "o1[t] & o1[t-1] = 1.";
 		auto memory = run_test(sample, 2);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[t] + o1[t-1] = 1") {
 		const char* sample = "o1[t] + o1[t-1] = 1.";
 		auto memory = run_test(sample, 2);
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[0] = {bdd:a} && o1[t] < o1[t-1] && o1[t] != 0") {
 		const char* sample = "o1[0] = {bdd:a} && o1[t] < o1[t-1] && o1[t] != 0.";
 		auto memory = run_test(sample, 4);
+		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0"
-			* doctest::should_fail(true)) {
+	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0") {
 		const char* sample = "<:a> o1[t] + <:b> o1[t]' = 0.";
 		auto memory = run_test(sample, 8);
+		// execution of this test should fail, i.e. memory should be empty
+		CHECK ( memory.empty() );
 	}
 
 	// f(f(f(x))) = f(x) using uninterpreted constants
 	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
 		const char* sample = "o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
+		CHECK ( !memory.empty() );
 	}
 
 	// f(f(f(x))) = f(x) using constants
 	TEST_CASE("o1[t] = {bdd:a} o1[t-1] + {bdd:b} o1[t-1]'") {
 		const char* sample = "o1[t] = {bdd:a} o1[t-1] + {bdd:b} o1[t-1]'.";
 		auto memory = run_test(sample, 8);
+		CHECK ( !memory.empty() );
 	}
 }
