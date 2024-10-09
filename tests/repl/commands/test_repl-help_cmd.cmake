@@ -14,11 +14,11 @@ add_repl_test(help_shortened_normalize_cmd "h normalize" "normalizes the given N
 add_test(NAME test_repl-help_qelim_command_cmd-full
 	COMMAND bash -c "echo 'help qelim. quit' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_qelim_command_cmd-full PROPERTIES
-	PASS_REGULAR_EXPRESSION "qelim command eliminates inner most quantifier")
+	PASS_REGULAR_EXPRESSION "qelim command eliminates the innermost quantifier")
 add_test(NAME test_repl-help_shortened_qelim_cmd
 	COMMAND bash -c "echo 'h qelim. q' | $<TARGET_FILE:${TAU_EXECUTABLE_NAME}>")
 set_tests_properties(test_repl-help_shortened_qelim_cmd PROPERTIES
-	PASS_REGULAR_EXPRESSION "qelim command eliminates inner most quantifier")
+	PASS_REGULAR_EXPRESSION "qelim command eliminates the innermost quantifier")
 
 # help normalize command with shortened command
 add_repl_test(help_normalize_cmd_shortened "help n" "normalizes the given NSO RR")
