@@ -413,8 +413,8 @@ nso<BAs...> transform_flags_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initial
 							ss.str(), flagvar, 1) : flag_iovar;
 
 		// Take lookback of formula into account for constructing rule
-		nso<BAs...> flag_rule1 = build_flag_on_lookback<BAs...>(ss.str(), flagvar, lookback);
-		auto flag_rule2 = build_prev_flag_on_lookback<BAs...>(ss.str(), flagvar, lookback);
+		nso<BAs...> flag_rule1 = build_prev_flag_on_lookback<BAs...>(ss.str(), flagvar, lookback);
+		auto flag_rule2 = build_flag_on_lookback<BAs...>(ss.str(), flagvar, lookback);
 		if (flag | p::flag_greater || flag | p::flag_greater_equal) {
 			// Add flag rule _fk[lookback] = 1 -> _fk[lookback-1] = 1
 			auto flag_rule = build_wff_imply(build_wff_eq(build_bf_neg(flag_rule1)),
