@@ -960,7 +960,7 @@ void repl_evaluator<BAs...>::help_cmd(
 
 		<< "Formula commands:\n"
 		<< "  normalize or n         normalize formula\n"
-		<< "  qelim                  inner most quantifier elimination\n"
+		<< "  qelim                  innermost quantifier elimination\n"
 		<< "\n"
 
 		<< "Normal form commands:\n"
@@ -1050,7 +1050,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		break;
 	case tau_parser::normalize_sym: cout
 		<< "normalize or n command normalizes a formula, prints it and\n"
-		<< "saves it into memory of previous memorys\n"
+		<< "saves it into memory of previous memoris\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  normalize <NSORR>      normalizes the given NSO RR\n"
@@ -1060,11 +1060,11 @@ void repl_evaluator<BAs...>::help_cmd(
 	//	<< "  normalize <selection>  normalizes the selection\n";
 		break;
 	case tau_parser::qelim_sym: cout
-		<< "qelim command eliminates inner most quantifier, prints it and\n"
-		<< "saves it into memory of previous memorys\n"
+		<< "qelim command eliminates the innermost quantifier, prints it and\n"
+		<< "saves it into memory of previous memories\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  qelim <WFF>            eliminates inner most quantifier in the given WFF\n";
+		<< "  qelim <WFF>            eliminates innermost quantifier in the given WFF\n";
 		break;
 	case tau_parser::run_sym: cout
 		<< "Command r, run ...\n";
