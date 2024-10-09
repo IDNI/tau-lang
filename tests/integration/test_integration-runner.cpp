@@ -143,7 +143,7 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 		output_bdd_console<tau_ba<bdd_binding>, bdd_binding>& outputs,
 		const size_t& times) {
-	output_bdd_console<tau_ba<bdd_binding>, bdd_binding> outputs;
+	input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> inputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
