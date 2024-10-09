@@ -191,7 +191,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 		| optional_value_extractor<nso<BAs...>>;
 	solution<BAs...> phi;
 	for (auto& [x_i, z_i] : s.value())
-		phi[x_i] = ((z_i & f) | (x_i & ~f))
+		phi[x_i] = ((z_i & f) + (x_i & ~f))
 			| bf_reduce_canonical<BAs...>();
 
 	#ifdef DEBUG
@@ -652,8 +652,25 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		else if (ng_i == _T<BAs...>) continue;
 		inequalities.insert(ng_i);
 	}
-	// and finally solve the given system  of inequalities
-	return solve_inequality_system<BAs...>(inequalities, splitter_one);
+	// solve the given system  of inequalities
+	auto inequality_solution = solve_inequality_system<BAs...>(inequalities, splitter_one);
+	if (!inequality_solution.has_value()) return {};
+	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
+	solution<BAs...> solution;
+
+	#ifdef DEBUG
+	std::cout << "solve_inequality_system/solution: ";
+	#endif // DEBUG
+
+	for (auto& [k, v]: phi.value()) {
+		auto copy = inequality_solution.value();
+		solution[k] = replace(v, copy);
+
+		#ifdef DEBUG
+		std::cout << k << " <- " << solution[k] << " ";
+		#endif // DEBUG
+	}
+	return solution;
 }
 
 template<typename...BAs>

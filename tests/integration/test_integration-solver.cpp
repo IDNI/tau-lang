@@ -506,12 +506,12 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	/*TEST_CASE("two var: y = {bdd: a} && x < y.") {
+	TEST_CASE("two var: y = {bdd: a} && x < y.") {
 		const char* equality = "y' & { bdd: a } | y & { bdd: a' } | x y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "x' & y | x & y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
-	}*/
+	}
 
 	TEST_CASE("two var: y < x && z < y.") {
 		const char* equality = "y & x' | z & y' = 0.";
