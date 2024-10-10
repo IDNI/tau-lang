@@ -2302,7 +2302,7 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_greater(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	return build_wff_neg(build_bf_less_equal<BAs...>(l, r));
+	return build_bf_less<BAs...>(r, l);
 }
 
 template<typename... BAs>

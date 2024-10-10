@@ -2063,6 +2063,7 @@ nso<BAs...> snf_wff(const nso<BAs...>& n) {
 			| elim_eqs<BAs...>
 			| simplify_wff<BAs...>
 			| push_neg_for_snf<BAs...>)
+		// TODO (LOW) Lucca thinks that maybe one call is enough
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
 	// in the second step we compute the SNF of the negation of the the result
 	// of the first step in order to squeeze the negative equal exponent literals.

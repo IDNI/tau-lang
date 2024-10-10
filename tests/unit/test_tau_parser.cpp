@@ -927,7 +927,7 @@ TEST_SUITE("parsing wwf formulas ") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff
-			| tau_parser::wff_neg;
+			| tau_parser::wff_and;
 		CHECK( greater_rule.has_value() );
 	}
 
