@@ -250,7 +250,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		auto [type, value] = check.value();
 		switch (type) {
 		case tau_parser::wff:
-			return dnf_wff<tau_ba<BAs...>, BAs...>(value);
+			return to_dnf2(value);
 		case tau_parser::bf:
 			return dnf_bf<tau_ba<BAs...>, BAs...>(value);
 		default:
@@ -270,7 +270,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		auto [type, value] = check.value();
 		switch (type) {
 		case tau_parser::wff:
-			return cnf_wff<tau_ba<BAs...>, BAs...>(value);
+			return to_cnf2(value);
 		case tau_parser::bf:
 			return cnf_bf<tau_ba<BAs...>, BAs...>(value);
 		default:
@@ -601,9 +601,10 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 		nso<tau_ba<BAs...>,BAs...> res;
 		// Convert each disjunct to unbounded continuation
 		for (auto& clause : clauses) {
-
-			if (res) res = build_wff_or(res, build_wff_always(always_to_unbounded_continuation(clause)));
-			else res = build_wff_always(always_to_unbounded_continuation(clause));
+			if (res) res = build_wff_or(res, build_wff_always(
+				always_to_unbounded_continuation(clause)));
+			else res = build_wff_always(
+				always_to_unbounded_continuation(clause));
 		}
 		return normalizer_step(res);
 	}
