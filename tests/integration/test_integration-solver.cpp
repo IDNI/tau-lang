@@ -332,6 +332,12 @@ TEST_SUITE("find_solution") {
 		const char* sample = "x & y' = 0.";
 		CHECK ( test_find_solution(sample) );
 	}
+
+	//  number 1 of test_integration-runner.cpp
+	TEST_CASE("x + <:c> = 0 && <:a> z + <:b> z' + y = 0") {
+		const char* sample = "x + <:c> | <:a> z + <:b> z' + y= 0.";
+		CHECK ( test_find_solution(sample) );
+	}
 }
 
 TEST_SUITE("lgrs") {
@@ -455,6 +461,13 @@ TEST_SUITE("solve_inequality_system") {
 			{"{bdd: a} x != 0." , "{bdd: a} x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
 	}
+
+	// increasing monotonicity, number 4 of test_integration-runner.cpp
+	TEST_CASE("x > y && x != 1") {
+		const std::vector<std::string> inequalities =
+			{ "x y' != 0.",  "x' != 0." };
+		CHECK ( test_solve_inequality_system(inequalities) );
+	}
 }
 
 TEST_SUITE("solve_system") {
@@ -524,6 +537,53 @@ TEST_SUITE("solve_system") {
 		const char* equality = "y & x' | z & y' | w & z' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x' | x & y' != 0.", "y & z' | z & y' != 0.", "w' & z | w & z' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	TEST_CASE("two var: y < x && y = {bdd: a} && x' != 0.") {
+		const char* equality = "y & x' | z & y' | w & z' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y & x' | x & y' != 0.", "y & z' | z & y' != 0.", "w' & z | w & z' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	// increasing monotonicity, number 2 of test_integration-runner.cpp
+	TEST_CASE("x = {bdd:a} && z < y && y != 1") {
+		const char* equality = "(x + {bdd:a}) | z y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y & z' | y' z != 0.", "y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	// increasing monotonicity, number 2 of test_integration-runner.cpp (y2)
+	TEST_CASE("x = {bdd:a} && x < y && y != 1") {
+		const char* equality = "(x + {bdd:a}) | x y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y & x' | y' x != 0.", "y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	// increasing monotonicity, number 2 of test_integration-runner.cpp (y3)
+	TEST_CASE("x = {bdd:a} {bdd:b} && x < y && y != 1") {
+		const char* equality = "(x + {bdd:a} {bdd:b}) | x y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y & x'| y' x != 0.", "y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	// increasing monotonicity, number 3 of test_integration-runner.cpp
+	TEST_CASE("x = 0 && z < y && y != 1") {
+		const char* equality = "x | z y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y z' | y' z != 0.", "y' != 0." };
+		CHECK ( test_solve_system(equality, inequalities) );
+	}
+
+	// increasing monotonicity, number 3 of test_integration-runner.cpp (y2)
+	TEST_CASE("x = 0 && x < y && y != 1") {
+		const char* equality = "x | x y' = 0.";
+		const std::vector<std::string> inequalities =
+			{ "y x' | y'x != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 }

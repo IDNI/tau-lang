@@ -198,7 +198,7 @@ TEST_SUITE("only outputs") {
 	// One possibility is return an optional instead of an assignment and
 	// return an optional with an empty assigment in this case.
 	TEST_CASE("o1[t] & o1[t]'= 0") {
-		const char* sample = "o1[t] | o1[t]' = 0.";
+		const char* sample = "o1[t] & o1[t]' = 0.";
 		auto memory = run_test(sample, 2);
 		CHECK ( memory.empty() );
 	}
@@ -209,7 +209,13 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {bdd: a} && o1[t] = o1[t-1]") { // replace second = by !=
+	TEST_CASE("o1[0] = {bdd: a} && o1[t] = o1[t-1]") {
+		const char* sample = "o1[0] = {bdd: a} && o1[t] = o1[t-1].";
+		auto memory = run_test(sample, 3);
+		CHECK ( !memory.empty() );
+	}
+
+	TEST_CASE("o1[0] = {bdd: a} && o1[t] != o1[t-1]") {
 		const char* sample = "o1[0] = {bdd: a} && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
@@ -239,12 +245,40 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
+	// increasing monotonicity, problem number 2
+	TEST_CASE("o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1") {
+		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
+		auto memory = run_test(sample, 4);
+		CHECK ( !memory.empty() );
+	}
+
+	// increasing monotonicity (y1), problem number 3
+	TEST_CASE("o1[0] = 0 && o1[t] > o1[t-1] && o1[t] != 1") {
+		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
+		auto memory = run_test(sample, 4);
+		CHECK ( !memory.empty() );
+	}
+
+	// increasing monotonicity (y2), problem number 4
+	TEST_CASE("o1[t] > o1[t-1] && o1[t] != 1") {
+		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
+		auto memory = run_test(sample, 4);
+		CHECK ( !memory.empty() );
+	}
+
 	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0") {
 		const char* sample = "<:a> o1[t] + <:b> o1[t]' = 0.";
 		auto memory = run_test(sample, 8);
 		// execution of this test should fail, i.e. memory should be empty
 		CHECK ( memory.empty() );
 	}
+
+	/*// issue
+	TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
+		const char* sample = "o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
+		auto memory = run_test(sample, 8);
+		CHECK ( !memory.empty() );
+	}*/
 
 	// f(f(f(x))) = f(x) using uninterpreted constants
 	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
