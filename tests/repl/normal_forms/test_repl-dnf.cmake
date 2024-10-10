@@ -9,7 +9,7 @@
 add_repl_test(normal_forms-dnf_wff_T "dnf T" ": T")
 add_repl_test(normal_forms-dnf_wff_F "dnf F" ": F")
 add_repl_test(normal_forms-dnf_wff_dist_right "dnf (X=0 && (Y=0 || Z=0))" ": X = 0 && Y = 0 \\|\\| X = 0 && Z = 0")
-add_repl_test(normal_forms-dnf_wff_dist_left "dnf ((X=0 || Y=0) && Z=0)" ": X = 0 && Z = 0 \\|\\| Y = 0 && Z = 0")
+add_repl_test(normal_forms-dnf_wff_dist_left "dnf ((X=0 || Y=0) && Z=0)" ": X = 0 && Z = 0 \\|\\| Z = 0 && Y = 0")
 
 #
 # bf

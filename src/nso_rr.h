@@ -2672,12 +2672,12 @@ std::vector<sp_tau_node<BAs...>> get_dnf_bf_clauses(const sp_tau_node<BAs...>& n
 }
 
 template<typename ...BAs>
-std::vector<sp_tau_node<BAs...>> get_cnf_wff_clause(const sp_tau_node<BAs...>& n) {
+std::vector<sp_tau_node<BAs...>> get_cnf_wff_clauses(const sp_tau_node<BAs...>& n) {
 	return get_leaves(n, tau_parser::wff_and, tau_parser::wff);
 }
 
 template<typename ...BAs>
-std::vector<sp_tau_node<BAs...>> get_cnf_bf_clause(const sp_tau_node<BAs...>& n) {
+std::vector<sp_tau_node<BAs...>> get_cnf_bf_clauses(const sp_tau_node<BAs...>& n) {
 	return get_leaves(n, tau_parser::bf_and, tau_parser::bf);
 }
 
