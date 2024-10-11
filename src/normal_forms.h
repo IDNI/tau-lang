@@ -635,8 +635,6 @@ nso<BAs...> nnf_wff(const nso<BAs...>& n) {
 
 // Reduce currrent dnf due to update by coeff and variable assignment i
 inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t p, bool surface = true) {
-	// Candidate storage for path joining
-	vector<pair<vector<int_t>*, int_t>> candidates;
 	for (size_t j=0; j < paths.size(); ++j) {
 		// Get Hamming distance between i and path and position of last difference
 		// while different irrelevant variables make assignments incompatible
@@ -672,10 +670,12 @@ inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t 
 }
 
 inline void join_paths (vector<vector<int_t>>& paths) {
-	for (size_t i=0; i < paths.size(); ++i) {
-		for (size_t j=i+1; j < paths.size(); ++j) {
+	for (size_t i = 0; i < paths.size(); ++i) {
+		for (size_t j = 0; j < paths.size(); ++j) {
+			if (i==j) continue;
 			int_t dist = 0, pos = 0;
-			bool subset_relation_decided = false, is_i_subset_of_j = true, subset_check = true;
+			bool subset_relation_decided = false, is_i_subset_of_j = true,
+				subset_check = true, equal = true;
 			for (size_t k=0; k < paths[i].size(); ++k) {
 			if (paths[i][k] == paths[j][k]) continue;
 			else if (dist == 2) break;
@@ -683,18 +683,26 @@ inline void join_paths (vector<vector<int_t>>& paths) {
 				if (!subset_relation_decided) {
 					subset_relation_decided = true;
 					is_i_subset_of_j = true;
+					if (paths[j][k] != 2)
+						equal = false;
 				} else {
 					if (!is_i_subset_of_j) {
 						subset_check = false;
 						break;
 					}
+					if (paths[j][k] != 2)
+						equal = false;
 				}
 			}
 			else if (paths[j][k] == 2) {
 				if (!subset_relation_decided) {
 					subset_relation_decided = true;
 					is_i_subset_of_j = false;
+					// paths[i][k] != 2
+					equal = false;
 				} else {
+					// paths[i][k] != 2
+					equal = false;
 					if (is_i_subset_of_j) {
 						subset_check = false;
 						break;
@@ -707,9 +715,28 @@ inline void join_paths (vector<vector<int_t>>& paths) {
 			if (is_i_subset_of_j) {
 				// Resovle variable in paths
 				paths[j][pos] = 2;
+				if (equal) {
+					paths.erase(paths.begin()+i);
+					if (j >= i) --j;
+					--i;
+					break;
+				}
 			} else {
 				// Resolve variable in i
 				paths[i][pos] = 2;
+			}
+		} else if (subset_check && dist == 0) {
+			// True subset relation between i and j
+			if (is_i_subset_of_j) {
+				// i -> j
+				paths.erase(paths.begin()+j);
+				if (i >= j) --i;
+				--j;
+			} else {
+				paths.erase(paths.begin()+i);
+				if (j >= i) --j;
+				--i;
+				break;
 			}
 		}
 		}
@@ -849,11 +876,10 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 		return dnf.begin()->first;
 	}
 	if(dnf.empty()) return _0<BAs...>;
-	if (!make_paths_disjoint) {
-		for (auto& [coeff, paths] : dnf) {
+	if (!make_paths_disjoint)
+		for (auto& [coeff, paths] : dnf)
 			join_paths(paths);
-		}
-	}
+
 	// Convert map structure dnf back to rewrite tree
 	nso<BAs...> reduced_dnf;
 	bool first = true;
