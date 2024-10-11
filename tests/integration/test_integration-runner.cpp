@@ -245,21 +245,21 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	// increasing monotonicity, problem number 2
+	// increasing monotonicity (2)
 	TEST_CASE("o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
 
-	// increasing monotonicity (y1), problem number 3
+	// increasing monotonicity (3)
 	TEST_CASE("o1[0] = 0 && o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
 
-	// increasing monotonicity (y2), problem number 4
+	// increasing monotonicity (4)
 	TEST_CASE("o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
@@ -273,12 +273,12 @@ TEST_SUITE("only outputs") {
 		CHECK ( memory.empty() );
 	}
 
-	/*// issue
+	// issue
 	TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
 		const char* sample = "o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.empty() );
-	}*/
+	}
 
 	// f(f(f(x))) = f(x) using uninterpreted constants
 	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
@@ -297,6 +297,10 @@ TEST_SUITE("only outputs") {
 
 
 TEST_SUITE("with inputs") {
+	// everything should fail unless the inputs are meaningless
+}
+
+TEST_SUITE("with inputs and outputs") {
 
 }
 

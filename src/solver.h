@@ -706,6 +706,11 @@ std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
 	static nso_factory<BAs...> factory;
 	if (form == _T<BAs...>) return { solution<BAs...>() };
 	auto splitter_one = factory.splitter_one(type);
+
+	#ifdef DEBUG
+	std::cout << "solve/form: " << form << "\n";
+	#endif // DEBUG
+
 	auto dnf = dnf_wff(form);
 	for (auto& clause: get_leaves(form, tau_parser::wff_or, tau_parser::wff)) {
 		auto is_equation = [](const nso<BAs...>& n) {

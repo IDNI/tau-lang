@@ -462,7 +462,7 @@ TEST_SUITE("solve_inequality_system") {
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
-	// increasing monotonicity, number 4 of test_integration-runner.cpp
+	// increasing monotonicity (4)
 	TEST_CASE("x > y && x != 1") {
 		const std::vector<std::string> inequalities =
 			{ "x y' != 0.",  "x' != 0." };
@@ -547,7 +547,7 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	// increasing monotonicity, number 2 of test_integration-runner.cpp
+	// increasing monotonicity (2)
 	TEST_CASE("x = {bdd:a} && z < y && y != 1") {
 		const char* equality = "(x + {bdd:a}) | z y' = 0.";
 		const std::vector<std::string> inequalities =
@@ -555,7 +555,7 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	// increasing monotonicity, number 2 of test_integration-runner.cpp (y2)
+	// increasing monotonicity (2 y1)
 	TEST_CASE("x = {bdd:a} && x < y && y != 1") {
 		const char* equality = "(x + {bdd:a}) | x y' = 0.";
 		const std::vector<std::string> inequalities =
@@ -563,7 +563,7 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	// increasing monotonicity, number 2 of test_integration-runner.cpp (y3)
+	// increasing monotonicity (2 y2)
 	TEST_CASE("x = {bdd:a} {bdd:b} && x < y && y != 1") {
 		const char* equality = "(x + {bdd:a} {bdd:b}) | x y' = 0.";
 		const std::vector<std::string> inequalities =
@@ -571,7 +571,7 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	// increasing monotonicity, number 3 of test_integration-runner.cpp
+	// increasing monotonicity (3)
 	TEST_CASE("x = 0 && z < y && y != 1") {
 		const char* equality = "x | z y' = 0.";
 		const std::vector<std::string> inequalities =
@@ -579,7 +579,7 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	// increasing monotonicity, number 3 of test_integration-runner.cpp (y2)
+	// increasing monotonicity (3 y1)
 	TEST_CASE("x = 0 && x < y && y != 1") {
 		const char* equality = "x | x y' = 0.";
 		const std::vector<std::string> inequalities =
