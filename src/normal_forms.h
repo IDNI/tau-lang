@@ -1268,14 +1268,14 @@ nso<BAs...> to_cnf2(const nso<BAs...>& fm, const int_t d = 0) {
 template<typename... BAs>
 bool has_temp_var (const nso<BAs...>& fm) {
 	auto io_vars = select_top(fm, is_non_terminal<tau_parser::io_var, BAs...>);
-	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::flag, BAs...>).has_value();
+	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
 	for (const auto& io_var : io_vars) {
 		if (find_top(io_var, is_non_terminal<tau_parser::shift, BAs...>))
 			return true;
 		if (!find_top(io_var, is_non_terminal<tau_parser::num, BAs...>))
 			return true;
 	}
-	return find_top(fm, is_non_terminal<tau_parser::flag, BAs...>).has_value();
+	return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
 }
 
 // Assumes a sometimes formula in dnf with negation pushed in containing no wff_or with max nesting depth 1

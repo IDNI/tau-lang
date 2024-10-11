@@ -2306,35 +2306,35 @@ sp_tau_node<BAs...> build_bf_greater(const sp_tau_node<BAs...>& l,
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_flag_greater_equal(const sp_tau_node<BAs...>& flagvar,
+sp_tau_node<BAs...> build_wff_ctn_greater_equal(const sp_tau_node<BAs...>& ctnvar,
 	const sp_tau_node<BAs...>& num) {
-	return wrap(tau_parser::bf,
-			wrap(tau_parser::flag,
-				wrap(tau_parser::flag_greater_equal, {flagvar, num})));
+	return wrap(tau_parser::wff,
+			wrap(tau_parser::constraint,
+				wrap(tau_parser::ctn_greater_equal, {ctnvar, num})));
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_flag_greater(const sp_tau_node<BAs...>& flagvar,
+sp_tau_node<BAs...> build_wff_ctn_greater(const sp_tau_node<BAs...>& ctnvar,
 	const sp_tau_node<BAs...>& num) {
-	return wrap(tau_parser::bf,
-			wrap(tau_parser::flag,
-				wrap(tau_parser::flag_greater, {flagvar, num})));
+	return wrap(tau_parser::wff,
+			wrap(tau_parser::constraint,
+				wrap(tau_parser::ctn_greater, {ctnvar, num})));
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_flag_less_equal(const sp_tau_node<BAs...>& flagvar,
+sp_tau_node<BAs...> build_wff_ctn_less_equal(const sp_tau_node<BAs...>& ctnvar,
 	const sp_tau_node<BAs...>& num) {
-	return wrap(tau_parser::bf,
-			wrap(tau_parser::flag,
-				wrap(tau_parser::flag_less_equal, {flagvar, num})));
+	return wrap(tau_parser::wff,
+			wrap(tau_parser::constraint,
+				wrap(tau_parser::ctn_less_equal, {ctnvar, num})));
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_flag_less(const sp_tau_node<BAs...>& flagvar,
+sp_tau_node<BAs...> build_wff_ctn_less(const sp_tau_node<BAs...>& ctnvar,
 	const sp_tau_node<BAs...>& num) {
-	return wrap(tau_parser::bf,
-			wrap(tau_parser::flag,
-				wrap(tau_parser::flag_less, {flagvar, num})));
+	return wrap(tau_parser::wff,
+			wrap(tau_parser::constraint,
+				wrap(tau_parser::ctn_less, {ctnvar, num})));
 }
 
 template<typename... BAs>
@@ -3275,19 +3275,19 @@ sp_tau_node<BAs...> make_node_hook_cte(const node<tau_sym<BAs...>>& n) {
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> make_node_hook_bf_flag(const node<tau_sym<BAs...>>& n) {
+sp_tau_node<BAs...> make_node_hook_wff_ctn(const node<tau_sym<BAs...>>& n) {
 	auto sp_n = make_shared<node<tau_sym<BAs...>>>(n);
-	if (is_child_non_terminal(tau_parser::flag_eq, trim(sp_n))) {
+	if (is_child_non_terminal(tau_parser::ctn_eq, trim(sp_n))) {
 		nso<BAs...> num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
-		nso<BAs...> flagvar = find_top(sp_n, is_non_terminal<tau_parser::flagvar, BAs...>).value();
-		return build_bf_and(build_bf_flag_less_equal(flagvar, num),
-								build_bf_flag_greater_equal(flagvar, num));
+		nso<BAs...> ctnvar = find_top(sp_n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
+		return build_wff_and(build_wff_ctn_less_equal(ctnvar, num),
+								build_wff_ctn_greater_equal(ctnvar, num));
 		}
-	if (is_child_non_terminal(tau_parser::flag_neq, trim(sp_n))) {
+	if (is_child_non_terminal(tau_parser::ctn_neq, trim(sp_n))) {
 		nso<BAs...> num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
-		nso<BAs...> flagvar = find_top(sp_n, is_non_terminal<tau_parser::flagvar, BAs...>).value();
-		return build_bf_or(build_bf_flag_less(flagvar, num),
-								build_bf_flag_greater(flagvar, num));
+		nso<BAs...> ctnvar = find_top(sp_n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
+		return build_wff_or(build_wff_ctn_less(ctnvar, num),
+								build_wff_ctn_greater(ctnvar, num));
 	}
 	return sp_n;
 }
@@ -3309,8 +3309,6 @@ sp_tau_node<BAs...> make_node_hook_bf(const node<tau_sym<BAs...>>& n) {
 				return make_node_hook_bf_xor<BAs...>(n);
 			case tau_parser::bf_constant:
 				return make_node_hook_cte<BAs...>(n);
-			case tau_parser::flag:
-				return make_node_hook_bf_flag<BAs...>(n);
 			default: return std::make_shared<node<tau_sym<BAs...>>>(n);
 		}
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
@@ -3679,6 +3677,8 @@ sp_tau_node<BAs...> make_node_hook_wff(const node<tau_sym<BAs...>>& n) {
 		case tau_parser::wff_equiv:
 			return make_node_hook_wff_equiv<BAs...>(n);
 
+		case tau_parser::constraint:
+				return make_node_hook_wff_ctn<BAs...>(n);
 		case tau_parser::bf_less:
 			return make_node_hook_wff_less<BAs...>(n);
 		case tau_parser::bf_less_equal:
@@ -3854,6 +3854,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		size_t parent)
 	{
 		static const std::set<size_t> no_wrap_for = {
+			tau_parser::constraint,
 			tau_parser::bf_splitter,
 			tau_parser::bf_ref,
 			tau_parser::bf_neg,
@@ -3926,7 +3927,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_remove_funiversal_cb,         630 },
 			{ tau_parser::bf_remove_fexistential_cb,       640 },
 
-			{ tau_parser::flag,                            710 },
 			{ tau_parser::bf_or,                           720 },
 			{ tau_parser::bf_and,                          730 },
 			{ tau_parser::bf_xor,                          740 },
@@ -4083,6 +4083,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 				break;
 			case tau_parser::source_binding: infix(":"); break;
 			// nodes to wrap
+			case tau_parser::constraint: wrap("[", "]"); break;
 			case tau_parser::bf_splitter: wrap("S(", ")"); break;
 			case tau_parser::bf_constant:
 				wrap("{ ", " }"); break;
@@ -4108,12 +4109,12 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_less_equal:  infix("<="); break;
 			case tau_parser::bf_nleq:        infix("!<="); break;
 			case tau_parser::bf_greater:     infix(">"); break;
-			case tau_parser::flag_neq:           infix("!="); break;
-			case tau_parser::flag_eq:            infix("=");  break;
-			case tau_parser::flag_greater_equal: infix(">="); break;
-			case tau_parser::flag_greater:       infix(">");  break;
-			case tau_parser::flag_less_equal:    infix("<="); break;
-			case tau_parser::flag_less:          infix("<");  break;
+			case tau_parser::ctn_neq:           infix("!="); break;
+			case tau_parser::ctn_eq:            infix("=");  break;
+			case tau_parser::ctn_greater_equal: infix(">="); break;
+			case tau_parser::ctn_greater:       infix(">");  break;
+			case tau_parser::ctn_less_equal:    infix("<="); break;
+			case tau_parser::ctn_less:          infix("<");  break;
 			case tau_parser::wff_and:        infix("&&"); break;
 			case tau_parser::wff_or:         infix("||"); break;
 			case tau_parser::wff_xor:        infix("^"); break;
