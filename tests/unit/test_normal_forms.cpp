@@ -191,6 +191,30 @@ TEST_SUITE("normal forms: dnf_bf") {
 		auto result = dnf_bf(statement);
 		CHECK( result == _0<Bool> );
 	}
+
+	/*TEST_CASE("uninterpreted constants") {
+		const char* sample = " o1[2]' & ((<:a> & (<:a> & <:c> | <:b> & <:c>' "
+			"& <:a>' | <:a> & <:b> & <:c>'))' & <:b> & (<:a> & <:c> | <:b> "
+			"& <:c>' & <:a>' | <:a> & <:b> & <:c>')' | <:a> & (<:a> & <:c> "
+			"| <:b> & <:c>' & <:a>' | <:a> & <:b> & <:c>') & (<:b> & (<:a> "
+			"& <:c> | <:b> & <:c>' & <:a>' | <:a> & <:b> & <:c>')')') | o1[2] "
+			"& ((<:a> & (<:a> & <:c> | <:b> & <:c>' & <:a>' | <:a> & <:b> "
+			"& <:c>'))' & <:b> & (<:a> & <:c> | <:b> & <:c>' & <:a>' | <:a> "
+			"& <:b> & <:c>')' | <:a> & (<:a> & <:c> | <:b> & <:c>' & <:a>' "
+			"| <:a> & <:b> & <:c>') & (<:b> & (<:a> & <:c> | <:b> & <:c>' "
+			"& <:a>' | <:a> & <:b> & <:c>')')')' = 0.";
+		auto src = make_tau_source(sample);
+		auto statement = (make_statement(src)
+			| tau_parser::rr
+			| tau_parser::main
+			| tau_parser::wff
+			| tau_parser::bf_eq
+			| tau_parser::bf).value();
+		auto result = dnf_bf(statement);
+		CHECK( result == _0<Bool> );
+	}*/
+
+
 }
 
 TEST_SUITE("normal forms: onf") {
