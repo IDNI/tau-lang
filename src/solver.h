@@ -112,9 +112,9 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		auto g = snf_bf(replace_with(vars[0], _1<BAs...>, f));
-		auto h = snf_bf(replace_with(vars[0], _0<BAs...>, f));
-		auto gh = snf_bf(g & h);
+		auto g = replace_with(vars[0], _1<BAs...>, f) | bf_reduce_canonical<BAs...>();
+		auto h = replace_with(vars[0], _0<BAs...>, f) | bf_reduce_canonical<BAs...>();
+		auto gh = (g & h) | bf_reduce_canonical<BAs...>();
 		auto solution = make_removed_vars_solution(vars, gh);
 
 		#ifdef DEBUG
@@ -138,7 +138,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 			}
 			else {
 				auto changes = solution;
-				solution[vars[0]] = h != _0<BAs...> ? replace(h, changes) : snf_bf(replace(~g, changes));
+				solution[vars[0]] = h != _0<BAs...> ? replace(h, changes) : replace(~g, changes) | bf_reduce_canonical<BAs...>();
 
 				#ifdef DEBUG
 				std::cout << "find_solution/solution[gh_no_var,gh=0]: ";
@@ -152,9 +152,9 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 		if (auto restricted = find_solution(build_wff_eq(gh)); restricted.has_value()) {
 			solution.insert(restricted.value().begin(), restricted.value().end());
 			auto restricted_copy = restricted;
-			if (auto nn = snf_bf(replace(h, restricted.value())); nn != _0<BAs...>)
+			if (auto nn = replace(h, restricted.value()) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
 				solution[vars[0]] = nn;
-			else solution[vars[0]] = snf_bf(replace(~g, restricted_copy.value()));
+			else solution[vars[0]] = replace(~g, restricted_copy.value()) | bf_reduce_canonical<BAs...>();
 
 			#ifdef DEBUG
 			std::cout << "find_solution/solution[general]: ";
@@ -191,7 +191,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 		| optional_value_extractor<nso<BAs...>>;
 	solution<BAs...> phi;
 	for (auto& [x_i, z_i] : s.value())
-		phi[x_i] = snf_bf((z_i & f) + (x_i & ~f));
+		phi[x_i] = ((z_i & f) + (x_i & ~f)) | bf_reduce_canonical<BAs...>();
 
 	#ifdef DEBUG
 	std::cout << "lgrs/equality: " << equality << "\n";
@@ -563,10 +563,11 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 		std::cout << "solve_minterm_system/neq: " << neq << "\n";
 		#endif // DEBUG
 
-		auto nf = snf_bf(neq
+		auto nf = neq
 			| tau_parser::bf_neq
 			| tau_parser::bf
-			| optional_value_extractor<nso<BAs...>>);
+			| optional_value_extractor<nso<BAs...>>
+			| bf_reduce_canonical<BAs...>();
 		auto cte = get_constant(nf);
 		auto minterm = get_minterm(nf);
 		eq = eq | (cte & ~minterm);
@@ -709,7 +710,7 @@ std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
 	std::cout << "solve/form: " << form << "\n";
 	#endif // DEBUG
 
-	auto dnf = dnf_wff(form);
+	auto dnf = form | bf_reduce_canonical<BAs...>();
 	for (auto& clause: get_leaves(form, tau_parser::wff_or, tau_parser::wff)) {
 		auto is_equation = [](const nso<BAs...>& n) {
 			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
