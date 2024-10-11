@@ -47,6 +47,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | ("all"     __ q_vars  __ wff)      :wff_all
                         | ("ex"      __ q_vars  __ wff)      :wff_ex
                         | ref                                :wff_ref
+                        |                                     constraint
                         | (wff   _ "->"  _ wff)              :wff_imply
                         | (wff   _ "<->" _ wff)              :wff_equiv
                         | (wff   _ "||"  _ wff)              :wff_or
@@ -70,7 +71,6 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         |                                     capture.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     variable
-                        |                                     flag
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ref                                :bf_ref
                         | (bf _       '|'  _  bf)            :bf_or
@@ -83,17 +83,17 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     capture
                         |                                     uninterpreted_constant.
 
-# flags
-flag =>   (flagvar _ "!=" _ num | num _ "!=" _ flagvar)      :flag_neq
-        | (flagvar _ '='  _ num | num _ '='  _ flagvar)      :flag_eq
-        | (flagvar _ ">=" _ num | num _ ">=" _ flagvar)      :flag_greater_equal
-        | (flagvar _ ">"  _ num | num _ ">"  _ flagvar)      :flag_greater
-        | (flagvar _ "<=" _ num | num _ "<=" _ flagvar)      :flag_less_equal
-        | (flagvar _ "<"  _ num | num _ "<"  _ flagvar)      :flag_less.
+# constant time constraints
+constraint => ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]")   :ctn_neq
+        | ("[" ctnvar _ '='  _ num "]" | "[" num _ '='  _ ctnvar "]")       :ctn_eq
+        | ("[" ctnvar _ ">=" _ num "]" | "[" num _ ">=" _ ctnvar "]")       :ctn_greater_equal
+        | ("[" ctnvar _ ">"  _ num "]" | "[" num _ ">"  _ ctnvar "]")       :ctn_greater
+        | ("[" ctnvar _ "<=" _ num "]" | "[" num _ "<=" _ ctnvar "]")       :ctn_less_equal
+        | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]")       :ctn_less.
 
 # variables
 charvar                => (alpha & ~'T' & ~'F') digit*.
-flagvar                => charvar.
+ctnvar                 => charvar.
 variable               => charvar | (in | out):io_var.
 in                     => ("i" (digit+)):in_var_name  '[' offset ']'.
 out                    => ("o" (digit+)):out_var_name '[' offset ']'.

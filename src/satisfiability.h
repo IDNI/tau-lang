@@ -192,54 +192,54 @@ nso<BAs...> universally_quantify_input_streams(nso<BAs...> fm, const auto& io_va
 }
 
 template<typename... BAs>
-nso<BAs...> calculate_flag(const nso<BAs...>& flag, int_t time_point) {
+nso<BAs...> calculate_ctn(const nso<BAs...>& constraint, int_t time_point) {
 	auto to_ba = [](const bool c){return c ? _1<BAs...> : _0<BAs...>;};
 	int_t condition;
 	bool is_left;
-	if (is_non_terminal(tau_parser::num, trim2(flag))) {
+	if (is_non_terminal(tau_parser::num, trim2(constraint))) {
 		is_left = true;
-		condition = size_t_extractor<BAs...>(trim(trim2(flag))).value();
+		condition = size_t_extractor<BAs...>(trim(trim2(constraint))).value();
 	}
 	else {
 		is_left = false;
-		condition = size_t_extractor<BAs...>(trim(flag)->child[1]->child[0]).value();
+		condition = size_t_extractor<BAs...>(trim(constraint)->child[1]->child[0]).value();
 	}
-	if (flag | tau_parser::flag_neq)
+	if (constraint | tau_parser::ctn_neq)
 		return to_ba(condition != time_point);
-	if (flag | tau_parser::flag_eq)
+	if (constraint | tau_parser::ctn_eq)
 		return to_ba(condition == time_point);
-	if (flag | tau_parser::flag_greater_equal)
+	if (constraint | tau_parser::ctn_greater_equal)
 		return is_left ? to_ba(condition >= time_point) : to_ba(time_point >= condition);
-	if (flag | tau_parser::flag_greater)
+	if (constraint | tau_parser::ctn_greater)
 		return is_left ? to_ba(condition > time_point) : to_ba(time_point > condition);
-	if (flag | tau_parser::flag_less_equal)
+	if (constraint | tau_parser::ctn_less_equal)
 		return is_left ? to_ba(condition <= time_point) : to_ba(time_point <= condition);
-	if (flag | tau_parser::flag_less)
+	if (constraint | tau_parser::ctn_less)
 		return is_left ? to_ba(condition < time_point) : to_ba(time_point < condition);
-	// The above is exhaustive for possible children of flag
+	// The above is exhaustive for possible children of constraint
 	assert(false);
 	return {};
 }
 
 template<typename... BAs>
-bool is_initial_flag_phase(const nso<BAs...>& flag, int_t time_point) {
-	const int_t condition = is_non_terminal(tau_parser::num, trim2(flag)) ?
-		size_t_extractor<BAs...>(trim(trim2(flag))).value() :
-		size_t_extractor<BAs...>(trim(flag)->child[1]->child[0]).value();
+bool is_initial_ctn_phase(const nso<BAs...>& constraint, int_t time_point) {
+	const int_t condition = is_non_terminal(tau_parser::num, trim2(constraint)) ?
+		size_t_extractor<BAs...>(trim(trim2(constraint))).value() :
+		size_t_extractor<BAs...>(trim(constraint)->child[1]->child[0]).value();
 
-	// At this point the equality and inequality flags should have been converted
-	assert(!(flag | tau_parser::flag_neq) && !(flag | tau_parser::flag_eq));
+	// At this point the equality and inequality constraints should have been converted
+	assert(!(constraint | tau_parser::ctn_neq) && !(constraint | tau_parser::ctn_eq));
 
-	if (flag | tau_parser::flag_greater_equal)
+	if (constraint | tau_parser::ctn_greater_equal)
 		return condition >= time_point;
-	if (flag | tau_parser::flag_greater)
+	if (constraint | tau_parser::ctn_greater)
 		return condition + 1 >= time_point;
-	if (flag | tau_parser::flag_less_equal)
+	if (constraint | tau_parser::ctn_less_equal)
 		return condition + 1 >= time_point;
-	if (flag | tau_parser::flag_less)
+	if (constraint | tau_parser::ctn_less)
 		return condition >= time_point;
 
-	// The above is exhaustive for possible children of flag
+	// The above is exhaustive for possible children of constraints
 	assert(false);
 	return {};
 }
@@ -284,10 +284,10 @@ nso<BAs...> build_step(const nso<BAs...>& original_fm,
 }
 
 template<typename... BAs>
-nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& flag_initials,
+nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& ctn_initials,
 	const auto& io_vars, const auto& initials, const int_t time_point) {
 	nso<BAs...> phi_prev = build_initial_step(base_fm, io_vars, time_point);
-	phi_prev = build_wff_and(flag_initials, phi_prev);
+	phi_prev = build_wff_and(ctn_initials, phi_prev);
 	int_t step_num = 1;
 	nso<BAs...> cache = phi_prev;
 	nso<BAs...> phi = build_step(base_fm, phi_prev, io_vars,
@@ -397,28 +397,32 @@ nso<BAs...> build_prev_flag_on_lookback (const string& name, const string& var, 
 }
 
 template<typename... BAs>
-nso<BAs...> transform_flags_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials, const int_t lookback) {
+nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials, const int_t lookback) {
 	using p = tau_parser;
+	auto to_eq_1 = [](const auto& n) {
+		return build_wff_eq(build_bf_neg(n));
+	};
 	flag_initials = _T<BAs...>;
 	map<nso<BAs...>, nso<BAs...>> changes;
-	// transform flags to their respective output streams and add required conditions
-	size_t flag_id = 0;
-	for (const auto& flag : select_top(fm, is_non_terminal<p::flag, BAs...>))
+	// transform constraints to their respective output streams and add required conditions
+	size_t ctn_id = 0;
+	for (const auto& ctn : select_top(fm, is_non_terminal<p::constraint, BAs...>))
 	{
-		string flagvar = make_string(tau_node_terminal_extractor<BAs...>,
-			find_top(flag, is_non_terminal<p::flagvar, BAs...>).value());
-		std::stringstream ss; ss << "_f" << flag_id++;
-		auto flag_iovar = build_io_out<BAs...>(ss.str(), flagvar);
-		changes[flag] = lookback == 0 ? build_io_out_shift<BAs...>(
-							ss.str(), flagvar, 1) : flag_iovar;
-
+		string ctnvar = make_string(tau_node_terminal_extractor<BAs...>,
+			find_top(ctn, is_non_terminal<p::ctnvar, BAs...>).value());
+		std::stringstream ss; ss << "_f" << ctn_id++;
+		auto flag_iovar = build_io_out<BAs...>(ss.str(), ctnvar);
+		changes[ctn] = lookback == 0
+			? trim(to_eq_1(wrap(p::bf,
+				build_io_out_shift<BAs...>(ss.str(), ctnvar, 1))))
+			: trim(to_eq_1(wrap(p::bf,flag_iovar)));
 		// Take lookback of formula into account for constructing rule
-		nso<BAs...> flag_rule1 = build_prev_flag_on_lookback<BAs...>(ss.str(), flagvar, lookback);
-		auto flag_rule2 = build_flag_on_lookback<BAs...>(ss.str(), flagvar, lookback);
-		if (flag | p::flag_greater || flag | p::flag_greater_equal) {
+		nso<BAs...> flag_rule1 = build_prev_flag_on_lookback<BAs...>(ss.str(), ctnvar, lookback);
+		auto flag_rule2 = build_flag_on_lookback<BAs...>(ss.str(), ctnvar, lookback);
+		if (ctn | p::ctn_greater || ctn | p::ctn_greater_equal) {
 			// Add flag rule _fk[lookback] = 1 -> _fk[lookback-1] = 1
-			auto flag_rule = build_wff_imply(build_wff_eq(build_bf_neg(flag_rule1)),
-				build_wff_eq(build_bf_neg(flag_rule2)));
+			auto flag_rule = build_wff_imply(to_eq_1(flag_rule1),
+				to_eq_1(flag_rule2));
 			// Conjunct flag rule with formula
 			fm = build_wff_and(fm, flag_rule);
 		} else {
@@ -432,12 +436,12 @@ nso<BAs...> transform_flags_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initial
 
 		// Add initial conditions for flag
 		int_t t = 0;
-		while (is_initial_flag_phase(flag, t)) {
+		while (is_initial_ctn_phase(ctn, t)) {
 			nso<BAs...> flag_init_cond =
 			transform_io_var(flag_iovar, get_io_name(flag_iovar), t);
 			flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
 			flag_initials = build_wff_and(build_wff_eq(build_bf_xor(
-			flag_init_cond, calculate_flag(flag, t))), flag_initials);
+			flag_init_cond, calculate_ctn(ctn, t))), flag_initials);
 			++t;
 		}
 	}
@@ -516,7 +520,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 				is_child_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
 	nso<BAs...> flag_initials;
-	auto transformed_fm = transform_flags_to_streams(fm, flag_initials, lookback);
+	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, lookback);
 	if (lookback == 0 && fm != transformed_fm)
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
 	else fm = transformed_fm;
