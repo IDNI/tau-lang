@@ -2338,6 +2338,22 @@ sp_tau_node<BAs...> build_wff_ctn_less(const sp_tau_node<BAs...>& ctnvar,
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> build_wff_ctn_eq(const sp_tau_node<BAs...>& ctnvar,
+	const sp_tau_node<BAs...>& num) {
+	return wrap(tau_parser::wff,
+			wrap(tau_parser::constraint,
+				wrap(tau_parser::ctn_eq, {ctnvar, num})));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_wff_ctn_neq(const sp_tau_node<BAs...>& ctnvar,
+	const sp_tau_node<BAs...>& num) {
+	return wrap(tau_parser::wff,
+			wrap(tau_parser::constraint,
+				wrap(tau_parser::ctn_neq, {ctnvar, num})));
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> operator&(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
@@ -3277,19 +3293,48 @@ sp_tau_node<BAs...> make_node_hook_cte(const node<tau_sym<BAs...>>& n) {
 template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_wff_ctn(const node<tau_sym<BAs...>>& n) {
 	auto sp_n = make_shared<node<tau_sym<BAs...>>>(n);
-	if (is_child_non_terminal(tau_parser::ctn_eq, trim(sp_n))) {
-		nso<BAs...> num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
-		nso<BAs...> ctnvar = find_top(sp_n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
+	auto num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
+	auto ctnvar = find_top(sp_n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
+	auto op = non_terminal_extractor<BAs...>(trim2(sp_n)).value();
+	switch (op) {
+	case tau_parser::ctn_eq:
 		return build_wff_and(build_wff_ctn_less_equal(ctnvar, num),
 								build_wff_ctn_greater_equal(ctnvar, num));
-		}
-	if (is_child_non_terminal(tau_parser::ctn_neq, trim(sp_n))) {
-		nso<BAs...> num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
-		nso<BAs...> ctnvar = find_top(sp_n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
+	case tau_parser::ctn_neq:
 		return build_wff_or(build_wff_ctn_less(ctnvar, num),
-								build_wff_ctn_greater(ctnvar, num));
+	 							build_wff_ctn_greater(ctnvar, num));
 	}
 	return sp_n;
+}
+
+template<typename...BAs>
+sp_tau_node<BAs...> make_node_hook_ctn_neg(const sp_tau_node<BAs...>& n) {
+	auto num = find_top(n, is_non_terminal<tau_parser::num, BAs...>).value();
+	auto ctnvar = find_top(n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
+	auto op = non_terminal_extractor<BAs...>(trim(n)).value();
+	switch (op) {
+		//RULE(BF_PUSH_NEGATION_INWARDS_2, "($X != $Y)' := $X = $Y.")
+	case tau_parser::ctn_neq:
+		return build_wff_ctn_eq<BAs...>(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_3, "($X = $Y)' := $X != $Y.")
+	case tau_parser::ctn_eq:
+		return build_wff_ctn_neq<BAs...>(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_4, "($X >= $Y)' := $X < $Y.")
+	case tau_parser::ctn_greater_equal:
+		return build_wff_ctn_less<BAs...>(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_5, "($X > $Y)' := $X <= $Y.")
+	case tau_parser::ctn_greater:
+		return build_wff_ctn_less_equal<BAs...>(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_6, "($X <= $Y)' := $X > $Y.")
+	case tau_parser::ctn_less_equal:
+		return build_wff_ctn_greater<BAs...>(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_7, "($X < $Y)' := $X >= $Y.")
+	case tau_parser::ctn_less:
+		return build_wff_ctn_greater_equal<BAs...>(ctnvar, num);
+	}
+	// Can never happen - all cases exhausted
+	assert(false);
+	return n;
 }
 
 template<typename... BAs>
@@ -3385,6 +3430,9 @@ sp_tau_node<BAs...> make_node_hook_wff_neg(const node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_ELIM_DOUBLE_NEGATION_0, "! ! $X ::=  $X.")
 	if (auto double_neg = first_argument_formula(n) | tau_parser::wff_neg | tau_parser::wff; double_neg)
 		return double_neg.value();
+	if (is_non_terminal<tau_parser::constraint>(first_argument_expression(n))) {
+		return make_node_hook_ctn_neg(first_argument_expression(n));
+	}
 	return std::make_shared<node<tau_sym<BAs...>>>(n);
 }
 

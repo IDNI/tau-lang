@@ -1067,7 +1067,8 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 			|| is_child_non_terminal(tp::wff_ex, n)
 			|| is_child_non_terminal(tp::wff_sometimes, n)
 			|| is_child_non_terminal(tp::wff_always, n)
-			|| is_child_non_terminal(tp::wff_all, n);
+			|| is_child_non_terminal(tp::wff_all, n)
+			|| is_child_non_terminal(tp::constraint, n);
 	};
 	auto is_var_bf = [](const auto& n) {
 		using tp = tau_parser;
