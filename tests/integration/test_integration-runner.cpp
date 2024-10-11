@@ -273,12 +273,11 @@ TEST_SUITE("only outputs") {
 		CHECK ( memory.empty() );
 	}
 
-	// issue
-	/*TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
+	TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
 		const char* sample = "o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.empty() );
-	}*/
+	}
 
 	// f(f(f(x))) = f(x) using uninterpreted constants
 	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
