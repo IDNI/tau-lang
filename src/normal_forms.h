@@ -736,18 +736,16 @@ auto lex_var_comp = [](const auto x, const auto y) {
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template<typename... BAs>
 void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const int_t p) {
-	auto cvars = select_all(fm, is_child_non_terminal<tau_parser::variable, BAs...>);
-	sort(cvars.begin(), cvars.end(), lex_var_comp<BAs...>);
+	auto is_var = [](const nso<BAs...>& n){return
+		is_child_non_terminal(tau_parser::variable, n) ||
+			is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
+	auto cvars = select_all(fm, is_var);
+	std::set<nso<BAs...>> cur_vars(std::make_move_iterator(cvars.begin()),
+              std::make_move_iterator(cvars.end()));
 
-	// Set irrelevant vars in assignment i to 2
-	int_t v_iter = p+1, cv_iter = 0;
-	while (v_iter < (int_t)vars.size()) {
-		if (cv_iter < (int_t)cvars.size() && vars[v_iter] == cvars[cv_iter]) {
-			++v_iter, ++cv_iter;
-		} else {
+	for (size_t v_iter = p+1; v_iter < vars.size(); ++v_iter) {
+		if (!cur_vars.contains(vars[v_iter]))
 			i[v_iter] = 2;
-			++v_iter;
-		}
 	}
 }
 
@@ -846,10 +844,7 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 	// Key is coefficient, value is possible variable assignments for coefficient
 	map<nso<BAs...>, vector<vector<int_t>>> dnf;
 
-	//Simplify formula as initial step
-	auto fm_simp = fm;
-
-	if(assign_and_reduce(fm_simp, vars, i, dnf, 0)) {
+	if(assign_and_reduce(fm, vars, i, dnf, 0)) {
 		assert(dnf.size() == 1);
 		return dnf.begin()->first;
 	}
