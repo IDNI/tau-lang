@@ -59,7 +59,7 @@ struct output_bdd_console {
 	}
 
 	std::optional<type> type_of(const nso<BAs...>&) {
-		return { "bdd" }; // bdd (always)
+		return { "SBF" }; // SBF (always)
 	}
 };
 
@@ -76,7 +76,7 @@ struct input_bdd_vector {
 	}
 
 	std::optional<type> type_of(const nso<BAs...>&) {
-		return { "bdd" }; // bdd (always)
+		return { "SBF" }; // SBF (always)
 	}
 
 	std::vector<assignment<BAs...>> inputs;
@@ -88,7 +88,8 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 		output_bdd_console<tau_ba<bdd_binding>, bdd_binding>& outputs,
 		const size_t& times) {
 	auto sample_src = make_tau_source(sample);
-	auto phi_inf = make_nso_rr_using_factory<tau_ba<bdd_binding>, bdd_binding>(sample_src).main;
+	auto phi_inf = make_nso_rr_using_factory<
+		tau_ba<bdd_binding>, bdd_binding>(sample_src).value().main;
 
 	#ifdef DEBUG
 	std::cout << "run_test/------------------------------------------------------\n";
@@ -186,8 +187,8 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[t] = {bdd: a}") {
-		const char* sample = "o1[t] = {bdd: a}.";
+	TEST_CASE("o1[t] = {a}:SBF") {
+		const char* sample = "o1[t] = {a}:SBF.";
 		auto memory = run_test(sample, 2);
 		CHECK ( !memory.empty() );
 	}
@@ -198,8 +199,8 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {bdd: a}") {
-		const char* sample = "o1[0] = {bdd: a}.";
+	TEST_CASE("o1[0] = {a}:SBF") {
+		const char* sample = "o1[0] = {a}:SBF.";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
 	}
@@ -222,14 +223,14 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {bdd: a} && o1[t] = o1[t-1]") {
-		const char* sample = "o1[0] = {bdd: a} && o1[t] = o1[t-1].";
+	TEST_CASE("o1[0] = {a}:SBF && o1[t] = o1[t-1]") {
+		const char* sample = "o1[0] = {a}:SBF && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {bdd: a} && o1[t] != o1[t-1]") {
-		const char* sample = "o1[0] = {bdd: a} && o1[t] = o1[t-1].";
+	TEST_CASE("o1[0] = {a}:SBF && o1[t] != o1[t-1]") {
+		const char* sample = "o1[0] = {a}:SBF && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
 	}
@@ -252,29 +253,29 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {bdd:a} && o1[t] < o1[t-1] && o1[t] != 0") {
-		const char* sample = "o1[0] = {bdd:a} && o1[t] < o1[t-1] && o1[t] != 0.";
+	TEST_CASE("o1[0] = {a}:SBF && o1[t] < o1[t-1] && o1[t] != 0") {
+		const char* sample = "o1[0] = {a}:SBF && o1[t] < o1[t-1] && o1[t] != 0.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
 
 	// increasing monotonicity (2)
-	TEST_CASE("o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1") {
-		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
+	TEST_CASE("o1[0] = {a}:SBF && o1[t] > o1[t-1] && o1[t] != 1") {
+		const char* sample = "o1[0] = {a}:SBF && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
 
 	// increasing monotonicity (3)
 	TEST_CASE("o1[0] = 0 && o1[t] > o1[t-1] && o1[t] != 1") {
-		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
+		const char* sample = "o1[0] = {a}:SBF && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
 
 	// increasing monotonicity (4)
 	TEST_CASE("o1[t] > o1[t-1] && o1[t] != 1") {
-		const char* sample = "o1[0] = {bdd:a} && o1[t] > o1[t-1] && o1[t] != 1.";
+		const char* sample = "o1[0] = {a}:SBF && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
@@ -300,8 +301,8 @@ TEST_SUITE("only outputs") {
 	}
 
 	// f(f(f(x))) = f(x) using constants
-	TEST_CASE("o1[t] = {bdd:a} o1[t-1] + {bdd:b} o1[t-1]'") {
-		const char* sample = "o1[t] = {bdd:a} o1[t-1] + {bdd:b} o1[t-1]'.";
+	TEST_CASE("o1[t] = {a}:SBF o1[t-1] + {b}:SBF o1[t-1]'") {
+		const char* sample = "o1[t] = {a}:SBF o1[t-1] + {b}:SBF o1[t-1]'.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.empty() );
 	}

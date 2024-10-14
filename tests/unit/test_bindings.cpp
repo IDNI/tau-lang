@@ -28,7 +28,7 @@ namespace testing = doctest;
 TEST_SUITE("named bindings") {
 
 	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
-		const char* sample =	"$X := $X.";
+		const char* sample = "$X := $X.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -37,7 +37,7 @@ TEST_SUITE("named bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
-		const char* sample =	"{ binding } := { binding }.";
+		const char* sample = "{ binding } := { binding }.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -46,7 +46,7 @@ TEST_SUITE("named bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
-		const char* sample =	"{ nonmatching } := { nonmatching }.";
+		const char* sample = "{ nonmatching } := { nonmatching }.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
@@ -58,7 +58,7 @@ TEST_SUITE("named bindings") {
 TEST_SUITE("factory bindings") {
 
 	TEST_CASE("binding: given one statement with no bindigns, the binding process returns the same statement.") {
-		const char* sample =	"$X := $X.";
+		const char* sample = "$X := $X.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto statement = make_statement(src);
 		auto binded = make_factory_bindings(statement);
@@ -66,7 +66,7 @@ TEST_SUITE("factory bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
-		const char* sample =	"{ binding } := { bool : some_source_sode }.";
+		const char* sample = "{ binding } := { some_source_sode } : bool.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto statement = make_statement(src);
 		auto binded = make_factory_bindings(statement);
@@ -74,7 +74,7 @@ TEST_SUITE("factory bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
-		const char* sample =	"{ nonmatching } := { nonbool: some_source_code }.";
+		const char* sample = "{ nonmatching } := { some_source_code } : nonbool.";
 		auto src = make_tau_source(sample, { .start = tau_parser::library });
 		auto statement = make_statement(src);
 		auto binded = make_factory_bindings(statement);

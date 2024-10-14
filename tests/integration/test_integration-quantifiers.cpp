@@ -76,9 +76,10 @@ bool test(const test_case& tc) {
 	bool fail = false;
 	auto src = make_tau_source(sample.c_str());
 	auto formula = make_nso_rr_using_factory<bdd_binding>(src);
-	auto got = to_str(formula);
+	if (!formula.has_value()) return fail;
+	auto got = to_str(formula.value());
 	if (got != exp) fail = true;
-	auto norm = normalizer<bdd_binding>(formula);
+	auto norm = normalizer<bdd_binding>(formula.value());
 	auto ngot = to_str(norm);
 	if (fail || ngot != nexp) fail = true,
 		cout << tc << "\n\tgot:      \"" << got

@@ -26,7 +26,7 @@ namespace testing = doctest;
 sp_bdd_node build_binding(const char* src) {
 	bdd_init<Bool>();
 	static bdd_factory<tau_ba<bdd_binding>, bdd_binding> bf;
-	return bf.parse(src);
+	return bf.parse(src).value();
 }
 
 bdd_binding& get_binding(const sp_bdd_node& n) {
