@@ -114,13 +114,15 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 
 		auto out = runner.step(in.value());
 
-		#ifdef DEBUG
 		if (out.size() == 0) {
-			std::cout << "run_test/output[" << i << "]: {}\n"; // no output
 			runner.memory.clear();
+			#ifdef DEBUG
+			std::cout << "run_test/output[" << i << "]: {}\n"; // no output
+			#endif // DEBUG
 			break;
 		}
 
+		#ifdef DEBUG
 		std::cout << "run_test/output[" << i << "]: ";
 		for (const auto& [var, value]: out) {
 			std::cout << var << " <- " << value << " ... ";
