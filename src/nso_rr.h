@@ -95,7 +95,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 		return (l->value == r->value && l->child == r->child);
 	if (l_has_extra && !r_has_extra) {
 		if (l->child.size() != r->child.size() + 1) return false;
-		for (int i = 0; i < (int_t)r->child.size(); ++i) {
+		for (size_t i = 0; i < r->child.size(); ++i) {
 			if (!(l->child[i] == r->child[i]))
 				return false;
 		}
@@ -103,7 +103,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 	}
 	if (!l_has_extra && r_has_extra) {
 		if (l->child.size() + 1 != r->child.size()) return false;
-		for (int i = 0; i < (int_t)l->child.size(); ++i) {
+		for (size_t i = 0; i < l->child.size(); ++i) {
 			if (!(l->child[i] == r->child[i]))
 				return false;
 		}
@@ -111,7 +111,7 @@ bool operator==(const sp_tau_node<BAs...> &l, const sp_tau_node<BAs...>& r) {
 	}
 	if (l_has_extra && r_has_extra) {
 		if (l->child.size() != r->child.size()) return false;
-		for (int i = 1; i < ((int_t)l->child.size()); ++i) {
+		for (size_t i = 1; i < l->child.size(); ++i) {
 			if (!(l->child[i-1] == r->child[i-1]))
 				return false;
 		}
@@ -1893,10 +1893,9 @@ nso<BAs...> build_variable(const char& name) {
 
 template<typename... BAs>
 nso<BAs...> build_in_var_name(const size_t& index) {
-	return wrap(
-		tau_parser::in_var_name, {
-			tau_sym<BAs...>('i'), {},
-			tau_sym<BAs...>(index), {}});
+	std::stringstream var_name;
+	var_name << "i" << index;
+	return wrap<BAs...>(tau_parser::in_var_name, var_name.str());
 }
 
 template<typename... BAs>
@@ -1961,9 +1960,9 @@ nso<BAs...> build_in_variable_at_t_minus(const size_t& index, const size_t& num)
 
 template<typename... BAs>
 nso<BAs...> build_out_var_name(const size_t& index) {
-	return wrap(tau_parser::out_var_name, {
-		tau_sym<BAs...>('o'), {},
-		tau_sym<BAs...>(index), {}});
+	std::stringstream var_name;
+	var_name << "o" << index;
+	return wrap<BAs...>(tau_parser::out_var_name, var_name.str());
 }
 
 template<typename... BAs>
@@ -4106,9 +4105,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 				infix(":=");  stream << "."; break;
 			case tau_parser::bf_builder_body:  prefix("=:");  break;
 			case tau_parser::wff_builder_body: prefix("=::"); break;
-			case tau_parser::inputs:           prefix("<");   break;
-			case tau_parser::input:
-				infix(": {"); stream << " }"; break;
 			case tau_parser::in:
 			case tau_parser::out:
 				infix_nows("["); stream << "]"; break;

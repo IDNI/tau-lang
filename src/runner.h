@@ -20,6 +20,10 @@
 #include "solver.h"
 #include "satisfiability.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
+
 namespace idni::tau {
 
 
@@ -194,6 +198,7 @@ struct interpreter {
 				auto updated = update_to_time_point(equations);
 				auto memory_copy = memory;
 				auto current = replace(updated, memory_copy);
+
 				#ifdef DEBUG
 				std::cout << "step/type: " << type << "\n";
 				std::cout << "step/equations: " << equations << "\n";
@@ -278,15 +283,6 @@ private:
 						| offset_extractor<BAs...>;
 							num && var)
 				changes[shift.value()] = build_num<BAs...>(time_point - num.value());
-			else if (auto offset = io_var
-						| only_child_extractor<BAs...>
-						| tau_parser::offset,
-					variable = offset
-						| tau_parser::variable;
-							variable)
-				changes[offset.value()] = wrap(
-					tau_parser::offset,
-						build_num<BAs...>(time_point));
 			else if (auto offset = io_var
 						| only_child_extractor<BAs...>
 						| tau_parser::offset,
