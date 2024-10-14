@@ -39,10 +39,12 @@ TEST_SUITE("normal forms: snf for wff") {
 		const char* sample = "T.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
 		#ifdef DEBUG
-		print_sp_tau_node_tree(std::cout, nso__rr.main);
+		print_sp_tau_node_tree(std::cout, nso__rr.value().main);
 		#endif // DEBUG
-		auto check = nso__rr.main
+		auto check = nso__rr.value().main
 			| tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
@@ -51,7 +53,9 @@ TEST_SUITE("normal forms: snf for wff") {
 		const char* sample = "F.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto check = nso__rr.main
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto check = nso__rr.value().main
 			| tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
@@ -60,48 +64,60 @@ TEST_SUITE("normal forms: snf for wff") {
 		const char* sample = "X = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
-		CHECK( nso__rr.main == result );
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
+		CHECK( nso__rr.value().main == result );
 	}
 
 	TEST_CASE("quantifiers: always X = 0") {
 		const char* sample = "always X = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
-		CHECK( nso__rr.main == result );
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
+		CHECK( nso__rr.value().main == result );
 	}
 
 	TEST_CASE("quantifiers: sometimes X = 0") {
 		const char* sample = "sometimes X = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
-		CHECK( nso__rr.main == result );
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
+		CHECK( nso__rr.value().main == result );
 	}
 
 	TEST_CASE("quantifiers: all X X = 0") {
 		const char* sample = "all X X = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
-		CHECK( nso__rr.main == result );
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
+		CHECK( nso__rr.value().main == result );
 	}
 
 	TEST_CASE("quantifiers: ex X X = 0") {
 		const char* sample = "ex X X = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
-		CHECK( nso__rr.main == result );
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
+		CHECK( nso__rr.value().main == result );
 	}
 
 	TEST_CASE("rec. relations: f[0](X)") {
 		const char* sample = "f[0](X).";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
-		CHECK( nso__rr.main == result );
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
+		CHECK( nso__rr.value().main == result );
 	}
 
 	// TODO (MEDIUM) fix this test
@@ -109,7 +125,9 @@ TEST_SUITE("normal forms: snf for wff") {
 		const char* sample = "{bdd: a} x = 0 && {bdd:a}' x = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
 		std::stringstream ss; ss << result;
 		CHECK( ss.str() == "x = 0" );
 	}*/
@@ -118,7 +136,9 @@ TEST_SUITE("normal forms: snf for wff") {
 		const char* sample = "xy = 0 && x = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
 		std::stringstream ss; ss << result;
 		CHECK( ss.str() == "x = 0" );
 	}
@@ -127,7 +147,9 @@ TEST_SUITE("normal forms: snf for wff") {
 		const char* sample = "xy != 0 && x != 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = snf_wff(nso__rr.main);
+		CHECK( nso__rr.has_value() );
+		if (!nso__rr.has_value()) return;
+		auto result = snf_wff(nso__rr.value().main);
 		std::stringstream ss; ss << result;
 		CHECK( ss.str() == "x & y != 0" );
 	}

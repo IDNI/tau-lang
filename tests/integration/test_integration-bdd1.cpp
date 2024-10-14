@@ -28,143 +28,77 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+bool normalize_and_test_for_value(const char* sample, tau_parser::nonterminal nt) {
+	auto sample_src = make_tau_source(sample);
+	auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+	if (!sample_formula.has_value()) return false;
+	auto result = normalizer<bdd_binding>(sample_formula.value());
+	auto check = result | nt;
+	return check.has_value();
+}
+
 // TODO (LOW) simplify this test cases extracting common logic to the helpers file
 
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
 	TEST_CASE("T") {
-		const char* sample = "T.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("T.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("F") {
-		const char* sample = "F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("F.", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("T && F") {
-		const char* sample = "T && F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("T && F.", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("T ^ F") {
-		const char* sample = "T ^ F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("T ^ F.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("T ? T : F") {
-		const char* sample = "T ? T : F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("T ? T : F.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("F ? T : F") {
-		const char* sample = "F ? T : F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("F ? T : F.", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("F || F") {
-		const char* sample = "F || F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("F || F.", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("! F") {
-		const char* sample = "! F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("! F.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("F -> F") {
-		const char* sample = "F -> F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("F -> F.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("F <-> F") {
-		const char* sample = "F <-> F.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("F <-> F.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("1 & 0 = 0.") {
-		const char* sample = "1 & 0 = 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("1 & 0 = 0.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("1 | 0 = 0.") {
-		const char* sample = "1 | 0 = 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("1 | 0 = 0.", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("1 + 0 != 0.") {
-		const char* sample = "1 + 0 != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("1 + 0 != 0.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("0' = 0.") {
-		const char* sample = "(0' = 0).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("(0' = 0).", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("1' = 0.") {
-		const char* sample = "1' = 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("1' = 0.", tau_parser::wff_t) );
 	}
 }
 
@@ -180,120 +114,60 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	// TODO (MEDIUM) check if we need to add more tests for bindings
 
-	TEST_CASE("{ bdd : X } != 0") {
+	TEST_CASE("{ X } : SBF != 0") {
 		bdd_init<Bool>();
-		const char* sample = "{ bdd : X } != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("{ X } : SBF != 0.", tau_parser::wff_t) );
 	}
 
-	TEST_CASE("{ bdd : X } = 0") {
+	TEST_CASE("{ X } : SBF = 0") {
 		bdd_init<Bool>();
-		const char* sample = "{ bdd : X } = 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("{ X } : SBF = 0.", tau_parser::wff_f) );
 	}
 
-	TEST_CASE("{ bdd : Y } | { bdd : Z } != 0") {
+	TEST_CASE("{ Y } : SBF | { Z } : SBF != 0") {
 		bdd_init<Bool>();
-		const char* sample = "{ bdd : Y } | { bdd : Z } != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("{ Y } : SBF | { Z } : SBF != 0.", tau_parser::wff_t) );
 	}
 
-	TEST_CASE("{ bdd : Y } & { bdd : Z } != 0") {
+	TEST_CASE("{ Y } : SBF & { Z } : SBF != 0") {
 		bdd_init<Bool>();
-		const char* sample = "{ bdd : Y } & { bdd : Z } != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("{ Y } : SBF | { Z } : SBF != 0.", tau_parser::wff_t) );
 	}
 
-	TEST_CASE("{ bdd : Y }' != 0") {
+	TEST_CASE("{ Y } : SBF' != 0") {
 		bdd_init<Bool>();
-		const char* sample = "{ bdd : Y }' != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("{ Y } : SBF' != 0.", tau_parser::wff_t) );
 	}
 
-	TEST_CASE("{ bdd : Y } != 0") {
+	TEST_CASE("{ Y } : SBF != 0") {
 		bdd_init<Bool>();
-		const char* sample = "{ bdd : Y } != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("{ Y } : SBF != 0.", tau_parser::wff_t) );
 	}
 }
 
 TEST_SUITE("formulas: variables, no bindings and quantifiers") {
 
 	TEST_CASE("ex P P != 0") {
-		const char* sample = "ex P P != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("ex P P != 0.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("ex P P = 0") {
-		const char* sample = "ex P P = 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("ex P P = 0.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("all P P != 0") {
-		const char* sample = "all P P != 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("all P P != 0.", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("all P P = 0") {
-		const char* sample = "all P P = 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("all P P = 0.", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("all X ex Y X = Y") {
-		const char* sample = "all X ex Y X = Y.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("all X ex Y X = Y.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("ex X all Y X = Y") {
-		const char* sample = "ex X all Y X = Y.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result | tau_parser::wff_f;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value("ex X all Y X = Y.", tau_parser::wff_f) );
 	}
 }

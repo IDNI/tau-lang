@@ -29,7 +29,7 @@ using namespace idni::tau;
 
 rr<nso<bdd_binding>> bdd_make_nso_rr(const std::string& src) {
 	auto sample_src = make_tau_source(src);
-	return make_nso_rr_using_factory<bdd_binding>(sample_src);
+	return make_nso_rr_using_factory<bdd_binding>(sample_src).value();
 }
 
 nso<bdd_binding> bdd_make_nso(const std::string& src) {
@@ -44,7 +44,7 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_binding> n, si
 		[&os](std::variant<bdd_binding> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
-			else os << "...bdd..."; }
+			else os << "...SBF..."; }
 	}, n->value);
 	for (auto& d : n->child) print_sp_tau_node(os, d, l + 1);
 	os << "}";
@@ -58,7 +58,7 @@ std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_binding
 		[&os](std::variant<bdd_binding> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
-			else os << "...bdd..."; }
+			else os << "...SBF..."; }
 	}, n->value);
 	for (auto& d : n->child) pretty_print_sp_tau_node(os, d, l + 1);
 	return os;

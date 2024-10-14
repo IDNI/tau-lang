@@ -28,6 +28,15 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
+bool normalize_and_test_for_value(const char* sample, tau_parser::nonterminal nt) {
+	auto sample_src = make_tau_source(sample);
+	auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+	if (!sample_formula.has_value()) return false;
+	auto result = normalizer<bdd_binding>(sample_formula.value());
+	auto check = result | nt;
+	return check.has_value();
+}
+
 TEST_SUITE("rec relations partial evaluation: simple cases") {
 
 	TEST_CASE("wff_rec_relation") {
@@ -35,11 +44,7 @@ TEST_SUITE("rec relations partial evaluation: simple cases") {
 			"h[0](X, Y) := X + Y != 0."
 			"g[n](Y) := h[n-1](Y, 0)."
 			"g[1](1).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result |  tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_t) );
 	}
 
 	TEST_CASE("bf_rec_relation") {
@@ -47,11 +52,7 @@ TEST_SUITE("rec relations partial evaluation: simple cases") {
 			"h[0](X, Y) := X + Y."
 			"g[n](Y) := h[n-1](Y, 0)."
 			"g[1](0) = 0.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result |  tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_t) );
 	}
 }
 
@@ -62,11 +63,7 @@ TEST_SUITE("functions partial evaluation: simple cases") {
 			"h(X, Y) := X = Y."
 			"g(Y) := h(Y, 0)."
 			"g(0).";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result |  tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_t) );
 	}
 
 	TEST_CASE("bf_rec_relation") {
@@ -74,10 +71,6 @@ TEST_SUITE("functions partial evaluation: simple cases") {
 			"h(X, Y) := X + Y."
 			"g(Y) := h(Y, 0)."
 			"g(1) = 1.";
-		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
-		auto check = result |  tau_parser::wff_t;
-		CHECK( check.has_value() );
+		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_t) );
 	}
 }
