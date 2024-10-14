@@ -66,6 +66,9 @@ struct output_bdd_console {
 template<typename...BAs>
 struct input_bdd_vector {
 
+	input_bdd_vector() = default;
+	input_bdd_vector(std::vector<assignment<BAs...>>& inputs): inputs(inputs) {}
+
 	std::optional<assignment<BAs...>> read() {
 		if (inputs.empty()) return { assignment<BAs...>{} };
 		if (current == inputs.size()) return {};
@@ -88,22 +91,32 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 	auto phi_inf = make_nso_rr_using_factory<tau_ba<bdd_binding>, bdd_binding>(sample_src).main;
 
 	#ifdef DEBUG
-	std::cout << "------------------------------------------------------\n";
+	std::cout << "run_test/------------------------------------------------------\n";
 	std::cout << "run_test/sample: " << sample << "\n";
 	#endif // DEBUG
 
 	auto runner = make_interpreter(phi_inf, inputs, outputs).value();
 
 	// we read the inputs only once (they are always empty in this test suite)
-	auto in = inputs.read();
 
 	for (size_t i = 0; i < times; ++i) {
 		// we execute the i-th step
+		auto in = inputs.read();
+
+		#ifdef DEBUG
+		std::cout << "run_test/input[" << i << "]: ";
+		if (in.has_value()) {
+			for (const auto& [var, value]: in.value())
+				std::cout << var << " <- " << value << " ... ";
+			std::cout << "\n";
+		} else std::cout << "{}\n"; // no input
+		#endif // DEBUG
+
 		auto out = runner.step(in.value());
 
 		#ifdef DEBUG
 		if (out.size() == 0) {
-			std::cout << "run_test/output[" << i << "]: {}"; // no output
+			std::cout << "run_test/output[" << i << "]: {}\n"; // no output
 			runner.memory.clear();
 			break;
 		}
@@ -112,7 +125,7 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 		for (const auto& [var, value]: out) {
 			std::cout << var << " <- " << value << " ... ";
 			if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<bdd_binding>, bdd_binding>); io_vars) {
-				std::cout << "run_test/output[", i, "]: unexpected io_var ", io_vars.value();
+				std::cout << "run_test/output[" << i << "]: unexpected io_var " << io_vars.value() << "\n";
 				runner.memory.clear();
 				break;
 			}
@@ -296,7 +309,53 @@ TEST_SUITE("only outputs") {
 
 
 TEST_SUITE("with inputs") {
-	// everything should fail unless the inputs are meaningless
+
+	input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> build_i1_inputs(
+			std::vector<nso<tau_ba<bdd_binding>, bdd_binding>> values) {
+		std::vector<assignment<tau_ba<bdd_binding>, bdd_binding>> assignments;
+		for (const auto& value: values) {
+			assignment<tau_ba<bdd_binding>, bdd_binding> assignment;
+			assignment[build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1)] = value;
+			assignments.push_back(assignment);
+		}
+		input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> ins(assignments);
+		return ins;
+	}
+
+	TEST_CASE("i1[t] = o1[t]") {
+		const char* sample = "i1[t] = o1[t].";
+		auto ins = build_i1_inputs({
+			_1<tau_ba<bdd_binding>, bdd_binding>,
+			_0<tau_ba<bdd_binding>, bdd_binding>,
+			_0<tau_ba<bdd_binding>, bdd_binding> });
+		auto memory = run_test(sample, ins, 3);
+		CHECK ( !memory.empty() );
+	}
+
+	// In this case, we get an error as the output should be equal to the
+	// input all the time, but the output is set to 0 at the beginning.
+	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
+		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
+		auto ins = build_i1_inputs({
+			_1<tau_ba<bdd_binding>, bdd_binding>,
+			_1<tau_ba<bdd_binding>, bdd_binding>,
+			_1<tau_ba<bdd_binding>, bdd_binding> });
+		auto memory = run_test(sample, ins, 3);
+		CHECK ( memory.empty() );
+	}
+
+	// In this case we get the sequence 0, 1, 1 as the output is set to 1
+	// at the beginning.
+	TEST_CASE("i1[t-1] = o1[t] && o1[0] = 0") {
+		const char* sample = "i1[t-1] = o1[t] && o1[0] = 0.";
+		auto ins = build_i1_inputs({
+			_1<tau_ba<bdd_binding>, bdd_binding>,
+			_1<tau_ba<bdd_binding>, bdd_binding>,
+			_1<tau_ba<bdd_binding>, bdd_binding> });
+		auto memory = run_test(sample, ins, 2);
+		CHECK ( !memory.empty() );
+	}
+
 }
 
 TEST_SUITE("with inputs and outputs") {

@@ -25,9 +25,6 @@ rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
 ref                    => sym [_ offsets] _ ref_args.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
-inputs                 => _ '<' { _ input } _ '.'.
-input                  => in _ ':' _ '{' _ source_binding _ '}'.
-
 library                => ((_ (wff_rule | bf_rule):rule)*):rules.
 wff_rule               => wff:wff_matcher _ "::=" _ (wff | wff_cb):wff_body _ '.'.
 bf_rule                => bf :bf_matcher  _  ":=" _ (bf  | bf_cb) :bf_body  _ '.'.
