@@ -2660,15 +2660,16 @@ void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch,
 	tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves)
 {
 	std::queue<sp_tau_node<BAs...>> queue;
-	queue.emplace(n);
+	queue.push(n);
 	while (!queue.empty()) {
-		auto cn = queue.front(); queue.pop();
-		if (auto check = n | branch; check) for (auto& c : check || skip)
-			queue.emplace(c);
+		auto cn = queue.front();
+		if (auto check = cn | branch; check) for (auto& c : check || skip)
+			queue.push(c);
 		else {
-			leaves.push_back(n);
-			BOOST_LOG_TRIVIAL(trace) << "(I) get_leaves: found clause: " << n;
+			leaves.push_back(cn);
+			BOOST_LOG_TRIVIAL(trace) << "(I) get_leaves: found clause: " << cn;
 		}
+		queue.pop();
 	}
 }
 

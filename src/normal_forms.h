@@ -1033,7 +1033,8 @@ vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff, const a
 		decided = false;
 		if (ranges::all_of(i, [](const auto el) {return el == 2;})) return {};
 
-		if (is_contained_in(i, paths)) continue;
+		// if (is_contained_in(i, paths)) continue;
+		// erase_if(paths, [](const auto& v){return v.empty();});
 		if (all_reductions) {
 			if (!reduce_paths(i, paths, var_size)) paths.emplace_back(move(i));
 			else {
@@ -1123,11 +1124,11 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 			   collect_paths(new_fm, wff, is_var_bf, vars.size(), var_pos,
 				decided, is_cnf, all_reductions);
 
+	if (all_reductions) join_paths(paths);
 	if (paths.empty()) {
 		if (decided) return is_cnf ? (wff ? _T<BAs...> : _1<BAs...>) : (wff ? _F<BAs...> : _0<BAs...>);
 		else return is_cnf ? (wff ? _F<BAs...> : _0<BAs...>) : (wff ? _T<BAs...> : _1<BAs...>);
 	}
-	if (all_reductions) join_paths(paths);
 
 	auto reduced_fm = build_reduced_formula<BAs...>(paths, vars, is_cnf, wff);
 	return wff ? reduced_fm | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>) : reduced_fm;
@@ -1271,8 +1272,6 @@ nso<BAs...> to_dnf2(const nso<BAs...>& fm, const int_t d=0) {
 		return it->second;
 #endif
 	using p = tau_parser;
-	assert(is_non_terminal(p::wff, fm));
-
 	auto new_fm = push_negation_one_in(fm);
 
 	if (is_non_terminal(p::wff, new_fm)) {
@@ -1311,8 +1310,6 @@ nso<BAs...> to_cnf2(const nso<BAs...>& fm, const int_t d = 0) {
 		return it->second;
 #endif
     using p = tau_parser;
-	assert(is_non_terminal(p::wff, fm));
-
 	auto new_fm = push_negation_one_in(fm);
 
 	if (is_non_terminal(p::wff, new_fm)) {
