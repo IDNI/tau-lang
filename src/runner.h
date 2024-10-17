@@ -185,15 +185,12 @@ private:
 					| tau_parser::num
 					| only_child_extractor<BAs...>
 					| offset_extractor<BAs...>; num) {
-				print_sp_tau_node_tree(std::cout, var);
 				auto io_var = var
 					| tau_parser::variable
 					| tau_parser::io_var
 					| tau_parser::out
 					| tau_parser::out_var_name
 					| optional_value_extractor<nso<BAs...>>;
-				print_sp_tau_node_tree(std::cout, io_var);
-				print_sp_tau_node_tree(std::cout, value);
 				result[num.value() - lower][io_var] = value;
 			}
 		}
