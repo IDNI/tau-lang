@@ -200,8 +200,20 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
+	TEST_CASE("o1[1] = 1") {
+		const char* sample = "o1[1] = 1.";
+		auto memory = run_test(sample, 3);
+		CHECK ( !memory.empty() );
+	}
+
 	TEST_CASE("o1[0] = {bdd: a}") {
 		const char* sample = "o1[0] = {bdd: a}.";
+		auto memory = run_test(sample, 3);
+		CHECK ( !memory.empty() );
+	}
+
+	TEST_CASE("o1[1] = {bdd: a}") {
+		const char* sample = "o1[1] = {bdd: a}.";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
 	}
@@ -338,7 +350,7 @@ TEST_SUITE("only outputs") {
 }
 
 
-TEST_SUITE("with inputs") {
+TEST_SUITE("with inputs and outputs") {
 
 	input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> build_i1_inputs(
 			std::vector<nso<tau_ba<bdd_binding>, bdd_binding>> values) {
@@ -388,14 +400,100 @@ TEST_SUITE("with inputs") {
 
 }
 
-TEST_SUITE("with inputs and outputs") {
-
-}
-
 TEST_SUITE("test inputs") {
 
+	TEST_CASE("reading from file") {
+		std::map<var_desc<tau_ba<bdd_binding>, bdd_binding>, std::string> input_map;
+		auto var = build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
+		var_desc<tau_ba<bdd_binding>, bdd_binding> i1 = { var, "bdd" };
+		input_map[i1] = "../tests/integration/test_files/bdd-alternating_zeros_and_ones-length_10.in";
+		finputs<tau_ba<bdd_binding>, bdd_binding> inputs(input_map);
+		CHECK (inputs.type_of(i1.first).has_value() );
+		for (size_t i = 0; i < 10; ++i) {
+			auto in = inputs.read();
+			if (in) {
+				auto check = (i % 2)
+					? in.value()[var] == _1<tau_ba<bdd_binding>, bdd_binding>
+					: in.value()[var] == _0<tau_ba<bdd_binding>, bdd_binding>;
+				CHECK ( check );
+			} else FAIL("no input");
+		}
+	}
 }
 
 TEST_SUITE("test outputs") {
+
+	TEST_CASE("writing to file") {
+		std::map<var_desc<tau_ba<bdd_binding>, bdd_binding>, std::string> output_map;
+		auto var = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
+		var_desc<tau_ba<bdd_binding>, bdd_binding> o1 = { var, "bdd" };
+		output_map[o1] = random_file();
+
+		#ifdef DEBUG
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[o1] << "\n";
+		#endif // DEBUG
+
+		foutputs<tau_ba<bdd_binding>, bdd_binding> outputs(output_map);
+		assignment<tau_ba<bdd_binding>, bdd_binding> output = {
+			{ var, _1<tau_ba<bdd_binding>, bdd_binding> }
+		};
+
+		CHECK( outputs.type_of(o1.first).has_value() );
+		CHECK ( outputs.write(output) );
+	}
+
+	TEST_CASE("writing to files: no completed outputs") {
+		std::map<var_desc<tau_ba<bdd_binding>, bdd_binding>, std::string> output_map;
+		auto var1 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
+		auto var2 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(2);
+		var_desc<tau_ba<bdd_binding>, bdd_binding> o1 = { var1, "bdd" };
+		var_desc<tau_ba<bdd_binding>, bdd_binding> o2 = { var2, "bdd" };
+		auto var1_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(1, 0);
+		auto var2_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(2, 0);
+		output_map[o1] = random_file();
+		output_map[o2] = random_file();
+
+		#ifdef DEBUG
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[o1] << "\n";
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[o2] << "\n";
+		#endif // DEBUG
+
+		foutputs<tau_ba<bdd_binding>, bdd_binding> outputs(output_map);
+		assignment<tau_ba<bdd_binding>, bdd_binding> output = {
+			{ var1_0, _1<tau_ba<bdd_binding>, bdd_binding> },
+			{ var2_0, _0<tau_ba<bdd_binding>, bdd_binding> }
+		};
+
+		CHECK( outputs.type_of(o1.first).has_value() );
+		CHECK( outputs.type_of(o2.first).has_value() );
+		CHECK ( outputs.write(output) );
+	}
+
+	TEST_CASE("writing to files: competing outputs") {
+		std::map<var_desc<tau_ba<bdd_binding>, bdd_binding>, std::string> output_map;
+		auto var1 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
+		auto var2 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(2);
+		var_desc<tau_ba<bdd_binding>, bdd_binding> o1 = { var1, "bdd" };
+		var_desc<tau_ba<bdd_binding>, bdd_binding> o2 = { var2, "bdd" };
+		auto var1_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(1, 0);
+		auto var2_1 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(2, 1);
+		output_map[o1] = random_file();
+		output_map[o2] = random_file();
+
+		#ifdef DEBUG
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[o1] << "\n";
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[o2] << "\n";
+		#endif // DEBUG
+
+		foutputs<tau_ba<bdd_binding>, bdd_binding> outputs(output_map);
+		assignment<tau_ba<bdd_binding>, bdd_binding> output = {
+			{ var1_0, _1<tau_ba<bdd_binding>, bdd_binding> },
+			{ var2_1, _0<tau_ba<bdd_binding>, bdd_binding> }
+		};
+
+		CHECK( outputs.type_of(o1.first).has_value() );
+		CHECK( outputs.type_of(o2.first).has_value() );
+		CHECK ( outputs.write(output) );
+	}
 
 }
