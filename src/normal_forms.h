@@ -1033,7 +1033,8 @@ vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff, const a
 		decided = false;
 		if (ranges::all_of(i, [](const auto el) {return el == 2;})) return {};
 
-		if (is_contained_in(i, paths)) continue;
+		// if (is_contained_in(i, paths)) continue;
+		// erase_if(paths, [](const auto& v){return v.empty();});
 		if (all_reductions) {
 			if (!reduce_paths(i, paths, var_size)) paths.emplace_back(move(i));
 			else {
@@ -1123,11 +1124,11 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 			   collect_paths(new_fm, wff, is_var_bf, vars.size(), var_pos,
 				decided, is_cnf, all_reductions);
 
+	if (all_reductions) join_paths(paths);
 	if (paths.empty()) {
 		if (decided) return is_cnf ? (wff ? _T<BAs...> : _1<BAs...>) : (wff ? _F<BAs...> : _0<BAs...>);
 		else return is_cnf ? (wff ? _F<BAs...> : _0<BAs...>) : (wff ? _T<BAs...> : _1<BAs...>);
 	}
-	if (all_reductions) join_paths(paths);
 
 	auto reduced_fm = build_reduced_formula<BAs...>(paths, vars, is_cnf, wff);
 	return wff ? reduced_fm | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>) : reduced_fm;
@@ -1173,25 +1174,43 @@ nso<BAs...> operator|(const nso<BAs...>& fm, const wff_reduce_cnf<BAs...>& r) {
 
 template<typename... BAs>
 nso<BAs...> conjunct_dnfs_to_dnf (const nso<BAs...>& d1, const nso<BAs...>& d2) {
-	nso<BAs...> res = _F<BAs...>;
-	for (const auto& dis1 : get_dnf_wff_clauses(d1))
-		for (const auto& dis2 : get_dnf_wff_clauses(d2))
+	if (is_non_terminal(tau_parser::wff, d1)) {
+		nso<BAs...> res = _F<BAs...>;
+		for (const auto& dis1 : get_dnf_wff_clauses(d1))
+			for (const auto& dis2 : get_dnf_wff_clauses(d2))
 				res = build_wff_or(res, build_wff_and(dis1, dis2));
-	return res;
+		return res;
+	} else {
+		nso<BAs...> res = _0<BAs...>;
+		for (const auto& dis1 : get_dnf_bf_clauses(d1))
+			for (const auto& dis2 : get_dnf_bf_clauses(d2))
+				res = build_bf_or(res, build_bf_and(dis1, dis2));
+		return res;
+	}
 }
 
 template<typename... BAs>
 nso<BAs...> disjunct_cnfs_to_cnf (const nso<BAs...>& c1, const nso<BAs...>& c2) {
-	nso<BAs...> res = _T<BAs...>;
-	for (const auto& dis1 : get_cnf_wff_clauses(c1))
-		for (const auto& dis2 : get_cnf_wff_clauses(c2))
+	if (is_non_terminal(tau_parser::wff, c1)) {
+		nso<BAs...> res = _T<BAs...>;
+		for (const auto& dis1 : get_cnf_wff_clauses(c1))
+			for (const auto& dis2 : get_cnf_wff_clauses(c2))
 				res = build_wff_and(res, build_wff_or(dis1, dis2));
-	return res;
+		return res;
+	} else {
+		nso<BAs...> res = _1<BAs...>;
+		for (const auto& dis1 : get_cnf_bf_clauses(c1))
+			for (const auto& dis2 : get_cnf_bf_clauses(c2))
+				res = build_bf_and(res, build_bf_or(dis1, dis2));
+		return res;
+	}
 }
 
+// Can be used for Tau formula and Boolean function
 template<typename... BAs>
 nso<BAs...> push_negation_one_in(const nso<BAs...>& fm) {
 	using p = tau_parser;
+	// Tau formula rules
 	if (is_child_non_terminal(p::wff_neg, fm)) {
 		auto c = trim2(fm);
 		if (is_child_non_terminal(p::wff_and, c))
@@ -1211,9 +1230,21 @@ nso<BAs...> push_negation_one_in(const nso<BAs...>& fm) {
 		if (is_child_non_terminal(p::wff_sometimes, c))
 			return build_wff_always(build_wff_neg(trim2(c)));
 	}
+	// Boolean function rules
+	if (is_child_non_terminal(p::bf_neg, fm)) {
+		auto c = trim2(fm);
+		if (is_child_non_terminal(p::bf_and, c))
+			return build_bf_or(build_bf_neg(trim(c)->child[0]),
+				build_bf_neg(trim(c)->child[1]));
+		if (is_child_non_terminal(p::bf_or, c)) {
+			return build_bf_and(build_bf_neg(trim(c)->child[0]),
+				build_bf_neg(trim(c)->child[1]));
+		}
+	}
 	return fm;
 }
 
+// Can be used for Tau formula and Boolean function
 template<typename... BAs>
 nso<BAs...> push_negation_in(const nso<BAs...>& fm) {
 #ifdef TAU_CACHE
@@ -1241,18 +1272,27 @@ nso<BAs...> to_dnf2(const nso<BAs...>& fm, const int_t d=0) {
 		return it->second;
 #endif
 	using p = tau_parser;
-	assert(is_non_terminal(p::wff, fm));
-
 	auto new_fm = push_negation_one_in(fm);
 
-	if (is_child_non_terminal(p::wff_and, new_fm)) {
-		new_fm = conjunct_dnfs_to_dnf(to_dnf2(trim(new_fm)->child[0], d+1),
-			to_dnf2(trim(new_fm)->child[1], d+1));
-		// After reaching certain wff_and depths, perform simplification
-		if (d % 4 == 0) new_fm = new_fm | wff_reduce_dnf<BAs...>();
-	} else if (is_child_non_terminal(p::wff_or, new_fm))  {
-		new_fm = build_wff_or(to_dnf2(trim(new_fm)->child[0], d),
-					to_dnf2(trim(new_fm)->child[1], d));
+	if (is_non_terminal(p::wff, new_fm)) {
+		if (is_child_non_terminal(p::wff_and, new_fm)) {
+			new_fm = conjunct_dnfs_to_dnf(to_dnf2(trim(new_fm)->child[0], d+1),
+				to_dnf2(trim(new_fm)->child[1], d+1));
+			// After reaching certain wff_and depths, perform simplification
+			if (d % 4 == 0) new_fm = new_fm | wff_reduce_dnf<BAs...>();
+		} else if (is_child_non_terminal(p::wff_or, new_fm))  {
+			new_fm = build_wff_or(to_dnf2(trim(new_fm)->child[0], d),
+						to_dnf2(trim(new_fm)->child[1], d));
+		}
+	} else if (is_non_terminal(p::bf, new_fm)) {
+		if (is_child_non_terminal(p::bf_and, new_fm)) {
+			new_fm = conjunct_dnfs_to_dnf(to_dnf2(trim(new_fm)->child[0], d+1),
+				to_dnf2(trim(new_fm)->child[1], d+1));
+			if (d % 4 == 0) new_fm = reduce2(new_fm, p::bf);
+		} else if (is_child_non_terminal(p::bf_or, new_fm))  {
+			new_fm = build_bf_or(to_dnf2(trim(new_fm)->child[0], d),
+						to_dnf2(trim(new_fm)->child[1], d));
+		}
 	}
 	assert(fm != nullptr);
 #ifdef TAU_CACHE
@@ -1270,18 +1310,31 @@ nso<BAs...> to_cnf2(const nso<BAs...>& fm, const int_t d = 0) {
 		return it->second;
 #endif
     using p = tau_parser;
-	assert(is_non_terminal(p::wff, fm));
-
 	auto new_fm = push_negation_one_in(fm);
 
-	if (is_child_non_terminal(p::wff_or, new_fm)) {
-		new_fm = disjunct_cnfs_to_cnf(to_cnf2(trim(new_fm)->child[0], d+1),
-			to_cnf2(trim(new_fm)->child[1], d+1));
-		// After reaching certain wff_and depths, perform simplification
-		if (d % 4 == 0) new_fm = new_fm | wff_reduce_cnf<BAs...>();
-	} else if (is_child_non_terminal(p::wff_and, new_fm))  {
-		new_fm = build_wff_and(to_cnf2(trim(new_fm)->child[0], d),
-					to_cnf2(trim(new_fm)->child[1], d));
+	if (is_non_terminal(p::wff, new_fm)) {
+		if (is_child_non_terminal(p::wff_or, new_fm)) {
+			new_fm = disjunct_cnfs_to_cnf(to_cnf2(trim(new_fm)->child[0], d+1),
+				to_cnf2(trim(new_fm)->child[1], d+1));
+			// After reaching certain wff_and depths, perform simplification
+			if (d % 4 == 0) new_fm = new_fm | wff_reduce_cnf<BAs...>();
+		} else if (is_child_non_terminal(p::wff_and, new_fm))  {
+			new_fm = build_wff_and(to_cnf2(trim(new_fm)->child[0], d),
+						to_cnf2(trim(new_fm)->child[1], d));
+		}
+	} else {
+		if (is_child_non_terminal(p::bf_or, new_fm)) {
+			new_fm = disjunct_cnfs_to_cnf(
+				to_cnf2(trim(new_fm)->child[0], d + 1),
+				to_cnf2(trim(new_fm)->child[1], d + 1));
+			// After reaching certain wff_and depths, perform simplification
+			if (d % 4 == 0)
+				new_fm = reduce2(new_fm, p::bf, true);
+		} else if (is_child_non_terminal(p::bf_and, new_fm)) {
+			new_fm = build_bf_and(
+				to_cnf2(trim(new_fm)->child[0], d),
+				to_cnf2(trim(new_fm)->child[1], d));
+	}
 	}
 	assert(fm != nullptr);
 #ifdef TAU_CACHE
