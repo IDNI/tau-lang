@@ -49,36 +49,41 @@ using system = std::map<type, nso<BAs...>>;
 template<typename...BAs>
 struct finputs {
 
-	finputs() = default;
+	finputs() = delete;
 
-	finputs(std::map<nso<BAs...>, type>& types,
-			std::map<nso<BAs...>, std::ifstream>& streams): streams(streams), types(types) {}
-
-	finputs(std::map<nso<BAs...>, type>& types,
-			std::map<nso<BAs...>, filename>& streams): types(types) {
+	finputs(std::map<var_desc<BAs...>, filename> inputs) {
 		// open the corresponding streams for input and store them in streams
-		for (const auto& [vd, fn]: streams)
-			this->streams[vd] = std::ifstream(fn);
+		for (const auto& [var_desc, filename]: inputs) {
+			this->types[var_desc.first] = var_desc.second;
+			if (filename.empty()) this->streams[var_desc.first] = {};
+			else this->streams[var_desc.first] = std::ifstream(filename);
+		}
 	}
 
 	~finputs() {
 		// close the streams
-		for (auto& [_, file]: streams) file.close();
+		for (auto& [_, file]: streams)
+			if (file) file.value().close();
 	}
 
 
 	std::optional<assignment<BAs...>> read() {
-		// for each stream in in.streams, read the value from the file,
+		// for each stream in in streams, read the value from the file/stdin,
 		// parsed it and store it in out.
 		static nso_factory<BAs...> factory;
-		if (streams.empty()) return {{}};
+		if (streams.empty()) return assignment<BAs...>();
 		assignment<BAs...> current;
-		for (const auto& [var, file]: streams) {
+		for (auto& [var, file]: streams) {
 			std::string line;
-			std::getline(file, line);
+			if (file) {
+				std::getline(file.value(), line);
+			} else {
+				std::cout << var << ": ";
+				std::getline(std::cin, line);
+			}
+			if (line.empty()) return {}; // error
 			// TODO MEDIUM add logging in case of error
-			if (!line.empty()) return {}; // error
-			current[var] = factory.parse(line, types[var]);
+			current[var] = build_bf_constant(factory.parse(line, types[var]));
 		}
 		return current;
 	}
@@ -90,63 +95,85 @@ struct finputs {
 	}
 
 	std::map<nso<BAs...>, type> types;
-	std::map<nso<BAs...>, std::ifstream> streams;
+	std::map<nso<BAs...>, std::optional<std::ifstream>> streams;
 };
 
 template<typename...BAs>
 struct foutputs {
 
-	foutputs() = default;
+	foutputs() = delete;
 
-	foutputs(std::map<io_var_name<BAs...>, std::ofstream>& streams): streams(streams) {}
-
-	foutputs(std::map<io_var_name<BAs...>, filename>& streams) {
-		// open the corresponding streams for output and store them in streams
-		for (const auto& [var, file]: streams)
-			this->streams[var] = std::ofstream(file);
+	foutputs(std::map<var_desc<BAs...>, filename> outputs) {
+		// open the corresponding streams for input and store them in streams
+		for (const auto& [var_desc, file]: outputs) {
+			//print_sp_tau_node_tree(std::cout, var_desc.first);
+			//std::cout << var_desc.second << "\n";
+			this->types[var_desc.first] = var_desc.second;
+			if (file.empty()) this->streams[var_desc.first] = {};
+			else this->streams[var_desc.first] = std::ofstream(file);
+		}
 	}
 
 	~foutputs() {
 		// close the streams
-		for (auto& [_, file]: streams) file.close();
+		for (auto& [_, file]: streams)
+			if (file) file.value().close();
 	}
 
 	bool write(const assignment<BAs...>& outputs) {
 		// sorting by time
 		auto sorted = sort(outputs);
+		// adding missing values
+		auto completed = complete(sorted);
 		// for each stream in out.streams, write the value from the solution
-		for (const auto& output: sorted) {
-			for (const auto& [var, value]: output)
-				if (auto stream = streams.find(var); stream)
-					stream->second << value;
+		for (const auto& output: completed) {
+			for (const auto& [var, value]: output) {
+				if (auto stream = streams.find(var); stream != streams.end())
+					if (stream->second) stream->second.value() << value << "\n";
+					else std::cout << value << "\n";
 				else return false; // error
+			}
 		}
 		return true; // success
 	}
 
-	std::map<nso<BAs...>, std::ofstream> streams;
+	std::optional<type> type_of(const nso<BAs...>& var) {
+		if (auto type = types.find(var); type != types.end())
+			return type->second;
+		return {}; // error
+	}
+
+	std::map<nso<BAs...>, type> types;
+	std::map<nso<BAs...>, std::optional<std::ofstream>> streams;
 
 private:
 
-	std::vector<assignment<BAs...>> sort(const solution<BAs...>& sol) {
-		auto compute_range = [](const solution<BAs...>& sol) {
+	std::vector<assignment<BAs...>> sort(const assignment<BAs...>& sol) {
+		auto compute_range = [](const assignment<BAs...>& sol) {
 			size_t lower = std::numeric_limits<size_t>::max(), upper = 0;
 			for (const auto& [var, value]: sol) {
 				if (auto num = var
+						| tau_parser::variable
 						| tau_parser::io_var
 						| tau_parser::out
 						| tau_parser::offset
-						| tau_parser::num; num) {
-					lower = std::min(lower, num | offset_extractor<BAs...>
-						| optional_value_extractor<size_t>);
-					upper = std::max(upper, num | offset_extractor<BAs...>
-						| optional_value_extractor<size_t>);
+						| tau_parser::num
+						| only_child_extractor<BAs...>
+						| offset_extractor<BAs...>; num) {
+					lower = std::min(lower, num | optional_value_extractor<size_t>);
+					upper = std::max(upper, num | optional_value_extractor<size_t>);
 				}
 			}
 			return std::make_pair(lower, upper);
 		};
 
 		auto [lower, upper] = compute_range(sol);
+
+		#ifdef DEBUG
+		std::cout << "sort/lower: " << lower << "\n";
+		std::cout << "sort/upper: " << upper << "\n";
+		#endif // DEBUG
+
 		std::vector<assignment<BAs...>> result(upper - lower + 1);
 
 		for (auto& [var, value]: sol) {
@@ -158,12 +185,47 @@ private:
 					| tau_parser::num
 					| only_child_extractor<BAs...>
 					| offset_extractor<BAs...>; num) {
-				auto io_var = var | tau_parser::io_var | tau_parser::out
-					| tau_parser::out_var_name |  offset_extractor<BAs...>;
-
-				result[num | optional_value_extractor<size_t>][io_var] = value;
+				print_sp_tau_node_tree(std::cout, var);
+				auto io_var = var
+					| tau_parser::variable
+					| tau_parser::io_var
+					| tau_parser::out
+					| tau_parser::out_var_name
+					| optional_value_extractor<nso<BAs...>>;
+				print_sp_tau_node_tree(std::cout, io_var);
+				print_sp_tau_node_tree(std::cout, value);
+				result[num.value() - lower][io_var] = value;
 			}
 		}
+
+		#ifdef DEBUG
+		for (size_t i = 0; i < result.size(); ++i) {
+			std::cout << "sort/result/[" << i <<"]: ";
+			for (const auto& [k, v]: result[i]) std::cout << k << " <- " << v << " ";
+			std::cout << "\n";
+		}
+		#endif // DEBUG
+
+		return result;
+	}
+
+	std::vector<assignment<BAs...>> complete(const std::vector<assignment<BAs...>>& sols) {
+		std::vector<assignment<BAs...>> result(sols.size());
+		for (size_t i = 0; i < sols.size(); ++i) {
+			assignment<BAs...> nsol = sols[i];
+			for (const auto& [var, _]: types)
+				if ( !nsol.contains(var) ) nsol[var] = _0<BAs...>;
+			result[i] = nsol;
+		}
+
+		#ifdef DEBUG
+		for (size_t i = 0; i < result.size(); ++i) {
+			std::cout << "complete/result/[" << i <<"]: ";
+			for (const auto& [k, v]: result[i]) std::cout << k << " <- " << v << " ";
+			std::cout << "\n";
+		}
+		#endif // DEBUG
+
 		return result;
 	}
 };
@@ -325,6 +387,13 @@ size_t compute_initial_execution_time(const nso<BAs...>& phi_inf) {
 				| only_child_extractor<BAs...>
 				| offset_extractor<BAs...>; num) {
 			initial_time_point = max(initial_time_point, num | optional_value_extractor<size_t>);
+		} else if (auto num = io_var
+				| tau_parser::out
+				| tau_parser::offset
+				| tau_parser::num
+				| only_child_extractor<BAs...>
+				| offset_extractor<BAs...>; num) {
+			initial_time_point = max(initial_time_point, num | optional_value_extractor<size_t>);
 		}
 	}
 	return initial_time_point;
@@ -419,11 +488,16 @@ std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> phi_inf, input_t
 template<typename input_t, typename output_t, typename...BAs>
 void run(const nso<BAs...>& phi_inf, input_t& inputs, output_t& outputs) {
 	auto intrprtr = make_interpreter(phi_inf, inputs, outputs);
+	if (!intrprtr) {
+		std::cout << "unable to create interpreter\n";
+		return;
+	}
 	while (true) {
 		if (auto current = inputs.read(); current) {
-			if (auto output = intrprtr.step(current.value()); output.size()) {
+			if (auto output = intrprtr.value().step(current.value()); output.size()) {
 				if (!outputs.write(output)) return;
 			} else return;
+		// TODO (HIGH) add logging in case of no input
 		} else return;
 	}
 }

@@ -306,6 +306,22 @@ static const auto is_quantifier = [](const nso<BAs...>& n) {
 };
 
 template<typename... BAs>
+static const auto is_temporal_quantifier = [](const nso<BAs...>& n) {
+	if (!std::holds_alternative<tau_source_sym>(n->value)
+			|| !get<tau_source_sym>(n->value).nt()) return false;
+	auto nt = get<tau_source_sym>(n->value).n();
+	return nt == tau_parser::wff_sometimes
+		|| nt == tau_parser::wff_always;
+};
+
+template<typename... BAs>
+static const auto is_regular_or_temporal_quantifier = [](const nso<BAs...>& n) {
+	return is_quantifier<BAs...>(n) || is_temporal_quantifier<BAs...>(n);
+};
+
+
+
+template<typename... BAs>
 using is_var_or_capture_t = decltype(is_var_or_capture<BAs...>);
 
 template<typename...BAs>
@@ -805,7 +821,7 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o,
 
 
 template <typename T>
-static const auto optional_value_extractor = [](const std::optional<T>& o) -> T{
+static const auto optional_value_extractor = [](const std::optional<T>& o) -> T {
 	if (!o) BOOST_LOG_TRIVIAL(error)
 		<< "parse tree traversal: bad optional access";
 	return o.value();
@@ -2037,13 +2053,19 @@ sp_tau_node<BAs...> build_wff_var(const std::string& name) {
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
-	auto cte = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+sp_tau_node<BAs...> build_bf_constant(const sp_tau_node<BAs...>& cte) {
 	return wrap(
 		tau_parser::bf, wrap(
 			tau_parser::bf_constant, wrap(
 				tau_parser::constant,
 					cte)));
+}
+
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
+	auto cte = make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	return build_bf_constant<BAs...>(cte);
 }
 
 template<typename... BAs>

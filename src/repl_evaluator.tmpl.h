@@ -525,13 +525,25 @@ template <typename... BAs>
 void repl_evaluator<BAs...>::run_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto form = n->child[1];
-	if (auto check = form | tau_parser::wff; check) {
-		// TODO (HIGH) call executor
-	} else if (auto check = form | tau_parser::rr; check) {
-		// TODO (HIGH) call executor
+	auto arg = n->child[1];
+	if (auto check = find_top(arg, is_regular_or_temporal_quantifier<tau_ba<BAs...>, BAs...>); check) {
+		std::cout << "not enabled yet\n";
+		return;
 	}
-	not_implemented_yet();
+
+	// running the program
+	if (auto program = get_wff(arg); program) {
+		// TODO (HIGH) only consider inputs/outputs present in the formula
+		auto ins = finputs<tau_ba<BAs...>, BAs...>(inputs);
+		auto outs = foutputs<tau_ba<BAs...>, BAs...>(outputs);
+		run<finputs<tau_ba<BAs...>, BAs...>,
+				foutputs<tau_ba<BAs...>, BAs...>,
+				tau_ba<BAs...>, BAs...>(
+			program.value(), ins, outs);
+		return;
+	}
+
+	cout << "error: invalid argument\n";
 }
 
 template <typename... BAs>
@@ -666,7 +678,7 @@ void repl_evaluator< BAs...>::def_input_cmd(
 			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
 	else fn = "/dev/stdin";
-	auto var_name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+	auto var_name = command | tau_parser::in_var_name | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
 	inputs[{var_name, t}] = fn;
 }
 
@@ -679,7 +691,7 @@ void repl_evaluator< BAs...>::def_output_cmd(
 			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
 	else fn = "/dev/stdout";
-	auto var_name = command | tau_parser::charvar | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
+	auto var_name = command | tau_parser::out_var_name | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
 	outputs[{var_name, t}] = fn;
 }
 
