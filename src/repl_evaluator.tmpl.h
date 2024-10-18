@@ -531,6 +531,15 @@ void repl_evaluator<BAs...>::run_cmd(
 		return;
 	}
 
+	// do we have a max number of iterations?
+	auto max_iter = std::numeric_limits<size_t>::max();
+	if (n->child.size() > 2) {
+		stringstream ss;
+		ss << n->child[2];
+		auto t = ss.str();
+		max_iter = std::stoul(t);
+	}
+
 	// running the program
 	if (auto program = get_wff(arg); program) {
 		// TODO (HIGH) only consider inputs/outputs present in the formula
@@ -539,7 +548,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		run<finputs<tau_ba<BAs...>, BAs...>,
 				foutputs<tau_ba<BAs...>, BAs...>,
 				tau_ba<BAs...>, BAs...>(
-			program.value(), ins, outs);
+			program.value(), ins, outs, max_iter);
 		return;
 	}
 
