@@ -543,8 +543,51 @@ void repl_evaluator<BAs...>::run_cmd(
 	// running the program
 	if (auto program = get_wff(arg); program) {
 		// TODO (HIGH) only consider inputs/outputs present in the formula
-		auto ins = finputs<tau_ba<BAs...>, BAs...>(inputs);
-		auto outs = foutputs<tau_ba<BAs...>, BAs...>(outputs);
+		// select current input variables
+		auto in_vars = select_all(program.value(),
+			is_non_terminal<tau_parser::in_var_name, tau_ba<BAs...>, BAs...>);
+		if (!in_vars.empty() && inputs.empty()) {
+			std::cout << "error: no input variables defined\n";
+			return;
+		}
+		std::map<var_desc<tau_ba<BAs...>, BAs...>, filename> current_inputs;
+		for (auto& var: in_vars) {
+			for (auto& [k, v]: inputs) {
+				if (k.first == var) {
+					current_inputs[k] = v;
+					break;
+				} else {
+					std::cout << "error: input variable " << var << " not defined\n";
+					return;
+				}
+			}
+		}
+		auto ins = finputs<tau_ba<BAs...>, BAs...>(current_inputs);
+		// select current output variables
+		auto out_vars = select_all(program.value(),
+			is_non_terminal<tau_parser::out_var_name, tau_ba<BAs...>, BAs...>);
+		if (out_vars.empty()) {
+			std::cout << "error: no output variables, nothing to compute\n";
+			return;
+		}
+		if (outputs.empty()) {
+			std::cout << "error: no output variables defined\n";
+			return;
+		}
+		std::map<var_desc<tau_ba<BAs...>, BAs...>, filename> current_outputs;
+		for (auto& var: out_vars) {
+			for (auto& [k, v]: outputs) {
+				if (k.first == var) {
+					current_outputs[k] = v;
+					break;
+				} else {
+					std::cout << "error: output variable " << var << " not defined\n";
+					return;
+				}
+			}
+		}
+
+		auto outs = foutputs<tau_ba<BAs...>, BAs...>(current_outputs);
 		run<finputs<tau_ba<BAs...>, BAs...>,
 				foutputs<tau_ba<BAs...>, BAs...>,
 				tau_ba<BAs...>, BAs...>(
