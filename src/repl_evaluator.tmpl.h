@@ -677,7 +677,7 @@ void repl_evaluator< BAs...>::def_input_cmd(
 	if (auto file_name = command | tau_parser::input_stream
 			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
-	else fn = "/dev/stdin";
+	else fn = ""; // default input (std::cin)
 	auto var_name = command | tau_parser::in_var_name | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
 	inputs[{var_name, t}] = fn;
 }
@@ -690,7 +690,7 @@ void repl_evaluator< BAs...>::def_output_cmd(
 	if (auto file_name = command | tau_parser::output_stream
 			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
-	else fn = "/dev/stdout";
+	else fn = ""; // default output (std::cout)
 	auto var_name = command | tau_parser::out_var_name | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
 	outputs[{var_name, t}] = fn;
 }
