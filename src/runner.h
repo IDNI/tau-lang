@@ -15,6 +15,7 @@
 #define __RUNNER_H__
 
 #include <fstream>
+#include <termios.h>
 
 #include "tau_ba.h"
 #include "solver.h"
@@ -79,7 +80,14 @@ struct finputs {
 				std::getline(file.value(), line);
 			} else {
 				std::cout << var << "[" << time_point << "]: ";
+				// get current terminal attributes
+				termios orig_attrs;
+    			tcgetattr(STDIN_FILENO, &orig_attrs);
+				// read from standad input
+				set_canonical_mode(orig_attrs);
 				std::getline(std::cin, line);
+				// restore original terminal attributes
+				reset_mode(orig_attrs);
 			}
 			if (line.empty()) return {}; // error
 			// TODO MEDIUM add logging in case of error
@@ -98,6 +106,19 @@ struct finputs {
 	std::map<nso<BAs...>, type> types;
 	std::map<nso<BAs...>, std::optional<std::ifstream>> streams;
 	size_t time_point = 0;
+
+private:
+
+	void set_canonical_mode(termios& orig_attrs) {
+		termios new_attrs = orig_attrs;
+		new_attrs.c_lflag |= ICANON;  // enable canonical mode
+		new_attrs.c_lflag |= ECHO;    // enable echo
+		tcsetattr(STDIN_FILENO, TCSANOW, &new_attrs);
+	}
+
+	void reset_mode(const termios& orig_attrs) {
+		tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
+	}
 };
 
 template<typename...BAs>
