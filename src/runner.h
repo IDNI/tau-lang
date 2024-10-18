@@ -78,13 +78,14 @@ struct finputs {
 			if (file) {
 				std::getline(file.value(), line);
 			} else {
-				std::cout << var << ": ";
+				std::cout << var << "[" << time_point << "]: ";
 				std::getline(std::cin, line);
 			}
 			if (line.empty()) return {}; // error
 			// TODO MEDIUM add logging in case of error
 			current[var] = build_bf_constant(factory.parse(line, types[var]));
 		}
+		time_point += 1;
 		return current;
 	}
 
@@ -96,6 +97,7 @@ struct finputs {
 
 	std::map<nso<BAs...>, type> types;
 	std::map<nso<BAs...>, std::optional<std::ifstream>> streams;
+	size_t time_point = 0;
 };
 
 template<typename...BAs>
@@ -483,13 +485,14 @@ std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> phi_inf, input_t
 
 
 template<typename input_t, typename output_t, typename...BAs>
-void run(const nso<BAs...>& phi_inf, input_t& inputs, output_t& outputs) {
+void run(const nso<BAs...>& phi_inf, input_t& inputs, output_t& outputs, size_t max_iter = std::numeric_limits<size_t>::max()) {
 	auto intrprtr = make_interpreter(phi_inf, inputs, outputs);
 	if (!intrprtr) {
 		std::cout << "unable to create interpreter\n";
 		return;
 	}
-	while (true) {
+
+	for (size_t i = 0; i < max_iter; ++i) {
 		if (auto current = inputs.read(); current) {
 			if (auto output = intrprtr.value().step(current.value()); output.size()) {
 				if (!outputs.write(output)) return;
