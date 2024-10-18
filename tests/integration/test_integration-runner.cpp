@@ -406,7 +406,7 @@ TEST_SUITE("test inputs") {
 		std::map<var_desc<tau_ba<bdd_binding>, bdd_binding>, std::string> input_map;
 		auto var = build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
 		var_desc<tau_ba<bdd_binding>, bdd_binding> i1 = { var, "bdd" };
-		input_map[i1] = "../tests/integration/test_files/bdd-alternating_zeros_and_ones-length_10.in";
+		input_map[i1] = "integration/test_files/bdd-alternating_zeros_and_ones-length_10.in";
 		finputs<tau_ba<bdd_binding>, bdd_binding> inputs(input_map);
 		CHECK (inputs.type_of(i1.first).has_value() );
 		for (size_t i = 0; i < 10; ++i) {
