@@ -408,7 +408,7 @@ TEST_SUITE("test inputs") {
 		auto var = build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
 		input_map[var] = { "bdd", "integration/test_files/bdd-alternating_zeros_and_ones-length_10.in"};
 		finputs<tau_ba<bdd_binding>, bdd_binding> inputs(input_map);
-		CHECK (inputs.type_of(var).has_value() );
+		CHECK ( inputs.type_of(var).has_value() );
 		for (size_t i = 0; i < 10; ++i) {
 			auto in = inputs.read();
 			if (in) {
@@ -425,7 +425,7 @@ TEST_SUITE("test inputs") {
 		auto var = build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
 		input_map[var] = { "tau", "integration/test_files/tau-alternating_zeros_and_ones-length_10.in"};
 		finputs<tau_ba<bdd_binding>, bdd_binding> inputs(input_map);
-		CHECK (inputs.type_of(var).has_value() );
+		CHECK ( inputs.type_of(var).has_value() );
 		for (size_t i = 0; i < 10; ++i) {
 			auto in = inputs.read();
 			if (in) {
@@ -470,8 +470,8 @@ TEST_SUITE("test outputs") {
 		output_map[var2] = {"bdd", random_file()};
 
 		#ifdef DEBUG
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_0].second << "\n";
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_0].second << "\n";
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1].second << "\n";
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2].second << "\n";
 		#endif // DEBUG
 
 		foutputs<tau_ba<bdd_binding>, bdd_binding> outputs(output_map);
@@ -495,14 +495,14 @@ TEST_SUITE("test outputs") {
 		output_map[var2] = {"bdd", random_file()};
 
 		#ifdef DEBUG
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_0].second << "\n";
-		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_1].second << "\n";
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1].second << "\n";
+		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2].second << "\n";
 		#endif // DEBUG
 
 		foutputs<tau_ba<bdd_binding>, bdd_binding> outputs(output_map);
 		assignment<tau_ba<bdd_binding>, bdd_binding> output = {
 			{ var1_0, _1<tau_ba<bdd_binding>, bdd_binding> },
-			{ var2_1, _0<tau_ba<bdd_binding>, bdd_binding> }
+			{ var2_1, _1<tau_ba<bdd_binding>, bdd_binding> }
 		};
 
 		CHECK( outputs.type_of(var1).has_value() );
