@@ -219,7 +219,7 @@ cli_command            =>
 # input/output streams
 input_stream           =>
         # in the future itcp, iudp,...
-        ("ifile" _ '(' _ q_file_name  _ ')') | ("keyboard"):keyboard_sym.
+        ("ifile" _ '(' _ q_file_name  _ ')') | ("console"):console_sym.
 output_stream          =>
         # in the future otcp, oudp,...
         ("ofile" _ '(' _ q_file_name  _ ')') | ("console"):console_sym.
