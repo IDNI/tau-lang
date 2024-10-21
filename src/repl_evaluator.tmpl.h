@@ -550,19 +550,19 @@ void repl_evaluator<BAs...>::run_cmd(
 			std::cout << "error: no input variables defined\n";
 			return;
 		}
-		std::map<var_desc<tau_ba<BAs...>, BAs...>, filename> current_inputs;
+
+		std::map<nso<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> current_inputs;
 		for (auto& var: in_vars) {
-			for (auto& [k, v]: inputs) {
-				if (k.first == var) {
-					current_inputs[k] = v;
-					break;
-				} else {
-					std::cout << "error: input variable " << var << " not defined\n";
-					return;
-				}
+			if (auto it = inputs.find(var); it != inputs.end()) {
+				current_inputs[var] = it->second;
+			} else {
+				std::cout << "error: input variable " << var << " not defined\n";
+				return;
 			}
 		}
+
 		auto ins = finputs<tau_ba<BAs...>, BAs...>(current_inputs);
+
 		// select current output variables
 		auto out_vars = select_all(program.value(),
 			is_non_terminal<tau_parser::out_var_name, tau_ba<BAs...>, BAs...>);
@@ -574,16 +574,14 @@ void repl_evaluator<BAs...>::run_cmd(
 			std::cout << "error: no output variables defined\n";
 			return;
 		}
-		std::map<var_desc<tau_ba<BAs...>, BAs...>, filename> current_outputs;
+
+		std::map<nso<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> current_outputs;
 		for (auto& var: out_vars) {
-			for (auto& [k, v]: outputs) {
-				if (k.first == var) {
-					current_outputs[k] = v;
-					break;
-				} else {
-					std::cout << "error: output variable " << var << " not defined\n";
-					return;
-				}
+			if (auto it = outputs.find(var); it != outputs.end()) {
+				current_outputs[var] = it->second;
+			} else {
+				std::cout << "error: output variable " << var << " not defined\n";
+				return;
 			}
 		}
 
@@ -699,10 +697,14 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 		cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
 	if (inputs.size() == 0 && outputs.size() == 0) cout << "i/o variables: empty\n";
 	else std::cout << "i/o variables:\n";
-	for (auto& [d, f]: inputs)
-		cout << "    " << d.second << " " << d.first << " = ifile(\"" << f << "\")\n";
-	for (auto& [d, f]: outputs)
-		cout << "    " << d.second << " " << d.first << " = ofile(\"" << f << "\")\n";
+	for (auto& [var, desc]: inputs) {
+		auto file = desc.second.empty() ? "keyboard" : "ifile(\"" + desc.second + "\")";
+		cout << "\t" << desc.first << " " << var << " = " << file << "\n";
+	}
+	for (auto& [var, desc]: outputs) {
+		auto file = desc.second.empty() ? "console" : "ofile(\"" + desc.second + "\")";
+		cout << "\t" << desc.first << " " << var << " = " << file << "\n";
+	}
 }
 
 template <typename... BAs>
@@ -725,26 +727,38 @@ template <typename... BAs>
 void repl_evaluator< BAs...>::def_input_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
-	type t = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
-	if (auto file_name = command | tau_parser::input_stream
-			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
+	type type = command
+		| tau_parser::type
+		| extract_string<tau_ba<BAs...>, BAs...>;
+	if (auto file_name = command
+			| tau_parser::input_stream
+			| tau_parser::q_file_name
+			| extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
 	else fn = ""; // default input (std::cin)
-	auto var_name = command | tau_parser::in_var_name | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
-	inputs[{var_name, t}] = fn;
+	auto var_name = command
+		| tau_parser::in_var_name
+		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+	inputs[var_name] = {type, fn};
 }
 
 template <typename... BAs>
 void repl_evaluator< BAs...>::def_output_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
-	type t = command | tau_parser::type | extract_string<tau_ba<BAs...>, BAs...>;
-	if (auto file_name = command | tau_parser::output_stream
-			| tau_parser::q_file_name | extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
+	type type = command
+		| tau_parser::type
+		| extract_string<tau_ba<BAs...>, BAs...>;
+	if (auto file_name = command
+			| tau_parser::output_stream
+			| tau_parser::q_file_name
+			| extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
 	else fn = ""; // default output (std::cout)
-	auto var_name = command | tau_parser::out_var_name | optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
-	outputs[{var_name, t}] = fn;
+	auto var_name = command
+		| tau_parser::out_var_name
+		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
+	outputs[var_name] = {type, fn};
 }
 
 // make a nso_rr from the given tau source and binder.

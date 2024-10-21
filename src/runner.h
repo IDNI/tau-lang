@@ -52,12 +52,13 @@ struct finputs {
 
 	finputs() = delete;
 
-	finputs(std::map<var_desc<BAs...>, filename> inputs) {
+	finputs(std::map<nso<BAs...>, std::pair<type, filename>> inputs) {
 		// open the corresponding streams for input and store them in streams
-		for (const auto& [var_desc, filename]: inputs) {
-			this->types[var_desc.first] = var_desc.second;
-			if (filename.empty()) this->streams[var_desc.first] = {};
-			else this->streams[var_desc.first] = std::ifstream(filename);
+		for (const auto& [var, desc]: inputs) {
+			this->types[var] = desc.first;
+			this->streams[var] = desc.second.empty()
+				? std::optional<std::ifstream>()
+				: std::ifstream(desc.second);
 		}
 	}
 
@@ -126,14 +127,15 @@ struct foutputs {
 
 	foutputs() = delete;
 
-	foutputs(std::map<var_desc<BAs...>, filename> outputs) {
+	foutputs(std::map<nso<BAs...>, std::pair<type, filename>> outputs) {
 		// open the corresponding streams for input and store them in streams
-		for (const auto& [var_desc, file]: outputs) {
+		for (const auto& [var, desc]: outputs) {
 			//print_sp_tau_node_tree(std::cout, var_desc.first);
 			//std::cout << var_desc.second << "\n";
-			this->types[var_desc.first] = var_desc.second;
-			if (file.empty()) this->streams[var_desc.first] = {};
-			else this->streams[var_desc.first] = std::ofstream(file);
+			this->types[var] = desc.first;
+			this->streams[var] = desc.second.empty()
+				? std::optional<std::ofstream>()
+				: std::ofstream(desc.second);
 		}
 	}
 

@@ -178,8 +178,8 @@ private:
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 	rec_relations<gssotc<BAs...>> definitions;
-	std::map<var_desc<tau_ba<BAs...>, BAs...>, filename> inputs;
-	std::map<var_desc<tau_ba<BAs...>, BAs...>, filename> outputs;
+	std::map<nso<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> inputs;
+	std::map<nso<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> outputs;
 	bool error = false;
 	idni::term::colors TC{};
 };
