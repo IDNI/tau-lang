@@ -6,17 +6,14 @@
 #
 # This demo should work under any *nix flavour due to the paths used for files.
 # To run it under windows you will need to change the paths to the files.
-# To run a tau program we need to define input and output variables.
-# If you attemp to run a program without defining the input and output variables,
-# the runner will throw an error.
 #
-# This idea of this demo is to give a more complex example for the runner.
-# The example is based in the well-known model of FPGA -filed programable
+# The idea of this demo is to give a more complex example for the runner.
+# The demo is based in the well-known model of FPGA -field programable
 # gate array- (see https://en.wikipedia.org/wiki/Field-programmable_gate_array for
 # the details).
 #
 # In the FPGA model, we have a programmable array of gates, some memory to store
-# computations, inputs and outputs and a way to update the array gate.
+# computations, inputs/outputs and a way to update the array gate.
 #
 # In our case we will deal with programmable Boolean Funtions, i.e. we will
 # copycut the same ideas but in order to compute the result of Boolean
@@ -45,11 +42,11 @@
 #
 # i0: update signal,
 #
-# i1...: the new Boolean function describing the value to be computed in the next step
-# if the update signal is true.
-#
-# i2...: the new Boolean function describing the value to be stored in the memory
+# i1...: the new Boolean function describing the Boolean Function to be computed
 # in the next step if the update signal is true.
+#
+# i2...: the new Boolean function describing the Boolean function computing the
+# to be stored in the memory in the next step if the update signal is true.
 #
 # i3..: the input values from which compute the Boolean function.
 #
