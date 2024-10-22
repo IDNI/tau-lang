@@ -1,0 +1,64 @@
+# To run it you need to compile the project using release.sh (c ustomized with
+# your settings if needed) and then execute the run.sh whithin the demo directory
+# as follows:
+#
+# ./run.sh demo_3.2-runner_fpbf.tau
+#
+# This demo should work under any *nix flavour due to the paths used for files.
+# To run it under windows you will need to change the paths to the files.
+# To run a tau program we need to define input and output variables.
+# If you attemp to run a program without defining the input and output variables,
+# the runner will throw an error.
+#
+# This idea of this demo is to give a more complex example for the runner.
+# The example is based in the well-known model of FPGA -filed programable
+# gate array- (see https://en.wikipedia.org/wiki/Field-programmable_gate_array for
+# the details).
+#
+# In the FPGA model, we have a programmable array of gates, some memory to store
+# computations, inputs and outputs and a way to update the array gate.
+#
+# In our case we will deal with programmable Boolean Funtions, i.e. we will
+# copycut the same ideas but in order to compute the result of Boolean
+# functions instead of computing ouput bits.
+#
+# In order to keep it simple, we will assume that the programmable Boolean
+# function has only to variables. Moreover, we would restrain the memory to
+# just one Boolean algebra element. These restrictions are just to keep the
+# example simple, more elaborated constructions could be done in the obvious way.
+#
+# In order to program the Boolean function, we will parametrize the function
+# with several ouput variables of the Tau program. The idea is that the
+# output variables will be used to compute the new Boolean function value from
+# the input values. The input values will be given by the input variables of
+# the Tau program.
+#
+# The value to be store in the memory will be parametrized also by output
+# variables of the Tau program. The memory will be updated by the specific
+# inputs given by certain input variables of the Tau program.
+#
+# We will also consider an input variable defifing the update signal. If the update
+# signal is true, the Boolean function will be updated, otherwise it will remain
+# the same. The memory will be updated in the same way.
+#
+# Thus, we will consider the following variables:
+#
+# i0: update signal,
+#
+# i1...: the new Boolean function describing the value to be computed in the next step
+# if the update signal is true.
+#
+# i2...: the new Boolean function describing the value to be stored in the memory
+# in the next step if the update signal is true.
+#
+# i3..: the input values from which compute the Boolean function.
+#
+# and the following output variables:
+#
+# o1...: the current values of the Bollean function describing what is computed.
+#
+# o2...: the current values of the Boolean function describing what is stored in the memory.
+#
+# o3: the value of the evaluation of the current Boolean function described by o1...
+#
+# o4: the value of the evaluation of the current Boolean function described by o2...

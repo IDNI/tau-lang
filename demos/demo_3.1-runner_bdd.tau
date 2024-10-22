@@ -1,30 +1,40 @@
-# This demo demonstrate the workings of the runner.
 # To run it you need to compile the project using release.sh (customized with
 # your settings if needed) and then execute the run.sh whithin the demo directory
 # as follows:
-# ./run.sh demo_3.1-runner.tau
+#
+# ./run.sh demo_3.1-runner_bdd.tau
+#
 # This demo should work under any *nix flavour due to the paths used for files.
 # To run it under windows you will need to change the paths to the files.
+#
+# This demo demonstrate the workings of the runner.
+#
 # To run a tau program we need to define input and output variables.
 # If you attemp to run a program without defining the input and output variables,
 # the runner will throw an error.
+#
 # The following program just echo the inputs to the outputs, but we have not
 # define inputs yet! So we would get an error.
 #
 r i1[t] = o1[t]
+#
 # Let us define the inputs for variable i1 from a file (of type bdd)
 #
 bdd i1 = ifile("../tests/integration/test_files/bdd-alternating_zeros_and_ones-length_10.in")
+#
 # However, we still need to define the output variable. If we try to run the above
 # program, we will still get an error.
 #
 r i1[t] = o1[t]
+#
 # Let us define the output variable as the console
 #
 bdd o1 = console
+#
 # In order to check the defined inputs and outputs, we can run the following command:
 #
 defs
+#
 # Now we can run the program, let say for 5 steps:
 #
 r i1[t] = o1[t] 5
@@ -33,6 +43,7 @@ r i1[t] = o1[t] 5
 #
 bdd o2 = ofile("/tmp/output_file1")
 r i1[t]' = o2[t] 5
+#
 # In order to check the result, you could run the following command, in another console:
 #
 # cat /tmp/output_file1
@@ -45,6 +56,8 @@ r i1[t]' = o2[t] 5
 #
 bdd o3 = ofile("/tmp/output_file2")
 r o3[t] = o3[t-1] + o3[t-2] && o3[0] = 1 && o3[1] = 1 7
+#
 # In the future we would provide more complex examples, but we
 # guess you have a taste of how the runner works, at least in simple cases.
+#
 q
