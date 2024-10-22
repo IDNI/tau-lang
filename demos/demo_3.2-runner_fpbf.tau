@@ -59,3 +59,30 @@
 # o3: the value of the evaluation of the current Boolean function described by o1...
 #
 # o4: the value of the evaluation of the current Boolean function described by o2...
+#
+# In order to simplify further the expressions, the Boolean formulas will be
+# given in algebraic normal form.
+#
+# Let us build our tau program step by step.
+#
+# First, let us deal with the evaluation of the Boolean function. We must take
+# into account the current Boolean function, the inputs and the previous memory:
+#
+# o1[t] = o1000[t] + ... + o1111[t] & i30[t] & i31[t] & o4[t-1]
+#
+# Regarding the memopry, we should have
+#
+# o2[t] = o200[t] + ... + o211[t] & i30[t] & i31[t]
+#
+# If the update signal is true, we must update the Boolean function and the memory, i.e.
+# we must have:
+#
+# (i0[t] = T ) -> (o1000[t] = i1000[t] && ... && o1111[t] = i1011[t])
+# (i0[t] = T ) -> (o200[t] = i200[t] && ... && o211[t] = i211[t])
+#
+# If the update signal is not true, we must keep the Boolean function and the memory
+# as they are, i.e. we must have:
+#
+# (i0[t] != T ) -> (o1000[t] = o1000[t-1] && ... && o1111[t] = o1111[t-1])
+# (i0[t] != T ) -> (o200[t] = o200[t-1] && ... && o211[t] = o211[t-1])
+#
