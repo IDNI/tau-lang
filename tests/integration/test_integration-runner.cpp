@@ -409,7 +409,7 @@ TEST_SUITE("test inputs") {
 	TEST_CASE("reading from file with bdd inputs") {
 		std::map<nso<tau_ba<bdd_binding>, bdd_binding>, std::pair<type, std::string>> input_map;
 		auto var = build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
-		input_map[var] = { "sbf", "integration/test_files/bdd-alternating_zeros_and_ones-length_10.in"};
+		input_map[var] = { "sbf", "integration/test_files/sbf-alternating_zeros_and_ones-length_10.in"};
 		finputs<tau_ba<bdd_binding>, bdd_binding> inputs(input_map);
 		CHECK ( inputs.type_of(var).has_value() );
 		for (size_t i = 0; i < 10; ++i) {

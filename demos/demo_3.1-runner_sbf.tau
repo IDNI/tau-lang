@@ -2,7 +2,7 @@
 # your settings if needed) and then execute the run.sh whithin the demo directory
 # as follows:
 #
-# ./run.sh demo_3.1-runner_bdd.tau
+# ./run.sh demo_3.1-runner_sbf.tau
 #
 # This demo should work under any *nix flavour due to the paths used for files.
 # To run it under windows you will need to change the paths to the files.
@@ -18,9 +18,9 @@
 #
 r i1[t] = o1[t]
 #
-# Let us define the inputs for variable i1 from a file (of type bdd)
+# Let us define the inputs for variable i1 from a file (of type sbf)
 #
-bdd i1 = ifile("../tests/integration/test_files/bdd-alternating_zeros_and_ones-length_10.in")
+sbf i1 = ifile("../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in")
 #
 # However, we still need to define the output variable. If we try to run the above
 # program, we will still get an error.
@@ -29,7 +29,7 @@ r i1[t] = o1[t]
 #
 # Let us define the output variable as the console
 #
-bdd o1 = console
+sbf o1 = console
 #
 # In order to check the defined inputs and outputs, we can run the following command:
 #
@@ -41,7 +41,7 @@ r i1[t] = o1[t] 5
 #
 # We could also define the ouput as a file, and run a similar program again:
 #
-bdd o2 = ofile("/tmp/output_file1")
+sbf o2 = ofile("/tmp/output_file1")
 r i1[t]' = o2[t] 5
 #
 # In order to check the result, you could run the following command, in another console:
@@ -54,7 +54,7 @@ r i1[t]' = o2[t] 5
 # simple but are provided to show the basic workings of the runner.
 # Let us consider the following example base on the Fibonacci sequence:
 #
-bdd o3 = ofile("/tmp/output_file2")
+sbf o3 = ofile("/tmp/output_file2")
 r o3[t] = o3[t-1] + o3[t-2] && o3[0] = 1 && o3[1] = 1 7
 #
 # We can also solve equations involving inequalities:
