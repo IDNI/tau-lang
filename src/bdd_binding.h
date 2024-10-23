@@ -166,6 +166,10 @@ struct nso_factory<bdd_binding> {
 		return build_bf_constant(bf.splitter_one());
 	}
 
+	std::string default_type() const {
+		return "sbf";
+	}
+
 	static nso_factory<bdd_binding>& instance() {
 		static nso_factory<bdd_binding> factory;
 		return factory;
@@ -200,6 +204,10 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 
 	std::vector<std::string> types() const {
 		return { "sbf", "tau" };
+	}
+
+	std::string default_type() const {
+		return "tau";
 	}
 
 	gssotc<bdd_binding> splitter_one (const std::string& type_name) const {

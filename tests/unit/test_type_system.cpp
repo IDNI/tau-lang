@@ -85,7 +85,7 @@ TEST_SUITE("constant types") {
 	TEST_CASE("none typed") {
 		auto n = infer("{ F. } = { T. } { F. }.");
 		// ptree<Bool>(std::cout << "inferred: ", n) << "\n";
-		CHECK( are_all_typed_as(n, "tau") );
+		CHECK( are_all_typed_as(n, "bool") );
 	}
 
 	TEST_CASE("type mismatch") {
