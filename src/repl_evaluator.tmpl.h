@@ -727,6 +727,7 @@ template <typename... BAs>
 void repl_evaluator< BAs...>::def_input_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
+	nso_factory<tau_ba<BAs...>, BAs...> factory;
 	type type = command
 		| tau_parser::type
 		| extract_string<tau_ba<BAs...>, BAs...>;
@@ -736,16 +737,24 @@ void repl_evaluator< BAs...>::def_input_cmd(
 			| extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
 	else fn = ""; // default input (std::cin)
-	auto var_name = command
-		| tau_parser::in_var_name
-		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
-	inputs[var_name] = {type, fn};
+
+	for (auto& t: factory.types()) {
+		if (type == t) {
+			auto var_name = command
+				| tau_parser::in_var_name
+				| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
+			inputs[var_name] = {type, fn};
+			return;
+		}
+	}
+	cout << "error: invalid type " << type << "\n";
 }
 
 template <typename... BAs>
 void repl_evaluator< BAs...>::def_output_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
+	nso_factory<tau_ba<BAs...>, BAs...> factory;
 	type type = command
 		| tau_parser::type
 		| extract_string<tau_ba<BAs...>, BAs...>;
@@ -755,10 +764,17 @@ void repl_evaluator< BAs...>::def_output_cmd(
 			| extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
 	else fn = ""; // default output (std::cout)
-	auto var_name = command
-		| tau_parser::out_var_name
-		| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
-	outputs[var_name] = {type, fn};
+
+	for (auto& t: factory.types()) {
+		if (type == t) {
+			auto var_name = command
+				| tau_parser::out_var_name
+				| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
+			outputs[var_name] = {type, fn};
+			return;
+		}
+	}
+	std::cout << "error: invalid type " << type << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
