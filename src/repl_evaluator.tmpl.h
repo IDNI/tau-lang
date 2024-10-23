@@ -792,12 +792,16 @@ void repl_evaluator<BAs...>::get_cmd(
 	{ tau_parser::debug_repl_opt, [this]() {
 		cout << "debug-repl:  " << pbool[opt.debug_repl] << "\n"; } },
 #endif
-	{ tau_parser::status_opt,   [this]() {
-		cout << "status:      " << pbool[opt.status] << "\n"; } },
-	{ tau_parser::colors_opt,   [this]() {
-		cout << "colors:      " << pbool[opt.colors] << "\n"; } },
-	{ tau_parser::severity_opt, [this]() {
-		cout << "severity:    " << opt.severity << "\n"; } }};
+	{ tau_parser::status_opt,     [this]() {
+		cout << "status:            " << pbool[opt.status] << "\n"; } },
+	{ tau_parser::colors_opt,     [this]() {
+		cout << "colors:            " << pbool[opt.colors] << "\n"; } },
+	{ tau_parser::hilighting_opt, [this]() {
+		cout << "syntax hilighting: " << pbool[pretty_printer_hilighting] << "\n"; } },
+	{ tau_parser::indenting_opt,  [this]() {
+		cout << "indenting:         " << pbool[pretty_printer_indenting] << "\n"; } },
+	{ tau_parser::severity_opt,   [this]() {
+		cout << "severity:          " << opt.severity << "\n"; } }};
 	auto option = n | tau_parser::bool_option;
 	if (option.has_value()) option = n;
 	else option = n | tau_parser::option;
@@ -816,7 +820,7 @@ boost::log::trivial::severity_level
 		case tau_parser::info_sym:  return boost::log::trivial::info;
 		default: std::cerr << "error: invalid severity value\n";
 	}
-	return boost::log::trivial::error;
+	return boost::log::trivial::info;
 }
 
 template <typename... BAs>
@@ -856,6 +860,10 @@ void repl_evaluator<BAs...>::set_cmd(
 		get_bool_value(opt.status); } },
 	{ tau_parser::colors_opt,   [&]() {
 		TC.set(get_bool_value(opt.colors)); } },
+	{ tau_parser::hilighting_opt,   [&]() {
+		get_bool_value(pretty_printer_hilighting); } },
+	{ tau_parser::indenting_opt,   [&]() {
+		get_bool_value(pretty_printer_indenting); } },
 	{ tau_parser::severity_opt, [&]() {
 		auto sev = v | tau_parser::severity;
 		if (!sev.has_value()) {
@@ -886,6 +894,10 @@ void repl_evaluator<BAs...>::toggle_cmd(
 #endif
 	case tau_parser::colors_opt:
 		TC.set(opt.colors = !opt.colors); break;
+	case tau_parser::hilighting_opt:
+		pretty_printer_hilighting = !pretty_printer_hilighting; break;
+	case tau_parser::indenting_opt:
+		pretty_printer_indenting = !pretty_printer_indenting; break;
 	case tau_parser::status_opt: opt.status = !opt.status; break;
 	default: cout << ": unknown bool option\n"; error = true;break;
 	}
@@ -1015,13 +1027,15 @@ void repl_evaluator<BAs...>::help_cmd(
 {
 	static const std::string bool_options =
 #ifdef DEBUG
-		"  debug-repl             show REPL commands on/off\n"
+		"  debug-repl             show REPL commands             on/off\n"
 #endif
-		"  status                 show status        on/off\n"
-		"  colors                 use term colors    on/off\n";
+		"  status                 show status                    on/off\n"
+		"  colors                 use term colors                on/off\n"
+		"  hilighting             syntax hilighting of formulas  on/off\n"
+		"  indenting              indenting of formulas          on/off\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options:\n" + bool_options +
-		"  severity               severity           error/info/debug/trace\n";
+		"  severity               severity                       error/info/debug/trace\n";
 	static const std::string bool_available_options = std::string{} +
 		"Available options:\n" + bool_options;
 	auto arg = n | tau_parser::help_arg

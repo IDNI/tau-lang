@@ -7,9 +7,9 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 add_repl_test(instantiation_cmd_bf1 "x. 1. i %[x / %1]" ": 1")
 
-add_repl_test(instantiation_cmd_bf2 "ax + bx'. y&z. i %1[x / %2]" ": \\(a & y & z\\)' & b & \\(y & z\\)' | a & y & z & \\(b & \\(y & z\\)'\\)")
+add_repl_test(instantiation_cmd_bf2 "ax + bx'. y&z. i %1[x / %2]" ": \\(ayz\\)'b\\(yz\\)'|ayz\\(b\\(yz\\)'\\)")
 
-add_repl_test(instantiation_cmd_bf3 "(x | (w & z)) & z. b. i %1[ z / %2]" ": \\(x | w & b\\) & b")
+add_repl_test(instantiation_cmd_bf3 "(x | (w & z)) & z. b. i %1[ z / %2]" ": \\(x|wb\\)b")
 
 add_repl_test(instantiation_cmd_bf4 "x & y. T. i %1[x / %2]" "error: invalid argument")
 
@@ -29,7 +29,7 @@ add_repl_test(instantiation_cmd_wff6 "(x=0|| (w=0 && z=0)) && z=0. b. i %1[z / %
 
 add_repl_test(instantiation_cmd_wff7 "x=0&& y=0. x=0. i %1[x/ %2]" "error: argument has wrong type")
 
-add_repl_test(instantiation_cmd_wff8 "i (ex x x=0 && y=0) && x=0[y/x|a]" ": \\(ex x2 x2 = 0 && x | a = 0\\) && x = 0")
+add_repl_test(instantiation_cmd_wff8 "i (ex x x=0 && y=0) && x=0[y/x|a]" ": \\(ex x2 x2 = 0 && x|a = 0\\) && x = 0")
 
 add_repl_test(instantiation_cmd_wff9 "i ex x ex x x=0 && y=0 [y/x]" ": ex x2, x3 x3 = 0 && x = 0")
 

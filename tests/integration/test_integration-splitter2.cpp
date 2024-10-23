@@ -34,7 +34,7 @@ TEST_CASE("Tau_splitter_tau_coeff1") {
 	auto fm = make_nso_rr_using_factory<tau_ba<bdd_test>, bdd_test>(src).value().main;
 	auto s = tau_splitter(fm, splitter_type::upper);
 	stringstream ss; ss << s;
-	CHECK(ss.str() == "{ x = 0. } & v != 0");
+	CHECK(ss.str() == "{ x = 0. } v != 0");
 }
 
 TEST_CASE("Tau_splitter_tau_coeff2") {
@@ -42,6 +42,6 @@ TEST_CASE("Tau_splitter_tau_coeff2") {
 	auto fm = make_nso_rr_using_factory<tau_ba<bdd_test>, bdd_test>(src).value().main;
 	auto s = tau_splitter(fm, splitter_type::upper);
 	stringstream ss; ss << s;
-	CHECK(ss.str() == "{ x | y = 0. } & v | { x | y = 0. } = 0");
+	CHECK(ss.str() == "{ x|y = 0. } v|{ x|y = 0. } = 0");
 }
 }

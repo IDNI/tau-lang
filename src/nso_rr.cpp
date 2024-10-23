@@ -14,6 +14,9 @@
 
 namespace idni::tau {
 
+bool pretty_printer_hilighting = false;
+bool pretty_printer_indenting  = false;
+
 // extracts terminal from sp_tau_source_node
 std::function<std::optional<char>(const sp_tau_source_node& n)>
 	tau_source_terminal_extractor = [](const sp_tau_source_node& n)

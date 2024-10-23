@@ -325,8 +325,8 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 template <typename... BAs>
 auto is_nso_equivalent_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
 	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
-		return are_nso_equivalent<BAs...>(n, p);
-	});
+			return are_nso_equivalent<BAs...>(n, p);
+		});
 }
 
 template<typename... BAs>
@@ -350,6 +350,7 @@ bool are_bf_equal(nso<BAs...> n1, nso<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << bf_equal_fm;
 
 	auto normalized = normalizer_step<BAs...>(bf_equal_fm);
+	BOOST_LOG_TRIVIAL(trace) << "(T) -- Normalized: " << normalized;
 	auto check = normalized | tau_parser::wff_t;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_bf_equal: " << check.has_value();
 
@@ -359,8 +360,8 @@ bool are_bf_equal(nso<BAs...> n1, nso<BAs...> n2) {
 template <typename... BAs>
 auto is_bf_same_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
 	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
-		return are_bf_equal<BAs...>(n, p);
-	});
+			return are_bf_equal<BAs...>(n, p);
+		});
 }
 
 template <typename... BAs>
@@ -618,6 +619,7 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Normalize step";
 		current = t == tau_parser::wff ? normalizer_step(current)
 					: bf_boole_normal_form(current);
+		BOOST_LOG_TRIVIAL(debug) << "(T) -- Normalized step";
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 
 		if (previous.size()
@@ -743,9 +745,11 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer step";
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 		current = normalizer_step(current);
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer step";
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 		if (is_nso_equivalent_to_any_of(current, previous)) break;
 		else previous.push_back(current);
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer step";
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Next step";
 	}
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";

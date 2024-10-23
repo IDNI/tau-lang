@@ -7,9 +7,9 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 add_repl_test(substitution_cmd_bf1 "x. 1. s %[x / %1]" ": 1")
 
-add_repl_test(substitution_cmd_bf2 "ax + bx'. y&z. s %1[x / %2]" ": \\(a & y & z\\)' & b & \\(y & z\\)' | a & y & z & \\(b & \\(y & z\\)'\\)'")
+add_repl_test(substitution_cmd_bf2 "ax + bx'. y&z. s %1[x / %2]" ": \\(ayz\\)'b\\(yz\\)'|ayz\\(b\\(yz\\)'\\)'")
 
-add_repl_test(substitution_cmd_bf5 "(x | (w & z)) & z. b. s %1[ z / %2]" ": \\(x | w & b\\) & b")
+add_repl_test(substitution_cmd_bf5 "(x | (w & z)) & z. b. s %1[ z / %2]" ": \\(x|wb\\)b")
 
 add_repl_test(substitution_cmd_bf6 "x & y. T. s %1[x / %2]" "error: invalid argument")
 
