@@ -1007,6 +1007,10 @@ struct nso_factory {
 		throw std::runtime_error("not implemented");
 	}
 
+	std::vector<std::string> types() const {
+		throw std::runtime_error("not implemented");
+	}
+
 	sp_tau_node<BAs...> splitter_one(const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
