@@ -32,9 +32,7 @@
 #include <variant>
 #include <numeric>
 
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-
+#include "init_log.h"
 #include "bool_ba.h"
 #include "variant_ba.h"
 #include "splitter_types.h"
@@ -42,6 +40,7 @@
 #include "utils.h"
 #include "../parser/tau_parser.generated.h"
 #include "rewriting.h"
+#include "term_colors.h"
 
 #ifdef TAU_MEASURE
 #include "measure.h"
@@ -52,6 +51,8 @@ using namespace tau_parser_data;
 
 namespace idni::tau {
 
+extern bool pretty_printer_hilighting;
+extern bool pretty_printer_indenting;
 
 //
 // types related to the tau language
@@ -3878,11 +3879,30 @@ std::ostream& operator<<(std::ostream& stream,
 // IDEA maybe it should be move to out.h
 template <typename... BAs>
 std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
+	std::vector<size_t>& hl_path, size_t& depth,
 	size_t parent = tau_parser::start, bool passthrough = false);
+
+template <typename... BAs>
+std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
+	size_t parent = tau_parser::start, bool passthrough = false)
+{
+	std::vector<size_t> hl_path;
+	size_t depth = 0;
+	return pp(stream, n, hl_path, depth, parent, passthrough);
+}
 
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream,
 	const idni::tau::sp_tau_node<BAs...>& n) { return pp(stream, n); }
+
+// << for node<tau_sym>
+template<typename... BAs>
+std::ostream& operator<<(std::ostream& stream,
+	const idni::rewriter::node<idni::tau::tau_sym<BAs...>>& n)
+{
+	return stream << std::make_shared<
+			idni::rewriter::node<idni::tau::tau_sym<BAs...>>>(n);
+}
 
 // old operator<< renamed to print_terminals and replaced by
 // pp pretty priniter
@@ -3906,10 +3926,41 @@ std::ostream& operator<<(std::ostream& stream,
 std::ostream& operator<<(std::ostream& stream,
 					const idni::tau::tau_source_node& n);
 
+inline static const std::map<size_t, std::string> hl_colors = {
+	{ tau_parser::bf,            idni::TC.LIGHT_GREEN() },
+	{ tau_parser::variable,      idni::TC.WHITE() },
+	{ tau_parser::capture,       idni::TC.BLUE() },
+	{ tau_parser::wff_all,       idni::TC.MAGENTA() },
+	{ tau_parser::wff_ex,        idni::TC.LIGHT_MAGENTA() },
+
+	{ tau_parser::rec_relation,  idni::TC.YELLOW() },
+	{ tau_parser::constraint,    idni::TC.LIGHT_MAGENTA() },
+	{ tau_parser::io_var,        idni::TC.WHITE() },
+	{ tau_parser::constant,      idni::TC.LIGHT_CYAN() }
+
+	// { tau_parser::rule,          idni::TC.BG_YELLOW() },
+	// { tau_parser::builder,       idni::TC.BG_LIGHT_YELLOW() }
+};
+
+inline static const std::vector<size_t> breaks = {
+	tau_parser::wff_and, tau_parser::wff_or, tau_parser::wff_xor,
+	tau_parser::wff_imply, tau_parser::wff_equiv,
+	tau_parser::wff_all, tau_parser::wff_ex
+};
+
+inline static const std::vector<size_t> indents = {
+	tau_parser::wff_sometimes, tau_parser::wff_always,
+	tau_parser::wff_conditional,
+	tau_parser::wff_all, tau_parser::wff_ex,
+	tau_parser::wff_imply, tau_parser::wff_equiv
+};
+
 template <typename... BAs>
 std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
-	size_t parent, bool passthrough)
+	std::vector<size_t>& hl_path, size_t& depth, size_t parent,
+	bool passthrough)
 {
+	using namespace idni;
 // #define DEBUG_PP
 // #ifdef DEBUG_PP
 // auto& p = tau_parser::instance();
@@ -3973,6 +4024,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::history_store_cmd,                50 },
 			{ tau_parser::sat_cmd,                        50 },
 			{ tau_parser::main,                             60 },
+			{ tau_parser::bf_rule,                          60 },
+			{ tau_parser::wff_rule,                         60 },
 			{ tau_parser::ref,                              80 },
 			{ tau_parser::wff,                              90 },
 			// wff
@@ -4048,17 +4101,30 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 	};
 
 	if (passthrough) { // passthrough
-		//auto ch = get_children(n->child);
-		for (const auto& c : n->child) pp(stream, c, parent);
+		for (const auto& c : n->child)
+			pp(stream, c, hl_path, depth, parent);
 		return stream;
 	}
-
 
 	if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
 		auto& ch = n->child;
 		auto tss = std::get<idni::tau::tau_source_sym>(n->value);
 		auto ppch = [&](size_t i) -> std::ostream& {
-			return pp(stream, ch[i], tss.n());
+			return pp(stream, ch[i], hl_path, depth, tss.n());
+		};
+		auto indent = [&depth, &stream]() {
+			if (!idni::tau::pretty_printer_indenting) return;
+			for (size_t i = 0; i < depth; ++i) stream << "\t";
+		};
+		auto break_line = [&]() {
+			if (!idni::tau::pretty_printer_indenting) return;
+			stream << "\n", indent();
+		};
+		auto break_if_needed = [&]() -> bool {
+			if (!idni::tau::pretty_printer_indenting) return false;
+			if (find(breaks.begin(), breaks.end(), tss.n())
+				!= breaks.end()) return break_line(), true;
+			return false;
 		};
 		auto sep = [&](const std::string& separator) {
 			for (size_t i = 0; i < ch.size(); ++i) {
@@ -4069,13 +4135,14 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		auto pass = [&]() {
 			sep("");
 		};
-		//auto pass_nows = [&]() {
-		//	for (const auto& c : ch) pp(stream, c, tss.n());
-		//};
+		// auto pass_nows = [&]() {
+		// 	for (const auto& c : ch)
+		// 		pp(stream, c, hl_path, depth, tss.n());
+		// };
 		auto infix_nows = [&](const std::string& op) {
 			ppch(0);
 			if (ch.size() == 1) return;
-			stream << op;
+			stream << op, break_if_needed();
 			ppch(1);
 		};
 		auto infix = [&](const std::string& op) {
@@ -4106,30 +4173,60 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			using namespace idni::tau;
 			size_t quant_nt = tss.n();
 			auto qch = ch;
-			//std::cout << "(quant_nt=" << quant_nt << ")";
 			switch (quant_nt) {
 			case tau_parser::wff_all:  stream << "all";   break;
 			case tau_parser::wff_ex:   stream << "ex";    break;
 			}
 			sp_tau_node<BAs...> expr;
 			size_t expr_nt;
-			size_t counter = 0;
 			do {
-				pp(stream << " ", qch[0], quant_nt);
+				pp(stream << " ", qch[0], hl_path, depth, quant_nt);
 				expr = qch[1]->child[0];
 				expr_nt = expr | non_terminal_extractor<BAs...>
 					| optional_value_extractor<size_t>;
-				//std::cout << "(expr_nt=" << expr_nt << ")";
 				if (expr_nt == quant_nt) {
 					stream << ",", qch = expr->child;
 				} else {
-					pp(stream << " ", expr, tss.n());
+					if (!break_if_needed()) stream << " ";
+					pp(stream, expr, hl_path, depth, tss.n());
 					break;
 				}
-				if (++counter > 10) break;
 			} while (true);
 		};
+		auto print_bf_and = [&]() {
+			std::stringstream ss;
+			bool is_hilight = idni::tau::pretty_printer_hilighting;
+			if (is_hilight)
+				idni::tau::pretty_printer_hilighting = false;
+			pp(ss, ch[0], hl_path, depth, tss.n());
+			if (is_hilight)
+				idni::tau::pretty_printer_hilighting = true;
+			auto str = ss.str();
+			if (is_hilight)
+				pp(stream, ch[0], hl_path, depth, tss.n());
+			else stream << str;
+			char lc = str[str.size()-1];
+			if (isdigit(lc) // || lc == '}'
+				|| idni::tau::is_child_non_terminal(
+					tau_parser::bf_constant, ch[0]))
+						stream << " ";
+			pp(stream, ch[1], hl_path, depth, tss.n());
+		};
 		if (tss.nt()) { //stream /*<< "*" << tss.nts << "-"*/ << tau_parser::instance().name(tss.n()) << ":";
+			// indenting and breaklines
+			bool indented = false;
+			if (idni::tau::pretty_printer_indenting)
+				if (find(indents.begin(), indents.end(),
+					tss.n()) != indents.end())
+						indented = true, depth++;
+			// syntax hilighting color start
+			bool hl_pop = false;
+			if (idni::tau::pretty_printer_hilighting)
+				if (auto it = hl_colors.find(tss.n());
+					it != hl_colors.end())
+						hl_path.push_back(tss.n()),
+						hl_pop = true,
+						stream << it->second;
 			switch (tss.n()) {
 			case tau_parser::main:
 			case tau_parser::builder:
@@ -4149,14 +4246,18 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf:
 			case tau_parser::wff:
 			{
-				//assert(ch.size() <= 1);
-				//if (ch.size() > 1) wrap("(", ")");
-				//else {
 				bool wrap = is_to_wrap(ch[0], parent);
-				if (wrap) stream << "(";
-				pp(stream, ch[0], parent);
-				if (wrap) stream << ")";
-				//}
+				if (wrap) {
+					stream << "(";
+					if (tss.n() == tau_parser::wff)
+						depth++, break_line();
+				}
+				pp(stream, ch[0], hl_path, depth, parent);
+				if (wrap) {
+					if (tss.n() == tau_parser::wff)
+						depth--, break_line();
+					stream << ")";
+				}
 			} break;
 			case tau_parser::shift:
 				if (ch.size() == 1) pass();
@@ -4183,9 +4284,9 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::wff_always:     prefix("always"); break;
 			//
 			// binary operators
-			case tau_parser::bf_and:         infix("&"); break;
-			case tau_parser::bf_or:          infix("|"); break;
-			case tau_parser::bf_xor:         infix("+"); break;
+			case tau_parser::bf_and:         print_bf_and(); break;
+			case tau_parser::bf_or:          infix_nows("|"); break;
+			case tau_parser::bf_xor:         infix_nows("+"); break;
 			case tau_parser::bf_eq:          infix("="); break;
 			case tau_parser::bf_neq:         infix("!="); break;
 			case tau_parser::bf_less:        infix("<"); break;
@@ -4298,8 +4399,18 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::extra: break; // We do not output this
 			// for the rest skip value and just passthrough to child
 			default: for (const auto& c : n->child)
-					pp(stream, c, parent);
+					pp(stream, c, hl_path, depth, parent);
 				break;
+			}
+			// indenting and breaklines
+			if (idni::tau::pretty_printer_indenting && indented)
+				depth--;
+			// syntax hilighting color end
+			if (idni::tau::pretty_printer_hilighting && hl_pop) {
+				hl_path.pop_back();
+				stream << TC.CLEAR();
+				if (hl_path.size()) // restore the prev color
+					stream << hl_colors.at(hl_path.back());
 			}
 		}
 		else if (!tss.is_null()) stream << tss.t();

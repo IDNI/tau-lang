@@ -155,8 +155,8 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
 		// cout << s;
-		CHECK((ss.str() == "{ x3 x4 y } & w != 0"
-			|| ss.str() == "{  x2 } & w != 0"));
+		CHECK((ss.str() == "{ x3 x4 y } w != 0"
+			|| ss.str() == "{ x2 } w != 0"));
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
@@ -168,8 +168,8 @@ TEST_SUITE("Tau_splitter_coeff") {
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
 		// cout << s;
-		CHECK((ss.str() == "{ x } & w != 0"
-			|| ss.str() == "{ y } & w != 0"
-			|| ss.str() == "{  x2 } & w != 0"));
+		CHECK((ss.str() == "{ x } w != 0"
+			|| ss.str() == "{ y } w != 0"
+			|| ss.str() == "{ x2 } w != 0"));
 	}
 }

@@ -55,11 +55,8 @@
 
 #include <iostream>
 #include <fstream>
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/utility/setup/console.hpp>
 
+#include "init_log.h"
 #include "cli.h"
 #include "repl.h"
 #include "repl_evaluator.h"
@@ -70,7 +67,6 @@ using namespace std;
 using namespace idni;
 using namespace idni::rewriter;
 using namespace idni::tau;
-using namespace boost::log;
 
 cli::commands tau_commands() {
 	cli::commands cmds;
@@ -168,15 +164,8 @@ int run_tau(const string& program, const string& input, const string& output,
 	return 0;
 }
 
-void init_logging() {
-	core::get()->set_filter(trivial::severity >= trivial::debug);
-	add_console_log(cout, keywords::format =
-		expressions::stream << expressions::smessage);
-}
-
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
-	init_logging();
 	bdd_init<Bool>();
 
 	vector<string> args;

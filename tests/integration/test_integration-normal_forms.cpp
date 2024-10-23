@@ -151,6 +151,6 @@ TEST_SUITE("normal forms: snf for wff") {
 		if (!nso__rr.has_value()) return;
 		auto result = snf_wff(nso__rr.value().main);
 		std::stringstream ss; ss << result;
-		CHECK( ss.str() == "x & y != 0" );
+		CHECK( ss.str() == "xy != 0" );
 	}
 }

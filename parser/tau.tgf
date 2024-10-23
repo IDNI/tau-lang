@@ -260,9 +260,11 @@ memory                 => ( "%"
 #
 option                 => bool_option
                         | ("sev" | "severity")      :severity_opt  :enum_option.
-bool_option            => ("s" | "status")          :status_opt
-                        | ("c" | "color" | "colors"):colors_opt
-                        | ("d" | "dbg"   | "debug") :debug_repl_opt.
+bool_option            => ("s" | "status")                :status_opt
+                        | ("c" | "color" | "colors")      :colors_opt
+                        | ("h" | "hilight" | "hilighting"):hilighting_opt
+                        | ("i" | "indent" | "indenting")  :indenting_opt
+                        | ("d" | "dbg"   | "debug")       :debug_repl_opt.
 option_value           => option_value_true | option_value_false | severity.
 option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
 option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".
