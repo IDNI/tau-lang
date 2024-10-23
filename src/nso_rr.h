@@ -1011,6 +1011,10 @@ struct nso_factory {
 		throw std::runtime_error("not implemented");
 	}
 
+	std::string default_type() const {
+		throw std::runtime_error("not implemented");
+	}
+
 	sp_tau_node<BAs...> splitter_one(const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
@@ -1277,7 +1281,7 @@ sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
 		}
 		BOOST_LOG_TRIVIAL(trace)
 			<< "(T) first appearing constant type: " << type;
-		if (type.size() == 0) type = "tau"; // default type
+		if (type.size() == 0) type = nso_factory<BAs...>::instance().default_type(); // default type
 		// pass the type to all constants and check for mismatch
 		for (auto& c : select_all(nd, is_non_terminal<
 				tau_parser::bf_constant, BAs...>))
@@ -1285,7 +1289,7 @@ sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
 			auto type_nd = c | tau_parser::type;
 			if (type_nd) {
 				auto got = extract_type(type_nd.value());
-				if (!(type.size() == 0 && got == "tau")
+				if (!(type.size() == 0 && got == nso_factory<BAs...>::instance().default_type())
 					&& got != type)
 				{
 					BOOST_LOG_TRIVIAL(trace)

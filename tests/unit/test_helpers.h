@@ -44,7 +44,11 @@ namespace idni::tau {
 			return { "bool" };
 		}
 
-		static nso_factory<Bool>& instance() {
+	std::string default_type() const {
+		return "bool";
+	}
+
+	static nso_factory<Bool>& instance() {
 			static nso_factory<Bool> factory;
 			return factory;
 		}
