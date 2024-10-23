@@ -59,6 +59,12 @@ struct finputs {
 			this->streams[var] = desc.second.empty()
 				? std::optional<std::ifstream>()
 				: std::ifstream(desc.second);
+			if (this->streams[var]
+				&& !this->streams[var].value().is_open())
+					BOOST_LOG_TRIVIAL(error)
+						<< "Failed to open input file '"
+						<< desc.second << "': "
+						<< std::strerror(errno) << "\n";
 		}
 	}
 
@@ -83,7 +89,7 @@ struct finputs {
 				std::cout << var << "[" << time_point << "]: ";
 				// get current terminal attributes
 				termios orig_attrs;
-    			tcgetattr(STDIN_FILENO, &orig_attrs);
+				tcgetattr(STDIN_FILENO, &orig_attrs);
 				// read from standad input
 				set_canonical_mode(orig_attrs);
 				std::getline(std::cin, line);
@@ -92,7 +98,9 @@ struct finputs {
 			}
 			if (line.empty()) return {}; // error
 			// TODO MEDIUM add logging in case of error
-			current[var] = build_bf_constant(factory.parse(line, types[var]));
+			auto cnst = factory.parse(line, types[var]);
+			if (!cnst) return {}; // error
+			current[var] = build_bf_constant(cnst.value());
 		}
 		time_point += 1;
 		return current;
@@ -422,7 +430,7 @@ size_t compute_initial_execution_time(const nso<BAs...>& phi_inf) {
 }
 
 template<typename input_t, typename...BAs>
-std::optional<assignment<BAs...>> compute_initial_memory(const nso<BAs...>& phi_inf,
+std::optional<assignment<BAs...>> compute_initial_memory(const nso<BAs...>& /*phi_inf*/,
 		const size_t& initial_execution_time, input_t& inputs) {
 	assignment<BAs...> memory;
 	for (size_t n = 0; n < initial_execution_time; ++n) {

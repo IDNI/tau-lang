@@ -30,9 +30,9 @@ namespace testing = doctest;
 
 bool fp_test(const char* sample, const size_t& nt) {
 	auto sample_src = make_tau_source(sample);
-	auto sample_formula = make_nso_rr_using_factory<
-		bdd_binding>(sample_src);
-	return (normalizer<bdd_binding>(sample_formula) | nt).has_value();
+	auto formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+	return formula.has_value()
+		&& (normalizer<bdd_binding>(formula.value()) | nt).has_value();
 }
 
 bool fp_test_wff_f(const char* sample) {
