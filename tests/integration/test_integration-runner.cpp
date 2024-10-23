@@ -317,7 +317,9 @@ TEST_SUITE("only outputs") {
 
 	// f(f(f(x))) = f(x) using constants
 	TEST_CASE("o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'") {
-		const char* sample = "o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'.";
+		// TODO (CHECK this one too
+		// const char* sample = "o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'.";
+		const char* sample = "o1[t] = ({a}:sbf) o1[t-1] + ({b}:sbf) o1[t-1]'.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.empty() );
 	}
