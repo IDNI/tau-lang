@@ -114,34 +114,34 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 
 	// TODO (MEDIUM) check if we need to add more tests for bindings
 
-	TEST_CASE("{ X } : SBF != 0") {
+	TEST_CASE("{ X } : sbf != 0") {
 		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ X } : SBF != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_test_for_value("{ X } : sbf != 0.", tau_parser::wff_t) );
 	}
 
-	TEST_CASE("{ X } : SBF = 0") {
+	TEST_CASE("{ X } : sbf = 0") {
 		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ X } : SBF = 0.", tau_parser::wff_f) );
+		CHECK( normalize_and_test_for_value("{ X } : sbf = 0.", tau_parser::wff_f) );
 	}
 
-	TEST_CASE("{ Y } : SBF | { Z } : SBF != 0") {
+	TEST_CASE("{ Y } : sbf | { Z } : sbf != 0") {
 		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ Y } : SBF | { Z } : SBF != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_test_for_value("{ Y } : sbf | { Z } : sbf != 0.", tau_parser::wff_t) );
 	}
 
-	TEST_CASE("{ Y } : SBF & { Z } : SBF != 0") {
+	TEST_CASE("{ Y } : sbf & { Z } : sbf != 0") {
 		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ Y } : SBF | { Z } : SBF != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_test_for_value("{ Y } : sbf | { Z } : sbf != 0.", tau_parser::wff_t) );
 	}
 
-	TEST_CASE("{ Y } : SBF' != 0") {
+	TEST_CASE("{ Y } : sbf' != 0") {
 		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ Y } : SBF' != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_test_for_value("{ Y } : sbf' != 0.", tau_parser::wff_t) );
 	}
 
-	TEST_CASE("{ Y } : SBF != 0") {
+	TEST_CASE("{ Y } : sbf != 0") {
 		bdd_init<Bool>();
-		CHECK( normalize_and_test_for_value("{ Y } : SBF != 0.", tau_parser::wff_t) );
+		CHECK( normalize_and_test_for_value("{ Y } : sbf != 0.", tau_parser::wff_t) );
 	}
 }
 
