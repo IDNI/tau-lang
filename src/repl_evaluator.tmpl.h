@@ -727,7 +727,6 @@ template <typename... BAs>
 void repl_evaluator< BAs...>::def_input_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
-	nso_factory<tau_ba<BAs...>, BAs...> factory;
 	type type = command
 		| tau_parser::type
 		| extract_string<tau_ba<BAs...>, BAs...>;
@@ -738,7 +737,7 @@ void repl_evaluator< BAs...>::def_input_cmd(
 		fn = file_name;
 	else fn = ""; // default input (std::cin)
 
-	for (auto& t: factory.types()) {
+	for (auto& t: nso_factory<BAs...>::instance().types()) {
 		if (type == t) {
 			auto var_name = command
 				| tau_parser::in_var_name
@@ -754,7 +753,6 @@ template <typename... BAs>
 void repl_evaluator< BAs...>::def_output_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
-	nso_factory<tau_ba<BAs...>, BAs...> factory;
 	type type = command
 		| tau_parser::type
 		| extract_string<tau_ba<BAs...>, BAs...>;
@@ -765,7 +763,7 @@ void repl_evaluator< BAs...>::def_output_cmd(
 		fn = file_name;
 	else fn = ""; // default output (std::cout)
 
-	for (auto& t: factory.types()) {
+	for (auto& t: nso_factory<BAs...>::instance().types()) {
 		if (type == t) {
 			auto var_name = command
 				| tau_parser::out_var_name

@@ -185,7 +185,7 @@ struct tau_ba_factory {
 		auto nso = make_nso_rr_using_factory<tau_ba<BAs...>,BAs...>(src);
 		if (!nso) return std::optional<gssotc<BAs...>>{};
 		tau_ba<BAs...> t(nso.value().main);
-		return std::optional<gssotc<BAs...>>{ 
+		return std::optional<gssotc<BAs...>>{
 			make_node<tau_sym<tau_ba<BAs...>, BAs...>>(t, {}) };
 	}
 

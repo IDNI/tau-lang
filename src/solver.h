@@ -702,9 +702,8 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const nso<BA
 template<typename...BAs>
 std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
 		const std::string& type = "") {
-	static nso_factory<BAs...> factory;
 	if (form == _T<BAs...>) return { solution<BAs...>() };
-	auto splitter_one = factory.splitter_one(type);
+	auto splitter_one = nso_factory<BAs...>::instance().splitter_one(type);
 
 	#ifdef DEBUG
 	std::cout << "solve/form: " << form << "\n";

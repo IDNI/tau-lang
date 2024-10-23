@@ -78,7 +78,6 @@ struct finputs {
 	std::optional<assignment<BAs...>> read() {
 		// for each stream in in streams, read the value from the file/stdin,
 		// parsed it and store it in out.
-		static nso_factory<BAs...> factory;
 		if (streams.empty()) return assignment<BAs...>();
 		assignment<BAs...> current;
 		for (auto& [var, file]: streams) {
@@ -98,7 +97,7 @@ struct finputs {
 			}
 			if (line.empty()) return {}; // error
 			// TODO MEDIUM add logging in case of error
-			auto cnst = factory.parse(line, types[var]);
+			auto cnst = nso_factory<BAs...>::instance().parse(line, types[var]);
 			if (!cnst) return {}; // error
 			current[var] = build_bf_constant(cnst.value());
 		}
