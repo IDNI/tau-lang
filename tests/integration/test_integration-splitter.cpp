@@ -148,7 +148,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 
 	TEST_CASE("Tau_splitter_coeff1") {
 		bdd_init<Bool>();
-		const char *sample = "{x3}:SBF&{y}:SBF w != 0.";
+		const char *sample = "{x3}:sbf&{y}:sbf w != 0.";
 		auto src = make_tau_source(sample);
 		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
 		fm = normalizer(fm);
@@ -161,7 +161,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 
 	TEST_CASE("Tau_splitter_coeff2") {
 		bdd_init<Bool>();
-		const char *sample = "({x}:SBF|{y}:SBF) w != 0.";
+		const char *sample = "({x}:sbf|{y}:sbf) w != 0.";
 		auto src = make_tau_source(sample);
 		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
 		fm = normalizer(fm);

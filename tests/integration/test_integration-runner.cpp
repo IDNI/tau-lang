@@ -60,7 +60,7 @@ struct output_bdd_console {
 	}
 
 	std::optional<type> type_of(const nso<BAs...>&) {
-		return { "SBF" }; // SBF (always)
+		return { "sbf" }; // sbf (always)
 	}
 };
 
@@ -77,7 +77,7 @@ struct input_bdd_vector {
 	}
 
 	std::optional<type> type_of(const nso<BAs...>&) {
-		return { "SBF" }; // SBF (always)
+		return { "sbf" }; // sbf (always)
 	}
 
 	std::vector<assignment<BAs...>> inputs;
@@ -190,8 +190,8 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[t] = {a}:SBF") {
-		const char* sample = "o1[t] = {a}:SBF.";
+	TEST_CASE("o1[t] = {a}:sbf") {
+		const char* sample = "o1[t] = {a}:sbf.";
 		auto memory = run_test(sample, 2);
 		CHECK ( !memory.empty() );
 	}
@@ -208,14 +208,14 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {a}:SBF") {
-		const char* sample = "o1[0] = {a}:SBF.";
+	TEST_CASE("o1[0] = {a}:sbf") {
+		const char* sample = "o1[0] = {a}:sbf.";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[1] = {a}:SBF") {
-		const char* sample = "o1[1] = {a}:SBF.";
+	TEST_CASE("o1[1] = {a}:sbf") {
+		const char* sample = "o1[1] = {a}:sbf.";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
 	}
@@ -238,14 +238,14 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {a}:SBF && o1[t] = o1[t-1]") {
-		const char* sample = "o1[0] = {a}:SBF && o1[t] = o1[t-1].";
+	TEST_CASE("o1[0] = {a}:sbf && o1[t] = o1[t-1]") {
+		const char* sample = "o1[0] = {a}:sbf && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {a}:SBF && o1[t] != o1[t-1]") {
-		const char* sample = "o1[0] = {a}:SBF && o1[t] = o1[t-1].";
+	TEST_CASE("o1[0] = {a}:sbf && o1[t] != o1[t-1]") {
+		const char* sample = "o1[0] = {a}:sbf && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
 		CHECK ( !memory.empty() );
 	}
@@ -268,29 +268,29 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.empty() );
 	}
 
-	TEST_CASE("o1[0] = {a}:SBF && o1[t] < o1[t-1] && o1[t] != 0") {
-		const char* sample = "o1[0] = {a}:SBF && o1[t] < o1[t-1] && o1[t] != 0.";
+	TEST_CASE("o1[0] = {a}:sbf && o1[t] < o1[t-1] && o1[t] != 0") {
+		const char* sample = "o1[0] = {a}:sbf && o1[t] < o1[t-1] && o1[t] != 0.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
 
 	// increasing monotonicity (2)
-	TEST_CASE("o1[0] = {a}:SBF && o1[t] > o1[t-1] && o1[t] != 1") {
-		const char* sample = "o1[0] = {a}:SBF && o1[t] > o1[t-1] && o1[t] != 1.";
+	TEST_CASE("o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1") {
+		const char* sample = "o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
 
 	// increasing monotonicity (3)
 	TEST_CASE("o1[0] = 0 && o1[t] > o1[t-1] && o1[t] != 1") {
-		const char* sample = "o1[0] = {a}:SBF && o1[t] > o1[t-1] && o1[t] != 1.";
+		const char* sample = "o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
 
 	// increasing monotonicity (4)
 	TEST_CASE("o1[t] > o1[t-1] && o1[t] != 1") {
-		const char* sample = "o1[0] = {a}:SBF && o1[t] > o1[t-1] && o1[t] != 1.";
+		const char* sample = "o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
 		CHECK ( !memory.empty() );
 	}
@@ -316,8 +316,8 @@ TEST_SUITE("only outputs") {
 	}
 
 	// f(f(f(x))) = f(x) using constants
-	TEST_CASE("o1[t] = {a}:SBF o1[t-1] + {b}:SBF o1[t-1]'") {
-		const char* sample = "o1[t] = {a}:SBF o1[t-1] + {b}:SBF o1[t-1]'.";
+	TEST_CASE("o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'") {
+		const char* sample = "o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'.";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.empty() );
 	}
@@ -330,8 +330,8 @@ TEST_SUITE("only outputs") {
 	}
 
 	// Fibonacci like sequence with BDDs
-	TEST_CASE("o1[0] = {a}:SBF && o1[1] = {a}:SBF && o1[t] = o1[t-1] + o1[t-2]") {
-		const char* sample = "o1[0] =  {a}:SBF && o1[1] =  {a}:SBF && o1[t] = o1[t-1] + o1[t-2].";
+	TEST_CASE("o1[0] = {a}:sbf && o1[1] = {a}:sbf && o1[t] = o1[t-1] + o1[t-2]") {
+		const char* sample = "o1[0] =  {a}:sbf && o1[1] =  {a}:sbf && o1[t] = o1[t-1] + o1[t-2].";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.empty() );
 	}
@@ -407,7 +407,7 @@ TEST_SUITE("test inputs") {
 	TEST_CASE("reading from file with bdd inputs") {
 		std::map<nso<tau_ba<bdd_binding>, bdd_binding>, std::pair<type, std::string>> input_map;
 		auto var = build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
-		input_map[var] = { "SBF", "integration/test_files/bdd-alternating_zeros_and_ones-length_10.in"};
+		input_map[var] = { "sbf", "integration/test_files/bdd-alternating_zeros_and_ones-length_10.in"};
 		finputs<tau_ba<bdd_binding>, bdd_binding> inputs(input_map);
 		CHECK ( inputs.type_of(var).has_value() );
 		for (size_t i = 0; i < 10; ++i) {
@@ -446,7 +446,7 @@ TEST_SUITE("test outputs") {
 		auto var = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
 		auto var_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(1, 0);
 
-		output_map[var] = { "SBF", random_file() };
+		output_map[var] = { "sbf", random_file() };
 
 		#ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var].second << "\n";
@@ -467,8 +467,8 @@ TEST_SUITE("test outputs") {
 		auto var2 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(2);
 		auto var1_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(1, 0);
 		auto var2_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(2, 0);
-		output_map[var1] = {"SBF", random_file()};
-		output_map[var2] = {"SBF", random_file()};
+		output_map[var1] = {"sbf", random_file()};
+		output_map[var2] = {"sbf", random_file()};
 
 		#ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1].second << "\n";
@@ -492,8 +492,8 @@ TEST_SUITE("test outputs") {
 		auto var2 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(2);
 		auto var1_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(1, 0);
 		auto var2_1 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(2, 1);
-		output_map[var1] = {"SBF", random_file()};
-		output_map[var2] = {"SBF", random_file()};
+		output_map[var1] = {"sbf", random_file()};
+		output_map[var2] = {"sbf", random_file()};
 
 		#ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1].second << "\n";

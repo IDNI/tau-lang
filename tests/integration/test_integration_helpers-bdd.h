@@ -44,7 +44,7 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_binding> n, si
 		[&os](std::variant<bdd_binding> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
-			else os << "...SBF..."; }
+			else os << "...sbf..."; }
 	}, n->value);
 	for (auto& d : n->child) print_sp_tau_node(os, d, l + 1);
 	os << "}";
@@ -58,7 +58,7 @@ std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<bdd_binding
 		[&os](std::variant<bdd_binding> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
 			else if (auto b = std::get<0>(v); b == false) os << "false";
-			else os << "...SBF..."; }
+			else os << "...sbf..."; }
 	}, n->value);
 	for (auto& d : n->child) pretty_print_sp_tau_node(os, d, l + 1);
 	return os;

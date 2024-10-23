@@ -163,7 +163,7 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 TEST_SUITE("BDD expressions") {
 	TEST_CASE("X or Y") {
 		bdd_init<Bool>();
-		const char* sample = "{X}:SBF | {Y}:SBF";
+		const char* sample = "{X}:sbf | {Y}:sbf";
 		CHECK( test_bf_normalizer_and_test_for_value(sample, tau_parser::bf_constant) );
 	}
 }

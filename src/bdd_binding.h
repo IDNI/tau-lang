@@ -173,7 +173,7 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 	std::optional<gssotc<bdd_binding>> parse(const std::string src,
 		const std::string type_name)
 	{
-		if (type_name == "SBF")	return bf.parse(src);
+		if (type_name == "sbf")	return bf.parse(src);
 		return tf.parse(src);
 	}
 
@@ -181,12 +181,12 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 		const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n,
 		const std::string type_name)
 	{
-		if (type_name == "SBF") return bf.binding(n);
+		if (type_name == "sbf") return bf.binding(n);
 		return tf.binding(n);
 	}
 
 	gssotc<bdd_binding> splitter_one (const std::string& type_name) const {
-		if (type_name == "SBF")
+		if (type_name == "sbf")
 			return build_bf_constant(bf.splitter_one());
 		else return build_bf_constant(tf.splitter_one());
 	}

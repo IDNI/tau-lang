@@ -57,6 +57,10 @@ r i1[t]' = o2[t] 5
 bdd o3 = ofile("/tmp/output_file2")
 r o3[t] = o3[t-1] + o3[t-2] && o3[0] = 1 && o3[1] = 1 7
 #
+# We can also solve equations involving inequalities:
+#
+r o1[t] != 0 && o1[t] != 1
+#
 # In the future we would provide more complex examples, but we
 # guess you have a taste of how the runner works, at least in simple cases.
 #

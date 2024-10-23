@@ -379,15 +379,15 @@ TEST_SUITE("solve_minterm_system") {
 		return check;
 	}
 
-	TEST_CASE("one var: {a}:SBF x != 0 && {a}:SBF' x != 0.") {
+	TEST_CASE("one var: {a}:sbf x != 0 && {a}:sbf' x != 0.") {
 		const std::vector<std::string> sample =
-			{ "{a}:SBF x != 0.", "{a}:SBF' x != 0."};
+			{ "{a}:sbf x != 0.", "{a}:sbf' x != 0."};
 		CHECK ( test_solve_minterm_system(sample) );
 	}
 
-	TEST_CASE("one var: {a}:SBF x != 0 && {b}:SBF y != 0.") {
+	TEST_CASE("one var: {a}:sbf x != 0 && {b}:sbf y != 0.") {
 		const std::vector<std::string> sample =
-			{"{a}:SBF x != 0." , "{b}:SBF y != 0."};
+			{"{a}:sbf x != 0." , "{b}:sbf y != 0."};
 		CHECK( test_solve_minterm_system(sample) );
 	}
 }
@@ -410,29 +410,29 @@ TEST_SUITE("solve_inequality_system") {
 		return check;
 	}
 
-	// Case 1 of add_minterm_to_disjoint: d = {a}:SBF x and m = {a}:SBF x'
+	// Case 1 of add_minterm_to_disjoint: d = {a}:sbf x and m = {a}:sbf x'
 	// both have the same exponent
-	TEST_CASE("one var: {a}:SBF x != 0 && {b}:SBF x != 0.") {
+	TEST_CASE("one var: {a}:sbf x != 0 && {b}:sbf x != 0.") {
 		const std::vector<std::string> sample =
-			{"{a}:SBF x != 0." , "{b}:SBF x != 0."};
+			{"{a}:sbf x != 0." , "{b}:sbf x != 0."};
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
-	// Case 2 of add_minterm_to_disjoint: d = ({a}:SBF|{b}:SBF) x and
-	// m = {a}:SBF x', both have different exponents and d_cte & m_cte != false
+	// Case 2 of add_minterm_to_disjoint: d = ({a}:sbf|{b}:sbf) x and
+	// m = {a}:sbf x', both have different exponents and d_cte & m_cte != false
 	// and d_cte & ~m_cte != false
-	TEST_CASE("one var (using splitter of a bdd): ({a}:SBF|{b}:SBF) x != 0 && {a}:SBF x' != 0.") {
+	TEST_CASE("one var (using splitter of a bdd): ({a}:sbf|{b}:sbf) x != 0 && {a}:sbf x' != 0.") {
 		const std::vector<std::string> sample =
-			{"({a}:SBF|{b}:SBF) x != 0." , "{a}:SBF x' != 0."};
+			{"({a}:sbf|{b}:sbf) x != 0." , "{a}:sbf x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
-	// Case 3 of add_minterm_to_disjoint: d = {a}:SBF x and
-	// m = ({a}:SBF|{b}:SBF) x', both have different exponents and
+	// Case 3 of add_minterm_to_disjoint: d = {a}:sbf x and
+	// m = ({a}:sbf|{b}:sbf) x', both have different exponents and
 	// d_cte & m_cte != false and ~d_cte & m_cte != false
-	TEST_CASE("one var (using splitter of a bdd): {a}:SBF x != 0 && ({a}:SBF|{b}:SBF) x' != 0.") {
+	TEST_CASE("one var (using splitter of a bdd): {a}:sbf x != 0 && ({a}:sbf|{b}:sbf) x' != 0.") {
 		const std::vector<std::string> sample =
-			{"{a}:SBF x != 0." , "({a}:SBF|{b}:SBF) x' != 0."};
+			{"{a}:sbf x != 0." , "({a}:sbf|{b}:sbf) x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
@@ -445,20 +445,20 @@ TEST_SUITE("solve_inequality_system") {
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
-	// Case 4.2 of add_minterm_to_disjoint: d = ({a}:SBF&{b}:SBF) x and
-	// m = ({a}:SBF|{b}:SBF) x' both have different exponents and
+	// Case 4.2 of add_minterm_to_disjoint: d = ({a}:sbf&{b}:sbf) x and
+	// m = ({a}:sbf|{b}:sbf) x' both have different exponents and
 	// d_cte & m_cte != false, d_cte & ~m_cte = false,  ~d_cte & m_cte = false
 	// and d_cte != 1
-	TEST_CASE("one var (using splitter of one): ({a}:SBF&{b}:SBF) x != 0 && ({a}:SBF|{b}:SBF) x' != 0.") {
+	TEST_CASE("one var (using splitter of one): ({a}:sbf&{b}:sbf) x != 0 && ({a}:sbf|{b}:sbf) x' != 0.") {
 		const std::vector<std::string> sample =
-			{"({a}:SBF&{b}:SBF) x != 0." , "({a}:SBF|{b}:SBF) x' != 0."};
+			{"({a}:sbf&{b}:sbf) x != 0." , "({a}:sbf|{b}:sbf) x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
 	// Case 5 of add_minterm_to_disjoint
-	TEST_CASE("one var (using splitter of a bdd): {a}:SBF x != 0 && {a}:SBF' x' != 0.") {
+	TEST_CASE("one var (using splitter of a bdd): {a}:sbf x != 0 && {a}:sbf' x' != 0.") {
 		const std::vector<std::string> sample =
-			{"{a}:SBF x != 0." , "{a}:SBF x' != 0."};
+			{"{a}:sbf x != 0." , "{a}:sbf x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
@@ -491,24 +491,24 @@ TEST_SUITE("solve_system") {
 		return check;
 	}
 
-	TEST_CASE("one var: {a}:SBF x = 0 && {a}:SBF x'  != 0.") {
-		const char* equality = "{a}:SBF x = 0.";
+	TEST_CASE("one var: {a}:sbf x = 0 && {a}:sbf x'  != 0.") {
+		const char* equality = "{a}:sbf x = 0.";
 		const std::vector<std::string> inequalities =
-			{ "{a}:SBF x' != 0." };
+			{ "{a}:sbf x' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	TEST_CASE("two var: {a}:SBF x y = 0 && {a}:SBF y != 0.") {
-		const char* equality = "{a}:SBF x y = 0.";
+	TEST_CASE("two var: {a}:sbf x y = 0 && {a}:sbf y != 0.") {
+		const char* equality = "{a}:sbf x y = 0.";
 		const std::vector<std::string> inequalities =
-			{ "{a}:SBF y != 0." };
+			{ "{a}:sbf y != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	TEST_CASE("two var: {a}:SBF x | {a}:SBF y = 0 && {b}:SBF y x != 0.") {
-		const char* equality = "{a}:SBF x | {a}:SBF y = 0.";
+	TEST_CASE("two var: {a}:sbf x | {a}:sbf y = 0 && {b}:sbf y x != 0.") {
+		const char* equality = "{a}:sbf x | {a}:sbf y = 0.";
 		const std::vector<std::string> inequalities =
-			{ "{b}:SBF y x != 0." };
+			{ "{b}:sbf y x != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
@@ -519,8 +519,8 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	TEST_CASE("two var: y = {a}:SBF && x < y.") {
-		const char* equality = "y' & {a}:SBF | y & {a}:SBF' | x y' = 0.";
+	TEST_CASE("two var: y = {a}:sbf && x < y.") {
+		const char* equality = "y' & {a}:sbf | y & {a}:sbf' | x y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "x' & y | x & y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
@@ -540,7 +540,7 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	TEST_CASE("two var: y < x && y = {a}:SBF && x' != 0.") {
+	TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0.") {
 		const char* equality = "y & x' | z & y' | w & z' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x' | x & y' != 0.", "y & z' | z & y' != 0.", "w' & z | w & z' != 0." };
@@ -548,24 +548,24 @@ TEST_SUITE("solve_system") {
 	}
 
 	// increasing monotonicity (2)
-	TEST_CASE("x = {a}:SBF && z < y && y != 1") {
-		const char* equality = "(x + {a}:SBF) | z y' = 0.";
+	TEST_CASE("x = {a}:sbf && z < y && y != 1") {
+		const char* equality = "(x + {a}:sbf) | z y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & z' | y' z != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
 	// increasing monotonicity (2 y1)
-	TEST_CASE("x = {a}:SBF && x < y && y != 1") {
-		const char* equality = "(x + {a}:SBF) | x y' = 0.";
+	TEST_CASE("x = {a}:sbf && x < y && y != 1") {
+		const char* equality = "(x + {a}:sbf) | x y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x' | y' x != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
 	// increasing monotonicity (2 y2)
-	TEST_CASE("x = {a}:SBF {b}:SBF && x < y && y != 1") {
-		const char* equality = "(x + {a}:SBF {b}:SBF) | x y' = 0.";
+	TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
+		const char* equality = "(x + {a}:sbf {b}:sbf) | x y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x'| y' x != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
