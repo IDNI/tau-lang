@@ -69,3 +69,5 @@ bw-output
 /.cache/*
 tests/benchmark/data/*
 logs/*
+
+.gdbinit

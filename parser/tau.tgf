@@ -67,14 +67,14 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "<"   _ bf)               :bf_less
                         |                                     capture.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
+                        |                                     bf_constant
                         |                                     variable
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ref                                :bf_ref
-                        | (bf _       '|'  _  bf)            :bf_or
-                        | (bf _       '+'  _  bf)            :bf_xor
-                        | (bf ( _ | _ '&' _ ) bf)            :bf_and
+                        | (bf _   '|'      _  bf)            :bf_or
+                        | (bf _   '+'      _  bf)            :bf_xor
+                        | (bf ( _ '&' _ | _ ) bf)            :bf_and
                         | (bf _ "'")                         :bf_neg
-                        | ('{' _ constant _ '}')             :bf_constant
                         | '1'                                :bf_t
                         | '0'                                :bf_f
                         |                                     capture
@@ -106,10 +106,9 @@ num                    => digits.
 
 # constants
 uninterpreted_constant => '<' ((chars | _ ) ':' chars):uninter_const_name _ '>'.
-constant               => binding | capture.
-binding                => ((chars _ | _):type ':' _ source):source_binding
-                        | chars                            :named_binding.
-source                 => src_c [ (src_c | space)* src_c ].
+bf_constant            => '{' _ (capture | binding):constant _ '}'
+							[ _ ':' _ chars:type ].
+binding                => (src_c [ (src_c | space)* src_c ]):source.
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
 # common elements
@@ -208,8 +207,8 @@ cli_command            =>
                                 (__ | _ '=' _) option_value)  :set_cmd
         | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
 # i/o stream definitions
-        | (type __ in_var_name _ '=' _ input_stream)              :def_input_cmd
-        | (type __ out_var_name _ '=' _ output_stream)             :def_output_cmd
+        | (type __ in_var_name  _ '=' _ input_stream)         :def_input_cmd
+        | (type __ out_var_name _ '=' _ output_stream)        :def_output_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
         | (                     history_sym __ memory)        :history_print_cmd
@@ -219,7 +218,7 @@ cli_command            =>
 # input/output streams
 input_stream           =>
         # in the future itcp, iudp,...
-        ("ifile" _ '(' _ q_file_name  _ ')') | ("console"):console_sym.
+        ("ifile" _ '(' _ q_file_name  _ ')') | "console":console_sym.
 output_stream          =>
         # in the future otcp, oudp,...
         ("ofile" _ '(' _ q_file_name  _ ')') | console_sym.

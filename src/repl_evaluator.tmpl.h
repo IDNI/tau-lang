@@ -603,7 +603,7 @@ void repl_evaluator<BAs...>::solve_cmd(
 		?  make_string<tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
 				nso<tau_ba<BAs...>, BAs...>>(
 			tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, n)
-		: "bdd"; // only tau makes always sense
+		: "SBF"; // only tau makes always sense
 	auto nn = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
 		? get_wff(n->child[2])
 		: get_wff(n->child[1]);

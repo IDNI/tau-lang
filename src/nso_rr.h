@@ -935,8 +935,9 @@ struct bind_transformer {
 	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
 		if (auto it = changes.find(n); it != changes.end())
 			return it->second;
-		if (is_non_terminal<tau_parser::binding, BAs...>(n))
-			return changes.emplace(n, binder.bind(n)).first->second;
+		if (is_non_terminal<tau_parser::bf_constant, BAs...>(n))
+			if (auto nb = binder.bind(n); nb != n)
+				return changes[n] = nb;
 		// IDEA maybe we could use the replace transform instead of having the following code
 		bool changed = false;
 		std::vector<sp_tau_node<BAs...>> child;
@@ -945,8 +946,7 @@ struct bind_transformer {
 				changed = true, child.push_back(changes[c]);
 			else child.push_back(c);
 		auto nn = make_node<tau_sym<BAs...>>(n->value, child);
-		if (changed)
-			changes[n] = nn;
+		if (changed) changes[n] = nn;
 		return nn;
 	}
 
@@ -974,15 +974,18 @@ struct name_binder {
 	name_binder(const bindings<BAs...>& bs) : bs(bs) {}
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		// FIXME (LOW) check if the node is a named binding one
+		auto binding = n | tau_parser::constant | tau_parser::binding;
+		if (!binding || (n | tau_parser::type).has_value()) return n;
 		auto bn = make_string<
 				tau_node_terminal_extractor_t<BAs...>,
 				sp_tau_node<BAs...>>(
-			tau_node_terminal_extractor<BAs...>, n);
+			tau_node_terminal_extractor<BAs...>, binding.value());
 		auto s = bs.find(bn);
 		if (s != bs.end()) {
 			tau_sym<BAs...> ts = s->second;
-			return make_node<tau_sym<BAs...>>(ts, {});
+			return wrap(tau_parser::bf_constant,
+				wrap(tau_parser::constant,
+					make_node<tau_sym<BAs...>>(ts, {})));
 		}
 		return n;
 	}
@@ -1015,124 +1018,31 @@ struct factory_binder {
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
 		static nso_factory<BAs...> factory;
-		if(auto type = find_top(n,
+		auto binding = n | tau_parser::constant | tau_parser::binding;
+		if (!binding) return n; // not a binding (capture?)
+		if (auto type = find_top(n,
 			is_non_terminal<tau_parser::type, BAs...>); type)
 		{
 			// the factory take two arguments, the first is the type and the
 			// second is the node representing the constant.
 			std::string type_name = make_string<
-					tau_node_terminal_extractor_t<BAs...>,
-					sp_tau_node<BAs...>>(
-				tau_node_terminal_extractor<BAs...>, type.value());
-			return factory.binding(n, type_name);
+				tau_node_terminal_extractor_t<BAs...>,
+				sp_tau_node<BAs...>>(
+					tau_node_terminal_extractor<BAs...>,
+					type.value());
+			auto nn = factory.binding(binding.value(), type_name);
+			if (nn != binding.value())
+				return wrap(tau_parser::bf_constant,
+					wrap(tau_parser::constant, nn));
+			return n;
 		}
-		return factory.binding(n, "");
+		auto nn = factory.binding(binding.value(), "");
+		if (nn != binding.value())
+			return wrap(tau_parser::bf_constant,
+				wrap(tau_parser::constant, nn));
+		return n;
 	}
 };
-
-// TODO (HIGH) improve type resolution adding types to quantifiers.
-//
-// Type resolution is used to ensure that all the Boolean Algebra operations are
-// consistente. Types could be specified at two levels:
-//
-// - At the boolean algebra expression level: in this case, the type of the
-//   expression is the type of one of the constants of the boolean expression,
-//   there is no need to provide the type in each of them.
-//
-// - At the quantifier expression level: in this case, the type of a variable is
-//   specified and all the underlying boolean algebra expressions are typed
-//   accordingly.
-//
-// In both cases, if there is a missmatch between the types, an error is raised
-// during the type resolution phase, i.e. before executing the program.
-
-
-// check if the type is unresolved.
-template<typename... BAs>
-static const auto is_unresolved_predicate = [](const sp_tau_node<BAs...>& n) {
-	if (!is_non_terminal<tau_parser::type, BAs...>(n)) return false;
-	auto type_name = make_string<
-			tau_node_terminal_extractor_t<BAs...>,
-			sp_tau_node<BAs...>>(
-			tau_node_terminal_extractor<BAs...>, n);
-	return type_name.empty();
-};
-
-template<typename... BAs>
-using is_unresolved_predicate_t = decltype(is_unresolved_predicate<BAs...>);
-
-// check if the type is resolved.
-template<typename... BAs>
-static const auto is_resolved_predicate = [](const sp_tau_node<BAs...>& n) {
-	if (!is_non_terminal<tau_parser::type, BAs...>(n)) return false;
-	auto type_name = make_string<
-			tau_node_terminal_extractor_t<BAs...>,
-			sp_tau_node<BAs...>>(
-			tau_node_terminal_extractor<BAs...>, n);
-	return !type_name.empty();
-};
-
-template<typename... BAs>
-using is_resolved_predicate_t = decltype(is_resolved_predicate<BAs...>);
-
-// check if the given expression is unresolved, i.e. contains a type which
-// is not resolved.
-template<typename... BAs>
-std::optional<sp_tau_node<BAs...>> is_unresolved(const sp_tau_node<BAs...>& n) {
-	return find_top(n, is_unresolved_predicate<BAs...>);
-}
-
-// resolve all the unresolved types in the given expression. the types are
-// resolved to the first bottom type resolved in the expression.
-template<typename... BAs>
-sp_tau_node<BAs...> resolve_type(const sp_tau_node<BAs...>& n) {
-	if (auto unresolved = is_unresolved(n); unresolved) {
-		// always we have type information or it is not needed at all
-		if (auto type = find_bottom(n,
-			is_resolved_predicate<BAs...>); type)
-		{
-			std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>>
-				change {{unresolved.value(), type.value()}};
-			return replace<sp_tau_node<BAs...>>(n, change);
-		}
-	}
-	return n;
-}
-
-// resolve all the unresolved types in the given statement.
-template<typename binder_t, typename... BAs>
-sp_tau_node<BAs...> resolve_types(const sp_tau_node<BAs...> source) {
-	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	for (const auto& bf: select_top(source,
-		is_non_terminal<BAs...>(tau_parser::bf)))
-	{
-		if (auto rbf = resolve_type(bf); rbf != bf) changes[bf] = rbf;
-	}
-	return replace<sp_tau_node<BAs...>>(source, changes);
-}
-
-// resolve all the unresolved types in the given rules.
-template<typename... BAs>
-rules<nso<BAs...>> resolve_types(const rules<nso<BAs...>> rs) {
-	rules<nso<BAs...>> nrs;
-	for (const auto& r : rs) {
-		auto nr = resolve_types(r);
-		nrs.push_back(nr);
-	}
-	return nrs;
-}
-
-// resolve all the unresolved types in the given library.
-template<typename binder_t, typename... BAs>
-library<nso<BAs...>> resolve_types(const library<nso<BAs...>> lib) {
-	return { resolve_types(lib.system) };
-}
-
-// resolve all the unresolved types in the given nso_rr.
-template<typename binder_t, typename... BAs>
-rr<nso<BAs...>> resolve_types(const rr<nso<BAs...>> f) {
-	return { resolve_types(f.rec_relations), resolve_type(f.main) };
-}
 
 // creates a specific rule from a generic rule
 // TODO (LOW) should depend in node_t instead of BAs...
@@ -1324,10 +1234,90 @@ sp_tau_node<BAs...> process_defs_input_variables(
 	return tau_code;
 }
 
+template <typename... BAs>
+sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
+	BOOST_LOG_TRIVIAL(trace)
+		<< "(T) infer constant types: " << code;
+	using node = sp_tau_node<BAs...>;
+	std::map<node, node> changes;
+	auto extract_type = [](const node& n) {
+		return make_string<tau_node_terminal_extractor_t<BAs...>,
+			node>(tau_node_terminal_extractor<BAs...>, n);
+	};
+	auto type_mismatch = [&](const std::string& expected,
+		const std::string& got)
+	{
+		BOOST_LOG_TRIVIAL(error)
+			<< "Type mismatch. Constant is expected to be "
+			<< expected << " but is " << got;
+		return false;
+	};
+	auto infer_over_scope = [&](const node& nd) {
+		std::string type = "";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "(T) infer over scope: " << nd;
+		// get first appearing type information in an expression
+		auto bfcs = select_all(nd,
+			is_non_terminal<tau_parser::bf_constant, BAs...>);
+		if (bfcs.size() == 0) return true;
+		for (auto& bfc : bfcs) {
+			auto type_opt = bfc | tau_parser::type;
+			if (type_opt) {
+				type = extract_type(type_opt.value());
+				break;
+			}
+		}
+		BOOST_LOG_TRIVIAL(trace)
+			<< "(T) first appearing constant type: " << type;
+		if (type.size() == 0) type = "tau"; // default type
+		// pass the type to all constants and check for mismatch
+		for (auto& c : select_all(nd, is_non_terminal<
+				tau_parser::bf_constant, BAs...>))
+		{
+			auto type_nd = c | tau_parser::type;
+			if (type_nd) {
+				auto got = extract_type(type_nd.value());
+				if (!(type.size() == 0 && got == "tau")
+					&& got != type)
+				{
+					BOOST_LOG_TRIVIAL(trace)
+						<< "(T) type mismatch: " << type << " got: " << got << " for: " << c;
+					return type_mismatch(got,type);
+				}
+			} else changes.emplace(c, make_node<
+				tau_sym<BAs...>>(c->value, {c->child[0],
+					wrap<BAs...>(tau_parser::type,
+							type)}));
+		}
+		return true;
+	};
+	static auto is_constant_type_scope_node = [](const node& n) {
+		static std::vector<size_t> scope_nodes{
+			tau_parser::bf_interval,
+			tau_parser::bf_neq,
+			tau_parser::bf_eq,
+			tau_parser::bf_nleq,
+			tau_parser::bf_greater,
+			tau_parser::bf_less_equal,
+			tau_parser::bf_less,
+			tau_parser::bf
+		};
+		if (!is_non_terminal_node<BAs...>(n)) return false;
+		auto nt = n | non_terminal_extractor<BAs...>
+			| optional_value_extractor<size_t>;
+		return find(scope_nodes.begin(), scope_nodes.end(), nt)
+							!= scope_nodes.end();
+	};
+	for (auto& nd : select_top(code, is_constant_type_scope_node))
+		if (!infer_over_scope(nd)) return 0;
+	return replace<node>(code, changes);
+}
+
 // create tau code from tau source
 template<typename... BAs>
 // TODO (LOW) should depend on node_t instead of BAs...
 sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
+	if (!tau_source) return 0;
 	tauify<BAs...> tf;
 	map_transformer<tauify<BAs...>, sp_tau_source_node, sp_tau_node<BAs...>>
 								transform(tf);
@@ -1338,10 +1328,11 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 			sp_node<tau_source_sym>,
 			sp_tau_node<BAs...>>(
 		transform, all)(tau_source);
-	return process_defs_input_variables(
+	return infer_constant_types(
+		process_defs_input_variables(
 		process_offset_variables(
 		process_quantifier_vars(
-		process_digits(tau_code))));
+		process_digits(tau_code)))));
 }
 
 // make a library from the given tau source.
@@ -1431,9 +1422,12 @@ rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& source,
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_binder(std::string& input, binder_t& binder) {
+std::optional<rr<nso<BAs...>>> make_nso_rr_using_binder(std::string& input, binder_t& binder) {
 	auto source = make_tau_source(input, { .start = tau_parser::rr });
-	return make_nso_rr_using_binder<binder_t, BAs...>(source, binder);
+	return !source ? std::optional<rr<nso<BAs...>>>{}
+		: std::optional<rr<nso<BAs...>>>{
+			make_nso_rr_using_binder<binder_t, BAs...>(
+				source, binder) };
 }
 
 // make a nso_rr from the given tau source and bindings.
@@ -1447,25 +1441,26 @@ rr<nso<BAs...>> make_nso_rr_using_bindings(const sp_tau_node<BAs...>& code,
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_bindings(sp_tau_source_node& source,
+std::optional<rr<nso<BAs...>>> make_nso_rr_using_bindings(sp_tau_source_node& source,
 	const bindings<BAs...>& bindings)
 {
 	auto code = make_tau_code<BAs...>(source);
+	if (!code) return {};
 	return make_nso_rr_using_bindings<BAs...>(code, bindings);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_bindings(const std::string& input,
-	const bindings<BAs...>& bindings)
+std::optional<rr<nso<BAs...>>> make_nso_rr_using_bindings(
+	const std::string& input, const bindings<BAs...>& bindings)
 {
 	auto source = make_tau_source(input, { .start = tau_parser::rr });
+	if (!source) return std::optional<rr<nso<BAs...>>>{};
 	return make_nso_rr_using_bindings<BAs...>(source, bindings);
 }
 
 template<typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code)
-{
+rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code) {
 	factory_binder<BAs...> fb;
 	return make_nso_rr_using_binder<
 			factory_binder<BAs...>, BAs...>(code,fb);
@@ -1473,17 +1468,21 @@ rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code)
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(sp_tau_source_node& source)
+std::optional<rr<nso<BAs...>>> make_nso_rr_using_factory(
+	sp_tau_source_node& source)
 {
 	auto code = make_tau_code<BAs...>(source);
+	if (!code) return std::optional<rr<nso<BAs...>>>{};
 	return make_nso_rr_using_factory<BAs...>(code);
 }
 
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
-rr<nso<BAs...>> make_nso_rr_using_factory(const std::string& input)
+std::optional<rr<nso<BAs...>>> make_nso_rr_using_factory(
+	const std::string& input)
 {
 	auto source = make_tau_source(input, { .start = tau_parser::rr });
+	if (!source) return std::optional<rr<nso<BAs...>>>{};
 	return make_nso_rr_using_factory<BAs...>(source);
 }
 
@@ -1556,11 +1555,14 @@ std::string get_ref_type(bool& success, rr_types& ts,
 		if (rt.type != t) err << "Type mismatch. ";
 		if (rt.args_arity != arity.second)
 			err << "Argument arity mismatch. ";
-		if (rt.fp && arity.first)
+		if (rt.fp && arity.first) {
 			// found a real offset arity for a uncomplete type taken
 			// from main with a fp call => update offset arity
-			ts.types[fn].offset_arity = arity.first,
+			ts.types[fn].offset_arity = arity.first;
 			ts.types[fn].fp = false;
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- Updated type of "
+				<< fn << "() : " << rr_type2str(ts.types[fn]);
+		}
 		if (!rt.fp && !new_type.fp && rt.offset_arity != arity.first)
 			err << "Offset arity mismatch. ";
 		if (err.tellp()) return
@@ -1570,7 +1572,7 @@ std::string get_ref_type(bool& success, rr_types& ts,
 			success = false, "";
 	} else {
 		ts.types[fn] = new_type;
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- Found type of " << fn
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- Found type of " << fn
 					<< "() : " << rr_type2str(ts.types[fn]);
 		return fn;
 	}
@@ -1631,7 +1633,7 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 
 template<typename... BAs>
 rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin type inferrence"; // << ": " << nso_rr;
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin type inferrence"; // << ": " << nso_rr;
 	// for (auto& r : nso_rr.rec_relations)
 	// 	ptree<BAs...>(std::cout << "rule left: ", r.first) << "\n",
 	// 	ptree<BAs...>(std::cout << "rule right: ", r.second) << "\n";
@@ -4009,7 +4011,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf,                              790 },
 
 			{ tau_parser::rec_relation,                    800 },
-			{ tau_parser::ref_args,                        800 }
+			{ tau_parser::ref_args,                        800 },
+			{ tau_parser::bf_rule,                         800 },
+			{ tau_parser::wff_rule,                        800 },
+			{ tau_parser::binding,                         800 },
 		};
 		static const std::set<size_t> wrap_child_for = {
 			};
@@ -4052,10 +4057,13 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 	if (std::holds_alternative<idni::tau::tau_source_sym>(n->value)) {
 		auto& ch = n->child;
 		auto tss = std::get<idni::tau::tau_source_sym>(n->value);
+		auto ppch = [&](size_t i) -> std::ostream& {
+			return pp(stream, ch[i], tss.n());
+		};
 		auto sep = [&](const std::string& separator) {
 			for (size_t i = 0; i < ch.size(); ++i) {
 				if (i > 0) stream << separator << " ";
-				pp(stream, ch[i], tss.n());
+				ppch(i);
 			}
 		};
 		auto pass = [&]() {
@@ -4065,9 +4073,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		//	for (const auto& c : ch) pp(stream, c, tss.n());
 		//};
 		auto infix_nows = [&](const std::string& op) {
-			pp(stream, ch[0], tss.n());
+			ppch(0);
+			if (ch.size() == 1) return;
 			stream << op;
-			pp(stream, ch[1], tss.n());
+			ppch(1);
 		};
 		auto infix = [&](const std::string& op) {
 			infix_nows(std::string(" ") + op + " ");
@@ -4077,7 +4086,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		{
 			infix(op1);
 			stream << " " << op2 << " ";
-			pp(stream, ch[2], tss.n());
+			ppch(2);
 		};
 		auto postfix_nows = [&](const std::string& postf) {
 			pass(), stream << postf;
@@ -4153,11 +4162,13 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 				if (ch.size() == 1) pass();
 				else infix_nows("-");
 				break;
-			case tau_parser::source_binding: infix(":"); break;
+			case tau_parser::bf_constant:
+				stream << "{ ", ppch(0) << " }";
+				if (ch.size() > 1) stream << " : ", ppch(1);
+				break;
 			// nodes to wrap
 			case tau_parser::constraint: wrap("[", "]"); break;
 			case tau_parser::bf_splitter: wrap("S(", ")"); break;
-			case tau_parser::bf_constant:
 				wrap("{ ", " }"); break;
 			case tau_parser::builder_head:
 				wrap("(" , ")"); break;
@@ -4230,11 +4241,9 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::inst_cmd:
 			case tau_parser::subst_cmd:
 				stream << (tss.n() == tau_parser::inst_cmd
-						? "instantiate" : "substitute");
-				pp(stream << " ",   ch[1], tss.n());
-				pp(stream << " [",  ch[2], tss.n());
-				pp(stream << " / ", ch[3], tss.n());
-				stream << "]";
+						? "instantiate" : "substitute")
+					<< " ", ppch(1) << " [", ppch(2)
+					<< " / ", ppch(3) << "]";
 				break;
 			case tau_parser::dnf_cmd:       prefix("dnf"); break;
 			case tau_parser::cnf_cmd:       prefix("cnf"); break;

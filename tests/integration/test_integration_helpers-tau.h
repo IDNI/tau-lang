@@ -31,7 +31,7 @@ using bdd_test = hbdd<Bool>;
 
 nso<tau_ba<bdd_test>, bdd_test> normalize_test_tau(const char* src) {
 	rr<nso<tau_ba<bdd_test>, bdd_test>> nso_rr = make_nso_rr_using_factory<
-		tau_ba<bdd_test>, bdd_test>(src);
+		tau_ba<bdd_test>, bdd_test>(src).value();
 	return normalizer<tau_ba<bdd_test>, bdd_test>(nso_rr);
 }
 

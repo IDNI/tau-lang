@@ -50,7 +50,7 @@ struct bdd_factory {
 	inline static std::map<std::string, nso<BAs...>> cache;
 
 	// parses a bdd from a string
-	nso<BAs...> parse(const std::string& src) {
+	std::optional<nso<BAs...>> parse(const std::string& src) {
 		// check source cache
 		if (auto cn = cache.find(src); cn != cache.end())
 			return cn->second;
@@ -59,25 +59,26 @@ struct bdd_factory {
 		if (!r.found) {
 			BOOST_LOG_TRIVIAL(error) << "# bdd binding: `"
 				<< src << "`\n" << r.parse_error;
-			return build_node(bdd_handle<Bool>::hfalse);
+			return std::optional<nso<BAs...>>{};
 		}
 		char dummy = 0;
 		auto root = make_node_from_tree<bdd_parser, char,
 			tau_sym<BAs...>>(dummy, r.get_shaped_tree());
 		auto t = traverser_t(root) | bdd_parser::bdd;
-		if (t.has_value()) return build_node(eval_node(t));
-		return build_node(bdd_handle<Bool>::hfalse);
+		return std::optional<nso<BAs...>>{ build_node(t.has_value()
+			? eval_node(t) : bdd_handle<Bool>::hfalse) };
 	}
 
 	// builds a bdd bounded node parsed from terminals of a source binding
 	nso<BAs...> binding(const nso<BAs...>& sn) {
-		auto n = sn
-			| tau_parser::source_binding
+		auto source = sn
 			| tau_parser::source
 			| optional_value_extractor<nso<BAs...>>;
 		std::string src = make_string(
-			tau_node_terminal_extractor<BAs...>, n);
-		return parse(src);
+			tau_node_terminal_extractor<BAs...>, source);
+		if (auto parsed = parse(src); parsed.has_value())
+			return parsed.value();
+		return sn;
 	}
 
 	std::variant<BAs...> splitter_one () const {
@@ -145,11 +146,15 @@ template<>
 struct nso_factory<bdd_binding> {
 	inline static bdd_factory<bdd_binding> bf;
 
-	nso<bdd_binding> parse(const std::string& src, const std::string& = "") {
+	std::optional<nso<bdd_binding>> parse(const std::string& src,
+		const std::string& = "")
+	{
 		return bf.parse(src);
 	}
 
-	nso<bdd_binding> binding(const nso<bdd_binding>& n, const std::string& = "") {
+	nso<bdd_binding> binding(const nso<bdd_binding>& n,
+		const std::string& = "")
+	{
 		return bf.binding(n);
 	}
 
@@ -165,18 +170,24 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 	inline static bdd_factory<tau_ba<bdd_binding>, bdd_binding> bf;
 	inline static tau_ba_factory<bdd_binding> tf;
 
-	gssotc<bdd_binding> parse(const std::string src, const std::string type_name) {
-		if (type_name == "bdd")	return bf.parse(src);
+	std::optional<gssotc<bdd_binding>> parse(const std::string src,
+		const std::string type_name)
+	{
+		if (type_name == "SBF")	return bf.parse(src);
 		return tf.parse(src);
 	}
 
-	gssotc<bdd_binding> binding(const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n, const std::string type_name) {
-		if (type_name == "bdd") return bf.binding(n);
+	gssotc<bdd_binding> binding(
+		const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n,
+		const std::string type_name)
+	{
+		if (type_name == "SBF") return bf.binding(n);
 		return tf.binding(n);
 	}
 
 	gssotc<bdd_binding> splitter_one (const std::string& type_name) const {
-		if (type_name == "bdd") return build_bf_constant(bf.splitter_one());
+		if (type_name == "SBF")
+			return build_bf_constant(bf.splitter_one());
 		else return build_bf_constant(tf.splitter_one());
 	}
 };

@@ -1053,7 +1053,7 @@ TEST_SUITE("parsing bf formulas ") {
 
 TEST_SUITE("parsing bindings ") {
 
-	TEST_CASE("named binding") {
+	TEST_CASE("binding") {
 		const char* sample = "{ binding } := { binding }.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
@@ -1066,13 +1066,12 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::binding
-			| tau_parser::named_binding;
+			| tau_parser::binding;
 		CHECK( named.has_value() );
 	}
 
-	TEST_CASE("source binding") {
-		const char* sample = "{ type : binding } := { type : binding }.";
+	TEST_CASE("typed binding") {
+		const char* sample = "{ binding } : type := { binding } : type.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1084,13 +1083,12 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::bf
 			| tau_parser::bf_constant
 			| tau_parser::constant
-			| tau_parser::binding
-			| tau_parser::source_binding;
+			| tau_parser::binding;
 		CHECK( source.has_value() );
 	}
 
-	TEST_CASE("source binding type") {
-		const char* sample = "{ type : binding } := { type : binding }.";
+	TEST_CASE("binding type") {
+		const char* sample = "{ binding } : type := { binding } : type.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1101,15 +1099,12 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
-			| tau_parser::constant
-			| tau_parser::binding
-			| tau_parser::source_binding
 			| tau_parser::type;
 		CHECK( type.has_value() );
 	}
 
-	TEST_CASE("source binding source") {
-		const char* sample = "{ type : binding } := { type : binding }.";
+	TEST_CASE("binding source") {
+		const char* sample = "{ binding } : type := { binding } : type.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1122,13 +1117,12 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::bf_constant
 			| tau_parser::constant
 			| tau_parser::binding
-			| tau_parser::source_binding
 			| tau_parser::source;
 		CHECK( source.has_value() );
 	}
 
-	TEST_CASE("unresolved source binding") {
-		const char* sample = "{  : binding } := {  : binding }.";
+	TEST_CASE("unresolved binding") {
+		const char* sample = "{ binding } := { binding }.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1139,16 +1133,13 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
-			| tau_parser::constant
-			| tau_parser::binding
-			| tau_parser::source_binding
 			| tau_parser::type
 			| tau_parser::chars;
 		CHECK( !type.has_value() );
 	}
 
-	TEST_CASE("resolved source binding") {
-		const char* sample = "{ type : binding } := { type : binding }.";
+	TEST_CASE("resolved binding") {
+		const char* sample = "{ binding } : type := { binding } : type.";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::library });
 		auto lib = make_statement(src);
@@ -1159,9 +1150,6 @@ TEST_SUITE("parsing bindings ") {
 			| tau_parser::bf_body
 			| tau_parser::bf
 			| tau_parser::bf_constant
-			| tau_parser::constant
-			| tau_parser::binding
-			| tau_parser::source_binding
 			| tau_parser::type;
 		CHECK( type.has_value() );
 	}
