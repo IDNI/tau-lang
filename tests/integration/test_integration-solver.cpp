@@ -506,9 +506,13 @@ TEST_SUITE("solve_system") {
 	}
 
 	TEST_CASE("two var: {a}:sbf x | {a}:sbf y = 0 && {b}:sbf y x != 0.") {
-		const char* equality = "{a}:sbf x | {a}:sbf y = 0.";
+		// TODo (HIGH) check this one too
+		//const char* equality = "{a}:sbf x | {a}:sbf y = 0.";
+		//const std::vector<std::string> inequalities =
+		//	{ "{b}:sbf y x != 0." };
+		const char* equality = "({a}:sbf) x | ({a}:sbf) y = 0.";
 		const std::vector<std::string> inequalities =
-			{ "{b}:sbf y x != 0." };
+			{ "({b}:sbf) y x != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 

@@ -39,8 +39,12 @@ namespace idni::tau {
 			if (type != "bool") return n;
 			return make_node<tau_sym<Bool>>(Bool(true), {});
 		}
+
+		std::vector<std::string> types() const {
+			return { "bool" };
+		}
 	};
-	
+
 } // namespace idni::tau
 
 // helper functions
