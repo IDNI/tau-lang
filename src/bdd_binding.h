@@ -165,6 +165,15 @@ struct nso_factory<bdd_binding> {
 	nso<bdd_binding> splitter_one() const {
 		return build_bf_constant(bf.splitter_one());
 	}
+
+	static nso_factory<bdd_binding>& instance() {
+		static nso_factory<bdd_binding> factory;
+		return factory;
+	}
+
+private:
+
+	nso_factory() {};
 };
 
 // using in repl
@@ -198,6 +207,16 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 			return build_bf_constant(bf.splitter_one());
 		else return build_bf_constant(tf.splitter_one());
 	}
+
+	static nso_factory<tau_ba<bdd_binding>, bdd_binding>& instance() {
+		static nso_factory<tau_ba<bdd_binding>, bdd_binding> factory;
+		return factory;
+	}
+
+private:
+
+	nso_factory() {};
+
 };
 
 } // namespace idni::tau

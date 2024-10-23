@@ -1014,6 +1014,10 @@ struct nso_factory {
 	sp_tau_node<BAs...> splitter_one(const std::string& = "") const {
 		throw std::runtime_error("not implemented");
 	}
+
+	static nso_factory<BAs...>& instance() {
+		throw std::runtime_error("not implemented");
+	}
 };
 
 // binds the constants of a given binding using the multi-factory for the types
@@ -1022,7 +1026,6 @@ template<typename... BAs>
 struct factory_binder {
 
 	sp_tau_node<BAs...> bind(const sp_tau_node<BAs...>& n) const {
-		static nso_factory<BAs...> factory;
 		auto binding = n | tau_parser::constant | tau_parser::binding;
 		if (!binding) return n; // not a binding (capture?)
 		if (auto type = find_top(n,
@@ -1035,13 +1038,13 @@ struct factory_binder {
 				sp_tau_node<BAs...>>(
 					tau_node_terminal_extractor<BAs...>,
 					type.value());
-			auto nn = factory.binding(binding.value(), type_name);
+			auto nn = nso_factory<BAs...>::instance().binding(binding.value(), type_name);
 			if (nn != binding.value())
 				return wrap(tau_parser::bf_constant,
 					wrap(tau_parser::constant, nn));
 			return n;
 		}
-		auto nn = factory.binding(binding.value(), "");
+		auto nn = nso_factory<BAs...>::instance().binding(binding.value(), "");
 		if (nn != binding.value())
 			return wrap(tau_parser::bf_constant,
 				wrap(tau_parser::constant, nn));

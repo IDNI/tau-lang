@@ -43,6 +43,15 @@ namespace idni::tau {
 		std::vector<std::string> types() const {
 			return { "bool" };
 		}
+
+		static nso_factory<Bool>& instance() {
+			static nso_factory<Bool> factory;
+			return factory;
+		}
+	private:
+
+		nso_factory() {};
+
 	};
 
 } // namespace idni::tau
