@@ -1187,7 +1187,7 @@ pair<vector<vector<int_t> >, vector<nso<BAs...> > > dnf_cnf_to_bdd(
 	if (paths.empty())
 		if (!decided)
 			paths.emplace_back();
-	// ranges::sort(paths);
+	ranges::sort(paths);
 	return make_pair(move(paths), move(vars));
 }
 
