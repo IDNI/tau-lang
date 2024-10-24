@@ -530,6 +530,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		return;
 	}
 
+
 	// do we have a max number of iterations?
 	auto max_iter = std::numeric_limits<size_t>::max();
 	if (n->child.size() > 2) {
@@ -541,9 +542,16 @@ void repl_evaluator<BAs...>::run_cmd(
 
 	// running the program
 	if (auto program = get_wff(arg); program) {
+		// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
+		// as we would get a formula in dnf already
+		auto dnf = program.value()
+			| repeat_each<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+				to_dnf_wff<tau_ba<BAs...>, BAs...>
+				| simplify_wff<tau_ba<BAs...>, BAs...>);
+
 		// TODO (HIGH) only consider inputs/outputs present in the formula
 		// select current input variables
-		auto in_vars = select_all(program.value(),
+		auto in_vars = select_all(dnf,
 			is_non_terminal<tau_parser::in_var_name, tau_ba<BAs...>, BAs...>);
 		if (!in_vars.empty() && inputs.empty()) {
 			std::cout << "error: no input variables defined\n";
@@ -563,7 +571,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		auto ins = finputs<tau_ba<BAs...>, BAs...>(current_inputs);
 
 		// select current output variables
-		auto out_vars = select_all(program.value(),
+		auto out_vars = select_all(dnf,
 			is_non_terminal<tau_parser::out_var_name, tau_ba<BAs...>, BAs...>);
 		if (out_vars.empty()) {
 			std::cout << "error: no output variables, nothing to compute\n";
@@ -588,7 +596,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		run<finputs<tau_ba<BAs...>, BAs...>,
 				foutputs<tau_ba<BAs...>, BAs...>,
 				tau_ba<BAs...>, BAs...>(
-			program.value(), ins, outs, max_iter);
+			dnf, ins, outs, max_iter);
 		return;
 	}
 
