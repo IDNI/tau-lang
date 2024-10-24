@@ -1224,15 +1224,528 @@ nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 }
 
 template<typename... BAs>
-struct wff_reduce_dnf {
-	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+nso<BAs...> reduce_terms (const nso<BAs...>& fm) {
+    std::map<nso<BAs...>, nso<BAs...>> changes = {};
+    for (const auto& bf: select_top(fm, is_non_terminal<tau_parser::bf, BAs...>)) {
+        auto dnf = to_dnf2(bf, false);
+        dnf = reduce2(dnf, tau_parser::bf);
+        if (dnf != bf) changes[bf] = dnf;
+    }
+    if (changes.empty()) return fm;
+    else return replace(fm, changes);
+}
+
+template<typename... BAs>
+nso<BAs...> group_dnf_expression (const nso<BAs...>& fm) {
 #ifdef TAU_CACHE
 		static map<nso<BAs...>, nso<BAs...>> cache;
-		if (auto it=cache.find(fm); it!=cache.end()) return it->second;
-		auto r = reduce2(fm, tau_parser::wff);
-		cache.emplace(fm, r);
-		return cache.emplace(r, r).first->second;
-#endif //TAU_CACHE
+		if (auto it = cache.find(fm); it != end(cache))
+			return it->second;
+#endif // TAU_CACHE
+	BOOST_LOG_TRIVIAL(debug) << "(I) Begin group_dnf_expression";
+	BOOST_LOG_TRIVIAL(debug) << "(F) Expression to factor: " << fm;
+	auto count_common = [](const auto& v1, const auto& v2) {
+		int_t count = 0;
+		auto it1 = begin(v1);
+		auto it2 = begin(v2);
+		while (it1 != end(v1) && it2 != end(v2)) {
+            if (*it1 < *it2) ++it1;
+            else { if (!(*it2 < *it1)) {++count;++it1;}
+                ++it2; } }
+		return count;
+	};
+
+	bool wff = is_non_terminal(tau_parser::wff, fm);
+	auto clauses = wff ? get_dnf_wff_clauses(fm)
+			       : get_dnf_bf_clauses(fm);
+	if (clauses.size() < 2) {
+#ifdef TAU_CACHE
+		return cache.emplace(fm, fm).first->second;
+#endif // TAU_CACHE
+		return fm;
+	}
+
+	vector<vector<nso<BAs...>>> atoms_of_clauses;
+	for (const auto& clause : clauses) {
+		auto atoms = wff ? get_cnf_wff_clauses(clause)
+				     : get_cnf_bf_clauses(clause);
+		if(wff) ranges::sort(atoms);
+		else ranges::sort(atoms, lex_var_comp<BAs...>);
+		atoms_of_clauses.emplace_back(move(atoms));
+	}
+	nso<BAs...> grouped_fm = wff ? _F<BAs...> : _0<BAs...>;
+	for (int_t i = 0; i < (int_t)atoms_of_clauses.size(); ++i) {
+		pair max_common = {0,0};
+		for (size_t j = i+1; j < atoms_of_clauses.size(); ++j) {
+			int_t count = count_common(atoms_of_clauses[i], atoms_of_clauses[j]);
+			if (count > max_common.second) {
+				max_common.first = j;
+				max_common.second = count;
+			}
+		}
+		if (max_common.first == 0) {
+			auto atoms = wff ? build_wff_and<BAs...>(
+						     atoms_of_clauses[i])
+					     : build_bf_and<BAs...>(
+						     atoms_of_clauses[i]);
+			grouped_fm = wff ? build_wff_or(grouped_fm, atoms)
+					     : build_bf_or(grouped_fm, atoms);
+			continue;
+		}
+		vector<nso<BAs...>> common;
+		ranges::set_intersection(atoms_of_clauses[i],
+					 atoms_of_clauses[max_common.first],
+					 back_inserter(common));
+
+		nso<BAs...> cl1 = wff ? _T<BAs...> : _1<BAs...>;
+		nso<BAs...> cl2 = wff ? _T<BAs...> : _1<BAs...>;
+		size_t p = 0;
+		for (const auto& atom : atoms_of_clauses[i]) {
+			if (p < common.size() && common[p] == atom) ++p;
+			else cl1 = wff ? build_wff_and(cl1, atom)
+					   : build_bf_and(cl1, atom);
+		}
+		p = 0;
+		for (const auto& atom : atoms_of_clauses[max_common.first]) {
+			if (p < common.size() && common[p] == atom) ++p;
+			else cl2 = wff ? build_wff_and(cl2, atom)
+					   : build_bf_and(cl2, atom);
+		}
+		// We need the canonical order for the reduction in "group_paths_and_simplify"
+		if (!lex_var_comp<BAs...>(cl1, cl2)) std::swap(cl1, cl2);
+		nso<BAs...> grouped = wff ? build_wff_or(cl1, cl2) :
+			build_bf_or<BAs...>(get_dnf_bf_clauses(
+				to_dnf2(build_bf_or(cl1, cl2), false)));
+
+		common.emplace_back(move(grouped));
+		atoms_of_clauses[i] = move(common);
+		atoms_of_clauses.erase(atoms_of_clauses.begin() + max_common.first);
+		--i;
+	}
+	assert(grouped_fm != nullptr);
+#ifdef TAU_CACHE
+		cache.emplace(grouped_fm, grouped_fm);
+		return cache.emplace(fm, grouped_fm).first->second;
+#endif // TAU_CACHE
+	BOOST_LOG_TRIVIAL(debug) << "(I) End group_dnf_expression";
+	BOOST_LOG_TRIVIAL(debug) << "(F) Factored expression: " << grouped_fm;
+	return grouped_fm;
+}
+
+template<typename... BAs>
+vector<nso<BAs...>> push_eq_and_get_vars (nso<BAs...>& fm) {
+ // First push in equalities all the way (bf != 0 is converted to !(bf = 0))
+	fm = fm | repeat_all<step<BAs...>, BAs...>(
+		unsqueeze_wff<BAs...> | to_mnf_wff<BAs...>);
+	// Find atomic formulas
+	return select_top(fm, is_wff_bdd_var);
+}
+
+// Requires fm to have Boolean functions in DNF and equalities pushed in
+// vars contains variable order
+template<typename... BAs>
+vector<vector<int_t>> wff_to_bdd (const nso<BAs...>& fm, auto& vars = {}) {
+	// Find atomic formulas
+	auto pushed_in_fm = fm;
+	if (vars.empty()) vars = push_eq_and_get_vars(pushed_in_fm);
+	else pushed_in_fm = fm | repeat_all<step<BAs...>, BAs...>(
+		 	unsqueeze_wff<BAs...> | to_mnf_wff<BAs...>);
+	vector<int_t> i (vars.size());
+	map<nso<BAs...>, vector<vector<int_t>>> dnf;
+	// dnf empty means false and and size 1 with empty paths means true
+    assign_and_reduce(pushed_in_fm, vars, i, dnf, is_wff_bdd_var, 0, true);
+	assert((dnf.size() == 1 || dnf.empty()));
+	if (dnf.empty()) return {};
+	join_paths(dnf.begin()->second);
+
+	if (dnf.begin()->second.empty())
+		dnf.begin()->second.emplace_back();
+	return dnf.begin()->second;
+}
+
+bool is_ordered_subset (const auto& v1, const auto& v2) {
+	if (v1.size() > v2.size()) return false;
+	if (v1.size() == 0) return true;
+	size_t j = 0;
+	for (size_t i=0; i < v2.size(); ++i) {
+		if (v1[j] == v2[i]) ++j;
+		if (j == v1.size()) return true;
+	}
+	return false;
+}
+
+template<typename... BAs>
+vector<vector<vector<nso<BAs...>>>> get_cnf_inequality_lits (const nso<BAs...>& fm) {
+	if (fm == _T<BAs...>) return {};
+	auto neq_pushed_in = fm | repeat_all<step<BAs...>, BAs...>(
+		 	unsqueeze_wff_neg<BAs...>);
+	// cout << "neq_pushed_in: " << neq_pushed_in << "\n";
+	vector<vector<vector<nso<BAs...>>>> cnf_lits;
+	for (const nso<BAs...>& clause : get_cnf_wff_clauses(neq_pushed_in)) {
+		vector<vector<nso<BAs...>>> c;
+		for (const nso<BAs...>& neqs : get_dnf_wff_clauses(clause)) {
+			c.emplace_back(get_cnf_bf_clauses(trim2(neqs)));
+		}
+		cnf_lits.emplace_back(move(c));
+	}
+	return cnf_lits;
+}
+
+template<typename... BAs>
+pair<vector<int_t>, bool> simplify_path(const vector<int_t>& path,
+			  vector<nso<BAs...> >& vars) {
+	// cout << "Vars: ";
+	// for (const auto& var : vars) {
+	// 	cout << var << ", ";
+	// }
+	// cout << "\n";
+	using tp = tau_parser;
+	vector<vector<nso<BAs...>>> pos;
+	// Build clause for non-equality terms
+	// and new representation for equality terms
+	nso<BAs...> clause = _T<BAs...>;
+	nso<BAs...> pos_bf = _0<BAs...>;
+	nso<BAs...> negs_wff = _T<BAs...>;
+	for (size_t p = 0; p < path.size(); ++p) {
+		if (path[p]== 2) continue;
+		if (is_child_non_terminal(tp::bf_eq, vars[p])) {
+			if (path[p] == -1) {
+				negs_wff = build_wff_and(negs_wff, build_wff_neq(trim2(vars[p])));
+			} else pos_bf = build_bf_or(pos_bf, trim2(vars[p]));
+		}
+		else if (path[p] == -1)
+			clause = build_wff_and(clause, build_wff_neg(vars[p]));
+		else if (path[p] == 1)
+			clause = build_wff_and(clause, vars[p]);
+		else assert(false);
+	}
+	// Simplify equalities/inequalities
+	// Here new variables can be created
+	pos_bf = reduce2(pos_bf, tau_parser::bf, false, true, false);
+	nso<BAs...> new_pos_bf;
+	// negs_wff = reduce2(negs_wff, tau_parser::wff);
+	for (const auto& c : get_dnf_bf_clauses(pos_bf)) {
+		pos.emplace_back(get_cnf_bf_clauses(c));
+		if (new_pos_bf) new_pos_bf = build_wff_and(new_pos_bf, build_wff_eq(c));
+		else new_pos_bf = build_wff_eq(c);
+	}
+	clause = build_wff_and(clause, new_pos_bf);
+
+	// cout << "Pos clause: " << clause << "\n";
+	auto cnf_neq_lits = get_cnf_inequality_lits(negs_wff);
+	// Check if any term in pos is subset of any term in negs
+	for (const auto& p : pos) {
+		for (auto& neq_clause : cnf_neq_lits){
+			for (auto& n : neq_clause) {
+				if (p.size() == 1 && n.size() == 1) {
+					if (is_child_non_terminal(tp::bf_neg, p[0])) {
+						if (trim2(p[0]) == n[0]) { n = {}; continue; }
+					} else if (is_child_non_terminal(tp::bf_neg, n[0])) {
+						if (p[0] == trim2(n[0])) { n = {}; continue; }
+					}
+				}
+				if (is_ordered_subset(p, n)) {
+					n = {};
+				}
+			}
+			if (ranges::all_of(neq_clause, [](const auto& el){return el.empty();})) {
+				return {{}, true};
+			}
+		}
+	}
+	// Eliminate redundant != 0 in cnf
+	for (int_t c1=0; c1 < (int_t)cnf_neq_lits.size(); ++c1) {
+		for (size_t i = 0; i < cnf_neq_lits[c1].size(); ++i) {
+			if (cnf_neq_lits[c1][i].empty()) continue;
+			bool all_subset = true;
+			for (int_t c2 = 0; c2 < (int_t)cnf_neq_lits.size(); ++c2) {
+				if (c1 == c2) continue;
+				for (size_t j = 0; j < cnf_neq_lits[c2].size(); ++j) {
+					if (cnf_neq_lits[c2][j].empty()) continue;
+					if (!is_ordered_subset(cnf_neq_lits[c1][i], cnf_neq_lits[c2][j])) {
+						all_subset = false;
+						break;
+					}
+				}
+				if (all_subset == true) {
+					cnf_neq_lits[c1].erase(cnf_neq_lits[c1].begin()+i);
+					--i;
+					break;
+				}
+			}
+		}
+	}
+
+	nso<BAs...> neq_cnf;
+	for (const auto& neq_clause : cnf_neq_lits) {
+		if (neq_clause.empty()) continue;
+		nso<BAs...> neqs;
+        for (const auto& n : neq_clause) {
+        	if (n.empty()) continue;
+	        if(neqs) neqs = build_wff_or(neqs, build_wff_neq(build_bf_and<BAs...>(n)));
+        	else neqs = build_wff_neq(build_bf_and<BAs...>(n));
+        }
+		if(neq_cnf) neq_cnf = build_wff_and(neq_cnf, neqs);
+		else neq_cnf = neqs;
+	}
+	if (neq_cnf) {
+		// Convert back to cnf and push inequalities back out
+		neq_cnf = reduce2(neq_cnf, tau_parser::wff, true);
+		neq_cnf = neq_cnf | repeat_all<step<BAs...>, BAs...>(
+				 squeeze_wff_neg<BAs...> | to_mnf_wff<BAs...>);
+		// cout << "neq_simplified: " << neq_cnf << "\n";
+		clause = build_wff_and(clause, neq_cnf);
+	}
+	// cout << "Build clause: " << clause << "\n";
+	auto new_vars = select_top(clause, is_wff_bdd_var);
+
+	map<nso<BAs...>, size_t> var_to_idx;
+	for (size_t i=0; i<vars.size(); ++i)
+		var_to_idx.emplace(vars[i], i);
+
+	for (const auto& v : new_vars) {
+		if (auto it = var_to_idx.find(v); it == end(var_to_idx)) {
+			// There is a new variable
+			vars.push_back(v);
+			var_to_idx.emplace(v, vars.size() - 1);
+		}
+	}
+	return clause_to_vector(clause, var_to_idx, true, false);
+}
+
+template<typename...BAs>
+pair<nso<BAs...>, bool> group_paths_and_simplify(vector<vector<int_t> >& paths,
+			      const auto& vars) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) Start group_paths_and_simplify";
+	using tp = tau_parser;
+	if (paths.empty()) return {_F<BAs...>, false};
+	if (paths.size() == 1 && paths[0].empty()) return {_T<BAs...>, false};
+    auto is_neq = [&](const int_t path, const int_t idx) {
+    	if (is_child_non_terminal(tp::bf_eq, vars[idx]))
+			return paths[path][idx] != 1;
+    	return false;
+    };
+
+	// Group those paths together which have the same non != part
+    vector<vector<vector<int_t>>> groups (paths.size());
+	bool is_simp = false;
+	for (size_t i = 0; i < paths.size(); ++i) {
+		for (size_t j = i+1; j < paths.size(); ++j) {
+			// Check if paths agree on non != vars
+			bool is_equal = true;
+			for (size_t k = 0; k < paths[i].size(); ++k) {
+				if (is_neq(i, k) && is_neq(j,k)) continue;
+				if (paths[i][k] != paths[j][k]) {
+					is_equal = false;
+					break;
+				}
+			}
+			// Here paths agree
+			if (is_equal) {
+				is_simp = true;
+				groups[i].emplace_back(move(paths[j]));
+				paths.erase(paths.begin()+j);
+				--j;
+			}
+		}
+	}
+
+	// paths[0] is connected to all in groups[0]
+	auto neq_from_path = [&](const auto& path) {
+		nso<BAs...> clause = _T<BAs...>;
+		for (size_t k = 0; k < path.size(); ++k) {
+			if (path[k] == -1 && is_child_non_terminal(tp::bf_eq, vars[k]))
+				clause = build_wff_and(clause, build_wff_neq(trim2(vars[k])));
+		}
+		return clause;
+	};
+	nso<BAs...> result = _F<BAs...>;
+	for (size_t i = 0; i < paths.size(); ++i) {
+		// Now add from paths[i] and groups[i]
+		nso<BAs...> neqs = neq_from_path(paths[i]);
+		for (const auto& path : groups[i])
+			neqs = build_wff_or(neqs, neq_from_path(path));
+		if (!groups[i].empty()) {
+			// simp to cnf
+			neqs = to_cnf2(neqs, true);
+			neqs = reduce2(neqs, tau_parser::wff, true);
+			// push != out
+            neqs = neqs | repeat_all<step<BAs...>, BAs...>(
+                   squeeze_wff_neg<BAs...>);
+		}
+		auto neq_clauses = get_cnf_wff_clauses(neqs);
+		// Simplify bfs and drop !=
+		bool clause_false = false;
+		for (auto& neq : neq_clauses) {
+			if (neq == _T<BAs...>) continue;
+			neq = reduce2(trim2(neq), tau_parser::bf);
+			if (neq == _0<BAs...>) clause_false = true;
+		}
+		if (clause_false) continue;
+		// Simplify neqs with assumptions from = part
+		nso<BAs...> rest = _T<BAs...>;
+		for (size_t k = 0; k < paths[i].size(); ++k) {
+			if (paths[i][k] == 1) {
+				if (is_child_non_terminal(tp::bf_eq, vars[k])) {
+					for (const auto& clause : get_dnf_bf_clauses(trim2(vars[k]))) {
+						// Here single assumption
+						auto neg_eq = push_negation_in(build_bf_neg(clause), false);
+						map<nso<BAs...>,nso<BAs...>> changes;
+						changes.emplace(neg_eq, _1<BAs...>);
+						for (auto& neq : neq_clauses) {
+							if (neq == _T<BAs...> || neq == _1<BAs...>) continue;
+							auto grouped_bf = group_dnf_expression(neq);
+							auto simp_neq = replace(grouped_bf, changes);
+							if (grouped_bf != simp_neq) {
+								neq = to_dnf2(simp_neq, false);
+								neq = reduce2(neq, tau_parser::bf);
+								is_simp = true;
+							}
+						}
+					}
+				}
+				rest = build_wff_and(rest, vars[k]);
+			} else if (paths[i][k] == -1 &&
+						!is_child_non_terminal(tp::bf_eq, vars[k]))
+				rest = build_wff_and(rest, build_wff_neg(vars[k]));
+		}
+		for (auto& neq : neq_clauses) {
+			if (neq == _T<BAs...>) continue;
+			neq = build_wff_neq(neq);
+		}
+
+		result =
+			build_wff_or(result,
+				build_wff_and(rest, build_wff_and<BAs...>(neq_clauses)));
+	}
+	assert(result != nullptr);
+	result = result | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>);
+	BOOST_LOG_TRIVIAL(debug) << "(I) End group_paths_and_simplify";
+	return make_pair(result, is_simp);
+}
+
+template<typename... BAs>
+nso<BAs...> reduce_across_bfs (const nso<BAs...>& fm, bool to_cnf) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) Start reduce_across_bfs with";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+
+	auto squeezed_fm = (to_cnf ? push_negation_in(build_wff_neg(fm)) : fm);
+	// Squeeze all equalities and inequalities
+	squeezed_fm = squeezed_fm | repeat_all<step<BAs...>, BAs...>(squeeze_wff<BAs...>);
+	squeezed_fm = reduce_terms(to_dnf2(squeezed_fm));
+	// We work with unsqueezed equality
+	squeezed_fm  = squeezed_fm | repeat_all<step<BAs...>, BAs...>(unsqueeze_wff_pos<BAs...>);
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) Formula in DNF: " << squeezed_fm;
+
+#ifdef TAU_CACHE
+		static map<pair<nso<BAs...>, bool>, nso<BAs...>> cache;
+		if (auto it = cache.find(make_pair(squeezed_fm, to_cnf)); it != end(cache))
+			return it->second;
+#endif // TAU_CACHE
+	auto [paths, vars] = dnf_cnf_to_bdd<BAs...>(squeezed_fm, tau_parser::wff, false, true, false);
+
+	if (paths.empty()) {
+		auto res = to_cnf ? _T<BAs...> : _F<BAs...>;
+#ifdef TAU_CACHE
+		return cache.emplace(make_pair(squeezed_fm, to_cnf), res).first->second;
+#endif // TAU_CACHE
+		BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+		return res;
+	} else if (paths.size() == 1 && paths[0].empty()) {
+		auto res = to_cnf ? _F<BAs...> : _T<BAs...>;
+#ifdef TAU_CACHE
+		return cache.emplace(make_pair(squeezed_fm, to_cnf), res).first->second;
+#endif // TAU_CACHE
+		BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+		return res;
+	}
+
+#ifdef DEBUG
+	// Check that vars are not T or F.
+	for (auto& var : vars) {
+		assert(var != _T<BAs...> && var != _F<BAs...>);
+	}
+#endif // DEBUG
+
+	bool has_simp = true;
+	while (has_simp) {
+		BOOST_LOG_TRIVIAL(debug) << "(I) New fix point run";
+		has_simp = false;
+		for (int_t i = 0; i < (int_t)paths.size(); ++i) {
+			auto len_vars = vars.size();
+			auto [simp_path, f] = simplify_path<BAs...>(paths[i], vars);
+			if (vars.size() != len_vars) {
+				// New variable was created -> append 2 to each path
+				for (size_t k = 0; k < vars.size() - len_vars; ++k)
+                    ranges::for_each(paths, [](auto& path){path.emplace_back(2);});
+			}
+
+			if (f) { paths.erase(paths.begin()+i); --i; }
+			else if (simp_path != paths[i]) {
+#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(debug) << "(I) Path simplification happened: ";
+				vector<vector<int_t> > tmp1{paths[i]};
+				vector<vector<int_t> > tmp2{simp_path};
+				BOOST_LOG_TRIVIAL(debug) << "(F) Current path: " <<
+						build_reduced_formula<BAs...>(
+							tmp1, vars, false,
+							true);
+				BOOST_LOG_TRIVIAL(debug) << "(F) Simplified path: " <<
+						build_reduced_formula<BAs...>(
+							tmp2, vars, false,
+							true);
+#endif // DEBUG
+				if (ranges::all_of( simp_path,
+					[](const auto el) { return el == 2; })) {
+					auto res = to_cnf ? _F<BAs...> : _T<BAs...>;
+#ifdef TAU_CACHE
+					return cache.emplace(
+						make_pair(squeezed_fm, to_cnf), res).first->second;
+#endif // TAU_CACHE
+					BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
+					BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+					return res;
+				}
+				has_simp = true;
+				paths[i] = move(simp_path);
+			}
+		}
+		if (has_simp) join_paths(paths);
+	}
+
+	while (true) {
+		auto [simp_fm, has_further_simp] =
+			group_paths_and_simplify<BAs...>(paths, vars);
+#ifdef DEBUG
+		if (has_further_simp) {
+			BOOST_LOG_TRIVIAL(debug) << "(F) Before factoring simplification: "
+				<< build_reduced_formula<BAs...>(paths, vars, false, true);
+			BOOST_LOG_TRIVIAL(debug) << "(F) After factoring simplification: " << simp_fm;
+		}
+#endif // DEBUG
+		if (!has_further_simp) {
+			assert(simp_fm != nullptr);
+			auto res = to_cnf ? push_negation_in(build_wff_neg(simp_fm)) : simp_fm;
+#ifdef TAU_CACHE
+			return cache.emplace(make_pair(squeezed_fm, to_cnf), res).first->second;
+#endif // TAU_CACHE
+			BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+			return res;
+		}
+		auto [simp_paths, simp_vars] =
+			dnf_cnf_to_bdd(simp_fm, tau_parser::wff);
+		paths = move(simp_paths);
+		vars = move(simp_vars);
+	}
+}
+
+template<typename... BAs>
+struct wff_reduce_dnf {
+	nso<BAs...> operator() (const nso<BAs...>& fm) const {
 		return reduce2(fm, tau_parser::wff);
 	}
 };
@@ -1593,6 +2106,7 @@ nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
 		// Simplyfy current formula and convert to DNF
 		// Reductions done in order to prevent blow up
 		flat_st = to_dnf2(flat_st);
+		flat_st = reduce2(flat_st, tau_parser::wff);
 		if (flat_st != st) g_changes[st] = flat_st;
 	}
 	// Apply changes
@@ -1618,7 +2132,10 @@ nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
 		auto flat_aw = build_wff_always(push_sometimes_always_in(trim2(aw)));
 		// Simplyfy current formula and convert to CNF
 		// Reductions done in order to prevent blow up
+		// TODO: First push always in
 		flat_aw = to_cnf2(flat_aw);
+		flat_aw = reduce2(flat_aw, tau_parser::wff, true);
+		// TODO: Then push always back out
 		if (flat_aw != aw) g_changes[aw] = flat_aw;
 	}
 	// Apply changes
@@ -1731,12 +2248,13 @@ struct sometimes_always_normalization {
 		// If there is no temporal quantifier and no temporal variable
 		// Just convert to DNF and return
 		if (!find_top(fm, st_aw).has_value() && !has_temp_var(fm))
-			return to_dnf2(fm);
+			return reduce_across_bfs(fm, false);
 
 		// Scope formula under always if not already under sometimes or always
 		nso<BAs...> res = !st_aw(fm) ? build_wff_always(fm) : fm;
 		// conversion to DNF necessary for pull_sometimes_always_out
 		res = to_dnf2(push_sometimes_always_in(res));
+		res = reduce2(res, tau_parser::wff);
 		res = pull_sometimes_always_out(res) |
 					repeat_each<step<BAs...>, BAs...>(simplify_wff<BAs...>);
 		auto temp_inner = select_top(res, st_aw);
@@ -1744,7 +2262,7 @@ struct sometimes_always_normalization {
 		map<nso<BAs...>, nso<BAs...>> changes;
 		for (const auto& f : temp_inner) {
 			// Reduction done to normalize again now that sometimes/always are all the way out
-			changes[trim2(f)] = to_dnf2(trim2(f));
+			changes[trim2(f)] = reduce_across_bfs(trim2(f), false);
 		}
 		return replace(res, changes);
 	}
