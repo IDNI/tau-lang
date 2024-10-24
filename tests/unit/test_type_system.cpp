@@ -71,15 +71,15 @@ TEST_SUITE("constant types") {
 	}
 
 	TEST_CASE("only 1 typed sbf") {
-		auto n = infer("{ x } = { y } { 0 } : sbf.");
+		auto n = expect_infer_fail("{ x } = { y } { 0 } : sbf.");
 		// ptree<Bool>(std::cout << "inferred: ", n) << "\n";
-		CHECK( are_all_typed_as(n, "sbf") );
+		CHECK( n );
 	}
 
 	TEST_CASE("only 1 typed tau") {
-		auto n = infer("{ F. } = { T. } { F. } : tau.");
+		auto n = expect_infer_fail("{ F. } = { T. } { F. } : tau.");
 		// ptree<Bool>(std::cout << "inferred: ", n) << "\n";
-		CHECK( are_all_typed_as(n, "tau") );
+		CHECK( n );
 	}
 
 	TEST_CASE("none typed") {

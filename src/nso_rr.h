@@ -1264,6 +1264,12 @@ sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
 			<< expected << " but is " << got;
 		return false;
 	};
+	auto unsupported_type = [&](const std::string& type)
+	{
+		BOOST_LOG_TRIVIAL(error)
+			<< "Unsupported type: " << type << "\n";
+		return false;
+	};
 	auto infer_over_scope = [&](const node& nd) {
 		std::string type = "";
 		BOOST_LOG_TRIVIAL(trace)
@@ -1289,6 +1295,10 @@ sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
 			auto type_nd = c | tau_parser::type;
 			if (type_nd) {
 				auto got = extract_type(type_nd.value());
+				bool found = false;
+				for (auto t: nso_factory<BAs...>::instance().types())
+					if (got == t) { found = true; break; }
+				if (!found) return unsupported_type(got);
 				if (!(type.size() == 0 && got == nso_factory<BAs...>::instance().default_type())
 					&& got != type)
 				{
