@@ -1491,8 +1491,10 @@ pair<vector<int_t>, bool> simplify_path(const vector<int_t>& path,
 	        if(neqs) neqs = build_wff_or(neqs, build_wff_neq(build_bf_and<BAs...>(n)));
         	else neqs = build_wff_neq(build_bf_and<BAs...>(n));
         }
-		if(neq_cnf) neq_cnf = build_wff_and(neq_cnf, neqs);
-		else neq_cnf = neqs;
+		if (neqs) {
+			if(neq_cnf) neq_cnf = build_wff_and(neq_cnf, neqs);
+			else neq_cnf = neqs;
+		}
 	}
 	if (neq_cnf) {
 		// Convert back to cnf and push inequalities back out
