@@ -1104,13 +1104,19 @@ vector<vector<int_t>> collect_paths(const nso<BAs...>& new_fm, bool wff,
 
 template<typename... BAs>
 nso<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_cnf, bool wff) {
-	if (paths.empty()) return is_cnf ? _T<BAs...> : _F<BAs...>;
-	nso<BAs...> reduced_fm = is_cnf ? _F<BAs...> : _T<BAs...>;
+	if (paths.empty()) return is_cnf
+					  ? (wff ? _T<BAs...> : _1<BAs...>)
+					  : (wff ? _F<BAs...> : _0<BAs...>);
+	nso<BAs...> reduced_fm = is_cnf
+					 ? (wff ? _F<BAs...> : _0<BAs...>)
+					 : (wff ? _T<BAs...> : _1<BAs...>);
 	bool first = true;
 	for (const auto& path : paths) {
 		if (path.empty()) continue;
         bool first_var = true;
-        nso<BAs...> var_path = is_cnf ? _F<BAs...> : _T<BAs...>;
+		nso<BAs...> var_path = is_cnf
+					       ? (wff ? _F<BAs...> : _0<BAs...>)
+					       : (wff ? _T<BAs...> : _1<BAs...>);
         for (size_t k=0; k < vars.size(); ++k) {
         	assert(path.size() == vars.size());
             if (path[k] == 2) continue;
@@ -1126,8 +1132,8 @@ nso<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_
                 }
                 else {
                 	if (wff)
-				var_path = path[k] == 1 ? build_wff_or(var_path, vars[k]) :
-				build_wff_or(var_path, build_wff_neg(vars[k]));
+                        var_path = path[k] == 1 ? build_wff_or(var_path, vars[k]) :
+                        build_wff_or(var_path, build_wff_neg(vars[k]));
                 	else var_path = path[k] == 1 ? build_bf_or(var_path, vars[k]) :
                 		build_bf_or(var_path, build_bf_neg(vars[k]));
                 }
@@ -1506,6 +1512,7 @@ pair<vector<int_t>, bool> simplify_path(const vector<int_t>& path,
 	for (const auto& v : new_vars) {
 		if (auto it = var_to_idx.find(v); it == end(var_to_idx)) {
 			// There is a new variable
+			assert(v != build_wff_eq(_T<BAs...>) && v != build_wff_eq(_F<BAs...>));
 			vars.push_back(v);
 			var_to_idx.emplace(v, vars.size() - 1);
 		}
