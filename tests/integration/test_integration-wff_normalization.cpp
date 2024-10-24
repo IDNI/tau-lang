@@ -33,7 +33,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "all a,b,c,d a'c|b'd = 0 <-> a & b' & d | a' & c | b' & c' & d = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
+		auto result = normalizer<bdd_binding>(sample_formula.value());
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
@@ -41,7 +41,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "all x all y ex z (x != y) -> (x < z && z < y).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
+		auto result = normalizer<bdd_binding>(sample_formula.value());
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
@@ -49,7 +49,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "all x all y ex z (x < y) -> (x < z && z < y).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
+		auto result = normalizer<bdd_binding>(sample_formula.value());
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
@@ -57,7 +57,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "all a all b all c all d all e all f (ax + bx' != cy + d'y' || ax + bx' = ey + fy') <-> (ax + bx' = ey + fy' || ax + bx' != cy + d'y').";
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
+		auto result = normalizer<bdd_binding>(sample_formula.value());
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
@@ -65,7 +65,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "all a all b all c all d all e all f (ax + bx' != cy + d'y' || ax + bx' = ey + fy') <-> (ax + bx' = ey + fy' || ax + bx' = cy + d'y').";
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
+		auto result = normalizer<bdd_binding>(sample_formula.value());
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
@@ -73,7 +73,7 @@ TEST_SUITE("Normalizer") {
 		const char* sample = "all x ex y all z ex w all u ex v ((x<y && y<z) || (z<w && w<u)|| (u<v && v<x)).";
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-		auto result = normalizer<bdd_binding>(sample_formula);
+		auto result = normalizer<bdd_binding>(sample_formula.value());
 		auto check = result |  tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
