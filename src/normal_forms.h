@@ -2328,9 +2328,16 @@ nso<BAs...> wff_remove_existential(const nso<BAs...>& var, const nso<BAs...>& wf
 				auto g = neq | tau_parser::bf | optional_value_extractor<sp_tau_node<BAs...>>;
 				auto g_0 = replace(g, changes_0);
 				auto g_1 = replace(g, changes_1);
-				nneqs = build_wff_and(nneqs, build_wff_neq(build_bf_or(
-					                      build_bf_and(build_bf_neg(f_1),	g_1),
-					                      build_bf_and(build_bf_neg(f_0),	g_0))));
+				// If both are 1 then inequality is implied by f_0f_1 = 0
+				if (g_0 == _1<BAs...> && g_1 == _1<BAs...>) continue;
+				// If f_0 is equal to f_1 we can use assumption f_0 = 0 and f_1 = 0
+				if (f_0 == f_1) {
+					nneqs = build_wff_and(nneqs, build_wff_neq(build_bf_or(g_0, g_1)));
+				} else if (g_0 == g_1) {
+					nneqs = build_wff_and(nneqs, build_wff_neq(g_0));
+				} else nneqs = build_wff_and(nneqs, build_wff_neq(build_bf_or(
+                                      build_bf_and(build_bf_neg(f_1),	g_1),
+                                      build_bf_and(build_bf_neg(f_0),	g_0))));
 			}
 			nl = build_wff_and(nl, build_wff_and(build_wff_eq(build_bf_and(f_0, f_1)), nneqs));
 		} else if (f) {
@@ -2344,8 +2351,18 @@ nso<BAs...> wff_remove_existential(const nso<BAs...>& var, const nso<BAs...>& wf
 template<typename... BAs>
 nso<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_fm) {
 	// Reductions to prevent blow ups and achieve DNF
-	scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
-	scoped_fm = to_dnf2(scoped_fm);
+	BOOST_LOG_TRIVIAL(debug) << "(I) Start existential quantifier elimination";
+	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << inner_fm;
+    BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << scoped_fm;
+	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
+	scoped_fm = reduce_across_bfs(scoped_fm, false);
+
+#ifdef TAU_CACHE
+		static map<pair<nso<BAs...>,nso<BAs...>>, nso<BAs...>> cache;
+		if (auto it = cache.find(make_pair(inner_fm, scoped_fm)); it != end(cache))
+			return it->second;
+#endif // TAU_CACHE
+
 	auto clauses = get_leaves(scoped_fm, tau_parser::wff_or, tau_parser::wff);
 	nso<BAs...> res;
 	for (const auto& clause : clauses) {
@@ -2366,10 +2383,11 @@ nso<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 				if (new_conjunct) new_conjunct = build_wff_and(new_conjunct, new_c);
 				else new_conjunct = new_c;
 			}
+			if (new_conjunct == _T<BAs...>) return _T<BAs...>;
 			if (res) res = build_wff_or(res, new_conjunct);
 			else res = new_conjunct;
 		}
-		if (all_equal_zero) {
+		else if (all_equal_zero) {
 			nso<BAs...> new_func;
 			for (const auto& d: conjuncts) {
 				if (new_func) new_func = build_bf_or(new_func, trim2(d));
@@ -2377,23 +2395,43 @@ nso<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 			}
 			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
 			new_func = wff_remove_existential(trim2(inner_fm), new_func);
+			if (new_func == _T<BAs...>) return _T<BAs...>;
 			if (res) res = build_wff_or(res, new_func);
 			else res = new_func;
 		}
 		else {
 			// Resolve quantified variable in scoped_fm
-			if (res) res = build_wff_or(res, wff_remove_existential(trim2(inner_fm), clause));
+			auto rem_clause = wff_remove_existential(trim2(inner_fm), clause);
+			if (rem_clause == _T<BAs...>) return _T<BAs...>;
+			if (res) res = build_wff_or(res, rem_clause);
 			else res = wff_remove_existential(trim2(inner_fm), clause);
 		}
 	}
+	// Simplify elimination result
+	res = reduce_across_bfs(res, false);
+	BOOST_LOG_TRIVIAL(debug) << "(I) End existential quantifier elimination";
+    BOOST_LOG_TRIVIAL(debug) << "(F)" << res;
+#ifdef TAU_CACHE
+	return cache.emplace(make_pair(inner_fm, scoped_fm), res).first->second;
+#endif // TAU_CACHE
 	return res;
 }
 
 template<typename... BAs>
 nso<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm) {
+    BOOST_LOG_TRIVIAL(debug) << "(I) Start universal quantifier elimination";
+	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << inner_fm;
+    BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << scoped_fm;
 	// Reductions to prevent blow ups and achieve CNF
-	scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
-	scoped_fm = to_cnf2(scoped_fm);
+	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
+	scoped_fm = reduce_across_bfs(scoped_fm, true);
+// Add cache after reductions; reductions are cached as well
+#ifdef TAU_CACHE
+		static map<pair<nso<BAs...>,nso<BAs...>>, nso<BAs...>> cache;
+		if (auto it = cache.find(make_pair(inner_fm, scoped_fm)); it != end(cache))
+			return it->second;
+#endif // TAU_CACHE
+
 	auto clauses = get_leaves(scoped_fm, tau_parser::wff_and, tau_parser::wff);
 	nso<BAs...> res;
 	for (const auto &clause: clauses) {
@@ -2410,12 +2448,13 @@ nso<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 			nso<BAs...> new_disjunct;
 			// Push quantifier inside disjunction
 			for (const auto &d: disjuncts) {
-				auto new_d = build_wff_neg(d) | (nso_transform<BAs...>)push_negation_in;
-				new_d = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_d))
-				        | (nso_transform<BAs...>)push_negation_in;
+				auto new_d = push_negation_in(build_wff_neg(d));
+				new_d = push_negation_in(
+					build_wff_neg(wff_remove_existential(trim2(inner_fm), new_d)));
 				if (new_disjunct) new_disjunct = build_wff_or(new_disjunct, new_d);
 				else new_disjunct = new_d;
 			}
+			if (new_disjunct == _F<BAs...>) return _F<BAs...>;
 			if (res) res = build_wff_and(res, new_disjunct);
 			else res = new_disjunct;
 		}
@@ -2426,20 +2465,28 @@ nso<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 				else new_func = trim2(d);
 			}
 			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
-			new_func = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_func))
-			           | (nso_transform<BAs...>)push_negation_in;
+			new_func = push_negation_in(
+				build_wff_neg(wff_remove_existential(trim2(inner_fm), new_func)));
+			if (new_func == _F<BAs...>) return _F<BAs...>;
 			if (res) res = build_wff_and(res, new_func);
 			else res = new_func;
 		} else {
 			// Turn universal into existential quantifier and eliminate
-			auto new_clause = build_wff_neg(clause)
-			                  | (nso_transform<BAs...>)push_negation_in;
-			new_clause = build_wff_neg(wff_remove_existential(trim2(inner_fm), new_clause))
-                         | (nso_transform<BAs...>)push_negation_in;
+			auto new_clause = push_negation_in(build_wff_neg(clause));
+			new_clause = push_negation_in(
+				build_wff_neg(wff_remove_existential(trim2(inner_fm), new_clause)));
+			if (res == _F<BAs...>) return _F<BAs...>;
 			if (!res) res = new_clause;
 			else res = build_wff_and(res, new_clause);
 		}
 	}
+	// Simplify elimination result
+	res = reduce_across_bfs(res, true);
+	BOOST_LOG_TRIVIAL(debug) << "(I) End universal quantifier elimination";
+    BOOST_LOG_TRIVIAL(debug) << "(F)" << res;
+#ifdef TAU_CACHE
+	return cache.emplace(make_pair(inner_fm, scoped_fm), res).first->second;
+#endif // TAU_CACHE
 	return res;
 }
 
