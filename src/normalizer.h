@@ -78,7 +78,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
 		// are reduced
 		| bf_reduce_canonical<BAs...>()
-		| repeat_all<step<BAs...>, BAs...>(elim_eqs<BAs...>)
+		// Normalize always and sometimes quantifiers and reduce Tau formula
 		| sometimes_always_normalization<BAs...>();
 	#ifdef TAU_CACHE
 	cache[form] = result;
