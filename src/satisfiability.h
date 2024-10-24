@@ -577,7 +577,7 @@ nso<BAs...> transform_to_eventual_variables(const nso<BAs...>& fm) {
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
 	BOOST_LOG_TRIVIAL(trace) << fm;
 	nso<BAs...> ev_assm = _T<BAs...>;
-	nso<BAs...> ev_collection = _1<BAs...>;
+	nso<BAs...> ev_collection = _0<BAs...>;
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
 		auto st_io_vars = select_top(smt_fms[n], is_child_non_terminal<p::io_var, BAs...>);
 		int_t st_lookback = get_max_shift(st_io_vars);
@@ -588,31 +588,29 @@ nso<BAs...> transform_to_eventual_variables(const nso<BAs...>& fm) {
 		auto eNt = build_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
 		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
 
-		auto eN0_is_zero = build_wff_eq(wrap(p::bf,
+		auto eN0_is_not_zero = build_wff_neq(wrap(p::bf,
 			build_io_out_const<BAs...>(ss.str(), 0)));
 		auto eNt_is_zero      = build_wff_eq(eNt);
-		auto eNt_is_one       = build_wff_eq(build_bf_neg(eNt));
+		auto eNt_is_not_zero  = build_wff_neq(eNt);
 		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
-		auto eNt_prev_is_one  = build_wff_eq(build_bf_neg(eNt_prev));
+		auto eNt_prev_is_not_zero	= build_wff_neq(eNt_prev);
 		// transform `sometimes psi` to:
-		// (_eN[t-1] = 0 && _eN[t] = 1) -> psi (N is nth `sometimes`)
+		// (_eN[t-1] != 0 && _eN[t] == 0) -> psi (N is nth `sometimes`)
 		auto shifted_sometimes = max_lookback == 0 ?
 			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars, 1) :
 			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars,
 				max_lookback - st_lookback);
 		ev_assm = build_wff_and(ev_assm, build_wff_imply(
-				build_wff_and(eNt_prev_is_zero, eNt_is_one),
+				build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
 				shifted_sometimes));
 
 		// for each _eN add conjunction
-		// 	(_eN[0] = 0 && (_eN[t-1]   = 0 || _eN[t-1] = 1)
-		//                         && (_eN[t-1] = 1 -> _eN[t] = 1))
+		// 	(_eN[0] != 0 && (_eN[t-1] = 0 -> _eN[t] = 0))
 		ev_assm = build_wff_and( ev_assm,
-				build_wff_and(eN0_is_zero, build_wff_and(
-				build_wff_or(eNt_prev_is_zero, eNt_prev_is_one),
-				build_wff_imply(eNt_prev_is_one, eNt_is_one))));
+				build_wff_and(eN0_is_not_zero,
+				build_wff_imply(eNt_prev_is_zero, eNt_is_zero)));
 
-		ev_collection = build_bf_and(ev_collection, eNt_without_lookback);
+		ev_collection = build_bf_or(ev_collection, eNt_without_lookback);
 	}
 	auto res = _T<BAs...>;
 	// Check if always part is present
@@ -630,7 +628,7 @@ nso<BAs...> transform_to_eventual_variables(const nso<BAs...>& fm) {
 			if (max_lookback == 0) res = shift_io_vars_in_fm(res, aw_io_vars, 1);
 			res = build_wff_and(
 				res, build_wff_sometimes(
-					build_wff_eq(build_bf_neg(ev_collection))));
+					build_wff_eq(ev_collection)));
 		}
 	} else {
 		// Conjunct new sometimes part if present
@@ -638,7 +636,7 @@ nso<BAs...> transform_to_eventual_variables(const nso<BAs...>& fm) {
 			res = build_wff_always(ev_assm);
 			res = build_wff_and(
 				res, build_wff_sometimes(
-					build_wff_eq(build_bf_neg(ev_collection))));
+					build_wff_eq(ev_collection)));
 		} else return fm;
 	}
 
