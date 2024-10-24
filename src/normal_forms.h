@@ -759,12 +759,36 @@ auto lex_var_comp = [](const auto x, const auto y) {
 	return xx < yy;
 };
 
+// In conversions to bdd, the following atomic formulas and terms are treated
+// as variables
+inline auto is_wff_bdd_var = [](const auto& n) {
+		using tp = tau_parser;
+		assert(!is_non_terminal(tp::bf_neq, n));
+		return is_child_non_terminal(tp::bf_eq, n)
+			|| is_child_non_terminal(tp::wff_ref, n)
+			|| is_child_non_terminal(tp::wff_ex, n)
+			|| is_child_non_terminal(tp::wff_sometimes, n)
+			|| is_child_non_terminal(tp::wff_always, n)
+			|| is_child_non_terminal(tp::wff_all, n)
+			|| is_child_non_terminal(tp::constraint, n);
+};
+
+inline auto is_bf_bdd_var = [](const auto& n) {
+		using tp = tau_parser;
+		return is_child_non_terminal(tp::variable, n) ||
+				is_child_non_terminal(tp::capture, n) ||
+				is_child_non_terminal(tp::bf_ref, n) ||
+				is_child_non_terminal(tp::bf_constant, n) ||
+				is_child_non_terminal(tp::uninterpreted_constant, n);
+};
+// ------------------------------
+
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template<typename... BAs>
-void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const int_t p) {
-	auto is_var = [](const nso<BAs...>& n){return
-		is_child_non_terminal(tau_parser::variable, n) ||
-			is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
+void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const int_t p, const auto& is_var) {
+	// auto is_var = [](const nso<BAs...>& n){return
+	// 	is_child_non_terminal(tau_parser::variable, n) ||
+	// 		is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
 	auto cvars = select_all(fm, is_var);
 	std::set<nso<BAs...>> cur_vars(std::make_move_iterator(cvars.begin()),
               std::make_move_iterator(cvars.end()));
@@ -777,24 +801,38 @@ void elim_vars_in_assignment (const auto& fm, const auto&vars, auto& i, const in
 
 // Declaration of functions used in assign_and_reduce which are implemented later
 template<typename... BAs>
-nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf = false, bool all_reductions = true);
+nso<BAs...> reduce2(const nso<BAs...>& fm, size_t type, bool is_cnf = false, bool all_reductions = true, bool enable_sort = true);
+template<typename... BAs>
+nso<BAs...> to_dnf2(const nso<BAs...>&, bool is_wff = true);
+template<typename... BAs>
+nso<BAs...> to_cnf2(const nso<BAs...>&, bool is_wff = true);
+template<typename... BAs>
+nso<BAs...> push_negation_in(const nso<BAs...>&, bool is_wff = true);
 
 // Create assignment in formula and reduce resulting clause
 template<typename... BAs>
-bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, vector<int_t>& i, auto& dnf, int_t p) {
+bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars,
+	vector<int_t>& i, auto& dnf, const auto& is_var, int_t p = 0, bool is_wff = false) {
 	// Check if all variables are assigned
 	if((int_t)vars.size() == p) {
-		// Normalize tau subformulas
-		auto fm_simp = fm
-					| (nso_transform<BAs...>)normalize_ba<BAs...>
-		 			| repeat_all<step<BAs...>, BAs...>(to_nnf_bf<BAs...>)
-		 			| repeat_all<step<BAs...>, BAs...>(nnf_to_dnf_bf<BAs...>);
-		// Simplify coefficient
-		fm_simp = reduce2(fm_simp, tau_parser::bf);
+		nso<BAs...> fm_simp;
+		if (!is_wff) {
+			// fm is a Boolean function
+			// Normalize tau subformulas
+			fm_simp = fm | (nso_transform<BAs...>)normalize_ba<BAs...>;
+			fm_simp = to_dnf2(fm_simp, false);
+			fm_simp = reduce2(fm_simp, tau_parser::bf);
 
-		// Do not add to dnf if the coefficient is 0
-		if(is_non_terminal(tau_parser::bf_f, fm_simp->child[0]))
-			return false;
+			// Do not add to dnf if the coefficient is 0
+			if (is_non_terminal(tau_parser::bf_f, fm_simp->child[0]))
+				return false;
+		} else {
+			// fm is a Tau formula
+			fm_simp = to_dnf2(fm);
+			fm_simp = reduce2(fm_simp, tau_parser::wff);
+			if (is_child_non_terminal(tau_parser::wff_f, fm_simp))
+				return false;
+		}
 		if(ranges::all_of(i, [](const auto el) {return el == 2;})) {
 			//bool t = is_non_terminal(tau_parser::bf_t, fm->child[0]);
 			return dnf.emplace(fm_simp, vector(0, i)), true;
@@ -810,30 +848,32 @@ bool assign_and_reduce(const nso<BAs...>& fm, const vector<nso<BAs...>>& vars, v
 	}
 	// variable was already eliminated
 	if (i[p] == 2) {
-		if (assign_and_reduce(fm, vars, i, dnf, p+1)) return true;
+		if (assign_and_reduce(fm, vars, i, dnf, is_var, p+1, is_wff)) return true;
 		i[p] = 0;
 		return false;
 	}
 	// Substitute 1 and 0 for v and simplify
 	const auto& v = vars[p];
-	map<nso<BAs...>, nso<BAs...>> c = {{v, _1<BAs...>}};
+	auto t = is_wff ? _T<BAs...> : _1<BAs...>;
+	auto f = is_wff ? _F<BAs...> : _0<BAs...>;
+	map<nso<BAs...>, nso<BAs...>> c = {{v, t}};
 	auto fm_v1 = replace(fm, c);
-	c = {{v, _0<BAs...>}};
+	c = {{v, f}};
 	auto fm_v0 = replace(fm, c);
 
-	elim_vars_in_assignment<BAs...>(fm_v1, vars, i, p);
+	elim_vars_in_assignment<BAs...>(fm_v1, vars, i, p, is_var);
 	if(fm_v1 == fm_v0) {
 		i[p] = 2;
-		if (assign_and_reduce(fm_v1, vars, i, dnf, p+1)) return true;
+		if (assign_and_reduce(fm_v1, vars, i, dnf, is_var, p+1, is_wff)) return true;
 		i[p] = 0;
 	} else {
 		i[p] = 1;
-		if (assign_and_reduce(fm_v1, vars, i, dnf, p+1)) return true;
+		if (assign_and_reduce(fm_v1, vars, i, dnf, is_var, p+1, is_wff)) return true;
 		i[p] = 0;
 
-		elim_vars_in_assignment<BAs...>(fm_v0, vars, i, p);
+		elim_vars_in_assignment<BAs...>(fm_v0, vars, i, p, is_var);
 		i[p] = -1;
-		if (assign_and_reduce(fm_v0, vars, i, dnf, p+1)) return true;
+		if (assign_and_reduce(fm_v0, vars, i, dnf, is_var, p+1, is_wff)) return true;
 		i[p] = 0;
 	}
 	return false;
@@ -846,15 +886,9 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 	// Function can only be applied to a BF
 	assert(is_non_terminal(tau_parser::bf, fm));
 #ifdef TAU_CACHE
-	static map<nso<BAs...>, nso<BAs...>> bf_cache_disjoint;
-	static map<nso<BAs...>, nso<BAs...>> bf_cache_nondisjoint;
-	if (make_paths_disjoint) {
-		if (auto it = bf_cache_disjoint.find(fm);
-			it != bf_cache_disjoint.end()) return it->second;
-	} else {
-		if (auto it = bf_cache_nondisjoint.find(fm);
-			it != bf_cache_nondisjoint.end()) return it->second;
-	}
+	static map<pair<nso<BAs...>, bool>, nso<BAs...>> cache;
+    if (auto it = cache.find(make_pair(fm, make_paths_disjoint));
+    		it != cache.end()) return it->second;
 #endif //TAU_CACHE
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
@@ -870,7 +904,7 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 	// Key is coefficient, value is possible variable assignments for coefficient
 	map<nso<BAs...>, vector<vector<int_t>>> dnf;
 
-	if(assign_and_reduce(fm, vars, i, dnf, 0)) {
+	if(assign_and_reduce(fm, vars, i, dnf, is_var, 0)) {
 		assert(dnf.size() == 1);
 		return dnf.begin()->first;
 	}
@@ -906,14 +940,8 @@ nso<BAs...> bf_boole_normal_form (const nso<BAs...>& fm, bool make_paths_disjoin
 		}
 	}
 #ifdef TAU_CACHE
-	if (make_paths_disjoint) {
-		bf_cache_disjoint.emplace(fm, reduced_dnf);
-		bf_cache_disjoint.emplace(reduced_dnf, reduced_dnf);
-	}
-	else {
-		bf_cache_nondisjoint.emplace(fm, reduced_dnf);
-		bf_cache_nondisjoint.emplace(reduced_dnf, reduced_dnf);
-	}
+		cache.emplace(make_pair(fm, make_paths_disjoint), reduced_dnf);
+		cache.emplace(make_pair(reduced_dnf, make_paths_disjoint), reduced_dnf);
 #endif //TAU_CACHE
 	return reduced_dnf;
 }
