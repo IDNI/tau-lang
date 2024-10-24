@@ -26,6 +26,7 @@ typedef int sym_t;
 
 #include <algorithm>
 #include <iostream>
+#include <vector>
 
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
