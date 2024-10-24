@@ -2241,11 +2241,11 @@ private:
 		for (auto& negative: negatives) {
 			auto n_cte = build_bf_constant(get_constant(negative));
 			auto nn_cte = n_cte ? build_bf_and(neg_positive_cte, n_cte.value()) : neg_positive_cte;
-			auto term = build_bf_and(exp);
+			auto term = build_bf_and<BAs...>(exp);
 			auto nn = build_bf_and(nn_cte, term);
 			lits.insert(build_wff_neq(nn));
 		}
-		return build_wff_and(lits);
+		return build_wff_and<BAs...>(lits);
 	}
 
 	// normalize each bdd path applying Corollary 3.1 from TABA book with few
@@ -2260,7 +2260,7 @@ private:
 			literals negs;
 			for (auto& [_, lits]: remove_redundant_negatives(path.second))
 				negs.insert(lits.begin(), lits.end());
-			return build_wff_neg(build_wff_or(negs));
+			return build_wff_neg(build_wff_or<BAs...>(negs));
 		}
 
 		// otherwise, let us consider lits the set of literals to be returned
@@ -2274,7 +2274,7 @@ private:
 			// - if no positive literal has the same exponent as n, we add n to
 			//   the literals
 			if (!squeezed_positives.contains(negative_exponent)) {
-				squeezed_negatives[negative_exponent].insert(build_wff_neg(build_wff_or(negatives))); continue;
+				squeezed_negatives[negative_exponent].insert(build_wff_neg(build_wff_or<BAs...>(negatives))); continue;
 			}
 			// - if the positive literal has 1 as constant we return F,
 			if (!get_constant(squeezed_positives[negative_exponent]).has_value())
@@ -2293,7 +2293,7 @@ private:
 		for (auto [_, positive]: squeezed_positives)
 			result.insert(positive);
 		// and return the conjunction of all the lits
-		return build_wff_and(result);
+		return build_wff_and<BAs...>(result);
 	}
 
 	bdd_path get_relative_path(const bdd_path& path, const literal& lit) const {
