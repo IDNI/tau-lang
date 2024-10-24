@@ -22,8 +22,10 @@ struct logging_initializer {
 	logging_initializer() {
 		using namespace boost::log;
 		core::get()->set_filter(trivial::severity >= trivial::info);
-		add_console_log(std::cout, keywords::format =
-			expressions::stream << expressions::smessage);
+		static bool initialize_console_log = true;
+		if (initialize_console_log) initialize_console_log = false,
+			add_console_log(std::cout, keywords::format =
+				expressions::stream << expressions::smessage);
 	}
 };
 inline static logging_initializer initialize_logging;
