@@ -334,6 +334,7 @@ nso<BAs...> find_fixpoint_chi (const nso<BAs...>& base_fm, const auto& io_vars,
 	int_t lookback = get_max_shift(io_vars);
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
+
 	while (step_num < max(max_initial_condition, lookback)
 		|| !are_nso_equivalent(chi_prev, chi))
 	{
@@ -421,15 +422,15 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 		auto flag_rule2 = build_flag_on_lookback<BAs...>(ss.str(), ctnvar, lookback);
 		if (ctn | p::ctn_greater || ctn | p::ctn_greater_equal) {
 			// Add flag rule _fk[lookback] = 1 -> _fk[lookback-1] = 1
-			auto flag_rule = build_wff_imply(to_eq_1(flag_rule1),
-				to_eq_1(flag_rule2));
+			auto flag_rule = build_wff_or(
+				build_wff_eq(flag_rule1), to_eq_1(flag_rule2));
 			// Conjunct flag rule with formula
 			fm = build_wff_and(fm, flag_rule);
 		} else {
 			// Flag is of type less or less_equal
 			// Add flag rule _fk[lookback] = 0 -> _fk[lookback-1] = 0
-			auto flag_rule = build_wff_imply(build_wff_eq(flag_rule1),
-				build_wff_eq(flag_rule2));
+			auto flag_rule = build_wff_or(
+				to_eq_1(flag_rule1), build_wff_eq(flag_rule2));
 			// Conjunct flag rule with formula
 			fm = build_wff_and(fm, flag_rule);
 		}
@@ -583,7 +584,7 @@ nso<BAs...> transform_to_eventual_variables(const nso<BAs...>& fm) {
 
 		std::stringstream ss; ss << "_e" << n;
 		// Build the eventual var flags based on the maximal lookback
-		auto eNt_without_lookback = build_io_out<BAs...>(ss.str(), "t");
+		auto eNt_without_lookback = wrap(p::bf, build_io_out<BAs...>(ss.str(), "t"));
 		auto eNt = build_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
 		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
 
@@ -655,11 +656,11 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation, co
 
 	using p = tau_parser;
 	assert(has_no_boolean_combs_of_models(ubd_aw_continuation));
-	assert(is_non_terminal(p::wff_always, ubd_aw_continuation));
-	assert(is_non_terminal(p::wff_sometimes, ev_var_flags));
+	// assert(is_non_terminal(p::wff_always, ubd_aw_continuation));
+	assert(is_child_non_terminal(p::wff_sometimes, ev_var_flags));
 
 	auto st_flags = trim2(ev_var_flags);
-	auto aw = trim2(ubd_aw_continuation);
+	auto aw = ubd_aw_continuation;
 
 	vector<nso<BAs...>> io_vars = select_top(aw,
 			is_child_non_terminal<p::io_var, BAs...>);
@@ -676,12 +677,13 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation, co
 
 	// Calculate fix point and get unbound continuation
 	int_t time_point = get_max_shift(io_vars);
-	st_flags = shift_io_vars_in_fm(st_flags, st_io_vars, time_point);
+	st_flags = shift_io_vars_in_fm(st_flags, st_io_vars, time_point - 1);
+	// cout << "chi base: " << build_wff_and(aw, st_flags) << "\n";
 	nso<BAs...> chi_inf = find_fixpoint_chi(build_wff_and(aw, st_flags), io_vars,
 		initials, time_point);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End to_unbounded_continuation";
-	return chi_inf;
+	return normalizer_step(chi_inf);
 }
 
 // Assumes a single normalized Tau DNF clause
