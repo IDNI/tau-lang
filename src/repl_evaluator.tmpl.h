@@ -250,9 +250,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		auto [type, value] = check.value();
 		switch (type) {
 		case tau_parser::wff:
-			return to_dnf2(value);
+			return reduce2(to_dnf2(value), tau_parser::wff);
 		case tau_parser::bf:
-			return dnf_bf<tau_ba<BAs...>, BAs...>(value);
+			return reduce2(to_dnf2(value, false), tau_parser::bf);
 		default:
 			cout << "error: invalid argument\n";
 		}
@@ -270,9 +270,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		auto [type, value] = check.value();
 		switch (type) {
 		case tau_parser::wff:
-			return to_cnf2(value);
+			return reduce2(to_cnf2(value), tau_parser::wff, true);
 		case tau_parser::bf:
-			return cnf_bf<tau_ba<BAs...>, BAs...>(value);
+			return reduce2(to_cnf2(value, false), tau_parser::bf, true);
 		default:
 			cout << "error: invalid argument\n";
 		}
@@ -439,7 +439,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		if (auto iter = changes.find(x); iter != changes.end())
 			res = iter->second;
 		else if (x->child == c) res = x;
-		else res = make_node(x->value, move(c));
+		else res = make_node(x->value, c);
 
 		if (marked_quants.contains(x)) {
 			assert(!var_stack.empty());
