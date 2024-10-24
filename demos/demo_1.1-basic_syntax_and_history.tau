@@ -39,7 +39,7 @@ all X ex Y X = 0 && Y = 0  # all and ex stands for universal and existential qua
 # and include constants from the Lindenbaum-Tarski algebra of Propositional Logic
 # represented by BDDs
 
-({X}:sbf) & Y | Z
+{X}:sbf & Y | Z
 
 # The '{type : ... }` syntax denotes constants in the supported types (Boolean algebras).
 # In the above example, as we have a constant in the BDD Boolean algebra corresponding

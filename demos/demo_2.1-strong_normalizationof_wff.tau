@@ -12,13 +12,13 @@ snf x & y != 0
 snf x = 0 || y = 0
 
 # Let us check how the algorithm squeeze the positives
-snf ({x}:sbf) x = 0 && ({y}:sbf) x = 0
+snf {x}:sbf x = 0 && {y}:sbf x = 0
 
 # Let us now show how the algorithm appply the Corollary 3.1 from Taba book
 # to further normalize the formulas:
-snf ({x}:sbf) x = 0 && ({y}:sbf) x != 0
-snf ({x}:sbf) x = 0 && ({y}:sbf) x = 0 && ({z}:sbf) x != 0
-snf ({x}:sbf) x = 0 || ({z}:sbf) x != 0
-snf ({x}:sbf) x != 0 && (({x}:sbf)({y}:sbf)) x != 0
+snf {x}:sbf x = 0 && {y}:sbf x != 0
+snf {x}:sbf x = 0 && {y}:sbf x = 0 && {z}:sbf x != 0
+snf {x}:sbf x = 0 || {z}:sbf x != 0
+snf {x}:sbf x != 0 && {x}:sbf{y}:sbf x != 0
 
 quit # quit the Tau REPL

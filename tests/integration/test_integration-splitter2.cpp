@@ -30,7 +30,7 @@ namespace testing = doctest;
 
 TEST_SUITE("Tau_splitter_tau_coeff") {
 TEST_CASE("Tau_splitter_tau_coeff1") {
-	const char *src = "{xy = 0.}v != 0.";
+	const char *src = "{xy = 0.} v != 0.";
 	auto fm = make_nso_rr_using_factory<tau_ba<bdd_test>, bdd_test>(src).value().main;
 	auto s = tau_splitter(fm, splitter_type::upper);
 	stringstream ss; ss << s;

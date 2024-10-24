@@ -445,13 +445,13 @@ TEST_SUITE("solve_inequality_system") {
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
-	// Case 4.2 of add_minterm_to_disjoint: d = ({a}:sbf&{b}:sbf) x and
+	// Case 4.2 of add_minterm_to_disjoint: d = {a}:sbf&{b}:sbf x and
 	// m = ({a}:sbf|{b}:sbf) x' both have different exponents and
 	// d_cte & m_cte != false, d_cte & ~m_cte = false,  ~d_cte & m_cte = false
 	// and d_cte != 1
-	TEST_CASE("one var (using splitter of one): ({a}:sbf&{b}:sbf) x != 0 && ({a}:sbf|{b}:sbf) x' != 0.") {
+	TEST_CASE("one var (using splitter of one): {a}:sbf&{b}:sbf x != 0 && ({a}:sbf|{b}:sbf) x' != 0.") {
 		const std::vector<std::string> sample =
-			{"({a}:sbf&{b}:sbf) x != 0." , "({a}:sbf|{b}:sbf) x' != 0."};
+			{"{a}:sbf&{b}:sbf x != 0." , "({a}:sbf|{b}:sbf) x' != 0."};
 		CHECK( test_solve_inequality_system(sample) );
 	}
 
@@ -510,9 +510,9 @@ TEST_SUITE("solve_system") {
 		//const char* equality = "{a}:sbf x | {a}:sbf y = 0.";
 		//const std::vector<std::string> inequalities =
 		//	{ "{b}:sbf y x != 0." };
-		const char* equality = "({a}:sbf) x | ({a}:sbf) y = 0.";
+		const char* equality = "{a}:sbf x | {a}:sbf y = 0.";
 		const std::vector<std::string> inequalities =
-			{ "({b}:sbf) y x != 0." };
+			{ "{b}:sbf y x != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
@@ -553,7 +553,7 @@ TEST_SUITE("solve_system") {
 
 	// increasing monotonicity (2)
 	TEST_CASE("x = {a}:sbf && z < y && y != 1") {
-		const char* equality = "(x + {a}:sbf) | z y' = 0.";
+		const char* equality = "x + {a}:sbf | z y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & z' | y' z != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
@@ -561,7 +561,7 @@ TEST_SUITE("solve_system") {
 
 	// increasing monotonicity (2 y1)
 	TEST_CASE("x = {a}:sbf && x < y && y != 1") {
-		const char* equality = "(x + {a}:sbf) | x y' = 0.";
+		const char* equality = "x + {a}:sbf | x y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x' | y' x != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
@@ -569,7 +569,7 @@ TEST_SUITE("solve_system") {
 
 	// increasing monotonicity (2 y2)
 	TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
-		const char* equality = "(x + {a}:sbf {b}:sbf) | x y' = 0.";
+		const char* equality = "x + {a}:sbf {b}:sbf | x y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x'| y' x != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );

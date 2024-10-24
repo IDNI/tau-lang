@@ -71,14 +71,20 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     variable
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ref                                :bf_ref
-                        | (bf _   '|'      _  bf)            :bf_or
-                        | (bf _   '+'      _  bf)            :bf_xor
-                        | (bf ( _ '&' _ | _ ) bf)            :bf_and
+                        | (bf  _ '|' _       bf)             :bf_or
+                        | (bf  _ '+' _       bf)             :bf_xor
+                        | (bf (_ '&' _ | __) bf)             :bf_and
                         | (bf _ "'")                         :bf_neg
                         | '1'                                :bf_t
                         | '0'                                :bf_f
                         |                                     capture
                         |                                     uninterpreted_constant.
+
+# bf_and alternation without a separator between operands
+# bf_and_nosep_1st_op has to be transformed to bf after parsing
+bf_and                 => (bf_parenthesis | variable | bf_splitter
+                        | bf_ref | bf_or | bf_xor | bf_neg | capture
+                        | uninterpreted_constant):bf_and_nosep_1st_op bf.
 
 # constant time constraints
 constraint => ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]")   :ctn_neq

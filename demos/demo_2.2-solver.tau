@@ -4,7 +4,7 @@
 solve x = 0
 solve x = 0 && y = 0
 # Let us now add some (bdd/sbf) constants
-solve ({a}:sbf) x = 0
+solve {a}:sbf x = 0
 # And now, let us add something that requieres splitters (bdd/sbf)
 solve x != 0 && x' != 0
 # Let us now add some more complex formulas, ones involving tau splitters

@@ -1325,6 +1325,35 @@ sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
 	return replace<node>(code, changes);
 }
 
+template<typename... BAs>
+struct bf_and_nosep_1st_op_transformer {
+       using p = tau_parser;
+       using node = sp_tau_node<BAs...>;
+       node operator()(const node& n) {
+               if (auto it = changes.find(n); it != changes.end())
+                       return it->second;
+               if (is_non_terminal<BAs...>(p::bf_and_nosep_1st_op, n))
+                       return changes[n] = wrap(p::bf, n->child);
+               bool changed = false;
+               std::vector<sp_tau_node<BAs...>> child;
+               for (node& c : n->child)
+                       if (changes.contains(c)) changed = true,
+                                               child.push_back(changes[c]);
+                       else child.push_back(c);
+               node nn = make_node<tau_sym<BAs...>>(n->value, child);
+               if (changed) changes[n] = nn;
+               return nn;
+       }
+       std::map<node, node> changes;
+};
+
+template<typename...BAs>
+sp_tau_node<BAs...> process_bf_and_nosep_1st_op(const sp_tau_node<BAs...>& tau_code) {
+       bf_and_nosep_1st_op_transformer<BAs...> transformer;
+       return post_order_traverser<bf_and_nosep_1st_op_transformer<BAs...>,
+               all_t, sp_tau_node<BAs...>>(transformer, all)(tau_code);
+}
+
 // create tau code from tau source
 template<typename... BAs>
 // TODO (LOW) should depend on node_t instead of BAs...
@@ -1344,7 +1373,8 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 		process_defs_input_variables(
 		process_offset_variables(
 		process_quantifier_vars(
-		process_digits(tau_code)))));
+		process_bf_and_nosep_1st_op(
+		process_digits(tau_code))))));
 }
 
 // make a library from the given tau source.
