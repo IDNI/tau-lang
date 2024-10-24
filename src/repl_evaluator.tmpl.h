@@ -886,17 +886,20 @@ void repl_evaluator<BAs...>::set_cmd(
 	{ tau_parser::indenting_opt,   [&]() {
 		get_bool_value(pretty_printer_indenting); } },
 	{ tau_parser::severity_opt, [&]() {
-		auto sev = v | tau_parser::severity;
-		if (!sev.has_value()) {
-			cout << "error: invalid severity value\n"; return; }
-		opt.severity = nt2severity(sev
-			| only_child_extractor<tau_ba<BAs...>, BAs...>
-			| non_terminal_extractor<tau_ba<BAs...>, BAs...>
-			| optional_value_extractor<size_t>);
+		if (vt == tau_parser::option_value_true)
+			opt.severity = boost::log::trivial::trace;
+		else {
+			auto sev = v | tau_parser::severity;
+			if (!sev.has_value()) {	cout
+				<< "error: invalid severity value\n"; return; }
+			opt.severity = nt2severity(sev
+				| only_child_extractor<tau_ba<BAs...>, BAs...>
+				| non_terminal_extractor<tau_ba<BAs...>, BAs...>
+				| optional_value_extractor<size_t>);
+		}
 		boost::log::core::get()->set_filter(
 			boost::log::trivial::severity >= opt.severity);
-		}
-	}};
+	} } };
 	setters[get_opt(option.value())]();
 	get_cmd(n);
 }
@@ -1012,7 +1015,7 @@ std::string repl_evaluator<BAs...>::prompt() {
 		std::stringstream status;
 		if (m.size()) status << " " << TC_STATUS_OUTPUT << "%"
 			<< m.size() << TC.CLEAR() << TC_STATUS;
-		if (opt.severity != trivial::error)
+		if (opt.severity != trivial::info)
 			status << " " << to_string(opt.severity);
 		if (status.tellp()) ss << TC_STATUS << "["
 			<< status.str() << " ]" << TC.CLEAR() << " ";
