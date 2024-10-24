@@ -2123,8 +2123,7 @@ sp_tau_node<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_and_constant(
-	const std::set<std::variant<BAs...>>& ctes)
+sp_tau_node<BAs...> build_bf_and_constant( const auto& ctes)
 {
 	if (ctes.empty()) return _1<BAs...>;
 
@@ -2135,8 +2134,7 @@ sp_tau_node<BAs...> build_bf_and_constant(
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_or_constant(
-	const std::set<std::variant<BAs...>>& ctes)
+sp_tau_node<BAs...> build_bf_or_constant( const auto& ctes)
 {
 	if (ctes.empty()) return _0<BAs...>;
 
@@ -2179,9 +2177,9 @@ sp_tau_node<BAs...> build_wff_and(const sp_tau_node<BAs...>& l,
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_and(const std::set<sp_tau_node<BAs...>>& wffs) {
+sp_tau_node<BAs...> build_wff_and(const auto& wffs) {
 	return std::accumulate(wffs.begin(), wffs.end(), _T<BAs...>,
-		[](const auto& l, const auto& r) {return build_wff_and(l, r);});
+		[](const auto& l, const auto& r) {return build_wff_and<BAs...>(l, r);});
 }
 
 template<typename... BAs>
@@ -2192,9 +2190,9 @@ sp_tau_node<BAs...> build_wff_or(const sp_tau_node<BAs...>& l,
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_or(const std::set<sp_tau_node<BAs...>>& wffs) {
+sp_tau_node<BAs...> build_wff_or(const auto& wffs) {
 	return std::accumulate(wffs.begin(), wffs.end(), _F<BAs...>,
-		[](const auto& l, const auto& r) { return build_wff_or(l, r);});
+		[](const auto& l, const auto& r) { return build_wff_or<BAs...>(l, r);});
 }
 
 template<typename... BAs>
@@ -2276,9 +2274,9 @@ sp_tau_node<BAs...> build_bf_and(const sp_tau_node<BAs...>& l,
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_and(const std::set<sp_tau_node<BAs...>>& bfs) {
+sp_tau_node<BAs...> build_bf_and(const auto& bfs) {
 	return std::accumulate(bfs.begin(), bfs.end(), _1<BAs...>,
-		[](const auto& l, const auto& r) { return build_bf_and(l, r);});
+		[](const auto& l, const auto& r) { return build_bf_and<BAs...>(l, r);});
 }
 
 template<typename... BAs>
@@ -2289,9 +2287,9 @@ sp_tau_node<BAs...> build_bf_or(const sp_tau_node<BAs...>& l,
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_or(const std::set<sp_tau_node<BAs...>>& bfs) {
+sp_tau_node<BAs...> build_bf_or(const auto& bfs) {
 	return std::accumulate(bfs.begin(), bfs.end(), _0<BAs...>,
-		[](const auto& l, const auto& r) { return build_bf_or(l, r); });
+		[](const auto& l, const auto& r) { return build_bf_or<BAs...>(l, r); });
 }
 
 template<typename... BAs>
