@@ -503,19 +503,13 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& phi_i
 
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> phi_inf, input_t& inputs, output_t& outputs) {
-	// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
-	// convert phi_inf to dnf
-	auto dnf = phi_inf
-		| repeat_each<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>);
 	// compute the different systems to be solved
-	auto systems = compute_systems(dnf, inputs, outputs);
+	auto systems = compute_systems(phi_inf, inputs, outputs);
 	if (!systems) return {}; // error
 	// compute the initial time point for execution
-	size_t initial_execution_time = compute_initial_execution_time(dnf);
+	size_t initial_execution_time = compute_initial_execution_time(phi_inf);
 	// compute initial memory
-	auto memory = compute_initial_memory(dnf, initial_execution_time, inputs);
+	auto memory = compute_initial_memory(phi_inf, initial_execution_time, inputs);
 	if (!memory) return {}; // error
 	//after the bove, we have the interpreter ready to be used.
 	return interpreter<BAs...>{ systems.value(), memory.value(), initial_execution_time };
