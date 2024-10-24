@@ -285,7 +285,7 @@ nso<BAs...> build_step(const nso<BAs...>& original_fm,
 
 template<typename... BAs>
 nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& ctn_initials,
-	const auto& io_vars, const auto& initials, const int_t time_point) {
+	const auto& io_vars, const auto& initials, const int_t time_point, bool raw = false) {
 	nso<BAs...> phi_prev = build_initial_step(base_fm, io_vars, time_point);
 	phi_prev = build_wff_and(ctn_initials, phi_prev);
 	int_t step_num = 1;
@@ -315,7 +315,7 @@ nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& ct
 	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
 	BOOST_LOG_TRIVIAL(debug) << phi_prev;
-	return phi_prev;
+	return raw ? phi : phi_prev;
 }
 
 template<typename... BAs>
@@ -541,7 +541,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	// Calculate fix point and get unbound continuation of fm
 	int_t time_point = get_max_shift(io_vars);
 	nso<BAs...> phi_inf =
-		find_fixpoint_phi(fm, flag_initials, io_vars, initials, time_point);
+		find_fixpoint_phi(fm, flag_initials, io_vars, initials, time_point, true);
 	nso<BAs...> res;
 	if (is_raw_unbound_continuation_satisfiable(phi_inf)) {
 		int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
