@@ -48,6 +48,15 @@ template<typename T, typename V> bool hasv(const T& t, const V& v) {
 	return std::find(t.begin(), t.end(), v) != t.end();
 }
 
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
+	os << "[";
+	for (size_t i=0; i < vec.size(); ++i)
+		if (i+1 < vec.size()) os << vec[i] << ",";
+	if (!vec.empty()) os << vec.back();
+	os << "]";
+	return os;
+}
 //-----------------------------------------------------------------------------
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
 #ifndef GIT_DESCRIBED
