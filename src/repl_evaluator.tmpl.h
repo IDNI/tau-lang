@@ -513,7 +513,6 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		| repeat_all<step<tau_ba<BAs...>, BAs...>,
 			tau_ba<BAs...>, BAs...>(
 				to_dnf_wff<tau_ba<BAs...>, BAs...>
-				| simplify_wff<tau_ba<BAs...>, BAs...>
 				| simplify_wff<tau_ba<BAs...>, BAs...>)
 		| reduce_bf<tau_ba<BAs...>, BAs...>
 		| reduce_wff<tau_ba<BAs...>, BAs...>;

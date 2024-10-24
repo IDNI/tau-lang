@@ -471,13 +471,13 @@ std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
 	};
 
 	#ifdef DEBUG
-	std::cout << "compute_systems/clause: " << clause << "\n";
+	std::cout << "compute_system/clause: " << clause << "\n";
 	#endif // DEBUG
 
 	system<BAs...> sys;
 	for (const auto& literal: select_top(clause, is_literal)) {
 		#ifdef DEBUG
-		std::cout << "compute_systems/literal: " << literal << "\n";
+		std::cout << "compute_system/literal: " << literal << "\n";
 		#endif // DEBUG
 		if (auto l = compute_literal(literal, inputs, outputs); l) {
 			if (sys.find(l.value().first) == sys.end()) sys[l.value().first] = l.value().second;
@@ -492,22 +492,30 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& phi_i
 		input_t& inputs, output_t& outputs) {
 	std::set<system<BAs...>> systems;
 	// split phi_inf in clauses
-	for (auto& clause: get_dnf_wff_clauses(phi_inf))
+	for (auto& clause: get_dnf_wff_clauses(phi_inf)) {
+		std::cout << "compute_systems/clause: " << clause << "\n";
 		if (auto system = compute_system(clause, inputs, outputs); system)
 			systems.insert(system.value());
 		else return {}; // error
+	}
 	return systems;
 }
 
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> phi_inf, input_t& inputs, output_t& outputs) {
+	// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
+	// convert phi_inf to dnf
+	auto dnf = phi_inf
+		| repeat_each<step<BAs...>, BAs...>(
+			to_dnf_wff<BAs...>
+			| simplify_wff<BAs...>);
 	// compute the different systems to be solved
-	auto systems = compute_systems(phi_inf, inputs, outputs);
+	auto systems = compute_systems(dnf, inputs, outputs);
 	if (!systems) return {}; // error
 	// compute the initial time point for execution
-	size_t initial_execution_time = compute_initial_execution_time(phi_inf);
+	size_t initial_execution_time = compute_initial_execution_time(dnf);
 	// compute initial memory
-	auto memory = compute_initial_memory(phi_inf, initial_execution_time, inputs);
+	auto memory = compute_initial_memory(dnf, initial_execution_time, inputs);
 	if (!memory) return {}; // error
 	//after the bove, we have the interpreter ready to be used.
 	return interpreter<BAs...>{ systems.value(), memory.value(), initial_execution_time };
