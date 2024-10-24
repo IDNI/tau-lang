@@ -670,8 +670,8 @@ inline bool reduce_paths (vector<int_t>& i, vector<vector<int_t>>& paths, int_t 
 }
 
 inline void join_paths (vector<vector<int_t>>& paths) {
-	for (size_t i = 0; i < paths.size(); ++i) {
-		for (size_t j = 0; j < paths.size(); ++j) {
+	for (int_t i = 0; i < (int_t)paths.size(); ++i) {
+		for (int_t j = 0; j < (int_t)paths.size(); ++j) {
 			if (i==j) continue;
 			int_t dist = 0, pos = 0;
 			bool subset_relation_decided = false, is_i_subset_of_j = true,
@@ -717,7 +717,6 @@ inline void join_paths (vector<vector<int_t>>& paths) {
 				paths[j][pos] = 2;
 				if (equal) {
 					paths.erase(paths.begin()+i);
-					if (j >= i) --j;
 					--i;
 					break;
 				}
@@ -730,11 +729,11 @@ inline void join_paths (vector<vector<int_t>>& paths) {
 			if (is_i_subset_of_j) {
 				// i -> j
 				paths.erase(paths.begin()+j);
-				if (i >= j) --i;
+				if (i > j) --i;
 				--j;
 			} else {
 				paths.erase(paths.begin()+i);
-				if (j >= i) --j;
+				if (j > i) --j;
 				--i;
 				break;
 			}
