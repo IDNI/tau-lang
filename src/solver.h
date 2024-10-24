@@ -480,7 +480,7 @@ nso<BAs...> get_minterm(const minterm<BAs...>& m) {
 	};
 	auto literals = select_top(m, is_literal);
 	set<nso<BAs...>> all_literals(literals.begin(), literals.end());
-	return build_bf_and(all_literals);
+	return build_bf_and<BAs...>(all_literals);
 }
 
 template<typename...BAs>
