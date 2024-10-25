@@ -148,17 +148,13 @@ TEST_SUITE("Tau_splitter_coeff") {
 
 	TEST_CASE("Tau_splitter_coeff1") {
 		bdd_init<Bool>();
-		// TODO (HIGH) check this one too
-		// const char *sample = "{x3}:sbf&{y}:sbf w != 0.";
 		const char *sample = "{x3}:sbf & {y}:sbf w != 0.";
 		auto src = make_tau_source(sample);
 		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		// cout << s;
-		CHECK((ss.str() == "{ x3 x4 y } w != 0"
-			|| ss.str() == "{ x2 } w != 0"));
+		CHECK(ss.str() == "{ x3 x4 y } w != 0" );
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
@@ -169,9 +165,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		// cout << s;
 		CHECK((ss.str() == "{ x } w != 0"
-			|| ss.str() == "{ y } w != 0"
-			|| ss.str() == "{ x2 } w != 0"));
+			|| ss.str() == "{ y } w != 0" ));
 	}
 }
