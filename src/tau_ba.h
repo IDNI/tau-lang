@@ -88,8 +88,7 @@ struct tau_ba {
 	}
 
 	bool is_one() const {
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nso_rr);
-		return is_tau_formula_sat(normalized);
+		return normalizer<tau_ba<BAs...>, BAs...>(nso_rr) == _T<tau_ba<BAs...>, BAs...>;
 	}
 
 	// the type is ewquivalent to tau_spec<BAs...>
