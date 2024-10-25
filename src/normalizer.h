@@ -306,7 +306,7 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 		imp1 = build_wff_all<BAs...>(v, imp1);
 		imp2 = build_wff_all<BAs...>(v, imp2);
 	}
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << build_wff_and(imp1, imp2);
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- wff: " << build_wff_and(imp1, imp2);
 
 	auto dir1 = normalizer_step<BAs...>(imp1);
 	assert((dir1 == _T<BAs...> || dir1 == _F<BAs...>));

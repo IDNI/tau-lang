@@ -259,10 +259,25 @@ nso<BAs...> build_initial_step(const nso<BAs...>& original_fm,
 }
 
 template<typename... BAs>
+pair<nso<BAs...>, nso<BAs...> > build_initial_step_chi(
+	const nso<BAs...>& phi_inf, const nso<BAs...>& st, auto& io_vars,
+	int_t time_point, auto& pholder_to_st) {
+	map<nso<BAs...>, nso<BAs...>> changes;
+	for (size_t i = 0; i < io_vars.size(); ++i) {
+		auto new_io_var = transform_io_var(io_vars[i], get_io_name(io_vars[i]),
+								time_point);
+		changes[io_vars[i]] = new_io_var;
+	}
+	nso<BAs...> c_pholder = build_io_out_const<BAs...>("_pholder", time_point);
+	pholder_to_st.emplace(c_pholder, replace(st, changes));
+	nso<BAs...> new_fm = build_wff_and(replace(phi_inf, changes), c_pholder);
+	return make_pair(new_fm, c_pholder);
+}
+
+template<typename... BAs>
 nso<BAs...> build_step(const nso<BAs...>& original_fm,
 	const nso<BAs...>& prev_fm, const auto& io_vars, auto& initials, int_t step_num,
-	int_t time_point, nso<BAs...>& cached_fm, bool is_chi = false)
-{
+	int_t time_point, nso<BAs...>& cached_fm) {
 	// Use build_initial_step otherwise
 	assert(step_num > 0);
 	map<nso<BAs...>, nso<BAs...> > changes;
@@ -277,14 +292,85 @@ nso<BAs...> build_step(const nso<BAs...>& original_fm,
 	                                                               initials);
 	q_most_inner_step = universally_quantify_input_streams(q_most_inner_step, io_vars, time_point + step_num,
 	                                                       initials);
-	changes = {{cached_fm, is_chi ? build_wff_or(cached_fm, q_most_inner_step) :
-		build_wff_and(cached_fm, q_most_inner_step)}};
+	changes = {{cached_fm, build_wff_and(cached_fm, q_most_inner_step)}};
 	cached_fm = most_inner_step;
 	return replace(prev_fm, changes);
 }
 
 template<typename... BAs>
-nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& ctn_initials,
+nso<BAs...> build_step_chi(const nso<BAs...>& phi_inf, const nso<BAs...>& st,
+	const nso<BAs...>& prev_fm, const auto& io_vars, auto& initials, int_t step_num,
+	int_t time_point, auto& cached_fm, auto& pholder_to_st) {
+	// Use build_initial_step otherwise
+	assert(step_num > 0);
+	map<nso<BAs...>, nso<BAs...> > changes;
+	for (size_t i = 0; i < io_vars.size(); ++i) {
+		auto new_io_var = transform_io_var(io_vars[i], get_io_name(io_vars[i]),
+							time_point + step_num);
+		changes[io_vars[i]] = new_io_var;
+	}
+
+	nso<BAs...> c_phi_inf = replace(phi_inf, changes);
+	cout << "Current phi_inf: " << c_phi_inf << "\n";
+	nso<BAs...> c_pholder = build_io_out_const<BAs...>("_pholder", time_point + step_num);
+	nso<BAs...> c_st = replace(st, changes);
+	pholder_to_st.emplace(c_pholder, c_st);
+    cout << "Current sometimes: " << c_st << "\n";
+	auto q_most_inner_step = existentially_quantify_output_streams(
+		build_wff_and(c_phi_inf, c_pholder), io_vars, time_point + step_num,
+		initials);
+	q_most_inner_step = universally_quantify_input_streams(
+		q_most_inner_step, io_vars, time_point + step_num, initials);
+	cout << "Current addition to chi: " << q_most_inner_step << "\n";
+	changes = {{cached_fm, build_wff_or(cached_fm, q_most_inner_step)}};
+	cached_fm = c_pholder;
+	return replace(prev_fm, changes);
+}
+
+// This method is designed to be called on the output of find_fixpoint_phi/chi
+// when the run was started at the earliest well-defined time point
+template<typename... BAs>
+bool is_raw_unbound_continuation_satisfiable (const nso<BAs...>& fm) {
+	using p = tau_parser;
+	auto free_io_vars = get_free_vars_from_nso(fm);
+	vector<nso<BAs...> > io_vars = select_top(fm,
+				is_child_non_terminal<p::io_var, BAs...>);
+	auto initial_comp = [](const auto& v1, const auto& v2) {
+		if (get_io_time_point(v1) < get_io_time_point(v2))
+			return true;
+		if (get_io_time_point(v1) == get_io_time_point(v2)) {
+			if (get_io_name(v2)[0] == 'i') return false;
+			else return true;
+		} else return false;
+	};
+	sort(io_vars.begin(), io_vars.end(), initial_comp);
+
+	// All io_vars in fm have to refer to constant time positions
+	assert(all_of(io_vars.begin(), io_vars.end(),
+		[](const auto& el){return is_io_initial(el);}));
+	auto sat_fm = fm;
+	while(!io_vars.empty()) {
+		if (!free_io_vars.contains(io_vars.back())) {
+			io_vars.pop_back();
+			continue;
+		}
+		auto& v = io_vars.back();
+		if (get_io_name(v)[0] == 'i') sat_fm = build_wff_all(v, sat_fm);
+		else sat_fm = build_wff_ex(v, sat_fm);
+		io_vars.pop_back();
+	}
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula for sat check";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << sat_fm;
+	// cout << "Formula for sat check: " << sat_fm << "\n";
+
+	return is_non_temp_nso_satisfiable(sat_fm);
+}
+
+// (o2[0] != 0 && o2[1] != 0 || o1[0] = 0 && o2[0] != 0 || o2[0] = 0 && o2[1] = 0 && o2[0] != 0 || o2[1] = 0 && o1[0] = 0 && o2[0] != 0) && (o2[1] = 0 || (ex o1[2] (o2[1] != 0 && o2[0] != 0 && o2[2] != 0 || o1[1] = 0 && o2[1] != 0 && o2[0] != 0 || o2[1] = 0 && o2[2] = 0 && o2[0] != 0 || o2[2] = 0 && o1[1] = 0 && o2[0] != 0) && o2[2] = 0))
+
+template<typename... BAs>
+pair<nso<BAs...>, int_t> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& ctn_initials,
 	const auto& io_vars, const auto& initials, const int_t time_point, bool raw = false) {
 	nso<BAs...> phi_prev = build_initial_step(base_fm, io_vars, time_point);
 	phi_prev = build_wff_and(ctn_initials, phi_prev);
@@ -315,42 +401,50 @@ nso<BAs...> find_fixpoint_phi (const nso<BAs...>& base_fm, const nso<BAs...>& ct
 	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
 	BOOST_LOG_TRIVIAL(debug) << phi_prev;
-	return raw ? phi : phi_prev;
+	return raw ? make_pair(phi, step_num) : make_pair(phi_prev, step_num - 1);
 }
 
 template<typename... BAs>
-nso<BAs...> find_fixpoint_chi (const nso<BAs...>& base_fm, const auto& io_vars,
-								const auto& initials, const int_t time_point) {
-	nso<BAs...> chi_prev = build_initial_step(base_fm, io_vars, time_point);
+nso<BAs...> find_fixpoint_chi(const nso<BAs...>& phi_inf, const nso<BAs...>& st,
+			      const auto& io_vars, const auto& initials,
+			      const int_t time_point, bool raw = false) {
+	map<nso<BAs...>, nso<BAs...>> pholder_to_st;
+	auto [chi_prev, cache] = build_initial_step_chi(
+		phi_inf, st, io_vars, time_point, pholder_to_st);
 	int_t step_num = 1;
-	nso<BAs...> cache = chi_prev;
-	nso<BAs...> chi = build_step(base_fm, chi_prev, io_vars,
-		 initials, step_num, time_point, cache, true);
+	nso<BAs...> chi = build_step_chi(phi_inf, st, chi_prev, io_vars,
+		 initials, step_num, time_point, cache, pholder_to_st);
 
-	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << chi;
+	cout << "Continuation at step " << step_num << "\n";
+	cout << "(F) " << replace(chi, pholder_to_st) << "\n";
 
 	int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
 	int_t lookback = get_max_shift(io_vars);
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
 
-	while (step_num < max(max_initial_condition, lookback)
-		|| !are_nso_equivalent(chi_prev, chi))
+	while (step_num < max(max_initial_condition, lookback) || !
+	       are_nso_equivalent(replace(chi_prev, pholder_to_st),
+				  replace(chi, pholder_to_st)))
 	{
 		chi_prev = chi;
 		++step_num;
 
-		chi = build_step(base_fm, chi_prev, io_vars,
-			initials, step_num, time_point, cache, true);
+		chi = build_step_chi(phi_inf, st, chi_prev, io_vars,
+			initials, step_num, time_point, cache, pholder_to_st);
 
-		BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << chi;
+		cout << "Continuation at step " << step_num<< "\n";
+		cout << "(F) " << replace(chi, pholder_to_st) << "\n";
+
+		// Check if current step is satisfiable
+		if (is_raw_unbound_continuation_satisfiable(replace(chi, pholder_to_st))) {
+			// TODO
+		}
 	}
-	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
-		"reached fixpoint after " << step_num - 1 << " steps";
-	BOOST_LOG_TRIVIAL(debug) << chi_prev;
-	return chi_prev;
+	cout << "Unbounded continuation of Tau formula "
+		"reached fixpoint after " << step_num - 1 << " steps"<< "\n";
+	cout << replace(chi_prev, pholder_to_st) << "\n";
+	return raw ? replace(chi, pholder_to_st) : replace(chi_prev, pholder_to_st);
 }
 
 template<typename... BAs>
@@ -450,45 +544,6 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 	return fm;
 }
 
-// This method is designed to be called on the output of find_fixpoint_phi
-// when the run was started at the earliest well-defined time point
-template<typename... BAs>
-bool is_raw_unbound_continuation_satisfiable (const nso<BAs...>& fm) {
-	using p = tau_parser;
-	auto free_io_vars = get_free_vars_from_nso(fm);
-	vector<nso<BAs...> > io_vars = select_top(fm,
-				is_child_non_terminal<p::io_var, BAs...>);
-	auto initial_comp = [](const auto& v1, const auto& v2) {
-		if (get_io_time_point(v1) < get_io_time_point(v2))
-			return true;
-		if (get_io_time_point(v1) == get_io_time_point(v2)) {
-			if (get_io_name(v2)[0] == 'i') return false;
-			else return true;
-		} else return false;
-	};
-	sort(io_vars.begin(), io_vars.end(), initial_comp);
-
-	// All io_vars in fm have to refer to constant time positions
-	assert(all_of(io_vars.begin(), io_vars.end(),
-		[](const auto& el){return is_io_initial(el);}));
-	auto sat_fm = fm;
-	while(!io_vars.empty()) {
-		if (!free_io_vars.contains(io_vars.back())) {
-			io_vars.pop_back();
-			continue;
-		}
-		auto& v = io_vars.back();
-		if (get_io_name(v)[0] == 'i') sat_fm = build_wff_all(v, sat_fm);
-		else sat_fm = build_wff_ex(v, sat_fm);
-		io_vars.pop_back();
-	}
-
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula for sat check";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << sat_fm;
-
-	return is_non_temp_nso_satisfiable(sat_fm);
-}
-
 // Shifts a formula of lookback 0 to previous time step
 template<typename... BAs>
 nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, const int_t shift) {
@@ -508,9 +563,10 @@ nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, con
 // We assume that the formula has run through the normalizer before
 // and is a single always statement
 template<typename... BAs>
-nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
+pair<nso<BAs...>, int_t> always_to_unbounded_continuation(nso<BAs...> fm, bool sat_check = false)
 {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin always_to_unbounded_continuation";
+	BOOST_LOG_TRIVIAL(debug) << "Start fm for always_to_unbound: " << fm << "\n";
 
 	using p = tau_parser;
 	assert(has_no_boolean_combs_of_models(fm));
@@ -541,18 +597,19 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 
 	// Calculate fix point and get unbound continuation of fm
 	int_t time_point = get_max_shift(io_vars);
-	nso<BAs...> phi_inf =
+	auto [phi_inf, step_num] =
 		find_fixpoint_phi(fm, flag_initials, io_vars, initials, time_point, true);
+	if (sat_check) return make_pair(phi_inf, lookback);
 	nso<BAs...> res;
 	if (is_raw_unbound_continuation_satisfiable(phi_inf)) {
 		int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
-		nso<BAs...> unbound_continuation = find_fixpoint_phi(fm, flag_initials, io_vars, initials,
+		auto [unbound_continuation, _ ] = find_fixpoint_phi(fm, flag_initials, io_vars, initials,
 									time_point + point_after_inits);
 		unbound_continuation = normalizer_step(unbound_continuation);
 		res = transform_back_non_initials(unbound_continuation, point_after_inits - 1);
 	} else res = _F<BAs...>;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
-	return res;
+	return make_pair(res, lookback);
 }
 
 // Assumes single normalized Tau DNF clause
@@ -677,7 +734,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation, co
 	int_t time_point = get_max_shift(io_vars);
 	st_flags = shift_io_vars_in_fm(st_flags, st_io_vars, time_point - 1);
 	// cout << "chi base: " << build_wff_and(aw, st_flags) << "\n";
-	nso<BAs...> chi_inf = find_fixpoint_chi(build_wff_and(aw, st_flags), io_vars,
+	nso<BAs...> chi_inf = find_fixpoint_chi(aw, st_flags, io_vars,
 		initials, time_point);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End to_unbounded_continuation";
@@ -695,9 +752,51 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 	auto st = select_top(ev_t, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	assert(st.size() < 2);
 
-	auto aw_ubd = always_to_unbounded_continuation(aw.value());
+	auto [aw_ubd, _ ] = always_to_unbounded_continuation(aw.value());
+	cout << "unbound always: " << aw_ubd << "\n";
 	if (!st.empty()) return to_unbounded_continuation(aw_ubd, st[0]);
 	else return aw_ubd;
+}
+
+template<typename... BAs>
+bool is_tau_formula_sat (const nso<BAs...>& fm) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+
+	using p = tau_parser;
+	auto ev_t = transform_to_eventual_variables(fm);
+	BOOST_LOG_TRIVIAL(trace) << "(I) After eventual variable transformation";
+	BOOST_LOG_TRIVIAL(trace) << "(F) " << ev_t;
+
+	auto aw = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
+	if (!aw.has_value()) return is_non_temp_nso_satisfiable(fm);
+	auto st = select_top(ev_t, is_child_non_terminal<p::wff_sometimes, BAs...>);
+	assert(st.size() < 2);
+
+	auto io_vars = select_top(aw.value(), is_child_non_terminal<p::io_var, BAs...>);
+	auto shifted_aw = shift_io_vars_in_fm(aw.value(), io_vars, 1);
+
+	auto [aw_part, lookback] = always_to_unbounded_continuation(shifted_aw, true);
+	BOOST_LOG_TRIVIAL(trace) << "(I) After conversion of always part to unbounded continuation";
+	BOOST_LOG_TRIVIAL(trace) << "(F) " << aw_part;
+
+	if (st.empty()) return is_raw_unbound_continuation_satisfiable(aw_part);
+
+	auto st_part = push_negation_in(build_wff_neg(trim2(st[0])));
+
+	map<nso<BAs...>, nso<BAs...> > num_change = {
+         {wrap<BAs...>(p::variable, "t"), build_num<BAs...>(lookback)}
+     };
+
+	nso<BAs...> imp = build_wff_imply<BAs...>(aw_part, replace(st_part, num_change));
+    auto vars = get_free_vars_from_nso(imp);
+    for(auto& v: vars) {
+        imp = build_wff_all<BAs...>(v, imp);
+    }
+    auto res = normalizer_step(imp) == _F<BAs...>;
+	BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
+	return res;
 }
 
 /*

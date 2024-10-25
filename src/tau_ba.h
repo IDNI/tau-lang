@@ -16,7 +16,7 @@
 
 #include <iostream>
 
-#include "normalizer.h"
+#include "satisfiability.h"
 #include "splitter.h"
 
 using namespace std;
@@ -83,25 +83,13 @@ struct tau_ba {
 	}
 
 	bool is_zero() const {
-		// TODO (HIGH) replace by satisfability in the future
-		auto vars = get_free_vars_from_nso(nso_rr.main);
-		auto wff = nso_rr.main;
-		for(auto& v: vars) wff = build_wff_all<tau_ba<BAs...>, BAs...>(v, wff);
-		auto nnso_rr = rr<nso<tau_ba<BAs...>, BAs...>>(nso_rr.rec_relations, wff);
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nnso_rr);
-		auto check = normalized | tau_parser::wff_f;
-		return check.has_value();
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nso_rr);
+		return !is_tau_formula_sat(normalized);
 	}
 
 	bool is_one() const {
-		// TODO (HIGH) replace by satisfability in the future
-		auto vars = get_free_vars_from_nso(nso_rr.main);
-		auto wff = build_wff_neg(nso_rr.main);
-		for(auto& v: vars) wff = build_wff_all<tau_ba<BAs...>, BAs...>(v, wff);
-		auto nnso_rr = rr<nso<tau_ba<BAs...>, BAs...>>(nso_rr.rec_relations, wff);
-		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nnso_rr);
-		auto check = normalized | tau_parser::wff_f;
-		return check.has_value();
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nso_rr);
+		return is_tau_formula_sat(normalized);
 	}
 
 	// the type is ewquivalent to tau_spec<BAs...>
@@ -128,17 +116,11 @@ struct tau_ba {
 	}
 };
 
-// TODO (HIGH) give a proper implementation for == operator
-// We assume "other" to be normalized already
 template<typename...BAs>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
-	//auto normalized = normalizer<tau_ba<BAs...>, BAs...>(other.nso_rr);
-	auto is_one = (other.nso_rr.main | tau_parser::wff_t).has_value();
-	auto is_zero = (other.nso_rr.main | tau_parser::wff_f).has_value();
-	return b ? is_one : is_zero ;
+	return b ? other.is_one() : other.is_zero();
 }
 
-// TODO (HIGH) give a proper implementation for != operator
 template<typename...BAs>
 bool operator==(const bool& b, const tau_ba<BAs...>& other) {
 	return other == b;
