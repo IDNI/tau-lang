@@ -76,9 +76,9 @@ struct repl_evaluator {
 				sp_tau_node<tau_ba<BAs...>, BAs...>, size_t>>;
 
 	struct options {
-		options() {};
 		bool status     = true;
 		bool colors     = true;
+		bool charvar    = true;
 #ifdef DEBUG
 		bool debug_repl = true;
 		boost::log::trivial::severity_level
@@ -97,6 +97,7 @@ struct repl_evaluator {
 private:
 
 	int eval_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
+	bool update_charvar(bool value);
 
 	// helpers
 	sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string& src);

@@ -84,11 +84,15 @@ cli::commands tau_commands() {
 		.set_description("program's input"));
 	run.add_option(cli::option("output", 'o', "@stdout")
 		.set_description("program's output"));
+	run.add_option(cli::option("charvar", 'v', true)
+		.set_description("charvar (enabled by default)"));
 	auto& repl = cmds["repl"] = cli::command("repl", "Tau REPL");
 	repl.add_option(cli::option("help", 'h', false)
 		.set_description("detailed information about repl options"));
 	repl.add_option(cli::option("evaluate", 'e', "")
 		.set_description("repl command to evaluate"));
+	repl.add_option(cli::option("charvar", 'v', true)
+		.set_description("charvar (enabled by default)"));
 	return cmds;
 }
 
@@ -189,10 +193,15 @@ int main(int argc, char** argv) {
 	// if cmd's --help/-h option is true, print cmd's help and exit
 	if (cmd.get<bool>("help")) return cl.help(cmd), 0;
 
+	// set charvar
+	bool charvar = cmd.get<bool>("charvar");
+	tau_parser::instance().get_grammar().set_enabled_productions({
+		charvar ? "charvar" : "var" });
+
 	// repl command
 	if (cmd.name() == "repl") {
 		string e = cmd.get<string>("evaluate");
-		repl_evaluator<bdd_binding> re;
+		repl_evaluator<bdd_binding> re({ .charvar = charvar });
 		if (e.size()) return re.eval(e), 0;
 		repl<decltype(re)> r(re, "tau> ", ".tau_history");
 		re.prompt();

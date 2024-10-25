@@ -838,6 +838,8 @@ void repl_evaluator<BAs...>::get_cmd(
 		cout << "status:            " << pbool[opt.status] << "\n"; } },
 	{ tau_parser::colors_opt,     [this]() {
 		cout << "colors:            " << pbool[opt.colors] << "\n"; } },
+	{ tau_parser::charvar_opt,     [this]() {
+		cout << "charvar:           " << pbool[opt.charvar] << "\n"; } },
 	{ tau_parser::hilighting_opt, [this]() {
 		cout << "syntax hilighting: " << pbool[pretty_printer_hilighting] << "\n"; } },
 	{ tau_parser::indenting_opt,  [this]() {
@@ -902,6 +904,8 @@ void repl_evaluator<BAs...>::set_cmd(
 		get_bool_value(opt.status); } },
 	{ tau_parser::colors_opt,   [&]() {
 		TC.set(get_bool_value(opt.colors)); } },
+	{ tau_parser::charvar_opt,   [&]() {
+		update_charvar(get_bool_value(opt.charvar)); } },
 	{ tau_parser::hilighting_opt,   [&]() {
 		get_bool_value(pretty_printer_hilighting); } },
 	{ tau_parser::indenting_opt,   [&]() {
@@ -939,6 +943,8 @@ void repl_evaluator<BAs...>::toggle_cmd(
 #endif
 	case tau_parser::colors_opt:
 		TC.set(opt.colors = !opt.colors); break;
+	case tau_parser::charvar_opt:
+		opt.charvar = update_charvar(!opt.charvar); break;
 	case tau_parser::hilighting_opt:
 		pretty_printer_hilighting = !pretty_printer_hilighting; break;
 	case tau_parser::indenting_opt:
@@ -1018,6 +1024,13 @@ int repl_evaluator<BAs...>::eval_cmd(
 #endif
 	if (result) memory_store(result.value());
 	return 0;
+}
+
+template<typename... BAs>
+bool repl_evaluator<BAs...>::update_charvar(bool value) {
+	tau_parser::instance().get_grammar().set_enabled_productions({
+		(opt.charvar = value) ? "charvar" : "var" });
+	return value;
 }
 
 template <typename... BAs>

@@ -1948,17 +1948,10 @@ nso<BAs...> build_num(size_t num) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_charvar(const char& name) {
-	return wrap(
-		tau_parser::charvar, make_node<tau_sym<BAs...>>(
-			tau_sym<BAs...>(name), {}));
-}
-
-template<typename... BAs>
 nso<BAs...> build_variable(const char& name) {
 	return wrap(
-		tau_parser::variable, {
-			build_charvar<BAs...>(name) });
+		tau_parser::variable, make_node<tau_sym<BAs...>>(
+			tau_sym<BAs...>(name), {}));
 }
 
 template<typename... BAs>
