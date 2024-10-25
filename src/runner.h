@@ -493,7 +493,9 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& phi_i
 	std::set<system<BAs...>> systems;
 	// split phi_inf in clauses
 	for (auto& clause: get_dnf_wff_clauses(phi_inf)) {
+		#ifdef DEBUG
 		std::cout << "compute_systems/clause: " << clause << "\n";
+		#endif // DEBUG
 		if (auto system = compute_system(clause, inputs, outputs); system)
 			systems.insert(system.value());
 		else return {}; // error
