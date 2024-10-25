@@ -1443,17 +1443,20 @@ pair<vector<int_t>, bool> simplify_path(const vector<int_t>& path,
 	for (const auto& p : pos) {
 		for (auto& neq_clause : cnf_neq_lits){
 			for (auto& n : neq_clause) {
+				// Simplify cases p' = 0&& p != 0 and p = 0 && p' != 0
 				if (p.size() == 1 && n.size() == 1) {
 					if (is_child_non_terminal(tp::bf_neg, p[0])) {
-						if (trim2(p[0]) == n[0]) { n = {}; continue; }
+						if (trim2(p[0]) == n[0]) { n[0] = _1<BAs...>; continue; }
 					} else if (is_child_non_terminal(tp::bf_neg, n[0])) {
-						if (p[0] == trim2(n[0])) { n = {}; continue; }
+						if (p[0] == trim2(n[0])) { n[0] = _1<BAs...>; continue; }
 					}
 				}
+				// Inequality n is unsat if p is subset
 				if (is_ordered_subset(p, n)) {
 					n = {};
 				}
 			}
+			// If all inequalities of the cnf clause are unsat, this path is unsat
 			if (ranges::all_of(neq_clause, [](const auto& el){return el.empty();})) {
 				return {{}, true};
 			}
