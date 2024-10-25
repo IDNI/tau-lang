@@ -162,7 +162,7 @@ struct foutputs {
 			for (const auto& [var, value]: output) {
 				if (auto stream = streams.find(var); stream != streams.end())
 					if (stream->second) stream->second.value() << value << "\n";
-					else std::cout << value << "\n";
+					else std::cout << var << "[" << time_point++ << "] <- " << value << "\n";
 				else return false; // error
 			}
 		}
@@ -177,6 +177,7 @@ struct foutputs {
 
 	std::map<nso<BAs...>, type> types;
 	std::map<nso<BAs...>, std::optional<std::ofstream>> streams;
+	size_t time_point = 0;
 
 private:
 
