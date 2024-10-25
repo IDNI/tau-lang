@@ -71,6 +71,9 @@ f(x) := {a}:sbf x + {b}:sbf x'
 g(x) := {c}:sbf x + {d}:sbf x'
 r o1[t] = f(o1[t-1]) + g(o1[t-2]) 3
 
+# Note that the 3 steps we are requesting are performed after the initial
+# conditions are set.
+
 # In the future we would provide more complex examples, but we
 # guess you have a taste of how the runner works, at least in simple cases.
 #
