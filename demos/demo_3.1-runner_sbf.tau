@@ -6,61 +6,71 @@
 #
 # This demo should work under any *nix flavour due to the paths used for files.
 # To run it under windows you will need to change the paths to the files.
-#
+
 # This demo demonstrate the workings of the runner.
-#
+
 # To run a tau program we need to define input and output variables.
 # If you attemp to run a program without defining the input and output variables,
 # the runner will throw an error.
-#
+
 # The following program just echo the inputs to the outputs, but we have not
 # define inputs yet! So we would get an error.
-#
+
 r i1[t] = o1[t]
-#
+
 # Let us define the inputs for variable i1 from a file (of type sbf)
-#
+
 sbf i1 = ifile("../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in")
-#
+
 # However, we still need to define the output variable. If we try to run the above
 # program, we will still get an error.
-#
+
 r i1[t] = o1[t]
-#
+
 # Let us define the output variable as the console
-#
+
 sbf o1 = console
-#
+
 # In order to check the defined inputs and outputs, we can run the following command:
-#
+
 defs
-#
+
 # Now we can run the program, let say for 5 steps:
-#
+
 r i1[t] = o1[t] 5
-#
+
 # We could also define the ouput as a file, and run a similar program again:
-#
+
 sbf o2 = ofile("/tmp/output_file1")
 r i1[t]' = o2[t] 5
-#
+
 # In order to check the result, you could run the following command, in another console:
 #
 # cat /tmp/output_file1
-#
+
 # You would see the negations of you have seen previously in the console as that
 # is what we have defined as the output.
 # Of course, we could also deal with more comples programs. The above examples are quite
 # simple but are provided to show the basic workings of the runner.
 # Let us consider the following example base on the Fibonacci sequence:
-#
+
 sbf o3 = ofile("/tmp/output_file2")
 r o3[t] = o3[t-1] + o3[t-2] && o3[0] = 1 && o3[1] = 1 7
-#
+
 # We can also solve equations involving inequalities:
-#
-r o1[t] != 0 && o1[t] != 1
-#
+
+r o1[t] != 0 && o1[t] != 1 7
+
+# and also include unconstrained constants:
+
+r o1[t] = <:a> 7
+
+# or use functions:
+
+f(x) := {a}:sbf x + {b}:sbf x'
+g(x) := {c}:sbf x + {d}:sbf x'
+r o1[t] = f(o1[t-1]) + g(o1[t-2]) 3
+
 # In the future we would provide more complex examples, but we
 # guess you have a taste of how the runner works, at least in simple cases.
 #

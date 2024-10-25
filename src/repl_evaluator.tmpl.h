@@ -541,10 +541,31 @@ void repl_evaluator<BAs...>::run_cmd(
 	}
 
 	// running the program
-	if (auto program = get_wff(arg); program) {
+	if (auto check = get_type_and_arg(arg); check) {
 		// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
-		// as we would get a formula in dnf already
-		auto dnf = program.value()
+		// as we would get a formula in dnf already. However, we would need to
+		// kept the application of definitionsand call the computation of phi/chi infinity
+		auto [t, program] = check.value();
+		bool contains_ref = contains(program, tau_parser::ref);
+		rr<nso<tau_ba<BAs...>, BAs...>> rr_ =
+			(contains_ref && t == tau_parser::rr)
+				? make_nso_rr_from_binded_code<
+						tau_ba<BAs...>, BAs...>(program)
+				: rr<nso<tau_ba<BAs...>, BAs...>>(program);
+		if (contains_ref)
+			rr_.rec_relations.insert(rr_.rec_relations.end(),
+				definitions.begin(), definitions.end()),
+			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
+
+		auto applied = program
+			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
+						step<tau_ba<BAs...>, BAs...>(rr_.rec_relations));
+
+		#ifdef DEBUG
+		cout << "applied: " << applied << "\n";
+		#endif // DEBUG
+
+		auto dnf = applied
 			| repeat_each<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
 				to_dnf_wff<tau_ba<BAs...>, BAs...>
 				| simplify_wff<tau_ba<BAs...>, BAs...>);
