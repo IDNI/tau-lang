@@ -14,6 +14,13 @@
 #ifndef __REPL_EVALUATOR_TMPL_H__
 #define __REPL_EVALUATOR_TMPL_H__
 
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/utility/setup/console.hpp>
+#include <limits>
+#include <termios.h>
+
 #include "repl_evaluator.h"
 #include "normalizer.h"
 #include "normal_forms.h"
@@ -22,16 +29,11 @@
 #include "term_colors.h"
 #include "solver.h"
 #include "satisfiability.h"
+#include "runner.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
 #endif // DEBUG
-
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/utility/setup/console.hpp>
-#include <limits>
 
 namespace idni::tau {
 
@@ -531,14 +533,14 @@ void repl_evaluator<BAs...>::run_cmd(
 	}
 
 
-	// do we have a max number of iterations?
-	auto max_iter = std::numeric_limits<size_t>::max();
+	// do we have to set a max number of iterations?
+	/*auto max_iter = std::numeric_limits<size_t>::max();
 	if (n->child.size() > 2) {
 		stringstream ss;
 		ss << n->child[2];
 		auto t = ss.str();
 		max_iter = std::stoul(t);
-	}
+	}*/
 
 	// running the program
 	if (auto check = get_type_and_arg(arg); check) {
@@ -601,6 +603,31 @@ void repl_evaluator<BAs...>::run_cmd(
 		if (outputs.empty()) {
 			std::cout << "error: no output variables defined\n";
 			return;
+		}
+
+		// do we need to bound the computation?
+		auto max_iter = std::numeric_limits<size_t>::max();
+		if (in_vars.empty() && !out_vars.empty()) {
+			// TODO (MEDIUM) maybe we should use an specialized method to get the number of steps
+			std::cout << "no inputs vars defined, how many steps do you want to perform? ";
+			// set proper input mode
+			termios orig_attrs;
+			tcgetattr(STDIN_FILENO, &orig_attrs);
+			termios new_attrs = orig_attrs;
+			new_attrs.c_lflag |= ICANON;  // enable canonical mode
+			new_attrs.c_lflag |= ECHO;    // enable echo
+			tcsetattr(STDIN_FILENO, TCSANOW, &new_attrs);
+			// read input
+			std::string line;
+			std::getline(std::cin, line);
+			// reset previous mode
+			tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
+			try {
+				max_iter = std::stoul(line);
+			} catch (std::exception& e) {
+				std::cout << "error: invalid input\n";
+				return;
+			}
 		}
 
 		std::map<nso<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> current_outputs;

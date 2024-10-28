@@ -71,7 +71,6 @@ struct repl_evaluator {
 	friend struct repl<repl_evaluator<BAs...>>;
 	using memory = nso<tau_ba<BAs...>, BAs...>;
 	using memorys = std::vector<memory>;
-
 	using memory_ref = std::optional<std::pair<
 				sp_tau_node<tau_ba<BAs...>, BAs...>, size_t>>;
 
