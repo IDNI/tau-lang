@@ -27,7 +27,6 @@
 
 namespace idni::tau {
 
-
 using type = std::string;
 
 using filename = std::string;
@@ -85,15 +84,20 @@ struct finputs {
 			if (file) {
 				std::getline(file.value(), line);
 			} else {
+				//TODO (MEDIUM) maybe we should use a repl here with
+				// a prompt for the user to input the value and
+				// a proper history file.
 				std::cout << var << "[" << time_point << "]: ";
-				// get current terminal attributes
+				// set proper input mode
 				termios orig_attrs;
 				tcgetattr(STDIN_FILENO, &orig_attrs);
-				// read from standad input
-				set_canonical_mode(orig_attrs);
+				termios new_attrs = orig_attrs;
+				new_attrs.c_lflag |= ICANON;  // enable canonical mode
+				new_attrs.c_lflag |= ECHO;    // enable echo
+				tcsetattr(STDIN_FILENO, TCSANOW, &new_attrs);
 				std::getline(std::cin, line);
-				// restore original terminal attributes
-				reset_mode(orig_attrs);
+				// reset previous mode
+				tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
 			}
 			if (line.empty()) return {}; // error
 			// TODO MEDIUM add logging in case of error
@@ -114,19 +118,6 @@ struct finputs {
 	std::map<nso<BAs...>, type> types;
 	std::map<nso<BAs...>, std::optional<std::ifstream>> streams;
 	size_t time_point = 0;
-
-private:
-
-	void set_canonical_mode(termios& orig_attrs) {
-		termios new_attrs = orig_attrs;
-		new_attrs.c_lflag |= ICANON;  // enable canonical mode
-		new_attrs.c_lflag |= ECHO;    // enable echo
-		tcsetattr(STDIN_FILENO, TCSANOW, &new_attrs);
-	}
-
-	void reset_mode(const termios& orig_attrs) {
-		tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
-	}
 };
 
 template<typename...BAs>
@@ -539,4 +530,4 @@ void run(const nso<BAs...>& phi_inf, input_t& inputs, output_t& outputs, size_t 
 
 } // namespace idni::tau
 
-# endif //__RUNNER_TMPL_H__
+# endif //__RUNNER_H__
