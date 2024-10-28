@@ -18,9 +18,9 @@
 
 r i1[t] = o1[t]
 
-# Let us define the inputs for variable i1 from a file (of type sbf)
+# Let us define the inputs for variable i1 directly from the console (of type sbf)
 
-sbf i1 = ifile("../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in")
+sbf i1 = console
 
 # However, we still need to define the output variable. If we try to run the above
 # program, we will still get an error.
@@ -35,44 +35,63 @@ sbf o1 = console
 
 defs
 
-# Now we can run the program, let say for 5 steps:
+# Now we can run the program:
 
-r i1[t] = o1[t] 5
+r i1[t] = o1[t]
+0
+1
+0
+1
+0
 
-# We could also define the ouput as a file, and run a similar program again:
+# We could also define the ouput as a file, and run a similar program again.
+# In order to check the result, you could run the following command, in another console:
+
+# cat /tmp/output_file1
 
 sbf o2 = ofile("/tmp/output_file1")
-r i1[t]' = o2[t] 5
-
-# In order to check the result, you could run the following command, in another console:
-#
-# cat /tmp/output_file1
+r i1[t]' = o2[t]
+0
+1
+0
+1
+0
 
 # You would see the negations of you have seen previously in the console as that
 # is what we have defined as the output.
+#
 # Of course, we could also deal with more comples programs. The above examples are quite
 # simple but are provided to show the basic workings of the runner.
 # Let us consider the following example base on the Fibonacci sequence:
 
 sbf o3 = ofile("/tmp/output_file2")
-r o3[t] = o3[t-1] + o3[t-2] && o3[0] = 1 && o3[1] = 1 7
+r o3[t] = o3[t-1] + o3[t-2] && o3[0] = 1 && o3[1] = 1
+7
 
 # We can also solve equations involving inequalities:
 
-r o1[t] != 0 && o1[t] != 1 7
+r o1[t] != 0 && o1[t] != 1
+7
 
 # and also include unconstrained constants:
 
-r o1[t] = <:a> 7
+r o1[t] = <:a>
+7
 
 # or use functions:
 
 f(x) := {a}:sbf x + {b}:sbf x'
 g(x) := {c}:sbf x + {d}:sbf x'
-r o1[t] = f(o1[t-1]) + g(o1[t-2]) 3
+r o1[t] = f(o1[t-1]) + g(o1[t-2])
+3
 
 # Note that the 3 steps we are requesting are performed after the initial
 # conditions are set.
+
+# Of course, we could define inputs for variable from a file (of type sbf)
+
+sbf i2 = ifile("../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in")
+r i2[t]' = o2[t]
 
 # In the future we would provide more complex examples, but we
 # guess you have a taste of how the runner works, at least in simple cases.

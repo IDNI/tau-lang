@@ -83,6 +83,7 @@ struct finputs {
 			std::string line;
 			if (file) {
 				std::getline(file.value(), line);
+				std::cout << line << "\n";
 			} else {
 				//TODO (MEDIUM) maybe we should use a repl here with
 				// a prompt for the user to input the value and
@@ -98,6 +99,7 @@ struct finputs {
 				std::getline(std::cin, line);
 				// reset previous mode
 				tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
+				// TODo (MEDIUM) add echo for input from a file instead of console
 			}
 			if (line.empty()) return {}; // error
 			// TODO MEDIUM add logging in case of error

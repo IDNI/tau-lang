@@ -624,6 +624,7 @@ void repl_evaluator<BAs...>::run_cmd(
 			tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
 			try {
 				max_iter = std::stoul(line);
+				std::cout << line << "\n";
 			} catch (std::exception& e) {
 				std::cout << "error: invalid input\n";
 				return;
@@ -753,7 +754,7 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	if (inputs.size() == 0 && outputs.size() == 0) cout << "i/o variables: empty\n";
 	else std::cout << "i/o variables:\n";
 	for (auto& [var, desc]: inputs) {
-		auto file = desc.second.empty() ? "keyboard" : "ifile(\"" + desc.second + "\")";
+		auto file = desc.second.empty() ? "console" : "ifile(\"" + desc.second + "\")";
 		cout << "\t" << desc.first << " " << var << " = " << file << "\n";
 	}
 	for (auto& [var, desc]: outputs) {
