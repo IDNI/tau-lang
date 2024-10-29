@@ -1177,7 +1177,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "\n"
 
 		<< "Definition commands:\n"
-		<< "  def                    manage defined recurrence relations\n"
+		<< "  def                    show defined recurrence relations and variables\n"
 		<< "\n"
 
 		//<< "Selection commands:\n"
@@ -1247,7 +1247,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  qelim <WFF>            eliminates innermost quantifier in the given WFF\n";
 		break;
 	case tau_parser::run_sym: cout
-		<< "Command r, run ...\n";
+		<< "Command r, run <WFF>\n";
 		break;
 	case tau_parser::solve_sym: cout
 		<< "Command s, solve ...\n";
@@ -1362,8 +1362,20 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  defs or definitions <rr_id>  print rec relation with given id\n";
 		break;
 	case tau_parser::examples_sym: cout
-		<< "examples\n";
-		// TODO (HIGH) show examples
+		<< "examples\n"
+		<< "\n"
+		<< "  # defining an input variables\n"
+		<< "  sbf i1 = console\n"
+		<< "  tau i2 = ifile(\"inputs.in\")\n"
+		<< "\n"
+		<< "  # defining an output variables\n"
+		<< "  sbf o1 = console\n"
+		<< "  tau o2 = ofile(\"outputs.out\")\n"
+		<< "\n"
+		<< "  # defining a rec. relation\n"
+		<< "  rr1 := (x & y) | z\n"
+		<< "  rr2 := ( x = 0 || y = 0) && z = 0\n"
+		<< "\n";
 		break;
 	}
 
