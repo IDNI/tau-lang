@@ -87,7 +87,8 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
 	#ifdef DEBUG
-	std::cout << "find_solution/eq: " << eq << "\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "find_solution/eq: " << eq;
 	#endif // DEBUG
 
 	auto has_no_var = [](const nso<BAs...>& f) {
@@ -95,9 +96,9 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	};
 
 	if (!(eq | tau_parser::bf_eq).has_value()) {
-
 		#ifdef DEBUG
-		std::cout << "find_solution/solution[no_eq]: {}\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "find_solution/solution[no_eq]: {}";
 		#endif // DEBUG
 
 		return {};
@@ -106,7 +107,8 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
 
 	#ifdef DEBUG
-	std::cout << "find_solution/f: " << f << "\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "find_solution/f: " << f;
 	#endif // DEBUG
 
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
@@ -118,20 +120,22 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 		auto solution = make_removed_vars_solution(vars, gh);
 
 		#ifdef DEBUG
-		std::cout << "find_solution/var[0]: " << vars[0] << "\n";
-		std::cout << "find_solution/g: " << g << "\n";
-		std::cout << "find_solution/h: " << h << "\n";
-		std::cout << "find_solution/gh: " << gh << "\n";
-		std::cout << "find_solution/solution[removed_vars]: ";
-		for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";
-		std::cout << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "find_solution/var[0]: " << vars[0] << "\n"
+			<< "find_solution/g: " << g << "\n"
+			<< "find_solution/h: " << h << "\n"
+			<< "find_solution/gh: " << gh << "\n"
+			<< "find_solution/solution[removed_vars]: ";
+		for (const auto& [k, v]: solution)
+			BOOST_LOG_TRIVIAL(trace)
+				<< "\t" << k << " <- " << v << " ";
 		#endif // DEBUG
 
 		if (has_no_var(gh)) {
 			if (gh != _0<BAs...>) {
-
 				#ifdef DEBUG
-				std::cout << "find_solution/solution[gh_no_var,gh_!=_0]: {}\n";
+				BOOST_LOG_TRIVIAL(trace)
+					<< "find_solution/solution[gh_no_var,gh_!=_0]: {}";
 				#endif // DEBUG
 
 				return {};
@@ -141,9 +145,11 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 				solution[vars[0]] = h != _0<BAs...> ? replace(h, changes) : replace(~g, changes) | bf_reduce_canonical<BAs...>();
 
 				#ifdef DEBUG
-				std::cout << "find_solution/solution[gh_no_var,gh=0]: ";
-				for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";
-				std::cout << "\n";
+				BOOST_LOG_TRIVIAL(trace)
+					<< "find_solution/solution[gh_no_var,gh=0]: ";
+				for (const auto& [k, v]: solution)
+					BOOST_LOG_TRIVIAL(trace)
+						<< "\t" << k << " <- " << v << " ";
 				#endif // DEBUG
 
 				return solution;
@@ -157,9 +163,11 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 			else solution[vars[0]] = replace(~g, restricted_copy.value()) | bf_reduce_canonical<BAs...>();
 
 			#ifdef DEBUG
-			std::cout << "find_solution/solution[general]: ";
-			for (const auto& [k, v]: solution) std::cout << k << " <- " << v << " ";
-			std::cout << "\n";
+			BOOST_LOG_TRIVIAL(trace)
+				<< "find_solution/solution[general]: ";
+			for (const auto& [k, v]: solution)
+				BOOST_LOG_TRIVIAL(trace)
+					<< "\t" << k << " <- " << v << " ";
 			#endif // DEBUG
 
 			return solution;
@@ -167,7 +175,8 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	}
 
 	#ifdef DEBUG
-	std::cout << "find_solution/solution[no_var]: {}\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "find_solution/solution[no_var]: {}";
 	#endif // DEBUG
 
 	return {};
@@ -184,7 +193,15 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
 
 	auto s = find_solution(equality);
-	if (!s.has_value()) return {};
+	if (!s.has_value()) {
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "lgrs/solution: {}";
+		#endif // DEBUG
+
+		return {};
+	}
 	auto f = equality
 		| tau_parser::bf_eq
 		| tau_parser::bf
@@ -194,13 +211,16 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 		phi[x_i] = ((z_i & f) + (x_i & ~f)) | bf_reduce_canonical<BAs...>();
 
 	#ifdef DEBUG
-	std::cout << "lgrs/equality: " << equality << "\n";
-	std::cout << "lgrs/solution: ";
-	for (const auto& [k, v] : phi) std::cout << k << " <- " << v << " ";
-	std::cout << "\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "lgrs/equality: " << equality << "\n"
+		<< "lgrs/solution: ";
+	for (const auto& [k, v] : phi)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "\t" << k << " <- " << v << " ";
 	auto copy = phi;
 	auto check = snf_wff(replace(equality, copy));
-	std::cout << "lgrs/check: " << check << "\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "lgrs/check: " << check << "\n";
 	#endif // DEBUG
 
 	return phi;
@@ -288,9 +308,12 @@ private:
 			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
 			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
 		auto current = (cte & choices.back().partial_minterm);
+
 		#ifdef DEBUG
-		std::cout << "make_current_minterm/current: " << current << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "make_current_minterm/current: " << current;
 		#endif // DEBUG
+
 		return current;
 	}
 
@@ -418,11 +441,15 @@ private:
 	minterm_system<BAs...> make_current_minterm_system() {
 		minterm_system<BAs...> minterms;
 		for (auto& it: minterm_iterators) minterms.insert(build_wff_neq(*it));
+
 		#ifdef DEBUG
-		std::cout << "make_current_minterm_system/minterms: ";
-		for (const auto& minterm : minterms) std::cout << minterm << " ";
-		std::cout << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "make_current_minterm_system/minterms: ";
+		for (const auto& minterm: minterms)
+			BOOST_LOG_TRIVIAL(trace)
+				<< "\t" << minterm;
 		#endif // DEBUG
+
 		return minterms;
 	}
 
@@ -549,9 +576,11 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 	// to compute one solution of the resulting system of equalities (squeezed).
 
 	#ifdef DEBUG
-	std::cout << "solve_minterm_system/system: ";
-	for (const auto& minterm : system) std::cout << minterm << " ";
-	std::cout << "\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solve_minterm_system/system: ";
+	for (const auto& minterm : system)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "\t" << minterm;
 	#endif // DEBUG
 
 	// We know the system has a solution as we only iterate over non-negative
@@ -560,7 +589,8 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 	for (auto& neq: make_minterm_system_disjoint<BAs...>(system, splitter_one)) {
 
 		#ifdef DEBUG
-		std::cout << "solve_minterm_system/neq: " << neq << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solve_minterm_system/neq: " << neq;
 		#endif // DEBUG
 
 		auto nf = neq
@@ -596,21 +626,33 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 	// using tthe above solve method.
 
 	#ifdef DEBUG
-	std::cout << "solve_inequality_system/system: ";
-	for (const auto& inequality : system) std::cout << inequality << " ";
-	std::cout << "\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solve_inequality_system/system: ";
+	for (const auto& inequality : system)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "\t" << inequality;
 	#endif // DEBUG
 
 	//for (auto& ms: minterm_inequality_system_range<BAs...>(system)) {
 	for (auto it = minterm_inequality_system_iterator<BAs...>(system); it != minterm_inequality_system_iterator<BAs...>::end; ++it) {
+
 		#ifdef DEBUG
-		std::cout << "solve_inequality_system/minterm system: ";
-		for (const auto& minterm : *it) std::cout << minterm << " ";
-		std::cout << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solve_inequality_system/minterm system: ";
+		for (const auto& minterm : *it)
+			BOOST_LOG_TRIVIAL(trace)
+				<< "\t" << minterm;
 		#endif // DEBUG
+
 		auto solution = solve_minterm_system<BAs...>(*it, splitter_one);
 		if (solution.has_value()) return solution;
 	}
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solve_inequality_system/solution: {}";
+	#endif // DEBUG
+
 	return {};
 }
 
@@ -632,10 +674,16 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 	#ifdef DEBUG
 	if (system.first.has_value())
-		std::cout << "solve_system/eq: " << system.first.value() << "\n";
-	if (!system.second.empty()) std::cout << "solve_system/inequalities: ";
-	for (const auto& inequality : system.second) std::cout << inequality << " ";
-	std::cout << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solve_system/eq: " << system.first.value();
+	if (!system.second.empty()) {
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solve_system/inequalities: ";
+		std::cout << "solve_system/inequalities: ";
+		for (const auto& inequality : system.second)
+			BOOST_LOG_TRIVIAL(trace)
+				<< "\t" << inequality;
+	}
 	#endif // DEBUG
 
 	if (!system.first) return solve_inequality_system<BAs...>(system.second, splitter_one);
@@ -647,18 +695,35 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	// of the equality
 	for (auto& g_i: system.second) {
 		auto nphi = phi.value(), ng_i = replace(g_i, nphi);
-		if (ng_i == _F<BAs...>) return {};
+		if (ng_i == _F<BAs...>) {
+
+			#ifdef DEBUG
+			BOOST_LOG_TRIVIAL(trace)
+				<< "solve_system/inequality_solution: {}";
+			#endif // DEBUG
+
+			return {};
+		}
 		else if (ng_i == _T<BAs...>) continue;
 		inequalities.insert(ng_i);
 	}
 	// solve the given system  of inequalities
 	auto inequality_solution = solve_inequality_system<BAs...>(inequalities, splitter_one);
-	if (!inequality_solution.has_value()) return {};
+	if (!inequality_solution.has_value()) {
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solve_system/inequality_solution: {}";
+		#endif // DEBUG
+
+		return {};
+	}
 	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
 	solution<BAs...> solution;
 
 	#ifdef DEBUG
-	std::cout << "solve_inequality_system/solution: ";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solve_system/inequality_solution: ";
 	#endif // DEBUG
 
 	for (auto& [k, v]: phi.value()) {
@@ -666,7 +731,8 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		solution[k] = replace(v, copy);
 
 		#ifdef DEBUG
-		std::cout << k << " <- " << solution[k] << " ";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "\t" << k << " <- " << solution[k];
 		#endif // DEBUG
 	}
 	return solution;
@@ -706,7 +772,8 @@ std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
 	auto splitter_one = nso_factory<BAs...>::instance().splitter_one(type);
 
 	#ifdef DEBUG
-	std::cout << "solve/form: " << form << "\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solve/form: " << form;
 	#endif // DEBUG
 
 	auto dnf = form | bf_reduce_canonical<BAs...>();
