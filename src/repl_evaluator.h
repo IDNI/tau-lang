@@ -122,7 +122,8 @@ private:
 
 	void get_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
 	void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
-	void toggle_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
+	void update_bool_opt_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
+		const std::function<bool(bool&)>& update_fn);
 
 	void history_print_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
 	void history_store_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
