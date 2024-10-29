@@ -61,9 +61,8 @@ struct finputs {
 			if (this->streams[var]
 				&& !this->streams[var].value().is_open())
 					BOOST_LOG_TRIVIAL(error)
-						<< "Failed to open input file '"
-						<< desc.second << "': "
-						<< std::strerror(errno) << "\n";
+						<< "failed to open input file '"
+						<< desc.second << "': ";
 		}
 	}
 
@@ -101,10 +100,15 @@ struct finputs {
 				tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
 				// TODo (MEDIUM) add echo for input from a file instead of console
 			}
-			if (line.empty()) return {}; // error
-			// TODO MEDIUM add logging in case of error
+			if (line.empty()) return {}; // no more inputs
 			auto cnst = nso_factory<BAs...>::instance().parse(line, types[var]);
-			if (!cnst) return {}; // error
+			if (!cnst) {
+				BOOST_LOG_TRIVIAL(error)
+					<< "failed to parse input value '"
+					<< line << "' for variable '"
+					<< var << "'\n";
+				return {};
+			}
 			current[var] = build_bf_constant(cnst.value());
 		}
 		time_point += 1;
@@ -114,7 +118,10 @@ struct finputs {
 	std::optional<type> type_of(const nso<BAs...>& var) {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
-		return {}; // error
+		BOOST_LOG_TRIVIAL(error)
+			<< "failed to find type for variable: "
+			<< var << "\n";
+		return {};
 	}
 
 	std::map<nso<BAs...>, type> types;
@@ -130,8 +137,6 @@ struct foutputs {
 	foutputs(std::map<nso<BAs...>, std::pair<type, filename>> outputs) {
 		// open the corresponding streams for input and store them in streams
 		for (const auto& [var, desc]: outputs) {
-			//print_sp_tau_node_tree(std::cout, var_desc.first);
-			//std::cout << var_desc.second << "\n";
 			this->types[var] = desc.first;
 			this->streams[var] = desc.second.empty()
 				? std::optional<std::ofstream>()
@@ -156,7 +161,12 @@ struct foutputs {
 				if (auto stream = streams.find(var); stream != streams.end())
 					if (stream->second) stream->second.value() << value << "\n";
 					else std::cout << var << "[" << time_point++ << "] <- " << value << "\n";
-				else return false; // error
+				else {
+					BOOST_LOG_TRIVIAL(error)
+						<< "failed to find output stream for variable '"
+						<< var << "'\n";
+					return false;
+				}
 			}
 		}
 		return true; // success
@@ -165,7 +175,10 @@ struct foutputs {
 	std::optional<type> type_of(const nso<BAs...>& var) {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
-		return {}; // error
+		BOOST_LOG_TRIVIAL(error)
+			<< "failed to find type for variable '"
+			<< var << "'\n";
+		return {};
 	}
 
 	std::map<nso<BAs...>, type> types;
@@ -196,8 +209,9 @@ private:
 		auto [lower, upper] = compute_range(sol);
 
 		#ifdef DEBUG
-		std::cout << "sort/lower: " << lower << "\n";
-		std::cout << "sort/upper: " << upper << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "sort/lower: " << lower << "\n"
+			<< "sort/upper: " << upper << "\n";
 		#endif // DEBUG
 
 		std::vector<assignment<BAs...>> result(upper - lower + 1);
@@ -223,9 +237,12 @@ private:
 
 		#ifdef DEBUG
 		for (size_t i = 0; i < result.size(); ++i) {
-			std::cout << "sort/result/[" << i <<"]: ";
-			for (const auto& [k, v]: result[i]) std::cout << k << " <- " << v << " ";
-			std::cout << "\n";
+			BOOST_LOG_TRIVIAL(trace)
+				<< "sort/result/[" << i <<"]: ";
+			for (const auto& [k, v]: result[i])
+				BOOST_LOG_TRIVIAL(trace)
+					<< "\t" << k << " <- " << v << " ";
+			BOOST_LOG_TRIVIAL(trace) << "\n";
 		}
 		#endif // DEBUG
 
@@ -243,9 +260,12 @@ private:
 
 		#ifdef DEBUG
 		for (size_t i = 0; i < result.size(); ++i) {
-			std::cout << "complete/result/[" << i <<"]: ";
-			for (const auto& [k, v]: result[i]) std::cout << k << " <- " << v << " ";
-			std::cout << "\n";
+			BOOST_LOG_TRIVIAL(trace)
+				<< "complete/result/[" << i <<"]: ";
+			for (const auto& [k, v]: result[i])
+				BOOST_LOG_TRIVIAL(trace)
+					<< "\t" << k << " <- " << v << " ";
+			BOOST_LOG_TRIVIAL(trace) << "\n";
 		}
 		#endif // DEBUG
 
@@ -285,29 +305,37 @@ struct interpreter {
 				auto current = replace(updated, memory_copy);
 
 				#ifdef DEBUG
-				std::cout << "step/type: " << type << "\n";
-				std::cout << "step/equations: " << equations << "\n";
-				std::cout << "step/updated: " << updated << "\n";
-				std::cout << "step/current: " << current << "\n";
-				std::cout << "step/memory: ";
-				for (const auto& [k, v]: memory) std::cout << k << " <- " << v << " ";
-				std::cout << "\n";
+				BOOST_LOG_TRIVIAL(trace)
+					<< "step/type: " << type << "\n"
+					<< "step/equations: " << equations << "\n"
+					<< "step/updated: " << updated << "\n"
+					<< "step/current: " << current << "\n"
+					<< "step/memory: ";
+				for (const auto& [k, v]: memory)
+					BOOST_LOG_TRIVIAL(trace)
+						<< "\t" << k << " <- " << v << " ";
+				BOOST_LOG_TRIVIAL(trace) << "\n";
 				#endif // DEBUG
 
 				auto solution = solve(current, type);
 
 				#ifdef DEBUG
 				if (solution) {
-					std::cout << "step/solution: ";
-					if (solution.value().empty()) std::cout << "{}";
-					else for (const auto& [k, v]: solution.value()) std::cout << k << " <- " << v << " ";
-					std::cout << "\n";
+					BOOST_LOG_TRIVIAL(trace)
+						<< "step/solution: ";
+					if (solution.value().empty())
+						BOOST_LOG_TRIVIAL(trace) << "\t{}";
+					else for (const auto& [k, v]: solution.value())
+						BOOST_LOG_TRIVIAL(trace)
+							<< "\t" << k << " <- " << v << " ";
 					auto copy = solution.value();
 					auto substituted = replace(current, copy);
 					auto check = snf_wff(substituted);
-					std::cout << "step/check: " << check << "\n";
+					BOOST_LOG_TRIVIAL(trace)
+						<< "step/check: " << check << "\n";
 				} else {
-					std::cout << "step/solution: error\n";
+					BOOST_LOG_TRIVIAL(trace)
+						<< "step/solution: no solution\n";
 				}
 				#endif // DEBUG
 
@@ -337,7 +365,9 @@ struct interpreter {
 				return global;
 			}
 		}
-		return {}; // error
+		BOOST_LOG_TRIVIAL(error)
+			<< "empty program\n";
+		return {};
 	}
 
 	// store all the possible systems to be solved, each system corresponds to a
@@ -431,7 +461,11 @@ std::optional<assignment<BAs...>> compute_initial_memory(const nso<BAs...>& /*ph
 		if (auto current = inputs.read(); current)
 			for (const auto& [var, value]: current.value())
 				memory[build_in_variable_at_n(var, n)] = value;
-		else return {}; // error
+		else {
+			BOOST_LOG_TRIVIAL(error)
+				<< "unable to read input at time point " << n << "\n";
+			return {};
+		}
 	}
 	return memory;
 }
@@ -453,7 +487,9 @@ std::optional<std::pair<type, nso<BAs...>>> compute_literal(const nso<BAs...>& l
 				return { make_pair(t.value() , literal) };
 		}
 	}
-	return {}; // error
+	BOOST_LOG_TRIVIAL(error)
+		<< "unable to find variable in literal: " << literal << "\n";
+	return {};
 }
 
 template<typename input_t, typename output_t, typename...BAs>
@@ -465,18 +501,25 @@ std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
 	};
 
 	#ifdef DEBUG
-	std::cout << "compute_system/clause: " << clause << "\n";
+	BOOST_LOG_TRIVIAL(trace)
+		<< "compute_system/clause: " << clause;
 	#endif // DEBUG
 
 	system<BAs...> sys;
 	for (const auto& literal: select_top(clause, is_literal)) {
 		#ifdef DEBUG
-		std::cout << "compute_system/literal: " << literal << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_system/literal: " << literal;
 		#endif // DEBUG
+
 		if (auto l = compute_literal(literal, inputs, outputs); l) {
 			if (sys.find(l.value().first) == sys.end()) sys[l.value().first] = l.value().second;
 			else sys[l.value().first] = build_wff_and(sys[l.value().first], l.value().second);
-		} else return {}; // error
+		} else {
+			BOOST_LOG_TRIVIAL(error)
+				<< "unable to found equations in clause: " << clause << "\n";
+			return {};
+		}
 	}
 	return { sys };
 }
@@ -488,11 +531,17 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& phi_i
 	// split phi_inf in clauses
 	for (auto& clause: get_dnf_wff_clauses(phi_inf)) {
 		#ifdef DEBUG
-		std::cout << "compute_systems/clause: " << clause << "\n";
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/clause: " << clause;
 		#endif // DEBUG
+
 		if (auto system = compute_system(clause, inputs, outputs); system)
 			systems.insert(system.value());
-		else return {}; // error
+		else {
+			BOOST_LOG_TRIVIAL(error)
+				<< "unable to compute system of equations in: " << clause << "\n";
+			return {};
+		}
 	}
 	return systems;
 }
@@ -515,18 +564,28 @@ std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> phi_inf, input_t
 template<typename input_t, typename output_t, typename...BAs>
 void run(const nso<BAs...>& phi_inf, input_t& inputs, output_t& outputs, size_t max_iter = std::numeric_limits<size_t>::max()) {
 	auto intrprtr = make_interpreter(phi_inf, inputs, outputs);
-	if (!intrprtr) {
-		std::cout << "unable to create interpreter\n";
-		return;
-	}
+	if (!intrprtr) return;
 
 	for (size_t i = 0; i < max_iter; ++i) {
 		if (auto current = inputs.read(); current) {
 			if (auto output = intrprtr.value().step(current.value()); output.size()) {
 				if (!outputs.write(output)) return;
-			} else return;
-		// TODO (HIGH) add logging in case of no input
-		} else return;
+			} else {
+				#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(trace)
+					<< "run/output: no more outputs\n";
+				#endif // DEBUG
+
+				return;
+			}
+		} else {
+			#ifdef DEBUG
+			BOOST_LOG_TRIVIAL(trace)
+				<< "run/inputs: no more inputs\n";
+			#endif // DEBUG
+
+			return;
+		}
 	}
 }
 
