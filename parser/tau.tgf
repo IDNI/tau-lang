@@ -61,12 +61,16 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
 # but they are not boolean functions themselves, they return a T/F wff value
 # and hence, should be considered as wffs
                         | (bf    _ "<="  _ bf _ "<=" _ bf)   :bf_interval
-                        | (bf    _ "!="  _ bf)               :bf_neq
                         | (bf    _ '='   _ bf)               :bf_eq
+                        | (bf    _ "!="  _ bf)               :bf_neq
+                        | (bf    _ "<="  _ bf)               :bf_less_equal
                         | (bf    _ "!<=" _ bf)               :bf_nleq
                         | (bf    _ ">"   _ bf)               :bf_greater
-                        | (bf    _ "<="  _ bf)               :bf_less_equal
+                        | (bf    _ "!>"  _ bf)               :bf_ngreater
+                        | (bf    _ ">="  _ bf)               :bf_greater_equal
+                        | (bf    _ "!>=" _ bf)               :bf_ngeq
                         | (bf    _ "<"   _ bf)               :bf_less
+                        | (bf    _ "!<"  _ bf)               :bf_nless
                         |                                     capture.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     bf_constant

@@ -4058,13 +4058,17 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::wff_and,                         480 },
 			{ tau_parser::wff_xor,                         490 },
 			{ tau_parser::wff_neg,                         500 },
-			{ tau_parser::bf_interval,                     510 },
-			{ tau_parser::bf_neq,                          520 },
-			{ tau_parser::bf_eq,                           530 },
-			{ tau_parser::bf_nleq,                         540 },
-			{ tau_parser::bf_greater,                      550 },
-			{ tau_parser::bf_less_equal,                   560 },
-			{ tau_parser::bf_less,                         570 },
+			{ tau_parser::bf_interval,                     501 },
+			{ tau_parser::bf_eq,                           502 },
+			{ tau_parser::bf_neq,                          503 },
+			{ tau_parser::bf_less_equal,                   504 },
+			{ tau_parser::bf_nleq,                         505 },
+			{ tau_parser::bf_greater,                      506 },
+			{ tau_parser::bf_ngreater,                     507 },
+			{ tau_parser::bf_greater_equal,                508 },
+			{ tau_parser::bf_ngeq,                         509 },
+			{ tau_parser::bf_less,                         510 },
+			{ tau_parser::bf_nless,                        511 },
 			{ tau_parser::wff,                             580 },
 			// bf
 			{ tau_parser::bf_has_subformula_cb,            620 },
@@ -4301,12 +4305,16 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::bf_and:         print_bf_and(); break;
 			case tau_parser::bf_or:          infix_nows("|"); break;
 			case tau_parser::bf_xor:         infix_nows("+"); break;
-			case tau_parser::bf_eq:          infix("="); break;
-			case tau_parser::bf_neq:         infix("!="); break;
-			case tau_parser::bf_less:        infix("<"); break;
-			case tau_parser::bf_less_equal:  infix("<="); break;
-			case tau_parser::bf_nleq:        infix("!<="); break;
-			case tau_parser::bf_greater:     infix(">"); break;
+			case tau_parser::bf_eq:             infix("="); break;
+			case tau_parser::bf_neq:            infix("!="); break;
+			case tau_parser::bf_less_equal:     infix("<="); break;
+			case tau_parser::bf_nleq:           infix("!<="); break;
+			case tau_parser::bf_greater:        infix(">"); break;
+			case tau_parser::bf_ngreater:       infix("!>"); break;
+			case tau_parser::bf_greater_equal:  infix(">="); break;
+			case tau_parser::bf_ngeq:           infix("!>="); break;
+			case tau_parser::bf_less:           infix("<"); break;
+			case tau_parser::bf_nless:          infix("!<"); break;
 			case tau_parser::ctn_neq:           infix("!="); break;
 			case tau_parser::ctn_eq:            infix("=");  break;
 			case tau_parser::ctn_greater_equal: infix(">="); break;
