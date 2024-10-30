@@ -101,7 +101,6 @@ private:
 	// helpers
 	sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string& src);
 	boost::log::trivial::severity_level nt2severity(size_t nt) const;
-
 	repl_evaluator<BAs...>::memory_ref memory_retrieve(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
 		bool silent = false);
@@ -113,6 +112,8 @@ private:
 	// returns if a subtree of a node contains a nonterminal
 	bool contains(const nso<tau_ba<BAs...>, BAs...>& n,
 		tau_parser::nonterminal nt);
+	// apply definitions and rr to a program
+	gssotc<BAs...> apply_rr_to_rr_gssotc(const size_t type, const gssotc<BAs...>& program);
 
 	// commands
 	void not_implemented_yet();

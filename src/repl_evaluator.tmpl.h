@@ -112,6 +112,22 @@ void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id,
 	cout << ": " << mem << "\n";
 }
 
+template<typename... BAs>
+gssotc<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_gssotc(const size_t type, const nso<tau_ba<BAs...>, BAs...>& program) {
+	bool contains_ref = contains(program, tau_parser::ref);
+	rr<nso<tau_ba<BAs...>, BAs...>> rr_ =
+		(contains_ref && type == tau_parser::rr)
+			? make_nso_rr_from_binded_code<tau_ba<BAs...>, BAs...>(program)
+			: rr<nso<tau_ba<BAs...>, BAs...>>(program);
+	if (contains_ref)
+		rr_.rec_relations.insert(rr_.rec_relations.end(),
+			definitions.begin(), definitions.end()),
+		rr_ = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_);
+	rr_.main = rr_.main | repeat_all<step<tau_ba<BAs...>, BAs...>,
+		tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(rr_.rec_relations));
+	return rr_.main;
+}
+
 template <typename... BAs>
 void repl_evaluator<BAs...>::history_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
@@ -236,8 +252,9 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	auto arg = n->child[1];
 	auto var = n->child[2];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [_, value] = check.value();
-		return onf<tau_ba<BAs...>, BAs...>(var, value);
+		auto [type, program] = check.value();
+		auto applied = apply_rr_to_rr_gssotc(type, program);
+		return onf<tau_ba<BAs...>, BAs...>(var, applied);
 	}
 	return {};
 }
@@ -249,12 +266,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [type, program] = check.value();
+		auto applied = apply_rr_to_rr_gssotc(type, program);
 		switch (type) {
 		case tau_parser::wff:
-			return reduce2(to_dnf2(value), tau_parser::wff);
+			return reduce2(to_dnf2(program), tau_parser::wff);
 		case tau_parser::bf:
-			return reduce2(to_dnf2(value, false), tau_parser::bf);
+			return reduce2(to_dnf2(program, false), tau_parser::bf);
 		default:
 			cout << "error: invalid argument\n";
 		}
@@ -269,12 +287,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [type, program] = check.value();
+		auto applied = apply_rr_to_rr_gssotc(type, program);
 		switch (type) {
 		case tau_parser::wff:
-			return reduce2(to_cnf2(value), tau_parser::wff, true);
+			return reduce2(to_cnf2(applied), tau_parser::wff, true);
 		case tau_parser::bf:
-			return reduce2(to_cnf2(value, false), tau_parser::bf, true);
+			return reduce2(to_cnf2(applied, false), tau_parser::bf, true);
 		default:
 			cout << "error: invalid argument\n";
 		}
@@ -289,12 +308,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [type, program] = check.value();
+		auto applied = apply_rr_to_rr_gssotc(type, program);
 		switch (type) {
 		case tau_parser::wff:
-			return nnf_wff<tau_ba<BAs...>, BAs...>(value);
+			return nnf_wff<tau_ba<BAs...>, BAs...>(applied);
 		case tau_parser::bf:
-			return nnf_bf<tau_ba<BAs...>, BAs...>(value);
+			return nnf_bf<tau_ba<BAs...>, BAs...>(applied);
 		}
 	}
 	return {};
@@ -307,12 +327,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [type, program] = check.value();
+		auto applied = apply_rr_to_rr_gssotc(type, program);
 		switch (type) {
 		case tau_parser::wff:
-			return mnf_wff<tau_ba<BAs...>, BAs...>(value);
+			return mnf_wff<tau_ba<BAs...>, BAs...>(applied);
 		case tau_parser::bf:
-			return mnf_bf<tau_ba<BAs...>, BAs...>(value);
+			return mnf_bf<tau_ba<BAs...>, BAs...>(applied);
 		}
 	}
 	return {};
@@ -325,12 +346,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [type, program] = check.value();
+		auto applied = apply_rr_to_rr_gssotc(type, program);
 		switch (type) {
 		case tau_parser::wff:
-			return snf_wff<tau_ba<BAs...>, BAs...>(value);
+			return snf_wff<tau_ba<BAs...>, BAs...>(applied);
 		case tau_parser::bf:
-			return snf_bf<tau_ba<BAs...>, BAs...>(value);
+			return snf_bf<tau_ba<BAs...>, BAs...>(applied);
 		}
 	}
 	return {};
@@ -510,14 +532,17 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	repl_evaluator<BAs...>::qelim_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n)
 {
-	auto arg = get_wff(n->child[1]);
-	if (arg) return eliminate_quantifiers<tau_ba<BAs...>, BAs...>(arg.value())
-		| repeat_all<step<tau_ba<BAs...>, BAs...>,
-			tau_ba<BAs...>, BAs...>(
-				to_dnf_wff<tau_ba<BAs...>, BAs...>
-				| simplify_wff<tau_ba<BAs...>, BAs...>)
-		| reduce_bf<tau_ba<BAs...>, BAs...>
-		| reduce_wff<tau_ba<BAs...>, BAs...>;
+	if (auto check = get_type_and_arg(n->child[1]); check) {
+		auto [type, program] = check.value();
+		auto applied = apply_rr_to_rr_gssotc(type, program);
+		return eliminate_quantifiers<tau_ba<BAs...>, BAs...>(applied)
+			| repeat_all<step<tau_ba<BAs...>, BAs...>,
+				tau_ba<BAs...>, BAs...>(
+					to_dnf_wff<tau_ba<BAs...>, BAs...>
+					| simplify_wff<tau_ba<BAs...>, BAs...>)
+			| reduce_bf<tau_ba<BAs...>, BAs...>
+			| reduce_wff<tau_ba<BAs...>, BAs...>;
+	}
 	cout << "error: invalid argument\n";
 	return {};
 }
@@ -532,36 +557,13 @@ void repl_evaluator<BAs...>::run_cmd(
 		return;
 	}
 
-
-	// do we have to set a max number of iterations?
-	/*auto max_iter = std::numeric_limits<size_t>::max();
-	if (n->child.size() > 2) {
-		stringstream ss;
-		ss << n->child[2];
-		auto t = ss.str();
-		max_iter = std::stoul(t);
-	}*/
-
 	// running the program
 	if (auto check = get_type_and_arg(arg); check) {
 		// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
 		// as we would get a formula in dnf already. However, we would need to
 		// kept the application of definitionsand call the computation of phi/chi infinity
 		auto [t, program] = check.value();
-		bool contains_ref = contains(program, tau_parser::ref);
-		rr<nso<tau_ba<BAs...>, BAs...>> rr_ =
-			(contains_ref && t == tau_parser::rr)
-				? make_nso_rr_from_binded_code<
-						tau_ba<BAs...>, BAs...>(program)
-				: rr<nso<tau_ba<BAs...>, BAs...>>(program);
-		if (contains_ref)
-			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end()),
-			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
-
-		auto applied = program
-			| repeat_all<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-						step<tau_ba<BAs...>, BAs...>(rr_.rec_relations));
+		auto applied = apply_rr_to_rr_gssotc(t, program);
 
 		#ifdef DEBUG
 		cout << "applied: " << applied << "\n";
@@ -660,15 +662,17 @@ void repl_evaluator<BAs...>::solve_cmd(
 				nso<tau_ba<BAs...>, BAs...>>(
 			tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, n)
 		: "sbf"; // only tau makes always sense
-	auto nn = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
-		? get_wff(n->child[2])
-		: get_wff(n->child[1]);
-	if (!nn) { cout << "error: invalid argument\n"; return; }
-	auto s = solve<tau_ba<BAs...>, BAs...>(nn.value(), type);
-	if (!s) { cout << "no solution\n"; return; }
-	std::cout << "solution: {" << "\n";
-	for (auto& [k, v] : s.value()) std::cout << "\t" << k << " <- " << v << "\n";
-	std::cout << "}\n";
+	if (auto nn = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
+			? get_type_and_arg(n->child[2]) : get_type_and_arg(n->child[1]); nn) {
+		auto [t, program] = nn.value();
+		auto applied = apply_rr_to_rr_gssotc(t, program);
+		if (!nn) { cout << "error: invalid argument\n"; return; }
+		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type);
+		if (!s) { cout << "no solution\n"; return; }
+		std::cout << "solution: {" << "\n";
+		for (auto& [k, v] : s.value()) std::cout << "\t" << k << " <- " << v << "\n";
+		std::cout << "}\n";
+	}
 }
 
 template<typename... BAs>

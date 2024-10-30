@@ -1412,7 +1412,7 @@ sp_tau_node<BAs...> bind_tau_code_using_factory(const sp_tau_node<BAs...>& code)
 
 // make a nso_rr from the given tau code
 template<typename... BAs>
-rr<nso<BAs...>> make_nso_rr_from_binded_code(sp_tau_node<BAs...>& code) {
+rr<nso<BAs...>> make_nso_rr_from_binded_code(const sp_tau_node<BAs...>& code) {
 	if (is_non_terminal(tau_parser::bf, code)
 		|| is_non_terminal(tau_parser::ref, code))
 			return { {}, code };
