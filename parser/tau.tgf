@@ -28,8 +28,8 @@ ref                    => sym [_ offsets] _ ref_args.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 library                => ((_ (wff_rule | bf_rule):rule)*):rules.
-wff_rule               => wff:wff_matcher _ "::=" _ (wff | wff_cb):wff_body _ '.'.
-bf_rule                => bf :bf_matcher  _  ":=" _ (bf  | bf_cb) :bf_body  _ '.'.
+wff_rule               => wff:wff_matcher _ "::=" _ (wff|wff_cb):wff_body _ '.'.
+bf_rule                => bf :bf_matcher  _  ":=" _ (bf |bf_cb) :bf_body  _ '.'.
 
 builder                => _ builder_head _ builder_body _ '.'.
 builder_head           => '(' _ capture (__ capture)* _ ')'.
@@ -80,7 +80,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | '1'                                :bf_t
                         | '0'                                :bf_f
                         |                                     capture
-                        |                                     uninterpreted_constant.
+                        |                                uninterpreted_constant.
 
 # bf_and alternation without a separator between operands
 # bf_and_nosep_1st_op has to be transformed to bf after parsing
@@ -89,12 +89,13 @@ bf_and                 => (bf_parenthesis | variable | bf_splitter
                         | uninterpreted_constant):bf_and_nosep_1st_op bf.
 
 # constant time constraints
-constraint => ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]")   :ctn_neq
-        | ("[" ctnvar _ '='  _ num "]" | "[" num _ '='  _ ctnvar "]")       :ctn_eq
-        | ("[" ctnvar _ ">=" _ num "]" | "[" num _ ">=" _ ctnvar "]")       :ctn_greater_equal
-        | ("[" ctnvar _ ">"  _ num "]" | "[" num _ ">"  _ ctnvar "]")       :ctn_greater
-        | ("[" ctnvar _ "<=" _ num "]" | "[" num _ "<=" _ ctnvar "]")       :ctn_less_equal
-        | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]")       :ctn_less.
+constraint =>
+   ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]"):ctn_neq
+ | ("[" ctnvar _ '='  _ num "]" | "[" num _ '='  _ ctnvar "]"):ctn_eq
+ | ("[" ctnvar _ ">=" _ num "]" | "[" num _ ">=" _ ctnvar "]"):ctn_greater_equal
+ | ("[" ctnvar _ ">"  _ num "]" | "[" num _ ">"  _ ctnvar "]"):ctn_greater
+ | ("[" ctnvar _ "<=" _ num "]" | "[" num _ "<=" _ ctnvar "]"):ctn_less_equal
+ | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_less.
 
 # variables
 variable[charvar]      => alpha digit*.
@@ -116,7 +117,7 @@ num                    => digits.
 # constants
 uninterpreted_constant => '<' ((chars | _ ) ':' chars):uninter_const_name _ '>'.
 bf_constant            => '{' _ (capture | binding):constant _ '}'
-							[ _ ':' _ chars:type ].
+                                                         [ _ ':' _ chars:type ].
 binding                => (src_c [ (src_c | space)* src_c ]):source.
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
@@ -214,7 +215,9 @@ cli_command            =>
         | ("get":get_sym  [__ option])                        :get_cmd
         | ("set":set_sym   __ option
                                 (__ | _ '=' _) option_value)  :set_cmd
-        | ("toggle":toggle_sym __ bool_option)                :toggle_cmd
+        | ("enable" :enable_sym  __ bool_option)              :enable_cmd
+        | ("disable":disable_sym __ bool_option)              :disable_cmd
+        | ("toggle" :toggle_sym  __ bool_option)              :toggle_cmd
 # i/o stream definitions
         | (type __ in_var_name  _ '=' _ input_stream)         :def_input_cmd
         | (type __ out_var_name _ '=' _ output_stream)        :def_output_cmd
@@ -250,7 +253,8 @@ inst_args              =>
 # symbols usable for detailed help message
 #
 help_arg               => help_sym | version_sym | quit_sym
-                        | clear_sym | get_sym | set_sym | toggle_sym | file_sym
+                        | clear_sym | get_sym | set_sym
+                        | enable_sym | disable_sym | toggle_sym | file_sym
                         | history_sym | abs_memory_sym | rel_memory_sym
                         | selection_sym | def_sym
                         | inst_sym | subst_sym | normalize_sym | execute_sym
@@ -271,7 +275,7 @@ option                 => bool_option
                         | ("sev" | "severity")      :severity_opt  :enum_option.
 bool_option            => ("s" | "status")                :status_opt
                         | ("c" | "color" | "colors")      :colors_opt
-			| ("v" | "charvar")               :charvar_opt
+                        | ("v" | "charvar")               :charvar_opt
                         | ("h" | "hilight" | "hilighting"):hilighting_opt
                         | ("i" | "indent" | "indenting")  :indenting_opt
                         | ("d" | "dbg"   | "debug")       :debug_repl_opt.

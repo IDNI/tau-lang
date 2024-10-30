@@ -962,26 +962,26 @@ void repl_evaluator<BAs...>::set_cmd(
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::toggle_cmd(
-	const sp_tau_node<tau_ba<BAs...>, BAs...>& n)
+void repl_evaluator<BAs...>::update_bool_opt_cmd(
+	const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
+	const function<bool(bool&)>& update_fn)
 {
-	auto toggle_type = n | tau_parser::bool_option
+	auto option_type = n | tau_parser::bool_option
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
-	switch (toggle_type) {
+	switch (option_type) {
 #ifdef DEBUG
-	case tau_parser::debug_repl_opt: opt.debug_repl = !opt.debug_repl;break;
+	case tau_parser::debug_repl_opt: update_fn(opt.debug_repl); break;
 #endif
-	case tau_parser::colors_opt:
-		TC.set(opt.colors = !opt.colors); break;
+	case tau_parser::colors_opt: TC.set(update_fn(opt.colors)); break;
 	case tau_parser::charvar_opt:
-		opt.charvar = update_charvar(!opt.charvar); break;
+		update_charvar(update_fn(opt.charvar)); break;
 	case tau_parser::hilighting_opt:
-		pretty_printer_hilighting = !pretty_printer_hilighting; break;
+		update_fn(pretty_printer_hilighting); break;
 	case tau_parser::indenting_opt:
-		pretty_printer_indenting = !pretty_printer_indenting; break;
-	case tau_parser::status_opt: opt.status = !opt.status; break;
+		update_fn(pretty_printer_indenting); break;
+	case tau_parser::status_opt: update_fn(opt.status); break;
 	default: cout << ": unknown bool option\n"; error = true;break;
 	}
 	get_cmd(n);
@@ -1012,7 +1012,12 @@ int repl_evaluator<BAs...>::eval_cmd(
 	case p::version_cmd:        version_cmd(); break;
 	case p::get_cmd:            get_cmd(command); break;
 	case p::set_cmd:            set_cmd(command); break;
-	case p::toggle_cmd:         toggle_cmd(command); break;
+	case p::enable_cmd:         update_bool_opt_cmd(command,
+					[](bool& b){ return b = true; }); break;
+	case p::disable_cmd:        update_bool_opt_cmd(command,
+					[](bool& b){ return b = false; });break;
+	case p::toggle_cmd:         update_bool_opt_cmd(command,
+					[](bool& b){ return b = !b; }); break;
 	case p::history_list_cmd:   history_list_cmd(); break;
 	case p::history_print_cmd:  history_print_cmd(command); break;
 	case p::history_store_cmd:  history_store_cmd(command); break;
@@ -1191,6 +1196,8 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "Settings commands:\n"
 		<< "  get                    get options' values\n"
 		<< "  set                    set option's value\n"
+		<< "  enable                 enable option's value\n"
+		<< "  disable                disable option's value\n"
 		<< "  toggle                 toggle option's value\n"
 		<< "\n"
 
@@ -1217,6 +1224,16 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "set <option> [=] <value> sets option value\n"
 		<< "\n"
 		<< all_available_options;
+		break;
+	case tau_parser::enable_sym: cout
+		<< "enable <option> enables option\n"
+		<< "\n"
+		<< bool_available_options;
+		break;
+	case tau_parser::disable_sym: cout
+		<< "disable <option> disables option\n"
+		<< "\n"
+		<< bool_available_options;
 		break;
 	case tau_parser::toggle_sym: cout
 		<< "toggle <option> toggles option value\n"
