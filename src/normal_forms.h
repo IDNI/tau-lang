@@ -2263,6 +2263,7 @@ struct sometimes_always_normalization {
 		};
 		// If there is no temporal quantifier and no temporal variable
 		// Just convert to DNF and return
+
 		if (!find_top(fm, st_aw).has_value() && !has_temp_var(fm))
 			return reduce_across_bfs(fm, false);
 
@@ -2280,7 +2281,7 @@ struct sometimes_always_normalization {
 			// Reduction done to normalize again now that sometimes/always are all the way out
 			changes[trim2(f)] = reduce_across_bfs(trim2(f), false);
 		}
-		return replace(res, changes);
+		return reduce_across_bfs(replace(res, changes), false);
 	}
 };
 
