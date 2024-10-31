@@ -23,6 +23,7 @@
 
 #include "test_integration_helpers-tau.h"
 
+using namespace std;
 using namespace idni::rewriter;
 using namespace idni::tau;
 

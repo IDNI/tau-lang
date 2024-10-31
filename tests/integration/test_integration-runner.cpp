@@ -171,7 +171,7 @@ TEST_SUITE("configuration") {
 		bdd_init<Bool>();
 		// configuring boost logging only for errors
 		core::get()->set_filter(trivial::severity >= trivial::error);
-		add_console_log(cout, keywords::format =
+		add_console_log(std::cout, keywords::format =
 			expressions::stream << expressions::smessage);
 	}
 }

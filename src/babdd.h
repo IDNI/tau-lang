@@ -30,11 +30,9 @@
 #include "bool_ba.h"
 #include "dict.h"
 
-using namespace std;
-
 typedef int32_t int_t;
 typedef uint32_t uint_t;
-template<typename T> using sp = shared_ptr<T>;
+template<typename T> using sp = std::shared_ptr<T>;
 
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
 #define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
@@ -245,7 +243,7 @@ struct std::hash<bdd_reference<S, O, IW, SW>> {
 };
 
 template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<pair<bdd_reference<S, O, IW, SW>, uint_t>> {
+struct std::hash<std::pair<bdd_reference<S, O, IW, SW>, uint_t>> {
 	size_t operator()(const auto& p) const {
 		return hash_upair((hash<bdd_reference<S, O, IW, SW>>{}(p.first)),
 				  p.second);
@@ -268,14 +266,14 @@ template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
 
 template<typename B, bdd_options o = bdd_options<>::create()>
-struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>>, B> {
+struct bdd : std::variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>>, B> {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
-	typedef variant<bdd_node_t, B> base;
+	typedef std::variant<bdd_node_t, B> base;
 
 	// This class is placed into the bdd universe if variable shifters are used
-	struct bdd_skeleton : variant<node_skeleton<bdd_ref>, B> {
-		using base = variant<node_skeleton<bdd_ref>, B>;
+	struct bdd_skeleton : std::variant<node_skeleton<bdd_ref>, B> {
+		using base = std::variant<node_skeleton<bdd_ref>, B>;
 		bdd_skeleton(bdd_ref h, bdd_ref l) : base(node_skeleton<bdd_ref>(h, l)) {}
 		explicit bdd_skeleton(const auto& n) : base(n) {}
 
@@ -293,20 +291,20 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 	struct initializer { initializer(); };
 
 	inline static std::conditional<o.has_varshift(),
-				vector<bdd_skeleton>, vector<bdd>>::type V;
+			std::vector<bdd_skeleton>, std::vector<bdd>>::type V;
 	inline static std::conditional<o.has_varshift(),
-			unordered_map<node_skeleton<bdd_ref>, size_t>,
-			        unordered_map<bdd_node_t, size_t>>::type Mn;
-	inline static map<B, size_t> Mb;
+			std::unordered_map<node_skeleton<bdd_ref>, size_t>,
+			std::unordered_map<bdd_node_t, size_t>>::type Mn;
+	inline static std::map<B, size_t> Mb;
 	inline static bdd_ref T, F;
 	inline static initializer I;
 
 	// Caches for bdd operations
-	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
-	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
-	inline static unordered_map<bdd_ref, bdd_ref> not_memo;
-	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
-	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
+	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
+	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
+	inline static std::unordered_map<bdd_ref, bdd_ref> not_memo;
+	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
+	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
 
 	static bool check_cache(bdd_ref& x, const auto& cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
@@ -699,8 +697,9 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 		return nx.h;
 	}
 
-	static bool dnf(bdd_ref x, vector<int_t>& v,
-		function<bool(const pair<B, vector<int_t>>&)> f) {
+	static bool dnf(bdd_ref x, std::vector<int_t>& v,
+		std::function<bool(const std::pair<B, std::vector<int_t>>&)> f)
+	{
 		const bdd& xx = get(x);
 		if (xx.leaf()) {
 			if (!(std::get<B>(xx) == false))
@@ -716,7 +715,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 		return true;
 	}
 
-	static void get_vars(bdd_ref x, set<int_t>& s) {
+	static void get_vars(bdd_ref x, std::set<int_t>& s) {
 		const bdd& xx = get(x);
 		if (xx.leaf()) return;
 		const bdd_node_t& n = std::get<bdd_node_t>(xx);
@@ -728,9 +727,9 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 		return bdd_or(bdd_and(x, y), bdd_and(bdd_not(x),z));
 	}
 
-	static void get_one_zero(bdd_ref, map<int_t, B>&);
+	static void get_one_zero(bdd_ref, std::map<int_t, B>&);
 
-	static bdd_ref compose(bdd_ref x, const map<int_t, bdd_ref>& m) {
+	static bdd_ref compose(bdd_ref x, const std::map<int_t, bdd_ref>& m) {
 		if (leaf(x)) return x;
 		const bdd_node_t& n = get_node(x);
 		bdd_ref a = compose(n.h, m), b = compose(n.l, m);
@@ -740,7 +739,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 	}
 
 	// m must include all vars in x, otherwise use compose()
-	static B eval(bdd_ref x, const map<int_t, B>& m) {
+	static B eval(bdd_ref x, const std::map<int_t, B>& m) {
 		if (leaf(x)) return get_elem(x);
 		const bdd_node_t& n = get_node(x);
 		B a = get_elem(eval(n.h, m)), b = get_elem(eval(n.l, m));
@@ -748,21 +747,23 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 		else return ite(it->second, a, b);
 	}
 
-	static bdd_ref from_clause(const pair<B, vector<int_t>>& v) {
+	static bdd_ref from_clause(const std::pair<B, std::vector<int_t>>& v) {
 		bdd_ref r = bdd_and(T, v.first);
 		for (int_t t : v.second) r = bdd_and(r, bit(t));
 		return r;
 	}
 
-	static bdd_ref from_dnf(const set<pair<B, vector<int_t>>>& s) {
+	static bdd_ref from_dnf(
+		const std::set<std::pair<B, std::vector<int_t>>>& s)
+	{
 		bdd_ref r = F;
 		for (auto& x : s) r = bdd_or(r, from_clause(x));
 		return r;
 	}
 
 	// treat x as a *disjoint* union of elements of s
-	static bdd_ref split(bdd_ref x, const B& e, const set<B>& s) {
-		set<pair<B, vector<int_t>>> r;
+	static bdd_ref split(bdd_ref x, const B& e, const std::set<B>& s) {
+		std::set<std::pair<B, std::vector<int_t>>> r;
 		B p = get_one<B>();
 		for (const B& y : s)
 			if ((p = (p & ~y)) == false)
@@ -807,7 +808,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 	}
 
 	// Find highest variable name in bdd
-	static uint highest_var(bdd_ref x) {
+	static uint_t highest_var(bdd_ref x) {
 		const bdd& xx = get(x);
 		if (xx.leaf()) return 0;
 		const bdd_node_t& n = std::get<bdd_node_t>(xx);
@@ -830,7 +831,7 @@ struct bdd : variant<bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order(),
 };
 
 template<typename B, bdd_options o>
-void bdd<B, o>::get_one_zero(bdd_ref x, map<int_t, B>& m) {
+void bdd<B, o>::get_one_zero(bdd_ref x, std::map<int_t, B>& m) {
 	assert(!leaf(x));
 	const bdd_node_t& n = get_node(x);
 	if (n.l == F) m.clear(), m.emplace(n.v, B::zero());
@@ -862,10 +863,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	struct initializer { initializer(); };
 
 	inline static std::conditional<o.has_varshift(),
-		vector<node_skeleton<bdd_ref>>, vector<bdd>>::type V;
+		std::vector<node_skeleton<bdd_ref>>, std::vector<bdd>>::type V;
 	inline static std::conditional<o.has_varshift(),
-		unordered_map<node_skeleton<bdd_ref>, size_t>,
-		unordered_map<bdd_node_t, size_t>>::type Mn;
+		std::unordered_map<node_skeleton<bdd_ref>, size_t>,
+		std::unordered_map<bdd_node_t, size_t>>::type Mn;
 	inline static bdd_ref T, F;
 	inline static initializer I;
 
@@ -878,12 +879,12 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static bool (*am_cmp)(const bdd_ref&, const bdd_ref&);
 
 	// Caches for bdd operations
-	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
-	inline static unordered_map<vector<bdd_ref>, bdd_ref> and_many_memo;
-	inline static unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
-	inline static unordered_map<bdd_ref, bdd_ref> not_memo;
-	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
-	inline static unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
+	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> and_memo;
+	inline static std::unordered_map<std::vector<bdd_ref>, bdd_ref> and_many_memo;
+	inline static std::unordered_map<std::array<bdd_ref,2>, bdd_ref> or_memo;
+	inline static std::unordered_map<bdd_ref, bdd_ref> not_memo;
+	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> ex_memo;
+	inline static std::unordered_map<std::pair<bdd_ref, uint_t>, bdd_ref> all_memo;
 
 	static bool check_cache(bdd_ref& x, const auto& cache) {
 		if constexpr (o.has_varshift() && o.has_inv_order()) {
@@ -917,7 +918,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			} else return false;
 		}
 		if constexpr (o.has_varshift()) {
-			auto d = min(x.shift, y.shift);
+			auto d = std::min(x.shift, y.shift);
 			if (auto it = cache.find({bdd_ref::to_shift_node(x, d),
 						  bdd_ref::to_shift_node(y, d)});
 				it != cache.end()) {
@@ -989,7 +990,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 				      bdd_ref::to_cache_node(r, d));
 		}
 		if constexpr (o.has_varshift()) {
-			auto d = min(x.shift, y.shift);
+			auto d = std::min(x.shift, y.shift);
 			cache.emplace(std::array<bdd_ref, 2>{
 					      bdd_ref::to_shift_node(x, d),
 					      bdd_ref::to_shift_node(y, d)},
@@ -999,8 +1000,8 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 
 	static void mk_order_canonical(bdd_ref& x, bdd_ref& y) {
 		if constexpr (o.has_varshift())
-			if (x.id == y.id && x.shift > y.shift) swap(x, y);
-		if(x.id > y.id) swap(x,y);
+			if (x.id == y.id && x.shift > y.shift) std::swap(x, y);
+		if(x.id > y.id) std::swap(x,y);
 	}
 
 	// Fast check only if output inverters are enabled
@@ -1025,7 +1026,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		bool in = false, out = false;
 		if constexpr (o.has_inv_in())
 			if(h.id < l.id)
-				swap(h, l), in = true;
+				std::swap(h, l), in = true;
 		if constexpr (o.has_inv_out())
 			if (l.out) {
 				h = bdd_ref::flip_out(h);
@@ -1115,7 +1116,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return update_cache(x, y, r, and_memo), r;
 	}
 
-	static void am_sort(vector<bdd_ref>& b) {
+	static void am_sort(std::vector<bdd_ref>& b) {
 		sort(b.begin(), b.end(), am_cmp);
 		for (size_t n = 0; n < b.size();)
 			if (b[n] == T) b.erase(b.begin() + n);
@@ -1126,9 +1127,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			else ++n;
 	}
 
-	static size_t bdd_and_many_iter(vector<bdd_ref> v, vector<bdd_ref> &h,
-					vector<bdd_ref> &l, bdd_ref &res,
-					uint_t &m) {
+	static size_t bdd_and_many_iter(std::vector<bdd_ref> v,
+		std::vector<bdd_ref> &h, std::vector<bdd_ref> &l, bdd_ref &res,
+		uint_t &m)
+	{
 		size_t i;
 		bool flag = false;
 		m = get(v[0]).v;
@@ -1154,9 +1156,9 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		if (!flag) { if (h.size() && h[0] == F) flag = true; }
 		if (l.size() && l[0] == F) return flag ? 3 : 2;
 		if (flag) return 3;
-		vector<bdd_ref> x;
-		set_intersection(h.begin(),h.end(),l.begin(),l.end(),back_inserter(x),
-				 am_cmp);
+		std::vector<bdd_ref> x;
+		set_intersection(h.begin(), h.end(), l.begin(), l.end(),
+						back_inserter(x), am_cmp);
 		am_sort(x);
 		if (x.size() > 1) {
 			for (size_t n = 0; n < h.size();)
@@ -1176,7 +1178,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return 0;
 	}
 
-	static bdd_ref bdd_and_many(vector<bdd_ref> v) {
+	static bdd_ref bdd_and_many(std::vector<bdd_ref> v) {
 		if (v.empty()) return T;
 		if (v.size() == 1) return v[0];
 
@@ -1200,7 +1202,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 			return and_many_memo.emplace(v, bdd_and(v[0], v[1])).first->second;
 		bdd_ref res = F, h, l;
 		uint_t m = 0;
-		vector<bdd_ref> vh, vl;
+		std::vector<bdd_ref> vh, vl;
 		switch (bdd_and_many_iter(v, vh, vl, res, m)) {
 			case 0: l = bdd_and_many(move(vl)),
 					h = bdd_and_many(move(vh));
@@ -1296,8 +1298,10 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return nx.h;
 	}
 
-	static bool dnf(bdd_ref x, vector<int_t>& v,
-			function<bool(const pair<Bool, vector<int_t>>&)> f) {
+	static bool dnf(bdd_ref x, std::vector<int_t>& v,
+		std::function<bool(const std::pair<Bool, std::vector<int_t>>&)>
+									f)
+	{
 		if (x == F) return true;
 		if (x == T) return f({Bool(true), v});
 		const bdd& n = get(x);
@@ -1309,7 +1313,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return true;
 	}
 
-	static void get_vars(bdd_ref x, set<int_t>& s) {
+	static void get_vars(bdd_ref x, std::set<int_t>& s) {
 		if (leaf(x)) return;
 		const bdd& n = get(x);
 		if (s.find(n.v) != s.end()) return;
@@ -1320,7 +1324,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		return bdd_or(bdd_and(x, y), bdd_and(bdd_not(x),z));
 	}
 
-	static void get_one_zero(bdd_ref x, map<int_t, Bool>& m) {
+	static void get_one_zero(bdd_ref x, std::map<int_t, Bool>& m) {
 		DBG(assert(x != T);)
 		m.clear();
 		while (!leaf(x)) {
@@ -1332,7 +1336,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		throw 0;
 	}
 
-	static bdd_ref compose(bdd_ref x, const map<int_t, bdd_ref>& m) {
+	static bdd_ref compose(bdd_ref x, const std::map<int_t, bdd_ref>& m) {
 		if (leaf(x)) return x;
 		const bdd_node_t& n = get(x);
 		bdd_ref a = compose(n.h, m), b = compose(n.l, m);
@@ -1342,7 +1346,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	}
 
 	// m must include all vars in x, otherwise use compose()
-	static Bool eval(bdd_ref x, const map<int_t, Bool>& m) {
+	static Bool eval(bdd_ref x, const std::map<int_t, Bool>& m) {
 		if (x == T) return {true};
 		if (x == F) return {false};
 		const bdd_node_t& n = get(x);
@@ -1351,21 +1355,24 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 		else return ite(it->second, a, b);
 	}
 
-	static bdd_ref from_clause(const pair<Bool, vector<int_t>>& v) {
+	static bdd_ref from_clause(const std::pair<Bool, std::vector<int_t>>& v)
+	{
 		bdd_ref r = bdd_and(T, v.first);
 		for (int_t t : v.second) r = bdd_and(r, bit(t));
 		return r;
 	}
 
-	static bdd_ref from_dnf(const set<pair<Bool, vector<int_t>>>& s) {
+	static bdd_ref from_dnf(
+		const std::set<std::pair<Bool, std::vector<int_t>>>& s)
+	{
 		bdd_ref r = F;
 		for (auto& x : s) r = bdd_or(r, from_clause(x));
 		return r;
 	}
 
 	// treat x as a *disjoint* union of elements of s
-	static bdd_ref split(bdd_ref x, const Bool& e, const set<Bool>& s) {
-		set<pair<Bool, vector<int_t>>> r;
+	static bdd_ref split(bdd_ref x, const Bool& e, const std::set<Bool>& s){
+		std::set<std::pair<Bool, std::vector<int_t>>> r;
 		Bool p = Bool(true);
 		for (const Bool& y : s)
 			if ((p = (p & ~y)) == false)
@@ -1413,7 +1420,7 @@ struct bdd<Bool, o> : bdd_node<bdd_reference<o.has_varshift(), o.has_inv_order()
 	static uint_t highest_var(bdd_ref x) {
 		if (leaf(x)) return 0;
 		const bdd& n = get(x);
-		return max(n.v, max(highest_var(n.h), highest_var(n.l)));
+		return std::max(n.v, std::max(highest_var(n.h), highest_var(n.l)));
 	}
 
 	// Find a variable not present in x
@@ -1440,7 +1447,8 @@ bool(*bdd<Bool, o>::var_cmp)(int_t, int_t) = [](int_t vl, int_t vr){
 template<bdd_options o>
 bool
 (*bdd<Bool, o>::am_cmp)(const bdd_ref &, const bdd_ref &) = [](const bdd_ref &x,
-							       const bdd_ref &y) {
+							       const bdd_ref &y)
+{
 	bool s = x.out && !y.out;
 	return x.id < y.id || (x.id == y.id && s);
 };

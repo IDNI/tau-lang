@@ -19,7 +19,6 @@
 #include <boost/log/expressions.hpp>
 #include <boost/log/utility/setup/console.hpp>
 #include <limits>
-#include <termios.h>
 
 #include "repl_evaluator.h"
 #include "normalizer.h"
@@ -62,7 +61,7 @@ std::optional<size_t> get_memory_index(
 	bool silent = false)
 {
 	if (size == 0) {
-		if (!silent) cout << "history is empty\n";
+		if (!silent) std::cout << "history is empty\n";
 		return {};
 	}
 	auto mem_type = n
@@ -76,10 +75,10 @@ std::optional<size_t> get_memory_index(
 		|| (!is_relative && (idx == 0 || idx > size)))
 	{
 		if (!silent) {
-			cout << "history location " << TC_OUTPUT
+			std::cout << "history location " << TC_OUTPUT
 				<< (is_relative ? "%-" : "%");
-			if (!is_relative || idx) cout << idx;
-			cout << TC.CLEAR() << " does not exist\n";
+			if (!is_relative || idx) std::cout << idx;
+			std::cout << TC.CLEAR() << " does not exist\n";
 		}
 		return {};
 	}
@@ -94,7 +93,7 @@ repl_evaluator<BAs...>::memory_ref
 {
 	if (auto pos = get_memory_index(n, m.size(), silent); pos.has_value())
 		return {{m[pos.value()], pos.value()}};
-	cout << "error: history location does not exist\n";
+	std::cout << "error: history location does not exist\n";
 	return {};
 }
 
@@ -102,14 +101,14 @@ template<typename... BAs>
 void print_memory(const nso<tau_ba<BAs...>, BAs...> mem, const size_t id,
 	const size_t size, bool print_relative_index = true)
 {
-	cout << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();
+	std::cout << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();
 	if (print_relative_index) {
-		cout << "/" << TC_OUTPUT;
-		if (size - id == 1) cout << "%";
-		else cout << "%-" << size - id - 1;
-		cout << TC.CLEAR();
+		std::cout << "/" << TC_OUTPUT;
+		if (size - id == 1) std::cout << "%";
+		else std::cout << "%-" << size - id - 1;
+		std::cout << TC.CLEAR();
 	}
-	cout << ": " << mem << "\n";
+	std::cout << ": " << mem << "\n";
 }
 
 template<typename... BAs>
@@ -140,7 +139,7 @@ void repl_evaluator<BAs...>::history_print_cmd(
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::history_list_cmd() {
-	if (m.size() == 0) cout << "history is empty\n";
+	if (m.size() == 0) std::cout << "history is empty\n";
 	else for (size_t i = 0; i < m.size(); i++)
 		print_memory(m[i], i, m.size());
 }
@@ -175,13 +174,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			if (is_non_terminal(tau_parser::bf, value))
 				return std::optional(value);
 			else {
-				if (!suppress_error) cout
+				if (!suppress_error) std::cout
 					<< "error: argument has wrong type\n";
 				return {};
 			}
 		}
 	}
-	if (!suppress_error) cout << "error: argument has wrong type\n";
+	if (!suppress_error) std::cout << "error: argument has wrong type\n";
 	return {};
 }
 
@@ -195,14 +194,14 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		if (auto check = memory_retrieve(n); check) {
 			auto [value, _] = check.value();
 			if (is_non_terminal(tau_parser::wff, value))
-				return optional(value);
+				return std::optional(value);
 			else {
-				cout << "error: argument has wrong type\n";
+				std::cout << "error: argument has wrong type\n";
 				return {};
 			}
 		}
 	}
-	cout << "error: argument has wrong type\n";
+	std::cout << "error: argument has wrong type\n";
 	return {};
 }
 
@@ -274,7 +273,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		case tau_parser::bf:
 			return reduce2(to_dnf2(program, false), tau_parser::bf);
 		default:
-			cout << "error: invalid argument\n";
+			std::cout << "error: invalid argument\n";
 		}
 	}
 	return {};
@@ -295,7 +294,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		case tau_parser::bf:
 			return reduce2(to_cnf2(applied, false), tau_parser::bf, true);
 		default:
-			cout << "error: invalid argument\n";
+			std::cout << "error: invalid argument\n";
 		}
 	}
 	return {};
@@ -368,7 +367,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	auto with = get_bf(n->child[3]);
 	// Check for correct argument types
 	if (!thiz || !in || !with) {
-		cout << "error: invalid argument\n"; return {};
+		std::cout << "error: invalid argument\n"; return {};
 	}
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
@@ -389,7 +388,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	in = get_wff(n->child[1]);
 	// Now sort out the remaining argument types
 	auto thiz = get_bf(n->child[2], true);
-	optional<nso<tau_ba<BAs...>, BAs...>> with;
+	std::optional<nso<tau_ba<BAs...>, BAs...>> with;
 	if (thiz) with = get_bf(n->child[3]);
 	else {
 		thiz = get_wff(n->child[2]);
@@ -397,16 +396,16 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	}
 	// Check for correct argument types
 	if (!thiz || !in || !with){
-		cout << "error: invalid argument\n"; return {};
+		std::cout << "error: invalid argument\n"; return {};
 	}
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
 
-	set free_vars_thiz = get_free_vars_from_nso(thiz.value());
-	set free_vars_with = get_free_vars_from_nso(with.value());
-	vector<nso<tau_ba<BAs...>, BAs...>> var_stack = {};
+	std::set free_vars_thiz = get_free_vars_from_nso(thiz.value());
+	std::set free_vars_with = get_free_vars_from_nso(with.value());
+	std::vector<nso<tau_ba<BAs...>, BAs...>> var_stack = {};
 	auto var_id = get_new_var_id(in.value());
-	set<nso<tau_ba<BAs...>, BAs...>> marked_quants;
+	std::set<nso<tau_ba<BAs...>, BAs...>> marked_quants;
 
 	// A variable should only be replaced if it is not quantified
 	auto quantified_vars_skipper = [&](auto x) {
@@ -436,7 +435,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 					tau_ba<BAs...>, BAs...>(
 						tau_parser::variable,
 							var.value());
-				ostringstream ss; ss << "x" << var_id; ++var_id;
+				std::ostringstream ss; ss << "x" << var_id; ++var_id;
 				auto unused_var = var_t
 					? build_bf_var<tau_ba<BAs...>, BAs...>(
 								ss.str())
@@ -481,7 +480,8 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		}
 		return res;
 	};
-	return post_order_recursive_traverser<nso<tau_ba<BAs...>, BAs...>>()(
+	return rewriter::post_order_recursive_traverser<
+		nso<tau_ba<BAs...>, BAs...>>()(
 			in.value(), quantified_var_adder, scoped_replace);
 }
 
@@ -495,7 +495,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		| optional_value_extractor<size_t>)
 			 == tau_parser::variable ? tau_parser::bf
 			 			: tau_parser::wff;
-	auto nn = make_node(n->value, {	n->child[0], n->child[1],
+	auto nn = rewriter::make_node(n->value, { n->child[0], n->child[1],
 				wrap(var_type, n->child[2]), n->child[3] });
 	return substitute_cmd(nn);
 }
@@ -523,7 +523,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		if (contains_ref) return bf_normalizer_with_rec_relation(rr_);
 		return bf_normalizer_without_rec_relation(rr_.main);
 	}
-	cout << "error: invalid argument\n";
+	std::cout << "error: invalid argument\n";
 	return {};
 }
 
@@ -543,7 +543,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			| reduce_bf<tau_ba<BAs...>, BAs...>
 			| reduce_wff<tau_ba<BAs...>, BAs...>;
 	}
-	cout << "error: invalid argument\n";
+	std::cout << "error: invalid argument\n";
 	return {};
 }
 
@@ -566,7 +566,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		auto applied = apply_rr_to_rr_gssotc(t, program);
 
 		#ifdef DEBUG
-		cout << "applied: " << applied << "\n";
+		std::cout << "applied: " << applied << "\n";
 		#endif // DEBUG
 
 		auto dnf = applied
@@ -651,7 +651,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		return;
 	}
 
-	cout << "error: invalid argument\n";
+	std::cout << "error: invalid argument\n";
 }
 
 template <typename... BAs>
@@ -666,9 +666,9 @@ void repl_evaluator<BAs...>::solve_cmd(
 			? get_type_and_arg(n->child[2]) : get_type_and_arg(n->child[1]); nn) {
 		auto [t, program] = nn.value();
 		auto applied = apply_rr_to_rr_gssotc(t, program);
-		if (!nn) { cout << "error: invalid argument\n"; return; }
+		if (!nn) { std::cout << "error: invalid argument\n"; return; }
 		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type);
-		if (!s) { cout << "no solution\n"; return; }
+		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
 		for (auto& [k, v] : s.value()) std::cout << "\t" << k << " <- " << v << "\n";
 		std::cout << "}\n";
@@ -695,7 +695,7 @@ template<typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n) {
 	if (find_top(n, is_non_terminal<tau_parser::wff_sometimes, tau_ba<BAs...>, BAs...>)) {
-		cout << "Currently only support for always quantification.";
+		std::cout << "Currently only support for always quantification.";
 		return {};
 	}
 	auto arg = n->child[1];
@@ -712,7 +712,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 				definitions.begin(), definitions.end()),
 			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
 		if (is_non_terminal(tau_parser::bf, rr_.main)) {
-			cout << "error: invalid argument";
+			std::cout << "error: invalid argument";
 			return {};
 		}
 		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
@@ -730,7 +730,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 		}
 		return normalizer_step(res);
 	}
-	cout << "error: invalid argument\n";
+	std::cout << "error: invalid argument\n";
 	return {};
 }
 
@@ -747,23 +747,23 @@ void repl_evaluator<BAs...>::def_rr_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	definitions.emplace_back(n->child[0]->child[0], n->child[0]->child[1]);
-	cout << "[" << definitions.size() << "] " << definitions.back() << "\n";
+	std::cout << "[" << definitions.size() << "] " << definitions.back() << "\n";
 }
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_list_cmd() {
-	if (definitions.size() == 0) cout << "definitions are empty\n";
+	if (definitions.size() == 0) std::cout << "definitions are empty\n";
 	for (size_t i = 0; i < definitions.size(); i++)
-		cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
-	if (inputs.size() == 0 && outputs.size() == 0) cout << "i/o variables: empty\n";
+		std::cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
+	if (inputs.size() == 0 && outputs.size() == 0) std::cout << "i/o variables: empty\n";
 	else std::cout << "i/o variables:\n";
 	for (auto& [var, desc]: inputs) {
 		auto file = desc.second.empty() ? "console" : "ifile(\"" + desc.second + "\")";
-		cout << "\t" << desc.first << " " << var << " = " << file << "\n";
+		std::cout << "\t" << desc.first << " " << var << " = " << file << "\n";
 	}
 	for (auto& [var, desc]: outputs) {
 		auto file = desc.second.empty() ? "console" : "ofile(\"" + desc.second + "\")";
-		cout << "\t" << desc.first << " " << var << " = " << file << "\n";
+		std::cout << "\t" << desc.first << " " << var << " = " << file << "\n";
 	}
 }
 
@@ -771,15 +771,15 @@ template <typename... BAs>
 void repl_evaluator<BAs...>::def_print_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& command)
 {
-	if (definitions.size() == 0) cout << "rec. relations: empty\n";
+	if (definitions.size() == 0) std::cout << "rec. relations: empty\n";
 	auto num = command | tau_parser::number;
 	if (!num) return;
 	auto i = digits(num.value());
 	if (i && i <= definitions.size()) {
-		cout << definitions[i-1] << "\n";
+		std::cout << definitions[i-1] << "\n";
 		return;
 	}
-	cout << "error: definition [" << i << "] does not exist\n";
+	std::cout << "error: definition [" << i << "] does not exist\n";
 	return;
 }
 
@@ -806,7 +806,7 @@ void repl_evaluator< BAs...>::def_input_cmd(
 			return;
 		}
 	}
-	cout << "error: invalid type " << type << "\n";
+	std::cout << "error: invalid type " << type << "\n";
 }
 
 template <typename... BAs>
@@ -864,20 +864,20 @@ void repl_evaluator<BAs...>::get_cmd(
 	static std::map<size_t,	std::function<void()>> printers = {
 #ifdef DEBUG
 	{ tau_parser::debug_repl_opt, [this]() {
-		cout << "debug-repl:  " << pbool[opt.debug_repl] << "\n"; } },
+		std::cout << "debug-repl:  " << pbool[opt.debug_repl] << "\n"; } },
 #endif
 	{ tau_parser::status_opt,     [this]() {
-		cout << "status:            " << pbool[opt.status] << "\n"; } },
+		std::cout << "status:            " << pbool[opt.status] << "\n"; } },
 	{ tau_parser::colors_opt,     [this]() {
-		cout << "colors:            " << pbool[opt.colors] << "\n"; } },
+		std::cout << "colors:            " << pbool[opt.colors] << "\n"; } },
 	{ tau_parser::charvar_opt,     [this]() {
-		cout << "charvar:           " << pbool[opt.charvar] << "\n"; } },
+		std::cout << "charvar:           " << pbool[opt.charvar] << "\n"; } },
 	{ tau_parser::hilighting_opt, [this]() {
-		cout << "syntax hilighting: " << pbool[pretty_printer_hilighting] << "\n"; } },
+		std::cout << "syntax hilighting: " << pbool[pretty_printer_hilighting] << "\n"; } },
 	{ tau_parser::indenting_opt,  [this]() {
-		cout << "indenting:         " << pbool[pretty_printer_indenting] << "\n"; } },
+		std::cout << "indenting:         " << pbool[pretty_printer_indenting] << "\n"; } },
 	{ tau_parser::severity_opt,   [this]() {
-		cout << "severity:          " << opt.severity << "\n"; } }};
+		std::cout << "severity:          " << opt.severity << "\n"; } }};
 	auto option = n | tau_parser::bool_option;
 	if (option.has_value()) option = n;
 	else option = n | tau_parser::option;
@@ -924,7 +924,7 @@ void repl_evaluator<BAs...>::set_cmd(
 	auto get_bool_value = [&v, &vt](bool& val) {
 		if      (vt == tau_parser::option_value_true) val = true;
 		else if (vt == tau_parser::option_value_false) val = false;
-		else cout << "error: invalid bool value\n";
+		else std::cout << "error: invalid bool value\n";
 		return val;
 	};
 	static std::map<size_t,	std::function<void()>> setters = {
@@ -947,7 +947,7 @@ void repl_evaluator<BAs...>::set_cmd(
 			opt.severity = boost::log::trivial::trace;
 		else {
 			auto sev = v | tau_parser::severity;
-			if (!sev.has_value()) {	cout
+			if (!sev.has_value()) {	std::cout
 				<< "error: invalid severity value\n"; return; }
 			opt.severity = nt2severity(sev
 				| only_child_extractor<tau_ba<BAs...>, BAs...>
@@ -964,7 +964,7 @@ void repl_evaluator<BAs...>::set_cmd(
 template <typename... BAs>
 void repl_evaluator<BAs...>::update_bool_opt_cmd(
 	const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
-	const function<bool(bool&)>& update_fn)
+	const std::function<bool(bool&)>& update_fn)
 {
 	auto option_type = n | tau_parser::bool_option
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
@@ -982,7 +982,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(
 	case tau_parser::indenting_opt:
 		update_fn(pretty_printer_indenting); break;
 	case tau_parser::status_opt: update_fn(opt.status); break;
-	default: cout << ": unknown bool option\n"; error = true;break;
+	default: std::cout << ": unknown bool option\n"; error = true;break;
 	}
 	get_cmd(n);
 }
@@ -999,14 +999,14 @@ int repl_evaluator<BAs...>::eval_cmd(
 #ifdef DEBUG
 	if (opt.debug_repl) {
 		std::cout << "command: " << command << "\n";
-		print_sp_tau_node_tree<tau_ba<BAs...>, BAs...>(cout
+		print_sp_tau_node_tree<tau_ba<BAs...>, BAs...>(std::cout
 			<< "tree: ", command) << "\n";
 	}
 #endif
 	std::optional<sp_tau_node<tau_ba<BAs...>, BAs...>> result;
 	using p = tau_parser;
 	switch (command_type) {
-	case p::quit_cmd:           return cout << "Quit.\n", 1;
+	case p::quit_cmd:           return std::cout << "Quit.\n", 1;
 	case p::clear_cmd:          if (r) r->clear(); break;
 	case p::help_cmd:           help_cmd(command); break;
 	case p::version_cmd:        version_cmd(); break;
@@ -1053,7 +1053,7 @@ int repl_evaluator<BAs...>::eval_cmd(
 	case p::qelim_cmd:          result = qelim_cmd(command); break;
 	case p::comment:            break;
 	// error handling
-	default: error = true, cout << "\nUnknown command\n"; break;
+	default: error = true, std::cout << "\nUnknown command\n"; break;
 	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) ptree<tau_ba<BAs...>, BAs...>(
@@ -1081,6 +1081,7 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 template <typename... BAs>
 std::string repl_evaluator<BAs...>::prompt() {
 	using namespace boost::log;
+	using namespace idni::term;
 	std::stringstream ss;
 	if (opt.status) {
 		std::stringstream status;
@@ -1113,7 +1114,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::version_cmd() {
-	cout << "Tau version: " << GIT_DESCRIBED << "\n";
+	std::cout << "Tau version: " << GIT_DESCRIBED << "\n";
 }
 
 template <typename... BAs>
@@ -1139,7 +1140,7 @@ void repl_evaluator<BAs...>::help_cmd(
 	size_t nt = arg ? arg.value()
 			: static_cast<size_t>(tau_parser::help_sym);
 	switch (nt) {
-	case tau_parser::help_sym: cout
+	case tau_parser::help_sym: std::cout
 		<< "Commands:\n"
 		<< "  help or h              print this help\n"
 		<< "  quit, q, exit or e     exit the repl\n"
@@ -1205,42 +1206,42 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  help or h examples     show examples related to the Tau Language syntax.\n"
 		<< "\n";
 		break;
-	case tau_parser::version_sym: cout
+	case tau_parser::version_sym: std::cout
 		<< "version or v prints out current Tau commit id\n";
 		break;
-	case tau_parser::quit_sym: cout
+	case tau_parser::quit_sym: std::cout
 		<< "q, quit, e or exit exits the repl\n";
 		break;
-	case tau_parser::clear_sym: cout
+	case tau_parser::clear_sym: std::cout
 		<< "clear clears the screen\n";
 		break;
-	case tau_parser::get_sym: cout
+	case tau_parser::get_sym: std::cout
 		<< "get if used alone prints all options and their values\n"
 		<< "get <option>        prints the value of the given option\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case tau_parser::set_sym: cout
+	case tau_parser::set_sym: std::cout
 		<< "set <option> [=] <value> sets option value\n"
 		<< "\n"
 		<< all_available_options;
 		break;
-	case tau_parser::enable_sym: cout
+	case tau_parser::enable_sym: std::cout
 		<< "enable <option> enables option\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau_parser::disable_sym: cout
+	case tau_parser::disable_sym: std::cout
 		<< "disable <option> disables option\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau_parser::toggle_sym: cout
+	case tau_parser::toggle_sym: std::cout
 		<< "toggle <option> toggles option value\n"
 		<< "\n"
 		<< bool_available_options;
 		break;
-	case tau_parser::history_sym: cout
+	case tau_parser::history_sym: std::cout
 		<< "history command manages stored or previous commands results\n"
 		<< "\n"
 		<< "  history or hist              lists all stored or output results\n"
@@ -1249,7 +1250,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  %<memory_id>                 provides relative access to memory\n"
 		<< "  &<memory_id>                 provides absolute access to memory\n";
 		break;
-	case tau_parser::normalize_sym: cout
+	case tau_parser::normalize_sym: std::cout
 		<< "normalize or n command normalizes a formula, prints it and\n"
 		<< "saves it into memory of previous memoris\n"
 		<< "\n"
@@ -1260,29 +1261,29 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  normalize <memory>     normalizes the memory with the given id\n";
 	//	<< "  normalize <selection>  normalizes the selection\n";
 		break;
-	case tau_parser::qelim_sym: cout
+	case tau_parser::qelim_sym: std::cout
 		<< "qelim command eliminates the innermost quantifier, prints it and\n"
 		<< "saves it into memory of previous memories\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  qelim <WFF>            eliminates innermost quantifier in the given WFF\n";
 		break;
-	case tau_parser::run_sym: cout
+	case tau_parser::run_sym: std::cout
 		<< "Command r, run <WFF>\n";
 		break;
-	case tau_parser::solve_sym: cout
+	case tau_parser::solve_sym: std::cout
 		<< "Command s, solve ...\n";
 		break;
-	case tau_parser::sat_sym: cout
+	case tau_parser::sat_sym: std::cout
 		<< "Command sat, is_satisfiable ...\n";
 		break;
-	case tau_parser::valid_sym: cout
+	case tau_parser::valid_sym: std::cout
 		<< "Command valid, is_valid ...\n";
 		break;
-	case tau_parser::unsat_sym: cout
+	case tau_parser::unsat_sym: std::cout
 		<< "Command unsat, is_unsatisfiable ...\n";
 		break;
-	case tau_parser::dnf_sym: cout
+	case tau_parser::dnf_sym: std::cout
 		<< "dnf command converts a boolean formula or a well formed formula to disjunctive normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -1290,7 +1291,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  dnf <WFF>            converts the given BF to DNF\n"
 		<< "  dnf <memory>         converts the memory with the given id to DNF\n";
 		break;
-	case tau_parser::cnf_sym: cout
+	case tau_parser::cnf_sym: std::cout
 		<< "cnf command converts a boolean formula or a well formed formula to conjunctive normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -1298,7 +1299,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  cnf <WFF>            converts the given BF to CNF\n"
 		<< "  cnf <memory>         converts the memory with the given id to CNF\n";
 		break;
-	//case tau_parser::anf_sym: cout
+	//case tau_parser::anf_sym: std::cout
 	//	<< "anf command converts a boolean formula or a well formed formula to algebraic normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
@@ -1306,7 +1307,7 @@ void repl_evaluator<BAs...>::help_cmd(
 	//	<< "  anf <WFF>            converts the given WFF to ANF\n"
 	//	<< "  anf <memory>         converts the memory with the given id to ANF\n";
 	//	break;
-	case tau_parser::nnf_sym: cout
+	case tau_parser::nnf_sym: std::cout
 		<< "nnf command converts a boolean formula or a well formed formula to negation normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -1314,7 +1315,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  nnf <WFF>            converts the given BF to NNF\n"
 		<< "  nnf <memory>         converts the memory with the given id to NNF\n";
 		break;
-	//case tau_parser::pnf_sym: cout
+	//case tau_parser::pnf_sym: std::cout
 	//	<< "pnf command converts a boolean formula or a well formed formula to prenex normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
@@ -1322,7 +1323,7 @@ void repl_evaluator<BAs...>::help_cmd(
 	//	<< "  pnf <WFF>            converts the given BF to PNF\n"
 	//	<< "  pnf <memory>           converts the memory with the given id to PNF\n";
 	//	break;
-	case tau_parser::mnf_sym: cout
+	case tau_parser::mnf_sym: std::cout
 		<< "mnf command converts a boolean formula or a well formed formula to minterm normal form\n"
 		<< "\n"
 		<< "usage:\n"
@@ -1330,14 +1331,14 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  mnf <WFF>            converts the given BF to MNF\n"
 		<< "  mnf <memory>         converts the memory with the given id to MNF\n";
 		break;
-	case tau_parser::onf_sym: cout
+	case tau_parser::onf_sym: std::cout
 		<< "onf command converts a well formed formula to order normal form\n"
 		<< "\n"
 		<< "usage:\n"
 		<< "  onf <VAR> <WFF>      converts the given WFF to ONF\n"
 		<< "  onf <VAR> <memory>   converts the memory with the given id to ONF\n";
 		break;
-	case tau_parser::subst_sym: cout
+	case tau_parser::subst_sym: std::cout
 		<< "substitute, subst or s substitutes a formula or a function\n"
 		<< "\n"
 		<< "usage:\n"
@@ -1355,7 +1356,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  substitute ?x && (?y || ?x) [ ?y || ?x / ?y ] # produces ?x && ?y\n"
 		<< "\n";
 		break;
-	case tau_parser::inst_sym: cout
+	case tau_parser::inst_sym: std::cout
 		<< "instantiate, inst or i instantiates a variable in a formula or in a function\n"
 		<< "\n"
 		<< "usage:\n"
@@ -1373,7 +1374,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  instantiate x | y & z [ z / 0 ]  # produces x | y & 0\n"
 		<< "\n";
 		break;
-	case tau_parser::def_sym: cout
+	case tau_parser::def_sym: std::cout
 		<< "defines a rec. relation\n"
 		<< "\n"
 		<< "usage:\n"
@@ -1382,7 +1383,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  defs or definitions          list definitions\n"
 		<< "  defs or definitions <rr_id>  print rec relation with given id\n";
 		break;
-	case tau_parser::examples_sym: cout
+	case tau_parser::examples_sym: std::cout
 		<< "examples\n"
 		<< "\n"
 		<< "  # defining an input variables\n"

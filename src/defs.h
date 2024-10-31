@@ -31,8 +31,6 @@ typedef int sym_t;
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 
-using namespace std;
-
 template<typename B> struct zero {
 	bool operator()(const B&) const;
 };

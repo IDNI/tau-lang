@@ -32,7 +32,7 @@ auto splitter_one_bdd() {
 	auto v = dict(var_name);
 	auto ref = bdd<Bool>::bit(v);
 	auto splitter_one = bdd_handle<Bool>::get(ref);
-	return build_bf_constant(variant<bdd_binding>(splitter_one));
+	return build_bf_constant(std::variant<bdd_binding>(splitter_one));
 }
 
 bool check_solution(const nso<bdd_binding>& equation, std::map<nso<bdd_binding>, nso<bdd_binding>> solution) {

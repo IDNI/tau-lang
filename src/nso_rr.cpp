@@ -14,6 +14,8 @@
 
 namespace idni::tau {
 
+using namespace idni::rewriter;
+
 bool pretty_printer_hilighting = false;
 bool pretty_printer_indenting  = false;
 
@@ -35,7 +37,7 @@ sp_tau_source_node make_tau_source(const std::string& source,
 		tau_parser,
 		drop_location_t<parse_symbol, tau_source_sym>,
 		tau_source_sym>(drop_location<parse_symbol, tau_source_sym>,
-				source, options);
+			source, options);
 }
 
 // make a tau source from the given source code stream.
@@ -47,7 +49,7 @@ sp_tau_source_node make_tau_source(std::istream& is,
 		tau_parser,
 		drop_location_t<parse_symbol, tau_source_sym>,
 		tau_source_sym>(drop_location<parse_symbol, tau_source_sym>,
-				is, options);
+			is, options);
 }
 
 // make a tau source from the given source code stream.
@@ -59,7 +61,7 @@ sp_tau_source_node make_tau_source_from_file(const std::string& filename,
 		tau_parser,
 		drop_location_t<parse_symbol, tau_source_sym>,
 		tau_source_sym>(drop_location<parse_symbol, tau_source_sym>,
-				filename, options);
+			filename, options);
 }
 
 } // idni::tau namespace
