@@ -256,7 +256,7 @@ nso<BAs...> fm_at_time_point(const nso<BAs...>& original_fm,
 }
 
 template<typename... BAs>
-pair<nso<BAs...>, nso<BAs...> > build_initial_step_chi(
+std::pair<nso<BAs...>, nso<BAs...> > build_initial_step_chi(
 	const nso<BAs...>& chi, const nso<BAs...>& st, auto& io_vars,
 	int_t time_point, auto& pholder_to_st) {
 	std::map<nso<BAs...>, nso<BAs...>> changes;
@@ -405,10 +405,10 @@ std::pair<nso<BAs...>, int_t> find_fixpoint_phi(const nso<BAs...>& base_fm, cons
 }
 
 template<typename... BAs>
-pair<nso<BAs...>, int_t> find_fixpoint_chi(const nso<BAs...>& chi_base, const nso<BAs...>& st,
+std::pair<nso<BAs...>, int_t> find_fixpoint_chi(const nso<BAs...>& chi_base, const nso<BAs...>& st,
 			      const auto& io_vars, const auto& initials,
 			      const int_t time_point) {
-	map<nso<BAs...>, nso<BAs...>> pholder_to_st;
+	std::map<nso<BAs...>, nso<BAs...>> pholder_to_st;
 	auto [chi_prev, cache] = build_initial_step_chi(
 		chi_base, st, io_vars, time_point, pholder_to_st);
 
@@ -545,7 +545,7 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 template<typename... BAs>
 nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, const int_t shift) {
 	if (shift <= 0) return fm;
-	map<nso<BAs...>, nso<BAs...>> changes;
+	std::map<nso<BAs...>, nso<BAs...>> changes;
     for (const auto& io_var : io_vars) {
         // Skip initial conditions
         if (is_io_initial(io_var))
@@ -707,7 +707,7 @@ nso<BAs...> add_st_ctn (const nso<BAs...>& st, const int_t timepoint, const int_
 	auto io_vars = select_top(
 		st, is_child_non_terminal<tau_parser::io_var, BAs...>);
 	for (int_t s = 0; s <= steps; ++s) {
-		map<nso<BAs...>, nso<BAs...> > changes;
+		std::map<nso<BAs...>, nso<BAs...> > changes;
 		for (size_t i = 0; i < io_vars.size(); ++i) {
 			auto new_io_var = transform_io_var(
 				io_vars[i], get_io_name(io_vars[i]), timepoint + s);
@@ -758,7 +758,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 
 	// Check if flag can be raised up to the highest initial condition + 1
 	nso<BAs...> run;
-	int_t flag_boundary = max(point_after_inits + time_point, 2*time_point + 1) + 1;
+	int_t flag_boundary = std::max(point_after_inits + time_point, 2*time_point + 1) + 1;
 	for (int_t i = time_point; i <= flag_boundary; ++i) {
 		auto current_aw = fm_at_time_point(aw, io_vars, i);
 		if (run) run = build_wff_and(run, current_aw);
@@ -837,7 +837,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 	if (aw_fm.has_value()) {
 		// If there is an always part, replace it with its unbound continuation
 		ubd_aw_fm = always_to_unbounded_continuation(aw_fm.value()).first;
-		map<nso<BAs...>, nso<BAs...> > changes = {
+		std::map<nso<BAs...>, nso<BAs...> > changes = {
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
 		ev_t = transform_to_eventual_variables(replace(fm, changes));
