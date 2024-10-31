@@ -694,10 +694,6 @@ void repl_evaluator<BAs...>::is_valid_cmd(
 template<typename... BAs>
 std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n) {
-	if (find_top(n, is_non_terminal<tau_parser::wff_sometimes, tau_ba<BAs...>, BAs...>)) {
-		std::cout << "Currently only support for always quantification.";
-		return {};
-	}
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
@@ -715,20 +711,23 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 			std::cout << "error: invalid argument";
 			return {};
 		}
-		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
+		auto normalized_fm = rr_.main;
+		// auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
+
 		if (has_no_boolean_combs_of_models(normalized_fm))
-			return always_to_unbounded_continuation(normalized_fm).first;
+			return build_wff_always(
+				always_to_unbounded_continuation(normalized_fm). first);
 		// Get each clause if there are several always disjuncts
 		auto clauses = get_leaves(normalized_fm, tau_parser::wff_or, tau_parser::wff);
 		nso<tau_ba<BAs...>,BAs...> res;
 		// Convert each disjunct to unbounded continuation
 		for (auto& clause : clauses) {
 			if (res) res = build_wff_or(res, build_wff_always(
-				always_to_unbounded_continuation(clause).first));
+				transform_to_execution(clause)));
 			else res = build_wff_always(
-				always_to_unbounded_continuation(clause).first);
+				transform_to_execution(clause));
 		}
-		return normalizer_step(res);
+		return res;
 	}
 	std::cout << "error: invalid argument\n";
 	return {};
