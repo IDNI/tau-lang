@@ -21,6 +21,7 @@ start                  => rr _.
 
 # start symbol posibilities: rr, inputs, library, builder, cli (bellow)
 #
+#TODO (LOW) maybe rename rr to program, rr_gssot or similar
 rr                     => rec_relations _ wff:main _ '.'.
 rec_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
@@ -186,15 +187,26 @@ cli_command            =>
         | ("v" | "version"):version_sym                       :version_cmd
         | ("c" | "clear")  :clear_sym                         :clear_cmd
         | (("h" | "help")  :help_sym   [__ help_arg])         :help_cmd
+# TODO (MEDIUM) remove file command, it is not used
         | ("file"          :file_sym    __ q_string)          :file_cmd
+# TODO (HIGH) maybe we must also check for validity of wff and bf (the later
+# in the sense that is always 1). Also, what does it means for a rr to be valid?
         | ("valid"         :valid_sym   __ rr)                :valid_cmd
+# TODO (HIGH) maybe we should also check for the validity of the wff and bf (the
+# later in the sense that is not always 0)
         | ("sat"           :sat_sym     __ normalize_cmd_arg) :sat_cmd
         | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
+# TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
+# a wff if possible.
         | ("solve"
                 :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
         | (("r" | "run"):run_sym __ wff)                      :run_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
+# TODO (MEDIUM) maybe we could remove in the subst and inst commands the
+# possibility of using wff or bf as source expression as is kind of naive
+# to use them in this context. A more interesting feature would be to
+# allow such changes in rec relations, redifining the existing ones.
         | (("s" | "subst" | "substitute")
                 :subst_sym __ nf_cmd_arg _ '[' _
                         nf_cmd_arg _ '/' _ nf_cmd_arg _ ']')  :subst_cmd
@@ -249,7 +261,9 @@ wff_cmd_arg            => memory | wff.
 solve_cmd_arg          => memory | wff.
 nf_cmd_arg             => memory | wff | bf.
 onf_cmd_arg            => memory | wff.
+# TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
 normalize_cmd_arg      => memory | rr | ref | wff | bf.
+# TODO (MEDIUM) check if could we only have one case?
 inst_args              =>
           wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
         | bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
@@ -269,6 +283,9 @@ help_arg               => help_sym | version_sym | quit_sym
 
 # memory
 #
+# TODO (LOW) in the future maybe is intererting to also store the result of the
+# solve command in a memory, so we could access it later. Maybe we could
+# use the notation %N[<var>] or %-N[<var>], where N is the id of the solution.
 memory                 => ( "%"
                           | "%-":rel_memory_sym [digits:memory_id]):rel_memory
                         | ( "%" :abs_memory_sym         memory_id) :abs_memory.
