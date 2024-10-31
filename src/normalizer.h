@@ -34,8 +34,6 @@
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
-using namespace idni::rewriter;
-
 namespace idni::tau {
 
 RULE(WFF_REMOVE_EX_0, "ex $X $Y ::= wff_remove_existential_cb $X $Y.")
@@ -132,10 +130,10 @@ auto get_free_vars_from_nso(const nso<BAs...>& n) {
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso of " << n;
 	std::set<nso<BAs...>> free_vars;
 	free_vars_collector<BAs...> collector(free_vars);
-	post_order_traverser<
+	rewriter::post_order_traverser<
 			free_vars_collector<BAs...>,
-			all_t,
-			nso<BAs...>>(collector, all)(n);
+			rewriter::all_t,
+			nso<BAs...>>(collector, rewriter::all)(n);
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
 	return free_vars;
 }
@@ -145,7 +143,7 @@ auto get_free_vars_from_nso(const nso<BAs...>& n) {
 template<typename... BAs>
 int_t get_new_var_id (const nso<BAs...> fm) {
 	auto var_nodes = get_vars_from_nso<BAs...>(fm);
-	set vars{1};
+	std::set vars{1};
 	for (auto var : var_nodes) {
 		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, var); tmp[0] == 'x') {
 			tmp.erase(0,1);
@@ -164,10 +162,10 @@ int_t get_new_var_id (const nso<BAs...> fm) {
 template<typename... BAs>
 int_t get_new_uniter_const_id (const nso<BAs...> fm) {
 	auto uniter_consts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
-	set ids {0};
+	std::set ids {0};
 	for (auto uniter_const : uniter_consts) {
-		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, uniter_const); tmp.find(":const") != string::npos) {
-			string id = tmp.substr(6, tmp.size()-1);
+		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, uniter_const); tmp.find(":const") != std::string::npos) {
+			std::string id = tmp.substr(6, tmp.size()-1);
 			if (!tmp.empty()) ids.insert(stoi(id));
 		}
 	}
@@ -449,7 +447,8 @@ nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
 	auto ref = r | only_child_extractor<BAs...>
 		| tau_parser::ref
 		| optional_value_extractor<sp_tau_node<BAs...>>;
-	changes[ref] = make_node<tau_sym<BAs...>>(ref->value, { ref->child[0],
+	changes[ref] = rewriter::make_node<tau_sym<BAs...>>(ref->value, {
+		ref->child[0],
 		wrap<BAs...>(tau_parser::offsets, ofs), ref->child[1] });
 	r = replace(r, changes);
 	BOOST_LOG_TRIVIAL(debug) << "(F*) " << r;
@@ -725,8 +724,8 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<BAs...> fpt(defs, types);
-	defs.main = post_order_traverser<decltype(fpt), all_t,
-		nso<BAs...>>(fpt, all)(defs.main);
+	defs.main = rewriter::post_order_traverser<decltype(fpt), rewriter::all_t,
+		nso<BAs...>>(fpt, rewriter::all)(defs.main);
 	if (fpt.changes.size()) {
 		defs.main = replace(defs.main, fpt.changes);
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "

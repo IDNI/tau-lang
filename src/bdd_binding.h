@@ -25,8 +25,6 @@
 
 #include "../parser/bdd_parser.generated.h"
 
-using namespace idni::rewriter;
-
 namespace idni::tau {
 
 using bdd_binding = hbdd<Bool>;
@@ -62,7 +60,7 @@ struct bdd_factory {
 			return std::optional<nso<BAs...>>{};
 		}
 		char dummy = 0;
-		auto root = make_node_from_tree<bdd_parser, char,
+		auto root = rewriter::make_node_from_tree<bdd_parser, char,
 			tau_sym<BAs...>>(dummy, r.get_shaped_tree());
 		auto t = traverser_t(root) | bdd_parser::bdd;
 		return std::optional<nso<BAs...>>{ build_node(t.has_value()
@@ -89,7 +87,7 @@ private:
 
 	nso<BAs...> build_node(const bdd_binding& b) {
 		std::variant<BAs...> vp{b};
-		return make_node<tau_sym<BAs...>>(vp, {});
+		return rewriter::make_node<tau_sym<BAs...>>(vp, {});
 	}
 
 	// evaluates a parsed bdd terminal node recursively

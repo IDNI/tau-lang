@@ -424,7 +424,7 @@ size_t compute_initial_execution_time(const nso<BAs...>& phi_inf) {
 				| tau_parser::num
 				| only_child_extractor<BAs...>
 				| offset_extractor<BAs...>; num) {
-			initial_time_point = max(initial_time_point, num | optional_value_extractor<size_t>);
+			initial_time_point = std::max(initial_time_point, num | optional_value_extractor<size_t>);
 		} else if (auto num = io_var
 				| tau_parser::out
 				| tau_parser::offset
@@ -432,21 +432,21 @@ size_t compute_initial_execution_time(const nso<BAs...>& phi_inf) {
 				| tau_parser::num
 				| only_child_extractor<BAs...>
 				| offset_extractor<BAs...>; num) {
-			initial_time_point = max(initial_time_point, num | optional_value_extractor<size_t>);
+			initial_time_point = std::max(initial_time_point, num | optional_value_extractor<size_t>);
 		} else if (auto num = io_var
 				| tau_parser::in
 				| tau_parser::offset
 				| tau_parser::num
 				| only_child_extractor<BAs...>
 				| offset_extractor<BAs...>; num) {
-			initial_time_point = max(initial_time_point, num | optional_value_extractor<size_t>);
+			initial_time_point = std::max(initial_time_point, num | optional_value_extractor<size_t>);
 		} else if (auto num = io_var
 				| tau_parser::out
 				| tau_parser::offset
 				| tau_parser::num
 				| only_child_extractor<BAs...>
 				| offset_extractor<BAs...>; num) {
-			initial_time_point = max(initial_time_point, num | optional_value_extractor<size_t>);
+			initial_time_point = std::max(initial_time_point, num | optional_value_extractor<size_t>);
 		}
 	}
 	return initial_time_point;

@@ -24,8 +24,6 @@
 #include "bdd_handle.h"
 #include "variant_ba.h"
 
-using namespace idni::rewriter;
-
 namespace idni::tau {
 
 // TODO (MEDIUM) clean execution api code

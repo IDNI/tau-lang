@@ -29,9 +29,6 @@
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.
 
-using namespace idni::rewriter;
-using namespace idni::tau;
-
 namespace idni::tau {
 
 template<typename...BAs>
@@ -506,7 +503,7 @@ nso<BAs...> get_minterm(const minterm<BAs...>& m) {
 			&& !is_child_non_terminal<tau_parser::bf_and>(n);
 	};
 	auto literals = select_top(m, is_literal);
-	set<nso<BAs...>> all_literals(literals.begin(), literals.end());
+	std::set<nso<BAs...>> all_literals(literals.begin(), literals.end());
 	return build_bf_and<BAs...>(all_literals);
 }
 

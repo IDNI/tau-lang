@@ -19,6 +19,7 @@
 #include "experimental/execution.h"
 
 using namespace std;
+using namespace idni::rewriter;
 using namespace idni::tau;
 using namespace idni::tau::experimental;
 

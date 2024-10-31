@@ -24,6 +24,7 @@
 
 #include "test_integration_helpers-bdd.h"
 
+using namespace std;
 using namespace idni::rewriter;
 using namespace idni::tau;
 

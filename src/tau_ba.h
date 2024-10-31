@@ -19,9 +19,6 @@
 #include "satisfiability.h"
 #include "splitter.h"
 
-using namespace std;
-using namespace idni::tau;
-
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
@@ -44,37 +41,49 @@ bool is_satisfiable(const rr<nso<tau_ba<BAs...>, BAs...>>& tau_spec);
 template<typename...BAs>
 struct tau_ba {
 
-	tau_ba(rules<nso<tau_ba<BAs...>, BAs...>>& rec_relations, nso<tau_ba<BAs...>, BAs...>& main) : nso_rr({rec_relations, main}) {}
+	tau_ba(rules<nso<tau_ba<BAs...>, BAs...>>& rec_relations,
+		nso<tau_ba<BAs...>, BAs...>& main)
+			: nso_rr({ rec_relations, main }) {}
 	tau_ba(nso<tau_ba<BAs...>, BAs...>& main) : nso_rr({main}) {}
 
 	auto operator<=>(const tau_ba<BAs...>&) const = default;
 
 	tau_ba<BAs...> operator~() const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_neg<tau_ba<BAs...>, BAs...>(nso_rr.main);
+		nso<tau_ba<BAs...>, BAs...> nmain =
+			build_wff_neg<tau_ba<BAs...>, BAs...>(nso_rr.main);
 		auto nrec_relations = nso_rr.rec_relations;
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_and<tau_ba<BAs...>, BAs...>(nso_rr.main, other.nso_rr.main);
-		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
+		nso<tau_ba<BAs...>, BAs...> nmain =
+			build_wff_and<tau_ba<BAs...>, BAs...>(nso_rr.main,
+							other.nso_rr.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations =
+			merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
 	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_or<tau_ba<BAs...>, BAs...>(nso_rr.main, other.nso_rr.main);
-		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
+		nso<tau_ba<BAs...>, BAs...> nmain =
+			build_wff_or<tau_ba<BAs...>, BAs...>(nso_rr.main,
+							other.nso_rr.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations =
+			merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 		tau_ba<BAs...> nnso_rr(nrec_relations, nmain);
 		return nnso_rr;
 	}
 
 	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const {
 		// TODO (HIGH) replace by ...tau... in the future
-		nso<tau_ba<BAs...>, BAs...> nmain = build_wff_xor_from_def<tau_ba<BAs...>, BAs...>(nso_rr.main, other.nso_rr.main);
-		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations = merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
+		nso<tau_ba<BAs...>, BAs...> nmain =
+			build_wff_xor_from_def<tau_ba<BAs...>, BAs...>(
+						nso_rr.main, other.nso_rr.main);
+		rules<nso<tau_ba<BAs...>, BAs...>>  nrec_relations =
+			merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
 
@@ -88,7 +97,8 @@ struct tau_ba {
 	}
 
 	bool is_one() const {
-		return normalizer<tau_ba<BAs...>, BAs...>(nso_rr) == _T<tau_ba<BAs...>, BAs...>;
+		return normalizer<tau_ba<BAs...>, BAs...>(nso_rr)
+						== _T<tau_ba<BAs...>, BAs...>;
 	}
 
 	// the type is ewquivalent to tau_spec<BAs...>
@@ -96,17 +106,24 @@ struct tau_ba {
 
 	private:
 
-	nso<tau_ba<BAs...>, BAs...> rename(const nso<tau_ba<BAs...>, BAs...>& form) const  {
+	nso<tau_ba<BAs...>, BAs...> rename(
+		const nso<tau_ba<BAs...>, BAs...>& form) const
+	{
 		// TODO (MEDIUM) implement properly
 		return form;
 	}
 
-	rule<rr<nso<tau_ba<BAs...>, BAs...>>> rename(const rule<nso<tau_ba<BAs...>, BAs...>>& rule) const {
+	rewriter::rule<rr<nso<tau_ba<BAs...>, BAs...>>> rename(
+		const rewriter::rule<nso<tau_ba<BAs...>, BAs...>>& rule) const
+	{
 		// TODO (MEDIUM) implement properly
 		return rule;
 	}
 
-	rules<nso<tau_ba<BAs...>, BAs...>> merge(const rules<nso<tau_ba<BAs...>, BAs...>>& rs1, const rules<nso<tau_ba<BAs...>, BAs...>>& rs2) const {
+	rules<nso<tau_ba<BAs...>, BAs...>> merge(
+		const rules<nso<tau_ba<BAs...>, BAs...>>& rs1,
+		const rules<nso<tau_ba<BAs...>, BAs...>>& rs2) const
+	{
 		// TODO (MEDIUM) implement properly calling renaming
 		rules<nso<tau_ba<BAs...>, BAs...>> nrs;
 		nrs.insert(nrs.end(), rs1.begin(), rs1.end());
@@ -167,7 +184,8 @@ struct tau_ba_factory {
 		if (!nso) return std::optional<gssotc<BAs...>>{};
 		tau_ba<BAs...> t(nso.value().main);
 		return std::optional<gssotc<BAs...>>{
-			make_node<tau_sym<tau_ba<BAs...>, BAs...>>(t, {}) };
+			rewriter::make_node<tau_sym<tau_ba<BAs...>, BAs...>>(
+				t, {}) };
 	}
 
 	gssotc<BAs...> binding(const gssotc<BAs...>& n) {

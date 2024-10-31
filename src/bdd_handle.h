@@ -75,10 +75,10 @@ template<typename B, auto o = bdd_options<>::create()>
 struct bdd_handle {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
-	typedef unordered_map<bdd_node_t, shared_ptr<bdd_handle>> mn_type;
-	typedef map<B, std::shared_ptr<bdd_handle>> mb_type;
-	inline static unordered_map<bdd_node_t, shared_ptr<bdd_handle>> Mn;
-	inline static map<B, std::shared_ptr<bdd_handle>> Mb;
+	typedef std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> mn_type;
+	typedef std::map<B, std::shared_ptr<bdd_handle>> mb_type;
+	inline static std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> Mn;
+	inline static std::map<B, std::shared_ptr<bdd_handle>> Mb;
 	inline static hbdd<B, o> htrue, hfalse;
 
 	// nonworking hack to call init
@@ -92,14 +92,14 @@ struct bdd_handle {
 	static hbdd<B, o> get(const bdd_node_t& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
-		hbdd<B, o> h = make_shared<bdd_handle<B, o>>(); //(new bdd_handle);
+		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>(); //(new bdd_handle);
 		return h->b = bdd<B, o>::add(x), Mn.emplace(x, h), h;
 	}
 
 	static hbdd<B, o> get(const B& x) {
 		if (auto it = Mb.find(x); it != Mb.end())
 			return it->second;//.lock();
-		hbdd<B, o> h = make_shared<bdd_handle<B, o>>();//(new bdd_handle);
+		hbdd<B, o> h = std::make_shared<bdd_handle<B, o>>();//(new bdd_handle);
 		return h->b = bdd<B, o>::add(x), Mb.emplace(x, h), h;
 	}
 
@@ -222,26 +222,30 @@ struct bdd_handle {
 		return subst(v, f->sub0(v)) | subst(v, ~(f->sub1(v)));
 	}
 
-	void dnf(function<bool(const pair<B, vector<int_t>>&)> f) const {
-		vector<int_t> v;
-		bdd<B, o>::dnf(b, v, [f](const pair<B, vector<int_t>>& v) {
+	void dnf(std::function<bool(const std::pair<B, std::vector<int_t>>&)> f)
+		const
+	{
+		std::vector<int_t> v;
+		bdd<B, o>::dnf(b, v, [f](
+			const std::pair<B, std::vector<int_t>>& v)
+		{
 			return f(v);
 		});
 	}
 
-	set<pair<B, vector<int_t>>> dnf() const {
-		set<pair<B, vector<int_t>>> r;
+	std::set<std::pair<B, std::vector<int_t>>> dnf() const {
+		std::set<std::pair<B, std::vector<int_t>>> r;
 		dnf([&r](auto& x) { r.insert(x); return true; });
 		return r;
 	}
 
-	set<int_t> get_vars() const {
-		set<int_t> r;
+	std::set<int_t> get_vars() const {
+		std::set<int_t> r;
 		return bdd<B, o>::get_vars(b, r), r;
 	}
 
-	map<int_t, B> get_one_zero() const {
-		map<int_t, B> m;
+	std::map<int_t, B> get_one_zero() const {
+		std::map<int_t, B> m;
 		bdd<B, o>::get_one_zero(b, m);
 //#ifdef DEBUG
 //		auto d = dnf();
@@ -252,17 +256,16 @@ struct bdd_handle {
 		return m;
 	}
 
-	hbdd<B, o>
-	compose(const map<int_t, hbdd<B, o>>& m) const {
-		map<int_t, bdd_ref> p;
+	hbdd<B, o> compose(const std::map<int_t, hbdd<B, o>>& m) const {
+		std::map<int_t, bdd_ref> p;
 		for (auto& x : m) p.emplace(x.first, x.second->b);
 		return get(bdd<B, o>::compose(b, p));
 	}
 
-	B eval(map<int_t, B>& m) const { return bdd<B, o>::eval(b, m); }
+	B eval(std::map<int_t, B>& m) const { return bdd<B, o>::eval(b, m); }
 
-	map<int_t, hbdd<B, o>> lgrs() const {
-		map<int_t, hbdd<B, o>> r;
+	std::map<int_t, hbdd<B, o>> lgrs() const {
+		std::map<int_t, hbdd<B, o>> r;
 		if (b == bdd<B, o>::F) return r;
 		DBG(assert((b != bdd<B, o>::T));)
 		for (const auto& z : get_one_zero())
@@ -307,10 +310,10 @@ template<bdd_options o>
 struct bdd_handle<Bool, o> {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
 	typedef bdd_node<bdd_ref> bdd_node_t;
-	typedef unordered_map<bdd_node_t, shared_ptr<bdd_handle>> mn_type;
-	typedef map<Bool, std::shared_ptr<bdd_handle>> mb_type;
-	inline static unordered_map<bdd_node_t, shared_ptr<bdd_handle>> Mn;
-	inline static map<Bool, std::shared_ptr<bdd_handle>> Mb;
+	typedef std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> mn_type;
+	typedef std::map<Bool, std::shared_ptr<bdd_handle>> mb_type;
+	inline static std::unordered_map<bdd_node_t, std::shared_ptr<bdd_handle>> Mn;
+	inline static std::map<Bool, std::shared_ptr<bdd_handle>> Mb;
 	inline static hbdd<Bool, o> htrue, hfalse;
 
 	// nonworking hack to call init
@@ -324,7 +327,7 @@ struct bdd_handle<Bool, o> {
 	static hbdd<Bool, o> get(const bdd_node_t& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
 			return it->second;//.lock();
-		hbdd<Bool, o> h = make_shared<bdd_handle<Bool, o>>(); //(new bdd_handle);
+		hbdd<Bool, o> h = std::make_shared<bdd_handle<Bool, o>>(); //(new bdd_handle);
 		return h->b = bdd<Bool, o>::add(x), Mn.emplace(x, h), h;
 	}
 
@@ -375,8 +378,8 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool, o>::bdd_or(x->b, b));
 	}
 
-	static hbdd<Bool, o> and_many(const vector<hbdd<Bool, o>>& v) {
-		vector<bdd_ref> x;
+	static hbdd<Bool, o> and_many(const std::vector<hbdd<Bool, o>>& v) {
+		std::vector<bdd_ref> x;
 		for (const auto& e : v) x.push_back(e->b);
 		return get(bdd<Bool, o>::bdd_and_many(x));
 	}
@@ -389,8 +392,7 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool, o>::all(b, v));
 	}
 
-	hbdd<Bool, o>
-	subst(size_t v, const hbdd<Bool, o>& x) const {
+	hbdd<Bool, o> subst(size_t v, const hbdd<Bool, o>& x) const {
 #ifdef DEBUG
 //		assert( get(bdd<Bool, o>::subst(b, v, x->b)) ==
 //			((sub0(v) & ~x) | (sub1(v) & x)));
@@ -407,31 +409,34 @@ struct bdd_handle<Bool, o> {
 		return get(bdd<Bool, o>::sub1(b, v));
 	}
 
-	hbdd<Bool, o>
-	condition(size_t v, const hbdd<Bool, o>& f) const {
+	hbdd<Bool, o> condition(size_t v, const hbdd<Bool, o>& f) const {
 		return subst(v, f->sub0(v)) | subst(v, ~(f->sub1(v)));
 	}
 
-	void dnf(function<bool(const pair<Bool, vector<int_t>>&)> f) const {
-		vector<int_t> v;
-		bdd<Bool, o>::dnf(b, v, [f](const pair<Bool, vector<int_t>>& v) {
+	void dnf(std::function<bool(const std::pair<Bool, std::vector<int_t>>&)>
+		f) const
+	{
+		std::vector<int_t> v;
+		bdd<Bool, o>::dnf(b, v, [f](
+			const std::pair<Bool, std::vector<int_t>>& v)
+		{
 			return f(v);
 		});
 	}
 
-	set<pair<Bool, vector<int_t>>> dnf() const {
-		set<pair<Bool, vector<int_t>>> r;
+	std::set<std::pair<Bool, std::vector<int_t>>> dnf() const {
+		std::set<std::pair<Bool, std::vector<int_t>>> r;
 		dnf([&r](auto& x) { r.insert(x); return true; });
 		return r;
 	}
 
-	set<int_t> get_vars() const {
-		set<int_t> r;
+	std::set<int_t> get_vars() const {
+		std::set<int_t> r;
 		return bdd<Bool, o>::get_vars(b, r), r;
 	}
 
-	map<int_t, Bool> get_one_zero() const {
-		map<int_t, Bool> m;
+	std::map<int_t, Bool> get_one_zero() const {
+		std::map<int_t, Bool> m;
 		bdd<Bool, o>::get_one_zero(b, m);
 //#ifdef DEBUG
 //		auto d = dnf();
@@ -442,17 +447,18 @@ struct bdd_handle<Bool, o> {
 		return m;
 	}
 
-	hbdd<Bool, o>
-	compose(const map<int_t, hbdd<Bool, o>>& m) const {
-		map<int_t, bdd_ref> p;
+	hbdd<Bool, o> compose(const std::map<int_t, hbdd<Bool, o>>& m) const {
+		std::map<int_t, bdd_ref> p;
 		for (auto& x : m) p.emplace(x.first, x.second->b);
 		return get(bdd<Bool, o>::compose(b, p));
 	}
 
-	Bool eval(map<int_t, Bool>& m) const { return bdd<Bool, o>::eval(b, m); }
+	Bool eval(std::map<int_t, Bool>& m) const {
+		return bdd<Bool, o>::eval(b, m);
+	}
 
-	map<int_t, hbdd<Bool, o>> lgrs() const {
-		map<int_t, hbdd<Bool, o>> r;
+	std::map<int_t, hbdd<Bool, o>> lgrs() const {
+		std::map<int_t, hbdd<Bool, o>> r;
 		if (b == bdd<Bool, o>::F) return r;
 		DBG(assert((b != bdd<Bool, o>::T));)
 		for (const auto& z : get_one_zero())
@@ -597,19 +603,19 @@ bdd<Bool, o>::initializer::initializer() {
 
 // bdd printer taken from out.h
 template<typename B, auto o = bdd_options<>::create()>
-ostream& operator<<(ostream& os, const hbdd<B, o>& f) {
+std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 	if (f == bdd_handle<B, o>::htrue) return os << '1';
 	if (f == bdd_handle<B, o>::hfalse) return os << '0';
-	set<pair<B, vector<int_t>>> dnf = f->dnf();
+	std::set<std::pair<B, std::vector<int_t>>> dnf = f->dnf();
 	size_t n = dnf.size();
-	set<string> ss;
+	std::set<std::string> ss;
 	for (auto& c : dnf) {
-		set<string> s;
+		std::set<std::string> s;
 		assert(!(c.first == false));
-		stringstream t;
+		std::stringstream t;
 		if (!(c.first == true)) t << '{' << c.first << '}';
 		for (int_t v : c.second)
-			if (v < 0) s.insert(string(dict(-v)) + "'"s);
+			if (v < 0) s.insert(std::string(dict(-v)) + "'");
 			else s.insert(dict(v));
 		bool first = true;
 		for (auto& x : s) {
