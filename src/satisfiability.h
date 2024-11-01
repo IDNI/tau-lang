@@ -134,7 +134,7 @@ bool has_temporary_io_var (const nso<BAs...>& fm) {
 		fm, is_child_non_terminal<p::io_var, BAs...>);
 	for (const auto& var : io_vars) {
 		// Check if the name of var starts with "_"
-		if (get_io_name(var)[0] == 'o')
+		if (get_io_name(var)[0] == '_')
 			return true;
 	}
 	return false;
