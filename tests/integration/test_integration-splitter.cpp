@@ -66,6 +66,40 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
 		CHECK(!check_uniter_const.has_value());
 	}
+
+	TEST_CASE("Tau_splitter_5") {
+		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(!check_uniter_const.has_value());
+	}
+
+	TEST_CASE("Tau_splitter_6") {
+		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(!check_uniter_const.has_value());
+	}
+	TEST_CASE("Tau_splitter_7") {
+		const char *sample = "(sometimes o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(check_uniter_const.has_value());
+	}
+	TEST_CASE("Tau_splitter_8") {
+		const char *sample = "(always o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(check_uniter_const.has_value());
+	}
 }
 
 TEST_SUITE("Tau_splitter_middle_tests") {
@@ -74,7 +108,6 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 		auto src = make_tau_source(sample);
 		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
-		cout << s << "\n";
 		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
 		CHECK(!check_uniter_const.has_value());
 	}
@@ -104,6 +137,39 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 		auto s = tau_splitter(fm, splitter_type::middle);
 		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
 		CHECK(!check_uniter_const.has_value());
+	}
+	TEST_CASE("Tau_splitter_5") {
+		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::middle);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(!check_uniter_const.has_value());
+	}
+
+	TEST_CASE("Tau_splitter_6") {
+		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::middle);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(!check_uniter_const.has_value());
+	}
+	TEST_CASE("Tau_splitter_7") {
+		const char *sample = "(sometimes o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::middle);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(check_uniter_const.has_value());
+	}
+	TEST_CASE("Tau_splitter_8") {
+		const char *sample = "(always o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::middle);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(check_uniter_const.has_value());
 	}
 }
 
@@ -142,6 +208,39 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 		auto s = tau_splitter(fm, splitter_type::lower);
 		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
 		CHECK(!check_uniter_const.has_value());
+	}
+	TEST_CASE("Tau_splitter_5") {
+		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::lower);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(check_uniter_const.has_value());
+	}
+
+	TEST_CASE("Tau_splitter_6") {
+		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::lower);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(check_uniter_const.has_value());
+	}
+	TEST_CASE("Tau_splitter_7") {
+		const char *sample = "(sometimes o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::lower);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(check_uniter_const.has_value());
+	}
+	TEST_CASE("Tau_splitter_8") {
+		const char *sample = "(always o1[t] = 1).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::lower);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, bdd_binding>);
+		CHECK(check_uniter_const.has_value());
 	}
 }
 
