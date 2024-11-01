@@ -2294,6 +2294,13 @@ sp_tau_node<BAs...> build_bf_less(const sp_tau_node<BAs...>& l,
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> build_bf_nless(const sp_tau_node<BAs...>& l,
+	const sp_tau_node<BAs...>& r)
+{
+	return build_wff_neg<BAs...>(build_bf_less<BAs...>(l, r));
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> build_bf_less_equal(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
@@ -2332,18 +2339,31 @@ sp_tau_node<BAs...> build_bf_nleq_upper(const sp_tau_node<BAs...>& l,
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_bf_not_less_equal(const sp_tau_node<BAs...>& l,
-	const sp_tau_node<BAs...>& r)
-{
-	std::vector<sp_tau_node<BAs...>> args {trim(l), trim(r)};
-	return tau_apply_builder<BAs...>(bldr_bf_not_less_equal<BAs...>, args);
-}
-
-template<typename... BAs>
 sp_tau_node<BAs...> build_bf_greater(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
 	return build_bf_less<BAs...>(r, l);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_ngreater(const sp_tau_node<BAs...>& l,
+	const sp_tau_node<BAs...>& r)
+{
+	return build_wff_neg<BAs...>(build_bf_greater<BAs...>(r, l));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_greater_equal(const sp_tau_node<BAs...>& l,
+	const sp_tau_node<BAs...>& r)
+{
+	return build_bf_less_equal<BAs...>(l, r);
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> build_bf_ngeq(const sp_tau_node<BAs...>& l,
+	const sp_tau_node<BAs...>& r)
+{
+	return build_wff_neg<BAs...>(build_bf_greater_equal<BAs...>(r, l));
 }
 
 template<typename... BAs>
@@ -3005,7 +3025,7 @@ private:
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template<typename... BAs>
-nso<BAs...> nso_rr_apply(const rewriter::rule<nso<BAs...>>& r, 
+nso<BAs...> nso_rr_apply(const rewriter::rule<nso<BAs...>>& r,
 	const nso<BAs...>& n)
 {
 	#ifdef TAU_CACHE
