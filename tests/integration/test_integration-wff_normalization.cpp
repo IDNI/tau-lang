@@ -87,9 +87,9 @@ TEST_SUITE("Normalizer") {
 	}
 }
 
-TEST_SUITE("wff_sometimes") {
-	/*TEST_CASE("push_in_1") {
-		const char* sample = "sometimes (?x && o1[t] = 0 && sometimes(?x && o1[t] = 0 && sometimes(?x && o1[t] = 0))).";
+TEST_SUITE("wff_sometimes_always") {
+	TEST_CASE("push_in_1") {
+		const char* sample = "sometimes (x=0 && o1[t] = 0 && sometimes(x=0 && o1[t] = 0 && sometimes(x=0 && o1[t] = 0))).";
 		auto src = make_tau_source(sample);
 		auto formula = make_nso_rr_using_factory<bdd_binding>(src);
 		CHECK( formula.has_value() );
@@ -100,8 +100,8 @@ TEST_SUITE("wff_sometimes") {
 			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
 			| reduce_wff<bdd_binding>;
 		std::stringstream ss; ss << simp_res;
-		CHECK((ss.str() == "?x && (sometimes o1[t] = 0)" || ss.str() == "(sometimes o1[t] = 0) && ?x"));
-	}*/
+		CHECK((ss.str() == "x = 0 && (sometimes o1[t] = 0)" || ss.str() == "(sometimes o1[t] = 0) && x = 0"));
+	}
 
 	TEST_CASE("push_in_2") {
 		const char* sample = "sometimes T.";
@@ -132,8 +132,8 @@ TEST_SUITE("wff_sometimes") {
 		CHECK( ss.str() == "always o1[t] = 0" );
 	}
 
-	/*TEST_CASE("pull_out_1") {
-		const char* sample = "(sometimes T && ?x) || (sometimes T && ?x) || (sometimes ?x).";
+	TEST_CASE("pull_out_1") {
+		const char* sample = "(sometimes T && x=0) || (sometimes T && x=0) || (sometimes x=0).";
 		auto src = make_tau_source(sample);
 		auto formula = make_nso_rr_using_factory<bdd_binding>(src);
 		CHECK( formula.has_value() );
@@ -144,11 +144,11 @@ TEST_SUITE("wff_sometimes") {
 			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
 			| reduce_wff<bdd_binding>;
 		std::stringstream ss; ss << simp_res;
-		CHECK(ss.str() == "sometimes ?x");
-	}*/
+		CHECK(ss.str() == "sometimes x = 0");
+	}
 
-	/*TEST_CASE("pull_out_2") {
-		const char* sample = "(always ?x) && ?x && (sometimes ?x && ?x).";
+	TEST_CASE("pull_out_2") {
+		const char* sample = "(always x=0) && x=0 && (sometimes x=0 && x=0).";
 		auto src = make_tau_source(sample);
 		auto formula = make_nso_rr_using_factory<bdd_binding>(src);
 		CHECK( formula.has_value() );
@@ -159,6 +159,6 @@ TEST_SUITE("wff_sometimes") {
 			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
 			| reduce_wff<bdd_binding>;
 		std::stringstream ss; ss << simp_res;
-		CHECK(ss.str() == "?x");
-	}*/
+		CHECK(ss.str() == "x = 0");
+	}
 }
