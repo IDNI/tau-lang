@@ -1184,7 +1184,7 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<nso<BAs...>>> dnf_cnf_to_
 	if (paths.empty())
 		if (!decided)
 			paths.emplace_back();
-	std::ranges::sort(paths);
+	if (enable_sort) std::ranges::sort(paths);
 	return make_pair(move(paths), move(vars));
 }
 
@@ -1400,11 +1400,6 @@ template<typename... BAs>
 std::pair<std::vector<int_t>, bool> simplify_path(
 	const std::vector<int_t>& path, std::vector<nso<BAs...> >& vars)
 {
-	// cout << "Vars: ";
-	// for (const auto& var : vars) {
-	// 	cout << var << ", ";
-	// }
-	// cout << "\n";
 	using tp = tau_parser;
 	std::vector<std::vector<nso<BAs...>>> pos;
 	// Build clause for non-equality terms
@@ -1427,7 +1422,9 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	}
 	// Simplify equalities/inequalities
 	// Here new variables can be created
+	// std::cout << "pos_bf: " << pos_bf << "\n";
 	pos_bf = reduce2(pos_bf, tau_parser::bf, false, true, false);
+	// std::cout << "pos_bf after reduce: " << pos_bf << "\n";
 	nso<BAs...> new_pos_bf;
 	// negs_wff = reduce2(negs_wff, tau_parser::wff);
 	for (const auto& c : get_dnf_bf_clauses(pos_bf)) {
@@ -1435,6 +1432,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 		if (new_pos_bf) new_pos_bf = build_wff_and(new_pos_bf, build_wff_eq(c));
 		else new_pos_bf = build_wff_eq(c);
 	}
+	// std::cout << "New_pos_bf: " << new_pos_bf << "\n";
 	clause = build_wff_and(clause, new_pos_bf);
 
 	// cout << "Pos clause: " << clause << "\n";
@@ -1501,13 +1499,14 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	}
 	if (neq_cnf) {
 		// Convert back to cnf and push inequalities back out
-		neq_cnf = reduce2(neq_cnf, tau_parser::wff, true);
+		// std::cout << "neq_cnf: " << neq_cnf << "\n";
+		neq_cnf = reduce2(neq_cnf, tau_parser::wff, true, true, false);
+		// std::cout << "neq_cnf after reduce: " << neq_cnf << "\n";
 		neq_cnf = neq_cnf | repeat_all<step<BAs...>, BAs...>(
 				 squeeze_wff_neg<BAs...> | to_mnf_wff<BAs...>);
-		// cout << "neq_simplified: " << neq_cnf << "\n";
+		// cout << "neq_cnf simplified: " << neq_cnf << "\n";
 		clause = build_wff_and(clause, neq_cnf);
 	}
-	// cout << "Build clause: " << clause << "\n";
 	auto new_vars = select_top(clause, is_wff_bdd_var);
 
 	std::map<nso<BAs...>, size_t> var_to_idx;
