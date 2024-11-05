@@ -915,6 +915,22 @@ bool is_tau_formula_sat (const nso<BAs...>& fm) {
 	return res;
 }
 
+// The formulas need to be closed
+template<typename... BAs>
+bool are_tau_equivalent (const nso<BAs...>& f1, const nso<BAs...>& f2) {
+	// Negate equivalence for unsat check
+	auto equiv_check = build_wff_neg(build_wff_always(build_wff_equiv(f1, f2)));
+	equiv_check = normalizer_step(equiv_check);
+	auto clauses = get_dnf_wff_clauses(equiv_check);
+	// Now check that each disjunct is not satisfiable
+	for (const auto& c : clauses) {
+		auto ctn = transform_to_execution(c);
+		if (ctn != _F<BAs...>)
+			return false;
+	}
+	return true;
+}
+
 /*
  *  Possible tests:
  *  (o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0, passing
