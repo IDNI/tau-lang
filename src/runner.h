@@ -535,6 +535,14 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& phi_i
 			<< "compute_systems/clause: " << clause;
 		#endif // DEBUG
 
+		// TODO (HIGH) call chi_inf and clean the resul
+		auto executable = transform_to_execution(clause);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/executable: " << executable;
+		#endif // DEBUG
+
 		if (auto system = compute_system(clause, inputs, outputs); system)
 			systems.insert(system.value());
 		else {
@@ -562,7 +570,8 @@ std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> phi_inf, input_t
 
 
 template<typename input_t, typename output_t, typename...BAs>
-void run(const nso<BAs...>& phi_inf, input_t& inputs, output_t& outputs, size_t max_iter = std::numeric_limits<size_t>::max()) {
+void run(const nso<BAs...>& form, input_t& inputs, output_t& outputs, size_t max_iter = std::numeric_limits<size_t>::max()) {
+	auto phi_inf = normalizer(form);
 	auto intrprtr = make_interpreter(phi_inf, inputs, outputs);
 	if (!intrprtr) return;
 
