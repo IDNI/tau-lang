@@ -329,15 +329,25 @@ nso<BAs...> tau_splitter (const nso<BAs...>& fm, splitter_type st) {
 
 	// Fm is temporal
 	auto clauses = get_dnf_wff_clauses(fm);
-	for (size_t i = 0; i < clauses.size(); ++i) {
+	for (int_t i = 0; i < (int_t)clauses.size(); ++i) {
+		// First check redundancy between current clause and rest
+		bool is_redundant = false;
+		for (size_t j = 0; j < clauses.size(); ++j) {
+			if ((size_t)i == j) continue;
+			if (is_tau_impl(clauses[j], clauses[i])) {
+				clauses.erase(clauses.begin() + i);
+				--i;
+				is_redundant = true;
+				break;
+			}
+		}
+		if (is_redundant) continue;
 		auto [splitter, type] = splitter_of_clause(clauses[i]);
 		if (type != splitter_type::bad) {
-			// TODO: Check if clauses[i] is redundant
 			clauses[i] = splitter;
 			return build_wff_or<BAs...>(clauses);
 		}
 	}
-
 	if (clauses.size() == 1) {
 		// Conjunct always part with bad splitter
 		// If there is no always part, create one
@@ -350,7 +360,7 @@ nso<BAs...> tau_splitter (const nso<BAs...>& fm, splitter_type st) {
 			return replace(fm, c);
 		} else return build_wff_and(build_wff_always(tau_bad_splitter<BAs...>()), fm);
 	} else {
-        // By assumption there is more than one clause and all not redundant (TODO)
+        // By assumption there is more than one clause and all not redundant
         // Split disjunction taking splitter type into account
         return split(fm, tau_parser::wff, false, st, clauses, 0, false);
 	}

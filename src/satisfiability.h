@@ -938,6 +938,21 @@ bool is_tau_formula_sat (const nso<BAs...>& fm) {
 	return res;
 }
 
+// Check for temporal formulas if f1 implies f2
+template<typename... BAs>
+bool is_tau_impl (const nso<BAs...>& f1, const nso<BAs...>& f2) {
+	auto imp_check = build_wff_neg(build_wff_always(build_wff_imply(f1,f2)));
+	imp_check = normalizer_step(imp_check);
+	auto clauses = get_dnf_wff_clauses(imp_check);
+	// Now check that each disjunct is not satisfiable
+	for (const auto& c : clauses) {
+		auto ctn = transform_to_execution(c);
+		if (ctn != _F<BAs...>)
+			return false;
+	}
+	return true;
+}
+
 // The formulas need to be closed
 template<typename... BAs>
 bool are_tau_equivalent (const nso<BAs...>& f1, const nso<BAs...>& f2) {
