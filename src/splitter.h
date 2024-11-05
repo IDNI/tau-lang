@@ -225,14 +225,16 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 				//TODO: this equiv check should happen in good_reverse_splitter_using_function
 				std::map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
 				auto new_fm = replace(fm, c);
-				if (!are_nso_equivalent(new_fm, fm)) {
-					// If we split part of a temporal formula,
-					// check that it is still satisfiable
-					if (spec) {
+				if (spec) {
+					// We are dealing with a temporal formula
+					if (!are_tau_equivalent(new_fm, fm)) {
 						c = {{fm, new_fm}};
 						if (transform_to_execution(replace(spec, c)) != _F<BAs...>)
 							return {new_fm, st};
-					} else return {new_fm, st};
+					}
+				} else {
+					// We are dealing with a non-temporal formula
+					if (!are_nso_equivalent(new_fm, fm)) return {new_fm, st};
 				}
 			}
 		}
@@ -245,14 +247,16 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 				//TODO: this equiv check should happen in good_splitter_using_function
 				std::map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
 				auto new_fm = replace(fm, c);
-				if (!are_nso_equivalent(new_fm, fm)) {
-					// If we split part of a temporal formula,
-					// check that it is still satisfiable
-					if (spec) {
+				if (spec) {
+					// We are dealing with a temporal formula
+					if (!are_tau_equivalent(new_fm, fm)) {
 						c = {{fm, new_fm}};
 						if (transform_to_execution(replace(spec, c)) != _F<BAs...>)
 							return {new_fm, st};
-					} else return {new_fm, st};
+					}
+				} else {
+					// We are dealing with a non-temporal formula
+					if (!are_nso_equivalent(new_fm, fm)) return {new_fm, st};
 				}
 			}
 		}
@@ -263,14 +267,18 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 	size_t i = 0;
 	do {
 		auto s = split(fm, tau_parser::wff, false, st, m, i, true);
-		if (!are_nso_equivalent(s, fm)) {
-			// If we split part of a temporal formula,
-			// check that it is still satisfiable
-			if (spec) {
+		if (spec) {
+			// We are dealing with a temporal formula
+			if (!are_tau_equivalent(s, fm)) {
 				std::map<nso<BAs...>, nso<BAs...>> c = {{fm, s}};
+				auto new_spec = replace(spec, c);
 				if (transform_to_execution(replace(spec, c)) != _F<BAs...>)
 					return {s, st};
-			} else return {s, st};
+			}
+		} else {
+			// We are dealing with a non-temporal formula
+			if (!are_nso_equivalent(s, fm)) return
+					{s, st};
 		}
 	} while (++i < m.size());
 
