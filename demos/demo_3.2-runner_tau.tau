@@ -34,6 +34,13 @@ o1[t] = 0.
 r o1[t] = i1[t]'
 always o1[t] = 0.
 
+# Now, let us go into the rabbit hole of recursion. Let us consider the above
+# program but let us provide as input a program that sometimes return a program
+# that returns the same program.
+
+r o1[t] = i1[t]'
+sometimes o1[t] =  { o1[t] = i1[t]. }:tau.
+
 # In the future we would provide more complex examples, but we
 # guess you have a taste of how the runner works, at least in simple cases.
 #
