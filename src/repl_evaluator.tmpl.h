@@ -711,9 +711,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 			std::cout << "error: invalid argument";
 			return {};
 		}
-		auto normalized_fm = rr_.main;
-		// auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
-
+		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
 		if (has_no_boolean_combs_of_models(normalized_fm))
 			return build_wff_always(
 				always_to_unbounded_continuation(normalized_fm). first);

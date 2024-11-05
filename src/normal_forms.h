@@ -89,17 +89,13 @@ static auto nnf_to_dnf_bf = make_library<BAs...>(
 );
 
 template<typename... BAs>
-static auto nnf_to_dnf_wff = make_library<BAs...>(
-	WFF_TO_DNF_0
-	+ WFF_TO_DNF_1
-	+ WFF_PUSH_SOMETIMES_INWARDS
+static auto push_sometimes_in = make_library<BAs...>(
+	WFF_PUSH_SOMETIMES_INWARDS
 );
 
 template<typename... BAs>
-static auto nnf_to_cnf_wff = make_library<BAs...>(
-	WFF_TO_CNF_0
-	+ WFF_TO_CNF_1
-	+ WFF_PUSH_ALWAYS_INWARDS
+static auto push_always_in = make_library<BAs...>(
+	WFF_PUSH_ALWAYS_INWARDS
 );
 
 // This set of rules can blow up due to the interaction between
@@ -2014,9 +2010,18 @@ nso<BAs...> extract_sometimes (nso<BAs...> fm) {
 	// Apply always/sometimes extractions to fm
 	if (!l_changes.empty()) fm = replace(fm, l_changes);
 
+	nso<BAs...> extracted_fm = _T<BAs...>;
+    for (const auto &se: sometimes_extractions)
+		extracted_fm = build_wff_and(extracted_fm, se);
+	for (const auto &ae : always_extractions)
+		extracted_fm = build_wff_and(extracted_fm, ae);
+
+	// Check if everything under sometimes was removed
+	if (fm == _T<BAs...>) return extracted_fm;
+	if (fm == _F<BAs...>) return _F<BAs...>;
+
 	std::vector<nso<BAs...>> extracted = {}, staying = {};
 	auto clauses = get_leaves(trim2(fm), tau_parser::wff_and, tau_parser::wff);
-	if (clauses.empty()) clauses.push_back(fm);
 	for (const auto& clause : clauses) {
 		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(clause)) &&
 					!is_non_terminal(tau_parser::wff_always, trim(clause)));
@@ -2026,28 +2031,13 @@ nso<BAs...> extract_sometimes (nso<BAs...> fm) {
 	}
 
 	// From here we build the formula which we will return
-	nso<BAs...> extracted_fm;
-	if (extracted.empty()) extracted_fm = _T<BAs...>;
-	else {
-		bool first = true;
-		for (const auto &e: extracted) {
-			if (first) { first = false; extracted_fm = e; }
-			else extracted_fm = build_wff_and(extracted_fm, e);
-		}
-	}
-	for (const auto &se: sometimes_extractions)
-		extracted_fm = build_wff_and(extracted_fm, se);
-	for (const auto &ae : always_extractions)
-		extracted_fm = build_wff_and(extracted_fm, ae);
-	nso<BAs...> staying_fm;
+    for (const auto &e: extracted) extracted_fm = build_wff_and(extracted_fm, e);
+
 	if (staying.empty()) return extracted_fm;
-	else {
-		bool first = true;
-		for (const auto &s: staying) {
-			if (first) { first = false; staying_fm = s; }
-			else staying_fm = build_wff_and(staying_fm, s);
-		}
-	}
+	nso<BAs...> staying_fm = _T<BAs...>;
+    for (const auto &s: staying)
+         staying_fm = build_wff_and(staying_fm, s);
+
 	if (extracted_fm == _T<BAs...>) return build_wff_sometimes(staying_fm);
 	return build_wff_and(build_wff_sometimes(staying_fm), extracted_fm);
 }
@@ -2071,42 +2061,35 @@ nso<BAs...> extract_always (nso<BAs...> fm) {
 	// Apply always/sometimes extractions to flat_st
 	if (!l_changes.empty()) fm = replace(fm, l_changes);
 
+	nso<BAs...> extracted_fm = _F<BAs...>;
+    for (const auto &se: sometimes_extractions)
+		extracted_fm = build_wff_or(extracted_fm, se);
+	for (const auto &ae : always_extractions)
+		extracted_fm = build_wff_or(extracted_fm, ae);
+
+    // Check if everything under fm was removed
+	if (fm == _F<BAs...>) return extracted_fm;
+	if (fm == _T<BAs...>) return _T<BAs...>;
+
 	// Now extract from all disjuncts
 	std::vector<nso<BAs...>> extracted = {}, staying = {};
 	auto clauses = get_leaves(trim2(fm), tau_parser::wff_or, tau_parser::wff);
-	if (clauses.empty()) clauses.push_back(fm);
 	for (const auto& clause : clauses) {
 		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(clause)) &&
 					!is_non_terminal(tau_parser::wff_always, trim(clause)));
-
 		if (!has_temp_var(clause))
 			extracted.push_back(clause);
 		else staying.push_back(clause);
 	}
 
 	// From here we build the formula to return based on the extractions
-	nso<BAs...> extracted_fm;
-	if (extracted.empty()) extracted_fm = _F<BAs...>;
-	else {
-		bool first = true;
-		for (const auto &e: extracted) {
-			if (first) { first = false; extracted_fm = e; }
-			else extracted_fm = build_wff_or(extracted_fm, e);
-		}
-	}
-	for (const auto &se: sometimes_extractions)
-		extracted_fm = build_wff_or(extracted_fm, se);
-	for (const auto &ae : always_extractions)
-		extracted_fm = build_wff_or(extracted_fm, ae);
-	nso<BAs...> staying_fm;
+    for (const auto &e: extracted) extracted_fm = build_wff_or(extracted_fm, e);
+
 	if (staying.empty()) return extracted_fm;
-	else {
-		bool first = true;
-		for (const auto &s: staying) {
-			if (first) { first = false; staying_fm = s; }
-			else staying_fm = build_wff_or(staying_fm, s);
-		}
-	}
+	nso<BAs...> staying_fm = _F<BAs...>;
+    for (const auto &s: staying)
+         staying_fm = build_wff_or(staying_fm, s);
+
 	if (extracted_fm == _F<BAs...>) return build_wff_always(staying_fm);
 	return build_wff_or(build_wff_always(staying_fm), extracted_fm);
 }
@@ -2118,10 +2101,12 @@ nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
 	for (const auto &st : select_top_until(fm, is_child_non_terminal<tau_parser::wff_sometimes, BAs...>,
 								is_child_non_terminal<tau_parser::wff_always, BAs...>)) {
 		// Recursively denest sometimes and always statements contained in sometimes statement st
-		auto flat_st = build_wff_sometimes(push_sometimes_always_in(trim2(st)));
+		auto flat_st = push_sometimes_always_in(trim2(st));
 		// Simplyfy current formula and convert to DNF
 		// Reductions done in order to prevent blow up
-		flat_st = to_dnf2(flat_st);
+		flat_st = build_wff_sometimes(to_dnf2(flat_st));
+		flat_st = flat_st | repeat_all<step<BAs...>, BAs...>(
+				  push_sometimes_in<BAs...>);
 		flat_st = reduce2(flat_st, tau_parser::wff);
 		if (flat_st != st) g_changes[st] = flat_st;
 	}
@@ -2145,13 +2130,13 @@ nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
 	for (const auto& aw : select_top_until(fm, is_child_non_terminal<tau_parser::wff_always, BAs...>,
 								is_child_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
 		// Recursively denest sometimes and always statements contained in always statement aw
-		auto flat_aw = build_wff_always(push_sometimes_always_in(trim2(aw)));
+		auto flat_aw = push_sometimes_always_in(trim2(aw));
 		// Simplyfy current formula and convert to CNF
 		// Reductions done in order to prevent blow up
-		// TODO: First push always in
-		flat_aw = to_cnf2(flat_aw);
+		flat_aw = build_wff_always(to_cnf2(flat_aw));
+		flat_aw = flat_aw | repeat_all<step<BAs...>, BAs...>(
+				  push_always_in<BAs...>);
 		flat_aw = reduce2(flat_aw, tau_parser::wff, true);
-		// TODO: Then push always back out
 		if (flat_aw != aw) g_changes[aw] = flat_aw;
 	}
 	// Apply changes
@@ -2247,7 +2232,6 @@ nso<BAs...> pull_sometimes_always_out(nso<BAs...> fm) {
 			changes[pure_always_clause] = build_wff_or(pure_always_clause, no_temp_fm);
 			return replace(fm, changes);
 		}
-		//no_temp_fm = build_wff_always(no_temp_fm);
 		fm = build_wff_or(fm, no_temp_fm);
 	}
 	return fm;

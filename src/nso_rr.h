@@ -3638,10 +3638,10 @@ sp_tau_node<BAs...> make_node_hook_wff_sometimes(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n)))
+	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
 		return _T<BAs...>;
 	//RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n)))
+	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
 		return _F<BAs...>;
 	//RULE(WFF_SIMPLIFY_SOMETIMES_1,  "sometimes sometimes $X ::= sometimes $X.")
 	if (auto double_quantifier = first_argument_formula(n) | tau_parser::wff_sometimes; double_quantifier)
@@ -3657,10 +3657,10 @@ sp_tau_node<BAs...> make_node_hook_wff_always(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
-	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n)))
+	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
 		return _T<BAs...>;
 	//RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
-	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n)))
+	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
 		return _F<BAs...>;
 	//RULE(WFF_SIMPLIFY_ALWAYS_1,     "always always $X ::= always $X.")
 	if (auto double_quantifier = first_argument_formula(n) | tau_parser::wff_always;
