@@ -732,28 +732,12 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 						"New main: " << defs.main;
 	}
 
-	if (defs.rec_relations.empty()) return normalizer_step(defs.main);
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << defs;
-
-	std::vector<nso<BAs...>> previous;
-	nso<BAs...> current;
-	for (int i = get_max_loopback_in_rr(defs.main); ; i++) {
-		current = build_main_step(defs.main, i)
-			| repeat_all<step<BAs...>, BAs...>(
-				step<BAs...>(defs.rec_relations));
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer step";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
-		current = normalizer_step(current);
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer step";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
-		if (is_nso_equivalent_to_any_of(current, previous)) break;
-		else previous.push_back(current);
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- Next step";
-	}
-
+	// Substitute function and recurrence relation definitions
+	defs.main = defs.main | repeat_all<step<BAs...>, BAs...>(
+			    step<BAs...>(defs.rec_relations));
+	auto res = normalizer_step(defs.main);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";
-	BOOST_LOG_TRIVIAL(debug) << "(O) " << current << "\n";
-	return current;
+	return res;
 }
 
 template <typename... BAs>
