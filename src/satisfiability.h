@@ -506,7 +506,7 @@ nso<BAs...> build_prev_flag_on_lookback (const std::string& name, const std::str
 }
 
 template<typename... BAs>
-nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials, const int_t lookback) {
+nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials, const int_t lookback, bool reset_ctn_id = false) {
 	using p = tau_parser;
 	auto to_eq_1 = [](const auto& n) {
 		return build_wff_eq(build_bf_neg(n));
@@ -514,7 +514,10 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 	flag_initials = _T<BAs...>;
 	std::map<nso<BAs...>, nso<BAs...>> changes;
 	// transform constraints to their respective output streams and add required conditions
-	size_t ctn_id = 0;
+	// We make the variable static so that we can transform different parts of the formula independently
+	static size_t ctn_id = 0;
+	if (reset_ctn_id)
+		ctn_id = 0;
 	for (const auto& ctn : select_top(fm, is_non_terminal<p::constraint, BAs...>))
 	{
 		std::string ctnvar = make_string(tau_node_terminal_extractor<BAs...>,
@@ -590,10 +593,11 @@ std::pair<nso<BAs...>, int_t> always_to_unbounded_continuation(nso<BAs...> fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
 	nso<BAs...> flag_initials;
-	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, lookback);
-	if (lookback == 0 && fm != transformed_fm)
+	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, lookback, true);
+	if (lookback == 0 && fm != transformed_fm) {
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
-	else fm = transformed_fm;
+		lookback = 1;
+	} else fm = transformed_fm;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Removed flags";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << build_wff_and(fm, flag_initials);
@@ -765,8 +769,23 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	std::vector<nso<BAs...>> st_io_vars = select_top(st_flags,
 		is_child_non_terminal<p::io_var, BAs...>);
 
-	int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
 	int_t time_point = get_max_shift(io_vars);
+	// Check if a constant time constraint is still present
+	// Can happen due to constraints in sometimes clause
+	if (find_top(aw, is_non_terminal<p::constraint, BAs...>)) {
+		// Transform constraint to stream
+		nso<BAs...> ctn_initials = _T<BAs...>;
+		aw = transform_ctn_to_streams(aw, ctn_initials, time_point);
+		aw = build_wff_and(ctn_initials, aw);
+		// The lookback cannot be 0 due to presents of eventual variables
+		// Therefore, no adjustment of aw is needed
+
+		// Search again for io_vars after transformation
+		io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
+		time_point = get_max_shift(io_vars);
+	}
+
+	int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
 	// Shift flags in order to match lookback of always part
 	st_flags = shift_io_vars_in_fm(st_flags, st_io_vars, time_point);
 	st_io_vars = select_top(st_flags, is_child_non_terminal<p::io_var, BAs...>);
@@ -855,11 +874,15 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 		std::map<nso<BAs...>, nso<BAs...> > changes = {
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
-		ev_t = transform_to_eventual_variables(replace(fm, changes));
+		auto ubd_fm = replace(fm, changes);
+		ev_t = transform_to_eventual_variables(ubd_fm);
+		// Check if there is a sometimes present
+		if (ev_t == ubd_fm) return ubd_fm;
 	} else {
 		ev_t = transform_to_eventual_variables(fm);
+		// Check if there is a sometimes present
+		if (ev_t == fm) return fm;
 	}
-
 	auto aw_after_ev = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
 	if (!aw_after_ev.has_value()) return fm;
 	auto st = select_top(ev_t, is_child_non_terminal<p::wff_sometimes, BAs...>);
