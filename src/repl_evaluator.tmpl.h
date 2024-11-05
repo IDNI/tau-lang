@@ -796,7 +796,7 @@ void repl_evaluator< BAs...>::def_input_cmd(
 		fn = file_name;
 	else fn = ""; // default input (std::cin)
 
-	for (auto& t: nso_factory<BAs...>::instance().types()) {
+	for (auto& t: nso_factory<tau_ba<BAs...>, BAs...>::instance().types()) {
 		if (type == t) {
 			auto var_name = command
 				| tau_parser::in_var_name
@@ -822,11 +822,11 @@ void repl_evaluator< BAs...>::def_output_cmd(
 		fn = file_name;
 	else fn = ""; // default output (std::cout)
 
-	for (auto& t: nso_factory<BAs...>::instance().types()) {
+	for (auto& t: nso_factory<tau_ba<BAs...>, BAs...>::instance().types()) {
 		if (type == t) {
 			auto var_name = command
 				| tau_parser::out_var_name
-				| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;;
+				| optional_value_extractor<sp_tau_node<tau_ba<BAs...>, BAs...>>;
 			outputs[var_name] = {type, fn};
 			return;
 		}
