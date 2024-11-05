@@ -125,6 +125,21 @@ int_t get_lookback_after_normalization(const auto& io_vars) {
 	return max_lookback;
 }
 
+// Check if a formula has a temporary output stream
+// which are used for flag handling
+template<typename... BAs>
+bool has_temporary_io_var (const nso<BAs...>& fm) {
+	using p = tau_parser;
+	auto io_vars = rewriter::select_top(
+		fm, is_child_non_terminal<p::io_var, BAs...>);
+	for (const auto& var : io_vars) {
+		// Check if the name of var starts with "_"
+		if (get_io_name(var)[0] == '_')
+			return true;
+	}
+	return false;
+}
+
 template<typename... BAs>
 nso<BAs...> transform_io_var(const nso<BAs...>& io_var, const std::string& io_var_name, int_t time_point) {
 	// Check if io_var has constant time point
@@ -773,7 +788,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
-		run = build_wff_and(run, build_wff_neg(current_flag));
+		run = normalizer_step(build_wff_and(run, build_wff_neg(current_flag)));
 	}
 	// Since flag could not be raised in the initial segment, we now check if it
 	// can be raised at all. To this end we calculate chi_inf
@@ -800,7 +815,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	io_vars = select_top(chi_inf, is_child_non_terminal<p::io_var, BAs...>);
 	auto chi_inf_anchored = fm_at_time_point(chi_inf, io_vars, point_after_inits);
 
-	auto sat_check = normalizer_step(build_wff_and(run, chi_inf_anchored));
+	auto sat_check = is_non_temp_nso_satisfiable(build_wff_and(run, chi_inf_anchored));
 	BOOST_LOG_TRIVIAL(trace) << "Fm to check sat:";
 	BOOST_LOG_TRIVIAL(trace) << "(F) " << sat_check;
 	if (sat_check == _F<BAs...>) return _F<BAs...>;
@@ -822,7 +837,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
-		run = build_wff_and(run, build_wff_neg(current_flag));
+		run = normalizer_step(build_wff_and(run, build_wff_neg(current_flag)));
 	}
 }
 
@@ -856,7 +871,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 				aw_after_ev.value(), st[0], ubd_aw_fm));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
-	return res;
+	return is_child_non_terminal(p::wff_always, res) ? trim2(res) : res;
 }
 
 template<typename... BAs>
