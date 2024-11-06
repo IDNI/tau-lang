@@ -2,16 +2,16 @@
 # your settings if needed) and then execute the run.sh whithin the demo directory
 # as follows:
 #
-# ./run.sh demo_3.1-runner_sbf.tau
+# ./run.sh demo_3.1-interpreter_sbf.tau
 #
 # This demo should work under any *nix flavour due to the paths used for files.
 # To run it under windows you will need to change the paths to the files.
 
-# This demo demonstrate the workings of the runner.
+# This demo demonstrate the workings of the interpreter.
 
 # To run a tau program we need to define input and output variables.
 # If you attemp to run a program without defining the input and output variables,
-# the runner will throw an error.
+# the interpreter will throw an error.
 
 # The following program just echo the inputs to the outputs, but we have not
 # define inputs yet! So we would get an error.
@@ -48,7 +48,7 @@ r i1[t] = o1[t]
 # is what we have defined as the output.
 #
 # Of course, we could also deal with more comples programs. The above examples are quite
-# simple but are provided to show the basic workings of the runner.
+# simple but are provided to show the basic workings of the interpreter.
 # Let us consider the following example base on the Fibonacci sequence:
 
 r o1[t] = o1[t-1] + o1[t-2] && o1[0] = 1 && o1[1] = 1
@@ -93,7 +93,7 @@ r i1[t]' = o2[t]
 0
 
 # In the future we would provide more complex examples, but we
-# guess you have a taste of how the runner works, at least in simple cases.
+# guess you have a taste of how the interpreter works, at least in simple cases.
 #
 
 q

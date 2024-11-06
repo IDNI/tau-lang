@@ -15,7 +15,7 @@ set(TESTS
 	splitter2
 	solver
 	quantifiers
-	runner
+	interpreter
 )
 
 foreach(TEST IN LISTS TESTS)

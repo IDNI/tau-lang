@@ -333,7 +333,7 @@ TEST_SUITE("find_solution") {
 		CHECK ( test_find_solution(sample) );
 	}
 
-	//  number 1 of test_integration-runner.cpp
+	//  number 1 of test_integration-interpreter.cpp
 	TEST_CASE("x + <:c> = 0 && <:a> z + <:b> z' + y = 0") {
 		const char* sample = "x + <:c> | <:a> z + <:b> z' + y= 0.";
 		CHECK ( test_find_solution(sample) );

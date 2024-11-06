@@ -2,12 +2,12 @@
 # your settings if needed) and then execute the run.sh whithin the demo directory
 # as follows:
 #
-# ./run.sh demo_3.2-runner_fpbf.tau
+# ./run.sh demo_3.2-interpreter_fpbf.tau
 #
 # This demo should work under any *nix flavour due to the paths used for files.
 # To run it under windows you will need to change the paths to the files.
 #
-# The idea of this demo is to give a more complex example for the runner.
+# The idea of this demo is to give a more complex example for the interpreter.
 # The demo is based in the well-known model of FPGA -field programable
 # gate array- (see https://en.wikipedia.org/wiki/Field-programmable_gate_array for
 # the details).
