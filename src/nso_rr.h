@@ -3859,7 +3859,6 @@ sp_tau_node<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n)
 			return make_node_hook_wff_sometimes<BAs...>(n);
 		case tau_parser::wff_always:
 			return make_node_hook_wff_always<BAs...>(n);
-
 		case tau_parser::wff_xor:
 			return make_node_hook_wff_xor<BAs...>(n);
 		case tau_parser::wff_conditional:
@@ -3868,9 +3867,8 @@ sp_tau_node<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n)
 			return make_node_hook_wff_imply<BAs...>(n);
 		case tau_parser::wff_equiv:
 			return make_node_hook_wff_equiv<BAs...>(n);
-
 		case tau_parser::constraint:
-				return make_node_hook_wff_ctn<BAs...>(n);
+			return make_node_hook_wff_ctn<BAs...>(n);
 		case tau_parser::bf_less:
 			return make_node_hook_wff_less<BAs...>(n);
 		case tau_parser::bf_less_equal:
@@ -3881,9 +3879,7 @@ sp_tau_node<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n)
 			return make_node_hook_wff_nleq<BAs...>(n);
 		case tau_parser::bf_interval:
 			return make_node_hook_wff_interval<BAs...>(n);
-
-		default: return std::make_shared<
-					rewriter::node<tau_sym<BAs...>>>(n);
+		default: return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	}
 }
 
@@ -4498,6 +4494,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			case tau_parser::chars:
 			case tau_parser::capture:
 			case tau_parser::sym:
+			case tau_parser::ctnvar:
 			case tau_parser::num:
 			case tau_parser::type:
 			case tau_parser::source:

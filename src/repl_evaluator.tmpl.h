@@ -1176,7 +1176,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		//<< "\n"
 
 		<< "Run command:\n"
-		<< "  run                    run a program that meets a tau spec\n"
+		<< "  run                    run a program that meets the tau spec\n"
 		<< "\n"
 
 		<< "Solver commands:\n"
@@ -1184,7 +1184,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "\n"
 
 		<< "Definition commands:\n"
-		<< "  def                    show defined recurrence relations and variables\n"
+		<< "  def                    show recurrence relations and input/output variables\n"
 		<< "\n"
 
 		//<< "Selection commands:\n"
