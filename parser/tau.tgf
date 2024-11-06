@@ -317,7 +317,7 @@ severity               => ("e" | "error"):error_sym
 @trim all terminals except children of
         sym, digits, type, source, named_binding, capture,
         variable, in_var_name, out_var_name, uninter_const_name,
-        file_name.
+        file_name, ctnvar.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, wff_cb, bf_cb,
