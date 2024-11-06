@@ -85,6 +85,15 @@ nso<BAs...> build_io_out_shift (const std::string& name, const std::string& var,
 	auto offset = wrap<BAs...>(p::offset, shift_node);
 	return wrap(p::variable, wrap(p::io_var, wrap(p::out, { var_name, offset })));
 }
+
+template<typename... BAs>
+nso<BAs...> build_io_in_shift (const std::string& name, const std::string& var, const int_t shift) {
+	using p = tau_parser;
+	auto var_name = wrap<BAs...>(p::in_var_name, name);
+	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, var), build_num<BAs...>(shift)});
+	auto offset = wrap<BAs...>(p::offset, shift_node);
+	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
+}
 // -----------------------------------------------
 template<typename... BAs>
 int_t get_io_var_shift(const nso<BAs...>& io_var) {
@@ -146,7 +155,7 @@ nso<BAs...> transform_io_var(const nso<BAs...>& io_var, const std::string& io_va
 	if (is_io_initial(io_var))
 		return io_var;
 	auto shift = get_io_var_shift(io_var);
-	if (io_var_name[0] == 'i')
+	if (io_var | tau_parser::io_var | tau_parser::in)
 		return build_io_in_const<BAs...>(io_var_name, time_point - shift);
 	else return build_io_out_const<BAs...>(io_var_name, time_point - shift);
 }
@@ -357,7 +366,7 @@ bool is_run_satisfiable (const nso<BAs...>& fm) {
 		if (get_io_time_point(v1) < get_io_time_point(v2))
 			return true;
 		if (get_io_time_point(v1) == get_io_time_point(v2)) {
-			if (get_io_name(v2)[0] == 'i') return false;
+			if (v2 | p::io_var | p::in) return false;
 			else return true;
 		} else return false;
 	};
@@ -373,7 +382,7 @@ bool is_run_satisfiable (const nso<BAs...>& fm) {
 			continue;
 		}
 		auto& v = io_vars.back();
-		if (get_io_name(v)[0] == 'i') sat_fm = build_wff_all(v, sat_fm);
+		if (v | p::io_var | p::in) sat_fm = build_wff_all(v, sat_fm);
 		else sat_fm = build_wff_ex(v, sat_fm);
 		io_vars.pop_back();
 	}
@@ -478,9 +487,24 @@ nso<BAs...> transform_back_non_initials(const nso<BAs...>& fm, const int_t highe
 			continue;
 
 		nso<BAs...> transformed_var;
-		if (time_point - lookback != 0)
-			transformed_var = build_io_out_shift<BAs...>(get_io_name(io_var), "t", abs(time_point - lookback));
-		else transformed_var = build_io_out<BAs...>(get_io_name(io_var), "t");
+		if (time_point - lookback != 0) {
+			if (io_var | tau_parser::io_var | tau_parser::in)
+				transformed_var = build_io_in_shift<BAs...>(
+					get_io_name(io_var), "t",
+					abs(time_point - lookback));
+			else
+				transformed_var = build_io_out_shift<BAs...>(
+					get_io_name(io_var), "t",
+					abs(time_point - lookback));
+		}
+		else {
+			if (io_var | tau_parser::io_var | tau_parser::in)
+				transformed_var = build_io_in<BAs...>(
+					get_io_name(io_var), "t");
+			else
+				transformed_var = build_io_out<BAs...>(
+					get_io_name(io_var), "t");
+		}
 
 		changes.emplace(io_var, transformed_var);
 	}
