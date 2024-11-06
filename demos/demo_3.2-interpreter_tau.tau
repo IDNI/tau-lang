@@ -2,12 +2,12 @@
 # your settings if needed) and then execute the run.sh whithin the demo directory
 # as follows:
 #
-# ./run.sh demo_3.2-runner_tau.tau
+# ./run.sh demo_3.2-interpreter_tau.tau
 #
 # This demo should work under any *nix flavour due to the paths used for files.
 # To run it under windows you will need to change the paths to the files.
 
-# This demo demonstrate the workings of the runner when considering inputs and
+# This demo demonstrate the workings of the interpreter when considering inputs and
 # outputs tau programs.
 
 # Let us define the inputs/outputs from the console (of type tau)
@@ -42,7 +42,7 @@ r o1[t] = i1[t]'
 sometimes o1[t] =  { o1[t] = i1[t]. }:tau.
 
 # In the future we would provide more complex examples, but we
-# guess you have a taste of how the runner works, at least in simple cases.
+# guess you have a taste of how the interpreter works, at least in simple cases.
 #
 
 q

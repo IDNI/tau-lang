@@ -11,8 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#ifndef __RUNNER_H__
-#define __RUNNER_H__
+#ifndef __INTERPRETER_H__
+#define __INTERPRETER_H__
 
 #include <fstream>
 #include <termios.h>
@@ -600,4 +600,4 @@ void run(const nso<BAs...>& form, input_t& inputs, output_t& outputs, size_t max
 
 } // namespace idni::tau
 
-# endif //__RUNNER_H__
+# endif //__INTERPRETER_H__

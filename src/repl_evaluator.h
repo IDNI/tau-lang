@@ -62,7 +62,7 @@
 
 #include "bdd_binding.h"
 #include "repl.h"
-#include "runner.h"
+#include "interpreter.h"
 
 namespace idni::tau {
 

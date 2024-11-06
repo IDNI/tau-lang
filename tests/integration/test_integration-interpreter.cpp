@@ -24,7 +24,7 @@
 #include <boost/log/utility/setup/console.hpp>
 
 #include "doctest.h"
-#include "runner.h"
+#include "interpreter.h"
 #include "bdd_binding.h"
 
 using namespace boost::log;
@@ -97,7 +97,7 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 	std::cout << "run_test/sample: " << sample << "\n";
 	#endif // DEBUG
 
-	auto runner = make_interpreter(phi_inf, inputs, outputs).value();
+	auto intprtr = make_interpreter(phi_inf, inputs, outputs).value();
 
 	// we read the inputs only once (they are always empty in this test suite)
 
@@ -114,10 +114,10 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 		} else std::cout << "{}\n"; // no input
 		#endif // DEBUG
 
-		auto out = runner.step(in.value());
+		auto out = intprtr.step(in.value());
 
 		if (out.size() == 0) {
-			runner.memory.clear();
+			intprtr.memory.clear();
 			#ifdef DEBUG
 			std::cout << "run_test/output[" << i << "]: {}\n"; // no output
 			#endif // DEBUG
@@ -130,17 +130,17 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 			std::cout << var << " <- " << value << " ... ";
 			if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<bdd_binding>, bdd_binding>); io_vars) {
 				std::cout << "run_test/output[" << i << "]: unexpected io_var " << io_vars.value() << "\n";
-				runner.memory.clear();
+				intprtr.memory.clear();
 				break;
 			}
 		}
 		std::cout << "\n";
 		#endif // DEBUG
 
-		if (runner.memory.empty()) break;
+		if (intprtr.memory.empty()) break;
 	}
 
-	return runner.memory;
+	return intprtr.memory;
 }
 
 assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
