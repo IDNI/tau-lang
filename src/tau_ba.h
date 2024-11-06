@@ -51,7 +51,7 @@ struct tau_ba {
 	tau_ba<BAs...> operator~() const {
 		// TODO (HIGH) replace by ...tau... in the future
 		nso<tau_ba<BAs...>, BAs...> nmain =
-			build_wff_neg<tau_ba<BAs...>, BAs...>(nso_rr.main);
+			build_wff_neg<tau_ba<BAs...>, BAs...>(normalizer(nso_rr.main));
 		auto nrec_relations = nso_rr.rec_relations;
 		return tau_ba<BAs...>(nrec_relations, nmain);
 	}
@@ -97,8 +97,8 @@ struct tau_ba {
 	}
 
 	bool is_one() const {
-		return normalizer<tau_ba<BAs...>, BAs...>(nso_rr)
-						== _T<tau_ba<BAs...>, BAs...>;
+		auto normalized = normalizer<tau_ba<BAs...>, BAs...>(nso_rr);
+		return is_tau_impl( _T<tau_ba<BAs...>, BAs...>, normalized);
 	}
 
 	// the type is ewquivalent to tau_spec<BAs...>
@@ -183,9 +183,8 @@ struct tau_ba_factory {
 		// parse source
 		auto rr = make_nso_rr_using_factory<tau_ba<BAs...>,BAs...>(src);
 		if (!rr) return std::optional<gssotc<BAs...>>{};
-		auto nso = normalizer(rr.value().main);
 		// cvompute final result
-		tau_ba<BAs...> t(nso);
+		tau_ba<BAs...> t(rr.value().rec_relations, rr.value().main);
 		return std::optional<gssotc<BAs...>>{
 			rewriter::make_node<tau_sym<tau_ba<BAs...>, BAs...>>(
 				t, {}) };

@@ -714,7 +714,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
 		if (has_no_boolean_combs_of_models(normalized_fm))
 			return build_wff_always(
-				always_to_unbounded_continuation(normalized_fm). first);
+				always_to_unbounded_continuation( normalized_fm));
 		// Get each clause if there are several always disjuncts
 		auto clauses = get_leaves(normalized_fm, tau_parser::wff_or, tau_parser::wff);
 		nso<tau_ba<BAs...>,BAs...> res;

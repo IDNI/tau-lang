@@ -578,7 +578,7 @@ nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, con
 // We assume that the formula has run through the normalizer before
 // and is a single always statement
 template<typename... BAs>
-std::pair<nso<BAs...>, int_t> always_to_unbounded_continuation(nso<BAs...> fm)
+nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin always_to_unbounded_continuation";
 	BOOST_LOG_TRIVIAL(debug) << "Start fm for always_to_unbound: " << fm << "\n";
@@ -595,7 +595,6 @@ std::pair<nso<BAs...>, int_t> always_to_unbounded_continuation(nso<BAs...> fm)
 	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, lookback, true);
 	if (lookback == 0 && fm != transformed_fm) {
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
-		lookback = 1;
 	} else fm = transformed_fm;
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Removed flags";
@@ -630,12 +629,12 @@ std::pair<nso<BAs...>, int_t> always_to_unbounded_continuation(nso<BAs...> fm)
 		// Check if run is still sat
 		run = normalizer_step(run);
 		if (!is_run_satisfiable(run))
-			return {_F<BAs...>, lookback};
+			return _F<BAs...>;
 	}
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << ubd_ctn;
-	return std::make_pair(ubd_ctn, lookback);
+	return ubd_ctn;
 }
 
 // Assumes single normalized Tau DNF clause
@@ -879,7 +878,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 	nso<BAs...> ubd_aw_fm;
 	if (aw_fm.has_value()) {
 		// If there is an always part, replace it with its unbound continuation
-		ubd_aw_fm = always_to_unbounded_continuation(aw_fm.value()).first;
+		ubd_aw_fm = always_to_unbounded_continuation(aw_fm.value());
 		std::map<nso<BAs...>, nso<BAs...> > changes = {
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
@@ -906,45 +905,23 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 	return is_child_non_terminal(p::wff_always, res) ? trim2(res) : res;
 }
 
+// Assumes that fm has been normalized
 template<typename... BAs>
-bool is_tau_formula_sat (const nso<BAs...>& fm) {
+bool is_tau_formula_sat (const nso<BAs...>& normalized_fm) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << normalized_fm;
 
-	using p = tau_parser;
-	auto ev_t = transform_to_eventual_variables(fm);
-	BOOST_LOG_TRIVIAL(trace) << "(I) After eventual variable transformation";
-	BOOST_LOG_TRIVIAL(trace) << "(F) " << ev_t;
-
-	auto aw = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
-	if (!aw.has_value()) return is_non_temp_nso_satisfiable(fm);
-	auto st = select_top(ev_t, is_child_non_terminal<p::wff_sometimes, BAs...>);
-	assert(st.size() < 2);
-
-	auto io_vars = select_top(aw.value(), is_child_non_terminal<p::io_var, BAs...>);
-	auto shifted_aw = shift_io_vars_in_fm(aw.value(), io_vars, 1);
-
-	auto [aw_part, lookback] = always_to_unbounded_continuation(shifted_aw);
-	BOOST_LOG_TRIVIAL(trace) << "(I) After conversion of always part to unbounded continuation";
-	BOOST_LOG_TRIVIAL(trace) << "(F) " << aw_part;
-
-	if (st.empty()) return is_run_satisfiable(aw_part);
-
-	auto st_part = push_negation_in(build_wff_neg(trim2(st[0])));
-
-	std::map<nso<BAs...>, nso<BAs...> > num_change = {
-		{ wrap<BAs...>(p::variable, "t"), build_num<BAs...>(lookback) }
-	};
-
-	nso<BAs...> imp = build_wff_imply<BAs...>(aw_part, replace(st_part, num_change));
-	auto vars = get_free_vars_from_nso(imp);
-	for(auto& v: vars) {
-		imp = build_wff_all<BAs...>(v, imp);
+	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or,
+				  tau_parser::wff);
+	// Convert each disjunct to unbounded continuation
+	for (auto& clause: clauses) {
+		if (transform_to_execution(clause) != _F<BAs...>) {
+			BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
+			return true;
+		}
 	}
-	auto res = normalizer_step(imp) == _F<BAs...>;
 	BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
-	return res;
+	return false;
 }
 
 // Check for temporal formulas if f1 implies f2
