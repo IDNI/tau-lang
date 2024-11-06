@@ -366,8 +366,15 @@ bool is_run_satisfiable (const nso<BAs...>& fm) {
 		if (get_io_time_point(v1) < get_io_time_point(v2))
 			return true;
 		if (get_io_time_point(v1) == get_io_time_point(v2)) {
-			if (v2 | p::io_var | p::in) return false;
-			else return true;
+			bool v1_in = (v1 | p::io_var | p::in).has_value();
+			bool v2_in = (v2 | p::io_var | p::in).has_value();
+
+			if (!v1_in && v2_in) return false;
+			if (v1_in && !v2_in) return true;
+			if (v1_in && v2_in) return get_io_name(v1) < get_io_name(v2);
+			if (!v1_in && !v2_in) return get_io_name(v1) < get_io_name(v2);
+			// This covers all cases already
+			else return false;
 		} else return false;
 	};
 	sort(io_vars.begin(), io_vars.end(), initial_comp);
