@@ -345,7 +345,7 @@ nso<BAs...> build_step_chi(const nso<BAs...>& chi, const nso<BAs...>& st,
 // This method is designed to be called on the output of find_fixpoint_phi/chi
 // when the run was started at the earliest well-defined time point
 template<typename... BAs>
-bool is_raw_unbound_continuation_satisfiable (const nso<BAs...>& fm) {
+bool is_run_satisfiable (const nso<BAs...>& fm) {
 	using p = tau_parser;
 	if (fm == _F<BAs...>) return false;
 	if (fm == _T<BAs...>) return true;
@@ -386,7 +386,7 @@ bool is_raw_unbound_continuation_satisfiable (const nso<BAs...>& fm) {
 
 template<typename... BAs>
 std::pair<nso<BAs...>, int_t> find_fixpoint_phi(const nso<BAs...>& base_fm, const nso<BAs...>& ctn_initials,
-	const auto& io_vars, const auto& initials, const int_t time_point, bool raw = false) {
+	const auto& io_vars, const auto& initials, const int_t time_point) {
 	nso<BAs...> phi_prev = fm_at_time_point(base_fm, io_vars, time_point);
 	phi_prev = build_wff_and(ctn_initials, phi_prev);
 	int_t step_num = 1;
@@ -416,7 +416,7 @@ std::pair<nso<BAs...>, int_t> find_fixpoint_phi(const nso<BAs...>& base_fm, cons
 	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
 	BOOST_LOG_TRIVIAL(debug) << phi_prev;
-	return raw ? make_pair(phi, step_num) : make_pair(phi_prev, step_num - 1);
+	return make_pair(phi_prev, step_num - 1);
 }
 
 template<typename... BAs>
@@ -578,8 +578,7 @@ nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, con
 // We assume that the formula has run through the normalizer before
 // and is a single always statement
 template<typename... BAs>
-std::pair<nso<BAs...>, int_t> always_to_unbounded_continuation(nso<BAs...> fm,
-	bool sat_check = false)
+std::pair<nso<BAs...>, int_t> always_to_unbounded_continuation(nso<BAs...> fm)
 {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin always_to_unbounded_continuation";
 	BOOST_LOG_TRIVIAL(debug) << "Start fm for always_to_unbound: " << fm << "\n";
@@ -612,22 +611,31 @@ std::pair<nso<BAs...>, int_t> always_to_unbounded_continuation(nso<BAs...> fm,
                 initials.emplace(get_io_name(io_vars[i]),
                     get_io_time_point(io_vars[i]));
 
-	// Calculate fix point and get unbound continuation of fm
+	// Calculate unbound continuation of fm
 	int_t time_point = get_max_shift(io_vars);
-	auto [phi_inf, step_num] =
-		find_fixpoint_phi(fm, flag_initials, io_vars, initials, time_point, true);
-	if (sat_check) return make_pair(phi_inf, lookback);
-	nso<BAs...> res;
-	if (is_raw_unbound_continuation_satisfiable(phi_inf)) {
-		int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
-		auto [unbound_continuation, _ ] = find_fixpoint_phi(fm, flag_initials, io_vars, initials,
-									time_point + point_after_inits);
-		unbound_continuation = normalizer_step(unbound_continuation);
-		res = transform_back_non_initials(unbound_continuation, point_after_inits - 1);
-	} else res = _F<BAs...>;
+	int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
+	auto [ubd_ctn, _] = find_fixpoint_phi(
+		fm, flag_initials, io_vars, initials,
+		time_point + point_after_inits);
+
+	ubd_ctn = normalizer_step(ubd_ctn);
+	ubd_ctn = transform_back_non_initials(ubd_ctn, point_after_inits - 1);
+	// Run phi_inf until all initial conditions are taken into account
+	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
+	nso<BAs...> run;
+	for (int_t t = time_point; t < point_after_inits + time_point; ++t) {
+		auto current_step = fm_at_time_point(ubd_ctn, io_vars, t);
+		if (run) run = build_wff_and(run, current_step);
+		else run = current_step;
+		// Check if run is still sat
+		run = normalizer_step(run);
+		if (!is_run_satisfiable(run))
+			return {_F<BAs...>, lookback};
+	}
+
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
-	return make_pair(res, lookback);
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << ubd_ctn;
+	return std::make_pair(ubd_ctn, lookback);
 }
 
 // Assumes single normalized Tau DNF clause
@@ -800,7 +808,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		auto current_flag = fm_at_time_point(st_flags, st_io_vars, i);
 
 		auto normed_run = normalizer_step(build_wff_and(run, current_flag));
-		if (is_raw_unbound_continuation_satisfiable(normed_run)) {
+		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
 			return build_wff_and(normed_run, original_aw_continuation);
@@ -834,7 +842,8 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	io_vars = select_top(chi_inf, is_child_non_terminal<p::io_var, BAs...>);
 	auto chi_inf_anchored = fm_at_time_point(chi_inf, io_vars, point_after_inits);
 
-	auto sat_check = is_non_temp_nso_satisfiable(build_wff_and(run, chi_inf_anchored));
+	auto sat_check = is_run_satisfiable(
+		build_wff_and(run, chi_inf_anchored));
 	BOOST_LOG_TRIVIAL(trace) << "Fm to check sat:";
 	BOOST_LOG_TRIVIAL(trace) << "(F) " << sat_check;
 	if (sat_check == _F<BAs...>) return _F<BAs...>;
@@ -849,7 +858,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		auto normed_run = normalizer_step(build_wff_and(run, current_flag));
 		// The formula is guaranteed to have be sat at some point
 		// Therefore, the loop will exit eventually
-		if (is_raw_unbound_continuation_satisfiable(normed_run)) {
+		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
 			return build_wff_and(normed_run, original_aw_continuation);
@@ -915,11 +924,11 @@ bool is_tau_formula_sat (const nso<BAs...>& fm) {
 	auto io_vars = select_top(aw.value(), is_child_non_terminal<p::io_var, BAs...>);
 	auto shifted_aw = shift_io_vars_in_fm(aw.value(), io_vars, 1);
 
-	auto [aw_part, lookback] = always_to_unbounded_continuation(shifted_aw, true);
+	auto [aw_part, lookback] = always_to_unbounded_continuation(shifted_aw);
 	BOOST_LOG_TRIVIAL(trace) << "(I) After conversion of always part to unbounded continuation";
 	BOOST_LOG_TRIVIAL(trace) << "(F) " << aw_part;
 
-	if (st.empty()) return is_raw_unbound_continuation_satisfiable(aw_part);
+	if (st.empty()) return is_run_satisfiable(aw_part);
 
 	auto st_part = push_negation_in(build_wff_neg(trim2(st[0])));
 
