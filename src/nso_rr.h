@@ -1419,11 +1419,12 @@ rr<nso<BAs...>> make_nso_rr_from_binded_code(const sp_tau_node<BAs...>& code) {
 	if (is_non_terminal(tau_parser::rec_relations, code))
 		return {make_rec_relations<BAs...>(code), {}};
 
-	auto main = (!is_non_terminal(tau_parser::rr, code)
-		? code | tau_parser::rr | tau_parser::main
-		: code | tau_parser::main)
-			| tau_parser::wff
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+	auto main = (is_non_terminal(tau_parser::tau_constant_source, code)
+		|| is_non_terminal(tau_parser::rr, code)
+			? code | tau_parser::main
+			: code | tau_parser::rr | tau_parser::main)
+				| tau_parser::wff
+				| optional_value_extractor<sp_tau_node<BAs...>>;
 	auto rules = make_rec_relations<BAs...>(code);
 	return infer_ref_types<BAs...>(rr<nso<BAs...>>{ rules, main });
 }
