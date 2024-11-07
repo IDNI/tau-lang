@@ -15,11 +15,11 @@
 #define __INTERPRETER_H__
 
 #include <fstream>
-#include <termios.h>
 
 #include "tau_ba.h"
 #include "solver.h"
 #include "satisfiability.h"
+#include "term.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -84,20 +84,10 @@ struct finputs {
 				std::getline(file.value(), line);
 				std::cout << line << "\n";
 			} else {
-				//TODO (MEDIUM) maybe we should use a repl here with
-				// a prompt for the user to input the value and
-				// a proper history file.
 				std::cout << var << "[" << time_point << "]: ";
-				// set proper input mode
-				termios orig_attrs;
-				tcgetattr(STDIN_FILENO, &orig_attrs);
-				termios new_attrs = orig_attrs;
-				new_attrs.c_lflag |= ICANON;  // enable canonical mode
-				new_attrs.c_lflag |= ECHO;    // enable echo
-				tcsetattr(STDIN_FILENO, TCSANOW, &new_attrs);
+				term::enable_getline_mode();
 				std::getline(std::cin, line);
-				// reset previous mode
-				tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
+				term::disable_getline_mode();
 				// TODo (MEDIUM) add echo for input from a file instead of console
 			}
 			if (line.empty()) return {}; // no more inputs
