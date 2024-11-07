@@ -181,7 +181,11 @@ struct tau_ba_factory {
 
 	std::optional<gssotc<BAs...>> parse(const std::string& src) {
 		// parse source
-		auto rr = make_nso_rr_using_factory<tau_ba<BAs...>,BAs...>(src);
+		auto source = make_tau_source(src, {
+				.start = tau_parser::tau_constant_source });
+		if (!source) return std::optional<gssotc<BAs...>>{};
+		auto rr = make_nso_rr_using_factory<tau_ba<BAs...>, BAs...>(
+									source);
 		if (!rr) return std::optional<gssotc<BAs...>>{};
 		// cvompute final result
 		tau_ba<BAs...> t(rr.value().rec_relations, rr.value().main);

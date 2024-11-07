@@ -19,8 +19,8 @@
 #
 start                  => rr _.
 
-# start symbol posibilities: rr, inputs, library, builder, cli (bellow)
-#
+# start symbol posibilities:
+# rr, inputs, library, builder, tau_constant_source, cli (bellow)
 #TODO (LOW) maybe rename rr to program, rr_gssot or similar
 rr                     => rec_relations _ wff:main _ '.'.
 rec_relations          => (_ rec_relation _ '.')*.
@@ -37,6 +37,7 @@ builder_head           => '(' _ capture (__ capture)* _ ')'.
 builder_body           => ("=:"  _ bf) :bf_builder_body
                         | ("=::" _ wff):wff_builder_body.
 
+tau_constant_source    => rec_relations _ main [ _ '.' ].
 
 # wff and bf expressions
 #
