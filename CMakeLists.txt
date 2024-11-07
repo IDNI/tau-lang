@@ -105,7 +105,14 @@ message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
 # Adding Boost log library
 #
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost REQUIRED COMPONENTS log)
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+	CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+		find_package(Boost REQUIRED
+			PATHS "${CMAKE_CURRENT_SOURCE_DIR}/libboost-mingw-w64"
+			COMPONENTS log)
+else()
+		find_package(Boost REQUIRED COMPONENTS log)
+endif()
 if (Boost_FOUND)
 	message(STATUS "Boost version: ${Boost_VERSION}")
 	message(STATUS "Boost include dirs: ${Boost_INCLUDE_DIRS}")

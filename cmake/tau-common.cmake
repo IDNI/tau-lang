@@ -59,9 +59,8 @@ function(target_compile_definitions_if target access project_definitions)
 	endforeach()
 endfunction()
 
-# setups a target: sets COMPILE and LINK options, adds warnings, c++20 req...
+# setups a target: sets COMPILE and LINK options, adds warnings, c++ std req...
 function(target_setup target)
-	target_compile_features(${target} PRIVATE cxx_std_23)
 	if(NOT MSVC)
 		target_compile_options(${target} PRIVATE
 			-W -Wall -Wextra -Wpedantic
@@ -71,15 +70,30 @@ function(target_setup target)
 			-Wstrict-overflow=5
 			-Wfloat-equal
 			-Wwrite-strings
-			#-Werror
-			#-Wfatal-errors
+			# -Werror
+			# -Wfatal-errors
 		)
 	else()
 		target_compile_options(${target} PRIVATE /W4)
 	endif()
 	target_compile_options(${target} PRIVATE "${COMPILE_OPTIONS}")
 	target_compile_definitions_if(${target} PRIVATE "${TAU_DEFINITIONS}")
-	target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
+	if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+		CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			target_compile_features(${target} PRIVATE cxx_std_20)
+			target_compile_options(${target} PRIVATE
+				-Wa,-mbig-obj
+				-fno-use-linker-plugin
+			)
+			target_link_libraries(${target}
+				${CMAKE_THREAD_LIBS_INIT}
+				-static-libgcc
+				-static-libstdc++
+			)
+	else()
+		target_compile_features(${target} PRIVATE cxx_std_23)
+		target_link_libraries(${target} ${CMAKE_THREAD_LIBS_INIT})
+	endif()
 	target_link_options(${target} PRIVATE "${LINK_OPTIONS}")
 	target_git_definitions(${target})
 	set_target_properties(${target} PROPERTIES
