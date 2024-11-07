@@ -2349,14 +2349,14 @@ template<typename... BAs>
 sp_tau_node<BAs...> build_bf_ngreater(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	return build_wff_neg<BAs...>(build_bf_greater<BAs...>(r, l));
+	return build_wff_neg<BAs...>(build_bf_greater<BAs...>(l, r));
 }
 
 template<typename... BAs>
 sp_tau_node<BAs...> build_bf_greater_equal(const sp_tau_node<BAs...>& l,
 	const sp_tau_node<BAs...>& r)
 {
-	return build_bf_less_equal<BAs...>(l, r);
+	return build_bf_less_equal<BAs...>(r, l);
 }
 
 template<typename... BAs>
@@ -3692,6 +3692,23 @@ sp_tau_node<BAs...> make_node_hook_wff_less(
 }
 
 template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_nless(
+	const rewriter::node<tau_sym<BAs...>>& n)
+{
+	//RULE(BF_NLESS_SIMPLIFY_0, "$X !< 0 ::= T.") @CP
+	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
+		return _T<BAs...>;
+	//RULE(BF_NLESS_SIMPLIFY_2, "0 !< 1 ::= F.")
+	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
+			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+		return _F<BAs...>;
+	//RULE(BF_DEF_SIMPLIFY_N, "$X !< 1 ::= $X' = 0.")
+	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+		return build_wff_eq<BAs...>(build_bf_neg(first_argument_formula(n)));
+	return build_bf_nless<BAs...>(first_argument_formula(n), second_argument_formula(n));
+}
+
+template<typename... BAs>
 sp_tau_node<BAs...> make_node_hook_wff_less_equal(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
@@ -3703,6 +3720,20 @@ sp_tau_node<BAs...> make_node_hook_wff_less_equal(
 			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
 		return _T<BAs...>;
 	return build_bf_less_equal<BAs...>(first_argument_formula(n), second_argument_formula(n));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_nleq(
+	const rewriter::node<tau_sym<BAs...>>& n)
+{
+	//RULE(BF_NLEQ_SIMPLIFY_0, "$X !<= 1 ::= F.") @CP
+	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+		return _F<BAs...>;
+	//RULE(BF_NLEQ_SIMPLIFY_2, "0 !<= 1 ::= F.")
+	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
+			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+		return _F<BAs...>;
+	return build_bf_nleq<BAs...>(first_argument_formula(n), second_argument_formula(n));
 }
 
 template<typename... BAs>
@@ -3723,17 +3754,48 @@ sp_tau_node<BAs...> make_node_hook_wff_greater(
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> make_node_hook_wff_nleq(
+sp_tau_node<BAs...> make_node_hook_wff_ngreater(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
-	//RULE(BF_NLEQ_SIMPLIFY_0, "$X !<= 1 ::= F.") @CP
+	//RULE(BF_NGREATER_SIMPLIFY_0, "$X !> 1 ::= T.") @CP
 	if (is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
+		return _T<BAs...>;
+	//RULE(BF_NGREATER_SIMPLIFY_2, "1 !> 0 ::= F.")
+	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
+			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
 		return _F<BAs...>;
-	//RULE(BF_NLEQ_SIMPLIFY_2, "1 !<= 0 ::= T.")
+	//RULE(BF_NGREATER_SIMPLIFY_3, "0 !> $X ::= T.")
+	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n)))
+		return _T<BAs...>;
+	return build_bf_ngreater<BAs...>(first_argument_formula(n), second_argument_formula(n));
+}
+
+template<typename... BAs>
+inline sp_tau_node<BAs...> make_node_hook_wff_greater_equal(
+	const rewriter::node<tau_sym<BAs...>>& n)
+{
+	//RULE(BF_GREATER_EQUAL_SIMPLIFY_0, "$X >= 0 ::= T.") @CP
+	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
+		return _T<BAs...>;
+	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= 0 ::= T.")
 	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
 		return _T<BAs...>;
-	return build_bf_nleq<BAs...>(first_argument_formula(n), second_argument_formula(n));
+	return build_bf_greater_equal<BAs...>(first_argument_formula(n), second_argument_formula(n));
+}
+
+template<typename... BAs>
+sp_tau_node<BAs...> make_node_hook_wff_ngeq(
+	const rewriter::node<tau_sym<BAs...>>& n)
+{
+	//RULE(BF_NGEQ_SIMPLIFY_0, "$X !>= 0 ::= F.") @CP
+	if (is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
+		return _F<BAs...>;
+	//RULE(BF_NGEQ_SIMPLIFY_2, "1 !>= 0 ::= F.")
+	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
+			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
+		return _F<BAs...>;
+	return build_bf_ngeq<BAs...>(first_argument_formula(n), second_argument_formula(n));
 }
 
 template<typename... BAs>
@@ -3871,12 +3933,20 @@ sp_tau_node<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n)
 			return make_node_hook_wff_ctn<BAs...>(n);
 		case tau_parser::bf_less:
 			return make_node_hook_wff_less<BAs...>(n);
+		case tau_parser::bf_nless:
+			return make_node_hook_wff_nless<BAs...>(n);
 		case tau_parser::bf_less_equal:
 			return make_node_hook_wff_less_equal<BAs...>(n);
-		case tau_parser::bf_greater:
-			return make_node_hook_wff_greater<BAs...>(n);
 		case tau_parser::bf_nleq:
 			return make_node_hook_wff_nleq<BAs...>(n);
+		case tau_parser::bf_greater:
+			return make_node_hook_wff_greater<BAs...>(n);
+		case tau_parser::bf_ngreater:
+			return make_node_hook_wff_ngreater<BAs...>(n);
+		case tau_parser::bf_greater_equal:
+			return make_node_hook_wff_greater_equal<BAs...>(n);
+		case tau_parser::bf_ngeq:
+			return make_node_hook_wff_ngeq<BAs...>(n);
 		case tau_parser::bf_interval:
 			return make_node_hook_wff_interval<BAs...>(n);
 		default: return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
