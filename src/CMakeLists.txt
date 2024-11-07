@@ -28,13 +28,12 @@ set(TAU_SOURCES
 	bool_ba.cpp
 	dict.cpp
 	nso_rr.cpp
-	repl_evaluator.cpp
 )
 
 set(CLI_SOURCES
 	main.cpp
-	repl_evaluator.cpp
-	../external/parser/src/cli.cpp)
+	../external/parser/src/cli.cpp
+)
 
 #
 # object library
