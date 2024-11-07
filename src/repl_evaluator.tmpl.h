@@ -612,18 +612,11 @@ void repl_evaluator<BAs...>::run_cmd(
 		if (in_vars.empty() && !out_vars.empty()) {
 			// TODO (MEDIUM) maybe we should use an specialized method to get the number of steps
 			std::cout << "no inputs vars defined, how many steps do you want to perform? ";
-			// set proper input mode
-			termios orig_attrs;
-			tcgetattr(STDIN_FILENO, &orig_attrs);
-			termios new_attrs = orig_attrs;
-			new_attrs.c_lflag |= ICANON;  // enable canonical mode
-			new_attrs.c_lflag |= ECHO;    // enable echo
-			tcsetattr(STDIN_FILENO, TCSANOW, &new_attrs);
+			term::enable_getline_mode();
 			// read input
 			std::string line;
 			std::getline(std::cin, line);
-			// reset previous mode
-			tcsetattr(STDIN_FILENO, TCSANOW, &orig_attrs);
+			term::disable_getline_mode();
 			try {
 				max_iter = std::stoul(line);
 				std::cout << line << "\n";
