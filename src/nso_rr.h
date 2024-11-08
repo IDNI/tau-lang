@@ -2609,10 +2609,8 @@ sp_tau_node<BAs...> normalize_ba(const sp_tau_node<BAs...>& fm) {
 	assert(is_non_terminal(tau_parser::bf, fm));
 	auto norm_ba = [](const auto& n, const auto& c) {
 
-		#ifdef DEBUG
-		std::cout << "normalize_ba/norm_ba/n: " << n << std::endl;
-		std::cout << "normalize_ba/norm_ba/c: " << c << std::endl;
-		#endif
+		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/n: " << n;
+		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/c: " << c;
 
 		if (!is_child_non_terminal(tau_parser::bf_constant, n))
 			return n->child == c ? n : make_node(n->value, c);

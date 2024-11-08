@@ -254,7 +254,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ x3 x4 y } w != 0" );
+		CHECK(ss.str() == "{ x3 y } ({ x3 y } w)' = 0" );
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
@@ -265,7 +265,17 @@ TEST_SUITE("Tau_splitter_coeff") {
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		CHECK((ss.str() == "{ x } w != 0"
-			|| ss.str() == "{ y } w != 0" ));
+		CHECK((ss.str() == "{ x | x' y } ({ x | x' y } w)' = 0" || ss.str() == "{ x y' | y } ({ x y' | y } w)' = 0"));
+	}
+
+	TEST_CASE("Tau_splitter_coeff3") {
+		bdd_init<Bool>();
+		const char *sample = "{x}:sbf f = 0 && {y}:sbf g = 0.";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<tau_ba<bdd_binding>, bdd_binding>(src).value().main;
+		fm = normalizer(fm);
+		auto s = tau_splitter(fm, splitter_type::upper);
+		stringstream ss; ss << s;
+		CHECK(ss.str() == "{ x } f = 0 && { y } g = 0 && f{ x' } = 0");
 	}
 }
