@@ -400,6 +400,64 @@ bool is_run_satisfiable (const nso<BAs...>& fm) {
 	return is_non_temp_nso_satisfiable(sat_fm);
 }
 
+// Assumption is that the provided fm is an unbound continuation
+template<typename... BAs>
+nso<BAs...> get_uninterpreted_constants_constraints (const nso<BAs...>& fm) {
+	using p = tau_parser;
+	std::vector<nso<BAs...> > io_vars = select_top(fm,
+				is_child_non_terminal<p::io_var, BAs...>);
+
+	// Substitute lookback as current time point
+	auto look_back = get_max_shift(io_vars);
+	auto uconst_ctns = fm_at_time_point(fm, io_vars, look_back);
+	io_vars = select_top(uconst_ctns,
+			     is_child_non_terminal<p::io_var, BAs...>);
+
+	auto initial_comp = [](const auto& v1, const auto& v2) {
+		if (get_io_time_point(v1) < get_io_time_point(v2))
+			return true;
+		if (get_io_time_point(v1) == get_io_time_point(v2)) {
+			bool v1_in = (v1 | p::io_var | p::in).has_value();
+			bool v2_in = (v2 | p::io_var | p::in).has_value();
+
+			if (!v1_in && v2_in) return false;
+			if (v1_in && !v2_in) return true;
+			if (v1_in && v2_in) return get_io_name(v1) < get_io_name(v2);
+			if (!v1_in && !v2_in) return get_io_name(v1) < get_io_name(v2);
+			// This covers all cases already
+			else return false;
+		} else return false;
+	};
+	// All io_vars in fm have to refer to constant time positions
+	assert(all_of(io_vars.begin(), io_vars.end(),
+		[](const auto& el){return is_io_initial(el);}));
+	sort(io_vars.begin(), io_vars.end(), initial_comp);
+
+	auto free_io_vars = get_free_vars_from_nso(uconst_ctns);
+	while(!io_vars.empty()) {
+		if (!free_io_vars.contains(io_vars.back())) {
+			io_vars.pop_back();
+			continue;
+		}
+		auto& v = io_vars.back();
+		free_io_vars.erase(v);
+		if (v | p::io_var | p::in) uconst_ctns = build_wff_all(v, uconst_ctns);
+		else uconst_ctns = build_wff_ex(v, uconst_ctns);
+		io_vars.pop_back();
+	}
+	// Existentially quantify remaining variables
+	for (const auto& v : free_io_vars) {
+		uconst_ctns = build_wff_ex(v, uconst_ctns);
+	}
+	// Eliminate all variables
+	uconst_ctns = normalizer_step(uconst_ctns);
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula describing constraints on uninterpreted constants";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << uconst_ctns;
+
+	return uconst_ctns;
+}
+
 template<typename... BAs>
 std::pair<nso<BAs...>, int_t> find_fixpoint_phi(const nso<BAs...>& base_fm, const nso<BAs...>& ctn_initials,
 	const auto& io_vars, const auto& initials, const int_t time_point) {
@@ -902,8 +960,11 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
 nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	using p = tau_parser;
+	auto elim_aw = [](const auto& f) {
+		return is_child_non_terminal(p::wff_always, f) ? trim2(f) : f;
+	};
+	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 	nso<BAs...> ev_t;
 	nso<BAs...> ubd_aw_fm;
@@ -916,14 +977,14 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 		auto ubd_fm = replace(fm, changes);
 		ev_t = transform_to_eventual_variables(ubd_fm);
 		// Check if there is a sometimes present
-		if (ev_t == ubd_fm) return ubd_fm;
+		if (ev_t == ubd_fm) return elim_aw(ubd_fm);
 	} else {
 		ev_t = transform_to_eventual_variables(fm);
 		// Check if there is a sometimes present
-		if (ev_t == fm) return fm;
+		if (ev_t == fm) return elim_aw(fm);
 	}
 	auto aw_after_ev = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
-	if (!aw_after_ev.has_value()) return fm;
+	if (!aw_after_ev.has_value()) return elim_aw(fm);
 	auto st = select_top(ev_t, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	assert(st.size() < 2);
 
@@ -933,7 +994,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 				aw_after_ev.value(), st[0], ubd_aw_fm));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
-	return is_child_non_terminal(p::wff_always, res) ? trim2(res) : res;
+	return elim_aw(res);
 }
 
 // Assumes that fm has been normalized
