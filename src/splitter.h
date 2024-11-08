@@ -87,20 +87,28 @@ nso<BAs...> split(const nso<BAs...>& fm, const size_t fm_type, bool is_cnf,
 	return fm;
 }
 
+template<typename... BAs>
+bool is_splitter(const nso<BAs...>& fm, const nso<BAs...>& splitter, const nso<BAs...>& spec) {
+	if (spec) {
+		// We are dealing with a temporal formula
+		if (!are_tau_equivalent(splitter, fm)) {
+			std::map<nso<BAs...>, nso<BAs...>> c = {{fm, splitter}};
+			if (transform_to_execution(replace(spec, c)) != _F<BAs ...>)
+				return true;
+		}
+	} else {
+		// We are dealing with a non-temporal formula
+		if (!are_nso_equivalent(splitter, fm) && normalizer_step(splitter)
+		    != _F<BAs...>) return true;
+	}
+	return false;
+}
+
 // Find a Boolean function which implies f
 template<typename... BAs>
-nso<BAs...> good_splitter_using_function(const nso<BAs...> &f, splitter_type st, const nso<BAs...> &original_fm,
-					 const auto &bf_constants) {
+nso<BAs...> good_splitter_using_function(const nso<BAs...>& f, splitter_type st,
+					 const nso<BAs...>& original_fm) {
 	assert(is_non_terminal(tau_parser::bf, f));
-	// Try to disjunct function with constant to produce splitter
-	for (const auto &bf_c: bf_constants) {
-		auto s = build_bf_and(f, bf_c);
-		std::map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
-		auto new_fm = replace(original_fm, changes);
-		if(!are_nso_equivalent(original_fm, new_fm))
-			return new_fm;
-	}
-
 	// First check if we have more then one disjunct
 	std::vector<nso<BAs...> > m;
 	size_t i = 0;
@@ -136,17 +144,8 @@ nso<BAs...> good_splitter_using_function(const nso<BAs...> &f, splitter_type st,
 // Find a Boolean function which is implied by f
 template<typename... BAs>
 nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_type st,
-						 const nso<BAs...> &original_fm, const auto &bf_constants) {
+						 const nso<BAs...> &original_fm) {
 	assert(is_non_terminal(tau_parser::bf, f));
-	// Try to disjunct function with constant to produce splitter
-	for (const auto &bf_c: bf_constants) {
-		auto s = build_bf_or(f, bf_c);
-		std::map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
-		auto new_fm = replace(original_fm, changes);
-		if(!are_nso_equivalent(original_fm, new_fm))
-			return new_fm;
-	}
-
 	// Convert Boolean function to CNF
 	auto f_cnf = to_cnf2(f, false);
 
@@ -214,28 +213,32 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 	//fm = snf_wff(fm);
 	// Collect all occurances of "||" while assuming that fm is in DNF
 	auto clauses = get_dnf_wff_clauses(fm);
-	// In case no disjunction is present
 	for (const auto& clause: clauses) {
 		// check for equality parts
 		auto eqs = select_top(clause, is_non_terminal<tau_parser::bf_eq, BAs...>);
 		for (const auto &eq: eqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(eq->child[1])));
 			auto f = eq->child[0];
-			if (auto s = good_reverse_splitter_using_function(f, st, clause, bf_constants); s != clause) {
+			std::set<nso<BAs...>> free_vars = get_free_vars_from_nso(fm);
+			for (const auto& c : bf_constants) {
+				// Try to convert f(x,...) = 0 to f(x,...) = 0 && x < c' for some variable x in f
+				auto vars_f = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
+				for (const auto& v : vars_f) {
+					if (!free_vars.contains(trim(v))) continue;
+					std::map<nso<BAs...>, nso<BAs...> >
+							changes = {{clause, build_wff_and(clause,
+									build_bf_less_equal(v, c))}};
+					auto new_fm = replace(fm, changes);
+					if (is_splitter(fm, new_fm, spec))
+						return {new_fm, st};
+				}
+			}
+			if (auto s = good_reverse_splitter_using_function(f, st, clause); s != clause) {
 				//TODO: this equiv check should happen in good_reverse_splitter_using_function
 				std::map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
 				auto new_fm = replace(fm, c);
-				if (spec) {
-					// We are dealing with a temporal formula
-					if (!are_tau_equivalent(new_fm, fm)) {
-						c = {{fm, new_fm}};
-						if (transform_to_execution(replace(spec, c)) != _F<BAs...>)
-							return {new_fm, st};
-					}
-				} else {
-					// We are dealing with a non-temporal formula
-					if (!are_nso_equivalent(new_fm, fm)) return {new_fm, st};
-				}
+				if (is_splitter(fm, new_fm, spec))
+					return {new_fm, st};
 			}
 		}
 		// check for inequality parts
@@ -243,21 +246,27 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 		for (const auto &neq: neqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(neq->child[1])));
 			auto f = neq->child[0];
-			if (auto s = good_splitter_using_function(f, st, clause, bf_constants); s != clause) {
+			for (const auto& c : bf_constants) {
+				// Try to convert f != 0 to f >= c
+				// First check that types match
+				auto type_f = find_top(f, is_non_terminal<tau_parser::type, BAs...>);
+				auto type_c = c | tau_parser::type;
+				if (type_f.has_value() && type_f != type_c)
+					continue;
+				auto r = build_bf_greater_equal(f, c);
+				std::map<nso<BAs...>, nso<BAs...> > changes = {{clause, build_wff_and(clause, r)}};
+				auto new_fm = replace(fm, changes);
+				changes = {{neq, _T_trimmed<BAs...>}};
+				new_fm = replace(new_fm, changes);
+				if (is_splitter(fm, new_fm, spec))
+					return {new_fm, st};
+			}
+			if (auto s = good_splitter_using_function(f, st, clause); s != clause) {
 				//TODO: this equiv check should happen in good_splitter_using_function
 				std::map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
 				auto new_fm = replace(fm, c);
-				if (spec) {
-					// We are dealing with a temporal formula
-					if (!are_tau_equivalent(new_fm, fm)) {
-						c = {{fm, new_fm}};
-						if (transform_to_execution(replace(spec, c)) != _F<BAs...>)
-							return {new_fm, st};
-					}
-				} else {
-					// We are dealing with a non-temporal formula
-					if (!are_nso_equivalent(new_fm, fm)) return {new_fm, st};
-				}
+				if (is_splitter(fm, new_fm, spec))
+					return {new_fm, st};
 			}
 		}
 	}
@@ -267,19 +276,8 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 	size_t i = 0;
 	do {
 		auto s = split(fm, tau_parser::wff, false, st, m, i, true);
-		if (spec) {
-			// We are dealing with a temporal formula
-			if (!are_tau_equivalent(s, fm)) {
-				std::map<nso<BAs...>, nso<BAs...>> c = {{fm, s}};
-				auto new_spec = replace(spec, c);
-				if (transform_to_execution(replace(spec, c)) != _F<BAs...>)
-					return {s, st};
-			}
-		} else {
-			// We are dealing with a non-temporal formula
-			if (!are_nso_equivalent(s, fm)) return
-					{s, st};
-		}
+		if (is_splitter(fm, s, spec))
+			return {s, st};
 	} while (++i < m.size());
 
 	// return bad splitter by conjuncting new uninterpreted constant
