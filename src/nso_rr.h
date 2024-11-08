@@ -1924,10 +1924,8 @@ nso<BAs...> build_num(size_t num) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_variable(const char& name) {
-	return wrap(
-		tau_parser::variable, rewriter::make_node<tau_sym<BAs...>>(
-			tau_sym<BAs...>(name), {}));
+nso<BAs...> build_variable(const std::string& name) {
+	return wrap<BAs...>(tau_parser::variable, name);
 }
 
 template<typename... BAs>
