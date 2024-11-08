@@ -250,18 +250,31 @@ bool has_no_boolean_combs_of_models(const nso<BAs...>& fm) {
 }
 
 template<typename... BAs>
+nso<BAs...> convert_uconsts_to_var (const nso<BAs...>& fm) {
+	auto uconsts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+	for (const auto& uc : uconsts) {
+		std::stringstream ss; ss << uc;
+		auto tvar = build_variable<BAs...>(ss.str());
+		changes.emplace(uc, tvar);
+	}
+	return replace(fm, changes);
+}
+
+template<typename... BAs>
 bool is_non_temp_nso_satisfiable (const nso<BAs...>& fm) {
 	assert(!has_temp_var(fm));
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_always, BAs...>));
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>));
 
 	auto new_fm = fm;
+	// Convert uninterpreted constants to variables for sat check
+	new_fm = convert_uconsts_to_var(new_fm);
 	auto vars = get_free_vars_from_nso(new_fm);
 	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
 	auto normalized = normalizer_step<BAs...>(new_fm);
-	auto check = normalized | tau_parser::wff_t;
-
-	return check.has_value();
+	assert((normalized == _T<BAs...> || normalized == _F<BAs...>));
+	return normalized == _T<BAs...>;
 }
 
 template <typename... BAs>
@@ -298,6 +311,9 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 
 	nso<BAs...> imp1 = build_wff_imply<BAs...>(n1, n2);
 	nso<BAs...> imp2 = build_wff_imply<BAs...>(n2, n1);
+	// Convert uninterpreted constants to variables for equiv check
+	imp1 = convert_uconsts_to_var(imp1);
+	imp2 = convert_uconsts_to_var(imp2);
 	auto vars = get_free_vars_from_nso(imp1);
 
 	for(auto& v: vars) {
@@ -342,6 +358,8 @@ bool are_bf_equal(nso<BAs...> n1, nso<BAs...> n2) {
 	}
 
 	nso<BAs...> bf_equal_fm = build_wff_eq(build_bf_xor(n1, n2));
+	// Replace uninterpreted constants by variables for equivalence check
+	bf_equal_fm = convert_uconsts_to_var(bf_equal_fm);
 
 	auto vars = get_free_vars_from_nso(bf_equal_fm);
 	for(auto& v: vars) bf_equal_fm = build_wff_all<BAs...>(v, bf_equal_fm);
