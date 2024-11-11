@@ -25,7 +25,7 @@ inline std::vector<std::string> symbol_names{
 	"__E_wff_37", "bf_greater", "__E_wff_38", "bf_ngreater", "__E_wff_39", "bf_greater_equal", "__E_wff_40", "bf_ngeq", "__E_wff_41", "bf_less", 
 	"__E_wff_42", "bf_nless", "__E_wff_43", "bf_parenthesis", "__E_bf_44", "bf_constant", "variable", "bf_splitter", "__E_bf_45", "bf_ref", 
 	"bf_or", "__E_bf_46", "bf_xor", "__E_bf_47", "bf_and", "__E_bf_48", "__E___E_bf_48_49", "bf_neg", "__E_bf_50", "bf_t", 
-	"bf_f", "uninterpreted_constant", "bf_and_nosep_1st_op", "__E_bf_and_51", "ctn_neq", "__E_constraint_52", "ctnvar", "num", "ctn_eq", "__E_constraint_53", 
+	"bf_f", "bf_and_nosep_1st_op", "__E_bf_and_51", "uninterpreted_constant", "ctn_neq", "__E_constraint_52", "ctnvar", "num", "ctn_eq", "__E_constraint_53", 
 	"ctn_greater_equal", "__E_constraint_54", "ctn_greater", "__E_constraint_55", "ctn_less_equal", "__E_constraint_56", "ctn_less", "__E_constraint_57", "__E_variable_58", "chars", 
 	"io_var", "__E_variable_59", "in", "out", "in_var_name", "__E_in_60", "__E___E_in_60_61", "offset", "out_var_name", "__E_out_62", 
 	"__E___E_out_62_63", "q_var", "__E_q_vars_64", "__E_q_vars_65", "__E_offsets_66", "__E_offsets_67", "shift", "__E_offset_68", "__E_shift_69", "__E___E_shift_69_70", 
@@ -466,96 +466,96 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(21), (NT(130)));
 //G165: bf(21)               => capture(20).
 	p(NT(21), (NT(20)));
-//G166: bf(21)               => uninterpreted_constant(131).
-	p(NT(21), (NT(131)));
-//G167: __E_bf_and_51(133)   => bf_parenthesis(113).
-	p(NT(133), (NT(113)));
-//G168: __E_bf_and_51(133)   => variable(116).
-	p(NT(133), (NT(116)));
-//G169: __E_bf_and_51(133)   => bf_splitter(117).
-	p(NT(133), (NT(117)));
-//G170: __E_bf_and_51(133)   => bf_ref(119).
-	p(NT(133), (NT(119)));
-//G171: __E_bf_and_51(133)   => bf_or(120).
-	p(NT(133), (NT(120)));
-//G172: __E_bf_and_51(133)   => bf_xor(122).
-	p(NT(133), (NT(122)));
-//G173: __E_bf_and_51(133)   => bf_neg(127).
-	p(NT(133), (NT(127)));
-//G174: __E_bf_and_51(133)   => capture(20).
-	p(NT(133), (NT(20)));
-//G175: __E_bf_and_51(133)   => uninterpreted_constant(131).
-	p(NT(133), (NT(131)));
-//G176: bf_and_nosep_1st_op(132) => __E_bf_and_51(133).
+//G166: __E_bf_and_51(132)   => bf_parenthesis(113).
+	p(NT(132), (NT(113)));
+//G167: __E_bf_and_51(132)   => variable(116).
+	p(NT(132), (NT(116)));
+//G168: __E_bf_and_51(132)   => bf_splitter(117).
+	p(NT(132), (NT(117)));
+//G169: __E_bf_and_51(132)   => bf_ref(119).
+	p(NT(132), (NT(119)));
+//G170: __E_bf_and_51(132)   => bf_or(120).
+	p(NT(132), (NT(120)));
+//G171: __E_bf_and_51(132)   => bf_xor(122).
+	p(NT(132), (NT(122)));
+//G172: __E_bf_and_51(132)   => bf_neg(127).
+	p(NT(132), (NT(127)));
+//G173: __E_bf_and_51(132)   => capture(20).
+	p(NT(132), (NT(20)));
+//G174: __E_bf_and_51(132)   => uninterpreted_constant(133).
 	p(NT(132), (NT(133)));
-//G177: bf_and(124)          => bf_and_nosep_1st_op(132) bf(21).
-	p(NT(124), (NT(132)+NT(21)));
-//G178: __E_constraint_52(135) => '[' ctnvar(136) _(11) '!' '=' _(11) num(137) ']'.
+//G175: bf_and_nosep_1st_op(131) => __E_bf_and_51(132).
+	p(NT(131), (NT(132)));
+//G176: bf_and(124)          => bf_and_nosep_1st_op(131) bf(21).
+	p(NT(124), (NT(131)+NT(21)));
+//G177: __E_constraint_52(135) => '[' ctnvar(136) _(11) '!' '=' _(11) num(137) ']'.
 	p(NT(135), (T(19)+NT(136)+NT(11)+T(27)+T(3)+NT(11)+NT(137)+T(20)));
-//G179: __E_constraint_52(135) => '[' num(137) _(11) '!' '=' _(11) ctnvar(136) ']'.
+//G178: __E_constraint_52(135) => '[' num(137) _(11) '!' '=' _(11) ctnvar(136) ']'.
 	p(NT(135), (T(19)+NT(137)+NT(11)+T(27)+T(3)+NT(11)+NT(136)+T(20)));
-//G180: ctn_neq(134)         => __E_constraint_52(135).
+//G179: ctn_neq(134)         => __E_constraint_52(135).
 	p(NT(134), (NT(135)));
-//G181: constraint(76)       => ctn_neq(134).
+//G180: constraint(76)       => ctn_neq(134).
 	p(NT(76), (NT(134)));
-//G182: __E_constraint_53(139) => '[' ctnvar(136) _(11) '=' _(11) num(137) ']'.
+//G181: __E_constraint_53(139) => '[' ctnvar(136) _(11) '=' _(11) num(137) ']'.
 	p(NT(139), (T(19)+NT(136)+NT(11)+T(3)+NT(11)+NT(137)+T(20)));
-//G183: __E_constraint_53(139) => '[' num(137) _(11) '=' _(11) ctnvar(136) ']'.
+//G182: __E_constraint_53(139) => '[' num(137) _(11) '=' _(11) ctnvar(136) ']'.
 	p(NT(139), (T(19)+NT(137)+NT(11)+T(3)+NT(11)+NT(136)+T(20)));
-//G184: ctn_eq(138)          => __E_constraint_53(139).
+//G183: ctn_eq(138)          => __E_constraint_53(139).
 	p(NT(138), (NT(139)));
-//G185: constraint(76)       => ctn_eq(138).
+//G184: constraint(76)       => ctn_eq(138).
 	p(NT(76), (NT(138)));
-//G186: __E_constraint_54(141) => '[' ctnvar(136) _(11) '>' '=' _(11) num(137) ']'.
+//G185: __E_constraint_54(141) => '[' ctnvar(136) _(11) '>' '=' _(11) num(137) ']'.
 	p(NT(141), (T(19)+NT(136)+NT(11)+T(14)+T(3)+NT(11)+NT(137)+T(20)));
-//G187: __E_constraint_54(141) => '[' num(137) _(11) '>' '=' _(11) ctnvar(136) ']'.
+//G186: __E_constraint_54(141) => '[' num(137) _(11) '>' '=' _(11) ctnvar(136) ']'.
 	p(NT(141), (T(19)+NT(137)+NT(11)+T(14)+T(3)+NT(11)+NT(136)+T(20)));
-//G188: ctn_greater_equal(140) => __E_constraint_54(141).
+//G187: ctn_greater_equal(140) => __E_constraint_54(141).
 	p(NT(140), (NT(141)));
-//G189: constraint(76)       => ctn_greater_equal(140).
+//G188: constraint(76)       => ctn_greater_equal(140).
 	p(NT(76), (NT(140)));
-//G190: __E_constraint_55(143) => '[' ctnvar(136) _(11) '>' _(11) num(137) ']'.
+//G189: __E_constraint_55(143) => '[' ctnvar(136) _(11) '>' _(11) num(137) ']'.
 	p(NT(143), (T(19)+NT(136)+NT(11)+T(14)+NT(11)+NT(137)+T(20)));
-//G191: __E_constraint_55(143) => '[' num(137) _(11) '>' _(11) ctnvar(136) ']'.
+//G190: __E_constraint_55(143) => '[' num(137) _(11) '>' _(11) ctnvar(136) ']'.
 	p(NT(143), (T(19)+NT(137)+NT(11)+T(14)+NT(11)+NT(136)+T(20)));
-//G192: ctn_greater(142)     => __E_constraint_55(143).
+//G191: ctn_greater(142)     => __E_constraint_55(143).
 	p(NT(142), (NT(143)));
-//G193: constraint(76)       => ctn_greater(142).
+//G192: constraint(76)       => ctn_greater(142).
 	p(NT(76), (NT(142)));
-//G194: __E_constraint_56(145) => '[' ctnvar(136) _(11) '<' '=' _(11) num(137) ']'.
+//G193: __E_constraint_56(145) => '[' ctnvar(136) _(11) '<' '=' _(11) num(137) ']'.
 	p(NT(145), (T(19)+NT(136)+NT(11)+T(13)+T(3)+NT(11)+NT(137)+T(20)));
-//G195: __E_constraint_56(145) => '[' num(137) _(11) '<' '=' _(11) ctnvar(136) ']'.
+//G194: __E_constraint_56(145) => '[' num(137) _(11) '<' '=' _(11) ctnvar(136) ']'.
 	p(NT(145), (T(19)+NT(137)+NT(11)+T(13)+T(3)+NT(11)+NT(136)+T(20)));
-//G196: ctn_less_equal(144)  => __E_constraint_56(145).
+//G195: ctn_less_equal(144)  => __E_constraint_56(145).
 	p(NT(144), (NT(145)));
-//G197: constraint(76)       => ctn_less_equal(144).
+//G196: constraint(76)       => ctn_less_equal(144).
 	p(NT(76), (NT(144)));
-//G198: __E_constraint_57(147) => '[' ctnvar(136) _(11) '<' _(11) num(137) ']'.
+//G197: __E_constraint_57(147) => '[' ctnvar(136) _(11) '<' _(11) num(137) ']'.
 	p(NT(147), (T(19)+NT(136)+NT(11)+T(13)+NT(11)+NT(137)+T(20)));
-//G199: __E_constraint_57(147) => '[' num(137) _(11) '<' _(11) ctnvar(136) ']'.
+//G198: __E_constraint_57(147) => '[' num(137) _(11) '<' _(11) ctnvar(136) ']'.
 	p(NT(147), (T(19)+NT(137)+NT(11)+T(13)+NT(11)+NT(136)+T(20)));
-//G200: ctn_less(146)        => __E_constraint_57(147).
+//G199: ctn_less(146)        => __E_constraint_57(147).
 	p(NT(146), (NT(147)));
-//G201: constraint(76)       => ctn_less(146).
+//G200: constraint(76)       => ctn_less(146).
 	p(NT(76), (NT(146)));
-//G202: __E_variable_58(148) => null.
+//G201: __E_variable_58(148) => null.
 	p(NT(148), (nul));
-//G203: __E_variable_58(148) => digit(3) __E_variable_58(148).
+//G202: __E_variable_58(148) => digit(3) __E_variable_58(148).
 	p(NT(148), (NT(3)+NT(148)));
-//G204: variable(116)        => alpha(5) __E_variable_58(148).	 # guarded: charvar
+//G203: variable(116)        => alpha(5) __E_variable_58(148).	 # guarded: charvar
 	p(NT(116), (NT(5)+NT(148)));
 	p.back().guard = "charvar";
-//G205: variable(116)        => chars(149).	 # guarded: var
+//G204: variable(116)        => chars(149).	 # guarded: var
 	p(NT(116), (NT(149)));
 	p.back().guard = "var";
-//G206: __E_variable_59(151) => in(152).
+//G205: __E_variable_59(151) => in(152).
 	p(NT(151), (NT(152)));
-//G207: __E_variable_59(151) => out(153).
+//G206: __E_variable_59(151) => out(153).
 	p(NT(151), (NT(153)));
-//G208: io_var(150)          => __E_variable_59(151).
+//G207: io_var(150)          => __E_variable_59(151).
 	p(NT(150), (NT(151)));
-//G209: variable(116)        => io_var(150).
+//G208: variable(116)        => io_var(150).
 	p(NT(116), (NT(150)));
+//G209: variable(116)        => uninterpreted_constant(133).
+	p(NT(116), (NT(133)));
 //G210: __E___E_in_60_61(156) => digit(3).
 	p(NT(156), (NT(3)));
 //G211: __E___E_in_60_61(156) => digit(3) __E___E_in_60_61(156).
@@ -632,8 +632,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(172), (NT(173)+T(2)+NT(149)));
 //G247: uninter_const_name(171) => __E_uninterpreted_constant_71(172).
 	p(NT(171), (NT(172)));
-//G248: uninterpreted_constant(131) => '<' uninter_const_name(171) _(11) '>'.
-	p(NT(131), (T(13)+NT(171)+NT(11)+T(14)));
+//G248: uninterpreted_constant(133) => '<' uninter_const_name(171) _(11) '>'.
+	p(NT(133), (T(13)+NT(171)+NT(11)+T(14)));
 //G249: __E_bf_constant_73(175) => capture(20).
 	p(NT(175), (NT(20)));
 //G250: __E_bf_constant_73(175) => binding(176).
@@ -1439,7 +1439,7 @@ struct tau_parser : public idni::parser<char, char> {
 		__E_wff_37, bf_greater, __E_wff_38, bf_ngreater, __E_wff_39, bf_greater_equal, __E_wff_40, bf_ngeq, __E_wff_41, bf_less, 
 		__E_wff_42, bf_nless, __E_wff_43, bf_parenthesis, __E_bf_44, bf_constant, variable, bf_splitter, __E_bf_45, bf_ref, 
 		bf_or, __E_bf_46, bf_xor, __E_bf_47, bf_and, __E_bf_48, __E___E_bf_48_49, bf_neg, __E_bf_50, bf_t, 
-		bf_f, uninterpreted_constant, bf_and_nosep_1st_op, __E_bf_and_51, ctn_neq, __E_constraint_52, ctnvar, num, ctn_eq, __E_constraint_53, 
+		bf_f, bf_and_nosep_1st_op, __E_bf_and_51, uninterpreted_constant, ctn_neq, __E_constraint_52, ctnvar, num, ctn_eq, __E_constraint_53, 
 		ctn_greater_equal, __E_constraint_54, ctn_greater, __E_constraint_55, ctn_less_equal, __E_constraint_56, ctn_less, __E_constraint_57, __E_variable_58, chars, 
 		io_var, __E_variable_59, in, out, in_var_name, __E_in_60, __E___E_in_60_61, offset, out_var_name, __E_out_62, 
 		__E___E_out_62_63, q_var, __E_q_vars_64, __E_q_vars_65, __E_offsets_66, __E_offsets_67, shift, __E_offset_68, __E_shift_69, __E___E_shift_69_70, 

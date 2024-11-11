@@ -85,8 +85,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | (bf _ "'")                         :bf_neg
                         | '1'                                :bf_t
                         | '0'                                :bf_f
-                        |                                     capture
-                        |                                uninterpreted_constant.
+                        |                                     capture.
 
 # bf_and alternation without a separator between operands
 # bf_and_nosep_1st_op has to be transformed to bf after parsing
@@ -107,6 +106,7 @@ constraint =>
 variable[charvar]      => alpha digit*.
 variable[var]          => chars.
 variable               => (in | out):io_var.
+variable               => uninterpreted_constant.
 in                     => ("i" digit+):in_var_name  '[' offset ']'.
 out                    => ("o" digit+):out_var_name '[' offset ']'.
 ctnvar                 => chars.
