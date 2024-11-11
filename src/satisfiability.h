@@ -653,14 +653,19 @@ template<typename... BAs>
 nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, const int_t shift) {
 	if (shift <= 0) return fm;
 	std::map<nso<BAs...>, nso<BAs...>> changes;
-    for (const auto& io_var : io_vars) {
-        // Skip initial conditions
-        if (is_io_initial(io_var))
-            continue;
-    	int_t var_shift = get_io_var_shift(io_var);
-        changes[io_var] = build_io_out_shift<BAs...>(
-            get_io_name(io_var), "t", var_shift + shift);
-    }
+	for (const auto& io_var: io_vars) {
+		// Skip initial conditions
+		if (is_io_initial(io_var))
+			continue;
+		int_t var_shift = get_io_var_shift(io_var);
+		if (io_var | tau_parser::io_var | tau_parser::in) {
+			changes[io_var] = build_io_in_shift<BAs...>(
+				get_io_name(io_var), "t", var_shift + shift);
+		} else {
+			changes[io_var] = build_io_out_shift<BAs...>(
+				get_io_name(io_var), "t", var_shift + shift);
+		}
+	}
     return replace(fm, changes);
 }
 
