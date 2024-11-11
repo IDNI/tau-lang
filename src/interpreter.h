@@ -525,15 +525,39 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& phi_i
 			<< "compute_systems/clause: " << clause;
 		#endif // DEBUG
 
-		// TODO (HIGH) call chi_inf and clean the resul
-		auto executable = transform_to_execution(clause);
+		// compute model for uninterpreted constants and solve it
+		auto constraints = get_uninterpreted_constants_constraints(clause);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/constraints: " << clause;
+		#endif // DEBUG
+
+		auto model = solve(constraints);
+
+		#ifdef DEBUG
+		if (model) {
+			BOOST_LOG_TRIVIAL(trace)
+				<< "compute_systems/constraints/model: ";
+			for (const auto& [k, v]: model.value())
+				BOOST_LOG_TRIVIAL(trace)
+					<< "\t" << k << " <- " << v << " ";
+		}
+		#endif // DEBUG
+
+		if (!model) {
+			BOOST_LOG_TRIVIAL(error)
+				<< "unable to compute interpretation for uninterpreted constants of clause: " << constraints << "\n";
+			return {};
+		}
+		auto executable = transform_to_execution(replace(clause, model.value()));
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/executable: " << executable;
 		#endif // DEBUG
 
-		if (auto system = compute_system(clause, inputs, outputs); system)
+		if (auto system = compute_system(executable, inputs, outputs); system)
 			systems.insert(system.value());
 		else {
 			BOOST_LOG_TRIVIAL(error)
