@@ -515,54 +515,53 @@ std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& phi_inf,
+std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& form,
 		input_t& inputs, output_t& outputs) {
 	std::set<system<BAs...>> systems;
 	// split phi_inf in clauses
-	for (auto& clause: get_dnf_wff_clauses(phi_inf)) {
+	for (auto& clause: get_dnf_wff_clauses(form)) {
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/clause: " << clause;
 		#endif // DEBUG
 
-		// compute model for uninterpreted constants and solve it
-		auto constraints = get_uninterpreted_constants_constraints(clause);
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "compute_systems/constraints: " << clause;
-		#endif // DEBUG
-
-		auto model = solve(constraints);
-
-		#ifdef DEBUG
-		if (model) {
-			BOOST_LOG_TRIVIAL(trace)
-				<< "compute_systems/constraints/model: ";
-			for (const auto& [k, v]: model.value())
-				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " <- " << v << " ";
-		}
-		#endif // DEBUG
-
-		if (!model) {
-			BOOST_LOG_TRIVIAL(error)
-				<< "unable to compute interpretation for uninterpreted constants of clause: " << constraints << "\n";
-			return {};
-		}
-		auto executable = transform_to_execution(replace(clause, model.value()));
-
+		auto executable = transform_to_execution(clause);
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/executable: " << executable;
 		#endif // DEBUG
+		if (executable == _F<BAs...>) continue;
 
-		if (auto system = compute_system(executable, inputs, outputs); system)
+		// compute model for uninterpreted constants and solve it
+		auto constraints = get_uninterpreted_constants_constraints(executable);
+		if (constraints == _F<BAs...>) continue;
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/constraints: " << constraints;
+		#endif // DEBUG
+
+		auto model = solve(constraints);
+		if (!model) continue;
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/constraints/model: ";
+		for (const auto& [k, v]: model.value())
+			BOOST_LOG_TRIVIAL(trace)
+				<< "\t" << k << " <- " << v << " ";
+		#endif // DEBUG
+
+		auto program = replace(executable, model.value());
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/program: " << program;
+		#endif // DEBUG
+
+		if (auto system = compute_system(program, inputs, outputs); system)
 			systems.insert(system.value());
 		else {
 			BOOST_LOG_TRIVIAL(error)
 				<< "unable to compute system of equations in: " << clause << "\n";
-			return {};
+			continue;
 		}
 	}
 	return systems;

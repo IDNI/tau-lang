@@ -84,7 +84,7 @@ struct input_bdd_vector {
 	size_t current = 0;
 };
 
-assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
+std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char* sample,
 		input_bdd_vector<tau_ba<bdd_binding>, bdd_binding>& inputs,
 		output_bdd_console<tau_ba<bdd_binding>, bdd_binding>& outputs,
 		const size_t& times) {
@@ -97,67 +97,69 @@ assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
 	std::cout << "run_test/sample: " << sample << "\n";
 	#endif // DEBUG
 
-	auto intprtr = make_interpreter(phi_inf, inputs, outputs).value();
+	if (auto intprtr = make_interpreter(phi_inf, inputs, outputs); intprtr) {
 
-	// we read the inputs only once (they are always empty in this test suite)
+		// we read the inputs only once (they are always empty in this test suite)
 
-	for (size_t i = 0; i < times; ++i) {
-		// we execute the i-th step
-		auto in = inputs.read();
+		for (size_t i = 0; i < times; ++i) {
+			// we execute the i-th step
+			auto in = inputs.read();
 
-		#ifdef DEBUG
-		std::cout << "run_test/input[" << i << "]: ";
-		if (in.has_value()) {
-			for (const auto& [var, value]: in.value())
-				std::cout << var << " <- " << value << " ... ";
-			std::cout << "\n";
-		} else std::cout << "{}\n"; // no input
-		#endif // DEBUG
-
-		auto out = intprtr.step(in.value());
-
-		if (out.size() == 0) {
-			intprtr.memory.clear();
 			#ifdef DEBUG
-			std::cout << "run_test/output[" << i << "]: {}\n"; // no output
+			std::cout << "run_test/input[" << i << "]: ";
+			if (in.has_value()) {
+				for (const auto& [var, value]: in.value())
+					std::cout << var << " <- " << value << " ... ";
+				std::cout << "\n";
+			} else std::cout << "{}\n"; // no input
 			#endif // DEBUG
-			break;
-		}
 
-		#ifdef DEBUG
-		std::cout << "run_test/output[" << i << "]: ";
-		for (const auto& [var, value]: out) {
-			std::cout << var << " <- " << value << " ... ";
-			if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<bdd_binding>, bdd_binding>); io_vars) {
-				std::cout << "run_test/output[" << i << "]: unexpected io_var " << io_vars.value() << "\n";
-				intprtr.memory.clear();
+			auto out = intprtr.value().step(in.value());
+
+			if (out.size() == 0) {
+				intprtr.value().memory.clear();
+				#ifdef DEBUG
+				std::cout << "run_test/output[" << i << "]: {}\n"; // no output
+				#endif // DEBUG
 				break;
 			}
+
+			#ifdef DEBUG
+			std::cout << "run_test/output[" << i << "]: ";
+			for (const auto& [var, value]: out) {
+				std::cout << var << " <- " << value << " ... ";
+				if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<bdd_binding>, bdd_binding>); io_vars) {
+					std::cout << "run_test/output[" << i << "]: unexpected io_var " << io_vars.value() << "\n";
+					intprtr.value().memory.clear();
+					break;
+				}
+			}
+			std::cout << "\n";
+			#endif // DEBUG
+
+			if (intprtr.value().memory.empty()) break;
 		}
-		std::cout << "\n";
-		#endif // DEBUG
 
-		if (intprtr.memory.empty()) break;
+		return intprtr.value().memory;
 	}
-
-	return intprtr.memory;
+	return {};
 }
 
-assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
+std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char* sample,
 		const size_t& times) {
 	input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> inputs;
 	output_bdd_console<tau_ba<bdd_binding>, bdd_binding> outputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
-assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
+std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char* sample,
 		input_bdd_vector<tau_ba<bdd_binding>, bdd_binding>& inputs,
 		const size_t& times) {
 	output_bdd_console<tau_ba<bdd_binding>, bdd_binding> outputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
-assignment<tau_ba<bdd_binding>, bdd_binding> run_test(const char* sample,
+std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char* sample,
 		output_bdd_console<tau_ba<bdd_binding>, bdd_binding>& outputs,
 		const size_t& times) {
 	input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> inputs;
@@ -187,37 +189,37 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[t] = 0") {
 		const char* sample = "o1[t] = 0.";
 		auto memory = run_test(sample, 2);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[t] = {a}:sbf") {
 		const char* sample = "o1[t] = {a}:sbf.";
 		auto memory = run_test(sample, 2);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = 1") {
 		const char* sample = "o1[0] = 1.";
 		auto memory = run_test(sample, 3);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[1] = 1") {
 		const char* sample = "o1[1] = 1.";
 		auto memory = run_test(sample, 3);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = {a}:sbf") {
 		const char* sample = "o1[0] = {a}:sbf.";
 		auto memory = run_test(sample, 3);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[1] = {a}:sbf") {
 		const char* sample = "o1[1] = {a}:sbf.";
 		auto memory = run_test(sample, 3);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// TODO (HIGH) check with Ohad the proper output in this case.
@@ -229,89 +231,89 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("o1[t] & o1[t]'= 0") {
 		const char* sample = "o1[t] & o1[t]' = 0.";
 		auto memory = run_test(sample, 2);
-		CHECK ( memory.empty() );
+		CHECK ( (!memory.has_value() || memory.value().empty()) );
 	}
 
 	TEST_CASE("o1[0] = 1 && o1[t] = o1[t-1]") {
 		const char* sample = "o1[0] = 1 && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 2);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] = o1[t-1]") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] != o1[t-1]") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] = o1[t-1].";
 		auto memory = run_test(sample, 3);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[t] | o2[t]= 0") {
 		const char* sample = "o1[t] | o2[t]= 0.";
 		auto memory = run_test(sample, 2);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[t] & o1[t-1] = 1") {
 		const char* sample = "o1[t] & o1[t-1] = 1.";
 		auto memory = run_test(sample, 2);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[t] + o1[t-1] = 1") {
 		const char* sample = "o1[t] + o1[t-1] = 1.";
 		auto memory = run_test(sample, 2);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] < o1[t-1] && o1[t] != 0") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] < o1[t-1] && o1[t] != 0.";
 		auto memory = run_test(sample, 4);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// increasing monotonicity (2)
 	TEST_CASE("o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// increasing monotonicity (3)
 	TEST_CASE("o1[0] = 0 && o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// increasing monotonicity (4)
 	TEST_CASE("o1[t] > o1[t-1] && o1[t] != 1") {
 		const char* sample = "o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1.";
 		auto memory = run_test(sample, 4);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0") {
 		const char* sample = "<:a> o1[t] + <:b> o1[t]' = 0.";
 		auto memory = run_test(sample, 8);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
 		const char* sample = "o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// f(f(f(x))) = f(x) using uninterpreted constants
 	TEST_CASE("o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
 		const char* sample = "o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'.";
 		auto memory = run_test(sample, 8);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// f(f(f(x))) = f(x) using constants
@@ -320,35 +322,35 @@ TEST_SUITE("only outputs") {
 		// const char* sample = "o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'.";
 		const char* sample = "o1[t] = {a}:sbf o1[t-1] + {b}:sbf o1[t-1]'.";
 		auto memory = run_test(sample, 8);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with BA constants (0 or 1)
 	TEST_CASE("o1[0] = 1 && o1[1] = 1 && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] = 1 && o1[1] = 1 && o1[t] = o1[t-1] + o1[t-2].";
 		auto memory = run_test(sample, 8);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with BDDs
 	TEST_CASE("o1[0] = {a}:sbf && o1[1] = {a}:sbf && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] =  {a}:sbf && o1[1] =  {a}:sbf && o1[t] = o1[t-1] + o1[t-2].";
 		auto memory = run_test(sample, 8);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with sample Tau syntax
 	TEST_CASE("o1[0] = {x = 0.} && o1[1] = {x = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] =  {x = 0.} && o1[1] =  {x = 0.} && o1[t] = o1[t-1] + o1[t-2].";
 		auto memory = run_test(sample, 8);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with sample Tau programs
 	TEST_CASE("o1[0] = {o1[0] = 0.} && o1[1] = {o1[0] = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] =  {o1[0] = 0.} && o1[1] =  {o1[0] = 0.} && o1[t] = o1[t-1] + o1[t-2].";
 		auto memory = run_test(sample, 8);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 }
 
@@ -374,22 +376,22 @@ TEST_SUITE("with inputs and outputs") {
 			_0<tau_ba<bdd_binding>, bdd_binding>,
 			_0<tau_ba<bdd_binding>, bdd_binding> });
 		auto memory = run_test(sample, ins, 3);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 	// In this case, we get an error as the output should be equal to the
 	// input all the time, but the output is set to 0 at the beginning.
 	//
 	// TODO (HIGH) check this case, issue in unconstrained constants model
-	/*TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
+	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
 		auto ins = build_i1_inputs({
 			_1<tau_ba<bdd_binding>, bdd_binding>,
 			_1<tau_ba<bdd_binding>, bdd_binding>,
 			_1<tau_ba<bdd_binding>, bdd_binding> });
 		auto memory = run_test(sample, ins, 3);
-		CHECK ( memory.empty() );
-	}*/
+		CHECK ( (!memory.has_value() || memory.value().empty()) );
+	}
 
 	// In this case we get the sequence 0, 1, 1 as the output is set to 1
 	// at the beginning.
@@ -400,7 +402,7 @@ TEST_SUITE("with inputs and outputs") {
 			_1<tau_ba<bdd_binding>, bdd_binding>,
 			_1<tau_ba<bdd_binding>, bdd_binding> });
 		auto memory = run_test(sample, ins, 2);
-		CHECK ( !memory.empty() );
+		CHECK ( !memory.value().empty() );
 	}
 
 }
