@@ -298,8 +298,7 @@ TEST_SUITE("only outputs") {
 	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0") {
 		const char* sample = "<:a> o1[t] + <:b> o1[t]' = 0.";
 		auto memory = run_test(sample, 8);
-		// execution of this test should fail, i.e. memory should be empty
-		CHECK ( memory.empty() );
+		CHECK ( !memory.empty() );
 	}
 
 	TEST_CASE("o1[0] = <:c> && o1[t] = <:a> o1[t-1] + <:b> o1[t-1]'") {
