@@ -551,8 +551,7 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 	// transform constraints to their respective output streams and add required conditions
 	// We make the variable static so that we can transform different parts of the formula independently
 	static size_t ctn_id = 0;
-	if (reset_ctn_id)
-		ctn_id = 0;
+	if (reset_ctn_id) ctn_id = 0;
 	for (const auto& ctn : select_top(fm, is_non_terminal<p::constraint, BAs...>))
 	{
 		std::string ctnvar = make_string(tau_node_terminal_extractor<BAs...>,
@@ -772,7 +771,8 @@ nso<BAs...> add_st_ctn (const nso<BAs...>& st, const int_t timepoint, const int_
 template<typename... BAs>
 nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 				      const nso<BAs...>& ev_var_flags,
-				      const auto& original_aw) {
+				      const auto& original_aw,
+				      const bool reset_ctn_streams) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
 
 	using p = tau_parser;
@@ -801,7 +801,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	if (find_top(aw, is_non_terminal<p::constraint, BAs...>)) {
 		// Transform constraint to stream
 		nso<BAs...> ctn_initials = _T<BAs...>;
-		aw = transform_ctn_to_streams(aw, ctn_initials, time_point);
+		aw = transform_ctn_to_streams(aw, ctn_initials, time_point, reset_ctn_streams);
 		aw = build_wff_and(ctn_initials, aw);
 		// The lookback cannot be 0 due to presents of eventual variables
 		// Therefore, no adjustment of aw is needed
@@ -898,6 +898,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 	nso<BAs...> ev_t;
 	nso<BAs...> ubd_aw_fm;
+	bool reset_ctn_stream = false;
 	if (aw_fm.has_value()) {
 		// If there is an always part, replace it with its unbound continuation
 		ubd_aw_fm = always_to_unbounded_continuation(aw_fm.value());
@@ -909,6 +910,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 		// Check if there is a sometimes present
 		if (ev_t == ubd_fm) return elim_aw(ubd_fm);
 	} else {
+		reset_ctn_stream = true;
 		ev_t = transform_to_eventual_variables(fm);
 		// Check if there is a sometimes present
 		if (ev_t == fm) return elim_aw(fm);
@@ -921,7 +923,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
 	nso<BAs...> res;
 	if (aw_after_ev.value() != _F<BAs...> && !st.empty())
 		res = normalizer_step(to_unbounded_continuation(
-				aw_after_ev.value(), st[0], ubd_aw_fm));
+			aw_after_ev.value(), st[0], ubd_aw_fm, reset_ctn_stream));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
 	return elim_aw(res);
