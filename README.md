@@ -110,6 +110,7 @@ The following command line options are available:
 | -v, --charvar  | charvar (enabled by default)                              |
 
 Among the possible inputs and outputs, the following are predefined:
+ TODO: exemplify, to demonstrate what this means.
 
 | Input/Output | Description        |
 |--------------|--------------------|
@@ -123,10 +124,21 @@ TODO (HIGH) add several simple examples of usage
 
 # The Tau Language
 
+In the Tau language you define how the current and previous inputs and outputs
+are related over time, using the first-order theory of atomless Boolean algebras
+extended with a time dimension. For example you can write `o1[t] & o1[t-1] & i1[t] = 0`
+which would mean that the current output, and the previous output, and the current input,
+have to have an empty intersection. The set-theoretic perspective of Boolean algebra
+is justfied by Stone's representation theorem for Boolean algebras, but more concretely,
+when a Tau spec is treated as a BA element (TODO: explain that tau is base BA of itself),
+it can be seen as a set of all programs that admit that spec, and the Boolean
+operations are simply the set-theoretic union/intersection/complementation.
+
 ## Boolean functions
 
 One of the key ingredients of the Tau Language are the Boolean functions (Boolean
-combinations of constants -over a Boolean algebra- and variables). They
+combinations of variables, and constants over some chosen atomless (or finite, TBD)
+Boolean algebra and variables).They
 are given by the following grammar:
 
 ```
