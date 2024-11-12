@@ -21,7 +21,7 @@
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
 	2. [REPL options](#repl-options)
-	3. [Recurrence relations and input/output variables](#recurrence-relations-and-inputoutput-variables)
+	3. [Recurrence relations and IO variables](#recurrence-relations-and-inputoutput-variables)
 	4. [Memory related commands](#memory-related-commands)
 	5. [Expression manipulation](#expression-manipulation)
 	6. [Logical procedures](#logical-procedures)
@@ -256,6 +256,7 @@ where `sbf` stands for a simple Boolean function, and the operators `&`, `'`,
 
 ## Variables
 
+
 TODO (HIGH) add a detailed explanation of variables, charvar options, etc.
 
 ## Tau formulas
@@ -451,14 +452,14 @@ REPL. It's on by default.
 
 * `d|dbg|debug`: Can be on/off. Controls debug mode. It's off by default.
 
-## Recurrence relations and input/output variables
+## Recurrence relations and IO variables
 
 As in other programming languages, you could define functions (recurrence
-relations in Tau Language) and input/output variables. The syntax of the commands
+relations in Tau Language) and IO variables. The syntax of the commands
 is the following:
 
 * `definitions|defs`: shows all the definitions of the current program. That
-includes the definitions of the recursive relations and the input/output variables.
+includes the definitions of the recursive relations and the IO variables.
 
 * `definitions|defs <number>`: shows the definition of the given recurrence
 relation.
@@ -552,7 +553,7 @@ expression with respect to the given variable.
 
 ## Program execution
 
-Finally, you could run the given program once you have defined input/output
+Finally, you could run the given program once you have defined IO
 variables as you need. The syntax of the commands is the
 
 * `run|r <memory|tau>`: runs the given program.
@@ -568,4 +569,5 @@ TODO (HIGH) add a list of future work
 
 # Submitting issues
 
-TODO (HIGH) write about how to submit issues
+As any other opensource project in GitHUb, you could submit issues in the
+following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
