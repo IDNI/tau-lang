@@ -813,7 +813,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 
 	int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
 	// Shift flags in order to match lookback of always part
-	st_flags = shift_io_vars_in_fm(st_flags, st_io_vars, time_point);
+	st_flags = shift_io_vars_in_fm(st_flags, st_io_vars, time_point - 1);
 	st_io_vars = select_top(st_flags, is_child_non_terminal<p::io_var, BAs...>);
 
 	// Check if flag can be raised up to the highest initial condition + 1
