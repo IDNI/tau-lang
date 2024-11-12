@@ -163,7 +163,7 @@ combinations of constants -over a Boolean algebra- and variables). They
 are given by the following grammar:
 
 ```
-bf -> "("bf "&" bf")" | bf "'" | "("bf "^" bf")" | "("bf "+" bf")" | "("bf "|" bf")"
+bf -> "("bf "&" bf")" | bf "'" | "("bf "+" bf")" | "("bf "|" bf")"
 	| bf_ref | constant | uninterpreted_constant | var | "0" | "1".
 ```
 
@@ -250,8 +250,34 @@ where `sbf` stands for a simple Boolean function, and the operators `&`, `'`,
 
 ## Variables
 
+Regarding variables, we could distinguish between variables in Boolean functions,
+IO variables and (somehow streching the concept) unconstrained context (which
+are implicitly existentially quantified variables).
 
-TODO (HIGH) add a detailed explanation of variables, charvar options, etc.
+Variables in Boolean functions are just regular variables that could be used.
+They could be quantified or not, depending on the context. Their syntax depends
+on whether `charvar` option is enabled or not. If it is enabled, the syntax is
+just a single character followed by digits. Otherwise, the syntax is just an
+arbitrary string of `chars`.
+
+Apart from that, we also have IO variables. They are used to define the input
+and output of the program. The syntax for an input variable is `i{num}` whereas
+ouput variables are of the form `o{num}` (in the near future we will allow
+arbitrary names for IO variables). Finally, we have the unconstrained constant
+context, which are implicitly existentially quantified variables. The syntax
+is `<:name>`.
+
+As commented later on, IO variables need to be defined before the program is run.
+For example, the following are a valid definition of IO variables:
+
+```
+tau i1 = console.
+tau o1 = console.
+```
+
+where `tau` points to the type of the variables (in this case, tau formulas) and
+`console` stands for the input/output stream of the variable (in this case, the
+console).
 
 ## Tau formulas
 
