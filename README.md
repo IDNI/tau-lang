@@ -44,19 +44,16 @@ refer to the TABA book ongoing draft
 
 # Quick start
 
-## Installing the Tau REPL
+## Installing the Tau Framework
 
-### Linux users (NOT YET AVAILABLE)
+### Linux (not available yet)
 
-We provide convenient packages for Linux users to install the Tau REPL. Currently,
-we automatically build packages (AMD64 architecture) for the following package managers:
+Currently we automatically build the following binaries packages (AMD64 architecture):
 
 * deb (Debian/Ubuntu): [tau_0.1.0_amd64.deb](http://someurl.com)
 * rpm (Fedora): [tau-0.1.0-1.x86_64.rpm](http://someurl.com)
 
-Those packages include the tau executable.
-
-### Windows users (NOT YET AVAILABLE)
+### Windows (not available yet)
 
 For windows we provide a convenient installer that includes the tau executable
 and also a zip file:
@@ -64,50 +61,24 @@ and also a zip file:
 * Installer: [tau-0.1.0-amd64.exe](http://someurl.com)
 * Zip file: [tau-0.1.0-amd64.zip](http://someurl.com)
 
+### MacOS (not available yet) 
+
 ## Compiling the source code
 
-To compile the source code you need a recent C++ compiler, say GCC 13.1.0
-compiler suite, as the source code uses recent features introduced in C++23
-standard. You also need at least a cmake version 3.22.1 installed in your system.
-Only a recent version of boost libraries are required to compile the source code.
+To compile the source code you need a recent C++ compiler supporting C++23, e.g.
+GCC 13.1.0. You also need at least a cmake version 3.22.1 installed in your system.
+The only code dependency is libboost.
 
-The first step to compile the code is to clone the repository:
+After cloning:
 
 ```bash
 git clone https://github.com/IDNI/tau-lang.git
 ```
 
-After that, you could run several bash scripts that are provided in the main
-directory to compile the source code in release or debug mode (also in release
-with debug information -used for benchmarking-).
+you can run either the `release.sh` or `debug.sh` or `relwithdebinfo.sh` scripts
+to build the binaries.
 
-The first script is `release.sh` which compiles the source code in release mode
-and also all the tests. The second script is `debug.sh` which compiles the
-source code in debug mode and also all the tests. The third one is
-`relwithdebinfo.sh` which compiles the source code in release mode with debug
-information, also all the tests and few benchmarks.
-
-```bash
-./release.sh # Compiles the source code in release mode
-./debug.sh # Compiles the source code in debug mode
-./relwithdebinfo.sh # Compiles the source code in release mode with debug information
-```
-
-We also provide scripts to execute the tests suite so you could check that
-everything is working properly. The first one is `test_release.sh` to run the
-tests in release mode and the second one is `test_debug.sh` to run the test
-in debug mode (also `test_relwithdebinfo.sh`).
-
-```bash
-./test_release.sh # Runs the tests in release mode
-./test_debug.sh # Runs the tests in debug mode
-./test_relwithdebinfo.sh # Runs the tests in release mode with debug information
-```
-
-If you want to produce the documentation of the source code you need to install
-the `doxygen` tool. After that, you could run the `release.sh` or `debug.sh`
-(also the `relwithdebinfo.sh`) scripts as follows to produce the documentation
-of the source code:
+To build with doxygen documentation:
 
 ```bash
  # Compiles the source code in release mode and also the documentation
@@ -118,19 +89,15 @@ of the source code:
 ./relwithdebinfo.sh -DBUILD_DOC=ON
 ```
 
-Please take a look to the main
-([CMakeLists.txt](https://github.com/IDNI/tau-lang/blob/main/CMakeLists.txt))
-for additional options.
-
 ## Running Tau REPL
 
-Once you have compiled the source code you could run the `tau` executable to
-execute Tau programs. The `tau` executable is located in the `build-Release`
-or `build-Debug` directory (alternatively in `build-RelWithDebInfo`).
+Once you have compiled the source code you can run the `tau` executable to
+execute Tau programs. The `tau` executable is located in the either `build-Release`
+or `build-Debug` or `build-RelWithDebInfo`.
 
 ### Command line options
 
-The following command line interface options are available:
+The following command line options are available:
 
 | Option         | Description                                               |
 |----------------|-----------------------------------------------------------|
@@ -143,6 +110,7 @@ The following command line interface options are available:
 | -v, --charvar  | charvar (enabled by default)                              |
 
 Among the possible inputs and outputs, the following are predefined:
+ TODO: exemplify, to demonstrate what this means.
 
 | Input/Output | Description        |
 |--------------|--------------------|
@@ -156,10 +124,21 @@ TODO (HIGH) add several simple examples of usage
 
 # The Tau Language
 
+In the Tau language you define how the current and previous inputs and outputs
+are related over time, using the first-order theory of atomless Boolean algebras
+extended with a time dimension. For example you can write `o1[t] & o1[t-1] & i1[t] = 0`
+which would mean that the current output, and the previous output, and the current input,
+have to have an empty intersection. The set-theoretic perspective of Boolean algebra
+is justfied by Stone's representation theorem for Boolean algebras, but more concretely,
+when a Tau spec is treated as a BA element (TODO: explain that tau is base BA of itself),
+it can be seen as a set of all programs that admit that spec, and the Boolean
+operations are simply the set-theoretic union/intersection/complementation.
+
 ## Boolean functions
 
 One of the key ingredients of the Tau Language are the Boolean functions (Boolean
-combinations of constants -over a Boolean algebra- and variables). They
+combinations of variables, and constants over some chosen atomless (or finite, TBD)
+Boolean algebra and variables).They
 are given by the following grammar:
 
 ```
@@ -328,7 +307,7 @@ where `x`, `y` and `z` are variables.
 TODO (HIGH) review this section
 
 Last, in usual programming languages you have loops, recursion and so on. In the
-case of Tau Language, recursive relations are used to this end. Obviously, they
+case of Tau Language, recurrence relations are used to this end. Obviously, they
 could not go as far as the usual programming languages (we will fall into the
 undecidable side), but they are enough to express the most complex specifications.
 
@@ -361,7 +340,7 @@ stands for a reference to a well formed formula (see well formed formulas
 Section), `sym` stands for a symbol, `offset` stands for an offset and `capture`
 stands for a capture/variable.
 
-Examples of recursive relations are:
+Examples of recurrence relations are:
 
 ```
 g[0](Y) := 1.
@@ -395,11 +374,11 @@ are given by the following grammar:
 rr => (rec_relation)* tau.
 ```
 
-where `tau_rec_relation` stands for a tau recursive relations, `tau_rec_relation`
+where `tau_rec_relation` stands for a tau recurrence relations, `tau_rec_relation`
 for a tau recursive relation, `bf_rec_relation` for a bf recursive relation and
 `tau` stands for a tau formula.
 
-Thus, they are a collection of Tau recursive relations and a main formula, p.e.:
+Thus, they are a collection of Tau recurrence relations and a main formula, p.e.:
 
 ```
 g[0](Y) :::= {T}.
@@ -479,7 +458,7 @@ relations in Tau Language) and IO variables. The syntax of the commands
 is the following:
 
 * `definitions|defs`: shows all the definitions of the current program. That
-includes the definitions of the recursive relations and the IO variables.
+includes the definitions of the recurrence relations and the IO variables.
 
 * `definitions|defs <number>`: shows the definition of the given recurrence
 relation.

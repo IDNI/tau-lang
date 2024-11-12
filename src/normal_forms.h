@@ -2035,6 +2035,82 @@ nso<BAs...> to_cnf2(const nso<BAs...>& fm, bool is_wff) {
 	return new_fm;
 }
 
+template<typename... BAs>
+nso<BAs...> push_temp_in (const nso<BAs...>& fm, const size_t temp, auto& visited) {
+	using p = tau_parser;
+	assert((temp == p::wff_always || temp == p::wff_sometimes));
+	// The algorithm becomes incorrect if visited nodes are visited again
+	bool is_aw = temp == p::wff_always;
+	auto push_always = [&](const auto& node, const auto& children) {
+		nso<BAs...> new_node = make_node(node->value, children);
+		// always phi && psi -> (always phi) && (always psi)
+		if (visited.contains(new_node)) return new_node;
+		if (is_child_non_terminal(temp, new_node)) {
+			auto clauses = is_aw
+					       ? get_cnf_wff_clauses( trim2(new_node))
+					       : get_dnf_wff_clauses( trim2(new_node));
+			int_t max_lookback = 0;
+			std::vector<int_t> clause_lookback;
+			for (const auto& clause : clauses) {
+				auto io_vars = select_top_until(
+					clause, is_child_non_terminal<p::io_var, BAs...>,
+					is_temporal_quantifier<BAs...>);
+				int_t clause_lb = get_max_shift(io_vars);
+				clause_lookback.push_back(clause_lb);
+				max_lookback = std::max(max_lookback, clause_lb);
+			}
+			// Now add to each clause with lookback smaller than max_lookback temporary output stream
+			for (size_t i = 0; i < clause_lookback.size(); ++i) {
+				if (!visited.contains(clauses[i]) && clause_lookback[i] < max_lookback) {
+					clauses[i] = build_wff_and(clauses[i], build_wff_eq(
+						build_out_variable_at_t_minus<BAs...>("_l", max_lookback)));
+				}
+				visited.emplace(clauses[i]);
+				clauses[i] = is_aw ? build_wff_always(clauses[i]) : build_wff_sometimes(clauses[i]);
+				visited.emplace(clauses[i]);
+			}
+			auto res = is_aw ? build_wff_and<BAs...>(clauses) : build_wff_or<BAs...>(clauses);
+			visited.emplace(res);
+			return res;
+		}
+		return new_node;
+	};
+	auto is_not_bf = [](const nso<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
+	return rewriter::post_order_recursive_traverser<nso<BAs...>>()(fm, is_not_bf, push_always);
+}
+
+// Assumes that fm is a single DNF always clause
+template<typename... BAs>
+nso<BAs...> rm_temporary_lookback (const nso<BAs...>& fm) {
+	auto io_vars = rewriter::select_top(fm,
+		is_child_non_terminal<tau_parser::io_var, BAs...>);
+	bool has_var = std::ranges::any_of(io_vars,
+		[](const auto& el){return !is_io_initial(el);});
+	int_t lookback = get_max_shift(io_vars, true);
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+	nso<BAs...> max_temp;
+	for (const auto& io_var : io_vars) {
+		auto n = get_io_name(io_var);
+		// Only eliminate lookback temporary variables
+		if (n[0] == '_' && n[1] == 'l') {
+			if (!has_var) changes.emplace(io_var, _0_trimmed<BAs...>);
+			else if (lookback >= get_io_var_shift(io_var))
+				changes.emplace(io_var, _0_trimmed<BAs...>);
+			else {
+				if (max_temp) {
+					if (get_io_var_shift(max_temp) < get_io_var_shift(io_var)) {
+						changes.emplace(max_temp, _0_trimmed<BAs...>);
+						max_temp = io_var;
+					} else changes.emplace(io_var, _0_trimmed<BAs...>);
+				} else {
+					max_temp = io_var;
+				}
+			}
+		}
+	}
+	return replace(fm, changes);
+}
+
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
 // or it contains a flag
 template<typename... BAs>
@@ -2050,7 +2126,7 @@ bool has_temp_var (const nso<BAs...>& fm) {
 	return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
 }
 
-// Assumes a sometimes formula in dnf with negation pushed in containing no wff_or with max nesting depth 1
+// Assumes a single sometimes DNF clause with negation pushed in containing no wff_or with max nesting depth 1
 template<typename... BAs>
 nso<BAs...> extract_sometimes (nso<BAs...> fm) {
 	std::map<nso<BAs...>, nso<BAs...>> l_changes = {};
@@ -2101,7 +2177,7 @@ nso<BAs...> extract_sometimes (nso<BAs...> fm) {
 	return build_wff_and(build_wff_sometimes(staying_fm), extracted_fm);
 }
 
-// Assumes an always formula in cnf with negation pushed in containing no wff_and with max nesting depth 1
+// Assumes a single DNF always clause in cnf with negation pushed in containing no wff_and with max nesting depth 1
 template<typename... BAs>
 nso<BAs...> extract_always (nso<BAs...> fm) {
 	std::map<nso<BAs...>, nso<BAs...>> l_changes = {};
@@ -2155,17 +2231,16 @@ nso<BAs...> extract_always (nso<BAs...> fm) {
 
 // Recursively extract non-dependend formulas under sometimes
 template<typename... BAs>
-nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
+nso<BAs...> push_sometimes_always_in (nso<BAs...> fm, auto& visited) {
 	std::map<nso<BAs...>, nso<BAs...>> g_changes = {};
 	for (const auto &st : select_top_until(fm, is_child_non_terminal<tau_parser::wff_sometimes, BAs...>,
 								is_child_non_terminal<tau_parser::wff_always, BAs...>)) {
 		// Recursively denest sometimes and always statements contained in sometimes statement st
-		auto flat_st = push_sometimes_always_in(trim2(st));
+		auto flat_st = push_sometimes_always_in(trim2(st), visited);
 		// Simplyfy current formula and convert to DNF
 		// Reductions done in order to prevent blow up
 		flat_st = build_wff_sometimes(to_dnf2(flat_st));
-		flat_st = flat_st | repeat_all<step<BAs...>, BAs...>(
-				  push_sometimes_in<BAs...>);
+		flat_st = push_temp_in(flat_st, tau_parser::wff_sometimes, visited);
 		flat_st = reduce2(flat_st, tau_parser::wff);
 		if (flat_st != st) g_changes[st] = flat_st;
 	}
@@ -2189,13 +2264,16 @@ nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
 	for (const auto& aw : select_top_until(fm, is_child_non_terminal<tau_parser::wff_always, BAs...>,
 								is_child_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
 		// Recursively denest sometimes and always statements contained in always statement aw
-		auto flat_aw = push_sometimes_always_in(trim2(aw));
+		auto flat_aw = push_sometimes_always_in(trim2(aw), visited);
+		// std::cout << "After push_sometimes_always_in: " << flat_aw << "\n";
 		// Simplyfy current formula and convert to CNF
 		// Reductions done in order to prevent blow up
 		flat_aw = build_wff_always(to_cnf2(flat_aw));
-		flat_aw = flat_aw | repeat_all<step<BAs...>, BAs...>(
-				  push_always_in<BAs...>);
+		// std::cout << "After to_cnf2: " << flat_aw << "\n";
+		flat_aw = push_temp_in(flat_aw, tau_parser::wff_always, visited);
+		// std::cout << "After push_temp_in: " << flat_aw << "\n";
 		flat_aw = reduce2(flat_aw, tau_parser::wff, true);
+		// std::cout << "After reduce2: " << flat_aw << "\n";
 		if (flat_aw != aw) g_changes[aw] = flat_aw;
 	}
 	// Apply changes
@@ -2207,12 +2285,34 @@ nso<BAs...> push_sometimes_always_in (nso<BAs...> fm) {
 								is_child_non_terminal<tau_parser::wff_sometimes, BAs...> )) {
 		// Here the formula under "always" is of the form (phi_1 || ... || phi_n)
 		// Pull out each phi_i that does not contain a time variable or is "sometimes/always"
+		// std::cout << "simp_aw: " << aw << "\n";
 		auto simp_aw = extract_always(aw);
 		if (aw != simp_aw) g_changes[aw] = simp_aw;
 	}
 	// Apply changes and return
 	if (!g_changes.empty()) fm = replace(fm, g_changes);
 	return fm;
+}
+
+// Shift the lookback in a formula
+template<typename... BAs>
+nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, const int_t shift) {
+	if (shift <= 0) return fm;
+	std::map<nso<BAs...>, nso<BAs...>> changes;
+	for (const auto& io_var: io_vars) {
+		// Skip initial conditions
+		if (is_io_initial(io_var))
+			continue;
+		int_t var_shift = get_io_var_shift(io_var);
+		if (io_var | tau_parser::io_var | tau_parser::in) {
+			changes[io_var] = trim(build_in_variable_at_t_minus<BAs...>(
+				get_io_name(io_var), var_shift + shift));
+		} else {
+			changes[io_var] = trim(build_out_variable_at_t_minus<BAs...>(
+				get_io_name(io_var), var_shift + shift));
+		}
+	}
+    return replace(fm, changes);
 }
 
 // Assumes a single DNF clause and normalizes the "always" parts into one
@@ -2223,7 +2323,6 @@ nso<BAs...> pull_always_out(const nso<BAs...>& fm) {
 	// Collect all always statments in the clause fm
 	// by analyzing conjuncts
 	auto clauses = get_leaves(fm, tau_parser::wff_and, tau_parser::wff);
-	if(clauses.empty()) clauses.push_back(fm);
 	for (const auto& clause : clauses) {
 		// if clause is a sometimes statement -> skip
 		if (is_child_non_terminal(tau_parser::wff_sometimes, clause))
@@ -2241,13 +2340,30 @@ nso<BAs...> pull_always_out(const nso<BAs...>& fm) {
 	if (collected_always_fms.empty()) return fm;
 	// Rebuild formula based on the extraction
 	nso<BAs...> always_part;
+	int_t lookback = 0;
 	bool first = true;
-	for (const auto& fa : collected_always_fms) {
-		if (first) {first = false; always_part = fa;}
-		else always_part = build_wff_and(always_part, fa);
+	for (auto& fa : collected_always_fms) {
+		auto io_vars = select_top(fa,
+			is_child_non_terminal<tau_parser::io_var, BAs...>);
+		auto current_lb = get_max_shift(io_vars);
+		if (first) { first = false; always_part = fa; }
+		else {
+			// Adjust lookback when joining always statements
+			if (current_lb < lookback)
+				fa = shift_io_vars_in_fm(fa, io_vars, lookback - current_lb);
+			if (current_lb > lookback) {
+				io_vars = select_top(always_part,
+					is_child_non_terminal<tau_parser::io_var, BAs...>);
+				always_part = shift_io_vars_in_fm(always_part, io_vars, current_lb - lookback);
+			}
+			always_part = build_wff_and(always_part, fa);
+		}
+		lookback = std::max(lookback, current_lb);
 	}
 	assert(!l_changes.empty());
-
+	// Now remove all temporary lookback variables which are not needed anymore
+	// after joining of the always statements
+	always_part = rm_temporary_lookback(always_part);
 	if (!has_temp_var(fm)) {
 		// No input/output variable present, hence return without always
 		return build_wff_and(always_part, replace(fm, l_changes));
@@ -2314,7 +2430,8 @@ struct sometimes_always_normalization {
 		// Scope formula under always if not already under sometimes or always
 		nso<BAs...> res = !st_aw(fm) ? build_wff_always(fm) : fm;
 		// conversion to DNF necessary for pull_sometimes_always_out
-		res = to_dnf2(push_sometimes_always_in(res));
+		std::set<nso<BAs...>> visited;
+		res = to_dnf2(push_sometimes_always_in(res, visited));
 		res = reduce2(res, tau_parser::wff);
 		res = pull_sometimes_always_out(res) |
 					repeat_each<step<BAs...>, BAs...>(simplify_wff<BAs...>);
