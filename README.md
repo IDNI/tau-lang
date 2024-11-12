@@ -1,11 +1,36 @@
 ![The TAU logo](/docs/tau_logo.png)
 
-TODO (MEDIUM) add executor related info: splitter, !<= for bf, ...
+# Table of contents
 
-TODO (HIGH) more structured and to the point
+1. [Introduction](#introduction)
+2. [Quick start](#quick-start)
+	1. [Installing the Tau REPL](#installing-the-tau-repl)
+		1. [Linux users](#linux-users)
+		2. [Windows users](#windows-users)
+	2. [Compiling the source code](#compiling-the-source-code)
+	3. [Running Tau REPL](#running-tau-repl)
+		1. [Command line options](#command-line-options)
+5. [The Tau Language](#the-tau-language)
+	1. [Boolean functions](#boolean-functions)
+	2. [Constants](#constants)
+	3. [Variables](#variables-variables-variables)
+	4. [Tau formulas](#tau-formulas)
+	5. [Recurrence relations](#recurrence-relations)
+	6. [Tau specifications](#tau-specifications)
+	7. [Reserved symbols](#reserved-symbols)
+6. [The Tau REPL](#the-tau-repl)
+	1. [Basic REPL commands](#basic-repl-commands)
+	2. [REPL options](#repl-options)
+	3. [Recurrence relations and input/output variables](#recurrence-relations-and-inputoutput-variables)
+	4. [Memory related commands](#memory-related-commands)
+	5. [Expression manipulation](#expression-manipulation)
+	6. [Logical procedures](#logical-procedures)
+	7. [Normal forms](#normal-forms)
+	8. [Program execution](#program-execution)
+7. [Known issues](#known-issues)
+8. [Future work](#future-work)
 
-** This repo is under active development and you could expect daily new features,
-improvements and fixes. **
+# Introduction
 
 Tau advances formal methods by removing coding from the process, while expanding
 its industrial capability, reliability and ease of maintenance. Tau enables you
@@ -23,14 +48,34 @@ more detailed explanation of Tau Language and all its details, please refer to
 the TABA book
 ([Theories and Applications of Boolean Algebras by Ohad Ashor](./docs/taba.pdf)).
 
-# Compiling the source code
+# Quick start
+
+## Installing the Tau REPL
+
+### Linux users (NOT YET AVAILABLE)
+
+We provide convenient packages for Linux users to install the Tau REPL. Currently,
+we automatically build packages (AMD64 architecture) for the following package managers:
+
+* deb (Debian/Ubuntu): [tau_0.1.0_amd64.deb](http://someurl.com)
+* rpm (Fedora): [tau-0.1.0-1.x86_64.rpm](http://someurl.com)
+
+Those packages include the tau executable.
+
+### Windows users (NOT YET AVAILABLE)
+
+For windows we provide a convenient installer that includes the tau executable
+and also a zip file:
+
+* Installer: [tau-0.1.0-amd64.exe](http://someurl.com)
+* Zip file: [tau-0.1.0-amd64.zip](http://someurl.com)
+
+## Compiling the source code
 
 To compile the source code you need a recent C++ compiler, say GCC 13.1.0
 compiler suite, as the source code uses recent features introduced in C++23
 standard. You also need at least a cmake version 3.22.1 installed in your system.
 Only a recent version of boost libraries are required to compile the source code.
-
-## Basic compilation
 
 The first step to compile the code is to clone the repository:
 
@@ -65,8 +110,6 @@ in debug mode (also `test_relwithdebinfo.sh`).
 ./test_relwithdebinfo.sh # Runs the tests in release mode with debug information
 ```
 
-## Additional options
-
 If you want to produce the documentation of the source code you need to install
 the `doxygen` tool. After that, you could run the `release.sh` or `debug.sh`
 (also the `relwithdebinfo.sh`) scripts as follows to produce the documentation
@@ -91,9 +134,222 @@ Once you have compiled the source code you could run the `tau` executable to
 execute Tau programs. The `tau` executable is located in the `build-Release`
 or `build-Debug` directory (alternatively in `build-RelWithDebInfo`).
 
+### Command line options
+
+The following command line interface options are available:
+
+| Option         | Description                                               |
+|----------------|-----------------------------------------------------------|
+| -h, --help     | detailed information about options                        |
+| -p, --program  | program to run                                            |
+| -e, --evaluate | program to be evaluated (alternative to -p)               |
+| -l, --license  | show the license (NOT YET AVAILABLE)                      |
+| -i, --input    | program's input                                           |
+| -o, --output   | program's output                                          |
+| -v, --charvar  | charvar (enabled by default)                              |
+
+Among the possible inputs and outputs, the following are predefined:
+
+| Input/Output | Description        |
+|--------------|--------------------|
+| @stdin, -    | standard input     |
+| @stdout      | standard output    |
+| @null        | null output        |
+
+### Simple examples of usage
+
+TODO (HIGH) add several simple examples of usage
+
+# The Tau Language
+
+## Boolean functions
+
+One of the key ingredients of the Tau Language are the Boolean functions (Boolean
+combinations of constants -over a Boolean algebra- and variables). They
+are given by the following grammar:
+
+```
+bf -> "("bf "&" bf")" | bf "'" | "("bf "^" bf")" | "("bf "+" bf")" | "("bf "|" bf")"
+	| bf_ref | constant | uninterpreted_constant | var | "0" | "1".
+```
+
+where
+
+* `bf` stands for a well formed sub-formula and the operators `&`, `'`,
+`^` and `|` stand for conjunction, negation, exclusive-or and disjunction
+(respectively).
+* `bf_ref` is  a reference to a recurrence relation (see the Subsection
+[Recurrence relations](#recurrence-relations)),
+* `constant` stands for an element of the Boolean algebras (see Subsction
+[Constants](#constants) for details),
+* `uninterpreted_constant` stands for an uninterpreted constant of the Boolean
+algebra, they are assume to be existentialy quantified in the context of the
+formula. The syntax is a follows:
+
+```
+uninterpreted_constant -> "<:" name ">".
+```
+
+* `var` stands for a variable of the Boolean algebra (see Subsection
+[Variables](#variables-variables-variables) for details), and
+* finally, `0` and `1` stands for the given elements in the corresponding Boolean
+algebra
+
+For example, the following is a valid expression in terms of Boolean function:
+
+```
+(x & y | (z ^ 0))
+```
+
+where `x`, `y` and `z` are variables.
+
+## Constants
+
+TODO (HIGH) add a detailed explanation of constants
+
+## Variables
+
+TODO (HIGH) add a detailed explanation of variables, charvar options, etc.
+
+## Tau formulas
+
+However, nothing is that simple in usual programming languages, we have
+decisions,... In the case of Tau Language, well formed formulas deal with
+that. They provide us an extra logical layer on basic
+computations (given by Boolean formulas) allowing us to use conditional
+and similar constructions.
+
+Well formed formulas are given in Tau Language by the following grammar:
+
+```
+tau -> "(" tau "&&" tau ")" | "!" tau | "(" tau "^" tau ")" | "(" tau "||" tau ")"
+	| "(" tau "->" tau ")" | "(" tau "<->" tau ")" | "(" tau "?" tau ":" tau ")"
+	| "(" bf "=" bf ")" | "(" bf "!=" bf ")" | "("bf "<" bf")" | "("bf "!<" bf")"
+	| "(" bf "<=" bf ")" | "(" bf "!<=" bf ")" | "(" bf ">" bf ")"
+	| "(" bf "!>" bf ")" | "all" var tau | "ex" var tau | tau_ref | T | F.
+```
+
+where
+
+* `tau` stands for a well formed sub-formula and the operators `&`, `!`, `^`,
+`|`, `->`, `<->` and `?` stand for conjunction, negation, exclusive-or,
+disjunction, implication, equivalence and conditional, in the usual sense,
+(respectively).
+
+* the operators `=`, `<`, `<=` and `>` stands for equality,
+inequality, less than, less or equal than and greater than; the operators
+`!=`, `!<`, `!<=` and `!>` denote their negations,
+
+* `all` stands for the universal quantifier and `ex` for the existential one, and
+finally,
+
+* `tau_ref` is  a reference to a recurrence relation (see the Subsection
+[Recurrence relations](#recurrence-relations)),
+
+* `T` and `F` represent the true and false values.
+
+For example, the following is a valid well formed formula:
+
+```
+(x && y || z) = 0 -> (x = 0 ? y = 0 : z = 0)
+```
+
+where `x`, `y` and `z` are variables.
+
+## Recurrence relations
+
+TODO (HIGH) review this section
+
+Last, in usual programming languages you have loops, recursion and so on. In the
+case of Tau Language, recursive relations are used to this end. Obviously, they
+could not go as far as the usual programming languages (we will fall into the
+undecidable side), but they are enough to express the most complex specifications.
+
+They are given by the following grammar:
+
+```
+bf_rec_relation -> bf_ref ":=" bf.
+bf_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
+```
+
+in the case of Boolean functions and in the case of well-formed general formulas,
+the grammar is:
+
+```
+tau_rec_relation -> tau_ref "::=" tau.
+tau_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
+```
+
+anf finally, in the case of tau formulas, the grammar is:
+
+```
+tau_rec_relation -> tau_ref ":::=" tau.
+tau_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
+```
+
+where `bf_rec_relation` stands for a Boolean function recursive relation, `bf_ref`
+stands for a reference to a Boolean function (see Boolean functions Section),
+`tau_rec_relation` stands for a well formed formula recursive relation, `tau_ref`
+stands for a reference to a well formed formula (see well formed formulas
+Section), `sym` stands for a symbol, `offset` stands for an offset and `capture`
+stands for a capture/variable.
+
+Examples of recursive relations are:
+
+```
+g[0](Y) := 1.
+g[n](Y) := g[n - 1](Y).
+```
+
+for the case of Boolean functions,
+
+```
+g[0](Y) ::= T.
+g[n](Y) ::= h[n - 1](Y).
+h[0](Y) ::= F.
+h[n](Y) ::= g[n - 1](Y).
+```
+
+and finally, for the case of well formed formulas:
+
+```
+g[0](Y) :::= {T}.
+g[n](Y) :::= g[n - 1](Y).
+```
+
+## Tau specifications
+
+TODO (HIGH) review this section
+
+Taking into account all the previous definitions and considerations, Tau programs
+are given by the following grammar:
+
+```
+rr => (rec_relation)* tau.
+```
+
+where `tau_rec_relation` stands for a tau recursive relations, `tau_rec_relation`
+for a tau recursive relation, `bf_rec_relation` for a bf recursive relation and
+`tau` stands for a tau formula.
+
+Thus, they are a collection of Tau recursive relations and a main formula, p.e.:
+
+```
+g[0](Y) :::= {T}.
+g[n](Y) :::= g[n - 1](Y).
+g[1](Y);
+```
+
+## Reserved symbols
+
+Tau Language has a set of reserved symbols that cannot be used as identifiers.
+In particular, we insists that `T` and `F` are reserved for true and false values
+respectively in tau formulas and `0` and `1` stand for the corresponding Boolean
+algebra in Boolean function formulas.
+
 # The Tau REPL
 
-The Tau REPL is a command line interface that allows you to interact with Tau
+The Tau REPL is a command line interface that allows you to interact with the Tau
 Language. It is a simple and easy to use tool that allows you to write and
 execute Tau programs on the go.
 
@@ -113,7 +369,7 @@ corresponds to the repo commit.
 
 * `clear|c`: clears the screen.
 
-## REPLE options
+## REPL options
 
 You have several options at your disposal to configure the Tau REPL. In order
 to set or get the value of an option you could use the following commands:
@@ -176,7 +432,7 @@ All the results are stored in memory. Also you could stored well-formed formulas
 or Boolean function for later reference. To do so, you could use the following
 syntax:
 
-* `wff|bf`: store a well-formed formula or a Boolean function in memory.
+* `tau|bf`: store a tau formula or a Boolean function in memory.
 
 If you want to consult the memory contents, you could use the following commands:
 
@@ -196,12 +452,12 @@ syntax:
 You could substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
-* `subst|s <memory|wff|bf> [<memory|wff|bf>/<memory|wff|bf>]`: substitutes a
+* `subst|s <memory|tau|bf> [<memory|tau|bf>/<memory|tau|bf>]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
 expression (beeing this one a memory position, well-formed formula or Boolean
 Function).
 
-* `instantiate|inst|i <memory|wff> [<var>/<memory|bf>]`: instantiates a variable
+* `instantiate|inst|i <memory|tau> [<var>/<memory|bf>]`: instantiates a variable
 by a memory position, well-formed formula or Boolean function in the given
 well-formed or Boolean function expression.
 
@@ -220,32 +476,32 @@ The syntax of the commands is the following:
 
 * `unsat <rr>`: checks if the given program is unsatisfiable.
 
-* `solve <memory|wff>`: solves the given system of equations given by the
+* `solve <memory|tau>`: solves the given system of equations given by the
 well-formed formula. It only computes one solution.
 
-* `normalize|n <memory|rr|ref|wff|bf>`: normalizes the given expression. See
+* `normalize|n <memory|rr|ref|tau|bf>`: normalizes the given expression. See
 the TABA book for details.
 
-* `qelim <memory|wff>`: performs quantifier elimination on the given expression.
+* `qelim <memory|tau>`: performs quantifier elimination on the given expression.
 
 ## Normal forms
 
 Also, the Tau REPL includes several transformations procedures to standard forms.
 The syntax of the commands as follows:
 
-* `dnf <memory|wff|bf>`: computes the disjunctive normal form of the given
+* `dnf <memory|tau|bf>`: computes the disjunctive normal form of the given
 expression.
 
-* `cnf <memory|wff|bf>`: computes the conjunctive normal form of the given
+* `cnf <memory|tau|bf>`: computes the conjunctive normal form of the given
 expression.
 
-* `nnf <memory|wff|bf>`: computes the negation normal form of the given expression.
+* `nnf <memory|tau|bf>`: computes the negation normal form of the given expression.
 
-* `mnf <memory|wff|bf>`: computes the minterm normal form of the given expression.
+* `mnf <memory|tau|bf>`: computes the minterm normal form of the given expression.
 
-* `snf <memory|wff|bf>`: computes the strong normal form of the given expression.
+* `snf <memory|tau|bf>`: computes the strong normal form of the given expression.
 
-* `onf <var> <memory|wff>`: computes the order normal form of the given
+* `onf <var> <memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
 
 ## Program execution
@@ -253,243 +509,17 @@ expression with respect to the given variable.
 Finally, you could run the given program once you have defined input/output
 variables as you need. The syntax of the commands is the
 
-* `run|r <memory|wff>`: runs the given program.
+* `run|r <memory|tau>`: runs the given program.
 
-# The Tau Language
 
-## Boolean functions
+# Known issues
 
-In usual programming languages, constants usually came in the form of integers,
-strings,... in the case of Tau Language they came in the form of constants in
-Boolean algebras.
+TODO (HIGH) add a list of known issues
 
-Almost everyone related to Computer Science is familiar with the classical
-Boolean algebra given by'0' and '1'. But Tau Language goes beyond that simple
-notion of Boolean Algebra and allows you to consider more elaborated ones as
-the Lindenbaum-Tarski algebra of a given logic (formulas of a given logic
-considering conjunction, negation, exclusive or,...or for example equality
--which would stand for equivalence in the given logic-), finite Boolean
-algebras (which would stand for algebras over finite bit representations),
-define your own Boolean Algebras and so on. If your input/output Boolean algebras
-are decidable, your are safe, Tau Language extension would also be decidable.
+# Future work
 
-Taking into account the previous considerations, Tau Language allows you to
-define Boolean functions in a clear and concise way. A Boolean function is a
-Boolean combination of constants and variables.
+TODO (HIGH) add a list of future work
 
-If you follow the analogy with the usual programming languages, and you consider
-integer inputs and outputs, Boolean functions would correspond to evaluate
-polynomials over the integers.
+# Submitting issues
 
-In Tau Language we could represent Boolean functions essentially following
-the grammar:
-
-```
-bf -> elem | "("bf "&" bf")" | bf "'" | "("bf "^" bf")" | "("bf "+" bf")" | "("bf "|" bf")"
-	| fall var bf | fex var bf
-elem -> var | const | bf_ref
-const -> 0 | 1 | { B }
-```
-
-where `elem` stands for an element of one of the Boolean algebras, `bf` for a
-Boolean functions, `var`stands for a variable, `const` stands for a constant,
-`bf_ref` stands for a reference to a Boolean function recursive relation
-(see recursive relations Section), `B` stands for a Boolean constant, `fall` is
-the universal functional quantifier and `fex` is the existential functional
-quantifier. As usual, the operators `&`, `'`, `^` and `|` stands for conjunction,
-negation, exclusive-or and disjunction respectively.
-
-For example, the following is a valid expression in terms of Boolean function:
-
-```
-(X & Y | (Z ^ 0))
-```
-
-where `X`, `Y` and `Z` are variables.
-
-## Well-formed formulas
-
-However, nothing is that simple in usual programming languages, we have
-decisions,... In the case of Tau Language, well formed formulas deal with
-that. They provide us an extra logical layer on basic
-computations (given by Boolean formulas) allowing us to use conditional
-and similar constructions.
-
-Well formed formulas are given in Tau Language by the following grammar:
-
-```
-wff -> "("wff "&&" wff")" | "!" wff | "("wff "^" wff")" | "("wff "||" wff")" | "("wff "->" wff")"
-	| "("wff "<->" wff")" | "("wff "?" wff ":" wff")" | all var wff | ex var wff
-	| ball bool_var wff | bex bool_var wff | wff_ref
-	| "("bf "=" bf")" | "("bf "!=" bf")" | "("bf "<" bf")" | "("bf "<=" bf")" | "("bf ">" bf")" | T | F.
-```
-
-where `wff` stands for a sub-well formed formula, `wff_ref` stands for a
-reference to a well formed recursive relation (see recursive relations Section),
-`T` stands for the true constant and `F` stands for the false constant. As usual,
-the operators `&`, `!`, `^`,  `|`, `->`, `<->` and `?` stands for conjunction,
-negation, exclusive-or, disjunction, implication, equivalence and conditional
-(in the usual sense) respectively.
-
-Also, `all` stands for the universal quantifier and `ex` for the existential one
- whereas `ball` stands for Boolean universal quantifier and `bex` stands for
- Boolean existential quantifier. The difference between the Boolean and the
- regular quantifiers is that the Boolean ones depend on a Boolean variable,
- i.e. a variable whose values are exactly `T` of `F`. The use of such quantifiers
- is to simplify the writing of complex formulas.
-
-Finally, the operators `=`, `!=`, `<`, `<=` and `>` stands for equality,
-inequality, less than, less or equal than and greater than respectively.
-
-Finally, `=` stands for equality, `!=` for inequality, `<` for less than,
-`<=` for less or equal than, `>` for greater than (all of them in one of the
-underlying Boolean algebras) and `T` for true and `F` for false.
-
-For example, the following is a valid well formed formula:
-
-```
-(X && Y || ((Z ^ 0) = 0)) -> (X ? Y : Z)
-```
-
-where `X`, `Y` and `Z` are variables.
-
-As in the case of `bf`, we have two types of quantifiers and the variables could
-be of the above types. As announced, we would clarify both of them in a
-forthcoming Section.
-
-## Variables, variables, variables,...
-
-Tau specifications, as deal with program specifications, could freely include
-input and output variables. The distinction between input and output variables
-is made by the use of the `i_` and `o_` prefix. For instance, in a Tau
-specification we could have variables named `ì_keyboard` or `o_terminal`.
-Moreover, the variables must have a timestamp, i.e. you could have
-`i_keyboard[t]` that denotes the value of the variable `i_keyboard` at time `t`.
-Also you could have `i_keyboard[t-1]` that denotes the value of the variable
-`i_keyboard` at time `t-1` or `ì_keyboard[3]` that denotes the value of variable
-at time `3` of the specification.
-
-Free variables used in recursive relations must be preceded by a `$` symbol,
-for example `$X` or `$Y`. The use of `$` symbol is to avoid name clashes with
-the variables of the specification. They could be used freely inside the body
-of the definitions.
-
-## Tau formulas
-
-Tau formulas are given by the following grammar:
-
-```
-tau => "{" wff "}" | tau_ref | "("tau "&&&" tau")" | "("tau "|||" tau")" | "!!!" tau.
-```
-
-where `tau` stands for a tau formula, `tau_wff` stands for a well formed formula,
-`tau_ref` stands for a reference to a well formed formula, `tau_and` stands for
-a conjunction of two tau formulas, `tau_or` stands for a disjunction of two tau
- formulas, `tau_neg` stands for a negation of a tau formula and `capture` stands
-  for a capture/variable.
-
-## Recursive relations
-
-Last, in usual programming languages you have loops, recursion and so on. In the
-case of Tau Language, recursive relations are used to this end. Obviously, they
-could not go as far as the usual programming languages (we will fall into the
-undecidable side), but they are enough to express the most complex specifications.
-
-They are given by the following grammar:
-
-```
-bf_rec_relation -> bf_ref ":=" bf.
-bf_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
-```
-
-in the case of Boolean functions and in the case of well-formed general formulas,
-the grammar is:
-
-```
-wff_rec_relation -> wff_ref "::=" wff.
-wff_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
-```
-
-anf finally, in the case of tau formulas, the grammar is:
-
-```
-tau_rec_relation -> tau_ref ":::=" tau.
-tau_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
-```
-
-where `bf_rec_relation` stands for a Boolean function recursive relation, `bf_ref`
-stands for a reference to a Boolean function (see Boolean functions Section),
-`wff_rec_relation` stands for a well formed formula recursive relation, `wff_ref`
-stands for a reference to a well formed formula (see well formed formulas
-Section), `sym` stands for a symbol, `offset` stands for an offset and `capture`
-stands for a capture/variable.
-
-Examples of recursive relations are:
-
-```
-g[0](Y) := 1.
-g[n](Y) := g[n - 1](Y).
-```
-
-for the case of Boolean functions,
-
-```
-g[0](Y) ::= T.
-g[n](Y) ::= h[n - 1](Y).
-h[0](Y) ::= F.
-h[n](Y) ::= g[n - 1](Y).
-```
-
-and finally, for the case of well formed formulas:
-
-```
-g[0](Y) :::= {T}.
-g[n](Y) :::= g[n - 1](Y).
-```
-
-## Tau programs
-
-TODO (HIGH) explain what is a specification
-
-Taking into account all the previous definitions and considerations, Tau programs
-are given by the following grammar:
-
-```
-rr => (rec_relation)* wff.
-```
-
-where `tau_rec_relation` stands for a tau recursive relations, `wff_rec_relation`
-for a wff recursive relation, `bf_rec_relation` for a bf recursive relation and
-`tau` stands for a tau formula.
-
-Thus, they are a collection of Tau recursive relations and a main formula, p.e.:
-
-```
-g[0](Y) :::= {T}.
-g[n](Y) :::= g[n - 1](Y).
-g[1](Y);
-```
-
-TODO (HIGH) add tau recursive relations
-
-## Type resolution
-
-Type resolution is used to ensure that all the Boolean Algebra operations are
-consistent. Types could be specified at two levels:
-
-* At the Boolean algebra expression level: in this case, the type of the
-expression is the type of one of the constants
-of the Boolean expression, there is no need to provide the type in each of them.
-
-* At the quantifier expression level: in this case, the type of a variable is
-specified and all the underlying Boolean algebra expressions are typed accordingly.
-
-In both cases, if there is a mismatch between the types, an error is raised
-during the type resolution phase, i.e. before executing the program.
-
-## Reserved symbols
-
-Tau Language has a set of reserved symbols that cannot be used as identifiers.
-In particular, `T` and `F` are reserved for true and false values respectively
-in well formed formulas and `0` and `1` stand for the corresponding Boolean
-algebra in Boolean function formulas.
+TODO (HIGH) write about how to submit issues
