@@ -32,21 +32,15 @@
 
 # Introduction
 
-Tau advances formal methods by removing coding from the process, while expanding
-its industrial capability, reliability and ease of maintenance. Tau enables you
-to automatically create the most complex, provably correct software, by simply
-writing sentences about what you want the software to do.
+The Tau language is a logical software specification language. It allows you to
+write constraints about software, check for satisfiability, and run a candidate
+program that meet those specifications. All related logical tasks are decidable.
 
-Tau Language is able to embed and extend the most powerful decidable knowledge
-representation languages, logics, and Boolean algebras to describe states in
-the specification.
+The language is based on the first-order theory of atomless Boolean algebras.
 
-This README.md file only tries to give you a brief operative overview of Tau
-Language so you could understand the main points without being too precise
-(actually deliberately imprecise just for the sake of ideas exposition). For a
-more detailed explanation of Tau Language and all its details, please refer to
-the TABA book
-([Theories and Applications of Boolean Algebras by Ohad Ashor](./docs/taba.pdf)).
+For a more detailed explanation of the theory behind the Tau Language, please
+refer to the TABA book ongoing draft
+([Theories and Applications of Boolean Algebras by Ohad Asor](./docs/taba.pdf)).
 
 # Quick start
 
