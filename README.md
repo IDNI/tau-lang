@@ -205,7 +205,54 @@ where `x`, `y` and `z` are variables.
 
 ## Constants
 
-TODO (HIGH) add a detailed explanation of constants
+Constants in the Tau Language are elements of the underlying Boolean algebras,
+usually other than `0` and `1` that have a dedicated syntax (but could also
+represented as such).
+
+In the REPL, we support two Boolean algebras: the Tau Boolean algebra and the
+simple Boolean function algebra. The Tau Boolean algebra is an extensional Boolean
+algebra that encodes Tau specifications over base algebras (in the REPL case we
+only support the simple Boolean functions as base one).
+
+The syntax for the first case, the Tau Boolean algebra, is the following:
+
+```
+constant -> "{" tau "}" [":" "tau"].
+```
+
+i.e. we could have a tau formula as a constant inside a tau formula as a constant.
+For example, the following is a valid constant in the Tau Boolean algebra:
+
+```
+{ (x & y | z) = 0 }:tau
+```
+
+or even
+
+```
+{ { (x & y | z) = 0 }:tau = 0 }:tau
+```
+
+where `x`, `y` and `z` are variables.
+
+
+Regarding the simple Boolean function algebra, the syntax is the following:
+
+```
+constant -> "{" sbf "}" ":" "sbf".
+```
+
+where the grammar for simple Boolean functions is the following:
+
+```
+sbf -> "("sbf "&" sbf")" | sbf "'" | "("sbf "^" sbf")" | "("sbf "+" sbf")"
+	| "("sbf "|" sbf")"	| var | "0" | "1".
+```
+
+where `sbf` stands for a simple Boolean function, and the operators `&`, `'`,
+(`^`|`+ `) and `|` stand for conjunction, negation, exclusive-or and disjunction;
+`var` stands for a variable on the simple Boolean algebra, and finally, `0` and
+`1` stands for the given elements in the simple Boolean algebra.
 
 ## Variables
 
@@ -236,15 +283,14 @@ where
 disjunction, implication, equivalence and conditional, in the usual sense,
 (respectively).
 
-* the operators `=`, `<`, `<=` and `>` stands for equality,
-inequality, less than, less or equal than and greater than; the operators
-`!=`, `!<`, `!<=` and `!>` denote their negations,
+* the operators `=`, `<`, `<=` and `>` stands for equality, less than, less or
+equal than and greater than; the operators `!=`, `!<`, `!<=` and `!>` denote
+their negations,
 
-* `all` stands for the universal quantifier and `ex` for the existential one, and
-finally,
+* `all` stands for the universal quantifier and `ex` for the existential one,
 
 * `tau_ref` is  a reference to a recurrence relation (see the Subsection
-[Recurrence relations](#recurrence-relations)),
+[Recurrence relations](#recurrence-relations)), and finally,
 
 * `T` and `F` represent the true and false values.
 
