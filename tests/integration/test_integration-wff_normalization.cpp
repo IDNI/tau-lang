@@ -95,7 +95,8 @@ TEST_SUITE("wff_sometimes_always") {
 		CHECK( formula.has_value() );
 		if (!formula.has_value()) return;
 		auto fm = formula.value().main;
-		auto result = push_sometimes_always_in(fm);
+		std::set<nso<bdd_binding>> visited;
+		auto result = push_sometimes_always_in(fm, visited);
 		auto simp_res = result
 			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
 			| reduce_wff<bdd_binding>;
@@ -110,7 +111,8 @@ TEST_SUITE("wff_sometimes_always") {
 		CHECK( formula.has_value() );
 		if (!formula.has_value()) return;
 		auto fm = formula.value().main;
-		auto result = push_sometimes_always_in(fm);
+		std::set<nso<bdd_binding>> visited;
+		auto result = push_sometimes_always_in(fm, visited);
 		auto simp_res = result
 			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
 			| reduce_wff<bdd_binding>;
@@ -124,7 +126,8 @@ TEST_SUITE("wff_sometimes_always") {
 		CHECK( formula.has_value() );
 		if (!formula.has_value()) return;
 		auto fm = formula.value().main;
-		auto result = push_sometimes_always_in(fm);
+		std::set<nso<bdd_binding>> visited;
+		auto result = push_sometimes_always_in(fm, visited);
 		auto simp_res = result
 			| repeat_all<step<bdd_binding>, bdd_binding>(simplify_wff<bdd_binding>)
 			| reduce_wff<bdd_binding>;

@@ -18,33 +18,6 @@
 
 namespace idni::tau {
 
-// ------ Helpers for variables having io_var as child ---------------
-template<typename... BAs>
-auto is_io_initial (const nso<BAs...>& io_var) {
-	return (trim2(io_var)->child[1] | tau_parser::num).has_value();
-}
-
-template<typename... BAs>
-auto is_io_shift (const nso<BAs...>& io_var) {
-	return (trim2(io_var)->child[1] | tau_parser::shift).has_value();
-}
-
-template<typename... BAs>
-auto get_io_time_point (const nso<BAs...>& io_var) {
-	return size_t_extractor<BAs...>(trim2(trim2(io_var)->child[1])).value();
-}
-
-template<typename... BAs>
-auto get_io_shift (const nso<BAs...>& io_var) {
-	return size_t_extractor<BAs...>(trim2(io_var)->child[1]->child[0]->child[1]->child[0]).value();
-}
-
-template<typename... BAs>
-std::string get_io_name (const nso<BAs...>& io_var) {
-	std::stringstream ss; ss << trim(trim2(io_var));
-	return ss.str();
-}
-
 template<typename... BAs>
 nso<BAs...> build_io_out (const std::string& name, const std::string& var) {
 	using p = tau_parser;
@@ -93,33 +66,6 @@ nso<BAs...> build_io_in_shift (const std::string& name, const std::string& var, 
 	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, var), build_num<BAs...>(shift)});
 	auto offset = wrap<BAs...>(p::offset, shift_node);
 	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
-}
-// -----------------------------------------------
-template<typename... BAs>
-int_t get_io_var_shift(const nso<BAs...>& io_var) {
-	// If there is a shift
-	if (is_io_shift(io_var))
-		return get_io_shift(io_var);
-	return 0;
-}
-
-int_t get_max_shift(const auto& io_vars) {
-	int_t max_shift = 0;
-	for (const auto& v : io_vars)
-		max_shift = std::max(max_shift, get_io_var_shift(v));
-	return max_shift;
-}
-
-template<typename... BAs>
-int_t get_max_initial(const auto& io_vars) {
-	int_t max_init = -1;
-	for (const nso<BAs...>& v : io_vars) {
-		if (is_io_initial(v)) {
-			int_t init = get_io_time_point(v);
-			max_init = std::max(max_init, init);
-		}
-	}
-	return max_init;
 }
 
 template<typename... BAs>
@@ -646,27 +592,6 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 	}
 	if (!changes.empty()) fm = replace(fm, changes);
 	return fm;
-}
-
-// Shifts a formula of lookback 0 to previous time step
-template<typename... BAs>
-nso<BAs...> shift_io_vars_in_fm (const nso<BAs...>& fm, const auto& io_vars, const int_t shift) {
-	if (shift <= 0) return fm;
-	std::map<nso<BAs...>, nso<BAs...>> changes;
-	for (const auto& io_var: io_vars) {
-		// Skip initial conditions
-		if (is_io_initial(io_var))
-			continue;
-		int_t var_shift = get_io_var_shift(io_var);
-		if (io_var | tau_parser::io_var | tau_parser::in) {
-			changes[io_var] = build_io_in_shift<BAs...>(
-				get_io_name(io_var), "t", var_shift + shift);
-		} else {
-			changes[io_var] = build_io_out_shift<BAs...>(
-				get_io_name(io_var), "t", var_shift + shift);
-		}
-	}
-    return replace(fm, changes);
 }
 
 // We assume that the formula has run through the normalizer before
