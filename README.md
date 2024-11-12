@@ -44,25 +44,24 @@ refer to the TABA book ongoing draft
 
 # Quick start
 
-## Installing the Tau REPL
+## Installing the Tau Framework
 
-### Linux users (NOT YET AVAILABLE)
+### Linux (not available yet)
 
-We provide convenient packages for Linux users to install the Tau REPL. Currently,
-we automatically build packages (AMD64 architecture) for the following package managers:
+Currently we automatically build the following binaries packages (AMD64 architecture):
 
 * deb (Debian/Ubuntu): [tau_0.1.0_amd64.deb](http://someurl.com)
 * rpm (Fedora): [tau-0.1.0-1.x86_64.rpm](http://someurl.com)
 
-Those packages include the tau executable.
-
-### Windows users (NOT YET AVAILABLE)
+### Windows (not available yet)
 
 For windows we provide a convenient installer that includes the tau executable
 and also a zip file:
 
 * Installer: [tau-0.1.0-amd64.exe](http://someurl.com)
 * Zip file: [tau-0.1.0-amd64.zip](http://someurl.com)
+
+### MacOS (not available yet) 
 
 ## Compiling the source code
 
