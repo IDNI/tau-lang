@@ -65,48 +65,20 @@ and also a zip file:
 
 ## Compiling the source code
 
-To compile the source code you need a recent C++ compiler, say GCC 13.1.0
-compiler suite, as the source code uses recent features introduced in C++23
-standard. You also need at least a cmake version 3.22.1 installed in your system.
-Only a recent version of boost libraries are required to compile the source code.
+To compile the source code you need a recent C++ compiler supporting C++23, e.g.
+GCC 13.1.0. You also need at least a cmake version 3.22.1 installed in your system.
+The only code dependency is libboost.
 
-The first step to compile the code is to clone the repository:
+After cloning:
 
 ```bash
 git clone https://github.com/IDNI/tau-lang.git
 ```
 
-After that, you could run several bash scripts that are provided in the main
-directory to compile the source code in release or debug mode (also in release
-with debug information -used for benchmarking-).
+you can run either the `release.sh` or `debug.sh` or `relwithdebinfo.sh` scripts
+to build the binaries.
 
-The first script is `release.sh` which compiles the source code in release mode
-and also all the tests. The second script is `debug.sh` which compiles the
-source code in debug mode and also all the tests. The third one is
-`relwithdebinfo.sh` which compiles the source code in release mode with debug
-information, also all the tests and few benchmarks.
-
-```bash
-./release.sh # Compiles the source code in release mode
-./debug.sh # Compiles the source code in debug mode
-./relwithdebinfo.sh # Compiles the source code in release mode with debug information
-```
-
-We also provide scripts to execute the tests suite so you could check that
-everything is working properly. The first one is `test_release.sh` to run the
-tests in release mode and the second one is `test_debug.sh` to run the test
-in debug mode (also `test_relwithdebinfo.sh`).
-
-```bash
-./test_release.sh # Runs the tests in release mode
-./test_debug.sh # Runs the tests in debug mode
-./test_relwithdebinfo.sh # Runs the tests in release mode with debug information
-```
-
-If you want to produce the documentation of the source code you need to install
-the `doxygen` tool. After that, you could run the `release.sh` or `debug.sh`
-(also the `relwithdebinfo.sh`) scripts as follows to produce the documentation
-of the source code:
+To build with doxygen documentation:
 
 ```bash
  # Compiles the source code in release mode and also the documentation
@@ -117,19 +89,15 @@ of the source code:
 ./relwithdebinfo.sh -DBUILD_DOC=ON
 ```
 
-Please take a look to the main
-([CMakeLists.txt](https://github.com/IDNI/tau-lang/blob/main/CMakeLists.txt))
-for additional options.
-
 ## Running Tau REPL
 
-Once you have compiled the source code you could run the `tau` executable to
-execute Tau programs. The `tau` executable is located in the `build-Release`
-or `build-Debug` directory (alternatively in `build-RelWithDebInfo`).
+Once you have compiled the source code you can run the `tau` executable to
+execute Tau programs. The `tau` executable is located in the either `build-Release`
+or `build-Debug` or `build-RelWithDebInfo`.
 
 ### Command line options
 
-The following command line interface options are available:
+The following command line options are available:
 
 | Option         | Description                                               |
 |----------------|-----------------------------------------------------------|
