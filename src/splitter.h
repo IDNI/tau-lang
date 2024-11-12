@@ -301,11 +301,11 @@ nso<BAs...> tau_splitter (const nso<BAs...>& fm, splitter_type st) {
 				     is_non_terminal<p::constraint, BAs...>). has_value()) {
 				// Split unbound continuation
 				auto ubd_ctn = transform_to_execution(specs[0]);
-                BOOST_LOG_TRIVIAL(trace) << "Unbound continuation for splitter: " << ubd_ctn;
-                auto res = nso_tau_splitter(ubd_ctn, st);
+				BOOST_LOG_TRIVIAL(trace) << "Unbound continuation for splitter: " << ubd_ctn;
+				auto res = nso_tau_splitter(ubd_ctn, st);
 				res.first = build_wff_always(res.first);
-                BOOST_LOG_TRIVIAL(trace) << "Splitter of unbound continuation: " << res.first;
-                return res;
+				BOOST_LOG_TRIVIAL(trace) << "Splitter of unbound continuation: " << res.first;
+				return res;
 			}
 		}
 		bool good_splitter = false;
