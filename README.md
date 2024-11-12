@@ -281,7 +281,7 @@ where `x`, `y` and `z` are variables.
 TODO (HIGH) review this section
 
 Last, in usual programming languages you have loops, recursion and so on. In the
-case of Tau Language, recursive relations are used to this end. Obviously, they
+case of Tau Language, recurrence relations are used to this end. Obviously, they
 could not go as far as the usual programming languages (we will fall into the
 undecidable side), but they are enough to express the most complex specifications.
 
@@ -314,7 +314,7 @@ stands for a reference to a well formed formula (see well formed formulas
 Section), `sym` stands for a symbol, `offset` stands for an offset and `capture`
 stands for a capture/variable.
 
-Examples of recursive relations are:
+Examples of recurrence relations are:
 
 ```
 g[0](Y) := 1.
@@ -348,11 +348,11 @@ are given by the following grammar:
 rr => (rec_relation)* tau.
 ```
 
-where `tau_rec_relation` stands for a tau recursive relations, `tau_rec_relation`
+where `tau_rec_relation` stands for a tau recurrence relations, `tau_rec_relation`
 for a tau recursive relation, `bf_rec_relation` for a bf recursive relation and
 `tau` stands for a tau formula.
 
-Thus, they are a collection of Tau recursive relations and a main formula, p.e.:
+Thus, they are a collection of Tau recurrence relations and a main formula, p.e.:
 
 ```
 g[0](Y) :::= {T}.
@@ -432,7 +432,7 @@ relations in Tau Language) and IO variables. The syntax of the commands
 is the following:
 
 * `definitions|defs`: shows all the definitions of the current program. That
-includes the definitions of the recursive relations and the IO variables.
+includes the definitions of the recurrence relations and the IO variables.
 
 * `definitions|defs <number>`: shows the definition of the given recurrence
 relation.
