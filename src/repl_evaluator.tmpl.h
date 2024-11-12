@@ -1055,8 +1055,10 @@ int repl_evaluator<BAs...>::eval_cmd(
 
 template<typename... BAs>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
-	tau_parser::instance().get_grammar().set_enabled_productions({
-		(opt.charvar = value) ? "charvar" : "var" });
+	std::set<std::string> guards{
+		(opt.charvar = value) ? "charvar" : "var" };
+	tau_parser::instance().get_grammar().set_enabled_productions(guards);
+	bdd_parser::instance().get_grammar().set_enabled_productions(guards);
 	return value;
 }
 

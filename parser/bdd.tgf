@@ -13,9 +13,11 @@
 
 @use char classes space, alpha, digit.
 
+@enable productions charvar.
+
 start  => _ bdd _.
 bdd    => ( '(' _ bdd _ ')'                ) :group
-        | ( alpha digit*                   ) :variable
+        |                                     variable
         | ( bdd _ "'"                      ) :negation
         | ( bdd _ '|' _ bdd                ) :disjunction
         | ( bdd _ ('^' | '+') _ bdd        ) :exclusive_disjunction
@@ -23,6 +25,9 @@ bdd    => ( '(' _ bdd _ ')'                ) :group
         | '1'                                :one
         | '0'                                :zero.
 _      => [ space _ ].
+
+variable[charvar] => alpha digit*.
+variable[var]     => alpha (alnum | '_')*.
 
 @trim _.
 @trim all terminals except children of variable.

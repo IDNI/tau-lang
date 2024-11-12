@@ -13,15 +13,15 @@ using terminal_type = char;
 
 inline std::vector<std::string> symbol_names{
 	"", "space", "alpha", "digit", "start", "_", "bdd", "group", "__E_bdd_0", "variable", 
-	"__E_bdd_1", "__E___E_bdd_1_2", "negation", "__E_bdd_3", "disjunction", "__E_bdd_4", "exclusive_disjunction", "__E_bdd_5", "__E___E_bdd_5_6", "conjunction", 
-	"__E_bdd_7", "__E___E_bdd_7_8", "one", "zero", "__E___9", 
+	"negation", "__E_bdd_1", "disjunction", "__E_bdd_2", "exclusive_disjunction", "__E_bdd_3", "__E___E_bdd_3_4", "conjunction", "__E_bdd_5", "__E___E_bdd_5_6", 
+	"one", "zero", "__E___7", "__E_variable_8", "__E_variable_9", "alnum", "__E_variable_10", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
 	'\0', '(', ')', '\'', '|', '^', '+', '&', '1', 
-	'0', 
+	'0', '_', 
 };
 
 inline ::idni::char_class_fns<terminal_type> char_classes =
@@ -48,6 +48,9 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 			{ 6, 7, 6 }
 		},
 		.inline_char_classes = true
+	},
+	.enabled_guards = {
+		"charvar"
 	}
 };
 
@@ -71,62 +74,72 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(7), (NT(8)));
 //G3:   bdd(6)               => group(7).
 	p(NT(6), (NT(7)));
-//G4:   __E___E_bdd_1_2(11)  => null.
-	p(NT(11), (nul));
-//G5:   __E___E_bdd_1_2(11)  => digit(3) __E___E_bdd_1_2(11).
-	p(NT(11), (NT(3)+NT(11)));
-//G6:   __E_bdd_1(10)        => alpha(2) __E___E_bdd_1_2(11).
-	p(NT(10), (NT(2)+NT(11)));
-//G7:   variable(9)          => __E_bdd_1(10).
-	p(NT(9), (NT(10)));
-//G8:   bdd(6)               => variable(9).
+//G4:   bdd(6)               => variable(9).
 	p(NT(6), (NT(9)));
-//G9:   __E_bdd_3(13)        => bdd(6) _(5) '\''.
-	p(NT(13), (NT(6)+NT(5)+T(3)));
-//G10:  negation(12)         => __E_bdd_3(13).
+//G5:   __E_bdd_1(11)        => bdd(6) _(5) '\''.
+	p(NT(11), (NT(6)+NT(5)+T(3)));
+//G6:   negation(10)         => __E_bdd_1(11).
+	p(NT(10), (NT(11)));
+//G7:   bdd(6)               => negation(10).
+	p(NT(6), (NT(10)));
+//G8:   __E_bdd_2(13)        => bdd(6) _(5) '|' _(5) bdd(6).
+	p(NT(13), (NT(6)+NT(5)+T(4)+NT(5)+NT(6)));
+//G9:   disjunction(12)      => __E_bdd_2(13).
 	p(NT(12), (NT(13)));
-//G11:  bdd(6)               => negation(12).
+//G10:  bdd(6)               => disjunction(12).
 	p(NT(6), (NT(12)));
-//G12:  __E_bdd_4(15)        => bdd(6) _(5) '|' _(5) bdd(6).
-	p(NT(15), (NT(6)+NT(5)+T(4)+NT(5)+NT(6)));
-//G13:  disjunction(14)      => __E_bdd_4(15).
+//G11:  __E___E_bdd_3_4(16)  => '^'.
+	p(NT(16), (T(5)));
+//G12:  __E___E_bdd_3_4(16)  => '+'.
+	p(NT(16), (T(6)));
+//G13:  __E_bdd_3(15)        => bdd(6) _(5) __E___E_bdd_3_4(16) _(5) bdd(6).
+	p(NT(15), (NT(6)+NT(5)+NT(16)+NT(5)+NT(6)));
+//G14:  exclusive_disjunction(14) => __E_bdd_3(15).
 	p(NT(14), (NT(15)));
-//G14:  bdd(6)               => disjunction(14).
+//G15:  bdd(6)               => exclusive_disjunction(14).
 	p(NT(6), (NT(14)));
-//G15:  __E___E_bdd_5_6(18)  => '^'.
-	p(NT(18), (T(5)));
-//G16:  __E___E_bdd_5_6(18)  => '+'.
-	p(NT(18), (T(6)));
-//G17:  __E_bdd_5(17)        => bdd(6) _(5) __E___E_bdd_5_6(18) _(5) bdd(6).
-	p(NT(17), (NT(6)+NT(5)+NT(18)+NT(5)+NT(6)));
-//G18:  exclusive_disjunction(16) => __E_bdd_5(17).
-	p(NT(16), (NT(17)));
-//G19:  bdd(6)               => exclusive_disjunction(16).
-	p(NT(6), (NT(16)));
-//G20:  __E___E_bdd_7_8(21)  => _(5).
-	p(NT(21), (NT(5)));
-//G21:  __E___E_bdd_7_8(21)  => _(5) '&' _(5).
-	p(NT(21), (NT(5)+T(7)+NT(5)));
-//G22:  __E_bdd_7(20)        => bdd(6) __E___E_bdd_7_8(21) bdd(6).
-	p(NT(20), (NT(6)+NT(21)+NT(6)));
-//G23:  conjunction(19)      => __E_bdd_7(20).
-	p(NT(19), (NT(20)));
-//G24:  bdd(6)               => conjunction(19).
-	p(NT(6), (NT(19)));
-//G25:  one(22)              => '1'.
-	p(NT(22), (T(8)));
-//G26:  bdd(6)               => one(22).
-	p(NT(6), (NT(22)));
-//G27:  zero(23)             => '0'.
-	p(NT(23), (T(9)));
-//G28:  bdd(6)               => zero(23).
-	p(NT(6), (NT(23)));
-//G29:  __E___9(24)          => space(1) _(5).
-	p(NT(24), (NT(1)+NT(5)));
-//G30:  __E___9(24)          => null.
-	p(NT(24), (nul));
-//G31:  _(5)                 => __E___9(24).
-	p(NT(5), (NT(24)));
+//G16:  __E___E_bdd_5_6(19)  => _(5).
+	p(NT(19), (NT(5)));
+//G17:  __E___E_bdd_5_6(19)  => _(5) '&' _(5).
+	p(NT(19), (NT(5)+T(7)+NT(5)));
+//G18:  __E_bdd_5(18)        => bdd(6) __E___E_bdd_5_6(19) bdd(6).
+	p(NT(18), (NT(6)+NT(19)+NT(6)));
+//G19:  conjunction(17)      => __E_bdd_5(18).
+	p(NT(17), (NT(18)));
+//G20:  bdd(6)               => conjunction(17).
+	p(NT(6), (NT(17)));
+//G21:  one(20)              => '1'.
+	p(NT(20), (T(8)));
+//G22:  bdd(6)               => one(20).
+	p(NT(6), (NT(20)));
+//G23:  zero(21)             => '0'.
+	p(NT(21), (T(9)));
+//G24:  bdd(6)               => zero(21).
+	p(NT(6), (NT(21)));
+//G25:  __E___7(22)          => space(1) _(5).
+	p(NT(22), (NT(1)+NT(5)));
+//G26:  __E___7(22)          => null.
+	p(NT(22), (nul));
+//G27:  _(5)                 => __E___7(22).
+	p(NT(5), (NT(22)));
+//G28:  __E_variable_8(23)   => null.
+	p(NT(23), (nul));
+//G29:  __E_variable_8(23)   => digit(3) __E_variable_8(23).
+	p(NT(23), (NT(3)+NT(23)));
+//G30:  variable(9)          => alpha(2) __E_variable_8(23).	 # guarded: charvar
+	p(NT(9), (NT(2)+NT(23)));
+	p.back().guard = "charvar";
+//G31:  __E_variable_9(24)   => alnum(25).
+	p(NT(24), (NT(25)));
+//G32:  __E_variable_9(24)   => '_'.
+	p(NT(24), (T(10)));
+//G33:  __E_variable_10(26)  => null.
+	p(NT(26), (nul));
+//G34:  __E_variable_10(26)  => __E_variable_9(24) __E_variable_10(26).
+	p(NT(26), (NT(24)+NT(26)));
+//G35:  variable(9)          => alpha(2) __E_variable_10(26).	 # guarded: var
+	p(NT(9), (NT(2)+NT(26)));
+	p.back().guard = "var";
 	#undef T
 	#undef NT
 	return loaded = true, p;
@@ -140,8 +153,8 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 struct bdd_parser : public idni::parser<char, char> {
 	enum nonterminal {
 		nul, space, alpha, digit, start, _, bdd, group, __E_bdd_0, variable, 
-		__E_bdd_1, __E___E_bdd_1_2, negation, __E_bdd_3, disjunction, __E_bdd_4, exclusive_disjunction, __E_bdd_5, __E___E_bdd_5_6, conjunction, 
-		__E_bdd_7, __E___E_bdd_7_8, one, zero, __E___9, 
+		negation, __E_bdd_1, disjunction, __E_bdd_2, exclusive_disjunction, __E_bdd_3, __E___E_bdd_3_4, conjunction, __E_bdd_5, __E___E_bdd_5_6, 
+		one, zero, __E___7, __E_variable_8, __E_variable_9, alnum, __E_variable_10, 
 	};
 	static bdd_parser& instance() {
 		static bdd_parser inst;
