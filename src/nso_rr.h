@@ -1340,6 +1340,42 @@ sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
 	return replace<node>(code, changes);
 }
 
+// TODO
+// template<typename... BAs>
+// bool invalid_nesting_of_quants (const sp_tau_node<BAs...>& fm) {
+// 	return false;
+// }
+
+template<typename... BAs>
+bool has_open_tau_fm_in_constant (const sp_tau_node<BAs...>& fm) {
+	auto _closed = [](const auto& n) -> bool {
+		return is_closed(n);
+	};
+	auto consts = select_top(fm, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
+	for (const auto& c : consts) {
+		auto ba_const = c
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
+		if (!std::visit(_closed, ba_const)) {
+			std::cerr << "Error: A Tau formula constant must be closed." << "\n";
+			return true;
+		}
+	}
+	return false;
+}
+
+// This function is used to check for semantic errors in formulas since those
+// cannot be captured by the grammar
+template<typename... BAs>
+bool has_semantic_error (const sp_tau_node<BAs...>& fm) {
+	bool error = /*invalid_nesting_of_quants(fm)
+					||*/ has_open_tau_fm_in_constant(fm);
+	return error;
+}
+
 // create tau code from tau source
 template<typename... BAs>
 // TODO (LOW) should depend on node_t instead of BAs...
@@ -1385,10 +1421,13 @@ sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& code,
 	binder_t& binder)
 {
 	bind_transformer<binder_t, BAs...> bs(binder);
-	return rewriter::post_order_traverser<
+	auto res = rewriter::post_order_traverser<
 			bind_transformer<binder_t, BAs...>,
 			rewriter::all_t,
 			sp_tau_node<BAs...>>(bs, rewriter::all)(code);
+	// Check for errors which cannot be captured by the grammar
+	if (has_semantic_error(res)) return {};
+	else return res;
 }
 
 // make a nso_rr from the given tau source and bindings.

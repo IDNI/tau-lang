@@ -63,6 +63,11 @@ hbdd<B, o> bdd_splitter_one () {
 	return bdd_handle<B,o>::htrue->splitter(splitter_type::bad);
 }
 
+template<typename B, auto o = bdd_options<>::create()>
+bool is_closed (const hbdd<B, o>& ) {
+	return true;
+}
+
 #ifdef DEBUG
 template<typename B, auto o = bdd_options<>::create()>
 bool operator==(const hbdd<B, o>& x, const hbdd<B, o>& y) {
