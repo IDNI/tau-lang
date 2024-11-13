@@ -1246,8 +1246,8 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "\n"
 		<< "usage:\n"
 		<< "  normalize <NSORR>      normalizes the given NSO RR\n"
-		<< "  normalize <WFF>        normalizes the given WFF formula\n"
-		<< "  normalize <BF>         normalizes the given WFF formula\n"
+		<< "  normalize <tau>        normalizes the given tau formula\n"
+		<< "  normalize <term>         normalizes the given term formula\n"
 		<< "  normalize <memory>     normalizes the memory with the given id\n";
 	//	<< "  normalize <selection>  normalizes the selection\n";
 		break;
@@ -1256,10 +1256,10 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "saves it into memory of previous memories\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  qelim <WFF>            eliminates innermost quantifier in the given WFF\n";
+		<< "  qelim <tau>            eliminates innermost quantifier in the given tau\n";
 		break;
 	case tau_parser::run_sym: std::cout
-		<< "Command r, run <WFF>\n";
+		<< "Command r, run <tau>\n";
 		break;
 	case tau_parser::solve_sym: std::cout
 		<< "Command s, solve ...\n";
@@ -1277,55 +1277,55 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "dnf command converts a boolean formula or a well formed formula to disjunctive normal form\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  dnf <BF>             converts the given BF to DNF\n"
-		<< "  dnf <WFF>            converts the given BF to DNF\n"
+		<< "  dnf <term>             converts the given term to DNF\n"
+		<< "  dnf <tau>            converts the given term to DNF\n"
 		<< "  dnf <memory>         converts the memory with the given id to DNF\n";
 		break;
 	case tau_parser::cnf_sym: std::cout
 		<< "cnf command converts a boolean formula or a well formed formula to conjunctive normal form\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  cnf <BF>             converts the given BF to CNF\n"
-		<< "  cnf <WFF>            converts the given BF to CNF\n"
+		<< "  cnf <term>             converts the given term to CNF\n"
+		<< "  cnf <tau>            converts the given term to CNF\n"
 		<< "  cnf <memory>         converts the memory with the given id to CNF\n";
 		break;
 	//case tau_parser::anf_sym: std::cout
 	//	<< "anf command converts a boolean formula or a well formed formula to algebraic normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
-	//	<< "  anf <BF>             converts the given BF to ANF\n"
-	//	<< "  anf <WFF>            converts the given WFF to ANF\n"
+	//	<< "  anf <term>             converts the given term to ANF\n"
+	//	<< "  anf <tau>            converts the given tau to ANF\n"
 	//	<< "  anf <memory>         converts the memory with the given id to ANF\n";
 	//	break;
 	case tau_parser::nnf_sym: std::cout
 		<< "nnf command converts a boolean formula or a well formed formula to negation normal form\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  nnf <BF>             converts the given BF to NNF\n"
-		<< "  nnf <WFF>            converts the given BF to NNF\n"
+		<< "  nnf <term>             converts the given term to NNF\n"
+		<< "  nnf <tau>            converts the given term to NNF\n"
 		<< "  nnf <memory>         converts the memory with the given id to NNF\n";
 		break;
 	//case tau_parser::pnf_sym: std::cout
 	//	<< "pnf command converts a boolean formula or a well formed formula to prenex normal form\n"
 	//	<< "\n"
 	//	<< "usage:\n"
-	//	<< "  pnf <BF>             converts the given BF to PNF\n"
-	//	<< "  pnf <WFF>            converts the given BF to PNF\n"
+	//	<< "  pnf <term>             converts the given term to PNF\n"
+	//	<< "  pnf <tau>            converts the given term to PNF\n"
 	//	<< "  pnf <memory>           converts the memory with the given id to PNF\n";
 	//	break;
 	case tau_parser::mnf_sym: std::cout
 		<< "mnf command converts a boolean formula or a well formed formula to minterm normal form\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  mnf <BF>             converts the given BF to MNF\n"
-		<< "  mnf <WFF>            converts the given BF to MNF\n"
+		<< "  mnf <term>             converts the given term to MNF\n"
+		<< "  mnf <tau>            converts the given tau to MNF\n"
 		<< "  mnf <memory>         converts the memory with the given id to MNF\n";
 		break;
 	case tau_parser::onf_sym: std::cout
 		<< "onf command converts a well formed formula to order normal form\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  onf <VAR> <WFF>      converts the given WFF to ONF\n"
+		<< "  onf <VAR> <tau>      converts the given tau to ONF\n"
 		<< "  onf <VAR> <memory>   converts the memory with the given id to ONF\n";
 		break;
 	case tau_parser::subst_sym: std::cout
@@ -1335,11 +1335,11 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  substitute <input> [ <match> / <replace>]\n"
 		<< "\n"
 		<< "where:\n"
-		<< "  <input> is BF or WFF or memory reference to BF or WFF\n"
-		<< "  <match> is BF or WFF supposedly contained in <input>\n"
-		<< "  <replace> is BF or WFF or memory reference to BF or WFF\n"
+		<< "  <input> is term or tau or memory reference to term or tau\n"
+		<< "  <match> is term or tau supposedly contained in <input>\n"
+		<< "  <replace> is term or tau or memory reference to term or tau\n"
 		<< "\n"
-		<< "  if <input> is BF, <match> and <replace> must be BF\n"
+		<< "  if <input> is term, <match> and <replace> must be term\n"
 		<< "  <match> and <replace> must be of the same type\n"
 		<< "\n"
 		<< "example:\n"
@@ -1353,11 +1353,11 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  instantiate <input> [ <variable> / <value>]\n"
 		<< "\n"
 		<< "where:\n"
-		<< "  <input> is BF or WFF or memory reference to BF or WFF\n"
-		<< "  <variable> is BF or WFF variable contained in <input>\n"
-		<< "  <value> is BF or WFF value or memory reference to BF or WFF\n"
+		<< "  <input> is term or tau or memory reference to term or tau\n"
+		<< "  <variable> is term or tau variable contained in <input>\n"
+		<< "  <value> is term or tau value or memory reference to term or tau\n"
 		<< "\n"
-		<< "  if <input> is BF, <variable> and <value> must be BF\n"
+		<< "  if <input> is term, <variable> and <value> must be term\n"
 		<< "  <variable> and <value> must be of the same type\n"
 		<< "\n"
 		<< "example:\n"
@@ -1368,8 +1368,8 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "defines a rec. relation\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  <WFF_RR>                     defines a wff rec. relation\n"
-		<< "  <BF_RR>                      defines a bf rec. relation\n"
+		<< "  <tau_rr>                     defines a wff rec. relation\n"
+		<< "  <term_rr>                      defines a term rec. relation\n"
 		<< "  defs or definitions          list definitions\n"
 		<< "  defs or definitions <rr_id>  print rec relation with given id\n";
 		break;
