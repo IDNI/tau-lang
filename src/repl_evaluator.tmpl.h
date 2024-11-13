@@ -267,14 +267,11 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_gssotc(type, program);
-		switch (type) {
-		case tau_parser::wff:
-			return reduce2(to_dnf2(program), tau_parser::wff);
-		case tau_parser::bf:
-			return reduce2(to_dnf2(program, false), tau_parser::bf);
-		default:
-			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
-		}
+		if (is_non_terminal(tau_parser::bf, applied))
+			return reduce2(to_dnf2(applied, false), tau_parser::bf);
+		else if (is_non_terminal(tau_parser::wff, applied))
+			return reduce2(to_dnf2(applied), tau_parser::wff);
+		else BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 	}
 	return {};
 }
@@ -288,7 +285,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_gssotc(type, program);
-		switch (type) {
+		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff:
 			return reduce2(to_cnf2(applied), tau_parser::wff, true);
 		case tau_parser::bf:
@@ -309,11 +306,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_gssotc(type, program);
-		switch (type) {
+		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff:
 			return nnf_wff<tau_ba<BAs...>, BAs...>(applied);
 		case tau_parser::bf:
 			return nnf_bf<tau_ba<BAs...>, BAs...>(applied);
+		default:
+			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		}
 	}
 	return {};
@@ -328,11 +327,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_gssotc(type, program);
-		switch (type) {
+		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff:
 			return mnf_wff<tau_ba<BAs...>, BAs...>(applied);
 		case tau_parser::bf:
 			return mnf_bf<tau_ba<BAs...>, BAs...>(applied);
+		default:
+			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		}
 	}
 	return {};
@@ -347,11 +348,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_gssotc(type, program);
-		switch (type) {
+		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff:
 			return snf_wff<tau_ba<BAs...>, BAs...>(applied);
 		case tau_parser::bf:
 			return snf_bf<tau_ba<BAs...>, BAs...>(applied);
+		default:
+			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		}
 	}
 	return {};

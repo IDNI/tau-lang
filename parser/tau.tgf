@@ -260,7 +260,7 @@ number                 => digits.
 bf_cmd_arg             => memory | bf.
 wff_cmd_arg            => memory | wff.
 solve_cmd_arg          => memory | wff.
-nf_cmd_arg             => memory | wff | bf.
+nf_cmd_arg             => memory | ref | wff | bf.
 onf_cmd_arg            => memory | wff.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
 normalize_cmd_arg      => memory | rr | ref | wff | bf.

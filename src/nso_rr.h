@@ -1882,8 +1882,7 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 	if (todo_names.size()) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
-		BOOST_LOG_TRIVIAL(error) << "(Error) Unknown recurrence relation ref "
-							"type for:" << ss.str();
+		BOOST_LOG_TRIVIAL(error) << "(Error) Unknown type for:" << ss.str();
 	}
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End type inferrence"; // << ": " << nn;
 	return nn;
