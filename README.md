@@ -1,7 +1,7 @@
 ![The TAU logo](/docs/images/tau_logo.png)
 
-![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/release.yml/badge.svg)
-![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/debug.yml/badge.svg)
+Release Build ![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/release.yml/badge.svg)
+Debug Build ![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/debug.yml/badge.svg)
 
 # Table of contents
 
@@ -11,8 +11,7 @@
 		1. [Linux users](#linux-users)
 		2. [Windows users](#windows-users)
 	2. [Compiling the source code](#compiling-the-source-code)
-	3. [Running Tau REPL](#running-tau-repl)
-		1. [Command line options](#command-line-options)
+	3. [Command line options](#command-line-options)
 5. [The Tau Language](#the-tau-language)
 	1. [Constants](#constants)
 	2. [Variables](#variables-variables-variables)
@@ -94,30 +93,47 @@ To build with doxygen documentation:
 ./relwithdebinfo.sh -DBUILD_DOC=ON
 ```
 
-## Running Tau REPL
-
 Once you have compiled the source code you can run the `tau` executable to
 execute Tau programs. The `tau` executable is located in the either `build-Release`
 or `build-Debug` or `build-RelWithDebInfo`.
 
-### Command line options
+### Command line interface
 
-The following command line options are available:
+The general form of tau executable command line is:
+
+```bash
+tau [ options ] [ <command> [ <command options> ] ]
+```
+
+The general options are the following:
 
 | Option         | Description                                               |
 |----------------|-----------------------------------------------------------|
 | -h, --help     | detailed information about options                        |
-| -p, --program  | program to run                                            |
-| -e, --evaluate | program to be evaluated (alternative to -p)               |
 | -l, --license  | show the license (NOT YET AVAILABLE)                      |
-| -i, --input    | program's input                                           |
-| -o, --output   | program's output                                          |
-| -v, --charvar  | charvar (enabled by default)                              |
+| -v, --version  | show the version of the executable (NOT YET AVAILABLE)    |
+
+Regarding the commands and its options we have the following:
+
+| Command        | Options         | Description                                 |
+|----------------|-----------------|---------------------------------------------|
+| run            |                 | run a Tau program                           |
+|                | -p, --program   | program to run                              |
+|                | -e, --evaluate  | program to be evaluated (alternative to -p) |
+|                | -i, --input     | program's input                             |
+|                | -o, --output    | program's output                            |
+|                | -v, --charvar   | charvar (enabled by default)                |
+|                | -h, --help	   | detailed information about options          |
+| repl           |                 | run the Tau REPL                            |
+|                | -v, --charvar   | charvar (enabled by default)                |
+|                | -h, --help	   | detailed information about options          |
+|                | -e, --evaluate  | repl command to be evaluated                |
+| help		     |                 | show help                                   |
 
 Among the possible inputs and outputs, the following are predefined:
 
 
-TODO: exemplify, to demonstrate what this means.
+TODO (HIGH) exemplify, to demonstrate what this means.
 
 
 | Input/Output | Description        |
@@ -547,7 +563,6 @@ Finally, you could run the given program once you have defined IO
 variables as you need. The syntax of the commands is the
 
 * `run|r <memory|tau>`: runs the given program.
-
 
 # Known issues
 
