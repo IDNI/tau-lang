@@ -42,6 +42,8 @@ For a more detailed explanation of the theory behind the Tau Language, please
 refer to the TABA book ongoing draft
 ([Theories and Applications of Boolean Algebras by Ohad Asor](./docs/taba.pdf)).
 
+TODO (HIGH) add an explanatino of the order of the presentation of the sections
+
 # Quick start
 
 ## Installing the Tau Framework
@@ -61,7 +63,7 @@ and also a zip file:
 * Installer: [tau-0.1.0-amd64.exe](http://someurl.com)
 * Zip file: [tau-0.1.0-amd64.zip](http://someurl.com)
 
-### MacOS (not available yet) 
+### MacOS (not available yet)
 
 ## Compiling the source code
 
@@ -142,16 +144,16 @@ Boolean algebra and variables).They
 are given by the following grammar:
 
 ```
-bf -> "("bf "&" bf")" | bf "'" | "("bf "+" bf")" | "("bf "|" bf")"
-	| bf_ref | constant | uninterpreted_constant | var | "0" | "1".
+term -> "("term "&" term")" | term "'" | "("term "+" term")" | "("term "|" term")"
+	| term_ref | constant | uninterpreted_constant | var | "0" | "1".
 ```
 
 where
 
-* `bf` stands for a well formed sub-formula and the operators `&`, `'`,
+* `term` stands for a well formed sub-formula and the operators `&`, `'`,
 `^` and `|` stand for conjunction, negation, exclusive-or and disjunction
 (respectively).
-* `bf_ref` is  a reference to a recurrence relation (see the Subsection
+* `term_ref` is  a reference to a recurrence relation (see the Subsection
 [Recurrence relations](#recurrence-relations)),
 * `constant` stands for an element of the Boolean algebras (see Subsction
 [Constants](#constants) for details),
@@ -271,9 +273,9 @@ Well formed formulas are given in Tau Language by the following grammar:
 ```
 tau -> "(" tau "&&" tau ")" | "!" tau | "(" tau "^" tau ")" | "(" tau "||" tau ")"
 	| "(" tau "->" tau ")" | "(" tau "<->" tau ")" | "(" tau "?" tau ":" tau ")"
-	| "(" bf "=" bf ")" | "(" bf "!=" bf ")" | "("bf "<" bf")" | "("bf "!<" bf")"
-	| "(" bf "<=" bf ")" | "(" bf "!<=" bf ")" | "(" bf ">" bf ")"
-	| "(" bf "!>" bf ")" | "all" var tau | "ex" var tau | tau_ref | T | F.
+	| "(" term "=" term ")" | "(" term "!=" term ")" | "("term "<" term")" | "("term "!<" term")"
+	| "(" term "<=" term ")" | "(" term "!<=" term ")" | "(" term ">" term ")"
+	| "(" term "!>" term ")" | "all" var tau | "ex" var tau | tau_ref | T | F.
 ```
 
 where
@@ -314,8 +316,8 @@ undecidable side), but they are enough to express the most complex specification
 They are given by the following grammar:
 
 ```
-bf_rec_relation -> bf_ref ":=" bf.
-bf_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
+term_rec_relation -> term_ref ":=" term.
+term_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
 ```
 
 in the case of Boolean functions and in the case of well-formed general formulas,
@@ -333,7 +335,7 @@ tau_rec_relation -> tau_ref ":::=" tau.
 tau_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
 ```
 
-where `bf_rec_relation` stands for a Boolean function recursive relation, `bf_ref`
+where `term_rec_relation` stands for a Boolean function recursive relation, `term_ref`
 stands for a reference to a Boolean function (see Boolean functions Section),
 `tau_rec_relation` stands for a well formed formula recursive relation, `tau_ref`
 stands for a reference to a well formed formula (see well formed formulas
@@ -375,7 +377,7 @@ rr => (rec_relation)* tau.
 ```
 
 where `tau_rec_relation` stands for a tau recurrence relations, `tau_rec_relation`
-for a tau recursive relation, `bf_rec_relation` for a bf recursive relation and
+for a tau recursive relation, `term_rec_relation` for a term recursive relation and
 `tau` stands for a tau formula.
 
 Thus, they are a collection of Tau recurrence relations and a main formula, p.e.:
@@ -478,7 +480,7 @@ All the results are stored in memory. Also you could stored well-formed formulas
 or Boolean function for later reference. To do so, you could use the following
 syntax:
 
-* `tau|bf`: store a tau formula or a Boolean function in memory.
+* `tau|term`: store a tau formula or a Boolean function in memory.
 
 If you want to consult the memory contents, you could use the following commands:
 
@@ -498,16 +500,16 @@ syntax:
 You could substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
-* `subst|s <memory|tau|bf> [<memory|tau|bf>/<memory|tau|bf>]`: substitutes a
+* `subst|s <memory|tau|term> [<memory|tau|term>/<memory|tau|term>]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
 expression (beeing this one a memory position, well-formed formula or Boolean
 Function).
 
-* `instantiate|inst|i <memory|tau> [<var>/<memory|bf>]`: instantiates a variable
+* `instantiate|inst|i <memory|tau> [<var>/<memory|term>]`: instantiates a variable
 by a memory position, well-formed formula or Boolean function in the given
 well-formed or Boolean function expression.
 
-* `instantiate|inst|i <memory|bf> [<var>/<memory|bf>]`: instantiates a variable
+* `instantiate|inst|i <memory|term> [<var>/<memory|term>]`: instantiates a variable
 by a memory position or Boolean function in the given expression.
 
 ## Logical procedures
@@ -525,7 +527,7 @@ The syntax of the commands is the following:
 * `solve <memory|tau>`: solves the given system of equations given by the
 well-formed formula. It only computes one solution.
 
-* `normalize|n <memory|rr|ref|tau|bf>`: normalizes the given expression. See
+* `normalize|n <memory|rr|ref|tau|term>`: normalizes the given expression. See
 the TABA book for details.
 
 * `qelim <memory|tau>`: performs quantifier elimination on the given expression.
@@ -535,17 +537,17 @@ the TABA book for details.
 Also, the Tau REPL includes several transformations procedures to standard forms.
 The syntax of the commands as follows:
 
-* `dnf <memory|tau|bf>`: computes the disjunctive normal form of the given
+* `dnf <memory|tau|term>`: computes the disjunctive normal form of the given
 expression.
 
-* `cnf <memory|tau|bf>`: computes the conjunctive normal form of the given
+* `cnf <memory|tau|term>`: computes the conjunctive normal form of the given
 expression.
 
-* `nnf <memory|tau|bf>`: computes the negation normal form of the given expression.
+* `nnf <memory|tau|term>`: computes the negation normal form of the given expression.
 
-* `mnf <memory|tau|bf>`: computes the minterm normal form of the given expression.
+* `mnf <memory|tau|term>`: computes the minterm normal form of the given expression.
 
-* `snf <memory|tau|bf>`: computes the strong normal form of the given expression.
+* `snf <memory|tau|term>`: computes the strong normal form of the given expression.
 
 * `onf <var> <memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
