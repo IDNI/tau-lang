@@ -122,8 +122,7 @@ gssotc<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_gssotc(const size_t type, 
 		rr_.rec_relations.insert(rr_.rec_relations.end(),
 			definitions.begin(), definitions.end()),
 		rr_ = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_);
-	rr_.main = rr_.main | repeat_all<step<tau_ba<BAs...>, BAs...>,
-		tau_ba<BAs...>, BAs...>(step<tau_ba<BAs...>, BAs...>(rr_.rec_relations));
+	rr_.main = apply_rr_to_formula(rr_);
 	return rr_.main;
 }
 
