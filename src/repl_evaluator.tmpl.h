@@ -93,7 +93,7 @@ repl_evaluator<BAs...>::memory_ref
 {
 	if (auto pos = get_memory_index(n, m.size(), silent); pos.has_value())
 		return {{m[pos.value()], pos.value()}};
-	std::cout << "error: history location does not exist\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) history location does not exist\n";
 	return {};
 }
 
@@ -273,7 +273,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		case tau_parser::bf:
 			return reduce2(to_dnf2(program, false), tau_parser::bf);
 		default:
-			std::cout << "error: invalid argument\n";
+			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		}
 	}
 	return {};
@@ -294,7 +294,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		case tau_parser::bf:
 			return reduce2(to_cnf2(applied, false), tau_parser::bf, true);
 		default:
-			std::cout << "error: invalid argument\n";
+			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		}
 	}
 	return {};
@@ -367,7 +367,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	auto with = get_bf(n->child[3]);
 	// Check for correct argument types
 	if (!thiz || !in || !with) {
-		std::cout << "error: invalid argument\n"; return {};
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return {};
 	}
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
@@ -396,7 +396,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 	}
 	// Check for correct argument types
 	if (!thiz || !in || !with){
-		std::cout << "error: invalid argument\n"; return {};
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return {};
 	}
 	std::map<nso<tau_ba<BAs...>, BAs...>, nso<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
@@ -523,7 +523,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 		if (contains_ref) return bf_normalizer_with_rec_relation(rr_);
 		return bf_normalizer_without_rec_relation(rr_.main);
 	}
-	std::cout << "error: invalid argument\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 	return {};
 }
 
@@ -543,7 +543,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			| reduce_bf<tau_ba<BAs...>, BAs...>
 			| reduce_wff<tau_ba<BAs...>, BAs...>;
 	}
-	std::cout << "error: invalid argument\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 	return {};
 }
 
@@ -579,7 +579,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		auto in_vars = select_all(dnf,
 			is_non_terminal<tau_parser::in_var_name, tau_ba<BAs...>, BAs...>);
 		if (!in_vars.empty() && inputs.empty()) {
-			std::cout << "error: no input variables defined\n";
+			BOOST_LOG_TRIVIAL(error) << "(Error) no input variables defined\n";
 			return;
 		}
 
@@ -588,7 +588,7 @@ void repl_evaluator<BAs...>::run_cmd(
 			if (auto it = inputs.find(var); it != inputs.end()) {
 				current_inputs[var] = it->second;
 			} else {
-				std::cout << "error: input variable " << var << " not defined\n";
+				BOOST_LOG_TRIVIAL(error) << "(Error) input variable " << var << " not defined\n";
 				return;
 			}
 		}
@@ -599,11 +599,11 @@ void repl_evaluator<BAs...>::run_cmd(
 		auto out_vars = select_all(dnf,
 			is_non_terminal<tau_parser::out_var_name, tau_ba<BAs...>, BAs...>);
 		if (out_vars.empty()) {
-			std::cout << "error: no output variables, nothing to compute\n";
+			BOOST_LOG_TRIVIAL(error) << "(Error) no output variables, nothing to compute\n";
 			return;
 		}
 		if (outputs.empty()) {
-			std::cout << "error: no output variables defined\n";
+			BOOST_LOG_TRIVIAL(error) << "(Error) no output variables defined\n";
 			return;
 		}
 
@@ -621,7 +621,7 @@ void repl_evaluator<BAs...>::run_cmd(
 				max_iter = std::stoul(line);
 				std::cout << line << "\n";
 			} catch (std::exception& e) {
-				std::cout << "error: invalid input\n";
+				BOOST_LOG_TRIVIAL(error) << "(Error) invalid input\n";
 				return;
 			}
 		}
@@ -631,7 +631,7 @@ void repl_evaluator<BAs...>::run_cmd(
 			if (auto it = outputs.find(var); it != outputs.end()) {
 				current_outputs[var] = it->second;
 			} else {
-				std::cout << "error: output variable " << var << " not defined\n";
+				BOOST_LOG_TRIVIAL(error) << "(Error) output variable " << var << " not defined\n";
 				return;
 			}
 		}
@@ -644,7 +644,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		return;
 	}
 
-	std::cout << "error: invalid argument\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 }
 
 template <typename... BAs>
@@ -659,7 +659,7 @@ void repl_evaluator<BAs...>::solve_cmd(
 			? get_type_and_arg(n->child[2]) : get_type_and_arg(n->child[1]); nn) {
 		auto [t, program] = nn.value();
 		auto applied = apply_rr_to_rr_gssotc(t, program);
-		if (!nn) { std::cout << "error: invalid argument\n"; return; }
+		if (!nn) { BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return; }
 		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type);
 		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
@@ -701,7 +701,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 				definitions.begin(), definitions.end()),
 			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
 		if (is_non_terminal(tau_parser::bf, rr_.main)) {
-			std::cout << "error: invalid argument";
+			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 			return {};
 		}
 		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
@@ -720,7 +720,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 		}
 		return res;
 	}
-	std::cout << "error: invalid argument\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 	return {};
 }
 
@@ -769,7 +769,7 @@ void repl_evaluator<BAs...>::def_print_cmd(
 		std::cout << definitions[i-1] << "\n";
 		return;
 	}
-	std::cout << "error: definition [" << i << "] does not exist\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) definition [" << i << "] does not exist\n";
 	return;
 }
 
@@ -796,7 +796,7 @@ void repl_evaluator< BAs...>::def_input_cmd(
 			return;
 		}
 	}
-	std::cout << "error: invalid type " << type << "\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type << "\n";
 }
 
 template <typename... BAs>
@@ -822,7 +822,7 @@ void repl_evaluator< BAs...>::def_output_cmd(
 			return;
 		}
 	}
-	std::cout << "error: invalid type " << type << "\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -884,7 +884,7 @@ boost::log::trivial::severity_level
 		case tau_parser::debug_sym: return boost::log::trivial::debug;
 		case tau_parser::trace_sym: return boost::log::trivial::trace;
 		case tau_parser::info_sym:  return boost::log::trivial::info;
-		default: std::cerr << "error: invalid severity value\n";
+		default: BOOST_LOG_TRIVIAL(error) << "(Error) invalid severity value\n";
 	}
 	return boost::log::trivial::info;
 }
@@ -914,7 +914,7 @@ void repl_evaluator<BAs...>::set_cmd(
 	auto get_bool_value = [&v, &vt](bool& val) {
 		if      (vt == tau_parser::option_value_true) val = true;
 		else if (vt == tau_parser::option_value_false) val = false;
-		else std::cout << "error: invalid bool value\n";
+		else BOOST_LOG_TRIVIAL(error) << "(Error) invalid bool value\n";
 		return val;
 	};
 	static std::map<size_t,	std::function<void()>> setters = {
@@ -937,8 +937,7 @@ void repl_evaluator<BAs...>::set_cmd(
 			opt.severity = boost::log::trivial::trace;
 		else {
 			auto sev = v | tau_parser::severity;
-			if (!sev.has_value()) {	std::cout
-				<< "error: invalid severity value\n"; return; }
+			if (!sev.has_value()) {	BOOST_LOG_TRIVIAL(error) << "(Error) invalid severity value\n"; return; }
 			opt.severity = nt2severity(sev
 				| only_child_extractor<tau_ba<BAs...>, BAs...>
 				| non_terminal_extractor<tau_ba<BAs...>, BAs...>
