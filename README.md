@@ -1,5 +1,8 @@
 ![The TAU logo](/docs/images/tau_logo.png)
 
+![example workflow](https://github.com/github/docs/actions/workflows/debug.yml/badge.svg)
+![example workflow](https://github.com/github/docs/actions/workflows/release.yml/badge.svg)
+
 # Table of contents
 
 1. [Introduction](#introduction)
@@ -113,7 +116,9 @@ The following command line options are available:
 
 Among the possible inputs and outputs, the following are predefined:
 
- TODO: exemplify, to demonstrate what this means.
+
+TODO: exemplify, to demonstrate what this means.
+
 
 | Input/Output | Description        |
 |--------------|--------------------|

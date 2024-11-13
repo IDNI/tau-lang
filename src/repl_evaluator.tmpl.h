@@ -1179,7 +1179,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "\n"
 
 		<< "Definition commands:\n"
-		<< "  def                    show recurrence relations and input/output variables\n"
+		<< "  def                    show recurrence relations and IO variables\n"
 		<< "\n"
 
 		//<< "Selection commands:\n"
