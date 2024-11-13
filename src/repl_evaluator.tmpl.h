@@ -742,11 +742,12 @@ void repl_evaluator<BAs...>::def_rr_cmd(
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_list_cmd() {
-	if (definitions.size() == 0) std::cout << "definitions are empty\n";
+	if (definitions.size() == 0) std::cout << "definitions: empty\n";
+	else std::cout << "definitions:\n";
 	for (size_t i = 0; i < definitions.size(); i++)
 		std::cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
-	if (inputs.size() == 0 && outputs.size() == 0) std::cout << "i/o variables: empty\n";
-	else std::cout << "i/o variables:\n";
+	if (inputs.size() == 0 && outputs.size() == 0) std::cout << "io variables: empty\n";
+	else std::cout << "io variables:\n";
 	for (auto& [var, desc]: inputs) {
 		auto file = desc.second.empty() ? "console" : "ifile(\"" + desc.second + "\")";
 		std::cout << "\t" << desc.first << " " << var << " = " << file << "\n";
