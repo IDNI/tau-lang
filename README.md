@@ -1,4 +1,4 @@
-![The TAU logo](/docs/tau_logo.png)
+![The TAU logo](/docs/images/tau_logo.png)
 
 # Table of contents
 
@@ -11,9 +11,9 @@
 	3. [Running Tau REPL](#running-tau-repl)
 		1. [Command line options](#command-line-options)
 5. [The Tau Language](#the-tau-language)
-	1. [Boolean functions](#boolean-functions)
-	2. [Constants](#constants)
-	3. [Variables](#variables-variables-variables)
+	1. [Constants](#constants)
+	2. [Variables](#variables-variables-variables)
+	3. [Boolean functions](#boolean-functions)
 	4. [Tau formulas](#tau-formulas)
 	5. [Recurrence relations](#recurrence-relations)
 	6. [Tau specifications](#tau-specifications)
@@ -112,6 +112,7 @@ The following command line options are available:
 | -v, --charvar  | charvar (enabled by default)                              |
 
 Among the possible inputs and outputs, the following are predefined:
+
  TODO: exemplify, to demonstrate what this means.
 
 | Input/Output | Description        |
@@ -150,7 +151,7 @@ only support the simple Boolean functions as base one).
 The syntax for the first case, the Tau Boolean algebra, is the following:
 
 ```
-constant -> "{" tau "}" [":" "tau"].
+constant => "{" tau "}" [":" "tau"].
 ```
 
 i.e. we could have a tau formula as a constant inside a tau formula as a constant.
@@ -172,13 +173,13 @@ where `x`, `y` and `z` are variables.
 Regarding the simple Boolean function algebra, the syntax is the following:
 
 ```
-constant -> "{" sbf "}" ":" "sbf".
+constant => "{" sbf "}" ":" "sbf".
 ```
 
 where the grammar for simple Boolean functions is the following:
 
 ```
-sbf -> "("sbf "&" sbf")" | sbf "'" | "("sbf "^" sbf")" | "("sbf "+" sbf")"
+sbf => "("sbf "&" sbf")" | sbf "'" | "("sbf "^" sbf")" | "("sbf "+" sbf")"
 	| "("sbf "|" sbf")"	| var | "0" | "1".
 ```
 
@@ -242,8 +243,8 @@ Boolean algebra and variables).They
 are given by the following grammar:
 
 ```
-term -> "("term "&" term")" | term "'" | "("term "+" term")" | "("term "|" term")"
-	| term_ref | constant | uninterpreted_constant | var | "0" | "1".
+term => "("term "&" term")" | term "'" | "("term "+" term")" | "("term "|" term")"
+	 | term_ref | constant | uninterpreted_constant | var | "0" | "1".
 ```
 
 where
@@ -260,7 +261,7 @@ algebra, they are assume to be existentialy quantified in the context of the
 formula. The syntax is a follows:
 
 ```
-uninterpreted_constant -> "<:" name ">".
+uninterpreted_constant => "<:" name ">".
 ```
 
 * `var` stands for a variable of the Boolean algebra (see Subsection
@@ -287,11 +288,12 @@ and similar constructions.
 Well formed formulas are given in Tau Language by the following grammar:
 
 ```
-tau -> "(" tau "&&" tau ")" | "!" tau | "(" tau "^" tau ")" | "(" tau "||" tau ")"
+tau => "(" tau "&&" tau ")" | "!" tau | "(" tau "^" tau ")" | "(" tau "||" tau ")"
 	| "(" tau "->" tau ")" | "(" tau "<->" tau ")" | "(" tau "?" tau ":" tau ")"
-	| "(" term "=" term ")" | "(" term "!=" term ")" | "("term "<" term")" | "("term "!<" term")"
-	| "(" term "<=" term ")" | "(" term "!<=" term ")" | "(" term ">" term ")"
-	| "(" term "!>" term ")" | "all" var tau | "ex" var tau | tau_ref | T | F.
+	| "(" term "=" term ")" | "(" term "!=" term ")" | "("term "<" term")"
+	| "("term "!<" term")"	| "(" term "<=" term ")" | "(" term "!<=" term ")"
+	| "(" term ">" term ")"	| "(" term "!>" term ")" | "all" var tau
+	| "ex" var tau | tau_ref | T | F.
 ```
 
 where
@@ -322,41 +324,19 @@ where `x`, `y` and `z` are variables.
 
 ## Recurrence relations
 
-TODO (HIGH) review this section
-
-Last, in usual programming languages you have loops, recursion and so on. In the
-case of Tau Language, recurrence relations are used to this end. Obviously, they
-could not go as far as the usual programming languages (we will fall into the
-undecidable side), but they are enough to express the most complex specifications.
-
-They are given by the following grammar:
+Another key concept in the Tau Language is  recurrence relations. They are given
+by the following grammar:
 
 ```
-term_rec_relation -> term_ref ":=" term.
-term_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
+term_rec_relation => term_ref ":=" term.
+term_ref          => sym "[" (offset)+  "]" "(" variable+ ")".
+tau_rec_relation  => tau_ref ":=" tau.
+tau_ref           => sym "[" (offset)+  "]" "(" variable+ ")".
 ```
 
-in the case of Boolean functions and in the case of well-formed general formulas,
-the grammar is:
-
-```
-tau_rec_relation -> tau_ref "::=" tau.
-tau_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
-```
-
-anf finally, in the case of tau formulas, the grammar is:
-
-```
-tau_rec_relation -> tau_ref ":::=" tau.
-tau_ref -> sym "[" (offset)+  "]" "(" variable+ ")".
-```
-
-where `term_rec_relation` stands for a Boolean function recursive relation, `term_ref`
-stands for a reference to a Boolean function (see Boolean functions Section),
-`tau_rec_relation` stands for a well formed formula recursive relation, `tau_ref`
-stands for a reference to a well formed formula (see well formed formulas
-Section), `sym` stands for a symbol, `offset` stands for an offset and `capture`
-stands for a capture/variable.
+where `sym` is the name of the recurrence relation (it has to be a sequence of
+letters and numbers starting by a letter) and `offset` is a positive integer or
+a variable.
 
 Examples of recurrence relations are:
 
@@ -365,42 +345,30 @@ g[0](Y) := 1.
 g[n](Y) := g[n - 1](Y).
 ```
 
-for the case of Boolean functions,
+or also
 
 ```
-g[0](Y) ::= T.
-g[n](Y) ::= h[n - 1](Y).
-h[0](Y) ::= F.
-h[n](Y) ::= g[n - 1](Y).
-```
-
-and finally, for the case of well formed formulas:
-
-```
-g[0](Y) :::= {T}.
-g[n](Y) :::= g[n - 1](Y).
+g[0](Y) := T.
+g[n](Y) := h[n - 1](Y).
+h[0](Y) := F.
+h[n](Y) := g[n - 1](Y).
 ```
 
 ## Tau specifications
-
-TODO (HIGH) review this section
 
 Taking into account all the previous definitions and considerations, Tau programs
 are given by the following grammar:
 
 ```
-rr => (rec_relation)* tau.
+rr           => (rec_relation)* tau.
+rec_relation => tau_rec_relation | term_rec_relation
 ```
 
-where `tau_rec_relation` stands for a tau recurrence relations, `tau_rec_relation`
-for a tau recursive relation, `term_rec_relation` for a term recursive relation and
-`tau` stands for a tau formula.
-
-Thus, they are a collection of Tau recurrence relations and a main formula, p.e.:
+Thus, they are a collection of recurrence relations and a main formula, p.e.:
 
 ```
-g[0](Y) :::= {T}.
-g[n](Y) :::= g[n - 1](Y).
+g[0](Y) := {T}.
+g[n](Y) := g[n - 1](Y).
 g[1](Y);
 ```
 
