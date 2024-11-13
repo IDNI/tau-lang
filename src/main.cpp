@@ -107,7 +107,7 @@ bool is_stdin(const string& s)  { return s == "@stdin" || s == "-"; }
 bool is_stdout(const string& s) { return s == "@stdout"; }
 bool is_null(const string& s)   { return s == "@null"; }
 int error(const string& s) {
-	cerr << s << "\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) " << s;
 	return 1;
 }
 

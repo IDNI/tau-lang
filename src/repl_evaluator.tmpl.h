@@ -174,13 +174,13 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			if (is_non_terminal(tau_parser::bf, value))
 				return std::optional(value);
 			else {
-				if (!suppress_error) std::cout
-					<< "error: argument has wrong type\n";
+				if (!suppress_error) BOOST_LOG_TRIVIAL(error)
+					<< "(Error) argument has wrong type";
 				return {};
 			}
 		}
 	}
-	if (!suppress_error) std::cout << "error: argument has wrong type\n";
+	if (!suppress_error) BOOST_LOG_TRIVIAL(error) << "(Error) argument has wrong type";
 	return {};
 }
 
@@ -196,12 +196,12 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			if (is_non_terminal(tau_parser::wff, value))
 				return std::optional(value);
 			else {
-				std::cout << "error: argument has wrong type\n";
+				BOOST_LOG_TRIVIAL(error) << "(Error) argument has wrong type\n";
 				return {};
 			}
 		}
 	}
-	std::cout << "error: argument has wrong type\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) argument has wrong type\n";
 	return {};
 }
 
@@ -972,7 +972,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(
 	case tau_parser::indenting_opt:
 		update_fn(pretty_printer_indenting); break;
 	case tau_parser::status_opt: update_fn(opt.status); break;
-	default: std::cout << ": unknown bool option\n"; error = true;break;
+	default: BOOST_LOG_TRIVIAL(error) << "(Error) unknown bool option\n"; error = true;break;
 	}
 	get_cmd(n);
 }
@@ -1043,7 +1043,7 @@ int repl_evaluator<BAs...>::eval_cmd(
 	case p::qelim_cmd:          result = qelim_cmd(command); break;
 	case p::comment:            break;
 	// error handling
-	default: error = true, std::cout << "\nUnknown command\n"; break;
+	default: { error = true; BOOST_LOG_TRIVIAL(error) << "\n (Error) Unknown command"; break; }
 	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) ptree<tau_ba<BAs...>, BAs...>(
