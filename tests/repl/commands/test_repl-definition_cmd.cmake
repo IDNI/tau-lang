@@ -26,5 +26,5 @@ add_repl_test(def_print_cmd-1 "g(Y) := 1. defs 1" "\\[1\\] g")
 add_repl_test(def_print_cmd-2 "g(Y) := 1. f(Y) := T. defs 2" "\\[2\\] f")
 
 # not existing defs
-add_repl_test(def_print_cmd-0 "g(Y) := 1. defs 0" "error: definition \\[0\\] does not exist")
-add_repl_test(def_print_cmd-3 "g(Y) := 1. defs 3" "error: definition \\[3\\] does not exist")
+add_repl_test(def_print_cmd-0 "g(Y) := 1. defs 0" "\\(Error\\) definition \\[0\\] does not exist")
+add_repl_test(def_print_cmd-3 "g(Y) := 1. defs 3" "\\(Error\\) definition \\[3\\] does not exist")
