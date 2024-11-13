@@ -1,7 +1,7 @@
 ![The TAU logo](/docs/images/tau_logo.png)
 
-![example workflow](https://github.com/github/docs/actions/workflows/debug.yml/badge.svg)
-![example workflow](https://github.com/github/docs/actions/workflows/release.yml/badge.svg)
+![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/release.yml/badge.svg)
+![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/debug.yml/badge.svg)
 
 # Table of contents
 
