@@ -112,21 +112,21 @@ The general options are the following:
 | Option         | Description                                               |
 |----------------|-----------------------------------------------------------|
 | -h, --help     | detailed information about options                        |
-| -l, --license  | show the license (NOT YET AVAILABLE)                      |
-| -v, --version  | show the version of the executable (NOT YET AVAILABLE)    |
+| -l, --license  | show the license (not available yet)                      |
+| -v, --version  | show the version of the executable (not available yet)    |
 
 Regarding the commands and its options we have the following:
 
 | Command        | Options         | Description                                 |
 |----------------|-----------------|---------------------------------------------|
-| run            |                 | run a Tau program                           |
+| run            |                 | run a Tau program (not available yet)       |
 |                | -p, --program   | program to run                              |
 |                | -e, --evaluate  | program to be evaluated (alternative to -p) |
 |                | -i, --input     | program's input                             |
 |                | -o, --output    | program's output                            |
 |                | -v, --charvar   | charvar (enabled by default)                |
 |                | -h, --help	   | detailed information about options          |
-| repl           |                 | run the Tau REPL                            |
+| repl           |                 | run the Tau REPL (default)                  |
 |                | -v, --charvar   | charvar (enabled by default)                |
 |                | -h, --help	   | detailed information about options          |
 |                | -e, --evaluate  | repl command to be evaluated                |

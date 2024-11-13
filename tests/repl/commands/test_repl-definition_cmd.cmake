@@ -11,7 +11,7 @@ add_repl_test(def_bf_cmd "g(Y) := 1" "\\[1\\] g")
 # definition command list
 #
 # no defs
-add_repl_test(def_list_cmd "defs" "definitions are empty")
+add_repl_test(def_list_cmd "defs" "definitions: empty")
 
 # with defs
 add_repl_test(def_list_cmd-with_defs "g(Y) := 1. defs" "\\[1\\] g")

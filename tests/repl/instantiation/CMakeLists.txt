@@ -27,7 +27,7 @@ add_repl_test(instantiation_cmd_wff5 "ex x x=0 && y=0. x. i %1[y / %2]" ": ex x2
 
 add_repl_test(instantiation_cmd_wff6 "(x=0|| (w=0 && z=0)) && z=0. b. i %1[z / %2]" ": \\(x = 0 || w = 0 && b = 0\\) && b = 0")
 
-add_repl_test(instantiation_cmd_wff7 "x=0&& y=0. x=0. i %1[x/ %2]" "error: argument has wrong type")
+add_repl_test(instantiation_cmd_wff7 "x=0&& y=0. x=0. i %1[x/ %2]" "argument has wrong type")
 
 add_repl_test(instantiation_cmd_wff8 "i (ex x x=0 && y=0) && x=0[y/x|a]" ": \\(ex x2 x2 = 0 && x|a = 0\\) && x = 0")
 

@@ -45,7 +45,7 @@ add_repl_test(help_shortened-onf_cmd "h onf" "onf command convert")
 add_repl_test(help_onf_cmd "help onf" "onf command converts")
 
 # help history command
-add_repl_test(help_shortened-history_cmd "h history" "history command")
-add_repl_test(help_history_cmd "help history" "history command")
-add_repl_test(help_shortened-history_shortened_m_cmd "h hist" "history command")
-add_repl_test(help-history_shortened_m_cmd "help hist" "history command")
+add_repl_test(help_shortened-history_cmd "h history" "history show")
+add_repl_test(help_history_cmd "help history" "history show")
+add_repl_test(help_shortened-history_shortened_m_cmd "h hist" "history show")
+add_repl_test(help-history_shortened_m_cmd "help hist" "history show")
