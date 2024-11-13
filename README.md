@@ -1,7 +1,9 @@
 ![The TAU logo](/docs/images/tau_logo.png)
 
-Release Build ![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/release.yml/badge.svg)
-Debug Build ![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/debug.yml/badge.svg)
+| Build type | Status                                                                                     |
+|------------|--------------------------------------------------------------------------------------------|
+| Release    | ![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/release.yml/badge.svg) |
+| Debug      | ![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/debug.yml/badge.svg)     |
 
 # Table of contents
 
