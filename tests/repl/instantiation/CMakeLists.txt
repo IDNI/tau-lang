@@ -11,7 +11,7 @@ add_repl_test(instantiation_cmd_bf2 "ax + bx'. y&z. i %1[x / %2]" ": \\(ayz\\)'b
 
 add_repl_test(instantiation_cmd_bf3 "(x | (w & z)) & z. b. i %1[ z / %2]" ": \\(x|wb\\)b")
 
-add_repl_test(instantiation_cmd_bf4 "x & y. T. i %1[x / %2]" "error: invalid argument")
+add_repl_test(instantiation_cmd_bf4 "x & y. T. i %1[x / %2]" "\\(Error\\) invalid argument")
 
 # WFF Instantiation
 

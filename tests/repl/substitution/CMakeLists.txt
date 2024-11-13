@@ -38,6 +38,6 @@ add_repl_test(substitution_cmd_wff11 "s ex x ex x x=0 && y=0 [y=0/x=0]" ": ex x2
 
 add_repl_test(substitution_cmd_wff12 "s (ex x x=0 && y=0) && x=0 [y/x]" ": \\(ex x2 x2 = 0 && x = 0\\) && x = 0")
 
-add_repl_test(substitution_cmd_wff13 "s (ex x x=0 && y=0) && x=0 [y/x=0]" "error: invalid argument")
+add_repl_test(substitution_cmd_wff13 "s (ex x x=0 && y=0) && x=0 [y/x=0]" "\\(Error\\) invalid argument")
 
-add_repl_test(substitution_cmd_wff14 "s (ex x x=0 && y=0) && x=0 [y=0/x]" "error: invalid argument")
+add_repl_test(substitution_cmd_wff14 "s (ex x x=0 && y=0) && x=0 [y=0/x]" "\\(Error\\) invalid argument")
