@@ -61,7 +61,7 @@ struct finputs {
 			if (this->streams[var]
 				&& !this->streams[var].value().is_open())
 					BOOST_LOG_TRIVIAL(error)
-						<< "failed to open input file '"
+						<< "(Error) failed to open input file '"
 						<< desc.second << "': ";
 		}
 	}
@@ -94,7 +94,7 @@ struct finputs {
 			auto cnst = nso_factory<BAs...>::instance().parse(line, types[var]);
 			if (!cnst) {
 				BOOST_LOG_TRIVIAL(error)
-					<< "failed to parse input value '"
+					<< "(Error) failed to parse input value '"
 					<< line << "' for variable '"
 					<< var << "'\n";
 				return {};
@@ -109,7 +109,7 @@ struct finputs {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 		BOOST_LOG_TRIVIAL(error)
-			<< "failed to find type for variable: "
+			<< "(Error) failed to find type for variable: "
 			<< var << "\n";
 		return {};
 	}
@@ -153,7 +153,7 @@ struct foutputs {
 					else std::cout << var << "[" << time_point++ << "] <- " << value << "\n";
 				else {
 					BOOST_LOG_TRIVIAL(error)
-						<< "failed to find output stream for variable '"
+						<< "(Error) failed to find output stream for variable '"
 						<< var << "'\n";
 					return false;
 				}
@@ -166,7 +166,7 @@ struct foutputs {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 		BOOST_LOG_TRIVIAL(error)
-			<< "failed to find type for variable '"
+			<< "(Error) failed to find type for variable '"
 			<< var << "'\n";
 		return {};
 	}
@@ -356,7 +356,7 @@ struct interpreter {
 			}
 		}
 		BOOST_LOG_TRIVIAL(error)
-			<< "empty program\n";
+			<< "(Error) empty program\n";
 		return {};
 	}
 
@@ -453,7 +453,7 @@ std::optional<assignment<BAs...>> compute_initial_memory(const nso<BAs...>& /*ph
 				memory[build_in_variable_at_n(var, n)] = value;
 		else {
 			BOOST_LOG_TRIVIAL(error)
-				<< "unable to read input at time point " << n << "\n";
+				<< "(Error) unable to read input at time point " << n << "\n";
 			return {};
 		}
 	}
@@ -478,7 +478,7 @@ std::optional<std::pair<type, nso<BAs...>>> compute_literal(const nso<BAs...>& l
 		}
 	}
 	BOOST_LOG_TRIVIAL(error)
-		<< "unable to find variable in literal: " << literal << "\n";
+		<< "(Error) unable to find variable in literal: " << literal << "\n";
 	return {};
 }
 
@@ -507,7 +507,7 @@ std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
 			else sys[l.value().first] = build_wff_and(sys[l.value().first], l.value().second);
 		} else {
 			BOOST_LOG_TRIVIAL(error)
-				<< "unable to found equations in clause: " << clause << "\n";
+				<< "(Error) unable to found equations in clause: " << clause << "\n";
 			return {};
 		}
 	}
@@ -560,7 +560,7 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& form,
 			systems.insert(system.value());
 		else {
 			BOOST_LOG_TRIVIAL(error)
-				<< "unable to compute system of equations in: " << clause << "\n";
+				<< "(Error) unable to compute system of equations in: " << clause << "\n";
 			continue;
 		}
 	}
