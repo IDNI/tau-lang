@@ -716,14 +716,10 @@ struct fixed_point_transformer {
 	rr_types types;
 };
 
-// REVIEW (HIGH) review overall execution
-template <typename... BAs>
-nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
-	// IDEA extract this to an operator| overload
-
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
-
+// This function applies the recurrence relations the formula comes with to
+// the formula
+template<typename... BAs>
+nso<BAs...> apply_rr_to_formula (const rr<nso<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions to rules";
 	rec_relations<nso<BAs...>> rrs;
 	for (const auto& r : nso_rr.rec_relations) {
@@ -753,7 +749,20 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	// Substitute function and recurrence relation definitions
 	defs.main = defs.main | repeat_all<step<BAs...>, BAs...>(
 			    step<BAs...>(defs.rec_relations));
-	auto res = normalizer_step(defs.main);
+	return defs.main;
+}
+
+// REVIEW (HIGH) review overall execution
+template <typename... BAs>
+nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
+	// IDEA extract this to an operator| overload
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
+
+	auto fm = apply_rr_to_formula(nso_rr);
+	auto res = normalizer_step(fm);
+
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";
 	return res;
 }
