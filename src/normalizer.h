@@ -670,36 +670,28 @@ struct fixed_point_transformer {
 // the formula
 template<typename... BAs>
 nso<BAs...> apply_rr_to_formula (const rr<nso<BAs...>>& nso_rr) {
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Apply once definitions to rules";
-	rec_relations<nso<BAs...>> rrs;
-	for (const auto& r : nso_rr.rec_relations) {
-		auto [matcher, body] = r;
-		rrs.emplace_back(matcher, body);
-	}
-	rr<nso<BAs...>> defs{ rrs, nso_rr.main };
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Applied once definitions to rules";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << defs;
-
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Start apply_rr_to_formula";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
 	// get types and do type checks
 	rr_types types;
 	bool success = true;
-	get_rr_types(success, types, defs);
-	if (!success || !is_valid(defs)) return _F<BAs...>;
-
+	get_rr_types(success, types, nso_rr);
+	if (!success || !is_valid(nso_rr)) return _F<BAs...>;
 	// transform fp calculation calls by calculation results
-	fixed_point_transformer<BAs...> fpt(defs, types);
-	defs.main = rewriter::post_order_traverser<decltype(fpt), rewriter::all_t,
-		nso<BAs...>>(fpt, rewriter::all)(defs.main);
+	fixed_point_transformer<BAs...> fpt(nso_rr, types);
+	auto new_main = rewriter::post_order_traverser<decltype(fpt), rewriter::all_t,
+		nso<BAs...>>(fpt, rewriter::all)(nso_rr.main);
 	if (fpt.changes.size()) {
-		defs.main = replace(defs.main, fpt.changes);
+		new_main = replace(new_main, fpt.changes);
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
-						"New main: " << defs.main;
+						"New main: " << new_main;
 	}
-
 	// Substitute function and recurrence relation definitions
-	defs.main = defs.main | repeat_all<step<BAs...>, BAs...>(
-			    step<BAs...>(defs.rec_relations));
-	return defs.main;
+	new_main = new_main | repeat_all<step<BAs...>, BAs...>(
+			    step<BAs...>(nso_rr.rec_relations));
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End apply_rr_to_formula";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
+	return new_main;
 }
 
 // REVIEW (HIGH) review overall execution
