@@ -136,48 +136,6 @@ when a Tau spec is treated as a BA element (TODO: explain that tau is base BA of
 it can be seen as a set of all programs that admit that spec, and the Boolean
 operations are simply the set-theoretic union/intersection/complementation.
 
-## Boolean functions
-
-One of the key ingredients of the Tau Language are the Boolean functions (Boolean
-combinations of variables, and constants over some chosen atomless (or finite, TBD)
-Boolean algebra and variables).They
-are given by the following grammar:
-
-```
-term -> "("term "&" term")" | term "'" | "("term "+" term")" | "("term "|" term")"
-	| term_ref | constant | uninterpreted_constant | var | "0" | "1".
-```
-
-where
-
-* `term` stands for a well formed sub-formula and the operators `&`, `'`,
-`^` and `|` stand for conjunction, negation, exclusive-or and disjunction
-(respectively).
-* `term_ref` is  a reference to a recurrence relation (see the Subsection
-[Recurrence relations](#recurrence-relations)),
-* `constant` stands for an element of the Boolean algebras (see Subsction
-[Constants](#constants) for details),
-* `uninterpreted_constant` stands for an uninterpreted constant of the Boolean
-algebra, they are assume to be existentialy quantified in the context of the
-formula. The syntax is a follows:
-
-```
-uninterpreted_constant -> "<:" name ">".
-```
-
-* `var` stands for a variable of the Boolean algebra (see Subsection
-[Variables](#variables-variables-variables) for details), and
-* finally, `0` and `1` stands for the given elements in the corresponding Boolean
-algebra
-
-For example, the following is a valid expression in terms of Boolean function:
-
-```
-(x & y | (z ^ 0))
-```
-
-where `x`, `y` and `z` are variables.
-
 ## Constants
 
 Constants in the Tau Language are elements of the underlying Boolean algebras,
@@ -229,6 +187,15 @@ where `sbf` stands for a simple Boolean function, and the operators `&`, `'`,
 `var` stands for a variable on the simple Boolean algebra, and finally, `0` and
 `1` stands for the given elements in the simple Boolean algebra.
 
+A simple example of a constant in the simple Boolean function algebra is the for
+example:
+
+```
+{ (x & y | z) }:sbf
+```
+
+where `x`, `y` and `z` are variables.
+
 ## Variables
 
 Regarding variables, we could distinguish between variables in Boolean functions,
@@ -241,12 +208,14 @@ on whether `charvar` option is enabled or not. If it is enabled, the syntax is
 just a single character followed by digits. Otherwise, the syntax is just an
 arbitrary string of `chars`.
 
-Apart from that, we also have IO variables. They are used to define the input
-and output of the program. The syntax for an input variable is `i{num}` whereas
+Apart from that, we also have IO variables. They are used to define the inputs
+and outputs of the program. The name for an input variable is `i{num}` whereas
 ouput variables are of the form `o{num}` (in the near future we will allow
-arbitrary names for IO variables). Finally, we have the unconstrained constant
-context, which are implicitly existentially quantified variables. The syntax
-is `<:name>`.
+arbitrary names for IO variables). One particularity of IO variables is that
+they take different values at different times. Thus, the are always refered to
+with a time offset. The syntax is `i{num}[t]` or `o{num}[t]` where `t` is the
+time offset, but also could be `i{num}[t-1]` or `o{num}[t-3]` (always a bounded
+positive loopback).
 
 As commented later on, IO variables need to be defined before the program is run.
 For example, the following are a valid definition of IO variables:
@@ -259,6 +228,53 @@ tau o1 = console.
 where `tau` points to the type of the variables (in this case, tau formulas) and
 `console` stands for the input/output stream of the variable (in this case, the
 console).
+
+In the near future we will allow arbitrary names for the IO variables.
+
+Finally, we have the unconstrained constant context, which are implicitly
+existentially quantified variables. The syntax is `<:name>`.
+
+## Boolean functions
+
+One of the key ingredients of the Tau Language are the Boolean functions (Boolean
+combinations of variables, and constants over some chosen atomless (or finite, TBD)
+Boolean algebra and variables).They
+are given by the following grammar:
+
+```
+term -> "("term "&" term")" | term "'" | "("term "+" term")" | "("term "|" term")"
+	| term_ref | constant | uninterpreted_constant | var | "0" | "1".
+```
+
+where
+
+* `term` stands for a well formed sub-formula and the operators `&`, `'`,
+`^` and `|` stand for conjunction, negation, exclusive-or and disjunction
+(respectively).
+* `term_ref` is  a reference to a recurrence relation (see the Subsection
+[Recurrence relations](#recurrence-relations)),
+* `constant` stands for an element of the Boolean algebras (see Subsction
+[Constants](#constants) for details),
+* `uninterpreted_constant` stands for an uninterpreted constant of the Boolean
+algebra, they are assume to be existentialy quantified in the context of the
+formula. The syntax is a follows:
+
+```
+uninterpreted_constant -> "<:" name ">".
+```
+
+* `var` stands for a variable of the Boolean algebra (see Subsection
+[Variables](#variables-variables-variables) for details), and
+* finally, `0` and `1` stands for the given elements in the corresponding Boolean
+algebra
+
+For example, the following is a valid expression in terms of Boolean function:
+
+```
+(x & y | (z ^ 0))
+```
+
+where `x`, `y` and `z` are variables.
 
 ## Tau formulas
 
