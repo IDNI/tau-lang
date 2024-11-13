@@ -195,8 +195,9 @@ int main(int argc, char** argv) {
 
 	// set charvar
 	bool charvar = cmd.get<bool>("charvar");
-	tau_parser::instance().get_grammar().set_enabled_productions({
-		charvar ? "charvar" : "var" });
+	std::set<std::string> guards{ charvar ? "charvar" : "var" };
+	tau_parser::instance().get_grammar().set_enabled_productions(guards);
+	bdd_parser::instance().get_grammar().set_enabled_productions(guards);
 
 	// repl command
 	if (cmd.name() == "repl") {

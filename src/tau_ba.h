@@ -169,6 +169,21 @@ auto tau_splitter_one () {
 	return tau_bad_splitter<BAs...>();
 }
 
+template<typename... BAs>
+bool is_closed (const tau_ba<BAs...>& fm) {
+	using p = tau_parser;
+	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
+	if (find_top(simp_fm, is_non_terminal<tau_parser::ref, tau_ba<BAs...>, BAs...>))
+		return false;
+	auto vars = get_free_vars_from_nso(simp_fm);
+	for (const auto& v : vars) {
+		if (!(is_child_non_terminal(p::io_var, v) ||
+			is_child_non_terminal(p::uninterpreted_constant, v)))
+			return false;
+	}
+	return true;
+}
+
 template<typename...BAs>
 using gssotc = nso<tau_ba<BAs...>, BAs...>;
 
