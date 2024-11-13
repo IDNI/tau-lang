@@ -55,7 +55,7 @@ struct bdd_factory {
 		auto& p = bdd_parser::instance();
 		auto r = p.parse(src.c_str(), src.size());
 		if (!r.found) {
-			BOOST_LOG_TRIVIAL(error) << "# bdd binding: `"
+			BOOST_LOG_TRIVIAL(error) << "(Error) # bdd binding: `"
 				<< src << "`\n" << r.parse_error;
 			return std::optional<nso<BAs...>>{};
 		}
