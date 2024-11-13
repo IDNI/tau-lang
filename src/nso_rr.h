@@ -822,7 +822,7 @@ std::optional<sp_tau_node<BAs...>> operator|(const sp_tau_node<BAs...>& o,
 template <typename T>
 static const auto optional_value_extractor = [](const std::optional<T>& o) -> T {
 	if (!o) BOOST_LOG_TRIVIAL(error)
-		<< "parse tree traversal: bad optional access";
+		<< "(Error) parse tree traversal: bad optional access";
 	return o.value();
 };
 
@@ -1265,14 +1265,14 @@ sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
 		const std::string& got)
 	{
 		BOOST_LOG_TRIVIAL(error)
-			<< "Type mismatch. Constant is expected to be "
+			<< "(Error) Type mismatch. Constant is expected to be "
 			<< expected << " but is " << got;
 		return false;
 	};
 	auto unsupported_type = [&](const std::string& type)
 	{
 		BOOST_LOG_TRIVIAL(error)
-			<< "Unsupported type: " << type << "\n";
+			<< "(Error) Unsupported type: " << type << "\n";
 		return false;
 	};
 	auto infer_over_scope = [&](const node& nd) {
@@ -1340,11 +1340,73 @@ sp_tau_node<BAs...> infer_constant_types(const sp_tau_node<BAs...>& code) {
 	return replace<node>(code, changes);
 }
 
-// TODO
-// template<typename... BAs>
-// bool invalid_nesting_of_quants (const sp_tau_node<BAs...>& fm) {
-// 	return false;
-// }
+// TODO (LOW) refactor and clean this structure
+template<typename... BAs>
+struct free_vars_collector {
+
+	free_vars_collector(std::set<nso<BAs...>>& free_vars) : free_vars(free_vars) {}
+
+	nso<BAs...> operator()(const nso<BAs...>& n) {
+		if (is_quantifier<BAs...>(n)) {
+			// IDEA using quantified_variable => variable | capture would simplify the code
+			auto var = find_top(n, is_var_or_capture<BAs...>);
+			if (var.has_value()) {
+				if (auto it = free_vars.find(var.value()); it != free_vars.end())
+					free_vars.erase(it);
+			}
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << var.value();
+		}
+		if (is_var_or_capture<BAs...>(n)) {
+			if (auto check = n
+					| tau_parser::io_var | only_child_extractor<BAs...> | tau_parser::offset
+					| only_child_extractor<BAs...>;
+					check.has_value() && is_var_or_capture<BAs...>(check.value())) {
+				auto var = check.value();
+				if (auto it = free_vars.find(var); it != free_vars.end()) {
+					free_vars.erase(it);
+					BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << var;
+				}
+			}
+			free_vars.insert(n);
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- inserting var: " << n;
+		}
+		return n;
+	}
+
+	std::set<nso<BAs...>>& free_vars;
+};
+
+template<typename... BAs>
+auto get_free_vars_from_nso(const nso<BAs...>& n) {
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso of " << n;
+	std::set<nso<BAs...>> free_vars;
+	free_vars_collector<BAs...> collector(free_vars);
+	rewriter::post_order_traverser<
+			free_vars_collector<BAs...>,
+			rewriter::all_t,
+			nso<BAs...>>(collector, rewriter::all)(n);
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
+	return free_vars;
+}
+
+// Check that no non-temporal quantified variable appears nested in the scope of
+// temporal quantification
+template<typename... BAs>
+bool invalid_nesting_of_quants (const sp_tau_node<BAs...>& fm) {
+	auto non_temp_quants = select_all(fm, is_quantifier<BAs...>);
+	for (const auto& ntq : non_temp_quants) {
+		auto ntq_var = trim(ntq);
+		auto temp_quants = select_all(ntq, is_temporal_quantifier<BAs...>);
+		for (const auto& tq : temp_quants) {
+			// Check that the non-temp quantified variable doesn't appear free
+			if (get_free_vars_from_nso(tq).contains(ntq_var)) {
+				BOOST_LOG_TRIVIAL(error) << "(Error) Non-temporal quantifier cannot capture variable appearing in scoped temporal subformula.";
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 template<typename... BAs>
 bool has_open_tau_fm_in_constant (const sp_tau_node<BAs...>& fm) {
@@ -1360,7 +1422,7 @@ bool has_open_tau_fm_in_constant (const sp_tau_node<BAs...>& fm) {
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
 		if (!std::visit(_closed, ba_const)) {
-			std::cerr << "Error: A Tau formula constant must be closed." << "\n";
+			BOOST_LOG_TRIVIAL(error) << "(Error) A Tau formula constant must be closed.";
 			return true;
 		}
 	}
@@ -1371,8 +1433,8 @@ bool has_open_tau_fm_in_constant (const sp_tau_node<BAs...>& fm) {
 // cannot be captured by the grammar
 template<typename... BAs>
 bool has_semantic_error (const sp_tau_node<BAs...>& fm) {
-	bool error = /*invalid_nesting_of_quants(fm)
-					||*/ has_open_tau_fm_in_constant(fm);
+	bool error = invalid_nesting_of_quants(fm)
+			|| has_open_tau_fm_in_constant(fm);
 	return error;
 }
 
@@ -1815,12 +1877,12 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		}
 	}
 
-	for (const auto& err : ts.errors) BOOST_LOG_TRIVIAL(error) << err;
+	for (const auto& err : ts.errors) BOOST_LOG_TRIVIAL(error) << "(Error) " << err;
 
 	if (todo_names.size()) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
-		BOOST_LOG_TRIVIAL(error) << "Unknown recurrence relation ref "
+		BOOST_LOG_TRIVIAL(error) << "(Error) Unknown recurrence relation ref "
 							"type for:" << ss.str();
 	}
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End type inferrence"; // << ": " << nn;

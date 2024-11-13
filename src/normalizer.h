@@ -62,7 +62,6 @@ rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
 	return normalizer(form);
 }
 
-
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 nso<BAs...> normalizer_step(const nso<BAs...>& form) {
@@ -84,58 +83,9 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 	return result;
 }
 
-// TODO (LOW) refactor and clean this structure
-template<typename... BAs>
-struct free_vars_collector {
-
-	free_vars_collector(std::set<nso<BAs...>>& free_vars) : free_vars(free_vars) {}
-
-	nso<BAs...> operator()(const nso<BAs...>& n) {
-		if (is_quantifier<BAs...>(n)) {
-			// IDEA using quantified_variable => variable | capture would simplify the code
-			auto var = find_top(n, is_var_or_capture<BAs...>);
-			if (var.has_value()) {
-				if (auto it = free_vars.find(var.value()); it != free_vars.end())
-					free_vars.erase(it);
-			}
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << var.value();
-		}
-		if (is_var_or_capture<BAs...>(n)) {
-			if (auto check = n
-					| tau_parser::io_var | only_child_extractor<BAs...> | tau_parser::offset
-					| only_child_extractor<BAs...>;
-					check.has_value() && is_var_or_capture<BAs...>(check.value())) {
-				auto var = check.value();
-				if (auto it = free_vars.find(var); it != free_vars.end()) {
-					free_vars.erase(it);
-					BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << var;
-				}
-			}
-			free_vars.insert(n);
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- inserting var: " << n;
-		}
-		return n;
-	}
-
-	std::set<nso<BAs...>>& free_vars;
-};
-
 template<typename... BAs>
 auto get_vars_from_nso(const nso<BAs...>& n) {
 	return select_top(n, is_var_or_capture<BAs...>);
-}
-
-template<typename... BAs>
-auto get_free_vars_from_nso(const nso<BAs...>& n) {
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso of " << n;
-	std::set<nso<BAs...>> free_vars;
-	free_vars_collector<BAs...> collector(free_vars);
-	rewriter::post_order_traverser<
-			free_vars_collector<BAs...>,
-			rewriter::all_t,
-			nso<BAs...>>(collector, rewriter::all)(n);
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
-	return free_vars;
 }
 
 // Given a nso<BAs...> produce a number such that the variable x_i is
@@ -481,7 +431,7 @@ bool is_valid(const rr<nso<BAs...>>& nso_rr) {
 			if (find_top(main_offsets,
 				is_non_terminal<tau_parser::capture, BAs...>))
 	{
-		BOOST_LOG_TRIVIAL(error) << "Main " << nso_rr.main
+		BOOST_LOG_TRIVIAL(error) << "(Error) Main " << nso_rr.main
 					<< " cannot contain a relative offset "
 					<< main_offsets;
 		return false; // capture in main's offset
@@ -491,7 +441,7 @@ bool is_valid(const rr<nso<BAs...>>& nso_rr) {
 		auto left = get_ref_info(get_ref(r.first).value());
 		for (const auto& [ot, _] : left.second)
 			if (ot == tau_parser::shift) {
-				BOOST_LOG_TRIVIAL(error) << "Recurrence "
+				BOOST_LOG_TRIVIAL(error) << "(Error) Recurrence "
 					"relation " << r.first << " cannot "
 					"contain an offset shift";
 				return false; // head ref cannot have shift
@@ -510,7 +460,7 @@ bool is_valid(const rr<nso<BAs...>>& nso_rr) {
 			if (ho.first == tau_parser::num) {
 				if (bo.first == tau_parser::capture) {
 					BOOST_LOG_TRIVIAL(error)
-						<< "Recurrence relation "
+						<< "(Error) Recurrence relation "
 						<< r.first << " (having a fixed"
 						" offset) cannot depend on a "
 						"relative offset " << r.second;
@@ -519,7 +469,7 @@ bool is_valid(const rr<nso<BAs...>>& nso_rr) {
 				if (bo.first == tau_parser::num
 					&& ho.second < bo.second) {
 						BOOST_LOG_TRIVIAL(error)
-							<<"Recurrence relation "
+							<<"(Error) Recurrence relation "
 							<< r.first << " cannot "
 							"depend on a future "
 							"state " << r.second;
@@ -570,14 +520,14 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 		visiting[left.first] = false;
 	}
 	if (!has_relative_rule) {
-		BOOST_LOG_TRIVIAL(error) << "Recurrence relation has no rules "
+		BOOST_LOG_TRIVIAL(error) << "(Error) Recurrence relation has no rules "
 						"other than initial conditions";
 		return false;
 	}
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
 			BOOST_LOG_TRIVIAL(error)
-					<< "Recurrence relation is cyclic";
+					<< "(Error) Recurrence relation is cyclic";
 			return false;
 		}
 	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Recurrence relation is well founded";
