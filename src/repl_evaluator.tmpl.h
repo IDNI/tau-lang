@@ -1155,8 +1155,8 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  mnf                    convert to minterm normal form\n"
 		<< "\n"
 
-		<< "Memory commands\n"
-		<< "  memory                 manage stored formulas or obtained results\n"
+		<< "History command\n"
+		<< "  history or hist        show stored or previous commands results\n"
 		<< "\n"
 
 		<< "Substitution and instantiation commands:\n"
@@ -1234,13 +1234,15 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< bool_available_options;
 		break;
 	case tau_parser::history_sym: std::cout
-		<< "history command manages stored or previous commands results\n"
+		<< "history show stored or previous commands results\n"
 		<< "\n"
 		<< "  history or hist              lists all stored or output results\n"
 		<< "  history or hist <memory_id>  prints the given stored or output result\n"
 		<< "  <formula>                    store the given formula in the memory\n"
-		<< "  %<memory_id>                 provides relative access to memory\n"
-		<< "  &<memory_id>                 provides absolute access to memory\n";
+		<< "\n"
+		<< "previous results can be used in other commands using the syntax:\n"
+		<< "  %-<memory_id>                provides relative access to memory\n"
+		<< "  %<memory_id>                 provides absolute access to memory\n";
 		break;
 	case tau_parser::normalize_sym: std::cout
 		<< "normalize or n command normalizes a formula, prints it and\n"
@@ -1370,8 +1372,8 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "defines a rec. relation\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  <tau_rr>                     defines a wff rec. relation\n"
-		<< "  <term_rr>                      defines a term rec. relation\n"
+		<< "  <tau_rr>                     defines a tau rec. relation\n"
+		<< "  <term_rr>                    defines a term rec. relation\n"
 		<< "  defs or definitions          list definitions\n"
 		<< "  defs or definitions <rr_id>  print rec relation with given id\n";
 		break;
