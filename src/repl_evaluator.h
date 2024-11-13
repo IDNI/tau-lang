@@ -146,9 +146,12 @@ private:
 		const nso<tau_ba<BAs...>, BAs...>& n);
 	void run_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
 	void solve_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void is_satisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void is_valid_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void is_unsatisfiable_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+
+	std::optional<nso<tau_ba<BAs...>, BAs...> > is_valid_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
+
+	std::optional<nso<tau_ba<BAs...>, BAs...> > is_unsatisfiable_cmd(
+		const nso<tau_ba<BAs...>, BAs...>& n);
 
 	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(
 		const nso<tau_ba<BAs...>, BAs...>& n, bool suppress_error=false);

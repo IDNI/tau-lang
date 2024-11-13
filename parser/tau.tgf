@@ -192,11 +192,11 @@ cli_command            =>
         | ("file"          :file_sym    __ q_string)          :file_cmd
 # TODO (HIGH) maybe we must also check for validity of wff and bf (the later
 # in the sense that is always 1). Also, what does it means for a rr to be valid?
-        | ("valid"         :valid_sym   __ rr)                :valid_cmd
+        | ("valid"         :valid_sym   __ normalize_cmd_arg) :valid_cmd
 # TODO (HIGH) maybe we should also check for the validity of the wff and bf (the
 # later in the sense that is not always 0)
         | ("sat"           :sat_sym     __ normalize_cmd_arg) :sat_cmd
-        | ("unsat"         :unsat_sym   __ rr)                :unsat_cmd
+        | ("unsat"         :unsat_sym   __ normalize_cmd_arg) :unsat_cmd
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
         | ("solve"
