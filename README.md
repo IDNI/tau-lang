@@ -162,23 +162,34 @@ operations are simply the set-theoretic union/intersection/complementation.
 
 ## Constants
 
-Constants in the Tau Language are elements of the underlying Boolean algebras,
-usually other than `0` and `1` that have a dedicated syntax (but could also
-represented as such).
+The Tau language is not one language: it is parametrized by given atomless Boolean
+algebras, that can be implemented using an API by the user. However it always
+supports the algebra most central to Tau: the algbera of Tau formulas themselves.
+So each Tau formula can also be a domain element, a constant, and to this end,
+it has to be surrounded by curly brackets. Any element of any supported BA can be
+referred to in the language by using curly brackets. Those type of constants are
+called the Interpreted Constants, since they are interpreted as fixed BA elements.
 
-In the REPL, we support two Boolean algebras: the Tau Boolean algebra and the
-simple Boolean function algebra. The Tau Boolean algebra is an extensional Boolean
-algebra that encodes Tau specifications over base algebras (in the REPL case we
-only support the simple Boolean functions as base one).
+There is another kind of constants called Uninterpreted Constants. Their syntax
+is borrowed from RDF and is of the form `<context:IRI>`, or simply `<:name>` where
+`name` is any alphanumeric string. Semantically, they behave as ordinary constants
+in first order logic.
 
-The syntax for the first case, the Tau Boolean algebra, is the following:
+Two exceptions are the constants `0,1` which are present in any Boolean algebra.
+
+We currently support two Boolean algebras: the Tau Boolean algebra and the algebra
+of simple Boolean functions. In the near future, BFs and SBFs will be treated in
+a more extended way, not only as udnerlying BA elements but as functions allowing
+also composition and quantification. 
+
+The syntax for constants in the Tau Boolean algebra is:
 
 ```
 constant => "{" tau "}" [":" "tau"].
 ```
 
-i.e. we could have a tau formula as a constant inside a tau formula as a constant.
 For example, the following is a valid constant in the Tau Boolean algebra:
+ (TODO: this is wrong since those formulas are open)
 
 ```
 { (x & y | z) = 0 }:tau
@@ -222,12 +233,12 @@ where `x`, `y` and `z` are variables.
 
 ## Variables
 
-Regarding variables, we could distinguish between variables in Boolean functions,
+We can distinguish between variables in Boolean functions,
 IO variables and (somehow streching the concept) unconstrained context (which
 are implicitly existentially quantified variables).
 
-Variables in Boolean functions are just regular variables that could be used.
-They could be quantified or not, depending on the context. Their syntax depends
+Variables in Boolean functions are just regular variables that can be used.
+They can be quantified or not, depending on the context. Their syntax depends
 on whether `charvar` option is enabled or not. If it is enabled, the syntax is
 just a single character followed by digits. Otherwise, the syntax is just an
 arbitrary string of `chars`.
@@ -238,7 +249,7 @@ ouput variables are of the form `o{num}` (in the near future we will allow
 arbitrary names for IO variables). One particularity of IO variables is that
 they take different values at different times. Thus, the are always refered to
 with a time offset. The syntax is `i{num}[t]` or `o{num}[t]` where `t` is the
-time offset, but also could be `i{num}[t-1]` or `o{num}[t-3]` (always a bounded
+time offset, but can also be `i{num}[t-1]` or `o{num}[t-3]` (always a bounded
 positive loopback).
 
 As commented later on, IO variables need to be defined before the program is run.
@@ -427,7 +438,7 @@ corresponds to the repo commit.
 ## REPL options
 
 You have several options at your disposal to configure the Tau REPL. In order
-to set or get the value of an option you could use the following commands:
+to set or get the value of an option you can use the following commands:
 
 * `get [<option>]`: shows all configurable settings and their values or a single
 one if its name is provided.
@@ -462,7 +473,7 @@ REPL. It's on by default.
 
 ## Recurrence relations and IO variables
 
-As in other programming languages, you could define functions (recurrence
+As in other programming languages, you can define functions (recurrence
 relations in Tau Language) and IO variables. The syntax of the commands
 is the following:
 
@@ -476,26 +487,26 @@ relation.
 for more information.
 
 * `<type> i<number> = console | ifile(<filename>)`: defines an input variable.
-The input variable could take values from the console or from a file.
+The input variable can take values from the console or from a file.
 
 * `<type> o<number> = console | ofile(<filename>)`: defines an output variable.
-The output variable could take values from the console or from a file.
+The output variable can take values from the console or from a file.
 
 ## Memory related commands
 
-All the results are stored in memory. Also you could stored well-formed formulas
-or Boolean function for later reference. To do so, you could use the following
+All the results are stored in memory. Also you can store well-formed formulas
+or Boolean function for later reference. To do so, you can use the following
 syntax:
 
 * `tau|term`: store a tau formula or a Boolean function in memory.
 
-If you want to consult the memory contents, you could use the following commands:
+If you want to consult the memory contents, you can use the following commands:
 
 * `history|hist`: show all the previous commands ouputs.
 
 * `history|hist <memory>`: show the output of the given memory position.
 
-In general, to retrive a previous memory position you could use the following
+In general, to retrive a previous memory position you can use the following
 syntax:
 
 * `%<id>`: stands for the absolute memory position with the given id.
@@ -504,7 +515,7 @@ syntax:
 
 ## Expression manipulation
 
-You could substitute expressions into other expressions or instantiate variables
+You can substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
 * `subst|s <memory|tau|term> [<memory|tau|term>/<memory|tau|term>]`: substitutes a
@@ -561,7 +572,7 @@ expression with respect to the given variable.
 
 ## Program execution
 
-Finally, you could run the given program once you have defined IO
+Finally, you can run the given program once you have defined IO
 variables as you need. The syntax of the commands is the
 
 * `run|r <memory|tau>`: runs the given program.
@@ -576,5 +587,5 @@ TODO (HIGH) add a list of future work
 
 # Submitting issues
 
-As any other opensource project in GitHUb, you could submit issues in the
+As any other opensource project in GitHUb, you can submit issues in the
 following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
