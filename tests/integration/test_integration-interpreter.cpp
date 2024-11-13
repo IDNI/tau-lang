@@ -340,8 +340,8 @@ TEST_SUITE("only outputs") {
 	}
 
 	// Fibonacci like sequence with sample Tau syntax
-	TEST_CASE("o1[0] = {x = 0.} && o1[1] = {x = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
-		const char* sample = "o1[0] =  {x = 0.} && o1[1] =  {x = 0.} && o1[t] = o1[t-1] + o1[t-2].";
+	TEST_CASE("o1[0] = {<:x> = 0.} && o1[1] = {<:x> = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
+		const char* sample = "o1[0] =  {<:x> = 0.} && o1[1] =  {<:x> = 0.} && o1[t] = o1[t-1] + o1[t-2].";
 		auto memory = run_test(sample, 8);
 		CHECK ( !memory.value().empty() );
 	}
