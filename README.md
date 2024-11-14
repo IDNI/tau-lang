@@ -58,25 +58,32 @@ We also provide a list of known issues, future work and how to submit issues.
 
 # Quick start
 
-To start using the Tau Language you can download the latest release from the
-[releases page](http://someurl.com). Once you have downloaded the executable
-and installed accordingly to you system (see the Section
-[Installing the Tau Framework](#installing-the-tau-framework)), you could run
-it from the command line in your system.
+To start using the Tau Language, download the latest release from the
+[releases page](http://someurl.com). Once you have downloaded and installed the
+executable (see the Section
+[Installing the Tau Framework](#installing-the-tau-framework)), you can run
+it from the command line.
 
-The programming model underlying the Tau language is declarative, you specify how
-the current and previous inputs and outputs are related over time. Of course, you
-are given and specification and multiple programs could satisfy it. The Tau
-framework will find one of them for you.
+The programming model underlying the Tau language is fully declarative. You
+specify, possibly only very implicitly, how the current and previous inputs and
+outputs are related, at each point of time. So what you write in the Tau language
+is not a program, but a specification, or spec, which represents all programs that
+meet the specification. Once you run a specification, you actually run one
+automatically-chosen representative program from that set.
 
-For example, you could write the following program:
+In the scope of the Tau language, a program means that for all inputs, at each
+point of time, exist outputs, that clearly do not depend on future inputs ("time-compatible").
+Implied from this definition is that all programs run indefinitely no matter what
+the inputs are.
+
+For example, the following program:
 
 ```
 o1[t] = 0
 ```
 
-which states that the output `o1` at time `t` has to be `0`. Or also you could
-write the following program:
+states that the output `o1` at all time points (`t`) has to be `0`. Similarly the
+following program:
 
 ```
 o1[t] = i1[t]
@@ -86,7 +93,7 @@ which states that the output `o1` at time `t` has to be the same as the input
 `i1` at time `t`.
 
 In the above examples, `o1` and `i1` are IO variables. They are used to define
-the inputs and outputs of the specification and also declare its type.
+the inputs and outputs of the specified programs and also declare their type.
 
 An example of how to define IO variables is the following:
 
@@ -104,34 +111,38 @@ tau i1 = ifile("input.in").
 tau o1 = ofile("output.out").
 ```
 
-The above IO vars definitions take values in the Boolean algebra of the Tau
-specifications itself. In the REPL you could also define IO vars in the Boolean
-function algebra. The syntax is the following:
+Note that those Tau specs define only one program, each (there's a caveat in this
+statement but we shall treat it later on). An example of a Tau spec that specifies
+infinitely many programs would be:
 
 ```
-sbf i2 = console.
-sbf o2 = console.
+o1[t] & i1[t] = 0
 ```
 
-Of course you could consider more complicated specifications as:
+Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
+are taken from. This spec says that the conjunction has to be empty.
+You can clearly consider more complicated specifications, e.g;.:
 
 ```
-o1[t] & o1[t-1] & i1[t] = 0
+o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
 ```
 
 which states that the current output, and the previous output, and the current
-input, have to be 0.
+input, has to be 0, or, the output has to equal the input. Note the difference
+between Boolean and Logical operators. The former are &|', and the latter are
+&&,||,!.
 
-In order to simplify the process of writing and running Tau programs, we provide
-also recursive relations. The following is a simple recurrence relation
-definition that takes as values expressions in the Tau Language formulas:
+In order to simplify the process of writing and running Tau programs, we allow
+to define functions and predicates, possibly by means of recurrence relations.
+The following is a simple predicate definition thata uses a recurrence relation,
+which takes as values expressions in the Tau Language Boolean algebra:
 
 ```
 f[0](y) := T.
 f[n](y) := f[n - 1](y).
 ```
 
-which just return always T and you could use in your specifications as follows:
+which you can use in your program as follows: (TODO: don't use "5". use the fixed point)
 
 ```
 o1[t] = f[5](i1[t]).
@@ -148,7 +159,7 @@ which takes values in expressions of the Tau Language Boolean functions and
 alternates between 0 and 1 depending on the parity of n.
 
 To get all the details about the Tau Language, please refer to the Section
-[The Tau Language](#the-tau-language). There you could find all the details
+[The Tau Language](#the-tau-language). You can find there all the details
 about the syntax and semantics of the language.
 
 # Installing the Tau Framework
@@ -266,8 +277,7 @@ operations are simply the set-theoretic union/intersection/complementation.
 ## Constants
 
 Constants in the Tau Language are elements of the underlying Boolean algebras,
-usually other than `0` and `1` that have a dedicated syntax (but could also
-represented as such).
+usually other than `0` and `1` that have a dedicated syntax.
 
 In the REPL, we support two Boolean algebras: the Tau Boolean algebra and the
 simple Boolean function algebra. The Tau Boolean algebra is an extensional Boolean
@@ -280,7 +290,7 @@ The syntax for the first case, the Tau Boolean algebra, is the following:
 constant => "{" tau "}" [":" "tau"].
 ```
 
-i.e. we could have a tau formula as aelement of a base Boolean algebra and so on.
+i.e. we may have a Tau formula seen as a Boolean algebra element.
 For example, the following is a valid constant in the Tau Boolean algebra:
 
 ```
@@ -329,8 +339,8 @@ Regarding variables, we could distinguish between variables in Boolean functions
 IO variables and (somehow streching the concept) unconstrained context (which
 are implicitly existentially quantified variables).
 
-Variables in Boolean functions are just regular variables that could be used.
-They could be quantified or not, depending on the context. Their syntax depends
+Variables in Boolean functions are just regular variables that may be used.
+They may be quantified or not, depending on the context. Their syntax depends
 on whether `charvar` option is enabled or not. If it is enabled, the syntax is
 just a single character followed by digits. Otherwise, the syntax is just an
 arbitrary string of `chars`.
