@@ -639,17 +639,16 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	ubd_ctn = transform_back_non_initials(ubd_ctn, point_after_inits - 1);
 	// Run phi_inf until all initial conditions are taken into account
 	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
-	nso<BAs...> run;
+	nso<BAs...> run = _T<BAs...>;
 	for (int_t t = time_point; t < point_after_inits + time_point; ++t) {
 		auto current_step = fm_at_time_point(ubd_ctn, io_vars, t);
-		if (run) run = build_wff_and(run, current_step);
-		else run = current_step;
+		run = build_wff_and(run, current_step);
 		// Check if run is still sat
 		run = normalizer_step(run);
 		if (!is_run_satisfiable(run))
 			return _F<BAs...>;
 	}
-
+	ubd_ctn = normalizer_step(build_wff_and(ubd_ctn, run));
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << ubd_ctn;
 	return ubd_ctn;
