@@ -40,7 +40,7 @@ jobs:
       run: |
         echo "GCC_VERSION=12" >> $GITHUB_ENV
         export GCC_VERSION=12
-        apt-get update && apt-get install cmake gcc-$GCC_VERSION g++-$GCC_VERSION -y
+        apt-get update && apt-get install cmake rpm gcc-$GCC_VERSION g++-$GCC_VERSION -y
 
     - name: Act update gcc and g++ alternatives to a selected compiler version
       if: ${{env.ACT}}
@@ -74,3 +74,7 @@ jobs:
       # Execute tests defined by the CMake configuration.
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
+
+    - name: Package
+      working-directory: ${{github.workspace}}/build
+      run: cpack -C ${{env.BUILD_TYPE}}
