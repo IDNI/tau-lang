@@ -29,7 +29,7 @@ nso<BAs...> build_io_out (const std::string& name, const std::string& var) {
 template<typename... BAs>
 nso<BAs...> build_io_in (const std::string& name, const std::string& var) {
 	using p = tau_parser;
-	auto var_name = wrap<BAs...>(p::out_var_name, name);
+	auto var_name = wrap<BAs...>(p::in_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, wrap<BAs...>(p::variable, var));
 	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
 }
@@ -45,7 +45,7 @@ nso<BAs...> build_io_out_const (const std::string& name, const int_t pos) {
 template<typename... BAs>
 nso<BAs...> build_io_in_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
-	auto var_name = wrap<BAs...>(p::out_var_name, name);
+	auto var_name = wrap<BAs...>(p::in_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, build_num<BAs...>(pos));
 	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
 }
