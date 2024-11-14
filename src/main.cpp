@@ -100,6 +100,10 @@ cli::options tau_options() {
 	cli::options opts;
 	opts["help"] = cli::option("help", 'h', false)
 		.set_description("detailed information about options");
+	opts["version"] = cli::option("version", 'v', false)
+		.set_description("show the current Tau executable version");
+	opts["license"] = cli::option("license", 'l', false)
+		.set_description("show license for Tau");
 	return opts;
 }
 
@@ -189,6 +193,13 @@ int main(int argc, char** argv) {
 	// if --help/-h option is true, print help end exit
 	if (cmd.name() == "help" || opts["help"].get<bool>())
 		return cl.help(), 0;
+
+	// if --version/-v option is true, print version and exit
+	if (opts["version"].get<bool>())
+		return cl.version(), 0;
+
+	if (opts["license"].get<bool>())
+		return cl.license(), 0;
 
 	// if cmd's --help/-h option is true, print cmd's help and exit
 	if (cmd.get<bool>("help")) return cl.help(cmd), 0;
