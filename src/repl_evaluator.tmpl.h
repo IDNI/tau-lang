@@ -916,17 +916,17 @@ void repl_evaluator<BAs...>::get_cmd(
 		std::cout << "debug-repl:  " << pbool[opt.debug_repl] << "\n"; } },
 #endif
 	{ tau_parser::status_opt,     [this]() {
-		std::cout << "status:            " << pbool[opt.status] << "\n"; } },
+		std::cout << "status:              " << pbool[opt.status] << "\n"; } },
 	{ tau_parser::colors_opt,     [this]() {
-		std::cout << "colors:            " << pbool[opt.colors] << "\n"; } },
+		std::cout << "colors:              " << pbool[opt.colors] << "\n"; } },
 	{ tau_parser::charvar_opt,     [this]() {
-		std::cout << "charvar:           " << pbool[opt.charvar] << "\n"; } },
-	{ tau_parser::hilighting_opt, [this]() {
-		std::cout << "syntax hilighting: " << pbool[pretty_printer_hilighting] << "\n"; } },
+		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
+	{ tau_parser::highlighting_opt, [this]() {
+		std::cout << "syntax highlighting: " << pbool[pretty_printer_hilighting] << "\n"; } },
 	{ tau_parser::indenting_opt,  [this]() {
-		std::cout << "indenting:         " << pbool[pretty_printer_indenting] << "\n"; } },
+		std::cout << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
 	{ tau_parser::severity_opt,   [this]() {
-		std::cout << "severity:          " << opt.severity << "\n"; } }};
+		std::cout << "severity:            " << opt.severity << "\n"; } }};
 	auto option = n | tau_parser::bool_option;
 	if (option.has_value()) option = n;
 	else option = n | tau_parser::option;
@@ -987,7 +987,7 @@ void repl_evaluator<BAs...>::set_cmd(
 		TC.set(get_bool_value(opt.colors)); } },
 	{ tau_parser::charvar_opt,   [&]() {
 		update_charvar(get_bool_value(opt.charvar)); } },
-	{ tau_parser::hilighting_opt,   [&]() {
+	{ tau_parser::highlighting_opt,   [&]() {
 		get_bool_value(pretty_printer_hilighting); } },
 	{ tau_parser::indenting_opt,   [&]() {
 		get_bool_value(pretty_printer_indenting); } },
@@ -1025,7 +1025,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(
 	case tau_parser::colors_opt: TC.set(update_fn(opt.colors)); break;
 	case tau_parser::charvar_opt:
 		update_charvar(update_fn(opt.charvar)); break;
-	case tau_parser::hilighting_opt:
+	case tau_parser::highlighting_opt:
 		update_fn(pretty_printer_hilighting); break;
 	case tau_parser::indenting_opt:
 		update_fn(pretty_printer_indenting); break;
@@ -1175,13 +1175,13 @@ void repl_evaluator<BAs...>::help_cmd(
 #ifdef DEBUG
 		"  debug-repl             show REPL commands             on/off\n"
 #endif
-		"  status                 show status                    on/off\n"
-		"  colors                 use term colors                on/off\n"
-		"  hilighting             syntax hilighting of formulas  on/off\n"
-		"  indenting              indenting of formulas          on/off\n";
+		"  status                 show status                          on/off\n"
+		"  colors                 use term colors                      on/off\n"
+		"  highlighting           syntax highlighting of Tau formulas  on/off\n"
+		"  indenting              indenting of Tau formulas            on/off\n";
 	static const std::string all_available_options = std::string{} +
 		"Available options:\n" + bool_options +
-		"  severity               severity                       error/info/debug/trace\n";
+		"  severity               severity                             error/info/debug/trace\n";
 	static const std::string bool_available_options = std::string{} +
 		"Available options:\n" + bool_options;
 	auto arg = n | tau_parser::help_arg
@@ -1191,70 +1191,59 @@ void repl_evaluator<BAs...>::help_cmd(
 			: static_cast<size_t>(tau_parser::help_sym);
 	switch (nt) {
 	case tau_parser::help_sym: std::cout
-		<< "Commands:\n"
-		<< "  help or h              print this help\n"
-		<< "  quit, q, exit or e     exit the repl\n"
-		<< "  version or v           print version\n"
-		<< "  clear                  clear the screen\n"
+		<< "General commands:\n"
+		<< "  help or h               print overview of available commands in Tau repl\n"
+		<< "  quit, q, exit or e      exit the Tau repl\n"
+		<< "  version or v            print current version\n"
+		<< "  clear                   clear the screen\n"
 		<< "\n"
 
-		<< "Formula commands:\n"
-		<< "  normalize or n         normalize formula\n"
-		<< "  qelim                  innermost quantifier elimination\n"
+		<< "Run command:\n"
+		<< "  run                     execute a Tau formula as a program\n"
+		<< "\n"
+
+		<< "Logical procedures:\n"
+		<< "  normalize or n          normalize a Tau expression\n"
+		<< "  qelim                   eliminate non-temporal quantifiers in a Tau formula\n"
+		<< "  sat                     check if a Tau formula is satisfiable\n"
+		<< "  unsat                   check if a Tau formula is unsatisfiable\n"
+		<< "  valid                   check if a Tau formula is valid\n"
+		<< "  solve                   compute a satisfying assignment for the free variables in a Tau formula\n"
 		<< "\n"
 
 		<< "Normal form commands:\n"
-		<< "  onf                    convert to order normal form\n"
-		<< "  dnf                    convert to disjunctive normal form\n"
-		<< "  cnf                    convert to conjunctive normal form\n"
-		//<< "  anf                    convert to algebraic normal form\n"
-		<< "  nnf                    convert to negation normal form\n"
-		//<< "  pnf                    convert to prenex normal form\n"
-		<< "  mnf                    convert to minterm normal form\n"
+		<< "  cnf                     convert a Tau expression to conjunctive normal form\n"
+		<< "  dnf                     convert a Tau expression to disjunctive normal form\n"
+		<< "  mnf                     convert a Tau expression to minterm normal form\n"
+		//<< "  anf                     convert to algebraic normal form\n"
+		<< "  nnf                     convert a Tau expression to negation normal form\n"
+		//<< "  pnf                     convert to prenex normal form\n"
+		<< "  onf                     convert a Tau formula to order normal form\n"
 		<< "\n"
 
-		<< "History command\n"
-		<< "  history or hist        show stored or previous commands results\n"
+		<< "History and definitions:\n"
+		<< "  history or hist         show all Tau expressions stored in the repl memory\n"
+		<< "  definitions or defs     show stored IO variables and function and recurrence relation definitions\n"
 		<< "\n"
 
-		<< "Substitution and instantiation commands:\n"
-		<< "  substitute (subst/s)   substitute a formula\n"
-		<< "  instantiate (inst/i)   instantiate a variable in a formula\n"
+		<< "Substitution and instantiation command:\n"
+		<< "  substitute, subst or s  substitute a Tau expression in a Tau expression by another\n"
+		<< "  instantiate, inst or i  instantiate a variable in a Tau expression with a Tau term\n"
 		<< "\n"
-
-		//<< "Validity commands:\n"
-		//<< "  sat                   check satisfiability\n"
-		//<< "  valid                 check validity\n"
-		//<< "  unsat				    check unsatisfiability\n"
-		//<< "\n"
-
-		<< "Run command:\n"
-		<< "  run                    run a program that meets the tau spec\n"
-		<< "\n"
-
-		<< "Solver commands:\n"
-		<< "  solve                  solve a formula\n"
-		<< "\n"
-
-		<< "Definition commands:\n"
-		<< "  def                    show recurrence relations and IO variables\n"
-		<< "\n"
-
-		//<< "Selection commands:\n"
-		//<< "  selection or s       selection control\n"
-		//<< "\n"
 
 		<< "Settings commands:\n"
-		<< "  get                    get options' values\n"
-		<< "  set                    set option's value\n"
-		<< "  enable                 enable option's value\n"
-		<< "  disable                disable option's value\n"
-		<< "  toggle                 toggle option's value\n"
+		<< "  get                     show option values\n"
+		<< "  set                     set option's value\n"
+		<< "  enable                  enable option's value\n"
+		<< "  disable                 disable option's value\n"
+		<< "  toggle                  toggle option's value\n"
 		<< "\n"
 
 		<< "Examples:\n"
-		<< "  help or h examples     show examples related to the Tau Language syntax.\n"
-		<< "\n";
+		<< "  help or h examples      show examples related to the Tau language syntax.\n"
+		<< "\n"
+
+		<< "Type \'help <command>\' for more information about a specific command.\n";
 		break;
 	case tau_parser::version_sym: std::cout
 		<< "version or v prints out current Tau commit id\n";
@@ -1292,7 +1281,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< bool_available_options;
 		break;
 	case tau_parser::history_sym: std::cout
-		<< "history show stored or previous commands results\n"
+		<< "the history shows stored and previous results\n"
 		<< "\n"
 		<< "  history or hist              lists all stored or output results\n"
 		<< "  history or hist <memory_id>  prints the given stored or output result\n"
@@ -1300,19 +1289,18 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "\n"
 		<< "previous results can be used in other commands using the syntax:\n"
 		<< "  %                            last stored result\n"
-		<< "  %-<memory_id>                provides relative access to memory\n"
-		<< "  %<memory_id>                 provides absolute access to memory\n";
+		<< "  %-<number>                provides relative access to memory\n"
+		<< "  %<number>                 provides absolute access to memory\n";
 		break;
 	case tau_parser::normalize_sym: std::cout
-		<< "normalize or n command normalizes a formula, prints it and\n"
-		<< "saves it into memory of previous memoris\n"
+		<< "normalize or n command normalizes a Tau expression, prints it and\n"
+		<< "saves it into memory if the expression is valid\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  normalize <NSORR>      normalizes the given NSO RR\n"
-		<< "  normalize <tau>        normalizes the given tau formula\n"
-		<< "  normalize <term>         normalizes the given term formula\n"
-		<< "  normalize <memory>     normalizes the memory with the given id\n";
-	//	<< "  normalize <selection>  normalizes the selection\n";
+		<< "  normalize <rr>		normalizes a given tau formula with additional recurrence relation and function definitions\n"
+		<< "  normalize <tau>		normalizes the given tau formula\n"
+		<< "  normalize <term>		normalizes the given term\n"
+		<< "  normalize <memory>	normalizes the expression found at the given memory position\n";
 		break;
 	case tau_parser::qelim_sym: std::cout
 		<< "qelim command eliminates the innermost quantifier, prints it and\n"
