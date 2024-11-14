@@ -871,22 +871,38 @@ void repl_evaluator< BAs...>::def_output_cmd(
 // make a nso_rr from the given tau source and binder.
 template <typename... BAs>
 sp_tau_node<tau_ba<BAs...>, BAs...>
-	repl_evaluator<BAs...>::make_cli(
-		const std::string& src)
+	repl_evaluator<BAs...>::make_cli(const std::string& src)
 {
 	// remove ascii char 22 if exists in the input
 	std::string filt = src;
 	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
 		return c == 22;
 	}), filt.end());
-	auto cli_src = make_tau_source(filt, {
+	auto result = tau_parser::instance().parse(filt.c_str(), filt.size(), {
 		.start = tau_parser::cli,
-		//.debug = opt.debug_repl
 	});
-	if (!cli_src) // flush! new line and return null if invalid source
-		return (std::cout << std::endl), error = true, nullptr;
+	auto fail = [this]() { return error = true, nullptr; };
+	if (!result.found) {
+		auto msg = result.parse_error
+			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
+		if (msg.find("Syntax Error: Unexpected end of file") != 0) {
+			BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
+			return fail();
+		}
+		return nullptr; // Unexpected eof, continue with reading input
+	}
+	using parse_symbol = tau_parser::node_type;
+	using namespace rewriter;
+	auto cli_src = make_node_from_parse_result<tau_parser,
+		drop_location_t<parse_symbol, tau_source_sym>, tau_source_sym>(
+			drop_location<parse_symbol, tau_source_sym>, result);
+	if (!cli_src) return fail();
 	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
-	return bind_tau_code_using_factory<tau_ba<BAs...>, BAs...>(cli_code);
+	if (!cli_code) return fail();
+	auto binded = bind_tau_code_using_factory<tau_ba<BAs...>, BAs...>(
+								cli_code);
+	if (!binded) return fail();
+	return binded;
 }
 
 template <typename... BAs>
@@ -1127,7 +1143,7 @@ std::string repl_evaluator<BAs...>::prompt() {
 			<< status.str() << " ]" << TC.CLEAR() << " ";
 	}
 	ss << (error ? TC_ERROR : TC_PROMPT) << "tau>" << TC.CLEAR() << " ";
-	if (r) r->prompt(ss.str());
+	if (r) r->set_prompt(ss.str());
 	return ss.str();
 }
 
@@ -1139,10 +1155,10 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 	if (tau_spec) {
 		auto commands = tau_spec || tau_parser::cli_command;
 		for (const auto& cmd : commands)
-			if (quit = eval_cmd(cmd); quit) break;
-	}
+			if (quit = eval_cmd(cmd); quit == 1) break;
+	} else if (!error) return 2;
 	std::cout << std::endl;
-	if (!quit) prompt();
+	if (quit == 0) prompt();
 	return quit;
 }
 
