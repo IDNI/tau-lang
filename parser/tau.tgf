@@ -298,7 +298,7 @@ option                 => bool_option
 bool_option            => ("s" | "status")                :status_opt
                         | ("c" | "color" | "colors")      :colors_opt
                         | ("v" | "charvar")               :charvar_opt
-                        | ("h" | "hilight" | "hilighting"):hilighting_opt
+                        | ("h" | "highlight" | "highlighting"):highlighting_opt
                         | ("i" | "indent" | "indenting")  :indenting_opt
                         | ("d" | "dbg"   | "debug")       :debug_repl_opt.
 option_value           => option_value_true | option_value_false | severity.

@@ -49,7 +49,7 @@ inline std::vector<std::string> symbol_names{
 	"history_list_cmd", "__E_cli_command_139", "history_sym", "__E___E_cli_command_139_140", "history_print_cmd", "__E_cli_command_141", "memory", "history_store_cmd", "__E_cli_command_142", "__E_input_stream_143", 
 	"q_file_name", "console_sym", "__E_output_stream_144", "file_name", "__E_file_name_145", "bf_cmd_arg", "abs_memory_sym", "rel_memory_sym", "selection_sym", "execute_sym", 
 	"examples_sym", "__E_help_arg_146", "__E___E_help_arg_146_147", "rel_memory", "__E_memory_148", "__E___E_memory_148_149", "memory_id", "abs_memory", "__E_memory_150", "enum_option", 
-	"severity_opt", "__E_option_151", "status_opt", "__E_bool_option_152", "colors_opt", "__E_bool_option_153", "charvar_opt", "__E_bool_option_154", "hilighting_opt", "__E_bool_option_155", 
+	"severity_opt", "__E_option_151", "status_opt", "__E_bool_option_152", "colors_opt", "__E_bool_option_153", "charvar_opt", "__E_bool_option_154", "highlighting_opt", "__E_bool_option_155", 
 	"indenting_opt", "__E_bool_option_156", "debug_repl_opt", "__E_bool_option_157", "option_value_true", "option_value_false", "severity", "error_sym", "__E_severity_158", "info_sym", 
 	"__E_severity_159", "debug_sym", "__E_severity_160", "trace_sym", "__E_severity_161", "named_binding", "__N_0", "__N_1", "__N_2", "__N_3", 
 	"__N_4", 
@@ -1329,13 +1329,13 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(327), (NT(376)));
 //G595: __E_bool_option_155(379) => 'h'.
 	p(NT(379), (T(44)));
-//G596: __E_bool_option_155(379) => 'h' 'i' 'l' 'i' 'g' 'h' 't'.
-	p(NT(379), (T(44)+T(12)+T(16)+T(12)+T(47)+T(44)+T(11)));
-//G597: __E_bool_option_155(379) => 'h' 'i' 'l' 'i' 'g' 'h' 't' 'i' 'n' 'g'.
-	p(NT(379), (T(44)+T(12)+T(16)+T(12)+T(47)+T(44)+T(11)+T(12)+T(46)+T(47)));
-//G598: hilighting_opt(378)  => __E_bool_option_155(379).
+//G596: __E_bool_option_155(379) => 'h' 'i' 'g' 'h' 'l' 'i' 'g' 'h' 't'.
+	p(NT(379), (T(44)+T(12)+T(47)+T(44)+T(16)+T(12)+T(47)+T(44)+T(11)));
+//G597: __E_bool_option_155(379) => 'h' 'i' 'g' 'h' 'l' 'i' 'g' 'h' 't' 'i' 'n' 'g'.
+	p(NT(379), (T(44)+T(12)+T(47)+T(44)+T(16)+T(12)+T(47)+T(44)+T(11)+T(12)+T(46)+T(47)));
+//G598: highlighting_opt(378) => __E_bool_option_155(379).
 	p(NT(378), (NT(379)));
-//G599: bool_option(327)     => hilighting_opt(378).
+//G599: bool_option(327)     => highlighting_opt(378).
 	p(NT(327), (NT(378)));
 //G600: __E_bool_option_156(381) => 'i'.
 	p(NT(381), (T(12)));
@@ -1468,7 +1468,7 @@ struct tau_parser : public idni::parser<char, char> {
 		history_list_cmd, __E_cli_command_139, history_sym, __E___E_cli_command_139_140, history_print_cmd, __E_cli_command_141, memory, history_store_cmd, __E_cli_command_142, __E_input_stream_143, 
 		q_file_name, console_sym, __E_output_stream_144, file_name, __E_file_name_145, bf_cmd_arg, abs_memory_sym, rel_memory_sym, selection_sym, execute_sym, 
 		examples_sym, __E_help_arg_146, __E___E_help_arg_146_147, rel_memory, __E_memory_148, __E___E_memory_148_149, memory_id, abs_memory, __E_memory_150, enum_option, 
-		severity_opt, __E_option_151, status_opt, __E_bool_option_152, colors_opt, __E_bool_option_153, charvar_opt, __E_bool_option_154, hilighting_opt, __E_bool_option_155, 
+		severity_opt, __E_option_151, status_opt, __E_bool_option_152, colors_opt, __E_bool_option_153, charvar_opt, __E_bool_option_154, highlighting_opt, __E_bool_option_155, 
 		indenting_opt, __E_bool_option_156, debug_repl_opt, __E_bool_option_157, option_value_true, option_value_false, severity, error_sym, __E_severity_158, info_sym, 
 		__E_severity_159, debug_sym, __E_severity_160, trace_sym, __E_severity_161, named_binding, __N_0, __N_1, __N_2, __N_3, 
 		__N_4, 
