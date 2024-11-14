@@ -9,11 +9,12 @@
 
 1. [Introduction](#introduction)
 2. [Quick start](#quick-start)
-	1. [Installing the Tau REPL](#installing-the-tau-repl)
-		1. [Linux users](#linux-users)
-		2. [Windows users](#windows-users)
+3. [Installing the Tau Farmework](#installing-the-tau-framework)
+	1. [Linux (not available yet)](#linux)
+	2. [Windows (not available yet)](#windows-users)
+	3. [MacOS (not available yet)](#macos-users)
 	2. [Compiling the source code](#compiling-the-source-code)
-	3. [Command line options](#command-line-options)
+4. [Command line options](#command-line-options)
 5. [The Tau Language](#the-tau-language)
 	1. [Constants](#constants)
 	2. [Variables](#variables-variables-variables)
@@ -46,20 +47,97 @@ For a more detailed explanation of the theory behind the Tau Language, please
 refer to the TABA book ongoing draft
 ([Theories and Applications of Boolean Algebras by Ohad Asor](./docs/taba.pdf)).
 
-TODO (HIGH) add an explanatino of the order of the presentation of the sections
+This README.md in structured in the following way: first, we provide a quick
+start guide to start using the Tau Language. Then, we provide a guide to install
+the Tau Framework in your system. After that, we provide a detailed explanation
+of the Tau Language, including the syntax and semantics of the language. Finally,
+we provide a guide to use the Tau REPL, a command line interface that allows you
+to interact with the Tau Language.
+
+We also provide a list of known issues, future work and how to submit issues.
 
 # Quick start
 
-## Installing the Tau Framework
+To start using the Tau Language you can download the latest release from the
+[releases page](http://someurl.com). Once you have downloaded the executable
+and installed accordingly to you system (see the Section
+[Installing the Tau Framework](#installing-the-tau-framework)), you could run
+it from the command line in your system.
 
-### Linux (not available yet)
+The programming model underlying the Tau language is declarative, you define how
+the current and previous inputs and outputs are related over time. Of course, you
+are given and specification and multiple programs could satisfy it. The Tau
+framework will find one of them for you.
+
+For example, you could write the following program:
+
+```
+o1[t] = 0
+```
+
+which states that the output `o1` at time `t` has to be `0`. Or also you could
+write the following program:
+
+```
+o1[t] = i1[t]
+```
+
+which states that the output `o1` at time `t` has to be the same as the input
+`i1` at time `t`.
+
+In the above examples, `o1` and `i1` are IO variables. They are used to define
+the inputs and outputs of the specification and also declare its type.
+
+An example of how to define IO variables is the following:
+
+```
+tau i1 = console.
+tau o1 = console.
+```
+
+In the above case we specify that `i1` and `o1` are of type `tau` and they take
+values from the console (let say stdin for the input and stdout for the output).
+
+Of course you could consider more complicated specifications as:
+
+```
+o1[t] & o1[t-1] & i1[t] = 0
+```
+
+which states that the current output, and the previous output, and the current
+input, have to be 0.
+
+In order to simplify the process of writing and running Tau programs, we provide
+also recursive relations. The following is a simple recurrence relation
+definition:
+
+```
+f[0](Y) := T.
+f[n](Y) := f[n - 1](Y).
+```
+
+which you could use in your program as follows:
+
+```
+o1[t] = f[5](i1[t]).
+```
+
+To get all the details about the Tau Language, please refer to the Section
+[The Tau Language](#the-tau-language). There you could find all the details
+about the syntax and semantics of the language.
+
+# Installing the Tau Framework
+
+## Linux (not available yet)
 
 Currently we automatically build the following binaries packages (AMD64 architecture):
 
 * deb (Debian/Ubuntu): [tau_0.1.0_amd64.deb](http://someurl.com)
 * rpm (Fedora): [tau-0.1.0-1.x86_64.rpm](http://someurl.com)
 
-### Windows (not available yet)
+The executable is installed in `/usr/bin/tau`.
+
+## Windows (not available yet)
 
 For windows we provide a convenient installer that includes the tau executable
 and also a zip file:
@@ -67,7 +145,7 @@ and also a zip file:
 * Installer: [tau-0.1.0-amd64.exe](http://someurl.com)
 * Zip file: [tau-0.1.0-amd64.zip](http://someurl.com)
 
-### MacOS (not available yet)
+## MacOS (not available yet)
 
 ## Compiling the source code
 
@@ -156,49 +234,38 @@ extended with a time dimension. For example you can write `o1[t] & o1[t-1] & i1[
 which would mean that the current output, and the previous output, and the current input,
 have to have an empty intersection. The set-theoretic perspective of Boolean algebra
 is justfied by Stone's representation theorem for Boolean algebras, but more concretely,
-when a Tau spec is treated as a BA element (TODO: explain that tau is base BA of itself),
+when a Tau spec is treated as a BA element,
 it can be seen as a set of all programs that admit that spec, and the Boolean
 operations are simply the set-theoretic union/intersection/complementation.
 
 ## Constants
 
-The Tau language is not one language: it is parametrized by given atomless Boolean
-algebras, that can be implemented using an API by the user. However it always
-supports the algebra most central to Tau: the algbera of Tau formulas themselves.
-So each Tau formula can also be a domain element, a constant, and to this end,
-it has to be surrounded by curly brackets. Any element of any supported BA can be
-referred to in the language by using curly brackets. Those type of constants are
-called the Interpreted Constants, since they are interpreted as fixed BA elements.
+Constants in the Tau Language are elements of the underlying Boolean algebras,
+usually other than `0` and `1` that have a dedicated syntax (but could also
+represented as such).
 
-There is another kind of constants called Uninterpreted Constants. Their syntax
-is borrowed from RDF and is of the form `<context:IRI>`, or simply `<:name>` where
-`name` is any alphanumeric string. Semantically, they behave as ordinary constants
-in first order logic.
+In the REPL, we support two Boolean algebras: the Tau Boolean algebra and the
+simple Boolean function algebra. The Tau Boolean algebra is an extensional Boolean
+algebra that encodes Tau specifications over base algebras (in the REPL case we
+only support the simple Boolean functions as base one).
 
-Two exceptions are the constants `0,1` which are present in any Boolean algebra.
-
-We currently support two Boolean algebras: the Tau Boolean algebra and the algebra
-of simple Boolean functions. In the near future, BFs and SBFs will be treated in
-a more extended way, not only as udnerlying BA elements but as functions allowing
-also composition and quantification. 
-
-The syntax for constants in the Tau Boolean algebra is:
+The syntax for the first case, the Tau Boolean algebra, is the following:
 
 ```
 constant => "{" tau "}" [":" "tau"].
 ```
 
+i.e. we could have a tau formula as aelement of a base Boolean algebra and so on.
 For example, the following is a valid constant in the Tau Boolean algebra:
- (TODO: this is wrong since those formulas are open)
 
 ```
-{ (x & y | z) = 0 }:tau
+{ ex x ex y ex z (x & y | z) = 0 }:tau
 ```
 
 or even
 
 ```
-{ { (x & y | z) = 0 }:tau = 0 }:tau
+{ { ex x ex y ex z (x & y | z) = 0 }:tau = 0 }:tau
 ```
 
 where `x`, `y` and `z` are variables.
@@ -233,12 +300,12 @@ where `x`, `y` and `z` are variables.
 
 ## Variables
 
-We can distinguish between variables in Boolean functions,
+Regarding variables, we could distinguish between variables in Boolean functions,
 IO variables and (somehow streching the concept) unconstrained context (which
 are implicitly existentially quantified variables).
 
-Variables in Boolean functions are just regular variables that can be used.
-They can be quantified or not, depending on the context. Their syntax depends
+Variables in Boolean functions are just regular variables that could be used.
+They could be quantified or not, depending on the context. Their syntax depends
 on whether `charvar` option is enabled or not. If it is enabled, the syntax is
 just a single character followed by digits. Otherwise, the syntax is just an
 arbitrary string of `chars`.
@@ -249,7 +316,7 @@ ouput variables are of the form `o{num}` (in the near future we will allow
 arbitrary names for IO variables). One particularity of IO variables is that
 they take different values at different times. Thus, the are always refered to
 with a time offset. The syntax is `i{num}[t]` or `o{num}[t]` where `t` is the
-time offset, but can also be `i{num}[t-1]` or `o{num}[t-3]` (always a bounded
+time offset, but also could be `i{num}[t-1]` or `o{num}[t-3]` (always a bounded
 positive loopback).
 
 As commented later on, IO variables need to be defined before the program is run.
@@ -438,7 +505,7 @@ corresponds to the repo commit.
 ## REPL options
 
 You have several options at your disposal to configure the Tau REPL. In order
-to set or get the value of an option you can use the following commands:
+to set or get the value of an option you could use the following commands:
 
 * `get [<option>]`: shows all configurable settings and their values or a single
 one if its name is provided.
@@ -473,7 +540,7 @@ REPL. It's on by default.
 
 ## Recurrence relations and IO variables
 
-As in other programming languages, you can define functions (recurrence
+As in other programming languages, you could define functions (recurrence
 relations in Tau Language) and IO variables. The syntax of the commands
 is the following:
 
@@ -487,26 +554,26 @@ relation.
 for more information.
 
 * `<type> i<number> = console | ifile(<filename>)`: defines an input variable.
-The input variable can take values from the console or from a file.
+The input variable could take values from the console or from a file.
 
 * `<type> o<number> = console | ofile(<filename>)`: defines an output variable.
-The output variable can take values from the console or from a file.
+The output variable could take values from the console or from a file.
 
 ## Memory related commands
 
-All the results are stored in memory. Also you can store well-formed formulas
-or Boolean function for later reference. To do so, you can use the following
+All the results are stored in memory. Also you could stored well-formed formulas
+or Boolean function for later reference. To do so, you could use the following
 syntax:
 
 * `tau|term`: store a tau formula or a Boolean function in memory.
 
-If you want to consult the memory contents, you can use the following commands:
+If you want to consult the memory contents, you could use the following commands:
 
 * `history|hist`: show all the previous commands ouputs.
 
 * `history|hist <memory>`: show the output of the given memory position.
 
-In general, to retrive a previous memory position you can use the following
+In general, to retrive a previous memory position you could use the following
 syntax:
 
 * `%<id>`: stands for the absolute memory position with the given id.
@@ -515,7 +582,7 @@ syntax:
 
 ## Expression manipulation
 
-You can substitute expressions into other expressions or instantiate variables
+You could substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
 * `subst|s <memory|tau|term> [<memory|tau|term>/<memory|tau|term>]`: substitutes a
@@ -572,7 +639,7 @@ expression with respect to the given variable.
 
 ## Program execution
 
-Finally, you can run the given program once you have defined IO
+Finally, you could run the given program once you have defined IO
 variables as you need. The syntax of the commands is the
 
 * `run|r <memory|tau>`: runs the given program.
@@ -587,5 +654,5 @@ TODO (HIGH) add a list of future work
 
 # Submitting issues
 
-As any other opensource project in GitHUb, you can submit issues in the
+As any other opensource project in GitHUb, you could submit issues in the
 following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
