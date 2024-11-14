@@ -104,6 +104,15 @@ tau i1 = ifile("input.in").
 tau o1 = ofile("output.out").
 ```
 
+The above IO vars definitions take values in the Boolean algebra of the Tau
+specifications itself. In the REPL you could also define IO vars in the Boolean
+function algebra. The syntax is the following:
+
+```
+sbf i2 = console.
+sbf o2 = console.
+```
+
 Of course you could consider more complicated specifications as:
 
 ```
@@ -122,7 +131,7 @@ f[0](y) := T.
 f[n](y) := f[n - 1](y).
 ```
 
-which you could use in your program as follows:
+which just return always T and you could use in your specifications as follows:
 
 ```
 o1[t] = f[5](i1[t]).
