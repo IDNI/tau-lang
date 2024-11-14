@@ -1299,6 +1299,7 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "  <formula>                    store the given formula in the memory\n"
 		<< "\n"
 		<< "previous results can be used in other commands using the syntax:\n"
+		<< "  %                            last stored result\n"
 		<< "  %-<memory_id>                provides relative access to memory\n"
 		<< "  %<memory_id>                 provides absolute access to memory\n";
 		break;
