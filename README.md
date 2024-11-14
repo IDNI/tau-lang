@@ -64,7 +64,7 @@ and installed accordingly to you system (see the Section
 [Installing the Tau Framework](#installing-the-tau-framework)), you could run
 it from the command line in your system.
 
-The programming model underlying the Tau language is declarative, you define how
+The programming model underlying the Tau language is declarative, you specify how
 the current and previous inputs and outputs are related over time. Of course, you
 are given and specification and multiple programs could satisfy it. The Tau
 framework will find one of them for you.
@@ -97,6 +97,12 @@ tau o1 = console.
 
 In the above case we specify that `i1` and `o1` are of type `tau` and they take
 values from the console (let say stdin for the input and stdout for the output).
+You couls define as IO streams also files:
+
+```
+tau i1 = ifile("input.in").
+tau o1 = ofile("output.out").
+```
 
 Of course you could consider more complicated specifications as:
 
@@ -109,11 +115,11 @@ input, have to be 0.
 
 In order to simplify the process of writing and running Tau programs, we provide
 also recursive relations. The following is a simple recurrence relation
-definition:
+definition that takes as values expressions in the Tau Language formulas:
 
 ```
-f[0](Y) := T.
-f[n](Y) := f[n - 1](Y).
+f[0](y) := T.
+f[n](y) := f[n - 1](y).
 ```
 
 which you could use in your program as follows:
@@ -121,6 +127,16 @@ which you could use in your program as follows:
 ```
 o1[t] = f[5](i1[t]).
 ```
+
+Or also, you can use the following recurrence relation definition
+
+```
+g[0](y) := 0.
+g[n](y) := g[n](y)'.
+```
+
+which takes values in expressions of the Tau Language Boolean functions and
+alternates between 0 and 1 depending on the parity of n.
 
 To get all the details about the Tau Language, please refer to the Section
 [The Tau Language](#the-tau-language). There you could find all the details
