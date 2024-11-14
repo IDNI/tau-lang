@@ -335,26 +335,23 @@ where `x`, `y` and `z` are variables.
 
 ## Variables
 
-Regarding variables, we could distinguish between variables in Boolean functions,
-IO variables and (somehow streching the concept) unconstrained context (which
-are implicitly existentially quantified variables).
-
-Variables in Boolean functions are just regular variables that may be used.
-They may be quantified or not, depending on the context. Their syntax depends
+Variables range over Boolean algebra elements. In the REPL you can work with
+open formulas (i.e. when variables are not quantified), but a specification
+makes sense only for closed formulas. Their syntax depends
 on whether `charvar` option is enabled or not. If it is enabled, the syntax is
-just a single character followed by digits. Otherwise, the syntax is just an
+a single character followed by digits. Otherwise, the syntax is an
 arbitrary string of `chars`.
 
-Apart from that, we also have IO variables. They are used to define the inputs
-and outputs of the program. The name for an input variable is `i{num}` whereas
+We also have IO variables, which are actually infinite sequence of Boolean
+algebra elements, each, indexed by positions in the sequence. They are used to define the inputs
+and outputs of the program. The name for an input variable is `i{num}` (e.g. `i1`) whereas
 ouput variables are of the form `o{num}` (in the near future we will allow
-arbitrary names for IO variables). One particularity of IO variables is that
-they take different values at different times. Thus, the are always refered to
-with a time offset. The syntax is `i{num}[t]` or `o{num}[t]` where `t` is the
-time offset, but also could be `i{num}[t-1]` or `o{num}[t-3]` (always a bounded
-positive loopback).
+arbitrary names for IO variables). They should always be referred to with reference
+to time (i.e. position in the sequence), and syntax is `i2[t]` or `o1[t]`
+where `t` always denotes time, but also could be `i1[t-1]` or `o2[t-3]`
+(always a constant lookback).
 
-As commented later on, IO variables need to be defined before the program is run.
+As commented later on, IO variables need to be defined before the spec is run.
 For example, the following are a valid definition of IO variables:
 
 ```
@@ -368,7 +365,7 @@ console).
 
 In the near future we will allow arbitrary names for the IO variables.
 
-Finally, we have the unconstrained constant context, which are implicitly
+Finally, we have the uninterpreted constant context, which are implicitly
 existentially quantified variables. The syntax is `<:name>`.
 
 ## Boolean functions
