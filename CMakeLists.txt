@@ -193,7 +193,7 @@ endif (DOXYGEN_FOUND AND TAU_BUILD_DOC)
 # Specify installation directories and files
 #
 install(TARGETS ${TAU_EXECUTABLE_NAME}
-    RUNTIME DESTINATION bin
+    RUNTIME DESTINATION usr/bin
 )
 
 #
