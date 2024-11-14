@@ -1048,12 +1048,14 @@ struct factory_binder {
 					tau_node_terminal_extractor<BAs...>,
 					type.value());
 			auto nn = nso_factory<BAs...>::instance().binding(binding.value(), type_name);
+			if (!nn) return nullptr;
 			if (nn != binding.value())
 				return wrap(tau_parser::bf_constant,
 					wrap(tau_parser::constant, nn));
 			return n;
 		}
 		auto nn = nso_factory<BAs...>::instance().binding(binding.value(), "");
+		if (!nn) return nullptr;
 		if (nn != binding.value())
 			return wrap(tau_parser::bf_constant,
 				wrap(tau_parser::constant, nn));
@@ -1453,6 +1455,7 @@ sp_tau_node<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 			rewriter::sp_node<tau_source_sym>,
 			sp_tau_node<BAs...>>(
 		transform, rewriter::all)(tau_source);
+	if (!tau_code) return nullptr;
 	return infer_constant_types(
 		process_defs_input_variables(
 		process_offset_variables(

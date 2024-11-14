@@ -217,7 +217,7 @@ struct tau_ba_factory {
 				tau_ba<BAs...>, BAs...>, source);
 		if (auto parsed = parse(src); parsed.has_value())
 			return parsed.value();
-		return n;
+		return nullptr;
 	}
 
 	std::variant<tau_ba<BAs...>, BAs...> splitter_one() const {
