@@ -6,7 +6,7 @@ set(PROJECT_NAME tau)
 # TODO (LOW) check if tau is better than TAU
 set(PROJECT_LIB_NAME TAU)
 project("${PROJECT_NAME}"
-	VERSION 0.0.1
+	VERSION 0.7
 	DESCRIPTION "IDNI's tau language"
 )
 
@@ -57,7 +57,9 @@ if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 		set(TAU_BUILD_EXECUTABLE ON)
 endif()
 
-# fine tuning definitions according to build type and options
+#
+# Fine tuning definitions according to build type and options
+#
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 	set(TAU_BUILD_BENCHMARK ON)
 	set(TAU_MEASURE ON)
@@ -80,7 +82,9 @@ if(TAU_MEASURE)
 	set(PARSER_MEASURE ON)
 endif()
 
-# defining available definitions
+#
+# Defining available definitions
+#
 set(TAU_DEFINITIONS
 	TAU_MEASURE
 	TAU_CACHE
@@ -142,6 +146,7 @@ if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/bdd.tgf")
 endif()
 
+#
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
 include(tau-common)
@@ -163,6 +168,7 @@ endif ()
 #
 # Build documentation
 #
+
 # check if Doxygen is installed
 find_package(Doxygen)
 if (DOXYGEN_FOUND AND TAU_BUILD_DOC)
@@ -182,3 +188,49 @@ if (DOXYGEN_FOUND AND TAU_BUILD_DOC)
 else (DOXYGEN_FOUND AND TAU_BUILD_DOC)
 	message("Doxygen need to be installed to generate the doxygen documentation")
 endif (DOXYGEN_FOUND AND TAU_BUILD_DOC)
+
+#
+# Specify installation directories and files
+#
+install(TARGETS ${TAU_EXECUTABLE_NAME}
+    RUNTIME DESTINATION bin
+)
+
+#
+# CPack configuration
+#
+
+SET(COMMON_IGNORE_FILES "/build" "/build-Debug" "/build-Release"
+	"/build-RelWithDebInfo" "/build-MinSizeRel" "/.git" "/.github"
+	"/.vs" "/.idea" "/.vscode" "/.gitignore" "/.gitmodules"
+)
+
+SET(CPACK_PACKAGE_IGNORE_FILES ${PRJ_COMMON_IGNORE_FILES} )
+
+set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_VENDOR "IDNI")
+set(CPACK_PACKAGE_CONTACT "contact@idni.org")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://idni.org")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+
+# Specify the package formats to generate
+set(CPACK_GENERATOR "DEB;RPM")
+
+# DEB specific settings
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "IDNI") # required
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27)")
+set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+set(CPACK_DEBIAN_ARCHITECTURE "amd64")
+
+# RPM specific settings
+set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
+set(CPACK_RPM_PACKAGE_LICENSE "Tau Language Framework")
+set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
+set(CPACK_RPM_PACKAGE_REQUIRES "libc >= 2.27")
+
+
+# Include the CPack module
+include(CPack)
