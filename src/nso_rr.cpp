@@ -16,7 +16,7 @@ namespace idni::tau {
 
 using namespace idni::rewriter;
 
-bool pretty_printer_hilighting = false;
+bool pretty_printer_highlighting = false;
 bool pretty_printer_indenting  = false;
 
 // extracts terminal from sp_tau_source_node

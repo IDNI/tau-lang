@@ -72,23 +72,49 @@ cli::commands tau_commands() {
 	cli::commands cmds;
 	cmds["help"] = cli::command("help",
 		"detailed information about options");
+
 	auto& run = cmds["run"] = cli::command("run",
 		"run a tau program");
+
+	// common options used by multiple commands
+	auto indenting_opt = cli::option("indenting", 'I', false)
+		.set_description("indenting of formulas");
+	auto highlighting_opt = cli::option("highlighting", 'H', false)
+		.set_description("syntax highlighting");
+	auto severity_opt = cli::option("severity", 'S', "info")
+		.set_description("severity level (trace/debug/info/error)");
+	auto charvar_opt = cli::option("charvar", 'V', true)
+		.set_description("charvar (enabled by default)");
+#ifdef DEBUG
+	auto debug_opt = cli::option("debug", 'd', true)
+				.set_description("debug mode");
+	run.add_option(debug_opt);
+#endif // DEBUG
+	run.add_option(severity_opt);
+	run.add_option(indenting_opt);
+	run.add_option(highlighting_opt);
+	run.add_option(charvar_opt);
 	run.add_option(cli::option("program", 'p', "@stdin")
 		.set_description("program to run"));
 	run.add_option(cli::option("evaluate", 'e', "")
 		.set_description("program to be evaluated (alternative to -p)"));
 	run.add_option(cli::option("help", 'h', false)
 		.set_description("detailed information about run options"));
-	run.add_option(cli::option("charvar", 'v', true)
-		.set_description("charvar (enabled by default)"));
 	auto& repl = cmds["repl"] = cli::command("repl", "Tau REPL");
+	DBG(repl.add_option(debug_opt);)
+	repl.add_option(severity_opt);
+	repl.add_option(indenting_opt);
+	repl.add_option(highlighting_opt);
+	repl.add_option(charvar_opt);
 	repl.add_option(cli::option("help", 'h', false)
 		.set_description("detailed information about repl options"));
 	repl.add_option(cli::option("evaluate", 'e', "")
 		.set_description("repl command to evaluate"));
-	repl.add_option(cli::option("charvar", 'v', true)
-		.set_description("charvar (enabled by default)"));
+	repl.add_option(cli::option("status", 's', true)
+		.set_description("display status"));
+	repl.add_option(cli::option("color", 'c', true)
+		.set_description("use colors"));
+
 	return cmds;
 }
 
@@ -182,10 +208,28 @@ int main(int argc, char** argv) {
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
 	bdd_parser::instance().get_grammar().set_enabled_productions(guards);
 
+	pretty_printer_highlighting = cmd.get<bool>("highlighting");
+	pretty_printer_indenting = cmd.get<bool>("indenting");
+
+	std::string sevstr = cmd.get<string>("severity");
+	boost::log::trivial::severity_level sev =
+		sevstr == "error" ? boost::log::trivial::error :
+		sevstr == "trace" ? boost::log::trivial::trace :
+		sevstr == "debug" ? boost::log::trivial::debug :
+		boost::log::trivial::info;
+
 	// repl command
 	if (cmd.name() == "repl") {
 		string e = cmd.get<string>("evaluate");
-		repl_evaluator<bdd_binding> re({ .charvar = charvar });
+		repl_evaluator<bdd_binding> re({
+			.status = cmd.get<bool>("status"),
+			.colors = cmd.get<bool>("color"),
+			.charvar = charvar,
+#ifdef DEBUG
+			.debug_repl = cmd.get<bool>("debug"),
+#endif // DEBUG
+			.severity = sev
+		});
 		if (e.size()) return re.eval(e), 0;
 		repl<decltype(re)> r(re, "tau> ", ".tau_history");
 		re.prompt();

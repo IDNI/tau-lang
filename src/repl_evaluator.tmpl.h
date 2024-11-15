@@ -921,7 +921,7 @@ void repl_evaluator<BAs...>::get_cmd(
 	{ tau_parser::charvar_opt,     [this]() {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
 	{ tau_parser::highlighting_opt, [this]() {
-		std::cout << "syntax highlighting: " << pbool[pretty_printer_hilighting] << "\n"; } },
+		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
 	{ tau_parser::indenting_opt,  [this]() {
 		std::cout << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
 	{ tau_parser::severity_opt,   [this]() {
@@ -987,7 +987,7 @@ void repl_evaluator<BAs...>::set_cmd(
 	{ tau_parser::charvar_opt,   [&]() {
 		update_charvar(get_bool_value(opt.charvar)); } },
 	{ tau_parser::highlighting_opt,   [&]() {
-		get_bool_value(pretty_printer_hilighting); } },
+		get_bool_value(pretty_printer_highlighting); } },
 	{ tau_parser::indenting_opt,   [&]() {
 		get_bool_value(pretty_printer_indenting); } },
 	{ tau_parser::severity_opt, [&]() {
@@ -1025,7 +1025,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(
 	case tau_parser::charvar_opt:
 		update_charvar(update_fn(opt.charvar)); break;
 	case tau_parser::highlighting_opt:
-		update_fn(pretty_printer_hilighting); break;
+		update_fn(pretty_printer_highlighting); break;
 	case tau_parser::indenting_opt:
 		update_fn(pretty_printer_indenting); break;
 	case tau_parser::status_opt: update_fn(opt.status); break;
