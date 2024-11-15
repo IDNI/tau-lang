@@ -8,8 +8,8 @@ solve {a}:sbf x = 0
 # And now, let us add something that requieres splitters (bdd/sbf)
 solve x != 0 && x' != 0
 # Let us now add some more complex formulas, ones involving tau splitters
-solve {a = 0.}: x != 0 && {b = 0.}: x != 0
+solve {ex a a = 0} x != 0 && {ex b b = 0} x != 0
 # or for example
-solve {x = 0.}: a + {y = 0.}: b = 0
+solve {ex x x = 0} a + {ex y y = 0} b = 0
 # Let us now consider an example with few more variables
 solve a x + b y = 0

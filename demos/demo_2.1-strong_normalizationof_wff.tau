@@ -19,6 +19,6 @@ snf {x}:sbf x = 0 && {y}:sbf x = 0
 snf {x}:sbf x = 0 && {y}:sbf x != 0
 snf {x}:sbf x = 0 && {y}:sbf x = 0 && {z}:sbf x != 0
 snf {x}:sbf x = 0 || {z}:sbf x != 0
-snf {x}:sbf x != 0 && {x}:sbf{y}:sbf x != 0
+snf {x}:sbf x != 0 && {x}:sbf {y}:sbf x != 0
 
 quit # quit the Tau REPL
