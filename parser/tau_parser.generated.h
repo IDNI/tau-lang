@@ -64,6 +64,7 @@ inline std::vector<terminal_type> terminals{
 	'F', 'S', '+', '\'', '1', '0', '$', '{', '}', '_', 
 	'\t', '\n', '\r', '#', 'f', 'h', 'c', 'n', 'g', 'u', 
 	'b', 'r', 'v', 'z', 'q', 'p', 'd', '/', '"', '%', 
+	'V', 'H', 'I', 
 };
 
 inline ::idni::char_class_fns<terminal_type> char_classes =
@@ -1297,8 +1298,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(264), (NT(368)));
 //G579: option(320)          => bool_option(329).
 	p(NT(320), (NT(329)));
-//G580: __E_option_152(372)  => 's' 'e' 'v'.
-	p(NT(372), (T(7)+T(10)+T(51)));
+//G580: __E_option_152(372)  => 'S'.
+	p(NT(372), (T(30)));
 //G581: __E_option_152(372)  => 's' 'e' 'v' 'e' 'r' 'i' 't' 'y'.
 	p(NT(372), (T(7)+T(10)+T(51)+T(10)+T(50)+T(12)+T(11)+T(18)));
 //G582: severity_opt(371)    => __E_option_152(372).
@@ -1325,16 +1326,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(375), (NT(376)));
 //G593: bool_option(329)     => colors_opt(375).
 	p(NT(329), (NT(375)));
-//G594: __E_bool_option_155(378) => 'v'.
-	p(NT(378), (T(51)));
+//G594: __E_bool_option_155(378) => 'V'.
+	p(NT(378), (T(59)));
 //G595: __E_bool_option_155(378) => 'c' 'h' 'a' 'r' 'v' 'a' 'r'.
 	p(NT(378), (T(45)+T(44)+T(15)+T(50)+T(51)+T(15)+T(50)));
 //G596: charvar_opt(377)     => __E_bool_option_155(378).
 	p(NT(377), (NT(378)));
 //G597: bool_option(329)     => charvar_opt(377).
 	p(NT(329), (NT(377)));
-//G598: __E_bool_option_156(380) => 'h'.
-	p(NT(380), (T(44)));
+//G598: __E_bool_option_156(380) => 'H'.
+	p(NT(380), (T(60)));
 //G599: __E_bool_option_156(380) => 'h' 'i' 'g' 'h' 'l' 'i' 'g' 'h' 't'.
 	p(NT(380), (T(44)+T(12)+T(47)+T(44)+T(16)+T(12)+T(47)+T(44)+T(11)));
 //G600: __E_bool_option_156(380) => 'h' 'i' 'g' 'h' 'l' 'i' 'g' 'h' 't' 'i' 'n' 'g'.
@@ -1343,8 +1344,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(379), (NT(380)));
 //G602: bool_option(329)     => highlighting_opt(379).
 	p(NT(329), (NT(379)));
-//G603: __E_bool_option_157(382) => 'i'.
-	p(NT(382), (T(12)));
+//G603: __E_bool_option_157(382) => 'I'.
+	p(NT(382), (T(61)));
 //G604: __E_bool_option_157(382) => 'i' 'n' 'd' 'e' 'n' 't'.
 	p(NT(382), (T(12)+T(46)+T(55)+T(10)+T(46)+T(11)));
 //G605: __E_bool_option_157(382) => 'i' 'n' 'd' 'e' 'n' 't' 'i' 'n' 'g'.

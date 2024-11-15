@@ -48,7 +48,7 @@
 
 namespace idni::tau {
 
-extern bool pretty_printer_hilighting;
+extern bool pretty_printer_highlighting;
 extern bool pretty_printer_indenting;
 
 //
@@ -4561,12 +4561,12 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 		};
 		auto print_bf_and = [&]() {
 			std::stringstream ss;
-			bool is_hilight = idni::tau::pretty_printer_hilighting;
+			bool is_hilight = idni::tau::pretty_printer_highlighting;
 			if (is_hilight)
-				idni::tau::pretty_printer_hilighting = false;
+				idni::tau::pretty_printer_highlighting = false;
 			pp(ss, ch[0], hl_path, depth, tss.n());
 			if (is_hilight)
-				idni::tau::pretty_printer_hilighting = true;
+				idni::tau::pretty_printer_highlighting = true;
 			auto str = ss.str();
 			if (is_hilight)
 				pp(stream, ch[0], hl_path, depth, tss.n());
@@ -4585,9 +4585,9 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 				if (find(indents.begin(), indents.end(),
 					tss.n()) != indents.end())
 						indented = true, depth++;
-			// syntax hilighting color start
+			// syntax highlighting color start
 			bool hl_pop = false;
-			if (idni::tau::pretty_printer_hilighting)
+			if (idni::tau::pretty_printer_highlighting)
 				if (auto it = hl_colors.find(tss.n());
 					it != hl_colors.end())
 						hl_path.push_back(tss.n()),
@@ -4776,8 +4776,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// indenting and breaklines
 			if (idni::tau::pretty_printer_indenting && indented)
 				depth--;
-			// syntax hilighting color end
-			if (idni::tau::pretty_printer_hilighting && hl_pop) {
+			// syntax highlighting color end
+			if (idni::tau::pretty_printer_highlighting && hl_pop) {
 				hl_path.pop_back();
 				stream << TC.CLEAR();
 				if (hl_path.size()) // restore the prev color

@@ -294,13 +294,13 @@ memory                 => ( "%"
 # options and their values
 #
 option                 => bool_option
-                        | ("sev" | "severity")      :severity_opt  :enum_option.
-bool_option            => ("s" | "status")                :status_opt
-                        | ("c" | "color" | "colors")      :colors_opt
-                        | ("v" | "charvar")               :charvar_opt
-                        | ("h" | "highlight" | "highlighting"):highlighting_opt
-                        | ("i" | "indent" | "indenting")  :indenting_opt
-                        | ("d" | "dbg"   | "debug")       :debug_repl_opt.
+                        | ("S" | "severity")         :severity_opt :enum_option.
+bool_option            => ("s" | "status")                    :status_opt
+                        | ("c" | "color" | "colors")          :colors_opt
+                        | ("V" | "charvar")                   :charvar_opt
+                        | ("H" | "highlight" | "highlighting"):highlighting_opt
+                        | ("I" | "indent" | "indenting")      :indenting_opt
+                        | ("d" | "dbg"   | "debug")           :debug_repl_opt.
 option_value           => option_value_true | option_value_false | severity.
 option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
 option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".
