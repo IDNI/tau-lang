@@ -651,7 +651,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	ubd_ctn = normalizer_step(build_wff_and(ubd_ctn, run));
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << ubd_ctn;
-	return ubd_ctn;
+	return pull_always_out_for_inf(ubd_ctn);
 }
 
 // Assumes single normalized Tau DNF clause
@@ -888,12 +888,18 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
-nso<BAs...> transform_to_execution(const nso<BAs...>& fm) {
+nso<BAs...> transform_to_execution(nso<BAs...> fm) {
+	assert(get_dnf_wff_clauses(fm).size() == 1);
 	using p = tau_parser;
 	auto elim_aw = [](const auto& f) {
 		return is_child_non_terminal(p::wff_always, f) ? trim2(f) : f;
 	};
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	// We merge all always statements on each clause
+	fm = pull_always_out_for_inf(fm);
+	BOOST_LOG_TRIVIAL(debug) << "(I) Merged always statements on each clause";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 	nso<BAs...> ev_t;
 	nso<BAs...> ubd_aw_fm;

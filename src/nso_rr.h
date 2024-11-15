@@ -1391,6 +1391,65 @@ auto get_free_vars_from_nso(const nso<BAs...>& n) {
 	return free_vars;
 }
 
+// TODO (MEDIUM) unify this code with get_gssotc_clause and get_gssotc_literals
+template<typename ...BAs>
+void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch,
+	tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves)
+{
+    if (is_child_non_terminal(branch, n)) {
+	    for (const auto& c : trim(n)->child)
+	    	if (is_non_terminal(skip, c))
+	    		get_leaves(c, branch, skip, leaves);
+    } else {
+        leaves.push_back(n);
+        BOOST_LOG_TRIVIAL(trace) << "(I) get_leaves: found clause: " << n;
+    }
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n,
+	tau_parser::nonterminal branch, tau_parser::nonterminal skip)
+{
+	std::vector<sp_tau_node<BAs...>> leaves;
+	get_leaves(n, branch, skip, leaves);
+	return leaves;
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_dnf_wff_clauses(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::wff_or, tau_parser::wff);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_dnf_bf_clauses(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::bf_or, tau_parser::bf);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_cnf_wff_clauses(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::wff_and, tau_parser::wff);
+}
+
+template<typename ...BAs>
+std::vector<sp_tau_node<BAs...>> get_cnf_bf_clauses(const sp_tau_node<BAs...>& n) {
+	return get_leaves(n, tau_parser::bf_and, tau_parser::bf);
+}
+
+// A formula has a temporal variable if either it contains an io_var with a variable or capture
+// or it contains a flag
+template<typename... BAs>
+bool has_temp_var (const nso<BAs...>& fm) {
+	auto io_vars = select_top(fm, is_non_terminal<tau_parser::io_var, BAs...>);
+	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
+	for (const auto& io_var : io_vars) {
+		if (find_top(io_var, is_non_terminal<tau_parser::shift, BAs...>))
+			return true;
+		if (!find_top(io_var, is_non_terminal<tau_parser::num, BAs...>))
+			return true;
+	}
+	return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
+}
+
 // Check that no non-temporal quantified variable appears nested in the scope of
 // temporal quantification
 template<typename... BAs>
@@ -1402,9 +1461,24 @@ bool invalid_nesting_of_quants (const sp_tau_node<BAs...>& fm) {
 		for (const auto& tq : temp_quants) {
 			// Check that the non-temp quantified variable doesn't appear free
 			if (get_free_vars_from_nso(tq).contains(ntq_var)) {
-				BOOST_LOG_TRIVIAL(error) << "(Error) Non-temporal quantifier cannot capture variable appearing in scoped temporal subformula.";
+				BOOST_LOG_TRIVIAL(error) << "(Error) Non-temporal quantifier cannot capture variable appearing in scoped temporal subformula: \n"
+				<< "Variable \"" << ntq_var << "\" is captured in \"" << tq << "\"";
 				return true;
 			}
+		}
+	}
+	return false;
+}
+
+template<typename... BAs>
+bool invalid_nesting_of_temp_quants (const sp_tau_node<BAs...>& fm) {
+	auto temp_statements = select_top(fm, is_temporal_quantifier<BAs...>);
+	// Check that in no temp_statement another temporal statement is found
+	for (const auto& temp_st : temp_statements) {
+		if(auto n = find_top(trim(temp_st), is_temporal_quantifier<BAs...>); n.has_value()) {
+			BOOST_LOG_TRIVIAL(error) << "(Error) Nesting of temporal quantifiers is currently not allowed: \n"
+			<< "Found \"" << n.value() << "\" in \"" << temp_st << "\"";
+			return true;
 		}
 	}
 	return false;
@@ -1424,8 +1498,27 @@ bool has_open_tau_fm_in_constant (const sp_tau_node<BAs...>& fm) {
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
 		if (!std::visit(_closed, ba_const)) {
-			BOOST_LOG_TRIVIAL(error) << "(Error) A Tau formula constant must be closed.";
+			BOOST_LOG_TRIVIAL(error) << "(Error) A Tau formula constant must be closed: " << ba_const;
 			return true;
+		}
+	}
+	return false;
+}
+
+template<typename... BAs>
+bool has_non_temp_in_sometimes (const sp_tau_node<BAs...>& fm) {
+	auto sts = select_top(fm, is_child_non_terminal<tau_parser::wff_sometimes, BAs...>);
+	for (const auto& st : sts) {
+		// Check that there is no non-temporal in sometimes statement
+		auto clauses = get_dnf_wff_clauses(trim2(st));
+		for (const auto& c : clauses) {
+			auto conjs = get_cnf_wff_clauses(c);
+			for (const auto& conj : conjs) {
+				if (!has_temp_var(conj)) {
+					BOOST_LOG_TRIVIAL(error) << "(Error) Non temporal formula found in sometimes statement: " << conj;
+					return true;
+				}
+			}
 		}
 	}
 	return false;
@@ -1436,7 +1529,9 @@ bool has_open_tau_fm_in_constant (const sp_tau_node<BAs...>& fm) {
 template<typename... BAs>
 bool has_semantic_error (const sp_tau_node<BAs...>& fm) {
 	bool error = invalid_nesting_of_quants(fm)
-			|| has_open_tau_fm_in_constant(fm);
+			|| has_open_tau_fm_in_constant(fm)
+			|| invalid_nesting_of_temp_quants(fm)
+			|| has_non_temp_in_sometimes(fm);
 	return error;
 }
 
@@ -2898,50 +2993,6 @@ sp_tau_node<BAs...> splitter(const sp_tau_node<BAs...>& n,
 	auto ba_constant = get<std::variant<BAs...>>(trim2(n)->value);
 	std::variant<BAs...> v = std::visit(_splitter, ba_constant);
 	return build_bf_constant<BAs...>(v);
-}
-
-// TODO (MEDIUM) unify this code with get_gssotc_clause and get_gssotc_literals
-template<typename ...BAs>
-void get_leaves(const sp_tau_node<BAs...>& n, tau_parser::nonterminal branch,
-	tau_parser::nonterminal skip, std::vector<sp_tau_node<BAs...>>& leaves)
-{
-    if (is_child_non_terminal(branch, n)) {
-	    for (const auto& c : trim(n)->child)
-	    	if (is_non_terminal(skip, c))
-	    		get_leaves(c, branch, skip, leaves);
-    } else {
-        leaves.push_back(n);
-        BOOST_LOG_TRIVIAL(trace) << "(I) get_leaves: found clause: " << n;
-    }
-}
-
-template<typename ...BAs>
-std::vector<sp_tau_node<BAs...>> get_leaves(const sp_tau_node<BAs...>& n,
-	tau_parser::nonterminal branch, tau_parser::nonterminal skip)
-{
-	std::vector<sp_tau_node<BAs...>> leaves;
-	get_leaves(n, branch, skip, leaves);
-	return leaves;
-}
-
-template<typename ...BAs>
-std::vector<sp_tau_node<BAs...>> get_dnf_wff_clauses(const sp_tau_node<BAs...>& n) {
-	return get_leaves(n, tau_parser::wff_or, tau_parser::wff);
-}
-
-template<typename ...BAs>
-std::vector<sp_tau_node<BAs...>> get_dnf_bf_clauses(const sp_tau_node<BAs...>& n) {
-	return get_leaves(n, tau_parser::bf_or, tau_parser::bf);
-}
-
-template<typename ...BAs>
-std::vector<sp_tau_node<BAs...>> get_cnf_wff_clauses(const sp_tau_node<BAs...>& n) {
-	return get_leaves(n, tau_parser::wff_and, tau_parser::wff);
-}
-
-template<typename ...BAs>
-std::vector<sp_tau_node<BAs...>> get_cnf_bf_clauses(const sp_tau_node<BAs...>& n) {
-	return get_leaves(n, tau_parser::bf_and, tau_parser::bf);
 }
 
 // IDEA convert to a const static applier and change all the code accordingly

@@ -2111,21 +2111,6 @@ nso<BAs...> rm_temporary_lookback (const nso<BAs...>& fm) {
 	return replace(fm, changes);
 }
 
-// A formula has a temporal variable if either it contains an io_var with a variable or capture
-// or it contains a flag
-template<typename... BAs>
-bool has_temp_var (const nso<BAs...>& fm) {
-	auto io_vars = select_top(fm, is_non_terminal<tau_parser::io_var, BAs...>);
-	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
-	for (const auto& io_var : io_vars) {
-		if (find_top(io_var, is_non_terminal<tau_parser::shift, BAs...>))
-			return true;
-		if (!find_top(io_var, is_non_terminal<tau_parser::num, BAs...>))
-			return true;
-	}
-	return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
-}
-
 // Assumes a single sometimes DNF clause with negation pushed in containing no wff_or with max nesting depth 1
 template<typename... BAs>
 nso<BAs...> extract_sometimes (nso<BAs...> fm) {
@@ -2414,7 +2399,7 @@ nso<BAs...> pull_sometimes_always_out(nso<BAs...> fm) {
 
 // The needed class in order to make sometimes/always normalization work with normalizer
 template<typename... BAs>
-struct sometimes_always_normalization {
+struct sometimes_always_normalization_depreciated {
 	nso<BAs...> operator() (const nso<BAs...>& fm) const {
 		auto st_aw = [](const auto& n) {
 			return is_child_non_terminal(tau_parser::wff_sometimes, n) ||
@@ -2445,6 +2430,89 @@ struct sometimes_always_normalization {
 		return reduce_across_bfs(replace(res, changes), false);
 	}
 };
+
+template<typename... BAs>
+struct sometimes_always_normalization {
+	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+		auto st_aw = [](const auto& n) {
+			return is_child_non_terminal(tau_parser::wff_sometimes, n) ||
+				is_child_non_terminal(tau_parser::wff_always, n);
+		};
+		if (!find_top(fm, st_aw).has_value() && !has_temp_var(fm)) {
+			return reduce_across_bfs(fm, false);
+		}
+		auto clauses = get_dnf_wff_clauses(reduce_across_bfs(fm, false));
+		nso<BAs...> res = _F<BAs...>;
+		nso<BAs...> always_disjuncts = _F<BAs...>;
+		for (const nso<BAs...>& clause : clauses) {
+			// If clause does not contain sometimes/always but temporal variables, we add it to always_disjuncts
+			if (!find_top(clause, st_aw) && has_temp_var(clause)) {
+				always_disjuncts = build_wff_or(always_disjuncts, clause);
+				continue;
+			}
+			auto conjuncts = get_cnf_wff_clauses(clause);
+			nso<BAs...> always_part = _T<BAs...>;
+			nso<BAs...> staying = _T<BAs...>;
+			for (const nso<BAs...>& conj : conjuncts) {
+				if (!st_aw(conj) && has_temp_var(conj))
+					always_part = build_wff_and(always_part, conj);
+				else staying = build_wff_and(staying, conj);
+			}
+			always_part = build_wff_always(always_part);
+			res = build_wff_or(res, build_wff_and(always_part, staying));
+		}
+		res = build_wff_or(build_wff_always(always_disjuncts), res);
+		auto temp_inner = select_top(res, st_aw);
+		if (temp_inner.empty()) return res;
+		std::map<nso<BAs...>, nso<BAs...>> changes;
+		for (const auto& f : temp_inner) {
+			// Reduction done to normalize again now that sometimes/always are all the way out
+			changes[trim2(f)] = reduce_across_bfs(trim2(f), false);
+		}
+		return reduce_across_bfs(replace(res, changes), false);
+	}
+};
+
+// Assumes that fm is normalized
+template<typename... BAs>
+nso<BAs...> pull_always_out_for_inf (const nso<BAs...>& fm) {
+	using p = tau_parser;
+	// Get all always statments on each clause and merge
+	auto clauses = get_dnf_wff_clauses(fm);
+	nso<BAs...> res = _F<BAs...>;
+	nso<BAs...> non_temps = _F<BAs...>;
+	nso<BAs...> last_always;
+	for (const nso<BAs...>& clause : clauses) {
+		// Clauses not containing temporal variables need to be added under always
+		if (!has_temp_var(clause)) {
+			non_temps = build_wff_or(non_temps, clause);
+			continue;
+		}
+		auto conjuncts = get_cnf_wff_clauses(clause);
+		nso<BAs...> always_statements = _T<BAs...>;
+		nso<BAs...> staying = _T<BAs...>;
+		for (const nso<BAs...>& conj : conjuncts) {
+			if (is_child_non_terminal(p::wff_always, conj))
+				always_statements = build_wff_and(always_statements, trim2(conj));
+			else if (!is_child_non_terminal(p::wff_sometimes, conj))
+				always_statements = build_wff_and(always_statements, conj);
+			else staying = build_wff_and(staying, conj);
+		}
+		// Add the non temporal clauses under always
+		last_always = reduce_across_bfs(always_statements, false);
+		always_statements = build_wff_always(last_always);
+		res = build_wff_or(res, build_wff_and(always_statements, staying));
+	}
+	if (last_always) {
+		std::map<nso<BAs...>, nso<BAs...>> changes =
+			{{last_always, build_wff_or(last_always, non_temps)}};
+		res = replace(res, changes);
+	} else {
+		assert(res == _F<BAs...>);
+		res = build_wff_always(non_temps);
+	}
+	return reduce_across_bfs(res, false);
+}
 
 template<typename... BAs>
 nso<BAs...> operator|(const nso<BAs...>& fm, const sometimes_always_normalization<BAs...>& r) {
