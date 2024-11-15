@@ -442,6 +442,16 @@ size_t compute_initial_execution_time(const nso<BAs...>& phi_inf) {
 	return initial_time_point;
 }
 
+template<typename...BAs>
+size_t compute_initial_execution_time(const std::set<system<BAs...>>& systems) {
+	size_t initial_time_point = 0;
+	for (const auto& system: systems)
+		for (const auto& [_, equations]: system)
+			initial_time_point = std::max(initial_time_point, compute_initial_execution_time(equations));
+	return initial_time_point;
+}
+
+
 template<typename input_t, typename...BAs>
 std::optional<assignment<BAs...>> compute_initial_memory(const nso<BAs...>& /*phi_inf*/,
 		const size_t& initial_execution_time, input_t& inputs) {
@@ -559,8 +569,8 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& form,
 		if (auto system = compute_system(program, inputs, outputs); system)
 			systems.insert(system.value());
 		else {
-			BOOST_LOG_TRIVIAL(error)
-				<< "(Error) unable to compute system of equations in: " << clause << "\n";
+			BOOST_LOG_TRIVIAL(trace)
+				<< "unable to compute system of equations in: " << clause << "\n";
 			continue;
 		}
 	}
@@ -571,9 +581,18 @@ template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> phi_inf, input_t& inputs, output_t& outputs) {
 	// compute the different systems to be solved
 	auto systems = compute_systems(phi_inf, inputs, outputs);
-	if (!systems) return {}; // error
+	if (!systems) {
+		BOOST_LOG_TRIVIAL(error)
+			<< "(Error) unable to compute systems\n";
+		return {}; // error
+	}
+	if (systems.value().empty()) {
+		BOOST_LOG_TRIVIAL(error)
+			<< "(Error) empty specification\n";
+		return {}; // error
+	}
 	// compute the initial time point for execution
-	size_t initial_execution_time = compute_initial_execution_time(phi_inf);
+	size_t initial_execution_time = compute_initial_execution_time(systems.value());
 	// compute initial memory
 	auto memory = compute_initial_memory(phi_inf, initial_execution_time, inputs);
 	if (!memory) return {}; // error
