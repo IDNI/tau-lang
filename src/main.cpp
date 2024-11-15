@@ -80,10 +80,6 @@ cli::commands tau_commands() {
 		.set_description("program to be evaluated (alternative to -p)"));
 	run.add_option(cli::option("help", 'h', false)
 		.set_description("detailed information about run options"));
-	run.add_option(cli::option("input", 'i', "@null")
-		.set_description("program's input"));
-	run.add_option(cli::option("output", 'o', "@stdout")
-		.set_description("program's output"));
 	run.add_option(cli::option("charvar", 'v', true)
 		.set_description("charvar (enabled by default)"));
 	auto& repl = cmds["repl"] = cli::command("repl", "Tau REPL");
@@ -116,60 +112,30 @@ int error(const string& s) {
 }
 
 // runs tau program or an evaluate string using input and output
-int run_tau(const string& program, const string& input, const string& output,
-	const string& evaluate = "")
-{
-	bool eval = evaluate.size();
-	if (input == output && !is_null(input))
-		return error("input and output cannot be the same");
-	if (eval && program.size() && !is_null(program) && !is_stdin(program))
-		return error("cannot use both --program and --evaluate");
-	if (!eval) {
-		if (program == input)
-			return error("program and input cannot be the same");
-		if (program == output)
-			return error("program and output cannot be the same");
+int run_tau(const cli::command& cmd, const vector<string>& files) {
+	string program = cmd.get<string>("program"),
+		e = cmd.get<string>("evaluate");
+	if (e.size()&& program.size()&& !is_null(program) && !is_stdin(program))
+		return error("Cannot use both --program and --evaluate");
+	if (e.empty()) {
+		if (files.size()) program = files[0];
+		if (is_null(program)) return error("Program cannot be null");
+		if (is_stdin(program)) {
+			std::ostringstream oss;
+			oss << std::cin.rdbuf(), e = oss.str();
+		} else {
+			std::ifstream ifs(program,
+					std::ios::binary | std::ios::ate);
+			if (!ifs) return error("Cannot open file " + program);
+			auto l = ifs.tellg();
+			e.resize(l), ifs.seekg(0), ifs.read(&e[0], l);
+		}
 	}
-
-	sp_tau_source_node prg_node, in_node, out_node;
-
-	if (eval) prg_node = make_tau_source(evaluate);
-	else if (is_null(program)) return error("program cannot be null");
-	else if (is_stdin(program)) prg_node = make_tau_source(cin);
-	else prg_node = make_tau_source_from_file(program);
-
-	if (is_null(input)) ;
-	else if (is_stdin(input)) in_node = make_tau_source(cin);
-	else in_node = make_tau_source_from_file(input);
-
-	// read input
-	if (in_node) {
-		DBG(cout << "input: `" << in_node << "`\n");
-	}
-
-	// read program
-	if (!prg_node) return error("cannot read program");
-	DBG(cout << "program: `" << prg_node << "`\n");
-
-	// run program
-	// TODO (MEDIUM) program execution
-	out_node = prg_node; // simulate execution by setting out_node to prg
-
-	ostream *out = 0;
-	ofstream outf;
-	if (is_null(output)) ;
-	else if (is_stdout(output)) out = &cout;
-	else if (!(outf = ofstream(output)).is_open())
-		return error("cannot open output file");
-	else out = &outf;
-
-	// write output
-	if (out && out_node) {
-		DBG(cout << "output: `" << out_node << "`\n");
-		*out << out_node;
-	}
-
-	return 0;
+	repl_evaluator<bdd_binding> re({ .print_memory_store = false,
+					.charvar = cmd.get<bool>("charvar") });
+	if (e.empty()) return 0;
+	if (re.eval(e) > 1) return 1;
+	return re.eval("run %");
 }
 
 // TODO (MEDIUM) add command to read input file,...
@@ -181,15 +147,20 @@ int main(int argc, char** argv) {
 
 	cli cl("tau", args, tau_commands(), "repl", tau_options());
 	cl.set_description("Tau language");
+	cl.set_default_command_when_files("run");
 
 	if (cl.process_args() != 0) return cl.status();
 
-	auto opts = cl.get_processed_options();
-	auto cmd  = cl.get_processed_command();
+	auto opts  = cl.get_processed_options();
+	auto cmd   = cl.get_processed_command();
+	auto files = cl.get_files();
 
 	// error if command is invalid
-	if (!cmd.ok()) return cl.error("invalid command", true);
-
+	if (!cmd.ok()) {
+		if (cmd.name() == "repl" && files.size())
+			return error("repl command does not accept files");
+		return cl.error("invalid command", true);
+	}
 	// if --help/-h option is true, print help end exit
 	if (cmd.name() == "help" || opts["help"].get<bool>())
 		return cl.help(), 0;
@@ -221,10 +192,6 @@ int main(int argc, char** argv) {
 	}
 
 	// run command
-	if (cmd.name() == "run") return run_tau(
-		cmd.get<string>("program"),
-		cmd.get<string>("input"),
-		cmd.get<string>("output"),
-		cmd.get<string>("evaluate"));
+	if (cmd.name() == "run") return run_tau(cmd, files);
 	return 0;
 }
