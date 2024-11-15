@@ -150,7 +150,8 @@ void repl_evaluator<BAs...>::memory_store(
 	// do not add into memory if the last memory value is the same
 	if (!(m.size() && m.back() == o))
 		m.push_back(o);
-	print_memory(m.back(), m.size() - 1, m.size(), false);
+	if (opt.print_memory_store)
+		print_memory(m.back(), m.size() - 1, m.size(), false);
 }
 
 template <typename... BAs>
@@ -881,7 +882,9 @@ sp_tau_node<tau_ba<BAs...>, BAs...>
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
-		if (msg.find("Syntax Error: Unexpected end of file") != 0) {
+		if (opt.error_quits
+			|| msg.find("Syntax Error: Unexpected end of file")!=0)
+		{
 			BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
 			return fail();
 		}
@@ -1154,6 +1157,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 			if (quit = eval_cmd(cmd); quit == 1) break;
 	} else if (!error) return 2;
 	std::cout << std::endl;
+	if (error && opt.error_quits) return quit = 1;
 	if (quit == 0) prompt();
 	return quit;
 }
