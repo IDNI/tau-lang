@@ -1224,7 +1224,7 @@ void repl_evaluator<BAs...>::help_cmd(
 
 		<< "History and definitions:\n"
 		<< "  history or hist         show all Tau expressions stored in the repl memory\n"
-		<< "  definitions or defs     show stored IO variables and function and recurrence relation definitions\n"
+		<< "  definitions or defs     show stored IO variables and function and predicate definitions\n"
 		<< "\n"
 
 		<< "Substitution and instantiation command:\n"
@@ -1284,14 +1284,14 @@ void repl_evaluator<BAs...>::help_cmd(
 	case tau_parser::history_sym: std::cout
 		<< "the history command shows all stored Tau expressions in the repl memory\n"
 		<< "\n"
-		<< "  history or hist              shows all stored Tau expressions\n"
-		<< "  history or hist <memory>     shows the Tau expression stored at the specified memory position\n"
-		<< "  <rr>, <tau> or <term>        stores a Tau expression in the repl memory at the latest position\n"
+		<< "  history or hist                shows all stored Tau expressions\n"
+		<< "  history or hist <repl_memory>  shows the Tau expression stored at the specified repl memory position\n"
+		<< "  <rr>, <tau> or <term>          stores a Tau expression in the repl memory at the latest position\n"
 		<< "\n"
 		<< "the repl memory can be accessed in the following ways\n\n"
-		<< "  %                            to retrieve the Tau expression stored at the latest position\n"
-		<< "  %-<number>                   to retrieve the Tau expression stored at the latest position minus <number>\n"
-		<< "  %<number>                    to retrieve the Tau expression stored at position <number>\n\n"
+		<< "  %                              to retrieve the Tau expression stored at the latest position\n"
+		<< "  %-<number>                     to retrieve the Tau expression stored at the latest position minus <number>\n"
+		<< "  %<number>                      to retrieve the Tau expression stored at position <number>\n\n"
 		<< "stored Tau expressions can be used wherever a command expects a Tau expression\n";
 		break;
 	case tau_parser::normalize_sym: std::cout
@@ -1299,18 +1299,18 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "saves it into the repl memory\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  normalize <rr>		normalizes the given tau formula with additional recurrence relation and function definitions\n"
-		<< "  normalize <tau>		normalizes the given tau formula\n"
-		<< "  normalize <term>		normalizes the given term\n"
-		<< "  normalize <memory>	normalizes the Tau expression stored at the specified memory position\n";
+		<< "  normalize <rr>		    normalizes the given tau formula with additional predicate and function definitions\n"
+		<< "  normalize <tau>		    normalizes the given tau formula\n"
+		<< "  normalize <term>		    normalizes the given term\n"
+		<< "  normalize <repl_memory>   normalizes the Tau expression stored at the specified repl memory position\n";
 		break;
 	case tau_parser::qelim_sym: std::cout
 		<< "the qelim command eliminates all non-temporal quantifiers, prints the result and\n"
 		<< "saves it into the repl memory\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  qelim <tau>            eliminates non-temporal quantifiers in the given tau formula\n"
-		<< "  qelim <memory>         eliminates non-temporal quantifiers in the Tau formula stored at the specified memory position\n";
+		<< "  qelim <tau>               eliminates non-temporal quantifiers in the given tau formula\n"
+		<< "  qelim <repl_memory>       eliminates non-temporal quantifiers in the Tau formula stored at the specified repl memory position\n";
 		break;
 	case tau_parser::run_sym: std::cout
 		<< "the run command executes a Tau formula as a program\n"
@@ -1319,16 +1319,16 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "and executes it in such a way that in each step (starting at 0) each input variable reads a value from the specified stream\n"
 		<< "and then a value is written into each specified output stream such that the Tau formula being executed is satisfied\n\n"
 		<< "usage:\n"
-		<< "  run <tau>              execute the given Tau formula\n"
-		<< "  run <memory>           execute the Tau formula stored at the specified memory position\n"
+		<< "  run <tau>                 execute the given Tau formula\n"
+		<< "  run <repl_memory>         execute the Tau formula stored at the specified repl memory position\n"
 		<< "\n";
 		break;
 	case tau_parser::solve_sym: std::cout
 		<< "the solve command computes a single satisfying assignment for the free variables in a Tau formula\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  solve <tau>            computes a single satisfying assignment for the free variables in the Tau formula\n"
-		<< "  solve <memory>         computes a single satisfying assignment for the free variables in the Tau formula stored at the specified memory position"
+		<< "  solve <tau>              computes a single satisfying assignment for the free variables in the Tau formula\n"
+		<< "  solve <repl_memory>      computes a single satisfying assignment for the free variables in the Tau formula stored at the specified repl memory position"
 		<< "\n";
 		break;
 	case tau_parser::sat_sym: std::cout
@@ -1337,17 +1337,17 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "such that for all possible inputs there exist time compatible outputs at each point in time\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  sat <rr>		        checks the given tau formula with additional recurrence relation and function definitions for satisfiability\n"
-		<< "  sat <tau>		        checks the given tau formula for satisfiability\n"
-		<< "  sat <memory>	        checks the Tau formula stored at the specified memory position for satisfiability\n";
+		<< "  sat <rr>		           checks the given tau formula with additional predicate and function definitions for satisfiability\n"
+		<< "  sat <tau>		           checks the given tau formula for satisfiability\n"
+		<< "  sat <repl_memory>	       checks the Tau formula stored at the specified repl memory position for satisfiability\n";
 		break;
 	case tau_parser::valid_sym: std::cout
 		<< "the valid command checks if a Tau formula is logically equivalent to T and if so prints T and else F\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  valid <rr>		      checks the given tau formula with additional recurrence relation and function definitions for validity\n"
-		<< "  valid <tau>		      checks the given tau formula for validity\n"
-		<< "  valid <memory>	      checks the Tau formula stored at the specified memory position for validity\n";
+		<< "  valid <rr>		       checks the given tau formula with additional predicate and function definitions for validity\n"
+		<< "  valid <tau>		       checks the given tau formula for validity\n"
+		<< "  valid <repl_memory>	   checks the Tau formula stored at the specified repl memory position for validity\n";
 		break;
 		break;
 	case tau_parser::unsat_sym: std::cout
@@ -1356,25 +1356,25 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "there exist inputs such that there are no time compatible outputs at some point in time\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  unsat <rr>		      checks the given tau formula with additional recurrence relation and function definitions for unsatisfiability\n"
-		<< "  unsat <tau>		      checks the given tau formula for unsatisfiability\n"
-		<< "  unsat <memory>	      checks the Tau formula stored at the specified memory position for unsatisfiability\n";
+		<< "  unsat <rr>		       checks the given tau formula with additional predicate and function definitions for unsatisfiability\n"
+		<< "  unsat <tau>		       checks the given tau formula for unsatisfiability\n"
+		<< "  unsat <repl_memory>	   checks the Tau formula stored at the specified repl memory position for unsatisfiability\n";
 		break;
 	case tau_parser::dnf_sym: std::cout
 		<< "dnf converts a Tau expression to disjunctive normal form (DNF)\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  dnf <term>           converts the given term to DNF\n"
-		<< "  dnf <tau>            converts the given Tau formula to DNF\n"
-		<< "  dnf <memory>         converts the Tau expression stored at the specified memory position to DNF\n";
+		<< "  dnf <term>               converts the given term to DNF\n"
+		<< "  dnf <tau>                converts the given Tau formula to DNF\n"
+		<< "  dnf <repl_memory>        converts the Tau expression stored at the specified repl memory position to DNF\n";
 		break;
 	case tau_parser::cnf_sym: std::cout
 		<< "cnf converts a Tau expression to conjunctive normal form (CNF)\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  cnf <term>           converts the given term to CNF\n"
-		<< "  cnf <tau>            converts the given Tau formula to CNF\n"
-		<< "  cnf <memory>         converts the Tau expression stored at the specified memory position to CNF\n";
+		<< "  cnf <term>              converts the given term to CNF\n"
+		<< "  cnf <tau>               converts the given Tau formula to CNF\n"
+		<< "  cnf <repl_memory>       converts the Tau expression stored at the specified repl memory position to CNF\n";
 		break;
 	//case tau_parser::anf_sym: std::cout
 	//	<< "anf command converts a boolean formula or a well formed formula to algebraic normal form\n"
@@ -1388,9 +1388,9 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "nnf converts a Tau expression to negation normal form (NNF)\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  nnf <term>           converts the given term to NNF\n"
-		<< "  nnf <tau>            converts the given tau formula to NNF\n"
-		<< "  nnf <memory>         converts the Tau expression stored at the specified memory position to NNF\n";
+		<< "  nnf <term>              converts the given term to NNF\n"
+		<< "  nnf <tau>               converts the given tau formula to NNF\n"
+		<< "  nnf <repl_memory>       converts the Tau expression stored at the specified repl memory position to NNF\n";
 		break;
 	//case tau_parser::pnf_sym: std::cout
 	//	<< "pnf command converts a boolean formula or a well formed formula to prenex normal form\n"
@@ -1404,16 +1404,16 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "mnf converts a Tau expression to minterm normal form (MNF)\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  mnf <term>           converts the given term to MNF\n"
-		<< "  mnf <tau>            converts the given tau formula to MNF\n"
-		<< "  mnf <memory>         converts the Tau expression stored at the specified memory position to MNF\n";
+		<< "  mnf <term>              converts the given term to MNF\n"
+		<< "  mnf <tau>               converts the given tau formula to MNF\n"
+		<< "  mnf <repl_memory>       converts the Tau expression stored at the specified repl memory position to MNF\n";
 		break;
 	case tau_parser::onf_sym: std::cout
 		<< "onf converts a tau formula to order normal form (ONF) on the specified variable\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  onf <var> <tau>      converts the given tau formula to ONF using <var>\n"
-		<< "  onf <var> <memory>   converts the Tau formula stored at the specified memory position to ONF using <var>\n";
+		<< "  onf <var> <tau>           converts the given tau formula to ONF using <var>\n"
+		<< "  onf <var> <repl_memory>   converts the Tau formula stored at the specified repl memory position to ONF using <var>\n";
 		break;
 	case tau_parser::subst_sym: std::cout
 		<< "the substitute command substitutes a Tau expression in a Tau expression by another Tau expression\n"
@@ -1443,15 +1443,15 @@ void repl_evaluator<BAs...>::help_cmd(
 		<< "\n";
 		break;
 	case tau_parser::def_sym: std::cout
-		<< "the definitions command shows stored input/output stream variables and function and recurrence relation definitions\n"
+		<< "the definitions command shows stored input/output stream variables and function and predicate definitions\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  <tau_rec_relation>    defines a tau formula recurrence relation or function\n"
-        << "  <term_rec_relation>   defines a tau term recurrence relation or function\n"
+		<< "  <tau_rec_relation>    defines a tau predicate\n"
+        << "  <term_rec_relation>   defines a tau function\n"
 		<< "  <def_input_cmd>       defines an input stream variable\n"
 		<< "  <def_output_cmd>      defines an output stream variable\n"
 		<< "  definitions           lists all definitions present in repl\n"
-		<< "  definitions <number>  prints recurrence relation or function at specified position\n"
+		<< "  definitions <number>  prints predicate or function at specified position\n"
 		<< "\n"
 		<< "Examples defining stream variables and functions can be found by typing \'help examples\'\n";
 		break;
