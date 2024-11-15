@@ -54,11 +54,7 @@ struct bdd_factory {
 			return cn->second;
 		auto& p = bdd_parser::instance();
 		auto r = p.parse(src.c_str(), src.size());
-		if (!r.found) {
-			BOOST_LOG_TRIVIAL(error) << "(Error) # bdd binding: `"
-				<< src << "`\n" << r.parse_error;
-			return std::optional<nso<BAs...>>{};
-		}
+		if (!r.found) return std::optional<nso<BAs...>>{};
 		char dummy = 0;
 		auto root = rewriter::make_node_from_tree<bdd_parser, char,
 			tau_sym<BAs...>>(dummy, r.get_shaped_tree());
