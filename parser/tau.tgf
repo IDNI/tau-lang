@@ -201,7 +201,7 @@ cli_command            =>
 # a wff if possible.
         | ("solve"
                 :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
-        | (("r" | "run"):run_sym __ wff)                      :run_cmd
+        | (("r" | "run"):run_sym __ (memory | wff))           :run_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
 # TODO (MEDIUM) maybe we could remove in the subst and inst commands the
