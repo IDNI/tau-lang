@@ -554,10 +554,6 @@ void repl_evaluator<BAs...>::run_cmd(
 	const nso<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
-	if (auto check = find_top(arg, is_regular_or_temporal_quantifier<tau_ba<BAs...>, BAs...>); check) {
-		std::cout << "not enabled yet\n";
-		return;
-	}
 
 	// running the program
 	if (auto check = get_type_and_arg(arg); check) {
