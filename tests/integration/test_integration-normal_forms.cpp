@@ -80,8 +80,8 @@ TEST_SUITE("normal forms: snf for wff") {
 		CHECK( nso__rr.value().main == result );
 	}
 
-	TEST_CASE("quantifiers: sometimes X = 0") {
-		const char* sample = "sometimes X = 0.";
+	TEST_CASE("quantifiers: sometimes o1[t] = 0") {
+		const char* sample = "sometimes o1[t] = 0.";
 		auto sample_src = make_tau_source(sample);
 		auto nso__rr = make_nso_rr_using_factory<bdd_binding>(sample_src);
 		CHECK( nso__rr.has_value() );
