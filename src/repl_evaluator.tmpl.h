@@ -150,7 +150,8 @@ void repl_evaluator<BAs...>::memory_store(
 	// do not add into memory if the last memory value is the same
 	if (!(m.size() && m.back() == o))
 		m.push_back(o);
-	print_memory(m.back(), m.size() - 1, m.size(), false);
+	if (opt.print_memory_store)
+		print_memory(m.back(), m.size() - 1, m.size(), false);
 }
 
 template <typename... BAs>

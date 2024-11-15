@@ -75,15 +75,16 @@ struct repl_evaluator {
 				sp_tau_node<tau_ba<BAs...>, BAs...>, size_t>>;
 
 	struct options {
-		bool status     = true;
-		bool colors     = true;
-		bool charvar    = true;
+		bool status             = true;
+		bool colors             = true;
+		bool print_memory_store = true;
+		bool charvar            = true;
 #ifdef DEBUG
-		bool debug_repl = true;
+		bool debug_repl         = true;
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::debug;
 #else
-		bool debug_repl = false;
+		bool debug_repl         = false;
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::info;
 #endif
