@@ -78,6 +78,7 @@ struct repl_evaluator {
 		bool status             = true;
 		bool colors             = true;
 		bool print_memory_store = true;
+		bool error_quits        = false;
 		bool charvar            = true;
 #ifdef DEBUG
 		bool debug_repl         = true;
