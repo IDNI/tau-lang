@@ -1164,7 +1164,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::version_cmd() {
-	std::cout << "Tau version: " << GIT_DESCRIBED << "\n";
+	std::cout << "Tau version: 0.7 (" << GIT_DESCRIBED << ")\n";
 }
 
 template <typename... BAs>
