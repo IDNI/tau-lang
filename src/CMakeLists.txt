@@ -22,12 +22,26 @@ set(TAU_HEADERS
 	product_ba.h
 	utils.h
 	experimental/execution.h
+	../external/parser/src/characters.h
+	../external/parser/src/charclasses.h
+	../external/parser/src/defs.h
+	../external/parser/src/devhelpers.h
+	../external/parser/src/forest.h
+	../external/parser/src/parser.h
+	../external/parser/src/parser.tmpl.h
+	../external/parser/src/recoders.h
+	../external/parser/src/tgf.h
 )
 
 set(TAU_SOURCES
 	bool_ba.cpp
 	dict.cpp
 	nso_rr.cpp
+	../external/parser/src/characters.cpp
+	../external/parser/src/charclasses.cpp
+	../external/parser/src/parser.cpp
+	../external/parser/src/recoders.cpp
+	../external/parser/src/term.cpp
 )
 
 set(CLI_SOURCES
@@ -137,13 +151,3 @@ endif()
 if(BUILD_SHARED_EXECUTABLE)
 	set(BUILD_TARGETS "${BUILD_TARGETS}" ${TAU_EXE_SHARED_NAME})
 endif()
-
-install(TARGETS ${BUILD_TARGETS}
-	EXPORT TAU
-	RUNTIME       DESTINATION ${CMAKE_INSTALL_BINDIR}
-	LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
-	INCLUDES      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-	PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/TAU
-	)
-export(EXPORT TAU FILE ${TAU}/tau-config.cmake)
-install(EXPORT TAU DESTINATION ${PROJECT_BINARY_DIR})

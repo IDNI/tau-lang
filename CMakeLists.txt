@@ -24,6 +24,8 @@ option(TAU_BUILD_REPL_TESTS        "Build repl tests"                      OFF)
 option(TAU_BUILD_INTEGRATION       "Build integration tests"               OFF)
 option(TAU_BUILD_REGRESSION        "Build regression tests"                OFF)
 option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
+option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
+option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
 set_property(CACHE TAU_BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
@@ -36,6 +38,8 @@ set_property(CACHE TAU_BUILD_REGRESSION        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_BENCHMARK         PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_REPL_TESTS        PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_GENERATE_PARSERS        PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_WINDOWS_ZIP_PACKAGE     PROPERTY STRINGS "OFF" "ON")
+set_property(CACHE TAU_WINDOWS_PACKAGE         PROPERTY STRINGS "OFF" "ON")
 
 if(TAU_BUILD_TESTS)
 	set(TAU_BUILD_UNIT_TESTS ON)
@@ -55,6 +59,10 @@ if(NOT TAU_BUILD_STATIC_LIBRARY AND NOT TAU_BUILD_SHARED_LIBRARY
 	AND NOT TAU_BUILD_INTEGRATION AND NOT TAU_BUILD_REPL_TESTS
 	AND NOT TAU_BUILD_BENCHMARK)
 		set(TAU_BUILD_EXECUTABLE ON)
+endif()
+
+if(TAU_WINDOW_PACKAGE AND TAU_WINDOWS_ZIP_PACKAGE)
+	message(FATAL_ERROR "Cannot build both Windows and Windows zip packages at the same time")
 endif()
 
 #
@@ -104,6 +112,8 @@ message(STATUS "TAU_BUILD_REGRESSION: ${TAU_BUILD_REGRESSION}")
 message(STATUS "TAU_BUILD_INTEGRATION: ${TAU_BUILD_INTEGRATION}")
 message(STATUS "TAU_BUILD_BENCHMARK: ${TAU_BUILD_BENCHMARK}")
 message(STATUS "TAU_GENERATE_PARSERS: ${TAU_GENERATE_PARSERS}")
+message(STATUS "TAU_WINDOWS_ZIP_PACKAGE: ${TAU_WINDOWS_ZIP_PACKAGE}")
+message(STATUS "TAU_WINDOWS_PACKAGE: ${TAU_WINDOWS_PACKAGE}")
 
 #
 # Adding Boost log library
@@ -126,12 +136,8 @@ else()
 endif()
 
 #
-# Adding parser library submodule directory
-#
 option(BOOST_LOG_TRIVIAL           "Build logging in parser"   ON)
 option(PARSER_BUILD_STATIC_LIBRARY "Build only static library" ON)
-add_subdirectory("external/parser")
-set(IDNI_PARSER_OBJECT_LIB "idni_parsero")
 
 # TODO (LOW) make it run automatically on grammar modifications
 #
@@ -190,22 +196,8 @@ else (DOXYGEN_FOUND AND TAU_BUILD_DOC)
 endif (DOXYGEN_FOUND AND TAU_BUILD_DOC)
 
 #
-# Specify installation directories and files
-#
-install(TARGETS ${TAU_EXECUTABLE_NAME}
-    RUNTIME DESTINATION usr/bin
-)
-
-#
 # CPack configuration
 #
-
-SET(COMMON_IGNORE_FILES "/build" "/build-Debug" "/build-Release"
-	"/build-RelWithDebInfo" "/build-MinSizeRel" "/.git" "/.github"
-	"/.vs" "/.idea" "/.vscode" "/.gitignore" "/.gitmodules"
-)
-
-SET(CPACK_PACKAGE_IGNORE_FILES ${PRJ_COMMON_IGNORE_FILES} )
 
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
@@ -215,22 +207,58 @@ set(CPACK_PACKAGE_CONTACT "contact@idni.org")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://idni.org")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 
-# Specify the package formats to generate
-set(CPACK_GENERATOR "DEB;RPM")
-
-# DEB specific settings
-set(CPACK_DEBIAN_PACKAGE_MAINTAINER "IDNI") # required
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27)")
-set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
-set(CPACK_DEBIAN_ARCHITECTURE "amd64")
-
-# RPM specific settings
-set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
-set(CPACK_RPM_PACKAGE_LICENSE "Tau Language Framework")
-set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
-set(CPACK_RPM_PACKAGE_REQUIRES "libc >= 2.27")
-
+#
+# Specify installation directories and files
+#
+if (TAU_WINDOWS_PACKAGE)
+	install(TARGETS ${TAU_EXECUTABLE_NAME}
+		RUNTIME DESTINATION "."
+		COMPONENT "WindowsFiles"
+		CONFIGURATIONS Release)
+	set(CPACK_GENERATOR "NSIS")
+	set(CPACK_COMPONENTS_ALL "WindowsFiles")
+	# NSIS (Windows Installer) specific settings
+	set(CPACK_NSIS_DISPLAY_NAME "Tau Language")
+	set(CPACK_NSIS_HELP_LINK "https://github.com/IDNI/tau-lang/blob/main/README.md")
+	set(CPACK_NSIS_URL_INFO_ABOUT "${CPACK_PACKAGE_HOMEPAGE_URL}")
+	set(CPACK_NSIS_CONTACT "${CPACK_PACKAGE_CONTACT}")
+	set(CPACK_NSIS_LICENSE_FILE "${CMAKE_SOURCE_DIR}/LICENSE.txt")
+	set(CPACK_PACKAGE_INSTALL_DIRECTORY "tau-lang-${CPACK_PACKAGE_VERSION}")
+elseif (TAU_WINDOWS_ZIP_PACKAGE)
+	install(TARGETS ${TAU_EXECUTABLE_NAME}
+		RUNTIME DESTINATION "."
+		COMPONENT "ZipFiles"
+		CONFIGURATIONS Release)
+	install(FILES "${CMAKE_SOURCE_DIR}/LICENSE.txt" "${CMAKE_SOURCE_DIR}/README.md"
+		DESTINATION "."
+		COMPONENT "ZipFiles")
+	set(CPACK_GENERATOR "ZIP")
+	set(CPACK_COMPONENTS_ALL "ZipFiles")
+	set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+else()
+	install(TARGETS ${TAU_EXECUTABLE_NAME}
+		RUNTIME DESTINATION "bin"
+		COMPONENT "LinuxFiles"
+		CONFIGURATIONS Release)
+	install(FILES "${CMAKE_SOURCE_DIR}/LICENSE.txt" "${CMAKE_SOURCE_DIR}/README.md"
+		DESTINATION "share/doc/${PROJECT_NAME}"
+		COMPONENT "LinuxFiles")
+	set(CPACK_GENERATOR "DEB;RPM")
+	set(CPACK_COMPONENTS_ALL "LinuxFiles")
+	# DEB specific settings
+	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "IDNI") # required
+	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.27)")
+	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+	set(CPACK_DEBIAN_ARCHITECTURE "amd64")
+	# RPM specific settings
+	set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
+	set(CPACK_RPM_PACKAGE_LICENSE "Tau Language Framework")
+	set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
+	set(CPACK_RPM_PACKAGE_REQUIRES "libc >= 2.27")
+	set(CPACK_RPM_PACKAGE_DOC_DIR "share/doc/${PROJECT_NAME}")
+endif()
 
 # Include the CPack module
 include(CPack)
