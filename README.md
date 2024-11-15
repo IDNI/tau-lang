@@ -290,8 +290,9 @@ The syntax for the first case, the Tau Boolean algebra, is the following:
 constant => "{" tau "}" [":" "tau"].
 ```
 
-i.e. we may have a Tau formula seen as a Boolean algebra element.
-For example, the following is a valid constant in the Tau Boolean algebra:
+i.e. we may have a Tau formula seen as a Boolean algebra element (you can ommit
+the type, as `tau` is the default type). For example, the following is a valid
+constant in the Tau Boolean algebra:
 
 ```
 { ex x ex y ex z (x & y | z) = 0 }:tau
@@ -343,13 +344,13 @@ a single character followed by digits. Otherwise, the syntax is an
 arbitrary string of `chars`.
 
 We also have IO variables, which are actually infinite sequence of Boolean
-algebra elements, each, indexed by positions in the sequence. They are used to define the inputs
-and outputs of the program. The name for an input variable is `i{num}` (e.g. `i1`) whereas
-ouput variables are of the form `o{num}` (in the near future we will allow
-arbitrary names for IO variables). They should always be referred to with reference
-to time (i.e. position in the sequence), and syntax is `i2[t]` or `o1[t]`
-where `t` always denotes time, but also could be `i1[t-1]` or `o2[t-3]`
-(always a constant lookback).
+algebra elements, each, indexed by positions in the sequence. They are used to
+define the inputs and outputs of the program. The name for an input variable is
+`i{num}` (e.g. `i1`) whereas ouput variables are of the form `o{num}` (in the
+near future we will allow arbitrary names for IO variables). They should always
+be referred to with reference to time (i.e. position in the sequence), and
+syntax is `i2[t]` or `o1[t]` where `t` always denotes time, but also could be
+`i1[t-1]` or `o2[t-3]` (always a constant lookback).
 
 As commented later on, IO variables need to be defined before the spec is run.
 For example, the following are a valid definition of IO variables:
@@ -370,10 +371,10 @@ existentially quantified variables. The syntax is `<:name>`.
 
 ## Boolean functions
 
-One of the key ingredients of the Tau Language are the Boolean functions (Boolean
-combinations of variables, and constants over some chosen atomless (or finite, TBD)
-Boolean algebra and variables).They
-are given by the following grammar:
+One of the key ingredients of the Tau Language are the Boolean functions
+(Boolean combinations of variables, and constants over some chosen atomless (or
+finite -to be develop-) Boolean algebra and variables).They are given by the
+following grammar:
 
 ```
 term => "("term "&" term")" | term "'" | "("term "+" term")" | "("term "|" term")"
@@ -682,7 +683,16 @@ TODO (HIGH) add a list of known issues
 
 # Future work
 
-TODO (HIGH) add a list of future work
+* Add support for redefinition of recurrence relations. This imply to have a
+global cache of precomputed results so we can invalidate entries depending in
+old recurrence relations.
+
+* Add support for arbitrary names for IO variables. We have to define a new syntax
+for the IO variables definitions and change the grammar accordingly.
+
+* Improve the performance of strong normalization form computation.
+
+* Improve the performance of normalization of Boolean functions.
 
 # Submitting issues
 
