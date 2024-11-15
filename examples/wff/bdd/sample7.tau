@@ -1,1 +1,0 @@
-all X all Y (((Y & X) | A) != 0)
