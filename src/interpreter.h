@@ -108,6 +108,12 @@ struct finputs {
 	std::optional<type> type_of(const nso<BAs...>& var) {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
+
+		std::stringstream ss; ss << var;
+		if (auto name = ss.str(); !name.empty() && name.front() == '_') {
+			return { "sbf" };
+		}
+
 		BOOST_LOG_TRIVIAL(error)
 			<< "(Error) failed to find type for variable: "
 			<< var << "\n";
@@ -152,6 +158,9 @@ struct foutputs {
 					if (stream->second) stream->second.value() << value << "\n";
 					else std::cout << var << "[" << time_point++ << "] <- " << value << "\n";
 				else {
+					std::stringstream ss; ss << var;
+					if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;
+
 					BOOST_LOG_TRIVIAL(error)
 						<< "(Error) failed to find output stream for variable '"
 						<< var << "'\n";
@@ -165,6 +174,12 @@ struct foutputs {
 	std::optional<type> type_of(const nso<BAs...>& var) {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
+
+		std::stringstream ss; ss << var;
+		if (auto name = ss.str(); !name.empty() && name.front() == '_') {
+			return { "sbf" };
+		}
+
 		BOOST_LOG_TRIVIAL(error)
 			<< "(Error) failed to find type for variable '"
 			<< var << "'\n";
