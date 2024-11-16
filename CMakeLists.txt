@@ -258,10 +258,11 @@ else()
 	set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
 	set(CPACK_DEBIAN_ARCHITECTURE "amd64")
 	# RPM specific settings
+	set(CPACK_RPM_PACKAGE_AUTOREQ " no")
 	set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
 	set(CPACK_RPM_PACKAGE_LICENSE "Tau Language Framework")
 	set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
-	set(CPACK_RPM_PACKAGE_REQUIRES "libc >= 2.27")
+	#set(CPACK_RPM_PACKAGE_REQUIRES "libc >= 2.27")
 	set(CPACK_RPM_PACKAGE_DOC_DIR "share/doc/${PROJECT_NAME}")
 endif()
 
