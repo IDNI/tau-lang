@@ -55,6 +55,9 @@
 
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 
 #include "init_log.h"
 #include "cli.h"
@@ -157,6 +160,7 @@ int run_tau(const cli::command& cmd, const vector<string>& files) {
 			e.resize(l), ifs.seekg(0), ifs.read(&e[0], l);
 		}
 	}
+
 	repl_evaluator<bdd_binding> re({ .print_memory_store = false,
 					.error_quits = true,
 					.charvar = cmd.get<bool>("charvar") });
@@ -171,6 +175,20 @@ int main(int argc, char** argv) {
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
+
+	// get current date
+	auto now = std::chrono::system_clock::now();
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm local_time = *std::localtime(&now_time);
+    std::ostringstream oss;
+    oss << std::put_time(&local_time, "%Y-%m-%d");
+
+	BOOST_LOG_TRIVIAL(info)
+		<< "Welcome to the Tau Language Framework Alpha version 0.7 (" << oss.str() << " build " << GIT_COMMIT_HASH << ") by IDNI AG. "
+		<< "This product is protected by patents and copyright. By using this product, you agree to the license terms. "
+		<< "To view the license run \"tau --license\".\n\n"
+		<< "For documentation, open issues and reporting issues please visit https://github.com/IDNI/tau-lang/\n\n"
+		<< "For built-in help, type \"help\" or \"help command\".\n\n";
 
 	cli cl("tau", args, tau_commands(), "repl", tau_options());
 	cl.set_description("Tau language");
