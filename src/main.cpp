@@ -176,12 +176,20 @@ int main(int argc, char** argv) {
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
 
-	// get current date
-	auto now = std::chrono::system_clock::now();
-    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-    std::tm local_time = *std::localtime(&now_time);
+	// get compile date
+    const char* date = __DATE__;
+    std::string month_str = std::string(date, 3);
+    std::string day_str = std::string(date + 4, 2);
+    std::string year_str = std::string(date + 7, 4);
+    std::map<std::string, std::string> month_map = {
+        {"Jan", "01"}, {"Feb", "02"}, {"Mar", "03"},
+        {"Apr", "04"}, {"May", "05"}, {"Jun", "06"},
+        {"Jul", "07"}, {"Aug", "08"}, {"Sep", "09"},
+        {"Oct", "10"}, {"Nov", "11"}, {"Dec", "12"}
+    };
+
     std::ostringstream oss;
-    oss << std::put_time(&local_time, "%Y-%m-%d");
+    oss << year_str << "-" << month_map[month_str] << "-" << day_str;
 
 	BOOST_LOG_TRIVIAL(info)
 		<< "Welcome to the Tau Language Framework Alpha version 0.7 (" << oss.str() << " build " << GIT_COMMIT_HASH << ") by IDNI AG. "
