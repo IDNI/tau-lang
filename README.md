@@ -8,14 +8,13 @@
 # Table of contents
 
 1. [Introduction](#introduction)
-2. [Quick start](#quick-start)
-3. [Installing the Tau Farmework](#installing-the-tau-framework)
+2. [Installing the Tau Farmework](#installing-the-tau-framework)
 	1. [Linux (not available yet)](#linux)
 	2. [Windows (not available yet)](#windows-users)
 	3. [MacOS (not available yet)](#macos-users)
 	2. [Compiling the source code](#compiling-the-source-code)
-4. [Command line options](#command-line-options)
-5. [The Tau Language](#the-tau-language)
+3. [Command line options](#command-line-options)
+4. [The Tau Language](#the-tau-language)
 	1. [Constants](#constants)
 	2. [Variables](#variables-variables-variables)
 	3. [Boolean functions](#boolean-functions)
@@ -23,7 +22,7 @@
 	5. [Recurrence relations](#recurrence-relations)
 	6. [Tau specifications](#tau-specifications)
 	7. [Reserved symbols](#reserved-symbols)
-6. [The Tau REPL](#the-tau-repl)
+5. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
 	2. [REPL options](#repl-options)
 	3. [Recurrence relations and IO variables](#recurrence-relations-and-inputoutput-variables)
@@ -32,10 +31,15 @@
 	6. [Logical procedures](#logical-procedures)
 	7. [Normal forms](#normal-forms)
 	8. [Program execution](#program-execution)
+6. [Quick start](#quick-start)
 7. [Known issues](#known-issues)
 8. [Future work](#future-work)
+9. [Submitting issues](#submitting-issues)
+10. [License](#license)
+11. [Authors](#authors)
 
-# Introduction
+
+# **Introduction**
 
 The Tau language is a logical software specification language. It allows you to
 write constraints about software, check for satisfiability, and run a candidate
@@ -56,134 +60,28 @@ to interact with the Tau Language.
 
 We also provide a list of known issues, future work and how to submit issues.
 
-# Quick start
+To skip straight to our quick start section click [Quick start](#quick-start).
 
-To start using the Tau Language, download the latest release from the
-[releases page](http://someurl.com). Once you have downloaded and installed the
-executable (see the Section
-[Installing the Tau Framework](#installing-the-tau-framework)), you can run
-it from the command line.
+# **Installing the Tau Framework**
 
-The programming model underlying the Tau language is fully declarative. You
-specify, possibly only very implicitly, how the current and previous inputs and
-outputs are related, at each point of time. So what you write in the Tau language
-is not a program, but a specification, or spec, which represents all programs that
-meet the specification. Once you run a specification, you actually run one
-automatically-chosen representative program from that set.
-
-In the scope of the Tau language, a program means that for all inputs, at each
-point of time, exist outputs, that clearly do not depend on future inputs ("time-compatible").
-Implied from this definition is that all programs run indefinitely no matter what
-the inputs are.
-
-For example, the following program:
-
-```
-o1[t] = 0
-```
-
-states that the output `o1` at all time points (`t`) has to be `0`. Similarly the
-following program:
-
-```
-o1[t] = i1[t]
-```
-
-which states that the output `o1` at time `t` has to be the same as the input
-`i1` at time `t`.
-
-In the above examples, `o1` and `i1` are IO variables. They are used to define
-the inputs and outputs of the specified programs and also declare their type.
-
-An example of how to define IO variables is the following:
-
-```
-tau i1 = console.
-tau o1 = console.
-```
-
-In the above case we specify that `i1` and `o1` are of type `tau` and they take
-values from the console (let say stdin for the input and stdout for the output).
-You couls define as IO streams also files:
-
-```
-tau i1 = ifile("input.in").
-tau o1 = ofile("output.out").
-```
-
-Note that those Tau specs define only one program, each (there's a caveat in this
-statement but we shall treat it later on). An example of a Tau spec that specifies
-infinitely many programs would be:
-
-```
-o1[t] & i1[t] = 0
-```
-
-Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
-are taken from. This spec says that the conjunction has to be empty.
-You can clearly consider more complicated specifications, e.g;.:
-
-```
-o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
-```
-
-which states that the current output, and the previous output, and the current
-input, has to be 0, or, the output has to equal the input. Note the difference
-between Boolean and Logical operators. The former are &|', and the latter are
-&&,||,!.
-
-In order to simplify the process of writing and running Tau programs, we allow
-to define functions and predicates, possibly by means of recurrence relations.
-The following is a simple predicate definition thata uses a recurrence relation,
-which takes as values expressions in the Tau Language Boolean algebra:
-
-```
-f[0](y) := T.
-f[n](y) := f[n - 1](y).
-```
-
-which you can use in your program as follows: (TODO: don't use "5". use the fixed point)
-
-```
-o1[t] = f[5](i1[t]).
-```
-
-Or also, you can use the following recurrence relation definition
-
-```
-g[0](y) := 0.
-g[n](y) := g[n](y)'.
-```
-
-which takes values in expressions of the Tau Language Boolean functions and
-alternates between 0 and 1 depending on the parity of n.
-
-To get all the details about the Tau Language, please refer to the Section
-[The Tau Language](#the-tau-language). You can find there all the details
-about the syntax and semantics of the language.
-
-# Installing the Tau Framework
-
-## Linux (not available yet)
+## **Linux (not available yet)**
 
 Currently we automatically build the following binaries packages (AMD64 architecture):
 
-* deb (Debian/Ubuntu): [tau_0.1.0_amd64.deb](http://someurl.com)
-* rpm (Fedora): [tau-0.1.0-1.x86_64.rpm](http://someurl.com)
+* deb (Debian/Ubuntu): [tau_0.1.0_amd64.deb](https://github.com/IDNI/tau-lang)
+* rpm (Fedora): [tau-0.1.0-1.x86_64.rpm](https://github.com/IDNI/tau-lang)
 
 The executable is installed in `/usr/bin/tau`.
 
-## Windows (not available yet)
+## **Windows (not available yet)**
 
 For windows we provide a convenient installer that includes the tau executable
 and also a zip file:
 
-* Installer: [tau-0.1.0-amd64.exe](http://someurl.com)
-* Zip file: [tau-0.1.0-amd64.zip](http://someurl.com)
+* Installer: [tau-0.1.0-amd64.exe](https://github.com/IDNI/tau-lang)
+* Zip file: [tau-0.1.0-amd64.zip](https://github.com/IDNI/tau-lang)
 
-## MacOS (not available yet)
-
-## Compiling the source code
+## **Compiling the source code**
 
 To compile the source code you need a recent C++ compiler supporting C++23, e.g.
 GCC 13.1.0. You also need at least a cmake version 3.22.1 installed in your system.
@@ -213,13 +111,21 @@ Once you have compiled the source code you can run the `tau` executable to
 execute Tau programs. The `tau` executable is located in the either `build-Release`
 or `build-Debug` or `build-RelWithDebInfo`.
 
-### Command line interface
+### **Command line interface**
 
 The general form of tau executable command line is:
 
 ```bash
 tau [ options ] [ <command> [ <command options> ] ]
 ```
+
+To quickly run a program, you can use the following command:
+
+```bash
+tau <program>
+```
+
+where `<program>` is the Tau program you want to run.
 
 The general options are the following:
 
@@ -231,38 +137,27 @@ The general options are the following:
 
 Regarding the commands and its options we have the following:
 
-| Command        | Options         | Description                                 |
-|----------------|-----------------|---------------------------------------------|
-| run            |                 | run a Tau program (not available yet)       |
-|                | -p, --program   | program to run                              |
-|                | -e, --evaluate  | program to be evaluated (alternative to -p) |
-|                | -i, --input     | program's input                             |
-|                | -o, --output    | program's output                            |
-|                | -v, --charvar   | charvar (enabled by default)                |
-|                | -h, --help	   | detailed information about options          |
-| repl           |                 | run the Tau REPL (default)                  |
-|                | -v, --charvar   | charvar (enabled by default)                |
-|                | -h, --help	   | detailed information about options          |
-|                | -e, --evaluate  | repl command to be evaluated                |
-| help		     |                 | show help                                   |
+| Command        | Options            | Description                                 |
+|----------------|--------------------|---------------------------------------------|
+| run            |                    | run a Tau program (not available yet)       |
+|                | -I, --indenting    | indenting of the formulas                   |
+|                | -H, --highlighting | syntax highlighting                         |
+|                | -S, --severity     | severity level (trace/debug/info/error)     |
+|                | -V, --charvar      | charvar (enabled by default)                |
+|                | -p, --program      | program to run                              |
+|                | -e, --evaluate     | program to be evaluated (alternative to -p) |
+|                | -h, --help	      | detailed information about options          |
+| repl           |                    | run the Tau REPL (default)                  |
+|                | -I, --indenting    | indenting of the formulas                   |
+|                | -H, --highlighting | syntax highlighting                         |
+|                | -S, --severity     | severity level (trace/debug/info/error)     |
+|                | -V, --charvar      | charvar (enabled by default)                |
+|                | -e, --evaluate     | repl command to be evaluated                |
+|                | -h, --help	      | detailed information about options          |
+| help		     |                    | show help                                   |
 
-Among the possible inputs and outputs, the following are predefined:
 
-
-TODO (HIGH) exemplify, to demonstrate what this means.
-
-
-| Input/Output | Description        |
-|--------------|--------------------|
-| @stdin, -    | standard input     |
-| @stdout      | standard output    |
-| @null        | null output        |
-
-### Simple examples of usage
-
-TODO (HIGH) add several simple examples of usage
-
-# The Tau Language
+# **The Tau Language**
 
 In the Tau language you define how the current and previous inputs and outputs
 are related over time, using the first-order theory of atomless Boolean algebras
@@ -274,7 +169,7 @@ when a Tau spec is treated as a BA element,
 it can be seen as a set of all programs that admit that spec, and the Boolean
 operations are simply the set-theoretic union/intersection/complementation.
 
-## Constants
+## **Constants**
 
 Constants in the Tau Language are elements of the underlying Boolean algebras,
 usually other than `0` and `1` that have a dedicated syntax.
@@ -334,7 +229,7 @@ example:
 
 where `x`, `y` and `z` are variables.
 
-## Variables
+## **Variables**
 
 Variables range over Boolean algebra elements. In the REPL you can work with
 open formulas (i.e. when variables are not quantified), but a specification
@@ -369,7 +264,7 @@ In the near future we will allow arbitrary names for the IO variables.
 Finally, we have the uninterpreted constant context, which are implicitly
 existentially quantified variables. The syntax is `<:name>`.
 
-## Boolean functions
+## **Boolean functions**
 
 One of the key ingredients of the Tau Language are the Boolean functions
 (Boolean combinations of variables, and constants over some chosen atomless (or
@@ -411,9 +306,9 @@ For example, the following is a valid expression in terms of Boolean function:
 
 where `x`, `y` and `z` are variables.
 
-## Tau formulas
+## **Tau formulas**
 
-However, nothing is that simple in usual programming languages, we have
+In traditional programming languages, we have
 decisions,... In the case of Tau Language, well formed formulas deal with
 that. They provide us an extra logical layer on basic
 computations (given by Boolean formulas) allowing us to use conditional
@@ -456,7 +351,7 @@ For example, the following is a valid well formed formula:
 
 where `x`, `y` and `z` are variables.
 
-## Recurrence relations
+## **Recurrence relations**
 
 Another key concept in the Tau Language is  recurrence relations. They are given
 by the following grammar:
@@ -488,7 +383,7 @@ h[0](Y) := F.
 h[n](Y) := g[n - 1](Y).
 ```
 
-## Tau specifications
+## **Tau specifications**
 
 Taking into account all the previous definitions and considerations, Tau programs
 are given by the following grammar:
@@ -506,20 +401,20 @@ g[n](Y) := g[n - 1](Y).
 g[1](Y);
 ```
 
-## Reserved symbols
+## **Reserved symbols**
 
 Tau Language has a set of reserved symbols that cannot be used as identifiers.
 In particular, we insists that `T` and `F` are reserved for true and false values
 respectively in tau formulas and `0` and `1` stand for the corresponding Boolean
 algebra in Boolean function formulas.
 
-# The Tau REPL
+# **The Tau REPL**
 
 The Tau REPL is a command line interface that allows you to interact with the Tau
 Language. It is a simple and easy to use tool that allows you to write and
 execute Tau programs on the go.
 
-## Basic REPL commands
+## **Basic REPL commands**
 
 The Tau REPL provides a set of basic commands that allow you to obtain help,
 version information, exit the REPL, clear the screen and so on. The syntax of
@@ -535,7 +430,7 @@ corresponds to the repo commit.
 
 * `clear|c`: clears the screen.
 
-## REPL options
+## **REPL options**
 
 You have several options at your disposal to configure the Tau REPL. In order
 to set or get the value of an option you could use the following commands:
@@ -571,7 +466,7 @@ REPL. It's on by default.
 
 * `d|dbg|debug`: Can be on/off. Controls debug mode. It's off by default.
 
-## Recurrence relations and IO variables
+## **Recurrence relations and IO variables**
 
 As in other programming languages, you could define functions (recurrence
 relations in Tau Language) and IO variables. The syntax of the commands
@@ -592,7 +487,7 @@ The input variable could take values from the console or from a file.
 * `<type> o<number> = console | ofile(<filename>)`: defines an output variable.
 The output variable could take values from the console or from a file.
 
-## Memory related commands
+## **Memory related commands**
 
 All the results are stored in memory. Also you could stored well-formed formulas
 or Boolean function for later reference. To do so, you could use the following
@@ -613,7 +508,7 @@ syntax:
 
 * `%-<relid>`: stands for the relative memory position with the given relative id.
 
-## Expression manipulation
+## **Expression manipulation**
 
 You could substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
@@ -630,7 +525,7 @@ well-formed or Boolean function expression.
 * `instantiate|inst|i <memory|term> [<var>/<memory|term>]`: instantiates a variable
 by a memory position or Boolean function in the given expression.
 
-## Logical procedures
+## **Logical procedures**
 
 The Tau REPL also provides a set of logical procedures that allow you to check
 several aspects of the given program/well-formed formulas/Boolean functions.
@@ -650,7 +545,7 @@ the TABA book for details.
 
 * `qelim <memory|tau>`: performs quantifier elimination on the given expression.
 
-## Normal forms
+## **Normal forms**
 
 Also, the Tau REPL includes several transformations procedures to standard forms.
 The syntax of the commands as follows:
@@ -670,31 +565,165 @@ expression.
 * `onf <var> <memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
 
-## Program execution
+## **Program execution**
 
 Finally, you could run the given program once you have defined IO
 variables as you need. The syntax of the commands is the
 
 * `run|r <memory|tau>`: runs the given program.
 
-# Known issues
+# **Quick start**
 
-TODO (HIGH) add a list of known issues
+To start using the Tau Language, download the latest release from the
+[GitHuub page](http://someurl.com). Once you have downloaded and installed the
+executable (see the Section
+[Installing the Tau Framework](#installing-the-tau-framework)), you can run
+it from the command line.
 
-# Future work
+The programming model underlying the Tau language is fully declarative. You
+specify, possibly only very implicitly, how the current and previous inputs and
+outputs are related, at each point of time. So what you write in the Tau language
+is not a program, but a specification, or spec, which represents all programs that
+meet the specification. Once you run a specification, you actually run one
+automatically-chosen representative program from that set.
 
-* Add support for redefinition of recurrence relations. This imply to have a
-global cache of precomputed results so we can invalidate entries depending in
-old recurrence relations.
+In the scope of the Tau language, a program means that for all inputs, at each
+point of time, exist outputs, that clearly do not depend on future inputs ("time-compatible").
+Implied from this definition is that all programs run indefinitely no matter what
+the inputs are.
 
-* Add support for arbitrary names for IO variables. We have to define a new syntax
-for the IO variables definitions and change the grammar accordingly.
+For example, the following program:
 
-* Improve the performance of strong normalization form computation.
+```
+o1[t] = 0
+```
+
+states that the output `o1` at all time points (`t`) has to be `0`. Similarly the
+following program:
+
+```
+o1[t] = i1[t]
+```
+
+which states that the output `o1` at time `t` has to be the same as the input
+`i1` at time `t`.
+In the above examples, `o1` and `i1` are IO variables. They are used to define
+
+the inputs and outputs of the specified programs and also declare their type.
+
+An example of how to define IO variables is the following:
+
+```
+tau i1 = console
+tau o1 = console
+```
+
+In the above case we specify that `i1` and `o1` are of type `tau` and they take
+values from the console (let say stdin for the input and stdout for the output).
+You couls define as IO streams also files:
+
+```
+tau i1 = ifile("input.in")
+tau o1 = ofile("output.out")
+```
+
+Note that those Tau specs define only one program, each (there's a caveat in this
+statement but we shall treat it later on). An example of a Tau spec that specifies
+infinitely many programs would be:
+
+```
+o1[t] & i1[t] = 0
+```
+
+Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
+are taken from. This spec says that the conjunction has to be empty.
+You can clearly consider more complicated specifications, e.g;.:
+
+```
+o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
+```
+
+which states that the current output, and the previous output, and the current
+input, has to be 0, or, the output has to equal the input. Note the difference
+between Boolean and Logical operators. The former are &|', and the latter are
+&&,||,!.
+
+In order to simplify the process of writing and running Tau programs, we allow
+to define functions and predicates, possibly by means of recurrence relations.
+The following is a simple predicate definition thata uses a recurrence relation,
+which takes as values expressions in the Tau Language Boolean algebra:
+
+```
+f[0](y) := T
+f[n](y) := f[n - 1](y)
+```
+
+which you can use in your program as follows:
+
+```
+o1[t] = 0 && f(i1[t])
+```
+
+Or also, you can use the following recurrence relation definition
+
+```
+g[0](y) := 0
+g[n](y) := g[n](y)'
+```
+
+which takes values in expressions of the Tau Language Boolean functions and
+alternates between 0 and 1 depending on the parity of n.
+
+To get all the details about the Tau Language, please refer to the Section
+[The Tau Language](#the-tau-language). You can find there all the details
+about the syntax and semantics of the language.
+
+In the [demos](https://github.com/IDNI/tau-lang/tree/main/demos) folder you
+can find lots of examples regarding how to use the Tau Language, its semantics
+and workings.
+
+# **Known issues**
+
+This is a short list of known issues that will be fixed in a subsequent release:
+
+* Issue in Fixed Point Calculations
+* Incorrect type inference of IO variables in certain cases.
+* Normalization:
+  * Error in DNF/CNF conversions in the normalizer
+* “Sometimes” keyword issues:
+  * The correctness of the satisfiability algorithm is still not fully verified
+  when input variables appear under "sometimes".
+  * Allow constants positions under "sometimes".
+  * Redundant “Sometimes” statements are not detected.
+* Simplification:
+  * Simplification of Boolean equations may take longer time in a few cases.
+  * Path simplification algorithm does not take equalities between variables
+  into account leading to later blow ups.
+* Minor errors in windows REPL
+
+# **Future work**
+
+* Add support for redefinition of recurrence relations.
+
+* Add support for arbitrary names for IO variables.
 
 * Improve the performance of normalization of Boolean functions.
 
-# Submitting issues
+# **Submitting issues**
 
 As any other opensource project in GitHUb, you could submit issues in the
 following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
+
+# **License**
+
+Tau Language is licensed under the following terms:
+[Tau Language License](https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt)
+
+# **Authors**
+
+The Tau Language has been developed by the following authors:
+
+* Ohad Asor
+* David Castro Esteban
+* Tomáš Klapka
+* Lucca Tiemens
