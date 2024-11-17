@@ -1,3 +1,12 @@
+# To run it you need to compile the project using release.sh (customized with
+# your settings if needed) and then execute the run.sh whithin the demo directory
+# as follows:
+#
+# ./run.sh demo_1.1-basic_syntax_and_history.tau
+#
+# This demo should work under any *nix flavour due to the paths used for files.
+# To run it under windows you will need to change the paths to the files.
+
 # The Tau REPL keeps track of all the results in a history store. There, you can
 # also store tau formulas and Boolean functions.
 
@@ -52,17 +61,15 @@ o1[t] = i1[t] || o2[t] != i2[t]   # as before, || stands for disjunction
 o1[t] = i1[t] && o2[t] = i2[t]    # as before, && stands for conjunction
 o1[t] = i1[t] && ! o2[t] = i2[t]  # as before, ! stands for negation
 
-# Also, we can include formulas with global operators (i.e., operators that involve
-# specifications)
-
-{o1[t] = i1[t] || o2[t] != i2[t]} &&& {o1[t] != 0} # &&& stands for global conjunction
-{o1[t] = i1[t] && o2[t] = i2[t]} ||| {o1[t] != 0}  # ||| stands for global disjunction
-- {o1[t] = i1[t] && ! o2[t] = i2[t]}               # - stands for global negation
-
 # We can also have formulas that involve constants over the Tau Boolean algebra
-# itself as the Tau Language is the first language that speaks about its own sentences.
+# itself.
 
-({ : i1[t]'o1[t] = 0. } i1[t] = 0) ? (o1[t] = 0) : (o1[t] = 1)
+
+{o1[t] = i1[t] || o2[t] != i2[t]} & {o1[t] != 0}
+{o1[t] = i1[t] && o2[t] = i2[t]} | {o1[t] != 0}
+{o1[t] = i1[t] && ! o2[t] = i2[t]}
+
+({ i1[t]'o1[t] = 0 } i1[t] = 0) ? (o1[t] = 0) : (o1[t] = 1)
 
 # In the above example, as we have a constant in the Tau Boolean algebra, the type
 # could be ommited. This allow us to write Tau specifications that talk about
