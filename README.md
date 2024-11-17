@@ -83,7 +83,7 @@ and also a zip file:
 
 ## **MacOS (not available yet)**
 
-A macOS installet will be available in the future.
+A macOS installer will be available in the future.
 
 ## **Compiling the source code**
 
