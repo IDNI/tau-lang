@@ -68,8 +68,8 @@ To skip straight to our quick start section click [Quick start](#quick-start).
 
 Currently we automatically build the following binaries packages (AMD64 architecture):
 
-* deb (Debian/Ubuntu): [tau_0.1.0_amd64.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
-* rpm (Fedora): [tau-0.1.0-1.x86_64.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
+* deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
+* rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
 
 The executable is installed in `/usr/bin/tau`.
 
@@ -78,8 +78,8 @@ The executable is installed in `/usr/bin/tau`.
 For windows we provide a convenient installer that includes the tau executable
 and also a zip file:
 
-* Installer: [tau-0.1.0-amd64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
-* Zip file: [tau-0.1.0-amd64.zip](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.zip)
+* Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
+* Zip file: [tau-0.7-win64.zip](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.zip)
 
 ## **MacOS (not available yet)**
 
