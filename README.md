@@ -9,8 +9,8 @@
 
 1. [Introduction](#introduction)
 2. [Installing the Tau Farmework](#installing-the-tau-framework)
-	1. [Linux (not available yet)](#linux)
-	2. [Windows (not available yet)](#windows-users)
+	1. [Linux](#linux)
+	2. [Windows](#windows-users)
 	3. [MacOS (not available yet)](#macos-users)
 	2. [Compiling the source code](#compiling-the-source-code)
 3. [Command line options](#command-line-options)
@@ -64,7 +64,7 @@ To skip straight to our quick start section click [Quick start](#quick-start).
 
 # **Installing the Tau Framework**
 
-## **Linux (not available yet)**
+## **Linux**
 
 Currently we automatically build the following binaries packages (AMD64 architecture):
 
@@ -73,13 +73,17 @@ Currently we automatically build the following binaries packages (AMD64 architec
 
 The executable is installed in `/usr/bin/tau`.
 
-## **Windows (not available yet)**
+## **Windows**
 
 For windows we provide a convenient installer that includes the tau executable
 and also a zip file:
 
 * Installer: [tau-0.1.0-amd64.exe](https://github.com/IDNI/tau-lang)
 * Zip file: [tau-0.1.0-amd64.zip](https://github.com/IDNI/tau-lang)
+
+## **MacOS (not available yet)**
+
+A macOS installet will be available in the future.
 
 ## **Compiling the source code**
 
