@@ -7,6 +7,8 @@
 # This demo should work under any *nix flavour due to the paths used for files.
 # To run it under windows you will need to change the paths to the files.
 #
+# IMPORTANT: This demo is not yet implemented. It is just a draft.
+#
 # The idea of this demo is to give a more complex example for the interpreter.
 # The demo is based in the well-known model of FPGA -field programable
 # gate array- (see https://en.wikipedia.org/wiki/Field-programmable_gate_array for

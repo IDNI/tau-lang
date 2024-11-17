@@ -1,3 +1,12 @@
+# To run it you need to compile the project using release.sh (customized with
+# your settings if needed) and then execute the run.sh whithin the demo directory
+# as follows:
+#
+# ./run.sh demo_2.1-strong_normalizationof_wff.tau
+#
+# This demo should work under any *nix flavour due to the paths used for files.
+# To run it under windows you will need to change the paths to the files.
+
 # Let us demonstrate the workings of strong normalization for wff
 
 # First, let us consider few trivial cases to check the basics

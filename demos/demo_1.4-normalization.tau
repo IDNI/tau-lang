@@ -1,3 +1,12 @@
+# To run it you need to compile the project using release.sh (customized with
+# your settings if needed) and then execute the run.sh whithin the demo directory
+# as follows:
+#
+# ./run.sh demo_1.4-normalization.tau
+#
+# This demo should work under any *nix flavour due to the paths used for files.
+# To run it under windows you will need to change the paths to the files.
+
 # Let us demonstrate several commands related to normalization and its inner workings.
 
 # The qelim command eliminate the inner quantifier from a formula.

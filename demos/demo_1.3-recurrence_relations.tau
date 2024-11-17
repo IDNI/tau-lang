@@ -1,0 +1,32 @@
+# To run it you need to compile the project using release.sh (customized with
+# your settings if needed) and then execute the run.sh whithin the demo directory
+# as follows:
+#
+# ./run.sh demo_1.3-recurrence_relations.tau
+#
+# This demo should work under any *nix flavour due to the paths used for files.
+# To run it under windows you will need to change the paths to the files.
+
+# Apart from the Boolean functions and Tau formulas, you can define your own
+# recurrence relations:
+
+f(x) := x +1        # base case
+f(x) := x + f(x)    # general case
+
+# or also
+
+p[1](x, y) := {all x ex y x' y = o1[t]}    # base case
+p[n](x, y) := p[n-1](y, z)                 # general case
+
+# As with history, such definitions are stored in a array like structure. You can
+# check them as follows:
+
+defs
+
+# In order to use them, you should just invoke them by their name.
+
+h[0](x) := 1 		        # base case
+h[n](x) := x + h[n-1](x) 	# general case
+n all x h[7](x) != 0 	    # normalize a formula involving the above h
+
+quit # quit the Tau REPL

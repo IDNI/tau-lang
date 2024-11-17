@@ -1,3 +1,12 @@
+# To run it you need to compile the project using release.sh (customized with
+# your settings if needed) and then execute the run.sh whithin the demo directory
+# as follows:
+#
+# ./run.sh demo_1.2-commands_and_history.tau
+#
+# This demo should work under any *nix flavour due to the paths used for files.
+# To run it under windows you will need to change the paths to the files.
+
 # The above notations used to access the history can also be used in the commands.
 # For example, the following commands will compute the DNF of a Boolean function
 # passed as an argument or as a memory position.
