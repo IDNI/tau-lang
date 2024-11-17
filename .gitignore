@@ -35,6 +35,8 @@
 .idea
 .vscode
 
+# GitHub local files
+*.github-issues
 
 # Cmake generated files
 build
@@ -66,11 +68,10 @@ bw-output
 # cli history files
 .*_history
 
+# other files
 /.cache/*
 tests/benchmark/data/*
 logs/*
-
 .gdbinit
-
 external/boost
 libboost-mingw-w64
