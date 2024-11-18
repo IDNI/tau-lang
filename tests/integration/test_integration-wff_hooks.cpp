@@ -22,8 +22,6 @@
 #include "normalizer.h"
 #include "bdd_binding.h"
 
-#include "test_integration_helpers-tau.h"
-
 using namespace idni::rewriter;
 using namespace idni::tau;
 
