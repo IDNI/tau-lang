@@ -1,4 +1,5 @@
 ﻿License Agreement for the Tau Language Framework
+
 The Tau Language Framework (the “Product,” including all associated files) is protected by IDNI AG legal rights, including intellectual property rights, which may be covered by patents and/or copyrights.  IDNI AG retains all of its intellectual property rights, but grants permission to use the Product for free (1) when building applications, smart contracts, and/or blockchain specifications solely for deployment and execution over the Tau Net blockchain (including its testnets) deployed by IDNI AG, regardless of whether the usage is for commercial purposes or not, (2) as part of running the aforementioned Tau Net blockchain (including its testnets) client software, and (3) in the following specific enumerated instances (the “enumerated instances”): educational use, research purposes, and non-commercial personal use.  The enumerated instances do not include any instance where data or software incorporating or embodying IDNI AG intellectual property associated with the Product is:
 1. redistributed to third parties; 
 2. used to build  software or hardware of any kind for profit or commercial usage;
