@@ -18,6 +18,12 @@
 
 namespace idni::tau {
 
+inline static bool use_debug_output_in_sat = false;
+inline void print_fixpoint_info(const std::string& info) {
+	if (!use_debug_output_in_sat) BOOST_LOG_TRIVIAL(info) << info;
+	else std::cerr << info << "\n";
+}
+
 template<typename... BAs>
 nso<BAs...> build_io_out (const std::string& name, const std::string& var) {
 	using p = tau_parser;
@@ -478,7 +484,7 @@ std::pair<nso<BAs...>, int_t> find_fixpoint_chi(const nso<BAs...>& chi_base, con
 	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << normalizer_step(chi_prev_replc);
-	return {chi_prev_replc, step_num};
+	return {chi_prev_replc, step_num - 1};
 }
 
 template<typename... BAs>
@@ -631,7 +637,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	// Calculate unbound continuation of fm
 	int_t time_point = get_max_shift(io_vars);
 	int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
-	auto [ubd_ctn, _] = find_fixpoint_phi(
+	auto [ubd_ctn, steps] = find_fixpoint_phi(
 		fm, flag_initials, io_vars, initials,
 		time_point + point_after_inits);
 
@@ -645,13 +651,23 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 		run = build_wff_and(run, current_step);
 		// Check if run is still sat
 		run = normalizer_step(run);
-		if (!is_run_satisfiable(run))
+		if (!is_run_satisfiable(run)) {
+			print_fixpoint_info(
+				"Temporal normalization of always specification reached fixpoint after "
+				+ std::to_string(steps) + " steps, yielding the result: ");
+            print_fixpoint_info(tau_to_str(_F<BAs...>));
 			return _F<BAs...>;
+		}
 	}
 	ubd_ctn = normalizer_step(build_wff_and(ubd_ctn, run));
+	auto res = pull_always_out_for_inf(ubd_ctn);
+	// The following is std::cout because it should always be printed
+	print_fixpoint_info("Temporal normalization of always specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
+	print_fixpoint_info(tau_to_str(is_child_non_terminal(p::wff_always, res)
+					       ? trim2(res)
+					       : res));
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << ubd_ctn;
-	return pull_always_out_for_inf(ubd_ctn);
+	return res;
 }
 
 // Assumes single normalized Tau DNF clause
@@ -828,7 +844,10 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
-			return build_wff_and(normed_run, original_aw_continuation);
+			auto res = build_wff_and(normed_run, original_aw_continuation);
+			print_fixpoint_info("Temporal normalization of Tau specification did not rely on fixpoint finding, yielding the result: ");
+            print_fixpoint_info(tau_to_str(res));
+			return res;
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
@@ -849,11 +868,16 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	BOOST_LOG_TRIVIAL(trace) << "chi base: " << build_wff_and(aw, st_flags);
 
 	// Find fixpoint of chi after highest initial condition
-	auto [chi_inf, _ ] = find_fixpoint_chi(aw, st_flags, io_vars,
+	auto [chi_inf, steps ] = find_fixpoint_chi(aw, st_flags, io_vars,
 		initials, time_point + point_after_inits);
 	chi_inf = normalizer_step(chi_inf);
-	BOOST_LOG_TRIVIAL(trace) << "Fixpoint chi after normalize: " << chi_inf;
-	if (chi_inf == _F<BAs...>) return _F<BAs...>;
+
+	// BOOST_LOG_TRIVIAL(trace) << "Fixpoint chi after normalize: " << chi_inf;
+	if (chi_inf == _F<BAs...>) {
+		print_fixpoint_info("Temporal normalization of Tau specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
+        print_fixpoint_info(tau_to_str(_F<BAs...>));
+		return _F<BAs...>;
+	}
 
 	chi_inf = transform_back_non_initials(chi_inf, point_after_inits - 1);
 	io_vars = select_top(chi_inf, is_child_non_terminal<p::io_var, BAs...>);
@@ -863,8 +887,11 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		build_wff_and(run, chi_inf_anchored));
 	BOOST_LOG_TRIVIAL(trace) << "Fm to check sat:";
 	BOOST_LOG_TRIVIAL(trace) << "(F) " << sat_check;
-	if (sat_check == _F<BAs...>) return _F<BAs...>;
-
+	if (sat_check == _F<BAs...>) {
+		print_fixpoint_info("Temporal normalization of Tau specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
+        print_fixpoint_info(tau_to_str(_F<BAs...>));
+		return _F<BAs...>;
+	}
 	// Here we know that the formula is satisfiable at some point
 	// Since the initial segment is already checked we continue from there
 	for (int_t i = flag_boundary + 1; true; ++i) {
@@ -878,7 +905,10 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
-			return build_wff_and(normed_run, original_aw_continuation);
+			auto res = build_wff_and(normed_run, original_aw_continuation);
+            print_fixpoint_info("Temporal normalization of Tau specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
+            print_fixpoint_info(tau_to_str(res));
+			return res;
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint

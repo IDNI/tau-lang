@@ -163,7 +163,8 @@ int run_tau(const cli::command& cmd, const vector<string>& files) {
 
 	repl_evaluator<bdd_binding> re({ .print_memory_store = false,
 					.error_quits = true,
-					.charvar = cmd.get<bool>("charvar") });
+					.charvar = cmd.get<bool>("charvar"),
+					.repl_running = false });
 	if (e.empty()) return 0;
 	if (auto status = re.eval(e); status) return status;
 	return re.eval("run %");

@@ -744,6 +744,14 @@ auto extract_string = [](const sp_tau_node<BAs...>& n) {
 template<typename... BAs>
 using extract_string_t = decltype(extract_string<BAs...>);
 
+// Simple helper method to convert a tau tree to string
+template<typename... BAs>
+std::string tau_to_str (const sp_tau_node<BAs...>& n) {
+	std::stringstream ss;
+	ss << n;
+	return ss.str();
+}
+
 template<typename... BAs>
 std::string operator|(const sp_tau_node<BAs...>& n, const extract_string_t<BAs...> e) {
 	return e(n);
