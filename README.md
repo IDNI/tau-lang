@@ -390,21 +390,60 @@ h[n](Y) := g[n - 1](Y).
 
 ## **Tau specifications**
 
-Taking into account all the previous definitions and considerations, Tau programs
-are given by the following grammar:
-
+At the top level, a Tau specification (we also say `spec`) is a collection of "always" 
+and "sometimes" statements applied to *local specifications* 
+(expressed by `tau`, see section [Tau formulas](#tau-formulas)), 
+combined by the logical 
+connectives *and*, *or* and *not*, denoted by `&&`, `||` and `!` respectively. 
+For example a well-formed Tau specification is
 ```
-rr           => (rec_relation)* tau.
+(always local_spec1) && (sometimes local_spec2)
+``` 
+where *local_spec1* and
+*local_spec2* are formulas as in section [Tau formulas](#tau-formulas). 
+We say local specification because a formula `tau` can only talk about a fixed (though arbitrary)
+point in time. 
+
+Recall from section [Variables](#variables) that there are input and output stream
+variables. For example the output stream variable `o1[t-2]` means "the value in   
+output stream number 1 two time-steps ago". So `o1[t]` would mean "the value in
+output stream number 1 at the current time-step". Likewise, there are input stream
+variables like `i1[t]`. It means "the input in the input stream 1 at the current time-step".
+Input streams can also have an offset in order to speak about past inputs. For example
+`i2[t-3]` means "the input in the input stream 2 three time-steps ago".
+As explained in section [Variables](#variables), input and output streams currently
+need to be defined before running a Tau specification.
+
+In all above cases, `t` is a free variable and refers to the current time at each point of time.
+The key point now is that an `always` statement will quantify all scoped `t` universally, while  
+a `sometimes` statement will quantify them existentially.
+For example the specification `always o1[t] = 0` says that at all time-steps
+the output stream number 1 will write `0`. Similarly, the specification `sometimes o1[t] = 0`
+says that there exists a time-step at which the output stream 1 will write `0`.
+Formally, the grammar is 
+```
+spec         => tau | always tau | sometimes tau | spec && spec | spec || spec | !spec
+rr           => (rec_relation)* spec.
 rec_relation => tau_rec_relation | term_rec_relation
 ```
+A Tau specification without a mentioning of "always" or "sometimes", is implicitly assumed to be
+an "always" statement.
+The `rr` in the above grammar describes how to add function and predicate definitions directly
+to the formula. In REPL they can also be provided separately as explained in the Tau REPL subsection 
+[Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables).
+See the subsection [Functions and predicates](#functions-and-predicates) for the definitions of 
+`tau_rec_relation` and `term_rec_relation`.
 
-Thus, they are a collection of functions, predicates and a Tau formula, p.e.:
+Note that instead of writing `always` and `sometimes` you can also use box `[]`
+and diamond `<>`, respectively.
 
-```
-g[0](Y) := {T}.
-g[n](Y) := g[n - 1](Y).
-g[1](Y)
-```
+Using this notation, a slightly bigger example of a Tau spec would be
+```                                                                            
+    ([] o1[t] i1[t] = 0 && (i1[t] != 1 -> o1[t] != 0)) && (<> o1[t] = i1[t]')  
+```                                                                             
+which reads: at each point of time, the output should be disjoint from the input.
+If the input is not 1, then the output is not zero. And, at least once during 
+execution, the output equals the complement of the input.
 
 ## **Reserved symbols**
 
