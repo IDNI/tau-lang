@@ -15,6 +15,7 @@ set(TESTS
 	splitter2
 	solver
 	quantifiers
+	wff_hooks
 	interpreter
 )
 

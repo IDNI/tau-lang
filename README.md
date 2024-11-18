@@ -156,7 +156,7 @@ Regarding the commands and its options we have the following:
 |                | -H, --highlighting | syntax highlighting                         |
 |                | -S, --severity     | severity level (trace/debug/info/error)     |
 |                | -V, --charvar      | charvar (enabled by default)                |
-|                | -e, --evaluate     | repl command to be evaluated                |
+|                | -e, --evaluate     | REPL command to be evaluated                |
 |                | -h, --help	      | detailed information about options          |
 | help		 |                    | show help                                   |
 
