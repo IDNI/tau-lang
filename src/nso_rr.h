@@ -1638,6 +1638,15 @@ rr<nso<BAs...>> make_nso_rr_using_binder(const sp_tau_node<BAs...>& code,
 	return make_nso_rr_from_binded_code<BAs...>(binded);
 }
 
+template<typename binder_t, typename... BAs>
+nso<BAs...> make_nso_using_binder(const sp_tau_node<BAs...>& code,
+	binder_t& binder)
+{
+	auto binded = bind_tau_code_using_binder<binder_t, BAs...>(code,
+									binder);
+	return binded;
+}
+
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& source,
@@ -1645,6 +1654,14 @@ rr<nso<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& source,
 {
 	auto code = make_tau_code<BAs...>(source);
 	return make_nso_rr_using_binder<binder_t, BAs...>(code, binder);
+}
+
+template<typename binder_t, typename... BAs>
+nso<BAs...> make_nso_using_binder(sp_tau_source_node& source,
+	binder_t& binder)
+{
+	auto code = make_tau_code<BAs...>(source);
+	return make_nso_using_binder<binder_t, BAs...>(code, binder);
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -1657,6 +1674,15 @@ std::optional<rr<nso<BAs...>>> make_nso_rr_using_binder(std::string& input, bind
 				source, binder) };
 }
 
+template<typename binder_t, typename... BAs>
+std::optional<nso<BAs...>> make_nso_using_binder(std::string& input, binder_t& binder, idni::parser<>::parse_options options = { .start = tau_parser::wff }) {
+	auto source = make_tau_source(input, options);
+	return !source ? std::optional<rr<nso<BAs...>>>{}
+		: std::optional<rr<nso<BAs...>>>{
+			make_nso_using_binder<binder_t, BAs...>(
+				source, binder) };
+}
+
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_bindings(const sp_tau_node<BAs...>& code,
@@ -1664,6 +1690,14 @@ rr<nso<BAs...>> make_nso_rr_using_bindings(const sp_tau_node<BAs...>& code,
 {
 	name_binder<BAs...> nb(bindings);
 	return make_nso_rr_using_binder<name_binder<BAs...>, BAs...>(code, nb);
+}
+
+template<typename... BAs>
+nso<BAs...> make_nso_using_bindings(const sp_tau_node<BAs...>& code,
+	const bindings<BAs...>& bindings)
+{
+	name_binder<BAs...> nb(bindings);
+	return make_nso_using_binder<name_binder<BAs...>, BAs...>(code, nb);
 }
 
 // make a nso_rr from the given tau source and bindings.
@@ -1676,6 +1710,15 @@ std::optional<rr<nso<BAs...>>> make_nso_rr_using_bindings(sp_tau_source_node& so
 	return make_nso_rr_using_bindings<BAs...>(code, bindings);
 }
 
+template<typename... BAs>
+std::optional<nso<BAs...>> make_nso_using_bindings(sp_tau_source_node& source,
+	const bindings<BAs...>& bindings)
+{
+	auto code = make_tau_code<BAs...>(source);
+	if (!code) return {};
+	return make_nso_using_bindings<BAs...>(code, bindings);
+}
+
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
 std::optional<rr<nso<BAs...>>> make_nso_rr_using_bindings(
@@ -1685,11 +1728,27 @@ std::optional<rr<nso<BAs...>>> make_nso_rr_using_bindings(
 	if (!source) return std::optional<rr<nso<BAs...>>>{};
 	return make_nso_rr_using_bindings<BAs...>(source, bindings);
 }
+// make a nso from the given tau source and bindings.
+template<typename... BAs>
+std::optional<nso<BAs...>> make_nso_using_bindings(
+	const std::string& input, const bindings<BAs...>& bindings, idni::parser<>::parse_options options =  { .start = tau_parser::wff })
+{
+	auto source = make_tau_source(input, options);
+	if (!source) return std::optional<rr<nso<BAs...>>>{};
+	return make_nso_using_bindings<BAs...>(source, bindings);
+}
 
 template<typename... BAs>
 rr<nso<BAs...>> make_nso_rr_using_factory(const sp_tau_node<BAs...>& code) {
 	factory_binder<BAs...> fb;
 	return make_nso_rr_using_binder<
+			factory_binder<BAs...>, BAs...>(code,fb);
+}
+
+template<typename... BAs>
+nso<BAs...> make_nso_using_factory(const sp_tau_node<BAs...>& code) {
+	factory_binder<BAs...> fb;
+	return make_nso_using_binder<
 			factory_binder<BAs...>, BAs...>(code,fb);
 }
 
@@ -1703,6 +1762,15 @@ std::optional<rr<nso<BAs...>>> make_nso_rr_using_factory(
 	return make_nso_rr_using_factory<BAs...>(code);
 }
 
+template<typename... BAs>
+std::optional<nso<BAs...>> make_nso_using_factory(
+	sp_tau_source_node& source)
+{
+	auto code = make_tau_code<BAs...>(source);
+	if (!code) return std::optional<rr<nso<BAs...>>>{};
+	return make_nso_using_factory<BAs...>(code);
+}
+
 // make a nso_rr from the given tau source and bindings.
 template<typename... BAs>
 std::optional<rr<nso<BAs...>>> make_nso_rr_using_factory(
@@ -1711,6 +1779,16 @@ std::optional<rr<nso<BAs...>>> make_nso_rr_using_factory(
 	auto source = make_tau_source(input, { .start = tau_parser::rr });
 	if (!source) return std::optional<rr<nso<BAs...>>>{};
 	return make_nso_rr_using_factory<BAs...>(source);
+}
+
+// make a nso_rr from the given tau source and bindings.
+template<typename... BAs>
+std::optional<nso<BAs...>> make_nso_using_factory(
+	const std::string& input, idni::parser<>::parse_options options =  { .start = tau_parser::wff })
+{
+	auto source = make_tau_source(input, options);
+	if (!source) return std::optional<rr<nso<BAs...>>>{};
+	return make_nso_using_factory<BAs...>(source);
 }
 
 //------------------------------------------------------------------------------
