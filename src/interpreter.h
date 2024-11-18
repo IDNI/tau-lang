@@ -371,7 +371,7 @@ struct interpreter {
 			}
 		}
 		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) empty program\n";
+			<< "(Error) Tau program is unsat\n";
 		return {};
 	}
 
