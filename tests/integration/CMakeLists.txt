@@ -16,6 +16,7 @@ set(TESTS
 	solver
 	quantifiers
 	wff_hooks
+	bf_hooks
 	interpreter
 )
 

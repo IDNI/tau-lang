@@ -3659,9 +3659,6 @@ sp_tau_node<BAs...> make_node_hook_bf_xor(
 		return first_argument_formula(n);
 	//RULE(BF_SIMPLIFY_SELF_N, "$X ^ $X := 0.")
 	if (first_argument_formula(n) == second_argument_formula(n))
-		return wrap<BAs...>(tau_parser::bf, wrap<BAs...>(tau_parser::bf_f, {}));
-	//RULE(BF_SIMPLIFY_SELF_N, "$X ^ $X := 0.")
-	if (first_argument_formula(n) == second_argument_formula(n))
 		return _0<BAs...>;
 	//RULE(BF_SIMPLIFY_SELF_2, "$X ^ $X' := 1.")
 	if (auto negated = second_argument_formula(n) | tau_parser::bf_neg | tau_parser::bf;
