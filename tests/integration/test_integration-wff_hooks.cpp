@@ -30,10 +30,10 @@ using namespace idni::tau;
 namespace testing = doctest;
 
 bool check_hook(const char* sample, const char* expected) {
-	auto tau_sample = make_nso_rr_using_factory<
-		tau_ba<bdd_binding>, bdd_binding>(sample).value().main;
-	auto tau_expected = make_nso_rr_using_factory<
-		tau_ba<bdd_binding>, bdd_binding>(expected).value().main;
+	auto tau_sample = make_nso_using_factory<
+		tau_ba<bdd_binding>, bdd_binding>(sample, { .start = tau_parser::wff }).value();
+	auto tau_expected = make_nso_using_factory<
+		tau_ba<bdd_binding>, bdd_binding>(expected, { .start = tau_parser::wff }).value();
 
 	#ifdef DEBUG
 	std::string str(sample);
@@ -46,203 +46,203 @@ bool check_hook(const char* sample, const char* expected) {
 TEST_SUITE("wff logical hooks") {
 
 	TEST_CASE("!") {
-		CHECK( check_hook("!F.", "T.") );
-		CHECK( check_hook("!T.", "F.") );
+		CHECK( check_hook("!F", "T") );
+		CHECK( check_hook("!T", "F") );
 
-		CHECK( check_hook("!!(x = 0).", "(x = 0).") );
+		CHECK( check_hook("!!(x = 0)", "(x = 0)") );
 	}
 
 	TEST_CASE("<->") {
-		CHECK( check_hook("T<->T.", "T.") );
-		CHECK( check_hook("T<->F.", "F.") );
-		CHECK( check_hook("F<->T.", "F.") );
-		CHECK( check_hook("F<->F.", "T.") );
+		CHECK( check_hook("T<->T", "T") );
+		CHECK( check_hook("T<->F", "F") );
+		CHECK( check_hook("F<->T", "F") );
+		CHECK( check_hook("F<->F", "T") );
 
-		CHECK( check_hook("F<->(x = 0).", "!(x = 0).") );
-		CHECK( check_hook("T<->(x = 0).", "(x = 0).") );
-		CHECK( check_hook("(x = 0)<->F.", "!(x = 0).") );
-		CHECK( check_hook("(x = 0)<->T.", "(x = 0).") );
-		CHECK( check_hook("(x = 0)<->(x = 0).", "T.") );
-		CHECK( check_hook("!(x = 0)<->(x = 0).", "F.") );
-		CHECK( check_hook("(x = 0)<->!(x = 0).", "F.") );
+		CHECK( check_hook("F<->(x = 0)", "!(x = 0)") );
+		CHECK( check_hook("T<->(x = 0)", "(x = 0)") );
+		CHECK( check_hook("(x = 0)<->F", "!(x = 0)") );
+		CHECK( check_hook("(x = 0)<->T", "(x = 0)") );
+		CHECK( check_hook("(x = 0)<->(x = 0)", "T") );
+		CHECK( check_hook("!(x = 0)<->(x = 0)", "F") );
+		CHECK( check_hook("(x = 0)<->!(x = 0)", "F") );
 	}
 
 	TEST_CASE("->") {
-		CHECK( check_hook("T->T.", "T.") );
-		CHECK( check_hook("T->F.", "F.") );
-		CHECK( check_hook("F->T.", "T.") );
-		CHECK( check_hook("F->F.", "T.") );
+		CHECK( check_hook("T->T", "T") );
+		CHECK( check_hook("T->F", "F") );
+		CHECK( check_hook("F->T", "T") );
+		CHECK( check_hook("F->F", "T") );
 
-		CHECK( check_hook("F->(x = 0).", "T.") );
-		CHECK( check_hook("T->(x = 0).", "(x = 0).") );
-		CHECK( check_hook("(x = 0)->F.", "!(x = 0).") );
-		CHECK( check_hook("(x = 0)->T.", "T.") );
-		CHECK( check_hook("(x = 0)->(x = 0).", "T.") );
+		CHECK( check_hook("F->(x = 0)", "T") );
+		CHECK( check_hook("T->(x = 0)", "(x = 0)") );
+		CHECK( check_hook("(x = 0)->F", "!(x = 0)") );
+		CHECK( check_hook("(x = 0)->T", "T") );
+		CHECK( check_hook("(x = 0)->(x = 0)", "T") );
 	}
 
 	TEST_CASE("||") {
-		CHECK( check_hook("T||T.", "T.") );
-		CHECK( check_hook("T||F.", "T.") );
-		CHECK( check_hook("F||T.", "T.") );
-		CHECK( check_hook("F||F.", "F.") );
+		CHECK( check_hook("T||T", "T") );
+		CHECK( check_hook("T||F", "T") );
+		CHECK( check_hook("F||T", "T") );
+		CHECK( check_hook("F||F", "F") );
 
-		CHECK( check_hook("T||(x = 0).", "T.") );
-		CHECK( check_hook("(x = 0)||T.", "T.") );
-		CHECK( check_hook("F||(x = 0).", "(x = 0).") );
-		CHECK( check_hook("(x = 0)||F.", "(x = 0).") );
-		CHECK( check_hook("(x = 0)||(x = 0).", "(x = 0).") );
-		CHECK( check_hook("!(x = 0)||(x = 0).", "T.") );
-		CHECK( check_hook("(x = 0)||!(x = 0).", "T.") );
+		CHECK( check_hook("T||(x = 0)", "T") );
+		CHECK( check_hook("(x = 0)||T", "T") );
+		CHECK( check_hook("F||(x = 0)", "(x = 0)") );
+		CHECK( check_hook("(x = 0)||F", "(x = 0)") );
+		CHECK( check_hook("(x = 0)||(x = 0)", "(x = 0)") );
+		CHECK( check_hook("!(x = 0)||(x = 0)", "T") );
+		CHECK( check_hook("(x = 0)||!(x = 0)", "T") );
 
 	}
 
 	TEST_CASE("&&") {
-		CHECK( check_hook("T&&T.", "T.") );
-		CHECK( check_hook("T&&F.", "F.") );
-		CHECK( check_hook("F&&T.", "F.") );
-		CHECK( check_hook("F&&F.", "F.") );
+		CHECK( check_hook("T&&T", "T") );
+		CHECK( check_hook("T&&F", "F") );
+		CHECK( check_hook("F&&T", "F") );
+		CHECK( check_hook("F&&F", "F") );
 
-		CHECK( check_hook("T&&(x = 0).", "(x = 0).") );
-		CHECK( check_hook("(x = 0)&&T.", "(x = 0).") );
-		CHECK( check_hook("F&&(x = 0).", "F.") );
-		CHECK( check_hook("(x = 0)&&F.", "F.") );
-		CHECK( check_hook("(x = 0)&&(x = 0).", "(x = 0).") );
-		CHECK( check_hook("!(x = 0)&&(x = 0).", "F.") );
-		CHECK( check_hook("(x = 0)&&!(x = 0).", "F.") );
+		CHECK( check_hook("T&&(x = 0)", "(x = 0)") );
+		CHECK( check_hook("(x = 0)&&T", "(x = 0)") );
+		CHECK( check_hook("F&&(x = 0)", "F") );
+		CHECK( check_hook("(x = 0)&&F", "F") );
+		CHECK( check_hook("(x = 0)&&(x = 0)", "(x = 0)") );
+		CHECK( check_hook("!(x = 0)&&(x = 0)", "F") );
+		CHECK( check_hook("(x = 0)&&!(x = 0)", "F") );
 	}
 
 	TEST_CASE("^") {
-		CHECK( check_hook("T^T.", "F.") );
-		CHECK( check_hook("T^F.", "T.") );
-		CHECK( check_hook("F^T.", "T.") );
-		CHECK( check_hook("F^F.", "F.") );
+		CHECK( check_hook("T^T", "F") );
+		CHECK( check_hook("T^F", "T") );
+		CHECK( check_hook("F^T", "T") );
+		CHECK( check_hook("F^F", "F") );
 
-		CHECK( check_hook("(x = 0)^F.", "(x = 0).") );
-		CHECK( check_hook("F^(x = 0).", "(x = 0).") );
-		CHECK( check_hook("(x = 0)^(x = 0).", "F.") );
-		CHECK( check_hook("!(x = 0)^(x = 0).", "T.") );
-		CHECK( check_hook("(x = 0)^!(x = 0).", "T.") );
-		CHECK( check_hook("(x = 0)^T.", "!(x = 0).") );
-		CHECK( check_hook("T^(x = 0).", "!(x = 0).") );
+		CHECK( check_hook("(x = 0)^F", "(x = 0)") );
+		CHECK( check_hook("F^(x = 0)", "(x = 0)") );
+		CHECK( check_hook("(x = 0)^(x = 0)", "F") );
+		CHECK( check_hook("!(x = 0)^(x = 0)", "T") );
+		CHECK( check_hook("(x = 0)^!(x = 0)", "T") );
+		CHECK( check_hook("(x = 0)^T", "!(x = 0)") );
+		CHECK( check_hook("T^(x = 0)", "!(x = 0)") );
 
 	}
 
 	TEST_CASE("?") {
-		CHECK( check_hook("T?T:F.", "T.") );
-		CHECK( check_hook("T?T:T.", "T.") );
-		CHECK( check_hook("T?F:T.", "F.") );
-		CHECK( check_hook("T?F:F.", "F.") );
-		CHECK( check_hook("F?T:F.", "F.") );
-		CHECK( check_hook("F?F:F.", "F.") );
-		CHECK( check_hook("F?F:T.", "T.") );
-		CHECK( check_hook("F?T:T.", "T.") );
+		CHECK( check_hook("T?T:F", "T") );
+		CHECK( check_hook("T?T:T", "T") );
+		CHECK( check_hook("T?F:T", "F") );
+		CHECK( check_hook("T?F:F", "F") );
+		CHECK( check_hook("F?T:F", "F") );
+		CHECK( check_hook("F?F:F", "F") );
+		CHECK( check_hook("F?F:T", "T") );
+		CHECK( check_hook("F?T:T", "T") );
 
-		CHECK( check_hook("F?(x=0):(y=0).", "(y=0).") );
-		CHECK( check_hook("T?(x=0):(y=0).", "(x=0).") );
-		CHECK( check_hook("F?(x=0):(x=0).", "(x=0).") );
-		CHECK( check_hook("T?(x=0):(x=0).", "(x=0).") );
+		CHECK( check_hook("F?(x=0):(y=0)", "(y=0)") );
+		CHECK( check_hook("T?(x=0):(y=0)", "(x=0)") );
+		CHECK( check_hook("F?(x=0):(x=0)", "(x=0)") );
+		CHECK( check_hook("T?(x=0):(x=0)", "(x=0)") );
 	}
 }
 
 TEST_SUITE("wff order hooks") {
 
 	TEST_CASE("=") {
-		CHECK( check_hook("1=1.", "T.") );
-		CHECK( check_hook("0=0.", "T.") );
-		CHECK( check_hook("1=0.", "F.") );
-		CHECK( check_hook("0=1.", "F.") );
+		CHECK( check_hook("1=1", "T") );
+		CHECK( check_hook("0=0", "T") );
+		CHECK( check_hook("1=0", "F") );
+		CHECK( check_hook("0=1", "F") );
 
-		CHECK( check_hook("{T}=0.", "F.") );
-		CHECK( check_hook("{F}=0.", "T.") );
-		CHECK( check_hook("x = y.", "x + y = 0.") );
+		CHECK( check_hook("{T}=0", "F") );
+		CHECK( check_hook("{F}=0", "T") );
+		CHECK( check_hook("x = y", "x + y = 0") );
 	}
 
 	TEST_CASE("!=") {
-		CHECK( check_hook("1!=1.", "F.") );
-		CHECK( check_hook("0!=0.", "F.") );
-		CHECK( check_hook("1!=0.", "T.") );
-		CHECK( check_hook("0!=1.", "T.") );
+		CHECK( check_hook("1!=1", "F") );
+		CHECK( check_hook("0!=0", "F") );
+		CHECK( check_hook("1!=0", "T") );
+		CHECK( check_hook("0!=1", "T") );
 
-		CHECK( check_hook("{T}!=0.", "T.") );
-		CHECK( check_hook("{F}!=0.", "F.") );
-		CHECK( check_hook("x != y.", "x + y != 0.") );
+		CHECK( check_hook("{T}!=0", "T") );
+		CHECK( check_hook("{F}!=0", "F") );
+		CHECK( check_hook("x != y", "x + y != 0") );
 	}
 
 	TEST_CASE("<") {
-		CHECK( check_hook("1<1.", "F.") );
-		CHECK( check_hook("0<0.", "F.") );
-		CHECK( check_hook("1<0.", "F.") );
-		CHECK( check_hook("0<1.", "T.") );
+		CHECK( check_hook("1<1", "F") );
+		CHECK( check_hook("0<0", "F") );
+		CHECK( check_hook("1<0", "F") );
+		CHECK( check_hook("0<1", "T") );
 
-		CHECK( check_hook("X<0.", "F.") );
-		CHECK( check_hook("X<1.", "X'!=0.") );
+		CHECK( check_hook("X<0", "F") );
+		CHECK( check_hook("X<1", "X'!=0") );
 	}
 
 	TEST_CASE("!<"){
-		CHECK( check_hook("1!<1.", "T.") );
-		CHECK( check_hook("0!<0.", "T.") );
-		CHECK( check_hook("1!<0.", "T.") );
-		CHECK( check_hook("0!<1.", "F.") );
+		CHECK( check_hook("1!<1", "T") );
+		CHECK( check_hook("0!<0", "T") );
+		CHECK( check_hook("1!<0", "T") );
+		CHECK( check_hook("0!<1", "F") );
 
-		CHECK( check_hook("X!<0.", "T.") );
-		CHECK( check_hook("X!<1.", "X'=0.") );
+		CHECK( check_hook("X!<0", "T") );
+		CHECK( check_hook("X!<1", "X'=0") );
 	}
 
 	TEST_CASE(">"){
-		CHECK( check_hook("1>1.", "F.") );
-		CHECK( check_hook("0>0.", "F.") );
-		CHECK( check_hook("1>0.", "T.") );
-		CHECK( check_hook("0>1.", "F.") );
+		CHECK( check_hook("1>1", "F") );
+		CHECK( check_hook("0>0", "F") );
+		CHECK( check_hook("1>0", "T") );
+		CHECK( check_hook("0>1", "F") );
 
-		CHECK( check_hook("X>1.", "F.") );
-		CHECK( check_hook("0>X.", "F.") );
+		CHECK( check_hook("X>1", "F") );
+		CHECK( check_hook("0>X", "F") );
 	}
 
 	TEST_CASE("!>"){
-		CHECK( check_hook("1!>1.", "T.") );
-		CHECK( check_hook("0!>0.", "T.") );
-		CHECK( check_hook("1!>0.", "F.") );
-		CHECK( check_hook("0!>1.", "T.") );
+		CHECK( check_hook("1!>1", "T") );
+		CHECK( check_hook("0!>0", "T") );
+		CHECK( check_hook("1!>0", "F") );
+		CHECK( check_hook("0!>1", "T") );
 
-		CHECK( check_hook("X!>1.", "T.") );
-		CHECK( check_hook("0!>X.", "T.") );
+		CHECK( check_hook("X!>1", "T") );
+		CHECK( check_hook("0!>X", "T") );
 	}
 
 	TEST_CASE("<="){
-		CHECK( check_hook("1<=1.", "T.") );
-		CHECK( check_hook("0<=0.", "T.") );
-		CHECK( check_hook("1<=0.", "F.") );
-		CHECK( check_hook("0<=1.", "T.") );
+		CHECK( check_hook("1<=1", "T") );
+		CHECK( check_hook("0<=0", "T") );
+		CHECK( check_hook("1<=0", "F") );
+		CHECK( check_hook("0<=1", "T") );
 
-		CHECK( check_hook("X<=1.", "T.") );
+		CHECK( check_hook("X<=1", "T") );
 	}
 
 	TEST_CASE("!<="){
-		CHECK( check_hook("1!<=1.", "F.") );
-		CHECK( check_hook("0!<=0.", "F.") );
-		CHECK( check_hook("1!<=0.", "T.") );
-		CHECK( check_hook("0!<=1.", "F.") );
+		CHECK( check_hook("1!<=1", "F") );
+		CHECK( check_hook("0!<=0", "F") );
+		CHECK( check_hook("1!<=0", "T") );
+		CHECK( check_hook("0!<=1", "F") );
 
-		CHECK( check_hook("X!<=1.", "F.") );
+		CHECK( check_hook("X!<=1", "F") );
 	}
 
 	TEST_CASE(">="){
-		CHECK( check_hook("1>=1.", "T.") );
-		CHECK( check_hook("0>=0.", "T.") );
-		CHECK( check_hook("1>=0.", "T.") );
-		CHECK( check_hook("0>=1.", "F.") );
+		CHECK( check_hook("1>=1", "T") );
+		CHECK( check_hook("0>=0", "T") );
+		CHECK( check_hook("1>=0", "T") );
+		CHECK( check_hook("0>=1", "F") );
 
-		CHECK( check_hook("X>=0.", "T.") );
-		CHECK( check_hook("1>=X.", "T.") );
+		CHECK( check_hook("X>=0", "T") );
+		CHECK( check_hook("1>=X", "T") );
 	}
 
 	TEST_CASE("!>="){
-		CHECK( check_hook("1!>=1.", "F.") );
-		CHECK( check_hook("0!>=0.", "F.") );
-		CHECK( check_hook("1!>=0.", "F.") );
-		CHECK( check_hook("0!>=1.", "T.") );
+		CHECK( check_hook("1!>=1", "F") );
+		CHECK( check_hook("0!>=0", "F") );
+		CHECK( check_hook("1!>=0", "F") );
+		CHECK( check_hook("0!>=1", "T") );
 
-		CHECK( check_hook("X!>=0.", "F.") );
-		CHECK( check_hook("1!>=X.", "F.") );
+		CHECK( check_hook("X!>=0", "F") );
+		CHECK( check_hook("1!>=X", "F") );
 	}
 }
