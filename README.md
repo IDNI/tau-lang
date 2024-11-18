@@ -136,14 +136,14 @@ The general options are the following:
 | Option         | Description                                               |
 |----------------|-----------------------------------------------------------|
 | -h, --help     | detailed information about options                        |
-| -l, --license  | show the license (not available yet)                      |
-| -v, --version  | show the version of the executable (not available yet)    |
+| -l, --license  | show the license                                          |
+| -v, --version  | show the version of the executable                        |
 
 Regarding the commands and its options we have the following:
 
 | Command        | Options            | Description                                 |
 |----------------|--------------------|---------------------------------------------|
-| run            |                    | run a Tau program (not available yet)       |
+| run            |                    | run a Tau program                           |
 |                | -I, --indenting    | indenting of the formulas                   |
 |                | -H, --highlighting | syntax highlighting                         |
 |                | -S, --severity     | severity level (trace/debug/info/error)     |
@@ -158,7 +158,7 @@ Regarding the commands and its options we have the following:
 |                | -V, --charvar      | charvar (enabled by default)                |
 |                | -e, --evaluate     | repl command to be evaluated                |
 |                | -h, --help	      | detailed information about options          |
-| help		     |                    | show help                                   |
+| help		 |                    | show help                                   |
 
 
 # **The Tau Language**
