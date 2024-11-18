@@ -405,8 +405,7 @@ We say local specification because a formula `tau` can only talk about a fixed (
 point in time. 
 
 Recall from section [Variables](#variables) that there are input and output stream
-variables. For example the output stream variable `o1[t-2]` means "the value in   
-output stream number 1 two time-steps ago". So `o1[t]` would mean "the value in
+variables. For example the output stream variable `o1[t-2]` means "the value in output stream number 1 two time-steps ago". So `o1[t]` would mean "the value in
 output stream number 1 at the current time-step". Likewise, there are input stream
 variables like `i1[t]`. It means "the input in the input stream 1 at the current time-step".
 Input streams can also have an offset in order to speak about past inputs. For example
@@ -415,12 +414,12 @@ As explained in section [Variables](#variables), input and output streams curren
 need to be defined before running a Tau specification.
 
 In all above cases, `t` is a free variable and refers to the current time at each point of time.
-The key point now is that an `always` statement will quantify all scoped `t` universally, while  
-a `sometimes` statement will quantify them existentially.
+The key point now is that an `always` statement will quantify all scoped `t` universally, while a `sometimes` statement will quantify them existentially.
 For example the specification `always o1[t] = 0` says that at all time-steps
 the output stream number 1 will write `0`. Similarly, the specification `sometimes o1[t] = 0`
 says that there exists a time-step at which the output stream 1 will write `0`.
-Formally, the grammar is 
+
+Formally, the grammar for Tau specifications is 
 ```
 spec         => tau | always tau | sometimes tau | spec && spec | spec || spec | !spec
 rr           => (rec_relation)* spec.
