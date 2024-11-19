@@ -930,7 +930,16 @@ void repl_evaluator<BAs...>::get_cmd(
 	if (option.has_value()) option = n;
 	else option = n | tau_parser::option;
 	if (!option.has_value()) { for (auto& [_, v] : printers) v(); return; }
-	else printers[get_opt(option.value())]();
+	else {
+		auto opt = get_opt(option.value());
+#ifndef DEBUG
+		if (opt == tau_parser::debug_repl_opt) {
+			BOOST_LOG_TRIVIAL(error) << "(Error) debug option not available\n";
+			return;
+		}
+#endif
+		printers[opt]();
+	}
 }
 
 template <typename... BAs>
@@ -951,9 +960,9 @@ template <typename... BAs>
 size_t get_opt(sp_tau_node<BAs...> n) {
 	sp_tau_node<BAs...> value;
 	if (auto bool_opt = n | tau_parser::bool_option; bool_opt)
-		value =  bool_opt.value();
+		value = bool_opt.value();
 	else if (auto enum_opt = n | tau_parser::enum_option; enum_opt)
-		value =  enum_opt.value();
+		value = enum_opt.value();
 	return value | only_child_extractor<BAs...>
 		| non_terminal_extractor<BAs...>
 		| optional_value_extractor<size_t>;
@@ -1004,7 +1013,14 @@ void repl_evaluator<BAs...>::set_cmd(
 		boost::log::core::get()->set_filter(
 			boost::log::trivial::severity >= opt.severity);
 	} } };
-	setters[get_opt(option.value())]();
+	size_t opt = get_opt(option.value());
+#ifndef DEBUG
+	if (opt == tau_parser::debug_repl_opt) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) debug option not available\n";
+		return;
+	}
+#endif
+	setters[opt]();
 	get_cmd(n);
 }
 
@@ -1029,7 +1045,9 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(
 	case tau_parser::indenting_opt:
 		update_fn(pretty_printer_indenting); break;
 	case tau_parser::status_opt: update_fn(opt.status); break;
-	default: BOOST_LOG_TRIVIAL(error) << "(Error) unknown bool option\n"; error = true;break;
+	default: BOOST_LOG_TRIVIAL(error) << "(Error) unknown bool option\n";
+		error = true;
+		return;
 	}
 	get_cmd(n);
 }
