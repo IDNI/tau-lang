@@ -1513,33 +1513,13 @@ bool has_open_tau_fm_in_constant (const sp_tau_node<BAs...>& fm) {
 	return false;
 }
 
-template<typename... BAs>
-bool has_non_temp_in_sometimes (const sp_tau_node<BAs...>& fm) {
-	auto sts = select_top(fm, is_child_non_terminal<tau_parser::wff_sometimes, BAs...>);
-	for (const auto& st : sts) {
-		// Check that there is no non-temporal in sometimes statement
-		auto clauses = get_dnf_wff_clauses(trim2(st));
-		for (const auto& c : clauses) {
-			auto conjs = get_cnf_wff_clauses(c);
-			for (const auto& conj : conjs) {
-				if (!has_temp_var(conj)) {
-					BOOST_LOG_TRIVIAL(error) << "(Error) Non temporal formula found in sometimes statement: " << conj;
-					return true;
-				}
-			}
-		}
-	}
-	return false;
-}
-
 // This function is used to check for semantic errors in formulas since those
 // cannot be captured by the grammar
 template<typename... BAs>
 bool has_semantic_error (const sp_tau_node<BAs...>& fm) {
 	bool error = invalid_nesting_of_quants(fm)
 			|| has_open_tau_fm_in_constant(fm)
-			|| invalid_nesting_of_temp_quants(fm)
-			|| has_non_temp_in_sometimes(fm);
+			|| invalid_nesting_of_temp_quants(fm);
 	return error;
 }
 
