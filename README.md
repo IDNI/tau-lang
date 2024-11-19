@@ -763,7 +763,7 @@ This is a short list of known issues that will be fixed in a subsequent release:
 
 # **Submitting issues**
 
-As any other opensource project in GitHUb, you could submit issues in the
+As any other opensource project in GitHub, you could submit issues in the
 following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
 
 # **License**
