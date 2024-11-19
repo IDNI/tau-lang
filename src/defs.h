@@ -10,11 +10,11 @@
 // from the Author (Ohad Asor).
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
-
 #ifndef __DEF_H__
 #define __DEF_H__
 
-typedef int sym_t;
+#define TAU_VERSION "0.7"
+#include "version_license.h"
 
 // basic macro for conditional execution of code
 #ifdef DEBUG
@@ -30,6 +30,8 @@ typedef int sym_t;
 
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
+
+typedef int sym_t;
 
 template<typename B> struct zero {
 	bool operator()(const B&) const;

@@ -55,16 +55,15 @@
 
 #include <iostream>
 #include <fstream>
-#include <chrono>
 #include <iomanip>
 #include <sstream>
 
 #include "init_log.h"
+#include "normalizer.h"
+#include "bdd_binding.h"
 #include "cli.h"
 #include "repl.h"
 #include "repl_evaluator.h"
-#include "normalizer.h"
-#include "bdd_binding.h"
 
 using namespace std;
 using namespace idni;
@@ -170,34 +169,24 @@ int run_tau(const cli::command& cmd, const vector<string>& files) {
 	return re.eval("run %");
 }
 
+void welcome() {
+	BOOST_LOG_TRIVIAL(info) << "Welcome to the Tau Language Framework Alpha"
+		<< " version 0.7 (" << compile_date << " build "
+		<< GIT_COMMIT_HASH << ") by IDNI AG. "
+		<< "This product is protected by patents and copyright. "
+		<< "By using this product, you agree to the license terms. "
+		<< "To view the license run \"tau --license\".\n\n"
+		<< "For documentation, open issues and reporting issues "
+			"please visit https://github.com/IDNI/tau-lang/\n\n"
+		<< "For built-in help, type \"help\" or \"help command\".\n\n";
+}
+
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	bdd_init<Bool>();
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
-
-	// get compile date
-    const char* date = __DATE__;
-    std::string month_str = std::string(date, 3);
-    std::string day_str = std::string(date + 4, 2);
-    std::string year_str = std::string(date + 7, 4);
-    std::map<std::string, std::string> month_map = {
-        {"Jan", "01"}, {"Feb", "02"}, {"Mar", "03"},
-        {"Apr", "04"}, {"May", "05"}, {"Jun", "06"},
-        {"Jul", "07"}, {"Aug", "08"}, {"Sep", "09"},
-        {"Oct", "10"}, {"Nov", "11"}, {"Dec", "12"}
-    };
-
-    std::ostringstream oss;
-    oss << year_str << "-" << month_map[month_str] << "-" << day_str;
-
-	BOOST_LOG_TRIVIAL(info)
-		<< "Welcome to the Tau Language Framework Alpha version 0.7 (" << oss.str() << " build " << GIT_COMMIT_HASH << ") by IDNI AG. "
-		<< "This product is protected by patents and copyright. By using this product, you agree to the license terms. "
-		<< "To view the license run \"tau --license\".\n\n"
-		<< "For documentation, open issues and reporting issues please visit https://github.com/IDNI/tau-lang/\n\n"
-		<< "For built-in help, type \"help\" or \"help command\".\n\n";
 
 	cli cl("tau", args, tau_commands(), "repl", tau_options());
 	cl.set_description("Tau language");
@@ -221,10 +210,10 @@ int main(int argc, char** argv) {
 
 	// if --version/-v option is true, print version and exit
 	if (opts["version"].get<bool>())
-		return cl.version(), 0;
+		return std::cout << "Tau version: " << version, 0;
 
-	if (opts["license"].get<bool>())
-		return cl.license(), 0;
+	// if --license/-l option is true, print license and exit
+	if (opts["license"].get<bool>()) return std::cout << license, 0;
 
 	// if cmd's --help/-h option is true, print cmd's help and exit
 	if (cmd.get<bool>("help")) return cl.help(cmd), 0;
@@ -259,6 +248,7 @@ int main(int argc, char** argv) {
 		});
 		if (e.size()) return re.eval(e), 0;
 		repl<decltype(re)> r(re, "tau> ", ".tau_history");
+		welcome();
 		re.prompt();
 		return r.run();
 	}
