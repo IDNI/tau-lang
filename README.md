@@ -8,7 +8,13 @@
 # Table of contents
 
 1. [Introduction](#introduction)
-2. [The Tau Language](#the-tau-language)
+2. [Installing the Tau Farmework](#installing-the-tau-framework)
+	1. [Linux](#linux)
+	2. [Windows](#windows-users)
+	3. [MacOS (not available yet)](#macos-users)
+	2. [Compiling the source code](#compiling-the-source-code)
+3. [Quick start](#quick-start)
+4. [The Tau Language](#the-tau-language)
 	1. [Constants](#constants)
 	2. [Variables](#variables-variables-variables)
 	3. [Boolean functions](#boolean-functions)
@@ -16,12 +22,6 @@
 	5. [Functions and predicates](#functions-and-predicates)
 	6. [Tau specifications](#tau-specifications)
 	7. [Reserved symbols](#reserved-symbols)
-3. [Quick start](#quick-start)
-4. [Installing the Tau Farmework](#installing-the-tau-framework)
-	1. [Linux](#linux)
-	2. [Windows](#windows-users)
-	3. [MacOS (not available yet)](#macos-users)
-	2. [Compiling the source code](#compiling-the-source-code)
 5. [Command line options](#command-line-options)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
@@ -76,6 +76,171 @@ allows you to interact with the Tau Language.
 We also provide a list of known issues, future work and how to submit issues.
 
 To skip straight to our quick start section click [Quick start](#quick-start).
+
+# **Installing the Tau Framework**
+
+## **Linux**
+
+Currently we automatically build the following binaries packages (AMD64 architecture):
+
+* deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
+* rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
+
+The executable is installed in `/usr/bin/tau`.
+
+## **Windows**
+
+For windows we provide a convenient installer that includes the tau executable
+and also a zip file:
+
+* Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
+* Zip file: [tau-0.7-win64.zip](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.zip)
+
+## **MacOS (not available yet)**
+
+A macOS installer will be available in the future.
+
+## **Compiling the source code**
+
+To compile the source code you need a recent C++ compiler supporting C++23, e.g.
+GCC 13.1.0. You also need at least a cmake version 3.22.1 installed in your system.
+The only code dependency is libboost.
+
+After cloning:
+
+```bash
+git clone https://github.com/IDNI/tau-lang.git
+```
+
+you can run either the `release.sh` or `debug.sh` or `relwithdebinfo.sh` scripts
+to build the binaries.
+
+To build with doxygen documentation:
+
+```bash
+ # Compiles the source code in release mode and also the documentation
+./release.sh -DBUILD_DOC=ON
+# Compiles the source code in debug mode and also the documentation
+./debug.sh -DBUILD_DOC=ON
+# Compiles the source code in release mode with debug information and also the documentation
+./relwithdebinfo.sh -DBUILD_DOC=ON
+```
+
+Once you have compiled the source code you can run the `tau` executable to
+execute Tau programs. The `tau` executable is located in the either `build-Release`
+or `build-Debug` or `build-RelWithDebInfo`.
+
+
+
+# **Quick start**
+
+To start using the Tau Language, download the latest release from the
+[GitHuub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
+you have downloaded and installed the executable (see the Section
+[Installing the Tau Framework](#installing-the-tau-framework)), you can run
+it from the command line just by typing `tau`.
+
+The programming model underlying the Tau language is fully declarative. You
+specify, possibly only very implicitly, how the current and previous inputs and
+outputs are related, at each point of time. So what you write in the Tau language
+is not a program, but a specification, or spec, which represents all programs that
+meet the specification. Once you run a specification, you actually run one
+automatically-chosen representative program from that set.
+
+In the scope of the Tau language, a program means that for all inputs, at each
+point of time, exist outputs, that clearly do not depend on future inputs
+("time-compatible"). Implied from this definition is that all programs run
+indefinitely no matter what the inputs are.
+
+For example, the following program:
+
+```
+o1[t] = 0
+```
+
+states that the output `o1` at all time points (`t`) has to be `0`. Similarly the
+following program:
+
+```
+o1[t] = i1[t]
+```
+
+which states that the output `o1` at time `t` has to be the same as the input
+`i1` at time `t`.
+In the above examples, `o1` and `i1` are IO variables. They are used to define
+
+the inputs and outputs of the specified programs and also declare their type.
+
+An example of how to define IO variables is the following:
+
+```
+tau i1 = console
+tau o1 = console
+```
+
+In the above case we specify that `i1` and `o1` are of type `tau` and they take
+values from the console (let say stdin for the input and stdout for the output).
+You couls define as IO streams also files:
+
+```
+tau i1 = ifile("input.in")
+tau o1 = ofile("output.out")
+```
+
+Note that those Tau specs define only one program, each (there's a caveat in this
+statement but we shall treat it later on). An example of a Tau spec that specifies
+infinitely many programs would be:
+
+```
+o1[t] & i1[t] = 0
+```
+
+Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
+are taken from. This spec says that the conjunction has to be empty.
+You can clearly consider more complicated specifications, e.g;.:
+
+```
+o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
+```
+
+which states that the current output, and the previous output, and the current
+input, has to be 0, or, the output has to equal the input. Note the difference
+between Boolean and Logical operators. The former are &|', and the latter are
+&&,||,!.
+
+In order to simplify the process of writing and running Tau programs, we allow
+to define functions and predicates, possibly by means of recurrence relations.
+The following is a simple predicate defined by a recurrence relation,
+which takes as argument a Tau formula:
+
+```
+f[0](y) := T
+f[n](y) := f[n - 1](y)
+```
+
+which you can use in your program as follows:
+
+```
+o1[t] = 0 && f(i1[t])
+```
+
+Or also, you can use the following recurrence relation definition
+
+```
+g[0](y) := 0
+g[n](y) := g[n](y)'
+```
+
+which takes as argument a Boolean function and
+alternates between 0 and 1 depending on the parity of n.
+
+To get all the details about the Tau Language, please refer to the Section
+[The Tau Language](#the-tau-language). You can find there all the details
+about the syntax and semantics of the language.
+
+In the [demos](https://github.com/IDNI/tau-lang/tree/main/demos) folder you
+can find lots of examples regarding how to use the Tau Language, its semantics
+and workings.
 
 # **The Tau Language**
 
@@ -211,7 +376,7 @@ where
 * `term` stands for a well formed sub-formula and the operators `&`, `'`,
 `^` and `|` stand for conjunction, negation, exclusive-or and disjunction
 (respectively).
-* `term_ref` is  a reference to a function (see the Subsection
+* `term_ref` is  a call to the given recurrence relation (see the Subsection
 [Functions and Predicates](#functions-and-predicates)),
 * `constant` stands for an element of the Boolean algebras (see Subsction
 [Constants](#constants) for details),
@@ -223,7 +388,7 @@ formula. The syntax is a follows:
 uninterpreted_constant => "<:" name ">".
 ```
 
-* `var` stands for a variable of the Boolean algebra (see Subsection
+* `var` is a variable of type a Boolean algebra element (see Subsection
 [Variables](#variables-variables-variables) for details), and
 * finally, `0` and `1` stands for the given elements in the corresponding Boolean
 algebra
@@ -317,7 +482,7 @@ sbf => "("sbf "&" sbf")" | sbf "'" | "("sbf "^" sbf")" | "("sbf "+" sbf")"
 
 where `sbf` stands for a simple Boolean function, and the operators `&`, `'`,
 (`^`|`+ `) and `|` stand for conjunction, negation, exclusive-or and disjunction;
-`var` stands for a variable on the simple Boolean algebra, and finally, `0` and
+`var` stands for a variable of type Boolean algebra element, and finally, `0` and
 `1` stands for the given elements in the simple Boolean algebra.
 
 A simple example of a constant in the simple Boolean function algebra is the for
@@ -369,171 +534,7 @@ existentially quantified variables. The syntax is `<:name>`.
 Tau Language has a set of reserved symbols that cannot be used as identifiers.
 In particular, we insists that `T` and `F` are reserved for true and false values
 respectively in tau formulas and `0` and `1` stand for the corresponding Boolean
-algebra in Boolean function formulas.
-
-
-# **Quick start**
-
-To start using the Tau Language, download the latest release from the
-[GitHuub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
-you have downloaded and installed the executable (see the Section
-[Installing the Tau Framework](#installing-the-tau-framework)), you can run
-it from the command line just by typing `tau`.
-
-The programming model underlying the Tau language is fully declarative. You
-specify, possibly only very implicitly, how the current and previous inputs and
-outputs are related, at each point of time. So what you write in the Tau language
-is not a program, but a specification, or spec, which represents all programs that
-meet the specification. Once you run a specification, you actually run one
-automatically-chosen representative program from that set.
-
-In the scope of the Tau language, a program means that for all inputs, at each
-point of time, exist outputs, that clearly do not depend on future inputs
-("time-compatible"). Implied from this definition is that all programs run
-indefinitely no matter what the inputs are.
-
-For example, the following program:
-
-```
-o1[t] = 0
-```
-
-states that the output `o1` at all time points (`t`) has to be `0`. Similarly the
-following program:
-
-```
-o1[t] = i1[t]
-```
-
-which states that the output `o1` at time `t` has to be the same as the input
-`i1` at time `t`.
-In the above examples, `o1` and `i1` are IO variables. They are used to define
-
-the inputs and outputs of the specified programs and also declare their type.
-
-An example of how to define IO variables is the following:
-
-```
-tau i1 = console
-tau o1 = console
-```
-
-In the above case we specify that `i1` and `o1` are of type `tau` and they take
-values from the console (let say stdin for the input and stdout for the output).
-You couls define as IO streams also files:
-
-```
-tau i1 = ifile("input.in")
-tau o1 = ofile("output.out")
-```
-
-Note that those Tau specs define only one program, each (there's a caveat in this
-statement but we shall treat it later on). An example of a Tau spec that specifies
-infinitely many programs would be:
-
-```
-o1[t] & i1[t] = 0
-```
-
-Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
-are taken from. This spec says that the conjunction has to be empty.
-You can clearly consider more complicated specifications, e.g;.:
-
-```
-o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
-```
-
-which states that the current output, and the previous output, and the current
-input, has to be 0, or, the output has to equal the input. Note the difference
-between Boolean and Logical operators. The former are &|', and the latter are
-&&,||,!.
-
-In order to simplify the process of writing and running Tau programs, we allow
-to define functions and predicates, possibly by means of recurrence relations.
-The following is a simple predicate defined by a recurrence relation,
-which takes as argument a Tau formula:
-
-```
-f[0](y) := T
-f[n](y) := f[n - 1](y)
-```
-
-which you can use in your program as follows:
-
-```
-o1[t] = 0 && f(i1[t])
-```
-
-Or also, you can use the following recurrence relation definition
-
-```
-g[0](y) := 0
-g[n](y) := g[n](y)'
-```
-
-which takes as argument a Boolean function and
-alternates between 0 and 1 depending on the parity of n.
-
-To get all the details about the Tau Language, please refer to the Section
-[The Tau Language](#the-tau-language). You can find there all the details
-about the syntax and semantics of the language.
-
-In the [demos](https://github.com/IDNI/tau-lang/tree/main/demos) folder you
-can find lots of examples regarding how to use the Tau Language, its semantics
-and workings.
-
-# **Installing the Tau Framework**
-
-## **Linux**
-
-Currently we automatically build the following binaries packages (AMD64 architecture):
-
-* deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
-* rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
-
-The executable is installed in `/usr/bin/tau`.
-
-## **Windows**
-
-For windows we provide a convenient installer that includes the tau executable
-and also a zip file:
-
-* Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
-* Zip file: [tau-0.7-win64.zip](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.zip)
-
-## **MacOS (not available yet)**
-
-A macOS installer will be available in the future.
-
-## **Compiling the source code**
-
-To compile the source code you need a recent C++ compiler supporting C++23, e.g.
-GCC 13.1.0. You also need at least a cmake version 3.22.1 installed in your system.
-The only code dependency is libboost.
-
-After cloning:
-
-```bash
-git clone https://github.com/IDNI/tau-lang.git
-```
-
-you can run either the `release.sh` or `debug.sh` or `relwithdebinfo.sh` scripts
-to build the binaries.
-
-To build with doxygen documentation:
-
-```bash
- # Compiles the source code in release mode and also the documentation
-./release.sh -DBUILD_DOC=ON
-# Compiles the source code in debug mode and also the documentation
-./debug.sh -DBUILD_DOC=ON
-# Compiles the source code in release mode with debug information and also the documentation
-./relwithdebinfo.sh -DBUILD_DOC=ON
-```
-
-Once you have compiled the source code you can run the `tau` executable to
-execute Tau programs. The `tau` executable is located in the either `build-Release`
-or `build-Debug` or `build-RelWithDebInfo`.
+algebra elements.
 
 # **Command line interface**
 
