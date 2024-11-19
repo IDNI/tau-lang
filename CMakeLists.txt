@@ -153,6 +153,11 @@ if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 endif()
 
 #
+# Generate LICENSE C++ file
+#
+include(version_license)
+
+#
 # load common cmake settings and load functions
 # 		target_setup(), target_compile_definitions_if() and exclude()
 include(tau-common)

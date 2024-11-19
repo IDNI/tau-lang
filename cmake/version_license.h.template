@@ -1,0 +1,10 @@
+namespace idni::tau {
+
+constexpr char compile_date[] = "@COMPILE_DATE_ISO@";
+constexpr char version[] = TAU_VERSION " (" GIT_DESCRIBED ")";
+constexpr char license[] = R"LICENSE_TEXT(
+@LICENSE_CONTENT@
+
+)LICENSE_TEXT";
+
+}
