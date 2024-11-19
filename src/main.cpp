@@ -70,56 +70,6 @@ using namespace idni;
 using namespace idni::rewriter;
 using namespace idni::tau;
 
-cli::commands tau_commands() {
-	cli::commands cmds;
-	cmds["help"] = cli::command("help",
-		"detailed information about options");
-
-	auto& run = cmds["run"] = cli::command("run",
-		"run a tau program");
-
-	// common options used by multiple commands
-	auto indenting_opt = cli::option("indenting", 'I', false)
-		.set_description("indenting of formulas");
-	auto highlighting_opt = cli::option("highlighting", 'H', false)
-		.set_description("syntax highlighting");
-	auto severity_opt = cli::option("severity", 'S', "info")
-		.set_description("severity level (trace/debug/info/error)");
-	auto charvar_opt = cli::option("charvar", 'V', true)
-		.set_description("charvar (enabled by default)");
-#ifdef DEBUG
-	auto debug_opt = cli::option("debug", 'd', true)
-				.set_description("debug mode");
-	run.add_option(debug_opt);
-#endif // DEBUG
-	run.add_option(severity_opt);
-	run.add_option(indenting_opt);
-	run.add_option(highlighting_opt);
-	run.add_option(charvar_opt);
-	run.add_option(cli::option("program", 'p', "@stdin")
-		.set_description("program to run"));
-	run.add_option(cli::option("evaluate", 'e', "")
-		.set_description("program to be evaluated (alternative to -p)"));
-	run.add_option(cli::option("help", 'h', false)
-		.set_description("detailed information about run options"));
-	auto& repl = cmds["repl"] = cli::command("repl", "Tau REPL");
-	DBG(repl.add_option(debug_opt);)
-	repl.add_option(severity_opt);
-	repl.add_option(indenting_opt);
-	repl.add_option(highlighting_opt);
-	repl.add_option(charvar_opt);
-	repl.add_option(cli::option("help", 'h', false)
-		.set_description("detailed information about repl options"));
-	repl.add_option(cli::option("evaluate", 'e', "")
-		.set_description("repl command to evaluate"));
-	repl.add_option(cli::option("status", 's', true)
-		.set_description("display status"));
-	repl.add_option(cli::option("color", 'c', true)
-		.set_description("use colors"));
-
-	return cmds;
-}
-
 cli::options tau_options() {
 	cli::options opts;
 	opts["help"] = cli::option("help", 'h', false)
@@ -128,50 +78,54 @@ cli::options tau_options() {
 		.set_description("show the current Tau executable version");
 	opts["license"] = cli::option("license", 'l', false)
 		.set_description("show license for Tau");
+
+	opts["charvar"] = cli::option("charvar", 'V', true)
+		.set_description("charvar (enabled by default)");
+	opts["severity"] = cli::option("severity", 'S', "info")
+		.set_description("severity level (trace/debug/info/error)");
+	opts["indenting"] = cli::option("indenting", 'I', false)
+		.set_description("indenting of formulas");
+	opts["highlighting"] = cli::option("highlighting", 'H', false)
+		.set_description("syntax highlighting");
+	// REPL specific options
+	opts["evaluate"] = cli::option("evaluate", 'e', "")
+		.set_description("REPL command to evaluate");
+	opts["status"] = cli::option("status", 's', true)
+		.set_description("display status");
+	opts["color"] = cli::option("color", 'c', true)
+		.set_description("use colors");
+	DBG(opts["debug"] = cli::option("debug", 'd', true)
+		.set_description("debug mode");)
 	return opts;
 }
 
-bool is_stdin(const string& s)  { return s == "@stdin" || s == "-"; }
-bool is_stdout(const string& s) { return s == "@stdout"; }
-bool is_null(const string& s)   { return s == "@null"; }
-int error(const string& s) {
-	BOOST_LOG_TRIVIAL(error) << "(Error) " << s;
-	return 1;
-}
+int error(const string& s) {BOOST_LOG_TRIVIAL(error)<< "(Error) "<< s;return 1;}
 
-// runs tau program or an evaluate string using input and output
-int run_tau(const cli::command& cmd, const vector<string>& files) {
-	string program = cmd.get<string>("program"),
-		e = cmd.get<string>("evaluate");
-	if (e.size()&& program.size()&& !is_null(program) && !is_stdin(program))
-		return error("Cannot use both --program and --evaluate");
-	if (e.empty()) {
-		if (files.size()) program = files[0];
-		if (is_null(program)) return error("Program cannot be null");
-		if (is_stdin(program)) {
-			std::ostringstream oss;
-			oss << std::cin.rdbuf(), e = oss.str();
-		} else {
-			std::ifstream ifs(program,
-					std::ios::binary | std::ios::ate);
-			if (!ifs) return error("Cannot open file " + program);
-			auto l = ifs.tellg();
-			e.resize(l), ifs.seekg(0), ifs.read(&e[0], l);
-		}
+int run_tau_spec(string spec_file, bool charvar) {
+	string src = "";
+	if (spec_file == "-") {
+		std::ostringstream oss;
+		oss << std::cin.rdbuf(), src = oss.str();
+	} else {
+		std::ifstream ifs(spec_file, std::ios::binary | std::ios::ate);
+		if (!ifs) return error("Cannot open file " + spec_file);
+		auto l = ifs.tellg();
+		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
-
-	repl_evaluator<bdd_binding> re({ .print_memory_store = false,
-					.error_quits = true,
-					.charvar = cmd.get<bool>("charvar"),
-					.repl_running = false });
-	if (e.empty()) return 0;
-	if (auto status = re.eval(e); status) return status;
+	if (src.empty()) return 0;
+	repl_evaluator<bdd_binding> re({
+		.print_memory_store = false,
+		.error_quits        = true,
+		.charvar            = charvar,
+		.repl_running       = false
+	});
+	if (auto status = re.eval(src); status) return status;
 	return re.eval("run %");
 }
 
 void welcome() {
 	BOOST_LOG_TRIVIAL(info) << "Welcome to the Tau Language Framework Alpha"
-		<< " version 0.7 (" << compile_date << " build "
+		<< " version " <<TAU_VERSION<< " (" << compile_date << " build "
 		<< GIT_COMMIT_HASH << ") by IDNI AG. "
 		<< "This product is protected by patents and copyright. "
 		<< "By using this product, you agree to the license terms. "
@@ -188,72 +142,50 @@ int main(int argc, char** argv) {
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
 
-	cli cl("tau", args, tau_commands(), "repl", tau_options());
-	cl.set_description("Tau language");
-	cl.set_default_command_when_files("run");
-
+	cli cl("tau", args, {}, "", tau_options());
+	cl.set_help_header("Usage: tau [ <specification file> ]");
+	
 	if (cl.process_args() != 0) return cl.status();
-
 	auto opts  = cl.get_processed_options();
-	auto cmd   = cl.get_processed_command();
 	auto files = cl.get_files();
 
-	// error if command is invalid
-	if (!cmd.ok()) {
-		if (cmd.name() == "repl" && files.size())
-			return error("repl command does not accept files");
-		return cl.error("invalid command", true);
-	}
-	// if --help/-h option is true, print help end exit
-	if (cmd.name() == "help" || opts["help"].get<bool>())
-		return cl.help(), 0;
-
-	// if --version/-v option is true, print version and exit
+	if (opts["help"].get<bool>()) return cl.help(), 0;
 	if (opts["version"].get<bool>())
 		return std::cout << "Tau version: " << version, 0;
-
-	// if --license/-l option is true, print license and exit
 	if (opts["license"].get<bool>()) return std::cout << license, 0;
 
-	// if cmd's --help/-h option is true, print cmd's help and exit
-	if (cmd.get<bool>("help")) return cl.help(cmd), 0;
-
-	// set charvar
-	bool charvar = cmd.get<bool>("charvar");
-	std::set<std::string> guards{ charvar ? "charvar" : "var" };
-	tau_parser::instance().get_grammar().set_enabled_productions(guards);
-	bdd_parser::instance().get_grammar().set_enabled_productions(guards);
-
-	pretty_printer_highlighting = cmd.get<bool>("highlighting");
-	pretty_printer_indenting = cmd.get<bool>("indenting");
-
-	std::string sevstr = cmd.get<string>("severity");
+	std::string sevstr = opts["severity"].get<string>();
 	boost::log::trivial::severity_level sev =
 		sevstr == "error" ? boost::log::trivial::error :
 		sevstr == "trace" ? boost::log::trivial::trace :
 		sevstr == "debug" ? boost::log::trivial::debug :
-		boost::log::trivial::info;
+				boost::log::trivial::info;
 
-	// repl command
-	if (cmd.name() == "repl") {
-		string e = cmd.get<string>("evaluate");
-		repl_evaluator<bdd_binding> re({
-			.status = cmd.get<bool>("status"),
-			.colors = cmd.get<bool>("color"),
-			.charvar = charvar,
+	pretty_printer_highlighting = opts["highlighting"].get<bool>();
+	pretty_printer_indenting    = opts["indenting"].get<bool>();
+
+	bool charvar = opts["charvar"].get<bool>();
+	std::set<std::string> guards{ charvar ? "charvar" : "var" };
+	tau_parser::instance().get_grammar().set_enabled_productions(guards);
+	bdd_parser::instance().get_grammar().set_enabled_productions(guards);
+
+	// spec provided, run it
+	if (files.size()) return run_tau_spec(files.front(), charvar);
+
+	// REPL
+	repl_evaluator<bdd_binding> re({
+		.status = opts["status"].get<bool>(),
+		.colors = opts["color"].get<bool>(),
+		.charvar = charvar,
 #ifdef DEBUG
-			.debug_repl = cmd.get<bool>("debug"),
+		.debug_repl = opts["debug"].get<bool>(),
 #endif // DEBUG
-			.severity = sev
-		});
-		if (e.size()) return re.eval(e), 0;
-		repl<decltype(re)> r(re, "tau> ", ".tau_history");
-		welcome();
-		re.prompt();
-		return r.run();
-	}
-
-	// run command
-	if (cmd.name() == "run") return run_tau(cmd, files);
-	return 0;
+		.severity = sev
+	});
+	string e = opts["evaluate"].get<string>();
+	if (e.size()) return re.eval(e), 0;
+	repl<decltype(re)> r(re, "tau> ", ".tau_history");
+	welcome();
+	re.prompt();
+	return r.run();
 }
