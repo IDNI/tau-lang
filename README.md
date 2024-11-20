@@ -62,7 +62,7 @@ algebras.
 For a more detailed explanation of the theory behind the Tau Language, please
 refer to:
 
-* TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
+* TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
 * Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
 
 
