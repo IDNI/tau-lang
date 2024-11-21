@@ -78,7 +78,28 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		// Normalize always and sometimes quantifiers and reduce Tau formula
 		| sometimes_always_normalization<BAs...>();
 	#ifdef TAU_CACHE
-	cache[form] = result;
+	cache.emplace(form, result);
+	#endif // TAU_CACHE
+	return result;
+}
+
+// Assumes that the formula passed does not have temporal quantifiers
+// This normalization will non perform the temporal normalization
+template<typename ... BAs>
+nso<BAs...> normalize_non_temp(const nso<BAs...>& fm) {
+	#ifdef TAU_CACHE
+	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+	#endif // TAU_CACHE
+	auto result = fm
+		// Push all quantifiers in and eliminate them
+		| (nso_transform<BAs...>)eliminate_quantifiers<BAs...>
+		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
+		// are reduced
+		| bf_reduce_canonical<BAs...>();
+	result = reduce_across_bfs(result, false);
+	#ifdef TAU_CACHE
+	cache.emplace(fm, result);
 	#endif // TAU_CACHE
 	return result;
 }
@@ -215,7 +236,6 @@ bool has_no_boolean_combs_of_models(const nso<BAs...>& fm) {
 
 template<typename... BAs>
 bool is_non_temp_nso_satisfiable (const nso<BAs...>& fm) {
-	assert(!has_temp_var(fm));
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_always, BAs...>));
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>));
 
@@ -224,7 +244,7 @@ bool is_non_temp_nso_satisfiable (const nso<BAs...>& fm) {
 	// new_fm = convert_uconsts_to_var(new_fm);
 	auto vars = get_free_vars_from_nso(new_fm);
 	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
-	auto normalized = normalizer_step<BAs...>(new_fm);
+	auto normalized = normalize_non_temp<BAs...>(new_fm);
 	assert((normalized == _T<BAs...> || normalized == _F<BAs...>));
 	return normalized == _T<BAs...>;
 }

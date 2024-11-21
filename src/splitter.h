@@ -93,7 +93,8 @@ bool is_splitter(const nso<BAs...>& fm, const nso<BAs...>& splitter, const nso<B
 		// We are dealing with a temporal formula
 		if (!are_tau_equivalent(splitter, fm)) {
 			std::map<nso<BAs...>, nso<BAs...>> c = {{fm, splitter}};
-			if (is_tau_formula_sat(replace(spec, c)))
+			auto new_spec = normalizer_step(replace(spec, c));
+			if (is_tau_formula_sat(new_spec))
 				return true;
 		}
 	} else {
