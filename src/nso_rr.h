@@ -2458,9 +2458,11 @@ std::optional<sp_tau_node<BAs...>> build_bf_constant(
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_uniter_const(const std::string& name) {
-	auto var = make_builder<BAs...>("( $X ) =:: <:" + name + "> != 0.").second;
-	return trim<BAs...>(var);
+sp_tau_node<BAs...> build_bf_uniter_const(const std::string& n1, const std::string& n2) {
+	auto name = wrap<BAs...>(tau_parser::uninter_const_name, n1 + ":" + n2);
+	return wrap(tau_parser::bf,
+		wrap(tau_parser::variable,
+			wrap(tau_parser::uninterpreted_constant, name)));
 }
 
 // wff factory method for building wff formulas
