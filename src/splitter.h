@@ -190,7 +190,7 @@ template<typename... BAs>
 nso<BAs...> tau_bad_splitter(nso<BAs...> fm = _T<BAs...>) {
 	std::stringstream ss;
 	ss << "split" << get_new_uniter_const_id(fm);
-	auto new_uniter_const = wrap(tau_parser::wff, build_wff_uniter_const<BAs...>(ss.str()));
+	auto new_uniter_const = build_wff_neq(build_bf_uniter_const<BAs...>("", ss.str()));
 	auto clauses = get_dnf_wff_clauses(fm);
 	// Add bad splitter only to a single disjunct if possible
 	if (!clauses.empty()) {
