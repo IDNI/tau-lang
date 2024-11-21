@@ -1449,13 +1449,8 @@ template<typename... BAs>
 bool has_temp_var (const nso<BAs...>& fm) {
 	auto io_vars = select_top(fm, is_non_terminal<tau_parser::io_var, BAs...>);
 	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
-	for (const auto& io_var : io_vars) {
-		if (find_top(io_var, is_non_terminal<tau_parser::shift, BAs...>))
-			return true;
-		if (!find_top(io_var, is_non_terminal<tau_parser::num, BAs...>))
-			return true;
-	}
-	return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
+	// any input/output stream is a temporal variable, also constant positions
+	else return true;
 }
 
 // Check that no non-temporal quantified variable appears nested in the scope of
