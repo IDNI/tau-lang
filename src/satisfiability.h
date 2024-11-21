@@ -399,7 +399,8 @@ nso<BAs...> get_uninterpreted_constants_constraints (const nso<BAs...>& fm) {
 	}
 	// Existentially quantify remaining variables
 	for (const auto& v : free_io_vars) {
-		uconst_ctns = build_wff_ex(v, uconst_ctns);
+		if (!is_child_non_terminal(tau_parser::uninterpreted_constant, v))
+			uconst_ctns = build_wff_ex(v, uconst_ctns);
 	}
 	// Eliminate all variables
 	uconst_ctns = normalizer_step(uconst_ctns);
