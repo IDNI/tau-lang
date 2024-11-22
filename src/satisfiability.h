@@ -946,8 +946,14 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
-nso<BAs...> transform_to_execution(nso<BAs...> fm) {
-	assert(get_dnf_wff_clauses(fm).size() == 1);
+nso<BAs...> transform_to_execution(const nso<BAs...>& f) {
+	assert(get_dnf_wff_clauses(f).size() == 1);
+#ifdef TAU_CACHE
+	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(f); it != cache.end())
+		return it->second;
+#endif
+	auto fm = f;
 	using p = tau_parser;
 	auto elim_aw = [](const auto& f) {
 		return is_child_non_terminal(p::wff_always, f) ? trim2(f) : f;
@@ -971,15 +977,31 @@ nso<BAs...> transform_to_execution(nso<BAs...> fm) {
 		auto ubd_fm = replace(fm, changes);
 		ev_t = transform_to_eventual_variables(ubd_fm);
 		// Check if there is a sometimes present
-		if (ev_t == ubd_fm) return elim_aw(ubd_fm);
+		if (ev_t == ubd_fm) {
+#ifdef TAU_CACHE
+			cache.emplace(elim_aw(ubd_fm), elim_aw(ubd_fm));
+			return cache.emplace(f, elim_aw(ubd_fm)).first->second;
+#endif
+			return elim_aw(ubd_fm);
+		}
 	} else {
 		reset_ctn_stream = true;
 		ev_t = transform_to_eventual_variables(fm);
 		// Check if there is a sometimes present
-		if (ev_t == fm) return elim_aw(fm);
+		if (ev_t == fm) {
+#ifdef TAU_CACHE
+			return cache.emplace(f, elim_aw(fm)).first->second;
+#endif
+			return elim_aw(fm);
+		}
 	}
 	auto aw_after_ev = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
-	if (!aw_after_ev.has_value()) return elim_aw(fm);
+	if (!aw_after_ev.has_value()) {
+#ifdef TAU_CACHE
+		return cache.emplace(f, elim_aw(fm)).first->second;
+#endif
+		return elim_aw(fm);
+	}
 	auto st = select_top(ev_t, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	assert(st.size() < 2);
 
@@ -989,7 +1011,12 @@ nso<BAs...> transform_to_execution(nso<BAs...> fm) {
 			aw_after_ev.value(), st[0], ubd_aw_fm, reset_ctn_stream));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
-	return elim_aw(res);
+	res = elim_aw(res);
+#ifdef TAU_CACHE
+	cache.emplace(res, res);
+	return cache.emplace(f, res).first->second;
+#endif
+	return res;
 }
 
 // Assumes that fm has been normalized
