@@ -658,6 +658,7 @@ void repl_evaluator<BAs...>::solve_cmd(
 			? get_type_and_arg(n->child[2]) : get_type_and_arg(n->child[1]); nn) {
 		auto [t, program] = nn.value();
 		auto applied = apply_rr_to_rr_gssotc(t, program);
+		applied = normalizer_step(applied);
 		if (!nn) { BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return; }
 		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type);
 		if (!s) { std::cout << "no solution\n"; return; }
