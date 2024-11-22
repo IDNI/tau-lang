@@ -521,6 +521,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>>
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
 				definitions.begin(), definitions.end()),
 			rr_ = infer_ref_types<tau_ba<BAs...>,BAs...>(rr_);
+		if (!rr_.main) return {};
 		if (!is_non_terminal(tau_parser::bf, rr_.main))
 			return normalizer<tau_ba<BAs...>, BAs...>(rr_);
 		if (contains_ref) return bf_normalizer_with_rec_relation(rr_);

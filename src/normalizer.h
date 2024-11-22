@@ -566,7 +566,7 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
 	//ptree<BAs...>(std::cout << "form: ", form) << "\n";
 
-	if (!is_well_founded(nso_rr)) return fallback;
+	if (!is_well_founded(nso_rr)) return nullptr;
 
 	std::vector<nso<BAs...>> previous;
 	nso<BAs...> current;
@@ -633,7 +633,8 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 		previous.push_back(current);
 	}
-	return fallback;
+	DBG(assert(0);)
+	return nullptr;
 }
 
 // calculate fixed points called from main and replace them by their results
@@ -654,9 +655,12 @@ struct fixed_point_transformer {
 			&& is_non_terminal<tau_parser::bf_ref, BAs...>(ref));
 		if (!is_ref) return n;
 		auto [type, offset_arity] = get_type_info(types, ref);
-		if (offset_arity) return changes.emplace(n,
-			calculate_fixed_point(defs, n, type, offset_arity))
-				.first->second;
+		if (offset_arity) {
+			auto fp = calculate_fixed_point(defs, n, type,
+					offset_arity);
+			if (!fp) return nullptr;
+			return changes.emplace(n, fp).first->second;
+		}
 		bool changed = false;
 		std::vector<sp_tau_node<BAs...>> child;
 		if (changes.contains(ref))
@@ -698,11 +702,12 @@ nso<BAs...> apply_rr_to_formula (const rr<nso<BAs...>>& nso_rr) {
 	rr_types types;
 	bool success = true;
 	get_rr_types(success, types, nso_rr);
-	if (!success || !is_valid(nso_rr)) return _F<BAs...>;
+	if (!success || !is_valid(nso_rr)) return nullptr;
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<BAs...> fpt(nso_rr, types);
-	auto new_main = rewriter::post_order_traverser<decltype(fpt), rewriter::all_t,
-		nso<BAs...>>(fpt, rewriter::all)(nso_rr.main);
+	auto new_main = rewriter::post_order_traverser<decltype(fpt),
+		rewriter::all_t, nso<BAs...>>(fpt, rewriter::all)(nso_rr.main);
+	if (!new_main) return nullptr;
 	if (fpt.changes.size()) {
 		new_main = replace(new_main, fpt.changes);
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
@@ -725,6 +730,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
 
 	auto fm = apply_rr_to_formula(nso_rr);
+	if (!fm) return nullptr;
 	auto res = normalizer_step(fm);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";

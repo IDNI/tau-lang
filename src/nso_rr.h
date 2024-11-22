@@ -1569,7 +1569,7 @@ sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& code,
 			rewriter::all_t,
 			sp_tau_node<BAs...>>(bs, rewriter::all)(code);
 	// Check for errors which cannot be captured by the grammar
-	if (has_semantic_error(res)) return {};
+	if (res && has_semantic_error(res)) return {};
 	else return res;
 }
 
@@ -2039,6 +2039,7 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
 		BOOST_LOG_TRIVIAL(error) << "(Error) Unknown type for:" << ss.str();
+		return { {}, nullptr };
 	}
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End type inferrence"; // << ": " << nn;
 	return nn;
