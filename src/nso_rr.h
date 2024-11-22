@@ -2940,14 +2940,25 @@ sp_tau_node<BAs...> operator+(const sp_tau_node<BAs...>& l,
 // This function traverses n and normalizes coefficients in a BF
 template<typename... BAs>
 sp_tau_node<BAs...> normalize_ba(const sp_tau_node<BAs...>& fm) {
+#ifdef TAU_CACHE
+	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(fm); it != cache.end())
+		return it->second;
+#endif
 	assert(is_non_terminal(tau_parser::bf, fm));
-	auto norm_ba = [](const auto& n, const auto& c) {
+	auto norm_ba = [&](const auto& n, const auto& c) {
 
 		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/n: " << n;
 		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/c: " << c;
 
-		if (!is_child_non_terminal(tau_parser::bf_constant, n))
-			return n->child == c ? n : make_node(n->value, c);
+		if (!is_child_non_terminal(tau_parser::bf_constant, n)) {
+			auto res = n->child == c ? n : make_node(n->value, c);
+#ifdef TAU_CACHE
+			cache.emplace(res, res);
+			return cache.emplace(n, res).first->second;
+#endif
+			return res;
+		}
 		auto ba_elem = n
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -2956,8 +2967,13 @@ sp_tau_node<BAs...> normalize_ba(const sp_tau_node<BAs...>& fm) {
 			| optional_value_extractor<std::variant<BAs...>>;
 		auto res = normalize_ba(ba_elem);
 		using p = tau_parser;
-		return wrap(p::bf, wrap(p::bf_constant, wrap(p::constant,
+		auto r = wrap(p::bf, wrap(p::bf_constant, wrap(p::constant,
 			rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(res), {}))));
+#ifdef TAU_CACHE
+		cache.emplace(r, r);
+		return cache.emplace(n, r).first->second;
+#endif
+		return r;
 	};
 	return rewriter::post_order_recursive_traverser<sp_tau_node<BAs...>>()(
 						fm, rewriter::all, norm_ba);
