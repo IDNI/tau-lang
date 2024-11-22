@@ -655,8 +655,9 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 		if (!is_run_satisfiable(run)) {
 			print_fixpoint_info(
 				"Temporal normalization of always specification reached fixpoint after "
-				+ std::to_string(steps) + " steps, yielding the result: ");
-            print_fixpoint_info(tau_to_str(_F<BAs...>));
+				+ std::to_string(steps) +
+				" steps, yielding the result: ");
+			print_fixpoint_info(tau_to_str(_F<BAs...>));
 			return _F<BAs...>;
 		}
 	}

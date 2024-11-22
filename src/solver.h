@@ -185,7 +185,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	// in the following theorem (of Taba Book):
 	//
 	// Theorem 1.8. Let f : Bn → B be a BF, and assume f (Z) = 0
-	// for some Z ∈ Bn. Then the set {X ∈ Bn| (X) = 0} equals precisely
+	// for some Z ∈ Bn. Then the set {X ∈ Bn| f(X) = 0} equals precisely
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
 
@@ -716,22 +716,29 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		return {};
 	}
 	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
-	solution<BAs...> solution;
+	// All solutions coming from inequality_solution are ready
+	solution<BAs...> solution = inequality_solution.value();
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
 		<< "solve_system/inequality_solution: ";
 	#endif // DEBUG
 
-	for (auto& [k, v]: phi.value()) {
+	// Now we need to add solutions for variables in the lgrs
+	for (auto& [var, func]: phi.value()) {
+		if (solution.contains(var)) continue;
 		auto copy = inequality_solution.value();
-		solution[k] = replace(v, copy);
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "\t" << k << " <- " << solution[k];
-		#endif // DEBUG
+		auto func_with_neq_assgm = replace(func, copy);
+		// Now assign the remaining variables to 0 and compute
+		// resulting value for var
+		auto free_vars = get_free_vars_from_nso(func_with_neq_assgm);
+		std::map<nso<BAs...>, nso<BAs...>> free_var_assgm;
+		for (const auto& free_var : free_vars)
+			free_var_assgm.emplace(free_var, _0_trimmed<BAs...>);
+		solution[var] = replace(func_with_neq_assgm, free_var_assgm) |
+				bf_reduce_canonical<BAs...>();
 	}
+
 	return solution;
 }
 
