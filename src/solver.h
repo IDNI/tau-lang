@@ -185,7 +185,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	// in the following theorem (of Taba Book):
 	//
 	// Theorem 1.8. Let f : Bn → B be a BF, and assume f (Z) = 0
-	// for some Z ∈ Bn. Then the set {X ∈ Bn| (X) = 0} equals precisely
+	// for some Z ∈ Bn. Then the set {X ∈ Bn| f(X) = 0} equals precisely
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
 
@@ -661,7 +661,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	//		{g_i (X) ̸= 0}i∈I
 	// and let ϕ be the LGRS of f (wrt some arbitrarily chosen single zero of
 	// f), and assume that a solution to the whole system, exists. Set h_i (X) =
-	// g_i (ϕ (X)) and suppose T satisfies {h_i (T) ̸= 0}i∈I , then f (T) = 0 because
+	// g_i (ϕ (X)) and suppose T satisfies {h_i (T) ̸= 0}i∈I , then f (ϕ (T)) = 0 because
 	// the LGRS is reproductive (cf. remark 1.2). So to solve the
 	// original system we only need to solve {h_i (T) ̸= 0}i∈I and the solution
 	// to the original system is then ϕ (T).
@@ -716,22 +716,29 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		return {};
 	}
 	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
-	solution<BAs...> solution;
+	// Solutions coming from inequality_solution for variables appearing also
+	// in the equality part will be replaced in the next step
+	solution<BAs...> solution = inequality_solution.value();
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
 		<< "solve_system/inequality_solution: ";
 	#endif // DEBUG
 
-	for (auto& [k, v]: phi.value()) {
+	// Now we need to add solutions for variables in the lgrs
+	for (auto& [var, func]: phi.value()) {
 		auto copy = inequality_solution.value();
-		solution[k] = replace(v, copy);
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "\t" << k << " <- " << solution[k];
-		#endif // DEBUG
+		auto func_with_neq_assgm = replace(func, copy);
+		// Now assign the remaining variables to 0 and compute
+		// resulting value for var
+		auto free_vars = get_free_vars_from_nso(func_with_neq_assgm);
+		std::map<nso<BAs...>, nso<BAs...>> free_var_assgm;
+		for (const auto& free_var : free_vars)
+			free_var_assgm.emplace(free_var, _0_trimmed<BAs...>);
+		solution[var] = replace(func_with_neq_assgm, free_var_assgm) |
+				bf_reduce_canonical<BAs...>();
 	}
+
 	return solution;
 }
 

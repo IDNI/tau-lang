@@ -93,7 +93,8 @@ bool is_splitter(const nso<BAs...>& fm, const nso<BAs...>& splitter, const nso<B
 		// We are dealing with a temporal formula
 		if (!are_tau_equivalent(splitter, fm)) {
 			std::map<nso<BAs...>, nso<BAs...>> c = {{fm, splitter}};
-			if (is_tau_formula_sat(replace(spec, c)))
+			auto new_spec = normalizer_step(replace(spec, c));
+			if (is_tau_formula_sat(new_spec))
 				return true;
 		}
 	} else {
@@ -190,7 +191,7 @@ template<typename... BAs>
 nso<BAs...> tau_bad_splitter(nso<BAs...> fm = _T<BAs...>) {
 	std::stringstream ss;
 	ss << "split" << get_new_uniter_const_id(fm);
-	auto new_uniter_const = wrap(tau_parser::wff, build_wff_uniter_const<BAs...>(ss.str()));
+	auto new_uniter_const = build_wff_neq(build_bf_uniter_const<BAs...>("", ss.str()));
 	auto clauses = get_dnf_wff_clauses(fm);
 	// Add bad splitter only to a single disjunct if possible
 	if (!clauses.empty()) {

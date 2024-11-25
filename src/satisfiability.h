@@ -399,10 +399,11 @@ nso<BAs...> get_uninterpreted_constants_constraints (const nso<BAs...>& fm) {
 	}
 	// Existentially quantify remaining variables
 	for (const auto& v : free_io_vars) {
-		uconst_ctns = build_wff_ex(v, uconst_ctns);
+		if (!is_child_non_terminal(tau_parser::uninterpreted_constant, v))
+			uconst_ctns = build_wff_ex(v, uconst_ctns);
 	}
 	// Eliminate all variables
-	uconst_ctns = normalizer_step(uconst_ctns);
+	uconst_ctns = normalize_non_temp(uconst_ctns);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula describing constraints on uninterpreted constants";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << uconst_ctns;
@@ -483,7 +484,7 @@ std::pair<nso<BAs...>, int_t> find_fixpoint_chi(const nso<BAs...>& chi_base, con
 	}
 	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << normalizer_step(chi_prev_replc);
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << normalize_non_temp(chi_prev_replc);
 	return {chi_prev_replc, step_num - 1};
 }
 
@@ -641,7 +642,7 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 		fm, flag_initials, io_vars, initials,
 		time_point + point_after_inits);
 
-	ubd_ctn = normalizer_step(ubd_ctn);
+	ubd_ctn = normalize_non_temp(ubd_ctn);
 	ubd_ctn = transform_back_non_initials(ubd_ctn, point_after_inits - 1);
 	// Run phi_inf until all initial conditions are taken into account
 	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
@@ -650,17 +651,17 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 		auto current_step = fm_at_time_point(ubd_ctn, io_vars, t);
 		run = build_wff_and(run, current_step);
 		// Check if run is still sat
-		run = normalizer_step(run);
+		run = normalize_non_temp(run);
 		if (!is_run_satisfiable(run)) {
 			print_fixpoint_info(
 				"Temporal normalization of always specification reached fixpoint after "
-				+ std::to_string(steps) + " steps, yielding the result: ");
-            print_fixpoint_info(tau_to_str(_F<BAs...>));
+				+ std::to_string(steps) +
+				" steps, yielding the result: ");
+			print_fixpoint_info(tau_to_str(_F<BAs...>));
 			return _F<BAs...>;
 		}
 	}
-	ubd_ctn = normalizer_step(build_wff_and(ubd_ctn, run));
-	auto res = pull_always_out_for_inf(ubd_ctn);
+	auto res = normalize_non_temp(build_wff_and(ubd_ctn, run));
 	// The following is std::cout because it should always be printed
 	print_fixpoint_info("Temporal normalization of always specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
 	print_fixpoint_info(tau_to_str(is_child_non_terminal(p::wff_always, res)
@@ -668,6 +669,23 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 					       : res));
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
 	return res;
+}
+
+// Creates a guard using the names of the input streams in uninterpreted constants
+template<typename... BAs>
+nso<BAs...> create_guard(const auto& io_vars, const int_t number) {
+	using p = tau_parser;
+	nso<BAs...> guard = _T<BAs...>;
+	for (const auto& io_var : io_vars) {
+		// Check if input stream variable
+		if (io_var | p::io_var | p::in) {
+			// Give name of io_var and make it non-user definable with "_"
+			auto uiter_const = build_bf_uniter_const<BAs...>("_" + tau_to_str(io_var), std::to_string(number));
+			auto cdn = build_wff_eq(build_bf_xor(wrap(p::bf, io_var), uiter_const));
+			guard = build_wff_and(guard, cdn);
+		}
+	}
+	return guard;
 }
 
 // Assumes single normalized Tau DNF clause
@@ -715,6 +733,16 @@ nso<BAs...> transform_to_eventual_variables(const nso<BAs...>& fm) {
 			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars, 1) :
 			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars,
 				max_lookback - st_lookback);
+
+		// Guard statement using uninterpreted constants to express that
+		// "if the inputs equal the uninterpreted constants, the Tau formula
+		// under sometimes is implied"
+		// This mimics an existential quantifier capturing the inputs but at the same
+		// time the inputs are not quantified
+		st_io_vars = select_top(shifted_sometimes, is_child_non_terminal<p::io_var, BAs...>);
+		auto guard = create_guard<BAs...>(st_io_vars, n);
+		shifted_sometimes = build_wff_imply(guard, shifted_sometimes);
+
 		ev_assm = build_wff_and(ev_assm, build_wff_imply(
 				build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
 				shifted_sometimes));
@@ -840,18 +868,18 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		else run = current_aw;
 		auto current_flag = fm_at_time_point(st_flags, st_io_vars, i);
 
-		auto normed_run = normalizer_step(build_wff_and(run, current_flag));
+		auto normed_run = normalize_non_temp(build_wff_and(run, current_flag));
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
 			auto res = build_wff_and(normed_run, original_aw_continuation);
 			print_fixpoint_info("Temporal normalization of Tau specification did not rely on fixpoint finding, yielding the result: ");
-            print_fixpoint_info(tau_to_str(res));
+			print_fixpoint_info(tau_to_str(res));
 			return res;
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
-		run = normalizer_step(build_wff_and(run, build_wff_neg(current_flag)));
+		run = normalize_non_temp(build_wff_and(run, build_wff_neg(current_flag)));
 	}
 	// Since flag could not be raised in the initial segment, we now check if it
 	// can be raised at all. To this end we calculate chi_inf
@@ -870,7 +898,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	// Find fixpoint of chi after highest initial condition
 	auto [chi_inf, steps ] = find_fixpoint_chi(aw, st_flags, io_vars,
 		initials, time_point + point_after_inits);
-	chi_inf = normalizer_step(chi_inf);
+	chi_inf = normalize_non_temp(chi_inf);
 
 	// BOOST_LOG_TRIVIAL(trace) << "Fixpoint chi after normalize: " << chi_inf;
 	if (chi_inf == _F<BAs...>) {
@@ -899,7 +927,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		run = build_wff_and(run, current_aw);
 		auto current_flag = fm_at_time_point(st_flags, st_io_vars, i);
 
-		auto normed_run = normalizer_step(build_wff_and(run, current_flag));
+		auto normed_run = normalize_non_temp(build_wff_and(run, current_flag));
 		// The formula is guaranteed to have be sat at some point
 		// Therefore, the loop will exit eventually
 		if (is_run_satisfiable(normed_run)) {
@@ -912,14 +940,20 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
 		// that it will never be raised at this timepoint
-		run = normalizer_step(build_wff_and(run, build_wff_neg(current_flag)));
+		run = normalize_non_temp(build_wff_and(run, build_wff_neg(current_flag)));
 	}
 }
 
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
-nso<BAs...> transform_to_execution(nso<BAs...> fm) {
-	assert(get_dnf_wff_clauses(fm).size() == 1);
+nso<BAs...> transform_to_execution(const nso<BAs...>& f) {
+	assert(get_dnf_wff_clauses(f).size() == 1);
+#ifdef TAU_CACHE
+	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(f); it != cache.end())
+		return it->second;
+#endif
+	auto fm = f;
 	using p = tau_parser;
 	auto elim_aw = [](const auto& f) {
 		return is_child_non_terminal(p::wff_always, f) ? trim2(f) : f;
@@ -943,25 +977,46 @@ nso<BAs...> transform_to_execution(nso<BAs...> fm) {
 		auto ubd_fm = replace(fm, changes);
 		ev_t = transform_to_eventual_variables(ubd_fm);
 		// Check if there is a sometimes present
-		if (ev_t == ubd_fm) return elim_aw(ubd_fm);
+		if (ev_t == ubd_fm) {
+#ifdef TAU_CACHE
+			cache.emplace(elim_aw(ubd_fm), elim_aw(ubd_fm));
+			return cache.emplace(f, elim_aw(ubd_fm)).first->second;
+#endif
+			return elim_aw(ubd_fm);
+		}
 	} else {
 		reset_ctn_stream = true;
 		ev_t = transform_to_eventual_variables(fm);
 		// Check if there is a sometimes present
-		if (ev_t == fm) return elim_aw(fm);
+		if (ev_t == fm) {
+#ifdef TAU_CACHE
+			return cache.emplace(f, elim_aw(fm)).first->second;
+#endif
+			return elim_aw(fm);
+		}
 	}
 	auto aw_after_ev = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
-	if (!aw_after_ev.has_value()) return elim_aw(fm);
+	if (!aw_after_ev.has_value()) {
+#ifdef TAU_CACHE
+		return cache.emplace(f, elim_aw(fm)).first->second;
+#endif
+		return elim_aw(fm);
+	}
 	auto st = select_top(ev_t, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	assert(st.size() < 2);
 
 	nso<BAs...> res;
 	if (aw_after_ev.value() != _F<BAs...> && !st.empty())
-		res = normalizer_step(to_unbounded_continuation(
+		res = normalize_non_temp(to_unbounded_continuation(
 			aw_after_ev.value(), st[0], ubd_aw_fm, reset_ctn_stream));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
-	return elim_aw(res);
+	res = elim_aw(res);
+#ifdef TAU_CACHE
+	cache.emplace(res, res);
+	return cache.emplace(f, res).first->second;
+#endif
+	return res;
 }
 
 // Assumes that fm has been normalized
@@ -986,8 +1041,8 @@ bool is_tau_formula_sat (const nso<BAs...>& normalized_fm) {
 // Check for temporal formulas if f1 implies f2
 template<typename... BAs>
 bool is_tau_impl (const nso<BAs...>& f1, const nso<BAs...>& f2) {
-	auto imp_check = build_wff_neg(build_wff_always(build_wff_imply(f1,f2)));
-	imp_check = normalizer_step(imp_check);
+	auto imp_check = normalizer_step(build_wff_imply(f1,f2));
+	imp_check = to_dnf2(build_wff_neg(imp_check));
 	auto clauses = get_dnf_wff_clauses(imp_check);
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
@@ -1002,8 +1057,8 @@ bool is_tau_impl (const nso<BAs...>& f1, const nso<BAs...>& f2) {
 template<typename... BAs>
 bool are_tau_equivalent (const nso<BAs...>& f1, const nso<BAs...>& f2) {
 	// Negate equivalence for unsat check
-	auto equiv_check = build_wff_neg(build_wff_always(build_wff_equiv(f1, f2)));
-	equiv_check = normalizer_step(equiv_check);
+	auto equiv_check = normalizer_step(build_wff_equiv(f1, f2));
+	equiv_check = to_dnf2(build_wff_neg(equiv_check));
 	auto clauses = get_dnf_wff_clauses(equiv_check);
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {

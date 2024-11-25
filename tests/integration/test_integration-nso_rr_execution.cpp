@@ -28,14 +28,22 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-bool normalize_and_test_for_value(const char* sample, tau_parser::nonterminal nt) {
+bool normalize_and_test_for_value(const char* sample,
+	tau_parser::nonterminal nt, bool expect_fail = false)
+{
 	auto sample_src = make_tau_source(sample);
 	auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-	if (!sample_formula.has_value()) return false;
+	if (!sample_formula.has_value()) return expect_fail;
 	auto result = normalizer<bdd_binding>(sample_formula.value());
+	if (!result) return expect_fail;
 	auto check = result | nt;
-	return check.has_value();
+	return expect_fail ? !check.has_value() : check.has_value();
 }
+
+bool normalize_and_expect_fail(const char* sample, tau_parser::nonterminal nt) {
+	return normalize_and_test_for_value(sample, nt, true);
+}
+
 
 TEST_SUITE("function execution: simple cases") {
 
@@ -110,7 +118,7 @@ TEST_SUITE("rec_relations execution: types") {
 			"g[0](Y) := 0."
 			"g[0](Y) := T."
 			"g[0](Y).";
-		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_f) );
+		CHECK( normalize_and_expect_fail(sample, tau_parser::wff_f) );
 	}
 
 	TEST_CASE("clashing name nso_rr wff_rec_relation and bf_rec_relation: type mismatch") {
@@ -118,7 +126,7 @@ TEST_SUITE("rec_relations execution: types") {
 			"g[0](Y) := 0."
 			"g[0](Y) := T."
 			"g[0](Y) = 0.";
-		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_f) );
+		CHECK( normalize_and_expect_fail(sample, tau_parser::wff_f) );
 	}
 }
 
