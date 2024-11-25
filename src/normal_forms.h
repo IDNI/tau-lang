@@ -1186,8 +1186,9 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<nso<BAs...>>> dnf_cnf_to_
 					    ? select_top(new_fm, is_wff_bdd_var)
 					    : select_top(new_fm, is_bf_bdd_var);
 	if (vars.empty()) {
-		assert(new_fm == _T<BAs...> || new_fm == _F<BAs...> ||
-			new_fm == _1<BAs...> || new_fm == _0<BAs...>);
+		//assert(new_fm == _T<BAs...> || new_fm == _F<BAs...> ||
+		//	new_fm == _1<BAs...> || new_fm == _0<BAs...>);
+		print_sp_tau_node_tree(std::cout, new_fm);
 		if (new_fm == _T<BAs...> || new_fm == _1<BAs...>) {
 			if (is_cnf) return {};
 			std::vector<std::vector<int_t>> paths;
