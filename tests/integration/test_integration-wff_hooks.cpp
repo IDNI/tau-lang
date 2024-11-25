@@ -41,7 +41,14 @@ bool check_hook(const char* sample, const char* expected) {
 	return tau_sample == tau_expected;
 }
 
-TEST_SUITE("wff logical hooks") {
+TEST_SUITE("configuration") {
+
+	TEST_CASE("bdd_init") {
+		bdd_init<Bool>();
+	}
+}
+
+TEST_SUITE("wff operator hooks") {
 
 	TEST_CASE("!") {
 		CHECK( check_hook("!F", "T") );
@@ -142,7 +149,7 @@ TEST_SUITE("wff logical hooks") {
 	}
 }
 
-TEST_SUITE("wff order hooks") {
+TEST_SUITE("wff comparator hooks") {
 
 	TEST_CASE("=") {
 		CHECK( check_hook("1=1", "T") );
@@ -150,8 +157,53 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("1=0", "F") );
 		CHECK( check_hook("0=1", "F") );
 
+		CHECK( check_hook("1:sbf=1:sbf", "T") );
+		CHECK( check_hook("0:sbf=0:sbf", "T") );
+		CHECK( check_hook("1:sbf=0:sbf", "F") );
+		CHECK( check_hook("0:sbf=1:sbf", "F") );
+
+		CHECK( check_hook("1:sbf=1", "T") );
+		CHECK( check_hook("0:sbf=0", "T") );
+		CHECK( check_hook("1:sbf=0", "F") );
+		CHECK( check_hook("0:sbf=1", "F") );
+
+		CHECK( check_hook("1=1:sbf", "T") );
+		CHECK( check_hook("0=0:sbf", "T") );
+		CHECK( check_hook("1=0:sbf", "F") );
+		CHECK( check_hook("0=1:sbf", "F") );
+
+		CHECK( check_hook("1:tau=1:tau", "T") );
+		CHECK( check_hook("0:tau=0:tau", "T") );
+		CHECK( check_hook("1:tau=0:tau", "F") );
+		CHECK( check_hook("0:tau=1:tau", "F") );
+
+		CHECK( check_hook("1:tau=1", "T") );
+		CHECK( check_hook("0:tau=0", "T") );
+		CHECK( check_hook("1:tau=0", "F") );
+		CHECK( check_hook("0:tau=1", "F") );
+
+		CHECK( check_hook("1=1:tau", "T") );
+		CHECK( check_hook("0=0:tau", "T") );
+		CHECK( check_hook("1=0:tau", "F") );
+		CHECK( check_hook("0=1:tau", "F") );
+
+		CHECK( !check_hook("1:tau=1:sbf", "T") );
+		CHECK( !check_hook("0:tau=0:sbf", "T") );
+		CHECK( !check_hook("1:tau=0:sbf", "F") );
+		CHECK( !check_hook("0:tau=1:sbf", "F") );
+
+		CHECK( !check_hook("1:sbf=1:tau", "T") );
+		CHECK( !check_hook("0:sbf=0:tau", "T") );
+		CHECK( !check_hook("1:sbf=0:tau", "F") );
+		CHECK( !check_hook("0:sbf=1:tau", "F") );
+
 		CHECK( check_hook("{T}=0", "F") );
 		CHECK( check_hook("{F}=0", "T") );
+		CHECK( check_hook("{T}:tau=0", "F") );
+		CHECK( check_hook("{F}:tau=0", "T") );
+		CHECK( check_hook("{1}:sbf=0", "F") );
+		// FIXME (HIGH) fix parser error
+		// CHECK( check_hook("{0}:sbf=0", "T") );
 		CHECK( check_hook("x = y", "x + y = 0") );
 	}
 
@@ -161,8 +213,53 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("1!=0", "T") );
 		CHECK( check_hook("0!=1", "T") );
 
+		CHECK( check_hook("1:sbf!=1:sbf", "F") );
+		CHECK( check_hook("0:sbf!=0:sbf", "F") );
+		CHECK( check_hook("1:sbf!=0:sbf", "T") );
+		CHECK( check_hook("0:sbf!=1:sbf", "T") );
+
+		CHECK( check_hook("1:sbf!=1", "F") );
+		CHECK( check_hook("0:sbf!=0", "F") );
+		CHECK( check_hook("1:sbf!=0", "T") );
+		CHECK( check_hook("0:sbf!=1", "T") );
+
+		CHECK( check_hook("1!=1:sbf", "F") );
+		CHECK( check_hook("0!=0:sbf", "F") );
+		CHECK( check_hook("1!=0:sbf", "T") );
+		CHECK( check_hook("0!=1:sbf", "T") );
+
+		CHECK( check_hook("1:tau!=1:tau", "F") );
+		CHECK( check_hook("0:tau!=0:tau", "F") );
+		CHECK( check_hook("1:tau!=0:tau", "T") );
+		CHECK( check_hook("0:tau!=1:tau", "T") );
+
+		CHECK( check_hook("1:tau!=1", "F") );
+		CHECK( check_hook("0:tau!=0", "F") );
+		CHECK( check_hook("1:tau!=0", "T") );
+		CHECK( check_hook("0:tau!=1", "T") );
+
+		CHECK( check_hook("1!=1:tau", "F") );
+		CHECK( check_hook("0!=0:tau", "F") );
+		CHECK( check_hook("1!=0:tau", "T") );
+		CHECK( check_hook("0!=1:tau", "T") );
+
+		CHECK( !check_hook("1:tau!=1:sbf", "F") );
+		CHECK( !check_hook("0:tau!=0:sbf", "F") );
+		CHECK( !check_hook("1:tau!=0:sbf", "T") );
+		CHECK( !check_hook("0:tau!=1:sbf", "T") );
+
+		CHECK( !check_hook("1:sbf!=1:tau", "F") );
+		CHECK( !check_hook("0:sbf!=0:tau", "F") );
+		CHECK( !check_hook("1:sbf!=0:tau", "T") );
+		CHECK( !check_hook("0:sbf!=1:tau", "T") );
+
 		CHECK( check_hook("{T}!=0", "T") );
 		CHECK( check_hook("{F}!=0", "F") );
+		CHECK( check_hook("{T}:tau!=0", "T") );
+		CHECK( check_hook("{F}:tau!=0", "F") );
+		CHECK( check_hook("{1}:sbf!=0", "T") );
+		// FIXME (HIGH) fix parser error
+		// CHECK( check_hook("{0}:sbf!=0", "F") );
 		CHECK( check_hook("x != y", "x + y != 0") );
 	}
 
@@ -171,6 +268,46 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("0<0", "F") );
 		CHECK( check_hook("1<0", "F") );
 		CHECK( check_hook("0<1", "T") );
+
+		CHECK( check_hook("1:sbf<1:sbf", "F") );
+		CHECK( check_hook("0:sbf<0:sbf", "F") );
+		CHECK( check_hook("1:sbf<0:sbf", "F") );
+		CHECK( check_hook("0:sbf<1:sbf", "T") );
+
+		CHECK( check_hook("1:sbf<1", "F") );
+		CHECK( check_hook("0:sbf<0", "F") );
+		CHECK( check_hook("1:sbf<0", "F") );
+		CHECK( check_hook("0:sbf<1", "T") );
+
+		CHECK( check_hook("1<1:sbf", "F") );
+		CHECK( check_hook("0<0:sbf", "F") );
+		CHECK( check_hook("1<0:sbf", "F") );
+		CHECK( check_hook("0<1:sbf", "T") );
+
+		CHECK( check_hook("1:tau<1:tau", "F") );
+		CHECK( check_hook("0:tau<0:tau", "F") );
+		CHECK( check_hook("1:tau<0:tau", "F") );
+		CHECK( check_hook("0:tau<1:tau", "T") );
+
+		CHECK( check_hook("1:tau<1", "F") );
+		CHECK( check_hook("0:tau<0", "F") );
+		CHECK( check_hook("1:tau<0", "F") );
+		CHECK( check_hook("0:tau<1", "T") );
+
+		CHECK( check_hook("1<1:tau", "F") );
+		CHECK( check_hook("0<0:tau", "F") );
+		CHECK( check_hook("1<0:tau", "F") );
+		CHECK( check_hook("0<1:tau", "T") );
+
+		CHECK( !check_hook("1:tau<1:sbf", "F") );
+		CHECK( !check_hook("0:tau<0:sbf", "F") );
+		CHECK( !check_hook("1:tau<0:sbf", "F") );
+		CHECK( !check_hook("0:tau<1:sbf", "T") );
+
+		CHECK( !check_hook("1:sbf<1:tau", "F") );
+		CHECK( !check_hook("0:sbf<0:tau", "F") );
+		CHECK( !check_hook("1:sbf<0:tau", "F") );
+		CHECK( !check_hook("0:sbf<1:tau", "T") );
 
 		CHECK( check_hook("X<0", "F") );
 		CHECK( check_hook("X<1", "X'!=0") );
@@ -182,6 +319,46 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("1!<0", "T") );
 		CHECK( check_hook("0!<1", "F") );
 
+		CHECK( check_hook("1:sbf!<1:sbf", "T") );
+		CHECK( check_hook("0:sbf!<0:sbf", "T") );
+		CHECK( check_hook("1:sbf!<0:sbf", "T") );
+		CHECK( check_hook("0:sbf!<1:sbf", "F") );
+
+		CHECK( check_hook("1:sbf!<1", "T") );
+		CHECK( check_hook("0:sbf!<0", "T") );
+		CHECK( check_hook("1:sbf!<0", "T") );
+		CHECK( check_hook("0:sbf!<1", "F") );
+
+		CHECK( check_hook("1!<1:sbf", "T") );
+		CHECK( check_hook("0!<0:sbf", "T") );
+		CHECK( check_hook("1!<0:sbf", "T") );
+		CHECK( check_hook("0!<1:sbf", "F") );
+
+		CHECK( check_hook("1:tau!<1:tau", "T") );
+		CHECK( check_hook("0:tau!<0:tau", "T") );
+		CHECK( check_hook("1:tau!<0:tau", "T") );
+		CHECK( check_hook("0:tau!<1:tau", "F") );
+
+		CHECK( check_hook("1:tau!<1", "T") );
+		CHECK( check_hook("0:tau!<0", "T") );
+		CHECK( check_hook("1:tau!<0", "T") );
+		CHECK( check_hook("0:tau!<1", "F") );
+
+		CHECK( check_hook("1!<1:tau", "T") );
+		CHECK( check_hook("0!<0:tau", "T") );
+		CHECK( check_hook("1!<0:tau", "T") );
+		CHECK( check_hook("0!<1:tau", "F") );
+
+		CHECK( !check_hook("1:tau!<1:sbf", "T") );
+		CHECK( !check_hook("0:tau!<0:sbf", "T") );
+		CHECK( !check_hook("1:tau!<0:sbf", "T") );
+		CHECK( !check_hook("0:tau!<1:sbf", "F") );
+
+		CHECK( !check_hook("1:sbf!<1:tau", "T") );
+		CHECK( !check_hook("0:sbf!<0:tau", "T") );
+		CHECK( !check_hook("1:sbf!<0:tau", "T") );
+		CHECK( !check_hook("0:sbf!<1:tau", "F") );
+
 		CHECK( check_hook("X!<0", "T") );
 		CHECK( check_hook("X!<1", "X'=0") );
 	}
@@ -191,6 +368,46 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("0>0", "F") );
 		CHECK( check_hook("1>0", "T") );
 		CHECK( check_hook("0>1", "F") );
+
+		CHECK( check_hook("1:sbf>1:sbf", "F") );
+		CHECK( check_hook("0:sbf>0:sbf", "F") );
+		CHECK( check_hook("1:sbf>0:sbf", "T") );
+		CHECK( check_hook("0:sbf>1:sbf", "F") );
+
+		CHECK( check_hook("1:sbf>1", "F") );
+		CHECK( check_hook("0:sbf>0", "F") );
+		CHECK( check_hook("1:sbf>0", "T") );
+		CHECK( check_hook("0:sbf>1", "F") );
+
+		CHECK( check_hook("1>1:sbf", "F") );
+		CHECK( check_hook("0>0:sbf", "F") );
+		CHECK( check_hook("1>0:sbf", "T") );
+		CHECK( check_hook("0>1:sbf", "F") );
+
+		CHECK( check_hook("1:tau>1:tau", "F") );
+		CHECK( check_hook("0:tau>0:tau", "F") );
+		CHECK( check_hook("1:tau>0:tau", "T") );
+		CHECK( check_hook("0:tau>1:tau", "F") );
+
+		CHECK( check_hook("1:tau>1", "F") );
+		CHECK( check_hook("0:tau>0", "F") );
+		CHECK( check_hook("1:tau>0", "T") );
+		CHECK( check_hook("0:tau>1", "F") );
+
+		CHECK( check_hook("1>1:tau", "F") );
+		CHECK( check_hook("0>0:tau", "F") );
+		CHECK( check_hook("1>0:tau", "T") );
+		CHECK( check_hook("0>1:tau", "F") );
+
+		CHECK( !check_hook("1:tau>1:sbf", "F") );
+		CHECK( !check_hook("0:tau>0:sbf", "F") );
+		CHECK( !check_hook("1:tau>0:sbf", "T") );
+		CHECK( !check_hook("0:tau>1:sbf", "F") );
+
+		CHECK( !check_hook("1:sbf>1:tau", "F") );
+		CHECK( !check_hook("0:sbf>0:tau", "F") );
+		CHECK( !check_hook("1:sbf>0:tau", "T") );
+		CHECK( !check_hook("0:sbf>1:tau", "F") );
 
 		CHECK( check_hook("X>1", "F") );
 		CHECK( check_hook("0>X", "F") );
@@ -202,6 +419,46 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("1!>0", "F") );
 		CHECK( check_hook("0!>1", "T") );
 
+		CHECK( check_hook("1:sbf!>1:sbf", "T") );
+		CHECK( check_hook("0:sbf!>0:sbf", "T") );
+		CHECK( check_hook("1:sbf!>0:sbf", "F") );
+		CHECK( check_hook("0:sbf!>1:sbf", "T") );
+
+		CHECK( check_hook("1:sbf!>1", "T") );
+		CHECK( check_hook("0:sbf!>0", "T") );
+		CHECK( check_hook("1:sbf!>0", "F") );
+		CHECK( check_hook("0:sbf!>1", "T") );
+
+		CHECK( check_hook("1!>1:sbf", "T") );
+		CHECK( check_hook("0!>0:sbf", "T") );
+		CHECK( check_hook("1!>0:sbf", "F") );
+		CHECK( check_hook("0!>1:sbf", "T") );
+
+		CHECK( check_hook("1:tau!>1:tau", "T") );
+		CHECK( check_hook("0:tau!>0:tau", "T") );
+		CHECK( check_hook("1:tau!>0:tau", "F") );
+		CHECK( check_hook("0:tau!>1:tau", "T") );
+
+		CHECK( check_hook("1:tau!>1", "T") );
+		CHECK( check_hook("0:tau!>0", "T") );
+		CHECK( check_hook("1:tau!>0", "F") );
+		CHECK( check_hook("0:tau!>1", "T") );
+
+		CHECK( check_hook("1!>1:tau", "T") );
+		CHECK( check_hook("0!>0:tau", "T") );
+		CHECK( check_hook("1!>0:tau", "F") );
+		CHECK( check_hook("0!>1:tau", "T") );
+
+		CHECK( !check_hook("1:tau!>1:sbf", "T") );
+		CHECK( !check_hook("0:tau!>0:sbf", "T") );
+		CHECK( !check_hook("1:tau!>0:sbf", "F") );
+		CHECK( !check_hook("0:tau!>1:sbf", "T") );
+
+		CHECK( !check_hook("1:sbf!>1:tau", "T") );
+		CHECK( !check_hook("0:sbf!>0:tau", "T") );
+		CHECK( !check_hook("1:sbf!>0:tau", "F") );
+		CHECK( !check_hook("0:sbf!>1:tau", "T") );
+
 		CHECK( check_hook("X!>1", "T") );
 		CHECK( check_hook("0!>X", "T") );
 	}
@@ -212,6 +469,46 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("1<=0", "F") );
 		CHECK( check_hook("0<=1", "T") );
 
+		CHECK( check_hook("1:sbf<=1:sbf", "T") );
+		CHECK( check_hook("0:sbf<=0:sbf", "T") );
+		CHECK( check_hook("1:sbf<=0:sbf", "F") );
+		CHECK( check_hook("0:sbf<=1:sbf", "T") );
+
+		CHECK( check_hook("1:sbf<=1", "T") );
+		CHECK( check_hook("0:sbf<=0", "T") );
+		CHECK( check_hook("1:sbf<=0", "F") );
+		CHECK( check_hook("0:sbf<=1", "T") );
+
+		CHECK( check_hook("1<=1:sbf", "T") );
+		CHECK( check_hook("0<=0:sbf", "T") );
+		CHECK( check_hook("1<=0:sbf", "F") );
+		CHECK( check_hook("0<=1:sbf", "T") );
+
+		CHECK( check_hook("1:tau<=1:tau", "T") );
+		CHECK( check_hook("0:tau<=0:tau", "T") );
+		CHECK( check_hook("1:tau<=0:tau", "F") );
+		CHECK( check_hook("0:tau<=1:tau", "T") );
+
+		CHECK( check_hook("1:tau<=1", "T") );
+		CHECK( check_hook("0:tau<=0", "T") );
+		CHECK( check_hook("1:tau<=0", "F") );
+		CHECK( check_hook("0:tau<=1", "T") );
+
+		CHECK( check_hook("1<=1:tau", "T") );
+		CHECK( check_hook("0<=0:tau", "T") );
+		CHECK( check_hook("1<=0:tau", "F") );
+		CHECK( check_hook("0<=1:tau", "T") );
+
+		CHECK( !check_hook("1:tau<=1:sbf", "T") );
+		CHECK( !check_hook("0:tau<=0:sbf", "T") );
+		CHECK( !check_hook("1:tau<=0:sbf", "F") );
+		CHECK( !check_hook("0:tau<=1:sbf", "T") );
+
+		CHECK( !check_hook("1:sbf<=1:tau", "T") );
+		CHECK( !check_hook("0:sbf<=0:tau", "T") );
+		CHECK( !check_hook("1:sbf<=0:tau", "F") );
+		CHECK( !check_hook("0:sbf<=1:tau", "T") );
+
 		CHECK( check_hook("X<=1", "T") );
 	}
 
@@ -220,6 +517,46 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("0!<=0", "F") );
 		CHECK( check_hook("1!<=0", "T") );
 		CHECK( check_hook("0!<=1", "F") );
+
+		CHECK( check_hook("1:sbf!<=1:sbf", "F") );
+		CHECK( check_hook("0:sbf!<=0:sbf", "F") );
+		CHECK( check_hook("1:sbf!<=0:sbf", "T") );
+		CHECK( check_hook("0:sbf!<=1:sbf", "F") );
+
+		CHECK( check_hook("1:sbf!<=1", "F") );
+		CHECK( check_hook("0:sbf!<=0", "F") );
+		CHECK( check_hook("1:sbf!<=0", "T") );
+		CHECK( check_hook("0:sbf!<=1", "F") );
+
+		CHECK( check_hook("1!<=1:sbf", "F") );
+		CHECK( check_hook("0!<=0:sbf", "F") );
+		CHECK( check_hook("1!<=0:sbf", "T") );
+		CHECK( check_hook("0!<=1:sbf", "F") );
+
+		CHECK( check_hook("1:tau!<=1:tau", "F") );
+		CHECK( check_hook("0:tau!<=0:tau", "F") );
+		CHECK( check_hook("1:tau!<=0:tau", "T") );
+		CHECK( check_hook("0:tau!<=1:tau", "F") );
+
+		CHECK( check_hook("1:tau!<=1", "F") );
+		CHECK( check_hook("0:tau!<=0", "F") );
+		CHECK( check_hook("1:tau!<=0", "T") );
+		CHECK( check_hook("0:tau!<=1", "F") );
+
+		CHECK( check_hook("1!<=1:tau", "F") );
+		CHECK( check_hook("0!<=0:tau", "F") );
+		CHECK( check_hook("1!<=0:tau", "T") );
+		CHECK( check_hook("0!<=1:tau", "F") );
+
+		CHECK( !check_hook("1:tau!<=1:sbf", "F") );
+		CHECK( !check_hook("0:tau!<=0:sbf", "F") );
+		CHECK( !check_hook("1:tau!<=0:sbf", "T") );
+		CHECK( !check_hook("0:tau!<=1:sbf", "F") );
+
+		CHECK( !check_hook("1:sbf!<=1:tau", "F") );
+		CHECK( !check_hook("0:sbf!<=0:tau", "F") );
+		CHECK( !check_hook("1:sbf!<=0:tau", "T") );
+		CHECK( !check_hook("0:sbf!<=1:tau", "F") );
 
 		CHECK( check_hook("X!<=1", "F") );
 	}
@@ -230,6 +567,46 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("1>=0", "T") );
 		CHECK( check_hook("0>=1", "F") );
 
+		CHECK( check_hook("1:sbf>=1:sbf", "T") );
+		CHECK( check_hook("0:sbf>=0:sbf", "T") );
+		CHECK( check_hook("1:sbf>=0:sbf", "T") );
+		CHECK( check_hook("0:sbf>=1:sbf", "F") );
+
+		CHECK( check_hook("1:sbf>=1", "T") );
+		CHECK( check_hook("0:sbf>=0", "T") );
+		CHECK( check_hook("1:sbf>=0", "T") );
+		CHECK( check_hook("0:sbf>=1", "F") );
+
+		CHECK( check_hook("1>=1:sbf", "T") );
+		CHECK( check_hook("0>=0:sbf", "T") );
+		CHECK( check_hook("1>=0:sbf", "T") );
+		CHECK( check_hook("0>=1:sbf", "F") );
+
+		CHECK( check_hook("1:tau>=1:tau", "T") );
+		CHECK( check_hook("0:tau>=0:tau", "T") );
+		CHECK( check_hook("1:tau>=0:tau", "T") );
+		CHECK( check_hook("0:tau>=1:tau", "F") );
+
+		CHECK( check_hook("1:tau>=1", "T") );
+		CHECK( check_hook("0:tau>=0", "T") );
+		CHECK( check_hook("1:tau>=0", "T") );
+		CHECK( check_hook("0:tau>=1", "F") );
+
+		CHECK( check_hook("1>=1:tau", "T") );
+		CHECK( check_hook("0>=0:tau", "T") );
+		CHECK( check_hook("1>=0:tau", "T") );
+		CHECK( check_hook("0>=1:tau", "F") );
+
+		CHECK( !check_hook("1:tau>=1:sbf", "T") );
+		CHECK( !check_hook("0:tau>=0:sbf", "T") );
+		CHECK( !check_hook("1:tau>=0:sbf", "T") );
+		CHECK( !check_hook("0:tau>=1:sbf", "F") );
+
+		CHECK( !check_hook("1:sbf>=1:tau", "T") );
+		CHECK( !check_hook("0:sbf>=0:tau", "T") );
+		CHECK( !check_hook("1:sbf>=0:tau", "T") );
+		CHECK( !check_hook("0:sbf>=1:tau", "F") );
+
 		CHECK( check_hook("X>=0", "T") );
 		CHECK( check_hook("1>=X", "T") );
 	}
@@ -239,6 +616,46 @@ TEST_SUITE("wff order hooks") {
 		CHECK( check_hook("0!>=0", "F") );
 		CHECK( check_hook("1!>=0", "F") );
 		CHECK( check_hook("0!>=1", "T") );
+
+		CHECK( check_hook("1:sbf!>=1:sbf", "F") );
+		CHECK( check_hook("0:sbf!>=0:sbf", "F") );
+		CHECK( check_hook("1:sbf!>=0:sbf", "F") );
+		CHECK( check_hook("0:sbf!>=1:sbf", "T") );
+
+		CHECK( check_hook("1:sbf!>=1", "F") );
+		CHECK( check_hook("0:sbf!>=0", "F") );
+		CHECK( check_hook("1:sbf!>=0", "F") );
+		CHECK( check_hook("0:sbf!>=1", "T") );
+
+		CHECK( check_hook("1!>=1:sbf", "F") );
+		CHECK( check_hook("0!>=0:sbf", "F") );
+		CHECK( check_hook("1!>=0:sbf", "F") );
+		CHECK( check_hook("0!>=1:sbf", "T") );
+
+		CHECK( check_hook("1:tau!>=1:tau", "F") );
+		CHECK( check_hook("0:tau!>=0:tau", "F") );
+		CHECK( check_hook("1:tau!>=0:tau", "F") );
+		CHECK( check_hook("0:tau!>=1:tau", "T") );
+
+		CHECK( check_hook("1:tau!>=1", "F") );
+		CHECK( check_hook("0:tau!>=0", "F") );
+		CHECK( check_hook("1:tau!>=0", "F") );
+		CHECK( check_hook("0:tau!>=1", "T") );
+
+		CHECK( check_hook("1!>=1:tau", "F") );
+		CHECK( check_hook("0!>=0:tau", "F") );
+		CHECK( check_hook("1!>=0:tau", "F") );
+		CHECK( check_hook("0!>=1:tau", "T") );
+
+		CHECK( !check_hook("1:tau!>=1:sbf", "F") );
+		CHECK( !check_hook("0:tau!>=0:sbf", "F") );
+		CHECK( !check_hook("1:tau!>=0:sbf", "F") );
+		CHECK( !check_hook("0:tau!>=1:sbf", "T") );
+
+		CHECK( !check_hook("1:sbf!>=1:tau", "F") );
+		CHECK( !check_hook("0:sbf!>=0:tau", "F") );
+		CHECK( !check_hook("1:sbf!>=0:tau", "F") );
+		CHECK( !check_hook("0:sbf!>=1:tau", "T") );
 
 		CHECK( check_hook("X!>=0", "F") );
 		CHECK( check_hook("1!>=X", "F") );

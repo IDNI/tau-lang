@@ -27,30 +27,55 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-bool check_hook(const char* sample, const char* expected) {
-	auto tau_sample = make_nso_using_factory<
-		tau_ba<bdd_binding>, bdd_binding>(sample, { .start = tau_parser::bf }).value();
-	auto tau_expected = make_nso_using_factory<
-		tau_ba<bdd_binding>, bdd_binding>(expected, { .start = tau_parser::bf }).value();
+TEST_SUITE("configuration") {
 
-	#ifdef DEBUG
-	std::string str(sample);
-	std::cout << "sample: " << str << " expected: " << tau_expected << " got: " << tau_sample << "\n";
-	#endif // DEBUG
-
-	return tau_sample == tau_expected;
+	TEST_CASE("bdd_init") {
+		bdd_init<Bool>();
+	}
 }
 
-TEST_SUITE("wff logical hooks") {
+TEST_SUITE("bf operator hooks") {
+
+	bool check_hook(const char* sample, const char* expected) {
+		auto tau_sample = make_nso_using_factory<
+			tau_ba<bdd_binding>, bdd_binding>(sample, { .start = tau_parser::bf }).value();
+		auto tau_expected = make_nso_using_factory<
+			tau_ba<bdd_binding>, bdd_binding>(expected, { .start = tau_parser::bf }).value();
+
+		#ifdef DEBUG
+		std::string str(sample);
+		std::cout << "sample: " << str << " expected: " << tau_expected << " got: " << tau_sample << "\n";
+		#endif // DEBUG
+
+		return tau_sample == tau_expected;
+	}
+
+	TEST_CASE("conversion to 1/0") {
+		//CHECK( check_hook("{0}:sbf", "0:sbf") );
+		//CHECK( check_hook("{1}:sbf", "1:sbf") );
+
+		CHECK( check_hook("{T}", "1:tau") );
+		CHECK( check_hook("{F}", "0:tau") );
+
+		CHECK( check_hook("{T}:tau", "1:tau") );
+		CHECK( check_hook("{F}:tau", "0:tau") );
+
+		CHECK( check_hook("{1}:sbf", "1:sbf") );
+		// FIXME (HIGH) fix parser error
+		//CHECK( check_hook("{0}:sbf", "0:sbf") );
+	}
 
 	TEST_CASE("'") {
 		CHECK( check_hook("0'", "1") );
 		CHECK( check_hook("1'", "0") );
 
-		CHECK( check_hook("x''", "x") );
+		CHECK( check_hook("0:sbf'", "1:sbf") );
+		CHECK( check_hook("1:sbf'", "0:sbf") );
 
-		CHECK( check_hook("{T}'", "0") );
-		CHECK( check_hook("{F}'", "1") );
+		CHECK( check_hook("0:tau'", "1:tau") );
+		CHECK( check_hook("1:tau'", "0:tau") );
+
+		CHECK( check_hook("x''", "x") );
 	}
 
 	TEST_CASE("|") {
@@ -59,6 +84,46 @@ TEST_SUITE("wff logical hooks") {
 		CHECK( check_hook("1|1", "1") );
 		CHECK( check_hook("0|0", "0") );
 
+		CHECK( check_hook("1:sbf|0:sbf", "1:sbf") );
+		CHECK( check_hook("0:sbf|1:sbf", "1:sbf") );
+		CHECK( check_hook("1:sbf|1:sbf", "1:sbf") );
+		CHECK( check_hook("0:sbf|0:sbf", "0:sbf") );
+
+		CHECK( check_hook("1:sbf|0", "1:sbf") );
+		CHECK( check_hook("0:sbf|1", "1:sbf") );
+		CHECK( check_hook("1:sbf|1", "1:sbf") );
+		CHECK( check_hook("0:sbf|0", "0:sbf") );
+
+		CHECK( check_hook("1|0:sbf", "1:sbf") );
+		CHECK( check_hook("0|1:sbf", "1:sbf") );
+		CHECK( check_hook("1|1:sbf", "1:sbf") );
+		CHECK( check_hook("0|0:sbf", "0:sbf") );
+
+		CHECK( check_hook("1:tau|0:tau", "1:tau") );
+		CHECK( check_hook("0:tau|1:tau", "1:tau") );
+		CHECK( check_hook("1:tau|1:tau", "1:tau") );
+		CHECK( check_hook("0:tau|0:tau", "0:tau") );
+
+		CHECK( check_hook("1|0:tau", "1:tau") );
+		CHECK( check_hook("0|1:tau", "1:tau") );
+		CHECK( check_hook("1|1:tau", "1:tau") );
+		CHECK( check_hook("0|0:tau", "0:tau") );
+
+		CHECK( check_hook("1:tau|0", "1:tau") );
+		CHECK( check_hook("0:tau|1", "1:tau") );
+		CHECK( check_hook("1:tau|1", "1:tau") );
+		CHECK( check_hook("0:tau|0", "0:tau") );
+
+		CHECK( !check_hook("1:sbf|0:tau", "1") );
+		CHECK( !check_hook("0:sbf|1:tau", "1") );
+		CHECK( !check_hook("1:sbf|1:tau", "1") );
+		CHECK( !check_hook("0:sbf|0:tau", "0") );
+
+		CHECK( !check_hook("1:tau|0:sbf", "1") );
+		CHECK( !check_hook("0:tau|1:sbf", "1") );
+		CHECK( !check_hook("1:tau|1:sbf", "1") );
+		CHECK( !check_hook("0:tau|0:sbf", "0") );
+
 		CHECK( check_hook("1|x", "1") );
 		CHECK( check_hook("x|1", "1") );
 		CHECK( check_hook("0|x", "x") );
@@ -66,11 +131,6 @@ TEST_SUITE("wff logical hooks") {
 		CHECK( check_hook("x|x", "x") );
 		CHECK( check_hook("x|x'", "1") );
 		CHECK( check_hook("x'|x", "1") );
-
-		CHECK( check_hook("{T}|{T}", "1"));
-		CHECK( check_hook("{T}|{F}", "1"));
-		CHECK( check_hook("{F}|{T}", "1"));
-		CHECK( check_hook("{F}|{F}", "0"));
 	}
 
 	TEST_CASE("&") {
@@ -79,6 +139,46 @@ TEST_SUITE("wff logical hooks") {
 		CHECK( check_hook("1&1", "1") );
 		CHECK( check_hook("0&0", "0") );
 
+		CHECK( check_hook("1:sbf&0:sbf", "0:sbf") );
+		CHECK( check_hook("0:sbf&1:sbf", "0:sbf") );
+		CHECK( check_hook("1:sbf&1:sbf", "1:sbf") );
+		CHECK( check_hook("0:sbf&0:sbf", "0:sbf") );
+
+		CHECK( check_hook("1:sbf&0", "0:sbf") );
+		CHECK( check_hook("0:sbf&1", "0:sbf") );
+		CHECK( check_hook("1:sbf&1", "1:sbf") );
+		CHECK( check_hook("0:sbf&0", "0:sbf") );
+
+		CHECK( check_hook("1&0:sbf", "0:sbf") );
+		CHECK( check_hook("0&1:sbf", "0:sbf") );
+		CHECK( check_hook("1&1:sbf", "1:sbf") );
+		CHECK( check_hook("0&0:sbf", "0:sbf") );
+
+		CHECK( check_hook("1:tau&0:tau", "0:tau") );
+		CHECK( check_hook("0:tau&1:tau", "0:tau") );
+		CHECK( check_hook("1:tau&1:tau", "1:tau") );
+		CHECK( check_hook("0:tau&0:tau", "0:tau") );
+
+		CHECK( check_hook("1&0:tau", "0:tau") );
+		CHECK( check_hook("0&1:tau", "0:tau") );
+		CHECK( check_hook("1&1:tau", "1:tau") );
+		CHECK( check_hook("0&0:tau", "0:tau") );
+
+		CHECK( check_hook("1:tau&0", "0:tau") );
+		CHECK( check_hook("0:tau&1", "0:tau") );
+		CHECK( check_hook("1:tau&1", "1:tau") );
+		CHECK( check_hook("0:tau&0", "0:tau") );
+
+		CHECK( !check_hook("1:sbf&0:tau", "0") );
+		CHECK( !check_hook("0:sbf&1:tau", "0") );
+		CHECK( !check_hook("1:sbf&1:tau", "1") );
+		CHECK( !check_hook("0:sbf&0:tau", "0") );
+
+		CHECK( !check_hook("1:tau&0:sbf", "0") );
+		CHECK( !check_hook("0:tau&1:sbf", "0") );
+		CHECK( !check_hook("1:tau&1:sbf", "1") );
+		CHECK( !check_hook("0:tau&0:sbf", "0") );
+
 		CHECK( check_hook("1&x", "x") );
 		CHECK( check_hook("x&1", "x") );
 		CHECK( check_hook("0&x", "0") );
@@ -86,11 +186,6 @@ TEST_SUITE("wff logical hooks") {
 		CHECK( check_hook("x&x", "x") );
 		CHECK( check_hook("x&x'", "0") );
 		CHECK( check_hook("x'&x", "0") );
-
-		CHECK( check_hook("{T}&{T}", "1"));
-		CHECK( check_hook("{T}&{F}", "0"));
-		CHECK( check_hook("{F}&{T}", "0"));
-		CHECK( check_hook("{F}&{F}", "0"));
 	}
 
 	TEST_CASE("+") {
@@ -99,6 +194,46 @@ TEST_SUITE("wff logical hooks") {
 		CHECK( check_hook("1+1", "0") );
 		CHECK( check_hook("0+0", "0") );
 
+		CHECK( check_hook("1:sbf+0:sbf", "1:sbf") );
+		CHECK( check_hook("0:sbf+1:sbf", "1:sbf") );
+		CHECK( check_hook("1:sbf+1:sbf", "0:sbf") );
+		CHECK( check_hook("0:sbf+0:sbf", "0:sbf") );
+
+		CHECK( check_hook("1:sbf+0", "1:sbf") );
+		CHECK( check_hook("0:sbf+1", "1:sbf") );
+		CHECK( check_hook("1:sbf+1", "0:sbf") );
+		CHECK( check_hook("0:sbf+0", "0:sbf") );
+
+		CHECK( check_hook("1+0:sbf", "1:sbf") );
+		CHECK( check_hook("0+1:sbf", "1:sbf") );
+		CHECK( check_hook("1+1:sbf", "0:sbf") );
+		CHECK( check_hook("0+0:sbf", "0:sbf") );
+
+		CHECK( check_hook("1:tau+0:tau", "1:tau") );
+		CHECK( check_hook("0:tau+1:tau", "1:tau") );
+		CHECK( check_hook("1:tau+1:tau", "0:tau") );
+		CHECK( check_hook("0:tau+0:tau", "0:tau") );
+
+		CHECK( check_hook("1+0:tau", "1:tau") );
+		CHECK( check_hook("0+1:tau", "1:tau") );
+		CHECK( check_hook("1+1:tau", "0:tau") );
+		CHECK( check_hook("0+0:tau", "0:tau") );
+
+		CHECK( check_hook("1:tau+0", "1:tau") );
+		CHECK( check_hook("0:tau+1", "1:tau") );
+		CHECK( check_hook("1:tau+1", "0:tau") );
+		CHECK( check_hook("0:tau+0", "0:tau") );
+
+		CHECK( !check_hook("1:sbf+0:tau", "1") );
+		CHECK( !check_hook("0:sbf+1:tau", "1") );
+		CHECK( !check_hook("1:sbf+1:tau", "0") );
+		CHECK( !check_hook("0:sbf+0:tau", "0") );
+
+		CHECK( !check_hook("1:tau+0:sbf", "1") );
+		CHECK( !check_hook("0:tau+1:sbf", "1") );
+		CHECK( !check_hook("1:tau+1:sbf", "0") );
+		CHECK( !check_hook("0:tau+0:sbf", "0") );
+
 		CHECK( check_hook("1+x", "x'") );
 		CHECK( check_hook("x+1", "x'") );
 		CHECK( check_hook("0+x", "x") );
@@ -106,11 +241,5 @@ TEST_SUITE("wff logical hooks") {
 		CHECK( check_hook("x+x", "0") );
 		CHECK( check_hook("x+x'", "1") );
 		CHECK( check_hook("x'+x", "1") );
-
-
-		CHECK( check_hook("{T}+{T}", "0") );
-		CHECK( check_hook("{T}+{F}", "1") );
-		CHECK( check_hook("{F}+{T}", "1") );
-		CHECK( check_hook("{F}+{F}", "0") );
 	}
 }

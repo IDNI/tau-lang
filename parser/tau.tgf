@@ -83,8 +83,8 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | (bf  _ '+' _       bf)             :bf_xor
                         | (bf (_ '&' _ | __) bf)             :bf_and
                         | (bf _ "'")                         :bf_neg
-                        | '1'                                :bf_t
-                        | '0'                                :bf_f
+                        | ('1' [ _ ':' _ type ])             :bf_t
+                        | ('0' [ _ ':' _ type ])             :bf_f
                         |                                     capture.
 
 # bf_and alternation without a separator between operands
