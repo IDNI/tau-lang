@@ -622,7 +622,7 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 			return previous.back();
 		}
 		else if (previous.size() > 1
-			&& (t == tau_parser::bf
+			&& (t == tau_parser::wff
 				? is_nso_equivalent_to_any_of(current, previous)
 				: is_bf_same_to_any_of(current, previous)))
 		{
