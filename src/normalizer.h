@@ -612,7 +612,9 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 
 		if (previous.size()
-			&& are_nso_equivalent<BAs...>(current, previous.back()))
+		&& (t == tau_parser::wff
+			? are_nso_equivalent<BAs...>(current, previous.back())
+			: are_bf_equal(current, previous.back())))
 		{
 			BOOST_LOG_TRIVIAL(debug) << eos
 				<< " - fixed point found at step: " << i;
@@ -620,7 +622,9 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 			return previous.back();
 		}
 		else if (previous.size() > 1
-			&& is_nso_equivalent_to_any_of(current, previous))
+			&& (t == tau_parser::bf
+				? is_nso_equivalent_to_any_of(current, previous)
+				: is_bf_same_to_any_of(current, previous)))
 		{
 			BOOST_LOG_TRIVIAL(debug) << eos
 				<< " - loop (no fixed point) "
