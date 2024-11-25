@@ -1471,13 +1471,8 @@ template<typename... BAs>
 bool has_temp_var (const nso<BAs...>& fm) {
 	auto io_vars = select_top(fm, is_non_terminal<tau_parser::io_var, BAs...>);
 	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
-	for (const auto& io_var : io_vars) {
-		if (find_top(io_var, is_non_terminal<tau_parser::shift, BAs...>))
-			return true;
-		if (!find_top(io_var, is_non_terminal<tau_parser::num, BAs...>))
-			return true;
-	}
-	return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
+	// any input/output stream is a temporal variable, also constant positions
+	else return true;
 }
 
 // Check that no non-temporal quantified variable appears nested in the scope of
@@ -1535,33 +1530,13 @@ bool has_open_tau_fm_in_constant (const sp_tau_node<BAs...>& fm) {
 	return false;
 }
 
-template<typename... BAs>
-bool has_non_temp_in_sometimes (const sp_tau_node<BAs...>& fm) {
-	auto sts = select_top(fm, is_child_non_terminal<tau_parser::wff_sometimes, BAs...>);
-	for (const auto& st : sts) {
-		// Check that there is no non-temporal in sometimes statement
-		auto clauses = get_dnf_wff_clauses(trim2(st));
-		for (const auto& c : clauses) {
-			auto conjs = get_cnf_wff_clauses(c);
-			for (const auto& conj : conjs) {
-				if (!has_temp_var(conj)) {
-					BOOST_LOG_TRIVIAL(error) << "(Error) Non temporal formula found in sometimes statement: " << conj;
-					return true;
-				}
-			}
-		}
-	}
-	return false;
-}
-
 // This function is used to check for semantic errors in formulas since those
 // cannot be captured by the grammar
 template<typename... BAs>
 bool has_semantic_error (const sp_tau_node<BAs...>& fm) {
 	bool error = invalid_nesting_of_quants(fm)
 			|| has_open_tau_fm_in_constant(fm)
-			|| invalid_nesting_of_temp_quants(fm)
-			|| has_non_temp_in_sometimes(fm);
+			|| invalid_nesting_of_temp_quants(fm);
 	return error;
 }
 
@@ -1616,7 +1591,7 @@ sp_tau_node<BAs...> bind_tau_code_using_binder(const sp_tau_node<BAs...>& code,
 			rewriter::all_t,
 			sp_tau_node<BAs...>>(bs, rewriter::all)(code);
 	// Check for errors which cannot be captured by the grammar
-	if (has_semantic_error(res)) return {};
+	if (res && has_semantic_error(res)) return {};
 	else return res;
 }
 
@@ -2086,6 +2061,7 @@ rr<nso<BAs...>> infer_ref_types(const rr<nso<BAs...>>& nso_rr) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
 		BOOST_LOG_TRIVIAL(error) << "(Error) Unknown type for:" << ss.str();
+		return { {}, nullptr };
 	}
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End type inferrence"; // << ": " << nn;
 	return nn;
@@ -2558,9 +2534,11 @@ std::optional<sp_tau_node<BAs...>> build_bf_constant(
 }
 
 template<typename... BAs>
-sp_tau_node<BAs...> build_wff_uniter_const(const std::string& name) {
-	auto var = make_builder<BAs...>("( $X ) =:: <:" + name + "> != 0.").second;
-	return trim<BAs...>(var);
+sp_tau_node<BAs...> build_bf_uniter_const(const std::string& n1, const std::string& n2) {
+	auto name = wrap<BAs...>(tau_parser::uninter_const_name, n1 + ":" + n2);
+	return wrap(tau_parser::bf,
+		wrap(tau_parser::variable,
+			wrap(tau_parser::uninterpreted_constant, name)));
 }
 
 // wff factory method for building wff formulas
@@ -3042,14 +3020,25 @@ sp_tau_node<BAs...> operator+(const sp_tau_node<BAs...>& l,
 // This function traverses n and normalizes coefficients in a BF
 template<typename... BAs>
 sp_tau_node<BAs...> normalize_ba(const sp_tau_node<BAs...>& fm) {
+#ifdef TAU_CACHE
+	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(fm); it != cache.end())
+		return it->second;
+#endif
 	assert(is_non_terminal(tau_parser::bf, fm));
-	auto norm_ba = [](const auto& n, const auto& c) {
+	auto norm_ba = [&](const auto& n, const auto& c) {
 
 		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/n: " << n;
 		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/c: " << c;
 
-		if (!is_child_non_terminal(tau_parser::bf_constant, n))
-			return n->child == c ? n : make_node(n->value, c);
+		if (!is_child_non_terminal(tau_parser::bf_constant, n)) {
+			auto res = n->child == c ? n : make_node(n->value, c);
+#ifdef TAU_CACHE
+			cache.emplace(res, res);
+			return cache.emplace(n, res).first->second;
+#endif
+			return res;
+		}
 		auto ba_elem = n
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -3058,8 +3047,13 @@ sp_tau_node<BAs...> normalize_ba(const sp_tau_node<BAs...>& fm) {
 			| optional_value_extractor<std::variant<BAs...>>;
 		auto res = normalize_ba(ba_elem);
 		using p = tau_parser;
-		return wrap(p::bf, wrap(p::bf_constant, wrap(p::constant,
+		auto r = wrap(p::bf, wrap(p::bf_constant, wrap(p::constant,
 			rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(res), {}))));
+#ifdef TAU_CACHE
+		cache.emplace(r, r);
+		return cache.emplace(n, r).first->second;
+#endif
+		return r;
 	};
 	return rewriter::post_order_recursive_traverser<sp_tau_node<BAs...>>()(
 						fm, rewriter::all, norm_ba);

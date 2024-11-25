@@ -78,7 +78,28 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 		// Normalize always and sometimes quantifiers and reduce Tau formula
 		| sometimes_always_normalization<BAs...>();
 	#ifdef TAU_CACHE
-	cache[form] = result;
+	cache.emplace(form, result);
+	#endif // TAU_CACHE
+	return result;
+}
+
+// Assumes that the formula passed does not have temporal quantifiers
+// This normalization will non perform the temporal normalization
+template<typename ... BAs>
+nso<BAs...> normalize_non_temp(const nso<BAs...>& fm) {
+	#ifdef TAU_CACHE
+	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(fm); it != cache.end()) return it->second;
+	#endif // TAU_CACHE
+	auto result = fm
+		// Push all quantifiers in and eliminate them
+		| (nso_transform<BAs...>)eliminate_quantifiers<BAs...>
+		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
+		// are reduced
+		| bf_reduce_canonical<BAs...>();
+	result = reduce_across_bfs(result, false);
+	#ifdef TAU_CACHE
+	cache.emplace(fm, result);
 	#endif // TAU_CACHE
 	return result;
 }
@@ -199,30 +220,31 @@ bool has_no_boolean_combs_of_models(const nso<BAs...>& fm) {
 	return true;
 }
 
-template<typename... BAs>
-nso<BAs...> convert_uconsts_to_var (const nso<BAs...>& fm) {
-	auto uconsts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
-	std::map<nso<BAs...>, nso<BAs...>> changes;
-	for (const auto& uc : uconsts) {
-		std::stringstream ss; ss << uc;
-		auto tvar = build_variable<BAs...>(ss.str());
-		changes.emplace(uc, tvar);
-	}
-	return replace(fm, changes);
-}
+// This method was used before tau_parser::uninterpreted constant was moved
+// under the tau_parser::variable node
+// template<typename... BAs>
+// nso<BAs...> convert_uconsts_to_var (const nso<BAs...>& fm) {
+// 	auto uconsts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
+// 	std::map<nso<BAs...>, nso<BAs...>> changes;
+// 	for (const auto& uc : uconsts) {
+// 		std::stringstream ss; ss << uc;
+// 		auto tvar = build_variable<BAs...>(ss.str());
+// 		changes.emplace(uc, tvar);
+// 	}
+// 	return replace(fm, changes);
+// }
 
 template<typename... BAs>
 bool is_non_temp_nso_satisfiable (const nso<BAs...>& fm) {
-	assert(!has_temp_var(fm));
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_always, BAs...>));
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>));
 
 	auto new_fm = fm;
 	// Convert uninterpreted constants to variables for sat check
-	new_fm = convert_uconsts_to_var(new_fm);
+	// new_fm = convert_uconsts_to_var(new_fm);
 	auto vars = get_free_vars_from_nso(new_fm);
 	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
-	auto normalized = normalizer_step<BAs...>(new_fm);
+	auto normalized = normalize_non_temp<BAs...>(new_fm);
 	assert((normalized == _T<BAs...> || normalized == _F<BAs...>));
 	return normalized == _T<BAs...>;
 }
@@ -262,8 +284,8 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 	nso<BAs...> imp1 = build_wff_imply<BAs...>(n1, n2);
 	nso<BAs...> imp2 = build_wff_imply<BAs...>(n2, n1);
 	// Convert uninterpreted constants to variables for equiv check
-	imp1 = convert_uconsts_to_var(imp1);
-	imp2 = convert_uconsts_to_var(imp2);
+	// imp1 = convert_uconsts_to_var(imp1);
+	// imp2 = convert_uconsts_to_var(imp2);
 	auto vars = get_free_vars_from_nso(imp1);
 
 	for(auto& v: vars) {
@@ -309,7 +331,7 @@ bool are_bf_equal(nso<BAs...> n1, nso<BAs...> n2) {
 
 	nso<BAs...> bf_equal_fm = build_wff_eq(build_bf_xor(n1, n2));
 	// Replace uninterpreted constants by variables for equivalence check
-	bf_equal_fm = convert_uconsts_to_var(bf_equal_fm);
+	// bf_equal_fm = convert_uconsts_to_var(bf_equal_fm);
 
 	auto vars = get_free_vars_from_nso(bf_equal_fm);
 	for(auto& v: vars) bf_equal_fm = build_wff_all<BAs...>(v, bf_equal_fm);
@@ -544,7 +566,7 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
 	//ptree<BAs...>(std::cout << "form: ", form) << "\n";
 
-	if (!is_well_founded(nso_rr)) return fallback;
+	if (!is_well_founded(nso_rr)) return nullptr;
 
 	std::vector<nso<BAs...>> previous;
 	nso<BAs...> current;
@@ -611,7 +633,8 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 		previous.push_back(current);
 	}
-	return fallback;
+	DBG(assert(0);)
+	return nullptr;
 }
 
 // calculate fixed points called from main and replace them by their results
@@ -632,9 +655,12 @@ struct fixed_point_transformer {
 			&& is_non_terminal<tau_parser::bf_ref, BAs...>(ref));
 		if (!is_ref) return n;
 		auto [type, offset_arity] = get_type_info(types, ref);
-		if (offset_arity) return changes.emplace(n,
-			calculate_fixed_point(defs, n, type, offset_arity))
-				.first->second;
+		if (offset_arity) {
+			auto fp = calculate_fixed_point(defs, n, type,
+					offset_arity);
+			if (!fp) return nullptr;
+			return changes.emplace(n, fp).first->second;
+		}
 		bool changed = false;
 		std::vector<sp_tau_node<BAs...>> child;
 		if (changes.contains(ref))
@@ -676,11 +702,12 @@ nso<BAs...> apply_rr_to_formula (const rr<nso<BAs...>>& nso_rr) {
 	rr_types types;
 	bool success = true;
 	get_rr_types(success, types, nso_rr);
-	if (!success || !is_valid(nso_rr)) return _F<BAs...>;
+	if (!success || !is_valid(nso_rr)) return nullptr;
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<BAs...> fpt(nso_rr, types);
-	auto new_main = rewriter::post_order_traverser<decltype(fpt), rewriter::all_t,
-		nso<BAs...>>(fpt, rewriter::all)(nso_rr.main);
+	auto new_main = rewriter::post_order_traverser<decltype(fpt),
+		rewriter::all_t, nso<BAs...>>(fpt, rewriter::all)(nso_rr.main);
+	if (!new_main) return nullptr;
 	if (fpt.changes.size()) {
 		new_main = replace(new_main, fpt.changes);
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
@@ -703,6 +730,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
 
 	auto fm = apply_rr_to_formula(nso_rr);
+	if (!fm) return nullptr;
 	auto res = normalizer_step(fm);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";

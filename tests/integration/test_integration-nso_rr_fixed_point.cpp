@@ -28,15 +28,22 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-bool fp_test(const char* sample, const size_t& nt) {
+bool fp_test(const char* sample, const size_t& nt, bool expect_fail = false) {
 	auto sample_src = make_tau_source(sample);
 	auto formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
-	return formula.has_value()
-		&& (normalizer<bdd_binding>(formula.value()) | nt).has_value();
+	if (!formula) return expect_fail;
+	auto normalized = normalizer<bdd_binding>(formula.value());
+	if (!normalized) return expect_fail;
+	auto ret = (normalized | nt).has_value();
+	return expect_fail ? !ret : ret;
 }
 
 bool fp_test_wff_f(const char* sample) {
 	return fp_test(sample, tau_parser::wff_f);
+}
+
+bool fp_test_fail(const char* sample) {
+	return fp_test(sample, tau_parser::wff_f, true);
 }
 
 TEST_SUITE("rec relations fixed point") {
@@ -92,28 +99,29 @@ TEST_SUITE("rec relations well foundedness") {
 		const char* sample =
 			"f[n-1](x) := f[n-2](x)."
 			"f(x).";
-		CHECK( fp_test_wff_f(sample) );
+		CHECK( fp_test_fail(sample) );
 	}
 
 	TEST_CASE("left fixed, right relative") {
 		const char* sample =
 			"f[0](x) := f[n](x)."
 			"f(x).";
-		CHECK( fp_test_wff_f(sample) );
+		CHECK( fp_test_fail(sample) );
 	}
 
 	TEST_CASE("left < right") {
 		const char* sample =
 			"f[1](x) := f[2](x)."
 			"f(x).";
-		CHECK( fp_test_wff_f(sample) );
+		CHECK( fp_test_fail(sample) );
 	}
 
 	TEST_CASE("detect cycle direct") {
 		const char* sample =
+			"f[0](x) := T."
 			"f[n](x) := f[n](x)."
 			"f(x).";
-		CHECK( fp_test_wff_f(sample) );
+		CHECK( fp_test_fail(sample) );
 	}
 
 	TEST_CASE("detect cycle indirect") {
@@ -121,7 +129,7 @@ TEST_SUITE("rec relations well foundedness") {
 			"f[n](x) := g[n](x)."
 			"g[n](x) := f[n](x)."
 			"g(x).";
-		CHECK( fp_test_wff_f(sample) );
+		CHECK( fp_test_fail(sample) );
 	}
 
 	TEST_CASE("no rule") {
@@ -129,7 +137,7 @@ TEST_SUITE("rec relations well foundedness") {
 			"g[0](Y) := T."
 			"g[1](Y) := T."
 			"g(Y).";
-		CHECK( fp_test_wff_f(sample) );
+		CHECK( fp_test_fail(sample) );
 	}
 
 }
