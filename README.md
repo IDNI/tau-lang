@@ -45,7 +45,7 @@ Tau Language is about enabling you to create software that elegantly adapts to
 meet your requirements in a fully formal, correct-by-construction manner.
 
 Tau Language is uniquely vastly expressive while retaining decidability and
-allows you to refer to sentences in Tau language. And, as you'll see, offers
+allows you to refer to sentences in Tau Language. And, as you'll see, offers
 many advantages when compared to other common formal languages and programming
 languages.
 
@@ -53,9 +53,9 @@ Tau Language offers a future where whether you're a developer, end-user, or
 stakeholder, Tau-built software will be able to accurately adapt to be what
 you, or a group of users, want it to be.
 
-More precisely, The Tau language is a logical software specification language.
+More precisely, the Tau Language is a logical software specification language.
 It allows you to write constraints about software, check for satisfiability, and
-run a candidate program that meet those specifications. All related logical
+run a candidate program that meets those specifications. All related logical
 tasks are decidable. It is based on the first-order theory of atomless Boolean
 algebras.
 
@@ -66,7 +66,7 @@ refer to:
 * Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
 
 
-This README.md in structured in the following way: first, we provide a detailed
+This README.md is structured in the following way: first, we provide a detailed
 explanation of the Tau Language, including the syntax and semantics of the
 language. Then, we provide a quick start guide to start using the Tau Language.
 Finally, we provide a guide to install the Tau Framework in your system, how to
@@ -118,7 +118,7 @@ to build the binaries.
 To build with doxygen documentation:
 
 ```bash
- # Compiles the source code in release mode and also the documentation
+# Compiles the source code in release mode and also the documentation
 ./release.sh -DBUILD_DOC=ON
 # Compiles the source code in debug mode and also the documentation
 ./debug.sh -DBUILD_DOC=ON
@@ -127,7 +127,7 @@ To build with doxygen documentation:
 ```
 
 Once you have compiled the source code you can run the `tau` executable to
-execute Tau programs. The `tau` executable is located in the either `build-Release`
+execute Tau programs. The `tau` executable is located in either `build-Release`
 or `build-Debug` or `build-RelWithDebInfo`.
 
 
@@ -135,20 +135,20 @@ or `build-Debug` or `build-RelWithDebInfo`.
 # **Quick start**
 
 To start using the Tau Language, download the latest release from the
-[GitHuub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
+[GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
 you have downloaded and installed the executable (see the Section
 [Installing the Tau Framework](#installing-the-tau-framework)), you can run
 it from the command line just by typing `tau`.
 
-The programming model underlying the Tau language is fully declarative. You
+The programming model underlying the Tau Language is fully declarative. You
 specify, possibly only very implicitly, how the current and previous inputs and
-outputs are related, at each point of time. So what you write in the Tau language
+outputs are related, at each point of time. So what you write in the Tau Language
 is not a program, but a specification, or spec, which represents all programs that
 meet the specification. Once you run a specification, you actually run one
 automatically-chosen representative program from that set.
 
-In the scope of the Tau language, a program means that for all inputs, at each
-point of time, exist outputs, that clearly do not depend on future inputs
+In the scope of the Tau Language, a program means that for all inputs, at each
+point in time, exist outputs, that clearly do not depend on future inputs
 ("time-compatible"). Implied from this definition is that all programs run
 indefinitely no matter what the inputs are.
 
@@ -165,7 +165,7 @@ following program:
 o1[t] = i1[t]
 ```
 
-which states that the output `o1` at time `t` has to be the same as the input
+states that the output `o1` at time `t` has to be the same as the input
 `i1` at time `t`.
 In the above examples, `o1` and `i1` are IO variables. They are used to define
 
@@ -179,8 +179,8 @@ tau o1 = console
 ```
 
 In the above case we specify that `i1` and `o1` are of type `tau` and they take
-values from the console (let say stdin for the input and stdout for the output).
-You couls define as IO streams also files:
+values from the console (lets say stdin for the input and stdout for the output).
+You can define as IO streams also files:
 
 ```
 tau i1 = ifile("input.in")
@@ -197,7 +197,7 @@ o1[t] & i1[t] = 0
 
 Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
 are taken from. This spec says that the conjunction has to be empty.
-You can clearly consider more complicated specifications, e.g;.:
+You can clearly consider more complicated specifications, e.g.:
 
 ```
 o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
@@ -244,7 +244,7 @@ and workings.
 
 # **The Tau Language**
 
-In the Tau language you define how the current and previous inputs and outputs
+In the Tau Language you define how the current and previous inputs and outputs
 are related over time, using the first-order theory of atomless Boolean algebras
 extended with a time dimension. For example you can write `o1[t] & o1[t-1] & i1[t] = 0`
 which would mean that the current output, and the previous output, and the current input,
@@ -282,7 +282,7 @@ input and output streams currently need to be defined before running a Tau
 specification.
 
 In all above cases, `t` is a free variable and refers to the current time at
-each point of time. The key point now is that an `always` statement will
+each point in time. The key point now is that an `always` statement will
 quantify all scoped `t` universally, while a `sometimes` statement will quantify
 them existentially. For example the specification `always o1[t] = 0` says that
 at all time-steps the output stream number 1 will write `0`. Similarly, the
@@ -295,7 +295,7 @@ spec         => tau | always tau | sometimes tau | spec && spec | spec || spec |
 rr           => (rec_relation)* spec.
 rec_relation => tau_rec_relation | term_rec_relation
 ```
-A Tau specification without a mentioning of "always" or "sometimes", is implicitly
+A Tau specification without a mentioning of "always" or "sometimes" is implicitly
 assumed to be an "always" statement. The `rr` in the above grammar describes how
 to add function and predicate definitions directly to the formula. In REPL they
 can also be provided separately as explained in the Tau REPL subsection
@@ -340,7 +340,7 @@ where
 disjunction, implication, equivalence and conditional, in the usual sense,
 (respectively).
 
-* the operators `=`, `<`, `<=` and `>` stands for equality, less than, less or
+* the operators `=`, `<`, `<=` and `>` stand for equality, less than, less or
 equal than and greater than; the operators `!=`, `!<`, `!<=` and `!>` denote
 their negations,
 
@@ -378,10 +378,10 @@ where
 (respectively).
 * `term_ref` is  a call to the given recurrence relation (see the Subsection
 [Functions and Predicates](#functions-and-predicates)),
-* `constant` stands for an element of the Boolean algebras (see Subsction
+* `constant` stands for an element of the Boolean algebras (see Subsection
 [Constants](#constants) for details),
 * `uninterpreted_constant` stands for an uninterpreted constant of the Boolean
-algebra, they are assume to be existentialy quantified in the context of the
+algebra, they are assumed to be existentially quantified in the context of the
 formula. The syntax is a follows:
 
 ```
@@ -391,9 +391,9 @@ uninterpreted_constant => "<:" name ">".
 * `var` is a variable of type a Boolean algebra element (see Subsection
 [Variables](#variables-variables-variables) for details), and
 * finally, `0` and `1` stands for the given elements in the corresponding Boolean
-algebra
+algebra.
 
-For example, the following is a valid expression in terms of Boolean function:
+For example, the following is a valid expression in terms of a Boolean function:
 
 ```
 (x & y | (z ^ 0))
@@ -450,7 +450,7 @@ The syntax for the first case, the Tau Boolean algebra, is the following:
 constant => "{" tau "}" [":" "tau"].
 ```
 
-i.e. we may have a Tau formula seen as a Boolean algebra element (you can ommit
+i.e. we may have a Tau formula seen as a Boolean algebra element (you can omit
 the type, as `tau` is the default type). For example, the following is a valid
 constant in the Tau Boolean algebra:
 
@@ -481,12 +481,11 @@ sbf => "("sbf "&" sbf")" | sbf "'" | "("sbf "^" sbf")" | "("sbf "+" sbf")"
 ```
 
 where `sbf` stands for a simple Boolean function, and the operators `&`, `'`,
-(`^`|`+ `) and `|` stand for conjunction, negation, exclusive-or and disjunction;
+(`^`|`+`) and `|` stand for conjunction, negation, exclusive-or and disjunction;
 `var` stands for a variable of type Boolean algebra element, and finally, `0` and
-`1` stands for the given elements in the simple Boolean algebra.
+`1` stand for the given elements in the simple Boolean algebra.
 
-A simple example of a constant in the simple Boolean function algebra is the for
-example:
+A constant in the simple Boolean function algebra is for example:
 
 ```
 { (x & y | z) }:sbf
@@ -499,7 +498,7 @@ where `x`, `y` and `z` are variables.
 Variables range over Boolean algebra elements. In the REPL you can work with
 open formulas (i.e. when variables are not quantified), but a specification
 makes sense only for closed formulas. Their syntax depends
-on whether `charvar` option is enabled or not. If it is enabled, the syntax is
+on whether the `charvar` option is enabled or not. If it is enabled, the syntax is
 a single character followed by digits. Otherwise, the syntax is an
 arbitrary string of `chars`.
 
@@ -509,11 +508,11 @@ define the inputs and outputs of the program. The name for an input variable is
 `i{num}` (e.g. `i1`) whereas ouput variables are of the form `o{num}` (in the
 near future we will allow arbitrary names for IO variables). They should always
 be referred to with reference to time (i.e. position in the sequence), and
-syntax is `i2[t]` or `o1[t]` where `t` always denotes time, but also could be
+the syntax is `i2[t]` or `o1[t]` where `t` always denotes time, but also can be
 `i1[t-1]` or `o2[t-3]` (always a constant lookback).
 
 As commented later on, IO variables need to be defined before the spec is run.
-For example, the following are a valid definition of IO variables:
+For example, the following is a valid definition of IO variables:
 
 ```
 tau i1 = console.
@@ -532,7 +531,7 @@ existentially quantified variables. The syntax is `<:name>`.
 ## **Reserved symbols**
 
 Tau Language has a set of reserved symbols that cannot be used as identifiers.
-In particular, we insists that `T` and `F` are reserved for true and false values
+In particular, we insist that `T` and `F` are reserved for true and false values
 respectively in tau formulas and `0` and `1` stand for the corresponding Boolean
 algebra elements.
 
@@ -545,7 +544,7 @@ tau [ options ] [ <program> ]
 ```
 
 where `[ options ]` are the command line options and `[ <program> ]` is the Tau
-program you want to run. If you ommit the tau program, the Tau REPL will be
+program you want to run. If you omit the tau program, the Tau REPL will be
 started.
 
 The general options are the following:
@@ -595,7 +594,7 @@ corresponds to the repo commit.
 ## **REPL options**
 
 You have several options at your disposal to configure the Tau REPL. In order
-to set or get the value of an option you could use the following commands:
+to set or get the value of an option you can use the following commands:
 
 * `get [<option>]`: shows all configurable settings and their values or a single
 one if its name is provided.
@@ -612,10 +611,8 @@ output. It's on by default.
 * `s|status`: Can be on/off. Controls status visibility in the prompt. It's on
 by default.
 
-* `v|charvar`: Can be on/off. Controls usage of character variables in the REPL.
-
-* `sev|severity`: Possible values are trace/debug/info/error. Value determines
-how much information will REPL provide. This is set to error by default.
+* `sev|severity`: Possible values are trace/debug/info/error. The value determines
+how much information the REPL will provide. This is set to error by default.
 
 * `h|hilight|highlight`: Can be on/off. Controls usage of highlighting in the
 output of commands. It's off by default.
@@ -640,7 +637,7 @@ includes the definitions of functions, predicates and the input/output stream va
 * `definitions|defs <number>`: shows the definition of the given function or predicate.
 
 * `rec_relation`: defines a function or predicate supporting the usage of
-* recurrence relations. See the Tau Language Section for more information.
+recurrence relations. See the Tau Language Section for more information.
 
 * `<type> i<number> = console | ifile(<filename>)`: defines an input stream variable.
 The input variable can read values from the console or from a provided file.
@@ -652,8 +649,8 @@ The output variable can write values to the console or into a file.
 
 ## **Memory related commands**
 
-All the results are stored in the REPL memory. You can also stored well-formed Tau
-formulas or Boolean function for later reference. To do so, you can use the following
+All the results are stored in the REPL memory. You can also store well-formed Tau
+formulas or Boolean functions for later reference. To do so, you can use the following
 syntax:
 
 * `tau|term`: store a tau formula or a Boolean function in the REPL memory.
@@ -673,13 +670,13 @@ syntax:
 
 ## **Expression manipulation**
 
-You could substitute expressions into other expressions or instantiate variables
+You can substitute expressions into other expressions or instantiate variables
 in expressions. The syntax of the commands is the following:
 
 * `subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
 expression (beeing this one a memory position, well-formed formula or Boolean
-Function).
+function).
 
 * `instantiate|inst|i <repl_memory|tau> [<var>/<repl_memory|term>]`: instantiates a variable
 by a memory position, well-formed formula or Boolean function in the given
@@ -710,8 +707,8 @@ the TABA book for details.
 
 ## **Normal forms**
 
-Also, the Tau REPL includes several transformations procedures to standard forms.
-The syntax of the commands as follows:
+Also, the Tau REPL includes several transformation procedures to standard forms.
+The syntax of the commands is as follows:
 
 * `dnf <repl_memory|tau|term>`: computes the disjunctive normal form of the given
 expression.
@@ -730,8 +727,8 @@ expression with respect to the given variable.
 
 ## **Program execution**
 
-Finally, you could run the given program once you have defined IO
-variables as you need. The syntax of the commands is the
+Finally, you can run the given program once you have defined the IO
+variables as you need. The syntax of the commands is:
 
 * `run|r <repl_memory|tau>`: runs the given program.
 
@@ -764,7 +761,7 @@ This is a short list of known issues that will be fixed in a subsequent release:
 
 # **Submitting issues**
 
-As any other opensource project in GitHub, you could submit issues in the
+Like any other open-source project on GitHub, you can submit issues using the
 following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
 
 # **License**
