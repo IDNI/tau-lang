@@ -131,16 +131,18 @@ int_t get_new_var_id (const nso<BAs...> fm) {
 // Given a nso<BAs...> produce a number i such that the uninterpreted constant const_i is
 // not present
 template<typename... BAs>
-int_t get_new_uniter_const_id (const nso<BAs...> fm) {
+nso<BAs...> get_new_uniter_const (const nso<BAs...> fm, const std::string& name) {
 	auto uniter_consts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
 	std::set ids {0};
 	for (auto uniter_const : uniter_consts) {
-		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, uniter_const); tmp.find(":const") != std::string::npos) {
-			std::string id = tmp.substr(6, tmp.size()-1);
-			if (!tmp.empty()) ids.insert(stoi(id));
+		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, uniter_const); tmp.find(name) != std::string::npos) {
+			std::string id = tmp.substr(name.length() + 1, tmp.size()-1);
+			if (!tmp.empty()) ids.insert(std::stoi(id));
 		}
 	}
-	return *ids.rbegin() + 1;
+	std::string id = std::to_string(*ids.rbegin() + 1);
+	auto uniter_const = build_bf_uniter_const<BAs...>("", name + id);
+	return uniter_const;
 }
 
 static inline std::vector<std::string> rr_v{"dummy"};
