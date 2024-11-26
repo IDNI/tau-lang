@@ -356,12 +356,15 @@ struct interpreter {
 						global[var] = value;
 					}
 				}
-				// complete solution according to the outputs
-				for (const auto &var: outputs[system]) {
-					auto timed_var = build_out_variable_at_n(var, time_point);
-					if (!global.contains(timed_var)) {
-						memory[timed_var] = _0<BAs...>;
-						global[timed_var] = _0<BAs...>;
+				// complete solution according to the outputs from all systems
+				// corresponding to the clauses of the currently executed specification
+				for (const auto& sys : systems) {
+					for (const auto &var: outputs[sys]) {
+						auto timed_var = build_out_variable_at_n(var, time_point);
+						if (!global.contains(timed_var)) {
+							memory[timed_var] = _0<BAs...>;
+							global[timed_var] = _0<BAs...>;
+						}
 					}
 				}
 				// update the time_point
@@ -371,7 +374,7 @@ struct interpreter {
 			}
 		}
 		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) Tau program is unsat\n";
+			<< "(Error) Tau specification is unsat\n";
 		return {};
 	}
 
@@ -467,6 +470,7 @@ size_t compute_initial_execution_time(const std::set<system<BAs...>>& systems) {
 }
 
 
+// Get input from user for time steps less than initial_execution_time
 template<typename input_t, typename...BAs>
 std::optional<assignment<BAs...>> compute_initial_memory(const nso<BAs...>& /*phi_inf*/,
 		const size_t& initial_execution_time, input_t& inputs) {
@@ -485,6 +489,7 @@ std::optional<assignment<BAs...>> compute_initial_memory(const nso<BAs...>& /*ph
 	return memory;
 }
 
+// Compute the type of the equation f = 0 or f != 0 stored in literal for the solver
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<std::pair<type, nso<BAs...>>> compute_literal(const nso<BAs...>& literal,
 		input_t& inputs, output_t& outputs) {
@@ -507,6 +512,7 @@ std::optional<std::pair<type, nso<BAs...>>> compute_literal(const nso<BAs...>& l
 	return {};
 }
 
+// Get the type for a clause of a local specification
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
 		input_t& inputs, output_t& outputs) {
@@ -539,11 +545,74 @@ std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
 	return { sys };
 }
 
+// Find an executable specification from DNF
+template<typename... BAs>
+nso<BAs...> get_executable_spec(const nso<BAs...>& fm) {
+	for (auto& clause : get_dnf_wff_clauses(fm)) {
+#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/clause: " << clause;
+#endif // DEBUG
+
+		auto executable = transform_to_execution(clause);
+#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/executable: " << executable;
+#endif // DEBUG
+		if (executable == _F<BAs...>) continue;
+
+		// compute model for uninterpreted constants and solve it
+		auto constraints = get_uninterpreted_constants_constraints(executable);
+		if (constraints == _F<BAs...>) continue;
+#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/constraints: " << constraints;
+#endif // DEBUG
+
+		auto model = solve(constraints);
+		if (!model) continue;
+#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/constraints/model: ";
+		for (const auto& [k, v]: model.value())
+			BOOST_LOG_TRIVIAL(trace)
+				<< "\t" << k << " <- " << v << " ";
+#endif // DEBUG
+
+		auto spec = replace(executable, model.value());
+#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_systems/program: " << spec;
+#endif // DEBUG
+		return spec;
+	}
+	return nullptr;
+}
+
+// Find a clause which has an unbounded continuation and return typed systems of equations
+// for the solver corresponding to each clause in the unbound continuation
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& form,
 		input_t& inputs, output_t& outputs) {
 	std::set<system<BAs...>> systems;
-	// split phi_inf in clauses
+
+	// Find a satisfiable clause
+	auto spec = get_executable_spec(form);
+	if (spec == nullptr) return {};
+
+	// Create blue-print for solver for each clause
+	for (const auto& clause : get_dnf_wff_clauses(spec)) {
+		if (auto system = compute_system(clause, inputs, outputs); system)
+			systems.insert(system.value());
+		else {
+			BOOST_LOG_TRIVIAL(trace)
+				<< "unable to compute system of equations in: " << clause << "\n";
+			continue;
+		}
+	}
+	return systems;
+
+	/*// split phi_inf in clauses
 	for (auto& clause: get_dnf_wff_clauses(form)) {
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
@@ -589,7 +658,7 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& form,
 			continue;
 		}
 	}
-	return systems;
+	return systems;*/
 }
 
 template<typename input_t, typename output_t, typename...BAs>
@@ -611,7 +680,7 @@ std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> phi_inf, input_t
 	// compute initial memory
 	auto memory = compute_initial_memory(phi_inf, initial_execution_time, inputs);
 	if (!memory) return {}; // error
-	//after the bove, we have the interpreter ready to be used.
+	//after the above, we have the interpreter ready to be used.
 	return interpreter<BAs...>{ systems.value(), memory.value(), initial_execution_time };
 };
 
