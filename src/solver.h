@@ -125,7 +125,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 			<< "find_solution/solution[removed_vars]: ";
 		for (const auto& [k, v]: solution)
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << k << " <- " << v << " ";
+				<< "\t" << k << " := " << v << " ";
 		#endif // DEBUG
 
 		if (has_no_var(gh)) {
@@ -146,7 +146,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 					<< "find_solution/solution[gh_no_var,gh=0]: ";
 				for (const auto& [k, v]: solution)
 					BOOST_LOG_TRIVIAL(trace)
-						<< "\t" << k << " <- " << v << " ";
+						<< "\t" << k << " := " << v << " ";
 				#endif // DEBUG
 
 				return solution;
@@ -164,7 +164,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 				<< "find_solution/solution[general]: ";
 			for (const auto& [k, v]: solution)
 				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " <- " << v << " ";
+					<< "\t" << k << " := " << v << " ";
 			#endif // DEBUG
 
 			return solution;
@@ -213,7 +213,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 		<< "lgrs/solution: ";
 	for (const auto& [k, v] : phi)
 		BOOST_LOG_TRIVIAL(trace)
-			<< "\t" << k << " <- " << v << " ";
+			<< "\t" << k << " := " << v << " ";
 	auto copy = phi;
 	auto check = snf_wff(replace(equality, copy));
 	BOOST_LOG_TRIVIAL(trace)
