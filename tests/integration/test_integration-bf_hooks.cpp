@@ -16,11 +16,8 @@
 #include <cassert>
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bool_ba.h"
-#include "bdd_handle.h"
 #include "normalizer.h"
-#include "bdd_binding.h"
+#include "sbf_ba.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -29,9 +26,9 @@ namespace testing = doctest;
 
 bool check_hook(const char* sample, const char* expected) {
 	auto tau_sample = make_nso_using_factory<
-		tau_ba<bdd_binding>, bdd_binding>(sample, { .start = tau_parser::bf }).value();
+		tau_ba<sbf_ba>, sbf_ba>(sample, { .start = tau_parser::bf }).value();
 	auto tau_expected = make_nso_using_factory<
-		tau_ba<bdd_binding>, bdd_binding>(expected, { .start = tau_parser::bf }).value();
+		tau_ba<sbf_ba>, sbf_ba>(expected, { .start = tau_parser::bf }).value();
 
 	#ifdef DEBUG
 	std::string str(sample);

@@ -60,7 +60,7 @@
 
 #include "init_log.h"
 #include "normalizer.h"
-#include "bdd_binding.h"
+#include "sbf_ba.h"
 #include "cli.h"
 #include "repl.h"
 #include "repl_evaluator.h"
@@ -113,7 +113,7 @@ int run_tau_spec(string spec_file, bool charvar) {
 		src.resize(l), ifs.seekg(0), ifs.read(&src[0], l);
 	}
 	if (src.empty()) return 0;
-	repl_evaluator<bdd_binding> re({
+	repl_evaluator<sbf_ba> re({
 		.print_memory_store = false,
 		.error_quits        = true,
 		.charvar            = charvar,
@@ -167,13 +167,13 @@ int main(int argc, char** argv) {
 	bool charvar = opts["charvar"].get<bool>();
 	std::set<std::string> guards{ charvar ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
-	bdd_parser::instance().get_grammar().set_enabled_productions(guards);
+	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
 
 	// spec provided, run it
 	if (files.size()) return run_tau_spec(files.front(), charvar);
 
 	// REPL
-	repl_evaluator<bdd_binding> re({
+	repl_evaluator<sbf_ba> re({
 		.status = opts["status"].get<bool>(),
 		.colors = opts["color"].get<bool>(),
 		.charvar = charvar,

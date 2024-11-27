@@ -25,7 +25,7 @@
 
 #include "doctest.h"
 #include "interpreter.h"
-#include "bdd_binding.h"
+#include "sbf_ba.h"
 
 using namespace boost::log;
 using namespace idni::tau;
@@ -50,7 +50,7 @@ std::string random_file(const std::string& extension = ".out", const std::string
 }
 
 template<typename...BAs>
-struct output_bdd_console {
+struct output_sbf_console {
 
 	bool write(const assignment<BAs...>& outputs) {
 		// for each stream in out.streams, write the value from the solution
@@ -65,10 +65,10 @@ struct output_bdd_console {
 };
 
 template<typename...BAs>
-struct input_bdd_vector {
+struct input_sbf_vector {
 
-	input_bdd_vector() = default;
-	input_bdd_vector(std::vector<assignment<BAs...>>& inputs): inputs(inputs) {}
+	input_sbf_vector() = default;
+	input_sbf_vector(std::vector<assignment<BAs...>>& inputs): inputs(inputs) {}
 
 	std::optional<assignment<BAs...>> read() {
 		if (inputs.empty()) return { assignment<BAs...>{} };
@@ -84,13 +84,13 @@ struct input_bdd_vector {
 	size_t current = 0;
 };
 
-std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char* sample,
-		input_bdd_vector<tau_ba<bdd_binding>, bdd_binding>& inputs,
-		output_bdd_console<tau_ba<bdd_binding>, bdd_binding>& outputs,
+std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
+		input_sbf_vector<tau_ba<sbf_ba>, sbf_ba>& inputs,
+		output_sbf_console<tau_ba<sbf_ba>, sbf_ba>& outputs,
 		const size_t& times) {
 	auto sample_src = make_tau_source(sample);
 	auto phi_inf = make_nso_rr_using_factory<
-		tau_ba<bdd_binding>, bdd_binding>(sample_src).value().main;
+		tau_ba<sbf_ba>, sbf_ba>(sample_src).value().main;
 
 	#ifdef DEBUG
 	std::cout << "run_test/------------------------------------------------------\n";
@@ -129,7 +129,7 @@ std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char*
 			std::cout << "run_test/output[" << i << "]: ";
 			for (const auto& [var, value]: out) {
 				std::cout << var << " <- " << value << " ... ";
-				if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<bdd_binding>, bdd_binding>); io_vars) {
+				if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>); io_vars) {
 					std::cout << "run_test/output[" << i << "]: unexpected io_var " << io_vars.value() << "\n";
 					intprtr.value().memory.clear();
 					break;
@@ -146,24 +146,24 @@ std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char*
 	return {};
 }
 
-std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char* sample,
+std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 		const size_t& times) {
-	input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> inputs;
-	output_bdd_console<tau_ba<bdd_binding>, bdd_binding> outputs;
+	input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> inputs;
+	output_sbf_console<tau_ba<sbf_ba>, sbf_ba> outputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
-std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char* sample,
-		input_bdd_vector<tau_ba<bdd_binding>, bdd_binding>& inputs,
+std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
+		input_sbf_vector<tau_ba<sbf_ba>, sbf_ba>& inputs,
 		const size_t& times) {
-	output_bdd_console<tau_ba<bdd_binding>, bdd_binding> outputs;
+	output_sbf_console<tau_ba<sbf_ba>, sbf_ba> outputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
-std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char* sample,
-		output_bdd_console<tau_ba<bdd_binding>, bdd_binding>& outputs,
+std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
+		output_sbf_console<tau_ba<sbf_ba>, sbf_ba>& outputs,
 		const size_t& times) {
-	input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> inputs;
+	input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> inputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
@@ -333,7 +333,7 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.value().empty() );
 	}
 
-	// Fibonacci like sequence with BDDs
+	// Fibonacci like sequence with SBFs
 	TEST_CASE("o1[0] = {a}:sbf && o1[1] = {a}:sbf && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] =  {a}:sbf && o1[1] =  {a}:sbf && o1[t] = o1[t-1] + o1[t-2].";
 		auto memory = run_test(sample, 8);
@@ -358,24 +358,24 @@ TEST_SUITE("only outputs") {
 
 TEST_SUITE("with inputs and outputs") {
 
-	input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> build_i1_inputs(
-			std::vector<nso<tau_ba<bdd_binding>, bdd_binding>> values) {
-		std::vector<assignment<tau_ba<bdd_binding>, bdd_binding>> assignments;
+	input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> build_i1_inputs(
+			std::vector<nso<tau_ba<sbf_ba>, sbf_ba>> values) {
+		std::vector<assignment<tau_ba<sbf_ba>, sbf_ba>> assignments;
 		for (const auto& value: values) {
-			assignment<tau_ba<bdd_binding>, bdd_binding> assignment;
-			assignment[build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1)] = value;
+			assignment<tau_ba<sbf_ba>, sbf_ba> assignment;
+			assignment[build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1)] = value;
 			assignments.push_back(assignment);
 		}
-		input_bdd_vector<tau_ba<bdd_binding>, bdd_binding> ins(assignments);
+		input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> ins(assignments);
 		return ins;
 	}
 
 	TEST_CASE("i1[t] = o1[t]") {
 		const char* sample = "i1[t] = o1[t].";
 		auto ins = build_i1_inputs({
-			_1<tau_ba<bdd_binding>, bdd_binding>,
-			_0<tau_ba<bdd_binding>, bdd_binding>,
-			_0<tau_ba<bdd_binding>, bdd_binding> });
+			_1<tau_ba<sbf_ba>, sbf_ba>,
+			_0<tau_ba<sbf_ba>, sbf_ba>,
+			_0<tau_ba<sbf_ba>, sbf_ba> });
 		auto memory = run_test(sample, ins, 3);
 		CHECK ( !memory.value().empty() );
 	}
@@ -387,9 +387,9 @@ TEST_SUITE("with inputs and outputs") {
 	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
 		auto ins = build_i1_inputs({
-			_1<tau_ba<bdd_binding>, bdd_binding>,
-			_1<tau_ba<bdd_binding>, bdd_binding>,
-			_1<tau_ba<bdd_binding>, bdd_binding> });
+			_1<tau_ba<sbf_ba>, sbf_ba>,
+			_1<tau_ba<sbf_ba>, sbf_ba>,
+			_1<tau_ba<sbf_ba>, sbf_ba> });
 		auto memory = run_test(sample, ins, 3);
 		CHECK ( (!memory.has_value() || memory.value().empty()) );
 	}
@@ -399,9 +399,9 @@ TEST_SUITE("with inputs and outputs") {
 	TEST_CASE("i1[t-1] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t-1] = o1[t] && o1[0] = 0.";
 		auto ins = build_i1_inputs({
-			_1<tau_ba<bdd_binding>, bdd_binding>,
-			_1<tau_ba<bdd_binding>, bdd_binding>,
-			_1<tau_ba<bdd_binding>, bdd_binding> });
+			_1<tau_ba<sbf_ba>, sbf_ba>,
+			_1<tau_ba<sbf_ba>, sbf_ba>,
+			_1<tau_ba<sbf_ba>, sbf_ba> });
 		auto memory = run_test(sample, ins, 2);
 		CHECK ( !memory.value().empty() );
 	}
@@ -410,35 +410,35 @@ TEST_SUITE("with inputs and outputs") {
 
 TEST_SUITE("test inputs") {
 
-	TEST_CASE("reading from file with bdd inputs") {
-		std::map<nso<tau_ba<bdd_binding>, bdd_binding>, std::pair<type, std::string>> input_map;
-		auto var = build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
+	TEST_CASE("reading from file with sbf inputs") {
+		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> input_map;
+		auto var = build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		input_map[var] = { "sbf", "integration/test_files/sbf-alternating_zeros_and_ones-length_10.in"};
-		finputs<tau_ba<bdd_binding>, bdd_binding> inputs(input_map);
+		finputs<tau_ba<sbf_ba>, sbf_ba> inputs(input_map);
 		CHECK ( inputs.type_of(var).has_value() );
 		for (size_t i = 0; i < 10; ++i) {
 			auto in = inputs.read();
 			if (in) {
 				auto check = (i % 2)
-					? in.value()[var] == _1<tau_ba<bdd_binding>, bdd_binding>
-					: in.value()[var] == _0<tau_ba<bdd_binding>, bdd_binding>;
+					? in.value()[var] == _1<tau_ba<sbf_ba>, sbf_ba>
+					: in.value()[var] == _0<tau_ba<sbf_ba>, sbf_ba>;
 				CHECK ( check );
 			} else FAIL("no input");
 		}
 	}
 
 	TEST_CASE("reading from file with tau program inputs") {
-		std::map<nso<tau_ba<bdd_binding>, bdd_binding>, std::pair<type, std::string>> input_map;
-		auto var = build_in_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
+		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> input_map;
+		auto var = build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		input_map[var] = { "tau", "integration/test_files/tau-alternating_zeros_and_ones-length_10.in"};
-		finputs<tau_ba<bdd_binding>, bdd_binding> inputs(input_map);
+		finputs<tau_ba<sbf_ba>, sbf_ba> inputs(input_map);
 		CHECK ( inputs.type_of(var).has_value() );
 		for (size_t i = 0; i < 10; ++i) {
 			auto in = inputs.read();
 			if (in) {
 				auto check = (i % 2)
-					? in.value()[var] == _1<tau_ba<bdd_binding>, bdd_binding>
-					: in.value()[var] == _0<tau_ba<bdd_binding>, bdd_binding>;
+					? in.value()[var] == _1<tau_ba<sbf_ba>, sbf_ba>
+					: in.value()[var] == _0<tau_ba<sbf_ba>, sbf_ba>;
 				CHECK ( check );
 			} else FAIL("no input");
 		}
@@ -448,9 +448,9 @@ TEST_SUITE("test inputs") {
 TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to file") {
-		std::map<nso<tau_ba<bdd_binding>, bdd_binding>, std::pair<type, std::string>> output_map;
-		auto var = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
-		auto var_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(1, 0);
+		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		auto var = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
+		auto var_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);
 
 		output_map[var] = { "sbf", random_file() };
 
@@ -458,9 +458,9 @@ TEST_SUITE("test outputs") {
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var].second << "\n";
 		#endif // DEBUG
 
-		foutputs<tau_ba<bdd_binding>, bdd_binding> outputs(output_map);
-		assignment<tau_ba<bdd_binding>, bdd_binding> output = {
-			{ var_0, _1<tau_ba<bdd_binding>, bdd_binding> }
+		foutputs<tau_ba<sbf_ba>, sbf_ba> outputs(output_map);
+		assignment<tau_ba<sbf_ba>, sbf_ba> output = {
+			{ var_0, _1<tau_ba<sbf_ba>, sbf_ba> }
 		};
 
 		CHECK( outputs.type_of(var).has_value() );
@@ -468,11 +468,11 @@ TEST_SUITE("test outputs") {
 	}
 
 	TEST_CASE("writing to files: two outputs") {
-		std::map<nso<tau_ba<bdd_binding>, bdd_binding>, std::pair<type, std::string>> output_map;
-		auto var1 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
-		auto var2 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(2);
-		auto var1_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(1, 0);
-		auto var2_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(2, 0);
+		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		auto var1 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
+		auto var2 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(2);
+		auto var1_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);
+		auto var2_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(2, 0);
 		output_map[var1] = {"sbf", random_file()};
 		output_map[var2] = {"sbf", random_file()};
 
@@ -481,10 +481,10 @@ TEST_SUITE("test outputs") {
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2].second << "\n";
 		#endif // DEBUG
 
-		foutputs<tau_ba<bdd_binding>, bdd_binding> outputs(output_map);
-		assignment<tau_ba<bdd_binding>, bdd_binding> output = {
-			{ var1_0, _1<tau_ba<bdd_binding>, bdd_binding> },
-			{ var2_0, _0<tau_ba<bdd_binding>, bdd_binding> }
+		foutputs<tau_ba<sbf_ba>, sbf_ba> outputs(output_map);
+		assignment<tau_ba<sbf_ba>, sbf_ba> output = {
+			{ var1_0, _1<tau_ba<sbf_ba>, sbf_ba> },
+			{ var2_0, _0<tau_ba<sbf_ba>, sbf_ba> }
 		};
 
 		CHECK( outputs.type_of(var1).has_value() );
@@ -493,11 +493,11 @@ TEST_SUITE("test outputs") {
 	}
 
 	TEST_CASE("writing to files: completing outputs") {
-		std::map<nso<tau_ba<bdd_binding>, bdd_binding>, std::pair<type, std::string>> output_map;
-		auto var1 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(1);
-		auto var2 = build_out_var_name<tau_ba<bdd_binding>, bdd_binding>(2);
-		auto var1_0 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(1, 0);
-		auto var2_1 = build_out_variable_at_n<tau_ba<bdd_binding>, bdd_binding>(2, 1);
+		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		auto var1 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
+		auto var2 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(2);
+		auto var1_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);
+		auto var2_1 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(2, 1);
 		output_map[var1] = {"sbf", random_file()};
 		output_map[var2] = {"sbf", random_file()};
 
@@ -506,10 +506,10 @@ TEST_SUITE("test outputs") {
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2].second << "\n";
 		#endif // DEBUG
 
-		foutputs<tau_ba<bdd_binding>, bdd_binding> outputs(output_map);
-		assignment<tau_ba<bdd_binding>, bdd_binding> output = {
-			{ var1_0, _1<tau_ba<bdd_binding>, bdd_binding> },
-			{ var2_1, _1<tau_ba<bdd_binding>, bdd_binding> }
+		foutputs<tau_ba<sbf_ba>, sbf_ba> outputs(output_map);
+		assignment<tau_ba<sbf_ba>, sbf_ba> output = {
+			{ var1_0, _1<tau_ba<sbf_ba>, sbf_ba> },
+			{ var2_1, _1<tau_ba<sbf_ba>, sbf_ba> }
 		};
 
 		CHECK( outputs.type_of(var1).has_value() );

@@ -16,12 +16,8 @@
 #include <cassert>
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bdd_handle.h"
-#include "normalizer.h"
-#include "bdd_binding.h"
 
-#include "test_integration_helpers-bdd.h"
+#include "test_integration_helpers-sbf.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau;
@@ -35,11 +31,11 @@ TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 	TEST_CASE("i1[t] = o1[t]") {
 		const char* sample = "( i1[t] = o1[t] ).";
 		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(
+		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(
 						sample_src);
 		CHECK( sample_formula.has_value() );
 		if (!sample_formula.has_value()) return;
-		auto result = normalizer<bdd_binding>(sample_formula.value());
+		auto result = normalizer<sbf_ba>(sample_formula.value());
 		auto check1 = result |  tau_parser::wff_f;
 		auto check2 = result |  tau_parser::wff_t;
 		CHECK( !check1.has_value() );

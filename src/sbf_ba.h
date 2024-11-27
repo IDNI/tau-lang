@@ -11,8 +11,8 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#ifndef __BDD_BINDING_H__
-#define __BDD_BINDING_H__
+#ifndef __SBF_BA_H__
+#define __SBF_BA_H__
 
 #include <boost/log/trivial.hpp>
 
@@ -23,22 +23,22 @@
 #include "tau_ba.h"
 #include "dict.h"
 
-#include "../parser/bdd_parser.generated.h"
+#include "../parser/sbf_parser.generated.h"
 
 namespace idni::tau {
 
-using bdd_binding = hbdd<Bool>;
-using sp_bdd_node = sp_tau_node<tau_ba<bdd_binding>, bdd_binding>;
+using sbf_ba = hbdd<Bool>;
+using sp_sbf_node = sp_tau_node<tau_ba<sbf_ba>, sbf_ba>;
 
 // global static bdd variable cache
-inline static std::map<int_t, bdd_binding> var_cache{};
+inline static std::map<int_t, sbf_ba> var_cache{};
 
 template<typename...BAs>
-struct bdd_factory {
+struct sbf_ba_factory {
 
 	using parse_forest = idni::parser<char, char>::pforest;
 	using parse_result = idni::parser<char, char>::result;
-	using traverser_t  = traverser<tau_sym<BAs...>, bdd_parser>;
+	using traverser_t  = traverser<tau_sym<BAs...>, sbf_parser>;
 	static constexpr const auto& get_only_child =
 			traverser_t::get_only_child_extractor();
 	static constexpr const auto& get_terminals =
@@ -52,17 +52,17 @@ struct bdd_factory {
 		// check source cache
 		if (auto cn = cache.find(src); cn != cache.end())
 			return cn->second;
-		auto& p = bdd_parser::instance();
+		auto& p = sbf_parser::instance();
 		auto r = p.parse(src.c_str(), src.size());
 		if (!r.found) return std::optional<nso<BAs...>>{};
-		using parse_symbol = bdd_parser::node_type;
+		using parse_symbol = sbf_parser::node_type;
 		using namespace rewriter;
-		auto root = make_node_from_tree<bdd_parser,
+		auto root = make_node_from_tree<sbf_parser,
 			drop_location_t<parse_symbol, tau_source_sym>,
 			tau_sym<BAs...>>(
 				drop_location<parse_symbol, tau_source_sym>,
 				r.get_shaped_tree());
-		auto t = traverser_t(root) | bdd_parser::bdd;
+		auto t = traverser_t(root) | sbf_parser::sbf;
 		return std::optional<nso<BAs...>>{ build_node(t.has_value()
 			? eval_node(t) : bdd_handle<Bool>::hfalse) };
 	}
@@ -85,25 +85,25 @@ struct bdd_factory {
 
 private:
 
-	nso<BAs...> build_node(const bdd_binding& b) {
+	nso<BAs...> build_node(const sbf_ba& b) {
 		std::variant<BAs...> vp{b};
 		return rewriter::make_node<tau_sym<BAs...>>(vp, {});
 	}
 
 	// evaluates a parsed bdd terminal node recursively
-	bdd_binding eval_node(const traverser_t& t) {
+	sbf_ba eval_node(const traverser_t& t) {
 		//BOOST_LOG_TRIVIAL(debug) << "eval_node";
 		auto n  = t | get_only_child;
 		auto nt = n | get_nonterminal;
 		switch (nt) {
-		case bdd_parser::zero: return bdd_handle<Bool>::hfalse;
-		case bdd_parser::one:  return bdd_handle<Bool>::htrue;
-		case bdd_parser::negation: {
+		case sbf_parser::zero: return bdd_handle<Bool>::hfalse;
+		case sbf_parser::one:  return bdd_handle<Bool>::htrue;
+		case sbf_parser::negation: {
 			auto e = eval_node(n | get_only_child);
 			BOOST_LOG_TRIVIAL(trace) << e << "' = " << ~e;
 			return ~e;
 		}
-		case bdd_parser::variable: {
+		case sbf_parser::variable: {
 			// get var id from var node's terminals
 			auto var_name = n | get_terminals;
 			auto v = dict(var_name);
@@ -117,18 +117,18 @@ private:
 				.first->second;
 		}
 		default:
-			auto o = (n || bdd_parser::bdd)();
+			auto o = (n || sbf_parser::sbf)();
 			auto l = eval_node(o[0]), r = eval_node(o[1]);
 			switch (nt) {
-			case bdd_parser::disjunction:
+			case sbf_parser::disjunction:
 				BOOST_LOG_TRIVIAL(trace)
 					<< l << " | " << r << " -> " << (l | r);
 				return l | r;
-			case bdd_parser::exclusive_disjunction:
+			case sbf_parser::exclusive_disjunction:
 				BOOST_LOG_TRIVIAL(trace)
 					<< l << " ^ " << r << " -> " << (l ^ r);
 				return l ^ r;
-			case bdd_parser::conjunction:
+			case sbf_parser::conjunction:
 				BOOST_LOG_TRIVIAL(trace)
 					<< l << " & " << r << " -> " << (l & r);
 				return l & r;
@@ -141,16 +141,16 @@ private:
 
 // using during testing
 template<>
-struct nso_factory<bdd_binding> {
-	inline static bdd_factory<bdd_binding> bf;
+struct nso_factory<sbf_ba> {
+	inline static sbf_ba_factory<sbf_ba> bf;
 
-	std::optional<nso<bdd_binding>> parse(const std::string& src,
+	std::optional<nso<sbf_ba>> parse(const std::string& src,
 		const std::string& = "")
 	{
 		return bf.parse(src);
 	}
 
-	nso<bdd_binding> binding(const nso<bdd_binding>& n,
+	nso<sbf_ba> binding(const nso<sbf_ba>& n,
 		const std::string& = "")
 	{
 		return bf.binding(n);
@@ -160,7 +160,7 @@ struct nso_factory<bdd_binding> {
 		return { "sbf" };
 	}
 
-	nso<bdd_binding> splitter_one() const {
+	nso<sbf_ba> splitter_one() const {
 		return build_bf_constant(bf.splitter_one());
 	}
 
@@ -168,8 +168,8 @@ struct nso_factory<bdd_binding> {
 		return "sbf";
 	}
 
-	static nso_factory<bdd_binding>& instance() {
-		static nso_factory<bdd_binding> factory;
+	static nso_factory<sbf_ba>& instance() {
+		static nso_factory<sbf_ba> factory;
 		return factory;
 	}
 
@@ -180,20 +180,20 @@ private:
 
 // using in repl
 template<>
-struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
+struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 
-	inline static bdd_factory<tau_ba<bdd_binding>, bdd_binding> bf;
-	inline static tau_ba_factory<bdd_binding> tf;
+	inline static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
+	inline static tau_ba_factory<sbf_ba> tf;
 
-	std::optional<gssotc<bdd_binding>> parse(const std::string src,
+	std::optional<gssotc<sbf_ba>> parse(const std::string src,
 		const std::string type_name)
 	{
 		if (type_name == "sbf")	return bf.parse(src);
 		return tf.parse(src);
 	}
 
-	gssotc<bdd_binding> binding(
-		const sp_tau_node<tau_ba<bdd_binding>, bdd_binding>& n,
+	gssotc<sbf_ba> binding(
+		const sp_tau_node<tau_ba<sbf_ba>, sbf_ba>& n,
 		const std::string type_name)
 	{
 		if (type_name == "sbf") return bf.binding(n);
@@ -208,14 +208,14 @@ struct nso_factory<tau_ba<bdd_binding>, bdd_binding> {
 		return "tau";
 	}
 
-	gssotc<bdd_binding> splitter_one (const std::string& type_name) const {
+	gssotc<sbf_ba> splitter_one (const std::string& type_name) const {
 		if (type_name == "sbf")
 			return build_bf_constant(bf.splitter_one());
 		else return build_bf_constant(tf.splitter_one());
 	}
 
-	static nso_factory<tau_ba<bdd_binding>, bdd_binding>& instance() {
-		static nso_factory<tau_ba<bdd_binding>, bdd_binding> factory;
+	static nso_factory<tau_ba<sbf_ba>, sbf_ba>& instance() {
+		static nso_factory<tau_ba<sbf_ba>, sbf_ba> factory;
 		return factory;
 	}
 
@@ -228,4 +228,4 @@ private:
 } // namespace idni::tau
 
 
-#endif // __BDD_BINDING_H__
+#endif // __SBF_BA_H__

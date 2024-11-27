@@ -16,10 +16,6 @@
 #include <cassert>
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bdd_handle.h"
-#include "normalizer.h"
-#include "tau_ba.h"
 
 #include "test_integration_helpers-tau.h"
 
@@ -32,7 +28,7 @@ namespace testing = doctest;
 TEST_SUITE("Tau_splitter_tau_coeff") {
 TEST_CASE("Tau_splitter_tau_coeff1") {
 	const char *src = "{o1[t]o2[t] = 0.} v != 0.";
-	auto fm = make_nso_rr_using_factory<tau_ba<bdd_test>, bdd_test>(src).value().main;
+	auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 	auto s = tau_splitter(fm, splitter_type::upper);
 	stringstream ss; ss << s;
 	CHECK(ss.str() == "{ o1[t]o2[t] = 0. } ({ o1[t]o2[t] = 0. } v)' = 0");
@@ -40,7 +36,7 @@ TEST_CASE("Tau_splitter_tau_coeff1") {
 
 TEST_CASE("Tau_splitter_tau_coeff2") {
 	const char *src = "{o1[t]|o2[t] = 0.}&v = 0.";
-	auto fm = make_nso_rr_using_factory<tau_ba<bdd_test>, bdd_test>(src).value().main;
+	auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 	auto s = tau_splitter(fm, splitter_type::upper);
 	stringstream ss; ss << s;
 	CHECK((ss.str() == "{ o1[t]|o2[t] = 0. } v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0). } = 0"

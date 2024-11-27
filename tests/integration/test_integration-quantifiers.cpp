@@ -17,16 +17,11 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bool_ba.h"
-#include "bdd_handle.h"
-#include "bdd_binding.h"
-#include "normalizer.h"
 
-#include "test_integration_helpers-bdd.h"
+#include "test_integration_helpers-sbf.h"
 #include "../unit/test_helpers.h"
 
-#include "debug_helpers.h"
+// #include "debug_helpers.h"
 
 using namespace std;
 using namespace idni::rewriter;
@@ -75,11 +70,11 @@ bool test(const test_case& tc) {
 	const auto& [ sample, exp, nexp ] = tc;
 	bool fail = false;
 	auto src = make_tau_source(sample.c_str());
-	auto formula = make_nso_rr_using_factory<bdd_binding>(src);
+	auto formula = make_nso_rr_using_factory<sbf_ba>(src);
 	if (!formula.has_value()) return fail;
 	auto got = to_str(formula.value());
 	if (got != exp) fail = true;
-	auto norm = normalizer<bdd_binding>(formula.value());
+	auto norm = normalizer<sbf_ba>(formula.value());
 	auto ngot = to_str(norm);
 	if (fail || ngot != nexp) fail = true,
 		cout << tc << "\n\tgot:      \"" << got
