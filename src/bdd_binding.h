@@ -29,6 +29,8 @@ namespace idni::tau {
 
 using bdd_binding = hbdd<Bool>;
 using sp_bdd_node = sp_tau_node<tau_ba<bdd_binding>, bdd_binding>;
+using bdd_source_sym = idni::lit<char, char>;
+using bdd_sym = std::variant<bdd_source_sym, bdd_binding>;
 
 // global static bdd variable cache
 inline static std::map<int_t, bdd_binding> var_cache{};
@@ -38,7 +40,7 @@ struct bdd_factory {
 
 	using parse_forest = idni::parser<char, char>::pforest;
 	using parse_result = idni::parser<char, char>::result;
-	using traverser_t  = traverser<tau_sym<BAs...>, bdd_parser>;
+	using traverser_t  = traverser<bdd_sym, bdd_parser>;
 	static constexpr const auto& get_only_child =
 			traverser_t::get_only_child_extractor();
 	static constexpr const auto& get_terminals =
@@ -58,9 +60,9 @@ struct bdd_factory {
 		using parse_symbol = bdd_parser::node_type;
 		using namespace rewriter;
 		auto root = make_node_from_tree<bdd_parser,
-			drop_location_t<parse_symbol, tau_source_sym>,
-			tau_sym<BAs...>>(
-				drop_location<parse_symbol, tau_source_sym>,
+			drop_location_t<parse_symbol, bdd_source_sym>,
+			bdd_sym>(
+				drop_location<parse_symbol, bdd_source_sym>,
 				r.get_shaped_tree());
 		auto t = traverser_t(root) | bdd_parser::bdd;
 		return std::optional<nso<BAs...>>{ build_node(t.has_value()
@@ -226,6 +228,5 @@ private:
 };
 
 } // namespace idni::tau
-
 
 #endif // __BDD_BINDING_H__
