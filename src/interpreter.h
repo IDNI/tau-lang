@@ -595,7 +595,7 @@ nso<BAs...> get_executable_spec(const nso<BAs...>& fm) {
 			<< "compute_systems/clause: " << clause;
 #endif // DEBUG
 
-		auto executable = transform_to_execution(clause);
+		auto executable = transform_to_execution(clause, true);
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/executable: " << executable;
