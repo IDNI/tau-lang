@@ -569,10 +569,8 @@ void repl_evaluator<BAs...>::run_cmd(
 		std::cout << "applied: " << applied << "\n";
 		#endif // DEBUG
 
-		auto dnf = applied
-			| repeat_each<step<tau_ba<BAs...>, BAs...>, tau_ba<BAs...>, BAs...>(
-				to_dnf_wff<tau_ba<BAs...>, BAs...>
-				| simplify_wff<tau_ba<BAs...>, BAs...>);
+		//
+		auto dnf = normalizer_step(applied);
 
 		// TODO (HIGH) only consider inputs/outputs present in the formula
 		// select current input variables

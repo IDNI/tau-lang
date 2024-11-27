@@ -279,3 +279,14 @@ TEST_SUITE("Tau_splitter_coeff") {
 		CHECK(ss.str() == "{ x } f = 0 && { y } g = 0 && f{ x' } = 0");
 	}
 }
+
+TEST_SUITE("Tau_splitter_uniter_const") {
+	TEST_CASE("Tau_splitter_tau_uniter_const") {
+		bdd_init<Bool>();
+		const char *src = "<:split1> = 0.";
+		auto fm = make_nso_rr_using_factory<tau_ba<bdd_binding>, bdd_binding>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		stringstream ss; ss << s;
+		CHECK(ss.str() == "<:split1> = 0 && <:split2> != 0");
+	}
+}

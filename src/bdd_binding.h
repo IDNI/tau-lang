@@ -55,9 +55,13 @@ struct bdd_factory {
 		auto& p = bdd_parser::instance();
 		auto r = p.parse(src.c_str(), src.size());
 		if (!r.found) return std::optional<nso<BAs...>>{};
-		char dummy = 0;
-		auto root = rewriter::make_node_from_tree<bdd_parser, char,
-			tau_sym<BAs...>>(dummy, r.get_shaped_tree());
+		using parse_symbol = bdd_parser::node_type;
+		using namespace rewriter;
+		auto root = make_node_from_tree<bdd_parser,
+			drop_location_t<parse_symbol, tau_source_sym>,
+			tau_sym<BAs...>>(
+				drop_location<parse_symbol, tau_source_sym>,
+				r.get_shaped_tree());
 		auto t = traverser_t(root) | bdd_parser::bdd;
 		return std::optional<nso<BAs...>>{ build_node(t.has_value()
 			? eval_node(t) : bdd_handle<Bool>::hfalse) };
