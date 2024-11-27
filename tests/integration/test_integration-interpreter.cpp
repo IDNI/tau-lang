@@ -116,12 +116,13 @@ std::optional<assignment<tau_ba<bdd_binding>, bdd_binding>> run_test(const char*
 
 			auto out = intprtr.value().step(in.value());
 
+			// The output can be empty if all variables have been assigned in previous steps
 			if (out.size() == 0) {
-				intprtr.value().memory.clear();
+				// intprtr.value().memory.clear();
 				#ifdef DEBUG
 				std::cout << "run_test/output[" << i << "]: {}\n"; // no output
 				#endif // DEBUG
-				break;
+				// break;
 			}
 
 			#ifdef DEBUG

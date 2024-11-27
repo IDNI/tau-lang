@@ -147,25 +147,33 @@ struct foutputs {
 	}
 
 	bool write(const assignment<BAs...>& outputs) {
-		// sorting by time
-		auto sorted = sort(outputs);
-		// adding missing values
-		auto completed = complete(sorted);
-		// for each stream in out.streams, write the value from the solution
-		for (const auto& output: completed) {
-			for (const auto& [var, value]: output) {
-				if (auto stream = streams.find(var); stream != streams.end())
-					if (stream->second) stream->second.value() << value << "\n";
-					else std::cout << var << "[" << time_point++ << "] <- " << value << "\n";
-				else {
-					std::stringstream ss; ss << var;
-					if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;
+		// Sort variables in output by time
+		std::vector<nso<BAs...>> io_vars;
+		for (const auto& [var, ass] : outputs)
+			io_vars.push_back(var);
+		std::ranges::sort(io_vars, constant_io_comp);
 
-					BOOST_LOG_TRIVIAL(error)
-						<< "(Error) failed to find output stream for variable '"
-						<< var << "'\n";
-					return false;
-				}
+		// sorting by time
+		// auto sorted = sort(outputs);
+		// adding missing values
+		// auto completed = complete(sorted);
+
+		// for each stream in out.streams, write the value from the solution
+		for (const auto& io_var : io_vars) {
+			auto value = outputs.find(io_var)->second;
+			// Get the out_var_name tag
+			auto io_var_name = trim2(trim2(io_var));
+			if (auto stream = streams.find(io_var_name); stream != streams.end())
+				if (stream->second) stream->second.value() << value << "\n";
+				else std::cout << io_var << " <- " << value << "\n";
+			else {
+				std::stringstream ss; ss << io_var;
+				if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;
+
+				BOOST_LOG_TRIVIAL(error)
+					<< "(Error) failed to find output stream for variable '"
+					<< io_var << "'\n";
+				return false;
 			}
 		}
 		return true; // success
@@ -302,7 +310,7 @@ struct interpreter {
 		for (const auto& system: this->systems) {
 			std::map<type, solution<BAs...>> solutions;
 			bool solved = true;
-			// solve the equations fro each type in the system
+			// solve the equations for each type in the system
 			for (const auto& [type, equations]: system) {
 				// rewriting the inputs and inserting them into memory
 				auto updated = update_to_time_point(equations);
@@ -344,8 +352,18 @@ struct interpreter {
 				}
 				#endif // DEBUG
 
-				if (solution.has_value()) solutions[type] = solution.value();
-				else { solved = false; break; }
+				if (solution.has_value()) {
+					// It can happen that variables are assigned
+					// to variables -> those need to be replaced
+					resolve_solution_dependencies(solution.value());
+					solutions[type] = solution.value();
+				}
+				else {
+					solved = false;
+					// We need to clear the solutions to current clause since it is unsat
+					solutions.clear();
+					break;
+				}
 			}
 			if (solved) {
 				solution<BAs...> global;
@@ -358,15 +376,17 @@ struct interpreter {
 				}
 				// complete solution according to the outputs from all systems
 				// corresponding to the clauses of the currently executed specification
-				for (const auto& sys : systems) {
-					for (const auto &var: outputs[sys]) {
-						auto timed_var = build_out_variable_at_n(var, time_point);
-						if (!global.contains(timed_var)) {
-							memory[timed_var] = _0<BAs...>;
-							global[timed_var] = _0<BAs...>;
-						}
-					}
-				}
+				// for (const auto& sys : systems) {
+				// 	for (const auto &var: outputs[sys]) {
+				// 		std::cout << "time_point: " << time_point << "\n";
+				// 		auto timed_var = build_out_variable_at_n(var, time_point);
+				// 		if (!global.contains(timed_var)) {
+				// 			std::cout << "timed_var: " << timed_var << "\n";
+				// 			memory[timed_var] = _0<BAs...>;
+				// 			global[timed_var] = _0<BAs...>;
+				// 		}
+				// 	}
+				// }
 				// update the time_point
 				time_point += 1;
 				// TODO (HIGH) remove old values from memory
@@ -416,6 +436,27 @@ private:
 					tau_parser::offset,
 						build_num<BAs...>(time_point));
 		return replace(f, changes);
+	}
+
+	// If a variable is assigned a variable V in a solution from the solver,
+	// try to find a non-variable value by checking the solution for V
+	void resolve_solution_dependencies(solution<BAs...>& s) {
+		using p = tau_parser;
+		for (auto& [v, a] : s) {
+			if (is_child_non_terminal(p::variable, a)) {
+				// The assigned value is a variables
+				auto new_a = a;
+				while (is_child_non_terminal(p::variable, new_a)) {
+					auto it = s.find(new_a);
+					if (it == s.end()) {
+						BOOST_LOG_TRIVIAL(error) << "(Error) cannot eliminate variable in solution\n";
+						break;
+					}
+					new_a = it->second;
+				}
+				a = new_a;
+			}
+		}
 	}
 };
 
