@@ -648,11 +648,13 @@ void repl_evaluator<BAs...>::run_cmd(
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n) {
-	auto type = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
-		?  make_string<tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
+	std::string type;
+	if (auto implicit_type = find_top(n, is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>); implicit_type) {
+		type = make_string<tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
 				nso<tau_ba<BAs...>, BAs...>>(
-			tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, n)
-		: "sbf"; // only tau makes always sense
+			tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, implicit_type.value());
+	} else type = "tau";
+
 	if (auto nn = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
 			? get_type_and_arg(n->child[2]) : get_type_and_arg(n->child[1]); nn) {
 		auto [t, program] = nn.value();
