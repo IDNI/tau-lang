@@ -25,7 +25,10 @@ start                  => rr _.
 rr                     => rec_relations _ wff:main _ '.'.
 rec_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
-ref                    => sym [_ offsets] _ ref_args.
+ref                    => sym [_ offsets] _ ref_args
+                                                [ _ "fallback" __ fp_fallback ].
+fp_fallback            => "first":first_sym | "last":last_sym
+                        | capture | ref | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 library                => ((_ (wff_rule | bf_rule):rule)*):rules.

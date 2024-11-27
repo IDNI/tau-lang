@@ -131,16 +131,18 @@ int_t get_new_var_id (const nso<BAs...> fm) {
 // Given a nso<BAs...> produce a number i such that the uninterpreted constant const_i is
 // not present
 template<typename... BAs>
-int_t get_new_uniter_const_id (const nso<BAs...> fm) {
+nso<BAs...> get_new_uniter_const (const nso<BAs...> fm, const std::string& name) {
 	auto uniter_consts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
 	std::set ids {0};
 	for (auto uniter_const : uniter_consts) {
-		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, uniter_const); tmp.find(":const") != std::string::npos) {
-			std::string id = tmp.substr(6, tmp.size()-1);
-			if (!tmp.empty()) ids.insert(stoi(id));
+		if (auto tmp = make_string(tau_node_terminal_extractor<BAs...>, uniter_const); tmp.find(name) != std::string::npos) {
+			std::string id = tmp.substr(name.length() + 1, tmp.size()-1);
+			if (!tmp.empty()) ids.insert(std::stoi(id));
 		}
 	}
-	return *ids.rbegin() + 1;
+	std::string id = std::to_string(*ids.rbegin() + 1);
+	auto uniter_const = build_bf_uniter_const<BAs...>("", name + id);
+	return uniter_const;
 }
 
 static inline std::vector<std::string> rr_v{"dummy"};
@@ -406,8 +408,11 @@ template<typename... BAs>
 nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
 	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Begin calculate recurrence relation";
 
-	auto bf_unfolded = bf.main | repeat_all<step<BAs...>, BAs...>(
-						step<BAs...>(bf.rec_relations));
+	auto main = calculate_all_fixed_points(bf);
+	if (!main) return nullptr;
+
+	auto bf_unfolded = main | repeat_all<step<BAs...>, BAs...>(
+					step<BAs...>(bf.rec_relations));
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End calculate recurrence relation";
 
@@ -558,13 +563,21 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 
 template <typename... BAs>
 nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
-	const nso<BAs...>& form, tau_parser::nonterminal t, size_t offset_arity)
+	const nso<BAs...>& form, tau_parser::nonterminal t, size_t offset_arity,
+	const sp_tau_node<BAs...>& fallback)
 {
-	static auto fallback = t == tau_parser::wff ? _F<BAs...> : _0<BAs...>;
-
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculating fixed point: " << form;
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
 	//ptree<BAs...>(std::cout << "form: ", form) << "\n";
+
+	auto ft = fallback | non_terminal_extractor<BAs...>
+		| optional_value_extractor<size_t>;
+	bool first = ft == tau_parser::first_sym,
+		last = ft == tau_parser::last_sym;
+	if (!first && !last && ft != t) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) Fallback type mismatch";
+		return nullptr;
+	}
 
 	if (!is_well_founded(nso_rr)) return nullptr;
 
@@ -612,7 +625,9 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
 
 		if (previous.size()
-			&& are_nso_equivalent<BAs...>(current, previous.back()))
+		&& (t == tau_parser::wff
+			? are_nso_equivalent<BAs...>(current, previous.back())
+			: are_bf_equal(current, previous.back())))
 		{
 			BOOST_LOG_TRIVIAL(debug) << eos
 				<< " - fixed point found at step: " << i;
@@ -620,11 +635,18 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 			return previous.back();
 		}
 		else if (previous.size() > 1
-			&& is_nso_equivalent_to_any_of(current, previous))
+			&& (t == tau_parser::wff
+				? is_nso_equivalent_to_any_of(current, previous)
+				: is_bf_same_to_any_of(current, previous)))
 		{
 			BOOST_LOG_TRIVIAL(debug) << eos
-				<< " - loop (no fixed point) "
-					"detected at step: " << i;
+				<< " - loop (no fixed point) detected at step: "
+				<< i << " returning fallback "
+				<< (first ? "first" : last ? "last" : "");
+			if (last) return previous.back();
+			if (first) return current;
+			BOOST_LOG_TRIVIAL(debug) << eos
+				<< " - fallback: " << fallback;
 			return fallback;
 		}
 		BOOST_LOG_TRIVIAL(debug) << eos
@@ -657,7 +679,7 @@ struct fixed_point_transformer {
 		auto [type, offset_arity] = get_type_info(types, ref);
 		if (offset_arity) {
 			auto fp = calculate_fixed_point(defs, n, type,
-					offset_arity);
+				offset_arity, get_fallback(type, ref));
 			if (!fp) return nullptr;
 			return changes.emplace(n, fp).first->second;
 		}
@@ -687,10 +709,40 @@ struct fixed_point_transformer {
 		return { tau_parser::wff, 0 };
 	}
 
+	sp_tau_node<BAs...> get_fallback(tau_parser::nonterminal t,
+		const sp_tau_node<BAs...>& ref)
+	{
+		auto fallback = ref | tau_parser::ref | tau_parser::fp_fallback;
+		if (!fallback) return t == tau_parser::wff
+			? _F<BAs...> : _0<BAs...>;
+		return fallback | only_child_extractor<BAs...>
+			| optional_value_extractor<sp_tau_node<BAs...>>;
+	}
+
 	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
 	rr<nso<BAs...>> defs;
 	rr_types types;
 };
+
+template<typename... BAs>
+nso<BAs...> calculate_all_fixed_points(const rr<nso<BAs...>>& recrel) {
+	// get types and do type checks
+	rr_types types;
+	bool success = true;
+	get_rr_types(success, types, recrel);
+	if (!success || !is_valid(recrel)) return nullptr;
+	// transform fp calculation calls by calculation results
+	fixed_point_transformer<BAs...> fpt(recrel, types);
+	auto new_main = rewriter::post_order_traverser<decltype(fpt),
+		rewriter::all_t, nso<BAs...>>(fpt, rewriter::all)(recrel.main);
+	if (!new_main) return nullptr;
+	if (fpt.changes.size()) {
+		new_main = replace(new_main, fpt.changes);
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
+						"New main: " << new_main;
+	}
+	return new_main;
+}
 
 // This function applies the recurrence relations the formula comes with to
 // the formula
@@ -698,23 +750,10 @@ template<typename... BAs>
 nso<BAs...> apply_rr_to_formula (const rr<nso<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Start apply_rr_to_formula";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
-	// get types and do type checks
-	rr_types types;
-	bool success = true;
-	get_rr_types(success, types, nso_rr);
-	if (!success || !is_valid(nso_rr)) return nullptr;
-	// transform fp calculation calls by calculation results
-	fixed_point_transformer<BAs...> fpt(nso_rr, types);
-	auto new_main = rewriter::post_order_traverser<decltype(fpt),
-		rewriter::all_t, nso<BAs...>>(fpt, rewriter::all)(nso_rr.main);
-	if (!new_main) return nullptr;
-	if (fpt.changes.size()) {
-		new_main = replace(new_main, fpt.changes);
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
-						"New main: " << new_main;
-	}
+	auto main = calculate_all_fixed_points(nso_rr);
+	if (!main) return nullptr;
 	// Substitute function and recurrence relation definitions
-	new_main = new_main | repeat_all<step<BAs...>, BAs...>(
+	auto new_main = main | repeat_all<step<BAs...>, BAs...>(
 			    step<BAs...>(nso_rr.rec_relations));
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End apply_rr_to_formula";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;

@@ -5247,11 +5247,15 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// constants
 			case tau_parser::uninterpreted_constant:
 							wrap("<", ">"); break;
+			// fixed point calculation fallback
+			case tau_parser::fp_fallback: prefix(" fallback"); break;
 			// simple symbols
-			case tau_parser::bf_f:  stream << '0';
+			case tau_parser::first_sym: stream << "first"; break;
+			case tau_parser::last_sym: stream << "last"; break;
+			case tau_parser::bf_f:  stream << '0'; break;
 				if (ch.size() > 0) stream << " : ", ppch(0);
 				break;
-			case tau_parser::bf_t:  stream << '1';
+			case tau_parser::bf_t:  stream << '1'; break;
 				if (ch.size() > 0) stream << " : ", ppch(0);
 				break;
 			case tau_parser::wff_f: stream << 'F'; break;
