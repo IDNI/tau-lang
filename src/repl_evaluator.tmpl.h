@@ -662,7 +662,7 @@ void repl_evaluator<BAs...>::solve_cmd(
 		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type);
 		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
-		for (auto& [k, v] : s.value()) std::cout << "\t" << k << " <- " << v << "\n";
+		for (auto& [k, v] : s.value()) std::cout << "\t" << k << " := " << v << "\n";
 		std::cout << "}\n";
 	}
 }
