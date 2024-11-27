@@ -303,6 +303,27 @@ nso<BAs...> build_step_chi(const nso<BAs...>& chi, const nso<BAs...>& st,
 	return replace(prev_fm, changes);
 }
 
+// comparator for sorting constant io variables
+inline auto constant_io_comp = [](const auto& v1, const auto& v2) {
+	using p = tau_parser;
+	// trim the bf of v1 and v2 if present
+	auto v1_ = is_non_terminal(p::bf, v1) ? trim(v1) : v1;
+	auto v2_ = is_non_terminal(p::bf, v2) ? trim(v2) : v2;
+	if (get_io_time_point(v1_) < get_io_time_point(v2_))
+		return true;
+	if (get_io_time_point(v1_) == get_io_time_point(v2_)) {
+		bool v1_in = (v1_ | p::io_var | p::in).has_value();
+		bool v2_in = (v2_ | p::io_var | p::in).has_value();
+
+		if (!v1_in && v2_in) return false;
+		if (v1_in && !v2_in) return true;
+		if (v1_in && v2_in) return get_io_name(v1_) < get_io_name(v2_);
+		if (!v1_in && !v2_in) return get_io_name(v1_) < get_io_name(v2_);
+			// This covers all cases already
+		else return false;
+	} else return false;
+};
+
 // This method is designed to be called on the output of find_fixpoint_phi/chi
 // when the run was started at the earliest well-defined time point
 template<typename... BAs>
@@ -314,22 +335,7 @@ bool is_run_satisfiable (const nso<BAs...>& fm) {
 	auto free_io_vars = get_free_vars_from_nso(fm);
 	std::vector<nso<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
-	auto initial_comp = [](const auto& v1, const auto& v2) {
-		if (get_io_time_point(v1) < get_io_time_point(v2))
-			return true;
-		if (get_io_time_point(v1) == get_io_time_point(v2)) {
-			bool v1_in = (v1 | p::io_var | p::in).has_value();
-			bool v2_in = (v2 | p::io_var | p::in).has_value();
-
-			if (!v1_in && v2_in) return false;
-			if (v1_in && !v2_in) return true;
-			if (v1_in && v2_in) return get_io_name(v1) < get_io_name(v2);
-			if (!v1_in && !v2_in) return get_io_name(v1) < get_io_name(v2);
-			// This covers all cases already
-			else return false;
-		} else return false;
-	};
-	sort(io_vars.begin(), io_vars.end(), initial_comp);
+	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
@@ -365,25 +371,10 @@ nso<BAs...> get_uninterpreted_constants_constraints (const nso<BAs...>& fm) {
 	io_vars = select_top(uconst_ctns,
 			     is_child_non_terminal<p::io_var, BAs...>);
 
-	auto initial_comp = [](const auto& v1, const auto& v2) {
-		if (get_io_time_point(v1) < get_io_time_point(v2))
-			return true;
-		if (get_io_time_point(v1) == get_io_time_point(v2)) {
-			bool v1_in = (v1 | p::io_var | p::in).has_value();
-			bool v2_in = (v2 | p::io_var | p::in).has_value();
-
-			if (!v1_in && v2_in) return false;
-			if (v1_in && !v2_in) return true;
-			if (v1_in && v2_in) return get_io_name(v1) < get_io_name(v2);
-			if (!v1_in && !v2_in) return get_io_name(v1) < get_io_name(v2);
-			// This covers all cases already
-			else return false;
-		} else return false;
-	};
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
 		[](const auto& el){return is_io_initial(el);}));
-	sort(io_vars.begin(), io_vars.end(), initial_comp);
+	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 
 	auto free_io_vars = get_free_vars_from_nso(uconst_ctns);
 	while(!io_vars.empty()) {
@@ -548,7 +539,10 @@ nso<BAs...> build_prev_flag_on_lookback (const std::string& name, const std::str
 }
 
 template<typename... BAs>
-nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials, const int_t lookback, bool reset_ctn_id = false) {
+nso<BAs...> transform_ctn_to_streams(const nso<BAs...>& fm, nso<BAs...>& flag_initials,
+					nso<BAs...>& flag_rules,
+					const int_t lookback,
+					bool reset_ctn_id = false) {
 	using p = tau_parser;
 	auto to_eq_1 = [](const auto& n) {
 		return build_wff_eq(build_bf_neg(n));
@@ -564,28 +558,28 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 		std::string ctnvar = make_string(tau_node_terminal_extractor<BAs...>,
 			find_top(ctn, is_non_terminal<p::ctnvar, BAs...>).value());
 		std::stringstream ss; ss << "_f" << ctn_id++;
+		auto flag_iovar = build_io_out<BAs...>(ss.str(), ctnvar);
 
 		// Take lookback of formula into account for constructing rule
 		auto flag_rule1 = build_prev_flag_on_lookback<BAs...>(ss.str(), ctnvar, lookback);
 		auto flag_rule2 = build_flag_on_lookback<BAs...>(ss.str(), ctnvar, lookback);
-		changes[ctn] = trim(to_eq_1(flag_rule1));
+		changes[ctn] = trim(to_eq_1( wrap(tau_parser::bf, flag_iovar)));
 		if (ctn | p::ctn_greater || ctn | p::ctn_greater_equal) {
 			// Add flag rule _fk[lookback] != 0 -> _fk[lookback-1] = 1
 			auto flag_rule = build_wff_or(
 				build_wff_eq(flag_rule1), to_eq_1(flag_rule2));
 			// Conjunct flag rule with formula
-			fm = build_wff_and(fm, flag_rule);
+			flag_rules = build_wff_and(flag_rules, flag_rule);
 		} else {
 			// Flag is of type less or less_equal
 			// Add flag rule _fk[lookback] != 1 -> _fk[lookback-1] = 0
 			auto flag_rule = build_wff_or(
 				to_eq_1(flag_rule1), build_wff_eq(flag_rule2));
 			// Conjunct flag rule with formula
-			fm = build_wff_and(fm, flag_rule);
+			flag_rules = build_wff_and(flag_rules, flag_rule);
 		}
 
 		// Add initial conditions for flag
-		auto flag_iovar = build_io_out<BAs...>(ss.str(), ctnvar);
 		int_t t = 0;
 		while (is_initial_ctn_phase(ctn, t)) {
 			nso<BAs...> flag_init_cond =
@@ -596,7 +590,7 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 			++t;
 		}
 	}
-	if (!changes.empty()) fm = replace(fm, changes);
+	if (!changes.empty()) return replace(fm, changes);
 	return fm;
 }
 
@@ -616,12 +610,13 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	std::vector<nso<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
-	nso<BAs...> flag_initials;
-	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, lookback, true);
+	nso<BAs...> flag_initials = _T<BAs...>, flag_rules = _T<BAs...>;
+	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, flag_rules, lookback, true);
 	if (lookback == 0 && fm != transformed_fm) {
+		io_vars = select_top(transformed_fm, is_child_non_terminal<p::io_var, BAs...>);
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
 	} else fm = transformed_fm;
-
+	fm = build_wff_and(fm, flag_rules);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Removed flags";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << build_wff_and(fm, flag_initials);
 
@@ -843,8 +838,9 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	// Can happen due to constraints in sometimes clause
 	if (find_top(aw, is_non_terminal<p::constraint, BAs...>)) {
 		// Transform constraint to stream
-		nso<BAs...> ctn_initials = _T<BAs...>;
-		aw = transform_ctn_to_streams(aw, ctn_initials, time_point, reset_ctn_streams);
+		nso<BAs...> ctn_initials = _T<BAs...>, ctn_rules = _T<BAs...>;
+		aw = transform_ctn_to_streams(aw, ctn_initials, ctn_rules, time_point, reset_ctn_streams);
+		aw = build_wff_and(ctn_rules, aw);
 		aw = build_wff_and(ctn_initials, aw);
 		// The lookback cannot be 0 due to presents of eventual variables
 		// Therefore, no adjustment of aw is needed
