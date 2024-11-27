@@ -2,7 +2,7 @@ set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
 	babdd.h
-	bdd_binding.h
+	sbf_ba.h
 	bdd_handle.h
 	bool_ba.h
 	defs.h

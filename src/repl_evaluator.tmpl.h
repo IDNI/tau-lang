@@ -1133,7 +1133,7 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	std::set<std::string> guards{
 		(opt.charvar = value) ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
-	bdd_parser::instance().get_grammar().set_enabled_productions(guards);
+	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
 	return value;
 }
 

@@ -15,13 +15,13 @@
 
 @enable productions charvar.
 
-start  => _ bdd _.
-bdd    => ( '(' _ bdd _ ')'                ) :group
+start  => _ sbf _.
+sbf    => ( '(' _ sbf _ ')'                ) :group
         |                                     variable
-        | ( bdd _ "'"                      ) :negation
-        | ( bdd _ '|' _ bdd                ) :disjunction
-        | ( bdd _ ('^' | '+') _ bdd        ) :exclusive_disjunction
-        | ( bdd (_ | _ '&' _) bdd          ) :conjunction
+        | ( sbf _ "'"                      ) :negation
+        | ( sbf _ '|' _ sbf                ) :disjunction
+        | ( sbf _ ('^' | '+') _ sbf        ) :exclusive_disjunction
+        | ( sbf (_ | _ '&' _) sbf          ) :conjunction
         | '1'                                :one
         | '0'                                :zero.
 _      => [ space _ ].
@@ -31,4 +31,4 @@ variable[var]     => alpha (alnum | '_')*.
 
 @trim _.
 @trim all terminals except children of variable.
-@inline char classes, bdd > group > bdd.
+@inline char classes, sbf > group > sbf.
