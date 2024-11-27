@@ -40,7 +40,7 @@ builder_head           => '(' _ capture (__ capture)* _ ')'.
 builder_body           => ("=:"  _ bf) :bf_builder_body
                         | ("=::" _ wff):wff_builder_body.
 
-tau_constant_source    => rec_relations _ main [ _ '.' ].
+tau_constant_source    => rec_relations _ main _ [ '.' _ ].
 
 # wff and bf expressions
 #

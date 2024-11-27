@@ -262,12 +262,12 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(60), (NT(61)));
 //G62:  builder_body(55)     => wff_builder_body(60).
 	p(NT(55), (NT(60)));
-//G63:  __E_tau_constant_source_19(63) => _(11) '.'.
-	p(NT(63), (NT(11)+T(1)));
+//G63:  __E_tau_constant_source_19(63) => '.' _(11).
+	p(NT(63), (T(1)+NT(11)));
 //G64:  __E_tau_constant_source_19(63) => null.
 	p(NT(63), (nul));
-//G65:  tau_constant_source(62) => rec_relations(12) _(11) main(13) __E_tau_constant_source_19(63).
-	p(NT(62), (NT(12)+NT(11)+NT(13)+NT(63)));
+//G65:  tau_constant_source(62) => rec_relations(12) _(11) main(13) _(11) __E_tau_constant_source_19(63).
+	p(NT(62), (NT(12)+NT(11)+NT(13)+NT(11)+NT(63)));
 //G66:  __E_wff_20(65)       => '(' _(11) wff(14) _(11) ')'.
 	p(NT(65), (T(15)+NT(11)+NT(14)+NT(11)+T(16)));
 //G67:  wff_parenthesis(64)  => __E_wff_20(65).
