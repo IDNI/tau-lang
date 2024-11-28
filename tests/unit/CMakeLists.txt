@@ -15,7 +15,7 @@ set(TESTS
 	normalizer
 	type_system
 	bindings
-	bdd_binding
+	sbf_ba_binding
 	traversal
 	tau
 	variant_ba

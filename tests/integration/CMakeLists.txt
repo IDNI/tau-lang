@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	bdd1
-	bdd2
+	sbf1
+	sbf2
 	tau_ba1
 	tau_ba3
 	normal_forms

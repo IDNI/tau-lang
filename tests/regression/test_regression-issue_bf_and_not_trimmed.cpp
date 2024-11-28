@@ -14,10 +14,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bdd_handle.h"
-#include "normalizer.h"
-#include "tau_ba.h"
 
 #include "../integration/test_integration_helpers-tau.h"
 

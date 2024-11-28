@@ -734,7 +734,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::sat_cmd(
 			return {};
 		}
 		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
-		return is_tau_formula_sat(normalized_fm)
+		return is_tau_formula_sat(normalized_fm, true)
 			       ? _T<tau_ba<BAs...>, BAs...>
 			       : _F<tau_ba<BAs...>, BAs...>;
 
@@ -779,7 +779,7 @@ std::optional<nso<tau_ba<BAs...>, BAs...>> repl_evaluator<BAs...>::is_unsatisfia
 			return {};
 		}
 		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
-		return (!is_tau_formula_sat(normalized_fm))
+		return (!is_tau_formula_sat(normalized_fm, true))
 			       ? _T<tau_ba<BAs...>, BAs...>
 			       : _F<tau_ba<BAs...>, BAs...>;
 	}
@@ -1149,7 +1149,7 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	std::set<std::string> guards{
 		(opt.charvar = value) ? "charvar" : "var" };
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
-	bdd_parser::instance().get_grammar().set_enabled_productions(guards);
+	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
 	return value;
 }
 

@@ -14,13 +14,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bool_ba.h"
-#include "bdd_handle.h"
-#include "bdd_binding.h"
-#include "normalizer.h"
 
-#include "test_integration_helpers-bdd.h"
+#include "test_integration_helpers-sbf.h"
 #include "../unit/test_helpers.h"
 
 using namespace idni::rewriter;
@@ -30,9 +25,9 @@ namespace testing = doctest;
 
 bool fp_test(const char* sample, const size_t& nt, bool expect_fail = false) {
 	auto sample_src = make_tau_source(sample);
-	auto formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+	auto formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 	if (!formula) return expect_fail;
-	auto normalized = normalizer<bdd_binding>(formula.value());
+	auto normalized = normalizer<sbf_ba>(formula.value());
 	if (!normalized) return expect_fail;
 	auto ret = (normalized | nt).has_value();
 	return expect_fail ? !ret : ret;

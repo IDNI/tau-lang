@@ -1,19 +1,19 @@
-// This file is generated from a file parser/bdd.tgf by
+// This file is generated from a file parser/sbf.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
-#ifndef __BDD_PARSER_H__
-#define __BDD_PARSER_H__
+#ifndef __SBF_PARSER_H__
+#define __SBF_PARSER_H__
 
 #include "parser.h"
 
-namespace bdd_parser_data {
+namespace sbf_parser_data {
 
 using char_type     = char;
 using terminal_type = char;
 
 inline std::vector<std::string> symbol_names{
-	"", "space", "alpha", "digit", "start", "_", "bdd", "group", "__E_bdd_0", "variable", 
-	"negation", "__E_bdd_1", "disjunction", "__E_bdd_2", "exclusive_disjunction", "__E_bdd_3", "__E___E_bdd_3_4", "conjunction", "__E_bdd_5", "__E___E_bdd_5_6", 
+	"", "space", "alpha", "digit", "start", "_", "sbf", "group", "__E_sbf_0", "variable", 
+	"negation", "__E_sbf_1", "disjunction", "__E_sbf_2", "exclusive_disjunction", "__E_sbf_3", "__E___E_sbf_3_4", "conjunction", "__E_sbf_5", "__E___E_sbf_5_6", 
 	"one", "zero", "__E___7", "__E_variable_8", "__E_variable_9", "alnum", "__E_variable_10", 
 };
 
@@ -66,55 +66,55 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	if (loaded) return p;
 	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
 	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
-//G0:   start(4)             => _(5) bdd(6) _(5).
+//G0:   start(4)             => _(5) sbf(6) _(5).
 	p(NT(4), (NT(5)+NT(6)+NT(5)));
-//G1:   __E_bdd_0(8)         => '(' _(5) bdd(6) _(5) ')'.
+//G1:   __E_sbf_0(8)         => '(' _(5) sbf(6) _(5) ')'.
 	p(NT(8), (T(1)+NT(5)+NT(6)+NT(5)+T(2)));
-//G2:   group(7)             => __E_bdd_0(8).
+//G2:   group(7)             => __E_sbf_0(8).
 	p(NT(7), (NT(8)));
-//G3:   bdd(6)               => group(7).
+//G3:   sbf(6)               => group(7).
 	p(NT(6), (NT(7)));
-//G4:   bdd(6)               => variable(9).
+//G4:   sbf(6)               => variable(9).
 	p(NT(6), (NT(9)));
-//G5:   __E_bdd_1(11)        => bdd(6) _(5) '\''.
+//G5:   __E_sbf_1(11)        => sbf(6) _(5) '\''.
 	p(NT(11), (NT(6)+NT(5)+T(3)));
-//G6:   negation(10)         => __E_bdd_1(11).
+//G6:   negation(10)         => __E_sbf_1(11).
 	p(NT(10), (NT(11)));
-//G7:   bdd(6)               => negation(10).
+//G7:   sbf(6)               => negation(10).
 	p(NT(6), (NT(10)));
-//G8:   __E_bdd_2(13)        => bdd(6) _(5) '|' _(5) bdd(6).
+//G8:   __E_sbf_2(13)        => sbf(6) _(5) '|' _(5) sbf(6).
 	p(NT(13), (NT(6)+NT(5)+T(4)+NT(5)+NT(6)));
-//G9:   disjunction(12)      => __E_bdd_2(13).
+//G9:   disjunction(12)      => __E_sbf_2(13).
 	p(NT(12), (NT(13)));
-//G10:  bdd(6)               => disjunction(12).
+//G10:  sbf(6)               => disjunction(12).
 	p(NT(6), (NT(12)));
-//G11:  __E___E_bdd_3_4(16)  => '^'.
+//G11:  __E___E_sbf_3_4(16)  => '^'.
 	p(NT(16), (T(5)));
-//G12:  __E___E_bdd_3_4(16)  => '+'.
+//G12:  __E___E_sbf_3_4(16)  => '+'.
 	p(NT(16), (T(6)));
-//G13:  __E_bdd_3(15)        => bdd(6) _(5) __E___E_bdd_3_4(16) _(5) bdd(6).
+//G13:  __E_sbf_3(15)        => sbf(6) _(5) __E___E_sbf_3_4(16) _(5) sbf(6).
 	p(NT(15), (NT(6)+NT(5)+NT(16)+NT(5)+NT(6)));
-//G14:  exclusive_disjunction(14) => __E_bdd_3(15).
+//G14:  exclusive_disjunction(14) => __E_sbf_3(15).
 	p(NT(14), (NT(15)));
-//G15:  bdd(6)               => exclusive_disjunction(14).
+//G15:  sbf(6)               => exclusive_disjunction(14).
 	p(NT(6), (NT(14)));
-//G16:  __E___E_bdd_5_6(19)  => _(5).
+//G16:  __E___E_sbf_5_6(19)  => _(5).
 	p(NT(19), (NT(5)));
-//G17:  __E___E_bdd_5_6(19)  => _(5) '&' _(5).
+//G17:  __E___E_sbf_5_6(19)  => _(5) '&' _(5).
 	p(NT(19), (NT(5)+T(7)+NT(5)));
-//G18:  __E_bdd_5(18)        => bdd(6) __E___E_bdd_5_6(19) bdd(6).
+//G18:  __E_sbf_5(18)        => sbf(6) __E___E_sbf_5_6(19) sbf(6).
 	p(NT(18), (NT(6)+NT(19)+NT(6)));
-//G19:  conjunction(17)      => __E_bdd_5(18).
+//G19:  conjunction(17)      => __E_sbf_5(18).
 	p(NT(17), (NT(18)));
-//G20:  bdd(6)               => conjunction(17).
+//G20:  sbf(6)               => conjunction(17).
 	p(NT(6), (NT(17)));
 //G21:  one(20)              => '1'.
 	p(NT(20), (T(8)));
-//G22:  bdd(6)               => one(20).
+//G22:  sbf(6)               => one(20).
 	p(NT(6), (NT(20)));
 //G23:  zero(21)             => '0'.
 	p(NT(21), (T(9)));
-//G24:  bdd(6)               => zero(21).
+//G24:  sbf(6)               => zero(21).
 	p(NT(6), (NT(21)));
 //G25:  __E___7(22)          => space(1) _(5).
 	p(NT(22), (NT(1)+NT(5)));
@@ -148,30 +148,30 @@ inline idni::prods<char_type, terminal_type>& productions() {
 inline ::idni::grammar<char_type, terminal_type> grammar(
 	nts, productions(), start_symbol, char_classes, grammar_options);
 
-} // namespace bdd_parser_data
+} // namespace sbf_parser_data
 
-struct bdd_parser : public idni::parser<char, char> {
+struct sbf_parser : public idni::parser<char, char> {
 	enum nonterminal {
-		nul, space, alpha, digit, start, _, bdd, group, __E_bdd_0, variable, 
-		negation, __E_bdd_1, disjunction, __E_bdd_2, exclusive_disjunction, __E_bdd_3, __E___E_bdd_3_4, conjunction, __E_bdd_5, __E___E_bdd_5_6, 
+		nul, space, alpha, digit, start, _, sbf, group, __E_sbf_0, variable, 
+		negation, __E_sbf_1, disjunction, __E_sbf_2, exclusive_disjunction, __E_sbf_3, __E___E_sbf_3_4, conjunction, __E_sbf_5, __E___E_sbf_5_6, 
 		one, zero, __E___7, __E_variable_8, __E_variable_9, alnum, __E_variable_10, 
 	};
-	static bdd_parser& instance() {
-		static bdd_parser inst;
+	static sbf_parser& instance() {
+		static sbf_parser inst;
 		return inst;
 	}
-	bdd_parser() : idni::parser<char_type, terminal_type>(
-		bdd_parser_data::grammar,
-		bdd_parser_data::parser_options) {}
+	sbf_parser() : idni::parser<char_type, terminal_type>(
+		sbf_parser_data::grammar,
+		sbf_parser_data::parser_options) {}
 	size_t id(const std::basic_string<char_type>& name) {
-		return bdd_parser_data::nts.get(name);
+		return sbf_parser_data::nts.get(name);
 	}
 	const std::basic_string<char_type>& name(size_t id) {
-		return bdd_parser_data::nts.get(id);
+		return sbf_parser_data::nts.get(id);
 	}
 	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &bdd_parser_data::nts);
+		return symbol_type(nt, &sbf_parser_data::nts);
 	}
 };
 
-#endif // __BDD_PARSER_H__
+#endif // __SBF_PARSER_H__

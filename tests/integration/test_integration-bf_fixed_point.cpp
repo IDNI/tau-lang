@@ -14,13 +14,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bool_ba.h"
-#include "bdd_handle.h"
-#include "normalizer.h"
-#include "bdd_binding.h"
 
-#include "test_integration_helpers-bdd.h"
+#include "test_integration_helpers-sbf.h"
 #include "../unit/test_helpers.h"
 
 using namespace idni::rewriter;
@@ -34,17 +29,17 @@ bool test_bf_rr_fp(const char* rec, const char* sample, tau_parser::nonterminal 
 	tau_parser::parse_options options;
 	options.start = tau_parser::rec_relations;
 	auto rec_src = make_tau_source(rec, options);
-	auto rec_formula = make_nso_rr_using_factory<bdd_binding>(rec_src);
+	auto rec_formula = make_nso_rr_using_factory<sbf_ba>(rec_src);
 	if (!rec_formula.has_value()) return expect_fail;
 	rec_formula = infer_ref_types(rec_formula.value());
 	if (!rec_formula.has_value()) return expect_fail;
 	options.start = tau_parser::bf;
 	auto sample_src = make_tau_source(sample, options);
-	auto formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+	auto formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 	if (!formula.has_value()) return expect_fail;
 	auto sample_formula = formula.value();
 	sample_formula.rec_relations = rec_formula.value().rec_relations;
-	auto result = bf_normalizer_with_rec_relation<bdd_binding>(
+	auto result = bf_normalizer_with_rec_relation<sbf_ba>(
 								sample_formula);
 	if (!result) return expect_fail;
 	auto check = result | nt;
