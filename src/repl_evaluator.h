@@ -60,7 +60,7 @@
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 
-#include "bdd_binding.h"
+#include "sbf_ba.h"
 #include "repl.h"
 #include "interpreter.h"
 

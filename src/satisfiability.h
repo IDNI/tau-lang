@@ -19,9 +19,10 @@
 namespace idni::tau {
 
 inline static bool use_debug_output_in_sat = false;
-inline void print_fixpoint_info(const std::string& info) {
-	if (!use_debug_output_in_sat) BOOST_LOG_TRIVIAL(info) << info;
-	else std::cerr << info << "\n";
+inline void print_fixpoint_info(const std::string& message, const std::string& result, const bool output) {
+	if (!output) return;
+	if (!use_debug_output_in_sat) BOOST_LOG_TRIVIAL(info) << "\n" << message << "\n" << result << "\n\n";
+	else std::cerr << message << "\n" << result << "\n";
 }
 
 template<typename... BAs>
@@ -303,6 +304,27 @@ nso<BAs...> build_step_chi(const nso<BAs...>& chi, const nso<BAs...>& st,
 	return replace(prev_fm, changes);
 }
 
+// comparator for sorting constant io variables
+inline auto constant_io_comp = [](const auto& v1, const auto& v2) {
+	using p = tau_parser;
+	// trim the bf of v1 and v2 if present
+	auto v1_ = is_non_terminal(p::bf, v1) ? trim(v1) : v1;
+	auto v2_ = is_non_terminal(p::bf, v2) ? trim(v2) : v2;
+	if (get_io_time_point(v1_) < get_io_time_point(v2_))
+		return true;
+	if (get_io_time_point(v1_) == get_io_time_point(v2_)) {
+		bool v1_in = (v1_ | p::io_var | p::in).has_value();
+		bool v2_in = (v2_ | p::io_var | p::in).has_value();
+
+		if (!v1_in && v2_in) return false;
+		if (v1_in && !v2_in) return true;
+		if (v1_in && v2_in) return get_io_name(v1_) < get_io_name(v2_);
+		if (!v1_in && !v2_in) return get_io_name(v1_) < get_io_name(v2_);
+			// This covers all cases already
+		else return false;
+	} else return false;
+};
+
 // This method is designed to be called on the output of find_fixpoint_phi/chi
 // when the run was started at the earliest well-defined time point
 template<typename... BAs>
@@ -314,22 +336,7 @@ bool is_run_satisfiable (const nso<BAs...>& fm) {
 	auto free_io_vars = get_free_vars_from_nso(fm);
 	std::vector<nso<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
-	auto initial_comp = [](const auto& v1, const auto& v2) {
-		if (get_io_time_point(v1) < get_io_time_point(v2))
-			return true;
-		if (get_io_time_point(v1) == get_io_time_point(v2)) {
-			bool v1_in = (v1 | p::io_var | p::in).has_value();
-			bool v2_in = (v2 | p::io_var | p::in).has_value();
-
-			if (!v1_in && v2_in) return false;
-			if (v1_in && !v2_in) return true;
-			if (v1_in && v2_in) return get_io_name(v1) < get_io_name(v2);
-			if (!v1_in && !v2_in) return get_io_name(v1) < get_io_name(v2);
-			// This covers all cases already
-			else return false;
-		} else return false;
-	};
-	sort(io_vars.begin(), io_vars.end(), initial_comp);
+	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
@@ -365,25 +372,10 @@ nso<BAs...> get_uninterpreted_constants_constraints (const nso<BAs...>& fm) {
 	io_vars = select_top(uconst_ctns,
 			     is_child_non_terminal<p::io_var, BAs...>);
 
-	auto initial_comp = [](const auto& v1, const auto& v2) {
-		if (get_io_time_point(v1) < get_io_time_point(v2))
-			return true;
-		if (get_io_time_point(v1) == get_io_time_point(v2)) {
-			bool v1_in = (v1 | p::io_var | p::in).has_value();
-			bool v2_in = (v2 | p::io_var | p::in).has_value();
-
-			if (!v1_in && v2_in) return false;
-			if (v1_in && !v2_in) return true;
-			if (v1_in && v2_in) return get_io_name(v1) < get_io_name(v2);
-			if (!v1_in && !v2_in) return get_io_name(v1) < get_io_name(v2);
-			// This covers all cases already
-			else return false;
-		} else return false;
-	};
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
 		[](const auto& el){return is_io_initial(el);}));
-	sort(io_vars.begin(), io_vars.end(), initial_comp);
+	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 
 	auto free_io_vars = get_free_vars_from_nso(uconst_ctns);
 	while(!io_vars.empty()) {
@@ -548,7 +540,10 @@ nso<BAs...> build_prev_flag_on_lookback (const std::string& name, const std::str
 }
 
 template<typename... BAs>
-nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials, const int_t lookback, bool reset_ctn_id = false) {
+nso<BAs...> transform_ctn_to_streams(const nso<BAs...>& fm, nso<BAs...>& flag_initials,
+					nso<BAs...>& flag_rules,
+					const int_t lookback,
+					bool reset_ctn_id = false) {
 	using p = tau_parser;
 	auto to_eq_1 = [](const auto& n) {
 		return build_wff_eq(build_bf_neg(n));
@@ -564,28 +559,28 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 		std::string ctnvar = make_string(tau_node_terminal_extractor<BAs...>,
 			find_top(ctn, is_non_terminal<p::ctnvar, BAs...>).value());
 		std::stringstream ss; ss << "_f" << ctn_id++;
+		auto flag_iovar = build_io_out<BAs...>(ss.str(), ctnvar);
 
 		// Take lookback of formula into account for constructing rule
 		auto flag_rule1 = build_prev_flag_on_lookback<BAs...>(ss.str(), ctnvar, lookback);
 		auto flag_rule2 = build_flag_on_lookback<BAs...>(ss.str(), ctnvar, lookback);
-		changes[ctn] = trim(to_eq_1(flag_rule1));
+		changes[ctn] = trim(to_eq_1( wrap(tau_parser::bf, flag_iovar)));
 		if (ctn | p::ctn_greater || ctn | p::ctn_greater_equal) {
 			// Add flag rule _fk[lookback] != 0 -> _fk[lookback-1] = 1
 			auto flag_rule = build_wff_or(
 				build_wff_eq(flag_rule1), to_eq_1(flag_rule2));
 			// Conjunct flag rule with formula
-			fm = build_wff_and(fm, flag_rule);
+			flag_rules = build_wff_and(flag_rules, flag_rule);
 		} else {
 			// Flag is of type less or less_equal
 			// Add flag rule _fk[lookback] != 1 -> _fk[lookback-1] = 0
 			auto flag_rule = build_wff_or(
 				to_eq_1(flag_rule1), build_wff_eq(flag_rule2));
 			// Conjunct flag rule with formula
-			fm = build_wff_and(fm, flag_rule);
+			flag_rules = build_wff_and(flag_rules, flag_rule);
 		}
 
 		// Add initial conditions for flag
-		auto flag_iovar = build_io_out<BAs...>(ss.str(), ctnvar);
 		int_t t = 0;
 		while (is_initial_ctn_phase(ctn, t)) {
 			nso<BAs...> flag_init_cond =
@@ -596,14 +591,14 @@ nso<BAs...> transform_ctn_to_streams(nso<BAs...> fm, nso<BAs...>& flag_initials,
 			++t;
 		}
 	}
-	if (!changes.empty()) fm = replace(fm, changes);
+	if (!changes.empty()) return replace(fm, changes);
 	return fm;
 }
 
 // We assume that the formula has run through the normalizer before
 // and is a single always statement
 template<typename... BAs>
-nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
+nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm, const bool output = false)
 {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin always_to_unbounded_continuation";
 	BOOST_LOG_TRIVIAL(debug) << "Start fm for always_to_unbound: " << fm << "\n";
@@ -616,12 +611,13 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 	std::vector<nso<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
-	nso<BAs...> flag_initials;
-	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, lookback, true);
+	nso<BAs...> flag_initials = _T<BAs...>, flag_rules = _T<BAs...>;
+	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, flag_rules, lookback, true);
 	if (lookback == 0 && fm != transformed_fm) {
+		io_vars = select_top(transformed_fm, is_child_non_terminal<p::io_var, BAs...>);
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
 	} else fm = transformed_fm;
-
+	fm = build_wff_and(fm, flag_rules);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Removed flags";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << build_wff_and(fm, flag_initials);
 
@@ -656,17 +652,19 @@ nso<BAs...> always_to_unbounded_continuation(nso<BAs...> fm)
 			print_fixpoint_info(
 				"Temporal normalization of always specification reached fixpoint after "
 				+ std::to_string(steps) +
-				" steps, yielding the result: ");
-			print_fixpoint_info(tau_to_str(_F<BAs...>));
+				" steps, yielding the result: ",
+				tau_to_str(_F<BAs...>), output);
 			return _F<BAs...>;
 		}
 	}
 	auto res = normalize_non_temp(build_wff_and(ubd_ctn, run));
 	// The following is std::cout because it should always be printed
-	print_fixpoint_info("Temporal normalization of always specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
-	print_fixpoint_info(tau_to_str(is_child_non_terminal(p::wff_always, res)
-					       ? trim2(res)
-					       : res));
+	print_fixpoint_info(
+		"Temporal normalization of always specification reached fixpoint after "
+		+ std::to_string(steps) + " steps, yielding the result: ",
+		tau_to_str(is_child_non_terminal(p::wff_always, res)
+				? trim2(res)
+				: res), output);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
 	return res;
 }
@@ -815,7 +813,8 @@ template<typename... BAs>
 nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 				      const nso<BAs...>& ev_var_flags,
 				      const auto& original_aw,
-				      const bool reset_ctn_streams) {
+				      const bool reset_ctn_streams,
+				      const bool output = false) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
 
 	using p = tau_parser;
@@ -843,8 +842,9 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	// Can happen due to constraints in sometimes clause
 	if (find_top(aw, is_non_terminal<p::constraint, BAs...>)) {
 		// Transform constraint to stream
-		nso<BAs...> ctn_initials = _T<BAs...>;
-		aw = transform_ctn_to_streams(aw, ctn_initials, time_point, reset_ctn_streams);
+		nso<BAs...> ctn_initials = _T<BAs...>, ctn_rules = _T<BAs...>;
+		aw = transform_ctn_to_streams(aw, ctn_initials, ctn_rules, time_point, reset_ctn_streams);
+		aw = build_wff_and(ctn_rules, aw);
 		aw = build_wff_and(ctn_initials, aw);
 		// The lookback cannot be 0 due to presents of eventual variables
 		// Therefore, no adjustment of aw is needed
@@ -873,8 +873,9 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
 			auto res = build_wff_and(normed_run, original_aw_continuation);
-			print_fixpoint_info("Temporal normalization of Tau specification did not rely on fixpoint finding, yielding the result: ");
-			print_fixpoint_info(tau_to_str(res));
+			print_fixpoint_info(
+				"Temporal normalization of Tau specification did not rely on fixpoint finding, yielding the result: ",
+				tau_to_str(res), output);
 			return res;
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
@@ -902,8 +903,11 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 
 	// BOOST_LOG_TRIVIAL(trace) << "Fixpoint chi after normalize: " << chi_inf;
 	if (chi_inf == _F<BAs...>) {
-		print_fixpoint_info("Temporal normalization of Tau specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
-        print_fixpoint_info(tau_to_str(_F<BAs...>));
+		print_fixpoint_info(
+			"Temporal normalization of Tau specification reached fixpoint after "
+			+ std::to_string(steps) +
+			" steps, yielding the result: ",
+			tau_to_str(_F<BAs...>), output);
 		return _F<BAs...>;
 	}
 
@@ -916,8 +920,11 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 	BOOST_LOG_TRIVIAL(trace) << "Fm to check sat:";
 	BOOST_LOG_TRIVIAL(trace) << "(F) " << sat_check;
 	if (sat_check == _F<BAs...>) {
-		print_fixpoint_info("Temporal normalization of Tau specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
-        print_fixpoint_info(tau_to_str(_F<BAs...>));
+		print_fixpoint_info(
+			"Temporal normalization of Tau specification reached fixpoint after "
+			+ std::to_string(steps) +
+			" steps, yielding the result: ",
+			tau_to_str(_F<BAs...>), output);
 		return _F<BAs...>;
 	}
 	// Here we know that the formula is satisfiable at some point
@@ -934,8 +941,11 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
 			auto res = build_wff_and(normed_run, original_aw_continuation);
-            print_fixpoint_info("Temporal normalization of Tau specification reached fixpoint after " + std::to_string(steps) + " steps, yielding the result: ");
-            print_fixpoint_info(tau_to_str(res));
+			print_fixpoint_info(
+				"Temporal normalization of Tau specification reached fixpoint after "
+				+ std::to_string(steps) +
+				" steps, yielding the result: ",
+				tau_to_str(res), output);
 			return res;
 		}
 		// Since the flag could not be raised in this step, we can add the assumption
@@ -946,7 +956,7 @@ nso<BAs...> to_unbounded_continuation(const nso<BAs...>& ubd_aw_continuation,
 
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
-nso<BAs...> transform_to_execution(const nso<BAs...>& f) {
+nso<BAs...> transform_to_execution(const nso<BAs...>& f, const bool output = false) {
 	assert(get_dnf_wff_clauses(f).size() == 1);
 #ifdef TAU_CACHE
 	static std::map<nso<BAs...>, nso<BAs...>> cache;
@@ -970,7 +980,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& f) {
 	bool reset_ctn_stream = false;
 	if (aw_fm.has_value()) {
 		// If there is an always part, replace it with its unbound continuation
-		ubd_aw_fm = always_to_unbounded_continuation(aw_fm.value());
+		ubd_aw_fm = always_to_unbounded_continuation(aw_fm.value(), output);
 		std::map<nso<BAs...>, nso<BAs...> > changes = {
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
@@ -1008,7 +1018,8 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& f) {
 	nso<BAs...> res;
 	if (aw_after_ev.value() != _F<BAs...> && !st.empty())
 		res = normalize_non_temp(to_unbounded_continuation(
-			aw_after_ev.value(), st[0], ubd_aw_fm, reset_ctn_stream));
+			aw_after_ev.value(), st[0], ubd_aw_fm, reset_ctn_stream,
+			output));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
 	res = elim_aw(res);
@@ -1021,7 +1032,7 @@ nso<BAs...> transform_to_execution(const nso<BAs...>& f) {
 
 // Assumes that fm has been normalized
 template<typename... BAs>
-bool is_tau_formula_sat (const nso<BAs...>& normalized_fm) {
+bool is_tau_formula_sat (const nso<BAs...>& normalized_fm, const bool output = false) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << normalized_fm;
 
@@ -1029,7 +1040,7 @@ bool is_tau_formula_sat (const nso<BAs...>& normalized_fm) {
 				  tau_parser::wff);
 	// Convert each disjunct to unbounded continuation
 	for (auto& clause: clauses) {
-		if (transform_to_execution(clause) != _F<BAs...>) {
+		if (transform_to_execution(clause, output) != _F<BAs...>) {
 			BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
 			return true;
 		}

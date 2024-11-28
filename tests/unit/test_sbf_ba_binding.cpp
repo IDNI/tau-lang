@@ -15,7 +15,7 @@
 
 #include "doctest.h"
 
-#include "../src/bdd_binding.h"
+#include "../src/sbf_ba.h"
 #include "babdd.h"
 
 using namespace std;
@@ -23,26 +23,26 @@ using namespace idni::tau;
 
 namespace testing = doctest;
 
-sp_bdd_node build_binding(const char* src) {
+sp_sbf_node build_binding(const char* src) {
 	bdd_init<Bool>();
-	static bdd_factory<tau_ba<bdd_binding>, bdd_binding> bf;
+	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
 	return bf.parse(src).value();
 }
 
-bdd_binding& get_binding(const sp_bdd_node& n) {
-	return get<bdd_binding>(get<variant<
-			tau_ba<bdd_binding>, bdd_binding>>(n->value));
+sbf_ba& get_binding(const sp_sbf_node& n) {
+	return get<sbf_ba>(get<variant<
+			tau_ba<sbf_ba>, sbf_ba>>(n->value));
 }
 
-bdd_binding& build_and_get_binding(const char* src) {
+sbf_ba& build_and_get_binding(const char* src) {
 	return get_binding(build_binding(src));
 }
 
 #define SAMPLES_SIZE (sizeof(samples) / sizeof(char *))
 
-TEST_SUITE("bdd binding") {
+TEST_SUITE("sbf binding") {
 
-	TEST_CASE("bdd true") {
+	TEST_CASE("sbf true") {
 		const char* sample = "1";
 		const char* expected = "1";
 		auto& v = build_and_get_binding(sample);
@@ -51,7 +51,7 @@ TEST_SUITE("bdd binding") {
 		CHECK(ss.str() == expected);
 	}
 
-	TEST_CASE("bdd false") {
+	TEST_CASE("sbf false") {
 		const char* sample = "0";
 		const char* expected = "0";
 		auto& v = build_and_get_binding(sample);
@@ -60,7 +60,7 @@ TEST_SUITE("bdd binding") {
 		CHECK(ss.str() == expected);
 	}
 
-	TEST_CASE("bdd negation") {
+	TEST_CASE("sbf negation") {
 		const char* samples[] = {
 			"0'", "1'", "0''", "1''", "0'''", "1'''"
 		};
@@ -74,7 +74,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd and") {
+	TEST_CASE("sbf and") {
 		const char* samples[] = {
 			"0 0", "0 1", "1 0", "1 1",
 			"0&0", "0&1", "1&0", "1&1"
@@ -90,7 +90,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd or") {
+	TEST_CASE("sbf or") {
 		const char* samples[] = {
 			"0|0", "0|1", "1|0", "1|1"
 		};
@@ -104,7 +104,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd xor") {
+	TEST_CASE("sbf xor") {
 		const char* samples[] = {
 			"0^0", "0^1", "1^0", "1^1",
 			"0+0", "0+1", "1+0", "1+1"
@@ -120,7 +120,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd parentheses") {
+	TEST_CASE("sbf parentheses") {
 		const char* samples[] = {
 			"1|0&0", "1|(0&0)", "(1|0)&0",
 			"1|1&0", "1|(1&0)", "(1|1)&0"
@@ -136,7 +136,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd variable") {
+	TEST_CASE("sbf variable") {
 		const char* samples[] = {
 			"p", "X", "a1"
 		};
@@ -150,7 +150,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd variable negation") {
+	TEST_CASE("sbf variable negation") {
 		const char* samples[] = {
 			"v'", "X''", "a1'''"
 		};
@@ -164,7 +164,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd variable and") {
+	TEST_CASE("sbf variable and") {
 		const char* samples[] = {
 			"v 0", "v 1", "0 v", "1 v", "v v", "v w",
 			"v&0", "v&1", "0&v", "1&v", "v&v", "v&w"
@@ -180,7 +180,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd variable or") {
+	TEST_CASE("sbf variable or") {
 		const char* samples[] = {
 			"v|0", "v|1", "0|v", "1|v", "v|v", "v|w"
 		};
@@ -194,7 +194,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd variable xor") {
+	TEST_CASE("sbf variable xor") {
 		const char* samples[] = {
 			"v^0", "0^v", "v^1", "1^v", "v^v", "v^w",
 			"v+0", "0+v", "v+1", "1+v", "v+v", "v+w"
@@ -210,7 +210,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd variable parentheses") {
+	TEST_CASE("sbf variable parentheses") {
 		const char* samples[] = {
 			"v|w&0", "v|(w&0)", "(v|w)&0",
 			"1|w&v", "1|(w&v)", "(1|w)&v"
@@ -226,7 +226,7 @@ TEST_SUITE("bdd binding") {
 		}
 	}
 
-	TEST_CASE("bdd all syntax") {
+	TEST_CASE("sbf all syntax") {
 	 	const char* sample = "z' | x b (1'^(a b) | 0+c | a) ^ d "
 					"| d^e&1";
 		string expected = "a b d e' x z | a b d' x z | a' b c d e'"

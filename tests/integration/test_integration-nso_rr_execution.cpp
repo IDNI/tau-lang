@@ -14,13 +14,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bool_ba.h"
-#include "bdd_handle.h"
-#include "bdd_binding.h"
-#include "normalizer.h"
 
-#include "test_integration_helpers-bdd.h"
+#include "test_integration_helpers-sbf.h"
 #include "../unit/test_helpers.h"
 
 using namespace idni::rewriter;
@@ -32,9 +27,9 @@ bool normalize_and_test_for_value(const char* sample,
 	tau_parser::nonterminal nt, bool expect_fail = false)
 {
 	auto sample_src = make_tau_source(sample);
-	auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+	auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 	if (!sample_formula.has_value()) return expect_fail;
-	auto result = normalizer<bdd_binding>(sample_formula.value());
+	auto result = normalizer<sbf_ba>(sample_formula.value());
 	if (!result) return expect_fail;
 	auto check = result | nt;
 	return expect_fail ? !check.has_value() : check.has_value();

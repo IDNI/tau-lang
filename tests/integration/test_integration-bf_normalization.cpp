@@ -14,13 +14,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "bool_ba.h"
-#include "bdd_handle.h"
-#include "normalizer.h"
-#include "bdd_binding.h"
 
-#include "test_integration_helpers-bdd.h"
+#include "test_integration_helpers-sbf.h"
 #include "../unit/test_helpers.h"
 
 using namespace idni::rewriter;
@@ -33,9 +28,9 @@ bool test_bf_normalizer_and_test_for_value(const char* sample,
 {
 	tau_parser::parse_options options; options.start = tau_parser::bf;
 	auto sample_src = make_tau_source(sample, options);
-	auto formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+	auto formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 	if (!formula.has_value()) return false;
-	auto result = bf_normalizer_without_rec_relation<bdd_binding>(
+	auto result = bf_normalizer_without_rec_relation<sbf_ba>(
 		formula.value().main);
 	return (result | nt).has_value();
 }
@@ -88,10 +83,10 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 	TEST_CASE("4 variables") {
 		const char* sample = "ex x ex y ex v ex w (x' & y & v & w') != 0.";
 		auto sample_src = make_tau_source(sample);
-		auto formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+		auto formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		CHECK ( formula.has_value() );
 		if (!formula.has_value()) return;
-		auto result = normalizer<bdd_binding>(formula.value());
+		auto result = normalizer<sbf_ba>(formula.value());
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
@@ -99,8 +94,8 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | Simple SAT 
 	TEST_CASE("Quantifier Alternation") {
 		const char* sample = "all x ex y all v ex w ((x' | y) & (y' | x) &  (v' | w) & (w' | v)) != 0.";
 		auto sample_src = make_tau_source(sample);
-		auto sample_formula = make_nso_rr_using_factory<bdd_binding>(sample_src).value();
-		auto result = normalizer<bdd_binding>(sample_formula);
+		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value();
+		auto result = normalizer<sbf_ba>(sample_formula);
 		auto check = result |  tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
@@ -114,19 +109,19 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		tau_parser::parse_options options;
 		options.start = tau_parser::rec_relations;
 		auto rec_src = make_tau_source(rec, options);
-		auto rec_formula = make_nso_rr_using_factory<bdd_binding>(rec_src);
+		auto rec_formula = make_nso_rr_using_factory<sbf_ba>(rec_src);
 		CHECK ( rec_formula.has_value() );
 		if (!rec_formula.has_value()) return;
 		rec_formula = infer_ref_types(rec_formula.value());
 		const char* sample = "h[8](Y)";
 	 	options.start = tau_parser::bf;
 		auto sample_src = make_tau_source(sample, options);
-		auto formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+		auto formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		CHECK ( formula.has_value() );
 		if (!formula.has_value()) return;
 		auto sample_formula = formula.value();
 		sample_formula.rec_relations = rec_formula.value().rec_relations;
-		auto result = bf_normalizer_with_rec_relation<bdd_binding>(sample_formula);
+		auto result = bf_normalizer_with_rec_relation<sbf_ba>(sample_formula);
 		auto check = result | tau_parser::variable;
 		CHECK( check.has_value() );
 	}
@@ -141,25 +136,25 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 	 	tau_parser::parse_options options;
 	 	options.start = tau_parser::rec_relations;
 	 	auto rec_src = make_tau_source(rec, options);
-	 	auto rec_formula = make_nso_rr_using_factory<bdd_binding>(rec_src);
+	 	auto rec_formula = make_nso_rr_using_factory<sbf_ba>(rec_src);
 		CHECK ( rec_formula.has_value() );
 		if (!rec_formula.has_value()) return;
 		rec_formula = infer_ref_types(rec_formula.value());
 	 	const char* sample = "h[8](Y)";
 	 	options.start = tau_parser::bf;
 	 	auto sample_src = make_tau_source(sample, options);
-	 	auto formula = make_nso_rr_using_factory<bdd_binding>(sample_src);
+	 	auto formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		CHECK ( formula.has_value() );
 		if (!formula.has_value()) return;
 		auto sample_formula = formula.value();
 	 	sample_formula.rec_relations = rec_formula.value().rec_relations;
-	 	auto result = bf_normalizer_with_rec_relation<bdd_binding>(sample_formula);
+	 	auto result = bf_normalizer_with_rec_relation<sbf_ba>(sample_formula);
 	 	auto check = result | tau_parser::variable;
 	 	CHECK( check.has_value() );
 	 }
 }
 
-TEST_SUITE("BDD expressions") {
+TEST_SUITE("SBF expressions") {
 	TEST_CASE("X or Y") {
 		bdd_init<Bool>();
 		const char* sample = "{X}:sbf | {Y}:sbf";
