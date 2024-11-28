@@ -648,12 +648,26 @@ void repl_evaluator<BAs...>::run_cmd(
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(
 		const nso<tau_ba<BAs...>, BAs...>& n) {
-	std::string type;
-	if (auto implicit_type = find_top(n, is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>); implicit_type) {
-		type = make_string<tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
+	std::optional<std::string> type = n->child.size() == 3
+		?  make_string<
+					tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
+					nso<tau_ba<BAs...>, BAs...>>(
+				tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, n->child[1])
+		: std::optional<std::string>();
+
+	auto implicit_types = select_all(n, is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>);
+	for (const auto& t: implicit_types) {
+		auto implicit_type = make_string<
+				tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
 				nso<tau_ba<BAs...>, BAs...>>(
-			tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, implicit_type.value());
-	} else type = "tau";
+			tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>, t);
+		if (type.has_value() && implicit_type != type.value()) {
+			BOOST_LOG_TRIVIAL(error) << "(Error) multiple types involved\n";
+			return;
+		} if (!type.has_value()) type = implicit_type;
+	}
+
+	if (!type.has_value()) type = "tau";
 
 	if (auto nn = is_non_terminal<tau_parser::type, tau_ba<BAs...>, BAs...>(n->child[1])
 			? get_type_and_arg(n->child[2]) : get_type_and_arg(n->child[1]); nn) {
@@ -661,7 +675,7 @@ void repl_evaluator<BAs...>::solve_cmd(
 		auto applied = apply_rr_to_rr_gssotc(t, program);
 		applied = normalizer_step(applied);
 		if (!nn) { BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return; }
-		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type);
+		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type.value());
 		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
 		for (auto& [k, v] : s.value()) std::cout << "\t" << k << " <- " << v << "\n";
