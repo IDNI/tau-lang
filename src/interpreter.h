@@ -1,15 +1,4 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #ifndef __INTERPRETER_H__
 #define __INTERPRETER_H__
@@ -165,7 +154,7 @@ struct foutputs {
 			auto io_var_name = trim2(trim2(io_var));
 			if (auto stream = streams.find(io_var_name); stream != streams.end())
 				if (stream->second) stream->second.value() << value << "\n";
-				else std::cout << io_var << " <- " << value << "\n";
+				else std::cout << io_var << " := " << value << "\n";
 			else {
 				std::stringstream ss; ss << io_var;
 				if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;
@@ -254,7 +243,7 @@ private:
 				<< "sort/result/[" << i <<"]: ";
 			for (const auto& [k, v]: result[i])
 				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " <- " << v << " ";
+					<< "\t" << k << " := " << v << " ";
 			BOOST_LOG_TRIVIAL(trace) << "\n";
 		}
 		#endif // DEBUG
@@ -277,7 +266,7 @@ private:
 				<< "complete/result/[" << i <<"]: ";
 			for (const auto& [k, v]: result[i])
 				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " <- " << v << " ";
+					<< "\t" << k << " := " << v << " ";
 			BOOST_LOG_TRIVIAL(trace) << "\n";
 		}
 		#endif // DEBUG
@@ -326,7 +315,7 @@ struct interpreter {
 					<< "step/memory: ";
 				for (const auto& [k, v]: memory)
 					BOOST_LOG_TRIVIAL(trace)
-						<< "\t" << k << " <- " << v << " ";
+						<< "\t" << k << " := " << v << " ";
 				BOOST_LOG_TRIVIAL(trace) << "\n";
 				#endif // DEBUG
 
@@ -340,7 +329,7 @@ struct interpreter {
 						BOOST_LOG_TRIVIAL(trace) << "\t{}";
 					else for (const auto& [k, v]: solution.value())
 						BOOST_LOG_TRIVIAL(trace)
-							<< "\t" << k << " <- " << v << " ";
+							<< "\t" << k << " := " << v << " ";
 					auto copy = solution.value();
 					auto substituted = replace(current, copy);
 					auto check = snf_wff(substituted);
@@ -617,7 +606,7 @@ nso<BAs...> get_executable_spec(const nso<BAs...>& fm) {
 			<< "compute_systems/constraints/model: ";
 		for (const auto& [k, v]: model.value())
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << k << " <- " << v << " ";
+				<< "\t" << k << " := " << v << " ";
 #endif // DEBUG
 
 		auto spec = replace(executable, model.value());
@@ -682,7 +671,7 @@ std::optional<std::set<system<BAs...>>> compute_systems(const nso<BAs...>& form,
 			<< "compute_systems/constraints/model: ";
 		for (const auto& [k, v]: model.value())
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << k << " <- " << v << " ";
+				<< "\t" << k << " := " << v << " ";
 		#endif // DEBUG
 
 		auto program = replace(executable, model.value());
