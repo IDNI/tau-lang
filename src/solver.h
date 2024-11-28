@@ -1,15 +1,4 @@
-// LICENSE
-// This software is free for use and redistribution while including this
-// license notice, unless:
-// 1. is used for commercial or non-personal purposes, or
-// 2. used for a product which includes or associated with a blockchain or other
-// decentralized database technology, or
-// 3. used for a product which includes or associated with the issuance or use
-// of cryptographic or electronic currencies/coins/tokens.
-// On all of the mentioned cases, an explicit and written permission is required
-// from the Author (Ohad Asor).
-// Contact ohad@idni.org for requesting a permission. This license may be
-// modified over time by the Author.
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #ifndef __SOLVER_H__
 #define __SOLVER_H__
@@ -125,7 +114,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 			<< "find_solution/solution[removed_vars]: ";
 		for (const auto& [k, v]: solution)
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << k << " <- " << v << " ";
+				<< "\t" << k << " := " << v << " ";
 		#endif // DEBUG
 
 		if (has_no_var(gh)) {
@@ -146,7 +135,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 					<< "find_solution/solution[gh_no_var,gh=0]: ";
 				for (const auto& [k, v]: solution)
 					BOOST_LOG_TRIVIAL(trace)
-						<< "\t" << k << " <- " << v << " ";
+						<< "\t" << k << " := " << v << " ";
 				#endif // DEBUG
 
 				return solution;
@@ -164,7 +153,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 				<< "find_solution/solution[general]: ";
 			for (const auto& [k, v]: solution)
 				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " <- " << v << " ";
+					<< "\t" << k << " := " << v << " ";
 			#endif // DEBUG
 
 			return solution;
@@ -213,7 +202,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 		<< "lgrs/solution: ";
 	for (const auto& [k, v] : phi)
 		BOOST_LOG_TRIVIAL(trace)
-			<< "\t" << k << " <- " << v << " ";
+			<< "\t" << k << " := " << v << " ";
 	auto copy = phi;
 	auto check = snf_wff(replace(equality, copy));
 	BOOST_LOG_TRIVIAL(trace)
