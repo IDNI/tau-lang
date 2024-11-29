@@ -32,21 +32,8 @@ struct sbf_ba_factory {
 
 	// static sbf_ba_factory<BAs...>& instance();
 private:
-	using parse_forest = idni::parser<char, char>::pforest;
-	using parse_result = idni::parser<char, char>::result;
-	using traverser_t  = traverser<sbf_sym, sbf_parser>;
 
-	static constexpr const auto& get_only_child =
-			traverser_t::get_only_child_extractor();
-	static constexpr const auto& get_terminals =
-			traverser_t::get_terminal_extractor();
-	static constexpr const auto& get_nonterminal =
-			traverser_t::get_nonterminal_extractor();
 	inline static std::map<std::string, nso<BAs...>> cache;
-
-	nso<BAs...> build_node(const sbf_ba& b);	// evaluates a parsed bdd terminal node recursively
-	// evaluates a parsed bdd terminal node recursively
-	sbf_ba eval_node(const traverser_t& t);
 };
 
 // using during testing
