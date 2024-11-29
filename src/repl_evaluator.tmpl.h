@@ -819,7 +819,7 @@ void repl_evaluator<BAs...>::def_print_cmd(
 }
 
 template <typename... BAs>
-void repl_evaluator< BAs...>::def_input_cmd(
+void repl_evaluator<BAs...>::def_input_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
 	type type = command
@@ -845,7 +845,7 @@ void repl_evaluator< BAs...>::def_input_cmd(
 }
 
 template <typename... BAs>
-void repl_evaluator< BAs...>::def_output_cmd(
+void repl_evaluator<BAs...>::def_output_cmd(
 		const sp_tau_node<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
 	type type = command
