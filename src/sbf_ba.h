@@ -44,49 +44,7 @@ private:
 			traverser_t::get_nonterminal_extractor();
 	inline static std::map<std::string, nso<BAs...>> cache;
 
-	// parses a bdd from a string
-	std::optional<nso<BAs...>> parse(const std::string& src) {
-		// check source cache
-		if (auto cn = cache.find(src); cn != cache.end())
-			return cn->second;
-		auto& p = sbf_parser::instance();
-		auto r = p.parse(src.c_str(), src.size());
-		if (!r.found) return std::optional<nso<BAs...>>{};
-		using parse_symbol = sbf_parser::node_type;
-		using namespace rewriter;
-		auto root = make_node_from_tree<sbf_parser,
-			drop_location_t<parse_symbol, sbf_source_sym>,
-			sbf_sym>(
-				drop_location<parse_symbol, sbf_source_sym>,
-				r.get_shaped_tree());
-		auto t = traverser_t(root) | sbf_parser::sbf;
-		return std::optional<nso<BAs...>>{ build_node(t.has_value()
-			? eval_node(t) : bdd_handle<Bool>::hfalse) };
-	}
-
-	// builds a bdd bounded node parsed from terminals of a source binding
-	nso<BAs...> binding(const nso<BAs...>& sn) {
-		auto source = sn
-			| tau_parser::source
-			| optional_value_extractor<nso<BAs...>>;
-		std::string src = make_string(
-			tau_node_terminal_extractor<BAs...>, source);
-		if (auto parsed = parse(src); parsed.has_value())
-			return parsed.value();
-		return sn;
-	}
-
-	std::variant<BAs...> splitter_one () const {
-		return std::variant<BAs...>(bdd_splitter_one<Bool>());
-	}
-
-private:
-
-	nso<BAs...> build_node(const sbf_ba& b) {
-		std::variant<BAs...> vp{b};
-		return rewriter::make_node<tau_sym<BAs...>>(vp, {});
-	}
-
+	nso<BAs...> build_node(const sbf_ba& b);	// evaluates a parsed bdd terminal node recursively
 	// evaluates a parsed bdd terminal node recursively
 	sbf_ba eval_node(const traverser_t& t);
 };

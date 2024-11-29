@@ -17,9 +17,9 @@ std::optional<nso<BAs...>> sbf_ba_factory<BAs...>::parse(
 	using parse_symbol = sbf_parser::node_type;
 	using namespace rewriter;
 	auto root = make_node_from_tree<sbf_parser,
-		drop_location_t<parse_symbol, tau_source_sym>,
-		tau_sym<BAs...>>(
-			drop_location<parse_symbol, tau_source_sym>,
+		drop_location_t<parse_symbol, sbf_sym>,
+		sbf_sym>(
+			drop_location<parse_symbol, sbf_sym>,
 			r.get_shaped_tree());
 	auto t = traverser_t(root) | sbf_parser::sbf;
 	return std::optional<nso<BAs...>>{ build_node(t.has_value()
