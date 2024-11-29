@@ -4,54 +4,20 @@
 
 namespace idni::tau {
 
-template <typename...BAs>
-std::optional<nso<BAs...>> sbf_ba_factory<BAs...>::parse(
-	const std::string& src)
-{
-	// check source cache
-	if (auto cn = cache.find(src); cn != cache.end())
-		return cn->second;
-	auto& p = sbf_parser::instance();
-	auto r = p.parse(src.c_str(), src.size());
-	if (!r.found) return std::optional<nso<BAs...>>{};
-	using parse_symbol = sbf_parser::node_type;
-	using namespace rewriter;
-	auto root = make_node_from_tree<sbf_parser,
-		drop_location_t<parse_symbol, sbf_sym>,
-		sbf_sym>(
-			drop_location<parse_symbol, sbf_sym>,
-			r.get_shaped_tree());
-	auto t = traverser_t(root) | sbf_parser::sbf;
-	return std::optional<nso<BAs...>>{ build_node(t.has_value()
-		? eval_node(t) : bdd_handle<Bool>::hfalse) };
-}
+using parse_forest = idni::parser<char, char>::pforest;
+using parse_result = idni::parser<char, char>::result;
+using traverser_t  = traverser<sbf_sym, sbf_parser>;
 
-template <typename...BAs>
-nso<BAs...> sbf_ba_factory<BAs...>::binding(const nso<BAs...>& sn) {
-	auto source = sn
-		| tau_parser::source
-		| optional_value_extractor<nso<BAs...>>;
-	std::string src = make_string(
-		tau_node_terminal_extractor<BAs...>, source);
-	if (auto parsed = parse(src); parsed.has_value())
-		return parsed.value();
-	return sn;
-}
-
-template <typename...BAs>
-std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
-	return std::variant<BAs...>(bdd_splitter_one<Bool>());
-}
-
-template <typename...BAs>
-nso<BAs...> sbf_ba_factory<BAs...>::build_node(const sbf_ba& b) {
-	std::variant<BAs...> vp{b};
-	return rewriter::make_node<tau_sym<BAs...>>(vp, {});
-}
+static constexpr const auto& get_only_child =
+		traverser_t::get_only_child_extractor();
+static constexpr const auto& get_terminals =
+		traverser_t::get_terminal_extractor();
+static constexpr const auto& get_nonterminal =
+		traverser_t::get_nonterminal_extractor();
 
 template <typename...BAs>
 // evaluates a parsed bdd terminal node recursively
-sbf_ba sbf_ba_factory<BAs...>::eval_node(const traverser_t& t) {
+sbf_ba eval_node(const traverser_t& t) {
 	//BOOST_LOG_TRIVIAL(debug) << "eval_node";
 	auto n  = t | get_only_child;
 	auto nt = n | get_nonterminal;
@@ -95,6 +61,46 @@ sbf_ba sbf_ba_factory<BAs...>::eval_node(const traverser_t& t) {
 		default: return bdd_handle<Bool>::hfalse;
 		}
 	}
+}
+template <typename...BAs>
+std::optional<nso<BAs...>> sbf_ba_factory<BAs...>::parse(
+	const std::string& src)
+{
+	// check source cache
+	if (auto cn = cache.find(src); cn != cache.end())
+		return cn->second;
+	auto& p = sbf_parser::instance();
+	auto r = p.parse(src.c_str(), src.size());
+	if (!r.found) return std::optional<nso<BAs...>>{};
+	using parse_symbol = sbf_parser::node_type;
+	using namespace rewriter;
+	auto root = make_node_from_tree<sbf_parser,
+		drop_location_t<parse_symbol, sbf_sym>,
+		sbf_sym>(
+			drop_location<parse_symbol, sbf_sym>,
+			r.get_shaped_tree());
+	auto t = traverser_t(root) | sbf_parser::sbf;
+	auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
+	std::variant<BAs...> vp {b};
+	auto n = rewriter::make_node<tau_sym<BAs...>>(vp, {});
+	return cache.emplace(src, n).first->second;
+}
+
+template <typename...BAs>
+nso<BAs...> sbf_ba_factory<BAs...>::binding(const nso<BAs...>& sn) {
+	auto source = sn
+		| tau_parser::source
+		| optional_value_extractor<nso<BAs...>>;
+	std::string src = make_string(
+		tau_node_terminal_extractor<BAs...>, source);
+	if (auto parsed = parse(src); parsed.has_value())
+		return parsed.value();
+	return sn;
+}
+
+template <typename...BAs>
+std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
+	return std::variant<BAs...>(bdd_splitter_one<Bool>());
 }
 
 std::optional<nso<sbf_ba>> nso_factory<sbf_ba>::parse(const std::string& src,
