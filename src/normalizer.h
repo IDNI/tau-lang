@@ -58,6 +58,7 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 	static std::map<nso<BAs...>, nso<BAs...>> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
+
 	auto result = form
 		// Push all quantifiers in and eliminate them
 		| (nso_transform<BAs...>)eliminate_quantifiers<BAs...>
