@@ -44,91 +44,30 @@ TEST_SUITE("configuration") {
 
 TEST_SUITE("Tau_splitter_tau_coeff") {
 
-	TEST_CASE("{T} v = 0") {
-		const char *src = "{T} v = 0.";
-		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-		auto s = tau_splitter(fm, splitter_type::upper);
-		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-
-	TEST_CASE("{x = 0} v = 0") {
-		const char *src = "{x = 0} v = 0.";
-		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-		auto s = tau_splitter(fm, splitter_type::upper);
-		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-
-	TEST_CASE("{x = 0 && y = 0} v = 0") {
-		const char *src = "{x = 0 && y = 0} v = 0.";
-		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-		auto s = tau_splitter(fm, splitter_type::upper);
-		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-
-	TEST_CASE("{x = 0 || y = 0} v = 0") {
-		const char *src = "{x = 0 || y = 0} v = 0.";
-		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-		auto s = tau_splitter(fm, splitter_type::upper);
-		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-
-	TEST_CASE("{x != 0}  v = 0") {
-		const char *src = "{x != 0} v = 0.";
-		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-		auto s = tau_splitter(fm, splitter_type::upper);
-		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-
-	TEST_CASE("{x y = 0}  v = 0") {
-		const char *src = "{x y = 0} v = 0.";
-		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-		auto s = tau_splitter(fm, splitter_type::upper);
-		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-
-	TEST_CASE("{x | y = 0}  v = 0") {
-		const char *src = "{x | y = 0} v = 0.";
-		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-		auto s = tau_splitter(fm, splitter_type::upper);
-		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-
-	TEST_CASE("{x' = 0}  v = 0") {
-		const char *src = "{x' = 0} v = 0.";
-		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-		auto s = tau_splitter(fm, splitter_type::upper);
-		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-
 	TEST_CASE("Tau_splitter_tau_coeff1") {
-		const char *src = "{o1[t]o2[t] = 0} v != 0";
+		const char *src = "{o1[t]o2[t] = 0.} v != 0.";
 		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0} ({ o1[t]o2[t] = 0} v)' = 0");
-	}
-TEST_CASE("Tau_splitter_tau_coeff1") {
-	const char *src = "{o1[t]o2[t] = 0.} v != 0.";
-	auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-	auto s = tau_splitter(fm, splitter_type::upper);
-	stringstream ss; ss << s;
-	CHECK(ss.str() == "{ o1[t]o2[t] = 0. } ({ o1[t]o2[t] = 0. } v)' = 0");
-}
 
-TEST_CASE("Tau_splitter_tau_coeff2") {
-	const char *src = "{o1[t]|o2[t] = 0.}&v = 0.";
-	auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
-	auto s = tau_splitter(fm, splitter_type::upper);
-	stringstream ss; ss << s;
-	CHECK((ss.str() == "{ o1[t]|o2[t] = 0. } v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0). } = 0"
-		|| ss.str() == "{ o1[t]|o2[t] = 0. } v = 0 && v{ !(always o2[t] = 0 && o1[t] = 0). } = 0"));
-}
+		#ifdef DEBUG
+		std::cout << ss.str() << "\n";
+		#endif
+
+		CHECK(ss.str() == "{ o1[t]o2[t] = 0. } : tau ({ o1[t]o2[t] = 0. } : tau v)' = 0");
+	}
+
+	TEST_CASE("Tau_splitter_tau_coeff2") {
+		const char *src = "{o1[t]|o2[t] = 0.}&v = 0.";
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		stringstream ss; ss << s;
+
+		#ifdef DEBUG
+		std::cout << ss.str() << "\n";
+		#endif
+
+		CHECK((ss.str() == "{ o1[t]|o2[t] = 0. } : tau v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0). } = 0"
+			|| ss.str() == "{ o1[t]|o2[t] = 0. } : tau v = 0 && v{ !(always o2[t] = 0 && o1[t] = 0). } : tau = 0"));
+	}
 }

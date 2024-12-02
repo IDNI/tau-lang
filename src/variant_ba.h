@@ -249,4 +249,6 @@ bool operator!=(const bool& l, const variant_ba<BAs...>& r) {
 
 } // namespace idni::tau
 
+//TODO (MEDIUM) add << for variant_ba
+
 #endif // __VARIANT_BA_H__

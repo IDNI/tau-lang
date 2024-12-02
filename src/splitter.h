@@ -238,7 +238,7 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 				// Try to convert f != 0 to f >= c
 				// First check that types match
 				auto type_f = find_top(f, is_non_terminal<tau_parser::type, BAs...>);
-				auto type_c = c | tau_parser::type;
+				auto type_c = c | tau_parser::bf_constant | tau_parser::type;
 				if (type_f.has_value() && type_f != type_c)
 					continue;
 				auto r = build_bf_greater_equal(f, c);
