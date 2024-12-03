@@ -84,7 +84,8 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ref                                :bf_ref
                         | (bf  _ '|' _       bf)             :bf_or
                         | (bf  _ '+' _       bf)             :bf_xor
-                        | (bf (_ '&' _ | __) bf)             :bf_and
+                        | ((bf (_ '&' _ | __) bf)
+                                        | bf_and_nosep)      :bf_and
                         | (bf _ "'")                         :bf_neg
                         | ('1' [ _ ':' _ type ])             :bf_t
                         | ('0' [ _ ':' _ type ])             :bf_f
@@ -92,9 +93,9 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
 
 # bf_and alternation without a separator between operands
 # bf_and_nosep_1st_op has to be transformed to bf after parsing
-bf_and                 => (bf_parenthesis | variable | bf_splitter
-                        | bf_ref | bf_or | bf_xor | bf_neg | capture
-                        | uninterpreted_constant):bf_and_nosep_1st_op bf.
+bf_and_nosep            => (bf_parenthesis | variable | bf_splitter
+                        | bf_ref | bf_or | bf_xor | bf_neg | capture)
+                                :bf_and_nosep_1st_op bf.
 
 # constant time constraints
 constraint =>
@@ -328,6 +329,6 @@ severity               => ("e" | "error"):error_sym
         bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
         wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
-        normalize_cmd_arg, solve_cmd_arg,
+        normalize_cmd_arg, solve_cmd_arg, bf_and_nosep,
         bf  > bf_parenthesis  > bf,
         wff > wff_parenthesis > wff.
