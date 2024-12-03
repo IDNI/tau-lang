@@ -883,14 +883,7 @@ template <typename... BAs>
 struct tauify {
 
 	tau_sym<BAs...> operator()(const tau_source_sym& n) const {
-		// TODO this is simple retype of bf_and_nosep_1st_op to bf
-		// this is temporary until conjunction & negation is fixed
-		// or parser features transformation of types
-		if (n.nt() && n.n() == tau_parser::bf_and_nosep_1st_op)
-			return tau_sym<BAs...>(tau_parser::instance()
-						.literal(tau_parser::bf));
-		tau_sym<BAs...> nn(n);
-		return nn;
+		return tau_sym<BAs...>(n);
 	}
 };
 

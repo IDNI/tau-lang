@@ -84,18 +84,15 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ref                                :bf_ref
                         | (bf  _ '|' _       bf)             :bf_or
                         | (bf  _ '+' _       bf)             :bf_xor
-                        | ((bf (_ '&' _ | __) bf)
-                                        | bf_and_nosep)      :bf_and
-                        | (bf _ "'")                         :bf_neg
                         | ('1' [ _ ':' _ type ])             :bf_t
                         | ('0' [ _ ':' _ type ])             :bf_f
+                        | (bf (_ '&' _ | __) bf)             :bf_and
+                        | bf_and_nosep                       :bf_and
+                        | (bf _ "'")                         :bf_neg
                         |                                     capture.
 
 # bf_and alternation without a separator between operands
-# bf_and_nosep_1st_op has to be transformed to bf after parsing
-bf_and_nosep            => (bf_parenthesis | variable | bf_splitter
-                        | bf_ref | bf_or | bf_xor | bf_neg | capture)
-                                :bf_and_nosep_1st_op bf.
+bf_and_nosep           => (bf & ~bf_constant & ~bf_and & ~bf_t & ~bf_f) bf.
 
 # constant time constraints
 constraint =>
