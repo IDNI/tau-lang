@@ -595,23 +595,23 @@ void repl_evaluator<BAs...>::run_cmd(
 		}
 
 		// do we need to bound the computation?
-		auto max_iter = std::numeric_limits<size_t>::max();
-		if (in_vars.empty() && !out_vars.empty()) {
-			// TODO (MEDIUM) maybe we should use an specialized method to get the number of steps
-			std::cout << "no inputs vars defined, how many steps do you want to perform? ";
-			term::enable_getline_mode();
-			// read input
-			std::string line;
-			std::getline(std::cin, line);
-			term::disable_getline_mode();
-			try {
-				max_iter = std::stoul(line);
-				std::cout << line << "\n";
-			} catch (std::exception& e) {
-				BOOST_LOG_TRIVIAL(error) << "(Error) invalid input\n";
-				return;
-			}
-		}
+		// auto max_iter = std::numeric_limits<size_t>::max();
+		// if (in_vars.empty() && !out_vars.empty()) {
+		// 	// TODO (MEDIUM) maybe we should use an specialized method to get the number of steps
+		// 	std::cout << "no inputs vars defined, how many steps do you want to perform? ";
+		// 	term::enable_getline_mode();
+		// 	// read input
+		// 	std::string line;
+		// 	std::getline(std::cin, line);
+		// 	term::disable_getline_mode();
+		// 	try {
+		// 		max_iter = std::stoul(line);
+		// 		std::cout << line << "\n";
+		// 	} catch (std::exception& e) {
+		// 		BOOST_LOG_TRIVIAL(error) << "(Error) invalid input\n";
+		// 		return;
+		// 	}
+		// }
 
 		std::map<nso<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> current_outputs;
 		for (auto& var: out_vars) {
@@ -624,10 +624,7 @@ void repl_evaluator<BAs...>::run_cmd(
 		}
 
 		auto outs = foutputs<tau_ba<BAs...>, BAs...>(current_outputs);
-		run<finputs<tau_ba<BAs...>, BAs...>,
-				foutputs<tau_ba<BAs...>, BAs...>,
-				tau_ba<BAs...>, BAs...>(
-			dnf, ins, outs, max_iter);
+		run<tau_ba<BAs...>, BAs...>(dnf, ins, outs);
 		return;
 	}
 
