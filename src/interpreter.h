@@ -154,7 +154,7 @@ struct foutputs {
 			auto io_var_name = trim2(trim2(io_var));
 			if (auto stream = streams.find(io_var_name); stream != streams.end())
 				if (stream->second) stream->second.value() << value << "\n";
-				else std::cout << io_var << " := " << value << "\n";
+				else std::cout << io_var << ": " << value << "\n";
 			else {
 				std::stringstream ss; ss << io_var;
 				if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;
