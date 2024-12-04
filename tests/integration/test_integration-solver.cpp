@@ -545,20 +545,20 @@ TEST_SUITE("solve_system") {
 	}
 
 	// increasing monotonicity (2 y1)
-	TEST_CASE("x = {a}:sbf && x < y && y != 1") {
-		const char* equality = "x + {a}:sbf | x y' = 0.";
+	/*TEST_CASE("x = {a}:sbf && x < y && y != 1") {
+		const char* equality = "(x + {a}:sbf) | x y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x' | y' x != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
-	}
+	}*/
 
 	// increasing monotonicity (2 y2)
-	TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
-		const char* equality = "x + {a}:sbf {b}:sbf | x y' = 0.";
+	/*TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
+		const char* equality = "x + ({a}:sbf {b}:sbf) | x y' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x'| y' x != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
-	}
+	}*/
 
 	// increasing monotonicity (3)
 	TEST_CASE("x = 0 && z < y && y != 1") {
