@@ -3582,42 +3582,13 @@ sp_tau_node<BAs...> make_node_hook_cte_or(
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-	/*if (!l || !r) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	auto type_l = type_of(first_argument_expression(n));
 	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l)
-		build_bf_constant<BAs...>(l.value() | r.value(), type_l.value());
-	if (!type_l && type_r)
-		build_bf_constant<BAs...>(l.value() | r.value(), type_r.value());
-	if (type_l && !type_r)
-		build_bf_constant<BAs...>(l.value() | r.value(), type_l.value());
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);*/
-	return l && r ? build_bf_constant<BAs...>(l.value() | r.value())
+	auto type = type_l ? type_l : type_r;
+	return l && r ? build_bf_constant<BAs...>(l.value() | r.value(), type)
 		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 
 }
-
-/*template<typename...BAs>
-sp_tau_node<BAs...> build_bf_1(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l) return build_bf_t_type<BAs...>(type_l.value());
-	if (type_l == type_r) return _1<BAs...>;
-	if (type_l && !type_r) return build_bf_t_type<BAs...>(type_l.value());
-	if (!type_l && type_r) return build_bf_t_type<BAs...>(type_r.value());
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}
-
-template<typename...BAs>
-sp_tau_node<BAs...> build_bf_0(const rewriter::node<tau_sym<BAs...>>& n) {
-	auto type_l = type_of(first_argument_expression(n));
-	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l) return build_bf_f_type<BAs...>(type_l.value());
-	if (type_l == type_r) return _0<BAs...>;
-	if (type_l && !type_r) return build_bf_f_type<BAs...>(type_l.value());
-	if (!type_l && type_r) return build_bf_f_type<BAs...>(type_r.value());
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-}*/
 
 template<typename...BAs>
 sp_tau_node<BAs...> build_bf_1(const rewriter::node<tau_sym<BAs...>>& n) {
@@ -3703,18 +3674,11 @@ sp_tau_node<BAs...> make_node_hook_cte_and(
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-	return l && r ? build_bf_constant<BAs...>(l.value() & r.value())
-		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-	/*if (!l || !r) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	auto type_l = type_of(first_argument_expression(n));
 	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l)
-		build_bf_constant<BAs...>(l.value() & r.value(), type_l.value());
-	if (!type_l && type_r)
-		build_bf_constant<BAs...>(l.value() & r.value(), type_r.value());
-	if (type_l && !type_r)
-		build_bf_constant<BAs...>(l.value() & r.value(), type_l.value());
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);*/
+	auto type = type_l ? type_l : type_r;
+	return l && r ? build_bf_constant<BAs...>(l.value() & r.value(), type)
+		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 }
 
 template <typename... BAs>
@@ -3775,7 +3739,8 @@ sp_tau_node<BAs...> make_node_hook_cte_neg(
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-	return l ? build_bf_constant<BAs...>(~l.value())
+	auto type = type_of(first_argument_expression(n));
+	return l ? build_bf_constant<BAs...>(~l.value(), type)
 		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 }
 
@@ -3817,17 +3782,10 @@ sp_tau_node<BAs...> make_node_hook_cte_xor(
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-	/*if (!l || !r) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	auto type_l = type_of(first_argument_expression(n));
 	auto type_r = type_of(second_argument_expression(n));
-	if (type_l == type_r && type_l)
-		build_bf_constant<BAs...>(l.value() ^ r.value(), type_l.value());
-	if (!type_l && type_r)
-		build_bf_constant<BAs...>(l.value() ^ r.value(), type_r.value());
-	if (type_l && !type_r)
-		build_bf_constant<BAs...>(l.value() ^ r.value(), type_l.value());
-	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);*/
-	return l && r ? build_bf_constant<BAs...>(l.value() ^ r.value())
+	auto type = type_l ? type_l : type_r;
+	return l && r ? build_bf_constant<BAs...>(l.value() ^ r.value(), type)
 		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 
 }

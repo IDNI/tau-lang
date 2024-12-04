@@ -33,11 +33,11 @@ TEST_SUITE("configuration") {
 
 TEST_SUITE("bf operator hooks") {
 
-bool check_hook(const char* sample, const char* expected) {
-	auto tau_sample = make_nso_using_factory<
-		tau_ba<sbf_ba>, sbf_ba>(sample, { .start = tau_parser::bf }).value();
-	auto tau_expected = make_nso_using_factory<
-		tau_ba<sbf_ba>, sbf_ba>(expected, { .start = tau_parser::bf }).value();
+	bool check_hook(const char* sample, const char* expected) {
+		auto tau_sample = make_nso_using_factory<
+			tau_ba<sbf_ba>, sbf_ba>(sample, { .start = tau_parser::bf }).value();
+		auto tau_expected = make_nso_using_factory<
+			tau_ba<sbf_ba>, sbf_ba>(expected, { .start = tau_parser::bf }).value();
 
 		#ifdef DEBUG
 		std::string str(sample);
@@ -45,6 +45,34 @@ bool check_hook(const char* sample, const char* expected) {
 		#endif // DEBUG
 
 		return tau_sample == tau_expected;
+	}
+
+	bool check_type(const char* sample, const char* type) {
+		auto type_sample = make_nso_using_factory<
+					tau_ba<sbf_ba>, sbf_ba>(
+				sample, { .start = tau_parser::bf }).value()
+			| tau_parser::bf_constant
+			| tau_parser::type
+			| optional_value_extractor<nso<tau_ba<sbf_ba>, sbf_ba>>;
+		auto type_expected = make_nso_using_factory<
+				tau_ba<sbf_ba>, sbf_ba>(
+			type, { .start = tau_parser::type }).value();
+
+		#ifdef DEBUG
+		std::string str(sample);
+		if (type_sample)
+			std::cout << "sample: " << str << " expected type: " << type_expected << " got: " << type_sample << "\n";
+		else
+			std::cout << "sample: " << str << " expected type: " << type_expected << " got: tau\n";
+		#endif // DEBUG
+
+		std::stringstream ss_sample, ss_expected;
+
+		if (type_sample) ss_sample << type_sample;
+		else ss_sample << "tau";
+
+		ss_expected << type_expected;
+		return ss_sample.str() == ss_expected.str();
 	}
 
 	TEST_CASE("conversion to 1/0") {
@@ -73,6 +101,10 @@ bool check_hook(const char* sample, const char* expected) {
 		CHECK( check_hook("1:tau'", "0:tau") );
 
 		CHECK( check_hook("x''", "x") );
+
+		CHECK( check_type("{a}:sbf'", "sbf") );
+		CHECK( check_type("{o1[t] = 0}'", "tau") );
+		CHECK( check_type("{o1[t] = 0}:tau'", "tau") );
 	}
 
 	TEST_CASE("|") {
@@ -128,6 +160,12 @@ bool check_hook(const char* sample, const char* expected) {
 		CHECK( check_hook("x|x", "x") );
 		CHECK( check_hook("x|x'", "1") );
 		CHECK( check_hook("x'|x", "1") );
+
+		CHECK( check_type("{a}:sbf|{b}:sbf", "sbf") );
+		CHECK( check_type("{o1[t] = 0}|{o2[t] = 0}", "tau") );
+		CHECK( check_type("{o1[t] = 0}:tau|{o2[t] = 0}", "tau") );
+		CHECK( check_type("{o1[t] = 0}|{o2[t] = 0}:tau", "tau") );
+
 	}
 
 	TEST_CASE("&") {
@@ -183,6 +221,11 @@ bool check_hook(const char* sample, const char* expected) {
 		CHECK( check_hook("x&x", "x") );
 		CHECK( check_hook("x&x'", "0") );
 		CHECK( check_hook("x'&x", "0") );
+
+		CHECK( check_type("{a}:sbf&{b}:sbf", "sbf") );
+		CHECK( check_type("{o1[t] = 0}&{o2[t] = 0}", "tau") );
+		CHECK( check_type("{o1[t] = 0}:tau&{o2[t] = 0}", "tau") );
+		CHECK( check_type("{o1[t] = 0}&{o2[t] = 0}:tau", "tau") );
 	}
 
 	TEST_CASE("+") {
@@ -238,5 +281,10 @@ bool check_hook(const char* sample, const char* expected) {
 		CHECK( check_hook("x+x", "0") );
 		CHECK( check_hook("x+x'", "1") );
 		CHECK( check_hook("x'+x", "1") );
+
+		CHECK( check_type("{a}:sbf+{b}:sbf", "sbf") );
+		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}", "tau") );
+		CHECK( check_type("{o1[t] = 0}:tau+{o2[t] = 0}", "tau") );
+		CHECK( check_type("{o1[t] = 0}+{o2[t] = 0}:tau", "tau") );
 	}
 }
