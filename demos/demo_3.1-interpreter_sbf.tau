@@ -10,7 +10,7 @@
 # This demo demonstrate the workings of the interpreter.
 
 # To run a tau program we need to define input and output variables.
-# If you attemp to run a program without defining the input and output variables,
+# If you attempt to run a program without defining the input and output variables,
 # the interpreter will throw an error.
 
 # The following program just echo the inputs to the outputs, but we have not
@@ -47,29 +47,54 @@ r i1[t] = o1[t]
 # You would see the negations of you have seen previously in the console as that
 # is what we have defined as the output.
 #
-# Of course, we could also deal with more comples programs. The above examples are quite
+# Of course, we could also deal with more complex programs. The above examples are quite
 # simple but are provided to show the basic workings of the interpreter.
-# Let us consider the following example base on the Fibonacci sequence:
+# Let us consider the following example based on the Fibonacci sequence:
 
 r o1[t] = o1[t-1] + o1[t-2] && o1[0] = 1 && o1[1] = 1
-7
+n
+n
+n
+n
+n
+n
+q
 
-# We can also solve equations involving inequalities:
+
+# We can also execute specifications involving inequalities:
 
 r o1[t] != 0 && o1[t] != 1
-7
+n
+n
+n
+n
+n
+n
+q
 
-# and also include unconstrained constants:
+
+# and also include uninterpreted constants:
 
 r o1[t] = <:a>
-7
+n
+n
+n
+n
+n
+n
+q
+
 
 # or use functions:
 
 f(x) := {a}:sbf x + {b}:sbf x'
 g(x) := {c}:sbf x + {d}:sbf x'
 r o1[t] = f(o1[t-1]) + g(o1[t-2])
-3
+n
+n
+n
+q
+
 
 # Note that the 3 steps we are requesting are performed after the initial
 # conditions are set.
@@ -79,7 +104,7 @@ r o1[t] = f(o1[t-1]) + g(o1[t-2])
 sbf i2 = ifile("../tests/integration/test_files/sbf-alternating_zeros_and_ones-length_10.in")
 r i2[t]' = o1[t]
 
-# We could also define the ouput as a file, and run a similar program again.
+# We could also define the output as a file, and run a similar program again.
 # In order to check the result, you could run the following command, in another console:
 
 # cat /tmp/output_file1

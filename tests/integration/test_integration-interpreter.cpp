@@ -65,6 +65,11 @@ struct input_sbf_vector {
 		return inputs[current++];
 	}
 
+	std::pair<std::optional<assignment<BAs...> >, bool> read(
+		const auto& , const size_t ) {
+		return { assignment<BAs...>{}, false };
+	}
+
 	std::optional<type> type_of(const nso<BAs...>&) {
 		return { "sbf" }; // sbf (always)
 	}
@@ -103,15 +108,15 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 			} else std::cout << "{}\n"; // no input
 			#endif // DEBUG
 
-			auto out = intprtr.value().step(in.value());
+			auto [out, _ ] = intprtr.value().step(inputs);
 
 			// The output can be empty if all variables have been assigned in previous steps
-			if (out.size() == 0) {
-				// intprtr.value().memory.clear();
+			if (!out.has_value()) {
+				intprtr.value().memory.clear();
 				#ifdef DEBUG
 				std::cout << "run_test/output[" << i << "]: {}\n"; // no output
 				#endif // DEBUG
-				// break;
+				break;
 			}
 
 			#ifdef DEBUG
@@ -126,8 +131,6 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 			}
 			std::cout << "\n";
 			#endif // DEBUG
-
-			if (intprtr.value().memory.empty()) break;
 		}
 
 		return intprtr.value().memory;
@@ -373,6 +376,7 @@ TEST_SUITE("with inputs and outputs") {
 	// input all the time, but the output is set to 0 at the beginning.
 	//
 	// TODO (HIGH) check this case, issue in unconstrained constants model
+	// Note that this specification is unsat.
 	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
 		auto ins = build_i1_inputs({
