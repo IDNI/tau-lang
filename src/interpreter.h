@@ -672,19 +672,26 @@ nso<BAs...> get_executable_spec(const nso<BAs...>& fm) {
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/constraints: " << constraints;
 #endif // DEBUG
+		auto spec = executable;
+		if (constraints != _T<BAs...>) {
+			auto model = solve(constraints);
+			if (!model) continue;
 
-		auto model = solve(constraints);
-		if (!model) continue;
-		// TODO: Print model
+			BOOST_LOG_TRIVIAL(info) << "Tau specification is executed setting ";
+			for (const auto& [uc, v] : model.value()) {
+				BOOST_LOG_TRIVIAL(info) << uc << " := " << v;
+			}
+
 #ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "compute_systems/constraints/model: ";
-		for (const auto& [k, v]: model.value())
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << k << " := " << v << " ";
+				<< "compute_systems/constraints/model: ";
+			for (const auto& [k, v]: model.value())
+				BOOST_LOG_TRIVIAL(trace)
+					<< "\t" << k << " := " << v << " ";
 #endif // DEBUG
-
-		auto spec = replace(executable, model.value());
+			spec = replace(executable, model.value());
+			BOOST_LOG_TRIVIAL(info) << "Resulting Tau specification: " << spec << "\n\n";
+		}
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/program: " << spec;
