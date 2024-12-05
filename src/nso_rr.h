@@ -333,24 +333,6 @@ static const auto is_regular_or_temporal_quantifier = [](const nso<BAs...>& n) {
 template <typename... BAs>
 using is_var_or_capture_t = decltype(is_var_or_capture<BAs...>);
 
-template <typename...BAs>
-static const auto is_callback = [](const sp_tau_node<BAs...>& n) {
-	if (!std::holds_alternative<tau_source_sym>(n->value)
-			|| !get<tau_source_sym>(n->value).nt()) return false;
-	auto nt = get<tau_source_sym>(n->value).n();
-	return nt == tau_parser::bf_normalize_cb
-		|| nt == tau_parser::wff_has_clashing_subformulas_cb
-		|| nt == tau_parser::bf_has_subformula_cb
-		|| nt == tau_parser::wff_has_subformula_cb
-		|| nt == tau_parser::wff_remove_existential_cb
-		|| nt == tau_parser::bf_remove_funiversal_cb
-		|| nt == tau_parser::bf_remove_fexistential_cb;
-};
-
-template <typename...BAs>
-using is_callback_t = decltype(is_callback<BAs...>);
-
-
 //
 // functions to traverse the tree according to the specified non terminals
 // and collect the corresponding nodes
@@ -3134,267 +3116,6 @@ sp_tau_node<BAs...> splitter(const sp_tau_node<BAs...>& n,
 	return build_bf_constant<BAs...>(v);
 }
 
-// IDEA convert to a const static applier and change all the code accordingly
-//
-// however, the logic is quite complez a lot of private functions doesn't make
-// sense outside the actual structure.
-template <typename... BAs>
-struct callback_applier {
-
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
-		if (!is_callback<BAs...>(n)) return n;
-		auto nt = get<tau_source_sym>(n->value).n();
-		switch (nt) {
-		case tau_parser::bf_normalize_cb:
-			return apply_unary_operation(_normalize, n);
-		case tau_parser::bf_has_subformula_cb:
-			return apply_has_subformula_check(n,tau_parser::bf_cb_arg);
-		case tau_parser::wff_has_clashing_subformulas_cb:
-			return apply_wff_clashing_subformulas_check(n);
-		case tau_parser::wff_has_subformula_cb:
-			return apply_has_subformula_check(n,tau_parser::wff_cb_arg);
-		case tau_parser::wff_remove_existential_cb:
-			return apply_wff_remove_existential(n);
-		case tau_parser::bf_remove_funiversal_cb:
-			return apply_bf_remove_funiversal(n);
-		case tau_parser::bf_remove_fexistential_cb:
-			return apply_bf_remove_fexistential(n);
-		default: return n;
-		}
-	}
-
-private:
-	// TODO (MEDIUM) simplify following methods using the new node and ba_variant operators
-
-	// unary operation
-	static constexpr auto _normalize = [](const auto& n) -> std::variant<BAs...>{
-		return normalize(n);
-	};
-
-	// ternary operators
-	static constexpr auto _eq =
-		[](const auto& l) -> bool { return l == false; };
-	static constexpr auto _neq =
-		[](const auto& l) -> bool { return !(l == false); };
-
-	std::pair<sp_tau_node<BAs...>, sp_tau_node<BAs...>>
-		get_quantifier_remove_constituents(
-			const tau_parser::nonterminal type,
-			const sp_tau_node<BAs...>& n)
-	{
-		auto args = n || type || only_child_extractor<BAs...>;
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> left_changes;
-		left_changes[args[0] /* var */] = args[2] /* T */;
-		auto left = replace<sp_tau_node<BAs...>>(
-			args[1] /* formula */, left_changes);
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>>right_changes;
-		right_changes[args[0] /* var */] = args[3] /* F */;
-		auto right = replace<sp_tau_node<BAs...>>(
-			args[1] /* formula */, right_changes);
-		return {left, right};
-	}
-
-	sp_tau_node<BAs...> apply_bf_remove_funiversal(
-		const sp_tau_node<BAs...>& n)
-	{
-		auto [left, right] = get_quantifier_remove_constituents(
-						tau_parser::bf_cb_arg, n);
-		return build_bf_and<BAs...>(left, right);
-	}
-
-	sp_tau_node<BAs...> apply_bf_remove_fexistential(
-		const sp_tau_node<BAs...>& n)
-	{
-		auto [left, right] = get_quantifier_remove_constituents(
-						tau_parser::bf_cb_arg, n);
-		return build_bf_or<BAs...>(left, right);
-	}
-
-	std::optional<sp_tau_node<BAs...>> squeeze_positives(
-		const sp_tau_node<BAs...> n)
-	{
-		if (auto positives = select_top(n,
-			is_non_terminal<tau_parser::bf_eq, BAs...>);
-							positives.size() > 0)
-		{
-			std::set<sp_tau_node<BAs...>> bfs;
-			for (auto& p: positives) bfs.insert(p | tau_parser::bf
-				| optional_value_extractor<sp_tau_node<BAs...>>);
-			return build_bf_or<BAs...>(bfs);
-		}
-		return {};
-	}
-
-	sp_tau_node<BAs...> apply_wff_remove_existential(
-		const sp_tau_node<BAs...>& n)
-	{
-		// Following Corollary 2.3 from Taba book from Ohad
-		auto args = n || tau_parser::wff_cb_arg
-				|| only_child_extractor<BAs...>;
-		auto var = args[0] | only_child_extractor<BAs...>
-				| optional_value_extractor<sp_tau_node<BAs...>>;
-		auto wff = args[1];
-		auto is_var = [&var](const auto& node){return node == var;};
-		// if var does not appear in the formula, we can return the formula as is
-		// if (!find_top(wff, is_var)) return wff;
-		std::map<nso<BAs...>, nso<BAs...>> changes;
-		for (const auto& l :
-			get_leaves(wff, tau_parser::wff_or, tau_parser::wff))
-		{
-			// if var does not appear in the clause, we can skip it
-			if (!find_top(l, is_var)) continue;
-			// Get each conjunct in clause
-			nso<BAs...> nl = _T<BAs...>;
-			bool is_quant_removable_in_clause = true;
-			for (const auto& conj : get_leaves(l,
-				tau_parser::wff_and, tau_parser::wff))
-			{
-				// Check if conjunct is of form = 0 or != 0
-				if ((conj | tau_parser::bf_eq)
-					|| (conj | tau_parser::bf_neq))
-						continue;
-				// If the conjunct contains the quantified variable at this point
-				// we cannot resolve the quantifier in this clause
-				if (find_top(conj, is_var)) {
-					is_quant_removable_in_clause = false;
-					break;
-				}
-				// conjunct does not depend on var
-				nl = build_wff_and(nl, conj);
-			}
-			if (!is_quant_removable_in_clause) {
-				// Since we cannot remove the quantifier in this
-				// clause it needs to be maintained
-				changes[l] = build_wff_ex(var, l);
-				continue;
-			}
-
-			auto f = squeeze_positives(l);
-			std::map<nso<BAs...>, nso<BAs...>>
-				changes_0 = {{var, _0_trimmed<BAs...>}},
-				changes_1 = {{var, _1_trimmed<BAs...>}};
-			auto f_0 = f ? replace(f.value(), changes_0)
-					: _0<BAs...>;
-			auto f_1 = f ? replace(f.value(), changes_1)
-					: _0<BAs...>;
-
-			if (auto neqs = select_all(l,
-				is_non_terminal<tau_parser::bf_neq, BAs...>);
-								neqs.size() > 0)
-			{
-				auto nneqs = _T<BAs...>;
-				for (auto& neq: neqs) {
-					auto g = neq | tau_parser::bf
-						| optional_value_extractor<sp_tau_node<BAs...>>;
-					auto g_0 = replace(g, changes_0);
-					auto g_1 = replace(g, changes_1);
-					nneqs = build_wff_and(nneqs,
-						build_wff_neq(build_bf_or(
-						build_bf_and(build_bf_neg(f_1),
-									g_1),
-						build_bf_and(build_bf_neg(f_0),
-									g_0))));
-				}
-				nl = build_wff_and(nl, build_wff_and(
-					build_wff_eq(build_bf_and(f_0, f_1)),
-									nneqs));
-			} else if (f) {
-				nl = build_wff_and(nl, build_wff_eq(
-						build_bf_and(f_0, f_1)));
-			}
-			changes[l] = nl;
-		}
-		return replace<sp_tau_node<BAs...>>(wff, changes);
-	}
-
-	sp_tau_node<BAs...> apply_has_subformula_check(sp_tau_node<BAs...> n,
-		const tau_parser::nonterminal& cb_arg_t)
-	{
-		auto args = n || cb_arg_t || only_child_extractor<BAs...>;
-		for (auto& subformula :
-			select_all(args[0], rewriter::all))
-				if (subformula == args[1]) return args[2];
-		return args[0];
-	}
-
-	// TODO (LOW) make a cleaner implementation
-	// we should merge the two following methods and split the logic in
-	// meaningful methods
-	sp_tau_node<BAs...> apply_wff_clashing_subformulas_check(
-		const sp_tau_node<BAs...>& n)
-	{
-		auto args = n || tau_parser::wff_cb_arg
-				|| only_child_extractor<BAs...>;
-		std::vector<sp_tau_node<BAs...>> positives, negatives;
-		for (auto& op: select_all(args[0], rewriter::all))
-			if (is_non_terminal<tau_parser::wff_and>(op))
-				for (auto& c: op->child)
-		{
-			if (auto check = c | tau_parser::wff_and;
-				!check.has_value()
-					&& is_non_terminal<tau_parser::wff>(c))
-			{
-				auto cc = c | only_child_extractor<BAs...>
-					| optional_value_extractor<
-							sp_tau_node<BAs...>>;
-				(is_non_terminal<tau_parser::wff_neg>(cc)
-					? negatives : positives).push_back(cc);
-			}
-		}
-		for (auto& negation: negatives) {
-			auto negated = negation | tau_parser::wff
-				| only_child_extractor<BAs...>
-				| optional_value_extractor<sp_tau_node<BAs...>>;
-			for (auto& positive: positives)
-				if (positive == negated) return args[1];
-		}
-		return args[0];
-	}
-
-	sp_tau_node<BAs...> apply_binary_operation(const auto& op,
-		const sp_tau_node<BAs...>& n)
-	{
-		auto ba_elements = n || tau_parser::bf_cb_arg
-			|| tau_parser::bf || only_child_extractor<BAs...>
-			|| ba_extractor<BAs...>;
-		sp_tau_node<BAs...> nn(
-			std::visit(op, ba_elements[0], ba_elements[1]));
-		return build_bf_constant<BAs...>(nn);
-	}
-
-	sp_tau_node<BAs...> apply_unary_operation(const auto& op,
-		const sp_tau_node<BAs...>& n)
-	{
-		auto ba_elements = n || tau_parser::bf_cb_arg || tau_parser::bf
-			|| only_child_extractor<BAs...> || ba_extractor<BAs...>;
-		std::variant<BAs...> v = std::visit(op, ba_elements[0]);
-		return build_bf_constant<BAs...>(v);
-	}
-
-	sp_tau_node<BAs...> apply_equality_relation(const auto& op,
-		const sp_tau_node<BAs...>& n)
-	{
-		auto bf_arg = n | tau_parser::bf_cb_arg | tau_parser::bf
-				| only_child_extractor<BAs...>;
-		auto wff_args = n || tau_parser::wff_cb_arg
-				|| only_child_extractor<BAs...>;
-		auto ba_element = bf_arg | ba_extractor<BAs...>
-			| optional_value_extractor<std::variant<BAs...>>;
-		return std::visit(op, ba_element) ? wff_args[0] : wff_args[1];
-	}
-
-	sp_tau_node<BAs...> apply_subs(const sp_tau_node<BAs...>& n) {
-		auto args = n || tau_parser::bf_cb_arg
-					|| only_child_extractor<BAs...>;
-		std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> m;
-		m[args[0]] = args[1];
-		auto tmp = replace<sp_tau_node<BAs...>>(args[2], m)
-			| only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
-		return tmp;
-	}
-};
-
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template <typename... BAs>
@@ -3418,16 +3139,8 @@ nso<BAs...> nso_rr_apply(const rewriter::rule<nso<BAs...>>& r,
 
 	std::map<nso<BAs...>, nso<BAs...>> changes;
 
-	// compute changes from callbacks
-	if (auto cbs = select_all(nn, is_callback<BAs...>); !cbs.empty()) {
-		callback_applier<BAs...> cb_applier;
-		for (auto& cb : cbs) {
-			auto nnn = cb_applier(cb);
-			changes[cb] = nnn;
-		}
-	}
-
 	// apply numerical simplifications
+	// TODO (HIGH) check if this is done with hooks
 	auto pred = is_non_terminal<BAs...>(tau_parser::shift);
 	if (auto shifts = select_all(nn, pred); !shifts.empty())
 		for (auto& shift : shifts)
@@ -4814,10 +4527,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::ref,                              80 },
 			{ tau_parser::wff,                              90 },
 			// wff
-			{ tau_parser::wff_has_clashing_subformulas_cb, 320 },
-			{ tau_parser::wff_has_subformula_cb,           330 },
-			{ tau_parser::wff_remove_existential_cb,       340 },
-
 			{ tau_parser::wff_sometimes,                   380 },
 			{ tau_parser::wff_always,                      390 },
 			{ tau_parser::wff_conditional,                 400 },
@@ -4842,10 +4551,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			{ tau_parser::bf_nless,                        511 },
 			{ tau_parser::wff,                             580 },
 			// bf
-			{ tau_parser::bf_has_subformula_cb,            620 },
-			{ tau_parser::bf_remove_funiversal_cb,         630 },
-			{ tau_parser::bf_remove_fexistential_cb,       640 },
-
 			{ tau_parser::bf_or,                           720 },
 			{ tau_parser::bf_and,                          730 },
 			{ tau_parser::bf_xor,                          740 },
@@ -5103,20 +4808,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau::sp_tau_node<BAs...>& n,
 			// quantifiers
 			case tau_parser::wff_all:
 			case tau_parser::wff_ex:         quant(); break;
-			// callbacks
-			case tau_parser::bf_normalize_cb:prefix("bf_normalize_cb"); break;
-			case tau_parser::bf_remove_funiversal_cb:
-				prefix("bf_remove_funiversal_cb"); break;
-			case tau_parser::bf_remove_fexistential_cb:
-				prefix("bf_remove_fexistential_cb"); break;
-			case tau_parser::wff_remove_existential_cb:
-				prefix("wff_remove_existential_cb"); break;
-			case tau_parser::wff_has_clashing_subformulas_cb:
-				prefix("wff_has_clashing_subformulas_cb"); break;
-			case tau_parser::bf_has_subformula_cb:
-				prefix("bf_has_subformula_cb"); break;
-			case tau_parser::wff_has_subformula_cb:
-				prefix("wff_has_subformula_cb"); break;
 			// cli commands
 			case tau_parser::cli:           sep(". "); break;
 			case tau_parser::rel_memory:    prefix_nows("%-"); break;

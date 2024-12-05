@@ -25,7 +25,6 @@
 
 namespace idni::tau {
 
-RULE(WFF_REMOVE_EX_0, "ex $X $Y ::= wff_remove_existential_cb $X $Y.")
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
 template<typename... BAs>

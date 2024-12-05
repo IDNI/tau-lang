@@ -32,8 +32,8 @@ fp_fallback            => "first":first_sym | "last":last_sym
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 library                => ((_ (wff_rule | bf_rule):rule)*):rules.
-wff_rule               => wff:wff_matcher _ "::=" _ (wff|wff_cb):wff_body _ '.'.
-bf_rule                => bf :bf_matcher  _  ":=" _ (bf |bf_cb) :bf_body  _ '.'.
+wff_rule               => wff:wff_matcher _ "::=" _ (wff):wff_body _ '.'.
+bf_rule                => bf :bf_matcher  _  ":=" _ (bf) :bf_body  _ '.'.
 
 builder                => _ builder_head _ builder_body _ '.'.
 builder_head           => '(' _ capture (__ capture)* _ ')'.
@@ -141,43 +141,6 @@ extra => chars.
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
 __                     => (space | comment) _.   # whitespace
 _                      => [ __ ].                # optional whitespace
-
-
-# callbacks
-
-# callbacks must be used in the following cases:
-#
-# 1.- underlying boolean algebras operations: and, or, xor, neg, less,
-# less_equal, greater, subs, eq, neq, is_zero, is_one,... In this case, no
-# other way we have to call the uderlying operations of the boolean algebra
-# 2.- speed up computations: has_clashing_subformulas, has_subformula,
-# remove_existential... In this case, we could use the the callback to
-# avoid the creation of intermediate formulas. For instance, if we want
-# to check if a formula has a subformula, we could use the callback to
-# avoid the creation of the subformulas to check that point.
-# 3.- to create new subformulas in other rules, for instance, to create a
-# new formula that is the substitution of a variable by a constant.
-
-# bultin_args, type is needed to capture appropriate typed arguments
-# do not try to simplify this
-bf_cb_args1            => __ bf:bf_cb_arg.
-bf_cb_args2            => bf_cb_args1 bf_cb_args1.
-bf_cb_args3            => bf_cb_args2 bf_cb_args1.
-bf_cb_args4            => bf_cb_args3 bf_cb_args1.
-wff_cb_args1           => __ wff:wff_cb_arg.
-wff_cb_args2           => wff_cb_args1 wff_cb_args1.
-wff_cb_args3           => wff_cb_args2 wff_cb_args1.
-wff_cb_args4           => wff_cb_args3 wff_cb_args1.
-
-wff_cb => ("wff_has_clashing_subformulas_cb" wff_cb_args2)
-                                                :wff_has_clashing_subformulas_cb
-        | ("wff_has_subformula_cb"      wff_cb_args3):wff_has_subformula_cb
-        | ("wff_remove_existential_cb"  wff_cb_args2):wff_remove_existential_cb.
-bf_cb  => ("bf_has_subformula_cb"       bf_cb_args3) :bf_has_subformula_cb
-        | ("bf_remove_funiversal_cb"    bf_cb_args4) :bf_remove_funiversal_cb
-        | ("bf_remove_fexistential_cb"  bf_cb_args4) :bf_remove_fexistential_cb
-        | ("bf_normalize_cb"            bf_cb_args1) :bf_normalize_cb.
-
 
 ################################################################################
 
@@ -322,9 +285,7 @@ severity               => ("e" | "error"):error_sym
         file_name, ctnvar.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, q_var, src_c, wff_cb, bf_cb,
-        bf_cb_args1, bf_cb_args2, bf_cb_args3, bf_cb_args4,
-        wff_cb_args1, wff_cb_args2, wff_cb_args3, wff_cb_args4,
+@inline char classes, chars, q_var, src_c,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg, solve_cmd_arg, bf_and_nosep,
         bf  > bf_parenthesis  > bf,

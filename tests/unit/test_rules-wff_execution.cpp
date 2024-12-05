@@ -76,10 +76,4 @@ TEST_SUITE("executing wff rules") {
 		CHECK( matcher != body );
 		CHECK( result == body );
 	}
-
-	TEST_CASE("WFF_REMOVE_EX_0") {
-		auto [ matcher, body, result ] = test_rule(WFF_REMOVE_EX_0);
-		CHECK( matcher != body );
-		CHECK( matcher != result );
-	}
 }
