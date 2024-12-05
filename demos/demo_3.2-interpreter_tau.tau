@@ -1,5 +1,5 @@
 # To run it you need to compile the project using release.sh (customized with
-# your settings if needed) and then execute the run.sh whithin the demo directory
+# your settings if needed) and then execute the run.sh within the demo directory
 # as follows:
 #
 # ./run.sh demo_3.2-interpreter_tau.tau
@@ -16,12 +16,14 @@ tau i1 = console
 tau o1 = console
 
 
-# Now, let us consider a simple tau program which alway output the same program
+# Now, let us consider a simple tau program which always output the same program
 # (as the output doesn't depends on the inputs, we must specify the number of
 # steps to be performed when running it).:
 
 r o1[t] = { o1[t] = i1[t] }
-2
+n
+n
+q
 
 # Now let us consider a program that take as inputs actual programs from the
 # console.
