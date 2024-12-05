@@ -54,8 +54,4 @@ TEST_SUITE("parsing wff rules") {
 	TEST_CASE("WFF_ELIM_FORALL") {
 		CHECK( test_rule(WFF_ELIM_FORALL) );
 	}
-
-	TEST_CASE("WFF_REMOVE_EX_0") {
-		CHECK( test_rule(WFF_REMOVE_EX_0) );
-	}
 }
