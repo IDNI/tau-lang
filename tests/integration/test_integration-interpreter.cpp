@@ -111,12 +111,12 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 			auto [out, _ ] = intprtr.value().step(inputs);
 
 			// The output can be empty if all variables have been assigned in previous steps
-			if (out.size() == 0) {
-				// intprtr.value().memory.clear();
+			if (!out.has_value()) {
+				intprtr.value().memory.clear();
 				#ifdef DEBUG
 				std::cout << "run_test/output[" << i << "]: {}\n"; // no output
 				#endif // DEBUG
-				// break;
+				break;
 			}
 
 			#ifdef DEBUG
@@ -131,8 +131,6 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 			}
 			std::cout << "\n";
 			#endif // DEBUG
-
-			// if (intprtr.value().memory.empty()) break;
 		}
 
 		return intprtr.value().memory;
