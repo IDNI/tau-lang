@@ -11,6 +11,9 @@ case "${BUILD_TYPE}" in
 	"RelWithDebInfo")
 		SUFFIX="RelWithDebInfo"
 		;;
+	"Coverage")
+		SUFFIX="Coverage"
+		;;
 	*)
 		echo "Unknown build type: ${BUILD_TYPE}"
 		exit 1

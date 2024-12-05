@@ -76,11 +76,46 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 	set(TAU_BUILD_BENCHMARK OFF)
 	set(TAU_MEASURE OFF)
 	set(TAU_CACHE OFF)
-elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+	elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 	set(TAU_BUILD_BENCHMARK OFF)
 	set(TAU_MEASURE OFF)
 	set(TAU_CACHE TRUE)
+	elseif(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+	set(TAU_BUILD_BENCHMARK OFF)
+	set(TAU_MEASURE OFF)
+	set(TAU_CACHE TRUE)
+	message(STATUS "Building with coverage information")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
+	set(TAU_BUILD_UNIT_TESTS ON)
+	set(TAU_BUILD_INTEGRATION ON)
+	set(TAU_BUILD_REPL_TESTS OFF)
+	set(TAU_BUILD_REGRESSION OFF)
+	set(TAU_BUILD_BENCHMARK OFF)
 endif()
+
+#
+# Adding coverage target if requested
+#
+if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+    find_program(LCOV_EXEC lcov)
+    find_program(GENHTML_EXEC genhtml)
+    if(LCOV_EXEC AND GENHTML_EXEC)
+        add_custom_target(coverage
+            COMMAND ${LCOV_EXEC} --directory . --capture --output-file coverage.info
+            #COMMAND ${LCOV_EXEC} --remove coverage.info '/usr/*' '*/tests/*' --output-file coverage.info
+            COMMAND ${GENHTML_EXEC} -o coverage coverage.info
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Generating coverage report"
+            VERBATIM
+        )
+    else()
+        message(WARNING "lcov or genhtml not found! Coverage target will not be available.")
+    endif()
+endif()
+
 
 if(NOT TAU_BUILD_BENCHMARK)
 	set(TAU_MEASURE OFF)
