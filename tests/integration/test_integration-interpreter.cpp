@@ -121,7 +121,7 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 
 			#ifdef DEBUG
 			std::cout << "run_test/output[" << i << "]: ";
-			for (const auto& [var, value]: out) {
+			for (const auto& [var, value]: out.value()) {
 				std::cout << var << " <- " << value << " ... ";
 				if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>); io_vars) {
 					std::cout << "run_test/output[" << i << "]: unexpected io_var " << io_vars.value() << "\n";
