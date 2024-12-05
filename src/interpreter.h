@@ -98,16 +98,13 @@ struct finputs {
 		std::vector<nso<BAs...> >& in_vars, size_t time_step) {
 		std::ranges::sort(in_vars, constant_io_comp);
 		assignment<BAs...> value;
-		bool all_input_assigned = true;
 		for (const auto& var : in_vars) {
 			// Skip output stream variables
 			if (var | tau_parser::io_var | tau_parser::out)
 				continue;
 			// Skip input stream variables with time point greater time_step
-			if (get_io_time_point(var) > time_step) {
-				all_input_assigned = false;
+			if (get_io_time_point(var) > time_step)
 				continue;
-			}
 			assert(is_non_terminal(tau_parser::variable, var));
 			std::string line;
 			auto var_name = trim(trim2(var));
@@ -124,7 +121,7 @@ struct finputs {
 				std::getline(std::cin, line);
 				term::disable_getline_mode();
 			}
-			if (line.empty()) return {}; // no more inputs
+			if (line.empty()) return {value, true}; // no more inputs
 			auto cnst = nso_factory<BAs...>::instance().parse(line, types[var_name]);
 			if (!cnst) {
 				BOOST_LOG_TRIVIAL(error)
@@ -135,7 +132,7 @@ struct finputs {
 			}
 			value[wrap(tau_parser::bf, var)] = build_bf_constant(cnst.value());
 		}
-		return {value, all_input_assigned};
+		return {value, false};
 	}
 
 	std::optional<type> type_of(const nso<BAs...>& var) {
@@ -328,7 +325,7 @@ struct interpreter {
 		}
 	}
 
-	std::pair<assignment<BAs...>, bool> step(auto& inputs) {
+	std::pair<std::optional<assignment<BAs...>>, bool> step(auto& inputs) {
 		// for each system in systems try to solve it, if it is not possible
 		// continue with the next system.
 		// std::cout << "Execution step: " << time_point << "\n";
@@ -344,8 +341,6 @@ struct interpreter {
 				auto current = replace(updated, memory_copy);
 				// Simplify after updating stream variables
 				current = normalize_non_temp(current);
-
-				// std::cout << "current: " << current << "\n";
 
 				// Find open input vars
 				auto io_vars = select_top(current,
@@ -366,11 +361,12 @@ struct interpreter {
 				}
 
 				// Get values for open inputs and save in memory
-				auto [values, assigned] = inputs.read(
+				auto [values, is_quit] = inputs.read(
 					io_vars, time_point);
-				// std::cout << "a_time: " << time_point << "\n";
-				// std::cout << "time: " << formula_time_point << "\n";
-				if (!values.has_value()) return {};
+				// Empty input
+				if (is_quit) return {};
+				// Error during input
+				if (!values.has_value()) return {assignment<BAs...>{}, false};
 				for (const auto& [var, value] : values.value()) {
 					assert(get_io_time_point(trim(var)) <= time_point);
 					has_input = true;
@@ -421,7 +417,6 @@ struct interpreter {
 					solutions[type] = solution.value();
 				}
 				else {
-					// std::cout << "Next disjunct." << "\n";
 					solved = false;
 					// We need to clear the solutions to current clause since it is unsat
 					solutions.clear();
@@ -438,7 +433,6 @@ struct interpreter {
 							if (get_io_time_point(trim(var)) <= time_point) {
 								memory.emplace(var, value);
 								global.emplace(var, value);
-								// std::cout << "var emplaced: " << var << "\n";
 							}
 						} else {
 							memory.emplace(var, value);
@@ -757,11 +751,16 @@ void run(const nso<BAs...>& form, auto& inputs, auto& outputs) {
 	auto intrprtr = make_interpreter(phi_inf, inputs, outputs);
 	if (!intrprtr) return;
 
-	BOOST_LOG_TRIVIAL(info) << "To stop execution, provide empty input for input stream, if present, and type q(uit). Press ENTER to continue.\n\n";
+	BOOST_LOG_TRIVIAL(info) << "Please provide requested input or press ENTER to terminate";
+	BOOST_LOG_TRIVIAL(info) << "If no input is requested, press ENTER to proceed to next output, or type q(uit) to terminate";
+	BOOST_LOG_TRIVIAL(info) << "After a parse error, press ENTER to resume or type q(uit) to terminate\n\n";
+
 	// Continuously perform execution step until user quits
 	while (true) {
 		auto [output, has_input] = intrprtr.value().step(inputs);
-		if (!outputs.write(output)) return;
+		// If the user provided empty input for an input stream, quit
+		if (!output.has_value()) return;
+		if (!outputs.write(output.value())) return;
 		// If there is no input, ask the user if execution should continue
 		if (!has_input) {
 			std::string line;
