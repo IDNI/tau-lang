@@ -379,12 +379,22 @@ nso<BAs...> get_uninterpreted_constants_constraints (const nso<BAs...>& fm) {
 		io_vars.pop_back();
 	}
 	// Existentially quantify remaining variables
+	std::vector<nso<BAs...>> uconsts;
 	for (const auto& v : free_io_vars) {
-		if (!is_child_non_terminal(tau_parser::uninterpreted_constant, v))
+		if (!is_child_non_terminal(p::uninterpreted_constant, v))
 			uconst_ctns = build_wff_ex(v, uconst_ctns);
+		else uconsts.push_back(v);
 	}
 	// Eliminate all variables
 	uconst_ctns = normalize_non_temp(uconst_ctns);
+	// Now add all uninterpreted constants which disappeared during elimination of variables
+	// and set them to 0
+	auto left_uconsts = select_top(uconst_ctns,
+		is_child_non_terminal<p::uninterpreted_constant, BAs...>);
+	for (const auto& uc : uconsts) {
+		if (std::ranges::find(left_uconsts, uc) == left_uconsts.end())
+			uconst_ctns = build_wff_and(uconst_ctns, build_wff_eq(wrap(p::bf, uc)));
+	}
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula describing constraints on uninterpreted constants";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << uconst_ctns;
