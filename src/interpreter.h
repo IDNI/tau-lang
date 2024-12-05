@@ -452,11 +452,16 @@ struct interpreter {
 					++time_point;
 				else ++formula_time_point, ++time_point;
 				// TODO (HIGH) remove old values from memory
+				// If there is no output for the current step
+				// print a warning
+				if (global.empty()) {
+					BOOST_LOG_TRIVIAL(info) << "(Warning) specification contains no output stream in current step";
+				}
 				return {global, has_input};
 			}
 		}
 		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) Tau specification is unsat\n";
+			<< "(Error) internal error: Tau specification is unexpectedly unsat\n";
 		return {};
 	}
 
