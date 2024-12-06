@@ -2405,7 +2405,7 @@ int_t get_max_shift(const auto& io_vars, bool ignore_temps = false) {
 }
 
 template <typename... BAs>
-int_t get_max_initial(const auto& io_vars) {
+int_t get_max_initial(const std::vector<nso<BAs...>>& io_vars) {
 	int_t max_init = -1;
 	for (const nso<BAs...>& v : io_vars) {
 		if (is_io_initial(v)) {
