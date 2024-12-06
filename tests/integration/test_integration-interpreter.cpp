@@ -83,7 +83,7 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 		output_sbf_console<tau_ba<sbf_ba>, sbf_ba>& outputs,
 		const size_t& times) {
 	auto sample_src = make_tau_source(sample);
-	auto phi_inf = make_nso_rr_using_factory<
+	auto spec = make_nso_rr_using_factory<
 		tau_ba<sbf_ba>, sbf_ba>(sample_src).value().main;
 
 	#ifdef DEBUG
@@ -91,7 +91,7 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 	std::cout << "run_test/sample: " << sample << "\n";
 	#endif // DEBUG
 
-	if (auto intprtr = make_interpreter(phi_inf, inputs, outputs); intprtr) {
+	if (auto intprtr = make_interpreter(spec, inputs, outputs); intprtr) {
 
 		// we read the inputs only once (they are always empty in this test suite)
 
