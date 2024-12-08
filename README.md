@@ -44,10 +44,11 @@
 Tau Language is about enabling you to create software that elegantly adapts to
 meet your requirements in a fully formal, correct-by-construction manner.
 
-Tau Language is uniquely vastly expressive while retaining decidability and
-allows you to refer to sentences in Tau Language. And, as you'll see, offers
-many advantages when compared to other common formal languages and programming
-languages.
+Tau Language is uniquely vastly expressive while retaining decidability. Further,
+it has the unique ability to specify programs that refer to Tau specifications
+and to logical relations between them. And, as you'll see, offers
+many other advantages when compared to other common formal languages and
+programming languages.
 
 Tau Language offers a future where whether you're a developer, end-user, or
 stakeholder, Tau-built software will be able to accurately adapt to be what
@@ -55,20 +56,23 @@ you, or a group of users, want it to be.
 
 More precisely, the Tau Language is a logical software specification language.
 It allows you to write constraints about software, check for satisfiability, and
-run a candidate program that meets those specifications. All related logical
-tasks are decidable. It is based on the first-order theory of atomless Boolean
-algebras.
+run a representative program that meets those specifications. Put it in different
+words: imagine programming by writing only tests, or assertions. Tau backend
+will figure out automatically a program that will make the tests and assertions
+pass. Tau is based on the first-order theory of atomless Boolean algebras. All
+common logical tasks oevr the language are decidable.
 
 For a more detailed explanation of the theory behind the Tau Language, please
 refer to:
 
+* GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
 * TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
 * Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
 
 
-This README.md is structured in the following way: first, we provide a detailed
+This README.md is structured in the following way: first we provide a detailed
 explanation of the Tau Language, including the syntax and semantics of the
-language. Then, we provide a quick start guide to start using the Tau Language.
+language. Then we provide a quick start guide to start using the Tau Language.
 Finally, we provide a guide to install the Tau Framework in your system, how to
 use the command line interface and the Tau REPL (Read-Eval-Print-Loop) that
 allows you to interact with the Tau Language.
