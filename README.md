@@ -226,25 +226,21 @@ f[0](y) := T
 f[n](y) := f[n - 1](y)
 ```
 
-which you can use in your program as follows:
+which you can use in your spec as follows:
 
 ```
 o1[t] = 0 && f(i1[t])
 ```
 
-Or also, you can use the following recurrence relation definition
+Also, you can use the following recurrence relation definition
 
 ```
 g[0](y) := 0
 g[n](y) := g[n](y)'
 ```
 
-which takes as argument a Boolean function and
-alternates between 0 and 1 depending on the parity of n.
-
-To get all the details about the Tau Language, please refer to the Section
-[The Tau Language](#the-tau-language). You can find there all the details
-about the syntax and semantics of the language.
+which defines a function (rather a predicate) and alternates between 0 and 1
+depending on the parity of n.
 
 In the [demos](https://github.com/IDNI/tau-lang/tree/main/demos) folder you
 can find lots of examples regarding how to use the Tau Language, its semantics
