@@ -54,7 +54,7 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		std::cout << ss.str() << "\n";
 		#endif
 
-		CHECK(ss.str() == "{ o1[t]o2[t] = 0. } : tau ({ o1[t]o2[t] = 0. } : tau v)' = 0");
+		CHECK(ss.str() == "{ o1[t]o2[t] = 0 } : tau ({ o1[t]o2[t] = 0 } : tau v)' = 0");
 	}
 
 	TEST_CASE("Tau_splitter_tau_coeff2") {
@@ -67,9 +67,9 @@ TEST_SUITE("Tau_splitter_tau_coeff") {
 		std::cout << ss.str() << "\n";
 		#endif
 
-		CHECK((ss.str() == "{ o1[t]|o2[t] = 0. } : tau v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0). } : tau = 0"
-			|| ss.str() == "{ o1[t]|o2[t] = 0. } : tau v = 0 && v{ !(always o2[t] = 0 && o1[t] = 0). } = 0"
-			|| ss.str() == "{ o1[t]|o2[t] = 0. } v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0). } : tau = 0"
-			|| ss.str() == "{ o1[t]|o2[t] = 0. } v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0). } = 0"));
+		CHECK((ss.str() == "{ o1[t]|o2[t] = 0 } : tau v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0) } : tau = 0"
+			|| ss.str() == "{ o1[t]|o2[t] = 0 } : tau v = 0 && v{ !(always o2[t] = 0 && o1[t] = 0) } = 0"
+			|| ss.str() == "{ o1[t]|o2[t] = 0 } v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0) } : tau = 0"
+			|| ss.str() == "{ o1[t]|o2[t] = 0 } v = 0 && v{ !(always o1[t] = 0 && o2[t] = 0) } = 0"));
 	}
 }
