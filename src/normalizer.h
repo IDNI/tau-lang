@@ -274,9 +274,6 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 
 	nso<BAs...> imp1 = build_wff_imply<BAs...>(n1, n2);
 	nso<BAs...> imp2 = build_wff_imply<BAs...>(n2, n1);
-	// Convert uninterpreted constants to variables for equiv check
-	// imp1 = convert_uconsts_to_var(imp1);
-	// imp2 = convert_uconsts_to_var(imp2);
 	auto vars = get_free_vars_from_nso(imp1);
 
 	for(auto& v: vars) {
@@ -304,6 +301,39 @@ auto is_nso_equivalent_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previ
 	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
 			return are_nso_equivalent<BAs...>(n, p);
 		});
+}
+
+template<typename... BAs>
+bool is_nso_impl (nso<BAs...> n1, nso<BAs...> n2) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin is_nso_impl";
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
+
+	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
+	assert((has_no_boolean_combs_of_models(n1) && has_no_boolean_combs_of_models(n2)));
+
+	if (is_non_terminal(tau_parser::wff_always, trim(n1)))
+		n1 = trim2(n1);
+	if (is_non_terminal(tau_parser::wff_always, trim(n2)))
+		n2 = trim2(n2);
+
+	if (n1 == n2) {
+		BOOST_LOG_TRIVIAL(debug) << "(I) -- End is_nso_impl: true (n1 implies n2)";
+		return true;
+	}
+
+	nso<BAs...> imp = build_wff_imply<BAs...>(n1, n2);
+	auto vars = get_free_vars_from_nso(imp);
+
+	for(auto& v: vars) {
+		imp = build_wff_all<BAs...>(v, imp);
+	}
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- wff: " << imp;
+
+	auto res = normalizer_step<BAs...>(imp);
+	assert((res == _T<BAs...> || res == _F<BAs...>));
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End is_nso_impl: " << res;
+	return res == _T<BAs...>;
 }
 
 template<typename... BAs>
@@ -341,6 +371,60 @@ auto is_bf_same_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
 	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
 			return are_bf_equal<BAs...>(n, p);
 		});
+}
+
+template<typename... BAs>
+nso<BAs...> normalize_with_temp_simp (const nso<BAs...>& fm) {
+	auto red_fm = normalizer_step(fm);
+	auto clauses = get_dnf_wff_clauses(red_fm);
+	nso<BAs...> new_fm;
+	for (const auto& clause : clauses) {
+		auto aw_parts = select_top(clause,
+			is_child_non_terminal<tau_parser::wff_always, BAs...>);
+		auto st_parts = select_top(clause,
+			is_child_non_terminal<tau_parser::wff_sometimes, BAs ...>);
+
+		// Replace always and sometimes parts by T
+		std::map<nso<BAs...>, nso<BAs...>> changes;
+		for (const auto& aw : aw_parts)
+			changes.emplace(aw, _T<BAs...>);
+		for (const auto& st : st_parts)
+			changes.emplace(st, _T<BAs...>);
+		nso<BAs...> new_clause = replace(clause, changes);
+
+		// First check if any always statements are implied by others
+		for (size_t i = 0; i < aw_parts.size(); ++i) {
+			for (size_t j = i+1; j < aw_parts.size(); ++j) {
+				if (is_nso_impl(aw_parts[i], aw_parts[j]))
+					aw_parts[j] = _T<BAs...>;
+				else if (is_nso_impl(aw_parts[j], aw_parts[i]))
+					aw_parts[i] = _T<BAs...>;
+			}
+		}
+		// Next check if any always statement implies a sometimes statement
+		for (const auto& aw : aw_parts) {
+			for (auto& st : st_parts) {
+				if (is_nso_impl(aw, trim2(st)))
+					st = _T<BAs...>;
+			}
+		}
+		// Now check if any sometimes statement implies another sometimes
+		for (size_t i = 0; i < st_parts.size(); ++i) {
+			for (size_t j = i+1; j < st_parts.size(); ++j) {
+				if (is_nso_impl(trim2(st_parts[i]), trim2(st_parts[j])))
+					st_parts[j] = _T<BAs...>;
+				else if (is_nso_impl(trim2(st_parts[j]), trim2(st_parts[i])))
+					st_parts[i] = _T<BAs...>;
+			}
+		}
+		new_clause = build_wff_and(new_clause, build_wff_and(
+						build_wff_and<BAs...>(aw_parts),
+						build_wff_and<BAs...>( st_parts)));
+		if (new_fm) new_fm = build_wff_or(new_fm, new_clause);
+		else new_fm = new_clause;
+	}
+	assert(new_fm != nullptr);
+	return new_fm;
 }
 
 template <typename... BAs>
@@ -759,7 +843,7 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 
 	auto fm = apply_rr_to_formula(nso_rr);
 	if (!fm) return nullptr;
-	auto res = normalizer_step(fm);
+	auto res = normalize_with_temp_simp(fm);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";
 	return res;
