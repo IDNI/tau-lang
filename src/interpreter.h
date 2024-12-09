@@ -9,6 +9,7 @@
 #include "solver.h"
 #include "satisfiability.h"
 #include "term.h"
+#include "variant_ba.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
@@ -185,12 +186,40 @@ struct foutputs {
 
 		// for each stream in out.streams, write the value from the solution
 		for (const auto& io_var : io_vars) {
-			auto value = outputs.find(io_var)->second;
-			// Get the out_var_name tag
+			// get the BA element associated with io_var_name
+			auto value = outputs.find(io_var)->second
+				| tau_parser::bf_constant
+				| tau_parser::constant
+				| only_child_extractor<BAs...>
+				| ba_extractor<BAs...>;
 			auto io_var_name = trim2(trim2(io_var));
+			std::stringstream ss;
+			if (!value) {
+
+				// is bf_t
+				if (auto check = outputs.find(io_var)->second
+						| tau_parser::bf_t; check) {
+					auto type = types.find(io_var_name)->second;
+					ss << nso_factory<BAs...>::instance().one(type);
+				// is bf_f
+				} else if (auto check = outputs.find(io_var)->second
+						| tau_parser::bf_f; check) {
+					auto type = types.find(io_var_name)->second;
+					ss << nso_factory<BAs...>::instance().zero(type);
+				// is something else but not a BA element
+				} else {
+					BOOST_LOG_TRIVIAL(error)
+						<< "(Error): no Boolean algebra element assigned to variable '"
+						<< io_var << "'\n";
+					return false;
+				}
+			} else {
+				ss << value.value();
+			}
+			// get the out_var_name tag
 			if (auto stream = streams.find(io_var_name); stream != streams.end())
-				if (stream->second) stream->second.value() << value << "\n";
-				else std::cout << io_var << ": " << value << "\n";
+				if (stream->second) stream->second.value() << ss.str() << "\n";
+				else std::cout << io_var << ": " << ss.str() << "\n";
 			else {
 				std::stringstream ss; ss << io_var;
 				if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;

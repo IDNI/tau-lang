@@ -30,6 +30,9 @@ struct sbf_ba_factory {
 
 	std::variant<BAs...> splitter_one () const;
 
+	std::string one() const;
+
+	std::string zero() const;
 	// static sbf_ba_factory<BAs...>& instance();
 private:
 
@@ -52,6 +55,10 @@ struct nso_factory<sbf_ba> {
 	nso<sbf_ba> splitter_one() const;
 
 	std::string default_type() const;
+
+	std::string one(const std::string type_name) const;
+
+	std::string zero(const std::string type_name) const;
 
 	static nso_factory<sbf_ba>& instance();
 private:
@@ -76,6 +83,10 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 	std::string default_type() const;
 
 	gssotc<sbf_ba> splitter_one(const std::string& type_name) const;
+
+	std::string one(const std::string type_name = "tau") const;
+
+	std::string zero(const std::string type_name = "tau") const;
 
 	static nso_factory<tau_ba<sbf_ba>, sbf_ba>& instance();
 private:
