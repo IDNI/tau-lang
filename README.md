@@ -142,7 +142,7 @@ To start using the Tau Language, download the latest release from the
 [GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
 you have downloaded and installed the executable (see the Section
 [Installing the Tau Framework](#installing-the-tau-framework)), you can run
-it from the command line just by typing `tau`.
+it from the command line by typing `tau`.
 
 The programming model underlying the Tau Language is fully declarative. You
 specify, possibly only very implicitly, how the current and previous inputs and
@@ -172,7 +172,6 @@ o1[t] = i1[t]
 states that the output `o1` at time `t` has to be the same as the input
 `i1` at time `t`.
 In the above examples, `o1` and `i1` are IO variables. They are used to define
-
 the inputs and outputs of the specified programs and also declare their type.
 
 An example of how to define IO variables is the following:
@@ -182,18 +181,23 @@ tau i1 = console
 tau o1 = console
 ```
 
-In the above case we specify that `i1` and `o1` are of type `tau` and they take
-values from the console (lets say stdin for the input and stdout for the output).
-You can define as IO streams also files:
+In the above case we specify that `i1` and `o1` are of type `tau`, namely that
+they are Tau formulas, and they take values from the console (e.g. stdin/stdout).
+Type actually means which Boolean algebra the values come from. It is a unique
+property of the Tau langauge that it can refer to its own sentences, abstracted
+as Boolean algebra elements.
+
+You can also define files as IO streams:
 
 ```
 tau i1 = ifile("input.in")
 tau o1 = ofile("output.out")
 ```
 
-Note that those Tau specs define only one program, each (there's a caveat in this
-statement but we shall treat it later on). An example of a Tau spec that specifies
-infinitely many programs would be:
+Back to the above two examples, the one where the output is always zero and the
+one where it equals the input, those Tau specs define only one program each
+(there's a caveat in this statement but we shall treat it later on). An example
+of a Tau spec that specifies infinitely many programs would be:
 
 ```
 o1[t] & i1[t] = 0
@@ -201,16 +205,16 @@ o1[t] & i1[t] = 0
 
 Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
 are taken from. This spec says that the conjunction has to be empty.
-You can clearly consider more complicated specifications, e.g.:
+Clearly, you can consider more complicated specifications, e.g.:
 
 ```
 o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
 ```
 
-which states that the current output, and the previous output, and the current
-input, has to be 0, or, the output has to equal the input. Note the difference
-between Boolean and Logical operators. The former are &|', and the latter are
-&&,||,!.
+which states that at each point in time, either the conjunction of the current
+output with the previous output and with the current input, has to be 0, or, the
+output has to equal the input. Note the difference between Boolean and Logical
+operators. The former are &|', and the latter are &&,||,!.
 
 In order to simplify the process of writing and running Tau programs, we allow
 to define functions and predicates, possibly by means of recurrence relations.
