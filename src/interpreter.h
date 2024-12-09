@@ -341,24 +341,23 @@ private:
 template<typename...BAs>
 struct interpreter {
 	interpreter(const std::vector<system<BAs...> >& systems,
-		assignment<BAs...>& memory, const size_t time_point,
-		const size_t lookback,
-		const size_t highest_initial_pos): systems(systems),
+		assignment<BAs...>& memory, const size_t time_point) :
+						systems(systems),
 						memory(memory),
-						formula_time_point(time_point),
-						lookback(lookback),
-						highest_initial_pos(
-							highest_initial_pos) {
-		// iniialize the variables
+						formula_time_point(time_point) {
+		// initialize the variables
 		for (const auto& system: systems) {
 			for (const auto& [type, equations]: system) {
-				for (const auto& out_var_name:
-					select_top(
-						equations,
+				for (const auto& o:
+					select_top(equations,
 						is_non_terminal<
 							tau_parser::out_var_name
-							, BAs...>))
-					outputs[system].insert(out_var_name);
+							, BAs...>)) {
+					std::stringstream ss; ss << o;
+					// Exclude temporary vars
+					if (ss.str()[0] != '_')
+						outputs.insert(o);
+				}
 			}
 		}
 	}
@@ -366,11 +365,11 @@ struct interpreter {
 	std::pair<std::optional<assignment<BAs...>>, bool> step(auto& inputs) {
 		// for each system in systems try to solve it, if it is not possible
 		// continue with the next system.
-		// std::cout << "Execution step: " << time_point << "\n";
+		std::cout << "Execution step: " << time_point << "\n";
+		bool auto_continue = false;
 		for (const auto& system: this->systems) {
 			std::map<type, solution<BAs...>> solutions;
 			bool solved = true;
-			bool auto_continue = false;
 			// solve the equations for each type in the system
 			for (const auto& [type, equations]: system) {
 				// rewriting the inputs and inserting them into memory
@@ -384,16 +383,17 @@ struct interpreter {
 				auto io_vars = select_top(current,
 					is_child_non_terminal<tau_parser::io_var, BAs...>);
 
-				// Get values for open inputs which do not exceed rel_time_point
+				// Get values for open inputs which do not exceed time_point
 				auto [values, is_quit] = inputs.read(
-					io_vars, rel_time_point);
+					io_vars, time_point);
 				// Empty input
 				if (is_quit) return {};
 				// Error during input
-				if (!values.has_value()) return {assignment<BAs...>{}, false};
+				if (!values.has_value()) return {assignment<BAs...>{}, true};
 				// Save inputs in memory
 				for (const auto& [var, value] : values.value()) {
-					assert(get_io_time_point(trim(var)) <= rel_time_point);
+					assert(get_io_time_point(trim(var)) <= time_point);
+					// If there is at least one input, continue automatically in execution
 					auto_continue = true;
 					memory[var] = value;
 				}
@@ -455,7 +455,7 @@ struct interpreter {
 					for (const auto& [var, value]: solution) {
 						// Check if we are dealing with a stream variable
 						if (var | tau_parser::variable | tau_parser::io_var) {
-							if (get_io_time_point(trim(var)) <= rel_time_point) {
+							if (get_io_time_point(trim(var)) <= time_point) {
 								// std::cout << "time_point: " << time_point << "\n";
 								// std::cout << "var: " << var << "\n";
 								memory.emplace(var, value);
@@ -470,45 +470,26 @@ struct interpreter {
 
 					}
 				}
-				// No output while below formula_time_point
-				if (global.empty() && rel_time_point < formula_time_point) {
-					++rel_time_point;
-					return {solution<BAs...>{}, true};
+				// Complete outputs using time_point and current solution
+				for (const auto& o : outputs) {
+					auto ot = build_out_variable_at_n(o, time_point);
+					if (auto it = global.find(ot); it == global.end()) {
+						global.emplace(ot, _0<BAs...>);
+					}
 				}
-				// update time_point and formula_time_point
-				if (rel_time_point < formula_time_point)
-					++rel_time_point;
-				else ++formula_time_point, ++rel_time_point;
-				// TODO (HIGH) remove old values from memory
-				// If there is no output for the current step
-				// decide if the user should be asked to continue
-				// or if the interpreter should automatically continue.
-				// This is done in order to avoid inf loops if no output
-				// is present
 				if (global.empty()) {
-					// No output in initial segment + lookback
-					if (rel_time_point - 1 <= highest_initial_pos + lookback)
-						return {solution<BAs...>{}, true};
-					// No output for the first time
-					else if (!no_output_set) {
-						// Set the no_output count
-						no_output_set = true;
-						no_output_at = rel_time_point - 1;
-						return {solution<BAs...>{}, true};
-					}
-					// No output was encountered before ->
-					// check if we should auto continue
-					else if (no_output_set) {
-						if (rel_time_point - 1 <= no_output_at + lookback)
-							return {solution<BAs...>{}, true};
-						else {
-							// Reset the no_output count
-							no_output_set = false;
-						}
-					}
 					BOOST_LOG_TRIVIAL(info) <<
 						"currently no output is specified";
 				}
+				// update time_point and formula_time_point
+				if (time_point < formula_time_point) {
+					++time_point;
+					// Auto continue in the initial segment
+					return {global, true};
+				}
+				else ++formula_time_point, ++time_point;
+				// TODO (HIGH) remove old values from memory
+
 				return {global, auto_continue};
 			}
 		}
@@ -522,14 +503,10 @@ struct interpreter {
 	std::vector<system<BAs...>> systems;
 	assignment<BAs...> memory;
 	size_t formula_time_point;
-	size_t rel_time_point = 0;
-	std::map<system<BAs...>, std::set<nso<BAs...>>> outputs;
+	size_t time_point = 0;
+	std::set<nso<BAs...>> outputs;
 
 private:
-	bool no_output_set = false;
-	size_t no_output_at = 0;
-	size_t lookback;
-	size_t highest_initial_pos;
 
 	nso<BAs...> update_to_time_point(const nso<BAs...>& f) {
 		// update the f according to current time_point, i.e. for each
@@ -584,13 +561,12 @@ private:
 	}
 };
 
-// Return the lookback and the highest initial condition of the given unbound continuation
+// Return the lookback of the given unbound continuation
 template<typename...BAs>
-std::pair<int_t, int_t> compute_lookback_and_initial(const nso<BAs...>& ubd_ctn) {
+size_t compute_lookback(const nso<BAs...>& ubd_ctn) {
 	std::vector<nso<BAs...>> io_vars = select_top(ubd_ctn, is_child_non_terminal<tau_parser::io_var, BAs...>);
 	int_t max_shift = get_max_shift(io_vars);
-	int_t max_init = get_max_initial(io_vars);
-	return {max_shift, max_init};
+	return (size_t)max_shift;
 }
 
 // Compute the type of the equation f = 0 or f != 0 stored in literal for the solver
@@ -736,13 +712,11 @@ std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> spec, auto& inpu
 		return {}; // error
 	}
 	// compute the initial time point for execution
-	auto [lookback, highest_init] = compute_lookback_and_initial(ubd_ctn);
-	// If no initial condition is present, highest_init is -1
-	if (highest_init < 0) highest_init = 0;
+	size_t lookback = compute_lookback(ubd_ctn);
 	//after the above, we have the interpreter ready to be used.
 	assignment<BAs...> memory;
 	return interpreter<BAs...>{
-		systems.value(), memory, (size_t)lookback, (size_t)lookback, (size_t)highest_init
+		systems.value(), memory, lookback
 	};
 };
 
@@ -753,8 +727,7 @@ void run(const nso<BAs...>& form, auto& inputs, auto& outputs) {
 	if (!intrprtr) return;
 
 	BOOST_LOG_TRIVIAL(info) << "Please provide requested input or press ENTER to terminate";
-	BOOST_LOG_TRIVIAL(info) << "If no input is requested, press ENTER to proceed to next output, or type q(uit) to terminate";
-	BOOST_LOG_TRIVIAL(info) << "After a parse error, press ENTER to resume or type q(uit) to terminate\n\n";
+	BOOST_LOG_TRIVIAL(info) << "If no input is requested, press ENTER to proceed to next output, or type q(uit) to terminate\n\n";
 
 	// Continuously perform execution step until user quits
 	while (true) {
@@ -770,7 +743,7 @@ void run(const nso<BAs...>& form, auto& inputs, auto& outputs) {
 			term::disable_getline_mode();
 			if (line == "q" || line == "quit")
 				return;
-		} else if (!output.value().empty()) std::cout << "\n";
+		} else std::cout << "\n";
 	}
 }
 
