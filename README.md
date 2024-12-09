@@ -60,7 +60,7 @@ run a representative program that meets those specifications. Put it in differen
 words: imagine programming by writing only tests, or assertions. Tau backend
 will figure out automatically a program that will make the tests and assertions
 pass. Tau is based on the first-order theory of atomless Boolean algebras. All
-common logical tasks oevr the language are decidable.
+common logical tasks over the language are decidable.
 
 For a more detailed explanation of the theory behind the Tau Language, please
 refer to:
