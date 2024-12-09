@@ -4364,7 +4364,7 @@ std::ostream& operator<<(std::ostream& stream,
 	const idni::tau::rr<idni::tau::nso<BAs...>>& f)
 {
 	stream << f.rec_relations;
-	if (f.main) stream << f.main << '.';
+	if (f.main) stream << f.main;
 	return stream;
 }
 
