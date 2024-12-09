@@ -213,6 +213,14 @@ struct tau_ba_factory {
 		auto s = tau_splitter_one<tau_ba<BAs...>, BAs...>();
 		return std::variant<tau_ba<BAs...>, BAs...>(tau_ba<BAs...>(s));
 	}
+
+	std::string one(std::string&) const {
+		return "T";
+	}
+
+	std::string zero(std::string&) const {
+		return "F";
+	}
 };
 
 } // namespace idni::tau

@@ -127,6 +127,14 @@ std::string nso_factory<sbf_ba>::default_type() const {
 	return "sbf";
 }
 
+std::string nso_factory<sbf_ba>::one(const std::string) const {
+	return "1";
+}
+
+std::string nso_factory<sbf_ba>::zero(const std::string) const {
+	return "0";
+}
+
 nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
 	static nso_factory<sbf_ba> factory;
 	return factory;
@@ -156,6 +164,14 @@ std::vector<std::string> nso_factory<tau_ba<sbf_ba>, sbf_ba>::types() const {
 
 std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::default_type() const {
 	return "tau";
+}
+
+std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::one(const std::string type_name) const {
+	return type_name == "sbf" ? "1" : "T";
+}
+
+std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::zero(const std::string type_name) const {
+	return type_name == "sbf" ? "0" : "F";
 }
 
 gssotc<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
