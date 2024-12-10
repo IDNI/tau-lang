@@ -780,8 +780,13 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 	#endif // DEBUG
 
 	auto dnf = form | bf_reduce_canonical<BAs...>();
-	for (auto& clause: get_leaves(form, tau_parser::wff_or, tau_parser::wff)) {
-		auto is_equation = [](const tau<BAs...>& n) {
+	for (auto& clause: get_leaves(dnf, tau_parser::wff_or, tau_parser::wff)) {
+		// Reject clause involving temporal quantification
+		if (find_top(clause, is_temporal_quantifier<BAs...>)) {
+			BOOST_LOG_TRIVIAL(info) << "(Warning) Skipped clause with temporal quantifier: " << clause;
+			continue;
+		}
+		auto is_equation = [](const nso<BAs...>& n) {
 			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 		};

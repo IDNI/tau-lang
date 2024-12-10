@@ -579,13 +579,10 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 				: get_type_and_arg(n->child[1]); nn)
 	{
 		auto [t, program] = nn.value();
-		auto applied = apply_rr_to_rr_tau_nso(t, program);
-		applied = normalizer_step(applied);
-		if (!nn) { BOOST_LOG_TRIVIAL(error)
-			<< "(Error) invalid argument\n";
-			return;
-		}
-		auto s = solve<tau_ba_t, BAs...>(applied, type.value());
+		auto applied = apply_rr_to_rr_gssotc(t, program);
+		applied = normalize_non_temp(applied);
+		if (!nn) { BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return; }
+		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type.value());
 		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
 		for (auto& [k, v] : s.value()) {
