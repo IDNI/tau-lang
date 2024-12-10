@@ -195,7 +195,6 @@ struct foutputs {
 			auto io_var_name = trim2(trim2(io_var));
 			std::stringstream ss;
 			if (!value) {
-
 				// is bf_t
 				if (auto check = outputs.find(io_var)->second
 						| tau_parser::bf_t; check) {
