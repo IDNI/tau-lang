@@ -569,34 +569,34 @@ size_t compute_lookback(const tau<BAs...>& ubd_ctn) {
 	return (size_t)max_shift;
 }
 
-// Compute the type of the equation f = 0 or f != 0 stored in literal for the solver
+// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<std::pair<type, tau<BAs...>>> compute_literal(const tau<BAs...>& literal,
+std::optional<std::pair<type, nso<BAs...>>> get_type_fm(const nso<BAs...>& fm,
 		input_t& inputs, output_t& outputs) {
-	if (auto io_var = find_top(literal,
+	if (auto io_var = find_top(fm,
 			is_non_terminal<tau_parser::io_var, BAs...>); io_var) {
 		if (auto in_var_name = io_var
 				| tau_parser::in
 				| tau_parser::in_var_name; in_var_name) {
 			if(auto t = inputs.type_of(in_var_name.value()); t)
-				return { make_pair(t.value() , literal) };
+				return { make_pair(t.value() , fm) };
 		} else if (auto out_var_name = io_var
 				| tau_parser::out
 				| tau_parser::out_var_name; out_var_name) {
 			if (auto t = outputs.type_of(out_var_name.value()); t)
-				return { make_pair(t.value() , literal) };
+				return { make_pair(t.value() , fm) };
 		}
 	}
 	BOOST_LOG_TRIVIAL(error)
-		<< "(Error) unable to find variable in literal: " << literal << "\n";
+		<< "(Error) atomic formula contains no stream variable: " << fm << "\n";
 	return {};
 }
 
 // Get the type for a clause of a local specification
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<system<BAs...>> compute_system(const tau<BAs...>& clause,
+std::optional<system<BAs...>> compute_atomic_fm_types(const nso<BAs...>& clause,
 		input_t& inputs, output_t& outputs) {
-	auto is_literal = [](const tau<BAs...>& n) {
+	auto is_atomic_fm = [](const nso<BAs...>& n) {
 		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 	};
@@ -607,18 +607,17 @@ std::optional<system<BAs...>> compute_system(const tau<BAs...>& clause,
 	#endif // DEBUG
 
 	system<BAs...> sys;
-	for (const auto& literal: select_top(clause, is_literal)) {
+	for (const auto& atomic_fm: select_top(clause, is_atomic_fm)) {
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_system/literal: " << literal;
 		#endif // DEBUG
 
-		if (auto l = compute_literal(literal, inputs, outputs); l) {
+		if (auto l = get_type_fm(atomic_fm, inputs, outputs); l) {
 			if (sys.find(l.value().first) == sys.end()) sys[l.value().first] = l.value().second;
 			else sys[l.value().first] = build_wff_and(sys[l.value().first], l.value().second);
 		} else {
-			BOOST_LOG_TRIVIAL(error)
-				<< "(Error) unable to found equations in clause: " << clause << "\n";
+			// Error message is already printed in get_type_fm
 			return {};
 		}
 	}
@@ -685,11 +684,11 @@ std::optional<std::vector<system<BAs...>>> compute_systems(const tau<BAs...>& ub
 	std::vector<system<BAs...>> systems;
 	// Create blue-print for solver for each clause
 	for (const auto& clause : get_dnf_wff_clauses(ubd_ctn)) {
-		if (auto system = compute_system(clause, inputs, outputs); system)
+		if (auto system = compute_atomic_fm_types(clause, inputs, outputs); system)
 			systems.emplace_back(std::move(system.value()));
 		else {
 			BOOST_LOG_TRIVIAL(trace)
-				<< "unable to compute system of equations in: " << clause << "\n";
+				<< "unable to compute all types of equations in: " << clause << "\n";
 			continue;
 		}
 	}

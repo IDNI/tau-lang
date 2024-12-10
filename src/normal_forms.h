@@ -2423,29 +2423,43 @@ struct sometimes_always_normalization_depreciated {
 
 template<typename... BAs>
 struct sometimes_always_normalization {
-	tau<BAs...> operator() (const tau<BAs...>& fm) const {
+	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+		using p = tau_parser;
 		auto st_aw = [](const auto& n) {
-			return is_child_non_terminal(tau_parser::wff_sometimes, n) ||
-				is_child_non_terminal(tau_parser::wff_always, n);
+			return is_child_non_terminal(p::wff_sometimes, n) ||
+				is_child_non_terminal(p::wff_always, n);
 		};
 		if (!find_top(fm, st_aw).has_value() && !has_temp_var(fm)) {
 			return reduce_across_bfs(fm, false);
 		}
-		auto clauses = get_dnf_wff_clauses(reduce_across_bfs(fm, false));
-		tau<BAs...> res = _F<BAs...>;
-		tau<BAs...> always_disjuncts = _F<BAs...>;
-		for (const tau<BAs...>& clause : clauses) {
+		// Delete all always/sometimes if they scope no temporal variable
+		auto temps = select_top(fm, st_aw);
+		std::map<nso<BAs...>, nso<BAs...>> changes;
+		for (const auto& temp : temps) {
+			if (!has_temp_var(temp))
+				changes.emplace(temp, trim2(temp));
+		}
+		auto clauses = get_dnf_wff_clauses(
+			reduce_across_bfs(
+				changes.empty()
+					? fm
+					: replace(fm, changes), false));
+		nso<BAs...> res = _F<BAs...>;
+		nso<BAs...> always_disjuncts = _F<BAs...>;
+		for (const nso<BAs...>& clause : clauses) {
 			// If clause does not contain sometimes/always but temporal variables, we add it to always_disjuncts
-			if (!find_top(clause, st_aw) && has_temp_var(clause)) {
+			if (!find_top(clause, st_aw)) {
 				always_disjuncts = build_wff_or(always_disjuncts, clause);
 				continue;
 			}
 			auto conjuncts = get_cnf_wff_clauses(clause);
-			tau<BAs...> always_part = _T<BAs...>;
-			tau<BAs...> staying = _T<BAs...>;
-			for (const tau<BAs...>& conj : conjuncts) {
-				if (!st_aw(conj) && has_temp_var(conj))
+			nso<BAs...> always_part = _T<BAs...>;
+			nso<BAs...> staying = _T<BAs...>;
+			for (const nso<BAs...>& conj : conjuncts) {
+				if (!st_aw(conj))
 					always_part = build_wff_and(always_part, conj);
+				else if (is_child_non_terminal(p::wff_always, conj))
+					always_part = build_wff_and(always_part, trim2(conj));
 				else staying = build_wff_and(staying, conj);
 			}
 			always_part = build_wff_always(always_part);
@@ -2454,7 +2468,7 @@ struct sometimes_always_normalization {
 		res = build_wff_or(build_wff_always(always_disjuncts), res);
 		auto temp_inner = select_top(res, st_aw);
 		if (temp_inner.empty()) return res;
-		std::map<tau<BAs...>, tau<BAs...>> changes;
+		changes.clear();
 		for (const auto& f : temp_inner) {
 			// Reduction done to normalize again now that sometimes/always are all the way out
 			changes[trim2(f)] = reduce_across_bfs(trim2(f), false);
