@@ -2421,6 +2421,34 @@ struct sometimes_always_normalization_depreciated {
 	}
 };
 
+// Adjust the lookback before conjunction of fm1 and fm2
+template<typename...BAs>
+nso<BAs...> always_conjunction (const nso<BAs...>& fm1_aw, const nso<BAs...>& fm2_aw) {
+	using p = tau_parser;
+	// Trim the always node if present
+	auto fm1 = is_child_non_terminal(p::wff_always, fm1_aw) ? trim2(fm1_aw) : fm1_aw;
+	auto fm2 = is_child_non_terminal(p::wff_always, fm2_aw) ? trim2(fm2_aw) : fm2_aw;
+	auto io_vars1 = select_top(fm1, is_child_non_terminal<p::io_var, BAs...>);
+	auto io_vars2 = select_top(fm2, is_child_non_terminal<p::io_var, BAs...>);
+	// Get lookbacks
+	int_t lb1 = get_max_shift(io_vars1);
+	int_t lb2 = get_max_shift(io_vars2);
+	if (lb1 < lb2) {
+		// adjust fm1 by lb2 - lb1
+		return build_wff_and(
+			shift_io_vars_in_fm(fm1, io_vars1, lb2 - lb1),
+			fm2);
+	} else if (lb2 < lb1) {
+		// adjust fm2 by lb1 - lb2
+		return build_wff_and(fm1,
+			shift_io_vars_in_fm(fm2, io_vars2, lb1 - lb2));
+	} else {
+		// no adjustment needed
+		return build_wff_and(fm1, fm2);
+	}
+}
+
+
 template<typename... BAs>
 struct sometimes_always_normalization {
 	nso<BAs...> operator() (const nso<BAs...>& fm) const {
@@ -2457,9 +2485,9 @@ struct sometimes_always_normalization {
 			nso<BAs...> staying = _T<BAs...>;
 			for (const nso<BAs...>& conj : conjuncts) {
 				if (!st_aw(conj))
-					always_part = build_wff_and(always_part, conj);
+					always_part = always_conjunction(always_part, conj);
 				else if (is_child_non_terminal(p::wff_always, conj))
-					always_part = build_wff_and(always_part, trim2(conj));
+					always_part = always_conjunction(always_part, conj);
 				else staying = build_wff_and(staying, conj);
 			}
 			always_part = build_wff_always(always_part);
