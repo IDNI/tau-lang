@@ -631,7 +631,22 @@ void repl_evaluator<BAs...>::solve_cmd(
 		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type.value());
 		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
-		for (auto& [k, v] : s.value()) std::cout << "\t" << k << " := " << v << "\n";
+		for (auto& [k, v] : s.value()) {
+			// is bf_t
+			if (auto check = v | tau_parser::bf_t; check) {
+				std::cout << "\t" << k << ": {"
+					<< nso_factory<tau_ba<BAs...>, BAs...>::instance().one(type.value())
+					<< "}: " << type.value() << "\n";
+			// is bf_f
+			} else if (auto check = v | tau_parser::bf_f; check) {
+				std::cout << "\t" << k << ": {"
+					<< nso_factory<tau_ba<BAs...>, BAs...>::instance().zero(type.value())
+					<< "}: " << type.value() << "\n";
+			// is something else but not a BA element
+			} else {
+				std::cout << "\t" << k << ": " << v << "\n";
+			}
+		}
 		std::cout << "}\n";
 	}
 }
