@@ -956,14 +956,13 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
-tau<BAs...> transform_to_execution(const tau<BAs...>& f, const bool output = false) {
+nso<BAs...> transform_to_execution(const nso<BAs...>& fm, const bool output = false) {
 	assert(get_dnf_wff_clauses(f).size() == 1);
 #ifdef TAU_CACHE
-	static std::map<tau<BAs...>, tau<BAs...>> cache;
-	if (auto it = cache.find(f); it != cache.end())
+	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	if (auto it = cache.find(fm); it != cache.end())
 		return it->second;
 #endif
-	auto fm = f;
 	using p = tau_parser;
 	auto elim_aw = [](const auto& f) {
 		return is_child_non_terminal(p::wff_always, f) ? trim2(f) : f;
@@ -971,7 +970,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& f, const bool output = fal
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 	// We merge all always statements on each clause
-	fm = pull_always_out_for_inf(fm);
+	// fm = pull_always_out_for_inf(fm);
 	BOOST_LOG_TRIVIAL(debug) << "(I) Merged always statements on each clause";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
@@ -990,7 +989,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& f, const bool output = fal
 		if (ev_t == ubd_fm) {
 #ifdef TAU_CACHE
 			cache.emplace(elim_aw(ubd_fm), elim_aw(ubd_fm));
-			return cache.emplace(f, elim_aw(ubd_fm)).first->second;
+			return cache.emplace(fm, elim_aw(ubd_fm)).first->second;
 #endif
 			return elim_aw(ubd_fm);
 		}
@@ -1000,7 +999,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& f, const bool output = fal
 		// Check if there is a sometimes present
 		if (ev_t == fm) {
 #ifdef TAU_CACHE
-			return cache.emplace(f, elim_aw(fm)).first->second;
+			return cache.emplace(fm, elim_aw(fm)).first->second;
 #endif
 			return elim_aw(fm);
 		}
@@ -1008,7 +1007,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& f, const bool output = fal
 	auto aw_after_ev = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
 	if (!aw_after_ev.has_value()) {
 #ifdef TAU_CACHE
-		return cache.emplace(f, elim_aw(fm)).first->second;
+		return cache.emplace(fm, elim_aw(fm)).first->second;
 #endif
 		return elim_aw(fm);
 	}
@@ -1025,7 +1024,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& f, const bool output = fal
 	res = elim_aw(res);
 #ifdef TAU_CACHE
 	cache.emplace(res, res);
-	return cache.emplace(f, res).first->second;
+	return cache.emplace(fm, res).first->second;
 #endif
 	return res;
 }
