@@ -329,6 +329,15 @@ private:
 			choices[i].partial_bf = choices[i - 1].value
 				? replace_with(choices[i - 1].var, _1<BAs...>, choices[i - 1].partial_bf)
 				: replace_with(choices[i - 1].var, _0<BAs...>, choices[i - 1].partial_bf);
+			// if current partial bf is 0, we can skip the rest of the choices
+			// as the corresponding minterms will be 0.
+			if (choices[i].partial_bf == _0<BAs...>) {
+				for (size_t j = i + 1; j < choices.size(); ++j) {
+					choices[j].partial_bf = _0<BAs...>;
+					choices[j].value = true;
+				}
+				return;
+			}
 		}
 	}
 };
