@@ -73,7 +73,7 @@ struct finputs {
 				std::getline(file.value(), line);
 				std::cout << line << "\n";
 			} else {
-				std::cout << var << "[" << time_point << "]: ";
+				std::cout << var << "[" << time_point << "] := ";
 				term::enable_getline_mode();
 				std::getline(std::cin, line);
 				term::disable_getline_mode();
@@ -117,7 +117,7 @@ struct finputs {
 					<< "(Error) failed to find input stream for variable '" << var_name << "'\n";
 				return {};
 			} else {
-				std::cout << var << ": ";
+				std::cout << var << " := ";
 				term::enable_getline_mode();
 				std::getline(std::cin, line);
 				term::disable_getline_mode();
@@ -218,7 +218,7 @@ struct foutputs {
 			// get the out_var_name tag
 			if (auto stream = streams.find(io_var_name); stream != streams.end())
 				if (stream->second) stream->second.value() << ss.str() << "\n";
-				else std::cout << io_var << ": " << ss.str() << "\n";
+				else std::cout << io_var << " := " << ss.str() << "\n";
 			else {
 				std::stringstream ss; ss << io_var;
 				if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;
