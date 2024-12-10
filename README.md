@@ -378,7 +378,7 @@ term => "("term "&" term")" | term "'" | "("term "+" term")" | "("term "|" term"
 where
 
 * `term` stands for a well formed sub-formula and the operators `&`, `'`,
-`^` and `|` stand for conjunction, negation, exclusive-or and disjunction
+`+` and `|` stand for conjunction, negation, exclusive-or and disjunction
 (respectively).
 * `term_ref` is  a call to the given recurrence relation (see the Subsection
 [Functions and Predicates](#functions-and-predicates)),
