@@ -198,3 +198,45 @@ TEST_SUITE("formulas: two level rec, no variables, no bindings and no quantifier
 		CHECK( check.has_value() );
 	}
 }
+
+TEST_SUITE("regression/bf_and not trimmed") {
+
+	// The problem was related to not trimming the bf_and_sym in the grammar.
+	// We could write the same formula in different ways and it would be
+	// process differently
+
+	TEST_CASE("ab = ba") {
+		const char* sample = "ab = ba.";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("ab = (b & a)") {
+		const char* sample = "ab = (b & a).";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("(a & b) = ba") {
+		const char* sample = "(a & b) = ba.";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("(a & b) = (b & a)") {
+		const char* sample = "(a & b) = (b & a).";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("((a & b) = (b & a))") {
+		const char* sample = "((a & b) = (b & a)).";
+		auto normalized = normalize_test_tau(sample);
+		auto check = normalized | tau_parser::wff_t;
+		CHECK( check.has_value() );
+	}
+}

@@ -13,17 +13,6 @@ set(DOCTEST_CONFIG_ASSERTION_PARAMETERS_BY_VALUE "true")
 add_link_options("-flto")
 
 #
-# Regression testing
-#
-set(TAU_BUILD_REGRESSION ON CACHE STRING "build the tau-lang regression suite ON")
-set_property(CACHE TAU_BUILD_REGRESSION PROPERTY STRINGS "OFF" "ON")
-
-if (TAU_BUILD_REGRESSION)
-	enable_testing()
-	add_subdirectory(regression)
-endif ()
-
-#
 # Integration testing
 #
 set(TAU_BUILD_INTEGRATION ON CACHE STRING "build the tau-lang integration suite ON")
