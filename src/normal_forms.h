@@ -740,17 +740,17 @@ inline void join_paths (std::vector<std::vector<int_t>>& paths) {
 // Ordering function for variables from nso formula
 template<typename... BAs>
 auto lex_var_comp = [](const auto x, const auto y) {
-#ifdef CACHE
+#ifdef TAU_CACHE
 	static std::map<std::pair<nso<BAs...>, nso<BAs...>>, bool> cache;
 	if (auto it = cache.find({x,y}); it != cache.end())
 		return it->second;
-#endif // CACHE
+#endif // TAU_CACHE
 	auto xx = make_string(tau_node_terminal_extractor<BAs...>, x);
 	auto yy = make_string(tau_node_terminal_extractor<BAs...>, y);
-#ifdef CACHE
-	pair<nso<BAs...>,nso<BAs...>> p (x,y);
+#ifdef TAU_CACHE
+	std::pair<nso<BAs...>,nso<BAs...>> p(x,y);
 	return cache.emplace(move(p), xx < yy).first->second;
-#endif // CACHE
+#endif // TAU_CACHE
 	return xx < yy;
 };
 
