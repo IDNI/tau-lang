@@ -96,7 +96,7 @@ struct finputs {
 
 	// Read input from command line and return mapping from in_vars to this input
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
-		std::vector<tau<BAs...> >& in_vars, size_t time_step) {
+		std::vector<nso<BAs...> >& in_vars, size_t time_step) const {
 		std::ranges::sort(in_vars, constant_io_comp);
 		assignment<BAs...> value;
 		for (const auto& var : in_vars) {
@@ -123,7 +123,13 @@ struct finputs {
 				term::disable_getline_mode();
 			}
 			if (line.empty()) return {value, true}; // no more inputs
-			auto cnst = nso_factory<BAs...>::instance().parse(line, types[var_name]);
+			const auto it = types.find(var_name);
+			if (it == types.end()) {
+				BOOST_LOG_TRIVIAL(error)
+					<< "(Error) failed to find type for " << var_name;
+				return {};
+			}
+			auto cnst = nso_factory<BAs...>::instance().parse(line, it->second);
 			if (!cnst) {
 				BOOST_LOG_TRIVIAL(error)
 					<< "(Error) failed to parse input value '"
@@ -136,7 +142,7 @@ struct finputs {
 		return {value, false};
 	}
 
-	std::optional<type> type_of(const tau<BAs...>& var) {
+	std::optional<type> type_of(const nso<BAs...>& var) const {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
@@ -151,8 +157,8 @@ struct finputs {
 		return {};
 	}
 
-	std::map<tau<BAs...>, type> types;
-	std::map<tau<BAs...>, std::optional<std::ifstream>> streams;
+	std::map<nso<BAs...>, type> types;
+	mutable std::map<nso<BAs...>, std::optional<std::ifstream>> streams;
 	size_t time_point = 0;
 };
 
@@ -177,11 +183,13 @@ struct foutputs {
 			if (file) file.value().close();
 	}
 
-	bool write(const assignment<BAs...>& outputs) {
+	bool write(const assignment<BAs...>& outputs) const {
 		// Sort variables in output by time
-		std::vector<tau<BAs...>> io_vars;
-		for (const auto& [var, ass] : outputs)
+		std::vector<nso<BAs...>> io_vars;
+		for (const auto& [var, ass] : outputs) {
+			assert(is_child_non_terminal(tau_parser::io_var, trim(var)));
 			io_vars.push_back(var);
+		}
 		std::ranges::sort(io_vars, constant_io_comp);
 
 		// for each stream in out.streams, write the value from the solution
@@ -232,7 +240,7 @@ struct foutputs {
 		return true; // success
 	}
 
-	std::optional<type> type_of(const tau<BAs...>& var) {
+	std::optional<type> type_of(const nso<BAs...>& var) const {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
@@ -338,31 +346,105 @@ private:
 	}
 };
 
-template<typename...BAs>
-struct interpreter {
-	interpreter(const std::vector<system<BAs...> >& systems,
-		assignment<BAs...>& memory, const size_t time_point) :
-						systems(systems),
-						memory(memory),
-						formula_time_point(time_point) {
-		// initialize the variables
-		for (const auto& system: systems) {
-			for (const auto& [type, equations]: system) {
-				for (const auto& o:
-					select_top(equations,
-						is_non_terminal<
-							tau_parser::out_var_name
-							, BAs...>)) {
-					std::stringstream ss; ss << o;
-					// Exclude temporary vars
-					if (ss.str()[0] != '_')
-						outputs.insert(o);
-				}
-			}
+// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
+template<typename input_t, typename output_t, typename...BAs>
+std::optional<std::pair<type, nso<BAs...>>> get_type_fm(const nso<BAs...>& fm,
+		input_t& inputs, output_t& outputs) {
+	if (auto io_var = find_top(fm,
+			is_non_terminal<tau_parser::io_var, BAs...>); io_var) {
+		if (auto in_var_name = io_var
+				| tau_parser::in
+				| tau_parser::in_var_name; in_var_name) {
+			if(auto t = inputs.type_of(in_var_name.value()); t)
+				return { make_pair(t.value() , fm) };
+		} else if (auto out_var_name = io_var
+				| tau_parser::out
+				| tau_parser::out_var_name; out_var_name) {
+			if (auto t = outputs.type_of(out_var_name.value()); t)
+				return { make_pair(t.value() , fm) };
 		}
 	}
+	BOOST_LOG_TRIVIAL(error)
+		<< "(Error) atomic formula contains no stream variable: " << fm << "\n";
+	return {};
+}
 
-	std::pair<std::optional<assignment<BAs...>>, bool> step(auto& inputs) {
+// Get the type for a clause of a local specification
+template<typename input_t, typename output_t, typename...BAs>
+std::optional<system<BAs...>> compute_atomic_fm_types(const nso<BAs...>& clause,
+		input_t& inputs, output_t& outputs) {
+	auto is_atomic_fm = [](const nso<BAs...>& n) {
+		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
+			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
+	};
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "compute_system/clause: " << clause;
+	#endif // DEBUG
+
+	system<BAs...> sys;
+	for (const auto& atomic_fm: select_top(clause, is_atomic_fm)) {
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "compute_system/atomic_fm " << atomic_fm;
+		#endif // DEBUG
+
+		if (auto l = get_type_fm(atomic_fm, inputs, outputs); l) {
+			if (sys.find(l.value().first) == sys.end()) sys[l.value().first] = l.value().second;
+			else sys[l.value().first] = build_wff_and(sys[l.value().first], l.value().second);
+		} else {
+			// Error message is already printed in get_type_fm
+			return {};
+		}
+	}
+	return { sys };
+}
+
+// Return typed systems of equations for the solver corresponding to each clause
+// in the unbound continuation
+template<typename...BAs>
+std::vector<system<BAs...>> compute_systems(const nso<BAs...>& ubd_ctn,
+		auto& inputs, auto& outputs) {
+	std::vector<system<BAs...>> systems;
+	// Create blue-print for solver for each clause
+	for (const auto& clause : get_dnf_wff_clauses(ubd_ctn)) {
+		if (auto system = compute_atomic_fm_types(clause, inputs, outputs); system)
+			systems.emplace_back(std::move(system.value()));
+		else {
+			BOOST_LOG_TRIVIAL(trace)
+				<< "unable to compute all types in equations in: " << clause << "\n";
+			continue;
+		}
+	}
+	return systems;
+}
+
+template<typename...BAs>
+struct interpreter {
+	interpreter(const nso<BAs...>& ubt_ctn, assignment<BAs...>& memory,
+		const auto& input, const auto& output) :
+						ubt_ctn(ubt_ctn),
+						memory(memory),
+						inputs(input),
+						outputs(output) {
+		compute_lookback_and_initial(ubt_ctn);
+		// TODO: Re-enable after inputs and outputs member have been removed
+		// collect non-temporary output stream variables
+		// for (const auto& o: select_top(ubt_ctn,
+		// 	is_non_terminal<tau_parser::out_var_name, BAs...>)) {
+		// 	std::stringstream ss; ss << o;
+		// 	// Exclude temporary vars
+		// 	if (ss.str()[0] != '_') outputs.insert(o);
+		// }
+	}
+
+	std::pair<std::optional<assignment<BAs...>>, bool> step() {
+		using p = tau_parser;
+
+		// Compute systems for the current step
+		if (!calculate_systems())
+			return {};
 		// for each system in systems try to solve it, if it is not possible
 		// continue with the next system.
 		std::cout << "Execution step: " << time_point << "\n";
@@ -381,7 +463,7 @@ struct interpreter {
 
 				// Find open input vars
 				auto io_vars = select_top(current,
-					is_child_non_terminal<tau_parser::io_var, BAs...>);
+					is_child_non_terminal<p::io_var, BAs...>);
 
 				// Get values for open inputs which do not exceed time_point
 				auto [values, is_quit] = inputs.read(
@@ -436,6 +518,10 @@ struct interpreter {
 				#endif // DEBUG
 
 				if (solution.has_value()) {
+					// std::cout << "solution: \n";
+					// for (const auto& [var, val] : solution.value()) {
+					// 	std::cout << "var: " << var << ", val: " << val << "\n";
+					// }
 					// It can happen that variables are assigned
 					// to variables -> those need to be replaced
 					resolve_solution_dependencies(solution.value());
@@ -471,9 +557,10 @@ struct interpreter {
 					}
 				}
 				// Complete outputs using time_point and current solution
-				for (const auto& o : outputs) {
+				for (const auto& [o, _ ] : outputs.streams) {
 					auto ot = build_out_variable_at_n(o, time_point);
 					if (auto it = global.find(ot); it == global.end()) {
+						memory.emplace(ot, _0<BAs...>);
 						global.emplace(ot, _0<BAs...>);
 					}
 				}
@@ -482,14 +569,18 @@ struct interpreter {
 						"currently no output is specified";
 				}
 				// update time_point and formula_time_point
-				if (time_point < formula_time_point) {
+				if ((int_t)time_point < lookback) {
+					// auto continue until lookback
+					auto_continue = true;
 					++time_point;
-					// Auto continue in the initial segment
-					return {global, true};
 				}
-				else ++formula_time_point, ++time_point;
+				else {
+					// auto continue until highest initial position
+					if ((int_t)time_point < highest_initial_pos)
+						auto_continue = true;
+					++formula_time_point, ++time_point;
+				}
 				// TODO (HIGH) remove old values from memory
-
 				return {global, auto_continue};
 			}
 		}
@@ -500,13 +591,55 @@ struct interpreter {
 
 	// store all the possible systems to be solved, each system corresponds to a
 	// different clause.
-	std::vector<system<BAs...>> systems;
-	assignment<BAs...> memory;
-	size_t formula_time_point;
-	size_t time_point = 0;
-	std::set<tau<BAs...>> outputs;
 
+	nso<BAs...> ubt_ctn;
+	assignment<BAs...> memory;
+	size_t time_point = 0;
+	// TODO: Remove inputs and outputs, once type inference for variables is ready
+	// and solver can accept clauses with several types
+	const finputs<BAs...>& inputs;
+	const foutputs<BAs...>& outputs;
 private:
+	std::vector<system<BAs...>> systems;
+	size_t formula_time_point = 0;
+	int_t highest_initial_pos = 0;
+	int_t lookback = 0;
+
+	bool calculate_systems () {
+		using p = tau_parser;
+		size_t initial_segment = std::max(highest_initial_pos, lookback);
+		// If time_point < initial_segment, recompute systems
+		if (time_point < initial_segment) {
+			// Adjust ubt_ctn to time_point by eliminating inputs and outputs
+			// which are greater than current time_point in a time-compatible fashion
+			auto step_ubt_ctn = update_to_time_point(ubt_ctn);
+			auto io_vars = select_top(step_ubt_ctn,
+					is_child_non_terminal<p::io_var, BAs...>);
+			sort(io_vars.begin(), io_vars.end(), constant_io_comp);
+			// All io_vars in fm have to refer to constant time positions
+			assert(all_of(io_vars.begin(), io_vars.end(),
+				[](const auto& el){return is_io_initial(el);}));
+			while (!io_vars.empty()) {
+				auto& v = io_vars.back();
+				if (get_io_time_point(v) <= time_point) {
+					io_vars.pop_back();
+					continue;
+				}
+				if (v | p::io_var | p::in)
+					step_ubt_ctn = build_wff_all(v, step_ubt_ctn);
+				else step_ubt_ctn = build_wff_ex(v, step_ubt_ctn);
+				io_vars.pop_back();
+			}
+			// Eliminate added quantifiers
+			step_ubt_ctn = normalize_non_temp(step_ubt_ctn);
+			systems = compute_systems(step_ubt_ctn, inputs, outputs);
+			if (systems.empty()) return false;
+		} else if (time_point == initial_segment) {
+			systems = compute_systems(ubt_ctn, inputs, outputs);
+			if (systems.empty()) return false;
+		}
+		return true;
+	}
 
 	tau<BAs...> update_to_time_point(const tau<BAs...>& f) {
 		// update the f according to current time_point, i.e. for each
@@ -536,7 +669,7 @@ private:
 				changes[offset.value()] = wrap(
 					tau_parser::offset,
 						build_num<BAs...>(formula_time_point));
-		return replace(f, changes);
+		return changes.empty() ? f : replace(f, changes);
 	}
 
 	// If a variable is assigned a variable V in a solution from the solver,
@@ -559,70 +692,15 @@ private:
 			}
 		}
 	}
+
+	// Return the lookback and highest initial position of the given unbound continuation
+	void compute_lookback_and_initial (const nso<BAs...>& ubd_ctn) {
+		std::vector<nso<BAs...>> io_vars = select_top(ubd_ctn, is_child_non_terminal<tau_parser::io_var, BAs...>);
+		lookback = get_max_shift(io_vars);
+		formula_time_point = lookback;
+		highest_initial_pos = get_max_initial(io_vars);
+	}
 };
-
-// Return the lookback of the given unbound continuation
-template<typename...BAs>
-size_t compute_lookback(const tau<BAs...>& ubd_ctn) {
-	std::vector<tau<BAs...>> io_vars = select_top(ubd_ctn, is_child_non_terminal<tau_parser::io_var, BAs...>);
-	int_t max_shift = get_max_shift(io_vars);
-	return (size_t)max_shift;
-}
-
-// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
-template<typename input_t, typename output_t, typename...BAs>
-std::optional<std::pair<type, nso<BAs...>>> get_type_fm(const nso<BAs...>& fm,
-		input_t& inputs, output_t& outputs) {
-	if (auto io_var = find_top(fm,
-			is_non_terminal<tau_parser::io_var, BAs...>); io_var) {
-		if (auto in_var_name = io_var
-				| tau_parser::in
-				| tau_parser::in_var_name; in_var_name) {
-			if(auto t = inputs.type_of(in_var_name.value()); t)
-				return { make_pair(t.value() , fm) };
-		} else if (auto out_var_name = io_var
-				| tau_parser::out
-				| tau_parser::out_var_name; out_var_name) {
-			if (auto t = outputs.type_of(out_var_name.value()); t)
-				return { make_pair(t.value() , fm) };
-		}
-	}
-	BOOST_LOG_TRIVIAL(error)
-		<< "(Error) atomic formula contains no stream variable: " << fm << "\n";
-	return {};
-}
-
-// Get the type for a clause of a local specification
-template<typename input_t, typename output_t, typename...BAs>
-std::optional<system<BAs...>> compute_atomic_fm_types(const nso<BAs...>& clause,
-		input_t& inputs, output_t& outputs) {
-	auto is_atomic_fm = [](const nso<BAs...>& n) {
-		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
-			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
-	};
-
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "compute_system/clause: " << clause;
-	#endif // DEBUG
-
-	system<BAs...> sys;
-	for (const auto& atomic_fm: select_top(clause, is_atomic_fm)) {
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "compute_system/literal: " << literal;
-		#endif // DEBUG
-
-		if (auto l = get_type_fm(atomic_fm, inputs, outputs); l) {
-			if (sys.find(l.value().first) == sys.end()) sys[l.value().first] = l.value().second;
-			else sys[l.value().first] = build_wff_and(sys[l.value().first], l.value().second);
-		} else {
-			// Error message is already printed in get_type_fm
-			return {};
-		}
-	}
-	return { sys };
-}
 
 // Find an executable specification from DNF
 template<typename... BAs>
@@ -676,25 +754,6 @@ tau<BAs...> get_executable_spec(const tau<BAs...>& fm) {
 	return nullptr;
 }
 
-// Return typed systems of equations for the solver corresponding to each clause
-// in the unbound continuation
-template<typename...BAs>
-std::optional<std::vector<system<BAs...>>> compute_systems(const tau<BAs...>& ubd_ctn,
-		auto& inputs, auto& outputs) {
-	std::vector<system<BAs...>> systems;
-	// Create blue-print for solver for each clause
-	for (const auto& clause : get_dnf_wff_clauses(ubd_ctn)) {
-		if (auto system = compute_atomic_fm_types(clause, inputs, outputs); system)
-			systems.emplace_back(std::move(system.value()));
-		else {
-			BOOST_LOG_TRIVIAL(trace)
-				<< "unable to compute all types of equations in: " << clause << "\n";
-			continue;
-		}
-	}
-	return systems;
-}
-
 template<typename...BAs>
 std::optional<interpreter<BAs...>> make_interpreter(tau<BAs...> spec, auto& inputs, auto& outputs) {
 	// Find a satisfiable unbound continuation from spec
@@ -706,16 +765,15 @@ std::optional<interpreter<BAs...>> make_interpreter(tau<BAs...> spec, auto& inpu
 	}
 
 	// compute the different systems to be solved
+	// TODO: This is currently only here to catch the error if some equation does not have a stream variable
 	auto systems = compute_systems(ubd_ctn, inputs, outputs);
-	if (!systems.has_value() || systems.value().empty()) {
+	if (systems.empty()) {
 		return {}; // error
 	}
-	// compute the initial time point for execution
-	size_t lookback = compute_lookback(ubd_ctn);
 	//after the above, we have the interpreter ready to be used.
 	assignment<BAs...> memory;
 	return interpreter<BAs...>{
-		systems.value(), memory, lookback
+		ubd_ctn, memory, inputs, outputs
 	};
 };
 
@@ -725,12 +783,14 @@ void run(const tau<BAs...>& form, auto& inputs, auto& outputs) {
 	auto intrprtr = make_interpreter(spec, inputs, outputs);
 	if (!intrprtr) return;
 
-	BOOST_LOG_TRIVIAL(info) << "Please provide requested input or press ENTER to terminate";
-	BOOST_LOG_TRIVIAL(info) << "If no input is requested, press ENTER to proceed to next output, or type q(uit) to terminate\n\n";
+	BOOST_LOG_TRIVIAL(info) << "-----------------------------------------------------------------------------------------------------------";
+	BOOST_LOG_TRIVIAL(info) << "Please provide requested input, or press ENTER to terminate                                               |";
+	BOOST_LOG_TRIVIAL(info) << "If no input is requested, press ENTER to continue to the next execution step, or type q(uit) to terminate |";
+	BOOST_LOG_TRIVIAL(info) << "-----------------------------------------------------------------------------------------------------------\n\n";
 
 	// Continuously perform execution step until user quits
 	while (true) {
-		auto [output, auto_continue] = intrprtr.value().step(inputs);
+		auto [output, auto_continue] = intrprtr.value().step();
 		// If the user provided empty input for an input stream, quit
 		if (!output.has_value()) return;
 		if (!outputs.write(output.value())) return;
