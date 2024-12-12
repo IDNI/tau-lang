@@ -171,7 +171,7 @@ bool repl_evaluator<BAs...>::contains(const tau_nso_t& n,
 	tau_parser::nonterminal nt)
 {
 	auto pred = [nt](const auto& n) {
-		return is_non_terminal<tau_ba<BAs...>, BAs...>(nt, n); };
+		return is_non_terminal<tau_ba_t, BAs...>(nt, n); };
 	return find_top<decltype(pred), tau_nso<BAs...>>(n, pred).has_value();
 }
 
@@ -552,7 +552,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 			}
 		}
 
-		auto outs = foutputs<tau_ba<BAs...>, BAs...>(current_outputs);
+		auto outs = foutputs<tau_ba_t, BAs...>(current_outputs);
 		run(dnf, ins, outs);
 		return;
 	}
@@ -589,10 +589,13 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 				: get_type_and_arg(n->child[1]); nn)
 	{
 		auto [t, program] = nn.value();
-		auto applied = apply_rr_to_rr_gssotc(t, program);
+		auto applied = apply_rr_to_rr_tau_nso(t, program);
 		applied = normalize_non_temp(applied);
-		if (!nn) { BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return; }
-		auto s = solve<tau_ba<BAs...>, BAs...>(applied, type.value());
+		if (!nn) {
+			BOOST_LOG_TRIVIAL(error) <<
+				"(Error) invalid argument\n"; return;
+		}
+		auto s = solve<tau_ba_t, BAs...>(applied, type.value());
 		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
 		for (auto& [k, v] : s.value()) {
@@ -678,7 +681,7 @@ std::optional<tau_nso<BAs...>>
 				always_to_unbounded_continuation( normalized_fm));
 		// Get each clause if there are several always disjuncts
 		auto clauses = get_leaves(normalized_fm, tau_parser::wff_or, tau_parser::wff);
-		tau<tau_ba<BAs...>,BAs...> res;
+		tau<tau_ba_t, BAs...> res;
 		// Convert each disjunct to unbounded continuation
 		for (auto& clause : clauses) {
 			if (res) res = build_wff_or(res, build_wff_always(

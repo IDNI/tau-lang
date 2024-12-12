@@ -956,10 +956,10 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
-nso<BAs...> transform_to_execution(const nso<BAs...>& fm, const bool output = false) {
+tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = false) {
 	assert(get_dnf_wff_clauses(fm).size() == 1);
 #ifdef TAU_CACHE
-	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	static std::map<tau<BAs...>, tau<BAs...>> cache;
 	if (auto it = cache.find(fm); it != cache.end())
 		return it->second;
 #endif

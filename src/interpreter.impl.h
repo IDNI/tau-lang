@@ -5,12 +5,12 @@
 
 #include "interpreter.h"
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<input_t, output_t, BAs...>>
 interpreter<input_t, output_t, BAs...>::make_interpreter(
-	nso<BAs...> spec, const auto& inputs, const auto& outputs) {
+	tau<BAs...> spec, const auto& inputs, const auto& outputs) {
 	// Find a satisfiable unbound continuation from spec
 	auto ubd_ctn = get_executable_spec(spec);
 	if (ubd_ctn == nullptr) {
@@ -223,11 +223,11 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-nso<BAs...> interpreter<input_t, output_t, BAs...>::update_to_time_point(const nso<BAs...>& f) {
+tau<BAs...> interpreter<input_t, output_t, BAs...>::update_to_time_point(const tau<BAs...>& f) {
 	// update the f according to current time_point, i.e. for each
 	// input/output var which has a shift, we replace it with the value
 	// corresponding to the current time_point minus the shift.
-	std::map<nso<BAs...>, nso<BAs...> > changes;
+	std::map<tau<BAs...>, tau<BAs...> > changes;
 	for (const auto& io_var:
 		select_top(
 			f, is_non_terminal<tau_parser::io_var, BAs...>))
@@ -279,8 +279,8 @@ void interpreter<input_t, output_t, BAs...>::resolve_solution_dependencies(solut
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial( const nso<BAs...>& ubd_ctn) {
-	std::vector<nso<BAs...> > io_vars = select_top(ubd_ctn,
+void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial( const tau<BAs...>& ubd_ctn) {
+	std::vector<tau<BAs...> > io_vars = select_top(ubd_ctn,
 		is_child_non_terminal< tau_parser::io_var , BAs...>);
 	lookback = get_max_shift(io_vars);
 	formula_time_point = lookback;
@@ -289,7 +289,7 @@ void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial( const
 
 
 template<typename input_t, typename output_t, typename...BAs>
-std::vector<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_systems(const nso<BAs...>& ubd_ctn,
+std::vector<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_systems(const tau<BAs...>& ubd_ctn,
 		const auto& inputs, const auto& outputs) {
 	std::vector<system<BAs...>> systems;
 	// Create blue-print for solver for each clause
@@ -306,9 +306,9 @@ std::vector<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_syst
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_atomic_fm_types(const nso<BAs...>& clause,
+std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_atomic_fm_types(const tau<BAs...>& clause,
 	const auto& inputs, const auto& outputs) {
-	auto is_atomic_fm = [](const nso<BAs...>& n) {
+	auto is_atomic_fm = [](const tau<BAs...>& n) {
 		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 	};
@@ -337,7 +337,7 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<std::pair<type, nso<BAs...>>> interpreter<input_t, output_t, BAs...>::get_type_fm(const nso<BAs...>& fm,
+std::optional<std::pair<type, tau<BAs...>>> interpreter<input_t, output_t, BAs...>::get_type_fm(const tau<BAs...>& fm,
 		const auto& inputs, const auto& outputs) {
 	if (auto io_var = find_top(fm,
 			is_non_terminal<tau_parser::io_var, BAs...>); io_var) {
@@ -359,7 +359,7 @@ std::optional<std::pair<type, nso<BAs...>>> interpreter<input_t, output_t, BAs..
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-nso<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const nso<BAs...>& fm) {
+tau<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const tau<BAs...>& fm) {
 	for (auto& clause : get_dnf_wff_clauses(fm)) {
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
@@ -409,5 +409,5 @@ nso<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const ns
 	return nullptr;
 }
 
-}
+} // namespace idni::tau_lang
 #endif //INTERPRETER_IMPL_H

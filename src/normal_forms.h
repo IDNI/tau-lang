@@ -224,10 +224,10 @@ static auto to_nnf_bf = make_library<BAs...>(
 // --------------------------------------------------------------
 // General operator for tau<BAs...> function application by pipe
 template<typename... BAs>
-using nso_transform = tau<BAs...>(*)(const tau<BAs...>&);
+using tau_transform = tau<BAs...>(*)(const tau<BAs...>&);
 
 template<typename... BAs>
-tau<BAs...> operator| (const tau<BAs...>& fm, const nso_transform<BAs...> func) {
+tau<BAs...> operator| (const tau<BAs...>& fm, const tau_transform<BAs...> func) {
 	return func(fm);
 }
 // --------------------------------------------------------------
@@ -819,7 +819,7 @@ bool assign_and_reduce(const tau<BAs...>& fm,
 		if (!is_wff) {
 			// fm is a Boolean function
 			// Normalize tau subformulas
-			fm_simp = fm | (nso_transform<BAs...>)normalize_ba<BAs...>;
+			fm_simp = fm | (tau_transform<BAs...>)normalize_ba<BAs...>;
 			fm_simp = to_dnf2(fm_simp, false);
 			fm_simp = reduce2(fm_simp, tau_parser::bf);
 
@@ -2423,7 +2423,7 @@ struct sometimes_always_normalization_depreciated {
 
 // Adjust the lookback before conjunction of fm1 and fm2
 template<typename...BAs>
-nso<BAs...> always_conjunction (const nso<BAs...>& fm1_aw, const nso<BAs...>& fm2_aw) {
+tau<BAs...> always_conjunction (const tau<BAs...>& fm1_aw, const tau<BAs...>& fm2_aw) {
 	using p = tau_parser;
 	// Trim the always node if present
 	auto fm1 = is_child_non_terminal(p::wff_always, fm1_aw) ? trim2(fm1_aw) : fm1_aw;
@@ -2451,7 +2451,7 @@ nso<BAs...> always_conjunction (const nso<BAs...>& fm1_aw, const nso<BAs...>& fm
 
 template<typename... BAs>
 struct sometimes_always_normalization {
-	nso<BAs...> operator() (const nso<BAs...>& fm) const {
+	tau<BAs...> operator() (const tau<BAs...>& fm) const {
 		using p = tau_parser;
 		auto st_aw = [](const auto& n) {
 			return is_child_non_terminal(p::wff_sometimes, n) ||
@@ -2462,7 +2462,7 @@ struct sometimes_always_normalization {
 		}
 		// Delete all always/sometimes if they scope no temporal variable
 		auto temps = select_top(fm, st_aw);
-		std::map<nso<BAs...>, nso<BAs...>> changes;
+		std::map<tau<BAs...>, tau<BAs...>> changes;
 		for (const auto& temp : temps) {
 			if (!has_temp_var(temp))
 				changes.emplace(temp, trim2(temp));
@@ -2472,18 +2472,18 @@ struct sometimes_always_normalization {
 				changes.empty()
 					? fm
 					: replace(fm, changes), false));
-		nso<BAs...> res = _F<BAs...>;
-		nso<BAs...> always_disjuncts = _F<BAs...>;
-		for (const nso<BAs...>& clause : clauses) {
+		tau<BAs...> res = _F<BAs...>;
+		tau<BAs...> always_disjuncts = _F<BAs...>;
+		for (const tau<BAs...>& clause : clauses) {
 			// If clause does not contain sometimes/always but temporal variables, we add it to always_disjuncts
 			if (!find_top(clause, st_aw)) {
 				always_disjuncts = build_wff_or(always_disjuncts, clause);
 				continue;
 			}
 			auto conjuncts = get_cnf_wff_clauses(clause);
-			nso<BAs...> always_part = _T<BAs...>;
-			nso<BAs...> staying = _T<BAs...>;
-			for (const nso<BAs...>& conj : conjuncts) {
+			tau<BAs...> always_part = _T<BAs...>;
+			tau<BAs...> staying = _T<BAs...>;
+			for (const tau<BAs...>& conj : conjuncts) {
 				if (!st_aw(conj))
 					always_part = always_conjunction(always_part, conj);
 				else if (is_child_non_terminal(p::wff_always, conj))

@@ -684,8 +684,13 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 	if (!system.first) return solve_inequality_system<BAs...>(system.second, splitter_one);
 	if (system.second.empty()) return find_solution(system.first.value());
+
 	auto phi = lgrs(system.first.value());
 	if (!phi.has_value()) return {};
+	// std::cout << "phi\n";
+	// for (const auto& [var, val] : phi.value())
+	// 	std::cout << "var: " << var << ", val: " << val << "\n";
+
 	inequality_system<BAs...> inequalities;
 	// for each inequality g_i we apply the transformation given by lgrs solution
 	// of the equality
@@ -703,6 +708,10 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		else if (ng_i == _T<BAs...>) continue;
 		inequalities.insert(ng_i);
 	}
+	// std::cout << "inequalities:\n";
+	// for (const auto& el : inequalities) {
+	// 	std::cout << "el: " << el << "\n";
+	// }
 	// solve the given system  of inequalities
 	auto inequality_solution = solve_inequality_system<BAs...>(inequalities, splitter_one);
 	if (!inequality_solution.has_value()) {
@@ -714,6 +723,10 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 		return {};
 	}
+	// std::cout << "inequalities solution: \n";
+	// for (const auto& [var, val] : inequality_solution.value()) {
+	// 	std::cout << "var: " << var << ", val: " << val << "\n";
+	// }
 	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
 	// Solutions coming from inequality_solution for variables appearing also
 	// in the equality part will be replaced in the next step
@@ -787,7 +800,7 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 			BOOST_LOG_TRIVIAL(info) << "(Warning) Skipped clause with temporal quantifier: " << clause;
 			continue;
 		}
-		auto is_equation = [](const nso<BAs...>& n) {
+		auto is_equation = [](const tau<BAs...>& n) {
 			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 		};
