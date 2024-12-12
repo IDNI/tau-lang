@@ -20,7 +20,7 @@
 #include "sbf_ba.h"
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
@@ -53,7 +53,7 @@ TEST_SUITE("bf operator hooks") {
 				sample, { .start = tau_parser::bf }).value()
 			| tau_parser::bf_constant
 			| tau_parser::type
-			| optional_value_extractor<nso<tau_ba<sbf_ba>, sbf_ba>>;
+			| optional_value_extractor<tau<tau_ba<sbf_ba>, sbf_ba>>;
 		auto type_expected = make_nso_using_factory<
 				tau_ba<sbf_ba>, sbf_ba>(
 			type, { .start = tau_parser::type }).value();

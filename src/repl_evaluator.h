@@ -53,15 +53,16 @@
 #include "repl.h"
 #include "interpreter.h"
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 template <typename... BAs>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<BAs...>>;
-	using memory = nso<tau_ba<BAs...>, BAs...>;
+	using tau_ba_t = tau_ba<BAs...>;
+	using tau_nso_t = tau_nso<BAs...>;
+	using memory = tau_nso_t;
 	using memorys = std::vector<memory>;
-	using memory_ref = std::optional<std::pair<
-				sp_tau_node<tau_ba<BAs...>, BAs...>, size_t>>;
+	using memory_ref = std::optional<std::pair<memory, size_t>>;
 
 	struct options {
 		bool status             = true;
@@ -87,101 +88,79 @@ struct repl_evaluator {
 
 private:
 
-	int eval_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n);
+	int eval_cmd(const tau_nso_t& n);
 	bool update_charvar(bool value);
 
 	// helpers
-	sp_tau_node<tau_ba<BAs...>, BAs...> make_cli(const std::string& src);
+	tau_nso_t make_cli(const std::string& src);
 	boost::log::trivial::severity_level nt2severity(size_t nt) const;
-	repl_evaluator<BAs...>::memory_ref memory_retrieve(
-		const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
-		bool silent = false);
-	void memory_store(repl_evaluator<BAs...>::memory o);
-	std::optional<std::pair<size_t, nso<tau_ba<BAs...>, BAs...>>>
-		get_type_and_arg(const nso<tau_ba<BAs...>, BAs...>& n);
+	memory_ref memory_retrieve(const tau_nso_t& n, bool silent = false);
+	void memory_store(memory o);
+	std::optional<std::pair<size_t, tau_nso_t>>
+		get_type_and_arg(const tau_nso_t& n);
 	// returns nonterminal type of a node (as size_t and no value if not nt
-	std::optional<size_t> get_type(const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<size_t> get_type(const tau_nso_t& n);
 	// returns if a subtree of a node contains a nonterminal
-	bool contains(const nso<tau_ba<BAs...>, BAs...>& n,
-		tau_parser::nonterminal nt);
+	bool contains(const tau_nso_t& n, tau_parser::nonterminal nt);
 	// apply definitions and rr to a program
-	gssotc<BAs...> apply_rr_to_rr_gssotc(const size_t type, const gssotc<BAs...>& program);
+	tau_nso_t apply_rr_to_rr_tau_nso(const size_t type, const tau_nso_t& program);
 
 	// commands
 	void not_implemented_yet();
 
 	void version_cmd();
-	void help_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void help_cmd(const tau_nso_t& n);
 
-	void get_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
-	void set_cmd(sp_tau_node<tau_ba<BAs...>, BAs...> n);
-	void update_bool_opt_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& n,
+	void get_cmd(tau_nso_t n);
+	void set_cmd(tau_nso_t n);
+	void update_bool_opt_cmd(const tau_nso_t& n,
 		const std::function<bool(bool&)>& update_fn);
 
-	void history_print_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
-	void history_store_cmd(const sp_tau_node<tau_ba<BAs...>, BAs...>& command);
+	void history_print_cmd(const tau_nso_t& command);
+	void history_store_cmd(const tau_nso_t& command);
 	void history_list_cmd();
 
-	void def_rr_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void def_print_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_rr_cmd(const tau_nso_t& n);
+	void def_print_cmd(const tau_nso_t& n);
 	void def_list_cmd();
-	void def_input_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void def_output_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	void def_input_cmd(const tau_nso_t& n);
+	void def_output_cmd(const tau_nso_t& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> qelim_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<tau_nso_t> qelim_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> normalize_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> sat_cmd(const tau_nso_t& n);
+	void run_cmd(const tau_nso_t& n);
+	void solve_cmd(const tau_nso_t& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> normalize_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<tau_nso_t> is_valid_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> is_unsatisfiable_cmd(const tau_nso_t& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...>> sat_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	void run_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
-	void solve_cmd(const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<tau_nso_t> get_bf(const tau_nso_t& n, bool suppress_error=false);
+	std::optional<tau_nso_t> get_wff(const tau_nso_t& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...> > is_valid_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<tau_nso_t> onf_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> dnf_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> cnf_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> nnf_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> mnf_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> snf_cmd(const tau_nso_t& n);
 
-	std::optional<nso<tau_ba<BAs...>, BAs...> > is_unsatisfiable_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-
-	std::optional<nso<tau_ba<BAs...>, BAs...>> get_bf(
-		const nso<tau_ba<BAs...>, BAs...>& n, bool suppress_error=false);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> get_wff(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-
-	std::optional<nso<tau_ba<BAs...>, BAs...>> onf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> dnf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> cnf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> nnf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> mnf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> snf_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-
-	std::optional<nso<tau_ba<BAs...>, BAs...>> bf_substitute_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> substitute_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
-	std::optional<nso<tau_ba<BAs...>, BAs...>> instantiate_cmd(
-		const nso<tau_ba<BAs...>, BAs...>& n);
+	std::optional<tau_nso_t> bf_substitute_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> substitute_cmd(const tau_nso_t& n);
+	std::optional<tau_nso_t> instantiate_cmd(const tau_nso_t& n);
 
 	memorys m;
 	options opt{};
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
-	rec_relations<gssotc<BAs...>> definitions;
-	std::map<nso<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> inputs;
-	std::map<nso<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> outputs;
+	rec_relations<tau_nso_t> definitions;
+	std::map<tau_nso_t, std::pair<type, filename>> inputs;
+	std::map<tau_nso_t, std::pair<type, filename>> outputs;
 	bool error = false;
 	idni::term::colors TC{};
 };
 
-} //idni::tau namespace
+} //idni::tau_lang namespace
 
 #include "repl_evaluator.tmpl.h"
 

@@ -25,7 +25,7 @@
 
 using namespace std;
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 using namespace boost::log;
 
 namespace testing = doctest;

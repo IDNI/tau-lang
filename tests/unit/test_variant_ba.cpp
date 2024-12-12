@@ -8,7 +8,7 @@
 
 namespace testing = doctest;
 
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 TEST_SUITE("variant Boolen algebra") {
 

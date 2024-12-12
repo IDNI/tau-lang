@@ -13,18 +13,18 @@
 #include "dict.h"
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
-rr<nso<sbf_ba>> sbf_make_nso_rr(const std::string& src) {
+rr<tau<sbf_ba>> sbf_make_nso_rr(const std::string& src) {
 	auto sample_src = make_tau_source(src);
 	return make_nso_rr_using_factory<sbf_ba>(sample_src).value();
 }
 
-nso<sbf_ba> sbf_make_nso(const std::string& src) {
+tau<sbf_ba> sbf_make_nso(const std::string& src) {
 	return sbf_make_nso_rr(src).main;
 }
 
-std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<sbf_ba> n, size_t l = 0) {
+std::ostream& print_tau(std::ostream &os, tau<sbf_ba> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
@@ -34,12 +34,12 @@ std::ostream& print_sp_tau_node(std::ostream &os, sp_tau_node<sbf_ba> n, size_t 
 			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...sbf..."; }
 	}, n->value);
-	for (auto& d : n->child) print_sp_tau_node(os, d, l + 1);
+	for (auto& d : n->child) print_tau(os, d, l + 1);
 	os << "}";
 	return os;
 }
 
-std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<sbf_ba> n, size_t l = 0) {
+std::ostream& pretty_print_tau(std::ostream &os, tau<sbf_ba> n, size_t l = 0) {
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },
@@ -48,7 +48,7 @@ std::ostream& pretty_print_sp_tau_node(std::ostream &os, sp_tau_node<sbf_ba> n, 
 			else if (auto b = std::get<0>(v); b == false) os << "false";
 			else os << "...sbf..."; }
 	}, n->value);
-	for (auto& d : n->child) pretty_print_sp_tau_node(os, d, l + 1);
+	for (auto& d : n->child) pretty_print_tau(os, d, l + 1);
 	return os;
 }
 

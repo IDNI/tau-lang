@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 #include "nso_rr.h"
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 using namespace idni::rewriter;
 
@@ -53,10 +53,10 @@ sp_tau_source_node make_tau_source_from_file(const std::string& filename,
 			filename, options);
 }
 
-} // idni::tau namespace
+} // idni::tau_lang namespace
 
 // << for tau_source_sym
-std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_sym& rs) {
+std::ostream& operator<<(std::ostream& stream, const idni::tau_lang::tau_source_sym& rs) {
 	if (rs.nt()) stream << rs.t();
 	return stream;
 }
@@ -65,11 +65,11 @@ std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_sym& 
 // and assumes that the constants also override operator<<.
 //
 // IDEA maybe it should be move to out.h
-std::ostream& operator<<(std::ostream& stream, const idni::tau::sp_tau_source_node& n){
-	return stream << idni::tau::make_string(idni::tau::tau_source_terminal_extractor, n);
+std::ostream& operator<<(std::ostream& stream, const idni::tau_lang::sp_tau_source_node& n){
+	return stream << idni::tau_lang::make_string(idni::tau_lang::tau_source_terminal_extractor, n);
 }
 
 // << tau_source_node (make it shared to make use of the previous operator)
-std::ostream& operator<<(std::ostream& stream, const idni::tau::tau_source_node& n){
-	return stream << std::make_shared<idni::tau::tau_source_node>(n);
+std::ostream& operator<<(std::ostream& stream, const idni::tau_lang::tau_source_node& n){
+	return stream << std::make_shared<idni::tau_lang::tau_source_node>(n);
 }

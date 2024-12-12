@@ -2,7 +2,7 @@
 
 #include "sbf_ba.h"
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 using parse_forest = idni::parser<char, char>::pforest;
 using parse_result = idni::parser<char, char>::result;
@@ -63,7 +63,7 @@ sbf_ba eval_node(const traverser_t& t) {
 	}
 }
 template <typename...BAs>
-std::optional<nso<BAs...>> sbf_ba_factory<BAs...>::parse(
+std::optional<tau<BAs...>> sbf_ba_factory<BAs...>::parse(
 	const std::string& src)
 {
 	// check source cache
@@ -71,7 +71,7 @@ std::optional<nso<BAs...>> sbf_ba_factory<BAs...>::parse(
 		return cn->second;
 	auto& p = sbf_parser::instance();
 	auto r = p.parse(src.c_str(), src.size());
-	if (!r.found) return std::optional<nso<BAs...>>{};
+	if (!r.found) return std::optional<tau<BAs...>>{};
 	using parse_symbol = sbf_parser::node_type;
 	using namespace rewriter;
 	auto root = make_node_from_tree<sbf_parser,
@@ -87,10 +87,10 @@ std::optional<nso<BAs...>> sbf_ba_factory<BAs...>::parse(
 }
 
 template <typename...BAs>
-nso<BAs...> sbf_ba_factory<BAs...>::binding(const nso<BAs...>& sn) {
+tau<BAs...> sbf_ba_factory<BAs...>::binding(const tau<BAs...>& sn) {
 	auto source = sn
 		| tau_parser::source
-		| optional_value_extractor<nso<BAs...>>;
+		| optional_value_extractor<tau<BAs...>>;
 	std::string src = make_string(
 		tau_node_terminal_extractor<BAs...>, source);
 	if (auto parsed = parse(src); parsed.has_value())
@@ -103,13 +103,13 @@ std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
 	return std::variant<BAs...>(bdd_splitter_one<Bool>());
 }
 
-std::optional<nso<sbf_ba>> nso_factory<sbf_ba>::parse(const std::string& src,
+std::optional<tau<sbf_ba>> nso_factory<sbf_ba>::parse(const std::string& src,
 	const std::string&)
 {
 	return bf.parse(src);
 }
 
-nso<sbf_ba> nso_factory<sbf_ba>::binding(const nso<sbf_ba>& n,
+tau<sbf_ba> nso_factory<sbf_ba>::binding(const tau<sbf_ba>& n,
 	const std::string&)
 {
 	return bf.binding(n);
@@ -119,7 +119,7 @@ std::vector<std::string> nso_factory<sbf_ba>::types() const {
 	return { "sbf" };
 }
 
-nso<sbf_ba> nso_factory<sbf_ba>::splitter_one() const {
+tau<sbf_ba> nso_factory<sbf_ba>::splitter_one() const {
 	return build_bf_constant(bf.splitter_one());
 }
 
@@ -143,15 +143,15 @@ nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
 nso_factory<sbf_ba>::nso_factory() {};
 
 
-std::optional<gssotc<sbf_ba>> nso_factory<tau_ba<sbf_ba>, sbf_ba>::parse(
+std::optional<tau_nso<sbf_ba>> nso_factory<tau_ba<sbf_ba>, sbf_ba>::parse(
 	const std::string src, const std::string type_name)
 {
 	if (type_name == "sbf")	return bf.parse(src);
 	return tf.parse(src);
 }
 
-gssotc<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::binding(
-	const sp_tau_node<tau_ba<sbf_ba>, sbf_ba>& n,
+tau_nso<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::binding(
+	const tau<tau_ba<sbf_ba>, sbf_ba>& n,
 	const std::string type_name)
 {
 	if (type_name == "sbf") return bf.binding(n);
@@ -174,7 +174,7 @@ std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::zero(const std::string type_nam
 	return type_name == "sbf" ? "0" : "F";
 }
 
-gssotc<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
+tau_nso<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
 	const std::string& type_name) const
 {
 	if (type_name == "sbf")
@@ -191,4 +191,4 @@ nso_factory<tau_ba<sbf_ba>, sbf_ba>&
 
 nso_factory<tau_ba<sbf_ba>, sbf_ba>::nso_factory() {};
 
-} // namespace idni::tau
+} // namespace idni::tau_lang

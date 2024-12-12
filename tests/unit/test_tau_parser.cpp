@@ -10,7 +10,7 @@
 #include "test_helpers.h"
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 using namespace std;
 
 namespace testing = doctest;

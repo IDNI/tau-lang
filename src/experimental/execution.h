@@ -15,7 +15,7 @@
 #include "debug_helpers.h"
 #endif // DEBUG*/
 
-namespace idni::tau::experimental {
+namespace idni::tau_lang::experimental {
 
 // Check https://en.cppreference.com/w/cpp/utility/functional/function for more
 // information about std::function and how to use it.
@@ -106,6 +106,6 @@ struct satisfying {
 	predicate_t p;
 };
 
-} // namespace idni::tau::experimental
+} // namespace idni::tau_lang::experimental
 
 #endif // __EXPERIMENTAL_EXECUTION_H__
