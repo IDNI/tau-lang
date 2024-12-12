@@ -73,18 +73,16 @@ bool operator==(const tau<BAs...> &l, const tau<BAs...>& r) {
 
 	if (std::addressof(*l) == std::addressof(*r)) return true;
 
-
-
 	// check if typed bf_f or bf_t
-	if (is_child_non_terminal<tau_parser::bf_f, BAs...>(l)
-			&& is_child_non_terminal<tau_parser::bf_f, BAs...>(r)) {
+	if (is_non_terminal(tau_parser::bf_f, l)
+			&& is_non_terminal(tau_parser::bf_f, r)) {
 		return (!l->child.empty() && !r->child.empty())
 			? (l->child[0] == r->child[0])
 			: true;
 	}
 
-	if (is_child_non_terminal<tau_parser::bf_t, BAs...>(l)
-			&& is_child_non_terminal<tau_parser::bf_t, BAs...>(r)) {
+	if (is_non_terminal(tau_parser::bf_t, l)
+			&& is_non_terminal(tau_parser::bf_t, r)) {
 		return (!l->child.empty() && !r->child.empty())
 			? (l->child[0] == r->child[0])
 			: true;
