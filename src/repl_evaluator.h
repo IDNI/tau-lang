@@ -40,18 +40,13 @@
 #ifndef __REPL_EVALUATOR_H__
 #define __REPL_EVALUATOR_H__
 
-#include <string>
-#include <vector>
-#include <optional>
-#include <variant>
-#include <utility>
-
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/utility/setup/console.hpp>
 
-#include "sbf_ba.h"
-#include "repl.h"
 #include "interpreter.h"
+#include "repl.h"
 
 namespace idni::tau_lang {
 
@@ -103,7 +98,8 @@ private:
 	// returns if a subtree of a node contains a nonterminal
 	bool contains(const tau_nso_t& n, tau_parser::nonterminal nt);
 	// apply definitions and rr to a program
-	tau_nso_t apply_rr_to_rr_tau_nso(const size_t type, const tau_nso_t& program);
+	tau_nso_t apply_rr_to_rr_tau_nso(const size_t type,
+		const tau_nso_t& program);
 
 	// commands
 	void not_implemented_yet();
@@ -135,7 +131,8 @@ private:
 	std::optional<tau_nso_t> is_valid_cmd(const tau_nso_t& n);
 	std::optional<tau_nso_t> is_unsatisfiable_cmd(const tau_nso_t& n);
 
-	std::optional<tau_nso_t> get_bf(const tau_nso_t& n, bool suppress_error=false);
+	std::optional<tau_nso_t> get_bf(const tau_nso_t& n,
+		bool suppress_error = false);
 	std::optional<tau_nso_t> get_wff(const tau_nso_t& n);
 
 	std::optional<tau_nso_t> onf_cmd(const tau_nso_t& n);

@@ -1,27 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __REPL_EVALUATOR_TMPL_H__
-#define __REPL_EVALUATOR_TMPL_H__
-
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/utility/setup/console.hpp>
-#include <limits>
-
 #include "repl_evaluator.h"
-#include "normalizer.h"
-#include "normal_forms.h"
-#include "nso_rr.h"
-#include "tau_ba.h"
-#include "term_colors.h"
-#include "solver.h"
-#include "satisfiability.h"
-#include "interpreter.h"
-
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
 
 namespace idni::tau_lang {
 
@@ -45,9 +24,8 @@ size_t digits(const tau_nso<BAs...>& n) {
 }
 
 template<typename... BAs>
-std::optional<size_t> get_memory_index(
-	const tau_nso<BAs...>& n, const size_t size,
-	bool silent = false)
+std::optional<size_t> get_memory_index(const tau_nso<BAs...>& n,
+	const size_t size, bool silent = false)
 {
 	if (size == 0) {
 		if (!silent) std::cout << "history is empty\n";
@@ -80,7 +58,7 @@ repl_evaluator<BAs...>::memory_ref repl_evaluator<BAs...>::memory_retrieve(
 	const tau_nso_t& n, bool silent)
 {
 	if (auto pos = get_memory_index(n, m.size(), silent); pos.has_value())
-		return {{m[pos.value()], pos.value()}};
+		return { { m[pos.value()], pos.value() } };
 	BOOST_LOG_TRIVIAL(error) << "(Error) history location does not exist\n";
 	return {};
 }
@@ -104,10 +82,9 @@ tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 	const size_t type, const tau_nso_t& program)
 {
 	bool contains_ref = contains(program, tau_parser::ref);
-	rr<tau_nso_t> rr_ =
-		(contains_ref && type == tau_parser::rr)
-			? make_nso_rr_from_binded_code<tau_ba_t, BAs...>(program)
-			: rr<tau_nso_t>(program);
+	rr<tau_nso_t> rr_ = (contains_ref && type == tau_parser::rr)
+		? make_nso_rr_from_binded_code<tau_ba_t, BAs...>(program)
+		: rr<tau_nso_t>(program);
 	if (contains_ref)
 		rr_.rec_relations.insert(rr_.rec_relations.end(),
 			definitions.begin(), definitions.end()),
@@ -117,9 +94,7 @@ tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::history_print_cmd(
-	const tau_nso_t& command)
-{
+void repl_evaluator<BAs...>::history_print_cmd(const tau_nso_t& command) {
 	auto n = command | tau_parser::memory;
 	if (!n) return;
 	auto idx = get_memory_index(n.value(), m.size());
@@ -143,9 +118,7 @@ void repl_evaluator<BAs...>::memory_store(memory o) {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::history_store_cmd(
-	const tau_nso_t& command)
-{
+void repl_evaluator<BAs...>::history_store_cmd(const tau_nso_t& command) {
 	memory_store(command->child[0]);
 }
 
@@ -167,7 +140,8 @@ std::optional<tau_nso<BAs...>>
 			}
 		}
 	}
-	if (!suppress_error) BOOST_LOG_TRIVIAL(error) << "(Error) argument has wrong type";
+	if (!suppress_error) BOOST_LOG_TRIVIAL(error)
+					<< "(Error) argument has wrong type";
 	return {};
 }
 
@@ -182,7 +156,8 @@ std::optional<tau_nso<BAs...>>
 			if (is_non_terminal(tau_parser::wff, value))
 				return std::optional(value);
 			else {
-				BOOST_LOG_TRIVIAL(error) << "(Error) argument has wrong type\n";
+				BOOST_LOG_TRIVIAL(error)
+					<< "(Error) argument has wrong type\n";
 				return {};
 			}
 		}
@@ -192,19 +167,16 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-bool repl_evaluator<BAs...>::contains(
-	const tau_nso_t& n, tau_parser::nonterminal nt)
+bool repl_evaluator<BAs...>::contains(const tau_nso_t& n,
+	tau_parser::nonterminal nt)
 {
 	auto pred = [nt](const auto& n) {
 		return is_non_terminal<tau_ba<BAs...>, BAs...>(nt, n); };
-	return find_top<decltype(pred), tau_nso<BAs...>>(n, pred)
-								.has_value();
+	return find_top<decltype(pred), tau_nso<BAs...>>(n, pred).has_value();
 }
 
 template <typename... BAs>
-std::optional<size_t> repl_evaluator<BAs...>::get_type(
-	const tau_nso_t& n)
-{
+std::optional<size_t> repl_evaluator<BAs...>::get_type(const tau_nso_t& n) {
 	return n | non_terminal_extractor<tau_ba_t, BAs...>;
 }
 
@@ -230,8 +202,7 @@ std::optional<std::pair<size_t, tau_nso<BAs...>>>
 
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::onf_cmd(
-		const tau_nso_t& n)
+	repl_evaluator<BAs...>::onf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	auto var = n->child[2];
@@ -245,8 +216,7 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::dnf_cmd(
-		const tau_nso_t& n)
+	repl_evaluator<BAs...>::dnf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
@@ -263,8 +233,7 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::cnf_cmd(
-		const tau_nso_t& n)
+	repl_evaluator<BAs...>::cnf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
@@ -274,9 +243,9 @@ std::optional<tau_nso<BAs...>>
 		case tau_parser::wff:
 			return reduce2(to_cnf2(applied), tau_parser::wff, true);
 		case tau_parser::bf:
-			return reduce2(to_cnf2(applied, false), tau_parser::bf, true);
-		default:
-			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+			return reduce2(to_cnf2(applied, false),
+							tau_parser::bf, true);
+		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
 	return {};
@@ -284,20 +253,16 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::nnf_cmd(
-		const tau_nso_t& n)
+	repl_evaluator<BAs...>::nnf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
-		case tau_parser::wff:
-			return nnf_wff<tau_ba_t, BAs...>(applied);
-		case tau_parser::bf:
-			return nnf_bf<tau_ba_t, BAs...>(applied);
-		default:
-			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+		case tau_parser::wff: return nnf_wff<tau_ba_t, BAs...>(applied);
+		case tau_parser::bf:  return nnf_bf<tau_ba_t, BAs...>(applied);
+		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
 	return {};
@@ -305,20 +270,16 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::mnf_cmd(
-		const tau_nso_t& n)
+	repl_evaluator<BAs...>::mnf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
-		case tau_parser::wff:
-			return mnf_wff<tau_ba_t, BAs...>(applied);
-		case tau_parser::bf:
-			return mnf_bf<tau_ba_t, BAs...>(applied);
-		default:
-			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+		case tau_parser::wff: return mnf_wff<tau_ba_t, BAs...>(applied);
+		case tau_parser::bf:  return mnf_bf<tau_ba_t, BAs...>(applied);
+		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
 	return {};
@@ -326,20 +287,16 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::snf_cmd(
-		const tau_nso_t& n)
+	repl_evaluator<BAs...>::snf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
-		case tau_parser::wff:
-			return snf_wff<tau_ba_t, BAs...>(applied);
-		case tau_parser::bf:
-			return snf_bf<tau_ba_t, BAs...>(applied);
-		default:
-			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+		case tau_parser::wff: return snf_wff<tau_ba_t, BAs...>(applied);
+		case tau_parser::bf:  return snf_bf<tau_ba_t, BAs...>(applied);
+		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
 	return {};
@@ -347,15 +304,15 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::bf_substitute_cmd(
-		const tau_nso_t& n)
+	repl_evaluator<BAs...>::bf_substitute_cmd(const tau_nso_t& n)
 {
 	auto in = get_bf(n->child[1]);
 	auto thiz = get_bf(n->child[2]);
 	auto with = get_bf(n->child[3]);
 	// Check for correct argument types
 	if (!thiz || !in || !with) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return {};
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+		return {};
 	}
 	std::map<tau_nso_t, tau_nso_t> changes = {{thiz.value(), with.value()}};
 
@@ -364,8 +321,7 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::substitute_cmd(
-		const tau_nso_t& n)
+	repl_evaluator<BAs...>::substitute_cmd(const tau_nso_t& n)
 {
 	// Since the memory command cannot be type-checked we do it here
 	// First try to get bf
@@ -382,8 +338,9 @@ std::optional<tau_nso<BAs...>>
 		with = get_wff(n->child[3]);
 	}
 	// Check for correct argument types
-	if (!thiz || !in || !with){
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return {};
+	if (!thiz || !in || !with) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+		return {};
 	}
 	std::map<tau_nso_t, tau_nso_t>
 		changes = {{thiz.value(), with.value()}};
@@ -422,7 +379,8 @@ std::optional<tau_nso<BAs...>>
 					tau_ba_t, BAs...>(
 						tau_parser::variable,
 							var.value());
-				std::ostringstream ss; ss << "x" << var_id; ++var_id;
+				std::ostringstream ss;
+				ss << "x" << var_id; ++var_id;
 				auto unused_var = var_t
 					? build_bf_var<tau_ba_t, BAs...>(
 								ss.str())
@@ -560,7 +518,9 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 			if (auto it = inputs.find(var); it != inputs.end()) {
 				current_inputs[var] = it->second;
 			} else {
-				BOOST_LOG_TRIVIAL(error) << "(Error) input variable " << var << " is not defined\n";
+				BOOST_LOG_TRIVIAL(error)
+					<< "(Error) input variable " << var
+					<< " is not defined\n";
 				return;
 			}
 		}
@@ -568,14 +528,16 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		auto ins = finputs<tau_ba_t, BAs...>(current_inputs);
 
 		// select current output variables
-		auto out_vars = select_all(dnf,
-			is_non_terminal<tau_parser::out_var_name, tau_ba_t, BAs...>);
+		auto out_vars = select_all(dnf, is_non_terminal<
+				tau_parser::out_var_name, tau_ba_t, BAs...>);
 		std::map<tau_nso_t, std::pair<type, filename>> current_outputs;
 		for (auto& var: out_vars) {
-			if (auto it = outputs.find(var); it != outputs.end()) {
+			if (auto it = outputs.find(var); it != outputs.end())
 				current_outputs[var] = it->second;
-			} else {
-				BOOST_LOG_TRIVIAL(error) << "(Error) output variable " << var << " is not defined\n";
+			else {
+				BOOST_LOG_TRIVIAL(error)
+					<< "(Error) output variable " << var
+					<< " is not defined\n";
 				return;
 			}
 		}
@@ -596,26 +558,33 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 				tau_ba_t, BAs...>, n->child[1])
 		: std::optional<std::string>();
 
-	auto implicit_types = select_all(n, is_non_terminal<tau_parser::type, tau_ba_t, BAs...>);
+	auto implicit_types = select_all(n, is_non_terminal<
+					tau_parser::type, tau_ba_t, BAs...>);
 	for (const auto& t: implicit_types) {
 		auto implicit_type = make_string<
 				tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
 				tau_nso_t>(
 			tau_node_terminal_extractor<tau_ba_t, BAs...>, t);
 		if (type.has_value() && implicit_type != type.value()) {
-			BOOST_LOG_TRIVIAL(error) << "(Error) multiple types involved\n";
+			BOOST_LOG_TRIVIAL(error)
+				<< "(Error) multiple types involved\n";
 			return;
 		} if (!type.has_value()) type = implicit_type;
 	}
 
 	if (!type.has_value()) type = "tau";
 
-	if (auto nn = is_non_terminal<tau_parser::type, tau_ba_t, BAs...>(n->child[1])
-			? get_type_and_arg(n->child[2]) : get_type_and_arg(n->child[1]); nn) {
+	if (auto nn = is_non_terminal<tau_parser::type, tau_ba_t, BAs...>(
+		n->child[1]) ? get_type_and_arg(n->child[2])
+				: get_type_and_arg(n->child[1]); nn)
+	{
 		auto [t, program] = nn.value();
 		auto applied = apply_rr_to_rr_tau_nso(t, program);
 		applied = normalizer_step(applied);
-		if (!nn) { BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n"; return; }
+		if (!nn) { BOOST_LOG_TRIVIAL(error)
+			<< "(Error) invalid argument\n";
+			return;
+		}
 		auto s = solve<tau_ba_t, BAs...>(applied, type.value());
 		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
@@ -623,12 +592,14 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 			// is bf_t
 			if (auto check = v | tau_parser::bf_t; check) {
 				std::cout << "\t" << k << " := {"
-					<< nso_factory<tau_ba_t, BAs...>::instance().one(type.value())
+					<< nso_factory<tau_ba_t, BAs...>
+						::instance().one(type.value())
 					<< "} : " << type.value() << "\n";
 			// is bf_f
 			} else if (auto check = v | tau_parser::bf_f; check) {
 				std::cout << "\t" << k << " := {"
-					<< nso_factory<tau_ba_t, BAs...>::instance().zero(type.value())
+					<< nso_factory<tau_ba_t, BAs...>
+						::instance().zero(type.value())
 					<< "} : " << type.value() << "\n";
 			// is something else but not a BA element
 			} else {
@@ -640,8 +611,8 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 }
 
 template<typename... BAs>
-std::optional<tau_nso<BAs...>> repl_evaluator<BAs...>::is_valid_cmd(
-	const tau_nso_t& n)
+std::optional<tau_nso<BAs...>>
+	repl_evaluator<BAs...>::is_valid_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
@@ -670,8 +641,8 @@ std::optional<tau_nso<BAs...>> repl_evaluator<BAs...>::is_valid_cmd(
 }
 
 template<typename... BAs>
-std::optional<tau_nso<BAs...>> repl_evaluator<BAs...>::sat_cmd(
-	const tau_nso_t& n)
+std::optional<tau_nso<BAs...>>
+	repl_evaluator<BAs...>::sat_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
@@ -715,8 +686,8 @@ std::optional<tau_nso<BAs...>> repl_evaluator<BAs...>::sat_cmd(
 }
 
 template<typename... BAs>
-std::optional<tau_nso<BAs...>> repl_evaluator<BAs...>::is_unsatisfiable_cmd(
-	const tau_nso_t& n)
+std::optional<tau_nso<BAs...>>
+	repl_evaluator<BAs...>::is_unsatisfiable_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
@@ -747,7 +718,8 @@ std::optional<tau_nso<BAs...>> repl_evaluator<BAs...>::is_unsatisfiable_cmd(
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_rr_cmd(const tau_nso_t& n) {
 	definitions.emplace_back(n->child[0]->child[0], n->child[0]->child[1]);
-	std::cout << "[" << definitions.size() << "] " << definitions.back() << "\n";
+	std::cout << "[" << definitions.size() << "] "
+						<< definitions.back() << "\n";
 }
 
 template <typename... BAs>
@@ -756,15 +728,20 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	else std::cout << "definitions:\n";
 	for (size_t i = 0; i < definitions.size(); i++)
 		std::cout << "    [" << i + 1 << "] " << definitions[i] << "\n";
-	if (inputs.size() == 0 && outputs.size() == 0) std::cout << "io variables: empty\n";
+	if (inputs.size() == 0 && outputs.size() == 0)
+		std::cout << "io variables: empty\n";
 	else std::cout << "io variables:\n";
 	for (auto& [var, desc]: inputs) {
-		auto file = desc.second.empty() ? "console" : "ifile(\"" + desc.second + "\")";
-		std::cout << "\t" << desc.first << " " << var << " = " << file << "\n";
+		auto file = desc.second.empty() ? "console"
+					: "ifile(\"" + desc.second + "\")";
+		std::cout << "\t" << desc.first << " "
+						<< var << " = " << file << "\n";
 	}
 	for (auto& [var, desc]: outputs) {
-		auto file = desc.second.empty() ? "console" : "ofile(\"" + desc.second + "\")";
-		std::cout << "\t" << desc.first << " " << var << " = " << file << "\n";
+		auto file = desc.second.empty() ? "console"
+					: "ofile(\"" + desc.second + "\")";
+		std::cout << "\t" << desc.first << " "
+						<< var << " = " << file << "\n";
 	}
 }
 
@@ -778,7 +755,8 @@ void repl_evaluator<BAs...>::def_print_cmd(const tau_nso_t& command) {
 		std::cout << definitions[i-1] << "\n";
 		return;
 	}
-	BOOST_LOG_TRIVIAL(error) << "(Error) definition [" << i << "] does not exist\n";
+	BOOST_LOG_TRIVIAL(error)
+		<< "(Error) definition [" << i << "] does not exist\n";
 	return;
 }
 
@@ -792,7 +770,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tau_nso_t& command) {
 			| tau_parser::input_stream
 			| tau_parser::q_file_name
 			| extract_string<tau_ba_t, BAs...>; !file_name.empty())
-		fn = file_name;
+								fn = file_name;
 	else fn = ""; // default input (std::cin)
 
 	for (auto& t: nso_factory<tau_ba_t, BAs...>::instance().types()) {
@@ -863,8 +841,7 @@ tau_nso<BAs...> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	if (!cli_src) return fail();
 	auto cli_code = make_tau_code<tau_ba_t, BAs...>(cli_src);
 	if (!cli_code) return fail();
-	auto binded = bind_tau_code_using_factory<tau_ba_t, BAs...>(
-								cli_code);
+	auto binded = bind_tau_code_using_factory<tau_ba_t, BAs...>(cli_code);
 	if (!binded) return fail();
 	return binded;
 }
@@ -897,7 +874,8 @@ void repl_evaluator<BAs...>::get_cmd(tau_nso_t n) {
 		auto opt = get_opt(option.value());
 #ifndef DEBUG
 		if (opt == tau_parser::debug_repl_opt) {
-			BOOST_LOG_TRIVIAL(error) << "(Error) debug option not available\n";
+			BOOST_LOG_TRIVIAL(error)
+				<< "(Error) debug option not available\n";
 			return;
 		}
 #endif
@@ -914,7 +892,8 @@ boost::log::trivial::severity_level
 		case tau_parser::debug_sym: return boost::log::trivial::debug;
 		case tau_parser::trace_sym: return boost::log::trivial::trace;
 		case tau_parser::info_sym:  return boost::log::trivial::info;
-		default: BOOST_LOG_TRIVIAL(error) << "(Error) invalid severity value\n";
+		default: BOOST_LOG_TRIVIAL(error)
+					<< "(Error) invalid severity value\n";
 	}
 	return boost::log::trivial::info;
 }
@@ -965,7 +944,8 @@ void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
 			opt.severity = boost::log::trivial::trace;
 		else {
 			auto sev = v | tau_parser::severity;
-			if (!sev.has_value()) {	BOOST_LOG_TRIVIAL(error) << "(Error) invalid severity value\n"; return; }
+			if (!sev.has_value()) {	BOOST_LOG_TRIVIAL(error)
+				<< "(Error) invalid severity value\n"; return; }
 			opt.severity = nt2severity(sev
 				| only_child_extractor<tau_ba_t, BAs...>
 				| non_terminal_extractor<tau_ba_t, BAs...>
@@ -977,7 +957,8 @@ void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
 	size_t opt = get_opt(option.value());
 #ifndef DEBUG
 	if (opt == tau_parser::debug_repl_opt) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) debug option not available\n";
+		BOOST_LOG_TRIVIAL(error)
+				<< "(Error) debug option not available\n";
 		return;
 	}
 #endif
@@ -1076,7 +1057,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
 	case p::qelim_cmd:          result = qelim_cmd(command); break;
 	case p::comment:            break;
 	// error handling
-	default: { error = true; BOOST_LOG_TRIVIAL(error) << "\n (Error) Unknown command"; break; }
+	default: error = true;
+		BOOST_LOG_TRIVIAL(error) << "\n (Error) Unknown command";
 	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) ptree<tau_ba_t, BAs...>(
@@ -1458,4 +1440,3 @@ void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
 #undef TC_OUTPUT
 
 } // idni::tau_lang namespace
-#endif // __REPL_EVALUATOR_TMPL_H__
