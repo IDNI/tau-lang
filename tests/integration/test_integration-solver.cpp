@@ -8,7 +8,7 @@
 #include "test_integration_helpers-sbf.h"
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
@@ -20,7 +20,7 @@ auto splitter_one_bdd() {
 	return build_bf_constant(std::variant<sbf_ba>(splitter_one));
 }
 
-bool check_solution(const nso<sbf_ba>& equation, std::map<nso<sbf_ba>, nso<sbf_ba>> solution) {
+bool check_solution(const tau<sbf_ba>& equation, std::map<tau<sbf_ba>, tau<sbf_ba>> solution) {
 	auto copy = solution;
 	auto substitution = replace(equation, copy);
 	auto check = snf_wff(substitution);
@@ -38,8 +38,8 @@ TEST_SUITE("minterm_iterator") {
 	TEST_CASE("with one var") {
 		const char* sample = "x = 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<sbf_ba>>;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<sbf_ba>>;
 		minterm_iterator<sbf_ba> it(sample_formula);
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
@@ -52,8 +52,8 @@ TEST_SUITE("minterm_iterator") {
 	TEST_CASE("with two vars") {
 		const char* sample = "x | y = 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<sbf_ba>>;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<sbf_ba>>;
 		minterm_iterator<sbf_ba> it(sample_formula);
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
@@ -72,8 +72,8 @@ TEST_SUITE("minterm_iterator") {
 		std::cout << "------------------------------------------------------\n";
 		const char* sample = "x | y | z = 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<sbf_ba>>;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<sbf_ba>>;
 		minterm_iterator<sbf_ba> it(sample_formula);
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
@@ -95,8 +95,8 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("one var") {
 		const char* sample = "x = 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<sbf_ba>>;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<sbf_ba>>;
 		minterm_range<sbf_ba> range(sample_formula);
 		CHECK ( range.begin() != range.end() );
 		CHECK ( ++range.begin() == range.end() );
@@ -105,8 +105,8 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("two var") {
 		const char* sample = "x | y = 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<sbf_ba>>;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<sbf_ba>>;
 		minterm_range<sbf_ba> range(sample_formula);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
 		CHECK ( n == 3 );
@@ -115,8 +115,8 @@ TEST_SUITE("minterm_range") {
 	TEST_CASE("three var") {
 		const char* sample = "x | y | z = 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
-			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<sbf_ba>>;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main
+			| tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<sbf_ba>>;
 		minterm_range<sbf_ba> range(sample_formula);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
 		CHECK ( n == 7 );
@@ -134,7 +134,7 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula);
 		minterm_inequality_system_iterator<sbf_ba> it(sys);
 		CHECK ( ++it == minterm_inequality_system_iterator<sbf_ba>::end );
@@ -143,7 +143,7 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 	TEST_CASE("one inequality with two vars") {
 		const char* sample = "x | y != 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula);
 		minterm_inequality_system_iterator<sbf_ba> it(sys);
 		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<sbf_ba>::end) n++;
@@ -152,7 +152,7 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 	TEST_CASE("one inequality with three vars") {
 		const char* sample = "x | y | z != 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula);
 		minterm_inequality_system_iterator<sbf_ba> it(sys);
 		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<sbf_ba>::end) n++;
@@ -162,10 +162,10 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 	TEST_CASE("two inequalities with one var") {
 		const char* sample1 = "a != 0.";
 		auto sample_src1 = make_tau_source(sample1);
-		nso<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
+		tau<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
 		const char* sample2 = "x != 0.";
 		auto sample_src2 = make_tau_source(sample2);
-		nso<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
+		tau<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula1); sys.insert(sample_formula2);
 		minterm_inequality_system_iterator<sbf_ba> it(sys);
 		CHECK ( ++it == minterm_inequality_system_iterator<sbf_ba>::end );
@@ -174,10 +174,10 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a | b != 0.";
 		auto sample_src1 = make_tau_source(sample1);
-		nso<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
+		tau<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
 		const char* sample2 = "x | y != 0.";
 		auto sample_src2 = make_tau_source(sample2);
-		nso<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
+		tau<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula1); sys.insert(sample_formula2);
 		minterm_inequality_system_iterator<sbf_ba> it(sys);
 		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<sbf_ba>::end) n++;
@@ -187,10 +187,10 @@ TEST_SUITE("minterm_inequality_system_iterator") {
 	TEST_CASE("two inequalities with three vars") {
 		const char* sample1 = "a | b |c != 0.";
 		auto sample_src1 = make_tau_source(sample1);
-		nso<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
+		tau<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
 		const char* sample2 = "x | y | z!= 0.";
 		auto sample_src2 = make_tau_source(sample2);
-		nso<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
+		tau<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula1); sys.insert(sample_formula2);
 		minterm_inequality_system_iterator<sbf_ba> it(sys);
 		size_t n = 1 ; while (it++ != minterm_inequality_system_iterator<sbf_ba>::end) n++;
@@ -210,7 +210,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 	TEST_CASE("one inequality with one var") {
 		const char* sample = "x != 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula);
 		minterm_inequality_system_range<sbf_ba> range(sys);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
@@ -220,7 +220,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 	TEST_CASE("one inequality with two vars") {
 		const char* sample = "x | y != 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula);
 		minterm_inequality_system_range<sbf_ba> range(sys);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
@@ -230,7 +230,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 	TEST_CASE("one inequality with three vars") {
 		const char* sample = "x | y | z != 0.";
 		auto sample_src = make_tau_source(sample);
-		nso<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
+		tau<sbf_ba> sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula);
 		minterm_inequality_system_range<sbf_ba> range(sys);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
@@ -240,10 +240,10 @@ TEST_SUITE("minterm_inequality_system_range") {
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a != 0.";
 		auto sample_src1 = make_tau_source(sample1);
-		nso<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
+		tau<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
 		const char* sample2 = "x != 0.";
 		auto sample_src2 = make_tau_source(sample2);
-		nso<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
+		tau<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula1); sys.insert(sample_formula2);
 		minterm_inequality_system_range<sbf_ba> range(sys);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
@@ -253,10 +253,10 @@ TEST_SUITE("minterm_inequality_system_range") {
 	TEST_CASE("two inequalities with two vars") {
 		const char* sample1 = "a | b != 0.";
 		auto sample_src1 = make_tau_source(sample1);
-		nso<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
+		tau<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
 		const char* sample2 = "x | y != 0.";
 		auto sample_src2 = make_tau_source(sample2);
-		nso<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
+		tau<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula1); sys.insert(sample_formula2);
 		minterm_inequality_system_range<sbf_ba> range(sys);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;
@@ -266,10 +266,10 @@ TEST_SUITE("minterm_inequality_system_range") {
 	TEST_CASE("three inequalities with two vars") {
 		const char* sample1 = "a | b | c != 0.";
 		auto sample_src1 = make_tau_source(sample1);
-		nso<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
+		tau<sbf_ba> sample_formula1 = make_nso_rr_using_factory<sbf_ba>(sample_src1).value().main;
 		const char* sample2 = "x | y | z!= 0.";
 		auto sample_src2 = make_tau_source(sample2);
-		nso<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
+		tau<sbf_ba> sample_formula2 = make_nso_rr_using_factory<sbf_ba>(sample_src2).value().main;
 		inequality_system<sbf_ba> sys; sys.insert(sample_formula1); sys.insert(sample_formula2);
 		minterm_inequality_system_range<sbf_ba> range(sys);
 		size_t n = 0; for ( [[gnu::unused]] auto& i: range) n++;

@@ -14,16 +14,16 @@
 
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
-nso<tau_ba<sbf_ba>, sbf_ba> normalize_test_tau(const char* src) {
-	rr<nso<tau_ba<sbf_ba>, sbf_ba>> nso_rr = make_nso_rr_using_factory<
+tau<tau_ba<sbf_ba>, sbf_ba> normalize_test_tau(const char* src) {
+	rr<tau<tau_ba<sbf_ba>, sbf_ba>> nso_rr = make_nso_rr_using_factory<
 		tau_ba<sbf_ba>, sbf_ba>(src).value();
 	return normalizer<tau_ba<sbf_ba>, sbf_ba>(nso_rr);
 }
 
-nso<tau_ba<sbf_ba>, sbf_ba> get_tau(const char* src) {
-	rr<nso<tau_ba<sbf_ba>, sbf_ba>> nso_rr = make_nso_rr_using_factory<
+tau<tau_ba<sbf_ba>, sbf_ba> get_tau(const char* src) {
+	rr<tau<tau_ba<sbf_ba>, sbf_ba>> nso_rr = make_nso_rr_using_factory<
 		tau_ba<sbf_ba>, sbf_ba>(src).value();
 	return normalizer<tau_ba<sbf_ba>, sbf_ba>(nso_rr);
 }

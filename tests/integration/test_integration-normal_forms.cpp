@@ -12,7 +12,7 @@
 #endif
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
@@ -25,7 +25,7 @@ TEST_SUITE("normal forms: snf for wff") {
 		CHECK( nso__rr.has_value() );
 		if (!nso__rr.has_value()) return;
 		#ifdef DEBUG
-		print_sp_tau_node_tree(std::cout, nso__rr.value().main);
+		print_tau_tree(std::cout, nso__rr.value().main);
 		#endif // DEBUG
 		auto check = nso__rr.value().main
 			| tau_parser::wff_t;

@@ -8,25 +8,25 @@
 #include "../integration/test_integration_helpers-tau.h"
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("get_gssotc_literals") {
+TEST_SUITE("get_tau_nso_literals") {
 
 	TEST_CASE("one literal y1") {
 		const char* sample = "{ T };";
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		get_gssotc_literals<sbf_ba>(sample_formula.main, literals);
+		std::vector<tau_nso<sbf_ba>> literals;
+		get_tau_nso_literals<sbf_ba>(sample_formula.main, literals);
 		CHECK( literals.size() == 1 );
 	}
 
@@ -35,8 +35,8 @@ TEST_SUITE("get_gssotc_literals") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		get_gssotc_literals<sbf_ba>(sample_formula.main, literals);
+		std::vector<tau_nso<sbf_ba>> literals;
+		get_tau_nso_literals<sbf_ba>(sample_formula.main, literals);
 		CHECK( literals.size() == 1 );
 	}
 
@@ -45,8 +45,8 @@ TEST_SUITE("get_gssotc_literals") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		get_gssotc_literals<sbf_ba>(sample_formula.main, literals);
+		std::vector<tau_nso<sbf_ba>> literals;
+		get_tau_nso_literals<sbf_ba>(sample_formula.main, literals);
 		CHECK( literals.size() == 2 );
 	}
 
@@ -55,20 +55,20 @@ TEST_SUITE("get_gssotc_literals") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		get_gssotc_literals<sbf_ba>(sample_formula.main, literals);
+		std::vector<tau_nso<sbf_ba>> literals;
+		get_tau_nso_literals<sbf_ba>(sample_formula.main, literals);
 		CHECK( literals.size() == 2 );
 	}
 }
 
-TEST_SUITE("get_gssotc_positive_negative_literals") {
+TEST_SUITE("get_tau_nso_positive_negative_literals") {
 
 	TEST_CASE("one literal: true") {
 		const char* sample = "{ T };";
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto [positive, negatives] = get_gssotc_positive_negative_literals<sbf_ba>(sample_formula.main);
+		auto [positive, negatives] = get_tau_nso_positive_negative_literals<sbf_ba>(sample_formula.main);
 		CHECK( positive.has_value() );
 		CHECK( negatives.size() == 0 );
 	}
@@ -78,7 +78,7 @@ TEST_SUITE("get_gssotc_positive_negative_literals") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto [positive, negatives] = get_gssotc_positive_negative_literals<sbf_ba>(sample_formula.main);
+		auto [positive, negatives] = get_tau_nso_positive_negative_literals<sbf_ba>(sample_formula.main);
 		CHECK( !positive.has_value() );
 		CHECK( negatives.size() == 1 );
 	}
@@ -88,7 +88,7 @@ TEST_SUITE("get_gssotc_positive_negative_literals") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto [positive, negatives] = get_gssotc_positive_negative_literals<sbf_ba>(sample_formula.main);
+		auto [positive, negatives] = get_tau_nso_positive_negative_literals<sbf_ba>(sample_formula.main);
 		CHECK( positive.has_value() );
 		CHECK( negatives.size() == 1 );
 	}
@@ -98,21 +98,21 @@ TEST_SUITE("get_gssotc_positive_negative_literals") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto [positive, negatives] = get_gssotc_positive_negative_literals<sbf_ba>(sample_formula.main);
+		auto [positive, negatives] = get_tau_nso_positive_negative_literals<sbf_ba>(sample_formula.main);
 		CHECK( !positive.has_value() );
 		CHECK( negatives.size() == 2 );
 	}
 }
 
-TEST_SUITE("get_gssotc_clauses") {
+TEST_SUITE("get_tau_nso_clauses") {
 
 	TEST_CASE("one clause") {
 		const char* sample = "{ T };";
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		get_gssotc_clauses<sbf_ba>(sample_formula.main, literals);
+		std::vector<tau_nso<sbf_ba>> literals;
+		get_tau_nso_clauses<sbf_ba>(sample_formula.main, literals);
 		CHECK( literals.size() == 1 );
 	}
 
@@ -121,8 +121,8 @@ TEST_SUITE("get_gssotc_clauses") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		get_gssotc_clauses<sbf_ba>(sample_formula.main, literals);
+		std::vector<tau_nso<sbf_ba>> literals;
+		get_tau_nso_clauses<sbf_ba>(sample_formula.main, literals);
 		CHECK( literals.size() == 2 );
 	}
 
@@ -131,8 +131,8 @@ TEST_SUITE("get_gssotc_clauses") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		get_gssotc_clauses<sbf_ba>(sample_formula.main, literals);
+		std::vector<tau_nso<sbf_ba>> literals;
+		get_tau_nso_clauses<sbf_ba>(sample_formula.main, literals);
 		CHECK( literals.size() == 2 );
 	}
 
@@ -141,21 +141,21 @@ TEST_SUITE("get_gssotc_clauses") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		get_gssotc_clauses<sbf_ba>(sample_formula.main, literals);
+		std::vector<tau_nso<sbf_ba>> literals;
+		get_tau_nso_clauses<sbf_ba>(sample_formula.main, literals);
 		CHECK( literals.size() == 3 );
 	}
 }
 
-TEST_SUITE("get_gssotc_io_vars") {
+TEST_SUITE("get_tau_nso_io_vars") {
 
 	TEST_CASE("none") {
 		const char* sample = "{ T };";
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		auto [inputs, outputs] = get_gssotc_io_vars<sbf_ba>(sample_formula.main);
+		std::vector<tau_nso<sbf_ba>> literals;
+		auto [inputs, outputs] = get_tau_nso_io_vars<sbf_ba>(sample_formula.main);
 		CHECK( (inputs.name.size() == 0 && outputs.name.size() == 0) );
 	}
 
@@ -164,8 +164,8 @@ TEST_SUITE("get_gssotc_io_vars") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		auto [inputs, outputs] = get_gssotc_io_vars<sbf_ba>(sample_formula.main);
+		std::vector<tau_nso<sbf_ba>> literals;
+		auto [inputs, outputs] = get_tau_nso_io_vars<sbf_ba>(sample_formula.main);
 		CHECK( (inputs.name.size() == 1 && outputs.name.size() == 0) );
 	}
 
@@ -174,8 +174,8 @@ TEST_SUITE("get_gssotc_io_vars") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		auto [inputs, outputs] = get_gssotc_io_vars<sbf_ba>(sample_formula.main);
+		std::vector<tau_nso<sbf_ba>> literals;
+		auto [inputs, outputs] = get_tau_nso_io_vars<sbf_ba>(sample_formula.main);
 		CHECK( (inputs.name.size() == 0 && outputs.name.size() == 1) );
 	}
 
@@ -184,8 +184,8 @@ TEST_SUITE("get_gssotc_io_vars") {
 		auto sample_src = make_tau_source(sample);
 		sbf_ba_factory bf;
 		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<gssotc<sbf_ba>> literals;
-		auto [inputs, outputs] = get_gssotc_io_vars<sbf_ba>(sample_formula.main);
+		std::vector<tau_nso<sbf_ba>> literals;
+		auto [inputs, outputs] = get_tau_nso_io_vars<sbf_ba>(sample_formula.main);
 		CHECK( (inputs.name.size() == 1 && outputs.name.size() == 1) );
 	}
 }

@@ -6,14 +6,14 @@
 #include "satisfiability.h"
 #include "nso_rr.h"
 
-namespace idni::tau {
+namespace idni::tau_lang {
 enum class split_sym {
 	conjunction, disjunction
 };
 
 template<typename... BAs>
-nso<BAs...> split(const nso<BAs...>& fm, const size_t fm_type, bool is_cnf,
-		   const splitter_type st, std::vector<nso<BAs...> >& mem,
+tau<BAs...> split(const tau<BAs...>& fm, const size_t fm_type, bool is_cnf,
+		   const splitter_type st, std::vector<tau<BAs...> >& mem,
 		   size_t i, bool check_temps) {
 	// First get clauses if not already in mem
 	const bool is_wff = fm_type == tau_parser::wff;
@@ -41,7 +41,7 @@ nso<BAs...> split(const nso<BAs...>& fm, const size_t fm_type, bool is_cnf,
 			// We cannot delete a clause holding a temporary io var
 			if (check_temps && has_temporary_io_var(mem[i]))
 				return fm;
-			std::map<nso<BAs...>, nso<BAs...> > changes = {
+			std::map<tau<BAs...>, tau<BAs...> > changes = {
 				{mem[i], sym}
 			};
 			return replace(fm, changes);
@@ -51,7 +51,7 @@ nso<BAs...> split(const nso<BAs...>& fm, const size_t fm_type, bool is_cnf,
 	case splitter_type::middle: {
 		// Remove half of the clause
 		size_t window = mem.size() / 2;
-		std::map<nso<BAs...>, nso<BAs...> > changes;
+		std::map<tau<BAs...>, tau<BAs...> > changes;
 		for (size_t j = 0; j < window; ++j) {
 			size_t idx = (i + j) % mem.size();
 			if (check_temps && has_temporary_io_var(mem[idx]))
@@ -77,11 +77,11 @@ nso<BAs...> split(const nso<BAs...>& fm, const size_t fm_type, bool is_cnf,
 }
 
 template<typename... BAs>
-bool is_splitter(const nso<BAs...>& fm, const nso<BAs...>& splitter, const nso<BAs...>& spec) {
+bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<BAs...>& spec) {
 	if (spec) {
 		// We are dealing with a temporal formula
 		if (!are_tau_equivalent(splitter, fm)) {
-			std::map<nso<BAs...>, nso<BAs...>> c = {{fm, splitter}};
+			std::map<tau<BAs...>, tau<BAs...>> c = {{fm, splitter}};
 			auto new_spec = normalizer_step(replace(spec, c));
 			if (is_tau_formula_sat(new_spec))
 				return true;
@@ -96,16 +96,16 @@ bool is_splitter(const nso<BAs...>& fm, const nso<BAs...>& splitter, const nso<B
 
 // Find a Boolean function which implies f
 template<typename... BAs>
-nso<BAs...> good_splitter_using_function(const nso<BAs...>& f, splitter_type st,
-					 const nso<BAs...>& original_fm) {
+tau<BAs...> good_splitter_using_function(const tau<BAs...>& f, splitter_type st,
+					 const tau<BAs...>& original_fm) {
 	assert(is_non_terminal(tau_parser::bf, f));
 	// First check if we have more then one disjunct
-	std::vector<nso<BAs...> > m;
+	std::vector<tau<BAs...> > m;
 	size_t i = 0;
 	do {
 		auto s = split(f, tau_parser::bf, false, st, m, i, true);
 		if (s != f) {
-			std::map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
+			std::map<tau<BAs...>, tau<BAs...> > changes = {{f, s}};
 			auto new_fm = replace(original_fm, changes);
 			if(!are_nso_equivalent(original_fm, new_fm))
 				return new_fm;
@@ -113,7 +113,7 @@ nso<BAs...> good_splitter_using_function(const nso<BAs...>& f, splitter_type st,
 	} while (++i < m.size());
 
 	// Find possible coefficient in each disjunct of f
-	std::vector<nso<BAs...> > clauses = get_leaves(f, tau_parser::bf_or, tau_parser::bf);
+	std::vector<tau<BAs...> > clauses = get_leaves(f, tau_parser::bf_or, tau_parser::bf);
 	// In case f is just a single clause
 	if (clauses.empty()) clauses.push_back(f);
 	for (const auto &clause: clauses) {
@@ -122,7 +122,7 @@ nso<BAs...> good_splitter_using_function(const nso<BAs...>& f, splitter_type st,
 		assert(is_non_terminal(tau_parser::bf_constant, coeff.value()));
 		auto s = splitter(coeff.value());
 		if (s != coeff.value()) {
-			std::map<nso<BAs...>, nso<BAs...> > changes = {{coeff.value(), trim(s)}};
+			std::map<tau<BAs...>, tau<BAs...> > changes = {{coeff.value(), trim(s)}};
 			auto new_fm = replace(original_fm, changes);
 			if(!are_nso_equivalent(original_fm, new_fm))
 				return new_fm;
@@ -133,19 +133,19 @@ nso<BAs...> good_splitter_using_function(const nso<BAs...>& f, splitter_type st,
 
 // Find a Boolean function which is implied by f
 template<typename... BAs>
-nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_type st,
-						 const nso<BAs...> &original_fm) {
+tau<BAs...> good_reverse_splitter_using_function(const tau<BAs...> &f, splitter_type st,
+						 const tau<BAs...> &original_fm) {
 	assert(is_non_terminal(tau_parser::bf, f));
 	// Convert Boolean function to CNF
 	auto f_cnf = to_cnf2(f, false);
 
 	// Try to remove a conjunt to produce splitter
-	std::vector<nso<BAs...> > m;
+	std::vector<tau<BAs...> > m;
 	size_t i = 0;
 	do {
 		auto s = split(f_cnf, tau_parser::bf, true, st, m, i, true);
 		if (s != f_cnf) {
-			std::map<nso<BAs...>, nso<BAs...> > changes = {{f, s}};
+			std::map<tau<BAs...>, tau<BAs...> > changes = {{f, s}};
 			auto new_fm = replace(original_fm, changes);
 			if(!are_nso_equivalent(original_fm, new_fm))
 				return new_fm;
@@ -153,7 +153,7 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 	} while (++i < m.size());
 
 	// Try to split coefficient in each conjunct of f
-	std::vector<nso<BAs...> > clauses = get_leaves(f_cnf, tau_parser::bf_and, tau_parser::bf);
+	std::vector<tau<BAs...> > clauses = get_leaves(f_cnf, tau_parser::bf_and, tau_parser::bf);
 	for (const auto &clause: clauses) {
 		auto coeff = find_top(clause, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
 		if (!coeff) continue;
@@ -165,7 +165,7 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 		// Negating s results in a reversed splitter for s
 		s = push_negation_in(build_bf_neg(s), false);
 		if (s != coeff.value()) {
-			std::map<nso<BAs...>, nso<BAs...> > changes = {{coeff.value(), s}};
+			std::map<tau<BAs...>, tau<BAs...> > changes = {{coeff.value(), s}};
 			auto new_fm = replace(original_fm, changes);
 			if(!are_nso_equivalent(original_fm, new_fm))
 				return new_fm;
@@ -177,7 +177,7 @@ nso<BAs...> good_reverse_splitter_using_function(const nso<BAs...> &f, splitter_
 // Return a bad splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
-nso<BAs...> tau_bad_splitter(nso<BAs...> fm = _T<BAs...>) {
+tau<BAs...> tau_bad_splitter(tau<BAs...> fm = _T<BAs...>) {
 	auto new_uniter_const = build_wff_neq(get_new_uniter_const(fm, "split"));
 	auto clauses = get_dnf_wff_clauses(fm);
 	// Add bad splitter only to a single disjunct if possible
@@ -190,8 +190,8 @@ nso<BAs...> tau_bad_splitter(nso<BAs...> fm = _T<BAs...>) {
 // Return a splitter for the provided non-temporal formula
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
-std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
-	nso<BAs...> fm, splitter_type st, const nso<BAs...>& spec = nullptr) {
+std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
+	tau<BAs...> fm, splitter_type st, const tau<BAs...>& spec = nullptr) {
 	if (st == splitter_type::bad)
 		return {tau_bad_splitter(fm), splitter_type::bad};
 
@@ -207,13 +207,13 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 		for (const auto &eq: eqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(eq->child[1])));
 			auto f = eq->child[0];
-			std::set<nso<BAs...>> free_vars = get_free_vars_from_nso(fm);
+			std::set<tau<BAs...>> free_vars = get_free_vars_from_nso(fm);
 			for (const auto& c : bf_constants) {
 				// Try to convert f(x,...) = 0 to f(x,...) = 0 && x < c' for some variable x in f
 				auto vars_f = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 				for (const auto& v : vars_f) {
 					if (!free_vars.contains(trim(v))) continue;
-					std::map<nso<BAs...>, nso<BAs...> >
+					std::map<tau<BAs...>, tau<BAs...> >
 							changes = {{clause, build_wff_and(clause,
 									build_bf_less_equal(v, c))}};
 					auto new_fm = replace(fm, changes);
@@ -223,7 +223,7 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 			}
 			if (auto s = good_reverse_splitter_using_function(f, st, clause); s != clause) {
 				//TODO: this equiv check should happen in good_reverse_splitter_using_function
-				std::map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
+				std::map<tau<BAs...>, tau<BAs...> > c = {{clause, s}};
 				auto new_fm = replace(fm, c);
 				if (is_splitter(fm, new_fm, spec))
 					return {new_fm, st};
@@ -242,7 +242,7 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 				if (type_f.has_value() && type_f != type_c)
 					continue;
 				auto r = build_bf_greater_equal(f, c);
-				std::map<nso<BAs...>, nso<BAs...> > changes = {{clause, build_wff_and(clause, r)}};
+				std::map<tau<BAs...>, tau<BAs...> > changes = {{clause, build_wff_and(clause, r)}};
 				auto new_fm = replace(fm, changes);
 				changes = {{neq, _T_trimmed<BAs...>}};
 				new_fm = replace(new_fm, changes);
@@ -251,7 +251,7 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 			}
 			if (auto s = good_splitter_using_function(f, st, clause); s != clause) {
 				//TODO: this equiv check should happen in good_splitter_using_function
-				std::map<nso<BAs...>, nso<BAs...> > c = {{clause, s}};
+				std::map<tau<BAs...>, tau<BAs...> > c = {{clause, s}};
 				auto new_fm = replace(fm, c);
 				if (is_splitter(fm, new_fm, spec))
 					return {new_fm, st};
@@ -260,7 +260,7 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 	}
 
 	// Split disjunction if possible
-	std::vector<nso<BAs...> > m;
+	std::vector<tau<BAs...> > m;
 	size_t i = 0;
 	do {
 		auto s = split(fm, tau_parser::wff, false, st, m, i, true);
@@ -274,13 +274,13 @@ std::pair<nso<BAs...>, splitter_type> nso_tau_splitter(
 
 // We assume fm to be normalized in DNF
 template<typename... BAs>
-nso<BAs...> tau_splitter (const nso<BAs...>& fm, splitter_type st) {
+tau<BAs...> tau_splitter (const tau<BAs...>& fm, splitter_type st) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start of tau_splitter";
 	using p = tau_parser;
 	// First we decide if we deal with a temporal formula
 	if (!has_temp_var(fm)) return nso_tau_splitter(fm, st).first;
 
-	auto splitter_of_clause = [&](const nso<BAs...>& clause) {
+	auto splitter_of_clause = [&](const tau<BAs...>& clause) {
 		auto specs = get_cnf_wff_clauses(clause);
 		if (specs.size() == 1) {
 			// Check if only always + no constraints present
@@ -340,7 +340,7 @@ nso<BAs...> tau_splitter (const nso<BAs...>& fm, splitter_type st) {
 		auto aw = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 		if (aw.has_value()) {
 			auto aw_bad_splitter = tau_bad_splitter(trim2(aw.value()));
-			std::map<nso<BAs...>, nso<BAs...> > c = {
+			std::map<tau<BAs...>, tau<BAs...> > c = {
 				{aw.value(), build_wff_always(aw_bad_splitter)}
 			};
 			return replace(fm, c);

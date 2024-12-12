@@ -15,33 +15,33 @@
 #include "debug_helpers.h"
 #endif // DEBUG
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 using type = std::string;
 
 using filename = std::string;
 
 template<typename...BAs>
-using io_var_name = nso<BAs...>; // out_var_name or in_var_name
+using io_var_name = tau<BAs...>; // out_var_name or in_var_name
 
 template<typename...BAs>
 using var_desc = std::pair<io_var_name<BAs...>, type>;
 
 // represents an solution of variables to values.
 template<typename...BAs>
-using assignment = std::map<nso<BAs...>, nso<BAs...>>;
+using assignment = std::map<tau<BAs...>, tau<BAs...>>;
 
 // A system represent a clause to be solved. It maps the different
 // equations of the clause according to its type.
 template<typename...BAs>
-using system = std::map<type, nso<BAs...>>;
+using system = std::map<type, tau<BAs...>>;
 
 template<typename...BAs>
 struct finputs {
 
 	finputs() = delete;
 
-	finputs(std::map<nso<BAs...>, std::pair<type, filename>> inputs) {
+	finputs(std::map<tau<BAs...>, std::pair<type, filename>> inputs) {
 		// open the corresponding streams for input and store them in streams
 		for (const auto& [var, desc]: inputs) {
 			this->types[var] = desc.first;
@@ -96,7 +96,7 @@ struct finputs {
 
 	// Read input from command line and return mapping from in_vars to this input
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
-		std::vector<nso<BAs...> >& in_vars, size_t time_step) {
+		std::vector<tau<BAs...> >& in_vars, size_t time_step) {
 		std::ranges::sort(in_vars, constant_io_comp);
 		assignment<BAs...> value;
 		for (const auto& var : in_vars) {
@@ -136,7 +136,7 @@ struct finputs {
 		return {value, false};
 	}
 
-	std::optional<type> type_of(const nso<BAs...>& var) {
+	std::optional<type> type_of(const tau<BAs...>& var) {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
@@ -151,8 +151,8 @@ struct finputs {
 		return {};
 	}
 
-	std::map<nso<BAs...>, type> types;
-	std::map<nso<BAs...>, std::optional<std::ifstream>> streams;
+	std::map<tau<BAs...>, type> types;
+	std::map<tau<BAs...>, std::optional<std::ifstream>> streams;
 	size_t time_point = 0;
 };
 
@@ -161,7 +161,7 @@ struct foutputs {
 
 	foutputs() = delete;
 
-	foutputs(std::map<nso<BAs...>, std::pair<type, filename>> outputs) {
+	foutputs(std::map<tau<BAs...>, std::pair<type, filename>> outputs) {
 		// open the corresponding streams for input and store them in streams
 		for (const auto& [var, desc]: outputs) {
 			this->types[var] = desc.first;
@@ -179,7 +179,7 @@ struct foutputs {
 
 	bool write(const assignment<BAs...>& outputs) {
 		// Sort variables in output by time
-		std::vector<nso<BAs...>> io_vars;
+		std::vector<tau<BAs...>> io_vars;
 		for (const auto& [var, ass] : outputs)
 			io_vars.push_back(var);
 		std::ranges::sort(io_vars, constant_io_comp);
@@ -232,7 +232,7 @@ struct foutputs {
 		return true; // success
 	}
 
-	std::optional<type> type_of(const nso<BAs...>& var) {
+	std::optional<type> type_of(const tau<BAs...>& var) {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
@@ -247,8 +247,8 @@ struct foutputs {
 		return {};
 	}
 
-	std::map<nso<BAs...>, type> types;
-	std::map<nso<BAs...>, std::optional<std::ofstream>> streams;
+	std::map<tau<BAs...>, type> types;
+	std::map<tau<BAs...>, std::optional<std::ofstream>> streams;
 
 private:
 
@@ -295,7 +295,7 @@ private:
 					| tau_parser::io_var
 					| tau_parser::out
 					| tau_parser::out_var_name
-					| optional_value_extractor<nso<BAs...>>;
+					| optional_value_extractor<tau<BAs...>>;
 				result[num.value() - lower][io_var] = value;
 			}
 		}
@@ -504,15 +504,15 @@ struct interpreter {
 	assignment<BAs...> memory;
 	size_t formula_time_point;
 	size_t time_point = 0;
-	std::set<nso<BAs...>> outputs;
+	std::set<tau<BAs...>> outputs;
 
 private:
 
-	nso<BAs...> update_to_time_point(const nso<BAs...>& f) {
+	tau<BAs...> update_to_time_point(const tau<BAs...>& f) {
 		// update the f according to current time_point, i.e. for each
 		// input/output var which has a shift, we replace it with the value
 		// corresponding to the current time_point minus the shift.
-		std::map<nso<BAs...>, nso<BAs...>> changes;
+		std::map<tau<BAs...>, tau<BAs...>> changes;
 		for (const auto& io_var:
 				select_top(f, is_non_terminal<tau_parser::io_var, BAs...>))
 			if (auto shift = io_var
@@ -563,15 +563,15 @@ private:
 
 // Return the lookback of the given unbound continuation
 template<typename...BAs>
-size_t compute_lookback(const nso<BAs...>& ubd_ctn) {
-	std::vector<nso<BAs...>> io_vars = select_top(ubd_ctn, is_child_non_terminal<tau_parser::io_var, BAs...>);
+size_t compute_lookback(const tau<BAs...>& ubd_ctn) {
+	std::vector<tau<BAs...>> io_vars = select_top(ubd_ctn, is_child_non_terminal<tau_parser::io_var, BAs...>);
 	int_t max_shift = get_max_shift(io_vars);
 	return (size_t)max_shift;
 }
 
 // Compute the type of the equation f = 0 or f != 0 stored in literal for the solver
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<std::pair<type, nso<BAs...>>> compute_literal(const nso<BAs...>& literal,
+std::optional<std::pair<type, tau<BAs...>>> compute_literal(const tau<BAs...>& literal,
 		input_t& inputs, output_t& outputs) {
 	if (auto io_var = find_top(literal,
 			is_non_terminal<tau_parser::io_var, BAs...>); io_var) {
@@ -594,9 +594,9 @@ std::optional<std::pair<type, nso<BAs...>>> compute_literal(const nso<BAs...>& l
 
 // Get the type for a clause of a local specification
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
+std::optional<system<BAs...>> compute_system(const tau<BAs...>& clause,
 		input_t& inputs, output_t& outputs) {
-	auto is_literal = [](const nso<BAs...>& n) {
+	auto is_literal = [](const tau<BAs...>& n) {
 		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 	};
@@ -627,7 +627,7 @@ std::optional<system<BAs...>> compute_system(const nso<BAs...>& clause,
 
 // Find an executable specification from DNF
 template<typename... BAs>
-nso<BAs...> get_executable_spec(const nso<BAs...>& fm) {
+tau<BAs...> get_executable_spec(const tau<BAs...>& fm) {
 	for (auto& clause : get_dnf_wff_clauses(fm)) {
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
@@ -680,7 +680,7 @@ nso<BAs...> get_executable_spec(const nso<BAs...>& fm) {
 // Return typed systems of equations for the solver corresponding to each clause
 // in the unbound continuation
 template<typename...BAs>
-std::optional<std::vector<system<BAs...>>> compute_systems(const nso<BAs...>& ubd_ctn,
+std::optional<std::vector<system<BAs...>>> compute_systems(const tau<BAs...>& ubd_ctn,
 		auto& inputs, auto& outputs) {
 	std::vector<system<BAs...>> systems;
 	// Create blue-print for solver for each clause
@@ -697,7 +697,7 @@ std::optional<std::vector<system<BAs...>>> compute_systems(const nso<BAs...>& ub
 }
 
 template<typename...BAs>
-std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> spec, auto& inputs, auto& outputs) {
+std::optional<interpreter<BAs...>> make_interpreter(tau<BAs...> spec, auto& inputs, auto& outputs) {
 	// Find a satisfiable unbound continuation from spec
 	auto ubd_ctn = get_executable_spec(spec);
 	if (ubd_ctn == nullptr) {
@@ -721,7 +721,7 @@ std::optional<interpreter<BAs...>> make_interpreter(nso<BAs...> spec, auto& inpu
 };
 
 template<typename...BAs>
-void run(const nso<BAs...>& form, auto& inputs, auto& outputs) {
+void run(const tau<BAs...>& form, auto& inputs, auto& outputs) {
 	auto spec = normalizer(form);
 	auto intrprtr = make_interpreter(spec, inputs, outputs);
 	if (!intrprtr) return;
@@ -747,6 +747,6 @@ void run(const nso<BAs...>& form, auto& inputs, auto& outputs) {
 	}
 }
 
-} // namespace idni::tau
+} // namespace idni::tau_lang
 
 # endif //__INTERPRETER_H__

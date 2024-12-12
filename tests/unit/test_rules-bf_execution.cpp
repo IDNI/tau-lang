@@ -10,11 +10,11 @@
 #include "test_helpers.h"
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
-std::tuple<sp_tau_node<Bool>, sp_tau_node<Bool>, sp_tau_node<Bool>>
+std::tuple<tau<Bool>, tau<Bool>, tau<Bool>>
 	test_rule(const std::string& rule_str)
 {
 	auto src_rule = make_tau_source(rule_str, {

@@ -30,7 +30,7 @@
 using namespace std;
 using namespace idni;
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 // using valgrind for memory leak detection
 //
@@ -75,7 +75,7 @@ int execute_benchmark(const std::string label, const std::string file, const std
 	}
 
 	// removing all measures
-	measures::remove_all<nso<tau_ba<sbf_ba>, sbf_ba>>();
+	measures::remove_all<tau<tau_ba<sbf_ba>, sbf_ba>>();
 	// benchmarking the normalization of a tau formula
 	measures::start_timer("tau_normalization");
 	normalize_test_tau(sample.c_str());
@@ -86,13 +86,13 @@ int execute_benchmark(const std::string label, const std::string file, const std
 	outfile << " (time): " << measures::get_timer("tau_normalization") << " ms\n";
 	outfile << " (rules):";
 	#ifdef TAU_MEASURE
-	if (measures::rule_counters<nso<tau_ba<sbf_ba>, sbf_ba>>.empty()) {
+	if (measures::rule_counters<tau<tau_ba<sbf_ba>, sbf_ba>>.empty()) {
 		outfile << "n/a\n";
 	} else {
 		outfile << "\n\n";
-		using rules_counters = vector<std::pair<rule<nso<tau_ba<sbf_ba>, sbf_ba>>, size_t>>;
-		rules_counters counters(measures::rule_counters<nso<tau_ba<sbf_ba>, sbf_ba>>.begin(),
-			measures::rule_counters<nso<tau_ba<sbf_ba>, sbf_ba>>.end());
+		using rules_counters = vector<std::pair<rule<tau<tau_ba<sbf_ba>, sbf_ba>>, size_t>>;
+		rules_counters counters(measures::rule_counters<tau<tau_ba<sbf_ba>, sbf_ba>>.begin(),
+			measures::rule_counters<tau<tau_ba<sbf_ba>, sbf_ba>>.end());
 		int width = std::floor(std::log10(counters[0].second)) + 2;
 		outfile << "\t" << std::setw(width) << "uses"
 			<< std::setw(width) << "hits"
@@ -101,13 +101,13 @@ int execute_benchmark(const std::string label, const std::string file, const std
 		std::sort(counters.begin(), counters.end(),	[](auto a, auto b) { return a.second > b.second; });
 		size_t total_counters = 0, total_hits = 0;
 		for (auto [rule, counter] : counters) {
-			double ratio = measures::rule_hits<nso<tau_ba<sbf_ba>, sbf_ba>>[rule] * 100 / (double)counter;
+			double ratio = measures::rule_hits<tau<tau_ba<sbf_ba>, sbf_ba>>[rule] * 100 / (double)counter;
 			outfile << "\t" << std::setw(width) << counter
-				<< std::setw(width) << measures::rule_hits<nso<tau_ba<sbf_ba>, sbf_ba>>[rule]
+				<< std::setw(width) << measures::rule_hits<tau<tau_ba<sbf_ba>, sbf_ba>>[rule]
 				<< std::setw(7) << std::fixed << std::setprecision(2) << ratio << "%"
 				<< " " << rule.first << ":=" << rule.second << "\n";
 			total_counters += counter;
-			total_hits += measures::rule_hits<nso<tau_ba<sbf_ba>, sbf_ba>>[rule];
+			total_hits += measures::rule_hits<tau<tau_ba<sbf_ba>, sbf_ba>>[rule];
 		}
 		double total_ratio = total_hits * 100 / (double)total_counters;
 		outfile << "\n\n";

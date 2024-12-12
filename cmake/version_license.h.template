@@ -1,4 +1,4 @@
-namespace idni::tau {
+namespace idni::tau_lang {
 
 constexpr char compile_date[] = "@COMPILE_DATE_ISO@";
 constexpr char version[] = TAU_VERSION " (" GIT_DESCRIBED ")";

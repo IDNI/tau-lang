@@ -9,12 +9,12 @@
 
 using namespace std;
 using namespace idni::rewriter;
-using namespace idni::tau;
-using namespace idni::tau::experimental;
+using namespace idni::tau_lang;
+using namespace idni::tau_lang::experimental;
 
 namespace testing = doctest;
 
-namespace idni::tau::experimental {
+namespace idni::tau_lang::experimental {
 
 sp_node<char> d(const char& value) {
 	vector<sp_node<char>> children;
@@ -235,4 +235,4 @@ TEST_SUITE("repeat") {
 
 }
 
-} // namespace idni::tau::experimental
+} // namespace idni::tau_lang::experimental

@@ -12,18 +12,18 @@
 #include "bdd_handle.h"
 #include "variant_ba.h"
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 // TODO (MEDIUM) clean execution api code
 template<typename... BAs>
 struct step {
-	step(library<nso<BAs...>> lib): lib(lib) {}
+	step(library<tau<BAs...>> lib): lib(lib) {}
 
-	nso<BAs...> operator()(const nso<BAs...>& n) const {
+	tau<BAs...> operator()(const tau<BAs...>& n) const {
 		return nso_rr_apply(lib, n);
 	}
 
-	library<nso<BAs...>> lib;
+	library<tau<BAs...>> lib;
 };
 
 template<typename step_t, typename...BAs>
@@ -34,7 +34,7 @@ struct steps {
 		libraries.push_back(library);
 	}
 
-	nso<BAs...> operator()(const nso<BAs...>& n) const {
+	tau<BAs...> operator()(const tau<BAs...>& n) const {
 		if (libraries.empty()) return n;
 		auto nn = n;
 		for (auto& lib : libraries) nn = lib(nn);
@@ -50,10 +50,10 @@ struct repeat_each {
 	repeat_each(steps<step_t, BAs...> s) : s(s) {}
 	repeat_each(step_t s) : s(steps<step_t, BAs...>(s)) {}
 
-	nso<BAs...> operator()(const nso<BAs...>& n) const {
+	tau<BAs...> operator()(const tau<BAs...>& n) const {
 		auto nn = n;
 		for (auto& l: s.libraries) {
-			std::set<nso<BAs...>> visited;
+			std::set<tau<BAs...>> visited;
 			while (true) {
 				nn = l(nn);
 				if (visited.find(nn) != visited.end()) break;
@@ -72,9 +72,9 @@ struct repeat_all {
 	repeat_all(steps<step_t, BAs...> s) : s(s) {}
 	repeat_all(step_t s) : s(steps<step_t, BAs...>(s)) {}
 
-	nso<BAs...> operator()(const nso<BAs...>& n) const {
+	tau<BAs...> operator()(const tau<BAs...>& n) const {
 		auto nn = n;
-		std::set<nso<BAs...>> visited;
+		std::set<tau<BAs...>> visited;
 		while (true) {
 			for (auto& l: s.libraries) nn = l(nn);
 			auto nnn = s(nn);
@@ -93,7 +93,7 @@ struct repeat_once {
 	repeat_once(steps<step_t, BAs...> s) : s(s) {}
 	repeat_once(step_t s) : s(steps<step_t, BAs...>(s)) {}
 
-	nso<BAs...> operator()(const nso<BAs...>& n) const {
+	tau<BAs...> operator()(const tau<BAs...>& n) const {
 		auto nn = n;
 		for(auto& l: s.libraries) {
 			nn = l(nn);
@@ -105,7 +105,7 @@ struct repeat_once {
 };
 
 template<typename...BAs>
-steps<step<BAs...>, BAs...> operator|(const library<nso<BAs...>>& l, const library<nso<BAs...>>& r) {
+steps<step<BAs...>, BAs...> operator|(const library<tau<BAs...>>& l, const library<tau<BAs...>>& r) {
 	auto s = steps<step<BAs...>, BAs...>(step<BAs...>(l));
 	s.libraries.push_back(r);
 	return s;
@@ -133,44 +133,44 @@ steps<step_t, BAs...> operator|(const steps<step_t, BAs...>& s, const step_t& l)
 }
 
 template<typename step_t, typename... BAs>
-steps<step_t, BAs...> operator|(const steps<step_t, BAs...>& s, const library<nso<BAs...>>& l) {
+steps<step_t, BAs...> operator|(const steps<step_t, BAs...>& s, const library<tau<BAs...>>& l) {
 	auto ns = s;
 	ns.libraries.push_back(l);
 	return ns;
 }
 
 template<typename... BAs>
-steps<step<library<nso<BAs...>>, BAs...>, BAs...> operator|(const steps<step<library<nso<BAs...>>, BAs...>, BAs...>& s, const library<nso<BAs...>>& l) {
+steps<step<library<tau<BAs...>>, BAs...>, BAs...> operator|(const steps<step<library<tau<BAs...>>, BAs...>, BAs...>& s, const library<tau<BAs...>>& l) {
 	auto ns = s;
 	ns.libraries.push_back(l);
 	return ns;
 }
 
 template<typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const library<nso<BAs...>>& l) {
+tau<BAs...> operator|(const tau<BAs...>& n, const library<tau<BAs...>>& l) {
 	auto s = step<BAs...>(l);
 	return s(n);
 }
 
 template<typename step_t, typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const steps<step_t, BAs...>& s) {
+tau<BAs...> operator|(const tau<BAs...>& n, const steps<step_t, BAs...>& s) {
 	return s(n);
 }
 
 template<typename step_t, typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const repeat_once<step_t, BAs...>& r) {
+tau<BAs...> operator|(const tau<BAs...>& n, const repeat_once<step_t, BAs...>& r) {
 	return r(n);
 }
 
 template<typename step_t, typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const repeat_all<step_t, BAs...>& r) {
+tau<BAs...> operator|(const tau<BAs...>& n, const repeat_all<step_t, BAs...>& r) {
 	return r(n);
 }
 
 template<typename step_t, typename... BAs>
-nso<BAs...> operator|(const nso<BAs...>& n, const repeat_each<step_t, BAs...>& r) {
+tau<BAs...> operator|(const tau<BAs...>& n, const repeat_each<step_t, BAs...>& r) {
 	return r(n);
 }
 
-} // namespace idni::tau
+} // namespace idni::tau_lang
 #endif // __EXECUTION_H__

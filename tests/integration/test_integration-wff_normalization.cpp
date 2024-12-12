@@ -6,7 +6,7 @@
 #include "test_integration_helpers-sbf.h"
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
@@ -77,7 +77,7 @@ TEST_SUITE("Normalizer") {
 	// 	CHECK( formula.has_value() );
 	// 	if (!formula.has_value()) return;
 	// 	auto fm = formula.value().main;
-	// 	std::set<nso<sbf_ba>> visited;
+	// 	std::set<tau<sbf_ba>> visited;
 	// 	auto result = push_sometimes_always_in(fm, visited);
 	// 	auto simp_res = result
 	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
@@ -93,7 +93,7 @@ TEST_SUITE("Normalizer") {
 	// 	CHECK( formula.has_value() );
 	// 	if (!formula.has_value()) return;
 	// 	auto fm = formula.value().main;
-	// 	std::set<nso<sbf_ba>> visited;
+	// 	std::set<tau<sbf_ba>> visited;
 	// 	auto result = push_sometimes_always_in(fm, visited);
 	// 	auto simp_res = result
 	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
@@ -108,7 +108,7 @@ TEST_SUITE("Normalizer") {
 	// 	CHECK( formula.has_value() );
 	// 	if (!formula.has_value()) return;
 	// 	auto fm = formula.value().main;
-	// 	std::set<nso<sbf_ba>> visited;
+	// 	std::set<tau<sbf_ba>> visited;
 	// 	auto result = push_sometimes_always_in(fm, visited);
 	// 	auto simp_res = result
 	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)

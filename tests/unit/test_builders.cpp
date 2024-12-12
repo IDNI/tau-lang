@@ -12,7 +12,7 @@
 #include "debug_helpers.h"
 
 using namespace idni::rewriter;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
@@ -68,20 +68,20 @@ TEST_SUITE("builders execution") {
 		| tau_parser::rr | tau_parser::main | tau_parser::wff
 		| tau_parser::bf_eq || tau_parser::bf;
 	auto X = bfs[0] | tau_parser::variable
-		| optional_value_extractor<sp_tau_node<Bool>>;
+		| optional_value_extractor<tau<Bool>>;
 	auto F = bfs[1] | tau_parser::bf_f
-		| optional_value_extractor<sp_tau_node<Bool>>;
+		| optional_value_extractor<tau<Bool>>;
 
 	TEST_CASE("BLDR_WFF_EQ") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EQ);
-		std::vector<sp_tau_node<Bool>> args = {X};
+		std::vector<tau<Bool>> args = {X};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_eq;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BLDR_WFF_NEQ") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_NEQ);
-		std::vector<sp_tau_node<Bool>> args = {X};
+		std::vector<tau<Bool>> args = {X};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_neq;
 		CHECK( check.has_value() );
 	}
@@ -103,21 +103,21 @@ TEST_SUITE("builders execution") {
 
 	TEST_CASE("BLDR_WFF_ALL") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_ALL);
-		std::vector<sp_tau_node<Bool>> args = {X, F};
+		std::vector<tau<Bool>> args = {X, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_all;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BLDR_WFF_EX") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EX);
-		std::vector<sp_tau_node<Bool>> args = {X, F};
+		std::vector<tau<Bool>> args = {X, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_ex;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BLDR_BF_SPLITTER") {
 		auto bldr = make_builder<Bool>(BLDR_BF_SPLITTER);
-		std::vector<sp_tau_node<Bool>> args = {F};
+		std::vector<tau<Bool>> args = {F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_splitter;
 		CHECK( check.has_value() );
 	}
@@ -135,7 +135,7 @@ TEST_SUITE("builders execution") {
 	// TODO (HIGH) implement update this tests to cover upper and lower bounds
 	/*TEST_CASE("BLDR_BF_NOT_LESS_EQUAL") {
 		auto bldr = make_builder<Bool>(BLDR_BF_NOT_LESS_EQUAL);
-		std::vector<sp_tau_node<Bool>> args = {F, F};
+		std::vector<tau<Bool>> args = {F, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_not_less_equal;
 		CHECK( check.has_value() );
 	}*/

@@ -3,7 +3,7 @@
 #ifndef __DEBUG_HELPERS_H__
 #define __DEBUG_HELPERS_H__
 
-namespace idni::tau {
+namespace idni::tau_lang {
 #ifdef DEBUG
 
 template <typename node_t>
@@ -34,7 +34,7 @@ std::ostream& print_sp_tau_source_node_tree(std::ostream &os,
 
 // print the tree of tau nodes for general debugging
 template <typename... BAs>
-std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
+std::ostream& print_tau_tree(std::ostream &os, tau<BAs...> n,
 	size_t l = 0)
 {
 	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
@@ -49,7 +49,7 @@ std::ostream& print_sp_tau_node_tree(std::ostream &os, sp_tau_node<BAs...> n,
 		[&os, &indent](const auto& v) { indent(), os << v; }
 	}, n->value);
 	if (n->child.size()) os << " {\n";
-	for (auto& c : n->child) print_sp_tau_node_tree<BAs...>(os, c, l + 1);
+	for (auto& c : n->child) print_tau_tree<BAs...>(os, c, l + 1);
 	if (n->child.size()) indent(), os << "}";
 	return os << "\n";
 }
@@ -60,8 +60,8 @@ std::ostream& ptree(std::ostream &os, rewriter::sp_node<node_t> n, size_t l = 0)
 }
 
 template <typename... BAs>
-std::ostream& ptree(std::ostream &os, sp_tau_node<BAs...> n, size_t l = 0) {
-	return print_sp_tau_node_tree<BAs...>(os, n, l);
+std::ostream& ptree(std::ostream &os, tau<BAs...> n, size_t l = 0) {
+	return print_tau_tree<BAs...>(os, n, l);
 }
 
 template <typename node_t>
@@ -72,13 +72,13 @@ std::string ptree(rewriter::sp_node<node_t> n, size_t l = 0) {
 }
 
 template <typename... BAs>
-std::string ptree(sp_tau_node<BAs...> n, size_t l = 0) {
+std::string ptree(tau<BAs...> n, size_t l = 0) {
 	std::stringstream ss;
-	print_sp_tau_node_tree<BAs...>(ss, n, l);
+	print_tau_tree<BAs...>(ss, n, l);
 	return ss.str();
 }
 
 #endif // DEBUG
-} // namespace idni::tau
+} // namespace idni::tau_lang
 
 #endif // __DEBUG_HELPERS_H__

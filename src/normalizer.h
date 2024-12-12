@@ -23,7 +23,7 @@
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
@@ -35,7 +35,7 @@ static auto elim_for_all = make_library<BAs...>(
 // executes the normalizer on the given source code taking into account the
 // bindings provided.
 template<typename... BAs>
-rr<nso<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
+rr<tau<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
 	auto form_source = make_tau_source(source, { .start = tau_parser::rr });
 	auto form = make_nso_rr_using_bindings(form_source, binds);
 	return normalizer(form);
@@ -44,7 +44,7 @@ rr<nso<BAs...>> normalizer(std::string& source, bindings<BAs...>& binds) {
 // executes the normalizer on the given source code taking into account the
 // provided factory.
 template<typename factory_t, typename... BAs>
-rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
+rr<tau<BAs...>> normalizer(std::string& source, factory_t& factory) {
 	auto form_source = make_tau_source(source, { .start = tau_parser::rr });
 	auto form = make_nso_rr_using_factory(form_source, factory);
 	return normalizer(form);
@@ -52,9 +52,9 @@ rr<nso<BAs...>> normalizer(std::string& source, factory_t& factory) {
 
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
-nso<BAs...> normalizer_step(const nso<BAs...>& form) {
+tau<BAs...> normalizer_step(const tau<BAs...>& form) {
 	#ifdef TAU_CACHE
-	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	static std::map<tau<BAs...>, tau<BAs...>> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 
@@ -75,9 +75,9 @@ nso<BAs...> normalizer_step(const nso<BAs...>& form) {
 // Assumes that the formula passed does not have temporal quantifiers
 // This normalization will non perform the temporal normalization
 template<typename ... BAs>
-nso<BAs...> normalize_non_temp(const nso<BAs...>& fm) {
+tau<BAs...> normalize_non_temp(const tau<BAs...>& fm) {
 	#ifdef TAU_CACHE
-	static std::map<nso<BAs...>, nso<BAs...>> cache;
+	static std::map<tau<BAs...>, tau<BAs...>> cache;
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 	auto result = fm
@@ -94,14 +94,14 @@ nso<BAs...> normalize_non_temp(const nso<BAs...>& fm) {
 }
 
 template<typename... BAs>
-auto get_vars_from_nso(const nso<BAs...>& n) {
+auto get_vars_from_nso(const tau<BAs...>& n) {
 	return select_top(n, is_var_or_capture<BAs...>);
 }
 
-// Given a nso<BAs...> produce a number such that the variable x_i is
+// Given a tau<BAs...> produce a number such that the variable x_i is
 // neither a bool_variable nor a variable nor a capture
 template<typename... BAs>
-int_t get_new_var_id (const nso<BAs...> fm) {
+int_t get_new_var_id (const tau<BAs...> fm) {
 	auto var_nodes = get_vars_from_nso<BAs...>(fm);
 	std::set vars{1};
 	for (auto var : var_nodes) {
@@ -117,10 +117,10 @@ int_t get_new_var_id (const nso<BAs...> fm) {
 }
 
 
-// Given a nso<BAs...> produce a number i such that the uninterpreted constant const_i is
+// Given a tau<BAs...> produce a number i such that the uninterpreted constant const_i is
 // not present
 template<typename... BAs>
-nso<BAs...> get_new_uniter_const (const nso<BAs...> fm, const std::string& name) {
+tau<BAs...> get_new_uniter_const (const tau<BAs...> fm, const std::string& name) {
 	auto uniter_consts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
 	std::set ids {0};
 	for (auto uniter_const : uniter_consts) {
@@ -148,7 +148,7 @@ using offset_t = std::pair<size_t, size_t>;
 // and vector of its offsets (offset_t)
 template <typename... BAs>
 std::pair<size_t, std::vector<offset_t>> get_ref_info(
-	const sp_tau_node<BAs...>& ref)
+	const tau<BAs...>& ref)
 {
 	//ptree<BAs...>(std::cout << "ref? ", ref) << "\n";
 	std::pair<size_t, std::vector<offset_t>> ret{
@@ -178,8 +178,8 @@ std::pair<size_t, std::vector<offset_t>> get_ref_info(
 };
 
 template <typename... BAs>
-std::optional<sp_tau_node<BAs...>> get_ref(const sp_tau_node<BAs...>& n) {
-	auto ref = std::optional<sp_tau_node<BAs...>>(n);
+std::optional<tau<BAs...>> get_ref(const tau<BAs...>& n) {
+	auto ref = std::optional<tau<BAs...>>(n);
 	while (ref.has_value() && is_non_terminal_node<BAs...>(ref.value())
 		&& (tau_parser::ref != (ref.value()
 			| non_terminal_extractor<BAs...>
@@ -189,13 +189,13 @@ std::optional<sp_tau_node<BAs...>> get_ref(const sp_tau_node<BAs...>& n) {
 		|| tau_parser::ref != (ref.value()
 			| non_terminal_extractor<BAs...>
 			| optional_value_extractor<size_t>))
-				return std::optional<sp_tau_node<BAs...>>();
+				return std::optional<tau<BAs...>>();
 	return ref;
 }
 
 // Check that the Tau formula does not use Boolean combinations of models
 template<typename ...BAs>
-bool has_no_boolean_combs_of_models(const nso<BAs...>& fm) {
+bool has_no_boolean_combs_of_models(const tau<BAs...>& fm) {
 	if (is_non_terminal(tau_parser::wff_always, trim(fm))) {
 		// check that there is no wff_always or wff_sometimes in the subtree
 		if (find_top(trim2(fm), is_non_terminal<tau_parser::wff_always, BAs...>))
@@ -214,9 +214,9 @@ bool has_no_boolean_combs_of_models(const nso<BAs...>& fm) {
 // This method was used before tau_parser::uninterpreted constant was moved
 // under the tau_parser::variable node
 // template<typename... BAs>
-// nso<BAs...> convert_uconsts_to_var (const nso<BAs...>& fm) {
+// tau<BAs...> convert_uconsts_to_var (const tau<BAs...>& fm) {
 // 	auto uconsts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
-// 	std::map<nso<BAs...>, nso<BAs...>> changes;
+// 	std::map<tau<BAs...>, tau<BAs...>> changes;
 // 	for (const auto& uc : uconsts) {
 // 		std::stringstream ss; ss << uc;
 // 		auto tvar = build_variable<BAs...>(ss.str());
@@ -226,7 +226,7 @@ bool has_no_boolean_combs_of_models(const nso<BAs...>& fm) {
 // }
 
 template<typename... BAs>
-bool is_non_temp_nso_satisfiable (const nso<BAs...>& fm) {
+bool is_non_temp_nso_satisfiable (const tau<BAs...>& fm) {
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_always, BAs...>));
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>));
 
@@ -241,7 +241,7 @@ bool is_non_temp_nso_satisfiable (const nso<BAs...>& fm) {
 }
 
 template <typename... BAs>
-bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
+bool are_nso_equivalent(tau<BAs...> n1, tau<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_nso_equivalent";
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
@@ -272,8 +272,8 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 		return false;
 	}
 
-	nso<BAs...> imp1 = build_wff_imply<BAs...>(n1, n2);
-	nso<BAs...> imp2 = build_wff_imply<BAs...>(n2, n1);
+	tau<BAs...> imp1 = build_wff_imply<BAs...>(n1, n2);
+	tau<BAs...> imp2 = build_wff_imply<BAs...>(n2, n1);
 	auto vars = get_free_vars_from_nso(imp1);
 
 	for(auto& v: vars) {
@@ -297,14 +297,14 @@ bool are_nso_equivalent(nso<BAs...> n1, nso<BAs...> n2) {
 }
 
 template <typename... BAs>
-auto is_nso_equivalent_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
-	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
+auto is_nso_equivalent_to_any_of(tau<BAs...>& n, std::vector<tau<BAs...>>& previous) {
+	return std::any_of(previous.begin(), previous.end(), [n] (tau<BAs...>& p) {
 			return are_nso_equivalent<BAs...>(n, p);
 		});
 }
 
 template<typename... BAs>
-bool is_nso_impl (nso<BAs...> n1, nso<BAs...> n2) {
+bool is_nso_impl (tau<BAs...> n1, tau<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin is_nso_impl";
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
@@ -322,7 +322,7 @@ bool is_nso_impl (nso<BAs...> n1, nso<BAs...> n2) {
 		return true;
 	}
 
-	nso<BAs...> imp = build_wff_imply<BAs...>(n1, n2);
+	tau<BAs...> imp = build_wff_imply<BAs...>(n1, n2);
 	auto vars = get_free_vars_from_nso(imp);
 
 	for(auto& v: vars) {
@@ -337,7 +337,7 @@ bool is_nso_impl (nso<BAs...> n1, nso<BAs...> n2) {
 }
 
 template<typename... BAs>
-bool are_bf_equal(nso<BAs...> n1, nso<BAs...> n2) {
+bool are_bf_equal(tau<BAs...> n1, tau<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_bf_equal";
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
@@ -350,7 +350,7 @@ bool are_bf_equal(nso<BAs...> n1, nso<BAs...> n2) {
 		return true;
 	}
 
-	nso<BAs...> bf_equal_fm = build_wff_eq(build_bf_xor(n1, n2));
+	tau<BAs...> bf_equal_fm = build_wff_eq(build_bf_xor(n1, n2));
 	// Replace uninterpreted constants by variables for equivalence check
 	// bf_equal_fm = convert_uconsts_to_var(bf_equal_fm);
 
@@ -367,17 +367,17 @@ bool are_bf_equal(nso<BAs...> n1, nso<BAs...> n2) {
 }
 
 template <typename... BAs>
-auto is_bf_same_to_any_of(nso<BAs...>& n, std::vector<nso<BAs...>>& previous) {
-	return std::any_of(previous.begin(), previous.end(), [n] (nso<BAs...>& p) {
+auto is_bf_same_to_any_of(tau<BAs...>& n, std::vector<tau<BAs...>>& previous) {
+	return std::any_of(previous.begin(), previous.end(), [n] (tau<BAs...>& p) {
 			return are_bf_equal<BAs...>(n, p);
 		});
 }
 
 template<typename... BAs>
-nso<BAs...> normalize_with_temp_simp (const nso<BAs...>& fm) {
+tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 	auto red_fm = normalizer_step(fm);
 	auto clauses = get_dnf_wff_clauses(red_fm);
-	nso<BAs...> new_fm;
+	tau<BAs...> new_fm;
 	for (const auto& clause : clauses) {
 		auto aw_parts = select_top(clause,
 			is_child_non_terminal<tau_parser::wff_always, BAs...>);
@@ -385,12 +385,12 @@ nso<BAs...> normalize_with_temp_simp (const nso<BAs...>& fm) {
 			is_child_non_terminal<tau_parser::wff_sometimes, BAs ...>);
 
 		// Replace always and sometimes parts by T
-		std::map<nso<BAs...>, nso<BAs...>> changes;
+		std::map<tau<BAs...>, tau<BAs...>> changes;
 		for (const auto& aw : aw_parts)
 			changes.emplace(aw, _T<BAs...>);
 		for (const auto& st : st_parts)
 			changes.emplace(st, _T<BAs...>);
-		nso<BAs...> new_clause = replace(clause, changes);
+		tau<BAs...> new_clause = replace(clause, changes);
 
 		// First check if any always statements are implied by others
 		for (size_t i = 0; i < aw_parts.size(); ++i) {
@@ -428,7 +428,7 @@ nso<BAs...> normalize_with_temp_simp (const nso<BAs...>& fm) {
 }
 
 template <typename... BAs>
-size_t get_max_loopback_in_rr(const nso<BAs...>& form) {
+size_t get_max_loopback_in_rr(const tau<BAs...>& form) {
 	size_t max = 0;
 	for (const auto& offset: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>)) {
 		auto current = offset
@@ -442,17 +442,17 @@ size_t get_max_loopback_in_rr(const nso<BAs...>& form) {
 }
 
 template<typename... BAs>
-nso<BAs...> build_shift_from_shift(nso<BAs...> shift, size_t step) {
-	auto num = shift | tau_parser::num | optional_value_extractor<nso<BAs...>>;
+tau<BAs...> build_shift_from_shift(tau<BAs...> shift, size_t step) {
+	auto num = shift | tau_parser::num | optional_value_extractor<tau<BAs...>>;
 	auto offset = num | only_child_extractor<BAs...> | offset_extractor<BAs...> | optional_value_extractor<size_t>;
-	if (step == offset) return shift | tau_parser::capture | optional_value_extractor<nso<BAs...>>;
-	std::map<nso<BAs...>, nso<BAs...>> changes{{num, build_num<BAs...>(step - offset)}};
-	return replace<nso<BAs...>>(shift, changes);
+	if (step == offset) return shift | tau_parser::capture | optional_value_extractor<tau<BAs...>>;
+	std::map<tau<BAs...>, tau<BAs...>> changes{{num, build_num<BAs...>(step - offset)}};
+	return replace<tau<BAs...>>(shift, changes);
 }
 
 template<typename... BAs>
-nso<BAs...> build_main_step(const nso<BAs...>& form, size_t step) {
-	std::map<nso<BAs...>, nso<BAs...>> changes;
+tau<BAs...> build_main_step(const tau<BAs...>& form, size_t step) {
+	std::map<tau<BAs...>, tau<BAs...>> changes;
 	for (const auto& offset : select_top(form,
 				is_non_terminal<tau_parser::offsets, BAs...>))
 	{
@@ -461,12 +461,12 @@ nso<BAs...> build_main_step(const nso<BAs...>& form, size_t step) {
 		auto nshift = build_shift_from_shift<BAs...>(shift.value(), step);
 		changes[shift.value()] = nshift;
 	}
-	return replace<nso<BAs...>>(form, changes);
+	return replace<tau<BAs...>>(form, changes);
 }
 
 // Normalizes a Boolean function having no recurrence relation
 template<typename... BAs>
-nso<BAs...> bf_normalizer_without_rec_relation (const nso<BAs...>& bf) {
+tau<BAs...> bf_normalizer_without_rec_relation (const tau<BAs...>& bf) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
 
 	auto result = bf_boole_normal_form(bf);
@@ -478,7 +478,7 @@ nso<BAs...> bf_normalizer_without_rec_relation (const nso<BAs...>& bf) {
 
 // Normalizes a Boolean function in which recurrence relations are present
 template<typename... BAs>
-nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
+tau<BAs...> bf_normalizer_with_rec_relation(const rr<tau<BAs...>> &bf) {
 	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Begin calculate recurrence relation";
 
 	auto main = calculate_all_fixed_points(bf);
@@ -500,12 +500,12 @@ nso<BAs...> bf_normalizer_with_rec_relation(const rr<nso<BAs...>> &bf) {
 
 // enumerates index in main with step i - used for finding a fixed point
 template <typename... BAs>
-nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
+tau<BAs...> build_enumerated_main_step(const tau<BAs...>& form, size_t i,
 	size_t offset_arity)
 {
 	auto r = form;
-	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	std::vector<sp_tau_node<BAs...>> ofs; // create offsets node
+	std::map<tau<BAs...>, tau<BAs...>> changes;
+	std::vector<tau<BAs...>> ofs; // create offsets node
 	ofs.push_back(wrap<BAs...>(tau_parser::offset, build_num<BAs...>(i)));
 	for (size_t o = 1; o < offset_arity; ++o)
 		ofs.push_back(wrap<BAs...>(tau_parser::offset,
@@ -514,7 +514,7 @@ nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
 	// create enumerated replacement
 	auto ref = r | only_child_extractor<BAs...>
 		| tau_parser::ref
-		| optional_value_extractor<sp_tau_node<BAs...>>;
+		| optional_value_extractor<tau<BAs...>>;
 	changes[ref] = rewriter::make_node<tau_sym<BAs...>>(ref->value, {
 		ref->child[0],
 		wrap<BAs...>(tau_parser::offsets, ofs), ref->child[1] });
@@ -525,7 +525,7 @@ nso<BAs...> build_enumerated_main_step(const nso<BAs...>& form, size_t i,
 }
 
 template <typename... BAs>
-bool is_valid(const rr<nso<BAs...>>& nso_rr) {
+bool is_valid(const rr<tau<BAs...>>& nso_rr) {
 	for (const auto& main_offsets : select_all(nso_rr.main,
 		is_non_terminal<tau_parser::offsets, BAs...>))
 			if (find_top(main_offsets,
@@ -583,7 +583,7 @@ bool is_valid(const rr<nso<BAs...>>& nso_rr) {
 }
 
 template <typename... BAs>
-bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
+bool is_well_founded(const rr<tau<BAs...>>& nso_rr) {
 	std::unordered_map<size_t, std::set<size_t>> graph;
 	std::unordered_map<size_t, bool> visited, visiting;
 	std::function<bool(size_t)> is_cyclic = [&](size_t n) {
@@ -635,9 +635,9 @@ bool is_well_founded(const rr<nso<BAs...>>& nso_rr) {
 }
 
 template <typename... BAs>
-nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
-	const nso<BAs...>& form, tau_parser::nonterminal t, size_t offset_arity,
-	const sp_tau_node<BAs...>& fallback)
+tau<BAs...> calculate_fixed_point(const rr<tau<BAs...>>& nso_rr,
+	const tau<BAs...>& form, tau_parser::nonterminal t, size_t offset_arity,
+	const tau<BAs...>& fallback)
 {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculating fixed point: " << form;
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
@@ -654,8 +654,8 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 
 	if (!is_well_founded(nso_rr)) return nullptr;
 
-	std::vector<nso<BAs...>> previous;
-	nso<BAs...> current;
+	std::vector<tau<BAs...>> previous;
+	tau<BAs...> current;
 	auto eos = "(I) -- End enumeration step";
 
 	size_t max_loopback = 0;
@@ -736,10 +736,10 @@ nso<BAs...> calculate_fixed_point(const rr<nso<BAs...>>& nso_rr,
 template<typename... BAs>
 struct fixed_point_transformer {
 
-	fixed_point_transformer(const rr<nso<BAs...>>& defs,
+	fixed_point_transformer(const rr<tau<BAs...>>& defs,
 		const rr_types& types) : defs(defs), types(types) {}
 
-	sp_tau_node<BAs...> operator()(const sp_tau_node<BAs...>& n) {
+	tau<BAs...> operator()(const tau<BAs...>& n) {
 		if (n->child.size() == 0) return n;
 		if (auto it = changes.find(n); it != changes.end())
 			return it->second;
@@ -757,7 +757,7 @@ struct fixed_point_transformer {
 			return changes.emplace(n, fp).first->second;
 		}
 		bool changed = false;
-		std::vector<sp_tau_node<BAs...>> child;
+		std::vector<tau<BAs...>> child;
 		if (changes.contains(ref))
 			changed = true, child.push_back(changes[ref]);
 		else child.push_back(ref);
@@ -767,7 +767,7 @@ struct fixed_point_transformer {
 	}
 
 	std::pair<tau_parser::nonterminal, size_t> get_type_info(
-		const rr_types& ts, const sp_tau_node<BAs...>& fp_ref)
+		const rr_types& ts, const tau<BAs...>& fp_ref)
 	{
 		// size_t type = fp_ref | non_terminal_extractor<BAs...>
 		// 	| optional_value_extractor<size_t>;
@@ -782,23 +782,23 @@ struct fixed_point_transformer {
 		return { tau_parser::wff, 0 };
 	}
 
-	sp_tau_node<BAs...> get_fallback(tau_parser::nonterminal t,
-		const sp_tau_node<BAs...>& ref)
+	tau<BAs...> get_fallback(tau_parser::nonterminal t,
+		const tau<BAs...>& ref)
 	{
 		auto fallback = ref | tau_parser::ref | tau_parser::fp_fallback;
 		if (!fallback) return t == tau_parser::wff
 			? _F<BAs...> : _0<BAs...>;
 		return fallback | only_child_extractor<BAs...>
-			| optional_value_extractor<sp_tau_node<BAs...>>;
+			| optional_value_extractor<tau<BAs...>>;
 	}
 
-	std::map<sp_tau_node<BAs...>, sp_tau_node<BAs...>> changes;
-	rr<nso<BAs...>> defs;
+	std::map<tau<BAs...>, tau<BAs...>> changes;
+	rr<tau<BAs...>> defs;
 	rr_types types;
 };
 
 template<typename... BAs>
-nso<BAs...> calculate_all_fixed_points(const rr<nso<BAs...>>& recrel) {
+tau<BAs...> calculate_all_fixed_points(const rr<tau<BAs...>>& recrel) {
 	// get types and do type checks
 	rr_types types;
 	bool success = true;
@@ -807,7 +807,7 @@ nso<BAs...> calculate_all_fixed_points(const rr<nso<BAs...>>& recrel) {
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<BAs...> fpt(recrel, types);
 	auto new_main = rewriter::post_order_traverser<decltype(fpt),
-		rewriter::all_t, nso<BAs...>>(fpt, rewriter::all)(recrel.main);
+		rewriter::all_t, tau<BAs...>>(fpt, rewriter::all)(recrel.main);
 	if (!new_main) return nullptr;
 	if (fpt.changes.size()) {
 		new_main = replace(new_main, fpt.changes);
@@ -820,7 +820,7 @@ nso<BAs...> calculate_all_fixed_points(const rr<nso<BAs...>>& recrel) {
 // This function applies the recurrence relations the formula comes with to
 // the formula
 template<typename... BAs>
-nso<BAs...> apply_rr_to_formula (const rr<nso<BAs...>>& nso_rr) {
+tau<BAs...> apply_rr_to_formula (const rr<tau<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Start apply_rr_to_formula";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
 	auto main = calculate_all_fixed_points(nso_rr);
@@ -835,7 +835,7 @@ nso<BAs...> apply_rr_to_formula (const rr<nso<BAs...>>& nso_rr) {
 
 // REVIEW (HIGH) review overall execution
 template <typename... BAs>
-nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
+tau<BAs...> normalizer(const rr<tau<BAs...>>& nso_rr) {
 	// IDEA extract this to an operator| overload
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer";
@@ -850,11 +850,11 @@ nso<BAs...> normalizer(const rr<nso<BAs...>>& nso_rr) {
 }
 
 template <typename... BAs>
-nso<BAs...> normalizer(const nso<BAs...>& form) {
-	rr<nso<BAs...>> nso_rr(form);
+tau<BAs...> normalizer(const tau<BAs...>& form) {
+	rr<tau<BAs...>> nso_rr(form);
 	return normalizer(nso_rr);
 }
 
-} // namespace idni::tau
+} // namespace idni::tau_lang
 
 #endif // __NORMALIZER2_H__

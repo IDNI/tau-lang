@@ -8,19 +8,18 @@
 #include "babdd.h"
 
 using namespace std;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
-sp_sbf_node build_binding(const char* src) {
+tau<tau_ba<sbf_ba>, sbf_ba> build_binding(const char* src) {
 	bdd_init<Bool>();
 	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
 	return bf.parse(src).value();
 }
 
-sbf_ba& get_binding(const sp_sbf_node& n) {
-	return get<sbf_ba>(get<variant<
-			tau_ba<sbf_ba>, sbf_ba>>(n->value));
+sbf_ba& get_binding(const tau<tau_ba<sbf_ba>, sbf_ba>& n) {
+	return get<sbf_ba>(get<variant<tau_ba<sbf_ba>, sbf_ba>>(n->value));
 }
 
 sbf_ba& build_and_get_binding(const char* src) {

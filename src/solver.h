@@ -18,26 +18,26 @@
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 template<typename...BAs>
-using typed_nso = nso<BAs...>;
+using typed_nso = tau<BAs...>;
 template<typename...BAs>
-using var = nso<BAs...>;
+using var = tau<BAs...>;
 template<typename...BAs>
-using minterm = nso<BAs...>;
+using minterm = tau<BAs...>;
 
 template<typename...BAs>
-using equality = nso<BAs...>;
+using equality = tau<BAs...>;
 
 template<typename...BAs>
-using inequality = nso<BAs...>;
+using inequality = tau<BAs...>;
 
 template<typename...BAs>
-using equation = nso<BAs...>;
+using equation = tau<BAs...>;
 
 template<typename...BAs>
-using equations = std::set<nso<BAs...>>;
+using equations = std::set<tau<BAs...>>;
 
 template<typename...BAs>
 using equation_system = std::pair<std::optional<equality<BAs...>>, std::set<inequality<BAs...>>>;
@@ -49,14 +49,14 @@ template<typename...BAs>
 using minterm_system = std::set<inequality<BAs...>>;
 
 template<typename...BAs>
-using solution = std::map<var<BAs...>, nso<BAs...>>;
+using solution = std::map<var<BAs...>, tau<BAs...>>;
 
 using type = std::string;
 
 static const type default_type = "";
 
 template<typename...BAs>
-solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const nso<BAs...>& gh) {
+solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const tau<BAs...>& gh) {
 	solution<BAs...> solution;
 	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
 	auto remaing = select_top(gh, is_child_non_terminal<tau_parser::variable, BAs...>);
@@ -77,7 +77,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 		<< "find_solution/eq: " << eq;
 	#endif // DEBUG
 
-	auto has_no_var = [](const nso<BAs...>& f) {
+	auto has_no_var = [](const tau<BAs...>& f) {
 		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 	};
 
@@ -90,7 +90,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 		return {};
 	}
 
-	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
@@ -191,7 +191,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	auto f = equality
 		| tau_parser::bf_eq
 		| tau_parser::bf
-		| optional_value_extractor<nso<BAs...>>;
+		| optional_value_extractor<tau<BAs...>>;
 	solution<BAs...> phi;
 	for (auto& [x_i, z_i] : s.value())
 		phi[x_i] = ((z_i & f) + (x_i & ~f)) | bf_reduce_canonical<BAs...>();
@@ -226,7 +226,7 @@ public:
 	class sentinel {};
 	static constexpr sentinel end{};
 
-	minterm_iterator(const nso<BAs...>& f) {
+	minterm_iterator(const tau<BAs...>& f) {
 		if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 			// we start with the full bf...
 			auto partial_bf = f;
@@ -278,8 +278,8 @@ private:
 	struct choice {
 		var<BAs...> var;
 		bool value;
-		nso<BAs...> partial_bf;
-		nso<BAs...> partial_minterm;
+		tau<BAs...> partial_bf;
+		tau<BAs...> partial_minterm;
 
 		bool operator==(const choice&) const = default;
 		bool operator!=(const choice&) const = default;
@@ -289,7 +289,7 @@ private:
 	minterm<BAs...> current;
 	bool exhausted = false;
 
-	nso<BAs...> make_current_minterm() {
+	tau<BAs...> make_current_minterm() {
 		auto cte =  choices.back().value
 			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
 			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
@@ -346,7 +346,7 @@ template<typename...BAs>
 class minterm_range {
 public:
 
-	explicit minterm_range(const nso<BAs...>& f): f (f) {}
+	explicit minterm_range(const tau<BAs...>& f): f (f) {}
 
 	bool empty() {
 		return false;
@@ -365,7 +365,7 @@ public:
 	bool operator!=(const minterm_range<BAs...>&) const = default;
 
 private:
-	const nso<BAs...> f;
+	const tau<BAs...> f;
 };
 
 template<typename...BAs>
@@ -386,7 +386,7 @@ public:
 		if (sys.empty()) { exhausted = true; return; }
 		// for each inequality in the system, we create a minterm range
 		for (auto& neq: sys) {
-			auto f = neq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<nso<BAs...>>;
+			auto f = neq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
 			ranges.push_back(minterm_range(f));
 		}
 		// we initialize the minterm iterators
@@ -488,36 +488,36 @@ private:
 };
 
 template<typename...BAs>
-nso<BAs...> get_constant(const minterm<BAs...>& m) {
+tau<BAs...> get_constant(const minterm<BAs...>& m) {
 	auto cte = find_top(m, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
 	return cte ? cte.value() : _1<BAs...>;
 }
 
 template<typename...BAs>
-nso<BAs...> get_minterm(const minterm<BAs...>& m) {
-	auto is_literal = [](const nso<BAs...> n) {
+tau<BAs...> get_minterm(const minterm<BAs...>& m) {
+	auto is_literal = [](const tau<BAs...> n) {
 		return is_non_terminal<tau_parser::bf>(n)
 			&& !is_child_non_terminal<tau_parser::bf_constant>(n)
 			&& !is_child_non_terminal<tau_parser::bf_and>(n);
 	};
 	auto literals = select_top(m, is_literal);
-	std::set<nso<BAs...>> all_literals(literals.begin(), literals.end());
+	std::set<tau<BAs...>> all_literals(literals.begin(), literals.end());
 	return build_bf_and<BAs...>(all_literals);
 }
 
 template<typename...BAs>
-std::set<nso<BAs...>> get_exponent(const nso<BAs...>& n) {
+std::set<tau<BAs...>> get_exponent(const tau<BAs...>& n) {
 	auto is_bf_literal = [](const auto& n) -> bool {
 		return (n | tau_parser::variable).has_value()
 			|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
 	};
 	auto all_vs = select_top(n, is_bf_literal);
-	return std::set<nso<BAs...>>(all_vs.begin(), all_vs.end());
+	return std::set<tau<BAs...>>(all_vs.begin(), all_vs.end());
 }
 
 template<typename...BAs>
 minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint,
-		const minterm<BAs...>& m, const nso<BAs...>& splitter_one) {
+		const minterm<BAs...>& m, const tau<BAs...>& splitter_one) {
 	minterm_system<BAs...> new_disjoint;
 	auto new_m = m;
 	for (auto& d: disjoint) {
@@ -543,7 +543,7 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 					// case 4.2
 					: splitter(d_cte
 						| tau_parser::bf_constant
-						| optional_value_extractor<nso<BAs...>>);
+						| optional_value_extractor<tau<BAs...>>);
 				new_disjoint.insert(s & d);
 				new_m = ~s & new_m;
 			}
@@ -556,7 +556,7 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 
 template<typename...BAs>
 minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys,
-		const nso<BAs...>& splitter_one) {
+		const tau<BAs...>& splitter_one) {
 	minterm_system<BAs...> disjoints;
 	for (auto it = sys.begin(); it != sys.end(); ++it)
 		disjoints = add_minterm_to_disjoint<BAs...>(disjoints, *it, splitter_one);
@@ -565,7 +565,7 @@ minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system,
-		const nso<BAs...>& splitter_one) {
+		const tau<BAs...>& splitter_one) {
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
@@ -591,7 +591,7 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 		auto nf = neq
 			| tau_parser::bf_neq
 			| tau_parser::bf
-			| optional_value_extractor<nso<BAs...>>
+			| optional_value_extractor<tau<BAs...>>
 			| bf_reduce_canonical<BAs...>();
 		auto cte = get_constant(nf);
 		auto minterm = get_minterm(nf);
@@ -603,7 +603,7 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system,
-		const nso<BAs...>& splitter_one) {
+		const tau<BAs...>& splitter_one) {
 	// Following Taba book:
 	//
 	// To solve  {h_i (T) ̸= 0}i∈I (and hence the original system whose solution
@@ -653,7 +653,7 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
-		const nso<BAs...>& splitter_one) {
+		const tau<BAs...>& splitter_one) {
 	// As in the Taba book, we consider
 	// 		f (X) = 0
 	//		{g_i (X) ̸= 0}i∈I
@@ -731,7 +731,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		// resulting value for var
 		auto free_vars = get_free_vars_from_nso(func_with_neq_assgm);
 		if (!free_vars.empty()) {
-			std::map<nso<BAs...>, nso<BAs...>> free_var_assgm;
+			std::map<tau<BAs...>, tau<BAs...>> free_var_assgm;
 			for (const auto& free_var : free_vars)
 				free_var_assgm.emplace(free_var, _0_trimmed<BAs...>);
 			solution[var] = replace(func_with_neq_assgm, free_var_assgm) |
@@ -742,7 +742,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 }
 
 template<typename...BAs>
-std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const nso<BAs...>& splitter_one) {
+std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const tau<BAs...>& splitter_one) {
 	// split among equalities and inequalities
 	equation_system<BAs...> system;
 	for (const auto& eq: eqs) {
@@ -754,11 +754,11 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const nso<BA
 				auto l = system.first.value()
 					| tau_parser::bf_eq
 					| tau_parser::bf
-					| optional_value_extractor<nso<BAs...>>;
+					| optional_value_extractor<tau<BAs...>>;
 				auto r = eq
 					| tau_parser::bf_eq
 					| tau_parser::bf
-					| optional_value_extractor<nso<BAs...>>;
+					| optional_value_extractor<tau<BAs...>>;
 				system.first = build_wff_eq(l | r);
 			}
 		}
@@ -769,7 +769,7 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const nso<BA
 
 // entry point for the solver
 template<typename...BAs>
-std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
+std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 		const std::string& type = "") {
 	if (form == _T<BAs...>) return { solution<BAs...>() };
 	auto splitter_one = nso_factory<BAs...>::instance().splitter_one(type);
@@ -781,18 +781,18 @@ std::optional<solution<BAs...>> solve(const nso<BAs...>& form,
 
 	auto dnf = form | bf_reduce_canonical<BAs...>();
 	for (auto& clause: get_leaves(form, tau_parser::wff_or, tau_parser::wff)) {
-		auto is_equation = [](const nso<BAs...>& n) {
+		auto is_equation = [](const tau<BAs...>& n) {
 			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 		};
 		auto eqs = select_top(clause, is_equation);
 		if (eqs.empty()) continue;
 		auto solution = solve<BAs...>(
-			std::set<nso<BAs...>>(eqs.begin(), eqs.end()), splitter_one);
+			std::set<tau<BAs...>>(eqs.begin(), eqs.end()), splitter_one);
 		if (solution.has_value()) return solution;
 	}
 	return {};
 }
 
-} // idni::tau namespace
+} // idni::tau_lang namespace
 #endif // __SOLVER_H__

@@ -9,7 +9,7 @@
 #include "utils.h"
 #include "splitter_types.h"
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 template<typename...BAs>
 std::variant<BAs...> operator&(const std::variant<BAs...>& l, const std::variant<BAs...>& r) {
@@ -247,7 +247,7 @@ bool operator!=(const bool& l, const variant_ba<BAs...>& r) {
 	return r != l;
 }
 
-} // namespace idni::tau
+} // namespace idni::tau_lang
 
 //TODO (MEDIUM) add << for variant_ba
 

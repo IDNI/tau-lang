@@ -9,13 +9,12 @@
 
 #include "../parser/sbf_parser.generated.h"
 
-namespace idni::tau {
+namespace idni::tau_lang {
 
 /**
  * @brief Simple Boolean function Boolean algebra represented by bdd 
  */
 using sbf_ba = hbdd<Bool>;
-using sp_sbf_node = sp_tau_node<tau_ba<sbf_ba>, sbf_ba>;
 using sbf_source_sym = idni::lit<char, char>;
 using sbf_sym = std::variant<sbf_source_sym, sbf_ba>;
 
@@ -38,7 +37,7 @@ struct sbf_ba_factory {
 	 * @param src source string
 	 * @return optional parsed node if parsing successful
 	 */
-	std::optional<nso<BAs...>> parse(const std::string& src);
+	std::optional<tau<BAs...>> parse(const std::string& src);
 
 	/**
 	 * @brief builds a SBF bounded node from a parsed terminals of a source binding
@@ -46,7 +45,7 @@ struct sbf_ba_factory {
 	 * @param sn tau code node with parsed SBF 
 	 * @return bounded constant
 	 */
-	nso<BAs...> binding(const nso<BAs...>& sn);
+	tau<BAs...> binding(const tau<BAs...>& sn);
 
 	std::variant<BAs...> splitter_one () const;
 
@@ -56,7 +55,7 @@ struct sbf_ba_factory {
 	// static sbf_ba_factory<BAs...>& instance();
 private:
 
-	inline static std::map<std::string, nso<BAs...>> cache;
+	inline static std::map<std::string, tau<BAs...>> cache;
 };
 
 /**
@@ -66,15 +65,15 @@ template<>
 struct nso_factory<sbf_ba> {
 	inline static sbf_ba_factory<sbf_ba> bf;
 
-	std::optional<nso<sbf_ba>> parse(const std::string& src,
+	std::optional<tau<sbf_ba>> parse(const std::string& src,
 		const std::string& = "");
 
-	nso<sbf_ba> binding(const nso<sbf_ba>& n,
+	tau<sbf_ba> binding(const tau<sbf_ba>& n,
 		const std::string& = "");
 
 	std::vector<std::string> types() const;
 
-	nso<sbf_ba> splitter_one() const;
+	tau<sbf_ba> splitter_one() const;
 
 	std::string default_type() const;
 
@@ -95,18 +94,18 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 	inline static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
 	inline static tau_ba_factory<sbf_ba> tf;
 
-	std::optional<gssotc<sbf_ba>> parse(const std::string src,
+	std::optional<tau_nso<sbf_ba>> parse(const std::string src,
 		const std::string type_name);
 
-	gssotc<sbf_ba> binding(
-		const sp_tau_node<tau_ba<sbf_ba>, sbf_ba>& n,
+	tau_nso<sbf_ba> binding(
+		const tau<tau_ba<sbf_ba>, sbf_ba>& n,
 		const std::string type_name);
 
 	std::vector<std::string> types() const;
 
 	std::string default_type() const;
 
-	gssotc<sbf_ba> splitter_one(const std::string& type_name) const;
+	tau_nso<sbf_ba> splitter_one(const std::string& type_name) const;
 
 	std::string one(const std::string type_name = "tau") const;
 
@@ -117,6 +116,6 @@ private:
 	nso_factory();
 };
 
-} // namespace idni::tau
+} // namespace idni::tau_lang
 #include "sbf_ba.tmpl.h"
 #endif // __SBF_BA_H__

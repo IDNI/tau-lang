@@ -17,7 +17,7 @@
 #include "sbf_ba.h"
 
 using namespace boost::log;
-using namespace idni::tau;
+using namespace idni::tau_lang;
 
 std::string random_file(const std::string& extension = ".out", const std::string prefix = "/tmp/") {
     // define the characters to use in the random string
@@ -48,7 +48,7 @@ struct output_sbf_console {
 		return true; // success (always)
 	}
 
-	std::optional<type> type_of(const nso<BAs...>&) {
+	std::optional<type> type_of(const tau<BAs...>&) {
 		return { "sbf" }; // sbf (always)
 	}
 };
@@ -70,7 +70,7 @@ struct input_sbf_vector {
 		return { assignment<BAs...>{}, false };
 	}
 
-	std::optional<type> type_of(const nso<BAs...>&) {
+	std::optional<type> type_of(const tau<BAs...>&) {
 		return { "sbf" }; // sbf (always)
 	}
 
@@ -351,7 +351,7 @@ TEST_SUITE("only outputs") {
 TEST_SUITE("with inputs and outputs") {
 
 	input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> build_i1_inputs(
-			std::vector<nso<tau_ba<sbf_ba>, sbf_ba>> values) {
+			std::vector<tau<tau_ba<sbf_ba>, sbf_ba>> values) {
 		std::vector<assignment<tau_ba<sbf_ba>, sbf_ba>> assignments;
 		for (const auto& value: values) {
 			assignment<tau_ba<sbf_ba>, sbf_ba> assignment;
@@ -404,7 +404,7 @@ TEST_SUITE("with inputs and outputs") {
 TEST_SUITE("test inputs") {
 
 	TEST_CASE("reading from file with sbf inputs") {
-		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> input_map;
+		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> input_map;
 		auto var = build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		input_map[var] = { "sbf", "integration/test_files/sbf-alternating_zeros_and_ones-length_10.in"};
 		finputs<tau_ba<sbf_ba>, sbf_ba> inputs(input_map);
@@ -421,7 +421,7 @@ TEST_SUITE("test inputs") {
 	}
 
 	TEST_CASE("reading from file with tau program inputs") {
-		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> input_map;
+		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> input_map;
 		auto var = build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		input_map[var] = { "tau", "integration/test_files/tau-alternating_zeros_and_ones-length_10.in"};
 		finputs<tau_ba<sbf_ba>, sbf_ba> inputs(input_map);
@@ -441,7 +441,7 @@ TEST_SUITE("test inputs") {
 TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to file") {
-		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
 		auto var = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		auto var_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);
 
@@ -461,7 +461,7 @@ TEST_SUITE("test outputs") {
 	}
 
 	TEST_CASE("writing to files: two outputs") {
-		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
 		auto var1 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		auto var2 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(2);
 		auto var1_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);
@@ -486,7 +486,7 @@ TEST_SUITE("test outputs") {
 	}
 
 	TEST_CASE("writing to files: completing outputs") {
-		std::map<nso<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
 		auto var1 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		auto var2 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(2);
 		auto var1_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);
