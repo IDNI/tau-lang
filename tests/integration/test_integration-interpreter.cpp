@@ -41,16 +41,18 @@ std::string random_file(const std::string& extension = ".out", const std::string
 template<typename...BAs>
 struct output_sbf_console {
 
-	bool write(const assignment<BAs...>& outputs) {
+	bool write(const assignment<BAs...>& outputs) const {
 		// for each stream in out.streams, write the value from the solution
 		for (const auto& [var, value]: outputs)
 			std::cout << var << " <- " << value << "\n";
 		return true; // success (always)
 	}
 
-	std::optional<type> type_of(const tau<BAs...>&) {
+	std::optional<type> type_of(const nso<BAs...>&) const {
 		return { "sbf" }; // sbf (always)
 	}
+
+	assignment<BAs...> streams;
 };
 
 template<typename...BAs>
@@ -59,23 +61,23 @@ struct input_sbf_vector {
 	input_sbf_vector() = default;
 	input_sbf_vector(std::vector<assignment<BAs...>>& inputs): inputs(inputs) {}
 
-	std::optional<assignment<BAs...>> read() {
+	std::optional<assignment<BAs...>> read() const {
 		if (inputs.empty()) return { assignment<BAs...>{} };
 		if (current == inputs.size()) return {};
 		return inputs[current++];
 	}
 
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
-		const auto& , const size_t ) {
+		const auto& , const size_t ) const {
 		return { assignment<BAs...>{}, false };
 	}
 
-	std::optional<type> type_of(const tau<BAs...>&) {
+	std::optional<type> type_of(const nso<BAs...>&) const {
 		return { "sbf" }; // sbf (always)
 	}
 
 	std::vector<assignment<BAs...>> inputs;
-	size_t current = 0;
+	mutable size_t current = 0;
 };
 
 std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
@@ -91,8 +93,11 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 	std::cout << "run_test/sample: " << sample << "\n";
 	#endif // DEBUG
 
-	if (auto intprtr = make_interpreter(spec, inputs, outputs); intprtr) {
-
+	auto intprtr = interpreter<
+		input_sbf_vector<tau_ba<sbf_ba>, sbf_ba>,
+		output_sbf_console<tau_ba<sbf_ba>, sbf_ba>,
+		tau_ba<sbf_ba>, sbf_ba>::make_interpreter(spec, inputs, outputs);
+	if (intprtr) {
 		// we read the inputs only once (they are always empty in this test suite)
 
 		for (size_t i = 0; i < times; ++i) {
@@ -108,7 +113,7 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 			} else std::cout << "{}\n"; // no input
 			#endif // DEBUG
 
-			auto [out, _ ] = intprtr.value().step(inputs);
+			auto [out, _ ] = intprtr.value().step();
 
 			// The output can be empty if all variables have been assigned in previous steps
 			if (!out.has_value()) {
