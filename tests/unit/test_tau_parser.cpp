@@ -1153,6 +1153,26 @@ TEST_SUITE("parsing bindings ") {
 	}
 }
 
+
+TEST_SUITE("regression/disallow T and F as variables") {
+
+	TEST_CASE("T is not a variable") {
+		const char* sample =
+			"T = 0.";
+		auto src = make_tau_source(sample);
+		CHECK( src == nullptr );
+	}
+
+	TEST_CASE("F is not a variable") {
+		const char* sample =
+			"F = 0.";
+		auto src = make_tau_source(sample);
+		CHECK( src == nullptr );
+	}
+
+}
+
+
 // TODO (VERY_LOW) write tests for parsing bf_is_one_cb
 // TODO (VERY_LOW) write tests for parsing bf_has_clashing_subformulas_cb
 // TODO (VERY_LOW) write tests for parsing bf_has_subformula_cb

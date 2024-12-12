@@ -105,8 +105,8 @@ constraint =>
  | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_less.
 
 # variables
-variable[charvar]      => alpha digit*.
-variable[var]          => chars.
+variable[charvar]      => (alpha & ~'T' & ~'F') digit*.
+variable[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
 variable               => (in | out):io_var.
 variable               => uninterpreted_constant.
 in                     => ("i" digit+):in_var_name  '[' offset ']'.
