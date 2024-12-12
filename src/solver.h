@@ -627,7 +627,8 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 		BOOST_LOG_TRIVIAL(trace)
 			<< "\t" << inequality;
 	#endif // DEBUG
-
+	// If no inequality is contained, return an empty solution
+	if (system.empty()) return solution<BAs...>{};
 	//for (auto& ms: minterm_inequality_system_range<BAs...>(system)) {
 	for (auto it = minterm_inequality_system_iterator<BAs...>(system); it != minterm_inequality_system_iterator<BAs...>::end; ++it) {
 
