@@ -45,6 +45,9 @@ endif()
 
 set(LINK_OPTIONS "-flto=auto")
 
+message(STATUS "COMPILE_OPTIONS ${COMPILE_OPTIONS}")
+message(STATUS "LINK_OPTIONS ${LINK_OPTIONS}")
+
 include(git-defs) # for ${GIT_DEFINITIONS}
 function(target_git_definitions target)
 	target_compile_definitions(${target} PRIVATE ${GIT_DEFINITIONS})
