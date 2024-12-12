@@ -552,8 +552,8 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 			}
 		}
 
-		auto outs = foutputs<tau_ba_t, BAs...>(current_outputs);
-		run<tau_ba_t, BAs...>(dnf, ins, outs);
+		auto outs = foutputs<tau_ba<BAs...>, BAs...>(current_outputs);
+		run(dnf, ins, outs);
 		return;
 	}
 
