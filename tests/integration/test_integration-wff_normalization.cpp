@@ -3,7 +3,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-
 #include "test_integration_helpers-sbf.h"
 
 using namespace idni::rewriter;
@@ -17,7 +16,7 @@ TEST_SUITE("Normalizer") {
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result |  tau_parser::wff_t;
+		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 	TEST_CASE("2") {
@@ -25,7 +24,7 @@ TEST_SUITE("Normalizer") {
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result |  tau_parser::wff_f;
+		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 	TEST_CASE("3") {
@@ -33,7 +32,7 @@ TEST_SUITE("Normalizer") {
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result |  tau_parser::wff_t;
+		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 	TEST_CASE("4") {
@@ -41,7 +40,7 @@ TEST_SUITE("Normalizer") {
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result |  tau_parser::wff_t;
+		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 	TEST_CASE("5") {
@@ -49,7 +48,7 @@ TEST_SUITE("Normalizer") {
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result |  tau_parser::wff_f;
+		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 	TEST_CASE("6") {
@@ -57,7 +56,7 @@ TEST_SUITE("Normalizer") {
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result |  tau_parser::wff_f;
+		auto check = result | tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
 	TEST_CASE("7") {
@@ -65,7 +64,7 @@ TEST_SUITE("Normalizer") {
 		auto sample_src = make_tau_source(sample);
 		auto sample_formula = make_nso_rr_using_factory<sbf_ba>(sample_src);
 		auto result = normalizer<sbf_ba>(sample_formula.value());
-		auto check = result |  tau_parser::wff_t;
+		auto check = result | tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
 }
