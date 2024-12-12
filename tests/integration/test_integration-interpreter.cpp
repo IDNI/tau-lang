@@ -48,7 +48,7 @@ struct output_sbf_console {
 		return true; // success (always)
 	}
 
-	std::optional<type> type_of(const nso<BAs...>&) const {
+	std::optional<type> type_of(const tau<BAs...>&) const {
 		return { "sbf" }; // sbf (always)
 	}
 
@@ -72,7 +72,7 @@ struct input_sbf_vector {
 		return { assignment<BAs...>{}, false };
 	}
 
-	std::optional<type> type_of(const nso<BAs...>&) const {
+	std::optional<type> type_of(const tau<BAs...>&) const {
 		return { "sbf" }; // sbf (always)
 	}
 
