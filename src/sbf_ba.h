@@ -11,21 +11,41 @@
 
 namespace idni::tau {
 
+/**
+ * @brief Simple Boolean function Boolean algebra represented by bdd 
+ */
 using sbf_ba = hbdd<Bool>;
 using sp_sbf_node = sp_tau_node<tau_ba<sbf_ba>, sbf_ba>;
 using sbf_source_sym = idni::lit<char, char>;
 using sbf_sym = std::variant<sbf_source_sym, sbf_ba>;
 
-// global static bdd variable cache
+/**
+ * @brief global static bdd variable cache
+ */
 inline static std::map<int_t, sbf_ba> var_cache{};
 
+/**
+ * @brief Boolean algebra factory for Simple Boolean function
+ * 
+ * @tparam BAs Boolean algebras
+ */
 template<typename...BAs>
 struct sbf_ba_factory {
 
-	// parses a SBF from a string
+	/**
+	 * @brief parses a SBF from a string
+	 *
+	 * @param src source string
+	 * @return optional parsed node if parsing successful
+	 */
 	std::optional<nso<BAs...>> parse(const std::string& src);
 
-	// builds a SBF bounded node parsed from terminals of a source binding
+	/**
+	 * @brief builds a SBF bounded node from a parsed terminals of a source binding
+	 * 
+	 * @param sn tau code node with parsed SBF 
+	 * @return bounded constant
+	 */
 	nso<BAs...> binding(const nso<BAs...>& sn);
 
 	std::variant<BAs...> splitter_one () const;
@@ -39,7 +59,9 @@ private:
 	inline static std::map<std::string, nso<BAs...>> cache;
 };
 
-// using during testing
+/**
+ * @brief NSO factory used during testing
+ */
 template<>
 struct nso_factory<sbf_ba> {
 	inline static sbf_ba_factory<sbf_ba> bf;
@@ -65,7 +87,9 @@ private:
 	nso_factory();
 };
 
-// using in repl
+/**
+ * @brief NSO factory used in REPL
+ */
 template<>
 struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 	inline static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
