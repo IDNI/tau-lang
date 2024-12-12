@@ -4,9 +4,6 @@
 
 namespace idni::tau_lang {
 
-// template <typename...BAs>
-// tau_ba<BAs...>::
-
 template <typename...BAs>
 tau_ba<BAs...>::tau_ba(rules<tau_nso_t>& rec_relations, tau_nso_t& main)
 		: nso_rr({ rec_relations, main }) {}
@@ -28,7 +25,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 template <typename...BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
-	tau_nso_t nmain = build_wff_and<tau_ba<BAs...>, BAs...>(nso_rr.main,
+	tau_nso_t nmain = build_wff_and<tau_ba_t, BAs...>(nso_rr.main,
 							other.nso_rr.main);
 	rules<tau_nso_t> nrec_relations =
 		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
@@ -38,7 +35,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba_t& other) const {
 template <typename...BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
-	tau_nso_t nmain = build_wff_or<tau_ba<BAs...>, BAs...>(nso_rr.main,
+	tau_nso_t nmain = build_wff_or<tau_ba_t, BAs...>(nso_rr.main,
 							other.nso_rr.main);
 	rules<tau_nso_t> nrec_relations =
 		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
@@ -48,7 +45,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba_t& other) const {
 template <typename...BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
-	tau_nso_t nmain = build_wff_xor_from_def<tau_ba<BAs...>, BAs...>(
+	tau_nso_t nmain = build_wff_xor_from_def<tau_ba_t, BAs...>(
 						nso_rr.main, other.nso_rr.main);
 	rules<tau_nso_t> nrec_relations =
 		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
@@ -74,7 +71,7 @@ bool tau_ba<BAs...>::is_one() const {
 
 template <typename...BAs>
 tau<tau_ba<BAs...>, BAs...> tau_ba<BAs...>::rename(
-	const tau<tau_ba<BAs...>, BAs...>& form) const
+	const tau<tau_ba_t, BAs...>& form) const
 {
 	// TODO (MEDIUM) implement properly
 	return form;

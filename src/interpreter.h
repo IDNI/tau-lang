@@ -96,7 +96,7 @@ struct finputs {
 
 	// Read input from command line and return mapping from in_vars to this input
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
-		std::vector<nso<BAs...> >& in_vars, size_t time_step) const {
+		std::vector<tau<BAs...> >& in_vars, size_t time_step) const {
 		std::ranges::sort(in_vars, constant_io_comp);
 		assignment<BAs...> value;
 		for (const auto& var : in_vars) {
@@ -142,7 +142,7 @@ struct finputs {
 		return {value, false};
 	}
 
-	std::optional<type> type_of(const nso<BAs...>& var) const {
+	std::optional<type> type_of(const tau<BAs...>& var) const {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
@@ -157,8 +157,8 @@ struct finputs {
 		return {};
 	}
 
-	std::map<nso<BAs...>, type> types;
-	mutable std::map<nso<BAs...>, std::optional<std::ifstream>> streams;
+	std::map<tau<BAs...>, type> types;
+	mutable std::map<tau<BAs...>, std::optional<std::ifstream>> streams;
 	size_t time_point = 0;
 };
 
@@ -185,7 +185,7 @@ struct foutputs {
 
 	bool write(const assignment<BAs...>& outputs) {
 		// Sort variables in output by time
-		std::vector<nso<BAs...>> io_vars;
+		std::vector<tau<BAs...>> io_vars;
 		for (const auto& [var, ass] : outputs) {
 			assert(is_child_non_terminal(tau_parser::io_var, trim(var)));
 			io_vars.push_back(var);
@@ -240,7 +240,7 @@ struct foutputs {
 		return true; // success
 	}
 
-	std::optional<type> type_of(const nso<BAs...>& var) const {
+	std::optional<type> type_of(const tau<BAs...>& var) const {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
@@ -348,7 +348,7 @@ private:
 
 template<typename input_t, typename output_t, typename...BAs>
 struct interpreter {
-	interpreter(const nso<BAs...>& ubt_ctn, assignment<BAs...>& memory,
+	interpreter(const tau<BAs...>& ubt_ctn, assignment<BAs...>& memory,
 		const auto& input, const auto& output) :
 						ubt_ctn(ubt_ctn),
 						memory(memory),
@@ -366,14 +366,14 @@ struct interpreter {
 	}
 
 	static std::optional<interpreter> make_interpreter(
-		nso<BAs...> spec, const auto& inputs, const auto& outputs);
+		tau<BAs...> spec, const auto& inputs, const auto& outputs);
 
 	std::pair<std::optional<assignment<BAs...>>, bool> step();
 
 	// store all the possible systems to be solved, each system corresponds to a
 	// different clause.
 
-	nso<BAs...> ubt_ctn;
+	tau<BAs...> ubt_ctn;
 	assignment<BAs...> memory;
 	size_t time_point = 0;
 	// TODO: Remove inputs and outputs, once type inference for variables is ready
@@ -392,32 +392,32 @@ private:
 
 	// Return typed systems of equations for the solver corresponding to each clause
 	// in the unbound continuation
-	static std::vector<system<BAs...>> compute_systems(const nso<BAs...>& ubd_ctn,
+	static std::vector<system<BAs...>> compute_systems(const tau<BAs...>& ubd_ctn,
 		const auto& inputs, const auto& outputs);
 
 	// Get the type for a clause of a local specification
-	static std::optional<system<BAs...>> compute_atomic_fm_types(const nso<BAs...>& clause,
+	static std::optional<system<BAs...>> compute_atomic_fm_types(const tau<BAs...>& clause,
 		const auto& inputs, const auto& outputs);
 
 	// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
-	static std::optional<std::pair<type, nso<BAs...>>> get_type_fm(const nso<BAs...>& fm,
+	static std::optional<std::pair<type, tau<BAs...>>> get_type_fm(const tau<BAs...>& fm,
 		const auto& inputs, const auto& outputs);
 
-	nso<BAs...> update_to_time_point(const nso<BAs...>& f);
+	tau<BAs...> update_to_time_point(const tau<BAs...>& f);
 
 	// If a variable is assigned a variable V in a solution from the solver,
 	// try to find a non-variable value by checking the solution for V
 	void resolve_solution_dependencies(solution<BAs...>& s);
 
 	// Return the lookback and highest initial position of the given unbound continuation
-	void compute_lookback_and_initial (const nso<BAs...>& ubd_ctn);
+	void compute_lookback_and_initial (const tau<BAs...>& ubd_ctn);
 
 	// Find an executable specification from DNF
-	static nso<BAs...> get_executable_spec(const nso<BAs...>& fm);
+	static tau<BAs...> get_executable_spec(const tau<BAs...>& fm);
 };
 
 template<typename input_t, typename output_t, typename...BAs>
-void run(const nso<BAs...>& form, input_t& inputs, output_t& outputs) {
+void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
 	auto spec = normalizer(form);
 	auto intrprtr = interpreter<input_t, output_t, BAs...>
 		::make_interpreter(spec, inputs, outputs);

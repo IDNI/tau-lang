@@ -81,7 +81,7 @@ struct tau_ba_factory {
 	using tau_nso_t = tau_nso<BAs...>;
 	std::optional<tau_nso_t> parse(const std::string& src);
 	tau_nso_t binding(const tau_nso_t& n);
-	std::variant<tau_ba<BAs...>, BAs...> splitter_one() const;
+	std::variant<tau_ba_t, BAs...> splitter_one() const;
 	std::string one(std::string&) const;
 	std::string zero(std::string&) const;
 };
