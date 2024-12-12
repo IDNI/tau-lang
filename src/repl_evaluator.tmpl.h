@@ -509,6 +509,16 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		//
 		auto dnf = normalizer_step(applied);
 
+		// Make sure that there is no free variable in the formula
+		auto free_vars = get_free_vars_from_nso(dnf);
+		for (const auto& var : free_vars) {
+			if (!is_child_non_terminal(tau_parser::io_var, var) &&
+				!is_child_non_terminal(tau_parser::uninterpreted_constant, var)) {
+				BOOST_LOG_TRIVIAL(error) << "(Error) The variable " << var << " must be quantified and cannot appear free\n";
+				return;
+			}
+		}
+
 		// select current input variables
 		auto in_vars = select_all(dnf,
 			is_non_terminal<tau_parser::in_var_name, tau_ba_t, BAs...>);
