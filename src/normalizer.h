@@ -375,6 +375,14 @@ auto is_bf_same_to_any_of(tau<BAs...>& n, std::vector<tau<BAs...>>& previous) {
 
 template<typename... BAs>
 tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
+	using p = tau_parser;
+	auto trim_q = [](const auto& n) {
+		if (is_child_non_terminal(p::wff_always, n))
+			return trim2(n);
+		if (is_child_non_terminal(p::wff_sometimes, n))
+			return trim2(n);
+		return n;
+	};
 	auto red_fm = normalizer_step(fm);
 	auto clauses = get_dnf_wff_clauses(red_fm);
 	tau<BAs...> new_fm;
@@ -404,16 +412,16 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		// Next check if any always statement implies a sometimes statement
 		for (const auto& aw : aw_parts) {
 			for (auto& st : st_parts) {
-				if (is_nso_impl(aw, trim2(st)))
+				if (is_nso_impl(aw, trim_q(st)))
 					st = _T<BAs...>;
 			}
 		}
 		// Now check if any sometimes statement implies another sometimes
 		for (size_t i = 0; i < st_parts.size(); ++i) {
 			for (size_t j = i+1; j < st_parts.size(); ++j) {
-				if (is_nso_impl(trim2(st_parts[i]), trim2(st_parts[j])))
+				if (is_nso_impl(trim_q(st_parts[i]), trim_q(st_parts[j])))
 					st_parts[j] = _T<BAs...>;
-				else if (is_nso_impl(trim2(st_parts[j]), trim2(st_parts[i])))
+				else if (is_nso_impl(trim_q(st_parts[j]), trim_q(st_parts[i])))
 					st_parts[i] = _T<BAs...>;
 			}
 		}
