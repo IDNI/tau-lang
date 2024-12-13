@@ -1461,7 +1461,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	for (const auto& p : pos) {
 		for (auto& neq_clause : cnf_neq_lits){
 			for (auto& n : neq_clause) {
-				// Simplify cases p' = 0&& p != 0 and p = 0 && p' != 0
+				// Simplify cases p' = 0 && p != 0 and p = 0 && p' != 0
 				if (p.size() == 1 && n.size() == 1) {
 					if (is_child_non_terminal(tp::bf_neg, p[0])) {
 						if (trim2(p[0]) == n[0]) { n[0] = _1<BAs...>; continue; }
@@ -1487,6 +1487,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 			bool all_subset = true;
 			for (int_t c2 = 0; c2 < (int_t)cnf_neq_lits.size(); ++c2) {
 				if (c1 == c2) continue;
+				if (cnf_neq_lits[c2].empty()) continue;
 				for (size_t j = 0; j < cnf_neq_lits[c2].size(); ++j) {
 					if (cnf_neq_lits[c2][j].empty()) continue;
 					if (!is_ordered_subset(cnf_neq_lits[c1][i], cnf_neq_lits[c2][j])) {

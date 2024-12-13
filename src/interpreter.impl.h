@@ -211,8 +211,6 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 		}
 		// Eliminate added quantifiers
 		step_ubt_ctn = normalize_non_temp(step_ubt_ctn);
-		std::cout << "time_point: " << time_point << "\n";
-		std::cout << "step_ubt_ctn: " << step_ubt_ctn << "\n";
 		systems = compute_systems(step_ubt_ctn, inputs, outputs);
 		if (systems.empty()) return false;
 	} else if (time_point == initial_segment) {
