@@ -1335,10 +1335,11 @@ struct free_vars_collector {
 			// IDEA using quantified_variable => variable | capture would simplify the code
 			auto var = find_top(n, is_var_or_capture<BAs...>);
 			if (var.has_value()) {
-				if (auto it = free_vars.find(var.value()); it != free_vars.end())
+				if (auto it = free_vars.find(var.value()); it != free_vars.end()) {
 					free_vars.erase(it);
+					BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << var.value();
+				}
 			}
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << var.value();
 		}
 		if (is_var_or_capture<BAs...>(n)) {
 			if (auto check = n
