@@ -511,7 +511,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 
 		// Make sure that there is no free variable in the formula
 		auto free_vars = get_free_vars_from_nso(dnf);
-		if (free_vars.size() > 1) {
+		if (!free_vars.empty()) {
 			// all elements of the set must be quantified
 			std::stringstream ss;
 			for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
@@ -595,7 +595,13 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	{
 		auto [t, program] = nn.value();
 		auto applied = apply_rr_to_rr_tau_nso(t, program);
+
 		applied = normalize_non_temp(applied);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace) << "solve_cmd/applied: " << applied << "\n";
+		#endif // DEBUG
+
 		if (!nn) {
 			BOOST_LOG_TRIVIAL(error) <<
 				"(Error) invalid argument\n"; return;
