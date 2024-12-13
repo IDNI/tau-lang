@@ -513,15 +513,20 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		auto free_vars = get_free_vars_from_nso(dnf);
 		if (!free_vars.empty()) {
 			// all elements of the set must be quantified
-			std::stringstream ss;
+			std::stringstream ss; bool has_real_free_vars = false;
 			for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
 				if (!is_child_non_terminal(tau_parser::io_var, *it) &&
-					!is_child_non_terminal(tau_parser::uninterpreted_constant, *it))
-					ss << *it << " ";
+					!is_child_non_terminal(tau_parser::uninterpreted_constant, *it)) {
+						ss << *it << " ";
+						has_real_free_vars = true;
+					}
 			}
-			BOOST_LOG_TRIVIAL(error)
-				<< "(Error) The following variable(s) must be quantified and cannot appear free: " << ss.str() << "\n";
-			return;
+
+			if (has_real_free_vars) {
+				BOOST_LOG_TRIVIAL(error)
+					<< "(Error) The following variable(s) must be quantified and cannot appear free: " << ss.str() << "\n";
+				return;
+			}
 		}
 
 		// select current input variables
