@@ -95,6 +95,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		.to_inline = {
 			{ 14, 62, 14 },
 			{ 21, 115, 21 },
+			{ 137, 115, 21 },
 			{ 172 },
 			{ 173 },
 			{ 192 },

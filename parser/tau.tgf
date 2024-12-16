@@ -289,5 +289,5 @@ severity               => ("e" | "error"):error_sym
 @inline char classes, chars, q_var, src_c,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg, solve_cmd_arg,
-        bf  > bf_parenthesis  > bf,
+        bf  > bf_parenthesis  > bf, bf_and_nosep_1st_op > bf_parenthesis > bf,
         wff > wff_parenthesis > wff.
