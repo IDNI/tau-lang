@@ -1568,13 +1568,15 @@ tau<BAs...> bind_tau_code_using_factory(const tau<BAs...>& code)
 
 // make a nso_rr from the given tau code
 template <typename... BAs>
-rr<tau<BAs...>> make_nso_rr_from_binded_code(const tau<BAs...>& code) {
+std::optional<rr<tau<BAs...>>> make_nso_rr_from_binded_code(
+	const tau<BAs...>& code)
+{
 	if (is_non_terminal(tau_parser::bf, code)
 		|| is_non_terminal(tau_parser::ref, code))
-			return { {}, code };
+			return { { {}, code } };
 
 	if (is_non_terminal(tau_parser::rec_relations, code))
-		return {make_rec_relations<BAs...>(code), {}};
+		return { { make_rec_relations<BAs...>(code), {} } };
 
 	auto main = (is_non_terminal(tau_parser::tau_constant_source, code)
 		|| is_non_terminal(tau_parser::rr, code)
@@ -1588,10 +1590,11 @@ rr<tau<BAs...>> make_nso_rr_from_binded_code(const tau<BAs...>& code) {
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-rr<tau<BAs...>> make_nso_rr_using_binder(const tau<BAs...>& code,
+std::optional<rr<tau<BAs...>>> make_nso_rr_using_binder(const tau<BAs...>& code,
 	binder_t& binder)
 {
 	auto binded = bind_tau_code_using_binder<binder_t, BAs...>(code, binder);
+	if (!binded) return {};
 	return make_nso_rr_from_binded_code<BAs...>(binded);
 }
 
@@ -1604,10 +1607,11 @@ tau<BAs...> make_nso_using_binder(const tau<BAs...>& code,
 
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
-rr<tau<BAs...>> make_nso_rr_using_binder(sp_tau_source_node& source,
-	binder_t& binder)
+std::optional<rr<tau<BAs...>>> make_nso_rr_using_binder(
+	sp_tau_source_node& source, binder_t& binder)
 {
 	auto code = make_tau_code<BAs...>(source);
+	if (!code) return {};
 	return make_nso_rr_using_binder<binder_t, BAs...>(code, binder);
 }
 
@@ -1616,6 +1620,7 @@ tau<BAs...> make_nso_using_binder(sp_tau_source_node& source,
 	binder_t& binder)
 {
 	auto code = make_tau_code<BAs...>(source);
+	if (!code) return nullptr;
 	return make_nso_using_binder<binder_t, BAs...>(code, binder);
 }
 
@@ -1645,8 +1650,8 @@ std::optional<tau<BAs...>> make_nso_using_binder(std::string& input,
 
 // make a nso_rr from the given tau source and bindings.
 template <typename... BAs>
-rr<tau<BAs...>> make_nso_rr_using_bindings(const tau<BAs...>& code,
-	const bindings<BAs...>& bindings)
+std::optional<rr<tau<BAs...>>> make_nso_rr_using_bindings(
+	const tau<BAs...>& code, const bindings<BAs...>& bindings)
 {
 	name_binder<BAs...> nb(bindings);
 	return make_nso_rr_using_binder<name_binder<BAs...>, BAs...>(code, nb);
@@ -1700,7 +1705,9 @@ std::optional<tau<BAs...>> make_nso_using_bindings(
 }
 
 template <typename... BAs>
-rr<tau<BAs...>> make_nso_rr_using_factory(const tau<BAs...>& code) {
+std::optional<rr<tau<BAs...>>> make_nso_rr_using_factory(
+	const tau<BAs...>& code)
+{
 	factory_binder<BAs...> fb;
 	return make_nso_rr_using_binder<
 			factory_binder<BAs...>, BAs...>(code,fb);
@@ -1899,7 +1906,7 @@ std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
 }
 
 template <typename... BAs>
-rr<tau<BAs...>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
+std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin type inferrence"; // << ": " << nso_rr;
 	// for (auto& r : nso_rr.rec_relations)
 	// 	ptree<BAs...>(std::cout << "rule left: ", r.first) << "\n",
@@ -2017,16 +2024,17 @@ rr<tau<BAs...>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 
 	for (const auto& err : ts.errors)
 		BOOST_LOG_TRIVIAL(error) << "(Error) " << err;
-	if (ts.errors.size()) return { {}, nullptr };
+	if (ts.errors.size()) return {};
 
 	if (todo_names.size()) {
 		std::stringstream ss;
 		for (auto& fn : todo_names) ss << " " << fn;
-		BOOST_LOG_TRIVIAL(error) << "(Error) Unknown type for:" << ss.str();
-		return { {}, nullptr };
+		BOOST_LOG_TRIVIAL(error)
+			<< "(Error) Unknown type for:" << ss.str();
+		return {};
 	}
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End type inferrence"; // << ": " << nn;
-	return nn;
+	return { nn };
 }
 
 
