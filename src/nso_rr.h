@@ -2015,7 +2015,9 @@ rr<tau<BAs...>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 		}
 	}
 
-	for (const auto& err : ts.errors) BOOST_LOG_TRIVIAL(error) << "(Error) " << err;
+	for (const auto& err : ts.errors)
+		BOOST_LOG_TRIVIAL(error) << "(Error) " << err;
+	if (ts.errors.size()) return { {}, nullptr };
 
 	if (todo_names.size()) {
 		std::stringstream ss;
