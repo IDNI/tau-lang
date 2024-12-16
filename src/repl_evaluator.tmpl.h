@@ -82,13 +82,20 @@ tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 	const size_t type, const tau_nso_t& program)
 {
 	bool contains_ref = contains(program, tau_parser::ref);
-	rr<tau_nso_t> rr_ = (contains_ref && type == tau_parser::rr)
-		? make_nso_rr_from_binded_code<tau_ba_t, BAs...>(program)
-		: rr<tau_nso_t>(program);
-	if (contains_ref)
+	rr<tau_nso_t> rr_{ nullptr };
+	if (contains_ref && type == tau_parser::rr) {
+		if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
+				program); x) rr_ = x.value();
+		else return {};
+	} else rr_ = rr<tau_nso_t>(program);
+	if (contains_ref) {
 		rr_.rec_relations.insert(rr_.rec_relations.end(),
-			definitions.begin(), definitions.end()),
-		rr_ = infer_ref_types<tau_ba_t, BAs...>(rr_);
+			definitions.begin(), definitions.end());
+		if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_); infr)
+			rr_ = infr.value();
+		else return nullptr;
+	}
+	
 	rr_.main = apply_rr_to_formula(rr_);
 	return rr_.main;
 }
@@ -451,15 +458,19 @@ std::optional<tau_nso<BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
-		rr<tau_nso_t> rr_ =
-			(contains_ref && type == tau_parser::rr)
-				? make_nso_rr_from_binded_code<
-						tau_ba_t, BAs...>(value)
-				: rr<tau_nso_t>(value);
-		if (contains_ref)
+		rr<tau_nso_t> rr_{ nullptr };
+		if (contains_ref && type == tau_parser::rr) {
+		if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
+				value); x) rr_ = x.value();
+		else return {};
+		} else rr_ = rr<tau_nso_t>(value);
+		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end()),
-			rr_ = infer_ref_types<tau_ba_t, BAs...>(rr_);
+				definitions.begin(), definitions.end());
+			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
+				infr) rr_ = infr.value();
+			else return {};
+		}
 		if (!rr_.main) return {};
 		if (!is_non_terminal(tau_parser::bf, rr_.main))
 			return normalizer<tau_ba_t, BAs...>(rr_);
@@ -644,15 +655,19 @@ std::optional<tau_nso<BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
-		rr<tau_nso_t> rr_ =
-			(contains_ref && type == tau_parser::rr)
-				? make_nso_rr_from_binded_code<
-						tau_ba_t, BAs...>(value)
-				: rr<tau_nso_t>(value);
-		if (contains_ref)
+		rr<tau_nso_t> rr_{ nullptr };
+		if (contains_ref && type == tau_parser::rr) {
+			if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
+				value); x) rr_ = x.value();
+			else return {};
+		}
+		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end()),
-			rr_ = infer_ref_types<tau_ba_t,BAs...>(rr_);
+				definitions.begin(), definitions.end());
+			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
+				infr) rr_ = infr.value();
+			else return {};
+		}
 		if (is_non_terminal(tau_parser::bf, rr_.main)) {
 			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 			return {};
@@ -674,15 +689,19 @@ std::optional<tau_nso<BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
-		rr<tau_nso_t> rr_ =
-			(contains_ref && type == tau_parser::rr)
-				? make_nso_rr_from_binded_code<
-						tau_ba_t, BAs...>(value)
-				: rr<tau_nso_t>(value);
-		if (contains_ref)
+		rr<tau_nso_t> rr_{ nullptr };
+		if (contains_ref && type == tau_parser::rr) {
+			if (auto x = make_nso_rr_from_binded_code<
+				tau_ba_t, BAs...>(value); x) rr_ = x.value();
+			else return {};
+		} else rr_ = rr<tau_nso_t>(value);
+		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end()),
-			rr_ = infer_ref_types<tau_ba_t,BAs...>(rr_);
+				definitions.begin(), definitions.end());
+			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
+				infr) rr_ = infr.value();
+			else return {};
+		}
 		if (is_non_terminal(tau_parser::bf, rr_.main)) {
 			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 			return {};
@@ -719,15 +738,19 @@ std::optional<tau_nso<BAs...>>
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
-		rr<tau_nso_t> rr_ =
-			(contains_ref && type == tau_parser::rr)
-				? make_nso_rr_from_binded_code<
-						tau_ba_t, BAs...>(value)
-				: rr<tau_nso_t>(value);
-		if (contains_ref)
+		rr<tau_nso_t> rr_{ nullptr };
+		if (contains_ref && type == tau_parser::rr) {
+			if (auto x = make_nso_rr_from_binded_code<
+				tau_ba_t, BAs...>(value); x) rr_ = x.value();
+			else return {};
+		} else rr_ = rr<tau_nso_t>(value);
+		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
-				definitions.begin(), definitions.end()),
-			rr_ = infer_ref_types<tau_ba_t,BAs...>(rr_);
+				definitions.begin(), definitions.end());
+			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
+				infr) rr_ = infr.value();
+			else return {};
+		}
 		if (is_non_terminal(tau_parser::bf, rr_.main)) {
 			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 			return {};
