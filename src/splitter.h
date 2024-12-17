@@ -282,20 +282,6 @@ tau<BAs...> tau_splitter (const tau<BAs...>& fm, splitter_type st) {
 
 	auto splitter_of_clause = [&](const tau<BAs...>& clause) {
 		auto specs = get_cnf_wff_clauses(clause);
-		if (specs.size() == 1) {
-			// Check if only always + no constraints present
-			if (is_child_non_terminal(p::wff_always, specs[0]) && !
-			    find_top(specs[0],
-				     is_non_terminal<p::constraint, BAs...>). has_value()) {
-				// Split unbound continuation
-				auto ubd_ctn = transform_to_execution(specs[0]);
-				BOOST_LOG_TRIVIAL(trace) << "Unbound continuation for splitter: " << ubd_ctn;
-				auto res = nso_tau_splitter(ubd_ctn, st);
-				res.first = build_wff_always(res.first);
-				BOOST_LOG_TRIVIAL(trace) << "Splitter of unbound continuation: " << res.first;
-				return res;
-			}
-		}
 		bool good_splitter = false;
 		for (auto& spec : specs) {
 			bool is_aw = is_child_non_terminal(p::wff_always, spec);
