@@ -96,6 +96,15 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, tau_ba<sbf_ba>, sbf_ba>);
 		CHECK(check_uniter_const.has_value());
 	}
+
+	TEST_CASE("Tau_splitter_9") {
+		const char *sample = "(always o1[t] = i1[t]).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		auto check_uniter_const = find_top(s, is_non_terminal<tau_parser::uninterpreted_constant, tau_ba<sbf_ba>, sbf_ba>);
+		CHECK(check_uniter_const.has_value());
+	}
 }
 
 TEST_SUITE("Tau_splitter_middle_tests") {
