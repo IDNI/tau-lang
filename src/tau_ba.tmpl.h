@@ -125,7 +125,7 @@ auto normalize (const tau_ba<BAs...>& fm) {
 
 template<typename... BAs>
 auto splitter (const tau_ba<BAs...>& fm, splitter_type st) {
-	auto s = tau_splitter(fm.nso_rr.main, st);
+	auto s = tau_splitter(normalizer(fm.nso_rr), st);
 	return tau_ba<BAs...>(s);
 }
 
