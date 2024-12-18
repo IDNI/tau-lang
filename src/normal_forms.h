@@ -1310,6 +1310,7 @@ tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
 template<typename... BAs>
 tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 	assert(is_non_terminal(tau_parser::bf, fm));
+	bool was_simplified = false;
 	auto grouped = group_dnf_expression(fm);
 	auto clauses = get_dnf_bf_clauses(grouped);
 	for (int_t i = 0; i < (int_t)clauses.size(); ++i) {
@@ -1325,6 +1326,7 @@ tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 				if (cnf[k] == cn) {
 					cnf.erase(cnf.begin() + k);
 					has_simp = true;
+					was_simplified = true;
 					if (cnf.empty()) {
 						erase_clause = true;
 					}
@@ -1343,7 +1345,7 @@ tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 			--i;
 		}
 	}
-	return to_dnf2(build_bf_or<BAs...>(clauses), false);
+	return was_simplified ? to_dnf2(build_bf_or<BAs...>(clauses), false) : fm;
 }
 
 // Assume that fm is in DNF (or CNF -> set is_cnf to true)
@@ -1655,10 +1657,14 @@ std::pair<std::vector<int_t>, bool> simplify_path(
                 clause = replace(clause, changes);
                 continue;
             }
+			if (sorted_v != v) {
+				std::map<tau<BAs...>, tau<BAs...>> changes = {{v, sorted_v}};
+				clause = replace(clause, changes);
+			}
 			// There is a new variable
-			assert(v != build_wff_eq(_T<BAs...>) && v != build_wff_eq(_F<BAs...>));
-			vars.push_back(v);
-			var_to_idx.emplace(v, vars.size() - 1);
+			assert(sorted_v != build_wff_eq(_T<BAs...>) && sorted_v != build_wff_eq(_F<BAs...>));
+			vars.push_back(sorted_v);
+			var_to_idx.emplace(sorted_v, vars.size() - 1);
 		}
 	}
 	return clause_to_vector(clause, var_to_idx, true, false);
@@ -2083,7 +2089,7 @@ tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
 				to_dnf2(trim(new_fm)->child[1], is_wff));
 			// Perform simplification
 			if (conj != new_fm)
-                new_fm = reduce2(conj, p::bf);
+                		new_fm = reduce2(conj, p::bf);
 		} else if (is_child_non_terminal(p::bf_or, new_fm)) {
 			new_fm = build_bf_or(
 				to_dnf2(trim(new_fm)->child[0], is_wff),
