@@ -74,7 +74,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	// find a variable, say x, in the equality
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
-		<< "find_solution/eq: " << eq;
+		<< "solver.h:" << __LINE__ << " find_solution/eq: " << eq;
 	#endif // DEBUG
 
 	auto has_no_var = [](const tau<BAs...>& f) {
@@ -84,7 +84,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	if (!(eq | tau_parser::bf_eq).has_value()) {
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "find_solution/solution[no_eq]: {}";
+			<< "solver.h:" << __LINE__ << " find_solution/solution[no_eq]: {}";
 		#endif // DEBUG
 
 		return {};
@@ -94,7 +94,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
-		<< "find_solution/f: " << f;
+		<< "solver.h:" << __LINE__ << " find_solution/f: " << f;
 	#endif // DEBUG
 
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
@@ -107,21 +107,21 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "find_solution/var[0]: " << vars[0] << "\n"
-			<< "find_solution/g: " << g << "\n"
-			<< "find_solution/h: " << h << "\n"
-			<< "find_solution/gh: " << gh << "\n"
-			<< "find_solution/solution[removed_vars]: ";
+			<< "solver.h:" << __LINE__ << " find_solution/var[0]: " << vars[0] << "\n"
+			<< "solver.h:" << __LINE__ << " find_solution/g: " << g << "\n"
+			<< "solver.h:" << __LINE__ << " find_solution/h: " << h << "\n"
+			<< "solver.h:" << __LINE__ << " find_solution/gh: " << gh << "\n"
+			<< "solver.h:" << __LINE__ << " find_solution/solution[removed_vars]: ";
 		for (const auto& [k, v]: solution)
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << k << " := " << v << " ";
+				<< "solver.h:" << __LINE__ << "\t" << k << " := " << v << " ";
 		#endif // DEBUG
 
 		if (has_no_var(gh)) {
 			if (gh != _0<BAs...>) {
 				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
-					<< "find_solution/solution[gh_no_var,gh_!=_0]: {}";
+					<< "solver.h:" << __LINE__ << " find_solution/solution[gh_no_var,gh_!=_0]: {}";
 				#endif // DEBUG
 
 				return {};
@@ -132,10 +132,10 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 
 				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
-					<< "find_solution/solution[gh_no_var,gh=0]: ";
+					<< "solver.h:" << __LINE__ << " find_solution/solution[gh_no_var,gh=0]: ";
 				for (const auto& [k, v]: solution)
 					BOOST_LOG_TRIVIAL(trace)
-						<< "\t" << k << " := " << v << " ";
+						<< "solver.h:" << __LINE__ << "\t" << k << " := " << v << " ";
 				#endif // DEBUG
 
 				return solution;
@@ -150,10 +150,10 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 
 			#ifdef DEBUG
 			BOOST_LOG_TRIVIAL(trace)
-				<< "find_solution/solution[general]: ";
+				<< "solver.h:" << __LINE__ << " find_solution/solution[general]: ";
 			for (const auto& [k, v]: solution)
 				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " := " << v << " ";
+					<< "solver.h:" << __LINE__ << "\t" << k << " := " << v << " ";
 			#endif // DEBUG
 
 			return solution;
@@ -162,7 +162,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
-		<< "find_solution/solution[no_var]: {}";
+		<< "solver.h:" << __LINE__ << " find_solution/solution[no_var]: {}";
 	#endif // DEBUG
 
 	return {};
@@ -178,12 +178,17 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
 
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " lgrs/eq: " << equality << "\n";
+	#endif // DEBUG
+
 	auto s = find_solution(equality);
 	if (!s.has_value()) {
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "lgrs/solution: {}";
+			<< "solver.h:" << __LINE__ << " lgrs/solution: {}";
 		#endif // DEBUG
 
 		return {};
@@ -198,15 +203,15 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
-		<< "lgrs/equality: " << equality << "\n"
-		<< "lgrs/solution: ";
+		<< "solver.h:" << __LINE__ << " lgrs/equality: " << equality << "\n"
+		<< "solver.h:" << __LINE__ << " lgrs/solution: ";
 	for (const auto& [k, v] : phi)
 		BOOST_LOG_TRIVIAL(trace)
-			<< "\t" << k << " := " << v << " ";
+			<< "solver.h:" << __LINE__ << "\t" << k << " := " << v << " ";
 	auto copy = phi;
 	auto check = snf_wff(replace(equality, copy));
 	BOOST_LOG_TRIVIAL(trace)
-		<< "lgrs/check: " << check << "\n";
+		<< "solver.h:" << __LINE__ << " lgrs/check: " << check << "\n";
 	#endif // DEBUG
 
 	return phi;
@@ -297,7 +302,7 @@ private:
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "make_current_minterm/current: " << current;
+			<< "solver.h:" << __LINE__ << " make_current_minterm/current: " << current;
 		#endif // DEBUG
 
 		return current;
@@ -439,10 +444,10 @@ private:
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "make_current_minterm_system/minterms: ";
+			<< "solver.h:" << __LINE__ << " make_current_minterm_system/minterms: ";
 		for (const auto& minterm: minterms)
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << minterm;
+				<< "solver.h:" << __LINE__ << "\t" << minterm;
 		#endif // DEBUG
 
 		return minterms;
@@ -489,20 +494,13 @@ private:
 
 template<typename...BAs>
 tau<BAs...> get_constant(const minterm<BAs...>& m) {
-	auto cte = find_top(m, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
-	return cte ? cte.value() : _1<BAs...>;
-}
-
-template<typename...BAs>
-tau<BAs...> get_minterm(const minterm<BAs...>& m) {
-	auto is_literal = [](const tau<BAs...> n) {
-		return is_non_terminal<tau_parser::bf>(n)
-			&& !is_child_non_terminal<tau_parser::bf_constant>(n)
-			&& !is_child_non_terminal<tau_parser::bf_and>(n);
+	//auto cte = find_top(m, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
+	//return cte ? cte.value() : _1<BAs...>;
+	auto is_bf_constant = [](const auto& n) -> bool {
+		return is_child_non_terminal<tau_parser::bf_constant, BAs...>(n);
 	};
-	auto literals = select_top(m, is_literal);
-	std::set<tau<BAs...>> all_literals(literals.begin(), literals.end());
-	return build_bf_and<BAs...>(all_literals);
+	auto all_vs = select_top(m, is_bf_constant);
+	return build_bf_and<BAs...>(all_vs);
 }
 
 template<typename...BAs>
@@ -516,18 +514,42 @@ std::set<tau<BAs...>> get_exponent(const tau<BAs...>& n) {
 }
 
 template<typename...BAs>
+tau<BAs...> get_minterm(const minterm<BAs...>& m) {
+	/*auto is_literal = [](const tau<BAs...> n) {
+		return is_non_terminal<tau_parser::bf>(n)
+			&& !is_child_non_terminal<tau_parser::bf_constant>(n)
+			&& !is_child_non_terminal<tau_parser::bf_and>(n);
+	};
+	auto literals = select_top(m, is_literal);
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " get_minterm/literals:\n";
+	for (const auto& l: literals)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << l;
+	#endif // DEBUG
+
+
+	std::set<tau<BAs...>> all_literals(literals.begin(), literals.end());*/
+	return build_bf_and<BAs...>(get_exponent(m));
+}
+
+template<typename...BAs>
 minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint,
 		const minterm<BAs...>& m, const tau<BAs...>& splitter_one) {
 	minterm_system<BAs...> new_disjoint;
 	auto new_m = m;
+	auto new_m_cte = get_constant(new_m);
+	auto new_m_exp = get_exponent(new_m);
+
 	for (auto& d: disjoint) {
 		// case 1
-		if (get_exponent(d) == get_exponent(m)) {
+		if (get_exponent(d) == new_m_exp) {
 			new_disjoint.insert(d);
 			continue;
 		}
-		if (auto d_cte = get_constant(d), new_m_cte = get_constant(new_m);
-				(d_cte & new_m_cte) != false) {
+		if (auto d_cte = get_constant(d); (d_cte & new_m_cte) != false) {
 			// case 2
 			if ((d_cte & ~new_m_cte) != false)
 				new_disjoint.insert(~new_m_cte & d);
@@ -537,6 +559,12 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 				new_m = ~d_cte & new_m;
 			// case 4
 			} else {
+
+				#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(trace)
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/d_cte: " << d_cte << "\n";
+				#endif // DEBUG
+
 				auto s = d_cte == _1<BAs...>
 					// case 4.1
 					? splitter_one
@@ -544,6 +572,12 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 					: splitter(d_cte
 						| tau_parser::bf_constant
 						| optional_value_extractor<tau<BAs...>>);
+
+				#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(trace)
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/s: " << s << "\n";
+				#endif // DEBUG
+
 				new_disjoint.insert(s & d);
 				new_m = ~s & new_m;
 			}
@@ -572,10 +606,10 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
-		<< "solve_minterm_system/system: ";
+		<< "solver.h:" << __LINE__ << " solve_minterm_system/system: ";
 	for (const auto& minterm : system)
 		BOOST_LOG_TRIVIAL(trace)
-			<< "\t" << minterm;
+			<< "solver.h:" << __LINE__ << "\t" << minterm;
 	#endif // DEBUG
 
 	// We know the system has a solution as we only iterate over non-negative
@@ -585,7 +619,11 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "solve_minterm_system/neq: " << neq;
+			<< "solver.h:" << __LINE__ << " solve_minterm_system/neq: " << neq;
+		#endif // DEBUG
+
+		#ifdef DEBUG
+		print_tau_tree(std::cout, neq);
 		#endif // DEBUG
 
 		auto nf = neq
@@ -593,9 +631,38 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 			| tau_parser::bf
 			| optional_value_extractor<tau<BAs...>>
 			| bf_reduce_canonical<BAs...>();
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " solve_minterm_system/nf: " << nf;
+		#endif // DEBUG
+
+		#ifdef DEBUG
+		print_tau_tree(std::cout, nf);
+		#endif // DEBUG
+
+		if (nf == _0<BAs...>) continue;
+
 		auto cte = get_constant(nf);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " solve_minterm_system/cte: " << cte;
+		#endif // DEBUG
+
 		auto minterm = get_minterm(nf);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " solve_minterm_system/minterm: " << minterm;
+		#endif // DEBUG
+
 		eq = eq | (cte & ~minterm);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " solve_minterm_system/eq: " << eq;
+		#endif // DEBUG
 	}
 	eq = build_wff_eq(eq);
 	return find_solution(eq);
@@ -622,10 +689,10 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
-		<< "solve_inequality_system/system: ";
+		<< "solver.h:" << __LINE__ << " solve_inequality_system/system: ";
 	for (const auto& inequality : system)
 		BOOST_LOG_TRIVIAL(trace)
-			<< "\t" << inequality;
+			<< "solver.h:" << __LINE__ << "\t" << inequality;
 	#endif // DEBUG
 	// If no inequality is contained, return an empty solution
 	if (system.empty()) return solution<BAs...>{};
@@ -634,10 +701,10 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "solve_inequality_system/minterm system: ";
+			<< "solver.h:" << __LINE__ << " solve_inequality_system/minterm system: ";
 		for (const auto& minterm : *it)
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << minterm;
+				<< "solver.h:" << __LINE__ << "\t" << minterm;
 		#endif // DEBUG
 
 		auto solution = solve_minterm_system<BAs...>(*it, splitter_one);
@@ -646,7 +713,7 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
-		<< "solve_inequality_system/solution: {}";
+		<< "solver.h:" << __LINE__ << " solve_inequality_system/solution: {}";
 	#endif // DEBUG
 
 	return {};
@@ -671,14 +738,13 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	#ifdef DEBUG
 	if (system.first.has_value())
 		BOOST_LOG_TRIVIAL(trace)
-			<< "solve_system/eq: " << system.first.value();
+			<< "solver.h:" << __LINE__ << " solve_system/eq: " << system.first.value();
 	if (!system.second.empty()) {
 		BOOST_LOG_TRIVIAL(trace)
-			<< "solve_system/inequalities: ";
-		std::cout << "solve_system/inequalities: ";
+			<< "solver.h:" << __LINE__ << " solve_system/inequalities: ";
 		for (const auto& inequality : system.second)
 			BOOST_LOG_TRIVIAL(trace)
-				<< "\t" << inequality;
+				<< "solver.h:" << __LINE__ << "\t" << inequality;
 	}
 	#endif // DEBUG
 
@@ -695,19 +761,27 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	// for each inequality g_i we apply the transformation given by lgrs solution
 	// of the equality
 	for (auto& g_i: system.second) {
-		auto nphi = phi.value(), ng_i = replace(g_i, nphi);
+		auto nphi = phi.value(), ng_i = replace(g_i, nphi) | bf_reduce_canonical<BAs...>();
 		if (ng_i == _F<BAs...>) {
 
 			#ifdef DEBUG
 			BOOST_LOG_TRIVIAL(trace)
-				<< "solve_system/inequality_solution: {}";
+				<< "solver.h:" << __LINE__ << " solve_system/inequality_solution: {}";
 			#endif // DEBUG
 
 			return {};
 		}
 		else if (ng_i == _T<BAs...>) continue;
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " solve_system/inequality: " << ng_i;
+		#endif // DEBUG
+
 		inequalities.insert(ng_i);
 	}
+
+
 	// std::cout << "inequalities:\n";
 	// for (const auto& el : inequalities) {
 	// 	std::cout << "el: " << el << "\n";
@@ -718,7 +792,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "solve_system/inequality_solution: {}";
+			<< "solver.h:" << __LINE__ << " solve_system/inequality_solution: {}";
 		#endif // DEBUG
 
 		return {};
@@ -731,11 +805,6 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	// Solutions coming from inequality_solution for variables appearing also
 	// in the equality part will be replaced in the next step
 	solution<BAs...> solution = inequality_solution.value();
-
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solve_system/inequality_solution: ";
-	#endif // DEBUG
 
 	// Now we need to add solutions for variables in the lgrs
 	for (auto& [var, func]: phi.value()) {
@@ -752,6 +821,15 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 					bf_reduce_canonical<BAs...>();
 		} else solution[var] = func_with_neq_assgm | bf_reduce_canonical<BAs...>();
 	}
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " solve_system/inequality_solution: ";
+	for (const auto& [k, v]: solution)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << k << " := " << v;
+	#endif // DEBUG
+
 	return solution;
 }
 
@@ -790,7 +868,9 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
-		<< "solve/form: " << form;
+		<< "solver.h:" << __LINE__ << " solve/form: " << form;
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " solve/splitter_one: " << splitter_one;
 	#endif // DEBUG
 
 	auto dnf = form | bf_reduce_canonical<BAs...>();

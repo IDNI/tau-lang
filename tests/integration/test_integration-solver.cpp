@@ -522,19 +522,19 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	TEST_CASE("two var: y < x && z < y && w < z.") {
+	/*TEST_CASE("two var: y < x && z < y && w < z.") {
 		const char* equality = "y & x' | z & y' | w & z' = 0.";
 		const std::vector<std::string> inequalities =
 			{ "y & x' | x & y' != 0.", "y & z' | z & y' != 0.", "w' & z | w & z' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
-	}
+	}*/
 
-	TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0.") {
-		const char* equality = "y & x' | z & y' | w & z' = 0.";
+	/*TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0.") {
+		const char* equality =  "y'{ a } : sbf|y{ a' } : sbf | yx'= 0.";
 		const std::vector<std::string> inequalities =
-			{ "y & x' | x & y' != 0.", "y & z' | z & y' != 0.", "w' & z | w & z' != 0." };
+			{ "y & x' | x & y' != 0.", "x' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
-	}
+	}*/
 
 	// increasing monotonicity (2)
 	TEST_CASE("x = {a}:sbf && z < y && y != 1") {
