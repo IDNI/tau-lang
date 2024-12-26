@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "nso_rr.h"
+#include "builders.h"
 
 namespace idni::tau_lang {
 
@@ -1012,6 +1013,25 @@ tau<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n) {
 	}
 }
 
+template <typename... BAs>
+tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
+	// apply numerical simplifications
+	auto args = n || tau_parser::num;
+	if (args.size() == 2) {
+		auto left  = args[0] | only_child_extractor<BAs...>
+			| offset_extractor<BAs...>
+			| optional_value_extractor<size_t>;
+		auto right = args[1] | only_child_extractor<BAs...>
+			| offset_extractor<BAs...>
+			| optional_value_extractor<size_t>;
+		if (left >= right)
+			return build_num<BAs...>(left-right);
+		// TODO (HIGH) do not use exceptions
+		throw std::runtime_error("On shift creation: left < right");
+	}
+	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
+}
+
 template <typename...BAs>
 struct make_tau_node {
 	std::optional<tau<BAs...>> operator()(
@@ -1024,6 +1044,9 @@ struct make_tau_node {
 				}
 				case tau_parser::wff: {
 					return make_node_hook_wff<BAs...>(n);
+				}
+				case tau_parser::shift: {
+					return make_node_hook_shift<BAs...>(n);
 				}
 				default: return std::optional<tau<BAs...>>();
 			}
