@@ -7,6 +7,7 @@
 #include <numeric>
 
 #include "nso_rr.h"
+#include "hooks.h"
 #include "execution.h"
 
 #ifdef DEBUG

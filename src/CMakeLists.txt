@@ -21,6 +21,7 @@ set(TAU_HEADERS
 	interpreter.h
     interpreter.impl.h
 	product_ba.h
+	hooks.h
 	utils.h
 	experimental/execution.h
 	../external/parser/src/characters.h
