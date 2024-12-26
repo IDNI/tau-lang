@@ -5,6 +5,9 @@
 
 #include "satisfiability.h"
 #include "nso_rr.h"
+#include "hooks.h"
+#include "builders.h"
+#include "nso_ba.h"
 
 namespace idni::tau_lang {
 enum class split_sym {
