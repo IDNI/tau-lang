@@ -5,11 +5,10 @@
 
 #include "nso_rr.h"
 #include "hooks.h"
+#include "queries.h"
+#include "language.h"
 
 namespace idni::tau_lang {
-
-
-//------------------------------------------------------------------------------
 
 // creates a specific builder from a tau.
 template <typename... BAs>

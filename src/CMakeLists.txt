@@ -24,6 +24,8 @@ set(TAU_HEADERS
 	nso_ba.h
 	hooks.h
 	builders.h
+	language.h
+	queries.h
 	utils.h
 	experimental/execution.h
 	../external/parser/src/characters.h

@@ -6,6 +6,7 @@
 
 #include "doctest.h"
 #include "nso_rr.h"
+#include "language.h"
 #include "bool_ba.h"
 #include "bdd_handle.h"
 #include "test_helpers.h"
