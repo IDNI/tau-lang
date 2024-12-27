@@ -4,6 +4,7 @@
 #define __TEST_HELPERS_H__
 
 #include "nso_rr.h"
+#include "language.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
