@@ -447,5 +447,7 @@ void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
 }
 
 } // namespace idni::tau_lang
+
 #include "interpreter.impl.h"
+
 # endif //__INTERPRETER_H__
