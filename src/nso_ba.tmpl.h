@@ -57,7 +57,7 @@ tau<BAs...> operator&(const tau<BAs...>& l,
 	if (is_non_terminal<tau_parser::wff>(l)
 			&& is_non_terminal<tau_parser::wff, BAs...>(r))
 		return build_wff_and<BAs...>(l, r);
-	throw std::logic_error("wrong types");
+	throw std::logic_error("nso_ba and: wrong types");
 }
 
 template <typename... BAs>
@@ -88,7 +88,7 @@ tau<BAs...> operator|(const tau<BAs...>& l,
 	if (is_non_terminal<tau_parser::wff>(l)
 		&& is_non_terminal<tau_parser::wff, BAs...>(r))
 			return build_wff_or<BAs...>(l, r);
-	throw std::logic_error("wrong types");
+	throw std::logic_error("nso_ba or: wrong types");
 }
 
 template <typename... BAs>
@@ -128,7 +128,7 @@ tau<BAs...> operator~(const tau<BAs...>& l) {
 	}
 	if (is_non_terminal<tau_parser::wff>(l))
 		return build_wff_neg<BAs...>(l);
-	throw std::logic_error("wrong types");
+	throw std::logic_error("nso_ba neg: wrong types");
 }
 
 template <typename... BAs>
@@ -183,7 +183,7 @@ tau<BAs...> operator^(const tau<BAs...>& l,
 	if (is_non_terminal<tau_parser::wff>(l)
 		&& is_non_terminal<tau_parser::wff, BAs...>(r))
 			return build_wff_xor<BAs...>(l, r);
-	throw std::logic_error("wrong types");
+	throw std::logic_error("nso_ba xor: wrong types");
 }
 
 template <typename... BAs>
@@ -216,7 +216,7 @@ bool is_zero(const tau<BAs...>& l) {
 		return l == _0<BAs...>;
 	if (is_non_terminal<tau_parser::wff>(l))
 		return l == _F<BAs...>;
-	throw std::logic_error("wrong types");
+	throw std::logic_error("nso_ba is_zero: wrong types");
 }
 
 template <typename... BAs>
@@ -242,7 +242,7 @@ bool is_one(const tau<BAs...>& l) {
 		return l == _1<BAs...>;
 	if (is_non_terminal<tau_parser::wff>(l))
 		return l == _T<BAs...>;
-	throw std::logic_error("wrong types");
+	throw std::logic_error("nso_ba is_one: wrong types");
 }
 
 // We overload the == operator for tau in order to store additional data

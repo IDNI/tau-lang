@@ -1024,7 +1024,7 @@ tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 		if (left >= right)
 			return build_num<BAs...>(left-right);
 		// TODO (HIGH) do not use exceptions
-		throw std::runtime_error("On shift creation: left < right");
+		throw std::logic_error("shift creation: left < right");
 	}
 	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 }
