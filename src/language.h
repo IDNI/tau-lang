@@ -36,39 +36,21 @@ tau<BAs...> wrap(tau_parser::nonterminal nt, const std::string& terminals);
 template <typename...BAs>
 struct nso_factory {
 
-	std::optional<tau<BAs...>> parse(const std::string&,
-			const std::string& = "") const {
-		throw std::runtime_error("not implemented");
-	}
+	std::optional<tau<BAs...>> parse(const std::string&, const std::string& = "") const;
 
-	tau<BAs...> binding(const tau<BAs...>&,
-			const std::string& = "") const {
-		throw std::runtime_error("not implemented");
-	}
+	tau<BAs...> binding(const tau<BAs...>&,	const std::string& = "") const;
 
-	std::vector<std::string> types() const {
-		throw std::runtime_error("not implemented");
-	}
+	std::vector<std::string> types() const;
 
-	std::string default_type() const {
-		throw std::runtime_error("not implemented");
-	}
+	std::string default_type() const;
 
-	std::string one(const std::string& type_name) const {
-		throw std::runtime_error("not implemented");
-	}
+	std::string one(const std::string& type_name) const;
 
-	std::string zero(const std::string& type_name) const {
-		throw std::runtime_error("not implemented");
-	}
+	std::string zero(const std::string& type_name) const;
 
-	tau<BAs...> splitter_one(const std::string& = "") const {
-		throw std::runtime_error("not implemented");
-	}
+	tau<BAs...> splitter_one(const std::string& = "") const;
 
-	static nso_factory<BAs...>& instance() {
-		throw std::runtime_error("not implemented");
-	}
+	static nso_factory<BAs...>& instance();
 };
 
 // creates a specific rule from a generic rule
