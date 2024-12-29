@@ -21,7 +21,7 @@ namespace idni::tau_lang {
 
 		tau<Bool> parse(const std::string&,
 				const std::string&) const {
-			throw std::runtime_error("not implemented");
+			throw std::logic_error("not implemented");
 		}
 
 		tau<Bool> binding(const tau<Bool>& n,
@@ -34,18 +34,30 @@ namespace idni::tau_lang {
 			return { "bool" };
 		}
 
-	std::string default_type() const {
-		return "bool";
-	}
-
-	static nso_factory<Bool>& instance() {
-			static nso_factory<Bool> factory;
-			return factory;
+		std::string default_type() const {
+			return "bool";
 		}
+
+		std::string one(const std::string&) const {
+			throw std::logic_error("not implemented");
+		}
+
+		std::string zero(const std::string&) const {
+			throw std::logic_error("not implemented");
+		}
+
+		tau<Bool> splitter_one(const std::string&) const {
+			throw std::logic_error("not implemented");
+		}
+
+		static nso_factory<Bool>& instance() {
+				static nso_factory<Bool> factory;
+				return factory;
+			}
+
 	private:
 
 		nso_factory() {};
-
 	};
 
 } // namespace idni::tau_lang
