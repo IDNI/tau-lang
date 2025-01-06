@@ -39,6 +39,30 @@ template<typename T, typename V> bool hasv(const T& t, const V& v) {
 }
 
 template<typename T>
+void hash_combine (size_t& seed, const T& v) {
+	seed ^= std::hash<T>{}(v) + 0x9e3779b97f4a7c15 + (seed << 12) + (seed >> 4);
+}
+
+template<typename X>
+struct std::hash<std::vector<X>> {
+	size_t operator()(const std::vector<X>& vec) const {
+		size_t seed = vec.size();
+		for(auto& i : vec) hash_combine(seed, i);
+		return seed;
+	}
+};
+
+template<typename T1, typename T2>
+struct std::hash<std::pair<T1, T2>> {
+	size_t operator()(const std::pair<T1, T2>& p) const noexcept {
+		size_t seed = 0;
+		hash_combine(seed, p.first);
+		hash_combine(seed, p.second);
+		return seed;
+	}
+};
+
+template<typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
 	os << "[";
 	for (size_t i=0; i < vec.size(); ++i)

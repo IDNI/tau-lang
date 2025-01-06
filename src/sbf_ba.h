@@ -117,5 +117,14 @@ private:
 };
 
 } // namespace idni::tau_lang
+
+// Hash for hbdd as specialization of std::hash
+template<>
+struct std::hash<hbdd<Bool>> {
+	size_t operator()(const hbdd<Bool>& h) const noexcept {
+		return h->hash();
+	}
+};
+
 #include "sbf_ba.tmpl.h"
 #endif // __SBF_BA_H__
