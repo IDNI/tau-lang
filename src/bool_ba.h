@@ -24,6 +24,13 @@ struct Bool {
 
 Bool normalize (const Bool& b);
 
+template<>
+struct std::hash<Bool> {
+	size_t operator()(const Bool& b) {
+		return b.b ? 1 : 0;
+	}
+};
+
 std::ostream& operator<<(std::ostream& os, const Bool& b);
 
 #endif // __BOOL_BA_H__
