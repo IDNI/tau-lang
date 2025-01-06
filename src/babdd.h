@@ -111,6 +111,13 @@ struct bdd_reference {
 		       id == x.id;
 	}
 
+	auto operator<=>(const bdd_reference x) const {
+		if (in != x.in) return (int)in <=> (int)x.in;
+		if (out != x.out) return (int)out <=> (int)x.out;
+		if (shift != x.shift) return (long long)shift <=> (long long)x.shift;
+		return (long long)id <=> (long long)x.id;
+	}
+
 	static bdd_reference flip_in(const bdd_reference x) {
 		return bdd_reference(x.in ? 0 : 1, x.out, x.shift, x.id);
 	}
@@ -147,7 +154,10 @@ struct bdd_reference {
 	}
 
 	static size_t hash(const bdd_reference x) {
-		return (x.id + x.in) ^ (x.shift + x.out);
+		size_t seed = 0;
+		hash_combine(seed, x.id + x.in);
+		hash_combine(seed, x.shift + x.out);
+		return seed;
 	}
 };
 
@@ -164,6 +174,12 @@ struct bdd_reference<false, INV_ORDER, ID_WIDTH, SHIFT_WIDTH> {
 
 	bool operator==(const bdd_reference x) const {
 		return in == x.in && out == x.out && id == x.id;
+	}
+
+	auto operator<=>(const bdd_reference x) const {
+		if (in != x.in) return (int)in <=> (int)x.in;
+		if (out != x.out) return (int)out <=> (int)x.out;
+		return (long long)id <=> (long long)x.id;
 	}
 
 	static bdd_reference flip_in(const bdd_reference x) {
@@ -236,18 +252,6 @@ struct std::hash<std::pair<bdd_reference<S, O, IW, SW>, uint_t>> {
 	size_t operator()(const auto& p) const {
 		return hash_upair((hash<bdd_reference<S, O, IW, SW>>{}(p.first)),
 				  p.second);
-	}
-};
-
-template<typename X>
-struct std::hash<std::vector<X>> {
-	size_t operator()(const std::vector<X>& vec) const {
-		std::hash<X> hasher;
-		size_t seed = vec.size();
-		for(auto& i : vec) {
-			seed ^= hasher(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-		}
-		return seed;
 	}
 };
 

@@ -11,6 +11,38 @@ template<typename B, auto o> struct bdd_handle;
 template<typename B, auto o = bdd_options<>::create()>
 using hbdd = sp<bdd_handle<B, o>>;
 
+// --- Custom operators for hbdd ---
+template<typename B, auto o = bdd_options<>::create()>
+auto operator<=> (const hbdd<B, o>& x, const hbdd<B, o>& y) {
+	return *x <=> *y;
+}
+template<typename B, auto o = bdd_options<>::create()>
+auto operator< (const hbdd<B, o>& x, const hbdd<B, o>& y) {
+	return (x <=> y) < 0;
+}
+template<typename B, auto o = bdd_options<>::create()>
+auto operator<= (const hbdd<B, o>& x, const hbdd<B, o>& y) {
+	return (x <=> y) <= 0;
+}
+template<typename B, auto o = bdd_options<>::create()>
+auto operator> (const hbdd<B, o>& x, const hbdd<B, o>& y) {
+	return (x <=> y) > 0;
+}
+template<typename B, auto o = bdd_options<>::create()>
+auto operator>= (const hbdd<B, o>& x, const hbdd<B, o>& y) {
+	return (x <=> y) >= 0;
+}
+template<typename B, auto o = bdd_options<>::create()>
+auto operator== (const hbdd<B, o>& x, const hbdd<B, o>& y) {
+	assert((&*x == &*y) == (x->b == y->b));
+	return *x == *y;
+}
+template<typename B, auto o = bdd_options<>::create()>
+auto operator!= (const hbdd<B, o>& x, const hbdd<B, o>& y) {
+	return !(x == y);
+}
+// --------------------------------
+
 template<typename B, auto o = bdd_options<>::create()>
 bool operator==(const hbdd<B, o>& x, bool b) {
 	return b ? x->is_one() : x->is_zero();
@@ -57,14 +89,6 @@ bool is_closed (const hbdd<B, o>& ) {
 	return true;
 }
 
-#ifdef DEBUG
-template<typename B, auto o = bdd_options<>::create()>
-bool operator==(const hbdd<B, o>& x, const hbdd<B, o>& y) {
-	assert((&*x == &*y) == (x->b == y->b));
-	return x->b == y->b;
-}
-#endif
-
 template<typename B, auto o = bdd_options<>::create()>
 struct bdd_handle {
 	using bdd_ref = bdd_reference<o.has_varshift(), o.has_inv_order(), o.idW, o.shiftW>;
@@ -82,6 +106,7 @@ struct bdd_handle {
 	static bool dummy;
 
 //	bdd_handle();
+	auto operator<=>(const bdd_handle&) const = default;
 
 	static hbdd<B, o> get(const bdd_node_t& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
@@ -292,6 +317,7 @@ struct bdd_handle {
 		return get(bdd<B,o>::split_clause(b));
 	}
 
+	size_t hash () {return std::hash<bdd_ref>{}(b);}
 #ifndef DEBUG
 private:
 #endif
@@ -317,6 +343,7 @@ struct bdd_handle<Bool, o> {
 	static bool dummy;
 
 //	bdd_handle();
+	auto operator<=>(const bdd_handle&) const = default;
 
 	static hbdd<Bool, o> get(const bdd_node_t& x) {
 		if (auto it = Mn.find(x); it != Mn.end())
@@ -484,6 +511,8 @@ struct bdd_handle<Bool, o> {
 		}
 		return get(bdd<Bool,o>::split_clause(b));
 	}
+
+	size_t hash () {return std::hash<bdd_ref>{}(b);}
 
 #ifndef DEBUG
 	private:
