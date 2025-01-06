@@ -18,11 +18,11 @@ tau<tau_ba<sbf_ba>, sbf_ba> build_binding(const char* src) {
 	return bf.parse(src).value();
 }
 
-sbf_ba& get_binding(const tau<tau_ba<sbf_ba>, sbf_ba>& n) {
+const sbf_ba& get_binding(const tau<tau_ba<sbf_ba>, sbf_ba>& n) {
 	return get<sbf_ba>(get<variant<tau_ba<sbf_ba>, sbf_ba>>(n->value));
 }
 
-sbf_ba& build_and_get_binding(const char* src) {
+const sbf_ba& build_and_get_binding(const char* src) {
 	return get_binding(build_binding(src));
 }
 
