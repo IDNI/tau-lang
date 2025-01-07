@@ -3,8 +3,6 @@
 #ifndef __BUILDERS_H__
 #define __BUILDERS_H__
 
-#include "nso_rr.h"
-#include "hooks.h"
 #include "queries.h"
 #include "language.h"
 
@@ -126,14 +124,6 @@ static const tau<BAs...> _T = bldr_wff_T<BAs...>.second;
 
 template <typename... BAs>
 static const tau<BAs...> _T_trimmed = trim(_T<BAs...>);
-
-template <typename... BAs>
-tau<BAs...> build_extra (const tau<BAs...> n, const std::string &note) {
-	assert((!n->child.empty()) && (!is_non_terminal(tau_parser::extra, n->child.back())));
-	std::vector<tau<BAs...>> c (n->child);
-	c.emplace_back(wrap<BAs...>(tau_parser::extra, note));
-	return make_node(n->value, move(c));
-}
 
 template <typename... BAs>
 tau<BAs...> build_num(size_t num) {

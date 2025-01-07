@@ -4,7 +4,6 @@
 
 #include "doctest.h"
 #include "defs.h"
-#include "nso_rr.h"
 #include "hooks.h"
 #include "bool_ba.h"
 
