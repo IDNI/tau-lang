@@ -30,6 +30,7 @@
 #include "../parser/tau_parser.generated.h"
 #include "rewriting.h"
 #include "term_colors.h"
+#include "defs.h"
 
 #ifdef TAU_MEASURE
 #include "measure.h"

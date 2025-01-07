@@ -14,6 +14,12 @@ bool is_child_non_terminal(const size_t nt, const tau<BAs...>& n);
 template <size_t nt, typename...BAs>
 bool is_child_non_terminal(const tau<BAs...>& n);
 
+template <typename... BAs>
+bool is_non_terminal_node(const tau_sym<BAs...>& s) {
+	return std::holds_alternative<tau_source_sym>(s)
+		&& get<tau_source_sym>(s).nt();
+}
+
 // check if a node is a non terminal node
 template <typename... BAs>
 bool is_non_terminal_node(const rewriter::node<tau_sym<BAs...>>& s) {
@@ -58,7 +64,7 @@ bool is_non_terminal(const size_t nt, const tau<BAs...>& n) {
 
 template <typename... BAs>
 bool is_non_terminal_sym(const size_t nt, const tau_sym<BAs...>& s) {
-	return is_non_terminal_sym<BAs...>(s)
+	return is_non_terminal_node<BAs...>(s)
 				&& get<tau_source_sym>(s).n() == nt;
 }
 
@@ -609,5 +615,87 @@ T operator|(const std::optional<T>& o, const optional_value_extractor_t<T> e) {
 
 } // namespace idni::tau_lang
 
+// Specialization of tau node
+namespace idni::rewriter {
+
+// Specialization of tau node in order to hash typed and non-typed
+// Tau constants the same
+template <typename... BAs>
+struct node<idni::tau_lang::tau_sym<BAs...>> {
+	using child_type = std::vector<std::shared_ptr<node>>;
+	node (const idni::tau_lang::tau_sym<BAs...> v, const child_type& c) :
+		value(v), child(c), hash(calc_hash(v, c)) {}
+
+	// This is not default because the hash value is not considered
+	auto operator<=>(const node& that) const {
+		if (value != that.value) return value <=> that.value;
+		return child <=> that.child;
+	}
+	// We list all ordering operators explicitly
+	bool operator<(const node& that) {
+		return (*this <=> that) < 0;
+	}
+	bool operator<=(const node& that) {
+		return (*this <=> that) <= 0;
+	}
+	bool operator>(const node& that) {
+		return (*this <=> that) > 0;
+	}
+	bool operator>=(const node& that) {
+		return (*this <=> that) >= 0;
+	}
+	auto operator==(const node& that) const {
+		return value == that.value && child == that.child;
+	}
+	auto operator!=(const node& that) const {
+		return !(*this == that);
+	}
+
+	// the value of the node and pointers to the children, we follow the same
+	// notation as in forest<...>::tree to be able to reuse the code with
+	// forest<...>::tree.
+	const idni::tau_lang::tau_sym<BAs...> value;
+	const child_type child;
+	// Hash of the node
+	const size_t hash;
+private:
+	static size_t calc_hash (const idni::tau_lang::tau_sym<BAs...> v, const child_type& c) {
+		size_t seed = 0;
+		// Hash bf_t and bf_f same for all types
+		// This is done in order to use hash inequality in equality operator
+		if (idni::tau_lang::is_non_terminal_sym(tau_parser::bf_t, v)) {
+			return hash_combine(seed, v), seed;
+		}
+		if (idni::tau_lang::is_non_terminal_sym(tau_parser::bf_f, v)) {
+			return hash_combine(seed, v), seed;
+		};
+		hash_combine(seed, v);
+		for (const std::shared_ptr<node>& _c : c) hash_combine(seed, *_c);
+		return seed;
+	}
+};
+}
+
+// The hash function for tau as specialisation of std::hash
+template<typename... BAs>
+struct std::hash<idni::tau_lang::tau<BAs...>> {
+	size_t operator()(const idni::tau_lang::tau<BAs...>& n) const noexcept {
+		using namespace idni::tau_lang;
+		using namespace idni::rewriter;
+		// Let the hash respect the typing rules for bf_t and bf_f
+		return hash<node<tau_sym<BAs...>>>{}(*n);
+	}
+};
+
+// Hash for rr using specialization to std::hash
+template <typename type_t>
+struct std::hash<idni::tau_lang::rr<type_t>> {
+	size_t operator()(const idni::tau_lang::rr<type_t>& rr) const noexcept {
+		size_t seed = 0;
+		hash_combine(seed, rr.main);
+		hash_combine(seed, rr.rec_relations);
+		return seed;
+	}
+};
 
 #endif // __QUERIES_H__

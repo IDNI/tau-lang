@@ -245,18 +245,19 @@ bool is_one(const tau<BAs...>& l) {
 	throw std::logic_error("nso_ba is_one: wrong types");
 }
 
-// We overload the == operator for tau in order to store additional data
-// which is not taken into account for the quality check
+// We overload the == operator for tau in order to account for typed constants
 template <typename... BAs>
-bool operator==(const tau<BAs...> &l, const tau<BAs...>& r) {
+bool operator==(const tau<BAs...>& l, const tau<BAs...>& r) {
 	if (r == nullptr && l == nullptr) return true;
 	if (r == nullptr || l == nullptr) return false;
 
 	if (std::addressof(*l) == std::addressof(*r)) return true;
+	if (l->hash != r->hash) return false;
 
 	// check if typed bf_f or bf_t
 	if (is_non_terminal(tau_parser::bf_f, l)
 			&& is_non_terminal(tau_parser::bf_f, r)) {
+		// In case it is untyped, ignore other type
 		return (!l->child.empty() && !r->child.empty())
 			? (l->child[0] == r->child[0])
 			: true;
@@ -264,55 +265,59 @@ bool operator==(const tau<BAs...> &l, const tau<BAs...>& r) {
 
 	if (is_non_terminal(tau_parser::bf_t, l)
 			&& is_non_terminal(tau_parser::bf_t, r)) {
+		// In case it is untyped, ignore other type
 		return (!l->child.empty() && !r->child.empty())
 			? (l->child[0] == r->child[0])
 			: true;
 	}
 
-	// check if the nodes have extra data
-	bool l_has_extra = false;
-	if (!l->child.empty())
-		if (is_non_terminal(tau_parser::extra, l->child.back()))
-			l_has_extra = true;
-	bool r_has_extra = false;
-	if (!r->child.empty())
-		if (is_non_terminal(tau_parser::extra, r->child.back()))
-			r_has_extra = true;
-
-	if (!l_has_extra && !r_has_extra)
-		return (l->value == r->value && l->child == r->child);
-	if (l_has_extra && !r_has_extra) {
-		if (l->child.size() != r->child.size() + 1) return false;
-		for (size_t i = 0; i < r->child.size(); ++i) {
-			if (!(l->child[i] == r->child[i]))
-				return false;
-		}
-		return l->value == r->value;
-	}
-	if (!l_has_extra && r_has_extra) {
-		if (l->child.size() + 1 != r->child.size()) return false;
-		for (size_t i = 0; i < l->child.size(); ++i) {
-			if (!(l->child[i] == r->child[i]))
-				return false;
-		}
-		return l->value == r->value;
-	}
-	if (l_has_extra && r_has_extra) {
-		if (l->child.size() != r->child.size()) return false;
-		for (size_t i = 1; i < l->child.size(); ++i) {
-			if (!(l->child[i-1] == r->child[i-1]))
-				return false;
-		}
-		return l->value == r->value;
-	}
-	// All cases are covered above
-	assert(false);
-	return false;
+	return (l->value == r->value && l->child == r->child);
 }
 
+// Also define != again in terms of ==
 template <typename... BAs>
 bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r) {
 	return !(l == r);
+}
+
+// We overload spaceship operator in order to have deterministic operators across
+// program runs
+// In this comparison typed and non-typed Tau constants are considered different
+template<typename... BAs>
+std::weak_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r) {
+	if (l == nullptr && r == nullptr) return std::weak_ordering::equivalent;
+	if (l == nullptr) return std::weak_ordering::less;
+	if (r == nullptr) return std::weak_ordering::greater;
+
+	// Identical objects compare equivalent
+	if (std::addressof(*l) == std::addressof(*r)) return std::weak_ordering::equivalent;
+	// If the hash is different, compare hash
+	if (l->hash != r->hash) return l->hash <=> r->hash;
+	// If value is different, compare value
+	if (l->value != r->value) return l->value <=> r->value;
+	// If value is same, compare children
+	// For performance reasons, put the child length first
+	if (l->child.size() != r->child.size())
+		return l->child.size() <=> r->child.size();
+	return l->child <=> r->child;
+}
+
+// We list all ordering operators explicitly
+template<typename... BAs>
+bool operator<(const tau<BAs...>& l, const tau<BAs...>& r) {
+	return (l <=> r) < 0;
+}
+template<typename... BAs>
+bool operator<=(const tau<BAs...>& l, const tau<BAs...>& r) {
+	return (l <=> r) <= 0;
+}
+template<typename... BAs>
+bool operator>(const tau<BAs...>& l, const tau<BAs...>& r) {
+	return (l <=> r) > 0;
+}
+template<typename... BAs>
+bool operator>=(const tau<BAs...>& l, const tau<BAs...>& r) {
+	return (l <=> r) >= 0;
 }
 
 template <typename... BAs>
@@ -863,7 +868,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::debug_sym: stream << "debug"; break;
 			case tau_parser::trace_sym: stream << "trace"; break;
 			case tau_parser::info_sym:  stream << "info"; break;
-			case tau_parser::extra: break; // We do not output this
 			// for the rest skip value and just passthrough to child
 			default: for (const auto& c : n->child)
 					pp(stream, c, hl_path, depth, parent);

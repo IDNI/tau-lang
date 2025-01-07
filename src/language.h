@@ -6,7 +6,6 @@
 #include <optional>
 
 #include "nso_rr.h"
-#include "queries.h"
 
 namespace idni::tau_lang {
 

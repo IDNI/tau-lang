@@ -9,10 +9,6 @@
 #include <boost/log/trivial.hpp>
 
 #include "parser.h"
-#include "nso_rr.h"
-#include "hooks.h"
-#include "builders.h"
-#include "nso_ba.h"
 #include "normal_forms.h"
 #include "bdd_handle.h"
 #include "variant_ba.h"

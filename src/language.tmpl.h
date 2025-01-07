@@ -309,7 +309,7 @@ struct quantifier_vars_transformer {
 			// travers into q_vars node and access all var/capture children
 			auto q_vars = n | p::q_vars
 				| optional_value_extractor<node>;
-			std::vector<node>& vars = q_vars->child;
+			const std::vector<node>& vars = q_vars->child;
 			//  traverse to quantifier wff expression
 			node nn = n | p::wff | only_child_extractor<BAs...>
 				| optional_value_extractor<node>;
@@ -331,7 +331,7 @@ struct quantifier_vars_transformer {
 
 		bool changed = false;
 		std::vector<tau<BAs...>> child;
-		for (node& c : n->child)
+		for (const node& c : n->child)
 			if (changes.contains(c)) changed = true,
 						child.push_back(changes[c]);
 			else child.push_back(c);

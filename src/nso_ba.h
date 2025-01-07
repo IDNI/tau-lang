@@ -3,8 +3,7 @@
 #ifndef __NSO_BA_H__
 #define __NSO_BA_H__
 
-#include "builders.h"
-#include "queries.h"
+#include "hooks.h"
 
 namespace idni::tau_lang {
 
@@ -36,6 +35,21 @@ bool operator==(const tau<BAs...> &l, const tau<BAs...>& r);
 
 template <typename... BAs>
 bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r);
+
+template <typename... BAs>
+std::weak_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r);
+
+template<typename... BAs>
+bool operator<(const tau<BAs...>& l, const tau<BAs...>& r);
+
+template<typename... BAs>
+bool operator<=(const tau<BAs...>& l, const tau<BAs...>& r);
+
+template<typename... BAs>
+bool operator>(const tau<BAs...>& l, const tau<BAs...>& r);
+
+template<typename... BAs>
+bool operator>=(const tau<BAs...>& l, const tau<BAs...>& r);
 
 template <typename... BAs>
 bool operator==(const tau<BAs...>& l, const bool& r);
