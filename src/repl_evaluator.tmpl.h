@@ -896,122 +896,125 @@ tau_nso<BAs...> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 }
 
 template <typename... BAs>
+repl_option get_opt(tau<BAs...> n) {
+	auto o = n | tau_parser::option_name;
+	if (!o) return none_opt;
+	auto x = make_string<tau_node_terminal_extractor_t<BAs...>,tau<BAs...>>(
+		tau_node_terminal_extractor<BAs...>, o.value());
+	if (x.empty())                       return none_opt;
+	if (x == "S" || x == "severity"
+		|| x == "sev")               return severity_opt;
+	if (x == "s" || x == "status")       return status_opt;
+	if (x == "c" || x == "colors"
+		|| x == "color")             return colors_opt;
+	if (x == "V" || x == "charvar")      return charvar_opt;
+	if (x == "H" || x == "highlighting"
+		|| x == "highlight")         return highlighting_opt;
+	if (x == "I" || x == "indenting"
+		|| x == "indent")            return indenting_opt;
+	if (x == "d" || x == "debug"
+		|| x == "dbg")               return debug_opt;
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid option: " << x << "\n";
+	return invalid_opt;
+}
+
+template <typename... BAs>
+std::optional<boost::log::trivial::severity_level>
+	str2severity(const std::string& v)
+{
+	if (v == "e" || v == "error") return { boost::log::trivial::error };
+	if (v == "d" || v == "debug") return { boost::log::trivial::debug };
+	if (v == "t" || v == "trace") return { boost::log::trivial::trace };
+	if (v == "i" || v == "info")  return { boost::log::trivial::info };
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid severity value: " << v
+		<< " (only error, info, debug or trace are allowed)\n";
+	return {};
+}
+
+template <typename... BAs>
 void repl_evaluator<BAs...>::get_cmd(tau_nso_t n) {
 	static std::string pbool[] = { "off", "on" };
-	static std::map<size_t,	std::function<void()>> printers = {
+	static std::map<repl_option, std::function<void()>> printers = {
 #ifdef DEBUG
-	{ tau_parser::debug_repl_opt, [this]() {
-		std::cout << "debug-repl:  " << pbool[opt.debug_repl] << "\n"; } },
+	{ debug_opt, [this]() {
+		std::cout << "debug-repl:          " << pbool[opt.debug_repl] << "\n"; } },
 #endif
-	{ tau_parser::status_opt,     [this]() {
+	{ status_opt,       [this]() {
 		std::cout << "status:              " << pbool[opt.status] << "\n"; } },
-	{ tau_parser::colors_opt,     [this]() {
+	{ colors_opt,       [this]() {
 		std::cout << "colors:              " << pbool[opt.colors] << "\n"; } },
-	{ tau_parser::charvar_opt,     [this]() {
+	{ charvar_opt,      [this]() {
 		std::cout << "charvar:             " << pbool[opt.charvar] << "\n"; } },
-	{ tau_parser::highlighting_opt, [this]() {
+	{ highlighting_opt, [this]() {
 		std::cout << "syntax highlighting: " << pbool[pretty_printer_highlighting] << "\n"; } },
-	{ tau_parser::indenting_opt,  [this]() {
+	{ indenting_opt,    [this]() {
 		std::cout << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
-	{ tau_parser::severity_opt,   [this]() {
+	{ severity_opt,     [this]() {
 		std::cout << "severity:            " << opt.severity << "\n"; } }};
-	auto option = n | tau_parser::bool_option;
-	if (option.has_value()) option = n;
-	else option = n | tau_parser::option;
-	if (!option.has_value()) { for (auto& [_, v] : printers) v(); return; }
-	else {
-		auto opt = get_opt(option.value());
+	auto o = get_opt(n);
+	if (o == invalid_opt) return;
 #ifndef DEBUG
-		if (opt == tau_parser::debug_repl_opt) {
-			BOOST_LOG_TRIVIAL(error)
-				<< "(Error) debug option not available\n";
-			return;
-		}
+	if (o == debug_opt) {
+		BOOST_LOG_TRIVIAL(error)
+			<< "(Error) debug option not available in release build\n";
+		return;
+	}
 #endif
-		printers[opt]();
-	}
-}
-
-template <typename... BAs>
-boost::log::trivial::severity_level
-	repl_evaluator<BAs...>::nt2severity(size_t nt) const
-{
-	switch (nt) {
-		case tau_parser::error_sym: return boost::log::trivial::error;
-		case tau_parser::debug_sym: return boost::log::trivial::debug;
-		case tau_parser::trace_sym: return boost::log::trivial::trace;
-		case tau_parser::info_sym:  return boost::log::trivial::info;
-		default: BOOST_LOG_TRIVIAL(error)
-					<< "(Error) invalid severity value\n";
-	}
-	return boost::log::trivial::info;
-}
-
-template <typename... BAs>
-size_t get_opt(tau<BAs...> n) {
-	tau<BAs...> value;
-	if (auto bool_opt = n | tau_parser::bool_option; bool_opt)
-		value = bool_opt.value();
-	else if (auto enum_opt = n | tau_parser::enum_option; enum_opt)
-		value = enum_opt.value();
-	return value | only_child_extractor<BAs...>
-		| non_terminal_extractor<BAs...>
-		| optional_value_extractor<size_t>;
+	if (o == none_opt) { for (auto& [_, v] : printers) v(); return; }
+	printers[o]();
 }
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
 	using namespace boost::log;
-	auto option = n | tau_parser::option;
-	auto v  = n | tau_parser::option_value;
-	auto vt = v | only_child_extractor<tau_ba_t, BAs...>
-		| non_terminal_extractor<tau_ba_t, BAs...>
-		| optional_value_extractor<size_t>;
-	auto get_bool_value = [&v, &vt](bool& val) {
-		if      (vt == tau_parser::option_value_true) val = true;
-		else if (vt == tau_parser::option_value_false) val = false;
-		else BOOST_LOG_TRIVIAL(error) << "(Error) invalid bool value\n";
-		return val;
-	};
-	static std::map<size_t,	std::function<void()>> setters = {
-#ifdef DEBUG
-	{ tau_parser::debug_repl_opt, [&]() {
-		get_bool_value(opt.debug_repl); } },
-#endif
-	{ tau_parser::status_opt,   [&]() {
-		get_bool_value(opt.status); } },
-	{ tau_parser::colors_opt,   [&]() {
-		TC.set(get_bool_value(opt.colors)); } },
-	{ tau_parser::charvar_opt,   [&]() {
-		update_charvar(get_bool_value(opt.charvar)); } },
-	{ tau_parser::highlighting_opt,   [&]() {
-		get_bool_value(pretty_printer_highlighting); } },
-	{ tau_parser::indenting_opt,   [&]() {
-		get_bool_value(pretty_printer_indenting); } },
-	{ tau_parser::severity_opt, [&]() {
-		if (vt == tau_parser::option_value_true)
-			opt.severity = boost::log::trivial::trace;
-		else {
-			auto sev = v | tau_parser::severity;
-			if (!sev.has_value()) {	BOOST_LOG_TRIVIAL(error)
-				<< "(Error) invalid severity value\n"; return; }
-			opt.severity = nt2severity(sev
-				| only_child_extractor<tau_ba_t, BAs...>
-				| non_terminal_extractor<tau_ba_t, BAs...>
-				| optional_value_extractor<size_t>);
-		}
-		boost::log::core::get()->set_filter(
-			boost::log::trivial::severity >= opt.severity);
-	} } };
-	size_t opt = get_opt(option.value());
+	auto o = get_opt(n);
+	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
-	if (opt == tau_parser::debug_repl_opt) {
+	if (o == debug_opt) {
 		BOOST_LOG_TRIVIAL(error)
-				<< "(Error) debug option not available\n";
+			<< "(Error) debug option not available\n";
 		return;
 	}
 #endif
-	setters[opt]();
+	auto ov = n | tau_parser::option_value;
+	if (!ov) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid value\n";
+		return;
+	}
+	auto v = make_string<tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
+		tau_nso_t>(tau_node_terminal_extractor<tau_ba_t, BAs...>,
+			ov.value());
+	auto update_bool_value = [&v](bool& opt) {
+		if (v == "t" || v == "true" || v == "on" || v == "1"
+			|| v == "y" || v == "yes") opt = true;
+		else if (v == "f" || v == "false" || v == "off" || v == "0"
+			|| v == "n" || v == "no") opt = false;
+		else BOOST_LOG_TRIVIAL(error) << "(Error) invalid bool value\n";
+		return opt;
+	};
+	static std::map<repl_option, std::function<void()>> setters = {
+#ifdef DEBUG
+	{ debug_opt, [&]() {
+		update_bool_value(opt.debug_repl); } },
+#endif
+	{ status_opt,   [&]() {
+		update_bool_value(opt.status); } },
+	{ colors_opt,   [&]() {
+		TC.set(update_bool_value(opt.colors)); } },
+	{ charvar_opt,   [&]() {
+		update_charvar(update_bool_value(opt.charvar)); } },
+	{ highlighting_opt,   [&]() {
+		update_bool_value(pretty_printer_highlighting); } },
+	{ indenting_opt,   [&]() {
+		update_bool_value(pretty_printer_indenting); } },
+	{ severity_opt, [&]() {
+		auto sev = str2severity(v);
+		if (!sev.has_value()) return;
+		opt.severity = sev.value();
+		boost::log::core::get()->set_filter(
+			boost::log::trivial::severity >= opt.severity);
+	} } };
+	setters[o]();
 	get_cmd(n);
 }
 
@@ -1019,27 +1022,38 @@ template <typename... BAs>
 void repl_evaluator<BAs...>::update_bool_opt_cmd(const tau_nso_t& n,
 	const std::function<bool(bool&)>& update_fn)
 {
-	auto option_type = n | tau_parser::bool_option
-		| only_child_extractor<tau_ba_t, BAs...>
-		| non_terminal_extractor<tau_ba_t, BAs...>
-		| optional_value_extractor<size_t>;
-	switch (option_type) {
-#ifdef DEBUG
-	case tau_parser::debug_repl_opt: update_fn(opt.debug_repl); break;
+	auto o = get_opt(n);
+	if (o == invalid_opt || o == none_opt) return;
+#ifndef DEBUG
+	if (o == debug_opt) {
+		BOOST_LOG_TRIVIAL(error)
+			<< "(Error) debug option not available\n";
+		return;
+	}
 #endif
-	case tau_parser::colors_opt: TC.set(update_fn(opt.colors)); break;
-	case tau_parser::charvar_opt:
-		update_charvar(update_fn(opt.charvar)); break;
-	case tau_parser::highlighting_opt:
-		update_fn(pretty_printer_highlighting); break;
-	case tau_parser::indenting_opt:
-		update_fn(pretty_printer_indenting); break;
-	case tau_parser::status_opt: update_fn(opt.status); break;
+	switch (o) {
+#ifdef DEBUG
+	case debug_opt: update_fn(opt.debug_repl); break;
+#endif
+	case colors_opt:       TC.set(update_fn(opt.colors)); break;
+	case charvar_opt:      update_charvar(update_fn(opt.charvar)); break;
+	case highlighting_opt: update_fn(pretty_printer_highlighting); break;
+	case indenting_opt:    update_fn(pretty_printer_indenting); break;
+	case status_opt:       update_fn(opt.status); break;
 	default: BOOST_LOG_TRIVIAL(error) << "(Error) unknown bool option\n";
 		error = true;
 		return;
 	}
 	get_cmd(n);
+}
+
+template<typename... BAs>
+bool repl_evaluator<BAs...>::update_charvar(bool value) {
+	std::set<std::string> guards{
+		(opt.charvar = value) ? "charvar" : "var" };
+	tau_parser::instance().get_grammar().set_enabled_productions(guards);
+	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
+	return value;
 }
 
 template <typename... BAs>
@@ -1115,15 +1129,6 @@ int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
 #endif
 	if (result) memory_store(result.value());
 	return 0;
-}
-
-template<typename... BAs>
-bool repl_evaluator<BAs...>::update_charvar(bool value) {
-	std::set<std::string> guards{
-		(opt.charvar = value) ? "charvar" : "var" };
-	tau_parser::instance().get_grammar().set_enabled_productions(guards);
-	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
-	return value;
 }
 
 template <typename... BAs>

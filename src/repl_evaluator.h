@@ -50,6 +50,9 @@
 
 namespace idni::tau_lang {
 
+enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
+	colors_opt, charvar_opt, highlighting_opt, indenting_opt, debug_opt };
+
 template <typename... BAs>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<BAs...>>;
@@ -88,7 +91,6 @@ private:
 
 	// helpers
 	tau_nso_t make_cli(const std::string& src);
-	boost::log::trivial::severity_level nt2severity(size_t nt) const;
 	memory_ref memory_retrieve(const tau_nso_t& n, bool silent = false);
 	void memory_store(memory o);
 	std::optional<std::pair<size_t, tau_nso_t>>

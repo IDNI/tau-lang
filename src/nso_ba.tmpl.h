@@ -840,6 +840,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::source:
 			case tau_parser::named_binding:
 			case tau_parser::uninter_const_name:
+			case tau_parser::option_name:
+			case tau_parser::option_value:
 				print_terminals(stream, n);
 				break;
 			// constants
@@ -858,16 +860,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 				break;
 			case tau_parser::wff_f: stream << 'F'; break;
 			case tau_parser::wff_t: stream << 'T'; break;
-			case tau_parser::severity_opt: stream << "severity"; break;
-			case tau_parser::status_opt: stream << "status"; break;
-			case tau_parser::colors_opt: stream << "colors"; break;
-			case tau_parser::debug_repl_opt: stream << "debug"; break;
-			case tau_parser::option_value_true: stream << "true"; break;
-			case tau_parser::option_value_false: stream << "false"; break;
-			case tau_parser::error_sym: stream << "error"; break;
-			case tau_parser::debug_sym: stream << "debug"; break;
-			case tau_parser::trace_sym: stream << "trace"; break;
-			case tau_parser::info_sym:  stream << "info"; break;
 			// for the rest skip value and just passthrough to child
 			default: for (const auto& c : n->child)
 					pp(stream, c, hl_path, depth, parent);
