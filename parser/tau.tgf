@@ -190,12 +190,12 @@ cli_command            =>
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
-        | ("get":get_sym  [__ option])                        :get_cmd
-        | ("set":set_sym   __ option
+        | ("get":get_sym  [__ option_name])                   :get_cmd
+        | ("set":set_sym   __ option_name
                                 (__ | _ '=' _) option_value)  :set_cmd
-        | ("enable" :enable_sym  __ bool_option)              :enable_cmd
-        | ("disable":disable_sym __ bool_option)              :disable_cmd
-        | ("toggle" :toggle_sym  __ bool_option)              :toggle_cmd
+        | ("enable" :enable_sym  __ option_name)              :enable_cmd
+        | ("disable":disable_sym __ option_name)              :disable_cmd
+        | ("toggle" :toggle_sym  __ option_name)              :toggle_cmd
 # i/o stream definitions
         | (type __ in_var_name  _ '=' _ input_stream)         :def_input_cmd
         | (type __ out_var_name _ '=' _ output_stream)        :def_output_cmd
@@ -214,6 +214,8 @@ output_stream          =>
         ("ofile" _ '(' _ q_file_name  _ ')') | console_sym.
 q_file_name            => '"' file_name '"'.
 file_name              => printable+.
+option_name            => alnum+.
+option_value           => alnum+.
 
 # command arguments
 #
@@ -252,25 +254,6 @@ memory                 => ( "%"
                           | "%-":rel_memory_sym [digits:memory_id]):rel_memory
                         | ( "%" :abs_memory_sym         memory_id) :abs_memory.
 
-# options and their values
-#
-option                 => bool_option
-                        | ("S" | "severity")         :severity_opt :enum_option.
-bool_option            => ("s" | "status")                    :status_opt
-                        | ("c" | "color" | "colors")          :colors_opt
-                        | ("V" | "charvar")                   :charvar_opt
-                        | ("H" | "highlight" | "highlighting"):highlighting_opt
-                        | ("I" | "indent" | "indenting")      :indenting_opt
-                        | ("d" | "dbg"   | "debug")           :debug_repl_opt.
-option_value           => option_value_true | option_value_false | severity.
-option_value_true      => "t" | "true"  | "on"  | "1" | "y" | "yes".
-option_value_false     => "f" | "false" | "off" | "0" | "n" | "no".
-severity               => ("e" | "error"):error_sym
-                        | ("i" | "info" ):info_sym
-                        | ("d" | "debug"):debug_sym
-                        | ("t" | "trace"):trace_sym.
-
-
 # shaping of the parsed tree
 #
 @trim _, __.  # trim whitespace
@@ -279,7 +262,7 @@ severity               => ("e" | "error"):error_sym
 @trim all terminals except children of
         sym, digits, type, source, named_binding, capture,
         variable, in_var_name, out_var_name, uninter_const_name,
-        file_name, ctnvar.
+        file_name, ctnvar, option_name, option_value.
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c,
