@@ -53,15 +53,6 @@ tau<BAs...> quantified_formula(const rewriter::node<tau_sym<BAs...>>& n) {
 	return n.child[0]->child[0];
 }
 
-/*template<typename...BAs>
-std::optional<tau<BAs...>> type_of(const tau<BAs...>& l,
-	const tau<BAs...>& r)
-{
-	if (auto check = l | tau_parser::type; check) return check.value();
-	if (auto check = r | tau_parser::type; check) return check.value();
-	return {};
-}*/
-
 template<typename...BAs>
 std::optional<tau<BAs...>> type_of(const tau<BAs...>& e)
 {
