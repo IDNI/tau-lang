@@ -158,3 +158,7 @@ template <typename... BAs>
 tau<BAs...> splitter(const tau<BAs...>& n, splitter_type st = splitter_type::upper);
 
 } // namespace idni::tau_lang
+
+#include "nso_ba.tmpl.h"
+
+#endif // __NSO_BA_H__
