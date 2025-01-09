@@ -351,3 +351,7 @@ std::optional<tau<BAs...>> make_nso_using_factory(const std::string& input,
 	idni::parser<>::parse_options options = { .start = tau_parser::wff });
 
 } // namespace tau
+
+#include "language.tmpl.h"
+
+#endif // __LANGUAGE_H__
