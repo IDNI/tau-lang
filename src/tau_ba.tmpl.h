@@ -194,6 +194,12 @@ std::string tau_ba_factory<BAs...>::zero(std::string&) const {
 } // namespace idni::tau_lang
 
 template <typename... BAs>
+size_t std::hash<idni::tau_lang::tau_ba<BAs...>>::operator()(const idni::tau_lang::tau_ba<BAs...>& f) const noexcept {
+	using namespace idni::tau_lang;
+	return hash<rr<tau<tau_ba<BAs...>, BAs...>>>{}(f.nso_rr);
+}
+
+template <typename... BAs>
 std::ostream& operator<<(std::ostream& os, const idni::tau_lang::tau_ba<BAs...>& rs)
 {
 	return os << rs.nso_rr;
