@@ -372,6 +372,8 @@ auto is_bf_same_to_any_of(tau<BAs...>& n, std::vector<tau<BAs...>>& previous) {
 		});
 }
 
+// Normalize fm and additionally simplify implications between
+// always, !always, sometimes and !sometimes statements
 template<typename... BAs>
 tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 	using p = tau_parser;
@@ -382,22 +384,50 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 			return trim2(n);
 		return n;
 	};
+	auto push_neg = [](const auto& n) {
+		if (is_child_non_terminal(p::wff_neg, n) &&
+			(is_child_non_terminal(p::wff_always, trim2(n)) ||
+			is_child_non_terminal(p::wff_sometimes, trim2(n))))
+			return build_wff_neg(trim2(trim2(n)));
+		return n;
+	};
+	auto is_neg_st = [](const auto& n) {
+		if (is_child_non_terminal(p::wff_neg, n) &&
+			is_child_non_terminal(p::wff_sometimes, trim2(n)))
+			return true;
+		else return false;
+	};
+	auto is_neg_aw = [](const auto& n) {
+		if (is_child_non_terminal(p::wff_neg, n) &&
+			is_child_non_terminal(p::wff_always, trim2(n)))
+			return true;
+		else return false;
+	};
 	auto red_fm = normalizer_step(fm);
 	auto clauses = get_dnf_wff_clauses(red_fm);
 	tau<BAs...> new_fm;
 	for (const auto& clause : clauses) {
-		auto aw_parts = select_top(clause,
-			is_child_non_terminal<tau_parser::wff_always, BAs...>);
-		auto st_parts = select_top(clause,
-			is_child_non_terminal<tau_parser::wff_sometimes, BAs ...>);
+		auto aw_parts = select_top_until(clause,
+			is_child_non_terminal<p::wff_always, BAs...>,
+			is_child_non_terminal<p::wff_neg, BAs...>);
+		auto neg_aw_parts = select_top(clause, is_neg_aw);
+		// TODO: activate once new sometimes definition is there
+		// auto st_parts = select_top(clause, is_st);
+		// std::ranges::for_each(st_parts, trim2);
+		// auto neg_st_parts = select_top(clause, is_neg_st);
 
-		// Replace always and sometimes parts by T
+		// Replace (!)always and (!)sometimes parts by T
 		std::map<tau<BAs...>, tau<BAs...>> changes;
 		for (const auto& aw : aw_parts)
 			changes.emplace(aw, _T<BAs...>);
-		for (const auto& st : st_parts)
-			changes.emplace(st, _T<BAs...>);
+		for (const auto& naw : neg_aw_parts)
+			changes.emplace(naw, _T<BAs...>);
+		// for (const auto& st : st_parts)
+		// 	changes.emplace(st, _T<BAs...>);
+		// for (const auto& nst : neg_st_parts)
+		// 	changes.emplace(nst, _T<BAs...>);
 		tau<BAs...> new_clause = replace(clause, changes);
+		std::cout << "new_clause: " << new_clause << "\n";
 
 		// First check if any always statements are implied by others
 		for (size_t i = 0; i < aw_parts.size(); ++i) {
@@ -408,29 +438,30 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 					aw_parts[i] = _T<BAs...>;
 			}
 		}
-		// Next check if any always statement implies a sometimes statement
+		// Next check if any always statement implies a !always statement
 		for (const auto& aw : aw_parts) {
-			for (auto& st : st_parts) {
-				if (is_nso_impl(aw, trim_q(st)))
-					st = _T<BAs...>;
+			for (auto& naw : neg_aw_parts) {
+				if (is_nso_impl(aw, push_neg(naw)))
+					naw = _T<BAs...>;
 			}
 		}
-		// Now check if any sometimes statement implies another sometimes
-		for (size_t i = 0; i < st_parts.size(); ++i) {
-			for (size_t j = i+1; j < st_parts.size(); ++j) {
-				if (is_nso_impl(trim_q(st_parts[i]), trim_q(st_parts[j])))
-					st_parts[j] = _T<BAs...>;
-				else if (is_nso_impl(trim_q(st_parts[j]), trim_q(st_parts[i])))
-					st_parts[i] = _T<BAs...>;
+		// Now check if any !always statement implies another !always
+		for (size_t i = 0; i < neg_aw_parts.size(); ++i) {
+			for (size_t j = i+1; j < neg_aw_parts.size(); ++j) {
+				if (is_nso_impl(push_neg(neg_aw_parts[i]), push_neg(neg_aw_parts[j])))
+					neg_aw_parts[j] = _T<BAs...>;
+				else if (is_nso_impl(push_neg(neg_aw_parts[j]), push_neg(neg_aw_parts[i])))
+					neg_aw_parts[i] = _T<BAs...>;
 			}
 		}
 		new_clause = build_wff_and(new_clause, build_wff_and(
 						build_wff_and<BAs...>(aw_parts),
-						build_wff_and<BAs...>( st_parts)));
+						build_wff_and<BAs...>(neg_aw_parts)));
 		if (new_fm) new_fm = build_wff_or(new_fm, new_clause);
 		else new_fm = new_clause;
 	}
 	assert(new_fm != nullptr);
+	std::cout << "new_fm: " << new_fm << "\n";
 	return new_fm;
 }
 
