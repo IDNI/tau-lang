@@ -76,6 +76,12 @@ tau<BAs...> split(const tau<BAs...>& fm, const size_t fm_type, bool is_cnf,
 	return fm;
 }
 
+// If checking a temporal Tau formula F, we split a single DNF clause.
+// In order to check if the split clause yields a splitter for F, we have that
+// "fm" holds the clause, "splitter" holds the splitter of the clause and
+// "spec" holds the original temporal Tau formula
+// If we check a non-temporal Tau formula, it suffices to place it in "fm" and
+// the proposed splitter in "splitter".
 template<typename... BAs>
 bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<BAs...>& spec) {
 	if (spec) {
