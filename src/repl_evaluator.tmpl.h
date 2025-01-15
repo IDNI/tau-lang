@@ -95,7 +95,7 @@ tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 			rr_ = infr.value();
 		else return nullptr;
 	}
-	
+
 	rr_.main = apply_rr_to_formula(rr_);
 	return rr_.main;
 }
@@ -647,6 +647,72 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	}
 }
 
+template <typename... BAs>
+void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
+	std::optional<std::string> type = n->child.size() == 3
+		?  make_string<tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
+			tau_nso_t>(tau_node_terminal_extractor<
+				tau_ba_t, BAs...>, n->child[1])
+		: std::optional<std::string>();
+
+	auto implicit_types = select_all(n, is_non_terminal<
+					tau_parser::type, tau_ba_t, BAs...>);
+	for (const auto& t: implicit_types) {
+		auto implicit_type = make_string<
+				tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
+				tau_nso_t>(
+			tau_node_terminal_extractor<tau_ba_t, BAs...>, t);
+		if (type.has_value() && implicit_type != type.value()) {
+			BOOST_LOG_TRIVIAL(error)
+				<< "(Error) multiple types involved\n";
+			return;
+		} if (!type.has_value()) type = implicit_type;
+	}
+
+	if (!type.has_value()) type = "tau";
+
+	if (auto nn = is_non_terminal<tau_parser::type, tau_ba_t, BAs...>(
+		n->child[1]) ? get_type_and_arg(n->child[2])
+				: get_type_and_arg(n->child[1]); nn)
+	{
+		auto [t, program] = nn.value();
+		//auto applied = apply_rr_to_rr_tau_nso(t, program);
+
+		//applied = normalize_non_temp(applied);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/applied: " << program << "\n";
+		#endif // DEBUG
+
+		if (!nn) {
+			BOOST_LOG_TRIVIAL(error) <<
+				"(Error) invalid argument\n"; return;
+		}
+		auto s = lgrs(program); //  lgrs(applied);
+		if (!s) { std::cout << "no solution\n"; return; }
+		std::cout << "solution: {" << "\n";
+		for (auto& [k, v] : s.value()) {
+			// is bf_t
+			if (auto check = v | tau_parser::bf_t; check) {
+				std::cout << "\t" << k << " := {"
+					<< nso_factory<tau_ba_t, BAs...>
+						::instance().one(type.value())
+					<< "} : " << type.value() << "\n";
+			// is bf_f
+			} else if (auto check = v | tau_parser::bf_f; check) {
+				std::cout << "\t" << k << " := {"
+					<< nso_factory<tau_ba_t, BAs...>
+						::instance().zero(type.value())
+					<< "} : " << type.value() << "\n";
+			// is something else but not a BA element
+			} else {
+				std::cout << "\t" << k << " := " << v << "\n";
+			}
+		}
+		std::cout << "}\n";
+	}
+}
+
 template<typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::is_valid_cmd(const tau_nso_t& n)
@@ -1093,6 +1159,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
 	// execution
 	case p::run_cmd:            run_cmd(command); break;
 	case p::solve_cmd:          solve_cmd(command); break;
+	case p::lgrs_cmd:           lgrs_cmd(command); break;
 	// substitution and instantiation
 	case p::subst_cmd:          result = substitute_cmd(command); break;
 	case p::inst_cmd:           result = instantiate_cmd(command); break;
@@ -1222,6 +1289,7 @@ void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
 		<< "  unsat                   check if a Tau formula is unsatisfiable\n"
 		<< "  valid                   check if a Tau formula is valid\n"
 		<< "  solve                   compute a satisfying assignment for the free variables in a Tau formula\n"
+		<< "  lgrs                    compute a LGRS for a given equation\n"
 		<< "\n"
 
 		<< "Normal form commands:\n"
@@ -1341,6 +1409,13 @@ void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
 		<< "usage:\n"
 		<< "  solve <tau>              computes a single satisfying assignment for the free variables in the Tau formula\n"
 		<< "  solve <repl_memory>      computes a single satisfying assignment for the free variables in the Tau formula stored at the specified repl memory position"
+		<< "\n";
+		break;
+	case tau_parser::lgrs_sym: std::cout
+		<< "the lgrs command computes a LGRS for an equation\n"
+		<< "\n"
+		<< "usage:\n"
+		<< "  lgrs <tau_eq>            computes a LGRS for a given equation\n"
 		<< "\n";
 		break;
 	case tau_parser::sat_sym: std::cout
