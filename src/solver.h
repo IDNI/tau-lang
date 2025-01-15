@@ -515,23 +515,6 @@ std::set<tau<BAs...>> get_exponent(const tau<BAs...>& n) {
 
 template<typename...BAs>
 tau<BAs...> get_minterm(const minterm<BAs...>& m) {
-	/*auto is_literal = [](const tau<BAs...> n) {
-		return is_non_terminal<tau_parser::bf>(n)
-			&& !is_child_non_terminal<tau_parser::bf_constant>(n)
-			&& !is_child_non_terminal<tau_parser::bf_and>(n);
-	};
-	auto literals = select_top(m, is_literal);
-
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.h:" << __LINE__ << " get_minterm/literals:\n";
-	for (const auto& l: literals)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.h:" << __LINE__ << "\t" << l;
-	#endif // DEBUG
-
-
-	std::set<tau<BAs...>> all_literals(literals.begin(), literals.end());*/
 	return build_bf_and<BAs...>(get_exponent(m));
 }
 
@@ -753,9 +736,15 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 	auto phi = lgrs(system.first.value());
 	if (!phi.has_value()) return {};
-	// std::cout << "phi\n";
-	// for (const auto& [var, val] : phi.value())
-	// 	std::cout << "var: " << var << ", val: " << val << "\n";
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " solve_system/phi: ";
+	for (const auto& [k, v]: phi.value())
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << k << " := " << v;
+	#endif // DEBUG
+
 
 	inequality_system<BAs...> inequalities;
 	// for each inequality g_i we apply the transformation given by lgrs solution
@@ -781,11 +770,15 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		inequalities.insert(ng_i);
 	}
 
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " solve_system/inequalities: ";
+	for (const auto& inequality : inequalities)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << inequality;
+	#endif // DEBUG
 
-	// std::cout << "inequalities:\n";
-	// for (const auto& el : inequalities) {
-	// 	std::cout << "el: " << el << "\n";
-	// }
+
 	// solve the given system  of inequalities
 	auto inequality_solution = solve_inequality_system<BAs...>(inequalities, splitter_one);
 	if (!inequality_solution.has_value()) {
@@ -797,10 +790,15 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 		return {};
 	}
-	// std::cout << "inequalities solution: \n";
-	// for (const auto& [var, val] : inequality_solution.value()) {
-	// 	std::cout << "var: " << var << ", val: " << val << "\n";
-	// }
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " solve_system/inequality_solution: ";
+	for (const auto& [k, v]: inequality_solution.value())
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << k << " := " << v;
+	#endif // DEBUG
+
 	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
 	// Solutions coming from inequality_solution for variables appearing also
 	// in the equality part will be replaced in the next step
