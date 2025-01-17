@@ -13,14 +13,14 @@ using terminal_type = char;
 
 inline std::vector<std::string> symbol_names{
 	"", "space", "alpha", "digit", "start", "_", "sbf", "group", "__E_sbf_0", "variable", 
-	"negation", "__E_sbf_1", "disjunction", "__E_sbf_2", "exclusive_disjunction", "__E_sbf_3", "__E___E_sbf_3_4", "conjunction", "__E_sbf_5", "__E___E_sbf_5_6", 
+	"disjunction", "__E_sbf_1", "exclusive_disjunction", "__E_sbf_2", "__E___E_sbf_2_3", "conjunction", "__E_sbf_4", "__E___E_sbf_4_5", "negation", "__E_sbf_6", 
 	"one", "zero", "__E___7", "__E_variable_8", "__E_variable_9", "alnum", "__E_variable_10", 
 };
 
 inline ::idni::nonterminals<char_type, terminal_type> nts{symbol_names};
 
 inline std::vector<terminal_type> terminals{
-	'\0', '(', ')', '\'', '|', '^', '+', '&', '1', 
+	'\0', '(', ')', '|', '^', '+', '&', '\'', '1', 
 	'0', '_', 
 };
 
@@ -76,38 +76,38 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(6), (NT(7)));
 //G4:   sbf(6)               => variable(9).
 	p(NT(6), (NT(9)));
-//G5:   __E_sbf_1(11)        => sbf(6) _(5) '\''.
-	p(NT(11), (NT(6)+NT(5)+T(3)));
-//G6:   negation(10)         => __E_sbf_1(11).
+//G5:   __E_sbf_1(11)        => sbf(6) _(5) '|' _(5) sbf(6).
+	p(NT(11), (NT(6)+NT(5)+T(3)+NT(5)+NT(6)));
+//G6:   disjunction(10)      => __E_sbf_1(11).
 	p(NT(10), (NT(11)));
-//G7:   sbf(6)               => negation(10).
+//G7:   sbf(6)               => disjunction(10).
 	p(NT(6), (NT(10)));
-//G8:   __E_sbf_2(13)        => sbf(6) _(5) '|' _(5) sbf(6).
-	p(NT(13), (NT(6)+NT(5)+T(4)+NT(5)+NT(6)));
-//G9:   disjunction(12)      => __E_sbf_2(13).
+//G8:   __E___E_sbf_2_3(14)  => '^'.
+	p(NT(14), (T(4)));
+//G9:   __E___E_sbf_2_3(14)  => '+'.
+	p(NT(14), (T(5)));
+//G10:  __E_sbf_2(13)        => sbf(6) _(5) __E___E_sbf_2_3(14) _(5) sbf(6).
+	p(NT(13), (NT(6)+NT(5)+NT(14)+NT(5)+NT(6)));
+//G11:  exclusive_disjunction(12) => __E_sbf_2(13).
 	p(NT(12), (NT(13)));
-//G10:  sbf(6)               => disjunction(12).
+//G12:  sbf(6)               => exclusive_disjunction(12).
 	p(NT(6), (NT(12)));
-//G11:  __E___E_sbf_3_4(16)  => '^'.
-	p(NT(16), (T(5)));
-//G12:  __E___E_sbf_3_4(16)  => '+'.
-	p(NT(16), (T(6)));
-//G13:  __E_sbf_3(15)        => sbf(6) _(5) __E___E_sbf_3_4(16) _(5) sbf(6).
-	p(NT(15), (NT(6)+NT(5)+NT(16)+NT(5)+NT(6)));
-//G14:  exclusive_disjunction(14) => __E_sbf_3(15).
-	p(NT(14), (NT(15)));
-//G15:  sbf(6)               => exclusive_disjunction(14).
-	p(NT(6), (NT(14)));
-//G16:  __E___E_sbf_5_6(19)  => _(5).
-	p(NT(19), (NT(5)));
-//G17:  __E___E_sbf_5_6(19)  => _(5) '&' _(5).
-	p(NT(19), (NT(5)+T(7)+NT(5)));
-//G18:  __E_sbf_5(18)        => sbf(6) __E___E_sbf_5_6(19) sbf(6).
-	p(NT(18), (NT(6)+NT(19)+NT(6)));
-//G19:  conjunction(17)      => __E_sbf_5(18).
-	p(NT(17), (NT(18)));
-//G20:  sbf(6)               => conjunction(17).
-	p(NT(6), (NT(17)));
+//G13:  __E___E_sbf_4_5(17)  => _(5).
+	p(NT(17), (NT(5)));
+//G14:  __E___E_sbf_4_5(17)  => _(5) '&' _(5).
+	p(NT(17), (NT(5)+T(6)+NT(5)));
+//G15:  __E_sbf_4(16)        => sbf(6) __E___E_sbf_4_5(17) sbf(6).
+	p(NT(16), (NT(6)+NT(17)+NT(6)));
+//G16:  conjunction(15)      => __E_sbf_4(16).
+	p(NT(15), (NT(16)));
+//G17:  sbf(6)               => conjunction(15).
+	p(NT(6), (NT(15)));
+//G18:  __E_sbf_6(19)        => sbf(6) _(5) '\''.
+	p(NT(19), (NT(6)+NT(5)+T(7)));
+//G19:  negation(18)         => __E_sbf_6(19).
+	p(NT(18), (NT(19)));
+//G20:  sbf(6)               => negation(18).
+	p(NT(6), (NT(18)));
 //G21:  one(20)              => '1'.
 	p(NT(20), (T(8)));
 //G22:  sbf(6)               => one(20).
@@ -153,7 +153,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 struct sbf_parser : public idni::parser<char, char> {
 	enum nonterminal {
 		nul, space, alpha, digit, start, _, sbf, group, __E_sbf_0, variable, 
-		negation, __E_sbf_1, disjunction, __E_sbf_2, exclusive_disjunction, __E_sbf_3, __E___E_sbf_3_4, conjunction, __E_sbf_5, __E___E_sbf_5_6, 
+		disjunction, __E_sbf_1, exclusive_disjunction, __E_sbf_2, __E___E_sbf_2_3, conjunction, __E_sbf_4, __E___E_sbf_4_5, negation, __E_sbf_6, 
 		one, zero, __E___7, __E_variable_8, __E_variable_9, alnum, __E_variable_10, 
 	};
 	static sbf_parser& instance() {
