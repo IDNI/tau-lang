@@ -925,6 +925,26 @@ tau<BAs...> make_node_hook_wff_imply(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
+tau<BAs...> make_node_hook_wff_rimply(const rewriter::node<tau_sym<BAs...>>& n) {
+	//RULE(WFF_IMPLY_SIMPLIFY_0, "F -> $X ::= T.")
+	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
+		return _T<BAs...>;
+	//RULE(WFF_IMPLY_SIMPLIFY_1, "T -> $X ::= $X.")
+	if (is_non_terminal<tau_parser::wff_t>(second_argument_expression(n)))
+		return first_argument_formula(n);
+	//RULE(WFF_IMPLY_SIMPLIFY_2, "$X -> F ::= ! $X.")
+	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
+		return build_wff_neg<BAs...>(second_argument_formula(n));
+	//RULE(WFF_IMPLY_SIMPLIFY_3, "$X -> T ::= T.")
+	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
+		return _T<BAs...>;
+	//RULE(WFF_IMPLY_SIMPLIFY_4, "$X -> $X ::= T.")
+	if (first_argument_formula(n) == second_argument_formula(n))
+		return _T<BAs...>;
+	return build_wff_imply<BAs...>(second_argument_formula(n), first_argument_formula(n));
+}
+
+template <typename... BAs>
 tau<BAs...> make_node_hook_wff_equiv(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_EQUIV_SIMPLIFY_0, "F <-> $X ::= ! $X.")
 	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
@@ -975,6 +995,8 @@ tau<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n) {
 			return make_node_hook_wff_conditional<BAs...>(n);
 		case tau_parser::wff_imply:
 			return make_node_hook_wff_imply<BAs...>(n);
+		case tau_parser::wff_rimply:
+			return make_node_hook_wff_rimply<BAs...>(n);
 		case tau_parser::wff_equiv:
 			return make_node_hook_wff_equiv<BAs...>(n);
 		case tau_parser::constraint:
