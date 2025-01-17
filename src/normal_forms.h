@@ -1635,24 +1635,31 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	}
 	// Eliminate redundant != 0 in cnf
 	for (int_t c1=0; c1 < (int_t)cnf_neq_lits.size(); ++c1) {
-		for (size_t i = 0; i < cnf_neq_lits[c1].size(); ++i) {
-			if (cnf_neq_lits[c1][i].empty()) continue;
-			bool all_subset = true;
-			for (int_t c2 = 0; c2 < (int_t)cnf_neq_lits.size(); ++c2) {
-				if (c1 == c2) continue;
-				if (cnf_neq_lits[c2].empty()) continue;
+		for (int_t c2 = 0; c2 < (int_t)cnf_neq_lits.size(); ++c2) {
+			if (c1 == c2) continue;
+			bool is_impl = true;
+			for (size_t i = 0; i < cnf_neq_lits[c1].size(); ++i) {
+				if (cnf_neq_lits[c1][i].empty()) continue;
+				bool exists_superset = false;
 				for (size_t j = 0; j < cnf_neq_lits[c2].size(); ++j) {
 					if (cnf_neq_lits[c2][j].empty()) continue;
-					if (!is_ordered_subset(cnf_neq_lits[c1][i], cnf_neq_lits[c2][j])) {
-						all_subset = false;
+					if (is_ordered_subset(cnf_neq_lits[c2][j], cnf_neq_lits[c1][i])) {
+						exists_superset = true;
 						break;
 					}
 				}
-				if (all_subset == true) {
-					cnf_neq_lits[c1].erase(cnf_neq_lits[c1].begin()+i);
-					--i;
+				// If not exists_superset, c1[i] is not a superset for some c2[j]
+				// Hence, c1 cannot imply c2
+				if (!exists_superset) {
+					is_impl = false;
 					break;
 				}
+			}
+			if (is_impl) {
+				// c1 implies c2
+				cnf_neq_lits.erase(cnf_neq_lits.begin() + c2);
+				if (c1 >= c2) --c1;
+				break;
 			}
 		}
 	}
