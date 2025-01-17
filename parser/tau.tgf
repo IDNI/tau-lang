@@ -53,6 +53,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | ref                                :wff_ref
                         |                                     constraint
                         | (wff   _ "->"  _ wff)              :wff_imply
+                        | (wff   _ "<-"  _ wff)              :wff_rimply
                         | (wff   _ "<->" _ wff)              :wff_equiv
                         | (wff   _ "||"  _ wff)              :wff_or
                         | (wff   _ '^'   _ wff)              :wff_xor
