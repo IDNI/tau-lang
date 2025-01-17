@@ -18,10 +18,10 @@
 start  => _ sbf _.
 sbf    => ( '(' _ sbf _ ')'                ) :group
         |                                     variable
+        | ( sbf _ "'"                      ) :negation
         | ( sbf _ '|' _ sbf                ) :disjunction
         | ( sbf _ ('^' | '+') _ sbf        ) :exclusive_disjunction
         | ( sbf (_ | _ '&' _) sbf          ) :conjunction
-        | ( sbf _ "'"                      ) :negation
         | '1'                                :one
         | '0'                                :zero.
 _      => [ space _ ].
