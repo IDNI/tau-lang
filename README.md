@@ -31,7 +31,7 @@
 	5. [Expression manipulation](#expression-manipulation)
 	6. [Logical procedures](#logical-procedures)
 	7. [Normal forms](#normal-forms)
-	8. [Program execution](#program-execution)
+	8. [Specification execution](#specification-execution)
 7. [Known issues](#known-issues)
 8. [Future work](#future-work)
 9. [Submitting issues](#submitting-issues)
@@ -131,7 +131,7 @@ To build with doxygen documentation:
 ```
 
 Once you have compiled the source code you can run the `tau` executable to
-execute Tau programs. The `tau` executable is located in either `build-Release`
+execute Tau specifications. The `tau` executable is located in either `build-Release`
 or `build-Debug` or `build-RelWithDebInfo`.
 
 
@@ -151,19 +151,19 @@ is not a program, but a specification, or spec, which represents all programs th
 meet the specification. Once you run a specification, you actually run one
 automatically-chosen representative program from that set.
 
-In the scope of the Tau Language, a program means that for all inputs, at each
+In the scope of the Tau Language, a specification means that for all inputs, at each
 point in time, exist outputs, that clearly do not depend on future inputs
-("time-compatible"). Implied from this definition is that all programs run
+("time-compatible"). Implied from this definition is that all specifications run
 indefinitely no matter what the inputs are.
 
-For example, the following program:
+For example, the following specification:
 
 ```
 o1[t] = 0
 ```
 
 states that the output `o1` at all time points (`t`) has to be `0`. Similarly the
-following program:
+following specification:
 
 ```
 o1[t] = i1[t]
@@ -172,7 +172,7 @@ o1[t] = i1[t]
 states that the output `o1` at time `t` has to be the same as the input
 `i1` at time `t`.
 In the above examples, `o1` and `i1` are IO variables. They are used to define
-the inputs and outputs of the specified programs and also declare their type.
+the inputs and outputs of the specified specifications and also declare their type.
 
 An example of how to define IO variables is the following:
 
@@ -195,7 +195,7 @@ tau o1 = ofile("output.out")
 ```
 
 Back to the above two examples, the one where the output is always zero and the
-one where it equals the input, those Tau specs define only one program each
+one where it equals the input, those Tau specs define only one specification each
 (there's a caveat in this statement but we shall treat it later on). An example
 of a Tau spec that specifies infinitely many programs would be:
 
@@ -216,7 +216,7 @@ output with the previous output and with the current input, has to be 0, or, the
 output has to equal the input. Note the difference between Boolean and Logical
 operators. The former are &|', and the latter are &&,||,!.
 
-In order to simplify the process of writing and running Tau programs, we allow
+In order to simplify the process of writing and running Tau specifications, we allow
 to define functions and predicates, possibly by means of recurrence relations.
 The following is a simple predicate defined by a recurrence relation,
 which takes as argument a Tau formula:
@@ -544,11 +544,11 @@ algebra elements.
 The general form of tau executable command line is:
 
 ```bash
-tau [ options ] [ <program> ]
+tau [ options ] [ <specification> ]
 ```
 
-where `[ options ]` are the command line options and `[ <program> ]` is the Tau
-program you want to run. If you omit the tau program, the Tau REPL will be
+where `[ options ]` are the command line options and `[ <specification> ]` is the Tau
+specification you want to run. If you omit the tau specification, the Tau REPL will be
 started.
 
 The general options are the following:
@@ -577,7 +577,7 @@ whereas the REPL specific options are:
 
 The Tau REPL is a command line interface that allows you to interact with the Tau
 Language. It is a simple and easy to use tool that allows you to write and
-execute Tau programs on the go.
+execute Tau specifications on the go.
 
 ## **Basic REPL commands**
 
@@ -635,7 +635,7 @@ As in other programming languages, you can define functions, predicates (both po
 relations) but also input and output stream variables. The syntax of the commands
 is the following:
 
-* `definitions|defs`: shows all the definitions of the current program. That
+* `definitions|defs`: shows all the definitions of the current session. That
 includes the definitions of functions, predicates and the input/output stream variables.
 
 * `definitions|defs <number>`: shows the definition of the given function or predicate.
@@ -692,14 +692,14 @@ by a memory position or Boolean function in the given expression.
 ## **Logical procedures**
 
 The Tau REPL also provides a set of logical procedures that allow you to check
-several aspects of the given program/well-formed formulas/Boolean functions.
+several aspects of the given specification/well-formed formulas/Boolean functions.
 The syntax of the commands is the following:
 
-* `valid <repl_memory|tau>`: checks if the given program is valid.
+* `valid <repl_memory|tau>`: checks if the given specification is valid.
 
-* `sat <repl_memory|tau>`: checks if the given program is satisfiable.
+* `sat <repl_memory|tau>`: checks if the given specification is satisfiable.
 
-* `unsat <repl_memory|tau>`: checks if the given program is unsatisfiable.
+* `unsat <repl_memory|tau>`: checks if the given specification is unsatisfiable.
 
 * `solve <repl_memory|tau>`: solves the given system of equations given by the
 well-formed formula. It only computes one solution.
@@ -729,12 +729,12 @@ expression.
 * `onf <var> <repl_memory|tau>`: computes the order normal form of the given
 expression with respect to the given variable.
 
-## **Program execution**
+## **Specification execution**
 
-Finally, you can run the given program once you have defined the IO
+Finally, you can run the given specification once you have defined the IO
 variables as you need. The syntax of the commands is:
 
-* `run|r <repl_memory|tau>`: runs the given program.
+* `run|r <repl_memory|tau>`: runs the given specification.
 
 # **Known issues**
 
