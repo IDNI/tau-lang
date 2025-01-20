@@ -83,19 +83,23 @@ tau<BAs...> split(const tau<BAs...>& fm, const size_t fm_type, bool is_cnf,
 // If we check a non-temporal Tau formula, it suffices to place it in "fm" and
 // the proposed splitter in "splitter".
 template<typename... BAs>
-bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<BAs...>& spec) {
+bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<BAs...>& spec = nullptr) {
 	if (spec) {
 		// We are dealing with a temporal formula
 		if (!are_tau_equivalent(splitter, fm)) {
+			assert(is_tau_impl(splitter, fm));
 			std::map<tau<BAs...>, tau<BAs...>> c = {{fm, splitter}};
-			auto new_spec = normalizer_step(replace(spec, c));
+			auto new_spec = normalize_with_temp_simp(replace(spec, c));
 			if (is_tau_formula_sat(new_spec))
 				return true;
 		}
 	} else {
 		// We are dealing with a non-temporal formula
 		if (!are_nso_equivalent(splitter, fm) && normalizer_step(splitter)
-		    != _F<BAs...>) return true;
+		    != _F<BAs...>) {
+			assert(is_nso_impl(splitter, fm));
+			return true;
+		}
 	}
 	return false;
 }
