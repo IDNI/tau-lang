@@ -515,23 +515,6 @@ std::set<tau<BAs...>> get_exponent(const tau<BAs...>& n) {
 
 template<typename...BAs>
 tau<BAs...> get_minterm(const minterm<BAs...>& m) {
-	/*auto is_literal = [](const tau<BAs...> n) {
-		return is_non_terminal<tau_parser::bf>(n)
-			&& !is_child_non_terminal<tau_parser::bf_constant>(n)
-			&& !is_child_non_terminal<tau_parser::bf_and>(n);
-	};
-	auto literals = select_top(m, is_literal);
-
-	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.h:" << __LINE__ << " get_minterm/literals:\n";
-	for (const auto& l: literals)
-		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.h:" << __LINE__ << "\t" << l;
-	#endif // DEBUG
-
-
-	std::set<tau<BAs...>> all_literals(literals.begin(), literals.end());*/
 	return build_bf_and<BAs...>(get_exponent(m));
 }
 
@@ -540,29 +523,60 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 		const minterm<BAs...>& m, const tau<BAs...>& splitter_one) {
 	minterm_system<BAs...> new_disjoint;
 	auto new_m = m;
-	auto new_m_cte = get_constant(new_m);
-	auto new_m_exp = get_exponent(new_m);
 
 	for (auto& d: disjoint) {
+		auto new_m_cte = get_constant(new_m);
+		auto new_m_exp = get_exponent(new_m);
+
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/d: " << d << "\n"
+			<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/new_m: " << new_m << "\n"
+			<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/new_m_cte: " << new_m_cte << "\n"
+			<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/new_m_exp:\n";
+		for (const auto& e: new_m_exp)
+			BOOST_LOG_TRIVIAL(trace)
+				<< "solver.h:" << __LINE__ << "\t" << e;
+		#endif // DEBUG
+
 		// case 1
 		if (get_exponent(d) == new_m_exp) {
+
+			#ifdef DEBUG
+			BOOST_LOG_TRIVIAL(trace)
+				<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case1]/new_disjoint: " << d << "\n";
+			#endif // DEBUG
+
 			new_disjoint.insert(d);
 			continue;
 		}
 		if (auto d_cte = get_constant(d); (d_cte & new_m_cte) != false) {
 			// case 2
-			if ((d_cte & ~new_m_cte) != false)
+			if ((d_cte & ~new_m_cte) != false) {
 				new_disjoint.insert(~new_m_cte & d);
+
+				#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(trace)
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case2]/new_disjoint: " << (~new_m_cte & d) << "\n";
+				#endif // DEBUG
+
 			// case 3
-			else if ((~d_cte & new_m_cte) != false) {
+			} else if ((~d_cte & new_m_cte) != false) {
 				new_disjoint.insert(d);
-				new_m = ~d_cte & new_m;
+				new_m = (~d_cte & new_m) | bf_reduce_canonical<BAs...>();
+
+				#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(trace)
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case3]/new_disjoint: " << d << "\n"
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case3]/new_m: " << new_m << "\n";
+				#endif // DEBUG
+
 			// case 4
 			} else {
 
 				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/d_cte: " << d_cte << "\n";
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/d_cte: " << d_cte << "\n";
 				#endif // DEBUG
 
 				auto s = d_cte == _1<BAs...>
@@ -575,14 +589,27 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 
 				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/s: " << s << "\n";
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/s: " << s << "\n";
 				#endif // DEBUG
 
 				new_disjoint.insert(s & d);
-				new_m = ~s & new_m;
+				new_m = (~s & new_m) | bf_reduce_canonical<BAs...>();
+
+				#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(trace)
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/new_disjoint: " << (s & d) << "\n"
+					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/new_m: " << new_m << "\n";
+				#endif // DEBUG
 			}
 		// case 5
-		} else new_disjoint.insert(d);
+		} else {
+			new_disjoint.insert(d);
+
+			#ifdef DEBUG
+			BOOST_LOG_TRIVIAL(trace)
+				<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case5]/new_disjoint: " << d << "\n";
+			#endif // DEBUG
+		}
 	}
 	new_disjoint.insert(new_m);
 	return new_disjoint;
@@ -591,9 +618,27 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 template<typename...BAs>
 minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys,
 		const tau<BAs...>& splitter_one) {
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " make_minterm_system_disjoint/system: ";
+	for (const auto& minterm : sys)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << minterm;
+	#endif // DEBUG
+
 	minterm_system<BAs...> disjoints;
 	for (auto it = sys.begin(); it != sys.end(); ++it)
 		disjoints = add_minterm_to_disjoint<BAs...>(disjoints, *it, splitter_one);
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " make_minterm_system_disjoint/disjoints: ";
+	for (const auto& minterm : disjoints)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << minterm;
+	#endif // DEBUG
+
 	return disjoints;
 }
 
@@ -753,9 +798,15 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 	auto phi = lgrs(system.first.value());
 	if (!phi.has_value()) return {};
-	// std::cout << "phi\n";
-	// for (const auto& [var, val] : phi.value())
-	// 	std::cout << "var: " << var << ", val: " << val << "\n";
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " solve_system/phi: ";
+	for (const auto& [k, v]: phi.value())
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << k << " := " << v;
+	#endif // DEBUG
+
 
 	inequality_system<BAs...> inequalities;
 	// for each inequality g_i we apply the transformation given by lgrs solution
@@ -781,11 +832,15 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 		inequalities.insert(ng_i);
 	}
 
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " solve_system/inequalities: ";
+	for (const auto& inequality : inequalities)
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << inequality;
+	#endif // DEBUG
 
-	// std::cout << "inequalities:\n";
-	// for (const auto& el : inequalities) {
-	// 	std::cout << "el: " << el << "\n";
-	// }
+
 	// solve the given system  of inequalities
 	auto inequality_solution = solve_inequality_system<BAs...>(inequalities, splitter_one);
 	if (!inequality_solution.has_value()) {
@@ -797,10 +852,15 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 		return {};
 	}
-	// std::cout << "inequalities solution: \n";
-	// for (const auto& [var, val] : inequality_solution.value()) {
-	// 	std::cout << "var: " << var << ", val: " << val << "\n";
-	// }
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace)
+		<< "solver.h:" << __LINE__ << " solve_system/inequality_solution: ";
+	for (const auto& [k, v]: inequality_solution.value())
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << "\t" << k << " := " << v;
+	#endif // DEBUG
+
 	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
 	// Solutions coming from inequality_solution for variables appearing also
 	// in the equality part will be replaced in the next step

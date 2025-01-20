@@ -4,7 +4,7 @@
 
 #include "doctest.h"
 
-#include "test_integration_helpers-sbf.h"
+#include "test_integration_helpers.h"
 #include "../unit/test_helpers.h"
 
 using namespace idni::rewriter;
@@ -259,7 +259,7 @@ TEST_SUITE("mutual rec cases") {
 			"h[0](Y) := F."
 			"h[n](Y) := g[n - 1](Y)."
 			"g[5](Y).";
-		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_f) ); 
+		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_f) );
 	}
 
 	TEST_CASE("bf_rec_relation: case 1") {
@@ -279,7 +279,7 @@ TEST_SUITE("mutual rec cases") {
 			"h[0](Y) := 0."
 			"h[n](Y) := g[n - 1](Y)."
 			"g[5](Y) = 0.";
-		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_t) ); 
+		CHECK( normalize_and_test_for_value(sample, tau_parser::wff_t) );
 	}
 }
 

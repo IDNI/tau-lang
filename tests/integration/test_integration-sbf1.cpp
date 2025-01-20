@@ -17,7 +17,7 @@
 
 #include "doctest.h"
 
-#include "test_integration_helpers-sbf.h"
+#include "test_integration_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;

@@ -85,9 +85,15 @@ struct tauify {
 	tau_sym<BAs...> operator()(const tau_source_sym& n) const {
 		// TODO this is simple retype of bf_and_nosep_1st_op to bf
 		// this is temporary until parser features retyping
-		if (n.nt() && n.n() == tau_parser::bf_and_nosep_1st_op)
+		if (n.nt()) switch (n.n()) {
+		case tau_parser::bf_and_nosep_1st_oprnd:
+		case tau_parser::bf_neg_oprnd:
 			return tau_sym<BAs...>(tau_parser::instance()
 						.literal(tau_parser::bf));
+		case tau_parser::bf_and_nosep:
+			return tau_sym<BAs...>(tau_parser::instance()
+						.literal(tau_parser::bf_and));
+		}
 		return tau_sym<BAs...>(n);
 	}
 };
