@@ -1043,8 +1043,9 @@ bool is_tau_formula_sat (const tau<BAs...>& normalized_fm, const bool output = f
 // Check for temporal formulas if f1 implies f2
 template<typename... BAs>
 bool is_tau_impl (const tau<BAs...>& f1, const tau<BAs...>& f2) {
-	auto imp_check = normalizer_step(build_wff_imply(f1,f2));
-	imp_check = to_dnf2(build_wff_neg(imp_check));
+	auto f1_norm = normalizer_step(f1);
+	auto f2_norm = normalizer_step(f2);
+	auto imp_check = normalize_with_temp_simp((build_wff_neg(build_wff_imply(f1_norm,f2_norm))));
 	auto clauses = get_dnf_wff_clauses(imp_check);
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
@@ -1059,8 +1060,9 @@ bool is_tau_impl (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 template<typename... BAs>
 bool are_tau_equivalent (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 	// Negate equivalence for unsat check
-	auto equiv_check = normalizer_step(build_wff_equiv(f1, f2));
-	equiv_check = to_dnf2(build_wff_neg(equiv_check));
+	auto f1_norm = normalizer_step(f1);
+	auto f2_norm = normalizer_step(f2);
+	auto equiv_check = normalize_with_temp_simp(build_wff_neg(build_wff_equiv(f1_norm, f2_norm)));
 	auto clauses = get_dnf_wff_clauses(equiv_check);
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
