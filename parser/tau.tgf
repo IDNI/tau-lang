@@ -88,11 +88,10 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('1' [ _ ':' _ type ])             :bf_t
                         | ('0' [ _ ':' _ type ])             :bf_f
                         | (bf (_ '&' _ | __) bf)             :bf_and
-                          # bf_neg_oprnd cannot contain bf_and_nosep
+                          # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | bf_constant
                           | variable | bf_splitter | bf_ref
-                          | bf_t | bf_f | bf_and | bf_neg
-                          | capture)
+                          | bf_t | bf_f | bf_neg | capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
