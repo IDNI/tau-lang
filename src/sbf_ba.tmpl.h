@@ -21,6 +21,10 @@ sbf_ba eval_node(const traverser_t& t) {
 	//BOOST_LOG_TRIVIAL(debug) << "eval_node";
 	auto n  = t | get_only_child;
 	auto nt = n | get_nonterminal;
+	if (nt == sbf_parser::conjunction_nosep_1st_oprnd
+		|| nt == sbf_parser::negation_oprnd)  nt = sbf_parser::sbf;
+	else if (nt == sbf_parser::conjunction_nosep)
+						nt = sbf_parser::conjunction;
 	switch (nt) {
 	case sbf_parser::zero: return bdd_handle<Bool>::hfalse;
 	case sbf_parser::one:  return bdd_handle<Bool>::htrue;

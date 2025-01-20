@@ -94,7 +94,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 			{ 14, 62, 14 },
 			{ 21, 117, 21 },
 			{ 140, 117, 21 },
-			{ 142, 117, 21 },
+			{ 142, 117, 135 },
 			{ 144, 117, 21 },
 			{ 177 },
 			{ 178 },
