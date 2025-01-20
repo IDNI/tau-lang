@@ -88,12 +88,17 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ('1' [ _ ':' _ type ])             :bf_t
                         | ('0' [ _ ':' _ type ])             :bf_f
                         | (bf (_ '&' _ | __) bf)             :bf_and
+                          # bf_neg_oprnd cannot contain bf_and_nosep
+                        | ((bf_parenthesis | bf_constant
+                          | variable | bf_splitter | bf_ref
+                          | bf_t | bf_f | bf_and | bf_neg
+                          | capture)
+                                :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
-			  | bf_splitter | bf_ref | bf_or
-			  | bf_xor | bf_neg | capture)
-                                :bf_and_nosep_1st_op bf)     :bf_and
-                        | (bf _ "'")                         :bf_neg
+                          | bf_splitter | bf_ref | bf_or
+                          | bf_xor | bf_neg | capture)
+                                :bf_and_nosep_1st_oprnd bf)  :bf_and_nosep
                         |                                     capture.
 
 # constant time constraints
@@ -270,5 +275,8 @@ memory                 => ( "%"
 @inline char classes, chars, q_var, src_c,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg, solve_cmd_arg,
-        bf  > bf_parenthesis  > bf, bf_and_nosep_1st_op > bf_parenthesis > bf,
+        bf  > bf_parenthesis  > bf,
+	bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
+	bf_and_nosep > bf_parenthesis > bf,
+	bf_neg_oprnd > bf_parenthesis > bf,
         wff > wff_parenthesis > wff.
