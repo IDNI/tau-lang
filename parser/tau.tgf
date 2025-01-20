@@ -275,7 +275,7 @@ memory                 => ( "%"
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg, solve_cmd_arg,
         bf  > bf_parenthesis  > bf,
-	bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
-	bf_and_nosep > bf_parenthesis > bf,
 	bf_neg_oprnd > bf_parenthesis > bf,
+	bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
+	bf_and_nosep > bf_parenthesis > bf_and,
         wff > wff_parenthesis > wff.

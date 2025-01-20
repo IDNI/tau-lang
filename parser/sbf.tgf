@@ -16,14 +16,19 @@
 @enable productions charvar.
 
 start  => _ sbf _.
-sbf    => ( '(' _ sbf _ ')'                ) :group
-        |                                     variable
-        | ( sbf _ "'"                      ) :negation
-        | ( sbf _ '|' _ sbf                ) :disjunction
-        | ( sbf _ ('^' | '+') _ sbf        ) :exclusive_disjunction
-        | ( sbf (_ | _ '&' _) sbf          ) :conjunction
-        | '1'                                :one
-        | '0'                                :zero.
+sbf    => ( '(' _ sbf _ ')'                        ) :group
+        |                                             variable
+        | ( sbf _ '|' _ sbf                        ) :disjunction
+        | ( sbf _ ('^' | '+') _ sbf                ) :exclusive_disjunction
+        | ( sbf (_ '&' _ | space _)  sbf           ) :conjunction
+        | ( (group | variable | negation
+           | one | zero)
+           :negation_oprnd _ "'"                   ) :negation
+        | ( (group | variable | disjunction
+           | exclusive_disjunction | negation)
+           :conjunction_nosep_1st_oprnd sbf        ) :conjunction_nosep
+        | '1'                                        :one
+        | '0'                                        :zero.
 _      => [ space _ ].
 
 variable[charvar] => alpha digit*.
@@ -31,4 +36,8 @@ variable[var]     => alpha (alnum | '_')*.
 
 @trim _.
 @trim all terminals except children of variable.
-@inline char classes, sbf > group > sbf.
+@inline char classes,
+        sbf > group > sbf,
+	negation_oprnd > group > sbf,
+	conjunction_nosep_1st_oprnd > group > sbf,
+	conjunction_nosep > group > conjunction.
