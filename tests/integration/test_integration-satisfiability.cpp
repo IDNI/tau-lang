@@ -5,7 +5,7 @@
 #include "doctest.h"
 
 // TODO (LOW) consider move this test to integration tests
-#include "../integration/test_integration_helpers-tau.h"
+#include "../integration/test_integration_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;

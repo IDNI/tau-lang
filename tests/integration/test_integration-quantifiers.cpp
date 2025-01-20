@@ -7,7 +7,7 @@
 
 #include "doctest.h"
 
-#include "test_integration_helpers-sbf.h"
+#include "test_integration_helpers.h"
 #include "../unit/test_helpers.h"
 
 // #include "debug_helpers.h"
