@@ -18,7 +18,7 @@
 #include "doctest.h"
 #include "tau_ba.h"
 
-#include "test_integration_helpers-sbf.h"
+#include "test_integration_helpers.h"
 
 using namespace std;
 using namespace idni::rewriter;

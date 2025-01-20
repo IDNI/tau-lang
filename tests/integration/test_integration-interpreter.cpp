@@ -295,6 +295,13 @@ TEST_SUITE("only outputs") {
 		CHECK ( !memory.value().empty() );
 	}
 
+	// increasing monotonicity (5)
+	TEST_CASE("o1[t] > o1[t-1]") {
+		const char* sample = "o1[0] = {a}:sbf && o1[t] > o1[t-1] && o1[t] != 1.";
+		auto memory = run_test(sample, 4);
+		CHECK ( !memory.value().empty() );
+	}
+
 	TEST_CASE("<:a> o1[t] + <:b> o1[t]' = 0") {
 		const char* sample = "<:a> o1[t] + <:b> o1[t]' = 0.";
 		auto memory = run_test(sample, 8);
