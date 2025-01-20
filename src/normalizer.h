@@ -282,12 +282,15 @@ bool are_nso_equivalent(tau<BAs...> n1, tau<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- wff: " << build_wff_and(imp1, imp2);
 
 	auto dir1 = normalizer_step<BAs...>(imp1);
-	assert((dir1 == _T<BAs...> || dir1 == _F<BAs...>));
+	assert((dir1 == _T<BAs...> || dir1 == _F<BAs...> || find_top(dir1,
+		is_non_terminal<tau_parser::constraint, BAs...>)));
 	if (dir1 == _F<BAs...>) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << dir1;
 		return false;
 	}
 	auto dir2 = normalizer_step<BAs...>(imp2);
+	assert((dir2 == _T<BAs...> || dir2 == _F<BAs...> || find_top(dir2,
+		is_non_terminal<tau_parser::constraint, BAs...>)));
 	bool res = (dir1 == _T<BAs...> && dir2 == _T<BAs...>);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << res;
@@ -330,7 +333,8 @@ bool is_nso_impl (tau<BAs...> n1, tau<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- wff: " << imp;
 
 	auto res = normalizer_step<BAs...>(imp);
-	assert((res == _T<BAs...> || res == _F<BAs...>));
+	assert((res == _T<BAs...> || res == _F<BAs...> || find_top(res,
+		is_non_terminal<tau_parser::constraint, BAs...>)));
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End is_nso_impl: " << res;
 	return res == _T<BAs...>;
 }

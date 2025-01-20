@@ -129,6 +129,7 @@ private:
 	std::optional<tau_nso_t> sat_cmd(const tau_nso_t& n);
 	void run_cmd(const tau_nso_t& n);
 	void solve_cmd(const tau_nso_t& n);
+	void lgrs_cmd(const tau_nso_t& n);
 
 	std::optional<tau_nso_t> is_valid_cmd(const tau_nso_t& n);
 	std::optional<tau_nso_t> is_unsatisfiable_cmd(const tau_nso_t& n);

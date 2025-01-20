@@ -5,7 +5,7 @@
 #include "doctest.h"
 #include "solver.h"
 
-#include "test_integration_helpers-sbf.h"
+#include "test_integration_helpers.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
@@ -20,7 +20,8 @@ auto splitter_one_bdd() {
 	return build_bf_constant(std::variant<sbf_ba>(splitter_one));
 }
 
-bool check_solution(const tau<sbf_ba>& equation, std::map<tau<sbf_ba>, tau<sbf_ba>> solution) {
+template<typename...BAs>
+bool check_solution(const tau<BAs...>& equation, std::map<tau<BAs...>, tau<BAs...>> solution) {
 	auto copy = solution;
 	auto substitution = replace(equation, copy);
 	auto check = snf_wff(substitution);
@@ -30,7 +31,7 @@ bool check_solution(const tau<sbf_ba>& equation, std::map<tau<sbf_ba>, tau<sbf_b
 	std::cout << "check_solution/substitution: " << substitution << "\n";
 	std::cout << "check_solution/check: " << check << "\n";
 	#endif // DEBUG
-	return check == _T<sbf_ba>;
+	return check == _T<BAs...>;
 }
 
 TEST_SUITE("minterm_iterator") {
@@ -522,17 +523,17 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	/*TEST_CASE("two var: y < x && z < y && w < z.") {
-		const char* equality = "y & x' | z & y' | w & z' = 0.";
+	TEST_CASE("two var: y < x && z < y && w < z.") {
+		const char* equality = "x'y | y'z | wz' = 0.";
 		const std::vector<std::string> inequalities =
-			{ "y & x' | x & y' != 0.", "y & z' | z & y' != 0.", "w' & z | w & z' != 0." };
+			{ " w'z|wz' != 0.", "xy' != 0.", "yz' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
-	}*/
+	}
 
 	/*TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0.") {
 		const char* equality =  "y'{ a } : sbf|y{ a' } : sbf | yx'= 0.";
 		const std::vector<std::string> inequalities =
-			{ "y & x' | x & y' != 0.", "x' != 0." };
+			{ "y'x|yx' != 0.", "x' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}*/
 
@@ -574,5 +575,26 @@ TEST_SUITE("solve_system") {
 		const std::vector<std::string> inequalities =
 			{ "y x' | y'x != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
+	}
+}
+
+TEST_SUITE("solve") {
+
+	bool test_solve(const std::string system,
+			const std::string type) {
+		#ifdef DEBUG
+		std::cout << "------------------------------------------------------\n";
+		#endif // DEBUG
+		bdd_init<Bool>();
+		auto form = tau_make_nso_test(system);
+		auto solution = solve<tau_ba<sbf_ba>, sbf_ba>(form, type);
+		return check_solution(form, solution.value());
+	}
+
+	// increasing monotonicity (1)
+	TEST_CASE("o1[t] > {<:split1> != 0} && o1[t] != 1") {
+		const char* system = "o1[t] > {<:split1> != 0} && o1[t] != 1.";
+		const char* type = "tau";
+		CHECK ( test_solve(system, type) );
 	}
 }

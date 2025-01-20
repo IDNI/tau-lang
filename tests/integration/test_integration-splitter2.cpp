@@ -21,7 +21,7 @@
 
 #include "doctest.h"
 
-#include "test_integration_helpers-tau.h"
+#include "test_integration_helpers.h"
 
 using namespace std;
 using namespace idni::rewriter;
