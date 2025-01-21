@@ -941,7 +941,7 @@ tau_nso<BAs...> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
 		if (opt.error_quits
-			|| msg.find("Syntax Error: Unexpected end of file")!=0)
+			|| msg.find("Syntax Error: Unexpected end")!=0)
 		{
 			BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
 			return fail();

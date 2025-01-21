@@ -22,12 +22,21 @@ std::function<std::optional<char>(const sp_tau_source_node& n)>
 sp_tau_source_node make_tau_source(const std::string& source,
 	tau_parser::parse_options options)
 {
+	// IDEA add cache for the parser
+	auto result = tau_parser::instance().parse(
+		source.c_str(), source.size(), options);
+	if (!result.found) {
+		auto msg = result.parse_error
+			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
+		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
+		return nullptr; // Syntax error
+	}
 	using parse_symbol = tau_parser::node_type;
-	return make_node_from_string<
+	return make_node_from_parse_result<
 		tau_parser,
 		drop_location_t<parse_symbol, tau_source_sym>,
 		tau_source_sym>(drop_location<parse_symbol, tau_source_sym>,
-			source, options);
+			result);
 }
 
 // make a tau source from the given source code stream.

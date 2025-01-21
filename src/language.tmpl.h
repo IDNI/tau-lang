@@ -76,7 +76,6 @@ auto get_optionals(const extractor_t& extractor, const tau<BAs...>& n) {
 				&std::optional<tau_sym<BAs...>>::has_value);
 }
 
-
 // converts a tau_source_sym to a tau_sym, it is used to convert from
 // tau_source to tau_node...
 template <typename... BAs>
@@ -112,11 +111,14 @@ struct bind_transformer {
 	bind_transformer(binder_t& binder) : binder(binder) {}
 
 	tau<BAs...> operator()(const tau<BAs...>& n) {
+		if (error) return nullptr;
 		if (auto it = changes.find(n); it != changes.end())
 			return it->second;
-		if (is_non_terminal<tau_parser::bf_constant, BAs...>(n))
-			if (auto nb = binder.bind(n); nb != n)
-				return changes[n] = nb;
+		if (is_non_terminal<tau_parser::bf_constant, BAs...>(n)) {
+			auto nb = binder.bind(n);
+			if (binder.error) return error = true, nullptr;
+			return changes[n] = nb;
+		}
 		// IDEA maybe we could use the replace transform instead of having the following code
 		bool changed = false;
 		std::vector<tau<BAs...>> child;
@@ -131,6 +133,7 @@ struct bind_transformer {
 
 	std::map<tau<BAs...>, tau<BAs...>> changes;
 	binder_t binder;
+	bool error = false;
 };
 
 // is not a whitespace predicate
@@ -152,24 +155,24 @@ struct name_binder {
 
 	name_binder(const bindings<BAs...>& bs) : bs(bs) {}
 
-	tau<BAs...> bind(const tau<BAs...>& n) const {
+	tau<BAs...> bind(const tau<BAs...>& n) {
 		auto binding = n | tau_parser::constant | tau_parser::binding;
 		if (!binding || (n | tau_parser::type).has_value()) return n;
 		auto bn = make_string<
 				tau_node_terminal_extractor_t<BAs...>,
 				tau<BAs...>>(
 			tau_node_terminal_extractor<BAs...>, binding.value());
-		auto s = bs.find(bn);
-		if (s != bs.end()) {
+		if (auto s = bs.find(bn); s != bs.end()) {
 			tau_sym<BAs...> ts = s->second;
 			return wrap(tau_parser::bf_constant,
 				wrap(tau_parser::constant,
 					rewriter::make_node<tau_sym<BAs...>>(
 								ts, {})));
 		}
-		return n;
+		return error = true, n;
 	}
 
+	bool error = false;
 	const bindings<BAs...>& bs;
 };
 
@@ -178,12 +181,12 @@ struct name_binder {
 template <typename... BAs>
 struct factory_binder {
 
-	tau<BAs...> bind(const tau<BAs...>& n) const {
+	tau<BAs...> bind(const tau<BAs...>& n) {
+		if (error) return nullptr;
 		auto binding = n | tau_parser::constant | tau_parser::binding;
 		if (!binding) return n; // not a binding (capture?)
 		auto type = find_top(n, is_non_terminal<tau_parser::type, BAs...>);
-		if (type)
-		{
+		if (type) {
 			// the factory take two arguments, the first is the type and the
 			// second is the node representing the constant.
 			std::string type_name = make_string<
@@ -192,19 +195,19 @@ struct factory_binder {
 					tau_node_terminal_extractor<BAs...>,
 					type.value());
 			auto nn = nso_factory<BAs...>::instance().binding(binding.value(), type_name);
-			if (!nn) return nullptr;
+			if (!nn) return error = true, nullptr;
 			if (nn != binding.value())
 				return wrap(tau_parser::bf_constant,
 					wrap(tau_parser::constant, nn), type.value());
 			return n;
 		}
 		auto nn = nso_factory<BAs...>::instance().binding(binding.value(), "");
-		if (!nn) return nullptr;
-		if (nn != binding.value())
-			return wrap(tau_parser::bf_constant,
-				wrap(tau_parser::constant, nn));
-		return n;
+		if (!nn) return error = true, nullptr;
+		return wrap(tau_parser::bf_constant,
+			wrap(tau_parser::constant, nn));
 	}
+
+	bool error = false;
 };
 
 // creates a specific rule from a generic rule
@@ -701,7 +704,8 @@ tau<BAs...> bind_tau_code_using_binder(const tau<BAs...>& code,
 			rewriter::all_t,
 			tau<BAs...>>(bs, rewriter::all)(code);
 	// Check for errors which cannot be captured by the grammar
-	if (res && has_semantic_error(res)) return {};
+	if (bs.error) return nullptr;
+	if (has_semantic_error(res)) return {};
 	else return res;
 }
 
