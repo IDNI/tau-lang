@@ -271,9 +271,12 @@ bool are_nso_equivalent(tau<BAs...> n1, tau<BAs...> n2) {
 		return false;
 	}
 
+	auto vars = get_free_vars_from_nso(n1);
+	auto vars2 = get_free_vars_from_nso(n2);
+	vars.insert(vars2.begin(), vars2.end());
+
 	tau<BAs...> imp1 = build_wff_imply<BAs...>(n1, n2);
 	tau<BAs...> imp2 = build_wff_imply<BAs...>(n2, n1);
-	auto vars = get_free_vars_from_nso(imp1);
 
 	for(auto& v: vars) {
 		imp1 = build_wff_all<BAs...>(v, imp1);
@@ -324,8 +327,11 @@ bool is_nso_impl (tau<BAs...> n1, tau<BAs...> n2) {
 		return true;
 	}
 
+	auto vars = get_free_vars_from_nso(n1);
+	auto vars2 = get_free_vars_from_nso(n2);
+	vars.insert(vars2.begin(), vars2.end());
+
 	tau<BAs...> imp = build_wff_imply<BAs...>(n1, n2);
-	auto vars = get_free_vars_from_nso(imp);
 
 	for(auto& v: vars) {
 		imp = build_wff_all<BAs...>(v, imp);
@@ -353,11 +359,12 @@ bool are_bf_equal(tau<BAs...> n1, tau<BAs...> n2) {
 		return true;
 	}
 
-	tau<BAs...> bf_equal_fm = build_wff_eq(build_bf_xor(n1, n2));
-	// Replace uninterpreted constants by variables for equivalence check
-	// bf_equal_fm = convert_uconsts_to_var(bf_equal_fm);
+	auto vars = get_free_vars_from_nso(n1);
+	auto vars2 = get_free_vars_from_nso(n2);
+	vars.insert(vars2.begin(), vars2.end());
 
-	auto vars = get_free_vars_from_nso(bf_equal_fm);
+	tau<BAs...> bf_equal_fm = build_wff_eq(build_bf_xor(n1, n2));
+
 	for(auto& v: vars) bf_equal_fm = build_wff_all<BAs...>(v, bf_equal_fm);
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << bf_equal_fm;
 
