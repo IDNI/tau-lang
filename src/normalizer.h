@@ -230,8 +230,6 @@ bool is_non_temp_nso_satisfiable (const tau<BAs...>& fm) {
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>));
 
 	auto new_fm = fm;
-	// Convert uninterpreted constants to variables for sat check
-	// new_fm = convert_uconsts_to_var(new_fm);
 	auto vars = get_free_vars_from_nso(new_fm);
 	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
 	auto normalized = normalize_non_temp<BAs...>(new_fm);
@@ -386,7 +384,7 @@ auto is_bf_same_to_any_of(tau<BAs...>& n, std::vector<tau<BAs...>>& previous) {
 // Normalize fm and additionally simplify implications between
 // always, !always, sometimes and !sometimes statements
 template<typename... BAs>
-tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
+tau<BAs...> normalize_temporal_simp (const tau<BAs...>& fm) {
 	using p = tau_parser;
 	auto trim_q = [](const auto& n) {
 		if (is_child_non_terminal(p::wff_always, n))
@@ -422,10 +420,10 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 			is_child_non_terminal<p::wff_always, BAs...>,
 			is_child_non_terminal<p::wff_neg, BAs...>);
 		auto neg_aw_parts = select_top(clause, is_neg_aw);
-		// TODO: activate once new sometimes definition is there
-		// auto st_parts = select_top(clause, is_st);
-		// std::ranges::for_each(st_parts, trim2);
-		// auto neg_st_parts = select_top(clause, is_neg_st);
+		auto st_parts = select_top_until(clause,
+			is_child_non_terminal<p::wff_sometimes, BAs...>,
+			is_child_non_terminal<p::wff_neg, BAs...>);
+		auto neg_st_parts = select_top(clause, is_neg_st);
 
 		// Replace (!)always and (!)sometimes parts by T
 		std::map<tau<BAs...>, tau<BAs...>> changes;
@@ -433,10 +431,10 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 			changes.emplace(aw, _T<BAs...>);
 		for (const auto& naw : neg_aw_parts)
 			changes.emplace(naw, _T<BAs...>);
-		// for (const auto& st : st_parts)
-		// 	changes.emplace(st, _T<BAs...>);
-		// for (const auto& nst : neg_st_parts)
-		// 	changes.emplace(nst, _T<BAs...>);
+		for (const auto& st : st_parts)
+			changes.emplace(st, _T<BAs...>);
+		for (const auto& nst : neg_st_parts)
+			changes.emplace(nst, _T<BAs...>);
 		tau<BAs...> new_clause = replace(clause, changes);
 		std::cout << "new_clause: " << new_clause << "\n";
 
@@ -456,6 +454,20 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 					naw = _T<BAs...>;
 			}
 		}
+		// Next check if any always statement implies a sometimes statement
+		for (const auto& aw : aw_parts) {
+			for (auto& st : st_parts) {
+				if (is_nso_impl(aw, trim_q(st)))
+					st = _T<BAs...>;
+			}
+		}
+		// Next check if any always statement implies a !sometimes statement
+		for (const auto& aw : aw_parts) {
+			for (auto& nst : neg_st_parts) {
+				if (is_nso_impl(aw, trim_q(push_neg(nst))))
+					nst = _T<BAs...>;
+			}
+		}
 		// Now check if any !always statement implies another !always
 		for (size_t i = 0; i < neg_aw_parts.size(); ++i) {
 			for (size_t j = i+1; j < neg_aw_parts.size(); ++j) {
@@ -465,9 +477,26 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 					neg_aw_parts[i] = _T<BAs...>;
 			}
 		}
-		new_clause = build_wff_and(new_clause, build_wff_and(
-						build_wff_and<BAs...>(aw_parts),
-						build_wff_and<BAs...>(neg_aw_parts)));
+		// Next check if any sometimes implies another !always
+		for (const auto& st : st_parts) {
+			for (auto& naw : neg_aw_parts) {
+				if (is_nso_impl(trim_q(st), push_neg(naw)))
+					naw = _T<BAs...>;
+			}
+		}
+		// Next check if any !sometimes implies another !always
+		for (const auto& nst : neg_st_parts) {
+			for (auto& naw : neg_aw_parts) {
+				if (is_nso_impl(trim_q(push_neg(nst)), push_neg(naw)))
+					naw = _T<BAs...>;
+			}
+		}
+		auto new_aw_parts = build_wff_and(build_wff_and<BAs...>(aw_parts),
+						build_wff_and<BAs...>(neg_aw_parts));
+		auto new_st_parts = build_wff_and(build_wff_and<BAs...>(st_parts),
+						build_wff_and<BAs...>(neg_st_parts));
+		new_clause = build_wff_and(new_clause,
+			build_wff_and(new_aw_parts, new_st_parts));
 		if (new_fm) new_fm = build_wff_or(new_fm, new_clause);
 		else new_fm = new_clause;
 	}
@@ -892,7 +921,7 @@ tau<BAs...> normalizer(const rr<tau<BAs...>>& nso_rr) {
 
 	auto fm = apply_rr_to_formula(nso_rr);
 	if (!fm) return nullptr;
-	auto res = normalize_with_temp_simp(fm);
+	auto res = normalize_temporal_simp(fm);
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";
 	return res;
