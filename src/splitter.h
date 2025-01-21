@@ -89,7 +89,7 @@ bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<B
 		if (!are_tau_equivalent(splitter, fm)) {
 			assert(is_tau_impl(splitter, fm));
 			std::map<tau<BAs...>, tau<BAs...>> c = {{fm, splitter}};
-			auto new_spec = normalize_with_temp_simp(replace(spec, c));
+			auto new_spec = normalize_temporal_simp(replace(spec, c));
 			if (is_tau_formula_sat(new_spec))
 				return true;
 		}

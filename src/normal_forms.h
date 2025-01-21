@@ -1826,7 +1826,7 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 	// Squeeze all equalities and inequalities
 	squeezed_fm = squeezed_fm | repeat_all<step<BAs...>, BAs...>(squeeze_wff<BAs...>);
 	squeezed_fm = reduce_terms(to_dnf2(squeezed_fm));
-	// std::cout << squeezed_fm << "\n";
+	std::cout << squeezed_fm << "\n";
 	// We work with unsqueezed equality
 	squeezed_fm  = squeezed_fm | repeat_all<step<BAs...>, BAs...>(unsqueeze_wff_pos<BAs...>);
     // std::cout << squeezed_fm << "\n";
@@ -1983,6 +1983,13 @@ tau<BAs...> operator|(const tau<BAs...>& fm, const wff_reduce_cnf<BAs...>& r) {
 
 template<typename... BAs>
 tau<BAs...> conjunct_dnfs_to_dnf (const tau<BAs...>& d1, const tau<BAs...>& d2) {
+	// std::cout << "d1: " << d1 << "\n";
+	// std::cout << "d2: " << d2 << "\n";
+	// std::stringstream ss; ss << d1;
+	// if (ss.str() == "_e0[0] = 0 || _e0[1] != 0 || i1[0]o1[0]' = 0 && i1[0]'o1[0] = 0") {
+	// 	ptree(std::cout, d1);
+	// 	std::cout << "\n";
+	// }
 	if (is_non_terminal(tau_parser::wff, d1)) {
 		assert(is_non_terminal(tau_parser::wff, d2));
 		tau<BAs...> res = _F<BAs...>;
@@ -2092,13 +2099,15 @@ tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
 #endif
 	using p = tau_parser;
 	auto new_fm = push_negation_one_in(fm, is_wff);
-
+	std::cout << "fm: " << fm << "\n";
+	std::cout << "new_fm: " << new_fm << "\n";
 	if (is_wff && is_non_terminal(p::wff, new_fm)) {
 		if (is_child_non_terminal(p::wff_and, new_fm)) {
 			auto conj = conjunct_dnfs_to_dnf(
 				to_dnf2(trim(new_fm)->child[0], is_wff),
 				to_dnf2(trim(new_fm)->child[1], is_wff));
 			// Perform simplification
+			std::cout << "conj: " << conj << "\n";
 			if (conj != new_fm)
 				new_fm = conj | wff_reduce_dnf<BAs...>();
 		} else if (is_child_non_terminal(p::wff_or, new_fm)) {

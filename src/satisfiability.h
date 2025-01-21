@@ -542,7 +542,7 @@ template<typename... BAs>
 tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_initials,
 					tau<BAs...>& flag_rules,
 					const int_t lookback,
-					bool reset_ctn_id = false) {
+					const bool reset_ctn_id) {
 	using p = tau_parser;
 	auto to_eq_1 = [](const auto& n) {
 		return build_wff_eq(build_bf_neg(n));
@@ -686,49 +686,133 @@ tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
 	return guard;
 }
 
-// Assumes single normalized Tau DNF clause
+// Creates a guard for the input streams in io_vars
 template<typename... BAs>
-tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ctn_stream) {
+tau<BAs...> create_stream_guard(const auto& io_vars, const int_t number) {
 	using p = tau_parser;
-	auto is_neg_aw = [](const auto& n) {
+	tau<BAs...> guard = _T<BAs...>;
+	for (const auto& io_var : io_vars) {
+		// Check if input stream variable
+		if (io_var | p::io_var | p::in) {
+			auto var_guard = build_io_out<BAs...>(
+				"_" + tau_to_str(io_var) + "_" + std::to_string(
+					number), "t");
+			auto cdn = build_wff_eq(build_bf_xor(wrap(p::bf, io_var), var_guard));
+			guard = build_wff_and(guard, cdn);
+		}
+	}
+	return guard;
+}
+
+template<typename... BAs>
+tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm) {
+	using p = tau_parser;
+	// Find negated always parts
+	auto is_neg_st = [](const auto& n) {
 		if (is_child_non_terminal(p::wff_neg, n) &&
-			is_child_non_terminal(p::wff_always, trim2(n)))
+			is_child_non_terminal(p::wff_sometimes, trim2(n)))
 			return true;
 		else return false;
 	};
-	auto neg_aw_fms = select_top(fm, is_neg_aw);
-	if (neg_aw_fms.empty()) return fm;
+	auto neg_st_fms = select_top(fm, is_neg_st);
+	// Replace negated sometimes parts in fm with T
+	std::map<tau<BAs...>, tau<BAs...>> changes;
+	for (const auto& el : neg_st_fms)
+		changes.emplace(el, _T<BAs...>);
+	auto new_fm = replace(fm, changes);
 	// Put !(always phi) into the form !phi
-	for (auto& neg_aw_fm : neg_aw_fms) {
-		auto tmp = trim2(trim2(neg_aw_fm));
-		neg_aw_fm = push_negation_in(build_wff_neg(tmp));
+	for (auto& neg_st_fm : neg_st_fms) {
+		auto tmp = trim2(trim2(neg_st_fm));
+		neg_st_fm = push_negation_in(build_wff_neg(tmp));
 	}
-	auto aw_fm = find_top_until(fm, is_child_non_terminal<p::wff_always, BAs...>,
-			is_child_non_terminal<p::wff_neg, BAs...>);
-
-	int_t max_lookback = get_max_shift(
-		select_top(fm, is_child_non_terminal<p::io_var, BAs...>));
-
-	int_t aw_lookback = 0;
-	std::vector<tau<BAs...>> aw_io_vars;
-	if (aw_fm.has_value()) {
-		aw_io_vars = select_top(aw_fm.value(),
-			is_child_non_terminal<p::io_var, BAs...>);
-		aw_lookback = get_max_shift(aw_io_vars);
+	// make statements guarded
+	for (size_t i = 0; i < neg_st_fms.size(); ++i) {
+		auto current_io_vars = select_top(
+			neg_st_fms[i], is_child_non_terminal<p::io_var, BAs...>);
+		auto guarded_fm = create_stream_guard<BAs...>(current_io_vars, i);
+		neg_st_fms[i] = build_wff_imply(guarded_fm, neg_st_fms[i]);
 	}
+	// conjunct with initial always part
+	auto _aw = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
+	auto aw = _aw.has_value() ? _aw.value() : _T<BAs...>;
+	for (auto& neg_st_fm : neg_st_fms) {
+		aw = always_conjunction(aw, neg_st_fm);
+	}
+	if (_aw.has_value()) {
+		changes.clear();
+		changes.emplace(trim2(_aw.value()), aw);
+		return replace(new_fm, changes);
+	}
+	return build_wff_and(build_wff_always(aw), new_fm);
+}
 
-	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
-	BOOST_LOG_TRIVIAL(trace) << fm;
-	tau<BAs...> ev_assm = _T<BAs...>;
-	tau<BAs...> ev_collection = _0<BAs...>;
+template<typename... BAs>
+void transform_sometimes_to_eventual (std::vector<tau<BAs...>>& st_fms,
+						bool reset_ctn_stream,
+						const int_t max_lookback,
+						const size_t flag_num_shift,
+						auto& ev_assm, auto& ev_collection
+						) {
+	using p = tau_parser;
+	for (size_t n = 0; n < st_fms.size(); ++n) {
+		auto st_io_vars = select_top(st_fms[n], is_child_non_terminal<p::io_var, BAs...>);
+		int_t st_lookback = get_max_shift(st_io_vars);
+
+		// Transform constant time constraints to io var in sometimes statement
+		tau<BAs...> ctn_initials = _T<BAs...>, ctn_assm = _T<BAs...>;
+		st_fms[n] = transform_ctn_to_streams(st_fms[n], ctn_initials, ctn_assm, st_lookback, reset_ctn_stream);
+		st_io_vars = select_top(st_fms[n], is_child_non_terminal<p::io_var, BAs...>);
+
+		std::stringstream ss; ss << "_e" << n + flag_num_shift;
+		// Build the eventual var flags based on the maximal lookback
+		auto eNt_without_lookback = wrap(p::bf, build_io_out<BAs...>(ss.str(), "t"));
+		auto eNt = build_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
+		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
+
+		auto eN0_is_not_zero = build_wff_neq(wrap(p::bf,
+			build_io_out_const<BAs...>(ss.str(), 0)));
+		auto eNt_is_zero      = build_wff_eq(eNt);
+		auto eNt_is_not_zero  = build_wff_neq(eNt);
+		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
+		auto eNt_prev_is_not_zero	= build_wff_neq(eNt_prev);
+		// transform `!always psi` to:
+		// (_eN[t-1] != 0 && _eN[t] == 0) -> psi (N is nth `!always`)
+		auto shifted_st = max_lookback == 0 ?
+			shift_io_vars_in_fm(trim2(st_fms[n]), st_io_vars, 1) :
+			shift_io_vars_in_fm(trim2(st_fms[n]), st_io_vars,
+				max_lookback - st_lookback);
+
+		ev_assm = build_wff_and(ev_assm, build_wff_imply(
+				build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
+				shifted_st));
+
+		// for each _eN add conjunction
+		// 	(_eN[0] != 0 && (_eN[t-1] = 0 -> _eN[t] = 0))
+		ev_assm = build_wff_and( ev_assm,
+				build_wff_and(eN0_is_not_zero,
+				build_wff_imply(eNt_prev_is_zero, eNt_is_zero)));
+
+		// Add flag assumptions from constant time constraints
+		ev_assm = build_wff_and(ev_assm, build_wff_and(ctn_initials, ctn_assm));
+
+		ev_collection = build_bf_or(ev_collection, eNt_without_lookback);
+	}
+}
+
+template<typename... BAs>
+void transform_neg_aw_to_eventual (std::vector<tau<BAs...>>& neg_aw_fms,
+						bool reset_ctn_stream,
+						const int_t max_lookback,
+						auto& ev_assm, auto& ev_collection) {
+	using p = tau_parser;
 	for (size_t n = 0; n < neg_aw_fms.size(); ++n) {
 		auto neg_aw_io_vars = select_top(neg_aw_fms[n], is_child_non_terminal<p::io_var, BAs...>);
 		int_t neg_aw_lookback = get_max_shift(neg_aw_io_vars);
 
 		// Transform constant time constraints to io var in sometimes statement
 		tau<BAs...> ctn_initials = _T<BAs...>, ctn_assm = _T<BAs...>;
-		smt_fms[n] = transform_ctn_to_streams(smt_fms[n], ctn_initials, ctn_assm, st_lookback);
-		st_io_vars = select_top(smt_fms[n], is_child_non_terminal<p::io_var, BAs...>);
+		neg_aw_fms[n] = transform_ctn_to_streams(neg_aw_fms[n], ctn_initials, ctn_assm, neg_aw_lookback, reset_ctn_stream);
+		neg_aw_io_vars = select_top(neg_aw_fms[n], is_child_non_terminal<p::io_var, BAs...>);
 
 		std::stringstream ss; ss << "_e" << n;
 		// Build the eventual var flags based on the maximal lookback
@@ -773,6 +857,54 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ct
 
 		ev_collection = build_bf_or(ev_collection, eNt_without_lookback);
 	}
+}
+
+// Assumes single normalized Tau DNF clause
+template<typename... BAs>
+tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, const bool reset_ctn_stream) {
+	using p = tau_parser;
+	// Collect all statements to be transformed to eventual variables
+	auto is_neg_aw = [](const auto& n) {
+		if (is_child_non_terminal(p::wff_neg, n) &&
+			is_child_non_terminal(p::wff_always, trim2(n)))
+			return true;
+		else return false;
+	};
+	auto neg_aw_fms = select_top(fm, is_neg_aw);
+	// Put !(always phi) into the form !phi
+	for (auto& neg_aw_fm : neg_aw_fms) {
+		auto tmp = trim2(trim2(neg_aw_fm));
+		neg_aw_fm = push_negation_in(build_wff_neg(tmp));
+	}
+	auto aw_fm = find_top_until(
+		fm, is_child_non_terminal<p::wff_always, BAs...>,
+		is_child_non_terminal<p::wff_neg, BAs...>);
+
+	auto st_fms = select_top_until(
+		fm, is_child_non_terminal<p::wff_sometimes, BAs...>,
+		is_child_non_terminal<p::wff_neg, BAs...>);
+	int_t max_lookback = get_max_shift(
+		select_top(fm, is_child_non_terminal<p::io_var, BAs...>));
+
+	int_t aw_lookback = 0;
+	std::vector<tau<BAs...>> aw_io_vars;
+	if (aw_fm.has_value()) {
+		aw_io_vars = select_top(aw_fm.value(),
+			is_child_non_terminal<p::io_var, BAs...>);
+		aw_lookback = get_max_shift(aw_io_vars);
+	}
+
+	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
+	BOOST_LOG_TRIVIAL(trace) << fm;
+	tau<BAs...> ev_assm = _T<BAs...>;
+	tau<BAs...> ev_collection = _0<BAs...>;
+	// Transform negated always parts
+	transform_neg_aw_to_eventual(neg_aw_fms, reset_ctn_stream, max_lookback,
+					ev_assm, ev_collection);
+	// Transform sometimes parts
+	transform_sometimes_to_eventual(st_fms, reset_ctn_stream, max_lookback,
+					neg_aw_fms.size(), ev_assm, ev_collection);
+	// Build formula out of eventual variable transformations
 	auto res = _T<BAs...>;
 	// Check if always part is present
 	if (aw_fm.has_value()) {
@@ -803,6 +935,7 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ct
 
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
 	BOOST_LOG_TRIVIAL(trace) << res;
+	std::cout << "trans even vars, res: " << res << "\n";
 	return res;
 }
 
@@ -877,7 +1010,9 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 		else run = current_aw;
 		auto current_flag = fm_at_time_point(st_flags, st_io_vars, i);
 
+		std::cout << "run: " << build_wff_and(run, current_flag) << "\n";
 		auto normed_run = normalize_non_temp(build_wff_and(run, current_flag));
+		std::cout << "normed_run: " << normed_run << "\n";
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
@@ -978,7 +1113,12 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 	};
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
-	auto aw_fm = find_top_until(fm, is_child_non_terminal<p::wff_always, BAs...>,
+
+	// Convert !sometimes parts to guarded always statements
+	auto trans_fm = transform_neg_sometimes_to_guarded_always(fm);
+	std::cout << "trans_fm: " << trans_fm << "\n";
+
+	auto aw_fm = find_top_until(trans_fm, is_child_non_terminal<p::wff_always, BAs...>,
 			is_child_non_terminal<p::wff_neg, BAs...>);
 	tau<BAs...> ev_t;
 	tau<BAs...> ubd_aw_fm;
@@ -989,7 +1129,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 		std::map<tau<BAs...>, tau<BAs...> > changes = {
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
-		auto ubd_fm = replace(fm, changes);
+		auto ubd_fm = replace(trans_fm, changes);
 		ev_t = transform_to_eventual_variables(ubd_fm, false);
 		// Check if there is a sometimes present
 		if (ev_t == ubd_fm) {
@@ -1058,7 +1198,8 @@ template<typename... BAs>
 bool is_tau_impl (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 	auto f1_norm = normalizer_step(f1);
 	auto f2_norm = normalizer_step(f2);
-	auto imp_check = normalize_with_temp_simp((build_wff_neg(build_wff_imply(f1_norm,f2_norm))));
+	auto imp_check = normalize_temporal_simp(
+		(build_wff_neg(build_wff_imply(f1_norm, f2_norm))));
 	auto clauses = get_dnf_wff_clauses(imp_check);
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
@@ -1075,7 +1216,8 @@ bool are_tau_equivalent (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 	// Negate equivalence for unsat check
 	auto f1_norm = normalizer_step(f1);
 	auto f2_norm = normalizer_step(f2);
-	auto equiv_check = normalize_with_temp_simp(build_wff_neg(build_wff_equiv(f1_norm, f2_norm)));
+	auto equiv_check = normalize_temporal_simp(
+		build_wff_neg(build_wff_equiv(f1_norm, f2_norm)));
 	auto clauses = get_dnf_wff_clauses(equiv_check);
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
