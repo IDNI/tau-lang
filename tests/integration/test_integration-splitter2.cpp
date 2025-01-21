@@ -32,13 +32,15 @@ namespace testing = doctest;
 
 TEST_SUITE("configuration") {
 
-	TEST_CASE("configuration") {
-		// initialize the bdd library
-		bdd_init<Bool>();
-		// configuring boost logging only for errors
-		core::get()->set_filter(trivial::severity >= trivial::info);
+
+	TEST_CASE("logging") {
+		core::get()->set_filter(trivial::severity >= trivial::trace);
 		add_console_log(std::cout, keywords::format =
 			expressions::stream << expressions::smessage);
+	}
+
+	TEST_CASE("bdd initialization") {
+		bdd_init<Bool>();
 	}
 }
 
