@@ -2462,7 +2462,7 @@ tau<BAs...> shift_io_vars_in_fm (const tau<BAs...>& fm, const auto& io_vars, con
 				get_io_name(io_var), var_shift + shift));
 		}
 	}
-    return replace(fm, changes);
+	return replace(fm, changes);
 }
 
 // Assumes a single DNF clause and normalizes the "always" parts into one
