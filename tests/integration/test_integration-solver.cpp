@@ -2,6 +2,11 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/utility/setup/console.hpp>
+
 #include "doctest.h"
 #include "solver.h"
 
@@ -9,15 +14,13 @@
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
+using namespace boost::log;
 
 namespace testing = doctest;
 
 auto splitter_one_bdd() {
-	auto var_name = "splitter_one";
-	auto v = dict(var_name);
-	auto ref = bdd<Bool>::bit(v);
-	auto splitter_one = bdd_handle<Bool>::get(ref);
-	return build_bf_constant(std::variant<sbf_ba>(splitter_one));
+	static sbf_ba_factory<sbf_ba> factory;
+	return build_bf_constant(factory.splitter_one());
 }
 
 template<typename...BAs>
@@ -278,6 +281,20 @@ TEST_SUITE("minterm_inequality_system_range") {
 	}
 }
 
+
+TEST_SUITE("configuration") {
+
+	/*TEST_CASE("logging") {
+		core::get()->set_filter(trivial::severity >= trivial::error);
+		add_console_log(std::cout, keywords::format =
+			expressions::stream << expressions::smessage);
+	}*/
+
+	TEST_CASE("bdd initialization") {
+		bdd_init<Bool>();
+	}
+}
+
 TEST_SUITE("find_solution") {
 
 	bool test_find_solution(const char* src) {
@@ -354,7 +371,6 @@ TEST_SUITE("solve_minterm_system") {
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
-		bdd_init<Bool>();
 		minterm_system<sbf_ba> system;
 		for (const auto& minterm: minterms)
 			system.insert(sbf_make_nso(minterm));
@@ -384,7 +400,6 @@ TEST_SUITE("solve_inequality_system") {
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
-		bdd_init<Bool>();
 		inequality_system<sbf_ba> system;
 		for (const auto& inequality: inequalities) {
 			system.insert(sbf_make_nso(inequality));
@@ -463,12 +478,23 @@ TEST_SUITE("solve_system") {
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
-		bdd_init<Bool>();
 		equation_system<sbf_ba> system;
 		if (equality.size() != 0) system.first = sbf_make_nso(equality);
-		for (const auto& inequality: inequalities)
-		system.second.insert(sbf_make_nso(inequality));
+		#ifdef DEBUG
+		if (system.first)
+			std::cout << "test_solve_system/system.first: " << system.first.value() << "\n";
+		#endif // DEBUG
+		for (const auto& inequality: inequalities) {
+			system.second.insert(sbf_make_nso(inequality));
+			#ifdef DEBUG
+			std::cout << "test_solve_system/system.second: " << sbf_make_nso(inequality) << "\n";
+			#endif // DEBUG
+		}
 		auto solution = solve_system<sbf_ba>(system, splitter_one_bdd());
+		#ifdef DEBUG
+		if (solution)
+			std::cout << "test_solve_system/solution: " << solution.value() << "\n";
+		#endif // DEBUG
 		bool check = system.first
 			? check_solution(system.first.value(), solution.value())
 			: false;
@@ -531,7 +557,7 @@ TEST_SUITE("solve_system") {
 	}
 
 	/*TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0.") {
-		const char* equality =  "y'{ a } : sbf|y{ a' } : sbf | yx'= 0.";
+		const char* equality =  "{ a }:sbf y' | { a' }:sbf y | yx'= 0.";
 		const std::vector<std::string> inequalities =
 			{ "y'x|yx' != 0.", "x' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
@@ -581,11 +607,10 @@ TEST_SUITE("solve_system") {
 TEST_SUITE("solve") {
 
 	bool test_solve(const std::string system,
-			const std::string type) {
+			const std::string type = "tau") {
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
-		bdd_init<Bool>();
 		auto form = tau_make_nso_test(system);
 		auto solution = solve<tau_ba<sbf_ba>, sbf_ba>(form, type);
 		return check_solution(form, solution.value());
@@ -594,7 +619,23 @@ TEST_SUITE("solve") {
 	// increasing monotonicity (1)
 	TEST_CASE("o1[t] > {<:split1> != 0} && o1[t] != 1") {
 		const char* system = "o1[t] > {<:split1> != 0} && o1[t] != 1.";
-		const char* type = "tau";
-		CHECK ( test_solve(system, type) );
+		CHECK ( test_solve(system) );
+	}
+
+	TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0") {
+		const char* system = " y < x && y = {a}:sbf && x' != 0.";
+		CHECK ( test_solve(system, "sbf") );
+	}
+
+	// increasing monotonicity (2 y1)
+	TEST_CASE("x = {a}:sbf && x < y && y != 1") {
+		const char* system = "x = {a}:sbf && x < y && y != 1.";
+		CHECK ( test_solve(system, "sbf") );
+	}
+
+	// increasing monotonicity (2 y2)
+	TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
+		const char* system = "x = {a}:sbf {b}:sbf && x < y && y != 1.";
+		CHECK ( test_solve(system, "sbf") );
 	}
 }
