@@ -166,13 +166,14 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 
 TEST_SUITE("configuration") {
 
-	TEST_CASE("configuration") {
-		// initialize the bdd library
-		bdd_init<Bool>();
-		// configuring boost logging only for errors
+	TEST_CASE("logging") {
 		core::get()->set_filter(trivial::severity >= trivial::error);
 		add_console_log(std::cout, keywords::format =
 			expressions::stream << expressions::smessage);
+	}
+
+	TEST_CASE("bdd initialization") {
+		bdd_init<Bool>();
 	}
 }
 
