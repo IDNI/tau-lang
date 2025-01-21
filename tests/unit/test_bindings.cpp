@@ -41,7 +41,7 @@ TEST_SUITE("named bindings") {
 		auto statement = make_statement(src);
 		bindings<Bool> bs; bs["binding"] = { Bool(true) };
 		auto binded = make_named_bindings(statement, bs);
-		CHECK( binded == statement );
+		CHECK( binded == nullptr );
 	}
 }
 

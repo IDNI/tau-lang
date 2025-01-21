@@ -73,16 +73,20 @@ std::optional<tau<BAs...>> sbf_ba_factory<BAs...>::parse(
 	// check source cache
 	if (auto cn = cache.find(src); cn != cache.end())
 		return cn->second;
-	auto& p = sbf_parser::instance();
-	auto r = p.parse(src.c_str(), src.size());
-	if (!r.found) return std::optional<tau<BAs...>>{};
+	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
+	if (!result.found) {
+		auto msg = result.parse_error
+			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
+		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
+		return std::optional<tau<BAs...>>{}; // Syntax error
+	}
 	using parse_symbol = sbf_parser::node_type;
 	using namespace rewriter;
 	auto root = make_node_from_tree<sbf_parser,
 		drop_location_t<parse_symbol, sbf_sym>,
 		sbf_sym>(
 			drop_location<parse_symbol, sbf_sym>,
-			r.get_shaped_tree());
+			result.get_shaped_tree());
 	auto t = traverser_t(root) | sbf_parser::sbf;
 	auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
 	std::variant<BAs...> vp {b};
@@ -99,7 +103,7 @@ tau<BAs...> sbf_ba_factory<BAs...>::binding(const tau<BAs...>& sn) {
 		tau_node_terminal_extractor<BAs...>, source);
 	if (auto parsed = parse(src); parsed.has_value())
 		return parsed.value();
-	return sn;
+	return nullptr;
 }
 
 template <typename...BAs>
