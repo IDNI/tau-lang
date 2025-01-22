@@ -133,25 +133,17 @@ tau<BAs...> get_new_uniter_const (const tau<BAs...> fm, const std::string& name)
 	return uniter_const;
 }
 
-static inline std::vector<std::string> rr_v{"dummy"};
-static inline std::map<std::string, size_t> rr_m{};
-inline size_t rr_dict(const std::string& s) {
-	if (auto it = rr_m.find(s); it != rr_m.end()) return it->second;
-	return rr_m.emplace(s, rr_v.size()), rr_v.push_back(s), rr_v.size() - 1;
-};
-
 // ref offset info. first is offset type (num/capture/shift/variable)
 // and second is value of num, rr_dict id of capture or 0 for shift and variable
 using offset_t = std::pair<size_t, size_t>;
-// extracts ref info. returns pair of rr_dict id of ref symbol
+// extracts ref info. returns pair of rr_sig (name id and arity)
 // and vector of its offsets (offset_t)
 template <typename... BAs>
-std::pair<size_t, std::vector<offset_t>> get_ref_info(
+std::pair<rr_sig, std::vector<offset_t>> get_ref_info(
 	const tau<BAs...>& ref)
 {
 	//ptree<BAs...>(std::cout << "ref? ", ref) << "\n";
-	std::pair<size_t, std::vector<offset_t>> ret{
-		rr_dict(get_ref_name(ref)), {} };
+	std::pair<rr_sig, std::vector<offset_t>> ret{ get_rr_sig(ref), {} };
 	auto offsets = ref | tau_parser::offsets || tau_parser::offset;
 	//BOOST_LOG_TRIVIAL(debug) << "(T) -- get_ref " << ref << " " << ret.first << " offsets.size: " << offsets.size();
 	for (const auto& offset : offsets) {
@@ -602,16 +594,16 @@ bool is_valid(const rr<tau<BAs...>>& nso_rr) {
 
 template <typename... BAs>
 bool is_well_founded(const rr<tau<BAs...>>& nso_rr) {
-	std::unordered_map<size_t, std::set<size_t>> graph;
-	std::unordered_map<size_t, bool> visited, visiting;
-	std::function<bool(size_t)> is_cyclic = [&](size_t n) {
-		if (visiting[n]) return true;
-		if (visited[n]) return false;
-		visiting[n] = true;
-		for (const auto& neighbor : graph[n])
+	std::unordered_map<rr_sig, std::set<rr_sig>> graph;
+	std::unordered_map<rr_sig, bool> visited, visiting;
+	std::function<bool(rr_sig)> is_cyclic = [&](const rr_sig& sig) {
+		if (visiting[sig]) return true;
+		if (visited[sig]) return false;
+		visiting[sig] = true;
+		for (const auto& neighbor : graph[sig])
 			if (is_cyclic(neighbor)) return true;
-		visiting[n] = false;
-		visited[n]  = true;
+		visiting[sig] = false;
+		visited[sig]  = true;
 		return false;
 	};
 	bool has_relative_rule = false;
@@ -791,8 +783,7 @@ struct fixed_point_transformer {
 		// 	| optional_value_extractor<size_t>;
 		auto ref = fp_ref | tau_parser::ref;
 		if (ref && !(ref | tau_parser::offsets).has_value()) {
-			auto fn = get_ref_name(ref.value());
-			auto it = ts.types.find(fn);
+			auto it = ts.types.find(get_rr_sig(ref.value()));
 			if (it != ts.types.end() && it->second.offset_arity)
 				return { it->second.type,
 						it->second.offset_arity };
