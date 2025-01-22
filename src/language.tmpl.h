@@ -922,18 +922,34 @@ std::optional<tau<BAs...>> make_nso_using_factory(
 }
 
 //------------------------------------------------------------------------------
-// rec relations type inference
+// rec relations type checking and inference
+
+// rr name-id dict
+static inline std::vector<std::string> rr_v{ "dummy" };
+static inline std::map<std::string, size_t> rr_m{};
+inline size_t rr_dict(const std::string& s) {
+	if (auto it = rr_m.find(s); it != rr_m.end()) return it->second;
+	return rr_m.emplace(s, rr_v.size()), rr_v.push_back(s), rr_v.size() - 1;
+};
+inline const std::string& rr_dict(size_t i) { return rr_v[i]; };
+
+// pair of name id (rr_dict) and argument arity
+using rr_sig = std::pair<size_t, size_t>;
 
 struct rr_type {
 	tau_parser::nonterminal type;
 	size_t offset_arity = 0;
-	size_t args_arity = 0;
 	bool fp = false;
 };
 
 struct rr_types {
-	std::unordered_map<std::string, rr_type> types;
+	std::unordered_map<rr_sig, rr_type> types;
 	std::set<std::string> errors;
+};
+
+static auto sig2str = [](const rr_sig& s) {
+	std::stringstream ss;
+	return (ss << rr_dict(s.first) << "/" << s.second), ss.str();
 };
 
 static auto type2str = [](const tau_parser::nonterminal& t) {
@@ -941,9 +957,9 @@ static auto type2str = [](const tau_parser::nonterminal& t) {
 };
 
 inline std::ostream& print_rr_type(std::ostream& os, const rr_type& t) {
-	os << type2str(t.type) << "/[";
+	os << type2str(t.type) << "[";
 	if (t.fp) os << "*"; else os << t.offset_arity;
-	return os << "]" << t.args_arity;
+	return os << "]";
 }
 
 inline std::string rr_type2str(const rr_type& t) {
@@ -953,108 +969,97 @@ inline std::string rr_type2str(const rr_type& t) {
 }
 
 template <typename... BAs>
-std::string get_ref_name(const tau<BAs...>& n) {
+rr_sig get_rr_sig(const tau<BAs...>& n) {
 	auto ref = n;
 	if (auto ref_as_child = n | tau_parser::ref; ref_as_child)
 		ref = ref_as_child.value();
-	return make_string(tau_node_terminal_extractor<BAs...>,
-		(ref | tau_parser::sym).value());
+	auto args = ref | tau_parser::ref_args || tau_parser::ref_arg;
+	return { rr_dict(make_string(tau_node_terminal_extractor<BAs...>,
+		(ref | tau_parser::sym).value())), args.size() };
 };
 
 template <typename... BAs>
-std::pair<std::string, std::pair<size_t, size_t>> get_ref_name_and_arity(
-	const tau<BAs...>& n)
-{
-	auto ref = n;
-	if (auto ref_as_child = n | tau_parser::ref; ref_as_child)
-		ref = ref_as_child.value();
-	auto ofs = ref | tau_parser::offsets || tau_parser::offset;
-	auto ras = ref | tau_parser::ref_args || tau_parser::ref_arg;
-	return { make_string(tau_node_terminal_extractor<BAs...>,
-					(ref | tau_parser::sym).value()),
-		{ ofs.size(), ras.size() } };
-};
-
-template <typename... BAs>
-std::string get_ref_type(bool& success, rr_types& ts,
-	const tau<BAs...>& ref, const tau_parser::nonterminal& t,
+rr_sig get_ref_type(bool& success, rr_types& ts,
+	const tau<BAs...>& n, const tau_parser::nonterminal& t,
 	bool possible_fp = false)
 {
-	auto [fn, arity] = get_ref_name_and_arity(ref);
-	rr_type new_type(t, arity.first, arity.second,
-					possible_fp && arity.first == 0);
-	auto it = ts.types.find(fn);
+	auto ref = n;
+	if (auto ref_as_child = n | tau_parser::ref; ref_as_child)
+		ref = ref_as_child.value();
+	auto sig = get_rr_sig(ref);
+	auto oarity = (ref | tau_parser::offsets || tau_parser::offset).size();
+	rr_type new_type(t, oarity, possible_fp && oarity == 0);
+	auto it = ts.types.find(sig);
 	if (it != ts.types.end()) {
 		auto& rt = it->second;
 		std::stringstream err;
 		if (rt.type != t) err << "Type mismatch. ";
-		if (rt.args_arity != arity.second)
-			err << "Argument arity mismatch. ";
-		if (rt.fp && arity.first) {
+		if (rt.fp && oarity) {
 			// found a real offset arity for a uncomplete type taken
 			// from main with a fp call => update offset arity
-			ts.types[fn].offset_arity = arity.first;
-			ts.types[fn].fp = false;
+			ts.types[sig].offset_arity = oarity;
+			ts.types[sig].fp = false;
 			BOOST_LOG_TRIVIAL(trace) << "(I) -- Updated type of "
-				<< fn << "() : " << rr_type2str(ts.types[fn]);
+				<< sig2str(sig) << "() : "
+				<< rr_type2str(ts.types[sig]);
 		}
-		if (!rt.fp && !new_type.fp && rt.offset_arity != arity.first)
+		if (!rt.fp && !new_type.fp && rt.offset_arity != oarity)
 			err << "Offset arity mismatch. ";
 		if (err.tellp()) return
-			err << fn << "() : " << rr_type2str(new_type)
+			err << sig2str(sig) << "() : " << rr_type2str(new_type)
 				<< " declared as " << rr_type2str(rt),
 			ts.errors.insert(err.str()),
-			success = false, "";
+			success = false, rr_sig{ 0, 0 };
 	} else {
-		ts.types[fn] = new_type;
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Found type of " << fn
-					<< "() : " << rr_type2str(ts.types[fn]);
-		return fn;
+		ts.types[sig] = new_type;
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- Found type of "
+			<< sig2str(sig) << "() : " << rr_type2str(ts.types[sig]);
+		return sig;
 	}
-	return "";
+	return rr_sig{ 0, 0 };
 };
 
 template <typename... BAs>
-std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
+std::pair<std::set<rr_sig>, std::set<rr_sig>> get_rr_types(
 	bool& success, rr_types& ts, const tau<BAs...>& n,
 	bool possible_fp = false)
 {
-	std::set<std::string> done_names;
-	std::set<std::string> todo_names;
+	std::set<rr_sig> done_names;
+	std::set<rr_sig> todo_names;
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::ref, BAs...>))
-		todo_names.insert(get_ref_name(ref));
+		todo_names.insert(get_rr_sig(ref));
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::wff_ref, BAs...>))
 	{
-		auto fn = get_ref_type(success, ts, ref, tau_parser::wff,
+		auto sig = get_ref_type(success, ts, ref, tau_parser::wff,
 			possible_fp);
-		done_names.insert(fn), todo_names.erase(fn);
+		done_names.insert(sig), todo_names.erase(sig);
 	}
 	for (const auto& ref : select_all(n,
 			is_non_terminal<tau_parser::bf_ref, BAs...>))
 	{
-		auto fn = get_ref_type(success, ts, ref, tau_parser::bf,
+		auto sig = get_ref_type(success, ts, ref, tau_parser::bf,
 			possible_fp);
-		done_names.insert(fn), todo_names.erase(fn);
+		done_names.insert(sig), todo_names.erase(sig);
 	}
 	return { done_names, todo_names };
 }
 
 template <typename... BAs>
-std::pair<std::set<std::string>, std::set<std::string>> get_rr_types(
+std::pair<std::set<rr_sig>, std::set<rr_sig>> get_rr_types(
 	bool& success, rr_types& ts, const rr<tau<BAs...>>& nso_rr)
 {
-	std::set<std::string> done_names;
-	std::set<std::string> todo_names;
+	std::set<rr_sig> done_names;
+	std::set<rr_sig> todo_names;
 	auto add_ref_names = [&done_names, &todo_names](const std::pair<
-		std::set<std::string>, std::set<std::string>>& names)
+		std::set<rr_sig>, std::set<rr_sig>>& names)
 	{
-		for (const auto& fn : names.first)
-			done_names.insert(fn), todo_names.erase(fn);
-		for (const auto& fn : names.second)
-	 		if (done_names.find(fn) == done_names.end())
-				todo_names.insert(fn);
+		for (const auto& sig : names.first)
+			done_names.insert(sig), todo_names.erase(sig);
+		for (const auto& sig : names.second)
+	 		if (done_names.find(sig) == done_names.end())
+				todo_names.insert(sig);
 	};
 	// get types from relations if any
 	for (const auto& r : nso_rr.rec_relations)
@@ -1075,7 +1080,7 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 	// ptree<BAs...>(std::cout << "main: ", nso_rr.main) << "\n";
 	rr<tau<BAs...>> nn = nso_rr;
 	rr_types ts;
-	std::set<std::string> done_names, todo_names;
+	std::set<rr_sig> done_names, todo_names;
 	bool success = true;
 	static auto get_nt_type = [](const tau<BAs...>& r) {
 		size_t n = r | non_terminal_extractor<BAs...>
@@ -1091,16 +1096,16 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 		//ptree<BAs...>(std::cout << "updated ref: ", r) << "\n";
 	};
 	auto add_ref_names = [&done_names, &todo_names](const std::pair<
-		std::set<std::string>, std::set<std::string>>& names)
+		std::set<rr_sig>, std::set<rr_sig>>& names)
 	{
-		for (const auto& fn : names.first)
-			done_names.insert(fn), todo_names.erase(fn);
-		for (const auto& fn : names.second)
-	 		if (done_names.find(fn) == done_names.end())
-				todo_names.insert(fn);
+		for (const auto& sig : names.first)
+			done_names.insert(sig), todo_names.erase(sig);
+		for (const auto& sig : names.second)
+	 		if (done_names.find(sig) == done_names.end())
+				todo_names.insert(sig);
 	};
-	auto done = [&done_names, &todo_names](const std::string& fn) {
-		todo_names.erase(fn), done_names.insert(fn);
+	auto done = [&done_names, &todo_names](const rr_sig& sig) {
+		todo_names.erase(sig), done_names.insert(sig);
 	};
 	// get types from relations if any
 	for (const auto& r : nn.rec_relations)
@@ -1117,8 +1122,7 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 			BOOST_LOG_TRIVIAL(trace) << "(T) " << r.second << " is " << (type2str(t));
 			if (t == tau_parser::ref) {
 				// right side is unresolved ref
-				auto fn = get_ref_name(r.second);
-				auto it = ts.types.find(fn); // if we know type
+				auto it = ts.types.find(get_rr_sig(r.second)); // if we know type
 				if (it != ts.types.end()) {  // update
 					BOOST_LOG_TRIVIAL(trace) << "(T) updating right side: " << r.second;
 					t = it->second.type;
@@ -1131,7 +1135,8 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 				if (get_nt_type(r.first) == tau_parser::ref) {
 					// left side is unresolved ref
 					BOOST_LOG_TRIVIAL(trace) << "(T) updating left side: " << r.first;
-					done(get_ref_type(success, ts, r.first, t));
+					done(get_ref_type(
+						success, ts, r.first, t));
 					update_ref(r.first, t);
 					changed = true;
 				}
@@ -1141,8 +1146,8 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 				auto lt = get_nt_type(r.first);
 				// left side is an unresolved ref
 				if (lt == tau_parser::ref) {
-					auto fn = get_ref_name(r.first);
-					auto it = ts.types.find(fn); // if we know
+					auto it = ts.types
+						.find(get_rr_sig(r.first)); // if we know
 					if (it != ts.types.end()) { // type -> assign
 						lt = it->second.type;
 						BOOST_LOG_TRIVIAL(trace) << "(T) updating known type of the left side: " << r.first;
@@ -1173,8 +1178,7 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 		BOOST_LOG_TRIVIAL(trace) << "(T) main " << nn.main << " is " << (type2str(t));
 		if (t == tau_parser::ref) {
 			// main is an unresolved ref
-			auto fn = get_ref_name(nn.main);
-			auto it = ts.types.find(fn); // if we know type
+			auto it = ts.types.find(get_rr_sig(nn.main)); // if we know type
 			if (it != ts.types.end()) {  // update
 				BOOST_LOG_TRIVIAL(trace) << "(T) updating main: " << nn.main;
 				t = it->second.type;
@@ -1189,7 +1193,7 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr) {
 
 	if (todo_names.size()) {
 		std::stringstream ss;
-		for (auto& fn : todo_names) ss << " " << fn;
+		for (auto& sig : todo_names) ss << " " << sig2str(sig);
 		BOOST_LOG_TRIVIAL(error)
 			<< "(Error) Unknown type for:" << ss.str();
 		return {};
