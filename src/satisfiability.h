@@ -688,7 +688,7 @@ tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
 
 // Assumes single normalized Tau DNF clause
 template<typename... BAs>
-tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ctn_stream) {
+tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_ctn_stream*/) {
 	using p = tau_parser;
 	auto smt_fms = select_top(fm, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	if (smt_fms.empty()) return fm;
