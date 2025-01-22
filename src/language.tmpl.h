@@ -465,12 +465,16 @@ tau<BAs...> infer_constant_types(const tau<BAs...>& code) {
 	static auto is_constant_type_scope_node = [](const node& n) {
 		static std::vector<size_t> scope_nodes{
 			tau_parser::bf_interval,
-			tau_parser::bf_neq,
 			tau_parser::bf_eq,
+			tau_parser::bf_neq,
+			tau_parser::bf_less_equal,
 			tau_parser::bf_nleq,
 			tau_parser::bf_greater,
-			tau_parser::bf_less_equal,
+			tau_parser::bf_ngreater,
+			tau_parser::bf_greater_equal,
+			tau_parser::bf_ngeq,
 			tau_parser::bf_less,
+			tau_parser::bf_nless,
 			tau_parser::bf
 		};
 		if (!is_non_terminal_node<BAs...>(n)) return false;
@@ -669,10 +673,10 @@ tau<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 			tau<BAs...>>(
 		transform, rewriter::all)(tau_source);
 	if (!tau_code) return nullptr;
-	return infer_constant_types(
-		process_defs_input_variables(
-		process_offset_variables(
-		process_quantifier_vars(
+	return infer_constant_types(          // transforms ref to bf_ref/wff_ref
+		process_defs_input_variables( // transforms input variables to captures
+		process_offset_variables(     // transforms offset variables to captures
+		process_quantifier_vars(      // transforms ex x,y to ex x ex y
 		process_digits(tau_code)))));
 }
 
