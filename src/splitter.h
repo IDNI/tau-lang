@@ -217,8 +217,14 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 		for (const auto &eq: eqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(eq->child[1])));
 			auto f = eq->child[0];
+			auto type_f = find_top(f, is_non_terminal<tau_parser::type, BAs...>);
 			std::set<tau<BAs...>> free_vars = get_free_vars_from_nso(fm);
 			for (const auto& c : bf_constants) {
+				// First check that types match
+				auto type_c = c | tau_parser::bf_constant | tau_parser::type;
+				if (type_f.has_value() && type_f != type_c)
+					continue;
+
 				// Try to convert f(x,...) = 0 to f(x,...) = 0 && x < c' for some variable x in f
 				auto vars_f = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 				for (const auto& v : vars_f) {
@@ -244,10 +250,10 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 		for (const auto &neq: neqs) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(neq->child[1])));
 			auto f = neq->child[0];
+			auto type_f = find_top(f, is_non_terminal<tau_parser::type, BAs...>);
 			for (const auto& c : bf_constants) {
 				// Try to convert f != 0 to f >= c
 				// First check that types match
-				auto type_f = find_top(f, is_non_terminal<tau_parser::type, BAs...>);
 				auto type_c = c | tau_parser::bf_constant | tau_parser::type;
 				if (type_f.has_value() && type_f != type_c)
 					continue;
