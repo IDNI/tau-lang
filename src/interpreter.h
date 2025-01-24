@@ -62,6 +62,20 @@ struct finputs {
 			if (file) file.value().close();
 	}
 
+	void add_input (const tau<BAs...>& var, type t, filename f) {
+		if (!types.contains(var)) {
+			types.emplace(var, t);
+			streams.emplace(var,
+				f.empty()? std::optional<std::ifstream>()
+						: std::ifstream(f));
+			if (this->streams[var]
+				&& !this->streams[var].value().is_open())
+					BOOST_LOG_TRIVIAL(error)
+						<< "(Error) failed to open input file '"
+						<< f << "': ";
+		}
+	}
+
 	std::optional<assignment<BAs...>> read() {
 		// for each stream in in streams, read the value from the file/stdin,
 		// parsed it and store it in out.
@@ -146,8 +160,8 @@ struct finputs {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
-		std::stringstream ss; ss << var;
-		if (auto name = ss.str(); !name.empty() && name.front() == '_') {
+		auto name = tau_to_str(var);
+		if (name.size() > 1 && name[0] == '_' && name[1] == 'e') {
 			return { "sbf" };
 		}
 
@@ -181,6 +195,15 @@ struct foutputs {
 		// close the streams
 		for (auto& [_, file]: streams)
 			if (file) file.value().close();
+	}
+
+	void add_output (const tau<BAs...>& var, type t, filename f) {
+		if (!types.contains(var)) {
+			types.emplace(var, t);
+			streams.emplace(var,
+				f.empty()? std::optional<std::ofstream>()
+						: std::ofstream(f));
+		}
 	}
 
 	bool write(const assignment<BAs...>& outputs) {
@@ -244,8 +267,8 @@ struct foutputs {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
-		std::stringstream ss; ss << var;
-		if (auto name = ss.str(); !name.empty() && name.front() == '_') {
+		auto name = tau_to_str(var);
+		if (name.size() > 1 && name[0] == '_' && name[1] == 'e') {
 			return { "sbf" };
 		}
 
@@ -262,8 +285,7 @@ struct foutputs {
 template<typename input_t, typename output_t, typename...BAs>
 struct interpreter {
 	interpreter(const tau<BAs...>& ubt_ctn, const tau<BAs...>& original_spec,
-		assignment<BAs...>& memory, const auto& input,
-		const auto& output) :
+		assignment<BAs...>& memory, auto& input, auto& output) :
 						ubt_ctn(ubt_ctn),
 						original_spec(original_spec),
 						memory(memory),
@@ -281,7 +303,7 @@ struct interpreter {
 	}
 
 	static std::optional<interpreter> make_interpreter(
-		const tau<BAs...>& spec, const auto& inputs, const auto& outputs);
+		const tau<BAs...>& spec, auto& inputs, auto& outputs);
 
 	std::pair<std::optional<assignment<BAs...>>, bool> step();
 
@@ -294,8 +316,8 @@ struct interpreter {
 	size_t time_point = 0;
 	// TODO: Remove inputs and outputs, once type inference for variables is ready
 	// and solver can accept clauses with several types
-	const input_t& inputs;
-	const output_t& outputs;
+	input_t& inputs;
+	output_t& outputs;
 
 private:
 	// store all the possible systems to be solved, each system corresponds to a
@@ -311,15 +333,15 @@ private:
 	// Return typed systems of equations for the solver corresponding to each clause
 	// in the unbound continuation
 	static std::vector<system<BAs...>> compute_systems(const tau<BAs...>& ubd_ctn,
-		const auto& inputs, const auto& outputs);
+		auto& inputs, auto& outputs);
 
 	// Get the type for a clause of a local specification
 	static std::optional<system<BAs...>> compute_atomic_fm_types(const tau<BAs...>& clause,
-		const auto& inputs, const auto& outputs);
+		auto& inputs, auto& outputs);
 
 	// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
-	static std::optional<std::pair<type, tau<BAs...>>> get_type_fm(const tau<BAs...>& fm,
-		const auto& inputs, const auto& outputs);
+	static std::optional<std::pair<type, tau<BAs...>>> get_type_atomic_fm(const tau<BAs...>& fm,
+		auto& inputs, auto& outputs);
 
 	tau<BAs...> update_to_time_point(const tau<BAs...>& f);
 
@@ -345,7 +367,9 @@ private:
 	// The update stream u contained in this solution for spec is guaranteed maximal
 	std::optional<assignment<BAs...>>
 	solution_with_max_update(const tau<BAs...>& spec);
-};
+
+	// Returns if the variable is excluded from output
+	static bool is_excluded_output(const auto& var);};
 
 template<typename... BAs>
 std::optional<tau<BAs...>> unpack_tau_constant(const tau<BAs...>& constant) {

@@ -547,19 +547,11 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		// select current input variables
 		auto in_vars = select_all(dnf,
 			is_non_terminal<tau_parser::in_var_name, tau_ba_t, BAs...>);
-
-		std::map<tau_nso_t, std::pair<type, filename>> current_inputs = inputs;
+		std::map<tau_nso_t, std::pair<type, filename>> current_inputs;
 		for (auto& var: in_vars) {
-			if (auto it = inputs.find(var); it != inputs.end()) {
+			if (auto it = inputs.find(var); it != inputs.end())
 				current_inputs[var] = it->second;
-			} else {
-				BOOST_LOG_TRIVIAL(error)
-					<< "(Error) input variable " << var
-					<< " is not defined\n";
-				return;
-			}
 		}
-
 		auto ins = finputs<tau_ba_t, BAs...>(current_inputs);
 
 		// select current output variables
@@ -569,15 +561,9 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		for (auto& var: out_vars) {
 			if (auto it = outputs.find(var); it != outputs.end())
 				current_outputs[var] = it->second;
-			else {
-				BOOST_LOG_TRIVIAL(error)
-					<< "(Error) output variable " << var
-					<< " is not defined\n";
-				return;
-			}
 		}
-
 		auto outs = foutputs<tau_ba_t, BAs...>(current_outputs);
+
 		run(dnf, ins, outs);
 		return;
 	}
