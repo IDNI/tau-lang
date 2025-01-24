@@ -92,7 +92,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 			// setting proper options for the solver
 			solver_options<BAs...> options = {
 				.splitter_one = nso_factory<BAs...>::instance().splitter_one(""),
-				.engine = solver_mode::general };
+				.mode = solver_mode::general };
 
 			// solve the given system of equations
 			auto solution = solve(current, options);
@@ -389,7 +389,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const ta
 			// setting proper options for the solver
 			solver_options<BAs...> options = {
 				.splitter_one = nso_factory<BAs...>::instance().splitter_one(""),
-				.engine = solver_mode::general };
+				.mode = solver_mode::general };
 
 			auto model = solve(constraints, options);
 			if (!model) continue;
