@@ -10,7 +10,7 @@ namespace idni::tau_lang {
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<input_t, output_t, BAs...>>
 interpreter<input_t, output_t, BAs...>::make_interpreter(
-	tau<BAs...> spec, const auto& inputs, const auto& outputs) {
+	tau<BAs...> spec, auto& inputs, auto& outputs) {
 	// Find a satisfiable unbound continuation from spec
 	auto ubd_ctn = get_executable_spec(spec);
 	if (ubd_ctn == nullptr) {
@@ -140,7 +140,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 							// std::cout << "var: " << var << "\n";
 							memory.emplace(var, value);
 							// Exclude temporary streams in solution
-							if (get_io_name(trim(var))[0] != '_')
+							if (!is_excluded_output(trim(var)))
 								global.emplace(var, value);
 						}
 					} else {
@@ -288,7 +288,7 @@ void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial( const
 
 template<typename input_t, typename output_t, typename...BAs>
 std::vector<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_systems(const tau<BAs...>& ubd_ctn,
-		const auto& inputs, const auto& outputs) {
+		auto& inputs, auto& outputs) {
 	std::vector<system<BAs...>> systems;
 	// Create blue-print for solver for each clause
 	for (const auto& clause : get_dnf_wff_clauses(ubd_ctn)) {
@@ -305,7 +305,7 @@ std::vector<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_syst
 
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_atomic_fm_types(const tau<BAs...>& clause,
-	const auto& inputs, const auto& outputs) {
+	auto& inputs, auto& outputs) {
 	auto is_atomic_fm = [](const tau<BAs...>& n) {
 		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
@@ -323,7 +323,7 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 			<< "compute_system/atomic_fm " << atomic_fm;
 		#endif // DEBUG
 
-		if (auto l = get_type_fm(atomic_fm, inputs, outputs); l) {
+		if (auto l = get_type_atomic_fm(atomic_fm, inputs, outputs); l) {
 			if (sys.find(l.value().first) == sys.end()) sys[l.value().first] = l.value().second;
 			else sys[l.value().first] = build_wff_and(sys[l.value().first], l.value().second);
 		} else {
@@ -335,25 +335,62 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<std::pair<type, tau<BAs...>>> interpreter<input_t, output_t, BAs...>::get_type_fm(const tau<BAs...>& fm,
-		const auto& inputs, const auto& outputs) {
-	if (auto io_var = find_top(fm,
-			is_non_terminal<tau_parser::io_var, BAs...>); io_var) {
-		if (auto in_var_name = io_var
-				| tau_parser::in
-				| tau_parser::in_var_name; in_var_name) {
-			if(auto t = inputs.type_of(in_var_name.value()); t)
-				return { make_pair(t.value() , fm) };
-		} else if (auto out_var_name = io_var
-				| tau_parser::out
-				| tau_parser::out_var_name; out_var_name) {
-			if (auto t = outputs.type_of(out_var_name.value()); t)
-				return { make_pair(t.value() , fm) };
+std::optional<std::pair<type, tau<BAs...>>> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(const tau<BAs...>& fm,
+		auto& inputs, auto& outputs) {
+	using p = tau_parser;
+	auto io_vars = select_top(fm, is_child_non_terminal<p::io_var, BAs...>);
+
+	// Check if any io_var has a predefined type
+	std::string type;
+	for (const auto& io_var : io_vars) {
+		if (auto it = inputs.types.find(trim2(io_var)); it != inputs.types.end()) {
+			if (!type.empty() && type != it->second) {
+				// Type mismatch in atomic fm
+				BOOST_LOG_TRIVIAL(error) <<
+					"(Error) stream variable type mismatch in atomic formula: " << fm <<
+					" between " << type << "and " << it->second << "\n";
+				return {};
+			} else if (type.empty()) type = it->second;
+		}
+		if (auto it = outputs.types.find(trim2(io_var)); it != outputs.types.end()) {
+			if (!type.empty() && type != it->second) {
+				// Type mismatch in atomic fm
+				BOOST_LOG_TRIVIAL(error) <<
+					"(Error) stream variable type mismatch in atomic formula: " << fm <<
+					" between " << type << "and " << it->second << "\n";
+				return {};
+			} else if (type.empty()) type = it->second;
 		}
 	}
-	BOOST_LOG_TRIVIAL(error)
-		<< "(Error) atomic formula contains no stream variable: " << fm << "\n";
-	return {};
+	// Check if all constants match the type, if present, else infer from there
+	auto consts = select_top(fm, is_non_terminal<p::bf_constant, BAs...>);
+	for (const auto& c : consts) {
+		assert(is_non_terminal(p::type, trim(c)));
+		auto c_type = tau_to_str(trim(c));
+		if (type.empty()) type = c_type;
+		else if (type != c_type) {
+			// Type mismatch in atomic fm
+			BOOST_LOG_TRIVIAL(error) <<
+				"(Error) stream variable or constant type mismatch in atomic formula: " << fm <<
+				" between " << type << "and " << c_type << "\n";
+			return {};
+		}
+	}
+	// If type is still empty, set by default to tau
+	if (type.empty()) type = "tau";
+	// Lastly set all io_vars to found type
+	for (const auto& io_var : io_vars) {
+		const auto io_name = trim2(trim(io_var));
+		if (io_var | p::io_var | p::in) {
+			// Add type to inputs
+			inputs.add_input(io_name, type, "");
+		} else {
+			// Add type to outputs
+			if (!is_excluded_output(io_var))
+				outputs.add_output(io_name, type, "");
+		}
+	}
+	return { make_pair(type , fm) };
 }
 
 template<typename input_t, typename output_t, typename...BAs>
@@ -405,6 +442,12 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const ta
 		return spec;
 	}
 	return nullptr;
+}
+
+template<typename input_t, typename output_t, typename...BAs>
+bool interpreter<input_t, output_t, BAs...>::is_excluded_output (const auto& var) {
+	std::string io_name = get_io_name(var);
+	return io_name[0] == '_' && io_name.size() > 1 && io_name[1] == 'e';
 }
 
 } // namespace idni::tau_lang
