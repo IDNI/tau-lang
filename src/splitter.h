@@ -294,14 +294,22 @@ tau<BAs...> tau_splitter (const tau<BAs...>& fm, splitter_type st) {
 		auto specs = get_cnf_wff_clauses(clause);
 		bool good_splitter = false;
 		for (auto& spec : specs) {
+			bool is_neg = is_child_non_terminal(p::wff_neg, spec);
+			if (is_neg) {
+				spec = trim2(spec);
+				spec = push_negation_in(build_wff_neg(spec));
+			}
+
 			bool is_aw = is_child_non_terminal(p::wff_always, spec);
+			assert((is_aw || is_child_non_terminal(p::wff_sometimes, spec)));
 			auto [splitter, type] = nso_tau_splitter(trim2(spec), st, fm);
 			if (type != splitter_type::bad) {
 				BOOST_LOG_TRIVIAL(trace) << "Splitter of spec: " << splitter;
 				good_splitter = true;
+				if (is_neg) splitter = push_negation_in(build_wff_neg(splitter));
 				if (is_aw) splitter = build_wff_always(splitter);
 				else splitter = build_wff_sometimes(splitter);
-				spec = splitter;
+				spec = is_neg ? build_wff_neg(splitter) : splitter;
 				break;
 			}
 		}
@@ -333,7 +341,9 @@ tau<BAs...> tau_splitter (const tau<BAs...>& fm, splitter_type st) {
 	if (clauses.size() == 1) {
 		// Conjunct always part with bad splitter
 		// If there is no always part, create one
-		auto aw = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
+		auto aw = find_top_until(
+			fm, is_child_non_terminal<p::wff_always, BAs...>,
+			is_child_non_terminal<p::wff_neg, BAs...>);
 		if (aw.has_value()) {
 			auto aw_bad_splitter = tau_bad_splitter(trim2(aw.value()));
 			std::map<tau<BAs...>, tau<BAs...> > c = {
