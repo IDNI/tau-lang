@@ -725,7 +725,7 @@ std::optional<tau_nso<BAs...>>
 			if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
 				value); x) rr_ = x.value();
 			else return {};
-		}
+		} else rr_ = rr<tau_nso_t>(value);
 		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
 				definitions.begin(), definitions.end());
