@@ -302,7 +302,7 @@ TEST_SUITE("find_solution") {
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
 		auto equation = sbf_make_nso(src);
-		auto solution = find_solution(equation, solver_engine::general);
+		auto solution = find_solution(equation, solver_mode::general);
 		return ( check_solution(equation, solution.value()));
 	}
 
@@ -376,7 +376,7 @@ TEST_SUITE("solve_minterm_system") {
 			system.insert(sbf_make_nso(minterm));
 		solver_options<sbf_ba> options = {
 			.splitter_one = splitter_one_bdd(),
-			.engine = solver_engine::general
+			.engine = solver_mode::general
 		};
 		auto solution = solve_minterm_system<sbf_ba>(system, options);
 		bool check = true;
@@ -412,7 +412,7 @@ TEST_SUITE("solve_inequality_system") {
 		// setting the proper options
 		solver_options<sbf_ba> options = {
 			.splitter_one = splitter_one_bdd(),
-			.engine = solver_engine::general
+			.engine = solver_mode::general
 		};
 
 		auto solution = solve_inequality_system<sbf_ba>(system, options);
@@ -505,7 +505,7 @@ TEST_SUITE("solve_system") {
 		// setting the proper options
 		solver_options<sbf_ba> options = {
 			.splitter_one = splitter_one_bdd(),
-			.engine = solver_engine::general
+			.engine = solver_mode::general
 		};
 
 		// calling the solver function
@@ -626,15 +626,14 @@ TEST_SUITE("solve_system") {
 
 TEST_SUITE("solve") {
 
-	bool test_solve(const std::string system,
-			const std::string type = "tau") {
+	bool test_solve(const std::string system) {
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
 		auto form = tau_make_nso_test(system);
 		solver_options<tau_ba<sbf_ba>, sbf_ba> options = {
 			.splitter_one = nso_factory<tau_ba<sbf_ba>, sbf_ba>::instance().splitter_one(""),
-			.engine = solver_engine::general
+			.engine = solver_mode::general
 		};
 
 		auto solution = solve<tau_ba<sbf_ba>, sbf_ba>(form, options);

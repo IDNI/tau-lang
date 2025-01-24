@@ -178,14 +178,14 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 
 template<typename...BAs>
 std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq,
-		const solver_engine engine) {
-	if (engine == solver_engine::general) {
+		const solver_mode engine) {
+	if (engine == solver_mode::general) {
 		return find_general_solution(eq);
 	}
 	if (auto base_solution = lgrs(eq); base_solution) {
 		std::map<var<BAs...>, tau<BAs...>> substitution;
 		for (auto& [k, v] : base_solution.value())
-			substitution[k] = engine == solver_engine::maximum
+			substitution[k] = engine == solver_mode::maximum
 				? _1<BAs...> : _0<BAs...>;
 		solution<BAs...> new_solution;
 		for (auto& [k, v] : base_solution.value()) {
@@ -555,7 +555,7 @@ std::optional<minterm_system<BAs...>> add_minterm_to_disjoint(
 			// case 4
 			} else {
 				// do not consider splitters due to the selected engine
-				if (options.engine != solver_engine::general) return {};
+				if (options.engine != solver_mode::general) return {};
 
 				// otherwise, go with the splitters
 				#ifdef DEBUG
@@ -693,9 +693,9 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 	eq = build_wff_eq(eq);
 
 	switch (options.engine) {
-		case solver_engine::maximum:
+		case solver_mode::maximum:
 			return find_solution(eq, options.engine);
-		case solver_engine::minimum:
+		case solver_mode::minimum:
 			return find_solution(eq, options.engine);
 		default:
 			return find_solution(eq);
@@ -919,9 +919,9 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 	BOOST_LOG_TRIVIAL(trace)
 		<< "solver.h:" << __LINE__ << " solve/form: " << form;
 	switch (options.engine) {
-		case solver_engine::maximum: BOOST_LOG_TRIVIAL(trace)
+		case solver_mode::maximum: BOOST_LOG_TRIVIAL(trace)
 			<< "solver.h:" << __LINE__ << " solve/options.kind: maximum\n"; break;
-		case solver_engine::minimum: BOOST_LOG_TRIVIAL(trace)
+		case solver_mode::minimum: BOOST_LOG_TRIVIAL(trace)
 			<< "solver.h:" << __LINE__ << " solve/options.kind: minimum"; break;
 		default: BOOST_LOG_TRIVIAL(trace)
 			<< "solver.h:" << __LINE__ << " solve/options.kind: default\n"

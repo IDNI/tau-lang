@@ -581,51 +581,58 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 }
 
-template <typename... BAs>
-void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
-	std::optional<std::string> type = n->child.size() == 3
-		?  make_string<tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
-			tau_nso_t>(tau_node_terminal_extractor<
-				tau_ba_t, BAs...>, n->child[1])
-		: std::optional<std::string>();
+template<typename...BAs>
+solver_mode get_solver_mode(const tau<BAs...>& n) {
+	if (auto solver_mode = find_top(n,
+			is_non_terminal<tau_parser::solver_mode, BAs...>); solver_mode) {
+		auto engine = solver_mode
+			| only_child_extractor<BAs...>
+			| non_terminal_extractor<BAs...>
+			| optional_value_extractor<size_t>;
+		return (engine == tau_parser::solver_mode_minimum)
+			? solver_mode::minimum
+			: solver_mode::maximum;
+	} else return solver_mode::general;
+}
 
-	auto implicit_types = select_all(n, is_non_terminal<
-					tau_parser::type, tau_ba_t, BAs...>);
+template<typename...BAs>
+std::optional<std::string> get_solver_type(const tau<BAs...>& n) {
+	auto types = select_all(n, is_non_terminal<tau_parser::type, BAs...>);
+	std::string type = "";
 
-	// setting solver options
-	solver_options<tau_ba_t, BAs...> options;
-	if (auto solver_engine = find_top(n, is_non_terminal<tau_parser::solver_engine,
-		tau_ba_t, BAs...>); solver_engine) {
-			auto engine = solver_engine
-				| only_child_extractor<tau_ba_t, BAs...>
-				| optional_value_extractor<tau_nso_t>;
-			options.engine = (engine == tau_parser::solver_engine_minimum)
-				? solver_engine::minimum
-				: solver_engine::maximum;
-	} else {
-		options.splitter_one = nso_factory<tau_ba_t, BAs...>::instance().splitter_one(type.value());
-		options.engine = solver_engine::general;
-	}
-
-	for (const auto& t: implicit_types) {
-		auto implicit_type = make_string<
-				tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
-				tau_nso_t>(
-			tau_node_terminal_extractor<tau_ba_t, BAs...>, t);
-		if (type.has_value() && implicit_type != type.value()) {
+	for (const auto& t: types) {
+		auto current_type = make_string<
+				tau_node_terminal_extractor_t<BAs...>,
+				tau<BAs...>>(
+			tau_node_terminal_extractor<BAs...>, t);
+		if (type == "" || type == current_type) {
+			type = current_type;
+		} else {
 			BOOST_LOG_TRIVIAL(error)
 				<< "(Error) multiple types involved\n";
-			return;
-		} if (!type.has_value()) type = implicit_type;
+			return {};
+		}
 	}
 
-	if (!type.has_value()) type = "tau";
+	return type == "" ? nso_factory<BAs...>::instance().default_type() : type;
+}
 
-	if (auto nn = is_non_terminal<tau_parser::type, tau_ba_t, BAs...>(
-		n->child[1]) ? get_type_and_arg(n->child[2])
-				: get_type_and_arg(n->child[1]); nn)
-	{
-		auto [t, program] = nn.value();
+template <typename... BAs>
+void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
+	// getting the type
+	auto type = get_solver_type(n);
+	if (!type) return;
+
+	// setting solver options
+	solver_options<tau_ba_t, BAs...> options = {
+		.splitter_one = nso_factory<tau_ba_t, BAs...>
+			::instance().splitter_one(type.value()),
+		.engine = get_solver_mode(n)
+	};
+
+	if (auto arg = find_top(n, is_non_terminal<tau_parser::wff, tau_ba<BAs...>, BAs...>); arg) {
+		auto system = get_type_and_arg(arg.value());
+		auto [t, program] = system.value();
 		auto applied = apply_rr_to_rr_tau_nso(t, program);
 
 		applied = normalize_non_temp(applied);
@@ -633,11 +640,6 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace) << "solve_cmd/applied: " << applied << "\n";
 		#endif // DEBUG
-
-		if (!nn) {
-			BOOST_LOG_TRIVIAL(error) <<
-				"(Error) invalid argument\n"; return;
-		}
 
 		auto s = solve<tau_ba_t, BAs...>(applied, options);
 		if (!s) { std::cout << "no solution\n"; return; }
@@ -661,6 +663,8 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 			}
 		}
 		std::cout << "}\n";
+	} else {
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 	}
 }
 
