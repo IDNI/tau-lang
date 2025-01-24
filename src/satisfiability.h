@@ -669,43 +669,95 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	return res;
 }
 
-// Creates a guard using the names of the input streams in uninterpreted constants
+// Creates a guard for input stream variables
 template<typename... BAs>
-tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
+tau<BAs...> create_guard(const auto& io_vars, int_t& guard_id) {
 	using p = tau_parser;
+	auto create_uconst_guard = [&guard_id]() {
+		return build_bf_uniter_const<BAs...>("", "_g" + std::to_string(guard_id++));
+	};
+	auto create_stream_guard = [&guard_id](const int_t shift, const bool init = false) {
+		assert((init || shift > 0));
+		if (init == true) {
+			return wrap(
+				p::bf, build_io_out_const<BAs...>(
+					"_g" + std::to_string(guard_id++), shift));
+		}
+		else return wrap(
+			p::bf, build_io_out_shift<BAs...>(
+				"_g" + std::to_string(guard_id++), "t", shift));
+	};
+	auto add_guard = [](auto& guard, const auto& new_guard, const auto io_var) {
+		auto cdn = build_wff_eq(build_bf_xor(wrap(p::bf, io_var), new_guard));
+		guard = build_wff_and(guard, cdn);
+	};
 	tau<BAs...> guard = _T<BAs...>;
 	for (const auto& io_var : io_vars) {
 		// Check if input stream variable
 		if (io_var | p::io_var | p::in) {
-			// Give name of io_var and make it non-user definable with "_"
-			auto uiter_const = build_bf_uniter_const<BAs...>("_" + tau_to_str(io_var), std::to_string(number));
-			auto cdn = build_wff_eq(build_bf_xor(wrap(p::bf, io_var), uiter_const));
-			guard = build_wff_and(guard, cdn);
+			if (is_io_initial(io_var)) {
+				int_t t = get_io_time_point(io_var);
+				tau<BAs...> g;
+				if (t == 0) g = create_uconst_guard();
+				else g = create_stream_guard(t-1, true);
+				add_guard(guard, g, io_var);
+			} else {
+				int_t t = get_io_var_shift(io_var);
+				add_guard(guard, create_stream_guard(t+1), io_var);
+			}
 		}
 	}
 	return guard;
+}
+
+// Given a formula, wrap its input variables in guards to mimic
+// existential quantification for input
+template<typename... BAs>
+tau<BAs...> make_inputs_guarded(const tau<BAs...>& fm, const bool conj, int_t& guard_id) {
+	using p = tau_parser;
+	auto guarded_step_0 = [](const auto& ori_fm, const auto& io_vars, int_t& guard_id) {
+		int_t t = get_max_shift(io_vars);
+		auto fm_at_0 = fm_at_time_point(ori_fm, io_vars, t);
+		auto new_io_vars = select_top(
+			fm_at_0, is_child_non_terminal<p::io_var, BAs...>);
+		auto guard = create_guard<BAs...>(new_io_vars, guard_id);
+		return build_wff_imply(guard, fm_at_0);
+	};
+
+	auto current_io_vars = select_top(fm,
+			is_child_non_terminal<p::io_var, BAs...>);
+	// Create guarded step 0
+	auto guarded_fm_at_0 = guarded_step_0(
+		fm, current_io_vars, guard_id);
+	// Create rest of guard
+	auto guard = create_guard<BAs...>(current_io_vars, guard_id);
+	if (conj)
+		return build_wff_and(guarded_fm_at_0,
+			build_wff_imply(guard, fm));
+	else return build_wff_or(guarded_fm_at_0, build_wff_imply(guard, fm));
 }
 
 // Creates a guard for the input streams in io_vars
-template<typename... BAs>
-tau<BAs...> create_stream_guard(const auto& io_vars, const int_t number) {
-	using p = tau_parser;
-	tau<BAs...> guard = _T<BAs...>;
-	for (const auto& io_var : io_vars) {
-		// Check if input stream variable
-		if (io_var | p::io_var | p::in) {
-			auto var_guard = build_io_out<BAs...>(
-				"_" + tau_to_str(io_var) + "_" + std::to_string(
-					number), "t");
-			auto cdn = build_wff_eq(build_bf_xor(wrap(p::bf, io_var), var_guard));
-			guard = build_wff_and(guard, cdn);
-		}
-	}
-	return guard;
-}
+// template<typename... BAs>
+// tau<BAs...> create_guard(const auto& io_vars, int_t& guard_id) {
+// 	using p = tau_parser;
+// 	tau<BAs...> guard = _T<BAs...>;
+// 	for (const auto& io_var : io_vars) {
+// 		// Check if input stream variable
+// 		if (io_var | p::io_var | p::in) {
+// 			auto var_guard = wrap(
+// 				p::bf, build_io_out<BAs...>("_g" + std::to_string(guard_id), "t"));
+// 			auto cdn = build_wff_eq(build_bf_xor(wrap(p::bf, io_var), var_guard));
+// 			guard = build_wff_and(guard, cdn);
+// 			// Increase the seed by 1
+// 			++guard_id;
+// 		}
+// 	}
+// 	return guard;
+// }
 
 template<typename... BAs>
-tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm) {
+tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm, int_t& guard_id) {
 	using p = tau_parser;
 	// Find negated always parts
 	auto is_neg_st = [](const auto& n) {
@@ -726,12 +778,10 @@ tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm) {
 		neg_st_fm = push_negation_in(build_wff_neg(tmp));
 	}
 	// make statements guarded
-	for (size_t i = 0; i < neg_st_fms.size(); ++i) {
-		auto current_io_vars = select_top(
-			neg_st_fms[i], is_child_non_terminal<p::io_var, BAs...>);
-		auto guarded_fm = create_stream_guard<BAs...>(current_io_vars, i);
-		neg_st_fms[i] = build_wff_imply(guarded_fm, neg_st_fms[i]);
-	}
+	for (size_t i = 0; i < neg_st_fms.size(); ++i)
+		neg_st_fms[i] = make_inputs_guarded(
+					neg_st_fms[i], true, guard_id);
+
 	// conjunct with initial always part
 	auto _aw = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 	auto aw = _aw.has_value() ? _aw.value() : _T<BAs...>;
@@ -743,6 +793,7 @@ tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm) {
 		changes.emplace(trim2(_aw.value()), aw);
 		return replace(new_fm, changes);
 	}
+	std::cout << "trans_neg_st/aw: " << aw << "\n";
 	return build_wff_and(build_wff_always(aw), new_fm);
 }
 
@@ -803,6 +854,7 @@ template<typename... BAs>
 void transform_neg_aw_to_eventual (std::vector<tau<BAs...>>& neg_aw_fms,
 						bool reset_ctn_stream,
 						const int_t max_lookback,
+						int_t& guard_id,
 						auto& ev_assm, auto& ev_collection) {
 	using p = tau_parser;
 	for (size_t n = 0; n < neg_aw_fms.size(); ++n) {
@@ -833,14 +885,12 @@ void transform_neg_aw_to_eventual (std::vector<tau<BAs...>>& neg_aw_fms,
 			shift_io_vars_in_fm(neg_aw_fms[n], neg_aw_io_vars,
 				max_lookback - neg_aw_lookback);
 
-		// Guard statement using uninterpreted constants to express that
-		// "if the inputs equal the uninterpreted constants, the Tau formula
+		// Guard statement to express that
+		// "if the inputs equal the guard, the Tau formula
 		// under !always is implied"
 		// This mimics an existential quantifier capturing the inputs but at the same
 		// time the inputs are not quantified
-		neg_aw_io_vars = select_top(shifted_neg_aw, is_child_non_terminal<p::io_var, BAs...>);
-		auto guard = create_guard<BAs...>(neg_aw_io_vars, n);
-		shifted_neg_aw = build_wff_imply(guard, shifted_neg_aw);
+		shifted_neg_aw = make_inputs_guarded(shifted_neg_aw, false, guard_id);
 
 		ev_assm = build_wff_and(ev_assm, build_wff_imply(
 				build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
@@ -861,7 +911,9 @@ void transform_neg_aw_to_eventual (std::vector<tau<BAs...>>& neg_aw_fms,
 
 // Assumes single normalized Tau DNF clause
 template<typename... BAs>
-tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, const bool reset_ctn_stream) {
+tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm,
+					int_t& guard_id,
+					const bool reset_ctn_stream) {
 	using p = tau_parser;
 	// Collect all statements to be transformed to eventual variables
 	auto is_neg_aw = [](const auto& n) {
@@ -871,10 +923,11 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, const bool re
 		else return false;
 	};
 	auto neg_aw_fms = select_top(fm, is_neg_aw);
-	// Put !(always phi) into the form !phi
+	// Put !(always phi) into the form !phi and add input guards
 	for (auto& neg_aw_fm : neg_aw_fms) {
 		auto tmp = trim2(trim2(neg_aw_fm));
-		neg_aw_fm = push_negation_in(build_wff_neg(tmp));
+		auto neg_tmp = push_negation_in(build_wff_neg(tmp));
+		neg_aw_fm = make_inputs_guarded(neg_tmp, false, guard_id);
 	}
 	auto aw_fm = find_top_until(
 		fm, is_child_non_terminal<p::wff_always, BAs...>,
@@ -883,6 +936,9 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, const bool re
 	auto st_fms = select_top_until(
 		fm, is_child_non_terminal<p::wff_sometimes, BAs...>,
 		is_child_non_terminal<p::wff_neg, BAs...>);
+	// Add formula from neg_aw_fms to st_fms, since after guarding inputs
+	// they are ordinary sometimes statements
+	std::ranges::move(neg_aw_fms, std::back_inserter(st_fms));
 	int_t max_lookback = get_max_shift(
 		select_top(fm, is_child_non_terminal<p::io_var, BAs...>));
 
@@ -899,8 +955,8 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, const bool re
 	tau<BAs...> ev_assm = _T<BAs...>;
 	tau<BAs...> ev_collection = _0<BAs...>;
 	// Transform negated always parts
-	transform_neg_aw_to_eventual(neg_aw_fms, reset_ctn_stream, max_lookback,
-					ev_assm, ev_collection);
+	// transform_neg_aw_to_eventual(neg_aw_fms, reset_ctn_stream, max_lookback,
+	// 				guard_id, ev_assm, ev_collection);
 	// Transform sometimes parts
 	transform_sometimes_to_eventual(st_fms, reset_ctn_stream, max_lookback,
 					neg_aw_fms.size(), ev_assm, ev_collection);
@@ -1115,8 +1171,11 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 
 	// Convert !sometimes parts to guarded always statements
-	auto trans_fm = transform_neg_sometimes_to_guarded_always(fm);
+	int_t guard_id = 0;
+	auto trans_fm = transform_neg_sometimes_to_guarded_always(fm, guard_id);
 	std::cout << "trans_fm: " << trans_fm << "\n";
+	// ptree(std::cout, trans_fm);
+	// std::cout << "\n";
 
 	auto aw_fm = find_top_until(trans_fm, is_child_non_terminal<p::wff_always, BAs...>,
 			is_child_non_terminal<p::wff_neg, BAs...>);
@@ -1130,7 +1189,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
 		auto ubd_fm = replace(trans_fm, changes);
-		ev_t = transform_to_eventual_variables(ubd_fm, false);
+		ev_t = transform_to_eventual_variables(ubd_fm, guard_id, false);
 		// Check if there is a sometimes present
 		if (ev_t == ubd_fm) {
 #ifdef TAU_CACHE
@@ -1140,7 +1199,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 			return elim_aw(ubd_fm);
 		}
 	} else {
-		ev_t = transform_to_eventual_variables(fm, true);
+		ev_t = transform_to_eventual_variables(fm, guard_id, true);
 		// Check if there is a sometimes present
 		if (ev_t == fm) {
 #ifdef TAU_CACHE

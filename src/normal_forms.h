@@ -2099,15 +2099,15 @@ tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
 #endif
 	using p = tau_parser;
 	auto new_fm = push_negation_one_in(fm, is_wff);
-	std::cout << "fm: " << fm << "\n";
-	std::cout << "new_fm: " << new_fm << "\n";
+	// std::cout << "fm: " << fm << "\n";
+	// std::cout << "new_fm: " << new_fm << "\n";
 	if (is_wff && is_non_terminal(p::wff, new_fm)) {
 		if (is_child_non_terminal(p::wff_and, new_fm)) {
 			auto conj = conjunct_dnfs_to_dnf(
 				to_dnf2(trim(new_fm)->child[0], is_wff),
 				to_dnf2(trim(new_fm)->child[1], is_wff));
 			// Perform simplification
-			std::cout << "conj: " << conj << "\n";
+			// std::cout << "conj: " << conj << "\n";
 			if (conj != new_fm)
 				new_fm = conj | wff_reduce_dnf<BAs...>();
 		} else if (is_child_non_terminal(p::wff_or, new_fm)) {
