@@ -166,7 +166,7 @@ cli_command            =>
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
         | ("solve"
-                :solve_sym [__ type]  __ solve_cmd_arg)       :solve_cmd
+                :solve_sym solve_options  __ solve_cmd_arg)       :solve_cmd
         | ("lgrs" :lgrs_sym [ __type] __ wff_cmd_arg)         :lgrs_cmd
         | (("r" | "run"):run_sym __ (memory | wff))           :run_cmd
         | (("n" | "normalize")
@@ -210,6 +210,15 @@ cli_command            =>
         | (                     history_sym __ memory)        :history_print_cmd
         | (                     wff | bf)                     :history_store_cmd
         .
+
+# options
+solve_options =>
+        (__ solve_option)*.
+solve_option =>
+        ("--" solver_engine) | ("--" type).
+solver_engine =>
+        ("minimum" | "min"):solver_engine_minimum
+        | ("maximum" | "max"):solver_engine_maximum.
 
 # input/output streams
 input_stream           =>

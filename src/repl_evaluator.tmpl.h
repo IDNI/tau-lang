@@ -591,6 +591,22 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 
 	auto implicit_types = select_all(n, is_non_terminal<
 					tau_parser::type, tau_ba_t, BAs...>);
+
+	// setting solver options
+	solver_options<tau_ba_t, BAs...> options;
+	if (auto solver_engine = find_top(n, is_non_terminal<tau_parser::solver_engine,
+		tau_ba_t, BAs...>); solver_engine) {
+			auto engine = solver_engine
+				| only_child_extractor<tau_ba_t, BAs...>
+				| optional_value_extractor<tau_nso_t>;
+			options.engine = (engine == tau_parser::solver_engine_minimum)
+				? solver_engine::minimum
+				: solver_engine::maximum;
+	} else {
+		options.splitter_one = nso_factory<tau_ba_t, BAs...>::instance().splitter_one(type.value());
+		options.engine = solver_engine::general;
+	}
+
 	for (const auto& t: implicit_types) {
 		auto implicit_type = make_string<
 				tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
@@ -622,7 +638,8 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 			BOOST_LOG_TRIVIAL(error) <<
 				"(Error) invalid argument\n"; return;
 		}
-		auto s = solve<tau_ba_t, BAs...>(applied, type.value());
+
+		auto s = solve<tau_ba_t, BAs...>(applied, options);
 		if (!s) { std::cout << "no solution\n"; return; }
 		std::cout << "solution: {" << "\n";
 		for (auto& [k, v] : s.value()) {
