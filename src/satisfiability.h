@@ -727,8 +727,9 @@ tau<BAs...> make_inputs_guarded(const tau<BAs...>& fm, const bool conj, int_t& g
 	auto current_io_vars = select_top(fm,
 			is_child_non_terminal<p::io_var, BAs...>);
 	// Create guarded step 0
+	int_t guard_at_0_id = guard_id;
 	auto guarded_fm_at_0 = guarded_step_0(
-		fm, current_io_vars, guard_id);
+		fm, current_io_vars, guard_at_0_id);
 	// Create rest of guard
 	auto guard = create_guard<BAs...>(current_io_vars, guard_id);
 	if (conj)
