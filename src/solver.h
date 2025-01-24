@@ -49,19 +49,19 @@ using solution = std::map<var<BAs...>, tau<BAs...>>;
 
 using type = std::string;
 
-enum solver_engine {
+enum solver_mode {
 	maximum, minimum, general
 };
 
 template<typename...BAs>
 struct solver_options {
 	tau<BAs...> splitter_one = nullptr;
-	solver_engine engine = solver_engine::general;
+	solver_mode engine = solver_mode::general;
 };
 
 template<typename...BAs>
 std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq,
-	const solver_engine engine = solver_engine::general);
+	const solver_mode engine = solver_mode::general);
 
 template<typename...BAs>
 std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality);

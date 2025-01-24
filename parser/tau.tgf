@@ -166,8 +166,8 @@ cli_command            =>
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
         | ("solve"
-                :solve_sym solve_options  __ solve_cmd_arg)       :solve_cmd
-        | ("lgrs" :lgrs_sym [ __type] __ wff_cmd_arg)         :lgrs_cmd
+                :solve_sym [solve_options]  __ solve_cmd_arg)       :solve_cmd
+        | ("lgrs" :lgrs_sym [ __ type] __ wff_cmd_arg)         :lgrs_cmd
         | (("r" | "run"):run_sym __ (memory | wff))           :run_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
@@ -212,13 +212,11 @@ cli_command            =>
         .
 
 # options
-solve_options =>
-        (__ solve_option)*.
-solve_option =>
-        ("--" solver_engine) | ("--" type).
-solver_engine =>
-        ("minimum" | "min"):solver_engine_minimum
-        | ("maximum" | "max"):solver_engine_maximum.
+solve_options => (__ solve_option)*.
+solve_option  => ("--" solver_mode) | ("--" type).
+solver_mode   =>
+        ("minimum" | "min"):solver_mode_minimum
+        | ("maximum" | "max"):solver_mode_maximum.
 
 # input/output streams
 input_stream           =>
@@ -282,7 +280,7 @@ memory                 => ( "%"
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
-        normalize_cmd_arg, solve_cmd_arg,
+        normalize_cmd_arg,
         bf  > bf_parenthesis  > bf,
 	bf_neg_oprnd > bf_parenthesis > bf,
 	bf_and_nosep_1st_oprnd > bf_parenthesis > bf,

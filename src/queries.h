@@ -502,10 +502,7 @@ auto tau_node_terminal_extractor = [](const tau<BAs...>& n)
 };
 
 template <typename... BAs>
-using tau_node_terminal_extractor_t =
-				decltype(tau_node_terminal_extractor<BAs...>);
-
-
+using tau_node_terminal_extractor_t = decltype(tau_node_terminal_extractor<BAs...>);
 
 template <typename... BAs>
 auto extract_string = [](const tau<BAs...>& n) {
