@@ -585,11 +585,11 @@ template<typename...BAs>
 solver_mode get_solver_mode(const tau<BAs...>& n) {
 	if (auto solver_mode = find_top(n,
 			is_non_terminal<tau_parser::solver_mode, BAs...>); solver_mode) {
-		auto engine = solver_mode
+		auto mode = solver_mode
 			| only_child_extractor<BAs...>
 			| non_terminal_extractor<BAs...>
 			| optional_value_extractor<size_t>;
-		return (engine == tau_parser::solver_mode_minimum)
+		return (mode == tau_parser::solver_mode_minimum)
 			? solver_mode::minimum
 			: solver_mode::maximum;
 	} else return solver_mode::general;
@@ -627,7 +627,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	solver_options<tau_ba_t, BAs...> options = {
 		.splitter_one = nso_factory<tau_ba_t, BAs...>
 			::instance().splitter_one(type.value()),
-		.engine = get_solver_mode(n)
+		.mode = get_solver_mode(n)
 	};
 
 	if (auto arg = find_top(n, is_non_terminal<tau_parser::wff, tau_ba<BAs...>, BAs...>); arg) {

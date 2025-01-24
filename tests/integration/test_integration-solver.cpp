@@ -376,7 +376,7 @@ TEST_SUITE("solve_minterm_system") {
 			system.insert(sbf_make_nso(minterm));
 		solver_options<sbf_ba> options = {
 			.splitter_one = splitter_one_bdd(),
-			.engine = solver_mode::general
+			.mode = solver_mode::general
 		};
 		auto solution = solve_minterm_system<sbf_ba>(system, options);
 		bool check = true;
@@ -412,7 +412,7 @@ TEST_SUITE("solve_inequality_system") {
 		// setting the proper options
 		solver_options<sbf_ba> options = {
 			.splitter_one = splitter_one_bdd(),
-			.engine = solver_mode::general
+			.mode = solver_mode::general
 		};
 
 		auto solution = solve_inequality_system<sbf_ba>(system, options);
@@ -505,7 +505,7 @@ TEST_SUITE("solve_system") {
 		// setting the proper options
 		solver_options<sbf_ba> options = {
 			.splitter_one = splitter_one_bdd(),
-			.engine = solver_mode::general
+			.mode = solver_mode::general
 		};
 
 		// calling the solver function
@@ -576,13 +576,6 @@ TEST_SUITE("solve_system") {
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
 
-	/*TEST_CASE("two var: y < x && y = {a}:sbf && x' != 0.") {
-		const char* equality =  "{ a }:sbf y' | { a' }:sbf y | yx'= 0.";
-		const std::vector<std::string> inequalities =
-			{ "y'x|yx' != 0.", "x' != 0." };
-		CHECK ( test_solve_system(equality, inequalities) );
-	}*/
-
 	// increasing monotonicity (2)
 	TEST_CASE("x = {a}:sbf && z < y && y != 1") {
 		const char* equality = "x + {a}:sbf | z y' = 0.";
@@ -590,22 +583,6 @@ TEST_SUITE("solve_system") {
 			{ "y & z' | y' z != 0.", "y' != 0." };
 		CHECK ( test_solve_system(equality, inequalities) );
 	}
-
-	// increasing monotonicity (2 y1)
-	/*TEST_CASE("x = {a}:sbf && x < y && y != 1") {
-		const char* equality = "(x + {a}:sbf) | x y' = 0.";
-		const std::vector<std::string> inequalities =
-			{ "y & x' | y' x != 0.", "y' != 0." };
-		CHECK ( test_solve_system(equality, inequalities) );
-	}*/
-
-	// increasing monotonicity (2 y2)
-	/*TEST_CASE("x = {a}:sbf {b}:sbf && x < y && y != 1") {
-		const char* equality = "x + ({a}:sbf {b}:sbf) | x y' = 0.";
-		const std::vector<std::string> inequalities =
-			{ "y & x'| y' x != 0.", "y' != 0." };
-		CHECK ( test_solve_system(equality, inequalities) );
-	}*/
 
 	// increasing monotonicity (3)
 	TEST_CASE("x = 0 && z < y && y != 1") {
@@ -626,14 +603,14 @@ TEST_SUITE("solve_system") {
 
 TEST_SUITE("solve") {
 
-	bool test_solve(const std::string system) {
+	bool test_solve(const std::string system, const std::string type = "") {
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
 		auto form = tau_make_nso_test(system);
 		solver_options<tau_ba<sbf_ba>, sbf_ba> options = {
-			.splitter_one = nso_factory<tau_ba<sbf_ba>, sbf_ba>::instance().splitter_one(""),
-			.engine = solver_mode::general
+			.splitter_one = nso_factory<tau_ba<sbf_ba>, sbf_ba>::instance().splitter_one(type),
+			.mode = solver_mode::general
 		};
 
 		auto solution = solve<tau_ba<sbf_ba>, sbf_ba>(form, options);
