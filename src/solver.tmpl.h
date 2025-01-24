@@ -24,7 +24,7 @@ solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& orig
 }
 
 template<typename...BAs>
-std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
+std::optional<solution<BAs...>> find_general_solution(const equality<BAs...>& eq) {
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
 	// Theorem 3.1. For f (x,X) = xg (X) + x′h (X), let Z be a zero of
@@ -100,7 +100,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 				return solution;
 			}
 		}
-		if (auto restricted = find_solution(build_wff_eq(gh)); restricted.has_value()) {
+		if (auto restricted = find_general_solution(build_wff_eq(gh)); restricted.has_value()) {
 			solution.insert(restricted.value().begin(), restricted.value().end());
 			auto restricted_copy = restricted;
 			if (auto nn = replace(h, restricted.value()) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
@@ -142,7 +142,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 		<< "solver.h:" << __LINE__ << " lgrs/eq: " << equality << "\n";
 	#endif // DEBUG
 
-	auto s = find_solution(equality);
+	auto s = find_general_solution(equality);
 	if (!s.has_value()) {
 
 		#ifdef DEBUG
@@ -174,6 +174,27 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	#endif // DEBUG
 
 	return phi;
+}
+
+template<typename...BAs>
+std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq,
+		const solver_engine engine) {
+	if (engine == solver_engine::general) {
+		return find_general_solution(eq);
+	}
+	if (auto base_solution = lgrs(eq); base_solution) {
+		std::map<var<BAs...>, tau<BAs...>> substitution;
+		for (auto& [k, v] : base_solution.value())
+			substitution[k] = engine == solver_engine::maximum
+				? _1<BAs...> : _0<BAs...>;
+		solution<BAs...> new_solution;
+		for (auto& [k, v] : base_solution.value()) {
+			auto copy = substitution;
+			new_solution[k] = replace(v, copy);
+		}
+		return new_solution;
+	}
+	return {};
 }
 
 template<typename...BAs>
@@ -478,8 +499,9 @@ tau<BAs...> get_minterm(const minterm<BAs...>& m) {
 }
 
 template<typename...BAs>
-minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& disjoint,
-		const minterm<BAs...>& m, const tau<BAs...>& splitter_one) {
+std::optional<minterm_system<BAs...>> add_minterm_to_disjoint(
+		const minterm_system<BAs...>& disjoint,	const minterm<BAs...>& m,
+		const solver_options<BAs...>& options) {
 	minterm_system<BAs...> new_disjoint;
 	auto new_m = m;
 
@@ -532,7 +554,10 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 
 			// case 4
 			} else {
+				// do not consider splitters due to the selected engine
+				if (options.engine != solver_engine::general) return {};
 
+				// otherwise, go with the splitters
 				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
 					<< "solver.h:" << __LINE__ << " add_minterm_to_disjoint/[case4]/d_cte: " << d_cte << "\n";
@@ -540,7 +565,7 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 
 				auto s = d_cte == _1<BAs...>
 					// case 4.1
-					? splitter_one
+					? options.splitter_one
 					// case 4.2
 					: splitter(d_cte
 						| tau_parser::bf_constant
@@ -575,8 +600,8 @@ minterm_system<BAs...> add_minterm_to_disjoint(const minterm_system<BAs...>& dis
 }
 
 template<typename...BAs>
-minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>& sys,
-		const tau<BAs...>& splitter_one) {
+std::optional<minterm_system<BAs...>> make_minterm_system_disjoint(
+		const minterm_system<BAs...>& sys, const solver_options<BAs...>& options) {
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
@@ -588,7 +613,9 @@ minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>
 
 	minterm_system<BAs...> disjoints;
 	for (auto it = sys.begin(); it != sys.end(); ++it)
-		disjoints = add_minterm_to_disjoint<BAs...>(disjoints, *it, splitter_one);
+		if (auto new_disjoints = add_minterm_to_disjoint<BAs...>(disjoints, *it, options); new_disjoints)
+			disjoints = new_disjoints.value();
+		else return {};
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
@@ -603,7 +630,7 @@ minterm_system<BAs...> make_minterm_system_disjoint(const minterm_system<BAs...>
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system,
-		const tau<BAs...>& splitter_one) {
+		const solver_options<BAs...>& options) {
 	// To solve the minterm system, we use the Corollary 3.2 (of Taba Book),
 	// the splitters to compute proper c_i's, and finally, use find_solution
 	// to compute one solution of the resulting system of equalities (squeezed).
@@ -619,15 +646,14 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 	// We know the system has a solution as we only iterate over non-negative
 	// minterms (which trivially satisfy the condition of Theorem 3.3)
 	equality<BAs...> eq = _0<BAs...>;
-	for (auto& neq: make_minterm_system_disjoint<BAs...>(system, splitter_one)) {
+	auto disjoint_minterms = make_minterm_system_disjoint<BAs...>(system, options);
+	if (!disjoint_minterms.has_value()) return {};
+
+	for (auto& neq: disjoint_minterms.value()) {
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "solver.h:" << __LINE__ << " solve_minterm_system/neq: " << neq;
-		#endif // DEBUG
-
-		#ifdef DEBUG
-		print_tau_tree(std::cout, neq);
 		#endif // DEBUG
 
 		auto nf = neq
@@ -639,10 +665,6 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "solver.h:" << __LINE__ << " solve_minterm_system/nf: " << nf;
-		#endif // DEBUG
-
-		#ifdef DEBUG
-		print_tau_tree(std::cout, nf);
 		#endif // DEBUG
 
 		if (nf == _0<BAs...>) continue;
@@ -669,12 +691,20 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 		#endif // DEBUG
 	}
 	eq = build_wff_eq(eq);
-	return find_solution(eq);
+
+	switch (options.engine) {
+		case solver_engine::maximum:
+			return find_solution(eq, options.engine);
+		case solver_engine::minimum:
+			return find_solution(eq, options.engine);
+		default:
+			return find_solution(eq);
+	}
 }
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system,
-		const tau<BAs...>& splitter_one) {
+		const solver_options<BAs...>& options) {
 	// Following Taba book:
 	//
 	// To solve  {h_i (T) ̸= 0}i∈I (and hence the original system whose solution
@@ -711,7 +741,7 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 				<< "solver.h:" << __LINE__ << "\t" << minterm;
 		#endif // DEBUG
 
-		auto solution = solve_minterm_system<BAs...>(*it, splitter_one);
+		auto solution = solve_minterm_system<BAs...>(*it, options);
 		if (solution.has_value()) return solution;
 	}
 
@@ -725,7 +755,7 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
-		const tau<BAs...>& splitter_one) {
+		const solver_options<BAs...>& options) {
 	// As in the Taba book, we consider
 	// 		f (X) = 0
 	//		{g_i (X) ̸= 0}i∈I
@@ -752,7 +782,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	}
 	#endif // DEBUG
 
-	if (!system.first) return solve_inequality_system<BAs...>(system.second, splitter_one);
+	if (!system.first) return solve_inequality_system<BAs...>(system.second, options);
 	if (system.second.empty()) return find_solution(system.first.value());
 
 	auto phi = lgrs(system.first.value());
@@ -801,7 +831,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 
 
 	// solve the given system  of inequalities
-	auto inequality_solution = solve_inequality_system<BAs...>(inequalities, splitter_one);
+	auto inequality_solution = solve_inequality_system<BAs...>(inequalities, options);
 	if (!inequality_solution.has_value()) {
 
 		#ifdef DEBUG
@@ -853,7 +883,8 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 }
 
 template<typename...BAs>
-std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const tau<BAs...>& splitter_one) {
+std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs,
+		const solver_options<BAs...>& options) {
 	// split among equalities and inequalities
 	equation_system<BAs...> system;
 	for (const auto& eq: eqs) {
@@ -875,28 +906,35 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const tau<BA
 		}
 		else system.second.insert(eq);
 	}
-	return solve_system<BAs...>(system, splitter_one);
+	return solve_system<BAs...>(system, options);
 }
 
 // entry point for the solver
 template<typename...BAs>
 std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
-		const std::string& type) {
+		const solver_options<BAs...>& options) {
 	if (form == _T<BAs...>) return { solution<BAs...>() };
-	auto splitter_one = nso_factory<BAs...>::instance().splitter_one(type);
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
 		<< "solver.h:" << __LINE__ << " solve/form: " << form;
-	BOOST_LOG_TRIVIAL(trace)
-		<< "solver.h:" << __LINE__ << " solve/splitter_one: " << splitter_one;
+	switch (options.engine) {
+		case solver_engine::maximum: BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " solve/options.kind: maximum\n"; break;
+		case solver_engine::minimum: BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " solve/options.kind: minimum"; break;
+		default: BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " solve/options.kind: default\n"
+			<< "solver.h:" << __LINE__ << " solve/options.splitter_one:"
+			<< options.splitter_one; break;
+	}
 	#endif // DEBUG
 
 	auto dnf = form | bf_reduce_canonical<BAs...>();
 	for (auto& clause: get_leaves(dnf, tau_parser::wff_or, tau_parser::wff)) {
 		// Reject clause involving temporal quantification
 		if (find_top(clause, is_temporal_quantifier<BAs...>)) {
-			BOOST_LOG_TRIVIAL(info) << "(Warning) Skipped clause with temporal quantifier: " << clause;
+			BOOST_LOG_TRIVIAL(warning) << "(Warning) Skipped clause with temporal quantifier: " << clause;
 			continue;
 		}
 		auto is_equation = [](const tau<BAs...>& n) {
@@ -906,7 +944,7 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 		auto eqs = select_top(clause, is_equation);
 		if (eqs.empty()) continue;
 		auto solution = solve<BAs...>(
-			std::set<tau<BAs...>>(eqs.begin(), eqs.end()), splitter_one);
+			std::set<tau<BAs...>>(eqs.begin(), eqs.end()), options);
 		if (solution.has_value()) return solution;
 	}
 	return {};

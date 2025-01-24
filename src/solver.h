@@ -49,32 +49,42 @@ using solution = std::map<var<BAs...>, tau<BAs...>>;
 
 using type = std::string;
 
-static const type default_type = "";
+enum solver_engine {
+	maximum, minimum, general
+};
 
 template<typename...BAs>
-std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq);
+struct solver_options {
+	tau<BAs...> splitter_one = nullptr;
+	solver_engine engine = solver_engine::general;
+};
+
+template<typename...BAs>
+std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq,
+	const solver_engine engine = solver_engine::general);
 
 template<typename...BAs>
 std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality);
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...>& system,
-		const tau<BAs...>& splitter_one);
+		const solver_options<BAs...>& options);
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<BAs...>& system,
-		const tau<BAs...>& splitter_one);
+		const solver_options<BAs...>& options);
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
-		const tau<BAs...>& splitter_one);
+		const solver_options<BAs...>& options);
 
 template<typename...BAs>
-std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs, const tau<BAs...>& splitter_one);
+std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs,
+		const solver_options<BAs...>& options);
 
 template<typename...BAs>
 std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
-		const std::string& type = "");
+		const solver_options<BAs...>& options);
 
 } // idni::tau_lang namespace
 

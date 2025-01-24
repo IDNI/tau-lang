@@ -302,7 +302,7 @@ TEST_SUITE("find_solution") {
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
 		auto equation = sbf_make_nso(src);
-		auto solution = find_solution(equation);
+		auto solution = find_solution(equation, solver_engine::general);
 		return ( check_solution(equation, solution.value()));
 	}
 
@@ -374,7 +374,11 @@ TEST_SUITE("solve_minterm_system") {
 		minterm_system<sbf_ba> system;
 		for (const auto& minterm: minterms)
 			system.insert(sbf_make_nso(minterm));
-		auto solution = solve_minterm_system<sbf_ba>(system, splitter_one_bdd());
+		solver_options<sbf_ba> options = {
+			.splitter_one = splitter_one_bdd(),
+			.engine = solver_engine::general
+		};
+		auto solution = solve_minterm_system<sbf_ba>(system, options);
 		bool check = true;
 		for (const auto& equation: system)
 			check = check ? check_solution(equation, solution.value()) : false;
@@ -404,7 +408,14 @@ TEST_SUITE("solve_inequality_system") {
 		for (const auto& inequality: inequalities) {
 			system.insert(sbf_make_nso(inequality));
 		}
-		auto solution = solve_inequality_system<sbf_ba>(system, splitter_one_bdd());
+
+		// setting the proper options
+		solver_options<sbf_ba> options = {
+			.splitter_one = splitter_one_bdd(),
+			.engine = solver_engine::general
+		};
+
+		auto solution = solve_inequality_system<sbf_ba>(system, options);
 		bool check = true;
 		for (const auto& equation: system)
 			check = check ? check_solution(equation, solution.value()) : false;
@@ -490,7 +501,16 @@ TEST_SUITE("solve_system") {
 			std::cout << "test_solve_system/system.second: " << sbf_make_nso(inequality) << "\n";
 			#endif // DEBUG
 		}
-		auto solution = solve_system<sbf_ba>(system, splitter_one_bdd());
+
+		// setting the proper options
+		solver_options<sbf_ba> options = {
+			.splitter_one = splitter_one_bdd(),
+			.engine = solver_engine::general
+		};
+
+		// calling the solver function
+		auto solution = solve_system<sbf_ba>(system, options);
+
 		#ifdef DEBUG
 		if (solution)
 			std::cout << "test_solve_system/solution: " << solution.value() << "\n";
@@ -612,7 +632,12 @@ TEST_SUITE("solve") {
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
 		auto form = tau_make_nso_test(system);
-		auto solution = solve<tau_ba<sbf_ba>, sbf_ba>(form, type);
+		solver_options<tau_ba<sbf_ba>, sbf_ba> options = {
+			.splitter_one = nso_factory<tau_ba<sbf_ba>, sbf_ba>::instance().splitter_one(""),
+			.engine = solver_engine::general
+		};
+
+		auto solution = solve<tau_ba<sbf_ba>, sbf_ba>(form, options);
 		return check_solution(form, solution.value());
 	}
 

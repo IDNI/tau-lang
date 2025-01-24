@@ -89,7 +89,13 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 			BOOST_LOG_TRIVIAL(trace) << "\n";
 			#endif // DEBUG
 
-			auto solution = solve(current, type);
+			// setting proper options for the solver
+			solver_options<BAs...> options = {
+				.splitter_one = nso_factory<BAs...>::instance().splitter_one(""),
+				.engine = solver_engine::general };
+
+			// solve the given system of equations
+			auto solution = solve(current, options);
 
 			#ifdef DEBUG
 			if (solution) {
@@ -380,7 +386,12 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const ta
 #endif // DEBUG
 		auto spec = executable;
 		if (constraints != _T<BAs...>) {
-			auto model = solve(constraints);
+			// setting proper options for the solver
+			solver_options<BAs...> options = {
+				.splitter_one = nso_factory<BAs...>::instance().splitter_one(""),
+				.engine = solver_engine::general };
+
+			auto model = solve(constraints, options);
 			if (!model) continue;
 
 			BOOST_LOG_TRIVIAL(info) << "Tau specification is executed setting ";
