@@ -582,7 +582,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 }
 
 template<typename...BAs>
-solver_mode get_solver_mode(const tau<BAs...>& n) {
+solver_mode get_solver_cmd_mode(const tau<BAs...>& n) {
 	if (auto solver_mode = find_top(n,
 			is_non_terminal<tau_parser::solver_mode, BAs...>); solver_mode) {
 		auto mode = solver_mode
@@ -596,7 +596,7 @@ solver_mode get_solver_mode(const tau<BAs...>& n) {
 }
 
 template<typename...BAs>
-std::optional<std::string> get_solver_type(const tau<BAs...>& n) {
+std::optional<std::string> get_solver_cmd_type(const tau<BAs...>& n) {
 	auto types = select_all(n, is_non_terminal<tau_parser::type, BAs...>);
 	std::string type = "";
 
@@ -617,55 +617,84 @@ std::optional<std::string> get_solver_type(const tau<BAs...>& n) {
 	return type == "" ? nso_factory<BAs...>::instance().default_type() : type;
 }
 
+template<typename...BAs>
+void print_solver_cmd_solution(const tau<BAs...>& equations,
+		std::optional<solution<BAs...>>& solution,
+		const solver_options<BAs...>& options) {
+	auto print_zero_case = [&options](const tau<BAs...>& var) {
+		std::cout << "\t" << var << " := {"
+			<< nso_factory<BAs...>::instance().zero(options.type)
+			<< "}:" << options.type << "\n";
+	};
+
+	auto print_one_case = [&options](const tau<BAs...>& var) {
+		std::cout << "\t" << var << " := {"
+			<< nso_factory<BAs...>::instance().one(options.type)
+			<< "}:" << options.type << "\n";
+	};
+
+	auto print_general_case = [&options](const auto& assignment) {
+		std::cout << "\t" << assignment->first << " := " << assignment->second << "\n";
+	};
+
+	if (!solution) { std::cout << "no solution\n"; return; }
+
+	std::cout << "solution: {\n";
+	for  (auto var: select_all(equations, is_non_terminal<tau_parser::variable, BAs...>)) {
+		if (auto found = solution.value().find(var); found != solution.value().end()) {
+			if (auto check = found->second | tau_parser::bf_t; check) {
+				print_zero_case(var);
+			} else if (auto check = found->second | tau_parser::bf_f; check) {
+				print_one_case(var);
+			} else {
+				print_general_case(found);
+			}
+		} else {
+			switch (options.mode) {
+				case solver_mode::minimum: print_zero_case(var); break;
+				case solver_mode::maximum: print_one_case(var); break;
+				default: break;
+			}
+		}
+	}
+	std::cout << "}\n";
+
+	return;
+}
+
+
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	// getting the type
-	auto type = get_solver_type(n);
+	auto type = get_solver_cmd_type(n);
 	if (!type) return;
 
 	// setting solver options
 	solver_options<tau_ba_t, BAs...> options = {
 		.splitter_one = nso_factory<tau_ba_t, BAs...>
 			::instance().splitter_one(type.value()),
-		.mode = get_solver_mode(n)
+		.mode = get_solver_cmd_mode(n),
+		.type = type.value()
 	};
 
 	if (auto arg = find_top(n, is_non_terminal<tau_parser::wff, tau_ba<BAs...>, BAs...>); arg) {
 		auto system = get_type_and_arg(arg.value());
-		auto [t, program] = system.value();
-		auto applied = apply_rr_to_rr_tau_nso(t, program);
-
+		auto [t, equations] = system.value();
+		auto applied = apply_rr_to_rr_tau_nso(t, equations);
 		applied = normalize_non_temp(applied);
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace) << "solve_cmd/applied: " << applied << "\n";
 		#endif // DEBUG
 
-		auto s = solve<tau_ba_t, BAs...>(applied, options);
-		if (!s) { std::cout << "no solution\n"; return; }
-		std::cout << "solution: {" << "\n";
-		for (auto& [k, v] : s.value()) {
-			// is bf_t
-			if (auto check = v | tau_parser::bf_t; check) {
-				std::cout << "\t" << k << " := {"
-					<< nso_factory<tau_ba_t, BAs...>
-						::instance().one(type.value())
-					<< "} : " << type.value() << "\n";
-			// is bf_f
-			} else if (auto check = v | tau_parser::bf_f; check) {
-				std::cout << "\t" << k << " := {"
-					<< nso_factory<tau_ba_t, BAs...>
-						::instance().zero(type.value())
-					<< "} : " << type.value() << "\n";
-			// is something else but not a BA element
-			} else {
-				std::cout << "\t" << k << " := " << v << "\n";
-			}
-		}
-		std::cout << "}\n";
+		auto solution = solve<tau_ba_t, BAs...>(applied, options);
+		if (!solution) { std::cout << "no solution\n"; return; }
+		else print_solver_cmd_solution(equations, solution, options);
 	} else {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s) and/or options\n";
 	}
+
+	return;
 }
 
 template <typename... BAs>
