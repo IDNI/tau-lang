@@ -121,6 +121,7 @@ template<typename...BAs>
 struct solver_options {
 	tau<BAs...> splitter_one = nullptr; /**< Splitter option */
 	solver_mode mode = solver_mode::general; /**< Solver mode option */
+	std::string type = ""; /**< Type option */
 };
 
 /**
