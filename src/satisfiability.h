@@ -793,8 +793,9 @@ tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm, int
 	}
 	if (_aw.has_value()) {
 		changes.clear();
-		return replace(new_fm, changes);
 		changes.emplace(_aw.value(), build_wff_always(aw));
+		return replace_until(new_fm, changes,
+			is_child_non_terminal<p::wff_neg, BAs...>);
 	}
 	std::cout << "trans_neg_st/aw: " << aw << "\n";
 	return build_wff_and(build_wff_always(aw), new_fm);
@@ -998,26 +999,6 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm,
 	return res;
 }
 
-template<typename... BAs>
-tau<BAs...> add_st_ctn (const tau<BAs...>& st, const int_t timepoint, const int_t steps) {
-	tau<BAs...> st_ctn = _T<BAs...>;
-	auto io_vars = select_top(
-		st, is_child_non_terminal<tau_parser::io_var, BAs...>);
-	for (int_t s = 0; s <= steps; ++s) {
-		std::map<tau<BAs...>, tau<BAs...> > changes;
-		for (size_t i = 0; i < io_vars.size(); ++i) {
-			auto new_io_var = transform_io_var(
-				io_vars[i], get_io_name(io_vars[i]), timepoint + s);
-			changes[io_vars[i]] = new_io_var;
-		}
-		if (s == steps) st_ctn = build_wff_and(
-					    st_ctn, replace(st, changes));
-		else st_ctn = build_wff_and(
-			     st_ctn, build_wff_neg(replace(st, changes)));
-	}
-	return st_ctn;
-}
-
 // Assumes that ubd_aw_continuation is the result of computing the unbounded always continuation of
 // the always part of the output of "transform_to_eventual_variables" and
 // that ev_var_flags is the sometimes part of "transform_to_eventual_variables"
@@ -1191,7 +1172,8 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 		std::map<tau<BAs...>, tau<BAs...> > changes = {
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
-		auto ubd_fm = replace(trans_fm, changes);
+		auto ubd_fm = replace_until(trans_fm, changes,
+			is_child_non_terminal<p::wff_neg, BAs...>);
 		ev_t = transform_to_eventual_variables(ubd_fm, guard_id, false);
 		// Check if there is a sometimes present
 		if (ev_t == ubd_fm) {
