@@ -137,6 +137,15 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	// the image of ϕ : Bn → Bn defined by ϕ (X) = Zf (X) + Xf′ (X). Decyphering
 	// the abuse of notation, this reads ϕ_i (X) = z_i f (X)+x_i f′ (X).
 
+	if (equality == _T<BAs...>) {
+		#ifdef DEBUG
+		BOOST_LOG_TRIVIAL(trace)
+			<< "solver.h:" << __LINE__ << " lgrs/solution: {}";
+		#endif // DEBUG
+
+		return solution<BAs...>();
+	}
+
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
 		<< "solver.h:" << __LINE__ << " lgrs/eq: " << equality << "\n";
@@ -147,7 +156,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
-			<< "solver.h:" << __LINE__ << " lgrs/solution: {}";
+			<< "solver.h:" << __LINE__ << " lgrs/no solution";
 		#endif // DEBUG
 
 		return {};

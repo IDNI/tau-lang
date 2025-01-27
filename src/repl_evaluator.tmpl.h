@@ -620,7 +620,7 @@ std::optional<std::string> get_solver_cmd_type(const tau<BAs...>& n) {
 template<typename...BAs>
 void print_solver_cmd_solution(const tau<BAs...>& equations,
 		std::optional<solution<BAs...>>& solution,
-		const solver_options<BAs...>& options) {
+		const solver_options<BAs...>& options = { .type = "" }) {
 	auto print_zero_case = [&options](const tau<BAs...>& var) {
 		std::cout << "\t" << var << " := {"
 			<< nso_factory<BAs...>::instance().zero(options.type)
@@ -677,7 +677,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 		.type = type.value()
 	};
 
-	if (auto arg = find_top(n, is_non_terminal<tau_parser::wff, tau_ba<BAs...>, BAs...>); arg) {
+	if (auto arg = find_top(n, is_non_terminal<tau_parser::wff_cmd_arg, tau_ba<BAs...>, BAs...>); arg) {
 		auto system = get_type_and_arg(arg.value());
 		auto [t, equations] = system.value();
 		auto applied = apply_rr_to_rr_tau_nso(t, equations);
@@ -690,77 +690,43 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 		auto solution = solve<tau_ba_t, BAs...>(applied, options);
 		if (!solution) { std::cout << "no solution\n"; return; }
 		else print_solver_cmd_solution(equations, solution, options);
-	} else {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s) and/or options\n";
+		return;
 	}
-
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s) and/or options\n";
 	return;
 }
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
-	std::optional<std::string> type = n->child.size() == 3
-		?  make_string<tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
-			tau_nso_t>(tau_node_terminal_extractor<
-				tau_ba_t, BAs...>, n->child[1])
-		: std::optional<std::string>();
+	// getting the type
+	auto type = get_solver_cmd_type(n);
+	if (!type) return;
 
-	auto implicit_types = select_all(n, is_non_terminal<
-					tau_parser::type, tau_ba_t, BAs...>);
-	for (const auto& t: implicit_types) {
-		auto implicit_type = make_string<
-				tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
-				tau_nso_t>(
-			tau_node_terminal_extractor<tau_ba_t, BAs...>, t);
-		if (type.has_value() && implicit_type != type.value()) {
-			BOOST_LOG_TRIVIAL(error)
-				<< "(Error) multiple types involved\n";
-			return;
-		} if (!type.has_value()) type = implicit_type;
-	}
-
-	if (!type.has_value()) type = "tau";
-
-	if (auto nn = is_non_terminal<tau_parser::type, tau_ba_t, BAs...>(
-		n->child[1]) ? get_type_and_arg(n->child[2])
-				: get_type_and_arg(n->child[1]); nn)
-	{
-		auto [t, program] = nn.value();
-		//auto applied = apply_rr_to_rr_tau_nso(t, program);
-
-		//applied = normalize_non_temp(applied);
+	if (auto arg = find_top(n, is_non_terminal<tau_parser::wff_cmd_arg, tau_ba<BAs...>, BAs...>); arg) {
+		auto system = get_type_and_arg(arg.value());
+		auto [t, equations] = system.value();
+		auto applied = apply_rr_to_rr_tau_nso(t, equations);
+		applied = normalize_non_temp(applied);
 
 		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/applied: " << program << "\n";
+		BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/applied: " << applied << "\n";
 		#endif // DEBUG
 
-		if (!nn) {
-			BOOST_LOG_TRIVIAL(error) <<
-				"(Error) invalid argument\n"; return;
+		if (auto equality
+				= find_top(applied, is_child_non_terminal<tau_parser::bf_eq, tau_ba<BAs...>, BAs...>);
+				equality) {
+			#ifdef DEBUG
+			BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/equality: " << equality.value() << "\n";
+			#endif // DEBUG
+
+			auto solution = lgrs(equality.value());
+			if (!solution) { std::cout << "no solution\n"; return; }
+			else print_solver_cmd_solution(equality.value(), solution);
+			return;
 		}
-		auto s = lgrs(program); //  lgrs(applied);
-		if (!s) { std::cout << "no solution\n"; return; }
-		std::cout << "solution: {" << "\n";
-		for (auto& [k, v] : s.value()) {
-			// is bf_t
-			if (auto check = v | tau_parser::bf_t; check) {
-				std::cout << "\t" << k << " := {"
-					<< nso_factory<tau_ba_t, BAs...>
-						::instance().one(type.value())
-					<< "} : " << type.value() << "\n";
-			// is bf_f
-			} else if (auto check = v | tau_parser::bf_f; check) {
-				std::cout << "\t" << k << " := {"
-					<< nso_factory<tau_ba_t, BAs...>
-						::instance().zero(type.value())
-					<< "} : " << type.value() << "\n";
-			// is something else but not a BA element
-			} else {
-				std::cout << "\t" << k << " := " << v << "\n";
-			}
-		}
-		std::cout << "}\n";
 	}
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+	return;
 }
 
 template<typename... BAs>
@@ -826,21 +792,6 @@ std::optional<tau_nso<BAs...>>
 		return is_tau_formula_sat(normalized_fm, true)
 			       ? _T<tau_ba_t, BAs...>
 			       : _F<tau_ba_t, BAs...>;
-
-		/*if (has_no_boolean_combs_of_models(normalized_fm))
-			return build_wff_always(
-				always_to_unbounded_continuation( normalized_fm));
-		// Get each clause if there are several always disjuncts
-		auto clauses = get_leaves(normalized_fm, tau_parser::wff_or, tau_parser::wff);
-		tau<tau_ba_t, BAs...> res;
-		// Convert each disjunct to unbounded continuation
-		for (auto& clause : clauses) {
-			if (res) res = build_wff_or(res, build_wff_always(
-				transform_to_execution(clause)));
-			else res = build_wff_always(
-				transform_to_execution(clause));
-		}
-		return res;*/
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 	return {};
