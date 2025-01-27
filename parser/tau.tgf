@@ -25,15 +25,15 @@ start                  => rr _.
 rr                     => rec_relations _ wff:main _ '.'.
 rec_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
-ref                    => sym [_ offsets] _ ref_args
+ref                    => sym [offsets] ref_args
                                                 [ _ "fallback" __ fp_fallback ].
 fp_fallback            => "first":first_sym | "last":last_sym
                         | capture | ref | wff | bf.
 ref_args               => '(' [ (_ bf:ref_arg) (_ ',' _ ref_arg)* ] _ ')'.
 
 library                => ((_ (wff_rule | bf_rule):rule)*):rules.
-wff_rule               => wff:wff_matcher _ "::=" _ (wff):wff_body _ '.'.
-bf_rule                => bf :bf_matcher  _  ":=" _ (bf) :bf_body  _ '.'.
+wff_rule               => wff:wff_matcher _ "::=" _ wff:wff_body _ '.'.
+bf_rule                => bf :bf_matcher  _  ":=" _ bf :bf_body  _ '.'.
 
 builder                => _ builder_head _ builder_body _ '.'.
 builder_head           => '(' _ capture (__ capture)* _ ')'.
@@ -95,11 +95,14 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
                         | ((bf_parenthesis | variable
-                          | bf_splitter | bf_ref | bf_or
-                          | bf_xor | bf_neg | capture)
-                                :bf_and_nosep_1st_oprnd bf)  :bf_and_nosep
+                           | bf_splitter | bf_ref | bf_neg
+                           | bf_and_nosep | capture)
+                                :bf_and_nosep_1st_oprnd
+                           (bf_parenthesis | bf_constant
+                           | variable | bf_splitter | bf_ref
+                           | bf_neg | capture)
+                                :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
-
 # constant time constraints
 constraint =>
    ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]"):ctn_neq
@@ -282,5 +285,6 @@ memory                 => ( "%"
         bf  > bf_parenthesis  > bf,
 	bf_neg_oprnd > bf_parenthesis > bf,
 	bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
+	bf_and_nosep_2nd_oprnd > bf_parenthesis > bf,
 	bf_and_nosep > bf_parenthesis > bf_and,
         wff > wff_parenthesis > wff.
