@@ -311,69 +311,50 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 		<< "compute_system/clause: " << clause;
 	#endif // DEBUG
 
-	system<BAs...> sys;
-	for (const auto& atomic_fm: select_top(clause, is_atomic_fm)) {
+	std::set<tau<BAs...>> pending_atomic_fms;
+	for (auto& atomic_fm: select_top(clause, is_atomic_fm)) {
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_system/atomic_fm " << atomic_fm;
 		#endif // DEBUG
-
-		if (auto l = get_type_atomic_fm(atomic_fm, inputs, outputs); l) {
-			if (sys.find(l.value().first) == sys.end()) sys[l.value().first] = l.value().second;
-			else sys[l.value().first] = build_wff_and(sys[l.value().first], l.value().second);
-		} else {
-			// Error message is already printed in get_type_fm
-			return {};
+		pending_atomic_fms.emplace(std::move(atomic_fm));
+	}
+	using p = tau_parser;
+	system<BAs...> sys;
+	bool new_choice = true;
+	while (new_choice) {
+		new_choice = false;
+		for (const auto& fm : pending_atomic_fms) {
+			if (auto l = get_type_atomic_fm(fm, inputs, outputs, pending_atomic_fms); l) {
+				// Skip atomic fms which have no type yet
+				const std::string t = l.value();
+				if (l.value() == "") continue;
+				if (sys.find(t) == sys.end()) sys[t] = fm;
+				else sys[t] = build_wff_and(sys[t], fm);
+				new_choice = true;
+			} else {
+				// Error message is already printed in get_type_fm
+				return {};
+			}
 		}
+	}
+	// All remaining formulas in pending_atomic_fms can be typed by default
+	for (const auto& fm : pending_atomic_fms) {
+		std::cout << "def. type for: " << fm << "\n";
+		auto io_vars = select_top(fm,
+			is_child_non_terminal<p::io_var, BAs...>);
+		type_io_vars(io_vars, "tau", inputs, outputs);
+		if (sys.find("tau") == sys.end()) sys["tau"] = fm;
+		else sys["tau"] = build_wff_and(sys["tau"], fm);
 	}
 	return { sys };
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<std::pair<type, tau<BAs...>>> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(const tau<BAs...>& fm,
-		auto& inputs, auto& outputs) {
+void interpreter<input_t, output_t, BAs...>::type_io_vars(
+	const auto& io_vars, const std::string& type, auto& inputs,
+	auto& outputs) {
 	using p = tau_parser;
-	auto io_vars = select_top(fm, is_child_non_terminal<p::io_var, BAs...>);
-
-	// Check if any io_var has a predefined type
-	std::string type;
-	for (const auto& io_var : io_vars) {
-		if (auto it = inputs.types.find(trim2(io_var)); it != inputs.types.end()) {
-			if (!type.empty() && type != it->second) {
-				// Type mismatch in atomic fm
-				BOOST_LOG_TRIVIAL(error) <<
-					"(Error) stream variable type mismatch in atomic formula: " << fm <<
-					" between " << type << "and " << it->second << "\n";
-				return {};
-			} else if (type.empty()) type = it->second;
-		}
-		if (auto it = outputs.types.find(trim2(io_var)); it != outputs.types.end()) {
-			if (!type.empty() && type != it->second) {
-				// Type mismatch in atomic fm
-				BOOST_LOG_TRIVIAL(error) <<
-					"(Error) stream variable type mismatch in atomic formula: " << fm <<
-					" between " << type << "and " << it->second << "\n";
-				return {};
-			} else if (type.empty()) type = it->second;
-		}
-	}
-	// Check if all constants match the type, if present, else infer from there
-	auto consts = select_top(fm, is_non_terminal<p::bf_constant, BAs...>);
-	for (const auto& c : consts) {
-		assert(is_non_terminal(p::type, trim(c)));
-		auto c_type = tau_to_str(trim(c));
-		if (type.empty()) type = c_type;
-		else if (type != c_type) {
-			// Type mismatch in atomic fm
-			BOOST_LOG_TRIVIAL(error) <<
-				"(Error) stream variable or constant type mismatch in atomic formula: " << fm <<
-				" between " << type << "and " << c_type << "\n";
-			return {};
-		}
-	}
-	// If type is still empty, set by default to tau
-	if (type.empty()) type = "tau";
-	// Lastly set all io_vars to found type
 	for (const auto& io_var : io_vars) {
 		const auto io_name = trim2(trim(io_var));
 		if (io_var | p::io_var | p::in) {
@@ -385,7 +366,63 @@ std::optional<std::pair<type, tau<BAs...>>> interpreter<input_t, output_t, BAs..
 				outputs.add_output(io_name, type, "");
 		}
 	}
-	return { make_pair(type , fm) };
+}
+
+template<typename input_t, typename output_t, typename...BAs>
+std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(const tau<BAs...>& fm,
+		auto& inputs, auto& outputs, std::set<tau<BAs...>>& pending) {
+	using p = tau_parser;
+	auto io_vars = select_top(fm, is_child_non_terminal<p::io_var, BAs...>);
+
+	// Check if any io_var has a predefined type
+	std::string type;
+	for (const auto& io_var : io_vars) {
+		if (auto it = inputs.types.find(trim2(trim(io_var))); it != inputs.types.end()) {
+			if (!type.empty() && type != it->second) {
+				// Type mismatch in atomic fm
+				BOOST_LOG_TRIVIAL(error) <<
+					"(Error) stream variable type mismatch between '"
+ << type << "' and '" << it->second << "' in atomic formula: " << fm << "\n";
+				return {};
+			} else if (type.empty()) type = it->second;
+		}
+		if (auto it = outputs.types.find(trim2(trim(io_var))); it != outputs.types.end()) {
+			if (!type.empty() && type != it->second) {
+				// Type mismatch in atomic fm
+				BOOST_LOG_TRIVIAL(error) <<
+					"(Error) stream variable type mismatch between '"
+ << type << "' and '" << it->second << "' in atomic formula: " << fm << "\n";
+				return {};
+			} else if (type.empty()) type = it->second;
+		}
+	}
+	std::cout << "type before const: " << type << "\n";
+	// Check if all constants match the type, if present, else infer from there
+	auto consts = select_top(fm, is_non_terminal<p::bf_constant, BAs...>);
+	for (const auto& c : consts) {
+		assert(is_non_terminal(p::type, c->child[1]));
+		auto c_type = tau_to_str(c->child[1]);
+		std::cout << "c_type: " << c_type << "\n";
+		if (type.empty()) type = c_type;
+		else if (type != c_type) {
+			// Type mismatch in atomic fm
+			BOOST_LOG_TRIVIAL(error) <<
+				"(Error) stream variable or constant type mismatch between '"
+ << type << "' and '" << c_type << "' in atomic formula: " << fm << "\n";
+			return {};
+		}
+	}
+	std::cout << "type: " << type << "\n";
+	// No type information was found, delay typing until all equations have
+	// been visited
+	if (type.empty()) return "";
+
+	// If a type is found, set all io_vars to found type
+	type_io_vars(io_vars, type, inputs, outputs);
+	// Remove from pending if present
+	if (auto it = pending.find(fm); it != pending.end())
+		pending.erase(it);
+	return type;
 }
 
 template<typename input_t, typename output_t, typename...BAs>
