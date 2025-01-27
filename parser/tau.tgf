@@ -165,9 +165,8 @@ cli_command            =>
         | ("unsat"         :unsat_sym   __ normalize_cmd_arg) :unsat_cmd
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
-        | ("solve"
-                :solve_sym [solve_options]  __ solve_cmd_arg)       :solve_cmd
-        | ("lgrs" :lgrs_sym [ __ type] __ wff_cmd_arg)         :lgrs_cmd
+        | ("solve" :solve_sym [solve_options]  __ wff_cmd_arg):solve_cmd
+        | ("lgrs" :lgrs_sym __ wff_cmd_arg)    :lgrs_cmd
         | (("r" | "run"):run_sym __ (memory | wff))           :run_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
@@ -212,6 +211,7 @@ cli_command            =>
         .
 
 # options
+solve_option  => ("--" solver_mode) | ("--" type).
 solve_options => (__ solve_option)*.
 solve_option  => ("--" solver_mode) | ("--" type).
 solver_mode   =>
@@ -235,7 +235,6 @@ option_value           => alnum+.
 number                 => digits.
 bf_cmd_arg             => memory | bf.
 wff_cmd_arg            => memory | wff.
-solve_cmd_arg          => memory | wff.
 nf_cmd_arg             => memory | ref | wff | bf.
 onf_cmd_arg            => memory | wff.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
