@@ -19,6 +19,7 @@ set(TESTS
 	wff_hooks
 	bf_hooks
 	interpreter
+    satisfiability
 )
 
 foreach(TEST IN LISTS TESTS)
