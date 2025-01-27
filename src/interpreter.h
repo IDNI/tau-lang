@@ -438,7 +438,7 @@ private:
 	// Find an executable specification from DNF
 	static tau<BAs...> get_executable_spec(const tau<BAs...>& fm);
 
-	// Returns if the variable is excluded from output
+	// Returns true if the variable is excluded from output
 	static bool is_excluded_output(const auto& var);
 };
 
