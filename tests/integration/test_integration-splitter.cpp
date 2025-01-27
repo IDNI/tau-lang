@@ -98,6 +98,21 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s, fm));
 	}
+
+	TEST_CASE("Tau_splitter_!always") {
+		const char *sample = "!(always xyz = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		CHECK(is_splitter(fm, s));
+	}
+	TEST_CASE("Tau_splitter_!sometimes") {
+		const char *sample = "!(sometimes xyz = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		CHECK(is_splitter(fm, s));
+	}
 }
 
 TEST_SUITE("Tau_splitter_middle_tests") {
@@ -162,6 +177,20 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s, fm));
+	}
+	TEST_CASE("Tau_splitter_!always") {
+		const char *sample = "!(always xyz = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		CHECK(is_splitter(fm, s));
+	}
+	TEST_CASE("Tau_splitter_!sometimes") {
+		const char *sample = "!(sometimes xyz = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		CHECK(is_splitter(fm, s));
 	}
 }
 
@@ -228,6 +257,20 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s, fm));
 	}
+	TEST_CASE("Tau_splitter_!always") {
+		const char *sample = "!(always xyz = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		CHECK(is_splitter(fm, s));
+	}
+	TEST_CASE("Tau_splitter_!sometimes") {
+		const char *sample = "!(sometimes xyz = 0).";
+		auto src = make_tau_source(sample);
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto s = tau_splitter(fm, splitter_type::upper);
+		CHECK(is_splitter(fm, s));
+	}
 }
 
 TEST_SUITE("Tau_splitter_coeff") {
@@ -251,7 +294,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		CHECK((ss.str() == "{ x | x' y } ({ x | x' y } w)' = 0" || ss.str() == "{ x y' | y } ({ x y' | y } w)' = 0"));
+		CHECK(ss.str() == "{ x | x' y } ({ x | x' y } w)' = 0");
 	}
 
 	TEST_CASE("Tau_splitter_coeff3") {
