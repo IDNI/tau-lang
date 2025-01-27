@@ -618,8 +618,7 @@ std::optional<std::string> get_solver_cmd_type(const tau<BAs...>& n) {
 }
 
 template<typename...BAs>
-void print_solver_cmd_solution(const tau<BAs...>& equations,
-		std::optional<solution<BAs...>>& solution,
+void print_solver_cmd_solution(const std::vector<tau<BAs...>>& vars, std::optional<solution<BAs...>>& solution,
 		const solver_options<BAs...>& options = { .type = "" }) {
 	auto print_zero_case = [&options](const tau<BAs...>& var) {
 		std::cout << "\t" << var << " := {"
@@ -640,12 +639,12 @@ void print_solver_cmd_solution(const tau<BAs...>& equations,
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	std::cout << "solution: {\n";
-	for  (auto var: select_all(equations, is_non_terminal<tau_parser::variable, BAs...>)) {
+	for (auto var: vars) {
 		if (auto found = solution.value().find(var); found != solution.value().end()) {
 			if (auto check = found->second | tau_parser::bf_t; check) {
-				print_zero_case(var);
-			} else if (auto check = found->second | tau_parser::bf_f; check) {
 				print_one_case(var);
+			} else if (auto check = found->second | tau_parser::bf_f; check) {
+				print_zero_case(var);
 			} else {
 				print_general_case(found);
 			}
@@ -653,7 +652,7 @@ void print_solver_cmd_solution(const tau<BAs...>& equations,
 			switch (options.mode) {
 				case solver_mode::minimum: print_zero_case(var); break;
 				case solver_mode::maximum: print_one_case(var); break;
-				default: break;
+				default: print_one_case(var); break;
 			}
 		}
 	}
@@ -677,9 +676,9 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 		.type = type.value()
 	};
 
-	if (auto arg = find_top(n, is_non_terminal<tau_parser::wff_cmd_arg, tau_ba<BAs...>, BAs...>); arg) {
-		auto system = get_type_and_arg(arg.value());
-		auto [t, equations] = system.value();
+	auto arg = n->child.back();
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [t, equations] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(t, equations);
 		applied = normalize_non_temp(applied);
 
@@ -689,7 +688,9 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 
 		auto solution = solve<tau_ba_t, BAs...>(applied, options);
 		if (!solution) { std::cout << "no solution\n"; return; }
-		else print_solver_cmd_solution(equations, solution, options);
+		auto vars = select_top(equations,
+			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
+		print_solver_cmd_solution(vars, solution, options);
 		return;
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s) and/or options\n";
@@ -702,9 +703,9 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 	auto type = get_solver_cmd_type(n);
 	if (!type) return;
 
-	if (auto arg = find_top(n, is_non_terminal<tau_parser::wff_cmd_arg, tau_ba<BAs...>, BAs...>); arg) {
-		auto system = get_type_and_arg(arg.value());
-		auto [t, equations] = system.value();
+	auto arg = n->child.back();
+	if (auto check = get_type_and_arg(arg); check) {
+		auto [t, equations] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(t, equations);
 		applied = normalize_non_temp(applied);
 
@@ -712,17 +713,17 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 		BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/applied: " << applied << "\n";
 		#endif // DEBUG
 
-		if (auto equality
-				= find_top(applied, is_child_non_terminal<tau_parser::bf_eq, tau_ba<BAs...>, BAs...>);
-				equality) {
+		if (auto equality = applied | tau_parser::bf_eq; equality) {
 			#ifdef DEBUG
 			BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/equality: " << equality.value() << "\n";
 			#endif // DEBUG
 
 			auto solution = lgrs(equality.value());
 			if (!solution) { std::cout << "no solution\n"; return; }
-			else print_solver_cmd_solution(equality.value(), solution);
-			return;
+		auto vars = select_top(equations,
+			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
+		print_solver_cmd_solution(vars, solution);
+		return;
 		}
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
