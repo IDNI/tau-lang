@@ -768,6 +768,8 @@ tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm, int
 		else return false;
 	};
 	auto neg_st_fms = select_top(fm, is_neg_st);
+	// Do nothing if there is no negated sometimes
+	if (neg_st_fms.empty()) return fm;
 	// Replace negated sometimes parts in fm with T
 	std::map<tau<BAs...>, tau<BAs...>> changes;
 	for (const auto& el : neg_st_fms)
@@ -785,14 +787,14 @@ tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm, int
 
 	// conjunct with initial always part
 	auto _aw = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
-	auto aw = _aw.has_value() ? _aw.value() : _T<BAs...>;
+	auto aw = _aw.has_value() ? trim2(_aw.value()) : _T<BAs...>;
 	for (auto& neg_st_fm : neg_st_fms) {
 		aw = always_conjunction(aw, neg_st_fm);
 	}
 	if (_aw.has_value()) {
 		changes.clear();
-		changes.emplace(trim2(_aw.value()), aw);
 		return replace(new_fm, changes);
+		changes.emplace(_aw.value(), build_wff_always(aw));
 	}
 	std::cout << "trans_neg_st/aw: " << aw << "\n";
 	return build_wff_and(build_wff_always(aw), new_fm);
