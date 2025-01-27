@@ -220,7 +220,7 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 #endif
 	assert(is_non_terminal(tau_parser::bf, fm));
 	auto norm_ba = [&](const auto& n, const auto& c) {
-
+		using p = tau_parser;
 		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/n: " << n;
 		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/c: " << c;
 
@@ -233,15 +233,18 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 			return res;
 		}
 		auto ba_elem = n
-			| tau_parser::bf_constant
-			| tau_parser::constant
+			| p::bf_constant
+			| p::constant
 			| only_child_extractor<BAs...>
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
 		auto res = normalize_ba(ba_elem);
-		using p = tau_parser;
-		auto r = wrap(p::bf, wrap(p::bf_constant, wrap(p::constant,
-			rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(res), {}))));
+		auto type = n | p::bf_constant | p::type;
+		assert(type.has_value());
+		auto r = build_bf_constant(
+			rewriter::make_node<tau_sym<BAs...> >(
+				tau_sym<BAs...>(res), {}), type.value());
+
 #ifdef TAU_CACHE
 		cache.emplace(r, r);
 		return cache.emplace(n, r).first->second;

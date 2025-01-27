@@ -22,6 +22,7 @@ tau<BAs...> operator&(const tau<BAs...>& l,
 			| only_child_extractor<BAs...>
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
+		//TODO: type is chopped
 		return build_bf_constant<BAs...>(lc & rc);
 	};
 
@@ -64,6 +65,7 @@ template <typename... BAs>
 tau<BAs...> operator|(const tau<BAs...>& l,
 	const tau<BAs...>& r)
 {
+	//TODO: bf_constant is missing
 	if (is_non_terminal<tau_parser::bf>(l)
 		&& is_non_terminal<tau_parser::bf, BAs...>(r))
 			return build_bf_or<BAs...>(l, r);
@@ -343,6 +345,7 @@ tau<BAs...> splitter(const tau<BAs...>& n,
 	assert(std::holds_alternative<std::variant<BAs...>>(trim2(n)->value));
 	auto ba_constant = get<std::variant<BAs...>>(trim2(n)->value);
 	std::variant<BAs...> v = std::visit(_splitter, ba_constant);
+	//TODO: type is chopped
 	return build_bf_constant<BAs...>(v);
 }
 
