@@ -151,7 +151,7 @@ struct finputs {
 					<< var << "'\n";
 				return {};
 			}
-			value[wrap(tau_parser::bf, var)] = build_bf_constant(cnst.value());
+			value[wrap(tau_parser::bf, var)] = build_bf_constant(cnst.value(), it->second);
 		}
 		return {value, false};
 	}
@@ -422,9 +422,12 @@ private:
 	static std::optional<system<BAs...>> compute_atomic_fm_types(const tau<BAs...>& clause,
 		auto& inputs, auto& outputs);
 
+	// Record type of io_vars in inputs and outputs
+	static void type_io_vars(const auto& io_vars, const std::string& type, auto& inputs, auto& outputs);
+
 	// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
-	static std::optional<std::pair<type, tau<BAs...>>> get_type_atomic_fm(const tau<BAs...>& fm,
-		auto& inputs, auto& outputs);
+	static std::optional<type> get_type_atomic_fm(const tau<BAs...>& fm,
+		auto& inputs, auto& outputs, std::set<tau<BAs...>>& pending);
 
 	tau<BAs...> update_to_time_point(const tau<BAs...>& f);
 
