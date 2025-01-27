@@ -632,28 +632,20 @@ void print_solver_cmd_solution(const std::vector<tau<BAs...>>& vars, std::option
 			<< "}:" << options.type << "\n";
 	};
 
-	auto print_general_case = [&options](const auto& assignment) {
-		std::cout << "\t" << assignment->first << " := " << assignment->second << "\n";
+	auto print_general_case = [&options](const auto& var, const auto& value) {
+		std::cout << "\t" << var << " := " << value << "\n";
 	};
 
 	if (!solution) { std::cout << "no solution\n"; return; }
 
 	std::cout << "solution: {\n";
-	for (auto var: vars) {
-		if (auto found = solution.value().find(var); found != solution.value().end()) {
-			if (auto check = found->second | tau_parser::bf_t; check) {
-				print_one_case(var);
-			} else if (auto check = found->second | tau_parser::bf_f; check) {
-				print_zero_case(var);
-			} else {
-				print_general_case(found);
-			}
+	for (auto [var, value]: solution.value()) {
+		if (auto check = value | tau_parser::bf_t; check) {
+			print_one_case(var);
+		} else if (auto check = value | tau_parser::bf_f; check) {
+			print_zero_case(var);
 		} else {
-			switch (options.mode) {
-				case solver_mode::minimum: print_zero_case(var); break;
-				case solver_mode::maximum: print_one_case(var); break;
-				default: print_one_case(var); break;
-			}
+			print_general_case(var, value);
 		}
 	}
 	std::cout << "}\n";
