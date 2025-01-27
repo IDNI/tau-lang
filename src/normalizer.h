@@ -436,7 +436,6 @@ tau<BAs...> normalize_temporal_simp (const tau<BAs...>& fm) {
 		for (const auto& nst : neg_st_parts)
 			changes.emplace(nst, _T<BAs...>);
 		tau<BAs...> new_clause = replace(clause, changes);
-		std::cout << "new_clause: " << new_clause << "\n";
 
 		// First check if any always statements are implied by others
 		for (size_t i = 0; i < aw_parts.size(); ++i) {
@@ -501,7 +500,6 @@ tau<BAs...> normalize_temporal_simp (const tau<BAs...>& fm) {
 		else new_fm = new_clause;
 	}
 	assert(new_fm != nullptr);
-	std::cout << "new_fm: " << new_fm << "\n";
 	return new_fm;
 }
 
