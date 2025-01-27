@@ -738,25 +738,6 @@ tau<BAs...> make_inputs_guarded(const tau<BAs...>& fm, const bool conj, int_t& g
 	else return build_wff_or(guarded_fm_at_0, build_wff_imply(guard, fm));
 }
 
-// Creates a guard for the input streams in io_vars
-// template<typename... BAs>
-// tau<BAs...> create_guard(const auto& io_vars, int_t& guard_id) {
-// 	using p = tau_parser;
-// 	tau<BAs...> guard = _T<BAs...>;
-// 	for (const auto& io_var : io_vars) {
-// 		// Check if input stream variable
-// 		if (io_var | p::io_var | p::in) {
-// 			auto var_guard = wrap(
-// 				p::bf, build_io_out<BAs...>("_g" + std::to_string(guard_id), "t"));
-// 			auto cdn = build_wff_eq(build_bf_xor(wrap(p::bf, io_var), var_guard));
-// 			guard = build_wff_and(guard, cdn);
-// 			// Increase the seed by 1
-// 			++guard_id;
-// 		}
-// 	}
-// 	return guard;
-// }
-
 template<typename... BAs>
 tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm, int_t& guard_id) {
 	using p = tau_parser;
@@ -797,7 +778,6 @@ tau<BAs...> transform_neg_sometimes_to_guarded_always(const tau<BAs...>& fm, int
 		return replace_until(new_fm, changes,
 			is_child_non_terminal<p::wff_neg, BAs...>);
 	}
-	std::cout << "trans_neg_st/aw: " << aw << "\n";
 	return build_wff_and(build_wff_always(aw), new_fm);
 }
 
@@ -840,65 +820,6 @@ void transform_sometimes_to_eventual (std::vector<tau<BAs...>>& st_fms,
 		ev_assm = build_wff_and(ev_assm, build_wff_imply(
 				build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
 				shifted_st));
-
-		// for each _eN add conjunction
-		// 	(_eN[0] != 0 && (_eN[t-1] = 0 -> _eN[t] = 0))
-		ev_assm = build_wff_and( ev_assm,
-				build_wff_and(eN0_is_not_zero,
-				build_wff_imply(eNt_prev_is_zero, eNt_is_zero)));
-
-		// Add flag assumptions from constant time constraints
-		ev_assm = build_wff_and(ev_assm, build_wff_and(ctn_initials, ctn_assm));
-
-		ev_collection = build_bf_or(ev_collection, eNt_without_lookback);
-	}
-}
-
-template<typename... BAs>
-void transform_neg_aw_to_eventual (std::vector<tau<BAs...>>& neg_aw_fms,
-						bool reset_ctn_stream,
-						const int_t max_lookback,
-						int_t& guard_id,
-						auto& ev_assm, auto& ev_collection) {
-	using p = tau_parser;
-	for (size_t n = 0; n < neg_aw_fms.size(); ++n) {
-		auto neg_aw_io_vars = select_top(neg_aw_fms[n], is_child_non_terminal<p::io_var, BAs...>);
-		int_t neg_aw_lookback = get_max_shift(neg_aw_io_vars);
-
-		// Transform constant time constraints to io var in sometimes statement
-		tau<BAs...> ctn_initials = _T<BAs...>, ctn_assm = _T<BAs...>;
-		neg_aw_fms[n] = transform_ctn_to_streams(neg_aw_fms[n], ctn_initials, ctn_assm, neg_aw_lookback, reset_ctn_stream);
-		neg_aw_io_vars = select_top(neg_aw_fms[n], is_child_non_terminal<p::io_var, BAs...>);
-
-		std::stringstream ss; ss << "_e" << n;
-		// Build the eventual var flags based on the maximal lookback
-		auto eNt_without_lookback = wrap(p::bf, build_io_out<BAs...>(ss.str(), "t"));
-		auto eNt = build_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
-		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
-
-		auto eN0_is_not_zero = build_wff_neq(wrap(p::bf,
-			build_io_out_const<BAs...>(ss.str(), 0)));
-		auto eNt_is_zero      = build_wff_eq(eNt);
-		auto eNt_is_not_zero  = build_wff_neq(eNt);
-		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
-		auto eNt_prev_is_not_zero	= build_wff_neq(eNt_prev);
-		// transform `!always psi` to:
-		// (_eN[t-1] != 0 && _eN[t] == 0) -> psi (N is nth `!always`)
-		auto shifted_neg_aw = max_lookback == 0 ?
-			shift_io_vars_in_fm(neg_aw_fms[n], neg_aw_io_vars, 1) :
-			shift_io_vars_in_fm(neg_aw_fms[n], neg_aw_io_vars,
-				max_lookback - neg_aw_lookback);
-
-		// Guard statement to express that
-		// "if the inputs equal the guard, the Tau formula
-		// under !always is implied"
-		// This mimics an existential quantifier capturing the inputs but at the same
-		// time the inputs are not quantified
-		shifted_neg_aw = make_inputs_guarded(shifted_neg_aw, false, guard_id);
-
-		ev_assm = build_wff_and(ev_assm, build_wff_imply(
-				build_wff_and(eNt_prev_is_not_zero, eNt_is_zero),
-				shifted_neg_aw));
 
 		// for each _eN add conjunction
 		// 	(_eN[0] != 0 && (_eN[t-1] = 0 -> _eN[t] = 0))
@@ -995,7 +916,6 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm,
 
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
 	BOOST_LOG_TRIVIAL(trace) << res;
-	std::cout << "trans even vars, res: " << res << "\n";
 	return res;
 }
 
@@ -1010,8 +930,6 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
 
 	using p = tau_parser;
-	std::cout << "ubd_aw_continuation: " << ubd_aw_continuation << "\n";
-	std::cout << "ev_var_flags: " << ev_var_flags << "\n";
 	assert(has_no_boolean_combs_of_models(ubd_aw_continuation));
 	assert(is_child_non_terminal(p::wff_sometimes, ev_var_flags));
 
@@ -1050,9 +968,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 		else run = current_aw;
 		auto current_flag = fm_at_time_point(st_flags, st_io_vars, i);
 
-		std::cout << "run: " << build_wff_and(run, current_flag) << "\n";
 		auto normed_run = normalize_non_temp(build_wff_and(run, current_flag));
-		std::cout << "normed_run: " << normed_run << "\n";
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
@@ -1157,16 +1073,12 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 	// Convert !sometimes parts to guarded always statements
 	int_t guard_id = 0;
 	auto trans_fm = transform_neg_sometimes_to_guarded_always(fm, guard_id);
-	std::cout << "trans_fm: " << trans_fm << "\n";
-	// ptree(std::cout, trans_fm);
-	// std::cout << "\n";
 
 	auto aw_fm = find_top_until(trans_fm, is_child_non_terminal<p::wff_always, BAs...>,
 			is_child_non_terminal<p::wff_neg, BAs...>);
 	tau<BAs...> ev_t;
 	tau<BAs...> ubd_aw_fm;
 	if (aw_fm.has_value()) {
-		std::cout << "aw_fm: " << aw_fm.value() << "\n";
 		// If there is an always part, replace it with its unbound continuation
 		ubd_aw_fm = always_to_unbounded_continuation(aw_fm.value(), output);
 		std::map<tau<BAs...>, tau<BAs...> > changes = {
@@ -1271,15 +1183,6 @@ bool are_tau_equivalent (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 	}
 	return true;
 }
-
-/*
- *  Possible tests:
- *  (o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0, passing
- *  o1[0] = 0 && o1[t] = 0 -> o1[0] = 0 && o1[t] = 0, passing
- *  o1[t] = i1[t] && o1[3] = 0 -> F, passing
- *  o1[t-1] = i1[t] -> F, passing
- *  o1[t-2] = 0 && o1[1] = 0 -> should be o1[t-2] = 0 && o1[t-1] = 0 && o1[t] = 0 && o1[1] = 0, passing
- */
 
 } // namespace idni::tau_lang
 
