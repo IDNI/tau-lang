@@ -211,7 +211,6 @@ cli_command            =>
         .
 
 # options
-solve_option  => ("--" solver_mode) | ("--" type).
 solve_options => (__ solve_option)*.
 solve_option  => ("--" solver_mode) | ("--" type).
 solver_mode   =>
