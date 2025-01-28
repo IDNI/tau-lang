@@ -2874,6 +2874,7 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 			else res = new_conjunct;
 		}
 		else if (all_equal_zero) {
+			//TODO: If they have different type, seperate
 			tau<BAs...> new_func;
 			for (const auto& d: conjuncts) {
 				if (new_func) new_func = build_bf_or(new_func, trim2(d));
