@@ -215,8 +215,7 @@ TEST_SUITE("wff comparator hooks") {
 		CHECK( check_hook("{T}:tau=0", "F") );
 		CHECK( check_hook("{F}:tau=0", "T") );
 		CHECK( check_hook("{1}:sbf=0", "F") );
-		// FIXME (HIGH) fix parser error
-		// CHECK( check_hook("{0}:sbf=0", "T") );
+		CHECK( check_hook("{0}:sbf=0", "T") );
 		CHECK( check_hook("x = y", "x + y = 0") );
 	}
 
@@ -271,8 +270,7 @@ TEST_SUITE("wff comparator hooks") {
 		CHECK( check_hook("{T}:tau!=0", "T") );
 		CHECK( check_hook("{F}:tau!=0", "F") );
 		CHECK( check_hook("{1}:sbf!=0", "T") );
-		// FIXME (HIGH) fix parser error
-		// CHECK( check_hook("{0}:sbf!=0", "F") );
+		CHECK( check_hook("{0}:sbf!=0", "F") );
 		CHECK( check_hook("x != y", "x + y != 0") );
 	}
 

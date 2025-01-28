@@ -700,8 +700,7 @@ library<tau<BAs...>> make_library(const std::string& source) {
 // make a nso_rr from the given tau source and binder.
 template<typename binder_t, typename... BAs>
 tau<BAs...> bind_tau_code_using_binder(const tau<BAs...>& code,
-	binder_t& binder)
-{
+	binder_t& binder) {
 	bind_transformer<binder_t, BAs...> bs(binder);
 	auto res = rewriter::post_order_traverser<
 			bind_transformer<binder_t, BAs...>,

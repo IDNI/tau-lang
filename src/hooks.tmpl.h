@@ -60,6 +60,17 @@ std::optional<tau<BAs...>> type_of(const tau<BAs...>& e)
 }
 
 template<typename...BAs>
+bool unbinded_subexpressionns(const rewriter::node<tau_sym<BAs...>>& n) {
+	auto l = first_argument_expression(n)
+		| tau_parser::constant
+		| tau_parser::binding;
+	auto r = second_argument_expression(n)
+		| tau_parser::constant
+		| tau_parser::binding;
+	return l.has_value() || r.has_value();
+}
+
+template<typename...BAs>
 tau<BAs...> make_node_hook_cte_or(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
@@ -76,7 +87,6 @@ tau<BAs...> make_node_hook_cte_or(
 	auto type = type_l ? type_l : type_r;
 	return l && r ? build_bf_constant<BAs...>(l.value() | r.value(), type)
 		: std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
-
 }
 
 template<typename...BAs>
@@ -103,6 +113,8 @@ tau<BAs...> build_bf_0(const rewriter::node<tau_sym<BAs...>>& n) {
 
 template <typename...BAs>
 tau<BAs...> make_node_hook_bf_or(const rewriter::node<tau_sym<BAs...>>& n) {
+	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
+	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 | 1 := 1.")
 	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
@@ -168,6 +180,8 @@ tau<BAs...> make_node_hook_cte_and(const rewriter::node<tau_sym<BAs...>>& n) {
 
 template <typename... BAs>
 tau<BAs...> make_node_hook_bf_and(const rewriter::node<tau_sym<BAs...>>& n) {
+	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
+	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 & 1 := 1.")
 	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
@@ -273,6 +287,8 @@ tau<BAs...> make_node_hook_cte_xor(
 
 template <typename... BAs>
 tau<BAs...> make_node_hook_bf_xor(const rewriter::node<tau_sym<BAs...>>& n) {
+	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
+	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 ^ 1 := 0.")
 	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
