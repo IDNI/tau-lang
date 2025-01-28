@@ -33,6 +33,23 @@ TEST_SUITE("configuration") {
 
 TEST_SUITE("bf operator hooks") {
 
+	// we should get an error during parsing and hence return true if we get an error
+	bool check_unbinded_hook(const char* sample) {
+		auto tau_sample_src = make_tau_source(sample, { .start = tau_parser::bf });
+		auto tau_sample = make_tau_code<tau_ba<sbf_ba>, sbf_ba>(tau_sample_src);
+
+		#ifdef DEBUG
+		std::string str(sample);
+		if (tau_sample)
+			std::cout << "sample: " << str << " expected error, got : " << tau_sample << "\n";
+		else
+			std::cout << "sample: " << str << " expected error, got it\n";
+		#endif // DEBUG
+
+		return tau_sample == nullptr;
+	}
+
+	// we should be able to parse the sample and the expected result should be the same
 	bool check_hook(const char* sample, const char* expected) {
 		auto tau_sample = make_nso_using_factory<
 			tau_ba<sbf_ba>, sbf_ba>(sample, { .start = tau_parser::bf }).value();
@@ -76,9 +93,6 @@ TEST_SUITE("bf operator hooks") {
 	}
 
 	TEST_CASE("conversion to 1/0") {
-		//CHECK( check_hook("{0}:sbf", "0:sbf") );
-		//CHECK( check_hook("{1}:sbf", "1:sbf") );
-
 		CHECK( check_hook("{T}", "1:tau") );
 		CHECK( check_hook("{F}", "0:tau") );
 
@@ -86,8 +100,7 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( check_hook("{F}:tau", "0:tau") );
 
 		CHECK( check_hook("{1}:sbf", "1:sbf") );
-		// FIXME (HIGH) fix parser error
-		//CHECK( check_hook("{0}:sbf", "0:sbf") );
+		CHECK( check_hook("{0}:sbf", "0:sbf") );
 	}
 
 	TEST_CASE("'") {
@@ -153,6 +166,36 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("1:tau|1:sbf", "1") );
 		CHECK( !check_hook("0:tau|0:sbf", "0") );
 
+		CHECK( !check_hook("{1}:sbf|0:tau", "1") );
+		CHECK( !check_hook("{0}:sbf|1:tau", "1") );
+		CHECK( !check_hook("{1}:sbf|1:tau", "1") );
+		CHECK( !check_hook("{0}:sbf|0:tau", "0") );
+
+		CHECK( !check_hook("1:tau|{0}:sbf", "1") );
+		CHECK( !check_hook("0:tau|{1}:sbf", "1") );
+		CHECK( !check_hook("1:tau|{1}:sbf", "1") );
+		CHECK( !check_hook("0:tau|{0}:sbf", "0") );
+
+		CHECK( !check_hook("1:sbf|{F}:tau", "1") );
+		CHECK( !check_hook("0:sbf|{T}:tau", "1") );
+		CHECK( !check_hook("1:sbf|{T}:tau", "1") );
+		CHECK( !check_hook("0:sbf|{F}:tau", "0") );
+
+		CHECK( !check_hook("{T}:tau|1:sbf", "1") );
+		CHECK( !check_hook("{F}:tau|0:sbf", "0") );
+		CHECK( !check_hook("{T}:tau|1:sbf", "1") );
+		CHECK( !check_hook("{F}:tau|0:sbf", "0") );
+
+		CHECK( check_unbinded_hook("{1}:sbf|{F}:tau") );
+		CHECK( check_unbinded_hook("{0}:sbf|{T}:tau") );
+		CHECK( check_unbinded_hook("{1}:sbf|{T}:tau") );
+		CHECK( check_unbinded_hook("{0}:sbf|{F}:tau") );
+
+		CHECK( check_unbinded_hook("{T}:tau|{1}:sbf") );
+		CHECK( check_unbinded_hook("{F}:tau|{0}:sbf") );
+		CHECK( check_unbinded_hook("{T}:tau|{1}:sbf") );
+		CHECK( check_unbinded_hook("{F}:tau|{0}:sbf") );
+
 		CHECK( check_hook("1|x", "1") );
 		CHECK( check_hook("x|1", "1") );
 		CHECK( check_hook("0|x", "x") );
@@ -214,6 +257,36 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("1:tau&1:sbf", "1") );
 		CHECK( !check_hook("0:tau&0:sbf", "0") );
 
+		CHECK( !check_hook("{1}:sbf&0:tau", "0") );
+		CHECK( !check_hook("{0}:sbf&1:tau", "0") );
+		CHECK( !check_hook("{1}:sbf&1:tau", "1") );
+		CHECK( !check_hook("{0}:sbf&0:tau", "0") );
+
+		CHECK( !check_hook("1:tau&{0}:sbf", "0") );
+		CHECK( !check_hook("0:tau&{1}:sbf", "0") );
+		CHECK( !check_hook("1:tau&{1}:sbf", "1") );
+		CHECK( !check_hook("0:tau&{0}:sbf", "0") );
+
+		CHECK( !check_hook("1:sbf&{F}:tau", "0") );
+		CHECK( !check_hook("0:sbf&{T}:tau", "0") );
+		CHECK( !check_hook("1:sbf&{T}:tau", "1") );
+		CHECK( !check_hook("0:sbf&{F}:tau", "0") );
+
+		CHECK( !check_hook("{T}:tau&0:sbf", "0") );
+		CHECK( !check_hook("{F}:tau&1:sbf", "0") );
+		CHECK( !check_hook("{T}:tau&1:sbf", "1") );
+		CHECK( !check_hook("{F}:tau&0:sbf", "0") );
+
+		CHECK( check_unbinded_hook("{1}:sbf&{F}:tau") );
+		CHECK( check_unbinded_hook("{0}:sbf&{T}:tau") );
+		CHECK( check_unbinded_hook("{1}:sbf&{T}:tau") );
+		CHECK( check_unbinded_hook("{0}:sbf&{F}:tau") );
+
+		CHECK( check_unbinded_hook("{T}:tau&{0}:sbf") );
+		CHECK( check_unbinded_hook("{F}:tau&{1}:sbf") );
+		CHECK( check_unbinded_hook("{T}:tau&{1}:sbf") );
+		CHECK( check_unbinded_hook("{F}:tau&{0}:sbf") );
+
 		CHECK( check_hook("1&x", "x") );
 		CHECK( check_hook("x&1", "x") );
 		CHECK( check_hook("0&x", "0") );
@@ -273,6 +346,36 @@ TEST_SUITE("bf operator hooks") {
 		CHECK( !check_hook("0:tau+1:sbf", "1") );
 		CHECK( !check_hook("1:tau+1:sbf", "0") );
 		CHECK( !check_hook("0:tau+0:sbf", "0") );
+
+		CHECK( !check_hook("{1}:sbf+0:tau", "1") );
+		CHECK( !check_hook("{0}:sbf+1:tau", "1") );
+		CHECK( !check_hook("{1}:sbf+1:tau", "0") );
+		CHECK( !check_hook("{0}:sbf+0:tau", "0") );
+
+		CHECK( !check_hook("1:tau+{0}:sbf", "1") );
+		CHECK( !check_hook("0:tau+{1}:sbf", "1") );
+		CHECK( !check_hook("1:tau+{1}:sbf", "0") );
+		CHECK( !check_hook("0:tau+{0}:sbf", "0") );
+
+		CHECK( !check_hook("1:sbf+{F}:tau", "1") );
+		CHECK( !check_hook("0:sbf+{T}:tau", "1") );
+		CHECK( !check_hook("1:sbf+{T}:tau", "0") );
+		CHECK( !check_hook("0:sbf+{F}:tau", "0") );
+
+		CHECK( !check_hook("{T}:tau+0:sbf", "1") );
+		CHECK( !check_hook("{F}:tau+1:sbf", "1") );
+		CHECK( !check_hook("{T}:tau+1:sbf", "0") );
+		CHECK( !check_hook("{F}:tau+0:sbf", "0") );
+
+		CHECK( check_unbinded_hook("{1}:sbf+{F}:tau") );
+		CHECK( check_unbinded_hook("{0}:sbf+{T}:tau") );
+		CHECK( check_unbinded_hook("{1}:sbf+{T}:tau") );
+		CHECK( check_unbinded_hook("{0}:sbf+{F}:tau") );
+
+		CHECK( check_unbinded_hook("{T}:tau+{0}:sbf") );
+		CHECK( check_unbinded_hook("{F}:tau+{1}:sbf") );
+		CHECK( check_unbinded_hook("{T}:tau+{1}:sbf") );
+		CHECK( check_unbinded_hook("{F}:tau+{0}:sbf") );
 
 		CHECK( check_hook("1+x", "x'") );
 		CHECK( check_hook("x+1", "x'") );
