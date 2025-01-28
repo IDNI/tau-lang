@@ -86,6 +86,7 @@ struct tauify {
 		// this is temporary until parser features retyping
 		if (n.nt()) switch (n.n()) {
 		case tau_parser::bf_and_nosep_1st_oprnd:
+		case tau_parser::bf_and_nosep_2nd_oprnd:
 		case tau_parser::bf_neg_oprnd:
 			return tau_sym<BAs...>(tau_parser::instance()
 						.literal(tau_parser::bf));
