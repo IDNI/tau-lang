@@ -186,7 +186,7 @@ struct foutputs {
 	bool write(const assignment<BAs...>& outputs) {
 		// Sort variables in output by time
 		std::vector<tau<BAs...>> io_vars;
-		for (const auto& [var, ass] : outputs) {
+		for (const auto& [var, _ ] : outputs) {
 			assert(is_child_non_terminal(tau_parser::io_var, trim(var)));
 			io_vars.push_back(var);
 		}
@@ -348,13 +348,15 @@ private:
 
 template<typename input_t, typename output_t, typename...BAs>
 struct interpreter {
-	interpreter(const tau<BAs...>& ubt_ctn, assignment<BAs...>& memory,
-		const auto& input, const auto& output) :
+	interpreter(const tau<BAs...>& ubt_ctn, const tau<BAs...>& original_spec,
+		assignment<BAs...>& memory, const auto& input,
+		const auto& output) :
 						ubt_ctn(ubt_ctn),
+						original_spec(original_spec),
 						memory(memory),
 						inputs(input),
 						outputs(output) {
-		compute_lookback_and_initial(ubt_ctn);
+		compute_lookback_and_initial();
 		// TODO: Re-enable after inputs and outputs member have been removed
 		// collect non-temporary output stream variables
 		// for (const auto& o: select_top(ubt_ctn,
@@ -366,14 +368,15 @@ struct interpreter {
 	}
 
 	static std::optional<interpreter> make_interpreter(
-		tau<BAs...> spec, const auto& inputs, const auto& outputs);
+		const tau<BAs...>& spec, const auto& inputs, const auto& outputs);
 
 	std::pair<std::optional<assignment<BAs...>>, bool> step();
 
-	// store all the possible systems to be solved, each system corresponds to a
-	// different clause.
+	// Update the interpreter with a given update
+	void update(const tau<BAs...>& update);
 
 	tau<BAs...> ubt_ctn;
+	tau<BAs...> original_spec;
 	assignment<BAs...> memory;
 	size_t time_point = 0;
 	// TODO: Remove inputs and outputs, once type inference for variables is ready
@@ -382,8 +385,10 @@ struct interpreter {
 	const output_t& outputs;
 
 private:
-
+	// store all the possible systems to be solved, each system corresponds to a
+	// different clause.
 	std::vector<system<BAs...>> systems;
+	bool final_system = false;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
@@ -410,11 +415,29 @@ private:
 	void resolve_solution_dependencies(solution<BAs...>& s);
 
 	// Return the lookback and highest initial position of the given unbound continuation
-	void compute_lookback_and_initial (const tau<BAs...>& ubd_ctn);
+	void compute_lookback_and_initial ();
 
 	// Find an executable specification from DNF
 	static tau<BAs...> get_executable_spec(const tau<BAs...>& fm);
+
+	// Pointwise revision algorithm for producing updated specification
+	// Both spec and update need to be normalized
+	tau<BAs...> pointwise_revision(const tau<BAs...>& spec,
+					const tau<BAs...>& update,
+					const int_t start_time);
 };
+
+template<typename... BAs>
+std::optional<tau<BAs...>> unpack_tau_constant(const tau<BAs...>& constant) {
+	using p = tau_parser;
+	auto c_variant = constant
+		| p::bf_constant
+		| p::constant
+		| only_child_extractor<BAs...>
+		| ba_extractor<BAs...>;
+	if (!c_variant)	return {};
+	return nso_factory<BAs...>::instance().unpack_tau_ba(c_variant.value());
+}
 
 template<typename input_t, typename output_t, typename...BAs>
 void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
@@ -429,6 +452,7 @@ void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
 	BOOST_LOG_TRIVIAL(info) << "-----------------------------------------------------------------------------------------------------------\n\n";
 
 	// Continuously perform execution step until user quits
+	size_t highest_step = 0;
 	while (true) {
 		auto [output, auto_continue] = intrprtr.value().step();
 		// If the user provided empty input for an input stream, quit
@@ -443,6 +467,21 @@ void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
 			if (line == "q" || line == "quit")
 				return;
 		} else std::cout << "\n";
+
+		// Update interpreter only if not currently re-doing previous steps due to previous update
+		if (highest_step >= intrprtr.value().time_point)
+			continue;
+		highest_step = intrprtr.value().time_point;
+
+		// Update interpreter in case the output stream u is present and unequal to 0
+		for (const auto& [o, a] : output.value()) {
+			if (get_io_name(trim(o)) == "u" && a != _0<BAs...>) {
+				auto update = unpack_tau_constant(a);
+				if (!update) break;
+				std::cout << "update: " << update.value() << "\n";
+				intrprtr.value().update(update.value());
+			}
+		}
 	}
 }
 

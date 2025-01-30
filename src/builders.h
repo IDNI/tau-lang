@@ -352,6 +352,11 @@ std::string get_io_name (const tau<BAs...>& io_var) {
 	return ss.str();
 }
 
+template<typename... BAs>
+tau<BAs...> get_tau_io_name(const tau<BAs...>& io_var) {
+	return trim(trim2(io_var));
+}
+
 template <typename... BAs>
 int_t get_io_var_shift(const tau<BAs...>& io_var) {
 	// If there is a shift
@@ -626,6 +631,16 @@ tau<BAs...> build_bf_xor(const tau<BAs...>& l,
 	return build_bf_or<BAs...>(
 		build_bf_and<BAs...>(build_bf_neg<BAs...>(l), r),
 		build_bf_and<BAs...>(l, build_bf_neg<BAs...>(r)));
+}
+
+template<typename... BAs>
+tau<BAs...> build_wff_eq(const tau<BAs...>& l, const tau<BAs...>& r) {
+#ifdef DEBUG
+	using p = tau_parser;
+	assert(is_non_terminal(p::bf, l) && is_non_terminal(p::bf, r));
+#endif // DEBUG
+	auto left_side = build_bf_xor(l,r);
+	return build_wff_eq(left_side);
 }
 
 template <typename... BAs>

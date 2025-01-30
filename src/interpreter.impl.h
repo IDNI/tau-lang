@@ -10,7 +10,7 @@ namespace idni::tau_lang {
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<input_t, output_t, BAs...>>
 interpreter<input_t, output_t, BAs...>::make_interpreter(
-	tau<BAs...> spec, const auto& inputs, const auto& outputs) {
+	const tau<BAs...>& spec, const auto& inputs, const auto& outputs) {
 	// Find a satisfiable unbound continuation from spec
 	auto ubd_ctn = get_executable_spec(spec);
 	if (ubd_ctn == nullptr) {
@@ -28,7 +28,8 @@ interpreter<input_t, output_t, BAs...>::make_interpreter(
 	//after the above, we have the interpreter ready to be used.
 	assignment<BAs...> memory;
 	return interpreter {
-		ubd_ctn, memory, inputs, outputs
+		// TODO: spec needs to be clause matching ubd_ctn
+		ubd_ctn, spec, memory, inputs, outputs
 	};
 };
 
@@ -160,8 +161,14 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 			for (const auto& [o, _ ] : outputs.streams) {
 				auto ot = build_out_variable_at_n(o, time_point);
 				if (auto it = global.find(ot); it == global.end()) {
-					memory.emplace(ot, _0<BAs...>);
-					global.emplace(ot, _0<BAs...>);
+					// If it is not in global, see if is in memory
+					// Can happen due to pointwise revision
+					if (auto it2 = memory.find(ot); it2 != memory.end()) {
+						global.emplace(ot, it2->second);
+					} else {
+						memory.emplace(ot, _0<BAs...>);
+						global.emplace(ot, _0<BAs...>);
+					}
 				}
 			}
 			if (global.empty()) {
@@ -178,7 +185,8 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 				// auto continue until highest initial position
 				if ((int_t)time_point < highest_initial_pos)
 					auto_continue = true;
-				++formula_time_point, ++time_point;
+				++time_point;
+				formula_time_point = time_point;
 			}
 			// TODO (HIGH) remove old values from memory
 			return {global, auto_continue};
@@ -192,7 +200,11 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 template<typename input_t, typename output_t, typename...BAs>
 bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 	using p = tau_parser;
-	size_t initial_segment = std::max(highest_initial_pos, lookback);
+	if (final_system) return true;
+
+	size_t initial_segment = std::max(highest_initial_pos, (int_t)formula_time_point);
+	std::cout << "initial_segment: " << initial_segment << "\n";
+	std::cout << "time_point: " << time_point << "\n";
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
 		// Adjust ubt_ctn to time_point by eliminating inputs and outputs
@@ -221,6 +233,7 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 		if (systems.empty()) return false;
 	} else if (time_point == initial_segment) {
 		systems = compute_systems(ubt_ctn, inputs, outputs);
+		final_system = true;
 		if (systems.empty()) return false;
 	}
 	return true;
@@ -283,11 +296,12 @@ void interpreter<input_t, output_t, BAs...>::resolve_solution_dependencies(solut
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial( const tau<BAs...>& ubd_ctn) {
-	std::vector<tau<BAs...> > io_vars = select_top(ubd_ctn,
+void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial() {
+	std::vector<tau<BAs...> > io_vars = select_top(ubt_ctn,
 		is_child_non_terminal< tau_parser::io_var , BAs...>);
 	lookback = get_max_shift(io_vars);
-	formula_time_point = lookback;
+	if ((int_t)time_point < lookback)
+		formula_time_point = lookback;
 	highest_initial_pos = get_max_initial(io_vars);
 }
 
@@ -370,7 +384,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const ta
 			<< "compute_systems/clause: " << clause;
 #endif // DEBUG
 
-		auto executable = transform_to_execution(clause, true);
+		auto executable = transform_to_execution(clause, 0, true);
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/executable: " << executable;
@@ -416,6 +430,107 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const ta
 		return spec;
 	}
 	return nullptr;
+}
+
+template<typename input_t, typename output_t, typename ... BAs>
+void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
+	auto io_vars = select_top(
+		update, is_child_non_terminal<tau_parser::io_var, BAs...>);
+	int_t lb = get_max_shift(io_vars);
+	// Use bool conversion to integer to decide minimal lookback
+	int_t art_lb = (lb == 0 && has_stream_flag(update));
+	std::cout << "artificial_lookback: " << art_lb << "\n";
+	int_t start_time = std::max(time_point - std::max(lb, art_lb), (size_t)0);
+	std::cout << "start_time: " << start_time << "\n";
+	// the constant time positions in update are seen relative to
+	// time_point, i.e. time point 0 is shifted to time_point
+	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(update, time_point);
+	std::cout << "shifted_update: " << shifted_update << "\n";
+
+	// The constant time positions in original_spec need to be replaced
+	// by present assignments from memory and already executed sometimes statements need to be removed
+	auto memory_copy = memory;
+	auto current_spec = replace(original_spec, memory_copy);
+	std::cout << "current_spec: " << current_spec << "\n";
+
+	// TODO: current_spec = remove_happend_sometimes(current_spec);
+
+	auto new_spec = pointwise_revision(current_spec, shifted_update, time_point);
+	std::cout << "new_spec: " << new_spec << "\n";
+	if (new_spec == _F<BAs...>) {
+		std::cout << "(Warning) no updated performed\n";
+		return;
+	}
+
+	// If the unbound continuation from start_time is possible,
+	// it is save to swap the current spec by update_unbound
+	auto new_ubd_ctn = transform_to_execution(new_spec, time_point, true);
+	if (new_ubd_ctn == _F<BAs...>) {
+		std::cout << "(Warning) updated specification is unsat\n";
+		return;
+	}
+
+	// Set new specification for interpreter
+	ubt_ctn = new_ubd_ctn;
+	original_spec = new_spec;
+	formula_time_point = time_point;
+	time_point = start_time;
+	// The systems for solver need to be recomputed at beginning of next step
+	final_system = false;
+	compute_lookback_and_initial();
+}
+
+template<typename input_t, typename output_t, typename ... BAs>
+tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
+	const tau<BAs...>& spec, const tau<BAs...>& update, const int_t start_time) {
+	using p = tau_parser;
+	// TODO: if update has more than one clause, need to choose one
+
+	auto upd_always = find_top(
+		update, is_child_non_terminal<p::wff_always, BAs...>);
+	auto spec_sometimes = select_top(
+		spec, is_child_non_terminal<p::wff_sometimes, BAs...>);
+	auto spec_always = find_top(
+		spec, is_child_non_terminal<p::wff_always, BAs...>);
+
+	tau<BAs...> new_spec = normalizer(update);
+	// Check if the update by itself is sat from current time point onwards
+	// taking the memory into account
+	std::cout << "pwr/new_spec: " << new_spec << "\n";
+	if (!is_tau_formula_sat(new_spec, start_time, memory))
+		return _F<BAs...>;
+
+	// Now try to add always part of old spec in a pointwise way
+	tau<BAs...> new_spec_pointwise;
+	if (spec_always) {
+		tau<BAs...> aw;
+		if (upd_always)
+			aw = build_wff_and(trim2(upd_always.value()),
+				trim2(spec_always.value()));
+		else aw = trim2(spec_always.value());
+
+		auto aw_io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
+		for (const auto& io_var : aw_io_vars)
+			if (io_var | p::io_var | p::out)
+				aw = build_wff_ex(io_var, aw);
+		new_spec_pointwise = build_wff_and(
+			new_spec, build_wff_imply(aw, trim2(spec_always.value())));
+
+		std::cout << "pwr/new_spec_pointwise: " << new_spec_pointwise << "\n";
+		if (!is_tau_formula_sat(new_spec_pointwise, start_time, memory))
+			return new_spec;
+	} else new_spec_pointwise = new_spec;
+
+	// Now try to add sometimes part of old spec
+	auto new_spec_pointwise_sometimes =
+		build_wff_and(new_spec_pointwise,
+			build_wff_and<BAs...>(spec_sometimes));
+
+	std::cout << "pwr/new_spec_pointwise_sometimes: " << new_spec_pointwise_sometimes << "\n";
+	if (!is_tau_formula_sat(new_spec_pointwise_sometimes, start_time, memory))
+		return normalizer_step(new_spec_pointwise);
+
+	return normalize_with_temp_simp(new_spec_pointwise_sometimes);
 }
 
 } // namespace idni::tau_lang

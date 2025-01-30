@@ -143,6 +143,12 @@ std::string nso_factory<sbf_ba>::zero(const std::string) const {
 	return "0";
 }
 
+std::optional<tau<sbf_ba> > nso_factory<sbf_ba>::unpack_tau_ba(
+	const std::variant<sbf_ba>&) const {
+	// There is no tau_ba present
+	return {};
+}
+
 nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
 	static nso_factory<sbf_ba> factory;
 	return factory;
@@ -180,6 +186,14 @@ std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::one(const std::string type_name
 
 std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::zero(const std::string type_name) const {
 	return type_name == "sbf" ? "0" : "F";
+}
+
+std::optional<tau_nso<sbf_ba> > nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
+		const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const {
+	if (!std::holds_alternative<tau_ba<sbf_ba>>(v))
+		return {};
+	const auto unpacked = std::get<tau_ba<sbf_ba>>(v);
+	return std::optional(unpacked.nso_rr.main);
 }
 
 tau_nso<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(

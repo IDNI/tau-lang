@@ -50,6 +50,12 @@ namespace idni::tau_lang {
 			throw std::logic_error("not implemented");
 		}
 
+		std::optional<Bool> unpack_tau_ba(
+			const std::variant<Bool>& v) const {
+			// There is no tau_ba
+			return {};
+		}
+
 		static nso_factory<Bool>& instance() {
 				static nso_factory<Bool> factory;
 				return factory;
