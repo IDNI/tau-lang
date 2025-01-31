@@ -442,7 +442,7 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	// Use bool conversion to integer to decide minimal lookback
 	int_t art_lb = (lb == 0 && has_stream_flag(update));
 	std::cout << "artificial_lookback: " << art_lb << "\n";
-	int_t start_time = std::max(time_point - std::max(lb, art_lb), (size_t)0);
+	int_t start_time = std::max(int_t(time_point - std::max(lb, art_lb)), 0);
 	std::cout << "start_time: " << start_time << "\n";
 	// the constant time positions in update are seen relative to
 	// start_time, i.e. time point 0 is shifted to start_time
