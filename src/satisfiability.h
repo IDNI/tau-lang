@@ -671,7 +671,7 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	// Run phi_inf until all initial conditions are taken into account
 	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
 	tau<BAs...> run = _T<BAs...>;
-	const int_t s = std::max(time_point, start_time);
+	const int_t s = std::max(time_point, start_time + time_point);
 	// In case there is memory and no initial condition being checked
 	// we still need to check a run once
 	if (!memory.empty() && point_after_inits == 0)
@@ -893,7 +893,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 	// Check if flag can be raised up to the highest initial condition + 1
 	tau<BAs...> run;
-	const int_t s = std::max(time_point, start_time);
+	const int_t s = std::max(time_point, start_time + time_point);
 	const int_t flag_boundary =
 		std::max(s + point_after_inits, s + time_point + 1) + 1;
 	for (int_t i = s; i <= flag_boundary; ++i) {
