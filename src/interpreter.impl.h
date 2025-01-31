@@ -523,6 +523,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 			return new_spec;
 	} else new_spec_pointwise = new_spec;
 
+	if (spec_sometimes.empty()) return normalizer_step(new_spec_pointwise);
 	// Now try to add sometimes part of old spec
 	auto new_spec_pointwise_sometimes =
 		build_wff_and(new_spec_pointwise,
