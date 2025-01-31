@@ -720,6 +720,8 @@ tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
 	return guard;
 }
 
+//TODO: Initial condition must match start_time, also revise initial condition in constraints transformation
+//
 // Assumes single normalized Tau DNF clause
 template<typename... BAs>
 tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_ctn_stream*/) {
