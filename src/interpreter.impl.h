@@ -445,8 +445,8 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	int_t start_time = std::max(time_point - std::max(lb, art_lb), (size_t)0);
 	std::cout << "start_time: " << start_time << "\n";
 	// the constant time positions in update are seen relative to
-	// time_point, i.e. time point 0 is shifted to time_point
-	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(update, time_point);
+	// start_time, i.e. time point 0 is shifted to start_time
+	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(update, start_time);
 	std::cout << "shifted_update: " << shifted_update << "\n";
 
 	// The constant time positions in original_spec need to be replaced
