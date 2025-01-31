@@ -165,10 +165,12 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 					// Can happen due to pointwise revision
 					if (auto it2 = memory.find(ot); it2 != memory.end()) {
 						global.emplace(ot, it2->second);
-					} else {
-						memory.emplace(ot, _0<BAs...>);
-						global.emplace(ot, _0<BAs...>);
 					}
+					//TODO: Enable autocomplete again after type inference is there
+					// else {
+					// 	memory.emplace(ot, _0<BAs...>);
+					// 	global.emplace(ot, _0<BAs...>);
+					// }
 				}
 			}
 			if (global.empty()) {
