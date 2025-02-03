@@ -563,17 +563,29 @@ template<typename... BAs>
 tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_initials,
 					tau<BAs...>& flag_rules,
 					const int_t lookback,
+					const int_t start_time,
 					bool reset_ctn_id = false) {
 	using p = tau_parser;
 	auto to_eq_1 = [](const auto& n) {
 		return build_wff_eq(build_bf_neg(n));
+	};
+	auto create_initial = [&flag_initials](
+		const auto& ctn, const auto& flag_iovar, const int_t t) {
+		tau<BAs...> flag_init_cond = transform_io_var(
+					flag_iovar, get_io_name(flag_iovar), t);
+		flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
+		flag_initials = build_wff_and(build_wff_eq(build_bf_xor(
+		flag_init_cond, calculate_ctn(ctn, t))), flag_initials);
 	};
 	flag_initials = _T<BAs...>;
 	std::map<tau<BAs...>, tau<BAs...>> changes;
 	// transform constraints to their respective output streams and add required conditions
 	// We make the variable static so that we can transform different parts of the formula independently
 	static size_t ctn_id = 0;
-	if (reset_ctn_id) ctn_id = 0;
+	if (reset_ctn_id) {
+		ctn_id = 0;
+		reset_ctn_id = false;
+	}
 	for (const auto& ctn : select_top(fm, is_non_terminal<p::constraint, BAs...>))
 	{
 		std::string ctnvar = make_string(tau_node_terminal_extractor<BAs...>,
@@ -601,14 +613,16 @@ tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_in
 		}
 
 		// Add initial conditions for flag
-		int_t t = 0;
-		while (is_initial_ctn_phase(ctn, t)) {
-			tau<BAs...> flag_init_cond = transform_io_var(
-				flag_iovar, get_io_name(flag_iovar), t);
-			flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
-			flag_initials = build_wff_and(build_wff_eq(build_bf_xor(
-			flag_init_cond, calculate_ctn(ctn, t))), flag_initials);
-			++t;
+		int_t t = start_time;
+		// Check if start_time is higher then initial ctn phase
+		if (is_initial_ctn_phase(ctn, t))
+			while (is_initial_ctn_phase(ctn, t)) {
+				create_initial(ctn, flag_iovar, t);
+				++t;
+			}
+		else {
+			// The flag needs to be initialized
+			create_initial(ctn, flag_iovar, t);
 		}
 	}
 	if (!changes.empty()) return replace(fm, changes);
@@ -635,7 +649,8 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
 	tau<BAs...> flag_initials = _T<BAs...>, flag_rules = _T<BAs...>;
-	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, flag_rules, lookback, true);
+	auto transformed_fm = transform_ctn_to_streams(
+		fm, flag_initials, flag_rules, lookback, start_time, true);
 	if (lookback == 0 && fm != transformed_fm) {
 		io_vars = select_top(transformed_fm, is_child_non_terminal<p::io_var, BAs...>);
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
@@ -655,11 +670,11 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
                     get_io_time_point(io_vars[i]));
 
 	// Calculate unbound continuation of fm
-	int_t time_point = get_max_shift(io_vars);
+	lookback = get_max_shift(io_vars);
 	int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
 	auto [ubd_ctn, steps] = find_fixpoint_phi(
 		fm, flag_initials, io_vars, initials,
-		time_point + point_after_inits);
+		lookback + point_after_inits);
 
 	ubd_ctn = normalize_non_temp(ubd_ctn);
 	ubd_ctn = transform_back_non_initials(ubd_ctn, point_after_inits - 1);
@@ -671,12 +686,13 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	// Run phi_inf until all initial conditions are taken into account
 	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
 	tau<BAs...> run = _T<BAs...>;
-	const int_t s = std::max(time_point, start_time + time_point);
+	const int_t s = start_time + lookback;
 	// In case there is memory and no initial condition being checked
 	// we still need to check a run once
-	if (!memory.empty() && point_after_inits == 0)
-		point_after_inits = 1;
-	for (int_t t = s; t < point_after_inits + s; ++t) {
+	if (!memory.empty() && point_after_inits + lookback <= s)
+		point_after_inits = s+1-lookback; // By def of s, this is positive
+	// variable furthest back needs to pass all initial conditions
+	for (int_t t = s; t < point_after_inits + lookback; ++t) {
 		auto current_step = fm_at_time_point_memory(ubd_ctn, io_vars, t, memory);
 		run = build_wff_and(run, current_step);
 		std::cout << "run: " << run << "\n";
@@ -720,11 +736,9 @@ tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
 	return guard;
 }
 
-//TODO: Initial condition must match start_time, also revise initial condition in constraints transformation
-//
 // Assumes single normalized Tau DNF clause
 template<typename... BAs>
-tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_ctn_stream*/) {
+tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ctn_stream, const int_t start_time) {
 	using p = tau_parser;
 	auto smt_fms = select_top(fm, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	if (smt_fms.empty()) return fm;
@@ -751,7 +765,9 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_
 
 		// Transform constant time constraints to io var in sometimes statement
 		tau<BAs...> ctn_initials = _T<BAs...>, ctn_assm = _T<BAs...>;
-		smt_fms[n] = transform_ctn_to_streams(smt_fms[n], ctn_initials, ctn_assm, st_lookback);
+		smt_fms[n] = transform_ctn_to_streams(
+			smt_fms[n], ctn_initials, ctn_assm, st_lookback,
+			start_time, reset_ctn_stream);
 		st_io_vars = select_top(smt_fms[n], is_child_non_terminal<p::io_var, BAs...>);
 
 		std::stringstream ss; ss << "_e" << n;
@@ -761,7 +777,7 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_
 		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
 
 		auto eN0_is_not_zero = build_wff_neq(wrap(p::bf,
-			build_io_out_const<BAs...>(ss.str(), 0)));
+			build_io_out_const<BAs...>(ss.str(), start_time)));
 		auto eNt_is_zero      = build_wff_eq(eNt);
 		auto eNt_is_not_zero  = build_wff_neq(eNt);
 		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
@@ -794,6 +810,8 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_
 
 		// Add flag assumptions from constant time constraints
 		ev_assm = build_wff_and(ev_assm, build_wff_and(ctn_initials, ctn_assm));
+
+		std::cout << "ev_assm: " << ev_assm << "\n";
 
 		ev_collection = build_bf_or(ev_collection, eNt_without_lookback);
 	}
@@ -895,9 +913,9 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 	// Check if flag can be raised up to the highest initial condition + 1
 	tau<BAs...> run;
-	const int_t s = std::max(time_point, start_time + time_point);
+	const int_t s = start_time + time_point;
 	const int_t flag_boundary =
-		std::max(s + point_after_inits, s + time_point + 1) + 1;
+		std::max(time_point + point_after_inits, s + time_point + 1) + 1;
 	for (int_t i = s; i <= flag_boundary; ++i) {
 		auto current_aw = fm_at_time_point_memory(aw, io_vars, i, memory);
 		if (run) run = build_wff_and(run, current_aw);
@@ -1011,6 +1029,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	auto elim_aw = [](const auto& f) {
 		return is_child_non_terminal(p::wff_always, f) ? trim2(f) : f;
 	};
+	std::cout << "Transform_to_execution happening.\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 	// We merge all always statements on each clause
@@ -1028,7 +1047,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
 		auto ubd_fm = replace(fm, changes);
-		ev_t = transform_to_eventual_variables(ubd_fm, false);
+		ev_t = transform_to_eventual_variables(ubd_fm, false, start_time);
 		// Check if there is a sometimes present
 		if (ev_t == ubd_fm) {
 #ifdef TAU_CACHE
@@ -1040,7 +1059,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 			return elim_aw(ubd_fm);
 		}
 	} else {
-		ev_t = transform_to_eventual_variables(fm, true);
+		ev_t = transform_to_eventual_variables(fm, true, start_time);
 		// Check if there is a sometimes present
 		if (ev_t == fm) {
 #ifdef TAU_CACHE
