@@ -10,6 +10,8 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
+include(FetchContent)
+
 option(TAU_MEASURE                 "Measure tau performance"               OFF)
 option(PARSER_MEASURE              "Measure parser performance"            OFF)
 option(TAU_CACHE                   "Cache costly computations"             OFF)
@@ -167,6 +169,16 @@ endif()
 #
 option(BOOST_LOG_TRIVIAL           "Build logging in parser"   ON)
 option(PARSER_BUILD_STATIC_LIBRARY "Build only static library" ON)
+
+#
+# Adding Z3 (see https://github.com/Z3Prover/z3/blob/master/README-CMake.md)
+#
+FetchContent_Declare(z3
+        GIT_REPOSITORY https://github.com/Z3Prover/z3
+        GIT_TAG        z3-4.13.4
+)
+FetchContent_MakeAvailable(z3)
+include_directories( ${z3_SOURCE_DIR}/src/api )
 
 # TODO (LOW) make it run automatically on grammar modifications
 #
