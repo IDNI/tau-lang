@@ -61,7 +61,10 @@ set(CLI_SOURCES
 add_library(${TAU_OBJECT_LIB_NAME} OBJECT)
 target_sources(${TAU_OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_OBJECT_LIB_NAME})
-target_link_libraries(${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} Boost::log libz3)
+target_link_libraries(${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} Boost::log)
+if (TAU_WITH_Z3)
+	target_link_libraries(${TAU_OBJECT_LIB_NAME} libz3)
+endif()
 target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
