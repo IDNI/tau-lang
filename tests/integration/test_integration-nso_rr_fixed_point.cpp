@@ -92,7 +92,7 @@ TEST_SUITE("rec relations fixed point") {
 
 	TEST_CASE("no initial condition") {
 		const char* sample =
-			"f[n](x) := f[n-1](x)."
+			"f[n](x) := f[n-1](x) && T."
 			"f(x).";
 		CHECK( fp_test(sample, tau_parser::wff_ref) );
 	}

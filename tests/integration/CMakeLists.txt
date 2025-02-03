@@ -9,6 +9,7 @@ set(TESTS
 	nso_rr_execution
 	nso_rr_partial_eval
 	nso_rr_fixed_point
+	ref_types
 	bf_fixed_point
 	bf_normalization
 	wff_normalization
