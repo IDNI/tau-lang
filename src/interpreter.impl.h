@@ -466,7 +466,8 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 
 	// If the unbound continuation from start_time is possible,
 	// it is save to swap the current spec by update_unbound
-	auto new_ubd_ctn = transform_to_execution(new_spec, time_point, true);
+	auto new_ubd_ctn = transform_to_execution(
+		new_spec, time_point, true, memory);
 	if (new_ubd_ctn == _F<BAs...>) {
 		std::cout << "(Warning) updated specification is unsat\n";
 		return;
