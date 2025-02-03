@@ -5,7 +5,7 @@
 #include "doctest.h"
 #include "defs.h"
 #include "hooks.h"
-#include "bool_ba.h"
+#include "boolean_algebras/bool_ba.h"
 
 #include "test_helpers.h"
 

@@ -5,11 +5,11 @@
 
 #include <fstream>
 
-#include "tau_ba.h"
+#include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/variant_ba.h"
 #include "solver.h"
 #include "satisfiability.h"
 #include "term.h"
-#include "variant_ba.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"

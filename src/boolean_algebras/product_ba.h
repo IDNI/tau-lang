@@ -7,8 +7,6 @@
 #include <list>
 #include <variant>
 
-#include "bdd_handle.h"
-
 // product boolean algebra
 template <typename...BAS>
 struct product_ba: std::tuple<BAS...> {

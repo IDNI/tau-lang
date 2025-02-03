@@ -1,10 +1,23 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
-	babdd.h
-	sbf_ba.h
-	bdd_handle.h
-	bool_ba.h
+	../external/parser/src/characters.h
+	../external/parser/src/charclasses.h
+	../external/parser/src/defs.h
+	../external/parser/src/devhelpers.h
+	../external/parser/src/forest.h
+	../external/parser/src/parser.h
+	../external/parser/src/parser.tmpl.h
+	../external/parser/src/recoders.h
+	../external/parser/src/tgf.h
+	boolean_algebras/bdds/babdd.h
+	boolean_algebras/bdds/bdd_handle.h
+	boolean_algebras/bool_ba.h
+	boolean_algebras/sbf_ba.h
+	boolean_algebras/variant_ba.h
+	boolean_algebras/product_ba.h
+	boolean_algebras/nso_ba.h
+	experimental/execution.h
 	defs.h
 	rewriting.h
 	dict.h
@@ -17,37 +30,24 @@ set(TAU_HEADERS
 	solver.h
 	splitter.h
 	splitter_types.h
-	variant_ba.h
 	interpreter.h
     interpreter.impl.h
-	product_ba.h
-	nso_ba.h
 	hooks.h
 	builders.h
 	language.h
 	queries.h
 	utils.h
-	experimental/execution.h
-	../external/parser/src/characters.h
-	../external/parser/src/charclasses.h
-	../external/parser/src/defs.h
-	../external/parser/src/devhelpers.h
-	../external/parser/src/forest.h
-	../external/parser/src/parser.h
-	../external/parser/src/parser.tmpl.h
-	../external/parser/src/recoders.h
-	../external/parser/src/tgf.h
 )
 
 set(TAU_SOURCES
-	bool_ba.cpp
-	dict.cpp
-	nso_rr.cpp
 	../external/parser/src/characters.cpp
 	../external/parser/src/charclasses.cpp
 	../external/parser/src/parser.cpp
 	../external/parser/src/recoders.cpp
 	../external/parser/src/term.cpp
+	boolean_algebras/bool_ba.cpp
+	dict.cpp
+	nso_rr.cpp
 )
 
 set(CLI_SOURCES

@@ -13,8 +13,8 @@
 #include <boost/log/utility/setup/console.hpp>
 
 #include "doctest.h"
+#include "boolean_algebras/sbf_ba.h"
 #include "interpreter.h"
-#include "sbf_ba.h"
 
 using namespace boost::log;
 using namespace idni::tau_lang;

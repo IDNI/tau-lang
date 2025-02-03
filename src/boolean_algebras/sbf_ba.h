@@ -5,14 +5,13 @@
 
 #include <boost/log/trivial.hpp>
 
-#include "tau_ba.h"
-
+#include "boolean_algebras/tau_ba.h"
 #include "../parser/sbf_parser.generated.h"
 
 namespace idni::tau_lang {
 
 /**
- * @brief Simple Boolean function Boolean algebra represented by bdd 
+ * @brief Simple Boolean function Boolean algebra represented by bdd
  */
 using sbf_ba = hbdd<Bool>;
 using sbf_source_sym = idni::lit<char, char>;
@@ -25,7 +24,7 @@ inline static std::map<int_t, sbf_ba> var_cache{};
 
 /**
  * @brief Boolean algebra factory for Simple Boolean function
- * 
+ *
  * @tparam BAs Boolean algebras
  */
 template<typename...BAs>
@@ -41,8 +40,8 @@ struct sbf_ba_factory {
 
 	/**
 	 * @brief builds a SBF bounded node from a parsed terminals of a source binding
-	 * 
-	 * @param sn tau code node with parsed SBF 
+	 *
+	 * @param sn tau code node with parsed SBF
 	 * @return bounded constant
 	 */
 	tau<BAs...> binding(const tau<BAs...>& sn);

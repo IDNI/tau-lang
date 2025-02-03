@@ -19,9 +19,9 @@
 #include <optional>
 #include <string>
 
-#include "tau_ba.h"
+#include "boolean_algebras/tau_ba.h"
 #include "normal_forms.h"
-#include "bdd_handle.h"
+#include "boolean_algebras/bdds/bdd_handle.h"
 #include "splitter.h"
 
 namespace idni::tau_lang {

@@ -3,9 +3,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
+#include "boolean_algebras/bool_ba.h"
 #include "nso_rr.h"
-#include "bool_ba.h"
-#include "bdd_handle.h"
+#include "boolean_algebras/bdds/bdd_handle.h"
 #include "normalizer.h"
 #include "test_helpers.h"
 

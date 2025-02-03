@@ -6,7 +6,7 @@
 #include <list>
 #include <numeric>
 
-#include "nso_ba.h"
+#include "boolean_algebras/nso_ba.h"
 #include "execution.h"
 
 #ifdef DEBUG

@@ -13,8 +13,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include "boolean_algebras/product_ba.h"
 #include "doctest.h"
-#include "product_ba.h"
 
 namespace testing = doctest;
 

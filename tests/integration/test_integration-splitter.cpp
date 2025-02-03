@@ -15,8 +15,8 @@
 
 #include <cassert>
 
+#include "boolean_algebras/tau_ba.h"
 #include "doctest.h"
-#include "tau_ba.h"
 
 #include "test_integration_helpers.h"
 
