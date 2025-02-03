@@ -16,8 +16,8 @@
 #include <cmath>
 
 #include "defs.h"
-#include "bool_ba.h"
 #include "dict.h"
+#include "boolean_algebras/bool_ba.h"
 
 typedef int32_t int_t;
 typedef uint32_t uint_t;

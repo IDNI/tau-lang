@@ -2,6 +2,8 @@
 #ifndef __BOOL_BA_H__
 #define __BOOL_BA_H__
 
+#include "defs.h"
+
 struct Bool {
 	Bool();
 	Bool(bool b);

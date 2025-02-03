@@ -47,9 +47,9 @@
 #include <iomanip>
 #include <sstream>
 
+#include "boolean_algebras/sbf_ba.h"
 #include "init_log.h"
 #include "normalizer.h"
-#include "sbf_ba.h"
 #include "cli.h"
 #include "repl.h"
 #include "repl_evaluator.h"
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
 
 	cli cl("tau", args, {}, "", tau_options());
 	cl.set_help_header("Usage: tau [ <specification file> ]");
-	
+
 	if (cl.process_args() != 0) return cl.status();
 	auto opts  = cl.get_processed_options();
 	auto files = cl.get_files();

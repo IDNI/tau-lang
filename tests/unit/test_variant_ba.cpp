@@ -3,8 +3,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "bool_ba.h"
-#include "variant_ba.h"
+#include "boolean_algebras/bool_ba.h"
+#include "boolean_algebras/variant_ba.h"
 
 namespace testing = doctest;
 

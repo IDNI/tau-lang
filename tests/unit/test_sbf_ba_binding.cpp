@@ -4,8 +4,8 @@
 
 #include "doctest.h"
 
-#include "../src/sbf_ba.h"
-#include "babdd.h"
+#include "boolean_algebras/sbf_ba.h"
+#include "boolean_algebras/bdds/babdd.h"
 
 using namespace std;
 using namespace idni::tau_lang;

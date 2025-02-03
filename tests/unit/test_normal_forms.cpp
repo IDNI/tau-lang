@@ -4,8 +4,8 @@
 
 #include "doctest.h"
 //#include "satisfiability.h"
-#include "bool_ba.h"
-#include "bdd_handle.h"
+#include "boolean_algebras/bool_ba.h"
+#include "boolean_algebras/bdds/bdd_handle.h"
 #include "normalizer.h"
 
 // TODO (LOW) consider move this test to integration tests

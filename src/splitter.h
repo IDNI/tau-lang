@@ -4,7 +4,7 @@
 #define SPLITTER_H
 
 #include "satisfiability.h"
-#include "nso_ba.h"
+#include "boolean_algebras/nso_ba.h"
 
 namespace idni::tau_lang {
 enum class split_sym {

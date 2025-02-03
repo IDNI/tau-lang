@@ -16,8 +16,8 @@
 #include <cassert>
 
 #include "doctest.h"
+#include "boolean_algebras/sbf_ba.h"
 #include "normalizer.h"
-#include "sbf_ba.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;

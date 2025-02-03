@@ -6,7 +6,7 @@
 #include "defs.h"
 #include "nso_rr.h"
 #include "language.h"
-#include "bool_ba.h"
+#include "boolean_algebras/bool_ba.h"
 #include "test_helpers.h"
 
 using namespace idni::rewriter;
