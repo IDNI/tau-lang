@@ -747,7 +747,7 @@ template<typename... BAs>
 struct fixed_point_transformer {
 
 	fixed_point_transformer(const rr<tau<BAs...>>& defs,
-		const rr_types& types) : defs(defs), types(types) {}
+		const rr_types<BAs...>& types) : defs(defs), types(types) {}
 
 	tau<BAs...> operator()(const tau<BAs...>& n) {
 		if (n->child.size() == 0) return n;
@@ -759,10 +759,25 @@ struct fixed_point_transformer {
 			|| (is_non_terminal<tau_parser::bf, BAs...>(n)
 			&& is_non_terminal<tau_parser::bf_ref, BAs...>(ref));
 		if (!is_ref) return n;
-		auto [type, offset_arity] = get_type_info(types, ref);
-		if (offset_arity) {
-			auto fp = calculate_fixed_point(defs, n, type,
-				offset_arity, get_fallback(type, ref));
+		auto sig = get_rr_sig(ref);
+		auto topt = types.type(sig);
+		if (!topt) { // this should not happen if rr_types.ok()
+			BOOST_LOG_TRIVIAL(error)
+				<< "(Error) Unresolved type of " << sig2str(sig);
+			return nullptr;
+		}
+		if (auto fpopt = types.fpcall(sig); fpopt) { // is fp call
+			auto offset_arity = fpopt.value().offset_arity;
+			// TODO we don't support FP calc for multiindex offsets yet
+			if (offset_arity > 1) {
+				BOOST_LOG_TRIVIAL(error) << "(Error) Fixed point"
+					" calculation of multiindex offset "
+					"relations is not supported yet";
+				return nullptr;
+			}
+			auto t = topt.value();
+			auto fp = calculate_fixed_point(defs, n, t,
+				offset_arity, get_fallback(t, ref));
 			if (!fp) return nullptr;
 			return changes.emplace(n, fp).first->second;
 		}
@@ -774,21 +789,6 @@ struct fixed_point_transformer {
 		auto nn = make_node<tau_sym<BAs...>>(n->value, child);
 		if (changed) changes[n] = nn;
 		return nn;
-	}
-
-	std::pair<tau_parser::nonterminal, size_t> get_type_info(
-		const rr_types& ts, const tau<BAs...>& fp_ref)
-	{
-		// size_t type = fp_ref | non_terminal_extractor<BAs...>
-		// 	| optional_value_extractor<size_t>;
-		auto ref = fp_ref | tau_parser::ref;
-		if (ref && !(ref | tau_parser::offsets).has_value()) {
-			auto it = ts.types.find(get_rr_sig(ref.value()));
-			if (it != ts.types.end() && it->second.offset_arity)
-				return { it->second.type,
-						it->second.offset_arity };
-		}
-		return { tau_parser::wff, 0 };
 	}
 
 	tau<BAs...> get_fallback(tau_parser::nonterminal t,
@@ -803,16 +803,14 @@ struct fixed_point_transformer {
 
 	std::map<tau<BAs...>, tau<BAs...>> changes;
 	rr<tau<BAs...>> defs;
-	rr_types types;
+	rr_types<BAs...> types;
 };
 
 template<typename... BAs>
 tau<BAs...> calculate_all_fixed_points(const rr<tau<BAs...>>& recrel) {
-	// get types and do type checks
-	rr_types types;
-	bool success = true;
-	get_rr_types(success, types, recrel);
-	if (!success || !is_valid(recrel)) return nullptr;
+	// get types and do type checks and validation
+	rr_types<BAs...> types(recrel);
+	if (!types.ok() || !is_valid(recrel)) return nullptr;
 	// transform fp calculation calls by calculation results
 	fixed_point_transformer<BAs...> fpt(recrel, types);
 	auto new_main = rewriter::post_order_traverser<decltype(fpt),
