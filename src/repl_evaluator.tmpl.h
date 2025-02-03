@@ -472,10 +472,14 @@ std::optional<tau_nso<BAs...>>
 			else return {};
 		}
 		if (!rr_.main) return {};
+		tau_nso_t ret;
 		if (!is_non_terminal(tau_parser::bf, rr_.main))
-			return normalizer<tau_ba_t, BAs...>(rr_);
-		if (contains_ref) return bf_normalizer_with_rec_relation(rr_);
-		return bf_normalizer_without_rec_relation(rr_.main);
+			ret = normalizer<tau_ba_t, BAs...>(rr_);
+		else if (contains_ref)
+			ret = bf_normalizer_with_rec_relation(rr_);
+		else ret = bf_normalizer_without_rec_relation(rr_.main);
+		if (ret == nullptr) return {};
+		return ret;
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 	return {};

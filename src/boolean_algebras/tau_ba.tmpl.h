@@ -138,6 +138,7 @@ template<typename... BAs>
 bool is_closed (const tau_ba<BAs...>& fm) {
 	using p = tau_parser;
 	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
+	if (!simp_fm) return false; // TODO (MEDIUM) check if this is correct
 	if (find_top(simp_fm, is_non_terminal<tau_parser::ref, tau_ba<BAs...>, BAs...>))
 		return false;
 	auto vars = get_free_vars_from_nso(simp_fm);
