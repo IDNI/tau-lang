@@ -302,8 +302,7 @@ void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial() {
 	std::vector<tau<BAs...> > io_vars = select_top(ubt_ctn,
 		is_child_non_terminal< tau_parser::io_var , BAs...>);
 	lookback = get_max_shift(io_vars);
-	if ((int_t)time_point < lookback)
-		formula_time_point = lookback;
+	formula_time_point = time_point + lookback;
 	highest_initial_pos = get_max_initial(io_vars);
 }
 
@@ -442,11 +441,9 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	// Use bool conversion to integer to decide minimal lookback
 	int_t art_lb = (lb == 0 && has_stream_flag(update));
 	std::cout << "artificial_lookback: " << art_lb << "\n";
-	int_t start_time = std::max(int_t(time_point - std::max(lb, art_lb)), 0);
-	std::cout << "start_time: " << start_time << "\n";
 	// the constant time positions in update are seen relative to
-	// start_time, i.e. time point 0 is shifted to start_time
-	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(update, start_time);
+	// time_point, i.e. time point 0 is shifted to time_point
+	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(update, time_point);
 	std::cout << "shifted_update: " << shifted_update << "\n";
 
 	// The constant time positions in original_spec need to be replaced
@@ -476,8 +473,6 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	// Set new specification for interpreter
 	ubt_ctn = new_ubd_ctn;
 	original_spec = new_spec;
-	formula_time_point = time_point;
-	time_point = start_time;
 	// The systems for solver need to be recomputed at beginning of next step
 	final_system = false;
 	compute_lookback_and_initial();
