@@ -782,7 +782,7 @@ std::optional<tau_nso<BAs...>>
 			return {};
 		}
 		auto normalized_fm = normalizer<tau_ba_t, BAs...>(rr_);
-		return is_tau_formula_sat(normalized_fm, 0, {}, true)
+		return is_tau_formula_sat(normalized_fm, 0, true)
 			       ? _T<tau_ba_t, BAs...>
 			       : _F<tau_ba_t, BAs...>;
 	}
@@ -816,7 +816,7 @@ std::optional<tau_nso<BAs...>>
 			return {};
 		}
 		auto normalized_fm = normalizer<tau_ba_t, BAs...>(rr_);
-		return (!is_tau_formula_sat(normalized_fm, 0, {}, true))
+		return (!is_tau_formula_sat(normalized_fm, 0, true))
 			       ? _T<tau_ba_t, BAs...>
 			       : _F<tau_ba_t, BAs...>;
 	}
