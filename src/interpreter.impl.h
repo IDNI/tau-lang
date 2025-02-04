@@ -430,7 +430,6 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	// time_point, i.e. time point 0 is shifted to time_point
 	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(
 		update, io_vars, time_point);
-	std::cout << "shifted_update: " << shifted_update << "\n";
 	if (shifted_update == _F<BAs...>) {
 		std::cout << "(Warning) no update performed\n";
 		return;
@@ -441,10 +440,13 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 		std::cout << "(Warning) no update performed\n";
 		return;
 	}
+	auto memory_copy = memory;
+	shifted_update = replace(shifted_update, memory_copy);
+	std::cout << "shifted_update: " << shifted_update << "\n";
 
 	// The constant time positions in original_spec need to be replaced
 	// by present assignments from memory and already executed sometimes statements need to be removed
-	auto memory_copy = memory;
+	memory_copy = memory;
 	auto current_spec = replace(original_spec, memory_copy);
 	std::cout << "current_spec: " << current_spec << "\n";
 
@@ -458,9 +460,9 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	}
 
 	// If the unbound continuation from start_time is possible,
-	// it is save to swap the current spec by update_unbound
+	// it is safe to swap the current spec by update_unbound
 	auto new_ubd_ctn = transform_to_execution(
-		new_spec, time_point, true, memory);
+		new_spec, time_point, true);
 	if (new_ubd_ctn == _F<BAs...>) {
 		std::cout << "(Warning) updated specification is unsat\n";
 		return;
@@ -491,7 +493,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 	// Check if the update by itself is sat from current time point onwards
 	// taking the memory into account
 	std::cout << "pwr/new_spec: " << new_spec << "\n";
-	if (!is_tau_formula_sat(new_spec, start_time, memory))
+	if (!is_tau_formula_sat(new_spec, start_time))
 		return _F<BAs...>;
 
 	// Now try to add always part of old spec in a pointwise way
@@ -511,7 +513,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 			new_spec, build_wff_imply(aw, trim2(spec_always.value())));
 
 		std::cout << "pwr/new_spec_pointwise: " << new_spec_pointwise << "\n";
-		if (!is_tau_formula_sat(new_spec_pointwise, start_time, memory))
+		if (!is_tau_formula_sat(new_spec_pointwise, start_time))
 			return new_spec;
 	} else new_spec_pointwise = new_spec;
 
@@ -522,7 +524,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 			build_wff_and<BAs...>(spec_sometimes));
 
 	std::cout << "pwr/new_spec_pointwise_sometimes: " << new_spec_pointwise_sometimes << "\n";
-	if (!is_tau_formula_sat(new_spec_pointwise_sometimes, start_time, memory))
+	if (!is_tau_formula_sat(new_spec_pointwise_sometimes, start_time))
 		return normalizer_step(new_spec_pointwise);
 
 	return normalize_with_temp_simp(new_spec_pointwise_sometimes);

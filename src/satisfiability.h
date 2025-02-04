@@ -229,20 +229,6 @@ tau<BAs...> fm_at_time_point(const tau<BAs...>& original_fm,
 }
 
 template<typename... BAs>
-tau<BAs...> fm_at_time_point_memory(const tau<BAs...>& original_fm,
-	auto &io_vars, int_t time_point,
-	const std::map<tau<BAs...>, tau<BAs...>>& memory) {
-	std::map<tau<BAs...>, tau<BAs...>> changes;
-	for (size_t i = 0; i < io_vars.size(); ++i)
-		changes[io_vars[i]] = transform_io_var(
-			io_vars[i], get_io_name(io_vars[i]), time_point);
-	if (!memory.empty()) {
-		auto memory_copy = memory;
-		return replace(replace(original_fm, changes), memory_copy);
-	} else return replace(original_fm, changes);
-}
-
-template<typename... BAs>
 std::pair<tau<BAs...>, tau<BAs...> > build_initial_step_chi(
 	const tau<BAs...>& chi, const tau<BAs...>& st, auto& io_vars,
 	int_t time_point, auto& pholder_to_st) {
@@ -633,8 +619,7 @@ tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_in
 template<typename... BAs>
 tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	const int_t start_time,
-	const bool output,
-	const std::map<tau<BAs...>, tau<BAs...>>& memory)
+	const bool output)
 {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin always_to_unbounded_continuation";
 	BOOST_LOG_TRIVIAL(debug) << "Start fm for always_to_unbound: " << fm << "\n";
@@ -677,22 +662,18 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 
 	ubd_ctn = normalize_non_temp(ubd_ctn);
 	ubd_ctn = transform_back_non_initials(ubd_ctn, point_after_inits - 1);
-	// If memory is present, apply to formula for constant positions
-	if (!memory.empty()) {
-		auto memory_copy = memory;
-		ubd_ctn = replace(ubd_ctn, memory_copy);
-	}
+
 	// Run phi_inf until all initial conditions are taken into account
 	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
 	tau<BAs...> run = _T<BAs...>;
 	const int_t s = start_time + lookback;
-	// In case there is memory and no initial condition being checked
-	// we still need to check a run once
-	if (!memory.empty() && point_after_inits + lookback <= s)
-		point_after_inits = s+1-lookback; // By def of s, this is positive
+	// // In case no initial condition is being checked
+	// // we still need to check a run once
+	// if (point_after_inits + lookback <= s)
+	// 	point_after_inits = s+1-lookback; // By def of s, this is positive
 	// variable furthest back needs to pass all initial conditions
 	for (int_t t = s; t < point_after_inits + lookback; ++t) {
-		auto current_step = fm_at_time_point_memory(ubd_ctn, io_vars, t, memory);
+		auto current_step = fm_at_time_point(ubd_ctn, io_vars, t);
 		run = build_wff_and(run, current_step);
 		std::cout << "run: " << run << "\n";
 		// Check if run is still sat
@@ -875,8 +856,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 				      const tau<BAs...>& ev_var_flags,
 				      const auto& original_aw,
 				      const int_t start_time,
-				      const bool output,
-				      const std::map<tau<BAs...>, tau<BAs...>>& memory) {
+				      const bool output) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
 
 	using p = tau_parser;
@@ -916,10 +896,10 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	const int_t flag_boundary =
 		std::max(time_point + point_after_inits, s + time_point + 1) + 1;
 	for (int_t i = s; i <= flag_boundary; ++i) {
-		auto current_aw = fm_at_time_point_memory(aw, io_vars, i, memory);
+		auto current_aw = fm_at_time_point(aw, io_vars, i);
 		if (run) run = build_wff_and(run, current_aw);
 		else run = current_aw;
-		auto current_flag = fm_at_time_point_memory(st_flags, st_io_vars, i, memory);
+		auto current_flag = fm_at_time_point(st_flags, st_io_vars, i);
 
 		auto normed_run = normalize_non_temp(build_wff_and(run, current_flag));
 		if (is_run_satisfiable(normed_run)) {
@@ -953,10 +933,6 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	auto [chi_inf, steps ] = find_fixpoint_chi(aw, st_flags, io_vars,
 		initials, time_point + point_after_inits);
 	chi_inf = normalize_non_temp(chi_inf);
-	if (!memory.empty()) {
-		auto memory_copy = memory;
-		chi_inf = replace(chi_inf, memory_copy);
-	}
 
 	// BOOST_LOG_TRIVIAL(trace) << "Fixpoint chi after normalize: " << chi_inf;
 	if (chi_inf == _F<BAs...>) {
@@ -970,8 +946,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 	chi_inf = transform_back_non_initials(chi_inf, point_after_inits - 1);
 	io_vars = select_top(chi_inf, is_child_non_terminal<p::io_var, BAs...>);
-	auto chi_inf_anchored = fm_at_time_point_memory(
-		chi_inf, io_vars, point_after_inits, memory);
+	auto chi_inf_anchored = fm_at_time_point(chi_inf, io_vars, point_after_inits);
 
 	auto sat_check = is_run_satisfiable(
 		build_wff_and(run, chi_inf_anchored));
@@ -988,9 +963,9 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	// Here we know that the formula is satisfiable at some point
 	// Since the initial segment is already checked we continue from there
 	for (int_t i = flag_boundary + 1; true; ++i) {
-		auto current_aw = fm_at_time_point_memory(aw, io_vars, i, memory);
+		auto current_aw = fm_at_time_point(aw, io_vars, i);
 		run = build_wff_and(run, current_aw);
-		auto current_flag = fm_at_time_point_memory(st_flags, st_io_vars, i, memory);
+		auto current_flag = fm_at_time_point(st_flags, st_io_vars, i);
 
 		auto normed_run = normalize_non_temp(build_wff_and(run, current_flag));
 		// The formula is guaranteed to have be sat at some point
@@ -1016,12 +991,11 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 template<typename... BAs>
 tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 				const int_t start_time = 0,
-				const bool output = false,
-				const std::map<tau<BAs...>, tau<BAs...>>& memory = {}) {
+				const bool output = false ) {
 	assert(get_dnf_wff_clauses(fm).size() == 1);
 #ifdef TAU_CACHE
 	static std::map<tau<BAs...>, tau<BAs...>> cache;
-	if (auto it = cache.find(fm); memory.empty() && it != cache.end())
+	if (auto it = cache.find(fm); it != cache.end())
 		return it->second;
 #endif
 	using p = tau_parser;
@@ -1044,7 +1018,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	if (aw_fm.has_value()) {
 		// If there is an always part, replace it with its unbound continuation
 		ubd_aw_fm = always_to_unbounded_continuation(
-			aw_fm.value(), start_time, output, memory);
+			aw_fm.value(), start_time, output);
 		std::map<tau<BAs...>, tau<BAs...> > changes = {
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
@@ -1053,10 +1027,8 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 		// Check if there is a sometimes present
 		if (ev_t == ubd_fm) {
 #ifdef TAU_CACHE
-			if (memory.empty()) {
-				cache.emplace(elim_aw(ubd_fm), elim_aw(ubd_fm));
-				return cache.emplace(fm, elim_aw(ubd_fm)).first->second;
-			}
+			cache.emplace(elim_aw(ubd_fm), elim_aw(ubd_fm));
+			return cache.emplace(fm, elim_aw(ubd_fm)).first->second;
 #endif
 			return elim_aw(ubd_fm);
 		}
@@ -1065,8 +1037,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 		// Check if there is a sometimes present
 		if (ev_t == fm) {
 #ifdef TAU_CACHE
-			if (memory.empty())
-				return cache.emplace(fm, elim_aw(fm)).first->second;
+			return cache.emplace(fm, elim_aw(fm)).first->second;
 #endif
 			return elim_aw(fm);
 		}
@@ -1074,8 +1045,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	auto aw_after_ev = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
 	if (!aw_after_ev.has_value()) {
 #ifdef TAU_CACHE
-		if (memory.empty())
-			return cache.emplace(fm, elim_aw(fm)).first->second;
+		return cache.emplace(fm, elim_aw(fm)).first->second;
 #endif
 		return elim_aw(fm);
 	}
@@ -1086,22 +1056,19 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	if (aw_after_ev.value() != _F<BAs...> && !st.empty())
 		res = normalize_non_temp(to_unbounded_continuation(
 			aw_after_ev.value(), st[0], ubd_aw_fm, start_time,
-			output, memory));
+			output));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
 	res = elim_aw(res);
 #ifdef TAU_CACHE
-	if (memory.empty()) {
-		cache.emplace(res, res);
-		return cache.emplace(fm, res).first->second;
-	}
+	cache.emplace(res, res);
+	return cache.emplace(fm, res).first->second;
 #endif
 	return res;
 }
 
 template<typename... BAs>
 bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
-			const std::map<tau<BAs...>, tau<BAs...>>& memory = {},
 			const bool output = false) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
@@ -1110,7 +1077,7 @@ bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
 				  tau_parser::wff);
 	// Convert each disjunct to unbounded continuation
 	for (auto& clause: clauses) {
-		if (transform_to_execution(clause, start_time, output, memory) != _F<BAs...>) {
+		if (transform_to_execution(clause, start_time, output) != _F<BAs...>) {
 			BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
 			return true;
 		}
