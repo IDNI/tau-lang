@@ -357,11 +357,8 @@ bool is_run_satisfiable(const tau<BAs...>& fm) {
 
 // Assumption is that the provided fm is an unbound continuation
 template<typename... BAs>
-tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm) {
+tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto& io_vars) {
 	using p = tau_parser;
-	std::vector<tau<BAs...> > io_vars = select_top(fm,
-				is_child_non_terminal<p::io_var, BAs...>);
-
 	// Substitute lookback as current time point
 	auto look_back = get_max_shift(io_vars);
 	auto uconst_ctns = fm_at_time_point(fm, io_vars, look_back);
@@ -1005,12 +1002,6 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	std::cout << "Transform_to_execution happening.\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
-	// Make sure that no constant time position is smaller than start_time
-	auto io_vars = select_top(fm, is_child_non_terminal<p::io_var, BAs...>);
-	for (const auto& io_var : io_vars) {
-		if (is_io_initial(io_var) && get_io_time_point(io_var) < start_time)
-			return _F<BAs...>;
-	}
 
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 	tau<BAs...> ev_t;

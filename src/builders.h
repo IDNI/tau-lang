@@ -137,12 +137,13 @@ tau<BAs...> build_int(int_t i) {
 	using p = tau_parser;
 	std::vector<tau<BAs...>> children;
 	const bool n = i < 0;
+	size_t u = n ? (size_t)(-i) : (size_t)i;
 	if (n) {
 		children.emplace_back(rewriter::make_node<tau_sym<BAs...>>(
 				tau_source_sym('-'), {}));
 	}
 	children.emplace_back(rewriter::make_node<tau_sym<BAs...>>(
-				tau_sym<BAs...>(n ? -i : i),{}));
+				tau_sym<BAs...>(u),{}));
 	return wrap(p::integer, children);
 }
 

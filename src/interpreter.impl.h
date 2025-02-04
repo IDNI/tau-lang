@@ -68,7 +68,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 			if (!values.has_value()) return {assignment<BAs...>{}, true};
 			// Save inputs in memory
 			for (const auto& [var, value] : values.value()) {
-				assert(get_io_time_point(trim(var)) <= time_point);
+				assert(get_io_time_point(trim(var)) <= (int_t)time_point);
 				// If there is at least one input, continue automatically in execution
 				auto_continue = true;
 				memory[var] = value;
@@ -160,16 +160,8 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 			for (const auto& [o, _ ] : outputs.streams) {
 				auto ot = build_out_variable_at_n(o, time_point);
 				if (auto it = global.find(ot); it == global.end()) {
-					// If it is not in global, see if is in memory
-					// Can happen due to pointwise revision
-					if (auto it2 = memory.find(ot); it2 != memory.end()) {
-						global.emplace(ot, it2->second);
-					}
-					//TODO: Enable autocomplete again after type inference is there
-					// else {
-					// 	memory.emplace(ot, _0<BAs...>);
-					// 	global.emplace(ot, _0<BAs...>);
-					// }
+					memory.emplace(ot, _0<BAs...>);
+					global.emplace(ot, _0<BAs...>);
 				}
 			}
 			if (global.empty()) {
@@ -380,9 +372,17 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(const tau<BAs...>& f
 			<< "compute_systems/executable: " << executable;
 #endif // DEBUG
 		if (executable == _F<BAs...>) continue;
-
+		// Make sure that no constant time position is smaller than 0
+		auto io_vars = select_top(executable, is_child_non_terminal<tau_parser::io_var, BAs...>);
+		for (const auto& io_var : io_vars) {
+			if (is_io_initial(io_var) && get_io_time_point(io_var) < 0) {
+				std::cout << "(Error) Constant time position is smaller than 0\n";
+				return std::make_pair(nullptr, nullptr);
+			}
+		}
 		// compute model for uninterpreted constants and solve it
-		auto constraints = get_uninterpreted_constants_constraints(executable);
+		auto constraints =
+			get_uninterpreted_constants_constraints(executable, io_vars);
 		if (constraints == _F<BAs...>) continue;
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
@@ -431,13 +431,13 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(
 		update, io_vars, time_point);
 	if (shifted_update == _F<BAs...>) {
-		std::cout << "(Warning) no update performed\n";
+		std::cout << "(Warning) no update performed: constant time position below 0 was found\n";
 		return;
 	}
 	io_vars = select_top(shifted_update,
 		is_child_non_terminal<tau_parser::io_var, BAs...>);
 	if (!is_memory_access_valid(io_vars)) {
-		std::cout << "(Warning) no update performed\n";
+		std::cout << "(Warning) no update performed: invalid memory access was found\n";
 		return;
 	}
 	auto memory_copy = memory;
@@ -455,7 +455,7 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	auto new_spec = pointwise_revision(current_spec, shifted_update, time_point);
 	std::cout << "new_spec: " << new_spec << "\n";
 	if (new_spec == _F<BAs...>) {
-		std::cout << "(Warning) no updated performed\n";
+		std::cout << "(Warning) no updated performed: updated specification is unsat\n";
 		return;
 	}
 
@@ -464,7 +464,7 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	auto new_ubd_ctn = transform_to_execution(
 		new_spec, time_point, true);
 	if (new_ubd_ctn == _F<BAs...>) {
-		std::cout << "(Warning) updated specification is unsat\n";
+		std::cout << "(Warning) no update performed: updated specification is unsat\n";
 		return;
 	}
 
