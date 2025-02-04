@@ -648,13 +648,37 @@ bool has_open_tau_fm_in_constant (const tau<BAs...>& fm) {
 	return false;
 }
 
+// Check that no recurrence relation offset is negative
+template <typename... BAs>
+bool has_negative_offset(const tau<BAs...>& fm) {
+	using p = tau_parser;
+	auto terms = [](const auto& n) {
+		return is_non_terminal(p::ref, n) ||
+			is_non_terminal(p::bf_ref, n) ||
+				is_non_terminal(p::wff_ref, n);
+	};
+	for (const auto& ref : select_top(fm, terms)) {
+		auto offsets = ref | p::offsets;
+		if (!offsets.has_value()) continue;
+		for (const auto& i : select_top(offsets.value(), is_non_terminal<p::integer, BAs...>)) {
+			// Check that each integer is positive
+			if (int_extractor<BAs...>(i) < 0) {
+				BOOST_LOG_TRIVIAL(error) << "(Error) Index in recurrence relation is negative " << ref;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 // This function is used to check for semantic errors in formulas since those
 // cannot be captured by the grammar
 template <typename... BAs>
 bool has_semantic_error (const tau<BAs...>& fm) {
 	bool error = invalid_nesting_of_quants(fm)
 			|| has_open_tau_fm_in_constant(fm)
-			|| invalid_nesting_of_temp_quants(fm);
+			|| invalid_nesting_of_temp_quants(fm)
+			|| has_negative_offset(fm);
 	return error;
 }
 

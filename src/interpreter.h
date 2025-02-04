@@ -104,7 +104,7 @@ struct finputs {
 			if (var | tau_parser::io_var | tau_parser::out)
 				continue;
 			// Skip input stream variables with time point greater time_step
-			if (get_io_time_point(var) > time_step)
+			if (get_io_time_point(var) > (int_t)time_step)
 				continue;
 			assert(is_non_terminal(tau_parser::variable, var));
 			std::string line;
@@ -257,93 +257,6 @@ struct foutputs {
 
 	std::map<tau<BAs...>, type> types;
 	std::map<tau<BAs...>, std::optional<std::ofstream>> streams;
-
-private:
-
-	std::vector<assignment<BAs...>> sort(const assignment<BAs...>& sol) {
-		auto compute_range = [](const assignment<BAs...>& sol) {
-			size_t lower = std::numeric_limits<size_t>::max(), upper = 0;
-			for (const auto& [var, value]: sol) {
-				if (auto num = var
-						| tau_parser::variable
-						| tau_parser::io_var
-						| tau_parser::out
-						| tau_parser::offset
-						| tau_parser::num
-						| only_child_extractor<BAs...>
-						| offset_extractor<BAs...>; num) {
-					lower = std::min(lower, num | optional_value_extractor<size_t>);
-					upper = std::max(upper, num | optional_value_extractor<size_t>);
-				}
-			}
-			return std::make_pair(lower, upper);
-		};
-
-		auto [lower, upper] = compute_range(sol);
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "sort/lower: " << lower << "\n"
-			<< "sort/upper: " << upper << "\n";
-		#endif // DEBUG
-
-		std::vector<assignment<BAs...>> result(upper - lower + 1);
-
-		for (auto& [var, value]: sol) {
-			if (auto num = var
-					| tau_parser::variable
-					| tau_parser::io_var
-					| tau_parser::out
-					| tau_parser::offset
-					| tau_parser::num
-					| only_child_extractor<BAs...>
-					| offset_extractor<BAs...>; num) {
-				auto io_var = var
-					| tau_parser::variable
-					| tau_parser::io_var
-					| tau_parser::out
-					| tau_parser::out_var_name
-					| optional_value_extractor<tau<BAs...>>;
-				result[num.value() - lower][io_var] = value;
-			}
-		}
-
-		#ifdef DEBUG
-		for (size_t i = 0; i < result.size(); ++i) {
-			BOOST_LOG_TRIVIAL(trace)
-				<< "sort/result/[" << i <<"]: ";
-			for (const auto& [k, v]: result[i])
-				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " := " << v << " ";
-			BOOST_LOG_TRIVIAL(trace) << "\n";
-		}
-		#endif // DEBUG
-
-		return result;
-	}
-
-	std::vector<assignment<BAs...>> complete(const std::vector<assignment<BAs...>>& sols) {
-		std::vector<assignment<BAs...>> result(sols.size());
-		for (size_t i = 0; i < sols.size(); ++i) {
-			assignment<BAs...> nsol = sols[i];
-			for (const auto& [var, _]: types)
-				if ( !nsol.contains(var) ) nsol[var] = _0<BAs...>;
-			result[i] = nsol;
-		}
-
-		#ifdef DEBUG
-		for (size_t i = 0; i < result.size(); ++i) {
-			BOOST_LOG_TRIVIAL(trace)
-				<< "complete/result/[" << i <<"]: ";
-			for (const auto& [k, v]: result[i])
-				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " := " << v << " ";
-			BOOST_LOG_TRIVIAL(trace) << "\n";
-		}
-		#endif // DEBUG
-
-		return result;
-	}
 };
 
 template<typename input_t, typename output_t, typename...BAs>
@@ -410,6 +323,8 @@ private:
 
 	tau<BAs...> update_to_time_point(const tau<BAs...>& f);
 
+	bool is_memory_access_valid(const auto& io_vars);
+
 	// If a variable is assigned a variable V in a solution from the solver,
 	// try to find a non-variable value by checking the solution for V
 	void resolve_solution_dependencies(solution<BAs...>& s);
@@ -418,7 +333,8 @@ private:
 	void compute_lookback_and_initial ();
 
 	// Find an executable specification from DNF
-	static tau<BAs...> get_executable_spec(const tau<BAs...>& fm);
+	static std::pair<tau<BAs...>, tau<BAs...>>
+	get_executable_spec(const tau<BAs...>& fm);
 
 	// Pointwise revision algorithm for producing updated specification
 	// Both spec and update need to be normalized
