@@ -12,7 +12,7 @@ std::optional<interpreter<input_t, output_t, BAs...>>
 interpreter<input_t, output_t, BAs...>::make_interpreter(
 	const tau<BAs...>& spec, const auto& inputs, const auto& outputs) {
 	// Find a satisfiable unbound continuation from spec
-	auto ubd_ctn = get_executable_spec(spec);
+	auto [ubd_ctn, clause] = get_executable_spec(spec);
 	if (ubd_ctn == nullptr) {
 		BOOST_LOG_TRIVIAL(error)
 			<< "(Error) Tau specification is unsat\n";
@@ -28,8 +28,7 @@ interpreter<input_t, output_t, BAs...>::make_interpreter(
 	//after the above, we have the interpreter ready to be used.
 	assignment<BAs...> memory;
 	return interpreter {
-		// TODO: spec needs to be clause matching ubd_ctn
-		ubd_ctn, spec, memory, inputs, outputs
+		ubd_ctn, clause, memory, inputs, outputs
 	};
 };
 
@@ -142,7 +141,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 				for (const auto& [var, value]: solution) {
 					// Check if we are dealing with a stream variable
 					if (var | tau_parser::variable | tau_parser::io_var) {
-						if (get_io_time_point(trim(var)) <= time_point) {
+						if (get_io_time_point(trim(var)) <= (int_t)time_point) {
 							// std::cout << "time_point: " << time_point << "\n";
 							// std::cout << "var: " << var << "\n";
 							memory.emplace(var, value);
@@ -220,7 +219,7 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 			[](const auto& el){return is_io_initial(el);}));
 		while (!io_vars.empty()) {
 			auto& v = io_vars.back();
-			if (get_io_time_point(v) <= time_point) {
+			if (get_io_time_point(v) <= (int_t)time_point) {
 				io_vars.pop_back();
 				continue;
 			}
@@ -246,35 +245,24 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::update_to_time_point(const t
 	// update the f according to current time_point, i.e. for each
 	// input/output var which has a shift, we replace it with the value
 	// corresponding to the current time_point minus the shift.
-	std::map<tau<BAs...>, tau<BAs...> > changes;
-	for (const auto& io_var:
-		select_top(
-			f, is_non_terminal<tau_parser::io_var, BAs...>))
-		if (auto shift = io_var
-				| only_child_extractor<BAs...>
-				| tau_parser::offset
-				| tau_parser::shift,
-					var = shift
-						| tau_parser::variable,
-					num = shift
-						| tau_parser::num
-						| only_child_extractor<
-							BAs...>
-						| offset_extractor<BAs
-							...>;
-			num && var)
-			changes[shift.value()] = build_num<BAs...>(
-				formula_time_point - num.value());
-		else if (auto offset = io_var
-					| only_child_extractor<BAs...>
-					| tau_parser::offset,
-					variable = offset
-						| tau_parser::variable;
-			variable)
-			changes[offset.value()] = wrap(
-				tau_parser::offset,
-				build_num<BAs...>(formula_time_point));
-	return changes.empty() ? f : replace(f, changes);
+	auto io_vars = select_top(f,
+		is_child_non_terminal<tau_parser::io_var, BAs...>);
+	return fm_at_time_point(f, io_vars, formula_time_point);
+}
+
+template<typename input_t, typename output_t, typename ... BAs>
+bool interpreter<input_t, output_t, BAs...>::is_memory_access_valid(
+	const auto& io_vars) {
+	using p = tau_parser;
+	// Check for each constant time point accessing memory, if it is available
+	for (const auto& io_var : io_vars) {
+		if (is_io_initial(io_var) &&
+			get_io_time_point(io_var) < (int_t)time_point) {
+			const auto& v = wrap(p::bf, io_var);
+			if (!memory.contains(v)) return false;
+		}
+	}
+	return true;
 }
 
 template<typename input_t, typename output_t, typename...BAs>
@@ -378,7 +366,8 @@ std::optional<std::pair<type, tau<BAs...>>> interpreter<input_t, output_t, BAs..
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-tau<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const tau<BAs...>& fm) {
+std::pair<tau<BAs...>, tau<BAs...>>
+interpreter<input_t, output_t, BAs...>::get_executable_spec(const tau<BAs...>& fm) {
 	for (auto& clause : get_dnf_wff_clauses(fm)) {
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
@@ -428,23 +417,30 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_executable_spec(const ta
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/program: " << spec;
 #endif // DEBUG
-		return spec;
+		return std::make_pair(spec, clause);
 	}
-	return nullptr;
+	return std::make_pair(nullptr, nullptr);
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
 void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	auto io_vars = select_top(
 		update, is_child_non_terminal<tau_parser::io_var, BAs...>);
-	int_t lb = get_max_shift(io_vars);
-	// Use bool conversion to integer to decide minimal lookback
-	int_t art_lb = (lb == 0 && has_stream_flag(update));
-	std::cout << "artificial_lookback: " << art_lb << "\n";
 	// the constant time positions in update are seen relative to
 	// time_point, i.e. time point 0 is shifted to time_point
-	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(update, time_point);
+	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(
+		update, io_vars, time_point);
 	std::cout << "shifted_update: " << shifted_update << "\n";
+	if (shifted_update == _F<BAs...>) {
+		std::cout << "(Warning) no update performed\n";
+		return;
+	}
+	io_vars = select_top(shifted_update,
+		is_child_non_terminal<tau_parser::io_var, BAs...>);
+	if (!is_memory_access_valid(io_vars)) {
+		std::cout << "(Warning) no update performed\n";
+		return;
+	}
 
 	// The constant time positions in original_spec need to be replaced
 	// by present assignments from memory and already executed sometimes statements need to be removed

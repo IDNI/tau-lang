@@ -1029,10 +1029,10 @@ tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 	auto args = n || tau_parser::num;
 	if (args.size() == 2) {
 		auto left  = args[0] | only_child_extractor<BAs...>
-			| offset_extractor<BAs...>
+			| size_t_extractor<BAs...>
 			| optional_value_extractor<size_t>;
 		auto right = args[1] | only_child_extractor<BAs...>
-			| offset_extractor<BAs...>
+			| size_t_extractor<BAs...>
 			| optional_value_extractor<size_t>;
 		if (left >= right)
 			return build_num<BAs...>(left-right);

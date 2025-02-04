@@ -34,7 +34,7 @@ template<typename... BAs>
 tau<BAs...> build_io_out_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
-	auto offset = wrap<BAs...>(p::offset, build_num<BAs...>(pos));
+	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
 	return wrap(p::variable, wrap(p::io_var, wrap(p::out, { var_name, offset })));
 }
 
@@ -42,7 +42,7 @@ template<typename... BAs>
 tau<BAs...> build_io_in_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
-	auto offset = wrap<BAs...>(p::offset, build_num<BAs...>(pos));
+	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
 	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
 }
 
@@ -511,8 +511,7 @@ tau<BAs...> transform_back_non_initials(const tau<BAs...>& fm, const int_t highe
 	// Get time positions which are higher than highest_init_cond and transform back to
 	// time variable depending on t
 	for (const auto& io_var : current_io_vars) {
-		int_t time_point = size_t_extractor<BAs...>(
-			trim2(trim2(io_var)->child[1])).value();
+		int_t time_point = get_io_time_point(io_var);
 		if (time_point <= highest_init_cond)
 			continue;
 
@@ -1032,10 +1031,13 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	std::cout << "Transform_to_execution happening.\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
-	// We merge all always statements on each clause
-	// fm = pull_always_out_for_inf(fm);
-	BOOST_LOG_TRIVIAL(debug) << "(I) Merged always statements on each clause";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	// Make sure that no constant time position is smaller than start_time
+	auto io_vars = select_top(fm, is_child_non_terminal<p::io_var, BAs...>);
+	for (const auto& io_var : io_vars) {
+		if (is_io_initial(io_var) && get_io_time_point(io_var) < start_time)
+			return _F<BAs...>;
+	}
+
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 	tau<BAs...> ev_t;
 	tau<BAs...> ubd_aw_fm;
