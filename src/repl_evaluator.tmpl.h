@@ -514,7 +514,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		auto applied = apply_rr_to_rr_tau_nso(t, program);
 
 		#ifdef DEBUG
-		std::cout << "applied: " << applied << "\n";
+		BOOST_LOG_TRIVIAL(debug) << "applied: " << applied << "\n";
 		#endif // DEBUG
 
 		//
