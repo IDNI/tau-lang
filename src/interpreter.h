@@ -356,11 +356,12 @@ std::optional<tau<BAs...>> unpack_tau_constant(const tau<BAs...>& constant) {
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
+std::optional<interpreter<input_t, output_t, BAs...>>
+run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t steps = 0) {
 	auto spec = normalizer(form);
 	auto intrprtr = interpreter<input_t, output_t, BAs...>
 		::make_interpreter(spec, inputs, outputs);
-	if (!intrprtr) return;
+	if (!intrprtr) return {};
 
 	BOOST_LOG_TRIVIAL(info) << "-----------------------------------------------------------------------------------------------------------";
 	BOOST_LOG_TRIVIAL(info) << "Please provide requested input, or press ENTER to terminate                                               |";
@@ -368,37 +369,34 @@ void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
 	BOOST_LOG_TRIVIAL(info) << "-----------------------------------------------------------------------------------------------------------\n\n";
 
 	// Continuously perform execution step until user quits
-	size_t highest_step = 0;
 	while (true) {
 		auto [output, auto_continue] = intrprtr.value().step();
 		// If the user provided empty input for an input stream, quit
-		if (!output.has_value()) return;
-		if (!outputs.write(output.value())) return;
+		if (!output.has_value()) break;
+		if (!outputs.write(output.value())) break;
 		// If there is no input, ask the user if execution should continue
-		if (!auto_continue) {
+		if (!auto_continue || steps != 0) {
 			std::string line;
 			term::enable_getline_mode();
 			std::getline(std::cin, line);
 			term::disable_getline_mode();
 			if (line == "q" || line == "quit")
-				return;
+				break;
 		} else std::cout << "\n";
 
-		// Update interpreter only if not currently re-doing previous steps due to previous update
-		if (highest_step >= intrprtr.value().time_point)
-			continue;
-		highest_step = intrprtr.value().time_point;
-
 		// Update interpreter in case the output stream u is present and unequal to 0
-		for (const auto& [o, a] : output.value()) {
-			if (get_io_name(trim(o)) == "u" && a != _0<BAs...>) {
-				auto update = unpack_tau_constant(a);
-				if (!update) break;
-				std::cout << "update: " << update.value() << "\n";
+		auto it = output.value().find(
+			build_out_variable_at_n<BAs...>("u", intrprtr.value().time_point - 1));
+		if (it != output.value().end() && it->second != _0<BAs...>) {
+			auto update = unpack_tau_constant(it->second);
+			if (update) {
+				BOOST_LOG_TRIVIAL(trace) << "update: " << update.value() << "\n";
 				intrprtr.value().update(update.value());
 			}
 		}
+		if (steps != 0 && intrprtr.value().time_point == steps) break;
 	}
+	return intrprtr;
 }
 
 } // namespace idni::tau_lang
