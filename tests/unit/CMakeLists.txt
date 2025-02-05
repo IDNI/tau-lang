@@ -8,6 +8,7 @@ set(TESTS
 	rules-bf_parsing
 	rules-wff_execution
 	rules-wff_parsing
+	bitvector
 	builders
 	rewriting
 	nso_rr
