@@ -41,7 +41,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 		return {};
 	// for each system in systems try to solve it, if it is not possible
 	// continue with the next system.
-	std::cout << "Execution step: " << time_point << "\n";
+	BOOST_LOG_TRIVIAL(info) << "Execution step: " << time_point << "\n";
 	bool auto_continue = false;
 	for (const auto& system: this->systems) {
 		std::map<type, solution<BAs...>> solutions;
@@ -196,8 +196,8 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 	if (final_system) return true;
 
 	size_t initial_segment = std::max(highest_initial_pos, (int_t)formula_time_point);
-	std::cout << "initial_segment: " << initial_segment << "\n";
-	std::cout << "time_point: " << time_point << "\n";
+	BOOST_LOG_TRIVIAL(trace) << "cis/initial_segment: " << initial_segment << "\n";
+	BOOST_LOG_TRIVIAL(trace) << "cis/time_point: " << time_point << "\n";
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
 		// Adjust ubt_ctn to time_point by eliminating inputs and outputs
@@ -376,7 +376,7 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(const tau<BAs...>& f
 		auto io_vars = select_top(executable, is_child_non_terminal<tau_parser::io_var, BAs...>);
 		for (const auto& io_var : io_vars) {
 			if (is_io_initial(io_var) && get_io_time_point(io_var) < 0) {
-				std::cout << "(Error) Constant time position is smaller than 0\n";
+				BOOST_LOG_TRIVIAL(error) << "(Error) Constant time position is smaller than 0\n";
 				return std::make_pair(nullptr, nullptr);
 			}
 		}
@@ -431,31 +431,31 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(
 		update, io_vars, time_point);
 	if (shifted_update == _F<BAs...>) {
-		std::cout << "(Warning) no update performed: constant time position below 0 was found\n";
+		BOOST_LOG_TRIVIAL(info) << "(Warning) no update performed: constant time position below 0 was found\n";
 		return;
 	}
 	io_vars = select_top(shifted_update,
 		is_child_non_terminal<tau_parser::io_var, BAs...>);
 	if (!is_memory_access_valid(io_vars)) {
-		std::cout << "(Warning) no update performed: invalid memory access was found\n";
+		BOOST_LOG_TRIVIAL(info) << "(Warning) no update performed: invalid memory access was found\n";
 		return;
 	}
 	auto memory_copy = memory;
 	shifted_update = replace(shifted_update, memory_copy);
-	std::cout << "shifted_update: " << shifted_update << "\n";
+	BOOST_LOG_TRIVIAL(trace) << "update/shifted_update: " << shifted_update << "\n";
 
 	// The constant time positions in original_spec need to be replaced
 	// by present assignments from memory and already executed sometimes statements need to be removed
 	memory_copy = memory;
 	auto current_spec = replace(original_spec, memory_copy);
-	std::cout << "current_spec: " << current_spec << "\n";
+	BOOST_LOG_TRIVIAL(debug) << "update/current_spec: " << current_spec << "\n";
 
 	// TODO: current_spec = remove_happend_sometimes(current_spec);
 
 	auto new_spec = pointwise_revision(current_spec, shifted_update, time_point);
-	std::cout << "new_spec: " << new_spec << "\n";
+	BOOST_LOG_TRIVIAL(debug) << "update/new_spec: " << new_spec << "\n";
 	if (new_spec == _F<BAs...>) {
-		std::cout << "(Warning) no updated performed: updated specification is unsat\n";
+		BOOST_LOG_TRIVIAL(info) << "(Warning) no updated performed: updated specification is unsat\n";
 		return;
 	}
 
@@ -464,7 +464,7 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	auto new_ubd_ctn = transform_to_execution(
 		new_spec, time_point, true);
 	if (new_ubd_ctn == _F<BAs...>) {
-		std::cout << "(Warning) no update performed: updated specification is unsat\n";
+		BOOST_LOG_TRIVIAL(info) << "(Warning) no update performed: updated specification is unsat\n";
 		return;
 	}
 
@@ -480,54 +480,56 @@ template<typename input_t, typename output_t, typename ... BAs>
 tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 	const tau<BAs...>& spec, const tau<BAs...>& update, const int_t start_time) {
 	using p = tau_parser;
-	// TODO: if update has more than one clause, need to choose one
+	for (const auto& clause : get_dnf_wff_clauses(update)) {
+		auto upd_always = find_top(
+			clause, is_child_non_terminal<p::wff_always, BAs...>);
+		auto spec_sometimes = select_top(
+			spec, is_child_non_terminal<p::wff_sometimes, BAs...>);
+		auto spec_always = find_top(
+			spec, is_child_non_terminal<p::wff_always, BAs...>);
 
-	auto upd_always = find_top(
-		update, is_child_non_terminal<p::wff_always, BAs...>);
-	auto spec_sometimes = select_top(
-		spec, is_child_non_terminal<p::wff_sometimes, BAs...>);
-	auto spec_always = find_top(
-		spec, is_child_non_terminal<p::wff_always, BAs...>);
+		tau<BAs...> new_spec = normalizer(clause);
+		// Check if the update by itself is sat from current time point onwards
+		// taking the memory into account
+		BOOST_LOG_TRIVIAL(trace) << "pwr/new_spec: " << new_spec << "\n";
+		if (!is_tau_formula_sat(new_spec, start_time))
+			continue;
 
-	tau<BAs...> new_spec = normalizer(update);
-	// Check if the update by itself is sat from current time point onwards
-	// taking the memory into account
-	std::cout << "pwr/new_spec: " << new_spec << "\n";
-	if (!is_tau_formula_sat(new_spec, start_time))
-		return _F<BAs...>;
+		// Now try to add always part of old spec in a pointwise way
+		tau<BAs...> new_spec_pointwise;
+		if (spec_always) {
+			tau<BAs...> aw;
+			if (upd_always)
+				aw = build_wff_and(trim2(upd_always.value()),
+					trim2(spec_always.value()));
+			else aw = trim2(spec_always.value());
 
-	// Now try to add always part of old spec in a pointwise way
-	tau<BAs...> new_spec_pointwise;
-	if (spec_always) {
-		tau<BAs...> aw;
-		if (upd_always)
-			aw = build_wff_and(trim2(upd_always.value()),
-				trim2(spec_always.value()));
-		else aw = trim2(spec_always.value());
+			auto aw_io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
+			for (const auto& io_var : aw_io_vars)
+				if (io_var | p::io_var | p::out)
+					aw = build_wff_ex(io_var, aw);
+			new_spec_pointwise = build_wff_and(
+				new_spec, build_wff_imply(aw, trim2(spec_always.value())));
 
-		auto aw_io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
-		for (const auto& io_var : aw_io_vars)
-			if (io_var | p::io_var | p::out)
-				aw = build_wff_ex(io_var, aw);
-		new_spec_pointwise = build_wff_and(
-			new_spec, build_wff_imply(aw, trim2(spec_always.value())));
+			BOOST_LOG_TRIVIAL(trace) << "pwr/new_spec_pointwise: " << new_spec_pointwise << "\n";
+			if (!is_tau_formula_sat(new_spec_pointwise, start_time))
+				return new_spec;
+		} else new_spec_pointwise = new_spec;
 
-		std::cout << "pwr/new_spec_pointwise: " << new_spec_pointwise << "\n";
-		if (!is_tau_formula_sat(new_spec_pointwise, start_time))
-			return new_spec;
-	} else new_spec_pointwise = new_spec;
+		if (spec_sometimes.empty()) return normalizer_step(new_spec_pointwise);
+		// Now try to add sometimes part of old spec
+		auto new_spec_pointwise_sometimes =
+			build_wff_and(new_spec_pointwise,
+				build_wff_and<BAs...>(spec_sometimes));
 
-	if (spec_sometimes.empty()) return normalizer_step(new_spec_pointwise);
-	// Now try to add sometimes part of old spec
-	auto new_spec_pointwise_sometimes =
-		build_wff_and(new_spec_pointwise,
-			build_wff_and<BAs...>(spec_sometimes));
+		BOOST_LOG_TRIVIAL(trace) << "pwr/new_spec_pointwise_sometimes: " << new_spec_pointwise_sometimes << "\n";
+		if (!is_tau_formula_sat(new_spec_pointwise_sometimes, start_time))
+			return normalizer_step(new_spec_pointwise);
 
-	std::cout << "pwr/new_spec_pointwise_sometimes: " << new_spec_pointwise_sometimes << "\n";
-	if (!is_tau_formula_sat(new_spec_pointwise_sometimes, start_time))
-		return normalizer_step(new_spec_pointwise);
-
-	return normalize_with_temp_simp(new_spec_pointwise_sometimes);
+		return normalize_with_temp_simp(new_spec_pointwise_sometimes);
+	}
+	// If no clause is sat, return F
+	return _F<BAs...>;
 }
 
 } // namespace idni::tau_lang

@@ -672,7 +672,7 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	for (int_t t = s; t < point_after_inits + lookback; ++t) {
 		auto current_step = fm_at_time_point(ubd_ctn, io_vars, t);
 		run = build_wff_and(run, current_step);
-		std::cout << "run: " << run << "\n";
+		BOOST_LOG_TRIVIAL(trace) << "aw_ubd/run: " << run << "\n";
 		// Check if run is still sat
 		run = normalize_non_temp(run);
 		if (!is_run_satisfiable(run)) {
@@ -788,7 +788,7 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ct
 		// Add flag assumptions from constant time constraints
 		ev_assm = build_wff_and(ev_assm, build_wff_and(ctn_initials, ctn_assm));
 
-		std::cout << "ev_assm: " << ev_assm << "\n";
+		BOOST_LOG_TRIVIAL(trace) << "trans_ev/ev_assm: " << ev_assm << "\n";
 
 		ev_collection = build_bf_or(ev_collection, eNt_without_lookback);
 	}
@@ -999,7 +999,6 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	auto elim_aw = [](const auto& f) {
 		return is_child_non_terminal(p::wff_always, f) ? trim2(f) : f;
 	};
-	std::cout << "Transform_to_execution happening.\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 
