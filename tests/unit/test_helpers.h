@@ -51,7 +51,7 @@ namespace idni::tau_lang {
 		}
 
 		std::optional<Bool> unpack_tau_ba(
-			const std::variant<Bool>& v) const {
+			const std::variant<Bool>&) const {
 			// There is no tau_ba
 			return {};
 		}
