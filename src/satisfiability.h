@@ -1109,6 +1109,27 @@ bool are_tau_equivalent (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 	return true;
 }
 
+template<typename... BAs>
+tau<BAs...> simp_tau_unsat_valid(const tau<BAs...>& fm, const int_t start_time = 0,
+			const bool output = false) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) Start simp_tau_unsat_valid";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	// Check if formula is valid
+	if (is_tau_impl(_T<BAs...>, fm)) return _T<BAs...>;
+	auto normalized_fm = normalize_with_temp_simp(fm);
+	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or,
+				  tau_parser::wff);
+
+	// Check satisfiability of each clause
+	for (auto& clause: clauses) {
+		if (transform_to_execution(clause, start_time, output) == _F<BAs...>)
+			clause = _F<BAs...>;
+	}
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) End simp_tau_unsat_valid";
+	return build_wff_or<BAs...>(clauses);
+}
+
 /*
  *  Possible tests:
  *  (o1[t-1] = 0 -> o1[t] = 1) && (o1[t-1] = 1 -> o1[t] = 0) && o1[0] = 0, passing
