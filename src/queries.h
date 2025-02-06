@@ -400,11 +400,16 @@ std::optional<size_t> operator|(const tau<BAs...>& o,
 	return e(o);
 }
 
-// returns an optional containing the offset of the node if possible
-template <typename...BAs>
-static const auto& offset_extractor = size_t_extractor<BAs...>;
-template <typename...BAs>
-using offset_extractor_t = size_t_extractor_t<BAs...>;
+template<typename...BAs>
+inline const auto int_extractor = [](const tau<BAs...>& n) {
+	assert(is_non_terminal(tau_parser::integer, n));
+	const auto& c = n->child;
+	if (c.size() == 1) {
+		return (int_t)std::get<size_t>(c[0]->value);
+	} else {
+		return -((int_t)std::get<size_t>(c[1]->value));
+	}
+};
 
 // returns an optional containing the bas... of the node if possible
 template <typename... BAs>
