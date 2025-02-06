@@ -563,8 +563,6 @@ std::optional<minterm_system<BAs...>> add_minterm_to_disjoint(
 
 			// case 4
 			} else {
-				// do not consider splitters due to the selected mode
-				if (options.mode != solver_mode::general) return {};
 
 				// otherwise, go with the splitters
 				#ifdef DEBUG
@@ -763,7 +761,7 @@ std::optional<solution<BAs...>> solve_inequality_system(const inequality_system<
 }
 
 template<typename...BAs>
-std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
+std::optional<solution<BAs...>> solve_general_system(const equation_system<BAs...>& system,
 		const solver_options<BAs...>& options) {
 	// As in the Taba book, we consider
 	// 		f (X) = 0
@@ -889,6 +887,74 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	#endif // DEBUG
 
 	return solution;
+}
+
+template<typename...BAs>
+bool check_extreme_solution(const equation_system<BAs...>& system,
+		const solution<BAs...>& substitution) {
+	// We check if the solution satisfies the inequalities of the system
+	for (const auto& inequality: system.second) {
+		auto copy = substitution;
+		auto value = replace(inequality, copy);
+		if (value == _F<BAs...>) return false;
+	}
+	return true;
+}
+
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_extreme(const equation_system<BAs...>& system,
+		solution<BAs...>& substitution, const solver_mode& mode = solver_mode::maximum) {
+	if (!system.first.has_value()) {
+		return check_extreme_solution(system, substitution) ? substitution : std::optional<solution<BAs...>>{};
+	}
+	auto  equation = system.first.value()
+		| tau_parser::bf_eq
+		| tau_parser::bf
+		| optional_value_extractor<tau<BAs...>>;
+	equation = (mode == solver_mode::maximum) ? ~equation : equation;
+	auto current = substitution;
+	for (auto& [k, v]: current)	{
+		auto copy = current;
+		current[k] = replace(equation, copy);
+	}
+	return check_extreme_solution(system, current) ? current : std::optional<solution<BAs...>>{};
+}
+
+template<typename...BAs>
+std::vector<tau<BAs...>> get_variables(const equation_system<BAs...>& system) {
+	std::vector<tau<BAs...>> vars;
+	if (system.first.has_value()) {
+		auto vs = select_top(system.first.value(), is_child_non_terminal<tau_parser::variable, BAs...>);
+		vars.insert(vars.end(), vs.begin(), vs.end());
+	}
+	for (const auto& inequality: system.second) {
+		auto vs = select_top(inequality, is_child_non_terminal<tau_parser::variable, BAs...>);
+		vars.insert(vars.end(), vs.begin(), vs.end());
+	}
+	return vars;
+}
+
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
+		const solver_options<BAs...>& options) {
+	// then, we try a maximum solution
+	auto vars = get_variables(system);
+	solution<BAs...> substitution;
+	for (auto& var: vars) substitution[var] = build_bf_t_type<BAs...>(options.type);
+	if (auto solution = solve_extreme<BAs...>(system, substitution);
+			(solution.has_value() && options.mode != solver_mode::minimum)
+			|| options.mode == solver_mode::maximum)
+		return solution;
+	// if it fails, we try a minimum solution
+	for (auto& var: vars) substitution[var] = build_bf_f_type<BAs...>(options.type);
+	if (auto solution = solve_extreme<BAs...>(system, substitution, solver_mode::minimum);
+			(solution.has_value() && options.mode != solver_mode::maximum)
+			|| options.mode == solver_mode::minimum)
+		return solution;
+	// if we have no equality we try to solve the inequalities
+	if (!system.first.has_value()) return solve_inequality_system<BAs...>(system.second, options);
+	// otherwise we try a general solution
+	return solve_general_system<BAs...>(system, options);
 }
 
 template<typename...BAs>
