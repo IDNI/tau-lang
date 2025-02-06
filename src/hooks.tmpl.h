@@ -335,6 +335,7 @@ tau<BAs...> make_node_hook_bf_xor(const rewriter::node<tau_sym<BAs...>>& n) {
 	return  build_bf_xor<BAs...>(first_argument_formula(n), second_argument_formula(n));
 }
 
+// Simplify constants being syntactically true or false
 template <typename...BAs>
 tau<BAs...> make_node_hook_cte(const rewriter::node<tau_sym<BAs...>>& n)
 {
@@ -343,13 +344,11 @@ tau<BAs...> make_node_hook_cte(const rewriter::node<tau_sym<BAs...>>& n)
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
-	//RULE(BF_CALLBACK_IS_ZERO, "{ $X } := bf_is_zero_cb { $X } 1.")
-	//RULE(BF_CALLBACK_IS_ONE, "{ $X } := bf_is_one_cb { $X } 1.")
 	if (l.has_value()) {
 		auto typed = n | tau_parser::bf_constant | tau_parser::type;
-		if (l.value() == false)
+		if (is_syntactic_zero(l.value()))
 			return typed.has_value() ? build_bf_f_type(typed.value()) : _0<BAs...>;
-		else if (l.value() == true)
+		else if (is_syntactic_one(l.value()))
 			return typed.has_value() ? build_bf_t_type(typed.value()) : _1<BAs...>;
 	}
 	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);

@@ -862,7 +862,7 @@ bool assign_and_reduce(const tau<BAs...>& fm,
 		if (!is_wff) {
 			// fm is a Boolean function
 			// Normalize tau subformulas
-			fm_simp = fm | (tau_transform<BAs...>)normalize_ba<BAs...>;
+			fm_simp = normalize_ba<BAs...>(fm);
 			fm_simp = to_dnf2(fm_simp, false);
 			fm_simp = reduce2(fm_simp, tau_parser::bf);
 
