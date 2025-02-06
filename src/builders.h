@@ -215,6 +215,15 @@ tau<BAs...> build_in_variable_at_n(const size_t& index, const size_t& num) {
 	return build_in_variable_at_(build_in_var_name<BAs...>(index), num);
 }
 
+template<typename... BAs>
+tau<BAs...> build_in_variable_at_n(const std::string& name, const int_t pos) {
+	using p = tau_parser;
+	auto var_name = wrap<BAs...>(p::in_var_name, name);
+	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
+	return wrap(p::bf, wrap(p::variable,
+		wrap(p::io_var, wrap(p::in, { var_name, offset }))));
+}
+
 template <typename... BAs>
 tau<BAs...> build_in_variable_at_t(const tau<BAs...>& in_var_name) {
 	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));

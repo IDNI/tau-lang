@@ -375,7 +375,7 @@ run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t st
 		if (!output.has_value()) break;
 		if (!outputs.write(output.value())) break;
 		// If there is no input, ask the user if execution should continue
-		if (!auto_continue || steps != 0) {
+		if (!auto_continue && steps == 0) {
 			std::string line;
 			term::enable_getline_mode();
 			std::getline(std::cin, line);
