@@ -2465,6 +2465,35 @@ tau<BAs...> shift_io_vars_in_fm (const tau<BAs...>& fm, const auto& io_vars, con
 	return replace(fm, changes);
 }
 
+template<typename... BAs>
+tau<BAs...> shift_const_io_vars_in_fm(const tau<BAs...>& fm,
+					const auto& io_vars, const int_t shift) {
+	if (shift <= 0) return fm;
+	using p = tau_parser;
+	std::map<tau<BAs...>, tau<BAs...>> changes;
+	for (const auto& io_var : io_vars) {
+		if (!is_io_initial(io_var))
+			continue;
+		int_t tp = get_io_time_point(io_var);
+		// Make sure that the resulting time point is positive
+		if (tp + shift < 0) return _F<BAs...>;
+		if (io_var | p::io_var | p::in) {
+			changes.emplace(
+				io_var, trim(
+					build_in_variable_at_n(
+						get_tau_io_name(io_var),
+						tp + shift)));
+		} else {
+			changes.emplace(
+				io_var, trim(
+					build_out_variable_at_n(
+						get_tau_io_name(io_var),
+						tp + shift)));
+		}
+	}
+	return replace(fm, changes);
+}
+
 // Assumes a single DNF clause and normalizes the "always" parts into one
 template<typename... BAs>
 tau<BAs...> pull_always_out(const tau<BAs...>& fm) {
