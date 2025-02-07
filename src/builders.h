@@ -212,7 +212,7 @@ tau<BAs...> build_in_variable_at_n(const tau<BAs...>& in_var_name, const size_t&
 
 template <typename... BAs>
 tau<BAs...> build_in_variable_at_n(const size_t& index, const size_t& num) {
-	return build_in_variable_at_(build_in_var_name<BAs...>(index), num);
+	return build_in_variable_at_n(build_in_var_name<BAs...>(index), num);
 }
 
 template<typename... BAs>
