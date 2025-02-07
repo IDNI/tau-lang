@@ -462,6 +462,8 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 		return;
 	}
 
+	BOOST_LOG_TRIVIAL(info) << "Updated specification: \n" << new_spec << "\n\n";
+
 	// Set new specification for interpreter
 	ubt_ctn = new_ubd_ctn;
 	original_spec = new_spec;
