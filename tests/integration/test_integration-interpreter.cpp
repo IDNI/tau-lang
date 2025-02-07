@@ -70,10 +70,10 @@ struct input_vector {
 	input_vector(std::vector<assignment<BAs...>>& inputs,
 		const std::string& type) : inputs(std::move(inputs)), _type(type) {}
 
-	std::optional<assignment<BAs...>> read() const {
+	std::optional<assignment<BAs...>> get() const {
 		if (inputs.empty()) return { assignment<BAs...>{} };
 		if (current == inputs.size()) return {};
-		return inputs[current++];
+		return inputs[current];
 	}
 
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
@@ -326,7 +326,7 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 
 		for (size_t i = 0; i < times; ++i) {
 			// we execute the i-th step
-			auto in = inputs.read();
+			auto in = inputs.get();
 
 			#ifdef DEBUG
 			std::cout << "run_test/input[" << i << "]: ";
@@ -590,10 +590,12 @@ TEST_SUITE("with inputs and outputs") {
 	input_vector<tau_ba<sbf_ba>, sbf_ba> build_i1_inputs(
 			std::vector<tau<tau_ba<sbf_ba>, sbf_ba>> values) {
 		std::vector<assignment<tau_ba<sbf_ba>, sbf_ba>> assignments;
+		size_t t = 0;
 		for (const auto& value: values) {
 			assignment<tau_ba<sbf_ba>, sbf_ba> assignment;
-			assignment[build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1)] = value;
+			assignment[build_in_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, t)] = value;
 			assignments.push_back(assignment);
+			++t;
 		}
 		input_vector<tau_ba<sbf_ba>, sbf_ba> ins(assignments);
 		return ins;
