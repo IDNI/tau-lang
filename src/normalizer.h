@@ -147,15 +147,12 @@ std::pair<rr_sig, std::vector<offset_t>> get_ref_info(
 	auto offsets = ref | tau_parser::offsets || tau_parser::offset;
 	//BOOST_LOG_TRIVIAL(debug) << "(T) -- get_ref " << ref << " " << ret.first << " offsets.size: " << offsets.size();
 	for (const auto& offset : offsets) {
-		auto t = offset	| only_child_extractor<BAs...>
+		auto t = offset | only_child_extractor<BAs...>
 				| non_terminal_extractor<BAs...>
 				| optional_value_extractor<size_t>;
 		int_t d = 0;
-		if (t == tau_parser::num)
-			d = offset | tau_parser::num
-				| only_child_extractor<BAs...>
-				| size_t_extractor<BAs...>
-				| optional_value_extractor<size_t>;
+		if (t == tau_parser::integer)
+			d = int_extractor<BAs...>(trim(offset));
 		else if (t == tau_parser::capture)
 			d = rr_dict(make_string(
 				tau_node_terminal_extractor<BAs...>,
@@ -202,28 +199,12 @@ bool has_no_boolean_combs_of_models(const tau<BAs...>& fm) {
 	return true;
 }
 
-// This method was used before tau_parser::uninterpreted constant was moved
-// under the tau_parser::variable node
-// template<typename... BAs>
-// tau<BAs...> convert_uconsts_to_var (const tau<BAs...>& fm) {
-// 	auto uconsts = select_top(fm, is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
-// 	std::map<tau<BAs...>, tau<BAs...>> changes;
-// 	for (const auto& uc : uconsts) {
-// 		std::stringstream ss; ss << uc;
-// 		auto tvar = build_variable<BAs...>(ss.str());
-// 		changes.emplace(uc, tvar);
-// 	}
-// 	return replace(fm, changes);
-// }
-
 template<typename... BAs>
 bool is_non_temp_nso_satisfiable (const tau<BAs...>& fm) {
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_always, BAs...>));
 	assert(!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>));
 
 	auto new_fm = fm;
-	// Convert uninterpreted constants to variables for sat check
-	// new_fm = convert_uconsts_to_var(new_fm);
 	auto vars = get_free_vars_from_nso(new_fm);
 	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
 	auto normalized = normalize_non_temp<BAs...>(new_fm);
@@ -440,21 +421,19 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 template <typename... BAs>
 size_t get_max_loopback_in_rr(const tau<BAs...>& form) {
 	size_t max = 0;
-	for (const auto& offset: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>)) {
-		auto current = offset
-			| tau_parser::offset
-			| tau_parser::num
-			| only_child_extractor<BAs...>
-			| offset_extractor<BAs...>;
-		max = current.has_value() ? std::max(max, current.value()) : max;
-	}
+	for (const auto& offsets: select_top(form, is_non_terminal<tau_parser::offsets, BAs...>))
+		for (const auto& offset : offsets || tau_parser::offset)
+			if (offset | tau_parser::integer) {
+				int_t c = int_extractor<BAs...>(trim(offset));
+				max = std::max(max, (size_t)c);
+			}
 	return max;
 }
 
 template<typename... BAs>
 tau<BAs...> build_shift_from_shift(tau<BAs...> shift, size_t step) {
 	auto num = shift | tau_parser::num | optional_value_extractor<tau<BAs...>>;
-	auto offset = num | only_child_extractor<BAs...> | offset_extractor<BAs...> | optional_value_extractor<size_t>;
+	auto offset = num | only_child_extractor<BAs...> | size_t_extractor<BAs...> | optional_value_extractor<size_t>;
 	if (step == offset) return shift | tau_parser::capture | optional_value_extractor<tau<BAs...>>;
 	std::map<tau<BAs...>, tau<BAs...>> changes{{num, build_num<BAs...>(step - offset)}};
 	return replace<tau<BAs...>>(shift, changes);
@@ -516,10 +495,10 @@ tau<BAs...> build_enumerated_main_step(const tau<BAs...>& form, size_t i,
 	auto r = form;
 	std::map<tau<BAs...>, tau<BAs...>> changes;
 	std::vector<tau<BAs...>> ofs; // create offsets node
-	ofs.push_back(wrap<BAs...>(tau_parser::offset, build_num<BAs...>(i)));
+	ofs.push_back(wrap<BAs...>(tau_parser::offset, build_int<BAs...>(i)));
 	for (size_t o = 1; o < offset_arity; ++o)
 		ofs.push_back(wrap<BAs...>(tau_parser::offset,
-							build_num<BAs...>(0)));
+							build_int<BAs...>(0)));
 
 	// create enumerated replacement
 	auto ref = r | only_child_extractor<BAs...>
@@ -567,7 +546,7 @@ bool is_valid(const rr<tau<BAs...>>& nso_rr) {
 			if (right.second.size() == 0) continue; // no offsets
 			auto& bo = right.second.front();
 			//BOOST_LOG_TRIVIAL(debug) << "(T) -- body offset " << bo.first << " / " << bo.second;
-			if (ho.first == tau_parser::num) {
+			if (ho.first == tau_parser::integer) {
 				if (bo.first == tau_parser::capture) {
 					BOOST_LOG_TRIVIAL(error)
 						<< "(Error) Recurrence relation "
@@ -576,7 +555,7 @@ bool is_valid(const rr<tau<BAs...>>& nso_rr) {
 						"relative offset " << r.second;
 					return false; // left num right capture
 				}
-				if (bo.first == tau_parser::num
+				if (bo.first == tau_parser::integer
 					&& ho.second < bo.second) {
 						BOOST_LOG_TRIVIAL(error)
 							<<"(Error) Recurrence relation "

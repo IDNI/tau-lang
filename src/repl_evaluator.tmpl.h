@@ -518,7 +518,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		auto applied = apply_rr_to_rr_tau_nso(t, program);
 
 		#ifdef DEBUG
-		std::cout << "applied: " << applied << "\n";
+		BOOST_LOG_TRIVIAL(debug) << "applied: " << applied << "\n";
 		#endif // DEBUG
 
 		//
@@ -548,7 +548,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		auto in_vars = select_all(dnf,
 			is_non_terminal<tau_parser::in_var_name, tau_ba_t, BAs...>);
 
-		std::map<tau_nso_t, std::pair<type, filename>> current_inputs;
+		std::map<tau_nso_t, std::pair<type, filename>> current_inputs = inputs;
 		for (auto& var: in_vars) {
 			if (auto it = inputs.find(var); it != inputs.end()) {
 				current_inputs[var] = it->second;
@@ -565,7 +565,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		// select current output variables
 		auto out_vars = select_all(dnf, is_non_terminal<
 				tau_parser::out_var_name, tau_ba_t, BAs...>);
-		std::map<tau_nso_t, std::pair<type, filename>> current_outputs;
+		std::map<tau_nso_t, std::pair<type, filename>> current_outputs = outputs;
 		for (auto& var: out_vars) {
 			if (auto it = outputs.find(var); it != outputs.end())
 				current_outputs[var] = it->second;
@@ -786,7 +786,7 @@ std::optional<tau_nso<BAs...>>
 			return {};
 		}
 		auto normalized_fm = normalizer<tau_ba_t, BAs...>(rr_);
-		return is_tau_formula_sat(normalized_fm, true)
+		return is_tau_formula_sat(normalized_fm, 0, true)
 			       ? _T<tau_ba_t, BAs...>
 			       : _F<tau_ba_t, BAs...>;
 	}
@@ -820,7 +820,7 @@ std::optional<tau_nso<BAs...>>
 			return {};
 		}
 		auto normalized_fm = normalizer<tau_ba_t, BAs...>(rr_);
-		return (!is_tau_formula_sat(normalized_fm, true))
+		return (!is_tau_formula_sat(normalized_fm, 0, true))
 			       ? _T<tau_ba_t, BAs...>
 			       : _F<tau_ba_t, BAs...>;
 	}

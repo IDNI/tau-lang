@@ -34,6 +34,14 @@ Bool normalize(const Bool &b) {
 	return b;
 }
 
+bool is_syntactic_one(const Bool& b) {
+	return b.is_one();
+}
+
+bool is_syntactic_zero(const Bool& b) {
+	return b.is_zero();
+}
+
 std::ostream& operator<<(std::ostream& os, const Bool& b) {
 	return os << (b.b ? 1 : 0);
 }
