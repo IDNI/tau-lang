@@ -302,7 +302,7 @@ TEST_SUITE("find_solution") {
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
 		auto equation = sbf_make_nso(src);
-		auto solution = find_solution(equation, solver_mode::general);
+		auto solution = find_solution(equation);
 		return ( check_solution(equation, solution.value()));
 	}
 
@@ -603,18 +603,37 @@ TEST_SUITE("solve_system") {
 
 TEST_SUITE("solve") {
 
-	bool test_solve(const std::string system, const std::string type = "") {
+	bool test_solve(const std::string system, const solver_options<tau_ba<sbf_ba>, sbf_ba>& options) {
 		#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		#endif // DEBUG
 		auto form = tau_make_nso_test(system);
+		auto solution = solve<tau_ba<sbf_ba>, sbf_ba>(form, options);
+		return solution ? check_solution(form, solution.value()) : false;
+	}
+
+	bool test_solve_min(const std::string system,  const std::string type = "") {
+		solver_options<tau_ba<sbf_ba>, sbf_ba> options = {
+			.splitter_one = nso_factory<tau_ba<sbf_ba>, sbf_ba>::instance().splitter_one(type),
+			.mode = solver_mode::minimum
+		};
+		return test_solve(system, options);
+	}
+
+	bool test_solve_max(const std::string system, const std::string type = "") {
+		solver_options<tau_ba<sbf_ba>, sbf_ba> options = {
+			.splitter_one = nso_factory<tau_ba<sbf_ba>, sbf_ba>::instance().splitter_one(type),
+			.mode = solver_mode::maximum
+		};
+		return test_solve(system, options);
+	}
+
+	bool test_solve(const std::string system, const std::string type = "") {
 		solver_options<tau_ba<sbf_ba>, sbf_ba> options = {
 			.splitter_one = nso_factory<tau_ba<sbf_ba>, sbf_ba>::instance().splitter_one(type),
 			.mode = solver_mode::general
 		};
-
-		auto solution = solve<tau_ba<sbf_ba>, sbf_ba>(form, options);
-		return check_solution(form, solution.value());
+		return test_solve(system, options);
 	}
 
 	// increasing monotonicity (1)
@@ -639,4 +658,26 @@ TEST_SUITE("solve") {
 		const char* system = "x = {a}:sbf {b}:sbf && x < y && y != 1.";
 		CHECK ( test_solve(system, "sbf") );
 	}
+
+	TEST_CASE("x != 0") {
+		const char* system = "x != 0.";
+		CHECK ( test_solve(system) );
+		CHECK ( !test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
+	TEST_CASE("x != 0 && x != 1") {
+		const char* system = "x != 0 && x != 1.";
+		CHECK ( test_solve(system) );
+		CHECK ( !test_solve_min(system) );
+		CHECK ( !test_solve_max(system) );
+	}
+
+	TEST_CASE("x != 0 && y != 0") {
+		const char* system = "x != 0 && y != 0.";
+		CHECK ( test_solve(system) );
+		CHECK ( !test_solve_min(system) );
+		CHECK ( test_solve_max(system) );
+	}
+
 }

@@ -1,0 +1,38 @@
+# To run it you need to compile the project using release.sh (customized with
+# your settings if needed) and then execute the run.sh whithin the demo directory
+# as follows:
+
+# ./run.sh demo_2.3-solver-min_max.tau
+
+# This demo should work under any *nix flavour due to the paths used for files.
+# To run it under windows you will need to change the paths to the files.
+
+# Let us demonstrate the workings of the solver when using the minimum and
+# maximum options. In those cases, the solver provide the minimmum or the maximum
+# solution in the sense of Theorem 2.6 from Rudeanu 1974.
+
+# Let us consider few trivial cases to check the basics of the idea.
+
+# In the following case the minimum value is `{F}:tau`:
+solve --min x != 1
+# whewreas we have no maximum value:
+solve --max x != 1
+
+# Please note we could also use `--minimum` and `--maximum`.
+
+# In the following case we neither have minimum or maximum:
+solve --min x != 0:sbf && x != 1:sbf
+# however, we have a solution:
+solve x != 0:sbf && x != 1:sbf
+
+# By default (i.e. no `--max` or `--min` options are passed), the solver will
+# try to compute a maximum solution, then a minimum solution and finally a
+# general solution (returning the first one at hand).
+
+# Of course you could try to compute maximum and minimum solutions for more
+# complex formulas, like the following one:
+solve --max {a}:sbf x != 0 && {b}:sbf x + {a}:sbf  y = 0
+
+# Finally, if you want to specify the boolean algebra to be used, you can do so
+# using the `--sbf` or `--tau` options. For example:
+solve --min --sbf x != 0 && x' != 0

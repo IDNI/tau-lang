@@ -18,13 +18,14 @@ template<typename...BAs>
 solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const tau<BAs...>& gh) {
 	solution<BAs...> solution;
 	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
+	// FIXME convert vars to a set
 	auto remaing = select_top(gh, is_child_non_terminal<tau_parser::variable, BAs...>);
 	for (auto& v: remaing) solution.erase(v);
 	return solution;
 }
 
 template<typename...BAs>
-std::optional<solution<BAs...>> find_general_solution(const equality<BAs...>& eq) {
+std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq) {
 	// We would use the algorithm subyaccent to the following theorem (of Taba Book):
 	//
 	// Theorem 3.1. For f (x,X) = xg (X) + x′h (X), let Z be a zero of
@@ -56,6 +57,7 @@ std::optional<solution<BAs...>> find_general_solution(const equality<BAs...>& eq
 		<< "solver.h:" << __LINE__ << " find_solution/f: " << f;
 	#endif // DEBUG
 
+	// FIXME convert vars to a set
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
@@ -100,7 +102,7 @@ std::optional<solution<BAs...>> find_general_solution(const equality<BAs...>& eq
 				return solution;
 			}
 		}
-		if (auto restricted = find_general_solution(build_wff_eq(gh)); restricted.has_value()) {
+		if (auto restricted = find_solution(build_wff_eq(gh)); restricted.has_value()) {
 			solution.insert(restricted.value().begin(), restricted.value().end());
 			auto restricted_copy = restricted;
 			if (auto nn = replace(h, restricted.value()) | bf_reduce_canonical<BAs...>(); nn != _0<BAs...>)
@@ -142,7 +144,6 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 		BOOST_LOG_TRIVIAL(trace)
 			<< "solver.h:" << __LINE__ << " lgrs/solution: {}";
 		#endif // DEBUG
-
 		return solution<BAs...>();
 	}
 
@@ -151,7 +152,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 		<< "solver.h:" << __LINE__ << " lgrs/eq: " << equality << "\n";
 	#endif // DEBUG
 
-	auto s = find_general_solution(equality);
+	auto s = find_solution(equality);
 	if (!s.has_value()) {
 
 		#ifdef DEBUG
@@ -186,27 +187,6 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 }
 
 template<typename...BAs>
-std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq,
-		const solver_mode mode) {
-	if (mode == solver_mode::general) {
-		return find_general_solution(eq);
-	}
-	if (auto base_solution = lgrs(eq); base_solution) {
-		std::map<var<BAs...>, tau<BAs...>> substitution;
-		for (auto& [k, v] : base_solution.value())
-			substitution[k] = mode == solver_mode::maximum
-				? _1<BAs...> : _0<BAs...>;
-		solution<BAs...> new_solution;
-		for (auto& [k, v] : base_solution.value()) {
-			auto copy = substitution;
-			new_solution[k] = replace(v, copy);
-		}
-		return new_solution;
-	}
-	return {};
-}
-
-template<typename...BAs>
 class minterm_iterator {
 public:
 	// iterator traits
@@ -221,6 +201,7 @@ public:
 	static constexpr sentinel end{};
 
 	minterm_iterator(const tau<BAs...>& f) {
+		// FIXME convert vars to a set
 		if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 			// we start with the full bf...
 			auto partial_bf = f;
@@ -488,6 +469,7 @@ tau<BAs...> get_constant(const minterm<BAs...>& m) {
 	auto is_bf_constant = [](const auto& n) -> bool {
 		return is_child_non_terminal<tau_parser::bf_constant, BAs...>(n);
 	};
+	// FIXME convert vars to a set
 	auto all_vs = select_top(m, is_bf_constant);
 	return build_bf_and<BAs...>(all_vs);
 }
@@ -498,6 +480,7 @@ std::set<tau<BAs...>> get_exponent(const tau<BAs...>& n) {
 		return (n | tau_parser::variable).has_value()
 			|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
 	};
+	// FIXME convert vars to a set
 	auto all_vs = select_top(n, is_bf_literal);
 	return std::set<tau<BAs...>>(all_vs.begin(), all_vs.end());
 }
@@ -697,16 +680,9 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 			<< "solver.h:" << __LINE__ << " solve_minterm_system/eq: " << eq;
 		#endif // DEBUG
 	}
-	eq = build_wff_eq(eq);
 
-	switch (options.mode) {
-		case solver_mode::maximum:
-			return find_solution(eq, options.mode);
-		case solver_mode::minimum:
-			return find_solution(eq, options.mode);
-		default:
-			return find_solution(eq);
-	}
+	eq = build_wff_eq(eq);
+	return find_solution(eq);
 }
 
 template<typename...BAs>
@@ -895,7 +871,7 @@ bool check_extreme_solution(const equation_system<BAs...>& system,
 	// We check if the solution satisfies the inequalities of the system
 	for (const auto& inequality: system.second) {
 		auto copy = substitution;
-		auto value = replace(inequality, copy);
+		auto value = normalizer(replace(inequality, copy));
 		if (value == _F<BAs...>) return false;
 	}
 	return true;
@@ -1016,6 +992,7 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 		};
+		// FIXME convert vars to a set
 		auto eqs = select_top(clause, is_equation);
 		if (eqs.empty()) continue;
 		auto solution = solve<BAs...>(
