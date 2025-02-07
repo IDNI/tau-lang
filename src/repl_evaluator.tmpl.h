@@ -622,7 +622,7 @@ std::optional<std::string> get_solver_cmd_type(const tau<BAs...>& n) {
 }
 
 template<typename...BAs>
-void print_solver_cmd_solution(const std::vector<tau<BAs...>>& vars, std::optional<solution<BAs...>>& solution,
+void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 		const solver_options<BAs...>& options = { .type = "" }) {
 	auto print_zero_case = [&options](const tau<BAs...>& var) {
 		std::cout << "\t" << var << " := {"
@@ -686,7 +686,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 		if (!solution) { std::cout << "no solution\n"; return; }
 		auto vars = select_top(equations,
 			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
-		print_solver_cmd_solution(vars, solution, options);
+		print_solver_cmd_solution(solution, options);
 		return;
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s) and/or options\n";
@@ -718,7 +718,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 			if (!solution) { std::cout << "no solution\n"; return; }
 		auto vars = select_top(equations,
 			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
-		print_solver_cmd_solution(vars, solution);
+		print_solver_cmd_solution(solution);
 		return;
 		}
 	}
@@ -1405,8 +1405,13 @@ void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
 		<< "the solve command computes a single satisfying assignment for the free variables in a Tau formula\n"
 		<< "\n"
 		<< "usage:\n"
-		<< "  solve <tau>              computes a single satisfying assignment for the free variables in the Tau formula\n"
-		<< "  solve <repl_memory>      computes a single satisfying assignment for the free variables in the Tau formula stored at the specified repl memory position"
+		<< "  solve [options] <tau>              computes a single satisfying assignment for the free variables in the Tau formula\n"
+		<< "  solve [options] <repl_memory>      computes a single satisfying assignment for the free variables in the Tau formula stored at the specified repl memory position"
+		<< "\n"
+		<< "options:\n"
+		<< "  --min, --minimmum                  computes the minimum extreme point of the lgrs corresponding to the solution\n"
+		<< "  --max, --maximum                   computes the maximum extreme point of the lgrs corresponding to the solution\n"
+		<< "  --<type>                           uses the specified type for the solution (sbf or tau)\n"
 		<< "\n";
 		break;
 	case tau_parser::lgrs_sym: std::cout
@@ -1414,6 +1419,9 @@ void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
 		<< "\n"
 		<< "usage:\n"
 		<< "  lgrs <tau_eq>            computes a LGRS for a given equation\n"
+		<< "  lgrs <repl_memory>       computes a LGRS for the equation stored at the specified repl memory position\n"
+		<< "options:\n"
+		<< "  --<type>                 uses the specified type for the solution\n"
 		<< "\n";
 		break;
 	case tau_parser::sat_sym: std::cout
