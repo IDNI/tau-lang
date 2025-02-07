@@ -84,7 +84,7 @@ struct finputs {
 			if (!cnst) {
 				BOOST_LOG_TRIVIAL(error)
 					<< "(Error) failed to parse input value '"
-					<< line << "' for variable '"
+					<< line << "' for stream '"
 					<< var << "'\n";
 				return {};
 			}
@@ -114,7 +114,7 @@ struct finputs {
 				std::cout << line << "\n";
 			} else if (it == streams.end()) {
 				BOOST_LOG_TRIVIAL(error)
-					<< "(Error) failed to find input stream for variable '" << var_name << "'\n";
+					<< "(Error) failed to find input stream for stream '" << var_name << "'\n";
 				return {};
 			} else {
 				std::cout << var << " := ";
@@ -133,7 +133,7 @@ struct finputs {
 			if (!cnst) {
 				BOOST_LOG_TRIVIAL(error)
 					<< "(Error) failed to parse input value '"
-					<< line << "' for variable '"
+					<< line << "' for stream '"
 					<< var << "'\n";
 				return {};
 			}
@@ -152,7 +152,7 @@ struct finputs {
 		}
 
 		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) failed to find type for variable: "
+			<< "(Error) failed to find type for stream: "
 			<< var << "\n";
 		return {};
 	}
@@ -216,7 +216,7 @@ struct foutputs {
 				// is something else but not a BA element
 				} else {
 					BOOST_LOG_TRIVIAL(error)
-						<< "(Error): no Boolean algebra element assigned to variable '"
+						<< "(Error): no Boolean algebra element assigned to output '"
 						<< io_var << "'\n";
 					return false;
 				}
@@ -232,7 +232,7 @@ struct foutputs {
 				if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;
 
 				BOOST_LOG_TRIVIAL(error)
-					<< "(Error) failed to find output stream for variable '"
+					<< "(Error) failed to find output stream for stream '"
 					<< io_var << "'\n";
 				return false;
 			}
@@ -250,7 +250,7 @@ struct foutputs {
 		}
 
 		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) failed to find type for variable '"
+			<< "(Error) failed to find type for stream '"
 			<< var << "'\n";
 		return {};
 	}
@@ -385,13 +385,18 @@ run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t st
 		} else std::cout << "\n";
 
 		// Update interpreter in case the output stream u is present and unequal to 0
-		auto it = output.value().find(
-			build_out_variable_at_n<BAs...>("u", intrprtr.value().time_point - 1));
-		if (it != output.value().end() && it->second != _0<BAs...>) {
-			auto update = unpack_tau_constant(it->second);
-			if (update) {
-				BOOST_LOG_TRIVIAL(trace) << "update: " << update.value() << "\n";
-				intrprtr.value().update(update.value());
+		auto update_stream = build_out_variable_at_n<BAs...>(
+			"u", intrprtr.value().time_point - 1);
+		// Update only if u is of type tau
+		if (auto t = outputs.type_of(get_tau_io_name(trim(update_stream)));
+				t.has_value() && t.value() == "tau") {
+			auto it = output.value().find(update_stream);
+			if (it != output.value().end() && it->second != _0<BAs...>) {
+				auto update = unpack_tau_constant(it->second);
+				if (update) {
+					BOOST_LOG_TRIVIAL(trace) << "update: " << update.value() << "\n";
+					intrprtr.value().update(update.value());
+				}
 			}
 		}
 		if (steps != 0 && intrprtr.value().time_point == steps) break;
