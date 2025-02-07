@@ -844,14 +844,8 @@ std::optional<solution<BAs...>> solve_general_system(const equation_system<BAs..
 		auto func_with_neq_assgm = replace(func, copy);
 		// Now assign the remaining variables to 0 and compute
 		// resulting value for var
-		auto free_vars = get_free_vars_from_nso(func_with_neq_assgm);
-		if (!free_vars.empty()) {
-			std::map<tau<BAs...>, tau<BAs...>> free_var_assgm;
-			for (const auto& free_var : free_vars)
-				free_var_assgm.emplace(free_var, _0_trimmed<BAs...>);
-			solution[var] = replace(func_with_neq_assgm, free_var_assgm) |
-					bf_reduce_canonical<BAs...>();
-		} else solution[var] = func_with_neq_assgm | bf_reduce_canonical<BAs...>();
+		solution[var] = replace_free_vars_by(func_with_neq_assgm,
+			_0_trimmed<BAs...>) | bf_reduce_canonical<BAs...>();
 	}
 
 	#ifdef DEBUG
