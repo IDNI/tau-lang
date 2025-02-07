@@ -34,7 +34,7 @@ template<typename... BAs>
 tau<BAs...> build_io_out_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
-	auto offset = wrap<BAs...>(p::offset, build_num<BAs...>(pos));
+	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
 	return wrap(p::variable, wrap(p::io_var, wrap(p::out, { var_name, offset })));
 }
 
@@ -42,7 +42,7 @@ template<typename... BAs>
 tau<BAs...> build_io_in_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
-	auto offset = wrap<BAs...>(p::offset, build_num<BAs...>(pos));
+	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
 	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
 }
 
@@ -62,6 +62,16 @@ tau<BAs...> build_io_in_shift (const std::string& name, const std::string& var, 
 	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, var), build_num<BAs...>(shift)});
 	auto offset = wrap<BAs...>(p::offset, shift_node);
 	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
+}
+
+template<typename... BAs>
+bool has_stream_flag(const tau<BAs...>& fm) {
+	using p = tau_parser;
+	if (find_top(fm, is_non_terminal<p::wff_sometimes, BAs...>))
+		return true;
+	if (find_top(fm, is_non_terminal<p::constraint, BAs...>))
+		return true;
+	return false;
 }
 
 template<typename... BAs>
@@ -212,13 +222,10 @@ tau<BAs...> fm_at_time_point(const tau<BAs...>& original_fm,
 	auto &io_vars, int_t time_point)
 {
 	std::map<tau<BAs...>, tau<BAs...>> changes;
-	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var(io_vars[i], get_io_name(io_vars[i]),
-								time_point);
-		changes[io_vars[i]] = new_io_var;
-	}
-	tau<BAs...> new_fm = replace(original_fm, changes);
-	return new_fm;
+	for (size_t i = 0; i < io_vars.size(); ++i)
+		changes[io_vars[i]] = transform_io_var(
+			io_vars[i], get_io_name(io_vars[i]), time_point);
+	return replace(original_fm, changes);
 }
 
 template<typename... BAs>
@@ -350,11 +357,8 @@ bool is_run_satisfiable(const tau<BAs...>& fm) {
 
 // Assumption is that the provided fm is an unbound continuation
 template<typename... BAs>
-tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm) {
+tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto& io_vars) {
 	using p = tau_parser;
-	std::vector<tau<BAs...> > io_vars = select_top(fm,
-				is_child_non_terminal<p::io_var, BAs...>);
-
 	// Substitute lookback as current time point
 	auto look_back = get_max_shift(io_vars);
 	auto uconst_ctns = fm_at_time_point(fm, io_vars, look_back);
@@ -490,8 +494,7 @@ tau<BAs...> transform_back_non_initials(const tau<BAs...>& fm, const int_t highe
 	// Get time positions which are higher than highest_init_cond and transform back to
 	// time variable depending on t
 	for (const auto& io_var : current_io_vars) {
-		int_t time_point = size_t_extractor<BAs...>(
-			trim2(trim2(io_var)->child[1])).value();
+		int_t time_point = get_io_time_point(io_var);
 		if (time_point <= highest_init_cond)
 			continue;
 
@@ -542,17 +545,29 @@ template<typename... BAs>
 tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_initials,
 					tau<BAs...>& flag_rules,
 					const int_t lookback,
+					const int_t start_time,
 					bool reset_ctn_id = false) {
 	using p = tau_parser;
 	auto to_eq_1 = [](const auto& n) {
 		return build_wff_eq(build_bf_neg(n));
+	};
+	auto create_initial = [&flag_initials](
+		const auto& ctn, const auto& flag_iovar, const int_t t) {
+		tau<BAs...> flag_init_cond = transform_io_var(
+					flag_iovar, get_io_name(flag_iovar), t);
+		flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
+		flag_initials = build_wff_and(build_wff_eq(build_bf_xor(
+		flag_init_cond, calculate_ctn(ctn, t))), flag_initials);
 	};
 	flag_initials = _T<BAs...>;
 	std::map<tau<BAs...>, tau<BAs...>> changes;
 	// transform constraints to their respective output streams and add required conditions
 	// We make the variable static so that we can transform different parts of the formula independently
 	static size_t ctn_id = 0;
-	if (reset_ctn_id) ctn_id = 0;
+	if (reset_ctn_id) {
+		ctn_id = 0;
+		reset_ctn_id = false;
+	}
 	for (const auto& ctn : select_top(fm, is_non_terminal<p::constraint, BAs...>))
 	{
 		std::string ctnvar = make_string(tau_node_terminal_extractor<BAs...>,
@@ -580,14 +595,16 @@ tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_in
 		}
 
 		// Add initial conditions for flag
-		int_t t = 0;
-		while (is_initial_ctn_phase(ctn, t)) {
-			tau<BAs...> flag_init_cond = transform_io_var(
-				flag_iovar, get_io_name(flag_iovar), t);
-			flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
-			flag_initials = build_wff_and(build_wff_eq(build_bf_xor(
-			flag_init_cond, calculate_ctn(ctn, t))), flag_initials);
-			++t;
+		int_t t = start_time;
+		// Check if start_time is higher then initial ctn phase
+		if (is_initial_ctn_phase(ctn, t))
+			while (is_initial_ctn_phase(ctn, t)) {
+				create_initial(ctn, flag_iovar, t);
+				++t;
+			}
+		else {
+			// The flag needs to be initialized
+			create_initial(ctn, flag_iovar, t);
 		}
 	}
 	if (!changes.empty()) return replace(fm, changes);
@@ -598,7 +615,8 @@ tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_in
 // and is a single always statement
 template<typename... BAs>
 tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
-	const bool output = false)
+	const int_t start_time,
+	const bool output)
 {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin always_to_unbounded_continuation";
 	BOOST_LOG_TRIVIAL(debug) << "Start fm for always_to_unbound: " << fm << "\n";
@@ -612,7 +630,8 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
 	tau<BAs...> flag_initials = _T<BAs...>, flag_rules = _T<BAs...>;
-	auto transformed_fm = transform_ctn_to_streams(fm, flag_initials, flag_rules, lookback, true);
+	auto transformed_fm = transform_ctn_to_streams(
+		fm, flag_initials, flag_rules, lookback, start_time, true);
 	if (lookback == 0 && fm != transformed_fm) {
 		io_vars = select_top(transformed_fm, is_child_non_terminal<p::io_var, BAs...>);
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
@@ -632,20 +651,28 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
                     get_io_time_point(io_vars[i]));
 
 	// Calculate unbound continuation of fm
-	int_t time_point = get_max_shift(io_vars);
+	lookback = get_max_shift(io_vars);
 	int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
 	auto [ubd_ctn, steps] = find_fixpoint_phi(
 		fm, flag_initials, io_vars, initials,
-		time_point + point_after_inits);
+		lookback + point_after_inits);
 
 	ubd_ctn = normalize_non_temp(ubd_ctn);
 	ubd_ctn = transform_back_non_initials(ubd_ctn, point_after_inits - 1);
+
 	// Run phi_inf until all initial conditions are taken into account
 	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
 	tau<BAs...> run = _T<BAs...>;
-	for (int_t t = time_point; t < point_after_inits + time_point; ++t) {
+	const int_t s = start_time + lookback;
+	// // In case no initial condition is being checked
+	// // we still need to check a run once
+	// if (point_after_inits + lookback <= s)
+	// 	point_after_inits = s+1-lookback; // By def of s, this is positive
+	// variable furthest back needs to pass all initial conditions
+	for (int_t t = s; t < point_after_inits + lookback; ++t) {
 		auto current_step = fm_at_time_point(ubd_ctn, io_vars, t);
 		run = build_wff_and(run, current_step);
+		BOOST_LOG_TRIVIAL(trace) << "aw_ubd/run: " << run << "\n";
 		// Check if run is still sat
 		run = normalize_non_temp(run);
 		if (!is_run_satisfiable(run)) {
@@ -688,7 +715,7 @@ tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
 
 // Assumes single normalized Tau DNF clause
 template<typename... BAs>
-tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_ctn_stream*/) {
+tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ctn_stream, const int_t start_time) {
 	using p = tau_parser;
 	auto smt_fms = select_top(fm, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	if (smt_fms.empty()) return fm;
@@ -715,7 +742,9 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_
 
 		// Transform constant time constraints to io var in sometimes statement
 		tau<BAs...> ctn_initials = _T<BAs...>, ctn_assm = _T<BAs...>;
-		smt_fms[n] = transform_ctn_to_streams(smt_fms[n], ctn_initials, ctn_assm, st_lookback);
+		smt_fms[n] = transform_ctn_to_streams(
+			smt_fms[n], ctn_initials, ctn_assm, st_lookback,
+			start_time, reset_ctn_stream);
 		st_io_vars = select_top(smt_fms[n], is_child_non_terminal<p::io_var, BAs...>);
 
 		std::stringstream ss; ss << "_e" << n;
@@ -725,7 +754,7 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_
 		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
 
 		auto eN0_is_not_zero = build_wff_neq(wrap(p::bf,
-			build_io_out_const<BAs...>(ss.str(), 0)));
+			build_io_out_const<BAs...>(ss.str(), start_time)));
 		auto eNt_is_zero      = build_wff_eq(eNt);
 		auto eNt_is_not_zero  = build_wff_neq(eNt);
 		auto eNt_prev_is_zero = build_wff_eq(eNt_prev);
@@ -758,6 +787,8 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool /*reset_
 
 		// Add flag assumptions from constant time constraints
 		ev_assm = build_wff_and(ev_assm, build_wff_and(ctn_initials, ctn_assm));
+
+		BOOST_LOG_TRIVIAL(trace) << "trans_ev/ev_assm: " << ev_assm << "\n";
 
 		ev_collection = build_bf_or(ev_collection, eNt_without_lookback);
 	}
@@ -821,7 +852,8 @@ template<typename... BAs>
 tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 				      const tau<BAs...>& ev_var_flags,
 				      const auto& original_aw,
-				      const bool output = false) {
+				      const int_t start_time,
+				      const bool output) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
 
 	using p = tau_parser;
@@ -844,6 +876,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	std::vector<tau<BAs...>> st_io_vars = select_top(st_flags,
 		is_child_non_terminal<p::io_var, BAs...>);
 
+	// Note that time_point is also the lookback
 	int_t time_point = get_max_shift(io_vars);
 
 	// There must not be a constant time constraint at this point
@@ -856,8 +889,10 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 	// Check if flag can be raised up to the highest initial condition + 1
 	tau<BAs...> run;
-	int_t flag_boundary = std::max(point_after_inits + time_point, 2*time_point + 1) + 1;
-	for (int_t i = time_point; i <= flag_boundary; ++i) {
+	const int_t s = start_time + time_point;
+	const int_t flag_boundary =
+		std::max(time_point + point_after_inits, s + time_point + 1) + 1;
+	for (int_t i = s; i <= flag_boundary; ++i) {
 		auto current_aw = fm_at_time_point(aw, io_vars, i);
 		if (run) run = build_wff_and(run, current_aw);
 		else run = current_aw;
@@ -951,7 +986,9 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
-tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = false) {
+tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
+				const int_t start_time = 0,
+				const bool output = false ) {
 	assert(get_dnf_wff_clauses(fm).size() == 1);
 #ifdef TAU_CACHE
 	static std::map<tau<BAs...>, tau<BAs...>> cache;
@@ -964,21 +1001,19 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 	};
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
-	// We merge all always statements on each clause
-	// fm = pull_always_out_for_inf(fm);
-	BOOST_LOG_TRIVIAL(debug) << "(I) Merged always statements on each clause";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 	tau<BAs...> ev_t;
 	tau<BAs...> ubd_aw_fm;
 	if (aw_fm.has_value()) {
 		// If there is an always part, replace it with its unbound continuation
-		ubd_aw_fm = always_to_unbounded_continuation(aw_fm.value(), output);
+		ubd_aw_fm = always_to_unbounded_continuation(
+			aw_fm.value(), start_time, output);
 		std::map<tau<BAs...>, tau<BAs...> > changes = {
 			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
 		};
 		auto ubd_fm = replace(fm, changes);
-		ev_t = transform_to_eventual_variables(ubd_fm, false);
+		ev_t = transform_to_eventual_variables(ubd_fm, false, start_time);
 		// Check if there is a sometimes present
 		if (ev_t == ubd_fm) {
 #ifdef TAU_CACHE
@@ -988,7 +1023,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 			return elim_aw(ubd_fm);
 		}
 	} else {
-		ev_t = transform_to_eventual_variables(fm, true);
+		ev_t = transform_to_eventual_variables(fm, true, start_time);
 		// Check if there is a sometimes present
 		if (ev_t == fm) {
 #ifdef TAU_CACHE
@@ -1010,7 +1045,8 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 	tau<BAs...> res;
 	if (aw_after_ev.value() != _F<BAs...> && !st.empty())
 		res = normalize_non_temp(to_unbounded_continuation(
-			aw_after_ev.value(), st[0], ubd_aw_fm, output));
+			aw_after_ev.value(), st[0], ubd_aw_fm, start_time,
+			output));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
 	res = elim_aw(res);
@@ -1021,17 +1057,17 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm, const bool output = fa
 	return res;
 }
 
-// Assumes that fm has been normalized
 template<typename... BAs>
-bool is_tau_formula_sat (const tau<BAs...>& normalized_fm, const bool output = false) {
+bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
+			const bool output = false) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << normalized_fm;
-
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	auto normalized_fm = normalize_with_temp_simp(fm);
 	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or,
 				  tau_parser::wff);
 	// Convert each disjunct to unbounded continuation
 	for (auto& clause: clauses) {
-		if (transform_to_execution(clause, output) != _F<BAs...>) {
+		if (transform_to_execution(clause, start_time, output) != _F<BAs...>) {
 			BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
 			return true;
 		}
@@ -1071,6 +1107,27 @@ bool are_tau_equivalent (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 			return false;
 	}
 	return true;
+}
+
+template<typename... BAs>
+tau<BAs...> simp_tau_unsat_valid(const tau<BAs...>& fm, const int_t start_time = 0,
+			const bool output = false) {
+	BOOST_LOG_TRIVIAL(debug) << "(I) Start simp_tau_unsat_valid";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	// Check if formula is valid
+	if (is_tau_impl(_T<BAs...>, fm)) return _T<BAs...>;
+	auto normalized_fm = normalize_with_temp_simp(fm);
+	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or,
+				  tau_parser::wff);
+
+	// Check satisfiability of each clause
+	for (auto& clause: clauses) {
+		if (transform_to_execution(clause, start_time, output) == _F<BAs...>)
+			clause = _F<BAs...>;
+	}
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) End simp_tau_unsat_valid";
+	return build_wff_or<BAs...>(clauses);
 }
 
 /*

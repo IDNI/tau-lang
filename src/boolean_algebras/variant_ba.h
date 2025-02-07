@@ -72,6 +72,24 @@ std::variant<BAs...> normalize_ba(const std::variant<BAs...>& elem) {
 	), elem);
 }
 
+template <typename... BAs>
+bool is_syntactic_one(const std::variant<BAs...>& elem) {
+	return std::visit(overloaded(
+			[](const auto& el) {
+				return is_syntactic_one(el);
+			}
+		), elem);
+}
+
+template <typename... BAs>
+bool is_syntactic_zero(const std::variant<BAs...>& elem) {
+	return std::visit(overloaded(
+			[](const auto& el) {
+				return is_syntactic_zero(el);
+			}
+		), elem);
+}
+
 template<typename... BAs>
 std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem, splitter_type st) {
 	return std::visit(overloaded(
@@ -83,7 +101,7 @@ std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem, splitter_type
 
 template<typename... BAs>
 std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem) {
-	return splitter_ba(elem, splitter_type::middle);
+	return splitter_ba(elem, splitter_type::upper);
 }
 
 template<typename...BAs>

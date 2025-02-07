@@ -25,6 +25,9 @@ struct Bool {
 };
 
 Bool normalize (const Bool& b);
+bool is_syntactic_one (const Bool& b);
+bool is_syntactic_zero(const Bool& b);
+
 
 template<>
 struct std::hash<Bool> {
