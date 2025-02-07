@@ -991,8 +991,8 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 				const bool output = false ) {
 	assert(get_dnf_wff_clauses(fm).size() == 1);
 #ifdef TAU_CACHE
-	static std::map<tau<BAs...>, tau<BAs...>> cache;
-	if (auto it = cache.find(fm); it != cache.end())
+	static std::map<std::pair<tau<BAs...>, int_t>, tau<BAs...>> cache;
+	if (auto it = cache.find(std::make_pair(fm, start_time)); it != cache.end())
 		return it->second;
 #endif
 	using p = tau_parser;
@@ -1017,8 +1017,8 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 		// Check if there is a sometimes present
 		if (ev_t == ubd_fm) {
 #ifdef TAU_CACHE
-			cache.emplace(elim_aw(ubd_fm), elim_aw(ubd_fm));
-			return cache.emplace(fm, elim_aw(ubd_fm)).first->second;
+			cache.emplace(std::make_pair(elim_aw(ubd_fm), start_time), elim_aw(ubd_fm));
+			return cache.emplace(std::make_pair(fm, start_time), elim_aw(ubd_fm)).first->second;
 #endif
 			return elim_aw(ubd_fm);
 		}
@@ -1027,7 +1027,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 		// Check if there is a sometimes present
 		if (ev_t == fm) {
 #ifdef TAU_CACHE
-			return cache.emplace(fm, elim_aw(fm)).first->second;
+			return cache.emplace(std::make_pair(fm, start_time), elim_aw(fm)).first->second;
 #endif
 			return elim_aw(fm);
 		}
@@ -1035,7 +1035,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	auto aw_after_ev = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
 	if (!aw_after_ev.has_value()) {
 #ifdef TAU_CACHE
-		return cache.emplace(fm, elim_aw(fm)).first->second;
+		return cache.emplace(std::make_pair(fm, start_time), elim_aw(fm)).first->second;
 #endif
 		return elim_aw(fm);
 	}
@@ -1051,8 +1051,8 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
 	res = elim_aw(res);
 #ifdef TAU_CACHE
-	cache.emplace(res, res);
-	return cache.emplace(fm, res).first->second;
+	cache.emplace(std::make_pair(res, start_time), res);
+	return cache.emplace(std::make_pair(fm, start_time), res).first->second;
 #endif
 	return res;
 }
