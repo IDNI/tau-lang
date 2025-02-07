@@ -614,8 +614,8 @@ TEST_SUITE("with inputs and outputs") {
 	// In this case, we get an error as the output should be equal to the
 	// input all the time, but the output is set to 0 at the beginning.
 	//
-	// TODO (HIGH) check this case, issue in unconstrained constants model
-	// Note that this specification is unsat.
+	// Note that this specification is unsat because i1[0] = 0 is deduced
+	// which is an assumption on an input stream
 	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
 		auto ins = build_i1_inputs({

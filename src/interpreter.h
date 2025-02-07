@@ -341,6 +341,10 @@ private:
 	tau<BAs...> pointwise_revision(const tau<BAs...>& spec,
 					const tau<BAs...>& update,
 					const int_t start_time);
+
+	// The update stream u contained in this solution for spec is guaranteed maximal
+	std::optional<assignment<BAs...>>
+	solution_with_max_update(const tau<BAs...>& spec);
 };
 
 template<typename... BAs>
