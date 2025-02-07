@@ -907,7 +907,8 @@ std::vector<tau<BAs...>> get_variables(const equation_system<BAs...>& system) {
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& system,
 		const solver_options<BAs...>& options) {
-	// then, we try a maximum solution
+	//TODO: comment out again, once min/max solutions work correctly
+	/*// then, we try a maximum solution
 	auto vars = get_variables(system);
 	solution<BAs...> substitution;
 	for (auto& var: vars) substitution[var] = build_bf_t_type<BAs...>(options.type);
@@ -920,7 +921,7 @@ std::optional<solution<BAs...>> solve_system(const equation_system<BAs...>& syst
 	if (auto solution = solve_extreme<BAs...>(system, substitution, solver_mode::minimum);
 			(solution.has_value() && options.mode != solver_mode::maximum)
 			|| options.mode == solver_mode::minimum)
-		return solution;
+		return solution;*/
 	// if we have no equality we try to solve the inequalities
 	if (!system.first.has_value()) return solve_inequality_system<BAs...>(system.second, options);
 	// otherwise we try a general solution

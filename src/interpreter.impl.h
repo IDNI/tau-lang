@@ -89,13 +89,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 			BOOST_LOG_TRIVIAL(trace) << "\n";
 			#endif // DEBUG
 
-			// setting proper options for the solver
-			solver_options<BAs...> options = {
-				.splitter_one = nso_factory<BAs...>::instance().splitter_one(""),
-				.mode = solver_mode::general };
-
-			// solve the given system of equations
-			auto solution = solve(current, options);
+			auto solution = solution_with_max_update(current);
 
 			#ifdef DEBUG
 			if (solution) {
@@ -530,6 +524,67 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 	}
 	// If no clause is sat, return F
 	return _F<BAs...>;
+}
+
+template<typename input_t, typename output_t, typename ... BAs>
+std::optional<assignment<BAs...>> interpreter<input_t, output_t, BAs...>::
+solution_with_max_update(const tau<BAs...>& spec) {
+	auto get_solution = [](const auto& fm) {
+		// setting proper options for the solver
+		solver_options<BAs...> options = {
+			.splitter_one = nso_factory<BAs...>::instance().splitter_one(""),
+			.mode = solver_mode::general
+		};
+		// solve the given system of equations
+		return solve(fm, options);
+	};
+	auto u = build_out_variable_at_n<BAs...>("u", time_point);
+	auto is_u_stream = [&u](const auto& n) {
+		return n == u;
+	};
+	for (const auto& clause : get_dnf_wff_clauses(spec)) {
+		// Find update stream in clause
+		auto update = find_top(clause, is_u_stream);
+		// If there is no update in clause
+		if (!update.has_value()) {
+			if (auto sol = get_solution(clause)) return sol;
+			else continue;
+		}
+
+		// Obtain single f = 0 part of clause
+		auto f = squeeze_positives(clause);
+		// If no positive parts exists, the update cannot be maximized
+		if (!f.has_value()) {
+			if (auto sol = get_solution(clause)) return sol;
+			else continue;
+		}
+
+		// Check that f is wide (not 0 and has more than one zero), otherwise continue
+		f.value() = f.value() | bf_reduce_canonical<BAs...>();
+		if (f.value() == _0<BAs...>) continue;
+		assignment<BAs...> changes = {{u, _0<BAs...>}};
+		auto f0 = replace(f.value(), changes);
+		changes = {{u, _1<BAs...>}};
+		auto f1 = replace(f.value(), changes);
+		auto f0_xor_f1 = build_bf_xor(f0, f1) | bf_reduce_canonical<BAs...>();
+		if (f0_xor_f1 == _0<BAs...> || f0_xor_f1 == _1<BAs...>) continue;
+
+		// Here we know that f is wide
+		auto max_u = build_bf_neg(f1);
+		changes = {{u, max_u}};
+		auto max_u_spec = replace(clause, changes);
+		auto sol = get_solution(max_u_spec);
+		if (!sol.has_value()) continue;
+		// Now we need to add solution for u[t]
+		auto sol_copy = sol.value();
+		max_u = replace(max_u, sol_copy);
+		max_u = replace_free_vars_by(max_u, _0_trimmed<BAs...>)
+				| bf_reduce_canonical<BAs...>();
+		sol.value().emplace(u, max_u);
+		return sol;
+	}
+	// In case there is no maximal solution for u
+	return get_solution(spec);
 }
 
 } // namespace idni::tau_lang

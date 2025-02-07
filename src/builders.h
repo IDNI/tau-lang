@@ -282,6 +282,11 @@ tau<BAs...> build_out_var_name(const size_t& index) {
 }
 
 template <typename... BAs>
+tau<BAs...> build_out_var_name(const std::string& name) {
+	return wrap<BAs...>(tau_parser::out_var_name, name);
+}
+
+template <typename... BAs>
 tau<BAs...> build_out_variable_at_t(const tau<BAs...>& out_var_name) {
 	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
 	return wrap(
