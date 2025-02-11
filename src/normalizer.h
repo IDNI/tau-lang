@@ -367,13 +367,22 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		return n;
 	};
 	auto red_fm = normalizer_step(fm);
+	if (red_fm == _T<BAs...> || red_fm == _F<BAs...>) return red_fm;
 	auto clauses = get_dnf_wff_clauses(red_fm);
-	tau<BAs...> new_fm;
+	tau<BAs...> new_fm = _F<BAs...>;
 	for (const auto& clause : clauses) {
 		auto aw_parts = select_top(clause,
 			is_child_non_terminal<tau_parser::wff_always, BAs...>);
 		auto st_parts = select_top(clause,
 			is_child_non_terminal<tau_parser::wff_sometimes, BAs ...>);
+		if (aw_parts.size() == 1 && st_parts.empty()) {
+			new_fm = build_wff_or(new_fm, clause);
+			continue;
+		}
+		if (aw_parts.empty() && st_parts.size() == 1) {
+			new_fm = build_wff_or(new_fm, clause);
+			continue;
+		}
 
 		// Replace always and sometimes parts by T
 		std::map<tau<BAs...>, tau<BAs...>> changes;
@@ -392,6 +401,17 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 					aw_parts[i] = _T<BAs...>;
 			}
 		}
+		// Check for unsat of always conjuncted with single sometimes part
+		bool clause_false = false;
+		for (const auto& aw : aw_parts) {
+			for (const auto& st : st_parts) {
+				const auto& f = build_wff_and(trim_q(aw), trim_q(st));
+				if (normalize_non_temp(f) == _F<BAs...>)
+					clause_false = true;
+			}
+		}
+		if (clause_false) continue;
+
 		// Next check if any always statement implies a sometimes statement
 		for (const auto& aw : aw_parts) {
 			for (auto& st : st_parts) {
@@ -410,9 +430,8 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		}
 		new_clause = build_wff_and(new_clause, build_wff_and(
 						build_wff_and<BAs...>(aw_parts),
-						build_wff_and<BAs...>( st_parts)));
-		if (new_fm) new_fm = build_wff_or(new_fm, new_clause);
-		else new_fm = new_clause;
+						build_wff_and<BAs...>(st_parts)));
+		new_fm = build_wff_or(new_fm, new_clause);
 	}
 	assert(new_fm != nullptr);
 	return new_fm;
