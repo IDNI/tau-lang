@@ -8,6 +8,8 @@ using parse_forest = idni::parser<char, char>::pforest;
 using parse_result = idni::parser<char, char>::result;
 using traverser_t  = traverser<sbf_sym, sbf_parser>;
 
+static constexpr const auto& get_children =
+		traverser_t::get_children_extractor();
 static constexpr const auto& get_only_child =
 		traverser_t::get_only_child_extractor();
 static constexpr const auto& get_terminals =
@@ -21,10 +23,6 @@ sbf_ba eval_node(const traverser_t& t) {
 	//BOOST_LOG_TRIVIAL(debug) << "eval_node";
 	auto n  = t | get_only_child;
 	auto nt = n | get_nonterminal;
-	if (nt == sbf_parser::conjunction_nosep_1st_oprnd
-		|| nt == sbf_parser::negation_oprnd)  nt = sbf_parser::sbf;
-	else if (nt == sbf_parser::conjunction_nosep)
-						nt = sbf_parser::conjunction;
 	switch (nt) {
 	case sbf_parser::zero: return bdd_handle<Bool>::hfalse;
 	case sbf_parser::one:  return bdd_handle<Bool>::htrue;
@@ -47,7 +45,7 @@ sbf_ba eval_node(const traverser_t& t) {
 			.first->second;
 	}
 	default:
-		auto o = (n || sbf_parser::sbf)();
+		auto o = (n | get_children)();
 		auto l = eval_node(o[0]), r = eval_node(o[1]);
 		switch (nt) {
 		case sbf_parser::disjunction:
@@ -59,6 +57,7 @@ sbf_ba eval_node(const traverser_t& t) {
 				<< l << " ^ " << r << " -> " << (l ^ r);
 			return l ^ r;
 		case sbf_parser::conjunction:
+		case sbf_parser::conjunction_nosep:
 			BOOST_LOG_TRIVIAL(trace)
 				<< l << " & " << r << " -> " << (l & r);
 			return l & r;
