@@ -28,7 +28,7 @@ option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
 option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
-option(TAU_WITH_Z3                 "Builds with Z3"                        OFF)
+#option(TAU_WITH_Z3                 "Builds with Z3"                        OFF)
 set_property(CACHE TAU_BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_LIBRARY    PROPERTY STRINGS "OFF" "ON")
@@ -170,19 +170,17 @@ endif()
 #
 option(BOOST_LOG_TRIVIAL           "Build logging in parser"   ON)
 option(PARSER_BUILD_STATIC_LIBRARY "Build only static library" ON)
-option(TAU_WITH_Z3                 "Build and use Z3"          ON)
+#option(TAU_WITH_Z3                 "Build and use Z3"          OFF)
 
 #
-# Adding Z3 (see https://github.com/Z3Prover/z3/blob/master/README-CMake.md)
+# Adding Z3
 #
-if (TAU_WITH_Z3)
-	FetchContent_Declare(z3
-		GIT_REPOSITORY https://github.com/Z3Prover/z3
-		GIT_TAG        z3-4.13.4
-	)
-	FetchContent_MakeAvailable(z3)
-	include_directories( ${z3_SOURCE_DIR}/src/api )
-endif()
+#find_library(Z3
+#	NAMES z3
+#	HINTS /usr/lib)
+#add_library(Z3 SHARED IMPORTED)
+#set_target_properties(Z3 PROPERTIES
+#	IMPORTED_LOCATION "${Z3}")
 
 # TODO (LOW) make it run automatically on grammar modifications
 #
@@ -253,7 +251,6 @@ set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_VENDOR "IDNI")
 set(CPACK_PACKAGE_CONTACT "contact@idni.org")
-set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/packages")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://idni.org")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")

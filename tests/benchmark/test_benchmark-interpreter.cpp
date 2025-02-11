@@ -19,7 +19,7 @@
 
 using namespace std;
 using namespace idni;
-//using namespace idni::rewriter;
+using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
 // using valgrind for memory leak detection
@@ -33,7 +33,7 @@ using namespace idni::tau_lang;
 // valgrind --tool=callgrind --callgrind-out-file=logs/test_benchmark-bernays-schonfinkel1.callgrind
 // ./build/test_benchmark-wff_normalization -t 600 -m 16384
 
-static const std::vector<std::tuple<std::string, std::string, std::string>> normalizer_samples = {
+static const std::vector<std::tuple<std::string, std::string, std::string>> interpreter_samples = {
 //	{ "Lucca's example", "luccas_example", // OK
 //		"ex a ex b ex c ex d ex f ex e (ax + bx' = cy + dy'"
 //		"|| ax + bx' != ey + fy') <-> (ax + bx' = cy + gy')."},
@@ -55,7 +55,7 @@ static const std::vector<std::tuple<std::string, std::string, std::string>> norm
 //		"f(x,y1x+y0'x)=0 && (g(x,y1x+y0'x)!=0 && h(x,y1x+y0'x)=0))"}
 };
 
-int execute_normalizer_benchmark(const std::string label, const std::string file, const std::string sample) {
+int execute_interpreter_benchmark(const std::string label, const std::string file, const std::string sample) {
 	// creating output stream
 	auto filename = "test_benchmark-"+ std::string(file) + "." + GIT_COMMIT_HASH + ".measures";
 	std::ofstream outfile(filename);
@@ -146,9 +146,9 @@ int main(int argc, char* argv[]) {
 
 	// iterating over all samples
 	int return_code = 0;
-	for (auto& sample: normalizer_samples) {
+	for (auto& sample: interpreter_samples) {
 		// executing the benchmark
-		auto success = execute_normalizer_benchmark(std::get<0>(sample), std::get<1>(sample), std::get<2>(sample));
+		auto success = execute_interpreter_benchmark(std::get<0>(sample), std::get<1>(sample), std::get<2>(sample));
 		std::cout << "Benchmark " << std::get<0>(sample) << (success ? ": Failed\n" : ": Passed\n");
 	}
 	return return_code;
