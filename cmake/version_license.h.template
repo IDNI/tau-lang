@@ -1,7 +1,9 @@
 namespace idni::tau_lang {
 
-constexpr char compile_date[] = "@COMPILE_DATE_ISO@";
-constexpr char version[] = TAU_VERSION " (" GIT_DESCRIBED ")";
+constexpr char build_date[] = "@BUILD_DATE_ISO@";
+constexpr char version[]    = "@VERSION@";
+constexpr auto full_version = "Tau Language Framework version @VERSION@ ("
+				GIT_COMMIT_HASH ")";
 constexpr char license[] = R"LICENSE_TEXT(
 @LICENSE_CONTENT@
 

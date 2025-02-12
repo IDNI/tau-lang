@@ -113,12 +113,11 @@ int run_tau_spec(string spec_file, bool charvar) {
 }
 
 void welcome() {
-	BOOST_LOG_TRIVIAL(info) << "Welcome to the Tau Language Framework Alpha"
-		<< " version " <<TAU_VERSION<< " (" << compile_date << " build "
-		<< GIT_COMMIT_HASH << ") by IDNI AG. "
-		<< "This product is protected by patents and copyright. "
-		<< "By using this product, you agree to the license terms. "
-		<< "To view the license run \"tau --license\".\n\n"
+	BOOST_LOG_TRIVIAL(info)
+		<< "Welcome to the " << full_version << " by IDNI AG.\n"
+		<< "This product is protected by patents and copyright."
+			" By using this product, you agree to the license terms."
+			" To view the license run \"tau --license\".\n\n"
 		<< "For documentation, open issues and reporting issues "
 			"please visit https://github.com/IDNI/tau-lang/\n\n"
 		<< "For built-in help, type \"help\" or \"help command\".\n\n";
@@ -140,7 +139,7 @@ int main(int argc, char** argv) {
 
 	if (opts["help"].get<bool>()) return cl.help(), 0;
 	if (opts["version"].get<bool>())
-		return std::cout << "Tau version: " << version, 0;
+				return std::cout << full_version << "\n", 0;
 	if (opts["license"].get<bool>()) return std::cout << license, 0;
 
 	std::string sevstr = opts["severity"].get<string>();
