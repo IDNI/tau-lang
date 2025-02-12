@@ -836,6 +836,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::sym:
 			case tau_parser::ctnvar:
 			case tau_parser::num:
+			case tau_parser::integer:
 			case tau_parser::type:
 			case tau_parser::source:
 			case tau_parser::named_binding:

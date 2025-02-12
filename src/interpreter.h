@@ -84,7 +84,7 @@ struct finputs {
 			if (!cnst) {
 				BOOST_LOG_TRIVIAL(error)
 					<< "(Error) failed to parse input value '"
-					<< line << "' for variable '"
+					<< line << "' for stream '"
 					<< var << "'\n";
 				return {};
 			}
@@ -104,7 +104,7 @@ struct finputs {
 			if (var | tau_parser::io_var | tau_parser::out)
 				continue;
 			// Skip input stream variables with time point greater time_step
-			if (get_io_time_point(var) > time_step)
+			if (get_io_time_point(var) > (int_t)time_step)
 				continue;
 			assert(is_non_terminal(tau_parser::variable, var));
 			std::string line;
@@ -114,7 +114,7 @@ struct finputs {
 				std::cout << line << "\n";
 			} else if (it == streams.end()) {
 				BOOST_LOG_TRIVIAL(error)
-					<< "(Error) failed to find input stream for variable '" << var_name << "'\n";
+					<< "(Error) failed to find input stream for stream '" << var_name << "'\n";
 				return {};
 			} else {
 				std::cout << var << " := ";
@@ -133,7 +133,7 @@ struct finputs {
 			if (!cnst) {
 				BOOST_LOG_TRIVIAL(error)
 					<< "(Error) failed to parse input value '"
-					<< line << "' for variable '"
+					<< line << "' for stream '"
 					<< var << "'\n";
 				return {};
 			}
@@ -152,7 +152,7 @@ struct finputs {
 		}
 
 		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) failed to find type for variable: "
+			<< "(Error) failed to find type for stream: "
 			<< var << "\n";
 		return {};
 	}
@@ -186,7 +186,7 @@ struct foutputs {
 	bool write(const assignment<BAs...>& outputs) {
 		// Sort variables in output by time
 		std::vector<tau<BAs...>> io_vars;
-		for (const auto& [var, ass] : outputs) {
+		for (const auto& [var, _ ] : outputs) {
 			assert(is_child_non_terminal(tau_parser::io_var, trim(var)));
 			io_vars.push_back(var);
 		}
@@ -216,7 +216,7 @@ struct foutputs {
 				// is something else but not a BA element
 				} else {
 					BOOST_LOG_TRIVIAL(error)
-						<< "(Error): no Boolean algebra element assigned to variable '"
+						<< "(Error): no Boolean algebra element assigned to output '"
 						<< io_var << "'\n";
 					return false;
 				}
@@ -232,7 +232,7 @@ struct foutputs {
 				if (auto name = ss.str(); !name.empty() && name.front() == '_') continue;
 
 				BOOST_LOG_TRIVIAL(error)
-					<< "(Error) failed to find output stream for variable '"
+					<< "(Error) failed to find output stream for stream '"
 					<< io_var << "'\n";
 				return false;
 			}
@@ -250,111 +250,26 @@ struct foutputs {
 		}
 
 		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) failed to find type for variable '"
+			<< "(Error) failed to find type for stream '"
 			<< var << "'\n";
 		return {};
 	}
 
 	std::map<tau<BAs...>, type> types;
 	std::map<tau<BAs...>, std::optional<std::ofstream>> streams;
-
-private:
-
-	std::vector<assignment<BAs...>> sort(const assignment<BAs...>& sol) {
-		auto compute_range = [](const assignment<BAs...>& sol) {
-			size_t lower = std::numeric_limits<size_t>::max(), upper = 0;
-			for (const auto& [var, value]: sol) {
-				if (auto num = var
-						| tau_parser::variable
-						| tau_parser::io_var
-						| tau_parser::out
-						| tau_parser::offset
-						| tau_parser::num
-						| only_child_extractor<BAs...>
-						| offset_extractor<BAs...>; num) {
-					lower = std::min(lower, num | optional_value_extractor<size_t>);
-					upper = std::max(upper, num | optional_value_extractor<size_t>);
-				}
-			}
-			return std::make_pair(lower, upper);
-		};
-
-		auto [lower, upper] = compute_range(sol);
-
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(trace)
-			<< "sort/lower: " << lower << "\n"
-			<< "sort/upper: " << upper << "\n";
-		#endif // DEBUG
-
-		std::vector<assignment<BAs...>> result(upper - lower + 1);
-
-		for (auto& [var, value]: sol) {
-			if (auto num = var
-					| tau_parser::variable
-					| tau_parser::io_var
-					| tau_parser::out
-					| tau_parser::offset
-					| tau_parser::num
-					| only_child_extractor<BAs...>
-					| offset_extractor<BAs...>; num) {
-				auto io_var = var
-					| tau_parser::variable
-					| tau_parser::io_var
-					| tau_parser::out
-					| tau_parser::out_var_name
-					| optional_value_extractor<tau<BAs...>>;
-				result[num.value() - lower][io_var] = value;
-			}
-		}
-
-		#ifdef DEBUG
-		for (size_t i = 0; i < result.size(); ++i) {
-			BOOST_LOG_TRIVIAL(trace)
-				<< "sort/result/[" << i <<"]: ";
-			for (const auto& [k, v]: result[i])
-				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " := " << v << " ";
-			BOOST_LOG_TRIVIAL(trace) << "\n";
-		}
-		#endif // DEBUG
-
-		return result;
-	}
-
-	std::vector<assignment<BAs...>> complete(const std::vector<assignment<BAs...>>& sols) {
-		std::vector<assignment<BAs...>> result(sols.size());
-		for (size_t i = 0; i < sols.size(); ++i) {
-			assignment<BAs...> nsol = sols[i];
-			for (const auto& [var, _]: types)
-				if ( !nsol.contains(var) ) nsol[var] = _0<BAs...>;
-			result[i] = nsol;
-		}
-
-		#ifdef DEBUG
-		for (size_t i = 0; i < result.size(); ++i) {
-			BOOST_LOG_TRIVIAL(trace)
-				<< "complete/result/[" << i <<"]: ";
-			for (const auto& [k, v]: result[i])
-				BOOST_LOG_TRIVIAL(trace)
-					<< "\t" << k << " := " << v << " ";
-			BOOST_LOG_TRIVIAL(trace) << "\n";
-		}
-		#endif // DEBUG
-
-		return result;
-	}
 };
 
 template<typename input_t, typename output_t, typename...BAs>
 struct interpreter {
-	interpreter(const tau<BAs...>& ubt_ctn, assignment<BAs...>& memory,
-		const auto& input, const auto& output) :
+	interpreter(const tau<BAs...>& ubt_ctn, const tau<BAs...>& original_spec,
+		assignment<BAs...>& memory, const auto& input,
+		const auto& output) :
 						ubt_ctn(ubt_ctn),
+						original_spec(original_spec),
 						memory(memory),
 						inputs(input),
 						outputs(output) {
-		compute_lookback_and_initial(ubt_ctn);
+		compute_lookback_and_initial();
 		// TODO: Re-enable after inputs and outputs member have been removed
 		// collect non-temporary output stream variables
 		// for (const auto& o: select_top(ubt_ctn,
@@ -366,14 +281,15 @@ struct interpreter {
 	}
 
 	static std::optional<interpreter> make_interpreter(
-		tau<BAs...> spec, const auto& inputs, const auto& outputs);
+		const tau<BAs...>& spec, const auto& inputs, const auto& outputs);
 
 	std::pair<std::optional<assignment<BAs...>>, bool> step();
 
-	// store all the possible systems to be solved, each system corresponds to a
-	// different clause.
+	// Update the interpreter with a given update
+	void update(const tau<BAs...>& update);
 
 	tau<BAs...> ubt_ctn;
+	tau<BAs...> original_spec;
 	assignment<BAs...> memory;
 	size_t time_point = 0;
 	// TODO: Remove inputs and outputs, once type inference for variables is ready
@@ -382,8 +298,10 @@ struct interpreter {
 	const output_t& outputs;
 
 private:
-
+	// store all the possible systems to be solved, each system corresponds to a
+	// different clause.
 	std::vector<system<BAs...>> systems;
+	bool final_system = false;
 	size_t formula_time_point = 0;
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
@@ -405,23 +323,49 @@ private:
 
 	tau<BAs...> update_to_time_point(const tau<BAs...>& f);
 
+	bool is_memory_access_valid(const auto& io_vars);
+
 	// If a variable is assigned a variable V in a solution from the solver,
 	// try to find a non-variable value by checking the solution for V
 	void resolve_solution_dependencies(solution<BAs...>& s);
 
 	// Return the lookback and highest initial position of the given unbound continuation
-	void compute_lookback_and_initial (const tau<BAs...>& ubd_ctn);
+	void compute_lookback_and_initial ();
 
 	// Find an executable specification from DNF
-	static tau<BAs...> get_executable_spec(const tau<BAs...>& fm);
+	static std::pair<tau<BAs...>, tau<BAs...>>
+	get_executable_spec(const tau<BAs...>& fm);
+
+	// Pointwise revision algorithm for producing updated specification
+	// Both spec and update need to be normalized
+	tau<BAs...> pointwise_revision(const tau<BAs...>& spec,
+					const tau<BAs...>& update,
+					const int_t start_time);
+
+	// The update stream u contained in this solution for spec is guaranteed maximal
+	std::optional<assignment<BAs...>>
+	solution_with_max_update(const tau<BAs...>& spec);
 };
 
+template<typename... BAs>
+std::optional<tau<BAs...>> unpack_tau_constant(const tau<BAs...>& constant) {
+	using p = tau_parser;
+	auto c_variant = constant
+		| p::bf_constant
+		| p::constant
+		| only_child_extractor<BAs...>
+		| ba_extractor<BAs...>;
+	if (!c_variant)	return {};
+	return nso_factory<BAs...>::instance().unpack_tau_ba(c_variant.value());
+}
+
 template<typename input_t, typename output_t, typename...BAs>
-void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
+std::optional<interpreter<input_t, output_t, BAs...>>
+run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t steps = 0) {
 	auto spec = normalizer(form);
 	auto intrprtr = interpreter<input_t, output_t, BAs...>
 		::make_interpreter(spec, inputs, outputs);
-	if (!intrprtr) return;
+	if (!intrprtr) return {};
 
 	BOOST_LOG_TRIVIAL(info) << "-----------------------------------------------------------------------------------------------------------";
 	BOOST_LOG_TRIVIAL(info) << "Please provide requested input, or press ENTER to terminate                                               |";
@@ -432,18 +376,36 @@ void run(const tau<BAs...>& form, input_t& inputs, output_t& outputs) {
 	while (true) {
 		auto [output, auto_continue] = intrprtr.value().step();
 		// If the user provided empty input for an input stream, quit
-		if (!output.has_value()) return;
-		if (!outputs.write(output.value())) return;
+		if (!output.has_value()) break;
+		if (!outputs.write(output.value())) break;
 		// If there is no input, ask the user if execution should continue
-		if (!auto_continue) {
+		if (!auto_continue && steps == 0) {
 			std::string line;
 			term::enable_getline_mode();
 			std::getline(std::cin, line);
 			term::disable_getline_mode();
 			if (line == "q" || line == "quit")
-				return;
+				break;
 		} else std::cout << "\n";
+
+		// Update interpreter in case the output stream u is present and unequal to 0
+		auto update_stream = build_out_variable_at_n<BAs...>(
+			"u", intrprtr.value().time_point - 1);
+		// Update only if u is of type tau
+		if (auto t = outputs.type_of(get_tau_io_name(trim(update_stream)));
+				t.has_value() && t.value() == "tau") {
+			auto it = output.value().find(update_stream);
+			if (it != output.value().end() && it->second != _0<BAs...>) {
+				auto update = unpack_tau_constant(it->second);
+				if (update) {
+					BOOST_LOG_TRIVIAL(trace) << "update: " << update.value() << "\n";
+					intrprtr.value().update(update.value());
+				}
+			}
+		}
+		if (steps != 0 && intrprtr.value().time_point == steps) break;
 	}
+	return intrprtr;
 }
 
 } // namespace idni::tau_lang

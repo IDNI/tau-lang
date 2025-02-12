@@ -129,12 +129,10 @@ struct solver_options {
  *
  * @tparam BAs Variadic template parameters.
  * @param eq The equality to solve.
- * @param mode The solver mode.
  * @return An optional solution.
  */
 template<typename...BAs>
-std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq,
-	const solver_mode mode = solver_mode::general);
+std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq);
 
 /**
  * @brief Solves the given equality using LGRS algorithm.

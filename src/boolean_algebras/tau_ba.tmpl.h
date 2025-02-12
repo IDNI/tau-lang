@@ -119,8 +119,19 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 
 template<typename... BAs>
 auto normalize (const tau_ba<BAs...>& fm) {
-	auto res = normalizer<tau_ba<BAs...>, BAs...>(fm.nso_rr);
+	auto res = apply_rr_to_formula<tau_ba<BAs...>, BAs...>(fm.nso_rr);
+	res = simp_tau_unsat_valid(res);
 	return tau_ba<BAs...>(res);
+}
+
+template<typename... BAs>
+bool is_syntactic_one(const tau_ba<BAs...>& fm) {
+	return fm.nso_rr.main == _T<tau_ba<BAs...>, BAs...>;
+}
+
+template<typename... BAs>
+bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
+	return fm.nso_rr.main == _F<tau_ba<BAs...>, BAs...>;
 }
 
 template<typename... BAs>
@@ -138,7 +149,7 @@ template<typename... BAs>
 bool is_closed (const tau_ba<BAs...>& fm) {
 	using p = tau_parser;
 	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
-	if (!simp_fm) return false; // TODO (MEDIUM) check if this is correct
+	if (!simp_fm) return false;
 	if (find_top(simp_fm, is_non_terminal<tau_parser::ref, tau_ba<BAs...>, BAs...>))
 		return false;
 	auto vars = get_free_vars_from_nso(simp_fm);

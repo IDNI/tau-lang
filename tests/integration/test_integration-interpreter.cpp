@@ -16,6 +16,8 @@
 #include "boolean_algebras/sbf_ba.h"
 #include "interpreter.h"
 
+#define base_bas tau_ba<sbf_ba>, sbf_ba
+
 using namespace boost::log;
 using namespace idni::tau_lang;
 
@@ -39,50 +41,272 @@ std::string random_file(const std::string& extension = ".out", const std::string
 }
 
 template<typename...BAs>
-struct output_sbf_console {
+struct output_console {
+
+	output_console() = default;
+	output_console(const std::string& type) : _type(type) {}
 
 	bool write(const assignment<BAs...>& outputs) const {
 		// for each stream in out.streams, write the value from the solution
 		for (const auto& [var, value]: outputs)
-			std::cout << var << " <- " << value << "\n";
+			std::cout << var << " := " << value << "\n";
 		return true; // success (always)
 	}
 
 	std::optional<type> type_of(const tau<BAs...>&) const {
-		return { "sbf" }; // sbf (always)
+		return { _type };
 	}
 
 	assignment<BAs...> streams;
+	std::string _type = "sbf";
 };
 
 template<typename...BAs>
-struct input_sbf_vector {
+struct input_vector {
 
-	input_sbf_vector() = default;
-	input_sbf_vector(std::vector<assignment<BAs...>>& inputs): inputs(inputs) {}
+	input_vector() = default;
+	input_vector(std::vector<assignment<BAs...>>& inputs) : inputs(
+		std::move(inputs)) {}
+	input_vector(std::vector<assignment<BAs...>>& inputs,
+		const std::string& type) : inputs(std::move(inputs)), _type(type) {}
 
-	std::optional<assignment<BAs...>> read() const {
+	std::optional<assignment<BAs...>> get() const {
 		if (inputs.empty()) return { assignment<BAs...>{} };
 		if (current == inputs.size()) return {};
-		return inputs[current++];
+		return inputs[current];
 	}
 
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
 		const auto& , const size_t ) const {
-		return { assignment<BAs...>{}, false };
+        if (inputs.empty()) return { assignment<BAs...>{}, false };
+		if (current >= inputs.size()) return { assignment<BAs...>{}, false };
+		return { inputs[current++], false};
 	}
 
 	std::optional<type> type_of(const tau<BAs...>&) const {
-		return { "sbf" }; // sbf (always)
+		return { _type };
 	}
 
 	std::vector<assignment<BAs...>> inputs;
 	mutable size_t current = 0;
+	std::string _type = "sbf";
 };
 
+template<typename... BAs>
+void build_input(const std::string& name, const std::vector<std::string>& values,
+		const std::string& type, auto& assgn) {
+	std::vector<tau<BAs...>> in_vars;
+	size_t t = 0;
+	for (const auto& val : values) {
+		auto in_var = build_in_variable_at_n<BAs...>(name, t);
+		auto v = nso_factory<BAs...>::instance().parse(val, type);
+		auto v_const = build_bf_constant(v.value());
+
+		if (assgn.size() <= t) {
+			std::map<tau<BAs...>, tau<BAs...>> a;
+			a.emplace(in_var, v_const);
+			assgn.emplace_back(std::move(a));
+		} else assgn[t].emplace(in_var, v_const);
+		++t;
+	}
+}
+
+template<typename... BAs>
+void build_output(const std::string& name, const std::vector<std::string>& values,
+		const std::string& type, auto& assgn) {
+	std::vector<tau<BAs...>> in_vars;
+	size_t t = 0;
+	for (const auto& val : values) {
+		auto out_var = build_out_variable_at_n<BAs...>(name, t);
+		if (val.empty()) {
+			assgn.emplace(out_var, nullptr);
+		} else {
+			auto v = nso_factory<BAs...>::instance().parse( val, type);
+			auto v_const = build_bf_constant(v.value());
+			assgn.emplace(out_var, v_const);
+		}
+		++t;
+	}
+}
+
+inline bool matches_output(const auto& assm, const auto& memory) {
+	for (const auto& [var, val] : assm) {
+		if (val == nullptr) continue;
+		if (auto it = memory.find(var); it != memory.end()) {
+			if (!are_bf_equal(it->second, val)) {
+				std::cout << "(Error) " << it->second << " != " << val << "\n";
+#ifdef DEBUG
+				std::cout << "first:\n";
+				ptree(std::cout, it->second);
+				std::cout << "\n";
+				std::cout << "second:\n";
+				ptree(std::cout, val);
+				std::cout << "\n";
+#endif // DEBUG
+				return false;
+			}
+		} else {
+			std::cout << "(Error) " << var << " not found\n";
+			return false;
+		}
+	}
+	return true;
+}
+
+template<typename... BAs>
+tau<BAs...> create_spec(const char* spec) {
+	auto sample_src = make_tau_source(spec);
+	return make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(
+		sample_src).value().main;
+}
+
+TEST_SUITE("Execution") {
+	TEST_CASE("o1[t] = i1[t]") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("o1[t] = i1[t].");
+		std::vector<std::string> i1 = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
+		std::vector<std::string> o1 = i1;
+		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
+		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		build_input<base_bas>("i1", i1, "tau", assgn_in);
+		build_output<base_bas>("o1", o1, "tau", assgn_out);
+		auto ins = input_vector<base_bas>(assgn_in, "tau");
+		auto outs = output_console<base_bas>("tau");
+		auto i = run(spec, ins, outs, 3);
+		CHECK( matches_output(assgn_out, i.value().memory) );
+	}
+
+	TEST_CASE("u[t] = i1[t]: dec_seq") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("u[t] = i1[t].");
+		std::vector<std::string> i1 = {
+			"F", "o1[t] = o1[t-1]&i2[t] && o1[0] = 1", "F", "F", "F", "F"
+		};
+		std::vector<std::string> i2 = {
+			"F", "F", "F", "<:x> = 0", "<:y> = 0", "<:z> = 0"
+		};
+		std::vector<std::string> u = {
+			"F", "always o1[t]o1[t-1]' = 0 && i2[t]o1[t]'o1[t-1] = 0 && i2[t]'o1[t] = 0 && o1[0]' = 0",
+			"F", "F", "F", "F"
+		};
+		std::vector<std::string> o1 = {
+			"", "", "T", "<:x> = 0", "<:x> = 0 && <:y> = 0",
+			"<:x> = 0 && <:y> = 0 && <:z> = 0"
+		};
+		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
+		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		build_input<base_bas>("i1", i1, "tau", assgn_in);
+		build_input<base_bas>("i2", i2, "tau", assgn_in);
+		build_output<base_bas>("o1", o1, "tau", assgn_out);
+		build_output<base_bas>("u", u, "tau", assgn_out);
+		auto ins = input_vector<base_bas>(assgn_in, "tau");
+		auto outs = output_console<base_bas>("tau");
+		auto i = run(spec, ins, outs, 6);
+		CHECK( matches_output(assgn_out, i.value().memory) );
+	}
+
+	TEST_CASE("u[t] = i1[t]: negative_rel_pos") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>(
+			"u[t] = i1[t] && o1[2] = { <:x> = 0 } && o2[1] = { <:y> = 0 }.");
+		std::vector<std::string> i1 = {
+			"F", "F", "o3[t] = o1[-1] & o2[-2]", "F", "F"
+		};
+		std::vector<std::string> u = {
+			"F", "F", "o3[t] = o1[-1] & o2[-2]", "F", "F"
+		};
+		std::vector<std::string> o3 = {
+			"", "", "", "<:x> = 0 && <:y> = 0", "<:x> = 0 && <:y> = 0"
+		};
+		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
+		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		build_input<base_bas>("i1", i1, "tau", assgn_in);
+		build_output<base_bas>("o3", o3, "tau", assgn_out);
+		build_output<base_bas>("u", u, "tau", assgn_out);
+		auto ins = input_vector<base_bas>(assgn_in, "tau");
+		auto outs = output_console<base_bas>("tau");
+		auto i = run(spec, ins, outs, 5);
+		CHECK( matches_output(assgn_out, i.value().memory) );
+	}
+
+	TEST_CASE("u[t] = i1[t]: 2_clauses") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("u[t] = i1[t] && o2[t] = 0.");
+		std::vector<std::string> i1 = {
+			"(always o2[-1] = 1) || (always o3[t] = 1)", "F", "F", "F"
+		};
+		std::vector<std::string> u = {
+			"(always o2[-1]' = 0) || (always o3[t]' = 0)", "F", "F", "F"
+		};
+		std::vector<std::string> o2 = {
+			"F", "F", "F", "F",
+		};
+		std::vector<std::string> o3 = {
+			"", "T", "T", "T"
+		};
+		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
+		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		build_input<base_bas>("i1", i1, "tau", assgn_in);
+		build_output<base_bas>("o3", o3, "tau", assgn_out);
+		build_output<base_bas>("o2", o2, "tau", assgn_out);
+		build_output<base_bas>("u", u, "tau", assgn_out);
+		auto ins = input_vector<base_bas>(assgn_in, "tau");
+		auto outs = output_console<base_bas>("tau");
+		auto i = run(spec, ins, outs, 4);
+		CHECK( matches_output(assgn_out, i.value().memory) );
+	}
+
+	TEST_CASE("u[t] = i1[t]: history_unsat") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("u[t] = i1[t] && o1[t] = 0.");
+		std::vector<std::string> i1 = {
+			"F", "o1[-1] = 1", "F", "F"
+		};
+		std::vector<std::string> u = {
+			"F", "o1[-1] = 1", "F", "F"
+		};
+		std::vector<std::string> o1 = {
+			"F", "F", "F", "F",
+		};
+		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
+		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		build_input<base_bas>("i1", i1, "tau", assgn_in);
+		build_output<base_bas>("o1", o1, "tau", assgn_out);
+		build_output<base_bas>("u", u, "tau", assgn_out);
+		auto ins = input_vector<base_bas>(assgn_in, "tau");
+		auto outs = output_console<base_bas>("tau");
+		auto i = run(spec, ins, outs, 4);
+		CHECK( matches_output(assgn_out, i.value().memory) );
+	}
+
+	TEST_CASE("u[t] = i1[t]: spec_replace") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("u[t] = i1[t] && o1[t] = 0.");
+		std::vector<std::string> i1 = {
+			"F", "o1[t] = 1", "F", "F"
+		};
+		std::vector<std::string> u = {
+			"F", "o1[t] = 1", "", ""
+		};
+		std::vector<std::string> o1 = {
+			"F", "F", "T", "T",
+		};
+		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
+		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		build_input<base_bas>("i1", i1, "tau", assgn_in);
+		build_output<base_bas>("o1", o1, "tau", assgn_out);
+		build_output<base_bas>("u", u, "tau", assgn_out);
+		auto ins = input_vector<base_bas>(assgn_in, "tau");
+		auto outs = output_console<base_bas>("tau");
+		auto i = run(spec, ins, outs, 4);
+		CHECK( matches_output(assgn_out, i.value().memory) );
+	}
+}
+
+
 std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
-		input_sbf_vector<tau_ba<sbf_ba>, sbf_ba>& inputs,
-		output_sbf_console<tau_ba<sbf_ba>, sbf_ba>& outputs,
+		input_vector<tau_ba<sbf_ba>, sbf_ba>& inputs,
+		output_console<tau_ba<sbf_ba>, sbf_ba>& outputs,
 		const size_t& times) {
 	auto sample_src = make_tau_source(sample);
 	auto spec = make_nso_rr_using_factory<
@@ -94,15 +318,15 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 	#endif // DEBUG
 
 	auto intprtr = interpreter<
-		input_sbf_vector<tau_ba<sbf_ba>, sbf_ba>,
-		output_sbf_console<tau_ba<sbf_ba>, sbf_ba>,
+		input_vector<tau_ba<sbf_ba>, sbf_ba>,
+		output_console<tau_ba<sbf_ba>, sbf_ba>,
 		tau_ba<sbf_ba>, sbf_ba>::make_interpreter(spec, inputs, outputs);
 	if (intprtr) {
 		// we read the inputs only once (they are always empty in this test suite)
 
 		for (size_t i = 0; i < times; ++i) {
 			// we execute the i-th step
-			auto in = inputs.read();
+			auto in = inputs.get();
 
 			#ifdef DEBUG
 			std::cout << "run_test/input[" << i << "]: ";
@@ -145,22 +369,22 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 
 std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 		const size_t& times) {
-	input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> inputs;
-	output_sbf_console<tau_ba<sbf_ba>, sbf_ba> outputs;
+	input_vector<tau_ba<sbf_ba>, sbf_ba> inputs;
+	output_console<tau_ba<sbf_ba>, sbf_ba> outputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
 std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
-		input_sbf_vector<tau_ba<sbf_ba>, sbf_ba>& inputs,
+		input_vector<tau_ba<sbf_ba>, sbf_ba>& inputs,
 		const size_t& times) {
-	output_sbf_console<tau_ba<sbf_ba>, sbf_ba> outputs;
+	output_console<tau_ba<sbf_ba>, sbf_ba> outputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
 std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
-		output_sbf_console<tau_ba<sbf_ba>, sbf_ba>& outputs,
+		output_console<tau_ba<sbf_ba>, sbf_ba>& outputs,
 		const size_t& times) {
-	input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> inputs;
+	input_vector<tau_ba<sbf_ba>, sbf_ba> inputs;
 	return run_test(sample, inputs, outputs, times);
 }
 
@@ -363,15 +587,17 @@ TEST_SUITE("only outputs") {
 
 TEST_SUITE("with inputs and outputs") {
 
-	input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> build_i1_inputs(
+	input_vector<tau_ba<sbf_ba>, sbf_ba> build_i1_inputs(
 			std::vector<tau<tau_ba<sbf_ba>, sbf_ba>> values) {
 		std::vector<assignment<tau_ba<sbf_ba>, sbf_ba>> assignments;
+		size_t t = 0;
 		for (const auto& value: values) {
 			assignment<tau_ba<sbf_ba>, sbf_ba> assignment;
-			assignment[build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1)] = value;
+			assignment[build_in_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, t)] = value;
 			assignments.push_back(assignment);
+			++t;
 		}
-		input_sbf_vector<tau_ba<sbf_ba>, sbf_ba> ins(assignments);
+		input_vector<tau_ba<sbf_ba>, sbf_ba> ins(assignments);
 		return ins;
 	}
 
@@ -388,8 +614,8 @@ TEST_SUITE("with inputs and outputs") {
 	// In this case, we get an error as the output should be equal to the
 	// input all the time, but the output is set to 0 at the beginning.
 	//
-	// TODO (HIGH) check this case, issue in unconstrained constants model
-	// Note that this specification is unsat.
+	// Note that this specification is unsat because i1[0] = 0 is deduced
+	// which is an assumption on an input stream
 	TEST_CASE("i1[t] = o1[t] && o1[0] = 0") {
 		const char* sample = "i1[t] = o1[t] && o1[0] = 0.";
 		auto ins = build_i1_inputs({

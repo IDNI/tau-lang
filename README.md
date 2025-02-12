@@ -8,7 +8,7 @@
 # Table of contents
 
 1. [Introduction](#introduction)
-2. [Installing the Tau Farmework](#installing-the-tau-framework)
+2. [Installing the Tau Framework](#installing-the-tau-framework)
 	1. [Linux](#linux)
 	2. [Windows](#windows-users)
 	3. [MacOS (not available yet)](#macos-users)

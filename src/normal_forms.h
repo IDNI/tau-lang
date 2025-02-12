@@ -862,7 +862,7 @@ bool assign_and_reduce(const tau<BAs...>& fm,
 		if (!is_wff) {
 			// fm is a Boolean function
 			// Normalize tau subformulas
-			fm_simp = fm | (tau_transform<BAs...>)normalize_ba<BAs...>;
+			fm_simp = normalize_ba<BAs...>(fm);
 			fm_simp = to_dnf2(fm_simp, false);
 			fm_simp = reduce2(fm_simp, tau_parser::bf);
 
@@ -2465,6 +2465,35 @@ tau<BAs...> shift_io_vars_in_fm (const tau<BAs...>& fm, const auto& io_vars, con
 	return replace(fm, changes);
 }
 
+template<typename... BAs>
+tau<BAs...> shift_const_io_vars_in_fm(const tau<BAs...>& fm,
+					const auto& io_vars, const int_t shift) {
+	if (shift <= 0) return fm;
+	using p = tau_parser;
+	std::map<tau<BAs...>, tau<BAs...>> changes;
+	for (const auto& io_var : io_vars) {
+		if (!is_io_initial(io_var))
+			continue;
+		int_t tp = get_io_time_point(io_var);
+		// Make sure that the resulting time point is positive
+		if (tp + shift < 0) return _F<BAs...>;
+		if (io_var | p::io_var | p::in) {
+			changes.emplace(
+				io_var, trim(
+					build_in_variable_at_n(
+						get_tau_io_name(io_var),
+						tp + shift)));
+		} else {
+			changes.emplace(
+				io_var, trim(
+					build_out_variable_at_n(
+						get_tau_io_name(io_var),
+						tp + shift)));
+		}
+	}
+	return replace(fm, changes);
+}
+
 // Assumes a single DNF clause and normalizes the "always" parts into one
 template<typename... BAs>
 tau<BAs...> pull_always_out(const tau<BAs...>& fm) {
@@ -2726,18 +2755,19 @@ tau<BAs...> operator|(const tau<BAs...>& fm, const sometimes_always_normalizatio
 	return r(fm);
 }
 
+// Squeeze all equalities found in n
+template <typename... BAs>
+std::optional<tau<BAs...>> squeeze_positives(const tau<BAs...>& n) {
+	if (auto positives = select_top(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
+			positives.size() > 0) {
+		for (auto& p: positives) p = trim(p);
+		return build_bf_or<BAs...>(positives);
+	}
+	return {};
+}
+
 template<typename... BAs>
 tau<BAs...> wff_remove_existential(const tau<BAs...>& var, const tau<BAs...>& wff) {
-	auto squeeze_positives = [](const tau<BAs...>& n) -> std::optional<tau<BAs...>>{
-		if (auto positives = select_top(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
-				positives.size() > 0) {
-			std::set<tau<BAs...>> bfs;
-			for (auto& p: positives)
-				bfs.insert(p | tau_parser::bf | optional_value_extractor<tau<BAs...>>);
-			return build_bf_or<BAs...>(bfs);
-		}
-		return {};
-	};
 	// Following Corollary 2.3 from Taba book from Ohad
 	auto is_var = [&var](const auto& node){return node == var;};
 	// if var does not appear in the formula, we can return the formula as is
@@ -2974,7 +3004,17 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	return rewriter::post_order_recursive_traverser<tau<BAs...>>()(fm, is_not_bf, elim_quant);
 }
 
-
+template <typename... BAs>
+tau<BAs...> replace_free_vars_by (const tau<BAs...>& fm, const tau<BAs...>& val) {
+	assert(!is_non_terminal(tau_parser::bf, val));
+	auto free_vars = get_free_vars_from_nso(fm);
+	if (!free_vars.empty()) {
+		std::map<tau<BAs...>, tau<BAs...>> free_var_assgm;
+		for (const auto& free_var : free_vars)
+			free_var_assgm.emplace(free_var, val);
+		return replace(fm, free_var_assgm);
+	} else return fm;
+}
 
 // We assume that the input is a formula is in MNF (with no quantifiers whatsoever).
 // We implicitly transformed into BDD form and compute one step of the SNF transformation.
