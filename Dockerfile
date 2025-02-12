@@ -2,7 +2,11 @@ FROM ubuntu:24.04
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
-    bash cmake git g++ mingw-w64 libboost-all-dev nsis rpm wget
+    bash wget git nsis rpm \
+    cmake=3.28.3-1build7 \
+    g++=4:13.2.0-7ubuntu1 \
+    mingw-w64=11.0.1-3build1 \
+    libboost-all-dev=1.83.0.1ubuntu2 
 
 # Argument BUILD_TYPE=Debug/Release
 ARG BUILD_TYPE=Release
