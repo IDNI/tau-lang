@@ -2,7 +2,6 @@
 #ifndef __DEF_H__
 #define __DEF_H__
 
-#define TAU_VERSION "0.7"
 #include "version_license.h"
 
 // basic macro for conditional execution of code

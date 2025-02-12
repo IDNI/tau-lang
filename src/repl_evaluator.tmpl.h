@@ -1243,7 +1243,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::version_cmd() {
-	std::cout << "Tau version: " << version << "\n";
+	std::cout << full_version << "\n";
 }
 
 template <typename... BAs>
