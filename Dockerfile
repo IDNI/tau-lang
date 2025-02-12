@@ -1,3 +1,17 @@
+# This is a Dockerfile for building, testing, packaging and running the tau-lang
+
+# To build the image with tag 'tau' from ./Dockerfile:
+#   docker build -t tau .
+
+# use --build-arg TESTS="no" to skip running tests
+# use --build-arg BUILD_TYPE="Debug" for build debugging version
+
+# To run tau using the created image in interactive mode:
+#   docker run --rm -it tau [<tau options>]
+
+# --rm flag is used to remove the container after it exits
+
+
 FROM ubuntu:24.04
 
 # Install dependencies
@@ -54,3 +68,11 @@ RUN if [ "$RELEASE" = "yes" ]; then \
 	cd external && ./libboost-mingw-builder.sh && cd .. \
 	./w64-packages.sh; \
 fi
+
+# If tau executable does not exist already, build it
+RUN if [ ! -f ./build-${BUILD_TYPE}/tau ]; then ./build.sh "${BUILD_TYPE}"; fi
+
+# Set the entrypoint to the tau executable
+WORKDIR /tau-lang/build-${BUILD_TYPE}
+ENTRYPOINT [ "./tau" ]
+CMD []
