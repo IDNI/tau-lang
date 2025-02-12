@@ -28,7 +28,7 @@ ARG BUILD_TYPE=Release
 # Argument RELEASE=yes is used to build release packages
 ARG RELEASE=no
 
-# Argument NIGHTLY=yes is used to build nightly packages
+# Argument NIGHTLY=yes is used to build nightly packages (works only if RELEASE=yes)
 ARG NIGHTLY=no
 
 # Argument TESTS=no is used to skip running tests
@@ -44,7 +44,7 @@ WORKDIR /tau-lang
 
 # if NIGHTLY is set to yes, then add .YYYY-MM-DD to the first line of the VERSION file
 RUN if [ "$NIGHTLY" = "yes" ]; then \
-	echo "$(head -n 1 VERSION)-$(date --iso)" > VERSION; \
+	echo -n "$(head -n 1 VERSION)-$(date --iso)" > VERSION; \
 fi
 RUN echo "(BUILD) -- Building version: $(cat VERSION)"
 
@@ -57,7 +57,6 @@ RUN if [ "$TESTS" = "yes" ]; then \
 		|| exit 1; \
 fi
 
-RUN if [ "$NIGHTLY" = "yes" ]; then RELEASE=yes; fi
 RUN echo "(BUILD) -- Building packages: $RELEASE (nightly: $NIGHTLY)"
 
 # Linux packages

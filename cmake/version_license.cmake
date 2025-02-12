@@ -3,6 +3,7 @@ set(output_file "${PROJECT_SOURCE_DIR}/src/version_license.h")
 # VERSION
 set(version_file "${PROJECT_SOURCE_DIR}/VERSION")
 file(READ ${version_file} VERSION ENCODING UTF-8)
+string(STRIP "${VERSION}" VERSION)
 string(REPLACE "\"" "\\\"" VERSION "${VERSION}")
 
 # LICENSE_CONTENT
