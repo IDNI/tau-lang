@@ -20,7 +20,7 @@ jobs:
 
       - name: Read Version
         id: version
-        run: echo "version=v$(cat VERSION)" >> $GITHUB_ENV
+        run: echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV
 
       - name: Upload release packages
         uses: actions/upload-artifact@v4

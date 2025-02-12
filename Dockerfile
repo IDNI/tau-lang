@@ -46,7 +46,7 @@ WORKDIR /tau-lang
 RUN if [ "$NIGHTLY" = "yes" ]; then \
 	echo -n "$(head -n 1 VERSION)-$(date --iso)" > VERSION; \
 fi
-RUN echo "(BUILD) -- Building version: $(cat VERSION)"
+RUN echo "(BUILD) -- Building version: $(head -n 1 VERSION)"
 
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
 RUN echo " (BUILD) -- Running tests: $TESTS"
@@ -64,7 +64,7 @@ RUN if [ "$RELEASE" = "yes" ]; then ./packages.sh; fi
 
 # Windows packages
 RUN if [ "$RELEASE" = "yes" ]; then \
-	cd external && ./libboost-mingw-builder.sh && cd .. \
+	cd external && ./libboost-mingw-builder.sh && cd .. && \
 	./w64-packages.sh; \
 fi
 
