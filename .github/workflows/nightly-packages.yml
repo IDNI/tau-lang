@@ -42,18 +42,22 @@ jobs:
           docker cp $CID:/tau-lang/build-Release/packages ${{ github.workspace }}/
           docker rm $CID
 
+      - name: Get ISO date
+        id: date_iso
+        run: echo "date_iso=$(date --iso)" >> $GITHUB_ENV
+
       - name: Upload nightly packages
         uses: actions/upload-artifact@v4
         with:
-          name: nightly-$(date --iso)
+          name: "nightly-${{ env.date_iso }}"
           path: ${{ github.workspace }}/packages/
 
       - name: Create Nightly Build Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "nightly-$(date --iso)"
-          name: "Tau Language Framework Alpha Nightly Build $(date --iso)"
-          body: "Tau Language Framework automated nightly build $(date --iso)"
+          tag_name: "nightly-${{ env.date_iso }}"
+          name: "Tau Language Framework Alpha Nightly Build ${{ env.date_iso }}"
+          body: "Tau Language Framework automated nightly build ${{ env.date_iso }}"
           draft: true
           prerelease: true
           files: ${{ github.workspace }}/packages/*
