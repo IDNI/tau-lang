@@ -714,7 +714,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 			BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/equality: " << equality.value() << "\n";
 			#endif // DEBUG
 
-			auto solution = lgrs(equality.value());
+			auto solution = lgrs(applied);
 			if (!solution) { std::cout << "no solution\n"; return; }
 		auto vars = select_top(equations,
 			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
