@@ -2,7 +2,7 @@ FROM ubuntu:24.04
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
-    bash cmake git g++ mingw-w64 libboost-all-dev nsis rpm
+    bash cmake git g++ mingw-w64 libboost-all-dev nsis rpm wget
 
 # Argument NIGHTLY=yes is used to determine if the build is a nightly build
 ARG NIGHTLY=no
