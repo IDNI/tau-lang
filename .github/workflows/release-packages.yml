@@ -34,7 +34,7 @@ jobs:
           tag_name: "v${{ env.version }}"
           name: "Tau Language Framework Alpha ${{ env.version }}"
           body: "Tau Language Framework"
-          draft: false
+          draft: true
           prerelease: true
           files: ${{ github.workspace }}/packages/*
         env:

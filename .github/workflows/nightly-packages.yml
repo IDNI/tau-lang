@@ -52,9 +52,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "nightly-$(date --iso)"
-          name: "Nightly Build $(date --iso)"
-          body: "Automated nightly build."
-          draft: false
+          name: "Tau Language Framework Alpha Nightly Build $(date --iso)"
+          body: "Tau Language Framework automated nightly build $(date --iso)"
+          draft: true
           prerelease: true
           files: ${{ github.workspace }}/packages/*
         env:
