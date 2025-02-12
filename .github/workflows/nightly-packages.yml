@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build image with nightly packages
-        run: docker build --build-arg NIGHTLY="yes" -t packages .
+        run: docker build --build-arg RELEASE="yes" --build-arg NIGHTLY="yes" -t packages .
 
       - name: Copy nightly packages from container
         run: |
