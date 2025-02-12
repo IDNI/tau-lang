@@ -11,6 +11,10 @@ namespace idni::tau_lang {
 
 struct bitvector_ba {
 
+	enum type {
+		i /* int */, u /* unsigned int */, l /* long */, ul /* usigned long */, b /* bits */
+	};
+
 	bitvector_ba(expr e, const unsigned& size);
 
 	bitvector_ba operator&(const bitvector_ba& x) const;
@@ -21,7 +25,10 @@ struct bitvector_ba {
 
 	auto operator<=>(const bitvector_ba& x) const = default;
 
-	static bitvector_ba from(const int& i, const unsigned& size);
+	static bitvector_ba from(const int& i);
+	static bitvector_ba from(const unsigned& u);
+	static bitvector_ba from(const long& l);
+	static bitvector_ba from(const unsigned long& ul);
 	static bitvector_ba from(const unsigned& n, const bool* bits);
 
 	bool is_zero() const;
