@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build image with release packages
-        run: docker build -t packages .
+        run: docker build --build-arg RELEASE="yes" -t packages .
 
       - name: Copy release packages from container
         run: |
