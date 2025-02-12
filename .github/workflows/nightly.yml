@@ -1,0 +1,69 @@
+name: Nightly Packages
+
+on:
+  workflow_dispatch:
+
+# TODO add schedule for nightly builds when finished 
+# on:
+#   schedule:
+#     - cron: '0 0 * * *'
+
+jobs:
+  check_date:
+    runs-on: ubuntu-20.04
+    name: Check latest commit
+    outputs:
+      should_run: ${{ steps.should_run.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: print latest_commit
+        run: echo ${{ github.sha }}
+
+      - id: should_run
+        continue-on-error: true
+        name: check latest commit is less than a day
+        if: ${{ github.event_name == 'schedule' }}
+        run: test -z $(git rev-list --after="24 hours" ${{ github.sha }}) && echo "::set-output name=should_run::false"
+
+  build_and_deploy_nightly:
+    needs: check_date
+    if: ${{ needs.check_date.outputs.should_run != 'false' }}
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image with nightly packages
+        run: docker build --build-arg NIGHTLY="yes" -t packages .
+
+      - name: Copy nightly packages from container
+        run: |
+          CID=$(docker create packages)
+          docker cp $CID:/tau-lang/build-Release/packages ${{ github.workspace }}/
+          docker rm $CID
+
+      - name: List nightly packages
+        working-directory: ${{ github.workspace }}/packages
+        run: echo "Listing nightly packages" && ls -la tau-*
+
+# TODO add upload of nightly packages and creating of a nightly release
+
+#     - name: Upload nightly artifacts
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: nightly-artifacts
+#         path: |
+#           ${{ github.workspace }}/packages/...
+
+#     - name: Create Nightly Release
+#       uses: softprops/action-gh-release@v2
+#       with:
+#         tag_name: nightly-${{ github.run_number }}
+#         release_name: "Nightly Build ${{ github.run_number }}"
+#         body: "Automated nightly build."
+#         draft: false
+#         prerelease: true
+#         files: |
+#           ${{ github.workspace }}/packages/...
+#       env:
+#         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
