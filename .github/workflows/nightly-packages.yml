@@ -42,28 +42,20 @@ jobs:
           docker cp $CID:/tau-lang/build-Release/packages ${{ github.workspace }}/
           docker rm $CID
 
-      - name: List nightly packages
-        working-directory: ${{ github.workspace }}/packages
-        run: echo "Listing nightly packages" && ls -la tau-*
+      - name: Upload nightly packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-$(date --iso)
+          path: ${{ github.workspace }}/packages/
 
-# TODO add upload of nightly packages and creating of a nightly release
-
-#     - name: Upload nightly artifacts
-#       uses: actions/upload-artifact@v4
-#       with:
-#         name: nightly-artifacts
-#         path: |
-#           ${{ github.workspace }}/packages/...
-
-#     - name: Create Nightly Release
-#       uses: softprops/action-gh-release@v2
-#       with:
-#         tag_name: nightly-${{ github.run_number }}
-#         release_name: "Nightly Build ${{ github.run_number }}"
-#         body: "Automated nightly build."
-#         draft: false
-#         prerelease: true
-#         files: |
-#           ${{ github.workspace }}/packages/...
-#       env:
-#         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Nightly Build Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "nightly-$(date --iso)"
+          name: "Nightly Build $(date --iso)"
+          body: "Automated nightly build."
+          draft: false
+          prerelease: true
+          files: ${{ github.workspace }}/packages/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -18,8 +18,24 @@ jobs:
           docker cp $CID:/tau-lang/build-Release/packages ${{ github.workspace }}/
           docker rm $CID
 
-      - name: List release packages
-        working-directory: ${{ github.workspace }}/packages
-        run: echo "Listing release packages" && ls -la tau-*
+      - name: Read Version
+        id: version
+        run: echo "version=v$(cat VERSION)" >> $GITHUB_ENV
 
-# TODO add upload of release packages and creating a release
+      - name: Upload release packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: "release-${{ env.version }}"
+          path: ${{ github.workspace }}/packages/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ env.version }}"
+          name: "Tau Language Framework Alpha ${{ env.version }}"
+          body: "Tau Language Framework"
+          draft: false
+          prerelease: true
+          files: ${{ github.workspace }}/packages/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
