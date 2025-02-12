@@ -28,10 +28,10 @@ WORKDIR /tau-lang
 RUN if [ "$NIGHTLY" = "yes" ]; then \
 	echo "$(head -n 1 VERSION)-$(date --iso)" > VERSION; \
 fi
-RUN echo "(BUILD) Building version: $(cat VERSION)"
+RUN echo "(BUILD) -- Building version: $(cat VERSION)"
 
 # Build tests and run them if TESTS is set to yes. Stop the build if they fail
-RUN echo " (BUILD) Running tests: $TESTS"
+RUN echo " (BUILD) -- Running tests: $TESTS"
 RUN if [ "$TESTS" = "yes" ]; then \
 	./build.sh "${BUILD_TYPE}" -DTAU_BUILD_TESTS=ON && \
 	cd tests && \
@@ -40,7 +40,7 @@ RUN if [ "$TESTS" = "yes" ]; then \
 fi
 
 RUN if [ "$NIGHTLY" = "yes" ]; then RELEASE=yes; fi
-RUN echo "(BUILD) Building packages: $RELEASE (nightly: $NIGHTLY)"
+RUN echo "(BUILD) -- Building packages: $RELEASE (nightly: $NIGHTLY)"
 
 # Linux packages
 RUN if [ "$RELEASE" = "yes" ]; then ./packages.sh; fi
