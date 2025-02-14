@@ -213,6 +213,20 @@ bool is_non_temp_nso_satisfiable (const tau<BAs...>& fm) {
 	return normalized == _T<BAs...>;
 }
 
+template<typename... BAs>
+bool is_non_temp_nso_unsat (const tau<BAs...>& fm) {
+	assert(!find_top(fm, is_non_terminal<tau_parser::wff_always, BAs...>));
+	assert(!find_top(fm, is_non_terminal<tau_parser::wff_sometimes, BAs...>));
+
+	auto new_fm = fm;
+	auto vars = get_free_vars_from_nso(new_fm);
+	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
+	auto normalized = normalize_non_temp<BAs...>(new_fm);
+	assert((normalized == _T<BAs...> || normalized == _F<BAs...> ||
+		find_top(normalized, is_non_terminal<tau_parser::constraint, BAs...>)));
+	return normalized == _F<BAs...>;
+}
+
 template <typename... BAs>
 bool are_nso_equivalent(tau<BAs...> n1, tau<BAs...> n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_nso_equivalent";
@@ -407,7 +421,7 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		for (const auto& aw : aw_parts) {
 			for (const auto& st : st_parts) {
 				const auto& f = build_wff_and(trim_q(aw), trim_q(st));
-				if (!is_non_temp_nso_satisfiable(f))
+				if (is_non_temp_nso_unsat(f))
 					clause_false = true;
 			}
 		}
