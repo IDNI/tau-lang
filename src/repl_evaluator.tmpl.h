@@ -521,7 +521,31 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		BOOST_LOG_TRIVIAL(debug) << "applied: " << applied << "\n";
 		#endif // DEBUG
 
-		//
+		// -------------------------------------------------------------
+		// TODO: remove once type inference is ready
+		using p = tau_parser;
+		auto atomic = [](const tau_nso_t& n) {
+			return is_non_terminal(p::bf_eq, n) ||
+				is_non_terminal(p::bf_neq, n);
+		};
+		auto eqs = select_top(applied, atomic);
+		for (const auto& eq : eqs) {
+			// If find type, type all io_vars found in eq if not present yet
+			auto type = find_top(eq, is_non_terminal<p::type, tau_ba<BAs...>, BAs...>);
+			if (!type) continue;
+			auto out_vars = select_top(eq, is_non_terminal<p::out_var_name, tau_ba<BAs...>, BAs...>);
+			for (const auto& out_var : out_vars) {
+				if (auto it = outputs.find(out_var); it == outputs.end())
+					outputs.emplace(out_var, std::make_pair(tau_to_str(type.value()), ""));
+			}
+			auto in_vars = select_top(eq, is_non_terminal<p::in_var_name, tau_ba<BAs...>, BAs...>);
+			for (const auto& in_var : in_vars) {
+				if (auto it = inputs.find(in_var); it == inputs.end())
+					inputs.emplace(in_var, std::make_pair(tau_to_str(type.value()), ""));
+			}
+		}
+		// -------------------------------------------------------------
+
 		auto dnf = normalizer_step(applied);
 
 		// Make sure that there is no free variable in the formula
