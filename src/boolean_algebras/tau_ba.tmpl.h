@@ -35,8 +35,8 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba_t& other) const {
 template <typename...BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
-	tau_nso_t nmain = build_wff_or<tau_ba_t, BAs...>(nso_rr.main,
-							other.nso_rr.main);
+	tau_nso_t nmain = build_wff_or<tau_ba_t, BAs...>(normalizer(nso_rr.main),
+							normalizer(other.nso_rr.main));
 	rules<tau_nso_t> nrec_relations =
 		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba_t(nrec_relations, nmain);
@@ -46,7 +46,8 @@ template <typename...BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
 	tau_nso_t nmain = build_wff_xor_from_def<tau_ba_t, BAs...>(
-						nso_rr.main, other.nso_rr.main);
+						normalizer(nso_rr.main),
+						normalizer(other.nso_rr.main));
 	rules<tau_nso_t> nrec_relations =
 		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba_t(nrec_relations, nmain);
