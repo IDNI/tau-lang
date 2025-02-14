@@ -61,8 +61,8 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
-		auto g = replace_with(vars[0], _1<BAs...>, f) | bf_reduce_canonical<BAs...>();
-		auto h = replace_with(vars[0], _0<BAs...>, f) | bf_reduce_canonical<BAs...>();
+		auto g = replace_with(vars[0], _1<BAs...>, f);
+		auto h = replace_with(vars[0], _0<BAs...>, f);
 		auto gh = (g & h) | bf_reduce_canonical<BAs...>();
 
 		#ifdef DEBUG
@@ -84,10 +84,10 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 			}
 			else {
 				auto copy = substitution;
-				substitution[vars[0]] = mode == solver_mode::maximum
+				substitution[vars[0]] = ( ( mode == solver_mode::maximum
 						? replace(~g, copy)
-						: replace(h, copy)
-					| bf_reduce_canonical<BAs...>();
+						: replace(h, copy) )
+					| bf_reduce_canonical<BAs...>() );
 
 				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
@@ -103,10 +103,10 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 		if (auto restricted = find_solution(build_wff_eq(gh), substitution, mode); restricted) {
 			//solution.insert(restricted.value().begin(), restricted.value().end());
 			auto copy = restricted.value();
-			substitution[vars[0]] = mode == solver_mode::maximum
+			substitution[vars[0]] = ( ( mode == solver_mode::maximum
 					? replace(~g, copy)
-					: replace(h, copy)
-				| bf_reduce_canonical<BAs...>();
+					: replace(h, copy) )
+				| bf_reduce_canonical<BAs...>() );
 
 			#ifdef DEBUG
 			BOOST_LOG_TRIVIAL(trace)
@@ -132,8 +132,6 @@ template<typename...BAs>
 std::vector<tau<BAs...>> get_variables(const equality<BAs...>& eq) {
 	return select_top(eq, is_child_non_terminal<tau_parser::variable, BAs...>);
 }
-
-
 
 template<typename...BAs>
 std::vector<tau<BAs...>> get_variables(const equation_system<BAs...>& system) {
@@ -932,7 +930,7 @@ bool check_extreme_solution(const equation_system<BAs...>& system,
 	// We check if the solution satisfies the inequalities of the system
 	for (const auto& inequality: system.second) {
 		auto copy = substitution;
-		auto value = replace(inequality, copy) | bf_reduce_canonical<BAs...>();;
+		auto value = replace(inequality, copy) | bf_reduce_canonical<BAs...>();
 		if (value == _F<BAs...>)
 			return false;
 	}
