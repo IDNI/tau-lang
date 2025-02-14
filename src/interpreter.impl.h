@@ -421,14 +421,17 @@ std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(c
 
 template<typename input_t, typename output_t, typename...BAs>
 std::pair<tau<BAs...>, tau<BAs...>>
-interpreter<input_t, output_t, BAs...>::get_executable_spec(const tau<BAs...>& fm) {
+interpreter<input_t, output_t, BAs...>::get_executable_spec(
+	const tau<BAs...>& fm, const size_t start_time) {
 	for (auto& clause : get_dnf_wff_clauses(fm)) {
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/clause: " << clause;
 #endif // DEBUG
 
-		auto executable = transform_to_execution(clause, 0, true);
+		// std::cout << "try clause: " << clause << "\n";
+		auto executable = transform_to_execution(clause, start_time, true);
+		// std::cout << "executable: " << executable << "\n";
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/executable: " << executable;
@@ -514,18 +517,18 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 
 	// TODO: current_spec = remove_happend_sometimes(current_spec);
 
-	auto new_spec = pointwise_revision(current_spec, shifted_update, time_point);
-	BOOST_LOG_TRIVIAL(debug) << "update/new_spec: " << new_spec << "\n";
-	if (new_spec == _F<BAs...>) {
+	auto new_raw_spec = pointwise_revision(current_spec, shifted_update, time_point);
+	BOOST_LOG_TRIVIAL(debug) << "update/new_spec: " << new_raw_spec << "\n";
+	// std::cout << "update/new_spec: " << new_raw_spec << "\n";
+	if (new_raw_spec == _F<BAs...>) {
 		BOOST_LOG_TRIVIAL(info) << "(Warning) no updated performed: updated specification is unsat\n";
 		return;
 	}
 
 	// If the unbound continuation from start_time is possible,
 	// it is safe to swap the current spec by update_unbound
-	auto new_ubd_ctn = transform_to_execution(
-		new_spec, time_point, true);
-	if (new_ubd_ctn == _F<BAs...>) {
+	auto [new_ubd_ctn, new_spec] = get_executable_spec(new_raw_spec, time_point);
+	if (new_ubd_ctn == nullptr) {
 		BOOST_LOG_TRIVIAL(info) << "(Warning) no update performed: updated specification is unsat\n";
 		return;
 	}
@@ -552,7 +555,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 		auto spec_always = find_top(
 			spec, is_child_non_terminal<p::wff_always, BAs...>);
 
-		tau<BAs...> new_spec = normalizer(clause);
+		tau<BAs...> new_spec = clause;
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
 		BOOST_LOG_TRIVIAL(trace) << "pwr/new_spec: " << new_spec << "\n";

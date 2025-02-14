@@ -359,7 +359,7 @@ private:
 
 	// Find an executable specification from DNF
 	static std::pair<tau<BAs...>, tau<BAs...>>
-	get_executable_spec(const tau<BAs...>& fm);
+	get_executable_spec(const tau<BAs...>& fm, const size_t start_time = 0);
 
 	// Pointwise revision algorithm for producing updated specification
 	// Both spec and update need to be normalized
