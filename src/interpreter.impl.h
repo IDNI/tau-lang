@@ -429,9 +429,7 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(
 			<< "compute_systems/clause: " << clause;
 #endif // DEBUG
 
-		// std::cout << "try clause: " << clause << "\n";
 		auto executable = transform_to_execution(clause, start_time, true);
-		// std::cout << "executable: " << executable << "\n";
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
 			<< "compute_systems/executable: " << executable;
@@ -545,17 +543,21 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 
 template<typename input_t, typename output_t, typename ... BAs>
 tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
-	const tau<BAs...>& spec, const tau<BAs...>& update, const int_t start_time) {
+	tau<BAs...> spec, tau<BAs...> update, const int_t start_time) {
 	using p = tau_parser;
+	spec = normalizer(spec);
+	update = normalizer(update);
 	for (const auto& clause : get_dnf_wff_clauses(update)) {
 		auto upd_always = find_top(
 			clause, is_child_non_terminal<p::wff_always, BAs...>);
+		auto upd_sometime = select_top(
+			clause, is_child_non_terminal<p::wff_sometimes, BAs...>);
 		auto spec_sometimes = select_top(
 			spec, is_child_non_terminal<p::wff_sometimes, BAs...>);
 		auto spec_always = find_top(
 			spec, is_child_non_terminal<p::wff_always, BAs...>);
 
-		tau<BAs...> new_spec = clause;
+		const tau<BAs...> new_spec = clause;
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
 		BOOST_LOG_TRIVIAL(trace) << "pwr/new_spec: " << new_spec << "\n";
@@ -567,16 +569,25 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 		if (spec_always) {
 			tau<BAs...> aw;
 			if (upd_always)
-				aw = build_wff_and(trim2(upd_always.value()),
-					trim2(spec_always.value()));
+				aw = always_conjunction(
+					upd_always.value(),
+					spec_always.value());
 			else aw = trim2(spec_always.value());
 
 			auto aw_io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
 			for (const auto& io_var : aw_io_vars)
 				if (io_var | p::io_var | p::out)
 					aw = build_wff_ex(io_var, aw);
+			if (upd_always)
+				new_spec_pointwise = build_wff_and(
+					trim2(upd_always.value()),
+					build_wff_imply(aw, trim2(spec_always.value())));
+			else new_spec_pointwise = build_wff_imply(aw, trim2(spec_always.value()));
+
+			new_spec_pointwise = build_wff_always(new_spec_pointwise);
 			new_spec_pointwise = build_wff_and(
-				new_spec, build_wff_imply(aw, trim2(spec_always.value())));
+				new_spec_pointwise,
+				build_wff_and<BAs...>(upd_sometime));
 
 			BOOST_LOG_TRIVIAL(trace) << "pwr/new_spec_pointwise: " << new_spec_pointwise << "\n";
 			if (!is_tau_formula_sat(new_spec_pointwise, start_time))

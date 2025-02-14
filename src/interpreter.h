@@ -363,8 +363,7 @@ private:
 
 	// Pointwise revision algorithm for producing updated specification
 	// Both spec and update need to be normalized
-	tau<BAs...> pointwise_revision(const tau<BAs...>& spec,
-					const tau<BAs...>& update,
+	tau<BAs...> pointwise_revision(tau<BAs...> spec, tau<BAs...> update,
 					const int_t start_time);
 
 	// The update stream u contained in this solution for spec is guaranteed maximal
