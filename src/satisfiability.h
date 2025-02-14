@@ -666,8 +666,11 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	const int_t s = start_time + lookback;
 	// // In case no initial condition is being checked
 	// // we still need to check a run once
-	// if (point_after_inits + lookback <= s)
-	// 	point_after_inits = s+1-lookback; // By def of s, this is positive
+	bool conjunct_with_run = true;
+	if (point_after_inits + lookback <= s) {
+		point_after_inits = s+1-lookback; // By def of s, this is positive
+		conjunct_with_run = false;
+	}
 	// variable furthest back needs to pass all initial conditions
 	for (int_t t = s; t < point_after_inits + lookback; ++t) {
 		auto current_step = fm_at_time_point(ubd_ctn, io_vars, t);
@@ -684,7 +687,7 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 			return _F<BAs...>;
 		}
 	}
-	auto res = normalize_non_temp(build_wff_and(ubd_ctn, run));
+	auto res = normalize_non_temp( conjunct_with_run ? build_wff_and(ubd_ctn, run) : ubd_ctn);
 	// The following is std::cout because it should always be printed
 	print_fixpoint_info(
 		"Temporal normalization of always specification reached fixpoint after "
