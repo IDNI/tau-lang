@@ -82,7 +82,7 @@ struct input_vector {
 	}
 
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
-		const auto& , const size_t ) const {
+		const auto& , const size_t ) {
         if (inputs.empty()) return { assignment<BAs...>{}, false };
 		if (current >= inputs.size()) return { assignment<BAs...>{}, false };
 		return { inputs[current++], false};
@@ -97,7 +97,7 @@ struct input_vector {
 	}
 
 	std::vector<assignment<BAs...>> inputs;
-	mutable size_t current = 0;
+	size_t current = 0;
 	std::string _type = "sbf";
 };
 
