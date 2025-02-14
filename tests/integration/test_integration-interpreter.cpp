@@ -57,6 +57,10 @@ struct output_console {
 		return { _type };
 	}
 
+	void add_output (const tau<BAs...>&, const std::string&, const std::string&) {
+		return;
+	}
+
 	assignment<BAs...> streams;
 	std::string _type = "sbf";
 };
@@ -67,6 +71,7 @@ struct input_vector {
 	input_vector() = default;
 	input_vector(std::vector<assignment<BAs...>>& inputs) : inputs(
 		std::move(inputs)) {}
+	input_vector(const std::string& type) : _type(type) {}
 	input_vector(std::vector<assignment<BAs...>>& inputs,
 		const std::string& type) : inputs(std::move(inputs)), _type(type) {}
 
@@ -87,6 +92,10 @@ struct input_vector {
 		return { _type };
 	}
 
+	void add_input (const tau<BAs...>&, const std::string&, const std::string&) {
+		return;
+	}
+
 	std::vector<assignment<BAs...>> inputs;
 	mutable size_t current = 0;
 	std::string _type = "sbf";
@@ -100,7 +109,7 @@ void build_input(const std::string& name, const std::vector<std::string>& values
 	for (const auto& val : values) {
 		auto in_var = build_in_variable_at_n<BAs...>(name, t);
 		auto v = nso_factory<BAs...>::instance().parse(val, type);
-		auto v_const = build_bf_constant(v.value());
+		auto v_const = build_bf_constant(v.value(), type);
 
 		if (assgn.size() <= t) {
 			std::map<tau<BAs...>, tau<BAs...>> a;
@@ -122,7 +131,7 @@ void build_output(const std::string& name, const std::vector<std::string>& value
 			assgn.emplace(out_var, nullptr);
 		} else {
 			auto v = nso_factory<BAs...>::instance().parse( val, type);
-			auto v_const = build_bf_constant(v.value());
+			auto v_const = build_bf_constant(v.value(), type);
 			assgn.emplace(out_var, v_const);
 		}
 		++t;
@@ -368,9 +377,9 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 }
 
 std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
-		const size_t& times) {
-	input_vector<tau_ba<sbf_ba>, sbf_ba> inputs;
-	output_console<tau_ba<sbf_ba>, sbf_ba> outputs;
+		const size_t& times, const std::string& type = "sbf") {
+	input_vector<tau_ba<sbf_ba>, sbf_ba> inputs(type);
+	output_console<tau_ba<sbf_ba>, sbf_ba> outputs(type);
 	return run_test(sample, inputs, outputs, times);
 }
 
@@ -572,14 +581,14 @@ TEST_SUITE("only outputs") {
 	// Fibonacci like sequence with sample Tau syntax
 	TEST_CASE("o1[0] = {<:x> = 0.} && o1[1] = {<:x> = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] =  {<:x> = 0.} && o1[1] =  {<:x> = 0.} && o1[t] = o1[t-1] + o1[t-2].";
-		auto memory = run_test(sample, 8);
+		auto memory = run_test(sample, 8, "tau");
 		CHECK ( !memory.value().empty() );
 	}
 
 	// Fibonacci like sequence with sample Tau programs
 	TEST_CASE("o1[0] = {o1[0] = 0.} && o1[1] = {o1[0] = 0.} && o1[t] = o1[t-1] + o1[t-2]") {
 		const char* sample = "o1[0] =  {o1[0] = 0.} && o1[1] =  {o1[0] = 0.} && o1[t] = o1[t-1] + o1[t-2].";
-		auto memory = run_test(sample, 8);
+		auto memory = run_test(sample, 8, "tau");
 		CHECK ( !memory.value().empty() );
 	}
 }

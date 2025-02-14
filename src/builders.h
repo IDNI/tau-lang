@@ -485,25 +485,25 @@ tau<BAs...> build_bf_constant(const std::variant<BAs...>& v, const std::optional
 }
 
 template<typename... BAs>
-tau<BAs...> build_bf_and_constant( const auto& ctes)
+tau<BAs...> build_bf_and_constant( const auto& ctes, const tau<BAs...>& type)
 {
 	if (ctes.empty()) return _1<BAs...>;
 
 	auto cte = std::accumulate(++ctes.begin(), ctes.end(), *ctes.begin(),
 		[&](const auto& l, const auto& r) { return l & r; });
 
-	return build_bf_constant<BAs...>(cte);
+	return build_bf_constant<BAs...>(cte, type);
 }
 
 template <typename... BAs>
-tau<BAs...> build_bf_or_constant( const auto& ctes)
+tau<BAs...> build_bf_or_constant( const auto& ctes, const tau<BAs...>& type)
 {
 	if (ctes.empty()) return _0<BAs...>;
 
 	auto cte = std::accumulate(++ctes.begin(), ctes.end(), *ctes.begin(),
 		[&](const auto& l, const auto& r) { return l | r; });
 
-	return build_bf_constant<BAs...>(cte);
+	return build_bf_constant<BAs...>(cte, type);
 }
 
 template <typename... BAs>

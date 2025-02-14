@@ -260,12 +260,11 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 			| only_child_extractor<BAs...>
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
+		// std::cout << "Constant to normalize: " << ba_elem << "\n";
 		auto res = normalize_ba(ba_elem);
 		auto type = n | p::bf_constant | p::type;
 		assert(type.has_value());
-		auto r = build_bf_constant(
-			rewriter::make_node<tau_sym<BAs...> >(
-				tau_sym<BAs...>(res), {}), type.value());
+		auto r = build_bf_constant(res, type.value());
 
 #ifdef TAU_CACHE
 		cache.emplace(r, r);
@@ -2759,6 +2758,7 @@ tau<BAs...> operator|(const tau<BAs...>& fm, const sometimes_always_normalizatio
 }
 
 // Squeeze all equalities found in n
+//TODO: make it type depended
 template <typename... BAs>
 std::optional<tau<BAs...>> squeeze_positives(const tau<BAs...>& n) {
 	if (auto positives = select_top(n, is_non_terminal<tau_parser::bf_eq, BAs...>);

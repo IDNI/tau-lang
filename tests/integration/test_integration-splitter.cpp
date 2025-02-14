@@ -240,7 +240,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ x3 y } ({ x3 y } w)' = 0" );
+		CHECK(ss.str() == "{ x3 y } : sbf ({ x3 y } : sbf w)' = 0" );
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
@@ -251,7 +251,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		CHECK((ss.str() == "{ x | x' y } ({ x | x' y } w)' = 0" || ss.str() == "{ x y' | y } ({ x y' | y } w)' = 0"));
+		CHECK((ss.str() == "{ x | x' y } : sbf ({ x | x' y } : sbf w)' = 0" || ss.str() == "{ x y' | y } : sbf ({ x y' | y } : sbf w)' = 0"));
 	}
 
 	TEST_CASE("Tau_splitter_coeff3") {
@@ -262,7 +262,7 @@ TEST_SUITE("Tau_splitter_coeff") {
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
-		CHECK(ss.str() == "{ x } f = 0 && { y } g = 0 && f{ x' } = 0");
+		CHECK(ss.str() == "f{ x } : sbf = 0 && g{ y } : sbf = 0 && f{ x' } : sbf = 0");
 	}
 }
 

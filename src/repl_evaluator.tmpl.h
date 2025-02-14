@@ -557,7 +557,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		// select current output variables
 		auto out_vars = select_all(dnf, is_non_terminal<
 				tau_parser::out_var_name, tau_ba_t, BAs...>);
-		std::map<tau_nso_t, std::pair<type, filename>> current_outputs = outputs;
+		std::map<tau_nso_t, std::pair<type, filename>> current_outputs;
 		for (auto& var: out_vars) {
 			if (auto it = outputs.find(var); it != outputs.end())
 				current_outputs[var] = it->second;

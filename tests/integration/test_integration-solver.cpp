@@ -20,7 +20,7 @@ namespace testing = doctest;
 
 auto splitter_one_bdd() {
 	static sbf_ba_factory<sbf_ba> factory;
-	return build_bf_constant(factory.splitter_one());
+	return build_bf_constant(factory.splitter_one(), build_type<sbf_ba>("sbf"));
 }
 
 template<typename...BAs>
