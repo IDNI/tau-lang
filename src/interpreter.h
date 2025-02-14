@@ -56,6 +56,12 @@ struct finputs {
 		}
 	}
 
+	finputs (finputs&& other) noexcept {
+		types = std::move(other.types);
+		streams = std::move(other.streams);
+		time_point = other.time_point;
+	}
+
 	~finputs() {
 		// close the streams
 		for (auto& [_, file]: streams)
@@ -110,7 +116,7 @@ struct finputs {
 
 	// Read input from command line and return mapping from in_vars to this input
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
-		std::vector<tau<BAs...> >& in_vars, size_t time_step) const {
+		std::vector<tau<BAs...> >& in_vars, size_t time_step) {
 		std::ranges::sort(in_vars, constant_io_comp);
 		assignment<BAs...> value;
 		for (const auto& var : in_vars) {
@@ -172,7 +178,7 @@ struct finputs {
 	}
 
 	std::map<tau<BAs...>, type> types;
-	mutable std::map<tau<BAs...>, std::optional<std::ifstream>> streams;
+	std::map<tau<BAs...>, std::optional<std::ifstream>> streams;
 	size_t time_point = 0;
 };
 
@@ -189,6 +195,11 @@ struct foutputs {
 				? std::optional<std::ofstream>()
 				: std::ofstream(desc.second);
 		}
+	}
+
+	foutputs (foutputs&& other) noexcept {
+		types = std::move(other.types);
+		streams = std::move(other.streams);
 	}
 
 	~foutputs() {
@@ -285,21 +296,13 @@ struct foutputs {
 template<typename input_t, typename output_t, typename...BAs>
 struct interpreter {
 	interpreter(const tau<BAs...>& ubt_ctn, const tau<BAs...>& original_spec,
-		assignment<BAs...>& memory, auto& input, auto& output) :
+		assignment<BAs...>& memory, input_t& input, output_t& output) :
 						ubt_ctn(ubt_ctn),
 						original_spec(original_spec),
 						memory(memory),
-						inputs(input),
-						outputs(output) {
+						inputs(std::move(input)),
+						outputs(std::move(output)) {
 		compute_lookback_and_initial();
-		// TODO: Re-enable after inputs and outputs member have been removed
-		// collect non-temporary output stream variables
-		// for (const auto& o: select_top(ubt_ctn,
-		// 	is_non_terminal<tau_parser::out_var_name, BAs...>)) {
-		// 	std::stringstream ss; ss << o;
-		// 	// Exclude temporary vars
-		// 	if (ss.str()[0] != '_') outputs.insert(o);
-		// }
 	}
 
 	static std::optional<interpreter> make_interpreter(
@@ -314,10 +317,8 @@ struct interpreter {
 	tau<BAs...> original_spec;
 	assignment<BAs...> memory;
 	size_t time_point = 0;
-	// TODO: Remove inputs and outputs, once type inference for variables is ready
-	// and solver can accept clauses with several types
-	input_t& inputs;
-	output_t& outputs;
+	input_t inputs;
+	output_t outputs;
 
 private:
 	// store all the possible systems to be solved, each system corresponds to a
@@ -391,9 +392,10 @@ template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<input_t, output_t, BAs...>>
 run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t steps = 0) {
 	auto spec = normalizer(form);
-	auto intrprtr = interpreter<input_t, output_t, BAs...>
+	auto intrprtr_o = interpreter<input_t, output_t, BAs...>
 		::make_interpreter(spec, inputs, outputs);
-	if (!intrprtr) return {};
+	if (!intrprtr_o) return {};
+	auto& intrprtr = intrprtr_o.value();
 
 	BOOST_LOG_TRIVIAL(info) << "-----------------------------------------------------------------------------------------------------------";
 	BOOST_LOG_TRIVIAL(info) << "Please provide requested input, or press ENTER to terminate                                               |";
@@ -402,10 +404,10 @@ run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t st
 
 	// Continuously perform execution step until user quits
 	while (true) {
-		auto [output, auto_continue] = intrprtr.value().step();
+		auto [output, auto_continue] = intrprtr.step();
 		// If the user provided empty input for an input stream, quit
 		if (!output.has_value()) break;
-		if (!outputs.write(output.value())) break;
+		if (!intrprtr.outputs.write(output.value())) break;
 		// If there is no input, ask the user if execution should continue
 		if (!auto_continue && steps == 0) {
 			std::string line;
@@ -418,22 +420,22 @@ run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t st
 
 		// Update interpreter in case the output stream u is present and unequal to 0
 		auto update_stream = build_out_variable_at_n<BAs...>(
-			"u", intrprtr.value().time_point - 1);
+			"u", intrprtr.time_point - 1);
 		// Update only if u is of type tau
-		if (auto t = outputs.type_of(get_tau_io_name(trim(update_stream)));
+		if (auto t = intrprtr.outputs.type_of(get_tau_io_name(trim(update_stream)));
 				t.has_value() && t.value() == "tau") {
 			auto it = output.value().find(update_stream);
 			if (it != output.value().end() && it->second != _0<BAs...>) {
 				auto update = unpack_tau_constant(it->second);
 				if (update) {
 					BOOST_LOG_TRIVIAL(trace) << "update: " << update.value() << "\n";
-					intrprtr.value().update(update.value());
+					intrprtr.update(update.value());
 				}
 			}
 		}
-		if (steps != 0 && intrprtr.value().time_point == steps) break;
+		if (steps != 0 && intrprtr.time_point == steps) break;
 	}
-	return intrprtr;
+	return intrprtr_o;
 }
 
 } // namespace idni::tau_lang
