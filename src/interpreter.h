@@ -345,7 +345,7 @@ private:
 
 	// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
 	static std::optional<type> get_type_atomic_fm(const tau<BAs...>& fm,
-		auto& inputs, auto& outputs, std::set<tau<BAs...>>& pending);
+		auto& inputs, auto& outputs);
 
 	tau<BAs...> update_to_time_point(const tau<BAs...>& f);
 
