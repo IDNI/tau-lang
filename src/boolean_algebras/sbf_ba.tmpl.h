@@ -127,7 +127,7 @@ std::vector<std::string> nso_factory<sbf_ba>::types() const {
 }
 
 tau<sbf_ba> nso_factory<sbf_ba>::splitter_one() const {
-	return build_bf_constant(bf.splitter_one());
+	return build_bf_constant(bf.splitter_one(), build_type<sbf_ba>("sbf"));
 }
 
 std::string nso_factory<sbf_ba>::default_type() const {
@@ -199,8 +199,8 @@ tau_nso<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
 	const std::string& type_name) const
 {
 	if (type_name == "sbf")
-		return build_bf_constant(bf.splitter_one());
-	else return build_bf_constant(tf.splitter_one());
+		return build_bf_constant(bf.splitter_one(), build_type<tau_ba<sbf_ba>, sbf_ba>("sbf"));
+	else return build_bf_constant(tf.splitter_one(), build_type<tau_ba<sbf_ba>, sbf_ba>("tau"));
 }
 
 nso_factory<tau_ba<sbf_ba>, sbf_ba>&

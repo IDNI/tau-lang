@@ -62,7 +62,7 @@ struct finputs {
 			if (file) file.value().close();
 	}
 
-	void add_input (const tau<BAs...>& var, type t, filename f) {
+	void add_input (const tau<BAs...>& var, const type& t, const filename& f) {
 		if (!types.contains(var)) {
 			types.emplace(var, t);
 			streams.emplace(var,
@@ -102,7 +102,7 @@ struct finputs {
 					<< var << "'\n";
 				return {};
 			}
-			current[var] = build_bf_constant(cnst.value());
+			current[var] = build_bf_constant(cnst.value(), types[var]);
 		}
 		time_point += 1;
 		return current;
@@ -165,9 +165,9 @@ struct finputs {
 			return { "sbf" };
 		}
 
-		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) failed to find type for stream: "
-			<< var << "\n";
+		// BOOST_LOG_TRIVIAL(error)
+		// 	<< "(Error) failed to find type for stream: "
+		// 	<< var << "\n";
 		return {};
 	}
 
@@ -197,7 +197,7 @@ struct foutputs {
 			if (file) file.value().close();
 	}
 
-	void add_output (const tau<BAs...>& var, type t, filename f) {
+	void add_output (const tau<BAs...>& var, const type& t, const filename& f) {
 		if (!types.contains(var)) {
 			types.emplace(var, t);
 			streams.emplace(var,
@@ -272,9 +272,9 @@ struct foutputs {
 			return { "sbf" };
 		}
 
-		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) failed to find type for stream '"
-			<< var << "'\n";
+		// BOOST_LOG_TRIVIAL(error)
+		// 	<< "(Error) failed to find type for stream '"
+		// 	<< var << "'\n";
 		return {};
 	}
 
@@ -372,7 +372,9 @@ private:
 	solution_with_max_update(const tau<BAs...>& spec);
 
 	// Returns if the variable is excluded from output
-	static bool is_excluded_output(const auto& var);};
+	static bool is_excluded_output(const auto& var);
+
+};
 
 template<typename... BAs>
 std::optional<tau<BAs...>> unpack_tau_constant(const tau<BAs...>& constant) {

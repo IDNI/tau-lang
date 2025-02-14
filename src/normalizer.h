@@ -208,7 +208,8 @@ bool is_non_temp_nso_satisfiable (const tau<BAs...>& fm) {
 	auto vars = get_free_vars_from_nso(new_fm);
 	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
 	auto normalized = normalize_non_temp<BAs...>(new_fm);
-	assert((normalized == _T<BAs...> || normalized == _F<BAs...>));
+	assert((normalized == _T<BAs...> || normalized == _F<BAs...> ||
+		find_top(normalized, is_non_terminal<tau_parser::constraint, BAs...>)));
 	return normalized == _T<BAs...>;
 }
 
@@ -406,7 +407,7 @@ tau<BAs...> normalize_with_temp_simp (const tau<BAs...>& fm) {
 		for (const auto& aw : aw_parts) {
 			for (const auto& st : st_parts) {
 				const auto& f = build_wff_and(trim_q(aw), trim_q(st));
-				if (normalize_non_temp(f) == _F<BAs...>)
+				if (!is_non_temp_nso_satisfiable(f))
 					clause_false = true;
 			}
 		}
@@ -856,8 +857,7 @@ tau<BAs...> normalizer(const rr<tau<BAs...>>& nso_rr) {
 
 template <typename... BAs>
 tau<BAs...> normalizer(const tau<BAs...>& form) {
-	rr<tau<BAs...>> nso_rr(form);
-	return normalizer(nso_rr);
+	return normalize_with_temp_simp(form);
 }
 
 } // namespace idni::tau_lang

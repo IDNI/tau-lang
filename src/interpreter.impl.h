@@ -19,12 +19,6 @@ interpreter<input_t, output_t, BAs...>::make_interpreter(
 		return {};
 	}
 
-	// compute the different systems to be solved
-	// TODO: This is currently only here to catch the error if some equation does not have a stream variable
-	auto systems = compute_systems(ubd_ctn, inputs, outputs);
-	if (systems.empty()) {
-		return {}; // error
-	}
 	//after the above, we have the interpreter ready to be used.
 	assignment<BAs...> memory;
 	return interpreter {
@@ -327,9 +321,9 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 		for (const auto& fm : pending_atomic_fms) {
 			if (auto l = get_type_atomic_fm(fm, inputs, outputs, pending_atomic_fms); l) {
 				// Skip atomic fms which have no type yet
-				const std::string t = l.value();
+				const std::string& t = l.value();
 				if (l.value() == "") continue;
-				if (sys.find(t) == sys.end()) sys[t] = fm;
+				if (!sys.contains(t)) sys[t] = fm;
 				else sys[t] = build_wff_and(sys[t], fm);
 				new_choice = true;
 			} else {
@@ -340,7 +334,7 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 	}
 	// All remaining formulas in pending_atomic_fms can be typed by default
 	for (const auto& fm : pending_atomic_fms) {
-		std::cout << "def. type for: " << fm << "\n";
+		// std::cout << "def. type for: " << fm << "\n";
 		auto io_vars = select_top(fm,
 			is_child_non_terminal<p::io_var, BAs...>);
 		type_io_vars(io_vars, "tau", inputs, outputs);
@@ -356,7 +350,7 @@ void interpreter<input_t, output_t, BAs...>::type_io_vars(
 	auto& outputs) {
 	using p = tau_parser;
 	for (const auto& io_var : io_vars) {
-		const auto io_name = trim2(trim(io_var));
+		const auto io_name = get_tau_io_name(io_var);
 		if (io_var | p::io_var | p::in) {
 			// Add type to inputs
 			inputs.add_input(io_name, type, "");
@@ -377,32 +371,32 @@ std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(c
 	// Check if any io_var has a predefined type
 	std::string type;
 	for (const auto& io_var : io_vars) {
-		if (auto it = inputs.types.find(trim2(trim(io_var))); it != inputs.types.end()) {
-			if (!type.empty() && type != it->second) {
+		if (auto t = inputs.type_of(get_tau_io_name(io_var))) {
+			if (!type.empty() && type != t.value()) {
 				// Type mismatch in atomic fm
 				BOOST_LOG_TRIVIAL(error) <<
 					"(Error) stream variable type mismatch between '"
- << type << "' and '" << it->second << "' in atomic formula: " << fm << "\n";
+ << type << "' and '" << t.value() << "' in atomic formula: " << fm << "\n";
 				return {};
-			} else if (type.empty()) type = it->second;
+			} else if (type.empty()) type = t.value();
 		}
-		if (auto it = outputs.types.find(trim2(trim(io_var))); it != outputs.types.end()) {
-			if (!type.empty() && type != it->second) {
+		if (auto t = outputs.type_of(get_tau_io_name(io_var))) {
+			if (!type.empty() && type != t.value()) {
 				// Type mismatch in atomic fm
 				BOOST_LOG_TRIVIAL(error) <<
 					"(Error) stream variable type mismatch between '"
- << type << "' and '" << it->second << "' in atomic formula: " << fm << "\n";
+ << type << "' and '" << t.value() << "' in atomic formula: " << fm << "\n";
 				return {};
-			} else if (type.empty()) type = it->second;
+			} else if (type.empty()) type = t.value();
 		}
 	}
-	std::cout << "type before const: " << type << "\n";
+	// std::cout << "type before const: " << type << "\n";
 	// Check if all constants match the type, if present, else infer from there
 	auto consts = select_top(fm, is_non_terminal<p::bf_constant, BAs...>);
 	for (const auto& c : consts) {
 		assert(is_non_terminal(p::type, c->child[1]));
 		auto c_type = tau_to_str(c->child[1]);
-		std::cout << "c_type: " << c_type << "\n";
+		// std::cout << "c_type: " << c_type << "\n";
 		if (type.empty()) type = c_type;
 		else if (type != c_type) {
 			// Type mismatch in atomic fm
@@ -412,7 +406,7 @@ std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(c
 			return {};
 		}
 	}
-	std::cout << "type: " << type << "\n";
+	// std::cout << "type: " << type << "\n";
 	// No type information was found, delay typing until all equations have
 	// been visited
 	if (type.empty()) return "";

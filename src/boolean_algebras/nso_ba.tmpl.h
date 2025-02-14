@@ -22,8 +22,14 @@ tau<BAs...> operator&(const tau<BAs...>& l,
 			| only_child_extractor<BAs...>
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
-		//TODO: type is chopped
-		return build_bf_constant<BAs...>(lc & rc);
+
+		auto type_l = l | tau_parser::bf_constant | tau_parser::type;
+		auto type_r = r | tau_parser::bf_constant | tau_parser::type;
+
+		assert(type_l.has_value() && type_r.has_value());
+		assert(type_l == type_r);
+
+		return build_bf_constant<BAs...>(lc & rc, type_l.value());
 	};
 
 	// trivial cases
@@ -65,7 +71,32 @@ template <typename... BAs>
 tau<BAs...> operator|(const tau<BAs...>& l,
 	const tau<BAs...>& r)
 {
-	//TODO: bf_constant is missing
+	auto bf_constant_or = [](const auto& l, const auto& r) -> tau<BAs...> {
+		auto lc = l
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
+		auto rc = r
+			| tau_parser::bf_constant
+			| tau_parser::constant
+			| only_child_extractor<BAs...>
+			| ba_extractor<BAs...>
+			| optional_value_extractor<std::variant<BAs...>>;
+
+		auto type_l = l | tau_parser::bf_constant | tau_parser::type;
+		auto type_r = r | tau_parser::bf_constant | tau_parser::type;
+
+		assert(type_l.has_value() && type_r.has_value());
+		assert(type_l == type_r);
+
+		return build_bf_constant<BAs...>(lc | rc, type_l.value());
+	};
+
+	if (is_child_non_terminal<tau_parser::bf_constant, BAs...>(l)
+		&& is_child_non_terminal<tau_parser::bf_constant, BAs...>(r))
+			return bf_constant_or(l, r);
 	if (is_non_terminal<tau_parser::bf>(l)
 		&& is_non_terminal<tau_parser::bf, BAs...>(r))
 			return build_bf_or<BAs...>(l, r);
@@ -102,7 +133,11 @@ tau<BAs...> operator~(const tau<BAs...>& l) {
 			| only_child_extractor<BAs...>
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
-		return build_bf_constant<BAs...>(~lc);
+
+		auto type_l = l | tau_parser::bf_constant | tau_parser::type;
+		assert(type_l.has_value());
+
+		return build_bf_constant<BAs...>(~lc, type_l.value());
 	};
 
 	// trivial cases
@@ -150,7 +185,14 @@ tau<BAs...> operator^(const tau<BAs...>& l,
 			| only_child_extractor<BAs...>
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
-		return build_bf_constant<BAs...>(lc ^ rc);
+
+		auto type_l = l | tau_parser::bf_constant | tau_parser::type;
+		auto type_r = r | tau_parser::bf_constant | tau_parser::type;
+
+		assert(type_l.has_value() && type_r.has_value());
+		assert(type_l == type_r);
+
+		return build_bf_constant<BAs...>(lc ^ rc, type_l.value());
 	};
 
 	// trivial cases
@@ -273,7 +315,13 @@ bool operator==(const tau<BAs...>& l, const tau<BAs...>& r) {
 			: true;
 	}
 
-	return (l->value == r->value && l->child == r->child);
+	if (l->value != r->value) return false;
+	if (l->child.size() != r->child.size()) return false;
+
+	//compare children
+	for (size_t i = 0; i < l->child.size(); ++i)
+		if (!(l->child[i] == r->child[i])) return false;
+	return true;
 }
 
 // Also define != again in terms of ==
@@ -337,16 +385,21 @@ template <typename... BAs>
 tau<BAs...> splitter(const tau<BAs...>& n,
 	splitter_type st)
 {
+	using p = tau_parser;
 	// Lambda for calling splitter on n
 	auto _splitter = [&st](const auto& n) -> std::variant<BAs...> {
 		return splitter(n, st);
 	};
 
+	assert(is_non_terminal(tau_parser::bf_constant, n));
 	assert(std::holds_alternative<std::variant<BAs...>>(trim2(n)->value));
 	auto ba_constant = get<std::variant<BAs...>>(trim2(n)->value);
 	std::variant<BAs...> v = std::visit(_splitter, ba_constant);
-	//TODO: type is chopped
-	return build_bf_constant<BAs...>(v);
+
+	auto type = n | p::type;
+	assert(type.has_value());
+
+	return build_bf_constant<BAs...>(v, type.value());
 }
 
 } // namespace idni::tau_lang
