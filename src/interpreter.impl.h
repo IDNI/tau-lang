@@ -318,11 +318,13 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 	bool new_choice = true;
 	while (new_choice) {
 		new_choice = false;
+		std::vector<tau<BAs...>> to_erase_fms;
 		for (const auto& fm : pending_atomic_fms) {
-			if (auto l = get_type_atomic_fm(fm, inputs, outputs, pending_atomic_fms); l) {
+			if (auto l = get_type_atomic_fm(fm, inputs, outputs); l) {
 				// Skip atomic fms which have no type yet
 				const std::string& t = l.value();
 				if (l.value() == "") continue;
+				to_erase_fms.push_back(fm);
 				if (!sys.contains(t)) sys[t] = fm;
 				else sys[t] = build_wff_and(sys[t], fm);
 				new_choice = true;
@@ -331,6 +333,8 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 				return {};
 			}
 		}
+		for (const auto& fm : to_erase_fms)
+			pending_atomic_fms.erase(fm);
 	}
 	// All remaining formulas in pending_atomic_fms can be typed by default
 	for (const auto& fm : pending_atomic_fms) {
@@ -364,7 +368,7 @@ void interpreter<input_t, output_t, BAs...>::type_io_vars(
 
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(const tau<BAs...>& fm,
-		auto& inputs, auto& outputs, std::set<tau<BAs...>>& pending) {
+		auto& inputs, auto& outputs) {
 	using p = tau_parser;
 	auto io_vars = select_top(fm, is_child_non_terminal<p::io_var, BAs...>);
 
@@ -409,7 +413,6 @@ std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(c
 
 	// Check if any other type information is available
 	if (auto alt_type = find_top(fm, is_non_terminal<p::type, BAs...>)) {
-		std::cout << "alt_type: " << alt_type.value() << "\n";
 		if (type != tau_to_str(alt_type.value())) {
 			// Type mismatch in atomic fm
 			BOOST_LOG_TRIVIAL(error) <<
@@ -426,9 +429,6 @@ std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(c
 
 	// If a type is found, set all io_vars to found type
 	type_io_vars(io_vars, type, inputs, outputs);
-	// Remove from pending if present
-	if (auto it = pending.find(fm); it != pending.end())
-		pending.erase(it);
 	return type;
 }
 
