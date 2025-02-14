@@ -57,8 +57,8 @@ struct output_console {
 		return { _type };
 	}
 
-	void add_output (const tau<BAs...>&, const std::string&, const std::string&) {
-		return;
+	void add_output (const tau<BAs...>& v, const std::string&, const std::string&) {
+		if (!streams.contains(v)) streams.emplace(v, v);
 	}
 
 	assignment<BAs...> streams;
@@ -104,7 +104,6 @@ struct input_vector {
 template<typename... BAs>
 void build_input(const std::string& name, const std::vector<std::string>& values,
 		const std::string& type, auto& assgn) {
-	std::vector<tau<BAs...>> in_vars;
 	size_t t = 0;
 	for (const auto& val : values) {
 		auto in_var = build_in_variable_at_n<BAs...>(name, t);
@@ -123,7 +122,6 @@ void build_input(const std::string& name, const std::vector<std::string>& values
 template<typename... BAs>
 void build_output(const std::string& name, const std::vector<std::string>& values,
 		const std::string& type, auto& assgn) {
-	std::vector<tau<BAs...>> in_vars;
 	size_t t = 0;
 	for (const auto& val : values) {
 		auto out_var = build_out_variable_at_n<BAs...>(name, t);
