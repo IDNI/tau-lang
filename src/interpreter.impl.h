@@ -406,6 +406,19 @@ std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(c
 			return {};
 		}
 	}
+
+	// Check if any other type information is available
+	if (auto alt_type = find_top(fm, is_non_terminal<p::type, BAs...>)) {
+		std::cout << "alt_type: " << alt_type.value() << "\n";
+		if (type != tau_to_str(alt_type.value())) {
+			// Type mismatch in atomic fm
+			BOOST_LOG_TRIVIAL(error) <<
+				"(Error) stream variable or constant type mismatch between '"
+ << type << "' and '" << alt_type.value() << "' in atomic formula: " << fm << "\n";
+			return {};
+		} else type = tau_to_str(alt_type.value());
+	}
+
 	// std::cout << "type: " << type << "\n";
 	// No type information was found, delay typing until all equations have
 	// been visited
