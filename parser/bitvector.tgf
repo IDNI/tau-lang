@@ -5,17 +5,18 @@
 @enable productions charvar.
 
 start  => _ bitvector _.
-bitvector => uint
-        | int
-        | ulong
-        | long
-        | bits.
-sign    => minus | plus.
-minus   => '-'.
-plus    => ['+'].
-int  => sign _ unsigned.
-long => sign _ unsigned _ 'l'.
-uint => [plus] _ unsigned _ 'u'.
-ulong => [plus] _ unsigned _ "ul".
-bits => bit (_ bit)* 'b'.
-bit => '0':zero | '1':one.
+bitvector => _uint
+           | _int
+           | _ulong
+           | _long
+           | _bits.
+sign      => minus | plus.
+minus     => '-'.
+plus      => ['+'].
+_int      => sign _ _unsigned.
+_long     => sign _ _unsigned _ 'l'.
+_uint     => [plus] _ _unsigned _ 'u'.
+_ulong    => [plus] _ _unsigned _ "ul".
+_unsigned => digit (_digit)*.
+_bits     => _bit (_ _bit)* 'b'.
+_bit      => '0':zero | '1':one.
