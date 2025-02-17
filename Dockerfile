@@ -4,7 +4,7 @@
 #   docker build -t tau .
 
 # use --build-arg TESTS="no" to skip running tests
-# use --build-arg BUILD_TYPE="Debug" for build debugging version
+# use --build-arg BUILD_TYPE="Debug" for building of the debugging version
 
 # To run tau using the created image in interactive mode:
 #   docker run --rm -it tau [<tau options>]

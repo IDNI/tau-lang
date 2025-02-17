@@ -22,18 +22,22 @@ jobs:
         id: version
         run: echo "version=v$(head -n 1 VERSION)" >> $GITHUB_ENV
 
+      - name: Get ISO date
+        id: date_iso
+        run: echo "date_iso=$(date --iso)" >> $GITHUB_ENV
+
       - name: Upload release packages
         uses: actions/upload-artifact@v4
         with:
-          name: "release-${{ env.version }}"
+          name: "v${{ env.version }}"
           path: ${{ github.workspace }}/packages/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ env.version }}"
-          name: "Tau Language Framework Alpha ${{ env.version }}"
-          body: "Tau Language Framework"
+          name: "Tau Language Framework ${{ env.version }}"
+          body: "Tau Language Framework ${{ env.version }} release ${{ env.date_iso }} commit ${{ github.sha }}"
           draft: true
           prerelease: true
           files: ${{ github.workspace }}/packages/*
