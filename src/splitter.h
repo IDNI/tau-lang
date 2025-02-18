@@ -83,20 +83,20 @@ tau<BAs...> split(const tau<BAs...>& fm, const size_t fm_type, bool is_cnf,
 // If we check a non-temporal Tau formula, it suffices to place it in "fm" and
 // the proposed splitter in "splitter".
 template<typename... BAs>
-bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<BAs...>& spec = nullptr) {
-	if (spec) {
+bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<BAs...>& spec_clause = nullptr) {
+	if (spec_clause) {
 		// We are dealing with a temporal formula
-		if (!are_tau_equivalent(splitter, fm)) {
-			assert(is_tau_impl(splitter, fm));
-			std::map<tau<BAs...>, tau<BAs...>> c = {{fm, splitter}};
-			auto new_spec = normalize_with_temp_simp(replace(spec, c));
-			if (is_tau_formula_sat(new_spec))
+		assert(is_tau_impl(splitter, fm));
+		std::map<tau<BAs...>, tau<BAs...>> c = {{fm, splitter}};
+		auto new_spec_clause = normalize_with_temp_simp(replace(spec_clause, c));
+		if (is_tau_formula_sat(new_spec_clause)) {
+			if (!are_tau_equivalent(new_spec_clause, spec_clause))
 				return true;
 		}
 	} else {
 		// We are dealing with a non-temporal formula
-		if (!are_nso_equivalent(splitter, fm) && normalizer_step(splitter)
-		    != _F<BAs...>) {
+		if (is_non_temp_nso_satisfiable(splitter) &&
+			!are_nso_equivalent(splitter, fm)) {
 			assert(is_nso_impl(splitter, fm));
 			return true;
 		}
@@ -201,7 +201,7 @@ tau<BAs...> tau_bad_splitter(tau<BAs...> fm = _T<BAs...>) {
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
 std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
-	tau<BAs...> fm, splitter_type st, const tau<BAs...>& spec = nullptr) {
+	tau<BAs...> fm, splitter_type st, const tau<BAs...>& spec_clause = nullptr) {
 	if (st == splitter_type::bad)
 		return {tau_bad_splitter(fm), splitter_type::bad};
 
@@ -233,7 +233,7 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 							changes = {{clause, build_wff_and(clause,
 									build_bf_less_equal(v, c))}};
 					auto new_fm = replace(fm, changes);
-					if (is_splitter(fm, new_fm, spec))
+					if (is_splitter(fm, new_fm, spec_clause))
 						return {new_fm, st};
 				}
 			}
@@ -241,7 +241,7 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 				//TODO: this equiv check should happen in good_reverse_splitter_using_function
 				std::map<tau<BAs...>, tau<BAs...> > c = {{clause, s}};
 				auto new_fm = replace(fm, c);
-				if (is_splitter(fm, new_fm, spec))
+				if (is_splitter(fm, new_fm, spec_clause))
 					return {new_fm, st};
 			}
 		}
@@ -262,14 +262,14 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 				auto new_fm = replace(fm, changes);
 				changes = {{neq, _T_trimmed<BAs...>}};
 				new_fm = replace(new_fm, changes);
-				if (is_splitter(fm, new_fm, spec))
+				if (is_splitter(fm, new_fm, spec_clause))
 					return {new_fm, st};
 			}
 			if (auto s = good_splitter_using_function(f, st, clause); s != clause) {
 				//TODO: this equiv check should happen in good_splitter_using_function
 				std::map<tau<BAs...>, tau<BAs...> > c = {{clause, s}};
 				auto new_fm = replace(fm, c);
-				if (is_splitter(fm, new_fm, spec))
+				if (is_splitter(fm, new_fm, spec_clause))
 					return {new_fm, st};
 			}
 		}
@@ -280,7 +280,7 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 	size_t i = 0;
 	do {
 		auto s = split(fm, tau_parser::wff, false, st, m, i, true);
-		if (is_splitter(fm, s, spec))
+		if (is_splitter(fm, s, spec_clause))
 			return {s, st};
 	} while (++i < m.size());
 
@@ -301,7 +301,7 @@ tau<BAs...> tau_splitter (const tau<BAs...>& fm, splitter_type st) {
 		bool good_splitter = false;
 		for (auto& spec : specs) {
 			bool is_aw = is_child_non_terminal(p::wff_always, spec);
-			auto [splitter, type] = nso_tau_splitter(trim2(spec), st, fm);
+			auto [splitter, type] = nso_tau_splitter(trim2(spec), st, clause);
 			if (type != splitter_type::bad) {
 				BOOST_LOG_TRIVIAL(trace) << "Splitter of spec: " << splitter;
 				good_splitter = true;
