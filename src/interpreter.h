@@ -157,7 +157,11 @@ struct finputs {
 					<< var << "'\n";
 				return {};
 			}
-			value[wrap(tau_parser::bf, var)] = build_bf_constant(cnst.value(), it->second);
+			const auto wrapped_const = build_bf_constant(cnst.value(), it->second);
+			// Check that the input is a closed formula
+			if (has_open_tau_fm_in_constant(wrapped_const))
+				return {};
+			value[wrap(tau_parser::bf, var)] = wrapped_const;
 		}
 		return {value, false};
 	}
