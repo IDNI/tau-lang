@@ -510,6 +510,7 @@ tau<BAs...> make_node_hook_wff_eq_cte(const rewriter::node<tau_sym<BAs...>>& n){
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
+	//TODO: remove normalizer call
 	if (l.has_value() && l.value() == false) return _T<BAs...>;
 	else if (l.has_value()) return _F<BAs...>;
 	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
@@ -576,6 +577,7 @@ tau<BAs...> make_node_hook_wff_neq_cte(const rewriter::node<tau_sym<BAs...>>& n)
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
 		| ba_extractor<BAs...>;
+	//TODO: remove normalizer call
 	if (l.has_value() && l.value() == false) return _F<BAs...>;
 	else if (l.has_value()) return _T<BAs...>;
 	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
