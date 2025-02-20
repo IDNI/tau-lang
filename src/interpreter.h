@@ -307,6 +307,8 @@ struct interpreter {
 						inputs(std::move(input)),
 						outputs(std::move(output)) {
 		compute_lookback_and_initial();
+		// Put all streams in ubt_ctn into outputs/inputs
+		compute_systems(this->ubt_ctn, inputs, outputs);
 	}
 
 	static std::optional<interpreter> make_interpreter(
@@ -376,7 +378,7 @@ private:
 	solution_with_max_update(const tau<BAs...>& spec);
 
 	// Returns if the variable is excluded from output
-	static bool is_excluded_output(const auto& var);
+	static bool is_excluded_output(const tau<BAs...>& var);
 
 };
 

@@ -685,8 +685,11 @@ solution_with_max_update(const tau<BAs...>& spec) {
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-bool interpreter<input_t, output_t, BAs...>::is_excluded_output (const auto& var) {
-	std::string io_name = get_io_name(var);
+bool interpreter<input_t, output_t, BAs...>::is_excluded_output (const tau<BAs...>& var) {
+	using p = tau_parser;
+	std::string io_name = is_non_terminal(p::out_var_name, var)
+					? tau_to_str(var)
+					: get_io_name(var);
 	return io_name[0] == '_' && io_name.size() > 1 && io_name[1] == 'e';
 }
 
