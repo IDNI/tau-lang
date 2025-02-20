@@ -3,9 +3,13 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
+#include "boolean_algebras/sbf_ba.h"
+#include "satisfiability.h"
 
 // TODO (LOW) consider move this test to integration tests
 #include "../integration/test_integration_helpers.h"
+
+#define base_bas tau_ba<sbf_ba>, sbf_ba
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
@@ -18,227 +22,62 @@ using namespace std;
 
 namespace testing = doctest;
 
-TEST_SUITE("get_tau_nso_literals") {
-
-	TEST_CASE("one literal y1") {
-		const char* sample = "{ T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		get_tau_nso_literals<sbf_ba>(sample_formula.main, literals);
-		CHECK( literals.size() == 1 );
-	}
-
-	TEST_CASE("one literal y2") {
-		const char* sample = "{ T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		get_tau_nso_literals<sbf_ba>(sample_formula.main, literals);
-		CHECK( literals.size() == 1 );
-	}
-
-	TEST_CASE("two literals y1") {
-		const char* sample = "{ T } &&& - { T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		get_tau_nso_literals<sbf_ba>(sample_formula.main, literals);
-		CHECK( literals.size() == 2 );
-	}
-
-	TEST_CASE("two literals y2") {
-		const char* sample = "- { T } &&& - { T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		get_tau_nso_literals<sbf_ba>(sample_formula.main, literals);
-		CHECK( literals.size() == 2 );
-	}
+template<typename... BAs>
+tau<BAs...> create_spec(const char* spec) {
+	auto sample_src = make_tau_source(spec);
+	return make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(
+		sample_src).value().main;
 }
 
-TEST_SUITE("get_tau_nso_positive_negative_literals") {
-
-	TEST_CASE("one literal: true") {
-		const char* sample = "{ T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto [positive, negatives] = get_tau_nso_positive_negative_literals<sbf_ba>(sample_formula.main);
-		CHECK( positive.has_value() );
-		CHECK( negatives.size() == 0 );
+TEST_SUITE("Alignments") {
+	TEST_CASE("equal_lookback_one_st") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
+		CHECK(!is_tau_formula_sat(spec));
 	}
-
-	TEST_CASE("one literal: false") {
-		const char* sample = "- { T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto [positive, negatives] = get_tau_nso_positive_negative_literals<sbf_ba>(sample_formula.main);
-		CHECK( !positive.has_value() );
-		CHECK( negatives.size() == 1 );
+	TEST_CASE("smaller_lookback_one_st") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t] = o1[t-1] && o1[t-1] = 1) && (sometimes o2[t] = 0).");
+		CHECK(is_tau_formula_sat(spec));
 	}
-
-	TEST_CASE("two literals: true") {
-		const char* sample = "{ T } &&& - { T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto [positive, negatives] = get_tau_nso_positive_negative_literals<sbf_ba>(sample_formula.main);
-		CHECK( positive.has_value() );
-		CHECK( negatives.size() == 1 );
+	TEST_CASE("greater_lookback_one_st") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t] = o1[t-1]) && (sometimes o1[t] != o1[t-2]).");
+		CHECK(!is_tau_formula_sat(spec));
 	}
-
-	TEST_CASE("two literals: false") {
-		const char* sample = "- { T } &&& - { T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto [positive, negatives] = get_tau_nso_positive_negative_literals<sbf_ba>(sample_formula.main);
-		CHECK( !positive.has_value() );
-		CHECK( negatives.size() == 2 );
+	TEST_CASE("equal_lookback_two_st") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
+		CHECK(transform_to_execution(spec) == _F<base_bas>);
 	}
-}
-
-TEST_SUITE("get_tau_nso_clauses") {
-
-	TEST_CASE("one clause") {
-		const char* sample = "{ T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		get_tau_nso_clauses<sbf_ba>(sample_formula.main, literals);
-		CHECK( literals.size() == 1 );
+	TEST_CASE("greater_lookback_two_st_1") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 1) && (sometimes o2[t-2] = 0).");
+		CHECK(!is_tau_formula_sat(spec));
 	}
-
-	TEST_CASE("two clauses y1") {
-		const char* sample = "{ T } ||| - { T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		get_tau_nso_clauses<sbf_ba>(sample_formula.main, literals);
-		CHECK( literals.size() == 2 );
+	TEST_CASE("greater_lookback_two_st_2") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 0) && (sometimes o2[t-2] = 1).");
+		CHECK(!is_tau_formula_sat(spec));
 	}
-
-	TEST_CASE("two clauses y2") {
-		const char* sample = "{ T } ||| - { T } &&& { T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		get_tau_nso_clauses<sbf_ba>(sample_formula.main, literals);
-		CHECK( literals.size() == 2 );
+	TEST_CASE("smaller_lookback_two_st_1") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 1) && (sometimes o1[t-1] = 0).");
+		CHECK(!is_tau_formula_sat(spec));
 	}
-
-	TEST_CASE("three clauses") {
-		const char* sample = "{ T } ||| - { T } ||| { T};";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		get_tau_nso_clauses<sbf_ba>(sample_formula.main, literals);
-		CHECK( literals.size() == 3 );
+	TEST_CASE("smaller_lookback_two_st_2") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t-1] = 1).");
+		CHECK(!is_tau_formula_sat(spec));
 	}
-}
-
-TEST_SUITE("get_tau_nso_io_vars") {
-
-	TEST_CASE("none") {
-		const char* sample = "{ T };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		auto [inputs, outputs] = get_tau_nso_io_vars<sbf_ba>(sample_formula.main);
-		CHECK( (inputs.name.size() == 0 && outputs.name.size() == 0) );
+	TEST_CASE("mixed_lookback_two_st_1") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t-2] = 1) && (sometimes o1[t-3] = 0) && (sometimes o1[t] = 1).");
+		CHECK(!is_tau_formula_sat(spec));
 	}
-
-	TEST_CASE("one input") {
-		const char* sample = "{ i1[t] = 0 };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		auto [inputs, outputs] = get_tau_nso_io_vars<sbf_ba>(sample_formula.main);
-		CHECK( (inputs.name.size() == 1 && outputs.name.size() == 0) );
-	}
-
-	TEST_CASE("one output") {
-		const char* sample = "{ o1[t] = 0 };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		auto [inputs, outputs] = get_tau_nso_io_vars<sbf_ba>(sample_formula.main);
-		CHECK( (inputs.name.size() == 0 && outputs.name.size() == 1) );
-	}
-
-	TEST_CASE("one input and one output") {
-		const char* sample = "{ i1[t] = o1[t] };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		std::vector<tau_nso<sbf_ba>> literals;
-		auto [inputs, outputs] = get_tau_nso_io_vars<sbf_ba>(sample_formula.main);
-		CHECK( (inputs.name.size() == 1 && outputs.name.size() == 1) );
-	}
-}
-
-TEST_SUITE("tau_spec_vars") {
-
-	TEST_CASE("num") {
-		const char* sample = "{ i1[0] = 0 };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>);
-		tau_spec_vars<sbf_ba> vars; vars.add(variable.value());
-		CHECK( (vars.name.size() == 1 && vars.loopback == 0) );
-	}
-
-	TEST_CASE("capture") {
-		const char* sample = "{ (i1[$t] = 0)  };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>);
-		tau_spec_vars<sbf_ba> vars; vars.add(variable.value());
-		CHECK( (vars.name.size() == 1 && vars.loopback == 0) );
-	}
-
-	TEST_CASE("variable") {
-		const char* sample = "{ i1[t] = 0 };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>);
-		tau_spec_vars<sbf_ba> vars; vars.add(variable.value());
-		CHECK( (vars.name.size() == 1 && vars.loopback == 0) );
-	}
-
-	TEST_CASE("shift capture") {
-		const char* sample = "{ i1[$t - 1] = 0 };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>);
-		tau_spec_vars<sbf_ba> vars; vars.add(variable.value());
-		CHECK( (vars.name.size() == 1 && vars.loopback == 1) );
-	}
-
-	TEST_CASE("shift variable") {
-		const char* sample = "{ i1[t - 1] = 0 };";
-		auto sample_src = make_tau_source(sample);
-		sbf_ba_factory bf;
-		auto sample_formula = make_tau_spec_using_factory<sbf_ba_factory, sbf_ba>(sample_src, bf);
-		auto variable = find_top(sample_formula.main, is_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>);
-		tau_spec_vars<sbf_ba> vars; vars.add(variable.value());
-		CHECK( (vars.name.size() == 1 && vars.loopback == 1) );
+	TEST_CASE("mixed_lookback_two_st_2") {
+		bdd_init<Bool>();
+		auto spec = create_spec<base_bas>("(always o1[t-2] = 1) && (sometimes o1[t-3] = 1) && (sometimes o1[t] = 0).");
+		CHECK(!is_tau_formula_sat(spec));
 	}
 }
