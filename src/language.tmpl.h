@@ -507,14 +507,23 @@ struct free_vars_collector {
 			}
 		}
 		if (is_var_or_capture<BAs...>(n)) {
-			if (auto check = n
+			if (auto offset_child = n
 					| tau_parser::io_var | only_child_extractor<BAs...> | tau_parser::offset
-					| only_child_extractor<BAs...>;
-					check.has_value() && is_var_or_capture<BAs...>(check.value())) {
-				auto var = check.value();
-				if (auto it = free_vars.find(var); it != free_vars.end()) {
-					free_vars.erase(it);
-					BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << var;
+					| only_child_extractor<BAs...>; offset_child) {
+				if (is_var_or_capture<BAs...>(offset_child.value())) {
+					auto var = offset_child.value();
+					if (auto it = free_vars.find(var); it != free_vars.end()) {
+						free_vars.erase(it);
+						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << var;
+					}
+				} else if (is_non_terminal(tau_parser::shift, offset_child.value())) {
+					// shift variable in io_var
+					auto var = trim(offset_child.value());
+					assert(is_var_or_capture<BAs...>(var));
+					if (auto it = free_vars.find(var); it != free_vars.end()) {
+						free_vars.erase(it);
+						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << var;
+					}
 				}
 			}
 			free_vars.insert(n);
