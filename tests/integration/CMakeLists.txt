@@ -13,7 +13,8 @@ set(TESTS
 	bf_fixed_point
 	bf_normalization
 	wff_normalization
-	splitter
+    satisfiability
+    splitter
 	splitter2
 	solver
 	quantifiers

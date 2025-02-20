@@ -419,12 +419,10 @@ std::pair<tau<BAs...>, int_t> find_fixpoint_phi(const tau<BAs...>& base_fm, cons
 	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << phi;
 
-	int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
 	int_t lookback = get_max_shift(io_vars);
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
-	while (step_num < std::max(max_initial_condition, lookback)
-		|| !are_nso_equivalent(phi_prev, phi))
+	while (step_num < lookback || !are_nso_equivalent(phi_prev, phi))
 	{
 		phi_prev = phi;
 		++step_num;
@@ -449,7 +447,6 @@ std::pair<tau<BAs...>, int_t> find_fixpoint_chi(const tau<BAs...>& chi_base, con
 	auto [chi_prev, cache] = build_initial_step_chi(
 		chi_base, st, io_vars, time_point, pholder_to_st);
 
-	// int_t max_initial_condition = get_max_initial<BAs...>(io_vars);
 	int_t lookback = get_max_shift(io_vars);
 	int_t step_num = 1;
 
@@ -462,8 +459,7 @@ std::pair<tau<BAs...>, int_t> find_fixpoint_chi(const tau<BAs...>& chi_base, con
 	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << replace(chi, pholder_to_st);
 
-	// Find fix point once all initial conditions have been passed and
-	// the lookback is greater equal the step_num
+	// Find fix point once the lookback is greater the step_num
 	while (step_num < lookback || !are_nso_equivalent(
 		       chi_prev_replc, chi_replc)) {
 		chi_prev = chi;
@@ -718,14 +714,15 @@ tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
 
 // Assumes single normalized Tau DNF clause
 template<typename... BAs>
-tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ctn_stream, const int_t start_time) {
+std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ctn_stream, const int_t start_time) {
 	using p = tau_parser;
 	auto smt_fms = select_top(fm, is_child_non_terminal<p::wff_sometimes, BAs...>);
-	if (smt_fms.empty()) return fm;
+	if (smt_fms.empty()) return {fm, 0};
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 
-	int_t max_lookback = get_max_shift(
-		select_top(fm, is_child_non_terminal<p::io_var, BAs...>));
+	int_t max_st_lookback = get_max_shift(
+		select_top_until(fm, is_child_non_terminal<p::io_var, BAs...>,
+			is_child_non_terminal<p::wff_always, BAs...>));
 
 	int_t aw_lookback = 0;
 	std::vector<tau<BAs...>> aw_io_vars;
@@ -753,8 +750,8 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ct
 		std::stringstream ss; ss << "_e" << n;
 		// Build the eventual var flags based on the maximal lookback
 		auto eNt_without_lookback = wrap(p::bf, build_io_out<BAs...>(ss.str(), "t"));
-		auto eNt = build_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
-		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_lookback);
+		auto eNt = build_flag_on_lookback<BAs...>(ss.str(), "t", max_st_lookback + aw_lookback);
+		auto eNt_prev = build_prev_flag_on_lookback<BAs...>(ss.str(), "t", max_st_lookback + aw_lookback);
 
 		auto eN0_is_not_zero = build_wff_neq(wrap(p::bf,
 			build_io_out_const<BAs...>(ss.str(), start_time)));
@@ -764,10 +761,10 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ct
 		auto eNt_prev_is_not_zero	= build_wff_neq(eNt_prev);
 		// transform `sometimes psi` to:
 		// (_eN[t-1] != 0 && _eN[t] == 0) -> psi (N is nth `sometimes`)
-		auto shifted_sometimes = max_lookback == 0 ?
+		auto shifted_sometimes = (max_st_lookback == 0 && aw_lookback == 0) ?
 			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars, 1) :
 			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars,
-				max_lookback - st_lookback);
+				(max_st_lookback - st_lookback) + aw_lookback);
 
 		// Guard statement using uninterpreted constants to express that
 		// "if the inputs equal the uninterpreted constants, the Tau formula
@@ -799,8 +796,6 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ct
 	// Check if always part is present
 	if (aw_fm.has_value()) {
 		auto aw = trim2(aw_fm.value());
-		// Adjust lookback
-		aw = shift_io_vars_in_fm(aw, aw_io_vars, max_lookback - aw_lookback);
 		// Conjunct former always part and eventual variable assumptions
 		res = build_wff_always(
 			build_wff_and(aw, ev_assm));
@@ -808,7 +803,8 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ct
 		if (ev_assm != _T<BAs...>) {
 			// if the lookback of all parts is 0, we need to shift the always part
 			// to account for the modified lookback due to the eventual variables
-			if (max_lookback == 0) res = shift_io_vars_in_fm(res, aw_io_vars, 1);
+			if (max_st_lookback == 0 && aw_lookback == 0)
+				res = shift_io_vars_in_fm(res, aw_io_vars, 1);
 			res = build_wff_and(
 				res, build_wff_sometimes(
 					build_wff_eq(ev_collection)));
@@ -820,12 +816,12 @@ tau<BAs...> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ct
 			res = build_wff_and(
 				res, build_wff_sometimes(
 					build_wff_eq(ev_collection)));
-		} else return fm;
+		} else return  {fm, max_st_lookback};
 	}
 
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
 	BOOST_LOG_TRIVIAL(trace) << res;
-	return res;
+	return {res, max_st_lookback};
 }
 
 template<typename... BAs>
@@ -848,6 +844,22 @@ tau<BAs...> add_st_ctn (const tau<BAs...>& st, const int_t timepoint, const int_
 	return st_ctn;
 }
 
+template <typename... BAs>
+tau<BAs...> make_initial_run(const tau<BAs...>& aw, const int_t max_st_lookback) {
+	// get lookback of aw
+	using p = tau_parser;
+	auto io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
+	const int_t t = get_max_shift(io_vars);
+
+	tau<BAs...> run;
+	for (int_t i = 0; i < max_st_lookback; ++i) {
+		auto current_aw = fm_at_time_point(aw, io_vars, t + i);
+		if (run) run = normalize_non_temp(build_wff_and(run, current_aw));
+		else run = current_aw;
+	}
+	return run;
+}
+
 // Assumes that ubd_aw_continuation is the result of computing the unbounded always continuation of
 // the always part of the output of "transform_to_eventual_variables" and
 // that ev_var_flags is the sometimes part of "transform_to_eventual_variables"
@@ -856,6 +868,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 				      const tau<BAs...>& ev_var_flags,
 				      const auto& original_aw,
 				      const int_t start_time,
+				      const int_t max_st_lookback,
 				      const bool output) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
 
@@ -867,7 +880,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	auto aw = is_child_non_terminal(p::wff_always, ubd_aw_continuation)
 			  ? trim2(ubd_aw_continuation)
 			  : ubd_aw_continuation;
-	auto original_aw_continuation = original_aw != nullptr
+	auto ori_aw_ctn = original_aw != nullptr
 						? (is_child_non_terminal(
 							   p::wff_always, original_aw)
 							   ? trim2(original_aw)
@@ -880,7 +893,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 		is_child_non_terminal<p::io_var, BAs...>);
 
 	// Note that time_point is also the lookback
-	int_t time_point = get_max_shift(io_vars);
+	const int_t time_point = get_max_shift(io_vars);
 
 	// There must not be a constant time constraint at this point
 	assert(!find_top(aw, is_non_terminal<p::constraint, BAs...>));
@@ -890,8 +903,11 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	st_flags = shift_io_vars_in_fm(st_flags, st_io_vars, time_point - 1);
 	st_io_vars = select_top(st_flags, is_child_non_terminal<p::io_var, BAs...>);
 
-	// Check if flag can be raised up to the highest initial condition + 1
-	tau<BAs...> run;
+	// Create the initial phase of the always part
+	tau<BAs...> run = make_initial_run(ori_aw_ctn, max_st_lookback);
+	// Check if flag can be raised up to the highest initial condition + 2
+	// which corresponds to checking the sometimes statement up to time point
+	// of the highest initial condition + 1
 	const int_t s = start_time + time_point;
 	const int_t flag_boundary =
 		std::max(time_point + point_after_inits, s + time_point + 1) + 1;
@@ -905,7 +921,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
-			auto res = build_wff_and(normed_run, original_aw_continuation);
+			auto res = build_wff_and(normed_run, ori_aw_ctn);
 			print_fixpoint_info(
 				"Temporal normalization of Tau specification did not rely on fixpoint finding, yielding the result: ",
 				tau_to_str(res), output);
@@ -946,13 +962,11 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 	chi_inf = transform_back_non_initials(chi_inf, point_after_inits - 1);
 	io_vars = select_top(chi_inf, is_child_non_terminal<p::io_var, BAs...>);
-	auto chi_inf_anchored = fm_at_time_point(chi_inf, io_vars, point_after_inits);
+	auto chi_inf_anchored = fm_at_time_point(chi_inf, io_vars, std::max(point_after_inits, time_point));
 
-	auto sat_check = is_run_satisfiable(
-		build_wff_and(run, chi_inf_anchored));
 	BOOST_LOG_TRIVIAL(trace) << "Fm to check sat:";
-	BOOST_LOG_TRIVIAL(trace) << "(F) " << sat_check;
-	if (sat_check == _F<BAs...>) {
+	BOOST_LOG_TRIVIAL(trace) << "(F) " << build_wff_and(run, chi_inf_anchored);
+	if (!is_run_satisfiable(build_wff_and(run, chi_inf_anchored))) {
 		print_fixpoint_info(
 			"Temporal normalization of Tau specification reached fixpoint after "
 			+ std::to_string(steps) +
@@ -973,7 +987,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
-			auto res = build_wff_and(normed_run, original_aw_continuation);
+			auto res = build_wff_and(normed_run, ori_aw_ctn);
 			print_fixpoint_info(
 				"Temporal normalization of Tau specification reached fixpoint after "
 				+ std::to_string(steps) +
@@ -1006,7 +1020,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
-	tau<BAs...> ev_t;
+	std::pair<tau<BAs...>, int_t> ev_t;
 	tau<BAs...> ubd_aw_fm;
 	if (aw_fm.has_value()) {
 		// If there is an always part, replace it with its unbound continuation
@@ -1018,7 +1032,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 		auto ubd_fm = replace(fm, changes);
 		ev_t = transform_to_eventual_variables(ubd_fm, false, start_time);
 		// Check if there is a sometimes present
-		if (ev_t == ubd_fm) {
+		if (ev_t.first == ubd_fm) {
 #ifdef TAU_CACHE
 			cache.emplace(std::make_pair(elim_aw(ubd_fm), start_time), elim_aw(ubd_fm));
 			return cache.emplace(std::make_pair(fm, start_time), elim_aw(ubd_fm)).first->second;
@@ -1028,28 +1042,28 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	} else {
 		ev_t = transform_to_eventual_variables(fm, true, start_time);
 		// Check if there is a sometimes present
-		if (ev_t == fm) {
+		if (ev_t.first == fm) {
 #ifdef TAU_CACHE
 			return cache.emplace(std::make_pair(fm, start_time), elim_aw(fm)).first->second;
 #endif
 			return elim_aw(fm);
 		}
 	}
-	auto aw_after_ev = find_top(ev_t, is_child_non_terminal<p::wff_always, BAs...>);
+	auto aw_after_ev = find_top(ev_t.first, is_child_non_terminal<p::wff_always, BAs...>);
 	if (!aw_after_ev.has_value()) {
 #ifdef TAU_CACHE
 		return cache.emplace(std::make_pair(fm, start_time), elim_aw(fm)).first->second;
 #endif
 		return elim_aw(fm);
 	}
-	auto st = select_top(ev_t, is_child_non_terminal<p::wff_sometimes, BAs...>);
+	auto st = select_top(ev_t.first, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	assert(st.size() < 2);
 
 	tau<BAs...> res;
 	if (aw_after_ev.value() != _F<BAs...> && !st.empty())
 		res = normalize_non_temp(to_unbounded_continuation(
 			aw_after_ev.value(), st[0], ubd_aw_fm, start_time,
-			output));
+			ev_t.second, output));
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
 	res = elim_aw(res);
