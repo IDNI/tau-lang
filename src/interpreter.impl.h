@@ -24,31 +24,18 @@ interpreter<input_t, output_t, BAs...>::make_interpreter(
 	return interpreter {
 		ubd_ctn, clause, memory, inputs, outputs
 	};
-};
+}
 
 template<typename input_t, typename output_t, typename...BAs>
 std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t, BAs...>::step() {
-	using p = tau_parser;
-	auto is_current_input = [&](const auto& n) {
-		if (is_child_non_terminal(p::io_var, n)) {
-			if (is_child_non_terminal(p::in, trim(n)) &&
-				get_io_time_point(n) == (int_t)time_point)
-				return true;
-		}
-		return false;
-	};
-	auto not_appears_within_lookback = [&](const auto& n) {
-		return !appears_within_lookback(n);
-	};
 	// Compute systems for the current step
 	if (!calculate_initial_systems())
 		return {};
 	BOOST_LOG_TRIVIAL(info) << "Execution step: " << time_point << "\n";
 	bool auto_continue = false;
 	// Get inputs for this step
-	auto step_fm = update_to_time_point(ubt_ctn, formula_time_point);
-	auto step_inputs = select_top(step_fm, is_current_input);
-	std::erase_if(step_inputs, not_appears_within_lookback);
+	auto step_inputs = build_inputs_for_step(time_point);
+	step_inputs = appear_within_lookback(step_inputs);
 	// Get values for inputs which do not exceed time_point
 	auto [values, is_quit] = inputs.read(
 		step_inputs, time_point);
@@ -234,6 +221,17 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 		if (systems.empty()) return false;
 	}
 	return true;
+}
+
+template<typename input_t, typename output_t, typename ... BAs>
+std::vector<tau<BAs...>> interpreter<input_t, output_t, BAs...>::
+build_inputs_for_step(const size_t t) {
+	std::vector<tau<BAs...>> step_inputs;
+	for (auto& [var_name, _] : inputs.streams) {
+		step_inputs.emplace_back(
+			trim(build_in_variable_at_n(var_name, t)));
+	}
+	return step_inputs;
 }
 
 template<typename input_t, typename output_t, typename...BAs>
@@ -713,19 +711,24 @@ bool interpreter<input_t, output_t, BAs...>::is_excluded_output (const tau<BAs..
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
-bool interpreter<input_t, output_t, BAs...>::appears_within_lookback(
-	const tau<BAs...>& var) {
-	auto is_var = [&var](const auto& n){return n == var;};
+std::vector<tau<BAs...>> interpreter<input_t, output_t, BAs...>::appear_within_lookback(
+	const std::vector<tau<BAs...>>& vars) {
+	std::vector<tau<BAs...>> appeared;
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
 		auto step_ubt_ctn = get_ubt_ctn_at(t);
 		auto memory_copy = memory;
 		step_ubt_ctn = replace(step_ubt_ctn, memory_copy);
 		step_ubt_ctn = normalize_non_temp(step_ubt_ctn);
 		// Try to find var in step_ubt_ctn
-		if (find_top(step_ubt_ctn, is_var))
-			return true;
+		for (const auto& v : vars) {
+			const auto has_var = [&v](const auto& n){return n == v;};
+			if (find_top(step_ubt_ctn, has_var)) {
+				if (std::ranges::find(appeared, v) == appeared.end())
+					appeared.emplace_back(v);
+			}
+		}
 	}
-	return false;
+	return appeared;
 }
 } // namespace idni::tau_lang
 #endif //INTERPRETER_IMPL_H
