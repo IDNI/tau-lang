@@ -335,6 +335,8 @@ private:
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
 
+	tau<BAs...> get_ubt_ctn_at (int_t t);
+
 	bool calculate_initial_systems ();
 
 	// Return typed systems of equations for the solver corresponding to each clause
@@ -353,7 +355,7 @@ private:
 	static std::optional<type> get_type_atomic_fm(const tau<BAs...>& fm,
 		auto& inputs, auto& outputs);
 
-	tau<BAs...> update_to_time_point(const tau<BAs...>& f);
+	tau<BAs...> update_to_time_point(const tau<BAs...>& f, const int_t t);
 
 	bool is_memory_access_valid(const auto& io_vars);
 
@@ -379,6 +381,9 @@ private:
 
 	// Returns if the variable is excluded from output
 	static bool is_excluded_output(const tau<BAs...>& var);
+
+	// Check if a stream appears within the next 'lookback' steps
+	bool appears_within_lookback(const tau<BAs...>& var);
 
 };
 
