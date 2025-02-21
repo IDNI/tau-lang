@@ -339,6 +339,8 @@ private:
 
 	bool calculate_initial_systems ();
 
+	std::vector<tau<BAs...>> build_inputs_for_step (const size_t t);
+
 	// Return typed systems of equations for the solver corresponding to each clause
 	// in the unbound continuation
 	static std::vector<system<BAs...>> compute_systems(const tau<BAs...>& ubd_ctn,
@@ -382,8 +384,9 @@ private:
 	// Returns if the variable is excluded from output
 	static bool is_excluded_output(const tau<BAs...>& var);
 
-	// Check if a stream appears within the next 'lookback' steps
-	bool appears_within_lookback(const tau<BAs...>& var);
+	// Return those variables that appear within the lookback
+	std::vector<tau<BAs...> > appear_within_lookback(
+		const std::vector<tau<BAs...> >& vars);
 
 };
 

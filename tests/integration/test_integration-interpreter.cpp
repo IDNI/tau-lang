@@ -92,11 +92,12 @@ struct input_vector {
 		return { _type };
 	}
 
-	void add_input (const tau<BAs...>&, const std::string&, const std::string&) {
-		return;
+	void add_input (const tau<BAs...>& v, const std::string&, const std::string&) {
+		if (!streams.contains(v)) streams.emplace(v,v);
 	}
 
 	std::vector<assignment<BAs...>> inputs;
+	assignment<BAs...> streams;
 	size_t current = 0;
 	std::string _type = "sbf";
 };
