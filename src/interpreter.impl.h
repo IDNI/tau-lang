@@ -29,46 +29,53 @@ interpreter<input_t, output_t, BAs...>::make_interpreter(
 template<typename input_t, typename output_t, typename...BAs>
 std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t, BAs...>::step() {
 	using p = tau_parser;
-
+	auto is_current_input = [&](const auto& n) {
+		if (is_child_non_terminal(p::io_var, n)) {
+			if (is_child_non_terminal(p::in, trim(n)) &&
+				get_io_time_point(n) == (int_t)time_point)
+				return true;
+		}
+		return false;
+	};
+	auto not_appears_within_lookback = [&](const auto& n) {
+		return !appears_within_lookback(n);
+	};
 	// Compute systems for the current step
 	if (!calculate_initial_systems())
 		return {};
-	// for each system in systems try to solve it, if it is not possible
-	// continue with the next system.
 	BOOST_LOG_TRIVIAL(info) << "Execution step: " << time_point << "\n";
 	bool auto_continue = false;
+	// Get inputs for this step
+	auto step_fm = update_to_time_point(ubt_ctn, formula_time_point);
+	auto step_inputs = select_top(step_fm, is_current_input);
+	std::erase_if(step_inputs, not_appears_within_lookback);
+	// Get values for inputs which do not exceed time_point
+	auto [values, is_quit] = inputs.read(
+		step_inputs, time_point);
+	// Empty input
+	if (is_quit) return {};
+	// Error during input
+	if (!values.has_value()) return {assignment<BAs...>{}, true};
+	// Save inputs in memory
+	for (const auto& [var, value] : values.value()) {
+		assert(get_io_time_point(trim(var)) <= (int_t)time_point);
+		// If there is at least one input, continue automatically in execution
+		auto_continue = true;
+		memory[var] = value;
+	}
+	// for each system in systems try to solve it, if it is not possible
+	// continue with the next system.
 	for (const auto& system: this->systems) {
 		std::map<type, solution<BAs...>> solutions;
 		bool solved = true;
 		// solve the equations for each type in the system
 		for (const auto& [type, equations]: system) {
 			// rewriting the inputs and inserting them into memory
-			auto updated = update_to_time_point(equations);
+			auto updated = update_to_time_point(equations, formula_time_point);
 			auto memory_copy = memory;
 			auto current = replace(updated, memory_copy);
 			// Simplify after updating stream variables
 			current = normalize_non_temp(current);
-
-			// Find open input vars
-			auto io_vars = select_top(current,
-				is_child_non_terminal<p::io_var, BAs...>);
-
-			// Get values for open inputs which do not exceed time_point
-			auto [values, is_quit] = inputs.read(
-				io_vars, time_point);
-			// Empty input
-			if (is_quit) return {};
-			// Error during input
-			if (!values.has_value()) return {assignment<BAs...>{}, true};
-			// Save inputs in memory
-			for (const auto& [var, value] : values.value()) {
-				assert(get_io_time_point(trim(var)) <= (int_t)time_point);
-				// If there is at least one input, continue automatically in execution
-				auto_continue = true;
-				memory[var] = value;
-			}
-			// Plug values for inputs into formula
-			current = replace(current, values.value());
 
 			#ifdef DEBUG
 			BOOST_LOG_TRIVIAL(trace)
@@ -178,9 +185,39 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 	return {};
 }
 
+template<typename input_t, typename output_t, typename ... BAs>
+tau<BAs...> interpreter<input_t, output_t, BAs...>::get_ubt_ctn_at(int_t t) {
+	using p = tau_parser;
+	const int_t ut = t < (int_t)formula_time_point ? (int_t)formula_time_point : t;
+	if (t >= std::max(highest_initial_pos, (int_t)formula_time_point)) {
+		return update_to_time_point(ubt_ctn, ut);
+	}
+	// Adjust ubt_ctn to time_point by eliminating inputs and outputs
+	// which are greater than current time_point in a time-compatible fashion
+	auto step_ubt_ctn = update_to_time_point(ubt_ctn, ut);
+	auto io_vars = select_top(step_ubt_ctn,
+			is_child_non_terminal<p::io_var, BAs...>);
+	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
+	// All io_vars in fm have to refer to constant time positions
+	assert(all_of(io_vars.begin(), io_vars.end(),
+		[](const auto& el){return is_io_initial(el);}));
+	while (!io_vars.empty()) {
+		auto& v = io_vars.back();
+		if (get_io_time_point(v) <= t) {
+			io_vars.pop_back();
+			continue;
+		}
+		if (v | p::io_var | p::in)
+			step_ubt_ctn = build_wff_all(v, step_ubt_ctn);
+		else step_ubt_ctn = build_wff_ex(v, step_ubt_ctn);
+		io_vars.pop_back();
+	}
+	// Eliminate added quantifiers
+	return normalize_non_temp(step_ubt_ctn);
+}
+
 template<typename input_t, typename output_t, typename...BAs>
 bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
-	using p = tau_parser;
 	if (final_system) return true;
 
 	size_t initial_segment = std::max(highest_initial_pos, (int_t)formula_time_point);
@@ -188,28 +225,7 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 	BOOST_LOG_TRIVIAL(trace) << "cis/time_point: " << time_point << "\n";
 	// If time_point < initial_segment, recompute systems
 	if (time_point < initial_segment) {
-		// Adjust ubt_ctn to time_point by eliminating inputs and outputs
-		// which are greater than current time_point in a time-compatible fashion
-		auto step_ubt_ctn = update_to_time_point(ubt_ctn);
-		auto io_vars = select_top(step_ubt_ctn,
-				is_child_non_terminal<p::io_var, BAs...>);
-		sort(io_vars.begin(), io_vars.end(), constant_io_comp);
-		// All io_vars in fm have to refer to constant time positions
-		assert(all_of(io_vars.begin(), io_vars.end(),
-			[](const auto& el){return is_io_initial(el);}));
-		while (!io_vars.empty()) {
-			auto& v = io_vars.back();
-			if (get_io_time_point(v) <= (int_t)time_point) {
-				io_vars.pop_back();
-				continue;
-			}
-			if (v | p::io_var | p::in)
-				step_ubt_ctn = build_wff_all(v, step_ubt_ctn);
-			else step_ubt_ctn = build_wff_ex(v, step_ubt_ctn);
-			io_vars.pop_back();
-		}
-		// Eliminate added quantifiers
-		step_ubt_ctn = normalize_non_temp(step_ubt_ctn);
+		auto step_ubt_ctn = get_ubt_ctn_at(time_point);
 		systems = compute_systems(step_ubt_ctn, inputs, outputs);
 		if (systems.empty()) return false;
 	} else if (time_point == initial_segment) {
@@ -221,13 +237,14 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-tau<BAs...> interpreter<input_t, output_t, BAs...>::update_to_time_point(const tau<BAs...>& f) {
+tau<BAs...> interpreter<input_t, output_t, BAs...>::update_to_time_point(
+	const tau<BAs...>& f, const int_t t) {
 	// update the f according to current time_point, i.e. for each
 	// input/output var which has a shift, we replace it with the value
 	// corresponding to the current time_point minus the shift.
 	auto io_vars = select_top(f,
 		is_child_non_terminal<tau_parser::io_var, BAs...>);
-	return fm_at_time_point(f, io_vars, formula_time_point);
+	return fm_at_time_point(f, io_vars, t);
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
@@ -552,6 +569,8 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	// The systems for solver need to be recomputed at beginning of next step
 	final_system = false;
 	compute_lookback_and_initial();
+	compute_systems(ubt_ctn, inputs, outputs);
+	//TODO: remove inputs and outputs which no longer appear in the updated specification
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
@@ -693,5 +712,20 @@ bool interpreter<input_t, output_t, BAs...>::is_excluded_output (const tau<BAs..
 	return io_name[0] == '_' && io_name.size() > 1 && io_name[1] == 'e';
 }
 
+template<typename input_t, typename output_t, typename ... BAs>
+bool interpreter<input_t, output_t, BAs...>::appears_within_lookback(
+	const tau<BAs...>& var) {
+	auto is_var = [&var](const auto& n){return n == var;};
+	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
+		auto step_ubt_ctn = get_ubt_ctn_at(t);
+		auto memory_copy = memory;
+		step_ubt_ctn = replace(step_ubt_ctn, memory_copy);
+		step_ubt_ctn = normalize_non_temp(step_ubt_ctn);
+		// Try to find var in step_ubt_ctn
+		if (find_top(step_ubt_ctn, is_var))
+			return true;
+	}
+	return false;
+}
 } // namespace idni::tau_lang
 #endif //INTERPRETER_IMPL_H
