@@ -597,22 +597,19 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 		// Now try to add always part of old spec in a pointwise way
 		tau<BAs...> new_spec_pointwise;
 		if (spec_always) {
-			tau<BAs...> aw;
-			if (upd_always)
-				aw = always_conjunction(
+			if (upd_always) {
+				tau<BAs...> aw = always_conjunction(
 					upd_always.value(),
 					spec_always.value());
-			else aw = trim2(spec_always.value());
-
-			auto aw_io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
-			for (const auto& io_var : aw_io_vars)
-				if (io_var | p::io_var | p::out)
-					aw = build_wff_ex(io_var, aw);
-			if (upd_always)
-				new_spec_pointwise = build_wff_and(
-					trim2(upd_always.value()),
-					build_wff_imply(aw, trim2(spec_always.value())));
-			else new_spec_pointwise = build_wff_imply(aw, trim2(spec_always.value()));
+				auto aw_io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
+				for (const auto& io_var : aw_io_vars)
+					if (io_var | p::io_var | p::out)
+						aw = build_wff_ex(io_var, aw);
+				new_spec_pointwise = build_wff_or(
+					always_conjunction(upd_always.value(), build_wff_neg(aw)),
+					always_conjunction(upd_always.value(), spec_always.value())
+				);
+			} else new_spec_pointwise = trim2(spec_always.value());
 
 			new_spec_pointwise = build_wff_always(new_spec_pointwise);
 			new_spec_pointwise = build_wff_and(
