@@ -59,8 +59,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 		for (const auto& [type, equations]: system) {
 			// rewriting the inputs and inserting them into memory
 			auto updated = update_to_time_point(equations, formula_time_point);
-			auto memory_copy = memory;
-			auto current = replace(updated, memory_copy);
+			auto current = replace(updated, memory);
 			// Simplify after updating stream variables
 			current = normalize_non_temp(current);
 
@@ -88,8 +87,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 				else for (const auto& [k, v]: solution.value())
 					BOOST_LOG_TRIVIAL(trace)
 						<< "\t" << k << " := " << v << " ";
-				auto copy = solution.value();
-				auto substituted = replace(current, copy);
+				auto substituted = replace(current, solution.value());
 				auto check = snf_wff(substituted);
 				BOOST_LOG_TRIVIAL(trace)
 					<< "step/check: " << check << "\n";
@@ -531,14 +529,12 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 		BOOST_LOG_TRIVIAL(info) << "(Warning) no update performed: invalid memory access was found\n";
 		return;
 	}
-	auto memory_copy = memory;
-	shifted_update = replace(shifted_update, memory_copy);
+	shifted_update = replace(shifted_update, memory);
 	BOOST_LOG_TRIVIAL(trace) << "update/shifted_update: " << shifted_update << "\n";
 
 	// The constant time positions in original_spec need to be replaced
 	// by present assignments from memory and already executed sometimes statements need to be removed
-	memory_copy = memory;
-	auto current_spec = replace(original_spec, memory_copy);
+	auto current_spec = replace(original_spec, memory);
 	BOOST_LOG_TRIVIAL(debug) << "update/current_spec: " << current_spec << "\n";
 
 	// TODO: current_spec = remove_happend_sometimes(current_spec);
@@ -673,22 +669,18 @@ solution_with_max_update(const tau<BAs...>& spec) {
 		// Check that f is wide (not 0 and has more than one zero), otherwise continue
 		f.value() = f.value() | bf_reduce_canonical<BAs...>();
 		if (f.value() == _0<BAs...>) continue;
-		assignment<BAs...> changes = {{u, _0<BAs...>}};
-		auto f0 = replace(f.value(), changes);
-		changes = {{u, _1<BAs...>}};
-		auto f1 = replace(f.value(), changes);
+		auto f0 = replace(f.value(), u, _0<BAs...>);
+		auto f1 = replace(f.value(), u, _1<BAs...>);
 		auto f0_xor_f1 = build_bf_xor(f0, f1) | bf_reduce_canonical<BAs...>();
 		if (f0_xor_f1 == _0<BAs...> || f0_xor_f1 == _1<BAs...>) continue;
 
 		// Here we know that f is wide
 		auto max_u = build_bf_neg(f1);
-		changes = {{u, max_u}};
-		auto max_u_spec = replace(clause, changes);
+		auto max_u_spec = replace(clause, u, max_u);
 		auto sol = get_solution(max_u_spec);
 		if (!sol.has_value()) continue;
 		// Now we need to add solution for u[t]
-		auto sol_copy = sol.value();
-		max_u = replace(max_u, sol_copy);
+		max_u = replace(max_u, sol.value());
 		max_u = replace_free_vars_by(max_u, _0_trimmed<BAs...>)
 				| bf_reduce_canonical<BAs...>();
 		sol.value().emplace(u, max_u);
@@ -713,8 +705,7 @@ std::vector<tau<BAs...>> interpreter<input_t, output_t, BAs...>::appear_within_l
 	std::vector<tau<BAs...>> appeared;
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
 		auto step_ubt_ctn = get_ubt_ctn_at(t);
-		auto memory_copy = memory;
-		step_ubt_ctn = replace(step_ubt_ctn, memory_copy);
+		step_ubt_ctn = replace(step_ubt_ctn, memory);
 		step_ubt_ctn = normalize_non_temp(step_ubt_ctn);
 		// Try to find var in step_ubt_ctn
 		for (const auto& v : vars) {

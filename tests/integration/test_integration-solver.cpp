@@ -25,8 +25,7 @@ auto splitter_one_bdd() {
 
 template<typename...BAs>
 bool check_solution(const tau<BAs...>& equation, const std::map<tau<BAs...>, tau<BAs...>>& solution) {
-	auto copy = solution;
-	auto substitution = replace(equation, copy);
+	auto substitution = replace(equation, solution);
 	auto check = snf_wff(substitution);
 	#ifdef DEBUG
 	std::cout << "check_solution/solution: " << solution;
