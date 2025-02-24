@@ -538,11 +538,9 @@ private:
 		if (eq && find_top(trim(eq.value()), has_var)) {
 			auto eq_v = eq.value();
 			assert(is_non_terminal(tau_parser::bf_f, trim(eq_v->child[1])));
-			std::map<tau<BAs...>, tau<BAs...>> l_changes = {{var, _0<BAs...>}};
-			auto f_0 = replace(trim(eq_v),  l_changes);
+			auto f_0 = replace(trim(eq_v), var, _0<BAs...>);
 			f_0 = f_0 | bf_reduce_canonical<BAs...>();
-			l_changes = {{var, _1<BAs...>}};
-			auto f_1 = replace(build_bf_neg(trim(eq_v)),  l_changes)
+			auto f_1 = replace(build_bf_neg(trim(eq_v)), var, _1<BAs...>)
 				| bf_reduce_canonical<BAs...>();
 
 			changes[eq_v] = trim(build_bf_interval(f_0, var, f_1));
@@ -550,11 +548,9 @@ private:
 		for (const auto& neq: select_all(n, is_non_terminal<tau_parser::bf_neq, BAs...>)) {
 			assert(is_non_terminal(tau_parser::bf_f, trim(neq->child[1])));
 			if (!find_top(trim(neq), has_var)) continue;
-			std::map<tau<BAs...>, tau<BAs...>> l_changes = {{var, _0<BAs...>}};
-			auto f_0 = replace(trim(neq), l_changes)
+			auto f_0 = replace(trim(neq), var, _0<BAs...>)
 				| bf_reduce_canonical<BAs...>();
-			l_changes = {{var, _1<BAs...>}};
-			auto f_1 = replace(build_bf_neg(trim(neq)), l_changes)
+			auto f_1 = replace(build_bf_neg(trim(neq)), var, _1<BAs...>)
 				| bf_reduce_canonical<BAs...>();
 			changes[neq] = trim(build_wff_or(build_bf_nleq_upper(f_0, var), build_bf_nleq_lower(f_1, var)));
 		}
@@ -604,8 +600,7 @@ tau<BAs...> dnf_wff(const tau<BAs...>& n) {
 		);
 	// finally, we also simplify the bf part of the formula
 	auto dnf = dnf_bf(nform);
-	std::map<tau<BAs...>, tau<BAs...>> changes = {{nn, dnf}};
-	return replace(n, changes);
+	return replace(n, nn, dnf);
 }
 
 template<typename...BAs>
@@ -626,8 +621,7 @@ tau<BAs...> cnf_wff(const tau<BAs...>& n) {
 		);
 	// finally, we also simplify the bf part of the formula
 	auto cnf = cnf_bf(wff);
-	std::map<tau<BAs...>, tau<BAs...>> changes = {{nn, cnf}};
-	return replace(n, changes);
+	return replace(n, nn, cnf);
 }
 
 template<typename...BAs>
@@ -659,8 +653,7 @@ tau<BAs...> nnf_wff(const tau<BAs...>& n) {
 		);
 	// finally, we also simplify the bf part of the formula
 	auto nnf = nnf_bf(nform);
-	std::map<tau<BAs...>, tau<BAs...>> changes = {{nn, nnf}};
-	return replace(n, changes);
+	return replace(n, nn, nnf);
 }
 
 // Reduce currrent dnf due to update by coeff and variable assignment i
@@ -893,10 +886,8 @@ bool assign_and_reduce(const tau<BAs...>& fm,
 	const auto& v = vars[p];
 	auto t = is_wff ? _T<BAs...> : _1<BAs...>;
 	auto f = is_wff ? _F<BAs...> : _0<BAs...>;
-	std::map<tau<BAs...>, tau<BAs...>> c = {{v, t}};
-	auto fm_v1 = replace(fm, c);
-	c = {{v, f}};
-	auto fm_v0 = replace(fm, c);
+	auto fm_v1 = replace(fm, v, t);
+	auto fm_v0 = replace(fm, v, f);
 
 	elim_vars_in_assignment<BAs...>(fm_v1, vars, i, p, is_var);
 	if(fm_v1 == fm_v0) {
@@ -1695,13 +1686,11 @@ std::pair<std::vector<int_t>, bool> simplify_path(
             // std::cout << "new var: " << sorted_v << "\n";
             if (sorted_v != v && var_to_idx.contains(sorted_v)) {
                 // Rename variable in current clause
-                std::map<tau<BAs...>, tau<BAs...>> changes = {{v, sorted_v}};
-                clause = replace(clause, changes);
+                clause = replace(clause, v, sorted_v);
                 continue;
             }
 			if (sorted_v != v) {
-				std::map<tau<BAs...>, tau<BAs...>> changes = {{v, sorted_v}};
-				clause = replace(clause, changes);
+				clause = replace(clause, v, sorted_v);
 			}
 			// There is a new variable
 			assert(sorted_v != build_wff_eq(_T<BAs...>) && sorted_v != build_wff_eq(_F<BAs...>));
@@ -1794,13 +1783,11 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 						// Here single assumption
 						auto neg_eq = push_negation_in(build_bf_neg(clause), false);
 						// std::cout << "neg_eq: " << neg_eq << "\n";
-						std::map<tau<BAs...>, tau<BAs...>> changes;
-						changes.emplace(neg_eq, _1<BAs...>);
 						for (auto& neq : neq_clauses) {
 							if (neq == _T<BAs...> || neq == _1<BAs...>) continue;
 							auto grouped_bf = group_dnf_expression(neq);
 							// std::cout << "grouped_bf: " << grouped_bf << "\n";
-							auto simp_neq = replace(grouped_bf, changes);
+							auto simp_neq = replace(grouped_bf, neg_eq, _1<BAs...>);
 							// std::cout << "simp_neq: " << simp_neq << "\n";
 							if (grouped_bf != simp_neq) {
 								neq = to_dnf2(simp_neq, false);
@@ -2688,9 +2675,7 @@ tau<BAs...> pull_always_out_for_inf (const tau<BAs...>& fm) {
 		res = build_wff_or(res, build_wff_and(always_statements, staying));
 	}
 	if (last_always) {
-		std::map<tau<BAs...>, tau<BAs...>> changes =
-			{{last_always, build_wff_or(last_always, non_temps)}};
-		res = replace(res, changes);
+		res = replace(res, last_always, build_wff_or(last_always, non_temps));
 	} else {
 		assert(res == _F<BAs...>);
 		res = build_wff_always(non_temps);
@@ -2749,17 +2734,15 @@ tau<BAs...> wff_remove_existential(const tau<BAs...>& var, const tau<BAs...>& wf
 		}
 
 		auto f = squeeze_positives(l);
-		std::map<tau<BAs...>, tau<BAs...>> changes_0 = {{var, _0_trimmed<BAs...>}};
-		std::map<tau<BAs...>, tau<BAs...>> changes_1 = {{var, _1_trimmed<BAs...>}};
-		auto f_0 = f ? replace(f.value(), changes_0) : _0<BAs...>;
-		auto f_1 = f ? replace(f.value(), changes_1) : _0<BAs...>;
+		auto f_0 = f ? replace(f.value(), var, _0_trimmed<BAs...>) : _0<BAs...>;
+		auto f_1 = f ? replace(f.value(), var, _1_trimmed<BAs...>) : _0<BAs...>;
 
 		if (auto neqs = select_all(l, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
 			auto nneqs = _T<BAs...>;
 			for (auto& neq: neqs) {
 				auto g = neq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
-				auto g_0 = replace(g, changes_0);
-				auto g_1 = replace(g, changes_1);
+				auto g_0 = replace(g, var, _0_trimmed<BAs...>);
+				auto g_1 = replace(g, var, _1_trimmed<BAs...>);
 				// If both are 1 then inequality is implied by f_0f_1 = 0
 				if (g_0 == _1<BAs...> && g_1 == _1<BAs...>) continue;
 				// If f_0 is equal to f_1 we can use assumption f_0 = 0 and f_1 = 0
@@ -3366,8 +3349,7 @@ tau<BAs...> snf_wff(const tau<BAs...>& n) {
 			| simplify_wff<BAs...>
 			| fix_neg_in_snf<BAs...>)
 		| bf_reduce_canonical<BAs...>();
-	std::map<tau<BAs...>, tau<BAs...>> changes = {{nn, second_step}};
-	return replace(n, changes);
+	return replace(n, nn, second_step);
 }
 
 template<typename...BAs>
@@ -3387,7 +3369,7 @@ tau<BAs...> mnf_wff(const tau<BAs...>& n) {
 			to_mnf_wff<BAs...>)
 		| reduce_wff<BAs...>;
 	std::map<tau<BAs...>, tau<BAs...>> changes = {{nn, mnf}};
-	return replace(n, changes);
+	return replace(n, nn, mnf);
 }
 
 template<typename...BAs>

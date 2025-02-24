@@ -1026,10 +1026,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 		// If there is an always part, replace it with its unbound continuation
 		ubd_aw_fm = always_to_unbounded_continuation(
 			aw_fm.value(), start_time, output);
-		std::map<tau<BAs...>, tau<BAs...> > changes = {
-			{aw_fm.value(), build_wff_always(ubd_aw_fm)}
-		};
-		auto ubd_fm = replace(fm, changes);
+		auto ubd_fm = replace(fm, aw_fm.value(), build_wff_always(ubd_aw_fm));
 		ev_t = transform_to_eventual_variables(ubd_fm, false, start_time);
 		// Check if there is a sometimes present
 		if (ev_t.first == ubd_fm) {

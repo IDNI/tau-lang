@@ -83,10 +83,9 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 				return {};
 			}
 			else {
-				auto copy = substitution;
 				substitution[vars[0]] = ( ( mode == solver_mode::maximum
-						? replace(~g, copy)
-						: replace(h, copy) )
+						? replace(~g, substitution)
+						: replace(h, substitution) )
 					| bf_reduce_canonical<BAs...>() );
 
 				#ifdef DEBUG
@@ -102,10 +101,9 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 		}
 		if (auto restricted = find_solution(build_wff_eq(gh), substitution, mode); restricted) {
 			//solution.insert(restricted.value().begin(), restricted.value().end());
-			auto copy = restricted.value();
 			substitution[vars[0]] = ( ( mode == solver_mode::maximum
-					? replace(~g, copy)
-					: replace(h, copy) )
+					? replace(~g, restricted.value())
+					: replace(h, restricted.value()) )
 				| bf_reduce_canonical<BAs...>() );
 
 			#ifdef DEBUG
@@ -226,8 +224,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	for (const auto& [k, v] : phi)
 		BOOST_LOG_TRIVIAL(trace)
 			<< "solver.tmpl.h:" << __LINE__ << "\t" << k << " := " << v << " ";
-	auto copy = phi;
-	auto check = snf_wff(replace(equality, copy));
+	auto check = snf_wff(replace(equality, phi));
 	BOOST_LOG_TRIVIAL(trace)
 		<< "solver.tmpl.h:" << __LINE__ << " lgrs/check: " << check << "\n";
 	#endif // DEBUG
@@ -894,8 +891,7 @@ std::optional<solution<BAs...>> solve_general_system(const equation_system<BAs..
 
 	// Now we need to add solutions for variables in the lgrs
 	for (auto& [var, func]: phi.value()) {
-		auto copy = inequality_solution.value();
-		auto func_with_neq_assgm = replace(func, copy);
+		auto func_with_neq_assgm = replace(func, inequality_solution.value());
 		// Now assign the remaining variables to 0 and compute
 		// resulting value for var
 		solution[var] = replace_free_vars_by(func_with_neq_assgm,
@@ -929,8 +925,7 @@ bool check_extreme_solution(const equation_system<BAs...>& system,
 	#endif // DEBUG
 	// We check if the solution satisfies the inequalities of the system
 	for (const auto& inequality: system.second) {
-		auto copy = substitution;
-		auto value = replace(inequality, copy) | bf_reduce_canonical<BAs...>();
+		auto value = replace(inequality, substitution) | bf_reduce_canonical<BAs...>();
 		if (value == _F<BAs...>)
 			return false;
 	}

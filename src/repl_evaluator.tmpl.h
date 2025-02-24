@@ -321,9 +321,7 @@ std::optional<tau_nso<BAs...>>
 		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		return {};
 	}
-	std::map<tau_nso_t, tau_nso_t> changes = {{thiz.value(), with.value()}};
-
-	return replace(in.value(), changes);
+	return replace(in.value(), thiz.value(), with.value());
 }
 
 template <typename... BAs>
