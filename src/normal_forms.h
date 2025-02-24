@@ -241,26 +241,19 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 		return it->second;
 #endif
 	assert(is_non_terminal(tau_parser::bf, fm));
-	auto norm_ba = [&](const auto& n, const auto& c) {
+	auto norm_ba = [&](const auto& n) {
 		using p = tau_parser;
-		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/n: " << n;
-		BOOST_LOG_TRIVIAL(trace) << "normalize_ba/norm_ba/c: " << c;
 
-		if (!is_child_non_terminal(tau_parser::bf_constant, n)) {
-			auto res = n->child == c ? n : make_node(n->value, c);
-#ifdef TAU_CACHE
-			cache.emplace(res, res);
-			return cache.emplace(n, res).first->second;
-#endif
-			return res;
-		}
+		if (!is_child_non_terminal(p::bf_constant, n))
+			return n;
+
+		// Node has a Boolean algebra element
 		auto ba_elem = n
 			| p::bf_constant
 			| p::constant
 			| only_child_extractor<BAs...>
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
-		// std::cout << "Constant to normalize: " << ba_elem << "\n";
 		auto res = normalize_ba(ba_elem);
 		auto type = n | p::bf_constant | p::type;
 		assert(type.has_value());
@@ -272,8 +265,7 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 #endif
 		return r;
 	};
-	return rewriter::post_order_recursive_traverser<tau<BAs...>>()(
-						fm, rewriter::all, norm_ba);
+	return pre_order(fm).apply_until_change(norm_ba);
 }
 
 
@@ -1072,13 +1064,13 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(const tau<BAs...>& clause,
 			if (is_non_terminal(wff ? tp::wff_neg : tp::bf_neg, n)) {
 				auto v = trim(n);
 				// Check if v is a T/F or 1/0
-                if (v == _T<BAs...> || v == _1<BAs...>) {
-                    if (!is_cnf) clause_is_decided = true;
-                    return false;
-                } else if (v == _F<BAs...> || v == _0<BAs...>) {
-                    if (is_cnf) clause_is_decided = true;
-                    return false;
-                }
+				if (v == _T<BAs...> || v == _1<BAs...>) {
+					if (!is_cnf) clause_is_decided = true;
+					return false;
+				} else if (v == _F<BAs...> || v == _0<BAs...>) {
+					if (is_cnf) clause_is_decided = true;
+					return false;
+				}
 				auto it = var_pos.find(v);
 				assert(it != var_pos.end());
 				if (i[it->second] == 1) {
@@ -1100,9 +1092,7 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(const tau<BAs...>& clause,
 			}
 			else return true;
 		};
-		rewriter::post_order_traverser<rewriter::identity_t,
-			decltype(var_assigner), tau<BAs...>>(
-				rewriter::identity, var_assigner)(clause);
+		pre_order(clause).visit(var_assigner);
 	return std::make_pair(move(i), clause_is_decided);
 }
 
@@ -2202,50 +2192,6 @@ tau<BAs...> to_cnf2(const tau<BAs...>& fm, bool is_wff) {
 	return new_fm;
 }
 
-template<typename... BAs>
-tau<BAs...> push_temp_in (const tau<BAs...>& fm, const size_t temp, auto& visited) {
-	using p = tau_parser;
-	assert((temp == p::wff_always || temp == p::wff_sometimes));
-	// The algorithm becomes incorrect if visited nodes are visited again
-	bool is_aw = temp == p::wff_always;
-	auto push_always = [&](const auto& node, const auto& children) {
-		tau<BAs...> new_node = make_node(node->value, children);
-		// always phi && psi -> (always phi) && (always psi)
-		if (visited.contains(new_node)) return new_node;
-		if (is_child_non_terminal(temp, new_node)) {
-			auto clauses = is_aw
-					       ? get_cnf_wff_clauses( trim2(new_node))
-					       : get_dnf_wff_clauses( trim2(new_node));
-			int_t max_lookback = 0;
-			std::vector<int_t> clause_lookback;
-			for (const auto& clause : clauses) {
-				auto io_vars = select_top_until(
-					clause, is_child_non_terminal<p::io_var, BAs...>,
-					is_temporal_quantifier<BAs...>);
-				int_t clause_lb = get_max_shift(io_vars);
-				clause_lookback.push_back(clause_lb);
-				max_lookback = std::max(max_lookback, clause_lb);
-			}
-			// Now add to each clause with lookback smaller than max_lookback temporary output stream
-			for (size_t i = 0; i < clause_lookback.size(); ++i) {
-				if (!visited.contains(clauses[i]) && clause_lookback[i] < max_lookback) {
-					clauses[i] = build_wff_and(clauses[i], build_wff_eq(
-						build_out_variable_at_t_minus<BAs...>("_l", max_lookback)));
-				}
-				visited.emplace(clauses[i]);
-				clauses[i] = is_aw ? build_wff_always(clauses[i]) : build_wff_sometimes(clauses[i]);
-				visited.emplace(clauses[i]);
-			}
-			auto res = is_aw ? build_wff_and<BAs...>(clauses) : build_wff_or<BAs...>(clauses);
-			visited.emplace(res);
-			return res;
-		}
-		return new_node;
-	};
-	auto is_not_bf = [](const tau<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
-	return rewriter::post_order_recursive_traverser<tau<BAs...>>()(fm, is_not_bf, push_always);
-}
-
 // Assumes that fm is a single DNF always clause
 template<typename... BAs>
 tau<BAs...> rm_temporary_lookback (const tau<BAs...>& fm) {
@@ -2838,7 +2784,7 @@ template<typename... BAs>
 tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_fm) {
 	// Reductions to prevent blow ups and achieve DNF
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start existential quantifier elimination";
-	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << inner_fm;
+	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << trim2(inner_fm);
 	BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << scoped_fm;
 	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
 	scoped_fm = reduce_across_bfs(scoped_fm, false);
@@ -2907,7 +2853,7 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 template<typename... BAs>
 tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start universal quantifier elimination";
-	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << inner_fm;
+	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << trim2(inner_fm);
 	BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << scoped_fm;
 	// Reductions to prevent blow ups and achieve CNF
 	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
@@ -2981,9 +2927,7 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 template<typename... BAs>
 tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	// Lambda is applied to nodes of fm in post order
-	auto elim_quant = [](tau<BAs...> inner_fm, const auto& child) -> tau<BAs...> {
-		// Update node according to current children
-		if (inner_fm->child != child) inner_fm = make_node(inner_fm->value, child);
+	auto elim_quant = [](const tau<BAs...>& inner_fm) -> tau<BAs...> {
 		// Find out if current node is a quantifier
 		bool is_ex_quant;
 		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm))
@@ -3005,7 +2949,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 		else return eliminate_universal_quantifier<BAs...>(inner_fm, scoped_fm);
 	};
 	auto is_not_bf = [](const tau<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
-	return rewriter::post_order_recursive_traverser<tau<BAs...>>()(fm, is_not_bf, elim_quant);
+	return post_order(fm).apply(elim_quant, is_not_bf);
 }
 
 template <typename... BAs>
