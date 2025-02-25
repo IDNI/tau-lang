@@ -1077,8 +1077,7 @@ bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 	auto normalized_fm = normalize_with_temp_simp(fm);
-	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or,
-				  tau_parser::wff);
+	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or);
 	// Convert each disjunct to unbounded continuation
 	for (auto& clause: clauses) {
 		if (transform_to_execution(clause, start_time, output) != _F<BAs...>) {
@@ -1131,8 +1130,7 @@ tau<BAs...> simp_tau_unsat_valid(const tau<BAs...>& fm, const int_t start_time =
 	// Check if formula is valid
 	if (is_tau_impl(_T<BAs...>, fm)) return _T<BAs...>;
 	auto normalized_fm = normalize_with_temp_simp(fm);
-	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or,
-				  tau_parser::wff);
+	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or);
 
 	// Check satisfiability of each clause
 	for (auto& clause: clauses) {
