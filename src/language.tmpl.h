@@ -553,14 +553,12 @@ template<typename ...BAs>
 void get_leaves(const tau<BAs...>& n, tau_parser::nonterminal branch,
 	tau_parser::nonterminal skip, std::vector<tau<BAs...>>& leaves)
 {
-    if (is_child_non_terminal(branch, n)) {
-	    for (const auto& c : trim(n)->child)
-	    	if (is_non_terminal(skip, c))
-	    		get_leaves(c, branch, skip, leaves);
-    } else {
-        leaves.push_back(n);
-        BOOST_LOG_TRIVIAL(trace) << "(I) get_leaves: found clause: " << n;
-    }
+	auto add_leave = [&branch, &leaves](const auto& n) {
+		if (is_non_terminal(branch, n)) return true;
+		if (is_child_non_terminal(branch, n)) return true;
+		return leaves.push_back(n), false;
+	};
+	pre_order(n).visit(add_leave);
 }
 
 template<typename ...BAs>
