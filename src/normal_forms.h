@@ -1095,8 +1095,10 @@ std::vector<std::vector<int_t>> collect_paths(const tau<BAs...>& new_fm, bool wf
 	for (int_t k=0; k < (int_t)vars.size(); ++k)
 		var_pos.emplace(vars[k], k);
 	using tp = tau_parser;
-	for (const auto& clause : get_leaves(new_fm, is_cnf ? (wff ? tp::wff_and : tp::bf_and) :
-							(wff ? tp::wff_or : tp::bf_or), wff ? tp::wff : tp::bf)) {
+	for (const auto& clause: get_leaves(
+			new_fm, is_cnf
+					? (wff ? tp::wff_and : tp::bf_and)
+					: (wff ? tp::wff_or : tp::bf_or))) {
 		auto [i, clause_is_decided] = clause_to_vector(clause, var_pos, wff, is_cnf);
 		if (clause_is_decided) continue;
 		// There is at least one satisfiable clause
@@ -2201,7 +2203,7 @@ tau<BAs...> extract_sometimes (tau<BAs...> fm) {
 	if (fm == _F<BAs...>) return _F<BAs...>;
 
 	std::vector<tau<BAs...>> extracted = {}, staying = {};
-	auto clauses = get_leaves(trim2(fm), tau_parser::wff_and, tau_parser::wff);
+	auto clauses = get_leaves(trim2(fm), tau_parser::wff_and);
 	for (const auto& clause : clauses) {
 		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(clause)) &&
 					!is_non_terminal(tau_parser::wff_always, trim(clause)));
@@ -2253,7 +2255,7 @@ tau<BAs...> extract_always (tau<BAs...> fm) {
 
 	// Now extract from all disjuncts
 	std::vector<tau<BAs...>> extracted = {}, staying = {};
-	auto clauses = get_leaves(trim2(fm), tau_parser::wff_or, tau_parser::wff);
+	auto clauses = get_leaves(trim2(fm), tau_parser::wff_or);
 	for (const auto& clause : clauses) {
 		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(clause)) &&
 					!is_non_terminal(tau_parser::wff_always, trim(clause)));
@@ -2396,7 +2398,7 @@ tau<BAs...> pull_always_out(const tau<BAs...>& fm) {
 	std::vector<tau<BAs...>> collected_always_fms;
 	// Collect all always statments in the clause fm
 	// by analyzing conjuncts
-	auto clauses = get_leaves(fm, tau_parser::wff_and, tau_parser::wff);
+	auto clauses = get_leaves(fm, tau_parser::wff_and);
 	for (const auto& clause : clauses) {
 		// if clause is a sometimes statement -> skip
 		if (is_child_non_terminal(tau_parser::wff_sometimes, clause))
@@ -2453,7 +2455,7 @@ tau<BAs...> pull_sometimes_always_out(tau<BAs...> fm) {
 	std::vector<tau<BAs...>> collected_no_temp_fms;
 	tau<BAs...> pure_always_clause;
 	// Collect all disjuncts which have temporal variables and call pull_always_out on the others
-	auto clauses = get_leaves(fm, tau_parser::wff_or, tau_parser::wff);
+	auto clauses = get_leaves(fm, tau_parser::wff_or);
 	if(clauses.empty()) clauses.push_back(fm);
 	for (const auto& clause : clauses) {
         auto r = pull_always_out(clause);
@@ -2667,13 +2669,13 @@ tau<BAs...> wff_remove_existential(const tau<BAs...>& var, const tau<BAs...>& wf
 	// if var does not appear in the formula, we can return the formula as is
 	// if (!find_top(wff, is_var)) return wff;
 	std::map<tau<BAs...>, tau<BAs...>> changes;
-	for (const auto& l: get_leaves(wff, tau_parser::wff_or, tau_parser::wff)) {
+	for (const auto& l: get_leaves(wff, tau_parser::wff_or)) {
 		// if var does not appear in the clause, we can skip it
 		if (!find_top(l, is_var)) continue;
 		// Get each conjunct in clause
 		tau<BAs...> nl = _T<BAs...>;
 		bool is_quant_removable_in_clause = true;
-		for (const auto& conj : get_leaves(l, tau_parser::wff_and, tau_parser::wff)) {
+		for (const auto& conj : get_leaves(l, tau_parser::wff_and)) {
 			// Check if conjunct is of form = 0 or != 0
 			if ((conj | tau_parser::bf_eq) || (conj | tau_parser::bf_neq))
 				continue;
@@ -2738,11 +2740,11 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 			return it->second;
 #endif // TAU_CACHE
 
-	auto clauses = get_leaves(scoped_fm, tau_parser::wff_or, tau_parser::wff);
+	auto clauses = get_leaves(scoped_fm, tau_parser::wff_or);
 	tau<BAs...> res;
 	for (const auto& clause : clauses) {
 		// Check if every conjunct in clause is of form f = 0 or f != 0
-		auto conjuncts = get_leaves(clause, tau_parser::wff_and, tau_parser::wff);
+		auto conjuncts = get_leaves(clause, tau_parser::wff_and);
 		bool all_equal_zero = true, all_unequal_zero = true;
 		for (const auto& c : conjuncts) {
 			if (!is_child_non_terminal(tau_parser::bf_eq, c))
@@ -2808,11 +2810,11 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 			return it->second;
 #endif // TAU_CACHE
 
-	auto clauses = get_leaves(scoped_fm, tau_parser::wff_and, tau_parser::wff);
+	auto clauses = get_leaves(scoped_fm, tau_parser::wff_and);
 	tau<BAs...> res;
 	for (const auto &clause: clauses) {
 		// Check if every disjunct in clause is of form f = 0 or f != 0
-		auto disjuncts = get_leaves(clause, tau_parser::wff_or, tau_parser::wff);
+		auto disjuncts = get_leaves(clause, tau_parser::wff_or);
 		bool all_equal_zero = true, all_unequal_zero = true;
 		for (const auto &d: disjuncts) {
 			if (!is_child_non_terminal(tau_parser::bf_eq, d))

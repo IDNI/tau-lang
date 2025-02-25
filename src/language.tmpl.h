@@ -551,7 +551,7 @@ auto get_free_vars_from_nso(const tau<BAs...>& n) {
 // TODO (MEDIUM) unify this code with get_tau_nso_clause and get_tau_nso_literals
 template<typename ...BAs>
 void get_leaves(const tau<BAs...>& n, tau_parser::nonterminal branch,
-	tau_parser::nonterminal skip, std::vector<tau<BAs...>>& leaves)
+	std::vector<tau<BAs...>>& leaves)
 {
 	auto add_leave = [&branch, &leaves](const auto& n) {
 		if (is_non_terminal(branch, n)) return true;
@@ -563,31 +563,31 @@ void get_leaves(const tau<BAs...>& n, tau_parser::nonterminal branch,
 
 template<typename ...BAs>
 std::vector<tau<BAs...>> get_leaves(const tau<BAs...>& n,
-	tau_parser::nonterminal branch, tau_parser::nonterminal skip)
+	tau_parser::nonterminal branch)
 {
 	std::vector<tau<BAs...>> leaves;
-	get_leaves(n, branch, skip, leaves);
+	get_leaves(n, branch, leaves);
 	return leaves;
 }
 
 template<typename ...BAs>
 std::vector<tau<BAs...>> get_dnf_wff_clauses(const tau<BAs...>& n) {
-	return get_leaves(n, tau_parser::wff_or, tau_parser::wff);
+	return get_leaves(n, tau_parser::wff_or);
 }
 
 template<typename ...BAs>
 std::vector<tau<BAs...>> get_dnf_bf_clauses(const tau<BAs...>& n) {
-	return get_leaves(n, tau_parser::bf_or, tau_parser::bf);
+	return get_leaves(n, tau_parser::bf_or);
 }
 
 template<typename ...BAs>
 std::vector<tau<BAs...>> get_cnf_wff_clauses(const tau<BAs...>& n) {
-	return get_leaves(n, tau_parser::wff_and, tau_parser::wff);
+	return get_leaves(n, tau_parser::wff_and);
 }
 
 template<typename ...BAs>
 std::vector<tau<BAs...>> get_cnf_bf_clauses(const tau<BAs...>& n) {
-	return get_leaves(n, tau_parser::bf_and, tau_parser::bf);
+	return get_leaves(n, tau_parser::bf_and);
 }
 
 // A formula has a temporal variable if either it contains an io_var with a variable or capture

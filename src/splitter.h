@@ -118,7 +118,7 @@ tau<BAs...> good_splitter_using_function(const tau<BAs...>& f, splitter_type st,
 	} while (++i < m.size());
 
 	// Find possible coefficient in each disjunct of f
-	std::vector<tau<BAs...> > clauses = get_leaves(f, tau_parser::bf_or, tau_parser::bf);
+	std::vector<tau<BAs...> > clauses = get_leaves(f, tau_parser::bf_or);
 	// In case f is just a single clause
 	if (clauses.empty()) clauses.push_back(f);
 	for (const auto &clause: clauses) {
@@ -156,7 +156,7 @@ tau<BAs...> good_reverse_splitter_using_function(const tau<BAs...> &f, splitter_
 	} while (++i < m.size());
 
 	// Try to split coefficient in each conjunct of f
-	std::vector<tau<BAs...> > clauses = get_leaves(f_cnf, tau_parser::bf_and, tau_parser::bf);
+	std::vector<tau<BAs...> > clauses = get_leaves(f_cnf, tau_parser::bf_and);
 	for (const auto &clause: clauses) {
 		auto coeff = find_top(clause, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
 		if (!coeff) continue;
