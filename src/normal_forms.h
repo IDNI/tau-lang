@@ -2069,114 +2069,74 @@ tau<BAs...> push_negation_one_in(const tau<BAs...>& fm, bool is_wff = true) {
 // Can be used for Tau formula and Boolean function
 template<typename... BAs>
 tau<BAs...> push_negation_in(const tau<BAs...>& fm, bool is_wff) {
-#ifdef TAU_CACHE
-	static std::map<tau<BAs...>, tau<BAs...>> cache;
-	if (auto it = cache.find(fm); it != cache.end())
-		return it->second;
-#endif
-	auto new_fm = push_negation_one_in(fm, is_wff);
-	std::vector<tau<BAs...>> new_c;
-	for (const auto& c : new_fm->child) {
-		new_c.emplace_back(push_negation_in(c, is_wff));
-	}
-#ifdef TAU_CACHE
-	auto res = make_node(new_fm->value, new_c);
-	cache.emplace(res, res);
-	return cache.emplace(fm, res).first->second;
-#endif
-	return make_node(new_fm->value, new_c);
+	auto pn = [&is_wff](const auto& n) {
+		return push_negation_one_in(n, is_wff);
+	};
+	return rewriter::pre_order(fm).apply(pn);
 }
 
 // Conversion to dnf while applying reductions during the process
 template<typename... BAs>
 tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
-#ifdef TAU_CACHE
-	static std::map<tau<BAs...>, tau<BAs...>> cache;
-	if (auto it = cache.find(fm); it != cache.end())
-		return it->second;
-#endif
 	using p = tau_parser;
-	auto new_fm = push_negation_one_in(fm, is_wff);
-
-	if (is_wff && is_non_terminal(p::wff, new_fm)) {
-		if (is_child_non_terminal(p::wff_and, new_fm)) {
-			auto conj = conjunct_dnfs_to_dnf(
-				to_dnf2(trim(new_fm)->child[0], is_wff),
-				to_dnf2(trim(new_fm)->child[1], is_wff));
-			// Perform simplification
-			if (conj != new_fm)
-				new_fm = conj | wff_reduce_dnf<BAs...>();
-		} else if (is_child_non_terminal(p::wff_or, new_fm)) {
-			new_fm = build_wff_or(
-				to_dnf2(trim(new_fm)->child[0], is_wff),
-				to_dnf2(trim(new_fm)->child[1], is_wff));
+	auto layer_to_dnf = [&is_wff](const auto& n) {
+		if (is_wff && is_non_terminal(p::wff, n)) {
+			if (is_child_non_terminal(p::wff_and, n)) {
+				auto conj = conjunct_dnfs_to_dnf(
+					trim(n)->child[0],
+					trim(n)->child[1]);
+				// Perform simplification
+				if (conj != n)
+					return conj | wff_reduce_dnf<BAs...>();
+				else return n;
+			}
+		} else if (!is_wff && is_non_terminal(p::bf, n)) {
+			if (is_child_non_terminal(p::bf_and, n)) {
+				auto conj = conjunct_dnfs_to_dnf(
+					trim(n)->child[0],
+					trim(n)->child[1]);
+				// Perform simplification
+				if (conj != n)
+					return reduce2(conj, p::bf);
+				else return n;
+			}
 		}
-	} else if (!is_wff && is_non_terminal(p::bf, new_fm)) {
-		if (is_child_non_terminal(p::bf_and, new_fm)) {
-			auto conj = conjunct_dnfs_to_dnf(
-				to_dnf2(trim(new_fm)->child[0], is_wff),
-				to_dnf2(trim(new_fm)->child[1], is_wff));
-			// Perform simplification
-			if (conj != new_fm)
-                		new_fm = reduce2(conj, p::bf);
-		} else if (is_child_non_terminal(p::bf_or, new_fm)) {
-			new_fm = build_bf_or(
-				to_dnf2(trim(new_fm)->child[0], is_wff),
-				to_dnf2(trim(new_fm)->child[1], is_wff));
-		}
-	}
-	assert(fm != nullptr);
-#ifdef TAU_CACHE
-	cache.emplace(new_fm, new_fm);
-	return cache.emplace(fm, new_fm).first->second;
-#endif
-	return new_fm;
+		return n;
+	};
+	auto nnf_fm = push_negation_in(fm, is_wff);
+	return post_order(nnf_fm).apply(layer_to_dnf);
 }
 
 // Conversion to cnf while applying reductions during the process
 template<typename... BAs>
 tau<BAs...> to_cnf2(const tau<BAs...>& fm, bool is_wff) {
-#ifdef TAU_CACHE
-	static std::map<tau<BAs...>, tau<BAs...>> cache;
-	if (auto it = cache.find(fm); it != cache.end())
-		return it->second;
-#endif
 	using p = tau_parser;
-	auto new_fm = push_negation_one_in(fm, is_wff);
-
-	if (is_wff && is_non_terminal(p::wff, new_fm)) {
-		if (is_child_non_terminal(p::wff_or, new_fm)) {
-			auto dis = disjunct_cnfs_to_cnf(
-				to_cnf2(trim(new_fm)->child[0], is_wff),
-				to_cnf2(trim(new_fm)->child[1], is_wff));
-			// Perform simplification
-			if (dis != new_fm)
-				new_fm = dis | wff_reduce_cnf<BAs...>();
-		} else if (is_child_non_terminal(p::wff_and, new_fm)) {
-			new_fm = build_wff_and(
-				to_cnf2(trim(new_fm)->child[0], is_wff),
-				to_cnf2(trim(new_fm)->child[1], is_wff));
+	auto layer_to_cnf = [&is_wff](const auto& n) {
+		if (is_wff && is_non_terminal(p::wff, n)) {
+			if (is_child_non_terminal(p::wff_or, n)) {
+				auto dis = disjunct_cnfs_to_cnf(
+					trim(n)->child[0],
+					trim(n)->child[1]);
+				// Perform simplification
+				if (dis != n)
+					return dis | wff_reduce_cnf<BAs...>();
+				else return n;
+			}
+		} else if (!is_wff){
+			if (is_child_non_terminal(p::bf_or, n)) {
+				auto dis = disjunct_cnfs_to_cnf(
+					trim(n)->child[0],
+					trim(n)->child[1]);
+				// Perform simplification
+				if (dis != n)
+					return reduce2(dis, p::bf, true);
+				else return n;
+			}
 		}
-	} else if (!is_wff){
-		if (is_child_non_terminal(p::bf_or, new_fm)) {
-			auto dis = disjunct_cnfs_to_cnf(
-				to_cnf2(trim(new_fm)->child[0], is_wff),
-				to_cnf2(trim(new_fm)->child[1], is_wff));
-			// Perform simplification
-			if (dis != new_fm)
-                new_fm = reduce2(dis, p::bf, true);
-		} else if (is_child_non_terminal(p::bf_and, new_fm)) {
-			new_fm = build_bf_and(
-				to_cnf2(trim(new_fm)->child[0], is_wff),
-				to_cnf2(trim(new_fm)->child[1], is_wff));
-		}
-	}
-	assert(fm != nullptr);
-#ifdef TAU_CACHE
-	cache.emplace(new_fm, new_fm);
-	return cache.emplace(fm, new_fm).first->second;
-#endif
-	return new_fm;
+		return n;
+	};
+	auto nnf_fm = push_negation_in(fm, is_wff);
+	return post_order(nnf_fm).apply(layer_to_cnf);
 }
 
 // Assumes that fm is a single DNF always clause
