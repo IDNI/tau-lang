@@ -265,7 +265,7 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 #endif
 		return r;
 	};
-	return pre_order(fm).apply_until_change(norm_ba);
+	return pre_order(fm).template apply_until_change<1>(norm_ba);
 }
 
 
@@ -1157,6 +1157,7 @@ tau<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_
                             : ( wff ? build_wff_or(reduced_fm, var_path) : build_bf_or(reduced_fm, var_path));
 	}
 	assert(reduced_fm != nullptr);
+	//TODO: avoid pattern matcher
 	return reduced_fm | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>);
 }
 
@@ -1185,6 +1186,7 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_
 	assert(is_non_terminal(type, fm));
 	// Pull negation out of equality
 	bool wff = type == tau_parser::wff;
+	//TODO: avoid patternmatcher
 	auto new_fm = wff ? fm | repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>) : fm;
 	if (wff) {
 		// Make equalities canonical
@@ -1494,6 +1496,7 @@ tau<BAs...> apply_eqs_across_clauses (const tau<BAs...>& fm) {
 template<typename... BAs>
 std::vector<tau<BAs...>> push_eq_and_get_vars (tau<BAs...>& fm) {
  // First push in equalities all the way (bf != 0 is converted to !(bf = 0))
+	//TODO: avoid pattern matcher
 	fm = fm | repeat_all<step<BAs...>, BAs...>(
 		unsqueeze_wff<BAs...> | to_mnf_wff<BAs...>);
 	// Find atomic formulas
@@ -1507,6 +1510,7 @@ std::vector<std::vector<int_t>> wff_to_bdd (const tau<BAs...>& fm, auto& vars = 
 	// Find atomic formulas
 	auto pushed_in_fm = fm;
 	if (vars.empty()) vars = push_eq_and_get_vars(pushed_in_fm);
+	//TODO: Avoid pattern matcher
 	else pushed_in_fm = fm | repeat_all<step<BAs...>, BAs...>(
 		 	unsqueeze_wff<BAs...> | to_mnf_wff<BAs...>);
 	std::vector<int_t> i (vars.size());
@@ -1537,6 +1541,7 @@ template<typename... BAs>
 std::vector<std::vector<std::vector<tau<BAs...>>>> get_cnf_inequality_lits(
 	const tau<BAs...>& fm)
 {
+	// TODO: avoid pattern matcher
 	auto neq_pushed_in = fm | repeat_all<step<BAs...>, BAs...>(
 		 	unsqueeze_wff_neg<BAs...>);
 	if (neq_pushed_in == _T<BAs...>) return {};
@@ -1668,6 +1673,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 		// std::cout << "neq_cnf: " << neq_cnf << "\n";
 		neq_cnf = reduce2(neq_cnf, tau_parser::wff, true, true, false);
 		// std::cout << "neq_cnf after reduce: " << neq_cnf << "\n";
+		//TODO: avoid pattern matcher
 		neq_cnf = neq_cnf | repeat_all<step<BAs...>, BAs...>(
 				 squeeze_wff_neg<BAs...> | to_mnf_wff<BAs...>);
 		// cout << "neq_cnf simplified: " << neq_cnf << "\n";
@@ -1761,6 +1767,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 			neqs = to_cnf2(neqs, true);
 			neqs = reduce2(neqs, tau_parser::wff, true);
 			// push != out
+			//TODO: avoid pattern matcher
 			neqs = neqs | repeat_all<step<BAs...>, BAs...>(
 			squeeze_wff_neg<BAs...>);
 		}
@@ -1813,6 +1820,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 			build_wff_and(rest, build_wff_and<BAs...>(neq_clauses)));
 	}
 	assert(result != nullptr);
+	//TODO: avoid pattern matcher
 	result = result | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>);
 	BOOST_LOG_TRIVIAL(debug) << "(I) End group_paths_and_simplify";
 	return make_pair(result, is_simp);
@@ -1827,10 +1835,12 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 
 	auto squeezed_fm = (to_cnf ? push_negation_in(build_wff_neg(fm)) : fm);
 	// Squeeze all equalities and inequalities
+	//TODO: avoid pattern matcher
 	squeezed_fm = squeezed_fm | repeat_all<step<BAs...>, BAs...>(squeeze_wff<BAs...>);
 	squeezed_fm = reduce_terms(to_dnf2(squeezed_fm));
 	// std::cout << squeezed_fm << "\n";
 	// We work with unsqueezed equality
+	//TODO: avoid pattern matcher
 	squeezed_fm  = squeezed_fm | repeat_all<step<BAs...>, BAs...>(unsqueeze_wff_pos<BAs...>);
     // std::cout << squeezed_fm << "\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Formula in DNF: " << squeezed_fm;
