@@ -2650,6 +2650,44 @@ tau<BAs...> operator|(const tau<BAs...>& fm, const sometimes_always_normalizatio
 	return r(fm);
 }
 
+template <typename... BAs>
+tau<BAs...> push_existential_quantifier_one (const tau<BAs...>& fm) {
+	using p = tau_parser;
+	assert(is_child_non_terminal(p::wff_ex, fm));
+	const tau<BAs...> scoped_fm = trim(fm)->child[1];
+	const tau<BAs...> quant_var = trim2(fm);
+	const auto has_var = [&quant_var](const auto& el){return el == quant_var;};
+
+	if (is_child_non_terminal(p::wff_or, scoped_fm)) {
+		// Push quantifier in
+		const auto c0 = build_wff_ex(quant_var, trim2(scoped_fm));
+		const auto c1 = build_wff_ex(quant_var, trim(scoped_fm)->child[1]);
+		return build_wff_or(c0, c1);
+	}
+	else if (is_child_non_terminal(p::wff_and, scoped_fm)) {
+		// Remove existential, if quant_var does not appear in clause
+		auto clauses = get_cnf_wff_clauses(scoped_fm);
+		tau<BAs...> no_q_fm = _T<BAs...>;
+		for (tau<BAs...>& clause : clauses) {
+			if (!find_top(clause, has_var)) {
+				no_q_fm = build_wff_and(no_q_fm, clause);
+				clause = _T<BAs...>;
+			}
+		}
+		return build_wff_and(
+			build_wff_ex(quant_var, build_wff_and<BAs...>(clauses)),
+			no_q_fm);
+	}
+	else if (is_child_non_terminal(p::wff_ex, scoped_fm)) {
+		//other ex quant, hence can switch them
+		const auto& c = build_wff_ex(quant_var, trim(scoped_fm)->child[1]);
+		return build_wff_ex(trim2(scoped_fm), c);
+	}
+	// Else check if quant_var is contained in subtree
+	if (find_top(scoped_fm, has_var)) return fm;
+	else return scoped_fm;
+}
+
 // Squeeze all equalities found in n
 //TODO: make it type depended
 template <typename... BAs>
