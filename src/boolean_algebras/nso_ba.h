@@ -86,6 +86,35 @@ template <typename... BAs>
 bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r);
 
 /**
+ * @brief Structural equality for tau nodes
+ * @param l Left-hand side of comparison.
+ * @param r Right-hand side of comparison.
+ * @return True, if the tree structure for l and r is the same, else false.
+ */
+template <typename... BAs>
+struct struc_equal {
+	bool operator() (const tau<BAs...>& l, const tau<BAs...>& r) {
+		if (r == nullptr && l == nullptr) return true;
+		if (r == nullptr || l == nullptr) return false;
+
+		if (std::addressof(*l) == std::addressof(*r)) return true;
+		if (l->hash != r->hash) return false;
+
+		if (l->value != r->value) return false;
+		if (l->child.size() != r->child.size()) return false;
+
+		//compare children
+		for (size_t i = 0; i < l->child.size(); ++i)
+			if (!(l->child[i] == r->child[i])) return false;
+		return true;
+	}
+};
+
+template <typename... BAs>
+using urd_tau_map = std::unordered_map<tau<BAs...>, tau<BAs...>,
+			std::hash<tau<BAs...>>, struc_equal<BAs...>>;
+
+/**
  * @brief Three-way comparison operator for tau.
  * @param l Left-hand side operand.
  * @param r Right-hand side operand.
