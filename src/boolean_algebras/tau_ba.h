@@ -8,6 +8,12 @@
 #include "satisfiability.h"
 #include "splitter.h"
 
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+
+
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
@@ -23,70 +29,68 @@ namespace idni::tau_lang {
 
 template <typename...BAs>
 struct tau_ba {
-	using tau_ba_t = tau_ba<BAs...>;
-	using tau_nso_t = tau<tau_ba_t, BAs...>;
 
 	/**
-	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.
+	 * @brief Constructor initializing tau_ba with recursive relations and main tau<tau_ba<BAs...>, BAs...>.
 	 *
-	 * @param rec_relations Reference to rules of tau_nso_t.
-	 * @param main Reference to main tau_nso_t.
+	 * @param rec_relations Reference to rules of tau<tau_ba<BAs...>, BAs...>.
+	 * @param main Reference to main tau<tau_ba<BAs...>, BAs...>.
 	 */
-	tau_ba(rules<tau_nso_t>& rec_relations, tau_nso_t& main);
+	tau_ba(rules<tau<tau_ba<BAs...>, BAs...>>& rec_relations, tau<tau_ba<BAs...>, BAs...>& main);
 
 	/**
-	 * @brief Constructor initializing tau_ba with main tau_nso_t.
+	 * @brief Constructor initializing tau_ba with main tau<tau_ba<BAs...>, BAs...>.
 	 *
-	 * @param main Reference to main tau_nso_t.
+	 * @param main Reference to main tau<tau_ba<BAs...>, BAs...>.
 	 */
-	tau_ba(tau_nso_t& main);
+	tau_ba(tau<tau_ba<BAs...>, BAs...>& main);
 
 	/**
 	 * @brief Three-way comparison operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the comparison.
 	 */
-	auto operator<=>(const tau_ba_t&) const;
+	auto operator<=>(const tau_ba<BAs...>&) const = default;
 
 	/**
 	 * @brief Bitwise NOT operator.
 	 *
 	 * @return Result of the bitwise NOT operation.
 	 */
-	tau_ba_t operator~() const;
+	tau_ba<BAs...> operator~() const;
 
 	/**
 	 * @brief Bitwise AND operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the bitwise AND operation.
 	 */
-	tau_ba_t operator&(const tau_ba_t& other) const;
+	tau_ba<BAs...> operator&(const tau_ba<BAs...>& other) const;
 
 	/**
 	 * @brief Bitwise OR operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the bitwise OR operation.
 	 */
-	tau_ba_t operator|(const tau_ba_t& other) const;
+	tau_ba<BAs...> operator|(const tau_ba<BAs...>& other) const;
 
 	/**
 	 * @brief Addition operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the addition operation.
 	 */
-	tau_ba_t operator+(const tau_ba_t& other) const;
+	tau_ba<BAs...> operator+(const tau_ba<BAs...>& other) const;
 
 	/**
 	 * @brief Bitwise XOR operator.
 	 *
-	 * @param other Reference to another tau_ba_t.
+	 * @param other Reference to another tau_ba<BAs...>.
 	 * @return Result of the bitwise XOR operation.
 	 */
-	tau_ba_t operator^(const tau_ba_t& other) const;
+	tau_ba<BAs...> operator^(const tau_ba<BAs...>& other) const;
 
 	/**
 	 * @brief Checks if the tau_ba is zero.
@@ -105,24 +109,24 @@ struct tau_ba {
 	/**
 	 * @brief Type equivalent to tau_spec<BAs...>.
 	 */
-	const rr<tau_nso_t> nso_rr;
+	const rr<tau<tau_ba<BAs...>, BAs...>> nso_rr;
 
 private:
 	/**
-	 * @brief Renames the given tau_nso_t form.
+	 * @brief Renames the given tau<tau_ba<BAs...>, BAs...> form.
 	 *
-	 * @param form Reference to the tau_nso_t form.
-	 * @return Renamed tau_nso_t.
+	 * @param form Reference to the tau<tau_ba<BAs...>, BAs...> form.
+	 * @return Renamed tau<tau_ba<BAs...>, BAs...>.
 	 */
-	tau_nso_t rename(const tau_nso_t& form) const;
+	tau<tau_ba<BAs...>, BAs...> rename(const tau<tau_ba<BAs...>, BAs...>& form) const;
 
 	/**
 	 * @brief Renames the given rewriter rule.
 	 *
-	 * @param rule Reference to the rewriter rule of tau_nso_t.
+	 * @param rule Reference to the rewriter rule of tau<tau_ba<BAs...>, BAs...>.
 	 * @return Renamed rewriter rule.
 	 */
-	rewriter::rule<rr<tau_nso_t>> rename(const rewriter::rule<tau_nso_t>& rule) const;
+	rewriter::rule<rr<tau<tau_ba<BAs...>, BAs...>>> rename(const rewriter::rule<tau<tau_ba<BAs...>, BAs...>>& rule) const;
 
 	/**
 	 * @brief Merges two sets of rules.
@@ -131,7 +135,7 @@ private:
 	 * @param rs2 Reference to the second set of rules.
 	 * @return Merged set of rules.
 	 */
-	rules<tau_nso_t> merge(const rules<tau_nso_t>& rs1, const rules<tau_nso_t>& rs2) const;
+	rules<tau<tau_ba<BAs...>, BAs...>> merge(const rules<tau<tau_ba<BAs...>, BAs...>>& rs1, const rules<tau<tau_ba<BAs...>, BAs...>>& rs2) const;
 };
 
 /**
@@ -223,8 +227,8 @@ bool is_closed(const tau_ba<BAs...>& fm);
  *
  * @tparam BAs Variadic template parameters.
  */
-template <typename... BAs>
-using tau_nso = tau<tau_ba<BAs...>, BAs...>;
+//template <typename... BAs>
+//using tau_nso = tau<tau_ba<BAs...>, BAs...>;
 
 /**
  * @brief Alias for tau_spec.
@@ -232,7 +236,7 @@ using tau_nso = tau<tau_ba<BAs...>, BAs...>;
  * @tparam BAs Variadic template parameters.
  */
 template <typename... BAs>
-using tau_spec = rr<tau_nso<BAs...>>;
+using tau_spec = rr<tau<tau_ba<BAs...>, BAs...>>;
 
 /**
  * @brief Template struct representing a tau_ba_factory.
@@ -241,31 +245,29 @@ using tau_spec = rr<tau_nso<BAs...>>;
  */
 template <typename...BAs>
 struct tau_ba_factory {
-	using tau_ba_t = tau_ba<BAs...>;
-	using tau_nso_t = tau_nso<BAs...>;
 
 	/**
-	 * @brief Parses the given source string into tau_nso_t.
+	 * @brief Parses the given source string into tau<tau_ba<BAs...>, BAs...>.
 	 *
 	 * @param src Reference to the source string.
-	 * @return Parsed tau_nso_t or std::nullopt if parsing fails.
+	 * @return Parsed tau<tau_ba<BAs...>, BAs...> or std::nullopt if parsing fails.
 	 */
-	std::optional<tau_nso_t> parse(const std::string& src);
+	std::optional<tau<tau_ba<BAs...>, BAs...>> parse(const std::string& src);
 
 	/**
-	 * @brief Binds the given tau_nso_t.
+	 * @brief Binds the given tau<tau_ba<BAs...>, BAs...>.
 	 *
-	 * @param n Reference to tau_nso_t.
-	 * @return Bound tau_nso_t.
+	 * @param n Reference to tau<tau_ba<BAs...>, BAs...>.
+	 * @return Bound tau<tau_ba<BAs...>, BAs...>.
 	 */
-	tau_nso_t binding(const tau_nso_t& n);
+	tau<tau_ba<BAs...>, BAs...> binding(const tau<tau_ba<BAs...>, BAs...>& n);
 
 	/**
 	 * @brief Splits one.
 	 *
 	 * @return Variant containing the splitter of one in the given BA.
 	 */
-	std::variant<tau_ba_t, BAs...> splitter_one() const;
+	std::variant<tau_ba<BAs...>, BAs...> splitter_one() const;
 
 	/**
 	 * @brief Converts one to string.

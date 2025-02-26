@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
-#ifndef __INIT_LOG_H__
-#define __INIT_LOG_H__
+#ifndef __LOGGING_H__
+#define __LOGGING_H__
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
@@ -19,4 +19,4 @@ struct logging_initializer {
 };
 inline static logging_initializer initialize_logging;
 
-#endif //__INIT_LOG_H__
+#endif //__LOGGING_H__

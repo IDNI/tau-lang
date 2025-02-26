@@ -5,6 +5,11 @@
 
 #include "nso_rr.h"
 
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+
 namespace idni::tau_lang {
 
 template <typename... BAs>
@@ -628,7 +633,7 @@ struct node<idni::tau_lang::tau_sym<BAs...>> {
 	node (const idni::tau_lang::tau_sym<BAs...> v, const child_type& c) :
 		value(v), child(c), hash(calc_hash(v, c)) {}
 
-	// This is not default because the hash value is not considered
+/*	// This is not default because the hash value is not considered
 	auto operator<=>(const node& that) const {
 		if (value != that.value) return value <=> that.value;
 		return child <=> that.child;
@@ -651,7 +656,7 @@ struct node<idni::tau_lang::tau_sym<BAs...>> {
 	}
 	auto operator!=(const node& that) const {
 		return !(*this == that);
-	}
+	}*/
 
 	// the value of the node and pointers to the children, we follow the same
 	// notation as in forest<...>::tree to be able to reuse the code with
@@ -676,7 +681,16 @@ private:
 		return seed;
 	}
 };
+
+template <typename... BAs>
+std::strong_ordering operator<=>(const node<idni::tau_lang::tau_sym<BAs...>>& x,
+	const node<idni::tau_lang::tau_sym<BAs...>>& y) {
+		if (x.value != y.value) return x.value <=> y.value;
+		return x.child <=> y.child;
 }
+
+} // namespace idni::rewriter
+
 
 // The hash function for tau as specialisation of std::hash
 template<typename... BAs>

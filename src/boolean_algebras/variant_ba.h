@@ -9,6 +9,11 @@
 #include "utils.h"
 #include "splitter_types.h"
 
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+
 namespace idni::tau_lang {
 
 template<typename...BAs>

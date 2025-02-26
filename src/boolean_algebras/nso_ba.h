@@ -3,7 +3,14 @@
 #ifndef __NSO_BA_H__
 #define __NSO_BA_H__
 
-#include "hooks.h"
+#include "nso_rr.h"
+#include "splitter_types.h"
+
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+
 
 namespace idni::tau_lang {
 
@@ -92,7 +99,7 @@ bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r);
  * @return Result of the three-way comparison.
  */
 template <typename... BAs>
-std::weak_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r);
+std::strong_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r);
 
 /**
  * @brief Less-than operator for tau.

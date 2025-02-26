@@ -1,6 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "repl_evaluator.h"
+#include "tau_parser.generated.h"
+#include "bitvector_parser.generated.h"
+#include "sbf_parser.generated.h"
+#include "interpreter.h"
+
+using namespace std;
 
 namespace idni::tau_lang {
 
@@ -16,7 +21,7 @@ void repl_evaluator<BAs...>::not_implemented_yet() {
 }
 
 template<typename... BAs>
-size_t digits(const tau_nso<BAs...>& n) {
+size_t digits(const tau<tau_ba<BAs...>, BAs...>& n) {
 	return process_digits(n)
 		| only_child_extractor<tau_ba<BAs...>, BAs...>
 		| size_t_extractor<tau_ba<BAs...>, BAs...>
@@ -24,7 +29,7 @@ size_t digits(const tau_nso<BAs...>& n) {
 }
 
 template<typename... BAs>
-std::optional<size_t> get_memory_index(const tau_nso<BAs...>& n,
+std::optional<size_t> get_memory_index(const tau<tau_ba<BAs...>, BAs...>& n,
 	const size_t size, bool silent = false)
 {
 	if (size == 0) {
@@ -55,7 +60,7 @@ std::optional<size_t> get_memory_index(const tau_nso<BAs...>& n,
 
 template <typename... BAs>
 repl_evaluator<BAs...>::memory_ref repl_evaluator<BAs...>::memory_retrieve(
-	const tau_nso_t& n, bool silent)
+	const tau<tau_ba<BAs...>, BAs...>& n, bool silent)
 {
 	if (auto pos = get_memory_index(n, m.size(), silent); pos.has_value())
 		return { { m[pos.value()], pos.value() } };
@@ -64,7 +69,7 @@ repl_evaluator<BAs...>::memory_ref repl_evaluator<BAs...>::memory_retrieve(
 }
 
 template<typename... BAs>
-void print_memory(const tau_nso<BAs...> mem, const size_t id,
+void print_memory(const tau<tau_ba<BAs...>, BAs...> mem, const size_t id,
 	const size_t size, bool print_relative_index = true)
 {
 	std::cout << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();
@@ -78,20 +83,20 @@ void print_memory(const tau_nso<BAs...> mem, const size_t id,
 }
 
 template<typename... BAs>
-tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
-	const size_t type, const tau_nso_t& program)
+tau<tau_ba<BAs...>, BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
+	const size_t type, const tau<tau_ba<BAs...>, BAs...>& program)
 {
 	bool contains_ref = contains(program, tau_parser::ref);
-	rr<tau_nso_t> rr_{ nullptr };
+	rr<tau<tau_ba<BAs...>, BAs...>> rr_{ nullptr };
 	if (contains_ref && type == tau_parser::rr) {
-		if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
+		if (auto x = make_nso_rr_from_binded_code<tau_ba<BAs...>, BAs...>(
 				program); x) rr_ = x.value();
 		else return {};
-	} else rr_ = rr<tau_nso_t>(program);
+	} else rr_ = rr<tau<tau_ba<BAs...>, BAs...>>(program);
 	if (contains_ref) {
 		rr_.rec_relations.insert(rr_.rec_relations.end(),
 			definitions.begin(), definitions.end());
-		if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_); infr)
+		if (auto infr = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_); infr)
 			rr_ = infr.value();
 		else return nullptr;
 	}
@@ -101,7 +106,7 @@ tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::history_print_cmd(const tau_nso_t& command) {
+void repl_evaluator<BAs...>::history_print_cmd(const tau<tau_ba<BAs...>, BAs...>& command) {
 	auto n = command | tau_parser::memory;
 	if (!n) return;
 	auto idx = get_memory_index(n.value(), m.size());
@@ -125,13 +130,13 @@ void repl_evaluator<BAs...>::memory_store(memory o) {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::history_store_cmd(const tau_nso_t& command) {
+void repl_evaluator<BAs...>::history_store_cmd(const tau<tau_ba<BAs...>, BAs...>& command) {
 	memory_store(command->child[0]);
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::get_bf(const tau_nso_t& n, bool suppress_error)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::get_bf(const tau<tau_ba<BAs...>, BAs...>& n, bool suppress_error)
 {
 	if (is_non_terminal(tau_parser::bf, n))
 		return std::optional(n);
@@ -153,8 +158,8 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::get_wff(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::get_wff(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	if (is_non_terminal(tau_parser::wff, n)) return std::optional(n);
 	else if (is_non_terminal(tau_parser::memory, n)) {
@@ -174,32 +179,32 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-bool repl_evaluator<BAs...>::contains(const tau_nso_t& n,
+bool repl_evaluator<BAs...>::contains(const tau<tau_ba<BAs...>, BAs...>& n,
 	tau_parser::nonterminal nt)
 {
 	auto pred = [nt](const auto& n) {
-		return is_non_terminal<tau_ba_t, BAs...>(nt, n); };
-	return find_top<decltype(pred), tau_nso<BAs...>>(n, pred).has_value();
+		return is_non_terminal<tau_ba<BAs...>, BAs...>(nt, n); };
+	return find_top<decltype(pred), tau<tau_ba<BAs...>, BAs...>>(n, pred).has_value();
 }
 
 template <typename... BAs>
-std::optional<size_t> repl_evaluator<BAs...>::get_type(const tau_nso_t& n) {
-	return n | non_terminal_extractor<tau_ba_t, BAs...>;
+std::optional<size_t> repl_evaluator<BAs...>::get_type(const tau<tau_ba<BAs...>, BAs...>& n) {
+	return n | non_terminal_extractor<tau_ba<BAs...>, BAs...>;
 }
 
 template <typename... BAs>
-std::optional<std::pair<size_t, tau_nso<BAs...>>>
-	repl_evaluator<BAs...>::get_type_and_arg(const tau_nso_t& n)
+std::optional<std::pair<size_t, tau<tau_ba<BAs...>, BAs...>>>
+	repl_evaluator<BAs...>::get_type_and_arg(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto type = n
-		| non_terminal_extractor<tau_ba_t, BAs...>
+		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 	switch (type) {
 	case tau_parser::memory:
 		if (auto check = memory_retrieve(n); check) {
 			auto [value, _] = check.value();
 			auto mem_type = value
-				| non_terminal_extractor<tau_ba_t, BAs...>
+				| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 				| optional_value_extractor<size_t>;
 			return {{mem_type, value}};
 		} else return {};
@@ -208,22 +213,22 @@ std::optional<std::pair<size_t, tau_nso<BAs...>>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::onf_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::onf_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	auto var = n->child[2];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
-		return onf<tau_ba_t, BAs...>(var, applied);
+		return onf<tau_ba<BAs...>, BAs...>(var, applied);
 	}
 	return {};
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::dnf_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::dnf_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
@@ -239,8 +244,8 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::cnf_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::cnf_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
@@ -259,16 +264,16 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::nnf_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::nnf_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
-		case tau_parser::wff: return nnf_wff<tau_ba_t, BAs...>(applied);
-		case tau_parser::bf:  return nnf_bf<tau_ba_t, BAs...>(applied);
+		case tau_parser::wff: return nnf_wff<tau_ba<BAs...>, BAs...>(applied);
+		case tau_parser::bf:  return nnf_bf<tau_ba<BAs...>, BAs...>(applied);
 		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
@@ -276,16 +281,16 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::mnf_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::mnf_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
-		case tau_parser::wff: return mnf_wff<tau_ba_t, BAs...>(applied);
-		case tau_parser::bf:  return mnf_bf<tau_ba_t, BAs...>(applied);
+		case tau_parser::wff: return mnf_wff<tau_ba<BAs...>, BAs...>(applied);
+		case tau_parser::bf:  return mnf_bf<tau_ba<BAs...>, BAs...>(applied);
 		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
@@ -293,16 +298,16 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::snf_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::snf_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
-		case tau_parser::wff: return snf_wff<tau_ba_t, BAs...>(applied);
-		case tau_parser::bf:  return snf_bf<tau_ba_t, BAs...>(applied);
+		case tau_parser::wff: return snf_wff<tau_ba<BAs...>, BAs...>(applied);
+		case tau_parser::bf:  return snf_bf<tau_ba<BAs...>, BAs...>(applied);
 		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
@@ -310,8 +315,8 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::bf_substitute_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::bf_substitute_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto in = get_bf(n->child[1]);
 	auto thiz = get_bf(n->child[2]);
@@ -321,14 +326,14 @@ std::optional<tau_nso<BAs...>>
 		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		return {};
 	}
-	std::map<tau_nso_t, tau_nso_t> changes = {{thiz.value(), with.value()}};
+	std::map<tau<tau_ba<BAs...>, BAs...>, tau<tau_ba<BAs...>, BAs...>> changes = {{thiz.value(), with.value()}};
 
 	return replace(in.value(), changes);
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::substitute_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::substitute_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	// Since the memory command cannot be type-checked we do it here
 	// First try to get bf
@@ -338,7 +343,7 @@ std::optional<tau_nso<BAs...>>
 	in = get_wff(n->child[1]);
 	// Now sort out the remaining argument types
 	auto thiz = get_bf(n->child[2], true);
-	std::optional<tau_nso_t> with;
+	std::optional<tau<tau_ba<BAs...>, BAs...>> with;
 	if (thiz) with = get_bf(n->child[3]);
 	else {
 		thiz = get_wff(n->child[2]);
@@ -349,20 +354,20 @@ std::optional<tau_nso<BAs...>>
 		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		return {};
 	}
-	std::map<tau_nso_t, tau_nso_t>
+	std::map<tau<tau_ba<BAs...>, BAs...>, tau<tau_ba<BAs...>, BAs...>>
 		changes = {{thiz.value(), with.value()}};
 
 	std::set free_vars_thiz = get_free_vars_from_nso(thiz.value());
 	std::set free_vars_with = get_free_vars_from_nso(with.value());
-	std::vector<tau_nso_t> var_stack = {};
+	std::vector<tau<tau_ba<BAs...>, BAs...>> var_stack = {};
 	auto var_id = get_new_var_id(in.value());
-	std::set<tau_nso_t> marked_quants;
+	std::set<tau<tau_ba<BAs...>, BAs...>> marked_quants;
 
 	// A variable should only be replaced if it is not quantified
 	auto quantified_vars_skipper = [&](auto x) {
-		if (is_quantifier<tau_ba_t, BAs...>(x)) {
+		if (is_quantifier<tau_ba<BAs...>, BAs...>(x)) {
 			auto var = find_top(x,
-				is_var_or_capture<tau_ba_t, BAs...>);
+				is_var_or_capture<tau_ba<BAs...>, BAs...>);
 			if (var && free_vars_thiz.contains(var.value()))
 				return false;
 		}
@@ -373,25 +378,25 @@ std::optional<tau_nso<BAs...>>
 	auto quantified_var_adder = [&](auto x) {
 		if (!quantified_vars_skipper(x))
 			return false;
-		if (is_quantifier<tau_ba_t, BAs...>(x)) {
+		if (is_quantifier<tau_ba<BAs...>, BAs...>(x)) {
 			auto var = find_top(x,
-				is_var_or_capture<tau_ba_t, BAs...>);
+				is_var_or_capture<tau_ba<BAs...>, BAs...>);
 			if (var && free_vars_with.contains(var.value())) {
 				DBG(assert(!(is_non_terminal<
-					tau_ba_t, BAs...>(
+					tau_ba<BAs...>, BAs...>(
 						tau_parser::capture,
 						var.value())));)
 				marked_quants.insert(x);
 				bool var_t = is_non_terminal<
-					tau_ba_t, BAs...>(
+					tau_ba<BAs...>, BAs...>(
 						tau_parser::variable,
 							var.value());
 				std::ostringstream ss;
 				ss << "x" << var_id; ++var_id;
 				auto unused_var = var_t
-					? build_bf_var<tau_ba_t, BAs...>(
+					? build_bf_var<tau_ba<BAs...>, BAs...>(
 								ss.str())
-					: build_wff_var<tau_ba_t, BAs...>(
+					: build_wff_var<tau_ba<BAs...>, BAs...>(
 								ss.str());
 				// Case where variable is captured by two or more quantifiers
 				if (changes.contains(var.value())) {
@@ -410,7 +415,7 @@ std::optional<tau_nso<BAs...>>
 	// After a quantifier is encountered on the way up in post_order_traverser
 	// it needs to be removed from changes
 	auto scoped_replace = [&](auto x, auto& c) {
-		tau_nso_t res;
+		tau<tau_ba<BAs...>, BAs...> res;
 		if (auto iter = changes.find(x); iter != changes.end())
 			res = iter->second;
 		else if (x->child == c) res = x;
@@ -432,16 +437,16 @@ std::optional<tau_nso<BAs...>>
 		}
 		return res;
 	};
-	return rewriter::post_order_recursive_traverser<tau_nso_t>()(
+	return rewriter::post_order_recursive_traverser<tau<tau_ba<BAs...>, BAs...>>()(
 			in.value(), quantified_var_adder, scoped_replace);
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::instantiate_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::instantiate_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto var_type = static_cast<tau_parser::nonterminal>(n->child[2]
-		| non_terminal_extractor<tau_ba_t, BAs...>
+		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>)
 			 == tau_parser::variable ? tau_parser::bf
 			 			: tau_parser::wff;
@@ -451,30 +456,30 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::normalize_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::normalize_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
-		rr<tau_nso_t> rr_{ nullptr };
+		rr<tau<tau_ba<BAs...>, BAs...>> rr_{ nullptr };
 		if (contains_ref && type == tau_parser::rr) {
-		if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
+		if (auto x = make_nso_rr_from_binded_code<tau_ba<BAs...>, BAs...>(
 				value); x) rr_ = x.value();
 		else return {};
-		} else rr_ = rr<tau_nso_t>(value);
+		} else rr_ = rr<tau<tau_ba<BAs...>, BAs...>>(value);
 		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
 				definitions.begin(), definitions.end());
-			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
+			if (auto infr = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_);
 				infr) rr_ = infr.value();
 			else return {};
 		}
 		if (!rr_.main) return {};
-		tau_nso_t ret;
+		tau<tau_ba<BAs...>, BAs...> ret;
 		if (!is_non_terminal(tau_parser::bf, rr_.main))
-			ret = normalizer<tau_ba_t, BAs...>(rr_);
+			ret = normalizer<tau_ba<BAs...>, BAs...>(rr_);
 		else if (contains_ref)
 			ret = bf_normalizer_with_rec_relation(rr_);
 		else ret = bf_normalizer_without_rec_relation(rr_.main);
@@ -486,26 +491,26 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::qelim_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::qelim_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	if (auto check = get_type_and_arg(n->child[1]); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
-		return eliminate_quantifiers<tau_ba_t, BAs...>(applied)
-			| repeat_all<step<tau_ba_t, BAs...>,
-				tau_ba_t, BAs...>(
-					to_dnf_wff<tau_ba_t, BAs...>
-					| simplify_wff<tau_ba_t, BAs...>)
-			| reduce_bf<tau_ba_t, BAs...>
-			| reduce_wff<tau_ba_t, BAs...>;
+		return eliminate_quantifiers<tau_ba<BAs...>, BAs...>(applied)
+			| repeat_all<step<tau_ba<BAs...>, BAs...>,
+				tau_ba<BAs...>, BAs...>(
+					to_dnf_wff<tau_ba<BAs...>, BAs...>
+					| simplify_wff<tau_ba<BAs...>, BAs...>)
+			| reduce_bf<tau_ba<BAs...>, BAs...>
+			| reduce_wff<tau_ba<BAs...>, BAs...>;
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 	return {};
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
+void repl_evaluator<BAs...>::run_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 
@@ -546,9 +551,9 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 
 		// select current input variables
 		auto in_vars = select_all(dnf,
-			is_non_terminal<tau_parser::in_var_name, tau_ba_t, BAs...>);
+			is_non_terminal<tau_parser::in_var_name, tau_ba<BAs...>, BAs...>);
 
-		std::map<tau_nso_t, std::pair<type, filename>> current_inputs = inputs;
+		std::map<tau<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> current_inputs = inputs;
 		for (auto& var: in_vars) {
 			if (auto it = inputs.find(var); it != inputs.end()) {
 				current_inputs[var] = it->second;
@@ -560,12 +565,12 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 			}
 		}
 
-		auto ins = finputs<tau_ba_t, BAs...>(current_inputs);
+		auto ins = finputs<tau_ba<BAs...>, BAs...>(current_inputs);
 
 		// select current output variables
 		auto out_vars = select_all(dnf, is_non_terminal<
-				tau_parser::out_var_name, tau_ba_t, BAs...>);
-		std::map<tau_nso_t, std::pair<type, filename>> current_outputs = outputs;
+				tau_parser::out_var_name, tau_ba<BAs...>, BAs...>);
+		std::map<tau<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> current_outputs = outputs;
 		for (auto& var: out_vars) {
 			if (auto it = outputs.find(var); it != outputs.end())
 				current_outputs[var] = it->second;
@@ -577,7 +582,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 			}
 		}
 
-		auto outs = foutputs<tau_ba_t, BAs...>(current_outputs);
+		auto outs = foutputs<tau_ba<BAs...>, BAs...>(current_outputs);
 		run(dnf, ins, outs);
 		return;
 	}
@@ -659,14 +664,14 @@ void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
+void repl_evaluator<BAs...>::solve_cmd(const tau<tau_ba<BAs...>, BAs...>& n) {
 	// getting the type
 	auto type = get_solver_cmd_type(n);
 	if (!type) return;
 
 	// setting solver options
-	solver_options<tau_ba_t, BAs...> options = {
-		.splitter_one = nso_factory<tau_ba_t, BAs...>
+	solver_options<tau_ba<BAs...>, BAs...> options = {
+		.splitter_one = nso_factory<tau_ba<BAs...>, BAs...>
 			::instance().splitter_one(type.value()),
 		.mode = get_solver_cmd_mode(n),
 		.type = type.value()
@@ -682,7 +687,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 		BOOST_LOG_TRIVIAL(trace) << "solve_cmd/applied: " << applied << "\n";
 		#endif // DEBUG
 
-		auto solution = solve<tau_ba_t, BAs...>(applied, options);
+		auto solution = solve<tau_ba<BAs...>, BAs...>(applied, options);
 		if (!solution) { std::cout << "no solution\n"; return; }
 		auto vars = select_top(equations,
 			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
@@ -694,7 +699,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
+void repl_evaluator<BAs...>::lgrs_cmd(const tau<tau_ba<BAs...>, BAs...>& n) {
 	// getting the type
 	auto type = get_solver_cmd_type(n);
 	if (!type) return;
@@ -727,23 +732,23 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 }
 
 template<typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::is_valid_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::is_valid_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
-		rr<tau_nso_t> rr_{ nullptr };
+		rr<tau<tau_ba<BAs...>, BAs...>> rr_{ nullptr };
 		if (contains_ref && type == tau_parser::rr) {
-			if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
+			if (auto x = make_nso_rr_from_binded_code<tau_ba<BAs...>, BAs...>(
 				value); x) rr_ = x.value();
 			else return {};
 		}
 		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
 				definitions.begin(), definitions.end());
-			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
+			if (auto infr = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_);
 				infr) rr_ = infr.value();
 			else return {};
 		}
@@ -751,33 +756,33 @@ std::optional<tau_nso<BAs...>>
 			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 			return {};
 		}
-		auto normalized_fm = normalizer<tau_ba_t, BAs...>(rr_);
-		return is_tau_impl(_T<tau_ba_t, BAs...>, normalized_fm)
-			       ? _T<tau_ba_t, BAs...>
-			       : _F<tau_ba_t, BAs...>;
+		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
+		return is_tau_impl(_T<tau_ba<BAs...>, BAs...>, normalized_fm)
+			       ? _T<tau_ba<BAs...>, BAs...>
+			       : _F<tau_ba<BAs...>, BAs...>;
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 	return {};
 }
 
 template<typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::sat_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::sat_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
-		rr<tau_nso_t> rr_{ nullptr };
+		rr<tau<tau_ba<BAs...>, BAs...>> rr_{ nullptr };
 		if (contains_ref && type == tau_parser::rr) {
 			if (auto x = make_nso_rr_from_binded_code<
-				tau_ba_t, BAs...>(value); x) rr_ = x.value();
+				tau_ba<BAs...>, BAs...>(value); x) rr_ = x.value();
 			else return {};
-		} else rr_ = rr<tau_nso_t>(value);
+		} else rr_ = rr<tau<tau_ba<BAs...>, BAs...>>(value);
 		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
 				definitions.begin(), definitions.end());
-			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
+			if (auto infr = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_);
 				infr) rr_ = infr.value();
 			else return {};
 		}
@@ -785,33 +790,33 @@ std::optional<tau_nso<BAs...>>
 			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 			return {};
 		}
-		auto normalized_fm = normalizer<tau_ba_t, BAs...>(rr_);
+		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
 		return is_tau_formula_sat(normalized_fm, 0, true)
-			       ? _T<tau_ba_t, BAs...>
-			       : _F<tau_ba_t, BAs...>;
+			       ? _T<tau_ba<BAs...>, BAs...>
+			       : _F<tau_ba<BAs...>, BAs...>;
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 	return {};
 }
 
 template<typename... BAs>
-std::optional<tau_nso<BAs...>>
-	repl_evaluator<BAs...>::is_unsatisfiable_cmd(const tau_nso_t& n)
+std::optional<tau<tau_ba<BAs...>, BAs...>>
+	repl_evaluator<BAs...>::is_unsatisfiable_cmd(const tau<tau_ba<BAs...>, BAs...>& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
-		rr<tau_nso_t> rr_{ nullptr };
+		rr<tau<tau_ba<BAs...>, BAs...>> rr_{ nullptr };
 		if (contains_ref && type == tau_parser::rr) {
 			if (auto x = make_nso_rr_from_binded_code<
-				tau_ba_t, BAs...>(value); x) rr_ = x.value();
+				tau_ba<BAs...>, BAs...>(value); x) rr_ = x.value();
 			else return {};
-		} else rr_ = rr<tau_nso_t>(value);
+		} else rr_ = rr<tau<tau_ba<BAs...>, BAs...>>(value);
 		if (contains_ref) {
 			rr_.rec_relations.insert(rr_.rec_relations.end(),
 				definitions.begin(), definitions.end());
-			if (auto infr = infer_ref_types<tau_ba_t, BAs...>(rr_);
+			if (auto infr = infer_ref_types<tau_ba<BAs...>, BAs...>(rr_);
 				infr) rr_ = infr.value();
 			else return {};
 		}
@@ -819,17 +824,17 @@ std::optional<tau_nso<BAs...>>
 			BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 			return {};
 		}
-		auto normalized_fm = normalizer<tau_ba_t, BAs...>(rr_);
+		auto normalized_fm = normalizer<tau_ba<BAs...>, BAs...>(rr_);
 		return (!is_tau_formula_sat(normalized_fm, 0, true))
-			       ? _T<tau_ba_t, BAs...>
-			       : _F<tau_ba_t, BAs...>;
+			       ? _T<tau_ba<BAs...>, BAs...>
+			       : _F<tau_ba<BAs...>, BAs...>;
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument";
 	return {};
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::def_rr_cmd(const tau_nso_t& n) {
+void repl_evaluator<BAs...>::def_rr_cmd(const tau<tau_ba<BAs...>, BAs...>& n) {
 	definitions.emplace_back(n->child[0]->child[0], n->child[0]->child[1]);
 	std::cout << "[" << definitions.size() << "] "
 						<< definitions.back() << "\n";
@@ -859,7 +864,7 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::def_print_cmd(const tau_nso_t& command) {
+void repl_evaluator<BAs...>::def_print_cmd(const tau<tau_ba<BAs...>, BAs...>& command) {
 	if (definitions.size() == 0) std::cout << "rec. relations: empty\n";
 	auto num = command | tau_parser::number;
 	if (!num) return;
@@ -874,23 +879,23 @@ void repl_evaluator<BAs...>::def_print_cmd(const tau_nso_t& command) {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::def_input_cmd(const tau_nso_t& command) {
+void repl_evaluator<BAs...>::def_input_cmd(const tau<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
 	type type = command
 		| tau_parser::type
-		| extract_string<tau_ba_t, BAs...>;
+		| extract_string<tau_ba<BAs...>, BAs...>;
 	if (auto file_name = command
 			| tau_parser::input_stream
 			| tau_parser::q_file_name
-			| extract_string<tau_ba_t, BAs...>; !file_name.empty())
+			| extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 								fn = file_name;
 	else fn = ""; // default input (std::cin)
 
-	for (auto& t: nso_factory<tau_ba_t, BAs...>::instance().types()) {
+	for (auto& t: nso_factory<tau_ba<BAs...>, BAs...>::instance().types()) {
 		if (type == t) {
 			auto var_name = command
 				| tau_parser::in_var_name
-				| optional_value_extractor<tau_nso_t>;
+				| optional_value_extractor<tau<tau_ba<BAs...>, BAs...>>;
 			inputs[var_name] = {type, fn};
 			return;
 		}
@@ -899,23 +904,23 @@ void repl_evaluator<BAs...>::def_input_cmd(const tau_nso_t& command) {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::def_output_cmd(const tau_nso_t& command) {
+void repl_evaluator<BAs...>::def_output_cmd(const tau<tau_ba<BAs...>, BAs...>& command) {
 	filename fn;
 	type type = command
 		| tau_parser::type
-		| extract_string<tau_ba_t, BAs...>;
+		| extract_string<tau_ba<BAs...>, BAs...>;
 	if (auto file_name = command
 			| tau_parser::output_stream
 			| tau_parser::q_file_name
-			| extract_string<tau_ba_t, BAs...>; !file_name.empty())
+			| extract_string<tau_ba<BAs...>, BAs...>; !file_name.empty())
 		fn = file_name;
 	else fn = ""; // default output (std::cout)
 
-	for (auto& t: nso_factory<tau_ba_t, BAs...>::instance().types()) {
+	for (auto& t: nso_factory<tau_ba<BAs...>, BAs...>::instance().types()) {
 		if (type == t) {
 			auto var_name = command
 				| tau_parser::out_var_name
-				| optional_value_extractor<tau_nso_t>;
+				| optional_value_extractor<tau<tau_ba<BAs...>, BAs...>>;
 			outputs[var_name] = {type, fn};
 			return;
 		}
@@ -925,7 +930,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tau_nso_t& command) {
 
 // make a nso_rr from the given tau source and binder.
 template <typename... BAs>
-tau_nso<BAs...> repl_evaluator<BAs...>::make_cli(const std::string& src) {
+tau<tau_ba<BAs...>, BAs...> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	// remove ascii char 22 if exists in the input
 	std::string filt = src;
 	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
@@ -952,9 +957,9 @@ tau_nso<BAs...> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		drop_location_t<parse_symbol, tau_source_sym>, tau_source_sym>(
 			drop_location<parse_symbol, tau_source_sym>, result);
 	if (!cli_src) return fail();
-	auto cli_code = make_tau_code<tau_ba_t, BAs...>(cli_src);
+	auto cli_code = make_tau_code<tau_ba<BAs...>, BAs...>(cli_src);
 	if (!cli_code) return fail();
-	auto binded = bind_tau_code_using_factory<tau_ba_t, BAs...>(cli_code);
+	auto binded = bind_tau_code_using_factory<tau_ba<BAs...>, BAs...>(cli_code);
 	if (!binded) return fail();
 	return binded;
 }
@@ -996,7 +1001,7 @@ std::optional<boost::log::trivial::severity_level>
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::get_cmd(tau_nso_t n) {
+void repl_evaluator<BAs...>::get_cmd(tau<tau_ba<BAs...>, BAs...> n) {
 	static std::string pbool[] = { "off", "on" };
 	static std::map<repl_option, std::function<void()>> printers = {
 #ifdef DEBUG
@@ -1029,7 +1034,7 @@ void repl_evaluator<BAs...>::get_cmd(tau_nso_t n) {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
+void repl_evaluator<BAs...>::set_cmd(tau<tau_ba<BAs...>, BAs...> n) {
 	using namespace boost::log;
 	auto o = get_opt(n);
 	if (o == invalid_opt || o == none_opt) return;
@@ -1045,8 +1050,8 @@ void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
 		BOOST_LOG_TRIVIAL(error) << "(Error) invalid value\n";
 		return;
 	}
-	auto v = make_string<tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
-		tau_nso_t>(tau_node_terminal_extractor<tau_ba_t, BAs...>,
+	auto v = make_string<tau_node_terminal_extractor_t<tau_ba<BAs...>, BAs...>,
+		tau<tau_ba<BAs...>, BAs...>>(tau_node_terminal_extractor<tau_ba<BAs...>, BAs...>,
 			ov.value());
 	auto update_bool_value = [&v](bool& opt) {
 		if (v == "t" || v == "true" || v == "on" || v == "1"
@@ -1083,7 +1088,7 @@ void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::update_bool_opt_cmd(const tau_nso_t& n,
+void repl_evaluator<BAs...>::update_bool_opt_cmd(const tau<tau_ba<BAs...>, BAs...>& n,
 	const std::function<bool(bool&)>& update_fn)
 {
 	auto o = get_opt(n);
@@ -1121,20 +1126,20 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 }
 
 template <typename... BAs>
-int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
+int repl_evaluator<BAs...>::eval_cmd(const tau<tau_ba<BAs...>, BAs...>& n) {
 	auto command = (n
-		| only_child_extractor<tau_ba_t, BAs...>).value();
+		| only_child_extractor<tau_ba<BAs...>, BAs...>).value();
 	auto command_type = command
-		| non_terminal_extractor<tau_ba_t, BAs...>
+		| non_terminal_extractor<tau_ba<BAs...>, BAs...>
 		| optional_value_extractor<size_t>;
 #ifdef DEBUG
 	if (opt.debug_repl) {
 		std::cout << "command: " << command << "\n";
-		print_tau_tree<tau_ba_t, BAs...>(std::cout
+		print_tau_tree<tau_ba<BAs...>, BAs...>(std::cout
 			<< "tree: ", command) << "\n";
 	}
 #endif
-	std::optional<tau_nso_t> result;
+	std::optional<tau<tau_ba<BAs...>, BAs...>> result;
 	using p = tau_parser;
 	switch (command_type) {
 	case p::quit_cmd:           return std::cout << "Quit.\n", 1;
@@ -1189,7 +1194,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
 		BOOST_LOG_TRIVIAL(error) << "\n (Error) Unknown command";
 	}
 #ifdef DEBUG
-	if (opt.debug_repl && result) ptree<tau_ba_t, BAs...>(
+	if (opt.debug_repl && result) ptree<tau_ba<BAs...>, BAs...>(
 		std::cout << "result tree: ", result.value()) << "\n";
 #endif
 	if (result) memory_store(result.value());
@@ -1247,7 +1252,7 @@ void repl_evaluator<BAs...>::version_cmd() {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
+void repl_evaluator<BAs...>::help_cmd(const tau<tau_ba<BAs...>, BAs...>& n) {
 	static const std::string bool_options =
 		"  <option>               <description>                        <value>\n"
 #ifdef DEBUG
@@ -1263,8 +1268,8 @@ void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
 	static const std::string bool_available_options = std::string{} +
 		"Available options and values:\n" + bool_options;
 	auto arg = n | tau_parser::help_arg
-			| only_child_extractor<tau_ba_t, BAs...>
-			| non_terminal_extractor<tau_ba_t, BAs...>;
+			| only_child_extractor<tau_ba<BAs...>, BAs...>
+			| non_terminal_extractor<tau_ba<BAs...>, BAs...>;
 	size_t nt = arg ? arg.value()
 			: static_cast<size_t>(tau_parser::help_sym);
 	switch (nt) {

@@ -2,7 +2,7 @@
 
 #include <optional>
 
-#include "nso_rr.h"
+#include "runtime.h"
 #include "queries.h"
 
 namespace idni::tau_lang {
@@ -968,6 +968,7 @@ struct rr_sig {
 };
 
 } // namespace idni::tau_lang
+
 template<>
 struct std::hash<idni::tau_lang::rr_sig> {
 	size_t operator()(const idni::tau_lang::rr_sig& s) const noexcept {
@@ -978,6 +979,7 @@ struct std::hash<idni::tau_lang::rr_sig> {
 		return seed;
 	}
 };
+
 namespace idni::tau_lang {
 
 static auto sig2str = [](const rr_sig& s) {
@@ -1072,7 +1074,7 @@ private:
 		// TODO (LOW) decide how to call fp calculation for various
 		// offset arity rels with otherwise same signature.
 		// We currently call the rel with the least offset arity.
-		// Should we provide a way how to specify exact relation to call? 
+		// Should we provide a way how to specify exact relation to call?
 		rr_sig fp_sig(sig);
 		fp_sig.offset_arity = 0;
 		if (auto fp_exists = fpcall(fp_sig); fp_exists) {

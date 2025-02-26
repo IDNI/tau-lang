@@ -16,9 +16,9 @@
 #include <cassert>
 
 #include "doctest.h"
+#include "test_integration_helpers.h"
 #include "satisfiability.h"
 
-#include "test_integration_helpers-tau.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;

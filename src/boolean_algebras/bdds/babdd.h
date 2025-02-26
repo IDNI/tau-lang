@@ -19,15 +19,21 @@
 #include "dict.h"
 #include "boolean_algebras/bool_ba.h"
 
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+namespace idni::tau_lang {
+
 typedef int32_t int_t;
 typedef uint32_t uint_t;
 template<typename T> using sp = std::shared_ptr<T>;
 
 #define neg_to_odd(x) (((x)<0?(((-(x))<<1)+1):((x)<<1)))
-#define hash_pair(x, y) fpairing(neg_to_odd(x), neg_to_odd(y))
-#define hash_tri(x, y, z), N fpairing(hash_pair(x, y), neg_to_odd(z))
-#define hash_upair(x, y) fpairing(x, y)
-#define hash_utri(x, y, z) fpairing(hash_upair(x, y), z)
+#define hash_pair(x, y) idni::tau_lang::fpairing(neg_to_odd(x), neg_to_odd(y))
+#define hash_tri(x, y, z) idni::tau_lang::fpairing(hash_pair(x, y), neg_to_odd(z))
+#define hash_upair(x, y) idni::tau_lang::fpairing(x, y)
+#define hash_utri(x, y, z) idni::tau_lang::fpairing(hash_upair(x, y), z)
 
 inline size_t fpairing(size_t x, size_t y) {
 	const size_t z = x + y;
@@ -222,38 +228,6 @@ struct node_skeleton {
 	}
 };
 
-template<typename R>
-struct std::hash<bdd_node<R>> {
-	size_t operator()(auto& n) const { return n.hash; }
-};
-
-template<typename R>
-struct std::hash<node_skeleton<R>> {
-	size_t operator()(auto& n) const { return n.hash; }
-};
-
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<std::array<bdd_reference<S, O, IW, SW>, 2>> {
-	size_t operator()(const auto& a) const {
-		return hash_upair((bdd_reference<S, O, IW, SW>::hash(a[0])),
-				  (bdd_reference<S, O, IW, SW>::hash(a[1])));
-	}
-};
-
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<bdd_reference<S, O, IW, SW>> {
-	size_t operator()(const auto& a) const {
-		return bdd_reference<S, O, IW, SW>::hash(a);
-	}
-};
-
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<std::pair<bdd_reference<S, O, IW, SW>, uint_t>> {
-	size_t operator()(const auto& p) const {
-		return hash_upair((hash<bdd_reference<S, O, IW, SW>>{}(p.first)),
-				  p.second);
-	}
-};
 
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
@@ -1445,5 +1419,41 @@ bool
 	bool s = x.out && !y.out;
 	return x.id < y.id || (x.id == y.id && s);
 };
+
+} // namespace idni::tau_lang
+
+template<typename R>
+struct std::hash<idni::tau_lang::bdd_node<R>> {
+	size_t operator()(auto& n) const { return n.hash; }
+};
+
+template<typename R>
+struct std::hash<idni::tau_lang::node_skeleton<R>> {
+	size_t operator()(auto& n) const { return n.hash; }
+};
+
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct std::hash<std::array<idni::tau_lang::bdd_reference<S, O, IW, SW>, 2>> {
+	size_t operator()(const auto& a) const {
+		return hash_upair((idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[0])),
+				  (idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[1])));
+	}
+};
+
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct std::hash<idni::tau_lang::bdd_reference<S, O, IW, SW>> {
+	size_t operator()(const auto& a) const {
+		return idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a);
+	}
+};
+
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct std::hash<std::pair<idni::tau_lang::bdd_reference<S, O, IW, SW>, idni::tau_lang::uint_t>> {
+	size_t operator()(const auto& p) const {
+		return hash_upair((hash<idni::tau_lang::bdd_reference<S, O, IW, SW>>{}(p.first)),
+				  p.second);
+	}
+};
+
 
 #endif

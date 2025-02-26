@@ -10,6 +10,9 @@ set(TAU_HEADERS
 	../external/parser/src/parser.tmpl.h
 	../external/parser/src/recoders.h
 	../external/parser/src/tgf.h
+	../parser/bitvector_parser.generated.h
+	../parser/sbf_parser.generated.h
+	../parser/tau_parser.generated.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h
@@ -24,7 +27,10 @@ set(TAU_HEADERS
 	dict.h
 	normalizer.h
 	nso_rr.h
+	logging.h
 	execution.h
+	runtime.h
+	runtime_configuration.h
 	tau.h
 	normal_forms.h
 	satisfiability.h
@@ -46,7 +52,6 @@ set(TAU_SOURCES
 	../external/parser/src/parser.cpp
 	../external/parser/src/recoders.cpp
 	../external/parser/src/term.cpp
-	boolean_algebras/bool_ba.cpp
 	dict.cpp
 	nso_rr.cpp
 )

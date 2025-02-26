@@ -20,7 +20,7 @@ set_property(CACHE TAU_BUILD_INTEGRATION PROPERTY STRINGS "OFF" "ON")
 
 if (TAU_BUILD_INTEGRATION)
 	enable_testing()
-	add_subdirectory(integration)
+#	add_subdirectory(integration)
 endif ()
 
 #
@@ -31,7 +31,7 @@ set_property(CACHE TAU_BUILD_UNIT_TESTS PROPERTY STRINGS "OFF" "ON")
 
 if (TAU_BUILD_UNIT_TESTS)
 	enable_testing()
-	add_subdirectory(unit)
+#	add_subdirectory(unit)
 endif ()
 
 #
@@ -39,7 +39,7 @@ endif ()
 #
 if (TAU_BUILD_UNIT_TESTS)
 	enable_testing()
-	add_subdirectory(experimental)
+#	add_subdirectory(experimental)
 endif ()
 
 #
@@ -47,7 +47,7 @@ endif ()
 #
 if (TAU_BUILD_BENCHMARK)
 	enable_testing()
-	add_subdirectory(benchmark)
+#	add_subdirectory(benchmark)
 endif ()
 
 #

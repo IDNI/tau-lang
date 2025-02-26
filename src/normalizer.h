@@ -9,13 +9,17 @@
 #include <boost/log/trivial.hpp>
 
 #include "parser.h"
-#include "boolean_algebras/variant_ba.h"
 #include "normal_forms.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
 #endif // DEBUG
+
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //

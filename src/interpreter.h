@@ -15,6 +15,11 @@
 #include "debug_helpers.h"
 #endif // DEBUG
 
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+
 namespace idni::tau_lang {
 
 using type = std::string;

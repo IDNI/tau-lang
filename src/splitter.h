@@ -3,9 +3,13 @@
 #ifndef SPLITTER_H
 #define SPLITTER_H
 
-#include "satisfiability.h"
 #include "boolean_algebras/nso_ba.h"
+#include "satisfiability.h"
 
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
 namespace idni::tau_lang {
 enum class split_sym {
 	conjunction, disjunction
@@ -347,5 +351,6 @@ tau<BAs...> tau_splitter (const tau<BAs...>& fm, splitter_type st) {
         return split(fm, tau_parser::wff, false, st, clauses, 0, false);
 	}
 }
-}
+
+} // namespace idni::tau_lang
 #endif //SPLITTER_H

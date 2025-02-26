@@ -3,6 +3,11 @@
 #ifndef __DEBUG_HELPERS_H__
 #define __DEBUG_HELPERS_H__
 
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+
 namespace idni::tau_lang {
 #ifdef DEBUG
 

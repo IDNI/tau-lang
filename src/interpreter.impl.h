@@ -3,8 +3,6 @@
 #ifndef INTERPRETER_IMPL_H
 #define INTERPRETER_IMPL_H
 
-#include "interpreter.h"
-
 namespace idni::tau_lang {
 
 template<typename input_t, typename output_t, typename...BAs>
@@ -199,7 +197,7 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 		auto step_ubt_ctn = update_to_time_point(ubt_ctn);
 		auto io_vars = select_top(step_ubt_ctn,
 				is_child_non_terminal<p::io_var, BAs...>);
-		sort(io_vars.begin(), io_vars.end(), constant_io_comp);
+		std::sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 		// All io_vars in fm have to refer to constant time positions
 		assert(all_of(io_vars.begin(), io_vars.end(),
 			[](const auto& el){return is_io_initial(el);}));

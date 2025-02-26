@@ -3,70 +3,12 @@
 #ifndef __TEST_HELPERS_H__
 #define __TEST_HELPERS_H__
 
-#include "nso_rr.h"
-#include "language.h"
+#include "runtime_configuration.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;
-
-// TODO (LOW) most of this functions could be remove and replace by the standart API
-
-
-namespace idni::tau_lang {
-
-	template<>
-	struct nso_factory<Bool> {
-
-		tau<Bool> parse(const std::string&,
-				const std::string&) const {
-			throw std::logic_error("not implemented");
-		}
-
-		tau<Bool> binding(const tau<Bool>& n,
-				const std::string& type) const {
-			if (type != "bool") return n;
-			return make_node<tau_sym<Bool>>(Bool(true), {});
-		}
-
-		std::vector<std::string> types() const {
-			return { "bool" };
-		}
-
-		std::string default_type() const {
-			return "bool";
-		}
-
-		std::string one(const std::string&) const {
-			throw std::logic_error("not implemented");
-		}
-
-		std::string zero(const std::string&) const {
-			throw std::logic_error("not implemented");
-		}
-
-		tau<Bool> splitter_one(const std::string&) const {
-			throw std::logic_error("not implemented");
-		}
-
-		std::optional<Bool> unpack_tau_ba(
-			const std::variant<Bool>&) const {
-			// There is no tau_ba
-			return {};
-		}
-
-		static nso_factory<Bool>& instance() {
-				static nso_factory<Bool> factory;
-				return factory;
-			}
-
-	private:
-
-		nso_factory() {};
-	};
-
-} // namespace idni::tau_lang
 
 // helper functions
 tau<Bool> make_statement(const sp_tau_source_node& source) {

@@ -22,11 +22,7 @@
 #include <numeric>
 
 #include "../parser/tau_parser.generated.h"
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/variant_ba.h"
-#include "init_log.h"
-#include "splitter_types.h"
-#include "parser.h"
+#include "logging.h"
 #include "utils.h"
 #include "rewriting.h"
 #include "term_colors.h"
@@ -35,6 +31,11 @@
 #ifdef TAU_MEASURE
 #include "measure.h"
 #endif // TAU_MEASURE
+
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
 
 namespace idni::tau_lang {
 

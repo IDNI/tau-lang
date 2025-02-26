@@ -4,10 +4,14 @@
 #define __BDD_HANDLE_H__
 
 #include "babdd.h"
-#include "dict.h"
 #include "splitter_types.h"
-#include "defs.h"
 
+using namespace std;
+using namespace idni;
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
+
+namespace idni::tau_lang {
 
 template<typename B, auto o> struct bdd_handle;
 template<typename B, auto o = bdd_options<>::create()>
@@ -632,12 +636,14 @@ bdd<Bool, o>::initializer::initializer() {
 	bdd_init<Bool, o>();
 }
 
+} // namespace idni::tau_lang
+
 // bdd printer taken from out.h
-template<typename B, auto o = bdd_options<>::create()>
-std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
-	if (f == bdd_handle<B, o>::htrue) return os << '1';
-	if (f == bdd_handle<B, o>::hfalse) return os << '0';
-	std::set<std::pair<B, std::vector<int_t>>> dnf = f->dnf();
+template<typename B, auto o = idni::tau_lang::bdd_options<>::create()>
+std::ostream& operator<<(std::ostream& os, const idni::tau_lang::hbdd<B, o>& f) {
+	if (f == idni::tau_lang::bdd_handle<B, o>::htrue) return os << '1';
+	if (f == idni::tau_lang::bdd_handle<B, o>::hfalse) return os << '0';
+	std::set<std::pair<B, std::vector<idni::tau_lang::int_t>>> dnf = f->dnf();
 	size_t n = dnf.size();
 	std::set<std::string> ss;
 	for (auto& c : dnf) {
@@ -645,7 +651,7 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 		assert(!(c.first == false));
 		std::stringstream t;
 		if (!(c.first == true)) t << '{' << c.first << '}';
-		for (int_t v : c.second)
+		for (idni::tau_lang::int_t v : c.second)
 			if (v < 0) s.insert(std::string(dict(-v)) + "'");
 			else s.insert(dict(v));
 		bool first = true;
