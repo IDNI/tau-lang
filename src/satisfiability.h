@@ -5,11 +5,6 @@
 
 #include "normalizer.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
 namespace idni::tau_lang {
 
 inline static bool use_debug_output_in_sat = false;

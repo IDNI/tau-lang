@@ -11,11 +11,6 @@
 #include "nso_rr.h"
 #include "repl.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
 namespace idni::tau_lang {
 
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,

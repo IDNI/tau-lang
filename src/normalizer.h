@@ -15,12 +15,6 @@
 #include "debug_helpers.h"
 #endif // DEBUG
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,

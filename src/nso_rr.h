@@ -32,11 +32,6 @@
 #include "measure.h"
 #endif // TAU_MEASURE
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
 namespace idni::tau_lang {
 
 using namespace idni::rewriter;

@@ -19,10 +19,6 @@
 #include "dict.h"
 #include "boolean_algebras/bool_ba.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
 namespace idni::tau_lang {
 
 typedef int32_t int_t;

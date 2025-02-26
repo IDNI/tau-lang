@@ -24,12 +24,6 @@
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "splitter.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-
 namespace idni::tau_lang {
 
 /**

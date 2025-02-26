@@ -10,11 +10,6 @@
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
 namespace idni::tau_lang {
 
 /**

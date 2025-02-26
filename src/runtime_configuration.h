@@ -9,11 +9,6 @@
 #include "boolean_algebras/bitvector_ba.h"
 #include "boolean_algebras/tau_ba.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
 namespace idni::tau_lang {
 
 /**

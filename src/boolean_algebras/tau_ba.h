@@ -8,11 +8,6 @@
 #include "satisfiability.h"
 #include "splitter.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //

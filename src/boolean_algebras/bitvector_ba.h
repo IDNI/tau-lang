@@ -7,10 +7,6 @@
 #include "z3++.h"
 #include "nso_rr.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
 using namespace z3;
 
 namespace idni::tau_lang {

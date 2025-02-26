@@ -8,11 +8,6 @@
 #include "nso_rr.h"
 #include "builders.h"
 
-using namespace std;
-using namespace idni;
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
 namespace idni::tau_lang {
 
 /**

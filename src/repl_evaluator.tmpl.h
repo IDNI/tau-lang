@@ -5,8 +5,6 @@
 #include "sbf_parser.generated.h"
 #include "interpreter.h"
 
-using namespace std;
-
 namespace idni::tau_lang {
 
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
