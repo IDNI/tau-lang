@@ -7,8 +7,6 @@
 #include "z3++.h"
 #include "nso_rr.h"
 
-using namespace z3;
-
 namespace idni::tau_lang {
 
 using bitvector_source_sym = idni::lit<char, char>;
@@ -20,7 +18,7 @@ struct bitvector_ba {
 	};
 
 	bitvector_ba() = delete;
-	bitvector_ba(expr e, const unsigned& size);
+	bitvector_ba(z3::expr e, const unsigned& size);
 	bitvector_ba(int n, const unsigned& size);
 	bitvector_ba(unsigned int n, const unsigned& size);
 	bitvector_ba(long n, const unsigned& size);
@@ -36,9 +34,9 @@ struct bitvector_ba {
 	bool is_zero() const;
 	bool is_one() const;
 
-	static context ctx;
+	static z3::context ctx;
 	unsigned size;
-	expr e;
+	z3::expr e;
 };
 
 std::strong_ordering operator<=>(const bitvector_ba& x, const bitvector_ba& y);
@@ -78,7 +76,7 @@ private:
 	inline static std::map<std::string, tau<BAs...>> cache;
 };
 
-bool is_closed(const bitvector_ba& /*x*/) { return true; }
+bool is_closed(const bitvector_ba& /*x*/);
 
 } // namespace idni::tau_lang
 

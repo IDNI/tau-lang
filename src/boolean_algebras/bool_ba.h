@@ -5,6 +5,7 @@
 #include <ostream>
 
 #include "defs.h"
+#include "nso_rr.h"
 
 namespace idni::tau_lang {
 

@@ -52,6 +52,8 @@ set(TAU_SOURCES
 	../external/parser/src/parser.cpp
 	../external/parser/src/recoders.cpp
 	../external/parser/src/term.cpp
+	boolean_algebras/bool_ba.cpp
+	boolean_algebras/bitvector_ba.cpp
 	dict.cpp
 	nso_rr.cpp
 )
