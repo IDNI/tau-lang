@@ -110,8 +110,8 @@ struct struc_equal {
 	}
 };
 
-template <typename... BAs>
-using urd_tau_map = std::unordered_map<tau<BAs...>, tau<BAs...>,
+template <typename value_t, typename... BAs>
+using unordered_tau_map = std::unordered_map<tau<BAs...>, value_t,
 			std::hash<tau<BAs...>>, struc_equal<BAs...>>;
 
 /**
