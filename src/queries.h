@@ -627,7 +627,8 @@ struct node<idni::tau_lang::tau_sym<BAs...>> {
 	using child_type = std::vector<std::shared_ptr<node>>;
 	node (const idni::tau_lang::tau_sym<BAs...> v, const child_type& c) :
 		value(v), child(c), hash(calc_hash(v, c)) {}
-
+	node (const idni::tau_lang::tau_sym<BAs...> v, child_type&& c) :
+		value(v), child(std::move(c)), hash(calc_hash(v,child)) {}
 	// This is not default because the hash value is not considered
 	auto operator<=>(const node& that) const {
 		if (value != that.value) return value <=> that.value;
@@ -676,6 +677,7 @@ private:
 		return seed;
 	}
 };
+
 }
 
 // The hash function for tau as specialisation of std::hash
