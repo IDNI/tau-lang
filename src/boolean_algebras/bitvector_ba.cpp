@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "bitvector_ba.h"
-#include "splitter_types.h"
+#include "../splitter_types.h"
 
 //using namespace z3;
 
@@ -42,7 +42,7 @@ bitvector_ba bitvector_false() {
 	return bitvector_ba(0, 32);
 }
 
-auto normalize (const bitvector_ba& fm) {
+bitvector_ba normalize (const bitvector_ba& fm) {
 	return fm;
 }
 

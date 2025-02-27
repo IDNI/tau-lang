@@ -3,8 +3,9 @@
 #ifndef DICT_H
 #define DICT_H_
 
-#include "defs.h"
 #include <string>
+
+#include "defs.h"
 
 sym_t dict(const char*);
 sym_t dict(const std::string&);

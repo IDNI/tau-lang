@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "queries.h"
+#include "../queries.h"
 
 namespace idni::tau_lang {
 

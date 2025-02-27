@@ -8,6 +8,7 @@
 #include <boost/log/expressions.hpp>
 #include <boost/log/utility/setup/console.hpp>
 
+#include "boolean_algebras/tau_ba.h"
 #include "nso_rr.h"
 #include "repl.h"
 
@@ -117,7 +118,7 @@ private:
 	options opt{};
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
-	rec_relations<tau<tau_ba<BAs...>, BAs...>> definitions;
+	rules<tau<tau_ba<BAs...>, BAs...>> definitions;
 	std::map<tau<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> inputs;
 	std::map<tau<tau_ba<BAs...>, BAs...>, std::pair<type, filename>> outputs;
 	bool error = false;

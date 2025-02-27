@@ -3,9 +3,10 @@
 #ifndef __BITVECTOR_BA_H__
 #define __BITVECTOR_BA_H__
 
-#include "../parser/bitvector_parser.generated.h"
-#include "z3++.h"
-#include "nso_rr.h"
+#include <z3++.h>
+
+#include "../../parser/bitvector_parser.generated.h"
+#include "../nso_rr.h"
 
 namespace idni::tau_lang {
 
@@ -47,6 +48,11 @@ bool operator==(const bool& b, const bitvector_ba& x);
 bool operator!=(const bitvector_ba& x, const bool& b);
 bool operator!=(const bool& b, const bitvector_ba& x);
 
+bitvector_ba normalize(const bitvector_ba& /*b*/);
+bool is_syntactic_one(const bitvector_ba& b);
+bool is_syntactic_zero(const bitvector_ba& b);
+bool is_closed(const bitvector_ba& x);
+
 template<typename...BAs>
 struct bitvector_ba_factory {
 
@@ -76,7 +82,6 @@ private:
 	inline static std::map<std::string, tau<BAs...>> cache;
 };
 
-bool is_closed(const bitvector_ba& /*x*/);
 
 } // namespace idni::tau_lang
 

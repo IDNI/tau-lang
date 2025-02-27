@@ -5,10 +5,10 @@
 
 #include <boost/log/trivial.hpp>
 
-#include "sbf_parser.generated.h"
-#include "nso_rr.h"
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
+#include "../../parser/sbf_parser.generated.h"
+#include "../nso_rr.h"
+#include "bool_ba.h"
+#include "bdds/bdd_handle.h"
 
 namespace idni::tau_lang {
 

@@ -1,8 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "tau_parser.generated.h"
-#include "bitvector_parser.generated.h"
-#include "sbf_parser.generated.h"
+#include "../parser/tau_parser.generated.h"
+#include "../parser/bitvector_parser.generated.h"
+#include "../parser/sbf_parser.generated.h"
 #include "interpreter.h"
 
 namespace idni::tau_lang {

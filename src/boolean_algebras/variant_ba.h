@@ -6,8 +6,8 @@
 #include <variant>
 #include <ostream>
 
-#include "utils.h"
-#include "splitter_types.h"
+#include "../utils.h"
+#include "../splitter_types.h"
 
 namespace idni::tau_lang {
 

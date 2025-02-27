@@ -5,8 +5,8 @@
 
 #include <iostream>
 
-#include "satisfiability.h"
-#include "splitter.h"
+#include "../satisfiability.h"
+#include "../splitter.h"
 
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction

@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "builders.h"
-#include "queries.h"
+#include "../builders.h"
+#include "../queries.h"
 
 namespace idni::tau_lang {
 

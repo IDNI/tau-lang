@@ -1,8 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef INTERPRETER_IMPL_H
-#define INTERPRETER_IMPL_H
-
 namespace idni::tau_lang {
 
 template<typename input_t, typename output_t, typename...BAs>
@@ -588,4 +585,3 @@ solution_with_max_update(const tau<BAs...>& spec) {
 }
 
 } // namespace idni::tau_lang
-#endif //INTERPRETER_IMPL_H

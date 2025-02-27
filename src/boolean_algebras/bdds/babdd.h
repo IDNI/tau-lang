@@ -16,8 +16,8 @@
 #include <cmath>
 
 #include "defs.h"
-#include "dict.h"
-#include "boolean_algebras/bool_ba.h"
+#include "../../dict.h"
+#include "../bool_ba.h"
 
 namespace idni::tau_lang {
 

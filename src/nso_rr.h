@@ -219,6 +219,7 @@ std::string make_string(const extractor_t& extractor, const node_t& n) {
 // operators << to pretty print the tau language related types
 //
 
+// << for rule
 template <typename...BAs>
 std::ostream& operator<<(std::ostream& stream,
 	const idni::rewriter::rule<idni::tau_lang::tau<BAs...>>& r)

@@ -7,10 +7,6 @@
 #include <optional>
 #include <boost/log/trivial.hpp>
 
-//#include "boolean_algebras/bdds/bdd_handle.h"
-//#include "boolean_algebras/variant_ba.h"
-//#include "parser.h"
-//#include "normal_forms.h"
 #include "nso_rr.h"
 
 namespace idni::tau_lang {

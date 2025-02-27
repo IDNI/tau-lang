@@ -4,10 +4,10 @@
 #define __RUNTIME_CONFIGURATION_H__
 
 #include "runtime.h"
+#include "boolean_algebras/tau_ba.h"
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/sbf_ba.h"
 #include "boolean_algebras/bitvector_ba.h"
-#include "boolean_algebras/tau_ba.h"
 
 namespace idni::tau_lang {
 

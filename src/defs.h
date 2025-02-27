@@ -2,9 +2,6 @@
 #ifndef __DEF_H__
 #define __DEF_H__
 
-#define TAU_VERSION "0.7"
-#include "version_license.h"
-
 // basic macro for conditional execution of code
 #ifdef DEBUG
 #	define DBG(x) x
@@ -16,6 +13,9 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
+
+#define TAU_VERSION "0.7"
+#include "version_license.h"
 
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
