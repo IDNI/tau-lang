@@ -59,7 +59,7 @@ jobs:
           tag_name: "nightly-${{ env.date_iso }}"
           name: "Tau Language Framework ${{ env.version }} Nightly Build ${{ env.date_iso }}"
           body: "Tau Language Framework ${{ env.version }} automated nightly build ${{ env.date_iso }} commit ${{ github.sha }}"
-          draft: true                   # TODO change to false to fully automate
+          draft: false
           prerelease: true
           files: ${{ github.workspace }}/packages/*
         env:
