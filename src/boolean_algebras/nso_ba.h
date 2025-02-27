@@ -190,7 +190,7 @@ tau<BAs...> splitter(const tau<BAs...>& n, splitter_type st = splitter_type::upp
 
 namespace idni::rewriter {
 template <typename... BAs>
-struct make_node_cache_equality<node<tau_lang::tau_sym<BAs...>>> {
+struct make_node_cache_equality<tau_lang::tau_sym<BAs...>> {
 	bool operator() (const node<tau_lang::tau_sym<BAs...>>& l,
 		const node<tau_lang::tau_sym<BAs...>>& r) const {
 		static tau_lang::struc_equal<BAs...> st_eq;
