@@ -105,7 +105,7 @@ struct struc_equal {
 
 		//compare children
 		for (size_t i = 0; i < l->child.size(); ++i)
-			if (!(l->child[i] == r->child[i])) return false;
+			if (!operator()(l->child[i], r->child[i])) return false;
 		return true;
 	}
 };
@@ -187,6 +187,45 @@ template <typename... BAs>
 tau<BAs...> splitter(const tau<BAs...>& n, splitter_type st = splitter_type::upper);
 
 } // namespace idni::tau_lang
+
+namespace idni::rewriter {
+template <typename... BAs>
+struct make_node_cache_equality<node<tau_lang::tau_sym<BAs...>>> {
+	bool operator() (const node<tau_lang::tau_sym<BAs...>>& l,
+		const node<tau_lang::tau_sym<BAs...>>& r) const {
+		static tau_lang::struc_equal<BAs...> st_eq;
+		if (std::addressof(l) == std::addressof(r)) return true;
+		if (l.hash != r.hash) return false;
+
+		if (l.value != r.value) return false;
+		if (l.child.size() != r.child.size()) return false;
+
+		//compare children
+		for (size_t i = 0; i < l.child.size(); ++i)
+			if (!st_eq(l.child[i], r.child[i])) return false;
+		return true;
+	}
+};
+
+template <typename... BAs>
+struct traverser_cache_equality<tau_lang::tau<BAs...>> {
+	bool operator() (const tau_lang::tau<BAs...>& l,
+		const tau_lang::tau<BAs...>& r) const {
+		static tau_lang::struc_equal<BAs...> st_eq;
+		return st_eq(l, r);
+	}
+};
+
+template <typename... BAs>
+struct traverser_pair_cache_equality<tau_lang::tau<BAs...>> {
+	using p = std::pair<tau_lang::tau<BAs...>, size_t>;
+	bool operator() (const p& l, const p& r) const {
+		static tau_lang::struc_equal<BAs...> st_eq;
+		return st_eq(l.first, r.first) && l.second == r.second;
+	}
+};
+
+}
 
 #include "nso_ba.tmpl.h"
 
