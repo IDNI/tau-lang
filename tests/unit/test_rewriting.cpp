@@ -15,7 +15,7 @@
 
 #include "doctest.h"
 #include "parser.h"
-#include "defs.h";
+#include "defs.h"
 
 using namespace idni::rewriter;
 using namespace std;
