@@ -265,7 +265,7 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 #endif
 		return r;
 	};
-	return pre_order(fm).template apply_until_change<1>(norm_ba);
+	return pre_order(fm).template apply_unique_until_change<1>(norm_ba);
 }
 
 
@@ -1083,7 +1083,7 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(const tau<BAs...>& clause,
 			}
 			else return true;
 		};
-		pre_order(clause).visit(var_assigner);
+		pre_order(clause).visit_unique(var_assigner);
 	return std::make_pair(move(i), clause_is_decided);
 }
 
@@ -2084,7 +2084,7 @@ tau<BAs...> push_negation_in(const tau<BAs...>& fm, bool is_wff) {
 	auto pn = [&is_wff](const auto& n) {
 		return push_negation_one_in(n, is_wff);
 	};
-	return rewriter::pre_order(fm).apply(pn);
+	return rewriter::pre_order(fm).apply_unique(pn);
 }
 
 // Conversion to dnf while applying reductions during the process
@@ -2116,7 +2116,7 @@ tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
 		return n;
 	};
 	auto nnf_fm = push_negation_in(fm, is_wff);
-	return post_order(nnf_fm).apply(layer_to_dnf);
+	return post_order(nnf_fm).apply_unique(layer_to_dnf);
 }
 
 // Conversion to cnf while applying reductions during the process
@@ -2148,7 +2148,7 @@ tau<BAs...> to_cnf2(const tau<BAs...>& fm, bool is_wff) {
 		return n;
 	};
 	auto nnf_fm = push_negation_in(fm, is_wff);
-	return post_order(nnf_fm).apply(layer_to_cnf);
+	return post_order(nnf_fm).apply_unique(layer_to_cnf);
 }
 
 // Assumes that fm is a single DNF always clause
@@ -2942,7 +2942,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 		else return eliminate_universal_quantifier<BAs...>(inner_fm, scoped_fm);
 	};
 	auto is_not_bf = [](const tau<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
-	return post_order(fm).apply(elim_quant, is_not_bf);
+	return post_order(fm).apply_unique(elim_quant, is_not_bf);
 }
 
 template <typename... BAs>
