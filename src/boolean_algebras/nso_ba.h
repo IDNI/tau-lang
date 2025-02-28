@@ -93,7 +93,7 @@ bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r);
  */
 template <typename... BAs>
 struct struc_equal {
-	bool operator() (const tau<BAs...>& l, const tau<BAs...>& r) {
+	bool operator() (const tau<BAs...>& l, const tau<BAs...>& r) const {
 		if (r == nullptr && l == nullptr) return true;
 		if (r == nullptr || l == nullptr) return false;
 

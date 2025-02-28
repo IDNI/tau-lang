@@ -235,11 +235,6 @@ tau<BAs...> operator| (const tau<BAs...>& fm, const tau_transform<BAs...> func) 
 // This function traverses n and normalizes coefficients in a BF
 template <typename... BAs>
 tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
-#ifdef TAU_CACHE
-	static std::map<tau<BAs...>, tau<BAs...>> cache;
-	if (auto it = cache.find(fm); it != cache.end())
-		return it->second;
-#endif
 	assert(is_non_terminal(tau_parser::bf, fm));
 	auto norm_ba = [&](const auto& n) {
 		using p = tau_parser;
@@ -257,17 +252,10 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 		auto res = normalize_ba(ba_elem);
 		auto type = n | p::bf_constant | p::type;
 		assert(type.has_value());
-		auto r = build_bf_constant(res, type.value());
-
-#ifdef TAU_CACHE
-		cache.emplace(r, r);
-		return cache.emplace(n, r).first->second;
-#endif
-		return r;
+		return build_bf_constant(res, type.value());
 	};
 	return pre_order(fm).template apply_unique_until_change<1>(norm_ba);
 }
-
 
 template<typename... BAs>
 struct bf_reduce_canonical;
@@ -847,21 +835,23 @@ bool assign_and_reduce(const tau<BAs...>& fm,
 	if((int_t)vars.size() == p) {
 		tau<BAs...> fm_simp;
 		if (!is_wff) {
+			// Do not add to dnf if the coefficient is 0
+			if (fm == _0<BAs...>) return false;
 			// fm is a Boolean function
 			// Normalize tau subformulas
 			fm_simp = normalize_ba<BAs...>(fm);
+			if (fm_simp == _0<BAs...>) return false;
 			fm_simp = to_dnf2(fm_simp, false);
+			if (fm_simp == _0<BAs...>) return false;
 			fm_simp = reduce2(fm_simp, tau_parser::bf);
-
-			// Do not add to dnf if the coefficient is 0
-			if (is_non_terminal(tau_parser::bf_f, fm_simp->child[0]))
-				return false;
+			if (fm_simp == _0<BAs...>) return false;
 		} else {
+			if (fm == _F<BAs...>) return false;
 			// fm is a Tau formula
 			fm_simp = to_dnf2(fm);
+			if (fm_simp == _F<BAs...>) return false;
 			fm_simp = reduce2(fm_simp, tau_parser::wff);
-			if (is_child_non_terminal(tau_parser::wff_f, fm_simp))
-				return false;
+			if (fm_simp == _F<BAs...>) return false;
 		}
 		if(std::ranges::all_of(i, [](const auto el) {return el == 2;})) {
 			//bool t = is_non_terminal(tau_parser::bf_t, fm->child[0]);
@@ -932,7 +922,7 @@ tau<BAs...> bf_boole_normal_form (const tau<BAs...>& fm,
 
 	// Resulting DNF - make it ordered for consistency
 	// Key is coefficient, value is possible variable assignments for coefficient
-	std::map<tau<BAs...>, std::vector<std::vector<int_t>>> dnf;
+	unordered_tau_map<std::vector<std::vector<int_t>>, BAs...> dnf;
 
 	if(assign_and_reduce(fm, vars, i, dnf, is_var, 0)) {
 		assert(dnf.size() == 1);
@@ -1091,7 +1081,7 @@ template<typename... BAs>
 std::vector<std::vector<int_t>> collect_paths(const tau<BAs...>& new_fm, bool wff,
 	const auto& vars, bool& decided, bool is_cnf, bool all_reductions = true) {
 	std::vector<std::vector<int_t>> paths;
-	std::map<tau<BAs...>, int_t> var_pos;
+	unordered_tau_map<int_t, BAs...> var_pos;
 	for (int_t k=0; k < (int_t)vars.size(); ++k)
 		var_pos.emplace(vars[k], k);
 	using tp = tau_parser;
@@ -1241,7 +1231,7 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_
 template<typename... BAs>
 tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
 #ifdef TAU_CACHE
-		static std::map<tau<BAs...>, tau<BAs...>> cache;
+		static unordered_tau_map<tau<BAs...>, BAs...> cache;
 		if (auto it = cache.find(fm); it != end(cache))
 			return it->second;
 #endif // TAU_CACHE
@@ -1682,7 +1672,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	// std::cout << "new clause: " << clause << "\n";
 	auto new_vars = select_top(clause, is_wff_bdd_var);
 
-	std::map<tau<BAs...>, size_t> var_to_idx;
+	unordered_tau_map<size_t, BAs...> var_to_idx;
 	for (size_t i=0; i<vars.size(); ++i)
 		var_to_idx.emplace(vars[i], i);
 
