@@ -9,7 +9,6 @@ message(STATUS "Tau version: ${TAU_TARGET_VERSION} / ${TAU_VERSION}")
 
 set(namespace "TAU")
 set(PROJECT_NAME tau)
-# TODO (LOW) check if tau is better than TAU
 set(PROJECT_LIB_NAME TAU)
 project("${PROJECT_NAME}"
 	VERSION "${TAU_TARGET_VERSION}"
@@ -34,7 +33,6 @@ option(TAU_BUILD_BENCHMARK         "Build benchmark tests"                 OFF)
 option(TAU_WINDOWS_PACKAGE         "Build Windows package"                 OFF)
 option(TAU_WINDOWS_ZIP_PACKAGE     "Build Windows zip package"             OFF)
 option(TAU_GENERATE_PARSERS        "Generates parsers from TGF"            OFF)
-#option(TAU_WITH_Z3                 "Builds with Z3"                        OFF)
 set_property(CACHE TAU_BUILD_DOC               PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_STATIC_LIBRARY    PROPERTY STRINGS "OFF" "ON")
 set_property(CACHE TAU_BUILD_SHARED_LIBRARY    PROPERTY STRINGS "OFF" "ON")
@@ -181,16 +179,12 @@ option(PARSER_BUILD_STATIC_LIBRARY "Build only static library" ON)
 #
 # Adding Z3
 #
-#find_library(Z3
-#	NAMES z3
-#	HINTS /usr/lib)
-#add_library(Z3 SHARED IMPORTED)
-#set_target_properties(Z3 PROPERTIES
-#	IMPORTED_LOCATION "${Z3}")
-
-# TODO (LOW) make it run automatically on grammar modifications
-#
-# Check https://stackoverflow.com/questions/26193068/how-to-only-build-auto-generated-code-when-the-generator-or-input-changes-in-cma
+find_library(Z3
+	NAMES z3
+	HINTS /usr/lib)
+add_library(Z3 SHARED IMPORTED)
+set_target_properties(Z3 PROPERTIES
+	IMPORTED_LOCATION "${Z3}")
 
 #
 # Generate C++ parser from TGF if requested
