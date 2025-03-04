@@ -1,0 +1,22 @@
+# To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+@use char classes space, alpha, digit.
+
+@enable productions charvar.
+
+start  => _ bitvector _.
+bitvector => _uint
+           | _int
+           | _ulong
+           | _long
+           | _bits.
+sign      => minus | plus.
+minus     => '-'.
+plus      => ['+'].
+_int      => sign _ _unsigned.
+_long     => sign _ _unsigned _ 'l'.
+_uint     => [plus] _ _unsigned _ 'u'.
+_ulong    => [plus] _ _unsigned _ "ul".
+_unsigned => digit (_digit)*.
+_bits     => _bit (_ _bit)* 'b'.
+_bit      => '0':zero | '1':one.
