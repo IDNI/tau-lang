@@ -120,7 +120,6 @@ tau<BAs...> operator<<(const tau<BAs...>& n,
 	return replace(n, changes);
 }
 
-
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template <typename... BAs>
@@ -217,7 +216,80 @@ std::string make_string(const extractor_t& extractor, const node_t& n) {
 	return ss.str();
 }
 
+/**
+ * @brief Structural equality for tau nodes
+ * @param l Left-hand side of comparison.
+ * @param r Right-hand side of comparison.
+ * @return True, if the tree structure for l and r is the same, else false.
+ */
+template <typename... BAs>
+struct struc_equal {
+	bool operator() (const tau<BAs...>& l, const tau<BAs...>& r) const {
+		if (r == nullptr && l == nullptr) return true;
+		if (r == nullptr || l == nullptr) return false;
+
+		if (std::addressof(*l) == std::addressof(*r)) return true;
+		if (l->hash != r->hash) return false;
+
+		if (l->value != r->value) return false;
+		if (l->child.size() != r->child.size()) return false;
+
+		//compare children
+		for (size_t i = 0; i < l->child.size(); ++i)
+			if (!operator()(l->child[i], r->child[i])) return false;
+		return true;
+	}
+};
+
+template <typename value_t, typename... BAs>
+using unordered_tau_map = std::unordered_map<tau<BAs...>, value_t,
+			std::hash<tau<BAs...>>, struc_equal<BAs...>>;
+
+template <typename... BAs>
+using unordered_tau_set = std::unordered_set<tau<BAs...>, std::hash<tau<BAs...>>,
+	struc_equal<BAs...>>;
+
 } // namespace tau_lang
+
+namespace idni::rewriter {
+
+template <typename... BAs>
+struct make_node_cache_equality<tau_lang::tau_sym<BAs...>> {
+	bool operator() (const node<tau_lang::tau_sym<BAs...>>& l,
+		const node<tau_lang::tau_sym<BAs...>>& r) const {
+		static tau_lang::struc_equal<BAs...> st_eq;
+		if (std::addressof(l) == std::addressof(r)) return true;
+		if (l.hash != r.hash) return false;
+
+		if (l.value != r.value) return false;
+		if (l.child.size() != r.child.size()) return false;
+
+		//compare children
+		for (size_t i = 0; i < l.child.size(); ++i)
+			if (!st_eq(l.child[i], r.child[i])) return false;
+		return true;
+	}
+};
+
+template <typename... BAs>
+struct traverser_cache_equality<tau_lang::tau<BAs...>> {
+	bool operator() (const tau_lang::tau<BAs...>& l,
+		const tau_lang::tau<BAs...>& r) const {
+		static tau_lang::struc_equal<BAs...> st_eq;
+		return st_eq(l, r);
+	}
+};
+
+template <typename... BAs>
+struct traverser_pair_cache_equality<tau_lang::tau<BAs...>> {
+	using p = std::pair<tau_lang::tau<BAs...>, size_t>;
+	bool operator() (const p& l, const p& r) const {
+		static tau_lang::struc_equal<BAs...> st_eq;
+		return st_eq(l.first, r.first) && l.second == r.second;
+	}
+};
+
+} // idni::rewriter
 
 //
 // operators << to pretty print the tau language related types
