@@ -20,7 +20,8 @@ RUN apt-get update && apt-get install -y \
     cmake=3.28.3-1build7 \
     g++=4:13.2.0-7ubuntu1 \
     mingw-w64=11.0.1-3build1 \
-    libboost-all-dev=1.83.0.1ubuntu2 
+    libboost-all-dev=1.83.0.1ubuntu2 \
+	libz3-dev
 
 # Argument BUILD_TYPE=Debug/Release
 ARG BUILD_TYPE=Release
