@@ -174,7 +174,6 @@ endif()
 #
 option(BOOST_LOG_TRIVIAL           "Build logging in parser"   ON)
 option(PARSER_BUILD_STATIC_LIBRARY "Build only static library" ON)
-#option(TAU_WITH_Z3                 "Build and use Z3"          OFF)
 
 #
 # Adding Z3

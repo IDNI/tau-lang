@@ -96,7 +96,6 @@ add_library(${TAU_SHARED_LIB_NAME} SHARED)
 add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
 target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_link_libraries(${TAU_SHARED_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} Boost::log Z3)
-target_link_libraries(${TAU_SHARED_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} Boost::log)
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
