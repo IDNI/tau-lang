@@ -15,7 +15,7 @@
 #include <functional>
 #include <cmath>
 
-#include "defs.h"
+#include "../../defs.h"
 #include "../../dict.h"
 #include "../bool_ba.h"
 
@@ -1452,4 +1452,4 @@ struct std::hash<std::pair<idni::tau_lang::bdd_reference<S, O, IW, SW>, idni::ta
 };
 
 
-#endif
+#endif // __BABDD_H__

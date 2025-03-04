@@ -4,7 +4,7 @@
 #define __BDD_HANDLE_H__
 
 #include "babdd.h"
-#include "splitter_types.h"
+#include "../../splitter_types.h"
 
 namespace idni::tau_lang {
 

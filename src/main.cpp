@@ -19,6 +19,30 @@ using namespace idni;
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
+/*template <typename S, typename T>
+std::ostream& operator<<(std::ostream& stream,
+	const std::pair<S, T>& r)
+{
+	return stream << r.first << " := " << r.second << ".";
+}*/
+
+/*template std::ostream& operator<<(std::ostream&,
+	const std::variant<idni::tau_lang::tau_ba<idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>, idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>&);
+
+template std::ostream& operator<<(std::ostream&,
+	const idni::tau_lang::tau_ba<idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>&);*/
+
+//	template std::ostream& operator<<(std::ostream&,
+//		const idni::tau_lang::tau<idni::tau_lang::tau_ba<idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>, idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>&);
+
+//template std::ostream& operator<<(std::ostream&, const std::pair<
+//	idni::tau_lang::tau<idni::tau_lang::tau_ba<idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>, idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>,
+//	idni::tau_lang::tau<idni::tau_lang::tau_ba<idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>, idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>>&);
+
+//	template std::ostream& operator<<(std::ostream&, const
+//			std::pair<std::shared_ptr<idni::rewriter::node<std::variant<idni::lit<char, char>, std::variant<idni::tau_lang::tau_ba<idni::tau_lang::bitvector_ba, std::shared_ptr<idni::tau_lang::bdd_handle<idni::tau_lang::Bool, idni::tau_lang::bdd_options<>{18, 12}> > >, idni::tau_lang::bitvector_ba, std::shared_ptr<idni::tau_lang::bdd_handle<idni::tau_lang::Bool, idni::tau_lang::bdd_options<>{18, 12}> > >, long unsigned int> > >,
+//			std::shared_ptr<idni::rewriter::node<std::variant<idni::lit<char, char>, std::variant<idni::tau_lang::tau_ba<idni::tau_lang::bitvector_ba, std::shared_ptr<idni::tau_lang::bdd_handle<idni::tau_lang::Bool, idni::tau_lang::bdd_options<>{18, 12}> > >, idni::tau_lang::bitvector_ba, std::shared_ptr<idni::tau_lang::bdd_handle<idni::tau_lang::Bool, idni::tau_lang::bdd_options<>{18, 12}> > >, long unsigned int> > > > &);
+
 cli::options tau_options() {
 	cli::options opts;
 	opts["help"] = cli::option("help", 'h', false)

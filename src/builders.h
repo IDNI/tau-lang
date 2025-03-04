@@ -59,6 +59,7 @@ const std::string BLDR_BF_1 = "( $X ) =: 1.";
 const std::string BLDR_WFF_F = "( $X ) =:: F.";
 const std::string BLDR_WFF_T = "( $X ) =:: T.";
 
+// TODO (LOW) clean unnecessary definitions
 // definitions of wff builder rules
 const std::string BLDR_WFF_EQ = "( $X ) =:: $X = 0.";
 const std::string BLDR_WFF_NEQ = "( $X ) =:: $X != 0.";

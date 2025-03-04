@@ -6,7 +6,6 @@
 #include <fstream>
 
 #include "boolean_algebras/tau_ba.h"
-#include "boolean_algebras/variant_ba.h"
 #include "solver.h"
 #include "satisfiability.h"
 

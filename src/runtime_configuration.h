@@ -4,8 +4,9 @@
 #define __RUNTIME_CONFIGURATION_H__
 
 #include "runtime.h"
+#include "boolean_algebras/variant_ba.h"
+#include "boolean_algebras/nso_ba.h"
 #include "boolean_algebras/tau_ba.h"
-#include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/sbf_ba.h"
 #include "boolean_algebras/bitvector_ba.h"
 
@@ -114,12 +115,12 @@ struct nso_factory<tau_ba<bitvector_ba>, bitvector_ba> {
 	inline static bitvector_ba_factory<tau_ba<bitvector_ba>,bitvector_ba> bvf;
 	inline static tau_ba_factory<bitvector_ba> tf;
 
-	std::optional<tau<tau_ba<bitvector_ba>, bitvector_ba>> parse(const std::string src,
-		const std::string = "");
+	std::optional<tau<tau_ba<bitvector_ba>, bitvector_ba>> parse(const std::string& src,
+		const std::string type_name = "");
 
 	tau<tau_ba<bitvector_ba>, bitvector_ba> binding(
 		const tau<tau_ba<bitvector_ba>, bitvector_ba>& n,
-		const std::string type_name);
+		const std::string type_name = "");
 
 	std::vector<std::string> types() const;
 
@@ -145,19 +146,19 @@ private:
  */
 template<>
 struct nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> {
-	inline static bitvector_ba_factory<tau_ba<bitvector_ba, sbf_ba>,bitvector_ba, sbf_ba> bvf;
+	inline static bitvector_ba_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> bvf;
 	inline static tau_ba_factory<bitvector_ba, sbf_ba> tf;
 
-	std::optional<tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>> parse(const std::string src,
-		const std::string = "");
+	std::optional<tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>> parse(const std::string& src,
+		const std::string type_name = "");
 
 	tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> binding(
 		const tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>& n,
-		const std::string type_name);
+		const std::string type_name = "");
 
 	std::vector<std::string> types() const;
 
-	tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> splitter_one(const std::string& type_name) const;
+	tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> splitter_one(const std::string& type_name = "") const;
 
 	std::string default_type() const;
 

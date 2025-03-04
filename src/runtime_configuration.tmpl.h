@@ -48,8 +48,9 @@ namespace idni::tau_lang {
 	nso_factory<bitvector_ba>::nso_factory() {};
 
 
+
 	std::optional<tau<tau_ba<bitvector_ba>, bitvector_ba>> nso_factory<tau_ba<bitvector_ba>, bitvector_ba>::parse(
-		const std::string src, const std::string type_name)
+		const std::string& src, const std::string type_name)
 	{
 		if (type_name == "bit")	return bvf.parse(src);
 		return tf.parse(src);
@@ -105,7 +106,90 @@ namespace idni::tau_lang {
 	nso_factory<tau_ba<bitvector_ba>, bitvector_ba>::nso_factory() {};
 
 
-	std::optional<tau<sbf_ba>> nso_factory<sbf_ba>::parse(const std::string& src,
+
+
+
+
+
+
+
+	std::optional<tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>> nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::parse(const std::string& src,
+		const std::string type_name)
+		{
+			return bvf.parse(src);
+		}
+
+	tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::binding(const tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>& n,
+		const std::string type_name)
+	{
+		return bvf.binding(n);
+	}
+
+
+
+
+
+
+	std::vector<std::string> nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::types() const {
+		return { "sbf" };
+	}
+
+
+
+
+
+
+	tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::splitter_one(const std::string& type_name) const {
+		throw std::logic_error("Unsupported");
+	}
+
+	std::string nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::default_type() const {
+		return "tau";
+	}
+
+	std::string nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::one(const std::string type_name) const {
+		return "1";
+	}
+
+	std::string nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::zero(const std::string type_name) const {
+		return "0";
+	}
+
+	std::optional<tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>> nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::unpack_tau_ba(
+		const std::variant<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>&) const {
+		// There is no tau_ba present
+		return {};
+	}
+
+	nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>& nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::instance() {
+		static nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> factory;
+		return factory;
+	}
+
+	nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>::nso_factory() {};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*	std::optional<tau<sbf_ba>> nso_factory<sbf_ba>::parse(const std::string& src,
 		const std::string&) {
 	return bf.parse(src);
 }
@@ -262,3 +346,6 @@ private:
 
 
 } // namespace idni::tau_lang
+
+template std::ostream& operator<<(std::ostream&,
+	const idni::tau_lang::tau<idni::tau_lang::tau_ba<idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>, idni::tau_lang::bitvector_ba, idni::tau_lang::sbf_ba>&);
