@@ -108,7 +108,7 @@ A macOS installer will be available in the future.
 
 To compile the source code you need a recent C++ compiler supporting C++23, e.g.
 GCC 13.1.0. You also need at least a cmake version 3.22.1 installed in your system.
-The only code dependency is libboost.
+The only code dependencies are Boost C++ Libraries (libboost) an Z3 SMT Solver (libz3-dev).
 
 After cloning:
 
