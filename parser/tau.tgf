@@ -87,6 +87,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | (bf  _ '+' _       bf)             :bf_xor
                         | ('1' [ _ ':' _ type ])             :bf_t
                         | ('0' [ _ ':' _ type ])             :bf_f
+                        |                                     arithmetic
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | bf_constant
@@ -103,6 +104,30 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
+
+# artthmetic expressions
+#
+# TODO fix the precedence of the arithmetic operators as we do with logical ones
+#
+arithmetic        => ('(' _ arithmetic _ ')')            :arithmetic_parenthesis
+                   |                                      bitvector_constant
+                   | (arithmetic _ ":+" _ arithmetic)    :arithmetic_add
+                   | (arithmetic _ ":-" _ arithmetic)    :arithmetic_sub
+                   | (arithmetic _ ":*" _ arithmetic)    :arithmetic_mul
+                   | (arithmetic _ ":/" _ arithmetic)    :arithmetic_div
+                   | (arithmetic _ ":%" _ arithmetic)    :arithmetic_mod
+                   | (arithmetic _ ":<<" _ digits)       :arithmetic_shl
+                   | (arithmetic _ ":>>" _ digits)       :arithmetic_shr
+                   | (arithmetic _ ":<" _ arithmetic)    :arithmetic_lt
+                   | (arithmetic _ ":<=" _ arithmetic)   :arithmetic_le
+                   | (arithmetic _ ":>" _ arithmetic)    :arithmetic_gt
+                   | (arithmetic _ ":>=" _ arithmetic)   :arithmetic_ge
+                   | (arithmetic _ ":=" _ arithmetic)    :arithmetic_eq
+                   | (arithmetic _ ":!=" _ arithmetic)   :arithmetic_ne.
+
+bitvector_constant =>  '{' _ (binding):constant _ '}' _ ':' _ (bv_type):type.
+bv_type            => "bit" _ '[' _ [digits] _ ']'.
+
 # constant time constraints
 constraint =>
    ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]"):ctn_neq
@@ -134,9 +159,12 @@ integer                => ['-'] _ digits.
 # constants
 uninterpreted_constant => '<' ((chars | _ ) ':' chars):uninter_const_name _ '>'.
 bf_constant            => '{' _ (capture | binding):constant _ '}'
-                                                         [ _ ':' _ chars:type ].
+                                                         [ _ ':' _ type ].
 binding                => (src_c [ (src_c | space)* src_c ]):source.
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
+
+type                   => chars
+                        | chars _ '[' _ num _ ']'.
 
 # common elements
 chars                  => alpha (alnum | '_')*.
@@ -281,6 +309,7 @@ memory                 => ( "%"
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c,
+        arithmetic > arithmetic_parenthesis > arithmetic,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
         bf  > bf_parenthesis  > bf,
