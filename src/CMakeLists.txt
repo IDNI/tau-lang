@@ -12,6 +12,7 @@ set(TAU_HEADERS
 	../external/parser/src/tgf.h
 	../parser/sbf_parser.generated.h
 	../parser/tau_parser.generated.h
+	../parser/bitvector_parser.generated.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h
@@ -19,6 +20,7 @@ set(TAU_HEADERS
 	boolean_algebras/variant_ba.h
 	boolean_algebras/product_ba.h
 	boolean_algebras/nso_ba.h
+	boolean_algebras/bitvector_ba.h
 	experimental/execution.h
 	defs.h
 	rewriting.h
@@ -48,6 +50,7 @@ set(TAU_SOURCES
 	../external/parser/src/recoders.cpp
 	../external/parser/src/term.cpp
 	boolean_algebras/bool_ba.cpp
+	boolean_algebras/bitvector_ba.cpp
 	dict.cpp
 	nso_rr.cpp
 )
