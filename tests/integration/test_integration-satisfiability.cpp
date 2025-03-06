@@ -70,14 +70,17 @@ TEST_SUITE("Alignments") {
 		auto spec = create_spec<base_bas>("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t-1] = 1).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
+#ifndef DEBUG
 	TEST_CASE("mixed_lookback_two_st_1") {
 		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t-2] = 1) && (sometimes o1[t-3] = 0) && (sometimes o1[t] = 1).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
+
 	TEST_CASE("mixed_lookback_two_st_2") {
 		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t-2] = 1) && (sometimes o1[t-3] = 1) && (sometimes o1[t] = 0).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
+#endif
 }
