@@ -152,21 +152,73 @@ static auto unsqueeze_wff = make_library<BAs...>(
 	+ WFF_UNSQUEEZE_NEGATIVES_0
 );
 
-template<typename... BAs>
-static auto squeeze_wff = make_library<BAs...>(
-	WFF_SQUEEZE_POSITIVES_0
-	+ WFF_SQUEEZE_NEGATIVES_0
-);
+template <typename... BAs>
+tau<BAs...> squeeze_wff (const tau<BAs...>& fm) {
+	//$X = 0 && $Y = 0 ::= $X | $Y = 0
+	// $X != 0 || $Y != 0 ::= $X | $Y != 0
+	using p = tau_parser;
+	auto f = [](const tau<BAs...>& n) {
+		if (is_non_terminal(p::wff_and, n)) {
+			const auto& e1 = trim(n);
+			const auto& e2 = n->child[1];
+			if (is_child_non_terminal(p::bf_eq, e1) &&
+				is_child_non_terminal(p::bf_eq, e2)) {
+				return trim(build_wff_eq(
+					build_bf_or(trim2(e1), trim2(e2))));
+				}
+		}
+		if (is_non_terminal(p::wff_or, n)) {
+			const auto& e1 = trim(n);
+			const auto& e2 = n->child[1];
+			if (is_child_non_terminal(p::bf_neq, e1) &&
+				is_child_non_terminal(p::bf_neq, e2)) {
+				return trim(build_wff_neq(
+					build_bf_or(trim2(e1), trim2(e2))));
+				}
+		}
+		return n;
+	};
+	return post_order(fm).apply_unique(f, visit_wff<BAs...>);
+}
 
-template<typename... BAs>
-static auto unsqueeze_wff_pos = make_library<BAs...>(
-	WFF_UNSQUEEZE_POSITIVES_0
-);
+template <typename... BAs>
+tau<BAs...> unsqueeze_wff_pos (const tau<BAs...>& fm) {
+	// $X | $Y = 0 ::= $X = 0 && $Y = 0
+	using p = tau_parser;
+	auto f = [](const tau<BAs...>& n) {
+		if (is_non_terminal(p::bf_eq, n)) {
+			const auto& e = trim2(n);
+			if (is_non_terminal(p::bf_or, e)) {
+				const auto& c1 = trim(e);
+				const auto& c2 = e->child[1];
+				return trim(build_wff_and(
+					build_wff_eq(c1),
+					build_wff_eq(c2)));
+			}
+		}
+		return n;
+	};
+	return pre_order(fm).apply_unique(f, visit_wff<BAs...>, identity);
+}
 
-template<typename... BAs>
-static auto squeeze_wff_pos = make_library<BAs...>(
-	WFF_SQUEEZE_POSITIVES_0
-);
+template <typename... BAs>
+tau<BAs...> squeeze_wff_pos (const tau<BAs...>& fm) {
+	// $X = 0 && $Y = 0 ::= $X | $Y = 0
+	using p = tau_parser;
+	auto f = [](const tau<BAs...>& n) {
+		if (is_non_terminal(p::wff_and, n)) {
+			const auto& e1 = trim(n);
+			const auto& e2 = n->child[1];
+			if (is_child_non_terminal(p::bf_eq, e1) &&
+				is_child_non_terminal(p::bf_eq, e2)) {
+				return trim(build_wff_eq(
+					build_bf_or(trim2(e1), trim2(e2))));
+			}
+		}
+		return n;
+	};
+	return post_order(fm).apply_unique(f, visit_wff<BAs...>);
+}
 
 template<typename... BAs>
 static auto unsqueeze_wff_neg = make_library<BAs...>(
@@ -1825,13 +1877,11 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 
 	auto squeezed_fm = (to_cnf ? push_negation_in(build_wff_neg(fm)) : fm);
 	// Squeeze all equalities and inequalities
-	//TODO: avoid pattern matcher
-	squeezed_fm = squeezed_fm | repeat_all<step<BAs...>, BAs...>(squeeze_wff<BAs...>);
+	squeezed_fm = squeeze_wff(squeezed_fm);
 	squeezed_fm = reduce_terms(to_dnf2(squeezed_fm));
 	// std::cout << squeezed_fm << "\n";
 	// We work with unsqueezed equality
-	//TODO: avoid pattern matcher
-	squeezed_fm  = squeezed_fm | repeat_all<step<BAs...>, BAs...>(unsqueeze_wff_pos<BAs...>);
+	squeezed_fm  = unsqueeze_wff_pos(squeezed_fm);
     // std::cout << squeezed_fm << "\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Formula in DNF: " << squeezed_fm;
 #ifdef TAU_CACHE
