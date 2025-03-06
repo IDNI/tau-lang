@@ -2764,7 +2764,6 @@ tau<BAs...> push_existential_quantifier_one (const tau<BAs...>& fm) {
 	assert(is_child_non_terminal(p::wff_ex, fm));
 	const tau<BAs...> scoped_fm = trim(fm)->child[1];
 	const tau<BAs...> quant_var = trim2(fm);
-	const auto has_var = [&quant_var](const auto& el){return el == quant_var;};
 
 	if (is_child_non_terminal(p::wff_or, scoped_fm)) {
 		// Push quantifier in
@@ -2777,14 +2776,16 @@ tau<BAs...> push_existential_quantifier_one (const tau<BAs...>& fm) {
 		auto clauses = get_cnf_wff_clauses(scoped_fm);
 		tau<BAs...> no_q_fm = _T<BAs...>;
 		for (tau<BAs...>& clause : clauses) {
-			if (!find_top(clause, has_var)) {
+			if (!contains(clause, quant_var)) {
 				no_q_fm = build_wff_and(no_q_fm, clause);
 				clause = _T<BAs...>;
 			}
 		}
-		return build_wff_and(
-			build_wff_ex(quant_var, build_wff_and<BAs...>(clauses)),
-			no_q_fm);
+		auto q_fm = build_wff_and<BAs...>(clauses);
+		if (q_fm == _T<BAs...>) return scoped_fm;
+		else if (no_q_fm == _T<BAs...>) return fm;
+		else return build_wff_and(
+			build_wff_ex(quant_var, q_fm), no_q_fm);
 	}
 	else if (is_child_non_terminal(p::wff_ex, scoped_fm)) {
 		//other ex quant, hence can switch them
@@ -2792,7 +2793,46 @@ tau<BAs...> push_existential_quantifier_one (const tau<BAs...>& fm) {
 		return build_wff_ex(trim2(scoped_fm), c);
 	}
 	// Else check if quant_var is contained in subtree
-	if (find_top(scoped_fm, has_var)) return fm;
+	else if (contains(scoped_fm, quant_var)) return fm;
+	else return scoped_fm;
+}
+
+template <typename... BAs>
+tau<BAs...> push_universal_quantifier_one (const tau<BAs...>& fm) {
+	using p = tau_parser;
+	assert(is_child_non_terminal(p::wff_all, fm));
+	const tau<BAs...> scoped_fm = trim(fm)->child[1];
+	const tau<BAs...> quant_var = trim2(fm);
+
+	if (is_child_non_terminal(p::wff_and, scoped_fm)) {
+		// Push quantifier in
+		const auto c0 = build_wff_all(quant_var, trim2(scoped_fm));
+		const auto c1 = build_wff_all(quant_var, trim(scoped_fm)->child[1]);
+		return build_wff_and(c0, c1);
+	}
+	else if (is_child_non_terminal(p::wff_or, scoped_fm)) {
+		// Remove existential, if quant_var does not appear in clause
+		auto clauses = get_dnf_wff_clauses(scoped_fm);
+		tau<BAs...> no_q_fm = _F<BAs...>;
+		for (tau<BAs...>& clause : clauses) {
+			if (!contains(clause, quant_var)) {
+				no_q_fm = build_wff_or(no_q_fm, clause);
+				clause = _F<BAs...>;
+			}
+		}
+		auto q_fm = build_wff_or<BAs...>(clauses);
+		if (q_fm == _F<BAs...>) return scoped_fm;
+		else if (no_q_fm == _F<BAs...>) return fm;
+		else return build_wff_or(
+			build_wff_all(quant_var, q_fm), no_q_fm);
+	}
+	else if (is_child_non_terminal(p::wff_all, scoped_fm)) {
+		//other all quant, hence can switch them
+		const auto& c = build_wff_all(quant_var, trim(scoped_fm)->child[1]);
+		return build_wff_all(trim2(scoped_fm), c);
+	}
+	// Else check if quant_var is contained in subtree
+	else if (contains(scoped_fm, quant_var)) return fm;
 	else return scoped_fm;
 }
 
