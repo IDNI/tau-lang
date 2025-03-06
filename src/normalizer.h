@@ -59,7 +59,7 @@ tau<BAs...> normalizer_step(const tau<BAs...>& form) {
 
 	auto result = form
 		// Push all quantifiers in and eliminate them
-		| (tau_transform<BAs...>)eliminate_quantifiers<BAs...>
+		| (tau_f<BAs...>)eliminate_quantifiers<BAs...>
 		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
 		// are reduced
 		| bf_reduce_canonical<BAs...>()
@@ -81,7 +81,7 @@ tau<BAs...> normalize_non_temp(const tau<BAs...>& fm) {
 	#endif // TAU_CACHE
 	auto result = fm
 		// Push all quantifiers in and eliminate them
-		| (tau_transform<BAs...>)eliminate_quantifiers<BAs...>
+		| (tau_f<BAs...>)eliminate_quantifiers<BAs...>
 		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
 		// are reduced
 		| bf_reduce_canonical<BAs...>();

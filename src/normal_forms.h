@@ -276,10 +276,10 @@ static auto to_nnf_bf = make_library<BAs...>(
 // --------------------------------------------------------------
 // General operator for tau<BAs...> function application by pipe
 template<typename... BAs>
-using tau_transform = tau<BAs...>(*)(const tau<BAs...>&);
+using tau_f = tau<BAs...>(*)(const tau<BAs...>&);
 
 template<typename... BAs>
-tau<BAs...> operator| (const tau<BAs...>& fm, const tau_transform<BAs...> func) {
+tau<BAs...> operator| (const tau<BAs...>& fm, const tau_f<BAs...> func) {
 	return func(fm);
 }
 // --------------------------------------------------------------
