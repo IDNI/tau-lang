@@ -249,6 +249,17 @@ template <typename... BAs>
 using unordered_tau_set = std::unordered_set<tau<BAs...>, std::hash<tau<BAs...>>,
 	struc_equal<BAs...>>;
 
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& os, const unordered_tau_set<BAs...>& set) {
+	os << "{";
+	for (auto it = set.begin(); it != set.end(); ++it) {
+		if (std::next(it)!=set.end()) os << *it << ",";
+		else os << *it;
+	}
+	os << "}";
+	return os;
+}
+
 } // namespace tau_lang
 
 namespace idni::rewriter {

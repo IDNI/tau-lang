@@ -120,6 +120,39 @@ std::function<bool(const tau<BAs...>&)> is_terminal(char c) {
 		return is_terminal<BAs...>(c, n); };
 }
 
+// --- Traversal restrictions for Tau tree
+
+template <typename... BAs>
+auto visit_wff = [](const tau<BAs...>& n) static {
+	using p = tau_parser;
+	if (is_non_terminal(p::bf, n))
+		return false;
+	return true;
+};
+
+template <typename... BAs>
+auto visit_io_vars = [] (const tau<BAs...>& n) static {
+	using p = tau_parser;
+	if (is_non_terminal(p::bf_constant, n))
+		return false;
+	if (is_non_terminal(p::uninterpreted_constant, n))
+		return false;
+	return true;
+};
+
+// ---
+
+//TODO: think about cache
+template <typename... BAs>
+bool contains (const tau<BAs...>& fm, const tau<BAs...>& sub_fm) {
+	bool is_contained = false;
+	auto has_sub_fm = [&sub_fm, &is_contained](const auto& n) {
+		if (n == sub_fm) return is_contained = true, false;
+		return true;
+	};
+	pre_order(fm).search_unique(has_sub_fm);
+	return is_contained;
+}
 
 template <typename... BAs>
 static const auto is_var_or_capture = [](const tau<BAs...>& n) {
@@ -137,6 +170,13 @@ static const auto is_quantifier = [](const tau<BAs...>& n) {
 	auto nt = get<tau_source_sym>(n->value).n();
 	return nt == tau_parser::wff_all
 		|| nt == tau_parser::wff_ex;
+};
+
+template <typename... BAs>
+const auto is_child_quantifier = [](const tau<BAs...>& n) {
+	using p = tau_parser;
+	return is_child_non_terminal(p::wff_all, n)
+		|| is_child_non_terminal(p::wff_ex, n);
 };
 
 template <typename... BAs>

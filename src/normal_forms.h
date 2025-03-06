@@ -1082,50 +1082,50 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(const tau<BAs...>& clause,
 {
 	using tp = tau_parser;
 	std::vector<int_t> i (var_pos.size());
-		for (size_t k = 0; k < var_pos.size(); ++k) i[k] = 2;
-		bool clause_is_decided = false;
-		auto var_assigner = [&](const tau<BAs...>& n) {
-			if (clause_is_decided) return false;
-			if (!is_cnf && is_non_terminal(wff ? tp::wff_f : tp::bf_f, n)) {
+	for (size_t k = 0; k < var_pos.size(); ++k) i[k] = 2;
+	bool clause_is_decided = false;
+	auto var_assigner = [&](const tau<BAs...>& n) {
+		if (clause_is_decided) return false;
+		if (!is_cnf && is_non_terminal(wff ? tp::wff_f : tp::bf_f, n)) {
+			clause_is_decided = true;
+			return false;
+		}
+		if (is_cnf && is_non_terminal(wff ? tp::wff_t : tp::bf_t, n)) {
+			clause_is_decided = true;
+			return false;
+		}
+		if (is_non_terminal(wff ? tp::wff_neg : tp::bf_neg, n)) {
+			auto v = trim(n);
+			// Check if v is a T/F or 1/0
+			if (v == _T<BAs...> || v == _1<BAs...>) {
+				if (!is_cnf) clause_is_decided = true;
+				return false;
+			} else if (v == _F<BAs...> || v == _0<BAs...>) {
+				if (is_cnf) clause_is_decided = true;
+				return false;
+			}
+			auto it = var_pos.find(v);
+			assert(it != var_pos.end());
+			if (i[it->second] == 1) {
+				// clause is false for DNF, true for CNF
 				clause_is_decided = true;
 				return false;
 			}
-			if (is_cnf && is_non_terminal(wff ? tp::wff_t : tp::bf_t, n)) {
+			i[it->second] = -1;
+			return false;
+		}
+		if (auto it = var_pos.find(n); it != var_pos.end()) {
+			if (i[it->second] == -1) {
+				// clause is false for DNF, true for CNF
 				clause_is_decided = true;
 				return false;
 			}
-			if (is_non_terminal(wff ? tp::wff_neg : tp::bf_neg, n)) {
-				auto v = trim(n);
-				// Check if v is a T/F or 1/0
-				if (v == _T<BAs...> || v == _1<BAs...>) {
-					if (!is_cnf) clause_is_decided = true;
-					return false;
-				} else if (v == _F<BAs...> || v == _0<BAs...>) {
-					if (is_cnf) clause_is_decided = true;
-					return false;
-				}
-				auto it = var_pos.find(v);
-				assert(it != var_pos.end());
-				if (i[it->second] == 1) {
-					// clause is false for DNF, true for CNF
-					clause_is_decided = true;
-					return false;
-				}
-				i[it->second] = -1;
-				return false;
-			}
-			if (auto it = var_pos.find(n); it != var_pos.end()) {
-				if (i[it->second] == -1) {
-					// clause is false for DNF, true for CNF
-					clause_is_decided = true;
-					return false;
-				}
-				i[it->second] = 1;
-				return false;
-			}
-			else return true;
-		};
-		pre_order(clause).visit_unique(var_assigner);
+			i[it->second] = 1;
+			return false;
+		}
+		else return true;
+	};
+	pre_order(clause).visit_unique(var_assigner);
 	return std::make_pair(move(i), clause_is_decided);
 }
 
@@ -1205,6 +1205,11 @@ tau<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_
 
 template<typename... BAs>
 tau<BAs...> sort_var (const tau<BAs...>& var) {
+#ifdef TAU_CACHE
+	static unordered_tau_map<tau<BAs...>, BAs...> cache;
+	if (auto it = cache.find(var); it != end(cache))
+		return it->second;
+#endif // TAU_CACHE
 	if (is_child_non_terminal(tau_parser::bf_eq, var)) {
 		auto clauses = get_dnf_bf_clauses(trim2(var));
 		std::ranges::sort(clauses);
@@ -1215,7 +1220,12 @@ tau<BAs...> sort_var (const tau<BAs...>& var) {
 			if (res) res = build_bf_or(res, build_bf_and<BAs...>(lits));
 			else res = build_bf_and<BAs...>(lits);
 		}
-		return build_wff_eq(res);
+		res = build_wff_eq(res);
+#ifdef TAU_CACHE
+		cache.emplace(res, res);
+		return cache.emplace(var, res).first->second;
+#endif // TAU_CACHE
+		return res;
 	}
 	return var;
 }
@@ -1254,12 +1264,12 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_
 			if (is_cnf) return {};
 			std::vector<std::vector<int_t>> paths;
 			paths.emplace_back();
-			return make_pair(move(paths), move(vars));
+			return make_pair(std::move(paths), std::move(vars));
 		} else {
 			if (is_cnf) {
 				std::vector<std::vector<int_t>> paths;
 				paths.emplace_back();
-				return make_pair(move(paths), move(vars));
+				return make_pair(std::move(paths), std::move(vars));
 			}
 			return {};
 		}
@@ -2099,6 +2109,10 @@ tau<BAs...> push_negation_one_in(const tau<BAs...>& fm, bool is_wff = true) {
 			return build_wff_neq(trim2(c));
 		if (is_child_non_terminal(p::bf_neq, c))
 			return build_wff_eq(trim2(c));
+		if (is_child_non_terminal(p::wff_ex, c))
+			return build_wff_all(trim2(c), build_wff_neg(trim(c)->child[1]));
+		if (is_child_non_terminal(p::wff_all, c))
+			return build_wff_ex(trim2(c), build_wff_neg(trim(c)->child[1]));
 		if (is_child_non_terminal(p::wff_always, c))
 			return build_wff_sometimes(build_wff_neg(trim2(c)));
 		if (is_child_non_terminal(p::wff_sometimes, c))
