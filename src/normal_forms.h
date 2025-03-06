@@ -3076,11 +3076,54 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 			return scoped_fm;
 		}
 		// Scoped formula contains the quantified variable
-		if (is_ex_quant) return eliminate_existential_quantifier<BAs...>(inner_fm, scoped_fm);
-		else return eliminate_universal_quantifier<BAs...>(inner_fm, scoped_fm);
+		if (is_ex_quant) {
+			// std::cout << "Elim ex: " << inner_fm << "\n";
+			return eliminate_existential_quantifier<BAs...>(inner_fm, scoped_fm);
+		}
+		else {
+			// std::cout << "Elim all: " << inner_fm << "\n";
+			return eliminate_universal_quantifier<BAs...>(inner_fm, scoped_fm);
+		}
+	};
+	unordered_tau_set<BAs...> excluded_nodes;
+	auto push_quantifiers = [&excluded_nodes](const tau<BAs...>& n) {
+		using p = tau_parser;
+		if (is_child_non_terminal(p::wff_ex, n)) {
+			// std::cout << "Push ex: " << n << "\n";
+			auto pushed = push_existential_quantifier_one(n);
+			// std::cout << "Push ex result: " << pushed << "\n";
+			if (pushed == n) {
+				for (const auto& c : n->child)
+					excluded_nodes.insert(c);
+				return n;
+			} else return pushed;
+		} else if (is_child_non_terminal(p::wff_all, n)) {
+			// std::cout << "Push all: " << n << "\n";
+			auto pushed = push_universal_quantifier_one(n);
+			// std::cout << "Push all result: " << pushed << "\n";
+			if (pushed == n) {
+				for (const auto& c : n->child)
+					excluded_nodes.insert(c);
+				return n;
+			} else return pushed;
+		}
+		return n;
+	};
+	auto visit = [&excluded_nodes](const tau<BAs...>& n) {
+		using p = tau_parser;
+		if (is_non_terminal(p::bf, n)) return false;
+		if (excluded_nodes.contains(n)) return false;
+		return true;
+	};
+	auto push_and_elim = [&elim_quant, &push_quantifiers, visit](const tau<BAs...>& n) {
+		if (is_child_quantifier<BAs...>(n)) {
+			// std::cout << "push_and_elim: " << n << "\n";
+			return pre_order(n).apply_unique(push_quantifiers, visit, elim_quant);
+		} else return n;
 	};
 	auto is_not_bf = [](const tau<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
-	return post_order(fm).apply_unique(elim_quant, is_not_bf);
+	// std::cout << "Quant elim in: " << fm << "\n";
+	return post_order(fm).apply_unique(push_and_elim, is_not_bf);
 }
 
 template <typename... BAs>
