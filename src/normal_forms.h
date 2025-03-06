@@ -2138,7 +2138,8 @@ tau<BAs...> push_negation_in(const tau<BAs...>& fm, bool is_wff) {
 	auto pn = [&is_wff](const auto& n) {
 		return push_negation_one_in(n, is_wff);
 	};
-	return rewriter::pre_order(fm).apply_unique(pn);
+	if (is_wff) return rewriter::pre_order(fm).template apply_unique<2>(pn);
+	else return rewriter::pre_order(fm).template apply_unique<3>(pn);
 }
 
 // Conversion to dnf while applying reductions during the process
@@ -2169,8 +2170,48 @@ tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
 		}
 		return n;
 	};
-	auto nnf_fm = push_negation_in(fm, is_wff);
-	return post_order(nnf_fm).apply_unique(layer_to_dnf);
+	auto pn = [&is_wff](const auto& n) {
+		return push_negation_one_in(n, is_wff);
+	};
+	if (is_wff) return pre_order(fm).template apply_unique<4>(pn, visit_wff<BAs...>, layer_to_dnf);
+	else return pre_order(fm).template apply_unique<5>(pn, all, layer_to_dnf);
+}
+
+template<typename... BAs>
+tau<BAs...> single_dis_lift(const tau<BAs...>& fm) {
+	using p = tau_parser;
+	auto layer_to_dnf = [](const auto& n) {
+		if (is_child_non_terminal(p::wff_and, n)) {
+			// If left child is a disjunction
+			if (is_child_non_terminal(p::wff_or, trim2(n))) {
+				const auto& c = trim2(n);
+				return build_wff_or (
+					build_wff_and(trim2(c), trim(n)->child[1]),
+					build_wff_and(trim(c)->child[1], trim(n)->child[1]));
+			}
+			// If right child is a disjunction
+			if (is_child_non_terminal(p::wff_or, trim(n)->child[1])) {
+				const auto& c = trim(n)->child[1];
+				return build_wff_or (
+					build_wff_and(trim2(n), trim2(c)),
+					build_wff_and(trim2(n), trim(c)->child[1]));
+			}
+		}
+		return n;
+	};
+	bool found_or = false;
+	auto decend = [&found_or](const auto& n) {
+		using p = tau_parser;
+		if (found_or) return false;
+		if (is_non_terminal(p::wff_or, n)) {
+			found_or = true;
+			return false;
+		}
+		if (is_non_terminal(p::bf, n))
+			return false;
+		return true;
+	};
+	return post_order(fm).apply_unique(layer_to_dnf, decend);
 }
 
 // Conversion to cnf while applying reductions during the process
@@ -2201,8 +2242,11 @@ tau<BAs...> to_cnf2(const tau<BAs...>& fm, bool is_wff) {
 		}
 		return n;
 	};
-	auto nnf_fm = push_negation_in(fm, is_wff);
-	return post_order(nnf_fm).apply_unique(layer_to_cnf);
+	auto pn = [&is_wff](const auto& n) {
+		return push_negation_one_in(n, is_wff);
+	};
+	if (is_wff) return pre_order(fm).template apply_unique<6>(pn, all, layer_to_cnf);
+	else return pre_order(fm).template apply_unique<7>(pn, all, layer_to_cnf);
 }
 
 // Assumes that fm is a single DNF always clause
