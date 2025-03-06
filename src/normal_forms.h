@@ -3126,6 +3126,212 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	return post_order(fm).apply_unique(push_and_elim, is_not_bf);
 }
 
+// fm is assumed to be quantifier free
+template <typename... BAs>
+tau<BAs...> get_eq_with_most_quant_vars (const tau<BAs...>& fm, const auto& quant_vars) {
+	using p = tau_parser;
+	// std::cout << "Begin get_eq_with_most_quant_vars with\n";
+	// std::cout << "fm: " << fm << "\n";
+	// std::cout << "quantified vars: " << quant_vars << "\n";
+	tau<BAs...> eq_max_quants;
+	int_t max_quants = 0;
+	auto get_eq = [&](const tau<BAs...>& n) {
+		if (is_non_terminal(p::bf_eq, n)) {
+			// Found term
+			// Get vars
+			auto vars = select_top(n, is_non_terminal<p::variable, BAs...>);
+			// Find overlap of vars and quant_vars
+			int_t quants = 0;
+			for (const auto& v : vars)
+				if (quant_vars.contains(v))
+					++quants;
+			if (quants >= max_quants)
+				max_quants = quants, eq_max_quants = n;
+			// Dont go deeper
+			return false;
+		}
+		// Go deeper
+		return true;
+	};
+	pre_order(fm).visit(get_eq, visit_wff<BAs...>, identity);
+	return wrap(p::wff, eq_max_quants);
+}
+
+template <typename... BAs>
+std::pair<tau<BAs...>, bool> anti_prenex_finalize_ex (const tau<BAs...>& q, const tau<BAs...>& scoped_fm) {
+	using p = tau_parser;
+	// Check if single disjunct
+	if (!find_top(scoped_fm, is_non_terminal<p::wff_or, BAs...>))
+		return {wff_remove_existential(q, scoped_fm), true};
+	// Check if all atomic fms are negative or if all are positive
+	static unordered_tau_set<BAs...> mixed_eqs;
+	if (mixed_eqs.contains(scoped_fm)) return {scoped_fm, false};
+	bool all_atm_fm_neq = true, all_atm_fm_eq = true;
+	auto check_atm_fms = [&all_atm_fm_neq, &all_atm_fm_eq, &q](const tau<BAs...>& n) {
+		if (is_non_terminal(p::bf_eq, n) && contains(n, q)) {
+			all_atm_fm_neq = false;
+			return all_atm_fm_eq != false;
+		} else if (is_non_terminal(p::bf_neq, n) && contains(n, q)) {
+			all_atm_fm_eq = false;
+			return all_atm_fm_neq != false;
+		} else if (is_non_terminal(p::wff_ref, n)) {
+			all_atm_fm_neq = false;
+			all_atm_fm_eq = false;
+			return false;
+		}
+		return true;
+	};
+	pre_order(scoped_fm).search_unique(check_atm_fms, visit_wff<BAs...>, identity);
+	if (all_atm_fm_neq) {
+		// std::cout << "all atomic fms are negative\n";
+		// All atomic formulas are of the form !=
+		auto elim_quants = [&q](const tau<BAs...>& n) {
+			if (is_child_non_terminal(p::bf_neq, n) && contains(n, q)) {
+				return wff_remove_existential(q, n);
+			} else return n;
+		};
+		return {pre_order(scoped_fm).apply_unique_until_change(
+			elim_quants, visit_wff<BAs...>, identity), true};
+	} else if (all_atm_fm_eq) {
+		// std::cout << "all atomic fms are positive\n";
+		tau<BAs...> red = reduce_across_bfs(scoped_fm, false);
+		return {wff_remove_existential(q, red), true};
+	}
+	mixed_eqs.insert(scoped_fm);
+	return {scoped_fm, false};
+}
+
+template <typename... BAs>
+tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
+	unordered_tau_set<BAs...> excluded_nodes, quant_vars;
+	auto anti_prenex_step = [&excluded_nodes](const tau<BAs...>& n) {
+		if (is_child_quantifier<BAs...>(n)) {
+			// std::cout << "Start anti_prenex_step\n";
+			// Try push quant down
+			auto pushed = push_existential_quantifier_one(n);
+			if (pushed != n) {
+				// std::cout << "Pushed existential one:\n";
+				// std::cout << "From " << n << "\n";
+				// std::cout << "To " << pushed << "\n\n";
+				return pushed;
+			}
+			tau<BAs...> scoped_fm = trim(n)->child[1];
+			const auto& q_v = trim2(n);
+			// Try apply finalize
+			auto [r, suc] = anti_prenex_finalize_ex(q_v, scoped_fm);
+			if (suc) {
+				// r = reduce_across_bfs(r, false);
+				// std::cout << "Finalized subtree:\n";
+				// std::cout << "From " << n << "\n";
+				// std::cout << "To " << r << "\n\n";
+				for (const auto& child : r->child)
+					excluded_nodes.insert(child);
+				return r;
+			}
+
+			// Try bf_reduce_across for now
+			tau<BAs...> res = eliminate_existential_quantifier<BAs...>(n, scoped_fm);
+			for (const auto& child : res->child)
+				excluded_nodes.insert(child);
+			return res;
+
+			/*// Boole decomposition
+			auto eq = get_eq_with_most_quant_vars(scoped_fm, quant_vars);
+			//TODO: absorbtions
+			auto left = build_wff_and(eq, replace(scoped_fm, eq, _T<BAs...>));
+			if (left == _F<BAs...>) {
+				// Boole decomp does not create two branches
+				assert(find_top(n, is_non_terminal<tau_parser::wff_or, BAs...>));
+				auto dis = single_dis_lift(n);
+				auto res = push_existential_quantifier_one(dis);
+				// std::cout << "Single || lift:\n";
+				// std::cout << "From " << n << "\n";
+				// ptree(std::cout, n);
+				// std::cout << "\n\n";
+				// std::cout << "dis: " << dis << "\n";
+				// std::cout << "To " << res << "\n\n";
+				return res;
+			}
+			auto neq = build_wff_neq(trim2(eq));
+			auto right = build_wff_and(neq, replace(scoped_fm, eq, _F<BAs...>));
+			if (right == _F<BAs...>) {
+				// Boole decomp does not create two branches
+				assert(find_top(n, is_non_terminal<tau_parser::wff_or, BAs...>));
+				auto dis = single_dis_lift(n);
+				auto res = push_existential_quantifier_one(dis);
+				// std::cout << "Single || lift:\n";
+				// std::cout << "From " << n << "\n";
+				// ptree(std::cout, n);
+				// std::cout << "\n\n";
+				// std::cout << "dis: " << dis << "\n";
+				// std::cout << "To " << res << "\n\n";
+				return res;
+			}
+			auto res = build_wff_or(
+				build_wff_ex(q_v, left),
+				build_wff_ex(q_v, right));
+			// std::cout << "Boole decomposition:\n";
+			// std::cout << "From " << n << "\n";
+			// std::cout << "To " << res << "\n\n";
+			return res;*/
+		} else return n;
+	};
+	auto visit = [&excluded_nodes](const tau<BAs...>& n) {
+		using p = tau_parser;
+		if (is_non_terminal(p::bf, n))
+			return false;
+		if (excluded_nodes.contains(n)) return false;
+		return true;
+	};
+	auto inner_quant = [&anti_prenex_step, &visit, &quant_vars](const tau<BAs...>& n) {
+		if (is_child_quantifier<BAs...>(n)) {
+			// TODO: implement universal quantifier explicitly
+			using p = tau_parser;
+			if (is_child_non_terminal(p::wff_all, n)) {
+				// std::cout << "Before elimination:\n";
+				// std::cout << n << "\n\n";
+				auto n_neg = push_negation_in(build_wff_neg(n));
+				auto res = pre_order(n_neg).template apply_unique<8>(
+					anti_prenex_step, visit, identity);
+				quant_vars.erase(trim2(n));
+				res = push_negation_in(build_wff_neg(res));
+				// std::cout << "After elimination:\n";
+				// std::cout << res << "\n\n";
+				// std::cout << "Simp dnf after elimination:\n";
+				// std::cout << reduce_across_bfs(res, false) << "\n\n";
+				// std::cout << "Simp cnf after elimination:\n";
+				res = reduce_across_bfs(res, true);
+				// std::cout << res << "\n\n";
+				return res;
+			} else {
+				// std::cout << "Before elimination:\n";
+				// std::cout << n << "\n\n";
+				auto res = pre_order(n).template apply_unique<8>(
+					anti_prenex_step, visit, identity);
+				quant_vars.erase(trim2(n));
+				// std::cout << "After elimination:\n";
+				// std::cout << res << "\n\n";
+				// std::cout << "Simp dnf after elimination:\n";
+				// std::cout << reduce_across_bfs(res, false) << "\n\n";
+				// std::cout << "Simp cnf after elimination:\n";
+				res = reduce_across_bfs(res, false);
+				// std::cout << res << "\n\n";
+				return res;
+			}
+		} else return n;
+	};
+	auto visit_inner_quant = [&quant_vars](const tau<BAs...>& n) {
+		using p = tau_parser;
+		if (is_quantifier<BAs...>(n))
+			quant_vars.insert(trim(n));
+		if (is_non_terminal(p::bf, n))
+			return false;
+		return true;
+	};
+	auto nnf = push_negation_in(fm);
+	return post_order(nnf).template apply_unique<1>(inner_quant, visit_inner_quant);
+}
+
 template <typename... BAs>
 tau<BAs...> replace_free_vars_by (const tau<BAs...>& fm, const tau<BAs...>& val) {
 	assert(!is_non_terminal(tau_parser::bf, val));
