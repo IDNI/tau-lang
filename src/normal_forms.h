@@ -2851,41 +2851,41 @@ std::optional<tau<BAs...>> squeeze_positives(const tau<BAs...>& n) {
 template<typename... BAs>
 tau<BAs...> wff_remove_existential(const tau<BAs...>& var, const tau<BAs...>& wff) {
 	// Following Corollary 2.3 from Taba book from Ohad
-	auto is_var = [&var](const auto& node){return node == var;};
-	// if var does not appear in the formula, we can return the formula as is
-	// if (!find_top(wff, is_var)) return wff;
 	std::map<tau<BAs...>, tau<BAs...>> changes;
 	for (const auto& l: get_leaves(wff, tau_parser::wff_or)) {
 		// if var does not appear in the clause, we can skip it
-		if (!find_top(l, is_var)) continue;
+		if (!contains(l, var)) continue;
 		// Get each conjunct in clause
 		tau<BAs...> nl = _T<BAs...>;
 		bool is_quant_removable_in_clause = true;
-		for (const auto& conj : get_leaves(l, tau_parser::wff_and)) {
+		auto conjs = get_cnf_wff_clauses(l);
+		for (auto& conj : conjs) {
+			if (!contains(conj, var)) {
+				nl = build_wff_and(nl, conj);
+				conj = _T<BAs...>;
+				continue;
+			}
 			// Check if conjunct is of form = 0 or != 0
 			if ((conj | tau_parser::bf_eq) || (conj | tau_parser::bf_neq))
 				continue;
 			// If the conjunct contains the quantified variable at this point
 			// we cannot resolve the quantifier in this clause
-			if (find_top(conj, is_var)) {
-				is_quant_removable_in_clause = false;
-				break;
-			}
-			// conjunct does not depend on var
-			nl = build_wff_and(nl, conj);
+			is_quant_removable_in_clause = false;
+			break;
 		}
+		const auto new_l = build_wff_and<BAs...>(conjs);
 		if (!is_quant_removable_in_clause) {
 			// Since we cannot remove the quantifier in this
 			// clause it needs to be maintained
-			changes[l] = build_wff_ex(var, l);
+			changes[l] = build_wff_and(build_wff_ex(var, new_l), nl);
 			continue;
 		}
 
-		auto f = squeeze_positives(l);
+		auto f = squeeze_positives(new_l);
 		auto f_0 = f ? replace(f.value(), var, _0_trimmed<BAs...>) : _0<BAs...>;
 		auto f_1 = f ? replace(f.value(), var, _1_trimmed<BAs...>) : _0<BAs...>;
 
-		if (auto neqs = select_all(l, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
+		if (auto neqs = select_all(new_l, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
 			auto nneqs = _T<BAs...>;
 			for (auto& neq: neqs) {
 				auto g = neq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
