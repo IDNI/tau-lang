@@ -64,7 +64,7 @@ bool is_syntactic_zero(const bitvector_ba& /*fm*/) {
 }
 
 std::strong_ordering operator<=>(const bitvector_ba& x, const bitvector_ba& y) {
-	return x.size <=> y.size;
+	return std::addressof(x) <=> std::addressof(y);
 }
 
 bool operator==(const bitvector_ba& x, const bitvector_ba& y) {
