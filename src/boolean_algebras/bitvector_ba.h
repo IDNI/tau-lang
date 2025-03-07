@@ -39,7 +39,7 @@ struct bitvector_ba {
 	z3::expr e;
 };
 
-auto operator<=>(const bitvector_ba& x, const bitvector_ba& y);
+std::strong_ordering operator<=>(const bitvector_ba& x, const bitvector_ba& y);
 bool operator==(const bitvector_ba& x, const bitvector_ba& y);
 bool operator!=(const bitvector_ba& x, const bitvector_ba& y);
 bool operator==(const bitvector_ba& x, const bool& b);

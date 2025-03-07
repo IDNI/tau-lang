@@ -334,13 +334,13 @@ bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r) {
 // program runs
 // In this comparison typed and non-typed Tau constants are considered different
 template<typename... BAs>
-std::weak_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r) {
-	if (l == nullptr && r == nullptr) return std::weak_ordering::equivalent;
-	if (l == nullptr) return std::weak_ordering::less;
-	if (r == nullptr) return std::weak_ordering::greater;
+std::strong_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r) {
+	if (l == nullptr || r == nullptr) return std::strong_ordering::equivalent;
+	if (l == nullptr) return std::strong_ordering::less;
+	if (r == nullptr) return std::strong_ordering::greater;
 
 	// Identical objects compare equivalent
-	if (std::addressof(*l) == std::addressof(*r)) return std::weak_ordering::equivalent;
+	if (std::addressof(*l) == std::addressof(*r)) return std::strong_ordering::equivalent;
 	// If the hash is different, compare hash
 	if (l->hash != r->hash) return l->hash <=> r->hash;
 	// If value is different, compare value

@@ -92,7 +92,7 @@ bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r);
  * @return Result of the three-way comparison.
  */
 template <typename... BAs>
-std::weak_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r);
+std::strong_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r);
 
 /**
  * @brief Less-than operator for tau.
