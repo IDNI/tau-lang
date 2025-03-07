@@ -241,6 +241,22 @@ struct struc_equal {
 	}
 };
 
+template <typename T, typename... BAs>
+struct pair_struc_equal {
+	bool operator() (const std::pair<tau<BAs...>, T>& l, const std::pair<tau<BAs...>, T>& r) const {
+		return struc_equal<BAs...>()(l.first, r.first) && l.second == r.second;
+	}
+};
+
+template <typename T1, typename T2, typename... BAs>
+struct tuple_struc_equal {
+	bool operator() (const std::tuple<tau<BAs...>, T1, T2>& l, const std::tuple<tau<BAs...>, T1, T2>& r) const {
+		return struc_equal<BAs...>()(std::get<0>(l), std::get<0>(r)) &&
+			std::get<1>(l) == std::get<1>(r) &&
+				std::get<2>(l) == std::get<2>(r);
+	}
+};
+
 template <typename value_t, typename... BAs>
 using unordered_tau_map = std::unordered_map<tau<BAs...>, value_t,
 			std::hash<tau<BAs...>>, struc_equal<BAs...>>;
@@ -248,6 +264,8 @@ using unordered_tau_map = std::unordered_map<tau<BAs...>, value_t,
 template <typename... BAs>
 using unordered_tau_set = std::unordered_set<tau<BAs...>, std::hash<tau<BAs...>>,
 	struc_equal<BAs...>>;
+
+
 
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& os, const unordered_tau_set<BAs...>& set) {
