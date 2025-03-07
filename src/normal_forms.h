@@ -15,6 +15,27 @@
 
 namespace idni::tau_lang {
 
+/**
+ * This enum holds the possible memory slots for traversals using the
+ * pre_order class
+ */
+enum MemorySlotPre {
+	normalize_ba_m,
+	push_negation_in_m,
+	to_dnf2_m,
+	to_cnf2_m,
+	eliminate_quantifiers_m,
+	anti_prenex_step_m
+};
+
+/**
+ * This enum holds the possible memory slots for traversals using the
+ * post_order class
+ */
+enum MemorySlotPost {
+	anti_prenex_m
+};
+
 // tau system library, used to define the tau system of rewriting rules
 #define RULE(name, code) const std::string name = code;
 
@@ -306,7 +327,8 @@ tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
 		assert(type.has_value());
 		return build_bf_constant(res, type.value());
 	};
-	return pre_order(fm).template apply_unique_until_change<1>(norm_ba);
+	return pre_order(fm).template
+	apply_unique_until_change<MemorySlotPre::normalize_ba_m>(norm_ba);
 }
 
 template<typename... BAs>
@@ -1434,6 +1456,7 @@ tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 // TODO: Normalize Tau constants in case type == bf
 template<typename... BAs>
 tau<BAs...> reduce2(const tau<BAs...>& fm, size_t type, bool is_cnf, bool all_reductions, bool enable_sort) {
+	//TODO: cache enable_sort option
 #ifdef TAU_CACHE
 		static std::map<std::pair<tau<BAs...>, bool>, tau<BAs...>> cache;
 		if (auto it = cache.find(make_pair(fm, all_reductions)); it != end(cache))
@@ -2138,8 +2161,13 @@ tau<BAs...> push_negation_in(const tau<BAs...>& fm, bool is_wff) {
 	auto pn = [&is_wff](const auto& n) {
 		return push_negation_one_in(n, is_wff);
 	};
-	if (is_wff) return rewriter::pre_order(fm).template apply_unique<2>(pn);
-	else return rewriter::pre_order(fm).template apply_unique<3>(pn);
+	// if (is_wff) return rewriter::pre_order(fm).template apply_unique<2>(pn);
+	if (is_wff) return rewriter::pre_order(fm).template
+	apply_unique<MemorySlotPre::push_negation_in_m>(
+		pn, visit_wff<BAs...>, identity);
+	else return rewriter::pre_order(fm).template
+	apply_unique<MemorySlotPre::push_negation_in_m>(
+		pn, all, identity);
 }
 
 // Conversion to dnf while applying reductions during the process
@@ -2173,12 +2201,17 @@ tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
 	auto pn = [&is_wff](const auto& n) {
 		return push_negation_one_in(n, is_wff);
 	};
-	if (is_wff) return pre_order(fm).template apply_unique<4>(pn, visit_wff<BAs...>, layer_to_dnf);
-	else return pre_order(fm).template apply_unique<5>(pn, all, layer_to_dnf);
+	// if (is_wff) return pre_order(fm).template apply_unique<4>(pn, visit_wff<BAs...>, layer_to_dnf);
+	if (is_wff) return pre_order(fm).template
+	apply_unique<MemorySlotPre::to_dnf2_m>(
+		pn, visit_wff<BAs...>, layer_to_dnf);
+	else return pre_order(fm).template
+	apply_unique<MemorySlotPre::to_dnf2_m>(
+		pn, all, layer_to_dnf);
 }
 
 template<typename... BAs>
-tau<BAs...> single_dis_lift(const tau<BAs...>& fm) {
+tau<BAs...> single_dnf_lift(const tau<BAs...>& fm) {
 	using p = tau_parser;
 	auto layer_to_dnf = [](const auto& n) {
 		if (is_child_non_terminal(p::wff_and, n)) {
@@ -2245,8 +2278,13 @@ tau<BAs...> to_cnf2(const tau<BAs...>& fm, bool is_wff) {
 	auto pn = [&is_wff](const auto& n) {
 		return push_negation_one_in(n, is_wff);
 	};
-	if (is_wff) return pre_order(fm).template apply_unique<6>(pn, all, layer_to_cnf);
-	else return pre_order(fm).template apply_unique<7>(pn, all, layer_to_cnf);
+	// if (is_wff) return pre_order(fm).template apply_unique<6>(pn, all, layer_to_cnf);
+	if (is_wff) return pre_order(fm).template
+	apply_unique<MemorySlotPre::to_cnf2_m>(
+		pn, visit_wff<BAs...>, layer_to_cnf);
+	else return pre_order(fm).template
+	apply_unique<MemorySlotPre::to_cnf2_m>(
+		pn, all, layer_to_cnf);
 }
 
 // Assumes that fm is a single DNF always clause
@@ -3055,9 +3093,11 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 }
 
 // Pushes all universal and existential quantifiers as deep as possible into the formula
+// and then eliminate them, returning a quantifier free formula
 template<typename... BAs>
 tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
-	// Lambda is applied to nodes of fm in post order
+	// Lambda is applied to nodes of fm in post order after quantifiers have
+	// been pushed in
 	auto elim_quant = [](const tau<BAs...>& inner_fm) -> tau<BAs...> {
 		// Find out if current node is a quantifier
 		bool is_ex_quant;
@@ -3077,11 +3117,9 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 		}
 		// Scoped formula contains the quantified variable
 		if (is_ex_quant) {
-			// std::cout << "Elim ex: " << inner_fm << "\n";
 			return eliminate_existential_quantifier<BAs...>(inner_fm, scoped_fm);
 		}
 		else {
-			// std::cout << "Elim all: " << inner_fm << "\n";
 			return eliminate_universal_quantifier<BAs...>(inner_fm, scoped_fm);
 		}
 	};
@@ -3089,19 +3127,17 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	auto push_quantifiers = [&excluded_nodes](const tau<BAs...>& n) {
 		using p = tau_parser;
 		if (is_child_non_terminal(p::wff_ex, n)) {
-			// std::cout << "Push ex: " << n << "\n";
 			auto pushed = push_existential_quantifier_one(n);
-			// std::cout << "Push ex result: " << pushed << "\n";
 			if (pushed == n) {
+				// Quantifier cannot be pushed deeper
 				for (const auto& c : n->child)
 					excluded_nodes.insert(c);
 				return n;
 			} else return pushed;
 		} else if (is_child_non_terminal(p::wff_all, n)) {
-			// std::cout << "Push all: " << n << "\n";
 			auto pushed = push_universal_quantifier_one(n);
-			// std::cout << "Push all result: " << pushed << "\n";
 			if (pushed == n) {
+				// Quantifier cannot be pushed deeper
 				for (const auto& c : n->child)
 					excluded_nodes.insert(c);
 				return n;
@@ -3112,18 +3148,20 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	auto visit = [&excluded_nodes](const tau<BAs...>& n) {
 		using p = tau_parser;
 		if (is_non_terminal(p::bf, n)) return false;
+		// Do not visit subtrees below a maximally pushed quantifier
 		if (excluded_nodes.contains(n)) return false;
 		return true;
 	};
+	// Push quantifiers in during pre-order traversal
+	// and eliminate quantifiers during the traversal back up (post-order)
 	auto push_and_elim = [&elim_quant, &push_quantifiers, visit](const tau<BAs...>& n) {
 		if (is_child_quantifier<BAs...>(n)) {
-			// std::cout << "push_and_elim: " << n << "\n";
-			return pre_order(n).apply_unique(push_quantifiers, visit, elim_quant);
+			return pre_order(n).template
+			apply_unique<MemorySlotPre::eliminate_quantifiers_m>(
+				push_quantifiers, visit, elim_quant);
 		} else return n;
 	};
-	auto is_not_bf = [](const tau<BAs...>& node){return !is_non_terminal(tau_parser::bf, node);};
-	// std::cout << "Quant elim in: " << fm << "\n";
-	return post_order(fm).apply_unique(push_and_elim, is_not_bf);
+	return post_order(fm).apply_unique(push_and_elim, visit_wff<BAs...>);
 }
 
 // fm is assumed to be quantifier free
@@ -3291,7 +3329,8 @@ tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
 				// std::cout << "Before elimination:\n";
 				// std::cout << n << "\n\n";
 				auto n_neg = push_negation_in(build_wff_neg(n));
-				auto res = pre_order(n_neg).template apply_unique<8>(
+				auto res = pre_order(n_neg).template
+				apply_unique<MemorySlotPre::anti_prenex_step_m>(
 					anti_prenex_step, visit, identity);
 				quant_vars.erase(trim2(n));
 				res = push_negation_in(build_wff_neg(res));
@@ -3306,7 +3345,8 @@ tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
 			} else {
 				// std::cout << "Before elimination:\n";
 				// std::cout << n << "\n\n";
-				auto res = pre_order(n).template apply_unique<8>(
+				auto res = pre_order(n).template
+				apply_unique<MemorySlotPre::anti_prenex_step_m>(
 					anti_prenex_step, visit, identity);
 				quant_vars.erase(trim2(n));
 				// std::cout << "After elimination:\n";
@@ -3329,7 +3369,8 @@ tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
 		return true;
 	};
 	auto nnf = push_negation_in(fm);
-	return post_order(nnf).template apply_unique<1>(inner_quant, visit_inner_quant);
+	return post_order(nnf).template
+	apply_unique<MemorySlotPost::anti_prenex_m>(inner_quant, visit_inner_quant);
 }
 
 template <typename... BAs>
