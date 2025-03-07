@@ -63,7 +63,7 @@ bool is_syntactic_zero(const bitvector_ba& /*fm*/) {
 	return false;
 }
 
-auto operator<=>(const bitvector_ba& x, const bitvector_ba& y) {
+std::strong_ordering operator<=>(const bitvector_ba& x, const bitvector_ba& y) {
 	return x.size <=> y.size;
 }
 
@@ -93,7 +93,7 @@ size_t std::hash<idni::tau_lang::bitvector_ba>::operator()(const idni::tau_lang:
 	return 0;
 }
 
-std::ostream& operator<<(std::ostream& os, const idni::tau_lang::bitvector_ba& /*x*/) {
+std::ostream& operator<<(std::ostream& os, const idni::tau_lang::bitvector_ba& x) {
 	// TODO implement
-	return os << "z3::expr";
+	return os << "z3::expr" << "[" << x.size << "]";
 }
