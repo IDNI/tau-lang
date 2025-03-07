@@ -35,7 +35,7 @@ set(TAU_HEADERS
 	splitter.h
 	splitter_types.h
 	interpreter.h
-    interpreter.impl.h
+	interpreter.impl.h
 	hooks.h
 	builders.h
 	language.h
@@ -66,7 +66,7 @@ set(CLI_SOURCES
 add_library(${TAU_OBJECT_LIB_NAME} OBJECT)
 target_sources(${TAU_OBJECT_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_OBJECT_LIB_NAME})
-target_link_libraries(${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} Boost::log Z3)
+target_link_libraries(${TAU_OBJECT_LIB_NAME} Boost::log ${Z3_LIB})
 target_compile_options(${TAU_OBJECT_LIB_NAME} PRIVATE -fPIC)
 target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
@@ -80,7 +80,7 @@ target_include_directories(${TAU_OBJECT_LIB_NAME} PUBLIC
 add_library(${TAU_STATIC_LIB_NAME} STATIC)
 target_sources(${TAU_STATIC_LIB_NAME} PRIVATE ${TAU_SOURCES})
 target_setup(${TAU_STATIC_LIB_NAME})
-target_link_libraries(${TAU_STATIC_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB}  Boost::log Z3)
+target_link_libraries(${TAU_STATIC_LIB_NAME} Boost::log ${Z3_LIB})
 target_include_directories(${TAU_STATIC_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>
@@ -98,7 +98,7 @@ endif()
 add_library(${TAU_SHARED_LIB_NAME} SHARED)
 add_library(${namespace}::${TAU_SHARED_LIB_NAME} ALIAS ${TAU_SHARED_LIB_NAME})
 target_sources(${TAU_SHARED_LIB_NAME} PRIVATE ${TAU_SOURCES})
-target_link_libraries(${TAU_SHARED_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} Boost::log Z3)
+target_link_libraries(${TAU_SHARED_LIB_NAME} Boost::log ${Z3_LIB})
 target_include_directories(${TAU_SHARED_LIB_NAME} PUBLIC
 	$<BUILD_INTERFACE:${TAU}/src>
 	$<BUILD_INTERFACE:${TAU}/parser>

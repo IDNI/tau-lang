@@ -53,13 +53,13 @@ rr<tau<BAs...>> normalizer(std::string& source, factory_t& factory) {
 template<typename ... BAs>
 tau<BAs...> normalizer_step(const tau<BAs...>& form) {
 	#ifdef TAU_CACHE
-	static std::map<tau<BAs...>, tau<BAs...>> cache;
+	static unordered_tau_map<tau<BAs...>, BAs...> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 
 	auto result = form
 		// Push all quantifiers in and eliminate them
-		| (tau_transform<BAs...>)eliminate_quantifiers<BAs...>
+		| (tau_f<BAs...>)eliminate_quantifiers<BAs...>
 		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
 		// are reduced
 		| bf_reduce_canonical<BAs...>()
@@ -76,12 +76,12 @@ tau<BAs...> normalizer_step(const tau<BAs...>& form) {
 template<typename ... BAs>
 tau<BAs...> normalize_non_temp(const tau<BAs...>& fm) {
 	#ifdef TAU_CACHE
-	static std::map<tau<BAs...>, tau<BAs...>> cache;
+	static unordered_tau_map<tau<BAs...>, BAs...> cache;
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 	auto result = fm
 		// Push all quantifiers in and eliminate them
-		| (tau_transform<BAs...>)eliminate_quantifiers<BAs...>
+		| (tau_f<BAs...>)eliminate_quantifiers<BAs...>
 		// After removal of quantifiers, only subformulas previously under the scope of a quantifier
 		// are reduced
 		| bf_reduce_canonical<BAs...>();
