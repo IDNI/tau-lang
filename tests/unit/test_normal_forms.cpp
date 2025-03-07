@@ -32,11 +32,9 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "T.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
-		auto result = mnf_wff(statement);
+		statement = find_top(statement, is_non_terminal<tau_parser::wff, Bool>).value();
+		auto result = to_mnf(reduce_across_bfs(statement, false));
 		auto check = result
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
 			| tau_parser::wff_t;
 		CHECK( check.has_value() );
 	}
@@ -45,11 +43,9 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "F.";
 		auto src = make_tau_source(sample);
 		auto statement = make_statement(src);
-		auto result = mnf_wff(statement);
+		statement = find_top(statement, is_non_terminal<tau_parser::wff, Bool>).value();
+		auto result = to_mnf(reduce_across_bfs(statement, false));
 		auto check = result
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
 			| tau_parser::wff_f;
 		CHECK( check.has_value() );
 	}
@@ -61,7 +57,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff).value();
-		auto result = mnf_wff(statement);
+		auto result = to_mnf(reduce_across_bfs(statement, false));
 		CHECK( statement == result );
 	}
 
@@ -72,7 +68,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff).value();
-		auto result = mnf_wff(statement);
+		auto result = to_mnf(reduce_across_bfs(statement, false));
 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
 		auto check_neg = select_all(result, is_non_terminal<tau_parser::wff_neg, Bool>);
 		CHECK( check_eq.size() == 1 );
@@ -86,7 +82,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff).value();
-		auto result = mnf_wff(statement);
+		auto result = to_mnf(reduce_across_bfs(statement, false));
 		auto check_and = select_all(result, is_non_terminal<tau_parser::wff_and, Bool>);
 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
 		CHECK( check_and.size() == 1 );
@@ -100,7 +96,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff).value();
-		auto result = mnf_wff(statement);
+		auto result = to_mnf(reduce_across_bfs(statement, false));
 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
 		auto check_neg = select_all(result, is_non_terminal<tau_parser::wff_neg, Bool>);
 		auto check_and = select_all(result, is_non_terminal<tau_parser::wff_and, Bool>);
@@ -116,7 +112,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 			| tau_parser::rr
 			| tau_parser::main
 			| tau_parser::wff).value();
-		auto result = mnf_wff(statement);
+		auto result = to_mnf(reduce_across_bfs(statement, false));
 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
 		auto check_or = select_all(result, is_non_terminal<tau_parser::wff_or, Bool>);
 		CHECK( check_eq.size() == 2 );
@@ -177,7 +173,7 @@ TEST_SUITE("normal forms: dnf_bf") {
 			| tau_parser::wff
 			| tau_parser::bf_eq
 			| tau_parser::bf).value();
-		auto result = dnf_bf(statement);
+		auto result = to_dnf2<false>(statement);
 		CHECK( result == _0<Bool> );
 	}
 

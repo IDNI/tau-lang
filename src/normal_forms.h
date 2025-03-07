@@ -85,54 +85,10 @@ RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 RULE(WFF_SQUEEZE_NEGATIVES_0, "$X != 0 || $Y != 0 ::= $X | $Y != 0.")
 
 template<typename... BAs>
-static auto to_dnf_bf = make_library<BAs...>(
-	BF_TO_DNF_0
-	+ BF_TO_DNF_1
-	+ BF_PUSH_NEGATION_INWARDS_0
-	+ BF_PUSH_NEGATION_INWARDS_1
-);
-
-template<typename... BAs>
-static auto nnf_to_dnf_bf = make_library<BAs...>(
-	BF_TO_DNF_0
-	+ BF_TO_DNF_1
-);
-
-template<typename... BAs>
-static auto push_sometimes_in = make_library<BAs...>(
-	WFF_PUSH_SOMETIMES_INWARDS
-);
-
-template<typename... BAs>
-static auto push_always_in = make_library<BAs...>(
-	WFF_PUSH_ALWAYS_INWARDS
-);
-
-// This set of rules can blow up due to the interaction between
-// pushing negation in and distributing the "and" over the "or"
-template<typename... BAs>
-static auto to_dnf_wff = make_library<BAs...>(
-	WFF_TO_DNF_0
-	+ WFF_TO_DNF_1
+static auto push_neg_for_snf = make_library<BAs...>(
+	WFF_PUSH_NEGATION_UPWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_1
-	+ WFF_PUSH_NEGATION_INWARDS_2
-	+ WFF_PUSH_NEGATION_INWARDS_3
-	+ WFF_PUSH_NEGATION_INWARDS_4
-	+ WFF_PUSH_NEGATION_INWARDS_5
-	+ WFF_PUSH_ALWAYS_INWARDS
-	+ WFF_PUSH_SOMETIMES_INWARDS
-);
-
-template<typename... BAs>
-static auto simplify_wff = make_library<BAs...>(
-	WFF_SIMPLIFY_SOMETIMES_3
-	+ WFF_SIMPLIFY_ALWAYS_3
-);
-
-template<typename... BAs>
-static auto apply_normalize = make_library<BAs...>(
-	BF_CALLBACK_NORMALIZE
 );
 
 template<typename... BAs>
@@ -143,23 +99,39 @@ static auto elim_eqs = make_library<BAs...>(
 	+ BF_EQ_OR_SIMPLIFY_1
 );
 
-template<typename... BAs>
-static auto push_neg_for_snf = make_library<BAs...>(
-	WFF_PUSH_NEGATION_UPWARDS_0
-	+ WFF_PUSH_NEGATION_INWARDS_0
-	+ WFF_PUSH_NEGATION_INWARDS_1
-);
+template <typename... BAs>
+tau<BAs...> to_mnf (const tau<BAs...>& fm) {
+	using p = tau_parser;
+	auto neq_to_eq = [](const tau<BAs...>& n) {
+		//$X != 0 ::= !($X = 0)
+		if (is_non_terminal(p::bf_neq, n)) {
+			return trim(build_wff_neg(build_wff_eq(trim(n))));
+		}
+		return n;
+	};
+	return pre_order(fm).apply_unique(neq_to_eq, visit_wff<BAs...>, identity);
+}
+
+template <typename... BAs>
+tau<BAs...> from_mnf_to_nnf (const tau<BAs...>& fm) {
+	using p = tau_parser;
+	auto ne_to_neq = [](const tau<BAs...>& n) {
+		//!($X = 0) ::= $X != 0
+		if (is_non_terminal(p::wff_neg, n)) {
+			const auto& e = trim2(n);
+			if (is_non_terminal(p::bf_eq, e)) {
+				return trim(build_wff_neq(trim(e)));
+			}
+		}
+		return n;
+	};
+	return pre_order(fm).apply_unique(ne_to_neq, visit_wff<BAs...>, identity);
+}
 
 template<typename... BAs>
 static auto simplify_snf = repeat_all<step<BAs...>, BAs...>(
 	elim_eqs<BAs...>
-	| simplify_wff<BAs...>
 	| push_neg_for_snf<BAs...>);
-
-template<typename... BAs>
-static auto to_mnf_wff = make_library<BAs...>(
-	WFF_PUSH_NEGATION_UPWARDS_0
-);
 
 template<typename... BAs>
 static auto fix_neg_in_snf = make_library<BAs...>(
@@ -167,11 +139,36 @@ static auto fix_neg_in_snf = make_library<BAs...>(
 	+ WFF_PUSH_NEGATION_INWARDS_3
 );
 
-template<typename... BAs>
-static auto unsqueeze_wff = make_library<BAs...>(
-	WFF_UNSQUEEZE_POSITIVES_0
-	+ WFF_UNSQUEEZE_NEGATIVES_0
-);
+template <typename... BAs>
+tau<BAs...> unsqueeze_wff (const tau<BAs...>& fm) {
+	// $X | $Y = 0 ::= $X = 0 && $Y = 0
+	// $X | $Y != 0 ::= $X != 0 || $Y != 0
+	using p = tau_parser;
+	auto f = [](const tau<BAs...>& n) {
+		if (is_non_terminal(p::bf_eq, n)) {
+			const auto& e = trim2(n);
+			if (is_non_terminal(p::bf_or, e)) {
+				const auto& c1 = trim(e);
+				const auto& c2 = e->child[1];
+				return trim(build_wff_and(
+					build_wff_eq(c1),
+					build_wff_eq(c2)));
+			}
+		}
+		if (is_non_terminal(p::bf_neq, n)) {
+			const auto& e = trim2(n);
+			if (is_non_terminal(p::bf_or, e)) {
+				const auto& c1 = trim(e);
+				const auto& c2 = e->child[1];
+				return trim(build_wff_or(
+					build_wff_neq(c1),
+					build_wff_neq(c2)));
+			}
+		}
+		return n;
+	};
+	return pre_order(fm).apply_unique(f, visit_wff<BAs...>, identity);
+}
 
 template <typename... BAs>
 tau<BAs...> squeeze_wff (const tau<BAs...>& fm) {
@@ -241,58 +238,56 @@ tau<BAs...> squeeze_wff_pos (const tau<BAs...>& fm) {
 	return post_order(fm).apply_unique(f, visit_wff<BAs...>);
 }
 
-template<typename... BAs>
-static auto unsqueeze_wff_neg = make_library<BAs...>(
-	WFF_UNSQUEEZE_NEGATIVES_0
-);
+template <typename... BAs>
+tau<BAs...> unsqueeze_wff_neg (const tau<BAs...>& fm) {
+	// $X | $Y != 0 ::= $X != 0 || $Y != 0
+	using p = tau_parser;
+	auto f = [](const tau<BAs...>& n) {
+		if (is_non_terminal(p::bf_neq, n)) {
+			const auto& e = trim2(n);
+			if (is_non_terminal(p::bf_or, e)) {
+				const auto& c1 = trim(e);
+				const auto& c2 = e->child[1];
+				return trim(build_wff_or(
+					build_wff_neq(c1),
+					build_wff_neq(c2)));
+			}
+		}
+		return n;
+	};
+	return pre_order(fm).apply_unique(f, visit_wff<BAs...>, identity);
+}
+
+template <typename... BAs>
+tau<BAs...> squeeze_wff_neg (const tau<BAs...>& fm) {
+	// $X != 0 || $Y != 0 ::= $X | $Y != 0
+	using p = tau_parser;
+	auto f = [](const tau<BAs...>& n) {
+		if (is_non_terminal(p::wff_or, n)) {
+			const auto& e1 = trim(n);
+			const auto& e2 = n->child[1];
+			if (is_child_non_terminal(p::bf_neq, e1) &&
+				is_child_non_terminal(p::bf_neq, e2)) {
+				return trim(build_wff_neq(
+					build_bf_or(trim2(e1), trim2(e2))));
+				}
+		}
+		return n;
+	};
+	return post_order(fm).apply_unique(f, visit_wff<BAs...>);
+}
+
+template<bool is_wff = true, typename... BAs>
+tau<BAs...> to_dnf2(const tau<BAs...>&);
+template<bool is_wff = true, typename... BAs>
+tau<BAs...> to_cnf2(const tau<BAs...>&);
+template<bool is_wff = true, typename... BAs>
+tau<BAs...> push_negation_in(const tau<BAs...>&);
 
 template<typename... BAs>
-static auto squeeze_wff_neg = make_library<BAs...>(
-	WFF_SQUEEZE_NEGATIVES_0
-);
-
-template<typename... BAs>
-static auto eq_to_neq = make_library<BAs...>(
-	WFF_PUSH_NEGATION_INWARDS_2
-);
-
-template<typename... BAs>
-static auto to_cnf_wff = make_library<BAs...>(
-	WFF_TO_CNF_0
-	+ WFF_TO_CNF_1
-	+ WFF_PUSH_NEGATION_INWARDS_0
-	+ WFF_PUSH_NEGATION_INWARDS_1
-	+ WFF_PUSH_NEGATION_INWARDS_2
-	+ WFF_PUSH_NEGATION_INWARDS_3
-	+ WFF_PUSH_NEGATION_INWARDS_4
-	+ WFF_PUSH_NEGATION_INWARDS_5
-	+ WFF_PUSH_ALWAYS_INWARDS
-	+ WFF_PUSH_SOMETIMES_INWARDS
-);
-
-template<typename... BAs>
-static auto to_cnf_bf = make_library<BAs...>(
-	BF_TO_CNF_0
-	+ BF_TO_CNF_1
-	+ BF_PUSH_NEGATION_INWARDS_0
-	+ BF_PUSH_NEGATION_INWARDS_1
-);
-
-template<typename...BAs>
-static auto to_nnf_wff = make_library<BAs...>(
-	WFF_PUSH_NEGATION_INWARDS_0
-	+ WFF_PUSH_NEGATION_INWARDS_1
-	+ WFF_PUSH_NEGATION_INWARDS_2
-	+ WFF_PUSH_NEGATION_INWARDS_3
-	+ WFF_PUSH_NEGATION_INWARDS_4
-	+ WFF_PUSH_NEGATION_INWARDS_5
-);
-
-template<typename...BAs>
-static auto to_nnf_bf = make_library<BAs...>(
-	BF_PUSH_NEGATION_INWARDS_0
-	+ BF_PUSH_NEGATION_INWARDS_1
-);
+tau<BAs...> to_nnf (const tau<BAs...>& fm) {
+	return push_negation_in(fm);
+}
 
 // --------------------------------------------------------------
 // General operator for tau<BAs...> function application by pipe
@@ -645,77 +640,9 @@ template<typename...BAs>
 std::optional<tau<BAs...>> onf(const tau<BAs...>& n, const tau<BAs...>& var) {
 	// FIXME take into account quiantifiers
 	return n
-		| repeat_all<step<BAs...>, BAs...>(to_dnf_wff<BAs...>)
+		| (tau_f<BAs...>) to_dnf2<true, BAs...>
 		| onf_wff<BAs...>(var)
-		| repeat_all<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>);
-}
-
-template<typename...BAs>
-tau<BAs...> dnf_wff(const tau<BAs...>& n) {
-	auto [_, nn] = get_inner_quantified_wff(n);
-	auto nform = nn
-		| repeat_each<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| simplify_wff<BAs...>
-		);
-	// finally, we also simplify the bf part of the formula
-	auto dnf = dnf_bf(nform);
-	return replace(n, nn, dnf);
-}
-
-template<typename...BAs>
-tau<BAs...> dnf_bf(const tau<BAs...>& n) {
-	return n | repeat_all<step<BAs...>, BAs...>(
-			to_dnf_bf<BAs...>
-			| elim_eqs<BAs...>)
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf<BAs...>;
-}
-
-template<typename...BAs>
-tau<BAs...> cnf_wff(const tau<BAs...>& n) {
-	auto [var, nn] = get_inner_quantified_wff(n);
-	auto wff = nn | repeat_each<step<BAs...>, BAs...>(
-			to_cnf_wff<BAs...>
-			| simplify_wff<BAs...>
-		);
-	// finally, we also simplify the bf part of the formula
-	auto cnf = cnf_bf(wff);
-	return replace(n, nn, cnf);
-}
-
-template<typename...BAs>
-tau<BAs...> cnf_bf(const tau<BAs...>& n) {
-	return n
-
-		| repeat_all<step<BAs...>, BAs...>(
-			to_cnf_bf<BAs...>
-			| elim_eqs<BAs...>)
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf<BAs...>;
-}
-
-template<typename...BAs>
-tau<BAs...> nnf_bf(const tau<BAs...>& n) {
-	return n | repeat_all<step<BAs...>, BAs...>(
-			to_nnf_bf<BAs...>
-			| elim_eqs<BAs...>)
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf<BAs...>;
-}
-
-template<typename...BAs>
-tau<BAs...> nnf_wff(const tau<BAs...>& n) {
-	auto [_, nn] = get_inner_quantified_wff(n);
-	auto nform = nn | repeat_each<step<BAs...>, BAs...>(
-			to_nnf_wff<BAs...>
-			| simplify_wff<BAs...>
-		);
-	// finally, we also simplify the bf part of the formula
-	auto nnf = nnf_bf(nform);
-	return replace(n, nn, nnf);
+		| (tau_f<BAs...>)to_dnf2<true, BAs...>;
 }
 
 // Reduce currrent dnf due to update by coeff and variable assignment i
@@ -891,12 +818,6 @@ void elim_vars_in_assignment (const auto& fm, const auto& vars, auto& i,
 // Declaration of functions used in assign_and_reduce which are implemented later
 template<typename... BAs>
 tau<BAs...> reduce2(const tau<BAs...>& fm, size_t type, bool is_cnf = false, bool all_reductions = true, bool enable_sort = true);
-template<typename... BAs>
-tau<BAs...> to_dnf2(const tau<BAs...>&, bool is_wff = true);
-template<typename... BAs>
-tau<BAs...> to_cnf2(const tau<BAs...>&, bool is_wff = true);
-template<typename... BAs>
-tau<BAs...> push_negation_in(const tau<BAs...>&, bool is_wff = true);
 
 // Create assignment in formula and reduce resulting clause
 template<typename... BAs>
@@ -915,7 +836,7 @@ bool assign_and_reduce(const tau<BAs...>& fm,
 			// Normalize tau subformulas
 			fm_simp = normalize_ba<BAs...>(fm);
 			if (fm_simp == _0<BAs...>) return false;
-			fm_simp = to_dnf2(fm_simp, false);
+			fm_simp = to_dnf2<false>(fm_simp);
 			if (fm_simp == _0<BAs...>) return false;
 			fm_simp = reduce2(fm_simp, tau_parser::bf);
 			if (fm_simp == _0<BAs...>) return false;
@@ -1221,8 +1142,7 @@ tau<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_
                             : ( wff ? build_wff_or(reduced_fm, var_path) : build_bf_or(reduced_fm, var_path));
 	}
 	assert(reduced_fm != nullptr);
-	//TODO: avoid pattern matcher
-	return reduced_fm | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>);
+	return from_mnf_to_nnf(reduced_fm);
 }
 
 template<typename... BAs>
@@ -1260,8 +1180,7 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_
 	assert(is_non_terminal(type, fm));
 	// Pull negation out of equality
 	bool wff = type == tau_parser::wff;
-	//TODO: avoid patternmatcher
-	auto new_fm = wff ? fm | repeat_all<step<BAs...>, BAs...>(to_mnf_wff<BAs...>) : fm;
+	auto new_fm = wff ? to_mnf(fm) : fm;
 	if (wff) {
 		// Make equalities canonical
 		std::map<tau<BAs...>, tau<BAs...> > changes;
@@ -1279,9 +1198,9 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_
 					    ? select_top(new_fm, is_wff_bdd_var)
 					    : select_top(new_fm, is_bf_bdd_var);
 	if (vars.empty()) {
+		// std::cout << "new_fm: " << new_fm << "\n";
 		//assert(new_fm == _T<BAs...> || new_fm == _F<BAs...> ||
 		//	new_fm == _1<BAs...> || new_fm == _0<BAs...>);
-		// print_tau_tree(std::cout, new_fm);
 		if (new_fm == _T<BAs...> || new_fm == _1<BAs...>) {
 			if (is_cnf) return {};
 			std::vector<std::vector<int_t>> paths;
@@ -1392,7 +1311,7 @@ tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
 		if (!lex_var_comp<BAs...>(cl1, cl2)) std::swap(cl1, cl2);
 		tau<BAs...> grouped = wff ? build_wff_or(cl1, cl2) :
 			build_bf_or<BAs...>(get_dnf_bf_clauses(
-				to_dnf2(build_bf_or(cl1, cl2), false)));
+				to_dnf2<false>(build_bf_or(cl1, cl2))));
 
 		common.emplace_back(move(grouped));
 		atoms_of_clauses[i] = move(common);
@@ -1419,7 +1338,7 @@ tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 	auto clauses = get_dnf_bf_clauses(grouped);
 	for (int_t i = 0; i < (int_t)clauses.size(); ++i) {
 		bool erase_clause = false;
-		auto cn = push_negation_in(build_bf_neg(clauses[i]), false);
+		auto cn = push_negation_in<false>(build_bf_neg(clauses[i]));
 		for (int_t j = 0; j < (int_t)clauses.size(); ++j) {
 			if (i==j) continue;
 			bool has_simp = false;
@@ -1449,7 +1368,7 @@ tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 			--i;
 		}
 	}
-	return was_simplified ? to_dnf2(build_bf_or<BAs...>(clauses), false) : fm;
+	return was_simplified ? to_dnf2<false>(build_bf_or<BAs...>(clauses)) : fm;
 }
 
 // Assume that fm is in DNF (or CNF -> set is_cnf to true)
@@ -1497,7 +1416,7 @@ template<typename... BAs>
 tau<BAs...> reduce_terms (const tau<BAs...>& fm, bool with_sorting = false) {
     std::map<tau<BAs...>, tau<BAs...>> changes = {};
     for (const auto& bf: select_top(fm, is_non_terminal<tau_parser::bf, BAs...>)) {
-        auto dnf = to_dnf2(bf, false);
+        auto dnf = to_dnf2<false>(bf);
         dnf = reduce2(dnf, tau_parser::bf, false, true, with_sorting);
         if (dnf != bf) changes[bf] = dnf;
     }
@@ -1573,9 +1492,8 @@ tau<BAs...> apply_eqs_across_clauses (const tau<BAs...>& fm) {
 template<typename... BAs>
 std::vector<tau<BAs...>> push_eq_and_get_vars (tau<BAs...>& fm) {
  // First push in equalities all the way (bf != 0 is converted to !(bf = 0))
-	//TODO: avoid pattern matcher
-	fm = fm | repeat_all<step<BAs...>, BAs...>(
-		unsqueeze_wff<BAs...> | to_mnf_wff<BAs...>);
+	fm = fm |(tau_f<BAs...>) unsqueeze_wff<BAs...>
+		|(tau_f<BAs...>) to_mnf<BAs...>;
 	// Find atomic formulas
 	return select_top(fm, is_wff_bdd_var);
 }
@@ -1587,9 +1505,8 @@ std::vector<std::vector<int_t>> wff_to_bdd (const tau<BAs...>& fm, auto& vars = 
 	// Find atomic formulas
 	auto pushed_in_fm = fm;
 	if (vars.empty()) vars = push_eq_and_get_vars(pushed_in_fm);
-	//TODO: Avoid pattern matcher
-	else pushed_in_fm = fm | repeat_all<step<BAs...>, BAs...>(
-		 	unsqueeze_wff<BAs...> | to_mnf_wff<BAs...>);
+	else pushed_in_fm = fm |(tau_f<BAs...>) unsqueeze_wff<BAs...>
+				|(tau_f<BAs...>) to_mnf<BAs...>;
 	std::vector<int_t> i (vars.size());
 	std::map<tau<BAs...>, std::vector<std::vector<int_t>>> dnf;
 	// dnf empty means false and and size 1 with empty paths means true
@@ -1618,9 +1535,7 @@ template<typename... BAs>
 std::vector<std::vector<std::vector<tau<BAs...>>>> get_cnf_inequality_lits(
 	const tau<BAs...>& fm)
 {
-	// TODO: avoid pattern matcher
-	auto neq_pushed_in = fm | repeat_all<step<BAs...>, BAs...>(
-		 	unsqueeze_wff_neg<BAs...>);
+	auto neq_pushed_in = unsqueeze_wff_neg(fm);
 	if (neq_pushed_in == _T<BAs...>) return {};
 	// cout << "neq_pushed_in: " << neq_pushed_in << "\n";
 	std::vector<std::vector<std::vector<tau<BAs...>>>> cnf_lits;
@@ -1750,9 +1665,8 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 		// std::cout << "neq_cnf: " << neq_cnf << "\n";
 		neq_cnf = reduce2(neq_cnf, tau_parser::wff, true, true, false);
 		// std::cout << "neq_cnf after reduce: " << neq_cnf << "\n";
-		//TODO: avoid pattern matcher
-		neq_cnf = neq_cnf | repeat_all<step<BAs...>, BAs...>(
-				 squeeze_wff_neg<BAs...> | to_mnf_wff<BAs...>);
+		neq_cnf = neq_cnf |(tau_f<BAs...>) squeeze_wff_neg<BAs...>
+				|(tau_f<BAs...>) to_mnf<BAs...>;
 		// cout << "neq_cnf simplified: " << neq_cnf << "\n";
 		clause = build_wff_and(clause, neq_cnf);
 	}
@@ -1841,12 +1755,10 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 			neqs = build_wff_or(neqs, neq_from_path(path));
 		if (!groups[i].empty()) {
 			// simp to cnf
-			neqs = to_cnf2(neqs, true);
+			neqs = to_cnf2(neqs);
 			neqs = reduce2(neqs, tau_parser::wff, true);
 			// push != out
-			//TODO: avoid pattern matcher
-			neqs = neqs | repeat_all<step<BAs...>, BAs...>(
-			squeeze_wff_neg<BAs...>);
+			neqs = squeeze_wff_neg(neqs);
 		}
 		auto neq_clauses = get_cnf_wff_clauses(neqs);
 		// std::cout << "neq_clauses: " << neq_clauses << "\n";
@@ -1867,7 +1779,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 				if (is_child_non_terminal(tp::bf_eq, vars[k])) {
 					for (const auto& clause : get_dnf_bf_clauses(trim2(vars[k]))) {
 						// Here single assumption
-						auto neg_eq = push_negation_in(build_bf_neg(clause), false);
+						auto neg_eq = push_negation_in<false>(build_bf_neg(clause));
 						// std::cout << "neg_eq: " << neg_eq << "\n";
 						for (auto& neq : neq_clauses) {
 							if (neq == _T<BAs...> || neq == _1<BAs...>) continue;
@@ -1876,7 +1788,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 							auto simp_neq = replace(grouped_bf, neg_eq, _1<BAs...>);
 							// std::cout << "simp_neq: " << simp_neq << "\n";
 							if (grouped_bf != simp_neq) {
-								neq = to_dnf2(simp_neq, false);
+								neq = to_dnf2<false>(simp_neq);
 								neq = reduce2(neq, tau_parser::bf);
 								is_simp = true;
 							}
@@ -1897,8 +1809,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 			build_wff_and(rest, build_wff_and<BAs...>(neq_clauses)));
 	}
 	assert(result != nullptr);
-	//TODO: avoid pattern matcher
-	result = result | repeat_all<step<BAs...>, BAs...>(eq_to_neq<BAs...>);
+	result = from_mnf_to_nnf(result);
 	BOOST_LOG_TRIVIAL(debug) << "(I) End group_paths_and_simplify";
 	return make_pair(result, is_simp);
 }
@@ -1917,7 +1828,7 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 	// std::cout << squeezed_fm << "\n";
 	// We work with unsqueezed equality
 	squeezed_fm  = unsqueeze_wff_pos(squeezed_fm);
-    // std::cout << squeezed_fm << "\n";
+	// std::cout << "squeezed_fm: " << squeezed_fm << "\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Formula in DNF: " << squeezed_fm;
 #ifdef TAU_CACHE
 		static std::map<std::pair<tau<BAs...>, bool>, tau<BAs...>> cache;
@@ -2116,11 +2027,11 @@ tau<BAs...> disjunct_cnfs_to_cnf (const tau<BAs...>& c1, const tau<BAs...>& c2) 
 }
 
 // Can be used for Tau formula and Boolean function
-template<typename... BAs>
-tau<BAs...> push_negation_one_in(const tau<BAs...>& fm, bool is_wff = true) {
+template<bool is_wff = true, typename... BAs>
+tau<BAs...> push_negation_one_in(const tau<BAs...>& fm) {
 	using p = tau_parser;
 	// Tau formula rules
-	if (is_wff && is_child_non_terminal(p::wff_neg, fm)) {
+	if constexpr (is_wff) if (is_child_non_terminal(p::wff_neg, fm)) {
 		auto c = trim2(fm);
 		if (is_child_non_terminal(p::wff_and, c))
 			return build_wff_or(
@@ -2144,7 +2055,7 @@ tau<BAs...> push_negation_one_in(const tau<BAs...>& fm, bool is_wff = true) {
 			return build_wff_always(build_wff_neg(trim2(c)));
 	}
 	// Boolean function rules
-	if (!is_wff && is_child_non_terminal(p::bf_neg, fm)) {
+	if constexpr (!is_wff) if (is_child_non_terminal(p::bf_neg, fm)) {
 		auto c = trim2(fm);
 		if (is_child_non_terminal(p::bf_and, c))
 			return build_bf_or(build_bf_neg(trim(c)->child[0]),
@@ -2158,13 +2069,12 @@ tau<BAs...> push_negation_one_in(const tau<BAs...>& fm, bool is_wff = true) {
 }
 
 // Can be used for Tau formula and Boolean function
-template<typename... BAs>
-tau<BAs...> push_negation_in(const tau<BAs...>& fm, bool is_wff) {
-	auto pn = [&is_wff](const auto& n) {
-		return push_negation_one_in(n, is_wff);
+template<bool is_wff, typename... BAs>
+tau<BAs...> push_negation_in(const tau<BAs...>& fm) {
+	auto pn = [](const auto& n) {
+		return push_negation_one_in<is_wff>(n);
 	};
-	// if (is_wff) return rewriter::pre_order(fm).template apply_unique<2>(pn);
-	if (is_wff) return rewriter::pre_order(fm).template
+	if constexpr (is_wff) return rewriter::pre_order(fm).template
 	apply_unique<MemorySlotPre::push_negation_in_m>(
 		pn, visit_wff<BAs...>, identity);
 	else return rewriter::pre_order(fm).template
@@ -2173,11 +2083,11 @@ tau<BAs...> push_negation_in(const tau<BAs...>& fm, bool is_wff) {
 }
 
 // Conversion to dnf while applying reductions during the process
-template<typename... BAs>
-tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
+template<bool is_wff, typename... BAs>
+tau<BAs...> to_dnf2(const tau<BAs...>& fm) {
 	using p = tau_parser;
-	auto layer_to_dnf = [&is_wff](const auto& n) {
-		if (is_wff && is_non_terminal(p::wff, n)) {
+	auto layer_to_dnf = [](const auto& n) {
+		if constexpr (is_wff) if (is_non_terminal(p::wff, n)) {
 			if (is_child_non_terminal(p::wff_and, n)) {
 				auto conj = conjunct_dnfs_to_dnf(
 					trim(n)->child[0],
@@ -2187,7 +2097,8 @@ tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
 					return conj | wff_reduce_dnf<BAs...>();
 				else return n;
 			}
-		} else if (!is_wff && is_non_terminal(p::bf, n)) {
+		}
+		if constexpr (!is_wff) if (is_non_terminal(p::bf, n)) {
 			if (is_child_non_terminal(p::bf_and, n)) {
 				auto conj = conjunct_dnfs_to_dnf(
 					trim(n)->child[0],
@@ -2200,11 +2111,11 @@ tau<BAs...> to_dnf2(const tau<BAs...>& fm, bool is_wff) {
 		}
 		return n;
 	};
-	auto pn = [&is_wff](const auto& n) {
-		return push_negation_one_in(n, is_wff);
+	auto pn = [](const auto& n) {
+		return push_negation_one_in<is_wff>(n);
 	};
 	// if (is_wff) return pre_order(fm).template apply_unique<4>(pn, visit_wff<BAs...>, layer_to_dnf);
-	if (is_wff) return pre_order(fm).template
+	if constexpr (is_wff) return pre_order(fm).template
 	apply_unique<MemorySlotPre::to_dnf2_m>(
 		pn, visit_wff<BAs...>, layer_to_dnf);
 	else return pre_order(fm).template
@@ -2250,11 +2161,11 @@ tau<BAs...> single_dnf_lift(const tau<BAs...>& fm) {
 }
 
 // Conversion to cnf while applying reductions during the process
-template<typename... BAs>
-tau<BAs...> to_cnf2(const tau<BAs...>& fm, bool is_wff) {
+template<bool is_wff, typename... BAs>
+tau<BAs...> to_cnf2(const tau<BAs...>& fm) {
 	using p = tau_parser;
-	auto layer_to_cnf = [&is_wff](const auto& n) {
-		if (is_wff && is_non_terminal(p::wff, n)) {
+	auto layer_to_cnf = [](const auto& n) {
+		if constexpr (is_wff) if (is_non_terminal(p::wff, n)) {
 			if (is_child_non_terminal(p::wff_or, n)) {
 				auto dis = disjunct_cnfs_to_cnf(
 					trim(n)->child[0],
@@ -2264,8 +2175,8 @@ tau<BAs...> to_cnf2(const tau<BAs...>& fm, bool is_wff) {
 					return dis | wff_reduce_cnf<BAs...>();
 				else return n;
 			}
-		} else if (!is_wff){
-			if (is_child_non_terminal(p::bf_or, n)) {
+		}
+		if constexpr (!is_wff) if (is_child_non_terminal(p::bf_or, n)) {
 				auto dis = disjunct_cnfs_to_cnf(
 					trim(n)->child[0],
 					trim(n)->child[1]);
@@ -2274,14 +2185,13 @@ tau<BAs...> to_cnf2(const tau<BAs...>& fm, bool is_wff) {
 					return reduce2(dis, p::bf, true);
 				else return n;
 			}
-		}
 		return n;
 	};
-	auto pn = [&is_wff](const auto& n) {
-		return push_negation_one_in(n, is_wff);
+	auto pn = [](const auto& n) {
+		return push_negation_one_in<is_wff>(n);
 	};
 	// if (is_wff) return pre_order(fm).template apply_unique<6>(pn, all, layer_to_cnf);
-	if (is_wff) return pre_order(fm).template
+	if constexpr (is_wff) return pre_order(fm).template
 	apply_unique<MemorySlotPre::to_cnf2_m>(
 		pn, visit_wff<BAs...>, layer_to_cnf);
 	else return pre_order(fm).template
@@ -2657,8 +2567,7 @@ struct sometimes_always_normalization_depreciated {
 		std::set<tau<BAs...>> visited;
 		res = to_dnf2(push_sometimes_always_in(res, visited));
 		res = reduce2(res, tau_parser::wff);
-		res = pull_sometimes_always_out(res) |
-					repeat_each<step<BAs...>, BAs...>(simplify_wff<BAs...>);
+		res = pull_sometimes_always_out(res);
 		auto temp_inner = select_top(res, st_aw);
 		if (temp_inner.empty()) return res;
 		std::map<tau<BAs...>, tau<BAs...>> changes;
@@ -3753,9 +3662,8 @@ template<typename...BAs>
 tau<BAs...> snf_bf(const tau<BAs...>& n) {
 	// TODO (HIGH) give a proper implementation (call to_bdd...)
 	return n | bf_reduce_canonical<BAs...>()
-		| repeat_all<step<BAs...>, BAs...>(
-			to_dnf_bf<BAs...>
-			| elim_eqs<BAs...>)
+		| (tau_f<BAs...>) to_dnf2<false, BAs...>
+		| repeat_all<step<BAs...>, BAs...>(elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf<BAs...>;
 }
@@ -3772,10 +3680,9 @@ tau<BAs...> snf_wff(const tau<BAs...>& n) {
 	// the formula in SNF with positive equal exponent literals sqeezed.
 	auto first_step = build_wff_neg(nn)
 		| bf_reduce_canonical<BAs...>()
+		| (tau_f<BAs...>) unsqueeze_wff<BAs...>
 		| repeat_all<step<BAs...>, BAs...>(
-			unsqueeze_wff<BAs...>
-			| elim_eqs<BAs...>
-			| simplify_wff<BAs...>
+			 elim_eqs<BAs...>
 			| push_neg_for_snf<BAs...>)
 		// TODO (LOW) Lucca thinks that maybe one call is enough
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>());
@@ -3786,7 +3693,6 @@ tau<BAs...> snf_wff(const tau<BAs...>& n) {
 		| repeat_all<to_snf_step<BAs...>, BAs...>(to_snf_step<BAs...>())
 		| repeat_all<step<BAs...>, BAs...>(
 			elim_eqs<BAs...>
-			| simplify_wff<BAs...>
 			| fix_neg_in_snf<BAs...>)
 		| bf_reduce_canonical<BAs...>();
 	return replace(n, nn, second_step);
@@ -3797,28 +3703,6 @@ tau<BAs...> build_split_wff_using(tau_parser::nonterminal type, const tau<BAs...
 	// TODO (HIGH) check formulas, should depend on the type
 	if (type == tau_parser::bf_eq) return build_wff_or(build_wff_and(a, b), build_wff_and(build_wff_neg(a), build_wff_neg(b)));
 	else return build_wff_and(build_wff_or(a, build_wff_neg(b)), build_wff_or(build_wff_neg(a), b));
-}
-
-template<typename...BAs>
-tau<BAs...> mnf_wff(const tau<BAs...>& n) {
-	auto [_, nn] = get_inner_quantified_wff(n);
-	auto mnf = nn | repeat_all<step<BAs...>, BAs...>(
-			to_dnf_wff<BAs...>
-			| to_mnf_wff<BAs...>)
-		| repeat_all<step<BAs...>, BAs...>(
-			to_mnf_wff<BAs...>)
-		| reduce_wff<BAs...>;
-	std::map<tau<BAs...>, tau<BAs...>> changes = {{nn, mnf}};
-	return replace(n, nn, mnf);
-}
-
-template<typename...BAs>
-tau<BAs...> mnf_bf(const tau<BAs...>& n) {
-	return n | repeat_all<step<BAs...>, BAs...>(
-			to_dnf_bf<BAs...>
-			| elim_eqs<BAs...>)
-		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf<BAs...>;
 }
 
 template<size_t type, typename...BAs>

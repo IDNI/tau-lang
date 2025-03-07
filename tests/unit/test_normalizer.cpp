@@ -23,24 +23,6 @@ using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
-TEST_SUITE("steps parsing") {
-
-	TEST_CASE("elim_for_all") {
-		CHECK( elim_for_all<Bool>.size() == 1 );
-	}
-
-	TEST_CASE("to_dnf_wff") {
-		CHECK( to_dnf_wff<Bool>.size() == 10 );
-	}
-
-	TEST_CASE("simplify_wff") {
-		CHECK( simplify_wff<Bool>.size() == 2 );
-	}
-}
-
-
-
-
 // TODO (HIGH) write tests to check build_dnf_from_clauses
 // TODO (HIGH) write tests to check to_minterm
 // TODO (HIGH) write tests to check get_dnf_clauses
