@@ -1456,10 +1456,12 @@ tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 // TODO: Normalize Tau constants in case type == bf
 template<typename... BAs>
 tau<BAs...> reduce2(const tau<BAs...>& fm, size_t type, bool is_cnf, bool all_reductions, bool enable_sort) {
-	//TODO: cache enable_sort option
 #ifdef TAU_CACHE
-		static std::map<std::pair<tau<BAs...>, bool>, tau<BAs...>> cache;
-		if (auto it = cache.find(make_pair(fm, all_reductions)); it != end(cache))
+		static std::unordered_map<std::tuple<tau<BAs...>, bool, bool>,
+			tau<BAs...>,
+			std::hash<std::tuple<tau<BAs...>, bool, bool>>,
+			tuple_struc_equal<bool, bool, BAs...>> cache;
+		if (auto it = cache.find(std::make_tuple(fm, all_reductions, enable_sort)); it != end(cache))
 			return it->second;
 #endif // TAU_CACHE
 	BOOST_LOG_TRIVIAL(trace) << "(I) Begin reduce2 with is_cnf set to " << is_cnf;
@@ -1470,21 +1472,21 @@ tau<BAs...> reduce2(const tau<BAs...>& fm, size_t type, bool is_cnf, bool all_re
 	if (paths.empty()) {
 		auto res = is_cnf ? (wff ? _T<BAs...> : _1<BAs...>) : (wff ? _F<BAs...> : _0<BAs...>);
 #ifdef TAU_CACHE
-		return cache.emplace(make_pair(fm, all_reductions), res).first->second;
+		return cache.emplace(make_tuple(fm, all_reductions, enable_sort), res).first->second;
 #endif // TAU_CACHE
 		return res;
 	}
 	if (paths.size() == 1 && paths[0].empty()) {
 		auto res = is_cnf ? (wff ? _F<BAs...> : _0<BAs...>) : (wff ? _T<BAs...> : _1<BAs...>);
 #ifdef TAU_CACHE
-		return cache.emplace(make_pair(fm, all_reductions), res).first->second;
+		return cache.emplace(make_tuple(fm, all_reductions, enable_sort), res).first->second;
 #endif // TAU_CACHE
 		return res;
 	}
 
 	auto reduced_fm = build_reduced_formula<BAs...>(paths, vars, is_cnf, wff);
 #ifdef TAU_CACHE
-		return cache.emplace(make_pair(fm, all_reductions), reduced_fm).first->second;
+		return cache.emplace(make_tuple(fm, all_reductions, enable_sort), reduced_fm).first->second;
 #endif // TAU_CACHE
 	BOOST_LOG_TRIVIAL(trace) << "(I) End reduce2";
 	BOOST_LOG_TRIVIAL(trace) << "(F) Reduced formula: " << reduced_fm;
