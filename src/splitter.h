@@ -141,7 +141,7 @@ tau<BAs...> good_reverse_splitter_using_function(const tau<BAs...> &f, splitter_
 						 const tau<BAs...> &original_fm) {
 	assert(is_non_terminal(tau_parser::bf, f));
 	// Convert Boolean function to CNF
-	auto f_cnf = to_cnf2<false>(f);
+	auto f_cnf = to_cnf<false>(f);
 
 	// Try to remove a conjunt to produce splitter
 	std::vector<tau<BAs...> > m;
