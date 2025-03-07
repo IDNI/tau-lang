@@ -16,12 +16,13 @@ FROM ubuntu:24.04
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
-    bash wget git nsis rpm \
-    cmake=3.28.3-1build7 \
-    g++=4:13.2.0-7ubuntu1 \
-    mingw-w64=11.0.1-3build1 \
-    libboost-all-dev=1.83.0.1ubuntu2 \
-	libz3-dev
+	bash wget git nsis rpm \
+	cmake=3.28.3-1build7 \
+	g++=4:13.2.0-7ubuntu1 \
+	mingw-w64=11.0.1-3build1 \
+	libboost-all-dev=1.83.0.1ubuntu2 \
+	libz3-dev=4.8.12-3.1build1 \
+	python3-distutils-extra
 
 # Argument BUILD_TYPE=Debug/Release
 ARG BUILD_TYPE=Release
@@ -43,6 +44,8 @@ COPY ./ /tau-lang
 
 WORKDIR /tau-lang
 
+RUN ./clean.sh
+
 # if NIGHTLY is set to yes, then add .YYYY-MM-DD to the first line of the VERSION file
 RUN if [ "$NIGHTLY" = "yes" ]; then \
 	echo -n "$(head -n 1 VERSION)-$(date --iso)" > VERSION; \
@@ -61,7 +64,9 @@ fi
 RUN echo "(BUILD) -- Building packages: $RELEASE (nightly: $NIGHTLY)"
 
 # Linux packages
-RUN if [ "$RELEASE" = "yes" ]; then ./packages.sh; fi
+RUN if [ "$RELEASE" = "yes" ]; then \
+	./packages.sh && rm ./build-Release/CMakeCache.txt; \
+fi
 
 # Windows packages
 RUN if [ "$RELEASE" = "yes" ]; then \
