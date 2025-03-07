@@ -9,30 +9,31 @@ namespace idni::tau_lang {
 
 static context ctx;
 
-bitvector_ba::bitvector_ba(z3::expr e, const unsigned& size) : size(size), e(e) {}
-bitvector_ba::bitvector_ba(int n, const unsigned& sz) : size(sz), e(ctx.bv_val(n, sz)) {}
-bitvector_ba::bitvector_ba(unsigned int n, const unsigned& sz) : size(sz), e(ctx.bv_val(n, sz)) {}
-bitvector_ba::bitvector_ba(long n, const unsigned& sz) : size(sz), e(ctx.bv_val(n, sz)) {}
-bitvector_ba::bitvector_ba(unsigned long n, const unsigned& sz) : size(sz), e(ctx.bv_val(n, sz)) {}
+bitvector_ba::bitvector_ba() : expr(0), size(sizeof(int)) {}
+bitvector_ba::bitvector_ba(z3::expr e, const unsigned& size) : expr(e), size(size) {}
+bitvector_ba::bitvector_ba(int n) : expr(ctx.bv_val(n, sizeof(int))), size(sizeof(int)) {}
+bitvector_ba::bitvector_ba(unsigned n) : expr(ctx.bv_val(n, sizeof(unsigned))), size(sizeof(unsigned)) {}
+bitvector_ba::bitvector_ba(int64_t n) : expr(ctx.bv_val(n, sizeof(int64_t))), size(sizeof(int64_t)) {}
+bitvector_ba::bitvector_ba(uint64_t n) : expr(ctx.bv_val(n, sizeof(uint64_t))), size(sizeof(uint64_t)) {}
 
 bitvector_ba bitvector_ba::operator&(const bitvector_ba& x) const {
-	return bitvector_ba(e & x.e, size);
+	return bitvector_ba();
 }
 
 bitvector_ba bitvector_ba::operator|(const bitvector_ba& x) const {
-	return bitvector_ba(e | x.e, size);
+	return bitvector_ba();
 }
 
 bitvector_ba bitvector_ba::operator^(const bitvector_ba& x) const {
-	return bitvector_ba(e ^x.e, size);
+	return bitvector_ba();
 }
 
 bitvector_ba bitvector_ba::operator+(const bitvector_ba& x) const {
-	return bitvector_ba(e ^ x.e, size);
+	return bitvector_ba();
 }
 
 bitvector_ba bitvector_ba::operator~() const {
-	return bitvector_ba(!e, size);
+	return bitvector_ba(0);
 }
 
 //auto bitvector_ba::operator<=>(const bitvector_ba& x) const {
@@ -41,7 +42,7 @@ bitvector_ba bitvector_ba::operator~() const {
 
 bitvector_ba bitvector_false() {
 	// FIXME maybe we should have an abstract false and one
-	return bitvector_ba(0, 32);
+	return bitvector_ba(0);
 }
 
 bitvector_ba normalize (const bitvector_ba& fm) {

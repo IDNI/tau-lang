@@ -14,16 +14,12 @@ using bitvector_source_sym = idni::lit<char, char>;
 
 struct bitvector_ba {
 
-	enum type {
-		i /* int */, u /* unsigned int */, l /* long */, ul /* usigned long */, b /* bits */
-	};
-
-	bitvector_ba() = delete;
+	bitvector_ba(); // not yet = delete;
 	bitvector_ba(z3::expr e, const unsigned& size);
-	bitvector_ba(int n, const unsigned& size);
-	bitvector_ba(unsigned int n, const unsigned& size);
-	bitvector_ba(long n, const unsigned& size);
-	bitvector_ba(unsigned long n, const unsigned& size);
+	bitvector_ba(int n);
+	bitvector_ba(unsigned n);
+	bitvector_ba(int64_t  n);
+	bitvector_ba(uint64_t n);
 
 	bitvector_ba operator&(const bitvector_ba& x) const;
 	bitvector_ba operator|(const bitvector_ba& x) const;
@@ -35,8 +31,8 @@ struct bitvector_ba {
 	bool is_zero() const;
 	bool is_one() const;
 
+	std::variant<z3::expr, int, unsigned int, long long, unsigned long long> expr;
 	unsigned size;
-	z3::expr e;
 };
 
 std::strong_ordering operator<=>(const bitvector_ba& x, const bitvector_ba& y);
