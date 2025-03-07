@@ -141,7 +141,7 @@ tau<BAs...> good_reverse_splitter_using_function(const tau<BAs...> &f, splitter_
 						 const tau<BAs...> &original_fm) {
 	assert(is_non_terminal(tau_parser::bf, f));
 	// Convert Boolean function to CNF
-	auto f_cnf = to_cnf2(f, false);
+	auto f_cnf = to_cnf2<false>(f);
 
 	// Try to remove a conjunt to produce splitter
 	std::vector<tau<BAs...> > m;
@@ -162,11 +162,11 @@ tau<BAs...> good_reverse_splitter_using_function(const tau<BAs...> &f, splitter_
 		if (!coeff) continue;
 		// TODO: Optimization: Instead of negating the formula think about reverse splitter call
 		// If coefficient exists try to split the negation
-		auto neg_coeff = push_negation_in(build_bf_neg(coeff.value()), false);
+		auto neg_coeff = push_negation_in<false>(build_bf_neg(coeff.value()));
 		assert(is_non_terminal(tau_parser::bf_constant, trim(neg_coeff)));
 		auto s = splitter(trim(neg_coeff), st);
 		// Negating s results in a reversed splitter for s
-		s = push_negation_in(build_bf_neg(s), false);
+		s = push_negation_in<false>(build_bf_neg(s));
 		if (s != coeff.value()) {
 			auto new_fm = replace(original_fm, coeff.value(), s);
 			if(!are_nso_equivalent(original_fm, new_fm))
