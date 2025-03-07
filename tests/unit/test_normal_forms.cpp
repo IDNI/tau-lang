@@ -173,7 +173,7 @@ TEST_SUITE("normal forms: dnf_bf") {
 			| tau_parser::wff
 			| tau_parser::bf_eq
 			| tau_parser::bf).value();
-		auto result = to_dnf2<false>(statement);
+		auto result = to_dnf<false>(statement);
 		CHECK( result == _0<Bool> );
 	}
 
