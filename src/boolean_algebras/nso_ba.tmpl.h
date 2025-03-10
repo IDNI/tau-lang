@@ -461,7 +461,7 @@ std::ostream& operator<<(std::ostream& stream,
 
 inline static const std::map<size_t, std::string> hl_colors = {
 	{ tau_parser::bf,            idni::TC.LIGHT_GREEN() },
-	{ tau_parser::arithmetic,    idni::TC.GREEN() },
+	{ tau_parser::z3,    idni::TC.GREEN() },
 	{ tau_parser::variable,      idni::TC.WHITE() },
 	{ tau_parser::capture,       idni::TC.BLUE() },
 	{ tau_parser::wff_all,       idni::TC.MAGENTA() },
@@ -592,21 +592,21 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			{ tau_parser::bf_xor,                          740 },
 			{ tau_parser::bf_neg,                          750 },
 			{ tau_parser::bf,                              760 },
-			// arithmetic
-			{ tau_parser::arithmetic_add,                  770 },
-			{ tau_parser::arithmetic_sub,                  771 },
-			{ tau_parser::arithmetic_mul,                  772 },
-			{ tau_parser::arithmetic_div,                  773 },
-			{ tau_parser::arithmetic_mod,                  774 },
-			{ tau_parser::arithmetic_shl,                  775 },
-			{ tau_parser::arithmetic_shr,                  776 },
-			{ tau_parser::arithmetic_lt,                   777 },
-			{ tau_parser::arithmetic_le,                   778 },
-			{ tau_parser::arithmetic_gt,                   779 },
-			{ tau_parser::arithmetic_ge,                   780 },
-			{ tau_parser::arithmetic_eq,                   781 },
-			{ tau_parser::arithmetic_ne,                   782 },
-			{ tau_parser::arithmetic,                      783 },
+			// z3
+			{ tau_parser::z3_add,                           770 },
+			{ tau_parser::z3_sub,                           771 },
+			{ tau_parser::z3_mul,                           772 },
+			{ tau_parser::z3_div,                           773 },
+			{ tau_parser::z3_mod,                           774 },
+			{ tau_parser::z3_shl,                           775 },
+			{ tau_parser::z3_shr,                           776 },
+			{ tau_parser::z3_lt,                            777 },
+			{ tau_parser::z3_le,                            778 },
+			{ tau_parser::z3_gt,                            779 },
+			{ tau_parser::z3_ge,                            780 },
+			{ tau_parser::z3_eq,                            781 },
+			{ tau_parser::z3_ne,                            782 },
+			{ tau_parser::z3,                               783 },
 
 			{ tau_parser::rec_relation,                    800 },
 			{ tau_parser::ref_args,                        800 },
@@ -853,19 +853,19 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::wff_xor:        infix("^"); break;
 			case tau_parser::wff_imply:      infix("->"); break;
 			case tau_parser::wff_equiv:      infix("<->"); break;
-			case tau_parser::arithmetic_add: infix(":+"); break;
-			case tau_parser::arithmetic_sub: infix(":-"); break;
-			case tau_parser::arithmetic_mul: infix(":*"); break;
-			case tau_parser::arithmetic_div: infix(":/"); break;
-			case tau_parser::arithmetic_mod: infix(":%"); break;
-			case tau_parser::arithmetic_shl: infix(":<<"); break;
-			case tau_parser::arithmetic_shr: infix(":>>"); break;
-			case tau_parser::arithmetic_lt:  infix(":<"); break;
-			case tau_parser::arithmetic_le:  infix(":<="); break;
-			case tau_parser::arithmetic_gt:  infix(":>"); break;
-			case tau_parser::arithmetic_ge:  infix(":>="); break;
-			case tau_parser::arithmetic_eq:  infix(":="); break;
-			case tau_parser::arithmetic_ne:  infix(":!="); break;
+			case tau_parser::z3_add: infix(":+"); break;
+			case tau_parser::z3_sub: infix(":-"); break;
+			case tau_parser::z3_mul: infix(":*"); break;
+			case tau_parser::z3_div: infix(":/"); break;
+			case tau_parser::z3_mod: infix(":%"); break;
+			case tau_parser::z3_shl: infix(":<<"); break;
+			case tau_parser::z3_shr: infix(":>>"); break;
+			case tau_parser::z3_lt:  infix(":<"); break;
+			case tau_parser::z3_le:  infix(":<="); break;
+			case tau_parser::z3_gt:  infix(":>"); break;
+			case tau_parser::z3_ge:  infix(":>="); break;
+			case tau_parser::z3_eq:  infix(":="); break;
+			case tau_parser::z3_ne:  infix(":!="); break;
 			// ternary operators
 			case tau_parser::bf_interval:    infix2("<=", "<="); break;
 			case tau_parser::wff_conditional:infix2("?", ":"); break;

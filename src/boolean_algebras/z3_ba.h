@@ -5,7 +5,7 @@
 
 #include <z3++.h>
 
-#include "../../parser/bitvector_parser.generated.h"
+#include "../../parser/z3_parser.generated.h"
 #include "../nso_rr.h"
 
 namespace idni::tau_lang {
@@ -26,11 +26,11 @@ struct z3_ba {
 	};
 
 // TODO (MEDIUM) to be added in the future
-//	struct z3_int {};
-//	struct z3_uint {};
-//	struct z3_long {};
-//	struct z3_ulong {};
-//	struct z3_string {};
+//	struct z3_int { int n; };
+//	struct z3_uint { unsigned n; };
+//	struct z3_int64 { int64_t n; };
+//	struct z3_uint64 { uint64_t n; };
+//	struct z3_string { std::string s; };
 
 	// TODO (MEDIUM) remove in the future
 	z3_ba();
@@ -49,6 +49,8 @@ struct z3_ba {
 	bool is_zero() const;
 	bool is_one() const;
 
+// TODO (MEDIUM) to be added in the future
+//	std::variant<z3_bitvector, z3_int, z3_uint, z3_int64, z3_uint64, z3_string> expr;
 	std::variant<z3_bitvector> expr;
 };
 

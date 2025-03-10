@@ -25,11 +25,11 @@ inline std::vector<std::string> symbol_names{
 	"__E_wff_36", "bf_nleq", "__E_wff_37", "bf_greater", "__E_wff_38", "bf_ngreater", "__E_wff_39", "bf_greater_equal", "__E_wff_40", "bf_ngeq", 
 	"__E_wff_41", "bf_less", "__E_wff_42", "bf_nless", "__E_wff_43", "bf_parenthesis", "__E_bf_44", "bf_constant", "variable", "bf_splitter", 
 	"__E_bf_45", "bf_ref", "bf_or", "__E_bf_46", "bf_xor", "__E_bf_47", "bf_t", "__E_bf_48", "__E___E_bf_48_49", "type", 
-	"bf_f", "__E_bf_50", "__E___E_bf_50_51", "arithmetic", "bf_and", "__E_bf_52", "__E___E_bf_52_53", "bf_neg", "__E_bf_54", "bf_neg_oprnd", 
-	"__E___E_bf_54_55", "bf_and_nosep", "__E_bf_56", "bf_and_nosep_1st_oprnd", "__E___E_bf_56_57", "bf_and_nosep_2nd_oprnd", "__E___E_bf_56_58", "arithmetic_parenthesis", "__E_arithmetic_59", "bitvector_constant", 
-	"arithmetic_add", "__E_arithmetic_60", "arithmetic_sub", "__E_arithmetic_61", "arithmetic_mul", "__E_arithmetic_62", "arithmetic_div", "__E_arithmetic_63", "arithmetic_mod", "__E_arithmetic_64", 
-	"arithmetic_shl", "__E_arithmetic_65", "digits", "arithmetic_shr", "__E_arithmetic_66", "arithmetic_lt", "__E_arithmetic_67", "arithmetic_le", "__E_arithmetic_68", "arithmetic_gt", 
-	"__E_arithmetic_69", "arithmetic_ge", "__E_arithmetic_70", "arithmetic_eq", "__E_arithmetic_71", "arithmetic_ne", "__E_arithmetic_72", "constant", "__E_bitvector_constant_73", "binding", 
+	"bf_f", "__E_bf_50", "__E___E_bf_50_51", "z3", "bf_and", "__E_bf_52", "__E___E_bf_52_53", "bf_neg", "__E_bf_54", "bf_neg_oprnd", 
+	"__E___E_bf_54_55", "bf_and_nosep", "__E_bf_56", "bf_and_nosep_1st_oprnd", "__E___E_bf_56_57", "bf_and_nosep_2nd_oprnd", "__E___E_bf_56_58", "z3_parenthesis", "__E_z3_59", "bitvector_constant", 
+	"z3_add", "__E_z3_60", "z3_sub", "__E_z3_61", "z3_mul", "__E_z3_62", "z3_div", "__E_z3_63", "z3_mod", "__E_z3_64", 
+	"z3_shl", "__E_z3_65", "digits", "z3_shr", "__E_z3_66", "z3_lt", "__E_z3_67", "z3_le", "__E_z3_68", "z3_gt", 
+	"__E_z3_69", "z3_ge", "__E_z3_70", "z3_eq", "__E_z3_71", "z3_ne", "__E_z3_72", "constant", "__E_bitvector_constant_73", "binding", 
 	"__E_bitvector_constant_74", "bv_type", "__E_bv_type_75", "ctn_neq", "__E_constraint_76", "ctnvar", "num", "ctn_eq", "__E_constraint_77", "ctn_greater_equal", 
 	"__E_constraint_78", "ctn_greater", "__E_constraint_79", "ctn_less_equal", "__E_constraint_80", "ctn_less", "__E_constraint_81", "__E_variable_82", "__E_variable_83", "__E_variable_84", 
 	"__E_variable_85", "__E_variable_86", "io_var", "__E_variable_87", "in", "out", "uninterpreted_constant", "in_var_name", "__E_in_88", "__E___E_in_88_89", 
@@ -476,7 +476,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(130), (NT(131)));
 //G171: bf(21)               => bf_f(130).
 	p(NT(21), (NT(130)));
-//G172: bf(21)               => arithmetic(133).
+//G172: bf(21)               => z3(133).
 	p(NT(21), (NT(133)));
 //G173: __E___E_bf_52_53(136) => _(11) '&' _(11).
 	p(NT(136), (NT(11)+T(31)+NT(11)));
@@ -554,91 +554,91 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(21), (NT(141)));
 //G210: bf(21)               => capture(20).
 	p(NT(21), (NT(20)));
-//G211: __E_arithmetic_59(148) => '(' _(11) arithmetic(133) _(11) ')'.
+//G211: __E_z3_59(148)       => '(' _(11) z3(133) _(11) ')'.
 	p(NT(148), (T(15)+NT(11)+NT(133)+NT(11)+T(16)));
-//G212: arithmetic_parenthesis(147) => __E_arithmetic_59(148).
+//G212: z3_parenthesis(147)  => __E_z3_59(148).
 	p(NT(147), (NT(148)));
-//G213: arithmetic(133)      => arithmetic_parenthesis(147).
+//G213: z3(133)              => z3_parenthesis(147).
 	p(NT(133), (NT(147)));
-//G214: arithmetic(133)      => bitvector_constant(149).
+//G214: z3(133)              => bitvector_constant(149).
 	p(NT(133), (NT(149)));
-//G215: __E_arithmetic_60(151) => arithmetic(133) _(11) ':' '+' _(11) arithmetic(133).
+//G215: __E_z3_60(151)       => z3(133) _(11) ':' '+' _(11) z3(133).
 	p(NT(151), (NT(133)+NT(11)+T(2)+T(36)+NT(11)+NT(133)));
-//G216: arithmetic_add(150)  => __E_arithmetic_60(151).
+//G216: z3_add(150)          => __E_z3_60(151).
 	p(NT(150), (NT(151)));
-//G217: arithmetic(133)      => arithmetic_add(150).
+//G217: z3(133)              => z3_add(150).
 	p(NT(133), (NT(150)));
-//G218: __E_arithmetic_61(153) => arithmetic(133) _(11) ':' '-' _(11) arithmetic(133).
+//G218: __E_z3_61(153)       => z3(133) _(11) ':' '-' _(11) z3(133).
 	p(NT(153), (NT(133)+NT(11)+T(2)+T(28)+NT(11)+NT(133)));
-//G219: arithmetic_sub(152)  => __E_arithmetic_61(153).
+//G219: z3_sub(152)          => __E_z3_61(153).
 	p(NT(152), (NT(153)));
-//G220: arithmetic(133)      => arithmetic_sub(152).
+//G220: z3(133)              => z3_sub(152).
 	p(NT(133), (NT(152)));
-//G221: __E_arithmetic_62(155) => arithmetic(133) _(11) ':' '*' _(11) arithmetic(133).
+//G221: __E_z3_62(155)       => z3(133) _(11) ':' '*' _(11) z3(133).
 	p(NT(155), (NT(133)+NT(11)+T(2)+T(40)+NT(11)+NT(133)));
-//G222: arithmetic_mul(154)  => __E_arithmetic_62(155).
+//G222: z3_mul(154)          => __E_z3_62(155).
 	p(NT(154), (NT(155)));
-//G223: arithmetic(133)      => arithmetic_mul(154).
+//G223: z3(133)              => z3_mul(154).
 	p(NT(133), (NT(154)));
-//G224: __E_arithmetic_63(157) => arithmetic(133) _(11) ':' '/' _(11) arithmetic(133).
+//G224: __E_z3_63(157)       => z3(133) _(11) ':' '/' _(11) z3(133).
 	p(NT(157), (NT(133)+NT(11)+T(2)+T(41)+NT(11)+NT(133)));
-//G225: arithmetic_div(156)  => __E_arithmetic_63(157).
+//G225: z3_div(156)          => __E_z3_63(157).
 	p(NT(156), (NT(157)));
-//G226: arithmetic(133)      => arithmetic_div(156).
+//G226: z3(133)              => z3_div(156).
 	p(NT(133), (NT(156)));
-//G227: __E_arithmetic_64(159) => arithmetic(133) _(11) ':' '%' _(11) arithmetic(133).
+//G227: __E_z3_64(159)       => z3(133) _(11) ':' '%' _(11) z3(133).
 	p(NT(159), (NT(133)+NT(11)+T(2)+T(42)+NT(11)+NT(133)));
-//G228: arithmetic_mod(158)  => __E_arithmetic_64(159).
+//G228: z3_mod(158)          => __E_z3_64(159).
 	p(NT(158), (NT(159)));
-//G229: arithmetic(133)      => arithmetic_mod(158).
+//G229: z3(133)              => z3_mod(158).
 	p(NT(133), (NT(158)));
-//G230: __E_arithmetic_65(161) => arithmetic(133) _(11) ':' '<' '<' _(11) digits(162).
+//G230: __E_z3_65(161)       => z3(133) _(11) ':' '<' '<' _(11) digits(162).
 	p(NT(161), (NT(133)+NT(11)+T(2)+T(20)+T(20)+NT(11)+NT(162)));
-//G231: arithmetic_shl(160)  => __E_arithmetic_65(161).
+//G231: z3_shl(160)          => __E_z3_65(161).
 	p(NT(160), (NT(161)));
-//G232: arithmetic(133)      => arithmetic_shl(160).
+//G232: z3(133)              => z3_shl(160).
 	p(NT(133), (NT(160)));
-//G233: __E_arithmetic_66(164) => arithmetic(133) _(11) ':' '>' '>' _(11) digits(162).
+//G233: __E_z3_66(164)       => z3(133) _(11) ':' '>' '>' _(11) digits(162).
 	p(NT(164), (NT(133)+NT(11)+T(2)+T(21)+T(21)+NT(11)+NT(162)));
-//G234: arithmetic_shr(163)  => __E_arithmetic_66(164).
+//G234: z3_shr(163)          => __E_z3_66(164).
 	p(NT(163), (NT(164)));
-//G235: arithmetic(133)      => arithmetic_shr(163).
+//G235: z3(133)              => z3_shr(163).
 	p(NT(133), (NT(163)));
-//G236: __E_arithmetic_67(166) => arithmetic(133) _(11) ':' '<' _(11) arithmetic(133).
+//G236: __E_z3_67(166)       => z3(133) _(11) ':' '<' _(11) z3(133).
 	p(NT(166), (NT(133)+NT(11)+T(2)+T(20)+NT(11)+NT(133)));
-//G237: arithmetic_lt(165)   => __E_arithmetic_67(166).
+//G237: z3_lt(165)           => __E_z3_67(166).
 	p(NT(165), (NT(166)));
-//G238: arithmetic(133)      => arithmetic_lt(165).
+//G238: z3(133)              => z3_lt(165).
 	p(NT(133), (NT(165)));
-//G239: __E_arithmetic_68(168) => arithmetic(133) _(11) ':' '<' '=' _(11) arithmetic(133).
+//G239: __E_z3_68(168)       => z3(133) _(11) ':' '<' '=' _(11) z3(133).
 	p(NT(168), (NT(133)+NT(11)+T(2)+T(20)+T(3)+NT(11)+NT(133)));
-//G240: arithmetic_le(167)   => __E_arithmetic_68(168).
+//G240: z3_le(167)           => __E_z3_68(168).
 	p(NT(167), (NT(168)));
-//G241: arithmetic(133)      => arithmetic_le(167).
+//G241: z3(133)              => z3_le(167).
 	p(NT(133), (NT(167)));
-//G242: __E_arithmetic_69(170) => arithmetic(133) _(11) ':' '>' _(11) arithmetic(133).
+//G242: __E_z3_69(170)       => z3(133) _(11) ':' '>' _(11) z3(133).
 	p(NT(170), (NT(133)+NT(11)+T(2)+T(21)+NT(11)+NT(133)));
-//G243: arithmetic_gt(169)   => __E_arithmetic_69(170).
+//G243: z3_gt(169)           => __E_z3_69(170).
 	p(NT(169), (NT(170)));
-//G244: arithmetic(133)      => arithmetic_gt(169).
+//G244: z3(133)              => z3_gt(169).
 	p(NT(133), (NT(169)));
-//G245: __E_arithmetic_70(172) => arithmetic(133) _(11) ':' '>' '=' _(11) arithmetic(133).
+//G245: __E_z3_70(172)       => z3(133) _(11) ':' '>' '=' _(11) z3(133).
 	p(NT(172), (NT(133)+NT(11)+T(2)+T(21)+T(3)+NT(11)+NT(133)));
-//G246: arithmetic_ge(171)   => __E_arithmetic_70(172).
+//G246: z3_ge(171)           => __E_z3_70(172).
 	p(NT(171), (NT(172)));
-//G247: arithmetic(133)      => arithmetic_ge(171).
+//G247: z3(133)              => z3_ge(171).
 	p(NT(133), (NT(171)));
-//G248: __E_arithmetic_71(174) => arithmetic(133) _(11) ':' '=' _(11) arithmetic(133).
+//G248: __E_z3_71(174)       => z3(133) _(11) ':' '=' _(11) z3(133).
 	p(NT(174), (NT(133)+NT(11)+T(2)+T(3)+NT(11)+NT(133)));
-//G249: arithmetic_eq(173)   => __E_arithmetic_71(174).
+//G249: z3_eq(173)           => __E_z3_71(174).
 	p(NT(173), (NT(174)));
-//G250: arithmetic(133)      => arithmetic_eq(173).
+//G250: z3(133)              => z3_eq(173).
 	p(NT(133), (NT(173)));
-//G251: __E_arithmetic_72(176) => arithmetic(133) _(11) ':' '!' '=' _(11) arithmetic(133).
+//G251: __E_z3_72(176)       => z3(133) _(11) ':' '!' '=' _(11) z3(133).
 	p(NT(176), (NT(133)+NT(11)+T(2)+T(32)+T(3)+NT(11)+NT(133)));
-//G252: arithmetic_ne(175)   => __E_arithmetic_72(176).
+//G252: z3_ne(175)           => __E_z3_72(176).
 	p(NT(175), (NT(176)));
-//G253: arithmetic(133)      => arithmetic_ne(175).
+//G253: z3(133)              => z3_ne(175).
 	p(NT(133), (NT(175)));
 //G254: __E_bitvector_constant_73(178) => binding(179).
 	p(NT(178), (NT(179)));
@@ -1503,11 +1503,11 @@ struct tau_parser : public idni::parser<char, char> {
 		__E_wff_36, bf_nleq, __E_wff_37, bf_greater, __E_wff_38, bf_ngreater, __E_wff_39, bf_greater_equal, __E_wff_40, bf_ngeq, 
 		__E_wff_41, bf_less, __E_wff_42, bf_nless, __E_wff_43, bf_parenthesis, __E_bf_44, bf_constant, variable, bf_splitter, 
 		__E_bf_45, bf_ref, bf_or, __E_bf_46, bf_xor, __E_bf_47, bf_t, __E_bf_48, __E___E_bf_48_49, type, 
-		bf_f, __E_bf_50, __E___E_bf_50_51, arithmetic, bf_and, __E_bf_52, __E___E_bf_52_53, bf_neg, __E_bf_54, bf_neg_oprnd, 
-		__E___E_bf_54_55, bf_and_nosep, __E_bf_56, bf_and_nosep_1st_oprnd, __E___E_bf_56_57, bf_and_nosep_2nd_oprnd, __E___E_bf_56_58, arithmetic_parenthesis, __E_arithmetic_59, bitvector_constant, 
-		arithmetic_add, __E_arithmetic_60, arithmetic_sub, __E_arithmetic_61, arithmetic_mul, __E_arithmetic_62, arithmetic_div, __E_arithmetic_63, arithmetic_mod, __E_arithmetic_64, 
-		arithmetic_shl, __E_arithmetic_65, digits, arithmetic_shr, __E_arithmetic_66, arithmetic_lt, __E_arithmetic_67, arithmetic_le, __E_arithmetic_68, arithmetic_gt, 
-		__E_arithmetic_69, arithmetic_ge, __E_arithmetic_70, arithmetic_eq, __E_arithmetic_71, arithmetic_ne, __E_arithmetic_72, constant, __E_bitvector_constant_73, binding, 
+		bf_f, __E_bf_50, __E___E_bf_50_51, z3, bf_and, __E_bf_52, __E___E_bf_52_53, bf_neg, __E_bf_54, bf_neg_oprnd, 
+		__E___E_bf_54_55, bf_and_nosep, __E_bf_56, bf_and_nosep_1st_oprnd, __E___E_bf_56_57, bf_and_nosep_2nd_oprnd, __E___E_bf_56_58, z3_parenthesis, __E_z3_59, bitvector_constant, 
+		z3_add, __E_z3_60, z3_sub, __E_z3_61, z3_mul, __E_z3_62, z3_div, __E_z3_63, z3_mod, __E_z3_64, 
+		z3_shl, __E_z3_65, digits, z3_shr, __E_z3_66, z3_lt, __E_z3_67, z3_le, __E_z3_68, z3_gt, 
+		__E_z3_69, z3_ge, __E_z3_70, z3_eq, __E_z3_71, z3_ne, __E_z3_72, constant, __E_bitvector_constant_73, binding, 
 		__E_bitvector_constant_74, bv_type, __E_bv_type_75, ctn_neq, __E_constraint_76, ctnvar, num, ctn_eq, __E_constraint_77, ctn_greater_equal, 
 		__E_constraint_78, ctn_greater, __E_constraint_79, ctn_less_equal, __E_constraint_80, ctn_less, __E_constraint_81, __E_variable_82, __E_variable_83, __E_variable_84, 
 		__E_variable_85, __E_variable_86, io_var, __E_variable_87, in, out, uninterpreted_constant, in_var_name, __E_in_88, __E___E_in_88_89, 
