@@ -12,8 +12,28 @@ namespace idni::tau_lang {
 
 struct z3_ba {
 
-	z3_ba(); // not yet = delete;
-	z3_ba(z3::expr e, const unsigned& size);
+	struct z3_bitvector {
+		z3::expr e;
+		size_t size;
+
+		bool operator==(const z3_bitvector& x) const {
+			return e == x.e;
+		}
+
+		bool operator!=(const z3_bitvector& x) const {
+			return e != x.e;
+		}
+	};
+
+// TODO (MEDIUM) to be added in the future
+//	struct z3_int {};
+//	struct z3_uint {};
+//	struct z3_long {};
+//	struct z3_ulong {};
+//	struct z3_string {};
+
+	// TODO (MEDIUM) remove in the future
+	z3_ba();
 	z3_ba(int n);
 	z3_ba(unsigned n);
 	z3_ba(int64_t  n);
@@ -29,8 +49,7 @@ struct z3_ba {
 	bool is_zero() const;
 	bool is_one() const;
 
-	std::variant<z3::expr, int, unsigned int, long long, unsigned long long> expr;
-	unsigned size;
+	std::variant<z3_bitvector> expr;
 };
 
 std::strong_ordering operator<=>(const z3_ba& x, const z3_ba& y);

@@ -9,12 +9,13 @@ namespace idni::tau_lang {
 
 static context ctx;
 
-z3_ba::z3_ba() : expr(0), size(sizeof(int)) {}
-z3_ba::z3_ba(z3::expr e, const unsigned& size) : expr(e), size(size) {}
-z3_ba::z3_ba(int n) : expr(ctx.bv_val(n, sizeof(int))), size(sizeof(int)) {}
-z3_ba::z3_ba(unsigned n) : expr(ctx.bv_val(n, sizeof(unsigned))), size(sizeof(unsigned)) {}
-z3_ba::z3_ba(int64_t n) : expr(ctx.bv_val(n, sizeof(int64_t))), size(sizeof(int64_t)) {}
-z3_ba::z3_ba(uint64_t n) : expr(ctx.bv_val(n, sizeof(uint64_t))), size(sizeof(uint64_t)) {}
+// TODO (MEDIUM) remove in the future
+z3_ba::z3_ba() : expr(z3_bitvector{ctx.bv_val(0, sizeof(int)), sizeof(int)}) {}
+// TODO (MEDIUM) this should be converted into sort typed factory methods in the future
+z3_ba::z3_ba(int n) : expr(z3_bitvector{ctx.bv_val(n, sizeof(int)), sizeof(int)}) {}
+z3_ba::z3_ba(unsigned n) : expr(z3_bitvector{ctx.bv_val(n, sizeof(unsigned)), sizeof(unsigned)}) {}
+z3_ba::z3_ba(int64_t n) : expr(z3_bitvector{ctx.bv_val(n, sizeof(int64_t)), sizeof(int64_t)}) {}
+z3_ba::z3_ba(uint64_t n) : expr(z3_bitvector{ctx.bv_val(n, sizeof(uint64_t)), sizeof(uint64_t)}) {}
 
 z3_ba z3_ba::operator&(const z3_ba& x) const {
 	return z3_ba();
@@ -69,11 +70,11 @@ std::strong_ordering operator<=>(const z3_ba& x, const z3_ba& y) {
 }
 
 bool operator==(const z3_ba& x, const z3_ba& y) {
-	return x.size == y.size;
+	return x.expr == y.expr;
 }
 
 bool operator!=(const z3_ba& x, const z3_ba& y) {
-	return x.size != y.size;
+	return !(x.expr != y.expr);
 }
 
 bool operator==(const z3_ba& /*x*/, const bool& /*b*/) { return false; }
@@ -96,5 +97,5 @@ size_t std::hash<idni::tau_lang::z3_ba>::operator()(const idni::tau_lang::z3_ba&
 
 std::ostream& operator<<(std::ostream& os, const idni::tau_lang::z3_ba& x) {
 	// TODO implement
-	return os << "z3::expr" << "[" << x.size << "]";
+	return os << "z3::expr" << "[" << "TODO" << "]";
 }
