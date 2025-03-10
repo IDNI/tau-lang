@@ -37,10 +37,6 @@ z3_ba z3_ba::operator~() const {
 	return z3_ba(0);
 }
 
-//auto z3_ba::operator<=>(const z3_ba& x) const {
-//	return std::addressof(e) <=> std::addressof(x.e);
-//}
-
 z3_ba bitvector_false() {
 	// FIXME maybe we should have an abstract false and one
 	return z3_ba(0);
@@ -66,15 +62,15 @@ bool is_syntactic_zero(const z3_ba& /*fm*/) {
 }
 
 std::strong_ordering operator<=>(const z3_ba& x, const z3_ba& y) {
-	return std::addressof(x) <=> std::addressof(y);
+	return x <=> y;
 }
 
 bool operator==(const z3_ba& x, const z3_ba& y) {
-	return x.expr == y.expr;
+	return x == y;
 }
 
 bool operator!=(const z3_ba& x, const z3_ba& y) {
-	return !(x.expr != y.expr);
+	return !(x == y);
 }
 
 bool operator==(const z3_ba& /*x*/, const bool& /*b*/) { return false; }
