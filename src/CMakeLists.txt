@@ -20,7 +20,7 @@ set(TAU_HEADERS
 	boolean_algebras/variant_ba.h
 	boolean_algebras/product_ba.h
 	boolean_algebras/nso_ba.h
-	boolean_algebras/bitvector_ba.h
+	boolean_algebras/z3_ba.h
 	experimental/execution.h
 	defs.h
 	rewriting.h
@@ -50,7 +50,7 @@ set(TAU_SOURCES
 	../external/parser/src/recoders.cpp
 	../external/parser/src/term.cpp
 	boolean_algebras/bool_ba.cpp
-	boolean_algebras/bitvector_ba.cpp
+	boolean_algebras/z3_ba.cpp
 	dict.cpp
 	nso_rr.cpp
 )

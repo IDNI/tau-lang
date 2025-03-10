@@ -6,7 +6,7 @@
 #include <boost/log/trivial.hpp>
 
 #include "boolean_algebras/tau_ba.h"
-#include "boolean_algebras/bitvector_ba.h"
+#include "boolean_algebras/z3_ba.h"
 #include "../parser/sbf_parser.generated.h"
 
 namespace idni::tau_lang {
@@ -127,18 +127,18 @@ private:
  * @brief NSO factory used during testing
  */
 template<>
-struct nso_factory<bitvector_ba> {
-	inline static bitvector_ba_factory<bitvector_ba> bvf;
+struct nso_factory<z3_ba> {
+	inline static z3_ba_factory<z3_ba> bvf;
 
-	std::optional<tau<bitvector_ba>> parse(const std::string& src,
+	std::optional<tau<z3_ba>> parse(const std::string& src,
 		const std::string& = "");
 
-	tau<bitvector_ba> binding(const tau<bitvector_ba>& n,
+	tau<z3_ba> binding(const tau<z3_ba>& n,
 		const std::string& = "");
 
 	std::vector<std::string> types() const;
 
-	tau<bitvector_ba> splitter_one() const;
+	tau<z3_ba> splitter_one() const;
 
 	std::string default_type() const;
 
@@ -146,10 +146,10 @@ struct nso_factory<bitvector_ba> {
 
 	std::string zero(const std::string type_name) const;
 
-	std::optional<tau<bitvector_ba> > unpack_tau_ba(
-		const std::variant<bitvector_ba>&) const;
+	std::optional<tau<z3_ba> > unpack_tau_ba(
+		const std::variant<z3_ba>&) const;
 
-	static nso_factory<bitvector_ba>& instance();
+	static nso_factory<z3_ba>& instance();
 private:
 	nso_factory();
 };
@@ -158,20 +158,20 @@ private:
  * @brief NSO factory used during testing
  */
 template<>
-struct nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> {
-	inline static bitvector_ba_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> bvf;
-	inline static tau_ba_factory<bitvector_ba, sbf_ba> tf;
+struct nso_factory<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba> {
+	inline static z3_ba_factory<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba> bvf;
+	inline static tau_ba_factory<z3_ba, sbf_ba> tf;
 
-	std::optional<tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>> parse(const std::string& src,
+	std::optional<tau<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba>> parse(const std::string& src,
 		const std::string type_name = "");
 
-	tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> binding(
-		const tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>& n,
+	tau<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba> binding(
+		const tau<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba>& n,
 		const std::string type_name = "");
 
 	std::vector<std::string> types() const;
 
-	tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> splitter_one(const std::string& type_name = "") const;
+	tau<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba> splitter_one(const std::string& type_name = "") const;
 
 	std::string default_type() const;
 
@@ -179,10 +179,10 @@ struct nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> {
 
 	std::string zero(const std::string type_name) const;
 
-	std::optional<tau<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba> > unpack_tau_ba(
-		const std::variant<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>&) const;
+	std::optional<tau<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba> > unpack_tau_ba(
+		const std::variant<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba>&) const;
 
-	static nso_factory<tau_ba<bitvector_ba, sbf_ba>, bitvector_ba, sbf_ba>& instance();
+	static nso_factory<tau_ba<z3_ba, sbf_ba>, z3_ba, sbf_ba>& instance();
 private:
 	nso_factory();
 };
