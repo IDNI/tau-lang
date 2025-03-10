@@ -61,6 +61,15 @@ struct std::hash<std::pair<T1, T2>> {
 	}
 };
 
+template<typename... Ts>
+struct std::hash<std::tuple<Ts...>> {
+	size_t operator()(const std::tuple<Ts...>& p) const noexcept {
+		size_t seed = 0;
+		std::apply([&seed](auto&&... xs){(hash_combine(seed, xs),...);}, p);
+		return seed;
+	}
+};
+
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
 	os << "[";

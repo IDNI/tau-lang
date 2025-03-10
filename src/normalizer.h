@@ -26,11 +26,6 @@ namespace idni::tau_lang {
 
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
-template<typename... BAs>
-static auto elim_for_all = make_library<BAs...>(
-	WFF_ELIM_FORALL
-);
-
 // executes the normalizer on the given source code taking into account the
 // bindings provided.
 template<typename... BAs>

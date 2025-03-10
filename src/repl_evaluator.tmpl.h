@@ -230,9 +230,9 @@ std::optional<tau_nso<BAs...>>
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		if (is_non_terminal(tau_parser::bf, applied))
-			return reduce2(to_dnf2(applied, false), tau_parser::bf);
+			return reduce(to_dnf<false>(applied), tau_parser::bf);
 		else if (is_non_terminal(tau_parser::wff, applied))
-			return reduce2(to_dnf2(applied), tau_parser::wff);
+			return reduce(to_dnf(applied), tau_parser::wff);
 		else BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 	}
 	return {};
@@ -248,9 +248,9 @@ std::optional<tau_nso<BAs...>>
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff:
-			return reduce2(to_cnf2(applied), tau_parser::wff, true);
+			return reduce(to_cnf(applied), tau_parser::wff, true);
 		case tau_parser::bf:
-			return reduce2(to_cnf2(applied, false),
+			return reduce(to_cnf<false>(applied),
 							tau_parser::bf, true);
 		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
@@ -267,8 +267,8 @@ std::optional<tau_nso<BAs...>>
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
-		case tau_parser::wff: return nnf_wff<tau_ba_t, BAs...>(applied);
-		case tau_parser::bf:  return nnf_bf<tau_ba_t, BAs...>(applied);
+		case tau_parser::wff: return to_nnf(applied);
+		case tau_parser::bf:  return push_negation_in<false>(applied);
 		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
@@ -284,8 +284,8 @@ std::optional<tau_nso<BAs...>>
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
 		switch (get_non_terminal_node(applied)) {
-		case tau_parser::wff: return mnf_wff<tau_ba_t, BAs...>(applied);
-		case tau_parser::bf:  return mnf_bf<tau_ba_t, BAs...>(applied);
+		case tau_parser::wff: return to_mnf(reduce_across_bfs(applied, false));
+		case tau_parser::bf:  return bf_boole_normal_form(applied);
 		default: BOOST_LOG_TRIVIAL(error)<<"(Error) invalid argument\n";
 		}
 	}
@@ -490,13 +490,8 @@ std::optional<tau_nso<BAs...>>
 	if (auto check = get_type_and_arg(n->child[1]); check) {
 		auto [type, program] = check.value();
 		auto applied = apply_rr_to_rr_tau_nso(type, program);
-		return eliminate_quantifiers<tau_ba_t, BAs...>(applied)
-			| repeat_all<step<tau_ba_t, BAs...>,
-				tau_ba_t, BAs...>(
-					to_dnf_wff<tau_ba_t, BAs...>
-					| simplify_wff<tau_ba_t, BAs...>)
-			| reduce_bf<tau_ba_t, BAs...>
-			| reduce_wff<tau_ba_t, BAs...>;
+		applied = eliminate_quantifiers<tau_ba_t, BAs...>(applied);
+		return reduce_across_bfs(applied, false);
 	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 	return {};
