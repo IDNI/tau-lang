@@ -1,12 +1,12 @@
-// This file is generated from a file parser/bitvector.tgf by
+// This file is generated from a file parser/z3.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
-#ifndef __BITVECTOR_PARSER_H__
-#define __BITVECTOR_PARSER_H__
+#ifndef __Z3_PARSER_H__
+#define __Z3_PARSER_H__
 
 #include "parser.h"
 
-namespace bitvector_parser_data {
+namespace z3_parser_data {
 
 using char_type     = char;
 using terminal_type = char;
@@ -128,30 +128,30 @@ inline idni::prods<char_type, terminal_type>& productions() {
 inline ::idni::grammar<char_type, terminal_type> grammar(
 	nts, productions(), start_symbol, char_classes, grammar_options);
 
-} // namespace bitvector_parser_data
+} // namespace z3_parser_data
 
-struct bitvector_parser : public idni::parser<char, char> {
+struct z3_parser : public idni::parser<char, char> {
 	enum nonterminal {
 		nul, space, alpha, digit, start, _, bitvector, _uint, _int, _ulong, 
 		_long, _bits, sign, minus, plus, __E_plus_0, _unsigned, __E__uint_1, __E__ulong_2, __E__unsigned_3, 
 		_digit, __E__unsigned_4, _bit, __E__bits_5, __E__bits_6, zero, one, 
 	};
-	static bitvector_parser& instance() {
-		static bitvector_parser inst;
+	static z3_parser& instance() {
+		static z3_parser inst;
 		return inst;
 	}
-	bitvector_parser() : idni::parser<char_type, terminal_type>(
-		bitvector_parser_data::grammar,
-		bitvector_parser_data::parser_options) {}
+	z3_parser() : idni::parser<char_type, terminal_type>(
+		z3_parser_data::grammar,
+		z3_parser_data::parser_options) {}
 	size_t id(const std::basic_string<char_type>& name) {
-		return bitvector_parser_data::nts.get(name);
+		return z3_parser_data::nts.get(name);
 	}
 	const std::basic_string<char_type>& name(size_t id) {
-		return bitvector_parser_data::nts.get(id);
+		return z3_parser_data::nts.get(id);
 	}
 	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &bitvector_parser_data::nts);
+		return symbol_type(nt, &z3_parser_data::nts);
 	}
 };
 
-#endif // __BITVECTOR_PARSER_H__
+#endif // __Z3_PARSER_H__
