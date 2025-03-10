@@ -10,7 +10,7 @@ using parse_forest = idni::parser<char, char>::pforest;
 using parse_result = idni::parser<char, char>::result;
 
 template <typename...BAs>
-std::optional<tau<BAs...>> bitvector_ba_factory<BAs...>::parse(
+std::optional<tau<BAs...>> z3_ba_factory<BAs...>::parse(
 	const std::string& /*src*/)
 {
 	// TODO implement
@@ -18,20 +18,20 @@ std::optional<tau<BAs...>> bitvector_ba_factory<BAs...>::parse(
 }
 
 template <typename...BAs>
-tau<BAs...> bitvector_ba_factory<BAs...>::binding(const tau<BAs...>& /*sn*/) {
+tau<BAs...> z3_ba_factory<BAs...>::binding(const tau<BAs...>& /*sn*/) {
 	// TODO implement
 	return nullptr;
 }
 
 template <typename...BAs>
-std::variant<BAs...> bitvector_ba_factory<BAs...>::splitter_one() const {
+std::variant<BAs...> z3_ba_factory<BAs...>::splitter_one() const {
 	throw std::logic_error("Unsupported");
 }
 
 template <typename...BAs>
-std::string bitvector_ba_factory<BAs...>::one() const { return "1:bit[]"; }
+std::string z3_ba_factory<BAs...>::one() const { return "1:bit[]"; }
 
 template <typename...BAs>
-std::string bitvector_ba_factory<BAs...>::zero() const { return "0:bit[]"; }
+std::string z3_ba_factory<BAs...>::zero() const { return "0:bit[]"; }
 
 } // namespace idni::tau_lang
