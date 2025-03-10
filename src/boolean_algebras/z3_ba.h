@@ -17,11 +17,15 @@ struct z3_ba {
 		size_t size;
 
 		bool operator==(const z3_bitvector& x) const {
-			return e == x.e;
+			return size == x.size && e == x.e;
 		}
 
 		bool operator!=(const z3_bitvector& x) const {
-			return e != x.e;
+			return size != x.size || e != x.e;
+		}
+
+		auto operator<=>(const z3_bitvector& x) const {
+			return std::tie(size, e) <=> std::tie(x.size, x.e);
 		}
 	};
 
