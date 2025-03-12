@@ -47,10 +47,12 @@
 #include <iomanip>
 #include <sstream>
 
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/z3_ba.h"
-#include "boolean_algebras/sbf_ba.h"
+//#include "boolean_algebras/bool_ba.h"
+//#include "boolean_algebras/z3_ba.h"
+//#include "boolean_algebras/sbf_ba.h"
 #include "init_log.h"
+#include "runtime.h"
+#include "hooks.h"
 #include "normalizer.h"
 #include "cli.h"
 #include "repl.h"
