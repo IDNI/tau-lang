@@ -22,6 +22,7 @@ set(TAU_HEADERS
 	boolean_algebras/nso_ba.h
 	boolean_algebras/z3_ba.h
 	experimental/execution.h
+	runtime.h
 	defs.h
 	rewriting.h
 	dict.h

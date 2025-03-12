@@ -182,7 +182,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_ubt_ctn_at(int_t t) {
 	auto step_ubt_ctn = update_to_time_point(ubt_ctn, ut);
 	auto io_vars = select_top(step_ubt_ctn,
 			is_child_non_terminal<p::io_var, BAs...>);
-	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
+	std::sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
 		[](const auto& el){return is_io_initial(el);}));

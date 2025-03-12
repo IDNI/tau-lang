@@ -332,7 +332,7 @@ bool is_run_satisfiable(const tau<BAs...>& fm) {
 	auto free_io_vars = get_free_vars_from_nso(fm);
 	std::vector<tau<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
-	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
+	std::sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
@@ -368,7 +368,7 @@ tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto&
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
 		[](const auto& el){return is_io_initial(el);}));
-	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
+	std::sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 
 	auto free_io_vars = get_free_vars_from_nso(uconst_ctns);
 	while(!io_vars.empty()) {
