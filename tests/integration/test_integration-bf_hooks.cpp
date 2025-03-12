@@ -16,6 +16,8 @@
 #include <cassert>
 
 #include "doctest.h"
+#include "boolean_algebras/bool_ba.h"
+#include "boolean_algebras/z3_ba.h"
 #include "boolean_algebras/sbf_ba.h"
 #include "normalizer.h"
 

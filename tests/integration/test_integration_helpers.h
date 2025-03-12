@@ -3,12 +3,13 @@
 #ifndef __TEST_INTEGRATION_HELPERS_SBF_H__
 #define __TEST_INTEGRATION_HELPERS_SBF_H__
 
-#include "../src/boolean_algebras/sbf_ba.h"
 #include "../src/boolean_algebras/bool_ba.h"
+#include "../src/boolean_algebras/z3_ba.h"
+#include "../src/boolean_algebras/sbf_ba.h"
+//#include "../src/boolean_algebras/bdds/babdd.h"
+//#include "../src/boolean_algebras/bdds/bdd_handle.h"
+//#include "../src/nso_rr.h"
 #include "../src/nso_rr.h"
-#include "../src/boolean_algebras/bdds/babdd.h"
-#include "../src/nso_rr.h"
-#include "../src/boolean_algebras/bdds/bdd_handle.h"
 #include "../src/normalizer.h"
 #include "dict.h"
 
