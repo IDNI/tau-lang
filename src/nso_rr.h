@@ -22,8 +22,7 @@
 #include <numeric>
 
 #include "../parser/tau_parser.generated.h"
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/variant_ba.h"
+//#include "boolean_algebras/variant_ba.h"
 #include "init_log.h"
 #include "splitter_types.h"
 #include "parser.h"

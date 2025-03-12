@@ -1,7 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "tau_ba.h"
-
 namespace idni::tau_lang {
 
 template <typename...BAs>

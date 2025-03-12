@@ -10,53 +10,18 @@
 
 namespace idni::tau_lang {
 
-struct z3_ba {
+using z3_ba = std::shared_ptr<z3::expr>;
+using z3_source_sym = idni::lit<char, char>;
+using z3_sym = std::variant<z3_source_sym, z3_ba>;
 
-	struct z3_bitvector {
-		z3::expr e;
-		size_t size;
+static z3::context ctx;
 
-		bool operator==(const z3_bitvector& x) const {
-			return size == x.size && e == x.e;
-		}
+z3_ba operator&(const z3_ba& x, const z3_ba& y);
+z3_ba operator|(const z3_ba& x, const z3_ba& y);
+z3_ba operator^(const z3_ba& x, const z3_ba& y);
+z3_ba operator+(const z3_ba& x, const z3_ba& y);
+z3_ba operator~(const z3_ba& x);
 
-		bool operator!=(const z3_bitvector& x) const {
-			return size != x.size || e != x.e;
-		}
-
-		auto operator<=>(const z3_bitvector& x) const {
-			return std::tie(size, e) <=> std::tie(x.size, x.e);
-		}
-	};
-
-// TODO (MEDIUM) to be added in the future
-//	struct z3_int { int n; };
-//	struct z3_uint { unsigned n; };
-//	struct z3_int64 { int64_t n; };
-//	struct z3_uint64 { uint64_t n; };
-//	struct z3_string { std::string s; };
-
-	// TODO (MEDIUM) remove in the future
-	z3_ba();
-	z3_ba(int n);
-	z3_ba(unsigned n);
-	z3_ba(int64_t  n);
-	z3_ba(uint64_t n);
-
-	z3_ba operator&(const z3_ba& x) const;
-	z3_ba operator|(const z3_ba& x) const;
-	z3_ba operator^(const z3_ba& x) const;
-	z3_ba operator+(const z3_ba& x) const;
-	z3_ba operator~() const;
-
-
-	bool is_zero() const;
-	bool is_one() const;
-
-// TODO (MEDIUM) to be added in the future
-//	std::variant<z3_bitvector, z3_int, z3_uint, z3_int64, z3_uint64, z3_string> expr;
-	std::variant<z3_bitvector> expr;
-};
 
 std::strong_ordering operator<=>(const z3_ba& x, const z3_ba& y);
 bool operator==(const z3_ba& x, const z3_ba& y);
@@ -99,7 +64,6 @@ private:
 
 	inline static std::map<std::string, tau<BAs...>> cache;
 };
-
 
 } // namespace idni::tau_lang
 

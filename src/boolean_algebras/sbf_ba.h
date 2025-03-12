@@ -5,8 +5,9 @@
 
 #include <boost/log/trivial.hpp>
 
-#include "boolean_algebras/tau_ba.h"
 #include "boolean_algebras/z3_ba.h"
+#include "boolean_algebras/bool_ba.h"
+#include "boolean_algebras/tau_ba.h"
 #include "../parser/sbf_parser.generated.h"
 
 namespace idni::tau_lang {

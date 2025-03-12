@@ -911,7 +911,7 @@ tau<BAs...> bf_boole_normal_form (const tau<BAs...>& fm,
 		is_child_non_terminal(tau_parser::variable, n) ||
 			is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
 	auto vars = select_top(fm, is_var);
-	sort(vars.begin(), vars.end(), lex_var_comp<BAs...>);
+	std::sort(vars.begin(), vars.end(), lex_var_comp<BAs...>);
 
 	std::vector<int_t> i(vars.size()); // Record assignments of vars
 

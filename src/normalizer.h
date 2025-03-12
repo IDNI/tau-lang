@@ -9,9 +9,9 @@
 #include <boost/log/trivial.hpp>
 
 #include "parser.h"
-#include "boolean_algebras/variant_ba.h"
+//#include "boolean_algebras/variant_ba.h"
 #include "normal_forms.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
+//#include "boolean_algebras/bdds/bdd_handle.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
