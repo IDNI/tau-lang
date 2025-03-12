@@ -153,6 +153,11 @@ tau<BAs...> build_variable(const std::string& name) {
 }
 
 template <typename... BAs>
+tau<BAs...> build_bf_variable(const std::string& name) {
+	return wrap<BAs...>(tau_parser::bf_variable, build_variable(name));
+}
+
+template <typename... BAs>
 tau<BAs...> build_in_var_name(const size_t& index) {
 	std::stringstream var_name;
 	var_name << "i" << index;
@@ -201,13 +206,13 @@ tau<BAs...> build_in_variable_at_n(const tau<BAs...>& in_var_name, const size_t&
 	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));
 
 	return wrap(
-		tau_parser::bf, wrap(
+		tau_parser::bf, wrap(tau_parser::bf_variable, wrap(
 			tau_parser::variable, wrap(
 				tau_parser::io_var,	wrap(
 					tau_parser::in,
 						in_var_name, wrap(
 						tau_parser::offset,
-							build_int<BAs...>(num))))));
+							build_int<BAs...>(num)))))));
 }
 
 template <typename... BAs>
@@ -220,8 +225,8 @@ tau<BAs...> build_in_variable_at_n(const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
-	return wrap(p::bf, wrap(p::variable,
-		wrap(p::io_var, wrap(p::in, { var_name, offset }))));
+	return wrap(p::bf, wrap(p::bf_variable, wrap(p::variable,
+		wrap(p::io_var, wrap(p::in, { var_name, offset })))));
 }
 
 template <typename... BAs>
@@ -229,13 +234,13 @@ tau<BAs...> build_in_variable_at_t(const tau<BAs...>& in_var_name) {
 	assert(is_non_terminal(tau_parser::in_var_name, in_var_name));
 
 	return wrap(
-		tau_parser::bf, wrap(
+		tau_parser::bf, wrap(tau_parser::bf_variable, wrap(
 			tau_parser::variable, wrap(
 				tau_parser::io_var,	wrap(
 					tau_parser::in,
 						in_var_name, wrap(
 						tau_parser::offset,
-							build_variable<BAs...>('t'))))));
+							build_variable<BAs...>('t')))))));
 }
 
 template <typename... BAs>
@@ -247,9 +252,13 @@ template <typename... BAs>
 tau<BAs...> build_in_variable_at_t_minus (const std::string& name, const int_t shift) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
-	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, "t"), build_num<BAs...>(shift)});
+	auto shift_node = wrap<BAs...>(p::shift, {
+		wrap<BAs...>(p::bf_variable, wrap<BAs...>(p::variable, "t")),
+			build_num<BAs...>(shift)});
 	auto offset = wrap<BAs...>(p::offset, shift_node);
-	return wrap<BAs...>(p::bf, wrap<BAs...>(p::variable, wrap<BAs...>(p::io_var, wrap<BAs...>(p::in, { var_name, offset }))));
+	return wrap<BAs...>(p::bf, wrap<BAs...>(p::bf_variable,
+		wrap<BAs...>(p::variable, wrap<BAs...>(p::io_var,
+			wrap<BAs...>(p::in, { var_name, offset })))));
 }
 
 template <typename... BAs>
@@ -258,15 +267,15 @@ tau<BAs...> build_in_variable_at_t_minus(const tau<BAs...>& in_var_name, const s
 	assert(num > 0);
 
 	return wrap(
-		tau_parser::bf, wrap(
+		tau_parser::bf, wrap(tau_parser::bf_variable, wrap(
 			tau_parser::variable, wrap(
 				tau_parser::io_var,	wrap(
 					tau_parser::in,
 						in_var_name, wrap(
 						tau_parser::offset, wrap(
 							tau_parser::shift,
-								build_variable<BAs...>('t'),
-								build_num<BAs...>(num)))))));
+								build_bf_variable<BAs...>('t'),
+								build_num<BAs...>(num))))))));
 }
 
 template <typename... BAs>
@@ -290,13 +299,13 @@ template <typename... BAs>
 tau<BAs...> build_out_variable_at_t(const tau<BAs...>& out_var_name) {
 	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
 	return wrap(
-		tau_parser::bf,	wrap(
+		tau_parser::bf,	wrap(tau_parser::bf_variable, wrap(
 			tau_parser::variable, wrap(
 				tau_parser::io_var, wrap(
 					tau_parser::out,
 						out_var_name, wrap(
 						tau_parser::offset,
-							build_variable<BAs...>('t'))))));
+							build_bf_variable<BAs...>('t')))))));
 }
 
 template <typename... BAs>
@@ -309,13 +318,13 @@ tau<BAs...> build_out_variable_at_n(const tau<BAs...>& out_var_name, const size_
 	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
 
 	return wrap(
-		tau_parser::bf,	wrap(
+		tau_parser::bf,	wrap(tau_parser::bf_variable, wrap(
 			tau_parser::variable, wrap(
 				tau_parser::io_var, wrap(
 					tau_parser::out,
 						out_var_name, wrap(
 						tau_parser::offset,
-							build_int<BAs...>(num))))));
+							build_int<BAs...>(num)))))));
 }
 
 template <typename... BAs>
@@ -328,17 +337,21 @@ tau<BAs...> build_out_variable_at_n(const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
-	return wrap(p::bf, wrap(p::variable,
-		wrap(p::io_var, wrap(p::out, { var_name, offset }))));
+	return wrap(p::bf, wrap(p::bf_variable, wrap(p::variable,
+		wrap(p::io_var, wrap(p::out, { var_name, offset })))));
 }
 
 template <typename... BAs>
 tau<BAs...> build_out_variable_at_t_minus (const std::string& name, const int_t shift) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
-	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, "t"), build_num<BAs...>(shift)});
+	auto shift_node = wrap<BAs...>(p::shift, {
+		wrap<BAs...>(p::bf_variable, wrap<BAs...>(p::variable, "t")),
+						build_num<BAs...>(shift)});
 	auto offset = wrap<BAs...>(p::offset, shift_node);
-	return wrap<BAs...>(p::bf, wrap<BAs...>(p::variable, wrap<BAs...>(p::io_var, wrap<BAs...>(p::out, { var_name, offset }))));
+	return wrap<BAs...>(p::bf, wrap<BAs...>(p::bf_variable,
+		wrap<BAs...>(p::variable, wrap<BAs...>(p::io_var,
+			wrap<BAs...>(p::out, { var_name, offset })))));
 }
 
 template <typename... BAs>
@@ -346,16 +359,16 @@ tau<BAs...> build_out_variable_at_t_minus(const tau<BAs...>& out_var_name, const
 	assert(is_non_terminal(tau_parser::out_var_name, out_var_name));
 	assert(num > 0);
 
-	return wrap(
-		tau_parser::bf,	wrap(
+	return wrap(tau_parser::bf, wrap(
+		tau_parser::bf_variable, wrap(
 			tau_parser::variable, wrap(
 				tau_parser::io_var, wrap(
 					tau_parser::out,
 						out_var_name, wrap(
 						tau_parser::offset, wrap(
 							tau_parser::shift,
-								build_variable<BAs...>('t'),
-								build_num<BAs...>(num)))))));
+								build_bf_variable<BAs...>('t'),
+								build_num<BAs...>(num))))))));
 }
 
 template <typename... BAs>
@@ -365,34 +378,40 @@ tau<BAs...> build_out_variable_at_t_minus(const size_t& index, const size_t& num
 
 // ------ Helpers for variables having io_var as child ---------------
 template <typename... BAs>
+auto get_io_var_offset (const tau<BAs...>& io_var) {
+	return trim3(io_var)->child[1];
+}
+
+template <typename... BAs>
 auto is_io_initial (const tau<BAs...>& io_var) {
-	return (trim2(io_var)->child[1] | tau_parser::integer).has_value();
+	return (get_io_var_offset(io_var) | tau_parser::integer).has_value();
 }
 
 template <typename... BAs>
 auto is_io_shift (const tau<BAs...>& io_var) {
-	return (trim2(io_var)->child[1] | tau_parser::shift).has_value();
+	return (get_io_var_offset(io_var) | tau_parser::shift).has_value();
 }
 
 template <typename... BAs>
 auto get_io_time_point (const tau<BAs...>& io_var) {
-	return int_extractor<BAs...>(trim(trim2(io_var)->child[1]));
+	return int_extractor<BAs...>(trim(get_io_var_offset(io_var)));
 }
 
 template <typename... BAs>
 auto get_io_shift (const tau<BAs...>& io_var) {
-	return size_t_extractor<BAs...>(trim2(io_var)->child[1]->child[0]->child[1]->child[0]).value();
+	return size_t_extractor<BAs...>(get_io_var_offset(io_var)
+					->child[0]->child[1]->child[0]).value();
 }
 
 template <typename... BAs>
-std::string get_io_name (const tau<BAs...>& io_var) {
-	std::stringstream ss; ss << trim(trim2(io_var));
+std::string get_io_name(const tau<BAs...>& io_var) {
+	std::stringstream ss; ss << trim2(trim2(io_var));
 	return ss.str();
 }
 
 template<typename... BAs>
 tau<BAs...> get_tau_io_name(const tau<BAs...>& io_var) {
-	return trim(trim2(io_var));
+	return trim2(trim2(io_var));
 }
 
 template <typename... BAs>
@@ -517,9 +536,9 @@ std::optional<tau<BAs...>> build_bf_constant(
 template <typename... BAs>
 tau<BAs...> build_bf_uniter_const(const std::string& n1, const std::string& n2) {
 	auto name = wrap<BAs...>(tau_parser::uninter_const_name, n1 + ":" + n2);
-	return wrap(tau_parser::bf,
+	return wrap(tau_parser::bf, wrap(tau_parser::bf_variable,
 		wrap(tau_parser::variable,
-			wrap(tau_parser::uninterpreted_constant, name)));
+			wrap(tau_parser::uninterpreted_constant, name))));
 }
 
 // wff factory method for building wff formulas

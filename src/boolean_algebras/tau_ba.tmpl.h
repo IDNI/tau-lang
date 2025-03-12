@@ -155,8 +155,8 @@ bool is_closed (const tau_ba<BAs...>& fm) {
 		return false;
 	auto vars = get_free_vars_from_nso(simp_fm);
 	for (const auto& v : vars) {
-		if (!(is_child_non_terminal(p::io_var, v) ||
-			is_child_non_terminal(p::uninterpreted_constant, v)))
+		if (!(is_grandchild_non_terminal(p::io_var, v) ||
+			is_grandchild_non_terminal(p::uninterpreted_constant, v)))
 			return false;
 	}
 	return true;

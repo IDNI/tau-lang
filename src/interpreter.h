@@ -10,10 +10,7 @@
 #include "solver.h"
 #include "satisfiability.h"
 #include "term.h"
-
-#ifdef DEBUG
 #include "debug_helpers.h"
-#endif // DEBUG
 
 namespace idni::tau_lang {
 
@@ -121,14 +118,15 @@ struct finputs {
 		assignment<BAs...> value;
 		for (const auto& var : in_vars) {
 			// Skip output stream variables
-			if (var | tau_parser::io_var | tau_parser::out)
+			if (var | tau_parser::variable
+					| tau_parser::io_var | tau_parser::out)
 				continue;
 			// Skip input stream variables with time point greater time_step
 			if (get_io_time_point(var) > (int_t)time_step)
 				continue;
-			assert(is_non_terminal(tau_parser::variable, var));
+			assert(is_non_terminal(tau_parser::bf_variable, var));
 			std::string line;
-			auto var_name = trim(trim2(var));
+			auto var_name = trim2(trim2(var));
 			if (auto it = streams.find(var_name); it != streams.end() && it->second.has_value()) {
 				std::getline(it->second.value(), line);
 				std::cout << line << "\n";
@@ -225,7 +223,7 @@ struct foutputs {
 		// Sort variables in output by time
 		std::vector<tau<BAs...>> io_vars;
 		for (const auto& [var, _ ] : outputs) {
-			assert(is_child_non_terminal(tau_parser::io_var, trim(var)));
+			assert(is_grandchild_non_terminal(tau_parser::io_var, trim(var)));
 			io_vars.push_back(var);
 		}
 		std::ranges::sort(io_vars, constant_io_comp);
@@ -238,7 +236,7 @@ struct foutputs {
 				| tau_parser::constant
 				| only_child_extractor<BAs...>
 				| ba_extractor<BAs...>;
-			auto io_var_name = trim2(trim2(io_var));
+			auto io_var_name = trim3(trim2(io_var));
 			std::stringstream ss;
 			if (!value) {
 				// is bf_t

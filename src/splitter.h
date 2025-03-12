@@ -218,7 +218,9 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 					continue;
 
 				// Try to convert f(x,...) = 0 to f(x,...) = 0 && x < c' for some variable x in f
-				auto vars_f = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
+				auto vars_f = select_top(f,
+					is_child_non_terminal<
+						tau_parser::bf_variable, BAs...>);
 				for (const auto& v : vars_f) {
 					if (!free_vars.contains(trim(v))) continue;
 					auto new_fm = replace(fm, clause, build_wff_and(clause,

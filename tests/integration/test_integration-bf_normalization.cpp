@@ -48,12 +48,12 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 
 	TEST_CASE("X or X") {
 		const char* sample = "X | X";
-		CHECK( test_bf_normalizer_and_test_for_value(sample, tau_parser::variable) );
+		CHECK( test_bf_normalizer_and_test_for_value(sample, tau_parser::bf_variable) );
 	}
 
 	TEST_CASE("X and X") {
 		const char* sample = "X & X";
-		CHECK( test_bf_normalizer_and_test_for_value(sample, tau_parser::variable) );
+		CHECK( test_bf_normalizer_and_test_for_value(sample, tau_parser::bf_variable) );
 	}
 
 	TEST_CASE("X or X'") {
@@ -111,7 +111,7 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		auto sample_formula = formula.value();
 		sample_formula.rec_relations = rec_formula.value().rec_relations;
 		auto result = bf_normalizer_with_rec_relation<sbf_ba>(sample_formula);
-		auto check = result | tau_parser::variable;
+		auto check = result | tau_parser::bf_variable;
 		CHECK( check.has_value() );
 	}
 
@@ -138,7 +138,7 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 		auto sample_formula = formula.value();
 	 	sample_formula.rec_relations = rec_formula.value().rec_relations;
 	 	auto result = bf_normalizer_with_rec_relation<sbf_ba>(sample_formula);
-	 	auto check = result | tau_parser::variable;
+	 	auto check = result | tau_parser::bf_variable;
 	 	CHECK( check.has_value() );
 	 }
 }

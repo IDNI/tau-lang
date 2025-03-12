@@ -14,29 +14,24 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <cassert>
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/utility/setup/console.hpp>
 
 #include "doctest.h"
 
 #include "test_integration_helpers.h"
 
+#include "init_log.h"
+using namespace boost::log;
+
 using namespace std;
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
-using namespace boost::log;
 
 namespace testing = doctest;
 
 TEST_SUITE("configuration") {
 
-
 	TEST_CASE("logging") {
 		core::get()->set_filter(trivial::severity >= trivial::trace);
-		add_console_log(std::cout, keywords::format =
-			expressions::stream << expressions::smessage);
 	}
 
 	TEST_CASE("bdd initialization") {

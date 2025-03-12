@@ -73,8 +73,9 @@ function(target_setup target)
 			-Wstrict-overflow=5
 			-Wfloat-equal
 			-Wwrite-strings
-			# -Werror
-			# -Wfatal-errors
+			# -Werror                       # warning is error
+			# -Wfatal-errors                # stops at first error
+			# -ftemplate-backtrace-limit=0  # template backtracing
 		)
 	else()
 		target_compile_options(${target} PRIVATE /W4)

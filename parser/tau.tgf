@@ -69,7 +69,7 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         |                                     capture.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     bf_constant
-                        |                                     variable
+                        |                                     bf_variable
                         | ('S' _ '(' _ bf _ ')')             :bf_splitter
                         | ref                                :bf_ref
                         | (bf  _ '|' _       bf)             :bf_or
@@ -79,16 +79,16 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | bf_constant
-                          | variable | bf_splitter | bf_ref
+                          | bf_variable | bf_splitter | bf_ref
                           | bf_t | bf_f | bf_neg | capture)
                                 :bf_neg_oprnd _ "'")         :bf_neg
                           # bf_and alternation without a separator between operands
-                        | ((bf_parenthesis | variable
+                        | ((bf_parenthesis | bf_variable
                            | bf_splitter | bf_ref | bf_neg
                            | bf_and_nosep | capture)
                                 :bf_and_nosep_1st_oprnd
                            (bf_parenthesis | bf_constant
-                           | variable | bf_splitter | bf_ref
+                           | bf_variable | bf_splitter | bf_ref
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
@@ -102,6 +102,7 @@ constraint =>
  | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_less.
 
 # variables
+bf_variable            => variable [ _ ':' _ chars:type ].
 variable[charvar]      => (alpha & ~'T' & ~'F') digit*.
 variable[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
 variable               => (in | out):io_var.
@@ -110,20 +111,27 @@ in                     => ("i" digit+):in_var_name  '[' offset ']'.
 out                    => (("o" digit+) | "u"):out_var_name '[' offset ']'.
 ctnvar                 => chars.
 capture                => '$' chars.
+# TODO better error message
+# remove & ~uninterpreted_constant, do check higher and provide better message
+#   "unexpected uninterpreted constant where expecting quantifier variable."
+q_var                  => capture | bf_variable & ~uninterpreted_constant.
 q_vars                 => q_var (_ ',' _ q_var)*.
-q_var                  => capture | variable & ~uninterpreted_constant.
+# q_vars are replaced by process_quantifier_vars() in make_tau_code() later
+
+# unreachable rule to introduce scope_id nonterminal used in transformations
+scope_id               => digits.
 
 # offsets
 offsets                => '[' _ offset (_ ',' _ offset)* _ ']'.
-offset                 => integer | capture | shift | (variable & ~io_var).
-shift                  => (capture | (variable & ~io_var)) _ '-' _ num.
+offset                 => integer | capture | shift | (bf_variable & ~io_var).
+shift                  => (capture | (bf_variable & ~io_var)) _ '-' _ num.
 num                    => digits.
 integer                => ['-'] _ digits.
 
 # constants
 uninterpreted_constant => '<' ((chars | _ ) ':' chars):uninter_const_name _ '>'.
 bf_constant            => '{' _ (capture | binding):constant _ '}'
-                                                         [ _ ':' _ chars:type ].
+                                                         [ _ ':' _ type ].
 binding                => (src_c [ (src_c | space)* src_c ]):source.
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
@@ -180,7 +188,7 @@ cli_command            =>
         | ("pnf":pnf_sym __ nf_cmd_arg)                       :pnf_cmd
         | ("mnf":mnf_sym __ nf_cmd_arg)                       :mnf_cmd
         | ("snf":snf_sym __ nf_cmd_arg)                       :snf_cmd
-        | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
+        | ("onf":onf_sym __ bf_variable __ onf_cmd_arg)       :onf_cmd
 # rec relations
         | (("defs" | "definitions"):def_sym)                  :def_list_cmd
         | (                         def_sym __ number)        :def_print_cmd
@@ -233,8 +241,8 @@ onf_cmd_arg            => memory | wff.
 normalize_cmd_arg      => memory | rr | ref | wff | bf.
 # TODO (MEDIUM) check if could we only have one case?
 inst_args              =>
-          wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
-        | bf_cmd_arg  _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'.
+          wff_cmd_arg _ '[' _ bf_variable _ '/' _ bf_cmd_arg  _ ']'
+        | bf_cmd_arg  _ '[' _ bf_variable _ '/' _ bf_cmd_arg  _ ']'.
 
 # symbols usable for detailed help message
 #

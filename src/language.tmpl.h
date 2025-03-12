@@ -19,6 +19,11 @@ tau<BAs...> trim2(const tau<BAs...>& n) {
 }
 
 template <typename... BAs>
+tau<BAs...> trim3(const tau<BAs...>& n) {
+	return n->child[0]->child[0]->child[0];
+}
+
+template <typename... BAs>
 tau<BAs...> wrap(tau_parser::nonterminal nt, const std::vector<tau<BAs...>>& nn)
 {
 	return make_node<tau_sym<BAs...>>(
@@ -296,9 +301,363 @@ tau<BAs...> process_digits(const tau<BAs...>& tau_source) {
 	return replace<tau<BAs...>>(tau_source, changes);
 }
 
-// } // include for ptree<BAs...>()
-// #include "debug_helpers.h"
-// namespace idni::tau_lang {
+// propagator object takes a formula argument with () operator and it checks and
+// propagates BA types accross atomic formulas and checks variable scopes
+template <typename... BAs>
+struct ba_types_checker_and_propagator {
+	using p = tau_parser;
+	using node = tau<BAs...>;
+	using var_scopes_t = std::unordered_map<std::string, size_t>;
+	inline static bool disabled = false;
+	node operator()(const node& n) {
+		if (disabled) return n;
+		BOOST_LOG_TRIVIAL(trace) << "(T) BA type check and propagate: " << n;
+		ts.clear(), untyped_n = 0;
+		var_scopes_t vsc; size_t tsid = 0;
+		auto x = replace_types_with_scope_ids(n, vsc, 0, tsid);
+		if (x == error_node<node>::value)
+			return error_node<node>::value;
+
+		BOOST_LOG_TRIVIAL(trace) << "(T) BA type scoped: " << x;
+
+		static std::string untyped{"???"};
+		for (auto& [k, v] : ts) BOOST_LOG_TRIVIAL(trace)
+				<< "(T) \t" << (v.empty() ? untyped : v)
+				<< " \t ( " << k << ")";
+		BOOST_LOG_TRIVIAL(trace) << "(T) check_and_propagate BA types";
+		auto nn = check_and_propagate(x);
+		if (!nn) return nullptr;
+
+		auto dflt = nso_factory<BAs...>::instance().default_type();
+		bool once_more = false;
+		for (auto& [k, v] : ts) if (v.empty()) {
+			ts[k] = dflt;
+			BOOST_LOG_TRIVIAL(trace) << "(T) setting default type: " << dflt << " to " << k;
+			once_more = true;
+		}
+		if (once_more) {
+			BOOST_LOG_TRIVIAL(trace) << "(T) check_and_propagate BA types once more with default type";
+			untyped_n = 0;
+			nn = check_and_propagate(x);
+			if (!nn) return nullptr;
+		}
+
+		auto y = replace_scope_ids_with_types(x);
+		BOOST_LOG_TRIVIAL(trace) << "(T) transformed BA types: " << y;
+		ts.clear();
+		return y;
+	}
+	node operator()(const std::optional<node>& n) {
+		if (!n.has_value()) return nullptr;
+		return (*this)(n.value());
+	}
+private:
+	// removes type info from constants and vars and adds their scope_id
+	// used as a preparation (first) step before type checking and propagation
+	// vsc = vars scope ids
+	// csid = constant scope id
+	// tsid = temporal scope id
+	node replace_types_with_scope_ids(const node& n, var_scopes_t& vsc,
+		size_t csid, size_t& tsid)
+	{
+		BOOST_LOG_TRIVIAL(trace)
+				<< "(T) replace_types_with_scope_ids: " << n;
+		// ptree(std::cout << "tree: ", n) << "\n";
+		const auto vsid = [this, &vsc](const node& var) {
+			auto n = get_terminals(var);			
+			if (vsc.find(n) == vsc.end()) vsc[n] = 0;
+			return vsc[n];
+		};
+		const auto inc_vsid = [this, &vsc](const node& var) {
+			auto n = get_terminals(var);
+			if (vsc.find(n) == vsc.end()) vsc[n] = 0;
+			else vsc[n]++;
+		};
+		const auto transform_element = [this, &csid, &tsid, &vsid](
+			const node& el, size_t nt)
+		{
+			BOOST_LOG_TRIVIAL(trace)
+					<< "(T) transform element: " << el;
+			auto io_var = el | p::variable | p::io_var
+				| only_child_extractor<BAs...>;
+			bool is_io_var = io_var.has_value();
+			bool is_global = is_io_var || (el | p::variable
+				| p::uninterpreted_constant).has_value();
+			std::vector<node> ch;
+			auto ch0 = el->child[0];
+			if (is_io_var) {
+				auto tv = io_var | p::offset | p::bf_variable;
+				if (!tv) tv = io_var
+					| p::offset | p::shift | p::bf_variable;
+				if (tv) {
+					auto tn = wrap(p::bf_variable, {
+						tv.value()->child[0],
+						wrap(p::scope_id, make_node(
+							tau_sym<BAs...>(tsid),
+							{}))
+					});
+					ts[tn] = "_temporal";
+					ch0 = replace<node>(ch0, {
+						{ tv.value(), tn } });
+				}
+			}
+			ch.push_back(ch0);
+			if (!is_global) {
+				size_t scope_id = nt == p::bf_constant
+						? csid++
+						: vsid(el->child[0]);
+				ch.push_back(wrap(p::scope_id, make_node(
+					tau_sym<BAs...>(scope_id), {})));
+			}
+			auto r = wrap(static_cast<p::nonterminal>(nt), ch);
+			std::string t = get_type(el);
+			if (t.size()) {
+				bool found = false;
+				for (auto st : nso_factory<BAs...>::instance()
+								.types())
+					if (t == st) { found = true; break; }
+				if (!found) {
+					BOOST_LOG_TRIVIAL(error)
+						<< "(Error) Unsupported type: "
+						<< t << "\n";
+					return error_node<node>::value;
+				}
+			}
+			ts[get_var_key_node(r)] = t;
+			BOOST_LOG_TRIVIAL(trace)
+					<< "(T) transformed element: " << r;
+			return r;
+		};
+		const auto transformer =
+			[this, &vsc, &csid, &tsid, &inc_vsid, &transform_element]
+			(const auto& el)
+		{
+			if (!is_non_terminal_node<BAs...>(el)) return el;
+			//BOOST_LOG_TRIVIAL(trace)
+			auto nt = el | non_terminal_extractor<BAs...>
+				| optional_value_extractor<size_t>;
+			switch (nt) {
+			case p::rr: {
+				std::vector<node> rrch, ch;
+				auto rrs = el | p::rec_relations
+						|| p::rec_relation;
+				auto main = (el | p::main).value();
+				for (const auto& r : rrs) {
+					var_scopes_t nvsc;
+					// BOOST_LOG_TRIVIAL(trace)
+					// 	<< "(T) replacing rec_relation";
+					auto x = replace_types_with_scope_ids(
+							r, nvsc, csid, ++tsid);
+					if (x == error_node<node>::value)
+						return error_node<node>::value;
+					rrch.push_back(x);
+				}
+				var_scopes_t nvsc;
+				// BOOST_LOG_TRIVIAL(trace) << "(T) replacing main";
+				auto x = replace_types_with_scope_ids(
+					main, nvsc, csid, ++tsid);
+				if (x == error_node<node>::value)
+					return error_node<node>::value;
+				ch.push_back(x);
+				if (rrch.size())
+					ch.push_back(wrap(p::rec_relations, rrch));
+				return wrap(tau_parser::rr, ch);
+			}
+			case p::wff_always:
+			case p::wff_sometimes: {
+				auto x = replace_types_with_scope_ids(
+					trim(el), vsc, csid, ++tsid);
+				if (x == error_node<node>::value)
+					return error_node<node>::value;
+				return wrap(static_cast<p::nonterminal>(
+					nt), x);
+			}
+			case p::wff_ex:
+			case p::wff_all: {
+				// ptree(std::cout << "quant: ", el->child[0]) << "\n";
+				auto v = transform_element(el->child[0],
+						p::bf_variable);
+				if (v == error_node<node>::value)
+					return error_node<node>::value;
+				// ptree(std::cout << "quant var: ", v) << "\n";
+				inc_vsid(get_var_key_node(v));
+				auto x = replace_types_with_scope_ids(
+					el->child[1], vsc, csid, tsid);
+				if (x == error_node<node>::value)
+					return error_node<node>::value;
+				auto r = make_node<tau_sym<BAs...>>(
+					el->value, { v, x });
+				// BOOST_LOG_TRIVIAL(trace)
+				// 	<< "(T) quant replaced: " << r;
+				// ptree(std::cout << "quant replaced: ", r) << "\n";
+				return r;
+			}
+			case p::bf_constant:
+			case p::bf_variable:
+				return transform_element(el, nt);
+			}
+			return el;
+		};
+		auto r = pre_order<node>(n).apply_until_change(transformer);
+		BOOST_LOG_TRIVIAL(trace)
+				<< "(T) replaced_types_with_scope_ids: " << r;
+		return r;
+	}
+
+	// checks and propagates types within the scope (global or quantifier)
+	node check_and_propagate(const node& n) {
+		bool err = false;
+		const auto checker_and_propagator = [this, &err](
+			const node& el) -> bool
+		{
+			if (err) return false;
+			if (!is_non_terminal_node<BAs...>(el)) return true;
+			auto nt = el | non_terminal_extractor<BAs...>
+				| optional_value_extractor<size_t>;
+			switch (nt) {
+				case p::bf_interval:
+				case p::bf_eq:
+				case p::bf_neq:
+				case p::bf_less_equal:
+				case p::bf_nleq:
+				case p::bf_greater:
+				case p::bf_ngreater:
+				case p::bf_greater_equal:
+				case p::bf_ngeq:
+				case p::bf_less:
+				case p::bf_nless:
+				case p::bf:
+					// prop known type within atomic formula
+					if (!propagate(el))
+						return err = true, false;
+					break;
+				case p::wff_ex:
+				case p::wff_all:
+					// check and propagate q_var sub scope first
+					BOOST_LOG_TRIVIAL(trace)
+						<< "(T) check and propagate "
+						"quantifier subscope: " << el;
+					check_and_propagate(el->child[1]);
+					return false;
+				default: break;
+			}
+			return true;
+		};
+		// repeat visits of checker and propagator
+		// until we are still resolving any untyped elements
+		size_t untyped_n0;
+		do {
+			untyped_n0 = untyped_n;
+			// BOOST_LOG_TRIVIAL(trace) << "(T) untyped_n0: " << untyped_n0;
+			pre_order<node>(n).visit(checker_and_propagator);
+			if (err) return nullptr; // type mismatch
+			// BOOST_LOG_TRIVIAL(trace) << "(T) untyped_n: " << untyped_n;
+		} while (untyped_n0 != untyped_n);
+		return n;
+	}
+
+	static constexpr auto is_ba_element = [](const node& el) {
+		return is_non_terminal<BAs...>(
+				tau_parser::bf_constant, el)
+			|| is_non_terminal<BAs...>(
+				tau_parser::bf_variable, el);
+	};
+	node get_var_key_node(const node& n) const {
+		auto io_var = n | p::variable | p::io_var
+			| only_child_extractor<BAs...>;
+		if (!io_var) return n;
+		return trim(io_var.value());
+	}
+	// check appearance of a single type in all BA elems, then propagate it
+	bool propagate(const node& n) {
+		std::set<std::string> types;
+		auto els = select_all(n, is_ba_element);
+		// collect types from BA elements
+		for (auto& el : els) {
+			auto key = get_var_key_node(el);
+			if (ts[key].size() && ts[key] != "_temporal") {
+				auto it = types.begin();
+				types.insert(ts[key]);
+				if (types.size() > 1) { // multiple types found, error
+					BOOST_LOG_TRIVIAL(error)
+						<< "(Error) BA type mismatch: "
+						<< el << " : " << ts[key]
+						<< " is expected to be " << *it;
+					return false;
+				}
+			}
+		}
+		if (types.size() == 1) { // single type found, propagate it
+			auto t = *types.begin();
+			for (auto& el : els) {
+				auto key = get_var_key_node(el);
+				if (ts[key].empty()) {
+					BOOST_LOG_TRIVIAL(trace)
+						<< "(T) propagating type: "
+						<< t << " to " << el;
+					ts[key] = t;
+					untyped_n--;
+				}
+			}
+		}
+		return true; 
+	}
+
+	// transform type info - remove scope_id and add type subnode
+	// used as a cleaning (last) step after type checking and propagation
+	node replace_scope_ids_with_types(const node& n) const {
+		const auto transformer = [this](const auto& el) {
+			if (is_ba_element(el)) {
+				auto key = get_var_key_node(el);
+				BOOST_LOG_TRIVIAL(trace)
+					<< "(T) transformer of ba_element: "
+					<< el;
+				// ptree(std::cout << "el tree: ", el) << "\n";
+				// BOOST_LOG_TRIVIAL(trace) << "(T) key: " << key;
+				for (auto& [k, v] : ts) {
+					BOOST_LOG_TRIVIAL(trace)
+						<< "(T) ident: " << key
+						<< (key == k ? " == " : " != ")
+						<< k << " : " << v;
+				}
+				BOOST_LOG_TRIVIAL(trace)
+						<< "(T) type: " << ts.at(key);
+				std::vector<node> ch{ el->child[0] };
+				if (is_non_terminal<BAs...>(
+						tau_parser::bf_constant, el))
+					ch.push_back(wrap<BAs...>(p::type,
+								ts.at(key)));
+				return make_node<tau_sym<BAs...>>(el->value, ch);
+			}
+			return el;
+		};
+		return pre_order<node>(n).apply_until_change(transformer);
+	}
+	std::string get_terminals(const node& n) const {
+		return make_string<tau_node_terminal_extractor_t<BAs...>,
+				tau<BAs...>>(
+			tau_node_terminal_extractor<BAs...>, n);
+	}
+	// helper to extract string from a type node or return empty string
+	std::string get_type(const node& n) const {
+		auto t = n | p::type;
+		if (!t) return "";
+		return get_terminals(t.value());
+	}
+
+	unordered_tau_map<std::string, BAs...> ts;
+	size_t untyped_n = 0;
+};
+
+template <typename... BAs>
+tau<BAs...> infer_ba_types(const tau<BAs...>& code) {
+	BOOST_LOG_TRIVIAL(trace) << "(T) infer BA types: " << code;
+	static ba_types_checker_and_propagator<BAs...> infer;
+	auto n = infer(code);
+	if (!n) return nullptr;
+	BOOST_LOG_TRIVIAL(trace) << "(T) inferred BA types: " << n;
+	return n;
+}
 
 template <typename... BAs>
 struct quantifier_vars_transformer {
@@ -369,8 +728,10 @@ tau<BAs...> process_offset_variables(const tau<BAs...>& tau_code) {
 		select_all(tau_code, is_non_terminal<p::offsets, BAs...>))
 	{
 		for (const auto& var : select_all(offsets,
-			is_non_terminal<p::variable, BAs...>))
-				changes[var] = wrap(p::capture, var->child);
+			is_non_terminal<p::bf_variable, BAs...>))
+		{
+			changes[var] = wrap(p::capture, trim(var)->child);
+		}
 	}
 	if (changes.size()) return replace(tau_code, changes);
 	return tau_code;
@@ -378,6 +739,7 @@ tau<BAs...> process_offset_variables(const tau<BAs...>& tau_code) {
 
 template <typename...BAs>
 tau<BAs...> process_defs_input_variables(const tau<BAs...>& tau_code) {
+	if (tau_code == nullptr) return nullptr;
 	using p = tau_parser;
 	using node = tau<BAs...>;
 	std::map<node, node> changes;
@@ -385,11 +747,11 @@ tau<BAs...> process_defs_input_variables(const tau<BAs...>& tau_code) {
 		select_all(tau_code, is_non_terminal<p::rec_relation, BAs...>))
 	{
 		for (const auto& ref_arg : select_all(def->child[0],
-			is_non_terminal<p::ref_arg, BAs...>))
-				for (const auto& var : select_all(ref_arg,
-					is_non_terminal<p::variable, BAs...>))
+				is_non_terminal<p::ref_arg, BAs...>))
+			for (const auto& var : select_all(ref_arg,
+				is_non_terminal<p::bf_variable, BAs...>))
 		{
-			changes[var] = wrap(p::capture, var->child);
+			changes[var] = wrap(p::capture, trim(var)->child);
 		}
 	}
 	if (changes.size()) return replace(tau_code, changes);
@@ -507,7 +869,7 @@ struct free_vars_collector {
 			}
 		}
 		if (is_var_or_capture<BAs...>(n)) {
-			if (auto offset_child = n
+			if (auto offset_child = n | tau_parser::variable
 					| tau_parser::io_var | only_child_extractor<BAs...> | tau_parser::offset
 					| only_child_extractor<BAs...>; offset_child) {
 				if (is_var_or_capture<BAs...>(offset_child.value())) {
@@ -594,8 +956,8 @@ std::vector<tau<BAs...>> get_cnf_bf_clauses(const tau<BAs...>& n) {
 // or it contains a flag
 template <typename... BAs>
 bool has_temp_var (const tau<BAs...>& fm) {
-	auto io_vars = select_top(fm, is_non_terminal<tau_parser::io_var, BAs...>);
-	if (io_vars.empty()) return find_top(fm, is_non_terminal<tau_parser::constraint, BAs...>).has_value();
+	auto io_vars = select_top(fm, is_child_non_terminal<tau_parser::io_var, BAs...>);
+	if (io_vars.empty()) return find_top(fm, is_child_non_terminal<tau_parser::constraint, BAs...>).has_value();
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;
 }
@@ -705,11 +1067,19 @@ tau<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 			tau<BAs...>>(
 		transform, rewriter::all)(tau_source);
 	if (!tau_code) return nullptr;
-	return infer_constant_types(          // transforms ref to bf_ref/wff_ref
+	return
+		infer_constant_types(               // check and propagate BA types of constants
 		process_defs_input_variables( // transforms input variables to captures
 		process_offset_variables(     // transforms offset variables to captures
 		process_quantifier_vars(      // transforms ex x,y to ex x ex y
 		process_digits(tau_code)))));
+	// return
+	// 	process_defs_input_variables( // transforms input variables to captures
+	// 	infer_ba_types(               // check and propagate BA types
+	// 	process_offset_variables(     // transforms offset variables to captures
+	// 	process_quantifier_vars(      // transforms ex x,y to ex x ex y
+	// 	process_digits(tau_code)))));
+
 }
 
 // make a library from the given tau source.
@@ -1154,7 +1524,7 @@ template <typename... BAs>
 std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr,
 	rr_types<BAs...>& ts)
 {
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin type inferrence"; // << ": " << nso_rr;
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin ref type inferrence"; // << ": " << nso_rr;
 	// for (auto& r : nso_rr.rec_relations)
 	// 	ptree<BAs...>(std::cout << "rule left: ", r.first) << "\n",
 	// 	ptree<BAs...>(std::cout << "rule right: ", r.second) << "\n";
@@ -1180,17 +1550,17 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr,
 		for (auto& r : nn.rec_relations) {
 			// check type of the right side
 			auto t = get_nt_type(r.second);
-			BOOST_LOG_TRIVIAL(trace) << "(T) " << r.second
-						<< " is " << (type2str(t));
+			// BOOST_LOG_TRIVIAL(trace) << "(T) " << r.second
+			// 			<< " is " << (type2str(t));
 			if (t == tau_parser::ref) {
 				// right side is unresolved ref
 				if (auto topt = ts.type(get_rr_sig(r.second));
 					topt.has_value())
 				{
 					t = topt.value();
-					BOOST_LOG_TRIVIAL(trace)
-						<< "(T) updating right side: "
-						<< r.second;
+					// BOOST_LOG_TRIVIAL(trace)
+					// 	<< "(T) updating right side: "
+					// 	<< r.second;
 					update_ref(r.second, t);
 					changed = true;
 				}
@@ -1199,9 +1569,9 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr,
 			if (t == tau_parser::bf || t == tau_parser::wff) {
 				if (get_nt_type(r.first) == tau_parser::ref) {
 					// left side is unresolved ref
-					BOOST_LOG_TRIVIAL(trace)
-						<< "(T) updating left side: "
-						<< r.first;
+					// BOOST_LOG_TRIVIAL(trace)
+					// 	<< "(T) updating left side: "
+					// 	<< r.first;
 					ts.add(r.first, t);
 					update_ref(r.first, t);
 					changed = true;
@@ -1215,9 +1585,9 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr,
 					auto topt = ts.type(get_rr_sig(r.first));
 					if (topt.has_value()) { // if we know
 						t = topt.value(); // update
-						BOOST_LOG_TRIVIAL(trace)
-							<< "(T) updating left "
-							"side: " << r.first;
+						// BOOST_LOG_TRIVIAL(trace)
+						// 	<< "(T) updating left "
+						// 	"side: " << r.first;
 						ts.done(get_rr_sig(r.first));
 						update_ref(r.first, t);
 						changed = true;
@@ -1227,9 +1597,9 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr,
 				if (t == tau_parser::bf
 					|| t == tau_parser::wff)
 				{
-					BOOST_LOG_TRIVIAL(trace)
-						<< "(T) updating capture: "
-						<< r.second;
+					// BOOST_LOG_TRIVIAL(trace)
+					// 	<< "(T) updating capture: "
+					// 	<< r.second;
 					//ptree<BAs...>(std::cout << "updating ref: ", r) << "\n";
 					r.second = wrap(t, r.second);
 					//ptree<BAs...>(std::cout << "updated ref: ", r) << "\n";
@@ -1241,14 +1611,14 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr,
 	// infer main if unresolved ref
 	if (nn.main) {
 		auto t = get_nt_type(nn.main);
-		BOOST_LOG_TRIVIAL(trace) << "(T) main " << nn.main
-						<< " is " << (type2str(t));
+		// BOOST_LOG_TRIVIAL(trace) << "(T) main " << nn.main
+		// 				<< " is " << (type2str(t));
 		if (t == tau_parser::ref) {
 			// main is an unresolved ref
 			if (auto topt = ts.type(get_rr_sig(nn.main)); topt) {
 				t = topt.value();
-				BOOST_LOG_TRIVIAL(trace)
-					<< "(T) updating main: " << nn.main;
+				// BOOST_LOG_TRIVIAL(trace)
+				// 	<< "(T) updating main: " << nn.main;
 				update_ref(nn.main, t);
 			}
 		}
@@ -1262,10 +1632,10 @@ std::optional<rr<tau<BAs...>>> infer_ref_types(const rr<tau<BAs...>>& nso_rr,
 		std::stringstream ss;
 		for (auto& sig : unresolved) ss << " " << sig2str(sig);
 		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) Unknown type for:" << ss.str();
+			<< "(Error) Unknown ref type for:" << ss.str();
 		return {};
 	}
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End type inferrence"; // << ": " << nn;
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- End ref type inferrence"; // << ": " << nn;
 	return { nn };
 }
 

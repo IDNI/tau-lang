@@ -7,19 +7,23 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/utility/setup/console.hpp>
 
 #include "doctest.h"
 #include "boolean_algebras/sbf_ba.h"
 #include "interpreter.h"
-
-#define base_bas tau_ba<sbf_ba>, sbf_ba
+#include "init_log.h"
 
 using namespace boost::log;
 using namespace idni::tau_lang;
+
+#define base_bas tau_ba<sbf_ba>, sbf_ba
+
+TEST_SUITE("Log configuration") {
+
+	TEST_CASE("set log level to trace") {
+		core::get()->set_filter(trivial::severity >= trivial::error);
+	}
+}
 
 std::string random_file(const std::string& extension = ".out", const std::string prefix = "/tmp/") {
     // define the characters to use in the random string
@@ -360,7 +364,7 @@ std::optional<assignment<tau_ba<sbf_ba>, sbf_ba>> run_test(const char* sample,
 			std::cout << "run_test/output[" << i << "]: ";
 			for (const auto& [var, value]: out.value()) {
 				std::cout << var << " <- " << value << " ... ";
-				if (auto io_vars = find_top(value, is_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>); io_vars) {
+				if (auto io_vars = find_top(value, is_child_non_terminal<tau_parser::io_var, tau_ba<sbf_ba>, sbf_ba>); io_vars) {
 					std::cout << "run_test/output[" << i << "]: unexpected io_var " << io_vars.value() << "\n";
 					intprtr.value().memory.clear();
 					break;
@@ -400,8 +404,6 @@ TEST_SUITE("configuration") {
 
 	TEST_CASE("logging") {
 		core::get()->set_filter(trivial::severity >= trivial::error);
-		add_console_log(std::cout, keywords::format =
-			expressions::stream << expressions::smessage);
 	}
 
 	TEST_CASE("bdd initialization") {

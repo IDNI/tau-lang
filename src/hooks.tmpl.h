@@ -1045,7 +1045,7 @@ tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 	// apply numerical simplifications
 	using p = tau_parser;
 	// This node must have two children
-	// The first node is either p::variable, p::capture, p::num or p::integer
+	// The first node is either p::bf_variable, p::capture, p::num or p::integer
 	// The second node must be p::num
 	if (n.child.size() == 2) {
 		int_t left = -1;
@@ -1053,17 +1053,18 @@ tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 		if (is_non_terminal(p::integer, c0))
 			left = int_extractor<BAs...>(c0);
 		else if (is_non_terminal(p::num, c0))
-			left = (int_t)(c0
+			left = (int_t) (c0
 				| only_child_extractor<BAs...>
 				| size_t_extractor<BAs...>
 				| optional_value_extractor<size_t>);
 		if (left < 0) {
-			assert(is_non_terminal(p::variable, c0) || is_non_terminal(p::capture, c0));
+			assert(is_non_terminal(p::bf_variable, c0)
+				|| is_non_terminal(p::capture, c0));
 			return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 		}
 		int_t right = -1;
 		if (is_non_terminal(p::num, n.child[1]))
-			right = (int_t) ( n.child[1]
+			right = (int_t) (n.child[1]
 				| only_child_extractor<BAs...>
 				| size_t_extractor<BAs...>
 				| optional_value_extractor<size_t>);

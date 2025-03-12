@@ -382,7 +382,7 @@ std::optional<tau_nso<BAs...>>
 				marked_quants.insert(x);
 				bool var_t = is_non_terminal<
 					tau_ba_t, BAs...>(
-						tau_parser::variable,
+						tau_parser::bf_variable,
 							var.value());
 				std::ostringstream ss;
 				ss << "x" << var_id; ++var_id;
@@ -441,7 +441,7 @@ std::optional<tau_nso<BAs...>>
 	auto var_type = static_cast<tau_parser::nonterminal>(n->child[2]
 		| non_terminal_extractor<tau_ba_t, BAs...>
 		| optional_value_extractor<size_t>)
-			 == tau_parser::variable ? tau_parser::bf
+			 == tau_parser::bf_variable ? tau_parser::bf
 			 			: tau_parser::wff;
 	auto nn = rewriter::make_node(n->value, { n->child[0], n->child[1],
 				wrap(var_type, n->child[2]), n->child[3] });
@@ -547,8 +547,8 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 			// all elements of the set must be quantified
 			std::stringstream ss; bool has_real_free_vars = false;
 			for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
-				if (!is_child_non_terminal(tau_parser::io_var, *it) &&
-					!is_child_non_terminal(tau_parser::uninterpreted_constant, *it)) {
+				if (!is_grandchild_non_terminal(tau_parser::io_var, *it) &&
+					!is_grandchild_non_terminal(tau_parser::uninterpreted_constant, *it)) {
 						ss << *it << " ";
 						has_real_free_vars = true;
 					}
@@ -687,8 +687,8 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 
 		auto solution = solve<tau_ba_t, BAs...>(applied, options);
 		if (!solution) { std::cout << "no solution\n"; return; }
-		auto vars = select_top(equations,
-			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
+		auto vars = select_top(equations, is_child_non_terminal<
+			tau_parser::bf_variable,tau_ba<BAs...>, BAs...>);
 		print_solver_cmd_solution(solution, options);
 		return;
 	}
@@ -720,7 +720,8 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 			auto solution = lgrs(applied);
 			if (!solution) { std::cout << "no solution\n"; return; }
 		auto vars = select_top(equations,
-			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
+			is_child_non_terminal<tau_parser::bf_variable,
+						tau_ba<BAs...>, BAs...>);
 		print_solver_cmd_solution(solution);
 		return;
 		}

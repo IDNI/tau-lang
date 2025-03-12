@@ -461,7 +461,7 @@ std::ostream& operator<<(std::ostream& stream,
 
 inline static const std::map<size_t, std::string> hl_colors = {
 	{ tau_parser::bf,            idni::TC.LIGHT_GREEN() },
-	{ tau_parser::variable,      idni::TC.WHITE() },
+	{ tau_parser::bf_variable,   idni::TC.WHITE() },
 	{ tau_parser::capture,       idni::TC.BLUE() },
 	{ tau_parser::wff_all,       idni::TC.MAGENTA() },
 	{ tau_parser::wff_ex,        idni::TC.LIGHT_MAGENTA() },
@@ -488,18 +488,25 @@ inline static const std::vector<size_t> indents = {
 	tau_parser::wff_imply, tau_parser::wff_equiv
 };
 
+// TODO (HIGH) rewrite pp() to use visitor traverser  
 template <typename... BAs>
 std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 	std::vector<size_t>& hl_path, size_t& depth, size_t parent,
 	bool passthrough)
 {
 	using namespace idni;
+	using namespace idni::tau_lang;
+	using p = tau_parser;
+#ifdef DEBUG
+	static size_t rdepth = 0;
+	if (++rdepth == 50) return rdepth--, stream << "... (reached limit)";
+#endif
 // #define DEBUG_PP
 // #ifdef DEBUG_PP
 // auto& p = tau_parser::instance();
 // 	auto dbg = [&stream, &p](const auto& c) {
-// 		if (std::holds_alternative<idni::tau_lang::tau_source_sym>(c->value)) {
-// 			auto tss = std::get<idni::tau_lang::tau_source_sym>(c->value);
+// 		if (std::holds_alternative<tau_source_sym>(c->value)) {
+// 			auto tss = std::gettau_source_sym>(c->value);
 // 			if (tss.nt()) stream << " NT:" << p.name(tss.n()) << " ";
 // 			else if (tss.is_null()) stream << " <NULL> ";
 // 			else stream << " T:'" << tss.t() << "' ";
@@ -511,97 +518,100 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 // 	for (const auto& c : n->child)
 // 		stream << "\t", dbg(c), stream << "\n";
 // #endif // DEBUG_PP
-	static auto is_to_wrap = [](const idni::tau_lang::tau<BAs...>& n,
+	static auto is_to_wrap = [](const tau<BAs...>& n,
 		size_t parent)
 	{
 		static const std::set<size_t> no_wrap_for = {
-			tau_parser::constraint,
-			tau_parser::bf_splitter,
-			tau_parser::bf_ref,
-			tau_parser::bf_neg,
-			tau_parser::bf_constant,
-			tau_parser::bf_t,
-			tau_parser::bf_f,
-			tau_parser::wff_ref,
-			tau_parser::wff_neg,
-			tau_parser::wff_t,
-			tau_parser::wff_f,
-			tau_parser::capture,
-			tau_parser::variable,
-			tau_parser::uninterpreted_constant,
-			tau_parser::ref_args,
-			tau_parser::start
+			p::constraint,
+			p::bf_splitter,
+			p::bf_ref,
+			p::bf_neg,
+			p::bf_constant,
+			p::bf_t,
+			p::bf_f,
+			p::wff_ref,
+			p::wff_neg,
+			p::wff_t,
+			p::wff_f,
+			p::capture,
+			p::bf_variable,
+			p::uninterpreted_constant,
+			p::ref_args,
+			p::start
 		};
 		// lower number = higher priority
 		static const std::map<size_t, size_t> prio = {
-			{ tau_parser::start,                             0 },
+			{ p::start,                             0 },
 			// cli commands
-			{ tau_parser::help_cmd,                         50 },
-			{ tau_parser::file_cmd,                         50 },
-			{ tau_parser::normalize_cmd,                    50 },
-			{ tau_parser::run_cmd,                          50 },
-			{ tau_parser::solve_cmd,                        50 },
-			{ tau_parser::dnf_cmd,                          50 },
-			{ tau_parser::cnf_cmd,                          50 },
-			{ tau_parser::anf_cmd,                          50 },
-			{ tau_parser::nnf_cmd,                          50 },
-			{ tau_parser::pnf_cmd,                          50 },
-			{ tau_parser::mnf_cmd,                          50 },
-			{ tau_parser::onf_cmd,                          50 },
-			{ tau_parser::inst_cmd,                         50 },
-			{ tau_parser::subst_cmd,                        50 },
-			{ tau_parser::def_rr_cmd,                       50 },
-			{ tau_parser::def_list_cmd,                     50 },
-			{ tau_parser::history_list_cmd,                 50 },
-			{ tau_parser::history_print_cmd,                50 },
-			{ tau_parser::history_store_cmd,                50 },
-			{ tau_parser::sat_cmd,                        50 },
-			{ tau_parser::main,                             60 },
-			{ tau_parser::bf_rule,                          60 },
-			{ tau_parser::wff_rule,                         60 },
-			{ tau_parser::ref,                              80 },
-			{ tau_parser::wff,                              90 },
+			{ p::help_cmd,                         50 },
+			{ p::file_cmd,                         50 },
+			{ p::normalize_cmd,                    50 },
+			{ p::run_cmd,                          50 },
+			{ p::solve_cmd,                        50 },
+			{ p::dnf_cmd,                          50 },
+			{ p::cnf_cmd,                          50 },
+			{ p::anf_cmd,                          50 },
+			{ p::nnf_cmd,                          50 },
+			{ p::pnf_cmd,                          50 },
+			{ p::mnf_cmd,                          50 },
+			{ p::onf_cmd,                          50 },
+			{ p::inst_cmd,                         50 },
+			{ p::subst_cmd,                        50 },
+			{ p::def_rr_cmd,                       50 },
+			{ p::def_list_cmd,                     50 },
+			{ p::history_list_cmd,                 50 },
+			{ p::history_print_cmd,                50 },
+			{ p::history_store_cmd,                50 },
+			{ p::sat_cmd,                        50 },
+			{ p::main,                             60 },
+			{ p::bf_rule,                          60 },
+			{ p::wff_rule,                         60 },
+			{ p::ref,                              80 },
+			{ p::wff,                              90 },
 			// wff
-			{ tau_parser::wff_sometimes,                   380 },
-			{ tau_parser::wff_always,                      390 },
-			{ tau_parser::wff_conditional,                 400 },
-			{ tau_parser::wff_all,                         430 },
-			{ tau_parser::wff_ex,                          440 },
-			{ tau_parser::wff_imply,                       450 },
-			{ tau_parser::wff_equiv,                       460 },
-			{ tau_parser::wff_or,                          470 },
-			{ tau_parser::wff_and,                         480 },
-			{ tau_parser::wff_xor,                         490 },
-			{ tau_parser::wff_neg,                         500 },
-			{ tau_parser::bf_interval,                     501 },
-			{ tau_parser::bf_eq,                           502 },
-			{ tau_parser::bf_neq,                          503 },
-			{ tau_parser::bf_less_equal,                   504 },
-			{ tau_parser::bf_nleq,                         505 },
-			{ tau_parser::bf_greater,                      506 },
-			{ tau_parser::bf_ngreater,                     507 },
-			{ tau_parser::bf_greater_equal,                508 },
-			{ tau_parser::bf_ngeq,                         509 },
-			{ tau_parser::bf_less,                         510 },
-			{ tau_parser::bf_nless,                        511 },
-			{ tau_parser::wff,                             580 },
+			{ p::wff_sometimes,                   380 },
+			{ p::wff_always,                      390 },
+			{ p::wff_conditional,                 400 },
+			{ p::wff_all,                         430 },
+			{ p::wff_ex,                          440 },
+			{ p::wff_imply,                       450 },
+			{ p::wff_equiv,                       460 },
+			{ p::wff_or,                          470 },
+			{ p::wff_and,                         480 },
+			{ p::wff_xor,                         490 },
+			{ p::wff_neg,                         500 },
+			{ p::bf_interval,                     501 },
+			{ p::bf_eq,                           502 },
+			{ p::bf_neq,                          503 },
+			{ p::bf_less_equal,                   504 },
+			{ p::bf_nleq,                         505 },
+			{ p::bf_greater,                      506 },
+			{ p::bf_ngreater,                     507 },
+			{ p::bf_greater_equal,                508 },
+			{ p::bf_ngeq,                         509 },
+			{ p::bf_less,                         510 },
+			{ p::bf_nless,                        511 },
+			{ p::wff,                             580 },
 			// bf
-			{ tau_parser::bf_or,                           720 },
-			{ tau_parser::bf_and,                          730 },
-			{ tau_parser::bf_xor,                          740 },
-			{ tau_parser::bf_neg,                          750 },
-			{ tau_parser::bf,                              790 },
+			{ p::variable,                        710 },
+			{ p::bf_or,                           720 },
+			{ p::bf_and,                          730 },
+			{ p::bf_xor,                          740 },
+			{ p::bf_neg,                          750 },
+			{ p::bf,                              790 },
 
-			{ tau_parser::rec_relation,                    800 },
-			{ tau_parser::ref_args,                        800 },
-			{ tau_parser::bf_rule,                         800 },
-			{ tau_parser::wff_rule,                        800 },
-			{ tau_parser::binding,                         800 },
+			{ p::rec_relation,                    800 },
+			{ p::ref_args,                        800 },
+			{ p::bf_rule,                         800 },
+			{ p::wff_rule,                        800 },
+			{ p::binding,                         800 },
+			{ p::wff_builder_body,                800 },
+
 		};
 		static const std::set<size_t> wrap_child_for = {
 			};
-		if (std::holds_alternative<idni::tau_lang::tau_source_sym>(n->value)) {
-			auto tss = std::get<idni::tau_lang::tau_source_sym>(n->value);
+		if (std::holds_alternative<tau_source_sym>(n->value)) {
+			auto tss = std::get<tau_source_sym>(n->value);
 			if (!tss.nt() || no_wrap_for.find(tss.n())
 						!= no_wrap_for.end())
 								return false;
@@ -635,22 +645,22 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 		return stream;
 	}
 
-	if (std::holds_alternative<idni::tau_lang::tau_source_sym>(n->value)) {
+	if (std::holds_alternative<tau_source_sym>(n->value)) {
 		auto& ch = n->child;
-		auto tss = std::get<idni::tau_lang::tau_source_sym>(n->value);
+		auto tss = std::get<tau_source_sym>(n->value);
 		auto ppch = [&](size_t i) -> std::ostream& {
 			return pp(stream, ch[i], hl_path, depth, tss.n());
 		};
 		auto indent = [&depth, &stream]() {
-			if (!idni::tau_lang::pretty_printer_indenting) return;
+			if (!pretty_printer_indenting) return;
 			for (size_t i = 0; i < depth; ++i) stream << "\t";
 		};
 		auto break_line = [&]() {
-			if (!idni::tau_lang::pretty_printer_indenting) return;
+			if (!pretty_printer_indenting) return;
 			stream << "\n", indent();
 		};
 		auto break_if_needed = [&]() -> bool {
-			if (!idni::tau_lang::pretty_printer_indenting) return false;
+			if (!pretty_printer_indenting) return false;
 			if (find(breaks.begin(), breaks.end(), tss.n())
 				!= breaks.end()) return break_line(), true;
 			return false;
@@ -703,8 +713,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			size_t quant_nt = tss.n();
 			auto qch = ch;
 			switch (quant_nt) {
-			case tau_parser::wff_all:  stream << "all";   break;
-			case tau_parser::wff_ex:   stream << "ex";    break;
+			case p::wff_all:  stream << "all";   break;
+			case p::wff_ex:   stream << "ex";    break;
 			}
 			tau<BAs...> expr;
 			size_t expr_nt;
@@ -724,56 +734,59 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 		};
 		auto print_bf_and = [&]() {
 			std::stringstream ss;
-			bool is_hilight = idni::tau_lang::pretty_printer_highlighting;
-			if (is_hilight)
-				idni::tau_lang::pretty_printer_highlighting = false;
+			bool is_hilight = pretty_printer_highlighting;
+			if (is_hilight) pretty_printer_highlighting = false;
 			pp(ss, ch[0], hl_path, depth, tss.n());
-			if (is_hilight)
-				idni::tau_lang::pretty_printer_highlighting = true;
+			if (is_hilight) pretty_printer_highlighting = true;
 			auto str = ss.str();
 			if (is_hilight)
 				pp(stream, ch[0], hl_path, depth, tss.n());
 			else stream << str;
 			char lc = str[str.size()-1];
 			if (isdigit(lc) // || lc == '}'
-				|| idni::tau_lang::is_child_non_terminal(
-					tau_parser::bf_constant, ch[0]))
+				|| is_child_non_terminal(p::bf_constant, ch[0]))
 						stream << " ";
 			pp(stream, ch[1], hl_path, depth, tss.n());
 		};
+		// static auto is_type_node = [](tau_sym<BAs...>& s) {
+		// 	return std::holds_alternative<tau_source_sym>(s)
+		// 		&& std::get<tau_source_sym>(s).nt()
+		// 		&& std::get<tau_source_sym>(s).n()
+		// 					== tau_parser::type;
+		// };
 		if (tss.nt()) { //stream /*<< "*" << tss.nts << "-"*/ << tau_parser::instance().name(tss.n()) << ":";
 			// indenting and breaklines
 			bool indented = false;
-			if (idni::tau_lang::pretty_printer_indenting)
+			if (pretty_printer_indenting)
 				if (find(indents.begin(), indents.end(),
 					tss.n()) != indents.end())
 						indented = true, depth++;
 			// syntax highlighting color start
 			bool hl_pop = false;
-			if (idni::tau_lang::pretty_printer_highlighting)
+			if (pretty_printer_highlighting)
 				if (auto it = hl_colors.find(tss.n());
 					it != hl_colors.end())
 						hl_path.push_back(tss.n()),
 						hl_pop = true,
 						stream << it->second;
 			switch (tss.n()) {
-			case tau_parser::main:
-			case tau_parser::builder:
+			case p::main:
+			case p::builder:
 				postfix_nows("."); break;
-			case tau_parser::rec_relation:
+			case p::rec_relation:
 				infix(":=");  stream << "."; break;
-			case tau_parser::wff_rule:
+			case p::wff_rule:
 				infix("::="); stream << "."; break;
-			case tau_parser::bf_rule:
+			case p::bf_rule:
 				infix(":=");  stream << "."; break;
-			case tau_parser::bf_builder_body:  prefix("=:");  break;
-			case tau_parser::wff_builder_body: prefix("=::"); break;
-			case tau_parser::in:
-			case tau_parser::out:
+			case p::bf_builder_body:  prefix("=:");  break;
+			case p::wff_builder_body: prefix("=::"); break;
+			case p::in:
+			case p::out:
 				infix_nows("["); stream << "]"; break;
 			// wrappable by parenthesis
-			case tau_parser::bf:
-			case tau_parser::wff:
+			case p::bf:
+			case p::wff:
 			{
 				bool wrap = is_to_wrap(ch[0], parent);
 				if (wrap) {
@@ -788,145 +801,159 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 					stream << ")";
 				}
 			} break;
-			case tau_parser::shift:
+			case p::shift:
 				if (ch.size() == 1) pass();
 				else infix_nows("-");
 				break;
-			case tau_parser::bf_constant:
-				stream << "{ ", ppch(0) << " }";
-				if (ch.size() > 1) stream << " : ", ppch(1);
+			case p::scope_id:
+				stream << "_", ppch(0), stream << "_ ";
+				break;
+			case p::type: {
+					std::stringstream ss;
+					print_terminals(ss, n);
+					if (ss.tellp()) stream << ss.str();
+					else stream << "untyped";
+				}
+				break;
+			case p::bf_constant:
+				stream << "{ "; // fall through
+			case p::bf_variable:
+				ppch(0);
+				if (tss.n() == tau_parser::bf_constant)
+					stream << " }";
+				if (ch.size() > 1) // && is_type_node(ch[1]->value))
+					stream << " : ", ppch(1);
 				break;
 			// nodes to wrap
-			case tau_parser::constraint: wrap("[", "]"); break;
-			case tau_parser::bf_splitter: wrap("S(", ")"); break;
+			case p::constraint: wrap("[", "]"); break;
+			case p::bf_splitter: wrap("S(", ")"); break;
 				wrap("{ ", " }"); break;
-			case tau_parser::builder_head:
+			case p::builder_head:
 				wrap("(" , ")"); break;
-			case tau_parser::offsets:
+			case p::offsets:
 				stream << "[", sep(","), stream << "]"; break;
-			case tau_parser::ref_args:
+			case p::ref_args:
 				stream << "(", sep(","), stream << ")"; break;
 			// unary operators
-			case tau_parser::wff_neg:        prefix_nows("!"); break;
-			case tau_parser::bf_neg:         postfix_nows("'"); break;
-			case tau_parser::wff_sometimes:  prefix("sometimes"); break;
-			case tau_parser::wff_always:     prefix("always"); break;
+			case p::wff_neg:        prefix_nows("!"); break;
+			case p::bf_neg:         postfix_nows("'"); break;
+			case p::wff_sometimes:  prefix("sometimes"); break;
+			case p::wff_always:     prefix("always"); break;
 			//
 			// binary operators
-			case tau_parser::bf_and:         print_bf_and(); break;
-			case tau_parser::bf_or:          infix_nows("|"); break;
-			case tau_parser::bf_xor:         infix_nows("+"); break;
-			case tau_parser::bf_eq:             infix("="); break;
-			case tau_parser::bf_neq:            infix("!="); break;
-			case tau_parser::bf_less_equal:     infix("<="); break;
-			case tau_parser::bf_nleq:           infix("!<="); break;
-			case tau_parser::bf_greater:        infix(">"); break;
-			case tau_parser::bf_ngreater:       infix("!>"); break;
-			case tau_parser::bf_greater_equal:  infix(">="); break;
-			case tau_parser::bf_ngeq:           infix("!>="); break;
-			case tau_parser::bf_less:           infix("<"); break;
-			case tau_parser::bf_nless:          infix("!<"); break;
-			case tau_parser::ctn_neq:           infix("!="); break;
-			case tau_parser::ctn_eq:            infix("=");  break;
-			case tau_parser::ctn_greater_equal: infix(">="); break;
-			case tau_parser::ctn_greater:       infix(">");  break;
-			case tau_parser::ctn_less_equal:    infix("<="); break;
-			case tau_parser::ctn_less:          infix("<");  break;
-			case tau_parser::wff_and:        infix("&&"); break;
-			case tau_parser::wff_or:         infix("||"); break;
-			case tau_parser::wff_xor:        infix("^"); break;
-			case tau_parser::wff_imply:      infix("->"); break;
-			case tau_parser::wff_equiv:      infix("<->"); break;
+			case p::bf_and:         print_bf_and(); break;
+			case p::bf_or:          infix_nows("|"); break;
+			case p::bf_xor:         infix_nows("+"); break;
+			case p::bf_eq:             infix("="); break;
+			case p::bf_neq:            infix("!="); break;
+			case p::bf_less_equal:     infix("<="); break;
+			case p::bf_nleq:           infix("!<="); break;
+			case p::bf_greater:        infix(">"); break;
+			case p::bf_ngreater:       infix("!>"); break;
+			case p::bf_greater_equal:  infix(">="); break;
+			case p::bf_ngeq:           infix("!>="); break;
+			case p::bf_less:           infix("<"); break;
+			case p::bf_nless:          infix("!<"); break;
+			case p::ctn_neq:           infix("!="); break;
+			case p::ctn_eq:            infix("=");  break;
+			case p::ctn_greater_equal: infix(">="); break;
+			case p::ctn_greater:       infix(">");  break;
+			case p::ctn_less_equal:    infix("<="); break;
+			case p::ctn_less:          infix("<");  break;
+			case p::wff_and:        infix("&&"); break;
+			case p::wff_or:         infix("||"); break;
+			case p::wff_xor:        infix("^"); break;
+			case p::wff_imply:      infix("->"); break;
+			case p::wff_equiv:      infix("<->"); break;
 			// ternary operators
-			case tau_parser::bf_interval:    infix2("<=", "<="); break;
-			case tau_parser::wff_conditional:infix2("?", ":"); break;
+			case p::bf_interval:    infix2("<=", "<="); break;
+			case p::wff_conditional:infix2("?", ":"); break;
 			// quantifiers
-			case tau_parser::wff_all:
-			case tau_parser::wff_ex:         quant(); break;
+			case p::wff_all:
+			case p::wff_ex:         quant(); break;
 			// cli commands
-			case tau_parser::cli:           sep(". "); break;
-			case tau_parser::rel_memory:    prefix_nows("%-"); break;
-			case tau_parser::abs_memory:    prefix_nows("%"); break;
-			case tau_parser::quit_cmd:      stream << "quit"; break;
-			case tau_parser::version_cmd:   stream << "version"; break;
-			case tau_parser::clear_cmd:     stream << "clear"; break;
-			case tau_parser::help_cmd:      prefix("help"); break;
-			case tau_parser::file_cmd:      prefix("file"); break;
-			case tau_parser::valid_cmd:     prefix("valid"); break;
-			case tau_parser::sat_cmd:       prefix("sat"); break;
-			case tau_parser::unsat_cmd:     prefix("unsat"); break;
-			case tau_parser::solve_cmd:     prefix("solve"); break;
-			case tau_parser::run_cmd:       prefix("run"); break;
-			case tau_parser::normalize_cmd: prefix("normalize"); break;
-			case tau_parser::inst_cmd:
-			case tau_parser::subst_cmd:
+			case p::cli:           sep(". "); break;
+			case p::rel_memory:    prefix_nows("%-"); break;
+			case p::abs_memory:    prefix_nows("%"); break;
+			case p::quit_cmd:      stream << "quit"; break;
+			case p::version_cmd:   stream << "version"; break;
+			case p::clear_cmd:     stream << "clear"; break;
+			case p::help_cmd:      prefix("help"); break;
+			case p::file_cmd:      prefix("file"); break;
+			case p::valid_cmd:     prefix("valid"); break;
+			case p::sat_cmd:       prefix("sat"); break;
+			case p::unsat_cmd:     prefix("unsat"); break;
+			case p::solve_cmd:     prefix("solve"); break;
+			case p::run_cmd:       prefix("run"); break;
+			case p::normalize_cmd: prefix("normalize"); break;
+			case p::inst_cmd:
+			case p::subst_cmd:
 				stream << (tss.n() == tau_parser::inst_cmd
 						? "instantiate" : "substitute")
 					<< " ", ppch(1) << " [", ppch(2)
 					<< " / ", ppch(3) << "]";
 				break;
-			case tau_parser::dnf_cmd:       prefix("dnf"); break;
-			case tau_parser::cnf_cmd:       prefix("cnf"); break;
-			case tau_parser::anf_cmd:       prefix("anf"); break;
-			case tau_parser::nnf_cmd:       prefix("nnf"); break;
-			case tau_parser::pnf_cmd:       prefix("pnf"); break;
-			case tau_parser::mnf_cmd:       prefix("mnf"); break;
-			case tau_parser::snf_cmd:       prefix("snf"); break;
-			case tau_parser::onf_cmd:       prefix("onf"); break;
-			case tau_parser::def_print_cmd:
-			case tau_parser::def_rr_cmd:    prefix("def"); break;
-			case tau_parser::def_list_cmd:  stream << "def"; break;
-			case tau_parser::history_list_cmd:
+			case p::dnf_cmd:       prefix("dnf"); break;
+			case p::cnf_cmd:       prefix("cnf"); break;
+			case p::anf_cmd:       prefix("anf"); break;
+			case p::nnf_cmd:       prefix("nnf"); break;
+			case p::pnf_cmd:       prefix("pnf"); break;
+			case p::mnf_cmd:       prefix("mnf"); break;
+			case p::snf_cmd:       prefix("snf"); break;
+			case p::onf_cmd:       prefix("onf"); break;
+			case p::def_print_cmd:
+			case p::def_rr_cmd:    prefix("def"); break;
+			case p::def_list_cmd:  stream << "def"; break;
+			case p::history_list_cmd:
 						stream << "history"; break;
-			case tau_parser::history_print_cmd:
-			case tau_parser::history_store_cmd:
+			case p::history_print_cmd:
+			case p::history_store_cmd:
 							prefix("history"); break;
-			case tau_parser::get_cmd:       prefix("get"); break;
-			case tau_parser::set_cmd:       prefix("set"); break;
-			case tau_parser::toggle_cmd:    prefix("toggle"); break;
+			case p::get_cmd:       prefix("get"); break;
+			case p::set_cmd:       prefix("set"); break;
+			case p::toggle_cmd:    prefix("toggle"); break;
 			// just print terminals for these
-			case tau_parser::in_var_name:
-			case tau_parser::out_var_name:
-			case tau_parser::chars:
-			case tau_parser::capture:
-			case tau_parser::sym:
-			case tau_parser::ctnvar:
-			case tau_parser::num:
-			case tau_parser::integer:
-			case tau_parser::type:
-			case tau_parser::source:
-			case tau_parser::named_binding:
-			case tau_parser::uninter_const_name:
-			case tau_parser::option_name:
-			case tau_parser::option_value:
+			case p::in_var_name:
+			case p::out_var_name:
+			case p::chars:
+			case p::capture:
+			case p::sym:
+			case p::ctnvar:
+			case p::num:
+			case p::integer:
+			case p::source:
+			case p::named_binding:
+			case p::uninter_const_name:
+			case p::option_name:
+			case p::option_value:
 				print_terminals(stream, n);
 				break;
 			// constants
-			case tau_parser::uninterpreted_constant:
+			case p::uninterpreted_constant:
 							wrap("<", ">"); break;
 			// fixed point calculation fallback
-			case tau_parser::fp_fallback: prefix(" fallback"); break;
+			case p::fp_fallback: prefix(" fallback"); break;
 			// simple symbols
-			case tau_parser::first_sym: stream << "first"; break;
-			case tau_parser::last_sym: stream << "last"; break;
-			case tau_parser::bf_f:  stream << '0'; break;
+			case p::first_sym: stream << "first"; break;
+			case p::last_sym: stream << "last"; break;
+			case p::bf_f:  stream << '0'; break;
 				if (ch.size() > 0) stream << " : ", ppch(0);
 				break;
-			case tau_parser::bf_t:  stream << '1'; break;
+			case p::bf_t:  stream << '1'; break;
 				if (ch.size() > 0) stream << " : ", ppch(0);
 				break;
-			case tau_parser::wff_f: stream << 'F'; break;
-			case tau_parser::wff_t: stream << 'T'; break;
+			case p::wff_f: stream << 'F'; break;
+			case p::wff_t: stream << 'T'; break;
 			// for the rest skip value and just passthrough to child
 			default: for (const auto& c : n->child)
 					pp(stream, c, hl_path, depth, parent);
 				break;
 			}
 			// indenting and breaklines
-			if (idni::tau_lang::pretty_printer_indenting && indented)
+			if (pretty_printer_indenting && indented)
 				depth--;
 			// syntax highlighting color end
-			if (idni::tau_lang::pretty_printer_highlighting && hl_pop) {
+			if (pretty_printer_highlighting && hl_pop) {
 				hl_path.pop_back();
 				stream << TC.CLEAR();
 				if (hl_path.size()) // restore the prev color
@@ -935,5 +962,6 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 		}
 		else if (!tss.is_null()) stream << tss.t();
 	} else stream << n->value;
+	DBG(rdepth--;)
 	return stream;
 }

@@ -11,14 +11,10 @@
 
 #define base_bas tau_ba<sbf_ba>, sbf_ba
 
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
-
-using namespace idni::rewriter;
-using namespace idni::tau_lang;
 using namespace std;
+
+using namespace idni::rewriter;
+using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
