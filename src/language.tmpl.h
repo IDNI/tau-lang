@@ -1068,17 +1068,11 @@ tau<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 		transform, rewriter::all)(tau_source);
 	if (!tau_code) return nullptr;
 	return
-		infer_constant_types(               // check and propagate BA types of constants
 		process_defs_input_variables( // transforms input variables to captures
+		infer_ba_types(               // check and propagate BA types
 		process_offset_variables(     // transforms offset variables to captures
 		process_quantifier_vars(      // transforms ex x,y to ex x ex y
 		process_digits(tau_code)))));
-	// return
-	// 	process_defs_input_variables( // transforms input variables to captures
-	// 	infer_ba_types(               // check and propagate BA types
-	// 	process_offset_variables(     // transforms offset variables to captures
-	// 	process_quantifier_vars(      // transforms ex x,y to ex x ex y
-	// 	process_digits(tau_code)))));
 
 }
 
