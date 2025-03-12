@@ -84,7 +84,7 @@ TEST_SUITE("Boolean function recurrence relation fixed point calculation") {
 		const char* rec="f[n](x) := f[n-1](x) & x."
 				"f[0](x) := 1.";
 		const char* sample = "f(x)";
-		CHECK( test_bf_rr_fp(rec, sample, tau_parser::variable) );
+		CHECK( test_bf_rr_fp(rec, sample, tau_parser::bf_variable) );
 	}
 
 	TEST_CASE("multiple") {

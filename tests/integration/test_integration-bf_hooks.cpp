@@ -19,6 +19,9 @@
 #include "boolean_algebras/sbf_ba.h"
 #include "normalizer.h"
 
+#include "init_log.h"
+using namespace boost::log;
+
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
@@ -26,13 +29,16 @@ namespace testing = doctest;
 
 TEST_SUITE("configuration") {
 
+	TEST_CASE("logging") {
+		core::get()->set_filter(trivial::severity >= trivial::trace);
+	}
+
 	TEST_CASE("bdd_init") {
 		bdd_init<Bool>();
 	}
 }
 
 TEST_SUITE("bf operator hooks") {
-
 	// we should get an error during parsing and hence return true if we get an error
 	bool check_unbinded_hook(const char* sample) {
 		auto tau_sample_src = make_tau_source(sample, { .start = tau_parser::bf });
@@ -51,10 +57,14 @@ TEST_SUITE("bf operator hooks") {
 
 	// we should be able to parse the sample and the expected result should be the same
 	bool check_hook(const char* sample, const char* expected) {
-		auto tau_sample = make_nso_using_factory<
-			tau_ba<sbf_ba>, sbf_ba>(sample, { .start = tau_parser::bf }).value();
-		auto tau_expected = make_nso_using_factory<
-			tau_ba<sbf_ba>, sbf_ba>(expected, { .start = tau_parser::bf }).value();
+		ba_types_checker_and_propagator<tau_ba<sbf_ba>, sbf_ba>
+			::disabled = true;
+		auto tau_sample = make_nso_using_factory<tau_ba<sbf_ba>, sbf_ba>(
+				sample, { .start = tau_parser::bf }).value();
+		ba_types_checker_and_propagator<tau_ba<sbf_ba>, sbf_ba>
+			::disabled = false;
+		auto tau_expected = make_nso_using_factory<tau_ba<sbf_ba>, sbf_ba>(
+				expected, { .start = tau_parser::bf }).value();
 
 		#ifdef DEBUG
 		std::string str(sample);

@@ -9,8 +9,6 @@
 #include "normalizer.h"
 #include "test_helpers.h"
 
-#include "debug_helpers.h"
-
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
@@ -67,7 +65,7 @@ TEST_SUITE("builders execution") {
 	auto bfs = frml
 		| tau_parser::rr | tau_parser::main | tau_parser::wff
 		| tau_parser::bf_eq || tau_parser::bf;
-	auto X = bfs[0] | tau_parser::variable
+	auto X = bfs[0] | tau_parser::bf_variable | tau_parser::variable
 		| optional_value_extractor<tau<Bool>>;
 	auto F = bfs[1] | tau_parser::bf_f
 		| optional_value_extractor<tau<Bool>>;

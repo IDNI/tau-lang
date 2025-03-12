@@ -4,10 +4,6 @@
 
 #include "solver.h"
 
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
-
 // In what follows we use the algorithms and notations of TABA book (cf.
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.
@@ -19,7 +15,8 @@ solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& orig
 	solution<BAs...> solution;
 	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
 	// FIXME convert vars to a set
-	auto remaing = select_top(gh, is_child_non_terminal<tau_parser::variable, BAs...>);
+	auto remaing = select_top(gh,
+		is_child_non_terminal<tau_parser::bf_variable, BAs...>);
 	for (auto& v: remaing) solution.erase(v);
 	return solution;
 }
@@ -38,7 +35,8 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 	#endif // DEBUG
 
 	auto has_no_var = [](const tau<BAs...>& f) {
-		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
+		return !find_top(f,
+			is_child_non_terminal<tau_parser::bf_variable, BAs...>);
 	};
 
 	if (!(eq | tau_parser::bf_eq).has_value()) {
@@ -58,7 +56,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 	#endif // DEBUG
 
 	// FIXME convert vars to a set
-	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
+	if (auto vars = select_top(f, is_child_non_terminal<tau_parser::bf_variable, BAs...>); !vars.empty()) {
 		// compute g(X) and h(X) from the equality by substituting x with 0 and 1
 		// with x <- h(Z)
 		auto g = replace_with(vars[0], _1<BAs...>, f);
@@ -128,7 +126,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 
 template<typename...BAs>
 std::vector<tau<BAs...>> get_variables(const equality<BAs...>& eq) {
-	return select_top(eq, is_child_non_terminal<tau_parser::variable, BAs...>);
+	return select_top(eq, is_child_non_terminal<tau_parser::bf_variable, BAs...>);
 }
 
 template<typename...BAs>
@@ -248,7 +246,10 @@ public:
 
 	minterm_iterator(const tau<BAs...>& f) {
 		// FIXME convert vars to a set
-		if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
+		if (auto vars = select_top(f,
+			is_child_non_terminal<tau_parser::bf_variable, BAs...>);
+			!vars.empty())
+		{
 			// we start with the full bf...
 			auto partial_bf = f;
 			// ... and the first variable (for computing the first partial minterm)
@@ -523,8 +524,9 @@ tau<BAs...> get_constant(const minterm<BAs...>& m) {
 template<typename...BAs>
 std::set<tau<BAs...>> get_exponent(const tau<BAs...>& n) {
 	auto is_bf_literal = [](const auto& n) -> bool {
-		return (n | tau_parser::variable).has_value()
-			|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
+		return (n | tau_parser::bf_variable).has_value()
+			|| (n | tau_parser::bf_neg | tau_parser::bf
+				| tau_parser::bf_variable).has_value();
 	};
 	// FIXME convert vars to a set
 	auto all_vs = select_top(n, is_bf_literal);

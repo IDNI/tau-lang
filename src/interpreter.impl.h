@@ -120,7 +120,9 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 			for (const auto& [type, solution]: solutions) {
 				for (const auto& [var, value]: solution) {
 					// Check if we are dealing with a stream variable
-					if (var | tau_parser::variable | tau_parser::io_var) {
+					if (var | tau_parser::variable
+						| tau_parser::io_var)
+					{
 						if (get_io_time_point(trim(var)) <= (int_t)time_point) {
 							// std::cout << "time_point: " << time_point << "\n";
 							// std::cout << "var: " << var << "\n";
@@ -181,7 +183,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_ubt_ctn_at(int_t t) {
 	// which are greater than current time_point in a time-compatible fashion
 	auto step_ubt_ctn = update_to_time_point(ubt_ctn, ut);
 	auto io_vars = select_top(step_ubt_ctn,
-			is_child_non_terminal<p::io_var, BAs...>);
+			is_grandchild_non_terminal<p::io_var, BAs...>);
 	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
@@ -192,7 +194,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::get_ubt_ctn_at(int_t t) {
 			io_vars.pop_back();
 			continue;
 		}
-		if (v | p::io_var | p::in)
+		if (v | p::variable | p::io_var | p::in)
 			step_ubt_ctn = build_wff_all(v, step_ubt_ctn);
 		else step_ubt_ctn = build_wff_ex(v, step_ubt_ctn);
 		io_vars.pop_back();
@@ -239,7 +241,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::update_to_time_point(
 	// input/output var which has a shift, we replace it with the value
 	// corresponding to the current time_point minus the shift.
 	auto io_vars = select_top(f,
-		is_child_non_terminal<tau_parser::io_var, BAs...>);
+		is_grandchild_non_terminal<tau_parser::io_var, BAs...>);
 	return fm_at_time_point(f, io_vars, t);
 }
 
@@ -262,10 +264,10 @@ template<typename input_t, typename output_t, typename...BAs>
 void interpreter<input_t, output_t, BAs...>::resolve_solution_dependencies(solution<BAs...>& s) {
 	using p = tau_parser;
 	for (auto& [v, a] : s) {
-		if (is_child_non_terminal(p::variable, a)) {
+		if (is_child_non_terminal(p::bf_variable, a)) {
 			// The assigned value is a variables
 			auto new_a = a;
-			while (is_child_non_terminal(p::variable, new_a)) {
+			while (is_child_non_terminal(p::bf_variable, new_a)) {
 				auto it = s.find(new_a);
 				if (it == s.end()) {
 					BOOST_LOG_TRIVIAL(error) << "(Error) cannot eliminate variable in solution\n";
@@ -281,7 +283,7 @@ void interpreter<input_t, output_t, BAs...>::resolve_solution_dependencies(solut
 template<typename input_t, typename output_t, typename...BAs>
 void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial() {
 	std::vector<tau<BAs...> > io_vars = select_top(ubt_ctn,
-		is_child_non_terminal< tau_parser::io_var , BAs...>);
+		is_grandchild_non_terminal< tau_parser::io_var , BAs...>);
 	lookback = get_max_shift(io_vars);
 	formula_time_point = time_point + lookback;
 	highest_initial_pos = get_max_initial(io_vars);
@@ -353,7 +355,7 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 	for (const auto& fm : pending_atomic_fms) {
 		// std::cout << "def. type for: " << fm << "\n";
 		auto io_vars = select_top(fm,
-			is_child_non_terminal<p::io_var, BAs...>);
+			is_grandchild_non_terminal<p::io_var, BAs...>);
 		type_io_vars(io_vars, "tau", inputs, outputs);
 		if (sys.find("tau") == sys.end()) sys["tau"] = fm;
 		else sys["tau"] = build_wff_and(sys["tau"], fm);
@@ -368,7 +370,7 @@ void interpreter<input_t, output_t, BAs...>::type_io_vars(
 	using p = tau_parser;
 	for (const auto& io_var : io_vars) {
 		const auto io_name = get_tau_io_name(io_var);
-		if (io_var | p::io_var | p::in) {
+		if (io_var | p::variable | p::io_var | p::in) {
 			// Add type to inputs
 			inputs.add_input(io_name, type, "");
 		} else {
@@ -383,7 +385,7 @@ template<typename input_t, typename output_t, typename...BAs>
 std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(const tau<BAs...>& fm,
 		auto& inputs, auto& outputs) {
 	using p = tau_parser;
-	auto io_vars = select_top(fm, is_child_non_terminal<p::io_var, BAs...>);
+	auto io_vars = select_top(fm, is_grandchild_non_terminal<p::io_var, BAs...>);
 
 	// Check if any io_var has a predefined type
 	std::string type;
@@ -462,7 +464,8 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(
 #endif // DEBUG
 		if (executable == _F<BAs...>) continue;
 		// Make sure that no constant time position is smaller than 0
-		auto io_vars = select_top(executable, is_child_non_terminal<tau_parser::io_var, BAs...>);
+		auto io_vars = select_top(executable,
+			is_grandchild_non_terminal<tau_parser::io_var, BAs...>);
 		for (const auto& io_var : io_vars) {
 			if (is_io_initial(io_var) && get_io_time_point(io_var) < 0) {
 				BOOST_LOG_TRIVIAL(error) << "(Error) Constant time position is smaller than 0\n";
@@ -514,7 +517,7 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(
 template<typename input_t, typename output_t, typename ... BAs>
 void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 	auto io_vars = select_top(
-		update, is_child_non_terminal<tau_parser::io_var, BAs...>);
+		update, is_grandchild_non_terminal<tau_parser::io_var, BAs...>);
 	// the constant time positions in update are seen relative to
 	// time_point, i.e. time point 0 is shifted to time_point
 	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(
@@ -524,7 +527,7 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 		return;
 	}
 	io_vars = select_top(shifted_update,
-		is_child_non_terminal<tau_parser::io_var, BAs...>);
+		is_grandchild_non_terminal<tau_parser::io_var, BAs...>);
 	if (!is_memory_access_valid(io_vars)) {
 		BOOST_LOG_TRIVIAL(info) << "(Warning) no update performed: invalid memory access was found\n";
 		return;
@@ -597,9 +600,11 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 				tau<BAs...> aw = always_conjunction(
 					upd_always.value(),
 					spec_always.value());
-				auto aw_io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
+				auto aw_io_vars = select_top(aw,
+					is_grandchild_non_terminal<
+							p::io_var, BAs...>);
 				for (const auto& io_var : aw_io_vars)
-					if (io_var | p::io_var | p::out)
+					if (io_var | p::variable | p::io_var | p::out)
 						aw = build_wff_ex(io_var, aw);
 				new_spec_pointwise = build_wff_or(
 					always_conjunction(upd_always.value(), build_wff_neg(aw)),

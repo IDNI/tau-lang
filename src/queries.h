@@ -13,6 +13,10 @@ template <typename... BAs>
 bool is_child_non_terminal(const size_t nt, const tau<BAs...>& n);
 template <size_t nt, typename...BAs>
 bool is_child_non_terminal(const tau<BAs...>& n);
+template <typename... BAs>
+bool is_grandchild_non_terminal(const size_t nt, const tau<BAs...>& n);
+template <size_t nt, typename...BAs>
+bool is_grandchild_non_terminal(const tau<BAs...>& n);
 
 template <typename... BAs>
 bool is_non_terminal_node(const tau_sym<BAs...>& s) {
@@ -160,7 +164,7 @@ static const auto is_var_or_capture = [](const tau<BAs...>& n) {
 		&& get<tau_source_sym>(n->value).nt()
 		&& ((get<tau_source_sym>(n->value).n() == tau_parser::capture)
 			|| (get<tau_source_sym>(n->value).n() ==
-							tau_parser::variable));
+						tau_parser::bf_variable));
 };
 
 template <typename... BAs>
@@ -596,6 +600,28 @@ template <typename... BAs>
 std::function<bool(const tau<BAs...>&)> is_child_non_terminal(const size_t nt) {
 	return [nt](const tau<BAs...>& n) {
 		return is_child_non_terminal<BAs...>(nt, n); };
+}
+
+// check if the node is the given non terminal
+template <typename... BAs>
+bool is_grandchild_non_terminal(const size_t nt, const tau<BAs...>& n) {
+	auto child = n | only_child_extractor<BAs...>;
+	return child.has_value() && is_child_non_terminal<BAs...>(nt, child.value());
+}
+
+// check if the node is the given non terminal (template approach)
+template <size_t nt, typename...BAs>
+bool is_grandchild_non_terminal(const tau<BAs...>& n) {
+	return is_grandchild_non_terminal<BAs...>(nt, n);
+}
+
+// factory method for is_non_terminal predicate
+template <typename... BAs>
+std::function<bool(const tau<BAs...>&)> is_grandchild_non_terminal(
+	const size_t nt)
+{
+	return [nt](const tau<BAs...>& n) {
+		return is_grandchild_non_terminal<BAs...>(nt, n); };
 }
 
 // returns the first child of a node

@@ -12,10 +12,7 @@
 #include "boolean_algebras/variant_ba.h"
 #include "normal_forms.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
-
-#ifdef DEBUG
 #include "debug_helpers.h"
-#endif // DEBUG
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -215,7 +212,9 @@ bool is_non_temp_nso_unsat (const tau<BAs...>& fm) {
 
 	auto new_fm = fm;
 	auto vars = get_free_vars_from_nso(new_fm);
-	for(auto& v: vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
+	for (auto& v : vars) new_fm = build_wff_ex<BAs...>(v, new_fm);
+	// ptree(std::cout << "new_fm: ", new_fm) << "\n";
+	BOOST_LOG_TRIVIAL(trace) << "new_fm: " << new_fm;
 	auto normalized = normalize_non_temp<BAs...>(new_fm);
 	assert((normalized == _T<BAs...> || normalized == _F<BAs...> ||
 		find_top(normalized, is_non_terminal<tau_parser::constraint, BAs...>)));
@@ -320,6 +319,7 @@ bool is_nso_impl (tau<BAs...> n1, tau<BAs...> n2) {
 		imp = build_wff_all<BAs...>(v, imp);
 	}
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- wff: " << imp;
+	// ptree(std::cout << "is_nso_tmpl wff: ", imp) << "\n";
 
 	auto res = normalizer_step<BAs...>(imp);
 	assert((res == _T<BAs...> || res == _F<BAs...> || find_top(res,

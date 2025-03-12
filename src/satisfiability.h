@@ -18,16 +18,20 @@ template<typename... BAs>
 tau<BAs...> build_io_out (const std::string& name, const std::string& var) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
-	auto offset = wrap<BAs...>(p::offset, wrap<BAs...>(p::variable, var));
-	return wrap(p::variable, wrap(p::io_var, wrap(p::out, { var_name, offset })));
+	auto offset = wrap<BAs...>(p::offset, wrap(p::bf_variable,
+					wrap<BAs...>(p::variable, var)));
+	return wrap(p::bf_variable, wrap(p::variable, wrap(p::io_var,
+					wrap(p::out, { var_name, offset }))));
 }
 
 template<typename... BAs>
 tau<BAs...> build_io_in (const std::string& name, const std::string& var) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
-	auto offset = wrap<BAs...>(p::offset, wrap<BAs...>(p::variable, var));
-	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
+	auto offset = wrap<BAs...>(p::offset, wrap(p::bf_variable,
+		wrap<BAs...>(p::variable, var)));
+	return wrap(p::bf_variable, wrap(p::variable, wrap(p::io_var,
+					wrap(p::in, { var_name, offset }))));
 }
 
 template<typename... BAs>
@@ -35,7 +39,8 @@ tau<BAs...> build_io_out_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
-	return wrap(p::variable, wrap(p::io_var, wrap(p::out, { var_name, offset })));
+	return wrap(p::bf_variable, wrap(p::variable, wrap(p::io_var,
+					wrap(p::out, { var_name, offset }))));
 }
 
 template<typename... BAs>
@@ -43,25 +48,31 @@ tau<BAs...> build_io_in_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
-	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
+	return wrap(p::bf_variable, wrap(p::variable, wrap(p::io_var,
+					wrap(p::in, { var_name, offset }))));
 }
 
 template<typename... BAs>
 tau<BAs...> build_io_out_shift (const std::string& name, const std::string& var, const int_t shift) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
-	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, var), build_num<BAs...>(shift)});
+	auto shift_node = wrap<BAs...>(p::shift, { wrap(p::bf_variable,
+		wrap<BAs...>(p::variable, var)), build_num<BAs...>(shift)});
 	auto offset = wrap<BAs...>(p::offset, shift_node);
-	return wrap(p::variable, wrap(p::io_var, wrap(p::out, { var_name, offset })));
+	return wrap(p::bf_variable, wrap(p::variable, wrap(p::io_var,
+					wrap(p::out, { var_name, offset }))));
 }
 
 template<typename... BAs>
 tau<BAs...> build_io_in_shift (const std::string& name, const std::string& var, const int_t shift) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
-	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, var), build_num<BAs...>(shift)});
+	auto shift_node = wrap<BAs...>(p::shift, {
+		wrap<BAs...>(p::bf_variable, wrap<BAs...>(p::variable, var)),
+		build_num<BAs...>(shift)});
 	auto offset = wrap<BAs...>(p::offset, shift_node);
-	return wrap(p::variable, wrap(p::io_var, wrap(p::in, { var_name, offset })));
+	return wrap(p::bf_variable, wrap(p::variable, wrap(p::io_var,
+		wrap(p::in, { var_name, offset }))));
 }
 
 template<typename... BAs>
@@ -92,7 +103,7 @@ template<typename... BAs>
 bool has_temporary_io_var (const tau<BAs...>& fm) {
 	using p = tau_parser;
 	auto io_vars = rewriter::select_top(
-		fm, is_child_non_terminal<p::io_var, BAs...>);
+		fm, is_grandchild_non_terminal<p::io_var, BAs...>);
 	for (const auto& var : io_vars) {
 		// Check if the name of var starts with "_"
 		if (get_io_name(var)[0] == '_')
@@ -103,11 +114,13 @@ bool has_temporary_io_var (const tau<BAs...>& fm) {
 
 template<typename... BAs>
 tau<BAs...> transform_io_var(const tau<BAs...>& io_var, const std::string& io_var_name, int_t time_point) {
+	// ptree(std::cout << "transform_io_var: ", io_var) << "\n";
+	using p = tau_parser;
 	// Check if io_var has constant time point
 	if (is_io_initial(io_var))
 		return io_var;
 	auto shift = get_io_var_shift(io_var);
-	if (io_var | tau_parser::io_var | tau_parser::in)
+	if (io_var | p::variable | p::io_var | p::in)
 		return build_io_in_const<BAs...>(io_var_name, time_point - shift);
 	else return build_io_out_const<BAs...>(io_var_name, time_point - shift);
 }
@@ -115,11 +128,12 @@ tau<BAs...> transform_io_var(const tau<BAs...>& io_var, const std::string& io_va
 template<typename... BAs>
 tau<BAs...> existentially_quantify_output_streams(tau<BAs...> fm, const auto& io_vars,
                                                   int_t time_point, const auto& initials) {
+	using p = tau_parser;
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_o_vars;
 	for (int_t i = 0; i < (int_t)io_vars.size(); ++i) {
 		// Skip input streams
-		if (io_vars[i] | tau_parser::io_var | tau_parser::in)
+		if (io_vars[i] | p::variable | p::io_var | p::in)
 			continue;
 		// Skip initial conditions
 		if (is_io_initial(io_vars[i]))
@@ -142,10 +156,11 @@ template<typename... BAs>
 tau<BAs...> universally_quantify_input_streams(tau<BAs...> fm, const auto& io_vars,
                                                int_t time_point, const auto& initials) {
 	// This map is needed in order to get the minimal shift for streams with same name
+	using p = tau_parser;
 	std::set<int_t> quantifiable_i_vars;
 	for (int_t i = 0; i < (int_t)io_vars.size(); ++i) {
 		// Skip output streams
-		if (io_vars[i] | tau_parser::io_var | tau_parser::out)
+		if (io_vars[i] | p::variable | p::io_var | p::out)
 			continue;
 		// Skip initial conditions
 		if (is_io_initial(io_vars[i]))
@@ -309,8 +324,8 @@ inline auto constant_io_comp = [](const auto& v1, const auto& v2) {
 	if (get_io_time_point(v1_) < get_io_time_point(v2_))
 		return true;
 	if (get_io_time_point(v1_) == get_io_time_point(v2_)) {
-		bool v1_in = (v1_ | p::io_var | p::in).has_value();
-		bool v2_in = (v2_ | p::io_var | p::in).has_value();
+		bool v1_in = (v1_ | p::variable | p::io_var | p::in).has_value();
+		bool v2_in = (v2_ | p::variable | p::io_var | p::in).has_value();
 
 		if (!v1_in && v2_in) return false;
 		if (v1_in && !v2_in) return true;
@@ -331,7 +346,7 @@ bool is_run_satisfiable(const tau<BAs...>& fm) {
 
 	auto free_io_vars = get_free_vars_from_nso(fm);
 	std::vector<tau<BAs...> > io_vars = select_top(fm,
-				is_child_non_terminal<p::io_var, BAs...>);
+				is_grandchild_non_terminal<p::io_var, BAs...>);
 	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 
 	// All io_vars in fm have to refer to constant time positions
@@ -344,7 +359,7 @@ bool is_run_satisfiable(const tau<BAs...>& fm) {
 			continue;
 		}
 		auto& v = io_vars.back();
-		if (v | p::io_var | p::in) sat_fm = build_wff_all(v, sat_fm);
+		if (v | p::variable | p::io_var | p::in) sat_fm = build_wff_all(v, sat_fm);
 		else sat_fm = build_wff_ex(v, sat_fm);
 		io_vars.pop_back();
 	}
@@ -363,7 +378,7 @@ tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto&
 	auto look_back = get_max_shift(io_vars);
 	auto uconst_ctns = fm_at_time_point(fm, io_vars, look_back);
 	io_vars = select_top(uconst_ctns,
-			     is_child_non_terminal<p::io_var, BAs...>);
+			     is_grandchild_non_terminal<p::io_var, BAs...>);
 
 	// All io_vars in fm have to refer to constant time positions
 	assert(all_of(io_vars.begin(), io_vars.end(),
@@ -378,7 +393,7 @@ tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto&
 		}
 		auto& v = io_vars.back();
 		free_io_vars.erase(v);
-		if (v | p::io_var | p::in) uconst_ctns = build_wff_all(v, uconst_ctns);
+		if (v | p::variable | p::io_var | p::in) uconst_ctns = build_wff_all(v, uconst_ctns);
 		else uconst_ctns = build_wff_ex(v, uconst_ctns);
 		io_vars.pop_back();
 	}
@@ -481,9 +496,10 @@ std::pair<tau<BAs...>, int_t> find_fixpoint_chi(const tau<BAs...>& chi_base, con
 
 template<typename... BAs>
 tau<BAs...> transform_back_non_initials(const tau<BAs...>& fm, const int_t highest_init_cond) {
+	using p = tau_parser;
 	// Find lookback
 	auto current_io_vars = select_top(fm,
-			is_child_non_terminal<tau_parser::io_var, BAs...>);
+				is_grandchild_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_lookback_after_normalization(current_io_vars);
 
 	std::map<tau<BAs...>,tau<BAs...>> changes;
@@ -496,7 +512,7 @@ tau<BAs...> transform_back_non_initials(const tau<BAs...>& fm, const int_t highe
 
 		tau<BAs...> transformed_var;
 		if (time_point - lookback != 0) {
-			if (io_var | tau_parser::io_var | tau_parser::in)
+			if (io_var | p::variable | p::io_var | p::in)
 				transformed_var = build_io_in_shift<BAs...>(
 					get_io_name(io_var), "t",
 					abs(time_point - lookback));
@@ -506,7 +522,7 @@ tau<BAs...> transform_back_non_initials(const tau<BAs...>& fm, const int_t highe
 					abs(time_point - lookback));
 		}
 		else {
-			if (io_var | tau_parser::io_var | tau_parser::in)
+			if (io_var | p::variable | p::io_var | p::in)
 				transformed_var = build_io_in<BAs...>(
 					get_io_name(io_var), "t");
 			else
@@ -623,13 +639,13 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 
 	// Preparation to transform flags to output streams
 	std::vector<tau<BAs...> > io_vars = select_top(fm,
-				is_child_non_terminal<p::io_var, BAs...>);
+				is_grandchild_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
 	tau<BAs...> flag_initials = _T<BAs...>, flag_rules = _T<BAs...>;
 	auto transformed_fm = transform_ctn_to_streams(
 		fm, flag_initials, flag_rules, lookback, start_time, true);
 	if (lookback == 0 && fm != transformed_fm) {
-		io_vars = select_top(transformed_fm, is_child_non_terminal<p::io_var, BAs...>);
+		io_vars = select_top(transformed_fm, is_grandchild_non_terminal<p::io_var, BAs...>);
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
 	} else fm = transformed_fm;
 	fm = build_wff_and(fm, flag_rules);
@@ -637,7 +653,7 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << build_wff_and(fm, flag_initials);
 
 	io_vars = select_top(build_wff_and(fm, flag_initials),
-			is_child_non_terminal<p::io_var, BAs...>);
+			is_grandchild_non_terminal<p::io_var, BAs...>);
 
 	// Save positions of io_variables which are initial conditions
 	std::set<std::pair<std::string, int_t>> initials;
@@ -657,7 +673,7 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	ubd_ctn = transform_back_non_initials(ubd_ctn, point_after_inits - 1);
 
 	// Run phi_inf until all initial conditions are taken into account
-	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
+	io_vars = select_top(ubd_ctn, is_grandchild_non_terminal<p::io_var, BAs...>);
 	tau<BAs...> run = _T<BAs...>;
 	const int_t s = start_time + lookback;
 	// // In case no initial condition is being checked
@@ -702,7 +718,7 @@ tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
 	tau<BAs...> guard = _T<BAs...>;
 	for (const auto& io_var : io_vars) {
 		// Check if input stream variable
-		if (io_var | p::io_var | p::in) {
+		if (io_var | p::variable | p::io_var | p::in) {
 			// Give name of io_var and make it non-user definable with "_"
 			auto uiter_const = build_bf_uniter_const<BAs...>("_" + tau_to_str(io_var), std::to_string(number));
 			auto cdn = build_wff_eq(build_bf_xor(wrap(p::bf, io_var), uiter_const));
@@ -721,23 +737,24 @@ std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>&
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 
 	int_t max_st_lookback = get_max_shift(
-		select_top_until(fm, is_child_non_terminal<p::io_var, BAs...>,
+		select_top_until(fm, is_grandchild_non_terminal<p::io_var, BAs...>,
 			is_child_non_terminal<p::wff_always, BAs...>));
 
 	int_t aw_lookback = 0;
 	std::vector<tau<BAs...>> aw_io_vars;
 	if (aw_fm.has_value()) {
 		aw_io_vars = select_top(aw_fm.value(),
-			is_child_non_terminal<p::io_var, BAs...>);
+			is_grandchild_non_terminal<p::io_var, BAs...>);
 		aw_lookback = get_max_shift(aw_io_vars);
 	}
 
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
 	BOOST_LOG_TRIVIAL(trace) << fm;
+	// ptree(std::cout << "fm: ", fm) << "\n";
 	tau<BAs...> ev_assm = _T<BAs...>;
 	tau<BAs...> ev_collection = _0<BAs...>;
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
-		auto st_io_vars = select_top(smt_fms[n], is_child_non_terminal<p::io_var, BAs...>);
+		auto st_io_vars = select_top(smt_fms[n], is_grandchild_non_terminal<p::io_var, BAs...>);
 		int_t st_lookback = get_max_shift(st_io_vars);
 
 		// Transform constant time constraints to io var in sometimes statement
@@ -745,7 +762,7 @@ std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>&
 		smt_fms[n] = transform_ctn_to_streams(
 			smt_fms[n], ctn_initials, ctn_assm, st_lookback,
 			start_time, reset_ctn_stream);
-		st_io_vars = select_top(smt_fms[n], is_child_non_terminal<p::io_var, BAs...>);
+		st_io_vars = select_top(smt_fms[n], is_grandchild_non_terminal<p::io_var, BAs...>);
 
 		std::stringstream ss; ss << "_e" << n;
 		// Build the eventual var flags based on the maximal lookback
@@ -761,6 +778,7 @@ std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>&
 		auto eNt_prev_is_not_zero	= build_wff_neq(eNt_prev);
 		// transform `sometimes psi` to:
 		// (_eN[t-1] != 0 && _eN[t] == 0) -> psi (N is nth `sometimes`)
+		// ptree(std::cout << "smt_fm[" << n << "]: ", smt_fms[n]) << "\n";
 		auto shifted_sometimes = (max_st_lookback == 0 && aw_lookback == 0) ?
 			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars, 1) :
 			shift_io_vars_in_fm(trim2(smt_fms[n]), st_io_vars,
@@ -771,7 +789,7 @@ std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>&
 		// under sometimes is implied"
 		// This mimics an existential quantifier capturing the inputs but at the same
 		// time the inputs are not quantified
-		st_io_vars = select_top(shifted_sometimes, is_child_non_terminal<p::io_var, BAs...>);
+		st_io_vars = select_top(shifted_sometimes, is_grandchild_non_terminal<p::io_var, BAs...>);
 		auto guard = create_guard<BAs...>(st_io_vars, n);
 		shifted_sometimes = build_wff_imply(guard, shifted_sometimes);
 
@@ -828,7 +846,7 @@ template<typename... BAs>
 tau<BAs...> add_st_ctn (const tau<BAs...>& st, const int_t timepoint, const int_t steps) {
 	tau<BAs...> st_ctn = _T<BAs...>;
 	auto io_vars = select_top(
-		st, is_child_non_terminal<tau_parser::io_var, BAs...>);
+		st, is_grandchild_non_terminal<tau_parser::io_var, BAs...>);
 	for (int_t s = 0; s <= steps; ++s) {
 		std::map<tau<BAs...>, tau<BAs...> > changes;
 		for (size_t i = 0; i < io_vars.size(); ++i) {
@@ -848,7 +866,7 @@ template <typename... BAs>
 tau<BAs...> make_initial_run(const tau<BAs...>& aw, const int_t max_st_lookback) {
 	// get lookback of aw
 	using p = tau_parser;
-	auto io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
+	auto io_vars = select_top(aw, is_grandchild_non_terminal<p::io_var, BAs...>);
 	const int_t t = get_max_shift(io_vars);
 
 	tau<BAs...> run;
@@ -871,6 +889,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 				      const int_t max_st_lookback,
 				      const bool output) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
+	// ptree(std::cout << "ubd_aw_continuation: ", ubd_aw_continuation) << "\n";
 
 	using p = tau_parser;
 	assert(has_no_boolean_combs_of_models(ubd_aw_continuation));
@@ -880,6 +899,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	auto aw = is_child_non_terminal(p::wff_always, ubd_aw_continuation)
 			  ? trim2(ubd_aw_continuation)
 			  : ubd_aw_continuation;
+	// ptree(std::cout << "aw: ", aw) << "\n";
 	auto ori_aw_ctn = original_aw != nullptr
 						? (is_child_non_terminal(
 							   p::wff_always, original_aw)
@@ -888,9 +908,14 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 						: _T<BAs...>;
 
 	std::vector<tau<BAs...>> io_vars = select_top(aw,
-			is_child_non_terminal<p::io_var, BAs...>);
+			is_grandchild_non_terminal<p::io_var, BAs...>);
 	std::vector<tau<BAs...>> st_io_vars = select_top(st_flags,
-		is_child_non_terminal<p::io_var, BAs...>);
+		is_grandchild_non_terminal<p::io_var, BAs...>);
+
+	// std::cout << "io_vars size: " << io_vars.size() << "\n";
+	// for (const auto& iov : io_vars) ptree(std::cout << "io_var: ", iov) << "\n";
+	// std::cout << "st_io_vars size: " << st_io_vars.size() << "\n";
+	// for (const auto& stiov : st_io_vars) ptree(std::cout << "st_io_var: ", stiov) << "\n";
 
 	// Note that time_point is also the lookback
 	const int_t time_point = get_max_shift(io_vars);
@@ -901,7 +926,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	int_t point_after_inits = get_max_initial<BAs...>(io_vars) + 1;
 	// Shift flags in order to match lookback of always part
 	st_flags = shift_io_vars_in_fm(st_flags, st_io_vars, time_point - 1);
-	st_io_vars = select_top(st_flags, is_child_non_terminal<p::io_var, BAs...>);
+	st_io_vars = select_top(st_flags, is_grandchild_non_terminal<p::io_var, BAs...>);
 
 	// Create the initial phase of the always part
 	tau<BAs...> run = make_initial_run(ori_aw_ctn, max_st_lookback);
@@ -961,7 +986,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	}
 
 	chi_inf = transform_back_non_initials(chi_inf, point_after_inits - 1);
-	io_vars = select_top(chi_inf, is_child_non_terminal<p::io_var, BAs...>);
+	io_vars = select_top(chi_inf, is_grandchild_non_terminal<p::io_var, BAs...>);
 	auto chi_inf_anchored = fm_at_time_point(chi_inf, io_vars, std::max(point_after_inits, time_point));
 
 	BOOST_LOG_TRIVIAL(trace) << "Fm to check sat:";

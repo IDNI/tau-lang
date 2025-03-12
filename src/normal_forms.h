@@ -9,10 +9,6 @@
 #include "boolean_algebras/nso_ba.h"
 #include "execution.h"
 
-#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG
-
 namespace idni::tau_lang {
 
 /**
@@ -553,8 +549,9 @@ std::pair<std::optional<tau<BAs...>>, tau<BAs...>> get_inner_quantified_wff(cons
 			|| is_non_terminal<tau_parser::wff_always, BAs...>(n);
 	};
 	if (auto quantifier = find_bottom(n, quantified); quantifier) {
-		return { quantifier | tau_parser::variable,
-			quantifier | tau_parser::wff | optional_value_extractor<tau<BAs...>> };
+		return { quantifier | tau_parser::bf_variable,
+			quantifier | tau_parser::wff
+				| optional_value_extractor<tau<BAs...>> };
 	}
 	return { {}, n };
 }
@@ -789,11 +786,11 @@ inline auto is_wff_bdd_var = [](const auto& n) {
 
 inline auto is_bf_bdd_var = [](const auto& n) {
 		using tp = tau_parser;
-		return is_child_non_terminal(tp::variable, n) ||
-				is_child_non_terminal(tp::capture, n) ||
-				is_child_non_terminal(tp::bf_ref, n) ||
-				is_child_non_terminal(tp::bf_constant, n) ||
-				is_child_non_terminal(tp::uninterpreted_constant, n);
+		return is_child_non_terminal(tp::bf_variable, n)
+			|| is_child_non_terminal(tp::capture, n)
+			|| is_child_non_terminal(tp::bf_ref, n)
+			|| is_child_non_terminal(tp::bf_constant, n)
+			|| is_child_non_terminal(tp::uninterpreted_constant, n);
 };
 // ------------------------------
 
@@ -803,7 +800,7 @@ void elim_vars_in_assignment (const auto& fm, const auto& vars, auto& i,
 	const int_t p, const auto& is_var)
 {
 	// auto is_var = [](const tau<BAs...>& n){return
-	// 	is_child_non_terminal(tau_parser::variable, n) ||
+	// 	is_child_non_terminal(tau_parser::bf_variable, n) ||
 	// 		is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
 	auto cvars = select_all(fm, is_var);
 	std::set<tau<BAs...>> cur_vars(std::make_move_iterator(cvars.begin()),
@@ -908,7 +905,7 @@ tau<BAs...> bf_boole_normal_form (const tau<BAs...>& fm,
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
 	auto is_var = [](const tau<BAs...>& n){return
-		is_child_non_terminal(tau_parser::variable, n) ||
+		is_child_non_terminal(tau_parser::bf_variable, n) ||
 			is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
 	auto vars = select_top(fm, is_var);
 	sort(vars.begin(), vars.end(), lex_var_comp<BAs...>);
@@ -2203,7 +2200,7 @@ tau<BAs...> to_cnf(const tau<BAs...>& fm) {
 template<typename... BAs>
 tau<BAs...> rm_temporary_lookback (const tau<BAs...>& fm) {
 	auto io_vars = rewriter::select_top(fm,
-		is_child_non_terminal<tau_parser::io_var, BAs...>);
+		is_grandchild_non_terminal<tau_parser::io_var, BAs...>);
 	bool has_var = std::ranges::any_of(io_vars,
 		[](const auto& el){return !is_io_initial(el);});
 	int_t lookback = get_max_shift(io_vars, true);
@@ -2404,18 +2401,19 @@ template<typename... BAs>
 tau<BAs...> shift_io_vars_in_fm (const tau<BAs...>& fm, const auto& io_vars, const int_t shift) {
 	if (shift <= 0) return fm;
 	std::map<tau<BAs...>, tau<BAs...>> changes;
-	for (const auto& io_var: io_vars) {
+	for (const auto& io_var : io_vars) {
 		// Skip initial conditions
 		if (is_io_initial(io_var))
 			continue;
 		int_t var_shift = get_io_var_shift(io_var);
-		if (io_var | tau_parser::io_var | tau_parser::in) {
+		if (io_var | tau_parser::variable | tau_parser::io_var | tau_parser::in) {
 			changes[io_var] = trim(build_in_variable_at_t_minus<BAs...>(
 				get_io_name(io_var), var_shift + shift));
 		} else {
 			changes[io_var] = trim(build_out_variable_at_t_minus<BAs...>(
 				get_io_name(io_var), var_shift + shift));
 		}
+		// ptree(std::cout << "changed io_var: ", changes[io_var]) << "\n";
 	}
 	return replace(fm, changes);
 }
@@ -2432,7 +2430,7 @@ tau<BAs...> shift_const_io_vars_in_fm(const tau<BAs...>& fm,
 		int_t tp = get_io_time_point(io_var);
 		// Make sure that the resulting time point is positive
 		if (tp + shift < 0) return _F<BAs...>;
-		if (io_var | p::io_var | p::in) {
+		if (io_var | p::variable | p::io_var | p::in) {
 			changes.emplace(
 				io_var, trim(
 					build_in_variable_at_n(
@@ -2478,7 +2476,7 @@ tau<BAs...> pull_always_out(const tau<BAs...>& fm) {
 	bool first = true;
 	for (auto& fa : collected_always_fms) {
 		auto io_vars = select_top(fa,
-			is_child_non_terminal<tau_parser::io_var, BAs...>);
+			is_grandchild_non_terminal<tau_parser::io_var, BAs...>);
 		auto current_lb = get_max_shift(io_vars);
 		if (first) { first = false; always_part = fa; }
 		else {
@@ -2487,7 +2485,7 @@ tau<BAs...> pull_always_out(const tau<BAs...>& fm) {
 				fa = shift_io_vars_in_fm(fa, io_vars, lookback - current_lb);
 			if (current_lb > lookback) {
 				io_vars = select_top(always_part,
-					is_child_non_terminal<tau_parser::io_var, BAs...>);
+					is_grandchild_non_terminal<tau_parser::io_var, BAs...>);
 				always_part = shift_io_vars_in_fm(always_part, io_vars, current_lb - lookback);
 			}
 			always_part = build_wff_and(always_part, fa);
@@ -2586,8 +2584,8 @@ tau<BAs...> always_conjunction (const tau<BAs...>& fm1_aw, const tau<BAs...>& fm
 	// Trim the always node if present
 	auto fm1 = is_child_non_terminal(p::wff_always, fm1_aw) ? trim2(fm1_aw) : fm1_aw;
 	auto fm2 = is_child_non_terminal(p::wff_always, fm2_aw) ? trim2(fm2_aw) : fm2_aw;
-	auto io_vars1 = select_top(fm1, is_child_non_terminal<p::io_var, BAs...>);
-	auto io_vars2 = select_top(fm2, is_child_non_terminal<p::io_var, BAs...>);
+	auto io_vars1 = select_top(fm1, is_grandchild_non_terminal<p::io_var, BAs...>);
+	auto io_vars2 = select_top(fm2, is_grandchild_non_terminal<p::io_var, BAs...>);
 	// Get lookbacks
 	int_t lb1 = get_max_shift(io_vars1);
 	int_t lb2 = get_max_shift(io_vars2);
@@ -2831,6 +2829,7 @@ tau<BAs...> wff_remove_existential(const tau<BAs...>& var, const tau<BAs...>& wf
 		}
 
 		auto f = squeeze_positives(new_l);
+		// if (f) ptree<BAs...>(std::cout << "f: ", f.value()) << "\n";
 		auto f_0 = f ? replace(f.value(), var, _0_trimmed<BAs...>) : _0<BAs...>;
 		auto f_1 = f ? replace(f.value(), var, _1_trimmed<BAs...>) : _0<BAs...>;
 
@@ -2866,6 +2865,8 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start existential quantifier elimination";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << trim2(inner_fm);
 	BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << scoped_fm;
+	// ptree(std::cout << "Q var: ", trim2(inner_fm)) << "\n";
+	// ptree(std::cout << "Q fm: ", scoped_fm) << "\n";
 	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
 	scoped_fm = reduce_across_bfs(scoped_fm, false);
 
@@ -2907,6 +2908,9 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 				else new_func = trim2(d);
 			}
 			new_func = build_wff_eq(new_func | bf_reduce_canonical<BAs...>());
+			// ptree<BAs...>(std::cout << "inner_fm: ", inner_fm) << "\n";
+			// ptree<BAs...>(std::cout << "new_func: ", new_func) << "\n";
+			// ptree<BAs...>(std::cout << "inner_fm trimmed: ", trim3(inner_fm)) << "\n";
 			new_func = wff_remove_existential(trim2(inner_fm), new_func);
 			if (new_func == _T<BAs...>) return _T<BAs...>;
 			if (res) res = build_wff_or(res, new_func);
@@ -2935,6 +2939,8 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start universal quantifier elimination";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << trim2(inner_fm);
 	BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << scoped_fm;
+	// ptree(std::cout << "Q var: ", trim2(inner_fm)) << "\n";
+	// ptree(std::cout << "Q fm: ", scoped_fm) << "\n";
 	// Reductions to prevent blow ups and achieve CNF
 	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
 	scoped_fm = reduce_across_bfs(scoped_fm, true);
@@ -3007,6 +3013,8 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 // and then eliminate them, returning a quantifier free formula
 template<typename... BAs>
 tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
+
+	// ptree<BAs...>(std::cout << "elim quantifiers!: ", fm) << "\n";
 	// Lambda is applied to nodes of fm in post order after quantifiers have
 	// been pushed in
 	auto elim_quant = [](const tau<BAs...>& inner_fm) -> tau<BAs...> {
@@ -3017,6 +3025,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 		else if (is_child_non_terminal(tau_parser::wff_all, inner_fm))
 			is_ex_quant = false;
 		else return inner_fm;
+		// ptree<BAs...>(std::cout << "elim quantifiers for: ", inner_fm) << "\n";
 
 		auto has_var = [&inner_fm](const auto& node)
 					{return node == trim2(inner_fm);};
@@ -3036,6 +3045,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	};
 	unordered_tau_set<BAs...> excluded_nodes;
 	auto push_quantifiers = [&excluded_nodes](const tau<BAs...>& n) {
+		// ptree<BAs...>(std::cout << "\tpush quantifiers ", n) << "\n";
 		using p = tau_parser;
 		if (is_child_non_terminal(p::wff_ex, n)) {
 			auto pushed = push_existential_quantifier_one(n);
@@ -3088,7 +3098,7 @@ tau<BAs...> get_eq_with_most_quant_vars (const tau<BAs...>& fm, const auto& quan
 		if (is_non_terminal(p::bf_eq, n)) {
 			// Found term
 			// Get vars
-			auto vars = select_top(n, is_non_terminal<p::variable, BAs...>);
+			auto vars = select_top(n, is_non_terminal<p::bf_variable, BAs...>);
 			// Find overlap of vars and quant_vars
 			int_t quants = 0;
 			for (const auto& v : vars)
@@ -3459,8 +3469,9 @@ private:
 
 	exponent get_exponent(const tau<BAs...>& n) const {
 		auto is_bf_literal = [](const auto& n) -> bool {
-			return (n | tau_parser::variable).has_value()
-				|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
+			return (n | tau_parser::bf_variable).has_value()
+				|| (n | tau_parser::bf_neg | tau_parser::bf
+					| tau_parser::bf_variable).has_value();
 		};
 		auto all_vs = select_top(n, is_bf_literal);
 		return exponent(all_vs.begin(), all_vs.end());

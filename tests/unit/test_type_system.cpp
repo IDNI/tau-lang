@@ -18,8 +18,10 @@ namespace testing = doctest;
 
 tau<Bool> infer(const char* sample) {
 	auto src = make_tau_source(sample);
+	if (!src) return nullptr;
 	auto stmt = make_statement(src);
-	return infer_constant_types<Bool>(stmt);
+	if (!stmt) return nullptr;
+	return infer_ba_types<Bool>(stmt);
 }
 
 bool expect_infer_fail(const char* sample) {

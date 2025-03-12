@@ -1,33 +1,33 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	sbf1
-	sbf2
-	tau_ba1
-	tau_ba3
+	bf_fixed_point
+	bf_hooks
+	bf_normalization
+	interpreter
 	normal_forms
 	nso_rr_execution
 	nso_rr_partial_eval
 	nso_rr_fixed_point
-	ref_types
-	bf_fixed_point
-	bf_normalization
-	wff_normalization
-    satisfiability
-    splitter
-	splitter2
-	solver
 	quantifiers
+	ref_types
+	satisfiability
+	sbf1
+	sbf2
+	solver
+	splitter
+	splitter2
+	tau_ba1
+	tau_ba3
 	wff_hooks
-	bf_hooks
-	interpreter
+	wff_normalization
 )
 
 foreach(TEST IN LISTS TESTS)
 	set(N "test_integration-${TEST}")
 	add_executable(${N} "${N}.cpp")
 	target_setup(${N})
-	target_link_libraries(${N} ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} doctest)
+	target_link_libraries(${N} ${TAU_OBJECT_LIB_NAME} doctest)
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
 	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
 	set_tests_properties(${N} PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tests)

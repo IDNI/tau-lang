@@ -7,6 +7,9 @@
 #include "test_integration_helpers.h"
 #include "../unit/test_helpers.h"
 
+#include "init_log.h"
+
+using namespace boost::log;
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
@@ -19,6 +22,13 @@ bool normalize_and_test_for_value(const char* sample, tau_parser::nonterminal nt
 	auto result = normalizer<sbf_ba>(sample_formula.value());
 	auto check = result | nt;
 	return check.has_value();
+}
+
+TEST_SUITE("configuration") {
+
+	TEST_CASE("log init") {
+		core::get()->set_filter(trivial::severity >= trivial::trace);
+	}
 }
 
 TEST_SUITE("rec relations partial evaluation: simple cases") {

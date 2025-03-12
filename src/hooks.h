@@ -5,6 +5,7 @@
 
 #include <optional>
 #include "nso_rr.h"
+#include "debug_helpers.h"
 #include "builders.h"
 
 namespace idni::tau_lang {

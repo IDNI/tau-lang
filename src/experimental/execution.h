@@ -11,10 +11,6 @@
 #include "parser.h"
 #include "rewriting.h"
 
-/*#ifdef DEBUG
-#include "debug_helpers.h"
-#endif // DEBUG*/
-
 namespace idni::tau_lang::experimental {
 
 // Check https://en.cppreference.com/w/cpp/utility/functional/function for more
