@@ -3,10 +3,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "defs.h"
-#include "hooks.h"
-#include "boolean_algebras/bool_ba.h"
-
 #include "test_helpers.h"
 
 using namespace idni::rewriter;

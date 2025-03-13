@@ -3,11 +3,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "boolean_algebras/sbf_ba.h"
-#include "satisfiability.h"
 
-// TODO (LOW) consider move this test to integration tests
 #include "../integration/test_integration_helpers.h"
+#include "satisfiability.h"
 
 #define base_bas tau_ba<sbf_ba>, sbf_ba
 

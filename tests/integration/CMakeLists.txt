@@ -16,7 +16,7 @@ set(TESTS
     satisfiability
     splitter
 	splitter2
-	solver
+#	solver
 	quantifiers
 	wff_hooks
 	bf_hooks

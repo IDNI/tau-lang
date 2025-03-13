@@ -3,9 +3,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-
-#include "boolean_algebras/sbf_ba.h"
-#include "boolean_algebras/bdds/babdd.h"
+#include "runtime.h"
+#include "hooks.h"
 
 using namespace std;
 using namespace idni::tau_lang;
