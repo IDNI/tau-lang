@@ -2,7 +2,8 @@
 
 #include <stack>
 
-#include "solver.h"
+#include "normal_forms.h"
+#include "splitter.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"

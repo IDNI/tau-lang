@@ -3,15 +3,14 @@
 #ifndef __TEST_INTEGRATION_HELPERS_SBF_H__
 #define __TEST_INTEGRATION_HELPERS_SBF_H__
 
-#include "../src/boolean_algebras/bool_ba.h"
-#include "../src/boolean_algebras/z3_ba.h"
-#include "../src/boolean_algebras/sbf_ba.h"
-//#include "../src/boolean_algebras/bdds/babdd.h"
-//#include "../src/boolean_algebras/bdds/bdd_handle.h"
-//#include "../src/nso_rr.h"
-#include "../src/nso_rr.h"
-#include "../src/normalizer.h"
-#include "dict.h"
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/utility/setup/console.hpp>
+
+#include "runtime.h"
+#include "hooks.h"
+#include "normalizer.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;

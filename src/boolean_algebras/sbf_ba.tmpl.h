@@ -1,5 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+#include "queries.h"
 namespace idni::tau_lang {
 
 	using parse_forest = idni::parser<char, char>::pforest;

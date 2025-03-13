@@ -2,15 +2,11 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/utility/setup/console.hpp>
-
 #include "doctest.h"
-#include "solver.h"
 
 #include "test_integration_helpers.h"
+#include "solver.h"
+
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;

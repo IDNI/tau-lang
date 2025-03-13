@@ -16,9 +16,8 @@
 #include <cassert>
 
 #include "doctest.h"
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/z3_ba.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "runtime.h"
+#include "hooks.h"
 #include "normalizer.h"
 
 using namespace idni::rewriter;

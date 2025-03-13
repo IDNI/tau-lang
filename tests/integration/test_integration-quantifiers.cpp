@@ -18,7 +18,7 @@ using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
-using test_case = array<string, 3>;
+using test_case = std::array<string, 3>;
 using test_cases = vector<test_case>;
 
 test_cases ex_cases = {

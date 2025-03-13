@@ -13,7 +13,8 @@
 #include <boost/log/utility/setup/console.hpp>
 
 #include "doctest.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "runtime.h"
+#include "hooks.h"
 #include "interpreter.h"
 
 #define base_bas tau_ba<sbf_ba>, sbf_ba

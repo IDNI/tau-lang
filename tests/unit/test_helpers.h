@@ -3,6 +3,8 @@
 #ifndef __TEST_HELPERS_H__
 #define __TEST_HELPERS_H__
 
+#include "runtime.h"
+#include "hooks.h"
 #include "nso_rr.h"
 #include "language.h"
 
