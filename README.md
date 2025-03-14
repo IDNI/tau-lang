@@ -310,6 +310,11 @@ local_spec => (local_spec "&&" local_spec)
 			| predicate | T | F
 ```
 
+The precedence of the logical operators/quantifiers is as follows (from higher
+precedence to lower):
+`!` > `&&` > `^` > `||` ` > `<->` > `<-` >` > `->` > `ex ... ...` > `all ... ...`
+> `... ? ... : ...` > `always ...`> `sometimes ...`.
+
 In order to properly define functions and predicates see Section
 [Functions and Predicates](#functions-and-predicates).
 
@@ -372,6 +377,9 @@ for an IO variable, and
 
 * finally, `0` and `1` stands for the given elements in the corresponding Boolean
 algebra.
+
+In this case, the order of the operations is the following (from higher precedence
+to lower): `'` > `&` > `+` (equivallently > `^`) > `|`.
 
 For example, the following is a valid expression in terms of a Boolean function:
 
