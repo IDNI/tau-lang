@@ -211,8 +211,8 @@ o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
 
 which states that at each point in time, either the conjunction of the current
 output with the previous output and with the current input, has to be 0, or, the
-output has to equal the input. Note the difference between Boolean and Logical
-operators. The former are &|', and the latter are &&,||,!.
+output has to equal the input. Note the difference between Boolean (algebraic
+operations) and Logical operators. The former are &|', and the latter are &&,||,!.
 
 In order to simplify the process of writing and running Tau specifications, we allow
 to define functions and predicates, possibly by means of recurrence relations.
@@ -721,27 +721,16 @@ variables as you need. The syntax of the commands is:
 
 This is a short list of known issues that will be fixed in a subsequent release:
 
-* Issue in Fixed Point Calculations
-* Incorrect type inference of IO variables in certain cases.
-* Normalization:
-  * Error in DNF/CNF conversions in the normalizer
-* “Sometimes” keyword issues:
-  * The correctness of the satisfiability algorithm is still not fully verified
-  when input variables appear under "sometimes".
-  * Allow constants positions under "sometimes".
-  * Redundant “Sometimes” statements are not detected.
 * Simplification:
   * Simplification of Boolean equations may take longer time in a few cases.
   * Path simplification algorithm does not take equalities between variables
   into account leading to later blow ups.
-* Minor errors in windows REPL
+* Minor errors in Windows REPL
 
 # **Future work**
 
 * Add support for redefinition of recurrence relations.
-
 * Add support for arbitrary names for IO variables.
-
 * Improve the performance of normalization of Boolean functions.
 
 # **Submitting issues**
