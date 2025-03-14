@@ -12,7 +12,7 @@ set(TAU_HEADERS
 	../external/parser/src/tgf.h
 	../parser/sbf_parser.generated.h
 	../parser/tau_parser.generated.h
-	../parser/z3_parser.generated.h
+	../parser/z3/bv_parser.generated.h
 	boolean_algebras/bdds/babdd.h
 	boolean_algebras/bdds/bdd_handle.h
 	boolean_algebras/bool_ba.h

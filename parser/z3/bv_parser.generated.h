@@ -1,18 +1,18 @@
-// This file is generated from a file parser/z3.tgf by
+// This file is generated from a file parser/z3/bv.tgf by
 //       https://github.com/IDNI/parser/tools/tgf
 //
-#ifndef __Z3_PARSER_H__
-#define __Z3_PARSER_H__
+#ifndef __BV_PARSER_H__
+#define __BV_PARSER_H__
 
 #include "parser.h"
 
-namespace z3_parser_data {
+namespace bv_parser_data {
 
 using char_type     = char;
 using terminal_type = char;
 
 inline std::vector<std::string> symbol_names{
-	"", "space", "alpha", "digit", "start", "_", "bitvector", "_uint", "_int", "_ulong", 
+	"", "space", "alpha", "digit", "start", "_", "bv", "_uint", "_int", "_ulong", 
 	"_long", "_bits", "sign", "minus", "plus", "__E_plus_0", "_unsigned", "__E__uint_1", "__E__ulong_2", "__E__unsigned_3", 
 	"_digit", "__E__unsigned_4", "_bit", "__E__bits_5", "__E__bits_6", "zero", "one", 
 };
@@ -56,17 +56,17 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	if (loaded) return p;
 	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
 	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
-//G0:   start(4)             => _(5) bitvector(6) _(5).
+//G0:   start(4)             => _(5) bv(6) _(5).
 	p(NT(4), (NT(5)+NT(6)+NT(5)));
-//G1:   bitvector(6)         => _uint(7).
+//G1:   bv(6)                => _uint(7).
 	p(NT(6), (NT(7)));
-//G2:   bitvector(6)         => _int(8).
+//G2:   bv(6)                => _int(8).
 	p(NT(6), (NT(8)));
-//G3:   bitvector(6)         => _ulong(9).
+//G3:   bv(6)                => _ulong(9).
 	p(NT(6), (NT(9)));
-//G4:   bitvector(6)         => _long(10).
+//G4:   bv(6)                => _long(10).
 	p(NT(6), (NT(10)));
-//G5:   bitvector(6)         => _bits(11).
+//G5:   bv(6)                => _bits(11).
 	p(NT(6), (NT(11)));
 //G6:   sign(12)             => minus(13).
 	p(NT(12), (NT(13)));
@@ -128,30 +128,30 @@ inline idni::prods<char_type, terminal_type>& productions() {
 inline ::idni::grammar<char_type, terminal_type> grammar(
 	nts, productions(), start_symbol, char_classes, grammar_options);
 
-} // namespace z3_parser_data
+} // namespace bv_parser_data
 
-struct z3_parser : public idni::parser<char, char> {
+struct bv_parser : public idni::parser<char, char> {
 	enum nonterminal {
-		nul, space, alpha, digit, start, _, bitvector, _uint, _int, _ulong, 
+		nul, space, alpha, digit, start, _, bv, _uint, _int, _ulong, 
 		_long, _bits, sign, minus, plus, __E_plus_0, _unsigned, __E__uint_1, __E__ulong_2, __E__unsigned_3, 
 		_digit, __E__unsigned_4, _bit, __E__bits_5, __E__bits_6, zero, one, 
 	};
-	static z3_parser& instance() {
-		static z3_parser inst;
+	static bv_parser& instance() {
+		static bv_parser inst;
 		return inst;
 	}
-	z3_parser() : idni::parser<char_type, terminal_type>(
-		z3_parser_data::grammar,
-		z3_parser_data::parser_options) {}
+	bv_parser() : idni::parser<char_type, terminal_type>(
+		bv_parser_data::grammar,
+		bv_parser_data::parser_options) {}
 	size_t id(const std::basic_string<char_type>& name) {
-		return z3_parser_data::nts.get(name);
+		return bv_parser_data::nts.get(name);
 	}
 	const std::basic_string<char_type>& name(size_t id) {
-		return z3_parser_data::nts.get(id);
+		return bv_parser_data::nts.get(id);
 	}
 	symbol_type literal(const nonterminal& nt) {
-		return symbol_type(nt, &z3_parser_data::nts);
+		return symbol_type(nt, &bv_parser_data::nts);
 	}
 };
 
-#endif // __Z3_PARSER_H__
+#endif // __BV_PARSER_H__

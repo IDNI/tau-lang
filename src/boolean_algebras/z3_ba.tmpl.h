@@ -10,7 +10,7 @@ using namespace z3;
 
 using parse_forest = idni::parser<char, char>::pforest;
 using parse_result = idni::parser<char, char>::result;
-using z3_traverser_t  = traverser<z3_sym, z3_parser>;
+using z3_traverser_t  = traverser<z3_sym, bv_parser>;
 
 template <typename...BAs>
 std::optional<tau<BAs...>> z3_ba_factory<BAs...>::parse( const std::string& src) {
