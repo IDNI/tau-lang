@@ -76,7 +76,6 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | (bf  _ '+' _       bf)             :bf_xor
                         | ('1' [ _ ':' _ type ])             :bf_t
                         | ('0' [ _ ':' _ type ])             :bf_f
-                        |                                     z3
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | bf_constant
@@ -93,29 +92,6 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
-
-# artthmetic expressions
-#
-# TODO fix the precedence of the z3 operators as we do with logical ones
-#
-z3        => ('(' _ z3 _ ')')            :z3_parenthesis
-                   |                                      bitvector_constant
-                   | (z3 _ ":+" _ z3)    :z3_add
-                   | (z3 _ ":-" _ z3)    :z3_sub
-                   | (z3 _ ":*" _ z3)    :z3_mul
-                   | (z3 _ ":/" _ z3)    :z3_div
-                   | (z3 _ ":%" _ z3)    :z3_mod
-                   | (z3 _ ":<<" _ digits)       :z3_shl
-                   | (z3 _ ":>>" _ digits)       :z3_shr
-                   | (z3 _ ":<" _ z3)    :z3_lt
-                   | (z3 _ ":<=" _ z3)   :z3_le
-                   | (z3 _ ":>" _ z3)    :z3_gt
-                   | (z3 _ ":>=" _ z3)   :z3_ge
-                   | (z3 _ ":=" _ z3)    :z3_eq
-                   | (z3 _ ":!=" _ z3)   :z3_ne.
-
-bitvector_constant =>  '{' _ (binding):constant _ '}' _ ':' _ (bv_type):type.
-bv_type            => "bit" _ '[' _ [digits] _ ']'.
 
 # constant time constraints
 constraint =>
@@ -298,7 +274,7 @@ memory                 => ( "%"
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c,
-        z3 > z3_parenthesis > z3,
+        z3_bv > z3_bv_parenthesis > z3_bv,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
         bf  > bf_parenthesis  > bf,

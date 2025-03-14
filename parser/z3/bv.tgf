@@ -4,12 +4,12 @@
 
 @enable productions charvar.
 
-start  => _ bitvector _.
-bitvector => _uint
-           | _int
-           | _ulong
-           | _long
-           | _bits.
+start  => _ bv _.
+bv => _uint
+    | _int
+    | _ulong
+    | _long
+    | _bits.
 sign      => minus | plus.
 minus     => '-'.
 plus      => ['+'].

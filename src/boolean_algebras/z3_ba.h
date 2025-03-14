@@ -5,7 +5,7 @@
 
 #include <z3++.h>
 
-#include "../../parser/z3_parser.generated.h"
+#include "../../parser/z3/bv_parser.generated.h"
 #include "../nso_rr.h"
 
 namespace idni::tau_lang {
