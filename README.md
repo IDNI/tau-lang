@@ -55,17 +55,6 @@ specifications and programs built in Tau Language, and accurately adapt them to
 meet requirements, which is useful for collaborative specification, maintenance,
 updates, safety and user control.
 
-
-
-This README.md is structured in the following way: first we provide a detailed
-explanation of the Tau Language, including the syntax and semantics of the
-language. Then we provide a quick start guide to start using the Tau Language.
-Finally, we provide a guide to install the Tau Framework in your system, how to
-use the command line interface and the Tau REPL (Read-Eval-Print-Loop) that
-allows you to interact with the Tau Language.
-
-We also provide a list of known issues, future work and how to submit issues.
-
 Skip to the quick start [click here](#quick-start).
 Skip to the installation guide [click here](#installing-the-tau-language).
 Known issues, future work and how to submit issues, [click here](#quick-start).
