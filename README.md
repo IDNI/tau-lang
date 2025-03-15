@@ -32,42 +32,29 @@
 	6. [Logical procedures](#logical-procedures)
 	7. [Normal forms](#normal-forms)
 	8. [Specification execution](#specification-execution)
-7. [Known issues](#known-issues)
-8. [Future work](#future-work)
-9. [Submitting issues](#submitting-issues)
-10. [License](#license)
-11. [Authors](#authors)
+7. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
+8. [Known issues](#known-issues)
+9. [Future work](#future-work)
+10. [Submitting issues](#submitting-issues)
+11. [License](#license)
+12. [Authors](#authors)
 
 
 # **Introduction**
 
-Tau Language is about enabling you to create software that elegantly adapts to
-meet your requirements in a fully formal, correct-by-construction manner.
+Tau language is an expressive and decidable formal software specification
+language. It allows you to write software constraints and requirements, check
+for satisfiability, and accurately synthesize a program that meets your
+specification.
 
-Tau Language is uniquely vastly expressive while retaining decidability. Further,
-it has the unique ability to specify programs that refer to Tau specifications
-and to logical relations between them. And, as you'll see, offers
-many other advantages when compared to other common formal languages and
-programming languages.
+Imagine programming by writing only tests, and getting a working program that
+passes all the tests, thus meeting all your requirements.
 
-Tau Language offers a future where whether you're a developer, end-user, or
-stakeholder, Tau-built software will be able to accurately adapt to be what
-you, or a group of users, want it to be.
+You can specify programs capable of mechanized deductive reasoning over
+specifications and programs built in Tau Language, and accurately adapt them to
+meet requirements, which is useful for collaborative specification, maintenance,
+updates, safety and user control.
 
-More precisely, the Tau Language is a logical software specification language.
-It allows you to write constraints about software, check for satisfiability, and
-run a representative program that meets those specifications. Put it in different
-words: imagine programming by writing only tests, or assertions. Tau backend
-will figure out automatically a program that will make the tests and assertions
-pass. Tau is based on the first-order theory of atomless Boolean algebras. All
-common logical tasks over the language are decidable.
-
-For a more detailed explanation of the theory behind the Tau Language, please
-refer to:
-
-* GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
-* TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
-* Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
 
 
 This README.md is structured in the following way: first we provide a detailed
@@ -79,9 +66,12 @@ allows you to interact with the Tau Language.
 
 We also provide a list of known issues, future work and how to submit issues.
 
-To skip straight to our quick start section click [Quick start](#quick-start).
+Skip to the quick start [click here](#quick-start).
+Skip to the installation guide [click here](#installing-the-tau-language).
+Known issues, future work and how to submit issues, [click here](#quick-start).
+For the theory behind Tau Language [click here](#quick-start).
 
-# **Installing the Tau Framework**
+# **Installing the Tau Language Framework**
 
 ## **Linux**
 
@@ -717,6 +707,13 @@ variables as you need. The syntax of the commands is:
 
 * `run|r <repl_memory|tau>`: runs the given specification.
 
+# **The Theory behind the Tau Language**
+
+* GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
+* TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
+* Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
+
+
 # **Known issues**
 
 This is a short list of known issues that will be fixed in a subsequent release:
@@ -735,8 +732,7 @@ This is a short list of known issues that will be fixed in a subsequent release:
 
 # **Submitting issues**
 
-Like any other open-source project on GitHub, you can submit issues using the
-following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
+Submit issues at the following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
 
 # **License**
 
