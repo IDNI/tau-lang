@@ -56,8 +56,11 @@ meet requirements, which is useful for collaborative specification, maintenance,
 updates, safety and user control.
 
 Skip to the quick start [click here](#quick-start).
+
 Skip to the installation guide [click here](#installing-the-tau-language).
+
 Known issues, future work and how to submit issues, [click here](#quick-start).
+
 For the theory behind Tau Language [click here](#quick-start).
 
 # **Installing the Tau Language Framework**
