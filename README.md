@@ -32,56 +32,38 @@
 	6. [Logical procedures](#logical-procedures)
 	7. [Normal forms](#normal-forms)
 	8. [Specification execution](#specification-execution)
-7. [Known issues](#known-issues)
-8. [Future work](#future-work)
-9. [Submitting issues](#submitting-issues)
-10. [License](#license)
-11. [Authors](#authors)
+7. [The Theory behind the Tau Language](#the-theory-behind-the-tau-language)
+8. [Known issues](#known-issues)
+9. [Future work](#future-work)
+10. [Submitting issues](#submitting-issues)
+11. [License](#license)
+12. [Authors](#authors)
 
 
 # **Introduction**
 
-Tau Language is about enabling you to create software that elegantly adapts to
-meet your requirements in a fully formal, correct-by-construction manner.
+Tau language is an expressive and decidable formal software specification
+language. It allows you to write software constraints and requirements, check
+for satisfiability, and accurately synthesize a program that meets your
+specification.
 
-Tau Language is uniquely vastly expressive while retaining decidability. Further,
-it has the unique ability to specify programs that refer to Tau specifications
-and to logical relations between them. And, as you'll see, offers
-many other advantages when compared to other common formal languages and
-programming languages.
+Imagine programming by writing only tests, and getting a working program that
+passes all the tests, thus meeting all your requirements.
 
-Tau Language offers a future where whether you're a developer, end-user, or
-stakeholder, Tau-built software will be able to accurately adapt to be what
-you, or a group of users, want it to be.
+You can specify programs capable of mechanized deductive reasoning over
+specifications and programs built in Tau Language, and accurately adapt them to
+meet requirements, which is useful for collaborative specification, maintenance,
+updates, safety and user control.
 
-More precisely, the Tau Language is a logical software specification language.
-It allows you to write constraints about software, check for satisfiability, and
-run a representative program that meets those specifications. Put it in different
-words: imagine programming by writing only tests, or assertions. Tau backend
-will figure out automatically a program that will make the tests and assertions
-pass. Tau is based on the first-order theory of atomless Boolean algebras. All
-common logical tasks over the language are decidable.
+Skip to the quick start [click here](#quick-start).
 
-For a more detailed explanation of the theory behind the Tau Language, please
-refer to:
+Skip to the installation guide [click here](#installing-the-tau-language).
 
-* GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
-* TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
-* Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
+Known issues, future work and how to submit issues, [click here](#quick-start).
 
+For the theory behind Tau Language [click here](#quick-start).
 
-This README.md is structured in the following way: first we provide a detailed
-explanation of the Tau Language, including the syntax and semantics of the
-language. Then we provide a quick start guide to start using the Tau Language.
-Finally, we provide a guide to install the Tau Framework in your system, how to
-use the command line interface and the Tau REPL (Read-Eval-Print-Loop) that
-allows you to interact with the Tau Language.
-
-We also provide a list of known issues, future work and how to submit issues.
-
-To skip straight to our quick start section click [Quick start](#quick-start).
-
-# **Installing the Tau Framework**
+# **Installing the Tau Language Framework**
 
 ## **Linux**
 
@@ -133,8 +115,6 @@ To build with doxygen documentation:
 Once you have compiled the source code you can run the `tau` executable to
 execute Tau specifications. The `tau` executable is located in either `build-Release`
 or `build-Debug` or `build-RelWithDebInfo`.
-
-
 
 # **Quick start**
 
@@ -213,8 +193,8 @@ o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
 
 which states that at each point in time, either the conjunction of the current
 output with the previous output and with the current input, has to be 0, or, the
-output has to equal the input. Note the difference between Boolean and Logical
-operators. The former are &|', and the latter are &&,||,!.
+output has to equal the input. Note the difference between Boolean (algebraic
+operations) and Logical operators. The former are &|', and the latter are &&,||,!.
 
 In order to simplify the process of writing and running Tau specifications, we allow
 to define functions and predicates, possibly by means of recurrence relations.
@@ -262,7 +242,7 @@ operations are simply the set-theoretic union/intersection/complementation.
 
 At the top level, a Tau specification (we also say `spec`) is a collection of
 "always" and "sometimes" statements applied to *local specifications*
-(expressed by `tau`, see section [Tau formulas](#tau-formulas)),
+(expressed by `local_spec`, see below),
 combined by the logical
 connectives *and*, *or* and *not*, denoted by `&&`, `||` and `!` respectively.
 For example a well-formed Tau specification is
@@ -270,7 +250,7 @@ For example a well-formed Tau specification is
 (always local_spec1) && (sometimes local_spec2)
 ```
 where *local_spec1* and
-*local_spec2* are formulas as in section [Tau formulas](#tau-formulas).
+*local_spec2* are formulas as described below.
 We say local specification because a formula `tau` can only talk about a fixed
 (though arbitrary) point in time.
 
@@ -295,10 +275,31 @@ the output stream 1 will write `0`.
 
 Formally, the grammar for Tau specifications is
 ```
-spec         => tau | always tau | sometimes tau | spec && spec | spec || spec | !spec
-rr           => (rec_relation)* spec.
-rec_relation => tau_rec_relation | term_rec_relation
+spec => local_spec | always local_spec | sometimes local_spec
+      | (spec && spec) | (spec || spec) | !spec
 ```
+where `local_spec` is a formula defined by the rules:
+
+```
+local_spec => (local_spec "&&" local_spec)
+            | "!" local_spec | (local_spec "^" local_spec)
+			| (local_spec "||" local_spec) | (local_spec "->" local_spec)
+			| (local_spec "<->" local_spec) | (local_spec "?" local_spec ":" local_spec)
+            | (term "=" term) | (term "!=" term) | (term "<" term)
+            | (term "!<" term) | (term "<=" term) | (term "!<=" term)
+            | (term ">" term) | (term "!>" term)
+            | "all" variable local_spec | "ex" variable local_spec
+			| predicate | T | F
+```
+
+The precedence of the logical operators/quantifiers is as follows (from higher
+precedence to lower):
+`!` > `&&` > `^` > `||` ` > `<->` > `<-` >` > `->` > `ex ... ...` > `all ... ...`
+> `... ? ... : ...` > `always ...`> `sometimes ...`.
+
+In order to properly define functions and predicates see Section
+[Functions and Predicates](#functions-and-predicates).
+
 A Tau specification without a mentioning of "always" or "sometimes" is implicitly
 assumed to be an "always" statement. The `rr` in the above grammar describes how
 to add function and predicate definitions directly to the formula. In REPL they
@@ -311,57 +312,14 @@ Note that instead of writing `always` and `sometimes` you can also use box `[]`
 and diamond `<>`, respectively.
 
 Using this notation, a slightly bigger example of a Tau spec would be
+
 ```
     ([] o1[t] i1[t] = 0 && (i1[t] != 1 -> o1[t] != 0)) && (<> o1[t] = i1[t]')
 ```
+
 which reads: at each point of time, the output should be disjoint from the input.
 If the input is not 1, then the output is not zero. And, at least once during
 execution, the output equals the complement of the input.
-
-## **Tau formulas**
-
-In traditional programming languages, we have
-decisions,... In the case of Tau Language, well formed formulas deal with
-that. They provide us an extra logical layer on basic
-computations (given by Boolean formulas) allowing us to use conditional
-and similar constructions.
-
-Well formed formulas are given in Tau Language by the following grammar:
-
-```
-tau => "(" tau "&&" tau ")" | "!" tau | "(" tau "^" tau ")" | "(" tau "||" tau ")"
-	| "(" tau "->" tau ")" | "(" tau "<->" tau ")" | "(" tau "?" tau ":" tau ")"
-	| "(" term "=" term ")" | "(" term "!=" term ")" | "("term "<" term")"
-	| "("term "!<" term")"	| "(" term "<=" term ")" | "(" term "!<=" term ")"
-	| "(" term ">" term ")"	| "(" term "!>" term ")" | "all" var tau
-	| "ex" var tau | tau_ref | T | F.
-```
-
-where
-
-* `tau` stands for a well formed sub-formula and the operators `&`, `!`, `^`,
-`|`, `->`, `<->` and `?` stand for conjunction, negation, exclusive-or,
-disjunction, implication, equivalence and conditional, in the usual sense,
-(respectively).
-
-* the operators `=`, `<`, `<=` and `>` stand for equality, less than, less or
-equal than and greater than; the operators `!=`, `!<`, `!<=` and `!>` denote
-their negations,
-
-* `all` stands for the universal quantifier and `ex` for the existential one,
-
-* `tau_ref` is  a reference to a predicate (see the Subsection
-[Functions and predicates](#functions-and-predicates)), and finally,
-
-* `T` and `F` represent the true and false values.
-
-For example, the following is a valid well formed formula:
-
-```
-(x && y || z) = 0 -> (x = 0 ? y = 0 : z = 0)
-```
-
-where `x`, `y` and `z` are variables.
 
 ## **Boolean functions**
 
@@ -371,16 +329,19 @@ finite -to be develop-) Boolean algebra and variables).They are given by the
 following grammar:
 
 ```
-term => "("term "&" term")" | term "'" | "("term "+" term")" | "("term "|" term")"
-	 | term_ref | constant | uninterpreted_constant | var | "0" | "1".
+term => (term "&" term) | term "'"
+      | (term "+" term) | (term "|" term)
+      | function | constant | uninterpreted_constant
+      | variable | stream_variable | "0" | "1"
+
 ```
 
 where
 
 * `term` stands for a well formed sub-formula and the operators `&`, `'`,
-`+` and `|` stand for conjunction, negation, exclusive-or and disjunction
-(respectively).
-* `term_ref` is  a call to the given recurrence relation (see the Subsection
+`+` (or equivallentli `^`) and `|` stand for conjunction, negation, exclusive-or
+and disjunction (respectively).
+* `function` is  a call to the given recurrence relation (see the Subsection
 [Functions and Predicates](#functions-and-predicates)),
 * `constant` stands for an element of the Boolean algebras (see Subsection
 [Constants](#constants) for details),
@@ -389,13 +350,18 @@ algebra, they are assumed to be existentially quantified in the context of the
 formula. The syntax is a follows:
 
 ```
-uninterpreted_constant => "<:" name ">".
+uninterpreted_constant => "<" [name] ":" name ">"
 ```
 
 * `var` is a variable of type a Boolean algebra element (see Subsection
-[Variables](#variables-variables-variables) for details), and
+[Variables](#variables-variables-variables) for details), `stream_aviable`stands
+for an IO variable, and
+
 * finally, `0` and `1` stands for the given elements in the corresponding Boolean
 algebra.
+
+In this case, the order of the operations is the following (from higher precedence
+to lower): `'` > `&` > `+` (equivallently > `^`) > `|`.
 
 For example, the following is a valid expression in terms of a Boolean function:
 
@@ -408,19 +374,23 @@ where `x`, `y` and `z` are variables.
 ## **Functions and predicates**
 
 Another key concept in the Tau Language are functions and predicates. They are given
-by the following grammar where `term_rec_relation` defines the syntax for a function
-and `tau_rec_relation` defines the syntax for a predicate:
+by the following grammar where `function_def` defines the syntax for a function
+and `predicate_def` defines the syntax for a predicate:
 
 ```
-term_rec_relation => term_ref ":=" term.
-term_ref          => sym "[" (offset)+  "]" "(" variable+ ")".
-tau_rec_relation  => tau_ref ":=" tau.
-tau_ref           => sym "[" (offset)+  "]" "(" variable+ ")".
+function_def      => function ":=" term
+function          => name "[" index+  "]" "(" [ variable ("," variable)* ] ")"
+predicate_def     => predicate ":=" spec
+predícate         => name "[" index+  "]" "(" [ variable ("," variable)* ] ")"
 ```
 
-where `sym` is the name of the function or predicate (it has to be a sequence of
-letters and numbers starting by a letter) and `offset` is a positive integer or
-a variable.
+where `name` is the name of the function or predicate (it has to be a sequence of
+letters and numbers starting by a letter) and `index` is a positive integer or
+a variable or a variable minus a positive integer, i.e.:
+
+```
+index => number | variable | variable "-" number
+```
 
 Examples of functions and predicates are:
 
@@ -448,13 +418,19 @@ simple Boolean function algebra. The Tau Boolean algebra is an extensional Boole
 algebra that encodes Tau specifications over base algebras (in the REPL case we
 only support the simple Boolean functions as base one).
 
-The syntax for the first case, the Tau Boolean algebra, is the following:
+Thus, in general the syntax for constants is the following:
 
 ```
-constant => "{" tau "}" [":" "tau"].
+constant => "{" (spec | term) "}" [":" base_boolean_algebra_type]
 ```
 
-i.e. we may have a Tau formula seen as a Boolean algebra element (you can omit
+where `base_boolean_algebra_type` is given by:
+
+```
+base_boolean_algebra_type => "tau" | "sbf"
+```
+
+i.e. we could have a Tau formula seen as a Boolean algebra element (you can omit
 the type, as `tau` is the default type). For example, the following is a valid
 constant in the Tau Boolean algebra:
 
@@ -470,24 +446,11 @@ or even
 
 where `x`, `y` and `z` are variables.
 
-
 Regarding the simple Boolean function algebra, the syntax is the following:
 
 ```
-constant => "{" sbf "}" ":" "sbf".
+constant => "{" term "}" ":" "sbf".
 ```
-
-where the grammar for simple Boolean functions is the following:
-
-```
-sbf => "("sbf "&" sbf")" | sbf "'" | "("sbf "^" sbf")" | "("sbf "+" sbf")"
-	| "("sbf "|" sbf")"	| var | "0" | "1".
-```
-
-where `sbf` stands for a simple Boolean function, and the operators `&`, `'`,
-(`^`|`+`) and `|` stand for conjunction, negation, exclusive-or and disjunction;
-`var` stands for a variable of type Boolean algebra element, and finally, `0` and
-`1` stand for the given elements in the simple Boolean algebra.
 
 A constant in the simple Boolean function algebra is for example:
 
@@ -736,37 +699,32 @@ variables as you need. The syntax of the commands is:
 
 * `run|r <repl_memory|tau>`: runs the given specification.
 
+# **The Theory behind the Tau Language**
+
+* GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
+* TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
+* Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
+
+
 # **Known issues**
 
 This is a short list of known issues that will be fixed in a subsequent release:
 
-* Issue in Fixed Point Calculations
-* Incorrect type inference of IO variables in certain cases.
-* Normalization:
-  * Error in DNF/CNF conversions in the normalizer
-* “Sometimes” keyword issues:
-  * The correctness of the satisfiability algorithm is still not fully verified
-  when input variables appear under "sometimes".
-  * Allow constants positions under "sometimes".
-  * Redundant “Sometimes” statements are not detected.
 * Simplification:
   * Simplification of Boolean equations may take longer time in a few cases.
   * Path simplification algorithm does not take equalities between variables
   into account leading to later blow ups.
-* Minor errors in windows REPL
+* Minor errors in Windows REPL
 
 # **Future work**
 
 * Add support for redefinition of recurrence relations.
-
 * Add support for arbitrary names for IO variables.
-
 * Improve the performance of normalization of Boolean functions.
 
 # **Submitting issues**
 
-Like any other open-source project on GitHub, you can submit issues using the
-following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
+Submit issues at the following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
 
 # **License**
 
