@@ -16,6 +16,8 @@
 #include <iostream>
 #include <vector>
 
+#include "z3++.h"
+
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 
@@ -36,6 +38,17 @@ template<typename T, typename V> bool has(const T& t, const V& v) {
 template<typename T, typename V> bool hasv(const T& t, const V& v) {
 	return std::find(t.begin(), t.end(), v) != t.end();
 }
+
+template <>
+struct std::hash<z3::expr> {
+	size_t operator()(const z3::expr& e) const {
+		return e.hash();
+	}
+};
+
+//auto operator<=>(const z3::expr& e1, const z3::expr& e2) {
+//	return std::addressof(e1) <=> std::addressof(e2);
+//}
 
 template<typename T>
 void hash_combine (size_t& seed, const T& v) {

@@ -2,8 +2,11 @@
 
 #include "builders.h"
 #include "queries.h"
+#include "z3++.h"
 
 namespace idni::tau_lang {
+
+using namespace z3;
 
 template <typename... BAs>
 tau<BAs...> operator&(const tau<BAs...>& l,
