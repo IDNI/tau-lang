@@ -283,19 +283,19 @@ where `local_spec` is a formula defined by the rules:
 ```
 local_spec => (local_spec "&&" local_spec)
             | "!" local_spec | (local_spec "^" local_spec)
-			| (local_spec "||" local_spec) | (local_spec "->" local_spec)
-			| (local_spec "<->" local_spec) | (local_spec "?" local_spec ":" local_spec)
+            | (local_spec "||" local_spec) | (local_spec "->" local_spec)
+            | (local_spec "<->" local_spec) | (local_spec "?" local_spec ":" local_spec)
             | (term "=" term) | (term "!=" term) | (term "<" term)
             | (term "!<" term) | (term "<=" term) | (term "!<=" term)
             | (term ">" term) | (term "!>" term)
             | "all" variable local_spec | "ex" variable local_spec
-			| predicate | T | F
+            | predicate | T | F
 ```
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
-`!` > `&&` > `^` > `||` ` > `<->` > `<-` >` > `->` > `ex ... ...` > `all ... ...`
-> `... ? ... : ...` > `always ...`> `sometimes ...`.
+`!` > `&&` > `^` > `||` ` > `<->` > `<-` >` > `->` > `ex ... ...` > `all ... ...` >
+`... ? ... : ...` > `always ...`> `sometimes ...`.
 
 In order to properly define functions and predicates see Section
 [Functions and Predicates](#functions-and-predicates).
