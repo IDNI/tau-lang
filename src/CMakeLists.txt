@@ -41,6 +41,7 @@ set(TAU_HEADERS
 	language.h
 	queries.h
 	utils.h
+	z3_solver.h
 )
 
 set(TAU_SOURCES
