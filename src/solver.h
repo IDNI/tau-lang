@@ -111,7 +111,8 @@ using solution = std::map<var<BAs...>, tau<BAs...>>;
 enum solver_mode {
 	maximum, /**< Maximum mode */
 	minimum, /**< Minimum mode */
-	general  /**< General mode */
+	general, /**< General mode */
+	z3 /**< Z3 mode */
 };
 
 /**
