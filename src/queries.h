@@ -718,7 +718,7 @@ private:
 	}
 };
 
-}
+} // namespace idni::rewriter
 
 // The hash function for tau as specialisation of std::hash
 template<typename... BAs>

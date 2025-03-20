@@ -64,6 +64,7 @@ namespace idni::tau_lang {
 			}
 		}
 	}
+	
 	template <typename...BAs>
 	std::optional<tau<BAs...>> sbf_ba_factory<BAs...>::parse(
 		const std::string& src)
