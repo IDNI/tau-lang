@@ -294,7 +294,7 @@ local_spec => (local_spec "&&" local_spec)
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
-`!` > `&&` > `^` > `||` ` > `<->` > `<-` >` > `->` > `ex ... ...` > `all ... ...` >
+`!` > `&&` > `^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
 `... ? ... : ...` > `always ...`> `sometimes ...`.
 
 In order to properly define functions and predicates see Section
