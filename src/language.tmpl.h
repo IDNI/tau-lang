@@ -558,7 +558,7 @@ void get_leaves(const tau<BAs...>& n, tau_parser::nonterminal branch,
 		if (is_child_non_terminal(branch, n)) return true;
 		return leaves.push_back(n), false;
 	};
-	pre_order(n).visit(add_leave);
+	rewriter::pre_order(n).visit(add_leave);
 }
 
 template<typename ...BAs>
@@ -979,9 +979,9 @@ template<>
 struct std::hash<idni::tau_lang::rr_sig> {
 	size_t operator()(const idni::tau_lang::rr_sig& s) const noexcept {
 		size_t seed = 0;
-		hash_combine(seed, s.name);
-		hash_combine(seed, s.offset_arity);
-		hash_combine(seed, s.arg_arity);
+		idni::hash_combine(seed, s.name);
+		idni::hash_combine(seed, s.offset_arity);
+		idni::hash_combine(seed, s.arg_arity);
 		return seed;
 	}
 };

@@ -50,8 +50,7 @@
 #include "boolean_algebras/sbf_ba.h"
 #include "init_log.h"
 #include "normalizer.h"
-#include "cli.h"
-#include "repl.h"
+#include "utility/cli.h"
 #include "repl_evaluator.h"
 
 using namespace std;
