@@ -201,6 +201,7 @@ endif()
 #
 if (TAU_GENERATE_PARSERS OR TAU_GENERATE_PARSER)
 	include(generate-parser)
+	generate_parser("${PROJECT_SOURCE_DIR}/parser/bitvector.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/tau.tgf")
 	generate_parser("${PROJECT_SOURCE_DIR}/parser/sbf.tgf")
 endif()
