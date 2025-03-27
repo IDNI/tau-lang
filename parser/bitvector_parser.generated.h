@@ -11,7 +11,8 @@ namespace bitvector_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline std::vector<std::string> symbol_names{
+inline static constexpr size_t nt_bits = 5;
+inline const std::vector<std::string> symbol_names{
 	"", "space", "alpha", "digit", "start", "_", "bitvector", "_uint", "_int", "_ulong", 
 	"_long", "_bits", "sign", "minus", "plus", "__E_plus_0", "_unsigned", "__E__uint_1", "__E__ulong_2", "__E__unsigned_3", 
 	"_digit", "__E__unsigned_4", "_bit", "__E__bits_5", "__E__bits_6", "zero", "one", 

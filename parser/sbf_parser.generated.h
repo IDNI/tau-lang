@@ -11,7 +11,8 @@ namespace sbf_parser_data {
 using char_type     = char;
 using terminal_type = char;
 
-inline std::vector<std::string> symbol_names{
+inline static constexpr size_t nt_bits = 6;
+inline const std::vector<std::string> symbol_names{
 	"", "space", "alpha", "digit", "start", "_", "sbf", "group", "__E_sbf_0", "variable", 
 	"disjunction", "__E_sbf_1", "exclusive_disjunction", "__E_sbf_2", "__E___E_sbf_2_3", "conjunction", "__E_sbf_4", "__E___E_sbf_4_5", "negation", "__E_sbf_6", 
 	"negation_oprnd", "__E___E_sbf_6_7", "one", "zero", "conjunction_nosep", "__E_sbf_8", "conjunction_nosep_1st_oprnd", "__E___E_sbf_8_9", "__E___10", "__E_variable_11", 
