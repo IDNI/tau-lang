@@ -4,12 +4,10 @@
 
 #include "version_license.h"
 
-// basic macro for conditional execution of code
+#include "../external/parser/src/defs.h"
+
 #ifdef DEBUG
-#	define DBG(x) x
 #	include <cxxabi.h>
-#else
-#define DBG(x)
 #endif
 
 #include <algorithm>
@@ -37,48 +35,6 @@ template<typename T, typename V> bool hasv(const T& t, const V& v) {
 	return std::find(t.begin(), t.end(), v) != t.end();
 }
 
-template<typename T>
-void hash_combine (size_t& seed, const T& v) {
-	seed ^= std::hash<T>{}(v) + 0x9e3779b97f4a7c15 + (seed << 12) + (seed >> 4);
-}
-
-template<typename X>
-struct std::hash<std::vector<X>> {
-	size_t operator()(const std::vector<X>& vec) const {
-		size_t seed = vec.size();
-		for(auto& i : vec) hash_combine(seed, i);
-		return seed;
-	}
-};
-
-template<typename T1, typename T2>
-struct std::hash<std::pair<T1, T2>> {
-	size_t operator()(const std::pair<T1, T2>& p) const noexcept {
-		size_t seed = 0;
-		hash_combine(seed, p.first);
-		hash_combine(seed, p.second);
-		return seed;
-	}
-};
-
-template<typename... Ts>
-struct std::hash<std::tuple<Ts...>> {
-	size_t operator()(const std::tuple<Ts...>& p) const noexcept {
-		size_t seed = 0;
-		std::apply([&seed](auto&&... xs){(hash_combine(seed, xs),...);}, p);
-		return seed;
-	}
-};
-
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
-	os << "[";
-	for (size_t i=0; i < vec.size(); ++i)
-		if (i+1 < vec.size()) os << vec[i] << ",";
-	if (!vec.empty()) os << vec.back();
-	os << "]";
-	return os;
-}
 //-----------------------------------------------------------------------------
 // GIT_* macros are populated at compile time by -D or they're set to "n/a"
 #ifndef GIT_DESCRIBED

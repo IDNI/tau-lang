@@ -150,7 +150,7 @@ bool contains (const tau<BAs...>& fm, const tau<BAs...>& sub_fm) {
 		if (n == sub_fm) return is_contained = true, false;
 		return true;
 	};
-	pre_order(fm).search_unique(has_sub_fm);
+	rewriter::pre_order(fm).search_unique(has_sub_fm);
 	return is_contained;
 }
 
