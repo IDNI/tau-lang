@@ -24,7 +24,7 @@ namespace idni::tau_lang {
 template <typename...BAs>
 struct tau_ba {
 	using tau_ba_t = tau_ba<BAs...>;
-	using tau_nso_t = tau<tau_ba_t, BAs...>;
+	using tau_nso_t = tau_depreciating<tau_ba_t, BAs...>;
 
 	/**
 	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.
@@ -224,7 +224,7 @@ bool is_closed(const tau_ba<BAs...>& fm);
  * @tparam BAs Variadic template parameters.
  */
 template <typename... BAs>
-using tau_nso = tau<tau_ba<BAs...>, BAs...>;
+using tau_nso = tau_depreciating<tau_ba<BAs...>, BAs...>;
 
 /**
  * @brief Alias for tau_spec.

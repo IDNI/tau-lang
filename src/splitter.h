@@ -12,8 +12,8 @@ enum class split_sym {
 };
 
 template<typename... BAs>
-tau<BAs...> split(const tau<BAs...>& fm, const size_t fm_type, bool is_cnf,
-		   const splitter_type st, std::vector<tau<BAs...> >& mem,
+tau_depreciating<BAs...> split(const tau_depreciating<BAs...>& fm, const size_t fm_type, bool is_cnf,
+		   const splitter_type st, std::vector<tau_depreciating<BAs...> >& mem,
 		   size_t i, bool check_temps) {
 	// First get clauses if not already in mem
 	const bool is_wff = fm_type == tau_parser::wff;
@@ -48,7 +48,7 @@ tau<BAs...> split(const tau<BAs...>& fm, const size_t fm_type, bool is_cnf,
 	case splitter_type::middle: {
 		// Remove half of the clause
 		size_t window = mem.size() / 2;
-		std::map<tau<BAs...>, tau<BAs...> > changes;
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...> > changes;
 		for (size_t j = 0; j < window; ++j) {
 			size_t idx = (i + j) % mem.size();
 			if (check_temps && has_temporary_io_var(mem[idx]))
@@ -80,7 +80,7 @@ tau<BAs...> split(const tau<BAs...>& fm, const size_t fm_type, bool is_cnf,
 // If we check a non-temporal Tau formula, it suffices to place it in "fm" and
 // the proposed splitter in "splitter".
 template<typename... BAs>
-bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<BAs...>& spec_clause = nullptr) {
+bool is_splitter(const tau_depreciating<BAs...>& fm, const tau_depreciating<BAs...>& splitter, const tau_depreciating<BAs...>& spec_clause = nullptr) {
 	if (spec_clause) {
 		// We are dealing with a temporal formula
 		assert(is_tau_impl(splitter, fm));
@@ -102,11 +102,11 @@ bool is_splitter(const tau<BAs...>& fm, const tau<BAs...>& splitter, const tau<B
 
 // Find a Boolean function which implies f
 template<typename... BAs>
-tau<BAs...> good_splitter_using_function(const tau<BAs...>& f, splitter_type st,
-					 const tau<BAs...>& original_fm) {
+tau_depreciating<BAs...> good_splitter_using_function(const tau_depreciating<BAs...>& f, splitter_type st,
+					 const tau_depreciating<BAs...>& original_fm) {
 	assert(is_non_terminal(tau_parser::bf, f));
 	// First check if we have more then one disjunct
-	std::vector<tau<BAs...> > m;
+	std::vector<tau_depreciating<BAs...> > m;
 	size_t i = 0;
 	do {
 		auto s = split(f, tau_parser::bf, false, st, m, i, true);
@@ -118,7 +118,7 @@ tau<BAs...> good_splitter_using_function(const tau<BAs...>& f, splitter_type st,
 	} while (++i < m.size());
 
 	// Find possible coefficient in each disjunct of f
-	std::vector<tau<BAs...> > clauses = get_leaves(f, tau_parser::bf_or);
+	std::vector<tau_depreciating<BAs...> > clauses = get_leaves(f, tau_parser::bf_or);
 	// In case f is just a single clause
 	if (clauses.empty()) clauses.push_back(f);
 	for (const auto &clause: clauses) {
@@ -137,14 +137,14 @@ tau<BAs...> good_splitter_using_function(const tau<BAs...>& f, splitter_type st,
 
 // Find a Boolean function which is implied by f
 template<typename... BAs>
-tau<BAs...> good_reverse_splitter_using_function(const tau<BAs...> &f, splitter_type st,
-						 const tau<BAs...> &original_fm) {
+tau_depreciating<BAs...> good_reverse_splitter_using_function(const tau_depreciating<BAs...> &f, splitter_type st,
+						 const tau_depreciating<BAs...> &original_fm) {
 	assert(is_non_terminal(tau_parser::bf, f));
 	// Convert Boolean function to CNF
 	auto f_cnf = to_cnf<false>(f);
 
 	// Try to remove a conjunt to produce splitter
-	std::vector<tau<BAs...> > m;
+	std::vector<tau_depreciating<BAs...> > m;
 	size_t i = 0;
 	do {
 		auto s = split(f_cnf, tau_parser::bf, true, st, m, i, true);
@@ -156,7 +156,7 @@ tau<BAs...> good_reverse_splitter_using_function(const tau<BAs...> &f, splitter_
 	} while (++i < m.size());
 
 	// Try to split coefficient in each conjunct of f
-	std::vector<tau<BAs...> > clauses = get_leaves(f_cnf, tau_parser::bf_and);
+	std::vector<tau_depreciating<BAs...> > clauses = get_leaves(f_cnf, tau_parser::bf_and);
 	for (const auto &clause: clauses) {
 		auto coeff = find_top(clause, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
 		if (!coeff) continue;
@@ -179,7 +179,7 @@ tau<BAs...> good_reverse_splitter_using_function(const tau<BAs...> &f, splitter_
 // Return a bad splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
-tau<BAs...> tau_bad_splitter(tau<BAs...> fm = _T<BAs...>) {
+tau_depreciating<BAs...> tau_bad_splitter(tau_depreciating<BAs...> fm = _T<BAs...>) {
 	auto new_uniter_const = build_wff_neq(get_new_uniter_const(fm, "split"));
 	auto clauses = get_dnf_wff_clauses(fm);
 	// Add bad splitter only to a single disjunct if possible
@@ -192,8 +192,8 @@ tau<BAs...> tau_bad_splitter(tau<BAs...> fm = _T<BAs...>) {
 // Return a splitter for the provided non-temporal formula
 // We assume the formula is fully normalized by normalizer
 template<typename... BAs>
-std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
-	tau<BAs...> fm, splitter_type st, const tau<BAs...>& spec_clause = nullptr) {
+std::pair<tau_depreciating<BAs...>, splitter_type> nso_tau_splitter(
+	tau_depreciating<BAs...> fm, splitter_type st, const tau_depreciating<BAs...>& spec_clause = nullptr) {
 	if (st == splitter_type::bad)
 		return {tau_bad_splitter(fm), splitter_type::bad};
 
@@ -210,7 +210,7 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 			assert(is_non_terminal(tau_parser::bf_f, trim(eq->child[1])));
 			auto f = eq->child[0];
 			auto type_f = find_top(f, is_non_terminal<tau_parser::type, BAs...>);
-			std::set<tau<BAs...>> free_vars = get_free_vars_from_nso(fm);
+			std::set<tau_depreciating<BAs...>> free_vars = get_free_vars_from_nso(fm);
 			for (const auto& c : bf_constants) {
 				// First check that types match
 				auto type_c = c | tau_parser::bf_constant | tau_parser::type;
@@ -262,7 +262,7 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 	}
 
 	// Split disjunction if possible
-	std::vector<tau<BAs...> > m;
+	std::vector<tau_depreciating<BAs...> > m;
 	size_t i = 0;
 	do {
 		auto s = split(fm, tau_parser::wff, false, st, m, i, true);
@@ -276,13 +276,13 @@ std::pair<tau<BAs...>, splitter_type> nso_tau_splitter(
 
 // We assume fm to be normalized in DNF
 template<typename... BAs>
-tau<BAs...> tau_splitter (const tau<BAs...>& fm, splitter_type st) {
+tau_depreciating<BAs...> tau_splitter (const tau_depreciating<BAs...>& fm, splitter_type st) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start of tau_splitter";
 	using p = tau_parser;
 	// First we decide if we deal with a temporal formula
 	if (!has_temp_var(fm)) return nso_tau_splitter(fm, st).first;
 
-	auto splitter_of_clause = [&](const tau<BAs...>& clause) {
+	auto splitter_of_clause = [&](const tau_depreciating<BAs...>& clause) {
 		auto specs = get_cnf_wff_clauses(clause);
 		bool good_splitter = false;
 		for (auto& spec : specs) {

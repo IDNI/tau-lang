@@ -15,31 +15,31 @@
 using namespace idni::rewriter;
 using namespace idni::tau_lang;
 
-rr<tau<sbf_ba>> sbf_make_nso_rr(const std::string& src) {
+rr<tau_depreciating<sbf_ba>> sbf_make_nso_rr(const std::string& src) {
 	auto sample_src = make_tau_source(src);
 	return make_nso_rr_using_factory<sbf_ba>(sample_src).value();
 }
 
-tau<sbf_ba> sbf_make_nso(const std::string& src) {
+tau_depreciating<sbf_ba> sbf_make_nso(const std::string& src) {
 	return sbf_make_nso_rr(src).main;
 }
 
-rr<tau<tau_ba<sbf_ba>, sbf_ba>> tau_make_nso_rr_test(const std::string& src) {
+rr<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>> tau_make_nso_rr_test(const std::string& src) {
 	auto sample_src = make_tau_source(src);
 	return make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(sample_src).value();
 }
 
-tau<tau_ba<sbf_ba>, sbf_ba> tau_make_nso_test(const std::string& src) {
+tau_depreciating<tau_ba<sbf_ba>, sbf_ba> tau_make_nso_test(const std::string& src) {
 	return tau_make_nso_rr_test(src).main;
 }
 
-tau<tau_ba<sbf_ba>, sbf_ba> normalize_test_tau(const char* src) {
-	rr<tau<tau_ba<sbf_ba>, sbf_ba>> nso_rr = make_nso_rr_using_factory<
+tau_depreciating<tau_ba<sbf_ba>, sbf_ba> normalize_test_tau(const char* src) {
+	rr<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>> nso_rr = make_nso_rr_using_factory<
 		tau_ba<sbf_ba>, sbf_ba>(src).value();
 	return normalizer<tau_ba<sbf_ba>, sbf_ba>(nso_rr);
 }
 
-std::ostream& print_tau(std::ostream &os, tau<sbf_ba> n, size_t l = 0) {
+std::ostream& print_tau(std::ostream &os, tau_depreciating<sbf_ba> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
@@ -54,7 +54,7 @@ std::ostream& print_tau(std::ostream &os, tau<sbf_ba> n, size_t l = 0) {
 	return os;
 }
 
-std::ostream& pretty_print_tau(std::ostream &os, tau<sbf_ba> n, size_t l = 0) {
+std::ostream& pretty_print_tau(std::ostream &os, tau_depreciating<sbf_ba> n, size_t l = 0) {
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },

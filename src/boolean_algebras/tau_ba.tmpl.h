@@ -71,8 +71,8 @@ bool tau_ba<BAs...>::is_one() const {
 }
 
 template <typename...BAs>
-tau<tau_ba<BAs...>, BAs...> tau_ba<BAs...>::rename(
-	const tau<tau_ba_t, BAs...>& form) const
+tau_depreciating<tau_ba<BAs...>, BAs...> tau_ba<BAs...>::rename(
+	const tau_depreciating<tau_ba_t, BAs...>& form) const
 {
 	// TODO (MEDIUM) implement properly
 	return form;
@@ -209,7 +209,7 @@ std::string tau_ba_factory<BAs...>::zero(std::string&) const {
 template <typename... BAs>
 size_t std::hash<idni::tau_lang::tau_ba<BAs...>>::operator()(const idni::tau_lang::tau_ba<BAs...>& f) const noexcept {
 	using namespace idni::tau_lang;
-	return hash<rr<tau<tau_ba<BAs...>, BAs...>>>{}(f.nso_rr);
+	return hash<rr<tau_depreciating<tau_ba<BAs...>, BAs...>>>{}(f.nso_rr);
 }
 
 template <typename... BAs>

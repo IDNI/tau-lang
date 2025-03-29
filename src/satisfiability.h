@@ -15,7 +15,7 @@ inline void print_fixpoint_info(const std::string& message, const std::string& r
 }
 
 template<typename... BAs>
-tau<BAs...> build_io_out (const std::string& name, const std::string& var) {
+tau_depreciating<BAs...> build_io_out (const std::string& name, const std::string& var) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, wrap<BAs...>(p::variable, var));
@@ -23,7 +23,7 @@ tau<BAs...> build_io_out (const std::string& name, const std::string& var) {
 }
 
 template<typename... BAs>
-tau<BAs...> build_io_in (const std::string& name, const std::string& var) {
+tau_depreciating<BAs...> build_io_in (const std::string& name, const std::string& var) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, wrap<BAs...>(p::variable, var));
@@ -31,7 +31,7 @@ tau<BAs...> build_io_in (const std::string& name, const std::string& var) {
 }
 
 template<typename... BAs>
-tau<BAs...> build_io_out_const (const std::string& name, const int_t pos) {
+tau_depreciating<BAs...> build_io_out_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
@@ -39,7 +39,7 @@ tau<BAs...> build_io_out_const (const std::string& name, const int_t pos) {
 }
 
 template<typename... BAs>
-tau<BAs...> build_io_in_const (const std::string& name, const int_t pos) {
+tau_depreciating<BAs...> build_io_in_const (const std::string& name, const int_t pos) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
 	auto offset = wrap<BAs...>(p::offset, build_int<BAs...>(pos));
@@ -47,7 +47,7 @@ tau<BAs...> build_io_in_const (const std::string& name, const int_t pos) {
 }
 
 template<typename... BAs>
-tau<BAs...> build_io_out_shift (const std::string& name, const std::string& var, const int_t shift) {
+tau_depreciating<BAs...> build_io_out_shift (const std::string& name, const std::string& var, const int_t shift) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::out_var_name, name);
 	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, var), build_num<BAs...>(shift)});
@@ -56,7 +56,7 @@ tau<BAs...> build_io_out_shift (const std::string& name, const std::string& var,
 }
 
 template<typename... BAs>
-tau<BAs...> build_io_in_shift (const std::string& name, const std::string& var, const int_t shift) {
+tau_depreciating<BAs...> build_io_in_shift (const std::string& name, const std::string& var, const int_t shift) {
 	using p = tau_parser;
 	auto var_name = wrap<BAs...>(p::in_var_name, name);
 	auto shift_node = wrap<BAs...>(p::shift, {wrap<BAs...>(p::variable, var), build_num<BAs...>(shift)});
@@ -65,7 +65,7 @@ tau<BAs...> build_io_in_shift (const std::string& name, const std::string& var, 
 }
 
 template<typename... BAs>
-bool has_stream_flag(const tau<BAs...>& fm) {
+bool has_stream_flag(const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	if (find_top(fm, is_non_terminal<p::wff_sometimes, BAs...>))
 		return true;
@@ -89,7 +89,7 @@ int_t get_lookback_after_normalization(const auto& io_vars) {
 // Check if a formula has a temporary output stream
 // which are used for flag handling
 template<typename... BAs>
-bool has_temporary_io_var (const tau<BAs...>& fm) {
+bool has_temporary_io_var (const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	auto io_vars = rewriter::select_top(
 		fm, is_child_non_terminal<p::io_var, BAs...>);
@@ -102,7 +102,7 @@ bool has_temporary_io_var (const tau<BAs...>& fm) {
 }
 
 template<typename... BAs>
-tau<BAs...> transform_io_var(const tau<BAs...>& io_var, const std::string& io_var_name, int_t time_point) {
+tau_depreciating<BAs...> transform_io_var(const tau_depreciating<BAs...>& io_var, const std::string& io_var_name, int_t time_point) {
 	// Check if io_var has constant time point
 	if (is_io_initial(io_var))
 		return io_var;
@@ -113,7 +113,7 @@ tau<BAs...> transform_io_var(const tau<BAs...>& io_var, const std::string& io_va
 }
 
 template<typename... BAs>
-tau<BAs...> existentially_quantify_output_streams(tau<BAs...> fm, const auto& io_vars,
+tau_depreciating<BAs...> existentially_quantify_output_streams(tau_depreciating<BAs...> fm, const auto& io_vars,
                                                   int_t time_point, const auto& initials) {
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_o_vars;
@@ -126,12 +126,12 @@ tau<BAs...> existentially_quantify_output_streams(tau<BAs...> fm, const auto& io
 			continue;
 		quantifiable_o_vars.insert(i);
 	}
-	std::set<tau<BAs...>> cache;
+	std::set<tau_depreciating<BAs...>> cache;
 	for (const auto& pos : quantifiable_o_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({get_io_name(io_vars[pos]), time_point}))
 			continue;
-		tau<BAs...> var = build_io_out_const<BAs...>(get_io_name(io_vars[pos]), time_point);
+		tau_depreciating<BAs...> var = build_io_out_const<BAs...>(get_io_name(io_vars[pos]), time_point);
 		auto res = cache.emplace(var);
 		if (res.second) fm = build_wff_ex(var, fm);
 	}
@@ -139,7 +139,7 @@ tau<BAs...> existentially_quantify_output_streams(tau<BAs...> fm, const auto& io
 }
 
 template<typename... BAs>
-tau<BAs...> universally_quantify_input_streams(tau<BAs...> fm, const auto& io_vars,
+tau_depreciating<BAs...> universally_quantify_input_streams(tau_depreciating<BAs...> fm, const auto& io_vars,
                                                int_t time_point, const auto& initials) {
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_i_vars;
@@ -152,12 +152,12 @@ tau<BAs...> universally_quantify_input_streams(tau<BAs...> fm, const auto& io_va
 			continue;
 		quantifiable_i_vars.insert(i);
 	}
-	std::set<tau<BAs...>> cache;
+	std::set<tau_depreciating<BAs...>> cache;
 	for (const auto& pos : quantifiable_i_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({get_io_name(io_vars[pos]), time_point}))
 			continue;
-		tau<BAs...> var = build_io_in_const<BAs...>(get_io_name(io_vars[pos]), time_point);
+		tau_depreciating<BAs...> var = build_io_in_const<BAs...>(get_io_name(io_vars[pos]), time_point);
 		auto res = cache.emplace(var);
 		if (res.second) fm = build_wff_all(var, fm);
 	}
@@ -165,7 +165,7 @@ tau<BAs...> universally_quantify_input_streams(tau<BAs...> fm, const auto& io_va
 }
 
 template<typename... BAs>
-tau<BAs...> calculate_ctn(const tau<BAs...>& constraint, int_t time_point) {
+tau_depreciating<BAs...> calculate_ctn(const tau_depreciating<BAs...>& constraint, int_t time_point) {
 	auto to_ba = [](const bool c){return c ? _1<BAs...> : _0<BAs...>;};
 	int_t condition;
 	bool is_left;
@@ -195,7 +195,7 @@ tau<BAs...> calculate_ctn(const tau<BAs...>& constraint, int_t time_point) {
 }
 
 template<typename... BAs>
-bool is_initial_ctn_phase(const tau<BAs...>& constraint, int_t time_point) {
+bool is_initial_ctn_phase(const tau_depreciating<BAs...>& constraint, int_t time_point) {
 	const int_t condition = is_non_terminal(tau_parser::num, trim2(constraint)) ?
 		size_t_extractor<BAs...>(trim(trim2(constraint))).value() :
 		size_t_extractor<BAs...>(trim(constraint)->child[1]->child[0]).value();
@@ -218,10 +218,10 @@ bool is_initial_ctn_phase(const tau<BAs...>& constraint, int_t time_point) {
 }
 
 template<typename... BAs>
-tau<BAs...> fm_at_time_point(const tau<BAs...>& original_fm,
+tau_depreciating<BAs...> fm_at_time_point(const tau_depreciating<BAs...>& original_fm,
 	auto &io_vars, int_t time_point)
 {
-	std::map<tau<BAs...>, tau<BAs...>> changes;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i)
 		changes[io_vars[i]] = transform_io_var(
 			io_vars[i], get_io_name(io_vars[i]), time_point);
@@ -229,36 +229,36 @@ tau<BAs...> fm_at_time_point(const tau<BAs...>& original_fm,
 }
 
 template<typename... BAs>
-std::pair<tau<BAs...>, tau<BAs...> > build_initial_step_chi(
-	const tau<BAs...>& chi, const tau<BAs...>& st, auto& io_vars,
+std::pair<tau_depreciating<BAs...>, tau_depreciating<BAs...> > build_initial_step_chi(
+	const tau_depreciating<BAs...>& chi, const tau_depreciating<BAs...>& st, auto& io_vars,
 	int_t time_point, auto& pholder_to_st) {
-	std::map<tau<BAs...>, tau<BAs...>> changes;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
 		auto new_io_var = transform_io_var(io_vars[i], get_io_name(io_vars[i]),
 								time_point);
 		changes[io_vars[i]] = new_io_var;
 	}
-	tau<BAs...> c_pholder = build_io_out_const<BAs...>("_pholder", time_point);
+	tau_depreciating<BAs...> c_pholder = build_io_out_const<BAs...>("_pholder", time_point);
 	c_pholder = build_wff_eq(wrap(tau_parser::bf, c_pholder));
 	pholder_to_st.emplace(c_pholder, replace(st, changes));
-	tau<BAs...> new_fm = build_wff_and(replace(chi, changes), c_pholder);
+	tau_depreciating<BAs...> new_fm = build_wff_and(replace(chi, changes), c_pholder);
 	return make_pair(new_fm, c_pholder);
 }
 
 template<typename... BAs>
-tau<BAs...> build_step(const tau<BAs...>& original_fm,
-	const tau<BAs...>& prev_fm, const auto& io_vars, auto& initials, int_t step_num,
-	int_t time_point, tau<BAs...>& cached_fm) {
+tau_depreciating<BAs...> build_step(const tau_depreciating<BAs...>& original_fm,
+	const tau_depreciating<BAs...>& prev_fm, const auto& io_vars, auto& initials, int_t step_num,
+	int_t time_point, tau_depreciating<BAs...>& cached_fm) {
 	// Use build_initial_step otherwise
 	assert(step_num > 0);
-	std::map<tau<BAs...>, tau<BAs...> > changes;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...> > changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
 		auto new_io_var = transform_io_var(io_vars[i], get_io_name(io_vars[i]),
 							time_point + step_num);
 		changes[io_vars[i]] = new_io_var;
 	}
 
-	tau<BAs...> most_inner_step = replace(original_fm, changes);
+	tau_depreciating<BAs...> most_inner_step = replace(original_fm, changes);
 	auto q_most_inner_step = existentially_quantify_output_streams(most_inner_step, io_vars, time_point + step_num,
 	                                                               initials);
 	q_most_inner_step = universally_quantify_input_streams(q_most_inner_step, io_vars, time_point + step_num,
@@ -269,22 +269,22 @@ tau<BAs...> build_step(const tau<BAs...>& original_fm,
 }
 
 template<typename... BAs>
-tau<BAs...> build_step_chi(const tau<BAs...>& chi, const tau<BAs...>& st,
-	const tau<BAs...>& prev_fm, const auto& io_vars, auto& initials, int_t step_num,
+tau_depreciating<BAs...> build_step_chi(const tau_depreciating<BAs...>& chi, const tau_depreciating<BAs...>& st,
+	const tau_depreciating<BAs...>& prev_fm, const auto& io_vars, auto& initials, int_t step_num,
 	int_t time_point, auto& cached_fm, auto& pholder_to_st) {
 	// Use build_initial_step otherwise
 	assert(step_num > 0);
-	std::map<tau<BAs...>, tau<BAs...> > changes;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...> > changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
 		auto new_io_var = transform_io_var(io_vars[i], get_io_name(io_vars[i]),
 							time_point + step_num);
 		changes[io_vars[i]] = new_io_var;
 	}
 	// We need a placeholder symbol in order to substitute during the next step
-	tau<BAs...> c_chi = replace(chi, changes);
-	tau<BAs...> c_pholder = build_io_out_const<BAs...>("_pholder", time_point + step_num);
+	tau_depreciating<BAs...> c_chi = replace(chi, changes);
+	tau_depreciating<BAs...> c_pholder = build_io_out_const<BAs...>("_pholder", time_point + step_num);
 	c_pholder = build_wff_eq(wrap(tau_parser::bf, c_pholder));
-	tau<BAs...> c_st = replace(st, changes);
+	tau_depreciating<BAs...> c_st = replace(st, changes);
 	pholder_to_st.emplace(c_pholder, c_st);
 	// Quantify formula which is to be added to chi
 	auto q_most_inner_step = existentially_quantify_output_streams(
@@ -324,13 +324,13 @@ inline auto constant_io_comp = [](const auto& v1, const auto& v2) {
 // This method is designed to be called on the output of find_fixpoint_phi/chi
 // when the run was started at the earliest well-defined time point
 template<typename... BAs>
-bool is_run_satisfiable(const tau<BAs...>& fm) {
+bool is_run_satisfiable(const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	if (fm == _F<BAs...>) return false;
 	if (fm == _T<BAs...>) return true;
 
 	auto free_io_vars = get_free_vars_from_nso(fm);
-	std::vector<tau<BAs...> > io_vars = select_top(fm,
+	std::vector<tau_depreciating<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	sort(io_vars.begin(), io_vars.end(), constant_io_comp);
 
@@ -357,7 +357,7 @@ bool is_run_satisfiable(const tau<BAs...>& fm) {
 
 // Assumption is that the provided fm is an unbound continuation
 template<typename... BAs>
-tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto& io_vars) {
+tau_depreciating<BAs...> get_uninterpreted_constants_constraints(const tau_depreciating<BAs...>& fm, auto& io_vars) {
 	using p = tau_parser;
 	// Substitute lookback as current time point
 	auto look_back = get_max_shift(io_vars);
@@ -383,7 +383,7 @@ tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto&
 		io_vars.pop_back();
 	}
 	// Existentially quantify remaining variables
-	std::vector<tau<BAs...>> uconsts;
+	std::vector<tau_depreciating<BAs...>> uconsts;
 	for (const auto& v : free_io_vars) {
 		if (!is_child_non_terminal(p::uninterpreted_constant, v))
 			uconst_ctns = build_wff_ex(v, uconst_ctns);
@@ -407,13 +407,13 @@ tau<BAs...> get_uninterpreted_constants_constraints(const tau<BAs...>& fm, auto&
 }
 
 template<typename... BAs>
-std::pair<tau<BAs...>, int_t> find_fixpoint_phi(const tau<BAs...>& base_fm, const tau<BAs...>& ctn_initials,
+std::pair<tau_depreciating<BAs...>, int_t> find_fixpoint_phi(const tau_depreciating<BAs...>& base_fm, const tau_depreciating<BAs...>& ctn_initials,
 	const auto& io_vars, const auto& initials, const int_t time_point) {
-	tau<BAs...> phi_prev = fm_at_time_point(base_fm, io_vars, time_point);
+	tau_depreciating<BAs...> phi_prev = fm_at_time_point(base_fm, io_vars, time_point);
 	phi_prev = build_wff_and(ctn_initials, phi_prev);
 	int_t step_num = 1;
-	tau<BAs...> cache = phi_prev;
-	tau<BAs...> phi = build_step(base_fm, phi_prev, io_vars,
+	tau_depreciating<BAs...> cache = phi_prev;
+	tau_depreciating<BAs...> phi = build_step(base_fm, phi_prev, io_vars,
 		 initials, step_num, time_point, cache);
 
 	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
@@ -440,17 +440,17 @@ std::pair<tau<BAs...>, int_t> find_fixpoint_phi(const tau<BAs...>& base_fm, cons
 }
 
 template<typename... BAs>
-std::pair<tau<BAs...>, int_t> find_fixpoint_chi(const tau<BAs...>& chi_base, const tau<BAs...>& st,
+std::pair<tau_depreciating<BAs...>, int_t> find_fixpoint_chi(const tau_depreciating<BAs...>& chi_base, const tau_depreciating<BAs...>& st,
 			      const auto& io_vars, const auto& initials,
 			      const int_t time_point) {
-	std::map<tau<BAs...>, tau<BAs...>> pholder_to_st;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> pholder_to_st;
 	auto [chi_prev, cache] = build_initial_step_chi(
 		chi_base, st, io_vars, time_point, pholder_to_st);
 
 	int_t lookback = get_max_shift(io_vars);
 	int_t step_num = 1;
 
-	tau<BAs...> chi = build_step_chi(chi_base, st, chi_prev, io_vars,
+	tau_depreciating<BAs...> chi = build_step_chi(chi_base, st, chi_prev, io_vars,
 		 initials, step_num, time_point, cache, pholder_to_st);
 
 	auto chi_replc = replace(chi, pholder_to_st);
@@ -480,13 +480,13 @@ std::pair<tau<BAs...>, int_t> find_fixpoint_chi(const tau<BAs...>& chi_base, con
 }
 
 template<typename... BAs>
-tau<BAs...> transform_back_non_initials(const tau<BAs...>& fm, const int_t highest_init_cond) {
+tau_depreciating<BAs...> transform_back_non_initials(const tau_depreciating<BAs...>& fm, const int_t highest_init_cond) {
 	// Find lookback
 	auto current_io_vars = select_top(fm,
 			is_child_non_terminal<tau_parser::io_var, BAs...>);
 	int_t lookback = get_lookback_after_normalization(current_io_vars);
 
-	std::map<tau<BAs...>,tau<BAs...>> changes;
+	std::map<tau_depreciating<BAs...>,tau_depreciating<BAs...>> changes;
 	// Get time positions which are higher than highest_init_cond and transform back to
 	// time variable depending on t
 	for (const auto& io_var : current_io_vars) {
@@ -494,7 +494,7 @@ tau<BAs...> transform_back_non_initials(const tau<BAs...>& fm, const int_t highe
 		if (time_point <= highest_init_cond)
 			continue;
 
-		tau<BAs...> transformed_var;
+		tau_depreciating<BAs...> transformed_var;
 		if (time_point - lookback != 0) {
 			if (io_var | tau_parser::io_var | tau_parser::in)
 				transformed_var = build_io_in_shift<BAs...>(
@@ -520,7 +520,7 @@ tau<BAs...> transform_back_non_initials(const tau<BAs...>& fm, const int_t highe
 }
 
 template<typename... BAs>
-tau<BAs...> build_flag_on_lookback (const std::string& name, const std::string& var,
+tau_depreciating<BAs...> build_flag_on_lookback (const std::string& name, const std::string& var,
 									const int_t lookback) {
 	if (lookback >= 2)
 		return wrap(tau_parser::bf,
@@ -529,7 +529,7 @@ tau<BAs...> build_flag_on_lookback (const std::string& name, const std::string& 
 }
 
 template<typename... BAs>
-tau<BAs...> build_prev_flag_on_lookback (const std::string& name, const std::string& var, const int_t lookback) {
+tau_depreciating<BAs...> build_prev_flag_on_lookback (const std::string& name, const std::string& var, const int_t lookback) {
 	if (lookback >= 2)
 		return wrap(tau_parser::bf,
 				build_io_out_shift<BAs...>(name, var, lookback));
@@ -538,8 +538,8 @@ tau<BAs...> build_prev_flag_on_lookback (const std::string& name, const std::str
 }
 
 template<typename... BAs>
-tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_initials,
-					tau<BAs...>& flag_rules,
+tau_depreciating<BAs...> transform_ctn_to_streams(const tau_depreciating<BAs...>& fm, tau_depreciating<BAs...>& flag_initials,
+					tau_depreciating<BAs...>& flag_rules,
 					const int_t lookback,
 					const int_t start_time,
 					bool reset_ctn_id = false) {
@@ -549,14 +549,14 @@ tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_in
 	};
 	auto create_initial = [&flag_initials](
 		const auto& ctn, const auto& flag_iovar, const int_t t) {
-		tau<BAs...> flag_init_cond = transform_io_var(
+		tau_depreciating<BAs...> flag_init_cond = transform_io_var(
 					flag_iovar, get_io_name(flag_iovar), t);
 		flag_init_cond = wrap(tau_parser::bf, flag_init_cond);
 		flag_initials = build_wff_and(build_wff_eq(build_bf_xor(
 		flag_init_cond, calculate_ctn(ctn, t))), flag_initials);
 	};
 	flag_initials = _T<BAs...>;
-	std::map<tau<BAs...>, tau<BAs...>> changes;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 	// transform constraints to their respective output streams and add required conditions
 	// We make the variable static so that we can transform different parts of the formula independently
 	static size_t ctn_id = 0;
@@ -610,7 +610,7 @@ tau<BAs...> transform_ctn_to_streams(const tau<BAs...>& fm, tau<BAs...>& flag_in
 // We assume that the formula has run through the normalizer before
 // and is a single always statement
 template<typename... BAs>
-tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
+tau_depreciating<BAs...> always_to_unbounded_continuation(tau_depreciating<BAs...> fm,
 	const int_t start_time,
 	const bool output)
 {
@@ -622,10 +622,10 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 	if (is_child_non_terminal(p::wff_always, fm)) fm = trim2(fm);
 
 	// Preparation to transform flags to output streams
-	std::vector<tau<BAs...> > io_vars = select_top(fm,
+	std::vector<tau_depreciating<BAs...> > io_vars = select_top(fm,
 				is_child_non_terminal<p::io_var, BAs...>);
 	int_t lookback = get_max_shift(io_vars);
-	tau<BAs...> flag_initials = _T<BAs...>, flag_rules = _T<BAs...>;
+	tau_depreciating<BAs...> flag_initials = _T<BAs...>, flag_rules = _T<BAs...>;
 	auto transformed_fm = transform_ctn_to_streams(
 		fm, flag_initials, flag_rules, lookback, start_time, true);
 	if (lookback == 0 && fm != transformed_fm) {
@@ -658,7 +658,7 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 
 	// Run phi_inf until all initial conditions are taken into account
 	io_vars = select_top(ubd_ctn, is_child_non_terminal<p::io_var, BAs...>);
-	tau<BAs...> run = _T<BAs...>;
+	tau_depreciating<BAs...> run = _T<BAs...>;
 	const int_t s = start_time + lookback;
 	// // In case no initial condition is being checked
 	// // we still need to check a run once
@@ -697,9 +697,9 @@ tau<BAs...> always_to_unbounded_continuation(tau<BAs...> fm,
 
 // Creates a guard using the names of the input streams in uninterpreted constants
 template<typename... BAs>
-tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
+tau_depreciating<BAs...> create_guard(const auto& io_vars, const int_t number) {
 	using p = tau_parser;
-	tau<BAs...> guard = _T<BAs...>;
+	tau_depreciating<BAs...> guard = _T<BAs...>;
 	for (const auto& io_var : io_vars) {
 		// Check if input stream variable
 		if (io_var | p::io_var | p::in) {
@@ -714,7 +714,7 @@ tau<BAs...> create_guard(const auto& io_vars, const int_t number) {
 
 // Assumes single normalized Tau DNF clause
 template<typename... BAs>
-std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>& fm, bool reset_ctn_stream, const int_t start_time) {
+std::pair<tau_depreciating<BAs...>, int_t> transform_to_eventual_variables(const tau_depreciating<BAs...>& fm, bool reset_ctn_stream, const int_t start_time) {
 	using p = tau_parser;
 	auto smt_fms = select_top(fm, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	if (smt_fms.empty()) return {fm, 0};
@@ -725,7 +725,7 @@ std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>&
 			is_child_non_terminal<p::wff_always, BAs...>));
 
 	int_t aw_lookback = 0;
-	std::vector<tau<BAs...>> aw_io_vars;
+	std::vector<tau_depreciating<BAs...>> aw_io_vars;
 	if (aw_fm.has_value()) {
 		aw_io_vars = select_top(aw_fm.value(),
 			is_child_non_terminal<p::io_var, BAs...>);
@@ -734,14 +734,14 @@ std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>&
 
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
 	BOOST_LOG_TRIVIAL(trace) << fm;
-	tau<BAs...> ev_assm = _T<BAs...>;
-	tau<BAs...> ev_collection = _0<BAs...>;
+	tau_depreciating<BAs...> ev_assm = _T<BAs...>;
+	tau_depreciating<BAs...> ev_collection = _0<BAs...>;
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
 		auto st_io_vars = select_top(smt_fms[n], is_child_non_terminal<p::io_var, BAs...>);
 		int_t st_lookback = get_max_shift(st_io_vars);
 
 		// Transform constant time constraints to io var in sometimes statement
-		tau<BAs...> ctn_initials = _T<BAs...>, ctn_assm = _T<BAs...>;
+		tau_depreciating<BAs...> ctn_initials = _T<BAs...>, ctn_assm = _T<BAs...>;
 		smt_fms[n] = transform_ctn_to_streams(
 			smt_fms[n], ctn_initials, ctn_assm, st_lookback,
 			start_time, reset_ctn_stream);
@@ -825,12 +825,12 @@ std::pair<tau<BAs...>, int_t> transform_to_eventual_variables(const tau<BAs...>&
 }
 
 template<typename... BAs>
-tau<BAs...> add_st_ctn (const tau<BAs...>& st, const int_t timepoint, const int_t steps) {
-	tau<BAs...> st_ctn = _T<BAs...>;
+tau_depreciating<BAs...> add_st_ctn (const tau_depreciating<BAs...>& st, const int_t timepoint, const int_t steps) {
+	tau_depreciating<BAs...> st_ctn = _T<BAs...>;
 	auto io_vars = select_top(
 		st, is_child_non_terminal<tau_parser::io_var, BAs...>);
 	for (int_t s = 0; s <= steps; ++s) {
-		std::map<tau<BAs...>, tau<BAs...> > changes;
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...> > changes;
 		for (size_t i = 0; i < io_vars.size(); ++i) {
 			auto new_io_var = transform_io_var(
 				io_vars[i], get_io_name(io_vars[i]), timepoint + s);
@@ -845,13 +845,13 @@ tau<BAs...> add_st_ctn (const tau<BAs...>& st, const int_t timepoint, const int_
 }
 
 template <typename... BAs>
-tau<BAs...> make_initial_run(const tau<BAs...>& aw, const int_t max_st_lookback) {
+tau_depreciating<BAs...> make_initial_run(const tau_depreciating<BAs...>& aw, const int_t max_st_lookback) {
 	// get lookback of aw
 	using p = tau_parser;
 	auto io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
 	const int_t t = get_max_shift(io_vars);
 
-	tau<BAs...> run;
+	tau_depreciating<BAs...> run;
 	for (int_t i = 0; i < max_st_lookback; ++i) {
 		auto current_aw = fm_at_time_point(aw, io_vars, t + i);
 		if (run) run = normalize_non_temp(build_wff_and(run, current_aw));
@@ -864,8 +864,8 @@ tau<BAs...> make_initial_run(const tau<BAs...>& aw, const int_t max_st_lookback)
 // the always part of the output of "transform_to_eventual_variables" and
 // that ev_var_flags is the sometimes part of "transform_to_eventual_variables"
 template<typename... BAs>
-tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
-				      const tau<BAs...>& ev_var_flags,
+tau_depreciating<BAs...> to_unbounded_continuation(const tau_depreciating<BAs...>& ubd_aw_continuation,
+				      const tau_depreciating<BAs...>& ev_var_flags,
 				      const auto& original_aw,
 				      const int_t start_time,
 				      const int_t max_st_lookback,
@@ -887,9 +887,9 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 							   : original_aw)
 						: _T<BAs...>;
 
-	std::vector<tau<BAs...>> io_vars = select_top(aw,
+	std::vector<tau_depreciating<BAs...>> io_vars = select_top(aw,
 			is_child_non_terminal<p::io_var, BAs...>);
-	std::vector<tau<BAs...>> st_io_vars = select_top(st_flags,
+	std::vector<tau_depreciating<BAs...>> st_io_vars = select_top(st_flags,
 		is_child_non_terminal<p::io_var, BAs...>);
 
 	// Note that time_point is also the lookback
@@ -904,7 +904,7 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 	st_io_vars = select_top(st_flags, is_child_non_terminal<p::io_var, BAs...>);
 
 	// Create the initial phase of the always part
-	tau<BAs...> run = make_initial_run(ori_aw_ctn, max_st_lookback);
+	tau_depreciating<BAs...> run = make_initial_run(ori_aw_ctn, max_st_lookback);
 	// Check if flag can be raised up to the highest initial condition + 2
 	// which corresponds to checking the sometimes statement up to time point
 	// of the highest initial condition + 1
@@ -1003,12 +1003,12 @@ tau<BAs...> to_unbounded_continuation(const tau<BAs...>& ubd_aw_continuation,
 
 // Assumes a single normalized Tau DNF clause
 template<typename... BAs>
-tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
+tau_depreciating<BAs...> transform_to_execution(const tau_depreciating<BAs...>& fm,
 				const int_t start_time = 0,
 				const bool output = false ) {
 	assert(get_dnf_wff_clauses(fm).size() == 1);
 #ifdef TAU_CACHE
-	static std::map<std::pair<tau<BAs...>, int_t>, tau<BAs...>> cache;
+	static std::map<std::pair<tau_depreciating<BAs...>, int_t>, tau_depreciating<BAs...>> cache;
 	if (auto it = cache.find(std::make_pair(fm, start_time)); it != cache.end())
 		return it->second;
 #endif
@@ -1020,8 +1020,8 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
 
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
-	std::pair<tau<BAs...>, int_t> ev_t;
-	tau<BAs...> ubd_aw_fm;
+	std::pair<tau_depreciating<BAs...>, int_t> ev_t;
+	tau_depreciating<BAs...> ubd_aw_fm;
 	if (aw_fm.has_value()) {
 		// If there is an always part, replace it with its unbound continuation
 		ubd_aw_fm = always_to_unbounded_continuation(
@@ -1056,7 +1056,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 	auto st = select_top(ev_t.first, is_child_non_terminal<p::wff_sometimes, BAs...>);
 	assert(st.size() < 2);
 
-	tau<BAs...> res;
+	tau_depreciating<BAs...> res;
 	if (aw_after_ev.value() != _F<BAs...> && !st.empty())
 		res = normalize_non_temp(to_unbounded_continuation(
 			aw_after_ev.value(), st[0], ubd_aw_fm, start_time,
@@ -1072,7 +1072,7 @@ tau<BAs...> transform_to_execution(const tau<BAs...>& fm,
 }
 
 template<typename... BAs>
-bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
+bool is_tau_formula_sat(const tau_depreciating<BAs...>& fm, const int_t start_time = 0,
 			const bool output = false) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
@@ -1091,7 +1091,7 @@ bool is_tau_formula_sat(const tau<BAs...>& fm, const int_t start_time = 0,
 
 // Check for temporal formulas if f1 implies f2
 template<typename... BAs>
-bool is_tau_impl (const tau<BAs...>& f1, const tau<BAs...>& f2) {
+bool is_tau_impl (const tau_depreciating<BAs...>& f1, const tau_depreciating<BAs...>& f2) {
 	auto f1_norm = normalizer_step(f1);
 	auto f2_norm = normalizer_step(f2);
 	auto imp_check = normalize_with_temp_simp((build_wff_neg(build_wff_imply(f1_norm,f2_norm))));
@@ -1107,7 +1107,7 @@ bool is_tau_impl (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 
 // The formulas need to be closed
 template<typename... BAs>
-bool are_tau_equivalent (const tau<BAs...>& f1, const tau<BAs...>& f2) {
+bool are_tau_equivalent (const tau_depreciating<BAs...>& f1, const tau_depreciating<BAs...>& f2) {
 	// Negate equivalence for unsat check
 	auto f1_norm = normalizer_step(f1);
 	auto f2_norm = normalizer_step(f2);
@@ -1123,7 +1123,7 @@ bool are_tau_equivalent (const tau<BAs...>& f1, const tau<BAs...>& f2) {
 }
 
 template<typename... BAs>
-tau<BAs...> simp_tau_unsat_valid(const tau<BAs...>& fm, const int_t start_time = 0,
+tau_depreciating<BAs...> simp_tau_unsat_valid(const tau_depreciating<BAs...>& fm, const int_t start_time = 0,
 			const bool output = false) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start simp_tau_unsat_valid";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;

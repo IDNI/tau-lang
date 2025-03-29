@@ -10,7 +10,7 @@ namespace idni::tau_lang {
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<input_t, output_t, BAs...>>
 interpreter<input_t, output_t, BAs...>::make_interpreter(
-	const tau<BAs...>& spec, auto& inputs, auto& outputs) {
+	const tau_depreciating<BAs...>& spec, auto& inputs, auto& outputs) {
 	// Find a satisfiable unbound continuation from spec
 	auto [ubd_ctn, clause] = get_executable_spec(spec);
 	if (ubd_ctn == nullptr) {
@@ -53,7 +53,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 	// for each system in systems try to solve it, if it is not possible
 	// continue with the next system.
 	for (const auto& system: this->systems) {
-		std::map<type, solution<BAs...>> solutions;
+		std::map<std::string, solution<BAs...>> solutions;
 		bool solved = true;
 		// solve the equations for each type in the system
 		for (const auto& [type, equations]: system) {
@@ -171,7 +171,7 @@ std::pair<std::optional<assignment<BAs...>>, bool> interpreter<input_t, output_t
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
-tau<BAs...> interpreter<input_t, output_t, BAs...>::get_ubt_ctn_at(int_t t) {
+tau_depreciating<BAs...> interpreter<input_t, output_t, BAs...>::get_ubt_ctn_at(int_t t) {
 	using p = tau_parser;
 	const int_t ut = t < (int_t)formula_time_point ? (int_t)formula_time_point : t;
 	if (t >= std::max(highest_initial_pos, (int_t)formula_time_point)) {
@@ -222,9 +222,9 @@ bool interpreter<input_t, output_t, BAs...>::calculate_initial_systems() {
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
-std::vector<tau<BAs...>> interpreter<input_t, output_t, BAs...>::
+std::vector<tau_depreciating<BAs...>> interpreter<input_t, output_t, BAs...>::
 build_inputs_for_step(const size_t t) {
-	std::vector<tau<BAs...>> step_inputs;
+	std::vector<tau_depreciating<BAs...>> step_inputs;
 	for (auto& [var_name, _] : inputs.streams) {
 		step_inputs.emplace_back(
 			trim(build_in_variable_at_n(var_name, t)));
@@ -233,8 +233,8 @@ build_inputs_for_step(const size_t t) {
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-tau<BAs...> interpreter<input_t, output_t, BAs...>::update_to_time_point(
-	const tau<BAs...>& f, const int_t t) {
+tau_depreciating<BAs...> interpreter<input_t, output_t, BAs...>::update_to_time_point(
+	const tau_depreciating<BAs...>& f, const int_t t) {
 	// update the f according to current time_point, i.e. for each
 	// input/output var which has a shift, we replace it with the value
 	// corresponding to the current time_point minus the shift.
@@ -280,7 +280,7 @@ void interpreter<input_t, output_t, BAs...>::resolve_solution_dependencies(solut
 
 template<typename input_t, typename output_t, typename...BAs>
 void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial() {
-	std::vector<tau<BAs...> > io_vars = select_top(ubt_ctn,
+	std::vector<tau_depreciating<BAs...> > io_vars = select_top(ubt_ctn,
 		is_child_non_terminal< tau_parser::io_var , BAs...>);
 	lookback = get_max_shift(io_vars);
 	formula_time_point = time_point + lookback;
@@ -289,7 +289,7 @@ void interpreter<input_t, output_t, BAs...>::compute_lookback_and_initial() {
 
 
 template<typename input_t, typename output_t, typename...BAs>
-std::vector<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_systems(const tau<BAs...>& ubd_ctn,
+std::vector<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_systems(const tau_depreciating<BAs...>& ubd_ctn,
 		auto& inputs, auto& outputs) {
 	std::vector<system<BAs...>> systems;
 	// Create blue-print for solver for each clause
@@ -306,9 +306,9 @@ std::vector<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_syst
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_atomic_fm_types(const tau<BAs...>& clause,
+std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_atomic_fm_types(const tau_depreciating<BAs...>& clause,
 	auto& inputs, auto& outputs) {
-	auto is_atomic_fm = [](const tau<BAs...>& n) {
+	auto is_atomic_fm = [](const tau_depreciating<BAs...>& n) {
 		return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 	};
@@ -318,7 +318,7 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 		<< "compute_system/clause: " << clause;
 	#endif // DEBUG
 
-	std::set<tau<BAs...>> pending_atomic_fms;
+	std::set<tau_depreciating<BAs...>> pending_atomic_fms;
 	for (auto& atomic_fm: select_top(clause, is_atomic_fm)) {
 		#ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
@@ -331,7 +331,7 @@ std::optional<system<BAs...>> interpreter<input_t, output_t, BAs...>::compute_at
 	bool new_choice = true;
 	while (new_choice) {
 		new_choice = false;
-		std::vector<tau<BAs...>> to_erase_fms;
+		std::vector<tau_depreciating<BAs...>> to_erase_fms;
 		for (const auto& fm : pending_atomic_fms) {
 			if (auto l = get_type_atomic_fm(fm, inputs, outputs); l) {
 				// Skip atomic fms which have no type yet
@@ -380,7 +380,7 @@ void interpreter<input_t, output_t, BAs...>::type_io_vars(
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(const tau<BAs...>& fm,
+std::optional<std::string> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(const tau_depreciating<BAs...>& fm,
 		auto& inputs, auto& outputs) {
 	using p = tau_parser;
 	auto io_vars = select_top(fm, is_child_non_terminal<p::io_var, BAs...>);
@@ -446,9 +446,9 @@ std::optional<type> interpreter<input_t, output_t, BAs...>::get_type_atomic_fm(c
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-std::pair<tau<BAs...>, tau<BAs...>>
+std::pair<tau_depreciating<BAs...>, tau_depreciating<BAs...>>
 interpreter<input_t, output_t, BAs...>::get_executable_spec(
-	const tau<BAs...>& fm, const size_t start_time) {
+	const tau_depreciating<BAs...>& fm, const size_t start_time) {
 	for (auto& clause : get_dnf_wff_clauses(fm)) {
 #ifdef DEBUG
 		BOOST_LOG_TRIVIAL(trace)
@@ -512,12 +512,12 @@ interpreter<input_t, output_t, BAs...>::get_executable_spec(
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
-void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
+void interpreter<input_t, output_t, BAs...>::update(const tau_depreciating<BAs...>& update) {
 	auto io_vars = select_top(
 		update, is_child_non_terminal<tau_parser::io_var, BAs...>);
 	// the constant time positions in update are seen relative to
 	// time_point, i.e. time point 0 is shifted to time_point
-	tau<BAs...> shifted_update = shift_const_io_vars_in_fm(
+	tau_depreciating<BAs...> shifted_update = shift_const_io_vars_in_fm(
 		update, io_vars, time_point);
 	if (shifted_update == _F<BAs...>) {
 		BOOST_LOG_TRIVIAL(info) << "(Warning) no update performed: constant time position below 0 was found\n";
@@ -568,8 +568,8 @@ void interpreter<input_t, output_t, BAs...>::update(const tau<BAs...>& update) {
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
-tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
-	tau<BAs...> spec, tau<BAs...> update, const int_t start_time) {
+tau_depreciating<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
+	tau_depreciating<BAs...> spec, tau_depreciating<BAs...> update, const int_t start_time) {
 	using p = tau_parser;
 	spec = normalizer(spec);
 	update = normalizer(update);
@@ -583,7 +583,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 		auto spec_always = find_top(
 			spec, is_child_non_terminal<p::wff_always, BAs...>);
 
-		const tau<BAs...> new_spec = clause;
+		const tau_depreciating<BAs...> new_spec = clause;
 		// Check if the update by itself is sat from current time point onwards
 		// taking the memory into account
 		BOOST_LOG_TRIVIAL(trace) << "pwr/new_spec: " << new_spec << "\n";
@@ -591,10 +591,10 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 			continue;
 
 		// Now try to add always part of old spec in a pointwise way
-		tau<BAs...> new_spec_pointwise;
+		tau_depreciating<BAs...> new_spec_pointwise;
 		if (spec_always) {
 			if (upd_always) {
-				tau<BAs...> aw = always_conjunction(
+				tau_depreciating<BAs...> aw = always_conjunction(
 					upd_always.value(),
 					spec_always.value());
 				auto aw_io_vars = select_top(aw, is_child_non_terminal<p::io_var, BAs...>);
@@ -635,7 +635,7 @@ tau<BAs...> interpreter<input_t, output_t, BAs...>::pointwise_revision(
 
 template<typename input_t, typename output_t, typename ... BAs>
 std::optional<assignment<BAs...>> interpreter<input_t, output_t, BAs...>::
-solution_with_max_update(const tau<BAs...>& spec) {
+solution_with_max_update(const tau_depreciating<BAs...>& spec) {
 	auto get_solution = [](const auto& fm) {
 		// setting proper options for the solver
 		solver_options<BAs...> options = {
@@ -691,7 +691,7 @@ solution_with_max_update(const tau<BAs...>& spec) {
 }
 
 template<typename input_t, typename output_t, typename...BAs>
-bool interpreter<input_t, output_t, BAs...>::is_excluded_output (const tau<BAs...>& var) {
+bool interpreter<input_t, output_t, BAs...>::is_excluded_output (const tau_depreciating<BAs...>& var) {
 	using p = tau_parser;
 	std::string io_name = is_non_terminal(p::out_var_name, var)
 					? tau_to_str(var)
@@ -700,9 +700,9 @@ bool interpreter<input_t, output_t, BAs...>::is_excluded_output (const tau<BAs..
 }
 
 template<typename input_t, typename output_t, typename ... BAs>
-std::vector<tau<BAs...>> interpreter<input_t, output_t, BAs...>::appear_within_lookback(
-	const std::vector<tau<BAs...>>& vars) {
-	std::vector<tau<BAs...>> appeared;
+std::vector<tau_depreciating<BAs...>> interpreter<input_t, output_t, BAs...>::appear_within_lookback(
+	const std::vector<tau_depreciating<BAs...>>& vars) {
+	std::vector<tau_depreciating<BAs...>> appeared;
 	for (size_t t = time_point; t <= time_point + (size_t)lookback; ++t) {
 		auto step_ubt_ctn = get_ubt_ctn_at(t);
 		step_ubt_ctn = replace(step_ubt_ctn, memory);

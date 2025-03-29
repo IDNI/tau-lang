@@ -31,49 +31,49 @@ namespace idni::tau_lang {
  * @brief Alias for tau template with variadic template parameters.
  */
 template<typename...BAs>
-using typed_nso = tau<BAs...>;
+using typed_nso = tau_depreciating<BAs...>;
 
 /**
  * @typedef var
  * @brief Alias for tau template with variadic template parameters.
  */
 template<typename...BAs>
-using var = tau<BAs...>;
+using var = tau_depreciating<BAs...>;
 
 /**
  * @typedef minterm
  * @brief Alias for tau template with variadic template parameters.
  */
 template<typename...BAs>
-using minterm = tau<BAs...>;
+using minterm = tau_depreciating<BAs...>;
 
 /**
  * @typedef equality
  * @brief Alias for tau template with variadic template parameters.
  */
 template<typename...BAs>
-using equality = tau<BAs...>;
+using equality = tau_depreciating<BAs...>;
 
 /**
  * @typedef inequality
  * @brief Alias for tau template with variadic template parameters.
  */
 template<typename...BAs>
-using inequality = tau<BAs...>;
+using inequality = tau_depreciating<BAs...>;
 
 /**
  * @typedef equation
  * @brief Alias for tau template with variadic template parameters.
  */
 template<typename...BAs>
-using equation = tau<BAs...>;
+using equation = tau_depreciating<BAs...>;
 
 /**
  * @typedef equations
  * @brief Alias for a set of tau templates with variadic template parameters.
  */
 template<typename...BAs>
-using equations = std::set<tau<BAs...>>;
+using equations = std::set<tau_depreciating<BAs...>>;
 
 /**
  * @typedef equation_system
@@ -101,7 +101,7 @@ using minterm_system = std::set<inequality<BAs...>>;
  * @brief Alias for a map of variables to tau templates.
  */
 template<typename...BAs>
-using solution = std::map<var<BAs...>, tau<BAs...>>;
+using solution = std::map<var<BAs...>, tau_depreciating<BAs...>>;
 
 /**
  * @enum solver_mode
@@ -119,7 +119,7 @@ enum solver_mode {
  */
 template<typename...BAs>
 struct solver_options {
-	tau<BAs...> splitter_one = nullptr; /**< Splitter option */
+	tau_depreciating<BAs...> splitter_one = nullptr; /**< Splitter option */
 	solver_mode mode = solver_mode::general; /**< Solver mode option */
 	std::string type = ""; /**< Type option */
 };
@@ -201,7 +201,7 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs,
  * @return An optional solution.
  */
 template<typename...BAs>
-std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
+std::optional<solution<BAs...>> solve(const tau_depreciating<BAs...>& form,
 	const solver_options<BAs...>& options);
 
 } // idni::tau_lang namespace

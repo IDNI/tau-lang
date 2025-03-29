@@ -100,9 +100,9 @@ static auto elim_eqs = make_library<BAs...>(
 );
 
 template <typename... BAs>
-tau<BAs...> to_mnf (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> to_mnf (const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
-	auto neq_to_eq = [](const tau<BAs...>& n) {
+	auto neq_to_eq = [](const tau_depreciating<BAs...>& n) {
 		//$X != 0 ::= !($X = 0)
 		if (is_non_terminal(p::bf_neq, n)) {
 			return trim(build_wff_neg(build_wff_eq(trim(n))));
@@ -114,9 +114,9 @@ tau<BAs...> to_mnf (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-tau<BAs...> from_mnf_to_nnf (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> from_mnf_to_nnf (const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
-	auto ne_to_neq = [](const tau<BAs...>& n) {
+	auto ne_to_neq = [](const tau_depreciating<BAs...>& n) {
 		//!($X = 0) ::= $X != 0
 		if (is_non_terminal(p::wff_neg, n)) {
 			const auto& e = trim2(n);
@@ -142,11 +142,11 @@ static auto fix_neg_in_snf = make_library<BAs...>(
 );
 
 template <typename... BAs>
-tau<BAs...> unsqueeze_wff (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> unsqueeze_wff (const tau_depreciating<BAs...>& fm) {
 	// $X | $Y = 0 ::= $X = 0 && $Y = 0
 	// $X | $Y != 0 ::= $X != 0 || $Y != 0
 	using p = tau_parser;
-	auto f = [](const tau<BAs...>& n) {
+	auto f = [](const tau_depreciating<BAs...>& n) {
 		if (is_non_terminal(p::bf_eq, n)) {
 			const auto& e = trim2(n);
 			if (is_non_terminal(p::bf_or, e)) {
@@ -173,11 +173,11 @@ tau<BAs...> unsqueeze_wff (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-tau<BAs...> squeeze_wff (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> squeeze_wff (const tau_depreciating<BAs...>& fm) {
 	//$X = 0 && $Y = 0 ::= $X | $Y = 0
 	// $X != 0 || $Y != 0 ::= $X | $Y != 0
 	using p = tau_parser;
-	auto f = [](const tau<BAs...>& n) {
+	auto f = [](const tau_depreciating<BAs...>& n) {
 		if (is_non_terminal(p::wff_and, n)) {
 			const auto& e1 = trim(n);
 			const auto& e2 = n->child[1];
@@ -202,10 +202,10 @@ tau<BAs...> squeeze_wff (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-tau<BAs...> unsqueeze_wff_pos (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> unsqueeze_wff_pos (const tau_depreciating<BAs...>& fm) {
 	// $X | $Y = 0 ::= $X = 0 && $Y = 0
 	using p = tau_parser;
-	auto f = [](const tau<BAs...>& n) {
+	auto f = [](const tau_depreciating<BAs...>& n) {
 		if (is_non_terminal(p::bf_eq, n)) {
 			const auto& e = trim2(n);
 			if (is_non_terminal(p::bf_or, e)) {
@@ -222,10 +222,10 @@ tau<BAs...> unsqueeze_wff_pos (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-tau<BAs...> squeeze_wff_pos (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> squeeze_wff_pos (const tau_depreciating<BAs...>& fm) {
 	// $X = 0 && $Y = 0 ::= $X | $Y = 0
 	using p = tau_parser;
-	auto f = [](const tau<BAs...>& n) {
+	auto f = [](const tau_depreciating<BAs...>& n) {
 		if (is_non_terminal(p::wff_and, n)) {
 			const auto& e1 = trim(n);
 			const auto& e2 = n->child[1];
@@ -241,10 +241,10 @@ tau<BAs...> squeeze_wff_pos (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-tau<BAs...> unsqueeze_wff_neg (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> unsqueeze_wff_neg (const tau_depreciating<BAs...>& fm) {
 	// $X | $Y != 0 ::= $X != 0 || $Y != 0
 	using p = tau_parser;
-	auto f = [](const tau<BAs...>& n) {
+	auto f = [](const tau_depreciating<BAs...>& n) {
 		if (is_non_terminal(p::bf_neq, n)) {
 			const auto& e = trim2(n);
 			if (is_non_terminal(p::bf_or, e)) {
@@ -261,10 +261,10 @@ tau<BAs...> unsqueeze_wff_neg (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-tau<BAs...> squeeze_wff_neg (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> squeeze_wff_neg (const tau_depreciating<BAs...>& fm) {
 	// $X != 0 || $Y != 0 ::= $X | $Y != 0
 	using p = tau_parser;
-	auto f = [](const tau<BAs...>& n) {
+	auto f = [](const tau_depreciating<BAs...>& n) {
 		if (is_non_terminal(p::wff_or, n)) {
 			const auto& e1 = trim(n);
 			const auto& e2 = n->child[1];
@@ -280,31 +280,31 @@ tau<BAs...> squeeze_wff_neg (const tau<BAs...>& fm) {
 }
 
 template<bool is_wff = true, typename... BAs>
-tau<BAs...> to_dnf(const tau<BAs...>&);
+tau_depreciating<BAs...> to_dnf(const tau_depreciating<BAs...>&);
 template<bool is_wff = true, typename... BAs>
-tau<BAs...> to_cnf(const tau<BAs...>&);
+tau_depreciating<BAs...> to_cnf(const tau_depreciating<BAs...>&);
 template<bool is_wff = true, typename... BAs>
-tau<BAs...> push_negation_in(const tau<BAs...>&);
+tau_depreciating<BAs...> push_negation_in(const tau_depreciating<BAs...>&);
 
 template<typename... BAs>
-tau<BAs...> to_nnf (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> to_nnf (const tau_depreciating<BAs...>& fm) {
 	return push_negation_in(fm);
 }
 
 // --------------------------------------------------------------
-// General operator for tau<BAs...> function application by pipe
+// General operator for tau_depreciating<BAs...> function application by pipe
 template<typename... BAs>
-using tau_f = tau<BAs...>(*)(const tau<BAs...>&);
+using tau_f = tau_depreciating<BAs...>(*)(const tau_depreciating<BAs...>&);
 
 template<typename... BAs>
-tau<BAs...> operator| (const tau<BAs...>& fm, const tau_f<BAs...> func) {
+tau_depreciating<BAs...> operator| (const tau_depreciating<BAs...>& fm, const tau_f<BAs...> func) {
 	return func(fm);
 }
 // --------------------------------------------------------------
 
 // This function traverses n and normalizes coefficients in a BF
 template <typename... BAs>
-tau<BAs...> normalize_ba(const tau<BAs...>& fm) {
+tau_depreciating<BAs...> normalize_ba(const tau_depreciating<BAs...>& fm) {
 	assert(is_non_terminal(tau_parser::bf, fm));
 	auto norm_ba = [&](const auto& n) {
 		using p = tau_parser;
@@ -332,11 +332,11 @@ template<typename... BAs>
 struct bf_reduce_canonical;
 
 template<tau_parser::nonterminal type, typename... BAs>
-struct reduce_deprecated {
+struct reduce_depreciating {
 
 	// TODO (VERY_HIGH) properly implement it
-	tau<BAs...> operator()(const tau<BAs...>& form) const {
-		std::map<tau<BAs...>, tau<BAs...>> changes;
+	tau_depreciating<BAs...> operator()(const tau_depreciating<BAs...>& form) const {
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 		// for all type dnfs do...
 		for (auto& dnf: select_top(form, is_non_terminal<type, BAs...>)) {
 			auto simplified = simplify(dnf);
@@ -347,7 +347,7 @@ struct reduce_deprecated {
 
 private:
 
-	void get_literals(const tau<BAs...>& clause, std::set<tau<BAs...>>& literals) const {
+	void get_literals(const tau_depreciating<BAs...>& clause, std::set<tau_depreciating<BAs...>>& literals) const {
 		BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
 		if constexpr (type == tau_parser::bf) {
 			if (auto check = clause | tau_parser::bf_and; check.has_value())
@@ -368,15 +368,15 @@ private:
 		}
 	}
 
-	std::set<tau<BAs...>> get_literals(const tau<BAs...>& clause) const {
-		std::set<tau<BAs...>> literals;
+	std::set<tau_depreciating<BAs...>> get_literals(const tau_depreciating<BAs...>& clause) const {
+		std::set<tau_depreciating<BAs...>> literals;
 		get_literals(clause, literals);
 		return literals;
 	}
 
-	std::pair<std::set<tau<BAs...>>, std::set<tau<BAs...>>> get_positive_negative_literals(const tau<BAs...> clause) const {
-		std::set<tau<BAs...>> positives;
-		std::set<tau<BAs...>> negatives;
+	std::pair<std::set<tau_depreciating<BAs...>>, std::set<tau_depreciating<BAs...>>> get_positive_negative_literals(const tau_depreciating<BAs...> clause) const {
+		std::set<tau_depreciating<BAs...>> positives;
+		std::set<tau_depreciating<BAs...>> negatives;
 
 		for(auto& l: get_literals(clause)) {
 			if constexpr (type == tau_parser::bf) {
@@ -401,7 +401,7 @@ private:
 		return {positives, negatives};
 	}
 
-	std::set<tau<BAs...>> get_dnf_clauses(const tau<BAs...>& n, std::set<tau<BAs...>> clauses = {}) const {
+	std::set<tau_depreciating<BAs...>> get_dnf_clauses(const tau_depreciating<BAs...>& n, std::set<tau_depreciating<BAs...>> clauses = {}) const {
 		if constexpr (type == tau_parser::bf)
 			if (auto check = n | tau_parser::bf_or; check.has_value())
 				for (auto& clause: check || tau_parser::bf)
@@ -423,13 +423,13 @@ private:
 		return clauses;
 	}
 
-	std::optional<tau<BAs...>> build_dnf_clause_from_literals(const std::set<tau<BAs...>>& positives, const std::set<tau<BAs...>>& negatives) const {
+	std::optional<tau_depreciating<BAs...>> build_dnf_clause_from_literals(const std::set<tau_depreciating<BAs...>>& positives, const std::set<tau_depreciating<BAs...>>& negatives) const {
 		if (positives.empty() && negatives.empty()) {
 			BOOST_LOG_TRIVIAL(debug) << "(F) {}";
 			return {};
 		}
 
-		std::vector<tau<BAs...>> literals;
+		std::vector<tau_depreciating<BAs...>> literals;
 		literals.insert(literals.end(), positives.begin(), positives.end());
 		literals.insert(literals.end(), negatives.begin(), negatives.end());
 
@@ -443,14 +443,14 @@ private:
 		return { clause };
 	}
 
-	std::optional<tau<BAs...>> to_minterm(const tau<BAs...>& clause) const {
+	std::optional<tau_depreciating<BAs...>> to_minterm(const tau_depreciating<BAs...>& clause) const {
 		auto [positives, negatives] = get_positive_negative_literals(clause);
 		if constexpr (type == tau_parser::bf) {
 			for (auto& negation: negatives) {
 				auto negated = negation
 					| tau_parser::bf_neg
 					| tau_parser::bf
-					| optional_value_extractor<tau<BAs...>>;
+					| optional_value_extractor<tau_depreciating<BAs...>>;
 				for (auto& positive: positives) {
 					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing? ";
 					if (positive == _0<BAs...>) {
@@ -469,12 +469,12 @@ private:
 				auto neq_bf = negation
 					| tau_parser::wff_neg
 					| tau_parser::wff
-					| optional_value_extractor<tau<BAs...>>;
+					| optional_value_extractor<tau_depreciating<BAs...>>;
 				for (auto& positive: positives) {
 					auto eq_bf = positive
 						| first_child_extractor<BAs...>
 						| tau_parser::bf
-						| optional_value_extractor<tau<BAs...>>;
+						| optional_value_extractor<tau_depreciating<BAs...>>;
 					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing: ";
 					if (eq_bf == _F<BAs...>) {
 						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
@@ -491,7 +491,7 @@ private:
 		return build_dnf_clause_from_literals(positives, negatives);
 	}
 
-	tau<BAs...> build_dnf_from_clauses(const std::set<tau<BAs...>>& clauses) const {
+	tau_depreciating<BAs...> build_dnf_from_clauses(const std::set<tau_depreciating<BAs...>>& clauses) const {
 		if constexpr (type == tau_parser::bf) {
 			if (clauses.empty()) {
 				BOOST_LOG_TRIVIAL(debug) << "(F) " << _0<BAs...>;
@@ -513,8 +513,8 @@ private:
 		return dnf;
 	}
 
-	tau<BAs...> simplify(const tau<BAs...>& form) const {
-		std::set<tau<BAs...>> clauses;
+	tau_depreciating<BAs...> simplify(const tau_depreciating<BAs...>& form) const {
+		std::set<tau_depreciating<BAs...>> clauses;
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying of " << form;
 		for (auto& clause: get_dnf_clauses(form))
 			if (auto dnf = to_minterm(clause); dnf) clauses.insert(dnf.value());
@@ -525,28 +525,28 @@ private:
 };
 
 template<typename... BAs>
-static const reduce_deprecated<tau_parser::bf, BAs...> reduce_bf_deprecated;
+static const reduce_depreciating<tau_parser::bf, BAs...> reduce_bf_depreciating;
 template<typename... BAs>
-using reduce_bf_t = reduce_deprecated<tau_parser::bf, BAs...>;
+using reduce_bf_t = reduce_depreciating<tau_parser::bf, BAs...>;
 
 template<typename...BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const reduce_bf_t<BAs...>& r) {
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& n, const reduce_bf_t<BAs...>& r) {
 	return r(n);
 }
 
 template<typename... BAs>
-static const reduce_deprecated<tau_parser::wff, BAs...> reduce_wff_deprecated;
+static const reduce_depreciating<tau_parser::wff, BAs...> reduce_wff_depreciating;
 template<typename... BAs>
-using reduce_wff_t = reduce_deprecated<tau_parser::wff, BAs...>;
+using reduce_wff_t = reduce_depreciating<tau_parser::wff, BAs...>;
 
 template<typename...BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const reduce_wff_t<BAs...>& r) {
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& n, const reduce_wff_t<BAs...>& r) {
 	return r(n);
 }
 
 // return the inner quantifier or the top wff if the formula is not quantified
 template<typename...BAs>
-std::pair<std::optional<tau<BAs...>>, tau<BAs...>> get_inner_quantified_wff(const tau<BAs...>& n) {
+std::pair<std::optional<tau_depreciating<BAs...>>, tau_depreciating<BAs...>> get_inner_quantified_wff(const tau_depreciating<BAs...>& n) {
 	// TODO (LOW) extract to a utils file
 	auto quantified = [](const auto& n) -> bool {
 		return is_non_terminal<tau_parser::wff_ex, BAs...>(n)
@@ -556,7 +556,7 @@ std::pair<std::optional<tau<BAs...>>, tau<BAs...>> get_inner_quantified_wff(cons
 	};
 	if (auto quantifier = find_bottom(n, quantified); quantifier) {
 		return { quantifier | tau_parser::variable,
-			quantifier | tau_parser::wff | optional_value_extractor<tau<BAs...>> };
+			quantifier | tau_parser::wff | optional_value_extractor<tau_depreciating<BAs...>> };
 	}
 	return { {}, n };
 }
@@ -564,17 +564,17 @@ std::pair<std::optional<tau<BAs...>>, tau<BAs...>> get_inner_quantified_wff(cons
 template<typename...BAs>
 struct onf_wff {
 
-	onf_wff(const tau<BAs...>& _var) {
+	onf_wff(const tau_depreciating<BAs...>& _var) {
 		if (!is_non_terminal(tau_parser::bf, _var))
 			var = wrap(tau_parser::bf, _var);
 		else var = _var;
 	}
 
-	tau<BAs...> operator()(const tau<BAs...>& n) const {
+	tau_depreciating<BAs...> operator()(const tau_depreciating<BAs...>& n) const {
 		auto [var, nn] = get_inner_quantified_wff(n);
 		// We assume that the formula is in DNF. In particular nn is in DNF
 		// For each disjunct calculate the onf
-		std::map<tau<BAs...>, tau<BAs...>> changes;
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 		bool no_disjunction = true;
 		for (const auto& disjunct : select_all(nn, is_non_terminal<tau_parser::wff_or, BAs...>)) {
 			no_disjunction = false;
@@ -589,11 +589,11 @@ struct onf_wff {
 	}
 
 private:
-	tau<BAs...> onf_subformula(const tau<BAs...>& n) const {
+	tau_depreciating<BAs...> onf_subformula(const tau_depreciating<BAs...>& n) const {
 		auto has_var = [&](const auto& node){ return node == var; };
 
 		auto eq = find_bottom(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
-		std::map<tau<BAs...>, tau<BAs...>> changes;
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 		if (eq && find_top(trim(eq.value()), has_var)) {
 			auto eq_v = eq.value();
 			assert(is_non_terminal(tau_parser::bf_f, trim(eq_v->child[1])));
@@ -616,19 +616,19 @@ private:
 		return replace(n, changes);
 	}
 
-	tau<BAs...> var;
+	tau_depreciating<BAs...> var;
 };
 
 template<typename... BAs>
 using onf_wff_t = onf_wff<BAs...>;
 
 template<typename...BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const onf_wff_t<BAs...>& r) {
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& n, const onf_wff_t<BAs...>& r) {
 	return r(n);
 }
 
 template<typename... BAs>
-static const auto is_not_eq_or_neq_to_zero_predicate = [](const tau<BAs...>& n) {
+static const auto is_not_eq_or_neq_to_zero_predicate = [](const tau_depreciating<BAs...>& n) {
 	if (!(is_non_terminal(tau_parser::bf_eq, trim(n)) || is_non_terminal(tau_parser::bf_neq, trim(n))))
 		return true;
 	auto check = (n | only_child_extractor<BAs...> || tau_parser::bf)[1] || tau_parser::bf_f;
@@ -639,7 +639,7 @@ template<typename... BAs>
 using is_not_eq_or_neq_predicate_t = decltype(is_not_eq_or_neq_to_zero_predicate<BAs...>);
 
 template<typename...BAs>
-std::optional<tau<BAs...>> onf(const tau<BAs...>& n, const tau<BAs...>& var) {
+std::optional<tau_depreciating<BAs...>> onf(const tau_depreciating<BAs...>& n, const tau_depreciating<BAs...>& var) {
 	// FIXME take into account quiantifiers
 	return n
 		| (tau_f<BAs...>) to_dnf<true, BAs...>
@@ -762,14 +762,14 @@ inline void join_paths (std::vector<std::vector<int_t>>& paths) {
 template<typename... BAs>
 auto lex_var_comp = [](const auto x, const auto y) {
 #ifdef TAU_CACHE
-	static std::map<std::pair<tau<BAs...>, tau<BAs...>>, bool> cache;
+	static std::map<std::pair<tau_depreciating<BAs...>, tau_depreciating<BAs...>>, bool> cache;
 	if (auto it = cache.find({x,y}); it != cache.end())
 		return it->second;
 #endif // TAU_CACHE
 	auto xx = make_string(tau_node_terminal_extractor<BAs...>, x);
 	auto yy = make_string(tau_node_terminal_extractor<BAs...>, y);
 #ifdef TAU_CACHE
-	std::pair<tau<BAs...>,tau<BAs...>> p(x,y);
+	std::pair<tau_depreciating<BAs...>,tau_depreciating<BAs...>> p(x,y);
 	return cache.emplace(move(p), xx < yy).first->second;
 #endif // TAU_CACHE
 	return xx < yy;
@@ -804,11 +804,11 @@ template<typename... BAs>
 void elim_vars_in_assignment (const auto& fm, const auto& vars, auto& i,
 	const int_t p, const auto& is_var)
 {
-	// auto is_var = [](const tau<BAs...>& n){return
+	// auto is_var = [](const tau_depreciating<BAs...>& n){return
 	// 	is_child_non_terminal(tau_parser::variable, n) ||
 	// 		is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
 	auto cvars = select_all(fm, is_var);
-	std::set<tau<BAs...>> cur_vars(std::make_move_iterator(cvars.begin()),
+	std::set<tau_depreciating<BAs...>> cur_vars(std::make_move_iterator(cvars.begin()),
               std::make_move_iterator(cvars.end()));
 
 	for (size_t v_iter = p+1; v_iter < vars.size(); ++v_iter) {
@@ -819,18 +819,18 @@ void elim_vars_in_assignment (const auto& fm, const auto& vars, auto& i,
 
 // Declaration of functions used in assign_and_reduce which are implemented later
 template<typename... BAs>
-tau<BAs...> reduce(const tau<BAs...>& fm, size_t type, bool is_cnf = false, bool all_reductions = true, bool enable_sort = true);
+tau_depreciating<BAs...> reduce(const tau_depreciating<BAs...>& fm, size_t type, bool is_cnf = false, bool all_reductions = true, bool enable_sort = true);
 
 // Create assignment in formula and reduce resulting clause
 template<typename... BAs>
-bool assign_and_reduce(const tau<BAs...>& fm,
-	const std::vector<tau<BAs...>>& vars,
+bool assign_and_reduce(const tau_depreciating<BAs...>& fm,
+	const std::vector<tau_depreciating<BAs...>>& vars,
 	std::vector<int_t>& i, auto& dnf, const auto& is_var, int_t p = 0,
 	bool is_wff = false)
 {
 	// Check if all variables are assigned
 	if((int_t)vars.size() == p) {
-		tau<BAs...> fm_simp;
+		tau_depreciating<BAs...> fm_simp;
 		if (!is_wff) {
 			// Do not add to dnf if the coefficient is 0
 			if (fm == _0<BAs...>) return false;
@@ -897,19 +897,19 @@ bool assign_and_reduce(const tau<BAs...>& fm,
 // Given a BF b, calculate the Boole normal form (DNF corresponding to the pathes to true in the BDD) of b
 // where the variable order is given by the function lex_var_comp
 template<typename... BAs>
-tau<BAs...> bf_boole_normal_form (const tau<BAs...>& fm,
+tau_depreciating<BAs...> bf_boole_normal_form (const tau_depreciating<BAs...>& fm,
 	bool make_paths_disjoint = false)
 {
 	// Function can only be applied to a BF
 	assert(is_non_terminal(tau_parser::bf, fm));
 #ifdef TAU_CACHE
-	static std::map<std::pair<tau<BAs...>, bool>, tau<BAs...>> cache;
+	static std::map<std::pair<tau_depreciating<BAs...>, bool>, tau_depreciating<BAs...>> cache;
     if (auto it = cache.find(make_pair(fm, make_paths_disjoint));
     		it != cache.end()) return it->second;
 #endif //TAU_CACHE
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
-	auto is_var = [](const tau<BAs...>& n){return
+	auto is_var = [](const tau_depreciating<BAs...>& n){return
 		is_child_non_terminal(tau_parser::variable, n) ||
 			is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
 	auto vars = select_top(fm, is_var);
@@ -931,7 +931,7 @@ tau<BAs...> bf_boole_normal_form (const tau<BAs...>& fm,
 			join_paths(paths);
 
 	// Convert map structure dnf back to rewrite tree
-	tau<BAs...> reduced_dnf;
+	tau_depreciating<BAs...> reduced_dnf;
 	bool first = true;
 	for (const auto& [coeff, paths] : dnf) {
 		bool t = is_non_terminal(tau_parser::bf_t, coeff->child[0]);
@@ -943,7 +943,7 @@ tau<BAs...> bf_boole_normal_form (const tau<BAs...>& fm,
 		}
 		for (const auto& path : paths) {
 			bool first_var = true;
-			tau<BAs...> var_path;
+			tau_depreciating<BAs...> var_path;
 			for (size_t k=0; k < vars.size(); ++k) {
 				if (path[k] == 2) continue;
 				if (first_var) var_path = path[k] == 1 ? vars[k] :
@@ -966,8 +966,8 @@ tau<BAs...> bf_boole_normal_form (const tau<BAs...>& fm,
 // The needed class in order to make bf_to_reduce_dnf work with rule applying process
 template<typename... BAs>
 struct bf_reduce_canonical {
-	tau<BAs...> operator() (const tau<BAs...>& fm) const {
-		std::map<tau<BAs...>, tau<BAs...>> changes = {};
+	tau_depreciating<BAs...> operator() (const tau_depreciating<BAs...>& fm) const {
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes = {};
 		for (const auto& bf: select_top(fm, is_non_terminal<tau_parser::bf, BAs...>)) {
 			auto dnf = bf_boole_normal_form(bf);
 			if (dnf != bf) changes[bf] = dnf;
@@ -978,13 +978,13 @@ struct bf_reduce_canonical {
 };
 
 template<typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& fm, const bf_reduce_canonical<BAs...>& r) {
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& fm, const bf_reduce_canonical<BAs...>& r) {
 	return r(fm);
 }
 
 template<typename... BAs>
-std::optional<tau<BAs...>> operator|(const std::optional<tau<BAs...>>& fm, const bf_reduce_canonical<BAs...>& r) {
-	return fm.has_value() ? r(fm.value()) : std::optional<tau<BAs...>>{};
+std::optional<tau_depreciating<BAs...>> operator|(const std::optional<tau_depreciating<BAs...>>& fm, const bf_reduce_canonical<BAs...>& r) {
+	return fm.has_value() ? r(fm.value()) : std::optional<tau_depreciating<BAs...>>{};
 }
 
 inline bool is_contained_in (const std::vector<int_t>& i, auto& paths) {
@@ -1022,14 +1022,14 @@ inline bool is_contained_in (const std::vector<int_t>& i, auto& paths) {
 }
 
 template<typename... BAs>
-std::pair<std::vector<int_t>, bool> clause_to_vector(const tau<BAs...>& clause,
+std::pair<std::vector<int_t>, bool> clause_to_vector(const tau_depreciating<BAs...>& clause,
 	const auto& var_pos, const bool wff, const bool is_cnf)
 {
 	using tp = tau_parser;
 	std::vector<int_t> i (var_pos.size());
 	for (size_t k = 0; k < var_pos.size(); ++k) i[k] = 2;
 	bool clause_is_decided = false;
-	auto var_assigner = [&](const tau<BAs...>& n) {
+	auto var_assigner = [&](const tau_depreciating<BAs...>& n) {
 		if (clause_is_decided) return false;
 		if (!is_cnf && is_non_terminal(wff ? tp::wff_f : tp::bf_f, n)) {
 			clause_is_decided = true;
@@ -1075,7 +1075,7 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(const tau<BAs...>& clause,
 }
 
 template<typename... BAs>
-std::vector<std::vector<int_t>> collect_paths(const tau<BAs...>& new_fm, bool wff,
+std::vector<std::vector<int_t>> collect_paths(const tau_depreciating<BAs...>& new_fm, bool wff,
 	const auto& vars, bool& decided, bool is_cnf, bool all_reductions = true) {
 	std::vector<std::vector<int_t>> paths;
 	unordered_tau_map<int_t, BAs...> var_pos;
@@ -1103,18 +1103,18 @@ std::vector<std::vector<int_t>> collect_paths(const tau<BAs...>& new_fm, bool wf
 }
 
 template<typename... BAs>
-tau<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_cnf, bool wff) {
+tau_depreciating<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_cnf, bool wff) {
 	if (paths.empty()) return is_cnf
 					  ? (wff ? _T<BAs...> : _1<BAs...>)
 					  : (wff ? _F<BAs...> : _0<BAs...>);
-	tau<BAs...> reduced_fm = is_cnf
+	tau_depreciating<BAs...> reduced_fm = is_cnf
 					 ? (wff ? _F<BAs...> : _0<BAs...>)
 					 : (wff ? _T<BAs...> : _1<BAs...>);
 	bool first = true;
 	for (const auto& path : paths) {
 		if (path.empty()) continue;
         bool first_var = true;
-		tau<BAs...> var_path = is_cnf
+		tau_depreciating<BAs...> var_path = is_cnf
 					       ? (wff ? _F<BAs...> : _0<BAs...>)
 					       : (wff ? _T<BAs...> : _1<BAs...>);
         for (size_t k=0; k < vars.size(); ++k) {
@@ -1148,16 +1148,16 @@ tau<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is_
 }
 
 template<typename... BAs>
-tau<BAs...> sort_var (const tau<BAs...>& var) {
+tau_depreciating<BAs...> sort_var (const tau_depreciating<BAs...>& var) {
 #ifdef TAU_CACHE
-	static unordered_tau_map<tau<BAs...>, BAs...> cache;
+	static unordered_tau_map<tau_depreciating<BAs...>, BAs...> cache;
 	if (auto it = cache.find(var); it != end(cache))
 		return it->second;
 #endif // TAU_CACHE
 	if (is_child_non_terminal(tau_parser::bf_eq, var)) {
 		auto clauses = get_dnf_bf_clauses(trim2(var));
 		std::ranges::sort(clauses);
-		tau<BAs...> res;
+		tau_depreciating<BAs...> res;
 		for (const auto& c : clauses) {
 			auto lits = get_cnf_bf_clauses(c);
 			std::ranges::sort(lits, lex_var_comp<BAs...>);
@@ -1175,8 +1175,8 @@ tau<BAs...> sort_var (const tau<BAs...>& var) {
 }
 
 template<typename... BAs>
-std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_bdd(
-	const tau<BAs...>& fm, size_t type, bool is_cnf = false,
+std::pair<std::vector<std::vector<int_t>>, std::vector<tau_depreciating<BAs...>>> dnf_cnf_to_bdd(
+	const tau_depreciating<BAs...>& fm, size_t type, bool is_cnf = false,
 	bool all_reductions = true, bool enable_sort = true)
 {
 	assert(is_non_terminal(type, fm));
@@ -1185,7 +1185,7 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_
 	auto new_fm = wff ? to_mnf(fm) : fm;
 	if (wff) {
 		// Make equalities canonical
-		std::map<tau<BAs...>, tau<BAs...> > changes;
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...> > changes;
 		auto eqs = select_top(new_fm, is_child_non_terminal<tau_parser::bf_eq, BAs...>);
 		for (const auto& eq: eqs) {
 			auto sorted_eq = sort_var(eq);
@@ -1196,7 +1196,7 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_
 		new_fm = replace(new_fm, changes);
 	}
 
-	std::vector<tau<BAs...> > vars = wff
+	std::vector<tau_depreciating<BAs...> > vars = wff
 					    ? select_top(new_fm, is_wff_bdd_var)
 					    : select_top(new_fm, is_bf_bdd_var);
 	if (vars.empty()) {
@@ -1234,9 +1234,9 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau<BAs...>>> dnf_cnf_to_
 }
 
 template<typename... BAs>
-tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> group_dnf_expression (const tau_depreciating<BAs...>& fm) {
 #ifdef TAU_CACHE
-		static unordered_tau_map<tau<BAs...>, BAs...> cache;
+		static unordered_tau_map<tau_depreciating<BAs...>, BAs...> cache;
 		if (auto it = cache.find(fm); it != end(cache))
 			return it->second;
 #endif // TAU_CACHE
@@ -1263,7 +1263,7 @@ tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
 		return fm;
 	}
 
-	std::vector<std::vector<tau<BAs...>>> atoms_of_clauses;
+	std::vector<std::vector<tau_depreciating<BAs...>>> atoms_of_clauses;
 	for (const auto& clause : clauses) {
 		auto atoms = wff ? get_cnf_wff_clauses(clause)
 				     : get_cnf_bf_clauses(clause);
@@ -1271,7 +1271,7 @@ tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
 		else std::ranges::sort(atoms, lex_var_comp<BAs...>);
 		atoms_of_clauses.emplace_back(move(atoms));
 	}
-	tau<BAs...> grouped_fm = wff ? _F<BAs...> : _0<BAs...>;
+	tau_depreciating<BAs...> grouped_fm = wff ? _F<BAs...> : _0<BAs...>;
 	for (int_t i = 0; i < (int_t)atoms_of_clauses.size(); ++i) {
 		std::pair max_common = {0,0};
 		for (size_t j = i+1; j < atoms_of_clauses.size(); ++j) {
@@ -1290,13 +1290,13 @@ tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
 					     : build_bf_or(grouped_fm, atoms);
 			continue;
 		}
-		std::vector<tau<BAs...>> common;
+		std::vector<tau_depreciating<BAs...>> common;
 		std::ranges::set_intersection(atoms_of_clauses[i],
 					 atoms_of_clauses[max_common.first],
 					 back_inserter(common));
 
-		tau<BAs...> cl1 = wff ? _T<BAs...> : _1<BAs...>;
-		tau<BAs...> cl2 = wff ? _T<BAs...> : _1<BAs...>;
+		tau_depreciating<BAs...> cl1 = wff ? _T<BAs...> : _1<BAs...>;
+		tau_depreciating<BAs...> cl2 = wff ? _T<BAs...> : _1<BAs...>;
 		size_t p = 0;
 		for (const auto& atom : atoms_of_clauses[i]) {
 			if (p < common.size() && common[p] == atom) ++p;
@@ -1311,7 +1311,7 @@ tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
 		}
 		// We need the canonical order for the reduction in "group_paths_and_simplify"
 		if (!lex_var_comp<BAs...>(cl1, cl2)) std::swap(cl1, cl2);
-		tau<BAs...> grouped = wff ? build_wff_or(cl1, cl2) :
+		tau_depreciating<BAs...> grouped = wff ? build_wff_or(cl1, cl2) :
 			build_bf_or<BAs...>(get_dnf_bf_clauses(
 				to_dnf<false>(build_bf_or(cl1, cl2))));
 
@@ -1333,7 +1333,7 @@ tau<BAs...> group_dnf_expression (const tau<BAs...>& fm) {
 // Simplifies for example abx'|aby'|xy to ab|xy
 // General idea is to eliminate (xyz...)' | xyz... after factorization
 template<typename... BAs>
-tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> simp_general_excluded_middle (const tau_depreciating<BAs...>& fm) {
 	assert(is_non_terminal(tau_parser::bf, fm));
 	bool was_simplified = false;
 	auto grouped = group_dnf_expression(fm);
@@ -1376,11 +1376,11 @@ tau<BAs...> simp_general_excluded_middle (const tau<BAs...>& fm) {
 // Assume that fm is in DNF (or CNF -> set is_cnf to true)
 // TODO: Normalize Tau constants in case type == bf
 template<typename... BAs>
-tau<BAs...> reduce(const tau<BAs...>& fm, size_t type, bool is_cnf, bool all_reductions, bool enable_sort) {
+tau_depreciating<BAs...> reduce(const tau_depreciating<BAs...>& fm, size_t type, bool is_cnf, bool all_reductions, bool enable_sort) {
 #ifdef TAU_CACHE
-		static std::unordered_map<std::tuple<tau<BAs...>, bool, bool>,
-			tau<BAs...>,
-			std::hash<std::tuple<tau<BAs...>, bool, bool>>,
+		static std::unordered_map<std::tuple<tau_depreciating<BAs...>, bool, bool>,
+			tau_depreciating<BAs...>,
+			std::hash<std::tuple<tau_depreciating<BAs...>, bool, bool>>,
 			tuple_struc_equal<bool, bool, BAs...>> cache;
 		if (auto it = cache.find(std::make_tuple(fm, all_reductions, enable_sort)); it != end(cache))
 			return it->second;
@@ -1415,8 +1415,8 @@ tau<BAs...> reduce(const tau<BAs...>& fm, size_t type, bool is_cnf, bool all_red
 }
 
 template<typename... BAs>
-tau<BAs...> reduce_terms (const tau<BAs...>& fm, bool with_sorting = false) {
-    std::map<tau<BAs...>, tau<BAs...>> changes = {};
+tau_depreciating<BAs...> reduce_terms (const tau_depreciating<BAs...>& fm, bool with_sorting = false) {
+    std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes = {};
     for (const auto& bf: select_top(fm, is_non_terminal<tau_parser::bf, BAs...>)) {
         auto dnf = to_dnf<false>(bf);
         dnf = reduce(dnf, tau_parser::bf, false, true, with_sorting);
@@ -1430,8 +1430,8 @@ tau<BAs...> reduce_terms (const tau<BAs...>& fm, bool with_sorting = false) {
 // Assumes that fm is in DNF with equalities pushed in and
 // inequalities pushed out
 template<typename... BAs>
-tau<BAs...> apply_eqs_across_clauses (const tau<BAs...>& fm) {
-	std::vector<tau<BAs...>> eq_reductions, neq_reductions;
+tau_depreciating<BAs...> apply_eqs_across_clauses (const tau_depreciating<BAs...>& fm) {
+	std::vector<tau_depreciating<BAs...>> eq_reductions, neq_reductions;
 	auto clauses = get_dnf_wff_clauses(fm);
 	for (const auto& clause : clauses) {
 		auto lits = get_cnf_wff_clauses(clause);
@@ -1446,8 +1446,8 @@ tau<BAs...> apply_eqs_across_clauses (const tau<BAs...>& fm) {
 		}
 	}
 	if (eq_reductions.empty() && neq_reductions.empty()) return fm;
-	tau<BAs...> new_fm;
-	std::map<tau<BAs...>, tau<BAs...>> changes;
+	tau_depreciating<BAs...> new_fm;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 	for (const auto& clause : clauses) {
 		auto neqs = select_top(clause, is_child_non_terminal<tau_parser::bf_neq, BAs...>);
 		for (const auto& neq : neqs) {
@@ -1492,7 +1492,7 @@ tau<BAs...> apply_eqs_across_clauses (const tau<BAs...>& fm) {
 }
 
 template<typename... BAs>
-std::vector<tau<BAs...>> push_eq_and_get_vars (tau<BAs...>& fm) {
+std::vector<tau_depreciating<BAs...>> push_eq_and_get_vars (tau_depreciating<BAs...>& fm) {
  // First push in equalities all the way (bf != 0 is converted to !(bf = 0))
 	fm = fm |(tau_f<BAs...>) unsqueeze_wff<BAs...>
 		|(tau_f<BAs...>) to_mnf<BAs...>;
@@ -1503,14 +1503,14 @@ std::vector<tau<BAs...>> push_eq_and_get_vars (tau<BAs...>& fm) {
 // Requires fm to have Boolean functions in DNF and equalities pushed in
 // vars contains variable order
 template<typename... BAs>
-std::vector<std::vector<int_t>> wff_to_bdd (const tau<BAs...>& fm, auto& vars = {}) {
+std::vector<std::vector<int_t>> wff_to_bdd (const tau_depreciating<BAs...>& fm, auto& vars = {}) {
 	// Find atomic formulas
 	auto pushed_in_fm = fm;
 	if (vars.empty()) vars = push_eq_and_get_vars(pushed_in_fm);
 	else pushed_in_fm = fm |(tau_f<BAs...>) unsqueeze_wff<BAs...>
 				|(tau_f<BAs...>) to_mnf<BAs...>;
 	std::vector<int_t> i (vars.size());
-	std::map<tau<BAs...>, std::vector<std::vector<int_t>>> dnf;
+	std::map<tau_depreciating<BAs...>, std::vector<std::vector<int_t>>> dnf;
 	// dnf empty means false and and size 1 with empty paths means true
 	assign_and_reduce(pushed_in_fm, vars, i, dnf, is_wff_bdd_var, 0, true);
 	assert((dnf.size() == 1 || dnf.empty()));
@@ -1534,16 +1534,16 @@ bool is_ordered_subset (const auto& v1, const auto& v2) {
 }
 
 template<typename... BAs>
-std::vector<std::vector<std::vector<tau<BAs...>>>> get_cnf_inequality_lits(
-	const tau<BAs...>& fm)
+std::vector<std::vector<std::vector<tau_depreciating<BAs...>>>> get_cnf_inequality_lits(
+	const tau_depreciating<BAs...>& fm)
 {
 	auto neq_pushed_in = unsqueeze_wff_neg(fm);
 	if (neq_pushed_in == _T<BAs...>) return {};
 	// cout << "neq_pushed_in: " << neq_pushed_in << "\n";
-	std::vector<std::vector<std::vector<tau<BAs...>>>> cnf_lits;
-	for (const tau<BAs...>& clause : get_cnf_wff_clauses(neq_pushed_in)) {
-		std::vector<std::vector<tau<BAs...>>> c;
-		for (const tau<BAs...>& neqs : get_dnf_wff_clauses(clause)) {
+	std::vector<std::vector<std::vector<tau_depreciating<BAs...>>>> cnf_lits;
+	for (const tau_depreciating<BAs...>& clause : get_cnf_wff_clauses(neq_pushed_in)) {
+		std::vector<std::vector<tau_depreciating<BAs...>>> c;
+		for (const tau_depreciating<BAs...>& neqs : get_dnf_wff_clauses(clause)) {
 			c.emplace_back(get_cnf_bf_clauses(trim2(neqs)));
 		}
 		cnf_lits.emplace_back(move(c));
@@ -1553,16 +1553,16 @@ std::vector<std::vector<std::vector<tau<BAs...>>>> get_cnf_inequality_lits(
 
 template<typename... BAs>
 std::pair<std::vector<int_t>, bool> simplify_path(
-	const std::vector<int_t>& path, std::vector<tau<BAs...> >& vars)
+	const std::vector<int_t>& path, std::vector<tau_depreciating<BAs...> >& vars)
 {
 	// std::cout << vars << "\n";
 	using tp = tau_parser;
-	std::vector<std::vector<tau<BAs...>>> pos;
+	std::vector<std::vector<tau_depreciating<BAs...>>> pos;
 	// Build clause for non-equality terms
 	// and new representation for equality terms
-	tau<BAs...> clause = _T<BAs...>;
-	tau<BAs...> pos_bf = _0<BAs...>;
-	tau<BAs...> negs_wff = _T<BAs...>;
+	tau_depreciating<BAs...> clause = _T<BAs...>;
+	tau_depreciating<BAs...> pos_bf = _0<BAs...>;
+	tau_depreciating<BAs...> negs_wff = _T<BAs...>;
 	for (size_t p = 0; p < path.size(); ++p) {
 		if (path[p]== 2) continue;
 		if (is_child_non_terminal(tp::bf_eq, vars[p])) {
@@ -1583,7 +1583,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	pos_bf = reduce(pos_bf, tau_parser::bf, false, true, false);
 	pos_bf = simp_general_excluded_middle(pos_bf);
 	// std::cout << "pos_bf after reduce: " << pos_bf << "\n";
-	tau<BAs...> new_pos_bf;
+	tau_depreciating<BAs...> new_pos_bf;
 	for (const auto& c : get_dnf_bf_clauses(pos_bf)) {
 		pos.emplace_back(get_cnf_bf_clauses(c));
 		if (new_pos_bf) new_pos_bf = build_wff_and(new_pos_bf, build_wff_eq(c));
@@ -1648,10 +1648,10 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 		}
 	}
 
-	tau<BAs...> neq_cnf;
+	tau_depreciating<BAs...> neq_cnf;
 	for (const auto& neq_clause : cnf_neq_lits) {
 		if (neq_clause.empty()) continue;
-		tau<BAs...> neqs;
+		tau_depreciating<BAs...> neqs;
         for (const auto& n : neq_clause) {
         	if (n.empty()) continue;
 	        if(neqs) neqs = build_wff_or(neqs, build_wff_neq(build_bf_and<BAs...>(n)));
@@ -1703,7 +1703,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 }
 
 template<typename...BAs>
-std::pair<tau<BAs...>, bool> group_paths_and_simplify(
+std::pair<tau_depreciating<BAs...>, bool> group_paths_and_simplify(
 	std::vector<std::vector<int_t> >& paths, const auto& vars)
 {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start group_paths_and_simplify";
@@ -1742,17 +1742,17 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 
 	// paths[0] is connected to all in groups[0]
 	auto neq_from_path = [&](const auto& path) {
-		tau<BAs...> clause = _T<BAs...>;
+		tau_depreciating<BAs...> clause = _T<BAs...>;
 		for (size_t k = 0; k < path.size(); ++k) {
 			if (path[k] == -1 && is_child_non_terminal(tp::bf_eq, vars[k]))
 				clause = build_wff_and(clause, build_wff_neq(trim2(vars[k])));
 		}
 		return clause;
 	};
-	tau<BAs...> result = _F<BAs...>;
+	tau_depreciating<BAs...> result = _F<BAs...>;
 	for (size_t i = 0; i < paths.size(); ++i) {
 		// Now add from paths[i] and groups[i]
-		tau<BAs...> neqs = neq_from_path(paths[i]);
+		tau_depreciating<BAs...> neqs = neq_from_path(paths[i]);
 		for (const auto& path : groups[i])
 			neqs = build_wff_or(neqs, neq_from_path(path));
 		if (!groups[i].empty()) {
@@ -1775,7 +1775,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 		if (clause_false) continue;
 		// std::cout << "neq_clause after reduce: " << neq_clauses << "\n";
 		// Simplify neqs with assumptions from = part
-		tau<BAs...> rest = _T<BAs...>;
+		tau_depreciating<BAs...> rest = _T<BAs...>;
 		for (size_t k = 0; k < paths[i].size(); ++k) {
 			if (paths[i][k] == 1) {
 				if (is_child_non_terminal(tp::bf_eq, vars[k])) {
@@ -1817,7 +1817,7 @@ std::pair<tau<BAs...>, bool> group_paths_and_simplify(
 }
 
 template<typename... BAs>
-tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
+tau_depreciating<BAs...> reduce_across_bfs (const tau_depreciating<BAs...>& fm, bool to_cnf) {
 	// std::cout << "Start reduce_across_bfs\n";
 	// std::cout << "(F) " << fm << "\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start reduce_across_bfs with";
@@ -1833,7 +1833,7 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 	// std::cout << "squeezed_fm: " << squeezed_fm << "\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Formula in DNF: " << squeezed_fm;
 #ifdef TAU_CACHE
-		static std::map<std::pair<tau<BAs...>, bool>, tau<BAs...>> cache;
+		static std::map<std::pair<tau_depreciating<BAs...>, bool>, tau_depreciating<BAs...>> cache;
 		if (auto it = cache.find(make_pair(squeezed_fm, to_cnf)); it != end(cache))
 			return it->second;
 #endif // TAU_CACHE
@@ -1960,33 +1960,33 @@ tau<BAs...> reduce_across_bfs (const tau<BAs...>& fm, bool to_cnf) {
 
 template<typename... BAs>
 struct wff_reduce_dnf {
-	tau<BAs...> operator() (const tau<BAs...>& fm) const {
+	tau_depreciating<BAs...> operator() (const tau_depreciating<BAs...>& fm) const {
 		return reduce(fm, tau_parser::wff);
 	}
 };
 
 template<typename... BAs>
 struct wff_reduce_cnf {
-	tau<BAs...> operator() (const tau<BAs...>& fm) const {
+	tau_depreciating<BAs...> operator() (const tau_depreciating<BAs...>& fm) const {
 		return reduce(fm, tau_parser::wff, true);
 	}
 };
 
 template<typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& fm, const wff_reduce_dnf<BAs...>& r) {
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& fm, const wff_reduce_dnf<BAs...>& r) {
 	return r(fm);
 }
 
 template<typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& fm, const wff_reduce_cnf<BAs...>& r) {
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& fm, const wff_reduce_cnf<BAs...>& r) {
 	return r(fm);
 }
 
 template<typename... BAs>
-tau<BAs...> conjunct_dnfs_to_dnf (const tau<BAs...>& d1, const tau<BAs...>& d2) {
+tau_depreciating<BAs...> conjunct_dnfs_to_dnf (const tau_depreciating<BAs...>& d1, const tau_depreciating<BAs...>& d2) {
 	if (is_non_terminal(tau_parser::wff, d1)) {
 		assert(is_non_terminal(tau_parser::wff, d2));
-		tau<BAs...> res = _F<BAs...>;
+		tau_depreciating<BAs...> res = _F<BAs...>;
 		auto clauses_d1 = get_dnf_wff_clauses(d1);
 		auto clauses_d2 = get_dnf_wff_clauses(d2);
 		for (const auto& dis1 : clauses_d1)
@@ -1995,7 +1995,7 @@ tau<BAs...> conjunct_dnfs_to_dnf (const tau<BAs...>& d1, const tau<BAs...>& d2) 
 		return res;
 	} else {
 		assert(is_non_terminal(tau_parser::bf, d1) && is_non_terminal(tau_parser::bf, d2));
-		tau<BAs...> res = _0<BAs...>;
+		tau_depreciating<BAs...> res = _0<BAs...>;
 		auto clauses_d1 = get_dnf_bf_clauses(d1);
 		auto clauses_d2 = get_dnf_bf_clauses(d2);
 		for (const auto& dis1 : clauses_d1)
@@ -2006,10 +2006,10 @@ tau<BAs...> conjunct_dnfs_to_dnf (const tau<BAs...>& d1, const tau<BAs...>& d2) 
 }
 
 template<typename... BAs>
-tau<BAs...> disjunct_cnfs_to_cnf (const tau<BAs...>& c1, const tau<BAs...>& c2) {
+tau_depreciating<BAs...> disjunct_cnfs_to_cnf (const tau_depreciating<BAs...>& c1, const tau_depreciating<BAs...>& c2) {
 	if (is_non_terminal(tau_parser::wff, c1)) {
 		assert(is_non_terminal(tau_parser::wff, c2));
-		tau<BAs...> res = _T<BAs...>;
+		tau_depreciating<BAs...> res = _T<BAs...>;
 		auto clauses_c1 = get_cnf_wff_clauses(c1);
 		auto clauses_c2 = get_cnf_wff_clauses(c2);
 		for (const auto& dis1 : clauses_c1)
@@ -2018,7 +2018,7 @@ tau<BAs...> disjunct_cnfs_to_cnf (const tau<BAs...>& c1, const tau<BAs...>& c2) 
 		return res;
 	} else {
 		assert(is_non_terminal(tau_parser::bf, c1) && is_non_terminal(tau_parser::bf, c2));
-		tau<BAs...> res = _1<BAs...>;
+		tau_depreciating<BAs...> res = _1<BAs...>;
 		auto clauses_c1 = get_cnf_bf_clauses(c1);
 		auto clauses_c2 = get_cnf_bf_clauses(c2);
 		for (const auto& dis1 : clauses_c1)
@@ -2030,7 +2030,7 @@ tau<BAs...> disjunct_cnfs_to_cnf (const tau<BAs...>& c1, const tau<BAs...>& c2) 
 
 // Can be used for Tau formula and Boolean function
 template<bool is_wff = true, typename... BAs>
-tau<BAs...> push_negation_one_in(const tau<BAs...>& fm) {
+tau_depreciating<BAs...> push_negation_one_in(const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	// Tau formula rules
 	if constexpr (is_wff) if (is_child_non_terminal(p::wff_neg, fm)) {
@@ -2072,7 +2072,7 @@ tau<BAs...> push_negation_one_in(const tau<BAs...>& fm) {
 
 // Can be used for Tau formula and Boolean function
 template<bool is_wff, typename... BAs>
-tau<BAs...> push_negation_in(const tau<BAs...>& fm) {
+tau_depreciating<BAs...> push_negation_in(const tau_depreciating<BAs...>& fm) {
 	auto pn = [](const auto& n) {
 		return push_negation_one_in<is_wff>(n);
 	};
@@ -2086,7 +2086,7 @@ tau<BAs...> push_negation_in(const tau<BAs...>& fm) {
 
 // Conversion to dnf while applying reductions during the process
 template<bool is_wff, typename... BAs>
-tau<BAs...> to_dnf(const tau<BAs...>& fm) {
+tau_depreciating<BAs...> to_dnf(const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	auto layer_to_dnf = [](const auto& n) {
 		if constexpr (is_wff) if (is_non_terminal(p::wff, n)) {
@@ -2126,7 +2126,7 @@ tau<BAs...> to_dnf(const tau<BAs...>& fm) {
 }
 
 template<typename... BAs>
-tau<BAs...> single_dnf_lift(const tau<BAs...>& fm) {
+tau_depreciating<BAs...> single_dnf_lift(const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	auto layer_to_dnf = [](const auto& n) {
 		if (is_child_non_terminal(p::wff_and, n)) {
@@ -2164,7 +2164,7 @@ tau<BAs...> single_dnf_lift(const tau<BAs...>& fm) {
 
 // Conversion to cnf while applying reductions during the process
 template<bool is_wff, typename... BAs>
-tau<BAs...> to_cnf(const tau<BAs...>& fm) {
+tau_depreciating<BAs...> to_cnf(const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	auto layer_to_cnf = [](const auto& n) {
 		if constexpr (is_wff) if (is_non_terminal(p::wff, n)) {
@@ -2203,14 +2203,14 @@ tau<BAs...> to_cnf(const tau<BAs...>& fm) {
 
 // Assumes that fm is a single DNF always clause
 template<typename... BAs>
-tau<BAs...> rm_temporary_lookback (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> rm_temporary_lookback (const tau_depreciating<BAs...>& fm) {
 	auto io_vars = rewriter::select_top(fm,
 		is_child_non_terminal<tau_parser::io_var, BAs...>);
 	bool has_var = std::ranges::any_of(io_vars,
 		[](const auto& el){return !is_io_initial(el);});
 	int_t lookback = get_max_shift(io_vars, true);
-	std::map<tau<BAs...>, tau<BAs...>> changes;
-	tau<BAs...> max_temp;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
+	tau_depreciating<BAs...> max_temp;
 	for (const auto& io_var : io_vars) {
 		auto n = get_io_name(io_var);
 		// Only eliminate lookback temporary variables
@@ -2235,16 +2235,16 @@ tau<BAs...> rm_temporary_lookback (const tau<BAs...>& fm) {
 
 // Assumes a single sometimes DNF clause with negation pushed in containing no wff_or with max nesting depth 1
 template<typename... BAs>
-tau<BAs...> extract_sometimes (tau<BAs...> fm) {
-	std::map<tau<BAs...>, tau<BAs...>> l_changes = {};
+tau_depreciating<BAs...> extract_sometimes (tau_depreciating<BAs...> fm) {
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> l_changes = {};
 	// Collect remaining nested "sometimes" formulas
-	std::vector<tau<BAs...>> sometimes_extractions = {};
+	std::vector<tau_depreciating<BAs...>> sometimes_extractions = {};
 	for (const auto &inner_st: select_top(trim2(fm), is_child_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
 		l_changes[inner_st] = _T<BAs...>;
 		sometimes_extractions.push_back(inner_st);
 	}
 	// Collect remaining nested "always" formulas
-	std::vector<tau<BAs...>> always_extractions = {};
+	std::vector<tau_depreciating<BAs...>> always_extractions = {};
 	for (const auto &inner_aw: select_top(trim2(fm), is_child_non_terminal<tau_parser::wff_always, BAs...>)) {
 		l_changes[inner_aw] = _T<BAs...>;
 		always_extractions.push_back(inner_aw);
@@ -2252,7 +2252,7 @@ tau<BAs...> extract_sometimes (tau<BAs...> fm) {
 	// Apply always/sometimes extractions to fm
 	if (!l_changes.empty()) fm = replace(fm, l_changes);
 
-	tau<BAs...> extracted_fm = _T<BAs...>;
+	tau_depreciating<BAs...> extracted_fm = _T<BAs...>;
     for (const auto &se: sometimes_extractions)
 		extracted_fm = build_wff_and(extracted_fm, se);
 	for (const auto &ae : always_extractions)
@@ -2262,7 +2262,7 @@ tau<BAs...> extract_sometimes (tau<BAs...> fm) {
 	if (fm == _T<BAs...>) return extracted_fm;
 	if (fm == _F<BAs...>) return _F<BAs...>;
 
-	std::vector<tau<BAs...>> extracted = {}, staying = {};
+	std::vector<tau_depreciating<BAs...>> extracted = {}, staying = {};
 	auto clauses = get_leaves(trim2(fm), tau_parser::wff_and);
 	for (const auto& clause : clauses) {
 		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(clause)) &&
@@ -2276,7 +2276,7 @@ tau<BAs...> extract_sometimes (tau<BAs...> fm) {
     for (const auto &e: extracted) extracted_fm = build_wff_and(extracted_fm, e);
 
 	if (staying.empty()) return extracted_fm;
-	tau<BAs...> staying_fm = _T<BAs...>;
+	tau_depreciating<BAs...> staying_fm = _T<BAs...>;
     for (const auto &s: staying)
          staying_fm = build_wff_and(staying_fm, s);
 
@@ -2286,16 +2286,16 @@ tau<BAs...> extract_sometimes (tau<BAs...> fm) {
 
 // Assumes a single DNF always clause in cnf with negation pushed in containing no wff_and with max nesting depth 1
 template<typename... BAs>
-tau<BAs...> extract_always (tau<BAs...> fm) {
-	std::map<tau<BAs...>, tau<BAs...>> l_changes = {};
+tau_depreciating<BAs...> extract_always (tau_depreciating<BAs...> fm) {
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> l_changes = {};
 	// Collect remaining nested "sometimes" formulas
-	std::vector<tau<BAs...>> sometimes_extractions = {};
+	std::vector<tau_depreciating<BAs...>> sometimes_extractions = {};
 	for (const auto &inner_st: select_top(trim2(fm), is_child_non_terminal<tau_parser::wff_sometimes, BAs...>)) {
 		l_changes[inner_st] = _F<BAs...>;
 		sometimes_extractions.push_back(inner_st);
 	}
 	// Collect remaining nested "always" formulas
-	std::vector<tau<BAs...>> always_extractions = {};
+	std::vector<tau_depreciating<BAs...>> always_extractions = {};
 	for (const auto &inner_aw: select_top(trim2(fm), is_child_non_terminal<tau_parser::wff_always, BAs...>)) {
 		l_changes[inner_aw] = _F<BAs...>;
 		always_extractions.push_back(inner_aw);
@@ -2303,7 +2303,7 @@ tau<BAs...> extract_always (tau<BAs...> fm) {
 	// Apply always/sometimes extractions to flat_st
 	if (!l_changes.empty()) fm = replace(fm, l_changes);
 
-	tau<BAs...> extracted_fm = _F<BAs...>;
+	tau_depreciating<BAs...> extracted_fm = _F<BAs...>;
     for (const auto &se: sometimes_extractions)
 		extracted_fm = build_wff_or(extracted_fm, se);
 	for (const auto &ae : always_extractions)
@@ -2314,7 +2314,7 @@ tau<BAs...> extract_always (tau<BAs...> fm) {
 	if (fm == _T<BAs...>) return _T<BAs...>;
 
 	// Now extract from all disjuncts
-	std::vector<tau<BAs...>> extracted = {}, staying = {};
+	std::vector<tau_depreciating<BAs...>> extracted = {}, staying = {};
 	auto clauses = get_leaves(trim2(fm), tau_parser::wff_or);
 	for (const auto& clause : clauses) {
 		assert(!is_non_terminal(tau_parser::wff_sometimes, trim(clause)) &&
@@ -2328,7 +2328,7 @@ tau<BAs...> extract_always (tau<BAs...> fm) {
     for (const auto &e: extracted) extracted_fm = build_wff_or(extracted_fm, e);
 
 	if (staying.empty()) return extracted_fm;
-	tau<BAs...> staying_fm = _F<BAs...>;
+	tau_depreciating<BAs...> staying_fm = _F<BAs...>;
     for (const auto &s: staying)
          staying_fm = build_wff_or(staying_fm, s);
 
@@ -2338,8 +2338,8 @@ tau<BAs...> extract_always (tau<BAs...> fm) {
 
 // Recursively extract non-dependend formulas under sometimes
 template<typename... BAs>
-tau<BAs...> push_sometimes_always_in (tau<BAs...> fm, auto& visited) {
-	std::map<tau<BAs...>, tau<BAs...>> g_changes = {};
+tau_depreciating<BAs...> push_sometimes_always_in (tau_depreciating<BAs...> fm, auto& visited) {
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> g_changes = {};
 	for (const auto &st : select_top_until(fm, is_child_non_terminal<tau_parser::wff_sometimes, BAs...>,
 								is_child_non_terminal<tau_parser::wff_always, BAs...>)) {
 		// Recursively denest sometimes and always statements contained in sometimes statement st
@@ -2403,9 +2403,9 @@ tau<BAs...> push_sometimes_always_in (tau<BAs...> fm, auto& visited) {
 
 // Shift the lookback in a formula
 template<typename... BAs>
-tau<BAs...> shift_io_vars_in_fm (const tau<BAs...>& fm, const auto& io_vars, const int_t shift) {
+tau_depreciating<BAs...> shift_io_vars_in_fm (const tau_depreciating<BAs...>& fm, const auto& io_vars, const int_t shift) {
 	if (shift <= 0) return fm;
-	std::map<tau<BAs...>, tau<BAs...>> changes;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 	for (const auto& io_var: io_vars) {
 		// Skip initial conditions
 		if (is_io_initial(io_var))
@@ -2423,11 +2423,11 @@ tau<BAs...> shift_io_vars_in_fm (const tau<BAs...>& fm, const auto& io_vars, con
 }
 
 template<typename... BAs>
-tau<BAs...> shift_const_io_vars_in_fm(const tau<BAs...>& fm,
+tau_depreciating<BAs...> shift_const_io_vars_in_fm(const tau_depreciating<BAs...>& fm,
 					const auto& io_vars, const int_t shift) {
 	if (shift <= 0) return fm;
 	using p = tau_parser;
-	std::map<tau<BAs...>, tau<BAs...>> changes;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 	for (const auto& io_var : io_vars) {
 		if (!is_io_initial(io_var))
 			continue;
@@ -2453,9 +2453,9 @@ tau<BAs...> shift_const_io_vars_in_fm(const tau<BAs...>& fm,
 
 // Assumes a single DNF clause and normalizes the "always" parts into one
 template<typename... BAs>
-tau<BAs...> pull_always_out(const tau<BAs...>& fm) {
-	std::map<tau<BAs...>, tau<BAs...>> l_changes = {};
-	std::vector<tau<BAs...>> collected_always_fms;
+tau_depreciating<BAs...> pull_always_out(const tau_depreciating<BAs...>& fm) {
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> l_changes = {};
+	std::vector<tau_depreciating<BAs...>> collected_always_fms;
 	// Collect all always statments in the clause fm
 	// by analyzing conjuncts
 	auto clauses = get_leaves(fm, tau_parser::wff_and);
@@ -2475,7 +2475,7 @@ tau<BAs...> pull_always_out(const tau<BAs...>& fm) {
 	}
 	if (collected_always_fms.empty()) return fm;
 	// Rebuild formula based on the extraction
-	tau<BAs...> always_part;
+	tau_depreciating<BAs...> always_part;
 	int_t lookback = 0;
 	bool first = true;
 	for (auto& fa : collected_always_fms) {
@@ -2510,10 +2510,10 @@ tau<BAs...> pull_always_out(const tau<BAs...>& fm) {
 // We assume that there is no nesting of "sometimes" and "always" in fm
 // and that fm is in DNF
 template<typename... BAs>
-tau<BAs...> pull_sometimes_always_out(tau<BAs...> fm) {
-	std::map<tau<BAs...>, tau<BAs...>> changes = {};
-	std::vector<tau<BAs...>> collected_no_temp_fms;
-	tau<BAs...> pure_always_clause;
+tau_depreciating<BAs...> pull_sometimes_always_out(tau_depreciating<BAs...> fm) {
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes = {};
+	std::vector<tau_depreciating<BAs...>> collected_no_temp_fms;
+	tau_depreciating<BAs...> pure_always_clause;
 	// Collect all disjuncts which have temporal variables and call pull_always_out on the others
 	auto clauses = get_leaves(fm, tau_parser::wff_or);
 	if(clauses.empty()) clauses.push_back(fm);
@@ -2532,7 +2532,7 @@ tau<BAs...> pull_sometimes_always_out(tau<BAs...> fm) {
 	}
 	if (!changes.empty()) fm = replace(fm, changes);
 	if(!collected_no_temp_fms.empty()) {
-		tau<BAs...> no_temp_fm;
+		tau_depreciating<BAs...> no_temp_fm;
 		bool first = true;
 		for (const auto& f : collected_no_temp_fms) {
 			if (first) {first = false; no_temp_fm = f;}
@@ -2551,7 +2551,7 @@ tau<BAs...> pull_sometimes_always_out(tau<BAs...> fm) {
 // The needed class in order to make sometimes/always normalization work with normalizer
 template<typename... BAs>
 struct sometimes_always_normalization_depreciated {
-	tau<BAs...> operator() (const tau<BAs...>& fm) const {
+	tau_depreciating<BAs...> operator() (const tau_depreciating<BAs...>& fm) const {
 		auto st_aw = [](const auto& n) {
 			return is_child_non_terminal(tau_parser::wff_sometimes, n) ||
 				is_child_non_terminal(tau_parser::wff_always, n);
@@ -2564,15 +2564,15 @@ struct sometimes_always_normalization_depreciated {
 		}
 
 		// Scope formula under always if not already under sometimes or always
-		tau<BAs...> res = !st_aw(fm) ? build_wff_always(fm) : fm;
+		tau_depreciating<BAs...> res = !st_aw(fm) ? build_wff_always(fm) : fm;
 		// conversion to DNF necessary for pull_sometimes_always_out
-		std::set<tau<BAs...>> visited;
+		std::set<tau_depreciating<BAs...>> visited;
 		res = to_dnf(push_sometimes_always_in(res, visited));
 		res = reduce(res, tau_parser::wff);
 		res = pull_sometimes_always_out(res);
 		auto temp_inner = select_top(res, st_aw);
 		if (temp_inner.empty()) return res;
-		std::map<tau<BAs...>, tau<BAs...>> changes;
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 		for (const auto& f : temp_inner) {
 			// Reduction done to normalize again now that sometimes/always are all the way out
 			changes[trim2(f)] = reduce_across_bfs(trim2(f), false);
@@ -2583,7 +2583,7 @@ struct sometimes_always_normalization_depreciated {
 
 // Adjust the lookback before conjunction of fm1 and fm2
 template<typename...BAs>
-tau<BAs...> always_conjunction (const tau<BAs...>& fm1_aw, const tau<BAs...>& fm2_aw) {
+tau_depreciating<BAs...> always_conjunction (const tau_depreciating<BAs...>& fm1_aw, const tau_depreciating<BAs...>& fm2_aw) {
 	using p = tau_parser;
 	// Trim the always node if present
 	auto fm1 = is_child_non_terminal(p::wff_always, fm1_aw) ? trim2(fm1_aw) : fm1_aw;
@@ -2611,7 +2611,7 @@ tau<BAs...> always_conjunction (const tau<BAs...>& fm1_aw, const tau<BAs...>& fm
 
 template<typename... BAs>
 struct sometimes_always_normalization {
-	tau<BAs...> operator() (const tau<BAs...>& fm) const {
+	tau_depreciating<BAs...> operator() (const tau_depreciating<BAs...>& fm) const {
 		using p = tau_parser;
 		auto st_aw = [](const auto& n) {
 			return is_child_non_terminal(p::wff_sometimes, n) ||
@@ -2622,7 +2622,7 @@ struct sometimes_always_normalization {
 		}
 		// Delete all always/sometimes if they scope no temporal variable
 		auto temps = select_top(fm, st_aw);
-		std::map<tau<BAs...>, tau<BAs...>> changes;
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 		for (const auto& temp : temps) {
 			if (!has_temp_var(temp))
 				changes.emplace(temp, trim2(temp));
@@ -2632,18 +2632,18 @@ struct sometimes_always_normalization {
 				changes.empty()
 					? fm
 					: replace(fm, changes), false));
-		tau<BAs...> res = _F<BAs...>;
-		tau<BAs...> always_disjuncts = _F<BAs...>;
-		for (const tau<BAs...>& clause : clauses) {
+		tau_depreciating<BAs...> res = _F<BAs...>;
+		tau_depreciating<BAs...> always_disjuncts = _F<BAs...>;
+		for (const tau_depreciating<BAs...>& clause : clauses) {
 			// If clause does not contain sometimes/always but temporal variables, we add it to always_disjuncts
 			if (!find_top(clause, st_aw)) {
 				always_disjuncts = build_wff_or(always_disjuncts, clause);
 				continue;
 			}
 			auto conjuncts = get_cnf_wff_clauses(clause);
-			tau<BAs...> always_part = _T<BAs...>;
-			tau<BAs...> staying = _T<BAs...>;
-			for (const tau<BAs...>& conj : conjuncts) {
+			tau_depreciating<BAs...> always_part = _T<BAs...>;
+			tau_depreciating<BAs...> staying = _T<BAs...>;
+			for (const tau_depreciating<BAs...>& conj : conjuncts) {
 				if (!st_aw(conj))
 					always_part = always_conjunction(always_part, conj);
 				else if (is_child_non_terminal(p::wff_always, conj))
@@ -2667,23 +2667,23 @@ struct sometimes_always_normalization {
 
 // Assumes that fm is normalized
 template<typename... BAs>
-tau<BAs...> pull_always_out_for_inf (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> pull_always_out_for_inf (const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	// Get all always statments on each clause and merge
 	auto clauses = get_dnf_wff_clauses(fm);
-	tau<BAs...> res = _F<BAs...>;
-	tau<BAs...> non_temps = _F<BAs...>;
-	tau<BAs...> last_always;
-	for (const tau<BAs...>& clause : clauses) {
+	tau_depreciating<BAs...> res = _F<BAs...>;
+	tau_depreciating<BAs...> non_temps = _F<BAs...>;
+	tau_depreciating<BAs...> last_always;
+	for (const tau_depreciating<BAs...>& clause : clauses) {
 		// Clauses not containing temporal variables need to be added under always
 		if (!has_temp_var(clause)) {
 			non_temps = build_wff_or(non_temps, clause);
 			continue;
 		}
 		auto conjuncts = get_cnf_wff_clauses(clause);
-		tau<BAs...> always_statements = _T<BAs...>;
-		tau<BAs...> staying = _T<BAs...>;
-		for (const tau<BAs...>& conj : conjuncts) {
+		tau_depreciating<BAs...> always_statements = _T<BAs...>;
+		tau_depreciating<BAs...> staying = _T<BAs...>;
+		for (const tau_depreciating<BAs...>& conj : conjuncts) {
 			if (is_child_non_terminal(p::wff_always, conj))
 				always_statements = build_wff_and(always_statements, trim2(conj));
 			else if (!is_child_non_terminal(p::wff_sometimes, conj))
@@ -2705,16 +2705,16 @@ tau<BAs...> pull_always_out_for_inf (const tau<BAs...>& fm) {
 }
 
 template<typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& fm, const sometimes_always_normalization<BAs...>& r) {
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& fm, const sometimes_always_normalization<BAs...>& r) {
 	return r(fm);
 }
 
 template <typename... BAs>
-tau<BAs...> push_existential_quantifier_one (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> push_existential_quantifier_one (const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	assert(is_child_non_terminal(p::wff_ex, fm));
-	const tau<BAs...> scoped_fm = trim(fm)->child[1];
-	const tau<BAs...> quant_var = trim2(fm);
+	const tau_depreciating<BAs...> scoped_fm = trim(fm)->child[1];
+	const tau_depreciating<BAs...> quant_var = trim2(fm);
 
 	if (is_child_non_terminal(p::wff_or, scoped_fm)) {
 		// Push quantifier in
@@ -2725,8 +2725,8 @@ tau<BAs...> push_existential_quantifier_one (const tau<BAs...>& fm) {
 	else if (is_child_non_terminal(p::wff_and, scoped_fm)) {
 		// Remove existential, if quant_var does not appear in clause
 		auto clauses = get_cnf_wff_clauses(scoped_fm);
-		tau<BAs...> no_q_fm = _T<BAs...>;
-		for (tau<BAs...>& clause : clauses) {
+		tau_depreciating<BAs...> no_q_fm = _T<BAs...>;
+		for (tau_depreciating<BAs...>& clause : clauses) {
 			if (!contains(clause, quant_var)) {
 				no_q_fm = build_wff_and(no_q_fm, clause);
 				clause = _T<BAs...>;
@@ -2749,11 +2749,11 @@ tau<BAs...> push_existential_quantifier_one (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-tau<BAs...> push_universal_quantifier_one (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> push_universal_quantifier_one (const tau_depreciating<BAs...>& fm) {
 	using p = tau_parser;
 	assert(is_child_non_terminal(p::wff_all, fm));
-	const tau<BAs...> scoped_fm = trim(fm)->child[1];
-	const tau<BAs...> quant_var = trim2(fm);
+	const tau_depreciating<BAs...> scoped_fm = trim(fm)->child[1];
+	const tau_depreciating<BAs...> quant_var = trim2(fm);
 
 	if (is_child_non_terminal(p::wff_and, scoped_fm)) {
 		// Push quantifier in
@@ -2764,8 +2764,8 @@ tau<BAs...> push_universal_quantifier_one (const tau<BAs...>& fm) {
 	else if (is_child_non_terminal(p::wff_or, scoped_fm)) {
 		// Remove existential, if quant_var does not appear in clause
 		auto clauses = get_dnf_wff_clauses(scoped_fm);
-		tau<BAs...> no_q_fm = _F<BAs...>;
-		for (tau<BAs...>& clause : clauses) {
+		tau_depreciating<BAs...> no_q_fm = _F<BAs...>;
+		for (tau_depreciating<BAs...>& clause : clauses) {
 			if (!contains(clause, quant_var)) {
 				no_q_fm = build_wff_or(no_q_fm, clause);
 				clause = _F<BAs...>;
@@ -2790,7 +2790,7 @@ tau<BAs...> push_universal_quantifier_one (const tau<BAs...>& fm) {
 // Squeeze all equalities found in n
 //TODO: make it type depended
 template <typename... BAs>
-std::optional<tau<BAs...>> squeeze_positives(const tau<BAs...>& n) {
+std::optional<tau_depreciating<BAs...>> squeeze_positives(const tau_depreciating<BAs...>& n) {
 	if (auto positives = select_top(n, is_non_terminal<tau_parser::bf_eq, BAs...>);
 			positives.size() > 0) {
 		for (auto& p: positives) p = trim(p);
@@ -2800,14 +2800,14 @@ std::optional<tau<BAs...>> squeeze_positives(const tau<BAs...>& n) {
 }
 
 template<typename... BAs>
-tau<BAs...> wff_remove_existential(const tau<BAs...>& var, const tau<BAs...>& wff) {
+tau_depreciating<BAs...> wff_remove_existential(const tau_depreciating<BAs...>& var, const tau_depreciating<BAs...>& wff) {
 	// Following Corollary 2.3 from Taba book from Ohad
-	std::map<tau<BAs...>, tau<BAs...>> changes;
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes;
 	for (const auto& l: get_leaves(wff, tau_parser::wff_or)) {
 		// if var does not appear in the clause, we can skip it
 		if (!contains(l, var)) continue;
 		// Get each conjunct in clause
-		tau<BAs...> nl = _T<BAs...>;
+		tau_depreciating<BAs...> nl = _T<BAs...>;
 		bool is_quant_removable_in_clause = true;
 		auto conjs = get_cnf_wff_clauses(l);
 		for (auto& conj : conjs) {
@@ -2839,7 +2839,7 @@ tau<BAs...> wff_remove_existential(const tau<BAs...>& var, const tau<BAs...>& wf
 		if (auto neqs = select_all(new_l, is_non_terminal<tau_parser::bf_neq, BAs...>); neqs.size() > 0) {
 			auto nneqs = _T<BAs...>;
 			for (auto& neq: neqs) {
-				auto g = neq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
+				auto g = neq | tau_parser::bf | optional_value_extractor<tau_depreciating<BAs...>>;
 				auto g_0 = replace(g, var, _0_trimmed<BAs...>);
 				auto g_1 = replace(g, var, _1_trimmed<BAs...>);
 				// If both are 1 then inequality is implied by f_0f_1 = 0
@@ -2859,11 +2859,11 @@ tau<BAs...> wff_remove_existential(const tau<BAs...>& var, const tau<BAs...>& wf
 		}
 		changes[l] = nl;
 	}
-	return replace<tau<BAs...>>(wff, changes);
+	return replace<tau_depreciating<BAs...>>(wff, changes);
 }
 
 template<typename... BAs>
-tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_fm) {
+tau_depreciating<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_fm) {
 	// Reductions to prevent blow ups and achieve DNF
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start existential quantifier elimination";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << trim2(inner_fm);
@@ -2872,13 +2872,13 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 	scoped_fm = reduce_across_bfs(scoped_fm, false);
 
 #ifdef TAU_CACHE
-		static std::map<std::pair<tau<BAs...>,tau<BAs...>>, tau<BAs...>> cache;
+		static std::map<std::pair<tau_depreciating<BAs...>,tau_depreciating<BAs...>>, tau_depreciating<BAs...>> cache;
 		if (auto it = cache.find(make_pair(inner_fm, scoped_fm)); it != end(cache))
 			return it->second;
 #endif // TAU_CACHE
 
 	auto clauses = get_leaves(scoped_fm, tau_parser::wff_or);
-	tau<BAs...> res;
+	tau_depreciating<BAs...> res;
 	for (const auto& clause : clauses) {
 		// Check if every conjunct in clause is of form f = 0 or f != 0
 		auto conjuncts = get_leaves(clause, tau_parser::wff_and);
@@ -2890,7 +2890,7 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 				all_unequal_zero = false;
 		}
 		if (all_unequal_zero) {
-			tau<BAs...> new_conjunct;
+			tau_depreciating<BAs...> new_conjunct;
 			// Push quantifier inside conjunction
 			for (const auto& c : conjuncts) {
 				auto new_c = wff_remove_existential(trim2(inner_fm), c);
@@ -2903,7 +2903,7 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 		}
 		else if (all_equal_zero) {
 			//TODO: If they have different type, seperate
-			tau<BAs...> new_func;
+			tau_depreciating<BAs...> new_func;
 			for (const auto& d: conjuncts) {
 				if (new_func) new_func = build_bf_or(new_func, trim2(d));
 				else new_func = trim2(d);
@@ -2933,7 +2933,7 @@ tau<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped_
 }
 
 template<typename... BAs>
-tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm) {
+tau_depreciating<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start universal quantifier elimination";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << trim2(inner_fm);
 	BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << scoped_fm;
@@ -2942,13 +2942,13 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 	scoped_fm = reduce_across_bfs(scoped_fm, true);
 // Add cache after reductions; reductions are cached as well
 #ifdef TAU_CACHE
-		static std::map<std::pair<tau<BAs...>,tau<BAs...>>, tau<BAs...>> cache;
+		static std::map<std::pair<tau_depreciating<BAs...>,tau_depreciating<BAs...>>, tau_depreciating<BAs...>> cache;
 		if (auto it = cache.find(make_pair(inner_fm, scoped_fm)); it != end(cache))
 			return it->second;
 #endif // TAU_CACHE
 
 	auto clauses = get_leaves(scoped_fm, tau_parser::wff_and);
-	tau<BAs...> res;
+	tau_depreciating<BAs...> res;
 	for (const auto &clause: clauses) {
 		// Check if every disjunct in clause is of form f = 0 or f != 0
 		auto disjuncts = get_leaves(clause, tau_parser::wff_or);
@@ -2960,7 +2960,7 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 				all_unequal_zero = false;
 		}
 		if (all_equal_zero) {
-			tau<BAs...> new_disjunct;
+			tau_depreciating<BAs...> new_disjunct;
 			// Push quantifier inside disjunction
 			for (const auto &d: disjuncts) {
 				auto new_d = push_negation_in(build_wff_neg(d));
@@ -2974,7 +2974,7 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 			else res = new_disjunct;
 		}
 		if (all_unequal_zero) {
-			tau<BAs...> new_func;
+			tau_depreciating<BAs...> new_func;
 			for (const auto &d: disjuncts) {
 				if (new_func) new_func = build_bf_or(new_func, trim2(d));
 				else new_func = trim2(d);
@@ -3008,10 +3008,10 @@ tau<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_fm
 // Pushes all universal and existential quantifiers as deep as possible into the formula
 // and then eliminate them, returning a quantifier free formula
 template<typename... BAs>
-tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
+tau_depreciating<BAs...> eliminate_quantifiers(const tau_depreciating<BAs...>& fm) {
 	// Lambda is applied to nodes of fm in post order after quantifiers have
 	// been pushed in
-	auto elim_quant = [](const tau<BAs...>& inner_fm) -> tau<BAs...> {
+	auto elim_quant = [](const tau_depreciating<BAs...>& inner_fm) -> tau_depreciating<BAs...> {
 		// Find out if current node is a quantifier
 		bool is_ex_quant;
 		if (is_child_non_terminal(tau_parser::wff_ex, inner_fm))
@@ -3037,7 +3037,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 		}
 	};
 	unordered_tau_set<BAs...> excluded_nodes;
-	auto push_quantifiers = [&excluded_nodes](const tau<BAs...>& n) {
+	auto push_quantifiers = [&excluded_nodes](const tau_depreciating<BAs...>& n) {
 		using p = tau_parser;
 		if (is_child_non_terminal(p::wff_ex, n)) {
 			auto pushed = push_existential_quantifier_one(n);
@@ -3058,7 +3058,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 		}
 		return n;
 	};
-	auto visit = [&excluded_nodes](const tau<BAs...>& n) {
+	auto visit = [&excluded_nodes](const tau_depreciating<BAs...>& n) {
 		using p = tau_parser;
 		if (is_non_terminal(p::bf, n)) return false;
 		// Do not visit subtrees below a maximally pushed quantifier
@@ -3067,7 +3067,7 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 	};
 	// Push quantifiers in during pre-order traversal
 	// and eliminate quantifiers during the traversal back up (post-order)
-	auto push_and_elim = [&elim_quant, &push_quantifiers, visit](const tau<BAs...>& n) {
+	auto push_and_elim = [&elim_quant, &push_quantifiers, visit](const tau_depreciating<BAs...>& n) {
 		if (is_child_quantifier<BAs...>(n)) {
 			return rewriter::pre_order(n).template
 			apply_unique<MemorySlotPre::eliminate_quantifiers_m>(
@@ -3079,14 +3079,14 @@ tau<BAs...> eliminate_quantifiers(const tau<BAs...>& fm) {
 
 // fm is assumed to be quantifier free
 template <typename... BAs>
-tau<BAs...> get_eq_with_most_quant_vars (const tau<BAs...>& fm, const auto& quant_vars) {
+tau_depreciating<BAs...> get_eq_with_most_quant_vars (const tau_depreciating<BAs...>& fm, const auto& quant_vars) {
 	using p = tau_parser;
 	// std::cout << "Begin get_eq_with_most_quant_vars with\n";
 	// std::cout << "fm: " << fm << "\n";
 	// std::cout << "quantified vars: " << quant_vars << "\n";
-	tau<BAs...> eq_max_quants;
+	tau_depreciating<BAs...> eq_max_quants;
 	int_t max_quants = 0;
-	auto get_eq = [&](const tau<BAs...>& n) {
+	auto get_eq = [&](const tau_depreciating<BAs...>& n) {
 		if (is_non_terminal(p::bf_eq, n)) {
 			// Found term
 			// Get vars
@@ -3109,7 +3109,7 @@ tau<BAs...> get_eq_with_most_quant_vars (const tau<BAs...>& fm, const auto& quan
 }
 
 template <typename... BAs>
-std::pair<tau<BAs...>, bool> anti_prenex_finalize_ex (const tau<BAs...>& q, const tau<BAs...>& scoped_fm) {
+std::pair<tau_depreciating<BAs...>, bool> anti_prenex_finalize_ex (const tau_depreciating<BAs...>& q, const tau_depreciating<BAs...>& scoped_fm) {
 	using p = tau_parser;
 	// Check if single disjunct
 	if (!find_top(scoped_fm, is_non_terminal<p::wff_or, BAs...>))
@@ -3118,7 +3118,7 @@ std::pair<tau<BAs...>, bool> anti_prenex_finalize_ex (const tau<BAs...>& q, cons
 	static unordered_tau_set<BAs...> mixed_eqs;
 	if (mixed_eqs.contains(scoped_fm)) return {scoped_fm, false};
 	bool all_atm_fm_neq = true, all_atm_fm_eq = true;
-	auto check_atm_fms = [&all_atm_fm_neq, &all_atm_fm_eq, &q](const tau<BAs...>& n) {
+	auto check_atm_fms = [&all_atm_fm_neq, &all_atm_fm_eq, &q](const tau_depreciating<BAs...>& n) {
 		if (is_non_terminal(p::bf_eq, n) && contains(n, q)) {
 			all_atm_fm_neq = false;
 			return all_atm_fm_eq != false;
@@ -3136,7 +3136,7 @@ std::pair<tau<BAs...>, bool> anti_prenex_finalize_ex (const tau<BAs...>& q, cons
 	if (all_atm_fm_neq) {
 		// std::cout << "all atomic fms are negative\n";
 		// All atomic formulas are of the form !=
-		auto elim_quants = [&q](const tau<BAs...>& n) {
+		auto elim_quants = [&q](const tau_depreciating<BAs...>& n) {
 			if (is_child_non_terminal(p::bf_neq, n) && contains(n, q)) {
 				return wff_remove_existential(q, n);
 			} else return n;
@@ -3145,7 +3145,7 @@ std::pair<tau<BAs...>, bool> anti_prenex_finalize_ex (const tau<BAs...>& q, cons
 			elim_quants, visit_wff<BAs...>, rewriter::identity), true};
 	} else if (all_atm_fm_eq) {
 		// std::cout << "all atomic fms are positive\n";
-		tau<BAs...> red = reduce_across_bfs(scoped_fm, false);
+		tau_depreciating<BAs...> red = reduce_across_bfs(scoped_fm, false);
 		return {wff_remove_existential(q, red), true};
 	}
 	mixed_eqs.insert(scoped_fm);
@@ -3153,9 +3153,9 @@ std::pair<tau<BAs...>, bool> anti_prenex_finalize_ex (const tau<BAs...>& q, cons
 }
 
 template <typename... BAs>
-tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
+tau_depreciating<BAs...> anti_prenex (const tau_depreciating<BAs...>& fm) {
 	unordered_tau_set<BAs...> excluded_nodes, quant_vars;
-	auto anti_prenex_step = [&excluded_nodes](const tau<BAs...>& n) {
+	auto anti_prenex_step = [&excluded_nodes](const tau_depreciating<BAs...>& n) {
 		if (is_child_quantifier<BAs...>(n)) {
 			// std::cout << "Start anti_prenex_step\n";
 			// Try push quant down
@@ -3166,7 +3166,7 @@ tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
 				// std::cout << "To " << pushed << "\n\n";
 				return pushed;
 			}
-			tau<BAs...> scoped_fm = trim(n)->child[1];
+			tau_depreciating<BAs...> scoped_fm = trim(n)->child[1];
 			const auto& q_v = trim2(n);
 			// Try apply finalize
 			auto [r, suc] = anti_prenex_finalize_ex(q_v, scoped_fm);
@@ -3181,7 +3181,7 @@ tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
 			}
 
 			// Try bf_reduce_across for now
-			tau<BAs...> res = eliminate_existential_quantifier<BAs...>(n, scoped_fm);
+			tau_depreciating<BAs...> res = eliminate_existential_quantifier<BAs...>(n, scoped_fm);
 			for (const auto& child : res->child)
 				excluded_nodes.insert(child);
 			return res;
@@ -3227,14 +3227,14 @@ tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
 			return res;*/
 		} else return n;
 	};
-	auto visit = [&excluded_nodes](const tau<BAs...>& n) {
+	auto visit = [&excluded_nodes](const tau_depreciating<BAs...>& n) {
 		using p = tau_parser;
 		if (is_non_terminal(p::bf, n))
 			return false;
 		if (excluded_nodes.contains(n)) return false;
 		return true;
 	};
-	auto inner_quant = [&anti_prenex_step, &visit, &quant_vars](const tau<BAs...>& n) {
+	auto inner_quant = [&anti_prenex_step, &visit, &quant_vars](const tau_depreciating<BAs...>& n) {
 		if (is_child_quantifier<BAs...>(n)) {
 			// TODO: implement universal quantifier explicitly
 			using p = tau_parser;
@@ -3273,7 +3273,7 @@ tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
 			}
 		} else return n;
 	};
-	auto visit_inner_quant = [&quant_vars](const tau<BAs...>& n) {
+	auto visit_inner_quant = [&quant_vars](const tau_depreciating<BAs...>& n) {
 		using p = tau_parser;
 		if (is_quantifier<BAs...>(n))
 			quant_vars.insert(trim(n));
@@ -3287,11 +3287,11 @@ tau<BAs...> anti_prenex (const tau<BAs...>& fm) {
 }
 
 template <typename... BAs>
-tau<BAs...> replace_free_vars_by (const tau<BAs...>& fm, const tau<BAs...>& val) {
+tau_depreciating<BAs...> replace_free_vars_by (const tau_depreciating<BAs...>& fm, const tau_depreciating<BAs...>& val) {
 	assert(!is_non_terminal(tau_parser::bf, val));
 	auto free_vars = get_free_vars_from_nso(fm);
 	if (!free_vars.empty()) {
-		std::map<tau<BAs...>, tau<BAs...>> free_var_assgm;
+		std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> free_var_assgm;
 		for (const auto& free_var : free_vars)
 			free_var_assgm.emplace(free_var, val);
 		return replace(fm, free_var_assgm);
@@ -3303,16 +3303,16 @@ tau<BAs...> replace_free_vars_by (const tau<BAs...>& fm, const tau<BAs...>& val)
 template<typename...BAs>
 struct to_snf_step {
 
-	using var = tau<BAs...>;
+	using var = tau_depreciating<BAs...>;
 	using vars = std::set<var>;
 	using constant = std::variant<BAs...>;
 	using exponent = std::set<var>;
-	using literal = tau<BAs...>;
+	using literal = tau_depreciating<BAs...>;
 	using literals = std::set<literal>;
 	using partition = std::map<exponent, literals>;
 	using bdd_path = std::pair<partition /* positive */, partition /* negatives */>;
 
-	tau<BAs...> operator()(const tau<BAs...>& form) const {
+	tau_depreciating<BAs...> operator()(const tau_depreciating<BAs...>& form) const {
 		// we select all literals, i.e. wff equalities or it negations.
 		static const auto is_literal = [](const auto& n) -> bool {
 			return (n | tau_parser::bf_eq).has_value();
@@ -3320,10 +3320,10 @@ struct to_snf_step {
 		if (auto literals = select_all(form, is_literal); !literals.empty()) {
 			// we call the recursive method traverse to traverse all the paths
 			// of the BDD.
-			std::set<tau<BAs...>> remaining(literals.begin(), literals.end());
+			std::set<tau_depreciating<BAs...>> remaining(literals.begin(), literals.end());
 			bdd_path path;
 			return traverse(path, remaining, form)
-				| bf_reduce_canonical<BAs...>() | reduce_wff_deprecated<BAs...>;
+				| bf_reduce_canonical<BAs...>() | reduce_wff_depreciating<BAs...>;
 		}
 		return form;
 	}
@@ -3350,7 +3350,7 @@ private:
 			return (l & ~r) == false;
 	}, [](const auto&, const auto&) -> bool { throw std::logic_error("wrong types"); });
 
-	tau<BAs...> bdd_path_to_snf(const bdd_path& path, const tau<BAs...>& form) const {
+	tau_depreciating<BAs...> bdd_path_to_snf(const bdd_path& path, const tau_depreciating<BAs...>& form) const {
 		// we simplify the constant part of the formula
 		// TODO (HIGH) fix simplification
 		auto simplified = form | simplify_snf<BAs...>;
@@ -3399,10 +3399,10 @@ private:
 		return npath;
 	}
 
-	tau<BAs...> traverse(const bdd_path& path, const literals& remaining, const tau<BAs...>& form) const {
+	tau_depreciating<BAs...> traverse(const bdd_path& path, const literals& remaining, const tau_depreciating<BAs...>& form) const {
 		// we only cache results in release mode
 		#ifdef TAU_CACHE
-		static std::map<std::tuple<bdd_path, literals, tau<BAs...>>, tau<BAs...>> cache;
+		static std::map<std::tuple<bdd_path, literals, tau_depreciating<BAs...>>, tau_depreciating<BAs...>> cache;
 		if (auto it = cache.find({path, remaining, form}); it != cache.end()) return it->second;
 		#endif // TAU_CACHE
 
@@ -3459,7 +3459,7 @@ private:
 		return result;
 	}
 
-	exponent get_exponent(const tau<BAs...>& n) const {
+	exponent get_exponent(const tau_depreciating<BAs...>& n) const {
 		auto is_bf_literal = [](const auto& n) -> bool {
 			return (n | tau_parser::variable).has_value()
 				|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
@@ -3479,13 +3479,13 @@ private:
 		return p;
 	}
 
-	tau<BAs...> squeeze_positives(const std::set<literal>& positives, const exponent& exp) const {
+	tau_depreciating<BAs...> squeeze_positives(const std::set<literal>& positives, const exponent& exp) const {
 		// find first element with non trivial constant
 		auto first = std::find_if(positives.begin(), positives.end(), [&](const auto& l) {
 			return get_constant(l).has_value();
 		});
 		// if there is no such element we return the first element
-		if (first == positives.end()) return tau<BAs...>(*positives.begin());
+		if (first == positives.end()) return tau_depreciating<BAs...>(*positives.begin());
 		// otherwise...
 		auto first_cte = build_bf_constant(get_constant(*first).value());
 		auto cte = std::accumulate(++positives.begin(), positives.end(), first_cte, [&](const auto& l, const auto& r) {
@@ -3590,7 +3590,7 @@ private:
 
 	// normalize each bdd path applying Corollary 3.1 from TABA book with few
 	// improvements related to the handling of negative literals.
-	tau<BAs...> normalize(const bdd_path& path) const {
+	tau_depreciating<BAs...> normalize(const bdd_path& path) const {
 		// if we have no positive literals we return the conjunction of all the
 		// negative literals negated. PLease note that we store the positive
 		// versions of the literals in the second component of the path. Thus,
@@ -3644,30 +3644,30 @@ private:
 		return relative_path;
 	}
 
-	tau<BAs...> normalize_positive(const bdd_path& path, const literal& positive) const {
+	tau_depreciating<BAs...> normalize_positive(const bdd_path& path, const literal& positive) const {
 		auto relative_path = get_relative_path(path, positive);
 		return normalize(add_to_positive_path(relative_path, positive));
 	}
 
-	tau<BAs...> normalize_negative(const bdd_path& path, const literal& negative) const {
+	tau_depreciating<BAs...> normalize_negative(const bdd_path& path, const literal& negative) const {
 		auto relative_path = get_relative_path(path, negative);
 		return normalize(add_to_negative_path(relative_path, negative));
 	}
 };
 
 template<typename...BAs>
-tau<BAs...> operator|(const tau<BAs...>& n, const to_snf_step<BAs...>& r) {
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& n, const to_snf_step<BAs...>& r) {
 	return r(n);
 }
 
 template<typename...BAs>
-tau<BAs...> snf_bf(const tau<BAs...>& n) {
+tau_depreciating<BAs...> snf_bf(const tau_depreciating<BAs...>& n) {
 	// TODO (HIGH) give a proper implementation (call to_bdd...)
 	return n | bf_reduce_canonical<BAs...>()
 		| (tau_f<BAs...>) to_dnf<false, BAs...>
 		| repeat_all<step<BAs...>, BAs...>(elim_eqs<BAs...>)
 		// TODO (MEDIUM) review after we fully normalize bf & wff
-		| reduce_bf_deprecated<BAs...>;
+		| reduce_bf_depreciating<BAs...>;
 }
 
 // We mostly follow the Remark 3.5 from the TABA book. However, we deviate at
@@ -3676,7 +3676,7 @@ tau<BAs...> snf_bf(const tau<BAs...>& n) {
 // construction of the BDD form and then traverse it. Our aim is to build the
 // BDD form and traverse it afterwards.
 template<typename...BAs>
-tau<BAs...> snf_wff(const tau<BAs...>& n) {
+tau_depreciating<BAs...> snf_wff(const tau_depreciating<BAs...>& n) {
 	auto [_, nn] = get_inner_quantified_wff(n);
 	// in the first step we apply compute the SNF of the formula, as a result we get
 	// the formula in SNF with positive equal exponent literals sqeezed.
@@ -3701,21 +3701,21 @@ tau<BAs...> snf_wff(const tau<BAs...>& n) {
 }
 
 template<typename...BAs>
-tau<BAs...> build_split_wff_using(tau_parser::nonterminal type, const tau<BAs...>& a, const tau<BAs...>& b) {
+tau_depreciating<BAs...> build_split_wff_using(tau_parser::nonterminal type, const tau_depreciating<BAs...>& a, const tau_depreciating<BAs...>& b) {
 	// TODO (HIGH) check formulas, should depend on the type
 	if (type == tau_parser::bf_eq) return build_wff_or(build_wff_and(a, b), build_wff_and(build_wff_neg(a), build_wff_neg(b)));
 	else return build_wff_and(build_wff_or(a, build_wff_neg(b)), build_wff_or(build_wff_neg(a), b));
 }
 
 template<size_t type, typename...BAs>
-tau<BAs...> anf(const tau<BAs...>& n) {
+tau_depreciating<BAs...> anf(const tau_depreciating<BAs...>& n) {
 	// TODO (MEDIUM) write anf (using?)
 	std::cout << "Not implemented yet." << std::endl;
 	return n;
 }
 
 template<typename...BAs>
-tau<BAs...> pnf(const tau<BAs...>& n) {
+tau_depreciating<BAs...> pnf(const tau_depreciating<BAs...>& n) {
 	// TODO (MEDIUM) write pnf (using?)
 	std::cout << "Not implemented yet." << std::endl;
 	return n;

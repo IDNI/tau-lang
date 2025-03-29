@@ -66,10 +66,10 @@ sp_tau_source_node make_tau_source_from_file(const std::string& filename,
 } // idni::tau_lang namespace
 
 // << for tau_source_sym
-std::ostream& operator<<(std::ostream& stream, const idni::tau_lang::tau_source_sym& rs) {
-	if (rs.nt()) stream << rs.t();
-	return stream;
-}
+// std::ostream& operator<<(std::ostream& stream, const idni::tau_lang::tau_source_sym& rs) {
+// 	if (rs.nt()) stream << rs.t();
+// 	return stream;
+// }
 
 // outputs a sp_tau_source_node to a stream, using the stringify transformer
 // and assumes that the constants also override operator<<.

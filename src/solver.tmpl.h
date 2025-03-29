@@ -15,7 +15,7 @@
 namespace idni::tau_lang {
 
 template<typename...BAs>
-solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const tau<BAs...>& gh) {
+solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const tau_depreciating<BAs...>& gh) {
 	solution<BAs...> solution;
 	for (size_t i = 1; i < originals.size(); ++i) solution[originals[i]] = _0<BAs...>;
 	// FIXME convert vars to a set
@@ -37,7 +37,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 		<< "solver.tmpl.h:" << __LINE__ << " find_solution/eq: " << eq;
 	#endif // DEBUG
 
-	auto has_no_var = [](const tau<BAs...>& f) {
+	auto has_no_var = [](const tau_depreciating<BAs...>& f) {
 		return !find_top(f, is_child_non_terminal<tau_parser::variable, BAs...>);
 	};
 
@@ -50,7 +50,7 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 		return {};
 	}
 
-	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
+	auto f = eq | tau_parser::bf_eq | tau_parser::bf | optional_value_extractor<tau_depreciating<BAs...>>;
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)
@@ -127,13 +127,13 @@ std::optional<solution<BAs...>> find_solution(const equality<BAs...>& eq, soluti
 }
 
 template<typename...BAs>
-std::vector<tau<BAs...>> get_variables(const equality<BAs...>& eq) {
+std::vector<tau_depreciating<BAs...>> get_variables(const equality<BAs...>& eq) {
 	return select_top(eq, is_child_non_terminal<tau_parser::variable, BAs...>);
 }
 
 template<typename...BAs>
-std::vector<tau<BAs...>> get_variables(const equation_system<BAs...>& system) {
-	std::vector<tau<BAs...>> vars;
+std::vector<tau_depreciating<BAs...>> get_variables(const equation_system<BAs...>& system) {
+	std::vector<tau_depreciating<BAs...>> vars;
 	if (system.first.has_value()) {
 		auto vs = get_variables(system.first.value());
 		vars.insert(vars.end(), vs.begin(), vs.end());
@@ -212,7 +212,7 @@ std::optional<solution<BAs...>> lgrs(const equality<BAs...>& equality) {
 	auto f = equality
 		| tau_parser::bf_eq
 		| tau_parser::bf
-		| optional_value_extractor<tau<BAs...>>;
+		| optional_value_extractor<tau_depreciating<BAs...>>;
 	solution<BAs...> phi;
 	for (auto& [x_i, z_i] : s.value())
 		phi[x_i] = ((z_i & f) + (x_i & ~f)) | bf_reduce_canonical<BAs...>();
@@ -246,7 +246,7 @@ public:
 	class sentinel {};
 	static constexpr sentinel end{};
 
-	minterm_iterator(const tau<BAs...>& f) {
+	minterm_iterator(const tau_depreciating<BAs...>& f) {
 		// FIXME convert vars to a set
 		if (auto vars = select_top(f, is_child_non_terminal<tau_parser::variable, BAs...>); !vars.empty()) {
 			// we start with the full bf...
@@ -299,8 +299,8 @@ private:
 	struct choice {
 		var<BAs...> var;
 		bool value;
-		tau<BAs...> partial_bf;
-		tau<BAs...> partial_minterm;
+		tau_depreciating<BAs...> partial_bf;
+		tau_depreciating<BAs...> partial_minterm;
 
 		bool operator==(const choice&) const = default;
 		bool operator!=(const choice&) const = default;
@@ -310,7 +310,7 @@ private:
 	minterm<BAs...> current;
 	bool exhausted = false;
 
-	tau<BAs...> make_current_minterm() {
+	tau_depreciating<BAs...> make_current_minterm() {
 		auto cte =  choices.back().value
 			? replace_with(choices.back().var, _1<BAs...>, choices.back().partial_bf)
 			: replace_with(choices.back().var, _0<BAs...>, choices.back().partial_bf);
@@ -367,7 +367,7 @@ template<typename...BAs>
 class minterm_range {
 public:
 
-	explicit minterm_range(const tau<BAs...>& f): f (f) {}
+	explicit minterm_range(const tau_depreciating<BAs...>& f): f (f) {}
 
 	bool empty() {
 		return false;
@@ -386,7 +386,7 @@ public:
 	bool operator!=(const minterm_range<BAs...>&) const = default;
 
 private:
-	const tau<BAs...> f;
+	const tau_depreciating<BAs...> f;
 };
 
 template<typename...BAs>
@@ -407,7 +407,7 @@ public:
 		if (sys.empty()) { exhausted = true; return; }
 		// for each inequality in the system, we create a minterm range
 		for (auto& neq: sys) {
-			auto f = neq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<tau<BAs...>>;
+			auto f = neq | tau_parser::bf_neq | tau_parser::bf | optional_value_extractor<tau_depreciating<BAs...>>;
 			ranges.push_back(minterm_range(f));
 		}
 		// we initialize the minterm iterators
@@ -509,7 +509,7 @@ private:
 };
 
 template<typename...BAs>
-tau<BAs...> get_constant(const minterm<BAs...>& m) {
+tau_depreciating<BAs...> get_constant(const minterm<BAs...>& m) {
 	//auto cte = find_top(m, is_child_non_terminal<tau_parser::bf_constant, BAs...>);
 	//return cte ? cte.value() : _1<BAs...>;
 	auto is_bf_constant = [](const auto& n) -> bool {
@@ -521,18 +521,18 @@ tau<BAs...> get_constant(const minterm<BAs...>& m) {
 }
 
 template<typename...BAs>
-std::set<tau<BAs...>> get_exponent(const tau<BAs...>& n) {
+std::set<tau_depreciating<BAs...>> get_exponent(const tau_depreciating<BAs...>& n) {
 	auto is_bf_literal = [](const auto& n) -> bool {
 		return (n | tau_parser::variable).has_value()
 			|| (n | tau_parser::bf_neg | tau_parser::bf | tau_parser::variable).has_value();
 	};
 	// FIXME convert vars to a set
 	auto all_vs = select_top(n, is_bf_literal);
-	return std::set<tau<BAs...>>(all_vs.begin(), all_vs.end());
+	return std::set<tau_depreciating<BAs...>>(all_vs.begin(), all_vs.end());
 }
 
 template<typename...BAs>
-tau<BAs...> get_minterm(const minterm<BAs...>& m) {
+tau_depreciating<BAs...> get_minterm(const minterm<BAs...>& m) {
 	return build_bf_and<BAs...>(get_exponent(m));
 }
 
@@ -605,7 +605,7 @@ std::optional<minterm_system<BAs...>> add_minterm_to_disjoint(
 					// case 4.2
 					: splitter(d_cte
 						| tau_parser::bf_constant
-						| optional_value_extractor<tau<BAs...>>);
+						| optional_value_extractor<tau_depreciating<BAs...>>);
 
 				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
@@ -695,7 +695,7 @@ std::optional<solution<BAs...>> solve_minterm_system(const minterm_system<BAs...
 		auto nf = neq
 			| tau_parser::bf_neq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>
+			| optional_value_extractor<tau_depreciating<BAs...>>
 			| bf_reduce_canonical<BAs...>();
 
 		#ifdef DEBUG
@@ -979,11 +979,11 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs,
 				auto l = system.first.value()
 					| tau_parser::bf_eq
 					| tau_parser::bf
-					| optional_value_extractor<tau<BAs...>>;
+					| optional_value_extractor<tau_depreciating<BAs...>>;
 				auto r = eq
 					| tau_parser::bf_eq
 					| tau_parser::bf
-					| optional_value_extractor<tau<BAs...>>;
+					| optional_value_extractor<tau_depreciating<BAs...>>;
 				system.first = build_wff_eq(l | r);
 			}
 		}
@@ -994,7 +994,7 @@ std::optional<solution<BAs...>> solve(const equations<BAs...>& eqs,
 
 // entry point for the solver
 template<typename...BAs>
-std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
+std::optional<solution<BAs...>> solve(const tau_depreciating<BAs...>& form,
 		const solver_options<BAs...>& options) {
 	if (form == _T<BAs...>) return { solution<BAs...>() };
 
@@ -1021,7 +1021,7 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 			BOOST_LOG_TRIVIAL(warning) << "(Warning) Skipped clause with temporal quantifier: " << clause;
 			continue;
 		}
-		auto is_equation = [](const tau<BAs...>& n) {
+		auto is_equation = [](const tau_depreciating<BAs...>& n) {
 			return is_child_non_terminal<tau_parser::bf_eq, BAs...>(n)
 			|| is_child_non_terminal<tau_parser::bf_neq, BAs...>(n);
 		};
@@ -1029,7 +1029,7 @@ std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 		auto eqs = select_top(clause, is_equation);
 		if (eqs.empty()) continue;
 		auto solution = solve<BAs...>(
-			std::set<tau<BAs...>>(eqs.begin(), eqs.end()), options);
+			std::set<tau_depreciating<BAs...>>(eqs.begin(), eqs.end()), options);
 		if (solution.has_value()) return solution;
 	}
 	return {};

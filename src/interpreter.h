@@ -17,31 +17,29 @@
 
 namespace idni::tau_lang {
 
-using type = std::string;
-
 using filename = std::string;
 
 template<typename...BAs>
-using io_var_name = tau<BAs...>; // out_var_name or in_var_name
+using io_var_name = tau_depreciating<BAs...>; // out_var_name or in_var_name
 
 template<typename...BAs>
-using var_desc = std::pair<io_var_name<BAs...>, type>;
+using var_desc = std::pair<io_var_name<BAs...>, std::string>;
 
 // represents an solution of variables to values.
 template<typename...BAs>
-using assignment = std::map<tau<BAs...>, tau<BAs...>>;
+using assignment = std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>>;
 
 // A system represent a clause to be solved. It maps the different
 // equations of the clause according to its type.
 template<typename...BAs>
-using system = std::map<type, tau<BAs...>>;
+using system = std::map<std::string, tau_depreciating<BAs...>>;
 
 template<typename...BAs>
 struct finputs {
 
 	finputs() = delete;
 
-	finputs(std::map<tau<BAs...>, std::pair<type, filename>> inputs) {
+	finputs(std::map<tau_depreciating<BAs...>, std::pair<std::string, filename>> inputs) {
 		// open the corresponding streams for input and store them in streams
 		for (const auto& [var, desc]: inputs) {
 			this->types[var] = desc.first;
@@ -68,7 +66,7 @@ struct finputs {
 			if (file) file.value().close();
 	}
 
-	void add_input (const tau<BAs...>& var, const type& t, const filename& f) {
+	void add_input (const tau_depreciating<BAs...>& var, const std::string& t, const filename& f) {
 		if (!types.contains(var)) {
 			types.emplace(var, t);
 			streams.emplace(var,
@@ -116,7 +114,7 @@ struct finputs {
 
 	// Read input from command line and return mapping from in_vars to this input
 	std::pair<std::optional<assignment<BAs...> >, bool> read(
-		std::vector<tau<BAs...> >& in_vars, size_t time_step) {
+		std::vector<tau_depreciating<BAs...> >& in_vars, size_t time_step) {
 		std::ranges::sort(in_vars, constant_io_comp);
 		assignment<BAs...> value;
 		for (const auto& var : in_vars) {
@@ -166,7 +164,7 @@ struct finputs {
 		return {value, false};
 	}
 
-	std::optional<type> type_of(const tau<BAs...>& var) const {
+	std::optional<std::string> type_of(const tau_depreciating<BAs...>& var) const {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
@@ -181,8 +179,8 @@ struct finputs {
 		return {};
 	}
 
-	std::map<tau<BAs...>, type> types;
-	std::map<tau<BAs...>, std::optional<std::ifstream>> streams;
+	std::map<tau_depreciating<BAs...>, std::string> types;
+	std::map<tau_depreciating<BAs...>, std::optional<std::ifstream>> streams;
 	size_t time_point = 0;
 };
 
@@ -191,7 +189,7 @@ struct foutputs {
 
 	foutputs() = delete;
 
-	foutputs(std::map<tau<BAs...>, std::pair<type, filename>> outputs) {
+	foutputs(std::map<tau_depreciating<BAs...>, std::pair<std::string, filename>> outputs) {
 		// open the corresponding streams for input and store them in streams
 		for (const auto& [var, desc]: outputs) {
 			this->types[var] = desc.first;
@@ -212,7 +210,7 @@ struct foutputs {
 			if (file) file.value().close();
 	}
 
-	void add_output (const tau<BAs...>& var, const type& t, const filename& f) {
+	void add_output (const tau_depreciating<BAs...>& var, const std::string& t, const filename& f) {
 		if (!types.contains(var)) {
 			types.emplace(var, t);
 			streams.emplace(var,
@@ -223,7 +221,7 @@ struct foutputs {
 
 	bool write(const assignment<BAs...>& outputs) {
 		// Sort variables in output by time
-		std::vector<tau<BAs...>> io_vars;
+		std::vector<tau_depreciating<BAs...>> io_vars;
 		for (const auto& [var, _ ] : outputs) {
 			assert(is_child_non_terminal(tau_parser::io_var, trim(var)));
 			io_vars.push_back(var);
@@ -278,7 +276,7 @@ struct foutputs {
 		return true; // success
 	}
 
-	std::optional<type> type_of(const tau<BAs...>& var) const {
+	std::optional<std::string> type_of(const tau_depreciating<BAs...>& var) const {
 		if (auto type = types.find(var); type != types.end())
 			return type->second;
 
@@ -293,13 +291,13 @@ struct foutputs {
 		return {};
 	}
 
-	std::map<tau<BAs...>, type> types;
-	std::map<tau<BAs...>, std::optional<std::ofstream>> streams;
+	std::map<tau_depreciating<BAs...>, std::string> types;
+	std::map<tau_depreciating<BAs...>, std::optional<std::ofstream>> streams;
 };
 
 template<typename input_t, typename output_t, typename...BAs>
 struct interpreter {
-	interpreter(const tau<BAs...>& ubt_ctn, const tau<BAs...>& original_spec,
+	interpreter(const tau_depreciating<BAs...>& ubt_ctn, const tau_depreciating<BAs...>& original_spec,
 		assignment<BAs...>& memory, input_t& input, output_t& output) :
 						ubt_ctn(ubt_ctn),
 						original_spec(original_spec),
@@ -312,15 +310,15 @@ struct interpreter {
 	}
 
 	static std::optional<interpreter> make_interpreter(
-		const tau<BAs...>& spec, auto& inputs, auto& outputs);
+		const tau_depreciating<BAs...>& spec, auto& inputs, auto& outputs);
 
 	std::pair<std::optional<assignment<BAs...>>, bool> step();
 
 	// Update the interpreter with a given update
-	void update(const tau<BAs...>& update);
+	void update(const tau_depreciating<BAs...>& update);
 
-	tau<BAs...> ubt_ctn;
-	tau<BAs...> original_spec;
+	tau_depreciating<BAs...> ubt_ctn;
+	tau_depreciating<BAs...> original_spec;
 	assignment<BAs...> memory;
 	size_t time_point = 0;
 	input_t inputs;
@@ -335,29 +333,29 @@ private:
 	int_t highest_initial_pos = 0;
 	int_t lookback = 0;
 
-	tau<BAs...> get_ubt_ctn_at (int_t t);
+	tau_depreciating<BAs...> get_ubt_ctn_at (int_t t);
 
 	bool calculate_initial_systems ();
 
-	std::vector<tau<BAs...>> build_inputs_for_step (const size_t t);
+	std::vector<tau_depreciating<BAs...>> build_inputs_for_step (const size_t t);
 
 	// Return typed systems of equations for the solver corresponding to each clause
 	// in the unbound continuation
-	static std::vector<system<BAs...>> compute_systems(const tau<BAs...>& ubd_ctn,
+	static std::vector<system<BAs...>> compute_systems(const tau_depreciating<BAs...>& ubd_ctn,
 		auto& inputs, auto& outputs);
 
 	// Get the type for a clause of a local specification
-	static std::optional<system<BAs...>> compute_atomic_fm_types(const tau<BAs...>& clause,
+	static std::optional<system<BAs...>> compute_atomic_fm_types(const tau_depreciating<BAs...>& clause,
 		auto& inputs, auto& outputs);
 
 	// Record type of io_vars in inputs and outputs
 	static void type_io_vars(const auto& io_vars, const std::string& type, auto& inputs, auto& outputs);
 
 	// Compute the type of the equation f = 0 or f != 0 stored in fm for the solver
-	static std::optional<type> get_type_atomic_fm(const tau<BAs...>& fm,
+	static std::optional<std::string> get_type_atomic_fm(const tau_depreciating<BAs...>& fm,
 		auto& inputs, auto& outputs);
 
-	tau<BAs...> update_to_time_point(const tau<BAs...>& f, const int_t t);
+	tau_depreciating<BAs...> update_to_time_point(const tau_depreciating<BAs...>& f, const int_t t);
 
 	bool is_memory_access_valid(const auto& io_vars);
 
@@ -369,29 +367,29 @@ private:
 	void compute_lookback_and_initial ();
 
 	// Find an executable specification from DNF
-	static std::pair<tau<BAs...>, tau<BAs...>>
-	get_executable_spec(const tau<BAs...>& fm, const size_t start_time = 0);
+	static std::pair<tau_depreciating<BAs...>, tau_depreciating<BAs...>>
+	get_executable_spec(const tau_depreciating<BAs...>& fm, const size_t start_time = 0);
 
 	// Pointwise revision algorithm for producing updated specification
 	// Both spec and update need to be normalized
-	tau<BAs...> pointwise_revision(tau<BAs...> spec, tau<BAs...> update,
+	tau_depreciating<BAs...> pointwise_revision(tau_depreciating<BAs...> spec, tau_depreciating<BAs...> update,
 					const int_t start_time);
 
 	// The update stream u contained in this solution for spec is guaranteed maximal
 	std::optional<assignment<BAs...>>
-	solution_with_max_update(const tau<BAs...>& spec);
+	solution_with_max_update(const tau_depreciating<BAs...>& spec);
 
 	// Returns if the variable is excluded from output
-	static bool is_excluded_output(const tau<BAs...>& var);
+	static bool is_excluded_output(const tau_depreciating<BAs...>& var);
 
 	// Return those variables that appear within the lookback
-	std::vector<tau<BAs...> > appear_within_lookback(
-		const std::vector<tau<BAs...> >& vars);
+	std::vector<tau_depreciating<BAs...> > appear_within_lookback(
+		const std::vector<tau_depreciating<BAs...> >& vars);
 
 };
 
 template<typename... BAs>
-std::optional<tau<BAs...>> unpack_tau_constant(const tau<BAs...>& constant) {
+std::optional<tau_depreciating<BAs...>> unpack_tau_constant(const tau_depreciating<BAs...>& constant) {
 	using p = tau_parser;
 	auto c_variant = constant
 		| p::bf_constant
@@ -404,7 +402,7 @@ std::optional<tau<BAs...>> unpack_tau_constant(const tau<BAs...>& constant) {
 
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<input_t, output_t, BAs...>>
-run(const tau<BAs...>& form, input_t& inputs, output_t& outputs, const size_t steps = 0) {
+run(const tau_depreciating<BAs...>& form, input_t& inputs, output_t& outputs, const size_t steps = 0) {
 	auto spec = normalizer(form);
 	auto intrprtr_o = interpreter<input_t, output_t, BAs...>
 		::make_interpreter(spec, inputs, outputs);

@@ -15,6 +15,7 @@ void repl_evaluator<BAs...>::not_implemented_yet() {
 	std::cout << "Not implemented yet.\n";
 }
 
+// DEPRECATED
 template<typename... BAs>
 size_t digits(const tau_nso<BAs...>& n) {
 	return process_digits(n)
@@ -23,6 +24,34 @@ size_t digits(const tau_nso<BAs...>& n) {
 		| optional_value_extractor<size_t>;
 }
 
+template<typename... BAs>
+std::optional<size_t> get_memory_index(const tt& n,
+	const size_t size, bool silent = false)
+{
+	if (size == 0) {
+		if (!silent) std::cout << "history is empty\n";
+		return {};
+	}
+	auto mem_type = n | tt::only_child | tt::nt;
+	auto is_relative = (mem_type == tau_parser::rel_memory);
+	auto mem_id = n | mem_type | tau_parser::memory_id;
+	size_t idx = 0;
+	if (mem_id) idx = mem_id | tt::num;
+	if ((is_relative && idx >= size)
+		|| (!is_relative && (idx == 0 || idx > size)))
+	{
+		if (!silent) {
+			std::cout << "history location " << TC_OUTPUT
+				<< (is_relative ? "%-" : "%");
+			if (!is_relative || idx) std::cout << idx;
+			std::cout << TC.CLEAR() << " does not exist\n";
+		}
+		return {};
+	}
+	return { is_relative ? size - idx - 1 : idx - 1 };
+}
+
+// DEPRECATED
 template<typename... BAs>
 std::optional<size_t> get_memory_index(const tau_nso<BAs...>& n,
 	const size_t size, bool silent = false)
@@ -52,10 +81,9 @@ std::optional<size_t> get_memory_index(const tau_nso<BAs...>& n,
 	return { is_relative ? size - idx - 1 : idx - 1 };
 }
 
-
 template <typename... BAs>
 repl_evaluator<BAs...>::memory_ref repl_evaluator<BAs...>::memory_retrieve(
-	const tau_nso_t& n, bool silent)
+	const tt& n, bool silent)
 {
 	if (auto pos = get_memory_index(n, m.size(), silent); pos.has_value())
 		return { { m[pos.value()], pos.value() } };
@@ -63,6 +91,33 @@ repl_evaluator<BAs...>::memory_ref repl_evaluator<BAs...>::memory_retrieve(
 	return {};
 }
 
+// DEPRECATED
+template <typename... BAs>
+repl_evaluator<BAs...>::memory_ref_depreciating repl_evaluator<BAs...>::memory_retrieve(
+	const tau_nso_t& n, bool silent)
+{
+	if (auto pos = get_memory_index(n, m_depreciating.size(), silent); pos.has_value())
+		return { { m_depreciating[pos.value()], pos.value() } };
+	BOOST_LOG_TRIVIAL(error) << "(Error) history location does not exist\n";
+	return {};
+}
+
+template<typename... BAs>
+void print_memory(const htree::sp& mem, const size_t id,
+	const size_t size, bool print_relative_index = true)
+{
+	std::cout << TC_OUTPUT << "%" << id + 1 << TC.CLEAR();
+	if (print_relative_index) {
+		std::cout << "/" << TC_OUTPUT;
+		if (size - id == 1) std::cout << "%";
+		else std::cout << "%-" << size - id - 1;
+		std::cout << TC.CLEAR();
+	}
+	std::cout << ": ";
+	tau::get(mem).print(std::cout) << "\n";
+}
+
+// DEPRECATED
 template<typename... BAs>
 void print_memory(const tau_nso<BAs...> mem, const size_t id,
 	const size_t size, bool print_relative_index = true)
@@ -78,12 +133,21 @@ void print_memory(const tau_nso<BAs...> mem, const size_t id,
 }
 
 template<typename... BAs>
+tref repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
+	const size_t nt, const tt& program)
+{
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
+template<typename... BAs>
 tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
-	const size_t type, const tau_nso_t& program)
+	const size_t nt, const tau_nso_t& program)
 {
 	bool contains_ref = contains(program, tau_parser::ref);
 	rr<tau_nso_t> rr_{ nullptr };
-	if (contains_ref && type == tau_parser::rr) {
+	if (contains_ref && nt == tau_parser::rr) {
 		if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
 				program); x) rr_ = x.value();
 		else return {};
@@ -101,11 +165,20 @@ tau_nso<BAs...> repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::history_print_cmd(const tau_nso_t& command) {
+void repl_evaluator<BAs...>::history_print_cmd(const tt& command) {
 	auto n = command | tau_parser::memory;
 	if (!n) return;
 	auto idx = get_memory_index(n.value(), m.size());
 	if (idx) print_memory(m[idx.value()], idx.value(), m.size());
+}
+
+// DEPRECATED
+template <typename... BAs>
+void repl_evaluator<BAs...>::history_print_cmd(const tau_nso_t& command) {
+	auto n = command | tau_parser::memory;
+	if (!n) return;
+	auto idx = get_memory_index(n.value(), m_depreciating.size());
+	if (idx) print_memory(m_depreciating[idx.value()], idx.value(), m_depreciating.size());
 }
 
 template <typename... BAs>
@@ -116,19 +189,50 @@ void repl_evaluator<BAs...>::history_list_cmd() {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::memory_store(memory o) {
+void repl_evaluator<BAs...>::history_list_cmd_depreciating() {
+	if (m_depreciating.size() == 0) std::cout << "history is empty\n";
+	else for (size_t i = 0; i < m_depreciating.size(); i++)
+		print_memory(m_depreciating[i], i, m_depreciating.size());
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::memory_store(tref o) {
+	auto v = tau::geth(o);
 	// do not add into memory if the last memory value is the same
-	if (!(m.size() && m.back() == o))
-		m.push_back(o);
+	if (!(m.size() && m.back() == v))
+		m.push_back(v);
 	if (opt.print_memory_store)
 		print_memory(m.back(), m.size() - 1, m.size(), false);
 }
 
+// DEPRECATED
+template <typename... BAs>
+void repl_evaluator<BAs...>::memory_store(memory_depreciating o) {
+	// do not add into memory if the last memory value is the same
+	if (!(m_depreciating.size() && m_depreciating.back() == o))
+		m_depreciating.push_back(o);
+	if (opt.print_memory_store)
+		print_memory(m_depreciating.back(), m_depreciating.size() - 1, m_depreciating.size(), false);
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::history_store_cmd(const tt& command) {
+	memory_store(command | tt::first | tt::ref);
+}
+
+// DEPRECATED
 template <typename... BAs>
 void repl_evaluator<BAs...>::history_store_cmd(const tau_nso_t& command) {
 	memory_store(command->child[0]);
 }
 
+template <typename... BAs>
+tref repl_evaluator<BAs...>::get_bf(const tt& /*n*/, bool /*suppress_error*/)
+{
+	return 0;
+}
+
+// DEPRECATED
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::get_bf(const tau_nso_t& n, bool suppress_error)
@@ -153,6 +257,13 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::get_wff(const tt& /*n*/) {
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::get_wff(const tau_nso_t& n)
 {
@@ -174,6 +285,15 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+bool repl_evaluator<BAs...>::contains(const tt& /*n*/,
+	tau_parser::nonterminal /*nt*/)
+{
+	// TODO
+	return false;
+}	
+
+// DEPRECATED
+template <typename... BAs>
 bool repl_evaluator<BAs...>::contains(const tau_nso_t& n,
 	tau_parser::nonterminal nt)
 {
@@ -183,18 +303,30 @@ bool repl_evaluator<BAs...>::contains(const tau_nso_t& n,
 }
 
 template <typename... BAs>
-std::optional<size_t> repl_evaluator<BAs...>::get_type(const tau_nso_t& n) {
-	return n | non_terminal_extractor<tau_ba_t, BAs...>;
+std::optional<std::pair<size_t, tref>>
+	repl_evaluator<BAs...>::get_type_and_arg(const tt& n)
+{
+	auto nt = n | tt::nt;
+	switch (nt) {
+	case tau_parser::memory:
+		if (auto check = memory_retrieve(n); check) {
+			auto [value, _] = check.value();
+			auto mem_type = tt(value) | tt::nt;
+			return { { mem_type, value->get() } };
+		} else return {};
+	default: return { std::pair<size_t, tref>{ nt, n | tt::ref } };
+	}
 }
 
+// DEPRECATED
 template <typename... BAs>
 std::optional<std::pair<size_t, tau_nso<BAs...>>>
 	repl_evaluator<BAs...>::get_type_and_arg(const tau_nso_t& n)
 {
-	auto type = n
+	auto nt = n
 		| non_terminal_extractor<tau_ba_t, BAs...>
 		| optional_value_extractor<size_t>;
-	switch (type) {
+	switch (nt) {
 	case tau_parser::memory:
 		if (auto check = memory_retrieve(n); check) {
 			auto [value, _] = check.value();
@@ -203,10 +335,22 @@ std::optional<std::pair<size_t, tau_nso<BAs...>>>
 				| optional_value_extractor<size_t>;
 			return {{mem_type, value}};
 		} else return {};
-	default: return {{type, n}};
+	default: return {{nt, n}};
 	}
 }
 
+// DEPRECATED
+template <typename... BAs>
+std::optional<size_t> repl_evaluator<BAs...>::get_type(const tau_nso_t& n) {
+	return n | non_terminal_extractor<tau_ba_t, BAs...>;
+}
+
+template <typename... BAs>
+tref repl_evaluator<BAs...>::onf_cmd(const tt& /*n*/) {
+	return 0;
+}
+
+// DEPRECATED
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::onf_cmd(const tau_nso_t& n)
@@ -214,21 +358,27 @@ std::optional<tau_nso<BAs...>>
 	auto arg = n->child[1];
 	auto var = n->child[2];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto [nt, program] = check.value();
+		auto applied = apply_rr_to_rr_tau_nso(nt, program);
 		return onf<tau_ba_t, BAs...>(var, applied);
 	}
 	return {};
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::dnf_cmd(const tt& /*n*/) {
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::dnf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto [nt, program] = check.value();
+		auto applied = apply_rr_to_rr_tau_nso(nt, program);
 		if (is_non_terminal(tau_parser::bf, applied))
 			return reduce(to_dnf<false>(applied), tau_parser::bf);
 		else if (is_non_terminal(tau_parser::wff, applied))
@@ -239,13 +389,19 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::cnf_cmd(const tt& /*n*/) {
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::cnf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto [nt, program] = check.value();
+		auto applied = apply_rr_to_rr_tau_nso(nt, program);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff:
 			return reduce(to_cnf(applied), tau_parser::wff, true);
@@ -259,13 +415,19 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::nnf_cmd(const tt& /*n*/) {
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::nnf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto [nt, program] = check.value();
+		auto applied = apply_rr_to_rr_tau_nso(nt, program);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff: return to_nnf(applied);
 		case tau_parser::bf:  return push_negation_in<false>(applied);
@@ -276,13 +438,19 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::mnf_cmd(const tt& /*n*/) {
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::mnf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto [nt, program] = check.value();
+		auto applied = apply_rr_to_rr_tau_nso(nt, program);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff: return to_mnf(reduce_across_bfs(applied, false));
 		case tau_parser::bf:  return bf_boole_normal_form(applied);
@@ -293,13 +461,19 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::snf_cmd(const tt& /*n*/) {
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::snf_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto [nt, program] = check.value();
+		auto applied = apply_rr_to_rr_tau_nso(nt, program);
 		switch (get_non_terminal_node(applied)) {
 		case tau_parser::wff: return snf_wff<tau_ba_t, BAs...>(applied);
 		case tau_parser::bf:  return snf_bf<tau_ba_t, BAs...>(applied);
@@ -310,30 +484,44 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::bf_substitute_cmd(const tt& /*n*/) {
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::bf_substitute_cmd(const tau_nso_t& n)
 {
-	auto in = get_bf(n->child[1]);
+	auto inp = get_bf(n->child[1]);
 	auto thiz = get_bf(n->child[2]);
 	auto with = get_bf(n->child[3]);
 	// Check for correct argument types
-	if (!thiz || !in || !with) {
+	if (!thiz || !inp || !with) {
 		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		return {};
 	}
-	return replace(in.value(), thiz.value(), with.value());
+	return replace(inp.value(), thiz.value(), with.value());
 }
 
+template <typename... BAs>
+tref repl_evaluator<BAs...>::substitute_cmd(const tt& /*n*/) {
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::substitute_cmd(const tau_nso_t& n)
 {
 	// Since the memory command cannot be type-checked we do it here
 	// First try to get bf
-	auto in = get_bf(n->child[1], true);
-	if (in) return bf_substitute_cmd(n);
+	auto inp = get_bf(n->child[1], true);
+	if (inp) return bf_substitute_cmd(n);
 	// First argument was not a bf so it must be a wff
-	in = get_wff(n->child[1]);
+	inp = get_wff(n->child[1]);
 	// Now sort out the remaining argument types
 	auto thiz = get_bf(n->child[2], true);
 	std::optional<tau_nso_t> with;
@@ -343,7 +531,7 @@ std::optional<tau_nso<BAs...>>
 		with = get_wff(n->child[3]);
 	}
 	// Check for correct argument types
-	if (!thiz || !in || !with) {
+	if (!thiz || !inp || !with) {
 		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
 		return {};
 	}
@@ -353,7 +541,7 @@ std::optional<tau_nso<BAs...>>
 	std::set free_vars_thiz = get_free_vars_from_nso(thiz.value());
 	std::set free_vars_with = get_free_vars_from_nso(with.value());
 	std::vector<tau_nso_t> var_stack = {};
-	auto var_id = get_new_var_id(in.value());
+	auto var_id = get_new_var_id(inp.value());
 	std::set<tau_nso_t> marked_quants;
 
 	// A variable should only be replaced if it is not quantified
@@ -431,9 +619,16 @@ std::optional<tau_nso<BAs...>>
 		return res;
 	};
 	return rewriter::post_order_recursive_traverser<tau_nso_t>()(
-			in.value(), quantified_var_adder, scoped_replace);
+			inp.value(), quantified_var_adder, scoped_replace);
 }
 
+template <typename... BAs>
+tref repl_evaluator<BAs...>::instantiate_cmd(const tt& /*n*/) {
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::instantiate_cmd(const tau_nso_t& n)
@@ -449,15 +644,22 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::normalize_cmd(const tt& /*n*/) {
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::normalize_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [nt, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
 		rr<tau_nso_t> rr_{ nullptr };
-		if (contains_ref && type == tau_parser::rr) {
+		if (contains_ref && nt == tau_parser::rr) {
 		if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
 				value); x) rr_ = x.value();
 		else return {};
@@ -484,12 +686,19 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
+tref repl_evaluator<BAs...>::qelim_cmd(const tt& /*n*/) {
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
+template <typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::qelim_cmd(const tau_nso_t& n)
 {
 	if (auto check = get_type_and_arg(n->child[1]); check) {
-		auto [type, program] = check.value();
-		auto applied = apply_rr_to_rr_tau_nso(type, program);
+		auto [nt, program] = check.value();
+		auto applied = apply_rr_to_rr_tau_nso(nt, program);
 		applied = eliminate_quantifiers<tau_ba_t, BAs...>(applied);
 		return reduce_across_bfs(applied, false);
 	}
@@ -498,8 +707,14 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
-{
+void repl_evaluator<BAs...>::run_cmd(const tt& /*n*/) {
+	// TODO
+}
+
+
+// DEPRECATED
+template <typename... BAs>
+void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n) {
 	auto arg = n->child[1];
 
 	// running the program
@@ -564,7 +779,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		// select current input variables
 		auto in_vars = select_all(dnf,
 			is_non_terminal<tau_parser::in_var_name, tau_ba_t, BAs...>);
-		std::map<tau_nso_t, std::pair<type, filename>> current_inputs;
+		std::map<tau_nso_t, std::pair<std::string, filename>> current_inputs;
 		for (auto& var: in_vars) {
 			if (auto it = inputs.find(var); it != inputs.end())
 				current_inputs[var] = it->second;
@@ -574,7 +789,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 		// select current output variables
 		auto out_vars = select_all(dnf, is_non_terminal<
 				tau_parser::out_var_name, tau_ba_t, BAs...>);
-		std::map<tau_nso_t, std::pair<type, filename>> current_outputs;
+		std::map<tau_nso_t, std::pair<std::string, filename>> current_outputs;
 		for (auto& var: out_vars) {
 			if (auto it = outputs.find(var); it != outputs.end())
 				current_outputs[var] = it->second;
@@ -589,7 +804,7 @@ void repl_evaluator<BAs...>::run_cmd(const tau_nso_t& n)
 }
 
 template<typename...BAs>
-solver_mode get_solver_cmd_mode(const tau<BAs...>& n) {
+solver_mode get_solver_cmd_mode(const tau_depreciating<BAs...>& n) {
 	if (auto solver_mode = find_top(n,
 			is_non_terminal<tau_parser::solver_mode, BAs...>); solver_mode) {
 		auto mode = solver_mode
@@ -603,14 +818,14 @@ solver_mode get_solver_cmd_mode(const tau<BAs...>& n) {
 }
 
 template<typename...BAs>
-std::optional<std::string> get_solver_cmd_type(const tau<BAs...>& n) {
+std::optional<std::string> get_solver_cmd_type(const tau_depreciating<BAs...>& n) {
 	auto types = select_all(n, is_non_terminal<tau_parser::type, BAs...>);
 	std::string type = "";
 
 	for (const auto& t: types) {
 		auto current_type = make_string<
 				tau_node_terminal_extractor_t<BAs...>,
-				tau<BAs...>>(
+				tau_depreciating<BAs...>>(
 			tau_node_terminal_extractor<BAs...>, t);
 		if (type == "" || type == current_type) {
 			type = current_type;
@@ -627,13 +842,13 @@ std::optional<std::string> get_solver_cmd_type(const tau<BAs...>& n) {
 template<typename...BAs>
 void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 		const solver_options<BAs...>& options = { .type = "" }) {
-	auto print_zero_case = [&options](const tau<BAs...>& var) {
+	auto print_zero_case = [&options](const tau_depreciating<BAs...>& var) {
 		std::cout << "\t" << var << " := {"
 			<< nso_factory<BAs...>::instance().zero(options.type)
 			<< "}:" << options.type << "\n";
 	};
 
-	auto print_one_case = [&options](const tau<BAs...>& var) {
+	auto print_one_case = [&options](const tau_depreciating<BAs...>& var) {
 		std::cout << "\t" << var << " := {"
 			<< nso_factory<BAs...>::instance().one(options.type)
 			<< "}:" << options.type << "\n";
@@ -661,6 +876,12 @@ void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 }
 
 
+template <typename... BAs>
+void repl_evaluator<BAs...>::solve_cmd(const tt& /*n*/) {
+	// TODO
+}
+
+// DEPRECATED
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	// getting the type
@@ -697,6 +918,12 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 }
 
 template <typename... BAs>
+void repl_evaluator<BAs...>::lgrs_cmd(const tt& /*n*/) {
+	// TODO
+}
+
+// DEPRECATED
+template <typename... BAs>
 void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 	// getting the type
 	auto type = get_solver_cmd_type(n);
@@ -730,15 +957,23 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tau_nso_t& n) {
 }
 
 template<typename... BAs>
+tref repl_evaluator<BAs...>::is_valid_cmd(const tt& /*n*/)
+{
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
+template<typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::is_valid_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [nt, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
 		rr<tau_nso_t> rr_{ nullptr };
-		if (contains_ref && type == tau_parser::rr) {
+		if (contains_ref && nt == tau_parser::rr) {
 			if (auto x = make_nso_rr_from_binded_code<tau_ba_t, BAs...>(
 				value); x) rr_ = x.value();
 			else return {};
@@ -764,15 +999,22 @@ std::optional<tau_nso<BAs...>>
 }
 
 template<typename... BAs>
+tref repl_evaluator<BAs...>::sat_cmd(const tt& /*n*/) {
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
+template<typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::sat_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [nt, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
 		rr<tau_nso_t> rr_{ nullptr };
-		if (contains_ref && type == tau_parser::rr) {
+		if (contains_ref && nt == tau_parser::rr) {
 			if (auto x = make_nso_rr_from_binded_code<
 				tau_ba_t, BAs...>(value); x) rr_ = x.value();
 			else return {};
@@ -798,15 +1040,22 @@ std::optional<tau_nso<BAs...>>
 }
 
 template<typename... BAs>
+tref repl_evaluator<BAs...>::is_unsatisfiable_cmd(const tt& /*n*/) {
+	// TODO
+	return 0;
+}
+
+// DEPRECATED
+template<typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::is_unsatisfiable_cmd(const tau_nso_t& n)
 {
 	auto arg = n->child[1];
 	if (auto check = get_type_and_arg(arg); check) {
-		auto [type, value] = check.value();
+		auto [nt, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);
 		rr<tau_nso_t> rr_{ nullptr };
-		if (contains_ref && type == tau_parser::rr) {
+		if (contains_ref && nt == tau_parser::rr) {
 			if (auto x = make_nso_rr_from_binded_code<
 				tau_ba_t, BAs...>(value); x) rr_ = x.value();
 			else return {};
@@ -831,6 +1080,12 @@ std::optional<tau_nso<BAs...>>
 	return {};
 }
 
+template <typename... BAs>
+void repl_evaluator<BAs...>::def_rr_cmd(const tt& /*n*/) {
+	// TODO
+}
+
+// DEPRECATED
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_rr_cmd(const tau_nso_t& n) {
 	definitions.emplace_back(n->child[0]->child[0], n->child[0]->child[1]);
@@ -877,9 +1132,24 @@ void repl_evaluator<BAs...>::def_print_cmd(const tau_nso_t& command) {
 }
 
 template <typename... BAs>
+void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
+	if (definitions.size() == 0) std::cout << "rec. relations: empty\n";
+	auto num = command | tau_parser::number;
+	if (!num) return;
+	auto i = num | tt::num;
+	if (i && i <= definitions.size()) {
+		std::cout << definitions[i-1] << "\n";
+		return;
+	}
+	BOOST_LOG_TRIVIAL(error)
+		<< "(Error) definition [" << i << "] does not exist\n";
+	return;
+}
+
+template <typename... BAs>
 void repl_evaluator<BAs...>::def_input_cmd(const tau_nso_t& command) {
 	filename fn;
-	type type = command
+	auto type_name = command
 		| tau_parser::type
 		| extract_string<tau_ba_t, BAs...>;
 	if (auto file_name = command
@@ -890,21 +1160,44 @@ void repl_evaluator<BAs...>::def_input_cmd(const tau_nso_t& command) {
 	else fn = ""; // default input (std::cin)
 
 	for (auto& t: nso_factory<tau_ba_t, BAs...>::instance().types()) {
-		if (type == t) {
+		if (type_name == t) {
 			auto var_name = command
 				| tau_parser::in_var_name
 				| optional_value_extractor<tau_nso_t>;
-			inputs[var_name] = {type, fn};
+			inputs[var_name] = {type_name, fn};
 			return;
 		}
 	}
-	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type << "\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
+	filename fn;
+	auto type_name = command | tau::type | tt::string;
+	if (auto file_name = command
+			| tau::input_stream
+			| tau::q_file_name
+			| tt::string; !file_name.empty()) fn = file_name;
+	else fn = ""; // default input (std::cin)
+
+	// TODO
+	// for (auto& t : nso_factory<tau_ba_t, BAs...>::instance().types()) {
+	// 	if (type == t) {
+	// 		auto var_name = command
+	// 			| tau_parser::in_var_name
+	// 			| optional_value_extractor<tau_nso_t>;
+	// 		inputs[var_name] = {type, fn};
+	// 		return;
+	// 	}
+	// }
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
 }
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_output_cmd(const tau_nso_t& command) {
 	filename fn;
-	type type = command
+	std::string type_name = command
 		| tau_parser::type
 		| extract_string<tau_ba_t, BAs...>;
 	if (auto file_name = command
@@ -915,20 +1208,75 @@ void repl_evaluator<BAs...>::def_output_cmd(const tau_nso_t& command) {
 	else fn = ""; // default output (std::cout)
 
 	for (auto& t: nso_factory<tau_ba_t, BAs...>::instance().types()) {
-		if (type == t) {
+		if (type_name == t) {
 			auto var_name = command
 				| tau_parser::out_var_name
 				| optional_value_extractor<tau_nso_t>;
-			outputs[var_name] = {type, fn};
+			outputs[var_name] = {type_name, fn};
 			return;
 		}
 	}
-	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type << "\n";
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
+	filename fn;
+	std::string type_name = command | tau::type | tt::string;
+	if (auto file_name = command
+			| tau::output_stream
+			| tau::q_file_name
+			| tt::string; !file_name.empty()) fn = file_name;
+	else fn = ""; // default output (std::cout)
+
+	// TODO
+	// for (auto& t: nso_factory<tau_ba_t, BAs...>::instance().types()) {
+	// 	if (type == t) {
+	// 		auto var_name = command
+	// 			| tau_parser::out_var_name
+	// 			| optional_value_extractor<tau_nso_t>;
+	// 		outputs[var_name] = {type, fn};
+	// 		return;
+	// 	}
+	// }
+	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
 template <typename... BAs>
-tau_nso<BAs...> repl_evaluator<BAs...>::make_cli(const std::string& src) {
+tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
+	// remove ascii char 22 if exists in the input
+	std::string filt = src;
+	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
+		return c == 22;
+	}), filt.end());
+	tau_parser::result result = tau_parser::instance()
+		.parse(filt.c_str(), filt.size(), {
+						.start = tau_parser::cli });
+	auto fail = [this]() { return error = true, nullptr; };
+	if (!result.found) {
+		auto msg = result.parse_error
+			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
+		if (opt.error_quits
+			|| msg.find("Syntax Error: Unexpected end")!=0)
+		{
+			BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
+			return fail();
+		}
+		return nullptr; // Unexpected eof, continue with reading input
+	}
+	constant_binder<tau, BAs...> binder;
+	auto t = result.get_shaped_tree2();
+	auto binded = tau::get(tau_parser::tree::get(t), binder);
+	if (!binded) return fail();
+	return binded;
+}
+
+// make a nso_rr from the given tau source and binder.
+template <typename... BAs>
+tau_nso<BAs...> repl_evaluator<BAs...>::make_cli_depreciating(
+	const std::string& src)
+{
 	// remove ascii char 22 if exists in the input
 	std::string filt = src;
 	filt.erase(remove_if(filt.begin(), filt.end(), [](unsigned char c) {
@@ -963,11 +1311,7 @@ tau_nso<BAs...> repl_evaluator<BAs...>::make_cli(const std::string& src) {
 }
 
 template <typename... BAs>
-repl_option get_opt(tau<BAs...> n) {
-	auto o = n | tau_parser::option_name;
-	if (!o) return none_opt;
-	auto x = make_string<tau_node_terminal_extractor_t<BAs...>,tau<BAs...>>(
-		tau_node_terminal_extractor<BAs...>, o.value());
+repl_option get_opt(const std::string& x) {
 	if (x.empty())                       return none_opt;
 	if (x == "S" || x == "severity"
 		|| x == "sev")               return severity_opt;
@@ -984,6 +1328,21 @@ repl_option get_opt(tau<BAs...> n) {
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid option: " << x << "\n";
 	return invalid_opt;
 }
+template <typename... BAs>
+repl_option get_opt(const tau_depreciating<BAs...>& n) {
+	auto o = n | tau_parser::option_name;
+	if (!o) return none_opt;
+	auto x = make_string<tau_node_terminal_extractor_t<BAs...>,tau_depreciating<BAs...>>(
+		tau_node_terminal_extractor<BAs...>, o.value());
+	return get_opt(x);
+}
+
+template <typename... BAs>
+repl_option get_opt(const tt& n) {
+	auto o = n | tau_parser::option_name;
+	if (!o) return none_opt;
+	return get_opt(o | tt::string);
+}
 
 template <typename... BAs>
 std::optional<boost::log::trivial::severity_level>
@@ -999,7 +1358,17 @@ std::optional<boost::log::trivial::severity_level>
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::get_cmd(tau_nso_t n) {
+void repl_evaluator<BAs...>::get_cmd(const tau_nso_t& n) {
+	return get_cmd(get_opt(n));
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::get_cmd(const tt& n) {
+	return get_cmd(get_opt(n));
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	static std::string pbool[] = { "off", "on" };
 	static std::map<repl_option, std::function<void()>> printers = {
 #ifdef DEBUG
@@ -1018,7 +1387,6 @@ void repl_evaluator<BAs...>::get_cmd(tau_nso_t n) {
 		std::cout << "indenting:           " << pbool[pretty_printer_indenting] << "\n"; } },
 	{ severity_opt,     [this]() {
 		std::cout << "severity:            " << opt.severity << "\n"; } }};
-	auto o = get_opt(n);
 	if (o == invalid_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
@@ -1032,9 +1400,29 @@ void repl_evaluator<BAs...>::get_cmd(tau_nso_t n) {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
+void repl_evaluator<BAs...>::set_cmd(const tt& n) {
+	repl_option o = get_opt(n);
+	auto ov = n | tau::option_value;
+	if (!ov) {BOOST_LOG_TRIVIAL(error) << "(Error) invalid value\n";return;}
+	set_cmd(o, ov | tt::string);
+	get_cmd(n);
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::set_cmd(const tau_nso_t& n) {
+	repl_option o = get_opt(n);
+	auto ov = n | tau_parser::option_value;
+	if (!ov) {BOOST_LOG_TRIVIAL(error) << "(Error) invalid value\n";return;}
+	auto v = make_string<tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
+		tau_nso_t>(tau_node_terminal_extractor<tau_ba_t, BAs...>,
+			ov.value());
+	set_cmd(o, v);
+	get_cmd(n);
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	using namespace boost::log;
-	auto o = get_opt(n);
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
@@ -1043,14 +1431,6 @@ void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
 		return;
 	}
 #endif
-	auto ov = n | tau_parser::option_value;
-	if (!ov) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid value\n";
-		return;
-	}
-	auto v = make_string<tau_node_terminal_extractor_t<tau_ba_t, BAs...>,
-		tau_nso_t>(tau_node_terminal_extractor<tau_ba_t, BAs...>,
-			ov.value());
 	auto update_bool_value = [&v](bool& opt) {
 		if (v == "t" || v == "true" || v == "on" || v == "1"
 			|| v == "y" || v == "yes") opt = true;
@@ -1082,7 +1462,6 @@ void repl_evaluator<BAs...>::set_cmd(tau_nso_t n) {
 			boost::log::trivial::severity >= opt.severity);
 	} } };
 	setters[o]();
-	get_cmd(n);
 }
 
 template <typename... BAs>
@@ -1090,6 +1469,23 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(const tau_nso_t& n,
 	const std::function<bool(bool&)>& update_fn)
 {
 	auto o = get_opt(n);
+	update_bool_opt_cmd(o, update_fn);
+	get_cmd(n);
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
+	const std::function<bool(bool&)>& update_fn)
+{
+	auto o = get_opt(n);
+	update_bool_opt_cmd(o, update_fn);
+	get_cmd(n);
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
+	const std::function<bool(bool&)>& update_fn)
+{
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
@@ -1111,7 +1507,6 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(const tau_nso_t& n,
 		error = true;
 		return;
 	}
-	get_cmd(n);
 }
 
 template<typename... BAs>
@@ -1138,6 +1533,40 @@ int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
 	}
 #endif
 	std::optional<tau_nso_t> result;
+	auto ret = eval_cmd(command, command_type, result);
+#ifdef DEBUG
+	if (opt.debug_repl && result) ptree<tau_ba_t, BAs...>(
+		std::cout << "result tree: ", result.value()) << "\n";
+#endif
+	if (result) memory_store(result.value());
+	return ret;
+}
+
+template <typename... BAs>
+int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
+	auto command = n | tt::only_child;
+	auto command_type = command | tt::nt;
+#ifdef DEBUG
+	if (opt.debug_repl) {
+		// std::cout << "command: " << command << "\n";
+		command.value_tree().print(std::cout << "tree: ") << "\n";
+	}
+#endif
+	tref result = 0;
+	auto ret = eval_cmd(command, command_type, result);
+#ifdef DEBUG
+	if (opt.debug_repl && result) tau::get(result).print(
+		std::cout << "result tree: ") << "\n";
+#endif
+	if (result) memory_store(result);
+	return ret;
+}
+
+template <typename... BAs>
+template <typename TT, typename RESULT>
+int repl_evaluator<BAs...>::eval_cmd(const TT& command, size_t command_type,
+	RESULT& result)
+{
 	using p = tau_parser;
 	switch (command_type) {
 	case p::quit_cmd:           return std::cout << "Quit.\n", 1;
@@ -1191,11 +1620,6 @@ int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
 	default: error = true;
 		BOOST_LOG_TRIVIAL(error) << "\n (Error) Unknown command";
 	}
-#ifdef DEBUG
-	if (opt.debug_repl && result) ptree<tau_ba_t, BAs...>(
-		std::cout << "result tree: ", result.value()) << "\n";
-#endif
-	if (result) memory_store(result.value());
 	return 0;
 }
 
@@ -1207,6 +1631,8 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 		boost::log::trivial::severity >= opt.severity);
 	// Controls how fixpoint information in satisfiability.h should be printed
 	if (!opt.repl_running) use_debug_output_in_sat = true;
+	if (opt.experimental) std::cout << "\n!!! Experimental features "
+		"enabled: new tree API (almost nothing works yet) !!!\n\n";
 }
 
 template <typename... BAs>
@@ -1229,13 +1655,33 @@ std::string repl_evaluator<BAs...>::prompt() {
 }
 
 template <typename... BAs>
+std::string repl_evaluator<BAs...>::prompt_depreciating() {
+	using namespace boost::log;
+	using namespace idni::term;
+	std::stringstream ss;
+	if (opt.status) {
+		std::stringstream status;
+		if (m_depreciating.size()) status << " " << TC_STATUS_OUTPUT << "%"
+			<< m_depreciating.size() << TC.CLEAR() << TC_STATUS;
+		if (opt.severity != trivial::info)
+			status << " " << to_string(opt.severity);
+		if (status.tellp()) ss << TC_STATUS << "["
+			<< status.str() << " ]" << TC.CLEAR() << " ";
+	}
+	ss << (error ? TC_ERROR : TC_PROMPT) << "tau>" << TC.CLEAR() << " ";
+	if (r) r->set_prompt(ss.str());
+	return ss.str();
+}
+
+template <typename... BAs>
 int repl_evaluator<BAs...>::eval(const std::string& src) {
+	if (!opt.experimental) return eval_depreciating(src);
 	error = false;
-	auto tau_spec = make_cli(src);
+	auto tau_spec = tt(make_cli(src));
 	int quit = 0;
 	if (tau_spec) {
-		auto commands = tau_spec || tau_parser::cli_command;
-		for (const auto& cmd : commands)
+		auto commands = tau_spec || tau::cli_command;
+		for (const auto& cmd : commands())
 			if (quit = eval_cmd(cmd); quit == 1) break;
 	} else if (!error) return 2;
 	std::cout << std::endl;
@@ -1245,12 +1691,45 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 }
 
 template <typename... BAs>
+int repl_evaluator<BAs...>::eval_depreciating(const std::string& src) {
+	error = false;
+	auto tau_spec = make_cli_depreciating(src);
+	int quit = 0;
+	if (tau_spec) {
+		auto commands = tau_spec || tau_parser::cli_command;
+		for (const auto& cmd : commands)
+			if (quit = eval_cmd(cmd); quit == 1) break;
+	} else if (!error) return 2;
+	std::cout << std::endl;
+	if (error && opt.error_quits) return quit = 1;
+	if (quit == 0) prompt_depreciating();
+	return quit;
+}
+
+template <typename... BAs>
 void repl_evaluator<BAs...>::version_cmd() {
 	std::cout << full_version << "\n";
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
+void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) const {
+	auto arg = n | tau_parser::help_arg
+			| only_child_extractor<tau_ba_t, BAs...>
+			| non_terminal_extractor<tau_ba_t, BAs...>;
+	size_t nt = arg ? arg.value()
+			: static_cast<size_t>(tau_parser::help_sym);
+	help(nt);
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::help_cmd(const tt& n) const {
+	auto arg = n | tau::help_arg | tt::only_child;
+	size_t nt = arg ? (arg | tt::nt) : tau::help_sym;
+	help(nt);
+}
+
+template <typename... BAs>
+void repl_evaluator<BAs...>::help(size_t nt) const {
 	static const std::string bool_options =
 		"  <option>               <description>                        <value>\n"
 #ifdef DEBUG
@@ -1265,11 +1744,6 @@ void repl_evaluator<BAs...>::help_cmd(const tau_nso_t& n) {
 		"  severity               severity                             error/info/debug/trace\n";
 	static const std::string bool_available_options = std::string{} +
 		"Available options and values:\n" + bool_options;
-	auto arg = n | tau_parser::help_arg
-			| only_child_extractor<tau_ba_t, BAs...>
-			| non_terminal_extractor<tau_ba_t, BAs...>;
-	size_t nt = arg ? arg.value()
-			: static_cast<size_t>(tau_parser::help_sym);
 	switch (nt) {
 	case tau_parser::help_sym: std::cout
 		<< "General commands:\n"

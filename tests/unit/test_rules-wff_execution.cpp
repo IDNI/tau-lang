@@ -14,7 +14,7 @@ using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
-std::tuple<tau<Bool>, tau<Bool>, tau<Bool>>
+std::tuple<tau_depreciating<Bool>, tau_depreciating<Bool>, tau_depreciating<Bool>>
 	test_rule(const std::string& rule_str)
 {
 	auto src_rule = make_tau_source(rule_str, {

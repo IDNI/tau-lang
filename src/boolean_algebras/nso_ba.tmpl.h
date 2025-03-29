@@ -6,10 +6,10 @@
 namespace idni::tau_lang {
 
 template <typename... BAs>
-tau<BAs...> operator&(const tau<BAs...>& l,
-	const tau<BAs...>& r)
+tau_depreciating<BAs...> operator&(const tau_depreciating<BAs...>& l,
+	const tau_depreciating<BAs...>& r)
 {
-	auto bf_constant_and = [](const auto& l, const auto& r) -> tau<BAs...> {
+	auto bf_constant_and = [](const auto& l, const auto& r) -> tau_depreciating<BAs...> {
 		auto lc = l
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -50,7 +50,7 @@ tau<BAs...> operator&(const tau<BAs...>& l,
 		auto rr = r
 			| tau_parser::bf_eq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>;
+			| optional_value_extractor<tau_depreciating<BAs...>>;
 		return build_wff_eq<BAs...>(l & rr);
 	}
 	if (is_non_terminal<tau_parser::bf>(l)
@@ -58,7 +58,7 @@ tau<BAs...> operator&(const tau<BAs...>& l,
 		auto rr = r
 			| tau_parser::bf_neq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>;
+			| optional_value_extractor<tau_depreciating<BAs...>>;
 		return build_wff_neq<BAs...>(l & rr);
 	}
 	if (is_non_terminal<tau_parser::wff>(l)
@@ -68,10 +68,10 @@ tau<BAs...> operator&(const tau<BAs...>& l,
 }
 
 template <typename... BAs>
-tau<BAs...> operator|(const tau<BAs...>& l,
-	const tau<BAs...>& r)
+tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& l,
+	const tau_depreciating<BAs...>& r)
 {
-	auto bf_constant_or = [](const auto& l, const auto& r) -> tau<BAs...> {
+	auto bf_constant_or = [](const auto& l, const auto& r) -> tau_depreciating<BAs...> {
 		auto lc = l
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -106,7 +106,7 @@ tau<BAs...> operator|(const tau<BAs...>& l,
 		auto rr = r
 			| tau_parser::bf_eq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>;
+			| optional_value_extractor<tau_depreciating<BAs...>>;
 		return build_wff_eq<BAs...>(l | rr);
 	}
 	if (is_non_terminal<tau_parser::bf>(l)
@@ -115,7 +115,7 @@ tau<BAs...> operator|(const tau<BAs...>& l,
 		auto rr = r
 			| tau_parser::bf_neq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>;
+			| optional_value_extractor<tau_depreciating<BAs...>>;
 		return build_wff_neq<BAs...>(l | rr);
 	}
 	if (is_non_terminal<tau_parser::wff>(l)
@@ -125,8 +125,8 @@ tau<BAs...> operator|(const tau<BAs...>& l,
 }
 
 template <typename... BAs>
-tau<BAs...> operator~(const tau<BAs...>& l) {
-	auto bf_constant_neg = [](const auto& l) -> tau<BAs...> {
+tau_depreciating<BAs...> operator~(const tau_depreciating<BAs...>& l) {
+	auto bf_constant_neg = [](const auto& l) -> tau_depreciating<BAs...> {
 		auto lc = l
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -153,14 +153,14 @@ tau<BAs...> operator~(const tau<BAs...>& l) {
 		auto ll = l
 			| tau_parser::bf_eq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>;
+			| optional_value_extractor<tau_depreciating<BAs...>>;
 		return build_wff_eq<BAs...>(~ll);
 	}
 	if (is_child_non_terminal<tau_parser::bf_neq, BAs...>(l)) {
 		auto ll = l
 			| tau_parser::bf_neq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>;
+			| optional_value_extractor<tau_depreciating<BAs...>>;
 		return build_wff_neq<BAs...>(~ll);
 	}
 	if (is_non_terminal<tau_parser::wff>(l))
@@ -169,10 +169,10 @@ tau<BAs...> operator~(const tau<BAs...>& l) {
 }
 
 template <typename... BAs>
-tau<BAs...> operator^(const tau<BAs...>& l,
-	const tau<BAs...>& r)
+tau_depreciating<BAs...> operator^(const tau_depreciating<BAs...>& l,
+	const tau_depreciating<BAs...>& r)
 {
-	auto bf_constant_xor = [](const auto& l, const auto& r) -> tau<BAs...> {
+	auto bf_constant_xor = [](const auto& l, const auto& r) -> tau_depreciating<BAs...> {
 		auto lc = l
 			| tau_parser::bf_constant
 			| tau_parser::constant
@@ -212,7 +212,7 @@ tau<BAs...> operator^(const tau<BAs...>& l,
 		auto rr = r
 			| tau_parser::bf_eq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>;
+			| optional_value_extractor<tau_depreciating<BAs...>>;
 		return build_wff_eq<BAs...>(l ^ rr);
 	}
 	if (is_non_terminal<tau_parser::bf>(l)
@@ -221,7 +221,7 @@ tau<BAs...> operator^(const tau<BAs...>& l,
 		auto rr = r
 			| tau_parser::bf_neq
 			| tau_parser::bf
-			| optional_value_extractor<tau<BAs...>>;
+			| optional_value_extractor<tau_depreciating<BAs...>>;
 		return build_wff_neq<BAs...>(l ^ rr);
 	}
 	if (is_non_terminal<tau_parser::wff>(l)
@@ -231,14 +231,14 @@ tau<BAs...> operator^(const tau<BAs...>& l,
 }
 
 template <typename... BAs>
-tau<BAs...> operator+(const tau<BAs...>& l,
-	const tau<BAs...>& r)
+tau_depreciating<BAs...> operator+(const tau_depreciating<BAs...>& l,
+	const tau_depreciating<BAs...>& r)
 {
 	return l ^ r;
 }
 
 template <typename... BAs>
-bool is_zero(const tau<BAs...>& l) {
+bool is_zero(const tau_depreciating<BAs...>& l) {
 	auto bf_constant_is_zero = [](const auto& l) -> bool {
 		auto lc = l
 			| tau_parser::bf_constant
@@ -264,7 +264,7 @@ bool is_zero(const tau<BAs...>& l) {
 }
 
 template <typename... BAs>
-bool is_one(const tau<BAs...>& l) {
+bool is_one(const tau_depreciating<BAs...>& l) {
 	auto bf_constant_is_one = [](const auto& l) -> bool {
 		auto lc = l
 			| tau_parser::bf_constant
@@ -291,7 +291,7 @@ bool is_one(const tau<BAs...>& l) {
 
 // We overload the == operator for tau in order to account for typed constants
 template <typename... BAs>
-bool operator==(const tau<BAs...>& l, const tau<BAs...>& r) {
+bool operator==(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r) {
 	if (r == nullptr && l == nullptr) return true;
 	if (r == nullptr || l == nullptr) return false;
 
@@ -326,7 +326,7 @@ bool operator==(const tau<BAs...>& l, const tau<BAs...>& r) {
 
 // Also define != again in terms of ==
 template <typename... BAs>
-bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r) {
+bool operator!=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r) {
 	return !(l == r);
 }
 
@@ -334,7 +334,7 @@ bool operator!=(const tau<BAs...>& l, const tau<BAs...>& r) {
 // program runs
 // In this comparison typed and non-typed Tau constants are considered different
 template<typename... BAs>
-std::weak_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r) {
+std::weak_ordering operator<=>(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r) {
 	if (l == nullptr && r == nullptr) return std::weak_ordering::equivalent;
 	if (l == nullptr) return std::weak_ordering::less;
 	if (r == nullptr) return std::weak_ordering::greater;
@@ -354,35 +354,35 @@ std::weak_ordering operator<=>(const tau<BAs...>& l, const tau<BAs...>& r) {
 
 // We list all ordering operators explicitly
 template<typename... BAs>
-bool operator<(const tau<BAs...>& l, const tau<BAs...>& r) {
+bool operator<(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r) {
 	return (l <=> r) < 0;
 }
 template<typename... BAs>
-bool operator<=(const tau<BAs...>& l, const tau<BAs...>& r) {
+bool operator<=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r) {
 	return (l <=> r) <= 0;
 }
 template<typename... BAs>
-bool operator>(const tau<BAs...>& l, const tau<BAs...>& r) {
+bool operator>(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r) {
 	return (l <=> r) > 0;
 }
 template<typename... BAs>
-bool operator>=(const tau<BAs...>& l, const tau<BAs...>& r) {
+bool operator>=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r) {
 	return (l <=> r) >= 0;
 }
 
 template <typename... BAs>
-bool operator==(const tau<BAs...>& l, const bool& r) {
+bool operator==(const tau_depreciating<BAs...>& l, const bool& r) {
 	return r ? is_one(l) : is_zero(l);
 }
 
 template <typename... BAs>
-bool operator==(const bool l, const tau<BAs...>& r) {
+bool operator==(const bool l, const tau_depreciating<BAs...>& r) {
 	return r == l;
 }
 
 // Splitter function for a nso tau_parser::bf_constant node holding a BA constant
 template <typename... BAs>
-tau<BAs...> splitter(const tau<BAs...>& n,
+tau_depreciating<BAs...> splitter(const tau_depreciating<BAs...>& n,
 	splitter_type st)
 {
 	using p = tau_parser;
@@ -411,12 +411,12 @@ tau<BAs...> splitter(const tau<BAs...>& n,
 //
 // IDEA maybe it should be move to out.h
 template <typename... BAs>
-std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
+std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau_depreciating<BAs...>& n,
 	std::vector<size_t>& hl_path, size_t& depth,
 	size_t parent = tau_parser::start, bool passthrough = false);
 
 template <typename... BAs>
-std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
+std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau_depreciating<BAs...>& n,
 	size_t parent = tau_parser::start, bool passthrough = false)
 {
 	std::vector<size_t> hl_path;
@@ -426,7 +426,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::tau_lang::tau<BAs...>& n) { return pp(stream, n); }
+	const idni::tau_lang::tau_depreciating<BAs...>& n) { return pp(stream, n); }
 
 // << for node<tau_sym>
 template <typename... BAs>
@@ -441,7 +441,7 @@ std::ostream& operator<<(std::ostream& stream,
 // pp pretty priniter
 template <typename... BAs>
 std::ostream& print_terminals(std::ostream& stream,
-	const idni::tau_lang::tau<BAs...>& n)
+	const idni::tau_lang::tau_depreciating<BAs...>& n)
 {
 	stream << n->value;
 	for (const auto& c : n->child) print_terminals<BAs...>(stream, c);
@@ -489,7 +489,7 @@ inline static const std::vector<size_t> indents = {
 };
 
 template <typename... BAs>
-std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
+std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau_depreciating<BAs...>& n,
 	std::vector<size_t>& hl_path, size_t& depth, size_t parent,
 	bool passthrough)
 {
@@ -511,7 +511,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 // 	for (const auto& c : n->child)
 // 		stream << "\t", dbg(c), stream << "\n";
 // #endif // DEBUG_PP
-	static auto is_to_wrap = [](const idni::tau_lang::tau<BAs...>& n,
+	static auto is_to_wrap = [](const idni::tau_lang::tau_depreciating<BAs...>& n,
 		size_t parent)
 	{
 		static const std::set<size_t> no_wrap_for = {
@@ -706,7 +706,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::wff_all:  stream << "all";   break;
 			case tau_parser::wff_ex:   stream << "ex";    break;
 			}
-			tau<BAs...> expr;
+			tau_depreciating<BAs...> expr;
 			size_t expr_nt;
 			do {
 				pp(stream << " ", qch[0], hl_path, depth, quant_nt);

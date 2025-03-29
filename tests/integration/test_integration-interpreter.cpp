@@ -53,11 +53,11 @@ struct output_console {
 		return true; // success (always)
 	}
 
-	std::optional<type> type_of(const tau<BAs...>&) const {
+	std::optional<std::string> type_of(const tau_depreciating<BAs...>&) const {
 		return { _type };
 	}
 
-	void add_output (const tau<BAs...>& v, const std::string&, const std::string&) {
+	void add_output (const tau_depreciating<BAs...>& v, const std::string&, const std::string&) {
 		if (!streams.contains(v)) streams.emplace(v, v);
 	}
 
@@ -88,11 +88,11 @@ struct input_vector {
 		return { inputs[current++], false};
 	}
 
-	std::optional<type> type_of(const tau<BAs...>&) const {
+	std::optional<std::string> type_of(const tau_depreciating<BAs...>&) const {
 		return { _type };
 	}
 
-	void add_input (const tau<BAs...>& v, const std::string&, const std::string&) {
+	void add_input (const tau_depreciating<BAs...>& v, const std::string&, const std::string&) {
 		if (!streams.contains(v)) streams.emplace(v,v);
 	}
 
@@ -112,7 +112,7 @@ void build_input(const std::string& name, const std::vector<std::string>& values
 		auto v_const = build_bf_constant(v.value(), type);
 
 		if (assgn.size() <= t) {
-			std::map<tau<BAs...>, tau<BAs...>> a;
+			std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> a;
 			a.emplace(in_var, v_const);
 			assgn.emplace_back(std::move(a));
 		} else assgn[t].emplace(in_var, v_const);
@@ -162,7 +162,7 @@ inline bool matches_output(const auto& assm, const auto& memory) {
 }
 
 template<typename... BAs>
-tau<BAs...> create_spec(const char* spec) {
+tau_depreciating<BAs...> create_spec(const char* spec) {
 	auto sample_src = make_tau_source(spec);
 	return make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(
 		sample_src).value().main;
@@ -174,8 +174,8 @@ TEST_SUITE("Execution") {
 		auto spec = create_spec<base_bas>("o1[t] = i1[t].");
 		std::vector<std::string> i1 = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
 		std::vector<std::string> o1 = i1;
-		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
-		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		std::vector<std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>>> assgn_in;
+		std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>> assgn_out;
 		build_input<base_bas>("i1", i1, "tau", assgn_in);
 		build_output<base_bas>("o1", o1, "tau", assgn_out);
 		auto ins = input_vector<base_bas>(assgn_in, "tau");
@@ -201,8 +201,8 @@ TEST_SUITE("Execution") {
 			"", "", "T", "<:x> = 0", "<:x> = 0 && <:y> = 0",
 			"<:x> = 0 && <:y> = 0 && <:z> = 0"
 		};
-		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
-		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		std::vector<std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>>> assgn_in;
+		std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>> assgn_out;
 		build_input<base_bas>("i1", i1, "tau", assgn_in);
 		build_input<base_bas>("i2", i2, "tau", assgn_in);
 		build_output<base_bas>("o1", o1, "tau", assgn_out);
@@ -226,8 +226,8 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o3 = {
 			"", "", "", "<:x> = 0 && <:y> = 0", "<:x> = 0 && <:y> = 0"
 		};
-		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
-		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		std::vector<std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>>> assgn_in;
+		std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>> assgn_out;
 		build_input<base_bas>("i1", i1, "tau", assgn_in);
 		build_output<base_bas>("o3", o3, "tau", assgn_out);
 		build_output<base_bas>("u", u, "tau", assgn_out);
@@ -252,8 +252,8 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o3 = {
 			"", "T", "T", "T"
 		};
-		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
-		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		std::vector<std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>>> assgn_in;
+		std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>> assgn_out;
 		build_input<base_bas>("i1", i1, "tau", assgn_in);
 		build_output<base_bas>("o3", o3, "tau", assgn_out);
 		build_output<base_bas>("o2", o2, "tau", assgn_out);
@@ -276,8 +276,8 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o1 = {
 			"F", "F", "F", "F",
 		};
-		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
-		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		std::vector<std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>>> assgn_in;
+		std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>> assgn_out;
 		build_input<base_bas>("i1", i1, "tau", assgn_in);
 		build_output<base_bas>("o1", o1, "tau", assgn_out);
 		build_output<base_bas>("u", u, "tau", assgn_out);
@@ -299,8 +299,8 @@ TEST_SUITE("Execution") {
 		std::vector<std::string> o1 = {
 			"F", "F", "T", "T",
 		};
-		std::vector<std::map<tau<base_bas>, tau<base_bas>>> assgn_in;
-		std::map<tau<base_bas>, tau<base_bas>> assgn_out;
+		std::vector<std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>>> assgn_in;
+		std::map<tau_depreciating<base_bas>, tau_depreciating<base_bas>> assgn_out;
 		build_input<base_bas>("i1", i1, "tau", assgn_in);
 		build_output<base_bas>("o1", o1, "tau", assgn_out);
 		build_output<base_bas>("u", u, "tau", assgn_out);
@@ -596,7 +596,7 @@ TEST_SUITE("only outputs") {
 TEST_SUITE("with inputs and outputs") {
 
 	input_vector<tau_ba<sbf_ba>, sbf_ba> build_i1_inputs(
-			std::vector<tau<tau_ba<sbf_ba>, sbf_ba>> values) {
+			std::vector<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>> values) {
 		std::vector<assignment<tau_ba<sbf_ba>, sbf_ba>> assignments;
 		size_t t = 0;
 		for (const auto& value: values) {
@@ -651,7 +651,7 @@ TEST_SUITE("with inputs and outputs") {
 TEST_SUITE("test inputs") {
 
 	TEST_CASE("reading from file with sbf inputs") {
-		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> input_map;
+		std::map<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>, std::pair<std::string, std::string>> input_map;
 		auto var = build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		input_map[var] = { "sbf", "integration/test_files/sbf-alternating_zeros_and_ones-length_10.in"};
 		finputs<tau_ba<sbf_ba>, sbf_ba> inputs(input_map);
@@ -668,7 +668,7 @@ TEST_SUITE("test inputs") {
 	}
 
 	TEST_CASE("reading from file with tau program inputs") {
-		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> input_map;
+		std::map<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>, std::pair<std::string, std::string>> input_map;
 		auto var = build_in_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		input_map[var] = { "tau", "integration/test_files/tau-alternating_zeros_and_ones-length_10.in"};
 		finputs<tau_ba<sbf_ba>, sbf_ba> inputs(input_map);
@@ -688,7 +688,7 @@ TEST_SUITE("test inputs") {
 TEST_SUITE("test outputs") {
 
 	TEST_CASE("writing to file") {
-		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		std::map<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>, std::pair<std::string, std::string>> output_map;
 		auto var = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		auto var_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);
 
@@ -708,7 +708,7 @@ TEST_SUITE("test outputs") {
 	}
 
 	TEST_CASE("writing to files: two outputs") {
-		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		std::map<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>, std::pair<std::string, std::string>> output_map;
 		auto var1 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		auto var2 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(2);
 		auto var1_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);
@@ -733,7 +733,7 @@ TEST_SUITE("test outputs") {
 	}
 
 	TEST_CASE("writing to files: completing outputs") {
-		std::map<tau<tau_ba<sbf_ba>, sbf_ba>, std::pair<type, std::string>> output_map;
+		std::map<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>, std::pair<std::string, std::string>> output_map;
 		auto var1 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(1);
 		auto var2 = build_out_var_name<tau_ba<sbf_ba>, sbf_ba>(2);
 		auto var1_0 = build_out_variable_at_n<tau_ba<sbf_ba>, sbf_ba>(1, 0);

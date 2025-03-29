@@ -1378,7 +1378,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 
 } // namespace tau_parser_data
 
-struct tau_parser : public idni::parser<char, char> {
+struct tau_parser_nonterminals {
 	enum nonterminal {
 		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, start, 
 		rr, _, rec_relations, main, wff, __E_rec_relations_0, rec_relation, __E_rec_relations_1, ref, __E_rec_relation_2, 
@@ -1420,6 +1420,9 @@ struct tau_parser : public idni::parser<char, char> {
 		__E_help_arg_162, __E___E_help_arg_162_163, rel_memory, __E_memory_164, __E___E_memory_164_165, memory_id, abs_memory, __E_memory_166, named_binding, __N_0, 
 		__N_1, __N_2, __N_3, __N_4, __N_5, __N_6, __N_7, __N_8, 
 	};
+};
+
+struct tau_parser : public idni::parser<char, char>, public tau_parser_nonterminals {
 	static tau_parser& instance() {
 		static tau_parser inst;
 		return inst;
