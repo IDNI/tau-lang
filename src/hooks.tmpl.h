@@ -8,53 +8,53 @@
 namespace idni::tau_lang {
 
 template <typename...BAs>
-tau<BAs...> first_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> first_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
 	return n.child[0]->child[0];
 }
 
 template <typename...BAs>
-tau<BAs...> first_argument_expression(const rewriter::node<tau_sym<BAs...>>& n){
+tau_depreciating<BAs...> first_argument_expression(const rewriter::node<tau_sym<BAs...>>& n){
 	return n.child[0]->child[0]->child[0];
 }
 
 template <typename...BAs>
-tau<BAs...> second_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> second_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
 	return n.child[0]->child[1];
 }
 
 template <typename...BAs>
-tau<BAs...> second_argument_expression(const rewriter::node<tau_sym<BAs...>>& n)
+tau_depreciating<BAs...> second_argument_expression(const rewriter::node<tau_sym<BAs...>>& n)
 {
 	return n.child[0]->child[1]->child[0];
 }
 
 template <typename...BAs>
-tau<BAs...> third_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> third_argument_formula(const rewriter::node<tau_sym<BAs...>>& n) {
 	return n.child[0]->child[2];
 }
 
 template <typename...BAs>
-tau<BAs...> third_argument_expression(const rewriter::node<tau_sym<BAs...>>& n){
+tau_depreciating<BAs...> third_argument_expression(const rewriter::node<tau_sym<BAs...>>& n){
 	return n.child[0]->child[2]->child[0];
 }
 
 template <typename...BAs>
-tau<BAs...> logic_operator(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> logic_operator(const rewriter::node<tau_sym<BAs...>>& n) {
 	return n.child[0];
 }
 
 template <typename...BAs>
-tau<BAs...> quantifier(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> quantifier(const rewriter::node<tau_sym<BAs...>>& n) {
 	return n.child[0];
 }
 
 template <typename...BAs>
-tau<BAs...> quantified_formula(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> quantified_formula(const rewriter::node<tau_sym<BAs...>>& n) {
 	return n.child[0]->child[0];
 }
 
 template<typename...BAs>
-std::optional<tau<BAs...>> type_of(const tau<BAs...>& e)
+std::optional<tau_depreciating<BAs...>> type_of(const tau_depreciating<BAs...>& e)
 {
 	return e | tau_parser::type;
 }
@@ -71,7 +71,7 @@ bool unbinded_subexpressionns(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template<typename...BAs>
-tau<BAs...> make_node_hook_cte_or(
+tau_depreciating<BAs...> make_node_hook_cte_or(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	auto l = first_argument_expression(n)
@@ -90,7 +90,7 @@ tau<BAs...> make_node_hook_cte_or(
 }
 
 template<typename...BAs>
-tau<BAs...> build_bf_1(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> build_bf_1(const rewriter::node<tau_sym<BAs...>>& n) {
 	auto type_l = type_of(first_argument_expression(n));
 	auto type_r = type_of(second_argument_expression(n));
 	if (type_l == type_r && type_l) return build_bf_t_type<BAs...>(type_l.value());
@@ -101,7 +101,7 @@ tau<BAs...> build_bf_1(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template<typename...BAs>
-tau<BAs...> build_bf_0(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> build_bf_0(const rewriter::node<tau_sym<BAs...>>& n) {
 	auto type_l = type_of(first_argument_expression(n));
 	auto type_r = type_of(second_argument_expression(n));
 	if (type_l == type_r && type_l) return build_bf_f_type<BAs...>(type_l.value());
@@ -112,7 +112,7 @@ tau<BAs...> build_bf_0(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename...BAs>
-tau<BAs...> make_node_hook_bf_or(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_bf_or(const rewriter::node<tau_sym<BAs...>>& n) {
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 | 1 := 1.")
@@ -162,7 +162,7 @@ tau<BAs...> make_node_hook_bf_or(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename...BAs>
-tau<BAs...> make_node_hook_cte_and(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_cte_and(const rewriter::node<tau_sym<BAs...>>& n) {
 	auto l = first_argument_expression(n)
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
@@ -179,7 +179,7 @@ tau<BAs...> make_node_hook_cte_and(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_bf_and(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_bf_and(const rewriter::node<tau_sym<BAs...>>& n) {
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 & 1 := 1.")
@@ -229,7 +229,7 @@ tau<BAs...> make_node_hook_bf_and(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename...BAs>
-tau<BAs...> make_node_hook_cte_neg(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_cte_neg(const rewriter::node<tau_sym<BAs...>>& n) {
 	auto l = first_argument_expression(n)
 		| tau_parser::constant
 		| only_child_extractor<BAs...>
@@ -240,7 +240,7 @@ tau<BAs...> make_node_hook_cte_neg(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_bf_neg(
+tau_depreciating<BAs...> make_node_hook_bf_neg(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
@@ -266,7 +266,7 @@ tau<BAs...> make_node_hook_bf_neg(
 }
 
 template <typename...BAs>
-tau<BAs...> make_node_hook_cte_xor(
+tau_depreciating<BAs...> make_node_hook_cte_xor(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	auto l = first_argument_expression(n)
@@ -286,7 +286,7 @@ tau<BAs...> make_node_hook_cte_xor(
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_bf_xor(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_bf_xor(const rewriter::node<tau_sym<BAs...>>& n) {
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	if (unbinded_subexpressionns(n)) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	//RULE(BF_SIMPLIFY_ONE_00, "1 ^ 1 := 0.")
@@ -337,7 +337,7 @@ tau<BAs...> make_node_hook_bf_xor(const rewriter::node<tau_sym<BAs...>>& n) {
 
 // Simplify constants being syntactically true or false
 template <typename...BAs>
-tau<BAs...> make_node_hook_cte(const rewriter::node<tau_sym<BAs...>>& n)
+tau_depreciating<BAs...> make_node_hook_cte(const rewriter::node<tau_sym<BAs...>>& n)
 {
 	auto l = n
 		| tau_parser::bf_constant
@@ -355,7 +355,7 @@ tau<BAs...> make_node_hook_cte(const rewriter::node<tau_sym<BAs...>>& n)
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_ctn(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_ctn(const rewriter::node<tau_sym<BAs...>>& n) {
 	auto sp_n = make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	auto num = find_top(sp_n, is_non_terminal<tau_parser::num, BAs...>).value();
 	auto ctnvar = find_top(sp_n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
@@ -372,7 +372,7 @@ tau<BAs...> make_node_hook_wff_ctn(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename...BAs>
-tau<BAs...> make_node_hook_ctn_neg(const tau<BAs...>& n) {
+tau_depreciating<BAs...> make_node_hook_ctn_neg(const tau_depreciating<BAs...>& n) {
 	auto num = find_top(n, is_non_terminal<tau_parser::num, BAs...>).value();
 	auto ctnvar = find_top(n, is_non_terminal<tau_parser::ctnvar, BAs...>).value();
 	auto op = non_terminal_extractor<BAs...>(trim(n)).value();
@@ -402,7 +402,7 @@ tau<BAs...> make_node_hook_ctn_neg(const tau<BAs...>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_bf(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_bf(const rewriter::node<tau_sym<BAs...>>& n) {
 	// if n is ref, capture, 0 or 1, we can return accordingly
 	//if (n.child.size() != 1)
 	//	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
@@ -425,7 +425,7 @@ tau<BAs...> make_node_hook_bf(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_and(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_and(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
 	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
 		return second_argument_formula(n);
@@ -455,7 +455,7 @@ tau<BAs...> make_node_hook_wff_and(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_or(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_or(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
 	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
 		return first_argument_formula(n);
@@ -485,7 +485,7 @@ tau<BAs...> make_node_hook_wff_or(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_neg(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_neg(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
 	if (is_non_terminal<tau_parser::wff_t>(first_argument_expression(n)))
 		return _F<BAs...>;
@@ -502,7 +502,7 @@ tau<BAs...> make_node_hook_wff_neg(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename...BAs>
-tau<BAs...> make_node_hook_wff_eq_cte(const rewriter::node<tau_sym<BAs...>>& n){
+tau_depreciating<BAs...> make_node_hook_wff_eq_cte(const rewriter::node<tau_sym<BAs...>>& n){
 	auto l = n
 		| tau_parser::bf_eq
 		| tau_parser::bf
@@ -517,7 +517,7 @@ tau<BAs...> make_node_hook_wff_eq_cte(const rewriter::node<tau_sym<BAs...>>& n){
 }
 
 template<typename... BAs>
-tau<BAs...> build_wff_t(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> build_wff_t(const rewriter::node<tau_sym<BAs...>>& n) {
 	auto type_l = type_of(first_argument_expression(n));
 	auto type_r = type_of(second_argument_expression(n));
 	if (type_l == type_r && type_l) return _T<BAs...>;
@@ -528,7 +528,7 @@ tau<BAs...> build_wff_t(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template<typename... BAs>
-tau<BAs...> build_wff_f(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> build_wff_f(const rewriter::node<tau_sym<BAs...>>& n) {
 	auto type_l = type_of(first_argument_expression(n));
 	auto type_r = type_of(second_argument_expression(n));
 	if (type_l == type_r && type_l) return _F<BAs...>;
@@ -539,7 +539,7 @@ tau<BAs...> build_wff_f(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template<typename... BAs>
-tau<BAs...> make_node_hook_wff_eq(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_eq(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
 	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
@@ -568,7 +568,7 @@ tau<BAs...> make_node_hook_wff_eq(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename...BAs>
-tau<BAs...> make_node_hook_wff_neq_cte(const rewriter::node<tau_sym<BAs...>>& n)
+tau_depreciating<BAs...> make_node_hook_wff_neq_cte(const rewriter::node<tau_sym<BAs...>>& n)
 {
 	auto l = n
 		| tau_parser::bf_neq
@@ -584,7 +584,7 @@ tau<BAs...> make_node_hook_wff_neq_cte(const rewriter::node<tau_sym<BAs...>>& n)
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_neq(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_neq(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
 	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
@@ -613,7 +613,7 @@ tau<BAs...> make_node_hook_wff_neq(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_sometimes(
+tau_depreciating<BAs...> make_node_hook_wff_sometimes(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
@@ -632,7 +632,7 @@ tau<BAs...> make_node_hook_wff_sometimes(
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_always(
+tau_depreciating<BAs...> make_node_hook_wff_always(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
@@ -653,7 +653,7 @@ tau<BAs...> make_node_hook_wff_always(
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_less(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_less(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(BF_LESS_SIMPLIFY_20, "0 < 1 ::= T.")
 	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
@@ -681,7 +681,7 @@ tau<BAs...> make_node_hook_wff_less(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_nless(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_nless(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(BF_NLESS_SIMPLIFY_20, "0 !< 1 ::= F.")
 	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
@@ -708,7 +708,7 @@ tau<BAs...> make_node_hook_wff_nless(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_less_equal(
+tau_depreciating<BAs...> make_node_hook_wff_less_equal(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(BF_LESS_EQUAL_SIMPLIFY_2, "0 <= 1 ::= T.")
@@ -734,7 +734,7 @@ tau<BAs...> make_node_hook_wff_less_equal(
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_nleq(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_nleq(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(BF_NLEQ_SIMPLIFY_2, "0 !<= 1 ::= F.")
 	if (is_non_terminal<tau_parser::bf_f>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_t>(second_argument_expression(n)))
@@ -758,7 +758,7 @@ tau<BAs...> make_node_hook_wff_nleq(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_greater(const rewriter::node<tau_sym<BAs...>>& n)
+tau_depreciating<BAs...> make_node_hook_wff_greater(const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(BF_GREATER_SIMPLIFY_2, "1 > 0 ::= T.")
 	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
@@ -786,7 +786,7 @@ tau<BAs...> make_node_hook_wff_greater(const rewriter::node<tau_sym<BAs...>>& n)
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_ngreater(
+tau_depreciating<BAs...> make_node_hook_wff_ngreater(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(BF_NGREATER_SIMPLIFY_2, "1 !> 0 ::= F.")
@@ -815,7 +815,7 @@ tau<BAs...> make_node_hook_wff_ngreater(
 }
 
 template <typename... BAs>
-inline tau<BAs...> make_node_hook_wff_greater_equal(
+inline tau_depreciating<BAs...> make_node_hook_wff_greater_equal(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= 0 ::= T.")
@@ -844,7 +844,7 @@ inline tau<BAs...> make_node_hook_wff_greater_equal(
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_ngeq(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_ngeq(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(BF_NGEQ_SIMPLIFY_2, "1 !>= 0 ::= F.")
 	if (is_non_terminal<tau_parser::bf_t>(first_argument_expression(n))
 			&& is_non_terminal<tau_parser::bf_f>(second_argument_expression(n)))
@@ -871,14 +871,14 @@ tau<BAs...> make_node_hook_wff_ngeq(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_interval(
+tau_depreciating<BAs...> make_node_hook_wff_interval(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	return build_bf_interval<BAs...>(first_argument_formula(n), second_argument_formula(n), third_argument_formula(n));
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_xor(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_xor(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(BF_XOR_SIMPLIFY_0, "$X ^ F ::= $X.")
 	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
 		return first_argument_formula(n);
@@ -906,7 +906,7 @@ tau<BAs...> make_node_hook_wff_xor(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_conditional(
+tau_depreciating<BAs...> make_node_hook_wff_conditional(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	//RULE(WFF_CONDITIONAL_SIMPLIFY_0, "F ? $X : $Y ::= $Y.")
@@ -922,7 +922,7 @@ tau<BAs...> make_node_hook_wff_conditional(
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_imply(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_imply(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_IMPLY_SIMPLIFY_0, "F -> $X ::= T.")
 	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
 		return _T<BAs...>;
@@ -942,7 +942,7 @@ tau<BAs...> make_node_hook_wff_imply(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_rimply(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_rimply(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_IMPLY_SIMPLIFY_0, "F -> $X ::= T.")
 	if (is_non_terminal<tau_parser::wff_f>(second_argument_expression(n)))
 		return _T<BAs...>;
@@ -962,7 +962,7 @@ tau<BAs...> make_node_hook_wff_rimply(const rewriter::node<tau_sym<BAs...>>& n) 
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff_equiv(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff_equiv(const rewriter::node<tau_sym<BAs...>>& n) {
 	//RULE(WFF_EQUIV_SIMPLIFY_0, "F <-> $X ::= ! $X.")
 	if (is_non_terminal<tau_parser::wff_f>(first_argument_expression(n)))
 		return build_wff_neg<BAs...>(second_argument_formula(n));
@@ -990,7 +990,7 @@ tau<BAs...> make_node_hook_wff_equiv(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n) {
 	switch (get_non_terminal_node(logic_operator(n))) {
 		case tau_parser::wff_and:
 			return make_node_hook_wff_and<BAs...>(n);
@@ -1041,7 +1041,7 @@ tau<BAs...> make_node_hook_wff(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
+tau_depreciating<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 	// apply numerical simplifications
 	using p = tau_parser;
 	// This node must have two children
@@ -1080,7 +1080,7 @@ tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename...BAs>
-std::optional<tau<BAs...>> make_tau_node<BAs...>::operator()(
+std::optional<tau_depreciating<BAs...>> make_tau_node<BAs...>::operator()(
 	const rewriter::node<tau_sym<BAs...>>& n)
 {
 	if (is_non_terminal_node<BAs...>(n)) {
@@ -1094,10 +1094,10 @@ std::optional<tau<BAs...>> make_tau_node<BAs...>::operator()(
 			case tau_parser::shift: {
 				return make_node_hook_shift<BAs...>(n);
 			}
-			default: return std::optional<tau<BAs...>>();
+			default: return std::optional<tau_depreciating<BAs...>>();
 		}
 	}
-	return std::optional<tau<BAs...>>();
+	return std::optional<tau_depreciating<BAs...>>();
 }
 
 } // namespace idni::tau_lang
@@ -1105,7 +1105,7 @@ std::optional<tau<BAs...>> make_tau_node<BAs...>::operator()(
 namespace idni::rewriter {
 
 template <typename...BAs>
-std::optional<idni::tau_lang::tau<BAs...>> make_node_hook<idni::tau_lang::tau_sym<BAs...>>::operator()(
+std::optional<idni::tau_lang::tau_depreciating<BAs...>> make_node_hook<idni::tau_lang::tau_sym<BAs...>>::operator()(
 		const rewriter::node<idni::tau_lang::tau_sym<BAs...>>& n) {
 	static idni::tau_lang::make_tau_node<BAs...> hook;
 	return hook(n);

@@ -23,7 +23,7 @@ using namespace std;
 namespace testing = doctest;
 
 template<typename... BAs>
-tau<BAs...> create_spec(const char* spec) {
+tau_depreciating<BAs...> create_spec(const char* spec) {
 	auto sample_src = make_tau_source(spec);
 	return make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(
 		sample_src).value().main;

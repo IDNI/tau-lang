@@ -7,21 +7,22 @@
 
 namespace idni::tau_lang {
 
-// ba constants
-struct some_ba {};
-struct some_other_ba {};
+// ba variant
+template <typename... BAs>
+using ba = std::variant<BAs...>;
 
-using ba_constant = std::variant<some_ba, some_other_ba>;
+static inline std::vector<std::string> ba_types{ "untyped" };
+static inline std::unordered_map<std::string, size_t> ba_types_map{
+							{ "untyped", 0 } };
+template <typename... BAs>
+static inline std::vector<ba<BAs...>> C{};         // constants
 
-static inline std::vector<ba_constant> C{};         // constants
+template <typename BA, typename... BAs>
+bool is_ba(size_t id) { return std::holds_alternative<BA>(C<BAs...>[id]); }
 
-template <typename BA>
-bool is_ba(size_t id) { return std::holds_alternative<BA>(C[id]); }
-
-template <typename BA>
-BA get_constant(size_t id) {
-	DBG(assert (is_ba<BA>(id));)
-	return std::get<BA>(C[id]);
+template <typename BA, typename... BAs>
+BA get_constant(size_t id) { DBG(assert((is_ba<BA, BAs...>(id)));)
+	return std::get<BA>(C<BAs...>[id]);
 }
 
 // strings dict
@@ -73,24 +74,24 @@ struct node {
 		);
 	}
 
+#define C(x) static_cast<T>(x)
 	constexpr T extension() const noexcept {
 		T result = 0;
-		result |= (static_cast<size_t>(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
-		result |= (static_cast<size_t>(term) & 1u) << node::term_shift ;
-		result |= (static_cast<size_t>(ba) & ((1u << node::ba_bits) - 1u)) << node::ba_shift;
-		result |= (static_cast<size_t>(ext) & 1u) << node::ext_shift;
-		result |= static_cast<size_t>(data) & node::data_mask;
+		result |= (C(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
+		result |= (C(term) & 1u) << node::term_shift ;
+		result |= (C(ba) & ((1u << node::ba_bits) - 1u)) << node::ba_shift;
+		result |= (C(ext) & 1u) << node::ext_shift;
+		result |= C(data) & node::data_mask;
 		return result;
 	}
-
 	auto operator<=>(const node& that) const {
-		static constexpr auto cast = [](T x) { return x; };
-		if (nt   != that.nt)   return cast(nt)   <=> cast(that.nt);
-		if (term != that.term) return cast(term) <=> cast(that.term);
-		if (ba   != that.ba)   return cast(ba)   <=> cast(that.ba);
-		if (ext  != that.ext)  return cast(ext)  <=> cast(that.ext);
-		return data <=> that.data;
+		if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
+		if (term != that.term) return C(term) <=> C(that.term);
+		if (ba   != that.ba)   return C(ba)   <=> C(that.ba);
+		if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
+		return C(data) <=> C(that.data);
 	}
+#undef C
 	constexpr bool operator<(const node& that) const {
 		return (*this <=> that) < 0;
 	}
@@ -121,13 +122,13 @@ struct node {
 	}
 };
 
-std::ostream& operator<<(std::ostream& os, const node& n);
+inline std::ostream& operator<<(std::ostream& os, const node& n);
 
 template <typename N = node>
-struct tree : idni::tree<N> {
+struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	using base_t = idni::tree<N>;
 	using node = N;
-	using type = node::type;
+
 	// handles
 	tref get() const;
 	static const tree& get(const tref id);
@@ -148,12 +149,12 @@ struct tree : idni::tree<N> {
 	static tref get(const node& v, const std::vector<node>& ch);
 
 	// creation of node::type and children
-	static tref get(const type& nt); // terminal / leaf
-	static tref get(const type& nt, tref ch); // with single child
-	static tref get(const type& nt, tref ch1, tref ch2); // with two children
-	static tref get(const type& nt, const tref* ch, size_t len); // with array of children
-	static tref get(const type& nt, const trefs& ch); // with vector of children
-	static tref get(const type& nt, const std::string& str); // with string
+	static tref get(const node::type& nt); // terminal / leaf
+	static tref get(const node::type& nt, tref ch); // with single child
+	static tref get(const node::type& nt, tref ch1, tref ch2); // with two children
+	static tref get(const node::type& nt, const tref* ch, size_t len); // with array of children
+	static tref get(const node::type& nt, const trefs& ch); // with vector of children
+	static tref get(const node::type& nt, const std::string& str); // with string
 
 	// terminals
 	static tref get_num(size_t v);
@@ -161,7 +162,8 @@ struct tree : idni::tree<N> {
 	static tref get_ba_constant_id(size_t v);
 
 	// transform from tau_parser::tree
-	static tref get(const tau_parser::tree& t);
+	template <typename binder>
+	static tref get(const tau_parser::tree& t, binder& b);
 
 	size_t children_size() const;
 
@@ -189,13 +191,13 @@ struct tree : idni::tree<N> {
 	size_t data() const;
 	size_t child_data() const;
 
-	bool is(const type& nt) const;
+	bool is(size_t nt) const;
 	bool is_string() const;
 	bool is_integer() const;
 	bool is_num() const;
 	bool is_ba_constant() const;
 
-	type get_type() const;
+	node::type get_type() const;
 	const std::string& get_string() const;
 	int_t get_integer() const;
 	size_t get_num() const;
@@ -221,6 +223,7 @@ struct tree : idni::tree<N> {
 	struct traverser {
 		traverser();
 		traverser(tref r);
+		traverser(const htree::sp& r);
 		traverser(const trefs& n);
 		bool has_value() const;
 		explicit operator bool() const;
@@ -231,6 +234,8 @@ struct tree : idni::tree<N> {
 		std::vector<traverser> traversers() const;
 		std::vector<traverser> operator()() const;
 
+		static inline const extractor<tref> ref{
+			[](const traverser& t) -> tref { return t.value(); }};
 		static inline const extractor<traverser> children{
 			[](const traverser& t) {
 				if (!t) return traverser();
@@ -261,21 +266,21 @@ struct tree : idni::tree<N> {
 		static inline const extractor<traverser> first{
 			[](const traverser& t) {
 				if (!t) return traverser();
-				tref r = t.value_tree()[0];
+				tref r = t.value_tree().first();
 				if (!r) return traverser();
 				return traverser(r);
 			}};
 		static inline const extractor<traverser> second{
 			[](const traverser& t) {
 				if (!t) return traverser();
-				tref r = t.value_tree()[1];
+				tref r = t.value_tree().second();
 				if (!r) return traverser();
 				return traverser(r);
 			}};
 		static inline const extractor<traverser> third{
 			[](const traverser& t) {
 				if (!t) return traverser();
-				tref r = t.value_tree()[2];
+				tref r = t.value_tree().third();
 				if (!r) return traverser();
 				return traverser(r);
 			}};
@@ -284,22 +289,23 @@ struct tree : idni::tree<N> {
 				if (!t) return std::string();
 				return t.value_tree().get_string();
 			}};
-		static inline const extractor<type> nt {
+		static inline const extractor<typename node::type> nt {
 			[](const traverser& t) {
-				if (!t) return static_cast<type>(0);
+				if (!t) return
+					static_cast<typename node::type>(0);
 				return t.value_tree().get_type();
 			}};
-		static inline const extractor<int_t> integer {
+		static inline const extractor<int_t> integer{
 			[](const traverser& t) {
 				if (!t) return 0;
 				return t.value_tree().get_integer();
 			}};
-		static inline const extractor<size_t> num {
+		static inline const extractor<size_t> num{
 			[](const traverser& t) -> size_t {
 				if (!t) return 0;
 				return t.value_tree().get_num();
 			}};
-		static inline const extractor<size_t> ba_constant_id {
+		static inline const extractor<size_t> ba_constant_id{
 			[](const traverser& t) -> size_t {
 				if (!t) return 0;
 				return t.value_tree().get_ba_constant_id();

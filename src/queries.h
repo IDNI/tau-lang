@@ -8,11 +8,11 @@
 namespace idni::tau_lang {
 
 template <typename... BAs>
-bool is_non_terminal(const size_t, const tau<BAs...>&);
+bool is_non_terminal(const size_t, const tau_depreciating<BAs...>&);
 template <typename... BAs>
-bool is_child_non_terminal(const size_t nt, const tau<BAs...>& n);
+bool is_child_non_terminal(const size_t nt, const tau_depreciating<BAs...>& n);
 template <size_t nt, typename...BAs>
-bool is_child_non_terminal(const tau<BAs...>& n);
+bool is_child_non_terminal(const tau_depreciating<BAs...>& n);
 
 template <typename... BAs>
 bool is_non_terminal_node(const tau_sym<BAs...>& s) {
@@ -28,7 +28,7 @@ bool is_non_terminal_node(const rewriter::node<tau_sym<BAs...>>& s) {
 }
 
 template <typename... BAs>
-bool is_non_terminal_node(const tau<BAs...>& n) {
+bool is_non_terminal_node(const tau_depreciating<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value)
 					&& get<tau_source_sym>(n->value).nt();
 };
@@ -44,20 +44,20 @@ size_t get_non_terminal_node(const rewriter::node<tau_sym<BAs...>>& n) {
 }
 
 template <typename... BAs>
-size_t get_non_terminal_node(const tau<BAs...>& n) {
+size_t get_non_terminal_node(const tau_depreciating<BAs...>& n) {
 	return get_non_terminal_node(*n);
 }
 
 // factory method for is_non_terminal_node predicate
 template <typename... BAs>
-std::function<bool(const tau<BAs...>&)> is_non_terminal_node() {
-	return [](const tau<BAs...>& n) {
+std::function<bool(const tau_depreciating<BAs...>&)> is_non_terminal_node() {
+	return [](const tau_depreciating<BAs...>& n) {
 		return is_non_terminal_node<BAs...>(n); };
 }
 
 // check if the node is the given non terminal
 template <typename... BAs>
-bool is_non_terminal(const size_t nt, const tau<BAs...>& n) {
+bool is_non_terminal(const size_t nt, const tau_depreciating<BAs...>& n) {
 	return is_non_terminal_node<BAs...>(n)
 				&& get<tau_source_sym>(n->value).n() == nt;
 }
@@ -70,7 +70,7 @@ bool is_non_terminal_sym(const size_t nt, const tau_sym<BAs...>& s) {
 
 // check if the node is the given non terminal (template approach)
 template <size_t nt, typename...BAs>
-bool is_non_terminal(const tau<BAs...>& n) {
+bool is_non_terminal(const tau_depreciating<BAs...>& n) {
 	return is_non_terminal<BAs...>(nt, n);
 }
 
@@ -81,49 +81,49 @@ bool is_non_terminal_sym(const tau_sym<BAs...>& s) {
 
 // factory method for is_non_terminal predicate
 template <typename... BAs>
-std::function<bool(const tau<BAs...>&)> is_non_terminal(const size_t nt)
+std::function<bool(const tau_depreciating<BAs...>&)> is_non_terminal(const size_t nt)
 {
-	return [nt](const tau<BAs...>& n) {
+	return [nt](const tau_depreciating<BAs...>& n) {
 		return is_non_terminal<BAs...>(nt, n); };
 }
 
 // check if a node is a terminal
 template <typename... BAs>
-bool is_terminal_node(const tau<BAs...>& n) {
+bool is_terminal_node(const tau_depreciating<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value)
 					&& !get<tau_source_sym>(n->value).nt();
 };
 
 // factory method for is_terminal_node predicate
 template <typename... BAs>
-std::function<bool(const tau<BAs...>&)> is_terminal_node() {
-	return [](const tau<BAs...>& n) {
+std::function<bool(const tau_depreciating<BAs...>&)> is_terminal_node() {
+	return [](const tau_depreciating<BAs...>& n) {
 		return is_terminal_node<BAs...>(n); };
 }
 
 // check if the node is the given terminal (functional approach)
 template <typename...BAs>
-bool is_terminal(const char c, const tau<BAs...>& n) {
+bool is_terminal(const char c, const tau_depreciating<BAs...>& n) {
 	return is_terminal<BAs...>(n) && get<tau_source_sym>(n->value).n() == c;
 };
 
 // check if the node is the given terminal (template approach)
 template <char c, typename...BAs>
-bool is_terminal(const tau<BAs...>& n) {
+bool is_terminal(const tau_depreciating<BAs...>& n) {
 	return is_terminal<BAs...>(c, n);
 };
 
 // factory method for is_terminal predicate
 template <typename... BAs>
-std::function<bool(const tau<BAs...>&)> is_terminal(char c) {
-	return [c](const tau<BAs...>& n) {
+std::function<bool(const tau_depreciating<BAs...>&)> is_terminal(char c) {
+	return [c](const tau_depreciating<BAs...>& n) {
 		return is_terminal<BAs...>(c, n); };
 }
 
 // --- Traversal restrictions for Tau tree
 
 template <typename... BAs>
-auto visit_wff = [](const tau<BAs...>& n) static {
+auto visit_wff = [](const tau_depreciating<BAs...>& n) static {
 	using p = tau_parser;
 	if (is_non_terminal(p::bf, n))
 		return false;
@@ -131,7 +131,7 @@ auto visit_wff = [](const tau<BAs...>& n) static {
 };
 
 template <typename... BAs>
-auto visit_io_vars = [] (const tau<BAs...>& n) static {
+auto visit_io_vars = [] (const tau_depreciating<BAs...>& n) static {
 	using p = tau_parser;
 	if (is_non_terminal(p::bf_constant, n))
 		return false;
@@ -144,7 +144,7 @@ auto visit_io_vars = [] (const tau<BAs...>& n) static {
 
 //TODO: think about cache
 template <typename... BAs>
-bool contains (const tau<BAs...>& fm, const tau<BAs...>& sub_fm) {
+bool contains (const tau_depreciating<BAs...>& fm, const tau_depreciating<BAs...>& sub_fm) {
 	bool is_contained = false;
 	auto has_sub_fm = [&sub_fm, &is_contained](const auto& n) {
 		if (n == sub_fm) return is_contained = true, false;
@@ -155,7 +155,7 @@ bool contains (const tau<BAs...>& fm, const tau<BAs...>& sub_fm) {
 }
 
 template <typename... BAs>
-static const auto is_var_or_capture = [](const tau<BAs...>& n) {
+static const auto is_var_or_capture = [](const tau_depreciating<BAs...>& n) {
 	return std::holds_alternative<tau_source_sym>(n->value)
 		&& get<tau_source_sym>(n->value).nt()
 		&& ((get<tau_source_sym>(n->value).n() == tau_parser::capture)
@@ -164,7 +164,7 @@ static const auto is_var_or_capture = [](const tau<BAs...>& n) {
 };
 
 template <typename... BAs>
-static const auto is_quantifier = [](const tau<BAs...>& n) {
+static const auto is_quantifier = [](const tau_depreciating<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value)
 			|| !get<tau_source_sym>(n->value).nt()) return false;
 	auto nt = get<tau_source_sym>(n->value).n();
@@ -173,14 +173,14 @@ static const auto is_quantifier = [](const tau<BAs...>& n) {
 };
 
 template <typename... BAs>
-const auto is_child_quantifier = [](const tau<BAs...>& n) {
+const auto is_child_quantifier = [](const tau_depreciating<BAs...>& n) {
 	using p = tau_parser;
 	return is_child_non_terminal(p::wff_all, n)
 		|| is_child_non_terminal(p::wff_ex, n);
 };
 
 template <typename... BAs>
-static const auto is_temporal_quantifier = [](const tau<BAs...>& n) {
+static const auto is_temporal_quantifier = [](const tau_depreciating<BAs...>& n) {
 	if (!std::holds_alternative<tau_source_sym>(n->value)
 			|| !get<tau_source_sym>(n->value).nt()) return false;
 	auto nt = get<tau_source_sym>(n->value).n();
@@ -189,7 +189,7 @@ static const auto is_temporal_quantifier = [](const tau<BAs...>& n) {
 };
 
 template <typename... BAs>
-static const auto is_regular_or_temporal_quantifier = [](const tau<BAs...>& n) {
+static const auto is_regular_or_temporal_quantifier = [](const tau_depreciating<BAs...>& n) {
 	return is_quantifier<BAs...>(n) || is_temporal_quantifier<BAs...>(n);
 };
 
@@ -207,34 +207,34 @@ using is_var_or_capture_t = decltype(is_var_or_capture<BAs...>);
 // traverse the tree, depth first, according to the specified non
 // terminals and return, if possible, the required non terminal node
 template <typename... BAs>
-std::optional<tau<BAs...>> operator|(
+std::optional<tau_depreciating<BAs...>> operator|(
 	const rewriter::node<tau_sym<BAs...>>& n, const size_t nt)
 {
 	auto v = n.child
 		| std::ranges::views::filter(is_non_terminal<BAs...>(nt))
 		| std::ranges::views::take(1);
-	return v.empty() ? std::optional<tau<BAs...>>()
-			: std::optional<tau<BAs...>>(v.front());
+	return v.empty() ? std::optional<tau_depreciating<BAs...>>()
+			: std::optional<tau_depreciating<BAs...>>(v.front());
 }
 
 template <typename... BAs>
-std::optional<tau<BAs...>> operator|(const tau<BAs...>& n, const size_t nt) {
+std::optional<tau_depreciating<BAs...>> operator|(const tau_depreciating<BAs...>& n, const size_t nt) {
 	return *n | nt;
 }
 
 template <typename... BAs>
-std::optional<tau<BAs...>> operator|(const std::optional<tau<BAs...>>& n,
+std::optional<tau_depreciating<BAs...>> operator|(const std::optional<tau_depreciating<BAs...>>& n,
 	const size_t nt)
 {
 	return n ? n.value() | nt : n;
 }
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator|(const std::vector<tau<BAs...>>& v,
+std::vector<tau_depreciating<BAs...>> operator|(const std::vector<tau_depreciating<BAs...>>& v,
 	const size_t nt)
 {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
-	std::vector<tau<BAs...>> nv;
+	std::vector<tau_depreciating<BAs...>> nv;
 	for (const auto& n: v
 			| std::ranges::views::transform(get_node<BAs...>(nt))
 			| std::ranges::views::join)
@@ -245,12 +245,12 @@ std::vector<tau<BAs...>> operator|(const std::vector<tau<BAs...>>& v,
 // traverse the tree, top down, and return all the nodes accessible according
 // to the specified non terminals and return them
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(
+std::vector<tau_depreciating<BAs...>> operator||(
 	const rewriter::node<tau_sym<BAs...>>& n,
 	const tau_parser::nonterminal nt)
 {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
-	std::vector<tau<BAs...>> nv;
+	std::vector<tau_depreciating<BAs...>> nv;
 	nv.reserve(n.child.size());
 	for (const auto& c: n.child
 		| std::ranges::views::filter(is_non_terminal<BAs...>(nt)))
@@ -259,14 +259,14 @@ std::vector<tau<BAs...>> operator||(
 }
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(const tau<BAs...>& n,
+std::vector<tau_depreciating<BAs...>> operator||(const tau_depreciating<BAs...>& n,
 	const tau_parser::nonterminal nt)
 {
 	return *n || nt;
 }
 
 template <typename... BAs>
-std::vector<tau<BAs...>>  operator||(const std::optional<tau<BAs...>>& n,
+std::vector<tau_depreciating<BAs...>>  operator||(const std::optional<tau_depreciating<BAs...>>& n,
 	const tau_parser::nonterminal nt)
 {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
@@ -276,29 +276,29 @@ std::vector<tau<BAs...>>  operator||(const std::optional<tau<BAs...>>& n,
 
 // TODO (LOW) remove get_nodes if possible and use operator|| instead
 template <typename... BAs>
-std::vector<tau<BAs...>> get_nodes(const tau_parser::nonterminal nt,
-	const tau<BAs...>& n)
+std::vector<tau_depreciating<BAs...>> get_nodes(const tau_parser::nonterminal nt,
+	const tau_depreciating<BAs...>& n)
 {
 	return n || nt;
 }
 
 template <size_t nt, typename... BAs>
-std::vector<tau<BAs...>> get_nodes(const tau<BAs...>& n) {
+std::vector<tau_depreciating<BAs...>> get_nodes(const tau_depreciating<BAs...>& n) {
 	return n || nt;
 }
 
 template <typename... BAs>
 auto get_nodes(const tau_parser::nonterminal nt) {
-	return [nt](const tau<BAs...>& n) {
+	return [nt](const tau_depreciating<BAs...>& n) {
 		return get_nodes<BAs...>(nt, n); };
 }
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
+std::vector<tau_depreciating<BAs...>> operator||(const std::vector<tau_depreciating<BAs...>>& v,
 	const tau_parser::nonterminal nt)
 {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
-	std::vector<tau<BAs...>> nv; nv.reserve(v.size());
+	std::vector<tau_depreciating<BAs...>> nv; nv.reserve(v.size());
 	for (const auto& n : v
 			| std::ranges::views::transform(get_nodes<BAs...>(nt))
 			| std::ranges::views::join)
@@ -313,14 +313,14 @@ std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
 
 // extract the value of the node
 template <typename... BAs>
-static const auto value_extractor = [](const tau<BAs...>& n)
+static const auto value_extractor = [](const tau_depreciating<BAs...>& n)
 	-> tau_sym<BAs...> { return n->value; };
 
 template <typename... BAs>
 using value_extractor_t = decltype(value_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
+std::vector<tau_depreciating<BAs...>> operator||(const std::vector<tau_depreciating<BAs...>>& v,
 	const value_extractor_t<BAs...> e)
 {
 	std::vector<std::variant<BAs...>> nv;
@@ -330,7 +330,7 @@ std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
 }
 
 template <typename... BAs>
-std::optional<char> operator|(const std::optional<tau<BAs...>>& o,
+std::optional<char> operator|(const std::optional<tau_depreciating<BAs...>>& o,
 	const value_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
@@ -339,7 +339,7 @@ std::optional<char> operator|(const std::optional<tau<BAs...>>& o,
 
 // returns an optional containing the terminal of the node if possible
 template <typename... BAs>
-static const auto terminal_extractor = [](const tau<BAs...>& n)
+static const auto terminal_extractor = [](const tau_depreciating<BAs...>& n)
 	-> std::optional<char>
 {
 	auto value = n->value;
@@ -354,7 +354,7 @@ template <typename... BAs>
 using terminal_extractor_t = decltype(terminal_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
+std::vector<tau_depreciating<BAs...>> operator||(const std::vector<tau_depreciating<BAs...>>& v,
 	const terminal_extractor_t<BAs...> e)
 {
 	std::vector<std::variant<BAs...>> nv;
@@ -364,7 +364,7 @@ std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
 }
 
 template <typename... BAs>
-std::optional<char> operator|(const std::optional<tau<BAs...>>& o,
+std::optional<char> operator|(const std::optional<tau_depreciating<BAs...>>& o,
 	const terminal_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
@@ -373,7 +373,7 @@ std::optional<char> operator|(const std::optional<tau<BAs...>>& o,
 
 // returns an optional containing the non terminal of the node if possible
 template <typename... BAs>
-static const auto non_terminal_extractor = [](const tau<BAs...>& n)
+static const auto non_terminal_extractor = [](const tau_depreciating<BAs...>& n)
 	-> std::optional<size_t>
 {
 	if (std::holds_alternative<tau_source_sym>(n->value)
@@ -386,14 +386,14 @@ template <typename... BAs>
 using non_terminal_extractor_t = decltype(non_terminal_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
+std::vector<tau_depreciating<BAs...>> operator||(const std::vector<tau_depreciating<BAs...>>& v,
 	const non_terminal_extractor_t<BAs...> e)
 {
 	return v | std::ranges::views::transform(e);
 }
 
 template <typename... BAs>
-std::optional<size_t> operator|(const std::optional<tau<BAs...>>& o,
+std::optional<size_t> operator|(const std::optional<tau_depreciating<BAs...>>& o,
 	const non_terminal_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
@@ -401,7 +401,7 @@ std::optional<size_t> operator|(const std::optional<tau<BAs...>>& o,
 }
 
 template <typename... BAs>
-std::optional<size_t> operator|(const tau<BAs...>& o,
+std::optional<size_t> operator|(const tau_depreciating<BAs...>& o,
 	const non_terminal_extractor_t<BAs...> e)
 {
 	return e(o);
@@ -409,7 +409,7 @@ std::optional<size_t> operator|(const tau<BAs...>& o,
 
 // returns an optional containing size_t of the node if possible
 template <typename... BAs>
-static const auto size_t_extractor = [](const tau<BAs...>& n)
+static const auto size_t_extractor = [](const tau_depreciating<BAs...>& n)
 	-> std::optional<size_t>
 {
 	if (std::holds_alternative<size_t>(n->value))
@@ -420,28 +420,28 @@ template <typename... BAs>
 using size_t_extractor_t = decltype(size_t_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
+std::vector<tau_depreciating<BAs...>> operator||(const std::vector<tau_depreciating<BAs...>>& v,
 	const size_t_extractor_t<BAs...> e)
 {
 	return v | std::ranges::views::transform(e);
 }
 
 template <typename... BAs>
-std::optional<size_t> operator|(const std::optional<tau<BAs...>>& o,
+std::optional<size_t> operator|(const std::optional<tau_depreciating<BAs...>>& o,
 	const size_t_extractor_t<BAs...> e)
 {
 	return o.has_value() ? e(o.value()) : std::optional<size_t>();
 }
 
 template <typename... BAs>
-std::optional<size_t> operator|(const tau<BAs...>& o,
+std::optional<size_t> operator|(const tau_depreciating<BAs...>& o,
 	const size_t_extractor_t<BAs...> e)
 {
 	return e(o);
 }
 
 template<typename...BAs>
-inline const auto int_extractor = [](const tau<BAs...>& n) {
+inline const auto int_extractor = [](const tau_depreciating<BAs...>& n) {
 	assert(is_non_terminal(tau_parser::integer, n));
 	const auto& c = n->child;
 	if (c.size() == 1) {
@@ -453,7 +453,7 @@ inline const auto int_extractor = [](const tau<BAs...>& n) {
 
 // returns an optional containing the bas... of the node if possible
 template <typename... BAs>
-static const auto ba_extractor = [](const tau<BAs...>& n)
+static const auto ba_extractor = [](const tau_depreciating<BAs...>& n)
 	-> std::optional<std::variant<BAs...>>
 {
 	if (std::holds_alternative<std::variant<BAs...>>(n->value))
@@ -466,7 +466,7 @@ template <typename... BAs>
 using ba_extractor_t = decltype(ba_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<std::variant<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
+std::vector<std::variant<BAs...>> operator||(const std::vector<tau_depreciating<BAs...>>& v,
 	const ba_extractor_t<BAs...> e)
 {
 	std::vector<std::variant<BAs...>> nv;
@@ -477,7 +477,7 @@ std::vector<std::variant<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
 
 template <typename... BAs>
 std::optional<std::variant<BAs...>> operator|(
-	const std::optional<tau<BAs...>>& o,
+	const std::optional<tau_depreciating<BAs...>>& o,
 	const ba_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
@@ -486,7 +486,7 @@ std::optional<std::variant<BAs...>> operator|(
 }
 
 template <typename... BAs>
-std::optional<std::variant<BAs...>> operator|(const tau<BAs...>& o,
+std::optional<std::variant<BAs...>> operator|(const tau_depreciating<BAs...>& o,
 	const ba_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
@@ -495,38 +495,38 @@ std::optional<std::variant<BAs...>> operator|(const tau<BAs...>& o,
 
 // returns the only child of a node
 template <typename... BAs>
-static const auto only_child_extractor = [](const tau<BAs...>& n)
-	-> std::optional<tau<BAs...>>
+static const auto only_child_extractor = [](const tau_depreciating<BAs...>& n)
+	-> std::optional<tau_depreciating<BAs...>>
 {
-	if (n->child.size() != 1) return std::optional<tau<BAs...>>();
-	return std::optional<tau<BAs...>>(n->child[0]);
+	if (n->child.size() != 1) return std::optional<tau_depreciating<BAs...>>();
+	return std::optional<tau_depreciating<BAs...>>(n->child[0]);
 };
 
 template <typename... BAs>
 using only_child_extractor_t = decltype(only_child_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(const std::vector<tau<BAs...>>& v,
+std::vector<tau_depreciating<BAs...>> operator||(const std::vector<tau_depreciating<BAs...>>& v,
 	const only_child_extractor_t<BAs...> e)
 {
-	std::vector<tau<BAs...>> nv;
+	std::vector<tau_depreciating<BAs...>> nv;
 	for (const auto& n: v | std::ranges::views::transform(e))
 		if (n.has_value()) nv.push_back(n.value());
 	return nv;
 }
 
 template <typename... BAs>
-std::optional<tau<BAs...>> operator|(const std::optional<tau<BAs...>>& o,
+std::optional<tau_depreciating<BAs...>> operator|(const std::optional<tau_depreciating<BAs...>>& o,
 	const only_child_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
 	return o.has_value() ? e(o.value())
-		: std::optional<tau<BAs...>>();
+		: std::optional<tau_depreciating<BAs...>>();
 }
 
 // IDEA maybe unify all the implementations dealing with operator| and operator|| for extractors
 template <typename... BAs>
-std::optional<tau<BAs...>> operator|(const tau<BAs...>& o,
+std::optional<tau_depreciating<BAs...>> operator|(const tau_depreciating<BAs...>& o,
 	const only_child_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
@@ -536,7 +536,7 @@ std::optional<tau<BAs...>> operator|(const tau<BAs...>& o,
 
 // extracts terminal from tau node
 template <typename... BAs>
-auto tau_node_terminal_extractor = [](const tau<BAs...>& n)
+auto tau_node_terminal_extractor = [](const tau_depreciating<BAs...>& n)
 	-> std::optional<char>
 {
 	if (n->value.index() == 0
@@ -550,7 +550,7 @@ template <typename... BAs>
 using tau_node_terminal_extractor_t = decltype(tau_node_terminal_extractor<BAs...>);
 
 template <typename... BAs>
-auto extract_string = [](const tau<BAs...>& n) {
+auto extract_string = [](const tau_depreciating<BAs...>& n) {
 	return idni::tau_lang::make_string(
 		idni::tau_lang::tau_node_terminal_extractor<BAs...>, n);
 };
@@ -560,19 +560,19 @@ using extract_string_t = decltype(extract_string<BAs...>);
 
 // Simple helper method to convert a tau tree to string
 template <typename... BAs>
-std::string tau_to_str (const tau<BAs...>& n) {
+std::string tau_to_str (const tau_depreciating<BAs...>& n) {
 	std::stringstream ss;
 	ss << n;
 	return ss.str();
 }
 
 template <typename... BAs>
-std::string operator|(const tau<BAs...>& n, const extract_string_t<BAs...> e) {
+std::string operator|(const tau_depreciating<BAs...>& n, const extract_string_t<BAs...> e) {
 	return e(n);
 }
 
 template <typename... BAs>
-std::string operator|(const std::optional<tau<BAs...>>& n,
+std::string operator|(const std::optional<tau_depreciating<BAs...>>& n,
 	const extract_string_t<BAs...> e)
 {
 	return n.has_value() ? e(n.value()) : "";
@@ -580,59 +580,59 @@ std::string operator|(const std::optional<tau<BAs...>>& n,
 
 // check if the node is the given non terminal
 template <typename... BAs>
-bool is_child_non_terminal(const size_t nt, const tau<BAs...>& n) {
+bool is_child_non_terminal(const size_t nt, const tau_depreciating<BAs...>& n) {
 	auto child = n | only_child_extractor<BAs...>;
 	return child.has_value() && is_non_terminal<BAs...>(nt, child.value());
 }
 
 // check if the node is the given non terminal (template approach)
 template <size_t nt, typename...BAs>
-bool is_child_non_terminal(const tau<BAs...>& n) {
+bool is_child_non_terminal(const tau_depreciating<BAs...>& n) {
 	return is_child_non_terminal<BAs...>(nt, n);
 }
 
 // factory method for is_non_terminal predicate
 template <typename... BAs>
-std::function<bool(const tau<BAs...>&)> is_child_non_terminal(const size_t nt) {
-	return [nt](const tau<BAs...>& n) {
+std::function<bool(const tau_depreciating<BAs...>&)> is_child_non_terminal(const size_t nt) {
+	return [nt](const tau_depreciating<BAs...>& n) {
 		return is_child_non_terminal<BAs...>(nt, n); };
 }
 
 // returns the first child of a node
 template <typename... BAs>
-static const auto first_child_extractor = [](const tau<BAs...>& n)
-	-> std::optional<tau<BAs...>>
+static const auto first_child_extractor = [](const tau_depreciating<BAs...>& n)
+	-> std::optional<tau_depreciating<BAs...>>
 {
-	if (n->child.size() == 0) return std::optional<tau<BAs...>>();
-	return std::optional<tau<BAs...>>(n->child[0]);
+	if (n->child.size() == 0) return std::optional<tau_depreciating<BAs...>>();
+	return std::optional<tau_depreciating<BAs...>>(n->child[0]);
 };
 
 template <typename... BAs>
 using first_child_extractor_t = decltype(first_child_extractor<BAs...>);
 
 template <typename... BAs>
-std::vector<tau<BAs...>> operator||(
-	const std::vector<tau<BAs...>>& v,
+std::vector<tau_depreciating<BAs...>> operator||(
+	const std::vector<tau_depreciating<BAs...>>& v,
 	const first_child_extractor_t<BAs...> e)
 {
-	std::vector<tau<BAs...>> nv;
+	std::vector<tau_depreciating<BAs...>> nv;
 	for (const auto& n: v | std::ranges::views::transform(e))
 		if (n.has_value()) nv.push_back(n.value());
 	return nv;
 }
 
 template <typename... BAs>
-std::optional<tau<BAs...>> operator|(const std::optional<tau<BAs...>>& o,
+std::optional<tau_depreciating<BAs...>> operator|(const std::optional<tau_depreciating<BAs...>>& o,
 	const first_child_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
 	return o.has_value() ? e(o.value())
-		: std::optional<tau<BAs...>>();
+		: std::optional<tau_depreciating<BAs...>>();
 }
 
 // IDEA maybe unify all the implementations dealing with operator| and operator|| for extractors
 template <typename... BAs>
-std::optional<tau<BAs...>> operator|(const tau<BAs...>& o,
+std::optional<tau_depreciating<BAs...>> operator|(const tau_depreciating<BAs...>& o,
 	const first_child_extractor_t<BAs...> e)
 {
 	// IDEA use o.transform(e) from C++23 when implemented in the future by gcc/clang
@@ -722,12 +722,12 @@ private:
 
 // The hash function for tau as specialisation of std::hash
 template<typename... BAs>
-struct std::hash<idni::tau_lang::tau<BAs...>> {
-	size_t operator()(const idni::tau_lang::tau<BAs...>& n) const noexcept {
+struct std::hash<idni::tau_lang::tau_depreciating<BAs...>> {
+	size_t operator()(const idni::tau_lang::tau_depreciating<BAs...>& n) const noexcept {
 		using namespace idni::tau_lang;
 		using namespace idni::rewriter;
 		// Let the hash respect the typing rules for bf_t and bf_f
-		return hash<node<tau_sym<BAs...>>>{}(*n);
+		return hash<idni::rewriter::node<tau_sym<BAs...>>>{}(*n);
 	}
 };
 

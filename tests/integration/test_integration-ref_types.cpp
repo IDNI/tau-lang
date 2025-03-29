@@ -32,8 +32,8 @@ bool test_ref_types(const char* rec_relation,
 	// std::cerr << "nt: " << tau_parser::instance().name(nt) << "\n";
 
 	auto main = binded | tau_parser::main
-		| tau_parser::wff | optional_value_extractor<tau<sbf_ba>>;
-	auto nso_rr = rr<tau<sbf_ba>>{ make_rec_relations<sbf_ba>(binded), main };
+		| tau_parser::wff | optional_value_extractor<tau_depreciating<sbf_ba>>;
+	auto nso_rr = rr<tau_depreciating<sbf_ba>>{ make_rec_relations<sbf_ba>(binded), main };
 
 	rr_types<sbf_ba> ts(nso_rr);
 	auto nso_rr_opt = infer_ref_types<sbf_ba>(nso_rr, ts);

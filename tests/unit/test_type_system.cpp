@@ -16,7 +16,7 @@ using namespace std;
 
 namespace testing = doctest;
 
-tau<Bool> infer(const char* sample) {
+tau_depreciating<Bool> infer(const char* sample) {
 	auto src = make_tau_source(sample);
 	auto stmt = make_statement(src);
 	return infer_constant_types<Bool>(stmt);
@@ -27,13 +27,13 @@ bool expect_infer_fail(const char* sample) {
 	return x.get() == 0;
 }
 
-bool are_all_typed_as(const tau<Bool>& n, const std::string& type) {
+bool are_all_typed_as(const tau_depreciating<Bool>& n, const std::string& type) {
 	for (const auto& c : select_all(n,
 				is_non_terminal<tau_parser::bf_constant, Bool>))
 	{
 		auto tn = c | tau_parser::type;
 		if ((!tn && type.size()) || ((tn && type != make_string<
-			tau_node_terminal_extractor_t<Bool>, tau<Bool>>(
+			tau_node_terminal_extractor_t<Bool>, tau_depreciating<Bool>>(
 				tau_node_terminal_extractor<Bool>, tn.value()))))
 					return false;
 	}

@@ -23,9 +23,9 @@ struct make_tau_node {
 	 * @brief Creates a tau node from a rewriter node.
 	 *
 	 * @param n The rewriter node to be converted.
-	 * @return std::optional<tau<BAs...>> The created tau node, or std::nullopt if creation fails.
+	 * @return std::optional<tau_depreciating<BAs...>> The created tau node, or std::nullopt if creation fails.
 	 */
-	std::optional<tau<BAs...>> operator()(
+	std::optional<tau_depreciating<BAs...>> operator()(
 		const rewriter::node<tau_sym<BAs...>>& n);
 };
 
@@ -47,9 +47,9 @@ struct make_node_hook<idni::tau_lang::tau_sym<BAs...>> {
 	 * @brief Creates a tau node from a rewriter node.
 	 *
 	 * @param n The rewriter node to be converted.
-	 * @return std::optional<idni::tau_lang::tau<BAs...>> The created tau node, or std::nullopt if creation fails.
+	 * @return std::optional<idni::tau_lang::tau_depreciating<BAs...>> The created tau node, or std::nullopt if creation fails.
 	 */
-	std::optional<idni::tau_lang::tau<BAs...>> operator()(
+	std::optional<idni::tau_lang::tau_depreciating<BAs...>> operator()(
 		const rewriter::node<idni::tau_lang::tau_sym<BAs...>>& n);
 };
 

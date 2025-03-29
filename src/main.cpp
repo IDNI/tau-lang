@@ -84,12 +84,14 @@ cli::options tau_options() {
 		.set_description("use colors");
 	DBG(opts["debug"] = cli::option("debug", 'd', true)
 		.set_description("debug mode");)
+	opts["experimental"] = cli::option("experimental", 'x', false)
+		.set_description("enables transitioning features");
 	return opts;
 }
 
 int error(const string& s) {BOOST_LOG_TRIVIAL(error)<< "(Error) "<< s;return 1;}
 
-int run_tau_spec(string spec_file, bool charvar) {
+int run_tau_spec(string spec_file, bool charvar, bool exp) {
 	string src = "";
 	if (spec_file == "-") {
 		std::ostringstream oss;
@@ -105,7 +107,8 @@ int run_tau_spec(string spec_file, bool charvar) {
 		.print_memory_store = false,
 		.error_quits        = true,
 		.charvar            = charvar,
-		.repl_running       = false
+		.repl_running       = false,
+		.experimental       = exp
 	});
 	if (auto status = re.eval(src); status) return status;
 	return re.eval("run %");
@@ -156,8 +159,10 @@ int main(int argc, char** argv) {
 	tau_parser::instance().get_grammar().set_enabled_productions(guards);
 	sbf_parser::instance().get_grammar().set_enabled_productions(guards);
 
+	bool exp = opts["experimental"].get<bool>();
+
 	// spec provided, run it
-	if (files.size()) return run_tau_spec(files.front(), charvar);
+	if (files.size()) return run_tau_spec(files.front(), charvar, exp);
 
 	// REPL
 	repl_evaluator<sbf_ba> re({
@@ -167,7 +172,8 @@ int main(int argc, char** argv) {
 #ifdef DEBUG
 		.debug_repl = opts["debug"].get<bool>(),
 #endif // DEBUG
-		.severity = sev
+		.severity = sev,
+		.experimental = exp
 	});
 	string e = opts["evaluate"].get<string>();
 	if (e.size()) return re.eval(e), 0;

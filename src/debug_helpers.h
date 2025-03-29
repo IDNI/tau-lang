@@ -34,7 +34,7 @@ std::ostream& print_sp_tau_source_node_tree(std::ostream &os,
 
 // print the tree of tau nodes for general debugging
 template <typename... BAs>
-std::ostream& print_tau_tree(std::ostream &os, tau<BAs...> n,
+std::ostream& print_tau_tree(std::ostream &os, tau_depreciating<BAs...> n,
 	size_t l = 0)
 {
 	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
@@ -60,7 +60,7 @@ std::ostream& ptree(std::ostream &os, rewriter::sp_node<node_t> n, size_t l = 0)
 }
 
 template <typename... BAs>
-std::ostream& ptree(std::ostream &os, tau<BAs...> n, size_t l = 0) {
+std::ostream& ptree(std::ostream &os, tau_depreciating<BAs...> n, size_t l = 0) {
 	return print_tau_tree<BAs...>(os, n, l);
 }
 
@@ -72,7 +72,7 @@ std::string ptree(rewriter::sp_node<node_t> n, size_t l = 0) {
 }
 
 template <typename... BAs>
-std::string ptree(tau<BAs...> n, size_t l = 0) {
+std::string ptree(tau_depreciating<BAs...> n, size_t l = 0) {
 	std::stringstream ss;
 	print_tau_tree<BAs...>(ss, n, l);
 	return ss.str();

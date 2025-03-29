@@ -13,10 +13,18 @@ static inline bool is_string_nt(size_t nt) {
 	return string_nts.contains(nt);
 }
 
+static inline bool is_digital_nt(size_t nt) {
+	using p = node::type;
+	static const std::set<size_t> digital_nts{
+		p::num, p::memory_id
+	};
+	return digital_nts.contains(nt);
+}
+
 std::ostream& operator<<(std::ostream& os, const node& n) {
-	if (n.nt == node::type::num) os << n.data << " ";
-	else if (n.nt == node::type::integer) os << n.as_int() << " ";
+	if (n.nt == node::type::integer) os << n.as_int() << " ";
 	else if (n.nt == node::type::bf_constant) os << " {C" << n.data << "} ";
+	else if (is_digital_nt(n.nt)) os << n.data << " ";
 	else if (is_string_nt(n.nt)) os << "\"" << S[n.data] << "\" ";
 	// else if (n.ext) os << "{EXT}";
 	os << tau_parser::instance().name(n.nt);
@@ -134,7 +142,7 @@ tref tree<node>::get(const node::type& nt, const std::string& s) {
 
 template <typename node>
 tref tree<node>::get_num(size_t n) {
-	return get(node(node::type::num, n));
+	return get(node(tree<node>::num, n));
 }
 
 template <typename node>
@@ -150,20 +158,26 @@ tref tree<node>::get_ba_constant_id(size_t c) {
 //------------------------------------------------------------------------------
 // transform from tau_parser::tree
 
+// Converts parser tree nodes to tau tree nodes
+// - terminals are colapsed into their parents
+//     ie. shift > num > "10" becomes shift > num("10")
+//     or  variable > type > "sbf" becomes variable > type("sbf")
+// important terminals are stored outside of the tree and value is actually its
+// id (strings, constants)
+// for constants, binder requires type and a tref, store it and get the id
 template <typename node>
-tref tree<node>::get(const tau_parser::tree& pt) {
+template <typename binder>
+tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 	using ptree = tau_parser::tree;
 	std::unordered_map<tref, tref> m;
-	auto transformer = [&m](tref t) {
+	auto transformer = [&m, &bind](tref t) {
 		// std::cout << "transforming:" << tau_parser::tree::get(t).value << std::endl;
 		if (m.find(t) != m.end()) return true;
 		const auto& tr = ptree::get(t);
 		const auto& l = tr.value.first;
 		if (!l.nt()) return true;
 		tref x;
-		if (l.n() == node::type::num)
-			x = get_num(std::stoul(tr.get_terminals()));
-		else if (l.n() == node::type::integer) {
+		if (l.n() == node::type::integer) {
 			bool neg = false;
 			tref d = nullptr;
 			for (tref c : tr.children()) {
@@ -174,10 +188,16 @@ tref tree<node>::get(const tau_parser::tree& pt) {
 				ptree::get(d).get_terminals()));
 			x = get_integer(neg ? -i : i);
 		} else if (l.n() == node::type::bf_constant) {
-			C.push_back(ba_constant{}); // store constant in C
-			x = get_ba_constant_id(C.size() - 1);
+			// call binder with a type and a tref, store it and get the id
+			size_t cid = bind(t);
+			if (bind.error) return false;
+			x = get_ba_constant_id(cid);
+		} else if (is_digital_nt(l.n())) {
+			size_t v = std::stoul(tr.get_terminals());
+			x = get(node(l.n(), v));
 		} else if (is_string_nt(l.n()))
-			x = get(static_cast<node::type>(l.n()), tr.get_terminals());
+			x = get(static_cast<node::type>(l.n()),
+							tr.get_terminals());
 		else {
 			trefs ch;
 			for (tref c : tr.children()) ch.push_back(m.at(c));
@@ -298,7 +318,7 @@ template <typename node>
 size_t tree<node>::child_data() const { return first_tree().value.data; }
 
 template <typename node>
-bool tree<node>::is(const node::type& nt) const {
+bool tree<node>::is(size_t nt) const {
 	return this->value.nt == nt;
 }
 
@@ -315,7 +335,9 @@ template <typename node>
 bool tree<node>::is_ba_constant() const { return is(node::type::bf_constant); }
 
 template <typename node>
-node::type tree<node>::get_type() const { return this->value.nt; }
+node::type tree<node>::get_type() const {
+	return static_cast<node::type>(this->value.nt);
+}
 
 template <typename node>
 const std::string& tree<node>::get_string() const {
@@ -348,7 +370,10 @@ template <typename node>
 tree<node>::traverser::traverser() : has_value_(false) {}
 template <typename node>
 tree<node>::traverser::traverser(tref r) : has_value_(r != nullptr),
-				values_(has_value_ ? trefs{ r } : trefs{}) {}
+			values_(has_value_ ? trefs{ r } : trefs{}) {}
+template <typename node>
+tree<node>::traverser::traverser(const htree::sp& h) : has_value_(h != nullptr),
+			values_(has_value_ ? trefs{ h->get() } : trefs{}) {}
 template <typename node>
 tree<node>::traverser::traverser(const trefs& refs) { set_values(refs); }
 
@@ -392,9 +417,8 @@ typename tree<node>::traverser
 	tree<node>::traverser::operator|(size_t nt) const
 {
 	if (!has_value()) return traverser();
-	for (tref c : get(value()).get_children()) {
-		const auto& n = get(c).value;
-		if (n.nt() && n.data == nt) return { c }; 
+	for (tref c : get(value()).children()) {
+		if (get(c).is(nt)) return { c }; 
 	}
 	return {};
 }
@@ -405,9 +429,8 @@ typename tree<node>::traverser
 {
 	trefs r;
 	for (const auto& v : values())
-		for (const tref& c : get(v).get_children()) {
-			const auto& n = get(c).value;
-			if (n.nt() && n.data == nt) r.push_back(c); 
+		for (const tref& c : get(v).children()) {
+			if (get(c).is(nt)) r.push_back(c); 
 		}
 	return traverser(r);
 }

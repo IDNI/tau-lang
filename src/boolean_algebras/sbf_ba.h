@@ -36,7 +36,7 @@ struct sbf_ba_factory {
 	 * @param src source string
 	 * @return optional parsed node if parsing successful
 	 */
-	std::optional<tau<BAs...>> parse(const std::string& src);
+	std::optional<tau_depreciating<BAs...>> parse(const std::string& src);
 
 	/**
 	 * @brief builds a SBF bounded node from a parsed terminals of a source binding
@@ -44,7 +44,7 @@ struct sbf_ba_factory {
 	 * @param sn tau code node with parsed SBF
 	 * @return bounded constant
 	 */
-	tau<BAs...> binding(const tau<BAs...>& sn);
+	tau_depreciating<BAs...> binding(const tau_depreciating<BAs...>& sn);
 
 	std::variant<BAs...> splitter_one () const;
 
@@ -54,7 +54,7 @@ struct sbf_ba_factory {
 	// static sbf_ba_factory<BAs...>& instance();
 private:
 
-	inline static std::map<std::string, tau<BAs...>> cache;
+	inline static std::map<std::string, tau_depreciating<BAs...>> cache;
 };
 
 /**
@@ -64,15 +64,15 @@ template<>
 struct nso_factory<sbf_ba> {
 	inline static sbf_ba_factory<sbf_ba> bf;
 
-	std::optional<tau<sbf_ba>> parse(const std::string& src,
+	std::optional<tau_depreciating<sbf_ba>> parse(const std::string& src,
 		const std::string& = "");
 
-	tau<sbf_ba> binding(const tau<sbf_ba>& n,
+	tau_depreciating<sbf_ba> binding(const tau_depreciating<sbf_ba>& n,
 		const std::string& = "");
 
 	std::vector<std::string> types() const;
 
-	tau<sbf_ba> splitter_one() const;
+	tau_depreciating<sbf_ba> splitter_one() const;
 
 	std::string default_type() const;
 
@@ -80,7 +80,7 @@ struct nso_factory<sbf_ba> {
 
 	std::string zero(const std::string type_name) const;
 
-	std::optional<tau<sbf_ba> > unpack_tau_ba(
+	std::optional<tau_depreciating<sbf_ba> > unpack_tau_ba(
 		const std::variant<sbf_ba>&) const;
 
 	static nso_factory<sbf_ba>& instance();
@@ -100,7 +100,7 @@ struct nso_factory<tau_ba<sbf_ba>, sbf_ba> {
 		const std::string type_name);
 
 	tau_nso<sbf_ba> binding(
-		const tau<tau_ba<sbf_ba>, sbf_ba>& n,
+		const tau_depreciating<tau_ba<sbf_ba>, sbf_ba>& n,
 		const std::string type_name);
 
 	std::vector<std::string> types() const;

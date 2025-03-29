@@ -58,7 +58,7 @@ template <typename... BAs>
 using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
 
 template <typename... BAs>
-using tau = rewriter::sp_node<tau_sym<BAs...>>;
+using tau_depreciating = rewriter::sp_node<tau_sym<BAs...>>;
 
 
 template <typename node_t>
@@ -69,7 +69,7 @@ using rec_relation = rewriter::rule<node_t>;
 // defined in the normalizer.
 
 template <typename... BAs>
-using builder = rewriter::rule<tau<BAs...>>;
+using builder = rewriter::rule<tau_depreciating<BAs...>>;
 
 // defines a vector of rules in the tau language, the order is important as it defines
 // the order of the rules in the rewriting process of the tau language.
@@ -106,46 +106,46 @@ struct rr {
 
 
 template <typename... BAs>
-tau<BAs...> operator<<(const tau<BAs...>& n,
-	const std::map<tau<BAs...>, tau<BAs...>>& changes)
+tau_depreciating<BAs...> operator<<(const tau_depreciating<BAs...>& n,
+	const std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>>& changes)
 {
 	return replace(n, changes);
 }
 
 template <typename... BAs>
-tau<BAs...> operator<<(const tau<BAs...>& n,
-	const std::pair<tau<BAs...>, tau<BAs...>>& change)
+tau_depreciating<BAs...> operator<<(const tau_depreciating<BAs...>& n,
+	const std::pair<tau_depreciating<BAs...>, tau_depreciating<BAs...>>& change)
 {
-	std::map<tau<BAs...>, tau<BAs...>> changes{change};
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes{change};
 	return replace(n, changes);
 }
 
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template <typename... BAs>
-tau<BAs...> nso_rr_apply(const rewriter::rule<tau<BAs...>>& r,
-	const tau<BAs...>& n)
+tau_depreciating<BAs...> nso_rr_apply(const rewriter::rule<tau_depreciating<BAs...>>& r,
+	const tau_depreciating<BAs...>& n)
 {
-	static const auto is_capture = [](const tau<BAs...>& n) {
+	static const auto is_capture = [](const tau_depreciating<BAs...>& n) {
 		return std::holds_alternative<tau_source_sym>(n->value)
 			&& get<tau_source_sym>(n->value).nt()
 			&& ( get<tau_source_sym>(n->value).n() == tau_parser::capture);
 	};
 
 	#ifdef TAU_CACHE
-	static std::map<std::pair<rewriter::rule<tau<BAs...>>, tau<BAs...>>, tau<BAs...>> cache;
+	static std::map<std::pair<rewriter::rule<tau_depreciating<BAs...>>, tau_depreciating<BAs...>>, tau_depreciating<BAs...>> cache;
 	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 
 	#ifdef TAU_MEASURE
-	measures::increase_rule_counter<tau<BAs...>>(r);
+	measures::increase_rule_counter<tau_depreciating<BAs...>>(r);
 	#endif // TAU_MEASURE
 
 	try {
-		auto nn = apply_rule<tau<BAs...>, decltype(is_capture)>(r, n, is_capture);
+		auto nn = apply_rule<tau_depreciating<BAs...>, decltype(is_capture)>(r, n, is_capture);
 
 		#ifdef TAU_MEASURE
-		if (n != nn) measures::increase_rule_hit<tau<BAs...>>(r);
+		if (n != nn) measures::increase_rule_hit<tau_depreciating<BAs...>>(r);
 		#endif // TAU_MEASURE
 
 		#ifdef TAU_CACHE
@@ -161,25 +161,25 @@ tau<BAs...> nso_rr_apply(const rewriter::rule<tau<BAs...>>& r,
 
 // TODO (LOW) move it to a more appropriate place (parser)
 template <typename... BAs>
-tau<BAs...> replace_with(const tau<BAs...>& node, const tau<BAs...>& with,
-	const tau<BAs...> in)
+tau_depreciating<BAs...> replace_with(const tau_depreciating<BAs...>& node, const tau_depreciating<BAs...>& with,
+	const tau_depreciating<BAs...> inp)
 {
-	std::map<tau<BAs...>, tau<BAs...>> changes = {{node, with}};
-	return replace<tau<BAs...>>(in, changes);
+	std::map<tau_depreciating<BAs...>, tau_depreciating<BAs...>> changes = {{node, with}};
+	return replace<tau_depreciating<BAs...>>(inp, changes);
 }
 
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template <typename... BAs>
-tau<BAs...> nso_rr_apply(const rules<tau<BAs...>>& rs, const tau<BAs...>& n)
+tau_depreciating<BAs...> nso_rr_apply(const rules<tau_depreciating<BAs...>>& rs, const tau_depreciating<BAs...>& n)
 {
 	#ifdef TAU_CACHE
-	static std::map<std::pair<rules<tau<BAs...>>, tau<BAs...>>, tau<BAs...>> cache;
+	static std::map<std::pair<rules<tau_depreciating<BAs...>>, tau_depreciating<BAs...>>, tau_depreciating<BAs...>> cache;
 	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 
 	if (rs.empty()) return n;
-	tau<BAs...> nn = n;
+	tau_depreciating<BAs...> nn = n;
 	for (auto& r : rs) nn = nso_rr_apply<BAs...>(r, nn);
 
 	#ifdef TAU_CACHE
@@ -224,7 +224,7 @@ std::string make_string(const extractor_t& extractor, const node_t& n) {
  */
 template <typename... BAs>
 struct struc_equal {
-	bool operator() (const tau<BAs...>& l, const tau<BAs...>& r) const {
+	bool operator() (const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r) const {
 		if (r == nullptr && l == nullptr) return true;
 		if (r == nullptr || l == nullptr) return false;
 
@@ -243,14 +243,14 @@ struct struc_equal {
 
 template <typename T, typename... BAs>
 struct pair_struc_equal {
-	bool operator() (const std::pair<tau<BAs...>, T>& l, const std::pair<tau<BAs...>, T>& r) const {
+	bool operator() (const std::pair<tau_depreciating<BAs...>, T>& l, const std::pair<tau_depreciating<BAs...>, T>& r) const {
 		return struc_equal<BAs...>()(l.first, r.first) && l.second == r.second;
 	}
 };
 
 template <typename T1, typename T2, typename... BAs>
 struct tuple_struc_equal {
-	bool operator() (const std::tuple<tau<BAs...>, T1, T2>& l, const std::tuple<tau<BAs...>, T1, T2>& r) const {
+	bool operator() (const std::tuple<tau_depreciating<BAs...>, T1, T2>& l, const std::tuple<tau_depreciating<BAs...>, T1, T2>& r) const {
 		return struc_equal<BAs...>()(std::get<0>(l), std::get<0>(r)) &&
 			std::get<1>(l) == std::get<1>(r) &&
 				std::get<2>(l) == std::get<2>(r);
@@ -258,11 +258,11 @@ struct tuple_struc_equal {
 };
 
 template <typename value_t, typename... BAs>
-using unordered_tau_map = std::unordered_map<tau<BAs...>, value_t,
-			std::hash<tau<BAs...>>, struc_equal<BAs...>>;
+using unordered_tau_map = std::unordered_map<tau_depreciating<BAs...>, value_t,
+			std::hash<tau_depreciating<BAs...>>, struc_equal<BAs...>>;
 
 template <typename... BAs>
-using unordered_tau_set = std::unordered_set<tau<BAs...>, std::hash<tau<BAs...>>,
+using unordered_tau_set = std::unordered_set<tau_depreciating<BAs...>, std::hash<tau_depreciating<BAs...>>,
 	struc_equal<BAs...>>;
 
 
@@ -301,17 +301,17 @@ struct make_node_cache_equality<tau_lang::tau_sym<BAs...>> {
 };
 
 template <typename... BAs>
-struct traverser_cache_equality<tau_lang::tau<BAs...>> {
-	bool operator() (const tau_lang::tau<BAs...>& l,
-		const tau_lang::tau<BAs...>& r) const {
+struct traverser_cache_equality<tau_lang::tau_depreciating<BAs...>> {
+	bool operator() (const tau_lang::tau_depreciating<BAs...>& l,
+		const tau_lang::tau_depreciating<BAs...>& r) const {
 		static tau_lang::struc_equal<BAs...> st_eq;
 		return st_eq(l, r);
 	}
 };
 
 template <typename... BAs>
-struct traverser_pair_cache_equality<tau_lang::tau<BAs...>> {
-	using p = std::pair<tau_lang::tau<BAs...>, size_t>;
+struct traverser_pair_cache_equality<tau_lang::tau_depreciating<BAs...>> {
+	using p = std::pair<tau_lang::tau_depreciating<BAs...>, size_t>;
 	bool operator() (const p& l, const p& r) const {
 		static tau_lang::struc_equal<BAs...> st_eq;
 		return st_eq(l.first, r.first) && l.second == r.second;
@@ -326,7 +326,7 @@ struct traverser_pair_cache_equality<tau_lang::tau<BAs...>> {
 
 template <typename...BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::rule<idni::tau_lang::tau<BAs...>>& r)
+	const idni::rewriter::rule<idni::tau_lang::tau_depreciating<BAs...>>& r)
 {
 	return stream << r.first << " := " << r.second << ".";
 }
@@ -334,15 +334,15 @@ std::ostream& operator<<(std::ostream& stream,
 // << for rules
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::tau_lang::rules<idni::tau_lang::tau<BAs...>>& rs)
+	const idni::tau_lang::rules<idni::tau_lang::tau_depreciating<BAs...>>& rs)
 {
 	for (const auto& r : rs) stream << r << " ";
 	return stream;
 }
 
 // << for tau_source_sym
-std::ostream& operator<<(std::ostream& stream,
-				const idni::tau_lang::tau_source_sym& rs);
+// std::ostream& operator<<(std::ostream& stream,
+// 				const idni::tau_lang::tau_source_sym& rs);
 
 // << for BAs... variant
 template <typename... BAs>
@@ -371,7 +371,7 @@ std::ostream& operator<<(std::ostream& stream,
 // << for formulas
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::tau_lang::rr<idni::tau_lang::tau<BAs...>>& f)
+	const idni::tau_lang::rr<idni::tau_lang::tau_depreciating<BAs...>>& f)
 {
 	stream << f.rec_relations;
 	if (f.main) stream << f.main;
