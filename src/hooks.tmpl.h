@@ -4,6 +4,7 @@
 
 #include "nso_rr.h"
 #include "builders.h"
+#include "z3_context.h"
 
 namespace idni::tau_lang {
 
@@ -1079,6 +1080,38 @@ tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 }
 
+template <typename... BAs>
+tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
+	// apply numerical simplifications
+	using p = tau_parser;
+	// get bitvector size
+	size_t size = n.child.size() == 2
+		? n.child[1]
+			| only_child_extractor<BAs...>
+			| size_t_extractor<BAs...>
+			| optional_value_extractor<size_t>
+		: sizeof(size_t);
+	auto bv_type = n.child[0]
+			| non_terminal_extractor<BAs...>
+			| optional_value_extractor<size_t>;
+	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
+	switch (bv_type) {
+		case p::num : {
+			int64_t ull = std::stoull(value);
+			auto bv = z3_context.bv_val(ull, size);
+			return std::make_shared<rewriter::node<tau_sym<BAs...>>>(tau_sym<BAs...>(bv), std::vector<tau<BAs...>>{});
+		}
+		case p::bits : {
+			value.pop_back();
+			auto bv = z3_context.bv_val(value.c_str(), size);
+			return std::make_shared<rewriter::node<tau_sym<BAs...>>>(tau_sym<BAs...>(bv), std::vector<tau<BAs...>>{});
+		}
+		default: {
+			assert(false);
+		}
+	}
+}
+
 template <typename...BAs>
 std::optional<tau<BAs...>> make_tau_node<BAs...>::operator()(
 	const rewriter::node<tau_sym<BAs...>>& n)
@@ -1093,6 +1126,9 @@ std::optional<tau<BAs...>> make_tau_node<BAs...>::operator()(
 			}
 			case tau_parser::shift: {
 				return make_node_hook_shift<BAs...>(n);
+			}
+			case tau_parser::bitvector : {
+				return make_node_hook_bitvector<BAs...>(n);
 			}
 			default: return std::optional<tau<BAs...>>();
 		}
