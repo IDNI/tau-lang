@@ -12,8 +12,9 @@ inline std::ostream& operator<<(std::ostream& os, const tau& t) {
 }
 
 inline std::ostream& operator<<(std::ostream& os, const tt& t) {
-	if (!t.has_value()) return os << "(NULL)";
-	for (const auto& c : t.values()) tau::get(c).print(os) << "\n";
+	if (!t.has_value()) return os << "(no value)";
+	if (t.values().size() == 1) return os << tau::get(t.value());
+	for (const auto& c : t.values()) os << tau::get(c) << "\n";
 	return os << "\n\n";
 }
 
