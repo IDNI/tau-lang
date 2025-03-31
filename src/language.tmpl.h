@@ -7,6 +7,15 @@
 
 namespace idni::tau_lang {
 
+inline std::ostream& operator<<(std::ostream& os, const tau& t) {
+	return t.print(os);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const tt& t) {
+	if (!t.has_value()) return os << "(NULL)";
+	for (const auto& c : t.values()) tau::get(c).print(os) << "\n";
+	return os << "\n\n";
+}
 
 template <typename... BAs>
 tau_depreciating<BAs...> trim(const tau_depreciating<BAs...>& n) {

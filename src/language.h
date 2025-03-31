@@ -437,7 +437,10 @@ template <typename... BAs>
 std::optional<tau_depreciating<BAs...>> make_nso_using_factory(const std::string& input,
 	idni::parser<>::parse_options options = { .start = tau_parser::wff });
 
-} // namespace tau
+std::ostream& operator<<(std::ostream& os, const tau& t);
+std::ostream& operator<<(std::ostream& os, const tt& t);
+
+} // namespace idni::tau_lang
 
 #include "language.tmpl.h"
 
