@@ -185,7 +185,8 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	const tree& third_tree()  const;
 	const tree& only_child_tree() const;
 	
-	std::ostream& print(std::ostream& o, size_t s = 0) const;
+	std::ostream& print(std::ostream& o) const;
+	std::ostream& print_tree(std::ostream& o, size_t s = 0) const;
 
 	// fast access helpers
 	size_t data() const;
@@ -198,6 +199,7 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	bool is_ba_constant() const;
 
 	node::type get_type() const;
+	const std::string& get_type_name() const;
 	const std::string& get_string() const;
 	int_t get_integer() const;
 	size_t get_num() const;

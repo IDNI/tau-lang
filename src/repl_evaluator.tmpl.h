@@ -1548,8 +1548,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	auto command_type = command | tt::nt;
 #ifdef DEBUG
 	if (opt.debug_repl) {
-		// std::cout << "command: " << command << "\n";
-		command.value_tree().print(std::cout << "tree: ") << "\n";
+		std::cout << "command: " << command << "\n";
+		command.value_tree().print_tree(std::cout << "tree: ") << "\n";
 	}
 #endif
 	tref result = 0;
