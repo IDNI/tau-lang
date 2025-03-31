@@ -112,24 +112,20 @@ z3                     => ('(' _ z3 _ ')')                   :z3_parenthesis
                         |                                     z3_constant
                         |                                     variable
                         | '~' _ z3                           :z3_not
-                        | (z3 (_ '+' _ | __) z3)             :z3_add
-                        | (z3 (_ '-' _ | __) z3)             :z3_sub
-                        | (z3 (_ '*' _ | __) z3)             :z3_mul
-                        | (z3 (_ '/' _ | __) z3)             :z3_div
-                        | (z3 (_ '%' _ | __) z3)             :z3_mod
-                        | (z3 (_ '&' _ | __) z3)             :z3_and
-                        | (z3 (_ '|' _ | __) z3)             :z3_or
-                        | (z3 (_ '^' _ | __) z3)             :z3_xo
-                        | bits | _uint | _int | _real.
+                        | (z3 _ '+' _ z3)             :z3_add
+                        | (z3 _ '-' _ z3)             :z3_sub
+                        | (z3 _ '*' _ z3)             :z3_mul
+                        | (z3 _ '/' _ z3)             :z3_div
+                        | (z3 _ '%' _ z3)             :z3_mod
+                        | (z3 _ '&' _ z3)             :z3_and
+                        | (z3 _ '|' _ z3)             :z3_or
+                        | (z3 _ '^' _ z3)             :z3_xo
+                        | bitvector.
 
 # z3 constants
-bits                   => bit (bit)*.
-bit                    => '0' | '1'.
-_int                   => integer [_ 'i'].
-_uint                  => num _ "ui".
-_long                  => integer _ 'l'.
-_ulong                 => num _ "ul".
-_real                  => integer [['.' _ [num]] | _ 'r'].
+bitvector              => bit (bit)* 'b' [_ bitvector_type]
+                        | num [ _ bitvector_type].
+bitvector_type        => ( _ ':' _ '[' _ num _ ']' ):type.
 
 # constant time constraints
 constraint =>
@@ -311,7 +307,7 @@ memory                 => ( "%"
         file_name, ctnvar, option_name, option_value, integer.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, q_var, src_c,
+@inline char classes, chars, q_var, src_c, bitvector_type,
         z3_bv > z3_bv_parenthesis > z3_bv,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
