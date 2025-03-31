@@ -119,7 +119,7 @@ z3                     => ('(' _ z3 _ ')')                   :z3_parenthesis
                         | (z3 _ '%' _ z3)             :z3_mod
                         | (z3 _ '&' _ z3)             :z3_and
                         | (z3 _ '|' _ z3)             :z3_or
-                        | (z3 _ '^' _ z3)             :z3_xo
+                        | (z3 _ '^' _ z3)             :z3_xor
                         | bitvector.
 
 # z3 constants

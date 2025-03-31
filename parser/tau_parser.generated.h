@@ -30,7 +30,7 @@ inline std::vector<std::string> symbol_names{
 	"type", "bf_f", "__E_bf_60", "__E___E_bf_60_61", "bf_and", "__E_bf_62", "__E___E_bf_62_63", "bf_neg", "__E_bf_64", "bf_neg_oprnd", 
 	"__E___E_bf_64_65", "bf_and_nosep", "__E_bf_66", "bf_and_nosep_1st_oprnd", "__E___E_bf_66_67", "bf_and_nosep_2nd_oprnd", "__E___E_bf_66_68", "z3_parenthesis", "__E_z3_69", "z3_constant", 
 	"z3_not", "z3_add", "__E_z3_70", "z3_sub", "__E_z3_71", "z3_mul", "__E_z3_72", "z3_div", "__E_z3_73", "z3_mod", 
-	"__E_z3_74", "z3_and", "__E_z3_75", "z3_or", "__E_z3_76", "z3_xo", "__E_z3_77", "bitvector", "bits", "__E_bitvector_78", 
+	"__E_z3_74", "z3_and", "__E_z3_75", "z3_or", "__E_z3_76", "z3_xor", "__E_z3_77", "bitvector", "bits", "__E_bitvector_78", 
 	"bitvector_type", "num", "__E_bitvector_79", "__E_bitvector_type_80", "bit", "__E_bits_81", "__E_bits_82", "ctn_neq", "__E_constraint_83", "ctnvar", 
 	"ctn_eq", "__E_constraint_84", "ctn_greater_equal", "__E_constraint_85", "ctn_greater", "__E_constraint_86", "ctn_less_equal", "__E_constraint_87", "ctn_less", "__E_constraint_88", 
 	"__E_variable_89", "__E_variable_90", "__E_variable_91", "chars", "__E_variable_92", "__E_variable_93", "__E_variable_94", "__E_variable_95", "io_var", "__E_variable_96", 
@@ -673,9 +673,9 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(117), (NT(183)));
 //G268: __E_z3_77(186)       => z3(117) _(11) '^' _(11) z3(117).
 	p(NT(186), (NT(117)+NT(11)+T(30)+NT(11)+NT(117)));
-//G269: z3_xo(185)           => __E_z3_77(186).
+//G269: z3_xor(185)          => __E_z3_77(186).
 	p(NT(185), (NT(186)));
-//G270: z3(117)              => z3_xo(185).
+//G270: z3(117)              => z3_xor(185).
 	p(NT(117), (NT(185)));
 //G271: z3(117)              => bitvector(187).
 	p(NT(117), (NT(187)));
@@ -1573,7 +1573,7 @@ struct tau_parser : public idni::parser<char, char> {
 		type, bf_f, __E_bf_60, __E___E_bf_60_61, bf_and, __E_bf_62, __E___E_bf_62_63, bf_neg, __E_bf_64, bf_neg_oprnd, 
 		__E___E_bf_64_65, bf_and_nosep, __E_bf_66, bf_and_nosep_1st_oprnd, __E___E_bf_66_67, bf_and_nosep_2nd_oprnd, __E___E_bf_66_68, z3_parenthesis, __E_z3_69, z3_constant, 
 		z3_not, z3_add, __E_z3_70, z3_sub, __E_z3_71, z3_mul, __E_z3_72, z3_div, __E_z3_73, z3_mod, 
-		__E_z3_74, z3_and, __E_z3_75, z3_or, __E_z3_76, z3_xo, __E_z3_77, bitvector, bits, __E_bitvector_78, 
+		__E_z3_74, z3_and, __E_z3_75, z3_or, __E_z3_76, z3_xor, __E_z3_77, bitvector, bits, __E_bitvector_78, 
 		bitvector_type, num, __E_bitvector_79, __E_bitvector_type_80, bit, __E_bits_81, __E_bits_82, ctn_neq, __E_constraint_83, ctnvar, 
 		ctn_eq, __E_constraint_84, ctn_greater_equal, __E_constraint_85, ctn_greater, __E_constraint_86, ctn_less_equal, __E_constraint_87, ctn_less, __E_constraint_88, 
 		__E_variable_89, __E_variable_90, __E_variable_91, chars, __E_variable_92, __E_variable_93, __E_variable_94, __E_variable_95, io_var, __E_variable_96, 

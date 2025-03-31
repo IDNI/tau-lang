@@ -594,7 +594,26 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			{ tau_parser::bf_xor,                          740 },
 			{ tau_parser::bf_neg,                          750 },
 			{ tau_parser::bf,                              760 },
-
+			// z3
+			{ tau_parser::z3_add,                          771 },
+			{ tau_parser::z3_sub,                          772 },
+			{ tau_parser::z3_mul,                          773 },
+			{ tau_parser::z3_div,                          774 },
+			{ tau_parser::z3_mod,                          775 },
+			{ tau_parser::z3_and,                          776 },
+			{ tau_parser::z3_and,                          777 },
+			{ tau_parser::z3_and,                          778 },
+			{ tau_parser::z3_eq,                           779 },
+			{ tau_parser::z3_neq,                          780 },
+			{ tau_parser::z3_less_equal,                   781 },
+			{ tau_parser::z3_nleq,                         782 },
+			{ tau_parser::z3_greater,                      783 },
+			{ tau_parser::z3_ngreater,                     784 },
+			{ tau_parser::z3_greater_equal,                785 },
+			{ tau_parser::z3_ngeq,                         786 },
+			{ tau_parser::z3_less,                         787 },
+			{ tau_parser::z3_nless,                        788 },
+			// others
 			{ tau_parser::rec_relation,                    800 },
 			{ tau_parser::ref_args,                        800 },
 			{ tau_parser::bf_rule,                         800 },
@@ -814,10 +833,11 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::bf_neg:         postfix_nows("'"); break;
 			case tau_parser::wff_sometimes:  prefix("sometimes"); break;
 			case tau_parser::wff_always:     prefix("always"); break;
+			case tau_parser::z3_not:         prefix("~"); break;
 			// binary operators
-			case tau_parser::bf_and:         print_bf_and(); break;
-			case tau_parser::bf_or:          infix_nows("|"); break;
-			case tau_parser::bf_xor:         infix_nows("+"); break;
+			case tau_parser::bf_and:            print_bf_and(); break;
+			case tau_parser::bf_or:             infix_nows("|"); break;
+			case tau_parser::bf_xor:            infix_nows("+"); break;
 			case tau_parser::bf_eq:             infix("="); break;
 			case tau_parser::bf_neq:            infix("!="); break;
 			case tau_parser::bf_less_equal:     infix("<="); break;
@@ -834,11 +854,29 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::ctn_greater:       infix(">");  break;
 			case tau_parser::ctn_less_equal:    infix("<="); break;
 			case tau_parser::ctn_less:          infix("<");  break;
-			case tau_parser::wff_and:        infix("&&"); break;
-			case tau_parser::wff_or:         infix("||"); break;
-			case tau_parser::wff_xor:        infix("^"); break;
-			case tau_parser::wff_imply:      infix("->"); break;
-			case tau_parser::wff_equiv:      infix("<->"); break;
+			case tau_parser::wff_and:           infix("&&"); break;
+			case tau_parser::wff_or:            infix("||"); break;
+			case tau_parser::wff_xor:           infix("^"); break;
+			case tau_parser::wff_imply:         infix("->"); break;
+			case tau_parser::wff_equiv:         infix("<->"); break;
+			case tau_parser::z3_eq:             infix("=_"); break;
+			case tau_parser::z3_neq:            infix("!=_"); break;
+			case tau_parser::z3_less_equal:     infix("<=_"); break;
+			case tau_parser::z3_nleq:           infix("!<=_"); break;
+			case tau_parser::z3_greater:        infix(">_"); break;
+			case tau_parser::z3_ngreater:       infix("!>_"); break;
+			case tau_parser::z3_greater_equal:  infix(">=_"); break;
+			case tau_parser::z3_ngeq:           infix("!>=_"); break;
+			case tau_parser::z3_less:           infix("<_"); break;
+			case tau_parser::z3_nless:          infix("!<_"); break;
+			case tau_parser::z3_add:            infix("+"); break;
+			case tau_parser::z3_sub:            infix("-"); break;
+			case tau_parser::z3_mul:            infix("*"); break;
+			case tau_parser::z3_div:            infix("/"); break;
+			case tau_parser::z3_mod:            infix("%"); break;
+			case tau_parser::z3_and:            infix("&"); break;
+			case tau_parser::z3_or:             infix("|"); break;
+			case tau_parser::z3_xor:            infix("^"); break;
 			// ternary operators
 			case tau_parser::bf_interval:    infix2("<=", "<="); break;
 			case tau_parser::wff_conditional:infix2("?", ":"); break;
