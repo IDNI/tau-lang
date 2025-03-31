@@ -437,7 +437,10 @@ template <typename... BAs>
 std::optional<tau_depreciating<BAs...>> make_nso_using_factory(const std::string& input,
 	idni::parser<>::parse_options options = { .start = tau_parser::wff });
 
+// default tau printer shortcut to pretty print
 std::ostream& operator<<(std::ostream& os, const tau& t);
+
+// debug helper for printing tt's values if any
 std::ostream& operator<<(std::ostream& os, const tt& t);
 
 } // namespace idni::tau_lang
