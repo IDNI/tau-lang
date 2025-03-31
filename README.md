@@ -15,12 +15,12 @@
 	2. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
 4. [The Tau Language](#the-tau-language)
-	1. [Constants](#constants)
-	2. [Variables](#variables-variables-variables)
-	3. [Boolean functions](#boolean-functions)
-	4. [Tau formulas](#tau-formulas)
-	5. [Functions and predicates](#functions-and-predicates)
-	6. [Tau specifications](#tau-specifications)
+	1. [Tau specifications](#tau-specifications)
+	2. [Boolean functions](#boolean-functions)
+	3. [Functions and predicates](#functions-and-predicates)
+	4. [Constants](#constants)
+	5. [Variables](#variables-variables-variables)
+	6. [Pointwise revision](#pointwise-revision) 
 	7. [Reserved symbols](#reserved-symbols)
 5. [Command line options](#command-line-options)
 6. [The Tau REPL](#the-tau-repl)
@@ -55,19 +55,19 @@ specifications and programs built in Tau Language, and accurately adapt them to
 meet requirements, which is useful for collaborative specification, maintenance,
 updates, safety and user control.
 
-Skip to the quick start [click here](#quick-start).
+To go to the quick start [click here](#quick-start).
 
-Skip to the installation guide [click here](#installing-the-tau-language).
+To go to the installation guide [click here](#installing-the-tau-language).
 
-Known issues, future work and how to submit issues, [click here](#quick-start).
+For viewing known issues, future work and how to submit issues, [click here](#quick-start).
 
-For the theory behind Tau Language [click here](#quick-start).
+For visiting the theory behind Tau Language [click here](#quick-start).
 
 # **Installing the Tau Language Framework**
 
 ## **Linux**
 
-Currently we automatically build the following binaries packages (AMD64 architecture):
+Currently, we automatically build the following binaries packages (AMD64 architecture):
 
 * deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
 * rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
@@ -76,7 +76,7 @@ The executable is installed in `/usr/bin/tau`.
 
 ## **Windows**
 
-For windows we provide a convenient installer that includes the tau executable
+For windows, we provide a convenient installer that includes the tau executable
 and also a zip file:
 
 * Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
@@ -142,7 +142,7 @@ For example, the following specification:
 o1[t] = 0
 ```
 
-states that the output `o1` at all time points (`t`) has to be `0`. Similarly the
+states that the output `o1` at all time points (`t`) has to be `0`. Similarly, the
 following specification:
 
 ```
@@ -228,15 +228,28 @@ and workings.
 
 # **The Tau Language**
 
-In the Tau Language you define how the current and previous inputs and outputs
-are related over time, using the first-order theory of atomless Boolean algebras
-extended with a time dimension. For example you can write `o1[t] & o1[t-1] & i1[t] = 0`
-which would mean that the current output, and the previous output, and the current input,
+The core idea of the Tau Language is to specify how current and previous inputs and outputs of a program
+are related over time, using the first-order theory of finite and infinite atomless Boolean algebras
+extended with a time dimension. It was carefully crafted around being purely logical,
+allowing efficient and decidable satisfiability checking, while being executable,
+yielding a framework to enable program synthesis.
+
+For example, you can write `o1[t] & o1[t-1] & i1[t] = 0`
+which means that the current output `o1[t]`, the previous output `o1[t-1]`, and the current input `i1[t]`,
 have to have an empty intersection. The set-theoretic perspective of Boolean algebra
-is justfied by Stone's representation theorem for Boolean algebras, but more concretely,
-when a Tau spec is treated as a BA element,
-it can be seen as a set of all programs that admit that spec, and the Boolean
-operations are simply the set-theoretic union/intersection/complementation.
+is given by Stone's representation theorem for Boolean algebras. More concretely,
+when a Tau specification is treated as a Boolean algebra element,
+it can be seen as a set of all programs that admit that specification, and the Boolean
+operations are the set-theoretic union/intersection and complementation.
+
+A key feature is the ability of checking satisfiability of Tau specifications within Tau specifications
+using the theory of Boolean equations and an abstraction of specifications to Boolean algebra elements.
+This enables, in particular, a novel approach to software updates. A specification which is currently  
+executed, can take as an input an arbitrary new Tau specification, seen as an update, check if the proposed new specification is
+satisfiable and incorporate the update into the existing specification using an operation we call pointwise revision.
+Section [Pointwise revision](#pointwise-revision) provides a more detailed introduction to this feature and how to use it.
+
+The following is a general introduction to using the Tau language.
 
 ## **Tau specifications**
 
@@ -325,7 +338,7 @@ execution, the output equals the complement of the input.
 
 One of the key ingredients of the Tau Language are the Boolean functions
 (Boolean combinations of variables, and constants over some chosen atomless (or
-finite -to be develop-) Boolean algebra and variables).They are given by the
+finite -to be developed-) Boolean algebra and variables).They are given by the
 following grammar:
 
 ```
@@ -338,7 +351,7 @@ term => (term "&" term) | term "'"
 
 where
 
-* `term` stands for a well formed sub-formula and the operators `&`, `'`,
+* `term` stands for a well-formed subformula and the operators `&`, `'`,
 `+` (or equivallentli `^`) and `|` stand for conjunction, negation, exclusive-or
 and disjunction (respectively).
 * `function` is  a call to the given recurrence relation (see the Subsection
@@ -361,7 +374,7 @@ for an IO variable, and
 algebra.
 
 In this case, the order of the operations is the following (from higher precedence
-to lower): `'` > `&` > `+` (equivallently > `^`) > `|`.
+to lower): `'` > `&` > `+` (equivalently > `^`) > `|`.
 
 For example, the following is a valid expression in terms of a Boolean function:
 
@@ -472,7 +485,7 @@ arbitrary string of `chars`.
 We also have IO variables, which are actually infinite sequence of Boolean
 algebra elements, each, indexed by positions in the sequence. They are used to
 define the inputs and outputs of the program. The name for an input variable is
-`i{num}` (e.g. `i1`) whereas ouput variables are of the form `o{num}` (in the
+`i{num}` (e.g. `i1`) whereas output variables are of the form `o{num}` (in the
 near future we will allow arbitrary names for IO variables). They should always
 be referred to with reference to time (i.e. position in the sequence), and
 the syntax is `i2[t]` or `o1[t]` where `t` always denotes time, but also can be
@@ -494,6 +507,120 @@ In the near future we will allow arbitrary names for the IO variables.
 
 Finally, we have the uninterpreted constant context, which are implicitly
 existentially quantified variables. The syntax is `<:name>`.
+
+## **Pointwise revision**
+
+As mentioned in the beginning, pointwise revision refers to the feature to incorporate 
+updates into a currently running specification. To this end, the special output stream `u`
+is introduced. A Tau specification written into this stream, will be interpreted as a potential
+update. If the proposed update is not satisfiable as a stand-alone specification, no update is performed. Otherwise,
+the pointwise revision procedure is called, updating the currently running specification with the specification
+written into `u`.
+
+### Minimal example
+
+Let us work with a concrete, minimal example to make the idea more clear. Afterwords, 
+the algorithm for pointwise revision is explained in more detail.
+
+Suppose we execute the specification `u[t] = i1[t]`. By default, both streams are of type `tau`. 
+This can be done in the REPL by just entering 
+```
+run u[t] = i1[t]
+```
+`u[t]` is the special output stream, while `i1[t]` is an ordinary input stream. 
+Hence, the specification says that the input into `i1` is written into `u` in each step of execution.
+We now input `o1[t] = 1` for `i1[0]`. This will yield the following output:
+```
+u[0] := o1[t] = 1
+```
+Since `o1[t] = 1` is a satisfiable specification, the update is accepted and in 
+the following step 1, the running Tau specification is
+```
+u[t] = i1[t] && o1[t] = 1
+```
+If we now input `o2[t] = 0 && o2[t] = 1` for `i1[1]` in the next step,
+no update is performed, because `o2[t]` cannot be 0 and 1 at the same time. So this
+is an example of a very simple unsatisfiable specification.
+
+Finally, in the next step we input `o1[t] = 0` for `i1[2]` as a proposed update. This is a satisfiable specification but contradicts
+the currently running specification (we required `o1[t] = 1`). The pointwise revision algorithm will replace the
+previous specification with the update, yielding just `o1[t] = 0`, 
+in order to ensure that the new specification is satisfiable.
+
+Running this example in REPL (see [The Tau REPL](#the-tau-repl) below) yields:
+```
+tau> run u[t] = i1[t]
+
+Temporal normalization of always specification reached fixpoint after 0 steps, yielding the result: 
+i1[t]u[t]' = 0 && i1[t]'u[t] = 0
+
+-----------------------------------------------------------------------------------------------------------
+Please provide requested input, or press ENTER to terminate                                               |
+If no input is requested, press ENTER to continue to the next execution step, or type q(uit) to terminate |
+-----------------------------------------------------------------------------------------------------------
+
+Execution step: 0
+i1[0] := o1[t] = 1
+u[0] := always o1[t]' = 0
+
+Updated specification: 
+always o1[t]' = 0 && i1[t]u[t]' = 0 && i1[t]'u[t] = 0
+
+Execution step: 1
+i1[1] := o2[t] = 0 && o2[t] = 1
+o1[1] := T
+u[1] := F
+
+Execution step: 2
+i1[2] := o1[t] = 0
+o1[2] := T
+u[2] := always o1[t] = 0
+
+Updated specification: 
+always o1[t] = 0
+
+Execution step: 3
+o1[3] := F
+u[3] := F
+
+Execution step: 4
+o1[4] := F
+u[4] := F
+...
+```
+Note that in order to interpret the output, `1` of type `tau` is represented as `T` and `O` as `F`.
+Furthermore, Tau specifications during execution are always displayed normalized.
+The REPL informs the user whenever an update was done successfully by printing the new, updated specification.
+
+### Pointwise revision details
+
+The following is a detailed explanation of the pointwise revision algorithm. Pointwise revision is performed 
+at the end of an execution step in which a Tau specification, let's call it `update`, is written 
+into the output stream `u`. First, it is checked if `update` is satisfiable. This means that
+for any given input at any given step during execution, there has to exist output satisfying the specification,
+where in this later case the standard definition of satisfiability for a logical formula is meant.
+If `update` is not satisfiable, it normalizes to `F` and no update is applied.
+
+In case `update` is satisfiable, the following steps are performed:
+
+1) `update` can refer to previous memory positions by using negative numbers in a stream index, 
+for example `o1[-k]`. Let `t` be the current time point of execution. Then `o1[-k]` is replaced with 
+the value at `o1[t-k]`. If no such memory position is present, no update is performed. After replacing all such streams with
+the respective value from the memory, it is checked again if `update` is satisfiable given these memory references.
+If it is unsatisfiable, no update is performed. Otherwise, we move to the next step:
+2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `always` statement
+and possibly several `sometimes` statements. We denote the `always` part by `aw_spec` and the collection of 
+`sometimes` parts by `st_spec`.
+The updated specification is given by <br> 
+`update && ( (ex [outputs] update && aw_spec) -> aw_spec)`, where `[outputs]` refers to the list of all output streams present 
+in `aw_spec` and `update` combined. The meaning is that whenever possible given the current input at a particular step, 
+`update` and `aw_spec` are executed together. The name _pointwise revision_ originates from this behavior.
+Note that it is possible to refine the definition of the new specification
+in more advanced ways. We will explore this aspect in the future.
+Note that if `update` is satisfiable, then the updated specification is satisfiable.
+3) As a final step, it is checked if the previous `sometimes` statements `st_spec` are executable along the updated specification.
+If this is the case, they are added to the updated specification. Otherwise, 
+the updated specification constructed in step 2 is accepted.
 
 ## **Reserved symbols**
 
