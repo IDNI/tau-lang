@@ -109,7 +109,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
 z3                     => ('(' _ z3 _ ')')                   :z3_parenthesis
-                        |                                     z3_constant
+                        |                                     bitvector
                         |                                     variable
                         | '~' _ z3                           :z3_not
                         | (z3 _ '+' _ z3)             :z3_add

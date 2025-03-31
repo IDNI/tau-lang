@@ -114,7 +114,7 @@ std::optional<z3::expr> eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z
 				if (!l.has_value() || !r.has_value()) return {};
 				return l.value() >= r.value();
 			}
-			case tau_parser::z3_constant: {
+			case tau_parser::bitvector: {
 				return std::get<z3::expr>(form->child[0]->value);
 			}
 			default: return {};

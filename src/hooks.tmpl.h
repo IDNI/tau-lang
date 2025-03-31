@@ -1099,12 +1099,12 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 		case p::num : {
 			int64_t ull = std::stoull(value);
 			auto bv = z3_context.bv_val(ull, size);
-			return std::make_shared<rewriter::node<tau_sym<BAs...>>>(tau_sym<BAs...>(bv), std::vector<tau<BAs...>>{});
+			return wrap(p::bitvector, std::make_shared<rewriter::node<tau_sym<BAs...>>>(tau_sym<BAs...>(bv), std::vector<tau<BAs...>>{}));
 		}
 		case p::bits : {
 			value.pop_back();
 			auto bv = z3_context.bv_val(value.c_str(), size);
-			return std::make_shared<rewriter::node<tau_sym<BAs...>>>(tau_sym<BAs...>(bv), std::vector<tau<BAs...>>{});
+			return wrap(p::bitvector, std::make_shared<rewriter::node<tau_sym<BAs...>>>(tau_sym<BAs...>(bv), std::vector<tau<BAs...>>{}));
 		}
 		default: {
 			assert(false);
