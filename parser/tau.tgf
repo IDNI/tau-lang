@@ -123,9 +123,10 @@ z3                     => ('(' _ z3 _ ')')                   :z3_parenthesis
                         | bitvector.
 
 # z3 constants
-bitvector              => bit (bit)* 'b' [_ bitvector_type]
+bitvector              => bits [_ bitvector_type]
                         | num [ _ bitvector_type].
 bitvector_type        => ( _ ':' _ '[' _ num _ ']' ):type.
+bits                  => bit (bit)* 'b'.
 
 # constant time constraints
 constraint =>
