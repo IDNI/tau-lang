@@ -137,6 +137,7 @@ tref repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 	const size_t nt, const tt& program)
 {
 	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -227,9 +228,31 @@ void repl_evaluator<BAs...>::history_store_cmd(const tau_nso_t& command) {
 }
 
 template <typename... BAs>
-tref repl_evaluator<BAs...>::get_bf(const tt& /*n*/, bool /*suppress_error*/)
+tt repl_evaluator<BAs...>::get_(tau::node::type nt, const tt& n,
+	bool suppress_error) 
 {
-	return 0;
+	if (n | tt::is<nt>) return n;
+	else if (n | tt::is<tau::memory>) {
+		if (auto check = memory_retrieve(n); check) {
+			auto [value, _] = check.value();
+			if (tt(value) | tt::is<nt>) return tt(value);
+			else if (!suppress_error) BOOST_LOG_TRIVIAL(error)
+				<< "(Error) argument has wrong type";
+			return tt();
+		}
+	}
+	if (!suppress_error) BOOST_LOG_TRIVIAL(error)
+		<< "(Error) argument has wrong type";
+	return tt();
+}
+
+template <typename... BAs>
+tt repl_evaluator<BAs...>::get_bf(const tt& n, bool suppress_error) {
+	return get_(tau::bf, n, suppress_error);
+}
+template <typename... BAs>
+tt repl_evaluator<BAs...>::get_wff(const tt& n) {
+	return get_(tau::wff, n, false);
 }
 
 // DEPRECATED
@@ -256,12 +279,6 @@ std::optional<tau_nso<BAs...>>
 	return {};
 }
 
-template <typename... BAs>
-tref repl_evaluator<BAs...>::get_wff(const tt& /*n*/) {
-	// TODO
-	return 0;
-}
-
 // DEPRECATED
 template <typename... BAs>
 std::optional<tau_nso<BAs...>>
@@ -285,11 +302,14 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-bool repl_evaluator<BAs...>::contains(const tt& /*n*/,
-	tau_parser::nonterminal /*nt*/)
+bool repl_evaluator<BAs...>::contains(const tt& n, tau::node::type nt)
 {
-	// TODO
-	return false;
+	bool found = false;
+	pre_order(n).search([&](const auto& n) {
+		if (tau::get(n).get_type() == nt) return found = true;
+		return false;
+	});
+	return found;
 }	
 
 // DEPRECATED
@@ -367,6 +387,8 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 tref repl_evaluator<BAs...>::dnf_cmd(const tt& /*n*/) {
+	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -390,6 +412,8 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 tref repl_evaluator<BAs...>::cnf_cmd(const tt& /*n*/) {
+	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -416,6 +440,8 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 tref repl_evaluator<BAs...>::nnf_cmd(const tt& /*n*/) {
+	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -439,6 +465,8 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& /*n*/) {
+	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -462,6 +490,8 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 tref repl_evaluator<BAs...>::snf_cmd(const tt& /*n*/) {
+	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -486,6 +516,7 @@ std::optional<tau_nso<BAs...>>
 template <typename... BAs>
 tref repl_evaluator<BAs...>::bf_substitute_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -508,6 +539,7 @@ std::optional<tau_nso<BAs...>>
 template <typename... BAs>
 tref repl_evaluator<BAs...>::substitute_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -623,9 +655,11 @@ std::optional<tau_nso<BAs...>>
 }
 
 template <typename... BAs>
-tref repl_evaluator<BAs...>::instantiate_cmd(const tt& /*n*/) {
-	// TODO
-	return 0;
+tref repl_evaluator<BAs...>::instantiate_cmd(const tt& n) {
+	auto var_type = n[2] | tt::is<tau::variable> ? tau::bf : tau::wff;
+	auto nn = tau::get(n.value_tree().value, { n[0].get(), n[1].get(),
+			tau::get(var_type, n[2].get()), n[3].get() });
+	return substitute_cmd(nn);
 }
 
 // DEPRECATED
@@ -646,6 +680,7 @@ std::optional<tau_nso<BAs...>>
 template <typename... BAs>
 tref repl_evaluator<BAs...>::normalize_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -688,6 +723,7 @@ std::optional<tau_nso<BAs...>>
 template <typename... BAs>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -709,6 +745,7 @@ std::optional<tau_nso<BAs...>>
 template <typename... BAs>
 void repl_evaluator<BAs...>::run_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 }
 
 
@@ -879,6 +916,7 @@ void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 }
 
 // DEPRECATED
@@ -920,6 +958,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 template <typename... BAs>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 }
 
 // DEPRECATED
@@ -960,6 +999,7 @@ template<typename... BAs>
 tref repl_evaluator<BAs...>::is_valid_cmd(const tt& /*n*/)
 {
 	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -1001,6 +1041,7 @@ std::optional<tau_nso<BAs...>>
 template<typename... BAs>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -1042,6 +1083,7 @@ std::optional<tau_nso<BAs...>>
 template<typename... BAs>
 tref repl_evaluator<BAs...>::is_unsatisfiable_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 	return 0;
 }
 
@@ -1083,6 +1125,7 @@ std::optional<tau_nso<BAs...>>
 template <typename... BAs>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& /*n*/) {
 	// TODO
+	not_implemented_yet();
 }
 
 // DEPRECATED
@@ -1182,6 +1225,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 	else fn = ""; // default input (std::cin)
 
 	// TODO
+	not_implemented_yet();
 	// for (auto& t : nso_factory<tau_ba_t, BAs...>::instance().types()) {
 	// 	if (type == t) {
 	// 		auto var_name = command
@@ -1230,6 +1274,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
 	else fn = ""; // default output (std::cout)
 
 	// TODO
+	not_implemented_yet();
 	// for (auto& t: nso_factory<tau_ba_t, BAs...>::instance().types()) {
 	// 	if (type == t) {
 	// 		auto var_name = command
