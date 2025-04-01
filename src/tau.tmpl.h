@@ -159,49 +159,54 @@ tref tree<node>::get_ba_constant_id(size_t c) {
 // transform from tau_parser::tree
 
 // Converts parser tree nodes to tau tree nodes
-// - terminals are colapsed into their parents
+// - terminals are collapsed into their parents
 //     ie. shift > num > "10" becomes shift > num("10")
 //     or  variable > type > "sbf" becomes variable > type("sbf")
-// important terminals are stored outside of the tree and value is actually its
-// id (strings, constants)
-// for constants, binder requires type and a tref, store it and get the id
+// important terminals are stored in their pools outside of the tree
+// and node's value is actually id in the pool (strings, constants)
+// for constants,
+//     binder requires type and a tref. binder stores it and returns its id
+// TODO constants 1binding
 template <typename node>
 template <typename binder>
 tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
-	using ptree = tau_parser::tree;
 	std::unordered_map<tref, tref> m;
 	auto transformer = [&m, &bind](tref t) {
-		// std::cout << "transforming:" << tau_parser::tree::get(t).value << std::endl;
+		// std::cout << "transforming:" << parse_tree::get(t).value << std::endl;
 		if (m.find(t) != m.end()) return true;
-		const auto& tr = ptree::get(t);
-		const auto& l = tr.value.first;
-		if (!l.nt()) return true;
+		const auto& tr = parse_tree::get(t);
+		if (tr.is_t()) return true;
+		auto nt = tr.get_nt();
 		tref x;
-		if (l.n() == node::type::integer) {
+		if (nt == node::type::digits) {
+			x = get(nt, std::stoul(tr.get_terminals()));
+		} else if (nt == node::type::integer) {
 			bool neg = false;
 			tref d = nullptr;
 			for (tref c : tr.children()) {
 				if (d != nullptr) neg = true;
 				d = c;
 			}
-			int_t i = static_cast<int_t>(std::stoul(
-				ptree::get(d).get_terminals()));
+			int_t i = static_cast<int_t>(get(m.at(tr.only_child()))
+								.data());
 			x = get_integer(neg ? -i : i);
-		} else if (l.n() == node::type::bf_constant) {
+		} else if (nt == node::type::bf_constant) {
 			// call binder with a type and a tref, store it and get the id
 			size_t cid = bind(t);
 			if (bind.error) return false;
 			x = get_ba_constant_id(cid);
-		} else if (is_digital_nt(l.n())) {
-			size_t v = std::stoul(tr.get_terminals());
-			x = get(node(l.n(), v));
-		} else if (is_string_nt(l.n()))
-			x = get(static_cast<node::type>(l.n()),
-							tr.get_terminals());
+		} else if (is_digital_nt(nt)) {
+			size_t v = get(m.at(tr.only_child())).data();
+			x = get(node(nt, v));
+		} else if (is_string_nt(nt))
+			x = get(static_cast<node::type>(nt), tr.get_terminals());
 		else {
 			trefs ch;
-			for (tref c : tr.children()) ch.push_back(m.at(c));
-			auto nt = l.n();
+			for (tref c : tr.children()) {
+				DBG(assert(c != nullptr);)
+				DBG(assert(m.find(c) != m.end());)
+				ch.push_back(m.at(c));
+			}
 			switch (nt) { // transform intermediate nodes
 				case node::type::bf_and_nosep_1st_oprnd:
 				case node::type::bf_and_nosep_2nd_oprnd:
@@ -213,12 +218,96 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 			x = get(static_cast<node::type>(nt), ch);
 		}
 		m.emplace(t, x);
-		// std::cout << "\tto: " << tree::get(m.at(t)).value << std::endl;
+		// std::cout << "emplaced:" << parse_tree::get(t).value
+		// 	<< " as " << tree::get(x).get_type_name() << std::endl;
 		return true;
 	};
 	// tau_parser::tree::get(pt.get()).print(std::cout << "tau tree from parser tree: ") << std::endl;
+	// auto visit_subtree = [](tref t) {
+	// 	// std::cout << "visiting subtree:" << parse_tree::get(t).value << std::endl;
+	// 	const auto& tr = parse_tree::get(t);
+	// 	if (tr.is_t()) return false;
+	// 	auto nt = tr.get_nt();
+	// 	switch (nt) {
+	// 		// case node::type::digits:
+	// 		// 	return false;
+	// 		default:
+	// 			return true;
+	// 	}
+	// };
 	idni::post_order<tau_parser::pnode>(pt.get()).search(transformer);
+	if (m.find(pt.get()) == m.end()) return nullptr;
 	return m.at(pt.get());
+}
+
+//------------------------------------------------------------------------------
+
+template <typename tau, typename... BAs>
+struct constant_binder {
+	using tt = tau::traverser;
+	size_t operator()(tref n) const {
+		if (error) return 0;
+		auto t = tt(n);
+		auto binding = t | tau::constant | tau::binding;
+		if (!binding) return 0;
+		auto type_node = t | tau::type;
+		auto tid = type_node | tt::num;
+		return tid;
+		// TODO rewrite this for new tree
+		if (tid > 0) {
+			// auto nn = nso_factory<BAs...>::instance()
+			// 	.binding(binding.value(), S[tid]);
+			// if (!nn) return error = true, 0;
+			// if (nn != binding.value())
+			// 	return tree::get(type::bf_constant,
+			// 		tree::get(type::constant, nn),
+			// 					type_node);
+			// return n;
+		}
+		// auto nn = nso_factory<BAs...>::instance()
+		// 	.binding(binding.value(), "");
+		// if (!nn) return error = true, 0;
+		// return tree::get(type::bf_constant,
+		// 	tree::get(type::constant, nn));
+		return tid;
+	}
+	bool error = false;
+};
+
+template <typename N>
+template <typename... BAs>
+tref tree<N>::get(tau_parser::result& result) {
+	if (!result.found) {
+		auto msg = result.parse_error
+			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
+		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
+		return nullptr; // Syntax error
+	}
+	constant_binder<tree<N>, BAs...> binder;
+	return tree<N>::template get<decltype(binder)>(
+			parse_tree::get(result.get_shaped_tree2()), binder);
+}
+
+template <typename N>
+template <typename... BAs>
+tref tree<N>::get(const std::string& source, parse_options options) {
+	auto result = tau_parser::instance()
+		.parse(source.c_str(), source.size(), options);
+	return tree<N>::template get<BAs...>(result);
+}
+
+template <typename N>
+template <typename... BAs>
+tref tree<N>::get(std::istream& is, parse_options options) {
+	auto result = tau_parser::instance().parse(is, options);
+	return tree<N>::template get<BAs...>(result);
+}
+
+template <typename N>
+template <typename... BAs>
+tref tree<N>::get_from_file(const std::string& filename, parse_options options){
+	auto result = tau_parser::instance().parse(filename, options);
+	return tree<N>::template get<BAs...>(result);
 }
 
 //------------------------------------------------------------------------------
@@ -419,6 +508,12 @@ std::vector<typename tree<node>::traverser>
 }
 
 template <typename node>
+bool tree<node>::traverser::empty() const { return values_.empty(); }
+
+template <typename node>
+size_t tree<node>::traverser::size() const { return values_.size(); }
+
+template <typename node>
 typename tree<node>::traverser
 	tree<node>::traverser::operator|(size_t nt) const
 {
@@ -468,13 +563,17 @@ void tree<node>::traverser::set_values(const trefs& refs) {
 template <typename node>
 std::ostream& tree<node>::print(std::ostream& os) const {
 
+// TODO wff_all, wff_ex (print all x all y as all x, y)
+// TODO bf_and spacing
+// TODO review indenting and syntax highlighting
+
 // #define DEBUG_TRAVERSAL 1
 
 	std::vector<size_t> hl_path;
 	size_t depth = 0;
 	std::unordered_map<tref, size_t> chpos;
 	std::unordered_set<tref> wraps, indented, highlighted;
-	auto is_to_wrap = [](size_t node_type, size_t parent_type) {
+	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
 			bf_splitter, bf_ref, bf_neg, bf_constant, bf_t, bf_f,
 			wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
@@ -542,17 +641,19 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ binding,            800 },
 		};
 		
-		if (no_wrap_for.find(node_type) != no_wrap_for.end())
+		if (no_wrap_for.find(nt) != no_wrap_for.end())
 			return false;
-		auto parent_it = prio.find(parent_type);
-		auto node_it   = prio.find(node_type);
-		tau_parser& p = tau_parser::instance();
-		if (parent_it == prio.end() || node_it == prio.end()) {
-			DBG(std::cerr << "No priority for "
-				<< (parent_it == prio.end() ? p.name(parent_type)
-						: p.name(node_type)) << "\n";)
+		auto p_it = prio.find(pt);
+		auto n_it   = prio.find(nt);
+		if (p_it == prio.end() || n_it == prio.end()) {
+#ifdef DEBUG
+			std::cerr << "No priority for " << (p_it == prio.end()
+					? tau_parser::instance().name(pt)
+					: tau_parser::instance().name(nt)) << "\n";
+#endif
 			return false;
 		}
+		// tau_parser& p = tau_parser::instance();
 		// std::cerr << "\n"
 		// 	<< p.name(parent_type) << " vs " << p.name(node_type)
 		// 	//<< "(" << parent_type << ")
@@ -562,7 +663,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		// 	<< node_it->second
 		// 	// << " (" << node_type << ")"
 		// 	<< "\n";
-		return parent_it->second > node_it->second;
+		return p_it->second > n_it->second;
 	};
 
 	auto indent = [&depth, &os]() {
@@ -708,8 +809,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		}
 		return true;
 	};
-	// TODO wff_all, wff_ex (print all x all y as all x, y)
-	// TODO bf_and spacing
 	auto on_between = [&](tref /*left*/, tref parent) {
 		const auto& t = get(parent);
 #ifdef DEBUG_TRAVERSAL

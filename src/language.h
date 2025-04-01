@@ -13,67 +13,6 @@ namespace idni::tau_lang {
 using tau = tree<node>;
 using tt = tau::traverser;
 
-template <typename tree, typename... BAs>
-struct constant_binder {
-	size_t operator()(tref n) const {
-		if (error) return 0;
-		auto t = tt(n);
-		auto binding = t | tau::constant | tau::binding;
-		if (!binding) return 0;
-		auto type_node = t | tau::type;
-		auto tid = type_node | tt::num;
-		return tid;
-		// TODO rewrite this for new tree
-		if (tid > 0) {
-			// auto nn = nso_factory<BAs...>::instance()
-			// 	.binding(binding.value(), S[tid]);
-			// if (!nn) return error = true, 0;
-			// if (nn != binding.value())
-			// 	return tree::get(type::bf_constant,
-			// 		tree::get(type::constant, nn),
-			// 					type_node);
-			// return n;
-		}
-		// auto nn = nso_factory<BAs...>::instance()
-		// 	.binding(binding.value(), "");
-		// if (!nn) return error = true, 0;
-		// return tree::get(type::bf_constant,
-		// 	tree::get(type::constant, nn));
-		return tid;
-	}
-	bool error = false;
-};
-
-template <typename... BAs>
-tref make_tau(tau_parser::result& result) {
-	if (!result.found) {
-		auto msg = result.parse_error
-			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
-		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
-		return nullptr; // Syntax error
-	}
-	constant_binder<tau, BAs...> binder;
-	return tau::get(result.get_shaped_tree2(), binder);
-}
-
-template <typename... BAs>
-tref make_tau(const std::string& source, tau_parser::parse_options options = {}) {
-	auto result = tau_parser::instance()
-				.parse(source.c_str(), source.size(), options);
-	return make_tau<BAs...>(result);
-}
-template <typename... BAs>
-tref make_tau(std::istream& is, tau_parser::parse_options options = {}) {
-	auto result = tau_parser::instance().parse(is, options);
-	return make_tau<BAs...>(result);
-}
-template <typename... BAs>
-tref make_tau_from_file(const std::string& filename, tau_parser::parse_options options = {}) {
-	auto result = tau_parser::instance().parse(filename, options);
-	return make_tau<BAs...>(result);
-}
-
-
 inline tref trim(tref n) { return tau::get(n).first(); }
 inline tref trim2(tref n) { return tt(n) | tt::first | tt::first | tt::ref; }
 inline tref wrap(tau_parser::nonterminal nt, trefs nn) { return tau::get(nt, nn); }

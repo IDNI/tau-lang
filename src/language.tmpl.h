@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "language.h"
 #include "nso_rr.h"
 #include "queries.h"
 

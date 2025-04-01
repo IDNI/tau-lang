@@ -2,6 +2,7 @@
 
 #include <variant>
 
+#include "defs.h"
 #include "utility/bintree.h"
 #include "tau_parser.generated.h"
 
@@ -128,6 +129,8 @@ template <typename N = node>
 struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	using base_t = idni::tree<N>;
 	using node = N;
+	using parse_tree = tau_parser::tree;
+	using parse_options = tau_parser::parse_options;
 
 	// handles
 	tref get() const;
@@ -155,6 +158,17 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt, const tref* ch, size_t len); // with array of children
 	static tref get(const node::type& nt, const trefs& ch); // with vector of children
 	static tref get(const node::type& nt, const std::string& str); // with string
+
+	// from parser result or parser input (string, stream, file)
+	template <typename... BAs>
+	static tref get(tau_parser::result& result);
+	template <typename... BAs>
+	static tref get(const std::string& str, parse_options options = {});
+	template <typename... BAs>
+	static tref get(std::istream& is, parse_options options = {});
+	template <typename... BAs>
+	static tref get_from_file(const std::string& filename,
+						parse_options options = {});
 
 	// terminals
 	static tref get_num(size_t v);
@@ -235,6 +249,8 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 		const trefs& values() const;
 		std::vector<traverser> traversers() const;
 		std::vector<traverser> operator()() const;
+		bool empty() const;
+		size_t size() const;
 
 		template <node::type NT>
 		static inline const extractor<bool> is{
