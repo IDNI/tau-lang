@@ -2,6 +2,8 @@
 # normal forms commands
 #
 
+include(add_repl_test_depreciated)
+
 # dnf command
 add_repl_test(normal_forms-dnf_wff "dnf T" ": T")
 add_repl_test(normal_forms-dnf_wff_mem_abs "T. dnf %0" "T")

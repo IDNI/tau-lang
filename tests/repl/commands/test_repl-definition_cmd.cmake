@@ -2,6 +2,8 @@
 # definition command
 #
 
+include(add_repl_test_depreciated)
+
 # definition command wff_tule
 add_repl_test(def_wff_cmd "g(Y) := T" "\\[1\\] g")
 
