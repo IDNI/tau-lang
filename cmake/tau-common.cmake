@@ -74,7 +74,7 @@ function(target_setup target)
 			-Wfloat-equal
 			-Wwrite-strings
 			# -Werror
-			# -Wfatal-errors
+			-Wfatal-errors
 		)
 	else()
 		target_compile_options(${target} PRIVATE /W4)
