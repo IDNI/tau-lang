@@ -233,7 +233,7 @@ and workings.
 
 The core idea of the Tau Language is to specify how current and previous inputs and outputs of a program
 are related over time, using the first-order theory of finite and infinite atomless Boolean algebras
-extended with a time dimension. It was carefully crafted around being purely logical,
+extended with a time dimension, represented by the natural numbers starting at 0. It was carefully crafted around being purely logical,
 allowing efficient and decidable satisfiability checking, while being executable,
 yielding a framework to enable program synthesis.
 
@@ -270,16 +270,19 @@ where *local_spec1* and
 We say local specification because a formula `tau` can only talk about a fixed
 (though arbitrary) point in time.
 
-Recall from section [Variables](#variables) that there are input and output
-stream variables. For example the output stream variable `o1[t-2]` means
+In order for a specification to communicate with the outside world, so-called *streams*
+are use. Those streams come in two flavors: input and output streams. Input
+streams are used in a `local_spec` to receive input from a user, while output streams
+are used for presenting output to a user. Each stream is associated with a point in time
+in the specification.
+For example the output stream variable `o1[t-2]` means
 "the value in output stream number 1 two time-steps ago". So `o1[t]` would mean
-"the value in output stream number 1 at the current time-step". Likewise, there
-are input stream variables like `i1[t]`. It means "the input in the input stream
+"the value in output stream number 1 at the current time-step". Likewise, for 
+input stream variables like `i1[t]`. It means "the input in the input stream
 1 at the current time-step". Input streams can also have an offset in order to
 speak about past inputs. For example `i2[t-3]` means "the input in the input
-stream 2 three time-steps ago". As explained in section [Variables](#variables),
-input and output streams currently need to be defined before running a Tau
-specification.
+stream 2 three time-steps ago". For further detail about streams, please refer 
+to section [Variables](#variables).
 
 In all above cases, `t` is a free variable and refers to the current time at
 each point in time. The key point now is that an `always` statement will
@@ -287,7 +290,8 @@ quantify all scoped `t` universally, while a `sometimes` statement will quantify
 them existentially. For example the specification `always o1[t] = 0` says that
 at all time-steps the output stream number 1 will write `0`. Similarly, the
 specification `sometimes o1[t] = 0` says that there exists a time-step at which
-the output stream 1 will write `0`.
+the output stream 1 will write `0`. When executing a Tau specification, the first
+time-step is always 0. 
 
 Formally, the grammar for Tau specifications is
 ```
@@ -307,22 +311,23 @@ local_spec => (local_spec "&&" local_spec)
             | "all" variable local_spec | "ex" variable local_spec
             | predicate | T | F
 ```
+The naming conventions for `variable` are discussed in [Variables](#variables).
+Furthermore, `term` is discussed in the next section [Boolean functions](#boolean-functions).
+The `predicate` non-terminal in the above grammar describes how
+to add predicate definitions directly into a formula. See the subsection
+[Functions and predicates](#functions-and-predicates) for the
+grammar definition of `predicate`.
+In the REPL ([The Tau REPL](#the-tau-repl)) they
+can be provided as explained in subsection
+[Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables).
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
 `!` > `&&` > `^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
 `... ? ... : ...` > `always ...`> `sometimes ...`.
 
-In order to properly define functions and predicates see Section
-[Functions and Predicates](#functions-and-predicates).
-
 A Tau specification without a mentioning of "always" or "sometimes" is implicitly
-assumed to be an "always" statement. The `rr` in the above grammar describes how
-to add function and predicate definitions directly to the formula. In REPL they
-can also be provided separately as explained in the Tau REPL subsection
-[Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables).
-See the subsection [Functions and predicates](#functions-and-predicates) for the
-definitions of `tau_rec_relation` and `term_rec_relation`.
+assumed to be an "always" statement. 
 
 Note that instead of writing `always` and `sometimes` you can also use box `[]`
 and diamond `<>`, respectively.
@@ -339,10 +344,11 @@ execution, the output equals the complement of the input.
 
 ## **Boolean functions**
 
-One of the key ingredients of the Tau Language are the Boolean functions
-(Boolean combinations of variables, and constants over some chosen atomless (or
-finite -to be developed-) Boolean algebra and variables).They are given by the
-following grammar:
+One of the key ingredients of the Tau Language are Boolean functions build from
+Boolean combinations of variables, streams and constants over some fixed chosen atomless (or
+finite -to be developed-) Boolean algebra. In particular, each Boolean
+function has a unique type being this chosen Boolean algebra.
+They are given by the following grammar:
 
 ```
 term => (term "&" term) | term "'"
@@ -354,32 +360,36 @@ term => (term "&" term) | term "'"
 
 where
 
-* `term` stands for a well-formed subformula and the operators `&`, `'`,
+* `term` stands for a well-formed subformula representing a Boolean function and the operators `&`, `'`,
 `+` (or equivalently `^`) and `|` respectively stand for conjunction, negation, exclusive-or
-and disjunction (respectively).
-* `function` is  a call to the given recurrence relation (see the Subsection
+and disjunction,
+* `function` is the non-terminal symbol used to incorporate function definitions (see the Subsection
 [Functions and Predicates](#functions-and-predicates)),
-* `constant` stands for an element of the Boolean algebras (see Subsection
-[Constants](#constants) for details),
-* `uninterpreted_constant` stands for an uninterpreted constant of the Boolean
-algebra, they are assumed to be existentially quantified in the context of the
-formula. The syntax is a follows:
+* `constant` stands for an element from an available Boolean algebra. The type of the constant
+determines the type of the Boolean function (see Subsection [Constants](#constants) for details).
+* `uninterpreted_constant` stands for an uninterpreted constant from the fixed Boolean
+algebra, which can be thought of as a variable being existentially quantified from the outside of
+the formula. Its syntax is as follows:
 
 ```
 uninterpreted_constant => "<" [name] ":" name ">"
 ```
 
-* `var` is a variable of type a Boolean algebra element (see Subsection
-[Variables](#variables) for details), `stream_aviable`stands
-for an IO variable, and
-
-* finally, `0` and `1` stands for the given elements in the corresponding Boolean
+* `variable` is a variable over the fixed Boolean algebra (see Subsection
+[Variables](#variables) for details), 
+* `stream_variable` represents an input or output 
+stream. The type of a stream also determines the type of the Boolean function (see also subsection [Variables](#variables)) and
+* `0` and `1` stand for the bottom and top element in the fixed Boolean
 algebra.
 
 In this case, the order of the operations is the following (from higher precedence
 to lower): `'` > `&` > `+` (equivalently > `^`) > `|`.
 
-For example, the following is a valid expression in terms of a Boolean function:
+If no type information is present within a Boolean function, it is assumed to be of the 
+general type `countable atomless Boolean algebra`. Since all such Boolean algebras are
+isomorphic, no particular Boolean algebra is chosen.
+
+For example, the following is a valid Boolean function:
 
 ```
 (x & y | (z ^ 0))
@@ -608,7 +618,8 @@ In case `update` is satisfiable, the following steps are performed:
 
 1) `update` can refer to previous memory positions by using negative numbers in a stream index, 
 for example `o1[-k]`. Let `t` be the current time point of execution. Then `o1[-k]` is replaced with 
-the value at `o1[t-k]`. If no such memory position is present, no update is performed. After replacing all such streams with
+the value at `o1[t-k]`. If no such memory position is present, no update is performed. Furthermore, 
+`t-k` must not be below 0. After replacing all such streams with
 the respective value from the memory, it is checked again if `update` is satisfiable given these memory references.
 If it is unsatisfiable, no update is performed. Otherwise, we move to the next step:
 2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `always` statement
@@ -624,6 +635,16 @@ Note that if `update` is satisfiable, then the updated specification is satisfia
 3) As a final step, it is checked if the previous `sometimes` statements `st_spec` are executable along the updated specification.
 If this is the case, they are added to the updated specification. Otherwise, 
 the updated specification constructed in step 2 is accepted.
+
+Note that in the step after an update was successfully applied, the new specification starts
+running as if it was started at time step 0 shifted to the correct time step to match the overall
+history. This means, in particular, that streams with lookback `k` only become solvable once the 
+specification has continued for at least `k` steps. For example, updating a specification in 
+step `s` with `o1[t] = i1[t-1]` means that in the next step `o1[s+1]` is unspecified. 
+To see this, assume we start at step 0. Then `o1[t] = i1[t-1]` will leave `o1[0]` unspecified
+since `i1[-1]` is not defined. We do not allow to define negative time steps in general. The only
+exception is during pointwise revision in order to allow access to previous stream values,
+as explained in step 1 above.
 
 ## **Reserved symbols**
 
