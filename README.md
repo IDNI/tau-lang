@@ -8,10 +8,10 @@
 # Table of contents
 
 1. [Introduction](#introduction)
-2. [Installing the Tau Framework](#installing-the-tau-framework)
+2. [Installing the Tau Language Framework](#installing-the-tau-language-framework)
 	1. [Linux](#linux)
-	2. [Windows](#windows-users)
-	3. [MacOS (not available yet)](#macos-users)
+	2. [Windows](#windows)
+	3. [MacOS (not available yet)](#macos-not-available-yet)
 	2. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
 4. [The Tau Language](#the-tau-language)
@@ -19,10 +19,10 @@
 	2. [Boolean functions](#boolean-functions)
 	3. [Functions and predicates](#functions-and-predicates)
 	4. [Constants](#constants)
-	5. [Variables](#variables-variables-variables)
+	5. [Variables](#variables)
 	6. [Pointwise revision](#pointwise-revision) 
 	7. [Reserved symbols](#reserved-symbols)
-5. [Command line options](#command-line-options)
+5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
 	2. [REPL options](#repl-options)
@@ -42,26 +42,29 @@
 
 # **Introduction**
 
-Tau language is an expressive and decidable formal software specification
-language. It allows you to write software constraints and requirements, check
-for satisfiability, and accurately synthesize a program that meets your
-specification.
+The Tau language is an expressive, decidable and executable formal software specification
+language. It allows for specifying software using requirements and constraints in a purely
+logical and declarative approach.
+Tau specifications can be checked for satisfiability, to decide if there exists a program
+matching the specification but, most importantly, can also be executed. The Tau framework
+is able to synthesize a program adhering to a given specification.
 
 Imagine programming by writing only tests, and getting a working program that
-passes all the tests, thus meeting all your requirements.
+passes all the tests, thus meeting all the specified requirements.
 
-You can specify programs capable of mechanized deductive reasoning over
-specifications and programs built in Tau Language, and accurately adapt them to
-meet requirements, which is useful for collaborative specification, maintenance,
+A unique feature of the Tau language is the ability to specify programs capable of mechanized
+deductive reasoning over Tau specifications themselves. This allows for a controlled adaption of new
+requirements because the requirements for the requirements can be taken into account,
+which is useful for collaborative specification, maintenance,
 updates, safety and user control.
 
 To go to the quick start [click here](#quick-start).
 
-To go to the installation guide [click here](#installing-the-tau-language).
+To go to the installation guide [click here](#installing-the-tau-language-framework).
 
-For viewing known issues, future work and how to submit issues, [click here](#quick-start).
+For viewing known issues, future work and how to submit issues, [click here](#known-issues).
 
-For visiting the theory behind Tau Language [click here](#quick-start).
+For visiting the theory behind Tau Language [click here](#the-theory-behind-the-tau-language).
 
 # **Installing the Tau Language Framework**
 
@@ -121,7 +124,7 @@ or `build-Debug` or `build-RelWithDebInfo`.
 To start using the Tau Language, download the latest release from the
 [GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
 you have downloaded and installed the executable (see the Section
-[Installing the Tau Framework](#installing-the-tau-framework)), you can run
+[Installing the Tau Framework](#installing-the-tau-language-framework)), you can run
 it from the command line by typing `tau`.
 
 The programming model underlying the Tau Language is fully declarative. You
@@ -352,7 +355,7 @@ term => (term "&" term) | term "'"
 where
 
 * `term` stands for a well-formed subformula and the operators `&`, `'`,
-`+` (or equivallentli `^`) and `|` stand for conjunction, negation, exclusive-or
+`+` (or equivalently `^`) and `|` respectively stand for conjunction, negation, exclusive-or
 and disjunction (respectively).
 * `function` is  a call to the given recurrence relation (see the Subsection
 [Functions and Predicates](#functions-and-predicates)),
@@ -367,7 +370,7 @@ uninterpreted_constant => "<" [name] ":" name ">"
 ```
 
 * `var` is a variable of type a Boolean algebra element (see Subsection
-[Variables](#variables-variables-variables) for details), `stream_aviable`stands
+[Variables](#variables) for details), `stream_aviable`stands
 for an IO variable, and
 
 * finally, `0` and `1` stands for the given elements in the corresponding Boolean
@@ -769,7 +772,7 @@ in expressions. The syntax of the commands is the following:
 
 * `subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
-expression (beeing this one a memory position, well-formed formula or Boolean
+expression (this one being a memory position, well-formed formula or Boolean
 function).
 
 * `instantiate|inst|i <repl_memory|tau> [<var>/<repl_memory|term>]`: instantiates a variable
@@ -830,7 +833,7 @@ variables as you need. The syntax of the commands is:
 
 * GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
 * TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
-* Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
+* YouTube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
 
 
 # **Known issues**
