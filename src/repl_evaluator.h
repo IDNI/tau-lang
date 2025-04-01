@@ -180,10 +180,11 @@ private:
 	tref is_unsatisfiable_cmd(const tt& n);
 	std::optional<tau_nso_t> is_unsatisfiable_cmd(const tau_nso_t& n);
 
-	tref get_bf(const tt& n, bool suppress_error = false);
+	tt get_(tau::node::type nt, const tt& n, bool suppress_error = false);
+	tt get_bf(const tt& n, bool suppress_error = false);
 	std::optional<tau_nso_t> get_bf(const tau_nso_t& n,
 		bool suppress_error = false);
-	tref get_wff(const tt& n);
+	tt get_wff(const tt& n);
 	std::optional<tau_nso_t> get_wff(const tau_nso_t& n);
 
 	tref onf_cmd(const tt& n);
