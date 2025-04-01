@@ -182,9 +182,9 @@ private:
 
 	tt get_(tau::node::type nt, const tt& n, bool suppress_error = false);
 	tt get_bf(const tt& n, bool suppress_error = false);
+	tt get_wff(const tt& n);
 	std::optional<tau_nso_t> get_bf(const tau_nso_t& n,
 		bool suppress_error = false);
-	tt get_wff(const tt& n);
 	std::optional<tau_nso_t> get_wff(const tau_nso_t& n);
 
 	tref onf_cmd(const tt& n);
@@ -224,4 +224,3 @@ private:
 #include "repl_evaluator.tmpl.h"
 
 #endif //__REPL_EVALUATOR_H__
-;
