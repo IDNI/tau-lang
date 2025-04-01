@@ -14,7 +14,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "test_helpers.h"
+#include "test_helpers_depreciating.h"
 #include "normalizer.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 

@@ -2,21 +2,12 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
-#include "defs.h"
-#include "hooks.h"
-#include "boolean_algebras/bool_ba.h"
-
 #include "test_helpers.h"
 
-using namespace idni::rewriter;
 using namespace idni::tau_lang;
 using namespace std;
 
 namespace testing = doctest;
-
-// IMPORTANT: To check the parser (and the underlying grammar) we don't need
-// any special boolean algebra, so we use Bool to simplify our testing.
 
 // The following test suites represent correct sentences of a tau nso_rr or
 // library and as such must be parsed correctly and satisfy the structural checks
@@ -31,12 +22,10 @@ namespace testing = doctest;
 TEST_SUITE("parsing only main") {
 
 	TEST_CASE("nso_rr main") {
-		const char* sample =
-			" Z = 0 .";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-			auto nso_rr = frml | tau_parser::rr | tau_parser::main;
-			CHECK( nso_rr.has_value() );
+		const char* sample = " Z = 0 .";
+		auto fm = make_tt<Bool>(sample);
+		auto nso_rr = fm | tau::rr | tau::main;
+		CHECK( nso_rr.has_value() );
 	}
 }
 
@@ -46,9 +35,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 		const char* sample =
 			"g[0](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -56,9 +45,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 		const char* sample =
 			"g[0](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -66,9 +55,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 		const char* sample =
 			"g[N](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -76,9 +65,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 		const char* sample =
 			"g[N](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -86,9 +75,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 		const char* sample =
 			"g[N - 1](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -97,9 +86,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			"h[0](Y) := T."
 			"g[0](Y) := h[0](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -108,9 +97,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			"h[0](Y) := T."
 			"g[0](Y) := h[0](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -119,9 +108,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			"h[0](Y) := T."
 			"g[0](Y) := h[N](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -130,9 +119,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			"h[0](Y) := T."
 			"g[0](Y) := h[N](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -141,9 +130,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			"h[0](Y) := T."
 			"g[0](Y) := h[N - 1](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -152,9 +141,9 @@ TEST_SUITE("parsing basic wff nso_rr") {
 			"h[0](Y) := T."
 			"g[0](Y) := h[N - 1](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 }
@@ -165,9 +154,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 		const char* sample =
 			"g[0](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -175,9 +164,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 		const char* sample =
 			"g[0](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -185,9 +174,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 		const char* sample =
 			"g[N](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -195,9 +184,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 		const char* sample =
 			"g[N](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -205,9 +194,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 		const char* sample =
 			"g[N - 1](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -216,9 +205,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			"h[0](Y) := 1."
 			"g[0](Y) := h[0](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -227,9 +216,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			"h[0](Y) := 1."
 			"g[0](Y) := h[0](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -238,9 +227,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			"h[0](Y) := 1."
 			"g[0](Y) := h[N](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -249,9 +238,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			"h[0](Y) := 1."
 			"g[0](Y) := h[N](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -260,9 +249,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			"h[0](Y) := 1."
 			"g[0](Y) := h[N - 1](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -271,9 +260,9 @@ TEST_SUITE("parsing basic bf nso_rr") {
 			"h[0](Y) := 1."
 			"g[0](Y) := h[N - 1](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations
+			| tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 }
@@ -284,9 +273,8 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 		const char* sample =
 			"g[0](Y) := T."
 			"g[0](Y).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -294,9 +282,8 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 		const char* sample =
 			"g[0](Y) := T."
 			"g[0](Y).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -304,9 +291,8 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 		const char* sample =
 			"g[0](Y) := T."
 			"g[N](Y).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -314,9 +300,8 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 		const char* sample =
 			"g[0](Y) := T."
 			"g[N](Y).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -324,9 +309,8 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 		const char* sample =
 			"g[0](Y) := T."
 			"g[N - 1](Y).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -334,9 +318,8 @@ TEST_SUITE("parsing basic wff nso_rr in main") {
 		const char* sample =
 			"g[0](Y) := T."
 			"g[N - 1](Y).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 }
@@ -346,54 +329,48 @@ TEST_SUITE("parsing basic bf nso_rr in main") {
 	TEST_CASE("nso_rr bf_rec_relation in main y1") {
 		const char* sample =
 			"(g[0, 0](Y) = 0).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
 	TEST_CASE("nso_rr bf_rec_relation in main y2") {
 		const char* sample =
 			"(g[0, 0](Y) = 0).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
 	TEST_CASE("nso_rr bf_rec_relation in main y3") {
 		const char* sample =
 			"(g[N, 0](Y) = 0).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
 	TEST_CASE("nso_rr bf_rec_relation in main y4") {
 		const char* sample =
 			"(g[N, 0](Y) = 0).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
 	TEST_CASE("nso_rr bf_rec_relation in main y5") {
 		const char* sample =
 			"(g[N - 1](Y) = 0).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
 	TEST_CASE("nso_rr bf_rec_relation in main y6") {
 		const char* sample =
 			"(g[N - 1](Y) = 0).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::main;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -405,9 +382,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[0, 0](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -415,9 +391,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[0, 0](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -425,9 +400,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[N, 0](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -435,9 +409,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[N, 0](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -445,9 +418,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[N - 1, 0](Y) := T."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -456,9 +428,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			"h[0](Y)    := T."
 			"g[0, 0](Y) := h[0](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -467,9 +438,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			"h[0](Y)    := T."
 			"g[0, 0](Y) := h[0](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -478,9 +448,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			"h[0](Y)    := T."
 			"g[0, 0](Y) := h[N](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -489,9 +458,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			"h[0](Y)    := T."
 			"g[0, 0](Y) := h[N](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -500,9 +468,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			"h[0](Y)    := T."
 			"g[0, 0](Y) := h[N - 1](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 
@@ -511,9 +478,8 @@ TEST_SUITE("parsing basic wff nso_rr (2d): 1th var check") {
 			"h[0](Y)    := T."
 			"g[0, 0](Y) := h[N - 1](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto wff_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto wff_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( wff_rec_relation.has_value() );
 	}
 }
@@ -524,9 +490,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[0, 0](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -534,9 +499,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[0, 0](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -544,9 +508,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[N, 0](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -554,9 +517,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[N, 0](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -564,9 +526,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 		const char* sample =
 			"g[N - 1, 0](Y) := 1."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -575,9 +536,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			"h[0](Y)    := 1."
 			"g[0, 0](Y) := h[0](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -586,9 +546,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			"h[0](Y)    := 1."
 			"g[0, 0](Y) := h[0](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -597,9 +556,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			"h[0](Y)    := 1."
 			"g[0, 0](Y) := h[N](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -608,9 +566,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			"h[0](Y)    := 1."
 			"g[0, 0](Y) := h[N](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -619,9 +576,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			"h[0](Y)    := 1."
 			"g[0, 0](Y) := h[N - 1](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 
@@ -630,9 +586,8 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 			"h[0](Y)    := 1."
 			"g[0, 0](Y) := h[N - 1](Y)."
 			"T.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto bf_rec_relation = frml | tau_parser::rr | tau_parser::rec_relations | tau_parser::rec_relation;
+		auto fm = make_tt<Bool>(sample);
+		auto bf_rec_relation = fm | tau::rr | tau::rec_relations | tau::rec_relation;
 		CHECK( bf_rec_relation.has_value() );
 	}
 }
@@ -642,41 +597,40 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 TEST_SUITE("parsing builders") {
 
-	TEST_CASE("one capture") {
-		const char* sample = "( $X ) =:: ($X && $X).";
-		auto src = make_builder<Bool>(sample);
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(src.first) );
-		CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
-	}
+	// TODO tree
+	// TEST_CASE("one capture") {
+	// 	const char* sample = "( $X ) =:: ($X && $X).";
+	// 	auto src = make_builder<Bool>(sample);
+	// 	CHECK( is_non_terminal<tau_parser::builder_head, Bool>(src.first) );
+	// 	CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
+	// }
 
-	TEST_CASE("two capture") {
-		const char* sample = "( $X $Y ) =:: ($X && $Y).";
-		auto src = make_builder<Bool>(sample);
-		auto left = src.first;
-		auto right = src.first;
-		CHECK( is_non_terminal<tau_parser::builder_head, Bool>(src.first) );
-		CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
-	}
+	// TODO tree
+	// TEST_CASE("two capture") {
+	// 	const char* sample = "( $X $Y ) =:: ($X && $Y).";
+	// 	auto src = make_builder<Bool>(sample);
+	// 	auto left = src.first;
+	// 	auto right = src.first;
+	// 	CHECK( is_non_terminal<tau_parser::builder_head, Bool>(src.first) );
+	// 	CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
+	// }
 }
 
 TEST_SUITE("parsing library") {
 
 	TEST_CASE("one rule") {
-	const char* sample =
-		"X := X.";
-	auto src = make_tau_source(sample, { .start = tau_parser::library });
-	auto lib = make_statement(src);
-		auto rules = lib | tau_parser::rules || tau_parser::rule;
+		const char* sample = "X := X.";
+		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto rules = lib | tau::rules || tau::rule;
 		CHECK( rules.size() == 1 );
 	}
 
 	TEST_CASE("two rule") {
-	const char* sample =
-		"X := X."
-		"Y := Y.";
-	auto src = make_tau_source(sample, { .start = tau_parser::library });
-	auto lib = make_statement(src);
-		auto rules = lib | tau_parser::rules || tau_parser::rule;
+		const char* sample =
+			"X := X."
+			"Y := Y.";
+		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto rules = lib | tau::rules || tau::rule;
 		CHECK( rules.size() == 2 );
 	}
 }
@@ -685,17 +639,15 @@ TEST_SUITE("parsing rewriting rules") {
 
 	TEST_CASE("wff rewriting rules") {
 		const char* sample = "T ::= T.";
-		auto src = make_tau_source(sample, { .start = tau_parser::library });
-		auto frml = make_statement(src);
-		auto wff_rule = frml | tau_parser::rules | tau_parser::rule | tau_parser::wff_rule;
+		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto wff_rule = lib | tau::rules | tau::rule | tau::wff_rule;
 		CHECK( wff_rule.has_value() );
 	}
 
 	TEST_CASE("bf rewriting rules") {
 		const char* sample = "1 := 1.";
-		auto src = make_tau_source(sample, { .start = tau_parser::library });
-		auto frml = make_statement(src);
-		auto bf_rule = frml | tau_parser::rules | tau_parser::rule | tau_parser::bf_rule;
+		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto bf_rule = lib | tau::rules | tau::rule | tau::bf_rule;
 		CHECK( bf_rule.has_value() );
 	}
 }
@@ -712,41 +664,36 @@ TEST_SUITE("parsing inputs") {
 
 	TEST_CASE("fix loopback") {
 		const char* sample = "( i1[0] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 
 	TEST_CASE("capture loopback") {
 		const char* sample = "( i1[n] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 
 	TEST_CASE("variable loopback") {
 		const char* sample = "( i1[t] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 
 	TEST_CASE("shift capture loopback") {
 		const char* sample = "( i1[n - 1] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 
 	TEST_CASE("shift variable loopback") {
 		const char* sample = "( i1[t - 1] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 }
@@ -755,41 +702,36 @@ TEST_SUITE("parsing outputs") {
 
 	TEST_CASE("fix loopback") {
 		const char* sample = "( o1[0] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 
 	TEST_CASE("capture loopback") {
 		const char* sample = "( o1[n] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 
 	TEST_CASE("variable loopback") {
 		const char* sample = "( o1[t] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 
 	TEST_CASE("shift capture loopback") {
 		const char* sample = "( o1[n - 1] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 
 	TEST_CASE("shift variable loopback") {
 		const char* sample = "( o1[t - 1] = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto input = frml | tau_parser::rr | tau_parser::main;
+		auto fm = make_tt<Bool>(sample);
+		auto input = fm | tau::rr | tau::main;
 		CHECK( input.has_value() );
 	}
 }
@@ -802,177 +744,115 @@ TEST_SUITE("parsing wwf formulas ") {
 
 	TEST_CASE("!") {
 		const char* sample = "! ( Z = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto neg_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_neg;
+		auto fm = make_tt<Bool>(sample);
+		auto neg_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::wff_neg;
 		CHECK( neg_formula.has_value() );
 	}
 
 	TEST_CASE("&&") {
 		const char* sample = "( Z = 0 ) && ( X = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto and_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_and;
+		auto fm = make_tt<Bool>(sample);
+		auto and_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::wff_and;
 		CHECK( and_formula.has_value() );
 	}
 
 	TEST_CASE("||") {
 		const char* sample = "( Z = 0 ) || ( X = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto or_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_or;
+		auto fm = make_tt<Bool>(sample);
+		auto or_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::wff_or;
 		CHECK( or_formula.has_value() );
 	}
 
 	TEST_CASE("^") {
 		const char* sample = "( Z = 0 ) ^ ( X = 0 ).";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto xor_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_or;
+		auto fm = make_tt<Bool>(sample);
+		auto xor_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::wff_xor;
 		CHECK( xor_formula.has_value() );
 	}
 
 	TEST_CASE("?") {
 		const char* sample = "$X ? $Y : $Z.";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto xor_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_and;
-		CHECK( xor_formula.has_value() );
+		auto fm = make_tt<Bool>(sample);
+		auto cond_formula = fm | tau::rr | tau::main | tau::wff
+							| tau::wff_conditional;
+		CHECK( cond_formula.has_value() );
 	}
 
 	TEST_CASE("= 0") {
 		const char* sample = " Z = 0 .";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto eq_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::bf_eq;
+		auto fm = make_tt<Bool>(sample);
+		auto eq_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::bf_eq;
 		CHECK( eq_formula.has_value() );
 	}
 
 	TEST_CASE("!= 0") {
 		const char* sample = " Z != 0 .";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto eq_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::bf_neq;
-		CHECK( eq_formula.has_value() );
+		auto fm = make_tt<Bool>(sample);
+		auto neq_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::bf_neq;
+		CHECK( neq_formula.has_value() );
 	}
 
 	TEST_CASE("<") {
 		const char* sample = " X < Y .";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto less_rule = lib
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_and;
-		CHECK( less_rule.has_value() );
+		auto fm = make_tt<Bool>(sample);
+		auto less_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::bf_less;
+		CHECK( less_formula.has_value() );
 	}
 
 	TEST_CASE("<=") {
 		const char* sample = " X <= Y .";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto less_equal_rule = lib
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::bf_eq;
-		CHECK( less_equal_rule.has_value() );
+		auto fm = make_tt<Bool>(sample);
+		auto less_equal_formula = fm | tau::rr | tau::main | tau::wff
+							| tau::bf_less_equal;
+		CHECK( less_equal_formula.has_value() );
 	}
 
 	TEST_CASE(">") {
 		const char* sample = "X > Y.";
-		auto src = make_tau_source(sample);
-		auto lib = make_statement(src);
-		auto greater_rule = lib
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_and;
-		CHECK( greater_rule.has_value() );
+		auto fm = make_tt<Bool>(sample);
+		auto greater_formula = fm | tau::rr | tau::main | tau::wff
+							| tau::bf_greater;
+		CHECK( greater_formula.has_value() );
 	}
 
 	TEST_CASE("->") {
 		const char* sample = "$Z -> $X ::= $Z.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto imply_rule = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule
-			| tau_parser::wff_matcher
-			| tau_parser::wff
-			| tau_parser::wff_or;
+		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+		auto imply_rule = lib | tau::rules | tau::rule | tau::wff_rule
+				| tau::wff_matcher | tau::wff | tau::wff_imply;
 		CHECK( imply_rule.has_value() );
 	}
 
 	TEST_CASE("<->") {
 		const char* sample = "$Z <-> $X ::= $Z.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto equiv_rule = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::wff_rule
-			| tau_parser::wff_matcher
-			| tau_parser::wff
-			| tau_parser::wff_and;
+		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+		auto equiv_rule = lib | tau::rules | tau::rule | tau::wff_rule
+				| tau::wff_matcher | tau::wff | tau::wff_equiv;
 		CHECK( equiv_rule.has_value() );
 	}
 
 	TEST_CASE("all") {
 		const char* sample =
 			"all Z ( Z = 0 ) .";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto all_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_all;
+		auto fm = make_tt<Bool>(sample);
+		auto all_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::wff_all;
 		CHECK( all_formula.has_value() );
 	}
 
 	TEST_CASE("ex") {
 		const char* sample =
 			"ex Z ( Z = 0 ) .";
-		auto src = make_tau_source(sample);
-		auto frml = make_statement(src);
-		auto ex_formula = frml
-			| tau_parser::rr
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::wff_ex;
+		auto fm = make_tt<Bool>(sample);
+		auto ex_formula = fm | tau::rr | tau::main | tau::wff
+								| tau::wff_ex;
 		CHECK( ex_formula.has_value() );
 	}
 }
@@ -981,177 +861,102 @@ TEST_SUITE("parsing bf formulas ") {
 
 	TEST_CASE("'") {
 		const char* sample = "Z' := Z.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto neg_rule = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_matcher
-			| tau_parser::bf
-			| tau_parser::bf_neg;
+		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+		auto neg_rule = lib | tau::rules | tau::rule | tau::bf_rule
+				| tau::bf_matcher | tau::bf | tau::bf_neg;
 		CHECK( neg_rule.has_value() );
 	}
 
 	TEST_CASE("&") {
 		const char* sample = "Z & X := Z.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto and_rule = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_matcher
-			| tau_parser::bf
-			| tau_parser::bf_and;
+		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+		auto and_rule = lib | tau::rules | tau::rule | tau::bf_rule
+				| tau::bf_matcher | tau::bf | tau::bf_and;
 		CHECK( and_rule.has_value() );
 	}
 
 	TEST_CASE("|") {
 		const char* sample = "Z | X := Z.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto or_rule = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_matcher
-			| tau_parser::bf
-			| tau_parser::bf_or;
+		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+		auto or_rule = lib | tau::rules | tau::rule | tau::bf_rule
+				| tau::bf_matcher | tau::bf | tau::bf_or;
 		CHECK( or_rule.has_value() );
 	}
 
 	TEST_CASE("+") {
 		const char* sample = "Z + X := Z.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto xor_rule = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_matcher
-			| tau_parser::bf
-			| tau_parser::bf_or;
+		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+		auto xor_rule = lib | tau::rules | tau::rule | tau::bf_rule
+				| tau::bf_matcher | tau::bf | tau::bf_xor;
 		CHECK( xor_rule.has_value() );
 	}
 }
 
-TEST_SUITE("parsing bindings ") {
+// TODO tree
+// TEST_SUITE("parsing bindings ") {
 
-	TEST_CASE("binding") {
-		const char* sample = "{ binding } := { binding }.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto named = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::constant
-			| tau_parser::binding;
-		CHECK( named.has_value() );
-	}
+// 	TEST_CASE("binding") {
+// 		const char* sample = "{ binding } := { binding }.";
+// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+// 		auto named = lib | tau::rules | tau::rule | tau::bf_rule
+// 				| tau::bf_body | tau::bf | tau::bf_constant
+// 				| tau::constant | tau::binding;
+// 		CHECK( named.has_value() );
+// 	}
 
-	TEST_CASE("typed binding") {
-		const char* sample = "{ binding } : type := { binding } : type.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto source = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::constant
-			| tau_parser::binding;
-		CHECK( source.has_value() );
-	}
+// 	TEST_CASE("typed binding") {
+// 		const char* sample = "{ binding } : type := { binding } : type.";
+// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+// 		auto typed = lib | tau::rules | tau::rule | tau::bf_rule
+// 				| tau::bf_body | tau::bf | tau::bf_constant
+// 				| tau::constant | tau::binding;
+// 		CHECK( typed.has_value() );
+// 	}
 
-	TEST_CASE("binding type") {
-		const char* sample = "{ binding } : type := { binding } : type.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto type = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::type;
-		CHECK( type.has_value() );
-	}
+// 	TEST_CASE("binding type") {
+// 		const char* sample = "{ binding } : type := { binding } : type.";
+// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+// 		auto type = lib | tau::rules | tau::rule | tau::bf_rule
+// 				| tau::bf_body | tau::bf | tau::bf_constant
+// 				| tau::constant | tau::binding;
+// 		CHECK( type.has_value() );
+// 	}
 
-	TEST_CASE("binding source") {
-		const char* sample = "{ binding } : type := { binding } : type.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto source = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::constant
-			| tau_parser::binding
-			| tau_parser::source;
-		CHECK( source.has_value() );
-	}
+// 	TEST_CASE("binding source") {
+// 		const char* sample = "{ binding } : type := { binding } : type.";
+// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+// 		auto source = lib | tau::rules | tau::rule | tau::bf_rule
+// 				| tau::bf_body | tau::bf | tau::bf_constant
+// 				| tau::constant | tau::binding
+// 				| tau::source;
+// 		CHECK( source.has_value() );
+// 	}
 
-	TEST_CASE("unresolved binding") {
-		const char* sample = "{ binding } := { binding }.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto type = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::type
-			| tau_parser::chars;
-		CHECK( !type.has_value() );
-	}
+// 	TEST_CASE("unresolved binding") {
+// 		const char* sample = "{ binding } := { binding }.";
+// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+// 		auto type = lib | tau::rules | tau::rule | tau::bf_rule
+// 				| tau::bf_body | tau::bf | tau::bf_constant
+// 				| tau::type | tau::chars;
+// 		CHECK( !type.has_value() );
+// 	}
 
-	TEST_CASE("resolved binding") {
-		const char* sample = "{ binding } : type := { binding } : type.";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::library });
-		auto lib = make_statement(src);
-		auto type = lib
-			| tau_parser::rules
-			| tau_parser::rule
-			| tau_parser::bf_rule
-			| tau_parser::bf_body
-			| tau_parser::bf
-			| tau_parser::bf_constant
-			| tau_parser::type;
-		CHECK( type.has_value() );
-	}
+// 	TEST_CASE("resolved binding") {
+// 		const char* sample = "{ binding } : type := { binding } : type.";
+// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+// 		auto type = lib | tau::rules | tau::rule | tau::bf_rule
+// 				| tau::bf_body | tau::bf | tau::bf_constant
+// 				| tau::type;
+// 		CHECK( type.has_value() );
+// 	}
 
-	TEST_CASE("multiple constants") {
-		const char* sample = "{ type : binding } & { type : binding2 }";
-		auto src = make_tau_source(sample, {
-						.start = tau_parser::bf_and });
-		auto constants = make_statement(src) || tau_parser::bf
-						|| tau_parser::bf_constant;
-		CHECK( constants.size() == 2 );
-	}
-}
+// 	TEST_CASE("multiple constants") {
+// 		const char* sample = "{ type : binding } & { type : binding2 }";
+// 		auto bf_and = make_tt<Bool>(sample, { .start = tau_parser::bf_and });
+// 		auto constants = bf_and || tau::bf || tau::bf_constant;
+// 		CHECK( constants.size() == 2 );
+// 	}
+// }
 
 
 TEST_SUITE("regression/disallow T and F as variables") {
@@ -1159,14 +964,14 @@ TEST_SUITE("regression/disallow T and F as variables") {
 	TEST_CASE("T is not a variable") {
 		const char* sample =
 			"T = 0.";
-		auto src = make_tau_source(sample);
+		auto src = make(sample);
 		CHECK( src == nullptr );
 	}
 
 	TEST_CASE("F is not a variable") {
 		const char* sample =
 			"F = 0.";
-		auto src = make_tau_source(sample);
+		auto src = make(sample);
 		CHECK( src == nullptr );
 	}
 

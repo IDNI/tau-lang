@@ -6,7 +6,7 @@
 #include "boolean_algebras/bool_ba.h"
 #include "defs.h"
 #include "nso_rr.h"
-#include "test_helpers.h"
+#include "test_helpers_depreciating.h"
 
 #include "debug_helpers.h"
 
