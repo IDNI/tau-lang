@@ -2,6 +2,8 @@
 # history commands
 #
 
+include(add_repl_test_depreciated)
+
 # history list command
 add_repl_test(history_list_cmd-empty "history" "history is empty")
 add_repl_test(history_list_cmd-non_empty "1. history" ": 1")

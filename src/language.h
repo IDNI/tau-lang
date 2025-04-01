@@ -25,7 +25,7 @@ inline tref wrap(tau_parser::nonterminal nt, const std::string& terminals) {
 }
 
 
-// following is deprecated
+// following is depreciated
 /**
  * Trims the given tau object.
  * @param n The tau object to be trimmed.
