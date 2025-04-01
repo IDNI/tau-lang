@@ -236,7 +236,7 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 		std::vector<traverser> traversers() const;
 		std::vector<traverser> operator()() const;
 
-		template <size_t NT>
+		template <node::type NT>
 		static inline const extractor<bool> is{
 			[](const traverser& t) {
 				if (!t) return false;

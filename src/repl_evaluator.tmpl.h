@@ -229,21 +229,21 @@ void repl_evaluator<BAs...>::history_store_cmd(const tau_nso_t& command) {
 
 template <typename... BAs>
 tt repl_evaluator<BAs...>::get_(tau::node::type nt, const tt& n,
-	bool suppress_error) 
+	bool suppress_error)
 {
-	if (n | tt::is<nt>) return n;
+	if (n.value_tree().is(nt)) return n;
 	else if (n | tt::is<tau::memory>) {
 		if (auto check = memory_retrieve(n); check) {
-			auto [value, _] = check.value();
-			if (tt(value) | tt::is<nt>) return tt(value);
+			tt value(check.value().first);
+			if (value.value_tree().is(nt)) return value;
 			else if (!suppress_error) BOOST_LOG_TRIVIAL(error)
 				<< "(Error) argument has wrong type";
-			return tt();
+			return {};
 		}
 	}
 	if (!suppress_error) BOOST_LOG_TRIVIAL(error)
 		<< "(Error) argument has wrong type";
-	return tt();
+	return {};
 }
 
 template <typename... BAs>
@@ -305,7 +305,7 @@ template <typename... BAs>
 bool repl_evaluator<BAs...>::contains(const tt& n, tau::node::type nt)
 {
 	bool found = false;
-	pre_order(n).search([&](const auto& n) {
+	idni::pre_order(n).search([&](const auto& n) {
 		if (tau::get(n).get_type() == nt) return found = true;
 		return false;
 	});
@@ -656,7 +656,7 @@ std::optional<tau_nso<BAs...>>
 
 template <typename... BAs>
 tref repl_evaluator<BAs...>::instantiate_cmd(const tt& n) {
-	auto var_type = n[2] | tt::is<tau::variable> ? tau::bf : tau::wff;
+	auto var_type = n[2].is(tau::variable) ? tau::bf : tau::wff;
 	auto nn = tau::get(n.value_tree().value, { n[0].get(), n[1].get(),
 			tau::get(var_type, n[2].get()), n[3].get() });
 	return substitute_cmd(nn);
