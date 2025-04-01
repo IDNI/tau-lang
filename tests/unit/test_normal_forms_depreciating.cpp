@@ -9,7 +9,7 @@
 #include "normalizer.h"
 
 // TODO (LOW) consider move this test to integration tests
-#include "test_helpers.h"
+#include "test_helpers_depreciating.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"
