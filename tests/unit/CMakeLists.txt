@@ -1,31 +1,40 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
+	# tree independent tests
+	bool
+	product_ba
+	hbdd
+
+	# new tree
+	rules-bf_parsing
+	rules-wff_parsing
 	tau_parser
 	traversal
 
-	# tests for depreciating rewriter tree
-	product_ba_depreciating
-	bool_depreciating
-	hbdd_depreciating
+	# tests to implement with new tree
 	rules-bf_execution_depreciating
-	rules-bf_parsing_depreciating
 	rules-wff_execution_depreciating
-	rules-wff_parsing_depreciating
 	builders_depreciating
 	rewriting_depreciating
 	nso_rr_depreciating
-	tau_parser_depreciating
-	normalizer_depreciating
 	type_system_depreciating
 	bindings_depreciating
 	sbf_ba_binding_depreciating
-	traversal_depreciating
-	tau_depreciating
 	variant_ba_depreciating
 	normal_forms_depreciating
 	make_node_hook_depreciating
-	interpreter_depreciating
+	
+	# finished
+	rules-bf_parsing_depreciating
+	rules-wff_parsing_depreciating
+	tau_parser_depreciating
+	traversal_depreciating
+	
+	# empty tests?
+	interpreter
+	normalizer
+	tau
 )
 
 foreach(X IN LISTS TESTS)
