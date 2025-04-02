@@ -168,7 +168,7 @@ struct nso_factory {
  * @return The specific rule.
  */
 template <typename... BAs>
-rewriter::rule<tau_depreciating<BAs...>> make_rule(const tau_depreciating<BAs...>& rule);
+depreciating::rewriter::rule<tau_depreciating<BAs...>> make_rule(const tau_depreciating<BAs...>& rule);
 
 /**
  * Creates a set of rules from a given tau source.

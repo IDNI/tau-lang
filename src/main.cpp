@@ -55,8 +55,8 @@
 
 using namespace std;
 using namespace idni;
-using namespace idni::rewriter;
 using namespace idni::tau_lang;
+using namespace idni::depreciating::rewriter;
 
 cli::options tau_options() {
 	cli::options opts;

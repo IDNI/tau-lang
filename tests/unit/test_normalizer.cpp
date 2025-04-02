@@ -18,7 +18,7 @@
 #include "normalizer.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 
-using namespace idni::rewriter;
+using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;

@@ -650,7 +650,7 @@ std::optional<tau_nso<BAs...>>
 		}
 		return res;
 	};
-	return rewriter::post_order_recursive_traverser<tau_nso_t>()(
+	return depreciating::rewriter::post_order_recursive_traverser<tau_nso_t>()(
 			inp.value(), quantified_var_adder, scoped_replace);
 }
 
@@ -672,7 +672,7 @@ std::optional<tau_nso<BAs...>>
 		| optional_value_extractor<size_t>)
 			 == tau_parser::variable ? tau_parser::bf
 			 			: tau_parser::wff;
-	auto nn = rewriter::make_node(n->value, { n->child[0], n->child[1],
+	auto nn = depreciating::rewriter::make_node(n->value, { n->child[0], n->child[1],
 				wrap(var_type, n->child[2]), n->child[3] });
 	return substitute_cmd(nn);
 }
@@ -1343,7 +1343,7 @@ tau_nso<BAs...> repl_evaluator<BAs...>::make_cli_depreciating(
 		return nullptr; // Unexpected eof, continue with reading input
 	}
 	using parse_symbol = tau_parser::node_type;
-	using namespace rewriter;
+	using namespace depreciating::rewriter;
 	auto cli_src = make_node_from_parse_result<tau_parser,
 		drop_location_t<parse_symbol, tau_source_sym>, tau_source_sym>(
 			drop_location<parse_symbol, tau_source_sym>, result);

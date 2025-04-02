@@ -12,7 +12,7 @@
 #include "../src/normalizer.h"
 #include "dict.h"
 
-using namespace idni::rewriter;
+using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
 
 rr<tau_depreciating<sbf_ba>> sbf_make_nso_rr(const std::string& src) {

@@ -122,7 +122,7 @@ private:
 	 * @param rule Reference to the rewriter rule of tau_nso_t.
 	 * @return Renamed rewriter rule.
 	 */
-	rewriter::rule<rr<tau_nso_t>> rename(const rewriter::rule<tau_nso_t>& rule) const;
+	depreciating::rewriter::rule<rr<tau_nso_t>> rename(const depreciating::rewriter::rule<tau_nso_t>& rule) const;
 
 	/**
 	 * @brief Merges two sets of rules.

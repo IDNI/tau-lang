@@ -59,7 +59,7 @@ template <typename... BAs>
 tau_depreciating<BAs...> wrap(tau_parser::nonterminal nt, const std::string& terminals) {
 	std::vector<tau_depreciating<BAs...>> children;
 	for (const auto& c : terminals)
-		children.emplace_back(rewriter::make_node<tau_sym<BAs...>>(
+		children.emplace_back(depreciating::rewriter::make_node<tau_sym<BAs...>>(
 			tau_source_sym(c), {}));
 	return wrap(nt, children);
 }
@@ -178,7 +178,7 @@ struct name_binder {
 			tau_sym<BAs...> ts = s->second;
 			return wrap(tau_parser::bf_constant,
 				wrap(tau_parser::constant,
-					rewriter::make_node<tau_sym<BAs...>>(
+					depreciating::rewriter::make_node<tau_sym<BAs...>>(
 								ts, {})));
 		}
 		return error = true, n;
@@ -225,7 +225,7 @@ struct factory_binder {
 // creates a specific rule from a generic rule
 // TODO (LOW) should depend in node_t instead of BAs...
 template <typename... BAs>
-rewriter::rule<tau_depreciating<BAs...>> make_rule(tau_parser::nonterminal rule_t,
+depreciating::rewriter::rule<tau_depreciating<BAs...>> make_rule(tau_parser::nonterminal rule_t,
 	tau_parser::nonterminal matcher_t, tau_parser::nonterminal body_t,
 	const tau_depreciating<BAs...>& rule)
 {
@@ -239,7 +239,7 @@ rewriter::rule<tau_depreciating<BAs...>> make_rule(tau_parser::nonterminal rule_
 // creates a specific rule from a generic rule
 // TODO (LOW) should depend in node_t instead of BAs...
 template <typename... BAs>
-rewriter::rule<tau_depreciating<BAs...>> make_rule(const tau_depreciating<BAs...>& rule) {
+depreciating::rewriter::rule<tau_depreciating<BAs...>> make_rule(const tau_depreciating<BAs...>& rule) {
 	auto type = only_child_extractor<BAs...>(rule)
 		| non_terminal_extractor<BAs...>
 		| optional_value_extractor<size_t>;
@@ -301,7 +301,7 @@ tau_depreciating<BAs...> process_digits(const tau_depreciating<BAs...>& tau_sour
 				tau_depreciating<BAs...>>(
 			tau_node_terminal_extractor<BAs...>,  n);
 		auto num = std::stoul(offset);
-		auto nn = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(num), {});
+		auto nn = depreciating::rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(num), {});
 		changes[n] = nn;
 	}
 	return replace<tau_depreciating<BAs...>>(tau_source, changes);
@@ -367,8 +367,8 @@ template <typename...BAs>
 tau_depreciating<BAs...> process_quantifier_vars(const tau_depreciating<BAs...>& tau_code) {
 	using node = tau_depreciating<BAs...>;
 	quantifier_vars_transformer<BAs...> transformer;
-	return rewriter::post_order_traverser<quantifier_vars_transformer<BAs...>,
-		rewriter::all_t, node>(transformer, rewriter::all)(tau_code);
+	return depreciating::rewriter::post_order_traverser<quantifier_vars_transformer<BAs...>,
+		depreciating::rewriter::all_t, node>(transformer, depreciating::rewriter::all)(tau_code);
 }
 
 template <typename...BAs>
@@ -467,7 +467,7 @@ tau_depreciating<BAs...> infer_constant_types(const tau_depreciating<BAs...>& co
 						<< "(T) Type mismatch: " << type << " got: " << got << " for: " << c;
 					return type_mismatch(got,type);
 				}
-			} else changes.emplace(c, rewriter::make_node<
+			} else changes.emplace(c, depreciating::rewriter::make_node<
 				tau_sym<BAs...>>(c->value, {c->child[0],
 					wrap<BAs...>(tau_parser::type,
 							type)}));
@@ -551,10 +551,10 @@ auto get_free_vars_from_nso(const tau_depreciating<BAs...>& n) {
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso of " << n;
 	std::set<tau_depreciating<BAs...>> free_vars;
 	free_vars_collector<BAs...> collector(free_vars);
-	rewriter::post_order_traverser<
+	depreciating::rewriter::post_order_traverser<
 			free_vars_collector<BAs...>,
-			rewriter::all_t,
-			tau_depreciating<BAs...>>(collector, rewriter::all)(n);
+			depreciating::rewriter::all_t,
+			tau_depreciating<BAs...>>(collector, depreciating::rewriter::all)(n);
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
 	return free_vars;
 }
@@ -569,7 +569,7 @@ void get_leaves(const tau_depreciating<BAs...>& n, tau_parser::nonterminal branc
 		if (is_child_non_terminal(branch, n)) return true;
 		return leaves.push_back(n), false;
 	};
-	rewriter::pre_order(n).visit(add_leave);
+	depreciating::rewriter::pre_order(n).visit(add_leave);
 }
 
 template<typename ...BAs>
@@ -706,15 +706,15 @@ template <typename... BAs>
 tau_depreciating<BAs...> make_tau_code(sp_tau_source_node& tau_source) {
 	if (!tau_source) return 0;
 	tauify<BAs...> tf;
-	rewriter::map_transformer<tauify<BAs...>,
+	depreciating::rewriter::map_transformer<tauify<BAs...>,
 		sp_tau_source_node, tau_depreciating<BAs...>> transform(tf);
-	auto tau_code = rewriter::post_order_traverser<
-				rewriter::map_transformer<tauify<BAs...>,
+	auto tau_code = depreciating::rewriter::post_order_traverser<
+				depreciating::rewriter::map_transformer<tauify<BAs...>,
 				sp_tau_source_node, tau_depreciating<BAs...>>,
-			rewriter::all_t,
-			rewriter::sp_node<tau_source_sym>,
+			depreciating::rewriter::all_t,
+			depreciating::rewriter::sp_node<tau_source_sym>,
 			tau_depreciating<BAs...>>(
-		transform, rewriter::all)(tau_source);
+		transform, depreciating::rewriter::all)(tau_source);
 	if (!tau_code) return nullptr;
 	return infer_constant_types(          // transforms ref to bf_ref/wff_ref
 		process_defs_input_variables( // transforms input variables to captures
@@ -745,10 +745,10 @@ template<typename binder_t, typename... BAs>
 tau_depreciating<BAs...> bind_tau_code_using_binder(const tau_depreciating<BAs...>& code,
 	binder_t& binder) {
 	bind_transformer<binder_t, BAs...> bs(binder);
-	auto res = rewriter::post_order_traverser<
+	auto res = depreciating::rewriter::post_order_traverser<
 			bind_transformer<binder_t, BAs...>,
-			rewriter::all_t,
-			tau_depreciating<BAs...>>(bs, rewriter::all)(code);
+			depreciating::rewriter::all_t,
+			tau_depreciating<BAs...>>(bs, depreciating::rewriter::all)(code);
 	// Check for errors which cannot be captured by the grammar
 	if (bs.error) return nullptr;
 	if (has_semantic_error(res)) return {};

@@ -313,10 +313,10 @@ tref tree<N>::get_from_file(const std::string& filename, parse_options options){
 }
 
 template <typename N>
-idni::library tree<N>::get_library(const std::string& str) {
+rewriter::library tree<N>::get_library(const std::string& str) {
 	auto rs = tt(tree::get(str, { .start = node::type::library }))
 				| node::type::rules || node::type::rule;
-	idni::library lib;
+	rewriter::library lib;
 	for (auto r : rs.traversers()) {
 		r = r | tt::first;
 		// tree::get(r.value()).print(std::cout << "rule: ");

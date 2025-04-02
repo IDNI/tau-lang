@@ -72,7 +72,7 @@ std::optional<tau_depreciating<BAs...>> sbf_ba_factory<BAs...>::parse(
 							| sbf_parser::sbf;
 	auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
 	std::variant<BAs...> vp {b};
-	auto n = rewriter::make_node<tau_sym<BAs...>>(vp, {});
+	auto n = depreciating::rewriter::make_node<tau_sym<BAs...>>(vp, {});
 	return cache.emplace(src, n).first->second;
 }
 

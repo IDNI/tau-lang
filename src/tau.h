@@ -174,7 +174,7 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 						parse_options options = {});
 
 	// other starting points
-	static idni::library get_library(const std::string& str);
+	static rewriter::library get_library(const std::string& str);
 
 	// terminals
 	static tref get_num(size_t v);

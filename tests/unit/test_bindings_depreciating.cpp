@@ -9,7 +9,7 @@
 #include "boolean_algebras/bool_ba.h"
 #include "test_helpers_depreciating.h"
 
-using namespace idni::rewriter;
+using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
 using namespace std;
 

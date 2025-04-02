@@ -128,7 +128,7 @@ static const tau_depreciating<BAs...> _T_trimmed = trim(_T<BAs...>);
 template <typename... BAs>
 tau_depreciating<BAs...> build_num(size_t num) {
 	return wrap(
-		tau_parser::num, rewriter::make_node<tau_sym<BAs...>>(
+		tau_parser::num, depreciating::rewriter::make_node<tau_sym<BAs...>>(
 			tau_sym<BAs...>(num), {}));
 }
 
@@ -139,10 +139,10 @@ tau_depreciating<BAs...> build_int(int_t i) {
 	const bool n = i < 0;
 	size_t u = n ? (size_t)(-i) : (size_t)i;
 	if (n) {
-		children.emplace_back(rewriter::make_node<tau_sym<BAs...>>(
+		children.emplace_back(depreciating::rewriter::make_node<tau_sym<BAs...>>(
 				tau_source_sym('-'), {}));
 	}
-	children.emplace_back(rewriter::make_node<tau_sym<BAs...>>(
+	children.emplace_back(depreciating::rewriter::make_node<tau_sym<BAs...>>(
 				tau_sym<BAs...>(u),{}));
 	return wrap(p::integer, children);
 }
@@ -468,19 +468,19 @@ tau_depreciating<BAs...> build_bf_constant(const tau_depreciating<BAs...>& cte, 
 
 template <typename... BAs>
 tau_depreciating<BAs...> build_bf_constant(const std::variant<BAs...>& v) {
-	auto cte = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	auto cte = depreciating::rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	return build_bf_constant<BAs...>(cte);
 }
 
 template<typename... BAs>
 tau_depreciating<BAs...> build_bf_constant(const std::variant<BAs...>& v, const tau_depreciating<BAs...>& type) {
-	auto cte = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	auto cte = depreciating::rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	return build_bf_constant<BAs...>(cte, type);
 }
 
 template<typename... BAs>
 tau_depreciating<BAs...> build_bf_constant(const std::variant<BAs...>& v, const std::optional<tau_depreciating<BAs...>>& type) {
-	auto cte = rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
+	auto cte = depreciating::rewriter::make_node<tau_sym<BAs...>>(tau_sym<BAs...>(v), {});
 	return type.has_value() ? build_bf_constant<BAs...>(cte, type.value()) : build_bf_constant<BAs...>(cte);
 }
 

@@ -109,8 +109,8 @@ tau_depreciating<BAs...> to_mnf (const tau_depreciating<BAs...>& fm) {
 		}
 		return n;
 	};
-	return rewriter::pre_order(fm).apply_unique(neq_to_eq,
-		visit_wff<BAs...>, rewriter::identity);
+	return depreciating::rewriter::pre_order(fm).apply_unique(neq_to_eq,
+		visit_wff<BAs...>, depreciating::rewriter::identity);
 }
 
 template <typename... BAs>
@@ -126,8 +126,8 @@ tau_depreciating<BAs...> from_mnf_to_nnf (const tau_depreciating<BAs...>& fm) {
 		}
 		return n;
 	};
-	return rewriter::pre_order(fm).apply_unique(ne_to_neq,
-		visit_wff<BAs...>, rewriter::identity);
+	return depreciating::rewriter::pre_order(fm).apply_unique(ne_to_neq,
+		visit_wff<BAs...>, depreciating::rewriter::identity);
 }
 
 template<typename... BAs>
@@ -169,7 +169,7 @@ tau_depreciating<BAs...> unsqueeze_wff (const tau_depreciating<BAs...>& fm) {
 		}
 		return n;
 	};
-	return rewriter::pre_order(fm).apply_unique(f, visit_wff<BAs...>, rewriter::identity);
+	return depreciating::rewriter::pre_order(fm).apply_unique(f, visit_wff<BAs...>, depreciating::rewriter::identity);
 }
 
 template <typename... BAs>
@@ -198,7 +198,7 @@ tau_depreciating<BAs...> squeeze_wff (const tau_depreciating<BAs...>& fm) {
 		}
 		return n;
 	};
-	return rewriter::post_order(fm).apply_unique(f, visit_wff<BAs...>);
+	return depreciating::rewriter::post_order(fm).apply_unique(f, visit_wff<BAs...>);
 }
 
 template <typename... BAs>
@@ -218,7 +218,7 @@ tau_depreciating<BAs...> unsqueeze_wff_pos (const tau_depreciating<BAs...>& fm) 
 		}
 		return n;
 	};
-	return rewriter::pre_order(fm).apply_unique(f, visit_wff<BAs...>, rewriter::identity);
+	return depreciating::rewriter::pre_order(fm).apply_unique(f, visit_wff<BAs...>, depreciating::rewriter::identity);
 }
 
 template <typename... BAs>
@@ -237,7 +237,7 @@ tau_depreciating<BAs...> squeeze_wff_pos (const tau_depreciating<BAs...>& fm) {
 		}
 		return n;
 	};
-	return rewriter::post_order(fm).apply_unique(f, visit_wff<BAs...>);
+	return depreciating::rewriter::post_order(fm).apply_unique(f, visit_wff<BAs...>);
 }
 
 template <typename... BAs>
@@ -257,7 +257,7 @@ tau_depreciating<BAs...> unsqueeze_wff_neg (const tau_depreciating<BAs...>& fm) 
 		}
 		return n;
 	};
-	return rewriter::pre_order(fm).apply_unique(f, visit_wff<BAs...>, rewriter::identity);
+	return depreciating::rewriter::pre_order(fm).apply_unique(f, visit_wff<BAs...>, depreciating::rewriter::identity);
 }
 
 template <typename... BAs>
@@ -276,7 +276,7 @@ tau_depreciating<BAs...> squeeze_wff_neg (const tau_depreciating<BAs...>& fm) {
 		}
 		return n;
 	};
-	return rewriter::post_order(fm).apply_unique(f, visit_wff<BAs...>);
+	return depreciating::rewriter::post_order(fm).apply_unique(f, visit_wff<BAs...>);
 }
 
 template<bool is_wff = true, typename... BAs>
@@ -324,7 +324,7 @@ tau_depreciating<BAs...> normalize_ba(const tau_depreciating<BAs...>& fm) {
 		assert(type.has_value());
 		return build_bf_constant(res, type.value());
 	};
-	return rewriter::pre_order(fm).template
+	return depreciating::rewriter::pre_order(fm).template
 	apply_unique_until_change<MemorySlotPre::normalize_ba_m>(norm_ba);
 }
 
@@ -1070,7 +1070,7 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(const tau_depreciating<BAs.
 		}
 		else return true;
 	};
-	rewriter::pre_order(clause).visit_unique(var_assigner);
+	depreciating::rewriter::pre_order(clause).visit_unique(var_assigner);
 	return std::make_pair(move(i), clause_is_decided);
 }
 
@@ -2076,12 +2076,12 @@ tau_depreciating<BAs...> push_negation_in(const tau_depreciating<BAs...>& fm) {
 	auto pn = [](const auto& n) {
 		return push_negation_one_in<is_wff>(n);
 	};
-	if constexpr (is_wff) return rewriter::pre_order(fm).template
+	if constexpr (is_wff) return depreciating::rewriter::pre_order(fm).template
 	apply_unique<MemorySlotPre::push_negation_in_m>(
-		pn, visit_wff<BAs...>, rewriter::identity);
-	else return rewriter::pre_order(fm).template
+		pn, visit_wff<BAs...>, depreciating::rewriter::identity);
+	else return depreciating::rewriter::pre_order(fm).template
 	apply_unique<MemorySlotPre::push_negation_in_m>(
-		pn, rewriter::all, rewriter::identity);
+		pn, depreciating::rewriter::all, depreciating::rewriter::identity);
 }
 
 // Conversion to dnf while applying reductions during the process
@@ -2116,13 +2116,13 @@ tau_depreciating<BAs...> to_dnf(const tau_depreciating<BAs...>& fm) {
 	auto pn = [](const auto& n) {
 		return push_negation_one_in<is_wff>(n);
 	};
-	// if (is_wff) return rewriter::pre_order(fm).template apply_unique<4>(pn, visit_wff<BAs...>, layer_to_dnf);
-	if constexpr (is_wff) return rewriter::pre_order(fm).template
+	// if (is_wff) return depreciating::rewriter::pre_order(fm).template apply_unique<4>(pn, visit_wff<BAs...>, layer_to_dnf);
+	if constexpr (is_wff) return depreciating::rewriter::pre_order(fm).template
 	apply_unique<MemorySlotPre::to_dnf2_m>(
 		pn, visit_wff<BAs...>, layer_to_dnf);
-	else return rewriter::pre_order(fm).template
+	else return depreciating::rewriter::pre_order(fm).template
 	apply_unique<MemorySlotPre::to_dnf2_m>(
-		pn, rewriter::all, layer_to_dnf);
+		pn, depreciating::rewriter::all, layer_to_dnf);
 }
 
 template<typename... BAs>
@@ -2159,7 +2159,7 @@ tau_depreciating<BAs...> single_dnf_lift(const tau_depreciating<BAs...>& fm) {
 			return false;
 		return true;
 	};
-	return rewriter::post_order(fm).apply_unique(layer_to_dnf, decend);
+	return depreciating::rewriter::post_order(fm).apply_unique(layer_to_dnf, decend);
 }
 
 // Conversion to cnf while applying reductions during the process
@@ -2192,19 +2192,19 @@ tau_depreciating<BAs...> to_cnf(const tau_depreciating<BAs...>& fm) {
 	auto pn = [](const auto& n) {
 		return push_negation_one_in<is_wff>(n);
 	};
-	// if (is_wff) return rewriter::pre_order(fm).template apply_unique<6>(pn, rewriter::all, layer_to_cnf);
-	if constexpr (is_wff) return rewriter::pre_order(fm).template
+	// if (is_wff) return depreciating::rewriter::pre_order(fm).template apply_unique<6>(pn, depreciating::rewriter::all, layer_to_cnf);
+	if constexpr (is_wff) return depreciating::rewriter::pre_order(fm).template
 	apply_unique<MemorySlotPre::to_cnf2_m>(
 		pn, visit_wff<BAs...>, layer_to_cnf);
-	else return rewriter::pre_order(fm).template
+	else return depreciating::rewriter::pre_order(fm).template
 	apply_unique<MemorySlotPre::to_cnf2_m>(
-		pn, rewriter::all, layer_to_cnf);
+		pn, depreciating::rewriter::all, layer_to_cnf);
 }
 
 // Assumes that fm is a single DNF always clause
 template<typename... BAs>
 tau_depreciating<BAs...> rm_temporary_lookback (const tau_depreciating<BAs...>& fm) {
-	auto io_vars = rewriter::select_top(fm,
+	auto io_vars = depreciating::rewriter::select_top(fm,
 		is_child_non_terminal<tau_parser::io_var, BAs...>);
 	bool has_var = std::ranges::any_of(io_vars,
 		[](const auto& el){return !is_io_initial(el);});
@@ -3069,12 +3069,12 @@ tau_depreciating<BAs...> eliminate_quantifiers(const tau_depreciating<BAs...>& f
 	// and eliminate quantifiers during the traversal back up (post-order)
 	auto push_and_elim = [&elim_quant, &push_quantifiers, visit](const tau_depreciating<BAs...>& n) {
 		if (is_child_quantifier<BAs...>(n)) {
-			return rewriter::pre_order(n).template
+			return depreciating::rewriter::pre_order(n).template
 			apply_unique<MemorySlotPre::eliminate_quantifiers_m>(
 				push_quantifiers, visit, elim_quant);
 		} else return n;
 	};
-	return rewriter::post_order(fm).apply_unique(push_and_elim, visit_wff<BAs...>);
+	return depreciating::rewriter::post_order(fm).apply_unique(push_and_elim, visit_wff<BAs...>);
 }
 
 // fm is assumed to be quantifier free
@@ -3104,7 +3104,7 @@ tau_depreciating<BAs...> get_eq_with_most_quant_vars (const tau_depreciating<BAs
 		// Go deeper
 		return true;
 	};
-	rewriter::pre_order(fm).visit(get_eq, visit_wff<BAs...>, rewriter::identity);
+	depreciating::rewriter::pre_order(fm).visit(get_eq, visit_wff<BAs...>, depreciating::rewriter::identity);
 	return wrap(p::wff, eq_max_quants);
 }
 
@@ -3132,7 +3132,7 @@ std::pair<tau_depreciating<BAs...>, bool> anti_prenex_finalize_ex (const tau_dep
 		}
 		return true;
 	};
-	rewriter::pre_order(scoped_fm).search_unique(check_atm_fms, visit_wff<BAs...>, rewriter::identity);
+	depreciating::rewriter::pre_order(scoped_fm).search_unique(check_atm_fms, visit_wff<BAs...>, depreciating::rewriter::identity);
 	if (all_atm_fm_neq) {
 		// std::cout << "all atomic fms are negative\n";
 		// All atomic formulas are of the form !=
@@ -3141,8 +3141,8 @@ std::pair<tau_depreciating<BAs...>, bool> anti_prenex_finalize_ex (const tau_dep
 				return wff_remove_existential(q, n);
 			} else return n;
 		};
-		return {rewriter::pre_order(scoped_fm).apply_unique_until_change(
-			elim_quants, visit_wff<BAs...>, rewriter::identity), true};
+		return {depreciating::rewriter::pre_order(scoped_fm).apply_unique_until_change(
+			elim_quants, visit_wff<BAs...>, depreciating::rewriter::identity), true};
 	} else if (all_atm_fm_eq) {
 		// std::cout << "all atomic fms are positive\n";
 		tau_depreciating<BAs...> red = reduce_across_bfs(scoped_fm, false);
@@ -3242,9 +3242,9 @@ tau_depreciating<BAs...> anti_prenex (const tau_depreciating<BAs...>& fm) {
 				// std::cout << "Before elimination:\n";
 				// std::cout << n << "\n\n";
 				auto n_neg = push_negation_in(build_wff_neg(n));
-				auto res = rewriter::pre_order(n_neg).template
+				auto res = depreciating::rewriter::pre_order(n_neg).template
 				apply_unique<MemorySlotPre::anti_prenex_step_m>(
-					anti_prenex_step, visit, rewriter::identity);
+					anti_prenex_step, visit, depreciating::rewriter::identity);
 				quant_vars.erase(trim2(n));
 				res = push_negation_in(build_wff_neg(res));
 				// std::cout << "After elimination:\n";
@@ -3258,9 +3258,9 @@ tau_depreciating<BAs...> anti_prenex (const tau_depreciating<BAs...>& fm) {
 			} else {
 				// std::cout << "Before elimination:\n";
 				// std::cout << n << "\n\n";
-				auto res = rewriter::pre_order(n).template
+				auto res = depreciating::rewriter::pre_order(n).template
 				apply_unique<MemorySlotPre::anti_prenex_step_m>(
-					anti_prenex_step, visit, rewriter::identity);
+					anti_prenex_step, visit, depreciating::rewriter::identity);
 				quant_vars.erase(trim2(n));
 				// std::cout << "After elimination:\n";
 				// std::cout << res << "\n\n";
@@ -3282,7 +3282,7 @@ tau_depreciating<BAs...> anti_prenex (const tau_depreciating<BAs...>& fm) {
 		return true;
 	};
 	auto nnf = push_negation_in(fm);
-	return rewriter::post_order(nnf).template
+	return depreciating::rewriter::post_order(nnf).template
 	apply_unique<MemorySlotPost::anti_prenex_m>(inner_quant, visit_inner_quant);
 }
 

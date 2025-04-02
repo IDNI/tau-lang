@@ -19,7 +19,7 @@
 #include "boolean_algebras/sbf_ba.h"
 #include "normalizer.h"
 
-using namespace idni::rewriter;
+using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;

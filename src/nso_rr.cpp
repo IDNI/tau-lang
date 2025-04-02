@@ -4,7 +4,7 @@
 
 namespace idni::tau_lang {
 
-using namespace idni::rewriter;
+using namespace idni::depreciating::rewriter;
 
 bool pretty_printer_highlighting = false;
 bool pretty_printer_indenting  = false;

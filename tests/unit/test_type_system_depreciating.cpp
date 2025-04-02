@@ -10,7 +10,7 @@
 
 #include "debug_helpers.h"
 
-using namespace idni::rewriter;
+using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
 using namespace std;
 

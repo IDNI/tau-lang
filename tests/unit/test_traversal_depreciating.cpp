@@ -11,7 +11,7 @@
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "test_helpers_depreciating.h"
 
-using namespace idni::rewriter;
+using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
 using namespace std;
 
