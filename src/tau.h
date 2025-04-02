@@ -3,7 +3,7 @@
 #include <variant>
 
 #include "defs.h"
-#include "utility/bintree.h"
+#include "utility/tree.h"
 #include "tau_parser.generated.h"
 
 namespace idni::tau_lang {
@@ -132,6 +132,9 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	using parse_tree = tau_parser::tree;
 	using parse_options = tau_parser::parse_options;
 
+	// tree direct API
+	// ---------------------------------------------------------------------
+
 	// handles
 	tref get() const;
 	static const tree& get(const tref id);
@@ -221,6 +224,9 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	int_t get_integer() const;
 	size_t get_num() const;
 	size_t get_ba_constant_id() const;
+
+	// tree::traverser / tt API
+	// ---------------------------------------------------------------------
 
 	struct traverser;
 
