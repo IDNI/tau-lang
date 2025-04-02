@@ -159,7 +159,7 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt, const trefs& ch); // with vector of children
 	static tref get(const node::type& nt, const std::string& str); // with string
 
-	// from parser result or parser input (string, stream, file)
+	// creation from parser result or parser input (string, stream, file)
 	template <typename... BAs>
 	static tref get(tau_parser::result& result);
 	template <typename... BAs>
@@ -169,6 +169,9 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	template <typename... BAs>
 	static tref get_from_file(const std::string& filename,
 						parse_options options = {});
+
+	// other starting points
+	static idni::library get_library(const std::string& str);
 
 	// terminals
 	static tref get_num(size_t v);
@@ -351,7 +354,7 @@ struct tree : public idni::tree<N>, public tau_parser_nonterminals {
 	traverser operator|(size_t nt) const;
 	traverser operator||(size_t nt) const;
 
-
+	using tt = traverser;
 };
 
 }

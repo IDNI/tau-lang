@@ -19,7 +19,7 @@ TEST_SUITE("make_library") {
 
 	TEST_CASE("make_library: one rule case") {
 		const auto sample = BF_TO_DNF_0;
-		auto lib = make_library<Bool>(sample);
+		auto lib = tau::get_library(sample);
 		CHECK( lib.size() == 1 );
 	}
 }

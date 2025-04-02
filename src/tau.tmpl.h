@@ -222,7 +222,6 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 		// 	<< " as " << tree::get(x).get_type_name() << std::endl;
 		return true;
 	};
-	// tau_parser::tree::get(pt.get()).print(std::cout << "tau tree from parser tree: ") << std::endl;
 	// auto visit_subtree = [](tref t) {
 	// 	// std::cout << "visiting subtree:" << parse_tree::get(t).value << std::endl;
 	// 	const auto& tr = parse_tree::get(t);
@@ -235,8 +234,11 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 	// 			return true;
 	// 	}
 	// };
+	// parse_tree::get(pt.get()).print(std::cout << "parse tree: ") << std::endl;
 	idni::post_order<tau_parser::pnode>(pt.get()).search(transformer);
 	if (m.find(pt.get()) == m.end()) return nullptr;
+	// std::cout << "tau tree: " << tree::get(m.at(pt.get())) << std::endl;
+	// tree::get(m.at(pt.get())).print_tree(std::cout << "tau tree: ") << std::endl;
 	return m.at(pt.get());
 }
 
@@ -244,7 +246,7 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 
 template <typename tau, typename... BAs>
 struct constant_binder {
-	using tt = tau::traverser;
+	using tt = tau::tt;
 	size_t operator()(tref n) const {
 		if (error) return 0;
 		auto t = tt(n);
@@ -308,6 +310,20 @@ template <typename... BAs>
 tref tree<N>::get_from_file(const std::string& filename, parse_options options){
 	auto result = tau_parser::instance().parse(filename, options);
 	return tree<N>::template get<BAs...>(result);
+}
+
+template <typename N>
+idni::library tree<N>::get_library(const std::string& str) {
+	auto rs = tt(tree::get(str, { .start = node::type::library }))
+				| node::type::rules || node::type::rule;
+	idni::library lib;
+	for (auto r : rs.traversers()) {
+		r = r | tt::first;
+		// tree::get(r.value()).print(std::cout << "rule: ");
+		lib.emplace_back(tree::geth(r | tt::first | tt::ref),
+				tree::geth(r | tt::second | tt::ref));
+	}
+	return lib;
 }
 
 //------------------------------------------------------------------------------
@@ -634,6 +650,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_xor,             740 },
 			{ bf_neg,             750 },
 			{ bf,                 790 },
+			{ bf_matcher,         795 },
+			{ bf_body,            795 },
 			{ rec_relation,       800 },
 			{ ref_args,           800 },
 			{ bf_rule,            800 },
