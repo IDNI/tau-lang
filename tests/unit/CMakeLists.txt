@@ -5,8 +5,10 @@ set(TESTS
 	bool
 	product_ba
 	hbdd
+	variant_ba
 
 	# new tree
+	nso_rr
 	rules-bf_parsing
 	rules-wff_parsing
 	tau_parser
@@ -21,7 +23,6 @@ set(TESTS
 	type_system_depreciating
 	bindings_depreciating
 	sbf_ba_binding_depreciating
-	variant_ba_depreciating
 	normal_forms_depreciating
 	make_node_hook_depreciating
 	
