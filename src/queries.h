@@ -22,7 +22,7 @@ bool is_non_terminal_node(const tau_sym<BAs...>& s) {
 
 // check if a node is a non terminal node
 template <typename... BAs>
-bool is_non_terminal_node(const rewriter::node<tau_sym<BAs...>>& s) {
+bool is_non_terminal_node(const depreciating::rewriter::node<tau_sym<BAs...>>& s) {
 	return std::holds_alternative<tau_source_sym>(s.value)
 		&& get<tau_source_sym>(s.value).nt();
 }
@@ -39,7 +39,7 @@ size_t get_non_terminal_node(const tau_sym<BAs...>& s) {
 }
 
 template <typename... BAs>
-size_t get_non_terminal_node(const rewriter::node<tau_sym<BAs...>>& n) {
+size_t get_non_terminal_node(const depreciating::rewriter::node<tau_sym<BAs...>>& n) {
 	return get_non_terminal_node(n.value);
 }
 
@@ -150,7 +150,7 @@ bool contains (const tau_depreciating<BAs...>& fm, const tau_depreciating<BAs...
 		if (n == sub_fm) return is_contained = true, false;
 		return true;
 	};
-	rewriter::pre_order(fm).search_unique(has_sub_fm);
+	depreciating::rewriter::pre_order(fm).search_unique(has_sub_fm);
 	return is_contained;
 }
 
@@ -208,7 +208,7 @@ using is_var_or_capture_t = decltype(is_var_or_capture<BAs...>);
 // terminals and return, if possible, the required non terminal node
 template <typename... BAs>
 std::optional<tau_depreciating<BAs...>> operator|(
-	const rewriter::node<tau_sym<BAs...>>& n, const size_t nt)
+	const depreciating::rewriter::node<tau_sym<BAs...>>& n, const size_t nt)
 {
 	auto v = n.child
 		| std::ranges::views::filter(is_non_terminal<BAs...>(nt))
@@ -246,7 +246,7 @@ std::vector<tau_depreciating<BAs...>> operator|(const std::vector<tau_depreciati
 // to the specified non terminals and return them
 template <typename... BAs>
 std::vector<tau_depreciating<BAs...>> operator||(
-	const rewriter::node<tau_sym<BAs...>>& n,
+	const depreciating::rewriter::node<tau_sym<BAs...>>& n,
 	const tau_parser::nonterminal nt)
 {
 	// IDEA use ::to to get a vector when gcc and clang implement it in the future
@@ -658,7 +658,7 @@ T operator|(const std::optional<T>& o, const optional_value_extractor_t<T> e) {
 } // namespace idni::tau_lang
 
 // Specialization of tau node
-namespace idni::rewriter {
+namespace idni::depreciating::rewriter  {
 
 // Specialization of tau node in order to hash typed and non-typed
 // Tau constants the same
@@ -725,9 +725,9 @@ template<typename... BAs>
 struct std::hash<idni::tau_lang::tau_depreciating<BAs...>> {
 	size_t operator()(const idni::tau_lang::tau_depreciating<BAs...>& n) const noexcept {
 		using namespace idni::tau_lang;
-		using namespace idni::rewriter;
+		using namespace idni::depreciating::rewriter;
 		// Let the hash respect the typing rules for bf_t and bf_f
-		return hash<idni::rewriter::node<tau_sym<BAs...>>>{}(*n);
+		return hash<idni::depreciating::rewriter::node<tau_sym<BAs...>>>{}(*n);
 	}
 };
 

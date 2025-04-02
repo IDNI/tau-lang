@@ -79,8 +79,8 @@ tau_depreciating<tau_ba<BAs...>, BAs...> tau_ba<BAs...>::rename(
 }
 
 template <typename...BAs>
-rewriter::rule<rr<tau_nso<BAs...>>> tau_ba<BAs...>::rename(
-	const rewriter::rule<tau_nso_t>& rule) const
+depreciating::rewriter::rule<rr<tau_nso<BAs...>>> tau_ba<BAs...>::rename(
+	const depreciating::rewriter::rule<tau_nso_t>& rule) const
 {
 	// TODO (MEDIUM) implement properly
 	return rule;
@@ -173,7 +173,7 @@ std::optional<tau_nso<BAs...>> tau_ba_factory<BAs...>::parse(const std::string& 
 	// cvompute final result
 	tau_ba_t t(rr.value().rec_relations, rr.value().main);
 	return std::optional<tau_nso_t>{
-		rewriter::make_node<tau_sym<tau_ba_t, BAs...>>(t, {}) };
+		depreciating::rewriter::make_node<tau_sym<tau_ba_t, BAs...>>(t, {}) };
 }
 
 template <typename...BAs>

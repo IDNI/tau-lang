@@ -26,12 +26,12 @@ struct make_tau_node {
 	 * @return std::optional<tau_depreciating<BAs...>> The created tau node, or std::nullopt if creation fails.
 	 */
 	std::optional<tau_depreciating<BAs...>> operator()(
-		const rewriter::node<tau_sym<BAs...>>& n);
+		const depreciating::rewriter::node<tau_sym<BAs...>>& n);
 };
 
 } // namespace idni::tau_lang
 
-namespace idni::rewriter {
+namespace idni::depreciating::rewriter  {
 
 /**
  * @brief Template specialization for creating a node hook for tau_sym.
@@ -50,10 +50,10 @@ struct make_node_hook<idni::tau_lang::tau_sym<BAs...>> {
 	 * @return std::optional<idni::tau_lang::tau_depreciating<BAs...>> The created tau node, or std::nullopt if creation fails.
 	 */
 	std::optional<idni::tau_lang::tau_depreciating<BAs...>> operator()(
-		const rewriter::node<idni::tau_lang::tau_sym<BAs...>>& n);
+		const depreciating::rewriter::node<idni::tau_lang::tau_sym<BAs...>>& n);
 };
 
-} // namespace idni::rewriter
+} // namespace idni::depreciating
 
 #include "hooks.tmpl.h"
 

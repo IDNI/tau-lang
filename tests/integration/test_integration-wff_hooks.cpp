@@ -22,7 +22,7 @@
 #include "nso_rr.h"
 #include "normalizer.h"
 
-using namespace idni::rewriter;
+using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;
