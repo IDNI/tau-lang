@@ -18,7 +18,7 @@
 using namespace idni;
 using namespace idni::rewriter;
 
-using chtree = idni::tree<char>;
+using chtree = idni::lcrs_tree<char>;
 
 tref n(const char& value) {
 	return chtree::get(value);
@@ -154,8 +154,7 @@ TEST_SUITE("post_order_traverser") {
 		tref root = n('a');
 		collect_visitor<decltype(idni::identity)> visited{idni::identity};
 		trefs expected {root};
-		post_order_traverser<chtree,
-			decltype(visited),
+		post_order_traverser<char, decltype(visited),
 			decltype(all)>(visited, all)(root);
 		CHECK( visited.nodes == expected );
 	}
@@ -165,8 +164,7 @@ TEST_SUITE("post_order_traverser") {
 		tref root = n('a', {n('b'), n('c')});
 		collect_visitor<decltype(idni::identity)> visited{idni::identity};
 		trefs expected {n('b'), n('c'), root};
-		post_order_traverser<chtree,
-			decltype(visited),
+		post_order_traverser<char, decltype(visited),
 			decltype(all)>(visited, all)(root);
 		CHECK( visited.nodes == expected );
 	}
@@ -176,85 +174,88 @@ TEST_SUITE("post_order_traverser") {
 		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
 		collect_visitor<decltype(idni::identity)> visited{idni::identity};
 		trefs expected {n('d'), n('b', {n('d')}), n('c', {n('d')}), root};
-		post_order_traverser<chtree,
-			decltype(visited),
+		post_order_traverser<char, decltype(visited),
 			decltype(all)>(visited, all)(root);
 		CHECK( visited.nodes == expected );
 	}
 }
 
-// TEST_SUITE("map_transformer") {
+TEST_SUITE("map_transformer") {
 
-// 	TEST_CASE("map_transformer: given a simple tree and a visitor, it returns a "
-// 			"new tree with the changes applied by the visitor") {
-// 		sp_node<char> root = n('a');
-// 		auto transform = [](char c) { return c == 'a' ? 'z' : c; };
-// 		map_transformer<decltype(transform), sp_node<char>> map{transform};
-// 		sp_node<char> expected { n('z') };
-// 		auto result = post_order_traverser<decltype(map), decltype(all), sp_node<char>>(map , all)(root);
-// 		CHECK( result == expected );
-// 	}
+	TEST_CASE("map_transformer: given a simple tree and a visitor, it returns a "
+			"new tree with the changes applied by the visitor") {
+		tref root = n('a');
+		auto transform = [](char c) { return c == 'a' ? 'z' : c; };
+		map_transformer<char, decltype(transform)> map{transform};
+		tref expected { n('z') };
+		auto result = post_order_traverser<char, decltype(map),
+			decltype(all)>(map, all)(root);
+		CHECK( result == expected );
+	}
 
-// 	TEST_CASE("map_transformer: given a tree with two children and a visitor, "
-// 			"it returns a new tree with the changes applied by the visitor") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto transform = [](char c) { return c == 'b' ? 'z' : c; };
-// 		map_transformer<decltype(transform), sp_node<char>> map{transform};
-// 		sp_node<char> expected { n('a', {n('z'), n('c')}) };
-// 		auto result = post_order_traverser<decltype(map), decltype(all), sp_node<char>>(map , all)(root);
-// 		CHECK( result == expected );
-// 	}
+	TEST_CASE("map_transformer: given a tree with two children and a visitor, "
+			"it returns a new tree with the changes applied by the visitor") {
+		tref root = n('a', {n('b'), n('c')});
+		auto transform = [](char c) { return c == 'b' ? 'z' : c; };
+		map_transformer<char, decltype(transform)> map{transform};
+		tref expected { n('a', {n('z'), n('c')}) };
+		auto result = post_order_traverser<char, decltype(map),
+			decltype(all)>(map , all)(root);
+		CHECK( result == expected );
+	}
 
-// 	TEST_CASE("map_transformer: given a tree with underlying diamond like DAG "
-// 			"and a visitor, it returns a new tree with the changes applied by "
-// 			"the visitor") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto transform = [](char c) { return c == 'd' ? 'z' : c; };
-// 		map_transformer<decltype(transform), sp_node<char>> map{transform};
-// 		sp_node<char> expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
-// 		auto result = post_order_traverser<decltype(map), decltype(all), sp_node<char>>(map , all)(root);
-// 		CHECK( result == expected );
-// 	}
-// }
+	TEST_CASE("map_transformer: given a tree with underlying diamond like DAG "
+			"and a visitor, it returns a new tree with the changes applied by "
+			"the visitor") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto transform = [](char c) { return c == 'd' ? 'z' : c; };
+		map_transformer<char, decltype(transform)> map{transform};
+		tref expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
+		auto result = post_order_traverser<char, decltype(map),
+			decltype(all)>(map , all)(root);
+		CHECK( result == expected );
+	}
+}
 
-// // TODO (LOW) write tests for replace_node_transformer
+// TODO (LOW) write tests for replace_node_transformer
 
-// TEST_SUITE("replace_transformer") {
+TEST_SUITE("replace_transformer") {
 
-// 	TEST_CASE("replace_transformer: given a simple tree and a visitor, it returns "
-// 			"a new tree with the provided replacements") {
-// 		sp_node<char> root = n('a');
-// 		map<sp_node<char>, sp_node<char>> m;
-// 		m[root] = n('z');
-// 		replace_transformer<sp_node<char>> replace{m};
-// 		sp_node<char> expected { n('z') };
-// 		auto result = post_order_traverser<decltype(replace), decltype(all), sp_node<char>>(replace , all)(root);
-// 		CHECK( result == expected );
-// 	}
+	TEST_CASE("replace_transformer: given a simple tree and a visitor, it returns "
+			"a new tree with the provided replacements") {
+		tref root = n('a');
+		map<tref, tref> m;
+		m[root] = n('z');
+		replace_transformer<char> replace{m};
+		tref expected { n('z') };
+		auto result = post_order_traverser<char, decltype(replace),
+			decltype(all)>(replace, all)(root);
+		CHECK( result == expected );
+	}
 
-// 	TEST_CASE("replace_transform: given a tree with two children and a visitor, "
-// 			"it returns a new tree with the provided replacements") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		map<sp_node<char>, sp_node<char>> m;
-// 		m[n('b')] = n('z');
-// 		replace_transformer<sp_node<char>> replace{m};
-// 		sp_node<char> expected { n('a', {n('z'), n('c')}) };
-// 		auto result = post_order_traverser<decltype(replace), decltype(all), sp_node<char>>(replace , all)(root);
-// 		CHECK( result == expected );
-// 	}
+	TEST_CASE("replace_transform: given a tree with two children and a visitor, "
+			"it returns a new tree with the provided replacements") {
+		tref root = n('a', {n('b'), n('c')});
+		map<tref, tref> m;
+		m[n('b')] = n('z');
+		replace_transformer<char> replace{m};
+		tref expected { n('a', {n('z'), n('c')}) };
+		auto result = post_order_traverser<char, decltype(replace), decltype(all)>(replace , all)(root);
+		CHECK( result == expected );
+	}
 
-// 	TEST_CASE("replace_transform: given a tree with underlying diamond like DAG "
-// 			"and a visitor, it returns a new tree with the provided replacements") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		map<sp_node<char>, sp_node<char>> m;
-// 		m[n('d')] = n('z');
-// 		replace_transformer<sp_node<char>> replace{m};
-// 		sp_node<char> expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
-// 		auto result = post_order_traverser<decltype(replace), decltype(all), sp_node<char>>(replace , all)(root);
-// 		CHECK( result == expected );
-// 	}
-// 	// TODO (LOW) write tests corresponding to related functions
-// }
+	TEST_CASE("replace_transform: given a tree with underlying diamond like DAG "
+			"and a visitor, it returns a new tree with the provided replacements") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		map<tref, tref> m;
+		m[n('d')] = n('z');
+		replace_transformer<char> replace{m};
+		tref expected { n('a', {n('b', {n('z')}), n('c', {n('z')})}) };
+		auto result = post_order_traverser<char, decltype(replace), decltype(all)>(replace , all)(root);
+		CHECK( result == expected );
+	}
+	// TODO (LOW) write tests corresponding to related functions
+}
 
 TEST_SUITE("select_top_predicate") {
 
@@ -266,8 +267,7 @@ TEST_SUITE("select_top_predicate") {
 		trefs expected{ root };
 		select_top_predicate<decltype(predicate)>
 					select{ predicate, selected };
-		post_order_traverser<chtree,
-			decltype(idni::identity),
+		post_order_traverser<char, decltype(idni::identity),
 			decltype(select)>(idni::identity, select)(root);
 		CHECK( selected == expected );
 	}
@@ -280,8 +280,7 @@ TEST_SUITE("select_top_predicate") {
 		trefs expected {};
 		select_top_predicate<decltype(predicate)>
 					select{ predicate, selected };
-		post_order_traverser<chtree,
-			decltype(idni::identity),
+		post_order_traverser<char, decltype(idni::identity),
 			decltype(select)>(idni::identity, select)(root);
 		CHECK( selected == expected );
 	}
@@ -298,748 +297,788 @@ TEST_SUITE("select_top_predicate") {
 		trefs expected {n('b'), n('c')};
 		select_top_predicate<decltype(predicate)>
 					select{ predicate, selected };
-		post_order_traverser<chtree,
-			decltype(idni::identity),
+		post_order_traverser<char, decltype(idni::identity),
 			decltype(select)>(idni::identity, select)(root);
-		// TODO revise hashing. since these should match but they are not
-		std::cout << "These pointers should match but they are not. Probably hashing issue? " << "\n";
+		// TODO revise hashing and get with children. since these should match but they are not
+		std::cout << "These pointers should match but they are not. Probably hashing issue?\n"
+			"Or get with children changes identity of a node?\n";
 		std::cout << "\tselected: " << chtree::get(selected[0]).value << " *" << selected[0]<< "\n";
 		std::cout << "\texpected: " << chtree::get(expected[0]).value << " *" << expected[0] << "\n";
 		CHECK( selected == expected );
 	}
 
+	TEST_CASE("select_top_predicate: given a tree with two children that do not "
+			"satisfy the predicate, it returns an empty vector satisfying the "
+			"predicate") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) {
+			char v = chtree::get(n).value;
+			return v == 'd' || v == 'e';
+		};
+		trefs selected;
+		trefs expected {};
+		select_top_predicate<decltype(predicate)>
+					select{ predicate, selected };
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity, select)(root);
+		CHECK( selected == expected );
+	}
+
+	TEST_CASE("select_top_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns a vector with only one bottom node "
+			"satisfying the predicate") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) {
+			return chtree::get(n).value == 'd';
+		};
+		trefs selected;
+		trefs expected {n('d')};
+		select_top_predicate<decltype(predicate)>
+					select{ predicate, selected };
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity, select)(root);
+		CHECK( selected == expected );
+	}
+
+	TEST_CASE("select_top_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns a vector the two top nodes satisfying "
+			"the predicate") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) {
+			char v = chtree::get(n).value;
+			return v == 'b' || v == 'c';
+		};
+		trefs selected;
+		trefs expected {n('b', {n('d')}), n('c', {n('d')})};
+		select_top_predicate<decltype(predicate)>
+					select{ predicate, selected };
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity, select)(root);
+		CHECK( selected == expected );
+	}
+
+	// TODO (LOW) write tests corresponding to related functions
 }
 
-// 	TEST_CASE("select_top_predicate: given a tree with two children that do not "
-// 			"satisfy the predicate, it returns an empty vector satisfying the "
-// 			"predicate") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'd' || n->value == 'e'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {};
-// 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity, select)(root);
-// 		CHECK( selected == expected );
-// 	}
-
-// 	TEST_CASE("select_top_predicate: given a tree with underlying diamond like "
-// 			"DAG and a visitor, it returns a vector with only one bottom node "
-// 			"satisfying the predicate") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'd'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {n('d')};
-// 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity, select)(root);
-// 		CHECK( selected == expected );
-// 	}
-
-// 	TEST_CASE("select_top_predicate: given a tree with underlying diamond like "
-// 			"DAG and a visitor, it returns a vector the two top nodes satisfying "
-// 			"the predicate") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {n('b', {n('d')}), n('c', {n('d')})};
-// 		select_top_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity, select)(root);
-// 		CHECK( selected == expected );
-// 	}
-
-// 	// TODO (LOW) write tests corresponding to related functions
-// }
-
-// // TODO (MEDIUM) write tests for select_subnodes predicates
-// // TODO (MEDIUM) write tests for select_subnodes functions
-
-
-// TEST_SUITE("select_all_predicate") {
-
-// 	TEST_CASE("select_all_predicate: given a simple tree whose root satisfies "
-// 			"the predicate, it returns the root") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'a'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {root};
-// 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity , select)(root);
-// 		CHECK( selected == expected );
-// 	}
-
-// 	TEST_CASE("select_all_predicate: given a simple tree whose root does not "
-// 			"satisfy the predicate, it returns an empty vector") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {};
-// 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity , select)(root);
-// 		CHECK( selected == expected );
-// 	}
-
-// 	TEST_CASE("select_all_predicate: given a tree with two children that satisfy "
-// 			"the predicate, it returns the children satisfying the predicate") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {n('b'), n('c')};
-// 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity , select)(root);
-// 		CHECK( selected == expected );
-// 	}
-
-// 	TEST_CASE("select_all_predicate: given a tree with two children that do not "
-// 			"satisfy the predicate, it returns an empty vector satisfying the "
-// 			"predicate") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'd' || n->value == 'e'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {};
-// 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity , select)(root);
-// 		CHECK( selected == expected );
-// 	}
-
-// 	TEST_CASE("select_all_predicate: given a tree with underlying diamond like "
-// 			"DAG and a visitor, it returns a vector with only one bottom node "
-// 			"satisfying the predicate") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'd'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {n('d')};
-// 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity , select)(root);
-// 		CHECK( selected == expected );
-// 	}
-
-// 	TEST_CASE("select_all_predicate: given a tree with underlying diamond like "
-// 			"DAG and a visitor, it returns a vector the two top nodes satisfying "
-// 			"the predicate") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		vector<sp_node<char>> selected;
-// 		vector<sp_node<char>> expected {n('b', {n('d')}), n('c', {n('d')})};
-// 		select_all_predicate<decltype(predicate), sp_node<char>> select{predicate, selected};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(select), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity , select)(root);
-// 		CHECK( selected == expected );
-// 	}
-// }
-
-// TEST_SUITE("find_top_predicate") {
-
-// 	TEST_CASE("find_top_predicate: given a simple tree whose root satisfies the "
-// 			"predicate, it returns the root") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'a'; };
-// 		optional<sp_node<char>> found;
-// 		sp_node<char> expected {root};
-// 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(find), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity, find)(root);
-// 		CHECK( found.value() == expected );
-// 	}
-
-// 	TEST_CASE("find_top_predicate: given a simple tree whose root does not "
-// 			"satisfy the predicate, it returns an empty optional") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
-// 		optional<sp_node<char>> found;
-// 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(find), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity, find)(root);
-// 		CHECK( !found );
-// 	}
-
-// 	TEST_CASE("find_top_predicate: given a tree with two children that satisfy "
-// 			"the predicate, it returns the first child satisfying the predicate") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		optional<sp_node<char>> found;
-// 		sp_node<char> expected {n('b')};
-// 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(find), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity, find)(root);
-// 		CHECK( found.value() == expected );
-// 	}
-
-// 	TEST_CASE("find_top_predicate: given a tree with two children that do not "
-// 			"satisfy the predicate, it returns an empty optional") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'd' || n->value == 'e'; };
-// 		optional<sp_node<char>> found;
-// 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(find), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity, find)(root);
-// 		CHECK( !found );
-// 	}
-
-// 	TEST_CASE("find_top_predicate: given a tree with underlying diamond like "
-// 			"DAG and a visitor, it returns the top node satisfying the predicate") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		optional<sp_node<char>> found;
-// 		sp_node<char> expected {n('c', {n('d')})};
-// 		find_top_predicate<decltype(predicate), sp_node<char>> find{predicate, found};
-// 		post_order_traverser<decltype(::idni::depreciating::rewriter::rewriter::identity), decltype(find), sp_node<char>>(::idni::depreciating::rewriter::rewriter::identity, find)(root);
-// 		CHECK( found.value() == expected );
-// 	}
-// }
-
-// // TODO (LOW) write tests for replace
-
-// TEST_SUITE("logical predicates") {
-
-// 	TEST_CASE("true_predicate: given a node, it always returns true") {
-// 		auto t = true_predicate<sp_node<char>>;
-// 		CHECK( t(n('a')) );
-// 	}
-
-// 	TEST_CASE("false_predicate: given a node, it always returns false") {
-// 		auto f = false_predicate<sp_node<char>>;
-// 		CHECK( !f(n('a')) );
-// 	}
-
-// 	TEST_CASE("and_predicate: given a true and a false predicate, it computes "
-// 			"the true table") {
-// 		auto t = true_predicate<sp_node<char>>;
-// 		auto f = false_predicate<sp_node<char>>;
-// 		CHECK( and_predicate(t, t)(d('a')) );
-// 		CHECK( !and_predicate(t, f)(d('a')) );
-// 		CHECK( !and_predicate(f, t)(d('a')) );
-// 		CHECK( !and_predicate(f, f)(d('a')) );
-// 	}
-
-// 	TEST_CASE("or_predicate: given a true and a false predicate, it computes "
-// 			"the true table") {
-// 		auto t = true_predicate<sp_node<char>>;
-// 		auto f = false_predicate<sp_node<char>>;
-// 		CHECK( or_predicate(t, t)(d('a')) );
-// 		CHECK( or_predicate(t, f)(d('a')) );
-// 		CHECK( or_predicate(f, t)(d('a')) );
-// 		CHECK( !or_predicate(f, f)(d('a')) );
-// 	}
-
-// 	TEST_CASE("neg_predicate: given a true and a false predicate, it computes "
-// 			"the true table") {
-// 		auto t = true_predicate<sp_node<char>>;
-// 		auto f = false_predicate<sp_node<char>>;
-// 		CHECK( !neg_predicate(t)(d('a')) );
-// 		CHECK( neg_predicate(f)(d('a')) );
-// 	}
-// }
-
-// TEST_SUITE("trim_top") {
-
-// 	TEST_CASE("trim_top: given a simple tree and a predicate not satisfied by "
-// 			"the root, it returns the tree itself whatever the predicate") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		sp_node<char> expected {root};
-// 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("trim_top: given a simple tree and a predicate satisfied by the "
-// 			"root, it returns the tree itself whatever the predicate") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'a'; };
-// 		sp_node<char> expected {root};
-// 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("trim_top: given a tree with two children -the right one matching "
-// 			"the predicate-, it returns the tree without the matching child") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		sp_node<char> expected {n('a', {n('b')})};
-// 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("trim_top: given a tree with two children -the left one matching "
-// 			"the predicate-, it returns the tree without the matching child") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
-// 		sp_node<char> expected {n('a', {n('c')})};
-// 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("trim_top: given a tree with two children -both matching the "
-// 			"predicate-, it returns the root") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		sp_node<char> expected { n('a') };
-// 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("trim_top: given a tree with two children -none matching the "
-// 			"predicate-, it returns the given tree") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'd' || n->value == 'e'; };
-// 		sp_node<char> expected { root };
-// 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("trim_top: given a tree with underlying diamond like DAG and a "
-// 			"predicate not satisfied by the nodes, it returns the tree itself") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'e'; };
-// 		sp_node<char> expected {root};
-// 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("trim_top: given a tree with underlying diamond like DAG and a "
-// 			"predicate satisfied by the bottom, it returns the tree without it") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'd'; };
-// 		sp_node<char> expected {n('a', {n('b'), n('c')})};
-// 		CHECK( trim_top<decltype(predicate), char>(root, predicate) == expected );
-// 	}
-// }
-
-// TEST_SUITE("select_top") {
-
-// 	TEST_CASE("select_top: given a simple tree and a predicate not satisfied "
-// 			"by the root, it returns the an empty collection") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		CHECK( select_top<decltype(predicate), sp_node<char>>(root, predicate).empty() );
-// 	}
-
-// 	TEST_CASE("select_top: given a simple tree and a predicate satisfied by "
-// 			"the root, it returns the root") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'a'; };
-// 		vector<sp_node<char>> expected {root};
-// 		CHECK( select_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("select_top: given a tree with two children -the right one "
-// 			"matching the predicate-, it returns the matching child") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		vector<sp_node<char>> expected {n('c')};
-// 		CHECK( select_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("select_top: given a tree with two children -the left one "
-// 			"matching the predicate-, it returns the matching child") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
-// 		vector<sp_node<char>> expected {n('b')};
-// 		CHECK( select_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("select_top: given a tree with two children -both matching "
-// 			"the predicate-, it returns the left one") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		vector<sp_node<char>> expected { n('b'), n('c') };
-// 		CHECK( select_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("select_top: given a tree with underlying diamond like DAG and "
-// 			"a predicate satisfied by the bottom, it returns the bottom") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'd'; };
-// 		vector<sp_node<char>> expected {n('d')};
-// 		CHECK( select_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-// }
-
-// TEST_SUITE("select_all") {
-
-// 	TEST_CASE("select_all: given a simple tree and a predicate not satisfied "
-// 			"by the root, it returns an empty collection") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		CHECK( select_all<decltype(predicate), sp_node<char>>(root, predicate).empty() );
-// 	}
-
-// 	TEST_CASE("select_all: given a simple tree and a predicate satisfied by "
-// 			"the root, it returns the root") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'a'; };
-// 		vector<sp_node<char>> expected {root};
-// 		CHECK( select_all<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("select_all: given a tree with two children -the right one "
-// 			"matching the predicate-, it returns the matching child") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		vector<sp_node<char>> expected {n('c')};
-// 		CHECK( select_all<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("select_all: given a tree with two children -the left one "
-// 			"matching the predicate-, it returns the matching child") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
-// 		vector<sp_node<char>> expected {n('b')};
-// 		CHECK( select_all<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("select_all: given a tree with two children -both matching the "
-// 			"predicate-, it returns both") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		vector<sp_node<char>> expected { n('b'), n('c') };
-// 		CHECK( select_all<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("select_all: given a tree with two children -both matching the "
-// 			"predicate-, it returns both") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		vector<sp_node<char>> expected { n('b'), n('c') };
-// 		CHECK( select_all<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-// }
-
-// TEST_SUITE("find_top") {
-
-// 	TEST_CASE("find_top: given a simple tree and a predicate not satisfied by "
-// 			"the root, it returns an empty optional") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		CHECK( !find_top<decltype(predicate), sp_node<char>>(root, predicate) );
-// 	}
-
-// 	TEST_CASE("find_top: given a simple tree and a predicate satisfied by the "
-// 			"root, it returns the root") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'a'; };
-// 		optional<sp_node<char>> expected {root};
-// 		CHECK( find_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("find_top: given a tree with two children -the right one matching "
-// 			"the predicate-, it returns the matching node") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		optional<sp_node<char>> expected {n('c')};
-// 		CHECK( find_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("find_top: given a tree with two children -the left one matching "
-// 			"the predicate-, it returns the matching node") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
-// 		optional<sp_node<char>> expected {n('b')};
-// 		CHECK( find_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("find_top: given a tree with two children -both matching the "
-// 			"predicate-, it returns the first matching node") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		optional<sp_node<char>> expected { n('b') };
-// 		CHECK( find_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-
-// 	TEST_CASE("find_top: given a tree with an underlying diamond like DAG "
-// 			"and a predicate satisfied by the bottom nodes, it returns the "
-// 			"first matching node") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) {
-// 			return n->value == 'b' || n->value == 'c' || n->value == 'd'; };
-// 		optional<sp_node<char>> expected { n('b', {n('d')}) };
-// 		CHECK( find_top<decltype(predicate), sp_node<char>>(root, predicate) == expected );
-// 	}
-// }
-
-// // TODO (LOW) write tests for while_not_found_predicate
-// // TODO (LOW) write tests for find_visitor
-
-// TEST_SUITE("find_bottom") {
-
-// 	TEST_CASE("find_bottom: given a simple tree and a predicate not satisfied by "
-// 			"the root, it returns an empty optional") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		CHECK( !find_bottom<decltype(predicate), sp_node<char>>(root, predicate) );
-// 	}
-
-// 	TEST_CASE("find_bottom: given a simple tree and a predicate satisfied by the "
-// 			"root, it returns the root") {
-// 		sp_node<char> root = n('a');
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'a'; };
-// 		optional<sp_node<char>> expected {root};
-// 		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
-// 		CHECK( result == expected );
-// 	}
-
-// 	TEST_CASE("find_bottom: given a tree with two children -the right one matching "
-// 			"the predicate-, it returns the matching node") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'c'; };
-// 		optional<sp_node<char>> expected {n('c')};
-// 		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
-// 		CHECK( result == expected );
-// 	}
-
-// 	TEST_CASE("find_bottom: given a tree with two children -the left one matching "
-// 			"the predicate-, it returns the matching node") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b'; };
-// 		optional<sp_node<char>> expected {n('b')};
-// 		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
-// 		CHECK( result == expected );
-// 	}
-
-// 	TEST_CASE("find_bottom: given a tree with two children -both matching the "
-// 			"predicate-, it returns the first matching node") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		auto predicate = [](sp_node<char> n) { return n->value == 'b' || n->value == 'c'; };
-// 		optional<sp_node<char>> expected { n('b') };
-// 		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
-// 		CHECK( result == expected );
-// 	}
-
-// 	TEST_CASE("find_bottom: given a tree with an underlying diamond like DAG "
-// 			"and a predicate satisfied by the bottom nodes, it returns the "
-// 			"first matching node") {
-// 		sp_node<char> root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
-// 		auto predicate = [](sp_node<char> n) {
-// 			return n->value == 'b' || n->value == 'c' || n->value == 'd'; };
-// 		optional<sp_node<char>> expected { n('d') };
-// 		auto result = find_bottom<decltype(predicate), sp_node<char>>(root, predicate);
-// 		CHECK( result == expected );
-// 	}
-// }
-
-// TEST_SUITE("pattern_matcher") {
-
-// 	struct is_capture_predicate {
-
-// 		bool operator()(const sp_node<char>& n) const {
-// 			return n->value == 'X' || n->value == 'Y' || n->value == 'Z';
-// 		}
-// 	};
-
-// 	static auto is_capture = is_capture_predicate();
-
-// 	TEST_CASE("pattern_matcher: given a simple tree and a simple capture, it "
-// 			"returns a environment with the capture") {
-// 		sp_node<char> root = n('a');
-// 		sp_node<char> pattern = n('X');
-// 		environment<sp_node<char>> expected { {pattern, root} };
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched, is_capture);
-// 		matcher(root);
-// 		CHECK( matcher.matched );
-// 		CHECK( matcher.env == expected);
-// 	}
-
-// 	TEST_CASE("pattern_matcher: given a simple tree and a simple ignore, it "
-// 			"returns an empty environment") {
-// 		sp_node<char> root = n('a');
-// 		sp_node<char> pattern = n('I');
-// 		environment<sp_node<char>> expected;
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched, is_capture);
-// 		matcher(root);
-// 		CHECK( !matcher.matched );
-// 	}
-
-// 	TEST_CASE("pattern_matcher: given a tree with two children, a same "
-// 			"structure tree pattern -both of them captures-,"
-// 			" it returns a environment with both captures") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		sp_node<char> pattern = n('a', {n('X'), n('Y')});
-// 		environment<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched, is_capture);
-// 		matcher(root);
-// 		CHECK( matcher.matched );
-// 		CHECK( matcher.env == expected);
-// 	}
-
-// 	TEST_CASE("pattern_matcher: given a tree with two equal children and a "
-// 			"same structure pattern -both of them the same captures-,"
-// 			", it returns a environment with one capture") {
-// 		sp_node<char> root = n('a', {n('b'), n('b')});
-// 		sp_node<char> pattern = n('a', {n('X'), n('X')});
-// 		environment<sp_node<char>> expected { {n('X'), n('b')} };
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched, is_capture);
-// 		matcher(root);
-// 		CHECK( matcher.matched );
-// 		CHECK( matcher.env == expected);
-// 	}
-
-// 	TEST_CASE("pattern_matcher: given a tree with two different children and a "
-// 			"same structure pattern -both of them the same captures-,"
-// 			", it returns a environment with one capture") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		sp_node<char> pattern = n('a', {n('X'), n('X')});
-// 		environment<sp_node<char>> expected { };
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched, is_capture);
-// 		matcher(root);
-// 		CHECK( !matcher.matched );
-// 		CHECK( matcher.env == expected);
-// 	}
-// }
-
-// TEST_SUITE("pattern_matcher") {
-
-// 	struct is_capture_predicate {
-
-// 		bool operator()(const sp_node<char>& n) const {
-// 			return n->value == 'X' || n->value == 'Y' || n->value == 'Z';
-// 		}
-// 	};
-
-// 	static auto is_capture = is_capture_predicate();
-
-// 	TEST_CASE("pattern_matcher: given a simple tree and a simple "
-// 			"capture, it returns a environment with the capture") {
-// 		sp_node<char> root = n('a');
-// 		sp_node<char> pattern = n('X');
-// 		environment<sp_node<char>> expected { {pattern, root} };
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched,
-// 			is_capture);
-// 		matcher(root);
-// 		CHECK( matcher.matched );
-// 		CHECK( matcher.env == expected);
-// 	}
-
-// 	TEST_CASE("pattern_matcher: given a simple tree and a simple "
-// 			"ignore, it returns an empty environment") {
-// 		sp_node<char> root = n('a');
-// 		sp_node<char> pattern = n('I');
-// 		environment<sp_node<char>> expected;
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched,
-// 			is_capture);
-// 		matcher(root);
-// 		CHECK( !matcher.matched );
-// 	}
-
-// 	TEST_CASE("pattern_matcher: given a tree with two children, a "
-// 			"same structure tree pattern -both of them captures-, it returns "
-// 			"a environment with both captures") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		sp_node<char> pattern = n('a', {n('X'), n('Y')});
-// 		environment<sp_node<char>> expected { {n('X'), n('b')}, {n('Y'), n('c')} };
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched,
-// 			is_capture);
-// 		matcher(root);
-// 		CHECK( matcher.matched );
-// 		CHECK( matcher.env == expected);
-// 	}
-
-// 	TEST_CASE("pattern_matcher: given a tree with two equal children "
-// 			"and a same structure pattern -both of them the same captures-, it "
-// 			"returns a environment with one capture") {
-// 		sp_node<char> root = n('a', {n('b'), n('b')});
-// 		sp_node<char> pattern = n('a', {n('X'), n('X')});
-// 		environment<sp_node<char>> expected { {n('X'), n('b')} };
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched,
-// 			is_capture);
-// 		matcher(root);
-// 		CHECK( matcher.matched );
-// 		CHECK( matcher.env == expected);
-// 	}
-
-// 	TEST_CASE("pattern_matcher: given a tree with two different "
-// 			"children and a same structure pattern -both of them the same captures-,"
-// 			" it returns a environment with one capture") {
-// 		sp_node<char> root = n('a', {n('b'), n('c')});
-// 		sp_node<char> pattern = n('a', {n('X'), n('X')});
-// 		environment<sp_node<char>> expected { };
-// 		environment<sp_node<char>> matched;
-// 		auto matcher = pattern_matcher(pattern, matched,
-// 			is_capture);
-// 		matcher(root);
-// 		CHECK( !matcher.matched );
-// 		CHECK( matcher.env == expected);
-// 	}
-// }
-
-// TEST_SUITE("apply") {
-
-// 	struct is_capture_predicate {
-
-// 		bool operator()(const sp_node<char>& n) const {
-// 			return n->value == 'X' || n->value == 'Y' || n->value == 'Z';
-// 		}
-// 	};
-
-// 	TEST_CASE("apply: given tree with one child and a environment that "
-// 	 		"transform a node with one children into two, it returns the "
-// 			"tree with the environment applied") {
-// 		sp_node<char> root {n('a', {n('b')})};
-// 		sp_node<char> pattern {n('a', {n('X')})};
-// 		sp_node<char> environment {n('a', {n('X'), n('X')})};
-// 		rule<sp_node<char>> rule {pattern, environment};
-// 		sp_node<char> expected = n('a', {n('b'), n('b')});
-// 		is_capture_predicate is_capture;
-// 		auto replaced = apply_rule(rule, root, is_capture) ;
-// 		CHECK( replaced == expected );
-// 	}
-
-// 	TEST_CASE("apply: given tree with one child and a environment that "
-// 			"transform that ignore the children node and replace the root node , "
-// 			"it returns the tree with the environment applied") {
-// 		sp_node<char> root {n('a', {n('b')})};
-// 		sp_node<char> pattern {n('a', {n('X')})};
-// 		sp_node<char> environment {n('a')};
-// 		rule<sp_node<char>> rule {pattern, environment};
-// 		sp_node<char> expected = n('a');
-// 		is_capture_predicate is_capture;
-// 		auto replaced = apply_rule(rule, root, is_capture) ;
-// 		CHECK( replaced == expected );
-// 	}
-
-// 	TEST_CASE("apply: given tree with two children and a environment that "
-// 			"transform that swaps the children, it returns the tree with the "
-// 			"environment applied") {
-// 		sp_node<char> root {n('a', {n('b'), n('c')})};
-// 		sp_node<char> pattern {n('a', {n('X'), n('Y')})};
-// 		sp_node<char> environment {n('a', {n('Y'), n('X')})};
-// 		rule<sp_node<char>> rule {pattern, environment};
-// 		sp_node<char> expected = n('a', {n('c'), n('b')});
-// 		is_capture_predicate is_capture;
-// 		auto replaced = apply_rule(rule, root, is_capture) ;
-// 		CHECK( replaced == expected );
-// 	}
-
-// 	TEST_CASE("apply: given tree with two children and a environment that "
-// 			"transform that swaps the children, it returns the tree with the "
-// 			"environment applied") {
-// 		sp_node<char> root {n('a', {n('b'), n('c', {n('d'), n('e')})})};
-// 		sp_node<char> pattern {n('a', {n('X'), n('c', {n('Y'), n('Z')})})};
-// 		sp_node<char> environment {n('a', {n('Y'), n('c', {n('Z'), n('X')})})};
-// 		rule<sp_node<char>> rule {pattern, environment};
-// 		sp_node<char> expected = n('a', {n('d'), n('c', {n('e'), n('b')})});
-// 		is_capture_predicate is_capture;
-// 		auto replaced = apply_rule(rule, root, is_capture) ;
-// 		CHECK( replaced == expected );
-// 	}
-
-// 	TEST_CASE("apply: given a tree with a diamond like DAG and a environment "
-// 			"that breaks the diamond like shape, it returns the tree with the "
-// 			"environment applied") {
-// 		sp_node<char> root {n('a', {n('b', {n('d')}), n('c', {n('d')})})};
-// 		sp_node<char> pattern {n('b', {n('X')})};
-// 		sp_node<char> environment {n('b', {n('e')})};
-// 		rule<sp_node<char>> rule {pattern, environment};
-// 		sp_node<char> expected = n('a', {n('b', {n('e')}), n('c', {n('d')})});
-// 		is_capture_predicate is_capture;
-// 		auto replaced = apply_rule(rule, root, is_capture) ;
-// 		CHECK( replaced == expected );
-// 	}
-
-// 	TEST_CASE("apply: given a tree with a diamond like DAG and a environment "
-// 			"that swaps the intermediate children, it returns the tree with the "
-// 			"environment applied") {
-// 		sp_node<char> root {n('a', {n('b', {n('d')}), n('c', {n('d')})})};
-// 		sp_node<char> pattern {n('a', {n('X'), n('Y')})};
-// 		sp_node<char> environment {n('a', {n('Y'), n('X')})};
-// 		rule<sp_node<char>> rule {pattern, environment};
-// 		sp_node<char> expected = n('a', {n('c', {n('d')}), n('b', {n('d')})});
-// 		is_capture_predicate is_capture;
-// 		auto replaced = apply_rule(rule, root, is_capture);
-// 		CHECK( replaced == expected );
-// 	}
-// }
+// TODO (MEDIUM) write tests for select_subnodes predicates
+// TODO (MEDIUM) write tests for select_subnodes functions
+
+
+TEST_SUITE("select_all_predicate") {
+
+	TEST_CASE("select_all_predicate: given a simple tree whose root satisfies "
+			"the predicate, it returns the root") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'a'; };
+		trefs selected;
+		trefs expected {root};
+		select_all_predicate<decltype(predicate)> select{predicate, selected};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity , select)(root);
+		CHECK( selected == expected );
+	}
+
+	TEST_CASE("select_all_predicate: given a simple tree whose root does not "
+			"satisfy the predicate, it returns an empty vector") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'; };
+		trefs selected;
+		trefs expected {};
+		select_all_predicate<decltype(predicate)> select{predicate, selected};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity , select)(root);
+		CHECK( selected == expected );
+	}
+
+	TEST_CASE("select_all_predicate: given a tree with two children that satisfy "
+			"the predicate, it returns the children satisfying the predicate") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		trefs selected;
+		trefs expected {n('b'), n('c')};
+		select_all_predicate<decltype(predicate)> select{predicate, selected};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity , select)(root);
+		CHECK( selected == expected );
+	}
+
+	TEST_CASE("select_all_predicate: given a tree with two children that do not "
+			"satisfy the predicate, it returns an empty vector satisfying the "
+			"predicate") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'd'
+					|| chtree::get(n).value == 'e'; };
+		trefs selected;
+		trefs expected {};
+		select_all_predicate<decltype(predicate)> select{predicate, selected};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity , select)(root);
+		CHECK( selected == expected );
+	}
+
+	TEST_CASE("select_all_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns a vector with only one bottom node "
+			"satisfying the predicate") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'd'; };
+		trefs selected;
+		trefs expected {n('d')};
+		select_all_predicate<decltype(predicate)> select{predicate, selected};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity , select)(root);
+		CHECK( selected == expected );
+	}
+
+	TEST_CASE("select_all_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns a vector the two top nodes satisfying "
+			"the predicate") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		trefs selected;
+		trefs expected {n('b', {n('d')}), n('c', {n('d')})};
+		select_all_predicate<decltype(predicate)> select{predicate, selected};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(select)>(idni::identity , select)(root);
+		CHECK( selected == expected );
+	}
+}
+
+TEST_SUITE("find_top_predicate") {
+
+	TEST_CASE("find_top_predicate: given a simple tree whose root satisfies the "
+			"predicate, it returns the root") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'a'; };
+		tref found;
+		tref expected{ root };
+		find_top_predicate<decltype(predicate)> find{predicate, found};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(find)>(idni::identity , find)(root);
+		CHECK( found == expected );
+	}
+
+	TEST_CASE("find_top_predicate: given a simple tree whose root does not "
+			"satisfy the predicate, it returns an empty optional") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'; };
+		tref found;
+		find_top_predicate<decltype(predicate)> find{predicate, found};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(find)>(idni::identity , find)(root);
+		CHECK( found == nullptr );
+	}
+
+	TEST_CASE("find_top_predicate: given a tree with two children that satisfy "
+			"the predicate, it returns the first child satisfying the predicate") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		tref found;
+		tref expected = n('b');
+		find_top_predicate<decltype(predicate)> find{predicate, found};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(find)>(idni::identity , find)(root);
+		CHECK( found == expected );
+	}
+
+	TEST_CASE("find_top_predicate: given a tree with two children that do not "
+			"satisfy the predicate, it returns an empty optional") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'd'
+					|| chtree::get(n).value == 'e'; };
+		tref found;
+		find_top_predicate<decltype(predicate)> find{predicate, found};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(find)>(idni::identity , find)(root);
+		CHECK( found == nullptr );
+	}
+
+	TEST_CASE("find_top_predicate: given a tree with underlying diamond like "
+			"DAG and a visitor, it returns the top node satisfying the predicate") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		tref found;
+		tref expected = n('c', {n('d')});
+		find_top_predicate<decltype(predicate)> find{predicate, found};
+		post_order_traverser<char, decltype(idni::identity),
+			decltype(find)>(idni::identity , find)(root);
+		CHECK( found == expected );
+	}
+}
+
+// TODO (LOW) write tests for replace
+
+TEST_SUITE("logical predicates") {
+
+	TEST_CASE("true_predicate: given a node, it always returns true") {
+		auto t = true_predicate;
+		CHECK( t(n('a')) );
+	}
+
+	TEST_CASE("false_predicate: given a node, it always returns false") {
+		auto f = false_predicate;
+		CHECK( !f(n('a')) );
+	}
+
+	TEST_CASE("and_predicate: given a true and a false predicate, it computes "
+			"the true table") {
+		auto t = true_predicate;
+		auto f = false_predicate;
+		CHECK( and_predicate(t, t)(n('a')) );
+		CHECK( !and_predicate(t, f)(n('a')) );
+		CHECK( !and_predicate(f, t)(n('a')) );
+		CHECK( !and_predicate(f, f)(n('a')) );
+	}
+
+	TEST_CASE("or_predicate: given a true and a false predicate, it computes "
+			"the true table") {
+		auto t = true_predicate;
+		auto f = false_predicate;
+		CHECK( or_predicate(t, t)(n('a')) );
+		CHECK( or_predicate(t, f)(n('a')) );
+		CHECK( or_predicate(f, t)(n('a')) );
+		CHECK( !or_predicate(f, f)(n('a')) );
+	}
+
+	TEST_CASE("neg_predicate: given a true and a false predicate, it computes "
+			"the true table") {
+		auto t = true_predicate;
+		auto f = false_predicate;
+		CHECK( !neg_predicate(t)(n('a')) );
+		CHECK( neg_predicate(f)(n('a')) );
+	}
+}
+
+TEST_SUITE("trim_top") {
+
+	TEST_CASE("trim_top: given a simple tree and a predicate not satisfied by "
+			"the root, it returns the tree itself whatever the predicate") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		tref expected {root};
+		CHECK( trim_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("trim_top: given a simple tree and a predicate satisfied by the "
+			"root, it returns the tree itself whatever the predicate") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'a'; };
+		tref expected {root};
+		CHECK( trim_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("trim_top: given a tree with two children -the right one matching "
+			"the predicate-, it returns the tree without the matching child") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		tref expected {n('a', {n('b')})};
+		CHECK( trim_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("trim_top: given a tree with two children -the left one matching "
+			"the predicate-, it returns the tree without the matching child") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'; };
+		tref expected {n('a', {n('c')})};
+		CHECK( trim_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("trim_top: given a tree with two children -both matching the "
+			"predicate-, it returns the root") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		tref expected { n('a') };
+		CHECK( trim_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("trim_top: given a tree with two children -none matching the "
+			"predicate-, it returns the given tree") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'd'
+					|| chtree::get(n).value == 'e'; };
+		tref expected { root };
+		CHECK( trim_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("trim_top: given a tree with underlying diamond like DAG and a "
+			"predicate not satisfied by the nodes, it returns the tree itself") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'e'; };
+		tref expected {root};
+		CHECK( trim_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("trim_top: given a tree with underlying diamond like DAG and a "
+			"predicate satisfied by the bottom, it returns the tree without it") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'd'; };
+		tref expected {n('a', {n('b'), n('c')})};
+		CHECK( trim_top<decltype(predicate)>(root, predicate) == expected );
+	}
+}
+
+TEST_SUITE("select_top") {
+
+	TEST_CASE("select_top: given a simple tree and a predicate not satisfied "
+			"by the root, it returns the an empty collection") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		CHECK( select_top<decltype(predicate)>(root, predicate).empty() );
+	}
+
+	TEST_CASE("select_top: given a simple tree and a predicate satisfied by "
+			"the root, it returns the root") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'a'; };
+		vector<tref> expected {root};
+		CHECK( select_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("select_top: given a tree with two children -the right one "
+			"matching the predicate-, it returns the matching child") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		vector<tref> expected {n('c')};
+		CHECK( select_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("select_top: given a tree with two children -the left one "
+			"matching the predicate-, it returns the matching child") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'; };
+		vector<tref> expected {n('b')};
+		CHECK( select_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("select_top: given a tree with two children -both matching "
+			"the predicate-, it returns the left one") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		vector<tref> expected { n('b'), n('c') };
+		CHECK( select_top<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("select_top: given a tree with underlying diamond like DAG and "
+			"a predicate satisfied by the bottom, it returns the bottom") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'd'; };
+		vector<tref> expected {n('d')};
+		CHECK( select_top<decltype(predicate)>(root, predicate) == expected );
+	}
+}
+
+TEST_SUITE("select_all") {
+
+	TEST_CASE("select_all: given a simple tree and a predicate not satisfied "
+			"by the root, it returns an empty collection") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		CHECK( select_all<decltype(predicate)>(root, predicate).empty() );
+	}
+
+	TEST_CASE("select_all: given a simple tree and a predicate satisfied by "
+			"the root, it returns the root") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'a'; };
+		vector<tref> expected {root};
+		CHECK( select_all<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("select_all: given a tree with two children -the right one "
+			"matching the predicate-, it returns the matching child") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		vector<tref> expected {n('c')};
+		CHECK( select_all<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("select_all: given a tree with two children -the left one "
+			"matching the predicate-, it returns the matching child") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'; };
+		vector<tref> expected {n('b')};
+		CHECK( select_all<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("select_all: given a tree with two children -both matching the "
+			"predicate-, it returns both") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		vector<tref> expected { n('b'), n('c') };
+		CHECK( select_all<decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("select_all: given a tree with two children -both matching the "
+			"predicate-, it returns both") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		vector<tref> expected { n('b'), n('c') };
+		CHECK( select_all<decltype(predicate)>(root, predicate) == expected );
+	}
+}
+
+TEST_SUITE("find_top") {
+
+	TEST_CASE("find_top: given a simple tree and a predicate not satisfied by "
+			"the root, it returns an empty optional") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		CHECK( !find_top<char, decltype(predicate)>(root, predicate) );
+	}
+
+	TEST_CASE("find_top: given a simple tree and a predicate satisfied by the "
+			"root, it returns the root") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'a'; };
+		tref expected {root};
+		CHECK( find_top<char, decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("find_top: given a tree with two children -the right one matching "
+			"the predicate-, it returns the matching node") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		tref expected {n('c')};
+		CHECK( find_top<char, decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("find_top: given a tree with two children -the left one matching "
+			"the predicate-, it returns the matching node") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'; };
+		tref expected {n('b')};
+		CHECK( find_top<char, decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("find_top: given a tree with two children -both matching the "
+			"predicate-, it returns the first matching node") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		tref expected { n('b') };
+		CHECK( find_top<char, decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("find_top: given a tree with an underlying diamond like DAG "
+			"and a predicate satisfied by the bottom nodes, it returns the "
+			"first matching node") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+						|| chtree::get(n).value == 'c'
+						|| chtree::get(n).value == 'd';};
+		tref expected { n('b', {n('d')}) };
+		CHECK( find_top<char, decltype(predicate)>(root, predicate) == expected );
+	}
+}
+
+// TODO (LOW) write tests for while_not_found_predicate
+// TODO (LOW) write tests for find_visitor
+
+TEST_SUITE("find_bottom") {
+
+	TEST_CASE("find_bottom: given a simple tree and a predicate not satisfied by "
+			"the root, it returns an empty optional") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		CHECK( !find_bottom<char, decltype(predicate)>(root, predicate) );
+	}
+
+	TEST_CASE("find_bottom: given a simple tree and a predicate satisfied by the "
+			"root, it returns the root") {
+		tref root = n('a');
+		auto predicate = [](tref n) { return chtree::get(n).value == 'a'; };
+		tref expected {root};
+		CHECK( find_bottom<char, decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("find_bottom: given a tree with two children -the right one matching "
+			"the predicate-, it returns the matching node") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'c'; };
+		tref expected {n('c')};
+		CHECK( find_bottom<char, decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("find_bottom: given a tree with two children -the left one matching "
+			"the predicate-, it returns the matching node") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'; };
+		tref expected {n('b')};
+		CHECK( find_bottom<char, decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("find_bottom: given a tree with two children -both matching the "
+			"predicate-, it returns the first matching node") {
+		tref root = n('a', {n('b'), n('c')});
+		auto predicate = [](tref n) { return chtree::get(n).value == 'b'
+					|| chtree::get(n).value == 'c'; };
+		tref expected = n('b');
+		CHECK( find_bottom<char, decltype(predicate)>(root, predicate) == expected );
+	}
+
+	TEST_CASE("find_bottom: given a tree with an underlying diamond like DAG "
+			"and a predicate satisfied by the bottom nodes, it returns the "
+			"first matching node") {
+		tref root = n('a', {n('b', {n('d')}), n('c', {n('d')})});
+		auto predicate = [](tref n) {
+			auto v = chtree::get(n).value;
+			return v == 'b' || v == 'c' || v == 'd';};
+		tref expected { n('d') };
+		CHECK( find_bottom<char, decltype(predicate)>(root, predicate) == expected );
+	}
+}
+
+TEST_SUITE("pattern_matcher") {
+
+	struct is_capture_predicate {
+
+		bool operator()(const tref& n) const {
+			auto v = chtree::get(n).value;
+			return v == 'X' || v == 'Y' || v == 'Z';
+		}
+	};
+
+	static auto is_capture = is_capture_predicate();
+
+	TEST_CASE("pattern_matcher: given a simple tree and a simple capture, it "
+			"returns a environment with the capture") {
+		tref root = n('a');
+		tref pattern = n('X');
+		environment expected { {pattern, root} };
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( matcher.matched );
+		CHECK( matcher.env == expected);
+	}
+
+	TEST_CASE("pattern_matcher: given a simple tree and a simple ignore, it "
+			"returns an empty environment") {
+		tref root = n('a');
+		tref pattern = n('I');
+		environment expected;
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( !matcher.matched );
+	}
+
+	TEST_CASE("pattern_matcher: given a tree with two children, a same "
+			"structure tree pattern -both of them captures-,"
+			" it returns a environment with both captures") {
+		tref root = n('a', {n('b'), n('c')});
+		tref pattern = n('a', {n('X'), n('Y')});
+		environment expected { {n('X'), n('b')}, {n('Y'), n('c')} };
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( matcher.matched );
+		CHECK( matcher.env == expected);
+	}
+
+	TEST_CASE("pattern_matcher: given a tree with two equal children and a "
+			"same structure pattern -both of them the same captures-,"
+			", it returns a environment with one capture") {
+		tref root = n('a', {n('b'), n('b')});
+		tref pattern = n('a', {n('X'), n('X')});
+		environment expected { {n('X'), n('b')} };
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( matcher.matched );
+		CHECK( matcher.env == expected);
+	}
+
+	TEST_CASE("pattern_matcher: given a tree with two different children and a "
+			"same structure pattern -both of them the same captures-,"
+			", it returns a environment with one capture") {
+		tref root = n('a', {n('b'), n('c')});
+		tref pattern = n('a', {n('X'), n('X')});
+		environment expected { };
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( !matcher.matched );
+		CHECK( matcher.env == expected);
+	}
+}
+
+TEST_SUITE("pattern_matcher") {
+
+	struct is_capture_predicate {
+
+		bool operator()(const tref& n) const {
+			auto v = chtree::get(n).value;
+			return v == 'X' || v == 'Y' || v == 'Z';
+		}
+	};
+
+	static auto is_capture = is_capture_predicate();
+
+	TEST_CASE("pattern_matcher: given a simple tree and a simple "
+			"capture, it returns a environment with the capture") {
+		tref root = n('a');
+		tref pattern = n('X');
+		environment expected { {pattern, root} };
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( matcher.matched );
+		CHECK( matcher.env == expected);
+	}
+
+	TEST_CASE("pattern_matcher: given a simple tree and a simple "
+			"ignore, it returns an empty environment") {
+		tref root = n('a');
+		tref pattern = n('I');
+		environment expected;
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( !matcher.matched );
+	}
+
+	TEST_CASE("pattern_matcher: given a tree with two children, a "
+			"same structure tree pattern -both of them captures-, it returns "
+			"a environment with both captures") {
+		tref root = n('a', {n('b'), n('c')});
+		tref pattern = n('a', {n('X'), n('Y')});
+		environment expected { {n('X'), n('b')}, {n('Y'), n('c')} };
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( matcher.matched );
+		CHECK( matcher.env == expected);
+	}
+
+	TEST_CASE("pattern_matcher: given a tree with two equal children "
+			"and a same structure pattern -both of them the same captures-, it "
+			"returns a environment with one capture") {
+		tref root = n('a', {n('b'), n('b')});
+		tref pattern = n('a', {n('X'), n('X')});
+		environment expected { {n('X'), n('b')} };
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( matcher.matched );
+		CHECK( matcher.env == expected);
+	}
+
+	TEST_CASE("pattern_matcher: given a tree with two different "
+			"children and a same structure pattern -both of them the same captures-,"
+			" it returns a environment with one capture") {
+		tref root = n('a', {n('b'), n('c')});
+		tref pattern = n('a', {n('X'), n('X')});
+		environment expected { };
+		environment matched;
+		auto matcher = pattern_matcher<char,
+			is_capture_predicate>(pattern, matched, is_capture);
+		matcher(root);
+		CHECK( !matcher.matched );
+		CHECK( matcher.env == expected);
+	}
+}
+
+TEST_SUITE("apply") {
+
+	struct is_capture_predicate {
+
+		bool operator()(const tref& n) const {
+			auto v = chtree::get(n).value;
+			return v == 'X' || v == 'Y' || v == 'Z';
+		}
+	};
+
+	TEST_CASE("apply: given tree with one child and a environment that "
+	 		"transform a node with one children into two, it returns the "
+			"tree with the environment applied") {
+		tref root {n('a', {n('b')})};
+		tref pattern {n('a', {n('X')})};
+		tref env {n('a', {n('X'), n('X')})};
+		rule r{ chtree::geth(pattern), chtree::geth(env) };
+		tref expected = n('a', {n('b'), n('b')});
+		is_capture_predicate is_capture;
+		auto replaced = apply_rule<char, is_capture_predicate>(r, root, is_capture) ;
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply: given tree with one child and a environment that "
+			"transform that ignore the children node and replace the root node , "
+			"it returns the tree with the environment applied") {
+		tref root {n('a', {n('b')})};
+		tref pattern {n('a', {n('X')})};
+		tref env {n('a')};
+		rule r{ chtree::geth(pattern), chtree::geth(env) };
+		tref expected = n('a');
+		is_capture_predicate is_capture;
+		auto replaced = apply_rule<char, is_capture_predicate>(r, root, is_capture) ;
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply: given tree with two children and a environment that "
+			"transform that swaps the children, it returns the tree with the "
+			"environment applied") {
+		tref root {n('a', {n('b'), n('c')})};
+		tref pattern {n('a', {n('X'), n('Y')})};
+		tref env {n('a', {n('Y'), n('X')})};
+		rule r{ chtree::geth(pattern), chtree::geth(env) };
+		tref expected = n('a', {n('c'), n('b')});
+		is_capture_predicate is_capture;
+		auto replaced = apply_rule<char, is_capture_predicate>(r, root, is_capture) ;
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply: given tree with two children and a environment that "
+			"transform that swaps the children, it returns the tree with the "
+			"environment applied") {
+		tref root {n('a', {n('b'), n('c', {n('d'), n('e')})})};
+		tref pattern {n('a', {n('X'), n('c', {n('Y'), n('Z')})})};
+		tref env {n('a', {n('Y'), n('c', {n('Z'), n('X')})})};
+		rule r{ chtree::geth(pattern), chtree::geth(env) };
+		tref expected = n('a', {n('d'), n('c', {n('e'), n('b')})});
+		is_capture_predicate is_capture;
+		auto replaced = apply_rule<char, is_capture_predicate>(r, root, is_capture) ;
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply: given a tree with a diamond like DAG and a environment "
+			"that breaks the diamond like shape, it returns the tree with the "
+			"environment applied") {
+		tref root {n('a', {n('b', {n('d')}), n('c', {n('d')})})};
+		tref pattern {n('b', {n('X')})};
+		tref env {n('b', {n('e')})};
+		rule r{ chtree::geth(pattern), chtree::geth(env) };
+		tref expected = n('a', {n('b', {n('e')}), n('c', {n('d')})});
+		is_capture_predicate is_capture;
+		auto replaced = apply_rule<char, is_capture_predicate>(r, root, is_capture) ;
+		CHECK( replaced == expected );
+	}
+
+	TEST_CASE("apply: given a tree with a diamond like DAG and a environment "
+			"that swaps the intermediate children, it returns the tree with the "
+			"environment applied") {
+		tref root {n('a', {n('b', {n('d')}), n('c', {n('d')})})};
+		tref pattern {n('a', {n('X'), n('Y')})};
+		tref env {n('a', {n('Y'), n('X')})};
+		rule r{ chtree::geth(pattern), chtree::geth(env) };
+		tref expected = n('a', {n('c', {n('d')}), n('b', {n('d')})});
+		is_capture_predicate is_capture;
+		auto replaced = apply_rule<char, is_capture_predicate>(r, root, is_capture);
+		CHECK( replaced == expected );
+	}
+}

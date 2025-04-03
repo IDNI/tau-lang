@@ -126,8 +126,8 @@ struct node {
 inline std::ostream& operator<<(std::ostream& os, const node& n);
 
 template <typename N = node>
-struct tree : public idni::tree<N>, public tau_parser_nonterminals {
-	using base_t = idni::tree<N>;
+struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
+	using base_t = idni::lcrs_tree<N>;
 	using node = N;
 	using parse_tree = tau_parser::tree;
 	using parse_options = tau_parser::parse_options;
