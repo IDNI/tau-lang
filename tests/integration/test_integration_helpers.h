@@ -11,7 +11,6 @@
 #include "runtime.h"
 #include "hooks.h"
 #include "normalizer.h"
-#include "z3++.h"
 
 using namespace idni::rewriter;
 using namespace idni::tau_lang;

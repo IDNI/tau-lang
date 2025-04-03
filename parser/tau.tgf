@@ -128,6 +128,7 @@ bitvector              => bits [_ bitvector_type]
                         | num [ _ bitvector_type].
 bitvector_type        => ( _ ':' _ '[' _ num _ ']' ):type.
 bits                  => bit (bit)* 'b'.
+bit                   => '0' | '1'.
 
 # constant time constraints
 constraint =>

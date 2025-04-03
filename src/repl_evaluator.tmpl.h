@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "repl_evaluator.h"
+#include "z3_solver.h"
 
 namespace idni::tau_lang {
 
@@ -663,6 +663,10 @@ void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
+	// if the  form is a z3 formula call z3
+	//if (auto check = find_top(n, is_non_terminal<tau_parser::z3, BAs...>); check) {
+	//	solve_z3(n);
+	//}
 	// getting the type
 	auto type = get_solver_cmd_type(n);
 	if (!type) return;
