@@ -1091,20 +1091,17 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 			| size_t_extractor<BAs...>
 			| optional_value_extractor<size_t>
 		: sizeof(size_t);
-	auto bv_type = n.child[0]
-			| non_terminal_extractor<BAs...>
-			| optional_value_extractor<size_t>;
 	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
-	switch (bv_type) {
+	switch (get_non_terminal_node(n.child[0])) {
 		case p::num : {
 			int64_t ull = std::stoull(value);
 			auto bv = z3_context.bv_val(ull, size);
-			return wrap(p::bitvector, std::make_shared<rewriter::node<tau_sym<BAs...>>>(tau_sym<BAs...>(bv), std::vector<tau<BAs...>>{}));
+			return make_node<tau_sym<BAs...>>(bv, {});
 		}
 		case p::bits : {
 			value.pop_back();
 			auto bv = z3_context.bv_val(value.c_str(), size);
-			return wrap(p::bitvector, std::make_shared<rewriter::node<tau_sym<BAs...>>>(tau_sym<BAs...>(bv), std::vector<tau<BAs...>>{}));
+			return make_node<tau_sym<BAs...>>(bv, {});
 		}
 		default: {
 			assert(false);
