@@ -464,7 +464,7 @@ std::ostream& operator<<(std::ostream& stream,
 
 inline static const std::map<size_t, std::string> hl_colors = {
 	{ tau_parser::bf,            idni::TC.LIGHT_GREEN() },
-	{ tau_parser::z3_bv,         idni::TC.GREEN() },
+	{ tau_parser::z3,            idni::TC.GREEN() },
 	{ tau_parser::variable,      idni::TC.WHITE() },
 	{ tau_parser::capture,       idni::TC.BLUE() },
 	{ tau_parser::wff_all,       idni::TC.MAGENTA() },
@@ -601,20 +601,21 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			{ tau_parser::z3_div,                          774 },
 			{ tau_parser::z3_mod,                          775 },
 			{ tau_parser::z3_and,                          776 },
-			{ tau_parser::z3_and,                          777 },
-			{ tau_parser::z3_and,                          778 },
+			{ tau_parser::z3_or,                           777 },
+			{ tau_parser::z3_xor,                          778 },
 			{ tau_parser::z3_eq,                           779 },
-			{ tau_parser::z3_neq,                          780 },
-			{ tau_parser::z3_less_equal,                   781 },
-			{ tau_parser::z3_nleq,                         782 },
-			{ tau_parser::z3_greater,                      783 },
-			{ tau_parser::z3_ngreater,                     784 },
-			{ tau_parser::z3_greater_equal,                785 },
-			{ tau_parser::z3_ngeq,                         786 },
-			{ tau_parser::z3_less,                         787 },
-			{ tau_parser::z3_nless,                        788 },
-			{ tau_parser::z3_shift_left,                   789 },
-			{ tau_parser::z3_shift_right,                  790 },
+			{ tau_parser::z3_neg,                          780 },
+			{ tau_parser::z3_neq,                          781 },
+			{ tau_parser::z3_less_equal,                   782 },
+			{ tau_parser::z3_nleq,                         783 },
+			{ tau_parser::z3_greater,                      784 },
+			{ tau_parser::z3_ngreater,                     785 },
+			{ tau_parser::z3_greater_equal,                786 },
+			{ tau_parser::z3_ngeq,                         787 },
+			{ tau_parser::z3_less,                         788 },
+			{ tau_parser::z3_nless,                        789 },
+			{ tau_parser::z3_shift_left,                   790 },
+			{ tau_parser::z3_shift_right,                  791 },
 			// others
 			{ tau_parser::rec_relation,                    800 },
 			{ tau_parser::ref_args,                        800 },
@@ -835,7 +836,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::bf_neg:         postfix_nows("'"); break;
 			case tau_parser::wff_sometimes:  prefix("sometimes"); break;
 			case tau_parser::wff_always:     prefix("always"); break;
-			case tau_parser::z3_not:         prefix("~"); break;
+			case tau_parser::z3_neg:         prefix("~"); break;
 			// binary operators
 			case tau_parser::bf_and:            print_bf_and(); break;
 			case tau_parser::bf_or:             infix_nows("|"); break;

@@ -310,7 +310,7 @@ memory                 => ( "%"
 
 # inline intermediate nodes and eliminate parenthesis
 @inline char classes, chars, q_var, src_c, bitvector_type,
-        z3_bv > z3_bv_parenthesis > z3_bv,
+        z3 > z3_parenthesis > z3,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
         bf  > bf_parenthesis  > bf,
