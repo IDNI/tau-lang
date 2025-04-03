@@ -1036,7 +1036,7 @@ TEST_SUITE("parsing bf formulas ") {
 	}
 }
 
-TEST_SUITE("parsing z3 formulas") {
+TEST_SUITE("parsing z3 expressions") {
 
 	TEST_CASE("variable") {
 		const char* sample = "Z";
@@ -1184,6 +1184,109 @@ TEST_SUITE("parsing z3 formulas") {
 		auto expr = make_statement(src);
 		auto check = expr->child[0]-> value;
 		CHECK( std::holds_alternative<z3::expr>(check) );
+	}
+}
+
+TEST_SUITE("parsing z3 formulas") {
+
+	TEST_CASE("z3_eq") {
+		const char* sample = "Z =_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_eq;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_neq") {
+		const char* sample = "Z !=_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_neq;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_less_equal") {
+		const char* sample = "Z <=_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_less_equal;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_nleq") {
+		const char* sample = "Z !<=_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_nleq;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_greater") {
+		const char* sample = "Z >_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_greater;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_ngreater") {
+		const char* sample = "Z !>_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_ngreater;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_greater_equal") {
+		const char* sample = "Z >=_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_greater_equal;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_ngeq") {
+		const char* sample = "Z !>=_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_ngeq;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_less") {
+		const char* sample = "Z <_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_less;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_nless") {
+		const char* sample = "Z !<_ Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_nless;
+		CHECK( check.has_value() );
 	}
 }
 
