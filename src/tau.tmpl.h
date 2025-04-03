@@ -932,7 +932,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				depth--, indented.erase(ref);
 	};
 	auto visit_all = [](tref) { return true; };
-	idni::pre_order<node>(this->get()).visit(on_enter, visit_all,
+	pre_order<node>(this->get()).visit(on_enter, visit_all,
 						on_leave, on_between);
 	return os;
 }
