@@ -613,6 +613,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			{ tau_parser::z3_ngeq,                         786 },
 			{ tau_parser::z3_less,                         787 },
 			{ tau_parser::z3_nless,                        788 },
+			{ tau_parser::z3_shift_left,                   789 },
+			{ tau_parser::z3_shift_right,                  790 },
 			// others
 			{ tau_parser::rec_relation,                    800 },
 			{ tau_parser::ref_args,                        800 },
@@ -876,7 +878,9 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::z3_mod:            infix("%"); break;
 			case tau_parser::z3_and:            infix("&"); break;
 			case tau_parser::z3_or:             infix("|"); break;
-			case tau_parser::z3_xor:            infix("^"); break;
+			case tau_parser::z3_xor:            infix("(+)"); break;
+			case tau_parser::z3_shift_left:     infix("<<"); break;
+			case tau_parser::z3_shift_right:    infix(">>"); break;
 			// ternary operators
 			case tau_parser::bf_interval:    infix2("<=", "<="); break;
 			case tau_parser::wff_conditional:infix2("?", ":"); break;

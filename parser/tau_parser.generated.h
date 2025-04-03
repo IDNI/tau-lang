@@ -28,7 +28,7 @@ inline std::vector<std::string> symbol_names{
 	"z3_ngeq", "__E_wff_51", "z3_less", "__E_wff_52", "z3_nless", "__E_wff_53", "bf_parenthesis", "__E_bf_54", "bf_constant", "variable", 
 	"bf_splitter", "__E_bf_55", "bf_ref", "bf_or", "__E_bf_56", "bf_xor", "__E_bf_57", "bf_t", "__E_bf_58", "__E___E_bf_58_59", 
 	"type", "bf_f", "__E_bf_60", "__E___E_bf_60_61", "bf_and", "__E_bf_62", "__E___E_bf_62_63", "bf_neg", "__E_bf_64", "bf_neg_oprnd", 
-	"__E___E_bf_64_65", "bf_and_nosep", "__E_bf_66", "bf_and_nosep_1st_oprnd", "__E___E_bf_66_67", "bf_and_nosep_2nd_oprnd", "__E___E_bf_66_68", "z3_parenthesis", "__E_z3_69", "z3_not", 
+	"__E___E_bf_64_65", "bf_and_nosep", "__E_bf_66", "bf_and_nosep_1st_oprnd", "__E___E_bf_66_67", "bf_and_nosep_2nd_oprnd", "__E___E_bf_66_68", "z3_parenthesis", "__E_z3_69", "z3_neg", 
 	"z3_add", "__E_z3_70", "z3_sub", "__E_z3_71", "z3_mul", "__E_z3_72", "z3_div", "__E_z3_73", "z3_mod", "__E_z3_74", 
 	"z3_and", "__E_z3_75", "z3_or", "__E_z3_76", "z3_xor", "__E_z3_77", "z3_shift_left", "__E_z3_78", "num", "z3_shift_right", 
 	"__E_z3_79", "bitvector", "bits", "__E_bitvector_80", "bitvector_type", "__E_bitvector_81", "__E_bitvector_type_82", "bit", "__E_bits_83", "__E_bits_84", 
@@ -623,9 +623,9 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(117), (NT(167)));
 //G243: z3(117)              => variable(139).
 	p(NT(117), (NT(139)));
-//G244: z3_not(169)          => z3(117).
+//G244: z3_neg(169)          => z3(117).
 	p(NT(169), (NT(117)));
-//G245: z3(117)              => '~' _(11) z3_not(169).
+//G245: z3(117)              => '~' _(11) z3_neg(169).
 	p(NT(117), (T(41)+NT(11)+NT(169)));
 //G246: __E_z3_70(171)       => z3(117) _(11) '+' _(11) z3(117).
 	p(NT(171), (NT(117)+NT(11)+T(37)+NT(11)+NT(117)));
@@ -1581,7 +1581,7 @@ struct tau_parser : public idni::parser<char, char> {
 		z3_ngeq, __E_wff_51, z3_less, __E_wff_52, z3_nless, __E_wff_53, bf_parenthesis, __E_bf_54, bf_constant, variable, 
 		bf_splitter, __E_bf_55, bf_ref, bf_or, __E_bf_56, bf_xor, __E_bf_57, bf_t, __E_bf_58, __E___E_bf_58_59, 
 		type, bf_f, __E_bf_60, __E___E_bf_60_61, bf_and, __E_bf_62, __E___E_bf_62_63, bf_neg, __E_bf_64, bf_neg_oprnd, 
-		__E___E_bf_64_65, bf_and_nosep, __E_bf_66, bf_and_nosep_1st_oprnd, __E___E_bf_66_67, bf_and_nosep_2nd_oprnd, __E___E_bf_66_68, z3_parenthesis, __E_z3_69, z3_not, 
+		__E___E_bf_64_65, bf_and_nosep, __E_bf_66, bf_and_nosep_1st_oprnd, __E___E_bf_66_67, bf_and_nosep_2nd_oprnd, __E___E_bf_66_68, z3_parenthesis, __E_z3_69, z3_neg, 
 		z3_add, __E_z3_70, z3_sub, __E_z3_71, z3_mul, __E_z3_72, z3_div, __E_z3_73, z3_mod, __E_z3_74, 
 		z3_and, __E_z3_75, z3_or, __E_z3_76, z3_xor, __E_z3_77, z3_shift_left, __E_z3_78, num, z3_shift_right, 
 		__E_z3_79, bitvector, bits, __E_bitvector_80, bitvector_type, __E_bitvector_81, __E_bitvector_type_82, bit, __E_bits_83, __E_bits_84, 

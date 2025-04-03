@@ -110,7 +110,7 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     capture.
 z3                     => ('(' _ z3 _ ')')                   :z3_parenthesis
                         |                                     variable
-                        | '~' _ z3                           :z3_not
+                        | '~' _ z3                    :z3_neg
                         | (z3 _ '+' _ z3)             :z3_add
                         | (z3 _ '-' _ z3)             :z3_sub
                         | (z3 _ '*' _ z3)             :z3_mul
