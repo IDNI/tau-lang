@@ -30,8 +30,8 @@ TEST_SUITE("z3_solve") {
 		std::cout << s.get_model().eval(y) << "\n";
 	}
 
-	TEST_CASE("variable") {
-		const char* sample = "X =_ Y";
+	TEST_CASE("X =_ X") {
+		const char* sample = "X =_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
@@ -42,7 +42,7 @@ TEST_SUITE("z3_solve") {
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("variable") {
+	TEST_CASE("X !=_ X") {
 		const char* sample = "X !=_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -50,6 +50,79 @@ TEST_SUITE("z3_solve") {
 		auto solution = solve_z3(equation);
 		CHECK( !solution.has_value() );
 	}
+
+	TEST_CASE("X >_ X") {
+		const char* sample = "X >_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( !solution.has_value() );
+	}
+
+	TEST_CASE("X !>_ X") {
+		const char* sample = "X !>_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X >=_ X") {
+		const char* sample = "X >=_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X !>=_ X") {
+		const char* sample = "X !>=_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( !solution.has_value() );
+	}
+
+	TEST_CASE("X <=_ X") {
+		const char* sample = "X <=_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("X !<=_ X") {
+		const char* sample = "X !<=_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( !solution.has_value() );
+	}
+
+	TEST_CASE("X <_ X") {
+		const char* sample = "X <_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( !solution.has_value() );
+	}
+
+	TEST_CASE("X !<_ X") {
+		const char* sample = "X !<_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+	}
+
 
 	/*TEST_CASE("variable") {
 		const char* sample = "X + Y =_ 1";
