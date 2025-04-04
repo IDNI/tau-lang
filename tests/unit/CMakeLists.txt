@@ -22,6 +22,7 @@ set(TESTS
 	normal_forms
 	make_node_hook
 	interpreter
+	z3_solver
 )
 
 foreach(X IN LISTS TESTS)

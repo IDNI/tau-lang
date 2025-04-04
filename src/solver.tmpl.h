@@ -999,7 +999,7 @@ template<typename...BAs>
 std::optional<solution<BAs...>> solve(const tau<BAs...>& form,
 		const solver_options<BAs...>& options) {
 	if (form == _T<BAs...>) return { solution<BAs...>() };
-	if (options.mode == solver_mode::z3) return solve_z3<BAs...>(form);
+//	if (options.mode == solver_mode::z3) return solve_z3<BAs...>(form);
 
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(trace)

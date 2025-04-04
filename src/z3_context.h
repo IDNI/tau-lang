@@ -7,6 +7,8 @@
 
 namespace idni::tau_lang {
 
+using namespace z3;
+
 static z3::context z3_context;
 
 //z3::context z3_context() {
