@@ -95,8 +95,8 @@ A macOS installer will be available in the future.
 ## **Compiling the source code**
 
 To compile the source code you need a recent C++ compiler supporting C++23, e.g.
-GCC 13.1.0. You also need at least a cmake version 3.22.1 installed in your system.
-The only code dependencies are Boost C++ Libraries (libboost) an Z3 SMT Solver (libz3-dev).
+GCC 13.1.0. You also need at least cmake version 3.22.1 installed in your system.
+The only code dependencies are the Boost C++ Libraries (libboost) and the Z3 SMT Solver (libz3-dev).
 
 After cloning:
 
@@ -122,9 +122,8 @@ Once you have compiled the source code you can run the `tau` executable to
 execute Tau specifications. The `tau` executable is located in either `build-Release`
 or `build-Debug` or `build-RelWithDebInfo`.
 
-# **Quick start**
 
-TODO: Remove typing
+# **Quick start**
 
 To start using the Tau Language, download the latest release from the
 [GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
@@ -134,14 +133,15 @@ it from the command line by typing `tau`.
 
 The programming model underlying the Tau Language is fully declarative. You
 specify, possibly only very implicitly, how the current and previous inputs and
-outputs are related, at each point of time. So what you write in the Tau Language
-is not a program, but a specification, or spec, which represents all programs that
-meet the specification. Once you run a specification, you actually run one
+outputs are related, at each point of time. As a result, you do not write a program 
+in the Tau Language, but a specification which effectively represents all programs that
+meet this specification. Once you run a specification, you actually run one
 automatically-chosen representative program from that set.
 
-In the scope of the Tau Language, a specification means that for all inputs, at each
-point in time, exist outputs, that clearly do not depend on future inputs
-("time-compatible"). Implied from this definition is that all specifications run
+In the scope of the Tau Language, a specification is [satisfiable](#satisfiability-and-execution), 
+loosely speaking, if for all inputs, at each point in time, there exist outputs, 
+that do not depend on future inputs while matching the specification. 
+Implied from this definition is that all specifications run
 indefinitely no matter what the inputs are.
 
 For example, the following specification:
@@ -150,19 +150,19 @@ For example, the following specification:
 o1[t] = 0
 ```
 
-states that the output `o1` at all time points (`t`) has to be `0`. Similarly, the
+states that the output `o1` at all time points `t` has to be `0`. Similarly, the
 following specification:
 
 ```
 o1[t] = i1[t]
 ```
 
-states that the output `o1` at time `t` has to be the same as the input
-`i1` at time `t`.
-In the above examples, `o1` and `i1` are IO variables. They are used to define
-the inputs and outputs of the specified specifications and also declare their type.
+states that the output `o1` has to be the same as the input
+`i1` at all time points `t`.
+In the above examples, `o1` and `i1` are [streams](#streams). They are used to define
+the inputs and outputs of the specification.
 
-An example of how to define IO variables is the following:
+An example of how to define input and output streams is the following:
 
 ```
 tau i1 = console
@@ -170,29 +170,31 @@ tau o1 = console
 ```
 
 In the above case we specify that `i1` and `o1` are of type `tau`, namely that
-they are Tau formulas, and they take values from the console (e.g. stdin/stdout).
-Type actually means which Boolean algebra the values come from. It is a unique
-property of the Tau langauge that it can refer to its own sentences, abstracted
-as Boolean algebra elements.
+they are Tau specifications, and they take values from the console (e.g. stdin/stdout).
+The type defines from which Boolean algebra the values come from. The `tau` type is a unique
+property of the Tau langauge because it enables Tau specifications to reason over 
+Tau specifications themselves abstracted as Boolean algebra elements.
 
-You can also define files as IO streams:
+You can also define files as input or output streams:
 
 ```
 tau i1 = ifile("input.in")
 tau o1 = ofile("output.out")
 ```
 
-Back to the above two examples, the one where the output is always zero and the
-one where it equals the input, those Tau specs define only one specification each
-(there's a caveat in this statement but we shall treat it later on). An example
-of a Tau spec that specifies infinitely many programs would be:
+The above two examples, `o1[t] = 0` and `o1[t] = i1[t]`, define one program each
+(there's a caveat in this statement, but we shall ignore it here). This is not
+always the case. An example
+of a Tau specification that specifies infinitely many programs is
 
 ```
 o1[t] & i1[t] = 0
 ```
+because many different assignments to `o1[t]` can be chosen as valid output. Each choice
+represents one program.
+Here `&` denotes conjunction in the Boolean algebra from which the inputs and outputs
+are taken from. This specification says that the conjunction has to be empty.
 
-Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
-are taken from. This spec says that the conjunction has to be empty.
 Clearly, you can consider more complicated specifications, e.g.:
 
 ```
@@ -201,20 +203,22 @@ o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
 
 which states that at each point in time, either the conjunction of the current
 output with the previous output and with the current input, has to be 0, or, the
-output has to equal the input. Note the difference between Boolean (algebraic
-operations) and Logical operators. The former are &|', and the latter are &&,||,!.
+output has to equal the input. Note the difference between [Boolean (algebraic
+operations)](#boolean-functions) and [Logical operators](#tau-specifications) . 
+The former are `&, |, '`, and the latter are `&&, ||, !`.
 
 In order to simplify the process of writing and running Tau specifications, we allow
-to define functions and predicates, possibly by means of recurrence relations.
+[function and predicate definitions](#functions-and-predicates), 
+possibly by means of recurrence relations.
 The following is a simple predicate defined by a recurrence relation,
-which takes as argument a Tau formula:
+which takes as argument a Tau term:
 
 ```
 f[0](y) := T
 f[n](y) := f[n - 1](y)
 ```
 
-which you can use in your spec as follows:
+which you can use in your specification as follows:
 
 ```
 o1[t] = 0 && f(i1[t])
@@ -227,7 +231,7 @@ g[0](y) := 0
 g[n](y) := g[n](y)'
 ```
 
-which defines a function (rather a predicate) and alternates between 0 and 1
+which defines a function (rather than a predicate) and alternates between 0 and 1
 depending on the parity of n.
 
 In the [demos](https://github.com/IDNI/tau-lang/tree/main/demos) folder you
