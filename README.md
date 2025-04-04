@@ -450,6 +450,12 @@ is also converted to what we call _unbounded continuation_ which essentially add
 assumptions from a specification ensuring that the solutions for output stream values
 do not make the execution contradictory in a future step.
 
+It is not always the case that the values which can be assigned to outputs are unique.
+For this reason, a single specification can give rise to a multitude of different programs
+differing in the choices made for assignments. As a result, during execution only 
+one of possibly many program is executed. The execution process in Tau, however, 
+is fully deterministic, so that the same program is always chosen for the same specification.
+
 
 ## **Boolean functions**
 
