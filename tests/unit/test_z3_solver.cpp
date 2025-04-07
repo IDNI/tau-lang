@@ -45,13 +45,10 @@ TEST_SUITE("z3_solve simple") {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
 		auto solution = solve_z3(equation);
-	//	for (const auto& v: solution.value().second) {
-	//		std::cout << solution.value().first.eval(v) << "\n";
-	//	}
 		CHECK( solution.has_value() );
 	}
 
-/*	TEST_CASE("X !=_ X") {
+	TEST_CASE("X !=_ X") {
 		const char* sample = "X !=_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -133,14 +130,124 @@ TEST_SUITE("z3_solve simple") {
 	}
 
 	TEST_CASE("variable") {
-		const char* sample = "X + Y =_ 1";
+		const char* sample = "X =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
 		auto solution = solve_z3(equation);
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
-	}*/
+	}
+
+	TEST_CASE("z3_neg") {
+		const char* sample = "~X =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_add") {
+		const char* sample = "X + 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_sub") {
+		const char* sample = "X - 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_mul") {
+		const char* sample = "X * 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_div") {
+		const char* sample = "X / 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_mod") {
+		const char* sample = "X % 2 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_and") {
+		const char* sample = "X & 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_or") {
+		const char* sample = "X | 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_xor") {
+		const char* sample = "X (+) 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_left_shift") {
+		const char* sample = "X << 1 =_ 2";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_shift_right") {
+		const char* sample = "X >> 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
 }
 
 TEST_SUITE("complex solve_z3") {
