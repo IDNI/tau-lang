@@ -542,7 +542,7 @@ bf(a, b, x) := ax | bx'
 while sample predicate definitions are
 ```
 bottom(x) := x = 0
-atom(x) := ex y y < x && y != 0
+not_atom(x) := ex y y < x && y != 0
 chain(x,y,z) := x < y < z  
 ```
 
@@ -1057,10 +1057,9 @@ expression with respect to the given variable.
 
 ## **Specification execution**
 
-Finally, you can run the given specification once you have defined the IO
-variables as you need. The syntax of the commands is:
+Finally, you can run a given Tau specification. The syntax for the commands is:
 
-* `run|r <repl_memory|tau>`: runs the given specification.
+* `run|r <repl_memory|tau>`: runs the given Tau specification.
 
 # **The Theory behind the Tau Language**
 
