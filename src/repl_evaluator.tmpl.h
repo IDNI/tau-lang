@@ -664,9 +664,14 @@ void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	// if the  form is a z3 formula call z3
-	//if (auto check = find_top(n, is_non_terminal<tau_parser::z3, BAs...>); check) {
-	//	solve_z3(n);
-	//}
+	if (holds_node(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>)) {
+		auto equations = n->child.back();
+		auto solution = solve_z3(equations);
+		if (!solution) { std::cout << "no solution\n"; return; }
+		else print_solver_cmd_solution(solution);
+		return;
+	}
+
 	// getting the type
 	auto type = get_solver_cmd_type(n);
 	if (!type) return;
@@ -691,8 +696,6 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 
 		auto solution = solve<tau_ba_t, BAs...>(applied, options);
 		if (!solution) { std::cout << "no solution\n"; return; }
-		auto vars = select_top(equations,
-			is_child_non_terminal<tau_parser::variable,tau_ba<BAs...>, BAs...>);
 		print_solver_cmd_solution(solution, options);
 		return;
 	}

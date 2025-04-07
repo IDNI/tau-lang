@@ -14,7 +14,7 @@ using namespace boost::log;
 
 namespace testing = doctest;
 
-TEST_SUITE("z3_solve") {
+TEST_SUITE("sample z3 programs") {
 
 	TEST_CASE("sample") {
 		context c;
@@ -22,27 +22,36 @@ TEST_SUITE("z3_solve") {
 		expr y = c.bv_const("y", 32);
 		solver s(c);
 		// In C++, the operator == has higher precedence than ^.
-		s.add((x + y) == 1);
+		s.add(((x * y) == 4) && (x  == 2));
 		std::cout << s << "\n";
 		std::cout << s.check() << "\n";
 		std::cout << s.get_model() << "\n";
 		std::cout << s.get_model().eval(x) << "\n";
 		std::cout << s.get_model().eval(y) << "\n";
 	}
+}
 
-	TEST_CASE("X =_ X") {
-		const char* sample = "X =_ X";
+TEST_SUITE("z3_solve simple") {
+
+	TEST_CASE("logging") {
+		core::get()->set_filter(trivial::severity >= trivial::trace);
+		add_console_log(std::cout, keywords::format =
+			expressions::stream << expressions::smessage);
+	}
+
+	TEST_CASE("X =_ 1") {
+		const char* sample = "X =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
 		auto solution = solve_z3(equation);
-		for (const auto& v: solution.value().second) {
-			std::cout << solution.value().first.eval(v) << "\n";
-		}
+	//	for (const auto& v: solution.value().second) {
+	//		std::cout << solution.value().first.eval(v) << "\n";
+	//	}
 		CHECK( solution.has_value() );
 	}
 
-	TEST_CASE("X !=_ X") {
+/*	TEST_CASE("X !=_ X") {
 		const char* sample = "X !=_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -123,8 +132,7 @@ TEST_SUITE("z3_solve") {
 		CHECK( solution.has_value() );
 	}
 
-
-	/*TEST_CASE("variable") {
+	TEST_CASE("variable") {
 		const char* sample = "X + Y =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -133,4 +141,19 @@ TEST_SUITE("z3_solve") {
 		CHECK( solution.has_value() );
 		CHECK( solution.value().size() == 1 );
 	}*/
+}
+
+TEST_SUITE("complex solve_z3") {
+
+	TEST_CASE("(x * y =_ 2) && (x =_ 2)") {
+		const char* sample = "x * y =_ 2 && x =_ 3";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+	//	for (const auto& v: solution.value().second) {
+	//		std::cout << solution.value().first.eval(v) << "\n";
+	//	}
+		CHECK( solution.has_value() );
+	}
 }

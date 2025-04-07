@@ -8,9 +8,6 @@
 namespace idni::tau_lang {
 
 template<typename...BAs>
-using z3_solution = std::pair<z3::model, z3::expr_vector>;
-
-template<typename...BAs>
 using var = tau<BAs...>;
 
 template<typename...BAs>
@@ -20,7 +17,7 @@ template <typename...BAs>
 std::optional<z3::expr> eval_z3(const tau<BAs...>& form, z3::context& ctx, std::map<tau<BAs...>, z3::expr>& vars);
 
 template<typename...BAs>
-std::optional<z3_solution<BAs...>> solve_z3(const tau<BAs...>& form);
+std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form);
 
 } // namespace idni::tau_lang
 
