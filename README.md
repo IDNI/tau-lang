@@ -68,6 +68,10 @@ For viewing known issues, future work and how to submit issues, [click here](#kn
 
 For visiting the theory behind the Tau Language [click here](#the-theory-behind-the-tau-language).
 
+Please note that the Tau language is work in progress. Releases are currently in an alpha state
+and can contain bugs. See the [submitting issues](#submitting-issues) section if you want to submit a report.
+All features discussed below in this readme are available but can have performance issues.
+
 
 # **Installing the Tau Language Framework**
 
@@ -1080,15 +1084,20 @@ This is a short list of known issues that will be fixed in a subsequent release:
   into account leading to later blow ups.
 * Minor errors in Windows REPL
 
+
 # **Future work**
 
-* Add support for redefinition of recurrence relations.
-* Add support for arbitrary names for IO variables.
-* Improve the performance of normalization of Boolean functions.
+* Enabling modular arithmatic using fixed width bitvectors in Tau specifications
+* Enabling efficient data storage and manipulation in Tau specifications using Boolean functions
+* Overcoming performance issues during normalization of formulas and satisfiability checking of Tau specifications
+* Add support for redefinitions of functions or predicates.
+* Add support for arbitrary stream names.
+* Improve the performance of Boolean function normalization.
+
 
 # **Submitting issues**
 
-Submit issues at the following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
+Please submit issues at the following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
 
 # **License**
 
