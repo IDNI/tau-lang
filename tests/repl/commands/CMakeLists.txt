@@ -14,6 +14,7 @@ include(test_repl-definition_cmd.cmake)
 include(test_repl-qelim_cmd.cmake)
 include(test_repl-normal_forms_cmd.cmake)
 include(test_repl-normalize_cmd.cmake)
+include(test_repl-solver_cmd.cmake)
 
 # TODO (HIGH) add tests for help definition,...
 # TODO (VERY_HIGH) add tests for normalize command
