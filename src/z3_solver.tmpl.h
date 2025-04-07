@@ -145,12 +145,12 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars)
 			case tau_parser::z3_and: {
 				auto l = eval_z3(form->child[0], vars);
 				auto r = eval_z3(form->child[1], vars);
-				return l && r;
+				return l & r;
 			}
 			case tau_parser::z3_or: {
 				auto l = eval_z3(form->child[0], vars);
 				auto r = eval_z3(form->child[1], vars);
-				return l || r;
+				return l | r;
 			}
 			case tau_parser::z3_xor: {
 				auto l = eval_z3(form->child[0], vars);
