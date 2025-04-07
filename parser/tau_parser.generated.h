@@ -701,8 +701,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(195), (nul));
 //G282: bitvector(191)       => num(188) __E_bitvector_81(195).
 	p(NT(191), (NT(188)+NT(195)));
-//G283: __E_bitvector_type_82(196) => _(11) ':' _(11) '[' _(11) num(188) _(11) ']'.
-	p(NT(196), (NT(11)+T(2)+NT(11)+T(24)+NT(11)+NT(188)+NT(11)+T(25)));
+//G283: __E_bitvector_type_82(196) => _(11) ':' _(11) num(188) _(11).
+	p(NT(196), (NT(11)+T(2)+NT(11)+NT(188)+NT(11)));
 //G284: type(150)            => __E_bitvector_type_82(196).
 	p(NT(150), (NT(196)));
 //G285: bitvector_type(194)  => type(150).

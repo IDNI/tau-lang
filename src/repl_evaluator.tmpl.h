@@ -664,7 +664,7 @@ void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	// if the  form is a z3 formula call z3
-	if (holds_node(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>)) {
+	if (auto check = find_top(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>); check) {
 		auto equations = n->child.back();
 		auto solution = solve_z3(equations);
 		if (!solution) { std::cout << "no solution\n"; return; }

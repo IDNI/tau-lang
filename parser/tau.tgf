@@ -126,7 +126,7 @@ z3                     => ('(' _ z3 _ ')')                   :z3_parenthesis
 # z3 constants
 bitvector              => bits [_ bitvector_type]
                         | num [ _ bitvector_type].
-bitvector_type        => ( _ ':' _ '[' _ num _ ']' ):type.
+bitvector_type        => ( _ ':' _ num _ ):type.
 bits                  => bit (bit)* 'b'.
 bit                   => '0' | '1'.
 

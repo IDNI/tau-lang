@@ -1085,13 +1085,14 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 	if (is_z3_node(n.child[0])) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	// apply numerical simplifications
 	using p = tau_parser;
-	// get bitvector size
-	size_t size = n.child.size() == 2
-		? n.child[1]
-			| only_child_extractor<BAs...>
-			| size_t_extractor<BAs...>
-			| optional_value_extractor<size_t>
-		: sizeof(size_t) * 8;
+	// get bitvector size, just 32 bits for now
+	// size_t size = n.child.size() == 2
+	//	? n.child[1]
+	//		| only_child_extractor<BAs...>
+	//		| size_t_extractor<BAs...>
+	//		| optional_value_extractor<size_t>
+	//	: sizeof(size_t) * 8;
+	size_t size = sizeof(size_t) * 8;
 	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
 	tau<BAs...> bvn;
 	switch (get_non_terminal_node(n.child[0])) {

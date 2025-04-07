@@ -20,16 +20,7 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars)
 			// due to hooks we should consider wff_t or bf_t
 			case tau_parser::wff:
 			case tau_parser::z3: {
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " eval_z3/z3_wff/form: " << form;
-				#endif // DEBUG
 				auto expr = eval_z3(form->child[0], vars);
-				//return eval_z3(form->child[0], vars);
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<<  "solver.tmpl.h:" << __LINE__ << " eval_z3/z3_wff/expr: " << expr;
-				#endif // DEBUG
 				return expr;
 			}
 			case tau_parser::wff_neg: {
@@ -66,18 +57,10 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars)
 			case tau_parser::variable: {
 				// check if the variable is alr
 				if (auto it = vars.find(form); it != vars.end()) return it->second;
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " eval_z3/variable/form: " << form;
-				#endif // DEBUG
 				auto v = make_string(tau_node_terminal_extractor<BAs...>, form);
 				// create a new constant according to the type and added to the map
 				auto x = z3_context.bv_const(v.c_str(), sizeof(size_t) * 8);
 				vars.emplace(form, x);
-				#ifdef DEBUG
-				BOOST_LOG_TRIVIAL(trace)
-					<<  "solver.tmpl.h:" << __LINE__ << " eval_z3/variable/x: " << x;
-				#endif // DEBUG
 				return x;
 			}
 			case tau_parser::z3_eq: {
@@ -189,19 +172,8 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars)
 				return l.rotate_right(ul);
 			}
 			case tau_parser::bitvector: {
-				#ifdef DEBUG
-				print_tau_tree(std::cout, form);
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " eval_z3/bitvector/form: " << form;
-				#endif // DEBUG
 				auto expr = std::get<z3::expr>(form->child[0]->value);
-				#ifdef DEBUG
-				print_tau_tree(std::cout, form);
-				BOOST_LOG_TRIVIAL(trace)
-					<< "solver.tmpl.h:" << __LINE__ << " eval_z3/bitvector/expr: " << form;
-				#endif // DEBUG
 				return expr;
-				// return std::get<z3::expr>(form->child[0]->value);
 			}
 			default: {
 				std::cout << "Unknown node type: " << nt << "\n";
