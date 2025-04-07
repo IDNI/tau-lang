@@ -1,0 +1,24 @@
+# To run it you need to compile the project using release.sh (customized with
+# your settings if needed) and then execute the run.sh whithin the demo directory
+# as follows:
+#
+# ./run.sh demo_2.4-solver_z3.tau
+#
+# This demo should work under any *nix flavour due to the paths used for files.
+# To run it under windows you will need to change the paths to the files.
+
+# First of all, let us clarify that Z3 is used only in order to support the
+# theory of bitvectors within the language. The core language and its algorithms
+# are independent of Z3.
+
+# For the time been, bitvectors are restricted to 32-bit size to just allos
+# basic operations. In the future, the size will be variable to allow more
+# complex encodings.
+
+# Let us demonstrate the workings of the z3 solver part in the Tau lanmguage.
+
+# As first example, let us consider a simple linear equation:
+solve x + y =_ 1
+
+# Let us also go with a simple non-linear equation
+solve x * y =_ 512 && x =_ 8
