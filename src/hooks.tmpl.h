@@ -1082,6 +1082,7 @@ tau<BAs...> make_node_hook_shift(const rewriter::node<tau_sym<BAs...>>& n) {
 
 template <typename... BAs>
 tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
+	if (is_z3_node(n.child[0])) return std::make_shared<rewriter::node<tau_sym<BAs...>>>(n);
 	// apply numerical simplifications
 	using p = tau_parser;
 	// get bitvector size
@@ -1092,21 +1093,28 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 			| optional_value_extractor<size_t>
 		: sizeof(size_t);
 	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
+	tau<BAs...> bvn;
 	switch (get_non_terminal_node(n.child[0])) {
 		case p::num : {
 			int64_t ull = std::stoull(value);
 			auto bv = z3_context.bv_val(ull, size);
-			return make_node<tau_sym<BAs...>>(bv, {});
+			bvn = make_node<tau_sym<BAs...>>(bv, {});
+			break;
 		}
 		case p::bits : {
 			value.pop_back();
 			auto bv = z3_context.bv_val(value.c_str(), size);
-			return make_node<tau_sym<BAs...>>(bv, {});
+			bvn = make_node<tau_sym<BAs...>>(bv, {});
+			break;
 		}
 		default: {
 			assert(false);
 		}
 	}
+	std::vector<tau<BAs...>> v{bvn};
+	if (n.child.size() == 2) v.emplace_back(n.child[1]);
+	return std::make_shared<rewriter::node<tau_sym<BAs...>>>(
+		tau_parser::instance().literal(p::bitvector), v);
 }
 
 template <typename...BAs>

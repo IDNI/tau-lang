@@ -4,7 +4,6 @@
 #define __QUERIES_H__
 
 #include "nso_rr.h"
-
 namespace idni::tau_lang {
 
 template <typename... BAs>
@@ -18,6 +17,21 @@ template <typename... BAs>
 bool is_non_terminal_node(const tau_sym<BAs...>& s) {
 	return std::holds_alternative<tau_source_sym>(s)
 		&& get<tau_source_sym>(s).nt();
+}
+
+template <typename... BAs>
+bool is_z3_node(const tau_sym<BAs...>& s) {
+	return std::holds_alternative<z3::expr>(s);
+}
+
+template <typename... BAs>
+bool is_z3_node(const rewriter::node<tau_sym<BAs...>>& s) {
+	return is_z3_node(s.value);
+}
+
+template <typename... BAs>
+bool is_z3_node(const tau<BAs...>& n) {
+	return is_z3_node<BAs...>(n->value);
 }
 
 // check if a node is a non terminal node

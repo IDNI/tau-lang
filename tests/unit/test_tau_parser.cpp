@@ -1172,7 +1172,9 @@ TEST_SUITE("parsing z3 expressions") {
 		const char* sample = "1234";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::z3 });
-		auto expr = make_statement(src);
+		auto expr = make_statement(src)
+			| tau_parser::bitvector
+			| optional_value_extractor<tau<Bool>>;
 		auto check = expr->child[0]->value;
 		CHECK( std::holds_alternative<z3::expr>(check) );
 	}
@@ -1181,7 +1183,9 @@ TEST_SUITE("parsing z3 expressions") {
 		const char* sample = "01010101b";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::z3 });
-		auto expr = make_statement(src);
+		auto expr = make_statement(src)
+			| tau_parser::bitvector
+			| optional_value_extractor<tau<Bool>>;
 		auto check = expr->child[0]-> value;
 		CHECK( std::holds_alternative<z3::expr>(check) );
 	}
