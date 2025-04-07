@@ -97,6 +97,8 @@ A macOS installer will be available in the future.
 To compile the source code you need a recent C++ compiler supporting C++23, e.g.
 GCC 13.1.0. You also need at least cmake version 3.22.1 installed in your system.
 The only code dependencies are the Boost C++ Libraries (libboost) and the Z3 SMT Solver (libz3-dev).
+Z3 is used only in order to support the theory of bitvectors within the language.
+The core language and its algorithms are independent of Z3.
 
 After cloning:
 
