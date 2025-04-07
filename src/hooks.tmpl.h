@@ -1091,7 +1091,7 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 			| only_child_extractor<BAs...>
 			| size_t_extractor<BAs...>
 			| optional_value_extractor<size_t>
-		: sizeof(size_t);
+		: sizeof(size_t) * 8;
 	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
 	tau<BAs...> bvn;
 	switch (get_non_terminal_node(n.child[0])) {

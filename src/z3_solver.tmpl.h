@@ -50,7 +50,7 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars)
 				if (auto it = vars.find(form); it != vars.end()) return it-> second;
 				auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
 				auto f = eval_z3(form->child[1], vars);
-				auto x = z3_context.bv_const(vn.c_str(), sizeof(size_t));
+				auto x = z3_context.bv_const(vn.c_str(), sizeof(size_t) * 8);
 				vars.emplace(v, x);
 				return forall(x, f);
 			}
@@ -59,7 +59,7 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars)
 				if (auto it = vars.find(form); it != vars.end()) return it-> second;
 				auto vn = make_string(tau_node_terminal_extractor<BAs...>, v);
 				auto f = eval_z3(form->child[1], vars);
-				auto x = z3_context.bv_const(vn.c_str(), sizeof(size_t));
+				auto x = z3_context.bv_const(vn.c_str(), sizeof(size_t) * 8);
 				vars.emplace(v, x);
 				return exists(x, f);
 			}
@@ -72,7 +72,7 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars)
 				#endif // DEBUG
 				auto v = make_string(tau_node_terminal_extractor<BAs...>, form);
 				// create a new constant according to the type and added to the map
-				auto x = z3_context.bv_const(v.c_str(), sizeof(size_t));
+				auto x = z3_context.bv_const(v.c_str(), sizeof(size_t) * 8);
 				vars.emplace(form, x);
 				#ifdef DEBUG
 				BOOST_LOG_TRIVIAL(trace)
