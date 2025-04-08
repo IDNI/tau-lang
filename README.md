@@ -2,27 +2,29 @@
 
 | Build type | Status                                                                                     |
 |------------|--------------------------------------------------------------------------------------------|
-| Release    | ![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/release.yml/badge.svg) |
-| Debug      | ![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/debug.yml/badge.svg)     |
+| Release    | ![Release Build](https://github.com/IDNI/tau-lang/actions/workflows/test-release.yml/badge.svg) |
+| Debug      | ![Debug Build](https://github.com/IDNI/tau-lang/actions/workflows/test-debug.yml/badge.svg)     |
 
 # Table of contents
 
 1. [Introduction](#introduction)
-2. [Installing the Tau Framework](#installing-the-tau-framework)
+2. [Installing the Tau Language Framework](#installing-the-tau-language-framework)
 	1. [Linux](#linux)
-	2. [Windows](#windows-users)
-	3. [MacOS (not available yet)](#macos-users)
+	2. [Windows](#windows)
+	3. [MacOS (not available yet)](#macos-not-available-yet)
 	2. [Compiling the source code](#compiling-the-source-code)
 3. [Quick start](#quick-start)
 4. [The Tau Language](#the-tau-language)
-	1. [Constants](#constants)
-	2. [Variables](#variables-variables-variables)
-	3. [Boolean functions](#boolean-functions)
-	4. [Tau formulas](#tau-formulas)
-	5. [Functions and predicates](#functions-and-predicates)
-	6. [Tau specifications](#tau-specifications)
-	7. [Reserved symbols](#reserved-symbols)
-5. [Command line options](#command-line-options)
+    1. [Tau specifications](#tau-specifications)
+    2. [Satisfiability and execution](#satisfiability-and-execution)
+    3. [Boolean functions](#boolean-functions)
+    4. [Functions and predicates](#functions-and-predicates)
+    5. [Constants](#constants)
+    6. [Streams](#streams) 
+    7. [Variables and uninterpreted constants](#variables-and-uninterpreted-constants)
+    8. [Pointwise revision](#pointwise-revision) 
+    9. [Reserved symbols](#reserved-symbols)
+5. [Command line interface](#command-line-interface)
 6. [The Tau REPL](#the-tau-repl)
 	1. [Basic REPL commands](#basic-repl-commands)
 	2. [REPL options](#repl-options)
@@ -42,32 +44,40 @@
 
 # **Introduction**
 
-Tau language is an expressive and decidable formal software specification
-language. It allows you to write software constraints and requirements, check
-for satisfiability, and accurately synthesize a program that meets your
-specification.
+The Tau language is an expressive, decidable and executable formal software specification
+language. It allows for specifying software using requirements and constraints in a purely
+logical and declarative approach.
+Tau specifications can be checked for satisfiability, effectively deciding if there exists a program
+matching the specification. Furthermore, the Tau framework
+is able to synthesize a program adhering to a satisfiable specification.
 
-Imagine programming by writing only tests, and getting a working program that
-passes all the tests, thus meeting all your requirements.
+Imagine programming by writing the tests only, while getting a working program automatically which
+is guaranteed to pass all the tests, thus meeting all the specified requirements.
 
-You can specify programs capable of mechanized deductive reasoning over
-specifications and programs built in Tau Language, and accurately adapt them to
-meet requirements, which is useful for collaborative specification, maintenance,
+A unique feature of the Tau language is the ability to specify programs capable of mechanized
+deductive reasoning over Tau specifications themselves. This allows for a controlled adaption of new
+requirements because the requirements for the requirements can be taken into account,
+which is useful for collaborative specification, maintenance,
 updates, safety and user control.
 
-Skip to the quick start [click here](#quick-start).
+To go to the quick start [click here](#quick-start).
 
-Skip to the installation guide [click here](#installing-the-tau-language).
+To go to the installation guide [click here](#installing-the-tau-language-framework).
 
-Known issues, future work and how to submit issues, [click here](#quick-start).
+For viewing known issues, future work and how to submit issues, [click here](#known-issues).
 
-For the theory behind Tau Language [click here](#quick-start).
+For visiting the theory behind the Tau Language [click here](#the-theory-behind-the-tau-language).
+
+Please note that the Tau language is work in progress. Releases are currently in an alpha state
+and can contain bugs. See the [submitting issues](#submitting-issues) section if you want to submit a report.
+All features discussed below in this readme are available but can have performance issues.
+
 
 # **Installing the Tau Language Framework**
 
 ## **Linux**
 
-Currently we automatically build the following binaries packages (AMD64 architecture):
+Currently, we automatically build the following binaries packages (AMD64 architecture):
 
 * deb (Debian/Ubuntu): [tau-0.7-Linux.deb](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.deb)
 * rpm (Fedora): [tau-0.7-Linux.rpm](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-Linux.rpm)
@@ -76,7 +86,7 @@ The executable is installed in `/usr/bin/tau`.
 
 ## **Windows**
 
-For windows we provide a convenient installer that includes the tau executable
+For windows, we provide a convenient installer that includes the tau executable
 and also a zip file:
 
 * Installer: [tau-0.7-win64.exe](https://github.com/IDNI/tau-lang/releases/download/v0.7-alpha/tau-0.7-win64.exe)
@@ -89,8 +99,10 @@ A macOS installer will be available in the future.
 ## **Compiling the source code**
 
 To compile the source code you need a recent C++ compiler supporting C++23, e.g.
-GCC 13.1.0. You also need at least a cmake version 3.22.1 installed in your system.
-The only code dependencies are Boost C++ Libraries (libboost) an Z3 SMT Solver (libz3-dev).
+GCC 13.1.0. You also need at least cmake version 3.22.1 installed in your system.
+The only code dependencies are the Boost C++ Libraries (libboost) and the Z3 SMT Solver (libz3-dev).
+Z3 is used only in order to support the theory of bitvectors within the language.
+The core language and its algorithms are independent of Z3.
 
 After cloning:
 
@@ -116,24 +128,26 @@ Once you have compiled the source code you can run the `tau` executable to
 execute Tau specifications. The `tau` executable is located in either `build-Release`
 or `build-Debug` or `build-RelWithDebInfo`.
 
+
 # **Quick start**
 
 To start using the Tau Language, download the latest release from the
 [GitHub page](https://github.com/IDNI/tau-lang/releases/tag/v0.7-alpha). Once
 you have downloaded and installed the executable (see the Section
-[Installing the Tau Framework](#installing-the-tau-framework)), you can run
+[Installing the Tau Framework](#installing-the-tau-language-framework)), you can run
 it from the command line by typing `tau`.
 
 The programming model underlying the Tau Language is fully declarative. You
 specify, possibly only very implicitly, how the current and previous inputs and
-outputs are related, at each point of time. So what you write in the Tau Language
-is not a program, but a specification, or spec, which represents all programs that
-meet the specification. Once you run a specification, you actually run one
+outputs are related, at each point of time. As a result, you do not write a program 
+in the Tau Language, but a specification which effectively represents all programs that
+meet this specification. Once you run a specification, you actually run one
 automatically-chosen representative program from that set.
 
-In the scope of the Tau Language, a specification means that for all inputs, at each
-point in time, exist outputs, that clearly do not depend on future inputs
-("time-compatible"). Implied from this definition is that all specifications run
+In the scope of the Tau Language, a specification is [satisfiable](#satisfiability-and-execution), 
+loosely speaking, if for all inputs, at each point in time, there exist outputs, 
+that do not depend on future inputs while matching the specification. 
+Implied from this definition is that all specifications run
 indefinitely no matter what the inputs are.
 
 For example, the following specification:
@@ -142,19 +156,19 @@ For example, the following specification:
 o1[t] = 0
 ```
 
-states that the output `o1` at all time points (`t`) has to be `0`. Similarly the
+states that the output `o1` at all time points `t` has to be `0`. Similarly, the
 following specification:
 
 ```
 o1[t] = i1[t]
 ```
 
-states that the output `o1` at time `t` has to be the same as the input
-`i1` at time `t`.
-In the above examples, `o1` and `i1` are IO variables. They are used to define
-the inputs and outputs of the specified specifications and also declare their type.
+states that the output `o1` has to be the same as the input
+`i1` at all time points `t`.
+In the above examples, `o1` and `i1` are [streams](#streams). They are used to define
+the inputs and outputs of the specification.
 
-An example of how to define IO variables is the following:
+An example of how to define input and output streams is the following:
 
 ```
 tau i1 = console
@@ -162,29 +176,31 @@ tau o1 = console
 ```
 
 In the above case we specify that `i1` and `o1` are of type `tau`, namely that
-they are Tau formulas, and they take values from the console (e.g. stdin/stdout).
-Type actually means which Boolean algebra the values come from. It is a unique
-property of the Tau langauge that it can refer to its own sentences, abstracted
-as Boolean algebra elements.
+they are Tau specifications, and they take values from the console (e.g. stdin/stdout).
+The type defines from which Boolean algebra the values come from. The `tau` type is a unique
+property of the Tau langauge because it enables Tau specifications to reason over 
+Tau specifications themselves abstracted as Boolean algebra elements.
 
-You can also define files as IO streams:
+You can also define files as input or output streams:
 
 ```
 tau i1 = ifile("input.in")
 tau o1 = ofile("output.out")
 ```
 
-Back to the above two examples, the one where the output is always zero and the
-one where it equals the input, those Tau specs define only one specification each
-(there's a caveat in this statement but we shall treat it later on). An example
-of a Tau spec that specifies infinitely many programs would be:
+The above two examples, `o1[t] = 0` and `o1[t] = i1[t]`, define one program each
+(there's a caveat in this statement, but we shall ignore it here). This is not
+always the case. An example
+of a Tau specification that specifies infinitely many programs is
 
 ```
 o1[t] & i1[t] = 0
 ```
+because many different assignments to `o1[t]` can be chosen as valid output. Each choice
+represents one program.
+Here `&` denotes conjunction in the Boolean algebra from which the inputs and outputs
+are taken from. This specification says that the conjunction has to be empty.
 
-Here `&` is conjunction in the Boolean algebra from which the inputs and outputs
-are taken from. This spec says that the conjunction has to be empty.
 Clearly, you can consider more complicated specifications, e.g.:
 
 ```
@@ -193,20 +209,22 @@ o1[t] & o1[t-1] & i1[t] = 0 || o1[t] = i1[t]
 
 which states that at each point in time, either the conjunction of the current
 output with the previous output and with the current input, has to be 0, or, the
-output has to equal the input. Note the difference between Boolean (algebraic
-operations) and Logical operators. The former are &|', and the latter are &&,||,!.
+output has to equal the input. Note the difference between [Boolean (algebraic
+operations)](#boolean-functions) and [Logical operators](#tau-specifications) . 
+The former are `&, |, '`, and the latter are `&&, ||, !`.
 
 In order to simplify the process of writing and running Tau specifications, we allow
-to define functions and predicates, possibly by means of recurrence relations.
+[function and predicate definitions](#functions-and-predicates), 
+possibly by means of recurrence relations.
 The following is a simple predicate defined by a recurrence relation,
-which takes as argument a Tau formula:
+which takes as argument a Tau term:
 
 ```
 f[0](y) := T
 f[n](y) := f[n - 1](y)
 ```
 
-which you can use in your spec as follows:
+which you can use in your specification as follows:
 
 ```
 o1[t] = 0 && f(i1[t])
@@ -219,7 +237,7 @@ g[0](y) := 0
 g[n](y) := g[n](y)'
 ```
 
-which defines a function (rather a predicate) and alternates between 0 and 1
+which defines a function (rather than a predicate) and alternates between 0 and 1
 depending on the parity of n.
 
 In the [demos](https://github.com/IDNI/tau-lang/tree/main/demos) folder you
@@ -228,15 +246,28 @@ and workings.
 
 # **The Tau Language**
 
-In the Tau Language you define how the current and previous inputs and outputs
-are related over time, using the first-order theory of atomless Boolean algebras
-extended with a time dimension. For example you can write `o1[t] & o1[t-1] & i1[t] = 0`
-which would mean that the current output, and the previous output, and the current input,
+The core idea of the Tau Language is to specify how current and previous inputs and outputs of a program
+are related over time, using the first-order theory of finite and infinite atomless Boolean algebras
+extended with a time dimension, represented by the natural numbers starting at 0. It was carefully crafted around being purely logical,
+allowing efficient and decidable satisfiability checking, while being executable,
+yielding a framework to enable program synthesis.
+
+For example, you can write `o1[t] & o1[t-1] & i1[t] = 0`
+which means that the current output `o1[t]`, the previous output `o1[t-1]`, and the current input `i1[t]`,
 have to have an empty intersection. The set-theoretic perspective of Boolean algebra
-is justfied by Stone's representation theorem for Boolean algebras, but more concretely,
-when a Tau spec is treated as a BA element,
-it can be seen as a set of all programs that admit that spec, and the Boolean
-operations are simply the set-theoretic union/intersection/complementation.
+is given by Stone's representation theorem for Boolean algebras. More concretely,
+when a Tau specification is treated as a Boolean algebra element,
+it can be seen as a set of all programs that admit that specification, and the Boolean
+operations are the set-theoretic union/intersection and complementation.
+
+A key feature is the ability of checking satisfiability of Tau specifications within Tau specifications
+using the theory of Boolean equations and an abstraction of specifications to Boolean algebra elements.
+This enables, in particular, a novel approach to software updates. A specification which is currently  
+executed, can take as an input an arbitrary new Tau specification, seen as an update, check if the proposed new specification is
+satisfiable and incorporate the update into the existing specification using an operation we call pointwise revision.
+Section [Pointwise revision](#pointwise-revision) provides a more detailed introduction to this feature and how to use it.
+
+The following is a general introduction to using the Tau language.
 
 ## **Tau specifications**
 
@@ -251,19 +282,22 @@ For example a well-formed Tau specification is
 ```
 where *local_spec1* and
 *local_spec2* are formulas as described below.
-We say local specification because a formula `tau` can only talk about a fixed
+We say local specification because such a formula can only talk about a fixed
 (though arbitrary) point in time.
 
-Recall from section [Variables](#variables) that there are input and output
-stream variables. For example the output stream variable `o1[t-2]` means
+In order for a specification to communicate with the outside world, so-called *streams*
+are use. Those streams come in two flavors: input and output streams. Input
+streams are used in a `local_spec` to receive input from a user, while output streams
+are used for presenting output to a user. Each stream in the specification 
+is associated with a relative or constant point in time.
+For example the output stream variable `o1[t-2]` means
 "the value in output stream number 1 two time-steps ago". So `o1[t]` would mean
-"the value in output stream number 1 at the current time-step". Likewise, there
-are input stream variables like `i1[t]`. It means "the input in the input stream
+"the value in output stream number 1 at the current time-step". Likewise, for 
+input stream variables like `i1[t]`. It means "the input in the input stream
 1 at the current time-step". Input streams can also have an offset in order to
 speak about past inputs. For example `i2[t-3]` means "the input in the input
-stream 2 three time-steps ago". As explained in section [Variables](#variables),
-input and output streams currently need to be defined before running a Tau
-specification.
+stream 2 three time-steps ago". For further detail about streams, please refer 
+to section [Streams](#streams).
 
 In all above cases, `t` is a free variable and refers to the current time at
 each point in time. The key point now is that an `always` statement will
@@ -271,7 +305,8 @@ quantify all scoped `t` universally, while a `sometimes` statement will quantify
 them existentially. For example the specification `always o1[t] = 0` says that
 at all time-steps the output stream number 1 will write `0`. Similarly, the
 specification `sometimes o1[t] = 0` says that there exists a time-step at which
-the output stream 1 will write `0`.
+the output stream 1 will write `0`. When executing a Tau specification, the first
+time-step is always 0. 
 
 Formally, the grammar for Tau specifications is
 ```
@@ -282,31 +317,62 @@ where `local_spec` is a formula defined by the rules:
 
 ```
 local_spec => (local_spec "&&" local_spec)
-            | "!" local_spec | (local_spec "^" local_spec)
-            | (local_spec "||" local_spec) | (local_spec "->" local_spec)
-            | (local_spec "<->" local_spec) | (local_spec "?" local_spec ":" local_spec)
-            | (term "=" term) | (term "!=" term) | (term "<" term)
-            | (term "!<" term) | (term "<=" term) | (term "!<=" term)
-            | (term ">" term) | (term "!>" term)
-            | "all" variable local_spec | "ex" variable local_spec
-            | predicate | T | F
+            | ("!" local_spec) 
+            | (local_spec "^" local_spec)
+            | (local_spec "||" local_spec) 
+            | (local_spec "->" local_spec)
+            | (local_spec "<->" local_spec) 
+            | (local_spec "?" local_spec ":" local_spec)
+            | (term "=" term) | (term "!=" term) 
+            | (term "<" term) | (term "!<" term) | (term "<=" term) | (term "!<=" term)
+            | (term ">" term) | (term "!>" term) | (term ">=" term)| (term "!>=" term) |
+            | "all" variable local_spec 
+            | "ex" variable local_spec
+            | predicate 
+            | T | F
 ```
+The naming conventions for `variable` are discussed in [Variables](#variables).
+Furthermore, `term` is discussed in the next section [Boolean functions](#boolean-functions).
+The `predicate` non-terminal in the above grammar describes how
+to add predicate definitions directly into a formula. See the subsection
+[Functions and predicates](#functions-and-predicates) for the
+grammar definition of `predicate`.
+In the REPL ([The Tau REPL](#the-tau-repl)) they
+can be provided as explained in subsection
+[Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables).
+
+The symbols used have the following meaning, where a formula refers to either `local_spec` or `spec`:
+
+| Symbol            | Meaning                                                |
+|-------------------|--------------------------------------------------------|
+| `!`               | negation of formula                                    |
+| `&&`              | conjunction of formulas                                |
+| `^`               | xor of formulas                                        |
+| `\|\|`            | disjunction of formulas                                |
+| `<->`             | equivalence of formulas                                |
+| `<-`              | left-implication of formulas                           |
+| `->`              | right-implication of formulas                          |
+| `ex`              | existential quantification of `variable`               |
+| `all`             | universal quantification of `variable`                 |
+| `... ? ... : ...` | if ... then ... else ...                               |
+| `=`               | standard equality relation in Boolean algebra          |
+| `!=`              | standard inequality relation in Boolean algebra        |
+| `<`               | standard less relation in Boolean algebra              |
+| `!<`              | standard not-less relation in Boolean algebra          |
+| `<=`              | standard less-equal relation in Boolean algebra        |
+| `!<=`             | standard not-less-equal relation in Boolean algebra    |
+| `>`               | standard greater relation in Boolean algebra           |
+| `!>`              | standard not-greater relation in Boolean algebra       |
+| `>=`              | standard greater-equal relation in Boolean algebra     |
+| `!>=`             | standard not-greater-equal relation in Boolean algebra |
 
 The precedence of the logical operators/quantifiers is as follows (from higher
 precedence to lower):
 `!` > `&&` > `^` > `||` > `<->` > `<-` > `->` > `ex ... ...` > `all ... ...` >
 `... ? ... : ...` > `always ...`> `sometimes ...`.
 
-In order to properly define functions and predicates see Section
-[Functions and Predicates](#functions-and-predicates).
-
 A Tau specification without a mentioning of "always" or "sometimes" is implicitly
-assumed to be an "always" statement. The `rr` in the above grammar describes how
-to add function and predicate definitions directly to the formula. In REPL they
-can also be provided separately as explained in the Tau REPL subsection
-[Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables).
-See the subsection [Functions and predicates](#functions-and-predicates) for the
-definitions of `tau_rec_relation` and `term_rec_relation`.
+assumed to be an "always" statement. 
 
 Note that instead of writing `always` and `sometimes` you can also use box `[]`
 and diamond `<>`, respectively.
@@ -321,12 +387,89 @@ which reads: at each point of time, the output should be disjoint from the input
 If the input is not 1, then the output is not zero. And, at least once during
 execution, the output equals the complement of the input.
 
+
+## **Satisfiability and execution**
+
+### Satisfiability
+
+The notion of satisfiability in the Tau language is non-standard and conceptually defined in such a way
+that a satisfiable Tau specification can be executed indefinitely regardless of the
+inputs given to the specification. In particular, a specification is unsatisfiable
+if a particular sequence of inputs would result in a contradictory situation.
+
+This notion of satisfiability is achieved by a certain quantification pattern of
+streams, which we call *time-compatability*. More precisely, all input streams are quantified
+universally and all output streams are quantified existentially in such a way that
+1. the ordering of
+   quantifiers is increasing with respect to the time step to which the quantified variable refers and
+2. the outputs always depend on the inputs in a given step.
+
+More informally, we can think of the phrase that _for all input,
+there exists output at each point in time such that the Tau specification
+can be satisfied_ (in the standard sense).
+
+The following example shows the explained quantification pattern for the Tau specification `o1[t] = i1[t] && ( i1[t-2] = 1 -> o2[t-1] = 1 )`:
+``` 
+all i1[t-2] ex o2[t-1] all i1[t] ex o1[t] o1[t] = i1[t] && ( i1[t-2] = 1 -> o2[t-1] = 1 )
+```
+
+This explanation of satisfiability neglects the fact that a contradiction can, in fact, occur only
+after a specification is executed for a certain number of steps. The entire procedure is, hence, (much) more involved.
+Further resources concerning the details can be found in the [theory section](#the-theory-behind-the-tau-language).
+
+### Execution
+
+We have talked about the execution of a Tau specification. Here we want to
+explain in more detail what that means. In general, the execution of Tau specification
+is about receiving values for the input streams from a source and to produce values
+for the output streams in accordance with the specification.
+In this fashion, a Tau specification is started at time step 0. 
+In each consecutive step the time step is incremented by 1. As a result, we get a
+continues timeline starting at 0 and ending at however far the specification has
+been executed.
+
+Take for a minimal example the specification `always o1[t] = i1[t]`, 
+saying that at each time step `t`, the input `i1` is equal to the output `o1`.
+Executing this specification means to start at `t := 0`. Hence, in the first step
+during execution we have `o1[0] = i1[0]`. The value for `i1[0]` is then requested, 
+let's call it `v`.
+After the value is received, `i1[0]` is replaced with `v`, yielding `o1[0] = v`.
+At this point the specification has as only stream the output `o1[0]` remaining and, 
+hence, can be passed to an internal solver
+to get a value for `o1[0]`, matching the specification. In this case this is easy, since
+it is immediate that `o1[0]` has to be `v` as well.
+Outputting the result for `o1[0]` then concludes the first step of execution. We then move
+to the next step being `t := 1`, which yields `o1[1] = i1[1]` for the specification. The steps
+above are now repeated such that at the end of the step, the value for `o1[1]` is outputted. 
+In the same fashion execution can now be continued as long as desired.
+
+For more complicated specifications the main steps stay the same:
+1. Execution is started at `t := 0`
+2. The inputs are requested (if present)
+3. The outputs are produced according to the specification after the received inputs 
+have been plugged in
+4. The time step `t` is incremented by 1 and execution continues from point 2. above
+
+Note that before a Tau specification is executed, it is checked for satisfiability in the sense
+that it can be executed indefinitely as described above. During this process the specification
+is also converted to what we call _unbounded continuation_ which essentially adds all implicit
+assumptions from a specification ensuring that the solutions for output stream values
+do not make the execution contradictory in a future step.
+
+It is not always the case that the values which can be assigned to outputs are unique.
+For this reason, a single specification can give rise to a multitude of different programs
+differing in the choices made for assignments. As a result, during execution only 
+one of possibly many program is executed. The execution process in Tau, however, 
+is fully deterministic, so that the same program is always chosen for the same specification.
+
+
 ## **Boolean functions**
 
-One of the key ingredients of the Tau Language are the Boolean functions
-(Boolean combinations of variables, and constants over some chosen atomless (or
-finite -to be develop-) Boolean algebra and variables).They are given by the
-following grammar:
+One of the key ingredients of the Tau Language are Boolean functions build from
+Boolean combinations of variables, streams and constants over some fixed atomless (or
+finite -to be developed-) Boolean algebra. In particular, each Boolean
+function has a unique type being this chosen Boolean algebra.
+They are given by the following grammar:
 
 ```
 term => (term "&" term) | term "'"
@@ -338,32 +481,36 @@ term => (term "&" term) | term "'"
 
 where
 
-* `term` stands for a well formed sub-formula and the operators `&`, `'`,
-`+` (or equivallentli `^`) and `|` stand for conjunction, negation, exclusive-or
-and disjunction (respectively).
-* `function` is  a call to the given recurrence relation (see the Subsection
+* `term` stands for a well-formed subformula representing a Boolean function and the operators `&`, `'`,
+`+` (or equivalently `^`) and `|` respectively stand for conjunction, negation, exclusive-or
+and disjunction,
+* `function` is the non-terminal symbol used to incorporate function definitions (see the subsection
 [Functions and Predicates](#functions-and-predicates)),
-* `constant` stands for an element of the Boolean algebras (see Subsection
-[Constants](#constants) for details),
-* `uninterpreted_constant` stands for an uninterpreted constant of the Boolean
-algebra, they are assumed to be existentially quantified in the context of the
-formula. The syntax is a follows:
+* `constant` stands for an element from an available Boolean algebra. The type of the constant
+determines the type of the Boolean function (see subsection [Constants](#constants) for details).
+* `uninterpreted_constant` stands for an uninterpreted constant from the fixed Boolean
+algebra, which can be thought of as a variable being existentially quantified from the outside of
+the formula. Its syntax is as follows:
 
 ```
 uninterpreted_constant => "<" [name] ":" name ">"
 ```
 
-* `var` is a variable of type a Boolean algebra element (see Subsection
-[Variables](#variables-variables-variables) for details), `stream_aviable`stands
-for an IO variable, and
-
-* finally, `0` and `1` stands for the given elements in the corresponding Boolean
+* `variable` is a variable over the fixed Boolean algebra (see subsection
+[Variables](#variables) for details), 
+* `stream_variable` represents an input or output 
+stream. The type of a stream also determines the type of the Boolean function (see also subsection [Variables](#variables)) and
+* `0` and `1` stand for the bottom and top element in the fixed Boolean
 algebra.
 
-In this case, the order of the operations is the following (from higher precedence
-to lower): `'` > `&` > `+` (equivallently > `^`) > `|`.
+The order of the operations is the following (from higher precedence
+to lower): `'` > `&` > `+` (equivalently > `^`) > `|`.
 
-For example, the following is a valid expression in terms of a Boolean function:
+If no type information is present within a Boolean function, it is assumed to be of the 
+general type `countable atomless Boolean algebra`. Since all such Boolean algebras are
+isomorphic, no particular model is chosen.
+
+For example, the following is a valid Boolean function of general type:
 
 ```
 (x & y | (z ^ 0))
@@ -392,33 +539,77 @@ a variable or a variable minus a positive integer, i.e.:
 index => number | variable | variable "-" number
 ```
 
-Examples of functions and predicates are:
+Simple examples of function definitions are
+```
+union(x, y, z) := x | y | z
+intersection(x, y, z) := x & y & z
+bf(a, b, x) := ax | bx'
+```
+while sample predicate definitions are
+```
+bottom(x) := x = 0
+not_atom(x) := ex y y < x && y != 0
+chain(x,y,z) := x < y < z  
+```
 
+Furthermore, it is supported to define a function or a predicate by means of a
+recurrence relations. Let's see a small example for such a function definition:
 ```
-g[0](Y) := 1.
-g[n](Y) := g[n - 1](Y).
+rotate[0](x,y,z) := x&y | z
+rotate[n](x,y,z) := rotate[n-1](y,z,x)
 ```
+As can be seen `rotate[n](x,y,z)` is defined in terms of `rotate[n-1](y,z,x)`. Together
+with the initial condition `rotate[0](x,y,z)`, `rotate[k](x,y,z)` can be calculated for any positive
+number `k`, and essentially rotates the arguments counterclockwise until reaching `rotate[0](...)`.
 
-or also
+A similar but more complex example for predicates is
+```
+f[0](w,x,y,z) := x & { always o1[t] = 0 } != 0
+f[n](w,x,y,z) := f[n-1](x,y,z,w)
 
+h[0](w,x,y,z) := f[0](w,x,y,z)
+h[n](w,x,y,z) := h[n-1](w,x,y,z) && f[n](w,x,y,z)
 ```
-g[0](Y) := T.
-g[n](Y) := h[n - 1](Y).
-h[0](Y) := F.
-h[n](Y) := g[n - 1](Y).
+As a result, calling `h[3](w,x,y,z)` checks that none of the arguments `w,x,y,z` 
+assumes `sometimes o1[t] != 0`. 
+
+As can be seen, recurrence relations can also refer to other recurrence relations.
+The rule one must follow is that the `index` at the right-hand side of `:=` is not bigger 
+than any `index` on the left. In addition, there must be no circular dependency among the
+recurrence relation definitions in use.
+
+Furthermore, we support the calculation of a fixpoint of a defined recurrence relation during normalization.
+The syntax is to call a defined recurrence relation as 
 ```
+name "(" [ variable ("," variable)* ] ")"
+```
+hence, omitting the `index`. For example, using the recurrence relation `h` from above,
+we can call the fix point by typing into [REPL](#the-tau-repl) `normalize h(x,y,z,w)`.
+Not all recurrence relations have a fixpoint. In this case, by default, `0` is returned for functions and
+`F` for predicates.
+
+It should be noted that recurrence relations in the Tau language are a conservative extension, 
+meaning that they do not add to the general expressiveness.
 
 ## **Constants**
 
-Constants in the Tau Language are elements of the underlying Boolean algebras,
-usually other than `0` and `1` that have a dedicated syntax.
+Constants in the Tau Language are elements of some available Boolean algebra,
+usually different from just `0` and `1`. Constants in a particular Boolean algebra come
+with their own syntax.
 
-In the REPL, we support two Boolean algebras: the Tau Boolean algebra and the
-simple Boolean function algebra. The Tau Boolean algebra is an extensional Boolean
-algebra that encodes Tau specifications over base algebras (in the REPL case we
-only support the simple Boolean functions as base one).
+In the Tau language, we currently support two Boolean algebras, which we also call the base Boolean algebras: 
+1. the Boolean algebra of Tau specifications (also referred to as Tau Boolean algebra)
+2. the Boolean algebra of simple Boolean functions
 
-Thus, in general the syntax for constants is the following:
+Several others are in development, like the Boolean algebra of bitvectors of fixed bit width and
+the Boolean algebra of Boolean (not just simple) functions in general.
+
+The Boolean algebra of Tau specifications is an extensional Boolean
+algebra that encodes Tau specifications over arbitrary available other Boolean algebras. 
+As a result, it is possible to have a Tau specification that itself has a Tau specification
+as a constant, allowing controlled reasoning of Tau specifications over Tau specifications.
+
+Given the available algebras, the general syntax for constants is the following:
 
 ```
 constant => "{" (spec | term) "}" [":" base_boolean_algebra_type]
@@ -430,27 +621,21 @@ where `base_boolean_algebra_type` is given by:
 base_boolean_algebra_type => "tau" | "sbf"
 ```
 
-i.e. we could have a Tau formula seen as a Boolean algebra element (you can omit
-the type, as `tau` is the default type). For example, the following is a valid
+As mentioned, we can have a Tau specification seen as a Boolean algebra element (you can omit
+the type, since `tau` is the default type). For example, the following is a valid
 constant in the Tau Boolean algebra:
 
 ```
 { ex x ex y ex z (x & y | z) = 0 }:tau
 ```
 
-or even
+or even a deeper nesting resulting in
 
 ```
 { { ex x ex y ex z (x & y | z) = 0 }:tau = 0 }:tau
 ```
 
 where `x`, `y` and `z` are variables.
-
-Regarding the simple Boolean function algebra, the syntax is the following:
-
-```
-constant => "{" term "}" ":" "sbf".
-```
 
 A constant in the simple Boolean function algebra is for example:
 
@@ -460,46 +645,228 @@ A constant in the simple Boolean function algebra is for example:
 
 where `x`, `y` and `z` are variables.
 
-## **Variables**
+## **Streams**
 
-Variables range over Boolean algebra elements. In the REPL you can work with
-open formulas (i.e. when variables are not quantified), but a specification
-makes sense only for closed formulas. Their syntax depends
-on whether the `charvar` option is enabled or not. If it is enabled, the syntax is
-a single character followed by digits. Otherwise, the syntax is an
-arbitrary string of `chars`.
+Streams represent the input and the output of Tau specifications. They are the 
+communication with the outside world, so to speak.
+We currently have two kinds of them: input streams and output streams. 
+The syntax is given by 
 
-We also have IO variables, which are actually infinite sequence of Boolean
-algebra elements, each, indexed by positions in the sequence. They are used to
-define the inputs and outputs of the program. The name for an input variable is
-`i{num}` (e.g. `i1`) whereas ouput variables are of the form `o{num}` (in the
-near future we will allow arbitrary names for IO variables). They should always
-be referred to with reference to time (i.e. position in the sequence), and
-the syntax is `i2[t]` or `o1[t]` where `t` always denotes time, but also can be
-`i1[t-1]` or `o2[t-3]` (always a constant lookback).
+`stream_variable => "o(number)[" index "]" | "i(number)[" index "]"`
 
-As commented later on, IO variables need to be defined before the spec is run.
-For example, the following is a valid definition of IO variables:
+where `index` is defined in subsection [Functions and predicates](#functions-and-predicates).
+Hence, `o1[t]` is a valid output stream, whereas `i1[t]` is a valid input stream.
+In the future we will allow arbitrary names for streams, but for now `number`
+is used as an identifier, while `o` denotes an output and `i` an input stream.
 
+Both kinds of streams are indexed by time starting at the time step 0. A stream 
+associates to each time step a Boolean algebra element matching the type of the stream.
+
+Which Boolean algebra element is associated, is decided by the Tau specification
+in which the stream is used. For example, the specification `always o1[t] = 0`
+says that `o1` associates `0` to each time step. One can alternatively think about this
+as the value `0` being written into the stream `o1` at each time step.
+
+There are several ways how a stream can refer to a time point. The following list uses an output stream
+but input streams can be used in these same ways:
+1. `o1[t]` refers to the current time point while executing a specification
+2. `o1[t-k]` refers to the time point k steps ago while executing a specification
+3. `o1[k]` refers to the fixed time point k while executing a specification
+
+There are currently two ways to assign a type to a stream: either explicitly in 
+the REPL (see also subsection 
+[Functions, predicates and input/output stream variables](#functions-predicates-and-inputoutput-stream-variables))
+or implicitly by using typed constants. In the later case the type for a stream is inferred.
+In a nutshell, the inference process works as follows:
+1. Typing a constant in a Boolean function, types the whole Boolean function.
+Any stream appearing in this Boolean function will be assigned this type.
+2. Streams that have been typed in a single Boolean function, are automatically typed
+in all Boolean functions.
+3. Streams that appear in a Boolean function, in which a different stream has been typed,
+are typed accordingly.
+4. If a stream cannot be typed by (possibly repeated application of) any of the above rules, it is assigned the default type `tau`.
+
+Note that this stream type inference only happens if you start executing a Tau specification.
+In case a type mismatch is detected, the execution does not start and is terminated.
+Furthermore, types are currently not propagated using variables. The process only considers constants and streams.
+Variables will be taken into account soon.
+
+When typing a stream explicitly in [REPL](#the-tau-repl), the syntax is
 ```
-tau i1 = console.
-tau o1 = console.
+<type> <stream_variable> = <stream_type>
 ```
+where `<type>` is either `tau` or `sbf` and `<stream_type>` is either `console` (meaning that the 
+stream reads/outputs values from/to the console) or `ifile("<filename>")` for input streams and `ofile("<filename>")`
+for output streams. `<filename>` denotes the file from/into which to read/write.
 
-where `tau` points to the type of the variables (in this case, tau formulas) and
-`console` stands for the input/output stream of the variable (in this case, the
-console).
 
-In the near future we will allow arbitrary names for the IO variables.
+## **Variables and uninterpreted constants**
 
-Finally, we have the uninterpreted constant context, which are implicitly
-existentially quantified variables. The syntax is `<:name>`.
+Variables range over Boolean algebra elements. As mentioned in subsection 
+[Boolean functions](#boolean-functions), each
+variable can only appear as part of a `term` and has, thus, a unique type.
+
+The syntax for the non-terminal `variable` depends on whether the `charvar` option
+is enabled or not. See [REPL options](#repl-options) for further details about the option. The option is enabled by default.
+
+If `charvar` is enabled, a variable is a single letter followed by an arbitrary sequence
+of numbers.
+
+If `charvar` is disabled, a variable can be any sequence of letters, numbers and `_`,
+must however be started by a letter.
+
+In the Tau language a variable can appear free or quantified universally or existentially. Since
+a Tau specification has to be a closed formula, in order to be executable, variables appearing
+in this context must appear under the scope of a quantifier.
+In the Tau REPL, however, you can also work with
+open formulas (i.e. when variables are not quantified). 
+
+### Uninterpreted constants
+
+Finally, we also have uninterpreted constants. They can be thought of as a variable being 
+implicitly existentially quantified from the outside of the Tau specification.
+For this reason, from a semantic point of view, they behave
+more like variables than constants.
+The syntax is mentioned above in subsection [Boolean functions](#boolean-functions). 
+The appearance of an uninterpreted constant within a Tau specification keeps the specification
+closed. Note that when executing a specification containing uninterpreted constants
+they are currently assigned a default value in a suitable way and the specification 
+is then executed with those assignments.
+
+
+## **Pointwise revision**
+
+As mentioned in the beginning, pointwise revision refers to the feature to incorporate 
+updates into a currently running specification. To this end, the special output stream `u`
+is introduced. A Tau specification written into this stream, will be interpreted as a potential
+update. If the proposed update is not satisfiable as a stand-alone specification, no update is performed. Otherwise,
+the pointwise revision procedure is called, updating the currently running specification with the specification
+written into `u`.
+
+### Minimal example
+
+Let us work with a concrete, minimal example to make the idea more clear. Afterwords, 
+the algorithm for pointwise revision is explained in more detail.
+
+Suppose we execute the specification `u[t] = i1[t]`. By default, both streams are of type `tau`. 
+This can be done in the REPL by just entering 
+```
+run u[t] = i1[t]
+```
+`u[t]` is the special output stream, while `i1[t]` is an ordinary input stream. 
+Hence, the specification says that the input into `i1` is written into `u` in each step of execution.
+We now input `o1[t] = 1` for `i1[0]`. This will yield the following output:
+```
+u[0] := o1[t] = 1
+```
+Since `o1[t] = 1` is a satisfiable specification, the update is accepted and in 
+the following step 1, the running Tau specification is
+```
+u[t] = i1[t] && o1[t] = 1
+```
+If we now input `o2[t] = 0 && o2[t] = 1` for `i1[1]` in the next step,
+no update is performed, because `o2[t]` cannot be 0 and 1 at the same time. So this
+is an example of a very simple unsatisfiable specification.
+
+Finally, in the next step we input `o1[t] = 0` for `i1[2]` as a proposed update. This is a satisfiable specification but contradicts
+the currently running specification (we required `o1[t] = 1`). The pointwise revision algorithm will replace the
+previous specification with the update, yielding just `o1[t] = 0`, 
+in order to ensure that the new specification is satisfiable.
+
+Running this example in REPL (see [The Tau REPL](#the-tau-repl) below) yields:
+```
+tau> run u[t] = i1[t]
+
+Temporal normalization of always specification reached fixpoint after 0 steps, yielding the result: 
+i1[t]u[t]' = 0 && i1[t]'u[t] = 0
+
+-----------------------------------------------------------------------------------------------------------
+Please provide requested input, or press ENTER to terminate                                               |
+If no input is requested, press ENTER to continue to the next execution step, or type q(uit) to terminate |
+-----------------------------------------------------------------------------------------------------------
+
+Execution step: 0
+i1[0] := o1[t] = 1
+u[0] := always o1[t]' = 0
+
+Updated specification: 
+always o1[t]' = 0 && i1[t]u[t]' = 0 && i1[t]'u[t] = 0
+
+Execution step: 1
+i1[1] := o2[t] = 0 && o2[t] = 1
+o1[1] := T
+u[1] := F
+
+Execution step: 2
+i1[2] := o1[t] = 0
+o1[2] := T
+u[2] := always o1[t] = 0
+
+Updated specification: 
+always o1[t] = 0
+
+Execution step: 3
+o1[3] := F
+u[3] := F
+
+Execution step: 4
+o1[4] := F
+u[4] := F
+...
+```
+Note, in order to interpret the output, that `1` of type `tau` is represented as `T` and `O` as `F`.
+Furthermore, Tau specifications are always displayed normalized during execution.
+The REPL informs the user whenever an update was done successfully by printing the new, updated specification.
+
+### Pointwise revision details
+
+The following is a detailed explanation of the pointwise revision algorithm. Pointwise revision is performed 
+at the end of an execution step in which a Tau specification, let's call it `update`, is written 
+into the output stream `u`. First, it is checked if `update` is satisfiable. This means that
+for any given input at any given step during execution, there has to exist output satisfying the specification,
+where in this later case the standard definition of satisfiability for a logical formula is meant.
+If `update` is not satisfiable, it normalizes to `F` and no update is applied.
+
+In case `update` is satisfiable, the following steps are performed:
+
+1) `update` can refer to previous memory positions by using negative numbers in a stream index, 
+for example `o1[-k]`. Let `t` be the current time point of execution. Then `o1[-k]` is replaced with 
+the value at `o1[t-k]`. If no such memory position is present, no update is performed. Furthermore, 
+`t-k` must not be below 0. After replacing all such streams with
+the respective value from the memory, it is checked again if `update` is satisfiable given these memory references.
+If it is unsatisfiable, no update is performed. Otherwise, we move to the next step:
+2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `always` statement
+and possibly several `sometimes` statements. We denote the `always` part by `aw_spec` and the collection of 
+`sometimes` parts by `st_spec`. In the same way `aw_update` denotes the `always` part of `update`.
+The next candidate for the updated specification, let's call it `U`, is given by <br> 
+`U := update && ( (ex [outputs] aw_update && aw_spec) -> aw_spec)`, where `[outputs]` refers to the list of all output streams present 
+in `aw_spec` and `aw_update` combined. The meaning is that, whenever possible given the current input at a particular step, 
+`update` and `aw_spec` are executed together. The name _pointwise revision_ originates from this behavior.
+Note that it is possible to refine the definition of the new specification
+in more advanced ways. We will explore this aspect in the future. <br>
+If `update` is satisfiable, then `U` is satisfiable, 
+unless the `sometimes` part of `update`
+prevents it. If it is prevented, `update` becomes the final updated specification. 
+Otherwise, `U` becomes the updated specification and the next step is performed.
+3) As a final step, it is checked if the previous `sometimes` statements `st_spec` are executable along the updated specification `U`.
+If this is the case, they are added to the updated specification. Otherwise, 
+`U` is accepted as the final update.
+
+Note that in the step after an update was successfully applied, the new specification starts
+running as if it was started at time step 0 shifted to the correct time step to match the overall
+history. This means, in particular, that streams with lookback `k` only become solvable once the 
+specification has continued for at least `k` steps. For example, updating a specification in 
+step `s` with `o1[t] = i1[t-1]` means that in the next step `o1[s+1]` is unspecified. 
+To see this, assume we start at step 0. Then `o1[t] = i1[t-1]` will leave `o1[0]` unspecified
+since `i1[-1]` is not defined, since we do not allow defining negative time steps in general. The only
+exception is during pointwise revision in order to allow access to previous stream values,
+as explained in step 1 above.
 
 ## **Reserved symbols**
 
 Tau Language has a set of reserved symbols that cannot be used as identifiers.
-In particular, we insist that `T` and `F` are reserved for true and false values
-respectively in tau formulas and `0` and `1` stand for the corresponding Boolean
+In particular, we require that `T` and `F` are reserved for truth values in Tau specifications 
+and `0` and `1` stand for the corresponding Boolean
 algebra elements.
 
 # **Command line interface**
@@ -538,14 +905,14 @@ whereas the REPL specific options are:
 
 # **The Tau REPL**
 
-The Tau REPL is a command line interface that allows you to interact with the Tau
-Language. It is a simple and easy to use tool that allows you to write and
-execute Tau specifications on the go.
+The Tau REPL is a command line application that allows you to interact with the Tau
+Language. It is a simple and easy to use tool that enables you to write and
+execute Tau specifications on the fly.
 
 ## **Basic REPL commands**
 
 The Tau REPL provides a set of basic commands that allow you to obtain help,
-version information, exit the REPL, clear the screen and so on. The syntax of
+version information, exit the REPL and clear the screen. The syntax of
 the commands is the following:
 
 * `help|h [<command>]`: shows a general help message or the help message of a
@@ -603,16 +970,21 @@ includes the definitions of functions, predicates and the input/output stream va
 
 * `definitions|defs <number>`: shows the definition of the given function or predicate.
 
-* `rec_relation`: defines a function or predicate supporting the usage of
-recurrence relations. See the Tau Language Section for more information.
+* `predicate_def`: defines a predicate, supporting the usage of
+recurrence relations. See the Tau Language section 
+[Functions and predicates](#functions-and-predicates) for more information.
+
+* `function_def`: defines a function, supporting the usage of
+recurrence relations. See the Tau Language section 
+[Functions and predicates](#functions-and-predicates) for more information. 
 
 * `<type> i<number> = console | ifile(<filename>)`: defines an input stream variable.
-The input variable can read values from the console or from a provided file.
+The input variable can read values from the console or from a provided file. <br>
 `<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
 
 * `<type> o<number> = console | ofile(<filename>)`: defines an output stream variable.
-The output variable can write values to the console or into a file.
-<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
+The output variable can write values to the console or into a file. <br>
+`<type>` can be either `tau` or `sbf` (simple Boolean function) at the moment.
 
 ## **Memory related commands**
 
@@ -629,7 +1001,7 @@ If you want to consult the REPL memory contents, you can use the following comma
 * `history|hist <repl_memory>`: show the Tau expression at the specified REPL memory position.
 
 In general, to retrieve a Tau expression from the REPL memory, you can use the following
-syntax:
+syntax for `<repl_memory>`:
 
 * `%`: to retrieve the Tau expression stored at the latest position
 * `%<number>`: to retrieve the Tau expression stored at position `<number>`
@@ -642,7 +1014,7 @@ in expressions. The syntax of the commands is the following:
 
 * `subst|s <repl_memory|tau|term> [<repl_memory|tau|term>/<repl_memory|tau|term>]`: substitutes a
 memory, well-formed formula or Boolean function by another one in the given
-expression (beeing this one a memory position, well-formed formula or Boolean
+expression (this one being a memory position, well-formed formula or Boolean
 function).
 
 * `instantiate|inst|i <repl_memory|tau> [<var>/<repl_memory|term>]`: instantiates a variable
@@ -694,16 +1066,15 @@ expression with respect to the given variable.
 
 ## **Specification execution**
 
-Finally, you can run the given specification once you have defined the IO
-variables as you need. The syntax of the commands is:
+Finally, you can run a given Tau specification. The syntax for the commands is:
 
-* `run|r <repl_memory|tau>`: runs the given specification.
+* `run|r <repl_memory|tau>`: runs the given Tau specification.
 
 # **The Theory behind the Tau Language**
 
 * GS Paper [Guarded Successor: A Novel Temporal Logic by Ohad Asor](https://web3.arxiv.org/abs/2407.06214)
 * TABA book [Theories and Applications of Boolean Algebras by Ohad Asor](./docs/Theories-and-Applications-of-Boolean-Algebras-0.25.pdf) (In works).
-* Youtube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
+* YouTube lecture series on [Atomless Boolean Algebra by Ohad Asor](https://www.youtube.com/watch?v=lNU1wS5rqtg&list=PLav2klOnTUlOeakJCbLZxoib_x0jYAQ5f&index=2).
 
 
 # **Known issues**
@@ -716,15 +1087,20 @@ This is a short list of known issues that will be fixed in a subsequent release:
   into account leading to later blow ups.
 * Minor errors in Windows REPL
 
+
 # **Future work**
 
-* Add support for redefinition of recurrence relations.
-* Add support for arbitrary names for IO variables.
-* Improve the performance of normalization of Boolean functions.
+* Enabling modular arithmatic using fixed width bitvectors in Tau specifications
+* Enabling efficient data storage and manipulation in Tau specifications using Boolean functions
+* Overcoming performance issues during normalization of formulas and satisfiability checking of Tau specifications
+* Add support for redefinitions of functions or predicates.
+* Add support for arbitrary stream names.
+* Improve the performance of Boolean function normalization.
+
 
 # **Submitting issues**
 
-Submit issues at the following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
+Please submit issues at the following link: [Tau Language issues](https://github.com/IDNI/tau-lang/issues).
 
 # **License**
 
