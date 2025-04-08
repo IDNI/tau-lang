@@ -209,8 +209,28 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
+	TEST_CASE("z3_nand") {
+		const char* sample = "2 !& 1 =_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
 	TEST_CASE("z3_or") {
 		const char* sample = "X | 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_nor") {
+		const char* sample = "2 !| 1 =_ X";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
@@ -229,7 +249,17 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_left_shift") {
+	TEST_CASE("z3_xnor") {
+		const char* sample = "X !(+) 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_rotate_shift") {
 		const char* sample = "X << 1 =_ 2";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
@@ -239,8 +269,28 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 
-	TEST_CASE("z3_shift_right") {
+	TEST_CASE("z3_rotate_right") {
 		const char* sample = "X >> 1 =_ 1";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_min") {
+		const char* sample = "min 2 1 =_ X";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+		CHECK( solution.value().size() == 1 );
+	}
+
+	TEST_CASE("z3_max") {
+		const char* sample = "max X 0 =_ 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);

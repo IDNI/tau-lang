@@ -147,24 +147,49 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars)
 				auto r = eval_z3(form->child[1], vars);
 				return l & r;
 			}
+			case tau_parser::z3_nand: {
+				auto l = eval_z3(form->child[0], vars);
+				auto r = eval_z3(form->child[1], vars);
+				return nand(l, r);
+			}
 			case tau_parser::z3_or: {
 				auto l = eval_z3(form->child[0], vars);
 				auto r = eval_z3(form->child[1], vars);
 				return l | r;
+			}
+			case tau_parser::z3_nor: {
+				auto l = eval_z3(form->child[0], vars);
+				auto r = eval_z3(form->child[1], vars);
+				return nor(l, r);
 			}
 			case tau_parser::z3_xor: {
 				auto l = eval_z3(form->child[0], vars);
 				auto r = eval_z3(form->child[1], vars);
 				return l ^ r;
 			}
-			case tau_parser::z3_shift_left: {
+			case tau_parser::z3_xnor: {
+				auto l = eval_z3(form->child[0], vars);
+				auto r = eval_z3(form->child[1], vars);
+				return xnor(l, r);
+			}
+			case tau_parser::z3_min: {
+				auto l = eval_z3(form->child[0], vars);
+				auto r = eval_z3(form->child[1], vars);
+				return min(l, r);
+			}
+			case tau_parser::z3_max: {
+				auto l = eval_z3(form->child[0], vars);
+				auto r = eval_z3(form->child[1], vars);
+				return max(l, r);
+			}
+			case tau_parser::z3_rotate_left: {
 				auto l = eval_z3(form->child[0], vars);
 				auto value = make_string(tau_node_terminal_extractor<BAs...>, form->child[1]);
 				// this is the type of rotate_left
 				unsigned int ul = std::stoul(value);
 				return l.rotate_left(ul);
 			}
-			case tau_parser::z3_shift_right: {
+			case tau_parser::z3_rotate_right: {
 				auto l = eval_z3(form->child[0], vars);
 				auto value = make_string(tau_node_terminal_extractor<BAs...>, form->child[1]);
 				// this is the type of rotate_left
