@@ -837,17 +837,20 @@ the respective value from the memory, it is checked again if `update` is satisfi
 If it is unsatisfiable, no update is performed. Otherwise, we move to the next step:
 2) Let us refer to the currently running specification as `spec`. `spec` is composed of a single `always` statement
 and possibly several `sometimes` statements. We denote the `always` part by `aw_spec` and the collection of 
-`sometimes` parts by `st_spec`.
-The updated specification is given by <br> 
-`update && ( (ex [outputs] update && aw_spec) -> aw_spec)`, where `[outputs]` refers to the list of all output streams present 
-in `aw_spec` and `update` combined. The meaning is that whenever possible given the current input at a particular step, 
+`sometimes` parts by `st_spec`. In the same way `aw_update` denotes the `always` part of `update`.
+The next candidate for the updated specification, let's call it `U`, is given by <br> 
+`U := update && ( (ex [outputs] aw_update && aw_spec) -> aw_spec)`, where `[outputs]` refers to the list of all output streams present 
+in `aw_spec` and `aw_update` combined. The meaning is that, whenever possible given the current input at a particular step, 
 `update` and `aw_spec` are executed together. The name _pointwise revision_ originates from this behavior.
 Note that it is possible to refine the definition of the new specification
-in more advanced ways. We will explore this aspect in the future.
-Note that if `update` is satisfiable, then the updated specification is satisfiable.
-3) As a final step, it is checked if the previous `sometimes` statements `st_spec` are executable along the updated specification.
+in more advanced ways. We will explore this aspect in the future. <br>
+If `update` is satisfiable, then `U` is satisfiable, 
+unless the `sometimes` part of `update`
+prevents it. If it is prevented, `update` becomes the final updated specification. 
+Otherwise, `U` becomes the updated specification and the next step is performed.
+3) As a final step, it is checked if the previous `sometimes` statements `st_spec` are executable along the updated specification `U`.
 If this is the case, they are added to the updated specification. Otherwise, 
-the updated specification constructed in step 2 is accepted.
+`U` is accepted as the final update.
 
 Note that in the step after an update was successfully applied, the new specification starts
 running as if it was started at time step 0 shifted to the correct time step to match the overall
@@ -855,7 +858,7 @@ history. This means, in particular, that streams with lookback `k` only become s
 specification has continued for at least `k` steps. For example, updating a specification in 
 step `s` with `o1[t] = i1[t-1]` means that in the next step `o1[s+1]` is unspecified. 
 To see this, assume we start at step 0. Then `o1[t] = i1[t-1]` will leave `o1[0]` unspecified
-since `i1[-1]` is not defined. We do not allow to define negative time steps in general. The only
+since `i1[-1]` is not defined, since we do not allow defining negative time steps in general. The only
 exception is during pointwise revision in order to allow access to previous stream values,
 as explained in step 1 above.
 
