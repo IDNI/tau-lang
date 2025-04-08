@@ -614,8 +614,13 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			{ tau_parser::z3_ngeq,                         787 },
 			{ tau_parser::z3_less,                         788 },
 			{ tau_parser::z3_nless,                        789 },
-			{ tau_parser::z3_shift_left,                   790 },
-			{ tau_parser::z3_shift_right,                  791 },
+			{ tau_parser::z3_rotate_left,                  790 },
+			{ tau_parser::z3_rotate_right,                 791 },
+			{ tau_parser::z3_nand,                         792 },
+			{ tau_parser::z3_nor,                          793 },
+			{ tau_parser::z3_xnor,                         794 },
+			{ tau_parser::z3_min,                          795 },
+			{ tau_parser::z3_max,                          796 },
 			// others
 			{ tau_parser::rec_relation,                    800 },
 			{ tau_parser::ref_args,                        800 },
@@ -878,10 +883,15 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::tau<BAs...>& n,
 			case tau_parser::z3_div:            infix("/"); break;
 			case tau_parser::z3_mod:            infix("%"); break;
 			case tau_parser::z3_and:            infix("&"); break;
+			case tau_parser::z3_nand:           infix("!&"); break;
 			case tau_parser::z3_or:             infix("|"); break;
+			case tau_parser::z3_nor:            infix("!|"); break;
 			case tau_parser::z3_xor:            infix("(+)"); break;
-			case tau_parser::z3_shift_left:     infix("<<"); break;
-			case tau_parser::z3_shift_right:    infix(">>"); break;
+			case tau_parser::z3_xnor:           infix("!(+)"); break;
+			case tau_parser::z3_rotate_left:    infix("<<"); break;
+			case tau_parser::z3_rotate_right:   infix(">>"); break;
+			case tau_parser::z3_max:            prefix("max"); break;
+			case tau_parser::z3_min:            prefix("min"); break;
 			// ternary operators
 			case tau_parser::bf_interval:    infix2("<=", "<="); break;
 			case tau_parser::wff_conditional:infix2("?", ":"); break;

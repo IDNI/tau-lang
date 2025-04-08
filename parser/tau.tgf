@@ -116,11 +116,16 @@ z3                     => ('(' _ z3 _ ')')                   :z3_parenthesis
                         | (z3 _ '*' _ z3)             :z3_mul
                         | (z3 _ '/' _ z3)             :z3_div
                         | (z3 _ '%' _ z3)             :z3_mod
+                        | (z3 _ "!&" _ z3)            :z3_nand
                         | (z3 _ '&' _ z3)             :z3_and
+                        | (z3 _ "!|" _ z3)            :z3_nor
                         | (z3 _ '|' _ z3)             :z3_or
+                        | (z3 _ "!(+)" _ z3)          :z3_xnor
                         | (z3 _ "(+)" _ z3)           :z3_xor
-                        | (z3 _ "<<" _ num)           :z3_shift_left
-                        | (z3 _ ">>" _ num)           :z3_shift_right
+                        | (z3 _ "<<" _ num)           :z3_rotate_left
+                        | (z3 _ ">>" _ num)           :z3_rotate_right
+                        | ("min" __ z3 __ z3)         :z3_min
+                        | ("max" __ z3 __ z3)         :z3_max
                         | bitvector.
 
 # z3 constants

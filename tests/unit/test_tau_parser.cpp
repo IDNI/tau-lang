@@ -1118,6 +1118,16 @@ TEST_SUITE("parsing z3 expressions") {
 		CHECK( check.has_value() );
 	}
 
+	TEST_CASE("nand") {
+		const char* sample = "Z !& Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::z3 });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_nand;
+		CHECK( check.has_value() );
+	}
+
 	TEST_CASE("or") {
 		const char* sample = "Z | Z";
 		auto src = make_tau_source(sample, {
@@ -1125,6 +1135,16 @@ TEST_SUITE("parsing z3 expressions") {
 		auto expr = make_statement(src);
 		auto check = expr
 			| tau_parser::z3_or;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("nor") {
+		const char* sample = "Z !| Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::z3 });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_nor;
 		CHECK( check.has_value() );
 	}
 
@@ -1138,23 +1158,33 @@ TEST_SUITE("parsing z3 expressions") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("shift left") {
+	TEST_CASE("xnor") {
+		const char* sample = "Z !(+) Z";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::z3 });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_xnor;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("rotate left") {
 		const char* sample = "Z << 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::z3 });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_shift_left;
+			| tau_parser::z3_rotate_left;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("shift right") {
+	TEST_CASE("rotate right") {
 		const char* sample = "Z >> 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::z3 });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_shift_right;
+			| tau_parser::z3_rotate_right;
 		CHECK( check.has_value() );
 	}
 
@@ -1381,6 +1411,16 @@ TEST_SUITE("parsing z3 formulas") {
 		CHECK( check.has_value() );
 	}
 
+	TEST_CASE("z3_nand") {
+		const char* sample = "Z !& Y";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::z3 });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_nand;
+		CHECK( check.has_value() );
+	}
+
 	TEST_CASE("z3_or") {
 		const char* sample = "Z | Y";
 		auto src = make_tau_source(sample, {
@@ -1388,6 +1428,16 @@ TEST_SUITE("parsing z3 formulas") {
 		auto expr = make_statement(src);
 		auto check = expr
 			| tau_parser::z3_or;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_nor") {
+		const char* sample = "Z !| Y";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::z3 });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_nor;
 		CHECK( check.has_value() );
 	}
 
@@ -1401,23 +1451,53 @@ TEST_SUITE("parsing z3 formulas") {
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_shift_left") {
+	TEST_CASE("z3_xnor") {
+		const char* sample = "Z !(+) Y";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::z3 });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_xnor;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_rotate_left") {
 		const char* sample = "Z << 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::z3 });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_shift_left;
+			| tau_parser::z3_rotate_left;
 		CHECK( check.has_value() );
 	}
 
-	TEST_CASE("z3_shift_right") {
+	TEST_CASE("z3_rotate_right") {
 		const char* sample = "Z >> 1";
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::z3 });
 		auto expr = make_statement(src);
 		auto check = expr
-			| tau_parser::z3_shift_right;
+			| tau_parser::z3_rotate_right;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_max") {
+		const char* sample = "max 1 2";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::z3 });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_max;
+		CHECK( check.has_value() );
+	}
+
+	TEST_CASE("z3_min") {
+		const char* sample = "min 1 2";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::z3 });
+		auto expr = make_statement(src);
+		auto check = expr
+			| tau_parser::z3_min;
 		CHECK( check.has_value() );
 	}
 }
