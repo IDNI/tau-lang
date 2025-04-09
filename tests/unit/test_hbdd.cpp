@@ -13,11 +13,7 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
-
-namespace testing = doctest;
+#include "test_helpers.h"
 
 TEST_SUITE("operator==") {
 
