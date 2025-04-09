@@ -660,6 +660,20 @@ void print_solver_cmd_solution(std::optional<solution<BAs...>>& solution,
 	return;
 }
 
+template<typename...BAs>
+void print_z3_solver_cmd_solution(std::optional<solution<BAs...>>& solution) {
+	if (!solution) { std::cout << "no solution\n"; return; }
+
+	std::cout << "solution: {\n";
+	for (auto [var, value]: solution.value()) {
+		auto ull = std::get<z3::expr>(value->child[0]->value).as_uint64();
+		std::cout << "\t" << var << " := " << ull << "\n";
+	}
+	std::cout << "}\n";
+
+	return;
+}
+
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
@@ -668,7 +682,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 		auto equations = n->child.back();
 		auto solution = solve_z3(equations);
 		if (!solution) { std::cout << "no solution\n"; return; }
-		else print_solver_cmd_solution(solution);
+		else print_z3_solver_cmd_solution(solution);
 		return;
 	}
 
