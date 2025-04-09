@@ -2,12 +2,11 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
+#include "test_helpers.h"
 #include "interpreter.h"
 
 TEST_SUITE("interpreter") {
 
 	TEST_CASE("interpreter") {
-		CHECK( true );
 	}
 }

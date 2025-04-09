@@ -4,11 +4,6 @@
 
 #include "test_helpers.h"
 
-using namespace idni::tau_lang;
-using namespace std;
-
-namespace testing = doctest;
-
 // The following test suites represent correct sentences of a tau nso_rr or
 // library and as such must be parsed correctly and satisfy the structural checks
 // we perform on the parsed nso_rr (as the rest of the code assumes such structure).

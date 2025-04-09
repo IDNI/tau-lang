@@ -13,10 +13,7 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
-#include "boolean_algebras/bool_ba.h"
-
-namespace testing = doctest;
+#include "test_helpers.h"
 
 TEST_SUITE("bool boolean algebra") {
 
