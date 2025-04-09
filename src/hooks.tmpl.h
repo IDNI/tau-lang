@@ -6,6 +6,10 @@
 #include "builders.h"
 #include "z3_context.h"
 
+#ifdef DEBUG
+#include "debug_helpers.h"
+#endif // DEBUG
+
 namespace idni::tau_lang {
 
 template <typename...BAs>
@@ -1095,7 +1099,8 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 	size_t size = sizeof(size_t) * 8;
 	auto value = make_string(tau_node_terminal_extractor<BAs...>, n.child[0]);
 	tau<BAs...> bvn;
-	switch (get_non_terminal_node(n.child[0])) {
+	auto nt = get_non_terminal_node(n.child[0]);
+	switch (nt) {
 		case p::num : {
 			int64_t ull = std::stoull(value);
 			auto bv = z3_context.bv_val(ull, size);
@@ -1103,12 +1108,23 @@ tau<BAs...> make_node_hook_bitvector(const rewriter::node<tau_sym<BAs...>>& n) {
 			break;
 		}
 		case p::bits : {
-			value.pop_back();
 			auto bv = z3_context.bv_val(value.c_str(), size);
 			bvn = make_node<tau_sym<BAs...>>(bv, {});
 			break;
 		}
+		case p::hexnum : {
+			// check https://stackoverflow.com/questions/48340828/how-to-convert-a-hexadecimal-string-to-long-in-c
+			std::istringstream converter { value };
+			int64_t ull = 0;
+		    converter >> std::hex >> ull;
+			auto bv = z3_context.bv_val(ull, size);
+			bvn = make_node<tau_sym<BAs...>>(bv, {});
+			break;
+		}
 		default: {
+			#ifdef DEBUG
+			BOOST_LOG_TRIVIAL(error) << "(error) Unknown bitvector type: " << nt;
+			#endif // DEBUG
 			assert(false);
 		}
 	}
