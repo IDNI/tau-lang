@@ -77,6 +77,12 @@ tref tree<node>::get(const node& v, const trefs& children) {
 	return base_t::get(v, children);
 }
 
+template <typename node>
+tref tree<node>::get(const node& v, const std::initializer_list<tref>& ch) {
+	return base_t::get(v, ch);
+}
+
+
 //------------------------------------------------------------------------------
 // creation with node childs
 
@@ -99,6 +105,12 @@ tref tree<node>::get(const node& v, const node* ch, size_t len)
 
 template <typename node>
 tref tree<node>::get(const node& v, const std::vector<node>& ch)
+{
+	return base_t::get(v, ch);
+}
+
+template <typename node>
+tref tree<node>::get(const node& v, const std::initializer_list<node>& ch)
 {
 	return base_t::get(v, ch);
 }
@@ -126,6 +138,11 @@ tref tree<node>::get(const node::type& nt, const tref* ch, size_t len) {
 
 template <typename node>
 tref tree<node>::get(const node::type& nt, const trefs& ch) {
+	return get(node(nt), ch);
+}
+
+template <typename node>
+tref tree<node>::get(const node::type& nt, const std::initializer_list<tref>& ch) {
 	return get(node(nt), ch);
 }
 
@@ -162,23 +179,46 @@ tref tree<node>::get_ba_constant_id(size_t c) {
 // - terminals are collapsed into their parents
 //     ie. shift > num > "10" becomes shift > num("10")
 //     or  variable > type > "sbf" becomes variable > type("sbf")
+// - does q_vars transformation from ex x, y to ex x ex y
+// - transforms offset variables to captures
 // important terminals are stored in their pools outside of the tree
 // and node's value is actually id in the pool (strings, constants)
 // for constants,
 //     binder requires type and a tref. binder stores it and returns its id
-// TODO constants 1binding
+// TODO constants binding
 template <typename node>
 template <typename binder>
 tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 	std::unordered_map<tref, tref> m;
-	auto transformer = [&m, &bind](tref t) {
-		// std::cout << "transforming:" << parse_tree::get(t).value << std::endl;
+	auto transformer = [&m, &bind](tref t, tref parent) {
+		// parse_tree::get(t).dump(std::cout << "transforming: ", true) << std::endl;
 		if (m.find(t) != m.end()) return true;
 		const auto& tr = parse_tree::get(t);
 		if (tr.is_t()) return true;
 		auto nt = tr.get_nt();
+		auto parent_nt = parent != nullptr
+			? parse_tree::get(parent).get_nt() : 0;
 		tref x;
-		if (nt == node::type::digits) {
+		// q_vars transformation (ex x,y to ex x ex y)
+		if (nt == node::type::wff_ex || nt == node::type::wff_all) {
+			const auto& q_vars = get(m.at(tr[0]));
+			const auto& expr = get(m.at(tr[1]));
+			trefs vars = q_vars.get_children();
+			if (vars.empty())
+				x = get(static_cast<node::type>(nt), {
+						q_vars.get(), expr.get() });
+			else {
+				x = expr.only_child();
+				for (size_t vi = 0; vi != vars.size(); ++vi) {
+					// create a new quantifier node with var and new children
+					x = get(static_cast<node::type>(nt), {
+						vars[vars.size() - 1 - vi],
+						get(node::type::wff, x) });
+				}
+			}
+		}
+		// tau tree terminals
+		else if (nt == node::type::digits) { // preprocess digits
 			x = get(nt, std::stoul(tr.get_terminals()));
 		} else if (nt == node::type::integer) {
 			bool neg = false;
@@ -200,20 +240,26 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 			x = get(node(nt, v));
 		} else if (is_string_nt(nt))
 			x = get(static_cast<node::type>(nt), tr.get_terminals());
-		else {
-			trefs ch;
+		else {  // all other nonterminals
+			trefs ch; // transform children
 			for (tref c : tr.children()) {
 				DBG(assert(c != nullptr);)
 				DBG(assert(m.find(c) != m.end());)
 				ch.push_back(m.at(c));
 			}
 			switch (nt) { // transform intermediate nodes
+				// bf_and_nosep and bf_neg_oprnd
 				case node::type::bf_and_nosep_1st_oprnd:
 				case node::type::bf_and_nosep_2nd_oprnd:
 				case node::type::bf_neg_oprnd:
 					nt = node::type::bf; break;
 				case node::type::bf_and_nosep:
 					nt = node::type::bf_and; break;
+				// offset variable -> capture
+				case node::type::variable:
+					if (parent_nt == node::type::offsets)
+						nt = node::type::capture;
+					break;
 			}
 			x = get(static_cast<node::type>(nt), ch);
 		}
@@ -222,18 +268,6 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 		// 	<< " as " << tree::get(x).get_type_name() << std::endl;
 		return true;
 	};
-	// auto visit_subtree = [](tref t) {
-	// 	// std::cout << "visiting subtree:" << parse_tree::get(t).value << std::endl;
-	// 	const auto& tr = parse_tree::get(t);
-	// 	if (tr.is_t()) return false;
-	// 	auto nt = tr.get_nt();
-	// 	switch (nt) {
-	// 		// case node::type::digits:
-	// 		// 	return false;
-	// 		default:
-	// 			return true;
-	// 	}
-	// };
 	// parse_tree::get(pt.get()).print(std::cout << "parse tree: ") << std::endl;
 	idni::post_order<tau_parser::pnode>(pt.get()).search(transformer);
 	if (m.find(pt.get()) == m.end()) return nullptr;

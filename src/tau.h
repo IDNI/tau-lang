@@ -147,12 +147,14 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get(const node& v, tref ch1, tref ch2); // with two children
 	static tref get(const node& v, const tref* ch, size_t len);
 	static tref get(const node& v, const trefs& ch);
+	static tref get(const node& v, const std::initializer_list<tref>& ch);
 
 	// creation with node children
 	static tref get(const node& v, const node& ch);
 	static tref get(const node& v, const node& ch1, const node& ch2);
 	static tref get(const node& v, const node* ch, size_t len);
 	static tref get(const node& v, const std::vector<node>& ch);
+	static tref get(const node& v, const std::initializer_list<node>& ch);
 
 	// creation of node::type and children
 	static tref get(const node::type& nt); // terminal / leaf
@@ -160,6 +162,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt, tref ch1, tref ch2); // with two children
 	static tref get(const node::type& nt, const tref* ch, size_t len); // with array of children
 	static tref get(const node::type& nt, const trefs& ch); // with vector of children
+	static tref get(const node::type& nt, const std::initializer_list<tref>& ch); // with initializer list of children
 	static tref get(const node::type& nt, const std::string& str); // with string
 
 	// creation from parser result or parser input (string, stream, file)
