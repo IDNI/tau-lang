@@ -1,5 +1,6 @@
 #pragma once
 
+#include <initializer_list>
 #include <variant>
 
 #include "defs.h"
@@ -375,6 +376,15 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 
 	static tref apply_builder(const rewriter::builder& b, trefs n);
 
+	struct bldr {
+		static rewriter::builder wff_eq;
+		static rewriter::builder bf_splitter;
+		static rewriter::builder bf_not_less_equal;
+		static rewriter::builder bf_interval;
+		static rewriter::builder bf_nleq_upper;
+		static rewriter::builder bf_nleq_lower;
+	};
+
 	static htree::sp _0;
 	static htree::sp _0_trimmed;
 	static htree::sp _1;
@@ -384,6 +394,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static htree::sp _T;
 	static htree::sp _T_trimmed;
 
+	// TODO (LOW) this could be somehow easily generatable by parser_gen
+	// or maybe create simple builder api, maybe with >> operator
 	struct build {
 
 		static tref variable(const std::string& name);
@@ -493,11 +505,47 @@ inline std::function<bool(tref)> is(size_t nt) {
 // -----------------------------------------------------------------------------
 // builders:
 
+// definitions of basic bf and wff
+const std::string BLDR_BF_0 = "( $X ) =: 0.";
+const std::string BLDR_BF_1 = "( $X ) =: 1.";
+const std::string BLDR_WFF_F = "( $X ) =:: F.";
+const std::string BLDR_WFF_T = "( $X ) =:: T.";
+
+// definitions of wff builder rules
+const std::string BLDR_WFF_EQ = "( $X ) =:: $X = 0.";
+const std::string BLDR_WFF_NEQ = "( $X ) =:: $X != 0.";
+const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) =:: $X !<= $Y.";
+const std::string BDLR_BF_INTERVAL = "( $X $Y $Z ) =:: $X <= $Y <= $Z.";
+const std::string BDLR_BF_NLEQ_UPPER = "( $X $Y ) =:: $X !<= $Y.";
+const std::string BDLR_BF_NLEQ_LOWWER = "( $X $Y ) =:: $Y !<= $X.";
+const std::string BLDR_WFF_ALL = "( $X $Y ) =:: all $X $Y.";
+const std::string BLDR_WFF_EX = "( $X $Y ) =:: ex $X $Y.";
+const std::string BLDR_WFF_SOMETIMES = "( $X ) =:: sometimes $X.";
+const std::string BLDR_WFF_ALWAYS = "( $X ) =:: always $X.";
+
+// definitions of bf builder rules
+const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
+
+
+// wff builder
+template <typename node>
+rewriter::builder tree<node>::bldr::wff_eq = tree<node>::get_builder(BLDR_WFF_EQ);
+template <typename node>
+rewriter::builder tree<node>::bldr::bf_splitter = tree<node>::get_builder(BLDR_BF_SPLITTER);
+template <typename node>
+rewriter::builder tree<node>::bldr::bf_not_less_equal = tree<node>::get_builder(BLDR_BF_NOT_LESS_EQUAL);
+template <typename node>
+rewriter::builder tree<node>::bldr::bf_interval = tree<node>::get_builder(BDLR_BF_INTERVAL);
+template <typename node>
+rewriter::builder tree<node>::bldr::bf_nleq_upper = tree<node>::get_builder(BDLR_BF_NLEQ_UPPER);
+template <typename node>
+rewriter::builder tree<node>::bldr::bf_nleq_lower = tree<node>::get_builder(BDLR_BF_NLEQ_LOWWER);
+
+// // basic bf and wff constants
 template <typename node>
 htree::sp tree<node>::_0_trimmed = tree<node>::get(node::type::bf_t);
 template <typename node>
 htree::sp tree<node>::_0 = tree<node>::get(node::type::bf, tree<node>::_0_trimmed);
-
 template <typename node>
 htree::sp tree<node>::_1_trimmed = tree<node>::get(node::type::bf_t);
 template <typename node>	
@@ -507,47 +555,11 @@ template <typename node>
 htree::sp tree<node>::_F_trimmed = tree<node>::get(node::type::wff_f);
 template <typename node>
 htree::sp tree<node>::_F = tree<node>::get(node::type::wff, tree<node>::_F_trimmed);
-
 template <typename node>
 htree::sp tree<node>::_T_trimmed = tree<node>::get(node::type::wff_t);
 template <typename node>
 htree::sp tree<node>::_T = tree<node>::get(node::type::wff, tree<node>::_T_trimmed);
 
-
-const std::string BUILDER_BF_NLEQ_UPPER = "( $X $Y ) =:: $X !<= $Y.";
-const std::string BUILDER_BF_NLEQ_LOWER = "( $X $Y ) =:: $Y !<= $X.";
-// // wff builder
-// template <typename node>
-// inline static auto builder_wff_eq = tree<node>::get_builder(BLDR_WFF_EQ);
-// template <typename node>
-// inline static auto builder_bf_splitter = tree<node>::get_builder(BLDR_BF_SPLITTER);
-// template <typename node>
-// inline static auto builder_bf_not_less_equal =
-// 				tree<node>::get_builder(BLDR_BF_NOT_LESS_EQUAL);
-// template <typename node>
-// inline static auto builder_bf_interval = tree<node>::get_builder(BDLR_BF_INTERVAL);
-template <typename node>
-static auto builder_bf_nleq_upper = tree<node>::get_builder(BUILDER_BF_NLEQ_UPPER);
-template <typename node>
-static auto builder_bf_nleq_lower = tree<node>::get_builder(BUILDER_BF_NLEQ_LOWER);
-
-// // basic bf and wff constants
-// template <typename node>
-// inline static htree::sp _0            = builder_bf_0<node>.second;
-// template <typename node>
-// inline static htree::sp _0_trimmed    = trim<node>(_0<node>);
-// template <typename node>
-// inline static htree::sp _1            = builder_bf_1<node>.second;
-// template <typename node>
-// inline static htree::sp _1_trimmed    = trim<node>(_1<node>);
-// template <typename node>
-// inline static htree::sp _F            = builder_wff_F<node>.second;
-// template <typename node>
-// inline static htree::sp _F_trimmed    = trim<node>(_F<node>);
-// template <typename node>
-// inline static htree::sp _T            = builder_wff_T<node>.second;
-// template <typename node>
-// inline static htree::sp _T_trimmed    = trim<node>(_T<node>);
 
 }
 

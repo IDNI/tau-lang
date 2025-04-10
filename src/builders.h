@@ -5,6 +5,7 @@
 
 #include "queries.h"
 #include "language.h"
+#include "tau.h"
 
 namespace idni::tau_lang {
 
@@ -52,28 +53,6 @@ tau_depreciating<BAs...> tau_apply_builder(const builder<BAs...>& b,
 	for (size_t i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
 	return replace<tau_depreciating<BAs...>>(b.second, changes);
 }
-
-// definitions of basic bf and wff
-const std::string BLDR_BF_0 = "( $X ) =: 0.";
-const std::string BLDR_BF_1 = "( $X ) =: 1.";
-const std::string BLDR_WFF_F = "( $X ) =:: F.";
-const std::string BLDR_WFF_T = "( $X ) =:: T.";
-
-// definitions of wff builder rules
-const std::string BLDR_WFF_EQ = "( $X ) =:: $X = 0.";
-const std::string BLDR_WFF_NEQ = "( $X ) =:: $X != 0.";
-const std::string BLDR_BF_NOT_LESS_EQUAL = "( $X $Y ) =:: $X !<= $Y.";
-const std::string BDLR_BF_INTERVAL = "( $X $Y $Z ) =:: $X <= $Y <= $Z.";
-const std::string BDLR_BF_NLEQ_UPPER = "( $X $Y ) =:: $X !<= $Y.";
-const std::string BDLR_BF_NLEQ_LOWWER = "( $X $Y ) =:: $Y !<= $X.";
-const std::string BLDR_WFF_ALL = "( $X $Y ) =:: all $X $Y.";
-const std::string BLDR_WFF_EX = "( $X $Y ) =:: ex $X $Y.";
-const std::string BLDR_WFF_SOMETIMES = "( $X ) =:: sometimes $X.";
-const std::string BLDR_WFF_ALWAYS = "( $X ) =:: always $X.";
-
-// definitions of bf builder rules
-const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
-
 
 // basic bf and wff builders
 template <typename... BAs>

@@ -5,7 +5,7 @@ namespace idni::tau_lang {
 template <typename N>
 tref tree<N>::apply_builder(const rewriter::builder& b, trefs n) {
 	typename tree<node>::subtree_map changes;
-	trefs vars = (tt(b.first->get()) || node::type::capture).values();
+	trefs vars = (tt(b.first->get()) || capture).values();
 	for (size_t i = 0; i < vars.size(); ++i) changes[vars[i]] = n[i];
 	return rewriter::replace<node>(b.second->get(), changes);
 }
@@ -22,7 +22,7 @@ template <typename N>
 tref tree<N>::build::in_var_name(size_t index) {
 	std::stringstream var_name;
 	var_name << "i" << index;
-	return get(node::type::in_var_name, var_name.str());
+	return get(in_var_name, var_name.str());
 }
 
 template <typename N>
@@ -52,9 +52,9 @@ tref tree<N>::build::bf_f_type(tref type) {
 
 template <typename N>
 tref tree<N>::build::in_variable_at_n(tref var_name, size_t num) {
-	DBG(assert(tree::get(var_name).is(node::type::var_name));)
-	return get(bf, get(variable, get(io_var, get(in,
-			get_string(in_var_name), get(offset, get_integer(num))))));
+	DBG(assert(get(var_name).is(var_name));)
+	return get(bf, get(variable, get(io_var, get(in, {
+				var_name, get(offset, get_integer(num)) }))));
 }
 
 template <typename N>
@@ -63,23 +63,17 @@ tref tree<N>::build::in_variable_at_n(size_t index, size_t num) {
 }
 
 template <typename N>
-tref tree<N>::build::in_variable_at_n(const std::string& name, const int_t pos) {
-	auto var_name = get(in_var_name, name);
-	auto offset = get(offset, get_integer(pos));
-	return get(bf, get(variable,
-		get(io_var, get(in, { var_name, offset }))));
+tref tree<N>::build::in_variable_at_n(const std::string& name, int_t pos) {
+	return get(bf, get(variable, get(io_var, get(in, {
+				get(in_var_name, name),
+				get(offset, get_integer(pos)) }))));
 }
 
 template <typename N>
 tref tree<N>::build::in_variable_at_t(tref var_name) {
-	DBG(assert(tree::get(var_name).is(node::type::in_var_name));)
-	return get(tau_parser::bf, get(
-			tau_parser::variable, get(
-				tau_parser::io_var, get(
-					tau_parser::in,
-						var_name, get(
-						tau_parser::offset,
-							build::variable("t"))))));
+	DBG(assert(get(var_name).is(in_var_name));)
+	return get(bf, get(variable, get(io_var, get(in,
+			var_name, get(offset, build::variable("t"))))));
 }
 
 template <typename N>
@@ -89,28 +83,20 @@ tref tree<N>::build::in_variable_at_t(size_t index) {
 
 template <typename N>
 tref tree<N>::build::in_variable_at_t_minus (const std::string& name, int_t shift) {
-	using p = tau_parser;
-	auto var_name = get(p::in_var_name, name);
-	auto shift_node = get(p::shift, {get(p::variable, "t"), get_num(shift)});
-	auto offset = get(p::offset, shift_node);
-	return get(p::bf, get(p::variable, get(p::io_var, get(p::in, { var_name, offset }))));
+	return get(bf, get(variable, get(io_var, get(in, {
+		get(in_var_name, name),
+		get(offset, get(shift, {get(variable, "t"), get_num(shift)})) }))));
 }
 
 template <typename N>
 tref tree<N>::build::in_variable_at_t_minus(tref var_name, size_t num) {
-	DBG(assert(tree::get(var_name).is(node::type::in_var_name));)
+	DBG(assert(get(var_name).is(in_var_name));)
 	DBG(assert(num > 0);)
-
-	return get(
-		tau_parser::bf, get(
-			tau_parser::variable, get(
-				tau_parser::io_var, get(
-					tau_parser::in,
-						var_name, get(
-						tau_parser::offset, get(
-							tau_parser::shift,
-								build::variable("t"),
-								get_num(num)))))));
+	return get(bf, get(variable, get(io_var, get( in, {
+						var_name,
+						get(offset, get(shift, {
+							build::variable("t"),
+							get_num(num) })) }))));
 }
 
 template <typename N>
@@ -122,25 +108,20 @@ template <typename N>
 tref tree<N>::build::out_var_name(size_t index) {
 	std::stringstream var_name;
 	var_name << "o" << index;
-	return get(tau_parser::out_var_name, var_name.str());
+	return get(out_var_name, var_name.str());
 }
 
 template <typename N>
 tref tree<N>::build::out_var_name(const std::string& name) {
-	return get(tau_parser::out_var_name, name);
+	return get(out_var_name, name);
 }
 
 template <typename N>
 tref tree<N>::build::out_variable_at_t(tref var_name) {
-	DBG(assert(tree::get(var_name).is(node::type::out_var_name));)
-	return get(
-		tau_parser::bf,	get(
-			tau_parser::variable, get(
-				tau_parser::io_var, get(
-					tau_parser::out,
-						var_name, get(
-						tau_parser::offset,
-							build::variable("t"))))));
+	DBG(assert(get(var_name).is(out_var_name));)
+	return get(bf, get(variable, get(io_var, get(out, {
+					var_name,
+					get(offset, build::variable("t")) }))));
 }
 
 template <typename N>
@@ -150,16 +131,10 @@ tref tree<N>::build::out_variable_at_t(size_t index) {
 
 template <typename N>
 tref tree<N>::build::out_variable_at_n(tref var_name, size_t num) {
-	DBG(assert(tree::get(var_name).is(node::type::out_var_name));)
-
-	return get(
-		tau_parser::bf,	get(
-			tau_parser::variable, get(
-				tau_parser::io_var, get(
-					tau_parser::out,
-						var_name, get(
-						tau_parser::offset,
-							get_integer(num))))));
+	DBG(assert(get(var_name).is(out_var_name));)
+	return get(bf, get(variable, get(io_var, get(out, {
+					var_name,
+					get(offset, get_integer(num)) }))));
 }
 
 template <typename N>
@@ -169,37 +144,32 @@ tref tree<N>::build::out_variable_at_n(size_t index, size_t num) {
 
 template <typename N>
 tref tree<N>::build::out_variable_at_n(const std::string& name, const int_t pos) {
-	using p = tau_parser;
-	auto var_name = get(p::out_var_name, name);
-	auto offset = get(p::offset, get_integer(pos));
-	return get(p::bf, get(p::variable,
-		get(p::io_var, get(p::out, { var_name, offset }))));
+	return get(bf, get(variable, get(io_var, get(out, {
+					get(out_var_name, name),
+					get(offset, get_integer(pos)) }))));
 }
 
 template <typename N>
-tref tree<N>::build::out_variable_at_t_minus (const std::string& name, const int_t shift) {
-	using p = tau_parser;
-	auto var_name = get(p::out_var_name, name);
-	auto shift_node = get(p::shift, {get(p::variable, "t"), get_num(shift)});
-	auto offset = get(p::offset, shift_node);
-	return get(p::bf, get(p::variable, get(p::io_var, get(p::out, { var_name, offset }))));
+tref tree<N>::build::out_variable_at_t_minus (const std::string& name,
+	const int_t shift)
+{
+	return get(bf, get(variable, get(io_var, get(out, {
+						get(out_var_name, name),
+						get(offset, get(shift, {
+							get(variable, "t"),
+							get_num(shift)})) }))));
 }
 
 template <typename N>
 tref tree<N>::build::out_variable_at_t_minus(tref var_name, size_t num) {
-	DBG(assert(tree::get(var_name).is(node::type::out_var_name));)
+	DBG(assert(get(var_name).is(out_var_name));)
 	DBG(assert(num > 0);)
 
-	return get(
-		tau_parser::bf,	get(
-			tau_parser::variable, get(
-				tau_parser::io_var, get(
-					tau_parser::out,
-						var_name, get(
-						tau_parser::offset, get(
-							tau_parser::shift,
-								build::variable("t"),
-								get_num(num)))))));
+	return get(bf, get(variable, get(io_var, get(out, {
+						var_name,
+						get(offset, get(shift, {
+							build::variable("t"),
+							get_num(num)})) }))));
 }
 
 template <typename N>
@@ -210,12 +180,12 @@ tref tree<N>::build::out_variable_at_t_minus(size_t index, size_t num) {
 // // ------ Helpers for variables having io_var as child ---------------
 // template <typename N>
 // auto is_io_initial (tref io_var) {
-// 	return (trim2(io_var)->child[1] | tau_parser::integer).has_value();
+// 	return (trim2(io_var)->child[1] | integer).has_value();
 // }
 
 // template <typename N>
 // auto is_io_shift (tref io_var) {
-// 	return (trim2(io_var)->child[1] | tau_parser::shift).has_value();
+// 	return (trim2(io_var)->child[1] | shift).has_value();
 // }
 
 // template <typename N>
@@ -279,29 +249,17 @@ tref tree<N>::build::out_variable_at_t_minus(size_t index, size_t num) {
 
 template <typename N>
 tref tree<N>::build::bf_constant(tref cte) {
-	return get(
-		tau_parser::bf, get(
-			tau_parser::bf_constant, get(
-				tau_parser::constant,
-					cte)));
+	return get(bf, get(bf_constant, get(constant, cte)));
 }
 
 template <typename N>
 tref tree<N>::build::bf_constant(tref cte, tref type) {
-	return get(
-		tau_parser::bf, get(
-			tau_parser::bf_constant, get(
-				tau_parser::constant,
-					cte),
-				type));
+	return get(bf, get(bf_constant, get(constant, cte), type));
 }
 
 template <typename N>
 tref tree<N>::build::bf_constant(tref cte, const std::string& type) {
-	auto t = build::type(type);
-	return get(tau_parser::bf,
-		get(tau_parser::bf_constant,
-			get(tau_parser::constant, cte), t));
+	return get(bf, get(bf_constant, get(constant, cte), build::type(type)));
 }
 
 // template <typename N>
@@ -354,28 +312,24 @@ tref tree<N>::build::bf_constant(tref cte, const std::string& type) {
 
 template <typename N>
 tref tree<N>::build::bf_uninter_const(const std::string& n1, const std::string& n2) {
-	auto name = get(tau_parser::uninter_const_name, n1 + ":" + n2);
-	return get(tau_parser::bf,
-		get(tau_parser::variable,
-			get(tau_parser::uninterpreted_constant, name)));
+	return get(bf, get(variable, get(uninterpreted_constant,
+			get(uninter_const_name, n1 + ":" + n2))));
 }
 
 // wff factory method for building wff formulas
 template <typename N>
 tref tree<N>::build::wff_eq(tref l) {
-	return get(tau_parser::wff, get(tau_parser::bf_eq, l, _0));
+	return get(wff, get(bf_eq, l, _0));
 }
 
 template <typename N>
 tref tree<N>::build::wff_neq(tref l) {
-	return get(tau_parser::wff, get(tau_parser::bf_neq, l, _0));
+	return get(wff, get(bf_neq, l, _0));
 }
 
 template <typename N>
-tref tree<N>::build::wff_and(tref l,
-	tref r)
-{
-	return get(tau_parser::wff, get(tau_parser::wff_and, l, r));
+tref tree<N>::build::wff_and(tref l, tref r) {
+	return get(wff, get(wff_and, l, r));
 }
 
 template <typename N>
@@ -385,10 +339,8 @@ tref tree<N>::build::wff_and(const auto& wffs) {
 }
 
 template <typename N>
-tref tree<N>::build::wff_or(tref l,
-	tref r)
-{
-	return get(tau_parser::wff, get(tau_parser::wff_or, l, r));
+tref tree<N>::build::wff_or(tref l, tref r) {
+	return get(wff, get(wff_or, l, r));
 }
 
 template <typename N>
@@ -399,80 +351,63 @@ tref tree<N>::build::wff_or(const auto& wffs) {
 
 template <typename N>
 tref tree<N>::build::wff_neg(tref l) {
-	return get(tau_parser::wff, get(tau_parser::wff_neg, l));
+	return get(wff, get(wff_neg, l));
 }
 
 template <typename N>
-tref tree<N>::build::wff_xor_from_def(tref l,
-	tref r)
-{
+tref tree<N>::build::wff_xor_from_def(tref l, tref r) {
 	return build::wff_or(build::wff_and(build::wff_neg(l), r),
 		build::wff_and(build::wff_neg(r), l));
 }
 
 template <typename N>
-tref tree<N>::build::wff_xor(tref l,
-	tref r)
-{
+tref tree<N>::build::wff_xor(tref l, tref r) {
 	return build::wff_or(
 		build::wff_and(build::wff_neg(l), r),
 		build::wff_and(build::wff_neg(r), l));
 }
 
 template <typename N>
-tref tree<N>::build::wff_imply(tref l,
-	tref r)
-{
+tref tree<N>::build::wff_imply(tref l, tref r) {
 	return build::wff_or(build::wff_neg(l), r);
 }
 
 template <typename N>
-tref tree<N>::build::wff_conditional(tref x,
-	tref y,
-	tref z)
-{
+tref tree<N>::build::wff_conditional(tref x, tref y, tref z) {
 	return build::wff_and(build::wff_imply(x, y),
 		build::wff_imply(build::wff_neg(x), z));
 }
 
 template <typename N>
-tref tree<N>::build::wff_equiv(tref l,
-	tref r)
-{
+tref tree<N>::build::wff_equiv(tref l, tref r) {
 	return build::wff_and(build::wff_imply(l, r),
 		build::wff_imply(r, l));
 }
 
 template <typename N>
-tref tree<N>::build::wff_all(tref l,
-	tref r)
-{
-	return get(tau_parser::wff, get(tau_parser::wff_all, l, r));
+tref tree<N>::build::wff_all(tref l, tref r) {
+	return get(wff, get(wff_all, l, r));
 }
 
 template <typename N>
-tref tree<N>::build::wff_ex(tref l,
-	tref r)
-{
-	return get(tau_parser::wff, get(tau_parser::wff_ex, l, r));
+tref tree<N>::build::wff_ex(tref l, tref r) {
+	return get(wff, get(wff_ex, l, r));
 }
 
 template <typename N>
 tref tree<N>::build::wff_sometimes(tref l) {
-	return get(tau_parser::wff, get(tau_parser::wff_sometimes, l));
+	return get(wff, get(wff_sometimes, l));
 }
 
 template <typename N>
 tref tree<N>::build::wff_always(tref l) {
-	return get(tau_parser::wff, get(tau_parser::wff_always, l));
+	return get(wff, get(wff_always, l));
 }
 
 // bf factory method for building bf formulas
 template <typename N>
-tref tree<N>::build::bf_and(tref l,
-	tref r)
-{
-	return get(tau_parser::bf, get(tau_parser::bf_and, l, r));
+tref tree<N>::build::bf_and(tref l, tref r) {
+	return get(bf, get(bf_and, l, r));
 }
 
 template <typename N>
@@ -482,10 +417,8 @@ tref tree<N>::build::bf_and(const auto& bfs) {
 }
 
 template <typename N>
-tref tree<N>::build::bf_or(tref l,
-	tref r)
-{
-	return get(tau_parser::bf, get(tau_parser::bf_or, l, r));
+tref tree<N>::build::bf_or(tref l, tref r) {
+	return get(bf, get(bf_or, l, r));
 }
 
 template <typename N>
@@ -496,22 +429,18 @@ tref tree<N>::build::bf_or(const auto& bfs) {
 
 template <typename N>
 tref tree<N>::build::bf_neg(tref l) {
-	return get(tau_parser::bf, get(tau_parser::bf_neg, l));
+	return get(bf, get(bf_neg, l));
 }
 
 template <typename N>
-tref tree<N>::build::bf_xor_from_def(tref l,
-	tref r)
-{
+tref tree<N>::build::bf_xor_from_def(tref l, tref r) {
 	return build::bf_or(
 		build::bf_and(build::bf_neg(l), r),
 		build::bf_and(build::bf_neg(r), l));
 }
 
 template <typename N>
-tref tree<N>::build::bf_xor(tref l,
-	tref r)
-{
+tref tree<N>::build::bf_xor(tref l, tref r) {
 	return build::bf_or(
 		build::bf_and(build::bf_neg(l), r),
 		build::bf_and(l, build::bf_neg(r)));
@@ -520,8 +449,7 @@ tref tree<N>::build::bf_xor(tref l,
 template <typename N>
 tref tree<N>::build::wff_eq(tref l, tref r) {
 // #ifdef DEBUG
-// 	using p = tau_parser;
-// 	assert(is_non_terminal(p::bf, l) && is_non_terminal(p::bf, r));
+// // 	assert(is_non_terminal(bf, l) && is_non_terminal(bf, r));
 // #endif // DEBUG
 	auto left_side = build::bf_xor(l,r);
 	return build::wff_eq(left_side);
@@ -559,13 +487,13 @@ tref tree<N>::build::bf_interval(tref x, tref y, tref z) {
 template <typename N>
 tref tree<N>::build::bf_nleq_lower(tref l, tref r) {
 	trefs args { trim(l), trim(r) };
-	return apply_builder(builder_bf_nleq_lower<N>, args);
+	return apply_builder(bldr::bf_nleq_lower, args);
 }
 
 template <typename N>
 tref tree<N>::build::bf_nleq_upper(tref l, tref r) {
 	trefs args { trim(l), trim(r) };
-	return apply_builder(builder_bf_nleq_upper<N>, args);
+	return apply_builder(bldr::bf_nleq_upper, args);
 }
 
 template <typename N>
@@ -590,44 +518,32 @@ tref tree<N>::build::bf_ngeq(tref l, tref r) {
 
 template <typename N>
 tref tree<N>::build::wff_ctn_greater_equal(tref ctnvar, tref num) {
-	return get(tau_parser::wff,
-			get(tau_parser::constraint,
-				get(tau_parser::ctn_greater_equal, {ctnvar, num})));
+	return get(wff, get(constraint, get(ctn_greater_equal, {ctnvar, num})));
 }
 
 template <typename N>
 tref tree<N>::build::wff_ctn_greater(tref ctnvar, tref num) {
-	return get(tau_parser::wff,
-			get(tau_parser::constraint,
-				get(tau_parser::ctn_greater, {ctnvar, num})));
+	return get(wff, get(constraint, get(ctn_greater, {ctnvar, num})));
 }
 
 template <typename N>
 tref tree<N>::build::wff_ctn_less_equal(tref ctnvar, tref num) {
-	return get(tau_parser::wff,
-			get(tau_parser::constraint,
-				get(tau_parser::ctn_less_equal, {ctnvar, num})));
+	return get(wff, get(constraint, get(ctn_less_equal, {ctnvar, num})));
 }
 
 template <typename N>
 tref tree<N>::build::wff_ctn_less(tref ctnvar, tref num) {
-	return get(tau_parser::wff,
-			get(tau_parser::constraint,
-				get(tau_parser::ctn_less, {ctnvar, num})));
+	return get(wff, get(constraint, get(ctn_less, {ctnvar, num})));
 }
 
 template <typename N>
 tref tree<N>::build::wff_ctn_eq(tref ctnvar, tref num) {
-	return get(tau_parser::wff,
-			get(tau_parser::constraint,
-				get(tau_parser::ctn_eq, {ctnvar, num})));
+	return get(wff, get(constraint, get(ctn_eq, {ctnvar, num})));
 }
 
 template <typename N>
 tref tree<N>::build::wff_ctn_neq(tref ctnvar, tref num) {
-	return get(tau_parser::wff,
-			get(tau_parser::constraint,
-				get(tau_parser::ctn_neq, {ctnvar, num})));
+	return get(wff, get(constraint, get(ctn_neq, {ctnvar, num})));
 }
 
 //------------------------------------------------------------------------------
