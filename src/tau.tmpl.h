@@ -164,12 +164,12 @@ tref tree<node>::get_num(size_t n) {
 
 template <typename node>
 tref tree<node>::get_integer(int_t n) {
-	return get(node(node::type::integer, static_cast<size_t>(n)));
+	return get(node(integer, static_cast<size_t>(n)));
 }
 
 template <typename node>
 tref tree<node>::get_ba_constant_id(size_t c) {
-	return get(node(node::type::bf_constant, c));
+	return get(node(bf_constant, c));
 }
 
 //------------------------------------------------------------------------------
@@ -189,11 +189,12 @@ tref tree<node>::get_ba_constant_id(size_t c) {
 template <typename node>
 template <typename binder>
 tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
-	std::unordered_map<tref, tref> m; // map of parse tree tref to tau tree tref
 
-	// get tau tree tref from parse tree tref
+	// map of parse tree nodes' refs to tau tree nodes' refs
+	std::unordered_map<tref, tref> m;
+	// get tau tree node ref from parse tree node ref
 	auto m_ref = [&m](tref t) { return m.at(t); };
-	// get tau tree node from parse tree tref
+	// get tau tree node instance from parse tree node ref
 	auto m_get = [&m](tref t) { return get(m.at(t)); };
 
 	auto transformer = [&m, &m_ref, &m_get, &bind](tref t, tref parent) {
@@ -201,7 +202,7 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 
 		if (m.find(t) != m.end()) return true; // already transformed
 		const auto& tr = parse_tree::get(t); // get parse tree node
-		if (tr.is_t()) return true; // terminals are process by their parents
+		if (tr.is_t()) return true; // terminals are processed by their parents
 
 		// get node type and parent node type
 		auto nt = tr.get_nt();
@@ -213,49 +214,53 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 			const auto& q_vars = m_get(tr[0]);
 			const auto& wff_expr = m_get(tr[1]);
 			trefs vars = q_vars.get_children();
-			if (vars.empty())
+			if (vars.empty()) // TODO (LOW) is this even reachable?
 				return get(static_cast<node::type>(nt), {
 						q_vars.get(), wff_expr.get() });
 			tref x = wff_expr.only_child();
 			for (size_t vi = 0; vi != vars.size(); ++vi) {
-				// create a new quantifier node with var and new children
+				// create a new quantifier node with var and new
+				// children. Note the reversed order!
 				x = get(static_cast<node::type>(nt), {
 					vars[vars.size() - 1 - vi],
-					get(node::type::wff, x) });
+					get(wff, x) });
 			}
 			return x;
 		};
 
+		// takes data value from a preprocessed digit subnode
+		// and negates if '-' sign is parsed (if children size == 2)
 		auto process_integer = [&m, &m_get, &tr]() {
-			trefs ch = tr.get_children();
+			trefs ch = tr.get_children(); // 1 or 2
 			bool neg = ch.size() == 2;
-			int_t i = static_cast<int_t>(
+			int_t i = static_cast<int_t>( // get data from child 0 or 1)
 				m_get(ch[static_cast<size_t>(neg)]).data());
 			return neg ? -i : i;
 		};
 
 		// simple renaming transformations
-		auto retype_nonterminal = [&nt, &parent_nt]() {
+		// TODO (LOW) this should be supported directly by the parser
+		auto retype_nonterminal = [&nt, &parent_nt]() -> node::type {
 			switch (nt) { // of intermediate nodes
 				// bf_and_nosep and bf_neg_oprnd
-				case node::type::bf_and_nosep_1st_oprnd:
-				case node::type::bf_and_nosep_2nd_oprnd:
-				case node::type::bf_neg_oprnd:
-					nt = node::type::bf; break;
-				case node::type::bf_and_nosep:
-					nt = node::type::bf_and; break;
-
+				case bf_and_nosep_1st_oprnd:
+				case bf_and_nosep_2nd_oprnd:
+				case bf_neg_oprnd:
+					nt = bf; break;
+				case bf_and_nosep:
+					nt = bf_and; break;
 				// offset variable -> capture
-				case node::type::variable:
-					if (parent_nt == node::type::offsets)
-						nt = node::type::capture;
+				case variable:
+					if (parent_nt == offsets)
+						nt = capture;
 					break;
 				default: break;
 			}
 			return static_cast<node::type>(nt);
 		};
 
-		// default transformation for nonterminals which do not require special handling
+		// default transformation for nonterminals which do not require
+		// special handling
 		auto process_arbitrary_nonterminal =
 			[&m, &m_ref, &tr, &retype_nonterminal]()
 		{
@@ -264,22 +269,24 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 				DBG(assert(c != nullptr && m.find(c) != m.end());)
 				ch.push_back(m_ref(c));
 			}
+			// return new node with remapped children and possibly
+			// retyped nonterminal type
 			return get(retype_nonterminal(), ch);
 		};
 
 		tref x; // result of node transformation
 		switch (nt) {
 			// tau tree terminals
-			case node::type::digits: // preprocess digits
+			case digits: // preprocess digits
 				// TODO: ??? check if number fits into data bitsize, if not, create an ext node
 				// maybe only if --ext_nodes option is used
 				x = get(nt, std::stoul(tr.get_terminals()));
 				break;
 
-			case node::type::integer:
+			case integer:
 				x = get_integer(process_integer()); break;
 
-			case node::type::bf_constant:
+			case bf_constant:
 				// call binder and get the id of the constant
 				if (size_t cid = bind(t); bind.error)
 					return false;
@@ -287,13 +294,13 @@ tref tree<node>::get(const tau_parser::tree& pt, binder& bind) {
 				break;
 
 			// digital terminals (same as is_digital_nt())
-			case node::type::num:
-			case node::type::memory_id:
+			case num:
+			case memory_id:
 				x = get(node(nt), m_get(tr.only_child()).data());
 				break;
 
-			case node::type::wff_all:
-			case node::type::wff_ex:
+			case wff_all:
+			case wff_ex:
 				x = process_quantifier_vars();
 				break;
 
@@ -389,8 +396,8 @@ tref tree<N>::get_from_file(const std::string& filename, parse_options options){
 
 template <typename N>
 rewriter::library tree<N>::get_library(const std::string& str) {
-	auto rs = tt(tree::get(str, { .start = node::type::library }))
-				| node::type::rules || node::type::rule;
+	auto rs = tt(tree::get(str, { .start = library }))
+				| rules || rule;
 	rewriter::library lib;
 	for (auto r : rs.traversers()) {
 		r = r | tt::first;
@@ -405,10 +412,10 @@ template <typename N>
 rewriter::builder tree<N>::get_builder(tref ref) {
 	DBG(assert(ref != nullptr);)
 	tt b(ref);
-	auto body = b | node::type::builder_body | tt::only_child;
-	DBG(assert((body | tt::nt) == node::type::bf_builder_body
-		|| (body | tt::nt) == node::type::wff_builder_body);)
-	return { geth(b | node::type::builder_head | tt::ref),
+	auto body = b | builder_body | tt::only_child;
+	DBG(assert((body | tt::nt) == bf_builder_body
+		|| (body | tt::nt) == wff_builder_body);)
+	return { geth(b | builder_head | tt::ref),
 		geth(body | tt::first | tt::ref) };
 }
 
@@ -523,13 +530,13 @@ template <typename node>
 bool tree<node>::is_string() const { return is_string_nt(this->value.nt); }
 
 template <typename node>
-bool tree<node>::is_integer() const { return is(node::type::integer); }
+bool tree<node>::is_integer() const { return is(integer); }
 
 template <typename node>
-bool tree<node>::is_num() const { return is(node::type::num); }
+bool tree<node>::is_num() const { return is(num); }
 
 template <typename node>
-bool tree<node>::is_ba_constant() const { return is(node::type::bf_constant); }
+bool tree<node>::is_ba_constant() const { return is(bf_constant); }
 
 template <typename node>
 node::type tree<node>::get_type() const {
