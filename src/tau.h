@@ -176,9 +176,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get_from_file(const std::string& filename,
 						parse_options options = {});
 
-	// other starting points
-	static rewriter::library get_library(const std::string& str);
-
+	// ---------------------------------------------------------------------
 	// terminals
 	static tref get_num(size_t v);
 	static tref get_integer(int_t v);
@@ -200,6 +198,9 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	tref second() const;
 	tref third()  const;
 	tref only_child() const;
+
+	tref trim() const { return first(); }
+	static tref trim(tref t) { return get(t).first(); }
 
 	const tree& child_tree(size_t n) const;
 	const tree& operator[](size_t n) const;
@@ -364,8 +365,191 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	traverser operator||(size_t nt) const;
 
 	using tt = traverser;
+
+	// ---------------------------------------------------------------------
+	// library and builders
+
+	static rewriter::library get_library(const std::string& str);
+	static rewriter::builder get_builder(tref ref);
+	static rewriter::builder get_builder(const std::string& source);
+
+	static tref apply_builder(const rewriter::builder& b, trefs n);
+
+	static htree::sp _0;
+	static htree::sp _0_trimmed;
+	static htree::sp _1;
+	static htree::sp _1_trimmed;
+	static htree::sp _F;
+	static htree::sp _F_trimmed;
+	static htree::sp _T;
+	static htree::sp _T_trimmed;
+
+	struct build {
+
+		static tref variable(const std::string& name);
+		static tref in_var_name(size_t index);
+		static tref type(const std::string& type);
+		static tref bf_t_type(const std::string& type);
+		static tref bf_t_type(tref type);
+		static tref bf_f_type(const std::string& type);
+		static tref bf_f_type(tref type);
+		static tref in_variable_at_n(tref in_var_name, size_t num);
+		static tref in_variable_at_n(size_t index, size_t num);
+		static tref in_variable_at_n(const std::string& name, int_t pos);
+		static tref in_variable_at_t(tref in_var_name);
+		static tref in_variable_at_t(size_t index);
+		static tref in_variable_at_t_minus(const std::string& var_name,
+									int_t shift);
+		static tref in_variable_at_t_minus(tref in_var_name, size_t num);
+		static tref in_variable_at_t_minus(size_t index, size_t num);
+		static tref out_var_name(size_t index);
+		static tref out_var_name(const std::string& name);
+		static tref out_variable_at_t(tref out_var_name);
+		static tref out_variable_at_t(size_t index);
+		static tref out_variable_at_n(tref out_var_name, size_t num);
+		static tref out_variable_at_n(size_t index, size_t num);
+		static tref out_variable_at_n(const std::string& name, int_t pos);
+		static tref out_variable_at_t_minus(const std::string& out_var_name,
+									int_t shift);
+		static tref out_variable_at_t_minus(tref out_var_name, size_t num);
+		static tref out_variable_at_t_minus(size_t index, size_t num);
+		// static tref bf_variable(const std::string& name);
+		static tref bf_constant(tref cte);
+		static tref bf_constant(tref cte, tref type);
+		static tref bf_constant(tref cte, const std::string& type);
+		
+		// build_bf_and_constant and build_bf_or_constant
+
+		static tref bf_uninter_const(const std::string& name1, const std::string& name2);
+		static tref wff_eq(tref l, tref r);
+		static tref wff_eq(tref l);
+		static tref wff_neq(tref l);
+		static tref wff_and(tref l, tref r);
+		static tref wff_and(const auto& wffs);
+		static tref wff_or(tref l, tref r);
+		static tref wff_or(const auto& wffs);
+		static tref wff_neg(tref n);
+		static tref wff_xor_from_def(tref l, tref r);
+		static tref wff_xor(tref l, tref r);
+		static tref wff_imply(tref l, tref r);
+		static tref wff_conditional(tref x, tref y, tref z);
+		static tref wff_equiv(tref l, tref r);
+		static tref wff_all(tref l, tref r);
+		static tref wff_ex(tref l, tref r);
+		static tref wff_sometimes(tref n);
+		static tref wff_always(tref n);
+		static tref bf_and(tref l, tref r);
+		static tref bf_and(const auto& bfs);
+		static tref bf_or(tref l, tref r);
+		static tref bf_or(const auto& bfs);
+		static tref bf_neg(tref n);
+		static tref bf_xor_from_def(tref l, tref r);
+		static tref bf_xor(tref l, tref r);
+		static tref bf_less(tref l, tref r);
+		static tref bf_nless(tref l, tref r);
+		static tref bf_less_equal(tref l, tref r);
+		static tref bf_nleq(tref l, tref r);
+		static tref bf_interval(tref x, tref y, tref z);
+		static tref bf_nleq_lower(tref l, tref r);
+		static tref bf_nleq_upper(tref l, tref r);
+		static tref bf_greater(tref l, tref r);
+		static tref bf_ngreater(tref l, tref r);
+		static tref bf_greater_equal(tref l, tref r);
+		static tref bf_ngeq(tref l, tref r);
+		static tref wff_ctn_greater_equal(tref ctnvar, tref num);
+		static tref wff_ctn_greater(tref ctnvar, tref num);
+		static tref wff_ctn_less_equal(tref ctnvar, tref num);
+		static tref wff_ctn_less(tref ctnvar, tref num);
+		static tref wff_ctn_eq(tref ctnvar, tref num);
+		static tref wff_ctn_neq(tref ctnvar, tref num);
+	};	
 };
+
+template <typename node>
+bool is_nt(tref n) {
+	return tree<node>::get(n).is_nt();
+}
+
+template <typename node>
+bool is_t(tref n) {
+	return tree<node>::get(n).is_t();
+}
+
+template <typename node>
+bool is(const size_t nt, tref n) {
+	return tree<node>::get(n).is(nt);
+}
+
+template <typename node, size_t nt>
+bool is(tref n) { return is<node>(nt, n); }
+
+// factory method for is predicate
+template <typename node>
+inline std::function<bool(tref)> is(size_t nt) {
+	return [nt](tref n) { return is<node>(nt, n); };
+}
+
+
+// -----------------------------------------------------------------------------
+// builders:
+
+template <typename node>
+htree::sp tree<node>::_0_trimmed = tree<node>::get(node::type::bf_t);
+template <typename node>
+htree::sp tree<node>::_0 = tree<node>::get(node::type::bf, tree<node>::_0_trimmed);
+
+template <typename node>
+htree::sp tree<node>::_1_trimmed = tree<node>::get(node::type::bf_t);
+template <typename node>	
+htree::sp tree<node>::_1 = tree<node>::get(node::type::bf, tree<node>::_1_trimmed);
+
+template <typename node>
+htree::sp tree<node>::_F_trimmed = tree<node>::get(node::type::wff_f);
+template <typename node>
+htree::sp tree<node>::_F = tree<node>::get(node::type::wff, tree<node>::_F_trimmed);
+
+template <typename node>
+htree::sp tree<node>::_T_trimmed = tree<node>::get(node::type::wff_t);
+template <typename node>
+htree::sp tree<node>::_T = tree<node>::get(node::type::wff, tree<node>::_T_trimmed);
+
+
+const std::string BUILDER_BF_NLEQ_UPPER = "( $X $Y ) =:: $X !<= $Y.";
+const std::string BUILDER_BF_NLEQ_LOWER = "( $X $Y ) =:: $Y !<= $X.";
+// // wff builder
+// template <typename node>
+// inline static auto builder_wff_eq = tree<node>::get_builder(BLDR_WFF_EQ);
+// template <typename node>
+// inline static auto builder_bf_splitter = tree<node>::get_builder(BLDR_BF_SPLITTER);
+// template <typename node>
+// inline static auto builder_bf_not_less_equal =
+// 				tree<node>::get_builder(BLDR_BF_NOT_LESS_EQUAL);
+// template <typename node>
+// inline static auto builder_bf_interval = tree<node>::get_builder(BDLR_BF_INTERVAL);
+template <typename node>
+static auto builder_bf_nleq_upper = tree<node>::get_builder(BUILDER_BF_NLEQ_UPPER);
+template <typename node>
+static auto builder_bf_nleq_lower = tree<node>::get_builder(BUILDER_BF_NLEQ_LOWER);
+
+// // basic bf and wff constants
+// template <typename node>
+// inline static htree::sp _0            = builder_bf_0<node>.second;
+// template <typename node>
+// inline static htree::sp _0_trimmed    = trim<node>(_0<node>);
+// template <typename node>
+// inline static htree::sp _1            = builder_bf_1<node>.second;
+// template <typename node>
+// inline static htree::sp _1_trimmed    = trim<node>(_1<node>);
+// template <typename node>
+// inline static htree::sp _F            = builder_wff_F<node>.second;
+// template <typename node>
+// inline static htree::sp _F_trimmed    = trim<node>(_F<node>);
+// template <typename node>
+// inline static htree::sp _T            = builder_wff_T<node>.second;
+// template <typename node>
+// inline static htree::sp _T_trimmed    = trim<node>(_T<node>);
 
 }
 
 #include "tau.tmpl.h"
+#include "tau_builders.h"

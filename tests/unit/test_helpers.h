@@ -25,7 +25,7 @@ namespace testing = doctest;
 
 template <typename... BAs>
 tref make(const std::string& s, tau_parser::parse_options opts = {}) {
-	return tau::get<BAs...>(s, opts);
+	return tau::get(s, opts);
 }
 
 template <typename... BAs>
