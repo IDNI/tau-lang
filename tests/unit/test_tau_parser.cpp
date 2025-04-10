@@ -592,23 +592,19 @@ TEST_SUITE("parsing basic bf nso_rr (2d): 1th var check") {
 
 TEST_SUITE("parsing builders") {
 
-	// TODO tree
-	// TEST_CASE("one capture") {
-	// 	const char* sample = "( $X ) =:: ($X && $X).";
-	// 	auto src = make_builder<Bool>(sample);
-	// 	CHECK( is_non_terminal<tau_parser::builder_head, Bool>(src.first) );
-	// 	CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
-	// }
+	TEST_CASE("one capture") {
+		const char* sample = "( $X ) =:: ($X && $X).";
+		auto bldr = tau::get_builder(sample);
+		CHECK( tau::get(bldr.first).is(tau::builder_head) );
+		CHECK( tau::get(bldr.second).is(tau::wff) );
+	}
 
-	// TODO tree
-	// TEST_CASE("two capture") {
-	// 	const char* sample = "( $X $Y ) =:: ($X && $Y).";
-	// 	auto src = make_builder<Bool>(sample);
-	// 	auto left = src.first;
-	// 	auto right = src.first;
-	// 	CHECK( is_non_terminal<tau_parser::builder_head, Bool>(src.first) );
-	// 	CHECK( is_non_terminal<tau_parser::wff, Bool>(src.second) );
-	// }
+	TEST_CASE("two capture") {
+		const char* sample = "( $X $Y ) =:: ($X && $Y).";
+		auto bldr = tau::get_builder(sample);
+		CHECK( tau::get(bldr.first).is(tau::builder_head) );
+		CHECK( tau::get(bldr.second).is(tau::wff) );
+	}
 }
 
 TEST_SUITE("parsing library") {
@@ -886,73 +882,6 @@ TEST_SUITE("parsing bf formulas ") {
 		CHECK( xor_rule.has_value() );
 	}
 }
-
-// TODO tree
-// TEST_SUITE("parsing bindings ") {
-
-// 	TEST_CASE("binding") {
-// 		const char* sample = "{ binding } := { binding }.";
-// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
-// 		auto named = lib | tau::rules | tau::rule | tau::bf_rule
-// 				| tau::bf_body | tau::bf | tau::bf_constant
-// 				| tau::constant | tau::binding;
-// 		CHECK( named.has_value() );
-// 	}
-
-// 	TEST_CASE("typed binding") {
-// 		const char* sample = "{ binding } : type := { binding } : type.";
-// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
-// 		auto typed = lib | tau::rules | tau::rule | tau::bf_rule
-// 				| tau::bf_body | tau::bf | tau::bf_constant
-// 				| tau::constant | tau::binding;
-// 		CHECK( typed.has_value() );
-// 	}
-
-// 	TEST_CASE("binding type") {
-// 		const char* sample = "{ binding } : type := { binding } : type.";
-// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
-// 		auto type = lib | tau::rules | tau::rule | tau::bf_rule
-// 				| tau::bf_body | tau::bf | tau::bf_constant
-// 				| tau::constant | tau::binding;
-// 		CHECK( type.has_value() );
-// 	}
-
-// 	TEST_CASE("binding source") {
-// 		const char* sample = "{ binding } : type := { binding } : type.";
-// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
-// 		auto source = lib | tau::rules | tau::rule | tau::bf_rule
-// 				| tau::bf_body | tau::bf | tau::bf_constant
-// 				| tau::constant | tau::binding
-// 				| tau::source;
-// 		CHECK( source.has_value() );
-// 	}
-
-// 	TEST_CASE("unresolved binding") {
-// 		const char* sample = "{ binding } := { binding }.";
-// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
-// 		auto type = lib | tau::rules | tau::rule | tau::bf_rule
-// 				| tau::bf_body | tau::bf | tau::bf_constant
-// 				| tau::type | tau::chars;
-// 		CHECK( !type.has_value() );
-// 	}
-
-// 	TEST_CASE("resolved binding") {
-// 		const char* sample = "{ binding } : type := { binding } : type.";
-// 		auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
-// 		auto type = lib | tau::rules | tau::rule | tau::bf_rule
-// 				| tau::bf_body | tau::bf | tau::bf_constant
-// 				| tau::type;
-// 		CHECK( type.has_value() );
-// 	}
-
-// 	TEST_CASE("multiple constants") {
-// 		const char* sample = "{ type : binding } & { type : binding2 }";
-// 		auto bf_and = make_tt<Bool>(sample, { .start = tau_parser::bf_and });
-// 		auto constants = bf_and || tau::bf || tau::bf_constant;
-// 		CHECK( constants.size() == 2 );
-// 	}
-// }
-
 
 TEST_SUITE("regression/disallow T and F as variables") {
 

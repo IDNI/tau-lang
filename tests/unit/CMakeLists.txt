@@ -8,6 +8,7 @@ set(TESTS
 	variant_ba
 
 	# new tree
+	builders
 	nso_rr
 	rules-bf_parsing
 	rules-wff_parsing
