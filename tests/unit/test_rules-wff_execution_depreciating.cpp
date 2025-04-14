@@ -3,18 +3,19 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "nso_rr.h"
+#include "depreciating/nso_rr_depreciating.h"
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
-#include "normalizer.h"
+#include "depreciating/normalizer_depreciating.h"
 #include "test_helpers_depreciating.h"
 
-using namespace idni::depreciating::rewriter;
+using namespace idni::rewriter::depreciating;
 using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
 
 namespace testing = doctest;
 
-std::tuple<tau_depreciating<Bool>, tau_depreciating<Bool>, tau_depreciating<Bool>>
+std::tuple<tau_<Bool>, tau_<Bool>, tau_<Bool>>
 	test_rule(const std::string& rule_str)
 {
 	auto src_rule = make_tau_source(rule_str, {

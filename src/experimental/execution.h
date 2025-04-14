@@ -21,12 +21,12 @@ namespace idni::tau_lang::experimental {
 // information about std::function and how to use it.
 
 template<typename N, typename F>
-auto operator|(const depreciating::rewriter::sp_node<N>& n, F f) {
+auto operator|(const rewriter::depreciating::sp_node<N>& n, F f) {
 	return f(n);
 }
 
 template<typename N, typename F, typename S>
-auto operator|(const depreciating::rewriter::sp_node<N>& n, const std::pair<F, S>& p) {
+auto operator|(const rewriter::depreciating::sp_node<N>& n, const std::pair<F, S>& p) {
 	return n | p.first | p.second;
 }
 

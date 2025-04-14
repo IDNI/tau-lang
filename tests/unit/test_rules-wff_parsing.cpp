@@ -3,6 +3,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "test_helpers.h"
+#include "normal_forms.h"
+#include "normalizer.h"
 
 bool test_rule(const std::string& sample) {
 	auto lib = make_tt<Bool>(sample, { .start = tau::library });

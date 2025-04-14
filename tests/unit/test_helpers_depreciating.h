@@ -4,28 +4,29 @@
 #define __TEST_HELPERS_H__
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "language.h"
+#include "depreciating/nso_rr_depreciating.h"
+#include "depreciating/language_depreciating.h"
+#include "depreciating/boolean_algebras/nso_ba_depreciating.h"
 
-using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
-
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
 namespace testing = doctest;
 
 // TODO (LOW) most of this functions could be remove and replace by the standart API
 
 
-namespace idni::tau_lang {
+namespace idni::tau_lang::depreciating {
 
 	template<>
 	struct nso_factory<Bool> {
 
-		tau_depreciating<Bool> parse(const std::string&,
+		tau_<Bool> parse(const std::string&,
 				const std::string&) const {
 			throw std::logic_error("not implemented");
 		}
 
-		tau_depreciating<Bool> binding(const tau_depreciating<Bool>& n,
+		tau_<Bool> binding(const tau_<Bool>& n,
 				const std::string& type) const {
 			if (type != "bool") return n;
 			return make_node<tau_sym<Bool>>(Bool(true), {});
@@ -47,7 +48,7 @@ namespace idni::tau_lang {
 			throw std::logic_error("not implemented");
 		}
 
-		tau_depreciating<Bool> splitter_one(const std::string&) const {
+		tau_<Bool> splitter_one(const std::string&) const {
 			throw std::logic_error("not implemented");
 		}
 
@@ -70,38 +71,38 @@ namespace idni::tau_lang {
 } // namespace idni::tau_lang
 
 // helper functions
-tau_depreciating<Bool> make_statement(const sp_tau_source_node& source) {
+tau_<Bool> make_statement(const sp_tau_source_node& source) {
 	tauify<Bool> tf;
-	map_transformer<tauify<Bool>, sp_tau_source_node, tau_depreciating<Bool>> transform(tf);
+	map_transformer<tauify<Bool>, sp_tau_source_node, tau_<Bool>> transform(tf);
 	return post_order_traverser<
-			map_transformer<tauify<Bool>, sp_tau_source_node, tau_depreciating<Bool>>,
+			map_transformer<tauify<Bool>, sp_tau_source_node, tau_<Bool>>,
 			all_t,
 			sp_node<tau_source_sym>,
-			tau_depreciating<Bool>>(
+			tau_<Bool>>(
 		transform, all)(source);
 }
 
-tau_depreciating<Bool> make_named_bindings(const tau_depreciating<Bool>& statement, const bindings<Bool>& bs) {
+tau_<Bool> make_named_bindings(const tau_<Bool>& statement, const bindings<Bool>& bs) {
 	name_binder<Bool> nb(bs);
 	bind_transformer<name_binder<Bool>, Bool> binder(nb);
 	return post_order_traverser<
 			bind_transformer<name_binder<Bool>, Bool>,
 			all_t,
-			tau_depreciating<Bool>>(
+			tau_<Bool>>(
 		binder, all)(statement);
 }
 
-tau_depreciating<Bool> make_factory_bindings(const tau_depreciating<Bool>& statement) {
+tau_<Bool> make_factory_bindings(const tau_<Bool>& statement) {
 	factory_binder<Bool> fb;
 	bind_transformer<factory_binder<Bool>, Bool> binder(fb);
 	return post_order_traverser<
 			bind_transformer<factory_binder<Bool>, Bool>,
 			all_t,
-			tau_depreciating<Bool>>(
+			tau_<Bool>>(
 		binder, all)(statement);
 }
 
-std::ostream& print_tau(std::ostream &os, tau_depreciating<Bool> n, size_t l = 0) {
+std::ostream& print_tau(std::ostream &os, tau_<Bool> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded {
@@ -114,7 +115,7 @@ std::ostream& print_tau(std::ostream &os, tau_depreciating<Bool> n, size_t l = 0
 	return os;
 }
 
-std::ostream& pretty_print_tau(std::ostream &os, tau_depreciating<Bool> n, size_t l = 0) {
+std::ostream& pretty_print_tau(std::ostream &os, tau_<Bool> n, size_t l = 0) {
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },

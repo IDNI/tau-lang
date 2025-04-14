@@ -18,12 +18,12 @@
 #include "doctest.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/sbf_ba.h"
-#include "nso_rr.h"
-#include "normalizer.h"
+#include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
+#include "depreciating/nso_rr_depreciating.h"
+#include "depreciating/normalizer_depreciating.h"
 
-using namespace idni::depreciating::rewriter;
-using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
 
 namespace testing = doctest;
 

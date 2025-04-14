@@ -17,12 +17,12 @@
 
 #include "boolean_algebras/bool_ba.h"
 #include "doctest.h"
-#include "nso_rr.h"
+#include "depreciating/nso_rr_depreciating.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
-#include "normalizer.h"
+#include "depreciating/normalizer_depreciating.h"
 #include "test_helpers_depreciating.h"
 
-using namespace idni::depreciating::rewriter;
+using namespace idni::rewriter::depreciating;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;
@@ -51,7 +51,7 @@ TEST_SUITE("make_library") {
 // other unit/integration tests. However, it is better to have explicit tests
 // for each of them.
 
-// TODO (VERY_LOW) write tests for operator<<(ostream, tau_depreciating<...>)
+// TODO (VERY_LOW) write tests for operator<<(ostream, tau_<...>)
 // TODO (VERY_LOW) write tests for operator<<(ostream, sp_tau_source_node)
 //
 // They are tagged as VERY_LOW because they should be remove once we have a proper

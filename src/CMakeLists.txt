@@ -19,26 +19,28 @@ set(TAU_HEADERS
 	boolean_algebras/variant_ba.h
 	boolean_algebras/product_ba.h
 	boolean_algebras/nso_ba.h
-	experimental/execution.h
 	defs.h
-	rewriting.h
 	dict.h
-	normalizer.h
-	nso_rr.h
-	execution.h
+	experimental/execution.h
+	rewriting.h
 	tau.h
-	normal_forms.h
-	satisfiability.h
-	solver.h
-	splitter.h
-	splitter_types.h
-	interpreter.h
-	interpreter.impl.h
-	hooks.h
-	builders.h
-	language.h
-	queries.h
 	utils.h
+	depreciating/boolean_algebras/nso_ba_depreciating.h
+	depreciating/boolean_algebras/sbf_ba_depreciating.h
+	depreciating/boolean_algebras/tau_ba_depreciating.h
+	depreciating/execution_depreciating.h
+	depreciating/hooks_depreciating.h
+	depreciating/interpreter_depreciating.h
+	depreciating/normal_forms_depreciating.h
+	depreciating/normalizer_depreciating.h
+	depreciating/nso_rr_depreciating.h
+	depreciating/satisfiability_depreciating.h
+	depreciating/solver_depreciating.h
+	depreciating/splitter_depreciating.h
+	depreciating/splitter_types_depreciating.h
+	depreciating/builders_depreciating.h
+	depreciating/language_depreciating.h
+	depreciating/queries_depreciating.h
 )
 
 set(TAU_SOURCES
@@ -49,7 +51,8 @@ set(TAU_SOURCES
 	../external/parser/src/utility/term.cpp
 	boolean_algebras/bool_ba.cpp
 	dict.cpp
-	nso_rr.cpp
+	depreciating/nso_rr_depreciating.cpp
+
 )
 
 set(CLI_SOURCES

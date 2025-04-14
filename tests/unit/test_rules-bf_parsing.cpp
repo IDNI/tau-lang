@@ -3,6 +3,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "test_helpers.h"
+#include "normal_forms.h"
 
 bool test_rule(const std::string& sample, tau_parser::nonterminal rule_type) {
 	auto lib = make_tt<Bool>(sample, { .start = tau::library });
