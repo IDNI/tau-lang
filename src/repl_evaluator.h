@@ -68,7 +68,7 @@ struct repl_evaluator {
 		bool print_memory_store = true;
 		bool error_quits        = false;
 		bool charvar            = true;
-		bool repl_running	= true;
+		bool repl_running	    = true;
 #ifdef DEBUG
 		bool debug_repl         = true;
 		boost::log::trivial::severity_level
