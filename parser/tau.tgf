@@ -6,12 +6,11 @@
 
 # default start symbol
 #
-start                  => rr _.
+start                  => spec _.
 
 # start symbol posibilities:
-# rr, inputs, library, builder, tau_constant_source, cli (bellow)
-#TODO (LOW) maybe rename rr to program, rr_gssot or similar
-rr                     => rec_relations _ wff:main _ '.'.
+# spec, inputs, library, builder, tau_constant_source, cli (bellow)
+spec                   => rec_relations _ wff:main _ '.'.
 rec_relations          => (_ rec_relation _ '.')*.
 rec_relation           => ref _ ":=" _ (capture | ref | wff | bf).
 ref                    => sym [offsets] ref_args
@@ -150,7 +149,7 @@ cli_command            =>
 # TODO (MEDIUM) remove file command, it is not used
         | ("file"          :file_sym    __ q_string)          :file_cmd
 # TODO (HIGH) maybe we must also check for validity of wff and bf (the later
-# in the sense that is always 1). Also, what does it means for a rr to be valid?
+# in the sense that is always 1). Also, what does it means for a spec to be valid?
         | ("valid"         :valid_sym   __ normalize_cmd_arg) :valid_cmd
 # TODO (HIGH) maybe we should also check for the validity of the wff and bf (the
 # later in the sense that is not always 0)
@@ -230,7 +229,7 @@ wff_cmd_arg            => memory | wff.
 nf_cmd_arg             => memory | ref | wff | bf.
 onf_cmd_arg            => memory | wff.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
-normalize_cmd_arg      => memory | rr | ref | wff | bf.
+normalize_cmd_arg      => memory | spec | ref | wff | bf.
 # TODO (MEDIUM) check if could we only have one case?
 inst_args              =>
           wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'

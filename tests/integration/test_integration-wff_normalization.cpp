@@ -5,8 +5,9 @@
 #include "doctest.h"
 #include "test_integration_helpers.h"
 
-using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
 
 namespace testing = doctest;
 
@@ -77,7 +78,7 @@ TEST_SUITE("Normalizer") {
 	// 	CHECK( formula.has_value() );
 	// 	if (!formula.has_value()) return;
 	// 	auto fm = formula.value().main;
-	// 	std::set<tau_depreciating<sbf_ba>> visited;
+	// 	std::set<tau_<sbf_ba>> visited;
 	// 	auto result = push_sometimes_always_in(fm, visited);
 	// 	auto simp_res = result
 	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
@@ -93,7 +94,7 @@ TEST_SUITE("Normalizer") {
 	// 	CHECK( formula.has_value() );
 	// 	if (!formula.has_value()) return;
 	// 	auto fm = formula.value().main;
-	// 	std::set<tau_depreciating<sbf_ba>> visited;
+	// 	std::set<tau_<sbf_ba>> visited;
 	// 	auto result = push_sometimes_always_in(fm, visited);
 	// 	auto simp_res = result
 	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
@@ -108,7 +109,7 @@ TEST_SUITE("Normalizer") {
 	// 	CHECK( formula.has_value() );
 	// 	if (!formula.has_value()) return;
 	// 	auto fm = formula.value().main;
-	// 	std::set<tau_depreciating<sbf_ba>> visited;
+	// 	std::set<tau_<sbf_ba>> visited;
 	// 	auto result = push_sometimes_always_in(fm, visited);
 	// 	auto simp_res = result
 	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)

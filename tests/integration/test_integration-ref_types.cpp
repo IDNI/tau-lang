@@ -9,8 +9,10 @@
 #include "test_integration_helpers.h"
 #include "../unit/test_helpers_depreciating.h"
 
-using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
+
 
 namespace testing = doctest;
 
@@ -20,7 +22,7 @@ bool test_ref_types(const char* rec_relation,
 	// boost::log::core::get()->set_filter(
 	// 	boost::log::trivial::severity >= boost::log::trivial::trace);
 
-	auto source = make_tau_source(rec_relation, { .start = tau_parser::rr });
+	auto source = make_tau_source(rec_relation, { .start = tau_parser::spec });
 	auto code = make_tau_code<sbf_ba>(source);
 	factory_binder<sbf_ba> fb;
 	auto binded = bind_tau_code_using_binder<
@@ -32,8 +34,8 @@ bool test_ref_types(const char* rec_relation,
 	// std::cerr << "nt: " << tau_parser::instance().name(nt) << "\n";
 
 	auto main = binded | tau_parser::main
-		| tau_parser::wff | optional_value_extractor<tau_depreciating<sbf_ba>>;
-	auto nso_rr = rr<tau_depreciating<sbf_ba>>{ make_rec_relations<sbf_ba>(binded), main };
+		| tau_parser::wff | optional_value_extractor<tau_<sbf_ba>>;
+	auto nso_rr = rr<tau_<sbf_ba>>{ make_rec_relations<sbf_ba>(binded), main };
 
 	rr_types<sbf_ba> ts(nso_rr);
 	auto nso_rr_opt = infer_ref_types<sbf_ba>(nso_rr, ts);

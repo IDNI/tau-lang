@@ -8,11 +8,13 @@
 #include "../unit/test_helpers_depreciating.h"
 
 #ifdef DEBUG
-#include "debug_helpers.h"
+#include "depreciating/debug_helpers_depreciating.h"
 #endif
 
-using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
+
 
 namespace testing = doctest;
 

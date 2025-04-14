@@ -15,10 +15,10 @@
 
 #include "doctest.h"
 #include "test_helpers_depreciating.h"
-#include "normalizer.h"
+#include "depreciating/normalizer_depreciating.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 
-using namespace idni::depreciating::rewriter;
+using namespace idni::rewriter::depreciating;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;

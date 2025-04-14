@@ -3,43 +3,44 @@
 #ifndef __TEST_INTEGRATION_HELPERS_SBF_H__
 #define __TEST_INTEGRATION_HELPERS_SBF_H__
 
-#include "../src/boolean_algebras/sbf_ba.h"
+#include "../src/depreciating/boolean_algebras/sbf_ba_depreciating.h"
 #include "../src/boolean_algebras/bool_ba.h"
-#include "../src/nso_rr.h"
+#include "../src/depreciating/nso_rr_depreciating.h"
 #include "../src/boolean_algebras/bdds/babdd.h"
-#include "../src/nso_rr.h"
 #include "../src/boolean_algebras/bdds/bdd_handle.h"
-#include "../src/normalizer.h"
+#include "../src/depreciating/normalizer_depreciating.h"
 #include "dict.h"
 
-using namespace idni::depreciating::rewriter;
-using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
 
-rr<tau_depreciating<sbf_ba>> sbf_make_nso_rr(const std::string& src) {
+namespace idni::tau_lang::depreciating {
+
+rr<tau_<sbf_ba>> sbf_make_nso_rr(const std::string& src) {
 	auto sample_src = make_tau_source(src);
 	return make_nso_rr_using_factory<sbf_ba>(sample_src).value();
 }
 
-tau_depreciating<sbf_ba> sbf_make_nso(const std::string& src) {
+tau_<sbf_ba> sbf_make_nso(const std::string& src) {
 	return sbf_make_nso_rr(src).main;
 }
 
-rr<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>> tau_make_nso_rr_test(const std::string& src) {
+rr<tau_<tau_ba<sbf_ba>, sbf_ba>> tau_make_nso_rr_test(const std::string& src) {
 	auto sample_src = make_tau_source(src);
 	return make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(sample_src).value();
 }
 
-tau_depreciating<tau_ba<sbf_ba>, sbf_ba> tau_make_nso_test(const std::string& src) {
+tau_<tau_ba<sbf_ba>, sbf_ba> tau_make_nso_test(const std::string& src) {
 	return tau_make_nso_rr_test(src).main;
 }
 
-tau_depreciating<tau_ba<sbf_ba>, sbf_ba> normalize_test_tau(const char* src) {
-	rr<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>> nso_rr = make_nso_rr_using_factory<
+tau_<tau_ba<sbf_ba>, sbf_ba> normalize_test_tau(const char* src) {
+	rr<tau_<tau_ba<sbf_ba>, sbf_ba>> nso_rr = make_nso_rr_using_factory<
 		tau_ba<sbf_ba>, sbf_ba>(src).value();
 	return normalizer<tau_ba<sbf_ba>, sbf_ba>(nso_rr);
 }
 
-std::ostream& print_tau(std::ostream &os, tau_depreciating<sbf_ba> n, size_t l = 0) {
+std::ostream& print_tau(std::ostream &os, tau_<sbf_ba> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
@@ -54,7 +55,7 @@ std::ostream& print_tau(std::ostream &os, tau_depreciating<sbf_ba> n, size_t l =
 	return os;
 }
 
-std::ostream& pretty_print_tau(std::ostream &os, tau_depreciating<sbf_ba> n, size_t l = 0) {
+std::ostream& pretty_print_tau(std::ostream &os, tau_<sbf_ba> n, size_t l = 0) {
 	// for (size_t t = 0; t < l; t++) os << " ";
 	std::visit(overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },
@@ -67,4 +68,5 @@ std::ostream& pretty_print_tau(std::ostream &os, tau_depreciating<sbf_ba> n, siz
 	return os;
 }
 
+}
 #endif // __TEST_INTEGRATION_HELPERS_SBF_H__

@@ -8,31 +8,34 @@ set(TESTS
 	variant_ba
 
 	# new tree
+	bindings
 	builders
+	normal_forms
 	nso_rr
 	rules-bf_parsing
 	rules-wff_parsing
+	sbf_ba_parsing
 	tau_parser
 	traversal
 
 	# tests to implement with new tree
 	rules-bf_execution_depreciating
 	rules-wff_execution_depreciating
-	builders_depreciating
 	type_system_depreciating
-	bindings_depreciating
-	sbf_ba_binding_depreciating
 	normal_forms_depreciating
 	make_node_hook_depreciating
 	
 	# finished
+	bindings_depreciating
+	builders_depreciating
 	nso_rr_depreciating
 	rules-bf_parsing_depreciating
 	rules-wff_parsing_depreciating
+	sbf_ba_binding_depreciating
 	tau_parser_depreciating
 	traversal_depreciating
 	rewriting_depreciating # moved to the parser repository
-
+	
 	# empty tests?
 	interpreter
 	normalizer

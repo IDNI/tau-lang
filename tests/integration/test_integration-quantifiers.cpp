@@ -13,8 +13,10 @@
 // #include "debug_helpers.h"
 
 using namespace std;
-using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
+
 
 namespace testing = doctest;
 

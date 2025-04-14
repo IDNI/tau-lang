@@ -14,7 +14,7 @@ using terminal_type = char;
 inline static constexpr size_t nt_bits = 9;
 inline const std::vector<std::string> symbol_names{
 	"", "eof", "space", "digit", "xdigit", "alpha", "alnum", "punct", "printable", "start", 
-	"rr", "_", "rec_relations", "main", "wff", "__E_rec_relations_0", "rec_relation", "__E_rec_relations_1", "ref", "__E_rec_relation_2", 
+	"spec", "_", "rec_relations", "main", "wff", "__E_rec_relations_0", "rec_relation", "__E_rec_relations_1", "ref", "__E_rec_relation_2", 
 	"capture", "bf", "sym", "__E_ref_3", "offsets", "ref_args", "__E_ref_4", "__", "fp_fallback", "first_sym", 
 	"last_sym", "__E_ref_args_5", "__E___E_ref_args_5_6", "ref_arg", "__E___E_ref_args_5_7", "__E___E_ref_args_5_8", "library", "rules", "__E_library_9", "__E___E_library_9_10", 
 	"rule", "__E___E___E_library_9_10_11", "wff_rule", "bf_rule", "__E___E_library_9_12", "wff_matcher", "wff_body", "bf_matcher", "bf_body", "builder", 
@@ -128,11 +128,11 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	if (loaded) return p;
 	#define  T(x) (idni::prods<char_type, terminal_type>{ terminals[x] })
 	#define NT(x) (idni::prods<char_type, terminal_type>{ nts(x) })
-//G0:   start(9)             => rr(10) _(11).
+//G0:   start(9)             => spec(10) _(11).
 	p(NT(9), (NT(10)+NT(11)));
 //G1:   main(13)             => wff(14).
 	p(NT(13), (NT(14)));
-//G2:   rr(10)               => rec_relations(12) _(11) main(13) _(11) '.'.
+//G2:   spec(10)             => rec_relations(12) _(11) main(13) _(11) '.'.
 	p(NT(10), (NT(12)+NT(11)+NT(13)+NT(11)+T(1)));
 //G3:   __E_rec_relations_0(15) => _(11) rec_relation(16) _(11) '.'.
 	p(NT(15), (NT(11)+NT(16)+NT(11)+T(1)));
@@ -1256,7 +1256,7 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(301), (NT(14)));
 //G562: normalize_cmd_arg(241) => memory(262).
 	p(NT(241), (NT(262)));
-//G563: normalize_cmd_arg(241) => rr(10).
+//G563: normalize_cmd_arg(241) => spec(10).
 	p(NT(241), (NT(10)));
 //G564: normalize_cmd_arg(241) => ref(18).
 	p(NT(241), (NT(18)));
@@ -1381,7 +1381,7 @@ inline ::idni::grammar<char_type, terminal_type> grammar(
 struct tau_parser_nonterminals {
 	enum nonterminal {
 		nul, eof, space, digit, xdigit, alpha, alnum, punct, printable, start, 
-		rr, _, rec_relations, main, wff, __E_rec_relations_0, rec_relation, __E_rec_relations_1, ref, __E_rec_relation_2, 
+		spec, _, rec_relations, main, wff, __E_rec_relations_0, rec_relation, __E_rec_relations_1, ref, __E_rec_relation_2, 
 		capture, bf, sym, __E_ref_3, offsets, ref_args, __E_ref_4, __, fp_fallback, first_sym, 
 		last_sym, __E_ref_args_5, __E___E_ref_args_5_6, ref_arg, __E___E_ref_args_5_7, __E___E_ref_args_5_8, library, rules, __E_library_9, __E___E_library_9_10, 
 		rule, __E___E___E_library_9_10_11, wff_rule, bf_rule, __E___E_library_9_12, wff_matcher, wff_body, bf_matcher, bf_body, builder, 

@@ -6,17 +6,17 @@
 //#include "satisfiability.h"
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
-#include "normalizer.h"
+#include "depreciating/normalizer_depreciating.h"
 
 // TODO (LOW) consider move this test to integration tests
 #include "test_helpers_depreciating.h"
 
 #ifdef DEBUG
-#include "debug_helpers.h"
+#include "depreciating/debug_helpers_depreciating.h"
 #endif
 
 using namespace std;
-using namespace idni::depreciating::rewriter;
+using namespace idni::rewriter::depreciating;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;
@@ -52,7 +52,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = to_mnf(reduce_across_bfs(statement, false));
@@ -63,7 +63,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X != 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = to_mnf(reduce_across_bfs(statement, false));
@@ -77,7 +77,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 && Y = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = to_mnf(reduce_across_bfs(statement, false));
@@ -91,7 +91,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X != 0 && Y != 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = to_mnf(reduce_across_bfs(statement, false));
@@ -107,7 +107,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 		const char* sample = "X = 0 || Y = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = to_mnf(reduce_across_bfs(statement, false));
@@ -124,7 +124,7 @@ TEST_SUITE("normal forms: bf_reduce_canonical") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = statement | bf_reduce_canonical<Bool>();
@@ -138,7 +138,7 @@ TEST_SUITE("normal forms: reduce_bf") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = statement | reduce_bf<Bool>;
@@ -152,7 +152,7 @@ TEST_SUITE("normal forms: snf_bf") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff).value();
 		auto result = snf_bf(statement);
@@ -166,7 +166,7 @@ TEST_SUITE("normal forms: dnf_bf") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::bf_eq
@@ -188,7 +188,7 @@ TEST_SUITE("normal forms: dnf_bf") {
 			"& <:a>' | <:a> & <:b> & <:c>')')')' = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::rr
+			| tau_parser::spec
 			| tau_parser::main
 			| tau_parser::wff
 			| tau_parser::bf_eq

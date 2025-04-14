@@ -4,12 +4,12 @@
 
 #include "doctest.h"
 #include "boolean_algebras/bool_ba.h"
-#include "nso_rr.h"
+#include "depreciating/nso_rr_depreciating.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
-#include "normalizer.h"
+#include "depreciating/normalizer_depreciating.h"
 #include "test_helpers_depreciating.h"
 
-using namespace idni::depreciating::rewriter;
+using namespace idni::rewriter::depreciating;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;

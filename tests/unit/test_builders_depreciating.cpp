@@ -3,15 +3,15 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "nso_rr.h"
+#include "depreciating/nso_rr_depreciating.h"
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
-#include "normalizer.h"
+#include "depreciating/normalizer_depreciating.h"
 #include "test_helpers_depreciating.h"
 
-#include "debug_helpers.h"
+#include "depreciating/debug_helpers_depreciating.h"
 
-using namespace idni::depreciating::rewriter;
+using namespace idni::rewriter::depreciating;
 using namespace idni::tau_lang;
 
 namespace testing = doctest;
@@ -65,23 +65,23 @@ TEST_SUITE("builders execution") {
 	auto src = make_tau_source(sample);
 	auto frml = make_statement(src);
 	auto bfs = frml
-		| tau_parser::rr | tau_parser::main | tau_parser::wff
+		| tau_parser::spec | tau_parser::main | tau_parser::wff
 		| tau_parser::bf_eq || tau_parser::bf;
 	auto X = bfs[0] | tau_parser::variable
-		| optional_value_extractor<tau_depreciating<Bool>>;
+		| optional_value_extractor<tau_<Bool>>;
 	auto F = bfs[1] | tau_parser::bf_f
-		| optional_value_extractor<tau_depreciating<Bool>>;
+		| optional_value_extractor<tau_<Bool>>;
 
 	TEST_CASE("BLDR_WFF_EQ") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EQ);
-		std::vector<tau_depreciating<Bool>> args = {X};
+		std::vector<tau_<Bool>> args = {X};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_eq;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BLDR_WFF_NEQ") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_NEQ);
-		std::vector<tau_depreciating<Bool>> args = {X};
+		std::vector<tau_<Bool>> args = {X};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_neq;
 		CHECK( check.has_value() );
 	}
@@ -103,21 +103,21 @@ TEST_SUITE("builders execution") {
 
 	TEST_CASE("BLDR_WFF_ALL") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_ALL);
-		std::vector<tau_depreciating<Bool>> args = {X, F};
+		std::vector<tau_<Bool>> args = {X, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_all;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BLDR_WFF_EX") {
 		auto bldr = make_builder<Bool>(BLDR_WFF_EX);
-		std::vector<tau_depreciating<Bool>> args = {X, F};
+		std::vector<tau_<Bool>> args = {X, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::wff_ex;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE("BLDR_BF_SPLITTER") {
 		auto bldr = make_builder<Bool>(BLDR_BF_SPLITTER);
-		std::vector<tau_depreciating<Bool>> args = {F};
+		std::vector<tau_<Bool>> args = {F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_splitter;
 		CHECK( check.has_value() );
 	}
@@ -135,7 +135,7 @@ TEST_SUITE("builders execution") {
 	// TODO (HIGH) implement update this tests to cover upper and lower bounds
 	/*TEST_CASE("BLDR_BF_NOT_LESS_EQUAL") {
 		auto bldr = make_builder<Bool>(BLDR_BF_NOT_LESS_EQUAL);
-		std::vector<tau_depreciating<Bool>> args = {F, F};
+		std::vector<tau_<Bool>> args = {F, F};
 		auto check = tau_apply_builder<Bool>(bldr, args) | tau_parser::bf_not_less_equal;
 		CHECK( check.has_value() );
 	}*/

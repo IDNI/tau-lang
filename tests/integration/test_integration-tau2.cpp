@@ -20,8 +20,10 @@
 
 #include "test_integration_helpers-tau.h"
 
-using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
+
 
 namespace testing = doctest;
 

@@ -3,27 +3,23 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
-#include "boolean_algebras/sbf_ba.h"
-#include "satisfiability.h"
+#include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
+#include "depreciating/satisfiability_depreciating.h"
 
 // TODO (LOW) consider move this test to integration tests
 #include "../integration/test_integration_helpers.h"
 
 #define base_bas tau_ba<sbf_ba>, sbf_ba
 
-using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
 
 namespace testing = doctest;
 
-using namespace idni::depreciating::rewriter;
-using namespace idni::tau_lang;
-using namespace std;
-
-namespace testing = doctest;
 
 template<typename... BAs>
-tau_depreciating<BAs...> create_spec(const char* spec) {
+tau_<BAs...> create_spec(const char* spec) {
 	auto sample_src = make_tau_source(spec);
 	return make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(
 		sample_src).value().main;

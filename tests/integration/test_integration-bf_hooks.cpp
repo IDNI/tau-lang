@@ -16,11 +16,12 @@
 #include <cassert>
 
 #include "doctest.h"
-#include "boolean_algebras/sbf_ba.h"
-#include "normalizer.h"
+#include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
+#include "depreciating/normalizer_depreciating.h"
 
-using namespace idni::depreciating::rewriter;
 using namespace idni::tau_lang;
+using namespace idni::tau_lang::depreciating;
+using namespace idni::rewriter::depreciating;
 
 namespace testing = doctest;
 
@@ -70,7 +71,7 @@ TEST_SUITE("bf operator hooks") {
 				sample, { .start = tau_parser::bf }).value()
 			| tau_parser::bf_constant
 			| tau_parser::type
-			| optional_value_extractor<tau_depreciating<tau_ba<sbf_ba>, sbf_ba>>;
+			| optional_value_extractor<tau_<tau_ba<sbf_ba>, sbf_ba>>;
 		auto type_expected = make_nso_using_factory<
 				tau_ba<sbf_ba>, sbf_ba>(
 			type, { .start = tau_parser::type }).value();
