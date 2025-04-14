@@ -13,11 +13,17 @@ using var = tau<BAs...>;
 template<typename...BAs>
 using solution = std::map<var<BAs...>, tau<BAs...>>;
 
+struct z3_solver_options {
+	enum output_format { hexadecimal, binary, decimal };
+	bool control_underflow_overflow;
+	output_format format = hexadecimal;
+};
+
 template <typename...BAs>
-std::optional<z3::expr> eval_z3(const tau<BAs...>& form, z3::context& ctx, std::map<tau<BAs...>, z3::expr>& vars);
+z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars, const z3_solver_options& options);
 
 template<typename...BAs>
-std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form);
+std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form, const z3_solver_options& options = { .control_underflow_overflow = false});
 
 } // namespace idni::tau_lang
 

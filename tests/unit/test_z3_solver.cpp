@@ -14,6 +14,15 @@ using namespace boost::log;
 
 namespace testing = doctest;
 
+TEST_SUITE("configuration") {
+
+	TEST_CASE("logging") {
+		core::get()->set_filter(trivial::severity >= trivial::trace);
+		add_console_log(std::cout, keywords::format =
+			expressions::stream << expressions::smessage);
+	}
+}
+
 TEST_SUITE("sample z3 programs") {
 
 	TEST_CASE("sample") {
@@ -32,12 +41,6 @@ TEST_SUITE("sample z3 programs") {
 }
 
 TEST_SUITE("z3_solve simple") {
-
-	TEST_CASE("logging") {
-		core::get()->set_filter(trivial::severity >= trivial::trace);
-		add_console_log(std::cout, keywords::format =
-			expressions::stream << expressions::smessage);
-	}
 
 	TEST_CASE("X =_ 1") {
 		const char* sample = "X =_ 1";
@@ -311,6 +314,78 @@ TEST_SUITE("complex solve_z3") {
 	//	for (const auto& v: solution.value().second) {
 	//		std::cout << solution.value().first.eval(v) << "\n";
 	//	}
+		CHECK( solution.has_value() );
+	}
+}
+
+
+TEST_SUITE("z3 overflow/underflow") {
+
+	TEST_CASE("multiplication overflow") {
+		const char* sample = "X =_ 4294967296 * 8589934592"; // 2^32 + 2^33
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		CHECK_THROWS( solve_z3(equation, z3_solver_options { .control_underflow_overflow = true }) );
+	}
+
+	TEST_CASE("no multiplication overflow") {
+		const char* sample = "X =_ 4294967296 * 8589934592"; // 2^32 + 2^33
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation, z3_solver_options { .control_underflow_overflow = false });
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("substraction underflow") {
+		const char* sample = "X =_ 1 - 2";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		CHECK_THROWS( solve_z3(equation, z3_solver_options { .control_underflow_overflow = true }) );
+	}
+
+	TEST_CASE("no substraction underflow") {
+		const char* sample = "X =_ 1 - 2";
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation, z3_solver_options { .control_underflow_overflow = false });
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("addition overflow") {
+		const char* sample = "X =_ 18446744073709551615 + 1"; // (2^64 - 1) + 1
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		CHECK_THROWS( solve_z3(equation, z3_solver_options { .control_underflow_overflow = true }) );
+	}
+
+	TEST_CASE("no addition overflow") {
+		const char* sample = "X =_ 18446744073709551615 + 1"; // (2^64 - 1) + 1
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation, z3_solver_options { .control_underflow_overflow = false });
+		CHECK( solution.has_value() );
+	}
+
+	TEST_CASE("intermediate addition overflow") {
+		const char* sample = "X =_ 18446744073709551615 && Y =_ 1 && Z =_ X + Y"; // (2^64 - 1) + 1
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		CHECK_THROWS( solve_z3(equation, z3_solver_options { .control_underflow_overflow = true }) );
+	}
+
+	TEST_CASE("intermediate no addition overflow") {
+		const char* sample = "X =_ 18446744073709551615 && Y =_ 1 && Z =_ X + Y"; // (2^64 - 1) + 1
+		auto src = make_tau_source(sample, {
+						.start = tau_parser::wff });
+		auto equation = make_statement(src);
+		auto solution = solve_z3(equation, z3_solver_options { .control_underflow_overflow = false });
 		CHECK( solution.has_value() );
 	}
 }
