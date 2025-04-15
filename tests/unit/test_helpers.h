@@ -6,18 +6,12 @@
 #include <cassert>
 #include "doctest.h"
 
-#include "defs.h"
-#include "init_log.h"
-
-#include "tau_tree.h"
-#include "boolean_algebras/variant_ba.h"
 #include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
 #include "boolean_algebras/sbf_ba.h"
 
+using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
-using namespace std;
 
 namespace testing = doctest;
 

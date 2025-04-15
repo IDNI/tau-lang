@@ -4,7 +4,6 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__VARIANT_BA_H__
 
 #include <variant>
-#include <ostream>
 
 #include "utils.h"
 #include "splitter_types.h"

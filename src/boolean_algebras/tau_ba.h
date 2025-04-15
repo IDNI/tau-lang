@@ -6,9 +6,7 @@
 #include <iostream>
 
 #include "tau_tree.h"
-
-// #include "satisfiability.h"
-// #include "splitter.h"
+#include "splitter.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //

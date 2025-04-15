@@ -3,8 +3,9 @@
 #ifndef __IDNI__TAU__DICT_H__
 #define __IDNI__TAU__DICT_H__
 
-#include "defs.h"
 #include <string>
+
+#include "defs.h"
 
 // bdd var dict
 sym_t dict(const char*);

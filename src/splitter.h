@@ -4,7 +4,6 @@
 #define __IDNI__TAU__SPLITTER_H__
 
 #include "satisfiability.h"
-#include "boolean_algebras/nso_ba.h"
 
 namespace idni::tau_lang {
 

@@ -1,6 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "tau_tree.h"
+#include <optional>
+#include <variant>
+#include <string>
+#include <vector>
+
+#include "utility/tree.h"
 
 #ifndef __IDNI__TAU__NSO_FACTORY_H__
 #define __IDNI__TAU__NSO_FACTORY_H__
@@ -9,7 +14,8 @@ namespace idni::tau_lang {
 
 /**
  * Factory for creating and manipulating tau objects.
- * "Interface" for creating custom BA types.
+ * - interface" for creating custom BA types by adding nso_factory<YourBA>
+ *   template specialization.
  */
 template <typename... BAs>
 struct nso_factory {
@@ -69,7 +75,7 @@ struct nso_factory {
 	 * @param v Variant for formula extraction
 	 * @return Extracted formula if present
 	 */
-	tref unpack_tau_ba (const std::variant<BAs...>& v);
+	tref unpack_tau_ba(const std::variant<BAs...>& v);
 
 	/**
 	 * Returns the singleton instance of the factory.

@@ -7,7 +7,7 @@ set(TESTS
 	# tau_ba3
 	# normal_forms
 	# nso_rr_execution
-	# nso_rr_partial_eval
+	nso_rr_partial_eval
 	# nso_rr_fixed_point
 	# ref_types
 	# bf_fixed_point

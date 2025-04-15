@@ -6,8 +6,6 @@
 #include "babdd.h"
 #include "dict.h"
 #include "splitter_types.h"
-#include "defs.h"
-
 
 template<typename B, auto o> struct bdd_handle;
 template<typename B, auto o = bdd_options<>::create()>

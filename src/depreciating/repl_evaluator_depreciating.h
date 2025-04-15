@@ -124,7 +124,6 @@ private:
 	void history_print_cmd(const tau_nso_t& command);
 	void history_store_cmd(const tau_nso_t& command);
 	void history_list_cmd();
-	void history_list_cmd();
 
 	void def_rr_cmd(const tau_nso_t& n);
 	void def_print_cmd(const tau_nso_t& n);

@@ -9,28 +9,22 @@
 #ifndef __IDNI__TAU__NSO_RR_H__
 #define __IDNI__TAU__NSO_RR_H__
 
-#include <map>
-#include <variant>
-#include <string>
-#include <vector>
-#include <memory>
-#include <optional>
-#include <algorithm>
-#include <functional>
-#include <ranges>
-#include <variant>
-#include <numeric>
+// #include <map>
+// #include <variant>
+// #include <string>
+// #include <vector>
+// #include <memory>
+// #include <optional>
+// #include <algorithm>
+// #include <functional>
+// #include <ranges>
+// #include <numeric>
 
-#include "defs.h"
-#include "utility/term_colors.h"
-#include "init_log.h"
-#include "../parser/tau_parser.generated.h"
-
-#include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/variant_ba.h"
-#include "splitter_types.h"
-#include "utils.h"
 #include "tau_tree.h"
+// #include "boolean_algebras/bool_ba.h"
+// #include "boolean_algebras/variant_ba.h"
+#include "splitter_types.h"
+// #include "utils.h"
 
 #ifdef TAU_MEASURE
 #include "measure.h"

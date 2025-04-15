@@ -3,9 +3,7 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
 
-#include "tau_tree.h"
 #include "boolean_algebras/tau_ba.h"
-#include "../parser/sbf_parser.generated.h"
 
 namespace idni::tau_lang {
 
