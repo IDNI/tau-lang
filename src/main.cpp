@@ -12,7 +12,7 @@
 #include "cli.h"
 #include "repl.h"
 #include "repl_evaluator.h"
-#include "z3_context.h"
+#include "base_bas/z3.h"
 
 using namespace std;
 using namespace idni;

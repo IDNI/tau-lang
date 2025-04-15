@@ -1,11 +1,18 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __Z3_SOLVER_H__
-#define __Z3_SOLVER_H__
+#ifndef __Z3_H__
+#define __Z3_H__
 
 #include "nso_rr.h"
 
 namespace idni::tau_lang {
+
+static z3::context z3_context;
+
+void z3_config() {
+	z3::set_param("pp.bv-literals", false);
+	z3::set_param("smt.mbqi", true);
+}
 
 template<typename...BAs>
 using var = tau<BAs...>;
@@ -27,6 +34,6 @@ std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form);
 
 } // namespace idni::tau_lang
 
- #include "z3_solver.tmpl.h"
+ #include "z3.tmpl.h"
 
- #endif // __Z3_SOLVER_H__
+ #endif // __Z3_H__

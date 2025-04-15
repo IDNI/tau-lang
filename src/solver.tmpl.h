@@ -4,7 +4,7 @@
 
 #include "normal_forms.h"
 #include "splitter.h"
-#include "z3_solver.h"
+#include "base_bas/z3.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"

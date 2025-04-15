@@ -5,7 +5,7 @@
 #include "doctest.h"
 
 #include "../unit/test_helpers.h"
-#include "z3_solver.h"
+#include "z3.h"
 
 
 using namespace idni::rewriter;
