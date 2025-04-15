@@ -4,23 +4,22 @@
 
 namespace idni::tau_lang {
 
-
-template <typename...BAs>
 // evaluates a parsed bdd terminal node recursively
-sbf_ba eval_node(const sbf_parser::tree::traverser& t) {
+inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	using tt = sbf_parser::tree::traverser;
-	//BOOST_LOG_TRIVIAL(debug) << "eval_node";
+	using type = sbf_parser::nonterminal;
+	// BOOST_LOG_TRIVIAL(debug) << "eval_node";
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 	switch (nt) {
-	case sbf_parser::zero: return bdd_handle<Bool>::hfalse;
-	case sbf_parser::one:  return bdd_handle<Bool>::htrue;
-	case sbf_parser::negation: {
-		auto e = eval_node(n | tt::only_child);
+	case type::zero: return bdd_handle<Bool>::hfalse;
+	case type::one:  return bdd_handle<Bool>::htrue;
+	case type::negation: {
+		auto e = sbf_eval_node(n | tt::only_child);
 		BOOST_LOG_TRIVIAL(trace) << e << "' = " << ~e;
 		return ~e;
 	}
-	case sbf_parser::variable: {
+	case type::variable: {
 		// get var id from var node's terminals
 		auto var_name = n | tt::terminals;
 		auto v = dict(var_name);
@@ -35,27 +34,27 @@ sbf_ba eval_node(const sbf_parser::tree::traverser& t) {
 	}
 	default:
 		auto o = (n | tt::children)();
-		auto l = eval_node(o[0]), r = eval_node(o[1]);
+		auto l = sbf_eval_node(o[0]), r = sbf_eval_node(o[1]);
 		switch (nt) {
-		case sbf_parser::disjunction:
-			BOOST_LOG_TRIVIAL(trace)
-				<< l << " | " << r << " -> " << (l | r);
+		case type::disjunction:
+			// BOOST_LOG_TRIVIAL(trace)
+			// 	<< l << " | " << r << " -> " << (l | r);
 			return l | r;
-		case sbf_parser::exclusive_disjunction:
-			BOOST_LOG_TRIVIAL(trace)
-				<< l << " ^ " << r << " -> " << (l ^ r);
+		case type::exclusive_disjunction:
+			// BOOST_LOG_TRIVIAL(trace)
+			// 	<< l << " ^ " << r << " -> " << (l ^ r);
 			return l ^ r;
-		case sbf_parser::conjunction:
-		case sbf_parser::conjunction_nosep:
-			BOOST_LOG_TRIVIAL(trace)
-				<< l << " & " << r << " -> " << (l & r);
+		case type::conjunction:
+		case type::conjunction_nosep:
+			// BOOST_LOG_TRIVIAL(trace)
+			// 	<< l << " & " << r << " -> " << (l & r);
 			return l & r;
 		default: return bdd_handle<Bool>::hfalse;
 		}
 	}
 }
 template <typename...BAs>
-std::optional<tau_depreciating<BAs...>> sbf_ba_factory<BAs...>::parse(
+std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	const std::string& src)
 {
 	// check source cache
@@ -66,25 +65,19 @@ std::optional<tau_depreciating<BAs...>> sbf_ba_factory<BAs...>::parse(
 		auto msg = result.parse_error
 			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
 		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
-		return std::optional<tau_depreciating<BAs...>>{}; // Syntax error
+		return {}; // Syntax error
 	}
 	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())
 							| sbf_parser::sbf;
-	auto b = t.has_value()? eval_node(t): bdd_handle<Bool>::hfalse;
-	std::variant<BAs...> vp {b};
-	auto n = depreciating::rewriter::make_node<tau_sym<BAs...>>(vp, {});
-	return cache.emplace(src, n).first->second;
+	auto v = t.has_value()? sbf_eval_node(t) : bdd_handle<Bool>::hfalse;
+	return cache.emplace(src, std::variant<BAs...>{ v }).first->second;
 }
 
 template <typename...BAs>
-tau_depreciating<BAs...> sbf_ba_factory<BAs...>::binding(const tau_depreciating<BAs...>& sn) {
-	auto source = sn
-		| tau_parser::source
-		| optional_value_extractor<tau_depreciating<BAs...>>;
-	std::string src = make_string(
-		tau_node_terminal_extractor<BAs...>, source);
-	if (auto parsed = parse(src); parsed.has_value())
-		return parsed.value();
+tref sbf_ba_factory<BAs...>::binding(const std::string& source) {
+	// tree<node<BAs...>>::get(sn).print(std::cout << "sbf_ba_factory::binding: ") << "\n";
+	if (auto p = parse(source); p)
+		return ba_constants<BAs...>::get(p.value(), "sbf");
 	return nullptr;
 }
 
@@ -93,15 +86,26 @@ std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
 	return std::variant<BAs...>(bdd_splitter_one<Bool>());
 }
 
-std::optional<tau_depreciating<sbf_ba>> nso_factory<sbf_ba>::parse(const std::string& src,
-	const std::string&)
+template <typename...BAs>
+std::string sbf_ba_factory<BAs...>::zero() const {
+	return "0";
+}
+
+template <typename...BAs>
+sbf_ba_factory<BAs...>& sbf_ba_factory<BAs...>::instance() {
+	static sbf_ba_factory<BAs...> factory;
+	return factory;
+}
+
+// ---------------------------------------------------------------------
+
+std::optional<std::variant<sbf_ba>> nso_factory<sbf_ba>::parse(
+	const std::string& src, const std::string)
 {
 	return bf.parse(src);
 }
 
-tau_depreciating<sbf_ba> nso_factory<sbf_ba>::binding(const tau_depreciating<sbf_ba>& n,
-	const std::string&)
-{
+tref nso_factory<sbf_ba>::binding(const std::string& n, const std::string&) {
 	return bf.binding(n);
 }
 
@@ -109,8 +113,8 @@ std::vector<std::string> nso_factory<sbf_ba>::types() const {
 	return { "sbf" };
 }
 
-tau_depreciating<sbf_ba> nso_factory<sbf_ba>::splitter_one() const {
-	return build_bf_constant(bf.splitter_one(), build_type<sbf_ba>("sbf"));
+tref nso_factory<sbf_ba>::splitter_one() const {
+	return ba_constants<sbf_ba>::get(bf.splitter_one(), "sbf");
 }
 
 std::string nso_factory<sbf_ba>::default_type() const {
@@ -125,10 +129,9 @@ std::string nso_factory<sbf_ba>::zero(const std::string) const {
 	return "0";
 }
 
-std::optional<tau_depreciating<sbf_ba> > nso_factory<sbf_ba>::unpack_tau_ba(
-	const std::variant<sbf_ba>&) const {
+tref nso_factory<sbf_ba>::unpack_tau_ba(const std::variant<sbf_ba>&) const {
 	// There is no tau_ba present
-	return {};
+	return nullptr;
 }
 
 nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
@@ -138,20 +141,19 @@ nso_factory<sbf_ba>& nso_factory<sbf_ba>::instance() {
 
 nso_factory<sbf_ba>::nso_factory() {};
 
-
-std::optional<tau_nso<sbf_ba>> nso_factory<tau_ba<sbf_ba>, sbf_ba>::parse(
-	const std::string src, const std::string type_name)
+std::optional<std::variant<tau_ba<sbf_ba>, sbf_ba>>
+	nso_factory<tau_ba<sbf_ba>, sbf_ba>::parse(
+	const std::string& src, const std::string type_name)
 {
-	if (type_name == "sbf")	return bf.parse(src);
-	return tf.parse(src);
+	if (type_name == "sbf")	return bf().parse(src);
+	return tf().parse(src);
 }
 
-tau_nso<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::binding(
-	const tau_depreciating<tau_ba<sbf_ba>, sbf_ba>& n,
+tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::binding(const std::string& n,
 	const std::string type_name)
 {
-	if (type_name == "sbf") return bf.binding(n);
-	return tf.binding(n);
+	if (type_name == "sbf") return bf().binding(n);
+	return tf().binding(n);
 }
 
 std::vector<std::string> nso_factory<tau_ba<sbf_ba>, sbf_ba>::types() const {
@@ -170,20 +172,22 @@ std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::zero(const std::string type_nam
 	return type_name == "sbf" ? "0" : "F";
 }
 
-std::optional<tau_nso<sbf_ba> > nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
-		const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const {
+tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
+	const std::variant<tau_ba<sbf_ba>, sbf_ba>& v) const
+{
 	if (!std::holds_alternative<tau_ba<sbf_ba>>(v))
 		return {};
 	const auto unpacked = std::get<tau_ba<sbf_ba>>(v);
-	return std::optional(unpacked.nso_rr.main);
+	return unpacked.nso_rr.main->get();
 }
 
-tau_nso<sbf_ba> nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
-	const std::string& type_name) const
+tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
+	const std::string type_name) const
 {
-	if (type_name == "sbf")
-		return build_bf_constant(bf.splitter_one(), build_type<tau_ba<sbf_ba>, sbf_ba>("sbf"));
-	else return build_bf_constant(tf.splitter_one(), build_type<tau_ba<sbf_ba>, sbf_ba>("tau"));
+	if (type_name == "sbf") return ba_constants<tau_ba<sbf_ba>, sbf_ba>::get(
+						bf().splitter_one(), "sbf");
+	else return ba_constants<tau_ba<sbf_ba>, sbf_ba>::get(
+						tf().splitter_one(), "tau");
 }
 
 nso_factory<tau_ba<sbf_ba>, sbf_ba>&

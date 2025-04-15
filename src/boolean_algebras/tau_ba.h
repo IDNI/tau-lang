@@ -5,8 +5,10 @@
 
 #include <iostream>
 
-#include "satisfiability.h"
-#include "splitter.h"
+#include "tau.h"
+
+// #include "satisfiability.h"
+// #include "splitter.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -21,10 +23,11 @@ namespace idni::tau_lang {
 // and https://devblogs.microsoft.com/cppblog/cpp23-deducing-this/ for how to use
 // "Deducing this" on CRTP.
 
-template <typename...BAs>
+template <typename... BAs>
 struct tau_ba {
 	using tau_ba_t = tau_ba<BAs...>;
-	using tau_nso_t = tau_depreciating<tau_ba_t, BAs...>;
+	using tau = idni::tau_lang::tree<idni::tau_lang::node<BAs...>>;
+	using node = tau::node;
 
 	/**
 	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.
@@ -32,14 +35,14 @@ struct tau_ba {
 	 * @param rec_relations Reference to rules of tau_nso_t.
 	 * @param main Reference to main tau_nso_t.
 	 */
-	tau_ba(rules<tau_nso_t>& rec_relations, tau_nso_t& main);
+	tau_ba(rewriter::rules& rec_relations, htree::sp main);
 
 	/**
 	 * @brief Constructor initializing tau_ba with main tau_nso_t.
 	 *
 	 * @param main Reference to main tau_nso_t.
 	 */
-	tau_ba(tau_nso_t& main);
+	tau_ba(htree::sp main);
 
 	/**
 	 * @brief Three-way comparison operator.
@@ -105,24 +108,24 @@ struct tau_ba {
 	/**
 	 * @brief Type equivalent to tau_spec<BAs...>.
 	 */
-	const rr<tau_nso_t> nso_rr;
+	const rr nso_rr;
 
 private:
-	/**
-	 * @brief Renames the given tau_nso_t form.
-	 *
-	 * @param form Reference to the tau_nso_t form.
-	 * @return Renamed tau_nso_t.
-	 */
-	tau_nso_t rename(const tau_nso_t& form) const;
+	// /**
+	//  * @brief Renames the given tau_nso_t form.
+	//  *
+	//  * @param form Reference to the tau_nso_t form.
+	//  * @return Renamed tau_nso_t.
+	//  */
+	// tref rename(tref form) const;
 
-	/**
-	 * @brief Renames the given rewriter rule.
-	 *
-	 * @param rule Reference to the rewriter rule of tau_nso_t.
-	 * @return Renamed rewriter rule.
-	 */
-	depreciating::rewriter::rule<rr<tau_nso_t>> rename(const depreciating::rewriter::rule<tau_nso_t>& rule) const;
+	// /**
+	//  * @brief Renames the given rewriter rule.
+	//  *
+	//  * @param rule Reference to the rewriter rule of tau_nso_t.
+	//  * @return Renamed rewriter rule.
+	//  */
+	// rewriter::rule rename(const rewriter::depreciating::rule<tau_nso_t>& rule) const;
 
 	/**
 	 * @brief Merges two sets of rules.
@@ -131,7 +134,7 @@ private:
 	 * @param rs2 Reference to the second set of rules.
 	 * @return Merged set of rules.
 	 */
-	rules<tau_nso_t> merge(const rules<tau_nso_t>& rs1, const rules<tau_nso_t>& rs2) const;
+	rewriter::rules merge(const rewriter::rules& rs1, const rewriter::rules& rs2) const;
 };
 
 /**
@@ -142,7 +145,7 @@ private:
  * @param b Reference to bool.
  * @return True if equal, otherwise false.
  */
-template <typename...BAs>
+template <typename... BAs>
 bool operator==(const tau_ba<BAs...>& other, const bool& b);
 
 /**
@@ -153,7 +156,7 @@ bool operator==(const tau_ba<BAs...>& other, const bool& b);
  * @param other Reference to tau_ba.
  * @return True if equal, otherwise false.
  */
-template <typename...BAs>
+template <typename... BAs>
 bool operator==(const bool& b, const tau_ba<BAs...>& other);
 
 /**
@@ -164,7 +167,7 @@ bool operator==(const bool& b, const tau_ba<BAs...>& other);
  * @param b Reference to bool.
  * @return True if not equal, otherwise false.
  */
-template <typename...BAs>
+template <typename... BAs>
 bool operator!=(const tau_ba<BAs...>& other, const bool& b);
 
 /**
@@ -175,7 +178,7 @@ bool operator!=(const tau_ba<BAs...>& other, const bool& b);
  * @param other Reference to tau_ba.
  * @return True if not equal, otherwise false.
  */
-template <typename...BAs>
+template <typename... BAs>
 bool operator!=(const bool& b, const tau_ba<BAs...>& other);
 
 /**
@@ -185,7 +188,7 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other);
  * @param fm Reference to tau_ba.
  * @return Normalized tau_ba.
  */
-template<typename... BAs>
+template <typename... BAs>
 auto normalize(const tau_ba<BAs...>& fm);
 
 /**
@@ -196,7 +199,7 @@ auto normalize(const tau_ba<BAs...>& fm);
  * @param st Splitter type.
  * @return Split tau_ba.
  */
-template<typename... BAs>
+template <typename... BAs>
 auto splitter(const tau_ba<BAs...>& fm, splitter_type st);
 
 /**
@@ -205,7 +208,7 @@ auto splitter(const tau_ba<BAs...>& fm, splitter_type st);
  * @tparam BAs Variadic template parameters.
  * @return Split tau_ba.
  */
-template<typename... BAs>
+template <typename... BAs>
 auto tau_splitter_one();
 
 /**
@@ -215,34 +218,24 @@ auto tau_splitter_one();
  * @param fm Reference to tau_ba.
  * @return True if closed, otherwise false.
  */
-template<typename... BAs>
-bool is_closed(const tau_ba<BAs...>& fm);
-
-/**
- * @brief Alias for tau_nso.
- *
- * @tparam BAs Variadic template parameters.
- */
 template <typename... BAs>
-using tau_nso = tau_depreciating<tau_ba<BAs...>, BAs...>;
+bool is_closed(const tau_ba<BAs...>& fm);
 
 /**
  * @brief Alias for tau_spec.
  *
  * @tparam BAs Variadic template parameters.
  */
-template <typename... BAs>
-using tau_spec = rr<tau_nso<BAs...>>;
+using tau_spec = rr;
 
 /**
  * @brief Template struct representing a tau_ba_factory.
  *
  * @tparam BAs Variadic template parameters.
  */
-template <typename...BAs>
+template <typename... BAs>
 struct tau_ba_factory {
 	using tau_ba_t = tau_ba<BAs...>;
-	using tau_nso_t = tau_nso<BAs...>;
 
 	/**
 	 * @brief Parses the given source string into tau_nso_t.
@@ -250,7 +243,7 @@ struct tau_ba_factory {
 	 * @param src Reference to the source string.
 	 * @return Parsed tau_nso_t or std::nullopt if parsing fails.
 	 */
-	std::optional<tau_nso_t> parse(const std::string& src);
+	std::optional<std::variant<tau_ba_t, BAs...>> parse(const std::string& src);
 
 	/**
 	 * @brief Binds the given tau_nso_t.
@@ -258,7 +251,7 @@ struct tau_ba_factory {
 	 * @param n Reference to tau_nso_t.
 	 * @return Bound tau_nso_t.
 	 */
-	tau_nso_t binding(const tau_nso_t& n);
+	tref binding(const std::string& src);
 
 	/**
 	 * @brief Splits one.
@@ -282,6 +275,10 @@ struct tau_ba_factory {
 	 * @return Converted string.
 	 */
 	std::string zero(std::string&) const;
+
+
+	static tau_ba_factory<BAs...>& instance();
+
 };
 
 } // namespace idni::tau_lang

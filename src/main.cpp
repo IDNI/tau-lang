@@ -47,16 +47,21 @@
 #include <iomanip>
 #include <sstream>
 
-#include "boolean_algebras/sbf_ba.h"
+// #include "depreciating/boolean_algebras/sbf_ba.h"
+#include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
 #include "init_log.h"
-#include "normalizer.h"
+#include "depreciating/normalizer_depreciating.h"
 #include "utility/cli.h"
 #include "repl_evaluator.h"
+#include "depreciating/nso_rr_depreciating.h"
+
+#include "tau.h"
+#include "boolean_algebras/sbf_ba.h"
 
 using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
-using namespace idni::depreciating::rewriter;
+using namespace idni::rewriter::depreciating;
 
 cli::options tau_options() {
 	cli::options opts;
@@ -165,20 +170,44 @@ int main(int argc, char** argv) {
 	if (files.size()) return run_tau_spec(files.front(), charvar, exp);
 
 	// REPL
-	repl_evaluator<sbf_ba> re({
-		.status = opts["status"].get<bool>(),
-		.colors = opts["color"].get<bool>(),
-		.charvar = charvar,
+	// new tree
+	if (exp) {
+		repl_evaluator<sbf_ba> re({
+			.status = opts["status"].get<bool>(),
+			.colors = opts["color"].get<bool>(),
+			.charvar = charvar,
 #ifdef DEBUG
-		.debug_repl = opts["debug"].get<bool>(),
+			.debug_repl = opts["debug"].get<bool>(),
 #endif // DEBUG
-		.severity = sev,
-		.experimental = exp
-	});
-	string e = opts["evaluate"].get<string>();
-	if (e.size()) return re.eval(e), 0;
-	repl<decltype(re)> r(re, "tau> ", ".tau_history");
-	welcome();
-	re.prompt();
-	return r.run();
+			.severity = sev,
+			.experimental = exp
+		});
+		string e = opts["evaluate"].get<string>();
+		if (e.size()) return re.eval(e), 0;
+		repl<decltype(re)> r(re, "tau> ", ".tau_history");
+		welcome();
+		re.prompt();
+		return r.run();
+	}
+	// depreciating
+	else {
+		depreciating::repl_evaluator<depreciating::sbf_ba> re({
+			.status = opts["status"].get<bool>(),
+			.colors = opts["color"].get<bool>(),
+			.charvar = charvar,
+#ifdef DEBUG
+			.debug_repl = opts["debug"].get<bool>(),
+#endif // DEBUG
+			.severity = sev,
+			.experimental = exp
+		});
+		string e = opts["evaluate"].get<string>();
+		if (e.size()) return re.eval(e), 0;
+		repl<decltype(re)> r(re, "tau> ", ".tau_history");
+		welcome();
+		re.prompt();
+		return r.run();
+	}
+
+
 }
