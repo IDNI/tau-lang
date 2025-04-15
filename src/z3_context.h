@@ -11,10 +11,10 @@ using namespace z3;
 
 static z3::context z3_context;
 
-//z3::context z3_context() {
-//	static z3::context ctx;
-//	return ctx;
-//}
+void z3_config() {
+	set_param("pp.bv-literals", false);
+	set_param("smt.mbqi", true);
+}
 
 } // namespace idni::tau_lang
 
