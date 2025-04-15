@@ -1,43 +1,60 @@
-#pragma once
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+#ifndef __IDNI__TAU__TAU_H__
+#define __IDNI__TAU__TAU_H__
 
 #include <initializer_list>
 #include <variant>
+#include <cmath>
 
 #include "defs.h"
+#include "dict.h"
+#include "init_log.h"
 #include "utility/tree.h"
 #include "tau_parser.generated.h"
 
 namespace idni::tau_lang {
 
-// ba variant
+// helper to get size of boolean algebras variant pack
 template <typename... BAs>
-using ba = std::variant<BAs...>;
+constexpr size_t BAs_size = std::variant_size<std::variant<BAs...>>::value;
 
-static inline std::vector<std::string> ba_types{ "untyped" };
-static inline std::unordered_map<std::string, size_t> ba_types_map{
-							{ "untyped", 0 } };
+// helper to get bitsize required for storing BA type ids
 template <typename... BAs>
-static inline std::vector<ba<BAs...>> C{};         // constants
+constexpr size_t BAs_bitsize = BAs_size<BAs...> <= 1 ? 1 : 
+                static_cast<size_t>(std::ceil(std::log2(BAs_size<BAs...>)));
 
-template <typename BA, typename... BAs>
-bool is_ba(size_t id) { return std::holds_alternative<BA>(C<BAs...>[id]); }
+template <typename... BAs>
+struct ba_constants;
 
-template <typename BA, typename... BAs>
-BA get_constant(size_t id) { DBG(assert((is_ba<BA, BAs...>(id)));)
-	return std::get<BA>(C<BAs...>[id]);
-}
-
-// strings dict
-static inline std::vector<std::string> S{""};       // strings
-static inline std::map<std::string, size_t> SM{};   // string -> id map
-
+// -----------------------------------------------------------------------------
+// Tau tree node
+//
+// node is templated by a pack of boolean algebras
+// This is used in the node for two purposes:
+// 1. determine bitsize required for storing BA type ids
+// 2. provide type aliases for packed types so they are accessible everywhere
+//
+// Node stores its type (nt), is_term flag, BA type id, and data in remaining bits
+// TODO There is an extension flag (ext) that indicates if the data is stored in the child node
+// but this is not implemented yet.
+// Currently the flag is always 0 and the data is stored in the node itself.
+//
+template <typename... BAs>
 struct node {
+	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;
+
+	// alias for recreation of the packed variant
+	using bas_variant = std::variant<BAs...>;
+	// alias for ba_constants<BAs...> pool and binder
+	using ba_constants_t = ba_constants<BAs...>;
+
 	using T = size_t; // just to simplify changes or templating it later;
 
 	static constexpr size_t bits      = std::numeric_limits<T>::digits;
 	static constexpr size_t nt_bits   = tau_parser_data::nt_bits;
-	static constexpr size_t ba_bits   = 5;
+	static constexpr size_t ba_bits   = BAs_bitsize<BAs...>;
 	static constexpr size_t data_bits = bits - nt_bits - 1 - ba_bits - 1;
 	
 	// masks and shifts
@@ -58,80 +75,49 @@ struct node {
 	const size_t hash;
 
 	constexpr node(size_t nt = 0, size_t data = 0, size_t is_term = 0,
-			size_t ba_type = 0, size_t ext = 0) noexcept
-		: nt(nt), term(is_term), ba(ba_type), ext(ext), data(data),
-			hash(hashit()) {}
+			size_t ba_type = 0, size_t ext = 0) noexcept;
 
-	int_t as_int() const { return static_cast<int_t>(data); }
+	// creates a ba constant node
+	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
 
-	static constexpr node nnull() { return node(); }
+	int_t as_int() const;
 
-	static constexpr node extension(T raw_value) {
-		return node(
-			(raw_value >> node::nt_shift) & node::nt_mask,
-			(raw_value >> node::term_shift) & 1u,
-			(raw_value >> node::ba_shift) & ((1u << node::ba_bits) - 1u),
-			(raw_value >> node::ext_shift) & 1u,
-				raw_value & node::data_mask
-		);
-	}
+	static constexpr node_t nnull();
 
-#define C(x) static_cast<T>(x)
-	constexpr T extension() const noexcept {
-		T result = 0;
-		result |= (C(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
-		result |= (C(term) & 1u) << node::term_shift ;
-		result |= (C(ba) & ((1u << node::ba_bits) - 1u)) << node::ba_shift;
-		result |= (C(ext) & 1u) << node::ext_shift;
-		result |= C(data) & node::data_mask;
-		return result;
-	}
-	auto operator<=>(const node& that) const {
-		if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
-		if (term != that.term) return C(term) <=> C(that.term);
-		if (ba   != that.ba)   return C(ba)   <=> C(that.ba);
-		if (ext  != that.ext)  return C(ext)  <=> C(that.ext);
-		return C(data) <=> C(that.data);
-	}
-#undef C
-	constexpr bool operator<(const node& that) const {
-		return (*this <=> that) < 0;
-	}
-	constexpr bool operator<=(const node& that) const {
-		return (*this <=> that) <= 0;
-	}
-	constexpr bool operator>(const node& that) const {
-		return (*this <=> that) > 0;
-	}
-	constexpr bool operator>=(const node& that) const {
-		return (*this <=> that) >= 0;
-	}
-	constexpr auto operator==(const node& that) const {
-		return nt == that.nt && term == that.term && ba == that.ba
-				&& ext == that.ext && data == that.data;
-	}
-	constexpr auto operator!=(const node& that) const {
-		return !(*this == that);
-	}
-	constexpr size_t hashit() const {
-		std::size_t seed = grcprime;
-		hash_combine(seed, static_cast<bool>(nt));
-		hash_combine(seed, static_cast<bool>(term));
-		hash_combine(seed, ba);
-		hash_combine(seed, static_cast<bool>(ext));
-		hash_combine(seed, data);
-		return seed;
-	}
+	static constexpr node_t extension(T raw_value);
+	constexpr T extension() const noexcept;
+
+	auto operator<=>(const node& that) const;
+	constexpr bool operator<(const node& that) const;
+	constexpr bool operator<=(const node& that) const;
+	constexpr bool operator>(const node& that) const;
+	constexpr bool operator>=(const node& that) const;
+	constexpr auto operator==(const node& that) const;
+	constexpr auto operator!=(const node& that) const;
+	constexpr size_t hashit() const;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const node& n);
+template <typename... BAs>	
+inline std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
 
-template <typename N = node>
+} // namespace idni::tau_lang
+
+#include "rr.h"
+
+namespace idni::tau_lang {
+
+template <typename... BAs>
+struct ba_constants;
+
+template <typename N>
 struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	using base_t = idni::lcrs_tree<N>;
+	using tau = tree<N>;
 	using node = N;
 	using parse_tree = tau_parser::tree;
 	using parse_options = tau_parser::parse_options;
+	using bas_variant = typename node::bas_variant;
+	using ba_constants_t = typename node::ba_constants_t;
 
 	// tree direct API
 	// ---------------------------------------------------------------------
@@ -141,6 +127,11 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static const tree& get(const tref id);
 	static const tree& get(const htree::sp& h);
 	static htree::sp geth(tref id);
+
+	// creation (transformation) from tau_parser::tree
+	template <typename binder>
+	static tref get(binder& bind, const tau_parser::tree& t);
+	static tref get(const tau_parser::tree& t);
 
 	// creation with tref children
 	static tref get(const node& v); // leaf
@@ -167,25 +158,30 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt, const std::string& str); // with string
 
 	// creation from parser result or parser input (string, stream, file)
-	template <typename... BAs>
 	static tref get(tau_parser::result& result);
-	template <typename... BAs>
 	static tref get(const std::string& str, parse_options options = {});
-	template <typename... BAs>
 	static tref get(std::istream& is, parse_options options = {});
-	template <typename... BAs>
 	static tref get_from_file(const std::string& filename,
+						parse_options options = {});
+
+	// with binder
+	template <typename binder>
+	static tref get(binder& bind, tau_parser::result& result);
+	template <typename binder>
+	static tref get(binder& bind, const std::string& str, parse_options options = {});
+	template <typename binder>
+	static tref get(binder& bind, std::istream& is, parse_options options = {});
+	template <typename binder>
+	static tref get_from_file(binder& bind, const std::string& filename,
 						parse_options options = {});
 
 	// ---------------------------------------------------------------------
 	// terminals
+
 	static tref get_num(size_t v);
 	static tref get_integer(int_t v);
-	static tref get_ba_constant_id(size_t v);
-
-	// transform from tau_parser::tree
-	template <typename binder>
-	static tref get(const tau_parser::tree& t, binder& b);
+	static tref get_ba_constant(size_t v);
+	static tref get_ba_constant(size_t v, size_t type);
 
 	size_t children_size() const;
 
@@ -203,8 +199,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	tref trim() const { return first(); }
 	static tref trim(tref t) { return get(t).first(); }
 
-	const tree& child_tree(size_t n) const;
 	const tree& operator[](size_t n) const;
+	const tree& child_tree(size_t n) const;
 	const tree& first_tree()  const;
 	const tree& second_tree() const;
 	const tree& third_tree()  const;
@@ -212,6 +208,10 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	
 	std::ostream& print(std::ostream& o) const;
 	std::ostream& print_tree(std::ostream& o, size_t s = 0) const;
+
+	// nt category helpers
+	static bool is_digital_nt(size_t nt);
+	static bool is_string_nt(size_t nt);
 
 	// fast access helpers
 	size_t data() const;
@@ -223,12 +223,38 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	bool is_num() const;
 	bool is_ba_constant() const;
 
+	bool child_is(size_t nt) const;
+
 	node::type get_type() const;
 	const std::string& get_type_name() const;
 	const std::string& get_string() const;
 	int_t get_integer() const;
 	size_t get_num() const;
 	size_t get_ba_constant_id() const;
+	bas_variant get_ba_constant() const;
+
+	// ---------------------------------------------------------------------
+	// various extractors
+
+	static void get_leaves(tref n, node::type branch, trefs& leaves);
+	static trefs get_leaves(tref n, node::type branch);
+	static trefs get_dnf_wff_clauses(tref n);
+	static trefs get_cnf_wff_clauses(tref n);
+	static trefs get_dnf_bf_clauses(tref n);
+	static trefs get_cnf_bf_clauses(tref n);
+
+	static rewriter::rules get_rules(tref r);
+	template <typename binder>
+	static rewriter::library get_library(binder& bind, const std::string& source);
+	static rewriter::library get_library(const std::string& source);
+	template <typename binder>	
+	static rewriter::builder get_builder(binder& bind, const std::string& source);
+	static rewriter::builder get_builder(const std::string& source);
+	static rewriter::builder get_builder(tref ref);
+
+	static rewriter::rules get_rec_relations(tref r);
+
+	static std::optional<rr> get_nso_rr(tref ref);
 
 	// tree::traverser / tt API
 	// ---------------------------------------------------------------------
@@ -263,15 +289,16 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		const trefs& values() const;
 		std::vector<traverser> traversers() const;
 		std::vector<traverser> operator()() const;
+		bool is(size_t nt) const { return value_tree().is(nt); }
 		bool empty() const;
 		size_t size() const;
 
-		template <node::type NT>
-		static inline const extractor<bool> is{
-			[](const traverser& t) {
-				if (!t) return false;
-				return t.value_tree().get_type() == NT;
-			}};
+		// template <node::type NT>
+		// static inline const extractor<bool> is{
+		// 	[](const traverser& t) {
+		// 		if (!t) return false;
+		// 		return t.value_tree().get_type() == NT;
+		// 	}};
 		static inline const extractor<tref> ref{
 			[](const traverser& t) -> tref { return t.value(); }};
 		static inline const extractor<traverser> children{
@@ -343,10 +370,39 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 				if (!t) return 0;
 				return t.value_tree().get_num();
 			}};
+		static inline const extractor<size_t> data{
+			[](const traverser& t) -> size_t {
+				if (!t) return 0;
+				return t.value_tree().data();
+			}};
 		static inline const extractor<size_t> ba_constant_id{
 			[](const traverser& t) -> size_t {
 				if (!t) return 0;
 				return t.value_tree().get_ba_constant_id();
+			}};
+		static inline const extractor<bas_variant> ba_constant
+		{
+			[](const traverser& t) -> bas_variant {
+				return ba_constants_t::get(
+					t.value_tree().get_ba_constant_id());
+			}
+		};
+		static inline const extractor<traverser> dump{
+			[](const traverser& t) {
+				if (!t) return t;
+				t.value_tree().dump(std::cout) << "\n";
+				return t;
+			}};
+		static inline const extractor<traverser> print_tree{
+			[](const traverser& t) {
+				if (!t) return t;
+				t.value_tree().print_tree(std::cout) << "\n";
+				return t;
+			}};
+		static inline const extractor<htree::sp> handle{
+			[](const traverser& t) {
+				if (!t) return htree::sp();
+				return geth(t.value());
 			}};
 
 		traverser operator|(size_t nt) const;
@@ -362,145 +418,144 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		bool has_value_ = true;
 		trefs values_{};
 	};
-	traverser operator|(size_t nt) const;
-	traverser operator||(size_t nt) const;
+	// traverser operator|(size_t nt) const;
+	// traverser operator||(size_t nt) const;
 
 	using tt = traverser;
 
 	// ---------------------------------------------------------------------
-	// library and builders
-
-	static rewriter::library get_library(const std::string& str);
-	static rewriter::builder get_builder(tref ref);
-	static rewriter::builder get_builder(const std::string& source);
+	// builder
 
 	static tref apply_builder(const rewriter::builder& b, trefs n);
 
-	struct bldr {
-		static rewriter::builder wff_eq;
-		static rewriter::builder bf_splitter;
-		static rewriter::builder bf_not_less_equal;
-		static rewriter::builder bf_interval;
-		static rewriter::builder bf_nleq_upper;
-		static rewriter::builder bf_nleq_lower;
-	};
+	static rewriter::builder bldr_wff_eq;
+	static rewriter::builder bldr_bf_splitter;
+	static rewriter::builder bldr_bf_not_less_equal;
+	static rewriter::builder bldr_bf_interval;
+	static rewriter::builder bldr_bf_nleq_upper;
+	static rewriter::builder bldr_bf_nleq_lower;
 
-	static htree::sp _0;
-	static htree::sp _0_trimmed;
-	static htree::sp _1;
-	static htree::sp _1_trimmed;
-	static htree::sp _F;
-	static htree::sp _F_trimmed;
-	static htree::sp _T;
-	static htree::sp _T_trimmed;
+	static const tree<N>& _0();
+	static const tree<N>& _0_trimmed();
+	static const tree<N>& _1();
+	static const tree<N>& _1_trimmed();
+	static const tree<N>& _F();
+	static const tree<N>& _F_trimmed();
+	static const tree<N>& _T();
+	static const tree<N>& _T_trimmed();
 
 	// TODO (LOW) this could be somehow easily generatable by parser_gen
 	// or maybe create simple builder api, maybe with >> operator
-	struct build {
+	static tref build_variable(const std::string& name);
+	static tref build_in_var_name(size_t index);
+	static tref build_type(const std::string& type);
+	static tref build_bf_t_type(const std::string& type);
+	static tref build_bf_t_type(tref type);
+	static tref build_bf_f_type(const std::string& type);
+	static tref build_bf_f_type(tref type);
+	static tref build_in_variable_at_n(tref in_var_name, size_t num);
+	static tref build_in_variable_at_n(size_t index, size_t num);
+	static tref build_in_variable_at_n(const std::string& name, int_t pos);
+	static tref build_in_variable_at_t(tref in_var_name);
+	static tref build_in_variable_at_t(size_t index);
+	static tref build_in_variable_at_t_minus(const std::string& var_name, int_t shift);
+	static tref build_in_variable_at_t_minus(tref in_var_name, size_t num);
+	static tref build_in_variable_at_t_minus(size_t index, size_t num);
+	static tref build_out_var_name(size_t index);
+	static tref build_out_var_name(const std::string& name);
+	static tref build_out_variable_at_t(tref out_var_name);
+	static tref build_out_variable_at_t(size_t index);
+	static tref build_out_variable_at_n(tref out_var_name, size_t num);
+	static tref build_out_variable_at_n(size_t index, size_t num);
+	static tref build_out_variable_at_n(const std::string& name, int_t pos);
+	static tref build_out_variable_at_t_minus(const std::string& out_var_name, int_t shift);
+	static tref build_out_variable_at_t_minus(tref out_var_name, size_t num);
+	static tref build_out_variable_at_t_minus(size_t index, size_t num);
+	// static tref bf_variable(const std::string& name);
+	static tref build_bf_constant(tref cte);
+	static tref build_bf_constant(tref cte, tref type);
+	static tref build_bf_constant(tref cte, const std::string& type);
+	// build_bf_and_constant and build_bf_or_constant
+	static tref build_bf_uniter_const(const std::string& name1, const std::string& name2);
+	static tref build_wff_eq(tref l, tref r);
+	static tref build_wff_eq(tref l);
+	static tref build_wff_neq(tref l);
+	static tref build_wff_and(tref l, tref r);
+	static tref build_wff_and(const auto& wffs);
+	static tref build_wff_or(tref l, tref r);
+	static tref build_wff_or(const auto& wffs);
+	static tref build_wff_neg(tref n);
+	static tref build_wff_xor_from_def(tref l, tref r);
+	static tref build_wff_xor(tref l, tref r);
+	static tref build_wff_imply(tref l, tref r);
+	static tref build_wff_conditional(tref x, tref y, tref z);
+	static tref build_wff_equiv(tref l, tref r);
+	static tref build_wff_all(tref l, tref r);
+	static tref build_wff_ex(tref l, tref r);
+	static tref build_wff_sometimes(tref n);
+	static tref build_wff_always(tref n);
+	static tref build_bf_and(tref l, tref r);
+	static tref build_bf_and(const auto& bfs);
+	static tref build_bf_or(tref l, tref r);
+	static tref build_bf_or(const auto& bfs);
+	static tref build_bf_neg(tref n);
+	static tref build_bf_xor_from_def(tref l, tref r);
+	static tref build_bf_xor(tref l, tref r);
+	static tref build_bf_less(tref l, tref r);
+	static tref build_bf_nless(tref l, tref r);
+	static tref build_bf_less_equal(tref l, tref r);
+	static tref build_bf_nleq(tref l, tref r);
+	static tref build_bf_interval(tref x, tref y, tref z);
+	static tref build_bf_nleq_lower(tref l, tref r);
+	static tref build_bf_nleq_upper(tref l, tref r);
+	static tref build_bf_greater(tref l, tref r);
+	static tref build_bf_ngreater(tref l, tref r);
+	static tref build_bf_greater_equal(tref l, tref r);
+	static tref build_bf_ngeq(tref l, tref r);
+	static tref build_wff_ctn_greater_equal(tref ctnvar, tref num);
+	static tref build_wff_ctn_greater(tref ctnvar, tref num);
+	static tref build_wff_ctn_less_equal(tref ctnvar, tref num);
+	static tref build_wff_ctn_less(tref ctnvar, tref num);
+	static tref build_wff_ctn_eq(tref ctnvar, tref num);
+	static tref build_wff_ctn_neq(tref ctnvar, tref num);
 
-		static tref variable(const std::string& name);
-		static tref in_var_name(size_t index);
-		static tref type(const std::string& type);
-		static tref bf_t_type(const std::string& type);
-		static tref bf_t_type(tref type);
-		static tref bf_f_type(const std::string& type);
-		static tref bf_f_type(tref type);
-		static tref in_variable_at_n(tref in_var_name, size_t num);
-		static tref in_variable_at_n(size_t index, size_t num);
-		static tref in_variable_at_n(const std::string& name, int_t pos);
-		static tref in_variable_at_t(tref in_var_name);
-		static tref in_variable_at_t(size_t index);
-		static tref in_variable_at_t_minus(const std::string& var_name,
-									int_t shift);
-		static tref in_variable_at_t_minus(tref in_var_name, size_t num);
-		static tref in_variable_at_t_minus(size_t index, size_t num);
-		static tref out_var_name(size_t index);
-		static tref out_var_name(const std::string& name);
-		static tref out_variable_at_t(tref out_var_name);
-		static tref out_variable_at_t(size_t index);
-		static tref out_variable_at_n(tref out_var_name, size_t num);
-		static tref out_variable_at_n(size_t index, size_t num);
-		static tref out_variable_at_n(const std::string& name, int_t pos);
-		static tref out_variable_at_t_minus(const std::string& out_var_name,
-									int_t shift);
-		static tref out_variable_at_t_minus(tref out_var_name, size_t num);
-		static tref out_variable_at_t_minus(size_t index, size_t num);
-		// static tref bf_variable(const std::string& name);
-		static tref bf_constant(tref cte);
-		static tref bf_constant(tref cte, tref type);
-		static tref bf_constant(tref cte, const std::string& type);
-		
-		// build_bf_and_constant and build_bf_or_constant
-
-		static tref bf_uninter_const(const std::string& name1, const std::string& name2);
-		static tref wff_eq(tref l, tref r);
-		static tref wff_eq(tref l);
-		static tref wff_neq(tref l);
-		static tref wff_and(tref l, tref r);
-		static tref wff_and(const auto& wffs);
-		static tref wff_or(tref l, tref r);
-		static tref wff_or(const auto& wffs);
-		static tref wff_neg(tref n);
-		static tref wff_xor_from_def(tref l, tref r);
-		static tref wff_xor(tref l, tref r);
-		static tref wff_imply(tref l, tref r);
-		static tref wff_conditional(tref x, tref y, tref z);
-		static tref wff_equiv(tref l, tref r);
-		static tref wff_all(tref l, tref r);
-		static tref wff_ex(tref l, tref r);
-		static tref wff_sometimes(tref n);
-		static tref wff_always(tref n);
-		static tref bf_and(tref l, tref r);
-		static tref bf_and(const auto& bfs);
-		static tref bf_or(tref l, tref r);
-		static tref bf_or(const auto& bfs);
-		static tref bf_neg(tref n);
-		static tref bf_xor_from_def(tref l, tref r);
-		static tref bf_xor(tref l, tref r);
-		static tref bf_less(tref l, tref r);
-		static tref bf_nless(tref l, tref r);
-		static tref bf_less_equal(tref l, tref r);
-		static tref bf_nleq(tref l, tref r);
-		static tref bf_interval(tref x, tref y, tref z);
-		static tref bf_nleq_lower(tref l, tref r);
-		static tref bf_nleq_upper(tref l, tref r);
-		static tref bf_greater(tref l, tref r);
-		static tref bf_ngreater(tref l, tref r);
-		static tref bf_greater_equal(tref l, tref r);
-		static tref bf_ngeq(tref l, tref r);
-		static tref wff_ctn_greater_equal(tref ctnvar, tref num);
-		static tref wff_ctn_greater(tref ctnvar, tref num);
-		static tref wff_ctn_less_equal(tref ctnvar, tref num);
-		static tref wff_ctn_less(tref ctnvar, tref num);
-		static tref wff_ctn_eq(tref ctnvar, tref num);
-		static tref wff_ctn_neq(tref ctnvar, tref num);
-	};	
 };
 
-template <typename node>
-bool is_nt(tref n) {
-	return tree<node>::get(n).is_nt();
-}
+// -----------------------------------------------------------------------------
+// tau and tt printers
 
 template <typename node>
-bool is_t(tref n) {
-	return tree<node>::get(n).is_t();
-}
+std::ostream& operator<<(std::ostream& os, const tree<node>& t);
 
 template <typename node>
-bool is(const size_t nt, tref n) {
-	return tree<node>::get(n).is(nt);
+std::ostream& operator<<(std::ostream& os, const typename tree<node>::traverser& tt);
+
+// -----------------------------------------------------------------------------
+// queries
+
+template <typename... BAs>
+bool is_non_terminal(tref n) {
+	return tree<node<BAs...>>::get(n).is_nt();
 }
 
-template <typename node, size_t nt>
-bool is(tref n) { return is<node>(nt, n); }
-
-// factory method for is predicate
-template <typename node>
-inline std::function<bool(tref)> is(size_t nt) {
-	return [nt](tref n) { return is<node>(nt, n); };
+template <typename... BAs>
+bool is_terminal(tref n) {
+	return tree<node<BAs...>>::get(n).is_t();
 }
 
+template <typename... BAs>
+bool is_non_terminal(const size_t nt, tref n) {
+	return tree<node<BAs...>>::get(n).is(nt);
+}
+
+template <size_t nt, typename... BAs>
+bool is_non_terminal(tref n) { return is_non_terminal<BAs...>(nt, n); }
+
+// factory method for is_non_terminal predicate
+template <typename... BAs>
+inline std::function<bool(tref)> is_non_terminal(size_t nt) {
+	return [nt](tref n) { return is_non_terminal<BAs...>(nt, n); };
+}
 
 // -----------------------------------------------------------------------------
 // builders:
@@ -529,39 +584,25 @@ const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
 
 // wff builder
 template <typename node>
-rewriter::builder tree<node>::bldr::wff_eq = tree<node>::get_builder(BLDR_WFF_EQ);
+rewriter::builder tree<node>::bldr_wff_eq = tree<node>::get_builder(BLDR_WFF_EQ);
 template <typename node>
-rewriter::builder tree<node>::bldr::bf_splitter = tree<node>::get_builder(BLDR_BF_SPLITTER);
+rewriter::builder tree<node>::bldr_bf_splitter = tree<node>::get_builder(BLDR_BF_SPLITTER);
 template <typename node>
-rewriter::builder tree<node>::bldr::bf_not_less_equal = tree<node>::get_builder(BLDR_BF_NOT_LESS_EQUAL);
+rewriter::builder tree<node>::bldr_bf_not_less_equal = tree<node>::get_builder(BLDR_BF_NOT_LESS_EQUAL);
 template <typename node>
-rewriter::builder tree<node>::bldr::bf_interval = tree<node>::get_builder(BDLR_BF_INTERVAL);
+rewriter::builder tree<node>::bldr_bf_interval = tree<node>::get_builder(BDLR_BF_INTERVAL);
 template <typename node>
-rewriter::builder tree<node>::bldr::bf_nleq_upper = tree<node>::get_builder(BDLR_BF_NLEQ_UPPER);
+rewriter::builder tree<node>::bldr_bf_nleq_upper = tree<node>::get_builder(BDLR_BF_NLEQ_UPPER);
 template <typename node>
-rewriter::builder tree<node>::bldr::bf_nleq_lower = tree<node>::get_builder(BDLR_BF_NLEQ_LOWWER);
-
-// // basic bf and wff constants
-template <typename node>
-htree::sp tree<node>::_0_trimmed = tree<node>::get(node::type::bf_t);
-template <typename node>
-htree::sp tree<node>::_0 = tree<node>::get(node::type::bf, tree<node>::_0_trimmed);
-template <typename node>
-htree::sp tree<node>::_1_trimmed = tree<node>::get(node::type::bf_t);
-template <typename node>	
-htree::sp tree<node>::_1 = tree<node>::get(node::type::bf, tree<node>::_1_trimmed);
-
-template <typename node>
-htree::sp tree<node>::_F_trimmed = tree<node>::get(node::type::wff_f);
-template <typename node>
-htree::sp tree<node>::_F = tree<node>::get(node::type::wff, tree<node>::_F_trimmed);
-template <typename node>
-htree::sp tree<node>::_T_trimmed = tree<node>::get(node::type::wff_t);
-template <typename node>
-htree::sp tree<node>::_T = tree<node>::get(node::type::wff, tree<node>::_T_trimmed);
+rewriter::builder tree<node>::bldr_bf_nleq_lower = tree<node>::get_builder(BDLR_BF_NLEQ_LOWWER);
 
 
-}
+} // namespace idni::tau_lang
+
+#include "nso_factory.h"
+#include "ba_constants.h"
 
 #include "tau.tmpl.h"
-#include "tau_builders.h"
+#include "tau_builders.tmpl.h"
+
+#endif // __IDNI__TAU__TAU_H__

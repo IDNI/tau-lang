@@ -1,4 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
 #include <ostream>
 #include "bool_ba.h"
 

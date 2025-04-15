@@ -3,7 +3,9 @@
 #ifndef __NSO_BA_H__
 #define __NSO_BA_H__
 
-#include "hooks.h"
+#include "tau.h"
+// #include "language.h"
+// #include "hooks.h"
 
 namespace idni::tau_lang {
 
@@ -14,7 +16,7 @@ namespace idni::tau_lang {
  * @return Result of bitwise AND operation.
  */
 template <typename... BAs>
-tau_depreciating<BAs...> operator&(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Bitwise OR operator for tau.
@@ -23,7 +25,7 @@ tau_depreciating<BAs...> operator&(const tau_depreciating<BAs...>& l, const tau_
  * @return Result of bitwise OR operation.
  */
 template <typename... BAs>
-tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Bitwise NOT operator for tau.
@@ -31,7 +33,7 @@ tau_depreciating<BAs...> operator|(const tau_depreciating<BAs...>& l, const tau_
  * @return Result of bitwise NOT operation.
  */
 template <typename... BAs>
-tau_depreciating<BAs...> operator~(const tau_depreciating<BAs...>& l);
+const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& l);
 
 /**
  * @brief Bitwise XOR operator for tau.
@@ -40,7 +42,7 @@ tau_depreciating<BAs...> operator~(const tau_depreciating<BAs...>& l);
  * @return Result of bitwise XOR operation.
  */
 template <typename... BAs>
-tau_depreciating<BAs...> operator^(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Addition operator for tau.
@@ -49,7 +51,7 @@ tau_depreciating<BAs...> operator^(const tau_depreciating<BAs...>& l, const tau_
  * @return Result of addition operation.
  */
 template <typename... BAs>
-tau_depreciating<BAs...> operator+(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Checks if the tau is zero.
@@ -57,7 +59,7 @@ tau_depreciating<BAs...> operator+(const tau_depreciating<BAs...>& l, const tau_
  * @return True if the tau is zero, false otherwise.
  */
 template <typename... BAs>
-bool is_zero(const tau_depreciating<BAs...>& l);
+bool is_zero(const tree<node<BAs...>>& l);
 
 /**
  * @brief Checks if the tau is one.
@@ -65,7 +67,7 @@ bool is_zero(const tau_depreciating<BAs...>& l);
  * @return True if the tau is one, false otherwise.
  */
 template <typename... BAs>
-bool is_one(const tau_depreciating<BAs...>& l);
+bool is_one(const tree<node<BAs...>>& l);
 
 /**
  * @brief Equality operator for tau.
@@ -74,7 +76,7 @@ bool is_one(const tau_depreciating<BAs...>& l);
  * @return True if both tau are equal, false otherwise.
  */
 template <typename... BAs>
-bool operator==(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+bool operator==(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Inequality operator for tau.
@@ -83,7 +85,7 @@ bool operator==(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...
  * @return True if both tau are not equal, false otherwise.
  */
 template <typename... BAs>
-bool operator!=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+bool operator!=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Three-way comparison operator for tau.
@@ -92,7 +94,7 @@ bool operator!=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...
  * @return Result of the three-way comparison.
  */
 template <typename... BAs>
-std::weak_ordering operator<=>(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+std::weak_ordering operator<=>(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Less-than operator for tau.
@@ -101,7 +103,7 @@ std::weak_ordering operator<=>(const tau_depreciating<BAs...>& l, const tau_depr
  * @return True if l is less than r, false otherwise.
  */
 template<typename... BAs>
-bool operator<(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+bool operator<(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Less-than or equal-to operator for tau.
@@ -110,7 +112,7 @@ bool operator<(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>
  * @return True if l is less than or equal to r, false otherwise.
  */
 template<typename... BAs>
-bool operator<=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+bool operator<=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Greater-than operator for tau.
@@ -119,7 +121,7 @@ bool operator<=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...
  * @return True if l is greater than r, false otherwise.
  */
 template<typename... BAs>
-bool operator>(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+bool operator>(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Greater-than or equal-to operator for tau.
@@ -128,7 +130,7 @@ bool operator>(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>
  * @return True if l is greater than or equal to r, false otherwise.
  */
 template<typename... BAs>
-bool operator>=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...>& r);
+bool operator>=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Equality operator for tau and bool.
@@ -137,7 +139,7 @@ bool operator>=(const tau_depreciating<BAs...>& l, const tau_depreciating<BAs...
  * @return True if tau is equal to the boolean value, false otherwise.
  */
 template <typename... BAs>
-bool operator==(const tau_depreciating<BAs...>& l, const bool& r);
+bool operator==(const tree<node<BAs...>>& l, const bool& r);
 
 /**
  * @brief Equality operator for bool and tau.
@@ -146,7 +148,7 @@ bool operator==(const tau_depreciating<BAs...>& l, const bool& r);
  * @return True if boolean value is equal to tau, false otherwise.
  */
 template <typename... BAs>
-bool operator==(const bool l, const tau_depreciating<BAs...>& r);
+bool operator==(const bool l, const tree<node<BAs...>>& r);
 
 /**
  * @brief Splitter function for a nso tau_parser::bf_constant node holding a BA constant.
@@ -155,7 +157,7 @@ bool operator==(const bool l, const tau_depreciating<BAs...>& r);
  * @return Result of the splitter operation.
  */
 template <typename... BAs>
-tau_depreciating<BAs...> splitter(const tau_depreciating<BAs...>& n, splitter_type st = splitter_type::upper);
+const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& n, splitter_type st = splitter_type::upper);
 
 } // namespace idni::tau_lang
 

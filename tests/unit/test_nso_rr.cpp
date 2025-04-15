@@ -14,12 +14,13 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "test_helpers.h"
+#include "normal_forms.h"
 
 TEST_SUITE("make_library") {
 
 	TEST_CASE("make_library: one rule case") {
 		const auto sample = BF_TO_DNF_0;
-		auto lib = tau::get_library(sample);
+		auto lib = tau::get_library<Bool>(sample);
 		CHECK( lib.size() == 1 );
 	}
 }
@@ -39,7 +40,7 @@ TEST_SUITE("make_library") {
 // other unit/integration tests. However, it is better to have explicit tests
 // for each of them.
 
-// TODO (VERY_LOW) write tests for operator<<(ostream, tau_depreciating<...>)
+// TODO (VERY_LOW) write tests for operator<<(ostream, tau_<...>)
 // TODO (VERY_LOW) write tests for operator<<(ostream, sp_tau_source_node)
 //
 // They are tagged as VERY_LOW because they should be remove once we have a proper
