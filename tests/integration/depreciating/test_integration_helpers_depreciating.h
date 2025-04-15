@@ -3,12 +3,12 @@
 #ifndef __TEST_INTEGRATION_HELPERS_SBF_H__
 #define __TEST_INTEGRATION_HELPERS_SBF_H__
 
-#include "../src/depreciating/boolean_algebras/sbf_ba_depreciating.h"
-#include "../src/boolean_algebras/bool_ba.h"
-#include "../src/depreciating/nso_rr_depreciating.h"
-#include "../src/boolean_algebras/bdds/babdd.h"
-#include "../src/boolean_algebras/bdds/bdd_handle.h"
-#include "../src/depreciating/normalizer_depreciating.h"
+#include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
+#include "boolean_algebras/bool_ba.h"
+#include "depreciating/nso_rr_depreciating.h"
+#include "boolean_algebras/bdds/babdd.h"
+#include "boolean_algebras/bdds/bdd_handle.h"
+#include "depreciating/normalizer_depreciating.h"
 #include "dict.h"
 
 using namespace idni::tau_lang::depreciating;

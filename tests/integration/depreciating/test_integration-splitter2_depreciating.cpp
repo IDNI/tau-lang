@@ -21,7 +21,7 @@
 
 #include "doctest.h"
 
-#include "test_integration_helpers.h"
+#include "test_integration_helpers_depreciating.h"
 
 using namespace std;
 using namespace idni::tau_lang;

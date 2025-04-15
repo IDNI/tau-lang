@@ -7,7 +7,7 @@
 #include "depreciating/satisfiability_depreciating.h"
 
 // TODO (LOW) consider move this test to integration tests
-#include "../integration/test_integration_helpers.h"
+#include "test_integration_helpers_depreciating.h"
 
 #define base_bas tau_ba<sbf_ba>, sbf_ba
 
