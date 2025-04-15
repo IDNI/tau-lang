@@ -10,6 +10,9 @@
 
 using namespace std;
 
+// -----------------------------------------------------------------------------
+// bdd var dict
+
 vector<string> v({"dummy"});
 map<string, size_t> m;
 
@@ -36,3 +39,19 @@ const char* dict(sym_t n) {
 }
 
 sym_t dict(const string& s) { return dict(s.c_str()); }
+
+// -----------------------------------------------------------------------------
+// tau strings dict
+
+vector<string> S{""};       // strings
+map<string, size_t> SM{};   // string -> id map
+
+size_t string_id(const std::string& s) {
+	if (auto it = SM.find(s); it != SM.end()) return it->second;
+	return SM.emplace(s, S.size()), S.push_back(s), S.size() - 1;
+}
+
+const char* string_from_id(size_t id) {
+	DBG(assert(id <= S.size());)
+	return S[id].c_str();
+}

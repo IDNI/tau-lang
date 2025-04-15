@@ -1,4 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
 #ifndef __DEF_H__
 #define __DEF_H__
 
