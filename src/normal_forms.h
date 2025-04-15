@@ -1,14 +1,14 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __NORMAL_FORMS_H__
-#define __NORMAL_FORMS_H__
+#ifndef __IDNI__TAU__NORMAL_FORMS_H__
+#define __IDNI__TAU__NORMAL_FORMS_H__
 
 #include <list>
 #include <numeric>
 
 #include "boolean_algebras/nso_ba.h"
 // #include "execution.h"
-#include "tau.h"
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 
@@ -99,4 +99,4 @@ static auto elim_eqs = tree<node<BAs...>>::get_library(
 
 } // namespace idni::tau_lang
 
-#endif // __NORMAL_FORMS_H__
+#endif // __IDNI__TAU__NORMAL_FORMS_H__

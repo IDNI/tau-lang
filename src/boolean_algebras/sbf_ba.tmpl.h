@@ -75,7 +75,7 @@ std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 
 template <typename...BAs>
 tref sbf_ba_factory<BAs...>::binding(const std::string& source) {
-	// tree<node<BAs...>>::get(sn).print(std::cout << "sbf_ba_factory::binding: ") << "\n";
+	// std::cout << "sbf_ba_factory::binding source: `" << source << "`\n";
 	if (auto p = parse(source); p)
 		return ba_constants<BAs...>::get(p.value(), "sbf");
 	return nullptr;

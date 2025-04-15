@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __SATISFIABILITY_H__
-#define __SATISFIABILITY_H__
+#ifndef __IDNI__TAU__SATISFIABILITY_H__
+#define __IDNI__TAU__SATISFIABILITY_H__
 
 #include "normalizer.h"
 
@@ -19,4 +19,4 @@ inline void print_fixpoint_info(const std::string& message,
 
 } // namespace idni::tau_lang
 
-#endif // __SATISFIABILITY_H__
+#endif // __IDNI__TAU__SATISFIABILITY_H__

@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __VARIANT_BA_H__
-#define __VARIANT_BA_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__VARIANT_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__VARIANT_BA_H__
 
 #include <variant>
 #include <ostream>
@@ -317,4 +317,4 @@ bool operator!=(const bool& l, const variant_ba<BAs...>& r) {
 
 //TODO (MEDIUM) add << for variant_ba
 
-#endif // __VARIANT_BA_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__VARIANT_BA_H__

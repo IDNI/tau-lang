@@ -1,11 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __TAU_BA_H__
-#define __TAU_BA_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
 
 #include <iostream>
 
-#include "tau.h"
+#include "tau_tree.h"
 
 // #include "satisfiability.h"
 // #include "splitter.h"
@@ -297,4 +297,4 @@ std::ostream& operator<<(std::ostream& os,
 
 #include "tau_ba.tmpl.h"
 
-#endif // __TAU_BA_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__

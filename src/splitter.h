@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __SPLITTER_H__
-#define __SPLITTER_H__
+#ifndef __IDNI__TAU__SPLITTER_H__
+#define __IDNI__TAU__SPLITTER_H__
 
 #include "satisfiability.h"
 #include "boolean_algebras/nso_ba.h"
@@ -29,4 +29,4 @@ tref tau_bad_splitter(tref fm = tree<node<BAs...>>::_T().get()) {
 
 } // idni::tau_lang namespace
 
-#endif //__SPLITTER_H__
+#endif //__IDNI__TAU__SPLITTER_H__

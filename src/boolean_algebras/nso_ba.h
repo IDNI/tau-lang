@@ -1,9 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __NSO_BA_H__
-#define __NSO_BA_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__NSO_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__NSO_BA_H__
 
-#include "tau.h"
+#include "tau_tree.h"
 // #include "language.h"
 // #include "hooks.h"
 
@@ -169,4 +169,4 @@ const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& n,
 
 #include "nso_ba.tmpl.h"
 
-#endif // __NSO_BA_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__NSO_BA_H__

@@ -6,8 +6,8 @@
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
-#ifndef __NSO_RR_H__
-#define __NSO_RR_H__
+#ifndef __IDNI__TAU__NSO_RR_H__
+#define __IDNI__TAU__NSO_RR_H__
 
 #include <map>
 #include <variant>
@@ -30,7 +30,7 @@
 #include "boolean_algebras/variant_ba.h"
 #include "splitter_types.h"
 #include "utils.h"
-#include "tau.h"
+#include "tau_tree.h"
 
 #ifdef TAU_MEASURE
 #include "measure.h"
@@ -94,4 +94,4 @@ tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 
 } // namespace idni::tau_lang
 
-#endif // __NSO_RR_H__
+#endif // __IDNI__TAU__NSO_RR_H__
