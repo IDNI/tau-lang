@@ -5,15 +5,15 @@
 #include <cassert>
 
 #include "doctest.h"
-#include "nso_rr.h"
-#include "language.h"
+#include "depreciating/nso_rr_depreciating.h"
+#include "depreciating/language_depreciating.h"
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "test_helpers_depreciating.h"
 
-using namespace idni::rewriter::depreciating;
-using namespace idni::tau_lang;
 using namespace std;
+using namespace idni::rewriter::depreciating;
+using namespace idni::tau_lang::depreciating;
 
 namespace testing = doctest;
 

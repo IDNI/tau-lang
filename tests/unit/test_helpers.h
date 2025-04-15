@@ -25,8 +25,8 @@ using bool_binder = ba_constants<Bool>;
 
 struct named_binder_fixture {
 	named_binder_fixture() : binder({
-		{ string_id("binding"),  bool_binder::get(Bool(true),  "bool") },
-		{ string_id("binding2"), bool_binder::get(Bool(false), "bool") } }) {}
+		{ "binding",  bool_binder::get(Bool(true),  "bool") },
+		{ "binding2", bool_binder::get(Bool(false), "bool") } }) {}
 	bool_binder binder;
 };
 
@@ -36,12 +36,14 @@ struct bool_binder_fixture {
 
 template <typename... BAs>
 tref make(const std::string& s, tau_parser::parse_options opts = {}) {
-	return tau::get<BAs...>(s, opts);
+	return tree<node<BAs...>>::get(s, opts);
 }
 
 template <typename... BAs>
-tt make_tt(const std::string& s, tau_parser::parse_options opts = {}) {
-	return tt(make<BAs...>(s, opts));
+typename tree<node<BAs...>>::traverser make_tt(const std::string& s,
+	tau_parser::parse_options opts = {})
+{
+	return typename tree<node<BAs...>>::traverser(make<BAs...>(s, opts));
 }
 
 namespace idni::tau_lang {
@@ -54,8 +56,8 @@ struct nso_factory<Bool> {
 		throw std::logic_error("not implemented");
 	}
 
-	tref binding(tref n, const std::string& type_name) const {
-		if (type_name != "bool") return n;
+	tref binding(const std::string&, const std::string& type_name) const {
+		if (type_name != "bool") return nullptr;
 		return bool_binder::get(Bool(true), "bool");
 	}
 
