@@ -680,11 +680,8 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	// if the  form is a z3 formula call z3
 	if (auto check = find_top(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>); check) {
 		auto equations = n->child.back();
-		z3_solver_options options = {
-			.control_underflow_overflow = false
-		};
 		try {
-			auto solution = solve_z3(equations, options);
+			auto solution = solve_z3(equations);
 			if (!solution) { std::cout << "no solution\n"; return; }
 			else print_z3_solver_cmd_solution(solution);
 		} catch (std::exception&) {
