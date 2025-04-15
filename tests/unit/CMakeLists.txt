@@ -18,6 +18,13 @@ set(TESTS
 	tau_parser
 	traversal
 
+	# empty tests?
+	# interpreter
+	# normalizer
+	# tau
+)
+
+set(DEPRECIATING_TESTS
 	# tests to implement with new tree
 	rules-bf_execution_depreciating
 	rules-wff_execution_depreciating
@@ -34,17 +41,21 @@ set(TESTS
 	sbf_ba_binding_depreciating
 	tau_parser_depreciating
 	traversal_depreciating
-	rewriting_depreciating # moved to the parser repository
-	
-	# empty tests?
-	interpreter
-	normalizer
-	tau
+	rewriting_depreciating # moved to the parser repository	
 )
 
 foreach(X IN LISTS TESTS)
 	set(N "test_${X}")
 	add_executable(${N} "${N}.cpp")
+	target_setup(${N})
+	target_link_libraries(${N} ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} doctest)
+	target_compile_options(${N} PUBLIC -Wno-unused-function)
+	add_test(NAME ${N} COMMAND "${PROJECT_BINARY_DIR}/${N}")
+endforeach()
+
+foreach(X IN LISTS DEPRECIATING_TESTS)
+	set(N "test_${X}")
+	add_executable(${N} "depreciating/${N}.cpp")
 	target_setup(${N})
 	target_link_libraries(${N} ${TAU_OBJECT_LIB_NAME} ${IDNI_PARSER_OBJECT_LIB} doctest)
 	target_compile_options(${N} PUBLIC -Wno-unused-function)
