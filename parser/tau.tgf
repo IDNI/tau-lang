@@ -108,8 +108,9 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                            | bf_neg | capture)
                                 :bf_and_nosep_2nd_oprnd)     :bf_and_nosep
                         |                                     capture.
-z3                     => ('(' _ z3 _ ')')                   :z3_parenthesis
-                        |                                     variable
+z3                     => ('(' _ z3 _ ')')            :z3_parenthesis
+                        | ( '[' z3 ']' )              :z3_checked
+                        |                              variable
                         | '~' _ z3                    :z3_neg
                         | (z3 _ '+' _ z3)             :z3_add
                         | (z3 _ '-' _ z3)             :z3_sub
@@ -201,7 +202,7 @@ cli_command            =>
 # TODO (HIGH) maybe we should also check for the validity of the wff and bf (the
 # later in the sense that is not always 0)
         | ("sat"           :sat_sym     __ normalize_cmd_arg) :sat_cmd
-        | ("unsat"         :unsat_sym   __ normalize_cmd_arg) :unsat_cmd                                                 
+        | ("unsat"         :unsat_sym   __ normalize_cmd_arg) :unsat_cmd
 # TODO (LOW) maybe we should also include a command lgrs to return the lgrs of
 # a wff if possible.
         | ("solve" :solve_sym [solve_options]  __ wff_cmd_arg):solve_cmd
