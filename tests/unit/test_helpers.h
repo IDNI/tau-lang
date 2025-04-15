@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __TEST_HELPERS_H__
-#define __TEST_HELPERS_H__
+#ifndef __IDNI__TAU__TESTS__UNIT__TEST_HELPERS_H__
+#define __IDNI__TAU__TESTS__UNIT__TEST_HELPERS_H__
 
 #include <cassert>
 #include "doctest.h"
@@ -99,4 +99,4 @@ private:
 
 } // namespace idni::tau_lang
 
-#endif // __TEST_HELPERS_H__
+#endif // __IDNI__TAU__TESTS__UNIT__TEST_HELPERS_H__
