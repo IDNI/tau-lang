@@ -51,7 +51,7 @@ size_t string_id(const std::string& s) {
 	return SM.emplace(s, S.size()), S.push_back(s), S.size() - 1;
 }
 
-const char* string_from_id(size_t id) {
+const std::string& string_from_id(size_t id) {
 	DBG(assert(id <= S.size());)
-	return S[id].c_str();
+	return S[id];
 }

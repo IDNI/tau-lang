@@ -13,7 +13,7 @@ const char* dict(sym_t);
 bool has(sym_t);
 
 // tau strings dict
-const char* string_from_id(size_t id);
+const std::string& string_from_id(size_t id);
 size_t string_id(const std::string& s);
 
 #endif // __DICT_H__
