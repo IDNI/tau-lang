@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __IDNI__TAU__TAU_H__
-#define __IDNI__TAU__TAU_H__
+#ifndef __IDNI__TAU__TAU_TREE_H__
+#define __IDNI__TAU__TAU_TREE_H__
 
 #include <initializer_list>
 #include <variant>
@@ -644,7 +644,7 @@ rewriter::builder tree<node>::bldr_bf_nleq_lower =
 #include "nso_factory.h"
 #include "ba_constants.h"
 
-#include "tau.tmpl.h"
-#include "tau_builders.tmpl.h"
+#include "tau_tree.tmpl.h"
+#include "tau_tree_builders.tmpl.h"
 
-#endif // __IDNI__TAU__TAU_H__
+#endif // __IDNI__TAU__TAU_TREE_H__

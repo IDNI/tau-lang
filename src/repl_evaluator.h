@@ -37,10 +37,10 @@
 // TODO (HIGH) use only required parenthesis in the memory or at least be able
 // to say something like `pretty(%)`  after executing a given command.
 
-#ifndef __REPL_EVALUATOR_H__
-#define __REPL_EVALUATOR_H__
+#ifndef __IDNI__TAU__REPL_EVALUATOR_H__
+#define __IDNI__TAU__REPL_EVALUATOR_H__
 
-#include "tau.h"
+#include "tau_tree.h"
 #include "utility/repl.h"
 
 namespace idni::tau_lang {
@@ -171,4 +171,4 @@ private:
 
 #include "repl_evaluator.tmpl.h"
 
-#endif //__REPL_EVALUATOR_H__
+#endif //__IDNI__TAU__REPL_EVALUATOR_H__

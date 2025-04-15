@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __BABDD_H__
-#define __BABDD_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BABDD_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BABDD_H__
 
 #include <vector>
 #include <map>

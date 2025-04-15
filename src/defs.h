@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __DEF_H__
-#define __DEF_H__
+#ifndef __IDNI__TAU__DEF_H__
+#define __IDNI__TAU__DEF_H__
 
 #include "version_license.h"
 
@@ -48,4 +48,4 @@ template<typename T, typename V> bool hasv(const T& t, const V& v) {
 #define GIT_BRANCH      "n/a"
 #endif
 
-#endif // __DEF_H__
+#endif // __IDNI__TAU__DEF_H__

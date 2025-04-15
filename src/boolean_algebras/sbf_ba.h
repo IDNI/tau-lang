@@ -1,9 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __SBF_BA_H__
-#define __SBF_BA_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
 
-#include "tau.h"
+#include "tau_tree.h"
 #include "boolean_algebras/tau_ba.h"
 #include "../parser/sbf_parser.generated.h"
 
@@ -127,4 +127,4 @@ struct std::hash<hbdd<Bool>> {
 };
 
 #include "sbf_ba.tmpl.h"
-#endif // __SBF_BA_H__
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__

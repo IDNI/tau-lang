@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __BDD_HANDLE_H__
-#define __BDD_HANDLE_H__
+#ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
+#define __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BDD_HANDLE_H__
 
 #include "babdd.h"
 #include "dict.h"

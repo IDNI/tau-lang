@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __DICT_H__
-#define __DICT_H__
+#ifndef __IDNI__TAU__DICT_H__
+#define __IDNI__TAU__DICT_H__
 
 #include "defs.h"
 #include <string>
@@ -16,4 +16,4 @@ bool has(sym_t);
 const std::string& string_from_id(size_t id);
 size_t string_id(const std::string& s);
 
-#endif // __DICT_H__
+#endif // __IDNI__TAU__DICT_H__

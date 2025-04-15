@@ -3,7 +3,7 @@
 #ifndef __IDNI__TAU__RR_H__
 #define __IDNI__TAU__RR_H__
 
-#include "tau.h"
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 
