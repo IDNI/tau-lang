@@ -21,6 +21,10 @@ TEST_SUITE("configuration") {
 		add_console_log(std::cout, keywords::format =
 			expressions::stream << expressions::smessage);
 	}
+
+	TEST_CASE("z3_config") {
+		z3_config();
+	}
 }
 
 TEST_SUITE("sample z3 programs") {
@@ -312,7 +316,6 @@ TEST_SUITE("z3_solve simple") {
 		CHECK( solution.value().size() == 1 );
 	}
 }
-
 
 TEST_SUITE("z3 overflow/underflow") {
 

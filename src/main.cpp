@@ -12,6 +12,7 @@
 #include "cli.h"
 #include "repl.h"
 #include "repl_evaluator.h"
+#include "z3_context.h"
 
 using namespace std;
 using namespace idni;
@@ -85,6 +86,7 @@ void welcome() {
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	bdd_init<Bool>();
+	z3_config();
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++) args.push_back(argv[i]);
