@@ -286,12 +286,14 @@ struct tau_ba_factory {
 // Hash for tau_ba using specialization to std::hash
 template <typename... BAs>
 struct std::hash<idni::tau_lang::tau_ba<BAs...>> {
-	size_t operator()(const idni::tau_lang::tau_ba<BAs...>& f) const noexcept;
+	size_t operator()(const idni::tau_lang::tau_ba<BAs...>& f) const
+								noexcept;
 };
 
 // << for printing tau_ba's form
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& os, const idni::tau_lang::tau_ba<BAs...>& rs);
+std::ostream& operator<<(std::ostream& os,
+				const idni::tau_lang::tau_ba<BAs...>& rs);
 
 #include "tau_ba.tmpl.h"
 

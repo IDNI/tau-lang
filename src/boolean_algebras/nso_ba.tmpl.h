@@ -24,11 +24,12 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 		DBG(assert(type_l && type_r);)
 		DBG(assert(type_l.value_tree() == type_r.value_tree());)
 
-		return tau::get(tau::build_bf_constant(lc & rc, type_l.value()));
+		return tau::get(tau::build_bf_constant(lc&rc, type_l.value()));
 	};
 
 	// trivial cases
-	if (lt.value == tau::_0().value || rt.value == tau::_0().value) return tau::_0();
+	if (lt.value == tau::_0().value
+		|| rt.value == tau::_0().value) return tau::_0();
 	if (lt.value == tau::_1().value) return rt;
 	if (rt.value == tau::_1().value) return lt;
 
@@ -69,7 +70,7 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 		DBG(assert(type_l.has_value() && type_r.has_value());)
 		DBG(assert(type_l.value_tree().data() == type_r.value_tree().data());)
 
-		return tau::get(tau::build_bf_constant(lc | rc, type_l.value()));
+		return tau::get(tau::build_bf_constant(lc|rc, type_l.value()));
 	};
 
 	if (lt.first_tree().is(tau::bf_constant)
@@ -97,7 +98,8 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 					| tt::template ba_constant<BAs...>;
 		auto type_l = l | tau::type;
 		DBG(assert(type_l.has_value());)
-		return tau::get(tau::build_bf_constant((~lc).get(), type_l.value()));
+		return tau::get(
+			tau::build_bf_constant((~lc).get(), type_l.value()));
 	};
 
 	// trivial cases
@@ -135,7 +137,8 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 		DBG(assert(type_l.has_value() && type_r.has_value());)
 		DBG(assert(type_l.value_tree().data() == type_r.value_tree().data());)
 
-		return tau::get(tau::build_bf_constant((lc ^ rc).get(), type_l.value()));
+		return tau::get(
+			tau::build_bf_constant((lc ^ rc).get(), type_l.value()));
 	};
 
 	// trivial cases
@@ -228,7 +231,9 @@ bool operator!=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 // program runs
 // In this comparison typed and non-typed Tau constants are considered different
 template<typename... BAs>
-std::weak_ordering operator<=>(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
+std::weak_ordering operator<=>(const tree<node<BAs...>>& lt,
+	const tree<node<BAs...>>& rt)
+{
 	return lt <=> rt;
 }
 
@@ -262,7 +267,9 @@ bool operator==(const bool lt, const tree<node<BAs...>>& rt) {
 
 // Splitter function for a nso tau_parser::bf_constant node holding a BA constant
 template <typename... BAs>
-const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t, splitter_type st) {
+const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
+	splitter_type st)
+{
 	using tau = tree<node<BAs...>>;
 	using tt = tau::traverser;
 

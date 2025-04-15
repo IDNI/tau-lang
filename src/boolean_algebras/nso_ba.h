@@ -16,7 +16,8 @@ namespace idni::tau_lang {
  * @return Result of bitwise AND operation.
  */
 template <typename... BAs>
-const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
+const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& l,
+        const tree<node<BAs...>>& r);
 
 /**
  * @brief Bitwise OR operator for tau.
@@ -25,7 +26,8 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& l, const tree<node
  * @return Result of bitwise OR operation.
  */
 template <typename... BAs>
-const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
+const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& l,
+        const tree<node<BAs...>>& r);
 
 /**
  * @brief Bitwise NOT operator for tau.
@@ -42,7 +44,8 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& l);
  * @return Result of bitwise XOR operation.
  */
 template <typename... BAs>
-const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
+const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& l,
+                                                const tree<node<BAs...>>& r);
 
 /**
  * @brief Addition operator for tau.
@@ -51,7 +54,8 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& l, const tree<node
  * @return Result of addition operation.
  */
 template <typename... BAs>
-const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
+const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& l,
+                                                const tree<node<BAs...>>& r);
 
 /**
  * @brief Checks if the tau is zero.
@@ -94,7 +98,8 @@ bool operator!=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
  * @return Result of the three-way comparison.
  */
 template <typename... BAs>
-std::weak_ordering operator<=>(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
+std::weak_ordering operator<=>(const tree<node<BAs...>>& l,
+                                                const tree<node<BAs...>>& r);
 
 /**
  * @brief Less-than operator for tau.
@@ -157,7 +162,8 @@ bool operator==(const bool l, const tree<node<BAs...>>& r);
  * @return Result of the splitter operation.
  */
 template <typename... BAs>
-const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& n, splitter_type st = splitter_type::upper);
+const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& n,
+                                splitter_type st = splitter_type::upper);
 
 } // namespace idni::tau_lang
 

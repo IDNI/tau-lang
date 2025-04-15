@@ -164,11 +164,15 @@ std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::default_type() const {
 	return "tau";
 }
 
-std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::one(const std::string type_name) const {
+std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::one(
+	const std::string type_name) const
+{
 	return type_name == "sbf" ? "1" : "T";
 }
 
-std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::zero(const std::string type_name) const {
+std::string nso_factory<tau_ba<sbf_ba>, sbf_ba>::zero(
+	const std::string type_name) const
+{
 	return type_name == "sbf" ? "0" : "F";
 }
 
@@ -184,7 +188,7 @@ tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
 tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
 	const std::string type_name) const
 {
-	if (type_name == "sbf") return ba_constants<tau_ba<sbf_ba>, sbf_ba>::get(
+	if (type_name=="sbf") return ba_constants<tau_ba<sbf_ba>, sbf_ba>::get(
 						bf().splitter_one(), "sbf");
 	else return ba_constants<tau_ba<sbf_ba>, sbf_ba>::get(
 						tf().splitter_one(), "tau");

@@ -26,7 +26,9 @@ auto operator|(const rewriter::depreciating::sp_node<N>& n, F f) {
 }
 
 template<typename N, typename F, typename S>
-auto operator|(const rewriter::depreciating::sp_node<N>& n, const std::pair<F, S>& p) {
+auto operator|(const rewriter::depreciating::sp_node<N>& n,
+	const std::pair<F, S>& p)
+{
 	return n | p.first | p.second;
 }
 

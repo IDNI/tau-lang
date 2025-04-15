@@ -107,8 +107,8 @@ void repl_evaluator<BAs...>::history_store_cmd(const tt& command) {
 }
 
 template <typename... BAs>
-repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_(tau::node::type nt, const tt& n,
-	bool suppress_error)
+repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_(tau::node::type nt,
+	const tt& n, bool suppress_error)
 {
 	if (n.value_tree().is(nt)) return n;
 	else if (n.value_tree().is(tau::memory)) {
@@ -126,7 +126,9 @@ repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_(tau::node::type nt, cons
 }
 
 template <typename... BAs>
-repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_bf(const tt& n, bool suppress_error) {
+repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_bf(const tt& n,
+	bool suppress_error)
+{
 	return get_(tau::bf, n, suppress_error);
 }
 template <typename... BAs>
@@ -301,7 +303,8 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	if (definitions.size() == 0) std::cout << "definitions: empty\n";
 	else std::cout << "definitions:\n";
 	for (size_t i = 0; i < definitions.size(); i++)
-		print_rule<node>(std::cout << "    [" << i + 1 << "] ", definitions[i]) << "\n";
+		print_rule<node>(std::cout << "    [" << i + 1 << "] ",
+						definitions[i]) << "\n";
 	if (inputs.size() == 0 && outputs.size() == 0)
 		std::cout << "io variables: empty\n";
 	else std::cout << "io variables:\n";
