@@ -74,19 +74,24 @@ struct node {
 
 	const size_t hash;
 
+	// generic constructor
 	constexpr node(size_t nt = 0, size_t data = 0, size_t is_term = 0,
 			size_t ba_type = 0, size_t ext = 0) noexcept;
 
-	// creates a ba constant node
+	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
 
+	// casts size_t data to int_t
 	int_t as_int() const;
 
+	// TODO null node? is it required? 
 	static constexpr node_t nnull();
 
+	// getter and setter for the raw data access of an extension node 
 	static constexpr node_t extension(T raw_value);
 	constexpr T extension() const noexcept;
 
+	// comparison operators
 	auto operator<=>(const node& that) const;
 	constexpr bool operator<(const node& that) const;
 	constexpr bool operator<=(const node& that) const;
@@ -94,6 +99,7 @@ struct node {
 	constexpr bool operator>=(const node& that) const;
 	constexpr auto operator==(const node& that) const;
 	constexpr auto operator!=(const node& that) const;
+	// hash function
 	constexpr size_t hashit() const;
 };
 
@@ -108,6 +114,27 @@ namespace idni::tau_lang {
 
 template <typename... BAs>
 struct ba_constants;
+
+// -----------------------------------------------------------------------------
+// Tau tree
+//
+// basic Tau language structure for storing terms, formulas and language constructs
+//
+// - extends lcrs_tree<node<BAs...>> with tau_parser_nonterminals
+// - is expected to be templated with node<BAs...>
+// 
+// Tree is usually created by static get calls either manually or transformed
+// from a tau parse tree
+//
+// - inherits tree API from lcrs_tree<N>
+// - provides traverser (tt) API for simple traversal and extraction
+// - provides tau tree builders
+// - provides type aliases for further usage:
+//     - tau = tree<node<BAs...>>
+//     - node = node<BAs...>
+//     - parse_tree = tau_parser::tree
+//     - parse_options = tau_parser::parse_options
+//
 
 template <typename N>
 struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
@@ -154,7 +181,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt, tref ch1, tref ch2); // with two children
 	static tref get(const node::type& nt, const tref* ch, size_t len); // with array of children
 	static tref get(const node::type& nt, const trefs& ch); // with vector of children
-	static tref get(const node::type& nt, const std::initializer_list<tref>& ch); // with initializer list of children
+	static tref get(const node::type& nt, // with initializer list of children
+					const std::initializer_list<tref>& ch);
 	static tref get(const node::type& nt, const std::string& str); // with string
 
 	// creation from parser result or parser input (string, stream, file)
@@ -168,9 +196,11 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	template <typename binder>
 	static tref get(binder& bind, tau_parser::result& result);
 	template <typename binder>
-	static tref get(binder& bind, const std::string& str, parse_options options = {});
+	static tref get(binder& bind, const std::string& str,
+						parse_options options = {});
 	template <typename binder>
-	static tref get(binder& bind, std::istream& is, parse_options options = {});
+	static tref get(binder& bind, std::istream& is,
+						parse_options options = {});
 	template <typename binder>
 	static tref get_from_file(binder& bind, const std::string& filename,
 						parse_options options = {});
@@ -245,10 +275,12 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 
 	static rewriter::rules get_rules(tref r);
 	template <typename binder>
-	static rewriter::library get_library(binder& bind, const std::string& source);
+	static rewriter::library get_library(binder& bind,
+						const std::string& source);
 	static rewriter::library get_library(const std::string& source);
 	template <typename binder>	
-	static rewriter::builder get_builder(binder& bind, const std::string& source);
+	static rewriter::builder get_builder(binder& bind,
+						const std::string& source);
 	static rewriter::builder get_builder(const std::string& source);
 	static rewriter::builder get_builder(tref ref);
 
@@ -458,7 +490,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref build_in_variable_at_n(const std::string& name, int_t pos);
 	static tref build_in_variable_at_t(tref in_var_name);
 	static tref build_in_variable_at_t(size_t index);
-	static tref build_in_variable_at_t_minus(const std::string& var_name, int_t shift);
+	static tref build_in_variable_at_t_minus(const std::string& var_name,
+								int_t shift);
 	static tref build_in_variable_at_t_minus(tref in_var_name, size_t num);
 	static tref build_in_variable_at_t_minus(size_t index, size_t num);
 	static tref build_out_var_name(size_t index);
@@ -468,7 +501,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref build_out_variable_at_n(tref out_var_name, size_t num);
 	static tref build_out_variable_at_n(size_t index, size_t num);
 	static tref build_out_variable_at_n(const std::string& name, int_t pos);
-	static tref build_out_variable_at_t_minus(const std::string& out_var_name, int_t shift);
+	static tref build_out_variable_at_t_minus(
+				const std::string& out_var_name, int_t shift);
 	static tref build_out_variable_at_t_minus(tref out_var_name, size_t num);
 	static tref build_out_variable_at_t_minus(size_t index, size_t num);
 	// static tref bf_variable(const std::string& name);
@@ -476,7 +510,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref build_bf_constant(tref cte, tref type);
 	static tref build_bf_constant(tref cte, const std::string& type);
 	// build_bf_and_constant and build_bf_or_constant
-	static tref build_bf_uniter_const(const std::string& name1, const std::string& name2);
+	static tref build_bf_uniter_const(const std::string& name1,
+						const std::string& name2);
 	static tref build_wff_eq(tref l, tref r);
 	static tref build_wff_eq(tref l);
 	static tref build_wff_neq(tref l);
@@ -528,7 +563,8 @@ template <typename node>
 std::ostream& operator<<(std::ostream& os, const tree<node>& t);
 
 template <typename node>
-std::ostream& operator<<(std::ostream& os, const typename tree<node>::traverser& tt);
+std::ostream& operator<<(std::ostream& os,
+				const typename tree<node>::traverser& tt);
 
 // -----------------------------------------------------------------------------
 // queries
@@ -584,17 +620,23 @@ const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
 
 // wff builder
 template <typename node>
-rewriter::builder tree<node>::bldr_wff_eq = tree<node>::get_builder(BLDR_WFF_EQ);
+rewriter::builder tree<node>::bldr_wff_eq =
+				tree<node>::get_builder(BLDR_WFF_EQ);
 template <typename node>
-rewriter::builder tree<node>::bldr_bf_splitter = tree<node>::get_builder(BLDR_BF_SPLITTER);
+rewriter::builder tree<node>::bldr_bf_splitter =
+				tree<node>::get_builder(BLDR_BF_SPLITTER);
 template <typename node>
-rewriter::builder tree<node>::bldr_bf_not_less_equal = tree<node>::get_builder(BLDR_BF_NOT_LESS_EQUAL);
+rewriter::builder tree<node>::bldr_bf_not_less_equal =
+				tree<node>::get_builder(BLDR_BF_NOT_LESS_EQUAL);
 template <typename node>
-rewriter::builder tree<node>::bldr_bf_interval = tree<node>::get_builder(BDLR_BF_INTERVAL);
+rewriter::builder tree<node>::bldr_bf_interval =
+				tree<node>::get_builder(BDLR_BF_INTERVAL);
 template <typename node>
-rewriter::builder tree<node>::bldr_bf_nleq_upper = tree<node>::get_builder(BDLR_BF_NLEQ_UPPER);
+rewriter::builder tree<node>::bldr_bf_nleq_upper =
+				tree<node>::get_builder(BDLR_BF_NLEQ_UPPER);
 template <typename node>
-rewriter::builder tree<node>::bldr_bf_nleq_lower = tree<node>::get_builder(BDLR_BF_NLEQ_LOWWER);
+rewriter::builder tree<node>::bldr_bf_nleq_lower =
+				tree<node>::get_builder(BDLR_BF_NLEQ_LOWWER);
 
 
 } // namespace idni::tau_lang

@@ -206,10 +206,11 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 					nt = bf; break;
 				case bf_and_nosep:
 					nt = bf_and; break;
-				// offset variable -> capture
+				// offset or ref_arg variable -> capture
 				case variable:
-					if (parent_nt == offsets || parent_nt == ref_arg)
-						nt = capture;
+					if (parent_nt == offsets
+						|| parent_nt == ref_arg)
+							nt = capture;
 					break;
 				default: break;
 			}
@@ -218,14 +219,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 		auto get_type = [](tref n) -> std::string {
 			auto t = tt(n) | tau_parser::type;
-			if (t) {
-				t.value_tree().dump(std::cout << "type1: ") << std::endl;
-				std::cout << t.value() << "\n";
-				std::cout << t.value_tree().data() << "\n";
-				std::cout << "type2: " << t.value_tree().get_string() << std::endl;
-				std::cout << "type3: " << (t | tt::string) << std::endl;
-				return t | tt::string;
-			}
+			if (t) return t | tt::string;
 			return "";
 		};
 
@@ -243,7 +237,8 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 			// digital terminals (same as is_digital_nt())
 			case num:
 			case memory_id:
-				x = get(node(nt), m_get(ptr.only_child()).data());
+				x = get(node(nt),
+					m_get(ptr.only_child()).data());
 				break;
 
 			case wff_all:
@@ -276,8 +271,9 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 				if (nt == bf_constant) {
 					if (!get(x)[0][0].is(binding)) break; // capture?
 					auto nn = bind(src, get_type(x));
-					if (nn == nullptr || bind.error || nn == x)
-						return error = true, false;
+					if (nn == nullptr || bind.error
+						|| nn == x) return error = true,
+									false;
 					x = nn;
 				}
 				break;
@@ -410,7 +406,9 @@ tref tree<node>::get(const node::type& nt, const trefs& ch) {
 }
 
 template <typename node>
-tref tree<node>::get(const node::type& nt, const std::initializer_list<tref>& ch) {
+tref tree<node>::get(const node::type& nt,
+	const std::initializer_list<tref>& ch)
+{
 	return get(node(nt), ch);
 }
 
@@ -464,7 +462,9 @@ tref tree<N>::get(tau_parser::result& result) {
 
 template <typename N>
 template <typename binder>
-tref tree<N>::get(binder& bind, const std::string& source, parse_options options) {
+tref tree<N>::get(binder& bind, const std::string& source,
+	parse_options options)
+{
 	auto result = tau_parser::instance()
 		.parse(source.c_str(), source.size(), options);
 	return tree<N>::template get<binder>(bind, result);
@@ -491,7 +491,9 @@ tref tree<N>::get(std::istream& is, parse_options options) {
 
 template <typename N>
 template <typename binder>
-tref tree<N>::get_from_file(binder& bind, const std::string& filename, parse_options options){
+tref tree<N>::get_from_file(binder& bind, const std::string& filename,
+	parse_options options)
+{
 	auto result = tau_parser::instance().parse(filename, options);
 	return tree<N>::template get<binder>(bind, result);
 }
@@ -581,8 +583,9 @@ rewriter::library tree<N>::get_library(const std::string& str) {
 
 template <typename N>
 template <typename binder>
-rewriter::builder tree<N>::get_builder(binder& bind, const std::string& source) {
-	return tree<N>::get_builder(get<binder>(bind, source, { .start = tau_parser::builder }));
+rewriter::builder tree<N>::get_builder(binder& bind, const std::string& source){
+	return tree<N>::get_builder(get<binder>(bind, source, {
+					.start = tau_parser::builder }));
 }
 
 template <typename N>
@@ -1089,11 +1092,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_constant:       os << "{ "; break;
 			case bf:
 			case wff:
-				if (parent && is_to_wrap(t.first_tree().get_type(),
+				if (parent && is_to_wrap(
+					t.first_tree().get_type(),
 					get(parent).get_type()))
 				{
 					wraps.insert(ref), os << "(";
-					if (static_cast<node::type>(nt) == wff) depth++, break_line();
+					if (static_cast<node::type>(nt) == wff)
+							depth++, break_line();
 				}
 				break;
 
@@ -1136,11 +1141,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case solve_cmd:         os << "solve "; break;
 			case run_cmd:           os << "run "; break;
 			case normalize_cmd:     os << "normalize "; break;
-			case inst_cmd:          track_chpos(); os << "instantiate "; break;
-			case subst_cmd:         track_chpos(); os << "substitute "; break;
+			case inst_cmd:          track_chpos();
+						os << "instantiate "; break;
+			case subst_cmd:         track_chpos();
+						os << "substitute "; break;
 			case wff_conditional:   track_chpos(); break;
 			default:
-				if (is_string_nt(nt)) os << string_from_id(t.data());
+				if (is_string_nt(nt))
+						os << string_from_id(t.data());
 				else if (is_digital_nt(nt)) os << t.data();
 				else if (t.is_integer()) os << t.get_integer();
 				else if (t.is_ba_constant()) os << "{C"
@@ -1237,7 +1245,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case wff:
 				if (wraps.find(ref) != wraps.end()) {
 					wraps.erase(ref), os << ")";
-					if (static_cast<node::type>(nt) == wff) depth--, break_line();
+					if (static_cast<node::type>(nt) == wff)
+							depth--, break_line();
 				}
 				break;
 		}

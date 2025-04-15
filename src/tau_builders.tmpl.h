@@ -132,10 +132,13 @@ tref tree<N>::build_in_variable_at_t(size_t index) {
 }
 
 template <typename N>
-tref tree<N>::build_in_variable_at_t_minus (const std::string& name, int_t shift) {
+tref tree<N>::build_in_variable_at_t_minus (const std::string& name,
+	int_t shift)
+{
 	return get(bf, get(variable, get(io_var, get(in, {
 		get(in_var_name, name),
-		get(offset, get(shift, {get(variable, "t"), get_num(shift)})) }))));
+		get(offset, get(shift, {get(variable, "t"),
+			get_num(shift)})) }))));
 }
 
 template <typename N>
@@ -193,7 +196,7 @@ tref tree<N>::build_out_variable_at_n(size_t index, size_t num) {
 }
 
 template <typename N>
-tref tree<N>::build_out_variable_at_n(const std::string& name, const int_t pos) {
+tref tree<N>::build_out_variable_at_n(const std::string& name, const int_t pos){
 	return get(bf, get(variable, get(io_var, get(out, {
 					get(out_var_name, name),
 					get(offset, get_integer(pos)) }))));
@@ -361,7 +364,9 @@ tref tree<N>::build_bf_constant(tref cte, const std::string& type) {
 // }
 
 template <typename N>
-tref tree<N>::build_bf_uniter_const(const std::string& n1, const std::string& n2) {
+tref tree<N>::build_bf_uniter_const(const std::string& n1,
+	const std::string& n2)
+{
 	return get(bf, get(variable, get(uninterpreted_constant,
 			get(uninter_const_name, n1 + ":" + n2))));
 }
