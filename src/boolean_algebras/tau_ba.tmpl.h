@@ -17,7 +17,8 @@ auto tau_ba<BAs...>::operator<=>(const tau_ba<BAs...>&) const = default;
 template <typename... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	// TODO (HIGH) replace by ...tau... in the future
-	tref nmain = tau::build_wff_neg(normalizer<tau_ba_t, BAs...>(nso_rr.main.get()));
+	tref nmain = tau::build_wff_neg(
+			normalizer<tau_ba_t, BAs...>(nso_rr.main.get()));
 	auto nrec_relations = nso_rr.rec_relations;
 	return tau_ba_t(nrec_relations, nmain);
 }
@@ -25,7 +26,8 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 template <typename... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
-	tref nmain = tau::build_wff_and(nso_rr.main->get(), other.nso_rr.main->get());
+	tref nmain = tau::build_wff_and(
+			nso_rr.main->get(), other.nso_rr.main->get());
 	auto nrec_relations =
 		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba_t(nrec_relations, nmain);
@@ -34,8 +36,9 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba_t& other) const {
 template <typename... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
-	tref nmain = tau::build_wff_or(normalizer<tau_ba_t, BAs...>(nso_rr.main.get()),
-					normalizer<tau_ba_t, BAs...>(other.nso_rr.main.get()));
+	tref nmain = tau::build_wff_or(
+			normalizer<tau_ba_t, BAs...>(nso_rr.main.get()),
+			normalizer<tau_ba_t, BAs...>(other.nso_rr.main.get()));
 	auto nrec_relations =
 		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba_t(nrec_relations, nmain);
@@ -44,8 +47,9 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba_t& other) const {
 template <typename... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
-	tref nmain = tau::build_wff_xor_from_def(normalizer<tau_ba_t, BAs...>(nso_rr.main.get()),
-						normalizer<tau_ba_t, BAs...>(other.nso_rr.main.get()));
+	tref nmain = tau::build_wff_xor_from_def(
+			normalizer<tau_ba_t, BAs...>(nso_rr.main.get()),
+			normalizer<tau_ba_t, BAs...>(other.nso_rr.main.get()));
 	auto nrec_relations =
 		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba_t(nrec_relations, nmain);
@@ -150,7 +154,8 @@ bool is_closed (const tau_ba<BAs...>& fm) {
 	using tau = tree<node<BAs...>>;
 	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
 	if (!simp_fm) return false;
-	if (find_top(simp_fm, is_non_terminal<tau::node, tau::ref>)) return false;
+	if (find_top(simp_fm, is_non_terminal<tau::node, tau::ref>))
+		return false;
 	auto vars = get_free_vars_from_nso(simp_fm);
 	for (const auto& v : vars) {
 		const auto& t = tau::get(v);
@@ -174,7 +179,8 @@ std::optional<std::variant<tau_ba<BAs...>, BAs...>>
 	if (!nso_rr) return {};
 	// compute final result
 	return { std::variant<tau_ba_t, BAs...>(
-			tau_ba_t(nso_rr.value().rec_relations, nso_rr.value().main)) };
+			tau_ba_t(nso_rr.value().rec_relations,
+				nso_rr.value().main)) };
 }
 
 template <typename... BAs>
@@ -185,9 +191,12 @@ tref tau_ba_factory<BAs...>::binding(const std::string& source) {
 }
 
 template <typename... BAs>
-std::variant<tau_ba<BAs...>, BAs...> tau_ba_factory<BAs...>::splitter_one() const {
+std::variant<tau_ba<BAs...>, BAs...> tau_ba_factory<BAs...>::splitter_one()
+	const
+{
 	return std::variant<tau_ba_t, BAs...>(
-		tau_ba<BAs...>(tree<node<BAs...>>::geth(tau_splitter_one<BAs...>())));
+		tau_ba<BAs...>(tree<node<BAs...>>::geth(
+						tau_splitter_one<BAs...>())));
 }
 
 template <typename... BAs>
@@ -217,7 +226,8 @@ tau_ba_factory<BAs...>& tau_ba_factory<BAs...>::instance() {
 // }
 
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& os, const idni::tau_lang::tau_ba<BAs...>& rs)
+std::ostream& operator<<(std::ostream& os,
+	const idni::tau_lang::tau_ba<BAs...>& rs)
 {
 	return os << rs.nso_rr;
 }

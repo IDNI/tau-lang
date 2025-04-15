@@ -35,9 +35,11 @@ tref get_new_uniter_const(tref fm, const std::string& name) {
 		is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
 	std::set ids{ 0 };
 	for (auto uniter_const : uniter_consts) {
-		if (const std::string& tmp = tau::get(uniter_const).get_string(); tmp.find(name) != std::string::npos) {
-			std::string id = tmp.substr(name.length() + 1, tmp.size()-1);
-			if (!tmp.empty()) ids.insert(std::stoi(id));
+		if (const std::string& s = tau::get(uniter_const).get_string();
+			s.find(name) != std::string::npos)
+		{
+			std::string id = s.substr(name.length() + 1, s.size()-1);
+			if (!s.empty()) ids.insert(std::stoi(id));
 		}
 	}
 	std::string id = std::to_string(*ids.rbegin() + 1);

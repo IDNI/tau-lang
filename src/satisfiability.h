@@ -8,9 +8,12 @@
 namespace idni::tau_lang {
 
 inline static bool use_debug_output_in_sat = false;
-inline void print_fixpoint_info(const std::string& message, const std::string& result, const bool output) {
+inline void print_fixpoint_info(const std::string& message,
+	const std::string& result, const bool output)
+{
 	if (!output) return;
-	if (!use_debug_output_in_sat) BOOST_LOG_TRIVIAL(info) << "\n" << message << "\n" << result << "\n\n";
+	if (!use_debug_output_in_sat) BOOST_LOG_TRIVIAL(info) << "\n"
+					<< message << "\n" << result << "\n\n";
 	else std::cerr << message << "\n" << result << "\n";
 }
 
