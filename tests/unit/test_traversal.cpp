@@ -4,6 +4,8 @@
 
 #include "test_helpers.h"
 
+using tau = tree<node<Bool>>;
+
 TEST_SUITE("operator|") {
 
 	TEST_CASE("match zero nodes") {

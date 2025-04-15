@@ -6,42 +6,45 @@
 
 #include "boolean_algebras/bdds/babdd.h"
 
+using tau = tree<node<Bool>>;
+using tt = tau::traverser;
+
 // TODO (MEDIUM) split into test_builder-parsing and test_builder-execution
 
 TEST_SUITE("builders parsing") {
 
 	TEST_CASE("BLDR_WFF_EQ") {
-		rewriter::builder bldr = tau::get_builder<Bool>(BLDR_WFF_EQ);
+		rewriter::builder bldr = tau::get_builder(BLDR_WFF_EQ);
 		CHECK( tau::get(bldr.first).is(tau::builder_head) );
 		CHECK( tau::get(bldr.second).is(tau::wff) );
 	}
 
 	TEST_CASE("BLDR_WFF_NEQ") {
-		rewriter::builder bldr = tau::get_builder<Bool>(BLDR_WFF_NEQ);
+		rewriter::builder bldr = tau::get_builder(BLDR_WFF_NEQ);
 		CHECK( tau::get(bldr.first).is(tau::builder_head) );
 		CHECK( tau::get(bldr.second).is(tau::wff) );
 	}
 
 	TEST_CASE("BLDR_WFF_ALL") {
-		rewriter::builder bldr = tau::get_builder<Bool>(BLDR_WFF_ALL);
+		rewriter::builder bldr = tau::get_builder(BLDR_WFF_ALL);
 		CHECK( tau::get(bldr.first).is(tau::builder_head) );
 		CHECK( tau::get(bldr.second).is(tau::wff) );
 	}
 
 	TEST_CASE("BLDR_WFF_EX") {
-		rewriter::builder bldr = tau::get_builder<Bool>(BLDR_WFF_EX);
+		rewriter::builder bldr = tau::get_builder(BLDR_WFF_EX);
 		CHECK( tau::get(bldr.first).is(tau::builder_head) );
 		CHECK( tau::get(bldr.second).is(tau::wff) );
 	}
 
 	TEST_CASE("BLDR_BF_SPLITTER") {
-		rewriter::builder bldr = tau::get_builder<Bool>(BLDR_BF_SPLITTER);
+		rewriter::builder bldr = tau::get_builder(BLDR_BF_SPLITTER);
 		CHECK( tau::get(bldr.first).is(tau::builder_head) );
 		CHECK( tau::get(bldr.second).is(tau::bf) );
 	}
 
 	TEST_CASE("BLDR_BF_NOT_LESS_EQUAL") {
-		auto bldr = tau::get_builder<Bool>(BLDR_BF_NOT_LESS_EQUAL);
+		auto bldr = tau::get_builder(BLDR_BF_NOT_LESS_EQUAL);
 		CHECK( tau::get(bldr.first).is(tau::builder_head) );
 		CHECK( tau::get(bldr.second).is(tau::wff) );
 	}
@@ -64,14 +67,14 @@ struct builders_exe_fixture {
 TEST_SUITE("builders execution") {
 
 	TEST_CASE_FIXTURE(builders_exe_fixture, "BLDR_WFF_EQ") {
-		auto bldr = tau::get_builder<Bool>(BLDR_WFF_EQ);
+		auto bldr = tau::get_builder(BLDR_WFF_EQ);
 		trefs args = { X };
 		auto check = tt(tau::apply_builder(bldr, args)) | tau::bf_eq;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE_FIXTURE(builders_exe_fixture, "BLDR_WFF_NEQ") {
-		auto bldr = tau::get_builder<Bool>(BLDR_WFF_NEQ);
+		auto bldr = tau::get_builder(BLDR_WFF_NEQ);
 		trefs args = { X };
 		auto check = tt(tau::apply_builder(bldr, args)) | tau::bf_neq;
 		CHECK( check.has_value() );
@@ -90,21 +93,21 @@ TEST_SUITE("builders execution") {
 	}
 
 	TEST_CASE_FIXTURE(builders_exe_fixture, "BLDR_WFF_ALL") {
-		auto bldr = tau::get_builder<Bool>(BLDR_WFF_ALL);
+		auto bldr = tau::get_builder(BLDR_WFF_ALL);
 		trefs args = { X, F };
 		auto check = tt(tau::apply_builder(bldr, args)) | tau::wff_all;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE_FIXTURE(builders_exe_fixture, "BLDR_WFF_EX") {
-		auto bldr = tau::get_builder<Bool>(BLDR_WFF_EX);
+		auto bldr = tau::get_builder(BLDR_WFF_EX);
 		trefs args = { X, F };
 		auto check = tt(tau::apply_builder(bldr, args)) | tau::wff_ex;
 		CHECK( check.has_value() );
 	}
 
 	TEST_CASE_FIXTURE(builders_exe_fixture, "BLDR_BF_SPLITTER") {
-		auto bldr = tau::get_builder<Bool>(BLDR_BF_SPLITTER);
+		auto bldr = tau::get_builder(BLDR_BF_SPLITTER);
 		trefs args = { F };
 		auto check = tt(tau::apply_builder(bldr, args)) | tau::bf_splitter;
 		CHECK( check.has_value() );

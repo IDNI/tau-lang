@@ -4,12 +4,15 @@
 
 #include "test_helpers.h"
 
+using tau = tree<node<Bool>>;
+
 TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
 		tref fm = make<Bool>(sample);
-		fm = rewriter::find_top<tau::node>(fm, is<tau::node, tau::wff>);
+		fm = rewriter::find_top<tau::node>(fm,
+					is_non_terminal<tau::wff, Bool>);
 		// fm = to_mnf(reduce_across_bfs(fm, false));
 		CHECK( tau::get(fm)[0].is(tau::wff_t) );
 		// tau::get(fm).dump(std::cout << "fm: ", true) << "\n";

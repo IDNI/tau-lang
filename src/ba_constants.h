@@ -47,10 +47,10 @@ struct ba_constants {
 	// singleton instance for factory binding
 	static ba_constants<BAs...>& instance();
 
-	// default constructor with default factory binding
+	// default constructor with factory binding
 	ba_constants();
 
-	// constructor with named constants map for named binding + default factory binding
+	// constructor with named constants map for named binding with factory binding
 	ba_constants(const named_constants_map& named_constants);
 
 	// binds the constant source of a type name to a tau tree node

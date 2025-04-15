@@ -5,6 +5,8 @@
 #include "test_helpers.h"
 #include "normal_forms.h"
 
+using tau = tree<node<Bool>>;
+
 bool test_rule(const std::string& sample, tau_parser::nonterminal rule_type) {
 	auto lib = make_tt<Bool>(sample, { .start = tau::library });
 	auto check = lib | tau::rules | tau::rule | rule_type;

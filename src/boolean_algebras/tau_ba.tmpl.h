@@ -120,7 +120,7 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 }
 
 template<typename... BAs>
-auto normalize (const tau_ba<BAs...>& fm) {
+auto normalize(const tau_ba<BAs...>& fm) {
 	auto res = apply_rr_to_formula<tau_ba<BAs...>, BAs...>(fm.nso_rr);
 	res = simp_tau_unsat_valid(res);
 	return tau_ba<BAs...>(res);
@@ -139,18 +139,18 @@ bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
 }
 
 template <typename... BAs>
-auto splitter (const tau_ba<BAs...>& fm, splitter_type st) {
+auto splitter(const tau_ba<BAs...>& fm, splitter_type st) {
 	auto s = tau_splitter(normalizer(fm.nso_rr), st);
 	return tau_ba<BAs...>(s);
 }
 
 template <typename... BAs>
-auto tau_splitter_one () {
+auto tau_splitter_one() {
 	return tau_bad_splitter<BAs...>();
 }
 
 template <typename... BAs>
-bool is_closed (const tau_ba<BAs...>& fm) {
+bool is_closed(const tau_ba<BAs...>& fm) {
 	using tau = tree<node<BAs...>>;
 	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
 	if (!simp_fm) return false;

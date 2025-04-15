@@ -7,8 +7,9 @@
 #include "normalizer.h"
 
 bool test_rule(const std::string& sample) {
-	auto lib = make_tt<Bool>(sample, { .start = tau::library });
-	auto check = lib | tau::rules | tau::rule | tau::wff_rule;
+	auto lib = make_tt<Bool>(sample, { .start = tau_parser::library });
+	auto check = lib | tau_parser::rules | tau_parser::rule
+						| tau_parser::wff_rule;
 	return check.has_value();
 }
 

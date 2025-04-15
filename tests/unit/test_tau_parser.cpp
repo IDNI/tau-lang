@@ -4,6 +4,8 @@
 
 #include "test_helpers.h"
 
+using tau = tree<node<Bool>>;
+
 // The following test suites represent correct sentences of a tau nso_rr or
 // library and as such must be parsed correctly and satisfy the structural checks
 // we perform on the parsed nso_rr (as the rest of the code assumes such structure).
@@ -594,14 +596,14 @@ TEST_SUITE("parsing builders") {
 
 	TEST_CASE("one capture") {
 		const char* sample = "( $X ) =:: ($X && $X).";
-		auto bldr = tau::get_builder<Bool>(sample);
+		auto bldr = tau::get_builder(sample);
 		CHECK( tau::get(bldr.first).is(tau::builder_head) );
 		CHECK( tau::get(bldr.second).is(tau::wff) );
 	}
 
 	TEST_CASE("two capture") {
 		const char* sample = "( $X $Y ) =:: ($X && $Y).";
-		auto bldr = tau::get_builder<Bool>(sample);
+		auto bldr = tau::get_builder(sample);
 		CHECK( tau::get(bldr.first).is(tau::builder_head) );
 		CHECK( tau::get(bldr.second).is(tau::wff) );
 	}
