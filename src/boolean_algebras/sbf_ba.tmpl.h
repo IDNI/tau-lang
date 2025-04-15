@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "sbf_ba.h"
+#include "../parser/sbf_parser.generated.h"
 
 namespace idni::tau_lang {
 

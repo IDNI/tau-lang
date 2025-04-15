@@ -1,7 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "nso_rr.h"
-
 namespace idni::tau_lang {
 
 inline bool pretty_printer_highlighting = false;

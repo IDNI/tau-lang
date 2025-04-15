@@ -117,13 +117,6 @@ void repl_evaluator<BAs...>::history_list_cmd() {
 }
 
 template <typename... BAs>
-void repl_evaluator<BAs...>::history_list_cmd() {
-	if (m.size() == 0) std::cout << "history is empty\n";
-	else for (size_t i = 0; i < m.size(); i++)
-		print_memory(m[i], i, m.size());
-}
-
-template <typename... BAs>
 void repl_evaluator<BAs...>::memory_store(memory o) {
 	// do not add into memory if the last memory value is the same
 	if (!(m.size() && m.back() == o))

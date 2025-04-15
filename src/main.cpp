@@ -44,18 +44,16 @@
 
 #include <iostream>
 #include <fstream>
-#include <iomanip>
 #include <sstream>
 
-#include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
-#include "init_log.h"
-#include "depreciating/normalizer_depreciating.h"
 #include "utility/cli.h"
-#include "repl_evaluator.h"
-#include "depreciating/nso_rr_depreciating.h"
-
-#include "tau_tree.h"
 #include "boolean_algebras/sbf_ba.h"
+#include "repl_evaluator.h"
+
+#include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
+#include "depreciating/normalizer_depreciating.h"
+#include "depreciating/nso_rr_depreciating.h"
+#include "depreciating/repl_evaluator_depreciating.h"
 
 using namespace std;
 using namespace idni;

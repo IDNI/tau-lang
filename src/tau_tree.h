@@ -5,13 +5,11 @@
 
 #include <initializer_list>
 #include <variant>
-#include <cmath>
+#include <numeric>
 
-#include "defs.h"
 #include "dict.h"
-#include "init_log.h"
-#include "utility/tree.h"
 #include "tau_parser.generated.h"
+#include "rr.h"
 
 namespace idni::tau_lang {
 
@@ -22,7 +20,8 @@ constexpr size_t BAs_size = std::variant_size<std::variant<BAs...>>::value;
 // helper to get bitsize required for storing BA type ids
 template <typename... BAs>
 constexpr size_t BAs_bitsize = BAs_size<BAs...> <= 1 ? 1 : 
-                static_cast<size_t>(std::ceil(std::log2(BAs_size<BAs...>)));
+		//static_cast<size_t>(std::ceil(std::log2(BAs_size<BAs...>)));
+                (sizeof(size_t) * 8 - __builtin_clzl(BAs_size<BAs...> - 1));
 
 template <typename... BAs>
 struct ba_constants;
@@ -105,12 +104,6 @@ struct node {
 
 template <typename... BAs>	
 inline std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
-
-} // namespace idni::tau_lang
-
-#include "rr.h"
-
-namespace idni::tau_lang {
 
 template <typename... BAs>
 struct ba_constants;

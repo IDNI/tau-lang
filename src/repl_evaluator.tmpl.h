@@ -665,7 +665,7 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 	boost::log::core::get()->set_filter(
 		boost::log::trivial::severity >= opt.severity);
 	// Controls how fixpoint information in satisfiability.h should be printed
-	if (!opt.repl_running) depreciating::use_debug_output_in_sat = true;
+	if (!opt.repl_running) use_debug_output_in_sat = true;
 	if (opt.experimental) std::cout << "\n!!! Experimental features "
 		"enabled: new tree API (almost nothing works yet) !!!\n\n";
 }

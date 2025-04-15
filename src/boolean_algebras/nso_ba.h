@@ -4,7 +4,6 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__NSO_BA_H__
 
 #include "tau_tree.h"
-// #include "language.h"
 // #include "hooks.h"
 
 namespace idni::tau_lang {

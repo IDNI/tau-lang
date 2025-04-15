@@ -3,9 +3,9 @@
 #ifndef __IDNI__TAU__NORMALIZER_H__
 #define __IDNI__TAU__NORMALIZER_H__
 
+#include "boolean_algebras/bdds/bdd_handle.h"
 #include "boolean_algebras/variant_ba.h"
 #include "normal_forms.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
@@ -17,8 +17,8 @@ namespace idni::tau_lang {
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
 template <typename... BAs>
-rr normalizer(const rr& fm) {
-	return fm; // TODO (HIGH)
+tref normalizer(const rr& fm) {
+	return fm.main->get(); // TODO (HIGH)
 }
 
 template <typename... BAs>

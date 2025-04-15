@@ -3,36 +3,37 @@
 #ifndef __IDNI__TAU__DEF_H__
 #define __IDNI__TAU__DEF_H__
 
-#include "version_license.h"
-
-#include "../external/parser/src/defs.h"
-
+#include <algorithm>
 #ifdef DEBUG
 #	include <cxxabi.h>
 #endif
 
-#include <algorithm>
-#include <iostream>
-#include <vector>
+#include "version_license.h" // include generated version and license constants
+#include "init_log.h"
+#include "../external/parser/src/defs.h" // include parser defs first
 
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 
-typedef int sym_t;
+using sym_t = int;
 
-template<typename B> struct zero {
+template <typename B>
+struct zero {
 	bool operator()(const B&) const;
 };
 
-template<typename B> struct one {
+template <typename B>
+struct one {
 	bool operator()(const B&) const;
 };
 
-template<typename T, typename V> bool has(const T& t, const V& v) {
+template <typename T, typename V>
+bool has(const T& t, const V& v) {
 	return t.find(v) != t.end();
 }
 
-template<typename T, typename V> bool hasv(const T& t, const V& v) {
+template <typename T, typename V>
+bool hasv(const T& t, const V& v) {
 	return std::find(t.begin(), t.end(), v) != t.end();
 }
 

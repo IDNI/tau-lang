@@ -8,7 +8,6 @@
 
 #include "boolean_algebras/nso_ba.h"
 // #include "execution.h"
-#include "tau_tree.h"
 
 namespace idni::tau_lang {
 
