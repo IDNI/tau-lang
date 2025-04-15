@@ -4,7 +4,7 @@
 
 #include "nso_rr.h"
 #include "builders.h"
-#include "z3_context.h"
+#include "base_bas/z3.h"
 
 #ifdef DEBUG
 #include "debug_helpers.h"

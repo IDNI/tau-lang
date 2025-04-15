@@ -1,6 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "z3_solver.h"
+#include "base_bas/z3.h"
 
 namespace idni::tau_lang {
 

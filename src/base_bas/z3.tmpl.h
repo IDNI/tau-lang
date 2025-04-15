@@ -1,7 +1,5 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "z3_context.h"
-
 #ifdef DEBUG
 #include "debug_helpers.h"
 #endif // DEBUG

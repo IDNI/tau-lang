@@ -20,6 +20,7 @@ set(TAU_HEADERS
 	boolean_algebras/variant_ba.h
 	boolean_algebras/product_ba.h
 	boolean_algebras/nso_ba.h
+	base_bas/z3.h
 	experimental/execution.h
 	runtime.h
 	defs.h
@@ -41,8 +42,6 @@ set(TAU_HEADERS
 	language.h
 	queries.h
 	utils.h
-	z3_context.h
-	z3_solver.h
 )
 
 set(TAU_SOURCES
