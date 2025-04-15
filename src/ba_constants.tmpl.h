@@ -5,6 +5,53 @@
 namespace idni::tau_lang {
 
 template <typename... BAs>
+size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
+	// TODO optimize
+	if (auto it = std::find(C.begin(), C.end(), b); it != C.end())
+		return it - C.begin();
+	C.push_back(b);
+	return C.size() - 1;
+}
+
+template <typename... BAs>
+tref ba_constants<BAs...>::get(const std::variant<BAs...>& b,
+	const std::string& type_name)
+{
+	return tree<node<BAs...>>::get_ba_constant(get(b),
+						type_id(string_id(type_name)));
+}
+
+template <typename... BAs>
+std::variant<BAs...> ba_constants<BAs...>::get(size_t constant_id) {
+	return C[constant_id];
+}
+
+template <typename... BAs>
+template <typename BA>
+BA ba_constants<BAs...>::get(size_t constant_id) {
+	DBG(assert((is<BA>(constant_id)));)
+	return std::get<BA>(C[constant_id]);
+}
+
+template <typename... BAs>
+template <typename BA>
+BA ba_constants<BAs...>::get(tref t) {
+	return get<BA>(tau::get(t).get_ba_constant_id());
+}
+
+template <typename... BAs>
+template <typename BA>
+bool ba_constants<BAs...>::is(tref t) {
+	return is<BA>(tau::get(t).get_ba_constant_id());
+}
+
+template <typename... BAs>
+template <typename BA>
+bool ba_constants<BAs...>::is(size_t constant_id) {
+	return std::holds_alternative<BA>(C[constant_id]);
+}
+
+template <typename... BAs>
 size_t ba_constants<BAs...>::type_id(size_t type_sid) {
 	if (auto it = types_map.find(type_sid); it != types_map.end())
 		return it->second;
@@ -28,50 +75,6 @@ const ba_constants<BAs...>::std::string& type_name(size_t tid) {
 }
 
 template <typename... BAs>
-template <typename BA>
-bool ba_constants<BAs...>::is(tref t) {
-	return is<BA>(tau::get(t).get_ba_constant_id());
-}
-
-template <typename... BAs>
-template <typename BA>
-bool ba_constants<BAs...>::is(size_t constant_id) {
-	return std::holds_alternative<BA>(C[constant_id]);
-}
-
-template <typename... BAs>
-std::variant<BAs...> ba_constants<BAs...>::get(size_t constant_id) {
-	return C[constant_id];
-}
-
-template <typename... BAs>
-template <typename BA>
-BA ba_constants<BAs...>::get(size_t constant_id) {
-	DBG(assert((is<BA>(constant_id)));)
-	return std::get<BA>(C[constant_id]);
-}
-
-template <typename... BAs>
-template <typename BA>
-BA ba_constants<BAs...>::get(tref t) {
-	return get<BA>(tau::get(t).get_ba_constant_id());
-}
-
-template <typename... BAs>
-size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
-	// TODO optimize
-	if (auto it = std::find(C.begin(), C.end(), b); it != C.end())
-		return it - C.begin();
-	C.push_back(b);
-	return C.size() - 1;
-}
-
-template <typename... BAs>
-tref ba_constants<BAs...>::get(const std::variant<BAs...>& b, const std::string& type_name) {
-	return tree<node<BAs...>>::get_ba_constant(get(b), type_id(string_id(type_name)));
-}
-
-template <typename... BAs>
 ba_constants<BAs...>& ba_constants<BAs...>::instance() {
 	static ba_constants<BAs...> binder;
 	return binder;
@@ -86,29 +89,33 @@ ba_constants<BAs...>::ba_constants() {
 template <typename... BAs>
 ba_constants<BAs...>::ba_constants(
 	const named_constants_map& named_constants)
-	: named_constants(named_constants) {
+	: named_constants(named_constants)
+{
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
 }
 
 template <typename... BAs>
-tref ba_constants<BAs...>::bind(const std::string& src, const std::string type_name) {
-	static_assert(sizeof...(BAs) > 0, "Empty template parameter pack not allowed");
-	// tau::get(n).dump(std::cout << "binding:", false) << "\n\n";
-	// tau::get(n).print_tree(std::cout << "tree:") << "\n\n";
-	// if (error) return nullptr; // how and when to reset error?
-	std::cout << "binding: `{ " << src << " } : " << type_name << std::endl;
+tref ba_constants<BAs...>::bind(const std::string& src,
+	const std::string& type_name)
+{
+	static_assert(sizeof...(BAs) > 0,
+		"Empty template parameter pack not allowed");
 	error = false;
 	if (auto it = named_constants.find(src);
 		it != named_constants.end()) return it->second;
-	if (type_name.size() > 0) {
-		auto nn = nso_factory<BAs...>::instance().binding(src, type_name);
-		if (!nn) return error = true, nullptr;
-		return nn;
-	}
-	auto nn = nso_factory<BAs...>::instance().binding(src, "untyped");
+	static const std::string untyped = "untyped";
+	auto nn = nso_factory<BAs...>::instance().binding(src,
+				type_name.empty() ? untyped : type_name);
 	if (!nn) return error = true, nullptr;
 	return nn;
+}
+
+template <typename... BAs>
+tref ba_constants<BAs...>::operator()(const std::string& src,
+	const std::string& type_name)
+{
+	return bind(src, type_name);
 }
 
 } // idni::tau_lang namespace
