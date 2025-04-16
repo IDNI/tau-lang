@@ -409,12 +409,7 @@ tau_<BAs...> splitter(const tau_<BAs...>& n,
 // IDEA maybe it should be move to out.h
 template <typename... BAs>
 std::ostream& pp(std::ostream& stream, const tau_<BAs...>& n,
-	std::vector<size_t>& hl_path, size_t& depth,
-	size_t parent = tau_parser::start, bool passthrough = false);
-
-template <typename... BAs>
-std::ostream& pp(std::ostream& stream, const tau_<BAs...>& n,
-	size_t parent = tau_parser::start, bool passthrough = false)
+	size_t parent, bool passthrough)
 {
 	std::vector<size_t> hl_path;
 	size_t depth = 0;
@@ -422,8 +417,9 @@ std::ostream& pp(std::ostream& stream, const tau_<BAs...>& n,
 }
 
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream,
-	const tau_<BAs...>& n) { return pp(stream, n); }
+std::ostream& operator<<(std::ostream& stream, const tau_<BAs...>& n) {
+	return pp(stream, n);
+}
 
 // << for node<tau_sym>
 template <typename... BAs>

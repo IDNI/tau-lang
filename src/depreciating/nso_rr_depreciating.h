@@ -320,6 +320,23 @@ struct traverser_pair_cache_equality<tau_lang_depreciating::tau_<BAs...>> {
 
 namespace idni::tau_lang_depreciating {
 
+template <typename... BAs>
+std::ostream& pp(std::ostream& stream, const tau_<BAs...>& n,
+	size_t parent = tau_parser::start, bool passthrough = false);
+template <typename... BAs>
+std::ostream& pp(std::ostream& stream, const tau_<BAs...>& n,
+	std::vector<size_t>& hl_path, size_t& depth,
+	size_t parent = tau_parser::start, bool passthrough = false);
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& stream, const tau_<BAs...>& n);
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& stream,
+	const idni::rewriter::depreciating::node<tau_sym<BAs...>>& n);
+template <typename... BAs>
+std::ostream& print_terminals(std::ostream& stream, const tau_<BAs...>& n);
+std::ostream& operator<<(std::ostream& stream, const sp_tau_source_node& n);
+std::ostream& operator<<(std::ostream& stream, const tau_source_node& n);
+
 //
 // operators << to pretty print the tau language related types
 //
