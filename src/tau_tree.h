@@ -23,6 +23,9 @@ constexpr size_t BAs_bitsize = BAs_size<BAs...> <= 1 ? 1 :
 		//static_cast<size_t>(std::ceil(std::log2(BAs_size<BAs...>)));
                 (sizeof(size_t) * 8 - __builtin_clzl(BAs_size<BAs...> - 1));
 
+// -----------------------------------------------------------------------------
+// forward declaration for ba_constants pool/binder
+
 template <typename... BAs>
 struct ba_constants;
 
@@ -104,9 +107,6 @@ struct node {
 
 template <typename... BAs>	
 std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
-
-template <typename... BAs>
-struct ba_constants;
 
 // -----------------------------------------------------------------------------
 // Tau tree
@@ -634,7 +634,6 @@ rewriter::builder tree<node>::bldr_bf_nleq_lower =
 
 } // namespace idni::tau_lang
 
-#include "nso_factory.h"
 #include "ba_constants.h"
 
 #include "tau_tree.tmpl.h"
