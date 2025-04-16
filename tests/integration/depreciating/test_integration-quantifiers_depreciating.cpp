@@ -10,8 +10,6 @@
 #include "test_integration_helpers_depreciating.h"
 #include "../../unit/depreciating/test_helpers_depreciating.h"
 
-// #include "debug_helpers.h"
-
 using namespace std;
 using namespace idni::tau_lang;
 using namespace idni::tau_lang_depreciating;
@@ -57,8 +55,6 @@ namespace idni::tau_lang_depreciating {
 
 string to_str(const auto& n) {
 	stringstream ss;
-	// pp<sbf_ba>(ss, n);
-	// return ss.str();
 	return (ss << n, ss.str());
 }
 
