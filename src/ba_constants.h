@@ -1,9 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "tau_tree.h"
-
 #ifndef __IDNI__TAU__BA_CONSTANTS_H__
 #define __IDNI__TAU__BA_CONSTANTS_H__
+
+#include "tau_tree.h"
 
 namespace idni::tau_lang {
 

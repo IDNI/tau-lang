@@ -13,6 +13,10 @@
 
 namespace idni::tau_lang {
 
+// pretty printer settings
+inline bool pretty_printer_highlighting = false;
+inline bool pretty_printer_indenting    = false;
+
 // helper to get size of boolean algebras variant pack
 template <typename... BAs>
 constexpr size_t BAs_size = std::variant_size<std::variant<BAs...>>::value;
@@ -546,7 +550,6 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref build_wff_ctn_less(tref ctnvar, tref num);
 	static tref build_wff_ctn_eq(tref ctnvar, tref num);
 	static tref build_wff_ctn_neq(tref ctnvar, tref num);
-
 };
 
 // -----------------------------------------------------------------------------
@@ -634,8 +637,7 @@ rewriter::builder tree<node>::bldr_bf_nleq_lower =
 
 } // namespace idni::tau_lang
 
-#include "ba_constants.h"
-
+#include "tau_tree_node.tmpl.h"
 #include "tau_tree.tmpl.h"
 #include "tau_tree_builders.tmpl.h"
 
