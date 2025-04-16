@@ -5,8 +5,9 @@
 #include "language_depreciating.h"
 #include "nso_rr_depreciating.h"
 #include "queries_depreciating.h"
+#include "boolean_algebras/variant_ba.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 template <typename... BAs>
 tau_<BAs...> trim(const tau_<BAs...>& n) {
@@ -648,7 +649,11 @@ bool has_open_tau_fm_in_constant (const tau_<BAs...>& fm) {
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
 		if (!std::visit(_closed, ba_const)) {
-			BOOST_LOG_TRIVIAL(error) << "(Error) A Tau formula constant must be closed: " << ba_const;
+			std::stringstream ss;
+			ss << "(Error) A Tau formula constant must be closed: ",
+			//idni::tau_lang::operator<<(ss, ba_const);
+			ss << ba_const;
+			BOOST_LOG_TRIVIAL(error) << ss.str();
 			return true;
 		}
 	}
@@ -976,8 +981,8 @@ struct rr_sig {
 
 } // namespace idni::tau_lang
 template<>
-struct std::hash<idni::tau_lang::depreciating::rr_sig> {
-	size_t operator()(const idni::tau_lang::depreciating::rr_sig& s) const noexcept {
+struct std::hash<idni::tau_lang_depreciating::rr_sig> {
+	size_t operator()(const idni::tau_lang_depreciating::rr_sig& s) const noexcept {
 		size_t seed = 0;
 		idni::hash_combine(seed, s.name);
 		idni::hash_combine(seed, s.offset_arity);
@@ -985,7 +990,7 @@ struct std::hash<idni::tau_lang::depreciating::rr_sig> {
 		return seed;
 	}
 };
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 static auto sig2str = [](const rr_sig& s) {
 	std::stringstream ss;
@@ -1275,4 +1280,4 @@ std::optional<rr<tau_<BAs...>>> infer_ref_types(const rr<tau_<BAs...>>& nso_rr) 
 	return infer_ref_types(nso_rr, ts);
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating

@@ -24,7 +24,7 @@
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "splitter_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 /**
  * @typedef typed_nso
@@ -204,7 +204,7 @@ template<typename...BAs>
 std::optional<solution<BAs...>> solve(const tau_<BAs...>& form,
 	const solver_options<BAs...>& options);
 
-} // idni::tau_lang::depreciating namespace
+} // idni::tau_lang_depreciating namespace
 
 #include "solver_depreciating.tmpl.h"
 #endif // __SOLVER_DEPRECIATING_H__

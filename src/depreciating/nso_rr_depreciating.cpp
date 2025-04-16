@@ -2,7 +2,7 @@
 
 #include "boolean_algebras/nso_ba_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 using namespace idni::rewriter::depreciating;
 
@@ -63,8 +63,6 @@ sp_tau_source_node make_tau_source_from_file(const std::string& filename,
 			filename, options);
 }
 
-} // idni::tau_lang::depreciating namespace
-
 // << for tau_source_sym
 // std::ostream& operator<<(std::ostream& stream, const idni::tau_lang::tau_source_sym& rs) {
 // 	if (rs.nt()) stream << rs.t();
@@ -75,11 +73,13 @@ sp_tau_source_node make_tau_source_from_file(const std::string& filename,
 // and assumes that the constants also override operator<<.
 //
 // IDEA maybe it should be move to out.h
-std::ostream& operator<<(std::ostream& stream, const idni::tau_lang::depreciating::sp_tau_source_node& n){
-	return stream << idni::tau_lang::depreciating::make_string(idni::tau_lang::depreciating::tau_source_terminal_extractor, n);
+std::ostream& operator<<(std::ostream& stream, const idni::tau_lang_depreciating::sp_tau_source_node& n){
+	return stream << idni::tau_lang_depreciating::make_string(idni::tau_lang_depreciating::tau_source_terminal_extractor, n);
 }
 
 // << tau_source_node (make it shared to make use of the previous operator)
-std::ostream& operator<<(std::ostream& stream, const idni::tau_lang::depreciating::tau_source_node& n){
-	return stream << std::make_shared<idni::tau_lang::depreciating::tau_source_node>(n);
+std::ostream& operator<<(std::ostream& stream, const idni::tau_lang_depreciating::tau_source_node& n){
+	return stream << std::make_shared<idni::tau_lang_depreciating::tau_source_node>(n);
 }
+
+} // idni::tau_lang_depreciating namespace

@@ -7,9 +7,7 @@
 #include "nso_rr_depreciating.h"
 #include "builders_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
-
-using namespace idni::tau_lang;
+namespace idni::tau_lang_depreciating {
 
 /**
  * @brief Template struct to create a tau node.
@@ -27,8 +25,8 @@ struct make_tau_node {
 	 * @param n The rewriter node to be converted.
 	 * @return std::optional<tau_<BAs...>> The created tau node, or std::nullopt if creation fails.
 	 */
-	std::optional<idni::tau_lang::depreciating::tau_<BAs...>> operator()(
-		const rewriter::depreciating::node<idni::tau_lang::depreciating::tau_sym<BAs...>>& n);
+	std::optional<tau_<BAs...>> operator()(
+		const rewriter::depreciating::node<tau_sym<BAs...>>& n);
 };
 
 } // namespace idni::tau_lang
@@ -44,18 +42,18 @@ namespace idni::rewriter::depreciating  {
  * @tparam BAs Variadic template parameters.
  */
 template <typename...BAs>
-struct make_node_hook<idni::tau_lang::depreciating::tau_sym<BAs...>> {
+struct make_node_hook<idni::tau_lang_depreciating::tau_sym<BAs...>> {
 	/**
 	 * @brief Creates a tau node from a rewriter node.
 	 *
 	 * @param n The rewriter node to be converted.
-	 * @return std::optional<idni::tau_lang::tau_<BAs...>> The created tau node, or std::nullopt if creation fails.
+	 * @return std::optional<tau_<BAs...>> The created tau node, or std::nullopt if creation fails.
 	 */
-	std::optional<idni::tau_lang::depreciating::tau_<BAs...>> operator()(
-		const rewriter::depreciating::node<idni::tau_lang::depreciating::tau_sym<BAs...>>& n);
+	std::optional<idni::tau_lang_depreciating::tau_<BAs...>> operator()(
+		const rewriter::depreciating::node<idni::tau_lang_depreciating::tau_sym<BAs...>>& n);
 };
 
-} // namespace idni::tau_lang::depreciating	
+} // namespace idni::tau_lang_depreciating	
 
 #include "hooks_depreciating.tmpl.h"
 

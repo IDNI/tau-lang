@@ -6,7 +6,7 @@
 #include <fstream>
 
 #include "boolean_algebras/tau_ba_depreciating.h"
-#include "boolean_algebras/variant_ba_depreciating.h"
+#include "boolean_algebras/variant_ba.h"
 #include "solver_depreciating.h"
 #include "satisfiability_depreciating.h"
 #include "utility/term.h"
@@ -15,7 +15,7 @@
 #include "debug_helpers_depreciating.h"
 #endif // DEBUG
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 using filename = std::string;
 
@@ -450,7 +450,7 @@ run(const tau_<BAs...>& form, input_t& inputs, output_t& outputs, const size_t s
 	return intrprtr_o;
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 #include "interpreter_depreciating.tmpl.h"
 

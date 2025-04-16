@@ -5,7 +5,7 @@
 
 #include "nso_rr_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 template <typename... BAs>
 bool is_non_terminal(const size_t, const tau_<BAs...>&);
@@ -654,7 +654,7 @@ T operator|(const std::optional<T>& o, const optional_value_extractor_t<T> e) {
 	return e(o);
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 // Specialization of tau node
 namespace idni::rewriter::depreciating  {
@@ -662,11 +662,11 @@ namespace idni::rewriter::depreciating  {
 // Specialization of tau node in order to hash typed and non-typed
 // Tau constants the same
 template <typename... BAs>
-struct node<idni::tau_lang::depreciating::tau_sym<BAs...>> {
+struct node<idni::tau_lang_depreciating::tau_sym<BAs...>> {
 	using child_type = std::vector<std::shared_ptr<node>>;
-	node (const idni::tau_lang::depreciating::tau_sym<BAs...> v, const child_type& c) :
+	node (const idni::tau_lang_depreciating::tau_sym<BAs...> v, const child_type& c) :
 		value(v), child(c), hash(calc_hash(v, c)) {}
-	node (const idni::tau_lang::depreciating::tau_sym<BAs...> v, child_type&& c) :
+	node (const idni::tau_lang_depreciating::tau_sym<BAs...> v, child_type&& c) :
 		value(v), child(std::move(c)), hash(calc_hash(v,child)) {}
 	// This is not default because the hash value is not considered
 	auto operator<=>(const node& that) const {
@@ -696,19 +696,19 @@ struct node<idni::tau_lang::depreciating::tau_sym<BAs...>> {
 	// the value of the node and pointers to the children, we follow the same
 	// notation as in forest<...>::tree to be able to reuse the code with
 	// forest<...>::tree.
-	const idni::tau_lang::depreciating::tau_sym<BAs...> value;
+	const idni::tau_lang_depreciating::tau_sym<BAs...> value;
 	const child_type child;
 	// Hash of the node
 	const size_t hash;
 private:
-	static size_t calc_hash (const idni::tau_lang::depreciating::tau_sym<BAs...> v, const child_type& c) {
+	static size_t calc_hash (const idni::tau_lang_depreciating::tau_sym<BAs...> v, const child_type& c) {
 		size_t seed = 0;
 		// Hash bf_t and bf_f same for all types
 		// This is done in order to use hash inequality in equality operator
-		if (idni::tau_lang::depreciating::is_non_terminal_sym(tau_parser::bf_t, v)) {
+		if (idni::tau_lang_depreciating::is_non_terminal_sym(tau_parser::bf_t, v)) {
 			return hash_combine(seed, v), seed;
 		}
-		if (idni::tau_lang::depreciating::is_non_terminal_sym(tau_parser::bf_f, v)) {
+		if (idni::tau_lang_depreciating::is_non_terminal_sym(tau_parser::bf_f, v)) {
 			return hash_combine(seed, v), seed;
 		};
 		hash_combine(seed, v);
@@ -721,18 +721,18 @@ private:
 
 // The hash function for tau as specialisation of std::hash
 template<typename... BAs>
-struct std::hash<idni::tau_lang::depreciating::tau_<BAs...>> {
-	size_t operator()(const idni::tau_lang::depreciating::tau_<BAs...>& n) const noexcept {
+struct std::hash<idni::tau_lang_depreciating::tau_<BAs...>> {
+	size_t operator()(const idni::tau_lang_depreciating::tau_<BAs...>& n) const noexcept {
 		// Let the hash respect the typing rules for bf_t and bf_f
 		return hash<idni::rewriter::depreciating::node<
-			idni::tau_lang::depreciating::tau_sym<BAs...>>>{}(*n);
+			idni::tau_lang_depreciating::tau_sym<BAs...>>>{}(*n);
 	}
 };
 
 // Hash for rr using specialization to std::hash
 template <typename type_t>
-struct std::hash<idni::tau_lang::depreciating::rr<type_t>> {
-	size_t operator()(const idni::tau_lang::depreciating::rr<type_t>& rr) const noexcept {
+struct std::hash<idni::tau_lang_depreciating::rr<type_t>> {
+	size_t operator()(const idni::tau_lang_depreciating::rr<type_t>& rr) const noexcept {
 		size_t seed = 0;
 		hash_combine(seed, rr.main);
 		hash_combine(seed, rr.rec_relations);

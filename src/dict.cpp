@@ -10,6 +10,8 @@
 
 using namespace std;
 
+namespace idni::tau_lang {
+
 // -----------------------------------------------------------------------------
 // bdd var dict
 
@@ -55,3 +57,5 @@ const std::string& string_from_id(size_t id) {
 	DBG(assert(id <= S.size());)
 	return S[id];
 }
+
+} // namespace idni::tau_lang

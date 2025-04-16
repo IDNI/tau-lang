@@ -13,7 +13,7 @@
 #include "test_integration_helpers_depreciating.h"
 
 using namespace idni::tau_lang;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 
 using namespace boost::log;
@@ -292,7 +292,7 @@ TEST_SUITE("configuration") {
 	}*/
 
 	TEST_CASE("bdd initialization") {
-		bdd_init<Bool>();
+		idni::tau_lang::bdd_init<Bool>();
 	}
 }
 

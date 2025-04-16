@@ -12,7 +12,7 @@
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 template<typename...BAs>
 solution<BAs...> make_removed_vars_solution(const std::vector<var<BAs...>>& originals, const tau_<BAs...>& gh) {
@@ -1035,4 +1035,4 @@ std::optional<solution<BAs...>> solve(const tau_<BAs...>& form,
 	return {};
 }
 
-} // idni::tau_lang::depreciating namespace
+} // idni::tau_lang_depreciating namespace

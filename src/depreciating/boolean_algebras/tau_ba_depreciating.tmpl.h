@@ -2,7 +2,7 @@
 
 #include "tau_ba_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 template <typename...BAs>
 tau_ba<BAs...>::tau_ba(rules<tau_nso_t>& rec_relations, tau_nso_t& main)
@@ -180,8 +180,8 @@ template <typename...BAs>
 tau_nso<BAs...> tau_ba_factory<BAs...>::binding(const tau_nso_t& n) {
 	auto source = n | tau_parser::source
 		| optional_value_extractor<tau_nso_t>;
-	std::string src = idni::tau_lang::depreciating::make_string(
-		idni::tau_lang::depreciating::tau_node_terminal_extractor<tau_ba_t, BAs...>,
+	std::string src = idni::tau_lang_depreciating::make_string(
+		idni::tau_lang_depreciating::tau_node_terminal_extractor<tau_ba_t, BAs...>,
 		source);
 	if (auto parsed = parse(src); parsed.has_value())
 		return parsed.value();
@@ -204,21 +204,21 @@ std::string tau_ba_factory<BAs...>::zero(std::string&) const {
 	return "F";
 }
 
-} // namespace idni::tau_lang::depreciating
-
 template <typename... BAs>
-size_t std::hash<idni::tau_lang::depreciating::tau_ba<BAs...>>::operator()(
-	const idni::tau_lang::depreciating::tau_ba<BAs...>& f) const noexcept
-{
-	using namespace idni::tau_lang::depreciating;
-	return hash<idni::tau_lang::depreciating::rr<
-		idni::tau_lang::depreciating::tau_<
-			idni::tau_lang::depreciating::tau_ba<BAs...>, BAs...>>>{}(
-				f.nso_rr);
-}
-
-template <typename... BAs>
-std::ostream& operator<<(std::ostream& os, const idni::tau_lang::depreciating::tau_ba<BAs...>& rs)
+std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs)
 {
 	return os << rs.nso_rr;
+}
+
+} // namespace idni::tau_lang_depreciating
+
+template <typename... BAs>
+size_t std::hash<idni::tau_lang_depreciating::tau_ba<BAs...>>::operator()(
+	const idni::tau_lang_depreciating::tau_ba<BAs...>& f) const noexcept
+{
+	using namespace idni::tau_lang_depreciating;
+	return hash<idni::tau_lang_depreciating::rr<
+		idni::tau_lang_depreciating::tau_<
+			idni::tau_lang_depreciating::tau_ba<BAs...>, BAs...>>>{}(
+				f.nso_rr);
 }

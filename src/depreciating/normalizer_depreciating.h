@@ -9,7 +9,7 @@
 #include <boost/log/trivial.hpp>
 
 #include "parser.h"
-#include "boolean_algebras/variant_ba_depreciating.h"
+#include "boolean_algebras/variant_ba.h"
 #include "normal_forms_depreciating.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 
@@ -22,7 +22,7 @@
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
 // bindings, etc... instead of sp_tau_node,...
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
@@ -697,7 +697,7 @@ tau_<BAs...> calculate_fixed_point(const rr<tau_<BAs...>>& nso_rr,
 			{
 				const auto& r = nso_rr.rec_relations[ri];
 				if (loopbacks[ri] > i) {
-					BOOST_LOG_TRIVIAL(debug) << "(I) -- current step " << i << " < " << loopbacks[ri] << " loopback, skipping " << r;
+					// BOOST_LOG_TRIVIAL(debug) << "(I) -- current step " << i << " < " << loopbacks[ri] << " loopback, skipping " << r;
 					continue; // skip steps depending on future fixed offsets
 				}
 				auto prev = current;
@@ -869,6 +869,6 @@ tau_<BAs...> normalizer(const tau_<BAs...>& form) {
 	return normalize_with_temp_simp(form);
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 #endif // __NORMALIZER2_DEPRECIATING_H__

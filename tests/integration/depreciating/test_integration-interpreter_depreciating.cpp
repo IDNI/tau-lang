@@ -15,11 +15,12 @@
 #include "doctest.h"
 #include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
 #include "depreciating/interpreter_depreciating.h"
+#include "depreciating/nso_rr_depreciating.h"
 
 #define base_bas tau_ba<sbf_ba>, sbf_ba
 
 using namespace idni::tau_lang;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 
 
@@ -170,9 +171,15 @@ tau_<BAs...> create_spec(const char* spec) {
 		sample_src).value().main;
 }
 
+TEST_SUITE("configuration") {
+
+	TEST_CASE("bdd_init") {
+		idni::tau_lang::bdd_init<Bool>();
+	}
+}
+
 TEST_SUITE("Execution") {
 	TEST_CASE("o1[t] = i1[t]") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("o1[t] = i1[t].");
 		std::vector<std::string> i1 = {"<:x> = 0", "<:y> = 0", "<:z> = 0"};
 		std::vector<std::string> o1 = i1;
@@ -187,7 +194,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: dec_seq") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("u[t] = i1[t].");
 		std::vector<std::string> i1 = {
 			"F", "o1[t] = o1[t-1]&i2[t] && o1[0] = 1", "F", "F", "F", "F"
@@ -216,7 +222,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: negative_rel_pos") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>(
 			"u[t] = i1[t] && o1[2] = { <:x> = 0 } && o2[1] = { <:y> = 0 }.");
 		std::vector<std::string> i1 = {
@@ -240,7 +245,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: 2_clauses") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("u[t] = i1[t] && o2[t] = 0.");
 		std::vector<std::string> i1 = {
 			"(always o2[-1] = 1) || (always o3[t] = 1)", "F", "F", "F"
@@ -267,7 +271,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: history_unsat") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("u[t] = i1[t] && o1[t] = 0.");
 		std::vector<std::string> i1 = {
 			"F", "o1[-1] = 1", "F", "F"
@@ -290,7 +293,6 @@ TEST_SUITE("Execution") {
 	}
 
 	TEST_CASE("u[t] = i1[t]: spec_replace") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("u[t] = i1[t] && o1[t] = 0.");
 		std::vector<std::string> i1 = {
 			"F", "o1[t] = 1", "F", "F"
@@ -408,7 +410,6 @@ TEST_SUITE("configuration") {
 	}
 
 	TEST_CASE("bdd initialization") {
-		bdd_init<Bool>();
 	}
 }
 

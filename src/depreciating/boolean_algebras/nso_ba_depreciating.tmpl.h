@@ -2,9 +2,9 @@
 
 #include "depreciating/builders_depreciating.h"
 #include "depreciating/queries_depreciating.h"
-#include "depreciating/boolean_algebras/variant_ba_depreciating.h"
+#include "boolean_algebras/variant_ba.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 template <typename... BAs>
 tau_<BAs...> operator&(const tau_<BAs...>& l,
@@ -403,20 +403,17 @@ tau_<BAs...> splitter(const tau_<BAs...>& n,
 	return build_bf_constant<BAs...>(v, type.value());
 }
 
-} // namespace idni::tau_lang::depreciating
-
-
 // outputs a tau_<...> to a stream, using the stringify transformer
 // and assumes that the constants also override operator<<.
 //
 // IDEA maybe it should be move to out.h
 template <typename... BAs>
-std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<BAs...>& n,
+std::ostream& pp(std::ostream& stream, const tau_<BAs...>& n,
 	std::vector<size_t>& hl_path, size_t& depth,
 	size_t parent = tau_parser::start, bool passthrough = false);
 
 template <typename... BAs>
-std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<BAs...>& n,
+std::ostream& pp(std::ostream& stream, const tau_<BAs...>& n,
 	size_t parent = tau_parser::start, bool passthrough = false)
 {
 	std::vector<size_t> hl_path;
@@ -426,22 +423,22 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::tau_lang::depreciating::tau_<BAs...>& n) { return pp(stream, n); }
+	const tau_<BAs...>& n) { return pp(stream, n); }
 
 // << for node<tau_sym>
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::depreciating::node<idni::tau_lang::depreciating::tau_sym<BAs...>>& n)
+	const idni::rewriter::depreciating::node<tau_sym<BAs...>>& n)
 {
 	return stream << std::make_shared<
-			idni::rewriter::depreciating::node<idni::tau_lang::depreciating::tau_sym<BAs...>>>(n);
+			idni::rewriter::depreciating::node<tau_sym<BAs...>>>(n);
 }
 
 // old operator<< renamed to print_terminals and replaced by
 // pp pretty priniter
 template <typename... BAs>
 std::ostream& print_terminals(std::ostream& stream,
-	const idni::tau_lang::depreciating::tau_<BAs...>& n)
+	const tau_<BAs...>& n)
 {
 	stream << n->value;
 	for (const auto& c : n->child) print_terminals<BAs...>(stream, c);
@@ -453,11 +450,11 @@ std::ostream& print_terminals(std::ostream& stream,
 //
 // IDEA maybe it should be move to out.h
 std::ostream& operator<<(std::ostream& stream,
-			const idni::tau_lang::depreciating::sp_tau_source_node& n);
+			const sp_tau_source_node& n);
 
 // << tau_source_node (make it shared to make use of the previous operator)
 std::ostream& operator<<(std::ostream& stream,
-					const idni::tau_lang::depreciating::tau_source_node& n);
+					const tau_source_node& n);
 
 inline static const std::map<size_t, std::string> hl_colors = {
 	{ tau_parser::bf,            idni::TC.LIGHT_GREEN() },
@@ -489,18 +486,18 @@ inline static const std::vector<size_t> indents = {
 };
 
 template <typename... BAs>
-std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<BAs...>& n,
+std::ostream& pp(std::ostream& stream, const tau_<BAs...>& n,
 	std::vector<size_t>& hl_path, size_t& depth, size_t parent,
 	bool passthrough)
 {
 	using namespace idni;
-	using namespace idni::tau_lang::depreciating;
+	using namespace idni::tau_lang_depreciating;
 // #define DEBUG_PP
 // #ifdef DEBUG_PP
 // auto& p = tau_parser::instance();
 // 	auto dbg = [&stream, &p](const auto& c) {
-// 		if (std::holds_alternative<idni::tau_lang::depreciating::tau_source_sym>(c->value)) {
-// 			auto tss = std::get<idni::tau_lang::depreciating::tau_source_sym>(c->value);
+// 		if (std::holds_alternative<tau_source_sym>(c->value)) {
+// 			auto tss = std::get<tau_source_sym>(c->value);
 // 			if (tss.nt()) stream << " NT:" << p.name(tss.n()) << " ";
 // 			else if (tss.is_null()) stream << " <NULL> ";
 // 			else stream << " T:'" << tss.t() << "' ";
@@ -512,7 +509,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 // 	for (const auto& c : n->child)
 // 		stream << "\t", dbg(c), stream << "\n";
 // #endif // DEBUG_PP
-	static auto is_to_wrap = [](const idni::tau_lang::depreciating::tau_<BAs...>& n,
+	static auto is_to_wrap = [](const tau_<BAs...>& n,
 		size_t parent)
 	{
 		static const std::set<size_t> no_wrap_for = {
@@ -601,8 +598,8 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 		};
 		static const std::set<size_t> wrap_child_for = {
 			};
-		if (std::holds_alternative<idni::tau_lang::depreciating::tau_source_sym>(n->value)) {
-			auto tss = std::get<idni::tau_lang::depreciating::tau_source_sym>(n->value);
+		if (std::holds_alternative<tau_source_sym>(n->value)) {
+			auto tss = std::get<tau_source_sym>(n->value);
 			if (!tss.nt() || no_wrap_for.find(tss.n())
 						!= no_wrap_for.end())
 								return false;
@@ -636,22 +633,22 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 		return stream;
 	}
 
-	if (std::holds_alternative<idni::tau_lang::depreciating::tau_source_sym>(n->value)) {
+	if (std::holds_alternative<tau_source_sym>(n->value)) {
 		auto& ch = n->child;
-		auto tss = std::get<idni::tau_lang::depreciating::tau_source_sym>(n->value);
+		auto tss = std::get<tau_source_sym>(n->value);
 		auto ppch = [&](size_t i) -> std::ostream& {
 			return pp(stream, ch[i], hl_path, depth, tss.n());
 		};
 		auto indent = [&depth, &stream]() {
-			if (!idni::tau_lang::depreciating::pretty_printer_indenting) return;
+			if (!pretty_printer_indenting) return;
 			for (size_t i = 0; i < depth; ++i) stream << "\t";
 		};
 		auto break_line = [&]() {
-			if (!idni::tau_lang::depreciating::pretty_printer_indenting) return;
+			if (!pretty_printer_indenting) return;
 			stream << "\n", indent();
 		};
 		auto break_if_needed = [&]() -> bool {
-			if (!idni::tau_lang::depreciating::pretty_printer_indenting) return false;
+			if (!pretty_printer_indenting) return false;
 			if (find(breaks.begin(), breaks.end(), tss.n())
 				!= breaks.end()) return break_line(), true;
 			return false;
@@ -700,7 +697,7 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 			stream << pref, pass(), stream << postf;
 		};
 		auto quant = [&]() {
-			using namespace idni::tau_lang;
+			using namespace idni::tau_lang_depreciating;
 			size_t quant_nt = tss.n();
 			auto qch = ch;
 			switch (quant_nt) {
@@ -725,19 +722,19 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 		};
 		auto print_bf_and = [&]() {
 			std::stringstream ss;
-			bool is_hilight = idni::tau_lang::depreciating::pretty_printer_highlighting;
+			bool is_hilight = pretty_printer_highlighting;
 			if (is_hilight)
-				idni::tau_lang::depreciating::pretty_printer_highlighting = false;
+				pretty_printer_highlighting = false;
 			pp(ss, ch[0], hl_path, depth, tss.n());
 			if (is_hilight)
-				idni::tau_lang::depreciating::pretty_printer_highlighting = true;
+				pretty_printer_highlighting = true;
 			auto str = ss.str();
 			if (is_hilight)
 				pp(stream, ch[0], hl_path, depth, tss.n());
 			else stream << str;
 			char lc = str[str.size()-1];
 			if (isdigit(lc) // || lc == '}'
-				|| idni::tau_lang::depreciating::is_child_non_terminal(
+				|| is_child_non_terminal(
 					tau_parser::bf_constant, ch[0]))
 						stream << " ";
 			pp(stream, ch[1], hl_path, depth, tss.n());
@@ -745,13 +742,13 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 		if (tss.nt()) { //stream /*<< "*" << tss.nts << "-"*/ << tau_parser::instance().name(tss.n()) << ":";
 			// indenting and breaklines
 			bool indented = false;
-			if (idni::tau_lang::depreciating::pretty_printer_indenting)
+			if (pretty_printer_indenting)
 				if (find(indents.begin(), indents.end(),
 					tss.n()) != indents.end())
 						indented = true, depth++;
 			// syntax highlighting color start
 			bool hl_pop = false;
-			if (idni::tau_lang::depreciating::pretty_printer_highlighting)
+			if (pretty_printer_highlighting)
 				if (auto it = hl_colors.find(tss.n());
 					it != hl_colors.end())
 						hl_path.push_back(tss.n()),
@@ -924,10 +921,10 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 				break;
 			}
 			// indenting and breaklines
-			if (idni::tau_lang::depreciating::pretty_printer_indenting && indented)
+			if (pretty_printer_indenting && indented)
 				depth--;
 			// syntax highlighting color end
-			if (idni::tau_lang::depreciating::pretty_printer_highlighting && hl_pop) {
+			if (pretty_printer_highlighting && hl_pop) {
 				hl_path.pop_back();
 				stream << TC.CLEAR();
 				if (hl_path.size()) // restore the prev color
@@ -938,3 +935,5 @@ std::ostream& pp(std::ostream& stream, const idni::tau_lang::depreciating::tau_<
 	} else stream << n->value;
 	return stream;
 }
+
+} // namespace idni::tau_lang_depreciating

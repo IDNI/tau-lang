@@ -92,9 +92,10 @@ constexpr size_t node<BAs...>::hashit() const {
 	return seed;
 }
 
-
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
+	static_assert(sizeof...(BAs) > 0,
+		"Empty template parameter pack not allowed");
 	using tau = tree<node<BAs...>>;
 	if (n.nt == tau_parser::integer) os << n.as_int() << " ";
 	else if (n.nt == tau_parser::bf_constant) os << " {C" << n.data << "} ";

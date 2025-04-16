@@ -5,7 +5,7 @@
 
 #include "depreciating/hooks_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 /**
  * @brief Bitwise AND operator for tau.
@@ -157,7 +157,7 @@ bool operator==(const bool l, const tau_<BAs...>& r);
 template <typename... BAs>
 tau_<BAs...> splitter(const tau_<BAs...>& n, splitter_type st = splitter_type::upper);
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 #include "nso_ba_depreciating.tmpl.h"
 

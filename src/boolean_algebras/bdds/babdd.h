@@ -15,9 +15,10 @@
 #include <functional>
 #include <cmath>
 
-#include "defs.h"
 #include "dict.h"
 #include "boolean_algebras/bool_ba.h"
+
+namespace idni::tau_lang {
 
 typedef int32_t int_t;
 typedef uint32_t uint_t;
@@ -222,38 +223,48 @@ struct node_skeleton {
 	}
 };
 
+} // namespace idni::tau_lang
+
+namespace std {
+
 template<typename R>
-struct std::hash<bdd_node<R>> {
+struct hash<idni::tau_lang::bdd_node<R>> {
 	size_t operator()(auto& n) const { return n.hash; }
 };
 
 template<typename R>
-struct std::hash<node_skeleton<R>> {
+struct hash<idni::tau_lang::node_skeleton<R>> {
 	size_t operator()(auto& n) const { return n.hash; }
 };
 
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<std::array<bdd_reference<S, O, IW, SW>, 2>> {
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<array<idni::tau_lang::bdd_reference<S, O, IW, SW>, 2>> {
 	size_t operator()(const auto& a) const {
-		return hash_upair((bdd_reference<S, O, IW, SW>::hash(a[0])),
-				  (bdd_reference<S, O, IW, SW>::hash(a[1])));
+		return idni::tau_lang::hash_upair(
+			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[0])),
+			(idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a[1])));
 	}
 };
 
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<bdd_reference<S, O, IW, SW>> {
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<idni::tau_lang::bdd_reference<S, O, IW, SW>> {
 	size_t operator()(const auto& a) const {
-		return bdd_reference<S, O, IW, SW>::hash(a);
+		return idni::tau_lang::bdd_reference<S, O, IW, SW>::hash(a);
 	}
 };
 
-template<bool S, bool O, int_t IW, int_t SW>
-struct std::hash<std::pair<bdd_reference<S, O, IW, SW>, uint_t>> {
+template<bool S, bool O, idni::tau_lang::int_t IW, idni::tau_lang::int_t SW>
+struct hash<pair<idni::tau_lang::bdd_reference<S, O, IW, SW>, idni::tau_lang::uint_t>> {
 	size_t operator()(const auto& p) const {
-		return hash_upair((hash<bdd_reference<S, O, IW, SW>>{}(p.first)),
-				  p.second);
+		return idni::tau_lang::hash_upair(
+			(hash<idni::tau_lang::bdd_reference<S, O, IW, SW>>{}(p.first)),
+			p.second);
 	}
 };
+
+} // namespace std
+
+namespace idni::tau_lang {
 
 template<typename B> B get_zero() { return B::zero(); }
 template<typename B> B get_one() { return B::one(); }
@@ -1446,4 +1457,6 @@ bool
 	return x.id < y.id || (x.id == y.id && s);
 };
 
-#endif
+} // namespace idni::tau_lang
+
+#endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BDDS__BABDD_H__

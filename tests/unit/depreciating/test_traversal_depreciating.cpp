@@ -13,7 +13,7 @@
 
 using namespace std;
 using namespace idni::rewriter::depreciating;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 
 namespace testing = doctest;
 

@@ -4,7 +4,7 @@
 
 #include "hooks_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 template <typename...BAs>
 tau_<BAs...> first_argument_formula(const rewriter::depreciating::node<tau_sym<BAs...>>& n) {
@@ -345,9 +345,9 @@ tau_<BAs...> make_node_hook_cte(const rewriter::depreciating::node<tau_sym<BAs..
 		| ba_extractor<BAs...>;
 	if (l.has_value()) {
 		auto typed = n | tau_parser::bf_constant | tau_parser::type;
-		if (is_syntactic_zero(l.value()))
+		if (tau_lang::is_syntactic_zero(l.value()))
 			return typed.has_value() ? build_bf_f_type(typed.value()) : _0<BAs...>;
-		else if (is_syntactic_one(l.value()))
+		else if (tau_lang::is_syntactic_one(l.value()))
 			return typed.has_value() ? build_bf_t_type(typed.value()) : _1<BAs...>;
 	}
 	return std::make_shared<rewriter::depreciating::node<tau_sym<BAs...>>>(n);
@@ -1099,14 +1099,14 @@ std::optional<tau_<BAs...>> make_tau_node<BAs...>::operator()(
 	return std::optional<tau_<BAs...>>();
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 namespace idni::rewriter::depreciating  {
 
 template <typename...BAs>
-std::optional<idni::tau_lang::depreciating::tau_<BAs...>> make_node_hook<idni::tau_lang::depreciating::tau_sym<BAs...>>::operator()(
-		const rewriter::depreciating::node<idni::tau_lang::depreciating::tau_sym<BAs...>>& n) {
-	static idni::tau_lang::depreciating::make_tau_node<BAs...> hook;
+std::optional<idni::tau_lang_depreciating::tau_<BAs...>> make_node_hook<idni::tau_lang_depreciating::tau_sym<BAs...>>::operator()(
+		const rewriter::depreciating::node<idni::tau_lang_depreciating::tau_sym<BAs...>>& n) {
+	static idni::tau_lang_depreciating::make_tau_node<BAs...> hook;
 	return hook(n);
 }
 

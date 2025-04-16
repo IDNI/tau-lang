@@ -20,7 +20,7 @@
 #include "test_integration_helpers_depreciating.h"
 
 using namespace idni::tau_lang;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 
 
@@ -36,6 +36,14 @@ bool normalize_and_test_for_value(const char* sample, tau_parser::nonterminal nt
 }
 
 // TODO (LOW) simplify this test cases extracting common logic to the helpers file
+
+TEST_SUITE("configuration") {
+
+	TEST_CASE("bdd_init") {
+		idni::tau_lang::bdd_init<Bool>();
+	}
+}
+
 
 TEST_SUITE("formulas: no variables, no bindings and no quantifiers") {
 
@@ -113,34 +121,28 @@ TEST_SUITE("formulas: no variables, bindings and no quantifiers") {
 	// TODO (MEDIUM) check if we need to add more tests for bindings
 
 	TEST_CASE("{ X } : sbf != 0") {
-		bdd_init<Bool>();
 		CHECK( normalize_and_test_for_value("{ X } : sbf != 0.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("{ X } : sbf = 0") {
-		bdd_init<Bool>();
 		CHECK( normalize_and_test_for_value("{ X } : sbf = 0.", tau_parser::wff_f) );
 	}
 
 	TEST_CASE("{ Y } : sbf | { Z } : sbf != 0") {
-		bdd_init<Bool>();
 		CHECK( normalize_and_test_for_value("{ Y } : sbf | { Z } : sbf != 0.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("{ Y } : sbf & { Z } : sbf != 0") {
-		bdd_init<Bool>();
 		CHECK( normalize_and_test_for_value("{ Y } : sbf | { Z } : sbf != 0.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("{ Y } : sbf' != 0") {
-		bdd_init<Bool>();
 		// TODO (HING) check this one too
 		// CHECK( normalize_and_test_for_value("{ Y } : sbf' != 0.", tau_parser::wff_t) );
 		CHECK( normalize_and_test_for_value("({ Y } : sbf)' != 0.", tau_parser::wff_t) );
 	}
 
 	TEST_CASE("{ Y } : sbf != 0") {
-		bdd_init<Bool>();
 		CHECK( normalize_and_test_for_value("{ Y } : sbf != 0.", tau_parser::wff_t) );
 	}
 }
