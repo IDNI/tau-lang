@@ -8,7 +8,7 @@
 #include "../../unit/depreciating/test_helpers_depreciating.h"
 
 using namespace idni::tau_lang;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 
 
@@ -147,7 +147,7 @@ TEST_SUITE("Normalize Boolean function with recurrence relation") {
 
 TEST_SUITE("SBF expressions") {
 	TEST_CASE("X or Y") {
-		bdd_init<Bool>();
+		idni::tau_lang::bdd_init<Bool>();
 		const char* sample = "{X}:sbf | {Y}:sbf";
 		CHECK( test_bf_normalizer_and_test_for_value(sample, tau_parser::bf_constant) );
 	}

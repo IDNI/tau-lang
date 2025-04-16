@@ -2,7 +2,7 @@
 
 #include "repl_evaluator_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
 #define TC_STATUS_OUTPUT TC(color::GREEN, color::BG_LIGHT_CYAN, color::BRIGHT)
@@ -1220,11 +1220,13 @@ int repl_evaluator<BAs...>::eval_cmd(const tau_nso_t& n) {
 template <typename... BAs>
 repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 {
+	static_assert(sizeof...(BAs) > 0,
+		"Empty template parameter pack not allowed");
 	TC.set(opt.colors);
 	boost::log::core::get()->set_filter(
 		boost::log::trivial::severity >= opt.severity);
 	// Controls how fixpoint information in satisfiability.h should be printed
-	if (!opt.repl_running) depreciating::use_debug_output_in_sat = true;
+	if (!opt.repl_running) use_debug_output_in_sat = true;
 	if (opt.experimental) std::cout << "\n!!! Experimental features "
 		"enabled: new tree API (almost nothing works yet) !!!\n\n";
 }
@@ -1258,7 +1260,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 		for (const auto& cmd : commands)
 			if (quit = eval_cmd(cmd); quit == 1) break;
 	} else if (!error) return 2;
-	std::cout << std::endl;
+	std::cout << "\n"; std::cout.flush();
 	if (error && opt.error_quits) return quit = 1;
 	if (quit == 0) prompt();
 	return quit;
@@ -1266,7 +1268,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::version_cmd() {
-	std::cout << full_version << "\n";
+	std::cout << tau_lang::full_version << "\n";
 }
 
 template <typename... BAs>
@@ -1602,4 +1604,4 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 #undef TC_PROMPT
 #undef TC_OUTPUT
 
-} // idni::tau_lang::depreciating namespace
+} // idni::tau_lang_depreciating namespace

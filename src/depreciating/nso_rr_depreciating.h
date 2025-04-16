@@ -23,7 +23,7 @@
 
 #include "../parser/tau_parser.generated.h"
 #include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/variant_ba_depreciating.h"
+#include "boolean_algebras/variant_ba.h"
 #include "init_log.h"
 #include "splitter_types.h"
 #include "parser.h"
@@ -36,7 +36,7 @@
 #include "measure.h"
 #endif // TAU_MEASURE
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 extern bool pretty_printer_highlighting;
 extern bool pretty_printer_indenting;
@@ -276,15 +276,15 @@ std::ostream& operator<<(std::ostream& os, const unordered_tau_set<BAs...>& set)
 	return os;
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 namespace idni::rewriter::depreciating  {
 
 template <typename... BAs>
-struct make_node_cache_equality<tau_lang::depreciating::tau_sym<BAs...>> {
-	bool operator() (const node<tau_lang::depreciating::tau_sym<BAs...>>& l,
-		const node<tau_lang::depreciating::tau_sym<BAs...>>& r) const {
-		static tau_lang::depreciating::struc_equal<BAs...> st_eq;
+struct make_node_cache_equality<tau_lang_depreciating::tau_sym<BAs...>> {
+	bool operator() (const node<tau_lang_depreciating::tau_sym<BAs...>>& l,
+		const node<tau_lang_depreciating::tau_sym<BAs...>>& r) const {
+		static tau_lang_depreciating::struc_equal<BAs...> st_eq;
 		if (std::addressof(l) == std::addressof(r)) return true;
 		if (l.hash != r.hash) return false;
 
@@ -299,24 +299,26 @@ struct make_node_cache_equality<tau_lang::depreciating::tau_sym<BAs...>> {
 };
 
 template <typename... BAs>
-struct traverser_cache_equality<tau_lang::depreciating::tau_<BAs...>> {
-	bool operator() (const tau_lang::depreciating::tau_<BAs...>& l,
-		const tau_lang::depreciating::tau_<BAs...>& r) const {
-		static tau_lang::depreciating::struc_equal<BAs...> st_eq;
+struct traverser_cache_equality<tau_lang_depreciating::tau_<BAs...>> {
+	bool operator() (const tau_lang_depreciating::tau_<BAs...>& l,
+		const tau_lang_depreciating::tau_<BAs...>& r) const {
+		static tau_lang_depreciating::struc_equal<BAs...> st_eq;
 		return st_eq(l, r);
 	}
 };
 
 template <typename... BAs>
-struct traverser_pair_cache_equality<tau_lang::depreciating::tau_<BAs...>> {
-	using p = std::pair<tau_lang::depreciating::tau_<BAs...>, size_t>;
+struct traverser_pair_cache_equality<tau_lang_depreciating::tau_<BAs...>> {
+	using p = std::pair<tau_lang_depreciating::tau_<BAs...>, size_t>;
 	bool operator() (const p& l, const p& r) const {
-		static tau_lang::depreciating::struc_equal<BAs...> st_eq;
+		static tau_lang_depreciating::struc_equal<BAs...> st_eq;
 		return st_eq(l.first, r.first) && l.second == r.second;
 	}
 };
 
 } // rewriter::depreciating
+
+namespace idni::tau_lang_depreciating {
 
 //
 // operators << to pretty print the tau language related types
@@ -324,28 +326,26 @@ struct traverser_pair_cache_equality<tau_lang::depreciating::tau_<BAs...>> {
 
 template <typename...BAs>
 std::ostream& operator<<(std::ostream& stream,
-	const idni::rewriter::depreciating::rule<idni::tau_lang::depreciating::tau_<BAs...>>& r)
+	const idni::rewriter::depreciating::rule<tau_<BAs...>>& r)
 {
 	return stream << r.first << " := " << r.second << ".";
 }
 
 // << for rules
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream,
-	const idni::tau_lang::depreciating::rules<idni::tau_lang::depreciating::tau_<BAs...>>& rs)
-{
+std::ostream& operator<<(std::ostream& stream, const rules<tau_<BAs...>>& rs) {
 	for (const auto& r : rs) stream << r << " ";
 	return stream;
 }
 
 // << for tau_source_sym
 // std::ostream& operator<<(std::ostream& stream,
-// 				const idni::tau_lang::depreciating::tau_source_sym& rs);
+// 				const tau_source_sym& rs);
 
 // << for BAs... variant
 template <typename... BAs>
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& rs) {
-	std::visit(overloaded {
+	std::visit(idni::tau_lang::overloaded {
 		[&os](const auto& a) { os << a; }
 	}, rs);
 	return os;
@@ -353,12 +353,10 @@ std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& rs) {
 
 // << for tau_sym
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream,
-	const idni::tau_lang::depreciating::tau_sym<BAs...>& rs)
-{
+std::ostream& operator<<(std::ostream& stream, const tau_sym<BAs...>& rs) {
 	// using tau_sym = std::variant<tau_source_sym, std::variant<BAs...>, size_t>;
-	std::visit(overloaded {
-		[&stream](const idni::tau_lang::depreciating::tau_source_sym& t) {
+	std::visit(idni::tau_lang::overloaded {
+		[&stream](const tau_source_sym& t) {
 			if (!t.nt() && !t.is_null()) stream << t.t();
 		},
 		[&stream](const auto& a) { stream << a; }
@@ -368,9 +366,7 @@ std::ostream& operator<<(std::ostream& stream,
 
 // << for formulas
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream,
-	const idni::tau_lang::depreciating::rr<idni::tau_lang::depreciating::tau_<BAs...>>& f)
-{
+std::ostream& operator<<(std::ostream& stream, const rr<tau_<BAs...>>& f) {
 	stream << f.rec_relations;
 	if (f.main) stream << f.main;
 	return stream;
@@ -380,11 +376,11 @@ std::ostream& operator<<(std::ostream& stream,
 // TODO (HIGH) << for bindings depends on << for variant<BAs...>
 // TODO (HIGH) << for bindings needs to follow tau lang syntax
 template <typename... BAs>
-std::ostream& operator<<(std::ostream& stream,
-	const idni::tau_lang::depreciating::bindings<BAs...>& bs)
-{
+std::ostream& operator<<(std::ostream& stream, const bindings<BAs...>& bs) {
 	for (const auto& b : bs) stream << b.first << ": " << b.second << "\n";
 	return stream;
 }
+
+} // namespace idni::tau_lang_depreciating
 
 #endif // __NSO_RR_DEPRECIATING_H__

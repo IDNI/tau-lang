@@ -7,6 +7,8 @@
 #include <list>
 #include <variant>
 
+namespace idni::tau_lang {
+
 // product boolean algebra
 template <typename...BAS>
 struct product_ba: std::tuple<BAS...> {
@@ -44,5 +46,7 @@ struct product_ba: std::tuple<BAS...> {
 		return result;
 	}
 };
+
+} // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__PRODUCT_BA_H__

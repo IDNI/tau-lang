@@ -3,9 +3,13 @@
 #ifndef __IDNI__TAU__UTILS_H__
 #define __IDNI__TAU__UTILS_H__
 
+namespace idni::tau_lang {
+
 template<class... Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
+
+} // namespace idni::tau_lang
 
 #endif // __IDNI__TAU__UTILS_H__

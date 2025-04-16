@@ -103,7 +103,7 @@ struct node {
 };
 
 template <typename... BAs>	
-inline std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
+std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
 
 template <typename... BAs>
 struct ba_constants;

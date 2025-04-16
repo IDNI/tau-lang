@@ -9,14 +9,14 @@
 #include "depreciating/boolean_algebras/nso_ba_depreciating.h"
 
 using namespace idni::tau_lang;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 namespace testing = doctest;
 
 // TODO (LOW) most of this functions could be remove and replace by the standart API
 
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 	template<>
 	struct nso_factory<Bool> {
@@ -105,7 +105,7 @@ tau_<Bool> make_factory_bindings(const tau_<Bool>& statement) {
 std::ostream& print_tau(std::ostream &os, tau_<Bool> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
-	std::visit(overloaded {
+	std::visit(idni::tau_lang::overloaded {
 		[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
 		[&os](std::variant<Bool> v) { if (auto b = std::get<0>(v); b.b) os << "true"; else os << "false"; },
 		[&os](size_t v) { os << v; }

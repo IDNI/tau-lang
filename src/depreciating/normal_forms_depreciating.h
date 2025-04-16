@@ -15,9 +15,7 @@
 #include "debug_helpers_depreciating.h"
 #endif // DEBUG
 
-namespace idni::tau_lang::depreciating {
-
-using namespace idni::tau_lang;
+namespace idni::tau_lang_depreciating {
 
 /**
  * This enum holds the possible memory slots for traversals using the
@@ -3342,23 +3340,23 @@ struct to_snf_step {
 
 private:
 
-	static constexpr auto _or = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
+	static constexpr auto _or = idni::tau_lang::overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l | r;
 	}, [](const auto&, const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
-	static constexpr auto _and = overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
+	static constexpr auto _and = idni::tau_lang::overloaded([]<typename T>(const T& l, const T& r) -> std::variant<BAs...> {
 			return l & r;
 	}, [](const auto&, const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
-	static constexpr auto _neg = overloaded([]<typename T>(const T& l) -> std::variant<BAs...> {
+	static constexpr auto _neg = idni::tau_lang::overloaded([]<typename T>(const T& l) -> std::variant<BAs...> {
 			return ~l;
 	}, [](const auto&) -> std::variant<BAs...> { throw std::logic_error("wrong types"); });
 
-	static constexpr auto _neq_zero = overloaded([]<typename T>(const T& l) -> bool {
+	static constexpr auto _neq_zero = idni::tau_lang::overloaded([]<typename T>(const T& l) -> bool {
 			return l != false;
 	}, [](const auto&) -> bool { throw std::logic_error("wrong types"); });
 
-	static constexpr auto _leq = overloaded([]<typename T>(const T& l, const T& r) -> bool {
+	static constexpr auto _leq = idni::tau_lang::overloaded([]<typename T>(const T& l, const T& r) -> bool {
 			return (l & ~r) == false;
 	}, [](const auto&, const auto&) -> bool { throw std::logic_error("wrong types"); });
 
@@ -3722,14 +3720,14 @@ tau_<BAs...> build_split_wff_using(tau_parser::nonterminal type, const tau_<BAs.
 template<size_t type, typename...BAs>
 tau_<BAs...> anf(const tau_<BAs...>& n) {
 	// TODO (MEDIUM) write anf (using?)
-	std::cout << "Not implemented yet." << std::endl;
+	std::cout << "Not implemented yet.\n";
 	return n;
 }
 
 template<typename...BAs>
 tau_<BAs...> pnf(const tau_<BAs...>& n) {
 	// TODO (MEDIUM) write pnf (using?)
-	std::cout << "Not implemented yet." << std::endl;
+	std::cout << "Not implemented yet.\n";
 	return n;
 }
 

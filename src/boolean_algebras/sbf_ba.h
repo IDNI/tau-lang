@@ -118,8 +118,10 @@ private:
 
 // Hash for hbdd as specialization of std::hash
 template<>
-struct std::hash<hbdd<Bool>> {
-	size_t operator()(const hbdd<Bool>& h) const noexcept {
+struct std::hash<idni::tau_lang::hbdd<idni::tau_lang::Bool>> {
+	size_t operator()(const idni::tau_lang::hbdd<idni::tau_lang::Bool>& h)
+		const noexcept
+	{
 		return h->hash();
 	}
 };

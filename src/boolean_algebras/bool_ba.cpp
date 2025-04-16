@@ -3,6 +3,8 @@
 #include <ostream>
 #include "bool_ba.h"
 
+namespace idni::tau_lang {
+
 Bool::Bool() : b(false) {}
 Bool::Bool(bool b) : b(b) {}
 
@@ -46,3 +48,5 @@ bool is_syntactic_zero(const Bool& b) {
 std::ostream& operator<<(std::ostream& os, const Bool& b) {
 	return os << (b.b ? 1 : 0);
 }
+
+} // namespace idni::tau_lang

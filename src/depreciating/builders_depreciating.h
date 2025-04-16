@@ -6,7 +6,7 @@
 #include "queries_depreciating.h"
 #include "language_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 // creates a specific builder from a tau.
 template <typename... BAs>
@@ -819,7 +819,7 @@ tau_<BAs...> build_wff_ctn_neq(const tau_<BAs...>& ctnvar,
 				wrap(tau_parser::ctn_neq, {ctnvar, num})));
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 
 #endif // __BUILDERS_DEPRECIATING_H__

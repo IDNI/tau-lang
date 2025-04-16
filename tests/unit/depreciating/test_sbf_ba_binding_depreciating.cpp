@@ -9,13 +9,13 @@
 
 using namespace std;
 using namespace idni::tau_lang;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 
 namespace testing = doctest;
 
 tau_<tau_ba<sbf_ba>, sbf_ba> build_binding(const char* src) {
-	bdd_init<Bool>();
+	idni::tau_lang::bdd_init<Bool>();
 	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;
 	return bf.parse(src).value();
 }

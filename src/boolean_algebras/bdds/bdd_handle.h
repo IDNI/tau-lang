@@ -7,6 +7,8 @@
 #include "dict.h"
 #include "splitter_types.h"
 
+namespace idni::tau_lang {
+
 template<typename B, auto o> struct bdd_handle;
 template<typename B, auto o = bdd_options<>::create()>
 using hbdd = sp<bdd_handle<B, o>>;
@@ -661,5 +663,7 @@ std::ostream& operator<<(std::ostream& os, const hbdd<B, o>& f) {
 	}
 	return os;
 }
+
+} // namespace idni::tau_lang
 
 #endif

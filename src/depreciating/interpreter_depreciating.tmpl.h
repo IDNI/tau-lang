@@ -2,7 +2,7 @@
 
 #include "interpreter_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 template<typename input_t, typename output_t, typename...BAs>
 std::optional<interpreter<input_t, output_t, BAs...>>
@@ -716,4 +716,4 @@ std::vector<tau_<BAs...>> interpreter<input_t, output_t, BAs...>::appear_within_
 	return appeared;
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating

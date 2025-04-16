@@ -5,6 +5,8 @@
 
 #include "defs.h"
 
+namespace idni::tau_lang {
+
 struct Bool {
 	Bool();
 	Bool(bool b);
@@ -29,14 +31,15 @@ Bool normalize (const Bool& b);
 bool is_syntactic_one (const Bool& b);
 bool is_syntactic_zero(const Bool& b);
 
+std::ostream& operator<<(std::ostream& os, const Bool& b);
+
+} // namespace idni::tau_lang
 
 template<>
-struct std::hash<Bool> {
-	size_t operator()(const Bool& b) {
+struct std::hash<idni::tau_lang::Bool> {
+	size_t operator()(const idni::tau_lang::Bool& b) {
 		return b.b ? 1 : 0;
 	}
 };
-
-std::ostream& operator<<(std::ostream& os, const Bool& b);
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__BOOL_BA_H__

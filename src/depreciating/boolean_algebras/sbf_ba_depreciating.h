@@ -7,8 +7,25 @@
 
 #include "tau_ba_depreciating.h"
 #include "../parser/sbf_parser.generated.h"
+#include "boolean_algebras/bdds/bdd_handle.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
+
+template<uint8_t params = tau_lang::INV_IN | tau_lang::INV_OUT | tau_lang::VARSHIFT>
+using bdd_options =  tau_lang::bdd_options<params>;
+
+template<typename B, auto o = bdd_options<>::create()>
+using hbdd = tau_lang::hbdd<B, o>;
+
+template<typename B, auto o = bdd_options<>::create()>
+using bdd_handle = tau_lang::bdd_handle<B, o>;
+
+template <typename B, bdd_options o = bdd_options<>::create()>
+using bdd = tau_lang::bdd<B, o>;
+
+using Bool = tau_lang::Bool;
+
+
 
 /**
  * @brief Simple Boolean function Boolean algebra represented by bdd
@@ -121,7 +138,7 @@ private:
 	nso_factory();
 };
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 #include "sbf_ba_depreciating.tmpl.h"
 #endif // __SBF_BA_DEPRECIATING_H__

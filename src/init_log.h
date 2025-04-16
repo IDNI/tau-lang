@@ -8,6 +8,8 @@
 #include <boost/log/expressions.hpp>
 #include <boost/log/utility/setup/console.hpp>
 
+namespace idni::tau_lang {
+
 struct logging_initializer {
 	logging_initializer() {
 		using namespace boost::log;
@@ -19,5 +21,7 @@ struct logging_initializer {
 	}
 };
 inline static logging_initializer initialize_logging;
+
+} // namespace idni::tau_lang
 
 #endif //__IDNI__TAU__INIT_LOG_H__

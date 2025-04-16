@@ -5,7 +5,7 @@
 
 #include "normalizer_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 inline static bool use_debug_output_in_sat = false;
 inline void print_fixpoint_info(const std::string& message, const std::string& result, const bool output) {
@@ -1151,6 +1151,6 @@ tau_<BAs...> simp_tau_unsat_valid(const tau_<BAs...>& fm, const int_t start_time
  *  o1[t-2] = 0 && o1[1] = 0 -> should be o1[t-2] = 0 && o1[t-1] = 0 && o1[t] = 0 && o1[1] = 0, passing
  */
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 #endif // __SATISFIABILITY_DEPRECIATING_H__

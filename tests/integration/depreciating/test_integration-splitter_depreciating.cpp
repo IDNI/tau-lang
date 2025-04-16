@@ -21,16 +21,23 @@
 #include "test_integration_helpers_depreciating.h"
 
 using namespace std;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 
 namespace testing = doctest;
+
+TEST_SUITE("configuration") {
+
+	TEST_CASE("bdd_init") {
+		idni::tau_lang::bdd_init<Bool>();
+	}
+}
 
 TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_1") {
 		const char *sample = "xyz = 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s));
 	}
@@ -38,7 +45,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_2") {
 		const char *sample = "xyz != 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s));
 	}
@@ -46,7 +53,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_3") {
 		const char *sample = "x = 0 && w != 0 || yz = 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s));
 	}
@@ -54,7 +61,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_4") {
 		const char *sample = "x = 0 && w != 0 || y|z != 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s));
 	}
@@ -62,7 +69,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_5") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -70,7 +77,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_6") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -78,14 +85,14 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_7") {
 		const char *sample = "(sometimes o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s, fm));
 	}
 	TEST_CASE("Tau_splitter_8") {
 		const char *sample = "(always o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -93,7 +100,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_9") {
 		const char *sample = "(always o1[t] = i1[t]).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -101,7 +108,7 @@ TEST_SUITE("Tau_splitter_upper_tests") {
 	TEST_CASE("Tau_splitter_10") {
 		const char *sample = "(always o1[0] = 0) && (sometimes o1[0]|o1[1] != 0).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -111,7 +118,7 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_1") {
 		const char *sample = "xyz = 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s));
 	}
@@ -119,7 +126,7 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_2") {
 		const char *sample = "xyz != 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s));
 	}
@@ -127,7 +134,7 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_3") {
 		const char *sample = "x = 0 && w != 0 || yz = 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s));
 	}
@@ -135,7 +142,7 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_4") {
 		const char *sample = "x = 0 && w != 0 || y|z != 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s));
 	}
@@ -143,7 +150,7 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_5") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -151,7 +158,7 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_6") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -159,14 +166,14 @@ TEST_SUITE("Tau_splitter_middle_tests") {
 	TEST_CASE("Tau_splitter_7") {
 		const char *sample = "(sometimes o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s, fm));
 	}
 	TEST_CASE("Tau_splitter_8") {
 		const char *sample = "(always o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::middle);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -176,7 +183,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	TEST_CASE("Tau_splitter_1") {
 		const char *sample = "xyz = 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s));
 	}
@@ -184,7 +191,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	TEST_CASE("Tau_splitter_2") {
 		const char *sample = "xyz != 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s));
 	}
@@ -192,7 +199,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	TEST_CASE("Tau_splitter_3") {
 		const char *sample = "x = 0 && w != 0 || yz = 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s));
 	}
@@ -200,7 +207,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	TEST_CASE("Tau_splitter_4") {
 		const char *sample = "x = 0 && w != 0 || y|z != 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s));
 	}
@@ -209,7 +216,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	/*TEST_CASE("Tau_splitter_5") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 0).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -217,7 +224,7 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	TEST_CASE("Tau_splitter_6") {
 		const char *sample = "(always ([t>0] -> (o1[t] = 0 || o1[t] = 1))) && (sometimes o1[t] != 0 && o1[t] != 1) && (sometimes o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s, fm));
 	}*/
@@ -225,14 +232,14 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 	TEST_CASE("Tau_splitter_7") {
 		const char *sample = "(sometimes o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s, fm));
 	}
 	TEST_CASE("Tau_splitter_8") {
 		const char *sample = "(always o1[t] = 1).";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::lower);
 		CHECK(is_splitter(fm, s, fm));
 	}
@@ -241,10 +248,9 @@ TEST_SUITE("Tau_splitter_lower_tests") {
 TEST_SUITE("Tau_splitter_coeff") {
 
 	TEST_CASE("Tau_splitter_coeff1") {
-		bdd_init<Bool>();
 		const char *sample = "{x3}:sbf & {y}:sbf w != 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
@@ -252,10 +258,9 @@ TEST_SUITE("Tau_splitter_coeff") {
 	}
 
 	TEST_CASE("Tau_splitter_coeff2") {
-		bdd_init<Bool>();
 		const char *sample = "({x}:sbf|{y}:sbf) w != 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
@@ -263,10 +268,9 @@ TEST_SUITE("Tau_splitter_coeff") {
 	}
 
 	TEST_CASE("Tau_splitter_coeff3") {
-		bdd_init<Bool>();
 		const char *sample = "{x}:sbf f = 0 && {y}:sbf g = 0.";
 		auto src = make_tau_source(sample);
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		fm = normalizer(fm);
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
@@ -276,9 +280,8 @@ TEST_SUITE("Tau_splitter_coeff") {
 
 TEST_SUITE("Tau_splitter_uniter_const") {
 	TEST_CASE("Tau_splitter_tau_uniter_const") {
-		bdd_init<Bool>();
 		const char *src = "<:split1> = 0.";
-		auto fm = make_nso_rr_using_factory<depreciating::tau_ba<sbf_ba>, sbf_ba>(src).value().main;
+		auto fm = make_nso_rr_using_factory<tau_ba<sbf_ba>, sbf_ba>(src).value().main;
 		auto s = tau_splitter(fm, splitter_type::upper);
 		stringstream ss; ss << s;
 		CHECK(ss.str() == "<:split1> = 0 && <:split2> != 0");

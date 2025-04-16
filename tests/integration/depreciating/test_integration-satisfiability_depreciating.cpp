@@ -12,7 +12,7 @@
 #define base_bas tau_ba<sbf_ba>, sbf_ba
 
 using namespace idni::tau_lang;
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 
 namespace testing = doctest;
@@ -25,56 +25,53 @@ tau_<BAs...> create_spec(const char* spec) {
 		sample_src).value().main;
 }
 
+TEST_SUITE("configuration") {
+
+	TEST_CASE("bdd_init") {
+		idni::tau_lang::bdd_init<Bool>();
+	}
+}
+
 TEST_SUITE("Alignments") {
 	TEST_CASE("equal_lookback_one_st") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t-1] = 0) && (sometimes o1[t] = 1 && o1[t-1] = 0).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
 	TEST_CASE("smaller_lookback_one_st") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t] = o1[t-1] && o1[t-1] = 1) && (sometimes o2[t] = 0).");
 		CHECK(is_tau_formula_sat(spec));
 	}
 	TEST_CASE("greater_lookback_one_st") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t] = o1[t-1]) && (sometimes o1[t] != o1[t-2]).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
 	TEST_CASE("equal_lookback_two_st") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t] = 1).");
 		CHECK(transform_to_execution(spec) == _F<base_bas>);
 	}
 	TEST_CASE("greater_lookback_two_st_1") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 1) && (sometimes o2[t-2] = 0).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
 	TEST_CASE("greater_lookback_two_st_2") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t] = 1 && o2[t] = 1) && (sometimes o1[t-1] = 0) && (sometimes o2[t-2] = 1).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
 	TEST_CASE("smaller_lookback_two_st_1") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 1) && (sometimes o1[t-1] = 0).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
 	TEST_CASE("smaller_lookback_two_st_2") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t-2] = 0 && o2[t-2] = 0) && (sometimes o1[t] = 0) && (sometimes o1[t-1] = 1).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
 #ifndef DEBUG
 	TEST_CASE("mixed_lookback_two_st_1") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t-2] = 1) && (sometimes o1[t-3] = 0) && (sometimes o1[t] = 1).");
 		CHECK(!is_tau_formula_sat(spec));
 	}
 
 	TEST_CASE("mixed_lookback_two_st_2") {
-		bdd_init<Bool>();
 		auto spec = create_spec<base_bas>("(always o1[t-2] = 1) && (sometimes o1[t-3] = 1) && (sometimes o1[t] = 0).");
 		CHECK(!is_tau_formula_sat(spec));
 	}

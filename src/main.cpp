@@ -58,7 +58,6 @@
 using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
-using namespace idni::rewriter::depreciating;
 
 cli::options tau_options() {
 	cli::options opts;
@@ -188,7 +187,9 @@ int main(int argc, char** argv) {
 	}
 	// depreciating
 	else {
-		depreciating::repl_evaluator<depreciating::sbf_ba> re({
+		tau_lang_depreciating::repl_evaluator<
+			tau_lang_depreciating::sbf_ba> re(
+		{
 			.status = opts["status"].get<bool>(),
 			.colors = opts["color"].get<bool>(),
 			.charvar = charvar,

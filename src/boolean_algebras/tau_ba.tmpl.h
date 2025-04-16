@@ -215,6 +215,10 @@ tau_ba_factory<BAs...>& tau_ba_factory<BAs...>::instance() {
 	return factory;
 }
 
+template <typename... BAs>
+std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs) {
+	return os << rs.nso_rr;
+}
 
 } // namespace idni::tau_lang
 
@@ -224,10 +228,3 @@ tau_ba_factory<BAs...>& tau_ba_factory<BAs...>::instance() {
 // {
 // 	return hash<idni::tau_lang::nso_rr>{}(f.nso_rr);
 // }
-
-template <typename... BAs>
-std::ostream& operator<<(std::ostream& os,
-	const idni::tau_lang::tau_ba<BAs...>& rs)
-{
-	return os << rs.nso_rr;
-}

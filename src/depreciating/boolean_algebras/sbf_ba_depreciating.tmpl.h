@@ -2,7 +2,7 @@
 
 #include "sbf_ba_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 template <typename...BAs>
 // evaluates a parsed bdd terminal node recursively
@@ -22,7 +22,7 @@ sbf_ba eval_node(const sbf_parser::tree::traverser& t) {
 	case sbf_parser::variable: {
 		// get var id from var node's terminals
 		auto var_name = n | tt::terminals;
-		auto v = dict(var_name);
+		auto v = tau_lang::dict(var_name);
 		// use cached var if exists
 		if (auto cn = var_cache.find(v);
 			cn != var_cache.end())
@@ -89,7 +89,7 @@ tau_<BAs...> sbf_ba_factory<BAs...>::binding(const tau_<BAs...>& sn) {
 
 template <typename...BAs>
 std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
-	return std::variant<BAs...>(bdd_splitter_one<Bool>());
+	return std::variant<BAs...>(tau_lang::bdd_splitter_one<Bool>());
 }
 
 std::optional<tau_<sbf_ba>> nso_factory<sbf_ba>::parse(const std::string& src,
@@ -194,4 +194,4 @@ nso_factory<tau_ba<sbf_ba>, sbf_ba>&
 
 nso_factory<tau_ba<sbf_ba>, sbf_ba>::nso_factory() {};
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating

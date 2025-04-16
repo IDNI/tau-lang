@@ -6,7 +6,7 @@
 #include "satisfiability_depreciating.h"
 #include "boolean_algebras/nso_ba_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 enum class split_sym {
 	conjunction, disjunction
@@ -338,6 +338,6 @@ tau_<BAs...> tau_splitter (const tau_<BAs...>& fm, splitter_type st) {
 	}
 }
 
-} // idni::tau_lang::depreciating namespace
+} // idni::tau_lang_depreciating namespace
 
 #endif //__SPLITTER_DEPRECIATING_H__

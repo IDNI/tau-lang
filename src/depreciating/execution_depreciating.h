@@ -7,17 +7,17 @@
 #include <optional>
 #include <boost/log/trivial.hpp>
 
-#include "boolean_algebras/variant_ba_depreciating.h"
+#include "boolean_algebras/variant_ba.h"
 #include "parser.h"
 #include "normal_forms_depreciating.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 // TODO (MEDIUM) clean execution api code
 template<typename... BAs>
 struct step {
-	step(idni::tau_lang::depreciating::library<tau_<BAs...>> lib): lib(lib) {}
+	step(idni::tau_lang_depreciating::library<tau_<BAs...>> lib): lib(lib) {}
 
 	tau_<BAs...> operator()(const tau_<BAs...>& n) const {
 		return nso_rr_apply(lib, n);
@@ -172,5 +172,5 @@ tau_<BAs...> operator|(const tau_<BAs...>& n, const repeat_each<step_t, BAs...>&
 	return r(n);
 }
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 #endif // __EXECUTION_DEPRECIATING_H__

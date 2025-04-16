@@ -3,7 +3,7 @@
 #ifndef __DEBUG_HELPERS_DEPRECIATING_H__
 #define __DEBUG_HELPERS_DEPRECIATING_H__
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 #ifdef DEBUG
 
@@ -39,7 +39,7 @@ std::ostream& print_tau_tree(std::ostream &os, tau_<BAs...> n,
 	size_t l = 0)
 {
 	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
-	std::visit(overloaded{
+	std::visit(idni::tau_lang::overloaded{
 		[&os, &indent](tau_source_sym v) {
 			indent();
 			if (v.nt()) os << tau_parser::instance()
@@ -81,6 +81,6 @@ std::string ptree(tau_<BAs...> n, size_t l = 0) {
 
 #endif // DEBUG
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 #endif // __DEBUG_HELPERS_DEPRECIATING_H__

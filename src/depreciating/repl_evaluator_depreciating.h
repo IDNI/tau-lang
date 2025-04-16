@@ -43,7 +43,7 @@
 #include "interpreter_depreciating.h"
 #include "utility/repl.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	colors_opt, charvar_opt, highlighting_opt, indenting_opt, debug_opt };
@@ -167,7 +167,7 @@ private:
 	idni::term::colors TC{};
 };
 
-} //idni::tau_lang::depreciating namespace
+} //idni::tau_lang_depreciating namespace
 
 #include "repl_evaluator_depreciating.tmpl.h"
 

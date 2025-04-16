@@ -9,12 +9,14 @@
 #include "boolean_algebras/bdds/babdd.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "depreciating/normalizer_depreciating.h"
+#include "boolean_algebras/variant_ba.h"
+#include "depreciating/boolean_algebras/nso_ba_depreciating.h"
 #include "dict.h"
 
-using namespace idni::tau_lang::depreciating;
+using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 rr<tau_<sbf_ba>> sbf_make_nso_rr(const std::string& src) {
 	auto sample_src = make_tau_source(src);
@@ -43,7 +45,7 @@ tau_<tau_ba<sbf_ba>, sbf_ba> normalize_test_tau(const char* src) {
 std::ostream& print_tau(std::ostream &os, tau_<sbf_ba> n, size_t l = 0) {
 	os << "{";
 	// for (size_t t = 0; t < l; t++) os << " ";
-	std::visit(overloaded{
+	std::visit(idni::tau_lang::overloaded{
 		[&os](tau_source_sym v) { if (v.nt()) os << v.n(); else os << v.t(); },
 		[&os](std::variant<sbf_ba> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
@@ -57,7 +59,7 @@ std::ostream& print_tau(std::ostream &os, tau_<sbf_ba> n, size_t l = 0) {
 
 std::ostream& pretty_print_tau(std::ostream &os, tau_<sbf_ba> n, size_t l = 0) {
 	// for (size_t t = 0; t < l; t++) os << " ";
-	std::visit(overloaded{
+	std::visit(idni::tau_lang::overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },
 		[&os](std::variant<sbf_ba> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";

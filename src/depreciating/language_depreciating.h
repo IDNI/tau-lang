@@ -7,7 +7,7 @@
 
 #include "nso_rr_depreciating.h"
 
-namespace idni::tau_lang::depreciating {
+namespace idni::tau_lang_depreciating {
 
 /**
  * Trims the given tau object.
@@ -359,7 +359,7 @@ template <typename... BAs>
 std::optional<tau_<BAs...>> make_nso_using_factory(const std::string& input,
 	idni::parser<>::parse_options options = { .start = tau_parser::wff });
 
-} // namespace idni::tau_lang::depreciating
+} // namespace idni::tau_lang_depreciating
 
 #include "language_depreciating.tmpl.h"
 
