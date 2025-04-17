@@ -117,7 +117,7 @@ std::ostream& print_tau(std::ostream &os, tau_<Bool> n, size_t l = 0) {
 
 std::ostream& pretty_print_tau(std::ostream &os, tau_<Bool> n, size_t l = 0) {
 	// for (size_t t = 0; t < l; t++) os << " ";
-	std::visit(overloaded{
+	std::visit(idni::tau_lang::overloaded{
 		[&os](tau_source_sym v) { if (!v.nt()) os << v.t(); },
 		[&os](std::variant<Bool> v) {
 			if (auto b = std::get<0>(v); b == true) os << "true";
