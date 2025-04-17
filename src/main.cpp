@@ -50,11 +50,6 @@
 #include "boolean_algebras/sbf_ba.h"
 #include "repl_evaluator.h"
 
-#include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
-#include "depreciating/normalizer_depreciating.h"
-#include "depreciating/nso_rr_depreciating.h"
-#include "depreciating/repl_evaluator_depreciating.h"
-
 using namespace std;
 using namespace idni;
 using namespace idni::tau_lang;
@@ -126,6 +121,11 @@ void welcome() {
 		<< "For built-in help, type \"help\" or \"help command\".\n\n";
 }
 
+
+// function declaration of a depreciating repl
+int run_repl_depreciating(cli::options& opts, bool charvar,
+	boost::log::trivial::severity_level sev, bool exp);
+
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	bdd_init<Bool>();
@@ -186,26 +186,6 @@ int main(int argc, char** argv) {
 		return r.run();
 	}
 	// depreciating
-	else {
-		tau_lang_depreciating::repl_evaluator<
-			tau_lang_depreciating::sbf_ba> re(
-		{
-			.status = opts["status"].get<bool>(),
-			.colors = opts["color"].get<bool>(),
-			.charvar = charvar,
-#ifdef DEBUG
-			.debug_repl = opts["debug"].get<bool>(),
-#endif // DEBUG
-			.severity = sev,
-			.experimental = exp
-		});
-		string e = opts["evaluate"].get<string>();
-		if (e.size()) return re.eval(e), 0;
-		repl<decltype(re)> r(re, "tau> ", ".tau_history");
-		welcome();
-		re.prompt();
-		return r.run();
-	}
-
+	else return run_repl_depreciating(opts, charvar, sev, exp);
 
 }

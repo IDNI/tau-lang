@@ -57,6 +57,7 @@ set(TAU_SOURCES
 
 set(CLI_SOURCES
 	main.cpp
+	depreciating/main_depreciating.cpp
 	../external/parser/src/utility/cli.cpp
 )
 
