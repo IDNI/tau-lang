@@ -424,7 +424,7 @@ private:
 				clauses.insert(n);
 
 		#ifdef DEBUG
-		if (clauses.empty()) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << n << std::endl;
+		if (clauses.empty()) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << n << "\n";
 		else for (auto& clause: clauses) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause;
 		#endif // DEBUG
 
@@ -462,13 +462,13 @@ private:
 				for (auto& positive: positives) {
 					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing? ";
 					if (positive == _0<BAs...>) {
-						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
+						BOOST_LOG_TRIVIAL(trace) << "yes\n";
 						return {};
 					} else if (positive == negated) {
-						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
+						BOOST_LOG_TRIVIAL(trace) << "yes\n";
 						return {};
 					} else {
-						BOOST_LOG_TRIVIAL(trace) << "no" << std::endl;
+						BOOST_LOG_TRIVIAL(trace) << "no\n";
 					}
 				}
 			}
@@ -485,13 +485,13 @@ private:
 						| optional_value_extractor<tau_<BAs...>>;
 					BOOST_LOG_TRIVIAL(trace) << "(I) are literals " << positive << " and " << negation << " clashing: ";
 					if (eq_bf == _F<BAs...>) {
-						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
+						BOOST_LOG_TRIVIAL(trace) << "yes\n";
 						return {};
 					} if (eq_bf == neq_bf) {
-						BOOST_LOG_TRIVIAL(trace) << "yes" << std::endl;
+						BOOST_LOG_TRIVIAL(trace) << "yes\n";
 						return {};
 					} else {
-						BOOST_LOG_TRIVIAL(trace) << "no" << std::endl;
+						BOOST_LOG_TRIVIAL(trace) << "no\n";
 					}
 				}
 			}
@@ -1895,7 +1895,7 @@ tau_<BAs...> reduce_across_bfs (const tau_<BAs...>& fm, bool to_cnf) {
 			}
 			else if (simp_path != paths[i]) {
 
-				// std::cout << "(I) Path simplification happened: " << "\n";
+				// std::cout << "(I) Path simplification happened: \n";
 				// std::vector<std::vector<int_t> > tmp1{paths[i]};
 				// std::vector<std::vector<int_t> > tmp2{simp_path};
 				// std::cout << "(F) Current path: " <<

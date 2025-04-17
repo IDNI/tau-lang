@@ -699,7 +699,7 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 		for (const auto& cmd : commands())
 			if (quit = eval_cmd(cmd); quit == 1) break;
 	} else if (!error) return 2;
-	std::cout << std::endl;
+	std::cout << "\n", std::cout.flush();
 	if (error && opt.error_quits) return quit = 1;
 	if (quit == 0) prompt();
 	return quit;

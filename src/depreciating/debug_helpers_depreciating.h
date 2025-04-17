@@ -39,7 +39,7 @@ std::ostream& print_tau_tree(std::ostream &os, tau_<BAs...> n,
 	size_t l = 0)
 {
 	auto indent = [&os, &l]() { for (size_t t = 0; t < l; t++) os << "\t";};
-	std::visit(idni::tau_lang::overloaded{
+	std::visit(idni::tau_lang_depreciating::overloaded{
 		[&os, &indent](tau_source_sym v) {
 			indent();
 			if (v.nt()) os << tau_parser::instance()
@@ -47,6 +47,8 @@ std::ostream& print_tau_tree(std::ostream &os, tau_<BAs...> n,
 			else if (v.is_null()) os << "null";
 			else os << v.t();
 		},
+		[&os, &indent](const std::variant<BAs...>& v) { indent(),
+			idni::tau_lang_depreciating::operator<<<BAs...>(os, v); },
 		[&os, &indent](const auto& v) { indent(), os << v; }
 	}, n->value);
 	if (n->child.size()) os << " {\n";

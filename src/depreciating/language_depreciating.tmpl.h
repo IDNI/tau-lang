@@ -652,7 +652,7 @@ bool has_open_tau_fm_in_constant (const tau_<BAs...>& fm) {
 			std::stringstream ss;
 			ss << "(Error) A Tau formula constant must be closed: ",
 			//idni::tau_lang::operator<<(ss, ba_const);
-			ss << ba_const;
+			idni::tau_lang_depreciating::operator<<(ss, ba_const);
 			BOOST_LOG_TRIVIAL(error) << ss.str();
 			return true;
 		}

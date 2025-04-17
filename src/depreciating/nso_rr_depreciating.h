@@ -361,6 +361,7 @@ std::ostream& operator<<(std::ostream& stream, const rules<tau_<BAs...>>& rs) {
 
 // << for BAs... variant
 template <typename... BAs>
+requires (sizeof...(BAs) > 0)
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& rs) {
 	std::visit(idni::tau_lang::overloaded {
 		[&os](const auto& a) { os << a; }
@@ -376,6 +377,8 @@ std::ostream& operator<<(std::ostream& stream, const tau_sym<BAs...>& rs) {
 		[&stream](const tau_source_sym& t) {
 			if (!t.nt() && !t.is_null()) stream << t.t();
 		},
+		[&stream](const std::variant<BAs...>& a) {
+			idni::tau_lang_depreciating::operator<<(stream, a); },
 		[&stream](const auto& a) { stream << a; }
 	}, rs);
 	return stream;
