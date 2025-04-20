@@ -56,6 +56,9 @@ struct nso_factory;
 template <BAsPack... BAs>
 struct tau_ba;
 
+template <NodeType node>
+struct rr_types;
+
 // -----------------------------------------------------------------------------
 
 // helper to get size of boolean algebras variant pack
@@ -68,10 +71,8 @@ constexpr size_t BAs_bitsize = BAs_size<BAs...> <= 1 ? 1 :
 		//static_cast<size_t>(std::ceil(std::log2(BAs_size<BAs...>)));
                 (sizeof(size_t) * 8 - __builtin_clzl(BAs_size<BAs...> - 1));
 
-
-
 // -----------------------------------------------------------------------------
-// Tau tree node
+// Tau tree node (tau_tree_node.tmpl.h)
 //
 // node is templated by a pack of boolean algebras
 // This is used in the node for two purposes:
@@ -156,7 +157,7 @@ struct node {
 };
 
 // -----------------------------------------------------------------------------
-// Tau tree
+// Tau tree (tau_tree.tmpl.h)
 //
 // basic Tau language structure for storing terms, formulas and language constructs
 //
@@ -226,29 +227,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 					const std::initializer_list<tref>& ch);
 	static tref get(const node::type& nt, const std::string& str); // with string
 
-	// creation from parser result or parser input (string, stream, file)
-	static tref get(tau_parser::result& result);
-	static tref get(const std::string& str, parse_options options = {});
-	static tref get(std::istream& is, parse_options options = {});
-	static tref get_from_file(const std::string& filename,
-						parse_options options = {});
-
-	// with binder
-	template <typename binder>
-	static tref get(binder& bind, tau_parser::result& result);
-	template <typename binder>
-	static tref get(binder& bind, const std::string& str,
-						parse_options options = {});
-	template <typename binder>
-	static tref get(binder& bind, std::istream& is,
-						parse_options options = {});
-	template <typename binder>
-	static tref get_from_file(binder& bind, const std::string& filename,
-						parse_options options = {});
-
-	// ---------------------------------------------------------------------
 	// terminals
-
 	static tref get_num(size_t v);
 	static tref get_integer(int_t v);
 	static tref get_ba_constant(size_t v);
@@ -308,7 +287,45 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	bas_variant get_ba_constant() const;
 
 	// ---------------------------------------------------------------------
-	// various extractors
+	// from parser (tau_tree_from_parser.tmpl.h)
+
+	// creation from parser result or parser input (string, stream, file)
+	static tref get(tau_parser::result& result);
+	static tref get(const std::string& str, parse_options options = {});
+	static tref get(std::istream& is, parse_options options = {});
+	static tref get_from_file(const std::string& filename,
+						parse_options options = {});
+	static rewriter::library get_library(const std::string& source);
+	static rewriter::builder get_builder(const std::string& source);
+
+	// with binder
+	template <typename binder>
+	static tref get(binder& bind, tau_parser::result& result);
+	template <typename binder>
+	static tref get(binder& bind, const std::string& str,
+						parse_options options = {});
+	template <typename binder>
+	static tref get(binder& bind, std::istream& is,
+						parse_options options = {});
+	template <typename binder>
+	static tref get_from_file(binder& bind, const std::string& filename,
+						parse_options options = {});
+	template <typename binder>
+	static rewriter::library get_library(binder& bind,
+						const std::string& source);
+	template <typename binder>	
+	static rewriter::builder get_builder(binder& bind,
+						const std::string& source);
+
+	// ---------------------------------------------------------------------
+	// various extractors (tau_tree_extractors.tmpl.h)
+
+	static rr_sig get_rr_sig(tref n);
+	static rewriter::rules get_rec_relations(tref r);
+	static std::optional<rr> get_nso_rr(tref ref);
+
+	static rewriter::builder get_builder(tref ref);
+	static rewriter::rules get_rules(tref r);
 
 	static void get_leaves(tref n, node::type branch, trefs& leaves);
 	static trefs get_leaves(tref n, node::type branch);
@@ -317,23 +334,17 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static trefs get_dnf_bf_clauses(tref n);
 	static trefs get_cnf_bf_clauses(tref n);
 
-	static rewriter::rules get_rules(tref r);
-	template <typename binder>
-	static rewriter::library get_library(binder& bind,
-						const std::string& source);
-	static rewriter::library get_library(const std::string& source);
-	template <typename binder>	
-	static rewriter::builder get_builder(binder& bind,
-						const std::string& source);
-	static rewriter::builder get_builder(const std::string& source);
-	static rewriter::builder get_builder(tref ref);
-
-	static rewriter::rules get_rec_relations(tref r);
-
-	static std::optional<rr> get_nso_rr(tref ref);
-
-	// tree::traverser / tt API
+	// inference 
 	// ---------------------------------------------------------------------
+	// rr_types (tau_tree_rr_types.tmpl.h)
+
+	static std::optional<rr> infer_ref_types(const rr& nso_rr);
+
+	// ba_types (tau_tree_ba_types.tmpl.h)
+	// static tref infer_ba_types(tref n);
+
+	// ---------------------------------------------------------------------
+	// tree::traverser / tt API (tau_tree_traverser.tmpl.h)
 
 	struct traverser;
 
@@ -500,7 +511,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	using tt = traverser;
 
 	// ---------------------------------------------------------------------
-	// builder
+	// builder (tau_tree_builders.tmpl.h)
 
 	static tref apply_builder(const rewriter::builder& b, trefs n);
 
@@ -598,10 +609,14 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref build_wff_ctn_less(tref ctnvar, tref num);
 	static tref build_wff_ctn_eq(tref ctnvar, tref num);
 	static tref build_wff_ctn_neq(tref ctnvar, tref num);
+
+private:
+	static std::optional<rr> infer_ref_types(const rr& nso_rr,
+							rr_types<node>& ts);
 };
 
 // -----------------------------------------------------------------------------
-// printers
+// printers (tau_tree_printers.tmpl.h)
 
 template <BAsPack... BAs>
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v);
@@ -620,26 +635,26 @@ template <BAsPack... BAs>
 std::ostream& print(std::ostream& os, const rr& rr_);
 
 // -----------------------------------------------------------------------------
-// queries
+// queries (tau_tree_queries.tmpl.h)
 
-template <BAsPack... BAs>
+template <NodeType node>
 bool is_non_terminal(tref n);
 
-template <BAsPack... BAs>
+template <NodeType node>
 bool is_terminal(tref n);
 
-template <BAsPack... BAs>
+template <NodeType node>
 bool is_non_terminal(const size_t nt, tref n);
 
-template <size_t nt, typename... BAs>
+template <size_t nt, NodeType node>
 bool is_non_terminal(tref n);
 
 // factory method for is_non_terminal predicate
-template <BAsPack... BAs>
+template <NodeType node>
 inline std::function<bool(tref)> is_non_terminal(size_t nt);
 
 // -----------------------------------------------------------------------------
-// builders:
+// builders (tau_tree_builders.tmpl.h)
 
 // definitions of basic bf and wff
 const std::string BLDR_BF_0 = "( $X ) =: 0.";
@@ -689,6 +704,8 @@ rewriter::builder tree<node>::bldr_bf_nleq_lower =
 #include "tau_tree_printers.tmpl.h"
 #include "tau_tree_queries.tmpl.h"
 #include "tau_tree_builders.tmpl.h"
-#include "tau_tree_transform.tmpl.h"
+#include "tau_tree_extractors.tmpl.h"
+#include "tau_tree_rr_types.tmpl.h"
+#include "tau_tree_from_parser.tmpl.h"
 
 #endif // __IDNI__TAU__TAU_TREE_H__
