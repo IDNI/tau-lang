@@ -257,7 +257,8 @@ struct foutputs {
 					return false;
 				}
 			} else {
-				ss << value.value();
+				idni::tau_lang_depreciating::operator<<(
+							ss, value.value());
 			}
 			// get the out_var_name tag
 			if (auto stream = streams.find(io_var_name); stream != streams.end())

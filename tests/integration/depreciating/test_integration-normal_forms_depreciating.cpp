@@ -2,21 +2,12 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
-
 #include "test_integration_helpers_depreciating.h"
 #include "../../unit/depreciating/test_helpers_depreciating.h"
 
 #ifdef DEBUG
 #include "depreciating/debug_helpers_depreciating.h"
 #endif
-
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-
-namespace testing = doctest;
 
 TEST_SUITE("normal forms: snf for wff") {
 

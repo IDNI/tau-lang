@@ -2,10 +2,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
 //#include "satisfiability.h"
 #include "boolean_algebras/bool_ba.h"
-#include "boolean_algebras/bdds/bdd_handle.h"
 #include "depreciating/normalizer_depreciating.h"
 
 // TODO (LOW) consider move this test to integration tests
@@ -14,15 +12,6 @@
 #ifdef DEBUG
 #include "depreciating/debug_helpers_depreciating.h"
 #endif
-
-using namespace std;
-using namespace idni::rewriter::depreciating;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
-
-
-namespace testing = doctest;
 
 TEST_SUITE("normal forms: mnf for wffs") {
 

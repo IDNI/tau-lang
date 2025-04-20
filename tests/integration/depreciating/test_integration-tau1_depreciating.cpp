@@ -13,18 +13,9 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <cassert>
-
-#include "doctest.h"
 #include "satisfiability.h"
 
 #include "test_integration_helpers-tau.h"
-
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-namespace testing = doctest;
 
 TEST_SUITE("simple tau formulas: no variables") {
 

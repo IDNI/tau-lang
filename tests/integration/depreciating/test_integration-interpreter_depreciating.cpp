@@ -19,10 +19,8 @@
 
 #define base_bas tau_ba<sbf_ba>, sbf_ba
 
-using namespace idni::tau_lang;
 using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
-
 
 std::string random_file(const std::string& extension = ".out", const std::string prefix = "/tmp/") {
     // define the characters to use in the random string

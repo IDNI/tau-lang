@@ -13,11 +13,11 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <cassert>
-
 #include "doctest.h"
+
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "boolean_algebras/bool_ba.h"
+
 #include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
 #include "depreciating/nso_rr_depreciating.h"
 #include "depreciating/normalizer_depreciating.h"

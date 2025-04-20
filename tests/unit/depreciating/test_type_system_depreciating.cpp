@@ -10,9 +10,6 @@
 
 #include "depreciating/debug_helpers_depreciating.h"
 
-using namespace idni::rewriter::depreciating;
-using namespace idni::tau_lang;
-using namespace std;
 
 namespace testing = doctest;
 

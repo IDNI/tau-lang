@@ -16,10 +16,10 @@
 #include <cassert>
 
 #include "doctest.h"
+
 #include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
 #include "depreciating/normalizer_depreciating.h"
 
-using namespace idni::tau_lang;
 using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 

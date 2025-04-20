@@ -73,6 +73,7 @@ function(target_setup target)
 			-Wstrict-overflow=5
 			-Wfloat-equal
 			-Wwrite-strings
+			# -ftemplate-backtrace-limit=0
 			# -Werror
 			-Wfatal-errors
 		)

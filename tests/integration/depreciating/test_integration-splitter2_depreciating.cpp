@@ -13,24 +13,11 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <cassert>
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/utility/setup/console.hpp>
-
-#include "doctest.h"
+#include "init_log.h"
 
 #include "test_integration_helpers_depreciating.h"
 
-using namespace std;
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
 using namespace boost::log;
-
-namespace testing = doctest;
 
 TEST_SUITE("configuration") {
 

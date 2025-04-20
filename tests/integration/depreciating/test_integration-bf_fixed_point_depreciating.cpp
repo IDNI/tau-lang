@@ -2,16 +2,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
-
 #include "test_integration_helpers_depreciating.h"
 #include "../../unit/depreciating/test_helpers_depreciating.h"
-
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-namespace testing = doctest;
 
 bool test_bf_rr_fp(const char* rec, const char* sample, tau_parser::nonterminal nt,
 	bool expect_fail = false)
