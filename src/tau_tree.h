@@ -7,7 +7,8 @@
 #include <variant>
 #include <numeric>
 
-#include "dict.h"
+#include "dict.h"  // string_id and string_from_id
+#include "utils.h" // overloaded
 #include "tau_parser.generated.h"
 #include "rr.h"
 
@@ -17,21 +18,57 @@ namespace idni::tau_lang {
 inline bool pretty_printer_highlighting = false;
 inline bool pretty_printer_indenting    = false;
 
-// helper to get size of boolean algebras variant pack
+// -----------------------------------------------------------------------------
+// concepts
+
 template <typename... BAs>
+concept BAsPack = sizeof...(BAs) > 0;
+
+template <typename BA, typename... BAs>
+using is_one_of = std::disjunction<std::is_same<BA, BAs>...>;
+
+template <typename BA, typename... BAs>
+concept OneOfBAs = is_one_of<BA, BAs...>::value;
+
+template <typename N>
+concept NodeType = requires {
+	typename N::bas_variant;
+	typename N::ba_constants_t;
+	typename N::ba_constants_binder_t;
+	typename N::type;
+	{ std::declval<N>().nt } -> std::convertible_to<size_t>;
+	{ std::declval<N>().data } -> std::convertible_to<size_t>;
+	// { N::hashit() } -> std::convertible_to<size_t>;
+};
+
+// -----------------------------------------------------------------------------
+// forward declarations
+
+template <BAsPack... BAs>
+struct ba_constants;
+
+template <BAsPack... BAs>
+struct ba_constants_binder;
+
+template <BAsPack... BAs>
+struct nso_factory;
+
+template <BAsPack... BAs>
+struct tau_ba;
+
+// -----------------------------------------------------------------------------
+
+// helper to get size of boolean algebras variant pack
+template <BAsPack... BAs>
 constexpr size_t BAs_size = std::variant_size<std::variant<BAs...>>::value;
 
 // helper to get bitsize required for storing BA type ids
-template <typename... BAs>
+template <BAsPack... BAs>
 constexpr size_t BAs_bitsize = BAs_size<BAs...> <= 1 ? 1 : 
 		//static_cast<size_t>(std::ceil(std::log2(BAs_size<BAs...>)));
                 (sizeof(size_t) * 8 - __builtin_clzl(BAs_size<BAs...> - 1));
 
-// -----------------------------------------------------------------------------
-// forward declaration for ba_constants pool/binder
 
-template <typename... BAs>
-struct ba_constants;
 
 // -----------------------------------------------------------------------------
 // Tau tree node
@@ -46,15 +83,19 @@ struct ba_constants;
 // but this is not implemented yet.
 // Currently the flag is always 0 and the data is stored in the node itself.
 //
-template <typename... BAs>
+// node also provides alias node::type for tau_parser::nonterminal
+// and provides static name(nt) nad name() methods to get type name string
+template <BAsPack... BAs>
 struct node {
 	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;
 
 	// alias for recreation of the packed variant
 	using bas_variant = std::variant<BAs...>;
-	// alias for ba_constants<BAs...> pool and binder
+	// alias for ba_constants<BAs...> pool
 	using ba_constants_t = ba_constants<BAs...>;
+	// alias for ba_constants_binder<BAs...>
+	using ba_constants_binder_t = ba_constants_binder<BAs...>;
 
 	using T = size_t; // just to simplify changes or templating it later;
 
@@ -87,6 +128,11 @@ struct node {
 	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
 
+	// returns name of the nonterminal nt
+	static const std::string& name(size_t nt);
+	// returns name of the node's nonterminal value
+	const std::string& name() const;
+
 	// casts size_t data to int_t
 	int_t as_int() const;
 
@@ -109,9 +155,6 @@ struct node {
 	constexpr size_t hashit() const;
 };
 
-template <typename... BAs>	
-std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
-
 // -----------------------------------------------------------------------------
 // Tau tree
 //
@@ -133,15 +176,16 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
 //     - parse_options = tau_parser::parse_options
 //
 
-template <typename N>
+template <NodeType N>
 struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	using base_t = idni::lcrs_tree<N>;
 	using tau = tree<N>;
 	using node = N;
 	using parse_tree = tau_parser::tree;
 	using parse_options = tau_parser::parse_options;
-	using bas_variant = typename node::bas_variant;
-	using ba_constants_t = typename node::ba_constants_t;
+	using bas_variant = node::bas_variant;
+	using ba_constants_t = node::ba_constants_t;
+	using ba_constants_binder_t = node::ba_constants_binder_t;
 
 	// tree direct API
 	// ---------------------------------------------------------------------
@@ -209,6 +253,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get_integer(int_t v);
 	static tref get_ba_constant(size_t v);
 	static tref get_ba_constant(size_t v, size_t type);
+	static tref get_ba_constant(
+				const std::pair<size_t, size_t>& typed_const);
 
 	size_t children_size() const;
 
@@ -239,6 +285,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	// nt category helpers
 	static bool is_digital_nt(size_t nt);
 	static bool is_string_nt(size_t nt);
+	static bool is_term_nt(size_t nt, size_t parent_nt);
 
 	// fast access helpers
 	size_t data() const;
@@ -464,6 +511,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static rewriter::builder bldr_bf_nleq_upper;
 	static rewriter::builder bldr_bf_nleq_lower;
 
+	// TODO revise these (need to take care of static initialization order)
 	static const tree<N>& _0();
 	static const tree<N>& _0_trimmed();
 	static const tree<N>& _1();
@@ -553,41 +601,42 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 };
 
 // -----------------------------------------------------------------------------
-// tau and tt printers
+// printers
 
-template <typename node>
+template <BAsPack... BAs>
+std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v);
+template <BAsPack... BAs>
+std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
+template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const tree<node>& t);
-
-template <typename node>
+template <NodeType node>
 std::ostream& operator<<(std::ostream& os,
 				const typename tree<node>::traverser& tt);
+template <BAsPack... BAs>
+std::ostream& print(std::ostream& os, const rewriter::rule& r);
+template <BAsPack... BAs>
+std::ostream& print(std::ostream& os, const rewriter::rules& rs);
+template <BAsPack... BAs>
+std::ostream& print(std::ostream& os, const rr& rr_);
 
 // -----------------------------------------------------------------------------
 // queries
 
-template <typename... BAs>
-bool is_non_terminal(tref n) {
-	return tree<node<BAs...>>::get(n).is_nt();
-}
+template <BAsPack... BAs>
+bool is_non_terminal(tref n);
 
-template <typename... BAs>
-bool is_terminal(tref n) {
-	return tree<node<BAs...>>::get(n).is_t();
-}
+template <BAsPack... BAs>
+bool is_terminal(tref n);
 
-template <typename... BAs>
-bool is_non_terminal(const size_t nt, tref n) {
-	return tree<node<BAs...>>::get(n).is(nt);
-}
+template <BAsPack... BAs>
+bool is_non_terminal(const size_t nt, tref n);
 
 template <size_t nt, typename... BAs>
-bool is_non_terminal(tref n) { return is_non_terminal<BAs...>(nt, n); }
+bool is_non_terminal(tref n);
 
 // factory method for is_non_terminal predicate
-template <typename... BAs>
-inline std::function<bool(tref)> is_non_terminal(size_t nt) {
-	return [nt](tref n) { return is_non_terminal<BAs...>(nt, n); };
-}
+template <BAsPack... BAs>
+inline std::function<bool(tref)> is_non_terminal(size_t nt);
 
 // -----------------------------------------------------------------------------
 // builders:
@@ -613,32 +662,33 @@ const std::string BLDR_WFF_ALWAYS = "( $X ) =:: always $X.";
 // definitions of bf builder rules
 const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
 
-
 // wff builder
-template <typename node>
+template <NodeType node>
 rewriter::builder tree<node>::bldr_wff_eq =
 				tree<node>::get_builder(BLDR_WFF_EQ);
-template <typename node>
+template <NodeType node>
 rewriter::builder tree<node>::bldr_bf_splitter =
 				tree<node>::get_builder(BLDR_BF_SPLITTER);
-template <typename node>
+template <NodeType node>
 rewriter::builder tree<node>::bldr_bf_not_less_equal =
 				tree<node>::get_builder(BLDR_BF_NOT_LESS_EQUAL);
-template <typename node>
+template <NodeType node>
 rewriter::builder tree<node>::bldr_bf_interval =
 				tree<node>::get_builder(BDLR_BF_INTERVAL);
-template <typename node>
+template <NodeType node>
 rewriter::builder tree<node>::bldr_bf_nleq_upper =
 				tree<node>::get_builder(BDLR_BF_NLEQ_UPPER);
-template <typename node>
+template <NodeType node>
 rewriter::builder tree<node>::bldr_bf_nleq_lower =
 				tree<node>::get_builder(BDLR_BF_NLEQ_LOWWER);
 
-
 } // namespace idni::tau_lang
 
-#include "tau_tree_node.tmpl.h"
 #include "tau_tree.tmpl.h"
+#include "tau_tree_node.tmpl.h"
+#include "tau_tree_printers.tmpl.h"
+#include "tau_tree_queries.tmpl.h"
 #include "tau_tree_builders.tmpl.h"
+#include "tau_tree_transform.tmpl.h"
 
 #endif // __IDNI__TAU__TAU_TREE_H__
