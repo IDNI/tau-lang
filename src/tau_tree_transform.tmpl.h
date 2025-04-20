@@ -59,7 +59,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 		// simple renaming transformations
 		// TODO (LOW) this should be supported directly by the parser
-		auto retype_nonterminal = [&nt, &parent_nt]() -> node::type {
+		auto retype_nonterminal = [&nt, &parent_nt]() -> type {
 			switch (nt) { // of intermediate nodes
 				// bf_and_nosep and bf_neg_oprnd
 				case bf_and_nosep_1st_oprnd:
@@ -76,7 +76,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 					break;
 				default: break;
 			}
-			return static_cast<node::type>(nt);
+			return static_cast<type>(nt);
 		};
 		// retype if needed
 		nt = retype_nonterminal();
@@ -86,8 +86,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 		size_t ba_type = 0;
 
 		bool unresolved_ref = !is_term && nt == ref;
-		if (unresolved_ref) ba_type = 1; // is_term = 0
-					// and ba_type = 1
+		if (unresolved_ref) ba_type = 1; // is_term = 0 and ba_type = 1
 
 		// helper to create a new node with current node type and provided children
 		auto getx = [&nt, &is_term, &ba_type](const auto& ch) -> tref {
@@ -165,7 +164,8 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 			default:
 				if (is_string_nt(nt)) {
-					x = getx_data(string_id(ptr.get_terminals()));
+					x = getx_data(
+                                                string_id(ptr.get_terminals()));
 					break;
 				}
 
@@ -175,7 +175,6 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 					DBG(assert(c != nullptr && m_ex(c));)
 					if (m_ref(c))ch.push_back(m_ref(c));
 				}
-
 				x = getx(ch);
 
 				// call binder on a transformed bf_constant node

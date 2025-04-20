@@ -13,18 +13,7 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <cassert>
-
-#include "doctest.h"
-
 #include "test_integration_helpers_depreciating.h"
-
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-
-namespace testing = doctest;
 
 bool normalize_and_test_for_value(const char* sample, tau_parser::nonterminal nt) {
 	auto sample_src = make_tau_source(sample);
