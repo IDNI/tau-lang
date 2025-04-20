@@ -13,18 +13,9 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <cassert>
-
 #include "boolean_algebras/tau_ba.h"
-#include "doctest.h"
 
 #include "test_integration_helpers_depreciating.h"
-
-using namespace std;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-namespace testing = doctest;
 
 TEST_SUITE("configuration") {
 

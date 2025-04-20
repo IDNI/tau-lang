@@ -2,23 +2,13 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <boost/log/core.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/utility/setup/console.hpp>
+#include "init_log.h"
 
-#include "doctest.h"
 #include "depreciating/solver_depreciating.h"
 
 #include "test_integration_helpers_depreciating.h"
 
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
 using namespace boost::log;
-
-namespace testing = doctest;
 
 auto splitter_one_bdd() {
 	static sbf_ba_factory<sbf_ba> factory;

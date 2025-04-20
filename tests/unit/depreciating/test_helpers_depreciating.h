@@ -8,13 +8,13 @@
 #include "depreciating/language_depreciating.h"
 #include "depreciating/boolean_algebras/nso_ba_depreciating.h"
 
-using namespace idni::tau_lang;
 using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 namespace testing = doctest;
 
 // TODO (LOW) most of this functions could be remove and replace by the standart API
 
+using Bool = idni::tau_lang::Bool;
 
 namespace idni::tau_lang_depreciating {
 

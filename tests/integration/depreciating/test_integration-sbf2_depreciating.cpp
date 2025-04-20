@@ -13,18 +13,7 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <cassert>
-
-#include "doctest.h"
-
 #include "test_integration_helpers_depreciating.h"
-
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-
-namespace testing = doctest;
 
 // TODO (LOW) simplify this test cases extracting common logic to the helpers file
 

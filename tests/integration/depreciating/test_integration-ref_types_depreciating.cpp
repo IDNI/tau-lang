@@ -4,17 +4,8 @@
 
 // #include "init_log.h"
 
-#include "doctest.h"
-
 #include "test_integration_helpers_depreciating.h"
 #include "../../unit/depreciating/test_helpers_depreciating.h"
-
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-
-namespace testing = doctest;
 
 bool test_ref_types(const char* rec_relation,
 	const std::string& expected_error = "", bool expect_fail = false)

@@ -2,19 +2,12 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
+#include "test_helpers_depreciating.h"
 #include "depreciating/nso_rr_depreciating.h"
 #include "boolean_algebras/bool_ba.h"
 #include "boolean_algebras/bdds/bdd_handle.h"
 #include "depreciating/normalizer_depreciating.h"
-#include "test_helpers_depreciating.h"
-
 #include "depreciating/debug_helpers_depreciating.h"
-
-using namespace idni::rewriter::depreciating;
-using namespace idni::tau_lang;
-
-namespace testing = doctest;
 
 // TODO (MEDIUM) split into test_builder-parsing and test_builder-execution
 

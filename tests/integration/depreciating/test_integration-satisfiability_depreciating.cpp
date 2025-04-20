@@ -2,7 +2,6 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
 #include "depreciating/boolean_algebras/sbf_ba_depreciating.h"
 #include "depreciating/satisfiability_depreciating.h"
 
@@ -10,13 +9,6 @@
 #include "test_integration_helpers_depreciating.h"
 
 #define base_bas tau_ba<sbf_ba>, sbf_ba
-
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-namespace testing = doctest;
-
 
 template<typename... BAs>
 tau_<BAs...> create_spec(const char* spec) {

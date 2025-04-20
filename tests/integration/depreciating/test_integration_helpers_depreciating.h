@@ -1,5 +1,9 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+#include <cassert>
+
+#include "doctest.h"
+
 #ifndef __TEST_INTEGRATION_HELPERS_SBF_H__
 #define __TEST_INTEGRATION_HELPERS_SBF_H__
 
@@ -13,8 +17,11 @@
 #include "depreciating/boolean_algebras/nso_ba_depreciating.h"
 #include "dict.h"
 
+using namespace std;
 using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
+
+namespace testing = doctest;
 
 namespace idni::tau_lang_depreciating {
 

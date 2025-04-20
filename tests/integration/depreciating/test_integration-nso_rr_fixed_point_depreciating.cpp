@@ -2,17 +2,8 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
-
 #include "test_integration_helpers_depreciating.h"
 #include "../../unit/depreciating/test_helpers_depreciating.h"
-
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-
-namespace testing = doctest;
 
 bool fp_test(const char* sample, const size_t& nt, bool expect_fail = false) {
 	auto sample_src = make_tau_source(sample);

@@ -8,7 +8,6 @@
 #include "boolean_algebras/bdds/babdd.h"
 
 using namespace std;
-using namespace idni::tau_lang;
 using namespace idni::tau_lang_depreciating;
 using namespace idni::rewriter::depreciating;
 

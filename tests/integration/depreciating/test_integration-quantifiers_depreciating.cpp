@@ -5,18 +5,9 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "doctest.h"
-
 #include "test_integration_helpers_depreciating.h"
 #include "../../unit/depreciating/test_helpers_depreciating.h"
 
-using namespace std;
-using namespace idni::tau_lang;
-using namespace idni::tau_lang_depreciating;
-using namespace idni::rewriter::depreciating;
-
-
-namespace testing = doctest;
 
 using test_case = array<string, 3>;
 using test_cases = vector<test_case>;
