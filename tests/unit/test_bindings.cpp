@@ -7,19 +7,36 @@
 using tau = tree<node<Bool>>;
 using tt = tau::traverser;
 
+struct bool_binder_fixture {
+	bacb binder;
+};
+
+struct named_bool_binder_fixture {
+	bacb binder;
+	named_bool_binder_fixture() : binder({
+		{ "true_binding",  bac::get(Bool(true),  "bool") },
+		{ "false_binding", bac::get(Bool(false), "bool") } }) {}
+};
+
 TEST_SUITE("named bindings") {
 
-	TEST_CASE_FIXTURE(named_binder_fixture, "binding: given one statement with no bindigns, the binding process returns the same statement.") {
+	TEST_CASE_FIXTURE(named_bool_binder_fixture,
+		"binding: given one statement with no bindigns, the binding "
+		"process returns the same statement.")
+	{
 		const char* sample = "$X := $X.";
 		tref t1 = tau::get(sample, { .start = tau_parser::library });
-		tref t2 = tau::get<bool_binder>(binder, sample, {
+		tref t2 = tau::get<bacb>(binder, sample, {
 						.start = tau_parser::library });
 		CHECK( t1 == t2 );
 	}
 
-	TEST_CASE_FIXTURE(named_binder_fixture, "binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
-		const char* sample = "{ binding } := { binding }.";
-		tref bound = tau::get<bool_binder>(binder, sample, {
+	TEST_CASE_FIXTURE(named_bool_binder_fixture,
+		"binding: given one statement with one binding, the binding "
+		"process returns the statement with the binding replaced.")
+	{
+		const char* sample = "{ true_binding } := { true_binding }.";
+		tref bound = tau::get<bacb>(binder, sample, {
 						.start = tau_parser::library });
 		// if (bound) tau::get(bound).dump(std::cout);
 		// if (bound) tau::get(bound).print_tree(std::cout << "result: ") << "\n";
@@ -31,9 +48,9 @@ TEST_SUITE("named bindings") {
 		CHECK(c1 == c2);
 	}
 
-	TEST_CASE_FIXTURE(named_binder_fixture, "binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
+	TEST_CASE_FIXTURE(named_bool_binder_fixture, "binding: given one statement with one non-matching binding, the binding process returns the original statement.") {
 		const char* sample = "{ nonmatching } := { nonmatching }.";
-		tref bound = tau::get<bool_binder>(binder, sample, {
+		tref bound = tau::get<bacb>(binder, sample, {
 						.start = tau_parser::library });
 		CHECK( bound == nullptr );
 	}
@@ -48,7 +65,7 @@ TEST_SUITE("factory bindings") {
 	}
 
 	TEST_CASE("binding: given one statement with one binding, the binding process returns the statement with the binding replaced.") {
-		const char* sample = "$X := { some_source_code } : bool.";
+		const char* sample = "$X := { true } : bool.";
 		tref t = tau::get(sample, { .start = tau_parser::library });
 		CHECK( tau::get(t).is(tau::library) );
 	}

@@ -8,6 +8,7 @@ set(TESTS
 	variant_ba
 
 	# new tree
+	ba_constants
 	bindings
 	builders
 	normal_forms

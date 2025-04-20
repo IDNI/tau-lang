@@ -5,16 +5,16 @@
 
 namespace idni::tau_lang {
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tau_ba<BAs...>::tau_ba(rewriter::rules& rec_relations, htree::sp main)
 		: nso_rr({ rec_relations, main }) {}
-template <typename... BAs>
+template <BAsPack... BAs>
 tau_ba<BAs...>::tau_ba(htree::sp main) : nso_rr({main}) {}
 
-template <typename... BAs>
+template <BAsPack... BAs>
 auto tau_ba<BAs...>::operator<=>(const tau_ba<BAs...>&) const = default;
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	// TODO (HIGH) replace by ...tau... in the future
 	tref nmain = tau::build_wff_neg(
@@ -23,7 +23,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator~() const {
 	return tau_ba_t(nrec_relations, nmain);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
 	tref nmain = tau::build_wff_and(
@@ -33,7 +33,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba_t& other) const {
 	return tau_ba_t(nrec_relations, nmain);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
 	tref nmain = tau::build_wff_or(
@@ -44,7 +44,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba_t& other) const {
 	return tau_ba_t(nrec_relations, nmain);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba_t& other) const {
 	// TODO (HIGH) replace by ...tau... in the future
 	tref nmain = tau::build_wff_xor_from_def(
@@ -55,24 +55,24 @@ tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba_t& other) const {
 	return tau_ba_t(nrec_relations, nmain);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba_t& other) const {
 	return *this + other;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool tau_ba<BAs...>::is_zero() const {
 	auto normalized = normalizer<tau_ba_t, BAs...>(nso_rr);
 	return !is_tau_formula_sat(normalized);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool tau_ba<BAs...>::is_one() const {
 	auto normalized = normalizer<tau_ba_t, BAs...>(nso_rr);
 	return is_tau_impl( tau::_T, normalized);
 }
 
-// template <typename... BAs>
+// template <BAsPack... BAs>
 // tau_<tau_ba<BAs...>, BAs...> tau_ba<BAs...>::rename(
 // 	const tau_<tau_ba_t, BAs...>& form) const
 // {
@@ -80,7 +80,7 @@ bool tau_ba<BAs...>::is_one() const {
 // 	return form;
 // }
 
-// template <typename... BAs>
+// template <BAsPack... BAs>
 // rewriter::depreciating::rule<rr<tau_nso<BAs...>>> tau_ba<BAs...>::rename(
 // 	const rewriter::depreciating::rule<tau_nso_t>& rule) const
 // {
@@ -88,7 +88,7 @@ bool tau_ba<BAs...>::is_one() const {
 // 	return rule;
 // }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 rewriter::rules tau_ba<BAs...>::merge(
 	const rewriter::rules& rs1, const rewriter::rules& rs2) const
 {
@@ -99,57 +99,57 @@ rewriter::rules tau_ba<BAs...>::merge(
 	return nrs;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool operator==(const tau_ba<BAs...>& other, const bool& b) {
 	return b ? other.is_one() : other.is_zero();
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool operator==(const bool& b, const tau_ba<BAs...>& other) {
 	return other == b;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool operator!=(const tau_ba<BAs...>& other, const bool& b) {
 	return !(other == b);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 	return !(other == b);
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 auto normalize(const tau_ba<BAs...>& fm) {
 	auto res = apply_rr_to_formula<tau_ba<BAs...>, BAs...>(fm.nso_rr);
 	res = simp_tau_unsat_valid(res);
 	return tau_ba<BAs...>(res);
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 bool is_syntactic_one(const tau_ba<BAs...>& fm) {
 	using tau = tree<node<BAs...>>;
 	return tau::get(fm.nso_rr.main) == tau::_T;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
 	using tau = tree<node<BAs...>>;
 	return tau::get(fm.nso_rr.main) == tau::_F;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 auto splitter(const tau_ba<BAs...>& fm, splitter_type st) {
 	auto s = tau_splitter(normalizer(fm.nso_rr), st);
 	return tau_ba<BAs...>(s);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 auto tau_splitter_one() {
 	return tau_bad_splitter<BAs...>();
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool is_closed(const tau_ba<BAs...>& fm) {
 	using tau = tree<node<BAs...>>;
 	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
@@ -166,7 +166,7 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	return true;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::optional<std::variant<tau_ba<BAs...>, BAs...>>
 	tau_ba_factory<BAs...>::parse(const std::string& src)
 {
@@ -183,14 +183,15 @@ std::optional<std::variant<tau_ba<BAs...>, BAs...>>
 				nso_rr.value().main)) };
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref tau_ba_factory<BAs...>::binding(const std::string& source) {
 	if (auto p = parse(source); p)
-		return ba_constants<tau_ba_t, BAs...>::get(p.value(), "tau");
+		return ba_constants_binder<tau_ba_t, BAs...>::instance()
+							.bind(p.value(), "tau");
 	return nullptr;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::variant<tau_ba<BAs...>, BAs...> tau_ba_factory<BAs...>::splitter_one()
 	const
 {
@@ -199,32 +200,32 @@ std::variant<tau_ba<BAs...>, BAs...> tau_ba_factory<BAs...>::splitter_one()
 						tau_splitter_one<BAs...>())));
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::string tau_ba_factory<BAs...>::one(std::string&) const {
 	return "T";
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::string tau_ba_factory<BAs...>::zero(std::string&) const {
 	return "F";
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tau_ba_factory<BAs...>& tau_ba_factory<BAs...>::instance() {
 	static tau_ba_factory<BAs...> factory;
 	return factory;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs) {
-	return os << rs.nso_rr;
+	return print<BAs...>(os, rs.nso_rr);
 }
 
 } // namespace idni::tau_lang
 
-// template <typename... BAs>
+// template <idni::tau_lang::BAsPack... BAs>
 // size_t std::hash<idni::tau_lang::tau_ba<BAs...>>::operator()(
 // 	const idni::tau_lang::tau_ba<BAs...>& f) const noexcept
 // {
-// 	return hash<idni::tau_lang::nso_rr>{}(f.nso_rr);
+// 	return hash<idni::tau_lang::rr>{}(f.nso_rr);
 // }

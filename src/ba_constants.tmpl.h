@@ -5,118 +5,181 @@
 
 namespace idni::tau_lang {
 
-template <typename... BAs>
-size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
-	// TODO optimize
-	if (auto it = std::find(C.begin(), C.end(), b); it != C.end())
-		return it - C.begin();
-	C.push_back(b);
-	return C.size() - 1;
-}
-
-template <typename... BAs>
-tref ba_constants<BAs...>::get(const std::variant<BAs...>& b,
+template <BAsPack... BAs>
+std::pair<size_t, size_t> ba_constants<BAs...>::get(const std::variant<BAs...>& b,
 	const std::string& type_name)
 {
-	return tree<node<BAs...>>::get_ba_constant(get(b),
-						type_id(string_id(type_name)));
+	// DBG(std::cout << "BAC get: " << b << " " << type_name << std::endl;)
+	size_t constant_id = get(b);
+	size_t tid = type_id(string_id(type_name));
+	return *(type_map.emplace(constant_id, tid).first);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::variant<BAs...> ba_constants<BAs...>::get(size_t constant_id) {
+	// std::cout << "BAC get: " << constant_id << " " << C.size() << std::endl;
+	DBG(assert(constant_id > 0);)
+	DBG(assert(constant_id < C.size());)
 	return C[constant_id];
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 template <typename BA>
+requires OneOfBAs<BA, BAs...>
 BA ba_constants<BAs...>::get(size_t constant_id) {
+	DBG(assert(constant_id > 0);)
+	DBG(assert(constant_id < C.size());)
 	DBG(assert((is<BA>(constant_id)));)
 	return std::get<BA>(C[constant_id]);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 template <typename BA>
+requires OneOfBAs<BA, BAs...>
 BA ba_constants<BAs...>::get(tref t) {
-	return get<BA>(tau::get(t).get_ba_constant_id());
+	DBG(assert(t != nullptr);)
+	return get<BA>(tree<node<BAs...>>::get(t).get_ba_constant_id());
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 template <typename BA>
-bool ba_constants<BAs...>::is(tref t) {
-	return is<BA>(tau::get(t).get_ba_constant_id());
-}
-
-template <typename... BAs>
-template <typename BA>
+requires OneOfBAs<BA, BAs...>
 bool ba_constants<BAs...>::is(size_t constant_id) {
+	DBG(assert(constant_id > 0);)
+	DBG(assert(constant_id < C.size());)
 	return std::holds_alternative<BA>(C[constant_id]);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 size_t ba_constants<BAs...>::type_id(size_t type_sid) {
-	if (auto it = types_map.find(type_sid); it != types_map.end())
-		return it->second;
-	return types_map.emplace(type_sid, types.size()),
+	if (auto it = type_names_map.find(type_sid);
+		it != type_names_map.end()) return it->second;
+	return type_names_map.emplace(type_sid, types.size()),
 		types.push_back(type_sid), types.size() - 1;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 size_t ba_constants<BAs...>::type_id(const std::string& type_name) {
-	if (types_map.size() == 0) {
-		types.push_back(string_id("untyped"));
-		types_map.emplace(types.back(), 0);
-	}
+	// TODO properly initialize types with "untyped" as first element
+	if (types.empty()) types.push_back(string_id("untyped")),
+			type_names_map.emplace(types.back(), 0);
 	return type_id(string_id(type_name));
 }
 
-template <typename... BAs>
-const ba_constants<BAs...>::std::string& type_name(size_t tid) {
-	if (tid >= ba_constants<BAs...>::types.size()) tid = 0;
-	return string_from_id(ba_constants<BAs...>::types[tid]);
+template <BAsPack... BAs>
+const std::string& ba_constants<BAs...>::type_name(size_t tid) {
+	if (tid >= types.size()) tid = 0;
+	return string_from_id(types[tid]);
 }
 
-template <typename... BAs>
-ba_constants<BAs...>& ba_constants<BAs...>::instance() {
-	static ba_constants<BAs...> binder;
-	return binder;
+template <BAsPack... BAs>
+size_t ba_constants<BAs...>::type_of(size_t constant_id) {
+	DBG(assert(constant_id > 0);)
+	DBG(assert(constant_id < C.size());)
+	return type_map.at(constant_id);
 }
 
-template <typename... BAs>
-ba_constants<BAs...>::ba_constants() {
+template <BAsPack... BAs>
+std::ostream& ba_constants<BAs...>::print(std::ostream& os, size_t constant_id) {
+	return print_type(
+		print_constant(os, constant_id) << " : ", type_of(constant_id));
+}
+
+// print the constant value to the stream
+template <BAsPack... BAs>
+std::ostream& ba_constants<BAs...>::print_constant(std::ostream& os, size_t constant_id) {
+	std::variant<BAs...> v = get(constant_id);
+	return os << "{ " << v << " }";
+}
+
+template <BAsPack... BAs>
+std::ostream& ba_constants<BAs...>::print_type(std::ostream& os, size_t type_id) {
+	return os << type_name(type_id);
+}
+
+
+// -----------------------------------------------------------------------------
+// internal insertion of a constant into the pool
+template <BAsPack... BAs>
+size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
+	// TODO better initialization of C
+	// currently reserves 0 position for null by just copying first inserted element
+	if (C.empty()) C.push_back(b);
+	// TODO optimize
+	if (auto it = std::find(C.begin() + 1, C.end(), b); it != C.end())
+		return it - C.begin();
+	C.push_back(b);
+	// DBG(std::cout << "BAC got: " << b << " with constant_id: " << C.size() - 1 << std::endl;)
+	return C.size() - 1;
+}
+
+// -----------------------------------------------------------------------------
+// binder
+
+template <BAsPack... BAs>
+ba_constants_binder<BAs...>::ba_constants_binder() {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
 }
 
-template <typename... BAs>
-ba_constants<BAs...>::ba_constants(
-	const named_constants_map& named_constants)
+template <BAsPack... BAs>
+ba_constants_binder<BAs...>::ba_constants_binder(
+	const std::map<std::string, std::pair<size_t, size_t>>& named_constants)
 	: named_constants(named_constants)
 {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
 }
 
-template <typename... BAs>
-tref ba_constants<BAs...>::bind(const std::string& src,
+// binds the constant to a tree from BA constant variant and type name string
+template <BAsPack... BAs>
+tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 	const std::string& type_name)
 {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
-	error = false;
-	if (auto it = named_constants.find(src);
-		it != named_constants.end()) return it->second;
-	static const std::string untyped = "untyped";
-	auto nn = nso_factory<BAs...>::instance().binding(src,
-				type_name.empty() ? untyped : type_name);
-	if (!nn) return error = true, nullptr;
-	return nn;
+	// BOOST_LOG_TRIVIAL(debug) << "ba_constants_binder::bind: " << constant << " " << type_name;
+	return tree<node<BAs...>>::get_ba_constant(
+				ba_constants<BAs...>::get(constant, type_name));
 }
 
-template <typename... BAs>
-tref ba_constants<BAs...>::operator()(const std::string& src,
+template <BAsPack... BAs>
+tref ba_constants_binder<BAs...>::operator()(const std::string& src,
 	const std::string& type_name)
 {
-	return bind(src, type_name);
+	// named binding
+	if (auto it = named_constants.find(src);
+		it != named_constants.end())
+	{
+		auto n = tree<node<BAs...>>::get_ba_constant(it->second);
+		BOOST_LOG_TRIVIAL(debug)
+			<< "ba_constants_binder::operator() named binding: `"
+			<< src << "` cid: " << it->second.first << " tid: "
+			<< it->second.second << " constant: "
+			<< tree<node<BAs...>>::get(n);
+		return n;
+	}
+
+	// factory binding
+	static const std::string untyped = "untyped";
+	error = false;
+	auto n = nso_factory<BAs...>::instance().binding(src,
+				type_name.empty() ? untyped : type_name);
+	if (!n) return error = true, nullptr;
+	const auto& t = tree<node<BAs...>>::get(n);
+	size_t cid = t.get_ba_constant_id();
+	size_t tid = ba_constants<BAs...>::type_of(cid);
+	BOOST_LOG_TRIVIAL(debug)
+		<< "ba_constants_binder::operator() factory binding: `"
+		<< src << "` cid: " << cid << " tid: " << tid
+		<< " constant: " << t;
+	return n;
+}
+
+template <BAsPack... BAs>
+ba_constants_binder<BAs...>& ba_constants_binder<BAs...>::instance() {
+	static ba_constants_binder<BAs...> binder;
+	return binder;
 }
 
 } // idni::tau_lang namespace

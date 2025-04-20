@@ -54,7 +54,7 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 		}
 	}
 }
-template <typename...BAs>
+template <BAsPack... BAs>
 std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	const std::string& src)
 {
@@ -74,25 +74,26 @@ std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	return cache.emplace(src, std::variant<BAs...>{ v }).first->second;
 }
 
-template <typename...BAs>
+template <BAsPack... BAs>
 tref sbf_ba_factory<BAs...>::binding(const std::string& source) {
-	// std::cout << "sbf_ba_factory::binding source: `" << source << "`\n";
+	// std::cout << "sbf_ba_factory::binding `" << source << "`\n";
 	if (auto p = parse(source); p)
-		return ba_constants<BAs...>::get(p.value(), "sbf");
+		return ba_constants_binder<BAs...>::instance()
+							.bind(p.value(), "sbf");
 	return nullptr;
 }
 
-template <typename...BAs>
+template <BAsPack... BAs>
 std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
 	return std::variant<BAs...>(bdd_splitter_one<Bool>());
 }
 
-template <typename...BAs>
+template <BAsPack... BAs>
 std::string sbf_ba_factory<BAs...>::zero() const {
 	return "0";
 }
 
-template <typename...BAs>
+template <BAsPack... BAs>
 sbf_ba_factory<BAs...>& sbf_ba_factory<BAs...>::instance() {
 	static sbf_ba_factory<BAs...> factory;
 	return factory;
@@ -115,7 +116,8 @@ std::vector<std::string> nso_factory<sbf_ba>::types() const {
 }
 
 tref nso_factory<sbf_ba>::splitter_one() const {
-	return ba_constants<sbf_ba>::get(bf.splitter_one(), "sbf");
+	return ba_constants_binder<sbf_ba>::instance()
+						.bind(bf.splitter_one(), "sbf");
 }
 
 std::string nso_factory<sbf_ba>::default_type() const {
@@ -189,10 +191,11 @@ tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::unpack_tau_ba(
 tref nso_factory<tau_ba<sbf_ba>, sbf_ba>::splitter_one(
 	const std::string type_name) const
 {
-	if (type_name=="sbf") return ba_constants<tau_ba<sbf_ba>, sbf_ba>::get(
-						bf().splitter_one(), "sbf");
-	else return ba_constants<tau_ba<sbf_ba>, sbf_ba>::get(
-						tf().splitter_one(), "tau");
+	if (type_name=="sbf")
+		return ba_constants_binder<tau_ba<sbf_ba>, sbf_ba>::instance()
+					.bind(bf().splitter_one(), "sbf");
+	else return ba_constants_binder<tau_ba<sbf_ba>, sbf_ba>::instance()
+					.bind(tf().splitter_one(), "tau");
 }
 
 nso_factory<tau_ba<sbf_ba>, sbf_ba>&
