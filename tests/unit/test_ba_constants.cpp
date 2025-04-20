@@ -20,6 +20,7 @@ struct sbf_ba_Bool_constants_fixture {
 				opt.has_value())
 			return std::get<BA>(opt.value());
 		assert(false);
+		return BA();
 	}
 	sbf_ba_Bool_constants_fixture() {
 		bdd_init<Bool>();
