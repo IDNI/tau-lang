@@ -80,14 +80,14 @@ RULE(WFF_UNSQUEEZE_NEGATIVES_0, "$X | $Y != 0 ::= $X != 0 || $Y != 0.")
 RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 RULE(WFF_SQUEEZE_NEGATIVES_0, "$X != 0 || $Y != 0 ::= $X | $Y != 0.")
 
-template<typename... BAs>
+template <BAsPack... BAs>
 static auto push_neg_for_snf = tree<node<BAs...>>::get_library(
 	WFF_PUSH_NEGATION_UPWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_0
 	+ WFF_PUSH_NEGATION_INWARDS_1
 );
 
-template<typename... BAs>
+template <BAsPack... BAs>
 static auto elim_eqs = tree<node<BAs...>>::get_library(
 	BF_EQ_AND_SIMPLIFY_0
 	+ BF_EQ_AND_SIMPLIFY_1

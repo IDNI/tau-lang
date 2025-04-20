@@ -13,7 +13,7 @@ enum class split_sym {
 
 // Return a bad splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
-template<typename... BAs>
+template <BAsPack... BAs>
 tref tau_bad_splitter(tref fm = tree<node<BAs...>>::_T().get()) {
 	using tau = tree<node<BAs...>>;
 	auto new_uniter_const = tau::build_wff_neq(

@@ -16,19 +16,19 @@ namespace idni::tau_lang {
 
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref normalizer(const rr& fm) {
 	return fm.main->get(); // TODO (HIGH)
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref normalizer(tref fm) {
 	return fm; // TODO (HIGH)
 }
 
 // Given a tree produce a number i such that the uninterpreted constant const_i is
 // not present
-template<typename... BAs>
+template <BAsPack... BAs>
 tref get_new_uniter_const(tref fm, const std::string& name) {
 	using tau = tree<node<BAs...>>;
 	auto uniter_consts = rewriter::select_top<node<BAs...>>(fm,

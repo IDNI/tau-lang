@@ -17,7 +17,7 @@ namespace idni::tau_lang {
  * - interface" for creating custom BA types by adding nso_factory<YourBA>
  *   template specialization.
  */
-template <typename... BAs>
+template <BAsPack... BAs>
 struct nso_factory {
 
 	/**

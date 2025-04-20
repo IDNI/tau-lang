@@ -10,12 +10,12 @@ namespace idni::tau_lang {
 #define TC_PROMPT        TC(color::WHITE, color::BRIGHT)
 #define TC_OUTPUT        TC.GREEN()
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::not_implemented_yet() {
 	std::cout << "Not implemented yet.\n";
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 std::optional<size_t> repl_evaluator<BAs...>::get_memory_index(const tt& n,
 	const size_t size, bool silent) const
 {
@@ -42,7 +42,7 @@ std::optional<size_t> repl_evaluator<BAs...>::get_memory_index(const tt& n,
 	return { is_relative ? size - idx - 1 : idx - 1 };
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 repl_evaluator<BAs...>::memory_ref repl_evaluator<BAs...>::memory_retrieve(
 	const tt& n, bool silent)
 {
@@ -52,7 +52,7 @@ repl_evaluator<BAs...>::memory_ref repl_evaluator<BAs...>::memory_retrieve(
 	return {};
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::print_memory(const htree::sp& mem, const size_t id,
 	const size_t size, bool print_relative_index) const
 {
@@ -67,7 +67,7 @@ void repl_evaluator<BAs...>::print_memory(const htree::sp& mem, const size_t id,
 	tau::get(mem).print(std::cout) << "\n";
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 	const size_t nt, const tt& program)
 {
@@ -76,7 +76,7 @@ tref repl_evaluator<BAs...>::apply_rr_to_rr_tau_nso(
 	return 0;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::history_print_cmd(const tt& command) {
 	auto n = command | tau_parser::memory;
 	if (!n) return;
@@ -84,14 +84,14 @@ void repl_evaluator<BAs...>::history_print_cmd(const tt& command) {
 	if (idx) print_memory(m[idx.value()], idx.value(), m.size());
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::history_list_cmd() {
 	if (m.size() == 0) std::cout << "history is empty\n";
 	else for (size_t i = 0; i < m.size(); i++)
 		print_memory(m[i], i, m.size());
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::memory_store(tref o) {
 	auto v = tau::geth(o);
 	// do not add into memory if the last memory value is the same
@@ -101,12 +101,12 @@ void repl_evaluator<BAs...>::memory_store(tref o) {
 		print_memory(m.back(), m.size() - 1, m.size(), false);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::history_store_cmd(const tt& command) {
 	memory_store(command | tt::first | tt::ref);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_(tau::node::type nt,
 	const tt& n, bool suppress_error)
 {
@@ -125,18 +125,18 @@ repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_(tau::node::type nt,
 	return {};
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_bf(const tt& n,
 	bool suppress_error)
 {
 	return get_(tau::bf, n, suppress_error);
 }
-template <typename... BAs>
+template <BAsPack... BAs>
 repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_wff(const tt& n) {
 	return get_(tau::wff, n, false);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool repl_evaluator<BAs...>::contains(const tt& n, node::type nt)
 {
 	bool found = false;
@@ -147,7 +147,7 @@ bool repl_evaluator<BAs...>::contains(const tt& n, node::type nt)
 	return found;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::optional<std::pair<size_t, tref>>
 	repl_evaluator<BAs...>::get_type_and_arg(const tt& n)
 {
@@ -163,13 +163,13 @@ std::optional<std::pair<size_t, tref>>
 	}
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::onf_cmd(const tt& /*n*/) {
 	return 0;
 }
 
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::dnf_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
@@ -177,7 +177,7 @@ tref repl_evaluator<BAs...>::dnf_cmd(const tt& /*n*/) {
 }
 
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::cnf_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
@@ -185,7 +185,7 @@ tref repl_evaluator<BAs...>::cnf_cmd(const tt& /*n*/) {
 }
 
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::nnf_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
@@ -193,7 +193,7 @@ tref repl_evaluator<BAs...>::nnf_cmd(const tt& /*n*/) {
 }
 
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::mnf_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
@@ -201,7 +201,7 @@ tref repl_evaluator<BAs...>::mnf_cmd(const tt& /*n*/) {
 }
 
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::snf_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
@@ -209,21 +209,21 @@ tref repl_evaluator<BAs...>::snf_cmd(const tt& /*n*/) {
 }
 
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::bf_substitute_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 	return 0;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::substitute_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 	return 0;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::instantiate_cmd(const tt& n) {
 	auto var_type = n[2].is(tau::variable) ? tau::bf : tau::wff;
 	auto nn = tau::get(n.value_tree().value, { n[0].get(), n[1].get(),
@@ -231,39 +231,39 @@ tref repl_evaluator<BAs...>::instantiate_cmd(const tt& n) {
 	return substitute_cmd(nn);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::normalize_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 	return 0;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::qelim_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 	return 0;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::run_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::lgrs_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::is_valid_cmd(const tt& /*n*/)
 {
 	// TODO
@@ -271,34 +271,34 @@ tref repl_evaluator<BAs...>::is_valid_cmd(const tt& /*n*/)
 	return 0;
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::sat_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 	return 0;
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::is_unsatisfiable_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 	return 0;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::def_rr_cmd(const tt& /*n*/) {
 	// TODO
 	not_implemented_yet();
 }
 
-template <typename node>
+template <NodeType node>
 std::ostream& print_rule(std::ostream& os, const rewriter::rule& r) {
-	tree<node>::get(r.first).print(os) << " -> ";
-	tree<node>::get(r.second).print(os);
+	tree<node>::get(r.first).print(os) << " := ";
+	tree<node>::get(r.second).print(os) << ".";
 	return os;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::def_list_cmd() {
 	if (definitions.size() == 0) std::cout << "definitions: empty\n";
 	else std::cout << "definitions:\n";
@@ -322,7 +322,7 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	}
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	if (definitions.size() == 0) std::cout << "rec. relations: empty\n";
 	auto num = command | tau_parser::number;
@@ -337,7 +337,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	return;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 	std::string fn;
 	auto type_name = command | tau::type | tt::string;
@@ -361,7 +361,7 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
 	std::string fn;
 	std::string type_name = command | tau::type | tt::string;
@@ -386,7 +386,7 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
 }
 
 // make a nso_rr from the given tau source and binder.
-template <typename... BAs>
+template <BAsPack... BAs>
 tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 	// remove ascii char 22 if exists in the input
 	std::string filt = src;
@@ -432,14 +432,14 @@ inline repl_option get_opt(const std::string& x) {
 	return invalid_opt;
 }
 
-template <typename node>
+template <NodeType node>
 repl_option get_opt(const typename tree<node>::traverser& n) {
 	auto o = n | tau_parser::option_name;
 	if (!o) return none_opt;
 	return get_opt(o | tree<node>::traverser::string);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::optional<boost::log::trivial::severity_level>
 	str2severity(const std::string& v)
 {
@@ -452,12 +452,12 @@ std::optional<boost::log::trivial::severity_level>
 	return {};
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::get_cmd(const tt& n) {
 	return get_cmd(get_opt<node>(n));
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	static std::string pbool[] = { "off", "on" };
 	static std::map<repl_option, std::function<void()>> printers = {
@@ -489,7 +489,7 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	printers[o]();
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::set_cmd(const tt& n) {
 	repl_option o = get_opt<node>(n);
 	auto ov = n | tau::option_value;
@@ -498,7 +498,7 @@ void repl_evaluator<BAs...>::set_cmd(const tt& n) {
 	get_cmd(n);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	using namespace boost::log;
 	if (o == invalid_opt || o == none_opt) return;
@@ -542,7 +542,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	setters[o]();
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 	const std::function<bool(bool&)>& update_fn)
 {
@@ -551,7 +551,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(const tt& n,
 	get_cmd(n);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	const std::function<bool(bool&)>& update_fn)
 {
@@ -578,7 +578,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	}
 }
 
-template<typename... BAs>
+template <BAsPack... BAs>
 bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	std::set<std::string> guards{
 		(opt.charvar = value) ? "charvar" : "var" };
@@ -587,7 +587,7 @@ bool repl_evaluator<BAs...>::update_charvar(bool value) {
 	return value;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	auto command = n | tt::only_child;
 	auto command_type = command | tt::nt;
@@ -658,7 +658,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	return 0;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 {
 	TC.set(opt.colors);
@@ -670,7 +670,7 @@ repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 		"enabled: new tree API (almost nothing works yet) !!!\n\n";
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 std::string repl_evaluator<BAs...>::prompt() {
 	using namespace boost::log;
 	using namespace idni::term;
@@ -689,7 +689,7 @@ std::string repl_evaluator<BAs...>::prompt() {
 	return ss.str();
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 int repl_evaluator<BAs...>::eval(const std::string& src) {
 	error = false;
 	auto tau_spec = tt(make_cli(src));
@@ -705,19 +705,19 @@ int repl_evaluator<BAs...>::eval(const std::string& src) {
 	return quit;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::version_cmd() {
 	std::cout << full_version << "\n";
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::help_cmd(const tt& n) const {
 	auto arg = n | tau::help_arg | tt::only_child;
 	size_t nt = arg ? (arg | tt::nt) : tau::help_sym;
 	help(nt);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 void repl_evaluator<BAs...>::help(size_t nt) const {
 	static const std::string bool_options =
 		"  <option>               <description>                        <value>\n"

@@ -4,7 +4,7 @@
 
 namespace idni::tau_lang {
 
-template <typename... BAs>
+template <BAsPack... BAs>
 const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
@@ -50,7 +50,7 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	DBG(throw std::logic_error("nso_ba and: wrong types");)
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
@@ -87,7 +87,7 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	DBG(throw std::logic_error("nso_ba or: wrong types");)
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 	using tt = tau::traverser;
@@ -118,7 +118,7 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	DBG(throw std::logic_error("nso_ba neg: wrong types");)
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
@@ -160,14 +160,14 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	DBG(throw std::logic_error("nso_ba xor: wrong types");)
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
 	return lt ^ rt;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool is_zero(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 	using tt = tau::traverser;
@@ -191,7 +191,7 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	DBG(throw std::logic_error("nso_ba is_zero: wrong types");)
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool is_one(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 	using tt = tau::traverser;
@@ -216,13 +216,13 @@ bool is_one(const tree<node<BAs...>>& lt) {
 }
 
 // We overload the == operator for tau in order to account for typed constants
-template <typename... BAs>
+template <BAsPack... BAs>
 bool operator==(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return lt == rt;
 }
 
 // Also define != again in terms of ==
-template <typename... BAs>
+template <BAsPack... BAs>
 bool operator!=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return !(lt == rt);
 }
@@ -230,7 +230,7 @@ bool operator!=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 // We overload spaceship operator in order to have deterministic operators across
 // program runs
 // In this comparison typed and non-typed Tau constants are considered different
-template<typename... BAs>
+template <BAsPack... BAs>
 std::weak_ordering operator<=>(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
@@ -238,35 +238,35 @@ std::weak_ordering operator<=>(const tree<node<BAs...>>& lt,
 }
 
 // We list all ordering operators explicitly
-template<typename... BAs>
+template <BAsPack... BAs>
 bool operator<(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return (lt <=> rt) < 0;
 }
-template<typename... BAs>
+template <BAsPack... BAs>
 bool operator<=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return (lt <=> rt) <= 0;
 }
-template<typename... BAs>
+template <BAsPack... BAs>
 bool operator>(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return (lt <=> rt) > 0;
 }
-template<typename... BAs>
+template <BAsPack... BAs>
 bool operator>=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return (lt <=> rt) >= 0;
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool operator==(const tree<node<BAs...>>& lt, const bool& rt) {
 	return rt ? is_one(lt) : is_zero(lt);
 }
 
-template <typename... BAs>
+template <BAsPack... BAs>
 bool operator==(const bool lt, const tree<node<BAs...>>& rt) {
 	return rt == lt;
 }
 
 // Splitter function for a nso tau_parser::bf_constant node holding a BA constant
-template <typename... BAs>
+template <BAsPack... BAs>
 const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
 	splitter_type st)
 {

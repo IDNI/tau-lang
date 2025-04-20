@@ -40,7 +40,7 @@
 #ifndef __IDNI__TAU__REPL_EVALUATOR_H__
 #define __IDNI__TAU__REPL_EVALUATOR_H__
 
-#include "tau_tree.h"
+#include "boolean_algebras/tau_ba.h"
 #include "utility/repl.h"
 
 namespace idni::tau_lang {
@@ -48,14 +48,14 @@ namespace idni::tau_lang {
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	colors_opt, charvar_opt, highlighting_opt, indenting_opt, debug_opt };
 
-template <typename... BAs>
+template <BAsPack... BAs>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<BAs...>>;
 	using memory = htree::sp;
 	using memories = std::vector<memory>;
 	using memory_ref = std::optional<std::pair<memory, size_t>>;
 
-	using node = idni::tau_lang::node<BAs...>;
+	using node = idni::tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
