@@ -30,9 +30,10 @@ tref normalizer(tref fm) {
 // not present
 template <BAsPack... BAs>
 tref get_new_uniter_const(tref fm, const std::string& name) {
-	using tau = tree<node<BAs...>>;
-	auto uniter_consts = rewriter::select_top<node<BAs...>>(fm,
-		is_non_terminal<tau_parser::uninterpreted_constant, BAs...>);
+	using node = node<BAs...>;
+	using tau = tree<node>;
+	auto uniter_consts = rewriter::select_top<node>(fm,
+		is_non_terminal<tau::uninterpreted_constant, node>);
 	std::set ids{ 0 };
 	for (auto uniter_const : uniter_consts) {
 		if (const std::string& s = tau::get(uniter_const).get_string();
