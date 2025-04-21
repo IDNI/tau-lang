@@ -8,13 +8,20 @@ namespace idni::tau_lang {
 // various extractors
 
 template <NodeType node>
+std::string tree<node>::get_type_name(tref n) {
+	auto t = tt(n) | tau::type;
+	if (t) return t | tt::string;
+	return "untyped";
+}
+
+template <NodeType node>
 rr_sig tree<node>::get_rr_sig(tref n) {
 	auto r = tt(n); // traverse to ref if n is bf_ref or wff_ref
 	if (auto r_as_child = r | ref; r_as_child) r = r_as_child;
 	return { rr_dict(r | tau_parser::sym | tt::string),
 		(r | offsets || offset).size(),
 		(r | ref_args || ref_arg).size() };
-};
+}
 
 template <NodeType node>
 rewriter::rules tree<node>::get_rec_relations(tref rrs) {
@@ -42,7 +49,14 @@ std::optional<rr> tree<node>::get_nso_rr(tref r) {
 					? tt(r) | main
 					: tt(r) | spec | main) | wff | tt::ref;
 	rewriter::rules rules = get_rec_relations(r);
-	return { { rules, geth(main_fm) } };
+	return get_nso_rr(rules, main_fm);
+}
+
+template <NodeType node>
+std::optional<rr> tree<node>::get_nso_rr(const rewriter::rules& rules,
+	tref main_fm)
+{
+	return infer_ref_types({ rules, geth(main_fm) });
 }
 
 template <NodeType node>

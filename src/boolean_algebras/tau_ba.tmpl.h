@@ -154,7 +154,7 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	using tau = tree<node<BAs...>>;
 	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
 	if (!simp_fm) return false;
-	if (find_top(simp_fm, is_non_terminal<tau::node, tau::ref>))
+	if (tau::get(simp_fm).find_top(is_non_terminal<tau::node, tau::ref>))
 		return false;
 	auto vars = get_free_vars_from_nso(simp_fm);
 	for (const auto& v : vars) {
@@ -171,9 +171,10 @@ std::optional<std::variant<tau_ba<BAs...>, BAs...>>
 	tau_ba_factory<BAs...>::parse(const std::string& src)
 {
 	using tau = tree<node<BAs...>>;
+	using parse_options = typename tau::parse_options;
 	// parse source
-	auto source = tau::get(src, tau_parser::parse_options{
-					.start = tau::tau_constant_source });
+	parse_options opts; opts.start = tau::tau_constant_source;
+	auto source = tau::get(src, opts);
 	if (!source) return {};
 	auto nso_rr = tau::get_nso_rr(source);
 	if (!nso_rr) return {};

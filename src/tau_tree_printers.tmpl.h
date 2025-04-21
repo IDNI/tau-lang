@@ -72,6 +72,11 @@ std::ostream& print(std::ostream& os, const rr& rr_) {
 	return os;
 }
 
+inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
+	return os << rr_dict(s.name)
+				<< "[" << s.offset_arity << "]/" << s.arg_arity;
+}
+
 template <NodeType node>
 std::ostream& tree<node>::print_tree(std::ostream& os, size_t s) const {
 	for (size_t i = 0; i < s; i++) os << "\t";
