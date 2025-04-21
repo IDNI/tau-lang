@@ -32,8 +32,8 @@ template <BAsPack... BAs>
 tref get_new_uniter_const(tref fm, const std::string& name) {
 	using node = node<BAs...>;
 	using tau = tree<node>;
-	auto uniter_consts = rewriter::select_top<node>(fm,
-		is_non_terminal<tau::uninterpreted_constant, node>);
+	auto uniter_consts = tau::get(fm).select_top(is_non_terminal<
+					tau::uninterpreted_constant, node>);
 	std::set ids{ 0 };
 	for (auto uniter_const : uniter_consts) {
 		if (const std::string& s = tau::get(uniter_const).get_string();

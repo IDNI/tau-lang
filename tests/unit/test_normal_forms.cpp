@@ -11,8 +11,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
 		tref fm = make<Bool>(sample);
-		fm = rewriter::find_top<tau::node>(fm,
-					is_non_terminal<tau::wff, tau::node>);
+		fm = tau::get(fm).find_top(is_non_terminal<tau::wff, tau::node>);
 		// fm = to_mnf(reduce_across_bfs(fm, false));
 		CHECK( tau::get(fm)[0].is(tau::wff_t) );
 		// tau::get(fm).dump(std::cout << "fm: ", true) << "\n";

@@ -54,7 +54,6 @@ tref tree<node>::get(const node& v, const std::initializer_list<tref>& ch) {
 	return base_t::get(v, ch);
 }
 
-
 //------------------------------------------------------------------------------
 // creation with node childs
 
@@ -153,9 +152,8 @@ tref tree<node>::get_ba_constant(const std::pair<size_t, size_t>& typed_const) {
 	return get(node::ba_constant(typed_const.first, typed_const.second));
 }
 
-
-
 // -----------------------------------------------------------------------------
+// children
 
 template <NodeType node>
 size_t tree<node>::children_size() const {
@@ -230,7 +228,6 @@ const tree<node>& tree<node>::only_child_tree() const {
 	tref c = only_child(); DBG(assert(c != nullptr);)
 	return get(c);
 }
-
 
 //------------------------------------------------------------------------------
 // nt category helpers
@@ -345,103 +342,6 @@ template <NodeType node>
 tree<node>::bas_variant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
 	return ba_constants_t::get(data());
-}
-
-//------------------------------------------------------------------------------
-
-template <NodeType node>
-tree<node>::traverser::traverser() : has_value_(false) {}
-template <NodeType node>
-tree<node>::traverser::traverser(tref r) : has_value_(r != nullptr),
-			values_(has_value_ ? trefs{ r } : trefs{}) {}
-template <NodeType node>
-tree<node>::traverser::traverser(const htree::sp& h) : has_value_(h != nullptr),
-			values_(has_value_ ? trefs{ h->get() } : trefs{}) {}
-template <NodeType node>
-tree<node>::traverser::traverser(const trefs& refs) { set_values(refs); }
-
-template <NodeType node>
-bool tree<node>::traverser::has_value() const { return has_value_; }
-template <NodeType node>
-tree<node>::traverser::operator bool() const { return has_value(); }
-
-template <NodeType node>
-tref tree<node>::traverser::value() const { return values_.front(); }
-
-template <NodeType node>
-const tree<node>& tree<node>::traverser::value_tree()
-	const { return get(values_.front()); }
-
-template <NodeType node>
-const tree<node>& tree<node>::traverser::operator[](
-	size_t n) const { return value_tree()[n]; }
-
-template <NodeType node>
-const trefs& tree<node>::traverser::values() const { return values_; }
-
-template <NodeType node>
-std::vector<typename tree<node>::traverser>
-	tree<node>::traverser::traversers() const
-{
-	std::vector<traverser> tv;
-	for (const auto& v : values_) tv.emplace_back(v);
-	return tv;
-}
-
-template <NodeType node>
-std::vector<typename tree<node>::traverser>
-	tree<node>::traverser::operator()() const
-{
-	return traversers();
-}
-
-template <NodeType node>
-bool tree<node>::traverser::empty() const { return values_.empty(); }
-
-template <NodeType node>
-size_t tree<node>::traverser::size() const { return values_.size(); }
-
-template <NodeType node>
-typename tree<node>::traverser
-	tree<node>::traverser::operator|(size_t nt) const
-{
-	if (!has_value()) return traverser();
-	for (tref c : get(value()).children()) {
-		if (get(c).is(nt)) return { c }; 
-	}
-	return {};
-}
-
-template <NodeType node>
-typename tree<node>::traverser
-	tree<node>::traverser::operator||(size_t nt) const
-{
-	trefs r;
-	for (tref v : values())	for (tref c : get(v).children())
-			if (get(c).is(nt)) r.push_back(c);
-	return traverser(r);
-}
-
-template <NodeType node>
-template <typename result_type>
-result_type tree<node>::traverser::operator|(
-	const extractor<result_type>& e) const
-{
-	return e(*this);
-}
-
-template <NodeType node>
-template <typename result_type>
-result_type tree<node>::traverser::operator||(
-	const extractor<result_type>& e) const
-{
-	return e(*this);
-}
-
-template <NodeType node>
-void tree<node>::traverser::set_values(const trefs& refs) {
-	for (tref t : refs) if (t != nullptr) values_.push_back(t);
-	has_value_ = values_.size();
 }
 
 } // idni::tau_lang namespace

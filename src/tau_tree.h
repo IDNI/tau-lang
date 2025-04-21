@@ -31,14 +31,23 @@ template <typename BA, typename... BAs>
 concept OneOfBAs = is_one_of<BA, BAs...>::value;
 
 template <typename N>
-concept NodeType = requires {
+concept NodeType = requires { // Node Type has to provide
+	// alias for the packed variant type
 	typename N::bas_variant;
+	// alias for the ba_constants pool type
 	typename N::ba_constants_t;
+	// alias for the ba_constants_binder type
 	typename N::ba_constants_binder_t;
+	// alias for the ba_types_checker_and_propagator type
+	typename N::ba_types_checker_and_propagator_t;
+	// alias for the node type
 	typename N::type;
+	// nt is convertible to size_t
 	{ std::declval<N>().nt } -> std::convertible_to<size_t>;
+	// data is convertible to size_t
 	{ std::declval<N>().data } -> std::convertible_to<size_t>;
-	// { N::hashit() } -> std::convertible_to<size_t>;
+	// hashit is convertible to size_t
+	// { std::declval<N>().hashit() } -> std::convertible_to<size_t>;
 };
 
 // -----------------------------------------------------------------------------
@@ -57,7 +66,10 @@ template <BAsPack... BAs>
 struct tau_ba;
 
 template <NodeType node>
-struct rr_types;
+struct ref_types;
+
+template <BAsPack... BAs>
+struct ba_types_checker_and_propagator;
 
 // -----------------------------------------------------------------------------
 
@@ -97,6 +109,9 @@ struct node {
 	using ba_constants_t = ba_constants<BAs...>;
 	// alias for ba_constants_binder<BAs...>
 	using ba_constants_binder_t = ba_constants_binder<BAs...>;
+	// alias for ba_types_checker_and_propagator<BAs...>
+	using ba_types_checker_and_propagator_t =
+					ba_types_checker_and_propagator<BAs...>;
 
 	using T = size_t; // just to simplify changes or templating it later;
 
@@ -183,11 +198,11 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	using tau = tree<N>;
 	using node = N;
 	using parse_tree = tau_parser::tree;
-	using parse_options = tau_parser::parse_options;
 	using bas_variant = node::bas_variant;
 	using ba_constants_t = node::ba_constants_t;
 	using ba_constants_binder_t = node::ba_constants_binder_t;
-
+	using ba_types_checker_and_propagator_t =
+				node::ba_types_checker_and_propagator_t;
 	// tree direct API
 	// ---------------------------------------------------------------------
 
@@ -289,6 +304,15 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	// ---------------------------------------------------------------------
 	// from parser (tau_tree_from_parser.tmpl.h)
 
+	struct parse_options : public tau_parser::parse_options {
+		std::map<std::string, std::pair<size_t, size_t>>
+							named_constants{}; 
+		parse_options() = default;		
+		parse_options(const tau_parser::parse_options& opts)
+			: tau_parser::parse_options(opts) {}
+		parse_options(const parse_options&) = default;
+	};
+
 	// creation from parser result or parser input (string, stream, file)
 	static tref get(tau_parser::result& result);
 	static tref get(const std::string& str, parse_options options = {});
@@ -320,9 +344,12 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	// ---------------------------------------------------------------------
 	// various extractors (tau_tree_extractors.tmpl.h)
 
+	static std::string get_type_name(tref n);
 	static rr_sig get_rr_sig(tref n);
 	static rewriter::rules get_rec_relations(tref r);
 	static std::optional<rr> get_nso_rr(tref ref);
+	static std::optional<rr> get_nso_rr(const rewriter::rules& rules,
+								tref main_fm);
 
 	static rewriter::builder get_builder(tref ref);
 	static rewriter::rules get_rules(tref r);
@@ -334,14 +361,13 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static trefs get_dnf_bf_clauses(tref n);
 	static trefs get_cnf_bf_clauses(tref n);
 
-	// inference 
+	// inference (tau_tree_types.tmpl.h)
 	// ---------------------------------------------------------------------
-	// rr_types (tau_tree_rr_types.tmpl.h)
 
+	// ref_types
 	static std::optional<rr> infer_ref_types(const rr& nso_rr);
-
 	// ba_types (tau_tree_ba_types.tmpl.h)
-	// static tref infer_ba_types(tref n);
+	static tref infer_ba_types(tref n);
 
 	// ---------------------------------------------------------------------
 	// tree::traverser / tt API (tau_tree_traverser.tmpl.h)
@@ -380,117 +406,25 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		bool empty() const;
 		size_t size() const;
 
-		// template <node::type NT>
-		// static inline const extractor<bool> is{
-		// 	[](const traverser& t) {
-		// 		if (!t) return false;
-		// 		return t.value_tree().get_type() == NT;
-		// 	}};
-		static inline const extractor<tref> ref{
-			[](const traverser& t) -> tref { return t.value(); }};
-		static inline const extractor<traverser> children{
-			[](const traverser& t) {
-				if (!t) return traverser();
-				return traverser(t.value_tree()
-						.get_children());
-			}};
-		static inline const extractor<tref_range<node>>
-							children_range{
-			[](const traverser& t) {
-				if (!t) return traverser();
-				return traverser(t.value_tree()
-						.children());
-			}};
-		static inline const extractor<tree_range<tree>>
-							children_trees_range{
-			[](const traverser& t) {
-				if (!t) return traverser();
-				return traverser(t.value_tree()
-						.children_trees());
-			}};
-		static inline const extractor<traverser> only_child{
-			[](const traverser& t) -> traverser {
-				if (!t) return {};
-				tref r = t.value_tree().only_child();
-				if (!r) return {};
-				return traverser(r);
-			}};
-		static inline const extractor<traverser> first{
-			[](const traverser& t) {
-				if (!t) return traverser();
-				tref r = t.value_tree().first();
-				if (!r) return traverser();
-				return traverser(r);
-			}};
-		static inline const extractor<traverser> second{
-			[](const traverser& t) {
-				if (!t) return traverser();
-				tref r = t.value_tree().second();
-				if (!r) return traverser();
-				return traverser(r);
-			}};
-		static inline const extractor<traverser> third{
-			[](const traverser& t) {
-				if (!t) return traverser();
-				tref r = t.value_tree().third();
-				if (!r) return traverser();
-				return traverser(r);
-			}};
-		static inline const extractor<std::string> string{
-			[](const traverser& t) {
-				if (!t) return std::string();
-				return t.value_tree().get_string();
-			}};
-		static inline const extractor<typename node::type> nt {
-			[](const traverser& t) {
-				if (!t) return
-					static_cast<typename node::type>(0);
-				return t.value_tree().get_type();
-			}};
-		static inline const extractor<int_t> integer{
-			[](const traverser& t) {
-				if (!t) return 0;
-				return t.value_tree().get_integer();
-			}};
-		static inline const extractor<size_t> num{
-			[](const traverser& t) -> size_t {
-				if (!t) return 0;
-				return t.value_tree().get_num();
-			}};
-		static inline const extractor<size_t> data{
-			[](const traverser& t) -> size_t {
-				if (!t) return 0;
-				return t.value_tree().data();
-			}};
-		static inline const extractor<size_t> ba_constant_id{
-			[](const traverser& t) -> size_t {
-				if (!t) return 0;
-				return t.value_tree().get_ba_constant_id();
-			}};
-		static inline const extractor<bas_variant> ba_constant
-		{
-			[](const traverser& t) -> bas_variant {
-				return ba_constants_t::get(
-					t.value_tree().get_ba_constant_id());
-			}
-		};
-		static inline const extractor<traverser> dump{
-			[](const traverser& t) {
-				if (!t) return t;
-				t.value_tree().dump(std::cout) << "\n";
-				return t;
-			}};
-		static inline const extractor<traverser> print_tree{
-			[](const traverser& t) {
-				if (!t) return t;
-				t.value_tree().print_tree(std::cout) << "\n";
-				return t;
-			}};
-		static inline const extractor<htree::sp> handle{
-			[](const traverser& t) {
-				if (!t) return htree::sp();
-				return geth(t.value());
-			}};
+		static const extractor<typename node::type> nt;
+		static const extractor<tref>               ref;
+		static const extractor<htree::sp>          handle;
+		static const extractor<traverser>          dump;
+		static const extractor<traverser>          print_tree;
+		static const extractor<traverser>          only_child;
+		static const extractor<traverser>          first;
+		static const extractor<traverser>          second;
+		static const extractor<traverser>          third;
+		static const extractor<traverser>          children;
+		static const extractor<tref_range<node>>   children_range;
+		static const extractor<tree_range<tree<node>>>
+							children_trees_range;
+		static const extractor<std::string>        string;
+		static const extractor<int_t>              integer;
+		static const extractor<size_t>             num;
+		static const extractor<size_t>             data;
+		static const extractor<size_t>             ba_constant_id;
+		static const extractor<bas_variant>        ba_constant;
 
 		traverser operator|(size_t nt) const;
 		traverser operator||(size_t nt) const;
@@ -612,7 +546,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 
 private:
 	static std::optional<rr> infer_ref_types(const rr& nso_rr,
-							rr_types<node>& ts);
+							ref_types<node>& ts);
 };
 
 // -----------------------------------------------------------------------------
@@ -633,6 +567,8 @@ template <BAsPack... BAs>
 std::ostream& print(std::ostream& os, const rewriter::rules& rs);
 template <BAsPack... BAs>
 std::ostream& print(std::ostream& os, const rr& rr_);
+
+std::ostream& operator<<(std::ostream& os, const rr_sig& s);
 
 // -----------------------------------------------------------------------------
 // queries (tau_tree_queries.tmpl.h)
@@ -677,7 +613,6 @@ const std::string BLDR_WFF_ALWAYS = "( $X ) =:: always $X.";
 // definitions of bf builder rules
 const std::string BLDR_BF_SPLITTER = "( $X ) =: S($X).";
 
-// wff builder
 template <NodeType node>
 rewriter::builder tree<node>::bldr_wff_eq =
 				tree<node>::get_builder(BLDR_WFF_EQ);
@@ -701,11 +636,12 @@ rewriter::builder tree<node>::bldr_bf_nleq_lower =
 
 #include "tau_tree.tmpl.h"
 #include "tau_tree_node.tmpl.h"
+#include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
 #include "tau_tree_queries.tmpl.h"
 #include "tau_tree_builders.tmpl.h"
 #include "tau_tree_extractors.tmpl.h"
-#include "tau_tree_rr_types.tmpl.h"
+#include "tau_tree_types.tmpl.h"
 #include "tau_tree_from_parser.tmpl.h"
 
 #endif // __IDNI__TAU__TAU_TREE_H__
