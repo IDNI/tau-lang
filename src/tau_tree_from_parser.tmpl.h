@@ -303,4 +303,14 @@ rewriter::builder tree<node>::get_builder(const std::string& source) {
 		ba_constants_binder_t::instance(), source);
 }
 
+template <NodeType node>
+tree<node>::parse_options::parse_options() = default;
+
+template <NodeType node>
+tree<node>::parse_options::parse_options(const parse_options&) = default;
+
+template <NodeType node>
+tree<node>::parse_options::parse_options(const tau_parser::parse_options& opts)
+	: tau_parser::parse_options(opts) {}
+
 } // namespace idni::tau_lang

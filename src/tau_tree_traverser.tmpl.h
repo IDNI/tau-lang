@@ -4,12 +4,27 @@
 
 namespace idni::tau_lang {
 
-// template <node::type NT>
-// static inline const extractor<bool> is{
-// 	[](const traverser& t) {
-// 		if (!t) return false;
-// 		return t.value_tree().get_type() == NT;
-// 	}};
+// -----------------------------------------------------------------------------
+// Tau traverser
+
+// -----------------------------------------------------------------------------
+// extractor
+
+template <NodeType node>
+template <typename result_type>
+tree<node>::extractor<result_type>::extractor(const function& e)
+	: e(e) {}
+
+template <NodeType node>
+template <typename result_type>
+result_type tree<node>::extractor<result_type>::operator()(
+	const traverser& t) const
+{
+	return e(t);
+}
+
+// -----------------------------------------------------------------------------
+// extractors
 
 template <NodeType node>
 const typename tree<node>::template extractor<tref> tree<node>::traverser::ref =
@@ -169,6 +184,13 @@ const typename tree<node>::template extractor<htree::sp>
 		if (!t) return htree::sp();
 		return geth(t.value());
 	});
+// template <node::type NT>
+// static inline const extractor<bool> is{
+// 	[](const traverser& t) {
+// 		if (!t) return false;
+// 		return t.value_tree().get_type() == NT;
+// 	}};
+
 
 //------------------------------------------------------------------------------
 // traverser
@@ -218,6 +240,9 @@ std::vector<typename tree<node>::traverser>
 {
 	return traversers();
 }
+
+template <NodeType node>
+bool tree<node>::traverser::is(size_t nt) const { return value_tree().is(nt); }
 
 template <NodeType node>
 bool tree<node>::traverser::empty() const { return values_.empty(); }
