@@ -87,7 +87,7 @@ constexpr size_t BAs_bitsize = BAs_size<BAs...> <= 1 ? 1 :
 // Tau tree node (tau_tree_node.tmpl.h)
 //
 // node is templated by a pack of boolean algebras
-// This is used in the node for two purposes:
+// This is used for two purposes:
 // 1. determine bitsize required for storing BA type ids
 // 2. provide type aliases for packed types so they are accessible everywhere
 //
@@ -113,7 +113,7 @@ struct node {
 	using ba_types_checker_and_propagator_t =
 					ba_types_checker_and_propagator<BAs...>;
 
-	using T = size_t; // just to simplify changes or templating it later;
+	using T = size_t; // just to simplify changes or templating it later
 
 	static constexpr size_t bits      = std::numeric_limits<T>::digits;
 	static constexpr size_t nt_bits   = tau_parser_data::nt_bits;
@@ -307,10 +307,9 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	struct parse_options : public tau_parser::parse_options {
 		std::map<std::string, std::pair<size_t, size_t>>
 							named_constants{}; 
-		parse_options() = default;		
-		parse_options(const tau_parser::parse_options& opts)
-			: tau_parser::parse_options(opts) {}
-		parse_options(const parse_options&) = default;
+		parse_options();
+		parse_options(const parse_options&);
+		parse_options(const tau_parser::parse_options& opts);
 	};
 
 	// creation from parser result or parser input (string, stream, file)
@@ -364,9 +363,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	// inference (tau_tree_types.tmpl.h)
 	// ---------------------------------------------------------------------
 
-	// ref_types
 	static std::optional<rr> infer_ref_types(const rr& nso_rr);
-	// ba_types (tau_tree_ba_types.tmpl.h)
 	static tref infer_ba_types(tref n);
 
 	// ---------------------------------------------------------------------
@@ -378,17 +375,14 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	template <typename result_type>
 	struct extractor {
 		using function = std::function<result_type(const traverser&)>;
-		extractor(const function& e) : e(e) {}
-		result_type operator()(const traverser& t) const
-						{ return e(t); }
+		extractor(const function& e);
+		result_type operator()(const traverser& t) const;
 	private:
 		function e;
 	};
 
 	// tree wrapper for simple traversing using | and || operators
 	// and | extractor<result_type>
-	//                only_child, opt_nonterminal, nonterminal,
-	//                terminals, first, second, third)
 	struct traverser {
 		traverser();
 		traverser(tref r);
@@ -402,29 +396,30 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		const trefs& values() const;
 		std::vector<traverser> traversers() const;
 		std::vector<traverser> operator()() const;
-		bool is(size_t nt) const { return value_tree().is(nt); }
+		bool is(size_t nt) const;
 		bool empty() const;
 		size_t size() const;
 
-		static const extractor<typename node::type> nt;
-		static const extractor<tref>               ref;
-		static const extractor<htree::sp>          handle;
-		static const extractor<traverser>          dump;
-		static const extractor<traverser>          print_tree;
-		static const extractor<traverser>          only_child;
-		static const extractor<traverser>          first;
-		static const extractor<traverser>          second;
-		static const extractor<traverser>          third;
-		static const extractor<traverser>          children;
-		static const extractor<tref_range<node>>   children_range;
-		static const extractor<tree_range<tree<node>>>
-							children_trees_range;
-		static const extractor<std::string>        string;
-		static const extractor<int_t>              integer;
-		static const extractor<size_t>             num;
-		static const extractor<size_t>             data;
-		static const extractor<size_t>             ba_constant_id;
-		static const extractor<bas_variant>        ba_constant;
+		static const extractor<
+			typename node::type>             nt;
+		static const extractor<tref>             ref;
+		static const extractor<htree::sp>        handle;
+		static const extractor<traverser>        dump;
+		static const extractor<traverser>        print_tree;
+		static const extractor<traverser>        only_child;
+		static const extractor<traverser>        first;
+		static const extractor<traverser>        second;
+		static const extractor<traverser>        third;
+		static const extractor<traverser>        children;
+		static const extractor<tref_range<node>> children_range;
+		static const extractor<
+			tree_range<tree<node>>>          children_trees_range;
+		static const extractor<std::string>      string;
+		static const extractor<int_t>            integer;
+		static const extractor<size_t>           num;
+		static const extractor<size_t>           data;
+		static const extractor<size_t>           ba_constant_id;
+		static const extractor<bas_variant>      ba_constant;
 
 		traverser operator|(size_t nt) const;
 		traverser operator||(size_t nt) const;
