@@ -1951,9 +1951,9 @@ typename tree<node>::traverser operator|(
 template <NodeType node>
 tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
 	using tau = tree<node>;
-	const auto& t1 = tau::get(d1), t2 = tau::get(d2);
-	if (t1.is(tau::wff)) {
-		DBG(assert(t2.is(tau::wff));)
+	const auto& t = tau::get(d1);
+	if (t.is(tau::wff)) {
+		DBG(assert(tau::get(d2).is(tau::wff));)
 		tref res = tau::_F();
 		auto clauses_d1 = tau::get_dnf_wff_clauses(d1);
 		auto clauses_d2 = tau::get_dnf_wff_clauses(d2);
@@ -1963,7 +1963,7 @@ tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
 					tau::build_wff_and(dis1, dis2));
 		return res;
 	} else {
-		DBG(assert(t1.is(tau::bf) && t2.is(tau::bf));)
+		DBG(assert(t.is(tau::bf) && tau::get(d2).is(tau::bf));)
 		tref res = tau::_0();
 		auto clauses_d1 = tau::get_dnf_bf_clauses(d1);
 		auto clauses_d2 = tau::get_dnf_bf_clauses(d2);
@@ -1978,9 +1978,9 @@ tref conjunct_dnfs_to_dnf(tref d1, tref d2) {
 template <NodeType node>
 tref disjunct_cnfs_to_cnf(tref c1, tref c2) {
 	using tau = tree<node>;
-	const auto& t1 = tau::get(c1), t2 = tau::get(c2);
-	if (t1.is(tau::wff)) {
-		DBG(assert(t2.is(tau::wff));)
+	const auto& t = tau::get(c1);
+	if (t.is(tau::wff)) {
+		DBG(assert(tau::get(c2).is(tau::wff));)
 		tref res = tau::_T();
 		auto clauses_c1 = tau::get_cnf_wff_clauses(c1);
 		auto clauses_c2 = tau::get_cnf_wff_clauses(c2);
@@ -1990,7 +1990,7 @@ tref disjunct_cnfs_to_cnf(tref c1, tref c2) {
 					tau::build_wff_or(dis1, dis2));
 		return res;
 	} else {
-		DBG(assert(t1.is(tau::bf) && t2.is(tau::bf));)
+		DBG(assert(t.is(tau::bf) && tau::get(c2).is(tau::bf));)
 		tref res = tau::_1();
 		auto clauses_c1 = tau::get_cnf_bf_clauses(c1);
 		auto clauses_c2 = tau::get_cnf_bf_clauses(c2);
