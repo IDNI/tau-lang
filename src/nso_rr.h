@@ -34,7 +34,7 @@ namespace idni::tau_lang {
 
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
-template <typename node, typename... BAs>
+template <typename node>
 tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	static const auto is_capture = [](const tref& n) {
 		return tree<node>::get(n).is(node::type::capture);
@@ -69,7 +69,7 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
-template <typename node, typename... BAs>
+template <typename node>
 tref nso_rr_apply(const rewriter::rules& rs, tref n) {
 	#ifdef TAU_CACHE
 	static std::map<std::pair<rewriter::rules, tref>, tref> cache;
