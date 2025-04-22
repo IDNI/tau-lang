@@ -19,6 +19,24 @@
 #define pfst(x) (*(x).begin())
 #define hasbc(x, y, f) std::binary_search(x.begin(), x.end(), y, f)
 
+// following macros work only if tau type is defined
+// helper macro for pretty printing a tau tree tref into std::cout
+#define TAU_PRINT(ref) (tau::get(ref).print(std::cout))
+// helper macro for printing a tau tree tref into std::cout
+#define TAU_TREE(ref) (tau::get(ref).print_tree(std::cout))
+// helper macro for dumping a tau tree tref into std::cout
+#define TAU_DUMP(ref) (tau::get(ref).dump(std::cout))
+// helper macro for pretty printing a tau tree tref into to stream
+#define TAU_PRINT_TO(ref, to) (tau::get(ref).print(to))
+// helper macro for printing a tau tree tref into to stream
+#define TAU_TREE_TO(ref, to) (tau::get(ref).print_tree(to))
+// helper macro for dumping a tau tree tref into to stream
+#define TAU_DUMP_TO(ref, to) (tau::get(ref).dump(to))
+// helper macro for pretty printing a tau tree tref into a string
+#define TAU_TO_STR(ref) (tau::get(ref).to_str())
+// helper macro for printing a tau tree tref into a string
+#define TAU_TREE_TO_STR(ref) (tau::get(ref).tree_to())
+
 namespace idni::tau_lang {
 
 using sym_t = int_t;
