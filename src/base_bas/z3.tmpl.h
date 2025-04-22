@@ -226,14 +226,14 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars,
 			#ifdef DEBUG
 			BOOST_LOG_TRIVIAL(error) << "(Error) unknow z3 non-terminal: " << nt;
 			#endif // DEBUG
-			assert(false);
 		}
 	}
+	assert(false);
 }
 
-template<typename...BAs>
-std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form) {
-	// transform form into a z3::expr
+
+template <typename...BAs>
+bool is_z3_formula_sat(const tau<BAs...>& form) {
 	z3::solver solver(z3_context);
 	std::map<tau<BAs...>, z3::expr> vars;
 	auto expr = eval_z3(form, vars);
@@ -243,6 +243,35 @@ std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form) {
 	#ifdef DEBUG
 	BOOST_LOG_TRIVIAL(info)
 		<< "(Info) z3 solver\n" << solver;
+	#endif // DEBUG
+
+	auto result = solver.check() == z3::sat;
+
+	#ifdef DEBUG
+	if (result) {
+		BOOST_LOG_TRIVIAL(info)
+			<< "(Info) z3 system is sat\n"
+			<< "(Info) z3 model\n" << solver.get_model();
+	} else {
+		BOOST_LOG_TRIVIAL(info)
+			<< "(Info) z3 system is unsat\n";
+	}
+	#endif // DEBUG
+
+	return result;
+}
+
+
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form, z3::solver& solver) {
+	std::map<tau<BAs...>, z3::expr> vars;
+	auto expr = eval_z3(form, vars);
+	// solve the equations
+	solver.add(expr);
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(info)
+	<< "(Info) z3 solver\n" << solver;
 	#endif // DEBUG
 
 	auto result = solver.check();
@@ -262,16 +291,22 @@ std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form) {
 			s.emplace(v.first,
 				std::make_shared<rewriter::node<tau_sym<BAs...>>>(
 					tau_parser::instance().literal(tau_parser::bitvector), bvv));
+				}
+				return s;
+			} else {
+
+				#ifdef DEBUG
+				BOOST_LOG_TRIVIAL(info) << "(Info) z3 system is unsat";
+				#endif // DEBUG
+
+			}
+			return {};
 		}
-		return s;
-	} else {
 
-		#ifdef DEBUG
-		BOOST_LOG_TRIVIAL(info) << "(Info) z3 system is unsat";
-		#endif // DEBUG
-
-	}
-	return {};
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form) {
+	z3::solver solver(z3_context);
+	return solve_z3(form, solver);
 }
 
 } // namespace idni::tau_lang
