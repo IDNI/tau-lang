@@ -1532,7 +1532,7 @@ std::vector<std::vector<int_t>> wff_to_bdd (const tau_<BAs...>& fm, auto& vars =
 	return dnf.begin()->second;
 }
 
-bool is_ordered_subset (const auto& v1, const auto& v2) {
+bool is_ordered_subset_depreciating(const auto& v1, const auto& v2) {
 	if (v1.size() > v2.size()) return false;
 	if (v1.size() == 0) return true;
 	size_t j = 0;
@@ -1617,7 +1617,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 					}
 				}
 				// Inequality n is unsat if p is subset
-				if (is_ordered_subset(p, n)) {
+				if (is_ordered_subset_depreciating(p, n)) {
 					n = {};
 				}
 			}
@@ -1637,7 +1637,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 				bool exists_superset = false;
 				for (size_t j = 0; j < cnf_neq_lits[c2].size(); ++j) {
 					if (cnf_neq_lits[c2][j].empty()) continue;
-					if (is_ordered_subset(cnf_neq_lits[c2][j], cnf_neq_lits[c1][i])) {
+					if (is_ordered_subset_depreciating(cnf_neq_lits[c2][j], cnf_neq_lits[c1][i])) {
 						exists_superset = true;
 						break;
 					}
