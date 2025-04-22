@@ -275,6 +275,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	
 	std::ostream& print(std::ostream& o) const;
 	std::ostream& print_tree(std::ostream& o, size_t s = 0) const;
+	std::string to_str() const;
+	std::string tree_to_str() const;
 
 	// nt category helpers
 	static bool is_digital_nt(size_t nt);
@@ -400,6 +402,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		bool empty() const;
 		size_t size() const;
 
+		// (tref) -> tref function tt:f wrapper	
+		static const extractor<traverser> f(const auto& fn);
 		static const extractor<
 			typename node::type>             nt;
 		static const extractor<tref>             ref;
@@ -452,14 +456,22 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static rewriter::builder bldr_bf_nleq_lower;
 
 	// TODO revise these (need to take care of static initialization order)
-	static const tree<N>& _0();
-	static const tree<N>& _0_trimmed();
-	static const tree<N>& _1();
-	static const tree<N>& _1_trimmed();
-	static const tree<N>& _F();
-	static const tree<N>& _F_trimmed();
-	static const tree<N>& _T();
-	static const tree<N>& _T_trimmed();
+	static tref _0();
+	static tref _1();
+	static tref _F();
+	static tref _T();
+	static tref _0_trimmed();
+	static tref _1_trimmed();
+	static tref _F_trimmed();
+	static tref _T_trimmed();
+	static const tree<N>& _0_tree();
+	static const tree<N>& _1_tree();
+	static const tree<N>& _F_tree();
+	static const tree<N>& _T_tree();
+	static const tree<N>& _0_trimmed_tree();
+	static const tree<N>& _1_trimmed_tree();
+	static const tree<N>& _F_trimmed_tree();
+	static const tree<N>& _T_trimmed_tree();
 
 	// TODO (LOW) this could be somehow easily generatable by parser_gen
 	// or maybe create simple builder api, maybe with >> operator
@@ -577,12 +589,22 @@ bool is_terminal(tref n);
 template <NodeType node>
 bool is_non_terminal(const size_t nt, tref n);
 
+template <NodeType node>
+bool is_child_non_terminal(const size_t nt, tref n);
+
 template <size_t nt, NodeType node>
 bool is_non_terminal(tref n);
+
+template <size_t nt, NodeType node>
+bool is_child_non_terminal(tref n);
 
 // factory method for is_non_terminal predicate
 template <NodeType node>
 inline std::function<bool(tref)> is_non_terminal(size_t nt);
+
+// factory method for is_child_non_terminal predicate
+template <NodeType node>
+inline std::function<bool(tref)> is_child_non_terminal(size_t nt);
 
 // -----------------------------------------------------------------------------
 // builders (tau_tree_builders.tmpl.h)
