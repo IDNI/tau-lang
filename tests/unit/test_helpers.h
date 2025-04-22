@@ -15,6 +15,9 @@ using namespace idni::tau_lang;
 
 namespace testing = doctest;
 
+// helper types and functions
+
+// mostly around Bool BA - the simplest BA available for testing
 using bac = ba_constants<Bool>;
 using bacb = ba_constants_binder<Bool>;
 using btree = tree<node<Bool>>;
@@ -78,6 +81,7 @@ private:
 	nso_factory() {};
 };
 
+// nso_factory for tests with <sbf_ba, Bool>
 template<>
 struct nso_factory<sbf_ba, Bool> {
 	std::optional<std::variant<sbf_ba, Bool>> parse(

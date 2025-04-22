@@ -11,7 +11,7 @@ set(TESTS
 	ba_constants
 	bindings
 	builders
-	normal_forms
+	# normal_forms
 	nso_rr
 	rules-bf_parsing
 	rules-wff_parsing

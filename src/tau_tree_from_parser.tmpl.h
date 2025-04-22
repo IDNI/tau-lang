@@ -134,7 +134,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 			return "untyped";
 		};
 
-		tref x; // result of node transformation
+		tref x = nullptr; // result of node transformation
 
 		switch (nt) {
 			// tau tree terminals
