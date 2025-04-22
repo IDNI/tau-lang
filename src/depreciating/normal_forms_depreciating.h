@@ -769,17 +769,17 @@ inline void join_paths (std::vector<std::vector<int_t>>& paths) {
 // Ordering function for variables from nso formula
 template<typename... BAs>
 auto lex_var_comp = [](const auto x, const auto y) {
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 	static std::map<std::pair<tau_<BAs...>, tau_<BAs...>>, bool> cache;
 	if (auto it = cache.find({x,y}); it != cache.end())
 		return it->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	auto xx = make_string(tau_node_terminal_extractor<BAs...>, x);
 	auto yy = make_string(tau_node_terminal_extractor<BAs...>, y);
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 	std::pair<tau_<BAs...>,tau_<BAs...>> p(x,y);
 	return cache.emplace(move(p), xx < yy).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	return xx < yy;
 };
 
@@ -911,11 +911,11 @@ tau_<BAs...> bf_boole_normal_form (const tau_<BAs...>& fm,
 {
 	// Function can only be applied to a BF
 	assert(is_non_terminal(tau_parser::bf, fm));
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 	static std::map<std::pair<tau_<BAs...>, bool>, tau_<BAs...>> cache;
     if (auto it = cache.find(make_pair(fm, make_paths_disjoint));
     		it != cache.end()) return it->second;
-#endif //TAU_CACHE
+#endif //TAU_CACHE_DEPRECIATING
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
 	auto is_var = [](const tau_<BAs...>& n){return
@@ -965,10 +965,10 @@ tau_<BAs...> bf_boole_normal_form (const tau_<BAs...>& fm,
 				build_bf_or(reduced_dnf, build_bf_and(coeff, var_path));
 		}
 	}
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		cache.emplace(make_pair(fm, make_paths_disjoint), reduced_dnf);
 		cache.emplace(make_pair(reduced_dnf, make_paths_disjoint), reduced_dnf);
-#endif //TAU_CACHE
+#endif //TAU_CACHE_DEPRECIATING
 	return reduced_dnf;
 }
 
@@ -1158,11 +1158,11 @@ tau_<BAs...> build_reduced_formula (const auto& paths, const auto& vars, bool is
 
 template<typename... BAs>
 tau_<BAs...> sort_var (const tau_<BAs...>& var) {
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 	static unordered_tau_map<tau_<BAs...>, BAs...> cache;
 	if (auto it = cache.find(var); it != end(cache))
 		return it->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	if (is_child_non_terminal(tau_parser::bf_eq, var)) {
 		auto clauses = get_dnf_bf_clauses(trim2(var));
 		std::ranges::sort(clauses);
@@ -1174,10 +1174,10 @@ tau_<BAs...> sort_var (const tau_<BAs...>& var) {
 			else res = build_bf_and<BAs...>(lits);
 		}
 		res = build_wff_eq(res);
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		cache.emplace(res, res);
 		return cache.emplace(var, res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 		return res;
 	}
 	return var;
@@ -1244,11 +1244,11 @@ std::pair<std::vector<std::vector<int_t>>, std::vector<tau_<BAs...>>> dnf_cnf_to
 
 template<typename... BAs>
 tau_<BAs...> group_dnf_expression (const tau_<BAs...>& fm) {
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		static unordered_tau_map<tau_<BAs...>, BAs...> cache;
 		if (auto it = cache.find(fm); it != end(cache))
 			return it->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	BOOST_LOG_TRIVIAL(debug) << "(I) Begin group_dnf_expression";
 	BOOST_LOG_TRIVIAL(debug) << "(F) Expression to factor: " << fm;
 	auto count_common = [](const auto& v1, const auto& v2) {
@@ -1266,9 +1266,9 @@ tau_<BAs...> group_dnf_expression (const tau_<BAs...>& fm) {
 	auto clauses = wff ? get_dnf_wff_clauses(fm)
 			       : get_dnf_bf_clauses(fm);
 	if (clauses.size() < 2) {
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		return cache.emplace(fm, fm).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 		return fm;
 	}
 
@@ -1330,10 +1330,10 @@ tau_<BAs...> group_dnf_expression (const tau_<BAs...>& fm) {
 		--i;
 	}
 	assert(grouped_fm != nullptr);
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		cache.emplace(grouped_fm, grouped_fm);
 		return cache.emplace(fm, grouped_fm).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	BOOST_LOG_TRIVIAL(debug) << "(I) End group_dnf_expression";
 	BOOST_LOG_TRIVIAL(debug) << "(F) Factored expression: " << grouped_fm;
 	return grouped_fm;
@@ -1387,14 +1387,14 @@ tau_<BAs...> simp_general_excluded_middle (const tau_<BAs...>& fm) {
 template <typename... BAs>
 tau_<BAs...> reduce(const tau_<BAs...>& fm, size_t type, bool is_cnf,
 	bool all_reductions, bool enable_sort) {
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		static std::unordered_map<std::tuple<tau_<BAs...>, bool, bool>,
 			tau_<BAs...>,
 			std::hash<std::tuple<tau_<BAs...>, bool, bool>>,
 			tuple_struc_equal<bool, bool, BAs...>> cache;
 		if (auto it = cache.find(std::make_tuple(fm, all_reductions, enable_sort)); it != end(cache))
 			return it->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	BOOST_LOG_TRIVIAL(trace) << "(I) Begin reduce2 with is_cnf set to " << is_cnf;
 	BOOST_LOG_TRIVIAL(trace) << "(F) Formula to reduce: " << fm;
 	auto [paths, vars] = dnf_cnf_to_bdd(fm, type, is_cnf, all_reductions, enable_sort);
@@ -1402,23 +1402,23 @@ tau_<BAs...> reduce(const tau_<BAs...>& fm, size_t type, bool is_cnf,
     bool wff = type == tau_parser::wff;
 	if (paths.empty()) {
 		auto res = is_cnf ? (wff ? _T<BAs...> : _1<BAs...>) : (wff ? _F<BAs...> : _0<BAs...>);
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		return cache.emplace(make_tuple(fm, all_reductions, enable_sort), res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 		return res;
 	}
 	if (paths.size() == 1 && paths[0].empty()) {
 		auto res = is_cnf ? (wff ? _F<BAs...> : _0<BAs...>) : (wff ? _T<BAs...> : _1<BAs...>);
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		return cache.emplace(make_tuple(fm, all_reductions, enable_sort), res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 		return res;
 	}
 
 	auto reduced_fm = build_reduced_formula<BAs...>(paths, vars, is_cnf, wff);
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		return cache.emplace(make_tuple(fm, all_reductions, enable_sort), reduced_fm).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	BOOST_LOG_TRIVIAL(trace) << "(I) End reduce2";
 	BOOST_LOG_TRIVIAL(trace) << "(F) Reduced formula: " << reduced_fm;
 	return reduced_fm;
@@ -1842,28 +1842,28 @@ tau_<BAs...> reduce_across_bfs (const tau_<BAs...>& fm, bool to_cnf) {
 	squeezed_fm  = unsqueeze_wff_pos(squeezed_fm);
 	// std::cout << "squeezed_fm: " << squeezed_fm << "\n";
 	BOOST_LOG_TRIVIAL(debug) << "(I) Formula in DNF: " << squeezed_fm;
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		static std::map<std::pair<tau_<BAs...>, bool>, tau_<BAs...>> cache;
 		if (auto it = cache.find(make_pair(squeezed_fm, to_cnf)); it != end(cache))
 			return it->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	auto [paths, vars] = dnf_cnf_to_bdd<BAs...>(squeezed_fm, tau_parser::wff, false, true, false);
 	// Vars might not be sorted canonically
 	// std::cout << "original vars: " << vars << "\n";
 
 	if (paths.empty()) {
 		auto res = to_cnf ? _T<BAs...> : _F<BAs...>;
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		return cache.emplace(make_pair(squeezed_fm, to_cnf), res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 		BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
 		return res;
 	} else if (paths.size() == 1 && paths[0].empty()) {
 		auto res = to_cnf ? _F<BAs...> : _T<BAs...>;
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		return cache.emplace(make_pair(squeezed_fm, to_cnf), res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 		BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
 		BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
 		return res;
@@ -1922,10 +1922,10 @@ tau_<BAs...> reduce_across_bfs (const tau_<BAs...>& fm, bool to_cnf) {
 				if (std::ranges::all_of( simp_path,
 					[](const auto el) { return el == 2; })) {
 					auto res = to_cnf ? _F<BAs...> : _T<BAs...>;
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 					return cache.emplace(
 						make_pair(squeezed_fm, to_cnf), res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 					BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
 					BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
 					return res;
@@ -1954,9 +1954,9 @@ tau_<BAs...> reduce_across_bfs (const tau_<BAs...>& fm, bool to_cnf) {
 		if (!has_further_simp) {
 			assert(simp_fm != nullptr);
 			auto res = to_cnf ? push_negation_in(build_wff_neg(simp_fm)) : simp_fm;
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 			return cache.emplace(make_pair(squeezed_fm, to_cnf), res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 			BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
 			BOOST_LOG_TRIVIAL(debug) << "(F) " << res;
 			return res;
@@ -2881,11 +2881,11 @@ tau_<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped
 	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
 	scoped_fm = reduce_across_bfs(scoped_fm, false);
 
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		static std::map<std::pair<tau_<BAs...>,tau_<BAs...>>, tau_<BAs...>> cache;
 		if (auto it = cache.find(make_pair(inner_fm, scoped_fm)); it != end(cache))
 			return it->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 
 	auto clauses = get_leaves(scoped_fm, tau_parser::wff_or);
 	tau_<BAs...> res;
@@ -2936,9 +2936,9 @@ tau_<BAs...> eliminate_existential_quantifier(const auto& inner_fm, auto& scoped
 	res = reduce_across_bfs(res, false);
 	BOOST_LOG_TRIVIAL(debug) << "(I) End existential quantifier elimination";
 	BOOST_LOG_TRIVIAL(debug) << "(F)" << res;
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 	return cache.emplace(make_pair(inner_fm, scoped_fm), res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	return res;
 }
 
@@ -2951,11 +2951,11 @@ tau_<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_f
 	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
 	scoped_fm = reduce_across_bfs(scoped_fm, true);
 // Add cache after reductions; reductions are cached as well
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		static std::map<std::pair<tau_<BAs...>,tau_<BAs...>>, tau_<BAs...>> cache;
 		if (auto it = cache.find(make_pair(inner_fm, scoped_fm)); it != end(cache))
 			return it->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 
 	auto clauses = get_leaves(scoped_fm, tau_parser::wff_and);
 	tau_<BAs...> res;
@@ -3009,9 +3009,9 @@ tau_<BAs...> eliminate_universal_quantifier(const auto& inner_fm, auto& scoped_f
 	res = reduce_across_bfs(res, true);
 	BOOST_LOG_TRIVIAL(debug) << "(I) End universal quantifier elimination";
     BOOST_LOG_TRIVIAL(debug) << "(F)" << res;
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 	return cache.emplace(make_pair(inner_fm, scoped_fm), res).first->second;
-#endif // TAU_CACHE
+#endif // TAU_CACHE_DEPRECIATING
 	return res;
 }
 
@@ -3411,10 +3411,10 @@ private:
 
 	tau_<BAs...> traverse(const bdd_path& path, const literals& remaining, const tau_<BAs...>& form) const {
 		// we only cache results in release mode
-		#ifdef TAU_CACHE
+		#ifdef TAU_CACHE_DEPRECIATING
 		static std::map<std::tuple<bdd_path, literals, tau_<BAs...>>, tau_<BAs...>> cache;
 		if (auto it = cache.find({path, remaining, form}); it != cache.end()) return it->second;
-		#endif // TAU_CACHE
+		#endif // TAU_CACHE_DEPRECIATING
 
 		if (remaining.empty()) return bdd_path_to_snf(path, form);
 
@@ -3425,9 +3425,9 @@ private:
 
 		if (f == _F<BAs...> && t == _F<BAs...>) {
 			// we only cache results in release mode
-			#ifdef TAU_CACHE
+			#ifdef TAU_CACHE_DEPRECIATING
 			cache[{path, remaining, form}] = _F<BAs...>;
-			#endif // TAU_CACHE
+			#endif // TAU_CACHE_DEPRECIATING
 			return _F<BAs...>;
 		}
 
@@ -3448,24 +3448,24 @@ private:
 		}
 
 		if (f_snf == _F<BAs...>) {
-			#ifdef TAU_CACHE
+			#ifdef TAU_CACHE_DEPRECIATING
 			cache[{path, remaining, form}] = t_snf;
-			#endif // TAU_CACHE
+			#endif // TAU_CACHE_DEPRECIATING
 			return t_snf;
 		}
 
 		if (t_snf == _F<BAs...>) {
-			#ifdef TAU_CACHE
+			#ifdef TAU_CACHE_DEPRECIATING
 			cache[{path, remaining, form}] = f_snf;
-			#endif // TAU_CACHE
+			#endif // TAU_CACHE_DEPRECIATING
 			return f_snf;
 		}
 
 		auto result = build_wff_or(t_snf, f_snf);
 		// we only cache results in release mode
-		#ifdef TAU_CACHE
+		#ifdef TAU_CACHE_DEPRECIATING
 		cache[{path, remaining, form}] = result;
-		#endif // TAU_CACHE
+		#endif // TAU_CACHE_DEPRECIATING
 		return result;
 	}
 

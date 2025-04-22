@@ -47,10 +47,10 @@ rr<tau_<BAs...>> normalizer(std::string& source, factory_t& factory) {
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template<typename ... BAs>
 tau_<BAs...> normalizer_step(const tau_<BAs...>& form) {
-	#ifdef TAU_CACHE
+	#ifdef TAU_CACHE_DEPRECIATING
 	static unordered_tau_map<tau_<BAs...>, BAs...> cache;
 	if (auto it = cache.find(form); it != cache.end()) return it->second;
-	#endif // TAU_CACHE
+	#endif // TAU_CACHE_DEPRECIATING
 
 	auto result = form
 		// Push all quantifiers in and eliminate them
@@ -60,9 +60,9 @@ tau_<BAs...> normalizer_step(const tau_<BAs...>& form) {
 		| bf_reduce_canonical<BAs...>()
 		// Normalize always and sometimes quantifiers and reduce Tau formula
 		| sometimes_always_normalization<BAs...>();
-	#ifdef TAU_CACHE
+	#ifdef TAU_CACHE_DEPRECIATING
 	cache.emplace(form, result);
-	#endif // TAU_CACHE
+	#endif // TAU_CACHE_DEPRECIATING
 	return result;
 }
 
@@ -70,10 +70,10 @@ tau_<BAs...> normalizer_step(const tau_<BAs...>& form) {
 // This normalization will non perform the temporal normalization
 template<typename ... BAs>
 tau_<BAs...> normalize_non_temp(const tau_<BAs...>& fm) {
-	#ifdef TAU_CACHE
+	#ifdef TAU_CACHE_DEPRECIATING
 	static unordered_tau_map<tau_<BAs...>, BAs...> cache;
 	if (auto it = cache.find(fm); it != cache.end()) return it->second;
-	#endif // TAU_CACHE
+	#endif // TAU_CACHE_DEPRECIATING
 	auto result = fm
 		// Push all quantifiers in and eliminate them
 		| (tau_f<BAs...>)eliminate_quantifiers<BAs...>
@@ -81,9 +81,9 @@ tau_<BAs...> normalize_non_temp(const tau_<BAs...>& fm) {
 		// are reduced
 		| bf_reduce_canonical<BAs...>();
 	result = reduce_across_bfs(result, false);
-	#ifdef TAU_CACHE
+	#ifdef TAU_CACHE_DEPRECIATING
 	cache.emplace(fm, result);
-	#endif // TAU_CACHE
+	#endif // TAU_CACHE_DEPRECIATING
 	return result;
 }
 
