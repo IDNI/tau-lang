@@ -189,6 +189,7 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	if (lt.is(tau::bf))  return lt == tau::_0();
 	if (lt.is(tau::wff)) return lt == tau::_F();
 	DBG(throw std::logic_error("nso_ba is_zero: wrong types");)
+	return false;
 }
 
 template <BAsPack... BAs>
@@ -213,6 +214,7 @@ bool is_one(const tree<node<BAs...>>& lt) {
 	if (lt.is(tau::bf))  return lt == tau::_1;
 	if (lt.is(tau::wff)) return lt == tau::_T;
 	DBG(throw std::logic_error("nso_ba is_one: wrong types");)
+	return false;
 }
 
 // We overload the == operator for tau in order to account for typed constants

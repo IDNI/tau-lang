@@ -74,7 +74,7 @@ function(target_setup target)
 			-Wfloat-equal
 			-Wwrite-strings
 			# -ftemplate-backtrace-limit=0
-			# -Werror
+			-Werror
 			-Wfatal-errors
 		)
 	else()
