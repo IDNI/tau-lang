@@ -175,13 +175,13 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	auto bf_constant_is_zero = [](const auto& lt) -> bool {
 		auto l = tt(lt.get()) | tau::bf_constant;
 		std::variant<BAs...> lc = l | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
+					| tt::ba_constant;
 		return is_zero(lc);
 	};
 
 	// trivial cases
-	if (lt.value == tau::_0().value) return true;
-	if (lt.value == tau::_1().value) return false;
+	if (lt.value == tau::_0_tree().value) return true;
+	if (lt.value == tau::_1_tree().value) return false;
 
 	// more elaborate cases
 	if (lt.first_tree().is(tau::bf_constant))
@@ -199,13 +199,13 @@ bool is_one(const tree<node<BAs...>>& lt) {
 	auto bf_constant_is_one = [](const auto& lt) -> bool {
 		auto l = tt(lt.get()) | tau::bf_constant;
 		std::variant<BAs...> lc = l | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
+					| tt::ba_constant;
 		return is_one(lc);
 	};
 
 	// trivial cases
-	if (lt.value == tau::_0().value) return false;
-	if (lt.value == tau::_1().value) return true;
+	if (lt.value == tau::_0_tree().value) return false;
+	if (lt.value == tau::_1_tree().value) return true;
 
 	// more elaborate cases
 	if (lt.first_tree().is(tau::bf_constant))
@@ -218,7 +218,7 @@ bool is_one(const tree<node<BAs...>>& lt) {
 // We overload the == operator for tau in order to account for typed constants
 template <BAsPack... BAs>
 bool operator==(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
-	return lt == rt;
+	return tree<node<BAs...>>::subtree_equals(lt.get(), rt.get());
 }
 
 // Also define != again in terms of ==
