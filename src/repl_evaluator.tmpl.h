@@ -674,12 +674,19 @@ void print_z3_solver_cmd_solution(std::optional<solution<BAs...>>& solution) {
 	return;
 }
 
+template <typename... BAs>
+bool is_z3_formula(const tau<BAs...>& n) {
+	return is_non_terminal<tau_parser::wff, BAs...>(n)
+		&& !idni::tau_lang::is_child_non_terminal<BAs...>(tau_parser::wff_t, n)
+		&& !idni::tau_lang::is_child_non_terminal<BAs...>(tau_parser::wff_f, n)
+		&& !find_top(n, is_non_terminal<tau_parser::bf, BAs...>).has_value();
+}
 
 template <typename... BAs>
 void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 	// if the  form is a z3 formula call z3
-	if (auto check = find_top(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>); check) {
-		auto equations = n->child.back();
+	auto equations = n->child.back();
+	if (is_z3_formula(equations)) {
 		try {
 			auto solution = solve_z3(equations);
 			if (!solution) { std::cout << "no solution\n"; return; }
@@ -687,6 +694,12 @@ void repl_evaluator<BAs...>::solve_cmd(const tau_nso_t& n) {
 		} catch (std::exception&) {
 			BOOST_LOG_TRIVIAL(error) << "(Error) overflow/underflow while solving the system";
 		}
+		return;
+	}
+
+	// TODO (HIGH) remove this check once evrything is enabled
+	if (find_top(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>).has_value()) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) mixed tau and z3 formulas not enabled yet";
 		return;
 	}
 
@@ -792,7 +805,25 @@ template<typename... BAs>
 std::optional<tau_nso<BAs...>>
 	repl_evaluator<BAs...>::sat_cmd(const tau_nso_t& n)
 {
+	// if the  form is a z3 formula call z3
 	auto arg = n->child[1];
+	if (is_z3_formula(arg)) {
+		try {
+			return is_z3_formula_sat(arg)
+				? _T<tau_ba_t, BAs...>
+				: _F<tau_ba_t, BAs...>;
+		 } catch (std::exception&) {
+			BOOST_LOG_TRIVIAL(error) << "(Error) overflow/underflow while solving the system";
+		}
+		return {};
+	}
+
+	// TODO (HIGH) remove this check once evrything is enabled
+	if (find_top(n, is_non_terminal<tau_parser::z3, tau_ba<BAs...>, BAs...>).has_value()) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) mixed tau and z3 formulas not enabled yet";
+		return {};
+	}
+
 	if (auto check = get_type_and_arg(arg); check) {
 		auto [type, value] = check.value();
 		bool contains_ref = contains(value, tau_parser::ref);

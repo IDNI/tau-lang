@@ -27,23 +27,6 @@ TEST_SUITE("configuration") {
 	}
 }
 
-TEST_SUITE("sample z3 programs") {
-
-	TEST_CASE("sample") {
-		context c;
-		expr x = c.bv_const("x", 32);
-		expr y = c.bv_const("y", 32);
-		solver s(c);
-		// In C++, the operator == has higher precedence than ^.
-		s.add(((x * y) == 4) && (x  == 2));
-		std::cout << s << "\n";
-		std::cout << s.check() << "\n";
-		std::cout << s.get_model() << "\n";
-		std::cout << s.get_model().eval(x) << "\n";
-		std::cout << s.get_model().eval(y) << "\n";
-	}
-}
-
 TEST_SUITE("z3_solve simple") {
 
 	TEST_CASE("X =_ 1") {

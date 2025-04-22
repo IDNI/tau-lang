@@ -23,6 +23,8 @@ set(TESTS
 	make_node_hook
 	interpreter
 	z3_solver
+	z3_satisfiability
+	z3
 )
 
 foreach(X IN LISTS TESTS)

@@ -29,6 +29,12 @@ using solution = std::map<var<BAs...>, tau<BAs...>>;
 template <typename...BAs>
 z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars, bool checked = false);
 
+template <typename...BAs>
+bool is_z3_formula_sat(const tau<BAs...>& form);
+
+template<typename...BAs>
+std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form, z3::solver& solver);
+
 template<typename...BAs>
 std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form);
 
