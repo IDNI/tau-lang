@@ -19,6 +19,22 @@ struct logging_initializer {
 			add_console_log(std::cout, keywords::format =
 				expressions::stream << expressions::smessage);
 	}
+	void trace() {
+		using namespace boost::log;
+		core::get()->set_filter(trivial::severity >= trivial::trace);
+	}
+	void debug() {
+		using namespace boost::log;
+		core::get()->set_filter(trivial::severity >= trivial::debug);
+	}
+	void info() {
+		using namespace boost::log;
+		core::get()->set_filter(trivial::severity >= trivial::info);
+	}
+	void error() {
+		using namespace boost::log;
+		core::get()->set_filter(trivial::severity >= trivial::error);
+	}
 };
 inline static logging_initializer initialize_logging;
 

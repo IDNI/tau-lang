@@ -6,6 +6,7 @@
 #include <cassert>
 #include "doctest.h"
 
+#include "init_log.h"
 #include "boolean_algebras/sbf_ba.h"
 
 using namespace std;
