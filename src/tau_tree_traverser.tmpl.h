@@ -27,6 +27,15 @@ result_type tree<node>::extractor<result_type>::operator()(
 // extractors
 
 template <NodeType node>
+const typename tree<node>::template extractor<typename tree<node>::traverser>
+	tree<node>::traverser::f(const auto& fn)
+{
+	return extractor<traverser>([fn](const traverser& t) {
+		return traverser(fn(t.value()));
+	});
+}
+
+template <NodeType node>
 const typename tree<node>::template extractor<tref> tree<node>::traverser::ref =
 	typename tree<node>::template extractor<tref>([](const traverser& t)
 						-> tref

@@ -87,6 +87,18 @@ std::ostream& tree<node>::print_tree(std::ostream& os, size_t s) const {
 	return os;
 }
 
+template <NodeType node>
+std::string tree<node>::to_str() const {
+	std::stringstream ss;
+	return print(ss), ss.str();
+}
+
+template <NodeType node>
+std::string tree<node>::tree_to_str() const {
+	std::stringstream ss;
+	return print_tree(ss), ss.str();
+}
+
 //------------------------------------------------------------------------------
 // print
 template <NodeType node>
@@ -348,6 +360,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		return true;
 	};
 	auto on_between = [&](tref /*left*/, tref parent) {
+		if (parent == nullptr) return true;
 		const auto& t = get(parent);
 #ifdef DEBUG_TRAVERSAL
 		std::cerr << "[|" << t.get_type_name() << "] \n";
