@@ -1007,7 +1007,7 @@ tau_<BAs...> transform_to_execution(const tau_<BAs...>& fm,
 				const int_t start_time = 0,
 				const bool output = false ) {
 	assert(get_dnf_wff_clauses(fm).size() == 1);
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 	static std::map<std::pair<tau_<BAs...>, int_t>, tau_<BAs...>> cache;
 	if (auto it = cache.find(std::make_pair(fm, start_time)); it != cache.end())
 		return it->second;
@@ -1030,7 +1030,7 @@ tau_<BAs...> transform_to_execution(const tau_<BAs...>& fm,
 		ev_t = transform_to_eventual_variables(ubd_fm, false, start_time);
 		// Check if there is a sometimes present
 		if (ev_t.first == ubd_fm) {
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 			cache.emplace(std::make_pair(elim_aw(ubd_fm), start_time), elim_aw(ubd_fm));
 			return cache.emplace(std::make_pair(fm, start_time), elim_aw(ubd_fm)).first->second;
 #endif
@@ -1040,7 +1040,7 @@ tau_<BAs...> transform_to_execution(const tau_<BAs...>& fm,
 		ev_t = transform_to_eventual_variables(fm, true, start_time);
 		// Check if there is a sometimes present
 		if (ev_t.first == fm) {
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 			return cache.emplace(std::make_pair(fm, start_time), elim_aw(fm)).first->second;
 #endif
 			return elim_aw(fm);
@@ -1048,7 +1048,7 @@ tau_<BAs...> transform_to_execution(const tau_<BAs...>& fm,
 	}
 	auto aw_after_ev = find_top(ev_t.first, is_child_non_terminal<p::wff_always, BAs...>);
 	if (!aw_after_ev.has_value()) {
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 		return cache.emplace(std::make_pair(fm, start_time), elim_aw(fm)).first->second;
 #endif
 		return elim_aw(fm);
@@ -1064,7 +1064,7 @@ tau_<BAs...> transform_to_execution(const tau_<BAs...>& fm,
 	else res = aw_after_ev.value();
 	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
 	res = elim_aw(res);
-#ifdef TAU_CACHE
+#ifdef TAU_CACHE_DEPRECIATING
 	cache.emplace(std::make_pair(res, start_time), res);
 	return cache.emplace(std::make_pair(fm, start_time), res).first->second;
 #endif

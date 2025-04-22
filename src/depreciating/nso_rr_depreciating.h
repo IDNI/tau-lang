@@ -130,10 +130,10 @@ tau_<BAs...> nso_rr_apply(const rewriter::depreciating::rule<tau_<BAs...>>& r,
 			&& ( get<tau_source_sym>(n->value).n() == tau_parser::capture);
 	};
 
-	#ifdef TAU_CACHE
+	#ifdef TAU_CACHE_DEPRECIATING
 	static std::map<std::pair<rewriter::depreciating::rule<tau_<BAs...>>, tau_<BAs...>>, tau_<BAs...>> cache;
 	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
-	#endif // TAU_CACHE
+	#endif // TAU_CACHE_DEPRECIATING
 
 	#ifdef TAU_MEASURE
 	measures::increase_rule_counter<tau_<BAs...>>(r);
@@ -146,9 +146,9 @@ tau_<BAs...> nso_rr_apply(const rewriter::depreciating::rule<tau_<BAs...>>& r,
 		if (n != nn) measures::increase_rule_hit<tau_<BAs...>>(r);
 		#endif // TAU_MEASURE
 
-		#ifdef TAU_CACHE
+		#ifdef TAU_CACHE_DEPRECIATING
 		cache[{r, n}] = nn;
-		#endif // TAU_CACHE
+		#endif // TAU_CACHE_DEPRECIATING
 
 		return nn;
 	} catch (const std::exception& e) {
@@ -171,18 +171,18 @@ tau_<BAs...> replace_with(const tau_<BAs...>& node, const tau_<BAs...>& with,
 template <typename... BAs>
 tau_<BAs...> nso_rr_apply(const rules<tau_<BAs...>>& rs, const tau_<BAs...>& n)
 {
-	#ifdef TAU_CACHE
+	#ifdef TAU_CACHE_DEPRECIATING
 	static std::map<std::pair<rules<tau_<BAs...>>, tau_<BAs...>>, tau_<BAs...>> cache;
 	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
-	#endif // TAU_CACHE
+	#endif // TAU_CACHE_DEPRECIATING
 
 	if (rs.empty()) return n;
 	tau_<BAs...> nn = n;
 	for (auto& r : rs) nn = nso_rr_apply<BAs...>(r, nn);
 
-	#ifdef TAU_CACHE
+	#ifdef TAU_CACHE_DEPRECIATING
 	cache[{rs, n}] = nn;
-	#endif // TAU_CACHE
+	#endif // TAU_CACHE_DEPRECIATING
 	return nn;
 }
 
