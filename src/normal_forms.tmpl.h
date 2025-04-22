@@ -653,7 +653,7 @@ inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template <NodeType node>
-void elim_vars_in_assignment(const auto& fm, const auto& vars, auto& i,
+void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 	const int_t p, const auto& is_var)
 {
 	// auto is_var = [](tref n){return
@@ -678,7 +678,7 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	using tau = tree<node>;
 	// Check if all variables are assigned
 	if((int_t) vars.size() == p) {
-		tref fm_simp;
+		tref fm_simp = nullptr;
 		if (!is_wff) {
 			// Do not add to dnf if the coefficient is 0
 			if (fm == tau::_0()) return false;
@@ -722,10 +722,10 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	}
 	// Substitute 1 and 0 for v and simplify
 	const auto& v = vars[p];
-	auto t = is_wff ? tau::_T() : tau::_1();
-	auto f = is_wff ? tau::_F() : tau::_0();
-	auto fm_v1 = replace<node>(fm, v, t);
-	auto fm_v0 = replace<node>(fm, v, f);
+	tref t = is_wff ? tau::_T() : tau::_1();
+	tref f = is_wff ? tau::_F() : tau::_0();
+	tref fm_v1 = replace<node>(fm, v, t);
+	tref fm_v0 = replace<node>(fm, v, f);
 
 	elim_vars_in_assignment<node>(fm_v1, vars, i, p, is_var);
 	if(fm_v1 == fm_v0) {
@@ -788,7 +788,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 		for (auto& [coeff, paths] : dnf) join_paths(paths);
 
 	// Convert map structure dnf back to rewrite tree
-	tref reduced_dnf;
+	tref reduced_dnf = nullptr;
 	bool first = true;
 	for (const auto& [coeff, paths] : dnf) {
 		const auto& t = tau::get(coeff);
@@ -801,7 +801,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 		}
 		for (const auto& path : paths) {
 			bool first_var = true;
-			tref var_path;
+			tref var_path = nullptr;
 			for (size_t k = 0; k < vars.size(); ++k) {
 				if (path[k] == 2) continue;
 				if (first_var) var_path = path[k] == 1 ? vars[k]
@@ -1045,11 +1045,11 @@ tref sort_var(tref var) {
 #endif // TAU_CACHE
 	const auto& t = tau::get(var);
 	if (t.child_is(tau::bf_eq)) {
-		auto clauses = tau::get_dnf_bf_clauses(t[0].first());
+		trefs clauses = tau::get_dnf_bf_clauses(t[0].first());
 		std::ranges::sort(clauses);
-		tref res;
+		tref res = nullptr;
 		for (tref c : clauses) {
-			auto lits = tau::get_cnf_bf_clauses(c);
+			trefs lits = tau::get_cnf_bf_clauses(c);
 			std::ranges::sort(lits, lex_var_comp<node>);
 			if (res) res = tau::build_bf_or(res,
 					tau::build_bf_and(lits));
@@ -1081,10 +1081,11 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 			is_child_non_terminal<tau::bf_eq, node>);
 		for (tref eq : eqs) {
 			auto sorted_eq = sort_var<node>(eq);
+			// BOOST_LOG_TRIVIAL(trace) << "(F) sorted_eq: " << TAU_TO_STR(sorted_eq);
 			if (sorted_eq != eq) changes.emplace(eq, sorted_eq);
 		}
 		new_fm = rewriter::replace<node>(new_fm, changes);
-		BOOST_LOG_TRIVIAL(trace) << "(F) canonical equalities: " << TAU_TO_STR(new_fm);
+		// BOOST_LOG_TRIVIAL(trace) << "(F) canonical equalities: " << TAU_TO_STR(new_fm);
 	}
 
 	trefs vars = wff ? tau::get(new_fm).select_top(is_wff_bdd_var<node>)
@@ -1357,7 +1358,7 @@ tref apply_eqs_across_clauses(tref fm) {
 		}
 	}
 	if (eq_reductions.empty() && neq_reductions.empty()) return fm;
-	tref new_fm;
+	tref new_fm = nullptr;
 	typename tau::subtree_map changes;
 	for (tref clause : clauses) {
 		auto neqs = tau::get(clause).select_top(
@@ -1510,7 +1511,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	pos_bf = reduce<node>(pos_bf, tau::bf, false, true, false);
 	pos_bf = simp_general_excluded_middle<node>(pos_bf);
 	// std::cout << "pos_bf after reduce: " << pos_bf << "\n";
-	tref new_pos_bf;
+	tref new_pos_bf = nullptr;
 	for (tref c : tau::get_dnf_bf_clauses(pos_bf)) {
 		pos.emplace_back(tau::get_cnf_bf_clauses(c));
 		if (new_pos_bf) new_pos_bf = tau::build_wff_and(new_pos_bf,
@@ -1590,10 +1591,10 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 		}
 	}
 
-	tref neq_cnf;
+	tref neq_cnf = nullptr;
 	for (const auto& neq_clause : cnf_neq_lits) {
 		if (neq_clause.empty()) continue;
-		tref neqs;
+		tref neqs = nullptr;
 		for (const auto& n : neq_clause) {
 			if (n.empty()) continue;
 			if (neqs) neqs = tau::build_wff_or(neqs,
@@ -2183,12 +2184,12 @@ template <NodeType node>
 tref rm_temporary_lookback(tref fm) {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
-	auto io_vars = t.select_top(is_child_non_terminal<tau::io_var, node>);
+	trefs io_vars = t.select_top(is_child_non_terminal<tau::io_var, node>);
 	bool has_var = std::ranges::any_of(io_vars,
 		[](tref el){return !is_io_initial<node>(el);});
 	int_t lookback = get_max_shift<node>(io_vars, true);
 	std::map<tref, tref> changes;
-	tref max_temp;
+	tref max_temp = nullptr;
 	for (tref io_var : io_vars) {
 		auto n = get_io_name<node>(io_var);
 		// Only eliminate lookback temporary variables
@@ -2479,7 +2480,7 @@ tref pull_always_out(tref fm) {
 	}
 	if (collected_always_fms.empty()) return fm;
 	// Rebuild formula based on the extraction
-	tref always_part;
+	tref always_part = nullptr;
 	int_t lookback = 0;
 	bool first = true;
 	for (tref fa : collected_always_fms) {
@@ -2522,7 +2523,7 @@ tref pull_sometimes_always_out(tref fm) {
 	using tau = tree<node>;
 	typename tau::subtree_map changes = {};
 	trefs collected_no_temp_fms;
-	tref pure_always_clause;
+	tref pure_always_clause = nullptr;
 	// Collect all disjuncts which have temporal variables and call pull_always_out on the others
 	auto clauses = tau::get(fm).get_leaves(tau::wff_or);
 	if (clauses.empty()) clauses.push_back(fm);
@@ -2541,7 +2542,7 @@ tref pull_sometimes_always_out(tref fm) {
 	}
 	if (!changes.empty()) fm = replace<node>(fm, changes);
 	if (!collected_no_temp_fms.empty()) {
-		tref no_temp_fm;
+		tref no_temp_fm = nullptr;
 		bool first = true;
 		for (tref f : collected_no_temp_fms) {
 			if (first) first = false, no_temp_fm = f;
@@ -2655,7 +2656,7 @@ tref pull_always_out_for_inf(tref fm) {
 	auto clauses = get_dnf_wff_clauses<node>(fm);
 	tref res = tau::_F();
 	tref non_temps = tau::_F();
-	tref last_always;
+	tref last_always = nullptr;
 	for (tref clause : clauses) {
 		// Clauses not containing temporal variables need to be added under always
 		if (!has_temp_var<node>(clause)) {
@@ -2894,7 +2895,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 #endif // TAU_CACHE
 
 	auto clauses = tau::get(scoped_fm).get_leaves(tau::wff_or);
-	tref res;
+	tref res = nullptr;
 	for (tref clause : clauses) {
 		// Check if every conjunct in clause is of form f = 0 or f != 0
 		trefs conjuncts = tau::get(clause).get_leaves(tau::wff_and);
@@ -2906,7 +2907,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 				all_unequal_zero = false;
 		}
 		if (all_unequal_zero) {
-			tref new_conjunct;
+			tref new_conjunct = nullptr;
 			// Push quantifier inside conjunction
 			for (tref c : conjuncts) {
 				auto new_c = wff_remove_existential<node>(
@@ -2921,7 +2922,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 		}
 		else if (all_equal_zero) {
 			//TODO: If they have different type, seperate
-			tref new_func;
+			tref new_func = nullptr;
 			for (tref d : conjuncts) {
 				if (new_func) new_func =
 					tau::build_bf_or(new_func, tau::trim2(d));
@@ -2972,7 +2973,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 #endif // TAU_CACHE
 
 	auto clauses = tau::get(scoped_fm).get_leaves(scoped_fm, tau::wff_and);
-	tref res;
+	tref res = nullptr;
 	for (tref clause : clauses) {
 		// Check if every disjunct in clause is of form f = 0 or f != 0
 		auto disjuncts = tau::get(clause).get_leaves(tau::wff_or);
@@ -2984,7 +2985,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 				all_unequal_zero = false;
 		}
 		if (all_equal_zero) {
-			tref new_disjunct;
+			tref new_disjunct = nullptr;
 			// Push quantifier inside disjunction
 			for (tref d : disjuncts) {
 				auto new_d = push_negation_in<node>(tau::build_wff_neg(d));
@@ -3000,7 +3001,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 			else res = new_disjunct;
 		}
 		if (all_unequal_zero) {
-			tref new_func;
+			tref new_func = nullptr;
 			for (tref d : disjuncts) {
 				if (new_func) new_func =
 					tau::build_bf_or(new_func, tau::trim2(d));
@@ -3116,7 +3117,7 @@ tref get_eq_with_most_quant_vars(tref fm, const auto& quant_vars) {
 	// std::cout << "Begin get_eq_with_most_quant_vars with\n";
 	// std::cout << "fm: " << fm << "\n";
 	// std::cout << "quantified vars: " << quant_vars << "\n";
-	tref eq_max_quants;
+	tref eq_max_quants = nullptr;
 	int_t max_quants = 0;
 	auto get_eq = [&](tref n) {
 		if (is_non_terminal<node>(tau::bf_eq, n)) {

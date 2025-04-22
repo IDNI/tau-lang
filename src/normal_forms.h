@@ -226,7 +226,7 @@ struct onf_wff {
 	tref operator()(tref n) const;
 private:
 	tref onf_subformula(tref n) const;
-	tref var;
+	tref var = nullptr;
 };
 
 template <NodeType node>
@@ -306,7 +306,7 @@ inline auto is_bf_bdd_var = [](tref n) {
 
 // Starting from variable at position p+1 in vars write to i which variables are irrelevant in assignment
 template <NodeType node>
-void elim_vars_in_assignment(const auto& fm, const auto& vars, auto& i,
+void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 	const int_t p, const auto& is_var);
 
 // Declaration of functions used in assign_and_reduce which are implemented later
