@@ -34,6 +34,16 @@ typename tree<node<BAs...>>::traverser make_tt(const std::string& s,
 	return typename tree<node<BAs...>>::traverser(make<BAs...>(s, opts));
 }
 
+inline tref bmake(const std::string& s, tau_parser::parse_options opts = {}) {
+	return make<Bool>(s, opts);
+}
+
+inline typename tree<node<Bool>>::traverser bmake_tt(const std::string& s,
+	tau_parser::parse_options opts = {})
+{
+	return typename tree<node<Bool>>::traverser(bmake(s, opts));
+}
+
 template <BAsPack... BAs>
 optional<variant<BAs...>> get_constant(const std::string& s, const std::string& type_name) {
 	return nso_factory<BAs...>::instance().parse(s, type_name);
@@ -128,9 +138,7 @@ struct nso_factory<sbf_ba, Bool> {
 		static nso_factory<sbf_ba, Bool> factory;
 		return factory;
 	}
-
 private:
-
 	nso_factory() {};
 };
 

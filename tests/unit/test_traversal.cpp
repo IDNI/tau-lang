@@ -10,7 +10,7 @@ TEST_SUITE("operator|") {
 
 	TEST_CASE("match zero nodes") {
 		const char* sample = "$X & $Y := $Z.";
-		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto lib = bmake_tt(sample, { .start = tau::library });
 		CHECK( !(lib | tau::main) 
 		
 		);
@@ -18,7 +18,7 @@ TEST_SUITE("operator|") {
 
 	TEST_CASE("match one node") {
 		const char* sample = "$X & $Y := $Z.";
-		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto lib = bmake_tt(sample, { .start = tau::library });
 		CHECK( (lib | tau::rules).size() == 1 );
 	}
 }
@@ -27,21 +27,21 @@ TEST_SUITE("operator||") {
 
 	TEST_CASE("match zero nodes") {
 		const char* sample = "$X & $Y := $Z.";
-		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto lib = bmake_tt(sample, { .start = tau::library });
 		CHECK( (lib | tau::rules | tau::rule | tau::wff_rule					
 						|| tau::wff).empty() );
 	}
 
 	TEST_CASE("match one node") {
 		const char* sample = "X & Y := Z.";
-		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto lib = bmake_tt(sample, { .start = tau::library });
 		CHECK( (lib | tau::rules | tau::rule
 						|| tau::bf_rule).size() == 1 );
 	}
 
 	TEST_CASE("match several nodes") {
 		const char* sample = "X & Y := Z.";
-		auto lib = make_tt<Bool>(sample, { .start = tau::library });
+		auto lib = bmake_tt(sample, { .start = tau::library });
 		CHECK( (lib | tau::rules | tau::rule | tau::bf_rule
 			| tau::bf_matcher | tau::bf | tau::bf_and
 						|| tau::bf).size() == 2 );
