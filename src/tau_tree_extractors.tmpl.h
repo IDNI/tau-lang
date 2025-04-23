@@ -18,7 +18,7 @@ template <NodeType node>
 rr_sig tree<node>::get_rr_sig(tref n) {
 	auto r = tt(n); // traverse to ref if n is bf_ref or wff_ref
 	if (auto r_as_child = r | ref; r_as_child) r = r_as_child;
-	return { rr_dict(r | tau_parser::sym | tt::string),
+	return { rr_dict(r | node::type::sym | tt::string),
 		(r | offsets || offset).size(),
 		(r | ref_args || ref_arg).size() };
 }
@@ -104,22 +104,22 @@ trefs tree<node>::get_leaves(tref n, node::type branch) {
 
 template <NodeType node>
 trefs tree<node>::get_dnf_wff_clauses(tref n) {
-	return get_leaves(n, tau_parser::wff_or);
+	return get_leaves(n, node::type::wff_or);
 }
 
 template <NodeType node>
 trefs tree<node>::get_dnf_bf_clauses(tref n) {
-	return get_leaves(n, tau_parser::bf_or);
+	return get_leaves(n, node::type::bf_or);
 }
 
 template <NodeType node>
 trefs tree<node>::get_cnf_wff_clauses(tref n) {
-	return get_leaves(n, tau_parser::wff_and);
+	return get_leaves(n, node::type::wff_and);
 }
 
 template <NodeType node>
 trefs tree<node>::get_cnf_bf_clauses(tref n) {
-	return get_leaves(n, tau_parser::bf_and);
+	return get_leaves(n, node::type::bf_and);
 }
 
 } // namespace idni::tau_lang
