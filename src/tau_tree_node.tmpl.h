@@ -8,8 +8,18 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 
 template <BAsPack... BAs>
+node<BAs...> node<BAs...>::retype(size_t new_nt) const {
+	return node(new_nt, data, term, ba, ext);
+}
+
+template <BAsPack... BAs>
 constexpr node<BAs...> node<BAs...>::ba_constant(size_t v, size_t ba_tid) {
 	return node(type::bf_constant, v, true /*is_term*/, ba_tid);
+}
+
+template <BAsPack... BAs>
+constexpr node<BAs...> node<BAs...>::ba_typed(type nt, size_t ba_tid) {
+	return node(nt, 0, true /*is_term*/, ba_tid);
 }
 
 inline bool is_term_nt(size_t nt) {

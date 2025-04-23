@@ -40,6 +40,8 @@ concept NodeType = requires { // Node Type has to provide
 	typename N::ba_constants_binder_t;
 	// alias for the ba_types_checker_and_propagator type
 	typename N::ba_types_checker_and_propagator_t;
+	// alias for the tau_ba type
+	typename N::tau_ba_t;
 	// alias for the node type
 	typename N::type;
 	// nt is convertible to size_t
@@ -54,22 +56,22 @@ concept NodeType = requires { // Node Type has to provide
 // forward declarations
 
 template <BAsPack... BAs>
+struct nso_factory;
+
+template <BAsPack... BAs>
+struct tau_ba;
+
+template <BAsPack... BAs>
 struct ba_constants;
 
 template <BAsPack... BAs>
 struct ba_constants_binder;
 
 template <BAsPack... BAs>
-struct nso_factory;
-
-template <BAsPack... BAs>
-struct tau_ba;
+struct ba_types_checker_and_propagator;
 
 template <NodeType node>
 struct ref_types;
-
-template <BAsPack... BAs>
-struct ba_types_checker_and_propagator;
 
 // -----------------------------------------------------------------------------
 
@@ -112,9 +114,12 @@ struct node {
 	// alias for ba_types_checker_and_propagator<BAs...>
 	using ba_types_checker_and_propagator_t =
 					ba_types_checker_and_propagator<BAs...>;
+	// alias for tau_ba<BAs...>
+	using tau_ba_t = tau_ba<BAs...>;
 
 	using T = size_t; // just to simplify changes or templating it later
 
+	// bit sizes
 	static constexpr size_t bits      = std::numeric_limits<T>::digits;
 	static constexpr size_t nt_bits   = tau_parser_data::nt_bits;
 	static constexpr size_t ba_bits   = BAs_bitsize<BAs...>;
@@ -129,6 +134,7 @@ struct node {
 	static constexpr size_t nt_shift = term_shift + 1;  // +1 for term
 	static constexpr size_t ba_mask = ((size_t(1) << ba_bits) - size_t(1)) << ba_shift;
 
+	// node fields
 	const T nt   : nt_bits   = 0; // id of the nonterminal (container of the data index value)
 	const T term : 1         = 0; // 1 = is term, 0 = is tau (if term == 0 and ba == 1 it is untyped)
 	const T ba   : ba_bits   = 0; // id of the ba type, 0 = untyped
@@ -141,8 +147,13 @@ struct node {
 	constexpr node(size_t nt = 0, size_t data = 0, size_t is_term = 0,
 			size_t ba_type = 0, size_t ext = 0) noexcept;
 
+	node retype(size_t new_nt) const;
+
 	// factory for a ba constant node
 	static constexpr node_t ba_constant(size_t v, size_t ba_tid = 0);
+
+	// factory for a node of a given node::type and BA type id
+	static constexpr node_t ba_typed(type nt, size_t ba_tid = 0);
 
 	// returns name of the nonterminal nt
 	static const std::string& name(size_t nt);
@@ -217,29 +228,33 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get(binder& bind, const tau_parser::tree& t);
 	static tref get(const tau_parser::tree& t);
 
+	// get node with children without triggering hooks
+	static tref get_raw(const node& v, const tref* ch = nullptr,
+					size_t len = 0, tref r = nullptr);
+
 	// creation with tref children
 	static tref get(const node& v); // leaf
 	static tref get(const node& v, tref ch); // with single child
 	static tref get(const node& v, tref ch1, tref ch2); // with two children
-	static tref get(const node& v, const tref* ch, size_t len);
-	static tref get(const node& v, const trefs& ch);
-	static tref get(const node& v, const std::initializer_list<tref>& ch);
+	static tref get(const node& v, const tref* ch, size_t len, tref r = nullptr);
+	static tref get(const node& v, const trefs& ch, tref r = nullptr);
+	static tref get(const node& v, const std::initializer_list<tref>& ch, tref r = nullptr);
 
 	// creation with node children
 	static tref get(const node& v, const node& ch);
 	static tref get(const node& v, const node& ch1, const node& ch2);
-	static tref get(const node& v, const node* ch, size_t len);
-	static tref get(const node& v, const std::vector<node>& ch);
-	static tref get(const node& v, const std::initializer_list<node>& ch);
+	static tref get(const node& v, const node* ch, size_t len, tref r = nullptr);
+	static tref get(const node& v, const std::vector<node>& ch, tref r = nullptr);
+	static tref get(const node& v, const std::initializer_list<node>& ch, tref r = nullptr);
 
 	// creation of node::type and children
 	static tref get(const node::type& nt); // terminal / leaf
 	static tref get(const node::type& nt, tref ch); // with single child
 	static tref get(const node::type& nt, tref ch1, tref ch2); // with two children
-	static tref get(const node::type& nt, const tref* ch, size_t len); // with array of children
-	static tref get(const node::type& nt, const trefs& ch); // with vector of children
+	static tref get(const node::type& nt, const tref* ch, size_t len, tref r = nullptr);
+	static tref get(const node::type& nt, const trefs& ch, tref r = nullptr); // with vector of children
 	static tref get(const node::type& nt, // with initializer list of children
-					const std::initializer_list<tref>& ch);
+					const std::initializer_list<tref>& ch, tref r = nullptr);
 	static tref get(const node::type& nt, const std::string& str); // with string
 
 	// terminals
@@ -302,6 +317,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	size_t get_num() const;
 	size_t get_ba_constant_id() const;
 	bas_variant get_ba_constant() const;
+	size_t get_ba_type() const;
 
 	// ---------------------------------------------------------------------
 	// from parser (tau_tree_from_parser.tmpl.h)
@@ -423,6 +439,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		static const extractor<size_t>           num;
 		static const extractor<size_t>           data;
 		static const extractor<size_t>           ba_constant_id;
+		static const extractor<size_t>           ba_type;
 		static const extractor<bas_variant>      ba_constant;
 
 		traverser operator|(size_t nt) const;
@@ -441,6 +458,10 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	// traverser operator|(size_t nt) const;
 	// traverser operator||(size_t nt) const;
 
+	// wraps this node by a traverser
+	traverser operator()() const;
+
+	// shortcut alias used mostly internally
 	using tt = traverser;
 
 	// ---------------------------------------------------------------------
