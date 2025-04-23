@@ -234,7 +234,7 @@ Also, you can use the following recurrence relation definition
 
 ```
 g[0](y) := 0
-g[n](y) := g[n](y)'
+g[n](y) := g[n - 1](y)'
 ```
 
 which defines a function (rather than a predicate) and alternates between 0 and 1
