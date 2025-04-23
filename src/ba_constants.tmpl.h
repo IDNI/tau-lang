@@ -6,18 +6,25 @@
 namespace idni::tau_lang {
 
 template <BAsPack... BAs>
-std::pair<size_t, size_t> ba_constants<BAs...>::get(const std::variant<BAs...>& b,
-	const std::string& type_name)
+std::pair<size_t, size_t> ba_constants<BAs...>::get(
+	const std::variant<BAs...>& b, size_t tid)
 {
-	// DBG(std::cout << "BAC get: " << b << " " << type_name << std::endl;)
+	// DBG(std::cout << "BAC get: " << b << " " << tid << "\n";)
 	size_t constant_id = get(b);
-	size_t tid = type_id(string_id(type_name));
 	return *(type_map.emplace(constant_id, tid).first);
 }
 
 template <BAsPack... BAs>
+std::pair<size_t, size_t> ba_constants<BAs...>::get(
+	const std::variant<BAs...>& b, const std::string& type_name)
+{
+	// DBG(std::cout << "BAC get: " << b << " " << type_name << "\n";)
+	return get(b, type_id(string_id(type_name)));
+}
+
+template <BAsPack... BAs>
 std::variant<BAs...> ba_constants<BAs...>::get(size_t constant_id) {
-	// std::cout << "BAC get: " << constant_id << " " << C.size() << std::endl;
+	// std::cout << "BAC get: " << constant_id << " " << C.size() << "\n";
 	DBG(assert(constant_id > 0);)
 	DBG(assert(constant_id < C.size());)
 	return C[constant_id];
@@ -109,7 +116,7 @@ size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
 	if (auto it = std::find(C.begin() + 1, C.end(), b); it != C.end())
 		return it - C.begin();
 	C.push_back(b);
-	// DBG(std::cout << "BAC got: " << b << " with constant_id: " << C.size() - 1 << std::endl;)
+	// DBG(std::cout << "BAC got: " << b << " with constant_id: " << C.size() - 1 << "\n";)
 	return C.size() - 1;
 }
 
