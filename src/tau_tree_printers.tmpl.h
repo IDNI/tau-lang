@@ -21,19 +21,20 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
 	using tau = tree<node<BAs...>>;
-	if (n.term) os << "T:";
-	if (n.data) os << "[" << n.data << "]";
-	if (n.nt == tau::integer) os << n.as_int() << " ";
-	else if (n.nt == tau::bf_constant)
-				os << ba_constants<BAs...>::get(n.data) << " ";
-	else if (tau::is_digital_nt(n.nt)) os << n.data << " ";
-	else if (tau::is_string_nt(n.nt))
-				os << "\"" << string_from_id(n.data) << "\" ";
-	// else if (n.ext) os << "{EXT}";
 	os << tau::node::name(n.nt);
 #ifdef DEBUG
-	if (bool print_nt_ids = true; print_nt_ids) os << "(" << n.nt << ")";
-	if (n.data) os << " #" << n.data;
+	if (bool print_nt_ids = false; print_nt_ids) os << "(" << n.nt << ")";
+#endif
+	if (n.nt == tau::integer) os << " " << n.as_int();
+	else if (n.nt == tau::bf_constant)
+				os << " " << ba_constants<BAs...>::get(n.data);
+	else if (tau::is_digital_nt(n.nt)) os << " " << n.data;
+	else if (tau::is_string_nt(n.nt))
+				os << " \"" << string_from_id(n.data) << "\"";
+	// else if (n.ext) os << "{EXT}";
+#ifdef DEBUG
+	if (n.data) os << " [" << n.data << "]";
+	if (bool print_is_term = false; print_is_term && n.term) os << " T";
 #endif
 	return os;
 }
