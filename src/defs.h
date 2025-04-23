@@ -35,7 +35,7 @@
 // helper macro for pretty printing a tau tree tref into a string
 #define TAU_TO_STR(ref) (tau::get(ref).to_str())
 // helper macro for printing a tau tree tref into a string
-#define TAU_TREE_TO_STR(ref) (tau::get(ref).tree_to())
+#define TAU_TREE_TO_STR(ref) (tau::get(ref).tree_to_str())
 
 namespace idni::tau_lang {
 
