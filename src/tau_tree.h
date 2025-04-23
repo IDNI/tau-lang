@@ -73,6 +73,9 @@ struct ba_types_checker_and_propagator;
 template <NodeType node>
 struct ref_types;
 
+template <NodeType node>
+struct get_hook;
+
 // -----------------------------------------------------------------------------
 
 // helper to get size of boolean algebras variant pack
