@@ -14,6 +14,7 @@ template <NodeType node>
 tref tree<node>::get() const { return base_t::get(); }
 template <NodeType node>
 const tree<node>& tree<node>::get(const tref id) {
+	DBG(assert(id != nullptr);)
 	return (const tree&) base_t::get(id);
 }
 template <NodeType node>
@@ -21,37 +22,48 @@ const tree<node>& tree<node>::get(const htree::sp& h) {
 	return (const tree&) base_t::get(h);
 }
 template <NodeType node>
-htree::sp tree<node>::geth(tref h) {return base_t::geth(h);}
+htree::sp tree<node>::geth(tref h) {
+	DBG(assert(h != nullptr);)
+	return base_t::geth(h);
+}
 
 //------------------------------------------------------------------------------
 // creation with tref childs
 
 template <NodeType node>
-tref tree<node>::get(const node& v) { return base_t::get(v); }
+tref tree<node>::get_raw(const node& v, const tref* ch, size_t len, tref r) {
+	// BOOST_LOG_TRIVIAL(debug) << "get_raw: " << v << " " << len << " r: " << r << "\n";
+	return base_t::get(v, ch, len, r);
+}
 
 template <NodeType node>
-tref tree<node>::get(const node& v, tref child) {
-	return base_t::get(v, child);
+tref tree<node>::get(const node& v) {
+	return get(v, (const tref*) nullptr, 0, nullptr);
+}
+
+template <NodeType node>
+tref tree<node>::get(const node& v, tref ch) {
+	return get(v, &ch, 1);
 }
 
 template <NodeType node>
 tref tree<node>::get(const node& v, tref ch1, tref ch2) {
-	return base_t::get(v, ch1, ch2);
+	return get(v, { ch1, ch2 });
 }
 
 template <NodeType node>
-tref tree<node>::get(const node& v, const tref* ch, size_t len) {
-	return base_t::get(v, ch, len);
+tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
+	return base_t::get(v, ch, len, r);
 }
 
 template <NodeType node>
-tref tree<node>::get(const node& v, const trefs& children) {
-	return base_t::get(v, children);
+tref tree<node>::get(const node& v, const trefs& ch, tref r) {
+	return get(v, ch.data(), ch.size(), r);
 }
 
 template <NodeType node>
-tref tree<node>::get(const node& v, const std::initializer_list<tref>& ch) {
-	return base_t::get(v, ch);
+tref tree<node>::get(const node& v, const std::initializer_list<tref>& ch, tref r) {
+	return get(v, std::data(ch), ch.size(), r);
 }
 
 //------------------------------------------------------------------------------
@@ -59,7 +71,7 @@ tref tree<node>::get(const node& v, const std::initializer_list<tref>& ch) {
 
 template <NodeType node>
 tref tree<node>::get(const node& v, const node& child) {
-	return base_t::get(v, child);
+	return get(v, get(child));
 }
 
 template <NodeType node>
@@ -69,21 +81,24 @@ tref tree<node>::get(const node& v, const node& ch1, const node& ch2)
 }
 
 template <NodeType node>
-tref tree<node>::get(const node& v, const node* ch, size_t len)
+tref tree<node>::get(const node& v, const node* ch, size_t len, tref r)
 {
-	return base_t::get(v, ch, len);
+	tref pr = nullptr;
+	for (size_t i = len; i > 0; ) --i,
+		pr = get(ch[i], (tref) nullptr, pr);
+	return get(v, &pr, 1, r);
 }
 
 template <NodeType node>
-tref tree<node>::get(const node& v, const std::vector<node>& ch)
+tref tree<node>::get(const node& v, const std::vector<node>& ch, tref r)
 {
-	return base_t::get(v, ch);
+	return get(v, ch.data(), ch.size(), r);
 }
 
 template <NodeType node>
-tref tree<node>::get(const node& v, const std::initializer_list<node>& ch)
+tref tree<node>::get(const node& v, const std::initializer_list<node>& ch, tref r)
 {
-	return base_t::get(v, ch);
+	return get(v, std::data(ch), ch.size(), r);
 }
 
 //------------------------------------------------------------------------------
@@ -103,20 +118,20 @@ tref tree<node>::get(const node::type& nt, tref ch1, tref ch2) {
 }
 
 template <NodeType node>
-tref tree<node>::get(const node::type& nt, const tref* ch, size_t len) {
-	return get(node(nt), ch, len);
+tref tree<node>::get(const node::type& nt, const tref* ch, size_t len, tref r) {
+	return get(node(nt), ch, len, r);
 }
 
 template <NodeType node>
-tref tree<node>::get(const node::type& nt, const trefs& ch) {
-	return get(node(nt), ch);
+tref tree<node>::get(const node::type& nt, const trefs& ch, tref r) {
+	return get(node(nt), ch, r);
 }
 
 template <NodeType node>
 tref tree<node>::get(const node::type& nt,
-	const std::initializer_list<tref>& ch)
+	const std::initializer_list<tref>& ch, tref r)
 {
-	return get(node(nt), ch);
+	return get(node(nt), ch, r);
 }
 
 template <NodeType node>
@@ -201,6 +216,11 @@ template <NodeType node>
 const tree<node>& tree<node>::child_tree(size_t n) const {
 	tref c = child(n); DBG(assert(c != nullptr);)
 	return get(c);
+}
+
+template <NodeType node>
+typename tree<node>::traverser tree<node>::operator()() const {
+	return traverser(get());
 }
 
 template <NodeType node>
@@ -343,6 +363,11 @@ template <NodeType node>
 tree<node>::bas_variant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
 	return ba_constants_t::get(data());
+}
+
+template <NodeType node>
+size_t tree<node>::get_ba_type() const {
+	return this->value.ba;
 }
 
 } // idni::tau_lang namespace
