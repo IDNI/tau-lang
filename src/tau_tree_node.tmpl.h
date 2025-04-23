@@ -12,10 +12,29 @@ constexpr node<BAs...> node<BAs...>::ba_constant(size_t v, size_t ba_tid) {
 	return node(type::bf_constant, v, true /*is_term*/, ba_tid);
 }
 
+inline bool is_term_nt(size_t nt) {
+	switch (nt) {
+		case tau_parser::bf:
+		case tau_parser::bf_constant:
+		case tau_parser::bf_splitter:
+		case tau_parser::bf_ref:
+		case tau_parser::bf_or:
+		case tau_parser::bf_xor:
+		case tau_parser::bf_and:
+		case tau_parser::bf_neg:
+		case tau_parser::bf_t:
+		case tau_parser::bf_f:
+		case tau_parser::variable:
+			return true;
+		default:
+			return false;
+	}
+}
+
 template <BAsPack... BAs>
 constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 		size_t ba_type, size_t ext) noexcept
-	: nt(nt), term(is_term), ba(ba_type), ext(ext), data(data),
+	: nt(nt), term(is_term || is_term_nt(nt)), ba(ba_type), ext(ext), data(data),
 		hash(hashit())
 {
 	static_assert(sizeof...(BAs) > 0,
