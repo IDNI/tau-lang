@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
+#include "hooks.h"
 
 namespace idni::tau_lang {
 
@@ -53,7 +54,8 @@ tref tree<node>::get(const node& v, tref ch1, tref ch2) {
 
 template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
-	return base_t::get(v, ch, len, r);
+	static get_hook<node> hook;
+	return hook(v, ch, len, r);
 }
 
 template <NodeType node>
