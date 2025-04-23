@@ -173,7 +173,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 				trefs ch;
 				for (tref c : ptr.children()) {
 					DBG(assert(c != nullptr && m_ex(c));)
-					if (m_ref(c))ch.push_back(m_ref(c));
+					if (m_ref(c)) ch.push_back(m_ref(c));
 				}
 				x = getx(ch);
 
