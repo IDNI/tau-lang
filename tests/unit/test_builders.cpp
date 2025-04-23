@@ -56,7 +56,7 @@ TEST_SUITE("builders parsing") {
 struct builders_exe_fixture {
 	builders_exe_fixture() {
 		const char* sample = " X = 0 .";
-		auto fm = make_tt<Bool>(sample);
+		auto fm = bmake_tt(sample);
 		auto bfs = (fm | tau::spec | tau::main | tau::wff | tau::bf_eq || tau::bf)();
 		X = bfs[0] | tau::variable | tt::ref;
 		F = bfs[1] | tau::bf_f | tt::ref;
