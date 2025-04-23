@@ -26,6 +26,16 @@ tref normalizer(tref fm) {
 	return fm; // TODO (HIGH)
 }
 
+template <BAsPack... BAs>
+tref normalizer_step(tref form) {
+	return form; // TODO (HIGH)
+}
+
+template <BAsPack... BAs>
+tref normalize_with_temp_simp(tref fm) {
+	return fm; // TODO (HIGH)
+}
+
 // Given a tree produce a number i such that the uninterpreted constant const_i is
 // not present
 template <BAsPack... BAs>
