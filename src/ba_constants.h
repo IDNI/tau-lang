@@ -22,6 +22,9 @@ struct ba_constants {
 	static typed_constant get(const std::variant<BAs...>& b,
 				const std::string& type_name);
 
+	// insert the constant value of a type id to the pool
+	static typed_constant get(const std::variant<BAs...>& b,size_t type_id);
+
 	// get the constant variant value by constant id
 	static std::variant<BAs...> get(size_t constant_id);
 
