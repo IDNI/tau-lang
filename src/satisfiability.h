@@ -17,6 +17,18 @@ inline void print_fixpoint_info(const std::string& message,
 	else std::cerr << message << "\n" << result << "\n";
 }
 
+// Check if a formula has a temporary output stream
+// which are used for flag handling
+template <BAsPack... BAs>
+bool has_temporary_io_var(tref fm) {
+	using tau = tree<node<BAs...>>;
+	auto io_vars = tau::get(fm).select_top(
+			is_child_non_terminal<tau::io_var, node<BAs...>>);
+	for (tref var : io_vars) // Check if the name of var starts with "_"
+		if (tau::get_io_name(var)[0] == '_') return true;
+	return false;
+}
+
 template <BAsPack... BAs>
 tref transform_to_execution(tref fm,
 	const int_t start_time = 0,

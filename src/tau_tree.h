@@ -381,6 +381,19 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static trefs get_dnf_bf_clauses(tref n);
 	static trefs get_cnf_bf_clauses(tref n);
 
+	static bool is_io_initial(tref io_var);
+	static bool is_io_shift(tref io_var);
+	static int_t get_io_time_point(tref io_var);
+	static int_t get_io_shift(tref io_var);
+	static std::string get_io_name(tref io_var);
+	static tref get_tau_io_name(tref io_var);
+	static int_t get_io_var_shift(tref io_var);
+	static int_t get_max_shift(const trefs& io_vars, bool ignore_temps = false);
+	static int_t get_max_initial(const trefs& io_vars);
+
+	static typename tree<node>::subtree_set get_free_vars_from_nso(tref n);
+	static bool has_temp_var(tref n);
+
 	// inference (tau_tree_types.tmpl.h)
 	// ---------------------------------------------------------------------
 
@@ -605,30 +618,30 @@ std::ostream& operator<<(std::ostream& os, const rr_sig& s);
 // queries (tau_tree_queries.tmpl.h)
 
 template <NodeType node>
-bool is_non_terminal(tref n);
-
-template <NodeType node>
-bool is_terminal(tref n);
-
-template <NodeType node>
 bool is_non_terminal(const size_t nt, tref n);
 
-template <NodeType node>
-bool is_child_non_terminal(const size_t nt, tref n);
-
 template <size_t nt, NodeType node>
 bool is_non_terminal(tref n);
-
-template <size_t nt, NodeType node>
-bool is_child_non_terminal(tref n);
 
 // factory method for is_non_terminal predicate
 template <NodeType node>
 inline std::function<bool(tref)> is_non_terminal(size_t nt);
 
+template <NodeType node>
+bool is_child_non_terminal(const size_t nt, tref n);
+
+template <size_t nt, NodeType node>
+bool is_child_non_terminal(tref n);
+
 // factory method for is_child_non_terminal predicate
 template <NodeType node>
 inline std::function<bool(tref)> is_child_non_terminal(size_t nt);
+
+template <NodeType node>
+bool is_var_or_capture(tref n);
+
+template <NodeType node>
+inline std::function<bool(tref)> is_var_or_capture();
 
 // -----------------------------------------------------------------------------
 // builders (tau_tree_builders.tmpl.h)
