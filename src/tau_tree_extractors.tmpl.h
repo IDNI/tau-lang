@@ -122,4 +122,125 @@ trefs tree<node>::get_cnf_bf_clauses(tref n) {
 	return get_leaves(n, node::type::bf_and);
 }
 
+
+// -----------------------------------------------------------------------------
+// Helpers for variables having io_var as child
+
+template <NodeType node>
+bool tree<node>::is_io_initial(tref io_var) {
+	return get(io_var)[0][0][1]() | integer;;
+}
+
+template <NodeType node>
+bool tree<node>::is_io_shift(tref io_var) {
+	return get(io_var)[0][0][1]() | shift;;
+}
+
+template <NodeType node>
+int_t tree<node>::get_io_time_point(tref io_var) {
+	return get(io_var)[0][0][0][1].get_integer();
+}
+
+template <NodeType node>
+int_t tree<node>::get_io_shift(tref io_var) {
+	return get(io_var)[0][0][1][0][1][0].get_integer();
+}
+
+template <NodeType node>
+std::string tree<node>::get_io_name(tref io_var) {
+	return get(io_var)[0][0][0].get_string();
+}
+
+template <NodeType node>
+tref tree<node>::get_tau_io_name(tref io_var) {
+	return get(io_var)[0][0].first();
+}
+
+template <NodeType node>
+int_t tree<node>::get_io_var_shift(tref io_var) {
+	// If there is a shift
+	if (is_io_shift(io_var)) return get_io_shift(io_var);
+	return 0;
+}
+
+template <NodeType node>
+int_t tree<node>::get_max_shift(const trefs& io_vars, bool ignore_temps) {
+	int_t max_shift = 0;
+	for (tref v : io_vars) {
+		if (ignore_temps && get_io_name(v)[0] == '_')
+			continue;
+		max_shift = std::max(max_shift, get_io_var_shift(v));
+	}
+	return max_shift;
+}
+
+template <NodeType node>
+int_t tree<node>::get_max_initial(const trefs& io_vars) {
+	int_t max_init = -1;
+	for (tref v : io_vars) {
+		if (is_io_initial(v)) {
+			int_t init = get_io_time_point(v);
+			max_init = std::max(max_init, init);
+		}
+	}
+	return max_init;
+}
+
+template <NodeType node>
+typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso of " << n;
+	typename tree<node>::subtree_set free_vars;
+	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
+	auto collector = [&free_vars](tref n) {
+		const auto& t = get(n);
+		if (t.is(wff_all) || t.is(wff_ex)) {
+			tref var = t.find_top(is_var_or_capture<node>);
+			if (var) if (auto it = free_vars.find(get(var));
+				it != free_vars.end())
+			{
+				BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << get(var);
+				free_vars.erase(it);
+			}
+		} else if (is_var_or_capture<node>(n)) {
+			if (auto offset_child = t() | io_var
+				| tt::only_child | offset | tt::only_child;
+					offset_child)
+			{
+				if (is_var_or_capture<node>(offset_child.value())) {
+					tref var = offset_child | tt::ref;
+					if (auto it = free_vars.find(get(var));
+						it != free_vars.end())
+					{
+						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child;
+						free_vars.erase(it);
+					}
+				} else if (offset_child.value_tree().is(shift)) {
+					tref var = offset_child | tt::first | tt::ref;
+					if (auto it = free_vars.find(get(var));
+						it != free_vars.end())
+					{
+						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child;
+						free_vars.erase(it);
+					}
+				}
+			}
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- inserting var: " << get(n);
+			free_vars.insert(n);
+		}
+	};
+	post_order<node>(n).search(collector);
+	return free_vars;
+}
+
+// A formula has a temporal variable if either it contains an io_var with a variable or capture
+// or it contains a flag
+template <NodeType node>
+bool tree<node>::has_temp_var (tref fm) {
+	const auto& t = get(fm);
+	auto io_vars = select_top(fm, is_non_terminal<node::type::io_var, node>);
+	if (io_vars.empty()) return find_top(fm, is_non_terminal<node::type::constraint, node>).has_value();
+	// any input/output stream is a temporal variable, also constant positions
+	else return true;
+}
+
 } // namespace idni::tau_lang

@@ -267,7 +267,7 @@ bool operator==(const bool lt, const tree<node<BAs...>>& rt) {
 	return rt == lt;
 }
 
-// Splitter function for a nso tau_parser::bf_constant node holding a BA constant
+// Splitter function for a nso tau::bf_constant node holding a BA constant
 template <BAsPack... BAs>
 const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
 	splitter_type st)

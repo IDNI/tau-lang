@@ -155,7 +155,7 @@ template <BAsPack... BAs>
 bool operator==(const bool l, const tree<node<BAs...>>& r);
 
 /**
- * @brief Splitter function for a nso tau_parser::bf_constant node holding a BA constant.
+ * @brief Splitter function for a nso tau::bf_constant node holding a BA constant.
  * @param n Operand.
  * @param st Splitter type (default is splitter_type::upper).
  * @return Result of the splitter operation.

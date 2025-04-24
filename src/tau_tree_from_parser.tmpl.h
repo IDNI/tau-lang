@@ -129,7 +129,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 		};
 
 		auto get_type = [](tref n) -> std::string {
-			auto t = tt(n) | tau_parser::type;
+			auto t = tt(n) | tau::type;
 			if (t) return t | tt::string;
 			return "untyped";
 		};
