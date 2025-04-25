@@ -261,12 +261,13 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt, const std::string& str); // with string
 
 	// terminals
-	static tref get_num(size_t v);
-	static tref get_integer(int_t v);
+	static tref get(const node::bas_variant& c, size_t type);
 	static tref get_ba_constant(size_t v);
 	static tref get_ba_constant(size_t v, size_t type);
 	static tref get_ba_constant(
 				const std::pair<size_t, size_t>& typed_const);
+	static tref get_num(size_t v);
+	static tref get_integer(int_t v);
 
 	size_t children_size() const;
 
@@ -378,6 +379,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 
 	static void get_leaves(tref n, node::type branch, trefs& leaves);
 	static trefs get_leaves(tref n, node::type branch);
+	trefs get_leaves(node::type branch) const;
 	static trefs get_dnf_wff_clauses(tref n);
 	static trefs get_cnf_wff_clauses(tref n);
 	static trefs get_dnf_bf_clauses(tref n);
@@ -523,7 +525,6 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	// or maybe create simple builder api, maybe with >> operator
 	static tref build_variable(const std::string& name);
 	static tref build_in_var_name(size_t index);
-	static tref build_type(const std::string& type);
 	static tref build_bf_t_type(const std::string& type);
 	static tref build_bf_t_type(tref type);
 	static tref build_bf_f_type(const std::string& type);
@@ -548,11 +549,6 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 				const std::string& out_var_name, int_t shift);
 	static tref build_out_variable_at_t_minus(tref out_var_name, size_t num);
 	static tref build_out_variable_at_t_minus(size_t index, size_t num);
-	// static tref bf_variable(const std::string& name);
-	static tref build_bf_constant(tref cte);
-	static tref build_bf_constant(tref cte, tref type);
-	static tref build_bf_constant(tref cte, const std::string& type);
-	// build_bf_and_constant and build_bf_or_constant
 	static tref build_bf_uninterpreted_constant(const std::string& name1,
 						const std::string& name2);
 	static tref build_wff_eq(tref l, tref r);
@@ -661,6 +657,9 @@ bool is_var_or_capture(tref n);
 
 template <NodeType node>
 inline std::function<bool(tref)> is_var_or_capture();
+
+template <NodeType node>
+bool contains(tref fm, tref sub_fm);
 
 // -----------------------------------------------------------------------------
 // builders (tau_tree_builders.tmpl.h)

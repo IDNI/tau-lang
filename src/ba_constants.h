@@ -89,6 +89,9 @@ struct ba_constants_binder {
 	// binds the constant of a type into a tree, usually called from nso_factory
 	tref bind(const std::variant<BAs...>& constant, const std::string& type_name);
 
+	// binds the constant of a type into a tree, usually called internally
+	tref bind(const std::variant<BAs...>& constant, size_t type_id);
+
 	// binder interface operator
 	tref operator()(const std::string& src, const std::string& type_name);
 

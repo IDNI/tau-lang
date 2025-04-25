@@ -103,6 +103,13 @@ trefs tree<node>::get_leaves(tref n, node::type branch) {
 }
 
 template <NodeType node>
+trefs tree<node>::get_leaves(node::type branch) const {
+	trefs leaves;
+	get_leaves(get(), branch, leaves);
+	return leaves;
+}
+
+template <NodeType node>
 trefs tree<node>::get_dnf_wff_clauses(tref n) {
 	return get_leaves(n, node::type::wff_or);
 }
@@ -128,12 +135,12 @@ trefs tree<node>::get_cnf_bf_clauses(tref n) {
 
 template <NodeType node>
 bool tree<node>::is_io_initial(tref io_var) {
-	return get(io_var)[0][0][1]() | integer;;
+	return get(io_var)[0][0][1].is(integer);
 }
 
 template <NodeType node>
 bool tree<node>::is_io_shift(tref io_var) {
-	return get(io_var)[0][0][1]() | shift;;
+	return get(io_var)[0][0][1].is(shift);
 }
 
 template <NodeType node>
@@ -212,7 +219,7 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
-						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child;
+						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child.value_tree();
 						free_vars.erase(it);
 					}
 				} else if (offset_child.value_tree().is(shift)) {
@@ -220,7 +227,7 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
-						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child;
+						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child.value_tree();
 						free_vars.erase(it);
 					}
 				}

@@ -150,6 +150,18 @@ tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 				ba_constants<BAs...>::get(constant, type_name));
 }
 
+// binds the constant to a tree from BA constant variant and type name string
+template <BAsPack... BAs>
+tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
+	size_t type_id)
+{
+	static_assert(sizeof...(BAs) > 0,
+		"Empty template parameter pack not allowed");
+	// BOOST_LOG_TRIVIAL(debug) << "ba_constants_binder::bind: " << constant << " " << type_name;
+	return tree<node<BAs...>>::get_ba_constant(
+				ba_constants<BAs...>::get(constant, type_id));
+}
+
 template <BAsPack... BAs>
 tref ba_constants_binder<BAs...>::operator()(const std::string& src,
 	const std::string& type_name)

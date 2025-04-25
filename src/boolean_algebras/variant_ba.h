@@ -71,8 +71,17 @@ bool operator==(const std::variant<BAs...>& l, const bool& r) {
 		), l);
 }
 
+template <NodeType node>
+typename node::bas_variant normalize_ba(const typename node::bas_variant& elem){
+	return std::visit(overloaded(
+		[](const auto& el) {
+			return typename node::bas_variant(normalize(el));
+		}
+	), elem);
+}
+
 template <BAsPack... BAs>
-std::variant<BAs...> normalize_ba(const std::variant<BAs...>& elem) {
+std::variant<BAs...> normalize_ba_depreciating(const std::variant<BAs...>& elem) {
 	return std::visit(overloaded(
 		[](const auto& el) {
 			return std::variant<BAs...>(normalize(el));

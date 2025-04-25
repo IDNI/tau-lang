@@ -249,7 +249,7 @@ tref ba_types_checker_and_propagator<BAs...>::get_var_key_node(tref n) const {
 template <BAsPack... BAs>
 bool ba_types_checker_and_propagator<BAs...>::propagate(tref n) {
 	std::set<std::string> types;
-	auto els = select_all(n, is_ba_element);
+	auto els = tau::get(n).select_all(is_ba_element);
 	// collect types from BA elements
 	for (tref el : els) {
 		auto key = get_var_key_node(el);

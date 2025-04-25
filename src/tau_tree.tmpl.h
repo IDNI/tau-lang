@@ -354,6 +354,10 @@ size_t tree<node>::get_num() const {
 	return this->value.data;
 }
 
+template <NodeType node>
+tref tree<node>::get(const node::bas_variant& c, size_t type) {
+	return node::ba_constants_binder_t::instance().bind(c, type);
+}
 
 template <NodeType node>
 size_t tree<node>::get_ba_constant_id() const {

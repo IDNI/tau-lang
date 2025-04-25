@@ -50,7 +50,8 @@ tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
 	#endif // TAU_MEASURE
 
 	try {
-		auto nn = apply_rule<node, decltype(is_capture)>(r, n, is_capture);
+		auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
+							r, n, is_capture);
 
 		#ifdef TAU_MEASURE
 		if (n != nn) measures::increase_rule_hit<tau_<BAs...>>(r);

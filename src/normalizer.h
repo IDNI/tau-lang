@@ -16,48 +16,97 @@ namespace idni::tau_lang {
 
 RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
-template <BAsPack... BAs>
-tref normalizer(const rr& fm) {
-	return fm.main->get(); // TODO (HIGH)
-}
+// ref offset info. first is offset type (num/capture/shift/variable)
+// and second is value of num, rr_dict id of capture or 0 for shift and variable
+using offset_t = std::pair<size_t, size_t>;
 
-template <BAsPack... BAs>
-tref normalizer(tref fm) {
-	return fm; // TODO (HIGH)
-}
+template <NodeType node>
+tref normalizer_step(tref form);
 
-template <BAsPack... BAs>
-tref normalizer_step(tref form) {
-	return form; // TODO (HIGH)
-}
+template <NodeType node>
+tref normalize_non_temp(tref fm);
 
-template <BAsPack... BAs>
-tref normalize_with_temp_simp(tref fm) {
-	return fm; // TODO (HIGH)
-}
+template <NodeType node>
+auto get_vars_from_nso(tref n);
 
-// Given a tree produce a number i such that the uninterpreted constant const_i is
-// not present
-template <BAsPack... BAs>
-tref get_new_uniter_const(tref fm, const std::string& name) {
-	using node = node<BAs...>;
-	using tau = tree<node>;
-	auto uniter_consts = tau::get(fm).select_top(is_non_terminal<
-					tau::uninterpreted_constant, node>);
-	std::set ids{ 0 };
-	for (auto uniter_const : uniter_consts) {
-		if (const std::string& s = tau::get(uniter_const).get_string();
-			s.find(name) != std::string::npos)
-		{
-			std::string id = s.substr(name.length() + 1, s.size()-1);
-			if (!s.empty()) ids.insert(std::stoi(id));
-		}
-	}
-	std::string id = std::to_string(*ids.rbegin() + 1);
-	auto uniter_const = tau::build_bf_uniter_const("", name + id);
-	return uniter_const;
-}
+template <NodeType node>
+int_t get_new_var_id(const tref fm);
+
+template <NodeType node>
+tref get_new_uninterpreted_constant(const tref fm, const std::string& name);
+
+template <NodeType node>
+std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref);
+
+template <NodeType node>
+tref get_ref(tref n);
+
+template <NodeType node>
+bool has_no_boolean_combs_of_models(tref n);
+
+template <NodeType node>
+bool is_non_temp_nso_satisfiable(tref n);
+
+template <NodeType node>
+bool is_non_temp_nso_unsat(tref n);
+
+template <NodeType node>
+bool are_nso_equivalent(tref n1, tref n2);
+
+template <NodeType node>
+bool is_nso_impl(tref n1, tref n2);
+
+template <NodeType node>
+bool are_bf_equal(tref n1, tref n2);
+
+template <NodeType node>
+bool is_bf_same_to_any_of(tref n, trefs& previous);
+
+template <NodeType node>
+tref normalize_with_temp_simp(tref fm);
+
+template <NodeType node>
+size_t get_max_loopback_in_rr(tref fm);
+
+template <NodeType node>
+tref build_shift_from_shift(tref shift, size_t step);
+
+template <NodeType node>
+tref build_main_step(tref form, size_t step);
+
+template <NodeType node>
+tref bf_normalizer_without_rec_relation(tref bf);
+
+template <NodeType node>
+tref bf_normalizer_with_rec_relation(const rr &bf);
+
+template <NodeType node>
+tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity);
+
+template <NodeType node>
+bool is_valid(const rr& nso_rr);
+
+template <NodeType node>
+bool is_well_founded(const rr& nso_rr);
+
+template <NodeType node>
+tref calculate_fixed_point(const rr& nso_rr, tref form, typename node::type t,
+	size_t offset_arity, tref fallback);
+
+template <NodeType node>
+tref calculate_all_fixed_points(const rr& recrel);
+
+template <NodeType node>
+tref apply_rr_to_formula (const rr& nso_rr);
+
+template <NodeType node>
+tref normalizer(const rr& fm);
+
+template <NodeType node>
+tref normalizer(tref fm);
 
 } // namespace idni::tau_lang
+
+#include "normalizer.tmpl.h"
 
 #endif // __IDNI__TAU__NORMALIZER_H__

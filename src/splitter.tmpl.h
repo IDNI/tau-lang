@@ -300,7 +300,7 @@ tref tau_splitter(tref fm, splitter_type st) {
 	using tau = tree<node>;
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start of tau_splitter";
 	// First we decide if we deal with a temporal formula
-	if (!has_temp_var<node>(fm)) return nso_tau_splitter(fm, st).first;
+	if (!tau::has_temp_var(fm)) return nso_tau_splitter(fm, st).first;
 
 	auto splitter_of_clause = [&](tref clause) {
 		trefs specs = tau::get_cnf_wff_clauses(clause);

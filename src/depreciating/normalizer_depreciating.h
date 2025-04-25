@@ -360,7 +360,7 @@ bool are_bf_equal(tau_<BAs...> n1, tau_<BAs...> n2) {
 }
 
 template <typename... BAs>
-auto is_bf_same_to_any_of(tau_<BAs...>& n, std::vector<tau_<BAs...>>& previous) {
+bool is_bf_same_to_any_of_depreciating(tau_<BAs...>& n, std::vector<tau_<BAs...>>& previous) {
 	return std::any_of(previous.begin(), previous.end(), [n] (tau_<BAs...>& p) {
 			return are_bf_equal<BAs...>(n, p);
 		});
@@ -728,7 +728,7 @@ tau_<BAs...> calculate_fixed_point(const rr<tau_<BAs...>>& nso_rr,
 		else if (previous.size() > 1
 			&& (t == tau_parser::wff
 				? is_nso_equivalent_to_any_of(current, previous)
-				: is_bf_same_to_any_of(current, previous)))
+				: is_bf_same_to_any_of_depreciating(current, previous)))
 		{
 			BOOST_LOG_TRIVIAL(debug) << eos
 				<< " - loop (no fixed point) detected at step: "
