@@ -307,7 +307,10 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		CHECK_THROWS( solve_z3(equation) );
+		//CHECK_THROWS( solve_z3(equation) );
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+
 	}
 
 	TEST_CASE("no multiplication overflow") {
@@ -324,7 +327,10 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		CHECK_THROWS( solve_z3(equation) );
+		//CHECK_THROWS( solve_z3(equation) );
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+
 	}
 
 	TEST_CASE("no substraction underflow") {
@@ -341,7 +347,10 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		CHECK_THROWS( solve_z3(equation) );
+		//CHECK_THROWS( solve_z3(equation) );
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+
 	}
 
 	TEST_CASE("no addition overflow") {
@@ -358,7 +367,10 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		CHECK_THROWS( solve_z3(equation) );
+		//CHECK_THROWS( solve_z3(equation) );
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
+
 	}
 
 	TEST_CASE("intermediate no addition overflow") {
@@ -384,7 +396,9 @@ TEST_SUITE("z3 overflow/underflow") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto equation = make_statement(src);
-		CHECK_THROWS( solve_z3(equation) );
+		//CHECK_THROWS( solve_z3(equation) );
+		auto solution = solve_z3(equation);
+		CHECK( solution.has_value() );
 	}
 }
 

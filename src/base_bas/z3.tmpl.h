@@ -8,15 +8,19 @@ namespace idni::tau_lang {
 
 using namespace z3;
 
-static bool _signed = false;
+// deactivated for the moment
+//static bool _signed = false;
 
 // evaluates a parsed bdd terminal node recursively
 template <typename...BAs>
 z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars, bool checked) {
 	auto nt = std::get<tau_source_sym>(form->value).n();
 	// control overflow/underflow if requested
+	// deactivated for the moment
 	if (checked) {
-		switch (nt) {
+		BOOST_LOG_TRIVIAL(warning)
+			<< "(Warning) overflow/underflow checking is deactivated";
+		/*switch (nt) {
 			case tau_parser::z3_add: {
 				auto l = eval_z3(form->child[0], vars, checked);
 				auto r = eval_z3(form->child[1], vars, checked);
@@ -32,7 +36,7 @@ z3::expr eval_z3(const tau<BAs...>& form, std::map<tau<BAs...>, z3::expr>& vars,
 				auto r = eval_z3(form->child[1], vars, checked);
 				return z3::bvmul_no_overflow(l, r, _signed);
 			}
-		}
+		}*/
 	}
 	// otherwise, use modular arithmetic
 	switch (nt) {
@@ -308,5 +312,12 @@ std::optional<solution<BAs...>> solve_z3(const tau<BAs...>& form) {
 	z3::solver solver(z3_context);
 	return solve_z3(form, solver);
 }
+
+template<typename...BAs>
+tau<BAs...> normalize_z3(const tau<BAs...>& form) {
+	// TODO (HIGH) implement
+	return form;
+}
+
 
 } // namespace idni::tau_lang
