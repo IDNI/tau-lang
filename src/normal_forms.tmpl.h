@@ -9,7 +9,7 @@ tref to_mnf(tref fm) {
 	using tau = tree<node>;
 	auto neq_to_eq = [](tref n) {
 		//$X != 0 ::= !($X = 0)
-		if (is_non_terminal<node>(tau::bf_neq, n)) {
+		if (is<node>(n, tau::bf_neq)) {
 			return tau::trim(tau::build_wff_neg(
 					tau::build_wff_eq(tau::trim(n))));
 		}
@@ -212,7 +212,7 @@ template <NodeType node, node::type type>
 tref reduce_deprecated<node, type>::operator()(tref form) const {
 	subtree_map changes;
 	// for all type dnfs do...
-	for (tref dnf : tau::get(form).select_top(is_non_terminal<type, node>)){
+	for (tref dnf : tau::get(form).select_top(is<node, type>)) {
 		auto simplified = simplify(dnf);
 		if (simplified != dnf) changes[dnf] = simplified;
 	}
@@ -461,8 +461,7 @@ tref onf_wff<node>::operator()(tref n) const {
 	// For each disjunct calculate the onf
 	typename tau::subtree_map changes;
 	bool no_disjunction = true;
-	for (tref disjunct_ref : tau::get(nn).select_all(
-			is_non_terminal<tau_parser::wff_or, node>))
+	for (tref disjunct_ref : tau::get(nn).select_all(is<node, tau::wff_or>))
 	{
 		no_disjunction = false;
 		const auto& disjunct = tau::get(disjunct_ref);
@@ -486,7 +485,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 		return tau::subtree_equals(n, var);
 	};
 	const auto& t = tau::get(n);
-	auto eq = t.find_bottom(is_non_terminal<tau::bf_eq, node>);
+	auto eq = t.find_bottom(is<node, tau::bf_eq>);
 	typename tau::subtree_map changes;
 	if (eq && eq.value_tree()[0].find_top(has_var)) {
 		auto eq_v = eq.value_tree();
@@ -501,9 +500,7 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 		changes[eq_v.get()] = tau::trim(tau::build_bf_interval(
 							f_0, var, f_1));
 	}
-	for (tref neq_ref : t.select_all(
-				is_non_terminal<tau::bf_neq, node>))
-	{
+	for (tref neq_ref : t.select_all(is<node, tau::bf_neq>)) {
 		const auto& neq = tau::get(neq_ref);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
 		if (!neq[0].find_top(has_var)) continue;
@@ -656,18 +653,17 @@ template <NodeType node>
 void elim_vars_in_assignment(tref fm, const auto& vars, auto& i,
 	const int_t p, const auto& is_var)
 {
+	using tau = tree<node>;
 	// auto is_var = [](tref n){return
-	// 	is_child_non_terminal(tau_parser::variable, n) ||
-	// 		is_child_non_terminal(tau_parser::uninterpreted_constant, n);};
-	auto cvars = tree<node>::get(fm).select_all(is_var);
-	typename tree<node>::subtree_set cur_vars(
+	// 	is_child<node>(n, tau::variable) ||
+	// 		is_child<node>(n, tau::uninterpreted_constant);};
+	auto cvars = tau::get(fm).select_all(is_var);
+	typename tau::subtree_set cur_vars(
 		std::make_move_iterator(cvars.begin()),
 		std::make_move_iterator(cvars.end()));
 
-	for (size_t v_iter = p + 1; v_iter < vars.size(); ++v_iter) {
-		if (!cur_vars.contains(vars[v_iter]))
-			i[v_iter] = 2;
-	}
+	for (size_t v_iter = p + 1; v_iter < vars.size(); ++v_iter)
+		if (!cur_vars.contains(vars[v_iter])) i[v_iter] = 2;
 }
 
 // Create assignment in formula and reduce resulting clause
@@ -699,7 +695,7 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 			if (fm_simp == tau::_F()) return false;
 		}
 		if (std::ranges::all_of(i, [](const auto el){return el == 2;})){
-			//bool t = is_non_terminal(tau_parser::bf_t, fm->child[0]);
+			//bool t = is<node>(fm->child[0], tau::bf_t);
 			return dnf.emplace(fm_simp, std::vector(0, i)), true;
 		}
 
@@ -835,7 +831,7 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	const auto& t = tau::get(fm);
 	std::map<tref, tref, typename tau::subtree_equality> changes = {};
 	for (const auto& bf : t.select_top(
-				is_non_terminal<tau_parser::bf, node>))
+				is<node, tau::bf>))
 	{
 		auto dnf = bf_boole_normal_form<node>(bf);
 		if (dnf != bf) changes[bf] = dnf;
@@ -1077,8 +1073,8 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	if (wff) {
 		// Make equalities canonical
 		typename tau::subtree_map changes;
-		auto eqs = tau::get(new_fm).select_top(
-			is_child_non_terminal<tau::bf_eq, node>);
+		auto eqs = tau::get(new_fm)
+			.select_top(is_child<node, tau::bf_eq>);
 		for (tref eq : eqs) {
 			auto sorted_eq = sort_var<node>(eq);
 			// BOOST_LOG_TRIVIAL(trace) << "(F) sorted_eq: " << TAU_TO_STR(sorted_eq);
@@ -1324,8 +1320,8 @@ template <NodeType node>
 tref reduce_terms(tref fm, bool with_sorting) {
 	using tau = tree<node>;
 	typename tau::subtree_map changes = {};
-	for (const auto& bf : tau::get(fm).select_top(
-						is_non_terminal<tau::bf, node>))
+	for (const auto& bf : tau::get(fm)
+		.select_top(is<node, tau::bf>))
 	{
 		auto dnf = to_dnf<node, false>(bf);
 		dnf = reduce<node>(dnf, tau::bf, false, true, with_sorting);
@@ -1361,8 +1357,8 @@ tref apply_eqs_across_clauses(tref fm) {
 	tref new_fm = nullptr;
 	typename tau::subtree_map changes;
 	for (tref clause : clauses) {
-		auto neqs = tau::get(clause).select_top(
-				is_child_non_terminal<tau::bf_neq, node>);
+		auto neqs = tau::get(clause)
+			.select_top(is_child<node, tau::bf_neq>);
 		for (tref neq : neqs) {
 			bool replace = false;
 			auto neq_lits = tau::get_dnf_bf_clauses(
@@ -1387,8 +1383,8 @@ tref apply_eqs_across_clauses(tref fm) {
 	if (neq_reductions.empty()) return fm;
 	changes.clear();
 	for (tref clause : clauses) {
-		auto eqs = tau::get(clause).select_top(
-				is_child_non_terminal<tau::bf_eq, node>);
+		auto eqs = tau::get(clause)
+			.select_top(is_child<node, tau::bf_eq>);
 		for (tref eq : eqs) {
 			for (tref neq : neq_reductions) {
 				if (tau::subtree_equals(
@@ -2184,7 +2180,7 @@ template <NodeType node>
 tref rm_temporary_lookback(tref fm) {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
-	trefs io_vars = t.select_top(is_child_non_terminal<tau::io_var, node>);
+	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
 	bool has_var = std::ranges::any_of(io_vars,
 		[](tref el){return !is_io_initial<node>(el);});
 	int_t lookback = get_max_shift<node>(io_vars, true);
@@ -2220,16 +2216,16 @@ tref extract_sometimes (tref fm) {
 	// Collect remaining nested "sometimes" formulas
 	trefs sometimes_extractions = {};
 	const auto& t = tau::get(fm);
-	for (tref inner_st : t[0][0].select_top(
-		is_child_non_terminal<tau::wff_sometimes, node>))
+	for (tref inner_st : t[0][0]
+		.select_top(is_child<node, tau::wff_sometimes>))
 	{
 		l_changes[inner_st] = tau::_T();
 		sometimes_extractions.push_back(inner_st);
 	}
 	// Collect remaining nested "always" formulas
 	trefs always_extractions = {};
-	for (tref inner_aw : t[0][0].select_top(
-		is_child_non_terminal<tau::wff_always, node>))
+	for (tref inner_aw : t[0][0]
+		.select_top(is_child<node, tau::wff_always>))
 	{
 		l_changes[inner_aw] = tau::_T();
 		always_extractions.push_back(inner_aw);
@@ -2251,9 +2247,9 @@ tref extract_sometimes (tref fm) {
 	trefs extracted = {}, staying = {};
 	auto clauses = tau::get_leaves(t2[0].first(), tau::wff_and);
 	for (tref clause : clauses) {
-		DBG(assert(!is_non_terminal(tau::wff_sometimes, tau::trim(clause))
-			&& !is_non_terminal(tau::wff_always, tau::trim(clause)));)
-		if( !has_temp_var<node>(clause)) extracted.push_back(clause);
+		DBG(assert(!is<node>(tau::trim(clause),tau::wff_sometimes)
+			&& !is<node>(tau::trim(clause),tau::wff_always));)
+		if (!has_temp_var<node>(clause)) extracted.push_back(clause);
 		else staying.push_back(clause);
 	}
 
@@ -2280,16 +2276,16 @@ tref extract_always (tref fm) {
 	// Collect remaining nested "sometimes" formulas
 	trefs sometimes_extractions = {};
 	const auto& t = tau::get(fm);
-	for (tref inner_st : t[0][0].select_top(
-		is_child_non_terminal<tau::wff_sometimes, node>))
+	for (tref inner_st : t[0][0]
+		.select_top(is_child<node, tau::wff_sometimes>))
 	{
 		l_changes[inner_st] = tau::_F();
 		sometimes_extractions.push_back(inner_st);
 	}
 	// Collect remaining nested "always" formulas
 	trefs always_extractions = {};
-	for (tref inner_aw : t[0][0].select_top(
-		is_child_non_terminal<tau::wff_always, node>))
+	for (tref inner_aw : t[0][0]
+		.select_top(is_child<node, tau::wff_always>))
 	{
 		l_changes[inner_aw] = tau::_F();
 		always_extractions.push_back(inner_aw);
@@ -2312,9 +2308,9 @@ tref extract_always (tref fm) {
 	const auto& t2 = tau::get(fm);
 	auto clauses = t2[0][0].get_leaves(tau::wff_or);
 	for (const auto& clause : clauses) {
-		assert(!is_non_terminal(tau::wff_sometimes, tau::trim(clause))
-			&& !is_non_terminal(tau::wff_always, tau::trim(clause)));
-		if( !has_temp_var(clause)) extracted.push_back(clause);
+		DBG(assert(!is<node>(tau::trim(clause), tau::wff_sometimes)
+			&& !is<node>(tau::trim(clause), tau::wff_always));)
+		if (!has_temp_var<node>(clause)) extracted.push_back(clause);
 		else staying.push_back(clause);
 	}
 
@@ -2338,8 +2334,8 @@ tref push_sometimes_always_in(tref fm, auto& visited) {
 	using tau = tree<node>;
 	typename tau::subtree_map g_changes = {};
 	for (tref st : tau::get(fm).select_top_until(
-		is_child_non_terminal<tau::wff_sometimes, node>,
-		is_child_non_terminal<tau::wff_always, node>))
+		is_child<node, tau::wff_sometimes>,
+		is_child<node, tau::wff_always>))
 	{
 		// Recursively denest sometimes and always statements contained in sometimes statement st
 		auto flat_st = push_sometimes_always_in<node>(
@@ -2357,8 +2353,8 @@ tref push_sometimes_always_in(tref fm, auto& visited) {
 		g_changes = {};
 	}
 	for (tref st : tau::get(fm).select_top_until(
-		is_child_non_terminal<tau::wff_sometimes, node>,
-		is_child_non_terminal<tau::wff_always, node>))
+		is_child<node, tau::wff_sometimes>,
+		is_child<node, tau::wff_always>))
 	{
 		// Here a formula under "sometimes" is of the form (phi_1 && ... && phi_n)
 		// Pull out each phi_i that does not contain a time variable or is "sometimes/always"
@@ -2371,8 +2367,8 @@ tref push_sometimes_always_in(tref fm, auto& visited) {
 		g_changes = {};
 	}
 	for (tref aw : tau::get(fm).select_top_until(
-		is_child_non_terminal<tau::wff_always, node>,
-		is_child_non_terminal<tau::wff_sometimes, node>))
+		is_child<node, tau::wff_always>,
+		is_child<node, tau::wff_sometimes>))
 	{
 		// Recursively denest sometimes and always statements contained in always statement aw
 		auto flat_aw = push_sometimes_always_in<node>(
@@ -2394,8 +2390,8 @@ tref push_sometimes_always_in(tref fm, auto& visited) {
 		g_changes = {};
 	}
 	for (tref aw : tau::get(fm).select_top_until(
-		is_child_non_terminal<tau::wff_always, node>,
-		is_child_non_terminal<tau::wff_sometimes, node>))
+		is_child<node, tau::wff_always, node>,
+		is_child<node, tau::wff_sometimes, node>))
 	{
 		// Here the formula under "always" is of the form (phi_1 || ... || phi_n)
 		// Pull out each phi_i that does not contain a time variable or is "sometimes/always"
@@ -2466,9 +2462,9 @@ tref pull_always_out(tref fm) {
 	auto clauses = tau::get(fm).get_leaves(tau::wff_and);
 	for (tref clause : clauses) {
 		// if clause is a sometimes statement -> skip
-		if (is_child_non_terminal<node>(tau::wff_sometimes, clause))
+		if (is_child<node>(clause, tau::wff_sometimes))
 			continue;
-		if (is_child_non_terminal<node>(tau::wff_always, clause)) {
+		if (is_child<node>(clause, tau::wff_always)) {
 			l_changes[clause] = tau::_T();
 			collected_always_fms.push_back(tau::trim2(clause));
 		}
@@ -2484,8 +2480,8 @@ tref pull_always_out(tref fm) {
 	int_t lookback = 0;
 	bool first = true;
 	for (tref fa : collected_always_fms) {
-		auto io_vars = tau::get(fa).select_top(
-			is_child_non_terminal<tau::io_var, node>);
+		auto io_vars = tau::get(fa)
+				.select_top(is_child<node, tau::io_var>);
 		auto current_lb = get_max_shift<node>(io_vars);
 		if (first) first = false, always_part = fa;
 		else {
@@ -2495,7 +2491,7 @@ tref pull_always_out(tref fm) {
 							lookback - current_lb);
 			if (current_lb > lookback) {
 				io_vars = tau::get(always_part).select_top(
-					is_child_non_terminal<tau::io_var, node>);
+					is_child<node, tau::io_var>);
 				always_part = shift_io_vars_in_fm<node>(
 					always_part, io_vars, current_lb - lookback);
 			}
@@ -2534,10 +2530,10 @@ tref pull_sometimes_always_out(tref fm) {
         	collected_no_temp_fms.push_back(r);
         }
         else if (clause != r) {
-        	if (is_child_non_terminal<node>(tau::wff_always, r))
+        	if (is_child<node>(r, tau::wff_always))
         		pure_always_clause = tau::trim2(r);
 	        changes[clause] = r;
-        } else if (is_child_non_terminal<node>(tau::wff_always, clause))
+        } else if (is_child<node>(clause, tau::wff_always))
         	pure_always_clause = tau::trim2(clause);
 	}
 	if (!changes.empty()) fm = replace<node>(fm, changes);
@@ -2564,14 +2560,14 @@ template <NodeType node>
 tref always_conjunction (tref fm1_aw, tref fm2_aw) {
 	using tau = tree<node>;
 	// Trim the always node if present
-	auto fm1 = is_child_non_terminal<node>(tau::wff_always, fm1_aw)
+	auto fm1 = is_child<node>(fm1_aw, tau::wff_always)
 				? tau::trim2(fm1_aw) : fm1_aw;
-	auto fm2 = is_child_non_terminal<node>(tau::wff_always, fm2_aw)
+	auto fm2 = is_child<node>(fm2_aw, tau::wff_always)
 				? tau::trim2(fm2_aw) : fm2_aw;
 	auto io_vars1 = tau::get(fm1).select_top(
-				is_child_non_terminal<tau::io_var, node>);
+				is_child_<node::tau::io_var>);
 	auto io_vars2 = tau::get(fm2).select_top(
-				is_child_non_terminal<tau::io_var, node>);
+				is_child_<node::tau::io_var>);
 	// Get lookbacks
 	int_t lb1 = get_max_shift<node>(io_vars1);
 	int_t lb2 = get_max_shift<node>(io_vars2);
@@ -2594,8 +2590,8 @@ template <NodeType node>
 tref sometimes_always_normalization<node>::operator()(tref fm) const {
 	using tau = tree<node>;
 	auto st_aw = [](const auto& n) {
-		return is_child_non_terminal<node>(tau::wff_sometimes, n)
-			|| is_child_non_terminal<node>(tau::wff_always, n);
+		return is_child<node>(n, tau::wff_sometimes)
+			|| is_child<node>(n, tau::wff_always);
 	};
 	if (!tau::get(fm).find_top(st_aw).has_value()
 		&& !has_temp_var<node>(fm))
@@ -2626,8 +2622,7 @@ tref sometimes_always_normalization<node>::operator()(tref fm) const {
 			if (!st_aw(conj))
 				always_part = always_conjunction<node>(
 						always_part, conj);
-			else if (is_child_non_terminal<node>(
-					tau::wff_always, conj))
+			else if (is_child<node>(conj, tau::wff_always))
 				always_part = always_conjunction<node>(
 					always_part, conj);
 			else staying = tau::build_wff_and(staying, conj);
@@ -2667,10 +2662,10 @@ tref pull_always_out_for_inf(tref fm) {
 		tref always_statements = tau::_T();
 		tref staying = tau::_T();
 		for (tref conj : conjuncts) {
-			if (is_child_non_terminal<node>(tau::wff_always, conj))
+			if (is_child<node>(conj, tau::wff_always))
 				always_statements = tau::build_wff_and(
 					always_statements, tau::trim2(conj));
-			else if (!is_child_non_terminal<node>(tau::wff_sometimes, conj))
+			else if (!is_child<node>(conj, tau::wff_sometimes))
 				always_statements = tau::build_wff_and(
 					always_statements, conj);
 			else staying = tau::build_wff_and(staying, conj);
@@ -2787,7 +2782,7 @@ template <NodeType node>
 std::optional<tref> squeeze_positives(tref n) {
 	using tau = tree<node>;
 	if (auto positives = tau::get(n).select_top(
-					is_non_terminal<tau::bf_eq, node>);
+					is<node, tau::bf_eq>);
 		positives.size() > 0)
 	{
 		for (tref p : positives) p = tau::trim(p);
@@ -2839,7 +2834,7 @@ tref wff_remove_existential(tref var, tref wff) {
 				: tau::_1();
 
 		if (auto neqs = tau::get(new_l).select_all(
-			is_non_terminal<tau::bf_neq, node>); neqs.size() > 0)
+			is<node, tau::bf_neq>); neqs.size() > 0)
 		{
 			auto nneqs = tau::_T();
 			for (tref neq : neqs) {
@@ -2901,9 +2896,9 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 		trefs conjuncts = tau::get(clause).get_leaves(tau::wff_and);
 		bool all_equal_zero = true, all_unequal_zero = true;
 		for (tref c : conjuncts) {
-			if (!is_child_non_terminal<node>(tau::bf_eq, c))
+			if (!is_child<node>(c, tau::bf_eq))
 				all_equal_zero = false;
-			if (!is_child_non_terminal<node>(tau::bf_neq, c))
+			if (!is_child<node>(c, tau::bf_neq))
 				all_unequal_zero = false;
 		}
 		if (all_unequal_zero) {
@@ -2979,9 +2974,9 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 		auto disjuncts = tau::get(clause).get_leaves(tau::wff_or);
 		bool all_equal_zero = true, all_unequal_zero = true;
 		for (tref d : disjuncts) {
-			if (!is_child_non_terminal<node>(tau::bf_eq, d))
+			if (!is_child<node>(d, tau::bf_eq))
 				all_equal_zero = false;
-			if (!is_child_non_terminal<node>(tau::bf_neq, d))
+			if (!is_child<node>(d, tau::bf_neq))
 				all_unequal_zero = false;
 		}
 		if (all_equal_zero) {
@@ -3047,9 +3042,9 @@ tref eliminate_quantifiers(tref fm) {
 	auto elim_quant = [](tref inner_fm) -> tref {
 		// Find out if current node is a quantifier
 		bool is_ex_quant;
-		if (is_child_non_terminal<node>(tau::wff_ex, inner_fm))
+		if (is_child<node>(inner_fm, tau::wff_ex))
 			is_ex_quant = true;
-		else if (is_child_non_terminal<node>(tau::wff_all, inner_fm))
+		else if (is_child<node>(inner_fm, tau::wff_all))
 			is_ex_quant = false;
 		else return inner_fm;
 
@@ -3072,7 +3067,7 @@ tref eliminate_quantifiers(tref fm) {
 	// unordered_tau_set<BAs...> excluded_nodes;
 	typename tau::subtree_set excluded_nodes;
 	auto push_quantifiers = [&excluded_nodes](tref n) {
-		if (is_child_non_terminal<node>(tau::wff_ex, n)) {
+		if (is_child<node>(n, tau::wff_ex)) {
 			auto pushed = push_existential_quantifier_one<node>(n);
 			if (pushed == n) {
 				// Quantifier cannot be pushed deeper
@@ -3080,7 +3075,7 @@ tref eliminate_quantifiers(tref fm) {
 					excluded_nodes.insert(c);
 				return n;
 			} else return pushed;
-		} else if (is_child_non_terminal<node>(tau::wff_all, n)) {
+		} else if (is_child<node>(n, tau::wff_all)) {
 			auto pushed = push_universal_quantifier_one<node>(n);
 			if (pushed == n) {
 				// Quantifier cannot be pushed deeper
@@ -3092,7 +3087,7 @@ tref eliminate_quantifiers(tref fm) {
 		return n;
 	};
 	auto visit = [&excluded_nodes](tref n) {
-		if (is_non_terminal<node>(tau::bf, n)) return false;
+		if (is<node>(tau, n)) return false;
 		// Do not visit subtrees below a maximally pushed quantifier
 		if (excluded_nodes.contains(n)) return false;
 		return true;
@@ -3120,11 +3115,11 @@ tref get_eq_with_most_quant_vars(tref fm, const auto& quant_vars) {
 	tref eq_max_quants = nullptr;
 	int_t max_quants = 0;
 	auto get_eq = [&](tref n) {
-		if (is_non_terminal<node>(tau::bf_eq, n)) {
+		if (is<node>(tau, n)) {
 			// Found term
 			// Get vars
 			auto vars = tau::get(n).select_top(
-				is_non_terminal<tau::variable, node>);
+				is<node, tau::variable>);
 			// Find overlap of vars and quant_vars
 			int_t quants = 0;
 			for (tref v : vars)
@@ -3145,7 +3140,7 @@ template <NodeType node>
 std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm) {
 	using tau = tree<node>;
 	// Check if single disjunct
-	if (!tau::get(scoped_fm).find_top(is_non_terminal<tau::wff_or, node>))
+	if (!tau::get(scoped_fm).find_top(is<node, tau::wff_or>))
 		return { wff_remove_existential<node>(q, scoped_fm), true };
 	// Check if all atomic fms are negative or if all are positive
 	// static unordered_tau_set<BAs...> mixed_eqs;
@@ -3153,15 +3148,13 @@ std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm) {
 	if (mixed_eqs.contains(scoped_fm)) return { scoped_fm, false };
 	bool all_atm_fm_neq = true, all_atm_fm_eq = true;
 	auto check_atm_fms = [&all_atm_fm_neq, &all_atm_fm_eq, &q](tref n) {
-		if (is_non_terminal<node>(tau::bf_eq, n) && contains<node>(n, q)) {
+		if (is<node>(tau, n) && contains<node>(n, q)) {
 			all_atm_fm_neq = false;
 			return all_atm_fm_eq != false;
-		} else if (is_non_terminal<node>(tau::bf_neq, n)
-			&& contains<node>(n, q))
-		{
+		} else if (is<node>(tau, n) && contains<node>(n, q)) {
 			all_atm_fm_eq = false;
 			return all_atm_fm_neq != false;
-		} else if (is_non_terminal<node>(tau::wff_ref, n)) {
+		} else if (is<node>(tau, n)) {
 			all_atm_fm_neq = false;
 			all_atm_fm_eq = false;
 			return false;
@@ -3174,7 +3167,7 @@ std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm) {
 		// std::cout << "all atomic fms are negative\n";
 		// All atomic formulas are of the form !=
 		auto elim_quants = [&q](tref n) {
-			if (is_child_non_terminal<node>(tau::bf_neq, n)
+			if (is_child<node>(n, tau::bf_neq)
 				&& contains<node>(n, q)) return
 					wff_remove_existential<node>(q, n);
 			else return n;
@@ -3234,7 +3227,7 @@ tref anti_prenex(const tref& fm) {
 			auto left = build_wff_and(eq, replace(scoped_fm, eq, _T<BAs...>));
 			if (left == _F<BAs...>) {
 				// Boole decomp does not create two branches
-				assert(find_top(n, is_non_terminal<tau_parser::wff_or, BAs...>));
+				assert(find_top(n, is<node, tau::wff_or...>));
 				auto dis = single_dis_lift(n);
 				auto res = push_existential_quantifier_one(dis);
 				// std::cout << "Single || lift:\n";
@@ -3249,7 +3242,7 @@ tref anti_prenex(const tref& fm) {
 			auto right = build_wff_and(neq, replace(scoped_fm, eq, _F<BAs...>));
 			if (right == _F<BAs...>) {
 				// Boole decomp does not create two branches
-				assert(find_top(n, is_non_terminal<tau_parser::wff_or, BAs...>));
+				assert(find_top(n, is<node, tau::wff_or...>));
 				auto dis = single_dis_lift(n);
 				auto res = push_existential_quantifier_one(dis);
 				// std::cout << "Single || lift:\n";
@@ -3270,14 +3263,14 @@ tref anti_prenex(const tref& fm) {
 		} else return n;
 	};
 	auto visit = [&excluded_nodes](tref n) {
-		if (is_non_terminal<node>(tau::bf, n)) return false;
+		if (is<node>(n, tau::bf)) return false;
 		if (excluded_nodes.contains(n)) return false;
 		return true;
 	};
 	auto inner_quant = [&anti_prenex_step, &visit, &quant_vars](tref n) {
 		if (is_child_quantifier<node>(n)) {
 			// TODO: implement universal quantifier explicitly
-			if (is_child_non_terminal<node>(tau::wff_all, n)) {
+			if (is_child<node>(n, tau::wff_all)) {
 				// std::cout << "Before elimination:\n";
 				// std::cout << n << "\n\n";
 				auto n_neg = push_negation_in<node>(
@@ -3317,7 +3310,7 @@ tref anti_prenex(const tref& fm) {
 	auto visit_inner_quant = [&quant_vars](tref n) {
 		if (is_quantifier<node>(n))
 			quant_vars.insert(tau::trim2(n));
-		if (is_non_terminal<node>(tau::bf, n)) return false;
+		if (is<node>(tau, n)) return false;
 		return true;
 	};
 	auto nnf = push_negation_in<node>(fm);
@@ -3327,10 +3320,11 @@ tref anti_prenex(const tref& fm) {
 
 template <NodeType node>
 tref replace_free_vars_by(tref fm, tref val) {
-	assert(!is_non_terminal<node>(tree<node>::bf, val));
+	using tau = tree<node>;
+	assert(!is<node>(val, tau::bf));
 	auto free_vars = get_free_vars_from_nso<node>(fm);
 	if (!free_vars.empty()) {
-		typename tree<node>::subtree_map free_var_assgm;
+		typename tau::subtree_map free_var_assgm;
 		for (tref free_var : free_vars)
 			free_var_assgm.emplace(free_var, val);
 		return replace<node>(fm, free_var_assgm);
@@ -3486,8 +3480,7 @@ typename to_snf_step<node>::exponent to_snf_step<node>::get_exponent(const tref 
 
 template <NodeType node>
 std::optional<typename to_snf_step<node>::constant> to_snf_step<node>::get_constant(tref lit) const {
-	return tau::get(lit).find_top(
-		is_non_terminal<tau::constant, node>)
+	return tau::get(lit).find_top(is<node, tau::constant>)
 			.only_child().get_ba_constant();
 }
 

@@ -418,6 +418,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	// tree wrapper for simple traversing using | and || operators
 	// and | extractor<result_type>
 	struct traverser {
+		using type = typename node::type;
 		traverser();
 		traverser(tref r);
 		traverser(const htree::sp& r);
@@ -434,29 +435,37 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		bool empty() const;
 		size_t size() const;
 
+		// handles
+		static const extractor<tref>                ref;
+		static const extractor<const trefs&>        refs;
+		static const extractor<htree::sp>           handle;
+		static const extractor<const tree<node>&>   tree;
+		// print/dump
+		static const extractor<traverser>           dump;
+		static const extractor<traverser>           print_tree;
+		// node type
+		static const extractor<type> nt;
+		template <type NT>
+		static const extractor<bool>                is;
+		// node data
+		static const extractor<std::string>         string;
+		static const extractor<int_t>               integer;
+		static const extractor<size_t>              num;
+		static const extractor<size_t>              data;
+		static const extractor<size_t>              ba_constant_id;
+		static const extractor<size_t>              ba_type;
+		static const extractor<bas_variant>         ba_constant;
+		// children
+		static const extractor<traverser>           only_child;
+		static const extractor<traverser>           first;
+		static const extractor<traverser>           second;
+		static const extractor<traverser>           third;
+		static const extractor<traverser>           children;
+		static const extractor<tref_range<node>>    children_range;
+		static const extractor<
+				tree_range<tree<node>>>     children_trees_range;
 		// (tref) -> tref function tt:f wrapper	
 		static const extractor<traverser> f(const auto& fn);
-		static const extractor<
-			typename node::type>             nt;
-		static const extractor<tref>             ref;
-		static const extractor<htree::sp>        handle;
-		static const extractor<traverser>        dump;
-		static const extractor<traverser>        print_tree;
-		static const extractor<traverser>        only_child;
-		static const extractor<traverser>        first;
-		static const extractor<traverser>        second;
-		static const extractor<traverser>        third;
-		static const extractor<traverser>        children;
-		static const extractor<tref_range<node>> children_range;
-		static const extractor<
-			tree_range<tree<node>>>          children_trees_range;
-		static const extractor<std::string>      string;
-		static const extractor<int_t>            integer;
-		static const extractor<size_t>           num;
-		static const extractor<size_t>           data;
-		static const extractor<size_t>           ba_constant_id;
-		static const extractor<size_t>           ba_type;
-		static const extractor<bas_variant>      ba_constant;
 
 		traverser operator|(size_t nt) const;
 		traverser operator||(size_t nt) const;
@@ -618,24 +627,24 @@ std::ostream& operator<<(std::ostream& os, const rr_sig& s);
 // queries (tau_tree_queries.tmpl.h)
 
 template <NodeType node>
-bool is_non_terminal(const size_t nt, tref n);
+bool is(tref n, size_t nt);
 
-template <size_t nt, NodeType node>
-bool is_non_terminal(tref n);
+template <NodeType node, size_t nt>
+bool is(tref n);
 
-// factory method for is_non_terminal predicate
+// factory method for is predicate
 template <NodeType node>
-inline std::function<bool(tref)> is_non_terminal(size_t nt);
+inline std::function<bool(tref)> is(size_t nt);
 
 template <NodeType node>
-bool is_child_non_terminal(const size_t nt, tref n);
+bool is_child(tref n, size_t nt);
 
-template <size_t nt, NodeType node>
-bool is_child_non_terminal(tref n);
+template <NodeType node, size_t nt>
+bool is_child(tref n);
 
-// factory method for is_child_non_terminal predicate
+// factory method for is_child predicate
 template <NodeType node>
-inline std::function<bool(tref)> is_child_non_terminal(size_t nt);
+inline std::function<bool(tref)> is_child(size_t nt);
 
 template <NodeType node>
 bool is_var_or_capture(tref n);

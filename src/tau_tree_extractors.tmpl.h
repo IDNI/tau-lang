@@ -235,10 +235,11 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
 // or it contains a flag
 template <NodeType node>
-bool tree<node>::has_temp_var (tref fm) {
+bool tree<node>::has_temp_var(tref fm) {
 	const auto& t = get(fm);
-	auto io_vars = select_top(fm, is_non_terminal<node::type::io_var, node>);
-	if (io_vars.empty()) return find_top(fm, is_non_terminal<node::type::constraint, node>).has_value();
+	trefs io_vars = t.select_top(is<node, node::type::io_var>);
+	if (io_vars.empty())
+		return t.find_top(is<node, node::type::constraint>) != nullptr;
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;
 }

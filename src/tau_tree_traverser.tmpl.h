@@ -44,6 +44,14 @@ const typename tree<node>::template extractor<tref> tree<node>::traverser::ref =
 });
 
 template <NodeType node>
+const typename tree<node>::template extractor<const trefs&>
+	tree<node>::traverser::refs =
+		typename tree<node>::template extractor<const trefs&>(
+			[](const traverser& t) -> const trefs& {
+				return t.values();
+			});
+
+template <NodeType node>
 const typename tree<node>::template extractor<typename tree<node>::traverser>
 	tree<node>::traverser::children =
 		typename tree<node>::template extractor<traverser>(
@@ -201,12 +209,16 @@ const typename tree<node>::template extractor<htree::sp>
 		if (!t) return htree::sp();
 		return geth(t.value());
 	});
-// template <node::type NT>
-// static inline const extractor<bool> is{
-// 	[](const traverser& t) {
-// 		if (!t) return false;
-// 		return t.value_tree().get_type() == NT;
-// 	}};
+
+template <NodeType node>
+template <node::type NT>
+const typename tree<node>::template extractor<bool>
+	tree<node>::traverser::is<NT> =
+		typename tree<node>::template extractor<bool>(
+	[](const traverser& t) {
+		if (!t) return false;
+		return t.value_tree().is(NT);
+	});
 
 
 //------------------------------------------------------------------------------
