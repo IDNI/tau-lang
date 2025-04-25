@@ -27,7 +27,7 @@ std::set<rr_sig> ref_types<node>::unresolved() const {
 
 // returns known type of a ref, or no value
 template <NodeType node>
-std::optional<typename node::type> ref_types<node>::get_type(
+std::optional<typename node::type> ref_types<node>::get(
 	const rr_sig& sig)
 {
 	rr_sig s(sig);

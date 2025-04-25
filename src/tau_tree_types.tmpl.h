@@ -60,7 +60,7 @@ std::optional<rr> tree<node>::infer_ref_types(const rr& nso_rr,
 			// 			<< " is " << (node::name(t));
 			if (t == ref) {
 				// right side is unresolved ref
-				if (auto topt = ts.get_type(get_rr_sig(body));
+				if (auto topt = ts.get(get_rr_sig(body));
 					topt.has_value())
 				{
 					t = topt.value();
@@ -88,7 +88,7 @@ std::optional<rr> tree<node>::infer_ref_types(const rr& nso_rr,
 				t = get_nt_type(head);
 				// left side is an unresolved ref
 				if (t == ref) {
-					auto topt = ts.get_type(get_rr_sig(head));
+					auto topt = ts.get(get_rr_sig(head));
 					if (topt.has_value()) { // if we know
 						t = topt.value(); // update
 						// BOOST_LOG_TRIVIAL(trace)
@@ -119,7 +119,7 @@ std::optional<rr> tree<node>::infer_ref_types(const rr& nso_rr,
 		// 				<< " is " << (node::name(t));
 		if (t == ref) {
 			// main is an unresolved ref
-			if (auto topt = ts.get_type(get_rr_sig(nn.main->get())); topt) {
+			if (auto topt = ts.get(get_rr_sig(nn.main->get())); topt) {
 				t = topt.value();
 				// BOOST_LOG_TRIVIAL(trace)
 				// 	<< "(T) updating main: " << nn.main;

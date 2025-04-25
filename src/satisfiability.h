@@ -61,7 +61,7 @@ bool is_tau_formula_sat(tref fm, const int_t start_time = 0,
 }
 
 // Check for temporal formulas if f1 implies f2
-template <typename... BAs>
+template <BAsPack... BAs>
 bool is_tau_impl(tref f1, tref f2) {
 	using tau = tree<node<BAs...>>;
 	auto f1_norm = normalizer_step<node<BAs...>>(f1);
@@ -75,6 +75,28 @@ bool is_tau_impl(tref f1, tref f2) {
 		if (!tau::subtree_equals(ctn, tau::_F())) return false;
 	}
 	return true;
+}
+
+template <BAsPack... BAs>
+tref simp_tau_unsat_valid(tref fm, const int_t start_time = 0,
+				const bool output = false)
+{
+	using node = tau_lang::node<BAs...>;
+	using tau = tree<node>;
+	BOOST_LOG_TRIVIAL(debug) << "(I) Start simp_tau_unsat_valid";
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	// Check if formula is valid
+	if (is_tau_impl<BAs...>(tau::_T(), fm)) return tau::_T();
+	tref normalized_fm = normalize_with_temp_simp<node>(fm);
+	trefs clauses = tau::get_leaves(normalized_fm, tau::wff_or);
+
+	// Check satisfiability of each clause
+	for (tref clause: clauses) if (tau::subtree_equals(tau::_F(),
+		transform_to_execution<BAs...>(clause, start_time, output)))
+			clause = tau::_F();
+
+	BOOST_LOG_TRIVIAL(debug) << "(I) End simp_tau_unsat_valid";
+	return tau::build_wff_or(clauses);
 }
 
 } // namespace idni::tau_lang

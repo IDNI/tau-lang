@@ -121,9 +121,9 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 
 template <BAsPack... BAs>
 auto normalize(const tau_ba<BAs...>& fm) {
-	auto res = apply_rr_to_formula<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
-	res = simp_tau_unsat_valid(res);
-	return tau_ba<BAs...>(res);
+	tref res = apply_rr_to_formula<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
+	res = simp_tau_unsat_valid<BAs...>(res);
+	return tau_ba<BAs...>(tree<node<BAs...>>::geth(res));
 }
 
 template <BAsPack... BAs>

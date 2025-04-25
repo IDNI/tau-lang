@@ -94,13 +94,9 @@ tref tree<node>::build_in_var_name(size_t index) {
 }
 
 template <NodeType node>
-tref tree<node>::build_type(const std::string& name) {
-	return get(type, name);
-}
-
-template <NodeType node>
 tref tree<node>::build_bf_t_type(const std::string& type) {
-	return get(bf, get(bf_t, build_type(type)));
+	return get(bf,
+		get(node::ba_typed(bf_t, node::ba_constants_t::type_id(type))));
 }
 
 template <NodeType node>
@@ -111,7 +107,8 @@ tref tree<node>::build_bf_t_type(tref type) {
 
 template <NodeType node>
 tref tree<node>::build_bf_f_type(const std::string& type) {
-	return get(bf, get(bf_f, build_type(type)));
+	return get(bf,
+		get(node::ba_typed(bf_f, node::ba_constants_t::type_id(type))));
 }
 
 template <NodeType node>
@@ -157,10 +154,9 @@ template <NodeType node>
 tref tree<node>::build_in_variable_at_t_minus (const std::string& name,
 	int_t shift)
 {
-	return get(bf, get(variable, get(io_var, get(in, {
+	return get(bf, get(variable, get(io_var, get(in,
 		get(in_var_name, name),
-		get(offset, get(shift, {get(variable, "t"),
-			get_num(shift)})) }))));
+		get(offset, get(shift, get(variable, "t"), get_num(shift)))))));
 }
 
 template <NodeType node>
@@ -168,11 +164,9 @@ tref tree<node>::build_in_variable_at_t_minus(tref var_name, size_t num) {
 	DBG(assert(var_name != nullptr);)
 	DBG(assert(get(var_name).is(in_var_name));)
 	DBG(assert(num > 0);)
-	return get(bf, get(variable, get(io_var, get( in, {
-						var_name,
-						get(offset, get(shift, {
-							build_variable("t"),
-							get_num(num) })) }))));
+	return get(bf, get(variable, get(io_var, get(in, var_name,
+			get(offset, get(shift, build_variable("t"),
+						get_num(num)))))));
 }
 
 template <NodeType node>
@@ -196,9 +190,8 @@ template <NodeType node>
 tref tree<node>::build_out_variable_at_t(tref var_name) {
 	DBG(assert(var_name != nullptr);)
 	DBG(assert(get(var_name).is(out_var_name));)
-	return get(bf, get(variable, get(io_var, get(out, {
-					var_name,
-					get(offset, build_variable("t")) }))));
+	return get(bf, get(variable, get(io_var, get(out, var_name,
+				get(offset, build_variable("t"))))));
 }
 
 template <NodeType node>
@@ -210,9 +203,8 @@ template <NodeType node>
 tref tree<node>::build_out_variable_at_n(tref var_name, size_t num) {
 	DBG(assert(var_name != nullptr);)
 	DBG(assert(get(var_name).is(out_var_name));)
-	return get(bf, get(variable, get(io_var, get(out, {
-					var_name,
-					get(offset, get_integer(num)) }))));
+	return get(bf, get(variable, get(io_var, get(out, var_name,
+					get(offset, get_integer(num))))));
 }
 
 template <NodeType node>
@@ -231,22 +223,21 @@ template <NodeType node>
 tref tree<node>::build_out_variable_at_t_minus (const std::string& name,
 	const int_t shift)
 {
-	return get(bf, get(variable, get(io_var, get(out, {
-						get(out_var_name, name),
-						get(offset, get(shift, {
-							get(variable, "t"),
-							get_num(shift)})) }))));
+	return get(bf, get(variable, get(io_var, get(out,
+		get(out_var_name, name),
+		get(offset, get(shift,
+			get(variable, "t"),
+			get_num(shift)))))));
 }
 
 template <NodeType node>
 tref tree<node>::build_out_variable_at_t_minus(tref var_name, size_t num) {
 	DBG(assert(get(var_name).is(out_var_name));)
 	DBG(assert(num > 0);)
-	return get(bf, get(variable, get(io_var, get(out, {
-						var_name,
-						get(offset, get(shift, {
-							build_variable("t"),
-							get_num(num)})) }))));
+	return get(bf, get(variable, get(io_var, get(out, var_name,
+		get(offset, get(shift,
+					build_variable("t"),
+					get_num(num)))))));
 }
 
 template <NodeType node>
@@ -254,23 +245,23 @@ tref tree<node>::build_out_variable_at_t_minus(size_t index, size_t num) {
 	return build_out_variable_at_t_minus(build_out_var_name(index), num);
 }
 
-template <NodeType node>
-tref tree<node>::build_bf_constant(tref cte) {
-	DBG(assert(cte != nullptr);)
-	return get(bf, get(bf_constant, get(constant, cte)));
-}
+// template <NodeType node>
+// tref tree<node>::build_bf_constant(tref cte) {
+// 	DBG(assert(cte != nullptr);)
+// 	return get(bf, get(bf_constant, get(constant, cte)));
+// }
 
-template <NodeType node>
-tref tree<node>::build_bf_constant(tref cte, tref type) {
-	DBG(assert(cte != nullptr);)
-	return get(bf, get(bf_constant, get(constant, cte), type));
-}
+// template <NodeType node>
+// tref tree<node>::build_bf_constant(tref cte, tref type) {
+// 	DBG(assert(cte != nullptr);)
+// 	return get(bf, get(bf_constant, get(constant, cte), type));
+// }
 
-template <NodeType node>
-tref tree<node>::build_bf_constant(tref cte, const std::string& type) {
-	DBG(assert(cte != nullptr);)
-	return get(bf, get(bf_constant, get(constant, cte), build_type(type)));
-}
+// template <NodeType node>
+// tref tree<node>::build_bf_constant(tref cte, const std::string& type) {
+// 	DBG(assert(cte != nullptr);)
+// 	return get(bf, get(bf_constant, get(constant, cte), build_type(type)));
+// }
 
 // template <NodeType node>
 // tref tree<node>::build_bf_constant(const std::variant& v) {

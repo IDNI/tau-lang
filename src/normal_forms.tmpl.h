@@ -188,20 +188,13 @@ typename tree<node>::traverser operator|(
 template <NodeType node>
 tref normalize_ba(tref fm) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	assert(tau::get(fm).is(tau::bf));
 	auto norm_ba = [&](tref n) {
-		auto t = tt(n);
+		const auto& t = tau::get(n);
 		if (!t.is(tau::bf_constant)) return n;
-
 		// Node has a Boolean algebra element
-		auto ba_elem = t
-			| tau::bf_constant | tau::constant
-			| tt::only_child   | tt::ba_constant;
-		auto res = normalize_ba<node>(ba_elem);
-		auto type = t | tau::bf_constant | tau::type;
-		assert(type.has_value());
-		return tau::build_bf_constant(res, type.value());
+		return tau::get(normalize_ba<node>(t.get_ba_constant()),
+			t.get_ba_type());
 	};
 	return pre_order<node>(fm).template apply_unique_until_change<
 					MemorySlotPre::normalize_ba_m>(norm_ba);
@@ -720,8 +713,8 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	const auto& v = vars[p];
 	tref t = is_wff ? tau::_T() : tau::_1();
 	tref f = is_wff ? tau::_F() : tau::_0();
-	tref fm_v1 = replace<node>(fm, v, t);
-	tref fm_v0 = replace<node>(fm, v, f);
+	tref fm_v1 = rewriter::replace<node>(fm, v, t);
+	tref fm_v0 = rewriter::replace<node>(fm, v, f);
 
 	elim_vars_in_assignment<node>(fm_v1, vars, i, p, is_var);
 	if(fm_v1 == fm_v0) {
@@ -751,7 +744,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	// Function can only be applied to a BF
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
-	DBG(assert(t.is(tau::bf, fm));)
+	DBG(assert(t.is(tau::bf));)
 #ifdef TAU_CACHE
 	static std::map<std::pair<tref, bool>, tref> cache;
     if (auto it = cache.find(std::make_pair(fm, make_paths_disjoint));
@@ -788,11 +781,11 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	bool first = true;
 	for (const auto& [coeff, paths] : dnf) {
 		const auto& t = tau::get(coeff);
-		bool one = t[0].is(tau::bf_t);
+		bool is_one = t[0].is(tau::bf_t);
 		if (paths.empty()) {
-			DBG(assert(!one);)
+			DBG(assert(!is_one);)
 			if (first) reduced_dnf = coeff;
-			else reduced_dnf = build_bf_or(reduced_dnf, coeff);
+			else reduced_dnf = tau::build_bf_or(reduced_dnf, coeff);
 			continue;
 		}
 		for (const auto& path : paths) {
@@ -808,10 +801,10 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 					: tau::build_bf_and(var_path,
 						tau::build_bf_neg(vars[k]));
 			}
-			if (first) reduced_dnf = t ? var_path
+			if (first) reduced_dnf = is_one ? var_path
 				: tau::build_bf_and(coeff, var_path),
 				first = false;
-			else reduced_dnf = t
+			else reduced_dnf = is_one
 				? tau::build_bf_or(reduced_dnf, var_path)
 				: tau::build_bf_or(reduced_dnf,
 					tau::build_bf_and(coeff, var_path));
@@ -837,7 +830,7 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 		if (dnf != bf) changes[bf] = dnf;
 	}
 	if (changes.empty()) return fm;
-	else return replace<node>(fm, changes);
+	else return rewriter::replace<node>(fm, changes);
 }
 
 template <NodeType node>
@@ -2181,8 +2174,8 @@ tref rm_temporary_lookback(tref fm) {
 	const auto& t = tau::get(fm);
 	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
 	bool has_var = std::ranges::any_of(io_vars,
-		[](tref el){return !is_io_initial<node>(el);});
-	int_t lookback = get_max_shift<node>(io_vars, true);
+		[](tref el){return !tau::is_io_initial(el);});
+	int_t lookback = tau::get_max_shift(io_vars, true);
 	std::map<tref, tref> changes;
 	tref max_temp = nullptr;
 	for (tref io_var : io_vars) {
@@ -2194,10 +2187,14 @@ tref rm_temporary_lookback(tref fm) {
 				changes.emplace(io_var, tau::_0_trimmed());
 			else {
 				if (max_temp) {
-					if (get_io_var_shift<node>(max_temp) < get_io_var_shift<node>(io_var)) {
-						changes.emplace(max_temp, tau::_0_trimmed());
+					if (tau::get_io_var_shift(max_temp)
+						< tau::get_io_var_shift(io_var))
+					{
+						changes.emplace(max_temp,
+							tau::_0_trimmed());
 						max_temp = io_var;
-					} else changes.emplace(io_var, tau::_0_trimmed());
+					} else changes.emplace(io_var,
+							tau::_0_trimmed());
 				} else {
 					max_temp = io_var;
 				}
@@ -2248,7 +2245,7 @@ tref extract_sometimes (tref fm) {
 	for (tref clause : clauses) {
 		DBG(assert(!is<node>(tau::trim(clause),tau::wff_sometimes)
 			&& !is<node>(tau::trim(clause),tau::wff_always));)
-		if (!has_temp_var<node>(clause)) extracted.push_back(clause);
+		if (!tau::has_temp_var(clause)) extracted.push_back(clause);
 		else staying.push_back(clause);
 	}
 
@@ -2309,7 +2306,7 @@ tref extract_always (tref fm) {
 	for (const auto& clause : clauses) {
 		DBG(assert(!is<node>(tau::trim(clause), tau::wff_sometimes)
 			&& !is<node>(tau::trim(clause), tau::wff_always));)
-		if (!has_temp_var<node>(clause)) extracted.push_back(clause);
+		if (!tau::has_temp_var(clause)) extracted.push_back(clause);
 		else staying.push_back(clause);
 	}
 
@@ -2407,23 +2404,24 @@ tref push_sometimes_always_in(tref fm, auto& visited) {
 template <NodeType node>
 tref shift_io_vars_in_fm (tref fm, const auto& io_vars, const int_t shift) {
 	using tau = tree<node>;
+	using tt = tau::traverser;
 	if (shift <= 0) return fm;
 	typename tau::subtree_map changes;
 	for (tref io_var : io_vars) {
 		// Skip initial conditions
-		if (is_io_initial<node>(io_var)) continue;
-		int_t var_shift = get_io_var_shift<node>(io_var);
-		if (io_var | tau::io_var | tau::in) {
+		if (tau::is_io_initial(io_var)) continue;
+		int_t var_shift = tau::get_io_var_shift(io_var);
+		if (tt(io_var) | tau::io_var | tau::in) {
 			changes[io_var] = tau::trim(
 				tau::build_in_variable_at_t_minus(
-					get_io_name<node>(io_var), var_shift + shift));
+					tau::get_io_name(io_var), var_shift + shift));
 		} else {
 			changes[io_var] = tau::trim(
 				tau::build_out_variable_at_t_minus(
-					get_io_name<node>(io_var), var_shift + shift));
+					tau::get_io_name(io_var), var_shift + shift));
 		}
 	}
-	return replace<node>(fm, changes);
+	return rewriter::replace<node>(fm, changes);
 }
 
 template <NodeType node>
@@ -2433,7 +2431,7 @@ tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift) 
 	if (shift <= 0) return fm;
 	typename tau::subtree_map changes;
 	for (tref io_var : io_vars) {
-		if (!is_io_initial<node>(io_var)) continue;
+		if (!tau::is_io_initial(io_var)) continue;
 		int_t tp = get_io_time_point<node>(io_var);
 		// Make sure that the resulting time point is positive
 		if (tp + shift < 0) return tau::_F();
@@ -2502,7 +2500,7 @@ tref pull_always_out(tref fm) {
 	// Now remove all temporary lookback variables which are not needed anymore
 	// after joining of the always statements
 	always_part = rm_temporary_lookback<node>(always_part);
-	if (!has_temp_var<node>(fm)) {
+	if (!tau::has_temp_var(fm)) {
 		// No input/output variable present, hence return without always
 		return tau::build_wff_and(always_part,
 					replace<node>(fm, l_changes));
@@ -2524,7 +2522,7 @@ tref pull_sometimes_always_out(tref fm) {
 	if (clauses.empty()) clauses.push_back(fm);
 	for (tref clause : clauses) {
         auto r = pull_always_out<node>(clause);
-        if (!has_temp_var<node>(r)) {
+        if (!tau::has_temp_var(r)) {
         	changes[clause] = tau::_F();
         	collected_no_temp_fms.push_back(r);
         }
@@ -2564,12 +2562,12 @@ tref always_conjunction (tref fm1_aw, tref fm2_aw) {
 	auto fm2 = is_child<node>(fm2_aw, tau::wff_always)
 				? tau::trim2(fm2_aw) : fm2_aw;
 	auto io_vars1 = tau::get(fm1)
-		.select_top(is_child<node, node::tau::io_var>);
+		.select_top(is_child<node, tau::io_var>);
 	auto io_vars2 = tau::get(fm2)
-		.select_top(is_child<node, node::tau::io_var>);
+		.select_top(is_child<node, tau::io_var>);
 	// Get lookbacks
-	int_t lb1 = get_max_shift<node>(io_vars1);
-	int_t lb2 = get_max_shift<node>(io_vars2);
+	int_t lb1 = tau::get_max_shift(io_vars1);
+	int_t lb2 = tau::get_max_shift(io_vars2);
 	if (lb1 < lb2) {
 		// adjust fm1 by lb2 - lb1
 		return tau::build_wff_and(
@@ -2592,19 +2590,19 @@ tref sometimes_always_normalization<node>::operator()(tref fm) const {
 		return is_child<node>(n, tau::wff_sometimes)
 			|| is_child<node>(n, tau::wff_always);
 	};
-	if (!tau::get(fm).find_top(st_aw).has_value()
-		&& !has_temp_var<node>(fm))
+	if (tau::get(fm).find_top(st_aw) == nullptr
+		&& !tau::has_temp_var(fm))
 			return reduce_across_bfs<node>(fm, false);
 	// Delete all always/sometimes if they scope no temporal variable
 	auto temps = tau::get(fm).select_top(st_aw);
 	typename tau::subtree_map changes;
 	for (tref temp : temps) {
-		if (!has_temp_var<node>(temp))
+		if (!tau::has_temp_var(temp))
 			changes.emplace(temp, tau::trim2(temp));
 	}
-	auto clauses = get_dnf_wff_clauses<node>(
+	auto clauses = tau::get_dnf_wff_clauses(
 		reduce_across_bfs<node>(changes.empty() ? fm
-				: replace<node>(fm, changes), false));
+				: rewriter::replace<node>(fm, changes), false));
 	tref res = tau::_F();
 	tref always_disjuncts = tau::_F();
 	for (tref clause : clauses) {
@@ -2614,7 +2612,7 @@ tref sometimes_always_normalization<node>::operator()(tref fm) const {
 					always_disjuncts, clause);
 			continue;
 		}
-		auto conjuncts = get_cnf_wff_clauses<node>(clause);
+		auto conjuncts = tau::get_cnf_wff_clauses(clause);
 		tref always_part = tau::_T();
 		tref staying = tau::_T();
 		for (tref conj : conjuncts) {
@@ -2639,7 +2637,8 @@ tref sometimes_always_normalization<node>::operator()(tref fm) const {
 		changes[tau::trim2(f)] = reduce_across_bfs<node>(
 						tau::trim2(f), false);
 	}
-	return reduce_across_bfs<node>(replace<node>(res, changes), false);
+	return reduce_across_bfs<node>(
+		rewriter::replace<node>(res, changes), false);
 }
 
 // Assumes that fm is normalized
@@ -2653,11 +2652,11 @@ tref pull_always_out_for_inf(tref fm) {
 	tref last_always = nullptr;
 	for (tref clause : clauses) {
 		// Clauses not containing temporal variables need to be added under always
-		if (!has_temp_var<node>(clause)) {
+		if (!tau::has_temp_var(clause)) {
 			non_temps = tau::build_wff_or(non_temps, clause);
 			continue;
 		}
-		auto conjuncts = get_cnf_wff_clauses<node>(clause);
+		auto conjuncts = tau::get_cnf_wff_clauses(clause);
 		tref always_statements = tau::_T();
 		tref staying = tau::_T();
 		for (tref conj : conjuncts) {
@@ -2710,7 +2709,7 @@ tref push_existential_quantifier_one(tref fm) {
 	}
 	else if (st.child_is(tau::wff_and)) {
 		// Remove existential, if quant_var does not appear in clause
-		auto clauses = st.get_cnf_wff_clauses();
+		auto clauses = tau::get_cnf_wff_clauses(st.get());
 		tref no_q_fm = tau::_T();
 		for (tref clause : clauses) {
 			if (!contains<node>(clause, quant_var)) {
@@ -2751,7 +2750,7 @@ tref push_universal_quantifier_one(tref fm) {
 	}
 	else if (st.child_is(tau::wff_or)) {
 		// Remove existential, if quant_var does not appear in clause
-		auto clauses = st.get_dnf_wff_clauses();
+		auto clauses = tau::get_dnf_wff_clauses(st.get());
 		tref no_q_fm = tau::_T();
 		for (tref clause : clauses) {
 			if (!contains<node>(clause, quant_var)) {
@@ -2802,7 +2801,7 @@ tref wff_remove_existential(tref var, tref wff) {
 		// Get each conjunct in clause
 		tref nl = tau::_T();
 		bool is_quant_removable_in_clause = true;
-		auto conjs = tau::get(l).get_cnf_wff_clauses();
+		auto conjs = tau::get_cnf_wff_clauses(l);
 		for (tref conj : conjs) {
 			if (!contains<node>(conj, var)) {
 				nl = tau::build_wff_and(nl, conj);
@@ -2827,10 +2826,12 @@ tref wff_remove_existential(tref var, tref wff) {
 		}
 
 		auto f = squeeze_positives<node>(new_l);
-		auto f_0 = f ? replace<node>(f.value(), var, tau::_0_trimmed())
-				: tau::_0();
-		auto f_1 = f ? replace<node>(f.value(), var, tau::_1_trimmed())
-				: tau::_1();
+		auto f_0 = f ? rewriter::replace<node>(
+				f.value(), var, tau::_0_trimmed())
+			: tau::_0();
+		auto f_1 = f ? rewriter::replace<node>(
+				f.value(), var, tau::_1_trimmed())
+			: tau::_1();
 
 		if (auto neqs = tau::get(new_l).select_all(
 			is<node, tau::bf_neq>); neqs.size() > 0)
@@ -2838,8 +2839,10 @@ tref wff_remove_existential(tref var, tref wff) {
 			auto nneqs = tau::_T();
 			for (tref neq : neqs) {
 				auto g = tt(neq) | tau::bf | tt::ref;
-				auto g_0 = replace<node>(g, var, tau::_0_trimmed());
-				auto g_1 = replace<node>(g, var, tau::_1_trimmed());
+				auto g_0 = rewriter::replace<node>(g, var,
+							tau::_0_trimmed());
+				auto g_1 = rewriter::replace<node>(g, var,
+							tau::_1_trimmed());
 				// If both are 1 then inequality is implied by f_0f_1 = 0
 				if (g_0 == tau::_1() && g_1 == tau::_1()) continue;
 				// If f_0 is equal to f_1 we can use assumption f_0 = 0 and f_1 = 0
@@ -2868,7 +2871,7 @@ tref wff_remove_existential(tref var, tref wff) {
 		}
 		changes[l] = nl;
 	}
-	return replace<node>(wff, changes);
+	return rewriter::replace<node>(wff, changes);
 }
 
 template <NodeType node>
@@ -3014,7 +3017,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 			auto new_clause = push_negation_in<node>(
 					tau::build_wff_neg(clause));
 			new_clause = push_negation_in<node>(
-				tau::build_wff_neg(tau::wff_remove_existential(
+				tau::build_wff_neg(wff_remove_existential<node>(
 					tau::trim2(inner_fm), new_clause)));
 			if (res == tau::_F()) return tau::_F();
 			if (!res) res = new_clause;

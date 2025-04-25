@@ -327,7 +327,7 @@ tau_<BAs...> normalize_ba(const tau_<BAs...>& fm) {
 			| only_child_extractor<BAs...>
 			| ba_extractor<BAs...>
 			| optional_value_extractor<std::variant<BAs...>>;
-		auto res = normalize_ba(ba_elem);
+		auto res = normalize_ba_depreciating(ba_elem);
 		auto type = n | p::bf_constant | p::type;
 		assert(type.has_value());
 		return build_bf_constant(res, type.value());

@@ -23,7 +23,7 @@ struct ref_types {
 	// returns set of unresolved refs
 	std::set<rr_sig> unresolved() const;
 	// returns known type of a ref, or no value
-	std::optional<typename node::type> get_type(const rr_sig& sig);
+	std::optional<typename node::type> get(const rr_sig& sig);
 	// returns ref to calculate fp by provided by fp call sig, or no value
 	std::optional<rr_sig> fpcall(const rr_sig& fp_sig) const;
 private:

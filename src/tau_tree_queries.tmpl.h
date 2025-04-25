@@ -34,8 +34,8 @@ inline std::function<bool(tref)> is_child(size_t nt) {
 
 template <NodeType node>
 bool is_child_quantifier(tref n) {
-	return tree<node>::get(n).is_child(node::type::wff_all)
-		|| tree<node>::get(n).is_child(node::type::wff_ex);
+	return tree<node>::get(n).child_is(node::type::wff_all)
+		|| tree<node>::get(n).child_is(node::type::wff_ex);
 }
 
 template <NodeType node>
@@ -47,6 +47,18 @@ bool is_var_or_capture(tref n) {
 template <NodeType node>
 inline std::function<bool(tref)> is_var_or_capture() {
 	return [](tref n) { return is_var_or_capture<node>(n); };
+}
+
+template <NodeType node>
+bool contains(tref fm, tref sub_fm) {
+	bool is_contained = false;
+	auto has_sub_fm = [&sub_fm, &is_contained](tref n) {
+		if (tree<node>::subtree_equals(n, sub_fm))
+			return is_contained = true, false;
+		return true;
+	};
+	pre_order<node>(fm).search_unique(has_sub_fm);
+	return is_contained;
 }
 
 template <NodeType node>
