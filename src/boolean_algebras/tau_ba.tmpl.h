@@ -152,9 +152,9 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	using tau = tree<node<BAs...>>;
 	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
 	if (!simp_fm) return false;
-	if (tau::get(simp_fm).find_top(is_non_terminal<tau::node, tau::ref>))
+	if (tau::get(simp_fm).find_top(is<tau::node, tau::ref>))
 		return false;
-	auto vars = get_free_vars_from_nso(simp_fm);
+	auto vars = tau::get_free_vars_from_nso(simp_fm);
 	for (const auto& v : vars) {
 		const auto& t = tau::get(v);
 		if (!(t.only_child_tree().is(tau::io_var)

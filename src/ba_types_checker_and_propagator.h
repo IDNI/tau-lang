@@ -30,8 +30,8 @@ private:
 	// checks and propagates types within the scope (global or quantifier)
 	tref check_and_propagate(tref n);
 	static constexpr auto is_ba_element = [](tref el) {
-		return is_non_terminal<BAs...>(tau::bf_constant, el)
-			|| is_non_terminal<BAs...>(tau::bf_variable, el);
+		return is<node>(el, tau::bf_constant)
+			|| is<node>(el, tau::bf_variable);
 	};
 	tref get_var_key_node(tref n) const;
 	// check appearance of a single type in all BA elems, then propagate it

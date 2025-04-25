@@ -479,9 +479,7 @@ tref tree<node>::build_bf_xor(tref l, tref r) {
 
 template <NodeType node>
 tref tree<node>::build_wff_eq(tref l, tref r) {
-// #ifdef DEBUG
-// // 	assert(is_non_terminal(bf, l) && is_non_terminal(bf, r));
-// #endif // DEBUG
+	// DBG(assert(is<node>(l, bf) && is<node>(r, bf));)
 	DBG(assert(l != nullptr && r != nullptr);)
 	auto left_side = build_bf_xor(l,r);
 	return build_wff_eq(left_side);

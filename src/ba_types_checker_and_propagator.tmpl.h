@@ -126,7 +126,6 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 		[this, &vsc, &csid, &tsid, &inc_vsid, &transform_element]
 		(tref el)
 	{
-		if (!is_non_terminal_node<BAs...>(el)) return el;
 		const auto& t = tau::get(el);
 		//BOOST_LOG_TRIVIAL(trace)
 		auto nt = t.get_type();
@@ -196,7 +195,6 @@ tref ba_types_checker_and_propagator<BAs...>::check_and_propagate(tref n) {
 	bool err = false;
 	const auto checker_and_propagator = [this, &err](tref el) -> bool {
 		if (err) return false;
-		if (!is_non_terminal_node<BAs...>(el)) return true;
 		auto nt = tau::get(el).get_type();
 		switch (nt) {
 			case tau::bf_interval:
@@ -239,13 +237,6 @@ tref ba_types_checker_and_propagator<BAs...>::check_and_propagate(tref n) {
 	} while (untyped_n0 != untyped_n);
 	return n;
 }
-
-// static constexpr auto is_ba_element = [](const node& el) {
-// 	return is_non_terminal<BAs...>(
-// 			tau_parser::bf_constant, el)
-// 		|| is_non_terminal<BAs...>(
-// 			tau_parser::bf_variable, el);
-// };
 
 template <BAsPack... BAs>
 tref ba_types_checker_and_propagator<BAs...>::get_var_key_node(tref n) const {

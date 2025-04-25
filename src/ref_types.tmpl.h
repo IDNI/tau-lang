@@ -135,19 +135,16 @@ bool ref_types<node>::add(tref n, const node::type& t) {
 template <NodeType node>
 bool ref_types<node>::get_types(tref n, bool def) {
 	const auto& t = tau::get(n);
-	for (tref r : t.select_all(// collect all refs to do
-			is_non_terminal<tau::ref, node>))
-	{
+	// collect all refs to do
+	for (tref r : t.select_all(is<node, tau::ref>)){
 		auto sig = tau::get_rr_sig(r);
 		todo(sig);
 		if (def	&& sig.offset_arity > 0) add_fpcall(sig);
 	}
-	for (tref r : t.select_all(// collect all wff typed refs
-			is_non_terminal<tau::wff_ref, node>))
-		add(r, tau::wff);
-	for (tref r : t.select_all(// collect all bf typed refs
-			is_non_terminal<tau::bf_ref, node>))
-		add(r, tau::bf);
+	// collect all wff typed refs
+	for (tref r : t.select_all(is<node, tau::wff_ref>)) add(r, tau::wff);
+	// collect all bf typed refs
+	for (tref r : t.select_all(is<node, tau::bf_ref>))  add(r, tau::bf);
 	return errors_.empty();
 }
 

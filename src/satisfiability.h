@@ -22,8 +22,8 @@ inline void print_fixpoint_info(const std::string& message,
 template <BAsPack... BAs>
 bool has_temporary_io_var(tref fm) {
 	using tau = tree<node<BAs...>>;
-	auto io_vars = tau::get(fm).select_top(
-			is_child_non_terminal<tau::io_var, node<BAs...>>);
+	auto io_vars = tau::get(fm)
+		.select_top(is_child<node<BAs...>, tau::io_var>);
 	for (tref var : io_vars) // Check if the name of var starts with "_"
 		if (tau::get_io_name(var)[0] == '_') return true;
 	return false;

@@ -415,8 +415,8 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 template <NodeType node>
 tref get_hook<node>::ctn_neg(tref n) {
 	const auto& t = tau::get(n);
-	auto num    = t.find_top(is_non_terminal<tau::num, node>);
-	auto ctnvar = t.find_top(is_non_terminal<tau::ctnvar, node>);
+	auto num    = t.find_top(is<node, tau::num>);
+	auto ctnvar = t.find_top(is<node, tau::ctnvar>);
 	auto op = t[0].get_type();
 	switch (op) {
 		//RULE(BF_PUSH_NEGATION_INWARDS_2, "($X != $Y)' := $X = $Y.")
@@ -610,8 +610,8 @@ template <NodeType node>
 tref get_hook<node>::wff_ctn(const node& v, const tref* ch, size_t len, tref r) {
 	tref n = tau::get_raw(v, ch, len, r);
 	const auto& t = tau::get(n);
-	tref num    = t.find_top(is_non_terminal<tau::num, node>);
-	tref ctnvar = t.find_top(is_non_terminal<tau::ctnvar, node>);
+	tref num    = t.find_top(is<node, tau::num>);
+	tref ctnvar = t.find_top(is<node, tau::ctnvar>);
 	size_t op = t[0][0].get_type();
 	switch (op) {
 	case tau::ctn_eq: return build_wff_and(

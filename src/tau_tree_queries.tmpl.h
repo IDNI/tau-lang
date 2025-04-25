@@ -5,31 +5,31 @@
 namespace idni::tau_lang {
 
 template <NodeType node>
-bool is_non_terminal(const size_t nt, tref n) {
+bool is(tref n, size_t nt) {
 	return tree<node>::get(n).is(nt);
 }
 
-template <size_t nt, NodeType node>
-bool is_non_terminal(tref n) { return is_non_terminal<node>(nt, n); }
+template <NodeType node, size_t nt>
+bool is(tref n) { return is<node>(nt, n); }
 
-// factory method for is_non_terminal predicate
+// factory method for is predicate
 template <NodeType node>
-inline std::function<bool(tref)> is_non_terminal(size_t nt) {
-	return [nt](tref n) { return is_non_terminal<node>(nt, n); };
+inline std::function<bool(tref)> is(size_t nt) {
+	return [nt](tref n) { return is<node>(nt, n); };
 }
 
 template <NodeType node>
-bool is_child_non_terminal(const size_t nt, tref n) {
+bool is_child(tref n, size_t nt) {
 	return tree<node>::get(n).child_is(nt);
 }
 
-template <size_t nt, NodeType node>
-bool is_child_non_terminal(tref n) { return is_child_non_terminal<node>(nt, n); }
+template <NodeType node, size_t nt>
+bool is_child(tref n) { return is_child<node>(nt, n); }
 
-// factory method for is_non_terminal predicate
+// factory method for is predicate
 template <NodeType node>
-inline std::function<bool(tref)> is_child_non_terminal(size_t nt) {
-	return [nt](tref n) { return is_child_non_terminal<node>(nt, n); };
+inline std::function<bool(tref)> is_child(size_t nt) {
+	return [nt](tref n) { return is_child<node>(nt, n); };
 }
 
 template <NodeType node>
