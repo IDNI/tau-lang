@@ -24,8 +24,9 @@ namespace idni::tau_lang {
 template <BAsPack... BAs>
 struct tau_ba {
 	using tau_ba_t = tau_ba<BAs...>;
-	using tau = idni::tau_lang::tree<idni::tau_lang::node<BAs...>>;
-	using node = tau::node;
+	using node = tau_lang::node<BAs...>;
+	using tau_ba_node = tau_lang::node<tau_ba<BAs...>, BAs...>;
+	using tau = tau_lang::tree<node>;
 
 	/**
 	 * @brief Constructor initializing tau_ba with recursive relations and main tau_nso_t.

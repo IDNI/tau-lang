@@ -47,7 +47,7 @@ bool is_tau_formula_sat(tref fm, const int_t start_time = 0,
 	using tau = tree<node<BAs...>>;
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(fm);
-	tref normalized_fm = normalize_with_temp_simp(fm);
+	tref normalized_fm = normalize_with_temp_simp<node<BAs...>>(fm);
 	trefs clauses = tau::get_leaves(normalized_fm, tau::wff_or);
 	// Convert each disjunct to unbounded continuation
 	for (tref clause : clauses) {
@@ -64,10 +64,10 @@ bool is_tau_formula_sat(tref fm, const int_t start_time = 0,
 template <typename... BAs>
 bool is_tau_impl(tref f1, tref f2) {
 	using tau = tree<node<BAs...>>;
-	auto f1_norm = normalizer_step(f1);
-	auto f2_norm = normalizer_step(f2);
-	auto imp_check = normalize_with_temp_simp((tau::build_wff_neg(
-				tau::build_wff_imply(f1_norm, f2_norm))));
+	auto f1_norm = normalizer_step<node<BAs...>>(f1);
+	auto f2_norm = normalizer_step<node<BAs...>>(f2);
+	auto imp_check = normalize_with_temp_simp<node<BAs...>>(
+		tau::build_wff_neg(tau::build_wff_imply(f1_norm, f2_norm)));
 	auto clauses = tau::get_dnf_wff_clauses(imp_check);
 	// Now check that each disjunct is not satisfiable
 	for (tref c : clauses) {

@@ -321,7 +321,7 @@ tref tree<node>::build_bf_constant(tref cte, const std::string& type) {
 // }
 
 template <NodeType node>
-tref tree<node>::build_bf_uniter_const(const std::string& n1,
+tref tree<node>::build_bf_uninterpreted_constant(const std::string& n1,
 	const std::string& n2)
 {
 	return get(bf, get(variable, get(uninterpreted_constant,

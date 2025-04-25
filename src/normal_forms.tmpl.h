@@ -845,9 +845,8 @@ typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& t,
 	const bf_reduce_canonical<node>& r)
 {
-	return tt(r(t));
+	return typename tree<node>::traverser(r(t.value()));
 }
-
 
 // template<typename... BAs>
 // std::optional<tref> operator|(const std::optional<tref>& fm, const bf_reduce_canonical<BAs...>& r) {
@@ -2564,10 +2563,10 @@ tref always_conjunction (tref fm1_aw, tref fm2_aw) {
 				? tau::trim2(fm1_aw) : fm1_aw;
 	auto fm2 = is_child<node>(fm2_aw, tau::wff_always)
 				? tau::trim2(fm2_aw) : fm2_aw;
-	auto io_vars1 = tau::get(fm1).select_top(
-				is_child_<node::tau::io_var>);
-	auto io_vars2 = tau::get(fm2).select_top(
-				is_child_<node::tau::io_var>);
+	auto io_vars1 = tau::get(fm1)
+		.select_top(is_child<node, node::tau::io_var>);
+	auto io_vars2 = tau::get(fm2)
+		.select_top(is_child<node, node::tau::io_var>);
 	// Get lookbacks
 	int_t lb1 = get_max_shift<node>(io_vars1);
 	int_t lb2 = get_max_shift<node>(io_vars2);
@@ -2691,7 +2690,7 @@ typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& fm,
 	const sometimes_always_normalization<node>& r)
 {
-	return tt(r(fm.get()));
+	return typename tree<node>::traverser(r(fm.value()));
 }
 
 template <NodeType node>
@@ -3087,7 +3086,7 @@ tref eliminate_quantifiers(tref fm) {
 		return n;
 	};
 	auto visit = [&excluded_nodes](tref n) {
-		if (is<node>(tau, n)) return false;
+		if (is<node>(n, tau::bf)) return false;
 		// Do not visit subtrees below a maximally pushed quantifier
 		if (excluded_nodes.contains(n)) return false;
 		return true;
@@ -3115,7 +3114,7 @@ tref get_eq_with_most_quant_vars(tref fm, const auto& quant_vars) {
 	tref eq_max_quants = nullptr;
 	int_t max_quants = 0;
 	auto get_eq = [&](tref n) {
-		if (is<node>(tau, n)) {
+		if (is<node>(n, tau::bf_eq)) {
 			// Found term
 			// Get vars
 			auto vars = tau::get(n).select_top(
@@ -3148,13 +3147,13 @@ std::pair<tref, bool> anti_prenex_finalize_ex(tref q, tref scoped_fm) {
 	if (mixed_eqs.contains(scoped_fm)) return { scoped_fm, false };
 	bool all_atm_fm_neq = true, all_atm_fm_eq = true;
 	auto check_atm_fms = [&all_atm_fm_neq, &all_atm_fm_eq, &q](tref n) {
-		if (is<node>(tau, n) && contains<node>(n, q)) {
+		if (is<node>(n, tau::bf_eq) && contains<node>(n, q)) {
 			all_atm_fm_neq = false;
 			return all_atm_fm_eq != false;
-		} else if (is<node>(tau, n) && contains<node>(n, q)) {
+		} else if (is<node>(n, tau::bf_neq) && contains<node>(n, q)) {
 			all_atm_fm_eq = false;
 			return all_atm_fm_neq != false;
-		} else if (is<node>(tau, n)) {
+		} else if (is<node>(n, tau::wff_ref)) {
 			all_atm_fm_neq = false;
 			all_atm_fm_eq = false;
 			return false;
@@ -3310,7 +3309,7 @@ tref anti_prenex(const tref& fm) {
 	auto visit_inner_quant = [&quant_vars](tref n) {
 		if (is_quantifier<node>(n))
 			quant_vars.insert(tau::trim2(n));
-		if (is<node>(tau, n)) return false;
+		if (is<node>(n, tau::bf)) return false;
 		return true;
 	};
 	auto nnf = push_negation_in<node>(fm);

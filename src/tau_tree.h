@@ -283,6 +283,8 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 
 	tref trim() const { return first(); }
 	static tref trim(tref t) { return get(t).first(); }
+	tref trim2() const { return first_tree().first(); }
+	static tref trim2(tref t) { return get(t)[0].first(); }
 
 	const tree& operator[](size_t n) const;
 	const tree& child_tree(size_t n) const;
@@ -439,14 +441,12 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		static const extractor<tref>                ref;
 		static const extractor<const trefs&>        refs;
 		static const extractor<htree::sp>           handle;
-		static const extractor<const tree<node>&>   tree;
+		static const extractor<const tree<node>&>   Tree;
 		// print/dump
 		static const extractor<traverser>           dump;
 		static const extractor<traverser>           print_tree;
 		// node type
-		static const extractor<type> nt;
-		template <type NT>
-		static const extractor<bool>                is;
+		static const extractor<type>                nt;
 		// node data
 		static const extractor<std::string>         string;
 		static const extractor<int_t>               integer;
@@ -553,7 +553,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref build_bf_constant(tref cte, tref type);
 	static tref build_bf_constant(tref cte, const std::string& type);
 	// build_bf_and_constant and build_bf_or_constant
-	static tref build_bf_uniter_const(const std::string& name1,
+	static tref build_bf_uninterpreted_constant(const std::string& name1,
 						const std::string& name2);
 	static tref build_wff_eq(tref l, tref r);
 	static tref build_wff_eq(tref l);
@@ -614,12 +614,19 @@ std::ostream& operator<<(std::ostream& os, const tree<node>& t);
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os,
 				const typename tree<node>::traverser& tt);
-template <BAsPack... BAs>
+template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rule& r);
-template <BAsPack... BAs>
+template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rules& rs);
-template <BAsPack... BAs>
+template <NodeType node>
 std::ostream& print(std::ostream& os, const rr& rr_);
+
+template <NodeType node>
+std::string to_str(const rewriter::rule& r);
+template <NodeType node>
+std::string to_str(const rewriter::rules& rs);
+template <NodeType node>
+std::string to_str(const rr& rr_);
 
 std::ostream& operator<<(std::ostream& os, const rr_sig& s);
 
@@ -629,7 +636,7 @@ std::ostream& operator<<(std::ostream& os, const rr_sig& s);
 template <NodeType node>
 bool is(tref n, size_t nt);
 
-template <NodeType node, size_t nt>
+template <NodeType node, typename node::type nt>
 bool is(tref n);
 
 // factory method for is predicate
@@ -645,6 +652,9 @@ bool is_child(tref n);
 // factory method for is_child predicate
 template <NodeType node>
 inline std::function<bool(tref)> is_child(size_t nt);
+
+template <NodeType node>
+bool is_child_quantifier(tref n);
 
 template <NodeType node>
 bool is_var_or_capture(tref n);

@@ -327,7 +327,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint = false);
 // The needed class in order to make bf_to_reduce_dnf work with rule applying process
 template <NodeType node>
 struct bf_reduce_canonical {
-	tref operator() (tref fm) const;
+	tref operator()(tref fm) const;
 };
 
 template <NodeType node>

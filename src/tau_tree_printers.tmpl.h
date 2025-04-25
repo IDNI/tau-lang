@@ -54,23 +54,41 @@ std::ostream& operator<<(std::ostream& os,
 	return os << "\n\n";
 }
 
-template <BAsPack... BAs>
+template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rule& r) {
-	return os << tree<node<BAs...>>::get(r.first) << " := "
-			<< tree<node<BAs...>>::get(r.second) << ".";
+	return os << tree<node>::get(r.first) << " := "
+			<< tree<node>::get(r.second) << ".";
 }
 
-template <BAsPack... BAs>
+template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rules& rs) {
-	for (const auto& r : rs) print<BAs...>(os, r) << " ";
+	for (const auto& r : rs) print<node>(os, r) << " ";
 	return os;
 }
 
-template <BAsPack... BAs>
+template <NodeType node>
 std::ostream& print(std::ostream& os, const rr& rr_) {
-	print<BAs...>(os, rr_.rec_relations);
-	if (rr_.main) os << tree<node<BAs...>>::get(rr_.main);
+	print<node>(os, rr_.rec_relations);
+	if (rr_.main) os << tree<node>::get(rr_.main);
 	return os;
+}
+
+template <NodeType node>
+std::string to_str(const rewriter::rule& r) {
+	std::stringstream ss;
+	return print<node>(ss, r), ss.str();
+}
+
+template <NodeType node>
+std::string to_str(const rewriter::rules& rs) {
+	std::stringstream ss;
+	return print<node>(ss, rs), ss.str();
+}
+
+template <NodeType node>
+std::string to_str(const rr& rr_) {
+	std::stringstream ss;
+	return print<node>(ss, rr_), ss.str();
 }
 
 inline std::ostream& operator<<(std::ostream& os, const rr_sig& s) {
