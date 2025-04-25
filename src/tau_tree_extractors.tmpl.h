@@ -194,8 +194,9 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 	auto collector = [&free_vars](tref n) {
 		const auto& t = get(n);
 		if (t.is(wff_all) || t.is(wff_ex)) {
-			tref var = t.find_top(is_var_or_capture<node>);
-			if (var) if (auto it = free_vars.find(get(var));
+			tref var = t.find_top(
+				(bool(*)(tref)) is_var_or_capture<node>);
+			if (var) if (auto it = free_vars.find(var);
 				it != free_vars.end())
 			{
 				BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << get(var);
@@ -208,7 +209,7 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 			{
 				if (is_var_or_capture<node>(offset_child.value())) {
 					tref var = offset_child | tt::ref;
-					if (auto it = free_vars.find(get(var));
+					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
 						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child;
@@ -216,7 +217,7 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 					}
 				} else if (offset_child.value_tree().is(shift)) {
 					tref var = offset_child | tt::first | tt::ref;
-					if (auto it = free_vars.find(get(var));
+					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
 						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child;
@@ -237,9 +238,9 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 template <NodeType node>
 bool tree<node>::has_temp_var(tref fm) {
 	const auto& t = get(fm);
-	trefs io_vars = t.select_top(is<node, node::type::io_var>);
+	trefs io_vars = t.select_top(tau_lang::is<node, node::type::io_var>);
 	if (io_vars.empty())
-		return t.find_top(is<node, node::type::constraint>) != nullptr;
+		return t.find_top(tau_lang::is<node, node::type::constraint>) != nullptr;
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;
 }

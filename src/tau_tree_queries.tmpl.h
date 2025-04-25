@@ -9,13 +9,13 @@ bool is(tref n, size_t nt) {
 	return tree<node>::get(n).is(nt);
 }
 
-template <NodeType node, size_t nt>
-bool is(tref n) { return is<node>(nt, n); }
+template <NodeType node, typename node::type nt>
+bool is(tref n) { return is<node>(n, nt); }
 
 // factory method for is predicate
 template <NodeType node>
 inline std::function<bool(tref)> is(size_t nt) {
-	return [nt](tref n) { return is<node>(nt, n); };
+	return [nt](tref n) { return is<node>(n, nt); };
 }
 
 template <NodeType node>
@@ -24,12 +24,18 @@ bool is_child(tref n, size_t nt) {
 }
 
 template <NodeType node, size_t nt>
-bool is_child(tref n) { return is_child<node>(nt, n); }
+bool is_child(tref n) { return is_child<node>(n, nt); }
 
 // factory method for is predicate
 template <NodeType node>
 inline std::function<bool(tref)> is_child(size_t nt) {
-	return [nt](tref n) { return is_child<node>(nt, n); };
+	return [nt](tref n) { return is_child<node>(n, nt); };
+}
+
+template <NodeType node>
+bool is_child_quantifier(tref n) {
+	return tree<node>::get(n).is_child(node::type::wff_all)
+		|| tree<node>::get(n).is_child(node::type::wff_ex);
 }
 
 template <NodeType node>
