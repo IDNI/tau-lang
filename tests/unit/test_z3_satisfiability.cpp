@@ -94,7 +94,9 @@ TEST_SUITE("z3_satisfiability") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
-		CHECK_THROWS( is_z3_formula_sat(formula) );
+		//CHECK_THROWS( is_z3_formula_sat(formula) );
+		CHECK( is_z3_formula_sat(formula) );
+
 	}
 
 	TEST_CASE("all x [x - (x/2)] =_ x") {
@@ -102,7 +104,9 @@ TEST_SUITE("z3_satisfiability") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
-		CHECK_THROWS( is_z3_formula_sat(formula) );
+		//CHECK_THROWS( is_z3_formula_sat(formula) );
+		CHECK( !is_z3_formula_sat(formula) );
+
 	}
 
 	/*TEST_CASE("all x [x - (x/2)] <=_ x") {
@@ -137,6 +141,7 @@ TEST_SUITE("z3_satisfiability") {
 		auto src = make_tau_source(sample, {
 						.start = tau_parser::wff });
 		auto formula = make_statement(src);
-		CHECK_THROWS( is_z3_formula_sat(formula) );
+		//CHECK_THROWS( is_z3_formula_sat(formula) );
+		CHECK( !is_z3_formula_sat(formula) );
 	}
 }
