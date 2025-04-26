@@ -3325,7 +3325,7 @@ tref replace_free_vars_by(tref fm, tref val) {
 	using tau = tree<node>;
 	assert(!is<node>(val, tau::bf));
 	auto free_vars = get_free_vars_from_nso<node>(fm);
-	if (!free_vars.empty()) {
+	if (free_vars.size()) {
 		typename tau::subtree_map free_var_assgm;
 		for (tref free_var : free_vars)
 			free_var_assgm.emplace(free_var, val);
@@ -3340,7 +3340,7 @@ tref to_snf_step<node>::operator()(tref form) const {
 		return tt(n) | tau::bf_eq;
 	};
 	if (auto literals = tau::get(form).select_all(is_literal);
-		!literals.empty())
+		literals.size())
 	{
 		// we call the recursive method traverse to traverse all the paths
 		// of the BDD.

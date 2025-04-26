@@ -34,7 +34,7 @@ tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
 			return fm;
 		if (i < mem.size()) {
 			// We cannot delete a clause holding a temporary io var
-			if (check_temps && has_temporary_io_var(mem[i]))
+			if (check_temps && has_temporary_io_var<node>(mem[i]))
 				return fm;
 			return rewriter::replace<node>(fm, mem[i], sym);
 		}
@@ -46,7 +46,7 @@ tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
 		typename tau::subtree_map changes;
 		for (size_t j = 0; j < window; ++j) {
 			size_t idx = (i + j) % mem.size();
-			if (check_temps && has_temporary_io_var(mem[idx]))
+			if (check_temps && has_temporary_io_var<node>(mem[idx]))
 				continue;
 			changes.emplace(mem[idx], sym);
 		}
@@ -57,7 +57,7 @@ tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
 	case splitter_type::lower: {
 		// Remove all but one clause
 		if (i < mem.size())
-			if (check_temps && !has_temporary_io_var(mem[i]))
+			if (check_temps && !has_temporary_io_var<node>(mem[i]))
 				return mem[i];
 		break;
 	}
@@ -76,21 +76,22 @@ tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
 // the proposed splitter in "splitter".
 template <BAsPack... BAs>
 bool is_splitter(tref fm, tref splitter, tref spec_clause) {
+	using node = tau_lang::node<BAs...>;
 	if (spec_clause) {
 		// We are dealing with a temporal formula
-		DBG(assert(is_tau_impl(splitter, fm));)
-		tref new_spec_clause = normalize_with_temp_simp(
-			rewriter::replace<node<BAs...>>(spec_clause, fm, splitter));
-		if (is_tau_formula_sat<BAs...>(new_spec_clause)) {
-			if (!are_tau_equivalent<BAs...>(new_spec_clause, spec_clause))
+		DBG(assert(is_tau_impl<node>(splitter, fm));)
+		tref new_spec_clause = normalize_with_temp_simp<node>(
+			rewriter::replace<node>(spec_clause, fm, splitter));
+		if (is_tau_formula_sat<node>(new_spec_clause)) {
+			if (!are_tau_equivalent<node>(new_spec_clause, spec_clause))
 				return true;
 		}
 	} else {
 		// We are dealing with a non-temporal formula
-		if (is_non_temp_nso_satisfiable<BAs...>(splitter)
-			&& !are_nso_equivalent<BAs...>(splitter, fm))
+		if (is_non_temp_nso_satisfiable<node>(splitter)
+			&& !are_nso_equivalent<node>(splitter, fm))
 		{
-			DBG(assert(is_nso_impl<BAs...>(splitter, fm));)
+			DBG(assert(is_nso_impl<node>(splitter, fm));)
 			return true;
 		}
 	}
