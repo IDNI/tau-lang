@@ -299,7 +299,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case wff_f:             os << 'F'; break;
 			case wff_t:             os << 'T'; break;
 			case wff_neg:           os << "!"; break;
-			case bf_neg:            os << "'"; break;
 			case first_sym:         os << "first"; break;
 			case last_sym:          os << "last"; break;
 			case fp_fallback:       os << " fallback "; break;
@@ -449,6 +448,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		// t.print_tree( << "leaving: ") << "\n";
 		size_t nt = t.get_type();
 		switch (nt) {
+			case bf_neg:       os << "'"; break;
 			case main: 
 			case builder:
 			case rec_relation:
