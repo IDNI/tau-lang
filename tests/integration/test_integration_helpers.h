@@ -21,7 +21,7 @@ using tt  = tau::traverser;
 bool check_normalized(const char* sample, tau::node::type nt) {
 	auto nso_rr_opt = tau::get_nso_rr(tau::get(sample));
 	if (!nso_rr_opt.has_value()) return false;
-	tref result = normalizer<sbf_ba>(nso_rr_opt.value());
+	tref result = normalizer<node<sbf_ba>>(nso_rr_opt.value());
 	if (!result) return false;
 	auto x = tt(result) | nt;
 	return x.has_value();
