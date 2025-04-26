@@ -63,13 +63,13 @@ tau_ba<BAs...> tau_ba<BAs...>::operator^(const tau_ba_t& other) const {
 template <BAsPack... BAs>
 bool tau_ba<BAs...>::is_zero() const {
 	auto normalized = normalizer<tau_ba_node>(nso_rr);
-	return !is_tau_formula_sat<BAs...>(normalized);
+	return !is_tau_formula_sat<node>(normalized);
 }
 
 template <BAsPack... BAs>
 bool tau_ba<BAs...>::is_one() const {
 	auto normalized = normalizer<tau_ba_node>(nso_rr);
-	return is_tau_impl<BAs...>(tau::_T(), normalized);
+	return is_tau_impl<node>(tau::_T(), normalized);
 }
 
 // template <BAsPack... BAs>
@@ -122,7 +122,7 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other) {
 template <BAsPack... BAs>
 auto normalize(const tau_ba<BAs...>& fm) {
 	tref res = apply_rr_to_formula<node<tau_ba<BAs...>, BAs...>>(fm.nso_rr);
-	res = simp_tau_unsat_valid<BAs...>(res);
+	res = simp_tau_unsat_valid<node<BAs...>>(res);
 	return tau_ba<BAs...>(tree<node<BAs...>>::geth(res));
 }
 

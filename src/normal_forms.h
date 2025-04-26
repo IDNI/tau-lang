@@ -468,7 +468,7 @@ tref push_sometimes_always_in(tref fm, auto& visited);
 
 // Shift the lookback in a formula
 template <NodeType node>
-tref shift_io_vars_in_fm (tref fm, const auto& io_vars, const int_t shift);
+tref shift_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift);
 
 template <NodeType node>
 tref shift_const_io_vars_in_fm(tref fm, const auto& io_vars, const int_t shift);
