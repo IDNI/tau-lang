@@ -196,12 +196,12 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 		// 	<< " as " << tree::get(x).get_type_name() << "\n"";
 		return true;
 	};
-	// parse_tree::get(pt.get()).print(std::cout << "parse tree: ") << "\n"";
+	// parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
 	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
 	if (error) return nullptr;
 	if (m.find(ptr.get()) == m.end()) return nullptr;
-	// std::cout << "tau tree: " << tree::get(m.at(pt.get())) << "\n"";
-	// tree::get(m_get(pt.get())).print_tree(std::cout << "tau tree: ") << "\n"";
+	// std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n"";
+	// tree::get(m_get(ptr.get())).print_tree(std::cout << "tau tree: ") << "\n"";
 	return m_ref(ptr.get());
 }
 

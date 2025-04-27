@@ -332,10 +332,10 @@ tref reduce_deprecated<node, type>::to_minterm(tref clause) const {
 				BOOST_LOG_TRIVIAL(trace) << "(I) are literals "
 					<< positive << " and "
 					<< negation << " clashing? ";
-				if (positive == tau::_0()) {
+				if (tau::get(positive) == tau::get_0()) {
 					BOOST_LOG_TRIVIAL(trace) << "yes\n";
 					return nullptr;
-				} else if (positive == negated) {
+				} else if (tau::get(positive) == tau::get(negated)) {
 					BOOST_LOG_TRIVIAL(trace) << "yes\n";
 					return nullptr;
 				} else {
@@ -353,10 +353,10 @@ tref reduce_deprecated<node, type>::to_minterm(tref clause) const {
 				BOOST_LOG_TRIVIAL(trace) << "(I) are literals "
 					<< positive << " and "
 					<< negation << " clashing: ";
-				if (eq_bf == tau::_F()) {
+				if (tau::get(eq_bf) == tau::get_F()) {
 					BOOST_LOG_TRIVIAL(trace) << "yes\n";
 					return nullptr;
-				} else if (eq_bf == neq_bf) {
+				} else if (tau::get(eq_bf) == tau::get(neq_bf)) {
 					BOOST_LOG_TRIVIAL(trace) << "yes\n";
 					return nullptr;
 				} else {
@@ -569,7 +569,7 @@ inline bool reduce_paths(std::vector<int_t>& i,
 inline void join_paths(std::vector<std::vector<int_t>>& paths) {
 	for (int_t i = 0; i < (int_t)paths.size(); ++i) {
 		for (int_t j = 0; j < (int_t)paths.size(); ++j) {
-			if (i==j) continue;
+			if (i == j) continue;
 			int_t dist = 0, pos = 0;
 			bool subset_relation_decided = false, is_i_subset_of_j = true,
 				subset_check = true, equal = true;
@@ -670,22 +670,22 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 		tref fm_simp = nullptr;
 		if (!is_wff) {
 			// Do not add to dnf if the coefficient is 0
-			if (fm == tau::_0()) return false;
+			if (tau::get(fm) == tau::get_0()) return false;
 			// fm is a Boolean function
 			// Normalize tau subformulas
 			fm_simp = normalize_ba<node>(fm);
-			if (fm_simp == tau::_0()) return false;
+			if (tau::get(fm_simp) == tau::get_0()) return false;
 			fm_simp = to_dnf<node, false>(fm_simp);
-			if (fm_simp == tau::_0()) return false;
+			if (tau::get(fm_simp) == tau::get_0()) return false;
 			fm_simp = reduce<node>(fm_simp, tau::bf);
-			if (fm_simp == tau::_0()) return false;
+			if (tau::get(fm_simp) == tau::get_0()) return false;
 		} else {
-			if (fm == tau::_F()) return false;
+			if (tau::get(fm) == tau::get_F()) return false;
 			// fm is a Tau formula
 			fm_simp = to_dnf<node, false>(fm);
-			if (fm_simp == tau::_F()) return false;
+			if (tau::get(fm_simp) == tau::get_F()) return false;
 			fm_simp = reduce<node>(fm_simp, tau::wff);
-			if (fm_simp == tau::_F()) return false;
+			if (tau::get(fm_simp) == tau::get_F()) return false;
 		}
 		if (std::ranges::all_of(i, [](const auto el){return el == 2;})){
 			//bool t = is<node>(fm->child[0], tau::bf_t);
@@ -717,7 +717,7 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	tref fm_v0 = rewriter::replace<node>(fm, v, f);
 
 	elim_vars_in_assignment<node>(fm_v1, vars, i, p, is_var);
-	if(fm_v1 == fm_v0) {
+	if (tau::get(fm_v1) == tau::get(fm_v0)) {
 		i[p] = 2;
 		if (assign_and_reduce<node>(fm_v1,
 			vars, i, dnf, is_var, p + 1, is_wff)) return true;
@@ -902,10 +902,10 @@ std::pair<std::vector<int_t>, bool> clause_to_vector(tref clause,
 		if (t.is(wff ? tau::wff_neg : tau::bf_neg)) {
 			const auto& v = t[0];
 			// Check if v is a T/F or 1/0
-			if (v == tau::_T() || v == tau::_1()) {
+			if (v == tau::get_T() || v == tau::get_1()) {
 				if (!is_cnf) clause_is_decided = true;
 				return false;
-			} else if (v == tau::_F() || v == tau::_0()) {
+			} else if (v == tau::get_F() || v == tau::get_0()) {
 				if (is_cnf) clause_is_decided = true;
 				return false;
 			}
@@ -1032,18 +1032,23 @@ tref sort_var(tref var) {
 		return it->second;
 #endif // TAU_CACHE
 	const auto& t = tau::get(var);
+	BOOST_LOG_TRIVIAL(trace) << "(F) sort var: " << t.to_str();
 	if (t.child_is(tau::bf_eq)) {
 		trefs clauses = tau::get_dnf_bf_clauses(t[0].first());
+		BOOST_LOG_TRIVIAL(trace) << "is child clauses: " << clauses.size();
 		std::ranges::sort(clauses);
 		tref res = nullptr;
 		for (tref c : clauses) {
+			BOOST_LOG_TRIVIAL(trace) << "(F) c: " << TAU_TO_STR(c);
 			trefs lits = tau::get_cnf_bf_clauses(c);
 			std::ranges::sort(lits, lex_var_comp<node>);
 			if (res) res = tau::build_bf_or(res,
 					tau::build_bf_and(lits));
 			else res = tau::build_bf_and(lits);
+			BOOST_LOG_TRIVIAL(trace) << "(F) res: " << TAU_TO_STR(res);
 		}
 		res = tau::build_wff_eq(res);
+		BOOST_LOG_TRIVIAL(trace) << "(F) res: " << TAU_TO_STR(res);
 #ifdef TAU_CACHE
 		cache.emplace(res, res);
 		return cache.emplace(var, res).first->second;
@@ -1058,31 +1063,36 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	tref fm, size_t type, bool is_cnf, bool all_reductions, bool enable_sort)
 {
 	using tau = tree<node>;
+	BOOST_LOG_TRIVIAL(trace) << "(F) fm: " << TAU_TREE_TO_STR(fm);
+	BOOST_LOG_TRIVIAL(trace) << "(F) type: " << type;
 	DBG(assert(tau::get(fm).is(type));)
 	// Pull negation out of equality
 	bool wff = type == tau::wff;
 	tref new_fm = wff ? to_mnf<node>(fm) : fm;
+	BOOST_LOG_TRIVIAL(trace) << "(F) new_fm: " << TAU_TREE_TO_STR(new_fm);
+	BOOST_LOG_TRIVIAL(trace) << "(F) " << (wff ? "wff" : "bf");
 	if (wff) {
 		// Make equalities canonical
 		typename tau::subtree_map changes;
-		auto eqs = tau::get(new_fm)
+		trefs eqs = tau::get(new_fm)
 			.select_top(is_child<node, tau::bf_eq>);
 		for (tref eq : eqs) {
-			auto sorted_eq = sort_var<node>(eq);
-			// BOOST_LOG_TRIVIAL(trace) << "(F) sorted_eq: " << TAU_TO_STR(sorted_eq);
-			if (sorted_eq != eq) changes.emplace(eq, sorted_eq);
+			tref sorted_eq = sort_var<node>(eq);
+			BOOST_LOG_TRIVIAL(trace) << "(F) sorted_eq: " << TAU_TO_STR(sorted_eq);
+			if (tau::get(sorted_eq) != tau::get(eq)) changes.emplace(eq, sorted_eq);
 		}
 		new_fm = rewriter::replace<node>(new_fm, changes);
-		// BOOST_LOG_TRIVIAL(trace) << "(F) canonical equalities: " << TAU_TO_STR(new_fm);
+		BOOST_LOG_TRIVIAL(trace) << "(F) new fm: " << TAU_TO_STR(new_fm);
 	}
 
 	trefs vars = wff ? tau::get(new_fm).select_top(is_wff_bdd_var<node>)
 			 : tau::get(new_fm).select_top(is_bf_bdd_var<node>);
+	BOOST_LOG_TRIVIAL(trace) << "vars.size(): " << vars.size();
 	if (vars.empty()) {
 		// std::cout << "new_fm: " << new_fm << "\n";
-		//assert(new_fm == _T<BAs...> || new_fm == _F<BAs...> ||
-		//	new_fm == _1<BAs...> || new_fm == _0<BAs...>);
-		if (new_fm == tau::_T() || new_fm == tau::_1()) {
+		//assert(tau::get(new_fm) == tau::get_T() || tau::get(new_fm) == tau::get_F() ||
+		//	tau::get(new_fm) == tau::get_1() || tau::get(new_fm) == tau::get_0());
+		if (tau::get(new_fm) == tau::get_T() || tau::get(new_fm) == tau::get_1()) {
 			if (is_cnf) return {};
 			std::vector<std::vector<int_t>> paths;
 			paths.emplace_back();
@@ -1096,9 +1106,6 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 			return {};
 		}
 	}
-	for (tref v : vars) {
-		BOOST_LOG_TRIVIAL(trace) << "(F) v: " << TAU_TO_STR(v);
-	}
 	// Sort bf variables canonically
 	if (!wff && enable_sort) std::ranges::sort(vars, lex_var_comp<node>);
 
@@ -1109,6 +1116,17 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	if (all_reductions) join_paths(paths);
 	if (paths.empty() && !decided) paths.emplace_back();
 	if (enable_sort) std::ranges::sort(paths);
+
+	
+	std::stringstream ss; ss << "dnf_cnf_to_bdd\n";
+	for (tref v : vars)
+		ss << "(F) v: " << TAU_TO_STR(v) << "\n";
+	for (const auto& p : paths) {
+		ss << "\tpath:\t";
+		for (const auto& i : p) ss << i << " ";
+		ss << "\n";
+	}
+	BOOST_LOG_TRIVIAL(trace) << ss.str() << "\n";
 	return std::make_pair(std::move(paths), std::move(vars));
 }
 
@@ -1182,14 +1200,14 @@ tref group_dnf_expression(tref fm) {
 		tref cl1 = wff ? tau::_T() : tau::_1();
 		tref cl2 = wff ? tau::_T() : tau::_1();
 		size_t p = 0;
-		for (const auto& atom : atoms_of_clauses[i]) {
-			if (p < common.size() && common[p] == atom) ++p;
+		for (tref atom : atoms_of_clauses[i]) {
+			if (p < common.size() && tau::get(common[p]) == tau::get(atom)) ++p;
 			else cl1 = wff ? tau::build_wff_and(cl1, atom)
 					: tau::build_bf_and(cl1, atom);
 		}
 		p = 0;
-		for (const auto& atom : atoms_of_clauses[max_common.first]) {
-			if (p < common.size() && common[p] == atom) ++p;
+		for (tref atom : atoms_of_clauses[max_common.first]) {
+			if (p < common.size() && tau::get(common[p]) == tau::get(atom)) ++p;
 			else cl2 = wff ? tau::build_wff_and(cl2, atom)
 					: tau::build_bf_and(cl2, atom);
 		}
@@ -1224,19 +1242,19 @@ tref simp_general_excluded_middle(tref fm) {
 	assert(tau::get(fm).is(tau::bf));
 	bool was_simplified = false;
 	auto grouped = group_dnf_expression<node>(fm);
-	auto clauses = tau::get_dnf_bf_clauses(grouped);
+	trefs clauses = tau::get_dnf_bf_clauses(grouped);
 	for (int_t i = 0; i < (int_t) clauses.size(); ++i) {
 		bool erase_clause = false;
-		auto cn = push_negation_in<node, false>(
+		tref cn = push_negation_in<node, false>(
 			tau::build_bf_neg(clauses[i]));
 		for (int_t j = 0; j < (int_t) clauses.size(); ++j) {
 			if (i == j) continue;
 			bool has_simp = false;
 			// TODO: generalize to recursion on grouped expression, for example for abx' | aby' | axy
-			auto cnf = tau::get_cnf_bf_clauses(clauses[j]);
+			trefs cnf = tau::get_cnf_bf_clauses(clauses[j]);
 			for (size_t k = 0; k < cnf.size(); ++k) {
 				// TODO: generalize to subset
-				if (cnf[k] == cn) {
+				if (tau::get(cnf[k]) == tau::get(cn)) {
 					cnf.erase(cnf.begin() + k);
 					has_simp = true;
 					was_simplified = true;
@@ -1281,7 +1299,7 @@ tref reduce(tref fm, size_t type, bool is_cnf,
 	auto [paths, vars] = dnf_cnf_to_bdd<node>(fm, type, is_cnf,
 						all_reductions, enable_sort);
 
-    bool wff = type == tau::wff;
+	bool wff = type == tau::wff;
 	if (paths.empty()) {
 		auto res = is_cnf ? (wff ? tau::_T() : tau::_1())
 				  : (wff ? tau::_F() : tau::_0());
@@ -1642,7 +1660,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start group_paths_and_simplify";
 	using tau = tree<node>;
 	if (paths.empty()) return { tau::_F(), false};
-	if (paths.size() == 1 && paths[0].empty()) return { tau::_T(), false};
+	if (paths.size() == 1 && paths[0].empty()) return { tau::_T(), false };
 	auto is_neq = [&](const int_t path, const int_t idx) {
 		if (tau::get(vars[idx]).child_is(tau::bf_eq))
 			return paths[path][idx] != 1;
@@ -1657,7 +1675,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 			// Check if paths agree on non != vars
 			bool is_equal = true;
 			for (size_t k = 0; k < paths[i].size(); ++k) {
-				if (is_neq(i, k) && is_neq(j,k)) continue;
+				if (is_neq(i, k) && is_neq(j, k)) continue;
 				if (paths[i][k] != paths[j][k]) {
 					is_equal = false;
 					break;
@@ -1667,7 +1685,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 			if (is_equal) {
 				is_simp = true;
 				groups[i].emplace_back(std::move(paths[j]));
-				paths.erase(paths.begin()+j);
+				paths.erase(paths.begin() + j);
 				--j;
 			}
 		}
@@ -1688,8 +1706,11 @@ std::pair<tref, bool> group_paths_and_simplify(
 	for (size_t i = 0; i < paths.size(); ++i) {
 		// Now add from paths[i] and groups[i]
 		tref neqs = neq_from_path(paths[i]);
+		BOOST_LOG_TRIVIAL(debug) << "(F) neqs: " << TAU_TO_STR(neqs);
 		for (const auto& path : groups[i])
 			neqs = tau::build_wff_or(neqs, neq_from_path(path));
+		BOOST_LOG_TRIVIAL(debug) << "(F) neqs: " << TAU_TO_STR(neqs);
+		BOOST_LOG_TRIVIAL(debug) << "  groups[" << i << "].size(): " << groups[i].size();
 		if (!groups[i].empty()) {
 			// simp to cnf
 			neqs = to_cnf<node>(neqs);
@@ -1697,15 +1718,16 @@ std::pair<tref, bool> group_paths_and_simplify(
 			// push != out
 			neqs = squeeze_wff_neg<node>(neqs);
 		}
-		auto neq_clauses = tau::get_cnf_wff_clauses(neqs);
+		trefs neq_clauses = tau::get_cnf_wff_clauses(neqs);
 		// std::cout << "neq_clauses: " << neq_clauses << "\n";
 		// Simplify bfs and drop !=
 		bool clause_false = false;
 		for (tref neq : neq_clauses) {
-			if (neq == tau::_T()) continue;
-			neq = reduce<node>(neq, tau::bf);
+			BOOST_LOG_TRIVIAL(debug) << "(F) neq: " << TAU_TO_STR(neq);
+			if (tau::get(neq) == tau::get_T()) continue;
+			neq = reduce<node>(tau::trim2(neq), tau::bf);
 			neq = simp_general_excluded_middle<node>(neq);
-			if (neq == tau::_0()) clause_false = true;
+			if (tau::get(neq) == tau::get_0()) clause_false = true;
 		}
 		if (clause_false) continue;
 		// std::cout << "neq_clause after reduce: " << neq_clauses << "\n";
@@ -1723,9 +1745,9 @@ std::pair<tref, bool> group_paths_and_simplify(
 						auto neg_eq = push_negation_in<node, false>(
 							tau::build_bf_neg(clause));
 						// std::cout << "neg_eq: " << neg_eq << "\n";
-						for (auto& neq : neq_clauses) {
-							if (neq == tau::_T()
-								|| neq == tau::_1()) continue;
+						for (tref neq : neq_clauses) {
+							if (tau::get(neq) == tau::get_T()
+								|| tau::get(neq) == tau::get_1()) continue;
 							auto grouped_bf = group_dnf_expression<node>(neq);
 							// std::cout << "grouped_bf: " << grouped_bf << "\n";
 							auto simp_neq = rewriter::replace<node>(grouped_bf, neg_eq, tau::_1());
@@ -1745,7 +1767,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 					tau::build_wff_neg(vars[k]));
 		}
 		for (tref neq : neq_clauses) {
-			if (neq == tau::_T()) continue;
+			if (tau::get(neq) == tau::get_T()) continue;
 			neq = tau::build_wff_neq(neq);
 		}
 
@@ -1756,6 +1778,8 @@ std::pair<tref, bool> group_paths_and_simplify(
 	DBG(assert(result != nullptr);)
 	result = from_mnf_to_nnf<node>(result);
 	BOOST_LOG_TRIVIAL(debug) << "(I) End group_paths_and_simplify";
+	BOOST_LOG_TRIVIAL(debug) << "(F) result: " << TAU_TO_STR(result);
+	BOOST_LOG_TRIVIAL(debug) << "(F) is_simp: " << is_simp;
 	return { result, is_simp };
 }
 
@@ -1788,6 +1812,16 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 							false, true, false);
 	// Vars might not be sorted canonically
 	// std::cout << "original vars: " << vars << "\n";
+
+	for (tref v : vars)
+		BOOST_LOG_TRIVIAL(trace) << "(F) v: " << TAU_TO_STR(v);
+	std::stringstream ss;
+	for (const auto& p : paths) {
+		ss << "\tpath:\t";
+		for (const auto& i : p) ss << i << " ";
+		ss << "\n";
+	}
+	BOOST_LOG_TRIVIAL(trace) << "(F) paths.size(): " << paths.size();
 
 	if (paths.empty()) {
 		tref res = to_cnf ? tau::_T() : tau::_F();
@@ -2237,8 +2271,8 @@ tref extract_sometimes (tref fm) {
 
 	const auto& t2 = tau::get(fm);
 	// Check if everything under sometimes was removed
-	if (t2 == tau::_T()) return extracted_fm;
-	if (t2 == tau::_F()) return tau::_F();
+	if (t2 == tau::get_T()) return extracted_fm;
+	if (t2 == tau::get_F()) return tau::_F();
 
 	trefs extracted = {}, staying = {};
 	auto clauses = tau::get_leaves(t2[0].first(), tau::wff_and);
@@ -2258,7 +2292,7 @@ tref extract_sometimes (tref fm) {
 	for (tref s : staying)
 		staying_fm = tau::build_wff_and(staying_fm, s);
 
-	if (extracted_fm == tau::_T())
+	if (tau::get(extracted_fm) == tau::get_T())
 		return tau::build_wff_sometimes(staying_fm);
 	return tau::build_wff_and(
 		tau::build_wff_sometimes(staying_fm), extracted_fm);
@@ -2296,8 +2330,8 @@ tref extract_always (tref fm) {
 		extracted_fm = tau::build_wff_or(extracted_fm, ae);
 
 	// Check if everything under fm was removed
-	if (fm == tau::_F()) return extracted_fm;
-	if (fm == tau::_T()) return tau::_T();
+	if (tau::get(fm) == tau::get_F()) return extracted_fm;
+	if (tau::get(fm) == tau::get_T()) return tau::_T();
 
 	// Now extract from all disjuncts
 	trefs extracted = {}, staying = {};
@@ -2319,7 +2353,7 @@ tref extract_always (tref fm) {
 	for (tref s : staying)
 		staying_fm = tau::build_wff_or(staying_fm, s);
 
-	if (extracted_fm == tau::_F()) return tau::build_wff_always(staying_fm);
+	if (tau::get(extracted_fm) == tau::get_F()) return tau::build_wff_always(staying_fm);
 	return tau::build_wff_or(
 		tau::build_wff_always(staying_fm), extracted_fm);
 }
@@ -2678,7 +2712,7 @@ tref pull_always_out_for_inf(tref fm) {
 		res = replace<node>(res, last_always, tau::build_wff_or(
 					last_always, non_temps));
 	} else {
-		assert(res == tau::_F());
+		assert(tau::get(res) == tau::get_F());
 		res = tau::build_wff_always(non_temps);
 	}
 	return reduce_across_bfs<node>(res, false);
@@ -2703,13 +2737,13 @@ tref push_existential_quantifier_one(tref fm) {
 	const auto& st = tau::get(scoped_fm);
 	if (st.child_is(tau::wff_or)) {
 		// Push quantifier in
-		const auto c0 = tau::build_wff_ex(quant_var, st[0].first());
-		const auto c1 = tau::build_wff_ex(quant_var, st[0].second());
+		tref c0 = tau::build_wff_ex(quant_var, st[0].first());
+		tref c1 = tau::build_wff_ex(quant_var, st[0].second());
 		return tau::build_wff_or(c0, c1);
 	}
 	else if (st.child_is(tau::wff_and)) {
 		// Remove existential, if quant_var does not appear in clause
-		auto clauses = tau::get_cnf_wff_clauses(st.get());
+		trefs clauses = tau::get_cnf_wff_clauses(st.get());
 		tref no_q_fm = tau::_T();
 		for (tref clause : clauses) {
 			if (!contains<node>(clause, quant_var)) {
@@ -2717,9 +2751,9 @@ tref push_existential_quantifier_one(tref fm) {
 				clause = tau::_T();
 			}
 		}
-		auto q_fm = tau::build_wff_and(clauses);
-		if (q_fm == tau::_T()) return scoped_fm;
-		else if (no_q_fm == tau::_T()) return fm;
+		tref q_fm = tau::build_wff_and(clauses);
+		if (tau::get(q_fm) == tau::get_T()) return scoped_fm;
+		else if (tau::get(no_q_fm) == tau::get_T()) return fm;
 		else return tau::build_wff_and(
 			tau::build_wff_ex(quant_var, q_fm), no_q_fm);
 	}
@@ -2759,8 +2793,8 @@ tref push_universal_quantifier_one(tref fm) {
 			}
 		}
 		tref q_fm = tau::build_wff_or(clauses);
-		if (q_fm == tau::_T()) return scoped_fm;
-		else if (no_q_fm == tau::_T()) return fm;
+		if (tau::get(q_fm) == tau::get_T()) return scoped_fm;
+		else if (tau::get(no_q_fm) == tau::get_T()) return fm;
 		else return tau::build_wff_or(
 			tau::build_wff_all(quant_var, q_fm), no_q_fm);
 	}
@@ -2844,13 +2878,13 @@ tref wff_remove_existential(tref var, tref wff) {
 				auto g_1 = rewriter::replace<node>(g, var,
 							tau::_1_trimmed());
 				// If both are 1 then inequality is implied by f_0f_1 = 0
-				if (g_0 == tau::_1() && g_1 == tau::_1()) continue;
+				if (tau::get(g_0) == tau::get_1() && tau::get(g_1) == tau::get_1()) continue;
 				// If f_0 is equal to f_1 we can use assumption f_0 = 0 and f_1 = 0
-				if (f_0 == f_1) {
+				if (tau::get(f_0) == tau::get(f_1)) {
 					nneqs = tau::build_wff_and(nneqs,
 						tau::build_wff_neq(
 							tau::build_bf_or(g_0, g_1)));
-				} else if (g_0 == g_1) {
+				} else if (tau::get(g_0) == tau::get(g_1)) {
 					nneqs = tau::build_wff_and(nneqs,
 						tau::build_wff_neq(g_0));
 				} else nneqs = tau::build_wff_and(nneqs,
@@ -2913,7 +2947,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 					tau::build_wff_and(new_conjunct, new_c);
 				else new_conjunct = new_c;
 			}
-			if (new_conjunct == tau::_T()) return tau::_T();
+			if (tau::get(new_conjunct) == tau::get_T()) return tau::_T();
 			if (res) res = tau::build_wff_or(res, new_conjunct);
 			else res = new_conjunct;
 		}
@@ -2929,7 +2963,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 				| bf_reduce_canonical<node>() | tt::ref);
 			new_func = wff_remove_existential<node>(
 				tau::trim2(inner_fm), new_func);
-			if (new_func == tau::_T()) return tau::_T();
+			if (tau::get(new_func) == tau::get_T()) return tau::_T();
 			if (res) res = tau::build_wff_or(res, new_func);
 			else res = new_func;
 		}
@@ -2937,7 +2971,7 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 			// Resolve quantified variable in scoped_fm
 			auto rem_clause = wff_remove_existential<node>(
 				tau::trim2(inner_fm), clause);
-			if (rem_clause == tau::_T()) return tau::_T();
+			if (tau::get(rem_clause) == tau::get_T()) return tau::_T();
 			if (res) res = tau::build_wff_or(res, rem_clause);
 			else res = rem_clause;
 		}
@@ -2993,7 +3027,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 				if (new_disjunct) new_disjunct = tau::build_wff_or(new_disjunct, new_d);
 				else new_disjunct = new_d;
 			}
-			if (new_disjunct == tau::_F()) return tau::_F();
+			if (tau::get(new_disjunct) == tau::get_F()) return tau::_F();
 			if (res) res = tau::build_wff_and(res, new_disjunct);
 			else res = new_disjunct;
 		}
@@ -3009,7 +3043,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 			new_func = push_negation_in<node>(
 				tau::build_wff_neg(wff_remove_existential<node>(
 					tau::trim2(inner_fm), new_func)));
-			if (new_func == tau::_F()) return tau::_F();
+			if (tau::get(new_func) == tau::get_F()) return tau::_F();
 			if (res) res = tau::build_wff_and(res, new_func);
 			else res = new_func;
 		} else {
@@ -3019,7 +3053,7 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 			new_clause = push_negation_in<node>(
 				tau::build_wff_neg(wff_remove_existential<node>(
 					tau::trim2(inner_fm), new_clause)));
-			if (res == tau::_F()) return tau::_F();
+			if (tau::get(res) == tau::get_F()) return tau::_F();
 			if (!res) res = new_clause;
 			else res = tau::build_wff_and(res, new_clause);
 		}
@@ -3051,7 +3085,7 @@ tref eliminate_quantifiers(tref fm) {
 		else return inner_fm;
 
 		auto has_var = [&inner_fm](tref n) {
-			return n == tau::trim2(inner_fm); };
+			return tau::get(n) == tau::get(tau::trim2(inner_fm)); };
 		auto scoped_fm = tau::get(inner_fm)[0][0].second();
 		if (!tau::get(scoped_fm).find_top(has_var)) {
 			// If the scoped formula does not contain
@@ -3070,16 +3104,16 @@ tref eliminate_quantifiers(tref fm) {
 	typename tau::subtree_set excluded_nodes;
 	auto push_quantifiers = [&excluded_nodes](tref n) {
 		if (is_child<node>(n, tau::wff_ex)) {
-			auto pushed = push_existential_quantifier_one<node>(n);
-			if (pushed == n) {
+			tref pushed = push_existential_quantifier_one<node>(n);
+			if (tau::get(pushed) == tau::get(n)) {
 				// Quantifier cannot be pushed deeper
 				for (tref c : tau::get(n).children())
 					excluded_nodes.insert(c);
 				return n;
 			} else return pushed;
 		} else if (is_child<node>(n, tau::wff_all)) {
-			auto pushed = push_universal_quantifier_one<node>(n);
-			if (pushed == n) {
+			tref pushed = push_universal_quantifier_one<node>(n);
+			if (tau::get(pushed) == tau::get(n)) {
 				// Quantifier cannot be pushed deeper
 				for (tref c : tau::get(n).children())
 					excluded_nodes.insert(c);
@@ -3227,7 +3261,7 @@ tref anti_prenex(const tref& fm) {
 			auto eq = get_eq_with_most_quant_vars(scoped_fm, quant_vars);
 			//TODO: absorbtions
 			auto left = build_wff_and(eq, replace(scoped_fm, eq, _T<BAs...>));
-			if (left == _F<BAs...>) {
+			if (tau::get(left) == tau::get_F()) {
 				// Boole decomp does not create two branches
 				assert(find_top(n, is<node, tau::wff_or...>));
 				auto dis = single_dis_lift(n);
@@ -3242,7 +3276,7 @@ tref anti_prenex(const tref& fm) {
 			}
 			auto neq = build_wff_neq(trim2(eq));
 			auto right = build_wff_and(neq, replace(scoped_fm, eq, _F<BAs...>));
-			if (right == _F<BAs...>) {
+			if (tau::get(right) == tau::get_F()) {
 				// Boole decomp does not create two branches
 				assert(find_top(n, is<node, tau::wff_or...>));
 				auto dis = single_dis_lift(n);
@@ -3420,10 +3454,12 @@ tref to_snf_step<node>::traverse(const bdd_path& path, const literals& remaining
 
 	auto lit = *remaining.begin();
 	auto exponent = get_exponent(lit);
-	auto f = normalize_negative(path, lit) == tau::_F() ? tau::_F() : replace_with(lit, tau::_F(), form) | simplify_snf<node>;
-	auto t = normalize_positive(path, lit) == tau::_T() ? tau::_T() : replace_with(lit, tau::_T(), form) | simplify_snf<node>;
+	tref f = tau::get(normalize_negative(path, lit)) == tau::get_F()
+		? tau::_F() : replace_with(lit, tau::_F(), form) | simplify_snf<node>;
+	tref t = tau::get(normalize_positive(path, lit)) == tau::get_T()
+		? tau::_T() : replace_with(lit, tau::_T(), form) | simplify_snf<node>;
 
-	if (f == tau::_F() && t == tau::_F()) {
+	if (tau::get(f) == tau::get_F() && tau::get(t) == tau::get_F()) {
 		// we only cache results in release mode
 		#ifdef TAU_CACHE
 		cache[{path, remaining, form}] = tau::_F();
@@ -3433,35 +3469,35 @@ tref to_snf_step<node>::traverse(const bdd_path& path, const literals& remaining
 
 	literals nremaining(++remaining.begin(), remaining.end());
 
-	if (f == t) return traverse(path, nremaining, t);
+	if (tau::get(f) == tau::get(t)) return traverse(path, nremaining, t);
 
-	auto t_snf = tau::_F(), f_snf = tau::_F();
+	tref t_snf = tau::_F(), f_snf = tau::_F();
 
-	if (f != tau::_F()) {
+	if (tau::get(f) != tau::get_F()) {
 		auto f_path = add_to_negative_path(path, lit);
 		f_snf = traverse(f_path, nremaining, f);
 	}
 
-	if (t != tau::_F()) {
+	if (tau::get(t) != tau::get_F()) {
 		auto t_path = add_to_positive_path(path, lit);
 		t_snf = traverse(t_path, nremaining, t);
 	}
 
-	if (f_snf == tau::_F()) {
+	if (tau::get(f_snf) == tau::get_F()) {
 		#ifdef TAU_CACHE
 		cache[{path, remaining, form}] = t_snf;
 		#endif // TAU_CACHE
 		return t_snf;
 	}
 
-	if (t_snf == tau::_F()) {
+	if (tau::get(t_snf) == tau::get_F()) {
 		#ifdef TAU_CACHE
 		cache[{path, remaining, form}] = f_snf;
 		#endif // TAU_CACHE
 		return f_snf;
 	}
 
-	auto result = tau::build_wff_or(t_snf, f_snf);
+	tref result = tau::build_wff_or(t_snf, f_snf);
 	// we only cache results in release mode
 	#ifdef TAU_CACHE
 	cache[{path, remaining, form}] = result;
