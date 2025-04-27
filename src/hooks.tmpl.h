@@ -847,7 +847,7 @@ tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
 	//RULE(WFF_EQUIV_SIMPLIFY_2, "$X <-> F ::= ! $X.")
 	if (arg2(ch).is(tau::wff_f)) return build_wff_neg(arg1_fm(ch).get());
 	//RULE(WFF_EQUIV_SIMPLIFY_3, "$X <-> T ::= $X.")
-	if (arg2(ch).is(tau::wff_t)) return arg2_fm(ch).get();
+	if (arg2(ch).is(tau::wff_t)) return arg1_fm(ch).get();
 	//RULE(WFF_EQUIV_SIMPLIFY_4, "$X <-> $X ::= T.")
 	if (arg1_fm(ch) == arg2_fm(ch)) return tau::_T();
 	//RULE(WFF_EQUIV_SIMPLIFY_5, "$X <-> ! $X ::= F.")

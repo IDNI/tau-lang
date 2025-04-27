@@ -331,6 +331,9 @@ template <NodeType node>
 bool tree<node>::is_ba_constant() const { return is(bf_constant); }
 
 template <NodeType node>
+bool tree<node>::is_term() const { return this->value.term; }
+
+template <NodeType node>
 bool tree<node>::child_is(size_t nt) const {
 	if (only_child() == nullptr) return false;
 	return first_tree().is(nt);
