@@ -24,18 +24,16 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	os << tau::node::name(n.nt);
 #ifdef DEBUG
 	if (bool print_nt_ids = false; print_nt_ids) os << "(" << n.nt << ")";
+	if (bool print_is_term = false; print_is_term && n.term) os << "*";
+	if (n.data) os << "[" << n.data << "]";
 #endif
-	if (n.nt == tau::integer) os << " " << n.as_int();
+	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::bf_constant)
-				os << " " << ba_constants<BAs...>::get(n.data);
-	else if (tau::is_digital_nt(n.nt)) os << " " << n.data;
+		os << " { " << ba_constants<BAs...>::get(n.data) << " }";
+	else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (tau::is_string_nt(n.nt))
-				os << " \"" << string_from_id(n.data) << "\"";
+		os << " { \"" << string_from_id(n.data) << "\" }";
 	// else if (n.ext) os << "{EXT}";
-#ifdef DEBUG
-	if (n.data) os << " [" << n.data << "]";
-	if (bool print_is_term = false; print_is_term && n.term) os << " T";
-#endif
 	return os;
 }
 
@@ -116,6 +114,12 @@ template <NodeType node>
 std::string tree<node>::tree_to_str() const {
 	std::stringstream ss;
 	return print_tree(ss), ss.str();
+}
+
+template <NodeType node>
+std::string tree<node>::dump_to_str(bool subtree) const {
+	std::stringstream ss;
+	return this->dump(ss, subtree), ss.str();
 }
 
 //------------------------------------------------------------------------------
@@ -200,6 +204,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ ref_args,           800 },
 			{ bf_rule,            800 },
 			{ wff_rule,           800 },
+			{ wff_builder_body,   800 },
 			{ binding,            800 },
 		};
 		

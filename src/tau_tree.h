@@ -217,6 +217,9 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	using ba_constants_binder_t = node::ba_constants_binder_t;
 	using ba_types_checker_and_propagator_t =
 				node::ba_types_checker_and_propagator_t;
+
+	inline static bool use_hooks = true; 
+
 	// tree direct API
 	// ---------------------------------------------------------------------
 
@@ -298,6 +301,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	std::ostream& print_tree(std::ostream& o, size_t s = 0) const;
 	std::string to_str() const;
 	std::string tree_to_str() const;
+	std::string dump_to_str(bool subtree = true) const;
 
 	// nt category helpers
 	static bool is_digital_nt(size_t nt);
@@ -512,14 +516,14 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref _1_trimmed();
 	static tref _F_trimmed();
 	static tref _T_trimmed();
-	static const tree<N>& _0_tree();
-	static const tree<N>& _1_tree();
-	static const tree<N>& _F_tree();
-	static const tree<N>& _T_tree();
-	static const tree<N>& _0_trimmed_tree();
-	static const tree<N>& _1_trimmed_tree();
-	static const tree<N>& _F_trimmed_tree();
-	static const tree<N>& _T_trimmed_tree();
+	static const tree<N>& get_0();
+	static const tree<N>& get_1();
+	static const tree<N>& get_F();
+	static const tree<N>& get_T();
+	static const tree<N>& get_0_trimmed();
+	static const tree<N>& get_1_trimmed();
+	static const tree<N>& get_F_trimmed();
+	static const tree<N>& get_T_trimmed();
 
 	// TODO (LOW) this could be somehow easily generatable by parser_gen
 	// or maybe create simple builder api, maybe with >> operator
@@ -707,13 +711,5 @@ rewriter::builder tree<node>::bldr_bf_nleq_lower =
 } // namespace idni::tau_lang
 
 #include "tau_tree.tmpl.h"
-#include "tau_tree_node.tmpl.h"
-#include "tau_tree_traverser.tmpl.h"
-#include "tau_tree_printers.tmpl.h"
-#include "tau_tree_queries.tmpl.h"
-#include "tau_tree_builders.tmpl.h"
-#include "tau_tree_extractors.tmpl.h"
-#include "tau_tree_types.tmpl.h"
-#include "tau_tree_from_parser.tmpl.h"
 
 #endif // __IDNI__TAU__TAU_TREE_H__

@@ -180,8 +180,8 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	};
 
 	// trivial cases
-	if (lt.value == tau::_0_tree().value) return true;
-	if (lt.value == tau::_1_tree().value) return false;
+	if (lt.value == tau::get_0().value) return true;
+	if (lt.value == tau::get_1().value) return false;
 
 	// more elaborate cases
 	if (lt.first_tree().is(tau::bf_constant))
@@ -205,8 +205,8 @@ bool is_one(const tree<node<BAs...>>& lt) {
 	};
 
 	// trivial cases
-	if (lt.value == tau::_0_tree().value) return false;
-	if (lt.value == tau::_1_tree().value) return true;
+	if (lt.value == tau::get_0().value) return false;
+	if (lt.value == tau::get_1().value) return true;
 
 	// more elaborate cases
 	if (lt.first_tree().is(tau::bf_constant))

@@ -1,6 +1,15 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
+#include "tau_tree_node.tmpl.h"
+#include "tau_tree_traverser.tmpl.h"
+#include "tau_tree_printers.tmpl.h"
+#include "tau_tree_queries.tmpl.h"
+#include "tau_tree_builders.tmpl.h"
+#include "tau_tree_extractors.tmpl.h"
+#include "tau_tree_types.tmpl.h"
+#include "tau_tree_from_parser.tmpl.h"
+
 #include "hooks.h"
 
 namespace idni::tau_lang {
@@ -55,6 +64,7 @@ tref tree<node>::get(const node& v, tref ch1, tref ch2) {
 template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
 	static get_hook<node> hook;
+	if (!use_hooks) return get_raw(v, ch, len, r);
 	return hook(v, ch, len, r);
 }
 

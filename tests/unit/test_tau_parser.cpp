@@ -16,6 +16,15 @@ using tau = tree<node<Bool>>;
 //
 // Check if still hapopens after the latest changes to the grammar.
 
+TEST_SUITE("configuration") {
+
+	TEST_CASE("disable hooks") {
+		tau::use_hooks = false;
+		CHECK( tau::use_hooks == false );
+	}
+
+}
+
 TEST_SUITE("parsing only main") {
 
 	TEST_CASE("nso_rr main") {

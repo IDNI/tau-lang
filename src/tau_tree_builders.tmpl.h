@@ -16,67 +16,67 @@ tref tree<node>::apply_builder(const rewriter::builder& b, trefs n) {
 // builders
 
 template <NodeType node>
-tref tree<node>::_0() { return _0_tree().get(); }
+tref tree<node>::_0() { return get_0().get(); }
 template <NodeType node>
-tref tree<node>::_1() { return _1_tree().get(); }
+tref tree<node>::_1() { return get_1().get(); }
 template <NodeType node>
-tref tree<node>::_F() { return _F_tree().get(); }
+tref tree<node>::_F() { return get_F().get(); }
 template <NodeType node>
-tref tree<node>::_T() { return _T_tree().get(); }
+tref tree<node>::_T() { return get_T().get(); }
 
 template <NodeType node>
-tref tree<node>::_0_trimmed() { return _0_trimmed_tree().get(); }
+tref tree<node>::_0_trimmed() { return get_0_trimmed().get(); }
 template <NodeType node>
-tref tree<node>::_1_trimmed() { return _1_trimmed_tree().get(); }
+tref tree<node>::_1_trimmed() { return get_1_trimmed().get(); }
 template <NodeType node>
-tref tree<node>::_F_trimmed() { return _F_trimmed_tree().get(); }
+tref tree<node>::_F_trimmed() { return get_F_trimmed().get(); }
 template <NodeType node>
-tref tree<node>::_T_trimmed() { return _T_trimmed_tree().get(); }
+tref tree<node>::_T_trimmed() { return get_T_trimmed().get(); }
 
 template <NodeType node>
-const tree<node>& tree<node>::_0_tree() {
+const tree<node>& tree<node>::get_0() {
 	static htree::sp cached = geth(get(node(bf), _0_trimmed()));
 	return get(cached);
 }
 
 template <NodeType node>
-const tree<node>& tree<node>::_1_tree() {
+const tree<node>& tree<node>::get_1() {
 	static htree::sp cached = geth(get(node(bf), _1_trimmed()));
 	return get(cached);
 }
 
 template <NodeType node>
-const tree<node>& tree<node>::_F_tree() {
+const tree<node>& tree<node>::get_F() {
 	static htree::sp cached = geth(get(node(wff), _F_trimmed()));
 	return get(cached);
 }
 
 template <NodeType node>
-const tree<node>& tree<node>::_T_tree() {
+const tree<node>& tree<node>::get_T() {
 	static htree::sp cached = geth(get(node(wff), _T_trimmed()));
 	return get(cached);
 }
 
 template <NodeType node>
-const tree<node>& tree<node>::_0_trimmed_tree() {
+const tree<node>& tree<node>::get_0_trimmed() {
 	static htree::sp cached = geth(get(node(bf_f)));
 	return get(cached);
 }
 
 template <NodeType node>
-const tree<node>& tree<node>::_1_trimmed_tree() {
+const tree<node>& tree<node>::get_1_trimmed() {
 	static htree::sp cached = geth(get(node(bf_t)));
 	return get(cached);
 }
 
 template <NodeType node>
-const tree<node>& tree<node>::_F_trimmed_tree() {
+const tree<node>& tree<node>::get_F_trimmed() {
 	static htree::sp cached = geth(get(node(wff_f)));
 	return get(cached);
 }
 
 template <NodeType node>
-const tree<node>& tree<node>::_T_trimmed_tree() {
+const tree<node>& tree<node>::get_T_trimmed() {
 	static htree::sp cached = geth(get(node(wff_t)));
 	return get(cached);
 }

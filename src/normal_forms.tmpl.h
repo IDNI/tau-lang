@@ -372,12 +372,12 @@ template <NodeType node, node::type type>
 tref reduce_deprecated<node, type>::build_dnf_from_clauses(const subtree_set& clauses) const {
 	if constexpr (type == tau::bf) {
 		if (clauses.empty()) {
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << tau::_0_tree();
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << tau::get_0();
 			return tau::_0();
 		}
 	} else {
 		if (clauses.empty()) {
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << tau::_F_tree();
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << tau::get_F();
 			return tau::_F();
 		}
 	}
