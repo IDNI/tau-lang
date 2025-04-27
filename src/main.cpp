@@ -46,9 +46,9 @@
 #include <fstream>
 #include <sstream>
 
-#include "utility/cli.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "tau.h"
 #include "repl_evaluator.h"
+#include "utility/cli.h"
 
 using namespace std;
 using namespace idni;
