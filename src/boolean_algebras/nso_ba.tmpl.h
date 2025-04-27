@@ -9,39 +9,26 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
 	using tau = tree<node<BAs...>>;
-	using tt = tau::traverser;
 
-	auto bf_constant_and = [](const auto& lt, const auto& rt) -> tau {
-		auto l = tt(lt.get()) | tau::bf_constant;
-		auto r = tt(rt.get()) | tau::bf_constant;
-		std::variant<BAs...> lc = l | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
-		std::variant<BAs...> rc = r | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
-		auto type_l = l | tau::type;
-		auto type_r = r | tau::type;
-
-		DBG(assert(type_l && type_r);)
-		DBG(assert(type_l.value_tree() == type_r.value_tree());)
-
-		return tau::get(tau::build_bf_constant(lc&rc, type_l.value()));
+	auto bf_constant_and = [](const auto& lt, const auto& rt) {
+		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
+						&& lt.get_ba_type() > 0);)
+		return ba_constants_binder<BAs...>::bind(
+			lt.get_ba_constant() & rt.get_ba_constant(),
+			lt.get_ba_type());
 	};
-
 	// trivial cases
-	if (lt.value == tau::_0().value
-		|| rt.value == tau::_0().value) return tau::_0();
-	if (lt.value == tau::_1().value) return rt;
-	if (rt.value == tau::_1().value) return lt;
-
+	if (lt == tau::get_0() || rt == tau::get_0()) return tau::get_0();
+	if (lt == tau::get_1()) return rt;
+	if (rt == tau::get_1()) return lt;
 	// more elaborate cases
-	if (lt.first_tree().is(tau::bf_constant)
-		&& rt.first_tree().is(tau::bf_constant))
-			return bf_constant_and(lt, rt);
+	if (lt.child_is(tau::bf_constant) && rt.child_is(tau::bf_constant)) 
+		return bf_constant_and(lt[0], rt[0]);
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_and(lt.get(), rt.get()));
-	if (lt.is(tau::bf) && rt.only_child_tree().is(tau::bf_eq))
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
 		return tau::get(tau::build_wff_eq((lt & rt[0][0]).get()));
-	if (lt.is(tau::bf) && rt.only_child_tree().is(tau::bf_neq))
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
 		return tau::get(tau::build_wff_neq((lt & rt[0][0]).get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_and(lt.get(), rt.get()));
@@ -55,32 +42,22 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
 	using tau = tree<node<BAs...>>;
-	using tt = tau::traverser;
 
-	auto bf_constant_or = [](const auto& lt, const auto& rt) -> tau {
-		auto l = tt(lt.get()) | tau::bf_constant;
-		auto r = tt(rt.get()) | tau::bf_constant;
-		std::variant<BAs...> lc = l | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
-		std::variant<BAs...> rc = r | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
-		auto type_l = l | tau::type;
-		auto type_r = r | tau::type;
-
-		DBG(assert(type_l.has_value() && type_r.has_value());)
-		DBG(assert(type_l.value_tree().data() == type_r.value_tree().data());)
-
-		return tau::get(tau::build_bf_constant(lc|rc, type_l.value()));
+	auto bf_constant_or = [](const auto& lt, const auto& rt) {
+		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
+						&& lt.get_ba_type() > 0);)
+		return ba_constants_binder<BAs...>::bind(
+			lt.get_ba_constant() | rt.get_ba_constant(),
+			lt.get_ba_type());
 	};
 
-	if (lt.first_tree().is(tau::bf_constant)
-		&& rt.first_tree().is(tau::bf_constant))
-			return bf_constant_or(lt, rt);
+	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
+		return bf_constant_or(lt, rt);
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_or(lt.get(), rt.get()));
-	if (lt.is(tau::bf) && rt.only_child_tree().is(tau::bf_eq))
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
 		return tau::get(tau::build_wff_eq((lt | rt[0][0]).get()));
-	if (lt.is(tau::bf) && rt.only_child_tree().is(tau::bf_neq))
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
 		return tau::get(tau::build_wff_neq((lt | rt[0][0]).get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_or(lt.get(), rt.get()));
@@ -90,30 +67,25 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 template <BAsPack... BAs>
 const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
-	using tt = tau::traverser;
 
-	auto bf_constant_neg = [](const auto& lt) -> tau {
-		auto l = tt(lt.get()) | tau::bf_constant;
-		std::variant<BAs...> lc = l | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
-		auto type_l = l | tau::type;
-		DBG(assert(type_l.has_value());)
-		return tau::get(
-			tau::build_bf_constant((~lc).get(), type_l.value()));
+	auto bf_constant_neg = [](const auto& lt) {
+		DBG(assert(lt.get_ba_type() > 0);)
+		return ba_constants_binder<BAs...>::bind(
+			~lt.get_ba_constant(), lt.get_ba_type());
 	};
 
 	// trivial cases
-	if (lt.value == tau::_0().value) return tau::_1();
-	if (lt.value == tau::_1().value) return tau::_0();
+	if (lt == tau::get_0()) return tau::get_1();
+	if (lt == tau::get_1()) return tau::get_0();
 
 	// more elaborate cases
-	if (lt.first_tree().is(tau::bf_constant))
+	if (lt[0].is_ba_constant())
 		return bf_constant_neg(lt);
-	if (lt.first_tree().is(tau::bf_eq))
+	if (lt[0].is(tau::bf_eq))
 		return tau::get(tau::build_wff_eq((~lt[0][0]).get()));
-	if (lt.first_tree().is(tau::bf_neq))
+	if (lt[0].is(tau::bf_neq))
 		return tau::get(tau::build_wff_neq((~lt[0][0]).get()));
-	if (lt.first_tree().is(tau::wff))
+	if (lt[0].is(tau::wff))
 		return tau::get(tau::build_wff_neg(lt.get()));
 	DBG(throw std::logic_error("nso_ba neg: wrong types");)
 }
@@ -123,37 +95,27 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
 	using tau = tree<node<BAs...>>;
-	using tt = tau::traverser;
 
-	auto bf_constant_xor = [](const auto& lt, const auto& rt) -> tau {
-		auto l = tt(lt.get()) | tau::bf_constant;
-		auto r = tt(rt.get()) | tau::bf_constant;
-		std::variant<BAs...> lc = l | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
-		std::variant<BAs...> rc = r | tau::constant | tt::only_child
-					| tt::template ba_constant<BAs...>;
-		auto type_l = l | tau::type;
-		auto type_r = r | tau::type;
-		DBG(assert(type_l.has_value() && type_r.has_value());)
-		DBG(assert(type_l.value_tree().data() == type_r.value_tree().data());)
-
-		return tau::get(
-			tau::build_bf_constant((lc ^ rc).get(), type_l.value()));
+	auto bf_constant_xor = [](const auto& lt, const auto& rt) {
+		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
+						&& lt.get_ba_type() > 0);)
+		return ba_constants_binder<BAs...>::bind(
+			lt.get_ba_constant() ^ rt.get_ba_constant(),
+			lt.get_ba_type());
 	};
 
 	// trivial cases
-	if (lt.value == tau::_0().value) return rt;
-	if (rt.value == tau::_0().value) return lt;
+	if (lt == tau::get_0()) return rt;
+	if (rt == tau::get_0()) return lt;
 
 	// more elaborate cases
-	if (lt.first_tree().is(tau::bf_constant)
-		&& rt.first_tree().is(tau::bf_constant))
-			return bf_constant_xor(lt, rt);
+	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
+		return bf_constant_xor(lt, rt);
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_xor(lt.get(), rt.get()));
-	if (lt.is(tau::bf) && rt.only_child_tree().is(tau::bf_eq))
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
 		return tau::get(tau::build_wff_eq((lt ^ rt[0][0]).get()));
-	if (lt.is(tau::bf) && rt.only_child_tree().is(tau::bf_neq))
+	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
 		return tau::get(tau::build_wff_neq((lt ^ rt[0][0]).get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_xor(lt.get(), rt.get()));
@@ -170,24 +132,15 @@ const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& lt,
 template <BAsPack... BAs>
 bool is_zero(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
-	using tt = tau::traverser;
-
-	auto bf_constant_is_zero = [](const auto& lt) -> bool {
-		auto l = tt(lt.get()) | tau::bf_constant;
-		std::variant<BAs...> lc = l | tau::constant | tt::only_child
-					| tt::ba_constant;
-		return is_zero(lc);
-	};
 
 	// trivial cases
-	if (lt.value == tau::get_0().value) return true;
-	if (lt.value == tau::get_1().value) return false;
+	if (lt == tau::get_0()) return true;
+	if (lt == tau::get_1()) return false;
 
 	// more elaborate cases
-	if (lt.first_tree().is(tau::bf_constant))
-		return bf_constant_is_zero(lt);
-	if (lt.is(tau::bf))  return lt == tau::_0();
-	if (lt.is(tau::wff)) return lt == tau::_F();
+	if (lt[0].is_ba_constant()) return is_zero(lt[0].get_ba_constant());
+	if (lt.is(tau::bf))  return lt == tau::get_0();
+	if (lt.is(tau::wff)) return lt == tau::get_F();
 	DBG(throw std::logic_error("nso_ba is_zero: wrong types");)
 	return false;
 }
@@ -195,24 +148,15 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 template <BAsPack... BAs>
 bool is_one(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
-	using tt = tau::traverser;
-
-	auto bf_constant_is_one = [](const auto& lt) -> bool {
-		auto l = tt(lt.get()) | tau::bf_constant;
-		std::variant<BAs...> lc = l | tau::constant | tt::only_child
-					| tt::ba_constant;
-		return is_one(lc);
-	};
 
 	// trivial cases
-	if (lt.value == tau::get_0().value) return false;
-	if (lt.value == tau::get_1().value) return true;
+	if (lt == tau::get_0()) return false;
+	if (lt == tau::get_1()) return true;
 
 	// more elaborate cases
-	if (lt.first_tree().is(tau::bf_constant))
-		return bf_constant_is_one(lt);
-	if (lt.is(tau::bf))  return lt == tau::_1;
-	if (lt.is(tau::wff)) return lt == tau::_T;
+	if (lt[0].is_ba_constant()) return is_one(lt[0].get_ba_constant());
+	if (lt.is(tau::bf))  return lt == tau::get_1();
+	if (lt.is(tau::wff)) return lt == tau::get_T();
 	DBG(throw std::logic_error("nso_ba is_one: wrong types");)
 	return false;
 }
@@ -272,20 +216,14 @@ template <BAsPack... BAs>
 const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
 	splitter_type st)
 {
-	using tau = tree<node<BAs...>>;
-	using tt = tau::traverser;
-
 	// Lambda for calling splitter on n
 	auto _splitter = [&st](const auto& t) -> std::variant<BAs...> {
 		return splitter(t, st);
 	};
-	DBG(assert(t.is(tau::bf_constant));)
-	auto c = ba_constants<BAs...>::get(t.get_ba_constant_id());
-	std::variant<BAs...> v = std::visit(_splitter, c);
-
-	auto type = tt(t.get()) | tau::type;
-	DBG(assert(type.has_value());)
-	return tau::get(tau::build_bf_constant(v, type.value()));
+	DBG(assert(t.is_ba_constant());)
+	return ba_constants_binder<BAs...>::bind(
+		std::visit(_splitter, t.get_ba_constant()),
+		t.get_ba_type());
 }
 
 } // namespace idni::tau_lang

@@ -317,6 +317,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	bool is_integer() const;
 	bool is_num() const;
 	bool is_ba_constant() const;
+	bool is_term() const;
 
 	bool child_is(size_t nt) const;
 

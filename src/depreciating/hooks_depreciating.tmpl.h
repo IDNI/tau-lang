@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "hooks_depreciating.h"
+#include "debug_helpers_depreciating.h"
 
 namespace idni::tau_lang_depreciating {
 
@@ -1082,21 +1083,26 @@ template <typename...BAs>
 std::optional<tau_<BAs...>> make_tau_node<BAs...>::operator()(
 	const rewriter::depreciating::node<tau_sym<BAs...>>& n)
 {
+	// DBG(print_tau_source_node_tree<tau_sym<BAs...>>(std::cout << "n: ", n) << "\n");
+	tau_<BAs...> x = nullptr;
 	if (is_non_terminal_node<BAs...>(n)) {
 		switch (get_non_terminal_node(n)) {
 			case tau_parser::bf: {
-				return make_node_hook_bf<BAs...>(n);
+				x = make_node_hook_bf<BAs...>(n); break;
 			}
 			case tau_parser::wff: {
-				return make_node_hook_wff<BAs...>(n);
+				x = make_node_hook_wff<BAs...>(n); break;
 			}
 			case tau_parser::shift: {
-				return make_node_hook_shift<BAs...>(n);
+				x = make_node_hook_shift<BAs...>(n); break;
 			}
-			default: return std::optional<tau_<BAs...>>();
+			default: x = nullptr;
 		}
 	}
-	return std::optional<tau_<BAs...>>();
+	// if (x) DBG(ptree<BAs...>(std::cout << "x: ", x) << "\n");
+	// else DBG(std::cout << "x is nullptr\n");
+	if (!x) return std::optional<tau_<BAs...>>();
+	return { x };
 }
 
 } // namespace idni::tau_lang_depreciating

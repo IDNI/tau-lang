@@ -116,6 +116,10 @@ constexpr bool node<BAs...>::operator>=(const node& that) const {
 }
 template <BAsPack... BAs>
 constexpr auto node<BAs...>::operator==(const node& that) const {
+	if (nt == type::bf_f && that.nt == type::bf_f) // 0 - ignore ba type if any untyped
+		return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
+	if (nt == type::bf_t && that.nt == type::bf_t) // 1 - ignore ba type if any untyped
+		return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
 	return nt == that.nt && term == that.term && ba == that.ba
 			&& ext == that.ext && data == that.data;
 }
