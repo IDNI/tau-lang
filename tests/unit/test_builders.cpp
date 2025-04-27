@@ -11,6 +11,16 @@ using tt = tau::traverser;
 
 // TODO (MEDIUM) split into test_builder-parsing and test_builder-execution
 
+
+TEST_SUITE("configuration") {
+
+	TEST_CASE("disable hooks") {
+		tau::use_hooks = false;
+		CHECK( tau::use_hooks == false );
+	}
+
+}
+
 TEST_SUITE("builders parsing") {
 
 	TEST_CASE("BLDR_WFF_EQ") {

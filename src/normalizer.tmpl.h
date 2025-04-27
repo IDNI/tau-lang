@@ -178,26 +178,25 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
-	assert((t == tau::_T_tree() || t == tau::_F_tree()
+	assert((t == tau::get_T() || t == tau::get_F()
 		|| t.find_top(is<node, tau::constraint>)));
-	return t == tau::_T_tree();
+	return t == tau::get_T();
 }
 
 template <NodeType node>
 bool is_non_temp_nso_unsat(tref n) {
 	using tau = tree<node>;
 	DBG(assert(n != nullptr));
-	const auto& fm = tau::get(n);
-	DBG(assert(!fm.find_top(is<node, tau::wff_always>));)
-	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
+	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_always>));)
+	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
 	auto vars = tau::get_free_vars_from_nso(nn);
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	const auto& t = tau::get(normalize_non_temp<node>(nn));
-	assert((t == tau::_T_tree() || t == tau::_F_tree()
+	assert((t == tau::get_T() || t == tau::get_F()
 		|| t.find_top(is<node, tau::constraint>)));
-	return t == tau::_F_tree();
+	return t == tau::get_F();
 }
 
 template <NodeType node>
@@ -251,17 +250,17 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		<< "(I) -- wff: " << tau::build_wff_and(imp1, imp2);
 
 	const auto& tdir1 = tau::get(normalizer_step<node>(imp1));
-	DBG(assert((tdir1 == tau::_T_tree() || tdir1 == tau::_F_tree()
+	DBG(assert((tdir1 == tau::get_T() || tdir1 == tau::get_F()
 		|| tdir1.find_top(is<node, tau::constraint>)));)
-	if (tdir1 == tau::_F_tree()) {
+	if (tdir1 == tau::get_F()) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: "
 							<< tdir1;
 		return false;
 	}
 	const auto& tdir2 = tau::get(normalizer_step<node>(imp2));
-	DBG(assert((tdir2 == tau::_T_tree() || tdir2 == tau::_F_tree()
+	DBG(assert((tdir2 == tau::get_T() || tdir2 == tau::get_F()
 		|| tdir2.find_top(is<node, tau::constraint>))));
-	bool res = (tdir1 == tau::_T_tree() && tdir2 == tau::_T_tree());
+	bool res = (tdir1 == tau::get_T() && tdir2 == tau::get_T());
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << res;
 
@@ -312,7 +311,7 @@ bool is_nso_impl(tref n1, tref n2) {
 	DBG(assert((res == tau::_T() || res == tau::_F()
 		|| res.find_top(is<node, tau::constraint>)));)
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End is_nso_impl: " << res;
-	return res == tau::_T_tree();
+	return res == tau::get_T();
 }
 
 template <NodeType node>
@@ -369,7 +368,7 @@ tref normalize_with_temp_simp(tref fm) {
 		return n;
 	};
 	const auto& red_fm = tau::get(normalizer_step<node>(fm));
-	if (red_fm == tau::_T_tree() || red_fm == tau::_F_tree())
+	if (red_fm == tau::get_T() || red_fm == tau::get_F())
 		return red_fm.get();
 	trefs clauses = tau::get_dnf_wff_clauses(red_fm.get());
 	tref nn = tau::_F();

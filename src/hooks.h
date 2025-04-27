@@ -5,6 +5,13 @@
 
 #include "tau_tree.h"
 
+// #define HOOK_LOGGING_ENABLED 1
+#ifdef HOOK_LOGGING_ENABLED
+#define HOOK_LOGGING(x) x
+#else
+#define HOOK_LOGGING(x)
+#endif // HOOK_LOGGING_ENABLED
+
 namespace idni::tau_lang {
 
 template <NodeType node>
@@ -15,6 +22,11 @@ private:
 	using tt = tau::traverser;
 
 	tref operator()(const node& v, const tref* ch, size_t len, tref r);
+
+#ifdef HOOK_LOGGING_ENABLED
+	static void log(const char* msg, const node& v, const tref* ch,
+							size_t len, tref r);
+#endif // HOOK_LOGGING
 
 	// helpers
 	static inline const tree<node>& arg1_fm(const tref* ch);
@@ -63,6 +75,7 @@ private:
 	static tref build_wff_ctn_eq(tref ctnvar, tref num);
 	static tref build_wff_ctn_neq(tref ctnvar, tref num);
 	static tref ctn_neg(tref n);
+
 	// hooks
 	static tref term           (const node& v, const tref* ch, size_t len, tref r);
 	static tref term_or        (const node& v, const tref* ch, size_t len, tref r);

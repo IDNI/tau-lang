@@ -5,6 +5,46 @@
 namespace idni::tau_lang {
 
 template <NodeType node>
+tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
+	tref r)
+{
+	HOOK_LOGGING(log("hook", v, ch, len, r);)
+	tref ret = nullptr;
+	if      (v.nt == tau::bf)    ret = term(v, ch, len, r);
+	else if (v.nt == tau::wff)   ret = wff(v, ch, len, r);
+	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
+	else ret = tau::get_raw(v, ch, len, r);
+#ifdef HOOK_LOGGING_ENABLED
+	log("result", v, ch, len, r);
+	BOOST_LOG_TRIVIAL(trace) << "(H) --                  "
+				 << TAU_DUMP_TO_STR(ret);
+#endif // HOOK_LOGGING_ENABLED
+	return ret;
+}
+
+#ifdef HOOK_LOGGING_ENABLED
+template <NodeType node>
+void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
+	size_t len, tref r)
+{
+	std::stringstream ss;
+	ss << "(H) -- " << msg;
+	auto pos = [&ss]() -> size_t { return ss.tellp() < 0 ? 0
+						: (size_t) ss.tellp(); };
+	while (pos() < 24) ss << " ";
+	ss << v;
+	if (len) {
+		ss << " \t[";
+		for (size_t i = 0; i < len; ++i) ss << (i ? "," : "")
+					<< " ( " << tau::get(ch[i]) << " )";
+		ss << " ]";
+	}
+	if (r) ss << " >> " << r;
+	BOOST_LOG_TRIVIAL(trace) << ss.str();
+}
+#endif // HOOK_LOGGING_ENABLED
+
+template <NodeType node>
 const tree<node>& get_hook<node>::arg1(const tref* ch) {
 	return tau::get(ch[0])[0][0];
 }
@@ -51,11 +91,13 @@ const tree<node>& get_hook<node>::quantified_formula(const tref* ch) {
 
 template <NodeType node>
 tref get_hook<node>::wrap(node::type nt, tref ch) {
+	// HOOK_LOGGING(BOOST_LOG_TRIVIAL(trace) << "\t\t(WRAP) nt: " << node::name(nt);)
 	return tau::get_raw(node(nt), &ch, 1, nullptr);
 }
 
 template <NodeType node>
 tref get_hook<node>::wrap(node::type nt, tref ch1, tref ch2) {
+	// HOOK_LOGGING(BOOST_LOG_TRIVIAL(trace) << "\t\t(WRAP2) nt: " << node::name(nt);)
 	return tau::get_raw(node(nt), std::data({ch1, ch2}), 2, nullptr);
 }
 
@@ -223,6 +265,16 @@ tref get_hook<node>::build_wff_ctn_neq(tref ctnvar, tref num) {
 }
 
 template <NodeType node>
+tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+{
+	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
+	auto l = arg1(ch).get_ba_constant();
+	auto type = arg1(ch).get_ba_type();
+	return build_ba_constant(~l, type);
+}
+
+template <NodeType node>
 tref get_hook<node>::_0(const node& v, const tref* ch, size_t len, tref r) {
 	size_t type_l = arg1(ch).get_ba_type(), type_r = arg2(ch).get_ba_type();
 	if (type_l == type_r && type_l)
@@ -270,6 +322,7 @@ tref get_hook<node>::_T(const node& v, const tref* ch, size_t len, tref r) {
 
 template <NodeType node>
 tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("term", v, ch, len, r);)
 	DBG(assert(len == 1));
 	switch (v.nt) {
 	case tau::bf_or:       return term_or(v, ch, len, r);
@@ -282,7 +335,8 @@ tref get_hook<node>::term(const node& v, const tref* ch, size_t len, tref r) {
 }
 
 template <NodeType node>
-tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r) {
+tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r){
+	HOOK_LOGGING(log("term_or", v, ch, len, r);)
 	DBG(assert(len == 2));
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
@@ -319,7 +373,9 @@ tref get_hook<node>::term_or(const node& v, const tref* ch, size_t len, tref r) 
 }
 
 template <NodeType node>
-tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r) {
+tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
+{
+	HOOK_LOGGING(log("term_and", v, ch, len, r);)
 	DBG(assert(len == 2));
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
@@ -356,7 +412,9 @@ tref get_hook<node>::term_and(const node& v, const tref* ch, size_t len, tref r)
 }
 
 template <NodeType node>
-tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r) {
+tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
+{
+	HOOK_LOGGING(log("term_neg", v, ch, len, r);)
 	DBG(assert(len == 1));
 	//RULE(BF_SIMPLIFY_ONE_4, "1' := 0.")
 	if (auto neg_one = logic_operator(ch)() | tau::bf | tau::bf_t;
@@ -376,7 +434,9 @@ tref get_hook<node>::term_neg(const node& v, const tref* ch, size_t len, tref r)
 }
 
 template <NodeType node>
-tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r) {
+tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
+{
+	HOOK_LOGGING(log("term_xor", v, ch, len, r);)
 	DBG(assert(len == 2));
 	// RULE(UNBINDED, UNBINDED_SUBEXPRESSIONS, NODE)
 	// if (unbound_subexpressions(ch)) return tau::get_raw(v, ch, len, r);
@@ -438,7 +498,8 @@ tref get_hook<node>::ctn_neg(tref n) {
 
 // Simplify constants being syntactically true or false
 template <NodeType node>
-tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right) {
+tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
+	HOOK_LOGGING(log("cte", v, ch, len, right);)
 	if (len == 1 && tau::get(ch[0]).is(tau::bf_constant)) {
 		const auto& l = tau::get(ch[0]);
 		size_t typed = l.get_ba_type();
@@ -453,7 +514,10 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right) 
 }
 
 template <NodeType node>
-tref get_hook<node>::cte_or(const node&, const tref* ch, size_t, tref) {
+tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+{
+	HOOK_LOGGING(log("cte_or", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
 	auto r = arg2(ch).get_ba_constant();
 	auto type_l = arg1(ch).get_ba_type();
@@ -463,7 +527,10 @@ tref get_hook<node>::cte_or(const node&, const tref* ch, size_t, tref) {
 }
 
 template <NodeType node>
-tref get_hook<node>::cte_and(const node&, const tref* ch, size_t, tref) {
+tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+{
+	HOOK_LOGGING(log("cte_and", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
 	auto r = arg2(ch).get_ba_constant();
 	auto type_l = arg1(ch).get_ba_type();
@@ -473,14 +540,10 @@ tref get_hook<node>::cte_and(const node&, const tref* ch, size_t, tref) {
 }
 
 template <NodeType node>
-tref get_hook<node>::cte_neg(const node&, const tref* ch, size_t, tref) {
-	auto l = arg1(ch).get_ba_constant();
-	auto type = arg1(ch).get_ba_type();
-	return build_ba_constant(~l, type);
-}
-
-template <NodeType node>
-tref get_hook<node>::cte_xor(const node&, const tref* ch, size_t, tref) {
+tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+{
+	HOOK_LOGGING(log("cte_xor", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
 	auto r = arg2(ch).get_ba_constant();
 	auto type_l = arg1(ch).get_ba_type();
@@ -491,6 +554,7 @@ tref get_hook<node>::cte_xor(const node&, const tref* ch, size_t, tref) {
 
 template <NodeType node>
 tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff", v, ch, len, r);)
 	switch (logic_operator(ch).get_type()) {
 	case tau::wff_and:          return wff_and(v, ch, len, r);
 	case tau::wff_or:           return wff_or(v, ch, len, r);
@@ -521,6 +585,7 @@ tref get_hook<node>::wff(const node& v, const tref* ch, size_t len, tref r) {
 
 template <NodeType node>
 tref get_hook<node>::wff_and(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_and", v, ch, len, r);)
 	//RULE(WFF_SIMPLIFY_ONE_2, "T && $X ::= $X.")
 	if (arg1(ch).is(tau::wff_t)) return arg2_fm(ch).get();
 	//RULE(WFF_SIMPLIFY_ONE_3, "$X && T ::= $X.")
@@ -546,6 +611,7 @@ tref get_hook<node>::wff_and(const node& v, const tref* ch, size_t len, tref r) 
 
 template <NodeType node>
 tref get_hook<node>::wff_or(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_or", v, ch, len, r);)
 	//RULE(WFF_SIMPLIFY_ONE_0, "T || $X ::= T.")
 	if (arg1(ch).is(tau::wff_t)) return arg1_fm(ch).get();
 	//RULE(WFF_SIMPLIFY_ONE_1, "$X || T ::= T.")
@@ -571,6 +637,7 @@ tref get_hook<node>::wff_or(const node& v, const tref* ch, size_t len, tref r) {
 
 template <NodeType node>
 tref get_hook<node>::wff_neg(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_neg", v, ch, len, r);)
 	DBG(assert(len == 1));
 	//RULE(WFF_SIMPLIFY_ONE_4, " ! T ::= F.")
 	if (arg1(ch).is(tau::wff_t)) return tau::_F();
@@ -584,7 +651,10 @@ tref get_hook<node>::wff_neg(const node& v, const tref* ch, size_t len, tref r) 
 }
 
 template <NodeType node>
-tref get_hook<node>::wff_xor(const node&, const tref* ch, size_t, tref) {
+tref get_hook<node>::wff_xor([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_xor", v, ch, len, r);)
 	//RULE(BF_XOR_SIMPLIFY_0, "$X ^ F ::= $X.")
 	if (arg2(ch).is(tau::wff_f)) return arg1_fm(ch).get();
 	//RULE(BF_XOR_SIMPLIFY_1, "F ^ $X ::= $X.")
@@ -608,6 +678,7 @@ tref get_hook<node>::wff_xor(const node&, const tref* ch, size_t, tref) {
 
 template <NodeType node>
 tref get_hook<node>::wff_ctn(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_ctn", v, ch, len, r);)
 	tref n = tau::get_raw(v, ch, len, r);
 	const auto& t = tau::get(n);
 	tref num    = t.find_top(is<node, tau::num>);
@@ -626,6 +697,7 @@ tref get_hook<node>::wff_ctn(const node& v, const tref* ch, size_t len, tref r) 
 
 template <NodeType node>
 tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_eq", v, ch, len, r);)
 	//RULE(BF_EQ_SIMPLIFY_0, "1 = 0 ::=  F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) return tau::_F();
 	//RULE(BF_EQ_SIMPLIFY_1, "0 = 0 ::= T.")
@@ -645,6 +717,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 
 template <NodeType node>
 tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_eq_cte", v, ch, len, r);)
 	auto l = tt(ch[0]) | tau::bf_eq | tau::bf | tau::bf_constant;
 	if (l && (l | tt::ba_constant) == false) return tau::_T();
 	else if (l) return tau::_F();
@@ -653,6 +726,7 @@ tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref 
 
 template <NodeType node>
 tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_neq", v, ch, len, r);)
 	//RULE(BF_NEQ_SIMPLIFY_0, "0 != 0 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_f)) return _F(v, ch, len, r);
 	//RULE(BF_NEQ_SIMPLIFY_1, "1 != 0 ::= T.")
@@ -672,6 +746,7 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 
 template <NodeType node>
 tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_neq_cte", v, ch, len, r);)
 	auto l = tt(ch[0]) | tau::bf_neq | tau::bf | tau::bf_constant;
 	if (l && (l | tt::ba_constant) == false) return tau::_F();
 	else if (l) return tau::_T();
@@ -680,6 +755,7 @@ tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref
 
 template <NodeType node>
 tref get_hook<node>::wff_sometimes(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_sometimes", v, ch, len, r);)
 	//RULE(WFF_SIMPLIFY_ONE_6, " sometimes T ::= T.")
 	if (arg1(ch).is(tau::wff_t)) return tau::_T();
 	//RULE(WFF_SIMPLIFY_ZERO_6, "sometimes F ::= F.")
@@ -695,6 +771,7 @@ tref get_hook<node>::wff_sometimes(const node& v, const tref* ch, size_t len, tr
 
 template <NodeType node>
 tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_always", v, ch, len, r);)
 	//RULE(WFF_SIMPLIFY_ONE_5, " always T ::= T.")
 	if (arg1(ch).is(tau::wff_t)) return tau::_T();
 	//RULE(WFF_SIMPLIFY_ZERO_5, "always F ::= F.")
@@ -712,6 +789,7 @@ tref get_hook<node>::wff_always(const node& v, const tref* ch, size_t len, tref 
 
 template <NodeType node>
 tref get_hook<node>::wff_conditional(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_conditional", v, ch, len, r);)
 	//RULE(WFF_CONDITIONAL_SIMPLIFY_0, "F ? $X : $Y ::= $Y.")
 	if (arg1(ch).is(tau::wff_f)) return arg3_fm(ch).get();
 	//RULE(WFF_CONDITIONAL_SIMPLIFY_1, "T ? $X : $Y ::= $X.")
@@ -722,7 +800,10 @@ tref get_hook<node>::wff_conditional(const node& v, const tref* ch, size_t len, 
 }
 
 template <NodeType node>
-tref get_hook<node>::wff_imply(const node&, const tref* ch, size_t, tref) {
+tref get_hook<node>::wff_imply([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_imply", v, ch, len, r);)
 	//RULE(WFF_IMPLY_SIMPLIFY_0, "F -> $X ::= T.")
 	if (arg1(ch).is(tau::wff_f)) return tau::_T();
 	//RULE(WFF_IMPLY_SIMPLIFY_1, "T -> $X ::= $X.")
@@ -737,7 +818,10 @@ tref get_hook<node>::wff_imply(const node&, const tref* ch, size_t, tref) {
 }
 
 template <NodeType node>
-tref get_hook<node>::wff_rimply(const node&, const tref* ch, size_t, tref) {
+tref get_hook<node>::wff_rimply([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_rimply", v, ch, len, r);)
 	//RULE(WFF_RIMPLY_SIMPLIFY_0, "F <- $X ::= T.")
 	if (arg2(ch).is(tau::wff_f)) return tau::_T();
 	//RULE(WFF_RIMPLY_SIMPLIFY_1, "T <- $X ::= $X.")
@@ -752,7 +836,10 @@ tref get_hook<node>::wff_rimply(const node&, const tref* ch, size_t, tref) {
 }
 
 template <NodeType node>
-tref get_hook<node>::wff_equiv(const node&, const tref* ch, size_t, tref) {
+tref get_hook<node>::wff_equiv([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_equiv", v, ch, len, r);)
 	//RULE(WFF_EQUIV_SIMPLIFY_0, "F <-> $X ::= ! $X.")
 	if (arg1(ch).is(tau::wff_f)) return build_wff_neg(arg2_fm(ch).get());
 	//RULE(WFF_EQUIV_SIMPLIFY_1, "T <-> $X ::= $X.")
@@ -774,6 +861,7 @@ tref get_hook<node>::wff_equiv(const node&, const tref* ch, size_t, tref) {
 
 template <NodeType node>
 tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_lt", v, ch, len, r);)
 	//RULE(BF_LESS_SIMPLIFY_20, "0 < 1 ::= T.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) return _T(v, ch, len, r);
 	//RULE(BF_LESS_SIMPLIFY_21, "1 < 0 ::= F.")
@@ -792,6 +880,7 @@ tref get_hook<node>::wff_lt(const node& v, const tref* ch, size_t len, tref r) {
 
 template <NodeType node>
 tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_nlt", v, ch, len, r);)
 	//RULE(BF_NLESS_SIMPLIFY_20, "0 !< 1 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) return _F(v, ch, len, r);
 	//RULE(BF_NLESS_SIMPLIFY_21, "1 !< 0 ::= T.")
@@ -810,6 +899,7 @@ tref get_hook<node>::wff_nlt(const node& v, const tref* ch, size_t len, tref r) 
 
 template <NodeType node>
 tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_lteq", v, ch, len, r);)
 	//RULE(BF_LESS_EQUAL_SIMPLIFY_2, "0 <= 1 ::= T.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) return _T(v, ch, len, r);
 	//RULE(BF_LESS_EQUAL_SIMPLIFY_0, "0 <= 0 ::= T.")
@@ -825,6 +915,7 @@ tref get_hook<node>::wff_lteq(const node& v, const tref* ch, size_t len, tref r)
 
 template <NodeType node>
 tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_nlteq", v, ch, len, r);)
 	//RULE(BF_NLEQ_SIMPLIFY_2, "0 !<= 1 ::= F.")
 	if (arg1(ch).is(tau::bf_f) && arg2(ch).is(tau::bf_t)) return _F(v, ch, len, r);
 	//RULE(BF_NLEQ_SIMPLIFY_0, "0 !<= 0 ::= F.")
@@ -840,6 +931,7 @@ tref get_hook<node>::wff_nlteq(const node& v, const tref* ch, size_t len, tref r
 
 template <NodeType node>
 tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_gt", v, ch, len, r);)
 	//RULE(BF_GREATER_SIMPLIFY_2, "1 > 0 ::= T.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) return _T(v, ch, len, r);
 	//RULE(BF_GREATER_SIMPLIFY_0, "0 > 0 ::= F.")
@@ -857,6 +949,7 @@ tref get_hook<node>::wff_gt(const node& v, const tref* ch, size_t len, tref r) {
 
 template <NodeType node>
 tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_ngt", v, ch, len, r);)
 	//RULE(BF_NGREATER_SIMPLIFY_2, "1 !> 0 ::= F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) return _F(v, ch, len, r);
 	//RULE(BF_NGREATER_SIMPLIFY_1, "0 !> 0 ::= T.")
@@ -874,6 +967,7 @@ tref get_hook<node>::wff_ngt(const node& v, const tref* ch, size_t len, tref r) 
 
 template <NodeType node>
 tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_gteq", v, ch, len, r);)
 	//RULE(BF_GREATER_EQUAL_SIMPLIFY_2, "1 >= 0 ::= T.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) return _T(v, ch, len, r);
 	//RULE(BF_GREATER_EQUAL_SIMPLIFY_1, "0 >= 0 ::= T.")
@@ -891,6 +985,7 @@ tref get_hook<node>::wff_gteq(const node& v, const tref* ch, size_t len, tref r)
 
 template <NodeType node>
 tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("wff_ngteq", v, ch, len, r);)
 	//RULE(BF_NGEQ_SIMPLIFY_2, "1 !>= 0 ::= F.")
 	if (arg1(ch).is(tau::bf_t) && arg2(ch).is(tau::bf_f)) return _F(v, ch, len, r);
 	//RULE(BF_NGEQ_SIMPLIFY_1, "0 !>= 0 ::= F.")
@@ -907,13 +1002,17 @@ tref get_hook<node>::wff_ngteq(const node& v, const tref* ch, size_t len, tref r
 }
 
 template <NodeType node>
-tref get_hook<node>::wff_interval(const node&, const tref* ch, size_t, tref) {
+tref get_hook<node>::wff_interval([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref r)
+{
+	HOOK_LOGGING(log("wff_interval", v, ch, len, r);)
 	return build_bf_interval(
 		arg1_fm(ch).get(), arg2_fm(ch).get(), arg3_fm(ch).get());
 }
 
 template <NodeType node>
 tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
+	HOOK_LOGGING(log("shift", v, ch, len, r);)
 	DBG(assert(len == 2);)
 	// apply numerical simplifications
 	// This node must have two children
@@ -933,19 +1032,6 @@ tref get_hook<node>::shift(const node& v, const tref* ch, size_t len, tref r) {
 	DBG(assert(right >= 0);)
 	if (left >= right) return tau::get_integer(left - right);
 	return nullptr; // Return error
-}
-
-template <NodeType node>
-tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len, tref r) {
-	BOOST_LOG_TRIVIAL(trace) << "(GET) n: " << v
-		<< " len: " << len << " r: " << r;
-	tref ret = nullptr;
-	if      (v.nt == tau::bf)    ret = term(v, ch, len, r);
-	else if (v.nt == tau::wff)   ret = wff(v, ch, len, r);
-	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
-	else ret = tau::get_raw(v, ch, len, r);
-	BOOST_LOG_TRIVIAL(trace) << "(GOT) ret: " << TAU_TO_STR(ret);
-	return ret;
 }
 
 } // idni::tau_lang namespace

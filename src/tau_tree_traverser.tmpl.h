@@ -255,15 +255,22 @@ template <NodeType node>
 tree<node>::traverser::operator bool() const { return has_value(); }
 
 template <NodeType node>
-tref tree<node>::traverser::value() const { return values_.front(); }
+tref tree<node>::traverser::value() const {
+	DBG(assert(has_value());)
+	return values_.front();
+}
 
 template <NodeType node>
-const tree<node>& tree<node>::traverser::value_tree()
-	const { return get(values_.front()); }
+const tree<node>& tree<node>::traverser::value_tree() const {
+	DBG(assert(has_value());)
+	return get(values_.front());
+}
 
 template <NodeType node>
-const tree<node>& tree<node>::traverser::operator[](
-	size_t n) const { return value_tree()[n]; }
+const tree<node>& tree<node>::traverser::operator[](size_t n) const {
+	DBG(assert(has_value());)
+	return value_tree()[n];
+}
 
 template <NodeType node>
 const trefs& tree<node>::traverser::values() const { return values_; }
@@ -285,7 +292,10 @@ std::vector<typename tree<node>::traverser>
 }
 
 template <NodeType node>
-bool tree<node>::traverser::is(size_t nt) const { return value_tree().is(nt); }
+bool tree<node>::traverser::is(size_t nt) const {
+	DBG(assert(has_value());)
+	return value_tree().is(nt);
+}
 
 template <NodeType node>
 bool tree<node>::traverser::empty() const { return values_.empty(); }

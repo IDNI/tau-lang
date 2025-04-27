@@ -354,8 +354,8 @@ bool is_run_satisfiable(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	const auto& t = tau::get(fm);
-	if (t == tau::_F_tree()) return false;
-	if (t == tau::_T_tree()) return true;
+	if (t == tau::get_F()) return false;
+	if (t == tau::get_T()) return true;
 
 	auto free_io_vars = tau::get_free_vars_from_nso(fm);
 	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
@@ -842,7 +842,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 		res = tau::build_wff_always(
 			tau::build_wff_and(aw, ev_assm));
 		// Conjunct new sometimes part if present
-		if (tau::get(ev_assm) != tau::_T_tree()) {
+		if (tau::get(ev_assm) != tau::get_T()) {
 			// if the lookback of all parts is 0, we need to shift the always part
 			// to account for the modified lookback due to the eventual variables
 			if (max_st_lookback == 0 && aw_lookback == 0)
@@ -854,7 +854,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 		}
 	} else {
 		// Conjunct new sometimes part if present
-		if (tau::get(ev_assm) != tau::_T_tree())
+		if (tau::get(ev_assm) != tau::get_T())
 			res = tau::build_wff_and(
 				tau::build_wff_always(ev_assm),
 				tau::build_wff_sometimes(
@@ -994,7 +994,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	chi_inf = normalize_non_temp<node>(chi_inf);
 
 	// BOOST_LOG_TRIVIAL(trace) << "Fixpoint chi after normalize: " << chi_inf;
-	if (tau::get(chi_inf) == tau::_F_tree()) {
+	if (tau::get(chi_inf) == tau::get_F()) {
 		print_fixpoint_info(
 			"Temporal normalization of Tau specification reached fixpoint after "
 			+ std::to_string(steps) +
@@ -1110,7 +1110,7 @@ tref transform_to_execution(tref fm,
 	DBG(assert(st.size() < 2);)
 
 	tref res;
-	if (tau::get(aw_after_ev) != tau::_F_tree() && !st.empty())
+	if (tau::get(aw_after_ev) != tau::get_F() && !st.empty())
 		res = normalize_non_temp<node>(
 			to_unbounded_continuation<node>(
 				aw_after_ev, st[0], ubd_aw_fm, start_time,
@@ -1137,7 +1137,7 @@ bool is_tau_formula_sat(tref fm, const int_t start_time = 0,
 	// Convert each disjunct to unbounded continuation
 	for (tref clause : clauses) {
 		if (tau::get(transform_to_execution<node>(
-			clause, start_time, output)) != tau::_F_tree()) {
+			clause, start_time, output)) != tau::get_F()) {
 			BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
 			return true;
 		}
@@ -1176,7 +1176,7 @@ bool are_tau_equivalent(tref f1, tref f2) {
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
 		auto ctn = transform_to_execution<node>(c);
-		if (tau::get(ctn) != tau::_F_tree()) return false;
+		if (tau::get(ctn) != tau::get_F()) return false;
 	}
 	return true;
 }
