@@ -349,8 +349,9 @@ bool is_run_satisfiable(const tau_<BAs...>& fm) {
 		io_vars.pop_back();
 	}
 
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula for sat check";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << sat_fm;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(sat_fm);
 
 	return is_non_temp_nso_satisfiable(sat_fm);
 }
@@ -400,8 +401,9 @@ tau_<BAs...> get_uninterpreted_constants_constraints(const tau_<BAs...>& fm, aut
 			uconst_ctns = build_wff_and(uconst_ctns, build_wff_eq(wrap(p::bf, uc)));
 	}
 
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula describing constraints on uninterpreted constants";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << uconst_ctns;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(uconst_ctns);
 
 	return uconst_ctns;
 }
@@ -416,8 +418,9 @@ std::pair<tau_<BAs...>, int_t> find_fixpoint_phi(const tau_<BAs...>& base_fm, co
 	tau_<BAs...> phi = build_step(base_fm, phi_prev, io_vars,
 		 initials, step_num, time_point, cache);
 
+	std::stringstream ss;	
 	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << phi;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(phi);
 
 	int_t lookback = get_max_shift(io_vars);
 	// Find fix point once all initial conditions have been passed and
@@ -431,11 +434,11 @@ std::pair<tau_<BAs...>, int_t> find_fixpoint_phi(const tau_<BAs...>& base_fm, co
 			initials, step_num, time_point,cache);
 
 		BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << phi;
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(phi);
 	}
 	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
-	BOOST_LOG_TRIVIAL(debug) << phi_prev;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(phi_prev);
 	return make_pair(phi_prev, step_num - 1);
 }
 
@@ -456,8 +459,9 @@ std::pair<tau_<BAs...>, int_t> find_fixpoint_chi(const tau_<BAs...>& chi_base, c
 	auto chi_replc = replace(chi, pholder_to_st);
 	auto chi_prev_replc = replace(chi_prev, pholder_to_st);
 
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << replace(chi, pholder_to_st);
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(replace(chi, pholder_to_st));
 
 	// Find fix point once the lookback is greater the step_num
 	while (step_num < lookback || !are_nso_equivalent(
@@ -471,11 +475,11 @@ std::pair<tau_<BAs...>, int_t> find_fixpoint_chi(const tau_<BAs...>& chi_base, c
 		chi_replc = replace(chi, pholder_to_st);
 
         BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << chi_replc;
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(chi_replc);
 	}
 	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << normalize_non_temp(chi_prev_replc);
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(normalize_non_temp(chi_prev_replc));
 	return {chi_prev_replc, step_num - 1};
 }
 
@@ -633,8 +637,10 @@ tau_<BAs...> always_to_unbounded_continuation(tau_<BAs...> fm,
 		fm = shift_io_vars_in_fm(transformed_fm, io_vars, 1);
 	} else fm = transformed_fm;
 	fm = build_wff_and(fm, flag_rules);
+
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Removed flags";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << build_wff_and(fm, flag_initials);
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(build_wff_and(fm, flag_initials));
 
 	io_vars = select_top(build_wff_and(fm, flag_initials),
 			is_child_non_terminal<p::io_var, BAs...>);
@@ -870,6 +876,7 @@ tau_<BAs...> to_unbounded_continuation(const tau_<BAs...>& ubd_aw_continuation,
 				      const int_t start_time,
 				      const int_t max_st_lookback,
 				      const bool output) {
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
 
 	using p = tau_parser;
@@ -920,7 +927,7 @@ tau_<BAs...> to_unbounded_continuation(const tau_<BAs...>& ubd_aw_continuation,
 		auto normed_run = normalize_non_temp(build_wff_and(run, current_flag));
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(normed_run);
 			auto res = build_wff_and(normed_run, ori_aw_ctn);
 			print_fixpoint_info(
 				"Temporal normalization of Tau specification did not rely on fixpoint finding, yielding the result: ",
@@ -965,7 +972,7 @@ tau_<BAs...> to_unbounded_continuation(const tau_<BAs...>& ubd_aw_continuation,
 	auto chi_inf_anchored = fm_at_time_point(chi_inf, io_vars, std::max(point_after_inits, time_point));
 
 	BOOST_LOG_TRIVIAL(trace) << "Fm to check sat:";
-	BOOST_LOG_TRIVIAL(trace) << "(F) " << build_wff_and(run, chi_inf_anchored);
+	BOOST_LOG_TRIVIAL(trace) << "(F) " << SS(build_wff_and(run, chi_inf_anchored));
 	if (!is_run_satisfiable(build_wff_and(run, chi_inf_anchored))) {
 		print_fixpoint_info(
 			"Temporal normalization of Tau specification reached fixpoint after "
@@ -986,7 +993,7 @@ tau_<BAs...> to_unbounded_continuation(const tau_<BAs...>& ubd_aw_continuation,
 		// Therefore, the loop will exit eventually
 		if (is_run_satisfiable(normed_run)) {
 			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(normed_run);
 			auto res = build_wff_and(normed_run, ori_aw_ctn);
 			print_fixpoint_info(
 				"Temporal normalization of Tau specification reached fixpoint after "
@@ -1016,8 +1023,9 @@ tau_<BAs...> transform_to_execution(const tau_<BAs...>& fm,
 	auto elim_aw = [](const auto& f) {
 		return is_child_non_terminal(p::wff_always, f) ? trim2(f) : f;
 	};
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(fm);
 
 	auto aw_fm = find_top(fm, is_child_non_terminal<p::wff_always, BAs...>);
 	std::pair<tau_<BAs...>, int_t> ev_t;
@@ -1073,9 +1081,10 @@ tau_<BAs...> transform_to_execution(const tau_<BAs...>& fm,
 
 template<typename... BAs>
 bool is_tau_formula_sat(const tau_<BAs...>& fm, const int_t start_time = 0,
-			const bool output = false) {
+			const bool output = false) {	
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(fm);
 	auto normalized_fm = normalize_with_temp_simp(fm);
 	auto clauses = get_leaves(normalized_fm, tau_parser::wff_or);
 	// Convert each disjunct to unbounded continuation
@@ -1125,8 +1134,9 @@ bool are_tau_equivalent (const tau_<BAs...>& f1, const tau_<BAs...>& f2) {
 template<typename... BAs>
 tau_<BAs...> simp_tau_unsat_valid(const tau_<BAs...>& fm, const int_t start_time = 0,
 			const bool output = false) {
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start simp_tau_unsat_valid";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(fm);
 	// Check if formula is valid
 	if (is_tau_impl(_T<BAs...>, fm)) return _T<BAs...>;
 	auto normalized_fm = normalize_with_temp_simp(fm);

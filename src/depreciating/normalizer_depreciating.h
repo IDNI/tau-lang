@@ -657,8 +657,9 @@ tau_<BAs...> calculate_fixed_point(const rr<tau_<BAs...>>& nso_rr,
 	const tau_<BAs...>& form, tau_parser::nonterminal t, size_t offset_arity,
 	const tau_<BAs...>& fallback)
 {
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculating fixed point: " << form;
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
+	std::stringstream ss;
+	BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculating fixed point: " << SS(form);
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(nso_rr);
 	//ptree<BAs...>(std::cout << "form: ", form) << "\n";
 
 	auto ft = fallback | non_terminal_extractor<BAs...>
@@ -707,13 +708,13 @@ tau_<BAs...> calculate_fixed_point(const rr<tau_<BAs...>>& nso_rr,
 		} while (changed);
 
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin enumeration step";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(current);
 
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- Normalize step";
 		current = t == tau_parser::wff ? normalizer_step(current)
 					: bf_boole_normal_form(current);
 		BOOST_LOG_TRIVIAL(debug) << "(T) -- Normalized step";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(current);
 
 		if (previous.size()
 		&& (t == tau_parser::wff
@@ -722,7 +723,7 @@ tau_<BAs...> calculate_fixed_point(const rr<tau_<BAs...>>& nso_rr,
 		{
 			BOOST_LOG_TRIVIAL(debug) << eos
 				<< " - fixed point found at step: " << i;
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << previous.back();
+			BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(previous.back());
 			return previous.back();
 		}
 		else if (previous.size() > 1
@@ -743,7 +744,7 @@ tau_<BAs...> calculate_fixed_point(const rr<tau_<BAs...>>& nso_rr,
 		BOOST_LOG_TRIVIAL(debug) << eos
 			<< " - no fixed point resolution at step: "
 			<< i << " incrementing";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+		BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(current);
 		previous.push_back(current);
 	}
 	DBG(assert(0);)
@@ -836,15 +837,16 @@ tau_<BAs...> calculate_all_fixed_points(const rr<tau_<BAs...>>& recrel) {
 // the formula
 template<typename... BAs>
 tau_<BAs...> apply_rr_to_formula (const rr<tau_<BAs...>>& nso_rr) {
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Start apply_rr_to_formula";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(nso_rr);
 	auto main = calculate_all_fixed_points(nso_rr);
 	if (!main) return nullptr;
 	// Substitute function and recurrence relation definitions
 	auto new_main = main | repeat_all<step<BAs...>, BAs...>(
 			    step<BAs...>(nso_rr.rec_relations));
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End apply_rr_to_formula";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(nso_rr);
 	return new_main;
 }
 
@@ -852,9 +854,9 @@ tau_<BAs...> apply_rr_to_formula (const rr<tau_<BAs...>>& nso_rr) {
 template <typename... BAs>
 tau_<BAs...> normalizer(const rr<tau_<BAs...>>& nso_rr) {
 	// IDEA extract this to an operator| overload
-
+	std::stringstream ss;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << nso_rr;
+	BOOST_LOG_TRIVIAL(debug) << "(F) " << SS(nso_rr);
 
 	auto fm = apply_rr_to_formula(nso_rr);
 	if (!fm) return nullptr;
