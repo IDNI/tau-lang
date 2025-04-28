@@ -5,7 +5,8 @@
 
 namespace idni::tau_lang {
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::pair<size_t, size_t> ba_constants<BAs...>::get(
 	const std::variant<BAs...>& b, size_t tid)
 {
@@ -14,7 +15,8 @@ std::pair<size_t, size_t> ba_constants<BAs...>::get(
 	return *(type_map.emplace(constant_id, tid).first);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::pair<size_t, size_t> ba_constants<BAs...>::get(
 	const std::variant<BAs...>& b, const std::string& type_name)
 {
@@ -22,7 +24,8 @@ std::pair<size_t, size_t> ba_constants<BAs...>::get(
 	return get(b, type_id(string_id(type_name)));
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> ba_constants<BAs...>::get(size_t constant_id) {
 	// std::cout << "BAC get: " << constant_id << " " << C.size() << "\n";
 	DBG(assert(constant_id > 0);)
@@ -30,7 +33,8 @@ std::variant<BAs...> ba_constants<BAs...>::get(size_t constant_id) {
 	return C[constant_id];
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 template <typename BA>
 requires OneOfBAs<BA, BAs...>
 BA ba_constants<BAs...>::get(size_t constant_id) {
@@ -40,7 +44,8 @@ BA ba_constants<BAs...>::get(size_t constant_id) {
 	return std::get<BA>(C[constant_id]);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 template <typename BA>
 requires OneOfBAs<BA, BAs...>
 BA ba_constants<BAs...>::get(tref t) {
@@ -48,7 +53,8 @@ BA ba_constants<BAs...>::get(tref t) {
 	return get<BA>(tree<node<BAs...>>::get(t).get_ba_constant_id());
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 template <typename BA>
 requires OneOfBAs<BA, BAs...>
 bool ba_constants<BAs...>::is(size_t constant_id) {
@@ -57,7 +63,8 @@ bool ba_constants<BAs...>::is(size_t constant_id) {
 	return std::holds_alternative<BA>(C[constant_id]);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 size_t ba_constants<BAs...>::type_id(size_t type_sid) {
 	if (auto it = type_names_map.find(type_sid);
 		it != type_names_map.end()) return it->second;
@@ -65,7 +72,8 @@ size_t ba_constants<BAs...>::type_id(size_t type_sid) {
 		types.push_back(type_sid), types.size() - 1;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 size_t ba_constants<BAs...>::type_id(const std::string& type_name) {
 	// TODO properly initialize types with "untyped" as first element
 	if (types.empty()) types.push_back(string_id("untyped")),
@@ -73,33 +81,38 @@ size_t ba_constants<BAs...>::type_id(const std::string& type_name) {
 	return type_id(string_id(type_name));
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const std::string& ba_constants<BAs...>::type_name(size_t tid) {
 	if (tid >= types.size()) tid = 0;
 	return string_from_id(types[tid]);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 size_t ba_constants<BAs...>::type_of(size_t constant_id) {
 	DBG(assert(constant_id > 0);)
 	DBG(assert(constant_id < C.size());)
 	return type_map.at(constant_id);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::ostream& ba_constants<BAs...>::print(std::ostream& os, size_t constant_id) {
 	return print_type(
 		print_constant(os, constant_id) << " : ", type_of(constant_id));
 }
 
 // print the constant value to the stream
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::ostream& ba_constants<BAs...>::print_constant(std::ostream& os, size_t constant_id) {
 	std::variant<BAs...> v = get(constant_id);
 	return os << "{ " << v << " }";
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::ostream& ba_constants<BAs...>::print_type(std::ostream& os, size_t type_id) {
 	return os << type_name(type_id);
 }
@@ -107,7 +120,8 @@ std::ostream& ba_constants<BAs...>::print_type(std::ostream& os, size_t type_id)
 
 // -----------------------------------------------------------------------------
 // internal insertion of a constant into the pool
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
 	// TODO better initialization of C
 	// currently reserves 0 position for null by just copying first inserted element
@@ -123,13 +137,15 @@ size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
 // -----------------------------------------------------------------------------
 // binder
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 ba_constants_binder<BAs...>::ba_constants_binder() {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 ba_constants_binder<BAs...>::ba_constants_binder(
 	const std::map<std::string, std::pair<size_t, size_t>>& named_constants)
 	: named_constants(named_constants)
@@ -139,7 +155,8 @@ ba_constants_binder<BAs...>::ba_constants_binder(
 }
 
 // binds the constant to a tree from BA constant variant and type name string
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 	const std::string& type_name)
 {
@@ -151,7 +168,8 @@ tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 }
 
 // binds the constant to a tree from BA constant variant and type name string
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 	size_t type_id)
 {
@@ -162,7 +180,8 @@ tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 				ba_constants<BAs...>::get(constant, type_id));
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_constants_binder<BAs...>::operator()(const std::string& src,
 	const std::string& type_name)
 {
@@ -195,7 +214,8 @@ tref ba_constants_binder<BAs...>::operator()(const std::string& src,
 	return n;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 ba_constants_binder<BAs...>& ba_constants_binder<BAs...>::instance() {
 	static ba_constants_binder<BAs...> binder;
 	return binder;

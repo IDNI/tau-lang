@@ -7,17 +7,20 @@ namespace idni::tau_lang {
 // Tau tree node templates implementation
 // -----------------------------------------------------------------------------
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 node<BAs...> node<BAs...>::retype(size_t new_nt) const {
 	return node(new_nt, data, term, ba, ext);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(size_t v, size_t ba_tid) {
 	return node(type::bf_constant, v, true /*is_term*/, ba_tid);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_typed(type nt, size_t ba_tid) {
 	return node(nt, 0, true /*is_term*/, ba_tid);
 }
@@ -41,7 +44,8 @@ inline bool is_term_nt(size_t nt) {
 	}
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 		size_t ba_type, size_t ext) noexcept
 	: nt(nt), term(is_term || is_term_nt(nt)), ba(ba_type), ext(ext), data(data),
@@ -51,23 +55,28 @@ constexpr node<BAs...>::node(size_t nt, size_t data, size_t is_term,
 		"Empty template parameter pack not allowed");
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const std::string& node<BAs...>::name() const {
 	return name(nt);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const std::string& node<BAs...>::name(size_t nt) {
 	return tau_parser::instance().name(nt);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 int_t node<BAs...>::as_int() const { return static_cast<int_t>(data); }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::nnull() { return node(); }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::extension(T raw_value) {
 	return node(
 		(raw_value >> node::nt_shift) & node::nt_mask,
@@ -79,7 +88,8 @@ constexpr node<BAs...> node<BAs...>::extension(T raw_value) {
 }
 
 #define C(x) static_cast<T>(x)
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
 	T result = 0;
 	result |= (C(nt) & ((1u << node::nt_bits) - 1u)) << node::nt_shift;
@@ -89,7 +99,8 @@ constexpr node<BAs...>::T node<BAs...>::extension() const noexcept {
 	result |= C(data) & node::data_mask;
 	return result;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 auto node<BAs...>::operator<=>(const node& that) const {
 	if (nt   != that.nt)   return C(nt)   <=> C(that.nt);
 	if (term != that.term) return C(term) <=> C(that.term);
@@ -98,23 +109,28 @@ auto node<BAs...>::operator<=>(const node& that) const {
 	return C(data) <=> C(that.data);
 }
 #undef C
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator<(const node& that) const {
 	return (*this <=> that) < 0;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator<=(const node& that) const {
 	return (*this <=> that) <= 0;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator>(const node& that) const {
 	return (*this <=> that) > 0;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr bool node<BAs...>::operator>=(const node& that) const {
 	return (*this <=> that) >= 0;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator==(const node& that) const {
 	if (nt == type::bf_f && that.nt == type::bf_f) // 0 - ignore ba type if any untyped
 		return (ba > 0 && that.ba > 0) ? ba == that.ba : true;
@@ -123,11 +139,13 @@ constexpr auto node<BAs...>::operator==(const node& that) const {
 	return nt == that.nt && term == that.term && ba == that.ba
 			&& ext == that.ext && data == that.data;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr auto node<BAs...>::operator!=(const node& that) const {
 	return !(*this == that);
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr size_t node<BAs...>::hashit() const {
 	std::size_t seed = grcprime;
 	hash_combine(seed, static_cast<bool>(nt));

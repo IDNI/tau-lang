@@ -4,7 +4,8 @@
 
 namespace idni::tau_lang {
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
 	trefs& mem, size_t i, bool check_temps)
 {
@@ -74,7 +75,8 @@ tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
 // "spec" holds the original temporal Tau formula
 // If we check a non-temporal Tau formula, it suffices to place it in "fm" and
 // the proposed splitter in "splitter".
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_splitter(tref fm, tref splitter, tref spec_clause) {
 	using node = tau_lang::node<BAs...>;
 	if (spec_clause) {
@@ -99,7 +101,8 @@ bool is_splitter(tref fm, tref splitter, tref spec_clause) {
 }
 
 // Find a Boolean function which implies f
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref good_splitter_using_function(tref f, splitter_type st, tref original_fm) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
@@ -137,7 +140,8 @@ tref good_splitter_using_function(tref f, splitter_type st, tref original_fm) {
 }
 
 // Find a Boolean function which is implied by f
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref good_reverse_splitter_using_function(tref f, splitter_type st,
 						tref original_fm)
 {
@@ -186,7 +190,8 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 
 // Return a bad splitter for the provided formula
 // We assume the formula is fully normalized by normalizer
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref tau_bad_splitter(tref fm ) {
 	using tau = tree<node<BAs...>>;
 	tref new_uniter_const = tau::build_wff_neq(
@@ -201,14 +206,15 @@ tref tau_bad_splitter(tref fm ) {
 
 // Return a splitter for the provided non-temporal formula
 // We assume the formula is fully normalized by normalizer
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 				splitter_type st, tref spec_clause)
 {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	if (st == splitter_type::bad)
-		return { tau_bad_splitter(fm), splitter_type::bad };
+		return { tau_bad_splitter<BAs...>(fm), splitter_type::bad };
 
 	// Collect coefficients to produce splitters
 	trefs constants = tau::get(fm)
@@ -295,13 +301,14 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 }
 
 // We assume fm to be normalized in DNF
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref tau_splitter(tref fm, splitter_type st) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start of tau_splitter";
 	// First we decide if we deal with a temporal formula
-	if (!tau::has_temp_var(fm)) return nso_tau_splitter(fm, st).first;
+	if (!tau::has_temp_var(fm)) return nso_tau_splitter<BAs...>(fm, st).first;
 
 	auto splitter_of_clause = [&](tref clause) {
 		trefs specs = tau::get_cnf_wff_clauses(clause);

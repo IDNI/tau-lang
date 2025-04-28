@@ -8,15 +8,17 @@ template <NodeType node>
 tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	tref r)
 {
-	HOOK_LOGGING(log("HOOK", v, ch, len, r);)
+	// if (v.nt == tau::bf || v.nt == tau::wff || v.nt == tau::shift) {
+	// 	HOOK_LOGGING(log("HOOK", v, ch, len, r);)
+	// }
 	tref ret = nullptr;
 	if      (v.nt == tau::bf)    ret = term(v, ch, len, r);
 	else if (v.nt == tau::wff)   ret = wff(v, ch, len, r);
 	else if (v.nt == tau::shift) ret = shift(v, ch, len, r);
-	else ret = tau::get_raw(v, ch, len, r);
+	else return tau::get_raw(v, ch, len, r);
 #ifdef HOOK_LOGGING_ENABLED
-	log("RESULT", v, ch, len, r);
-	BOOST_LOG_TRIVIAL(trace) << "(H) --                  "
+	// log("RESULT", v, ch, len, r);
+	BOOST_LOG_TRIVIAL(trace) << "(H) -- RESULT           "
 				 << TAU_DUMP_TO_STR(ret);
 #endif // HOOK_LOGGING_ENABLED
 	return ret;
@@ -28,7 +30,7 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	size_t len, tref r)
 {
 	std::stringstream ss;
-	ss << "(H) -- [" << msg << "] " << v.nt;
+	ss << "(H) -- [" << msg << "] ";
 	auto pos = [&ss]() -> size_t { return ss.tellp() < 0 ? 0
 						: (size_t) ss.tellp(); };
 	while (pos() < 32) ss << " ";

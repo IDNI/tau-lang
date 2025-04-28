@@ -22,7 +22,8 @@ inline static std::map<int_t, sbf_ba> var_cache{};
  *
  * @tparam BAs Boolean algebras
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct sbf_ba_factory {
 
 	/**

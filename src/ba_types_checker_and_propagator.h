@@ -9,10 +9,11 @@ namespace idni::tau_lang {
 
 // propagator object takes a formula argument with () operator and it checks and
 // propagates BA types accross atomic formulas and checks variable scopes
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct ba_types_checker_and_propagator {
-	using node = idni::tau_lang::node<BAs...>;
-	using tau = idni::tau_lang::tree<node>;
+	using node = tau_lang::node<BAs...>;
+	using tau = tree<node>;
 	using tt = tau::traverser;
 	using var_scopes_t = std::unordered_map<std::string, size_t>;
 	inline static bool disabled = false;

@@ -22,12 +22,14 @@ using bac = ba_constants<Bool>;
 using bacb = ba_constants_binder<Bool>;
 using btree = tree<node<Bool>>;
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref make(const std::string& s, tau_parser::parse_options opts = {}) {
 	return tree<node<BAs...>>::get(s, opts);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 typename tree<node<BAs...>>::traverser make_tt(const std::string& s,
 	tau_parser::parse_options opts = {})
 {
@@ -44,8 +46,9 @@ inline typename tree<node<Bool>>::traverser bmake_tt(const std::string& s,
 	return typename tree<node<Bool>>::traverser(bmake(s, opts));
 }
 
-template <BAsPack... BAs>
-optional<variant<BAs...>> get_constant(const std::string& s, const std::string& type_name) {
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::optional<std::variant<BAs...>> get_constant(const std::string& s, const std::string& type_name) {
 	return nso_factory<BAs...>::instance().parse(s, type_name);
 }
 

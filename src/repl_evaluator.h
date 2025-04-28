@@ -48,14 +48,15 @@ namespace idni::tau_lang {
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,
 	colors_opt, charvar_opt, highlighting_opt, indenting_opt, debug_opt };
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct repl_evaluator {
 	friend struct repl<repl_evaluator<BAs...>>;
 	using memory = htree::sp;
 	using memories = std::vector<memory>;
 	using memory_ref = std::optional<std::pair<memory, size_t>>;
 
-	using node = idni::tau_lang::node<tau_ba<BAs...>, BAs...>;
+	using node = tau_lang::node<tau_ba<BAs...>, BAs...>;
 	using tau = tree<node>;
 	using tt = tau::traverser;
 

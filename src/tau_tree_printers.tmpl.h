@@ -7,8 +7,8 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // Tau tree and comp. printers
 
-template <BAsPack... BAs>
-
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v) {
 	std::visit(overloaded {
 		[&os](const auto& a) { os << a; }
@@ -16,7 +16,8 @@ std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v) {
 	return os;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");

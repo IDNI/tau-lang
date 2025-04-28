@@ -11,7 +11,8 @@
 
 namespace idni::tau_lang {
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> operator&(const std::variant<BAs...>& l,
 	const std::variant<BAs...>& r)
 {
@@ -23,7 +24,8 @@ std::variant<BAs...> operator&(const std::variant<BAs...>& l,
 	), l, r);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> operator|(const std::variant<BAs...>& l,
 	const std::variant<BAs...>& r)
 {
@@ -35,7 +37,8 @@ std::variant<BAs...> operator|(const std::variant<BAs...>& l,
 	), l, r);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> operator^(const std::variant<BAs...>& l,
 	const std::variant<BAs...>& r)
 {
@@ -47,14 +50,16 @@ std::variant<BAs...> operator^(const std::variant<BAs...>& l,
 	), l, r);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> operator+(const std::variant<BAs...>& l,
 	const std::variant<BAs...>& r)
 {
 	return l ^ r;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> operator~(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(
 		[](const auto& l) -> std::variant<BAs...> {
@@ -62,7 +67,8 @@ std::variant<BAs...> operator~(const std::variant<BAs...>& l) {
 	}), l);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const std::variant<BAs...>& l, const bool& r) {
 	return std::visit(overloaded(
 			[&r](const auto& l) -> bool {
@@ -80,16 +86,8 @@ typename node::bas_variant normalize_ba(const typename node::bas_variant& elem){
 	), elem);
 }
 
-template <BAsPack... BAs>
-std::variant<BAs...> normalize_ba_depreciating(const std::variant<BAs...>& elem) {
-	return std::visit(overloaded(
-		[](const auto& el) {
-			return std::variant<BAs...>(normalize(el));
-		}
-	), elem);
-}
-
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_syntactic_one(const std::variant<BAs...>& elem) {
 	return std::visit(overloaded(
 		[](const auto& el) {
@@ -98,7 +96,8 @@ bool is_syntactic_one(const std::variant<BAs...>& elem) {
 	), elem);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_syntactic_zero(const std::variant<BAs...>& elem) {
 	return std::visit(overloaded(
 		[](const auto& el) {
@@ -107,7 +106,8 @@ bool is_syntactic_zero(const std::variant<BAs...>& elem) {
 	), elem);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem,
 	splitter_type st)
 {
@@ -118,12 +118,14 @@ std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem,
 	), elem);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> splitter_ba(const std::variant<BAs...>& elem) {
 	return splitter_ba(elem, splitter_type::upper);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_zero(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(
 		[](const auto& l) -> bool {
@@ -132,7 +134,8 @@ bool is_zero(const std::variant<BAs...>& l) {
 	), l);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_one(const std::variant<BAs...>& l) {
 	return std::visit(overloaded(
 		[](const auto& l) -> bool {
@@ -141,22 +144,26 @@ bool is_one(const std::variant<BAs...>& l) {
 	), l);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const bool& l, const std::variant<BAs...>& r) {
 	return r == l;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const std::variant<BAs...>& l, const bool& r) {
 	return !(l == r);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const bool& l, const std::variant<BAs...>& r) {
 	return r != l;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct variant_ba {
 
 	variant_ba(const std::variant<BAs...>& v) : v(v) {};
@@ -291,7 +298,8 @@ struct variant_ba {
 	std::variant<bool, std::variant<BAs...>> v;
 };
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const variant_ba<BAs...>& l, const bool& r) {
 	if (std::holds_alternative<bool>(l.v))
 		return std::get<bool>(l.v) == r;
@@ -307,17 +315,20 @@ bool operator==(const variant_ba<BAs...>& l, const bool& r) {
 	), std::get<std::variant<BAs...>>(l.v));
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const bool& l, const variant_ba<BAs...>& r) {
 	return r == l;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const variant_ba<BAs...>& l, const bool& r) {
 	return !(l == r);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const bool& l, const variant_ba<BAs...>& r) {
 	return r != l;
 }

@@ -4,7 +4,8 @@
 
 namespace idni::tau_lang {
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
@@ -37,7 +38,8 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	DBG(throw std::logic_error("nso_ba and: wrong types");)
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
@@ -64,7 +66,8 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	DBG(throw std::logic_error("nso_ba or: wrong types");)
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 
@@ -90,7 +93,8 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	DBG(throw std::logic_error("nso_ba neg: wrong types");)
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
@@ -122,14 +126,16 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	DBG(throw std::logic_error("nso_ba xor: wrong types");)
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
 	return lt ^ rt;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_zero(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 
@@ -145,7 +151,8 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	return false;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_one(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 
@@ -162,13 +169,15 @@ bool is_one(const tree<node<BAs...>>& lt) {
 }
 
 // We overload the == operator for tau in order to account for typed constants
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return tree<node<BAs...>>::subtree_equals(lt.get(), rt.get());
 }
 
 // Also define != again in terms of ==
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return !(lt == rt);
 }
@@ -176,7 +185,8 @@ bool operator!=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 // We overload spaceship operator in order to have deterministic operators across
 // program runs
 // In this comparison typed and non-typed Tau constants are considered different
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::weak_ordering operator<=>(const tree<node<BAs...>>& lt,
 	const tree<node<BAs...>>& rt)
 {
@@ -184,35 +194,42 @@ std::weak_ordering operator<=>(const tree<node<BAs...>>& lt,
 }
 
 // We list all ordering operators explicitly
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator<(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return (lt <=> rt) < 0;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator<=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return (lt <=> rt) <= 0;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator>(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return (lt <=> rt) > 0;
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator>=(const tree<node<BAs...>>& lt, const tree<node<BAs...>>& rt) {
 	return (lt <=> rt) >= 0;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const tree<node<BAs...>>& lt, const bool& rt) {
 	return rt ? is_one(lt) : is_zero(lt);
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const bool lt, const tree<node<BAs...>>& rt) {
 	return rt == lt;
 }
 
 // Splitter function for a nso tau::bf_constant node holding a BA constant
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
 	splitter_type st)
 {
