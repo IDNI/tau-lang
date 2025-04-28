@@ -80,7 +80,7 @@ tref squeeze_wff(const tref& fm) {
 				&& e2.child_is(tau::bf_eq))
 					return tau::trim(tau::build_wff_eq(
 						tau::build_bf_or(
-							e1.get(), e2.get())));
+							e1[0].first(), e2[0].first())));
 		}
 		else if (t.is(tau::wff_or)) {
 			const auto& e1 = t[0], e2 = t[1];
@@ -88,7 +88,7 @@ tref squeeze_wff(const tref& fm) {
 				&& e2.child_is(tau::bf_neq))
 					return tau::trim(tau::build_wff_neq(
 						tau::build_bf_or(
-							e1.get(), e2.get())));
+							e1[0].first(), e2[0].first())));
 		}
 		return n;
 	};
@@ -741,8 +741,9 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 // where the variable order is given by the function lex_var_comp
 template <NodeType node>
 tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
-	// Function can only be applied to a BF
 	using tau = tree<node>;
+	BOOST_LOG_TRIVIAL(trace) << "(F) bf_boole_normal_form: " << TAU_TO_STR(fm);
+	// Function can only be applied to a BF
 	const auto& t = tau::get(fm);
 	DBG(assert(t.is(tau::bf));)
 #ifdef TAU_CACHE
@@ -753,11 +754,14 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
 	auto is_var = [](tref n) {
-		const auto& t = tau::get(n);
-		return t.child_is(tau::variable)
-			|| t.child_is(tau::uninterpreted_constant);
+		return  tau::get(n).child_is(tau::variable)
+			|| tau::get(n).child_is(tau::uninterpreted_constant);
 	};
 	auto vars = t.select_top(is_var);
+	std::cout << "vars.size(): " << vars.size() << "\n";
+	for (auto v : vars) {
+		std::cout << "v: " << tau::get(v).dump_to_str() << "\n";
+	}
 	sort(vars.begin(), vars.end(), lex_var_comp<node>);
 
 	std::vector<int_t> i(vars.size()); // Record assignments of vars
@@ -2119,7 +2123,6 @@ tref to_dnf(tref fm) {
 	auto pn = [](const auto& n) {
 		return push_negation_one_in<node, is_wff>(n);
 	};
-	// if (is_wff) return rewriter::depreciating::pre_order(fm).template apply_unique<4>(pn, visit_wff<BAs...>, layer_to_dnf);
 	if constexpr (is_wff) return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf2_m>(
 					pn, visit_wff<node>, layer_to_dnf);
@@ -2192,7 +2195,6 @@ tref to_cnf(tref fm) {
 	auto pn = [](tref n) {
 		return push_negation_one_in<node, is_wff>(n);
 	};
-	// if (is_wff) return rewriter::depreciating::pre_order(fm).template apply_unique<6>(pn, rewriter::depreciating::all, layer_to_cnf);
 	if constexpr (is_wff) return pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_cnf2_m>(pn,
 						visit_wff<node>, layer_to_cnf);
