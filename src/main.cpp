@@ -122,10 +122,6 @@ void welcome() {
 }
 
 
-// function declaration of a depreciating repl
-int run_repl_depreciating(cli::options& opts, bool charvar,
-	boost::log::trivial::severity_level sev, bool exp);
-
 // TODO (MEDIUM) add command to read input file,...
 int main(int argc, char** argv) {
 	bdd_init<Bool>();
@@ -165,27 +161,21 @@ int main(int argc, char** argv) {
 	// spec provided, run it
 	if (files.size()) return run_tau_spec(files.front(), charvar, exp);
 
-	// REPL
-	// new tree
-	if (exp) {
-		repl_evaluator<sbf_ba> re({
-			.status = opts["status"].get<bool>(),
-			.colors = opts["color"].get<bool>(),
-			.charvar = charvar,
+	repl_evaluator<sbf_ba> re({
+		.status = opts["status"].get<bool>(),
+		.colors = opts["color"].get<bool>(),
+		.charvar = charvar,
 #ifdef DEBUG
-			.debug_repl = opts["debug"].get<bool>(),
+		.debug_repl = opts["debug"].get<bool>(),
 #endif // DEBUG
-			.severity = sev,
-			.experimental = exp
-		});
-		string e = opts["evaluate"].get<string>();
-		if (e.size()) return re.eval(e), 0;
-		repl<decltype(re)> r(re, "tau> ", ".tau_history");
-		welcome();
-		re.prompt();
-		return r.run();
-	}
-	// depreciating
-	else return run_repl_depreciating(opts, charvar, sev, exp);
+		.severity = sev,
+		.experimental = exp
+	});
+	string e = opts["evaluate"].get<string>();
+	if (e.size()) return re.eval(e), 0;
+	repl<decltype(re)> r(re, "tau> ", ".tau_history");
+	welcome();
+	re.prompt();
+	return r.run();
 
 }

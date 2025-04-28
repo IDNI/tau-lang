@@ -265,19 +265,19 @@ tref tree<node>::build_out_variable_at_t_minus(size_t index, size_t num) {
 
 // template <NodeType node>
 // tref tree<node>::build_bf_constant(const std::variant& v) {
-// 	auto cte = rewriter::depreciating::make_node<tau_sym>(tau_sym(v), {});
+// 	auto cte = rewriter::make_node<tau_sym>(tau_sym(v), {});
 // 	return build_bf_constant(cte);
 // }
 
 // template <NodeType node>
 // tref tree<node>::build_bf_constant(const std::variant& v, tref type) {
-// 	auto cte = rewriter::depreciating::make_node<tau_sym>(tau_sym(v), {});
+// 	auto cte = rewriter::make_node<tau_sym>(tau_sym(v), {});
 // 	return build_bf_constant(cte, type);
 // }
 
 // template <NodeType node>
 // tref tree<node>::build_bf_constant(const std::variant& v, const std::optional<tref>& type) {
-// 	auto cte = rewriter::depreciating::make_node<tau_sym>(tau_sym(v), {});
+// 	auto cte = rewriter::make_node<tau_sym>(tau_sym(v), {});
 // 	return type.has_value() ? build_bf_constant(cte, type.value()) : build_bf_constant(cte);
 // }
 

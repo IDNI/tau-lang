@@ -77,6 +77,4 @@ bool hasv(const T& t, const V& v) {
 #define GIT_BRANCH      "n/a"
 #endif
 
-#define SS(X) ((ss.str({}), idni::tau_lang_depreciating::operator<<(ss, X)), ss.str())
-
 #endif // __IDNI__TAU__DEFS_H__

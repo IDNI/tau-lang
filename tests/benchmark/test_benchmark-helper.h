@@ -10,7 +10,7 @@
 #include <thread>
 #include <unistd.h>
 
-#include "boolean_algebras/tau_ba_depreciating.h"
+#include "boolean_algebras/tau_ba.h"
 
 // Function to get memory usage in bytes
 size_t get_memory_usage() {

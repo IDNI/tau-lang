@@ -19,7 +19,6 @@
 
 using namespace std;
 using namespace idni;
-using namespace idni::rewriter::depreciating;
 using namespace idni::tau_lang;
 
 // using valgrind for memory leak detection
