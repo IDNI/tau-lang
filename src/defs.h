@@ -8,6 +8,18 @@
 #	include <cxxabi.h>
 #endif
 
+//-----------------------------------------------------------------------------
+// GIT_* macros are populated at compile time by -D or they're set to "n/a"
+#ifndef GIT_DESCRIBED
+#define GIT_DESCRIBED   "n/a"
+#endif
+#ifndef GIT_COMMIT_HASH
+#define GIT_COMMIT_HASH "n/a"
+#endif
+#ifndef GIT_BRANCH
+#define GIT_BRANCH      "n/a"
+#endif
+
 #include "version_license.h" // include generated version and license constants
 
 #include "init_log.h"
@@ -64,17 +76,5 @@ bool hasv(const T& t, const V& v) {
 }
 
 } // namespace idni::tau_lang
-
-//-----------------------------------------------------------------------------
-// GIT_* macros are populated at compile time by -D or they're set to "n/a"
-#ifndef GIT_DESCRIBED
-#define GIT_DESCRIBED   "n/a"
-#endif
-#ifndef GIT_COMMIT_HASH
-#define GIT_COMMIT_HASH "n/a"
-#endif
-#ifndef GIT_BRANCH
-#define GIT_BRANCH      "n/a"
-#endif
 
 #endif // __IDNI__TAU__DEFS_H__
