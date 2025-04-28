@@ -12,13 +12,4 @@ overloaded(Ts...) -> overloaded<Ts...>;
 
 } // namespace idni::tau_lang
 
-namespace idni::tau_lang_depreciating {
-
-template<class... Ts>
-struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
-
-} // namespace idni::tau_lang_depreciating
-
 #endif // __IDNI__TAU__UTILS_H__

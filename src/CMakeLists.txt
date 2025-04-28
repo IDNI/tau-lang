@@ -25,22 +25,6 @@ set(TAU_HEADERS
 	rewriting.h
 	tau.h
 	utils.h
-	depreciating/boolean_algebras/nso_ba_depreciating.h
-	depreciating/boolean_algebras/sbf_ba_depreciating.h
-	depreciating/boolean_algebras/tau_ba_depreciating.h
-	depreciating/execution_depreciating.h
-	depreciating/hooks_depreciating.h
-	depreciating/interpreter_depreciating.h
-	depreciating/normal_forms_depreciating.h
-	depreciating/normalizer_depreciating.h
-	depreciating/nso_rr_depreciating.h
-	depreciating/satisfiability_depreciating.h
-	depreciating/solver_depreciating.h
-	depreciating/splitter_depreciating.h
-	depreciating/splitter_types_depreciating.h
-	depreciating/builders_depreciating.h
-	depreciating/language_depreciating.h
-	depreciating/queries_depreciating.h
 )
 
 set(TAU_SOURCES
@@ -51,13 +35,10 @@ set(TAU_SOURCES
 	../external/parser/src/utility/term.cpp
 	boolean_algebras/bool_ba.cpp
 	dict.cpp
-	depreciating/nso_rr_depreciating.cpp
-
 )
 
 set(CLI_SOURCES
 	main.cpp
-	depreciating/main_depreciating.cpp
 	../external/parser/src/utility/cli.cpp
 )
 
