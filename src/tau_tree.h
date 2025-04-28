@@ -370,6 +370,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	template <typename binder>
 	static tref get_from_file(binder& bind, const std::string& filename,
 						parse_options options = {});
+
 	template <typename binder>
 	static rewriter::library get_library(binder& bind,
 						const std::string& source);
