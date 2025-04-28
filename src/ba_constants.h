@@ -12,7 +12,8 @@ namespace idni::tau_lang {
 //   implements tref operator()(constant_source, type_name) binding interface
 // - create custom nso_factory<BA> specialization for your BA type for factory binding
 // - and/or provide map of named constants for named binding
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct ba_constants {
 
 	// constant id and type id
@@ -72,7 +73,8 @@ private:
 	inline static std::map<size_t, size_t> type_map;       // constant_id -> type_id
 };
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct ba_constants_binder {
 	// constant id and type id
 	using typed_constant = std::pair<size_t, size_t>;

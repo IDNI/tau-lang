@@ -4,7 +4,8 @@
 
 namespace idni::tau_lang {
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_types_checker_and_propagator<BAs...>::operator()(tref n) {
 	if (disabled) return n;
 	BOOST_LOG_TRIVIAL(trace) << "(T) BA type check and propagate: " << n;
@@ -45,7 +46,8 @@ tref ba_types_checker_and_propagator<BAs...>::operator()(tref n) {
 	return y;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_types_checker_and_propagator<BAs...>::operator()(const tt& n) {
 	if (!n.has_value()) return nullptr;
 	return (*this)(n.value());
@@ -56,7 +58,8 @@ tref ba_types_checker_and_propagator<BAs...>::operator()(const tt& n) {
 // vsc = vars scope ids
 // csid = constant scope id
 // tsid = temporal scope id
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 	tref n, var_scopes_t& vsc, size_t csid, size_t& tsid)
 {
@@ -190,7 +193,8 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 }
 
 // checks and propagates types within the scope (global or quantifier)
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_types_checker_and_propagator<BAs...>::check_and_propagate(tref n) {
 	bool err = false;
 	const auto checker_and_propagator = [this, &err](tref el) -> bool {
@@ -238,7 +242,8 @@ tref ba_types_checker_and_propagator<BAs...>::check_and_propagate(tref n) {
 	return n;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_types_checker_and_propagator<BAs...>::get_var_key_node(tref n) const {
 	auto io_var = tt(n) | tau::variable | tau::io_var | tt::only_child;
 	if (!io_var) return n;
@@ -246,7 +251,8 @@ tref ba_types_checker_and_propagator<BAs...>::get_var_key_node(tref n) const {
 }
 
 // check appearance of a single type in all BA elems, then propagate it
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool ba_types_checker_and_propagator<BAs...>::propagate(tref n) {
 	std::set<std::string> types;
 	auto els = tau::get(n).select_all(is_ba_element);
@@ -283,7 +289,8 @@ bool ba_types_checker_and_propagator<BAs...>::propagate(tref n) {
 
 // transform type info - remove scope_id and add type subnode
 // used as a cleaning (last) step after type checking and propagation
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref ba_types_checker_and_propagator<BAs...>::replace_scope_ids_with_types(
 	tref n) const
 {

@@ -14,7 +14,8 @@ namespace idni::tau_lang {
  * @param r Right-hand side operand.
  * @return Result of bitwise AND operation.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& l,
         const tree<node<BAs...>>& r);
 
@@ -24,7 +25,8 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& l,
  * @param r Right-hand side operand.
  * @return Result of bitwise OR operation.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& l,
         const tree<node<BAs...>>& r);
 
@@ -33,7 +35,8 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& l,
  * @param l Operand.
  * @return Result of bitwise NOT operation.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& l);
 
 /**
@@ -42,7 +45,8 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& l);
  * @param r Right-hand side operand.
  * @return Result of bitwise XOR operation.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& l,
                                                 const tree<node<BAs...>>& r);
 
@@ -52,7 +56,8 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& l,
  * @param r Right-hand side operand.
  * @return Result of addition operation.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& l,
                                                 const tree<node<BAs...>>& r);
 
@@ -61,7 +66,8 @@ const tree<node<BAs...>>& operator+(const tree<node<BAs...>>& l,
  * @param l Operand.
  * @return True if the tau is zero, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_zero(const tree<node<BAs...>>& l);
 
 /**
@@ -69,7 +75,8 @@ bool is_zero(const tree<node<BAs...>>& l);
  * @param l Operand.
  * @return True if the tau is one, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_one(const tree<node<BAs...>>& l);
 
 /**
@@ -78,7 +85,8 @@ bool is_one(const tree<node<BAs...>>& l);
  * @param r Right-hand side operand.
  * @return True if both tau are equal, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
@@ -87,7 +95,8 @@ bool operator==(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
  * @param r Right-hand side operand.
  * @return True if both tau are not equal, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
@@ -96,7 +105,8 @@ bool operator!=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
  * @param r Right-hand side operand.
  * @return Result of the three-way comparison.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::weak_ordering operator<=>(const tree<node<BAs...>>& l,
                                                 const tree<node<BAs...>>& r);
 
@@ -106,7 +116,8 @@ std::weak_ordering operator<=>(const tree<node<BAs...>>& l,
  * @param r Right-hand side operand.
  * @return True if l is less than r, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator<(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
@@ -115,7 +126,8 @@ bool operator<(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
  * @param r Right-hand side operand.
  * @return True if l is less than or equal to r, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator<=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
@@ -124,7 +136,8 @@ bool operator<=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
  * @param r Right-hand side operand.
  * @return True if l is greater than r, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator>(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
@@ -133,7 +146,8 @@ bool operator>(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
  * @param r Right-hand side operand.
  * @return True if l is greater than or equal to r, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator>=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
 
 /**
@@ -142,7 +156,8 @@ bool operator>=(const tree<node<BAs...>>& l, const tree<node<BAs...>>& r);
  * @param r Right-hand side operand.
  * @return True if tau is equal to the boolean value, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const tree<node<BAs...>>& l, const bool& r);
 
 /**
@@ -151,7 +166,8 @@ bool operator==(const tree<node<BAs...>>& l, const bool& r);
  * @param r Right-hand side operand.
  * @return True if boolean value is equal to tau, false otherwise.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const bool l, const tree<node<BAs...>>& r);
 
 /**
@@ -160,7 +176,8 @@ bool operator==(const bool l, const tree<node<BAs...>>& r);
  * @param st Splitter type (default is splitter_type::upper).
  * @return Result of the splitter operation.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& n,
                                 splitter_type st = splitter_type::upper);
 

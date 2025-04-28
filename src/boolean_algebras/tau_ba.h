@@ -21,7 +21,8 @@ namespace idni::tau_lang {
 // and https://devblogs.microsoft.com/cppblog/cpp23-deducing-this/ for how to use
 // "Deducing this" on CRTP.
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct tau_ba {
 	using tau_ba_t = tau_ba<BAs...>;
 	using node = tau_lang::node<BAs...>;
@@ -124,7 +125,7 @@ private:
 	//  * @param rule Reference to the rewriter rule of tau_nso_t.
 	//  * @return Renamed rewriter rule.
 	//  */
-	// rewriter::rule rename(const rewriter::depreciating::rule<tau_nso_t>& rule) const;
+	// rewriter::rule rename(const rewriter::rule<tau_nso_t>& rule) const;
 
 	/**
 	 * @brief Merges two sets of rules.
@@ -144,7 +145,8 @@ private:
  * @param b Reference to bool.
  * @return True if equal, otherwise false.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const tau_ba<BAs...>& other, const bool& b);
 
 /**
@@ -155,7 +157,8 @@ bool operator==(const tau_ba<BAs...>& other, const bool& b);
  * @param other Reference to tau_ba.
  * @return True if equal, otherwise false.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator==(const bool& b, const tau_ba<BAs...>& other);
 
 /**
@@ -166,7 +169,8 @@ bool operator==(const bool& b, const tau_ba<BAs...>& other);
  * @param b Reference to bool.
  * @return True if not equal, otherwise false.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const tau_ba<BAs...>& other, const bool& b);
 
 /**
@@ -177,7 +181,8 @@ bool operator!=(const tau_ba<BAs...>& other, const bool& b);
  * @param other Reference to tau_ba.
  * @return True if not equal, otherwise false.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool operator!=(const bool& b, const tau_ba<BAs...>& other);
 
 /**
@@ -187,7 +192,8 @@ bool operator!=(const bool& b, const tau_ba<BAs...>& other);
  * @param fm Reference to tau_ba.
  * @return Normalized tau_ba.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 auto normalize(const tau_ba<BAs...>& fm);
 
 /**
@@ -198,7 +204,8 @@ auto normalize(const tau_ba<BAs...>& fm);
  * @param st Splitter type.
  * @return Split tau_ba.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 auto splitter(const tau_ba<BAs...>& fm, splitter_type st);
 
 /**
@@ -207,7 +214,8 @@ auto splitter(const tau_ba<BAs...>& fm, splitter_type st);
  * @tparam BAs Variadic template parameters.
  * @return Split tau_ba.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 auto tau_splitter_one();
 
 /**
@@ -217,7 +225,8 @@ auto tau_splitter_one();
  * @param fm Reference to tau_ba.
  * @return True if closed, otherwise false.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm);
 
 /**
@@ -232,7 +241,8 @@ using tau_spec = rr;
  *
  * @tparam BAs Variadic template parameters.
  */
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct tau_ba_factory {
 	using tau_ba_t = tau_ba<BAs...>;
 
@@ -281,13 +291,15 @@ struct tau_ba_factory {
 };
 
 // << for printing tau_ba's form
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const tau_ba<BAs...>& rs);
 
 } // namespace idni::tau_lang
 
 // Hash for tau_ba using specialization to std::hash
-template <idni::tau_lang::BAsPack... BAs>
+template <typename... BAs>
+requires idni::tau_lang::BAsPack<BAs...>
 struct std::hash<idni::tau_lang::tau_ba<BAs...>> {
 	size_t operator()(const idni::tau_lang::tau_ba<BAs...>& f) const
 								noexcept;

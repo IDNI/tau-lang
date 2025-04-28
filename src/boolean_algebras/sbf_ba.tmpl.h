@@ -54,7 +54,8 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 		}
 	}
 }
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	const std::string& src)
 {
@@ -74,7 +75,8 @@ std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	return cache.emplace(src, std::variant<BAs...>{ v }).first->second;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 tref sbf_ba_factory<BAs...>::binding(const std::string& source) {
 	// std::cout << "sbf_ba_factory::binding `" << source << "`\n";
 	if (auto p = parse(source); p)
@@ -83,17 +85,20 @@ tref sbf_ba_factory<BAs...>::binding(const std::string& source) {
 	return nullptr;
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::variant<BAs...> sbf_ba_factory<BAs...>::splitter_one() const {
 	return std::variant<BAs...>(bdd_splitter_one<Bool>());
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::string sbf_ba_factory<BAs...>::zero() const {
 	return "0";
 }
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 sbf_ba_factory<BAs...>& sbf_ba_factory<BAs...>::instance() {
 	static sbf_ba_factory<BAs...> factory;
 	return factory;

@@ -55,19 +55,24 @@ concept NodeType = requires { // Node Type has to provide
 // -----------------------------------------------------------------------------
 // forward declarations
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct nso_factory;
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct tau_ba;
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct ba_constants;
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct ba_constants_binder;
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct ba_types_checker_and_propagator;
 
 template <NodeType node>
@@ -79,11 +84,13 @@ struct get_hook;
 // -----------------------------------------------------------------------------
 
 // helper to get size of boolean algebras variant pack
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr size_t BAs_size = std::variant_size<std::variant<BAs...>>::value;
 
 // helper to get bitsize required for storing BA type ids
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 constexpr size_t BAs_bitsize = BAs_size<BAs...> <= 1 ? 1 : 
 		//static_cast<size_t>(std::ceil(std::log2(BAs_size<BAs...>)));
                 (sizeof(size_t) * 8 - __builtin_clzl(BAs_size<BAs...> - 1));
@@ -103,7 +110,8 @@ constexpr size_t BAs_bitsize = BAs_size<BAs...> <= 1 ? 1 :
 //
 // node also provides alias node::type for tau_parser::nonterminal
 // and provides static name(nt) nad name() methods to get type name string
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 struct node {
 	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;
@@ -606,9 +614,11 @@ private:
 // -----------------------------------------------------------------------------
 // printers (tau_tree_printers.tmpl.h)
 
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const std::variant<BAs...>& v);
-template <BAsPack... BAs>
+template <typename... BAs>
+requires BAsPack<BAs...>
 std::ostream& operator<<(std::ostream& os, const node<BAs...>& n);
 template <NodeType node>
 std::ostream& operator<<(std::ostream& os, const tree<node>& t);
