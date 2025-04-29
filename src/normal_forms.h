@@ -300,7 +300,7 @@ inline auto is_bf_bdd_var = [](tref n) {
 		|| t.child_is(tau::capture)
 		|| t.child_is(tau::bf_ref)
 		|| t.child_is(tau::bf_constant)
-		|| t.child_is(tau::uninterpreted_constant);
+		|| t.child_is(tau::uconst);
 };
 // ------------------------------
 

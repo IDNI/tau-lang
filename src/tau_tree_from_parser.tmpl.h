@@ -179,9 +179,9 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 				// call binder on a transformed bf_constant node
 				if (nt == bf_constant) {
-					if (!get(x)[0][0].is(binding)) break; // capture?
+					if (!get(x)[0][0].is(source)) break; // capture?
 					BOOST_LOG_TRIVIAL(debug) << "tau tree transform calling binder: " << src << " " << get_type(x);
-					auto nn = bind(src, tau::get_type_name(x));
+					auto nn = bind(src, string_from_id(get_type_sid<node>(x)));
 					if (nn == nullptr || bind.error
 						|| nn == x) return error = true,
 									false;
@@ -196,12 +196,12 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 		// 	<< " as " << tree::get(x).get_type_name() << "\n"";
 		return true;
 	};
-	// parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
+	parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
 	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
 	if (error) return nullptr;
 	if (m.find(ptr.get()) == m.end()) return nullptr;
-	// std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n"";
-	// tree::get(m_get(ptr.get())).print_tree(std::cout << "tau tree: ") << "\n"";
+	std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n";
+	m_get(ptr.get()).print_tree(std::cout << "tau tree: ") << "\n";
 	return m_ref(ptr.get());
 }
 
@@ -276,31 +276,54 @@ tref tree<node>::get_from_file(const std::string& filename, parse_options option
 }
 
 template <NodeType node>
-template <typename binder>
-rewriter::library tree<node>::get_library(binder& bind, const std::string& str) {
-	using tau = tree<node>;
-	tau::parse_options opts; opts.start = tau::library;
-	return get_rules(tau::get<binder>(bind, str, opts));
-}
-
-template <NodeType node>
-rewriter::library tree<node>::get_library(const std::string& str) {
-	return tree<node>::get_library<ba_constants_binder_t>(
-		ba_constants_binder_t::instance(), str);
+rewriter::builder tree<node>::get_builder(tref ref) {
+	return idni::tau_lang::get_builder<node>(ref);
 }
 
 template <NodeType node>
 template <typename binder>
-rewriter::builder tree<node>::get_builder(binder& bind, const std::string& source){
-	using tau = tree<node>;
-	tau::parse_options opts; opts.start = tau::builder;
-	return get_builder(tau::get<binder>(bind, source, opts));
+rewriter::builder tree<node>::get_builder(binder& bind,
+	const std::string& source)
+{
+	return idni::tau_lang::get_builder<node, binder>(bind, source);
 }
 
 template <NodeType node>
 rewriter::builder tree<node>::get_builder(const std::string& source) {
-	return tree<node>::get_builder<ba_constants_binder_t>(
-		ba_constants_binder_t::instance(), source);
+	return idni::tau_lang::get_builder<node>(source);
+}
+
+template <NodeType node>
+rewriter::rules tree<node>::get_rules(tref ref) {
+	return idni::tau_lang::get_rules<node>(ref);
+}
+
+template <NodeType node>
+template <typename binder>
+rewriter::rules tree<node>::get_rules(binder& bind, const std::string& source)
+{
+	return idni::tau_lang::get_rules<node, binder>(bind, source);
+}
+
+template <NodeType node>
+rewriter::rules tree<node>::get_rules(const std::string& source) {
+	return idni::tau_lang::get_rules<node>(source);
+}
+
+template <NodeType node>
+rewriter::library tree<node>::get_library(tref ref) {
+	return idni::tau_lang::get_library<node>(ref);
+}
+
+template <NodeType node>
+template <typename binder>
+rewriter::library tree<node>::get_library(binder& bind, const std::string& str) {
+	return idni::tau_lang::get_library<node, binder>(bind, str);
+}
+
+template <NodeType node>
+rewriter::library tree<node>::get_library(const std::string& str) {
+	return idni::tau_lang::get_library<node>(str);
 }
 
 template <NodeType node>
@@ -312,5 +335,84 @@ tree<node>::parse_options::parse_options(const parse_options&) = default;
 template <NodeType node>
 tree<node>::parse_options::parse_options(const tau_parser::parse_options& opts)
 	: tau_parser::parse_options(opts) {}
+
+
+template <NodeType node>
+rewriter::builder get_builder(tref ref) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	DBG(assert(ref != nullptr);)
+	tt b(ref);
+	auto body = b | tau::builder_body | tt::only_child;
+	DBG(assert((body | tt::nt) == tau::bf_builder_body
+		|| (body | tt::nt) == tau::wff_builder_body);)
+	return { tau::geth(b | tau::builder_head | tt::ref),
+		 tau::geth(body | tt::first | tt::ref) };
+}
+
+template <NodeType node, typename binder>
+rewriter::builder get_builder(binder& bind, const std::string& source){
+	using tau = tree<node>;
+	typename tau::parse_options opts; opts.start = tau::builder;
+	return get_builder<node>(tau::template get<binder>(bind, source, opts));
+}
+
+template <NodeType node>
+rewriter::builder get_builder(const std::string& source) {
+	return get_builder<node, typename node::ba_constants_binder_t>(
+		node::ba_constants_binder_t::instance(), source);
+}
+
+template <NodeType node>
+rewriter::rules get_rules(tref r) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	tt rules(r);
+	DBG(assert(rules.is(tau::rules));)
+	auto rs = rules || tau::rule || tt::first;
+	rewriter::rules x;
+	for (auto r : rs.traversers()) {
+		// tree::get(r.value()).print(std::cout << "rule: ");
+		x.emplace_back(tau::geth(r | tt::first | tt::ref),
+				tau::geth(r | tt::second | tt::ref));
+	}
+	return x;
+}
+
+template <NodeType node, typename binder>
+rewriter::library get_rules(binder& bind, const std::string& str) {
+	using tau = tree<node>;
+	typename tau::parse_options opts; opts.start = tau::rules;
+	return get_rules<node>(tau::template get<binder>(bind, str, opts));
+}
+
+template <NodeType node>
+rewriter::library get_rules(const std::string& str) {
+	return get_rules<node, typename node::ba_constants_binder_t>(
+		node::ba_constants_binder_t::instance(), str);
+}
+
+template <NodeType node>
+rewriter::rules get_library(tref r) {
+	using tau = tree<node>;
+	const auto& lib = tau::get(r);
+	DBG(assert(lib.is(tau::library));)
+	return get_rules<node>(lib.first());
+}
+
+template <NodeType node, typename binder>
+rewriter::library get_library(binder& bind, const std::string& str) {
+	using tau = tree<node>;
+	typename tau::parse_options opts; opts.start = tau::library;
+	return get_library<node>(tau::template get<binder>(bind, str, opts));
+}
+
+template <NodeType node>
+rewriter::library get_library(const std::string& str) {
+	return get_library<node, typename node::ba_constants_binder_t>(
+		node::ba_constants_binder_t::instance(), str);
+}
+
+
 
 } // namespace idni::tau_lang

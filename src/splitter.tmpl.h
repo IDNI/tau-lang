@@ -16,13 +16,13 @@ tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
 	if (mem.empty()) {
 		if (is_wff) {
 			mem = is_cnf
-				? tau::get_cnf_wff_clauses(fm)
-				: tau::get_dnf_wff_clauses(fm);
+				? get_cnf_wff_clauses<node>(fm)
+				: get_dnf_wff_clauses<node>(fm);
 		} else {
 			DBG(assert(fm_type == tau::bf);)
 			mem = is_cnf
-				? tau::get_cnf_bf_clauses(fm)
-				: tau::get_dnf_bf_clauses(fm);
+				? get_cnf_bf_clauses<node>(fm)
+				: get_dnf_bf_clauses<node>(fm);
 		}
 	}
 	tref sym = is_wff
@@ -112,7 +112,7 @@ tref good_splitter_using_function(tref f, splitter_type st, tref original_fm) {
 	size_t i = 0;
 	do {
 		tref s = split(f, tau::bf, false, st, m, i, true);
-		if (!tau::subtree_equals(s, f)) {
+		if (tau::get(s) != tau::get(f)) {
 			tref new_fm = rewriter::replace<node>(original_fm, f, s);
 			if(!are_nso_equivalent<BAs...>(original_fm, new_fm))
 				return new_fm;
@@ -120,7 +120,7 @@ tref good_splitter_using_function(tref f, splitter_type st, tref original_fm) {
 	} while (++i < m.size());
 
 	// Find possible coefficient in each disjunct of f
-	trefs clauses = tau::get_leaves(f, tau::bf_or);
+	trefs clauses = get_leaves<node>(f, tau::bf_or);
 	// In case f is just a single clause
 	if (clauses.empty()) clauses.push_back(f);
 	for (tref clause : clauses) {
@@ -129,7 +129,7 @@ tref good_splitter_using_function(tref f, splitter_type st, tref original_fm) {
 		if (!coeff) continue;
 		DBG(assert(is<node>(coeff, tau::bf_constant));)
 		tref s = splitter<BAs...>(coeff);
-		if (!tau::subtree_equals(s, coeff)) {
+		if (tau::get(s) != tau::get(coeff)) {
 			tref new_fm = rewriter::replace<node>(
 					original_fm, coeff, tau::trim(s));
 			if(!are_nso_equivalent<BAs...>(original_fm, new_fm))
@@ -156,7 +156,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 	size_t i = 0;
 	do {
 		tref s = split<BAs...>(f_cnf, tau::bf, true, st, m, i, true);
-		if (!tau::subtree_equals(s, f_cnf)) {
+		if (tau::get(s) != tau::get(f_cnf)) {
 			tref new_fm = rewriter::replace<node>(original_fm, f, s);
 			if(!are_nso_equivalent<BAs...>(original_fm, new_fm))
 				return new_fm;
@@ -164,7 +164,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 	} while (++i < m.size());
 
 	// Try to split coefficient in each conjunct of f
-	trefs clauses = tau::get_leaves(f_cnf, tau::bf_and);
+	trefs clauses = get_leaves<node>(f_cnf, tau::bf_and);
 	for (tref clause : clauses) {
 		tref coeff = tau::get(clause).find_top(
 			is_child<node, tau::bf_constant>);
@@ -178,7 +178,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 		tref s = splitter<BAs...>(tau::trim(neg_coeff), st);
 		// Negating s results in a reversed splitter for s
 		s = push_negation_in<node, false>(tau::build_bf_neg(s));
-		if (!tau::subtree_equals(s, coeff)) {
+		if (tau::get(s) != tau::get(coeff)) {
 			tref new_fm = rewriter::replace<node>(
 					original_fm, coeff, s);
 			if (!are_nso_equivalent<BAs...>(original_fm, new_fm))
@@ -193,10 +193,11 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref tau_bad_splitter(tref fm ) {
-	using tau = tree<node<BAs...>>;
-	tref new_uniter_const = tau::build_wff_neq(
-		get_new_uninterpreted_constant<node<BAs...>>(fm, "split"));
-	trefs clauses = tau::get_dnf_wff_clauses(fm);
+	using node = tau_lang::node<BAs...>;
+	using tau = tree<node>;
+	tref new_uniter_const = tau::build_bf_neq(
+		get_new_uninterpreted_constant<node>(fm, "split"));
+	trefs clauses = get_dnf_wff_clauses<node>(fm);
 	// Add bad splitter only to a single disjunct if possible
 	if (!clauses.empty()) {
 		clauses[0] = tau::build_wff_and(clauses[0], new_uniter_const);
@@ -222,7 +223,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 
 	//fm = snf_wff(fm);
 	// Collect all occurances of "||" while assuming that fm is in DNF
-	trefs clauses = tau::get_dnf_wff_clauses(fm);
+	trefs clauses = get_dnf_wff_clauses<node>(fm);
 	for (tref clause : clauses) {
 		// check for equality parts
 		trefs eqs = tau::get(clause)
@@ -231,7 +232,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 			DBG(assert(tau::get(eq)[1][0].is(tau::bf_f));)
 			const auto& f = tau::get(eq)[0];
 			size_t type_f = f.get_ba_type();
-			typename tau::subtree_set free_vars = tau::get_free_vars_from_nso(fm);
+			typename tau::subtree_set free_vars = get_free_vars_from_nso<node>(fm);
 			for (tref c : constants) {
 				// First check that types match
 				size_t type_c = tau::get(c).get_ba_type();
@@ -250,7 +251,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 				}
 			}
 			if (tref s = good_reverse_splitter_using_function<BAs...>(f, st, clause);
-				!tau::subtree_equals(s, clause))
+				tau::get(s) != tau::get(clause))
 			{
 				//TODO: this equiv check should happen in good_reverse_splitter_using_function
 				tref new_fm = rewriter::replace<node>(fm, clause, s);
@@ -278,7 +279,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 					return { new_fm, st };
 			}
 			if (tref s = good_splitter_using_function<BAs...>(f, st, clause);
-				!tau::subtree_equals(s, clause))
+				tau::get(s) != tau::get(clause))
 			{
 				//TODO: this equiv check should happen in good_splitter_using_function
 				tref new_fm = rewriter::replace<node>(fm, clause, s);
@@ -308,10 +309,10 @@ tref tau_splitter(tref fm, splitter_type st) {
 	using tau = tree<node>;
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start of tau_splitter";
 	// First we decide if we deal with a temporal formula
-	if (!tau::has_temp_var(fm)) return nso_tau_splitter<BAs...>(fm, st).first;
+	if (!has_temp_var<node>(fm)) return nso_tau_splitter<BAs...>(fm, st).first;
 
 	auto splitter_of_clause = [&](tref clause) {
-		trefs specs = tau::get_cnf_wff_clauses(clause);
+		trefs specs = get_cnf_wff_clauses<node>(clause);
 		bool good_splitter = false;
 		for (tref spec : specs) {
 			bool is_aw = is_child<node>(spec, tau::wff_always);
@@ -332,7 +333,7 @@ tref tau_splitter(tref fm, splitter_type st) {
 	};
 
 	// Fm is temporal
-	trefs clauses = tau::get_dnf_wff_clauses(fm);
+	trefs clauses = get_dnf_wff_clauses<node>(fm);
 	for (int_t i = 0; i < (int_t) clauses.size(); ++i) {
 		// First check redundancy between current clause and rest
 		bool is_redundant = false;

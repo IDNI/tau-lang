@@ -13,7 +13,12 @@ struct ref_types {
 	using node = N;
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	friend tau;
+	template <NodeType NT>
+	friend std::optional<rr> infer_ref_types(const rr& nso_rr);
+	template <NodeType NT>
+	friend std::optional<rr> infer_ref_types(const rr& nso_rr,
+						ref_types<NT>& ts);
+
 
 	ref_types(const rr& nso_rr);
 	// returns false if any error or unresolved ref
@@ -31,7 +36,7 @@ private:
 	void todo(const rr_sig& sig);
 	void add_fpcall(const rr_sig& sig);
 	// add sig with type t, and if it's already typed, check it equals to t
-	bool add(tref n, const typename node::type& t);
+	bool add(tref n, typename node::type t);
 	bool get_types(tref n, bool def = false);
 	bool get_ref_types(const rr& nso_rr);
 	std::unordered_map<rr_sig, rr_sig> fpcalls_;

@@ -8,30 +8,36 @@ namespace idni::tau_lang {
 // various extractors
 
 template <NodeType node>
-std::string tree<node>::get_type_name(tref n) {
-	auto t = tt(n) | tau::type;
-	if (t) return t | tt::string;
-	return "untyped";
+size_t get_type_sid(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	static size_t untyped_sid = string_id("untyped");
+	if (auto t = tt(n) | tau::type; t) return t | tt::data;
+	return untyped_sid;
 }
 
 template <NodeType node>
-rr_sig tree<node>::get_rr_sig(tref n) {
+rr_sig get_rr_sig(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
 	auto r = tt(n); // traverse to ref if n is bf_ref or wff_ref
-	if (auto r_as_child = r | ref; r_as_child) r = r_as_child;
-	return { rr_dict(r | node::type::sym | tt::string),
-		(r | offsets || offset).size(),
-		(r | ref_args || ref_arg).size() };
+	if (auto r_as_child = r | tau::ref; r_as_child) r = r_as_child;
+	return { rr_dict(r | tau::sym | tt::string),
+		(r | tau::offsets || tau::offset).size(),
+		(r | tau::ref_args || tau::ref_arg).size() };
 }
 
 template <NodeType node>
-rewriter::rules tree<node>::get_rec_relations(tref rrs) {
+rewriter::rules get_rec_relations(tref rrs) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
 	rewriter::rules x;
 	auto t = tt(rrs);
-	if (t.is(rec_relation))
-		return x.emplace_back(geth(t.value_tree().first()),
-					geth(t.value_tree().second())), x;
-	if (t.is(spec)) t = t | rec_relations;
-	t = t || rec_relation;
+	if (t.is(tau::rec_relation))
+		return x.emplace_back(tau::geth(t.value_tree().first()),
+					tau::geth(t.value_tree().second())), x;
+	if (t.is(tau::spec)) t = t | tau::rec_relations;
+	t = t || tau::rec_relation;
 	for (auto& r : t())
 		x.emplace_back(r | tt::first | tt::handle,
 				r | tt::second | tt::handle);
@@ -39,53 +45,31 @@ rewriter::rules tree<node>::get_rec_relations(tref rrs) {
 }
 
 template <NodeType node>
-std::optional<rr> tree<node>::get_nso_rr(tref r) {
-	using tt = tree<node>::traverser;
-	const auto& t = get(r);
-	if (t.is(bf) || t.is(ref)) return { { {}, geth(r) } };
-	if (t.is(rec_relation))
-		return { { tree<node>::get_rec_relations(r), geth(r) } };
-	tref main_fm = (t.is(tau_constant_source) || t.is(spec)
-					? tt(r) | main
-					: tt(r) | spec | main) | wff | tt::ref;
-	rewriter::rules rules = get_rec_relations(r);
-	return get_nso_rr(rules, main_fm);
+std::optional<rr> get_nso_rr(tref r) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	const auto& t = tau::	get(r);
+	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
+	if (t.is(tau::rec_relation))
+		return { { get_rec_relations<node>(r), tau::geth(r) } };
+	tref main_fm = (t.is(tau::tau_constant_source) || t.is(tau::spec)
+			? tt(r) | tau::main
+			: tt(r) | tau::spec | tau::main) | tau::wff | tt::ref;
+	rewriter::rules rules = get_rec_relations<node>(r);
+	return get_nso_rr<node>(rules, main_fm);
 }
 
 template <NodeType node>
-std::optional<rr> tree<node>::get_nso_rr(const rewriter::rules& rules,
+std::optional<rr> get_nso_rr(const rewriter::rules& rules,
 	tref main_fm)
 {
-	return infer_ref_types({ rules, geth(main_fm) });
-}
-
-template <NodeType node>
-rewriter::builder tree<node>::get_builder(tref ref) {
-	DBG(assert(ref != nullptr);)
-	tt b(ref);
-	auto body = b | builder_body | tt::only_child;
-	DBG(assert((body | tt::nt) == bf_builder_body
-		|| (body | tt::nt) == wff_builder_body);)
-	return { geth(b | builder_head | tt::ref),
-		geth(body | tt::first | tt::ref) };
-}
-
-template <NodeType node>
-rewriter::rules tree<node>::get_rules(tref r) {
-	auto rs = tt(r) | rules || rule || tt::first;
-	rewriter::rules x;
-	for (auto r : rs.traversers()) {
-		// tree::get(r.value()).print(std::cout << "rule: ");
-		x.emplace_back(tree::geth(r | tt::first | tt::ref),
-				tree::geth(r | tt::second | tt::ref));
-	}
-	return x;
+	return infer_ref_types<node>({ rules, tree<node>::geth(main_fm) });
 }
 
 // -----------------------------------------------------------------------------
 
 template <NodeType node>
-void tree<node>::get_leaves(tref n, node::type branch, trefs& leaves) {
+void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 	auto add_leave = [&branch, &leaves](tref n) {
 		const auto& t = tree<node>::get(n);
 		if (t.is(branch)) return true;
@@ -96,97 +80,85 @@ void tree<node>::get_leaves(tref n, node::type branch, trefs& leaves) {
 }
 
 template <NodeType node>
-trefs tree<node>::get_leaves(tref n, node::type branch) {
+trefs get_leaves(tref n, typename node::type branch) {
 	trefs leaves;
-	get_leaves(n, branch, leaves);
+	get_leaves<node>(n, branch, leaves);
 	return leaves;
 }
 
 template <NodeType node>
-trefs tree<node>::get_leaves(node::type branch) const {
-	trefs leaves;
-	get_leaves(get(), branch, leaves);
-	return leaves;
+trefs get_dnf_wff_clauses(tref n) {
+	return get_leaves<node>(n, node::type::wff_or);
 }
 
 template <NodeType node>
-trefs tree<node>::get_dnf_wff_clauses(tref n) {
-	return get_leaves(n, node::type::wff_or);
+trefs get_dnf_bf_clauses(tref n) {
+	return get_leaves<node>(n, node::type::bf_or);
 }
 
 template <NodeType node>
-trefs tree<node>::get_dnf_bf_clauses(tref n) {
-	return get_leaves(n, node::type::bf_or);
+trefs get_cnf_wff_clauses(tref n) {
+	return get_leaves<node>(n, node::type::wff_and);
 }
 
 template <NodeType node>
-trefs tree<node>::get_cnf_wff_clauses(tref n) {
-	return get_leaves(n, node::type::wff_and);
+trefs get_cnf_bf_clauses(tref n) {
+	return get_leaves<node>(n, node::type::bf_and);
 }
-
-template <NodeType node>
-trefs tree<node>::get_cnf_bf_clauses(tref n) {
-	return get_leaves(n, node::type::bf_and);
-}
-
 
 // -----------------------------------------------------------------------------
 // Helpers for variables having io_var as child
 
 template <NodeType node>
-bool tree<node>::is_io_initial(tref io_var) {
-	return get(io_var)[0][0][1].is(integer);
+bool is_io_initial(tref io_var) {
+	return tree<node>::get(io_var)[0][1].is_integer();
 }
 
 template <NodeType node>
-bool tree<node>::is_io_shift(tref io_var) {
-	return get(io_var)[0][0][1].is(shift);
+bool is_io_shift(tref io_var) {
+	using tau = tree<node>;
+	return tau::get(io_var)[0][1].is(tau::shift);
 }
 
 template <NodeType node>
-int_t tree<node>::get_io_time_point(tref io_var) {
-	return get(io_var)[0][0][0][1].get_integer();
+int_t get_io_time_point(tref io_var) {
+	return tree<node>::get(io_var)[0][0][1].get_integer();
 }
 
 template <NodeType node>
-int_t tree<node>::get_io_shift(tref io_var) {
-	return get(io_var)[0][0][1][0][1][0].get_integer();
+int_t get_io_shift(tref io_var) {
+	return tree<node>::get(io_var)[0][1][0][1][0].get_integer();
 }
 
 template <NodeType node>
-std::string tree<node>::get_io_name(tref io_var) {
-	return get(io_var)[0][0][0].get_string();
+const std::string& get_io_name(tref io_var) {
+	return tree<node>::get(io_var)[0].get_string();
 }
 
 template <NodeType node>
-tref tree<node>::get_tau_io_name(tref io_var) {
-	return get(io_var)[0][0].first();
-}
-
-template <NodeType node>
-int_t tree<node>::get_io_var_shift(tref io_var) {
+int_t get_io_var_shift(tref io_var) {
 	// If there is a shift
-	if (is_io_shift(io_var)) return get_io_shift(io_var);
+	if (is_io_shift<node>(io_var)) return get_io_shift<node>(io_var);
 	return 0;
 }
 
 template <NodeType node>
-int_t tree<node>::get_max_shift(const trefs& io_vars, bool ignore_temps) {
+int_t get_max_shift(const trefs& io_vars, bool ignore_temps) {
 	int_t max_shift = 0;
 	for (tref v : io_vars) {
-		if (ignore_temps && get_io_name(v)[0] == '_')
+		if (ignore_temps && tree<node>::get(v).get_string()[0] == '_')
 			continue;
-		max_shift = std::max(max_shift, get_io_var_shift(v));
+		max_shift = std::max(max_shift, get_io_var_shift<node>(v));
 	}
 	return max_shift;
 }
 
 template <NodeType node>
-int_t tree<node>::get_max_initial(const trefs& io_vars) {
+int_t get_max_initial(const trefs& io_vars) {
 	int_t max_init = -1;
 	for (tref v : io_vars) {
-		if (is_io_initial(v)) {
-			int_t init = get_io_time_point(v);
+		if (is_io_initial<node>(v)) {
+			int_t init = get_io_time_point<node>(v);
 			max_init = std::max(max_init, init);
 		}
 	}
@@ -194,25 +166,26 @@ int_t tree<node>::get_max_initial(const trefs& io_vars) {
 }
 
 template <NodeType node>
-typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
+typename tree<node>::subtree_set get_free_vars_from_nso(tref n) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso of " << n;
-	typename tree<node>::subtree_set free_vars;
+	typename tau::subtree_set free_vars;
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
 	auto collector = [&free_vars](tref n) {
-		const auto& t = get(n);
-		if (t.is(wff_all) || t.is(wff_ex)) {
+		const auto& t = tau::get(n);
+		if (t.is(tau::wff_all) || t.is(tau::wff_ex)) {
 			tref var = t.find_top(
 				(bool(*)(tref)) is_var_or_capture<node>);
 			if (var) if (auto it = free_vars.find(var);
 				it != free_vars.end())
 			{
-				BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << get(var);
+				BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << tau::get(var);
 				free_vars.erase(it);
 			}
 		} else if (is_var_or_capture<node>(n)) {
-			if (auto offset_child = t() | io_var
-				| tt::only_child | offset | tt::only_child;
-					offset_child)
+			if (auto offset_child = t() | tau::io_var | tau::offset
+				| tt::only_child; offset_child)
 			{
 				if (is_var_or_capture<node>(offset_child.value())) {
 					tref var = offset_child | tt::ref;
@@ -222,7 +195,7 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child.value_tree();
 						free_vars.erase(it);
 					}
-				} else if (offset_child.value_tree().is(shift)) {
+				} else if (offset_child.value_tree().is(tau::shift)) {
 					tref var = offset_child | tt::first | tt::ref;
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
@@ -232,7 +205,7 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 					}
 				}
 			}
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- inserting var: " << get(n);
+			BOOST_LOG_TRIVIAL(trace) << "(I) -- inserting var: " << tau::get(n);
 			free_vars.insert(n);
 		}
 	};
@@ -243,11 +216,12 @@ typename tree<node>::subtree_set tree<node>::get_free_vars_from_nso(tref n) {
 // A formula has a temporal variable if either it contains an io_var with a variable or capture
 // or it contains a flag
 template <NodeType node>
-bool tree<node>::has_temp_var(tref fm) {
-	const auto& t = get(fm);
-	trefs io_vars = t.select_top(tau_lang::is<node, node::type::io_var>);
+bool has_temp_var(tref fm) {
+	using tau = tree<node>;
+	const auto& t = tau::get(fm);
+	trefs io_vars = t.select_top(is<node, tau::io_var>);
 	if (io_vars.empty())
-		return t.find_top(tau_lang::is<node, node::type::constraint>) != nullptr;
+		return t.find_top(is<node, tau::constraint>) != nullptr;
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;
 }
