@@ -192,7 +192,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 // We assume the formula is fully normalized by normalizer
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref tau_bad_splitter(tref fm ) {
+tref tau_bad_splitter(tref fm) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	tref new_uniter_const = tau::build_bf_neq(

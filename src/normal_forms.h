@@ -267,8 +267,8 @@ auto lex_var_comp = [](tref x, tref y) {
 		return it->second;
 #endif // TAU_CACHE
 	// TODO (QUESTION) strings have unique id, use .data() instead?
-	auto xx = tree<node>::get(x)[0].get_string();
-	auto yy = tree<node>::get(y)[0].get_string();
+	auto xx = tree<node>::get(x)[0][0].get_string();
+	auto yy = tree<node>::get(y)[0][0].get_string();
 #ifdef TAU_CACHE
 	std::pair<tref,tref> p(x,y);
 	return cache.emplace(move(p), xx < yy).first->second;
@@ -299,8 +299,7 @@ inline auto is_bf_bdd_var = [](tref n) {
 	return t.child_is(tau::variable)
 		|| t.child_is(tau::capture)
 		|| t.child_is(tau::bf_ref)
-		|| t.child_is(tau::bf_constant)
-		|| t.child_is(tau::uconst);
+		|| t.child_is(tau::bf_constant);
 };
 // ------------------------------
 
