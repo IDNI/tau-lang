@@ -476,9 +476,7 @@ repl_option get_opt(const typename tree<node>::traverser& n) {
 	return get_opt(o | tree<node>::traverser::string);
 }
 
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::optional<boost::log::trivial::severity_level>
+inline std::optional<boost::log::trivial::severity_level>
 	str2severity(const std::string& v)
 {
 	if (v == "e" || v == "error") return { boost::log::trivial::error };
