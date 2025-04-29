@@ -1,0 +1,265 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+#ifndef __IDNI__TAU__TAU_TREE_BUILDERS_H__
+#define __IDNI__TAU__TAU_TREE_H__
+
+#include "tau_tree.h"
+
+namespace idni::tau_lang {
+
+// -----------------------------------------------------------------------------
+// tree builders functional API
+// -----------------------------------------------------------------------------
+
+template <NodeType node>
+tref _0();
+template <NodeType node>
+tref _1();
+template <NodeType node>
+tref _F();
+template <NodeType node>
+tref _T();
+template <NodeType node>
+tref _0_trimmed();
+template <NodeType node>
+tref _1_trimmed();
+template <NodeType node>
+tref _F_trimmed();
+template <NodeType node>
+tref _T_trimmed();
+
+template <NodeType node>
+const tree<node>& get_0();
+template <NodeType node>
+const tree<node>& get_1();
+template <NodeType node>
+const tree<node>& get_F();
+template <NodeType node>
+const tree<node>& get_T();
+template <NodeType node>
+const tree<node>& get_0_trimmed();
+template <NodeType node>
+const tree<node>& get_1_trimmed();
+template <NodeType node>
+const tree<node>& get_F_trimmed();
+template <NodeType node>
+const tree<node>& get_T_trimmed();
+
+// -----------------------------------------------------------------------------
+// formula builders
+
+template <NodeType node>
+tref build_wff_sometimes(tref n);
+
+template <NodeType node>
+tref build_wff_always(tref n);
+
+template <NodeType node>
+tref build_wff_conditional(tref x, tref y, tref z);
+
+template <NodeType node>
+tref build_wff_all(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_ex(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_imply(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_rimply(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_equiv(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_or(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_or(const auto& wffs);
+
+template <NodeType node>
+tref build_wff_xor_from_def(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_xor(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_and(tref l, tref r);
+
+template <NodeType node>
+tref build_wff_and(const auto& wffs);
+
+template <NodeType node>
+tref build_wff_neg(tref n);
+
+// -----------------------------------------------------------------------------
+// constraint builders
+
+template <NodeType node>
+tref build_wff_ctn_neq(tref ctnvar, tref num);
+
+template <NodeType node>
+tref build_wff_ctn_eq(tref ctnvar, tref num);
+
+template <NodeType node>
+tref build_wff_ctn_gteq(tref ctnvar, tref num);
+
+template <NodeType node>
+tref build_wff_ctn_gt(tref ctnvar, tref num);
+
+template <NodeType node>
+tref build_wff_ctn_lteq(tref ctnvar, tref num);
+
+template <NodeType node>
+tref build_wff_ctn_lt(tref ctnvar, tref num);
+
+// -----------------------------------------------------------------------------
+// term builders
+
+template <NodeType node>
+tref build_bf_interval(tref x, tref y, tref z);
+
+template <NodeType node>
+tref build_bf_eq(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_eq(tref l);
+
+template <NodeType node>
+tref build_bf_neq(tref l);
+
+template <NodeType node>
+tref build_bf_lteq(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_nlteq(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_nlteq_lower(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_nlteq_upper(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_gt(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_ngt(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_gteq(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_ngteq(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_lt(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_nlt(tref l, tref r);
+
+// -----------------------------------------------------------------------------
+// term builders
+
+template <NodeType node>
+tref build_bf_or(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_or(const auto& bfs);
+
+template <NodeType node>
+tref build_bf_xor_from_def(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_xor(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_and(tref l, tref r);
+
+template <NodeType node>
+tref build_bf_and(const auto& bfs);
+
+template <NodeType node>
+tref build_bf_neg(tref n);
+
+// -----------------------------------------------------------------------------
+// terminals, variables and constants
+
+template <NodeType node>
+tref build_bf_t_type(size_t ba_tid);
+
+template <NodeType node>
+tref build_bf_t_type(const std::string& type);
+
+template <NodeType node>
+tref build_bf_f_type(size_t ba_tid);
+
+template <NodeType node>
+tref build_bf_f_type(const std::string& type);
+
+template <NodeType node>
+tref build_ba_constant(typename node::bas_variant v, size_t ba_tid);
+
+template <NodeType node>
+tref build_bf_ba_constant(typename node::bas_variant v, size_t ba_tid);
+
+template <NodeType node>
+tref build_variable(const std::string& name);
+
+template <NodeType node>
+tref build_bf_uconst(const std::string& name1, const std::string& name2);
+
+template <NodeType node>
+tref build_in_var_indexed(size_t index);
+
+template <NodeType node>
+tref build_io_var_at_n(tref io_var_node, size_t num);
+
+template <NodeType node>
+tref build_in_var_at_n_indexed(size_t index, size_t num);
+
+template <NodeType node>
+tref build_in_var_at_n(const std::string& name, int_t pos);
+
+template <NodeType node>
+tref build_io_var_at_t(tref io_var_node);
+
+template <NodeType node>
+tref build_in_var_at_t_indexed(size_t index);
+
+template <NodeType node>
+tref build_in_var_at_t_minus(const std::string& var_name, int_t shift);
+
+template <NodeType node>
+tref build_io_var_at_t_minus(tref io_var_node, size_t num);
+
+template <NodeType node>
+tref build_in_var_at_t_minus_indexed(size_t index, size_t num);
+
+template <NodeType node>
+tref build_out_var(size_t index);
+
+template <NodeType node>
+tref build_out_var(const std::string& name);
+
+template <NodeType node>
+tref build_out_var_at_t_indexed(size_t index);
+
+template <NodeType node>
+tref build_out_var_at_n_indexed(size_t index, size_t num);
+
+template <NodeType node>
+tref build_out_var_at_n(const std::string& name, int_t pos);
+
+template <NodeType node>
+tref build_out_var_at_t_minus(const std::string& io_var_node, int_t shift);
+
+template <NodeType node>
+tref build_out_var_at_t_minus(size_t index, size_t num);
+
+} // idni::tau_lang namespace
+
+#include "tau_tree_builders.tmpl.h"
+
+#endif // __IDNI__TAU__TAU_TREE_BUILDERS_H__
