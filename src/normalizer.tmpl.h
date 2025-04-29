@@ -101,7 +101,7 @@ int_t get_new_var_id(const tref fm) {
 template <NodeType node>
 tref get_new_uninterpreted_constant(const tref fm, const std::string& name) {
 	using tau = tree<node>;
-	trefs uninter_consts = tau::get(fm).select_top(is<node, tau::uconst>);
+	trefs uninter_consts = tau::get(fm).select_top(is<node, tau::uconst_name>);
 	std::set ids{ 0 };
 	for (tref uninter_const : uninter_consts) {
 		const auto& tmp = tau::get(uninter_const).get_string();

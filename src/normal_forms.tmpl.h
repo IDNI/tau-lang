@@ -754,8 +754,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	// This defines the variable order used to calculate DNF
 	// It is made canonical by sorting the variables
 	auto is_var = [](tref n) {
-		return  tau::get(n).child_is(tau::variable)
-			|| tau::get(n).child_is(tau::uconst);
+		return  tau::get(n).child_is(tau::variable);
 	};
 	auto vars = t.select_top(is_var);
 	std::cout << "vars.size(): " << vars.size() << "\n";
@@ -776,7 +775,7 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 		assert(dnf.size() == 1);
 		return dnf.begin()->first;
 	}
-	if (dnf.empty()) return tau::_0();
+	if (dnf.empty()) return _0<node>();
 	if (!make_paths_disjoint)
 		for (auto& [coeff, paths] : dnf) join_paths(paths);
 
