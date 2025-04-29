@@ -39,41 +39,10 @@ private:
 	static inline const tree<node>& quantifier(const tref* ch);
 	static inline const tree<node>& quantified_formula(const tref* ch);
 
-	// build helpers (raw w/o hooks)
-	static tref wrap(node::type nt, tref ch);
-	static tref wrap(node::type nt, tref ch1, tref ch2);
 	static tref _0(const node& v, const tref* ch, size_t len, tref r);
 	static tref _1(const node& v, const tref* ch, size_t len, tref r);
 	static tref _F(const node& v, const tref* ch, size_t len, tref r);
 	static tref _T(const node& v, const tref* ch, size_t len, tref r);
-	static tref build_ba_constant(node::bas_variant v, size_t ba_tid);
-	static tref build_bf_and(tref l, tref r);
-	static tref build_bf_or(tref l, tref r);
-	static tref build_bf_neg(tref l);
-	static tref build_bf_xor(tref l, tref r);
-	static tref build_bf_lt(tref l, tref r);
-	static tref build_bf_nlt(tref l, tref r);
-	static tref build_bf_lteq(tref l, tref r);
-	static tref build_bf_nlteq(tref l, tref r);
-	static tref build_bf_gt(tref l, tref r);
-	static tref build_bf_ngt(tref l, tref r);
-	static tref build_bf_gteq(tref l, tref r);
-	static tref build_bf_ngteq(tref l, tref r);
-	static tref build_bf_interval(tref l, tref r, tref s);
-	static tref build_wff_and(tref l, tref r);
-	static tref build_wff_or(tref l, tref r);
-	static tref build_wff_neg(tref l);
-	static tref build_wff_xor(tref l, tref r);
-	static tref build_wff_eq(tref l);
-	static tref build_wff_neq(tref l);
-	static tref build_wff_imply(tref l, tref r);
-	static tref build_wff_equiv(tref l, tref r);
-	static tref build_wff_ctn_gteq(tref ctnvar, tref num);
-	static tref build_wff_ctn_gt(tref ctnvar, tref num);
-	static tref build_wff_ctn_lteq(tref ctnvar, tref num);
-	static tref build_wff_ctn_lt(tref ctnvar, tref num);
-	static tref build_wff_ctn_eq(tref ctnvar, tref num);
-	static tref build_wff_ctn_neq(tref ctnvar, tref num);
 	static tref ctn_neg(tref n);
 
 	// hooks
