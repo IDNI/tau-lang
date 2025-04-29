@@ -239,12 +239,14 @@ tref tree<node>::get_ba_constant(size_t c) {
 
 template <NodeType node>
 tref tree<node>::get_ba_constant(size_t c, size_t tid) {
-	return get(node::ba_constant(c, tid));
+	auto x = node::ba_constant(c, tid);
+	// BOOST_LOG_TRIVIAL(trace) << "(TREE) -- get_ba_constant: `" << x << "`";
+	return get(x);
 }
 
 template <NodeType node>
 tref tree<node>::get_ba_constant(const std::pair<size_t, size_t>& typed_const) {
-	return get(node::ba_constant(typed_const.first, typed_const.second));
+	return get_ba_constant(typed_const.first, typed_const.second);
 }
 
 // -----------------------------------------------------------------------------

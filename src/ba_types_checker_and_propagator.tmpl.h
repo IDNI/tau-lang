@@ -109,10 +109,10 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 			ch.push_back(tau::get_num(tau::scope_id, scope_id));
 		}
 		auto r = tau::get(nt, ch);
-		std::string t = tau::get_type_name(el);
+		const auto& t = string_from_id(get_type_sid<node>(el));
 		if (t.size()) {
 			bool found = false;
-			for (auto st : nso_factory<BAs...>::instance().types())
+			for (const auto& st : nso_factory<BAs...>::instance().types())
 				if (t == st) { found = true; break; }
 			if (!found) {
 				BOOST_LOG_TRIVIAL(error)

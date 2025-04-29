@@ -46,7 +46,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 	auto transformer = [&m, &m_ex, &m_ref, &m_get, &bind, &src,&error](
 		tref t, tref parent)
 	{
-		// parse_tree::get(t).dump(std::cout << "transforming: ") << "\n";
+		// BOOST_LOG_TRIVIAL(trace) << "(FROM PARSER) -- transforming: " << parse_tree::get(t);
 
 		if (m_ex(t)) return true; // already transformed
 		const auto& ptr = parse_tree::get(t); // get parse tree node
@@ -159,6 +159,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 			// preprocess source node
 			case source:
 				src = ptr.get_terminals();
+				// BOOST_LOG_TRIVIAL(debug) << "source: " << src;
 				x = nullptr;
 				break;
 
@@ -179,12 +180,14 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 				// call binder on a transformed bf_constant node
 				if (nt == bf_constant) {
-					if (!get(x)[0][0].is(source)) break; // capture?
 					BOOST_LOG_TRIVIAL(debug) << "tau tree transform calling binder: " << src << " " << get_type(x);
+					if (src.empty()) break; // capture?
 					auto nn = bind(src, string_from_id(get_type_sid<node>(x)));
-					if (nn == nullptr || bind.error
-						|| nn == x) return error = true,
-									false;
+					src = "";
+					if (nn == nullptr || bind.error || nn == x) {
+						// std::cout << "error: " << bind.error << "\n";
+						return error = true, false;
+					}
 					x = nn;
 				}
 				break;
@@ -192,16 +195,20 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 		m.emplace(t, x); // store new node into map
 
-		// std::cout << "emplaced:" << parse_tree::get(t).value
-		// 	<< " as " << tree::get(x).get_type_name() << "\n"";
+		// if (!x) BOOST_LOG_TRIVIAL(trace) << "(FROM PARSER) -- not emplaced: `"
+		// 			<< parse_tree::get(t).value << "`\n";
+		// else BOOST_LOG_TRIVIAL(trace) << "(FROM PARSER) -- emplaced: `"
+		// 	<< parse_tree::get(t).value << "` as "
+		// 	<< tree::get(x).get_type_name()
+		// 	<< " `" << tree::get(x) << "`\n";
 		return true;
 	};
-	parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
+	// parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
 	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
 	if (error) return nullptr;
 	if (m.find(ptr.get()) == m.end()) return nullptr;
-	std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n";
-	m_get(ptr.get()).print_tree(std::cout << "tau tree: ") << "\n";
+	// std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n";
+	// m_get(ptr.get()).print_tree(std::cout << "tau tree: ") << "\n";
 	return m_ref(ptr.get());
 }
 
