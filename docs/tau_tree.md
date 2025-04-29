@@ -8,7 +8,6 @@ It provides `node<BAs...>` and `tree<node>` types.
 It also contains `ba_constants<BAs...>` pool and `ba_constants_binder<BAs...>` named and factory binder
 
 
-
 ## struct `node<BAs...>`
 
 `node` is templated by a pack of Boolean algebras.
@@ -113,21 +112,21 @@ Tau tree inherits the nonterminals enum from a generated tau_parser, so the type
 
 ### Typical conversions:
 
-1. I want to acces the node value, children or basically the whole tree API: `const tau&`
+1. I want to acces a node value, children or basically the whole tree API: `const tau&`
 ```
 	- from tref:       tau::get(node_ref);
 	- from htree::sp:  tau::get(sp_node_handle);
 	- from tt:         traverser_wrapper | tt::Tree;   // using extractor
 	                or traverser_wrapper.value_tree();
 ```
-2. I want to prevent the node from being GC-ed: `htree::sp`
+2. I want to prevent a node from being GC-ed: `htree::sp`
 ```
 	- from tref:       tau::geth(node_ref);
 	- from const tau&: tau::geth(node_value_and_api.get());
 	- from:            traverser_wrapper | tt::handle; // using extractor
 ```
 
-3. I want to pass node reference around (for API calls and caching): `tref`
+3. I want to pass a node reference around (for API calls and caching): `tref`
 ```
 	- from htree::sp:  sp_node_handle->get();
 	- from const tau&: node_value_and_api.get();
@@ -135,7 +134,7 @@ Tau tree inherits the nonterminals enum from a generated tau_parser, so the type
 	                or traverser_wrapper.value();
 ```
 
-4. I want to use traverser API: `tt`
+4. I want to use the traverser API: `tt`
 ```
 	- from tref:       tt(node_ref);
 	- from htree::sp:  tt(sp_node_handle);
@@ -146,35 +145,45 @@ Tau tree inherits the nonterminals enum from a generated tau_parser, so the type
 
 ### Tree equality (with regards to LCRS tree)
 
-When comparing `tref == tref` you get structural equality with regards to right siblings because tree is a lcrs tree and comparing `tref` means the right siblings are also compared.
+When comparing `tref == tref`, ie. comparing two trefs directly, it compares node values, node children and additionally also their right siblings. This is because Tau tree is based on a binary tree using LCRS tree representation.
 
-We usually need subtree equality, ie. to ignore right siblings.
+For most cases we need subtree equality, which ignores right siblings.
 
-For that you can use `bool tau::subtree_equals(tref, tref)`
-Or subtree equality is also used when comparing tree nodes (`const tree<node<BAs...>>&`) directly.
+Subtree equality is used when comparing `const tree<node<BAs...>>&` nodes directly.
+
+Alternative to `operator==(const tree<node>&, const tree<node>&)` is `tau::subtree_equality(tref, tref)`. which does the conversion to `const tree<node>&` and then compares the trees.
 
 ```
-	tref ref1, ref2;
-	if (tau::subtree_equals(ref1, ref2)) ...
+        // for simplicity let's have a tree with char as a node
+	using chtree = idni::lcrs_tree<char>;
+	// create a tree with "R" as a root and two children "a" and "a", each with "b" child.
+	tref R = chtree::get('R', {
+		chtree::get('A', {
+			chtree::get('B') }),
+		chtree::get('A', {
+			chtree::get('B') }) });
 
-	// or
-	const auto& t1 = tau::get(ref1), t2 = tau::get(ref2);
-	if (t1 == t2) ...
+	const chtree& r = chtree::get(R);  // get the root tree node API
+	tref A1 = r.first();               // get ref of the first 'a'
+	tref A2 = r.second();              // get ref of the second 'a'
+	if (A1 == A2) ...; // this results into false
+	                   // because A1's right sibling is A2_ref and
+			   // A2's right sibling is nullptr
+
+	const chtree& a1 = chtree::get(A1); // or r[0];
+	const chtree& a2 = chtree::get(A2); // or r[1];
+	if (a1 == a2) ...; // results into true
+	                   // because right siblings are not considered
 ```
 
-Tree also provides `tau::subtree_less(tref, tref)` as subtree equality alternative to `operator<(tref, tref)`
+In a same way there is `operator<(const tree<node>&, const tree<node>&)` which is used for ordering. Alternatively `tau::subtree_less(tref, tref)` can be used.
 
-When storing tref in containers (ie. for caching) we can use `tau::subtree_equality`.
-Tree API provides set and map with subtree equality:
-```
-	using subtree_set = std::set<tref, subtree_equality>;
-	using subtree_map = std::map<tref, tref, subtree_equality>;
-```
+When storing tref in sets, as keys in maps or in other containers which accepts comparator, Tau provides `tree<node>::subtree_equality`.
 
-Declaring:
+Tree API already provides aliases for set and tref map using subtree equality:
 ```
-	typename tau::subtree_map cache;
-	typename tau::subtree_set visited;
+	using subtree_set = std::set<tref, tree<node>::subtree_equality>;
+	using subtree_map = std::map<tref, tref, tree<node>::subtree_equality>;
 ```
 
 
@@ -186,14 +195,21 @@ post_order and pre_order non-const traversers keep the right sibling values, so 
 
 Example replacing just children of a node:
 ```
-	tref n;                      // imagine we have a node with a right sibling
-	tref child1, child2;         // two new children we want instead of the original children
-	const auto& t = tau::get(n); // get access to the api
+	// have a node with a right sibling and some children
+	tref n;
+	// have two children to be placed instead of the original children
+	tref child1, child2;
 
+	// get access to the api
+	const auto& t = tau::get(n);
 	// create a new node with children while passing the right sibling
 	tau::get(t.value, { child1, child2 }, t.right_sibling());
-	// or just use the base data member r
+
+	// or use the base data member r
 	tau::get(t.value, { child1, child2 }, t.r);
+
+	// calling the same method without the right sibling trims the branch of the right siblings and their children away
+	tau::get(t.value, { child1, child2 });
 ```
 
 
@@ -340,9 +356,22 @@ TODO
 
    TODO
 
- - constants
+#### constants
 
-   TODO
+Tree provides several methods for creating BA constant nodes:
+```
+	// creates a ba_constant node from it's value and ba type id
+	static tref get(const node::bas_variant& c, size_t ba_type_id);
+
+	// creates a ba_constant node from constant_id untyped
+	static tref get_ba_constant(size_t constant_id);
+
+	// creates a ba_constant node from constant_id and ba type id
+	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
+
+	// creates a ba_constant node from a pair of constant_id and ba_type_id
+	static tref get_ba_constant(const std::pair<size_t, size_t>& typed_const);
+```
 
 ## `ba_constants<BAs...>` pool and binding
 
@@ -350,8 +379,77 @@ TODO
 
 ### `ba_constants<BAs...>`
 
+Following static methods stores a new constant into a pool and it returns a pair of constant id and ba type id.
+
+```
+	// constant id and type id
+	using typed_constant = std::pair<size_t, size_t>;
+
+	// insert the constant value of a type name to the pool
+	static typed_constant get(const std::variant<BAs...>& b,
+				const std::string& type_name);
+
+	// insert the constant value of a type id to the pool
+	static typed_constant get(const std::variant<BAs...>& b,size_t type_id);
+```
+
 TODO
 
 ### `ba_constants_binder<BAs...>`
+
+Stores constant in a pool and returns a tree node reference.
+Also can have a map of named constants. if provided source contains a name of a named constant, it returns the reference of the named constant.
+
+```
+	// binds the constant of a type into a tree, usually called from nso_factory
+	tref bind(const std::variant<BAs...>& constant, const std::string& type_name);
+
+	// binds the constant of a type into a tree, usually called internally
+	tref bind(const std::variant<BAs...>& constant, size_t type_id);
+```
+
+When parser encounters a constant it calls provided or default `binder(src, type_name)`. It checks if the source string is a named constant, then returns the reference of the named constant value. If no named constant is matched, then it calls `nso_factory<BAs...>::instance().binding(src, type_name)`.
+
+```
+	// binder interface operator
+	tref operator()(const std::string& src, const std::string& type_name);
+```
+
+
+TODO
+
+## struct `nso_factory<BAs...>`
+
+`nso_factory` is an "abstract" template which can be used by Tau API users to provide custom Boolean algebra (BA) types by creating a template specialization of `nso_factory<YourBA>`.
+
+Look into the `nso_factory` API documentation for more details.
+
+Most important method in nso_factory is `binding()` which binds the tau object and its type into a tree node, when factory binding is used and constant of your type is encountered.
+```
+	/**
+	 * Binds the given tau object with the specified type.
+	 * @param n The tau object source to bind.
+	 * @param type_name The type to bind with (string_id(type_name)).
+	 * @return The bound tau object.
+	 */
+	tref binding(const std::string& n, const std::string& type_name) const;
+```
+
+Another important method is `parse()` which parses the given string into a BAs pack variant.
+```
+	/**
+	 * Parses the given string into a tau object.
+	 * @param input The string to parse.
+	 * @param options Optional parse options.
+	 * @return The parsed tau object, or std::nullopt if parsing fails.
+	 */
+	std::optional<std::variant<BAs...>> parse(const std::string& input,
+					const std::string options = "") const;
+```
+
+
+
+
+
 
 TODO
