@@ -34,7 +34,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 		os << " { " << ba_constants<BAs...>::get(n.data) << " } : "
 		<< ba_constants<BAs...>::type_name(n.ba);
 	else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
-	else if (n.nt == tau::uconst) os << "<" << string_from_id(n.data) << ">";
+	else if (n.nt == tau::uconst_name) os << "<" << string_from_id(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
 		os << " { \"" << string_from_id(n.data) << "\" }";
 	// else if (n.ext) os << "{EXT}";
@@ -150,7 +150,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		static const std::set<size_t> no_wrap_for = {
 			bf_splitter, bf_ref, bf_neg, bf_constant, bf_t, bf_f,
 			wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
-			variable, uconst, ref_args, start
+			variable, ref_args, start
 		};
 		// priority map (lower number = higher priority)
 		static const std::map<size_t, size_t> prio = {
@@ -381,15 +381,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 						os << "substitute "; break;
 			case wff_conditional:   track_chpos(); break;
 			default:
-				os << "<DEFAULT:";
 				if (is_string_nt(nt)) {
-					if (nt == uconst) os << "<";
+					if (nt == uconst_name) os << "<";
 					os << string_from_id(t.data());
-					if (nt == uconst) os << ">";
+					if (nt == uconst_name) os << ">";
 				}
 				else if (is_digital_nt(nt)) os << t.data();
 				else if (t.is_integer()) os << t.get_integer();
-				os << "> ";
 		}
 		return true;
 	};

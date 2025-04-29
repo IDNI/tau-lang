@@ -536,6 +536,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref build_bf_f_type(size_t ba_tid);
 	static tref build_bf_f_type(const std::string& type);
 	static tref build_ba_constant(node::bas_variant v, size_t ba_tid);
+	static tref build_bf_ba_constant(node::bas_variant v, size_t ba_tid);
 	static tref build_variable(const std::string& name);
 	static tref build_bf_uconst(const std::string& name1,
 						const std::string& name2);

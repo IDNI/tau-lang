@@ -69,11 +69,12 @@ bool has_temp_var(tref n);
 #include "dict.h"  // string_id and string_from_id
 #include "rr.h"    // recurrence relations structure
 
+#include "tau_tree_builders.h"
+
 #include "tau_tree_node.tmpl.h"
 #include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
 #include "tau_tree_queries.tmpl.h"
-#include "tau_tree_builders.tmpl.h"
 #include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name
 #include "tau_tree_types.tmpl.h"
 #include "tau_tree_from_parser.tmpl.h"
@@ -349,7 +350,7 @@ const tree<node>& tree<node>::only_child_tree() const {
 template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
-		sym, type, source, capture, var_name, uconst, file_name,
+		sym, type, source, capture, var_name, uconst_name, file_name,
 		ctnvar, option_name, option_value
 	};
 	return string_nts.contains(nt);
