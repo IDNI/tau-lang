@@ -15,6 +15,8 @@ project("${PROJECT_NAME}"
 	DESCRIPTION "IDNI's tau language"
 )
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Export compile commands (clangd)
+
 include(FetchContent)
 
 option(TAU_MEASURE                 "Measure tau performance"               OFF)

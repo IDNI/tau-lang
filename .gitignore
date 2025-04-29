@@ -76,3 +76,4 @@ logs/*
 .gdbinit
 external/boost
 libboost-mingw-w64
+.clangd
