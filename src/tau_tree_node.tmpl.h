@@ -16,6 +16,7 @@ node<BAs...> node<BAs...>::retype(size_t new_nt) const {
 template <typename... BAs>
 requires BAsPack<BAs...>
 constexpr node<BAs...> node<BAs...>::ba_constant(size_t v, size_t ba_tid) {
+	// BOOST_LOG_TRIVIAL(trace) << "(NODE) -- node::ba_constant: " << v << " " << ba_tid;
 	return node(type::bf_constant, v, true /* is_term */, ba_tid);
 }
 

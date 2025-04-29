@@ -31,8 +31,10 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 #endif
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::bf_constant)
-		os << " { " << ba_constants<BAs...>::get(n.data) << " }";
+		os << " { " << ba_constants<BAs...>::get(n.data) << " } : "
+		<< ba_constants<BAs...>::type_name(n.ba);
 	else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
+	else if (n.nt == tau::uconst) os << "<" << string_from_id(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
 		os << " { \"" << string_from_id(n.data) << "\" }";
 	// else if (n.ext) os << "{EXT}";
@@ -379,6 +381,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 						os << "substitute "; break;
 			case wff_conditional:   track_chpos(); break;
 			default:
+				os << "<DEFAULT:";
 				if (is_string_nt(nt)) {
 					if (nt == uconst) os << "<";
 					os << string_from_id(t.data());
@@ -386,8 +389,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				}
 				else if (is_digital_nt(nt)) os << t.data();
 				else if (t.is_integer()) os << t.get_integer();
-				else if (t.is_ba_constant()) os << "{C"
-					<< t.get_ba_constant_id() << "}";
+				os << "> ";
 		}
 		return true;
 	};

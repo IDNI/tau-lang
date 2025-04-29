@@ -804,7 +804,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		const char* sample = " X < Y .";
 		auto fm = bmake_tt(sample);
 		auto less_formula = fm | tau::spec | tau::main | tau::wff
-								| tau::bf_less;
+								| tau::bf_lt;
 		CHECK( less_formula.has_value() );
 	}
 
@@ -812,7 +812,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		const char* sample = " X <= Y .";
 		auto fm = bmake_tt(sample);
 		auto less_equal_formula = fm | tau::spec | tau::main | tau::wff
-							| tau::bf_less_equal;
+							| tau::bf_lteq;
 		CHECK( less_equal_formula.has_value() );
 	}
 
@@ -820,7 +820,7 @@ TEST_SUITE("parsing wwf formulas ") {
 		const char* sample = "X > Y.";
 		auto fm = bmake_tt(sample);
 		auto greater_formula = fm | tau::spec | tau::main | tau::wff
-							| tau::bf_greater;
+							| tau::bf_gt;
 		CHECK( greater_formula.has_value() );
 	}
 

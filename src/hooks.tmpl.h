@@ -331,11 +331,11 @@ tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
 		const auto& l = tau::get(ch[0]);
 		size_t typed = l.get_ba_type();
 		if (is_syntactic_zero(l.get_ba_constant()))
-			return typed ? tau::get_raw(
-				node::ba_typed(tau::bf_f, typed)) : tau::_0();
+			return typed ? tau::get(tau::bf, tau::get_raw(
+				node::ba_typed(tau::bf_f, typed))) : tau::_0();
 		else if (is_syntactic_one(l.get_ba_constant()))
-			return typed ? tau::get_raw(
-				node::ba_typed(tau::bf_t, typed)) : tau::_1();
+			return typed ? tau::get(tau::bf, tau::get_raw(
+				node::ba_typed(tau::bf_t, typed))) : tau::_1();
 	}
 	return tau::get_raw(v, ch, len, right);
 }

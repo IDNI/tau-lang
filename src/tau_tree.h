@@ -244,13 +244,18 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get(const node::type& nt, const std::string& str); // with string
 
 	// terminals
-	static tref get(const node::bas_variant& c, size_t type);
-	static tref get_ba_constant(size_t v);
-	static tref get_ba_constant(size_t v, size_t type);
-	static tref get_ba_constant(
-				const std::pair<size_t, size_t>& typed_const);
-	static tref get_num(size_t v);
-	static tref get_integer(int_t v);
+	// creates a ba_constant node from it's value and ba type id
+	static tref get(const node::bas_variant& c, size_t ba_type_id);
+	// creates a ba_constant node from constant_id untyped
+	static tref get_ba_constant(size_t constant_id);
+	// creates a ba_constant node from constant_id and ba type id
+	static tref get_ba_constant(size_t constant_id, size_t ba_type_id);
+	// creates a ba_constant node from a pair of constant_id and ba_type_id
+	static tref get_ba_constant(const std::pair<size_t, size_t>& typed_const);
+	// creates a num node from a number n
+	static tref get_num(size_t n);
+	// creates an integer node from an integer i
+	static tref get_integer(int_t i);
 
 	size_t children_size() const;
 
@@ -265,8 +270,10 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	tref third()  const;
 	tref only_child() const;
 
+	// fast traverse to a first child
 	tref trim() const;
 	static tref trim(tref t);
+	// fast traverse to a first child of a first child
 	tref trim2() const;
 	static tref trim2(tref t);
 
