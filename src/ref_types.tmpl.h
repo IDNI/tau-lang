@@ -100,11 +100,11 @@ void ref_types<node>::add_fpcall(const rr_sig& sig) {
 
 // add sig with type t, and if it's already typed, check it equals to t
 template <NodeType node>
-bool ref_types<node>::add(tref n, const node::type& t) {
+bool ref_types<node>::add(tref n, node::type t) {
 	auto r = n;
 	if (auto r_as_child = tt(n) | tau::ref; r_as_child)
 		r = r_as_child.value();
-	auto sig = tau::get_rr_sig(r);
+	auto sig = get_rr_sig<node>(r);
 	if (auto fp_sig = fpcall(sig); fp_sig) { // if fp_call
 		BOOST_LOG_TRIVIAL(trace) << "(I) -- FP call "
 			<< fp_sig.value() << " for "
@@ -137,7 +137,7 @@ bool ref_types<node>::get_types(tref n, bool def) {
 	const auto& t = tau::get(n);
 	// collect all refs to do
 	for (tref r : t.select_all(is<node, tau::ref>)){
-		auto sig = tau::get_rr_sig(r);
+		auto sig = get_rr_sig<node>(r);
 		todo(sig);
 		if (def	&& sig.offset_arity > 0) add_fpcall(sig);
 	}

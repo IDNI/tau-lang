@@ -177,7 +177,7 @@ bool is_closed(const tau_ba<BAs...>& fm) {
 	if (!simp_fm) return false;
 	if (tau::get(simp_fm).find_top(is<tau::node, tau::ref>))
 		return false;
-	auto vars = tau::get_free_vars_from_nso(simp_fm);
+	auto vars = get_free_vars_from_nso<node>(simp_fm);
 	for (const auto& v : vars) {
 		const auto& t = tau::get(v);
 		if (!(t.only_child_tree().is(tau::io_var)
@@ -198,7 +198,7 @@ std::optional<std::variant<tau_ba<BAs...>, BAs...>>
 	parse_options opts; opts.start = tau::tau_constant_source;
 	auto source = tau::get(src, opts);
 	if (!source) return {};
-	auto nso_rr = tau::get_nso_rr(source);
+	auto nso_rr = get_nso_rr<node<BAs...>>(source);
 	if (!nso_rr) return {};
 	// compute final result
 	return { std::variant<tau_ba_t, BAs...>(

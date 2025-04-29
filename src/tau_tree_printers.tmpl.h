@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
+#include "utils.h"
 
 namespace idni::tau_lang {
 
@@ -125,6 +126,11 @@ std::string tree<node>::dump_to_str(bool subtree) const {
 
 //------------------------------------------------------------------------------
 // print
+
+// pretty printer settings
+inline bool pretty_printer_highlighting = false;
+inline bool pretty_printer_indenting    = false;
+
 template <NodeType node>
 std::ostream& tree<node>::print(std::ostream& os) const {
 
@@ -142,7 +148,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		static const std::set<size_t> no_wrap_for = {
 			bf_splitter, bf_ref, bf_neg, bf_constant, bf_t, bf_f,
 			wff_ref, wff_neg, wff_t, wff_f, constraint, capture,
-			variable, uninterpreted_constant, ref_args, start
+			variable, uconst, ref_args, start
 		};
 		// priority map (lower number = higher priority)
 		static const std::map<size_t, size_t> prio = {
@@ -185,14 +191,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_interval,        501 },
 			{ bf_eq,              502 },
 			{ bf_neq,             503 },
-			{ bf_less_equal,      504 },
-			{ bf_nleq,            505 },
-			{ bf_greater,         506 },
-			{ bf_ngreater,        507 },
-			{ bf_greater_equal,   508 },
-			{ bf_ngeq,            509 },
-			{ bf_less,            510 },
-			{ bf_nless,           511 },
+			{ bf_lteq,            504 },
+			{ bf_nlteq,           505 },
+			{ bf_gt,              506 },
+			{ bf_ngt,             507 },
+			{ bf_gteq,            508 },
+			{ bf_ngteq,           509 },
+			{ bf_lt,              510 },
+			{ bf_nlt,             511 },
 			{ wff,                580 },
 			{ bf_or,              720 },
 			{ bf_and,             730 },
@@ -206,7 +212,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_rule,            800 },
 			{ wff_rule,           800 },
 			{ wff_builder_body,   800 },
-			{ binding,            800 },
 		};
 		
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
@@ -274,7 +279,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		{ rec_relation,  idni::TC.YELLOW() },
 		{ constraint,    idni::TC.LIGHT_MAGENTA() },
 		{ io_var,        idni::TC.WHITE() },
-		{ constant,      idni::TC.LIGHT_CYAN() }
+		{ bf_constant,   idni::TC.LIGHT_CYAN() }
 
 		// { rule,          idni::TC.BG_YELLOW() },
 		// { builder,       idni::TC.BG_LIGHT_YELLOW() }
@@ -374,8 +379,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 						os << "substitute "; break;
 			case wff_conditional:   track_chpos(); break;
 			default:
-				if (is_string_nt(nt))
-						os << string_from_id(t.data());
+				if (is_string_nt(nt)) {
+					if (nt == uconst) os << "<";
+					os << string_from_id(t.data());
+					if (nt == uconst) os << ">";
+				}
 				else if (is_digital_nt(nt)) os << t.data();
 				else if (t.is_integer()) os << t.get_integer();
 				else if (t.is_ba_constant()) os << "{C"
@@ -399,21 +407,21 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_xor:            os << "+"; break;
 			case bf_eq:             os << " = "; break;
 			case bf_neq:            os << " != "; break;
-			case bf_less_equal:     os << " <= "; break;
-			case bf_nleq:           os << " !<= "; break;
-			case bf_greater:        os << " > "; break;
-			case bf_ngreater:       os << " !> "; break;
-			case bf_greater_equal:  os << " >= "; break;
-			case bf_ngeq:           os << " !>= "; break;
-			case bf_less:           os << " < "; break;
-			case bf_nless:          os << " !< "; break;
+			case bf_lteq:           os << " <= "; break;
+			case bf_nlteq:          os << " !<= "; break;
+			case bf_gt:             os << " > "; break;
+			case bf_ngt:            os << " !> "; break;
+			case bf_gteq:           os << " >= "; break;
+			case bf_ngteq:          os << " !>= "; break;
+			case bf_lt:             os << " < "; break;
+			case bf_nlt:            os << " !< "; break;
 
 			case ctn_neq:           os << " != "; break;
 			case ctn_eq:            os << " = "; break;
-			case ctn_greater_equal: os << " >= "; break;
-			case ctn_greater:       os << " > "; break;
-			case ctn_less_equal:    os << " <= "; break;
-			case ctn_less:          os << " < "; break;
+			case ctn_gteq:          os << " >= "; break;
+			case ctn_gt:            os << " > "; break;
+			case ctn_lteq:          os << " <= "; break;
+			case ctn_lt:            os << " < "; break;
 
 			case wff_and:           os << " && "; break;
 			case wff_or:            os << " || "; break;
@@ -426,8 +434,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case rec_relation:      os << " := "; break;
 			case wff_rule:          os << " ::= "; break;
 			case bf_rule:           os << " := "; break;
-			case in:
-			case out:               os << "["; break;
+			case io_var:            os << "["; break;
 			case shift:             os << "-"; break;
 			case bf_constant:       os << " : "; break;
 
@@ -460,8 +467,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case rec_relation:
 			case wff_rule:
 			case bf_rule:      os << "."; break;
-			case in:
-			case out:
+			case io_var:
 			case constraint:
 			case offsets:
 			case inst_cmd:

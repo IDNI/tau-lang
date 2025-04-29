@@ -10,7 +10,6 @@ set(TESTS
 	# new tree
 	ba_constants
 	bindings
-	builders
 	# normal_forms
 	nso_rr
 	rules-bf_parsing
@@ -23,6 +22,9 @@ set(TESTS
 	# interpreter
 	# normalizer
 	# tau
+
+	# obsoleted
+	# builders       # covered code is not used anymore
 )
 
 foreach(X IN LISTS TESTS)

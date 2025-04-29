@@ -57,14 +57,14 @@ wff                    => ('(' _ wff _ ')')                  :wff_parenthesis
                         | (bf    _ "<="  _ bf _ "<=" _ bf)   :bf_interval
                         | (bf    _ '='   _ bf)               :bf_eq
                         | (bf    _ "!="  _ bf)               :bf_neq
-                        | (bf    _ "<="  _ bf)               :bf_less_equal
-                        | (bf    _ "!<=" _ bf)               :bf_nleq
-                        | (bf    _ ">"   _ bf)               :bf_greater
-                        | (bf    _ "!>"  _ bf)               :bf_ngreater
-                        | (bf    _ ">="  _ bf)               :bf_greater_equal
-                        | (bf    _ "!>=" _ bf)               :bf_ngeq
-                        | (bf    _ "<"   _ bf)               :bf_less
-                        | (bf    _ "!<"  _ bf)               :bf_nless
+                        | (bf    _ "<="  _ bf)               :bf_lteq
+                        | (bf    _ "!<=" _ bf)               :bf_nlteq
+                        | (bf    _ ">"   _ bf)               :bf_gt
+                        | (bf    _ "!>"  _ bf)               :bf_ngt
+                        | (bf    _ ">="  _ bf)               :bf_gteq
+                        | (bf    _ "!>=" _ bf)               :bf_ngteq
+                        | (bf    _ "<"   _ bf)               :bf_lt
+                        | (bf    _ "!<"  _ bf)               :bf_nlt
                         |                                     capture.
 bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     bf_constant
@@ -73,8 +73,8 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         | ref                                :bf_ref
                         | (bf  _ '|' _       bf)             :bf_or
                         | (bf  _ '+' _       bf)             :bf_xor
-                        | ('1' [ _ ':' _ type ])             :bf_t
-                        | ('0' [ _ ':' _ type ])             :bf_f
+                        | ('1' [ typed ])                    :bf_t
+                        | ('0' [ typed ])                    :bf_f
                         | (bf (_ '&' _ | __) bf)             :bf_and
                           # bf_neg_oprnd can contain only unary operations
                         | ((bf_parenthesis | bf_constant
@@ -93,43 +93,45 @@ bf                     => ('(' _ bf _ ')')                   :bf_parenthesis
                         |                                     capture.
 # constant time constraints
 constraint =>
-   ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]"):ctn_neq
- | ("[" ctnvar _ '='  _ num "]" | "[" num _ '='  _ ctnvar "]"):ctn_eq
- | ("[" ctnvar _ ">=" _ num "]" | "[" num _ ">=" _ ctnvar "]"):ctn_greater_equal
- | ("[" ctnvar _ ">"  _ num "]" | "[" num _ ">"  _ ctnvar "]"):ctn_greater
- | ("[" ctnvar _ "<=" _ num "]" | "[" num _ "<=" _ ctnvar "]"):ctn_less_equal
- | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_less.
+          ("[" ctnvar _ "!=" _ num "]" | "[" num _ "!=" _ ctnvar "]"):ctn_neq
+        | ("[" ctnvar _ '='  _ num "]" | "[" num _ '='  _ ctnvar "]"):ctn_eq
+        | ("[" ctnvar _ ">=" _ num "]" | "[" num _ ">=" _ ctnvar "]"):ctn_gteq
+        | ("[" ctnvar _ ">"  _ num "]" | "[" num _ ">"  _ ctnvar "]"):ctn_gt
+        | ("[" ctnvar _ "<=" _ num "]" | "[" num _ "<=" _ ctnvar "]"):ctn_lteq
+        | ("[" ctnvar _ "<"  _ num "]" | "[" num _ "<"  _ ctnvar "]"):ctn_lt.
 
-# variables
-variable[charvar]      => (alpha & ~'T' & ~'F') digit*.
-variable[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
-variable               => (in | out):io_var.
-variable               => uninterpreted_constant.
-in                     => ("i" digit+):in_var_name  '[' offset ']'.
-out                    => (("o" digit+) | "u"):out_var_name '[' offset ']'.
-ctnvar                 => chars.
-capture                => '$' chars.
+# constants
+bf_constant            => '{' _ (capture | source) _ '}' [ typed ].
+source                 => src_c [ (src_c | space)* src_c ].
+src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
+
+# variables, io variables and and uninterpreted constants
+variable               => (uconst | io_var | var_name) [ typed ].
+var_name[charvar]      => (alpha & ~'T' & ~'F') digit*.
+var_name[var]          => (alpha & ~'T' & ~'F') (alnum | '_')*.
+io_var                 => var_name '[' offset ']'.
+uconst                 => '<' _ ([ chars _ ] ':' _ chars):uconst_name _ '>'.
+
+# quantifier variables
 q_vars                 => q_var (_ ',' _ q_var)*.
-q_var                  => capture | variable & ~uninterpreted_constant.
+q_var                  => capture | variable & ~uconst.
+
+# constraint variables
+ctnvar                 => chars.
 
 # offsets
 offsets                => '[' _ offset (_ ',' _ offset)* _ ']'.
 offset                 => integer | capture | shift | (variable & ~io_var).
 shift                  => (capture | (variable & ~io_var)) _ '-' _ num.
-num                    => digits.
-integer                => ['-'] _ digits.
-
-# constants
-uninterpreted_constant => '<' ((chars | _ ) ':' chars):uninter_const_name _ '>'.
-bf_constant            => '{' _ (capture | binding):constant _ '}'
-                                                         [ _ ':' _ chars:type ].
-binding                => (src_c [ (src_c | space)* src_c ]):source.
-src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
 # common elements
 chars                  => alpha (alnum | '_')*.
 digits                 => digit+.
+num                    => digits.
+integer                => [ '-' ] _ digits.
 sym                    => chars.
+capture                => '$' chars.
+typed                  => _ ':' _ chars:type.
 
 # whitespace and comments
 comment                => '#' (printable | '\t')* ('\n' | '\r' | eof).
@@ -203,11 +205,10 @@ cli_command            =>
         .
 
 # options
-solve_options => (__ solve_option)*.
-solve_option  => ("--" solver_mode) | ("--" type).
-solver_mode   =>
-        ("minimum" | "min"):solver_mode_minimum
-        | ("maximum" | "max"):solver_mode_maximum.
+solve_options          => (__ solve_option)*.
+solve_option           => ("--" solver_mode) | ("--" type).
+solver_mode            => ("minimum" | "min"):solver_mode_minimum
+                        | ("maximum" | "max"):solver_mode_maximum.
 
 # input/output streams
 input_stream           =>
@@ -263,17 +264,18 @@ memory                 => ( "%"
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, type, source, named_binding, capture,
-        variable, in_var_name, out_var_name, uninter_const_name,
-        file_name, ctnvar, option_name, option_value, integer.
+        sym, digits, integer, source, capture, var_name, uconst_name, type,
+        file_name, ctnvar, option_name, option_value.
 
 # inline intermediate nodes and eliminate parenthesis
-@inline char classes, chars, q_var, src_c,
+@inline char classes, chars, typed, q_var, src_c, uconst,
         inst_args, bf_cmd_arg, wff_cmd_arg, nf_cmd_arg, onf_cmd_arg,
         normalize_cmd_arg,
-        bf  > bf_parenthesis  > bf,
-	bf_neg_oprnd > bf_parenthesis > bf,
-	bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
-	bf_and_nosep_2nd_oprnd > bf_parenthesis > bf,
-	bf_and_nosep > bf_parenthesis > bf_and,
-        wff > wff_parenthesis > wff.
+        uconst > uconst_name,
+        wff > wff_parenthesis > wff,
+        bf > bf_parenthesis > bf,
+        bf_neg_oprnd > bf_parenthesis > bf,
+        bf_and_nosep_1st_oprnd > bf_parenthesis > bf,
+        bf_and_nosep_2nd_oprnd > bf_parenthesis > bf,
+        bf_and_nosep > bf_parenthesis > bf_and.
+

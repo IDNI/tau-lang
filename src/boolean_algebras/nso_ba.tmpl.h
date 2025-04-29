@@ -28,9 +28,9 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_and(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
-		return tau::get(tau::build_wff_eq((lt & rt[0][0]).get()));
+		return tau::get(tau::build_bf_eq((lt & rt[0][0]).get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
-		return tau::get(tau::build_wff_neq((lt & rt[0][0]).get()));
+		return tau::get(tau::build_bf_neq((lt & rt[0][0]).get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_and(lt.get(), rt.get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
@@ -58,9 +58,9 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_or(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
-		return tau::get(tau::build_wff_eq((lt | rt[0][0]).get()));
+		return tau::get(tau::build_bf_eq((lt | rt[0][0]).get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
-		return tau::get(tau::build_wff_neq((lt | rt[0][0]).get()));
+		return tau::get(tau::build_bf_neq((lt | rt[0][0]).get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_or(lt.get(), rt.get()));
 	DBG(throw std::logic_error("nso_ba or: wrong types");)
@@ -85,9 +85,9 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 	if (lt[0].is_ba_constant())
 		return bf_constant_neg(lt);
 	if (lt[0].is(tau::bf_eq))
-		return tau::get(tau::build_wff_eq((~lt[0][0]).get()));
+		return tau::get(tau::build_bf_eq((~lt[0][0]).get()));
 	if (lt[0].is(tau::bf_neq))
-		return tau::get(tau::build_wff_neq((~lt[0][0]).get()));
+		return tau::get(tau::build_bf_neq((~lt[0][0]).get()));
 	if (lt[0].is(tau::wff))
 		return tau::get(tau::build_wff_neg(lt.get()));
 	DBG(throw std::logic_error("nso_ba neg: wrong types");)
@@ -118,9 +118,9 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_xor(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
-		return tau::get(tau::build_wff_eq((lt ^ rt[0][0]).get()));
+		return tau::get(tau::build_bf_eq((lt ^ rt[0][0]).get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_neq))
-		return tau::get(tau::build_wff_neq((lt ^ rt[0][0]).get()));
+		return tau::get(tau::build_bf_neq((lt ^ rt[0][0]).get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_xor(lt.get(), rt.get()));
 	DBG(throw std::logic_error("nso_ba xor: wrong types");)

@@ -81,168 +81,437 @@ const tree<node>& tree<node>::get_T_trimmed() {
 	return get(cached);
 }
 
+// -----------------------------------------------------------------------------
+// formula builders
+
 template <NodeType node>
-tref tree<node>::build_variable(const std::string& name) {
-	return get(variable, name);
+tref tree<node>::build_wff_sometimes(tref l) {
+	DBG(assert(l != nullptr);)
+	return get(wff, get(wff_sometimes, l));
 }
 
 template <NodeType node>
-tref tree<node>::build_in_var_name(size_t index) {
-	std::stringstream var_name;
-	var_name << "i" << index;
-	return get(in_var_name, var_name.str());
+tref tree<node>::build_wff_always(tref l) {
+	DBG(assert(l != nullptr);)
+	return get(wff, get(wff_always, l));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_conditional(tref x, tref y, tref z) {
+	DBG(assert(x != nullptr && y != nullptr && z != nullptr);)
+	return build_wff_and(build_wff_imply(x, y),
+		build_wff_imply(build_wff_neg(x), z));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_all(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return get(wff, get(wff_all, l, r));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_ex(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return get(wff, get(wff_ex, l, r));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_imply(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_wff_or(build_wff_neg(l), r);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_rimply(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_wff_imply(r, l);
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_equiv(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_wff_and(build_wff_imply(l, r),
+		build_wff_imply(r, l));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_or(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return get(wff, get(wff_or, l, r));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_or(const auto& wffs) {
+	return std::accumulate(wffs.begin(), wffs.end(), _F(),
+		[](tref l, tref r) { return build_wff_or(l, r); });
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_xor_from_def(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_wff_or(build_wff_and(build_wff_neg(l), r),
+		build_wff_and(build_wff_neg(r), l));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_xor(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_wff_or(
+		build_wff_and(build_wff_neg(l), r),
+		build_wff_and(build_wff_neg(r), l));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_and(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return get(wff, get(node::type::wff_and, l, r));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_and(const auto& wffs) {
+	return std::accumulate(wffs.begin(), wffs.end(), _T(),
+		[](tref l, tref r) { return build_wff_and(l, r); });
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_neg(tref l) {
+	DBG(assert(l != nullptr);)
+	return get(wff, get(wff_neg, l));
+}
+
+// -----------------------------------------------------------------------------
+// constraint builders
+
+template <NodeType node>
+tref tree<node>::build_wff_ctn_gteq(tref ctnvar, tref num) {
+	DBG(assert(ctnvar != nullptr && num != nullptr);)
+	return get(wff, get(constraint, get(ctn_gteq, {ctnvar, num})));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_ctn_gt(tref ctnvar, tref num) {
+	DBG(assert(ctnvar != nullptr && num != nullptr);)
+	return get(wff, get(constraint, get(ctn_gt, {ctnvar, num})));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_ctn_lteq(tref ctnvar, tref num) {
+	DBG(assert(ctnvar != nullptr && num != nullptr);)
+	return get(wff, get(constraint, get(ctn_lteq, {ctnvar, num})));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_ctn_lt(tref ctnvar, tref num) {
+	DBG(assert(ctnvar != nullptr && num != nullptr);)
+	return get(wff, get(constraint, get(ctn_lt, {ctnvar, num})));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_ctn_eq(tref ctnvar, tref num) {
+	DBG(assert(ctnvar != nullptr && num != nullptr);)
+	return get(wff, get(constraint, get(ctn_eq, {ctnvar, num})));
+}
+
+template <NodeType node>
+tref tree<node>::build_wff_ctn_neq(tref ctnvar, tref num) {
+	DBG(assert(ctnvar != nullptr && num != nullptr);)
+	return get(wff, get(constraint, get(ctn_neq, {ctnvar, num})));
+}
+
+// -----------------------------------------------------------------------------
+// wff relational operators of terms
+
+template <NodeType node>
+tref tree<node>::build_bf_interval(tref x, tref y, tref z) {
+	DBG(assert(x != nullptr && y != nullptr && z != nullptr);)
+	return build_wff_and(build_bf_lteq(x, y),
+		build_bf_lteq(y, z));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_eq(tref l, tref r) {
+	// DBG(assert(is<node>(l, bf) && is<node>(r, bf));)
+	DBG(assert(l != nullptr && r != nullptr);)
+	auto left_side = build_bf_xor(l,r);
+	return build_bf_eq(left_side);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_eq(tref l) {
+	DBG(assert(l != nullptr);)
+	return get(wff, get(bf_eq, l, _0()));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_neq(tref l) {
+	DBG(assert(l != nullptr);)
+	return get(wff, get(bf_neq, l, _0()));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_lteq(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_eq(build_bf_and(l, build_bf_neg(r)));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_nlteq(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_neq(build_bf_and(l, build_bf_neg(r)));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_nlteq_lower(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_neq(build_bf_and(r, build_bf_neg(r)));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_nlteq_upper(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_neq(build_bf_and(l, build_bf_neg(r)));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_gt(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_lt(r, l);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_ngt(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_wff_neg(build_bf_gt(l, r));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_gteq(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_lteq(r, l);
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_ngteq(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_wff_neg(build_bf_gteq(l, r));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_lt(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_and(
+		build_bf_eq(build_bf_and(l, build_bf_neg(r))),
+		build_bf_neq(build_bf_xor(l, r)));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_nlt(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_wff_neg(build_bf_lt(l, r));
+}
+
+// -----------------------------------------------------------------------------
+// term builders
+
+template <NodeType node>
+tref tree<node>::build_bf_or(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return get(bf, get(bf_or, l, r));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_or(const auto& bfs) {
+	return std::accumulate(bfs.begin(), bfs.end(), _0(),
+		[](tref l, tref r) { return build_bf_or(l, r); });
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_xor_from_def(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_or(
+		build_bf_and(build_bf_neg(l), r),
+		build_bf_and(build_bf_neg(r), l));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_xor(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return build_bf_or(
+		build_bf_and(build_bf_neg(l), r),
+		build_bf_and(l, build_bf_neg(r)));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_and(tref l, tref r) {
+	DBG(assert(l != nullptr && r != nullptr);)
+	return get(bf, get(bf_and, l, r));
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_and(const auto& bfs) {
+	return std::accumulate(bfs.begin(), bfs.end(), _1(),
+		[](tref l, tref r) { return build_bf_and(l, r);});
+}
+
+template <NodeType node>
+tref tree<node>::build_bf_neg(tref l) {
+	DBG(assert(l != nullptr);)
+	return get(bf, get(bf_neg, l));
+}
+
+// -----------------------------------------------------------------------------
+// terminals, variables and constants
+
+template <NodeType node>
+tref tree<node>::build_bf_t_type(size_t ba_tid) {
+	DBG(assert(ba_tid > 0);)
+	return get(bf, get(node::ba_typed(bf_t, ba_tid)));
 }
 
 template <NodeType node>
 tref tree<node>::build_bf_t_type(const std::string& type) {
-	return get(bf,
-		get(node::ba_typed(bf_t, node::ba_constants_t::type_id(type))));
+	return build_bf_t_type(node::ba_constants_t::type_id(type));
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_t_type(tref type) {
-	DBG(assert(type != nullptr);)
-	return get(bf, get(bf_t, type));
+tref tree<node>::build_bf_f_type(size_t ba_tid) {
+	DBG(assert(ba_tid > 0);)
+	return get(bf, get(node::ba_typed(bf_f, ba_tid)));
 }
 
 template <NodeType node>
 tref tree<node>::build_bf_f_type(const std::string& type) {
-	return get(bf,
-		get(node::ba_typed(bf_f, node::ba_constants_t::type_id(type))));
+	return build_bf_f_type(node::ba_constants_t::type_id(type));
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_f_type(tref type) {
-	DBG(assert(type != nullptr);)
-	return get(bf, get(bf_f, type));
+tref tree<node>::build_ba_constant(node::bas_variant v, size_t ba_tid) {
+	return node::ba_constants_binder_t::instance().bind(v, ba_tid);
 }
 
 template <NodeType node>
-tref tree<node>::build_in_variable_at_n(tref var_name, size_t num) {
-	DBG(assert(var_name != nullptr);)
-	DBG(assert(get(var_name).is(var_name));)
-	return get(bf, get(variable, get(io_var, get(in, {
-				var_name, get(offset, get_integer(num)) }))));
-}
-
-template <NodeType node>
-tref tree<node>::build_in_variable_at_n(size_t index, size_t num) {
-	return build_in_variable_at_n(build_in_var_name(index), num);
-}
-
-template <NodeType node>
-tref tree<node>::build_in_variable_at_n(const std::string& name, int_t pos) {
-	return get(bf, get(variable, get(io_var, get(in, {
-				get(in_var_name, name),
-				get(offset, get_integer(pos)) }))));
-}
-
-template <NodeType node>
-tref tree<node>::build_in_variable_at_t(tref var_name) {
-	DBG(assert(var_name != nullptr);)
-	DBG(assert(get(var_name).is(in_var_name));)
-	return get(bf, get(variable, get(io_var, get(in,
-			var_name, get(offset, build_variable("t"))))));
-}
-
-template <NodeType node>
-tref tree<node>::build_in_variable_at_t(size_t index) {
-	return build_in_variable_at_t(build_in_var_name(index));
-}
-
-template <NodeType node>
-tref tree<node>::build_in_variable_at_t_minus (const std::string& name,
-	int_t shift)
+tref tree<node>::build_bf_uconst(const std::string& n1,
+	const std::string& n2)
 {
-	return get(bf, get(variable, get(io_var, get(in,
-		get(in_var_name, name),
-		get(offset, get(shift, get(variable, "t"), get_num(shift)))))));
+	return get(bf, get(variable, get(uconst, n1 + ":" + n2)));
 }
 
 template <NodeType node>
-tref tree<node>::build_in_variable_at_t_minus(tref var_name, size_t num) {
-	DBG(assert(var_name != nullptr);)
-	DBG(assert(get(var_name).is(in_var_name));)
+tref tree<node>::build_variable(const std::string& name) {
+	return get(variable, get(var_name, name));
+}
+
+template <NodeType node>
+tref tree<node>::build_in_var(const std::string& name) {
+	return build_in_var(string_id(name));
+}
+
+template <NodeType node>
+tref tree<node>::build_in_var(size_t var_name_sid) {
+	return get(node::input_variable(var_name_sid));
+}
+
+template <NodeType node>
+tref tree<node>::build_in_var_indexed(size_t index) {
+	std::stringstream name;
+	return build_in_var((name << "i" << index, name.str()));
+}
+
+template <NodeType node>
+tref tree<node>::build_io_var_at_n(tref io_var_node, size_t num) {
+	DBG(assert(io_var_node != nullptr);)
+	DBG(assert(get(io_var_node).is(io_var));)
+	return get(bf, get(variable, { io_var_node,
+					get(offset, get_integer(num)) }));
+}
+
+template <NodeType node>
+tref tree<node>::build_in_var_at_n_indexed(size_t index, size_t num) {
+	return build_io_var_at_n(build_in_var_indexed(index), num);
+}
+
+template <NodeType node>
+tref tree<node>::build_in_var_at_n(const std::string& name, int_t pos) {
+	return get(bf, get(variable, {
+		build_in_var(name), get(offset, get_integer(pos)) }));
+}
+
+template <NodeType node>
+tref tree<node>::build_io_var_at_t(tref io_var_node) {
+	DBG(assert(io_var_node != nullptr);)
+	DBG(assert(get(io_var_node).is(io_var));)
+	return get(bf, get(variable, { io_var_node,
+					get(offset, build_variable("t")) }));
+}
+
+template <NodeType node>
+tref tree<node>::build_in_var_at_t_indexed(size_t index) {
+	return build_io_var_at_t(build_in_var_indexed(index));
+}
+
+template <NodeType node>
+tref tree<node>::build_in_var_at_t_minus(const std::string& name, int_t shift) {
+	return get(bf, get(variable, { build_in_var(name),
+		get(offset, get(shift, get(variable, "t"), get_num(shift))) }));
+}
+
+template <NodeType node>
+tref tree<node>::build_io_var_at_t_minus(tref io_var_node, size_t num) {
+	DBG(assert(io_var_node != nullptr);)
+	DBG(assert(get(io_var_node).is(io_var));)
 	DBG(assert(num > 0);)
-	return get(bf, get(variable, get(io_var, get(in, var_name,
-			get(offset, get(shift, build_variable("t"),
-						get_num(num)))))));
+	return get(bf, get(variable, { io_var_node,
+		get(offset, get(shift, build_variable("t"), get_num(num))) }));
 }
 
 template <NodeType node>
-tref tree<node>::build_in_variable_at_t_minus(size_t index, size_t num) {
-	return build_in_variable_at_t_minus(build_in_var_name(index), num);
+tref tree<node>::build_in_var_at_t_minus_indexed(size_t index, size_t num) {
+	return build_io_var_at_t_minus(build_in_var_indexed(index), num);
 }
 
 template <NodeType node>
-tref tree<node>::build_out_var_name(size_t index) {
-	std::stringstream var_name;
-	var_name << "o" << index;
-	return get(out_var_name, var_name.str());
+tref tree<node>::build_out_var(const std::string& name) {
+	return build_out_var(string_id(name));
 }
 
 template <NodeType node>
-tref tree<node>::build_out_var_name(const std::string& name) {
-	return get(out_var_name, name);
+tref tree<node>::build_out_var(size_t var_name_sid) {
+	return get(node::output_variable(var_name_sid));
 }
 
 template <NodeType node>
-tref tree<node>::build_out_variable_at_t(tref var_name) {
-	DBG(assert(var_name != nullptr);)
-	DBG(assert(get(var_name).is(out_var_name));)
-	return get(bf, get(variable, get(io_var, get(out, var_name,
-				get(offset, build_variable("t"))))));
+tref tree<node>::build_out_var_indexed(size_t index) {
+	std::stringstream name;
+	return build_out_var((name << "o" << index, name.str()));
 }
 
 template <NodeType node>
-tref tree<node>::build_out_variable_at_t(size_t index) {
-	return build_out_variable_at_t(build_out_var_name(index));
+tref tree<node>::build_out_var_at_t_indexed(size_t index) {
+	return build_io_var_at_t(build_out_var_indexed(index));
 }
 
 template <NodeType node>
-tref tree<node>::build_out_variable_at_n(tref var_name, size_t num) {
-	DBG(assert(var_name != nullptr);)
-	DBG(assert(get(var_name).is(out_var_name));)
-	return get(bf, get(variable, get(io_var, get(out, var_name,
-					get(offset, get_integer(num))))));
+tref tree<node>::build_out_var_at_n_indexed(size_t index, size_t num) {
+	return build_io_var_at_n(build_out_var_indexed(index), num);
 }
 
 template <NodeType node>
-tref tree<node>::build_out_variable_at_n(size_t index, size_t num) {
-	return build_out_variable_at_n(build_out_var_name(index), num);
+tref tree<node>::build_out_var_at_n(const std::string& name, const int_t pos){
+	return get(bf, get(variable, { build_out_var(name),
+					get(offset, get_integer(pos)) }));
 }
 
 template <NodeType node>
-tref tree<node>::build_out_variable_at_n(const std::string& name, const int_t pos){
-	return get(bf, get(variable, get(io_var, get(out, {
-					get(out_var_name, name),
-					get(offset, get_integer(pos)) }))));
-}
-
-template <NodeType node>
-tref tree<node>::build_out_variable_at_t_minus (const std::string& name,
+tref tree<node>::build_out_var_at_t_minus(const std::string& name,
 	const int_t shift)
 {
-	return get(bf, get(variable, get(io_var, get(out,
-		get(out_var_name, name),
-		get(offset, get(shift,
-			get(variable, "t"),
-			get_num(shift)))))));
+	return get(bf, get(variable, { build_out_var(name),
+		get(offset, get(shift, get(variable, "t"), get_num(shift))) }));
 }
 
 template <NodeType node>
-tref tree<node>::build_out_variable_at_t_minus(tref var_name, size_t num) {
-	DBG(assert(get(var_name).is(out_var_name));)
-	DBG(assert(num > 0);)
-	return get(bf, get(variable, get(io_var, get(out, var_name,
-		get(offset, get(shift,
-					build_variable("t"),
-					get_num(num)))))));
-}
-
-template <NodeType node>
-tref tree<node>::build_out_variable_at_t_minus(size_t index, size_t num) {
-	return build_out_variable_at_t_minus(build_out_var_name(index), num);
+tref tree<node>::build_out_var_at_t_minus_indexed(size_t index, size_t num) {
+	return build_io_var_at_t_minus(build_out_var_indexed(index), num);
 }
 
 // template <NodeType node>
@@ -310,280 +579,5 @@ tref tree<node>::build_out_variable_at_t_minus(size_t index, size_t num) {
 // 	return o.has_value() ? build_bf_constant(o.value())
 // 				: std::optional<tref>();
 // }
-
-template <NodeType node>
-tref tree<node>::build_bf_uninterpreted_constant(const std::string& n1,
-	const std::string& n2)
-{
-	return get(bf, get(variable, get(uninterpreted_constant,
-			get(uninter_const_name, n1 + ":" + n2))));
-}
-
-// wff factory method for building wff formulas
-template <NodeType node>
-tref tree<node>::build_wff_eq(tref l) {
-	DBG(assert(l != nullptr);)
-	return get(wff, get(bf_eq, l, _0()));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_neq(tref l) {
-	DBG(assert(l != nullptr);)
-	return get(wff, get(bf_neq, l, _0()));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_and(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return get(wff, get(node::type::wff_and, l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_and(const auto& wffs) {
-	return std::accumulate(wffs.begin(), wffs.end(), _T(),
-		[](tref l, tref r) { return build_wff_and(l, r); });
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_or(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return get(wff, get(wff_or, l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_or(const auto& wffs) {
-	return std::accumulate(wffs.begin(), wffs.end(), _F(),
-		[](tref l, tref r) { return build_wff_or(l, r); });
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_neg(tref l) {
-	DBG(assert(l != nullptr);)
-	return get(wff, get(wff_neg, l));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_xor_from_def(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_or(build_wff_and(build_wff_neg(l), r),
-		build_wff_and(build_wff_neg(r), l));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_xor(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_or(
-		build_wff_and(build_wff_neg(l), r),
-		build_wff_and(build_wff_neg(r), l));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_imply(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_or(build_wff_neg(l), r);
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_conditional(tref x, tref y, tref z) {
-	DBG(assert(x != nullptr && y != nullptr && z != nullptr);)
-	return build_wff_and(build_wff_imply(x, y),
-		build_wff_imply(build_wff_neg(x), z));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_equiv(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_and(build_wff_imply(l, r),
-		build_wff_imply(r, l));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_all(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return get(wff, get(wff_all, l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_ex(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return get(wff, get(wff_ex, l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_sometimes(tref l) {
-	DBG(assert(l != nullptr);)
-	return get(wff, get(wff_sometimes, l));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_always(tref l) {
-	DBG(assert(l != nullptr);)
-	return get(wff, get(wff_always, l));
-}
-
-// bf factory method for building bf formulas
-template <NodeType node>
-tref tree<node>::build_bf_and(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return get(bf, get(bf_and, l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_and(const auto& bfs) {
-	return std::accumulate(bfs.begin(), bfs.end(), _1(),
-		[](tref l, tref r) { return build_bf_and(l, r);});
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_or(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return get(bf, get(bf_or, l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_or(const auto& bfs) {
-	return std::accumulate(bfs.begin(), bfs.end(), _0(),
-		[](tref l, tref r) { return build_bf_or(l, r); });
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_neg(tref l) {
-	DBG(assert(l != nullptr);)
-	return get(bf, get(bf_neg, l));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_xor_from_def(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_bf_or(
-		build_bf_and(build_bf_neg(l), r),
-		build_bf_and(build_bf_neg(r), l));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_xor(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_bf_or(
-		build_bf_and(build_bf_neg(l), r),
-		build_bf_and(l, build_bf_neg(r)));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_eq(tref l, tref r) {
-	// DBG(assert(is<node>(l, bf) && is<node>(r, bf));)
-	DBG(assert(l != nullptr && r != nullptr);)
-	auto left_side = build_bf_xor(l,r);
-	return build_wff_eq(left_side);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_less(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_and(
-		build_wff_eq(
-			build_bf_and(l, build_bf_neg(r))),
-		build_wff_neq(build_bf_xor(l, r)));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_nless(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_neg(build_bf_less(l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_less_equal(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_eq(build_bf_and(l, build_bf_neg(r)));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_nleq(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_neq(build_bf_and(l, build_bf_neg(r)));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_interval(tref x, tref y, tref z) {
-	DBG(assert(x != nullptr && y != nullptr && z != nullptr);)
-	return build_wff_and(build_bf_less_equal(x, y),
-		build_bf_less_equal(y, z));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_nleq_lower(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	trefs args { trim(l), trim(r) };
-	return apply_builder(bldr_bf_nleq_lower, args);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_nleq_upper(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	trefs args { trim(l), trim(r) };
-	return apply_builder(bldr_bf_nleq_upper, args);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_greater(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_bf_less(r, l);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_ngreater(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_neg(build_bf_greater(l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_greater_equal(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_bf_less_equal(r, l);
-}
-
-template <NodeType node>
-tref tree<node>::build_bf_ngeq(tref l, tref r) {
-	DBG(assert(l != nullptr && r != nullptr);)
-	return build_wff_neg(build_bf_greater_equal(l, r));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_ctn_greater_equal(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	return get(wff, get(constraint, get(ctn_greater_equal, {ctnvar, num})));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_ctn_greater(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	return get(wff, get(constraint, get(ctn_greater, {ctnvar, num})));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_ctn_less_equal(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	return get(wff, get(constraint, get(ctn_less_equal, {ctnvar, num})));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_ctn_less(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	return get(wff, get(constraint, get(ctn_less, {ctnvar, num})));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_ctn_eq(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	return get(wff, get(constraint, get(ctn_eq, {ctnvar, num})));
-}
-
-template <NodeType node>
-tref tree<node>::build_wff_ctn_neq(tref ctnvar, tref num) {
-	DBG(assert(ctnvar != nullptr && num != nullptr);)
-	return get(wff, get(constraint, get(ctn_neq, {ctnvar, num})));
-}
-
-//------------------------------------------------------------------------------
 
 } // idni::tau_lang namespace

@@ -20,65 +20,27 @@ inline void print_fixpoint_info(const std::string& message,
 }
 
 template <NodeType node>
-tref build_io_out(const std::string& name, const std::string& var) {
+tref build_io(tref io_var_node, const std::string& var) {
 	using tau = tree<node>;
-	tref var_name = tau::get(tau::out_var_name, name);
-	tref offset = tau::get(tau::offset, tau::get(tau::variable, var));
-	return tau::get(tau::variable, tau::get(tau::io_var,
-			tau::get(tau::out, { var_name, offset })));
+	return tau::get(tau::variable, { io_var_node,
+		tau::get(tau::offset, tau::build_variable(var)) });
 }
 
 template <NodeType node>
-tref build_io_in(const std::string& name, const std::string& var) {
+tref build_io_const(tref io_var_node, const int_t pos) {
 	using tau = tree<node>;
-	tref var_name = tau::get(tau::in_var_name, name);
-	tref offset = tau::get(tau::offset, tau::get(tau::variable, var));
-	return tau::get(tau::variable, tau::get(tau::io_var,
-			tau::get(tau::in, { var_name, offset })));
+	return tau::get(tau::variable, { io_var_node,
+		tau::get(tau::offset, tau::get_integer(pos)) });
 }
 
 template <NodeType node>
-tref build_io_out_const(const std::string& name, const int_t pos) {
-	using tau = tree<node>;
-	tref var_name = tau::get(tau::out_var_name, name);
-	tref offset = tau::get(tau::offset, tau::get_integer(pos));
-	return tau::get(tau::variable, tau::get(tau::io_var,
-			tau::get(tau::out, { var_name, offset })));
-}
-
-template <NodeType node>
-tref build_io_in_const(const std::string& name, const int_t pos) {
-	using tau = tree<node>;
-	tref var_name = tau::get(tau::in_var_name, name);
-	tref offset = tau::get(tau::offset, tau::get_integer(pos));
-	return tau::get(tau::variable, tau::get(tau::io_var,
-			tau::get(tau::in, { var_name, offset })));
-}
-
-template <NodeType node>
-tref build_io_out_shift(const std::string& name, const std::string& var,
-	const int_t shift)
+tref build_io_shift(tref io_var_node, const std::string& var, const int_t shift)
 {
 	using tau = tree<node>;
-	tref var_name = tau::get(tau::out_var_name, name);
-	tref shift_node = tau::get(tau::shift, {
-		tau::get(tau::variable, var), tau::get_integer(shift) });
-	tref offset = tau::get(tau::offset, shift_node);
-	return tau::get(tau::variable, tau::get(tau::io_var,
-			tau::get(tau::out, { var_name, offset })));
-}
-
-template <NodeType node>
-tref build_io_in_shift(const std::string& name, const std::string& var,
-	const int_t shift)
-{
-	using tau = tree<node>;
-	tref var_name = tau::get(tau::in_var_name, name);
-	tref shift_node = tau::get(tau::shift, {
-		tau::get(tau::variable, var), tau::get_integer(shift) });
-	tref offset = tau::get(tau::offset, shift_node);
-	return tau::get(tau::variable, tau::get(tau::io_var,
-			tau::get(tau::in, { var_name, offset })));
+	return tau::get(tau::variable, { io_var_node,
+		tau::get(tau::offset, tau::get(tau::shift, {
+			tau::build_variable(var), tau::get_integer(shift) }))
+	});
 }
 
 template <NodeType node>
@@ -90,10 +52,9 @@ bool has_stream_flag(const tref& fm) {
 
 template <NodeType node>
 int_t get_lookback_after_normalization(const trefs& io_vars) {
-	using tau = tree<node>;
 	int_t max_lookback = 0;
-	for (tref v : io_vars) if (tau::is_io_initial(v)) {
-		int_t lookback = tau::get_io_time_point(v);
+	for (tref v : io_vars) if (is_io_initial<node>(v)) {
+		int_t lookback = get_io_time_point<node>(v);
 		max_lookback = std::max(max_lookback, lookback);
 	}
 	return max_lookback;
@@ -107,22 +68,17 @@ bool has_temporary_io_var(tref fm) {
 	auto io_vars = tau::get(fm)
 		.select_top(is_child<node, tau::io_var>);
 	for (tref var : io_vars) // Check if the name of var starts with "_"
-		if (tau::get_io_name(var)[0] == '_') return true;
+		if (get_io_name<node>(var)[0] == '_') return true;
 	return false;
 }
 
 template <NodeType node>
-tref transform_io_var(tref io_var, const std::string& io_var_name,
-	int_t time_point)
-{
+tref transform_io_var(tref io_var, int_t time_point) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	// Check if io_var has constant time point
-	if (tau::is_io_initial(io_var)) return io_var;
-	int_t shift = tau::get_io_var_shift(io_var);
-	if (tt(io_var) | tau::io_var | tau::in)
-		return build_io_in_const<node>( io_var_name,time_point - shift);
-	else    return build_io_out_const<node>(io_var_name,time_point - shift);
+	if (is_io_initial<node>(io_var)) return io_var;
+	int_t shift = get_io_var_shift<node>(io_var);
+	return build_io_const<node>(tau::trim(io_var), time_point - shift);
 }
 
 template <NodeType node>
@@ -130,23 +86,21 @@ tref existentially_quantify_output_streams(tref fm, const trefs& io_vars,
                                 int_t time_point, const auto& initials)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_o_vars;
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i) {
 		// Skip input streams
-		if (tt(io_vars[i]) | tau::io_var | tau::in) continue;
+		if (tau::get(io_vars[i])[0].is_input_variable()) continue;
 		// Skip initial conditions
-		if (tau::is_io_initial(io_vars[i])) continue;
+		if (is_io_initial<node>(io_vars[i])) continue;
 		quantifiable_o_vars.insert(i);
 	}
 	typename tau::subtree_set cache;
 	for (int_t pos : quantifiable_o_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({
-			tau::get_io_name(io_vars[pos]), time_point })) continue;
-		tref var = build_io_out_const<node>(
-				tau::get_io_name(io_vars[pos]), time_point);
+			get_io_name<node>(io_vars[pos]), time_point })) continue;
+		tref var = build_io_const<node>(tau::trim(io_vars[pos]), time_point);
 		auto res = cache.emplace(var);
 		if (res.second) fm = tau::build_wff_ex(var, fm);
 	}
@@ -158,23 +112,21 @@ tref universally_quantify_input_streams(tref fm, const trefs& io_vars,
 					int_t time_point, const auto& initials)
 {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	// This map is needed in order to get the minimal shift for streams with same name
 	std::set<int_t> quantifiable_i_vars;
 	for (int_t i = 0; i < (int_t)io_vars.size(); ++i) {
 		// Skip output streams
-		if (tt(io_vars[i]) | tau::io_var | tau::out) continue;
+		if (tau::get(io_vars[i])[0].is_output_variable()) continue;
 		// Skip initial conditions
-		if (tau::is_io_initial(io_vars[i])) continue;
+		if (is_io_initial<node>(io_vars[i])) continue;
 		quantifiable_i_vars.insert(i);
 	}
 	typename tau::subtree_set cache;
 	for (int_t pos : quantifiable_i_vars) {
 		// Do not quantify time steps which are predefined by initial conditions
 		if (initials.contains({
-			tau::get_io_name(io_vars[pos]), time_point })) continue;
-		tref var = build_io_in_const<node>(
-				tau::get_io_name(io_vars[pos]), time_point);
+			get_io_name<node>(io_vars[pos]), time_point })) continue;
+		tref var = build_io_const<node>(tau::trim(io_vars[pos]), time_point);
 		auto res = cache.emplace(var);
 		if (res.second) fm = tau::build_wff_all(var, fm);
 	}
@@ -198,16 +150,16 @@ tref calculate_ctn(tref constraint, int_t time_point) {
 
 	if (t | tau::ctn_neq) return to_ba(condition != time_point);
 	if (t | tau::ctn_eq)  return to_ba(condition == time_point);
-	if (t | tau::ctn_greater_equal)
+	if (t | tau::ctn_gteq)
 		return is_left  ? to_ba(condition >= time_point)
 				: to_ba(time_point >= condition);
-	if (t | tau::ctn_greater)
+	if (t | tau::ctn_gt)
 		return is_left  ? to_ba(condition > time_point)
 				: to_ba(time_point > condition);
-	if (t | tau::ctn_less_equal)
+	if (t | tau::ctn_lteq)
 		return is_left  ? to_ba(condition <= time_point)
 				: to_ba(time_point <= condition);
-	if (t | tau::ctn_less)
+	if (t | tau::ctn_lt)
 		return is_left  ? to_ba(condition < time_point)
 				: to_ba(time_point < condition);
 	// The above is exhaustive for possible children of constraint
@@ -225,10 +177,10 @@ bool is_initial_ctn_phase(tref constraint, int_t time_point) {
 	auto t = ctn();
 	DBG(assert(!(t | tau::ctn_neq) && !(t | tau::ctn_eq));)
 
-	if (t | tau::ctn_greater_equal) return condition >= time_point;
-	if (t | tau::ctn_greater)       return condition + 1 >= time_point;
-	if (t | tau::ctn_less_equal)    return condition + 1 >= time_point;
-	if (t | tau::ctn_less)          return condition >= time_point;
+	if (t | tau::ctn_gteq) return condition >= time_point;
+	if (t | tau::ctn_gt)   return condition + 1 >= time_point;
+	if (t | tau::ctn_lteq) return condition + 1 >= time_point;
+	if (t | tau::ctn_lt)   return condition >= time_point;
 
 	// The above is exhaustive for possible children of constraints
 	assert(false); return {};
@@ -239,8 +191,8 @@ tref fm_at_time_point(tref original_fm, const trefs &io_vars, int_t time_point) 
 	using tau = tree<node>;
 	typename tau::subtree_map changes;
 	for (size_t i = 0; i < io_vars.size(); ++i)
-		changes[io_vars[i]] = transform_io_var<node>(
-			io_vars[i], tau::get_io_name(io_vars[i]), time_point);
+		changes[io_vars[i]] =
+				transform_io_var<node>(io_vars[i], time_point);
 	return rewriter::replace<node>(original_fm, changes);
 }
 
@@ -251,12 +203,11 @@ std::pair<tref, tref> build_initial_step_chi(tref chi, tref st,
 	using tau = tree<node>;
 	typename tau::subtree_map changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var<node>(io_vars[i],
-			tau::get_io_name(io_vars[i]), time_point);
+		auto new_io_var = transform_io_var<node>(io_vars[i],time_point);
 		changes[io_vars[i]] = new_io_var;
 	}
-	tref c_pholder = build_io_out_const<node>("_pholder", time_point);
-	c_pholder = tau::build_wff_eq(tau::get(tau::bf, c_pholder));
+	tref c_pholder = build_io_const<node>(tau::build_out_var("_pholder"), time_point);
+	c_pholder = tau::build_bf_eq(tau::get(tau::bf, c_pholder));
 	pholder_to_st.emplace(c_pholder, rewriter::replace<node>(st, changes));
 	tref new_fm = tau::build_wff_and(rewriter::replace<node>(chi, changes), c_pholder);
 	return std::make_pair(new_fm, c_pholder);
@@ -271,8 +222,8 @@ tref build_step(tref original_fm, tref prev_fm, const trefs &io_vars,
 	DBG(assert(step_num > 0);)
 	typename tau::subtree_map changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var<node>(io_vars[i],
-			tau::get_io_name(io_vars[i]), time_point + step_num);
+		auto new_io_var = transform_io_var<node>(
+					io_vars[i], time_point + step_num);
 		changes[io_vars[i]] = new_io_var;
 	}
 
@@ -297,15 +248,15 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	DBG(assert(step_num > 0);)
 	typename tau::subtree_map changes;
 	for (size_t i = 0; i < io_vars.size(); ++i) {
-		auto new_io_var = transform_io_var<node>(io_vars[i],
-			tau::get_io_name(io_vars[i]), time_point + step_num);
+		auto new_io_var = transform_io_var<node>(
+					io_vars[i], time_point + step_num);
 		changes[io_vars[i]] = new_io_var;
 	}
 	// We need a placeholder symbol in order to substitute during the next step
 	tref c_chi = rewriter::replace<node>(chi, changes);
-	tref c_pholder = build_io_out_const<node>("_pholder",
+	tref c_pholder = build_io_const<node>(tau::build_out_var("_pholder"),
 						time_point + step_num);
-	c_pholder = tau::build_wff_eq(tau::get(tau::bf, c_pholder));
+	c_pholder = tau::build_bf_eq(tau::get(tau::bf, c_pholder));
 	tref c_st = rewriter::replace<node>(st, changes);
 	pholder_to_st.emplace(c_pholder, c_st);
 	// Quantify formula which is to be added to chi
@@ -315,7 +266,7 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 	q_most_inner_step = universally_quantify_input_streams<node>(
 		q_most_inner_step, io_vars, time_point + step_num, initials);
 	// If build_step_chi is used with empty sometimes clause
-	if (tau::subtree_equals(st, tau::_T()))
+	if (tau::get(st) == tau::get_T())
 		changes = { { cached_fm,  q_most_inner_step } };
 	else changes = { { cached_fm,
 			tau::build_wff_or(cached_fm, q_most_inner_step) }};
@@ -327,21 +278,20 @@ tref build_step_chi(tref chi, tref st, tref prev_fm, const trefs& io_vars,
 template <NodeType node>
 inline auto constant_io_comp = [](tref v1, tref v2) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	// trim the bf of v1 and v2 if present
 	v1 = tau::get(v1).is(tau::bf) ? tau::trim(v1) : v1;
 	v2 = tau::get(v2).is(tau::bf) ? tau::trim(v2) : v2;
-	if (tau::get_io_time_point(v1) < tau::get_io_time_point(v2))
+	if (get_io_time_point<node>(v1) < get_io_time_point<node>(v2))
 		return true;
-	if (tau::get_io_time_point(v1) == tau::get_io_time_point(v2)) {
-		bool v1_in = (bool) (tt(v1) | tau::io_var | tau::in);
-		bool v2_in = (bool) (tt(v2) | tau::io_var | tau::in);
+	if (get_io_time_point<node>(v1) == get_io_time_point<node>(v2)) {
+		bool v1_in = tau::get(v1)[0].is_input_variable();
+		bool v2_in = tau::get(v2)[0].is_input_variable();
 		if (!v1_in &&  v2_in) return false;
 		if ( v1_in && !v2_in) return true;
 		if ( v1_in &&  v2_in)
-			return tau::get_io_name(v1) < tau::get_io_name(v2);
+			return get_io_name<node>(v1) < get_io_name<node>(v2);
 		if (!v1_in && !v2_in)
-			return tau::get_io_name(v1) < tau::get_io_name(v2);
+			return get_io_name<node>(v1) < get_io_name<node>(v2);
 			// This covers all cases already
 		else return false;
 	} else return false;
@@ -352,25 +302,24 @@ inline auto constant_io_comp = [](tref v1, tref v2) {
 template <NodeType node>
 bool is_run_satisfiable(tref fm) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	const auto& t = tau::get(fm);
 	if (t == tau::get_F()) return false;
 	if (t == tau::get_T()) return true;
 
-	auto free_io_vars = tau::get_free_vars_from_nso(fm);
+	auto free_io_vars = get_free_vars_from_nso<node>(fm);
 	trefs io_vars = t.select_top(is_child<node, tau::io_var>);
 	sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
 
 	// All io_vars in fm have to refer to constant time positions
 	DBG(assert(std::all_of(io_vars.begin(), io_vars.end(),
-		[](tref el) { return tau::is_io_initial(el); }));)
+		[](tref el) { return is_io_initial<node>(el); }));)
 	auto sat_fm = fm;
 	while (!io_vars.empty()) {
 		if (!free_io_vars.contains(io_vars.back())) {
 			io_vars.pop_back();
 			continue;
 		}
-		if (tt(io_vars.back()) | tau::io_var | tau::in)
+		if (tau::get(io_vars.back())[0].is_input_variable())
 			sat_fm = tau::build_wff_all(io_vars.back(), sat_fm);
 		else    sat_fm = tau::build_wff_ex(io_vars.back(), sat_fm);
 		io_vars.pop_back();
@@ -386,18 +335,17 @@ bool is_run_satisfiable(tref fm) {
 template <NodeType node>
 tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	// Substitute lookback as current time point
-	int_t look_back = tau::get_max_shift(io_vars);
+	int_t look_back = get_max_shift<node>(io_vars);
 	tref uconst_ctns = fm_at_time_point<node>(fm, io_vars, look_back);
 	io_vars = tau::get(uconst_ctns).select_top(is_child<node, tau::io_var>);
 
 	// All io_vars in fm have to refer to constant time positions
 	DBG(assert(std::all_of(io_vars.begin(), io_vars.end(),
-		[](tref el){ return tau::is_io_initial(el); }));)
+		[](tref el){ return is_io_initial<node>(el); }));)
 	sort(io_vars.begin(), io_vars.end(), constant_io_comp<node>);
 
-	auto free_io_vars = tau::get_free_vars_from_nso(uconst_ctns);
+	auto free_io_vars = get_free_vars_from_nso<node>(uconst_ctns);
 	while (io_vars.size()) {
 		if (!free_io_vars.contains(io_vars.back())) {
 			io_vars.pop_back();
@@ -405,7 +353,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 		}
 		auto& v = io_vars.back();
 		free_io_vars.erase(io_vars.back());
-		uconst_ctns = (tt(io_vars.back()) | tau::io_var | tau::in)
+		uconst_ctns = (tau::get(io_vars.back())[0].is_input_variable())
 			? tau::build_wff_all(io_vars.back(), uconst_ctns)
 			: tau::build_wff_ex( io_vars.back(), uconst_ctns);
 		io_vars.pop_back();
@@ -426,7 +374,7 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 	for (tref uc : uconsts) {
 		if (std::ranges::find(left_uconsts, uc) == left_uconsts.end())
 			uconst_ctns = tau::build_wff_and(uconst_ctns,
-				tau::build_wff_eq(tau::get(tau::bf, uc)));
+				tau::build_bf_eq(tau::get(tau::bf, uc)));
 	}
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula describing constraints on uninterpreted constants";
@@ -450,7 +398,7 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << phi;
 
-	int_t lookback = tau::get_max_shift(io_vars);
+	int_t lookback = get_max_shift<node>(io_vars);
 	// Find fix point once all initial conditions have been passed and
 	// the time_point is greater equal the step_num
 	while (step_num < lookback || !are_nso_equivalent<node>(phi_prev, phi)){
@@ -478,7 +426,7 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	auto [chi_prev, cache] = build_initial_step_chi<node>(
 		chi_base, st, io_vars, time_point, pholder_to_st);
 
-	int_t lookback = tau::get_max_shift(io_vars);
+	int_t lookback = get_max_shift<node>(io_vars);
 	int_t step_num = 1;
 
 	tref chi = build_step_chi<node>(chi_base, st, chi_prev, io_vars,
@@ -512,7 +460,6 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 template <NodeType node>
 tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	// Find lookback
 	auto current_io_vars = tau::get(fm).select_top(
 			is_child<node, tau::io_var>);
@@ -522,43 +469,38 @@ tref transform_back_non_initials(tref fm, const int_t highest_init_cond) {
 	// Get time positions which are higher than highest_init_cond and transform back to
 	// time variable depending on t
 	for (tref io_var : current_io_vars) {
-		int_t time_point = tau::get_io_time_point(io_var);
+		int_t time_point = get_io_time_point<node>(io_var);
 		if (time_point <= highest_init_cond) continue;
 		tref transformed_var;
 		if (time_point - lookback != 0)
-			transformed_var = (tt(io_var) | tau::io_var | tau::in)
-				? build_io_in_shift<node>(
-					tau::get_io_name(io_var), "t",
-					abs(time_point - lookback))
-				: build_io_out_shift<node>(
-					tau::get_io_name(io_var), "t",
-					abs(time_point - lookback));
-		else transformed_var = (tt(io_var) | tau::io_var | tau::in)
-			? build_io_in<node>(tau::get_io_name(io_var), "t")
-			: build_io_out<node>(tau::get_io_name(io_var), "t");
+			transformed_var = build_io_shift<node>(
+				tau::trim(io_var), "t",
+				abs(time_point - lookback));
+		else transformed_var = build_io<node>(tau::trim(io_var), "t");
 		changes.emplace(io_var, transformed_var);
 	}
 	return rewriter::replace<node>(fm, changes);
 }
 
 template <NodeType node>
-tref build_flag_on_lookback(const std::string& name, const std::string& var,
+tref build_flag_on_lookback(tref io_var_node, const std::string& var,
 							const int_t lookback)
 {
 	using tau = tree<node>;
 	if (lookback >= 2) return tau::get(tau::bf,
-			build_io_out_shift<node>(name, var, lookback - 1));
-	else return tau::get(tau::bf, build_io_out<node>(name, var));
+			build_io_shift<node>(io_var_node, var, lookback - 1));
+	else return tau::get(tau::bf, build_io<node>(io_var_node, var));
 }
 
 template <NodeType node>
-tref build_prev_flag_on_lookback(const std::string& name,
+tref build_prev_flag_on_lookback(tref io_var_node,
 				const std::string& var, const int_t lookback)
 {
 	using tau = tree<node>;
-	if (lookback >= 2) return tau::get(
-			tau::bf, build_io_out_shift<node>(name, var, lookback));
-	else return tau::get(tau::bf, build_io_out_shift<node>(name, var, 1));
+	if (lookback >= 2) return tau::get(tau::bf,
+			build_io_shift<node>(io_var_node, var, lookback));
+	else return tau::get(tau::bf,
+			build_io_shift<node>(io_var_node, var, 1));
 }
 
 template <NodeType node>
@@ -568,14 +510,13 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 {
 	using tau = tree<node>;
 	auto to_eq_1 = [](tref n) {
-			return tau::build_wff_eq(tau::build_bf_neg(n)); };
+			return tau::build_bf_eq(tau::build_bf_neg(n)); };
 	auto create_initial =
 		[&flag_initials](tref ctn, tref flag_iovar, const int_t t)
 	{
-		tref flag_init_cond = transform_io_var<node>(
-				flag_iovar, tau::get_io_name(flag_iovar), t);
+		tref flag_init_cond = transform_io_var<node>(flag_iovar, t);
 		flag_init_cond = tau::get(tau::bf, flag_init_cond);
-		flag_initials = tau::build_wff_and(tau::build_wff_eq(
+		flag_initials = tau::build_wff_and(tau::build_bf_eq(
 				tau::build_bf_xor(flag_init_cond,
 						calculate_ctn<node>(ctn, t))),
 			flag_initials);
@@ -591,18 +532,19 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 		std::string ctnvar = tau::get(
 			ct.find_top(is<node, tau::ctnvar>)).get_string();
 		std::stringstream ss; ss << "_f" << ctn_id++;
-		auto flag_iovar = build_io_out<node>(ss.str(), ctnvar);
+		tref var = tau::build_out_var(ss.str());
+		tref flag_iovar = build_io<node>(var, ctnvar);
 
 		// Take lookback of formula into account for constructing rule
-		auto flag_rule1 = build_prev_flag_on_lookback<node>(
-						ss.str(), ctnvar, lookback);
-		auto flag_rule2 = build_flag_on_lookback<node>(
-						ss.str(), ctnvar, lookback);
+		tref flag_rule1 = build_prev_flag_on_lookback<node>(
+						var, ctnvar, lookback);
+		tref flag_rule2 = build_flag_on_lookback<node>(
+						var, ctnvar, lookback);
 		changes[ctn] = tau::trim(to_eq_1(tau::get(tau::bf, flag_iovar)));
-		if (ct() | tau::ctn_greater || ct() | tau::ctn_greater_equal) {
+		if (ct() | tau::ctn_gt || ct() | tau::ctn_gteq) {
 			// Add flag rule _fk[lookback] != 0 -> _fk[lookback-1] = 1
 			auto flag_rule = tau::build_wff_or(
-				tau::build_wff_eq(flag_rule1),
+				tau::build_bf_eq(flag_rule1),
 				to_eq_1(flag_rule2));
 			// Conjunct flag rule with formula
 			flag_rules = tau::build_wff_and(flag_rules, flag_rule);
@@ -610,7 +552,7 @@ tref transform_ctn_to_streams(tref fm, tref& flag_initials,
 			// Flag is of type less or less_equal
 			// Add flag rule _fk[lookback] != 1 -> _fk[lookback-1] = 0
 			auto flag_rule = tau::build_wff_or(to_eq_1(flag_rule1),
-						tau::build_wff_eq(flag_rule2));
+						tau::build_bf_eq(flag_rule2));
 			// Conjunct flag rule with formula
 			flag_rules = tau::build_wff_and(flag_rules, flag_rule);
 		}
@@ -645,7 +587,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 
 	// Preparation to transform flags to output streams
 	trefs io_vars = tau::get(fm).select_top(is_child<node, tau::io_var>);
-	int_t lookback = tau::get_max_shift(io_vars);
+	int_t lookback = get_max_shift<node>(io_vars);
 	tref flag_initials = tau::_T(), flag_rules = tau::_T();
 	tref transformed_fm = transform_ctn_to_streams<node>(
 		fm, flag_initials, flag_rules, lookback, start_time, true);
@@ -664,13 +606,13 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	// Save positions of io_variables which are initial conditions
 	std::set<std::pair<std::string, int_t>> initials;
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
-            if (tau::is_io_initial(io_vars[i]))
-                initials.emplace(tau::get_io_name(io_vars[i]),
-                    tau::get_io_time_point(io_vars[i]));
+            if (is_io_initial<node>(io_vars[i]))
+                initials.emplace(tau::get(io_vars[i]).get_string(),
+                    get_io_time_point<node>(io_vars[i]));
 
 	// Calculate unbound continuation of fm
-	lookback = tau::get_max_shift(io_vars);
-	int_t point_after_inits = tau::get_max_initial(io_vars) + 1;
+	lookback = get_max_shift<node>(io_vars);
+	int_t point_after_inits = get_max_initial<node>(io_vars) + 1;
 	auto [ubd_ctn, steps] = find_fixpoint_phi<node>(fm, flag_initials, io_vars,
 					initials, lookback + point_after_inits);
 
@@ -720,18 +662,15 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 template <NodeType node>
 tref create_guard(const trefs& io_vars, const int_t number) {
 	using tau = tree<node>;
-	using tt = tau::traverser;
 	tref guard = tau::_T();
 	for (tref io_var : io_vars) {
 		// Check if input stream variable
-		if (tt(io_var) | tau::io_var | tau::in) {
+		if (tau::get(io_vars.back())[0].is_input_variable()) {
 			// Give name of io_var and make it non-user definable with "_"
-			tref uiter_const =
-				tau::build_bf_uninterpreted_constant(
-					"_" + TAU_TO_STR(io_var),
-					std::to_string(number));
-			tref cdn = tau::build_wff_eq(tau::build_bf_xor(
-				tau::get(tau::bf, io_var), uiter_const));
+			tref uc = tau::build_bf_uconst("_" + TAU_TO_STR(io_var),
+							std::to_string(number));
+			tref cdn = tau::build_bf_eq(tau::build_bf_xor(
+				tau::get(tau::bf, io_var), uc));
 			guard = tau::build_wff_and(guard, cdn);
 		}
 	}
@@ -749,7 +688,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	if (smt_fms.empty()) return { fm, 0 };
 	tref aw_fm = t.find_top(is_child<node, tau::wff_always>);
 
-	int_t max_st_lookback = tau::get_max_shift(
+	int_t max_st_lookback = get_max_shift<node>(
 		t.select_top_until(is_child<node, tau::io_var>,
 					is_child<node, tau::wff_always>));
 
@@ -758,7 +697,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	if (aw_fm != nullptr) {
 		aw_io_vars = tau::get(aw_fm)
 				.select_top(is_child<node, tau::io_var>);
-		aw_lookback = tau::get_max_shift(aw_io_vars);
+		aw_lookback = get_max_shift<node>(aw_io_vars);
 	}
 
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
@@ -768,7 +707,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
 		trefs st_io_vars = tau::get(smt_fms[n])
 				.select_top(is_child<node, tau::io_var>);
-		int_t st_lookback = tau::get_max_shift(st_io_vars);
+		int_t st_lookback = get_max_shift<node>(st_io_vars);
 
 		// Transform constant time constraints to io var in sometimes statement
 		tref ctn_initials = tau::_T(), ctn_assm = tau::_T();
@@ -779,21 +718,21 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 				.select_top(is_child<node, tau::io_var>);
 
 		std::stringstream ss; ss << "_e" << n;
+		tref out = tau::build_out_var(ss.str());
 		// Build the eventual var flags based on the maximal lookback
 		tref eNt_without_lookback = tau::get(tau::bf,
-					build_io_out<node>(ss.str(), "t"));
-		tref eNt = build_flag_on_lookback<node>(
-			ss.str(), "t", max_st_lookback + aw_lookback);
-		tref eNt_prev = build_prev_flag_on_lookback<node>(
-			ss.str(), "t", max_st_lookback + aw_lookback);
+					build_io<node>(out, "t"));
+		tref eNt = build_flag_on_lookback<node>(out, "t",
+						max_st_lookback + aw_lookback);
+		tref eNt_prev = build_prev_flag_on_lookback<node>(out, "t",
+						max_st_lookback + aw_lookback);
 
-		tref eN0_is_not_zero = tau::build_wff_neq(
-			tau::get(tau::bf, build_io_out_const<node>(
-				ss.str(), start_time)));
-		tref eNt_is_zero          = tau::build_wff_eq(eNt);
-		// tref eNt_is_not_zero      = tau::build_wff_neq(eNt);
-		tref eNt_prev_is_zero     = tau::build_wff_eq(eNt_prev);
-		tref eNt_prev_is_not_zero = tau::build_wff_neq(eNt_prev);
+		tref eN0_is_not_zero = tau::build_bf_neq(tau::get(tau::bf,
+					build_io_const<node>(out,start_time)));
+		tref eNt_is_zero          = tau::build_bf_eq(eNt);
+		// tref eNt_is_not_zero      = tau::build_bf_neq(eNt);
+		tref eNt_prev_is_zero     = tau::build_bf_eq(eNt_prev);
+		tref eNt_prev_is_not_zero = tau::build_bf_neq(eNt_prev);
 		// transform `sometimes psi` to:
 		// (_eN[t-1] != 0 && _eN[t] == 0) -> psi (N is nth `sometimes`)
 		tref shifted_sometimes = (max_st_lookback==0 && aw_lookback==0)
@@ -850,7 +789,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 							res, aw_io_vars, 1);
 			res = tau::build_wff_and(res,
 				tau::build_wff_sometimes(
-					tau::build_wff_eq(ev_collection)));
+					tau::build_bf_eq(ev_collection)));
 		}
 	} else {
 		// Conjunct new sometimes part if present
@@ -858,7 +797,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 			res = tau::build_wff_and(
 				tau::build_wff_always(ev_assm),
 				tau::build_wff_sometimes(
-					tau::build_wff_eq(ev_collection)));
+					tau::build_bf_eq(ev_collection)));
 		else return  { fm, max_st_lookback };
 	}
 
@@ -875,8 +814,8 @@ tref add_st_ctn(tref st, const int_t timepoint, const int_t steps) {
 	for (int_t s = 0; s <= steps; ++s) {
 		typename tau::subtree_map changes;
 		for (size_t i = 0; i < io_vars.size(); ++i) {
-			auto new_io_var = transform_io_var(io_vars[i],
-				tau::get_io_name(io_vars[i]), timepoint + s);
+			auto new_io_var = 
+				transform_io_var<node>(io_vars[i], timepoint + s);
 			changes[io_vars[i]] = new_io_var;
 		}
 		if (s == steps) st_ctn = tau::build_wff_and(st_ctn,
@@ -892,7 +831,7 @@ tref make_initial_run(tref aw, const int_t max_st_lookback) {
 	// get lookback of aw
 	using tau = tree<node>;
 	trefs io_vars = tau::get(aw).select_top(is_child<node, tau::io_var>);
-	const int_t t = tau::get_max_shift(io_vars);
+	const int_t t = get_max_shift<node>(io_vars);
 
 	tref run;
 	for (int_t i = 0; i < max_st_lookback; ++i) {
@@ -933,12 +872,12 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 				.select_top(is_child<node, tau::io_var>);
 
 	// Note that time_point is also the lookback
-	const int_t time_point = tau::get_max_shift(io_vars);
+	const int_t time_point = get_max_shift<node>(io_vars);
 
 	// There must not be a constant time constraint at this point
 	assert(!tau::get(aw).find_top(is<node, tau::constraint>));
 
-	int_t point_after_inits = tau::get_max_initial(io_vars) + 1;
+	int_t point_after_inits = get_max_initial<node>(io_vars) + 1;
 	// Shift flags in order to match lookback of always part
 	st_flags = shift_io_vars_in_fm<node>(
 					st_flags, st_io_vars, time_point - 1);
@@ -981,9 +920,9 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	std::set<std::pair<std::string, int_t>> initials;
 
 	for (int_t i = 0; i < (int_t) io_vars.size(); ++i)
-		if (tau::is_io_initial(io_vars[i]))
-			initials.emplace(tau::get_io_name(io_vars[i]),
-				tau::get_io_time_point(io_vars[i]));
+		if (is_io_initial<node>(io_vars[i]))
+			initials.emplace(tau::get(io_vars[i]).get_string(),
+				get_io_time_point<node>(io_vars[i]));
 
 	// Calculate fix point and get unbound continuation
 	BOOST_LOG_TRIVIAL(trace) << "chi base: " << tau::build_wff_and(aw, st_flags);
@@ -1053,7 +992,7 @@ tref transform_to_execution(tref fm,
 	const bool output = false)
 {
 	using tau = tree<node>;
-	DBG(assert(tau::get_dnf_wff_clauses(fm).size() == 1);)
+	DBG(assert(get_dnf_wff_clauses<node>(fm).size() == 1);)
 #ifdef TAU_CACHE
 	static std::map<std::pair<tau_<node>, int_t>, tau_<node>> cache;
 	if (auto it = cache.find(std::make_pair(fm, start_time)); it != cache.end())
@@ -1133,7 +1072,7 @@ bool is_tau_formula_sat(tref fm, const int_t start_time = 0,
 	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(fm);
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
-	trefs clauses = tau::get_leaves(normalized_fm, tau::wff_or);
+	trefs clauses = get_leaves<node>(normalized_fm, tau::wff_or);
 	// Convert each disjunct to unbounded continuation
 	for (tref clause : clauses) {
 		if (tau::get(transform_to_execution<node>(
@@ -1154,11 +1093,11 @@ bool is_tau_impl(tref f1, tref f2) {
 	auto f2_norm = normalizer_step<node>(f2);
 	auto imp_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_imply(f1_norm, f2_norm)));
-	auto clauses = tau::get_dnf_wff_clauses(imp_check);
+	auto clauses = get_dnf_wff_clauses<node>(imp_check);
 	// Now check that each disjunct is not satisfiable
 	for (tref c : clauses) {
 		auto ctn = transform_to_execution<node>(c);
-		if (!tau::subtree_equals(ctn, tau::_F())) return false;
+		if (tau::get(ctn) != tau::get_F()) return false;
 	}
 	return true;
 }
@@ -1172,7 +1111,7 @@ bool are_tau_equivalent(tref f1, tref f2) {
 	auto f2_norm = normalizer_step<node>(f2);
 	auto equiv_check = normalize_with_temp_simp<node>(
 		tau::build_wff_neg(tau::build_wff_equiv(f1_norm, f2_norm)));
-	auto clauses = tau::get_dnf_wff_clauses(equiv_check);
+	auto clauses = get_dnf_wff_clauses<node>(equiv_check);
 	// Now check that each disjunct is not satisfiable
 	for (const auto& c : clauses) {
 		auto ctn = transform_to_execution<node>(c);
@@ -1191,12 +1130,11 @@ tref simp_tau_unsat_valid(tref fm, const int_t start_time = 0,
 	// Check if formula is valid
 	if (is_tau_impl<node>(tau::_T(), fm)) return tau::_T();
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
-	trefs clauses = tau::get_leaves(normalized_fm, tau::wff_or);
+	trefs clauses = get_leaves<node>(normalized_fm, tau::wff_or);
 
 	// Check satisfiability of each clause
-	for (tref clause: clauses) if (tau::subtree_equals(tau::_F(),
-		transform_to_execution<node>(clause, start_time, output)))
-			clause = tau::_F();
+	for (tref clause: clauses) if (tau::get(transform_to_execution<node>(
+		clause, start_time, output)) == tau::get_F()) clause =tau::_F();
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) End simp_tau_unsat_valid";
 	return tau::build_wff_or(clauses);

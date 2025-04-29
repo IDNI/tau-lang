@@ -1,12 +1,80 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
+
+namespace idni::tau_lang {
+
+// -----------------------------------------------------------------------------
+// Tau tree implementation declarations
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// ba and ref types inference (tau_tree_types.tmpl.h)
+template <NodeType node>
+tref infer_ba_types(tref n);
+template <NodeType node>
+std::optional<rr> infer_ref_types(const rr& nso_rr);
+template <NodeType node>
+std::optional<rr> infer_ref_types(const rr& nso_rr, ref_types<node>& ts);
+
+// -----------------------------------------------------------------------------
+// various extractors (tau_tree_extractors.tmpl.h)
+template <NodeType node>
+size_t get_type_sid(tref n);
+template <NodeType node>
+rr_sig get_rr_sig(tref n);
+template <NodeType node>
+rewriter::rules get_rec_relations(tref r);
+template <NodeType node>
+std::optional<rr> get_nso_rr(tref ref);
+template <NodeType node>
+std::optional<rr> get_nso_rr(const rewriter::rules& rules, tref main_fm);
+template <NodeType node>
+void get_leaves(tref n, typename node::type branch, trefs& leaves);
+template <NodeType node>
+trefs get_leaves(tref n, typename node::type branch);
+template <NodeType node>
+trefs get_dnf_wff_clauses(tref n);
+template <NodeType node>
+trefs get_cnf_wff_clauses(tref n);
+template <NodeType node>
+trefs get_dnf_bf_clauses(tref n);
+template <NodeType node>
+trefs get_cnf_bf_clauses(tref n);
+template <NodeType node>
+bool is_io_initial(tref io_var);
+template <NodeType node>
+bool is_io_shift(tref io_var);
+template <NodeType node>
+int_t get_io_time_point(tref io_var);
+template <NodeType node>
+int_t get_io_shift(tref io_var);
+template <NodeType node>
+const std::string& get_io_name(tref io_var);
+template <NodeType node>
+tref get_tau_io_name(tref io_var);
+template <NodeType node>
+int_t get_io_var_shift(tref io_var);
+template <NodeType node>
+int_t get_max_shift(const trefs& io_vars, bool ignore_temps = false);
+template <NodeType node>
+int_t get_max_initial(const trefs& io_vars);
+template <NodeType node>
+typename tree<node>::subtree_set get_free_vars_from_nso(tref n);
+template <NodeType node>
+bool has_temp_var(tref n);
+
+} // idni::tau_lang namespace
+
+#include "dict.h"  // string_id and string_from_id
+#include "rr.h"    // recurrence relations structure
+
 #include "tau_tree_node.tmpl.h"
 #include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
 #include "tau_tree_queries.tmpl.h"
 #include "tau_tree_builders.tmpl.h"
-#include "tau_tree_extractors.tmpl.h"
+#include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name
 #include "tau_tree_types.tmpl.h"
 #include "tau_tree_from_parser.tmpl.h"
 
@@ -208,6 +276,18 @@ tref tree<node>::only_child() const {
 }
 
 template <NodeType node>
+tref tree<node>::trim() const { return first(); }
+
+template <NodeType node>
+tref tree<node>::trim(tref t) { return get(t).first(); }
+
+template <NodeType node>
+tref tree<node>::trim2() const { return first_tree().first(); }
+
+template <NodeType node>
+tref tree<node>::trim2(tref t) { return get(t)[0].first(); }
+
+template <NodeType node>
 trefs tree<node>::get_children() const {
 	return base_t::get_children();
 }
@@ -267,8 +347,7 @@ const tree<node>& tree<node>::only_child_tree() const {
 template <NodeType node>
 bool tree<node>::is_string_nt(size_t nt) {
 	static const std::set<size_t> string_nts{
-		sym, type, source, named_binding, capture, variable,
-		in_var_name, out_var_name, uninter_const_name, file_name,
+		sym, type, source, capture, var_name, uconst, file_name,
 		ctnvar, option_name, option_value
 	};
 	return string_nts.contains(nt);
@@ -331,7 +410,13 @@ template <NodeType node>
 bool tree<node>::is_ba_constant() const { return is(bf_constant); }
 
 template <NodeType node>
-bool tree<node>::is_term() const { return this->value.term; }
+bool tree<node>::is_term() const { return this->value.term || is(io_var); }
+
+template <NodeType node>
+bool tree<node>::is_input_variable() const { return is(io_var) && !is_term(); }
+
+template <NodeType node>
+bool tree<node>::is_output_variable() const { return is(io_var) && is_term(); }
 
 template <NodeType node>
 bool tree<node>::child_is(size_t nt) const {

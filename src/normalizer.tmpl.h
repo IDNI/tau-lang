@@ -101,8 +101,7 @@ int_t get_new_var_id(const tref fm) {
 template <NodeType node>
 tref get_new_uninterpreted_constant(const tref fm, const std::string& name) {
 	using tau = tree<node>;
-	trefs uninter_consts = tau::get(fm).select_top(
-		is<node, node::type::uninterpreted_constant>);
+	trefs uninter_consts = tau::get(fm).select_top(is<node, tau::uconst>);
 	std::set ids{ 0 };
 	for (tref uninter_const : uninter_consts) {
 		const auto& tmp = tau::get(uninter_const).get_string();
@@ -110,7 +109,7 @@ tref get_new_uninterpreted_constant(const tref fm, const std::string& name) {
 		if (!tmp.empty()) ids.insert(std::stoi(id));
 	}
 	std::string id = std::to_string(*ids.rbegin() + 1);
-	tref uninter_const = tau::build_bf_uninterpreted_constant("", name + id);
+	tref uninter_const = tau::build_bf_uconst("", name + id);
 	return uninter_const;
 }
 
@@ -121,7 +120,7 @@ std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	//ptree<BAs...>(std::cout << "ref? ", ref) << "\n";
-	std::pair<rr_sig, std::vector<offset_t>> ret{ tau::get_rr_sig(ref), {} };
+	std::pair<rr_sig, std::vector<offset_t>> ret{ get_rr_sig<node>(ref), {} };
 	auto offsets = tt(ref) | tau::offsets || tau::offset;
 	//BOOST_LOG_TRIVIAL(debug) << "(T) -- get_ref " << ref << " " << ret.first << " offsets.size: " << offsets.size();
 	for (auto offset : offsets()) {
@@ -174,7 +173,7 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	DBG(assert(!fm.find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
-	auto vars = tau::get_free_vars_from_nso(fm.get());
+	auto vars = get_free_vars_from_nso<node>(fm.get());
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
@@ -191,7 +190,7 @@ bool is_non_temp_nso_unsat(tref n) {
 	DBG(assert(!tau::get(n).find_top(is<node, tau::wff_sometimes>));)
 
 	tref nn = n;
-	auto vars = tau::get_free_vars_from_nso(nn);
+	auto vars = get_free_vars_from_nso<node>(nn);
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	const auto& t = tau::get(normalize_non_temp<node>(nn));
 	assert((t == tau::get_T() || t == tau::get_F()
@@ -215,7 +214,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	if (t1[0].is(tau::wff_always)) n1 = t1[0].first();
 	if (t2[0].is(tau::wff_always)) n2 = t2[0].first();
 
-	if (tau::subtree_equals(n1, n2)) {
+	if (tau::get(n1) == tau::get(n2)) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: true (equiv nodes)";
 		return true;
 	}
@@ -235,8 +234,8 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		return false;
 	}
 
-	auto vars = tau::get_free_vars_from_nso(n1);
-	auto vars2 = tau::get_free_vars_from_nso(n2);
+	auto vars = get_free_vars_from_nso<node>(n1);
+	auto vars2 = get_free_vars_from_nso<node>(n2);
 	vars.insert(vars2.begin(), vars2.end());
 
 	tref imp1 = tau::build_wff_imply(n1, n2);
@@ -291,13 +290,13 @@ bool is_nso_impl(tref n1, tref n2) {
 	if (t1[0].is(tau::wff_always)) n1 = t1[0].first();
 	if (t2[0].is(tau::wff_always)) n2 = t2[0].first();
 
-	if (tau::subtree_equals(n1, n2)) {
+	if (tau::get(n1) == tau::get(n2)) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End is_nso_impl: true (n1 implies n2)";
 		return true;
 	}
 
-	auto vars = tau::get_free_vars_from_nso(n1);
-	auto vars2 = tau::get_free_vars_from_nso(n2);
+	auto vars  = get_free_vars_from_nso<node>(n1);
+	auto vars2 = get_free_vars_from_nso<node>(n2);
 	vars.insert(vars2.begin(), vars2.end());
 
 	tref imp = tau::build_wff_imply(n1, n2);
@@ -333,11 +332,11 @@ bool are_bf_equal(tref n1, tref n2) {
 		return true;
 	}
 
-	auto vars = tau::get_free_vars_from_nso(n1);
-	auto vars2 = tau::get_free_vars_from_nso(n2);
+	auto vars = get_free_vars_from_nso<node>(n1);
+	auto vars2 = get_free_vars_from_nso<node>(n2);
 	vars.insert(vars2.begin(), vars2.end());
 
-	tref bf_equal_fm = tau::build_wff_eq(tau::build_bf_xor(n1, n2));
+	tref bf_equal_fm = tau::build_bf_eq(tau::build_bf_xor(n1, n2));
 
 	for (tref v : vars) bf_equal_fm = tau::build_wff_all(v, bf_equal_fm);
 	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << bf_equal_fm;
@@ -370,7 +369,7 @@ tref normalize_with_temp_simp(tref fm) {
 	const auto& red_fm = tau::get(normalizer_step<node>(fm));
 	if (red_fm == tau::get_T() || red_fm == tau::get_F())
 		return red_fm.get();
-	trefs clauses = tau::get_dnf_wff_clauses(red_fm.get());
+	trefs clauses = get_dnf_wff_clauses<node>(red_fm.get());
 	tref nn = tau::_F();
 	for (tref clause : clauses) {
 		const auto& t = tau::get(clause);
@@ -753,7 +752,7 @@ struct fixed_point_transformer {
 		bool is_ref = (t.is(tau::wff) && is<node, tau::wff_ref>(ref))
 			|| (t.is(tau::bf) && is<node, tau::bf_ref>(ref));
 		if (!is_ref) return n;
-		auto sig = tau::get_rr_sig(ref);
+		auto sig = get_rr_sig<node>(ref);
 		auto typopt = types.get(sig);
 		if (!typopt) { // this should not happen if rr_types.ok()
 			BOOST_LOG_TRIVIAL(error)
