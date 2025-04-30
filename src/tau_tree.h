@@ -289,6 +289,9 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	std::string to_str() const;
 	std::string tree_to_str() const;
 	std::string dump_to_str(bool subtree = true) const;
+	std::ostream& dump(std::ostream& os, bool subtree = true) const;
+	const tree& dump(bool subtree = true) const;
+	static std::ostream& dump(std::ostream& os, tref n, bool subtree = true);
 
 	// nt category helpers
 	static bool is_digital_nt(size_t nt);

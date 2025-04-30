@@ -123,7 +123,30 @@ std::string tree<node>::tree_to_str() const {
 template <NodeType node>
 std::string tree<node>::dump_to_str(bool subtree) const {
 	std::stringstream ss;
-	return this->dump(ss, subtree), ss.str();
+	return dump(ss, subtree), ss.str();
+}
+
+template <NodeType node>
+std::ostream& tree<node>::dump(std::ostream& os, bool subtree) const {
+	return dump(os, get(), subtree);
+}
+
+template <NodeType node>
+const tree<node>& tree<node>::dump(bool subtree) const {
+	return dump(std::cout, subtree), *this;
+}
+
+template <NodeType node>
+std::ostream& tree<node>::dump(std::ostream& os, tref n, bool subtree) {
+	const auto& t = get(n);
+	if (bool print_lcrs_pointers = false; print_lcrs_pointers) {
+		os << t.value << " [" << n ;
+		if (t.has_right_sibling()) os << " >> " << t.right_sibling();
+		if (t.has_child())         os << " __ " << t.left_child();
+		os << "] ";
+	}
+	if (subtree) t.print_in_line(os);
+	return os;
 }
 
 //------------------------------------------------------------------------------
@@ -146,6 +169,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	size_t depth = 0;
 	std::unordered_map<tref, size_t> chpos;
 	std::unordered_set<tref> wraps, indented, highlighted;
+	char bf_and_arg1_last_char_written = 0;
+
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
 			bf_splitter, bf_ref, bf_neg, bf_constant, bf_t, bf_f,
@@ -219,7 +244,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
 			return false;
 		auto p_it = prio.find(pt);
-		auto n_it   = prio.find(nt);
+		auto n_it = prio.find(nt);
 		if (p_it == prio.end() || n_it == prio.end()) {
 #ifdef DEBUG
 			std::cerr << "No priority for " << (p_it == prio.end()
@@ -293,6 +318,16 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		else return hl_path.push_back(nt), os << it->second, true;
 	};
 
+	auto get_bf_and_arg1_last_char = [&](const auto& bf_and_arg1) {
+		std::stringstream ss;
+		bool is_hilight = pretty_printer_highlighting;
+		if (is_hilight) pretty_printer_highlighting = false;
+		bf_and_arg1.print(ss);
+		if (is_hilight) pretty_printer_highlighting = true;
+		auto str = ss.str();
+		bf_and_arg1_last_char_written = str[str.size()-1];
+	};
+
 	auto on_enter = [&](tref ref, tref parent) {
 		const auto& t = get(ref);
 #ifdef DEBUG_TRAVERSAL
@@ -307,6 +342,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		if (syntax_highlight(nt)) highlighted.insert(ref);
 
 		switch (nt) {
+			case bf_and:     get_bf_and_arg1_last_char(t[0]); break;
 			case bf_f:              os << '0'; break;
 			case bf_t:              os << '1'; break;
 			case wff_f:             os << 'F'; break;
@@ -402,7 +438,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 		size_t nt = t.get_type();
 		switch (nt) {
-			case bf_and:            break;
+			case bf_and:
+				if (isdigit(bf_and_arg1_last_char_written)
+					|| t[0].is(tau::bf_constant))
+						os << " ";
+				break;
 			case bf_or:             os << "|"; break;
 			case bf_xor:            os << "+"; break;
 			case bf_eq:             os << " = "; break;
