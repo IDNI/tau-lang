@@ -1,22 +1,22 @@
 cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
-	# tree independent tests
-	bool
-	product_ba
-	hbdd
-	variant_ba
-
-	# new tree
 	ba_constants
+	
+	# new tree
 	bindings
+	bool
+	hbdd
 	normal_forms
 	nso_rr
+	product_ba
 	rules-bf_parsing
+	rules-wff_execution
 	rules-wff_parsing
 	sbf_ba_parsing
 	tau_parser
 	traversal
+	variant_ba
 
 	# empty tests?
 	# interpreter
