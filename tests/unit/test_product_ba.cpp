@@ -11,9 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
+#include "test_init.h"
 #include "boolean_algebras/product_ba.h"
 
 TEST_SUITE("product boolean algebra") {

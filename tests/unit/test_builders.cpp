@@ -1,24 +1,16 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
-
-#include "boolean_algebras/bdds/babdd.h"
-
-using tau = tree<node<Bool>>;
-using tt = tau::traverser;
+#include "test_init.h"
+#include "tau_tree.h"
+#include "test_Bool_helpers.h"
 
 // TODO (MEDIUM) split into test_builder-parsing and test_builder-execution
 
-
 TEST_SUITE("configuration") {
-
 	TEST_CASE("disable hooks") {
 		tau::use_hooks = false;
 		CHECK( tau::use_hooks == false );
 	}
-
 }
 
 TEST_SUITE("builders parsing") {
@@ -66,7 +58,7 @@ TEST_SUITE("builders parsing") {
 struct builders_exe_fixture {
 	builders_exe_fixture() {
 		const char* sample = " X = 0 .";
-		auto fm = bmake_tt(sample);
+		auto fm = tt(tau::get(sample));
 		auto bfs = (fm | tau::spec | tau::main | tau::wff | tau::bf_eq || tau::bf)();
 		X = bfs[0] | tau::variable | tt::ref;
 		F = bfs[1] | tau::bf_f | tt::ref;

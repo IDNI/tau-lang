@@ -1,11 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
-
-#include "boolean_algebras/bdds/babdd.h"
-#include "boolean_algebras/sbf_ba.h"
+#include "test_init.h"
+#include "tau.h"
+#include "test_Bool_helpers.h"
 
 variant<tau_ba<sbf_ba>, sbf_ba> parse(const char* src) {
 	static sbf_ba_factory<tau_ba<sbf_ba>, sbf_ba> bf;

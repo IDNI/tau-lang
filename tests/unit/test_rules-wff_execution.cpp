@@ -1,14 +1,8 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
-#include "normal_forms.h"
-#include "normalizer.h"
-#include "nso_rr.h"
-
-using bnode = tau_lang::node<Bool>;
-using tau = tree<bnode>;
+#include "test_init.h"
+#include "tau.h"
+#include "test_Bool_helpers.h"
 
 std::tuple<tref, tref, tref> test_rule(const std::string& rule_str) {
         auto tau_rule = tau::get_rules(rule_str)[0];

@@ -11,11 +11,9 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
-#include "normalizer.h"
-
+#include "test_init.h"
+#include "tau.h"
+#include "test_Bool_helpers.h"
 
 // TODO (HIGH) write tests to check build_dnf_from_clauses
 // TODO (HIGH) write tests to check to_minterm
