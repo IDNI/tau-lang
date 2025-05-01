@@ -665,6 +665,16 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	auto& dnf, const auto& is_var, int_t p, bool is_wff)
 {
 	using tau = tree<node>;
+	// std::cout << "assign_and_reduce " << (is_wff ? "wff" : "bf") << ": " << TAU_DUMP_TO_STR(fm) << "\n";
+	// // std::cout << "fm: "; TAU_DUMP(fm) << "\n";
+	// for (auto v : vars) {
+	// 	std::cout << "v: " << tau::get(v).dump_to_str() << "\n";
+	// }
+	// std::cout << "p: " << p << "\n";
+	// auto report = [&](bool result) {
+	// 	std::cout << "\t assign_and_reduce : "; TAU_PRINT(fm) << " result: " << (result ? "ok" : "nok") << "\n";
+	// 	return result;
+	// };
 	// Check if all variables are assigned
 	if((int_t) vars.size() == p) {
 		tref fm_simp = nullptr;
@@ -757,10 +767,6 @@ tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 		return  tau::get(n).child_is(tau::variable);
 	};
 	auto vars = t.select_top(is_var);
-	std::cout << "vars.size(): " << vars.size() << "\n";
-	for (auto v : vars) {
-		std::cout << "v: " << tau::get(v).dump_to_str() << "\n";
-	}
 	sort(vars.begin(), vars.end(), lex_var_comp<node>);
 
 	std::vector<int_t> i(vars.size()); // Record assignments of vars
@@ -826,14 +832,13 @@ tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
 	std::map<tref, tref, typename tau::subtree_equality> changes = {};
-	for (const auto& bf : t.select_top(
-				is<node, tau::bf>))
-	{
-		auto dnf = bf_boole_normal_form<node>(bf);
+	for (tref bf : t.select_top(is<node, tau::bf>)) {
+		tref dnf = bf_boole_normal_form<node>(bf);
 		if (dnf != bf) changes[bf] = dnf;
 	}
-	if (changes.empty()) return fm;
-	else return rewriter::replace<node>(fm, changes);
+	tref x = changes.empty()? fm : rewriter::replace<node>(fm, changes);
+	// BOOST_LOG_TRIVIAL(trace) << "bf reduced canonical: " << TAU_TO_STR(x) << "\n";
+	return x;
 }
 
 template <NodeType node>
@@ -1072,7 +1077,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	// Pull negation out of equality
 	bool wff = type == tau::wff;
 	tref new_fm = wff ? to_mnf<node>(fm) : fm;
-	BOOST_LOG_TRIVIAL(trace) << "(F) new_fm: " << TAU_TREE_TO_STR(new_fm);
+	BOOST_LOG_TRIVIAL(trace) << "(F) new_fm1: " << TAU_TREE_TO_STR(new_fm);
 	BOOST_LOG_TRIVIAL(trace) << "(F) " << (wff ? "wff" : "bf");
 	if (wff) {
 		// Make equalities canonical
@@ -1085,7 +1090,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 			if (tau::get(sorted_eq) != tau::get(eq)) changes.emplace(eq, sorted_eq);
 		}
 		new_fm = rewriter::replace<node>(new_fm, changes);
-		BOOST_LOG_TRIVIAL(trace) << "(F) new fm: " << TAU_TO_STR(new_fm);
+		BOOST_LOG_TRIVIAL(trace) << "(F) new fm2: " << TAU_TO_STR(new_fm);
 	}
 
 	trefs vars = wff ? tau::get(new_fm).select_top(is_wff_bdd_var<node>)
