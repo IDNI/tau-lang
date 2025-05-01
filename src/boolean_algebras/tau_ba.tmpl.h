@@ -33,7 +33,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator&(const tau_ba_t& other) const {
 	auto nmain = tau::geth(tau::build_wff_and(
 			nso_rr.main->get(), other.nso_rr.main->get()));
 	auto nrec_relations =
-		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
+		rewriter::merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba_t(nrec_relations, nmain);
 }
 
@@ -45,7 +45,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator|(const tau_ba_t& other) const {
 			normalizer<tau_ba_node>(nso_rr.main->get()),
 			normalizer<tau_ba_node>(other.nso_rr.main->get())));
 	auto nrec_relations =
-		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
+		rewriter::merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba_t(nrec_relations, nmain);
 }
 
@@ -57,7 +57,7 @@ tau_ba<BAs...> tau_ba<BAs...>::operator+(const tau_ba_t& other) const {
 			normalizer<tau_ba_node>(nso_rr.main->get()),
 			normalizer<tau_ba_node>(other.nso_rr.main->get())));
 	rewriter::rules nrec_relations =
-		merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
+		rewriter::merge(nso_rr.rec_relations, other.nso_rr.rec_relations);
 	return tau_ba_t(nrec_relations, nmain);
 }
 
@@ -98,18 +98,6 @@ bool tau_ba<BAs...>::is_one() const {
 // 	// TODO (MEDIUM) implement properly
 // 	return rule;
 // }
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-rewriter::rules tau_ba<BAs...>::merge(
-	const rewriter::rules& rs1, const rewriter::rules& rs2) const
-{
-	// TODO (MEDIUM) implement properly calling renaming
-	rewriter::rules nrs;
-	nrs.insert(nrs.end(), rs1.begin(), rs1.end());
-	nrs.insert(nrs.end(), rs2.begin(), rs2.end());
-	return nrs;
-}
 
 template <typename... BAs>
 requires BAsPack<BAs...>
