@@ -208,6 +208,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static const tree& get(const tref id);
 	static const tree& get(const htree::sp& h);
 	static htree::sp geth(tref id);
+	static htree::sp geth(const tree& n);
 
 	// creation (transformation) from tau_parser::tree
 	template <typename binder>
