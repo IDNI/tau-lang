@@ -96,10 +96,10 @@ struct repeat_once {
 };
 
 template <NodeType node>
-steps<step<node>, node> operator|(const rewriter::library& l,
+steps<node, step<node>> to_steps(const rewriter::library& l,
 	const rewriter::library& r)
 {
-	auto s = steps<step<node>, node>(step<node>(l));
+	auto s = steps<node, step<node>>(step<node>(l));
 	s.libraries.push_back(r);
 	return s;
 }
@@ -108,7 +108,7 @@ template <NodeType node, typename step_t>
 steps<repeat_each<node, step_t>, node> operator|(
 	const repeat_each<node, step_t>& l, const repeat_each<node, step_t>& r)
 {
-	auto s = steps<repeat_each<node, step_t>, node>(l);
+	auto s = steps<node, repeat_each<node, step_t>>(l);
 	s.libraries.push_back(r);
 	return s;
 }
@@ -123,7 +123,7 @@ steps<repeat_all<node, step_t>, node> operator|(
 }
 
 template <NodeType node, typename step_t>
-steps<step<node>, node> operator|(const steps<step<node>, node>& s,
+steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	const step_t& l)
 {
 	auto ns = s;
@@ -132,7 +132,7 @@ steps<step<node>, node> operator|(const steps<step<node>, node>& s,
 }
 
 template <NodeType node, typename step_t>
-steps<step<node>, node> operator|(const steps<step<node>, node>& s,
+steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	const rewriter::library& l)
 {
 	auto ns = s;
@@ -141,7 +141,7 @@ steps<step<node>, node> operator|(const steps<step<node>, node>& s,
 }
 
 template <NodeType node>
-steps<step<node>, node> operator|(const steps<step<node>, node>& s,
+steps<node, step<node>> operator|(const steps<node, step<node>>& s,
 	const rewriter::library& l)
 {
 	auto ns = s;
@@ -150,29 +150,46 @@ steps<step<node>, node> operator|(const steps<step<node>, node>& s,
 }
 
 template <NodeType node>
-tref operator|(const tref& n, const rewriter::library& l) {
-	auto s = step<node>(l);
-	return s(n);
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n, const rewriter::library& l)
+{
+	using tt = typename tree<node>::traverser;
+	return n | tt::f(step<node>(l));
 }
 
 template <NodeType node, typename step_t>
-tref operator|(const tref& n, const steps<step_t, node>& s) {
-	return s(n);
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n, const steps<step_t, node>& s)
+{
+	using tt = typename tree<node>::traverser;
+	return n | tt::f(s);
 }
 
 template <NodeType node, typename step_t>
-tref operator|(const tref& n, const repeat_once<node, step_t>& r) {
-	return r(n);
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n,
+	const repeat_once<node, step_t>& r)
+{
+	using tt = typename tree<node>::traverser;
+	return n | tt::f(r);
 }
 
 template <NodeType node, typename step_t>
-tref operator|(const tref& n, const repeat_all<node, step_t>& r) {
-	return r(n);
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n,
+	const repeat_all<node, step_t>& r)
+{
+	using tt = typename tree<node>::traverser;
+	return n | tt::f(r);
 }
 
 template <NodeType node, typename step_t>
-tref operator|(const tref& n, const repeat_each<node, step_t>& r) {
-	return r(n);
+typename tree<node>::traverser operator|(
+	const typename tree<node>::traverser& n,
+	const repeat_each<node, step_t>& r)
+{
+	using tt = typename tree<node>::traverser;
+	return n | tt::f(r);
 }
 
 } // namespace idni::tau_lang
