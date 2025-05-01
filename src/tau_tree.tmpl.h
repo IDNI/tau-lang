@@ -106,6 +106,11 @@ htree::sp tree<node>::geth(tref h) {
 	return base_t::geth(h);
 }
 
+template <NodeType node>
+htree::sp tree<node>::geth(const tree& n) {
+	return geth(n.get());
+}
+
 //------------------------------------------------------------------------------
 // creation with tref childs
 
