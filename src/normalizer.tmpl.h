@@ -487,20 +487,16 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 // Normalizes a Boolean function in which recurrence relations are present
 template <NodeType node>
 tref bf_normalizer_with_rec_relation(const rr &bf) {
+	using tt = typename tree<node>::traverser;
 	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Begin calculate recurrence relation";
-
 	auto main = calculate_all_fixed_points<node>(bf);
 	if (!main) return nullptr;
-
-	auto bf_unfolded = main | repeat_all<node, step<node>>(
-					step<node>(bf.rec_relations));
-
+	tref bf_unfolded = tt(main) | repeat_all<node, step<node>>(
+					step<node>(bf.rec_relations)) | tt::ref;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End calculate recurrence relation";
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
-
 	auto result = bf_boole_normal_form<node>(bf_unfolded);
-
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
 
 	return result;
