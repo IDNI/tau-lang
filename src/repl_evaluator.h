@@ -84,24 +84,42 @@ struct repl_evaluator {
 	std::string prompt();
 
 private:
-
+	// eval
 	int eval_cmd(const tt& n);
-	bool update_charvar(bool value);
+
+	// errors
+	tref invalid_argument() const;
 
 	// helpers
 	tref make_cli(const std::string& src);
 
-	memory_ref memory_retrieve(const tt& n, bool silent = false);
+	// returns if a subtree of a node contains a nonterminal
+	bool contains(const tt& n, typename node::type nt) const;
+	bool update_charvar(bool value);
+
+	// memory
+	memory_ref memory_retrieve(const tt& n, bool silent = false) const;
 	void memory_store(tref value);
 	void print_memory(const htree::sp& mem, const size_t id,
 		const size_t size, bool print_relative_index = true) const;
 	std::optional<size_t> get_memory_index(const tt& n, const size_t size,
 						bool silent = false) const;
-	std::optional<std::pair<size_t, tref>> get_type_and_arg(const tt& n);
-	// returns if a subtree of a node contains a nonterminal
-	bool contains(const tt& n, node::type nt);
-	// apply definitions and rr to a program
-	tref apply_rr_to_rr_tau_nso(const size_t type, const tt& program);
+
+
+	// get argument and type from input or from memory
+	std::optional<std::pair<size_t, tref>> get_type_and_arg(
+		const tt& n) const;
+	// get bf or wff from argument or from memory
+	tt get_(typename node::type nt, const tt& n,
+		bool suppress_error = false) const;
+	tt get_bf(const tt& n, bool suppress_error = false) const;
+	tt get_wff(const tt& n) const;
+
+	// get nso rr from argument and add definitions to it
+	std::optional<rr> get_nso_rr_with_defs(const tt& n) const;
+
+	// apply definitions and rr to a provided spec or formula
+	tref apply_rr_to_nso_rr_with_defs(const tt& spec) const;
 
 	// commands
 	void not_implemented_yet();
@@ -135,16 +153,11 @@ private:
 	tref qelim_cmd(const tt& n);
 	tref normalize_cmd(const tt& n);
 	tref sat_cmd(const tt& n);
+	tref unsat_cmd(const tt& n);
+	tref valid_cmd(const tt& n);
 	void run_cmd(const tt& n);
 	void solve_cmd(const tt& n);
 	void lgrs_cmd(const tt& n);
-
-	tref is_valid_cmd(const tt& n);
-	tref is_unsatisfiable_cmd(const tt& n);
-
-	tt get_(tau::node::type nt, const tt& n, bool suppress_error = false);
-	tt get_bf(const tt& n, bool suppress_error = false);
-	tt get_wff(const tt& n);
 
 	tref onf_cmd(const tt& n);
 	tref dnf_cmd(const tt& n);
