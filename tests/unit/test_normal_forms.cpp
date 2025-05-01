@@ -1,19 +1,14 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "test_init.h"
+#include "tau.h"
+#include "test_Bool_helpers.h"
 
-#include "test_helpers.h"
-
-using bnode = tau_lang::node<Bool>;
-using tau = tree<bnode>;
-using tt = typename tau::traverser;
-
-TEST_SUITE("configuration") {
-
-	TEST_CASE("set trace logging level") {
-		initialize_logging.trace();
-	}
-}
+// TEST_SUITE("configuration") {
+// 	TEST_CASE("set trace logging level") {
+// 		initialize_logging.trace();
+// 	}
+// }
 
 TEST_SUITE("normal forms: mnf for wffs") {
 
@@ -28,7 +23,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
-		tref fm = tau::get(bmake(sample))
+		tref fm = tau::get(tau::get(sample))
 			.find_top(is<tau::node, tau::wff>);
 		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
 		CHECK( tau::get(fm)[0].is(tau::wff_t) );
@@ -36,7 +31,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: F") {
 		const char* sample = "F.";
-		tref fm = tau::get(bmake(sample))
+		tref fm = tau::get(tau::get(sample))
 			.find_top(is<tau::node, tau::wff>);
 		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
 		CHECK( tau::get(fm)[0].is(tau::wff_f) );
@@ -44,18 +39,16 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: X = 0") {
 		const char* sample = "X = 0.";
-		tref fm = tt(bmake(sample))
+		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		tref result = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
-		// TAU_TREE(fm) << "\n";
-		// TAU_TREE(result) << "\n";
 		CHECK( fm == result );
 	}
 
 	TEST_CASE("simple case: X != 0") {
 		const char* sample = "X != 0.";
 
-		tref fm = tt(bmake(sample))
+		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
 		trefs check_eq  = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
@@ -66,7 +59,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: X = 0 && Y = 0") {
 		const char* sample = "X = 0 && Y = 0.";
-		tref fm = tt(bmake(sample))
+		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
 		trefs check_and = tau::get(fm).select_all(is<tau::node, tau::wff_and>);
@@ -77,7 +70,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: X != 0 && Y != 0") {
 		const char* sample = "X != 0 && Y != 0.";
-		tref fm = tt(bmake(sample))
+		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
 		trefs check_eq = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
@@ -90,7 +83,7 @@ TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: X = 0 || Y = 0") {
 		const char* sample = "X = 0 || Y = 0.";
-		tref fm = tt(bmake(sample))
+		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tt::ref;
 		fm = to_mnf<bnode>(reduce_across_bfs<bnode>(fm, false));
 		trefs check_eq = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
@@ -106,7 +99,7 @@ TEST_SUITE("normal forms: bf_reduce_canonical") {
 
 	TEST_CASE("uninterpreted constants") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
-		tref fm = tt(bmake(sample))
+		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff
 			| bf_reduce_canonical<bnode>() | tt::ref;
 		CHECK( tau::get(fm) == tau::get_T() );
@@ -132,7 +125,7 @@ TEST_SUITE("normal forms: snf_bf") {
 
 	TEST_CASE("uninterpreted constants") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
-		tref fm = tt(bmake(sample))
+		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff
 			| tt::f(snf_bf<bnode>) | tt::ref;
 		CHECK( tau::get(fm) == tau::get_T() );
@@ -143,7 +136,7 @@ TEST_SUITE("normal forms: dnf_bf") {
 
 	TEST_CASE("uninterpreted constants") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
-		tref fm = tt(bmake(sample))
+		tref fm = tt(tau::get(sample))
 			| tau::spec | tau::main | tau::wff | tau::bf_eq
 			| tau::bf | tt::f(to_dnf<bnode, false>) | tt::ref;
 		CHECK( tau::get(fm) == tau::get_0() );

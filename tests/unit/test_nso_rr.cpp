@@ -11,16 +11,15 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
-#include "normal_forms.h"
+#include "test_init.h"
+#include "tau.h"
+#include "test_Bool_helpers.h"
 
 TEST_SUITE("make_library") {
 
 	TEST_CASE("make_library: one rule case") {
 		const auto sample = BF_TO_DNF_0;
-		auto lib = tree<node<Bool>>::get_library(sample);
+		auto lib = tau::get_library(sample);
 		CHECK( lib.size() == 1 );
 	}
 }

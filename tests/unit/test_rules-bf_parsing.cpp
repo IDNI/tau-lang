@@ -1,14 +1,11 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
-#include "normal_forms.h"
-
-using tau = tree<node<Bool>>;
+#include "test_init.h"
+#include "tau.h"
+#include "test_Bool_helpers.h"
 
 bool test_rule(const std::string& sample, tau_parser::nonterminal rule_type) {
-	auto lib = bmake_tt(sample, { .start = tau::library });
+	auto lib = tt(tau::get(sample, parse_library()));
 	auto check = lib | tau::rules | tau::rule | rule_type;
 	return check.has_value();
 }

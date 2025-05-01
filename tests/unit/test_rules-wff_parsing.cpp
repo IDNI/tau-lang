@@ -1,15 +1,12 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
-#include "normal_forms.h"
-#include "normalizer.h"
+#include "test_init.h"
+#include "tau.h"
+#include "test_Bool_helpers.h"
 
 bool test_rule(const std::string& sample) {
-	auto lib = bmake_tt(sample, { .start = tau_parser::library });
-	auto check = lib | tau_parser::rules | tau_parser::rule
-						| tau_parser::wff_rule;
+	auto lib = tt(tau::get(sample, parse_library()));
+	auto check = lib | tau::rules | tau::rule | tau::wff_rule;
 	return check.has_value();
 }
 
