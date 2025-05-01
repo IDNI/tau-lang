@@ -130,12 +130,6 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 			return neg ? -i : i;
 		};
 
-		auto get_type = [](tref n) -> std::string {
-			auto t = tt(n) | tau::type;
-			if (t) return t | tt::string;
-			return "untyped";
-		};
-
 		tref x = nullptr; // result of node transformation
 
 		switch (nt) {
@@ -182,7 +176,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 				// call binder on a transformed bf_constant node
 				if (nt == bf_constant) {
-					// BOOST_LOG_TRIVIAL(trace) << "tau tree transform calling binder: " << src << " " << get_type(x);
+					// BOOST_LOG_TRIVIAL(trace) << "tau tree transform calling binder: " << src << " " << get_type_sid<node>(x);
 					if (src.empty()) break; // capture?
 					auto nn = bind(src, string_from_id(get_type_sid<node>(x)));
 					src = "";

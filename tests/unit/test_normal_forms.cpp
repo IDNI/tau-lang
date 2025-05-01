@@ -4,121 +4,116 @@
 
 #include "test_helpers.h"
 
-using tau = tree<node<Bool>>;
+using Node = tau_lang::node<Bool>;
+using tau = tree<Node>;
+using tt = typename tau::traverser;
+
+TEST_SUITE("configuration") {
+
+	TEST_CASE("set trace logging level") {
+		initialize_logging.trace();
+	}
+}
 
 TEST_SUITE("normal forms: mnf for wffs") {
 
 	TEST_CASE("simple case: T") {
+		const char* sample = "1";
+		tau::parse_options opts;
+		opts.start = tau::bf; 
+		tref fm = tau::get(sample, opts);
+		tau::get(fm).dump(std::cout << "fm: ") << "\n";
+		CHECK( tau::get(fm)[0].is(tau::bf_t) );
+	}
+
+	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
-		tref fm = make<Bool>(sample);
-		fm = tau::get(fm).find_top(is_non_terminal<tau::wff, tau::node>);
-		// fm = to_mnf(reduce_across_bfs(fm, false));
+		tref fm = tau::get(bmake(sample))
+			.find_top(is<tau::node, tau::wff>);
+		fm = to_mnf<Node>(reduce_across_bfs<Node>(fm, false));
 		CHECK( tau::get(fm)[0].is(tau::wff_t) );
-		// tau::get(fm).dump(std::cout << "fm: ", true) << "\n";
+	}
 
+	TEST_CASE("simple case: F") {
+		const char* sample = "F.";
+		tref fm = tau::get(bmake(sample))
+			.find_top(is<tau::node, tau::wff>);
+		fm = to_mnf<Node>(reduce_across_bfs<Node>(fm, false));
+		CHECK( tau::get(fm)[0].is(tau::wff_f) );
+	}
 
-		// statement = find_top(statement, is_non_terminal<tau_parser::wff, Bool>).value();
-		// auto result = to_mnf(reduce_across_bfs(statement, false));
-		// auto check = result
-		// 	| tau_parser::wff_t;
-		// CHECK( check.has_value() );
+	TEST_CASE("simple case: X = 0") {
+		const char* sample = "X = 0.";
+		tref fm = tt(bmake(sample))
+			| tau::spec | tau::main | tau::wff | tt::ref;
+		tref result = to_mnf<Node>(reduce_across_bfs<Node>(fm, false));
+		// TAU_TREE(fm) << "\n";
+		// TAU_TREE(result) << "\n";
+		CHECK( fm == result );
+	}
+
+	TEST_CASE("simple case: X != 0") {
+		const char* sample = "X != 0.";
+
+		tref fm = tt(bmake(sample))
+			| tau::spec | tau::main | tau::wff | tt::ref;
+		fm = to_mnf<Node>(reduce_across_bfs<Node>(fm, false));
+		trefs check_eq  = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
+		trefs check_neg = tau::get(fm).select_all(is<tau::node, tau::wff_neg>);
+		CHECK( check_eq.size() == 1 );
+		CHECK( check_neg.size() == 1 );
+	}
+
+	TEST_CASE("simple case: X = 0 && Y = 0") {
+		const char* sample = "X = 0 && Y = 0.";
+		tref fm = tt(bmake(sample))
+			| tau::spec | tau::main | tau::wff | tt::ref;
+		fm = to_mnf<Node>(reduce_across_bfs<Node>(fm, false));
+		trefs check_and = tau::get(fm).select_all(is<tau::node, tau::wff_and>);
+		trefs check_eq = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
+		CHECK( check_and.size() == 1 );
+		CHECK( check_eq.size() == 2 );
+	}
+
+	TEST_CASE("simple case: X != 0 && Y != 0") {
+		const char* sample = "X != 0 && Y != 0.";
+		tref fm = tt(bmake(sample))
+			| tau::spec | tau::main | tau::wff | tt::ref;
+		fm = to_mnf<Node>(reduce_across_bfs<Node>(fm, false));
+		trefs check_eq = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
+		trefs check_neg = tau::get(fm).select_all(is<tau::node, tau::wff_neg>);
+		trefs check_and = tau::get(fm).select_all(is<tau::node, tau::wff_and>);
+		CHECK( check_eq.size() == 2 );
+		CHECK( check_neg.size() == 2 );
+		CHECK( check_and.size() == 1 );
+	}
+
+	TEST_CASE("simple case: X = 0 || Y = 0") {
+		const char* sample = "X = 0 || Y = 0.";
+		tref fm = tt(bmake(sample))
+			| tau::spec | tau::main | tau::wff | tt::ref;
+		fm = to_mnf<Node>(reduce_across_bfs<Node>(fm, false));
+		trefs check_eq = tau::get(fm).select_all(is<tau::node, tau::bf_eq>);
+		trefs check_or = tau::get(fm).select_all(is<tau::node, tau::wff_or>);
+		CHECK( check_eq.size() == 2 );
+		CHECK( check_or.size() == 1 );
 	}
 
 }
-// 	TEST_CASE("simple case: F") {
-// 		const char* sample = "F.";
-// 		auto src = make_tau_source(sample);
-// 		auto statement = make_statement(src);
-// 		statement = find_top(statement, is_non_terminal<tau_parser::wff, Bool>).value();
-// 		auto result = to_mnf(reduce_across_bfs(statement, false));
-// 		auto check = result
-// 			| tau_parser::wff_f;
-// 		CHECK( check.has_value() );
-// 	}
 
-// 	TEST_CASE("simple case: X = 0") {
-// 		const char* sample = "X = 0.";
-// 		auto src = make_tau_source(sample);
-// 		auto statement = (make_statement(src)
-// 			| tau_parser::spec
-// 			| tau_parser::main
-// 			| tau_parser::wff).value();
-// 		auto result = to_mnf(reduce_across_bfs(statement, false));
-// 		CHECK( statement == result );
-// 	}
+TEST_SUITE("normal forms: bf_reduce_canonical") {
 
-// 	TEST_CASE("simple case: X != 0") {
-// 		const char* sample = "X != 0.";
-// 		auto src = make_tau_source(sample);
-// 		auto statement = (make_statement(src)
-// 			| tau_parser::spec
-// 			| tau_parser::main
-// 			| tau_parser::wff).value();
-// 		auto result = to_mnf(reduce_across_bfs(statement, false));
-// 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
-// 		auto check_neg = select_all(result, is_non_terminal<tau_parser::wff_neg, Bool>);
-// 		CHECK( check_eq.size() == 1 );
-// 		CHECK( check_neg.size() == 1 );
-// 	}
 
-// 	TEST_CASE("simple case: X = 0 && Y = 0") {
-// 		const char* sample = "X = 0 && Y = 0.";
-// 		auto src = make_tau_source(sample);
-// 		auto statement = (make_statement(src)
-// 			| tau_parser::spec
-// 			| tau_parser::main
-// 			| tau_parser::wff).value();
-// 		auto result = to_mnf(reduce_across_bfs(statement, false));
-// 		auto check_and = select_all(result, is_non_terminal<tau_parser::wff_and, Bool>);
-// 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
-// 		CHECK( check_and.size() == 1 );
-// 		CHECK( check_eq.size() == 2 );
-// 	}
+	TEST_CASE("uninterpreted constants") {
+		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
+		tref fm = tt(bmake(sample))
+			| tau::spec | tau::main | tau::wff
+			| bf_reduce_canonical<Node>() | tt::ref;
+		TAU_PRINT_TREE(fm) << "\n";
+		CHECK( tau::get(fm) == tau::get_T() );
+	}
 
-// 	TEST_CASE("simple case: X != 0 && Y != 0") {
-// 		const char* sample = "X != 0 && Y != 0.";
-// 		auto src = make_tau_source(sample);
-// 		auto statement = (make_statement(src)
-// 			| tau_parser::spec
-// 			| tau_parser::main
-// 			| tau_parser::wff).value();
-// 		auto result = to_mnf(reduce_across_bfs(statement, false));
-// 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
-// 		auto check_neg = select_all(result, is_non_terminal<tau_parser::wff_neg, Bool>);
-// 		auto check_and = select_all(result, is_non_terminal<tau_parser::wff_and, Bool>);
-// 		CHECK( check_eq.size() == 2 );
-// 		CHECK( check_neg.size() == 2 );
-// 		CHECK( check_and.size() == 1 );
-// 	}
-
-// 	TEST_CASE("simple case: X = 0 || Y = 0") {
-// 		const char* sample = "X = 0 || Y = 0.";
-// 		auto src = make_tau_source(sample);
-// 		auto statement = (make_statement(src)
-// 			| tau_parser::spec
-// 			| tau_parser::main
-// 			| tau_parser::wff).value();
-// 		auto result = to_mnf(reduce_across_bfs(statement, false));
-// 		auto check_eq = select_all(result, is_non_terminal<tau_parser::bf_eq, Bool>);
-// 		auto check_or = select_all(result, is_non_terminal<tau_parser::wff_or, Bool>);
-// 		CHECK( check_eq.size() == 2 );
-// 		CHECK( check_or.size() == 1 );
-// 	}
-// }
-
-// TEST_SUITE("normal forms: bf_reduce_canonical") {
-
-// 	TEST_CASE("uninterpreted constants") {
-// 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
-// 		auto src = make_tau_source(sample);
-// 		auto statement = (make_statement(src)
-// 			| tau_parser::spec
-// 			| tau_parser::main
-// 			| tau_parser::wff).value();
-// 		auto result = statement | bf_reduce_canonical<Bool>();
-// 		CHECK( result == _T<Bool> );
-// 	}
-// }
+}
 
 // TEST_SUITE("normal forms: reduce_bf") {
 
