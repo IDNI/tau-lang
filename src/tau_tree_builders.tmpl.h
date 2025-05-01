@@ -303,7 +303,7 @@ tref build_bf_nlteq(tref l, tref r) {
 template <NodeType node>
 tref build_bf_nlteq_lower(tref l, tref r) {
 	DBG(assert(l != nullptr && r != nullptr);)
-	return build_bf_neq<node>(build_bf_and<node>(r, build_bf_neg<node>(r)));
+	return build_bf_neq<node>(build_bf_and<node>(r, build_bf_neg<node>(l)));
 }
 
 template <NodeType node>
