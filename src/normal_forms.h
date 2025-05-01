@@ -108,14 +108,20 @@ template <NodeType node>
 tref from_mnf_to_nnf(tref fm);
 
 template <NodeType node>
-static auto simplify_snf = repeat_all<node, step<node>>(elim_eqs<node>()
-						| push_neg_for_snf<node>());
+static auto& simplify_snf() {
+	static auto instance = repeat_all<node, step<node>>(
+		to_steps<node>(elim_eqs<node>(), push_neg_for_snf<node>()));
+	return instance;
+}
 
 template <NodeType node>
-static auto fix_neg_in_snf = tree<node>::get_library(
-	WFF_PUSH_NEGATION_INWARDS_2
-	+ WFF_PUSH_NEGATION_INWARDS_3
-);
+static auto& fix_neg_in_snf() {
+	static auto instance = tree<node>::get_library(
+		WFF_PUSH_NEGATION_INWARDS_2
+		+ WFF_PUSH_NEGATION_INWARDS_3
+	);
+	return instance;
+}
 
 template <NodeType node>
 tref unsqueeze_wff(const tref& fm);
@@ -174,13 +180,14 @@ struct bf_reduce_canonical;
 
 template <NodeType node, node::type type>
 struct reduce_deprecated {
+	using tau = tree<node>;
+	using tt = tau::traverser;
 
 	// TODO (VERY_HIGH) properly implement it
 	tref operator()(tref form) const;
+	tt operator()(const tt& t) const;
 
 private:
-	using tau = tree<node>;
-	using tt = tau::traverser;
 	using subtree_set = tau::subtree_set;
 	using subtree_map = tau::subtree_map;
 	using literals = subtree_set;
@@ -611,6 +618,7 @@ private:
 	tref traverse(const bdd_path& path, const literals& remaining, tref form) const;
 
 	exponent get_exponent(const tref n) const;
+	tref get_bf_constant(literal lit) const;
 	std::optional<constant> get_constant(literal lit) const;
 	partition make_partition_by_exponent(const literals& s) const;
 
@@ -625,18 +633,18 @@ private:
 
 	// squeezed positives as much as possible.
 	std::map<exponent, literal> squeeze_positives(const partition& positives) const;
-	bool is_less_eq_than(const literal& l, const literal& r) const;
+	bool is_less_eq_than(literal l, literal r) const;
 
-	literal normalize(const literals& negatives, const literal& positive, const exponent& exp) const;
+	literal normalize(const literals& negatives, const literal positive, const exponent& exp) const;
 	// normalize each bdd path applying Corollary 3.1 from TABA book with few
 	// improvements related to the handling of negative literals.
 	tref normalize(const bdd_path& path) const;
 
-	bdd_path get_relative_path(const bdd_path& path, const literal& lit) const;
+	bdd_path get_relative_path(const bdd_path& path, literal lit) const;
 
-	tref normalize_positive(const bdd_path& path, const literal& positive) const;
+	tref normalize_positive(const bdd_path& path, literal positive) const;
 
-	tref normalize_negative(const bdd_path& path, const literal& negative) const;
+	tref normalize_negative(const bdd_path& path, literal negative) const;
 };
 
 template <NodeType node>

@@ -213,6 +213,13 @@ tref reduce_deprecated<node, type>::operator()(tref form) const {
 }
 
 template <NodeType node, node::type type>
+typename reduce_deprecated<node,type>::tt
+	reduce_deprecated<node, type>::operator()(const tt& t) const
+{
+	return tt(this->operator()(t.value()));
+}
+
+template <NodeType node, node::type type>
 void reduce_deprecated<node, type>::get_literals(tref clause, literals& lits) const {
 	BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
 	if constexpr (type == tau::bf) {
@@ -458,13 +465,13 @@ tref onf_wff<node>::operator()(tref n) const {
 	{
 		no_disjunction = false;
 		const auto& disjunct = tau::get(disjunct_ref);
-		DBG(assert(disjunct->child.size() == 2);)
+		DBG(assert(disjunct.children_size() == 2);)
 		if (!disjunct[0][0].is(tau::wff_or))
-			changes[disjunct[0][0]] =
-					onf_subformula(disjunct[0][0]);
+			changes[disjunct[0].first()] =
+					onf_subformula(disjunct[0].first());
 		if (!disjunct[1][0].is(tau::wff_or))
-			changes[disjunct[1][0]] =
-					onf_subformula(disjunct[1][0]);
+			changes[disjunct[1].first()] =
+					onf_subformula(disjunct[1].first());
 	}
 	if (no_disjunction) changes[nn] = onf_subformula(nn);
 	return rewriter::replace<node>(nn, changes);
@@ -478,15 +485,15 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 		return tau::get(n) == tau::get(var);
 	};
 	const auto& t = tau::get(n);
-	auto eq = t.find_bottom(is<node, tau::bf_eq>);
+	tref eq = t.find_bottom(is<node, tau::bf_eq>);
 	typename tau::subtree_map changes;
-	if (eq && eq.value_tree()[0].find_top(has_var)) {
-		auto eq_v = eq.value_tree();
+	if (eq && tau::get(eq)[0].find_top(has_var)) {
+		const auto& eq_v = tau::get(eq);
 		DBG(assert(eq_v[1][0].is(tau::bf_f));)
-		auto f_0 = tt(replace<node>(
+		tref f_0 = tt(rewriter::replace<node>(
 			eq_v.first(), var, tau::_0()))
 				| bf_reduce_canonical<node>() | tt::ref;
-		auto f_1 = tt(replace<node>(
+		tref f_1 = tt(rewriter::replace<node>(
 			tau::build_bf_neg(eq_v.first()), var,tau::_1()))
 				| bf_reduce_canonical<node>() | tt::ref;
 
@@ -497,17 +504,17 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 		const auto& neq = tau::get(neq_ref);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
 		if (!neq[0].find_top(has_var)) continue;
-		auto f_0 = tt(rewriter::replace<node>(
+		tref f_0 = tt(rewriter::replace<node>(
 			neq.first(), var, tau::_0()))
 				| bf_reduce_canonical<node>() | tt::ref;
-		auto f_1 = tt(rewriter::replace<node>(
+		tref f_1 = tt(rewriter::replace<node>(
 			tau::build_bf_neg(neq.first()), var, tau::_1()))
 				| bf_reduce_canonical<node>() | tt::ref;
 		changes[neq.get()] = tau::trim(tau::build_wff_or(
-			tau::build_bf_nleq_upper(f_0, var),
-			tau::build_bf_nleq_lower(f_1, var)));
+			tau::build_bf_nlteq_upper(f_0, var),
+			tau::build_bf_nlteq_lower(f_1, var)));
 	}
-	return replace<node>(n, changes);
+	return rewriter::replace<node>(n, changes);
 }
 
 template <NodeType node>
@@ -522,10 +529,9 @@ tref onf(tref n, tref var) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	// FIXME take into account quiantifiers
-	return tt(n)
-		| (tau_f<node>) to_dnf<node, true>
-		| onf_wff<node>(var)
-		| (tau_f<node>) to_dnf<node, true>;
+	return tt(n) | tt::f(to_dnf<node, true>)
+		     | tt::f(onf_wff<node>(var))
+		     | tt::f(to_dnf<node, true>) | tt::ref;
 }
 
 // Reduce currrent dnf due to update by coeff and variable assignment i
@@ -3357,9 +3363,11 @@ tref replace_free_vars_by(tref fm, tref val) {
 
 template <NodeType node>
 tref to_snf_step<node>::operator()(tref form) const {
+	using tau = tree<node>;
+	using tt = tau::traverser;
 	// we select all literals, i.e. wff equalities or it negations.
 	static const auto is_literal = [](tref n) -> bool {
-		return tt(n) | tau::bf_eq;
+		return tau::get(n).child_is(tau::bf_eq);
 	};
 	if (auto literals = tau::get(form).select_all(is_literal);
 		literals.size())
@@ -3370,18 +3378,19 @@ tref to_snf_step<node>::operator()(tref form) const {
 		bdd_path path;
 		return tt(traverse(path, remaining, form))
 			| bf_reduce_canonical<node>()
-			| reduce_wff_deprecated<node>;
+			| reduce_wff_deprecated<node> | tt::ref;
 	}
 	return form;
 }
 
 template <NodeType node>
 tref to_snf_step<node>::bdd_path_to_snf(const bdd_path& path, tref form) const {
+	using tt = typename tree<node>::traverser;
 	// we simplify the constant part of the formula
 	// TODO (HIGH) fix simplification
-	auto simplified = tt(form) | simplify_snf<node>;
+	// auto simplified = tt(form) | simplify_snf<node>();
 	return tt(tau::build_wff_and(normalize(path), form))
-							| simplify_snf<node>;
+					| simplify_snf<node>() | tt::ref;
 }
 
 template <NodeType node>
@@ -3438,14 +3447,18 @@ tref to_snf_step<node>::traverse(const bdd_path& path, const literals& remaining
 	if (auto it = cache.find({path, remaining, form}); it != cache.end()) return it->second;
 	#endif // TAU_CACHE
 
-	if (remaining.empty()) return bdd_path_to_snf<node>(path, form);
+	if (remaining.empty()) return bdd_path_to_snf(path, form);
 
 	auto lit = *remaining.begin();
 	auto exponent = get_exponent(lit);
 	tref f = tau::get(normalize_negative(path, lit)) == tau::get_F()
-		? tau::_F() : replace_with(lit, tau::_F(), form) | simplify_snf<node>;
+		? tau::_F()
+		: tt(rewriter::replace_with<node>(lit, tau::_F(), form))
+			| simplify_snf<node>() | tt::ref;
 	tref t = tau::get(normalize_positive(path, lit)) == tau::get_T()
-		? tau::_T() : replace_with(lit, tau::_T(), form) | simplify_snf<node>;
+		? tau::_T()
+		: tt(rewriter::replace_with<node>(lit, tau::_T(), form))
+			| simplify_snf<node>() | tt::ref;
 
 	if (tau::get(f) == tau::get_F() && tau::get(t) == tau::get_F()) {
 		// we only cache results in release mode
@@ -3505,9 +3518,17 @@ typename to_snf_step<node>::exponent to_snf_step<node>::get_exponent(const tref 
 }
 
 template <NodeType node>
-std::optional<typename to_snf_step<node>::constant> to_snf_step<node>::get_constant(tref lit) const {
-	return tau::get(lit).find_top(is<node, tau::constant>)
-			.only_child().get_ba_constant();
+tref to_snf_step<node>::get_bf_constant(tref lit) const {
+	return tau::get(lit).find_top(is<node, tau::bf_constant>);
+}
+
+template <NodeType node>
+std::optional<typename to_snf_step<node>::constant>
+	to_snf_step<node>::get_constant(tref lit) const
+{
+	if (tref c = get_bf_constant(lit); c)
+		return tau::get(c).get_ba_constant();
+	return {};
 }
 
 template <NodeType node>
@@ -3521,22 +3542,19 @@ template <NodeType node>
 tref to_snf_step<node>::squeeze_positives(const literals& positives, const exponent& exp) const {
 	// find first element with non trivial constant
 	auto first = std::find_if(positives.begin(), positives.end(),
-		[&](tref l) {
-			return get_constant(l).has_value();
-		});
+		[&](tref l) { return get_bf_constant(l) != nullptr; });
 	// if there is no such element we return the first element
 	if (first == positives.end()) return *positives.begin();
 	// otherwise...
-	auto first_cte = tau::build_bf_constant(
-		get_constant(*first).value());
+	auto first_cte = get_bf_constant(*first);
 	auto cte = std::accumulate(++positives.begin(), positives.end(),
 		first_cte, [&](tref l, tref r) {
-			auto l_cte = get_constant(l),
-				r_cte = get_constant(r);
+			auto l_cte = get_constant(l), r_cte = get_constant(r);
 			if (l_cte && r_cte)
-				return tau::build_bf_constant(
-					std::visit(_or, l_cte.value(),
-						r_cte.value()));
+				return node::ba_constants_binder_t::instance()
+					.bind(std::visit(_or,
+						l_cte.value(), r_cte.value()),
+						tau::get(l).get_ba_type());
 			return l;
 		});
 
@@ -3620,32 +3638,32 @@ std::map<typename to_snf_step<node>::exponent,
 }
 
 template <NodeType node>
-bool to_snf_step<node>::is_less_eq_than(const literal& l, const literal& r)
+bool to_snf_step<node>::is_less_eq_than(literal l, literal r)
 	const
 {
-	auto l_cte = get_constant(l);
-	auto r_cte = get_constant(r);
+	auto l_cte = get_constant(l), r_cte = get_constant(r);
 	if (!l_cte) return !r_cte;
 	if (!r_cte) return true;
 	return std::visit(_leq, l_cte.value(), r_cte.value());
 }
 
 template <NodeType node>
-typename to_snf_step<node>::literal to_snf_step<node>::normalize(const literals& negatives, const literal& positive, const exponent& exp) const {
+typename to_snf_step<node>::literal to_snf_step<node>::normalize(
+	const literals& negatives, literal positive, const exponent& exp)
+	const
+{
 	// we tacitely assume that the positive literal has a constant
 	// different from 1. Otherwise, the normalizer should already
 	// return F.
-	auto neg_positive_cte = tau::build_bf_neg(tau::build_bf_constant(
-			get_constant(positive).value()));
+	auto neg_positive_cte = tau::build_bf_neg(positive);
 	// now we conjunct the previous result with the constant of n
 	literals lits; lits.insert(positive);
-	for (auto& negative : negatives) {
-		auto n_cte = tau::build_bf_constant(get_constant(negative));
-		auto nn_cte = n_cte
-			? tau::build_bf_and(neg_positive_cte, n_cte.value())
+	for (tref negative : negatives) {
+		tref n_cte = negative;
+		tref nn_cte = n_cte
+			? tau::build_bf_and(neg_positive_cte, n_cte)
 			: neg_positive_cte;
-		auto term = tau::build_bf_and(exp);
-		auto nn = tau::build_bf_and(nn_cte, term);
+		auto nn = tau::build_bf_and(nn_cte, tau::build_bf_and(exp));
 		lits.insert(tau::build_bf_neq(nn));
 	}
 	return tau::build_wff_and(lits);
@@ -3683,8 +3701,8 @@ tref to_snf_step<node>::normalize(const bdd_path& path) const {
 					tau::build_wff_or(negatives))); continue;
 		}
 		// - if the positive literal has 1 as constant we return F,
-		if (!get_constant(squeezed_positives[negative_exponent])
-			.has_value()) return tau::_F();
+		if (!get_bf_constant(squeezed_positives[negative_exponent]))
+			return tau::_F();
 	// otherwise we compute the new negated literal following the Corollary 3.1
 		// from TABA book.
 		squeezed_negatives[negative_exponent].insert(normalize(
@@ -3705,7 +3723,7 @@ tref to_snf_step<node>::normalize(const bdd_path& path) const {
 }
 
 template <NodeType node>
-typename to_snf_step<node>::bdd_path to_snf_step<node>::get_relative_path(const bdd_path& path, const literal& lit) const {
+typename to_snf_step<node>::bdd_path to_snf_step<node>::get_relative_path(const bdd_path& path, literal lit) const {
 	bdd_path relative_path;
 	auto exp = get_exponent(lit);
 	if (path.first.contains(exp)) relative_path.first[exp] = path.first.at(exp);
@@ -3714,13 +3732,13 @@ typename to_snf_step<node>::bdd_path to_snf_step<node>::get_relative_path(const 
 }
 
 template <NodeType node>
-tref to_snf_step<node>::normalize_positive(const bdd_path& path, const literal& positive) const {
+tref to_snf_step<node>::normalize_positive(const bdd_path& path, literal positive) const {
 	auto relative_path = get_relative_path(path, positive);
 	return normalize(add_to_positive_path(relative_path, positive));
 }
 
 template <NodeType node>
-tref to_snf_step<node>::normalize_negative(const bdd_path& path, const literal& negative) const {
+tref to_snf_step<node>::normalize_negative(const bdd_path& path, literal negative) const {
 	auto relative_path = get_relative_path(path, negative);
 	return normalize(add_to_negative_path(relative_path, negative));
 }
@@ -3757,22 +3775,25 @@ tref snf_wff(tref n) {
 	auto [_, nn] = get_inner_quantified_wff<node>(n);
 	// in the first step we apply compute the SNF of the formula, as a result we get
 	// the formula in SNF with positive equal exponent literals sqeezed.
-	auto first_step = tt(tau::build_wff_neg(nn))
+	tref first_step = tt(tau::build_wff_neg(nn))
 		| bf_reduce_canonical<node>()
-		| (tau_f<node>) unsqueeze_wff<node>
+		| tt::f(unsqueeze_wff<node>)
 		| repeat_all<node, step<node>>(
-			elim_eqs<node>() | push_neg_for_snf<node>())
+			to_steps<node>(elim_eqs<node>(),
+					push_neg_for_snf<node>()))
 		// TODO (LOW) Lucca thinks that maybe one call is enough
-		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>());
+		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
+		| tt::ref;
 	// in the second step we compute the SNF of the negation of the the result
 	// of the first step in order to squeeze the negative equal exponent literals.
 	// Note that in this case we don't need to unsqueeze the formula.
-	auto second_step = tt(tau::build_wff_neg(first_step))
+	tref second_step = tt(tau::build_wff_neg(first_step))
 		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
 		| repeat_all<node, step<node>>(
-			elim_eqs<node>() | fix_neg_in_snf<node>)
-		| bf_reduce_canonical<node>();
-	return replace<node>(n, nn, second_step);
+			to_steps<node>(elim_eqs<node>(), fix_neg_in_snf<node>()))
+		| bf_reduce_canonical<node>()
+		| tt::ref;
+	return rewriter::replace<node>(n, nn, second_step);
 }
 
 template <NodeType node>
