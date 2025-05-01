@@ -127,14 +127,6 @@ private:
 	//  */
 	// rewriter::rule rename(const rewriter::rule<tau_nso_t>& rule) const;
 
-	/**
-	 * @brief Merges two sets of rules.
-	 *
-	 * @param rs1 Reference to the first set of rules.
-	 * @param rs2 Reference to the second set of rules.
-	 * @return Merged set of rules.
-	 */
-	rewriter::rules merge(const rewriter::rules& rs1, const rewriter::rules& rs2) const;
 };
 
 /**
