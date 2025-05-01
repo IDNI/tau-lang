@@ -112,7 +112,7 @@ htree::sp tree<node>::geth(tref h) {
 template <NodeType node>
 tref tree<node>::get_raw(const node& v, const tref* ch, size_t len, tref r) {
 	// BOOST_LOG_TRIVIAL(debug) << "get_raw: " << v << " " << len << " r: " << r << "\n";
-	return base_t::get(v, ch, len, r);
+	return base_t::get_raw(v, ch, len, r);
 }
 
 template <NodeType node>
@@ -132,9 +132,20 @@ tref tree<node>::get(const node& v, tref ch1, tref ch2) {
 
 template <NodeType node>
 tref tree<node>::get(const node& v, const tref* ch, size_t len, tref r) {
-	static get_hook<node> hook;
 	if (!use_hooks) return get_raw(v, ch, len, r);
-	return hook(v, ch, len, r);
+	get_hook<node> hook;
+	// set hook first if not hooked
+	if (!base_t::is_hooked()) base_t::set_hook(
+		[&hook](const node& v, const tref* ch, size_t len, tref r) {
+			return hook(v, ch, len, r);
+		});
+	// get with hooks
+	return base_t::get(v, ch, len, r);
+}
+
+template <NodeType node>
+tref tree<node>::get(tref n, tref r) {
+	return base_t::get(n, r);
 }
 
 template <NodeType node>
@@ -164,10 +175,9 @@ tref tree<node>::get(const node& v, const node& ch1, const node& ch2)
 template <NodeType node>
 tref tree<node>::get(const node& v, const node* ch, size_t len, tref r)
 {
-	tref pr = nullptr;
-	for (size_t i = len; i > 0; ) --i,
-		pr = get(ch[i], (tref) nullptr, pr);
-	return get(v, &pr, 1, r);
+	trefs nch;
+	for (size_t i = 0; i < len; ++i) nch.push_back(get(ch[i]));
+	return get(v, std::data(nch), len, r);
 }
 
 template <NodeType node>

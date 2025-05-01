@@ -46,7 +46,9 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 	auto transformer = [&m, &m_ex, &m_ref, &m_get, &bind, &src,&error](
 		tref t, tref parent)
 	{
-		// BOOST_LOG_TRIVIAL(trace) << "(FROM PARSER) -- transforming: " << parse_tree::get(t);
+		// std::stringstream ss;
+		// BOOST_LOG_TRIVIAL(trace) << "(FROM PARSER) -- transforming: "
+		// 	<< (parse_tree::get(t).print(ss), ss.str());
 
 		if (m_ex(t)) return true; // already transformed
 		const auto& ptr = parse_tree::get(t); // get parse tree node
@@ -180,7 +182,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 				// call binder on a transformed bf_constant node
 				if (nt == bf_constant) {
-					BOOST_LOG_TRIVIAL(debug) << "tau tree transform calling binder: " << src << " " << get_type(x);
+					// BOOST_LOG_TRIVIAL(trace) << "tau tree transform calling binder: " << src << " " << get_type(x);
 					if (src.empty()) break; // capture?
 					auto nn = bind(src, string_from_id(get_type_sid<node>(x)));
 					src = "";

@@ -218,6 +218,9 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref get_raw(const node& v, const tref* ch = nullptr,
 					size_t len = 0, tref r = nullptr);
 
+	// get node with updated right sibling
+	static tref get(tref n, tref r);
+
 	// creation with tref children
 	static tref get(const node& v); // leaf
 	static tref get(const node& v, tref ch); // with single child
