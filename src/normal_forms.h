@@ -81,19 +81,25 @@ RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 RULE(WFF_SQUEEZE_NEGATIVES_0, "$X != 0 || $Y != 0 ::= $X | $Y != 0.")
 
 template <NodeType node>
-static auto push_neg_for_snf = tree<node>::get_library(
-	WFF_PUSH_NEGATION_UPWARDS_0
-	+ WFF_PUSH_NEGATION_INWARDS_0
-	+ WFF_PUSH_NEGATION_INWARDS_1
-);
+static auto& push_neg_for_snf() {
+	static auto instance = tree<node>::get_library(
+		WFF_PUSH_NEGATION_UPWARDS_0
+		+ WFF_PUSH_NEGATION_INWARDS_0
+		+ WFF_PUSH_NEGATION_INWARDS_1
+	);
+	return instance;
+}
 
 template <NodeType node>
-static auto elim_eqs = tree<node>::get_library(
-	BF_EQ_AND_SIMPLIFY_0
-	+ BF_EQ_AND_SIMPLIFY_1
-	+ BF_EQ_OR_SIMPLIFY_0
-	+ BF_EQ_OR_SIMPLIFY_1
-);
+static auto& elim_eqs() {
+	static auto instance = tree<node>::get_library(
+		BF_EQ_AND_SIMPLIFY_0
+		+ BF_EQ_AND_SIMPLIFY_1
+		+ BF_EQ_OR_SIMPLIFY_0
+		+ BF_EQ_OR_SIMPLIFY_1
+	);
+	return instance;
+}
 
 template <NodeType node>
 tref to_mnf(tref fm);
@@ -102,8 +108,8 @@ template <NodeType node>
 tref from_mnf_to_nnf(tref fm);
 
 template <NodeType node>
-static auto simplify_snf = repeat_all<node, step<node>>(elim_eqs<node>
-						| push_neg_for_snf<node>);
+static auto simplify_snf = repeat_all<node, step<node>>(elim_eqs<node>()
+						| push_neg_for_snf<node>());
 
 template <NodeType node>
 static auto fix_neg_in_snf = tree<node>::get_library(
@@ -186,7 +192,7 @@ private:
 	std::pair<literals, literals> get_positive_negative_literals(
 		tref clause) const;
 
-	subtree_set get_dnf_clauses(tref n, subtree_set clauses = {});
+	subtree_set get_dnf_clauses(tref n, subtree_set clauses = {}) const;
 
 	tref build_dnf_clause_from_literals(const literals& positives,
 					const literals& negatives) const;

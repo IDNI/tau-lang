@@ -35,10 +35,10 @@ const typename tree<node>::template extractor<tref>
 			});
 
 template <NodeType node>
-const typename tree<node>::template extractor<const trefs&>
+const typename tree<node>::template extractor<trefs>
 	tree<node>::traverser::refs =
-		typename tree<node>::template extractor<const trefs&>(
-			[](const traverser& t) -> const trefs& {
+		typename tree<node>::template extractor<trefs>(
+			[](const traverser& t) -> trefs {
 				return t.values();
 			});
 
@@ -273,7 +273,7 @@ const tree<node>& tree<node>::traverser::operator[](size_t n) const {
 }
 
 template <NodeType node>
-const trefs& tree<node>::traverser::values() const { return values_; }
+trefs tree<node>::traverser::values() const { return values_; }
 
 template <NodeType node>
 std::vector<typename tree<node>::traverser>

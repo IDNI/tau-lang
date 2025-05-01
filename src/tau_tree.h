@@ -403,7 +403,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		tref value() const;
 		const tree& value_tree() const;
 		const tree& operator[](size_t n) const;
-		const trefs& values() const;
+		trefs values() const;
 		std::vector<traverser> traversers() const;
 		std::vector<traverser> operator()() const;
 		bool is(size_t nt) const;
@@ -412,7 +412,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 
 		// handles
 		static const extractor<tref>                ref;
-		static const extractor<const trefs&>        refs;
+		static const extractor<trefs>               refs;
 		static const extractor<htree::sp>           handle;
 		static const extractor<const tree<node>&>   Tree;
 		// print/dump
