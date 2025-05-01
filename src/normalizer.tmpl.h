@@ -819,13 +819,15 @@ tref calculate_all_fixed_points(const rr& nso_rr) {
 // the formula
 template <NodeType node>
 tref apply_rr_to_formula(const rr& nso_rr) {
+	using tt = typename tree<node>::traverser;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Start apply_rr_to_formula";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << to_str<node>(nso_rr);
-	auto main = calculate_all_fixed_points<node>(nso_rr);
+	tref main = calculate_all_fixed_points<node>(nso_rr);
 	if (!main) return nullptr;
 	// Substitute function and recurrence relation definitions
-	auto new_main = main
-		| repeat_all<node, step<node>>(step<node>(nso_rr.rec_relations));
+	tref new_main = main
+		| repeat_all<node, step<node>>(step<node>(nso_rr.rec_relations))
+		| tt::ref;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End apply_rr_to_formula";
 	BOOST_LOG_TRIVIAL(debug) << "(F) " << to_str<node>(nso_rr);
 	return new_main;

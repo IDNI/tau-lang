@@ -209,7 +209,7 @@ tref reduce_deprecated<node, type>::operator()(tref form) const {
 		auto simplified = simplify(dnf);
 		if (simplified != dnf) changes[dnf] = simplified;
 	}
-	return replace<node>(form, changes);
+	return rewriter::replace<node>(form, changes);
 }
 
 template <NodeType node, node::type type>
@@ -217,7 +217,7 @@ void reduce_deprecated<node, type>::get_literals(tref clause, literals& lits) co
 	BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
 	if constexpr (type == tau::bf) {
 		if (auto check = tt(clause) | tau::bf_and; check.has_value())
-			for (tref c : check || tau::bf)
+			for (tref c : (check || tau::bf).values())
 				get_literals(c, lits);
 		else {
 			lits.insert(clause);
@@ -225,7 +225,7 @@ void reduce_deprecated<node, type>::get_literals(tref clause, literals& lits) co
 		}
 	} else {
 		if (auto check = tt(clause) | tau::wff_and; check.has_value())
-			for (tref c : check || tau::wff)
+			for (tref c : (check || tau::wff).values())
 				get_literals(c , lits);
 		else {
 			lits.insert(clause);
@@ -275,20 +275,18 @@ std::pair<typename reduce_deprecated<node, type>::literals,
 template <NodeType node, node::type type>
 typename reduce_deprecated<node, type>::subtree_set
 	reduce_deprecated<node, type>::get_dnf_clauses(
-		tref n, subtree_set clauses)
+		tref n, subtree_set clauses) const
 {
 	if constexpr (type == tau::bf)
-		if (auto check = tt(n) | tau::bf_or; check.has_value())
+		if (auto check = tt(n) | tau::bf_or; check)
 			for (tref clause : (check || tau::bf).values())
 				clauses = get_dnf_clauses(clause, clauses);
-		else
-			clauses.insert(n);
+		else clauses.insert(n);
 	else
-		if (auto check = tt(n) | tau::wff_or; check.has_value())
+		if (auto check = tt(n) | tau::wff_or; check)
 			for (tref clause : (check || tau::wff).values())
 				clauses = get_dnf_clauses(clause, clauses);
-		else
-			clauses.insert(n);
+		else clauses.insert(n);
 
 	#ifdef DEBUG
 	if (clauses.empty()) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << n << "\n";
@@ -381,7 +379,7 @@ tref reduce_deprecated<node, type>::build_dnf_from_clauses(const subtree_set& cl
 			return tau::_F();
 		}
 	}
-	auto dnf = *clauses.begin();
+	tref dnf = *clauses.begin();
 	auto it = ++clauses.begin();
 	for ( ; it != clauses.end(); ++it)
 		if constexpr (type == tau::bf) dnf = tau::build_bf_or(dnf, *it);
@@ -396,9 +394,9 @@ tref reduce_deprecated<node, type>::simplify(tref form) const {
 	subtree_set clauses;
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying of " << form;
 	for (tref clause : get_dnf_clauses(form))
-		if (auto dnf = to_minterm(clause); dnf)
-			clauses.insert(dnf.value());
-	auto dnf = tau::build_dnf_from_clauses(clauses);
+		if (tref dnf = to_minterm(clause); dnf)
+			clauses.insert(dnf);
+	tref dnf = build_dnf_from_clauses(clauses);
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End simplifying";
 	return dnf;
 }
@@ -407,14 +405,16 @@ template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& t, const reduce_bf_t<node>& r)
 {
-	return tree<node>::traverser(r(t.value()));
+	using tt = typename tree<node>::traverser;
+	return tt(r(t.value()));
 }
 
 template <NodeType node>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& t, const reduce_wff_t<node>& r)
 {
-	return tree<node>::traverser(r(t.value()));
+	using tt = typename tree<node>::traverser;
+	return tt(r(t.value()));
 }
 
 
@@ -467,7 +467,7 @@ tref onf_wff<node>::operator()(tref n) const {
 					onf_subformula(disjunct[1][0]);
 	}
 	if (no_disjunction) changes[nn] = onf_subformula(nn);
-	return replace(nn, changes);
+	return rewriter::replace<node>(nn, changes);
 }
 
 template <NodeType node>
@@ -497,10 +497,10 @@ tref onf_wff<node>::onf_subformula(tref n) const {
 		const auto& neq = tau::get(neq_ref);
 		DBG(assert(neq[1][0].is(tau::bf_f));)
 		if (!neq[0].find_top(has_var)) continue;
-		auto f_0 = tt(replace<node>(
+		auto f_0 = tt(rewriter::replace<node>(
 			neq.first(), var, tau::_0()))
 				| bf_reduce_canonical<node>() | tt::ref;
-		auto f_1 = tt(replace(
+		auto f_1 = tt(rewriter::replace<node>(
 			tau::build_bf_neg(neq.first()), var, tau::_1()))
 				| bf_reduce_canonical<node>() | tt::ref;
 		changes[neq.get()] = tau::trim(tau::build_wff_or(
@@ -3248,7 +3248,7 @@ tref anti_prenex(const tref& fm) {
 			/*// Boole decomposition
 			auto eq = get_eq_with_most_quant_vars(scoped_fm, quant_vars);
 			//TODO: absorbtions
-			auto left = build_wff_and(eq, replace(scoped_fm, eq, _T<BAs...>));
+			auto left = build_wff_and(eq, rewriter::replace<node>(scoped_fm, eq, _T<BAs...>));
 			if (tau::get(left) == tau::get_F()) {
 				// Boole decomp does not create two branches
 				assert(find_top(n, is<node, tau::wff_or...>));
@@ -3263,7 +3263,7 @@ tref anti_prenex(const tref& fm) {
 				return res;
 			}
 			auto neq = build_wff_neq(trim2(eq));
-			auto right = build_wff_and(neq, replace(scoped_fm, eq, _F<BAs...>));
+			auto right = build_wff_and(neq, rewriter::replace<node>(scoped_fm, eq, _F<BAs...>));
 			if (tau::get(right) == tau::get_F()) {
 				// Boole decomp does not create two branches
 				assert(find_top(n, is<node, tau::wff_or...>));
@@ -3729,7 +3729,7 @@ template <NodeType node>
 typename tree<node>::traverser operator|(const typename tree<node>::traverser& n,
 	const to_snf_step<node>& r)
 {
-	return tt(r(n.value()));
+	return typename tree<node>::traverser(r(n.value()));
 }
 
 template <NodeType node>
@@ -3738,8 +3738,8 @@ tref snf_bf(tref n) {
 	using tt = tau::traverser;
 	// TODO (HIGH) give a proper implementation (call to_bdd...)
 	return tt(n) | bf_reduce_canonical<node>()
-		| (tau_f<node>) to_dnf<node, false>
-		| repeat_all<node, step<node>>(elim_eqs<node>)
+		| tt::f(to_dnf<node, false>)
+		| repeat_all<node, step<node>>(elim_eqs<node>())
 		// TODO (MEDIUM) review after we fully normalize bf & wff
 		| reduce_bf_deprecated<node>
 		| tt::ref;
@@ -3761,7 +3761,7 @@ tref snf_wff(tref n) {
 		| bf_reduce_canonical<node>()
 		| (tau_f<node>) unsqueeze_wff<node>
 		| repeat_all<node, step<node>>(
-			elim_eqs<node> | push_neg_for_snf<node>)
+			elim_eqs<node>() | push_neg_for_snf<node>())
 		// TODO (LOW) Lucca thinks that maybe one call is enough
 		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>());
 	// in the second step we compute the SNF of the negation of the the result
@@ -3770,7 +3770,7 @@ tref snf_wff(tref n) {
 	auto second_step = tt(tau::build_wff_neg(first_step))
 		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
 		| repeat_all<node, step<node>>(
-			elim_eqs<node> | fix_neg_in_snf<node>)
+			elim_eqs<node>() | fix_neg_in_snf<node>)
 		| bf_reduce_canonical<node>();
 	return replace<node>(n, nn, second_step);
 }
