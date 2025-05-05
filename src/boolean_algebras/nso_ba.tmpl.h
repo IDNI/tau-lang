@@ -1,6 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "nso_ba.h"
+#include "splitter.h"
 
 namespace idni::tau_lang {
 
@@ -238,9 +239,9 @@ const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& t,
 		return splitter(t, st);
 	};
 	DBG(assert(t.is_ba_constant());)
-	return ba_constants_binder<BAs...>::bind(
-		std::visit(_splitter, t.get_ba_constant()),
-		t.get_ba_type());
+	return tree<node<BAs...>>::get(ba_constants_binder<BAs...>::instance()
+		.bind(std::visit(_splitter, t.get_ba_constant()),
+			t.get_ba_type()));
 }
 
 } // namespace idni::tau_lang

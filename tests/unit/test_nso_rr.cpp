@@ -12,7 +12,6 @@
 // modified over time by the Author.
 
 #include "test_init.h"
-#include "tau.h"
 #include "test_Bool_helpers.h"
 
 TEST_SUITE("make_library") {

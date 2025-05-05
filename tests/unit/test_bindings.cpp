@@ -1,7 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "test_init.h"
-#include "tau.h"
 #include "test_Bool_helpers.h"
 
 struct bool_binder_fixture {
