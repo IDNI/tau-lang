@@ -6,8 +6,8 @@ namespace idni::tau_lang {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
-	trefs& mem, size_t i, bool check_temps)
+tref split(tref fm, typename node<BAs...>::type fm_type, bool is_cnf,
+	const splitter_type st, trefs& mem, size_t i, bool check_temps)
 {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
@@ -111,10 +111,10 @@ tref good_splitter_using_function(tref f, splitter_type st, tref original_fm) {
 	trefs m;
 	size_t i = 0;
 	do {
-		tref s = split(f, tau::bf, false, st, m, i, true);
+		tref s = split<BAs...>(f, tau::bf, false, st, m, i, true);
 		if (tau::get(s) != tau::get(f)) {
 			tref new_fm = rewriter::replace<node>(original_fm, f, s);
-			if(!are_nso_equivalent<BAs...>(original_fm, new_fm))
+			if(!are_nso_equivalent<node>(original_fm, new_fm))
 				return new_fm;
 		}
 	} while (++i < m.size());
@@ -128,11 +128,11 @@ tref good_splitter_using_function(tref f, splitter_type st, tref original_fm) {
 			.find_top(is<node, tau::bf_constant>);
 		if (!coeff) continue;
 		DBG(assert(is<node>(coeff, tau::bf_constant));)
-		tref s = splitter<BAs...>(coeff);
+		tref s = splitter<BAs...>(tau::get(coeff)).get();
 		if (tau::get(s) != tau::get(coeff)) {
 			tref new_fm = rewriter::replace<node>(
 					original_fm, coeff, tau::trim(s));
-			if(!are_nso_equivalent<BAs...>(original_fm, new_fm))
+			if(!are_nso_equivalent<node>(original_fm, new_fm))
 				return new_fm;
 		}
 	}
@@ -158,7 +158,7 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 		tref s = split<BAs...>(f_cnf, tau::bf, true, st, m, i, true);
 		if (tau::get(s) != tau::get(f_cnf)) {
 			tref new_fm = rewriter::replace<node>(original_fm, f, s);
-			if(!are_nso_equivalent<BAs...>(original_fm, new_fm))
+			if(!are_nso_equivalent<node>(original_fm, new_fm))
 				return new_fm;
 		}
 	} while (++i < m.size());
@@ -175,13 +175,13 @@ tref good_reverse_splitter_using_function(tref f, splitter_type st,
 			tau::build_bf_neg(coeff));
 		DBG(assert(is<node>(
 				tau::trim(neg_coeff), tau::bf_constant));)
-		tref s = splitter<BAs...>(tau::trim(neg_coeff), st);
+		const auto& s = splitter<BAs...>(tau::get(tau::trim(neg_coeff)), st);
 		// Negating s results in a reversed splitter for s
-		s = push_negation_in<node, false>(tau::build_bf_neg(s));
-		if (tau::get(s) != tau::get(coeff)) {
+		tref r = push_negation_in<node, false>(tau::build_bf_neg(s.get()));
+		if (tau::get(r) != tau::get(coeff)) {
 			tref new_fm = rewriter::replace<node>(
-					original_fm, coeff, s);
-			if (!are_nso_equivalent<BAs...>(original_fm, new_fm))
+					original_fm, coeff, r);
+			if (!are_nso_equivalent<node>(original_fm, new_fm))
 				return new_fm;
 		}
 	}
@@ -245,12 +245,12 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 					if (!free_vars.contains(tau::trim(v))) continue;
 					tref new_fm = rewriter::replace<node>(
 						fm, clause, tau::build_wff_and(clause,
-							tau::build_bf_less_equal(v, c)));
+							tau::build_bf_lteq(v, c)));
 					if (is_splitter<BAs...>(fm, new_fm, spec_clause))
 						return { new_fm, st };
 				}
 			}
-			if (tref s = good_reverse_splitter_using_function<BAs...>(f, st, clause);
+			if (tref s = good_reverse_splitter_using_function<BAs...>(f.get(), st, clause);
 				tau::get(s) != tau::get(clause))
 			{
 				//TODO: this equiv check should happen in good_reverse_splitter_using_function
@@ -263,7 +263,7 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 		trefs neqs = tau::get(clause)
 				.select_top(is<node, tau::bf_neq>);
 		for (tref neq : neqs) {
-			DBG(assert(is<node>(tau::trim(neq)[1], tau::bf_f));)
+			DBG(assert(tau::get(neq)[0][1].is(tau::bf_f));)
 			const auto& f = tau::get(neq)[0];
 			size_t type_f = f.get_ba_type();
 			for (tref c : constants) {
@@ -271,14 +271,14 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 				// First check that types match
 				size_t type_c = tau::get(c).get_ba_type();
 				if (type_f && type_f != type_c) continue;
-				tref r = tau::build_bf_greater_equal(f, c);
+				tref r = tau::build_bf_gteq(f.get(), c);
 				tref new_fm = rewriter::replace<node>(
 					fm, clause, tau::build_wff_and(clause, r));
 				new_fm = rewriter::replace<node>(new_fm, neq, tau::_T());
 				if (is_splitter<BAs...>(fm, new_fm, spec_clause))
 					return { new_fm, st };
 			}
-			if (tref s = good_splitter_using_function<BAs...>(f, st, clause);
+			if (tref s = good_splitter_using_function<BAs...>(f.get(), st, clause);
 				tau::get(s) != tau::get(clause))
 			{
 				//TODO: this equiv check should happen in good_splitter_using_function
@@ -339,7 +339,7 @@ tref tau_splitter(tref fm, splitter_type st) {
 		bool is_redundant = false;
 		for (size_t j = 0; j < clauses.size(); ++j) {
 			if ((size_t) i == j) continue;
-			if (is_tau_impl<BAs...>(clauses[j], clauses[i])) {
+			if (is_tau_impl<node>(clauses[j], clauses[i])) {
 				clauses.erase(clauses.begin() + i);
 				--i, is_redundant = true;
 				break;
@@ -364,9 +364,9 @@ tref tau_splitter(tref fm, splitter_type st) {
 		} else return tau::build_wff_and(
 			tau::build_wff_always(tau_bad_splitter<BAs...>()), fm);
 	} else {
-	// By assumption there is more than one clause and all not redundant
-	// Split disjunction taking splitter type into account
-	return split<BAs...>(fm, tau::wff, false, st, clauses, 0, false);
+		// By assumption there is more than one clause and all not redundant
+		// Split disjunction taking splitter type into account
+		return split<BAs...>(fm, tau::wff, false, st, clauses, 0, false);
 	}
 }
 

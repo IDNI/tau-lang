@@ -4,7 +4,6 @@
 #define __IDNI__TAU__SPLITTER_H__
 
 #include "satisfiability.h"
-#include "boolean_algebras/nso_ba.h"
 
 namespace idni::tau_lang {
 
@@ -14,8 +13,8 @@ enum class split_sym {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref split(tref fm, const size_t fm_type, bool is_cnf, const splitter_type st,
-	trefs& mem, size_t i, bool check_temps);
+tref split(tref fm, typename node<BAs...>::type fm_type, bool is_cnf,
+	const splitter_type st, trefs& mem, size_t i, bool check_temps);
 
 // If checking a temporal Tau formula F, we split a single DNF clause.
 // In order to check if the split clause yields a splitter for F, we have that

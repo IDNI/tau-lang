@@ -146,8 +146,8 @@ bool is_syntactic_zero(const tau_ba<BAs...>& fm) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 auto splitter(const tau_ba<BAs...>& fm, splitter_type st) {
-	auto s = tau_splitter(normalizer(fm.nso_rr), st);
-	return tau_ba<BAs...>(s);
+	auto s = tau_splitter<BAs...>(normalizer<node<BAs...>>(fm.nso_rr), st);
+	return tau_ba<BAs...>(tree<node<BAs...>>::geth(s));
 }
 
 template <typename... BAs>

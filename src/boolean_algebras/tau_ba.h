@@ -3,11 +3,6 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
 
-#include <iostream>
-
-#include "tau_tree.h"
-#include "splitter.h"
-
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,

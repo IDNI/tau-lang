@@ -11,9 +11,7 @@
 // Contact ohad@idni.org for requesting a permission. This license may be
 // modified over time by the Author.
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "test_helpers.h"
+#include "test_init.h"
 
 TEST_SUITE("something") {
 	TEST_CASE("something") {

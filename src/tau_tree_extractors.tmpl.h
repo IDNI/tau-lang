@@ -45,10 +45,10 @@ rewriter::rules get_rec_relations(tref rrs) {
 }
 
 template <NodeType node>
-std::optional<rr> get_nso_rr(tref r) {
+std::optional<rr> get_nso_rr(tref r, bool wo_inference) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	const auto& t = tau::	get(r);
+	const auto& t = tau::get(r);
 	if (t.is(tau::bf) || t.is(tau::ref)) return { { {}, tau::geth(r) } };
 	if (t.is(tau::rec_relation))
 		return { { get_rec_relations<node>(r), tau::geth(r) } };
@@ -56,6 +56,7 @@ std::optional<rr> get_nso_rr(tref r) {
 			? tt(r) | tau::main
 			: tt(r) | tau::spec | tau::main) | tau::wff | tt::ref;
 	rewriter::rules rules = get_rec_relations<node>(r);
+	if (wo_inference) return { { rules, tau::geth(main_fm) } };
 	return get_nso_rr<node>(rules, main_fm);
 }
 

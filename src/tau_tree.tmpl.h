@@ -26,7 +26,7 @@ rr_sig get_rr_sig(tref n);
 template <NodeType node>
 rewriter::rules get_rec_relations(tref r);
 template <NodeType node>
-std::optional<rr> get_nso_rr(tref ref);
+std::optional<rr> get_nso_rr(tref ref, bool wo_inference = false);
 template <NodeType node>
 std::optional<rr> get_nso_rr(const rewriter::rules& rules, tref main_fm);
 template <NodeType node>

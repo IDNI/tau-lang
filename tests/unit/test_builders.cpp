@@ -1,7 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "test_init.h"
-#include "tau_tree.h"
 #include "test_Bool_helpers.h"
 
 // TODO (MEDIUM) split into test_builder-parsing and test_builder-execution
