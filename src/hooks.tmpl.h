@@ -105,9 +105,9 @@ tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
 {
 	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
-	auto type = arg1(ch).get_ba_type();
-	return tau::get(node::ba_constants_binder_t::instance().bind(~l, type),
-									right);
+	size_t type = arg1(ch).get_ba_type();
+	return tau::get(tau::bf, tau::get(
+		node::ba_constants_binder_t::instance().bind(~l, type), right));
 }
 
 template <NodeType node>
@@ -394,9 +394,9 @@ tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return tau::get(
+	return tau::get(tau::bf, tau::get(
 		node::ba_constants_binder_t::instance().bind(l | r, type),
-		right);
+		right));
 }
 
 template <NodeType node>
@@ -409,9 +409,9 @@ tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return tau::get(
+	return tau::get(tau::bf, tau::get(
 		node::ba_constants_binder_t::instance().bind(l & r, type),
-		right);
+		right));
 }
 
 template <NodeType node>
@@ -424,9 +424,9 @@ tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return tau::get(
+	return tau::get(tau::bf, tau::get(
 		node::ba_constants_binder_t::instance().bind(l ^ r, type),
-		right);
+		right));
 }
 
 template <NodeType node>
@@ -595,7 +595,7 @@ tref get_hook<node>::wff_eq(const node& v, const tref* ch, size_t len, tref r) {
 template <NodeType node>
 tref get_hook<node>::wff_eq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_eq_cte", v, ch, len, r);)
-	auto l = tt(ch[0]) | tau::bf_eq | tau::bf | tau::bf_constant;
+	auto l = tt(ch[0]) | tau::bf | tau::bf_constant;
 	if (l && (l | tt::ba_constant) == false) return tau::get(tau::_T(), r);
 	else if (l) return tau::get(tau::_F(), r);
 	return tau::get_raw(v, ch, len, r);
@@ -624,9 +624,11 @@ tref get_hook<node>::wff_neq(const node& v, const tref* ch, size_t len, tref r) 
 template <NodeType node>
 tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref r) {
 	HOOK_LOGGING(log("wff_neq_cte", v, ch, len, r);)
-	auto l = tt(ch[0]) | tau::bf_neq | tau::bf | tau::bf_constant;
-	if (l && (l | tt::ba_constant) == false) return tau::get(tau::_F(), r);
-	else if (l) return tau::get(tau::_T(), r);
+	auto l = tt(ch[0]) | tau::bf | tau::bf_constant;
+	if (l.has_value() && (l | tt::ba_constant) == false)
+		return tau::get(tau::_F(), r);
+	else if (l.has_value()) return tau::get(tau::_T(), r);
+	BOOST_LOG_TRIVIAL(trace) << "(W) wff_neq_cte: pass";
 	return tau::get_raw(v, ch, len, r);
 }
 
