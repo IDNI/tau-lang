@@ -34,9 +34,9 @@ inline std::vector<std::string> symbol_names{
 	"z3_xnor", "__E_z3_80", "z3_xor", "__E_z3_81", "z3_rotate_left", "__E_z3_82", "num", "z3_rotate_right", "__E_z3_83", "z3_min", 
 	"__E_z3_84", "z3_max", "__E_z3_85", "bitvector", "bits", "__E_bitvector_86", "__E_bitvector_87", "hexnum", "__E_bitvector_88", "__E_bits_89", 
 	"__E_bits_90", "__E_hexnum_91", "ctn_neq", "__E_constraint_92", "ctnvar", "ctn_eq", "__E_constraint_93", "ctn_greater_equal", "__E_constraint_94", "ctn_greater", 
-	"__E_constraint_95", "ctn_less_equal", "__E_constraint_96", "ctn_less", "__E_constraint_97", "__E_variable_98", "__E_variable_99", "__E_variable_100", "chars", "__E_variable_101", 
-	"__E_variable_102", "__E_variable_103", "__E_variable_104", "io_var", "__E_variable_105", "in", "out", "__E_variable_106", "uninterpreted_constant", "in_var_name", 
-	"__E_in_107", "__E___E_in_107_108", "offset", "out_var_name", "__E_out_109", "__E___E_out_109_110", "__E___E___E_out_109_110_111", "q_var", "__E_q_vars_112", "__E_q_vars_113", 
+	"__E_constraint_95", "ctn_less_equal", "__E_constraint_96", "ctn_less", "__E_constraint_97", "__E_variable_98", "__E_variable_99", "__E_variable_100", "__E_variable_101", "__E_variable_102", 
+	"__E_variable_103", "__E_variable_104", "io_var", "__E_variable_105", "in", "out", "__E_variable_106", "uninterpreted_constant", "in_var_name", "__E_in_107", 
+	"__E___E_in_107_108", "offset", "out_var_name", "__E_out_109", "__E___E_out_109_110", "__E___E___E_out_109_110_111", "chars", "q_var", "__E_q_vars_112", "__E_q_vars_113", 
 	"__E_q_var_114", "__E_offsets_115", "__E_offsets_116", "integer", "shift", "__E_offset_117", "__E_shift_118", "__E___E_shift_118_119", "digits", "__E_integer_120", 
 	"uninter_const_name", "__E_uninterpreted_constant_121", "__E___E_uninterpreted_constant_121_122", "constant", "__E_bf_constant_123", "binding", "__E_bf_constant_124", "source", "__E_binding_125", "src_c", 
 	"__E___E_binding_125_126", "__E___E___E_binding_125_126_127", "__E___E___E_binding_125_126_128", "__E_src_c_129", "__E_src_c_130", "__E_chars_131", "__E_chars_132", "__E_digits_133", "comment", "__E_comment_134", 
@@ -95,7 +95,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 		},
 		.trim_terminals = true,
 		.dont_trim_terminals_of = {
-			20, 22, 139, 150, 204, 207, 214, 239, 243, 253,
+			20, 22, 139, 150, 204, 207, 214, 238, 242, 253,
 			258, 260, 267, 386, 391, 429, 447
 		},
 		.to_inline = {
@@ -106,7 +106,7 @@ inline struct ::idni::grammar<char_type, terminal_type>::options
 			{ 161, 136, 154 },
 			{ 163, 136, 21 },
 			{ 165, 136, 21 },
-			{ 228 },
+			{ 246 },
 			{ 247 },
 			{ 269 },
 			{ 310 },
@@ -725,20 +725,20 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(117), (NT(201)));
 //G294: z3(117)              => bitvector(203).
 	p(NT(117), (NT(203)));
-//G295: __E_bitvector_86(205) => _(11) ':' _(11) '[' _(11) type(150) _(11) ']'.
-	p(NT(205), (NT(11)+T(2)+NT(11)+T(24)+NT(11)+NT(150)+NT(11)+T(25)));
+//G295: __E_bitvector_86(205) => _(11) ':' _(11) type(150) _(11).
+	p(NT(205), (NT(11)+T(2)+NT(11)+NT(150)+NT(11)));
 //G296: __E_bitvector_86(205) => null.
 	p(NT(205), (nul));
 //G297: bitvector(203)       => '#' 'b' bits(204) __E_bitvector_86(205).
 	p(NT(203), (T(46)+T(7)+NT(204)+NT(205)));
-//G298: __E_bitvector_87(206) => _(11) ':' _(11) '[' _(11) type(150) _(11) ']'.
-	p(NT(206), (NT(11)+T(2)+NT(11)+T(24)+NT(11)+NT(150)+NT(11)+T(25)));
+//G298: __E_bitvector_87(206) => _(11) ':' _(11) type(150) _(11).
+	p(NT(206), (NT(11)+T(2)+NT(11)+NT(150)+NT(11)));
 //G299: __E_bitvector_87(206) => null.
 	p(NT(206), (nul));
 //G300: bitvector(203)       => num(196) __E_bitvector_87(206).
 	p(NT(203), (NT(196)+NT(206)));
-//G301: __E_bitvector_88(208) => _(11) ':' _(11) '[' _(11) type(150) _(11) ']'.
-	p(NT(208), (NT(11)+T(2)+NT(11)+T(24)+NT(11)+NT(150)+NT(11)+T(25)));
+//G301: __E_bitvector_88(208) => _(11) ':' _(11) type(150) _(11).
+	p(NT(208), (NT(11)+T(2)+NT(11)+NT(150)+NT(11)));
 //G302: __E_bitvector_88(208) => null.
 	p(NT(208), (nul));
 //G303: bitvector(203)       => '#' 'x' hexnum(207) __E_bitvector_88(208).
@@ -817,8 +817,8 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(226), (nul));
 //G340: __E_variable_99(226) => digit(3) __E_variable_99(226).
 	p(NT(226), (NT(3)+NT(226)));
-//G341: __E_variable_100(227) => _(11) ':' _(11) chars(228).
-	p(NT(227), (NT(11)+T(2)+NT(11)+NT(228)));
+//G341: __E_variable_100(227) => _(11) ':' _(11) type(150).
+	p(NT(227), (NT(11)+T(2)+NT(11)+NT(150)));
 //G342: __E_variable_100(227) => null.
 	p(NT(227), (nul));
 //G343: variable(139)        => __E_variable_98(225) __E_variable_99(226) __E_variable_100(227).	 # guarded: charvar
@@ -828,65 +828,65 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(450), (T(34)));
 //G345: __N_3(451)           => 'T'.
 	p(NT(451), (T(33)));
-//G346: __E_variable_101(229) => ~( __N_2(450) ) & ~( __N_3(451) ) & alpha(5).	 # conjunctive
-	p(NT(229), ~(NT(450)) & ~(NT(451)) & (NT(5)));
-//G347: __E_variable_102(230) => alnum(6).
-	p(NT(230), (NT(6)));
-//G348: __E_variable_102(230) => '_'.
-	p(NT(230), (T(35)));
-//G349: __E_variable_103(231) => null.
+//G346: __E_variable_101(228) => ~( __N_2(450) ) & ~( __N_3(451) ) & alpha(5).	 # conjunctive
+	p(NT(228), ~(NT(450)) & ~(NT(451)) & (NT(5)));
+//G347: __E_variable_102(229) => alnum(6).
+	p(NT(229), (NT(6)));
+//G348: __E_variable_102(229) => '_'.
+	p(NT(229), (T(35)));
+//G349: __E_variable_103(230) => null.
+	p(NT(230), (nul));
+//G350: __E_variable_103(230) => __E_variable_102(229) __E_variable_103(230).
+	p(NT(230), (NT(229)+NT(230)));
+//G351: __E_variable_104(231) => _(11) ':' _(11) type(150).
+	p(NT(231), (NT(11)+T(2)+NT(11)+NT(150)));
+//G352: __E_variable_104(231) => null.
 	p(NT(231), (nul));
-//G350: __E_variable_103(231) => __E_variable_102(230) __E_variable_103(231).
-	p(NT(231), (NT(230)+NT(231)));
-//G351: __E_variable_104(232) => _(11) ':' _(11) chars(228).
-	p(NT(232), (NT(11)+T(2)+NT(11)+NT(228)));
-//G352: __E_variable_104(232) => null.
-	p(NT(232), (nul));
-//G353: variable(139)        => __E_variable_101(229) __E_variable_103(231) __E_variable_104(232).	 # guarded: var
-	p(NT(139), (NT(229)+NT(231)+NT(232)));
+//G353: variable(139)        => __E_variable_101(228) __E_variable_103(230) __E_variable_104(231).	 # guarded: var
+	p(NT(139), (NT(228)+NT(230)+NT(231)));
 	p.back().guard = "var";
-//G354: __E_variable_105(234) => in(235).
-	p(NT(234), (NT(235)));
-//G355: __E_variable_105(234) => out(236).
-	p(NT(234), (NT(236)));
-//G356: io_var(233)          => __E_variable_105(234).
+//G354: __E_variable_105(233) => in(234).
 	p(NT(233), (NT(234)));
-//G357: __E_variable_106(237) => _(11) ':' _(11) chars(228).
-	p(NT(237), (NT(11)+T(2)+NT(11)+NT(228)));
-//G358: __E_variable_106(237) => null.
-	p(NT(237), (nul));
-//G359: variable(139)        => io_var(233) __E_variable_106(237).
-	p(NT(139), (NT(233)+NT(237)));
-//G360: variable(139)        => uninterpreted_constant(238).
-	p(NT(139), (NT(238)));
-//G361: __E___E_in_107_108(241) => digit(3).
-	p(NT(241), (NT(3)));
-//G362: __E___E_in_107_108(241) => digit(3) __E___E_in_107_108(241).
-	p(NT(241), (NT(3)+NT(241)));
-//G363: __E_in_107(240)      => 'i' __E___E_in_107_108(241).
-	p(NT(240), (T(10)+NT(241)));
-//G364: in_var_name(239)     => __E_in_107(240).
-	p(NT(239), (NT(240)));
-//G365: in(235)              => in_var_name(239) '[' offset(242) ']'.
-	p(NT(235), (NT(239)+T(24)+NT(242)+T(25)));
-//G366: __E___E___E_out_109_110_111(246) => digit(3).
-	p(NT(246), (NT(3)));
-//G367: __E___E___E_out_109_110_111(246) => digit(3) __E___E___E_out_109_110_111(246).
-	p(NT(246), (NT(3)+NT(246)));
-//G368: __E___E_out_109_110(245) => 'o' __E___E___E_out_109_110_111(246).
-	p(NT(245), (T(17)+NT(246)));
-//G369: __E_out_109(244)     => __E___E_out_109_110(245).
-	p(NT(244), (NT(245)));
-//G370: __E_out_109(244)     => 'u'.
-	p(NT(244), (T(47)));
-//G371: out_var_name(243)    => __E_out_109(244).
+//G355: __E_variable_105(233) => out(235).
+	p(NT(233), (NT(235)));
+//G356: io_var(232)          => __E_variable_105(233).
+	p(NT(232), (NT(233)));
+//G357: __E_variable_106(236) => _(11) ':' _(11) type(150).
+	p(NT(236), (NT(11)+T(2)+NT(11)+NT(150)));
+//G358: __E_variable_106(236) => null.
+	p(NT(236), (nul));
+//G359: variable(139)        => io_var(232) __E_variable_106(236).
+	p(NT(139), (NT(232)+NT(236)));
+//G360: variable(139)        => uninterpreted_constant(237).
+	p(NT(139), (NT(237)));
+//G361: __E___E_in_107_108(240) => digit(3).
+	p(NT(240), (NT(3)));
+//G362: __E___E_in_107_108(240) => digit(3) __E___E_in_107_108(240).
+	p(NT(240), (NT(3)+NT(240)));
+//G363: __E_in_107(239)      => 'i' __E___E_in_107_108(240).
+	p(NT(239), (T(10)+NT(240)));
+//G364: in_var_name(238)     => __E_in_107(239).
+	p(NT(238), (NT(239)));
+//G365: in(234)              => in_var_name(238) '[' offset(241) ']'.
+	p(NT(234), (NT(238)+T(24)+NT(241)+T(25)));
+//G366: __E___E___E_out_109_110_111(245) => digit(3).
+	p(NT(245), (NT(3)));
+//G367: __E___E___E_out_109_110_111(245) => digit(3) __E___E___E_out_109_110_111(245).
+	p(NT(245), (NT(3)+NT(245)));
+//G368: __E___E_out_109_110(244) => 'o' __E___E___E_out_109_110_111(245).
+	p(NT(244), (T(17)+NT(245)));
+//G369: __E_out_109(243)     => __E___E_out_109_110(244).
 	p(NT(243), (NT(244)));
-//G372: out(236)             => out_var_name(243) '[' offset(242) ']'.
-	p(NT(236), (NT(243)+T(24)+NT(242)+T(25)));
-//G373: ctnvar(214)          => chars(228).
-	p(NT(214), (NT(228)));
-//G374: capture(20)          => '$' chars(228).
-	p(NT(20), (T(48)+NT(228)));
+//G370: __E_out_109(243)     => 'u'.
+	p(NT(243), (T(47)));
+//G371: out_var_name(242)    => __E_out_109(243).
+	p(NT(242), (NT(243)));
+//G372: out(235)             => out_var_name(242) '[' offset(241) ']'.
+	p(NT(235), (NT(242)+T(24)+NT(241)+T(25)));
+//G373: ctnvar(214)          => chars(246).
+	p(NT(214), (NT(246)));
+//G374: capture(20)          => '$' chars(246).
+	p(NT(20), (T(48)+NT(246)));
 //G375: __E_q_vars_112(248)  => _(11) ',' _(11) q_var(247).
 	p(NT(248), (NT(11)+T(14)+NT(11)+NT(247)));
 //G376: __E_q_vars_113(249)  => null.
@@ -897,38 +897,38 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(72), (NT(247)+NT(249)));
 //G379: q_var(247)           => capture(20).
 	p(NT(247), (NT(20)));
-//G380: __E_q_var_114(250)   => _(11) ':' _(11) chars(228).
-	p(NT(250), (NT(11)+T(2)+NT(11)+NT(228)));
+//G380: __E_q_var_114(250)   => _(11) ':' _(11) type(150).
+	p(NT(250), (NT(11)+T(2)+NT(11)+NT(150)));
 //G381: __E_q_var_114(250)   => null.
 	p(NT(250), (nul));
-//G382: __N_4(452)           => uninterpreted_constant(238) __E_q_var_114(250).
-	p(NT(452), (NT(238)+NT(250)));
+//G382: __N_4(452)           => uninterpreted_constant(237) __E_q_var_114(250).
+	p(NT(452), (NT(237)+NT(250)));
 //G383: q_var(247)           => variable(139) & ~( __N_4(452) ).	 # conjunctive
 	p(NT(247), (NT(139)) & ~(NT(452)));
-//G384: __E_offsets_115(251) => _(11) ',' _(11) offset(242).
-	p(NT(251), (NT(11)+T(14)+NT(11)+NT(242)));
+//G384: __E_offsets_115(251) => _(11) ',' _(11) offset(241).
+	p(NT(251), (NT(11)+T(14)+NT(11)+NT(241)));
 //G385: __E_offsets_116(252) => null.
 	p(NT(252), (nul));
 //G386: __E_offsets_116(252) => __E_offsets_115(251) __E_offsets_116(252).
 	p(NT(252), (NT(251)+NT(252)));
-//G387: offsets(24)          => '[' _(11) offset(242) __E_offsets_116(252) _(11) ']'.
-	p(NT(24), (T(24)+NT(11)+NT(242)+NT(252)+NT(11)+T(25)));
-//G388: offset(242)          => integer(253).
-	p(NT(242), (NT(253)));
-//G389: offset(242)          => capture(20).
-	p(NT(242), (NT(20)));
-//G390: offset(242)          => shift(254).
-	p(NT(242), (NT(254)));
-//G391: __N_5(453)           => io_var(233).
-	p(NT(453), (NT(233)));
+//G387: offsets(24)          => '[' _(11) offset(241) __E_offsets_116(252) _(11) ']'.
+	p(NT(24), (T(24)+NT(11)+NT(241)+NT(252)+NT(11)+T(25)));
+//G388: offset(241)          => integer(253).
+	p(NT(241), (NT(253)));
+//G389: offset(241)          => capture(20).
+	p(NT(241), (NT(20)));
+//G390: offset(241)          => shift(254).
+	p(NT(241), (NT(254)));
+//G391: __N_5(453)           => io_var(232).
+	p(NT(453), (NT(232)));
 //G392: __E_offset_117(255)  => variable(139) & ~( __N_5(453) ).	 # conjunctive
 	p(NT(255), (NT(139)) & ~(NT(453)));
-//G393: offset(242)          => __E_offset_117(255).
-	p(NT(242), (NT(255)));
+//G393: offset(241)          => __E_offset_117(255).
+	p(NT(241), (NT(255)));
 //G394: __E_shift_118(256)   => capture(20).
 	p(NT(256), (NT(20)));
-//G395: __N_6(454)           => io_var(233).
-	p(NT(454), (NT(233)));
+//G395: __N_6(454)           => io_var(232).
+	p(NT(454), (NT(232)));
 //G396: __E___E_shift_118_119(257) => variable(139) & ~( __N_6(454) ).	 # conjunctive
 	p(NT(257), (NT(139)) & ~(NT(454)));
 //G397: __E_shift_118(256)   => __E___E_shift_118_119(257).
@@ -943,16 +943,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(259), (nul));
 //G402: integer(253)         => __E_integer_120(259) _(11) digits(258).
 	p(NT(253), (NT(259)+NT(11)+NT(258)));
-//G403: __E___E_uninterpreted_constant_121_122(262) => chars(228).
-	p(NT(262), (NT(228)));
+//G403: __E___E_uninterpreted_constant_121_122(262) => chars(246).
+	p(NT(262), (NT(246)));
 //G404: __E___E_uninterpreted_constant_121_122(262) => _(11).
 	p(NT(262), (NT(11)));
-//G405: __E_uninterpreted_constant_121(261) => __E___E_uninterpreted_constant_121_122(262) ':' chars(228).
-	p(NT(261), (NT(262)+T(2)+NT(228)));
+//G405: __E_uninterpreted_constant_121(261) => __E___E_uninterpreted_constant_121_122(262) ':' chars(246).
+	p(NT(261), (NT(262)+T(2)+NT(246)));
 //G406: uninter_const_name(260) => __E_uninterpreted_constant_121(261).
 	p(NT(260), (NT(261)));
-//G407: uninterpreted_constant(238) => '<' uninter_const_name(260) _(11) '>'.
-	p(NT(238), (T(20)+NT(260)+NT(11)+T(21)));
+//G407: uninterpreted_constant(237) => '<' uninter_const_name(260) _(11) '>'.
+	p(NT(237), (T(20)+NT(260)+NT(11)+T(21)));
 //G408: __E_bf_constant_123(264) => capture(20).
 	p(NT(264), (NT(20)));
 //G409: __E_bf_constant_123(264) => binding(265).
@@ -1001,10 +1001,10 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(274), (NT(273)+NT(274)));
 //G431: src_c(269)           => '{' __E_src_c_130(274) '}'.
 	p(NT(269), (T(49)+NT(274)+T(50)));
-//G432: type(150)            => chars(228).
-	p(NT(150), (NT(228)));
-//G433: type(150)            => chars(228) _(11) '[' _(11) num(196) _(11) ']'.
-	p(NT(150), (NT(228)+NT(11)+T(24)+NT(11)+NT(196)+NT(11)+T(25)));
+//G432: type(150)            => chars(246).
+	p(NT(150), (NT(246)));
+//G433: type(150)            => chars(246) _(11) '[' _(11) num(196) _(11) ']'.
+	p(NT(150), (NT(246)+NT(11)+T(24)+NT(11)+NT(196)+NT(11)+T(25)));
 //G434: __E_chars_131(275)   => alnum(6).
 	p(NT(275), (NT(6)));
 //G435: __E_chars_131(275)   => '_'.
@@ -1013,16 +1013,16 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(276), (nul));
 //G437: __E_chars_132(276)   => __E_chars_131(275) __E_chars_132(276).
 	p(NT(276), (NT(275)+NT(276)));
-//G438: chars(228)           => alpha(5) __E_chars_132(276).
-	p(NT(228), (NT(5)+NT(276)));
+//G438: chars(246)           => alpha(5) __E_chars_132(276).
+	p(NT(246), (NT(5)+NT(276)));
 //G439: __E_digits_133(277)  => digit(3).
 	p(NT(277), (NT(3)));
 //G440: __E_digits_133(277)  => digit(3) __E_digits_133(277).
 	p(NT(277), (NT(3)+NT(277)));
 //G441: digits(258)          => __E_digits_133(277).
 	p(NT(258), (NT(277)));
-//G442: sym(22)              => chars(228).
-	p(NT(22), (NT(228)));
+//G442: sym(22)              => chars(246).
+	p(NT(22), (NT(246)));
 //G443: __E_comment_134(279) => printable(8).
 	p(NT(279), (NT(8)));
 //G444: __E_comment_134(279) => '\t'.
@@ -1357,14 +1357,14 @@ inline idni::prods<char_type, terminal_type>& productions() {
 	p(NT(398), (NT(399)));
 //G609: cli_command(285)     => toggle_cmd(398).
 	p(NT(285), (NT(398)));
-//G610: __E_cli_command_182(402) => type(150) __(27) in_var_name(239) _(11) '=' _(11) input_stream(403).
-	p(NT(402), (NT(150)+NT(27)+NT(239)+NT(11)+T(3)+NT(11)+NT(403)));
+//G610: __E_cli_command_182(402) => type(150) __(27) in_var_name(238) _(11) '=' _(11) input_stream(403).
+	p(NT(402), (NT(150)+NT(27)+NT(238)+NT(11)+T(3)+NT(11)+NT(403)));
 //G611: def_input_cmd(401)   => __E_cli_command_182(402).
 	p(NT(401), (NT(402)));
 //G612: cli_command(285)     => def_input_cmd(401).
 	p(NT(285), (NT(401)));
-//G613: __E_cli_command_183(405) => type(150) __(27) out_var_name(243) _(11) '=' _(11) output_stream(406).
-	p(NT(405), (NT(150)+NT(27)+NT(243)+NT(11)+T(3)+NT(11)+NT(406)));
+//G613: __E_cli_command_183(405) => type(150) __(27) out_var_name(242) _(11) '=' _(11) output_stream(406).
+	p(NT(405), (NT(150)+NT(27)+NT(242)+NT(11)+T(3)+NT(11)+NT(406)));
 //G614: def_output_cmd(404)  => __E_cli_command_183(405).
 	p(NT(404), (NT(405)));
 //G615: cli_command(285)     => def_output_cmd(404).
@@ -1631,9 +1631,9 @@ struct tau_parser : public idni::parser<char, char> {
 		z3_xnor, __E_z3_80, z3_xor, __E_z3_81, z3_rotate_left, __E_z3_82, num, z3_rotate_right, __E_z3_83, z3_min, 
 		__E_z3_84, z3_max, __E_z3_85, bitvector, bits, __E_bitvector_86, __E_bitvector_87, hexnum, __E_bitvector_88, __E_bits_89, 
 		__E_bits_90, __E_hexnum_91, ctn_neq, __E_constraint_92, ctnvar, ctn_eq, __E_constraint_93, ctn_greater_equal, __E_constraint_94, ctn_greater, 
-		__E_constraint_95, ctn_less_equal, __E_constraint_96, ctn_less, __E_constraint_97, __E_variable_98, __E_variable_99, __E_variable_100, chars, __E_variable_101, 
-		__E_variable_102, __E_variable_103, __E_variable_104, io_var, __E_variable_105, in, out, __E_variable_106, uninterpreted_constant, in_var_name, 
-		__E_in_107, __E___E_in_107_108, offset, out_var_name, __E_out_109, __E___E_out_109_110, __E___E___E_out_109_110_111, q_var, __E_q_vars_112, __E_q_vars_113, 
+		__E_constraint_95, ctn_less_equal, __E_constraint_96, ctn_less, __E_constraint_97, __E_variable_98, __E_variable_99, __E_variable_100, __E_variable_101, __E_variable_102, 
+		__E_variable_103, __E_variable_104, io_var, __E_variable_105, in, out, __E_variable_106, uninterpreted_constant, in_var_name, __E_in_107, 
+		__E___E_in_107_108, offset, out_var_name, __E_out_109, __E___E_out_109_110, __E___E___E_out_109_110_111, chars, q_var, __E_q_vars_112, __E_q_vars_113, 
 		__E_q_var_114, __E_offsets_115, __E_offsets_116, integer, shift, __E_offset_117, __E_shift_118, __E___E_shift_118_119, digits, __E_integer_120, 
 		uninter_const_name, __E_uninterpreted_constant_121, __E___E_uninterpreted_constant_121_122, constant, __E_bf_constant_123, binding, __E_bf_constant_124, source, __E_binding_125, src_c, 
 		__E___E_binding_125_126, __E___E___E_binding_125_126_127, __E___E___E_binding_125_126_128, __E_src_c_129, __E_src_c_130, __E_chars_131, __E_chars_132, __E_digits_133, comment, __E_comment_134, 
