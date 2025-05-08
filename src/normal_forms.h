@@ -281,8 +281,8 @@ auto lex_var_comp = [](tref x, tref y) {
 		return it->second;
 #endif // TAU_CACHE
 	// TODO (QUESTION) strings have unique id, use .data() instead?
-	auto xx = tree<node>::get(x)[0][0].get_string();
-	auto yy = tree<node>::get(y)[0][0].get_string();
+	auto xx = tree<node>::get(x).to_str();
+	auto yy = tree<node>::get(y).to_str();
 #ifdef TAU_CACHE
 	std::pair<tref,tref> p(x,y);
 	return cache.emplace(move(p), xx < yy).first->second;

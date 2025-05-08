@@ -213,8 +213,11 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 		typename tree<node>::template extractor<traverser>(
 			[](const traverser& t) {
 				if (!t) return traverser();
-				return traverser(t.value_tree()
-						.get_children());
+				trefs ch;
+				for (tref v : t.values())
+					for (tref c : get(v).children())
+						ch.push_back(c);				
+				return traverser(ch);
 			});
 
 template <NodeType node>
