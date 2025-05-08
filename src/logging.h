@@ -10,8 +10,8 @@
 
 namespace idni::tau_lang {
 
-struct logging {
-	logging() {
+struct logging_manager {
+	logging_manager() {
 		using namespace boost::log;
 		core::get()->set_filter(trivial::severity >= trivial::info);
 		static bool initialize_console_log = true;
@@ -36,7 +36,7 @@ struct logging {
 		core::get()->set_filter(trivial::severity >= trivial::error);
 	}
 };
-inline static logging log;
+inline static logging_manager logging;
 
 } // namespace idni::tau_lang
 
