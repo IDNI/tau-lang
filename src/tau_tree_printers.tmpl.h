@@ -159,8 +159,6 @@ inline bool pretty_printer_indenting    = false;
 template <NodeType node>
 std::ostream& tree<node>::print(std::ostream& os) const {
 
-// TODO wff_all, wff_ex (print all x all y as all x, y)
-// TODO bf_and spacing
 // TODO review indenting and syntax highlighting
 
 // #define DEBUG_TRAVERSAL 1
@@ -170,6 +168,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	std::unordered_map<tref, size_t> chpos;
 	std::unordered_set<tref> wraps, indented, highlighted;
 	char bf_and_arg1_last_char_written = 0;
+	typename node::type last_quant_nt = start;
 
 	auto is_to_wrap = [](size_t nt, size_t pt) {
 		static const std::set<size_t> no_wrap_for = {
@@ -334,6 +333,10 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 #endif
 		// t.print_tree(os << "entering: ") << "\n";
 		size_t nt = t.get_type();
+		auto parent_nt = [&parent]() {
+			if (parent) return get(parent).get_type();
+			return start;
+		};
 
 		auto track_chpos = [&]() { chpos[ref] = 0; };
 
@@ -359,11 +362,17 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_constant:	ba_constants_t::print(os,
 							t.get_ba_constant_id());
 						break;
+			case wff: if (parent && last_quant_nt != start) {
+					size_t p = parent_nt();
+					bool brk = p != wff_all && p != wff_ex;
+					if (brk) last_quant_nt = start;
+					bool child_quant = p == last_quant_nt;
+					if (!child_quant) os << " ";
+				}
+				[[fallthrough]];
 			case bf:
-			case wff:
 				if (parent && is_to_wrap(
-					t.first_tree().get_type(),
-					get(parent).get_type()))
+					t.first_tree().get_type(), parent_nt()))
 				{
 					wraps.insert(ref), os << "(";
 					if (static_cast<node::type>(nt) == wff)
@@ -371,8 +380,14 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 				}
 				break;
 
-			case wff_all:           os << "all "; break;
-			case wff_ex:            os << "ex "; break;
+			case wff_all:
+				if (last_quant_nt == wff_all) os << ", ";
+				else last_quant_nt = wff_all, os << "all ";
+				break;
+			case wff_ex:				
+				if (last_quant_nt == wff_ex) os << ", ";
+				else last_quant_nt = wff_ex, os << "ex ";
+				break;
 
 			case wff_sometimes:     os << "sometimes "; break;
 			case wff_always:        os << "always "; break;
@@ -461,9 +476,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case ctn_gt:            os << " > "; break;
 			case ctn_lteq:          os << " <= "; break;
 			case ctn_lt:            os << " < "; break;
-
-			case wff_all:
-			case wff_ex:            os << " "; break;
 
 			case wff_and:           os << " && "; break;
 			case wff_or:            os << " || "; break;
