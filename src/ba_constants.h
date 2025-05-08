@@ -8,15 +8,35 @@
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
-// BA constants... static pool of BA constants
+// BA types
+//   contains type map of BA types
+template <typename... BAs>
+requires BAsPack<BAs...>
+struct ba_types {
+	// get the constant id from the type name string id
+	static size_t type_id(size_t ba_type);
+
+	// get the type id from the type name
+	static size_t type_id(const std::string& ba_type_name);
+
+	// get the type name from the type map id
+	static const std::string& type_name(size_t ba_type);
+
+	// print the type name to the stream
+	static std::ostream& print_type(std::ostream& os, size_t ba_type);
+private:
+	inline static std::vector<size_t> types;               // type_sids (index = ba_type id)
+	inline static std::map<size_t, size_t> type_names_map; // type_sid -> ba_type id
+};
+
+// -----------------------------------------------------------------------------
+// BA constants
+// static pool of BA constants
 //   implements tref operator()(constant_source, type_name) binding interface
-// - create custom nso_factory<BA> specialization for your BA type for factory binding
-// - and/or provide map of named constants for named binding
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct ba_constants {
-
-	// constant id and type id
+	// pair of constant id and type id
 	using typed_constant = std::pair<size_t, size_t>;
 
 	// insert the constant value of a type name to the pool
@@ -45,15 +65,6 @@ struct ba_constants {
 	requires OneOfBAs<BA, BAs...>
 	static bool is(size_t constant_id);
 
-	// get the constant id from the type name string id
-	static size_t type_id(size_t ba_type);
-
-	// get the type id from the type name
-	static size_t type_id(const std::string& ba_type_name);
-
-	// get the type name from the type map id
-	static const std::string& type_name(size_t ba_type);
-
 	// get the type id from the constant id
 	static size_t type_of(size_t constant_id);
 
@@ -61,19 +72,19 @@ struct ba_constants {
 	static std::ostream& print(std::ostream& os, size_t constant_id);
 	// print the constant value to the stream
 	static std::ostream& print_constant(std::ostream& os, size_t constant_id);
-	// print the type name to the stream
-	static std::ostream& print_type(std::ostream& os, size_t ba_type);
 
 private:
 	// internal insertion of a constant into the pool
 	static size_t get(const std::variant<BAs...>& b);
 
 	inline static std::vector<std::variant<BAs...>> C;     // pool of constants
-	inline static std::vector<size_t> ba_types;               // type_sids (index = ba_type id)
-	inline static std::map<size_t, size_t> ba_type_names_map; // type_sid -> ba_type id
 	inline static std::map<size_t, size_t> ba_type_map;       // constant_id -> ba_type id
 };
 
+// -----------------------------------------------------------------------------
+// BA constants binder
+// - create custom nso_factory<BA> specialization for your BA type for factory binding
+// - and/or provide map of named constants for named binding
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct ba_constants_binder {

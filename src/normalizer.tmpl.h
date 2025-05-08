@@ -177,9 +177,9 @@ bool is_non_temp_nso_satisfiable(tref n) {
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	tref normalized = normalize_non_temp<node>(nn);
 	const auto& t = tau::get(normalized);
-	assert((t == tau::get_T() || t == tau::get_F()
+	assert((t.equals_T() || t.equals_F()
 		|| t.find_top(is<node, tau::constraint>)));
-	return t == tau::get_T();
+	return t.equals_T();
 }
 
 template <NodeType node>
@@ -193,9 +193,9 @@ bool is_non_temp_nso_unsat(tref n) {
 	auto vars = get_free_vars_from_nso<node>(nn);
 	for (tref v : vars) nn = tau::build_wff_ex(v, nn);
 	const auto& t = tau::get(normalize_non_temp<node>(nn));
-	assert((t == tau::get_T() || t == tau::get_F()
+	assert((t.equals_T() || t.equals_F()
 		|| t.find_top(is<node, tau::constraint>)));
-	return t == tau::get_F();
+	return t.equals_F();
 }
 
 template <NodeType node>
@@ -249,17 +249,17 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		<< "(I) -- wff: " << tau::build_wff_and(imp1, imp2);
 
 	const auto& tdir1 = tau::get(normalizer_step<node>(imp1));
-	DBG(assert((tdir1 == tau::get_T() || tdir1 == tau::get_F()
+	DBG(assert((tdir1.equals_T() || tdir1.equals_F()
 		|| tdir1.find_top(is<node, tau::constraint>)));)
-	if (tdir1 == tau::get_F()) {
+	if (tdir1.equals_F()) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: "
 							<< tdir1;
 		return false;
 	}
 	const auto& tdir2 = tau::get(normalizer_step<node>(imp2));
-	DBG(assert((tdir2 == tau::get_T() || tdir2 == tau::get_F()
+	DBG(assert((tdir2.equals_T() || tdir2.equals_F()
 		|| tdir2.find_top(is<node, tau::constraint>))));
-	bool res = (tdir1 == tau::get_T() && tdir2 == tau::get_T());
+	bool res = (tdir1.equals_T() && tdir2.equals_T());
 
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << res;
 
@@ -307,10 +307,10 @@ bool is_nso_impl(tref n1, tref n2) {
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- wff: " << tau::get(imp);
 
 	const auto& res = tau::get(normalizer_step<node>(imp));
-	DBG(assert((res == tau::_T() || res == tau::_F()
+	DBG(assert((res.equals_T() || res.equals_F()
 		|| res.find_top(is<node, tau::constraint>)));)
 	BOOST_LOG_TRIVIAL(debug) << "(I) -- End is_nso_impl: " << res;
-	return res == tau::get_T();
+	return res.equals_T();
 }
 
 template <NodeType node>
@@ -367,20 +367,24 @@ tref normalize_with_temp_simp(tref fm) {
 		return n;
 	};
 	const auto& red_fm = tau::get(normalizer_step<node>(fm));
-	if (red_fm == tau::get_T() || red_fm == tau::get_F())
+	BOOST_LOG_TRIVIAL(trace) << "    -- red_fm: " << red_fm.to_str();
+	if (red_fm.equals_T() || red_fm.equals_F())
 		return red_fm.get();
 	trefs clauses = get_dnf_wff_clauses<node>(red_fm.get());
 	tref nn = tau::_F();
 	for (tref clause : clauses) {
+		BOOST_LOG_TRIVIAL(trace) << "    -- clause: " << TAU_TO_STR(clause);
 		const auto& t = tau::get(clause);
 		trefs aw_parts = t.select_top(is<node, tau::wff_always>);
 		trefs st_parts = t.select_top(is<node, tau::wff_sometimes>);
 		if (aw_parts.size() == 1 && st_parts.empty()) {
 			nn = tau::build_wff_or(nn, clause);
+			BOOST_LOG_TRIVIAL(trace) << "    -- nn: " << TAU_DUMP_TO_STR(nn);
 			continue;
 		}
 		if (aw_parts.empty() && st_parts.size() == 1) {
 			nn = tau::build_wff_or(nn, clause);
+			BOOST_LOG_TRIVIAL(trace) << "    -- nn: " << TAU_DUMP_TO_STR(nn);
 			continue;
 		}
 
@@ -389,6 +393,7 @@ tref normalize_with_temp_simp(tref fm) {
 		for (tref aw : aw_parts) changes.emplace(aw, tau::_T());
 		for (tref st : st_parts) changes.emplace(st, tau::_T());
 		tref new_clause = rewriter::replace<node>(clause, changes);
+		BOOST_LOG_TRIVIAL(trace) << "    -- new clause: " << TAU_DUMP_TO_STR(nn);
 
 		// First check if any always statements are implied by others
 		for (size_t i = 0; i < aw_parts.size(); ++i) {
@@ -405,6 +410,7 @@ tref normalize_with_temp_simp(tref fm) {
 			tref f = tau::build_wff_and(trim_q(aw), trim_q(st));
 			if (is_non_temp_nso_unsat<node>(f)) clause_false = true;
 		}
+		if (clause_false) BOOST_LOG_TRIVIAL(trace) << "    -- clause false";
 		if (clause_false) continue;
 
 		// Next check if any always statement implies a sometimes statement
@@ -426,8 +432,10 @@ tref normalize_with_temp_simp(tref fm) {
 					tau::build_wff_and(aw_parts),
 					tau::build_wff_and(st_parts)));
 		nn = tau::build_wff_or(nn, new_clause);
+		BOOST_LOG_TRIVIAL(trace) << "    -- nn: " << TAU_DUMP_TO_STR(nn);
 	}
 	DBG(assert(nn != nullptr);)
+	BOOST_LOG_TRIVIAL(trace) << "    -- normalize_with_temp_simp result: " << TAU_DUMP_TO_STR(nn);
 	return nn;
 }
 

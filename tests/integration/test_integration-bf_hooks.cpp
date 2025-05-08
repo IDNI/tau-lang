@@ -48,9 +48,9 @@ TEST_SUITE("bf operator hooks") {
 	bool check_type(const char* sample, const char* type) {
 		tref type_sample = tau::get(sample, parse_bf());
 		size_t type_id = tt(type_sample) | tau::bf_constant | tt::ba_type;
-		size_t type_expected_id = bac::type_id(type);
-		auto sample_type = bac::type_name(type_id);
-		auto expected_type = bac::type_name(type_expected_id);
+		size_t type_expected_id = bnode::ba_types_t::type_id(type);
+		auto sample_type = bnode::ba_types_t::type_name(type_id);
+		auto expected_type = bnode::ba_types_t::type_name(type_expected_id);
 
 		#ifdef DEBUG
 		string str(sample);

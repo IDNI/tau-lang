@@ -175,8 +175,8 @@ private:
 	// TODO (MEDIUM) this dependency should be removed
 	repl<repl_evaluator<BAs...>>* r = 0;
 	rewriter::rules definitions;
-	std::map<htree::sp, std::pair<std::string, std::string>> inputs;
-	std::map<htree::sp, std::pair<std::string, std::string>> outputs;
+	typed_io_vars inputs;
+	typed_io_vars outputs;
 	bool error = false;
 	idni::term::colors TC{};
 };

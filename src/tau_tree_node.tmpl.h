@@ -28,18 +28,16 @@ constexpr node<BAs...> node<BAs...>::ba_typed(type nt, size_t ba_tid) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr node<BAs...> node<BAs...>::input_variable(size_t var_name_sid,
-	size_t ba_tid)
+constexpr node<BAs...> node<BAs...>::input_variable(size_t ba_tid)
 {
-	return node(type::io_var, var_name_sid, false /* is_output */, ba_tid);
+	return node(type::io_var, 1 /* input */, true, ba_tid);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-constexpr node<BAs...> node<BAs...>::output_variable(size_t var_name_sid,
-	size_t ba_tid)
+constexpr node<BAs...> node<BAs...>::output_variable(size_t ba_tid)
 {
-	return node(type::io_var, var_name_sid, true /* is_output */, ba_tid);
+	return node(type::io_var, 2 /* output */, true, ba_tid);
 }
 
 inline bool is_term_nt(size_t nt) {

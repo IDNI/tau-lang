@@ -159,7 +159,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 			case bf_t:
 			case bf_f:
-				ba_type = node::ba_constants_t::type_id(get_type_sid<node>(x));
+				ba_type = node::ba_types_t::type_id(get_type_sid<node>(x));
 				x = getx_data(0);
 				break;
 
@@ -203,12 +203,12 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 		// 	<< " `" << tree::get(x) << "`\n";
 		return true;
 	};
-	// parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
+	parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
 	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
 	if (error) return nullptr;
 	if (m.find(ptr.get()) == m.end()) return nullptr;
-	// std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n";
-	// m_get(ptr.get()).print_tree(std::cout << "tau tree: ") << "\n";
+	std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n";
+	m_get(ptr.get()).print_tree(std::cout << "tau tree: ") << "\n";
 	return m_ref(ptr.get());
 }
 

@@ -32,7 +32,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::bf_constant)
 		os << " { " << ba_constants<BAs...>::get(n.data) << " } : "
-		<< ba_constants<BAs...>::type_name(n.ba);
+		<< node<BAs...>::ba_types_t::type_name(n.ba);
 	else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name) os << "<" << string_from_id(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
@@ -462,6 +462,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case ctn_gt:            os << " > "; break;
 			case ctn_lteq:          os << " <= "; break;
 			case ctn_lt:            os << " < "; break;
+
+			case wff_all:
+			case wff_ex:            os << " "; break;
 
 			case wff_and:           os << " && "; break;
 			case wff_or:            os << " || "; break;

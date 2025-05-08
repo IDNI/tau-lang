@@ -5,6 +5,44 @@
 
 namespace idni::tau_lang {
 
+// -----------------------------------------------------------------------------
+// BA types
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+size_t ba_types<BAs...>::type_id(size_t type_sid) {
+	if (types.empty()) types.push_back(string_id("untyped")),
+			type_names_map.emplace(types.back(), 0);
+	if (auto it = type_names_map.find(type_sid);
+		it != type_names_map.end()) return it->second;
+	return type_names_map.emplace(type_sid, types.size()),
+		types.push_back(type_sid), types.size() - 1;
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+size_t ba_types<BAs...>::type_id(const std::string& name) {
+	// TODO properly initialize types with "untyped" as first element
+	return type_id(string_id(name));
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+const std::string& ba_types<BAs...>::type_name(size_t tid) {
+	if (tid >= types.size()) tid = 0;
+	return string_from_id(types[tid]);
+}
+
+template <typename... BAs>
+requires BAsPack<BAs...>
+std::ostream& ba_types<BAs...>::print_type(std::ostream& os, size_t tid) {
+	return os << type_name(tid);
+}
+
+
+// -----------------------------------------------------------------------------
+// BA constants
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::pair<size_t, size_t> ba_constants<BAs...>::get(
@@ -23,7 +61,7 @@ std::pair<size_t, size_t> ba_constants<BAs...>::get(
 	const std::variant<BAs...>& b, const std::string& ba_type_name)
 {
 	// DBG(std::cout << "BAC get: " << b << " " << type_name << "\n";)
-	return get(b, type_id(string_id(ba_type_name)));
+	return get(b, ba_types<BAs...>::type_id(ba_type_name));
 }
 
 template <typename... BAs>
@@ -67,31 +105,6 @@ bool ba_constants<BAs...>::is(size_t constant_id) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-size_t ba_constants<BAs...>::type_id(size_t ba_type_sid) {
-	if (ba_types.empty()) ba_types.push_back(string_id("untyped")),
-			ba_type_names_map.emplace(ba_types.back(), 0);
-	if (auto it = ba_type_names_map.find(ba_type_sid);
-		it != ba_type_names_map.end()) return it->second;
-	return ba_type_names_map.emplace(ba_type_sid, ba_types.size()),
-		ba_types.push_back(ba_type_sid), ba_types.size() - 1;
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-size_t ba_constants<BAs...>::type_id(const std::string& ba_type_name) {
-	// TODO properly initialize types with "untyped" as first element
-	return type_id(string_id(ba_type_name));
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-const std::string& ba_constants<BAs...>::type_name(size_t ba_type) {
-	if (ba_type >= ba_types.size()) ba_type = 0;
-	return string_from_id(ba_types[ba_type]);
-}
-
-template <typename... BAs>
-requires BAsPack<BAs...>
 size_t ba_constants<BAs...>::type_of(size_t constant_id) {
 	DBG(assert(constant_id > 0);)
 	DBG(assert(constant_id < C.size());)
@@ -101,7 +114,7 @@ size_t ba_constants<BAs...>::type_of(size_t constant_id) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 std::ostream& ba_constants<BAs...>::print(std::ostream& os, size_t constant_id) {
-	return print_type(
+	return ba_types<BAs...>::print_type(
 		print_constant(os, constant_id) << " : ", type_of(constant_id));
 }
 
@@ -112,13 +125,6 @@ std::ostream& ba_constants<BAs...>::print_constant(std::ostream& os, size_t cons
 	std::variant<BAs...> v = get(constant_id);
 	return os << "{ " << v << " }";
 }
-
-template <typename... BAs>
-requires BAsPack<BAs...>
-std::ostream& ba_constants<BAs...>::print_type(std::ostream& os, size_t ba_type) {
-	return os << type_name(ba_type);
-}
-
 
 // -----------------------------------------------------------------------------
 // internal insertion of a constant into the pool
@@ -177,7 +183,9 @@ tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
-	BOOST_LOG_TRIVIAL(trace) << "(BACB) -- ba_constants_binder::bind: " << constant << " " << type_id << " " << ba_constants<BAs...>::type_name(type_id);
+	BOOST_LOG_TRIVIAL(trace) << "(BACB) -- ba_constants_binder::bind: "
+		<< constant << " " << type_id << " "
+		<< ba_types<BAs...>::type_name(type_id);
 	return tree<node<BAs...>>::get_ba_constant(
 				ba_constants<BAs...>::get(constant, type_id));
 }
@@ -198,7 +206,7 @@ tref ba_constants_binder<BAs...>::operator()(const std::string& src,
 			<< src << "` constant: `" << tree<node<BAs...>>::get(n)
 			<< "` cid: " << it->second.first << " tid: "
 			<< it->second.second << " "
-			<< " " << ba_constants<BAs...>::type_name(it->second.second);
+			<< " " << ba_types<BAs...>::type_name(it->second.second);
 		return n;
 	}
 
@@ -217,7 +225,7 @@ tref ba_constants_binder<BAs...>::operator()(const std::string& src,
 		<< "(BACB) -- ba_constants_binder::operator() factory binding: `"
 		<< src << " constant: `" << t << "`"
 		<< "` cid: " << cid << " tid: " << tid
-		<< " " << ba_constants<BAs...>::type_name(tid);
+		<< " " << ba_types<BAs...>::type_name(tid);
 
 	return n;
 }

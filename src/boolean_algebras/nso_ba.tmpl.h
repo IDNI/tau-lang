@@ -15,17 +15,17 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 	auto bf_constant_and = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
-		return ba_constants_binder<BAs...>::bind(
+		return ba_constants_binder<BAs...>::instance().bind(
 			lt.get_ba_constant() & rt.get_ba_constant(),
 			lt.get_ba_type());
 	};
 	// trivial cases
-	if (lt == tau::get_0() || rt == tau::get_0()) return tau::get_0();
-	if (lt == tau::get_1()) return rt;
-	if (rt == tau::get_1()) return lt;
+	if (lt.equals_0() || rt.equals_0()) return tau::get_0();
+	if (lt.equals_1()) return rt;
+	if (rt.equals_1()) return lt;
 	// more elaborate cases
 	if (lt.child_is(tau::bf_constant) && rt.child_is(tau::bf_constant)) 
-		return bf_constant_and(lt[0], rt[0]);
+		return tau::get(bf_constant_and(lt[0], rt[0]));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_and(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
@@ -49,13 +49,13 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 	auto bf_constant_or = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
-		return ba_constants_binder<BAs...>::bind(
+		return ba_constants_binder<BAs...>::instance().bind(
 			lt.get_ba_constant() | rt.get_ba_constant(),
 			lt.get_ba_type());
 	};
 
 	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
-		return bf_constant_or(lt, rt);
+		return tau::get(bf_constant_or(lt, rt));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_or(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
@@ -74,17 +74,17 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 
 	auto bf_constant_neg = [](const auto& lt) {
 		DBG(assert(lt.get_ba_type() > 0);)
-		return ba_constants_binder<BAs...>::bind(
+		return ba_constants_binder<BAs...>::instance().bind(
 			~lt.get_ba_constant(), lt.get_ba_type());
 	};
 
 	// trivial cases
-	if (lt == tau::get_0()) return tau::get_1();
-	if (lt == tau::get_1()) return tau::get_0();
+	if (lt.equals_0()) return tau::get_1();
+	if (lt.equals_1()) return tau::get_0();
 
 	// more elaborate cases
 	if (lt[0].is_ba_constant())
-		return bf_constant_neg(lt);
+		return tau::get(bf_constant_neg(lt));
 	if (lt[0].is(tau::bf_eq))
 		return tau::get(tau::build_bf_eq((~lt[0][0]).get()));
 	if (lt[0].is(tau::bf_neq))
@@ -104,18 +104,18 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 	auto bf_constant_xor = [](const auto& lt, const auto& rt) {
 		DBG(assert(lt.get_ba_type() == rt.get_ba_type()
 						&& lt.get_ba_type() > 0);)
-		return ba_constants_binder<BAs...>::bind(
+		return ba_constants_binder<BAs...>::instance().bind(
 			lt.get_ba_constant() ^ rt.get_ba_constant(),
 			lt.get_ba_type());
 	};
 
 	// trivial cases
-	if (lt == tau::get_0()) return rt;
-	if (rt == tau::get_0()) return lt;
+	if (lt.equals_0()) return rt;
+	if (rt.equals_0()) return lt;
 
 	// more elaborate cases
 	if (lt[0].is_ba_constant() && rt[0].is_ba_constant())
-		return bf_constant_xor(lt, rt);
+		return tau::get(bf_constant_xor(lt, rt));
 	if (lt.is(tau::bf) && rt.is(tau::bf))
 		return tau::get(tau::build_bf_xor(lt.get(), rt.get()));
 	if (lt.is(tau::bf) && rt[0].is(tau::bf_eq))
@@ -141,13 +141,13 @@ bool is_zero(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 
 	// trivial cases
-	if (lt == tau::get_0()) return true;
-	if (lt == tau::get_1()) return false;
+	if (lt.equals_0()) return true;
+	if (lt.equals_1()) return false;
 
 	// more elaborate cases
 	if (lt[0].is_ba_constant()) return is_zero(lt[0].get_ba_constant());
-	if (lt.is(tau::bf))  return lt == tau::get_0();
-	if (lt.is(tau::wff)) return lt == tau::get_F();
+	if (lt.is(tau::bf))  return lt.equals_0();
+	if (lt.is(tau::wff)) return lt.equals_F();
 	DBG(throw std::logic_error("nso_ba is_zero: wrong types");)
 	return false;
 }
@@ -158,13 +158,13 @@ bool is_one(const tree<node<BAs...>>& lt) {
 	using tau = tree<node<BAs...>>;
 
 	// trivial cases
-	if (lt == tau::get_0()) return false;
-	if (lt == tau::get_1()) return true;
+	if (lt.equals_0()) return false;
+	if (lt.equals_1()) return true;
 
 	// more elaborate cases
 	if (lt[0].is_ba_constant()) return is_one(lt[0].get_ba_constant());
-	if (lt.is(tau::bf))  return lt == tau::get_1();
-	if (lt.is(tau::wff)) return lt == tau::get_T();
+	if (lt.is(tau::bf))  return lt.equals_1();
+	if (lt.is(tau::wff)) return lt.equals_T();
 	DBG(throw std::logic_error("nso_ba is_one: wrong types");)
 	return false;
 }

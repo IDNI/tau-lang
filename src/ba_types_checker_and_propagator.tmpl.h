@@ -84,7 +84,7 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 							| tt::only_child;
 		bool is_io_var = io_var.has_value();
 		bool is_global = is_io_var || (tt(el) | tau::variable
-				| tau::uninterpreted_constant).has_value();
+				| tau::uconst_name).has_value();
 		trefs ch;
 		auto ch0 = tau::get(el).first();
 		if (is_io_var) {
@@ -313,7 +313,7 @@ tref ba_types_checker_and_propagator<BAs...>::replace_scope_ids_with_types(
 			const auto& t = tau::get(el);
 			trefs ch{ t.first() };
 			if (t.is(tau::bf_constant)) ch.push_back(
-					tau::get(node(tau::type), ts.at(key)));
+					tau::get(tau::type, ts.at(key)));
 			return get(t.value, ch);
 		}
 		return el;

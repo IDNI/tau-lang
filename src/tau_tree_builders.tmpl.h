@@ -1,5 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+#include <numeric>
+
 #include "tau_tree.h"
 
 namespace idni::tau_lang {
@@ -414,7 +416,7 @@ tref build_bf_t_type(size_t ba_tid) {
 
 template <NodeType node>
 tref build_bf_t_type(const std::string& type) {
-	return build_bf_t_type<node>(node::ba_constants_t::type_id(type));
+	return build_bf_t_type<node>(node::ba_types_t::type_id(type));
 }
 
 template <NodeType node>
@@ -426,7 +428,7 @@ tref build_bf_f_type(size_t ba_tid) {
 
 template <NodeType node>
 tref build_bf_f_type(const std::string& type) {
-	return build_bf_f_type<node>(node::ba_constants_t::type_id(type));
+	return build_bf_f_type<node>(node::ba_types_t::type_id(type));
 }
 
 template <NodeType node>
@@ -435,8 +437,9 @@ tref build_ba_constant(typename node::bas_variant v, size_t ba_tid) {
 }
 
 template <NodeType node>
-tref build_bf_ba_constant(typename node::bas_variant v, size_t ba_tid) {
-	return build_bf_ba_constant<node>(v, ba_tid);
+tref build_bf_ba_constant(typename node::bas_variant v, size_t ba_tid, tref r) {
+	using tau = tree<node>;
+	return tau::get(tau::bf, build_ba_constant<node>(v, ba_tid), r);
 }
 
 template <NodeType node>
@@ -449,132 +452,167 @@ tref build_bf_uconst(const std::string& n1,
 }
 
 template <NodeType node>
+tref build_var_name(size_t sid) {
+	using tau = tree<node>;
+	return tau::get(node(tau::var_name, sid));
+}
+
+template <NodeType node>
+tref build_var_name(const std::string& name) {
+	using tau = tree<node>;
+	return tau::get(tau::var_name, name);
+}
+
+template <NodeType node>
+tref build_var_name_indexed(size_t index) {
+	std::stringstream name;
+	return build_var_name<node>((name << "i" << index, name.str()));
+}
+
+template <NodeType node>
+tref build_variable(tref var_name_node) {
+	using tau = tree<node>;
+	return tau::get(tau::variable, var_name_node);
+}
+
+template <NodeType node>
 tref build_variable(const std::string& name) {
 	using tau = tree<node>;
-	return tau::get(tau::variable, tau::get(tau::var_name, name));
+	return tau::get(tau::variable, build_var_name<node>(name));
 }
 
 template <NodeType node>
-tref build_in_var(const std::string& name) {
-	return build_in_var<node>(string_id(name));
-}
-
-template <NodeType node>
-tref build_in_var(size_t var_name_sid) {
-	return tree<node>::get(node::input_variable(var_name_sid));
-}
-
-template <NodeType node>
-tref build_in_var_indexed(size_t index) {
-	std::stringstream name;
-	return build_in_var<node>((name << "i" << index, name.str()));
-}
-
-template <NodeType node>
-tref build_io_var_at_n(tref io_var_node, size_t num) {
+tref build_bf_variable(tref var_name_node) {
 	using tau = tree<node>;
-	DBG(assert(io_var_node != nullptr);)
-	DBG(assert(tau::get(io_var_node).is(tau::io_var));)
-	return tau::get(tau::bf, tau::get(tau::variable, {
-		io_var_node, tau::get(tau::offset, tau::get_integer(num)) }));
+	return tau::get(tau::bf, build_variable<node>(var_name_node));
 }
 
 template <NodeType node>
-tref build_in_var_at_n_indexed(size_t index, size_t num) {
-	return build_io_var_at_n<node>(build_in_var_indexed<node>(index), num);
+tref build_bf_variable(const std::string& name) {
+	using tau = tree<node>;
+	return tau::get(tau::bf, build_variable<node>(name));
+}
+
+template <NodeType node>
+tref build_in_var(tref var_name_node, tref offset_node) {
+	using tau = tree<node>;
+	return tau::get(tau::bf, tau::get(tau::variable,
+		tau::get(node::input_variable(), var_name_node, offset_node)));
+}
+
+template <NodeType node>
+tref build_in_var_at_n(tref var_name_node, int_t pos) {
+	using tau = tree<node>;
+	DBG(assert(var_name_node != nullptr);)
+	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
+	return build_in_var<node>(var_name_node,
+		tau::get(tau::offset, tau::get_integer(pos)));
 }
 
 template <NodeType node>
 tref build_in_var_at_n(const std::string& name, int_t pos) {
+	return build_in_var_at_n<node>(build_var_name<node>(name), pos);
+}
+
+template <NodeType node>
+tref build_in_var_at_n_indexed(size_t index, int_t pos) {
+	return build_in_var_at_n<node>(
+		build_var_name_indexed<node>(index), pos);
+}
+
+template <NodeType node>
+tref build_in_var_at_t(tref var_name_node, std::string t) {
 	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get(tau::variable, {
-		build_in_var<node>(name), tau::get(tau::offset, tau::get_integer(pos)) }));
+	DBG(assert(var_name_node != nullptr);)
+	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
+	return build_in_var<node>(var_name_node,
+		tau::get(tau::offset, build_variable<node>(t)));
 }
 
 template <NodeType node>
-tref build_io_var_at_t(tref io_var_node) {
+tref build_in_var_at_t_indexed(size_t index, std::string t) {
+	return build_in_var_at_t<node>(build_var_name_indexed<node>(index), t);
+}
+
+template <NodeType node>
+tref build_in_var_at_t_minus(tref var_name_node, size_t shift, std::string t) {
 	using tau = tree<node>;
-	DBG(assert(io_var_node != nullptr);)
-	DBG(assert(tau::get(io_var_node).is(tau::io_var));)
-	return tau::get(tau::bf, tau::get(tau::variable, {
-		io_var_node, tau::get(tau::offset, build_variable<node>("t")) }));
+	DBG(assert(var_name_node != nullptr);)
+	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
+	return build_in_var<node>(var_name_node,
+		tau::get(tau::offset, tau::get(tau::shift,
+			tau::get(tau::variable, t), tau::get_num(shift))));
 }
 
 template <NodeType node>
-tref build_in_var_at_t_indexed(size_t index) {
-	return build_io_var_at_t<node>(build_in_var_indexed<node>(index));
+tref build_in_var_at_t_minus(const std::string var_name, size_t shift, std::string t) {
+	return build_in_var_at_t_minus<node>(
+		build_var_name<node>(var_name), shift, t);
 }
 
 template <NodeType node>
-tref build_in_var_at_t_minus(const std::string& name, int_t shift) {
+tref build_in_var_at_t_minus_indexed(size_t index, size_t shift, std::string t) {
+	return build_in_var_at_t_minus<node>(
+		build_var_name_indexed<node>(index), shift, t);
+}
+
+template <NodeType node>
+tref build_out_var(tref var_name_node, tref offset_node) {
 	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get(tau::variable, {
-		build_in_var<node>(name), tau::get(tau::offset,
-			tau::get(tau::shift, tau::get(tau::variable, "t"), tau::get_num(shift))) }));
+	return tau::get(tau::bf, tau::get(tau::variable,
+		tau::get(node::output_variable(), var_name_node, offset_node)));
 }
 
 template <NodeType node>
-tref build_io_var_at_t_minus(tref io_var_node, size_t num) {
+tref build_out_var_at_n(tref var_name_node, int_t pos) {
 	using tau = tree<node>;
-	DBG(assert(io_var_node != nullptr);)
-	DBG(assert(tau::get(io_var_node).is(tau::io_var));)
-	DBG(assert(num > 0);)
-	return tau::get(tau::bf, tau::get(tau::variable, {
-		io_var_node, tau::get(tau::offset,
-			tau::get(tau::shift, tau::get(tau::variable, "t"), tau::get_num(num))) }));
+	return build_out_var<node>(var_name_node,
+		tau::get(tau::offset, tau::get_integer(pos)));
 }
 
 template <NodeType node>
-tref build_in_var_at_t_minus_indexed(size_t index, size_t num) {
-	return build_io_var_at_t_minus<node>(build_in_var_indexed<node>(index), num);
+tref build_out_var_at_n(const std::string& name, int_t pos) {
+	return build_out_var_at_n<node>(build_var_name<node>(name), pos);
 }
 
 template <NodeType node>
-tref build_out_var(const std::string& name) {
-	return build_out_var<node>(string_id(name));
+tref build_out_var_at_n_indexed(size_t index, int_t pos) {
+	return build_out_var_at_n<node>(
+		build_var_name_indexed<node>(index), pos);
 }
 
 template <NodeType node>
-tref build_out_var(size_t var_name_sid) {
-	return tree<node>::get(node::output_variable(var_name_sid));
-}
-
-template <NodeType node>
-tref build_out_var_indexed(size_t index) {
-	std::stringstream name;
-	return build_out_var<node>((name << "o" << index, name.str()));
-}
-
-template <NodeType node>
-tref build_out_var_at_t_indexed(size_t index) {
-	return build_io_var_at_t<node>(build_out_var_indexed<node>(index));
-}
-
-template <NodeType node>
-tref build_out_var_at_n_indexed(size_t index, size_t num) {
-	return build_io_var_at_n<node>(build_out_var_indexed<node>(index), num);
-}
-
-template <NodeType node>
-tref build_out_var_at_n(const std::string& name, const int_t pos) {
+tref build_out_var_at_t(tref var_name_node, std::string t) {
 	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get(tau::variable, {
-		build_out_var<node>(name), tau::get(tau::offset, tau::get_integer(pos)) }));
+	DBG(assert(var_name_node != nullptr);)
+	DBG(assert(tau::get(var_name_node).is(tau::var_name));)
+	return build_out_var<node>(var_name_node,
+		tau::get(tau::offset, build_variable<node>(t)));
 }
 
 template <NodeType node>
-tref build_out_var_at_t_minus(const std::string& name,
-	const int_t shift)
-{
+tref build_out_var_at_t_indexed(size_t index, std::string t) {
+	return build_out_var_at_t<node>(
+		build_var_name_indexed<node>(index), t);
+}
+
+template <NodeType node>
+tref build_out_var_at_t_minus(tref var_name_node, size_t shift, std::string t) {
 	using tau = tree<node>;
-	return tau::get(tau::bf, tau::get(tau::variable, {
-		build_out_var<node>(name), tau::get(tau::offset,
-			tau::get(tau::shift, tau::get(tau::variable, "t"), tau::get_num(shift))) }));
+	return build_out_var<node>(var_name_node,
+		tau::get(tau::offset, tau::get(tau::shift,
+			tau::get(tau::variable, t), tau::get_num(shift))));
 }
 
 template <NodeType node>
-tref build_out_var_at_t_minus_indexed(size_t index, size_t num) {
-	return build_io_var_at_t_minus<node>(build_out_var_indexed<node>(index), num);
+tref build_out_var_at_t_minus(const std::string& name, size_t shift, std::string t) {
+	return build_out_var_at_t_minus<node>(build_var_name<node>(name), shift, t);
+}
+
+template <NodeType node>
+tref build_out_var_at_t_minus_indexed(size_t index, size_t shift, std::string t) {
+	return build_out_var_at_t_minus<node>(
+		build_var_name_indexed<node>(index), shift, t);
 }
 
 // -----------------------------------------------------------------------------
@@ -847,7 +885,7 @@ tref tree<node>::build_bf_t_type(size_t ba_tid) {
 
 template <NodeType node>
 tref tree<node>::build_bf_t_type(const std::string& type) {
-	return tau_lang::build_bf_t_type<node>(node::ba_constants_t::type_id(type));
+	return tau_lang::build_bf_t_type<node>(node::ba_types_t::type_id(type));
 }
 
 template <NodeType node>
@@ -857,7 +895,7 @@ tref tree<node>::build_bf_f_type(size_t ba_tid) {
 
 template <NodeType node>
 tref tree<node>::build_bf_f_type(const std::string& type) {
-	return tau_lang::build_bf_f_type<node>(node::ba_constants_t::type_id(type));
+	return tau_lang::build_bf_f_type<node>(node::ba_types_t::type_id(type));
 }
 
 template <NodeType node>
@@ -866,8 +904,10 @@ tref tree<node>::build_ba_constant(node::bas_variant v, size_t ba_tid) {
 }
 
 template <NodeType node>
-tref tree<node>::build_bf_ba_constant(node::bas_variant v, size_t ba_tid) {
-	return tau_lang::build_bf_ba_constant<node>(v, ba_tid);
+tref tree<node>::build_bf_ba_constant(node::bas_variant v, size_t ba_tid,
+	tref r)
+{
+	return tau_lang::build_bf_ba_constant<node>(v, ba_tid, r);
 }
 
 template <NodeType node>
@@ -876,33 +916,48 @@ tref tree<node>::build_bf_uconst(const std::string& n1, const std::string& n2) {
 }
 
 template <NodeType node>
+tref tree<node>::build_var_name(size_t sid) {
+	return tau_lang::build_var_name<node>(sid);
+}
+
+template <NodeType node>
+tref tree<node>::build_var_name(const std::string& name) {
+	return tau_lang::build_var_name<node>(name);
+}
+
+template <NodeType node>
+tref tree<node>::build_var_name_indexed(size_t index) {
+	return tau_lang::build_var_name_indexed<node>(index);
+}
+
+template <NodeType node>
+tref tree<node>::build_variable(tref var_name_node) {
+	return tau_lang::build_variable<node>(var_name_node);
+}
+
+template <NodeType node>
 tref tree<node>::build_variable(const std::string& name) {
 	return tau_lang::build_variable<node>(name);
 }
 
 template <NodeType node>
-tref tree<node>::build_in_var(const std::string& name) {
-	return tau_lang::build_in_var<node>(string_id(name));
+tref tree<node>::build_bf_variable(tref var_name_node) {
+	return tau_lang::build_bf_variable<node>(var_name_node);
 }
 
 template <NodeType node>
-tref tree<node>::build_in_var(size_t var_name_sid) {
-	return tau_lang::build_in_var<node>(var_name_sid);
+tref tree<node>::build_bf_variable(const std::string& name) {
+	return tau_lang::build_bf_variable<node>(name);
 }
 
 template <NodeType node>
-tref tree<node>::build_in_var_indexed(size_t index) {
-	return tau_lang::build_in_var_indexed<node>(index);
+tref tree<node>::build_in_var(tref var_name_node, tref offset_node) {
+	return tau_lang::build_in_var<node>(var_name_node, offset_node);
 }
 
 template <NodeType node>
-tref tree<node>::build_io_var_at_n(tref io_var_node, size_t num) {
-	return tau_lang::build_io_var_at_n<node>(io_var_node, num);
-}
-
-template <NodeType node>
-tref tree<node>::build_in_var_at_n_indexed(size_t index, size_t num) {
-	return tau_lang::build_in_var_at_n_indexed<node>(index, num);
+tref tree<node>::build_in_var_at_n(tref var_name_node, int_t pos) {
+	return tau_lang::build_in_var_at_n<node>(var_name_node, pos);
 }
 
 template <NodeType node>
@@ -911,70 +966,90 @@ tref tree<node>::build_in_var_at_n(const std::string& name, int_t pos) {
 }
 
 template <NodeType node>
-tref tree<node>::build_io_var_at_t(tref io_var_node) {
-	return tau_lang::build_io_var_at_t<node>(io_var_node);
+tref tree<node>::build_in_var_at_n_indexed(size_t index, int_t pos) {
+	return tau_lang::build_in_var_at_n_indexed<node>(index, pos);
 }
 
 template <NodeType node>
-tref tree<node>::build_in_var_at_t_indexed(size_t index) {
-	return tau_lang::build_in_var_at_t_indexed<node>(index);
+tref tree<node>::build_in_var_at_t(tref var_name_node, std::string t) {
+	return tau_lang::build_in_var_at_t<node>(var_name_node, t);
 }
 
 template <NodeType node>
-tref tree<node>::build_in_var_at_t_minus(const std::string& name, int_t shift) {
-	return tau_lang::build_in_var_at_t_minus<node>(name, shift);
+tref tree<node>::build_in_var_at_t_indexed(size_t index, std::string t) {
+	return tau_lang::build_in_var_at_t_indexed<node>(index, t);
 }
 
 template <NodeType node>
-tref tree<node>::build_io_var_at_t_minus(tref io_var_node, size_t num) {
-	return tau_lang::build_io_var_at_t_minus<node>(io_var_node, num);
+tref tree<node>::build_in_var_at_t_minus(
+	tref var_name_node, size_t shift, std::string t)
+{
+	return tau_lang::build_in_var_at_t_minus<node>(var_name_node, shift, t);
 }
 
 template <NodeType node>
-tref tree<node>::build_in_var_at_t_minus_indexed(size_t index, size_t num) {
-	return tau_lang::build_in_var_at_t_minus_indexed<node>(index, num);
+tref tree<node>::build_in_var_at_t_minus(
+	const std::string& name, size_t shift, std::string t)
+{
+	return tau_lang::build_in_var_at_t_minus<node>(name, shift, t);
 }
 
 template <NodeType node>
-tref tree<node>::build_out_var(const std::string& name) {
-	return tau_lang::build_out_var<node>(name);
+tref tree<node>::build_in_var_at_t_minus_indexed(
+	size_t index, size_t shift, std::string t)
+{
+	return tau_lang::build_in_var_at_t_minus_indexed<node>(index, shift, t);
 }
 
 template <NodeType node>
-tref tree<node>::build_out_var(size_t var_name_sid) {
-	return tau_lang::build_out_var<node>(var_name_sid);
+tref tree<node>::build_out_var(tref var_name_node, tref offset_node) {
+	return tau_lang::build_out_var<node>(var_name_node, offset_node);
 }
 
 template <NodeType node>
-tref tree<node>::build_out_var_indexed(size_t index) {
-	return tau_lang::build_out_var_indexed<node>(index);
+tref tree<node>::build_out_var_at_n(tref var_name_node, int_t pos) {
+	return tau_lang::build_out_var_at_n<node>(var_name_node, pos);
 }
 
 template <NodeType node>
-tref tree<node>::build_out_var_at_t_indexed(size_t index) {
-	return tau_lang::build_out_var_at_t_indexed<node>(index);
-}
-
-template <NodeType node>
-tref tree<node>::build_out_var_at_n_indexed(size_t index, size_t num) {
-	return tau_lang::build_out_var_at_n_indexed<node>(index, num);
-}
-
-template <NodeType node>
-tref tree<node>::build_out_var_at_n(const std::string& name, const int_t pos){
+tref tree<node>::build_out_var_at_n(const std::string& name, int_t pos){
 	return tau_lang::build_out_var_at_n<node>(name, pos);
 }
 
 template <NodeType node>
-tref tree<node>::build_out_var_at_t_minus(const std::string& name,
-	const int_t shift)
-{
-	return tau_lang::build_out_var_at_t_minus<node>(name, shift);
+tref tree<node>::build_out_var_at_n_indexed(size_t index, int_t pos) {
+	return tau_lang::build_out_var_at_n_indexed<node>(index, pos);
 }
 
 template <NodeType node>
-tref tree<node>::build_out_var_at_t_minus_indexed(size_t index, size_t num) {
-	return tau_lang::build_out_var_at_t_minus_indexed<node>(index, num);
+tref tree<node>::build_out_var_at_t(tref var_name_node, std::string t) {
+	return tau_lang::build_out_var_at_t<node>(var_name_node, t);
+}
+
+template <NodeType node>
+tref tree<node>::build_out_var_at_t_indexed(size_t index, std::string t) {
+	return tau_lang::build_out_var_at_t_indexed<node>(index, t);
+}
+
+template <NodeType node>
+tref tree<node>::build_out_var_at_t_minus(
+	tref var_name_node, size_t shift, std::string t)
+{
+	return tau_lang::build_out_var_at_t_minus<node>(var_name_node, shift, t);
+}
+
+template <NodeType node>
+tref tree<node>::build_out_var_at_t_minus(
+	const std::string& name, size_t shift, std::string t)
+{
+	return tau_lang::build_out_var_at_t_minus<node>(name, shift, t);
+}
+
+template <NodeType node>
+tref tree<node>::build_out_var_at_t_minus_indexed(
+	size_t index, size_t shift, std::string t)
+{
+	return tau_lang::build_out_var_at_t_minus_indexed<node>(index, shift, t);
 }
 
 } // idni::tau_lang namespace

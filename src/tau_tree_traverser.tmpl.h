@@ -244,6 +244,9 @@ template <NodeType node>
 tree<node>::traverser::traverser(tref r) : has_value_(r != nullptr),
 			values_(has_value_ ? trefs{ r } : trefs{}) {}
 template <NodeType node>
+tree<node>::traverser::traverser(const tree<node>& t) : has_value_(true),
+			values_(trefs{ t.get() }) {}
+template <NodeType node>
 tree<node>::traverser::traverser(const htree::sp& h) : has_value_(h != nullptr),
 			values_(has_value_ ? trefs{ h->get() } : trefs{}) {}
 template <NodeType node>

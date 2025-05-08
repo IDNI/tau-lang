@@ -21,18 +21,23 @@ std::optional<rr> infer_ref_types(const rr& nso_rr, ref_types<node>& ts);
 // various extractors (tau_tree_extractors.tmpl.h)
 template <NodeType node>
 size_t get_type_sid(tref n);
+
 template <NodeType node>
 rr_sig get_rr_sig(tref n);
+
 template <NodeType node>
 rewriter::rules get_rec_relations(tref r);
+
 template <NodeType node>
 std::optional<rr> get_nso_rr(tref ref, bool wo_inference = false);
 template <NodeType node>
 std::optional<rr> get_nso_rr(const rewriter::rules& rules, tref main_fm);
+
 template <NodeType node>
 void get_leaves(tref n, typename node::type branch, trefs& leaves);
 template <NodeType node>
 trefs get_leaves(tref n, typename node::type branch);
+
 template <NodeType node>
 trefs get_dnf_wff_clauses(tref n);
 template <NodeType node>
@@ -41,6 +46,17 @@ template <NodeType node>
 trefs get_dnf_bf_clauses(tref n);
 template <NodeType node>
 trefs get_cnf_bf_clauses(tref n);
+
+template <NodeType node>
+size_t get_ba_type(tref n);
+
+template <NodeType node>
+tref get_var_name_node(tref var);
+template <NodeType node>
+const std::string& get_var_name(tref var);
+template <NodeType node>
+size_t get_var_name_sid(tref var);
+
 template <NodeType node>
 bool is_io_initial(tref io_var);
 template <NodeType node>
@@ -50,19 +66,20 @@ int_t get_io_time_point(tref io_var);
 template <NodeType node>
 int_t get_io_shift(tref io_var);
 template <NodeType node>
-const std::string& get_io_name(tref io_var);
-template <NodeType node>
-tref get_tau_io_name(tref io_var);
-template <NodeType node>
 int_t get_io_var_shift(tref io_var);
 template <NodeType node>
 int_t get_max_shift(const trefs& io_vars, bool ignore_temps = false);
 template <NodeType node>
 int_t get_max_initial(const trefs& io_vars);
+
 template <NodeType node>
 typename tree<node>::subtree_set get_free_vars_from_nso(tref n);
+
 template <NodeType node>
 bool has_temp_var(tref n);
+
+template <NodeType node>
+bool has_open_tau_fm_in_constant(tref fm);
 
 } // idni::tau_lang namespace
 
@@ -431,10 +448,40 @@ template <NodeType node>
 bool tree<node>::is_term() const { return this->value.term || is(io_var); }
 
 template <NodeType node>
-bool tree<node>::is_input_variable() const { return is(io_var) && !is_term(); }
+bool tree<node>::is_input_variable() const {
+	auto x = tt(*this);
+	if (x.is(bf)) x = x | variable;
+	if (x.is(variable)) x = x | io_var;
+	return x.is(io_var) && (x | tt::data) == 1;
+}
 
 template <NodeType node>
-bool tree<node>::is_output_variable() const { return is(io_var) && is_term(); }
+bool tree<node>::is_output_variable() const {
+	auto x = tt(*this);
+	if (x.is(bf)) x = x | variable;
+	if (x.is(variable)) x = x | io_var;
+	return x.is(io_var) && (x | tt::data) == 2;
+}
+
+template <NodeType node>
+bool tree<node>::equals_0() const {
+	return *this == tree<node>::get_0();
+}
+
+template <NodeType node>
+bool tree<node>::equals_1() const {
+	return *this == tree<node>::get_1();
+}
+
+template <NodeType node>
+bool tree<node>::equals_F() const {
+	return *this == tree<node>::get_F();
+}
+
+template <NodeType node>
+bool tree<node>::equals_T() const {
+	return *this == tree<node>::get_T();
+}
 
 template <NodeType node>
 bool tree<node>::child_is(size_t nt) const {

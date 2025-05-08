@@ -15,7 +15,7 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // bdd var dict
 
-vector<string> v({"dummy"});
+vector<string> v({ "dummy" });
 map<string, size_t> m;
 
 sym_t dict(const char* s) {
@@ -45,8 +45,8 @@ sym_t dict(const string& s) { return dict(s.c_str()); }
 // -----------------------------------------------------------------------------
 // tau strings dict
 
-vector<string> S{""};       // strings
-map<string, size_t> SM{};   // string -> id map
+vector<string> S{ "" };                // strings
+map<string, size_t> SM{ { "", 0 } };   // string -> id map
 
 size_t string_id(const std::string& s) {
 	if (auto it = SM.find(s); it != SM.end()) return it->second;

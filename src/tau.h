@@ -8,5 +8,6 @@
 #include "boolean_algebras/nso_ba.h"
 #include "boolean_algebras/sbf_ba.h"
 #include "splitter.h"
+#include "interpreter.h"
 
 #endif // __IDNI__TAU__TAU_H__

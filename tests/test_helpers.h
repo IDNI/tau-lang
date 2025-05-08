@@ -61,8 +61,13 @@ bool normalize_and_check(const char* sample,
 	auto nso_rr = get_nso_rr(sample);
 	if (!nso_rr.has_value()) return expect_fail;
 
+	BOOST_LOG_TRIVIAL(debug) << "(T) nso_rr: " << to_str<bnode>(nso_rr.value());
+
 	tref result = normalizer<bnode>(nso_rr.value());
 	if (!result) return expect_fail;
+
+	BOOST_LOG_TRIVIAL(debug) << "(T) Normalized result: " << TAU_TO_STR(result);
+
 	return tau::get(result).child_is(nt) != expect_fail;
 }
 

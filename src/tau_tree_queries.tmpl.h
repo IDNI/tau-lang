@@ -39,6 +39,29 @@ bool is_child_quantifier(tref n) {
 }
 
 template <NodeType node>
+bool is_temporal_quantifier(tref n) {
+	return tree<node>::get(n).is(node::type::wff_always)
+		|| tree<node>::get(n).is(node::type::wff_sometimes);
+
+}
+
+template <NodeType node> 
+bool is_io_var(tref n) {
+	return tree<node>::get(n).is_input_variable()
+		|| tree<node>::get(n).is_output_variable();
+}
+
+template <NodeType node> 
+bool is_input_var(tref n) {
+	return tree<node>::get(n).is_input_variable();
+}
+
+template <NodeType node>
+bool is_output_var(tref n) {
+	return tree<node>::get(n).is_output_variable();
+}
+
+template <NodeType node>
 bool is_var_or_capture(tref n) {
 	return tree<node>::get(n).is(node::type::variable)
 		|| tree<node>::get(n).is(node::type::capture);
@@ -67,12 +90,12 @@ auto visit_wff = [](tref n) static {
 	return true;
 };
 
-template <NodeType node>
-auto visit_io_vars = [] (tref n) static {
-	auto nt = tree<node>::get(n).get_type();
-	if (nt == node::type::bf_constant
-		|| nt == node::type::uninterpreted_constant) return false;
-	return true;
-};
+// template <NodeType node>
+// auto visit_io_vars = [] (tref n) static {
+// 	auto nt = tree<node>::get(n).get_type();
+// 	if (nt == node::type::bf_constant
+// 		|| nt == node::type::uconst_name) return false;
+// 	return true;
+// };
 
 } // idni::tau_lang namespace
