@@ -1,0 +1,13 @@
+// To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
+
+// This file was built from Tau Language Framework header files.
+//
+// Do not edit. Any changes will be lost!
+//
+
+#ifndef __IDNI__TAU__TAU_H__
+#define __IDNI__TAU__TAU_H__
+
+@TAU_HEADER_CONTENT@
+
+#endif // __IDNI__TAU__TAU_H__

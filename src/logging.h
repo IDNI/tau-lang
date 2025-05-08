@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __IDNI__TAU__INIT_LOG_H__
-#define __IDNI__TAU__INIT_LOG_H__
+#ifndef __IDNI__TAU__LOGGING_H__
+#define __IDNI__TAU__LOGGING_H__
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
@@ -10,8 +10,8 @@
 
 namespace idni::tau_lang {
 
-struct logging_initializer {
-	logging_initializer() {
+struct logging {
+	logging() {
 		using namespace boost::log;
 		core::get()->set_filter(trivial::severity >= trivial::info);
 		static bool initialize_console_log = true;
@@ -36,8 +36,8 @@ struct logging_initializer {
 		core::get()->set_filter(trivial::severity >= trivial::error);
 	}
 };
-inline static logging_initializer initialize_logging;
+inline static logging log;
 
 } // namespace idni::tau_lang
 
-#endif //__IDNI__TAU__INIT_LOG_H__
+#endif //__IDNI__TAU__LOGGING_H__

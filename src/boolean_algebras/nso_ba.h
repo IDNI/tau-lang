@@ -4,6 +4,7 @@
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__NSO_BA_H__
 
 #include "tau_tree.h"
+#include "splitter_types.h"
 
 namespace idni::tau_lang {
 
@@ -182,6 +183,6 @@ const tree<node<BAs...>>& splitter(const tree<node<BAs...>>& n,
 
 } // namespace idni::tau_lang
 
-#include "nso_ba.tmpl.h"
+#include "boolean_algebras/nso_ba.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__NSO_BA_H__

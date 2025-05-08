@@ -1,7 +1,6 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
 #include "tau_tree.h"
-
 #include "ref_types.h"
 // #include "ba_types_checker_and_propagator.h"
 

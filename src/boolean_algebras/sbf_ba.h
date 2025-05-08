@@ -3,7 +3,9 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__
 
+#include "boolean_algebras/bdds/bdd_handle.h"
 #include "boolean_algebras/tau_ba.h"
+#include "boolean_algebras/variant_ba.h"
 
 namespace idni::tau_lang {
 
@@ -56,6 +58,7 @@ private:
 
 /**
  * @brief NSO factory used during testing
+ * TODO (LOW) move to tests?
  */
 template<>
 struct nso_factory<sbf_ba> {
@@ -127,5 +130,5 @@ struct std::hash<idni::tau_lang::hbdd<idni::tau_lang::Bool>> {
 	}
 };
 
-#include "sbf_ba.tmpl.h"
+#include "boolean_algebras/sbf_ba.tmpl.h"
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__SBF_BA_H__

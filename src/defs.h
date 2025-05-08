@@ -24,7 +24,7 @@
 
 #include "version_license.h" // include generated version and license constants
 
-#include "init_log.h"
+#include "logging.h"
 
 // include parser defs for DBG macro, int_t (int32_t) and mostly for
 // common std::hash templates and specializations

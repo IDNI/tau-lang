@@ -196,7 +196,7 @@ cli_command            =>
         | ("disable":disable_sym __ option_name)              :disable_cmd
         | ("toggle" :toggle_sym  __ option_name)              :toggle_cmd
 # i/o stream definitions
-        | (type __ var_name  _ '=' _ input_stream)            :def_input_cmd
+        | (type __ var_name _ '=' _ input_stream)             :def_input_cmd
         | (type __ var_name _ '=' _ output_stream)            :def_output_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd

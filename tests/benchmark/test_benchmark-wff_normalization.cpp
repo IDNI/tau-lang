@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #include "defs.h"
-#include "measure.h"
+#include "utility/measure.h"
 
 #include "../integration/test_integration_helpers.h"
 #include "test_benchmark-helper.h"
