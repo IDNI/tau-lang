@@ -65,7 +65,7 @@ std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	auto result = sbf_parser::instance().parse(src.c_str(), src.size());
 	if (!result.found) {
 		auto msg = result.parse_error
-			.to_str(tau_parser::error::info_lvl::INFO_BASIC);
+			.to_str(sbf_parser::error::info_lvl::INFO_BASIC);
 		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
 		return {}; // Syntax error
 	}

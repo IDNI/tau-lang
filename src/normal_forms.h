@@ -665,7 +665,7 @@ template <NodeType node>
 tref snf_wff(tref n);
 
 template <NodeType node>
-tref build_split_wff_using(tau_parser::nonterminal type, tref a, tref b);
+tref build_split_wff_using(typename node::type type, tref a, tref b);
 
 template <NodeType node, size_t type>
 tref anf(tref n);

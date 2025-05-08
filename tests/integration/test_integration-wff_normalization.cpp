@@ -63,7 +63,7 @@ TEST_SUITE("Normalizer") {
 	// 	auto simp_res = result
 	// 		| repeat_all<step<sbf_ba>, sbf_ba>(simplify_wff<sbf_ba>)
 	// 		| reduce_wff<sbf_ba>;
-	// 	CHECK( (simp_res | tau_parser::wff_t).has_value() );
+	// 	CHECK( (simp_res | tau::wff_t).has_value() );
 	// }
 
 	// TEST_CASE("push_in_3") {
