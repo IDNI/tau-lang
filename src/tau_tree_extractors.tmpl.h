@@ -75,6 +75,7 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 		const auto& t = tree<node>::get(n);
 		if (t.is(branch)) return true;
 		if (t.child_is(branch)) return true;
+		BOOST_LOG_TRIVIAL(trace) << "(I) -- adding leave: " << t.to_str();
 		return leaves.push_back(n), false;
 	};
 	pre_order<node>(n).visit(add_leave);
@@ -108,6 +109,40 @@ trefs get_cnf_bf_clauses(tref n) {
 }
 
 // -----------------------------------------------------------------------------
+
+template <NodeType node>
+size_t get_ba_type(tref n) {
+	return tree<node>::get(n).get_ba_type();
+}
+
+template <NodeType node>
+tref get_var_name_node(tref var) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto v = tt(var);
+	if (v.is(tau::var_name)) return var;
+	if (auto vn = v | tau::var_name; vn) return vn.value();
+	if (auto vn = v | tau::io_var | tau::var_name; vn) return vn.value();
+	if (auto vn = v | tau::variable | tau::io_var | tau::var_name;
+		vn) return vn.value();
+	if (auto vn = v | tau::bf | tau::variable | tau::var_name;
+		vn) return vn.value();
+	if (auto vn = v | tau::bf | tau::variable | tau::io_var | tau::var_name;
+		vn) return vn.value();
+	return nullptr;
+}
+
+template <NodeType node>
+const std::string& get_var_name(tref var) {
+	return tree<node>::get(get_var_name_node<node>(var)).get_string();
+}
+
+template <NodeType node>
+size_t get_var_name_sid(tref var) {
+	return tree<node>::get(get_var_name_node<node>(var)).data();
+}
+
+// -----------------------------------------------------------------------------
 // Helpers for variables having io_var as child
 
 template <NodeType node>
@@ -129,11 +164,6 @@ int_t get_io_time_point(tref io_var) {
 template <NodeType node>
 int_t get_io_shift(tref io_var) {
 	return tree<node>::get(io_var)[0][1][0][1][0].get_integer();
-}
-
-template <NodeType node>
-const std::string& get_io_name(tref io_var) {
-	return tree<node>::get(io_var)[0].get_string();
 }
 
 template <NodeType node>
@@ -225,6 +255,22 @@ bool has_temp_var(tref fm) {
 		return t.find_top(is<node, tau::constraint>) != nullptr;
 	// any input/output stream is a temporal variable, also constant positions
 	else return true;
+}
+
+template <NodeType node>
+bool has_open_tau_fm_in_constant(tref fm) {
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto _closed = [](const auto& c) -> bool { return is_closed(c); };
+	trefs consts = tau::get(fm).select_top(is_child<node, tau::bf_constant>);
+	for (tref c : consts) {
+		auto ba_const = tt(c) | tau::bf_constant | tt::ba_constant;
+		if (!std::visit(_closed, ba_const)) {
+			BOOST_LOG_TRIVIAL(error) << "(Error) A Tau formula constant must be closed: " << ba_const;
+			return true;
+		}
+	}
+	return false;
 }
 
 } // namespace idni::tau_lang

@@ -4,6 +4,7 @@ set(TESTS
 	bf_fixed_point
 	bf_hooks
 	bf_normalization
+	interpreter
 	normal_forms
 	nso_rr_execution
 	nso_rr_fixed_point
@@ -13,14 +14,13 @@ set(TESTS
 	satisfiability
 	sbf1
 	sbf2
+	solver
 	splitter
 	splitter2
 	tau_ba1
 	tau_ba3
 	wff_hooks
 	wff_normalization
-	# solver
-	# interpreter
 )
 
 foreach(TEST IN LISTS TESTS)

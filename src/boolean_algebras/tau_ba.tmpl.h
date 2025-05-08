@@ -160,15 +160,15 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 bool is_closed(const tau_ba<BAs...>& fm) {
 	using tau = tree<node<BAs...>>;
-	auto simp_fm = apply_rr_to_formula(fm.nso_rr);
+	auto simp_fm = apply_rr_to_formula<node<BAs...>>(fm.nso_rr);
 	if (!simp_fm) return false;
-	if (tau::get(simp_fm).find_top(is<tau::node, tau::ref>))
+	if (tau::get(simp_fm).find_top(is<node<BAs...>, tau::ref>))
 		return false;
-	auto vars = get_free_vars_from_nso<node>(simp_fm);
+	auto vars = get_free_vars_from_nso<node<BAs...>>(simp_fm);
 	for (const auto& v : vars) {
 		const auto& t = tau::get(v);
 		if (!(t.only_child_tree().is(tau::io_var)
-			|| t.only_child_tree().is(tau::uninterpreted_constant)))
+			|| t.only_child_tree().is(tau::uconst_name)))
 				return false;
 	}
 	return true;

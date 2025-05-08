@@ -106,8 +106,7 @@ tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
 	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
 	auto l = arg1(ch).get_ba_constant();
 	size_t type = arg1(ch).get_ba_type();
-	return tau::get(tau::bf, tau::get(
-		node::ba_constants_binder_t::instance().bind(~l, type), right));
+	return build_bf_ba_constant<node>(~l, type, right);
 }
 
 template <NodeType node>
@@ -394,9 +393,7 @@ tref get_hook<node>::cte_or([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return tau::get(tau::bf, tau::get(
-		node::ba_constants_binder_t::instance().bind(l | r, type),
-		right));
+	return build_bf_ba_constant<node>(l | r, type, right);
 }
 
 template <NodeType node>
@@ -409,9 +406,7 @@ tref get_hook<node>::cte_and([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return tau::get(tau::bf, tau::get(
-		node::ba_constants_binder_t::instance().bind(l & r, type),
-		right));
+	return build_bf_ba_constant<node>(l & r, type, right);
 }
 
 template <NodeType node>
@@ -424,9 +419,7 @@ tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
 	auto type_l = arg1(ch).get_ba_type();
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
-	return tau::get(tau::bf, tau::get(
-		node::ba_constants_binder_t::instance().bind(l ^ r, type),
-		right));
+	return build_bf_ba_constant<node>(l ^ r, type, right);
 }
 
 template <NodeType node>

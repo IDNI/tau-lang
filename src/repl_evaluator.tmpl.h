@@ -316,9 +316,10 @@ tref repl_evaluator<BAs...>::substitute_cmd(const tt& /*n*/) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::instantiate_cmd(const tt& n) {
-	auto var_type = n[2].is(tau::variable) ? tau::bf : tau::wff;
-	auto nn = tau::get(n.value_tree().value, { n[0].get(), n[1].get(),
-			tau::get(var_type, n[2].get()), n[3].get() });
+	const auto& t = n.value_tree();
+	typename node::type var_type = t[2].is(tau::variable) ? tau::bf : tau::wff;
+	tref nn = tau::get(t.value, { t.first(), t.second(),
+			tau::get(var_type, t.third()), t.child(3) });
 	return substitute_cmd(nn);
 }
 
@@ -350,23 +351,228 @@ tref repl_evaluator<BAs...>::qelim_cmd(const tt& n) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::run_cmd(const tt& /*n*/) {
-	// TODO
-	not_implemented_yet();
+void repl_evaluator<BAs...>::run_cmd(const tt& n) {
+
+	tref arg = n[1].get();
+	tref applied = apply_rr_to_nso_rr_with_defs(arg);
+	if (!applied) {
+		invalid_argument();
+		return;
+	}
+
+	// running the program
+	// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
+	// as we would get a formula in dnf already. However, we would need to
+	// kept the application of definitionsand call the computation of phi/chi infinity
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(debug) << "run_cmd/applied: " << TAU_TO_STR(applied) << "\n";
+	#endif // DEBUG
+
+	// -------------------------------------------------------------
+	// TODO: remove once type inference is ready
+	auto atomic = [](tref n) {
+		return is<node>(n, tau::bf_eq) || is<node>(n, tau::bf_neq);
+	};
+	trefs eqs = tau::get(applied).select_top(atomic);
+	for (tref eq : eqs) {
+		// If find type, type all io_vars found in eq if not present yet
+		size_t type = get_ba_type<node>(eq);
+		if (type == 0) continue;
+		trefs out_vars = tau::get(eq).select_top(is_output_var<node>);
+		for (tref out_var : out_vars) {
+			size_t var_sid = get_var_name_sid<node>(out_var);
+			if (auto it = outputs.find(var_sid); it == outputs.end())
+				outputs.emplace(var_sid, typed_stream{ type, 0 });
+		}
+		trefs in_vars = tau::get(eq).select_top(is_input_var<node>);
+		for (tref in_var : in_vars) {
+			size_t var_sid = get_var_name_sid<node>(in_var);
+			if (auto it = inputs.find(var_sid); it == inputs.end())
+				inputs.emplace(var_sid, typed_stream{ type, 0 });
+		}
+	}
+	// -------------------------------------------------------------
+
+	auto dnf = normalizer_step<node>(applied);
+
+	// Make sure that there is no free variable in the formula
+	auto free_vars = get_free_vars_from_nso<node>(dnf);
+	if (!free_vars.empty()) {
+		// all elements of the set must be quantified
+		std::stringstream ss; bool has_real_free_vars = false;
+		for (auto it = free_vars.begin(), end = free_vars.end(); it != end; ++it) {
+			if (!is_child<node>(*it, tau::io_var) &&
+				!is_child<node>(*it, tau::uconst_name)) {
+					ss << *it << " ";
+					has_real_free_vars = true;
+				}
+		}
+
+		if (has_real_free_vars) {
+			BOOST_LOG_TRIVIAL(error)
+				<< "(Error) The following variable(s) must be quantified and cannot appear free: " << ss.str() << "\n";
+			return;
+		}
+	}
+
+	// select current input variables
+	auto is_in_var = [](tref n) {
+		return tree<node>::get(n).is_input_variable();
+	};
+	trefs in_vars = tau::get(dnf).select_all(is_in_var);
+	typed_io_vars current_inputs;
+	for (tref var : in_vars) {
+		size_t var_sid = get_var_name_sid<node>(var);
+		if (auto it = inputs.find(var_sid); it != inputs.end())
+			current_inputs[var_sid] = it->second;
+	}
+	auto ins = finputs<node>(current_inputs);
+
+	// select current output variables
+	auto is_out_var = [](tref n) {
+		return tree<node>::get(n).is_output_variable();
+	};
+	trefs out_vars = tau::get(dnf).select_all(is_out_var);
+	typed_io_vars current_outputs;
+	for (tref var : out_vars) {
+		size_t var_sid = get_var_name_sid<node>(var);
+		if (auto it = outputs.find(var_sid); it != outputs.end())
+			current_outputs[var_sid] = it->second;
+	}
+	auto outs = foutputs<node>(current_outputs);
+
+	run<node>(dnf, ins, outs);
+	return;
+}
+
+template <NodeType node>
+solver_mode get_solver_cmd_mode(tref n) {
+	using tau = tree<node>;
+	if (tref solver_mode = tau::get(n).find_top(is<node, tau::solver_mode>);
+		solver_mode)
+	{
+		typename node::type mode = tau::get(solver_mode)[0].get_type();
+		return (mode == tau::solver_mode_minimum) ? solver_mode::minimum
+							: solver_mode::maximum;
+	} else return solver_mode::general;
+}
+
+template <NodeType node>
+size_t get_solver_cmd_type(tref n) {
+	size_t type = get_ba_type<node>(n);
+	return type > 0 ? type
+		: node::ba_types_t::type_id(node::nso_factory_t::instance()
+			.default_type());
+}
+
+template <NodeType node>
+void print_solver_cmd_solution(std::optional<solution<node>>& solution,
+		const solver_options& options = { .type = "" })
+{
+	using tau = tree<node>;
+	using tt = tau::traverser;
+	auto print_zero_case = [&options](tref var) {
+		std::cout << "\t" << TAU_TO_STR(var) << " := {"
+			<< node::nso_factory_t::instance().zero(options.type)
+			<< "}:" << options.type << "\n";
+	};
+
+	auto print_one_case = [&options](tref var) {
+		std::cout << "\t" << TAU_TO_STR(var) << " := {"
+			<< node::nso_factory_t::instance().one(options.type)
+			<< "}:" << options.type << "\n";
+	};
+
+	auto print_general_case = [&options](tref var, tref value) {
+		std::cout << "\t" << TAU_TO_STR(var) << " := "
+			<< TAU_TO_STR(value) << "\n";
+	};
+
+	if (!solution) { std::cout << "no solution\n"; return; }
+
+	std::cout << "solution: {\n";
+	for (auto [var, value]: solution.value()) {
+		if (auto check = tt(value) | tau_parser::bf_t; check)
+			print_one_case(var);
+		else if (auto check = tt(value) | tau_parser::bf_f; check)
+			print_zero_case(var);
+		else
+			print_general_case(var, value);
+	}
+	std::cout << "}\n";
+
+	return;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::solve_cmd(const tt& /*n*/) {
-	// TODO
-	not_implemented_yet();
+void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
+	// getting the type
+	size_t type = get_solver_cmd_type<node>(n.value());
+	if (type == 0) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid type\n";
+		return;
+	}
+
+	// setting solver options
+	solver_options options = {
+		.splitter_one = node::nso_factory_t::instance()
+			.splitter_one(node::ba_types_t::type_name(type)),
+		.mode = get_solver_cmd_mode<node>(n.value()),
+		.type = node::ba_types_t::type_name(type)
+	};
+
+	tref arg = n.value_tree().first();
+	while (tau::get(arg).has_right_sibling())
+		arg = tau::get(arg).right_sibling();
+	tref applied = apply_rr_to_nso_rr_with_defs(arg);
+	if (!applied) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s)\n";
+		return;
+	}
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace) << "solve_cmd/applied: " << applied << "\n";
+	#endif // DEBUG
+
+	auto solution = solve<node>(applied, options);
+	if (!solution) { std::cout << "no solution\n"; return; }
+	// auto vars = tau::get(equations).select_top(is_child<node, tau::variable>);
+	print_solver_cmd_solution<node>(solution, options);
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-void repl_evaluator<BAs...>::lgrs_cmd(const tt& /*n*/) {
-	// TODO
-	not_implemented_yet();
+void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
+	// getting the type
+	size_t type = get_solver_cmd_type<node>(n.value());
+	if (type == 0) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid type\n";
+		return;
+	}
+
+	tref arg = n.value_tree().first();
+	while (tau::get(arg).has_right_sibling())
+		arg = tau::get(arg).right_sibling();
+	tref applied = apply_rr_to_nso_rr_with_defs(arg);
+	tref equality = tt(applied) | tau::bf_eq | tt::ref;
+	if (!applied || !equality) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s)\n";
+		return;
+	}
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/applied: " << TAU_DUMP_TO_STR(applied) << "\n";
+	#endif // DEBUG
+
+	#ifdef DEBUG
+	BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/equality: " << TAU_DUMP_TO_STR(equality) << "\n";
+	#endif // DEBUG
+
+	auto solution = lgrs<node>(applied);
+	if (!solution) { std::cout << "no solution\n"; return; }
+	// trefs vars = tau::get(equations).select_top(is_child<node, tau::variable>);
+	print_solver_cmd_solution<node>(solution);
 }
 
 template <typename... BAs>
@@ -399,7 +605,7 @@ tref repl_evaluator<BAs...>::sat_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::unsat_cmd(const tt& n) {
-	return tau::get(sat_cmd(n)) == tau::get_F() ? tau::_T()
+	return tau::get(sat_cmd(n)).equals_F() ? tau::_T()
 						    : tau::_F();
 }
 
@@ -422,24 +628,24 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 	if (inputs.size() == 0 && outputs.size() == 0)
 		std::cout << "io variables: empty\n";
 	else std::cout << "io variables:\n";
-	for (auto& [var, desc]: inputs) {
-		auto file = desc.second.empty() ? "console"
-					: "ifile(\"" + desc.second + "\")";
-		std::cout << "\t" << desc.first << " "
-						<< var << " = " << file << "\n";
+	for (auto& [var_sid, desc] : inputs) {
+		auto file = desc.second == 0 ? "console"
+			: "ifile(\"" + string_from_id(desc.second) + "\")";
+		std::cout << "\t" << node::ba_types_t::type_name(desc.first) << " "
+				<< string_from_id(var_sid) << " = " << file << "\n";
 	}
-	for (auto& [var, desc]: outputs) {
-		auto file = desc.second.empty() ? "console"
-					: "ofile(\"" + desc.second + "\")";
-		std::cout << "\t" << desc.first << " "
-						<< var << " = " << file << "\n";
+	for (auto& [var_sid, desc] : outputs) {
+		auto file = desc.second == 0 ? "console"
+			: "ofile(\"" + string_from_id(desc.second) + "\")";
+		std::cout << "\t" << node::ba_types_t::type_name(desc.first) << " "
+				<< string_from_id(var_sid) << " = " << file << "\n";
 	}
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
-	if (definitions.size() == 0) std::cout << "rec. relations: empty\n";
+	if (definitions.size() == 0) std::cout << "definitions: empty\n";
 	auto num = command | tau::number;
 	if (!num) return;
 	auto i = num | tt::num;

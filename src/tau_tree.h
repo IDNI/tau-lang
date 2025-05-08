@@ -6,7 +6,6 @@
 #include <concepts>
 #include <string>
 #include <initializer_list>
-#include <numeric>
 
 #include "defs.h"
 #include "tau_parser.generated.h"
@@ -56,6 +55,7 @@ template <NodeType node> struct ref_types;
 template <NodeType node> struct get_hook;
 template <typename... BAs> requires BAsPack<BAs...> struct nso_factory;
 template <typename... BAs> requires BAsPack<BAs...> struct tau_ba;
+template <typename... BAs> requires BAsPack<BAs...> struct ba_types;
 template <typename... BAs> requires BAsPack<BAs...> struct ba_constants;
 template <typename... BAs> requires BAsPack<BAs...> struct ba_constants_binder;
 template <typename... BAs> requires BAsPack<BAs...>
@@ -82,8 +82,12 @@ struct node {
 	using node_t = node<BAs...>;
 	using type = tau_parser::nonterminal;
 
+	// alias for nso_factory<BAs...>
+	using nso_factory_t = nso_factory<BAs...>;
 	// alias for recreation of the packed variant
 	using bas_variant = std::variant<BAs...>;
+	// alias for ba_types<BAs...> pool
+	using ba_types_t = ba_types<BAs...>;
 	// alias for ba_constants<BAs...> pool
 	using ba_constants_t = ba_constants<BAs...>;
 	// alias for ba_constants_binder<BAs...>
@@ -133,10 +137,8 @@ struct node {
 	static constexpr node_t ba_typed(type nt, size_t ba_tid = 0);
 
 	// factories for an io_var node
-	static constexpr node_t input_variable(size_t var_name_sid,
-						size_t ba_tid = 0);
-	static constexpr node_t output_variable(size_t var_name_sid,
-						size_t ba_tid = 0);
+	static constexpr node_t input_variable(size_t ba_tid = 0);
+	static constexpr node_t output_variable(size_t ba_tid = 0);
 
 	// returns name of the nonterminal nt
 	static const std::string& name(size_t nt);
@@ -193,6 +195,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	using node = N;
 	using parse_tree = tau_parser::tree;
 	using bas_variant = node::bas_variant;
+	using ba_types_t = node::ba_types_t;
 	using ba_constants_t = node::ba_constants_t;
 	using ba_constants_binder_t = node::ba_constants_binder_t;
 	using ba_types_checker_and_propagator_t =
@@ -315,6 +318,11 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	bool is_input_variable() const;
 	bool is_output_variable() const;
 
+	bool equals_0() const;
+	bool equals_1() const;
+	bool equals_F() const;
+	bool equals_T() const;
+
 	bool child_is(size_t nt) const;
 
 	node::type get_type() const;
@@ -397,6 +405,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		using type = typename node::type;
 		traverser();
 		traverser(tref r);
+		traverser(const tree& r);
 		traverser(const htree::sp& r);
 		traverser(const trefs& n);
 		bool has_value() const;
@@ -543,38 +552,41 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	static tref build_bf_f_type(size_t ba_tid);
 	static tref build_bf_f_type(const std::string& type);
 	static tref build_ba_constant(node::bas_variant v, size_t ba_tid);
-	static tref build_bf_ba_constant(node::bas_variant v, size_t ba_tid);
+	static tref build_bf_ba_constant(
+		node::bas_variant v, size_t ba_tid, tref r);
+	static tref build_bf_uconst(
+		const std::string& name1, const std::string& name2);
+	static tref build_var_name(size_t sid);
+	static tref build_var_name(const std::string& name);
+	static tref build_var_name_indexed(size_t index);
+	static tref build_variable(tref var_name_node);
 	static tref build_variable(const std::string& name);
-	static tref build_bf_uconst(const std::string& name1,
-						const std::string& name2);
-	static tref build_in_var(const std::string& name);
-	static tref build_in_var(size_t var_name_sid);
-	static tref build_in_var_indexed(size_t index);
-	static tref build_io_var_at_n(tref io_var_node, size_t num);
-	static tref build_in_var_at_n_indexed(size_t index, size_t num);
+	static tref build_bf_variable(tref var_name_node);
+	static tref build_bf_variable(const std::string& name);
+	static tref build_in_var(tref var_name_node, tref offset_node);
+	static tref build_in_var_at_n(tref var_name_node, int_t pos);
 	static tref build_in_var_at_n(const std::string& name, int_t pos);
-	static tref build_io_var_at_t(tref io_var_node);
-	static tref build_in_var_at_t_indexed(size_t index);
-	static tref build_in_var_at_t_minus(const std::string& var_name,
-								int_t shift);
-	static tref build_io_var_at_t_minus(tref io_var_node, size_t num);
-	static tref build_in_var_at_t_minus_indexed(size_t index, size_t num);
-	static tref build_out_var(const std::string& name);
-	static tref build_out_var(size_t var_name_sid);
-	static tref build_out_var_indexed(size_t index);
-	// static tref build_out_var_at_t(tref io_var_node);
-	static tref build_out_var_at_t_indexed(size_t index);
-	// static tref build_out_var_at_n(tref io_var_node, size_t num);
-	static tref build_out_var_at_n_indexed(size_t index, size_t num);
+	static tref build_in_var_at_n_indexed(size_t index, int_t pos);
+	static tref build_in_var_at_t(tref var_name_node, std::string t = "t");
+	static tref build_in_var_at_t_indexed(size_t index, std::string t = "t");
+	static tref build_in_var_at_t_minus(
+		tref var_name_node, size_t shift, std::string t = "t");
+	static tref build_in_var_at_t_minus(
+		const std::string& var_name, size_t shift, std::string t = "t");
+	static tref build_in_var_at_t_minus_indexed(
+		size_t index, size_t shift, std::string t = "t");
+	static tref build_out_var(tref var_name_node, tref offset_node);
+	static tref build_out_var_at_n(tref var_name_node, int_t pos);
 	static tref build_out_var_at_n(const std::string& name, int_t pos);
+	static tref build_out_var_at_n_indexed(size_t index, int_t pos);
+	static tref build_out_var_at_t(tref var_name_node, std::string t = "t");
+	static tref build_out_var_at_t_indexed(size_t index, std::string t="t");
 	static tref build_out_var_at_t_minus(
-				const std::string& io_var_node, int_t shift);
-	// static tref build_out_var_at_t_minus(tref io_var_node, size_t num);
-	static tref build_out_var_at_t_minus_indexed(size_t index, size_t num);
-
-private:
-	static std::optional<rr> infer_ref_types(const rr& nso_rr,
-							ref_types<node>& ts);
+		tref var_name_node, size_t shift, std::string t = "t");
+	static tref build_out_var_at_t_minus(
+		const std::string& io_var_node, size_t shift, std::string t = "t");
+	static tref build_out_var_at_t_minus_indexed(
+		size_t index, size_t shift, std::string t = "t");
 };
 
 // -----------------------------------------------------------------------------
@@ -632,6 +644,12 @@ inline std::function<bool(tref)> is_child(size_t nt);
 
 template <NodeType node>
 bool is_child_quantifier(tref n);
+
+template <NodeType node>
+bool is_input_var(tref n);
+
+template <NodeType node>
+bool is_output_var(tref n);
 
 template <NodeType node>
 bool is_var_or_capture(tref n);

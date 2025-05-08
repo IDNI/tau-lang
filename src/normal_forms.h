@@ -521,7 +521,7 @@ tref push_universal_quantifier_one(tref fm);
 // Squeeze all equalities found in n
 //TODO: make it type depended
 template <NodeType node>
-std::optional<tref> squeeze_positives(tref n);
+tref squeeze_positives(tref n);
 
 template <NodeType node>
 tref wff_remove_existential(tref var, tref wff);
