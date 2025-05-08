@@ -3,6 +3,12 @@
 #include "test_init.h"
 #include "test_Bool_helpers.h"
 
+TEST_SUITE("configuration") {
+	TEST_CASE("trace logging") {
+		logging.trace();
+	}
+}
+
 TEST_SUITE("normal forms: snf for wff") {
 
 	TEST_CASE("simple case: T") {

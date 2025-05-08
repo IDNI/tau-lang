@@ -265,7 +265,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 TEST_SUITE("configuration") {
 
 	// TEST_CASE("logging") {
-	// 	initialize_logging.trace()
+	// 	logging.trace()
 	// }
 
 	TEST_CASE("bdd initialization") {
@@ -564,7 +564,7 @@ TEST_SUITE("solve_system") {
 	}
 
 	// TEST_CASE("trace:on") {
-	// 	logging_initializer.trace();
+	// 	logging.trace();
 	// }
 
 	// increasing monotonicity (2)

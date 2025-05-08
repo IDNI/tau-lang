@@ -5,7 +5,7 @@
 
 TEST_SUITE("configuration") {
 	// TEST_CASE("logging") {
-	// 	initialize_logging.trace();
+	// 	logging.trace();
 	// }
 
 	TEST_CASE("bdd initialization") {
