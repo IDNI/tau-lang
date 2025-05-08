@@ -737,7 +737,7 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 	if (definitions.size() == 0) std::cout << "definitions: empty\n";
-	auto num = command | tau::number;
+	auto num = command | tau::num;
 	if (!num) return;
 	auto i = num | tt::num;
 	if (i && i <= definitions.size()) {
