@@ -702,8 +702,8 @@ template <NodeType node>
 std::optional<minterm_system<node>> make_minterm_system_disjoint(
 	const minterm_system<node>& sys, const solver_options& options)
 {
-	using tau = tree<node>;
 	#ifdef DEBUG
+	using tau = tree<node>;
 	BOOST_LOG_TRIVIAL(trace) << "solver.tmpl.h:" << __LINE__
 		<< " make_minterm_system_disjoint/system: ";
 	for (minterm t : sys) BOOST_LOG_TRIVIAL(trace)
@@ -820,8 +820,8 @@ std::optional<solution<node>> solve_inequality_system(
 	// for each possible choice of H_i's, we try to solve the minterm system
 	// using tthe above solve method.
 
-	using tau = tree<node>;
 	#ifdef DEBUG
+	using tau = tree<node>;
 	BOOST_LOG_TRIVIAL(trace) << "solver.tmpl.h:" << __LINE__
 		<< " solve_inequality_system/system: ";
 	for (inequality t : system) BOOST_LOG_TRIVIAL(trace)

@@ -307,10 +307,101 @@ tref repl_evaluator<BAs...>::bf_substitute_cmd(const tt& n) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref repl_evaluator<BAs...>::substitute_cmd(const tt& /*n*/) {
-	// TODO
-	not_implemented_yet();
-	return 0;
+tref repl_evaluator<BAs...>::substitute_cmd(const tt& n) {
+	// Since the memory command cannot be type-checked we do it here
+	// First try to get bf
+	tref in = get_bf(n | tt::second, true) | tt::ref;
+	if (in) return bf_substitute_cmd(n);
+	// First argument was not a bf so it must be a wff
+	in = get_wff(n | tt::second) | tt::ref;
+	// Now sort out the remaining argument types
+	tref thiz = get_bf(n | tt::third, true) | tt::ref;
+	tref with;
+	if (thiz) with = get_bf(n | tt::fourth | tt::ref) | tt::ref;
+	else {
+		thiz = get_wff(n | tt::third | tt::ref) | tt::ref;
+		with = get_wff(n | tt::fourth | tt::ref) | tt::ref;
+	}
+	// Check for correct argument types
+	if (!thiz || !in || !with) {
+		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+		return {};
+	}
+	typename tau::subtree_map changes = { { thiz, with } };
+
+	auto free_vars_thiz = get_free_vars_from_nso<node>(thiz);
+	auto free_vars_with = get_free_vars_from_nso<node>(with);
+	trefs var_stack = {};
+	auto var_id = get_new_var_id<node>(in);
+	typename tau::subtree_set marked_quants;
+
+	// A variable should only be replaced if it is not quantified
+	auto quantified_vars_skipper = [&](tref x) {
+		if (is_quantifier<node>(x)) {
+			tref var = tau::get(x).find_top(is_var_or_capture<node>());
+			if (var && free_vars_thiz.contains(var))
+				return false;
+		}
+		return true;
+	};
+	// If we encounter a variable in "with" that would be captured by a quantifier
+	// the quantified variable needs to be changed
+	auto quantified_var_adder = [&](tref x) {
+		if (!quantified_vars_skipper(x))
+			return false;
+		if (is_quantifier<node>(x)) {
+			tref var = tau::get(x).find_top(is_var_or_capture<node>());
+			if (var && free_vars_with.contains(var)) {
+				DBG(assert(!(tau::get(var).is(tau::capture)));)
+				marked_quants.insert(x);
+				// bool var_t = tau::get(var).is(tau::variable);
+				std::ostringstream ss;
+				ss << "x" << var_id; ++var_id;
+				auto unused_var = build_bf_variable<node>(ss.str());
+				// ???
+				// var_t
+					// ? build_bf_var<node>(ss.str())
+					// : build_wff_var<node>(ss.str());
+				// Case where variable is captured by two or more quantifiers
+				if (changes.contains(var)) {
+					var_stack.emplace_back(var);
+					var_stack.emplace_back(changes[var]);
+					changes[var] = unused_var;
+				} else {
+					changes.emplace(var, unused_var);
+					var_stack.emplace_back(var);
+				}
+			}
+		}
+		return true;
+	};
+	// After a quantifier is encountered on the way up in post_order_traverser
+	// it needs to be removed from changes
+	auto scoped_replace = [&](auto x, auto c) {
+		tref res;
+		if (auto iter = changes.find(x); iter != changes.end())
+			res = iter->second;
+		else if (tau::get(x).get_children() == c) res = x;
+		else res = tau::get(tau::get(x).value, c, tau::get(x).r);
+
+		if (marked_quants.contains(x)) {
+			assert(!var_stack.empty());
+			if (auto iter = changes.find(var_stack.back());
+				iter != changes.end())
+			{
+				var_stack.pop_back();
+				changes.erase(iter);
+			} else {
+				assert(var_stack.size() >= 2);
+				changes[var_stack.end()[-2]] = var_stack.back();
+				var_stack.pop_back();
+				var_stack.pop_back();
+			}
+		}
+		return res;
+	};
+	return rewriter::post_order_recursive_traverser<node>()(
+			in, quantified_var_adder, scoped_replace);
 }
 
 template <typename... BAs>
@@ -669,17 +760,14 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 			| tt::string; !file_name.empty()) fn = file_name;
 	else fn = ""; // default input (std::cin)
 
-	// TODO
-	not_implemented_yet();
-	// for (auto& t : nso_factory<tau_ba_t, BAs...>::instance().types()) {
-	// 	if (type == t) {
-	// 		auto var_name = command
-	// 			| tau_parser::in_var_name
-	// 			| optional_value_extractor<tau_nso_t>;
-	// 		inputs[var_name] = {type, fn};
-	// 		return;
-	// 	}
-	// }
+	for (auto& t : node::nso_factory_t::instance().types()) {
+		if (type_name == t) {
+			size_t var_sid = command | tau::var_name | tt::data;
+			inputs[var_sid] = { node::ba_types_t::type_id(t),
+								string_id(fn) };
+			return;
+		}
+	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
 }
 
@@ -694,17 +782,14 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
 			| tt::string; !file_name.empty()) fn = file_name;
 	else fn = ""; // default output (std::cout)
 
-	// TODO
-	not_implemented_yet();
-	// for (auto& t: nso_factory<tau_ba_t, BAs...>::instance().types()) {
-	// 	if (type == t) {
-	// 		auto var_name = command
-	// 			| tau_parser::out_var_name
-	// 			| optional_value_extractor<tau_nso_t>;
-	// 		outputs[var_name] = {type, fn};
-	// 		return;
-	// 	}
-	// }
+	for (auto& t : node::nso_factory_t::instance().types()) {
+		if (type_name == t) {
+			size_t var_sid = command | tau::var_name | tt::data;
+			outputs[var_sid] = { node::ba_types_t::type_id(t),
+								string_id(fn) };
+			return;
+		}
+	}
 	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
 }
 

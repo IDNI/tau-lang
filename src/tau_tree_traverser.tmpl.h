@@ -198,6 +198,17 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 
 template <NodeType node>
 const typename tree<node>::template extractor<typename tree<node>::traverser>
+	tree<node>::traverser::fourth =
+		typename tree<node>::template extractor<traverser>(
+			[](const traverser& t) {
+				if (!t) return traverser();
+				tref r = t.value_tree().child(3);
+				if (!r) return traverser();
+				return traverser(r);
+			});
+
+template <NodeType node>
+const typename tree<node>::template extractor<typename tree<node>::traverser>
 	tree<node>::traverser::children =
 		typename tree<node>::template extractor<traverser>(
 			[](const traverser& t) {

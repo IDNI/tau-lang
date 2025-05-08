@@ -36,7 +36,7 @@ const tree<node<BAs...>>& operator&(const tree<node<BAs...>>& lt,
 		return tau::get(tau::build_wff_and(lt.get(), rt.get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_and(lt.get(), rt.get()));
-	DBG(throw std::logic_error("nso_ba and: wrong types");)
+	throw std::logic_error("nso_ba and: wrong types");
 }
 
 template <typename... BAs>
@@ -64,7 +64,7 @@ const tree<node<BAs...>>& operator|(const tree<node<BAs...>>& lt,
 		return tau::get(tau::build_bf_neq((lt | rt[0][0]).get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_or(lt.get(), rt.get()));
-	DBG(throw std::logic_error("nso_ba or: wrong types");)
+	throw std::logic_error("nso_ba or: wrong types");
 }
 
 template <typename... BAs>
@@ -91,7 +91,7 @@ const tree<node<BAs...>>& operator~(const tree<node<BAs...>>& lt) {
 		return tau::get(tau::build_bf_neq((~lt[0][0]).get()));
 	if (lt[0].is(tau::wff))
 		return tau::get(tau::build_wff_neg(lt.get()));
-	DBG(throw std::logic_error("nso_ba neg: wrong types");)
+	throw std::logic_error("nso_ba neg: wrong types");
 }
 
 template <typename... BAs>
@@ -124,7 +124,7 @@ const tree<node<BAs...>>& operator^(const tree<node<BAs...>>& lt,
 		return tau::get(tau::build_bf_neq((lt ^ rt[0][0]).get()));
 	if (lt.is(tau::wff) && rt.is(tau::wff))
 		return tau::get(tau::build_wff_xor(lt.get(), rt.get()));
-	DBG(throw std::logic_error("nso_ba xor: wrong types");)
+	throw std::logic_error("nso_ba xor: wrong types");
 }
 
 template <typename... BAs>

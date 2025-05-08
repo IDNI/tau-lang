@@ -27,13 +27,13 @@ template <NodeType node>
 tref normalize_non_temp(tref fm);
 
 template <NodeType node>
-auto get_vars_from_nso(tref n);
+trefs get_vars_from_nso(tref n);
 
 template <NodeType node>
-int_t get_new_var_id(const tref fm);
+int_t get_new_var_id(tref fm);
 
 template <NodeType node>
-tref get_new_uninterpreted_constant(const tref fm, const std::string& name);
+tref get_new_uninterpreted_constant(tref fm, const std::string& name);
 
 template <NodeType node>
 std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref);
