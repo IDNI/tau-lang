@@ -5,7 +5,9 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 # BF Substitution
 
-add_repl_test(substitution_cmd_bf1 "x. 1. s %[x / %1]" ": 1")
+add_repl_test(substitution_cmd_bf0 "x. 1. s %[x / %1]" ": 1")
+
+add_repl_test(substitution_cmd_bf1 "x. 1. s %2[x / %1]" ": 1")
 
 add_repl_test(substitution_cmd_bf2 "ax + bx'. y&z. s %1[x / %2]" ": \\(ayz\\)'b\\(yz\\)'|ayz\\(b\\(yz\\)'\\)'")
 

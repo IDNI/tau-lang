@@ -159,10 +159,10 @@ private:
 	std::optional<std::pair<size_t, tref>> get_type_and_arg(
 		const tt& n) const;
 	// get bf or wff from argument or from history
-	tt get_(typename node::type nt, const tt& n,
-		bool suppress_error = false) const;
-	tt get_bf(const tt& n, bool suppress_error = false) const;
-	tt get_wff(const tt& n) const;
+	tref get_(typename node::type nt, tref n, bool suppress_error = false)
+									const;
+	tref get_bf(tref n, bool suppress_error = false) const;
+	tref get_wff(tref n) const;
 
 	// get nso rr from a provided spec or formula and add definitions to it
 	std::optional<rr> get_nso_rr_with_defs(const tt& spec) const;

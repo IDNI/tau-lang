@@ -439,7 +439,7 @@ template <NodeType node>
 bool tree<node>::is_integer() const { return is(integer); }
 
 template <NodeType node>
-bool tree<node>::is_num() const { return is(num); }
+bool tree<node>::is_num() const { return is(num) || is(history_id); }
 
 template <NodeType node>
 bool tree<node>::is_ba_constant() const { return is(bf_constant); }
