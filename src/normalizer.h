@@ -3,8 +3,6 @@
 #ifndef __IDNI__TAU__NORMALIZER_H__
 #define __IDNI__TAU__NORMALIZER_H__
 
-#include "boolean_algebras/bdds/bdd_handle.h"
-#include "boolean_algebras/variant_ba.h"
 #include "normal_forms.h"
 
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
@@ -13,8 +11,6 @@
 // bindings, etc... instead of sp_tau_node,...
 
 namespace idni::tau_lang {
-
-RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
 // ref offset info. first is offset type (num/capture/shift/variable)
 // and second is value of num, rr_dict id of capture or 0 for shift and variable

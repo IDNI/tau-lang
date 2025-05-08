@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "utility/tree.h"
+#include "tau_tree.h"
 
 #ifndef __IDNI__TAU__NSO_FACTORY_H__
 #define __IDNI__TAU__NSO_FACTORY_H__

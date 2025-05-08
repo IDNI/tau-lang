@@ -6,7 +6,6 @@
 #include <list>
 #include <numeric>
 
-#include "boolean_algebras/nso_ba.h"
 #include "execution.h"
 
 namespace idni::tau_lang {
@@ -79,6 +78,8 @@ RULE(WFF_UNSQUEEZE_POSITIVES_0, "$X | $Y = 0 ::= $X = 0 && $Y = 0.")
 RULE(WFF_UNSQUEEZE_NEGATIVES_0, "$X | $Y != 0 ::= $X != 0 || $Y != 0.")
 RULE(WFF_SQUEEZE_POSITIVES_0, "$X = 0 && $Y = 0 ::= $X | $Y = 0.")
 RULE(WFF_SQUEEZE_NEGATIVES_0, "$X != 0 || $Y != 0 ::= $X | $Y != 0.")
+
+RULE(WFF_ELIM_FORALL, "all $X $Y ::= ! ex $X !$Y.")
 
 template <NodeType node>
 static auto& push_neg_for_snf() {

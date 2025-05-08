@@ -3,7 +3,6 @@
 #ifndef __IDNI__TAU__EXECUTION_H__
 #define __IDNI__TAU__EXECUTION_H__
 
-#include "normal_forms.h"
 #include "nso_rr.h"
 
 namespace idni::tau_lang {

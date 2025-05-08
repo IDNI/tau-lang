@@ -1,30 +1,27 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
-	../external/parser/src/defs.h
-	../external/parser/src/parser.h
-	../external/parser/src/parser.tmpl.h
-	../external/parser/src/tgf.h
-	../external/parser/src/recoders.h
-	../external/parser/src/utility/characters.h
-	../external/parser/src/utility/charclasses.h
-	../external/parser/src/utility/devhelpers.h
-	../external/parser/src/utility/forest.h
-	../parser/sbf_parser.generated.h
-	../parser/tau_parser.generated.h
-	boolean_algebras/bdds/babdd.h
-	boolean_algebras/bdds/bdd_handle.h
-	boolean_algebras/bool_ba.h
-	boolean_algebras/sbf_ba.h
-	boolean_algebras/variant_ba.h
-	boolean_algebras/product_ba.h
-	boolean_algebras/nso_ba.h
 	defs.h
+	logging.h
+	tau_tree.h
+	ba_constants.h
 	dict.h
-	experimental/execution.h
-	rewriting.h
-	tau.h
-	utils.h
+	rr.h
+	nso_rr.h
+	execution.h
+	nso_factory.h
+	normal_forms.h
+	normalizer.h
+	satisfiability.h
+	splitter_types.h
+	splitter.h
+	solver.h
+	interpreter.h
+	boolean_algebras/bool_ba.h
+	boolean_algebras/variant_ba.h
+	boolean_algebras/nso_ba.h
+	boolean_algebras/tau_ba.h
+	boolean_algebras/sbf_ba.h
 )
 
 set(TAU_SOURCES
@@ -41,6 +38,29 @@ set(CLI_SOURCES
 	main.cpp
 	../external/parser/src/utility/cli.cpp
 )
+
+set(TAU_HEADER_TEMPLATE ${CMAKE_CURRENT_SOURCE_DIR}/tau.h.in)
+set(TAU_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/tau.h)
+set(TAU_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+message(STATUS "TAU_HEADER_TEMPLATE: ${TAU_HEADER_TEMPLATE}")
+message(STATUS "TAU_HEADER: ${TAU_HEADER}")
+message(STATUS "TAU_SOURCE_DIR: ${TAU_SOURCE_DIR}")
+
+# Custom command to generate the unified header
+add_custom_command(
+	OUTPUT ${TAU_HEADER}
+	COMMAND ${CMAKE_COMMAND}
+		-DTAU_HEADERS="${TAU_HEADERS}"
+		-DTAU_HEADER_TEMPLATE="${TAU_HEADER_TEMPLATE}"
+		-DTAU_HEADER="${TAU_HEADER}"
+		-DTAU_SOURCE_DIR="${TAU_SOURCE_DIR}"
+		-P ${PROJECT_SOURCE_DIR}/cmake/header.cmake
+	DEPENDS ${TAU_HEADERS} ${TAU_HEADER_TEMPLATE}
+	COMMENT "Building tau.h file"
+)
+
+add_custom_target(tau_header ALL DEPENDS ${TAU_HEADER})
 
 #
 # object library

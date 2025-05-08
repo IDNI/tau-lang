@@ -57,6 +57,7 @@ CMakeCache.txt
 !tests/repl/satisfiability/*
 src/doctest.h
 src/version_license.h
+src/tau.h
 Testing
 
 # Sonarqube

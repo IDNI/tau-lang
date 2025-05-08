@@ -3,6 +3,9 @@
 #ifndef __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
 #define __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
 
+#include "tau_tree.h"
+#include "splitter_types.h"
+
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,
@@ -292,6 +295,6 @@ struct std::hash<idni::tau_lang::tau_ba<BAs...>> {
 								noexcept;
 };
 
-#include "tau_ba.tmpl.h"
+#include "boolean_algebras/tau_ba.tmpl.h"
 
 #endif // __IDNI__TAU__BOOLEAN_ALGEBRAS__TAU_BA_H__
