@@ -73,6 +73,12 @@ inline std::function<bool(tref)> is_var_or_capture() {
 }
 
 template <NodeType node>
+bool is_quantifier(tref n) {
+	return tree<node>::get(n).is(node::type::wff_all)
+		|| tree<node>::get(n).is(node::type::wff_ex);
+};
+
+template <NodeType node>
 bool contains(tref fm, tref sub_fm) {
 	bool is_contained = false;
 	auto has_sub_fm = [&sub_fm, &is_contained](tref n) {

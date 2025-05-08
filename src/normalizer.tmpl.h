@@ -73,13 +73,13 @@ tref normalize_non_temp(tref fm) {
 
 template <NodeType node>
 trefs get_vars_from_nso(tref n) {
-	return tree<node>::get(n).select_top(is_var_or_capture<node>);
+	return tree<node>::get(n).select_top(is_var_or_capture<node>());
 }
 
 // Given a tref produce a number such that the variable x_i is
 // neither a bool_variable nor a variable nor a capture
 template <NodeType node>
-int_t get_new_var_id(const tref fm) {
+int_t get_new_var_id(tref fm) {
 	trefs var_nodes = get_vars_from_nso<node>(fm);
 	std::set vars{ 1 };
 	for (tref var : var_nodes) {
@@ -99,7 +99,7 @@ int_t get_new_var_id(const tref fm) {
 // Given a tref produce a number i such that the uninterpreted constant const_i is
 // not present
 template <NodeType node>
-tref get_new_uninterpreted_constant(const tref fm, const std::string& name) {
+tref get_new_uninterpreted_constant(tref fm, const std::string& name) {
 	using tau = tree<node>;
 	trefs uninter_consts = tau::get(fm).select_top(is<node, tau::uconst_name>);
 	std::set ids{ 0 };

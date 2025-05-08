@@ -443,6 +443,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		static const extractor<traverser>           first;
 		static const extractor<traverser>           second;
 		static const extractor<traverser>           third;
+		static const extractor<traverser>           fourth;
 		static const extractor<traverser>           children;
 		static const extractor<tref_range<node>>    children_range;
 		static const extractor<
@@ -646,6 +647,12 @@ template <NodeType node>
 bool is_child_quantifier(tref n);
 
 template <NodeType node>
+bool is_temporal_quantifier(tref n);
+
+template <NodeType node> 
+bool is_io_var(tref n);
+
+template <NodeType node>
 bool is_input_var(tref n);
 
 template <NodeType node>
@@ -656,6 +663,9 @@ bool is_var_or_capture(tref n);
 
 template <NodeType node>
 inline std::function<bool(tref)> is_var_or_capture();
+
+template <NodeType node>
+bool is_quantifier(tref n);
 
 template <NodeType node>
 bool contains(tref fm, tref sub_fm);
