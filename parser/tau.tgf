@@ -184,7 +184,7 @@ cli_command            =>
         | ("onf":onf_sym __ variable __ onf_cmd_arg)          :onf_cmd
 # rec relations
         | (("defs" | "definitions"):def_sym)                  :def_list_cmd
-        | (                         def_sym __ number)        :def_print_cmd
+        | (                         def_sym __ num)           :def_print_cmd
         |                           rec_relation              :def_rr_cmd
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
@@ -224,7 +224,6 @@ option_value           => alnum+.
 
 # command arguments
 #
-number                 => digits.
 bf_cmd_arg             => memory | bf.
 wff_cmd_arg            => memory | wff.
 nf_cmd_arg             => memory | ref | wff | bf.
