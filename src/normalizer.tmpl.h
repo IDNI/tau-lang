@@ -62,10 +62,14 @@ trefs get_vars_from_nso(tref n) {
 // neither a bool_variable nor a variable nor a capture
 template <NodeType node>
 int_t get_new_var_id(tref fm) {
+	// TODO (HIGH) why are captures here? don't captures start with '$'?
+	using tau = tree<node>;
 	trefs var_nodes = get_vars_from_nso<node>(fm);
 	std::set vars{ 1 };
 	for (tref var : var_nodes) {
-		std::string nam = tree<node>::get(var).get_string();
+		std::string nam = tau::get(var).is(tau::capture)
+			? tau::get(var).get_string()
+			: get_var_name<node>(var);
 		if (nam[0] == 'x') {
 			nam.erase(0, 1);
 			if (!nam.empty()) vars.insert(stoi(nam));
