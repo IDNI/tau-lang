@@ -3826,7 +3826,7 @@ tref snf_wff(tref n) {
 }
 
 template <NodeType node>
-tref build_split_wff_using(tau_parser::nonterminal type, tref a, tref b) {
+tref build_split_wff_using(typename node::type type, tref a, tref b) {
 	using tau = tree<node>;
 	// TODO (HIGH) check formulas, should depend on the type
 	if (type == tau::bf_eq)

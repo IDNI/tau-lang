@@ -248,14 +248,13 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		if (p_it == prio.end() || n_it == prio.end()) {
 #ifdef DEBUG
 			std::cerr << "No priority for " << (p_it == prio.end()
-					? tau_parser::instance().name(pt)
-					: tau_parser::instance().name(nt))<<"\n";
+							? node::name(pt)
+							: node::name(nt))<<"\n";
 #endif
 			return false;
 		}
-		// tau_parser& p = tau_parser::instance();
 		// std::cerr << "\n"
-		// 	<< p.name(parent_type) << " vs " << p.name(node_type)
+		// 	<< node::name(parent_type) << " vs " << node::name(node_type)
 		// 	//<< "(" << parent_type << ")
 		// 	<< " " << parent_it->second
 		// 	<< (parent_it->second > node_it->second
@@ -381,8 +380,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_builder_body:   os << " =: "; break;
 			case wff_builder_body:  os << " =:: "; break;
 
-			case rel_memory:        os << "%-"; break;
-			case abs_memory:        os << "%"; break;
+			case rel_history:       os << "%-"; break;
+			case abs_history:       os << "%"; break;
 			case dnf_cmd:           os << "dnf "; break;
 			case cnf_cmd:           os << "cnf "; break;
 			case anf_cmd:           os << "anf "; break;

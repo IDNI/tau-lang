@@ -391,7 +391,7 @@ bool tree<node>::is_string_nt(size_t nt) {
 template <NodeType node>
 bool tree<node>::is_digital_nt(size_t nt) {
 	static const std::set<size_t> digital_nts{
-		num, memory_id
+		num, history_id
 	};
 	return digital_nts.contains(nt);
 }

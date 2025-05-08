@@ -112,9 +112,9 @@ TEST_SUITE("normal forms: reduce_bf") {
 		const char* sample = "(<:c>' & <:b>' & <:b> | <:c>' & <:b>' & <:c> & <:b>' | <:c>' & <:c> & <:b> & <:b> | <:c>' & <:c> & <:b> & <:c> & <:b>') & <:a> | (<:b>' & <:c>' & <:b> | <:b>' & <:c>' & <:c> & <:b>' | <:c> & <:b> & <:c>' & <:b> | <:c> & <:b> & <:c>' & <:c> & <:b>') & <:a>' = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::spec
-			| tau_parser::main
-			| tau_parser::wff).value();
+			| tau::spec
+			| tau::main
+			| tau::wff).value();
 		auto result = statement | reduce_bf<Bool>;
 		CHECK( result == _F<Bool> );
 	}*/
@@ -154,11 +154,11 @@ TEST_SUITE("normal forms: dnf_bf") {
 			"& <:a>' | <:a> & <:b> & <:c>')')')' = 0.";
 		auto src = make_tau_source(sample);
 		auto statement = (make_statement(src)
-			| tau_parser::spec
-			| tau_parser::main
-			| tau_parser::wff
-			| tau_parser::bf_eq
-			| tau_parser::bf).value();
+			| tau::spec
+			| tau::main
+			| tau::wff
+			| tau::bf_eq
+			| tau::bf).value();
 		auto result = bf_boole_normal_form(statement);
 		CHECK( result == _0<Bool> );
 	}*/
@@ -174,9 +174,9 @@ TEST_SUITE("normal forms: onf") {
 		sbf_ba_factory bf;
 		auto sample_formula = make_nso_rr_using_factory<sbf_ba_factory_t, sbf_ba>(sample_src, bf);
 		auto nts = std::get<tau_source_sym>(sample_formula.main->value).nts;
-		auto var = make_node<tau_sym<sbf_ba>>(tau_source_sym(tau_parser::variable, nts), {});
+		auto var = make_node<tau_sym<sbf_ba>>(tau_source_sym(tau::variable, nts), {});
 		auto result = onf(sample_formula.main, var);
-		auto check = result | tau_parser::wff_t;
+		auto check = result | tau::wff_t;
 		CHECK( check.has_value() );
 		CHECK( true );
 	}*/

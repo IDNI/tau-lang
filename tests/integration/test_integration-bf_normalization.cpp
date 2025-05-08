@@ -3,9 +3,7 @@
 #include "test_init.h"
 #include "test_tau_helpers.h"
 
-bool bf_normalize_and_check(const char* sample,
-	tau_parser::nonterminal nt)
-{
+bool bf_normalize_and_check(const char* sample, typename bnode::type nt) {
 	tref formula = tau::get(sample, parse_bf());
 	if (!formula) return false;
 	auto nso_rr = get_nso_rr<bnode>(formula);
@@ -19,42 +17,42 @@ TEST_SUITE("Normalize Boolean function without recurrence relation | simple case
 
 	TEST_CASE("True and False") {
 		const char* sample = "1 & 0";
-		CHECK( bf_normalize_and_check(sample, tau_parser::bf_f) );
+		CHECK( bf_normalize_and_check(sample, tau::bf_f) );
 	}
 
 	TEST_CASE("True or False") {
 		const char* sample = "1 | 0";
-		CHECK( bf_normalize_and_check(sample, tau_parser::bf_t) );
+		CHECK( bf_normalize_and_check(sample, tau::bf_t) );
 	}
 
 	TEST_CASE("False and True") {
 		const char* sample = "0 & 1";
-		CHECK( bf_normalize_and_check(sample, tau_parser::bf_f) );
+		CHECK( bf_normalize_and_check(sample, tau::bf_f) );
 	}
 
 	TEST_CASE("False or True") {
 		const char* sample = "0 | 1";
-		CHECK( bf_normalize_and_check(sample, tau_parser::bf_t) );
+		CHECK( bf_normalize_and_check(sample, tau::bf_t) );
 	}
 
 	TEST_CASE("X or X") {
 		const char* sample = "X | X";
-		CHECK( bf_normalize_and_check(sample, tau_parser::variable) );
+		CHECK( bf_normalize_and_check(sample, tau::variable) );
 	}
 
 	TEST_CASE("X and X") {
 		const char* sample = "X & X";
-		CHECK( bf_normalize_and_check(sample, tau_parser::variable) );
+		CHECK( bf_normalize_and_check(sample, tau::variable) );
 	}
 
 	TEST_CASE("X or X'") {
 		const char* sample = "X | X'";
-		CHECK( bf_normalize_and_check(sample, tau_parser::bf_t) );
+		CHECK( bf_normalize_and_check(sample, tau::bf_t) );
 	}
 
 	TEST_CASE("X and X'") {
 		const char* sample = "X & X'";
-		CHECK( bf_normalize_and_check(sample, tau_parser::bf_f) );
+		CHECK( bf_normalize_and_check(sample, tau::bf_f) );
 	}
 }
 
@@ -120,6 +118,6 @@ TEST_SUITE("SBF expressions") {
 	TEST_CASE("X or Y") {
 		bdd_init<Bool>();
 		const char* sample = "{X}:sbf | {Y}:sbf";
-		CHECK( bf_normalize_and_check(sample, tau_parser::bf_constant) );
+		CHECK( bf_normalize_and_check(sample, tau::bf_constant) );
 	}
 }

@@ -143,7 +143,7 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 			// digital terminals (same as is_digital_nt())
 			case num:
-			case memory_id:
+			case history_id:
 				x = getx_data(m_get(ptr.only_child()).data());
 				break;
 

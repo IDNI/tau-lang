@@ -161,7 +161,7 @@ cli_command            =>
 # a wff if possible.
         | ("solve" :solve_sym [solve_options]  __ wff_cmd_arg):solve_cmd
         | ("lgrs" :lgrs_sym __ wff_cmd_arg)    :lgrs_cmd
-        | (("r" | "run"):run_sym __ (memory | wff))           :run_cmd
+        | (("r" | "run"):run_sym __ (history | wff))          :run_cmd
         | (("n" | "normalize")
                 :normalize_sym __ normalize_cmd_arg)          :normalize_cmd
 # TODO (MEDIUM) maybe we could remove in the subst and inst commands the
@@ -200,7 +200,7 @@ cli_command            =>
         | (type __ var_name _ '=' _ output_stream)            :def_output_cmd
 # outputs
         | (("hist" | "history"):history_sym)                  :history_list_cmd
-        | (                     history_sym __ memory)        :history_print_cmd
+        | (                     history_sym __ history)       :history_print_cmd
         | (                     wff | bf)                     :history_store_cmd
         .
 
@@ -224,12 +224,12 @@ option_value           => alnum+.
 
 # command arguments
 #
-bf_cmd_arg             => memory | bf.
-wff_cmd_arg            => memory | wff.
-nf_cmd_arg             => memory | ref | wff | bf.
-onf_cmd_arg            => memory | wff.
+bf_cmd_arg             => history | bf.
+wff_cmd_arg            => history | wff.
+nf_cmd_arg             => history | ref | wff | bf.
+onf_cmd_arg            => history | wff.
 # TODO (MEDIUM) check if we could simplify this as ref give us a bf or a wff
-normalize_cmd_arg      => memory | spec | ref | wff | bf.
+normalize_cmd_arg      => history | spec | ref | wff | bf.
 # TODO (MEDIUM) check if could we only have one case?
 inst_args              =>
           wff_cmd_arg _ '[' _ variable      _ '/' _ bf_cmd_arg  _ ']'
@@ -240,7 +240,7 @@ inst_args              =>
 help_arg               => help_sym | version_sym | quit_sym
                         | clear_sym | get_sym | set_sym
                         | enable_sym | disable_sym | toggle_sym | file_sym
-                        | history_sym | abs_memory_sym | rel_memory_sym
+                        | history_sym | abs_history_sym | rel_history_sym
                         | selection_sym | def_sym
                         | inst_sym | subst_sym | normalize_sym | execute_sym
                         | solve_sym | valid_sym | sat_sym | unsat_sym | run_sym
@@ -248,14 +248,14 @@ help_arg               => help_sym | version_sym | quit_sym
                         | nnf_sym | pnf_sym | mnf_sym | onf_sym | qelim_sym
                         | ("example" 's'?):examples_sym.
 
-# memory
+# history
 #
 # TODO (LOW) in the future maybe is intererting to also store the result of the
-# solve command in a memory, so we could access it later. Maybe we could
+# solve command in a history, so we could access it later. Maybe we could
 # use the notation %N[<var>] or %-N[<var>], where N is the id of the solution.
-memory                 => ( "%"
-                          | "%-":rel_memory_sym [digits:memory_id]):rel_memory
-                        | ( "%" :abs_memory_sym         memory_id) :abs_memory.
+history        => ( "%"
+                  | "%-":rel_history_sym [digits:history_id]):rel_history
+                | ( "%" :abs_history_sym         history_id) :abs_history.
 
 # shaping of the parsed tree
 #

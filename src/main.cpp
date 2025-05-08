@@ -100,11 +100,11 @@ int run_tau_spec(string spec_file, bool charvar, bool exp) {
 	}
 	if (src.empty()) return 0;
 	repl_evaluator<sbf_ba> re({
-		.print_memory_store = false,
-		.error_quits        = true,
-		.charvar            = charvar,
-		.repl_running       = false,
-		.experimental       = exp
+		.print_history_store = false,
+		.error_quits         = true,
+		.charvar             = charvar,
+		.repl_running        = false,
+		.experimental        = exp
 	});
 	if (auto status = re.eval(src); status) return status;
 	return re.eval("run %");

@@ -4,24 +4,6 @@
 
 namespace idni::tau_lang {
 
-// // executes the normalizer on the given source code taking into account the
-// // bindings provided.
-// template <NodeType node>
-// rr normalizer(std::string& source, bindings<BAs...>& binds) {
-// 	auto form_source = make_tau_source(source, { .start = tau_parser::spec });
-// 	auto form = make_nso_rr_using_bindings(form_source, binds);
-// 	return normalizer(form);
-// }
-
-// // executes the normalizer on the given source code taking into account the
-// // provided factory.
-// template <typename factory_t, NodeType node>
-// rr normalizer(std::string& source, factory_t& factory) {
-// 	auto form_source = make_tau_source(source, { .start = tau_parser::spec });
-// 	auto form = make_nso_rr_using_factory(form_source, factory);
-// 	return normalizer(form);
-// }
-
 // IDEA (HIGH) rewrite steps as a tuple to optimize the execution
 template <NodeType node>
 tref normalizer_step(tref form) {
@@ -324,8 +306,8 @@ bool are_bf_equal(tref n1, tref n2) {
 
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
-	DBG(assert(t1.is(tau_parser::bf)));
-	DBG(assert(t2.is(tau_parser::bf)));
+	DBG(assert(t1.is(tau::bf)));
+	DBG(assert(t2.is(tau::bf)));
 
 	if (t1 == t2) {
 		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_bf_equal: true (equal bf)";
@@ -343,7 +325,7 @@ bool are_bf_equal(tref n1, tref n2) {
 
 	tref normalized = normalizer_step<node>(bf_equal_fm);
 	BOOST_LOG_TRIVIAL(trace) << "(T) -- Normalized: " << normalized;
-	auto check = tt(normalized) | tau_parser::wff_t;
+	auto check = tt(normalized) | tau::wff_t;
 	BOOST_LOG_TRIVIAL(debug)
 		<< "(I) -- End are_bf_equal: " << check.has_value();
 
@@ -445,7 +427,7 @@ size_t get_max_loopback_in_rr(tref form) {
 	using tt = tau::traverser;
 	size_t max = 0;
 	for (tref offsets : tau::get(form).select_top(is<node, tau::offsets>)) {
-		for (auto offset : (tt(offsets) || tau_parser::offset)())
+		for (auto offset : (tt(offsets) || tau::offset)())
 			if (auto i = offset | tau::integer; i) {
 				int_t c = i | tt::integer;
 				max = std::max(max, static_cast<size_t>(c));
