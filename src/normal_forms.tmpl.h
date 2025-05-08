@@ -2210,7 +2210,7 @@ tref to_cnf(tref fm) {
 				else return n;
 			}
 		}
-		if constexpr (!is_wff) if (t.is(tau::bf_or)) {
+		if constexpr (!is_wff) if (t.child_is(tau::bf_or)) {
 				auto dis = disjunct_cnfs_to_cnf<node>(
 					t[0].first(), t[0].second());
 				// Perform simplification
