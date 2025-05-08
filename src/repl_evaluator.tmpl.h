@@ -37,6 +37,9 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 	auto mem_id = n | mem_type | tau::history_id;
 	size_t idx = 0;
 	if (mem_id) idx = mem_id | tt::num;
+	// BOOST_LOG_TRIVIAL(trace) << "get_history_index idx: " << idx
+	// 	<< "       relative? " << is_relative << "    "
+	// 	<< TAU_DUMP_TO_STR(n.value());
 	if ((is_relative && idx >= size)
 		|| (!is_relative && (idx == 0 || idx > size)))
 	{
@@ -48,6 +51,8 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 		}
 		return {};
 	}
+	// BOOST_LOG_TRIVIAL(trace) << "get_history_index result: "
+	// 	<< (is_relative ? size - idx - 1 : idx - 1);
 	return { is_relative ? size - idx - 1 : idx - 1 };
 }
 
@@ -144,36 +149,34 @@ void repl_evaluator<BAs...>::history_store_cmd(const tt& command) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-typename repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_(
-	typename node::type nt, const tt& n, bool suppress_error) const
+tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
+	bool suppress_error) const
 {
-	BOOST_LOG_TRIVIAL(trace) << "get_/n: " <<
-		node::name(nt) << " " << TAU_DUMP_TO_STR(n.value());
-	if (n.is(nt)) return n;
-	else if (n.is(tau::history)) {
+	// BOOST_LOG_TRIVIAL(trace) << "get_/n: " <<
+	// 	node::name(nt) << "        " << TAU_DUMP_TO_STR(n);
+	if (tau::get(n).is(nt)) return n;
+	else if (tau::get(n).is(tau::history)) {
 		if (auto check = history_retrieve(n); check) {
-			tt value(check.value().first);
-			if (value.value_tree().is(nt)) return value;
+			const auto& h = check.value().first;
+			if (tau::get(h).is(nt)) return h->get();
 			else if (!suppress_error) BOOST_LOG_TRIVIAL(error)
 				<< "(Error) argument has wrong type";
-			return {};
+			return nullptr;
 		}
 	}
 	if (!suppress_error) BOOST_LOG_TRIVIAL(error)
 		<< "(Error) argument has wrong type";
-	return {};
+	return nullptr;
 }
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_bf(const tt& n,
-	bool suppress_error) const
-{
+tref repl_evaluator<BAs...>::get_bf(tref n, bool suppress_error) const {
 	return get_(tau::bf, n, suppress_error);
 }
 template <typename... BAs>
 requires BAsPack<BAs...>
-repl_evaluator<BAs...>::tt repl_evaluator<BAs...>::get_wff(const tt& n) const {
+tref repl_evaluator<BAs...>::get_wff(tref n) const {
 	return get_(tau::wff, n, false);
 }
 
@@ -302,28 +305,30 @@ tref repl_evaluator<BAs...>::snf_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
+	tref arg1 = n | tt::second | tt::ref;
+	tref arg2 = n | tt::third  | tt::ref;
+	tref arg3 = n | tt::fourth | tt::ref;
+	// BOOST_LOG_TRIVIAL(trace) << "subst_cmd arg1: " << TAU_DUMP_TO_STR(arg1);
+	// BOOST_LOG_TRIVIAL(trace) << "subst_cmd arg2: " << TAU_DUMP_TO_STR(arg2);
+	// BOOST_LOG_TRIVIAL(trace) << "subst_cmd arg3: " << TAU_DUMP_TO_STR(arg3);
 	// Since the history command cannot be type-checked we do it here
 	// First try to get bf
-	tref in = get_bf(n | tt::second, true) | tt::ref;
+	tref in = get_bf(arg1, true);
 	if (in) { // BF substitution
-		in = n[1].get(); tref thiz = n[2].get(), with = n[3].get();
+		tref thiz = get_bf(arg2), with = get_bf(arg3);
 		if (!in || !thiz || !with) return invalid_argument();
 		return rewriter::replace<node>(in, thiz, with);
 	}
 	// First argument was not a bf so it must be a wff
-	in = get_wff(n | tt::second) | tt::ref;
+	in = get_wff(arg1);
 	// Now sort out the remaining argument types
-	tref thiz = get_bf(n | tt::third, true) | tt::ref;
-	tref with;
-	if (thiz) with = get_bf(n | tt::fourth | tt::ref) | tt::ref;
-	else {
-		thiz = get_wff(n | tt::third | tt::ref) | tt::ref;
-		with = get_wff(n | tt::fourth | tt::ref) | tt::ref;
-	}
+	tref with, thiz = get_bf(arg2, true);
+	if (thiz) with = get_bf(arg3);
+	else thiz = get_wff(arg2), with = get_wff(arg3);
 	// Check for correct argument types
 	if (!thiz || !in || !with) {
 		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
-		return {};
+		return nullptr;
 	}
 	typename tau::subtree_map changes = { { thiz, with } };
 
