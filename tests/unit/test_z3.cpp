@@ -16,12 +16,6 @@ namespace testing = doctest;
 
 TEST_SUITE("configuration") {
 
-	/*TEST_CASE("logging") {
-		core::get()->set_filter(trivial::severity >= trivial::trace);
-		add_console_log(std::cout, keywords::format =
-			expressions::stream << expressions::smessage);
-	}*/
-
 	TEST_CASE("z3_config") {
 		z3_config();
 	}
@@ -30,11 +24,24 @@ TEST_SUITE("configuration") {
 TEST_SUITE("sample z3 programs") {
 
 	TEST_CASE("sample") {
+		// (declare-const x (_ BitVec 32))
+		// (declare-const y (_ BitVec 32))
+		// (assert (= (bvadd x y) #x00000004))
+		// (assert (= x #x00000002))
+		// (check-sat)
+		// (get-model)
+		//
+		// ; output
+		//
+		// ;sat
+		// ;(
+		// ;  (define-fun x () (_ BitVec 32) #x00000002)
+		// ;  (define-fun y () (_ BitVec 32) #x00000002)
+		// ;)
 		context c;
 		expr x = c.bv_const("x", 32);
 		expr y = c.bv_const("y", 32);
 		solver s(c);
-		// In C++, the operator == has higher precedence than ^.
 		s.add(((x * y) == 4) && (x  == 2));
 		BOOST_LOG_TRIVIAL(info)
 			<< s << "\n"
@@ -44,47 +51,147 @@ TEST_SUITE("sample z3 programs") {
 			<< "y <- " << s.get_model().eval(y).get_numeral_int() << "\n";
 	}
 
-	TEST_CASE("function") {
+	TEST_CASE("evaluating expr in the model") {
+		// (declare-fun f (Int Int) Int)
+		// (assert (forall ((a Int) (b Int)) (= (f a b) (+ a b))))
+		// (check-sat)
+		// (get-model)
+		// (declare-const a Int)
+		// (declare-const b Int)
+		// (eval (f a b))
+		//
+		// ; output
+		//
+		// ;sat
+		// ;(
+		// ;  (define-fun f ((x!0 Int) (x!1 Int)) Int
+		// ;    (+ x!0 x!1))
+		// ;)
+		// ;(+ a b)
+
 		context c;
-
-		expr x      = c.int_const("x");
-		expr y      = c.int_const("y");
-
-		sort I      = c.int_sort();
-
-		func_decl g = function("g", I, I);
-
+		expr a = c.int_const("a");
+		expr b = c.int_const("b");
+		sort I = c.int_sort();
+		func_decl f = function("f", I, I, I);
 		solver s(c);
-
-		expr conjecture1 = implies(x == y, g(x) == g(y));
+		s.add(forall(a, b, f(a, b) == a + b));
 
 		BOOST_LOG_TRIVIAL(info)
-			<< "conjecture 1\n" << conjecture1 << "\n";
-		s.add(!conjecture1);
-
-		if (s.check() == unsat)
-			BOOST_LOG_TRIVIAL(info)
-				<< "proved" << "\n";
-		else
-			BOOST_LOG_TRIVIAL(info)
-				<< "failed to prove" << "\n";
-
-		s.reset(); // remove all assertions from solver s
-
-		expr conjecture2 = implies(x == y, g(g(x)) == g(y));
-		std::cout << "conjecture 2\n" << conjecture2 << "\n";
-		s.add(!conjecture2);
-		if (s.check() == unsat) {
-			BOOST_LOG_TRIVIAL(info)
-				<< "proved" << "\n";
-		}
-		else {
-			model m = s.get_model();
-			BOOST_LOG_TRIVIAL(info)
-				<< "failed to prove" << "\n"
-				<< "counterexample:\n" << m << "\n"
-				<< "g(g(x)) = " << m.eval(g(g(x))) << "\n"
-				<< "g(y)    = " << m.eval(g(y)) << "\n";
-		}
+			<< s << "\n"
+			<< s.check() << "\n"
+			<< s.get_model().eval(f(a, b)) << "\n";
 	}
+
+	TEST_CASE("eliminating one variable") {
+		//	(declare-fun f ((_ BitVec 2)) Bool)
+		//	(assert (forall ((y (_ BitVec 2))) (ite (exists ((x (_ BitVec 2))) (= (bvor y x) #b11)) (= (f y) true) (= (f y) false))))
+		//	(check-sat)
+		//	(get-model)
+		//	(reset)
+		//
+		//	; output
+		//
+		//	;sat
+		//	;(
+		//	;  (define-fun f ((x!0 (_ BitVec 2))) Bool
+		//	;    true)
+		//	;)
+
+		context c;
+		expr x = c.bv_const("x", 2);
+		expr y = c.bv_const("y", 2);
+		sort BV = c.bv_sort(2);
+		sort B = c.bool_sort();
+		func_decl f = function("f", BV, B);
+		solver s(c);
+		s.add(forall(y,
+			ite(
+				exists(x, (y | x) == c.bv_val(3, 2)),
+				f(y) == c.bool_val(true),
+				f(y) == c.bool_val(false))));
+
+		BOOST_LOG_TRIVIAL(info)
+			<< s << "\n"
+			<< s.check() << "\n"
+			<< s.get_model().eval(f(y)) << "\n";
+
+		CHECK( s.get_model().eval(f(y)).bool_value() == true );
+	}
+
+	TEST_CASE("eliminating one variable (y2)") {
+		//	(declare-fun f ((_ BitVec 2)) Bool)
+		//	(assert (forall ((y (_ BitVec 2))) (ite (exists ((x (_ BitVec 2))) (= (bvor y x) #b11)) (= (f y) true) (= (f y) false))))
+		//	(check-sat)
+		//	(get-model)
+		//	(reset)
+		//
+		//	; output
+		//
+		//	;sat
+		//	;(
+		//	;  (define-fun f ((x!0 (_ BitVec 2))) Bool
+		//	;    true)
+		//	;)
+
+		context c;
+		expr x = c.bv_const("x", 2);
+		expr y = c.bv_const("y", 2);
+		sort BV = c.bv_sort(2);
+		sort B = c.bool_sort();
+		func_decl f = function("f", BV, B);
+		solver s(c);
+		s.add(forall(y,
+			ite(
+				exists(x, (y & x) == c.bv_val(1, 2)),
+				f(y) == c.bool_val(true),
+				f(y) == c.bool_val(false))));
+
+		BOOST_LOG_TRIVIAL(info)
+			<< s << "\n"
+			<< s.check() << "\n"
+			<< s.get_model().eval(f(y)) << "\n";
+
+		CHECK( s.get_model().eval(f(y)).bool_value() == false );
+	}
+
+	TEST_CASE("eliminating one variable (y3)") {
+		//	(declare-fun f ((_ BitVec 2)) Bool)
+		//	(assert (forall ((y (_ BitVec 2))) (ite (forall ((x (_ BitVec 2))) (= (bvand y x) #b00)) (= (f y) true) (= (f y) false))))
+		//	(check-sat)
+		//	(get-model)
+		//	(reset)
+		//
+		//	; output
+		//
+		//	;sat
+		//	;(
+		//	;  (define-fun f ((x!0 (_ BitVec 2))) Bool
+		//	;    (and (= x!0 #b00) (not (= x!0 #b10))))
+		//	;)
+		//	;
+		//	; x!0 stands for the first argument of f, x!1 for the second and so on...
+		//	; the above solution is equivalent to equivalent to (= x!0 #b00)
+
+		context c;
+		expr x = c.bv_const("x", 2);
+		expr y = c.bv_const("y", 2);
+		sort BV = c.bv_sort(2);
+		sort B = c.bool_sort();
+		func_decl f = function("f", BV, B);
+		solver s(c);
+		s.add(forall(y,
+			ite(
+				exists(x, (y & x) == c.bv_val(0, 2)),
+				f(y) == c.bool_val(true),
+				f(y) == c.bool_val(false))));
+
+		BOOST_LOG_TRIVIAL(info)
+			<< s << "\n"
+			<< s.check() << "\n"
+			<< s.get_model().eval(f(y)) << "\n";
+
+			CHECK( s.get_model().eval(f(y)) != c.bool_val(false) );
+			CHECK( s.get_model().eval(f(y)) != c.bool_val(true) );
+		}
 }
