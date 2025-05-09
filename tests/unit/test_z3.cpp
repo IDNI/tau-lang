@@ -242,7 +242,7 @@ TEST_SUITE("sample z3 programs") {
 		func_decl f_z = function("f_z", BV, B);
 		s.add(forall(z,
 			ite(
-				exists(y, f_z(z) == f_y_z_val),
+				exists(y, f_z(y) == f_y_z_val),
 				f_z(z) == c.bool_val(true),
 				f_z(z) == c.bool_val(false))));
 
@@ -300,7 +300,7 @@ TEST_SUITE("sample z3 programs") {
 		func_decl f_z = function("f_z", BV, B);
 		s.add(forall(z,
 			ite(
-				exists(y, f_z(z) == f_y_z_val),
+				exists(y, f_z(y) == f_y_z_val),
 				f_z(z) == c.bool_val(true),
 				f_z(z) == c.bool_val(false))));
 
