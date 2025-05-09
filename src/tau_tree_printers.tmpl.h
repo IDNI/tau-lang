@@ -63,6 +63,18 @@ std::ostream& print(std::ostream& os, const rewriter::rule& r) {
 }
 
 template <NodeType node>
+std::ostream& dump(std::ostream& os, const rewriter::rule& r) {
+	return (tree<node>::get(r.first).dump(os) << " := ",
+			tree<node>::get(r.second).dump(os) << ".");
+}
+
+template <NodeType node>
+std::string dump_to_str(const rewriter::rule& r) {
+	std::stringstream ss;
+	return dump<node>(ss, r), ss.str();
+}
+
+template <NodeType node>
 std::ostream& print(std::ostream& os, const rewriter::rules& rs) {
 	for (const auto& r : rs) print<node>(os, r) << " ";
 	return os;
@@ -238,6 +250,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			{ bf_rule,            800 },
 			{ wff_rule,           800 },
 			{ wff_builder_body,   800 },
+			{ wff_matcher,        800 },
+			{ wff_body,           800 },
 		};
 		
 		if (no_wrap_for.find(nt) != no_wrap_for.end())
@@ -363,12 +377,12 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 							t.get_ba_constant_id());
 						break;
 			case wff: if (parent && last_quant_nt != start) {
-					size_t p = parent_nt();
-					bool brk = p != wff_all && p != wff_ex;
-					if (brk) last_quant_nt = start;
-					bool child_quant = p == last_quant_nt;
-					if (!child_quant) os << " ";
-				}
+				// if we are in a quant we need to care of " "
+				size_t p = parent_nt(); // and clear last_quant_nt
+				if (p != wff_all && p != wff_ex) // if not in quant
+					last_quant_nt = start;
+				if (p != last_quant_nt) os << " ";
+			}
 				[[fallthrough]];
 			case bf:
 				if (parent && is_to_wrap(
