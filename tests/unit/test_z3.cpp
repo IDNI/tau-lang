@@ -156,8 +156,8 @@ TEST_SUITE("sample z3 programs") {
 	}
 
 	TEST_CASE("eliminating one variable (y3)") {
-		//	(declare-fun f ((_ BitVec 2)) Bool)
-		//	(assert (forall ((y (_ BitVec 2))) (ite (forall ((x (_ BitVec 2))) (= (bvand y x) #b00)) (= (f y) true) (= (f y) false))))
+		//	(declare-fun f_y ((_ BitVec 2)) Bool)
+		//	(assert (forall ((y (_ BitVec 2))) (ite (forall ((x (_ BitVec 2))) (= (bvand y x) #b00)) (= (f_y y) true) (= (f_y y) false))))
 		//	(check-sat)
 		//	(get-model)
 		//	(reset)
@@ -178,20 +178,135 @@ TEST_SUITE("sample z3 programs") {
 		expr y = c.bv_const("y", 2);
 		sort BV = c.bv_sort(2);
 		sort B = c.bool_sort();
-		func_decl f = function("f", BV, B);
+		func_decl f_y = function("f_y", BV, B);
 		solver s(c);
 		s.add(forall(y,
 			ite(
 				exists(x, (y & x) == c.bv_val(0, 2)),
-				f(y) == c.bool_val(true),
-				f(y) == c.bool_val(false))));
+				f_y(y) == c.bool_val(true),
+				f_y(y) == c.bool_val(false))));
 
 		BOOST_LOG_TRIVIAL(info)
 			<< s << "\n"
 			<< s.check() << "\n"
-			<< s.get_model().eval(f(y)) << "\n";
+			<< s.get_model().eval(f_y(y)) << "\n";
 
-			CHECK( s.get_model().eval(f(y)) != c.bool_val(false) );
-			CHECK( s.get_model().eval(f(y)) != c.bool_val(true) );
+			CHECK( s.get_model().eval(f_y(y)) != c.bool_val(false) );
+			CHECK( s.get_model().eval(f_y(y)) != c.bool_val(true) );
 		}
+
+	TEST_CASE("eliminating two variables") {
+		//	(declare-fun f_y_z ((_ BitVec 2)) Bool)
+		//	(assert (forall ((y (_ BitVec 2))) (ite (forall ((x (_ BitVec 2))) (= (bvand y x z) #b00)) (= (f_y_z y) true) (= (f_y_z y) false))))
+		//	(check-sat)
+		//	(get-model)
+		//	(reset)
+		//
+		//	; output
+		//
+		//	;sat
+		//	;(
+		//	;  (define-fun f ((x!0 (_ BitVec 2))) Bool
+		//	;    (and (= x!0 #b00) (not (= x!0 #b10))))
+		//	;)
+		//	;
+		//	; x!0 stands for the first argument of f, x!1 for the second and so on...
+		//	; the above solution is equivalent to equivalent to (= x!0 #b00)
+		//
+		//	(declare-fun f_y_z ((_ BitVec 2)) Bool)
+		//	(assert (forall ((y (_ BitVec 2))) (ite (forall ((x (_ BitVec 2))) (= (bvand y x z) #b00)) (= (f_y_z y) true) (= (f_y_z y) false))))
+		//	(check-sat)
+		//	(get-model)
+		//	(reset)
+
+		context c;
+		expr x = c.bv_const("x", 2);
+		expr y = c.bv_const("y", 2);
+		expr z = c.bv_const("z", 2);
+		sort BV = c.bv_sort(2);
+		sort B = c.bool_sort();
+		func_decl f_y_z = function("f_y_z", BV, BV, B);
+		solver s(c);
+		s.add(forall(y, z,
+			ite(
+				exists(x, (y & x & z) == c.bv_val(0, 2)),
+				f_y_z(y, z) == c.bool_val(true),
+				f_y_z(y, z) == c.bool_val(false))));
+
+		BOOST_LOG_TRIVIAL(info)
+			<< s << "\n"
+			<< s.check() << "\n"
+			<< s.get_model().eval(f_y_z(y, z)) << "\n";
+
+		auto f_y_z_val = s.get_model().eval(f_y_z(y, z));
+		func_decl f_z = function("f_z", BV, B);
+		s.add(forall(z,
+			ite(
+				exists(y, f_z(z) == f_y_z_val),
+				f_z(z) == c.bool_val(true),
+				f_z(z) == c.bool_val(false))));
+
+		BOOST_LOG_TRIVIAL(info)
+			<< s << "\n"
+			<< s.check() << "\n"
+			<< s.get_model().eval(f_z(z)) << "\n";
+	}
+
+
+	TEST_CASE("eliminating two variables (y2)") {
+		//	(declare-fun f_y_z ((_ BitVec 2)) Bool)
+		//	(assert (forall ((y (_ BitVec 2))) (ite (forall ((x (_ BitVec 2))) (= (bvor y x z) #b00)) (= (f_y_z y) true) (= (f_y_z y) false))))
+		//	(check-sat)
+		//	(get-model)
+		//	(reset)
+		//
+		//	; output
+		//
+		//	;sat
+		//	;(
+		//	;  (define-fun f ((x!0 (_ BitVec 2))) Bool
+		//	;    (and (= x!0 #b00) (not (= x!0 #b10))))
+		//	;)
+		//	;
+		//	; x!0 stands for the first argument of f, x!1 for the second and so on...
+		//	; the above solution is equivalent to equivalent to (= x!0 #b00)
+		//
+		//	(declare-fun f_y_z ((_ BitVec 2)) Bool)
+		//	(assert (forall ((y (_ BitVec 2))) (ite (forall ((x (_ BitVec 2))) (= (bvor y x z) #b00)) (= (f_y_z y) true) (= (f_y_z y) false))))
+		//	(check-sat)
+		//	(get-model)
+		//	(reset)
+
+		context c;
+		expr x = c.bv_const("x", 2);
+		expr y = c.bv_const("y", 2);
+		expr z = c.bv_const("z", 2);
+		sort BV = c.bv_sort(2);
+		sort B = c.bool_sort();
+		func_decl f_y_z = function("f_y_z", BV, BV, B);
+		solver s(c);
+		s.add(forall(y, z,
+			ite(
+				exists(x, (y | x | z) == c.bv_val(3, 2)),
+				f_y_z(y, z) == c.bool_val(true),
+				f_y_z(y, z) == c.bool_val(false))));
+
+		BOOST_LOG_TRIVIAL(info)
+			<< s << "\n"
+			<< s.check() << "\n"
+			<< s.get_model().eval(f_y_z(y, z)) << "\n";
+
+		auto f_y_z_val = s.get_model().eval(f_y_z(y, z));
+		func_decl f_z = function("f_z", BV, B);
+		s.add(forall(z,
+			ite(
+				exists(y, f_z(z) == f_y_z_val),
+				f_z(z) == c.bool_val(true),
+				f_z(z) == c.bool_val(false))));
+
+		BOOST_LOG_TRIVIAL(info)
+			<< s << "\n"
+			<< s.check() << "\n"
+			<< s.get_model().eval(f_z(z)) << "\n";
+	}
 }
