@@ -158,9 +158,11 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 		typename tree<node>::template extractor<traverser>(
 			[](const traverser& t) -> traverser {
 				if (!t) return {};
-				tref r = t.value_tree().only_child();
-				if (!r) return {};
-				return traverser(r);
+				trefs only_ch;
+				for (tref v : t.values())
+					if (tref oc = get(v).only_child(); oc)
+						only_ch.push_back(oc);				
+				return traverser(only_ch);
 			});
 
 template <NodeType node>
@@ -169,9 +171,11 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 		typename tree<node>::template extractor<traverser>(
 			[](const traverser& t) {
 				if (!t) return traverser();
-				tref r = t.value_tree().first();
-				if (!r) return traverser();
-				return traverser(r);
+				trefs first_ch;
+				for (tref v : t.values())
+					if (tref fc = get(v).first(); fc)
+						first_ch.push_back(fc);				
+				return traverser(first_ch);
 			});
 
 template <NodeType node>
@@ -180,9 +184,11 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 		typename tree<node>::template extractor<traverser>(
 			[](const traverser& t) {
 				if (!t) return traverser();
-				tref r = t.value_tree().second();
-				if (!r) return traverser();
-				return traverser(r);
+				trefs second_ch;
+				for (tref v : t.values())
+					if (tref sc = get(v).second(); sc)
+						second_ch.push_back(sc);				
+				return traverser(second_ch);
 			});
 
 template <NodeType node>
@@ -191,9 +197,11 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 		typename tree<node>::template extractor<traverser>(
 			[](const traverser& t) {
 				if (!t) return traverser();
-				tref r = t.value_tree().third();
-				if (!r) return traverser();
-				return traverser(r);
+				trefs third_ch;
+				for (tref v : t.values())
+					if (tref tc = get(v).third(); tc)
+						third_ch.push_back(tc);				
+				return traverser(third_ch);
 			});
 
 template <NodeType node>
@@ -202,9 +210,11 @@ const typename tree<node>::template extractor<typename tree<node>::traverser>
 		typename tree<node>::template extractor<traverser>(
 			[](const traverser& t) {
 				if (!t) return traverser();
-				tref r = t.value_tree().child(3);
-				if (!r) return traverser();
-				return traverser(r);
+				trefs fourth_ch;
+				for (tref v : t.values())
+					if (tref fc = get(v).child(3); fc)
+						fourth_ch.push_back(fc);				
+				return traverser(fourth_ch);
 			});
 
 template <NodeType node>
@@ -244,8 +254,11 @@ template <NodeType node>
 const typename tree<node>::template extractor<typename tree<node>::traverser>
 	tree<node>::traverser::f(const auto& fn)
 {
-	return extractor<traverser>([fn](const traverser& t) {
-		return traverser(fn(t.value()));
+	return extractor<traverser>([&fn](const traverser& t) {
+		trefs nvals;
+		for (tref v : t.values())
+			if (tref r = fn(v); r) nvals.push_back(r);
+		return traverser(nvals);
 	});
 }
 
@@ -325,10 +338,9 @@ typename tree<node>::traverser
 	tree<node>::traverser::operator|(size_t nt) const
 {
 	if (!has_value()) return traverser();
-	for (tref c : get(value()).children()) {
-		if (get(c).is(nt)) return { c }; 
-	}
-	return {};
+	for (tref v : values()) for (tref c : get(v).children())
+		if (get(c).is(nt)) return traverser(c);
+	return traverser();
 }
 
 template <NodeType node>
@@ -337,7 +349,7 @@ typename tree<node>::traverser
 {
 	trefs r;
 	for (tref v : values())	for (tref c : get(v).children())
-			if (get(c).is(nt)) r.push_back(c);
+		if (get(c).is(nt)) r.push_back(c);
 	return traverser(r);
 }
 

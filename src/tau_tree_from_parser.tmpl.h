@@ -203,12 +203,12 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 		// 	<< " `" << tree::get(x) << "`\n";
 		return true;
 	};
-	parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
+	// parse_tree::get(ptr.get()).print(std::cout << "parse tree: ") << "\n";
 	post_order<tau_parser::pnode>(ptr.get()).search(transformer);
 	if (error) return nullptr;
 	if (m.find(ptr.get()) == m.end()) return nullptr;
-	std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n";
-	m_get(ptr.get()).print_tree(std::cout << "tau tree: ") << "\n";
+	// std::cout << "tau tree: " << tree::get(m.at(ptr.get())) << "\n";
+	// m_get(ptr.get()).print_tree(std::cout << "tau tree: ") << "\n";
 	return m_ref(ptr.get());
 }
 
@@ -380,8 +380,8 @@ rewriter::rules get_rules(tref r) {
 	rewriter::rules x;
 	for (auto r : rs.traversers()) {
 		// tree::get(r.value()).print(std::cout << "rule: ");
-		x.emplace_back(tau::geth(r | tt::first | tt::ref),
-				tau::geth(r | tt::second | tt::ref));
+		x.emplace_back(tau::geth(r | tt::first | tt::first | tt::ref),
+				tau::geth(r | tt::second | tt::first | tt::ref));
 	}
 	return x;
 }

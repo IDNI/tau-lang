@@ -451,14 +451,16 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 		// (tref) -> tref function tt:f wrapper	
 		static const extractor<traverser> f(const auto& fn);
 
+		// traverses to the first child of the type nt
 		traverser operator|(size_t nt) const;
+		// traverses to all children of the type nt
 		traverser operator||(size_t nt) const;
+		// extract or process values in traverser
 		template <typename result_type>
-		result_type operator|(const extractor<result_type>&)
-								const;
+		result_type operator|(const extractor<result_type>&) const;
+		// extract or process values in traverser (works equally to operator|)
 		template <typename result_type>
-		result_type operator||(const extractor<result_type>&)
-								const;
+		result_type operator||(const extractor<result_type>&) const;
 	private:
 		void set_values(const trefs& n);
 		bool has_value_ = true;
@@ -617,6 +619,10 @@ template <NodeType node>
 std::string to_str(const rewriter::rules& rs);
 template <NodeType node>
 std::string to_str(const rr& rr_);
+
+template <NodeType node>
+std::string dump_to_str(const rewriter::rule& r);
+
 
 std::ostream& operator<<(std::ostream& os, const rr_sig& s);
 
