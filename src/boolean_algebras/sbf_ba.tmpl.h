@@ -9,7 +9,7 @@ namespace idni::tau_lang {
 inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	using tt = sbf_parser::tree::traverser;
 	using type = sbf_parser::nonterminal;
-	// BOOST_LOG_TRIVIAL(debug) << "eval_node";
+	// LOG_DEBUG << "eval_node";
 	auto n  = t | tt::only_child;
 	auto nt = n | tt::nonterminal;
 	switch (nt) {
@@ -17,7 +17,7 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 	case type::one:  return bdd_handle<Bool>::htrue;
 	case type::negation: {
 		auto e = sbf_eval_node(n | tt::only_child);
-		BOOST_LOG_TRIVIAL(trace) << e << "' = " << ~e;
+		LOG_TRACE << e << "' = " << ~e;
 		return ~e;
 	}
 	case type::variable: {
@@ -38,17 +38,14 @@ inline sbf_ba sbf_eval_node(const sbf_parser::tree::traverser& t) {
 		auto l = sbf_eval_node(o[0]), r = sbf_eval_node(o[1]);
 		switch (nt) {
 		case type::disjunction:
-			// BOOST_LOG_TRIVIAL(trace)
-			// 	<< l << " | " << r << " -> " << (l | r);
+			// LOG_TRACE << l << " | " << r << " -> " << (l | r);
 			return l | r;
 		case type::exclusive_disjunction:
-			// BOOST_LOG_TRIVIAL(trace)
-			// 	<< l << " ^ " << r << " -> " << (l ^ r);
+			// LOG_TRACE << l << " ^ " << r << " -> " << (l ^ r);
 			return l ^ r;
 		case type::conjunction:
 		case type::conjunction_nosep:
-			// BOOST_LOG_TRIVIAL(trace)
-			// 	<< l << " & " << r << " -> " << (l & r);
+			// LOG_TRACE << l << " & " << r << " -> " << (l & r);
 			return l & r;
 		default: return bdd_handle<Bool>::hfalse;
 		}
@@ -66,7 +63,7 @@ std::optional<std::variant<BAs...>> sbf_ba_factory<BAs...>::parse(
 	if (!result.found) {
 		auto msg = result.parse_error
 			.to_str(sbf_parser::error::info_lvl::INFO_BASIC);
-		BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
+		LOG_ERROR << msg << "\n";
 		return {}; // Syntax error
 	}
 	auto t = sbf_parser::tree::traverser(result.get_shaped_tree2())

@@ -6,6 +6,9 @@
 #include "tau_tree.h"
 #include "splitter_types.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "nso_ba"
+
 namespace idni::tau_lang {
 
 /**

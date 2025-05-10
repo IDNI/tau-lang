@@ -19,7 +19,7 @@ void repl_evaluator<BAs...>::not_implemented_yet() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::invalid_argument() const {
-	BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+	LOG_ERROR << "Invalid argument\n";
 	return nullptr;
 }
 
@@ -37,9 +37,9 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 	auto mem_id = n | mem_type | tau::history_id;
 	size_t idx = 0;
 	if (mem_id) idx = mem_id | tt::num;
-	// BOOST_LOG_TRIVIAL(trace) << "get_history_index idx: " << idx
+	// LOG_TRACE << "get_history_index idx: " << idx
 	// 	<< "       relative? " << is_relative << "    "
-	// 	<< TAU_DUMP_TO_STR(n.value());
+	// 	<< TAU_TO_STR(n.value());
 	if ((is_relative && idx >= size)
 		|| (!is_relative && (idx == 0 || idx > size)))
 	{
@@ -51,7 +51,7 @@ std::optional<size_t> repl_evaluator<BAs...>::get_history_index(
 		}
 		return {};
 	}
-	// BOOST_LOG_TRIVIAL(trace) << "get_history_index result: "
+	// LOG_TRACE << "get_history_index result: "
 	// 	<< (is_relative ? size - idx - 1 : idx - 1);
 	return { is_relative ? size - idx - 1 : idx - 1 };
 }
@@ -63,7 +63,7 @@ repl_evaluator<BAs...>::history_ref repl_evaluator<BAs...>::history_retrieve(
 {
 	if (auto pos = get_history_index(n, H.size(), silent); pos.has_value())
 		return { { H[pos.value()], pos.value() } };
-	BOOST_LOG_TRIVIAL(error) << "(Error) history location does not exist\n";
+	LOG_ERROR << "History location does not exist\n";
 	return {};
 }
 
@@ -152,20 +152,18 @@ requires BAsPack<BAs...>
 tref repl_evaluator<BAs...>::get_(typename node::type nt, tref n,
 	bool suppress_error) const
 {
-	// BOOST_LOG_TRIVIAL(trace) << "get_/n: " <<
-	// 	node::name(nt) << "        " << TAU_DUMP_TO_STR(n);
+	// LOG_TRACE << "get_/n: " << node::name(nt) << "        " << TAU_DUMP_TO_STR(n);
 	if (tau::get(n).is(nt)) return n;
 	else if (tau::get(n).is(tau::history)) {
 		if (auto check = history_retrieve(n); check) {
 			const auto& h = check.value().first;
 			if (tau::get(h).is(nt)) return h->get();
-			else if (!suppress_error) BOOST_LOG_TRIVIAL(error)
-				<< "(Error) argument has wrong type";
+			else if (!suppress_error)
+				LOG_ERROR << "Argument has a wrong type";
 			return nullptr;
 		}
 	}
-	if (!suppress_error) BOOST_LOG_TRIVIAL(error)
-		<< "(Error) argument has wrong type";
+	if (!suppress_error) LOG_ERROR << "Argument has a wrong type";
 	return nullptr;
 }
 
@@ -308,9 +306,9 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	tref arg1 = n | tt::second | tt::ref;
 	tref arg2 = n | tt::third  | tt::ref;
 	tref arg3 = n | tt::fourth | tt::ref;
-	// BOOST_LOG_TRIVIAL(trace) << "subst_cmd arg1: " << TAU_DUMP_TO_STR(arg1);
-	// BOOST_LOG_TRIVIAL(trace) << "subst_cmd arg2: " << TAU_DUMP_TO_STR(arg2);
-	// BOOST_LOG_TRIVIAL(trace) << "subst_cmd arg3: " << TAU_DUMP_TO_STR(arg3);
+	// LOG_TRACE << "subst_cmd arg1: " << TAU_DUMP_TO_STR(arg1);
+	// LOG_TRACE << "subst_cmd arg2: " << TAU_DUMP_TO_STR(arg2);
+	// LOG_TRACE << "subst_cmd arg3: " << TAU_DUMP_TO_STR(arg3);
 	// Since the history command cannot be type-checked we do it here
 	// First try to get bf
 	tref in = get_bf(arg1, true);
@@ -327,7 +325,7 @@ tref repl_evaluator<BAs...>::subst_cmd(const tt& n) {
 	else thiz = get_wff(arg2), with = get_wff(arg3);
 	// Check for correct argument types
 	if (!thiz || !in || !with) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument\n";
+		LOG_ERROR << "Invalid argument\n";
 		return nullptr;
 	}
 	typename tau::subtree_map changes = { { thiz, with } };
@@ -459,7 +457,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// as we would get a formula in dnf already. However, we would need to
 	// kept the application of definitionsand call the computation of phi/chi infinity
 	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(debug) << "run_cmd/applied: " << TAU_TO_STR(applied) << "\n";
+	LOG_DEBUG << "run_cmd/applied: " << TAU_TO_STR(applied) << "\n";
 	#endif // DEBUG
 
 	// -------------------------------------------------------------
@@ -503,8 +501,9 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 		}
 
 		if (has_real_free_vars) {
-			BOOST_LOG_TRIVIAL(error)
-				<< "(Error) The following variable(s) must be quantified and cannot appear free: " << ss.str() << "\n";
+			LOG_ERROR << "The following variable(s) must be "
+				<< "quantified and cannot appear free: "
+				<< ss.str() << "\n";
 			return;
 		}
 	}
@@ -555,8 +554,8 @@ template <NodeType node>
 size_t get_solver_cmd_type(tref n) {
 	size_t type = get_ba_type<node>(n);
 	return type > 0 ? type
-		: node::ba_types_t::type_id(node::nso_factory_t::instance()
-			.default_type());
+		: get_ba_type_id<node>(
+			node::nso_factory::instance().default_type());
 }
 
 template <NodeType node>
@@ -567,13 +566,13 @@ void print_solver_cmd_solution(std::optional<solution<node>>& solution,
 	using tt = tau::traverser;
 	auto print_zero_case = [&options](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory_t::instance().zero(options.type)
+			<< node::nso_factory::instance().zero(options.type)
 			<< "}:" << options.type << "\n";
 	};
 
 	auto print_one_case = [&options](tref var) {
 		std::cout << "\t" << TAU_TO_STR(var) << " := {"
-			<< node::nso_factory_t::instance().one(options.type)
+			<< node::nso_factory::instance().one(options.type)
 			<< "}:" << options.type << "\n";
 	};
 
@@ -604,16 +603,16 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 	// getting the type
 	size_t type = get_solver_cmd_type<node>(n.value());
 	if (type == 0) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid type\n";
+		LOG_ERROR << "Invalid type\n";
 		return;
 	}
 
 	// setting solver options
 	solver_options options = {
-		.splitter_one = node::nso_factory_t::instance()
-			.splitter_one(node::ba_types_t::type_name(type)),
+		.splitter_one = node::nso_factory::instance()
+			.splitter_one(get_ba_type_name<node>(type)),
 		.mode = get_solver_cmd_mode<node>(n.value()),
-		.type = node::ba_types_t::type_name(type)
+		.type = get_ba_type_name<node>(type)
 	};
 
 	tref arg = n.value_tree().first();
@@ -621,12 +620,12 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		arg = tau::get(arg).right_sibling();
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	if (!applied) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s)\n";
+		LOG_ERROR << "Invalid argument(s)\n";
 		return;
 	}
 
 	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace) << "solve_cmd/applied: " << applied << "\n";
+	LOG_TRACE << "solve_cmd/applied: " << applied << "\n";
 	#endif // DEBUG
 
 	auto solution = solve<node>(applied, options);
@@ -641,7 +640,7 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	// getting the type
 	size_t type = get_solver_cmd_type<node>(n.value());
 	if (type == 0) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid type\n";
+		LOG_ERROR << "Invalid type\n";
 		return;
 	}
 
@@ -651,16 +650,16 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 	tref applied = apply_rr_to_nso_rr_with_defs(arg);
 	tref equality = tt(applied) | tau::bf_eq | tt::ref;
 	if (!applied || !equality) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) invalid argument(s)\n";
+		LOG_ERROR << "Invalid argument(s)\n";
 		return;
 	}
 
 	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/applied: " << TAU_DUMP_TO_STR(applied) << "\n";
+	LOG_TRACE << "lgrs_cmd/applied: " << TAU_TO_STR(applied) << "\n";
 	#endif // DEBUG
 
 	#ifdef DEBUG
-	BOOST_LOG_TRIVIAL(trace) << "lgrs_cmd/equality: " << TAU_DUMP_TO_STR(equality) << "\n";
+	LOG_TRACE << "lgrs_cmd/equality: " << TAU_TO_STR(equality) << "\n";
 	#endif // DEBUG
 
 	auto solution = lgrs<node>(applied);
@@ -714,24 +713,24 @@ void repl_evaluator<BAs...>::def_rr_cmd(const tt& n) {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_list_cmd() {
-	if (definitions.size() == 0) std::cout << "definitions: empty\n";
-	else std::cout << "definitions:\n";
+	if (definitions.size() == 0) std::cout << "Definitions: empty\n";
+	else std::cout << "Definitions:\n";
 	for (size_t i = 0; i < definitions.size(); i++)
 		std::cout << "    [" << i + 1 << "] "
 			<< to_str<node>(definitions[i]) << "\n";
 	if (inputs.size() == 0 && outputs.size() == 0)
-		std::cout << "io variables: empty\n";
-	else std::cout << "io variables:\n";
+		std::cout << "IO variables: empty\n";
+	else std::cout << "IO variables:\n";
 	for (auto& [var_sid, desc] : inputs) {
 		auto file = desc.second == 0 ? "console"
 			: "ifile(\"" + string_from_id(desc.second) + "\")";
-		std::cout << "\t" << node::ba_types_t::type_name(desc.first) << " "
+		std::cout << "\t" << get_ba_type_name<node>(desc.first) << " "
 				<< string_from_id(var_sid) << " = " << file << "\n";
 	}
 	for (auto& [var_sid, desc] : outputs) {
 		auto file = desc.second == 0 ? "console"
 			: "ofile(\"" + string_from_id(desc.second) + "\")";
-		std::cout << "\t" << node::ba_types_t::type_name(desc.first) << " "
+		std::cout << "\t" << get_ba_type_name<node>(desc.first) << " "
 				<< string_from_id(var_sid) << " = " << file << "\n";
 	}
 }
@@ -739,7 +738,7 @@ void repl_evaluator<BAs...>::def_list_cmd() {
 template <typename... BAs>
 requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
-	if (definitions.size() == 0) std::cout << "definitions: empty\n";
+	if (definitions.size() == 0) std::cout << "Definitions: empty\n";
 	auto num = command | tau::num;
 	if (!num) return;
 	auto i = num | tt::num;
@@ -747,8 +746,7 @@ void repl_evaluator<BAs...>::def_print_cmd(const tt& command) {
 		print<node>(std::cout, definitions[i-1]) << "\n";
 		return;
 	}
-	BOOST_LOG_TRIVIAL(error)
-		<< "(Error) definition [" << i << "] does not exist\n";
+	LOG_ERROR << "Definition [" << i << "] does not exist\n";
 	return;
 }
 
@@ -763,15 +761,15 @@ void repl_evaluator<BAs...>::def_input_cmd(const tt& command) {
 			| tt::string; !file_name.empty()) fn = file_name;
 	else fn = ""; // default input (std::cin)
 
-	for (auto& t : node::nso_factory_t::instance().types()) {
+	for (auto& t : node::nso_factory::instance().types()) {
 		if (type_name == t) {
 			size_t var_sid = command | tau::var_name | tt::data;
-			inputs[var_sid] = { node::ba_types_t::type_id(t),
-								string_id(fn) };
+			inputs[var_sid] = {
+				get_ba_type_id<node>(t), string_id(fn) };
 			return;
 		}
 	}
-	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
+	LOG_ERROR << "Invalid type " << type_name << "\n";
 }
 
 template <typename... BAs>
@@ -785,15 +783,15 @@ void repl_evaluator<BAs...>::def_output_cmd(const tt& command) {
 			| tt::string; !file_name.empty()) fn = file_name;
 	else fn = ""; // default output (std::cout)
 
-	for (auto& t : node::nso_factory_t::instance().types()) {
+	for (auto& t : node::nso_factory::instance().types()) {
 		if (type_name == t) {
 			size_t var_sid = command | tau::var_name | tt::data;
-			outputs[var_sid] = { node::ba_types_t::type_id(t),
-								string_id(fn) };
+			outputs[var_sid] = {
+				get_ba_type_id<node>(t), string_id(fn) };
 			return;
 		}
 	}
-	BOOST_LOG_TRIVIAL(error) << "(Error) invalid type " << type_name << "\n";
+	LOG_ERROR << "Invalid type " << type_name << "\n";
 }
 
 // make a nso_rr from the given tau source and binder.
@@ -815,7 +813,7 @@ tref repl_evaluator<BAs...>::make_cli(const std::string& src) {
 		if (opt.error_quits
 			|| msg.find("Syntax Error: Unexpected end")!=0)
 		{
-			BOOST_LOG_TRIVIAL(error) << "(Error) " << msg << "\n";
+			LOG_ERROR << msg << "\n";
 			return fail();
 		}
 		return nullptr; // Unexpected eof, continue with reading input
@@ -840,7 +838,7 @@ inline repl_option get_opt(const std::string& x) {
 		|| x == "indent")            return indenting_opt;
 	if (x == "d" || x == "debug"
 		|| x == "dbg")               return debug_opt;
-	BOOST_LOG_TRIVIAL(error) << "(Error) invalid option: " << x << "\n";
+	LOG_ERROR << "Invalid option: " << x << "\n";
 	return invalid_opt;
 }
 
@@ -854,11 +852,12 @@ repl_option get_opt(const typename tree<node>::traverser& n) {
 inline std::optional<boost::log::trivial::severity_level>
 	str2severity(const std::string& v)
 {
+	// TODO (LOW) should we add also warning? and what about fatal?
 	if (v == "e" || v == "error") return { boost::log::trivial::error };
 	if (v == "d" || v == "debug") return { boost::log::trivial::debug };
 	if (v == "t" || v == "trace") return { boost::log::trivial::trace };
 	if (v == "i" || v == "info")  return { boost::log::trivial::info };
-	BOOST_LOG_TRIVIAL(error) << "(Error) invalid severity value: " << v
+	LOG_ERROR << "Invalid severity value: " << v
 		<< " (only error, info, debug or trace are allowed)\n";
 	return {};
 }
@@ -893,8 +892,7 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 	if (o == invalid_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
-		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) debug option not available in release build\n";
+		LOG_ERROR << "Debug option not available in release build\n";
 		return;
 	}
 #endif
@@ -907,7 +905,7 @@ requires BAsPack<BAs...>
 void repl_evaluator<BAs...>::set_cmd(const tt& n) {
 	repl_option o = get_opt<node>(n);
 	auto ov = n | tau::option_value;
-	if (!ov) {BOOST_LOG_TRIVIAL(error) << "(Error) invalid value\n";return;}
+	if (!ov) { LOG_ERROR << "Invalid value\n"; return; }
 	set_cmd(o, ov | tt::string);
 	get_cmd(n);
 }
@@ -919,8 +917,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
-		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) debug option not available\n";
+		LOG_ERROR << "Debug option not available\n";
 		return;
 	}
 #endif
@@ -929,7 +926,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 			|| v == "y" || v == "yes") opt = true;
 		else if (v == "f" || v == "false" || v == "off" || v == "0"
 			|| v == "n" || v == "no") opt = false;
-		else BOOST_LOG_TRIVIAL(error) << "(Error) invalid bool value\n";
+		else LOG_ERROR << "Invalid value\n";
 		return opt;
 	};
 	static std::map<repl_option, std::function<void()>> setters = {
@@ -951,8 +948,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		auto sev = str2severity(v);
 		if (!sev.has_value()) return;
 		opt.severity = sev.value();
-		boost::log::core::get()->set_filter(
-			boost::log::trivial::severity >= opt.severity);
+		logging::set_filter(opt.severity);
 	} } };
 	setters[o]();
 }
@@ -975,8 +971,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	if (o == invalid_opt || o == none_opt) return;
 #ifndef DEBUG
 	if (o == debug_opt) {
-		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) debug option not available\n";
+		LOG_ERROR << "Debug option not available\n";
 		return;
 	}
 #endif
@@ -989,9 +984,7 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 	case highlighting_opt: update_fn(pretty_printer_highlighting); break;
 	case indenting_opt:    update_fn(pretty_printer_indenting); break;
 	case status_opt:       update_fn(opt.status); break;
-	default: BOOST_LOG_TRIVIAL(error) << "(Error) unknown bool option\n";
-		error = true;
-		return;
+	default: LOG_ERROR << "Invalid option\n", error = true; return;
 	}
 }
 
@@ -1066,8 +1059,8 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 	case tau::qelim_cmd:          result = qelim_cmd(command); break;
 	case tau::comment:            break;
 	// error handling
-	default: error = true;
-		BOOST_LOG_TRIVIAL(error) << "\n (Error) Unknown command";
+	default: error = true; std::cout << std::endl;
+		LOG_ERROR << "Unknown command";
 	}
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
@@ -1082,8 +1075,7 @@ requires BAsPack<BAs...>
 repl_evaluator<BAs...>::repl_evaluator(options opt): opt(opt)
 {
 	TC.set(opt.colors);
-	boost::log::core::get()->set_filter(
-		boost::log::trivial::severity >= opt.severity);
+	logging::set_filter(opt.severity);
 	// Controls how fixpoint information in satisfiability.h should be printed
 	if (!opt.repl_running) use_debug_output_in_sat = true;
 	if (opt.experimental) std::cout << "\n!!! Experimental features "

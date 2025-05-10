@@ -8,19 +8,18 @@ template <typename... BAs>
 requires BAsPack<BAs...>
 tref ba_types_checker_and_propagator<BAs...>::operator()(tref n) {
 	if (disabled) return n;
-	BOOST_LOG_TRIVIAL(trace) << "(T) BA type check and propagate: " << n;
+	LOG_TRACE << "(T) BA type check and propagate: " << TAU_TO_STR(n);
 	ts.clear(), untyped_n = 0;
 	var_scopes_t vsc; size_t tsid = 0;
-	auto x = replace_types_with_scope_ids(n, vsc, 0, tsid);
+	tref x = replace_types_with_scope_ids(n, vsc, 0, tsid);
 	if (x == nullptr) return nullptr;
 
-	BOOST_LOG_TRIVIAL(trace) << "(T) BA type scoped: " << x;
+	LOG_TRACE << "(T) BA type scoped: " << TAU_TO_STR(x);
 
 	static std::string untyped{"???"};
-	for (auto& [k, v] : ts) BOOST_LOG_TRIVIAL(trace)
-			<< "(T) \t" << (v.empty() ? untyped : v)
-			<< " \t ( " << k << ")";
-	BOOST_LOG_TRIVIAL(trace) << "(T) check_and_propagate BA types";
+	for (auto& [k, v] : ts) LOG_TRACE << "(T) \t"
+			<< (v.empty() ? untyped : v)<< " \t ( " << k << ")";
+	LOG_TRACE << "(T) check_and_propagate BA types";
 	auto nn = check_and_propagate(x);
 	if (!nn) return nullptr;
 
@@ -28,20 +27,20 @@ tref ba_types_checker_and_propagator<BAs...>::operator()(tref n) {
 	bool once_more = false;
 	for (auto& [k, v] : ts) if (v.empty()) {
 		ts[k] = dflt;
-		BOOST_LOG_TRIVIAL(trace) << "(T) setting default type: " << dflt
+		LOG_TRACE << "(T) setting default type: " << dflt
 							<< " to " << k;
 		once_more = true;
 	}
 	if (once_more) {
-		BOOST_LOG_TRIVIAL(trace) << "(T) check_and_propagate BA types "
+		LOG_TRACE << "(T) check_and_propagate BA types "
 						"once more with default type";
 		untyped_n = 0;
 		nn = check_and_propagate(x);
 		if (!nn) return nullptr;
 	}
 
-	auto y = replace_scope_ids_with_types(x);
-	BOOST_LOG_TRIVIAL(trace) << "(T) transformed BA types: " << y;
+	tref y = replace_scope_ids_with_types(x);
+	LOG_TRACE << "(T) transformed BA types: " << TAU_TO_STR(y);
 	ts.clear();
 	return y;
 }
@@ -63,7 +62,7 @@ requires BAsPack<BAs...>
 tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 	tref n, var_scopes_t& vsc, size_t csid, size_t& tsid)
 {
-	BOOST_LOG_TRIVIAL(trace)
+	LOG_TRACE
 			<< "(T) replace_types_with_scope_ids: " << n;
 	// ptree(std::cout << "tree: ", n) << "\n";
 	const auto vsid = [this, &vsc](tref var) {
@@ -79,7 +78,7 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 	const auto transform_element = [this, &csid, &tsid, &vsid](
 		tref el, size_t nt)
 	{
-		BOOST_LOG_TRIVIAL(trace) << "(T) transform element: " << el;
+		LOG_TRACE << "(T) transform element: " << el;
 		auto io_var = tt(el) | tau::variable | tau::io_var
 							| tt::only_child;
 		bool is_io_var = io_var.has_value();
@@ -115,14 +114,12 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 			for (const auto& st : nso_factory<BAs...>::instance().types())
 				if (t == st) { found = true; break; }
 			if (!found) {
-				BOOST_LOG_TRIVIAL(error)
-					<< "(Error) Unsupported type: "
-					<< t << "\n";
+				LOG_ERROR << "Unsupported type: " << t << "\n";
 				return nullptr;
 			}
 		}
 		ts[get_var_key_node(r)] = t;
-		BOOST_LOG_TRIVIAL(trace) << "(T) transformed element: " << r;
+		LOG_TRACE << "(T) transformed element: " << r;
 		return r;
 	};
 	const auto transformer =
@@ -130,7 +127,6 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 		(tref el)
 	{
 		const auto& t = tau::get(el);
-		//BOOST_LOG_TRIVIAL(trace)
 		auto nt = t.get_type();
 		switch (nt) {
 		case tau::spec: {
@@ -140,15 +136,14 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 			auto main = tt(el) | tau::main | tt::ref;
 			for (tref r : rrs.values()) {
 				var_scopes_t nvsc;
-				// BOOST_LOG_TRIVIAL(trace)
-				// 	<< "(T) replacing rec_relation";
+				// LOG_TRACE << "(T) replacing rec_relation";
 				auto x = replace_types_with_scope_ids(r,
 							nvsc, csid, ++tsid);
 				if (x == nullptr) return nullptr;
 				rrch.push_back(x);
 			}
 			var_scopes_t nvsc;
-			// BOOST_LOG_TRIVIAL(trace) << "(T) replacing main";
+			// LOG_TRACE << "(T) replacing main";
 			auto x = replace_types_with_scope_ids(
 				main, nvsc, csid, ++tsid);
 			if (x == nullptr) return nullptr;
@@ -175,9 +170,7 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 							vsc, csid, tsid);
 			if (x == nullptr) return nullptr;
 			auto r = tau::get(t.value, { v, x });
-			// BOOST_LOG_TRIVIAL(trace)
-			// 	<< "(T) quant replaced: " << r;
-			// ptree(std::cout << "quant replaced: ", r) << "\n";
+			// LOG_TRACE << "(T) quant replaced: " << r;
 			return r;
 		}
 		case tau::bf_constant:
@@ -187,8 +180,7 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 		return el;
 	};
 	auto r = pre_order<node>(n).apply_until_change(transformer);
-	BOOST_LOG_TRIVIAL(trace)
-			<< "(T) replaced_types_with_scope_ids: " << r;
+	LOG_TRACE << "(T) replaced_types_with_scope_ids: " << r;
 	return r;
 }
 
@@ -220,9 +212,8 @@ tref ba_types_checker_and_propagator<BAs...>::check_and_propagate(tref n) {
 			case tau::wff_ex:
 			case tau::wff_all:
 				// check and propagate q_var sub scope first
-				BOOST_LOG_TRIVIAL(trace)
-					<< "(T) check and propagate "
-					"quantifier subscope: " << el;
+				LOG_TRACE << "(T) check and propagate "
+					<< "quantifier subscope: " << el;
 				check_and_propagate(tau::get(el).second());
 				return false;
 			default: break;
@@ -234,10 +225,10 @@ tref ba_types_checker_and_propagator<BAs...>::check_and_propagate(tref n) {
 	size_t untyped_n0;
 	do {
 		untyped_n0 = untyped_n;
-		// BOOST_LOG_TRIVIAL(trace) << "(T) untyped_n0: " << untyped_n0;
+		// LOG_TRACE << "(T) untyped_n0: " << untyped_n0;
 		pre_order<node>(n).visit(checker_and_propagator);
 		if (err) return nullptr; // type mismatch
-		// BOOST_LOG_TRIVIAL(trace) << "(T) untyped_n: " << untyped_n;
+		// LOG_TRACE << "(T) untyped_n: " << untyped_n;
 	} while (untyped_n0 != untyped_n);
 	return n;
 }
@@ -263,10 +254,8 @@ bool ba_types_checker_and_propagator<BAs...>::propagate(tref n) {
 			auto it = types.begin();
 			types.insert(ts[key]);
 			if (types.size() > 1) { // multiple types found, error
-				BOOST_LOG_TRIVIAL(error)
-					<< "(Error) BA type mismatch: "
-					<< el << " : " << ts[key]
-					<< " is expected to be " << *it;
+				LOG_ERROR << "BA type mismatch: " << el << " : "
+					<< ts[key] <<" is expected to be "<<*it;
 				return false;
 			}
 		}
@@ -276,9 +265,8 @@ bool ba_types_checker_and_propagator<BAs...>::propagate(tref n) {
 		for (auto& el : els) {
 			auto key = get_var_key_node(el);
 			if (ts[key].empty()) {
-				BOOST_LOG_TRIVIAL(trace)
-					<< "(T) propagating type: "
-					<< t << " to " << el;
+				LOG_TRACE << "(T) propagating type: "
+							<< t << " to " << el;
 				ts[key] = t;
 				untyped_n--;
 			}
@@ -297,19 +285,13 @@ tref ba_types_checker_and_propagator<BAs...>::replace_scope_ids_with_types(
 	const auto transformer = [this](const auto& el) {
 		if (is_ba_element(el)) {
 			auto key = get_var_key_node(el);
-			BOOST_LOG_TRIVIAL(trace)
-				<< "(T) transformer of ba_element: "
-				<< el;
-			// ptree(std::cout << "el tree: ", el) << "\n";
-			// BOOST_LOG_TRIVIAL(trace) << "(T) key: " << key;
+			LOG_TRACE << "(T) transformer of ba_element: " << el;
 			for (auto& [k, v] : ts) {
-				BOOST_LOG_TRIVIAL(trace)
-					<< "(T) ident: " << key
+				LOG_TRACE << "(T) ident: " << key
 					<< (key == k ? " == " : " != ")
 					<< k << " : " << v;
 			}
-			BOOST_LOG_TRIVIAL(trace)
-					<< "(T) type: " << ts.at(key);
+			LOG_TRACE << "(T) type: " << ts.at(key);
 			const auto& t = tau::get(el);
 			trefs ch{ t.first() };
 			if (t.is(tau::bf_constant)) ch.push_back(

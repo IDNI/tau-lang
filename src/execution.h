@@ -1,9 +1,14 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+// TODO (MEDIUM) clean execution api code
+
 #ifndef __IDNI__TAU__EXECUTION_H__
 #define __IDNI__TAU__EXECUTION_H__
 
 #include "nso_rr.h"
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "execution"
 
 namespace idni::tau_lang {
 
@@ -11,25 +16,20 @@ namespace idni::tau_lang {
 template <NodeType node>
 struct step {
 
-	step(rewriter::library lib): lib(lib) {}
+	step(rewriter::library lib);
 
-	tref operator()(tref n) const { return nso_rr_apply<node>(lib, n); }
+	tref operator()(tref n) const;
 
 	rewriter::library lib;
 };
 
-template<NodeType node, typename step_t>
+template <NodeType node, typename step_t>
 struct steps {
 
-	steps(std::vector<step_t> libraries) : libraries(libraries) {}
-	steps(step_t library) { libraries.push_back(library); }
+	steps(std::vector<step_t> libraries);
+	steps(step_t library);
 
-	tref operator()(tref n) const {
-		if (libraries.empty()) return n;
-		auto nn = n;
-		for (auto& lib : libraries) nn = lib(nn);
-		return nn;
-	}
+	tref operator()(tref n) const;
 
 	std::vector<step_t> libraries;
 };
@@ -37,21 +37,10 @@ struct steps {
 template <NodeType node, typename step_t>
 struct repeat_each {
 
-	repeat_each(steps<node, step_t> s) : s(s) {}
-	repeat_each(step_t s) : s(steps<node, step_t>(s)) {}
+	repeat_each(steps<node, step_t> s);
+	repeat_each(step_t s);
 
-	tref operator()(tref n) const {
-		auto nn = n;
-		for (auto& l: s.libraries) {
-			std::set<tref> visited;
-			while (true) {
-				nn = l(nn);
-				if (visited.find(nn) != visited.end()) break;
-				visited.insert(nn);
-			}
-		}
-		return nn;
-	}
+	tref operator()(tref n) const;
 
 	steps<node, step_t> s;
 };
@@ -59,20 +48,10 @@ struct repeat_each {
 template <NodeType node, typename step_t>
 struct repeat_all {
 
-	repeat_all(steps<node, step_t> s) : s(s) {}
-	repeat_all(step_t s) : s(steps<node, step_t>(s)) {}
+	repeat_all(steps<node, step_t> s);
+	repeat_all(step_t s);
 
-	tref operator()(tref n) const {
-		auto nn = n;
-		std::set<tref> visited;
-		while (true) {
-			for (auto& l: s.libraries) nn = l(nn);
-			auto nnn = s(nn);
-			if (nnn == nn) break;
-			nn = nnn;
-		}
-		return nn;
-	}
+	tref operator()(tref n) const;
 
 	steps<node, step_t> s;
 };
@@ -80,117 +59,63 @@ struct repeat_all {
 template <NodeType node, typename step_t>
 struct repeat_once {
 
-	repeat_once(steps<node, step_t> s) : s(s) {}
-	repeat_once(step_t s) : s(steps<node, step_t>(s)) {}
+	repeat_once(steps<node, step_t> s);
+	repeat_once(step_t s);
 
-	tref operator()(tref n) const {
-		auto nn = n;
-		for(auto& l: s.libraries) {
-			nn = l(nn);
-		}
-		return nn;
-	}
+	tref operator()(tref n) const;
 
 	steps<node, step_t> s;
 };
 
 template <NodeType node>
-steps<node, step<node>> to_steps(const rewriter::library& l,
-	const rewriter::library& r)
-{
-	auto s = steps<node, step<node>>(step<node>(l));
-	s.libraries.push_back(r);
-	return s;
-}
+steps<node, step<node>> to_steps(
+	const std::initializer_list<rewriter::library>& libs);
 
 template <NodeType node, typename step_t>
 steps<repeat_each<node, step_t>, node> operator|(
-	const repeat_each<node, step_t>& l, const repeat_each<node, step_t>& r)
-{
-	auto s = steps<node, repeat_each<node, step_t>>(l);
-	s.libraries.push_back(r);
-	return s;
-}
+	const repeat_each<node, step_t>& l, const repeat_each<node, step_t>& r);
 
 template <NodeType node, typename step_t>
 steps<repeat_all<node, step_t>, node> operator|(
-	const repeat_all<node, step_t>& l, const repeat_all<node, step_t>& r)
-{
-	auto s = steps<repeat_all<node, step_t>, node>(l);
-	s.libraries.push_back(r);
-	return s;
-}
+	const repeat_all<node, step_t>& l, const repeat_all<node, step_t>& r);
 
 template <NodeType node, typename step_t>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
-	const step_t& l)
-{
-	auto ns = s;
-	ns.libraries.push_back(l);
-	return ns;
-}
+	const step_t& l);
 
 template <NodeType node, typename step_t>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
-	const rewriter::library& l)
-{
-	auto ns = s;
-	ns.libraries.push_back(l);
-	return ns;
-}
+	const rewriter::library& l);
 
 template <NodeType node>
 steps<node, step<node>> operator|(const steps<node, step<node>>& s,
-	const rewriter::library& l)
-{
-	auto ns = s;
-	ns.libraries.push_back(l);
-	return ns;
-}
+	const rewriter::library& l);
 
 template <NodeType node>
 typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n, const rewriter::library& l)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(step<node>(l));
-}
+	const typename tree<node>::traverser& n, const rewriter::library& l);
 
 template <NodeType node, typename step_t>
 typename tree<node>::traverser operator|(
-	const typename tree<node>::traverser& n, const steps<step_t, node>& s)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(s);
-}
+	const typename tree<node>::traverser& n, const steps<step_t, node>& s);
 
 template <NodeType node, typename step_t>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& n,
-	const repeat_once<node, step_t>& r)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(r);
-}
+	const repeat_once<node, step_t>& r);
 
 template <NodeType node, typename step_t>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& n,
-	const repeat_all<node, step_t>& r)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(r);
-}
+	const repeat_all<node, step_t>& r);
 
 template <NodeType node, typename step_t>
 typename tree<node>::traverser operator|(
 	const typename tree<node>::traverser& n,
-	const repeat_each<node, step_t>& r)
-{
-	using tt = typename tree<node>::traverser;
-	return n | tt::f(r);
-}
+	const repeat_each<node, step_t>& r);
 
 } // namespace idni::tau_lang
+
+#include "execution.tmpl.h"
 
 #endif // __IDNI__TAU__EXECUTION_H__

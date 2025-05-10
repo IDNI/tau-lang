@@ -19,9 +19,7 @@ tref get_hook<node>::operator()(const node& v, const tref* ch, size_t len,
 	}
 #ifdef HOOK_LOGGING_ENABLED
 	// log("RESULT", v, ch, len, r);
-	BOOST_LOG_TRIVIAL(trace) << "(H) -- RESULT           "
-				 << TAU_TO_STR(ret) << "\t\t #"
-				 <<TAU_DUMP_TO_STR(ret);
+	LOG_TRACE << "(H) -- RESULT           " << TAU_DUMP_TO_STR(ret);
 #endif // HOOK_LOGGING_ENABLED
 	DBG(auto type = tau::get(ret).get_type();)
 	DBG(assert(type == tau::bf || type == tau::wff || type == tau::shift);)
@@ -48,10 +46,10 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 		ss << "]";
 	}
 	// if (r) ss << " >> " << r;
-	BOOST_LOG_TRIVIAL(trace) << ss.str();
+	LOG_TRACE << ss.str();
 }
 void applied(const std::string& rule) {
-	BOOST_LOG_TRIVIAL(trace) << "(HOOK RULE) applied: " << rule;
+	LOG_TRACE << "(HOOK RULE) applied: " << rule;
 }
 #endif // HOOK_LOGGING_ENABLED
 
@@ -864,7 +862,6 @@ tref get_hook<node>::wff_neq_cte(const node& v, const tref* ch, size_t len, tref
 	if (l.has_value() && (l | tt::ba_constant) == false)
 		return tau::get(tau::_F(), r);
 	else if (l.has_value()) return tau::get(tau::_T(), r);
-	BOOST_LOG_TRIVIAL(trace) << "(W) wff_neq_cte: pass";
 	return tau::get_raw(v, ch, len, r);
 }
 

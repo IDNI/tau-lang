@@ -5,6 +5,9 @@
 
 #include "normalizer.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "satisfiability"
+
 namespace idni::tau_lang {
 
 inline void print_fixpoint_info(const std::string& message,

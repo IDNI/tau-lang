@@ -7,6 +7,7 @@ namespace idni::tau_lang {
 template <NodeType node>
 tref to_mnf(tref fm) {
 	using tau = tree<node>;
+	LOG_TRACE << "(F) to_mnf: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto neq_to_eq = [](tref n) {
 		//$X != 0 ::= !($X = 0)
 		if (is<node>(n, tau::bf_neq)) {
@@ -15,12 +16,15 @@ tref to_mnf(tref fm) {
 		}
 		return n;
 	};
-	return pre_order<node>(fm).apply_unique(neq_to_eq, visit_wff<node>);
+	auto result = pre_order<node>(fm).apply_unique(neq_to_eq, visit_wff<node>);
+	LOG_TRACE << "(F) to_mnf result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
 }
 
 template <NodeType node>
 tref from_mnf_to_nnf(tref fm) {
 	using tau = tree<node>;
+	LOG_TRACE << "(F) from_mnf_to_nnf: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto ne_to_neq = [](tref n) {
 		//!($X = 0) ::= $X != 0
 		const auto& t = tau::get(n);
@@ -32,7 +36,9 @@ tref from_mnf_to_nnf(tref fm) {
 		}
 		return n;
 	};
-	return pre_order<node>(fm).apply_unique(ne_to_neq, visit_wff<node>);
+	auto result = pre_order<node>(fm).apply_unique(ne_to_neq, visit_wff<node>);
+	LOG_TRACE << "(F) from_mnf_to_nnf result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
 }
 
 template <NodeType node>
@@ -40,6 +46,7 @@ tref unsqueeze_wff(const tref& fm) {
 	// $X | $Y = 0 ::= $X = 0 && $Y = 0
 	// $X | $Y != 0 ::= $X != 0 || $Y != 0
 	using tau = tree<node>;
+	LOG_TRACE << "(F) unsqueeze_wff: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::bf_eq)) {
@@ -64,7 +71,9 @@ tref unsqueeze_wff(const tref& fm) {
 		}
 		return n;
 	};
-	return pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	LOG_TRACE << "(F) unsqueeze_wff result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
 }
 
 template <NodeType node>
@@ -72,6 +81,7 @@ tref squeeze_wff(const tref& fm) {
 	//$X = 0 && $Y = 0 ::= $X | $Y = 0
 	// $X != 0 || $Y != 0 ::= $X | $Y != 0
 	using tau = tree<node>;
+	LOG_TRACE << "(F) squeeze_wff: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_and)) {
@@ -92,13 +102,16 @@ tref squeeze_wff(const tref& fm) {
 		}
 		return n;
 	};
-	return post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	tref result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	LOG_TRACE << "(F) squeeze_wff result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
 }
 
 template <NodeType node>
 tref unsqueeze_wff_pos(tref fm) {
 	// $X | $Y = 0 ::= $X = 0 && $Y = 0
 	using tau = tree<node>;
+	LOG_TRACE << "(F) unsqueeze_wff_pos: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::bf_eq)) {
@@ -112,13 +125,16 @@ tref unsqueeze_wff_pos(tref fm) {
 		}
 		return n;
 	};
-	return pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	LOG_TRACE << "(F) unsqueeze_wff_pos result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
 }
 
 template <NodeType node>
 tref squeeze_wff_pos(tref fm) {
 	// $X = 0 && $Y = 0 ::= $X | $Y = 0
 	using tau = tree<node>;
+	LOG_TRACE << "(F) squeeze_wff_pos: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_and)) {
@@ -131,13 +147,16 @@ tref squeeze_wff_pos(tref fm) {
 		}
 		return n;
 	};
-	return post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	LOG_TRACE << "(F) squeeze_wff_pos result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
 }
 
 template <NodeType node>
 tref unsqueeze_wff_neg(tref fm) {
 	// $X | $Y != 0 ::= $X != 0 || $Y != 0
 	using tau = tree<node>;
+	LOG_TRACE << "(F) unsqueeze_wff_neg: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::bf_neq)) {
@@ -151,13 +170,16 @@ tref unsqueeze_wff_neg(tref fm) {
 		}
 		return n;
 	};
-	return pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = pre_order<node>(fm).apply_unique(f, visit_wff<node>);
+	LOG_TRACE << "(F) unsqueeze_wff_neg result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
 }
 
 template <NodeType node>
 tref squeeze_wff_neg(tref fm) {
 	// $X != 0 || $Y != 0 ::= $X | $Y != 0
 	using tau = tree<node>;
+	LOG_TRACE << "(F) squeeze_wff_neg: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto f = [](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_or)) {
@@ -170,11 +192,19 @@ tref squeeze_wff_neg(tref fm) {
 		}
 		return n;
 	};
-	return post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	auto result = post_order<node>(fm).apply_unique(f, visit_wff<node>);
+	LOG_TRACE << "(F) squeeze_wff_neg result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
 }
 
 template <NodeType node>
-tref to_nnf(tref fm) { return push_negation_in<node>(fm); }
+tref to_nnf(tref fm) {
+	using tau = tree<node>;
+	LOG_TRACE << "(F) to_nnf: " << TAU_TO_STR(fm) << "\n";
+	auto result = push_negation_in<node>(fm);
+	LOG_TRACE << "(F) to_nnf result: " << TAU_DUMP_TO_STR(result) << "\n";
+	return result;
+}
 
 template <NodeType node>
 typename tree<node>::traverser operator|(
@@ -188,7 +218,7 @@ typename tree<node>::traverser operator|(
 template <NodeType node>
 tref normalize_ba(tref fm) {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(trace) << "(N) normalize_ba: " << TAU_DUMP_TO_STR(fm) << "\n";
+	LOG_TRACE << "(F) normalize_ba: " << TAU_TO_STR(fm) << "\n";
 	using tau = tree<node>;
 	assert(tau::get(fm).is(tau::bf));
 	auto norm_ba = [&](tref n) {
@@ -202,7 +232,7 @@ tref normalize_ba(tref fm) {
 	};
 	tref r = pre_order<node>(fm).template apply_unique_until_change<
 					MemorySlotPre::normalize_ba_m>(norm_ba);
-	BOOST_LOG_TRIVIAL(trace) << "(N) normalize_ba result: " << TAU_DUMP_TO_STR(r) << "\n";
+	LOG_TRACE << "(F) normalize_ba result: " << TAU_TO_STR(r) << "\n";
 	return r;
 }
 
@@ -227,14 +257,14 @@ typename reduce_deprecated<node,type>::tt
 
 template <NodeType node, node::type type>
 void reduce_deprecated<node, type>::get_literals(tref clause, literals& lits) const {
-	BOOST_LOG_TRIVIAL(trace) << "(I) get_bf_literals of: " << clause;
+	LOG_TRACE << "(I) get_bf_literals of: " << TAU_TO_STR(clause);
 	if constexpr (type == tau::bf) {
 		if (auto check = tt(clause) | tau::bf_and; check.has_value())
 			for (tref c : (check || tau::bf).values())
 				get_literals(c, lits);
 		else {
 			lits.insert(clause);
-			BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << clause;
+			LOG_TRACE << "(I) found literal: " << TAU_TO_STR(clause);
 		}
 	} else {
 		if (auto check = tt(clause) | tau::wff_and; check.has_value())
@@ -242,7 +272,7 @@ void reduce_deprecated<node, type>::get_literals(tref clause, literals& lits) co
 				get_literals(c , lits);
 		else {
 			lits.insert(clause);
-			BOOST_LOG_TRIVIAL(trace) << "(I) found literal: " << clause;
+			LOG_TRACE << "(I) found literal: " << TAU_TO_STR(clause);
 		}
 	}
 }
@@ -267,18 +297,18 @@ std::pair<typename reduce_deprecated<node, type>::literals,
 		if constexpr (type == tau::bf) {
 			if (auto check = tt(l) | tau::bf_neg; !check.has_value()) {
 				positives.insert(l);
-				BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l;
+				LOG_TRACE << "(I) found positive: " << TAU_TO_STR(l);
 			} else {
 				negatives.insert(l);
-				BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l;
+				LOG_TRACE << "(I) found negative: " << TAU_TO_STR(l);
 			}
 		} else {
 			if (auto check = tt(l) | tau::wff_neg; !check.has_value()) {
 				positives.insert(l);
-				BOOST_LOG_TRIVIAL(trace) << "(I) found positive: " << l;
+				LOG_TRACE << "(I) found positive: " << TAU_TO_STR(l);
 			} else {
 				negatives.insert(l);
-				BOOST_LOG_TRIVIAL(trace) << "(I) found negative: " << l;
+				LOG_TRACE << "(I) found negative: " << TAU_TO_STR(l);
 			}
 		}
 	}
@@ -302,8 +332,8 @@ typename reduce_deprecated<node, type>::subtree_set
 		else clauses.insert(n);
 
 	#ifdef DEBUG
-	if (clauses.empty()) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << n << "\n";
-	else for (tref clause : clauses) BOOST_LOG_TRIVIAL(trace) << "(I) found clause: " << clause;
+	if (clauses.empty()) LOG_TRACE << "(I) found clause: " << TAU_TO_STR(n) << "\n";
+	else for (tref clause : clauses) LOG_TRACE << "(I) found clause: " << TAU_TO_STR(clause);
 	#endif // DEBUG
 
 	return clauses;
@@ -313,7 +343,7 @@ template <NodeType node, node::type type>
 tref reduce_deprecated<node, type>::build_dnf_clause_from_literals(
 	const literals& positives, const literals& negatives) const {
 	if (positives.empty() && negatives.empty()) {
-		BOOST_LOG_TRIVIAL(debug) << "(F) {}";
+		LOG_DEBUG << "(F) {}";
 		return nullptr;
 	}
 
@@ -328,7 +358,7 @@ tref reduce_deprecated<node, type>::build_dnf_clause_from_literals(
 			clause = tau::build_bf_and(clause, lits[i]);
 		else clause = tau::build_wff_and(clause, lits[i]);
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) " << clause;
+	LOG_DEBUG << "(I) " << clause;
 	return clause;
 }
 
@@ -340,17 +370,17 @@ tref reduce_deprecated<node, type>::to_minterm(tref clause) const {
 			auto negated =
 				tt(negation) | tau::bf_neg | tau::bf | tt::ref;
 			for (tref positive : positives) {
-				BOOST_LOG_TRIVIAL(trace) << "(I) are literals "
+				LOG_TRACE << "(I) are literals "
 					<< positive << " and "
 					<< negation << " clashing? ";
 				if (tau::get(positive).equals_0()) {
-					BOOST_LOG_TRIVIAL(trace) << "yes\n";
+					LOG_TRACE << "yes\n";
 					return nullptr;
 				} else if (tau::get(positive) == tau::get(negated)) {
-					BOOST_LOG_TRIVIAL(trace) << "yes\n";
+					LOG_TRACE << "yes\n";
 					return nullptr;
 				} else {
-					BOOST_LOG_TRIVIAL(trace) << "no\n";
+					LOG_TRACE << "no\n";
 				}
 			}
 		}
@@ -361,17 +391,17 @@ tref reduce_deprecated<node, type>::to_minterm(tref clause) const {
 			for (tref positive : positives) {
 				auto eq_bf = tt(positive)
 					| tt::first | tau::bf | tt::ref;
-				BOOST_LOG_TRIVIAL(trace) << "(I) are literals "
+				LOG_TRACE << "(I) are literals "
 					<< positive << " and "
 					<< negation << " clashing: ";
 				if (tau::get(eq_bf).equals_F()) {
-					BOOST_LOG_TRIVIAL(trace) << "yes\n";
+					LOG_TRACE << "yes\n";
 					return nullptr;
 				} else if (tau::get(eq_bf) == tau::get(neq_bf)) {
-					BOOST_LOG_TRIVIAL(trace) << "yes\n";
+					LOG_TRACE << "yes\n";
 					return nullptr;
 				} else {
-					BOOST_LOG_TRIVIAL(trace) << "no\n";
+					LOG_TRACE << "no\n";
 				}
 			}
 		}
@@ -383,12 +413,12 @@ template <NodeType node, node::type type>
 tref reduce_deprecated<node, type>::build_dnf_from_clauses(const subtree_set& clauses) const {
 	if constexpr (type == tau::bf) {
 		if (clauses.empty()) {
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << tau::get_0();
+			LOG_DEBUG << "(F) " << tau::get_0();
 			return tau::_0();
 		}
 	} else {
 		if (clauses.empty()) {
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << tau::get_F();
+			LOG_DEBUG << "(F) " << tau::get_F();
 			return tau::_F();
 		}
 	}
@@ -398,19 +428,19 @@ tref reduce_deprecated<node, type>::build_dnf_from_clauses(const subtree_set& cl
 		if constexpr (type == tau::bf) dnf = tau::build_bf_or(dnf, *it);
 		else dnf = tau::build_wff_or(dnf, *it);
 
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << dnf;
+	LOG_DEBUG << "(F) " << dnf;
 	return dnf;
 }
 
 template <NodeType node, node::type type>
 tref reduce_deprecated<node, type>::simplify(tref form) const {
 	subtree_set clauses;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin simplifying of " << form;
+	LOG_DEBUG << "(I) -- Begin simplifying of " << form;
 	for (tref clause : get_dnf_clauses(form))
 		if (tref dnf = to_minterm(clause); dnf)
 			clauses.insert(dnf);
 	tref dnf = build_dnf_from_clauses(clauses);
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End simplifying";
+	LOG_DEBUG << "(I) -- End simplifying";
 	return dnf;
 }
 
@@ -677,14 +707,14 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 	auto& dnf, const auto& is_var, int_t p, bool is_wff)
 {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(trace) << "(A) assign_and_reduce " << (is_wff ? "wff" : "bf") << ": " << TAU_DUMP_TO_STR(fm);
-	// BOOST_LOG_TRIVIAL(trace) << "fm: "; TAU_DUMP(fm);
-	for (auto v : vars) {
-		BOOST_LOG_TRIVIAL(trace) << "v: " << tau::get(v).dump_to_str();
-	}
-	BOOST_LOG_TRIVIAL(trace) << "p: " << p;
+	// LOG_TRACE << "(A) assign_and_reduce " << (is_wff ? "wff" : "bf") << ": " << TAU_DUMP_TO_STR(fm);
+	// // LOG_TRACE << "fm: "; TAU_DUMP(fm);
+	// for (auto v : vars) {
+	// 	LOG_TRACE << "v: " << tau::get(v).dump_to_str();
+	// }
+	// LOG_TRACE << "p: " << p;
 	auto report = [&](bool result) {
-		BOOST_LOG_TRIVIAL(trace) << "(A) assign_and_reduce : "; TAU_PRINT(fm) << " result: " << (result ? "ok" : "nok");
+		// LOG_TRACE << "\t(A) assign_and_reduce : " << TAU_TO_STR(fm) << " result: " << (result ? "ok" : "nok");
 		return result;
 	};
 	// Check if all variables are assigned
@@ -696,17 +726,22 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 			// fm is a Boolean function
 			// Normalize tau subformulas
 			fm_simp = normalize_ba<node>(fm);
+			LOG_TRACE << "\t(A) normalize_ba result: " << TAU_TO_STR(fm_simp);
 			if (tau::get(fm_simp).equals_0()) return report(false);
 			fm_simp = to_dnf<node, false>(fm_simp);
+			LOG_TRACE << "\t(A) to_dnf result: " << TAU_TO_STR(fm_simp);
 			if (tau::get(fm_simp).equals_0()) return report(false);
 			fm_simp = reduce<node>(fm_simp, tau::bf);
+			LOG_TRACE << "\t(A) reduce result: " << TAU_TO_STR(fm_simp);
 			if (tau::get(fm_simp).equals_0()) return report(false);
 		} else {
 			if (tau::get(fm).equals_F()) return report(false);
 			// fm is a Tau formula
 			fm_simp = to_dnf<node, false>(fm);
+			LOG_TRACE << "\t(A) to_dnf result: " << TAU_TO_STR(fm_simp);
 			if (tau::get(fm_simp).equals_F()) return report(false);
 			fm_simp = reduce<node>(fm_simp, tau::wff);
+			LOG_TRACE << "\t(A) reduce result: " << TAU_TO_STR(fm_simp);
 			if (tau::get(fm_simp).equals_F()) return report(false);
 		}
 		if (std::ranges::all_of(i, [](const auto el){return el == 2;})){
@@ -764,11 +799,9 @@ bool assign_and_reduce(tref fm, const trefs& vars, std::vector<int_t>& i,
 template <NodeType node>
 tref bf_boole_normal_form(tref fm, bool make_paths_disjoint) {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(trace)
-		<< "(F) bf_boole_normal_form: " << TAU_TO_STR(fm);
+	LOG_TRACE << "(F) bf_boole_normal_form: " << TAU_TO_STR(fm);
 	static auto trace = [&](tref fm) {
-		BOOST_LOG_TRIVIAL(trace) << "(F) bf_boole_normal_form result: "
-			<< TAU_TO_STR(fm);
+		LOG_TRACE << "(F) bf_boole_normal_form result: " << TAU_TO_STR(fm);
 		return fm;
 	};
 	// Function can only be applied to a BF
@@ -849,14 +882,14 @@ template <NodeType node>
 tref bf_reduce_canonical<node>::operator() (tref fm) const {
 	using tau = tree<node>;
 	const auto& t = tau::get(fm);
-	BOOST_LOG_TRIVIAL(trace) << "bf reduce canonical: " << TAU_TO_STR(fm) << "\n";
+	LOG_TRACE << "bf reduce canonical: " << TAU_TO_STR(fm) << "\n";
 	std::map<tref, tref, typename tau::subtree_equality> changes = {};
 	for (tref bf : t.select_top(is<node, tau::bf>)) {
 		tref dnf = bf_boole_normal_form<node>(bf);
 		if (dnf != bf) changes[bf] = dnf;
 	}
 	tref x = changes.empty()? fm : rewriter::replace<node>(fm, changes);
-	BOOST_LOG_TRIVIAL(trace) << "bf reduce canonical result: " << TAU_TO_STR(x) << "\n";
+	LOG_TRACE << "bf reduce canonical result: " << TAU_TO_STR(x) << "\n";
 	return x;
 }
 
@@ -1059,23 +1092,26 @@ tref sort_var(tref var) {
 		return it->second;
 #endif // TAU_CACHE
 	const auto& t = tau::get(var);
-	BOOST_LOG_TRIVIAL(trace) << "(F) sort var: " << t.to_str();
+	LOG_TRACE << "(F) sort var: " << t.to_str();
 	if (t.child_is(tau::bf_eq)) {
 		trefs clauses = get_dnf_bf_clauses<node>(t[0].first());
-		BOOST_LOG_TRIVIAL(trace) << "is child clauses: " << clauses.size();
+		LOG_TRACE << "is child clauses: " << clauses.size();
 		std::ranges::sort(clauses);
 		tref res = nullptr;
 		for (tref c : clauses) {
-			BOOST_LOG_TRIVIAL(trace) << "(F) c: " << TAU_TO_STR(c);
+			LOG_TRACE << "(F) c: " << TAU_TO_STR(c);
 			trefs lits = get_cnf_bf_clauses<node>(c);
+			for (tref l : lits) {
+				LOG_TRACE << "\t(F) l: " << TAU_DUMP_TO_STR(l);
+			}
 			std::ranges::sort(lits, lex_var_comp<node>);
 			if (res) res = tau::build_bf_or(res,
 					tau::build_bf_and(lits));
 			else res = tau::build_bf_and(lits);
-			BOOST_LOG_TRIVIAL(trace) << "(F) res: " << TAU_TO_STR(res);
+			LOG_TRACE << "(F) res: " << TAU_TO_STR(res);
 		}
 		res = tau::build_bf_eq(res);
-		BOOST_LOG_TRIVIAL(trace) << "(F) res: " << TAU_TO_STR(res);
+		LOG_TRACE << "(F) res: " << TAU_TO_STR(res);
 #ifdef TAU_CACHE
 		cache.emplace(res, res);
 		return cache.emplace(var, res).first->second;
@@ -1090,30 +1126,30 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 	tref fm, size_t type, bool is_cnf, bool all_reductions, bool enable_sort)
 {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(trace) << "(F) dnf_cnf_to_bdd: " << TAU_TREE_TO_STR(fm);
-	BOOST_LOG_TRIVIAL(trace) << "(F) type: " << type << " is_cnf: " << is_cnf << " all_reductions: " << all_reductions << " enable_sort: " << enable_sort;
+	LOG_TRACE << "(F) dnf_cnf_to_bdd: " << TAU_TREE_TO_STR(fm);
+	LOG_TRACE << "(F) type: " << type << " is_cnf: " << is_cnf << " all_reductions: " << all_reductions << " enable_sort: " << enable_sort;
 	DBG(assert(tau::get(fm).is(type));)
 	// Pull negation out of equality
 	bool wff = type == tau::wff;
 	tref new_fm = wff ? to_mnf<node>(fm) : fm;
 	if (wff) {
-		BOOST_LOG_TRIVIAL(trace) << "(F) mnf: " << TAU_TREE_TO_STR(new_fm);
+		LOG_TRACE << "(F) mnf: " << TAU_TREE_TO_STR(new_fm);
 		// Make equalities canonical
 		typename tau::subtree_map changes;
 		trefs eqs = tau::get(new_fm)
 			.select_top(is_child<node, tau::bf_eq>);
 		for (tref eq : eqs) {
 			tref sorted_eq = sort_var<node>(eq);
-			BOOST_LOG_TRIVIAL(trace) << "(F) sorted_eq: " << TAU_TO_STR(sorted_eq);
+			LOG_TRACE << "(F) sorted_eq: " << TAU_TO_STR(sorted_eq);
 			if (tau::get(sorted_eq) != tau::get(eq)) changes.emplace(eq, sorted_eq);
 		}
 		new_fm = rewriter::replace<node>(new_fm, changes);
-		BOOST_LOG_TRIVIAL(trace) << "(F) sorted: " << TAU_TO_STR(new_fm);
+		LOG_TRACE << "(F) sorted: " << TAU_TO_STR(new_fm);
 	}
 
 	trefs vars = wff ? tau::get(new_fm).select_top(is_wff_bdd_var<node>)
 			 : tau::get(new_fm).select_top(is_bf_bdd_var<node>);
-	BOOST_LOG_TRIVIAL(trace) << "vars.size(): " << vars.size();
+	LOG_TRACE << "vars.size(): " << vars.size();
 	if (vars.empty()) {
 		// std::cout << "new_fm: " << new_fm << "\n";
 		//assert(tau::get(new_fm).equals_T() || tau::get(new_fm).equals_F() ||
@@ -1152,7 +1188,7 @@ std::pair<std::vector<std::vector<int_t>>, trefs> dnf_cnf_to_bdd(
 		for (const auto& i : p) ss << i << " ";
 		ss << "\n";
 	}
-	BOOST_LOG_TRIVIAL(trace) << ss.str() << "\n";
+	LOG_TRACE << ss.str() << "\n";
 	return std::make_pair(std::move(paths), std::move(vars));
 }
 
@@ -1165,8 +1201,8 @@ tref group_dnf_expression(tref fm) {
 		if (auto it = cache.find(fm); it != end(cache))
 			return it->second;
 #endif // TAU_CACHE
-	BOOST_LOG_TRIVIAL(debug) << "(I) Begin group_dnf_expression";
-	BOOST_LOG_TRIVIAL(debug) << "(F) Expression to factor: " << TAU_TO_STR(fm);
+	LOG_DEBUG << "(I) Begin group_dnf_expression";
+	LOG_DEBUG << "(F) Expression to factor: " << TAU_TO_STR(fm);
 	auto count_common = [](const auto& v1, const auto& v2) {
 		int_t count = 0;
 		auto it1 = begin(v1);
@@ -1184,7 +1220,7 @@ tref group_dnf_expression(tref fm) {
 	auto clauses = wff ? get_dnf_wff_clauses<node>(fm)
 				: get_dnf_bf_clauses<node>(fm);
 	if (clauses.size() < 2) {
-		BOOST_LOG_TRIVIAL(trace) << "(NF) group_dnf_expression result: " << TAU_TO_STR(fm);
+		LOG_TRACE << "(F) group_dnf_expression result: " << TAU_TO_STR(fm);
 #ifdef TAU_CACHE
 		return cache.emplace(fm, fm).first->second;
 #endif // TAU_CACHE
@@ -1256,8 +1292,8 @@ tref group_dnf_expression(tref fm) {
 		cache.emplace(grouped_fm, grouped_fm);
 		return cache.emplace(fm, grouped_fm).first->second;
 #endif // TAU_CACHE
-	BOOST_LOG_TRIVIAL(debug) << "(I) End group_dnf_expression";
-	BOOST_LOG_TRIVIAL(debug) << "(F) Factored expression: " << grouped_fm;
+	LOG_DEBUG << "(I) End group_dnf_expression";
+	LOG_DEBUG << "(F) Factored expression: " << grouped_fm;
 	return grouped_fm;
 }
 
@@ -1266,7 +1302,7 @@ tref group_dnf_expression(tref fm) {
 template <NodeType node>
 tref simp_general_excluded_middle(tref fm) {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(trace) << "(NF) simp_general_excluded_middle: " << TAU_DUMP_TO_STR(fm) << "\n";
+	LOG_TRACE << "(F) simp_general_excluded_middle: " << TAU_DUMP_TO_STR(fm) << "\n";
 	assert(tau::get(fm).is(tau::bf));
 	bool was_simplified = false;
 	auto grouped = group_dnf_expression<node>(fm);
@@ -1304,7 +1340,7 @@ tref simp_general_excluded_middle(tref fm) {
 	}
 	auto r = was_simplified
 			? to_dnf<node, false>(tau::build_bf_or(clauses)) : fm;
-	BOOST_LOG_TRIVIAL(trace) << "(NF) simp_general_excluded_middle result: " << TAU_TO_STR(r) << "\n";
+	LOG_TRACE << "(F) simp_general_excluded_middle result: " << TAU_TO_STR(r) << "\n";
 	return r;
 }
 
@@ -1324,8 +1360,8 @@ tref reduce(tref fm, size_t type, bool is_cnf,
 		if (auto it = cache.find(std::make_tuple(fm, all_reductions, enable_sort)); it != end(cache))
 			return it->second;
 #endif // TAU_CACHE
-	BOOST_LOG_TRIVIAL(trace) << "(I) Begin reduce with is_cnf set to " << is_cnf;
-	BOOST_LOG_TRIVIAL(trace) << "(F) Formula to reduce: " << TAU_TO_STR(fm);
+	LOG_TRACE << "(I) Begin reduce with is_cnf set to " << is_cnf;
+	LOG_TRACE << "(F) Formula to reduce: " << TAU_TO_STR(fm);
 	auto [paths, vars] = dnf_cnf_to_bdd<node>(fm, type, is_cnf,
 						all_reductions, enable_sort);
 
@@ -1351,8 +1387,8 @@ tref reduce(tref fm, size_t type, bool is_cnf,
 #ifdef TAU_CACHE
 		return cache.emplace(std::make_tuple(fm, all_reductions, enable_sort), reduced_fm).first->second;
 #endif // TAU_CACHE
-	BOOST_LOG_TRIVIAL(trace) << "(I) End reduce";
-	BOOST_LOG_TRIVIAL(trace) << "(F) Reduced formula: " << TAU_TO_STR(reduced_fm);
+	LOG_TRACE << "(I) End reduce";
+	LOG_TRACE << "(F) Reduced formula: " << TAU_TO_STR(reduced_fm);
 	return reduced_fm;
 }
 
@@ -1520,11 +1556,11 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	tref clause = tau::_T();
 	tref pos_bf = tau::_0();
 	tref negs_wff = tau::_T();
-	BOOST_LOG_TRIVIAL(trace) << "(F) pos_bf: " << TAU_TO_STR(pos_bf);
+	LOG_TRACE << "(F) pos_bf: " << TAU_TO_STR(pos_bf);
 	for (size_t p = 0; p < path.size(); ++p) {
 		if (path[p] == 2) continue;
 		const auto& t = tau::get(vars[p]);
-		BOOST_LOG_TRIVIAL(trace) << "(F) vars[p]: " << TAU_TO_STR(vars[p]);
+		LOG_TRACE << "(F) vars[p]: " << TAU_TO_STR(vars[p]);
 		if (t.child_is(tau::bf_eq)) {
 			if (path[p] == -1) {
 				auto vs = simp_general_excluded_middle<node>(
@@ -1541,7 +1577,7 @@ std::pair<std::vector<int_t>, bool> simplify_path(
 	}
 	// Simplify equalities/inequalities
 	// Here new variables can be created
-	BOOST_LOG_TRIVIAL(trace) << "(F) pos_bf: " << TAU_TO_STR(pos_bf);
+	LOG_TRACE << "(F) pos_bf: " << TAU_TO_STR(pos_bf);
 	pos_bf = reduce<node>(pos_bf, tau::bf, false, true, false);
 	pos_bf = simp_general_excluded_middle<node>(pos_bf);
 	// std::cout << "pos_bf after reduce: " << pos_bf << "\n";
@@ -1685,7 +1721,7 @@ template <NodeType node>
 std::pair<tref, bool> group_paths_and_simplify(
 	std::vector<std::vector<int_t>>& paths, const auto& vars)
 {
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start group_paths_and_simplify";
+	LOG_DEBUG << "(I) Start group_paths_and_simplify";
 	using tau = tree<node>;
 	if (paths.empty()) return { tau::_F(), false};
 	if (paths.size() == 1 && paths[0].empty()) return { tau::_T(), false };
@@ -1734,11 +1770,11 @@ std::pair<tref, bool> group_paths_and_simplify(
 	for (size_t i = 0; i < paths.size(); ++i) {
 		// Now add from paths[i] and groups[i]
 		tref neqs = neq_from_path(paths[i]);
-		BOOST_LOG_TRIVIAL(debug) << "(F) neqs: " << TAU_TO_STR(neqs);
+		LOG_DEBUG << "(F) neqs: " << TAU_TO_STR(neqs);
 		for (const auto& path : groups[i])
 			neqs = tau::build_wff_or(neqs, neq_from_path(path));
-		BOOST_LOG_TRIVIAL(debug) << "(F) neqs: " << TAU_TO_STR(neqs);
-		BOOST_LOG_TRIVIAL(debug) << "  groups[" << i << "].size(): " << groups[i].size();
+		LOG_DEBUG << "(F) neqs: " << TAU_TO_STR(neqs);
+		LOG_DEBUG << "  groups[" << i << "].size(): " << groups[i].size();
 		if (!groups[i].empty()) {
 			// simp to cnf
 			neqs = to_cnf<node>(neqs);
@@ -1751,7 +1787,7 @@ std::pair<tref, bool> group_paths_and_simplify(
 		// Simplify bfs and drop !=
 		bool clause_false = false;
 		for (tref neq : neq_clauses) {
-			BOOST_LOG_TRIVIAL(debug) << "(F) neq: " << TAU_TO_STR(neq);
+			LOG_DEBUG << "(F) neq: " << TAU_TO_STR(neq);
 			if (tau::get(neq).equals_T()) continue;
 			neq = reduce<node>(tau::trim2(neq), tau::bf);
 			neq = simp_general_excluded_middle<node>(neq);
@@ -1805,9 +1841,9 @@ std::pair<tref, bool> group_paths_and_simplify(
 	}
 	DBG(assert(result != nullptr);)
 	result = from_mnf_to_nnf<node>(result);
-	BOOST_LOG_TRIVIAL(debug) << "(I) End group_paths_and_simplify";
-	BOOST_LOG_TRIVIAL(debug) << "(F) result: " << TAU_TO_STR(result);
-	BOOST_LOG_TRIVIAL(debug) << "(F) is_simp: " << is_simp;
+	LOG_DEBUG << "(I) End group_paths_and_simplify";
+	LOG_DEBUG << "(F) result: " << TAU_TO_STR(result);
+	LOG_DEBUG << "(F) is_simp: " << is_simp;
 	return { result, is_simp };
 }
 
@@ -1816,8 +1852,8 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 	using tau = tree<node>;
 	// std::cout << "Start reduce_across_bfs\n";
 	// std::cout << "(F) " << fm << "\n";
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start reduce_across_bfs with";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(fm);
+	LOG_DEBUG << "(I) Start reduce_across_bfs with";
+	LOG_DEBUG << "(F) " << TAU_TO_STR(fm);
 
 	auto squeezed_fm = (to_cnf
 			? push_negation_in<node>(tau::build_wff_neg(fm)) : fm);
@@ -1830,7 +1866,7 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 	// We work with unsqueezed equality
 	squeezed_fm  = unsqueeze_wff_pos<node>(squeezed_fm);
 	// std::cout << "squeezed_fm: " << squeezed_fm << "\n";
-	BOOST_LOG_TRIVIAL(debug) << "(I) Formula in DNF: " << TAU_TO_STR(squeezed_fm);
+	LOG_DEBUG << "(I) Formula in DNF: " << TAU_TO_STR(squeezed_fm);
 #ifdef TAU_CACHE
 		static std::map<std::pair<tref, bool>, tref> cache;
 		if (auto it = cache.find(std::make_pair(squeezed_fm, to_cnf)); it != end(cache))
@@ -1842,30 +1878,30 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 	// std::cout << "original vars: " << vars << "\n";
 
 	for (tref v : vars)
-		BOOST_LOG_TRIVIAL(trace) << "(F) v: " << TAU_TO_STR(v);
+		LOG_TRACE << "(F) v: " << TAU_TO_STR(v);
 	std::stringstream ss;
 	for (const auto& p : paths) {
 		ss << "\tpath:\t";
 		for (const auto& i : p) ss << i << " ";
 		ss << "\n";
 	}
-	BOOST_LOG_TRIVIAL(trace) << "(F) paths.size(): " << paths.size();
+	LOG_TRACE << "(F) paths.size(): " << paths.size();
 
 	if (paths.empty()) {
 		tref res = to_cnf ? tau::_T() : tau::_F();
 #ifdef TAU_CACHE
 		return cache.emplace(std::make_pair(squeezed_fm, to_cnf), res).first->second;
 #endif // TAU_CACHE
-		BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(res);
+		LOG_DEBUG << "(I) End reduce_across_bfs";
+		LOG_DEBUG << "(F) " << TAU_TO_STR(res);
 		return res;
 	} else if (paths.size() == 1 && paths[0].empty()) {
 		tref res = to_cnf ? tau::_F() : tau::_T();
 #ifdef TAU_CACHE
 		return cache.emplace(std::make_pair(squeezed_fm, to_cnf), res).first->second;
 #endif // TAU_CACHE
-		BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(res);
+		LOG_DEBUG << "(I) End reduce_across_bfs";
+		LOG_DEBUG << "(F) " << TAU_TO_STR(res);
 		return res;
 	}
 
@@ -1878,7 +1914,7 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 
 	bool has_simp = true;
 	while (has_simp) {
-		BOOST_LOG_TRIVIAL(debug) << "(I) New fix point run";
+		LOG_DEBUG << "(I) New fix point run";
 		has_simp = false;
 		for (int_t i = 0; i < (int_t) paths.size(); ++i) {
 			auto len_vars = vars.size();
@@ -1909,14 +1945,14 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 				// 			tmp2, vars, false,
 				// 			true)<< "\n";
 // #ifdef DEBUG
-// 				BOOST_LOG_TRIVIAL(debug) << "(I) Path simplification happened: ";
+// 				LOG_DEBUG << "(I) Path simplification happened: ";
 // 				std::vector<std::vector<int_t> > tmp1{paths[i]};
 // 				std::vector<std::vector<int_t> > tmp2{simp_path};
-// 				BOOST_LOG_TRIVIAL(debug) << "(F) Current path: " <<
+// 				LOG_DEBUG << "(F) Current path: " <<
 // 						build_reduced_formula<BAs...>(
 // 							tmp1, vars, false,
 // 							true);
-// 				BOOST_LOG_TRIVIAL(debug) << "(F) Simplified path: " <<
+// 				LOG_DEBUG << "(F) Simplified path: " <<
 // 						build_reduced_formula<BAs...>(
 // 							tmp2, vars, false,
 // 							true);
@@ -1929,8 +1965,8 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 					return cache.emplace(
 						make_pair(squeezed_fm, to_cnf), res).first->second;
 #endif // TAU_CACHE
-					BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
-					BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(res);
+					LOG_DEBUG << "(I) End reduce_across_bfs";
+					LOG_DEBUG << "(F) " << TAU_TO_STR(res);
 					return res;
 				}
 				has_simp = true;
@@ -1945,9 +1981,9 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 			group_paths_and_simplify<node>(paths, vars);
 #ifdef DEBUG
 		if (has_further_simp) {
-			BOOST_LOG_TRIVIAL(debug) << "(F) Before factoring simplification: "
+			LOG_DEBUG << "(F) Before factoring simplification: "
 				<< TAU_TO_STR(build_reduced_formula<node>(paths, vars, false, true));
-			BOOST_LOG_TRIVIAL(debug) << "(F) After factoring simplification: " << TAU_TO_STR(simp_fm);
+			LOG_DEBUG << "(F) After factoring simplification: " << TAU_TO_STR(simp_fm);
 		}
 #endif // DEBUG
 		auto further_simp = apply_eqs_across_clauses<node>(simp_fm);
@@ -1961,8 +1997,8 @@ tref reduce_across_bfs(tref fm, bool to_cnf) {
 #ifdef TAU_CACHE
 			return cache.emplace(std::make_pair(squeezed_fm, to_cnf), res).first->second;
 #endif // TAU_CACHE
-			BOOST_LOG_TRIVIAL(debug) << "(I) End reduce_across_bfs";
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(res);
+			LOG_DEBUG << "(I) End reduce_across_bfs";
+			LOG_DEBUG << "(F) " << TAU_TO_STR(res);
 			return res;
 		}
 		auto [simp_paths, simp_vars] = dnf_cnf_to_bdd<node>(
@@ -2120,7 +2156,7 @@ template <NodeType node, bool is_wff>
 tref to_dnf(tref fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	BOOST_LOG_TRIVIAL(trace) << "(NF) to_dnf: " << TAU_DUMP_TO_STR(fm) << "\n";
+	LOG_TRACE << "(F) to_dnf: " << TAU_DUMP_TO_STR(fm) << "\n";
 	auto layer_to_dnf = [](tref n) {
 		const auto& t = tau::get(n);
 		if constexpr (is_wff) if (t.is(tau::wff)) {
@@ -2155,7 +2191,7 @@ tref to_dnf(tref fm) {
 	else r = pre_order<node>(fm)
 		.template apply_unique<MemorySlotPre::to_dnf2_m>(
 					pn, all, layer_to_dnf);
-	BOOST_LOG_TRIVIAL(trace) << "(NF) to_dnf result: " << TAU_DUMP_TO_STR(r) << "\n";
+	LOG_TRACE << "(F) to_dnf result: " << TAU_DUMP_TO_STR(r) << "\n";
 	return r;
 }
 
@@ -2833,13 +2869,16 @@ tref push_universal_quantifier_one(tref fm) {
 template <NodeType node>
 tref squeeze_positives(tref n) {
 	using tau = tree<node>;
-	if (auto positives = tau::get(n).select_top(
-					is<node, tau::bf_eq>);
-		positives.size() > 0)
+	using tt = tau::traverser;
+	LOG_TRACE << "(N) squeeze_positives: " << TAU_DUMP_TO_STR(n) << "\n";
+	if (auto eqs = tau::get(n).select_top(is<node, tau::bf_eq>);
+		eqs.size() > 0)
 	{
-		for (tref p : positives) p = tau::trim(p);
+		trefs positives = tt(eqs) | tt::children | tt::refs;
+		LOG_TRACE << "(N) squeeze_positives result: " << TAU_DUMP_TO_STR(tau::build_bf_or(positives)) << "\n";
 		return tau::build_bf_or(positives);
 	}
+	LOG_TRACE << "(N) squeeze_positives result: nullptr\n";
 	return nullptr;
 }
 
@@ -2933,9 +2972,9 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	// Reductions to prevent blow ups and achieve DNF
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start existential quantifier elimination";
-	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << TAU_TO_STR(tau::trim2(inner_fm));
-	BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << TAU_TO_STR(scoped_fm);
+	LOG_DEBUG << "(I) Start existential quantifier elimination";
+	LOG_DEBUG << "(I) Quantified variable: " << TAU_TO_STR(tau::trim2(inner_fm));
+	LOG_DEBUG << "(F) Quantified formula: " << TAU_TO_STR(scoped_fm);
 	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
 	scoped_fm = reduce_across_bfs<node>(scoped_fm, false);
 
@@ -2998,8 +3037,8 @@ tref eliminate_existential_quantifier(tref inner_fm, tref scoped_fm) {
 	}
 	// Simplify elimination result
 	res = reduce_across_bfs<node>(res, false);
-	BOOST_LOG_TRIVIAL(debug) << "(I) End existential quantifier elimination";
-	BOOST_LOG_TRIVIAL(debug) << "(F)" << res;
+	LOG_DEBUG << "(I) End existential quantifier elimination";
+	LOG_DEBUG << "(F)" << res;
 #ifdef TAU_CACHE
 	return cache.emplace(std::make_pair(inner_fm, scoped_fm), res).first->second;
 #endif // TAU_CACHE
@@ -3010,9 +3049,9 @@ template <NodeType node>
 tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start universal quantifier elimination";
-	BOOST_LOG_TRIVIAL(debug) << "(I) Quantified variable: " << tau::trim2(inner_fm);
-	BOOST_LOG_TRIVIAL(debug) << "(F) Quantified formula: " << scoped_fm;
+	LOG_DEBUG << "(I) Start universal quantifier elimination";
+	LOG_DEBUG << "(I) Quantified variable: " << tau::trim2(inner_fm);
+	LOG_DEBUG << "(F) Quantified formula: " << scoped_fm;
 	// Reductions to prevent blow ups and achieve CNF
 	// scoped_fm = scoped_fm | bf_reduce_canonical<BAs...>();
 	scoped_fm = reduce_across_bfs<node>(scoped_fm, true);
@@ -3080,8 +3119,8 @@ tref eliminate_universal_quantifier(tref inner_fm, tref scoped_fm) {
 	}
 	// Simplify elimination result
 	res = reduce_across_bfs<node>(res, true);
-	BOOST_LOG_TRIVIAL(debug) << "(I) End universal quantifier elimination";
-	BOOST_LOG_TRIVIAL(debug) << "(F)" << res;
+	LOG_DEBUG << "(I) End universal quantifier elimination";
+	LOG_DEBUG << "(F)" << res;
 #ifdef TAU_CACHE
 	return cache.emplace(std::make_pair(inner_fm, scoped_fm), res).first->second;
 #endif // TAU_CACHE
@@ -3097,7 +3136,7 @@ tref eliminate_quantifiers(tref fm) {
 	// been pushed in
 	auto elim_quant = [](tref inner_fm) -> tref {
 		// Find out if current node is a quantifier
-		BOOST_LOG_TRIVIAL(trace) << "(NF) elim_quant inner_fm: " << TAU_DUMP_TO_STR(inner_fm);
+		LOG_TRACE << "(F) elim_quant inner_fm: " << TAU_DUMP_TO_STR(inner_fm);
 		bool is_ex_quant;
 		if (is_child<node>(inner_fm, tau::wff_ex))
 			is_ex_quant = true;
@@ -3109,7 +3148,7 @@ tref eliminate_quantifiers(tref fm) {
 			return tau::get(n) == tau::get(tau::trim2(inner_fm)); };
 		tref scoped_fm = tau::get(inner_fm)[0].second();
 		if (scoped_fm != nullptr)
-			BOOST_LOG_TRIVIAL(trace) << "(NF) elim_quant scoped_fm: " << TAU_DUMP_TO_STR(scoped_fm);
+			LOG_TRACE << "(F) elim_quant scoped_fm: " << TAU_DUMP_TO_STR(scoped_fm);
 		if (!tau::get(scoped_fm).find_top(has_var)) {
 			// If the scoped formula does not contain
 			// the quantified variable, remove the quantifier
@@ -3580,7 +3619,7 @@ tref to_snf_step<node>::squeeze_positives(const literals& positives, const expon
 		first_cte, [&](tref l, tref r) {
 			auto l_cte = get_constant(l), r_cte = get_constant(r);
 			if (l_cte && r_cte)
-				return node::ba_constants_binder_t::instance()
+				return node::ba_constants_binder::instance()
 					.bind(std::visit(_or,
 						l_cte.value(), r_cte.value()),
 						tau::get(l).get_ba_type());
@@ -3801,27 +3840,66 @@ template <NodeType node>
 tref snf_wff(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "(F) to_snf formula: " << TAU_TO_STR(n);
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
 	auto [_, nn] = get_inner_quantified_wff<node>(n);
 	// in the first step we apply compute the SNF of the formula, as a result we get
 	// the formula in SNF with positive equal exponent literals sqeezed.
+	// tref x = tau::build_wff_neg(nn);
+	// x = bf_reduce_canonical<node>()(x);
+	// x = unsqueeze_wff<node>(x);
+
+	// tref y = nso_rr_apply<node>(elim_eqs<node>(),x);
+	// LOG_TRACE << "--------------------------------";
+	// LOG_TRACE << "(F) to_snf elim eqs: " << TAU_TO_STR(y);
+	// y = nso_rr_apply<node>(push_neg_for_snf<node>(),y);
+	// LOG_TRACE << "--------------------------------";
+	// LOG_TRACE << "(F) to_snf push neg for snf: " << TAU_TO_STR(y);
+
+	// x = tt(x) | repeat_all<node, step<node>>(
+	// 		to_steps<node>(elim_eqs<node>(),
+	// 				push_neg_for_snf<node>())) | tt::ref;
+	// LOG_TRACE << "--------------------------------";
+	// LOG_TRACE << "(F) to_snf elim eqs with pushed negation: " << TAU_TO_STR(x);
+
 	tref first_step = tt(tau::build_wff_neg(nn))
 		| bf_reduce_canonical<node>()
 		| tt::f(unsqueeze_wff<node>)
-		| repeat_all<node, step<node>>(
-			to_steps<node>(elim_eqs<node>(),
-					push_neg_for_snf<node>()))
+		| simplify_snf<node>()
 		// TODO (LOW) Lucca thinks that maybe one call is enough
 		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
 		| tt::ref;
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "(F) to_snf first_step result: " << TAU_TO_STR(first_step);
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
 	// in the second step we compute the SNF of the negation of the the result
 	// of the first step in order to squeeze the negative equal exponent literals.
 	// Note that in this case we don't need to unsqueeze the formula.
 	tref second_step = tt(tau::build_wff_neg(first_step))
 		| repeat_all<node, to_snf_step<node>>(to_snf_step<node>())
-		| repeat_all<node, step<node>>(
-			to_steps<node>(elim_eqs<node>(), fix_neg_in_snf<node>()))
+		| simplify_snf<node>()
 		| bf_reduce_canonical<node>()
 		| tt::ref;
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "(F) to_snf second_step result: " << TAU_TO_STR(second_step);
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
+	LOG_TRACE << "--------------------------------";
 	return rewriter::replace<node>(n, nn, second_step);
 }
 

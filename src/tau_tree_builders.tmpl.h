@@ -416,7 +416,7 @@ tref build_bf_t_type(size_t ba_tid) {
 
 template <NodeType node>
 tref build_bf_t_type(const std::string& type) {
-	return build_bf_t_type<node>(node::ba_types_t::type_id(type));
+	return build_bf_t_type<node>(get_ba_type_id<node>(type));
 }
 
 template <NodeType node>
@@ -428,12 +428,12 @@ tref build_bf_f_type(size_t ba_tid) {
 
 template <NodeType node>
 tref build_bf_f_type(const std::string& type) {
-	return build_bf_f_type<node>(node::ba_types_t::type_id(type));
+	return build_bf_f_type<node>(get_ba_type_id<node>(type));
 }
 
 template <NodeType node>
 tref build_ba_constant(typename node::bas_variant v, size_t ba_tid) {
-	return node::ba_constants_binder_t::instance().bind(v, ba_tid);
+	return node::ba_constants_binder::instance().bind(v, ba_tid);
 }
 
 template <NodeType node>
@@ -885,7 +885,7 @@ tref tree<node>::build_bf_t_type(size_t ba_tid) {
 
 template <NodeType node>
 tref tree<node>::build_bf_t_type(const std::string& type) {
-	return tau_lang::build_bf_t_type<node>(node::ba_types_t::type_id(type));
+	return tau_lang::build_bf_t_type<node>(get_ba_type_id<node>(type));
 }
 
 template <NodeType node>
@@ -895,7 +895,7 @@ tref tree<node>::build_bf_f_type(size_t ba_tid) {
 
 template <NodeType node>
 tref tree<node>::build_bf_f_type(const std::string& type) {
-	return tau_lang::build_bf_f_type<node>(node::ba_types_t::type_id(type));
+	return tau_lang::build_bf_f_type<node>(get_ba_type_id<node>(type));
 }
 
 template <NodeType node>

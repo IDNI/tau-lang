@@ -11,67 +11,23 @@
 
 #include "tau_tree.h"
 
-#ifdef TAU_MEASURE
-#include "utility/measure.h"
-#endif // TAU_MEASURE
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "nso_rr"
 
 namespace idni::tau_lang {
 
 // apply one tau rule to the given expression
 // IDEA maybe this could be operator|
 template <NodeType node>
-tref nso_rr_apply(const rewriter::rule& r, const tref& n) {
-	static const auto is_capture = [](const tref& n) {
-		return tree<node>::get(n).is(node::type::capture);
-	};
-
-	#ifdef TAU_CACHE
-	static std::map<std::pair<rewriter::rule, tref>, tref> cache;
-	if (auto it = cache.find({r, n}); it != cache.end()) return it->second;
-	#endif // TAU_CACHE
-
-	#ifdef TAU_MEASURE
-	measures::increase_rule_counter<tau_<BAs...>>(r);
-	#endif // TAU_MEASURE
-
-	try {
-		auto nn = rewriter::apply_rule<node, decltype(is_capture)>(
-							r, n, is_capture);
-
-		#ifdef TAU_MEASURE
-		if (n != nn) measures::increase_rule_hit<tau_<BAs...>>(r);
-		#endif // TAU_MEASURE
-
-		#ifdef TAU_CACHE
-		cache[{r, n}] = nn;
-		#endif // TAU_CACHE
-
-		return nn;
-	} catch (const std::exception& e) {
-		BOOST_LOG_TRIVIAL(warning) << "(Warning) " << e.what();
-		return n;
-	}
-}
+tref nso_rr_apply(const rewriter::rule& r, const tref& n);
 
 // apply the given rules to the given expression
 // IDEA maybe this could be operator|
 template <NodeType node>
-tref nso_rr_apply(const rewriter::rules& rs, tref n) {
-	#ifdef TAU_CACHE
-	static std::map<std::pair<rewriter::rules, tref>, tref> cache;
-	if (auto it = cache.find({rs, n}); it != cache.end()) return it->second;
-	#endif // TAU_CACHE
-
-	if (rs.empty()) return n;
-	tref nn = n;
-	for (auto& r : rs) nn = nso_rr_apply<node>(r, nn);
-
-	#ifdef TAU_CACHE
-	cache[{rs, n}] = nn;
-	#endif // TAU_CACHE
-	return nn;
-}
+tref nso_rr_apply(const rewriter::rules& rs, tref n);
 
 } // namespace idni::tau_lang
+
+#include "nso_rr.tmpl.h"
 
 #endif // __IDNI__TAU__NSO_RR_H__
