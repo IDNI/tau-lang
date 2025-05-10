@@ -39,6 +39,25 @@ std::ostream& ba_types<BAs...>::print_type(std::ostream& os, size_t tid) {
 	return os << type_name(tid);
 }
 
+template <NodeType node>
+size_t get_ba_type_id(size_t ba_type_sid) {
+	return  node::ba_types::type_id(ba_type_sid);
+}
+
+template <NodeType node>
+size_t get_ba_type_id(const std::string& ba_type_name) {
+	return node::ba_types::type_id(ba_type_name);
+}
+
+template <NodeType node>
+std::string get_ba_type_name(size_t ba_type_id) {
+	return node::ba_types::type_name(ba_type_id);
+}
+
+template <NodeType node>
+std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id) {
+	return node::ba_types::print_type(os, ba_type_id);
+}
 
 // -----------------------------------------------------------------------------
 // BA constants

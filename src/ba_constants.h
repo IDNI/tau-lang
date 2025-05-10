@@ -13,8 +13,8 @@ namespace idni::tau_lang {
 template <typename... BAs>
 requires BAsPack<BAs...>
 struct ba_types {
-	// get the constant id from the type name string id
-	static size_t type_id(size_t ba_type);
+	// get the type id from the type name string id
+	static size_t type_id(size_t ba_type_sid);
 
 	// get the type id from the type name
 	static size_t type_id(const std::string& ba_type_name);
@@ -28,6 +28,18 @@ private:
 	inline static std::vector<size_t> types;               // type_sids (index = ba_type id)
 	inline static std::map<size_t, size_t> type_names_map; // type_sid -> ba_type id
 };
+
+template <NodeType node>
+size_t get_ba_type_id(size_t ba_type_sid);
+
+template <NodeType node>
+size_t get_ba_type_id(const std::string& ba_type_name);
+
+template <NodeType node>
+std::string get_ba_type_name(size_t ba_type_id);
+
+template <NodeType node>
+std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id);
 
 // -----------------------------------------------------------------------------
 // BA constants
