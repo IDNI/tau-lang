@@ -67,9 +67,9 @@ requires BAsPack<BAs...>
 std::pair<size_t, size_t> ba_constants<BAs...>::get(
 	const std::variant<BAs...>& b, size_t ba_type)
 {
-	BOOST_LOG_TRIVIAL(trace) << "(BAC) -- ba_constants::get: " << b << " " << ba_type;
+	LOG_TRACE << "(BAC) -- ba_constants::get: " << b << " " << ba_type;
 	size_t constant_id = get(b);
-	BOOST_LOG_TRIVIAL(trace) << "(BAC) -- cid: " << constant_id
+	LOG_TRACE << "(BAC) -- constant_id: " << constant_id
 		<< " ba_type: " << ba_type;
 	return *(ba_type_map.emplace(constant_id, ba_type).first);
 }
@@ -189,7 +189,8 @@ tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
-	BOOST_LOG_TRIVIAL(debug) << "(BACB) -- ba_constants_binder::bind: " << constant << " " << type_name;
+	LOG_DEBUG << "(BACB) -- ba_constants_binder::bind: "
+					<< constant << " " << type_name;
 	return tree<node<BAs...>>::get_ba_constant(
 				ba_constants<BAs...>::get(constant, type_name));
 }
@@ -202,9 +203,8 @@ tref ba_constants_binder<BAs...>::bind(const std::variant<BAs...>& constant,
 {
 	static_assert(sizeof...(BAs) > 0,
 		"Empty template parameter pack not allowed");
-	BOOST_LOG_TRIVIAL(trace) << "(BACB) -- ba_constants_binder::bind: "
-		<< constant << " " << type_id << " "
-		<< ba_types<BAs...>::type_name(type_id);
+	LOG_TRACE << "(BACB) -- ba_constants_binder::bind: " << constant
+		<< " " << type_id << " " << ba_types<BAs...>::type_name(type_id);
 	return tree<node<BAs...>>::get_ba_constant(
 				ba_constants<BAs...>::get(constant, type_id));
 }
@@ -220,7 +220,7 @@ tref ba_constants_binder<BAs...>::operator()(const std::string& src,
 	{
 		tref n = tree<node<BAs...>>::get_ba_constant(it->second);
 		tree<node<BAs...>>::get(n).dump(std::cout << "tr: ") << "\n";
-		BOOST_LOG_TRIVIAL(trace)
+		LOG_TRACE
 			<< "(BACB) -- ba_constants_binder::operator() named binding: `"
 			<< src << "` constant: `" << tree<node<BAs...>>::get(n)
 			<< "` cid: " << it->second.first << " tid: "
@@ -240,7 +240,7 @@ tref ba_constants_binder<BAs...>::operator()(const std::string& src,
 	const auto& t = tree<node<BAs...>>::get(n);
 	size_t cid = t.get_ba_constant_id();
 	size_t tid = ba_constants<BAs...>::type_of(cid);
-	BOOST_LOG_TRIVIAL(trace)
+	LOG_TRACE
 		<< "(BACB) -- ba_constants_binder::operator() factory binding: `"
 		<< src << " constant: `" << t << "`"
 		<< "` cid: " << cid << " tid: " << tid

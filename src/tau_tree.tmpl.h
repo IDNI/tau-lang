@@ -98,6 +98,9 @@ bool has_open_tau_fm_in_constant(tref fm);
 
 #include "hooks.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "tau_tree"
+
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
@@ -133,7 +136,7 @@ htree::sp tree<node>::geth(const tree& n) {
 
 template <NodeType node>
 tref tree<node>::get_raw(const node& v, const tref* ch, size_t len, tref r) {
-	// BOOST_LOG_TRIVIAL(debug) << "get_raw: " << v << " " << len << " r: " << r << "\n";
+	// LOG_DEBUG << "get_raw: " << v << " " << len << " r: " << r << "\n";
 	return base_t::get_raw(v, ch, len, r);
 }
 
@@ -273,7 +276,7 @@ tref tree<node>::get_ba_constant(size_t c) {
 template <NodeType node>
 tref tree<node>::get_ba_constant(size_t c, size_t tid) {
 	auto x = node::ba_constant(c, tid);
-	// BOOST_LOG_TRIVIAL(trace) << "(TREE) -- get_ba_constant: `" << x << "`";
+	// LOG_TRACE << " -- get_ba_constant: `" << x << "`";
 	return get(x);
 }
 
@@ -519,7 +522,7 @@ size_t tree<node>::get_num() const {
 
 template <NodeType node>
 tref tree<node>::get(const node::bas_variant& c, size_t type) {
-	return node::ba_constants_binder_t::instance().bind(c, type);
+	return node::ba_constants_binder::instance().bind(c, type);
 }
 
 template <NodeType node>
@@ -531,7 +534,7 @@ size_t tree<node>::get_ba_constant_id() const {
 template <NodeType node>
 tree<node>::bas_variant tree<node>::get_ba_constant() const {
 	DBG(assert(is_ba_constant());)
-	return ba_constants_t::get(data());
+	return ba_constants::get(data());
 }
 
 template <NodeType node>

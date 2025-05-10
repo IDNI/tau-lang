@@ -7,7 +7,7 @@ auto splitter_one_bdd() {
 	using bnode = idni::tau_lang::node<sbf_ba>;
 	static sbf_ba_factory<sbf_ba> factory;
 	return build_bf_ba_constant<bnode>(factory.splitter_one(),
-					bnode::ba_types_t::type_id("sbf"));
+					get_ba_type_id<bnode>("sbf"));
 }
 
 template <NodeType node>
@@ -265,7 +265,7 @@ TEST_SUITE("minterm_inequality_system_range") {
 TEST_SUITE("configuration") {
 
 	// TEST_CASE("logging") {
-	// 	logging.trace()
+	// 	logging::trace()
 	// }
 
 	TEST_CASE("bdd initialization") {
@@ -564,7 +564,7 @@ TEST_SUITE("solve_system") {
 	}
 
 	// TEST_CASE("trace:on") {
-	// 	logging.trace();
+	// 	logging::trace();
 	// }
 
 	// increasing monotonicity (2)
@@ -619,7 +619,7 @@ TEST_SUITE("solve") {
 
 	bool test_solve_min(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = bnode::nso_factory_t::instance().splitter_one(type),
+			.splitter_one = bnode::nso_factory::instance().splitter_one(type),
 			.mode = solver_mode::minimum
 		};
 		return test_solve(system, options);
@@ -627,7 +627,7 @@ TEST_SUITE("solve") {
 
 	bool test_solve_max(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = bnode::nso_factory_t::instance().splitter_one(type),
+			.splitter_one = bnode::nso_factory::instance().splitter_one(type),
 			.mode = solver_mode::maximum
 		};
 		return test_solve(system, options);
@@ -635,7 +635,7 @@ TEST_SUITE("solve") {
 
 	bool test_solve(const std::string system, const std::string type = "") {
 		solver_options options = {
-			.splitter_one = bnode::nso_factory_t::instance().splitter_one(type),
+			.splitter_one = bnode::nso_factory::instance().splitter_one(type),
 			.mode = solver_mode::general
 		};
 		return test_solve(system, options);

@@ -5,6 +5,9 @@
 
 #include "solver.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "interpreter"
+
 namespace idni::tau_lang {
 
 // represents a solution  of variables to values.
@@ -29,7 +32,7 @@ template <NodeType node>
 struct finputs {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	using bac = node::ba_constants_t;
+	using bac = node::ba_constants;
 
 	finputs() = delete;
 	finputs(typed_io_vars inputs);
@@ -57,7 +60,7 @@ template <NodeType node>
 struct foutputs {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	using bac = node::ba_constants_t;
+	using bac = node::ba_constants;
 
 	foutputs() = delete;
 	foutputs(typed_io_vars outputs);

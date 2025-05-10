@@ -134,8 +134,7 @@ int main(int argc, char* argv[]) {
     }
 
 	// removing output but errors
-	boost::log::core::get()->set_filter(
-		boost::log::trivial::severity >= boost::log::trivial::severity_level::error);
+	logging::set_filter(boost::log::trivial::severity_level::error);
 
 	// exiting after 1 minute
 	std::thread(exit_after_seconds, time_limit).detach();

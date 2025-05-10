@@ -5,7 +5,7 @@
 
 // TEST_SUITE("configuration") {
 // 	TEST_CASE("set trace logging level") {
-// 		logging.trace();
+// 		logging::trace();
 // 	}
 // }
 

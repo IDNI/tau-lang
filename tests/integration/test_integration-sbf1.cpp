@@ -5,7 +5,7 @@
 
 TEST_SUITE("configuration") {
 	TEST_CASE("init trace logging") {
-		logging.trace();
+		logging::trace();
 	}
 	TEST_CASE("init bdd") {
 		bdd_init<Bool>();

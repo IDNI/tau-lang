@@ -11,8 +11,7 @@ inline void print_fixpoint_info(const std::string& message,
 {
 	if (!output) return;
 	if (!use_debug_output_in_sat)
-		BOOST_LOG_TRIVIAL(info) << "\n" << message << "\n"
-					<< result << "\n\n";
+		LOG_INFO << "\n" << message << "\n" << result << "\n\n";
 	else std::cerr << message << "\n" << result << "\n";
 }
 
@@ -304,8 +303,8 @@ bool is_run_satisfiable(tref fm) {
 		io_vars.pop_back();
 	}
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula for sat check";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << sat_fm;
+	LOG_DEBUG << "(I) -- Formula for sat check";
+	LOG_DEBUG << "(F) " << TAU_TO_STR(sat_fm);
 
 	return is_non_temp_nso_satisfiable<node>(sat_fm);
 }
@@ -356,8 +355,8 @@ tref get_uninterpreted_constants_constraints(tref fm, trefs& io_vars) {
 				tau::build_bf_eq(tau::get(tau::bf, uc)));
 	}
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Formula describing constraints on uninterpreted constants";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << uconst_ctns;
+	LOG_DEBUG << "(I) -- Formula describing constraints on uninterpreted constants";
+	LOG_DEBUG << "(F) " << TAU_TO_STR(uconst_ctns);
 
 	return uconst_ctns;
 }
@@ -374,8 +373,8 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 	tref phi = build_step<node>(base_fm, phi_prev, io_vars, initials, step_num,
 							time_point, cache);
 
-	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << phi;
+	LOG_DEBUG << "Continuation at step " << step_num;
+	LOG_DEBUG << "(F) " << TAU_TO_STR(phi);
 
 	int_t lookback = get_max_shift<node>(io_vars);
 	// Find fix point once all initial conditions have been passed and
@@ -387,12 +386,12 @@ std::pair<tref, int_t> find_fixpoint_phi(tref base_fm, tref ctn_initials,
 		phi = build_step<node>(base_fm, phi_prev, io_vars, initials, step_num,
 							time_point, cache);
 
-		BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << phi;
+		LOG_DEBUG << "Continuation at step " << step_num;
+		LOG_DEBUG << "(F) " << TAU_TO_STR(phi);
 	}
-	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
+	LOG_DEBUG << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
-	BOOST_LOG_TRIVIAL(debug) << phi_prev;
+	LOG_DEBUG << phi_prev;
 	return std::make_pair(phi_prev, step_num - 1);
 }
 
@@ -414,8 +413,8 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 	tref chi_replc = rewriter::replace<node>(chi, pholder_to_st);
 	tref chi_prev_replc = rewriter::replace<node>(chi_prev, pholder_to_st);
 
-	BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << rewriter::replace<node>(chi, pholder_to_st);
+	LOG_DEBUG << "Continuation at step " << step_num;
+	LOG_DEBUG << "(F) " << TAU_TO_STR(rewriter::replace<node>(chi, pholder_to_st));
 
 	// Find fix point once the lookback is greater the step_num
 	while (step_num < lookback
@@ -426,13 +425,12 @@ std::pair<tref, int_t> find_fixpoint_chi(tref chi_base, tref st,
 			initials, step_num, time_point, cache, pholder_to_st);
 		chi_replc = rewriter::replace<node>(chi, pholder_to_st);
 
-        BOOST_LOG_TRIVIAL(debug) << "Continuation at step " << step_num;
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << chi_replc;
+		LOG_DEBUG << "Continuation at step " << step_num;
+		LOG_DEBUG << "(F) " << TAU_TO_STR(chi_replc);
 	}
-	BOOST_LOG_TRIVIAL(debug) << "Unbounded continuation of Tau formula "
+	LOG_DEBUG << "Unbounded continuation of Tau formula "
 		"reached fixpoint after " << step_num - 1 << " steps";
-	BOOST_LOG_TRIVIAL(debug) << "(F) "
-		<< normalize_non_temp<node>(chi_prev_replc);
+	LOG_DEBUG << "(F) " << TAU_TO_STR(normalize_non_temp<node>(chi_prev_replc));
 	return { chi_prev_replc, step_num - 1 };
 }
 
@@ -563,10 +561,10 @@ template <NodeType node>
 tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	const bool output)
 {
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin always_to_unbounded_continuation";
-	BOOST_LOG_TRIVIAL(debug) << "Start fm for always_to_unbound: " << fm << "\n";
-
 	using tau = tree<node>;
+	LOG_DEBUG << "(I) -- Begin always_to_unbounded_continuation";
+	LOG_DEBUG << "Start fm for always_to_unbound: " << TAU_TO_STR(fm) << "\n";
+
 	assert(has_no_boolean_combs_of_models<node>(fm));
 	if (tau::get(fm).child_is(tau::wff_always)) fm = tau::trim2(fm);
 
@@ -582,8 +580,8 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		fm = shift_io_vars_in_fm<node>(transformed_fm, io_vars, 1);
 	} else fm = transformed_fm;
 	fm = tau::build_wff_and(fm, flag_rules);
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Removed flags";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << tau::build_wff_and(fm, flag_initials);
+	LOG_DEBUG << "(I) -- Removed flags";
+	LOG_DEBUG << "(F) " << TAU_TO_STR(tau::build_wff_and(fm, flag_initials));
 
 	io_vars = tau::get(tau::build_wff_and(fm, flag_initials))
 			.select_top(is_child<node, tau::io_var>);
@@ -619,7 +617,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 	for (int_t t = s; t < point_after_inits + lookback; ++t) {
 		auto current_step = fm_at_time_point<node>(ubd_ctn, io_vars, t);
 		run = tau::build_wff_and(run, current_step);
-		BOOST_LOG_TRIVIAL(trace) << "aw_ubd/run: " << run << "\n";
+		LOG_TRACE << "aw_ubd/run: " << TAU_TO_STR(run) << "\n";
 		// Check if run is still sat
 		run = normalize_non_temp<node>(run);
 		if (!is_run_satisfiable<node>(run)) {
@@ -639,7 +637,7 @@ tref always_to_unbounded_continuation(tref fm, const int_t start_time,
 		+ std::to_string(steps) + " steps, yielding the result: ",
 		TAU_TO_STR(tau::get(res).child_is(tau::wff_always)
 			? tau::trim2(res) : res), output);
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End always_to_unbounded_continuation";
+	LOG_DEBUG << "(I) -- End always_to_unbounded_continuation";
 	return res;
 }
 
@@ -685,8 +683,8 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 		aw_lookback = get_max_shift<node>(aw_io_vars);
 	}
 
-	BOOST_LOG_TRIVIAL(trace) << "(T) -- transforming eventual variables";
-	BOOST_LOG_TRIVIAL(trace) << fm;
+	LOG_TRACE << "(T) -- transforming eventual variables";
+	LOG_TRACE << TAU_TO_STR(fm);
 	tref ev_assm = tau::_T();
 	tref ev_collection = tau::_0();
 	for (size_t n = 0; n < smt_fms.size(); ++n) {
@@ -752,7 +750,7 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 		ev_assm = tau::build_wff_and(ev_assm,
 				tau::build_wff_and(ctn_initials, ctn_assm));
 
-		BOOST_LOG_TRIVIAL(trace) << "trans_ev/ev_assm: " << ev_assm << "\n";
+		LOG_TRACE << "trans_ev/ev_assm: " << TAU_TO_STR(ev_assm) << "\n";
 
 		ev_collection = tau::build_bf_or(
 			ev_collection, eNt_without_lookback);
@@ -785,8 +783,8 @@ std::pair<tref, int_t> transform_to_eventual_variables(tref fm,
 		else return  { fm, max_st_lookback };
 	}
 
-	BOOST_LOG_TRIVIAL(trace) << "(T) -- transformed eventual variables";
-	BOOST_LOG_TRIVIAL(trace) << res;
+	LOG_TRACE << "(T) -- transformed eventual variables";
+	LOG_TRACE << TAU_TO_STR(res);
 	return { res, max_st_lookback };
 }
 
@@ -835,7 +833,7 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	tref ev_var_flags, tref original_aw, const int_t start_time,
 	const int_t max_st_lookback, const bool output)
 {
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin to_unbounded_continuation";
+	LOG_DEBUG << "(I) -- Begin to_unbounded_continuation";
 
 	using tau = tree<node>;
 	DBG(assert(has_no_boolean_combs_of_models<node>(ubd_aw_continuation));)
@@ -884,8 +882,8 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		auto normed_run = normalize_non_temp<node>(
 					tau::build_wff_and(run, current_flag));
 		if (is_run_satisfiable<node>(normed_run)) {
-			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
+			LOG_DEBUG << "Flag raised at time point " << i - time_point;
+			LOG_DEBUG << "(F) " << TAU_TO_STR(normed_run);
 			tref res = tau::build_wff_and(normed_run, ori_aw_ctn);
 			print_fixpoint_info(
 				"Temporal normalization of Tau specification did not rely on fixpoint finding, yielding the result: ",
@@ -909,14 +907,14 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 				get_io_time_point<node>(io_vars[i]));
 
 	// Calculate fix point and get unbound continuation
-	BOOST_LOG_TRIVIAL(trace) << "chi base: " << tau::build_wff_and(aw, st_flags);
+	LOG_TRACE << "chi base: " << TAU_TO_STR(tau::build_wff_and(aw, st_flags));
 
 	// Find fixpoint of chi after highest initial condition
 	auto [chi_inf, steps] = find_fixpoint_chi<node>(aw, st_flags, io_vars,
 		initials, time_point + point_after_inits);
 	chi_inf = normalize_non_temp<node>(chi_inf);
 
-	// BOOST_LOG_TRIVIAL(trace) << "Fixpoint chi after normalize: " << chi_inf;
+	// LOG_TRACE << "Fixpoint chi after normalize: " << chi_inf;
 	if (tau::get(chi_inf).equals_F()) {
 		print_fixpoint_info(
 			"Temporal normalization of Tau specification reached fixpoint after "
@@ -931,8 +929,8 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 	auto chi_inf_anchored = fm_at_time_point<node>(chi_inf, io_vars,
 				std::max(point_after_inits, time_point));
 
-	BOOST_LOG_TRIVIAL(trace) << "Fm to check sat:";
-	BOOST_LOG_TRIVIAL(trace) << "(F) " << tau::build_wff_and(run, chi_inf_anchored);
+	LOG_TRACE << "Fm to check sat:";
+	LOG_TRACE << "(F) " << TAU_TO_STR(tau::build_wff_and(run, chi_inf_anchored));
 	if (!is_run_satisfiable<node>(tau::build_wff_and(run, chi_inf_anchored))) {
 		print_fixpoint_info(
 			"Temporal normalization of Tau specification reached fixpoint after "
@@ -953,8 +951,8 @@ tref to_unbounded_continuation(tref ubd_aw_continuation,
 		// The formula is guaranteed to have be sat at some point
 		// Therefore, the loop will exit eventually
 		if (is_run_satisfiable<node>(normed_run)) {
-			BOOST_LOG_TRIVIAL(debug) << "Flag raised at time point " << i - time_point;
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << normed_run;
+			LOG_DEBUG << "Flag raised at time point " << i - time_point;
+			LOG_DEBUG << "(F) " << TAU_TO_STR(normed_run);
 			tref res = tau::build_wff_and(normed_run, ori_aw_ctn);
 			print_fixpoint_info(
 				"Temporal normalization of Tau specification reached fixpoint after "
@@ -983,8 +981,8 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 		return tau::get(f)
 			.child_is(tau::wff_always) ? tau::trim2(f) : f;
 	};
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start transform_to_execution";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(fm);
+	LOG_DEBUG << "(I) Start transform_to_execution";
+	LOG_DEBUG << "(F) " << TAU_TO_STR(fm);
 
 	tref aw_fm = tau::get(fm).find_top(is_child<node, tau::wff_always>);
 	std::pair<tref, int_t> ev_t;
@@ -1036,7 +1034,7 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 				aw_after_ev, st[0], ubd_aw_fm, start_time,
 				ev_t.second, output));
 	else res = aw_after_ev;
-	BOOST_LOG_TRIVIAL(debug) << "(I) End transform_to_execution";
+	LOG_DEBUG << "(I) End transform_to_execution";
 	res = elim_aw(res);
 #ifdef TAU_CACHE
 	cache.emplace(std::make_pair(res, start_time), res);
@@ -1048,19 +1046,19 @@ tref transform_to_execution(tref fm, const int_t start_time, const bool output){
 template <NodeType node>
 bool is_tau_formula_sat(tref fm, const int_t start_time, const bool output) {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start is_tau_formula_sat";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << TAU_TO_STR(fm);
+	LOG_DEBUG << "(I) Start is_tau_formula_sat";
+	LOG_DEBUG << "(F) " << TAU_TO_STR(fm);
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
 	trefs clauses = get_leaves<node>(normalized_fm, tau::wff_or);
 	// Convert each disjunct to unbounded continuation
 	for (tref clause : clauses) {
 		if (!tau::get(transform_to_execution<node>(
 			clause, start_time, output)).equals_F()) {
-			BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
+			LOG_DEBUG << "(I) End is_tau_formula_sat";
 			return true;
 		}
 	}
-	BOOST_LOG_TRIVIAL(debug) << "(I) End is_tau_formula_sat";
+	LOG_DEBUG << "(I) End is_tau_formula_sat";
 	return false;
 }
 
@@ -1102,8 +1100,8 @@ bool are_tau_equivalent(tref f1, tref f2) {
 template <NodeType node>
 tref simp_tau_unsat_valid(tref fm, const int_t start_time, const bool output) {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start simp_tau_unsat_valid";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << fm;
+	LOG_DEBUG << "(I) Start simp_tau_unsat_valid";
+	LOG_DEBUG << "(F) " << TAU_TO_STR(fm);
 	// Check if formula is valid
 	if (is_tau_impl<node>(tau::_T(), fm)) return tau::_T();
 	tref normalized_fm = normalize_with_temp_simp<node>(fm);
@@ -1113,7 +1111,7 @@ tref simp_tau_unsat_valid(tref fm, const int_t start_time, const bool output) {
 	for (tref clause: clauses) if (tau::get(transform_to_execution<node>(
 		clause, start_time, output)).equals_F()) clause =tau::_F();
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) End simp_tau_unsat_valid";
+	LOG_DEBUG << "(I) End simp_tau_unsat_valid";
 	return tau::build_wff_or(clauses);
 }
 

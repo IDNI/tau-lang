@@ -3,6 +3,9 @@
 #include "tau_tree.h"
 #include "utils.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "tau_tree_printers"
+
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
@@ -32,7 +35,7 @@ std::ostream& operator<<(std::ostream& os, const node<BAs...>& n) {
 	if (n.nt == tau::integer) os << " { " << n.as_int() << " }";
 	else if (n.nt == tau::bf_constant)
 		os << " { " << ba_constants<BAs...>::get(n.data) << " } : "
-		<< node<BAs...>::ba_types_t::type_name(n.ba);
+		<< get_ba_type_name<node<BAs...>>(n.ba);
 	else if (tau::is_digital_nt(n.nt)) os << " { " << n.data << " }";
 	else if (n.nt == tau::uconst_name) os << "<" << string_from_id(n.data) << ">";
 	else if (tau::is_string_nt(n.nt))
@@ -151,13 +154,16 @@ const tree<node>& tree<node>::dump(bool subtree) const {
 template <NodeType node>
 std::ostream& tree<node>::dump(std::ostream& os, tref n, bool subtree) {
 	const auto& t = get(n);
-	if (bool print_lcrs_pointers = false; print_lcrs_pointers) {
-		os << t.value << " [" << n ;
+	t.print(os) << " \t\t " << t.value;
+	if (bool print_lcrs_pointers = false;
+		print_lcrs_pointers)
+	{
+		os << " [" << n ;
 		if (t.has_right_sibling()) os << " >> " << t.right_sibling();
 		if (t.has_child())         os << " __ " << t.left_child();
 		os << "] ";
 	}
-	if (subtree) t.print_in_line(os);
+	if (subtree) t.print_in_line(os << " \t#\t");
 	return os;
 }
 
@@ -373,7 +379,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case constraint:
 			case offsets:           os << "["; break;
 			case bf_splitter:       os << "S("; break;
-			case bf_constant:	ba_constants_t::print(os,
+			case bf_constant:	ba_constants::print(os,
 							t.get_ba_constant_id());
 						break;
 			case wff: if (parent && last_quant_nt != start) {

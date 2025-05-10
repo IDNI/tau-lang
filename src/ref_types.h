@@ -5,6 +5,9 @@
 
 #include "tau_tree.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ref_types"
+
 namespace idni::tau_lang {
 
 // manages information about refs resolved/unresolved types and fp calls

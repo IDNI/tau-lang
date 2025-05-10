@@ -108,7 +108,7 @@ std::pair<rr_sig, std::vector<offset_t>> get_ref_info(tref ref) {
 	//ptree<BAs...>(std::cout << "ref? ", ref) << "\n";
 	std::pair<rr_sig, std::vector<offset_t>> ret{ get_rr_sig<node>(ref), {} };
 	auto offsets = tt(ref) | tau::offsets || tau::offset;
-	//BOOST_LOG_TRIVIAL(debug) << "(T) -- get_ref " << ref << " " << ret.first << " offsets.size: " << offsets.size();
+	//LOG_DEBUG << "(T) -- get_ref " << ref << " " << ret.first << " offsets.size: " << offsets.size();
 	for (auto offset : offsets()) {
 		auto t = offset | tt::only_child | tt::Tree;
 		size_t nt = t.get_type();
@@ -187,9 +187,9 @@ bool is_non_temp_nso_unsat(tref n) {
 template <NodeType node>
 bool are_nso_equivalent(tref n1, tref n2) {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_nso_equivalent";
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << tau::get(n1);
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << tau::get(n2);
+	LOG_DEBUG << "(I) -- Begin are_nso_equivalent";
+	LOG_TRACE << "(I) -- n1 " << tau::get(n1);
+	LOG_TRACE << "(I) -- n2 " << tau::get(n2);
 
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
 	DBG(assert((has_no_boolean_combs_of_models<node>(n1)
@@ -201,7 +201,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	if (t2[0].is(tau::wff_always)) n2 = t2[0].first();
 
 	if (tau::get(n1) == tau::get(n2)) {
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: true (equiv nodes)";
+		LOG_DEBUG << "(I) -- End are_nso_equivalent: true (equiv nodes)";
 		return true;
 	}
 
@@ -210,13 +210,13 @@ bool are_nso_equivalent(tref n1, tref n2) {
 	if (r1opt != nullptr && r2opt != nullptr) { // both are refs
 		bool equiv = get_ref_info<node>(r1opt)
 						== get_ref_info<node>(r2opt);
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: "
+		LOG_DEBUG << "(I) -- End are_nso_equivalent: "
 						<< equiv << " (equiv refs)";
 		return equiv;
 	}
 	else if (r1opt != nullptr || r2opt != nullptr) { // one is a ref
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: "
-						"false (ref and not ref)";
+		LOG_DEBUG << "(I) -- End are_nso_equivalent: "
+						<< "false (ref and not ref)";
 		return false;
 	}
 
@@ -231,15 +231,13 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		imp1 = tau::build_wff_all(v, imp1);
 		imp2 = tau::build_wff_all(v, imp2);
 	}
-	BOOST_LOG_TRIVIAL(debug)
-		<< "(I) -- wff: " << tau::build_wff_and(imp1, imp2);
+	LOG_DEBUG << "(I) -- wff: " << tau::build_wff_and(imp1, imp2);
 
 	const auto& tdir1 = tau::get(normalizer_step<node>(imp1));
 	DBG(assert((tdir1.equals_T() || tdir1.equals_F()
 		|| tdir1.find_top(is<node, tau::constraint>)));)
 	if (tdir1.equals_F()) {
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: "
-							<< tdir1;
+		LOG_DEBUG << "(I) -- End are_nso_equivalent: " << tdir1;
 		return false;
 	}
 	const auto& tdir2 = tau::get(normalizer_step<node>(imp2));
@@ -247,7 +245,7 @@ bool are_nso_equivalent(tref n1, tref n2) {
 		|| tdir2.find_top(is<node, tau::constraint>))));
 	bool res = (tdir1.equals_T() && tdir2.equals_T());
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_nso_equivalent: " << res;
+	LOG_DEBUG << "(I) -- End are_nso_equivalent: " << res;
 
 	return res;
 }
@@ -262,9 +260,9 @@ bool is_nso_equivalent_to_any_of(tref n, trefs& previous) {
 template <NodeType node>
 bool is_nso_impl(tref n1, tref n2) {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin is_nso_impl";
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
+	LOG_DEBUG << "(I) -- Begin is_nso_impl";
+	LOG_TRACE << "(I) -- n1 " << n1;
+	LOG_TRACE << "(I) -- n2 " << n2;
 
 	// If this method is called on a formula that has Boolean combinations of models, it is used incorrectly
 	DBG(assert((has_no_boolean_combs_of_models<node>(n1)
@@ -277,7 +275,7 @@ bool is_nso_impl(tref n1, tref n2) {
 	if (t2[0].is(tau::wff_always)) n2 = t2[0].first();
 
 	if (tau::get(n1) == tau::get(n2)) {
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End is_nso_impl: true (n1 implies n2)";
+		LOG_DEBUG << "(I) -- End is_nso_impl: true (n1 implies n2)";
 		return true;
 	}
 
@@ -290,12 +288,12 @@ bool is_nso_impl(tref n1, tref n2) {
 	for (tref v : vars) {
 		imp = tau::build_wff_all(v, imp);
 	}
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- wff: " << tau::get(imp);
+	LOG_DEBUG << "(I) -- wff: " << tau::get(imp);
 
 	const auto& res = tau::get(normalizer_step<node>(imp));
 	DBG(assert((res.equals_T() || res.equals_F()
 		|| res.find_top(is<node, tau::constraint>)));)
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End is_nso_impl: " << res;
+	LOG_DEBUG << "(I) -- End is_nso_impl: " << res;
 	return res.equals_T();
 }
 
@@ -304,9 +302,9 @@ bool are_bf_equal(tref n1, tref n2) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin are_bf_equal";
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- n1 " << n1;
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- n2 " << n2;
+	LOG_DEBUG << "(I) -- Begin are_bf_equal";
+	LOG_TRACE << "(I) -- n1 " << n1;
+	LOG_TRACE << "(I) -- n2 " << n2;
 
 	const auto& t1 = tau::get(n1);
 	const auto& t2 = tau::get(n2);
@@ -314,7 +312,7 @@ bool are_bf_equal(tref n1, tref n2) {
 	DBG(assert(t2.is(tau::bf)));
 
 	if (t1 == t2) {
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- End are_bf_equal: true (equal bf)";
+		LOG_DEBUG << "(I) -- End are_bf_equal: true (equal bf)";
 		return true;
 	}
 
@@ -325,22 +323,20 @@ bool are_bf_equal(tref n1, tref n2) {
 	tref bf_equal_fm = tau::build_bf_eq(tau::build_bf_xor(n1, n2));
 
 	for (tref v : vars) bf_equal_fm = tau::build_wff_all(v, bf_equal_fm);
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- wff: " << bf_equal_fm;
+	LOG_TRACE << "(I) -- wff: " << bf_equal_fm;
 
 	tref normalized = normalizer_step<node>(bf_equal_fm);
-	BOOST_LOG_TRIVIAL(trace) << "(T) -- Normalized: " << normalized;
+	LOG_TRACE << "(T) -- Normalized: " << normalized;
 	auto check = tt(normalized) | tau::wff_t;
-	BOOST_LOG_TRIVIAL(debug)
-		<< "(I) -- End are_bf_equal: " << check.has_value();
-
+	LOG_DEBUG << "(I) -- End are_bf_equal: " << check.has_value();
 	return check.has_value();
 }
 
 template <NodeType node>
 bool is_bf_same_to_any_of(tref n, trefs& previous) {
 	return std::any_of(previous.begin(), previous.end(), [n](tref p) {
-			return are_bf_equal<node>(n, p);
-		});
+		return are_bf_equal<node>(n, p);
+	});
 }
 
 template <NodeType node>
@@ -353,24 +349,24 @@ tref normalize_with_temp_simp(tref fm) {
 		return n;
 	};
 	const auto& red_fm = tau::get(normalizer_step<node>(fm));
-	BOOST_LOG_TRIVIAL(trace) << "    -- red_fm: " << red_fm.to_str();
+	LOG_TRACE << "    -- red_fm: " << red_fm.to_str();
 	if (red_fm.equals_T() || red_fm.equals_F())
 		return red_fm.get();
 	trefs clauses = get_dnf_wff_clauses<node>(red_fm.get());
 	tref nn = tau::_F();
 	for (tref clause : clauses) {
-		BOOST_LOG_TRIVIAL(trace) << "    -- clause: " << TAU_TO_STR(clause);
+		LOG_TRACE << "    -- clause: " << TAU_TO_STR(clause);
 		const auto& t = tau::get(clause);
 		trefs aw_parts = t.select_top(is<node, tau::wff_always>);
 		trefs st_parts = t.select_top(is<node, tau::wff_sometimes>);
 		if (aw_parts.size() == 1 && st_parts.empty()) {
 			nn = tau::build_wff_or(nn, clause);
-			BOOST_LOG_TRIVIAL(trace) << "    -- nn: " << TAU_DUMP_TO_STR(nn);
+			LOG_TRACE << "    -- nn: " << TAU_TO_STR(nn);
 			continue;
 		}
 		if (aw_parts.empty() && st_parts.size() == 1) {
 			nn = tau::build_wff_or(nn, clause);
-			BOOST_LOG_TRIVIAL(trace) << "    -- nn: " << TAU_DUMP_TO_STR(nn);
+			LOG_TRACE << "    -- nn: " << TAU_TO_STR(nn);
 			continue;
 		}
 
@@ -379,7 +375,7 @@ tref normalize_with_temp_simp(tref fm) {
 		for (tref aw : aw_parts) changes.emplace(aw, tau::_T());
 		for (tref st : st_parts) changes.emplace(st, tau::_T());
 		tref new_clause = rewriter::replace<node>(clause, changes);
-		BOOST_LOG_TRIVIAL(trace) << "    -- new clause: " << TAU_DUMP_TO_STR(nn);
+		LOG_TRACE << "    -- new clause: " << TAU_TO_STR(nn);
 
 		// First check if any always statements are implied by others
 		for (size_t i = 0; i < aw_parts.size(); ++i) {
@@ -396,7 +392,7 @@ tref normalize_with_temp_simp(tref fm) {
 			tref f = tau::build_wff_and(trim_q(aw), trim_q(st));
 			if (is_non_temp_nso_unsat<node>(f)) clause_false = true;
 		}
-		if (clause_false) BOOST_LOG_TRIVIAL(trace) << "    -- clause false";
+		if (clause_false) LOG_TRACE << "    -- clause false";
 		if (clause_false) continue;
 
 		// Next check if any always statement implies a sometimes statement
@@ -418,10 +414,10 @@ tref normalize_with_temp_simp(tref fm) {
 					tau::build_wff_and(aw_parts),
 					tau::build_wff_and(st_parts)));
 		nn = tau::build_wff_or(nn, new_clause);
-		BOOST_LOG_TRIVIAL(trace) << "    -- nn: " << TAU_DUMP_TO_STR(nn);
+		LOG_TRACE << "    -- nn: " << TAU_TO_STR(nn);
 	}
 	DBG(assert(nn != nullptr);)
-	BOOST_LOG_TRIVIAL(trace) << "    -- normalize_with_temp_simp result: " << TAU_DUMP_TO_STR(nn);
+	LOG_TRACE << "    -- normalize_with_temp_simp result: " << TAU_TO_STR(nn);
 	return nn;
 }
 
@@ -469,11 +465,11 @@ tref build_main_step(tref form, size_t step) {
 // Normalizes a Boolean function having no recurrence relation
 template <NodeType node>
 tref bf_normalizer_without_rec_relation(tref bf) {
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
+	LOG_DEBUG << "(I) -- Begin Boolean function normalizer";
 
 	auto result = bf_boole_normal_form<node>(bf);
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
+	LOG_DEBUG << "(I) -- End Boolean function normalizer";
 
 	return result;
 }
@@ -482,16 +478,16 @@ tref bf_normalizer_without_rec_relation(tref bf) {
 template <NodeType node>
 tref bf_normalizer_with_rec_relation(const rr &bf) {
 	using tt = typename tree<node>::traverser;
-	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Begin calculate recurrence relation";
+	LOG_DEBUG<< "(I) -- Begin calculate recurrence relation";
 	auto main = calculate_all_fixed_points<node>(bf);
 	if (!main) return nullptr;
 	tref bf_unfolded = tt(main) | repeat_all<node, step<node>>(
 					step<node>(bf.rec_relations)) | tt::ref;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End calculate recurrence relation";
+	LOG_DEBUG << "(I) -- End calculate recurrence relation";
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin Boolean function normalizer";
+	LOG_DEBUG << "(I) -- Begin Boolean function normalizer";
 	auto result = bf_boole_normal_form<node>(bf_unfolded);
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End Boolean function normalizer";
+	LOG_DEBUG << "(I) -- End Boolean function normalizer";
 
 	return result;
 }
@@ -512,7 +508,7 @@ tref build_enumerated_main_step(tref form, size_t i, size_t offset_arity) {
 		{ t.first(), tau::get(tau::offsets, ofs), t.second() },
 		t.right_sibling());
 	form = rewriter::replace<node>(form, changes);
-	BOOST_LOG_TRIVIAL(debug) << "(F*) " << tau::get(form);
+	LOG_DEBUG << "(F*) " << tau::get(form);
 	return build_main_step<node>(form, i);
 }
 
@@ -523,9 +519,8 @@ bool is_valid(const rr& nso_rr) {
 		.select_all(is<node,tau::offsets>)) if (tau::get(main_offsets)
 			.find_top(is<node, tau::capture>))
 	{
-		BOOST_LOG_TRIVIAL(error) << "(Error) Main " << nso_rr.main
-					<< " cannot contain a relative offset "
-					<< main_offsets;
+		LOG_ERROR << "Main " << nso_rr.main
+			<< " cannot contain a relative offset " << main_offsets;
 		return false; // capture in main's offset
 	}
 	for (size_t ri = 0; ri != nso_rr.rec_relations.size(); ++ri) {
@@ -533,44 +528,43 @@ bool is_valid(const rr& nso_rr) {
 		auto left = get_ref_info<node>(get_ref<node>(r.first->get()));
 		for (const auto& [ot, _] : left.second)
 			if (ot == tau::shift) {
-				BOOST_LOG_TRIVIAL(error) << "(Error) Recurrence "
-					"relation " << r.first->get() << " cannot "
-					"contain an offset shift";
+				LOG_ERROR << "Recurrence relation "
+					<< r.first->get() << " cannot contain "
+					<< "an offset shift";
 				return false; // head ref cannot have shift
 			}
 		if (left.second.size() == 0) continue; // no offsets
 		// take only first offset for consideration
 		offset_t ho = left.second.front();
-		//BOOST_LOG_TRIVIAL(debug) << "(T) -- head offset " << ho.first << " / " << ho.second;
+		//LOG_DEBUG << "(T) -- head offset " << ho.first << " / " << ho.second;
 		for (tref ref : tau::get(r.second)
 			.select_all(is<node, tau::ref>))
 		{
 			auto right = get_ref_info<node>(ref);
 			if (right.second.size() == 0) continue; // no offsets
 			auto& bo = right.second.front();
-			//BOOST_LOG_TRIVIAL(debug) << "(T) -- body offset " << bo.first << " / " << bo.second;
+			//LOG_DEBUG << "(T) -- body offset " << bo.first << " / " << bo.second;
 			if (ho.first == tau::integer) {
 				if (bo.first == tau::capture) {
-					BOOST_LOG_TRIVIAL(error)
-						<< "(Error) Recurrence relation "
+					LOG_ERROR << "Recurrence relation "
 						<< r.first << " (having a fixed"
 						" offset) cannot depend on a "
 						"relative offset " << r.second;
 					return false; // left num right capture
 				}
 				if (bo.first == tau::integer
-					&& ho.second < bo.second) {
-						BOOST_LOG_TRIVIAL(error)
-							<<"(Error) Recurrence relation "
-							<< r.first << " cannot "
-							"depend on a future "
-							"state " << r.second;
-						return false; // l num < r num
+					&& ho.second < bo.second)
+				{
+					LOG_ERROR << "Recurrence relation "
+						<< r.first << " cannot depend "
+						<< "on a future state "
+						<< r.second;
+					return false; // l num < r num
 				}
 			}
 		}
 	}
-	//BOOST_LOG_TRIVIAL(debug) << "(I) -- Recurrence relation is well founded";
+	//LOG_DEBUG << "(I) -- Recurrence relation is well founded";
 	return true;
 }
 
@@ -599,31 +593,30 @@ bool is_well_founded(const rr& nso_rr) {
 		if (left.second.size() == 0) continue; // no offsets
 		// take only first offset for consideration
 		offset_t ho = left.second.front();
-		//BOOST_LOG_TRIVIAL(debug) << "(T) -- head offset " << ho.first << " / " << ho.second;
+		//LOG_DEBUG << "(T) -- head offset " << ho.first << " / " << ho.second;
 		for (const auto& ref : tau::get(r.second).select_all(
 			is<node, tau::ref>))
 		{
 			auto right = get_ref_info<node>(ref);
 			if (right.second.size() == 0) continue; // no offsets
 			auto& bo = right.second.front();
-			//BOOST_LOG_TRIVIAL(debug) << "(T) -- body offset " << bo.first << " / " << bo.second;
+			//LOG_DEBUG << "(T) -- body offset " << bo.first << " / " << bo.second;
 			if (ho == bo) graph[left.first].insert(right.first);
 		}
 		visited[left.first]  = false;
 		visiting[left.first] = false;
 	}
 	if (!has_relative_rule) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) Recurrence relation has no rules "
+		LOG_ERROR << "Recurrence relation has no rules "
 						"other than initial conditions";
 		return false;
 	}
 	for (const auto& [left, _] : graph)
 		if (!visited[left] && is_cyclic(left)) {
-			BOOST_LOG_TRIVIAL(error)
-					<< "(Error) Recurrence relation is cyclic";
+			LOG_ERROR << "Recurrence relation is cyclic";
 			return false;
 		}
-	BOOST_LOG_TRIVIAL(debug)<< "(I) -- Recurrence relation is well founded";
+	LOG_DEBUG<< "(I) -- Recurrence relation is well founded";
 	return true;
 }
 
@@ -633,14 +626,14 @@ tref calculate_fixed_point(const rr& nso_rr,
 	tref fallback)
 {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculating fixed point: " << form;
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << to_str<node>(nso_rr);
+	LOG_DEBUG << "(I) -- Calculating fixed point: " << form;
+	LOG_DEBUG << "(F) " << to_str<node>(nso_rr);
 	//ptree<BAs...>(std::cout << "form: ", form) << "\n";
 
 	auto ft = tau::get(fallback).get_type();
 	bool first = ft == tau::first_sym, last = ft == tau::last_sym;
 	if (!first && !last && ft != nt) {
-		BOOST_LOG_TRIVIAL(error) << "(Error) Fallback type mismatch";
+		LOG_ERROR << "Fallback type mismatch";
 		return nullptr;
 	}
 
@@ -659,7 +652,7 @@ tref calculate_fixed_point(const rr& nso_rr,
 		loopbacks.push_back(loopback);
 		max_loopback = std::max(max_loopback, loopback);
 	}
-	BOOST_LOG_TRIVIAL(debug) << "(I) max loopback " << max_loopback;
+	LOG_DEBUG << "(I) max loopback " << max_loopback;
 
 	for (size_t i = max_loopback; ; i++) {
 		current = build_enumerated_main_step<node>(
@@ -672,7 +665,7 @@ tref calculate_fixed_point(const rr& nso_rr,
 			{
 				const auto& r = nso_rr.rec_relations[ri];
 				if (loopbacks[ri] > i) {
-					// BOOST_LOG_TRIVIAL(debug) << "(I) -- current step " << i << " < " << loopbacks[ri] << " loopback, skipping " << r;
+					// LOG_DEBUG << "(I) -- current step " << i << " < " << loopbacks[ri] << " loopback, skipping " << r;
 					continue; // skip steps depending on future fixed offsets
 				}
 				auto prev = current;
@@ -681,42 +674,39 @@ tref calculate_fixed_point(const rr& nso_rr,
 			}
 		} while (changed);
 
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin enumeration step";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+		LOG_DEBUG << "(I) -- Begin enumeration step";
+		LOG_DEBUG << "(F) " << current;
 
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- Normalize step";
+		LOG_DEBUG << "(I) -- Normalize step";
 		current = nt == tau::wff ? normalizer_step<node>(current)
 					: bf_boole_normal_form<node>(current);
-		BOOST_LOG_TRIVIAL(debug) << "(T) -- Normalized step";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+		LOG_DEBUG << "(T) -- Normalized step";
+		LOG_DEBUG << "(F) " << current;
 
 		if (previous.size() && (nt == tau::wff
 			? are_nso_equivalent<node>(current, previous.back())
 			: are_bf_equal<node>(current, previous.back())))
 		{
-			BOOST_LOG_TRIVIAL(debug) << eos
-				<< " - fixed point found at step: " << i;
-			BOOST_LOG_TRIVIAL(debug) << "(F) " << previous.back();
+			LOG_DEBUG << eos << " - fixed point found at step: "<<i;
+			LOG_DEBUG << "(F) " << previous.back();
 			return previous.back();
 		}
 		else if (previous.size() > 1 && (nt == tau::wff
 			? is_nso_equivalent_to_any_of<node>(current, previous)
 			: is_bf_same_to_any_of<node>(current, previous)))
 		{
-			BOOST_LOG_TRIVIAL(debug) << eos
+			LOG_DEBUG << eos
 				<< " - loop (no fixed point) detected at step: "
 				<< i << " returning fallback "
 				<< (first ? "first" : last ? "last" : "");
 			if (last) return previous.back();
 			if (first) return current;
-			BOOST_LOG_TRIVIAL(debug) << eos
-				<< " - fallback: " << fallback;
+			LOG_DEBUG << eos << " - fallback: " << fallback;
 			return fallback;
 		}
-		BOOST_LOG_TRIVIAL(debug) << eos
-			<< " - no fixed point resolution at step: "
+		LOG_DEBUG << eos << " - no fixed point resolution at step: "
 			<< i << " incrementing";
-		BOOST_LOG_TRIVIAL(debug) << "(F) " << current;
+		LOG_DEBUG << "(F) " << current;
 		previous.push_back(current);
 	}
 	DBG(assert(0);)
@@ -745,15 +735,14 @@ struct fixed_point_transformer {
 		auto sig = get_rr_sig<node>(ref);
 		auto typopt = types.get(sig);
 		if (!typopt) { // this should not happen if rr_types.ok()
-			BOOST_LOG_TRIVIAL(error)
-				<< "(Error) Unresolved type of " << sig;
+			LOG_ERROR << "Unresolved type of " << sig;
 			return nullptr;
 		}
 		if (auto fpopt = types.fpcall(sig); fpopt) { // is fp call
 			auto offset_arity = fpopt.value().offset_arity;
 			// TODO we don't support FP calc for multiindex offsets yet
 			if (offset_arity > 1) {
-				BOOST_LOG_TRIVIAL(error) << "(Error) Fixed point"
+				LOG_ERROR << "Fixed point"
 					" calculation of multiindex offset "
 					"relations is not supported yet";
 				return nullptr;
@@ -799,8 +788,8 @@ tref calculate_all_fixed_points(const rr& nso_rr) {
 	if (!new_main) return nullptr;
 	if (fpt.changes.size()) {
 		new_main = rewriter::replace<node>(new_main, fpt.changes);
-		BOOST_LOG_TRIVIAL(debug) << "(I) -- Calculated fixed points. "
-						"New main: " << new_main;
+		LOG_DEBUG << "(I) -- Calculated fixed points. New main: "
+								<< new_main;
 	}
 	return new_main;
 }
@@ -810,16 +799,16 @@ tref calculate_all_fixed_points(const rr& nso_rr) {
 template <NodeType node>
 tref apply_rr_to_formula(const rr& nso_rr) {
 	using tt = typename tree<node>::traverser;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Start apply_rr_to_formula";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << to_str<node>(nso_rr);
+	LOG_DEBUG << "(I) -- Start apply_rr_to_formula";
+	LOG_DEBUG << "(F) " << to_str<node>(nso_rr);
 	tref main = calculate_all_fixed_points<node>(nso_rr);
 	if (!main) return nullptr;
 	// Substitute function and recurrence relation definitions
 	tref new_main = main
 		| repeat_all<node, step<node>>(step<node>(nso_rr.rec_relations))
 		| tt::ref;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End apply_rr_to_formula";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << to_str<node>(nso_rr);
+	LOG_DEBUG << "(I) -- End apply_rr_to_formula";
+	LOG_DEBUG << "(F) " << to_str<node>(nso_rr);
 	return new_main;
 }
 
@@ -828,14 +817,14 @@ template <NodeType node>
 tref normalizer(const rr& nso_rr) {
 	// IDEA extract this to an operator| overload
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin normalizer";
-	BOOST_LOG_TRIVIAL(debug) << "(F) " << to_str<node>(nso_rr);
+	LOG_DEBUG << "(I) -- Begin normalizer";
+	LOG_DEBUG << "(F) " << to_str<node>(nso_rr);
 
 	auto fm = apply_rr_to_formula<node>(nso_rr);
 	if (!fm) return nullptr;
 	auto res = normalize_with_temp_simp<node>(fm);
 
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End normalizer";
+	LOG_DEBUG << "(I) -- End normalizer";
 	return res;
 }
 

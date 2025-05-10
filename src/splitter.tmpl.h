@@ -307,7 +307,7 @@ requires BAsPack<BAs...>
 tref tau_splitter(tref fm, splitter_type st) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(debug) << "(I) Start of tau_splitter";
+	LOG_DEBUG << "(I) Start of tau_splitter";
 	// First we decide if we deal with a temporal formula
 	if (!has_temp_var<node>(fm)) return nso_tau_splitter<BAs...>(fm, st).first;
 
@@ -319,7 +319,7 @@ tref tau_splitter(tref fm, splitter_type st) {
 			auto [splitter, type] = nso_tau_splitter<BAs...>(
 					tau::get(spec)[0].first(), st, clause);
 			if (type != splitter_type::bad) {
-				BOOST_LOG_TRIVIAL(trace) << "Splitter of spec: " << splitter;
+				LOG_TRACE << "Splitter of spec: " << splitter;
 				good_splitter = true;
 				if (is_aw) splitter = tau::build_wff_always(splitter);
 				else splitter = tau::build_wff_sometimes(splitter);

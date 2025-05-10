@@ -4,6 +4,9 @@
 #include "ref_types.h"
 // #include "ba_types_checker_and_propagator.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "tau_tree_types"
+
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
@@ -11,10 +14,10 @@ namespace idni::tau_lang {
 
 template <NodeType node>
 tref infer_ba_types(tref n) {
-	BOOST_LOG_TRIVIAL(trace) << "(T) infer BA types: " << tree<node>::get(n);
-	// static typename node::ba_types_checker_and_propagator_t infer;
+	LOG_TRACE << "(T) infer BA types: " << tree<node>::get(n);
+	// static typename node::ba_types_checker_and_propagator infer;
 	// if ((n = infer(n)) == nullptr) return nullptr;
-	BOOST_LOG_TRIVIAL(trace) << "(T) inferred BA types: " << tree<node>::get(n);
+	LOG_TRACE << "(T) inferred BA types: " << tree<node>::get(n);
 	return n;
 }
 
@@ -32,7 +35,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 	ref_types<node>& ts)
 {
 	using tau = tree<node>;
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- Begin ref type inferrence"; // << ": " << nso_rr;
+	LOG_DEBUG << "(I) -- Begin ref type inferrence"; // << ": " << nso_rr;
 	// for (auto& r : nso_rr.rec_relations)
 	// 	ptree<BAs...>(std::cout << "rule left: ", r.first) << "\n",
 	// 	ptree<BAs...>(std::cout << "rule right: ", r.second) << "\n";
@@ -56,7 +59,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
                         tref body = r.second->get();
 			// check type of the right side
 			typename node::type t = get_nt_type(body);
-			// BOOST_LOG_TRIVIAL(trace) << "(T) " << r.second
+			// LOG_TRACE << "(T) " << r.second
 			// 			<< " is " << (node::name(t));
 			if (t == tau::ref) {
 				// right side is unresolved ref
@@ -64,7 +67,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 					topt.has_value())
 				{
 					t = topt.value();
-					// BOOST_LOG_TRIVIAL(trace)
+					// LOG_TRACE
 					// 	<< "(T) updating right side: "
 					// 	<< r.second;
 					update_ref(body, t);
@@ -75,7 +78,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 			if (t == tau::bf || t == tau::wff) {
 				if (get_nt_type(head) == tau::ref) {
 					// left side is unresolved ref
-					// BOOST_LOG_TRIVIAL(trace)
+					// LOG_TRACE
 					// 	<< "(T) updating left side: "
 					// 	<< r.first;
 					ts.add(head, t);
@@ -91,7 +94,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 					auto topt = ts.get(get_rr_sig<node>(head));
 					if (topt.has_value()) { // if we know
 						t = topt.value(); // update
-						// BOOST_LOG_TRIVIAL(trace)
+						// LOG_TRACE
 						// 	<< "(T) updating left "
 						// 	"side: " << r.first;
 						ts.done(get_rr_sig<node>(head));
@@ -101,7 +104,7 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 				}
 				// left side is bf or wff, update capture
 				if (t == tau::bf || t == tau::wff) {
-					// BOOST_LOG_TRIVIAL(trace)
+					// LOG_TRACE
 					// 	<< "(T) updating capture: "
 					// 	<< r.second;
 					//ptree<BAs...>(std::cout << "updating ref: ", r) << "\n";
@@ -115,31 +118,29 @@ std::optional<rr> infer_ref_types(const rr& nso_rr,
 	// infer main if unresolved ref
 	if (nn.main) {
 		auto t = get_nt_type(nn.main->get());
-		// BOOST_LOG_TRIVIAL(trace) << "(T) main " << nn.main
+		// LOG_TRACE << "(T) main " << nn.main
 		// 				<< " is " << (node::name(t));
 		if (t == tau::ref) {
 			// main is an unresolved ref
 			if (auto topt = ts.get(get_rr_sig<node>(nn.main->get())); topt) {
 				t = topt.value();
-				// BOOST_LOG_TRIVIAL(trace)
+				// LOG_TRACE
 				// 	<< "(T) updating main: " << nn.main;
 				update_ref(nn.main->get(), t);
 			}
 		}
 	}
 
-	for (const auto& err : ts.errors())
-		BOOST_LOG_TRIVIAL(error) << "(Error) " << err;
+	for (const auto& err : ts.errors()) LOG_ERROR << err;
 	if (ts.errors().size()) return {};
 
 	if (const auto& unresolved = ts.unresolved(); unresolved.size()) {
 		std::stringstream ss;
 		for (const auto& sig : unresolved) ss << " " << sig;
-		BOOST_LOG_TRIVIAL(error)
-			<< "(Error) Unknown ref type for:" << ss.str();
+		LOG_ERROR << "Unknown ref type for:" << ss.str();
 		return {};
 	}
-	BOOST_LOG_TRIVIAL(debug) << "(I) -- End ref type inferrence"; // << ": " << nn;
+	LOG_DEBUG << "(I) -- End ref type inferrence"; // << ": " << nn;
 	return { nn };
 }
 

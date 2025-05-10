@@ -10,6 +10,9 @@
 #include "defs.h"
 #include "tau_parser.generated.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "tau_tree"
+
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
@@ -29,11 +32,11 @@ concept NodeType = requires { // Node Type has to provide
 	// alias for the packed variant type
 	typename N::bas_variant;
 	// alias for the ba_constants pool type
-	typename N::ba_constants_t;
+	typename N::ba_constants;
 	// alias for the ba_constants_binder type
-	typename N::ba_constants_binder_t;
+	typename N::ba_constants_binder;
 	// alias for the ba_types_checker_and_propagator type
-	typename N::ba_types_checker_and_propagator_t;
+	typename N::ba_types_checker_and_propagator;
 	// alias for the tau_ba type
 	typename N::tau_ba_t;
 	// alias for the node type
@@ -83,20 +86,20 @@ struct node {
 	using type = tau_parser::nonterminal;
 
 	// alias for nso_factory<BAs...>
-	using nso_factory_t = nso_factory<BAs...>;
+	using nso_factory = idni::tau_lang::nso_factory<BAs...>;
 	// alias for recreation of the packed variant
 	using bas_variant = std::variant<BAs...>;
 	// alias for ba_types<BAs...> pool
-	using ba_types_t = ba_types<BAs...>;
+	using ba_types = idni::tau_lang::ba_types<BAs...>;
 	// alias for ba_constants<BAs...> pool
-	using ba_constants_t = ba_constants<BAs...>;
+	using ba_constants = idni::tau_lang::ba_constants<BAs...>;
 	// alias for ba_constants_binder<BAs...>
-	using ba_constants_binder_t = ba_constants_binder<BAs...>;
+	using ba_constants_binder = idni::tau_lang::ba_constants_binder<BAs...>;
 	// alias for ba_types_checker_and_propagator<BAs...>
-	using ba_types_checker_and_propagator_t =
-					ba_types_checker_and_propagator<BAs...>;
+	using ba_types_checker_and_propagator =
+			idni::tau_lang::ba_types_checker_and_propagator<BAs...>;
 	// alias for tau_ba<BAs...>
-	using tau_ba_t = tau_ba<BAs...>;
+	using tau_ba_t = idni::tau_lang::tau_ba<BAs...>;
 
 	using T = size_t; // just to simplify changes or templating it later
 
@@ -195,11 +198,11 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	using node = N;
 	using parse_tree = tau_parser::tree;
 	using bas_variant = node::bas_variant;
-	using ba_types_t = node::ba_types_t;
-	using ba_constants_t = node::ba_constants_t;
-	using ba_constants_binder_t = node::ba_constants_binder_t;
-	using ba_types_checker_and_propagator_t =
-				node::ba_types_checker_and_propagator_t;
+	using ba_types = node::ba_types;
+	using ba_constants = node::ba_constants;
+	using ba_constants_binder = node::ba_constants_binder;
+	using ba_types_checker_and_propagator
+					= node::ba_types_checker_and_propagator;
 
 	inline static bool use_hooks = true; 
 

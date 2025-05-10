@@ -5,7 +5,7 @@
 
 TEST_SUITE("configuration") {
 	TEST_CASE("trace logging") {
-		logging.trace();
+		logging::trace();
 	}
 }
 

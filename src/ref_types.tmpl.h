@@ -34,12 +34,11 @@ std::optional<typename node::type> ref_types<node>::get(
 	auto fpopt = fpcall(s);
 	if (fpopt) s = fpopt.value();
 	if (auto it = types_.find(s); it != types_.end()) {
-		BOOST_LOG_TRIVIAL(trace)
-			<< "(I) -- Looking for type of " << s
-			<< " found " << node::name(it->second);
+		LOG_TRACE << "(I) -- Looking for type of " << s << " found "
+						<< node::name(it->second);
 		return { it->second };
 	}
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- Looking for type of "
+	LOG_TRACE << "(I) -- Looking for type of "
 					<< sig << " failed";
 	return {};
 }
@@ -71,16 +70,14 @@ std::optional<rr_sig>  ref_types<node>::fpcall(const rr_sig& fp_sig) const {
 
 template <NodeType node>
 void ref_types<node>::done(const rr_sig& sig) {
-	BOOST_LOG_TRIVIAL(trace)
-		<< "(I) -- ref type done " << sig;
+	LOG_TRACE << "(I) -- ref type done " << sig;
 	todo_.erase(sig), done_.insert(sig);
 }
 
 template <NodeType node>
 void ref_types<node>::todo(const rr_sig& sig) {
 	if (done_.contains(sig) || todo_.contains(sig)) return;
-	BOOST_LOG_TRIVIAL(trace)
-		<< "(I) -- ref type todo " << sig;
+	LOG_TRACE << "(I) -- ref type todo " << sig;
 	todo_.insert(sig);
 }
 
@@ -106,9 +103,8 @@ bool ref_types<node>::add(tref n, node::type t) {
 		r = r_as_child.value();
 	auto sig = get_rr_sig<node>(r);
 	if (auto fp_sig = fpcall(sig); fp_sig) { // if fp_call
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- FP call "
-			<< fp_sig.value() << " for "
-			<< sig << "() : " << node::name(t);
+		LOG_TRACE << "(I) -- FP call " << fp_sig.value() << " for "
+					<< sig << "() : " << node::name(t);
 		sig = fp_sig.value(); // use actual relation's sig
 	}
 	typename node::type new_type = t;
@@ -124,9 +120,8 @@ bool ref_types<node>::add(tref n, node::type t) {
 			errors_.insert(err.str()), false;
 	} else {
 		types_[sig] = new_type, done(sig);
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- Found type of "
-			<< sig << "() : "
-			<< node::name(types_[sig]);
+		LOG_TRACE << "(I) -- Found type of " << sig << "() : "
+					<< node::name(types_[sig]);
 		return true;
 	}
 	return false;

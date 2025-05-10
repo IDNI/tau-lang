@@ -1,42 +1,183 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+// TODO (LOW) maybe allow to set a list of enabled channels (addition to --severity trace or debug)
+// TODO (LOW) multiple channels for various warnings and allow user to filter them
+
 #ifndef __IDNI__TAU__LOGGING_H__
 #define __IDNI__TAU__LOGGING_H__
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
+#include <boost/log/sources/severity_channel_logger.hpp>
+#include <boost/log/attributes/attribute.hpp>
 #include <boost/log/utility/setup/console.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/expressions.hpp>
+
+#include <set>
 
 namespace idni::tau_lang {
 
-struct logging_manager {
-	logging_manager() {
+// uncomment to enable logging for hooks
+// #define HOOK_LOGGING_ENABLED 1
+
+// list of enabled channels for TRACE and DEBUG messages
+// INFO, WARNING and ERROR messages are not filtered by channel
+// comment or uncomment as desired
+static const char* enabled_channels [] = {
+	"nso_ba",
+	"sbf_ba",
+	"ba_constants",
+	"ba_types_checker_and_propagator",
+	"execution",
+	"hooks",
+	"interpreter",
+	"normal_forms",
+	"normalizer",
+	"nso_rr",
+	"ref_types",
+	"repl_evaluator",
+	"satisfiability",
+	"solver",
+	"splitter",
+	"tau_tree",
+	"tau_tree_builders",
+	"tau_tree_extractors",
+	"tau_tree_from_parser",
+	"tau_tree_node",
+	"tau_tree_printers",
+	"tau_tree_queries",
+	"tau_tree_traverser",
+	"tau_tree_types",
+};
+
+// default channel name
+#define LOG_CHANNEL_NAME "global"
+
+// to define a channel name, redefine the LOG_CHANNEL_NAME macro.
+// All the following LOG_TRACE and LOG_DEBUG messages will go to this channel.
+
+// Usual place of a channel redefinition is at a header file right after all
+// includes.
+// It can be also around some part of a code.
+// If other channel code follows, it has to be redefined to the proper channel.
+
+// Channel name redefinition:
+//   #undef  LOG_CHANNEL_NAME
+//   #define LOG_CHANNEL_NAME "a_channel_name"
+
+// Logging streams:
+//  LOG_ERROR   << "log message"; prints "(Error) log message"
+//  LOG_WARNING << "log message"; prints "(Warning) log message"
+//  LOG_INFO    << "log message"; prints "log message"
+//  LOG_DEBUG   << "log message"; prints "(debug) channel_name:    log message"
+//  LOG_TRACE   << "log message"; prints "(trace) channel_name:    log message"
+
+// Logging stream for error messages. Prepends message with "(Error) "
+#define LOG_ERROR         BOOST_LOG_TRIVIAL(error)
+// Logging stream for warning messages. Prepends message with "(Warning) "
+#define LOG_WARNING       BOOST_LOG_TRIVIAL(warning)
+// Logging stream for info messages. Doesn't prepend anything
+#define LOG_INFO          BOOST_LOG_TRIVIAL(info)
+// Logging stream for debug messages. Prepends message with "(debug) channel_name: "
+// locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
+#define LOG_DEBUG         BOOST_LOG_STREAM_SEV( \
+				logging::get_channel_logger(LOG_CHANNEL_NAME), \
+				boost::log::trivial::debug)
+// Logging stream for trace messages. Prepends message with "(trace) channel_name: "
+// locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
+#define LOG_TRACE         BOOST_LOG_STREAM_SEV( \
+				logging::get_channel_logger(LOG_CHANNEL_NAME), \
+				boost::log::trivial::trace)
+
+BOOST_LOG_ATTRIBUTE_KEYWORD(channel_attr, "Channel", std::string)
+BOOST_LOG_ATTRIBUTE_KEYWORD(severity,
+				"Severity", boost::log::trivial::severity_level)
+
+struct logging {
+	// set filter to trace level
+	inline static void trace()   { set_filter(boost::log::trivial::trace); }
+	// set filter to debug level
+	inline static void debug()   { set_filter(boost::log::trivial::debug); }
+	// set filter to print info, warning and error messages
+	inline static void info()    { set_filter(boost::log::trivial::info);  }
+	// set filter to print warning and error messages
+	inline static void warning() { set_filter(boost::log::trivial::warning);}
+	// set filter to print error messages
+	inline static void error()   { set_filter(boost::log::trivial::error); }
+
+	// set filter to a specific level
+	inline static void set_filter(boost::log::trivial::severity_level level)
+	{
 		using namespace boost::log;
-		core::get()->set_filter(trivial::severity >= trivial::info);
-		static bool initialize_console_log = true;
-		if (initialize_console_log) initialize_console_log = false,
-			add_console_log(std::cout, keywords::format =
-				expressions::stream << expressions::smessage);
+		core::get()->set_filter([level](const attribute_value_set& rec){
+			auto sev = rec[trivial::severity];
+			if (!sev || *sev < level) return false;
+			auto ch = rec[channel_attr];
+			if (level != trivial::trace && level != trivial::debug)
+				return true;
+			if (!ch || *ch == "global") return true;
+			for (auto& channel : enabled_channels)
+				if (channel == *ch) return true;
+			return false;
+		});
 	}
-	void trace() {
+
+	// initialize logging
+	inline static bool initialized = false;
+	logging() {
 		using namespace boost::log;
-		core::get()->set_filter(trivial::severity >= trivial::trace);
-	}
-	void debug() {
+
+		if (initialized) return;
+		initialized = true;
+
+		add_common_attributes();
+
+		info(); // set filter to info level
+
+		auto formatter = [](
+			const record_view& rec, formatting_ostream& os)
+		{
+			std::stringstream ss;
+			if (auto sev = rec[trivial::severity];sev) switch (*sev)
+			{
+			case trivial::fatal: break; // not used
+			case trivial::error:   ss << "(Error) ";   break;
+			case trivial::warning: ss << "(Warning) "; break;
+			case trivial::info: break; // no prefix
+			case trivial::trace: // (severity) channel: message
+			case trivial::debug:
+				ss << "(" << *sev << ") " << (rec[channel_attr]
+					? *rec[channel_attr]
+					: "global") << ": ";
+				while (ss.tellp() < 24) ss << " "; // padding
+				break;
+			}
+			os << ss.str() << rec[expressions::smessage];
+		};
+		add_console_log(std::cout, keywords::format = formatter);
+ 	}
+
+	using channel_logger_type =
+		boost::log::sources::severity_channel_logger_mt<
+			boost::log::trivial::severity_level, std::string>;
+
+	// get a channel logger for a specific header
+	inline static channel_logger_type& get_channel_logger(
+						const std::string& channel_name)
+	{
 		using namespace boost::log;
-		core::get()->set_filter(trivial::severity >= trivial::debug);
-	}
-	void info() {
-		using namespace boost::log;
-		core::get()->set_filter(trivial::severity >= trivial::info);
-	}
-	void error() {
-		using namespace boost::log;
-		core::get()->set_filter(trivial::severity >= trivial::error);
+		static std::map<std::string, channel_logger_type> loggers;
+		if (loggers.find(channel_name) == loggers.end())
+			loggers.emplace(channel_name,
+				channel_logger_type(
+					keywords::channel = channel_name));
+		return loggers[channel_name];
 	}
 };
-inline static logging_manager logging;
+
+// static initialization of the logging system 
+inline static logging initialize_logging;
 
 } // namespace idni::tau_lang
 

@@ -8,6 +8,9 @@
 
 #include "execution.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "normal_forms"
+
 namespace idni::tau_lang {
 
 /**
@@ -111,7 +114,7 @@ tref from_mnf_to_nnf(tref fm);
 template <NodeType node>
 static auto& simplify_snf() {
 	static auto instance = repeat_all<node, step<node>>(
-		to_steps<node>(elim_eqs<node>(), push_neg_for_snf<node>()));
+		to_steps<node>({ elim_eqs<node>(), push_neg_for_snf<node>() }));
 	return instance;
 }
 

@@ -2,6 +2,9 @@
 
 #include "tau_tree.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "tau_tree_traverser"
+
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
@@ -148,7 +151,7 @@ const typename tree<node>::template extractor<typename tree<node>::bas_variant>
 	tree<node>::traverser::ba_constant =
 		typename tree<node>::template extractor<bas_variant>(
 			[](const traverser& t) -> bas_variant {
-				return ba_constants_t::get(
+				return ba_constants::get(
 					t.value_tree().get_ba_constant_id());
 			});
 

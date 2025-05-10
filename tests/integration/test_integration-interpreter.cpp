@@ -27,7 +27,7 @@ std::string random_file(const std::string& extension = ".out", const std::string
 struct output_console {
 	output_console() = default;
 	output_console(const std::string& type)
-		: _type(bnode::ba_types_t::type_id(type)) {}
+		: _type(get_ba_type_id<bnode>(type)) {}
 
 	bool write(const assignment<bnode>& outputs) const {
 		// for each stream in out.streams, write the value from the solution
@@ -43,7 +43,7 @@ struct output_console {
 	}
 
 	assignment<bnode> streams;
-	size_t _type = bnode::ba_types_t::type_id("sbf");
+	size_t _type = get_ba_type_id<bnode>("sbf");
 };
 
 struct input_vector {
@@ -52,10 +52,10 @@ struct input_vector {
 	input_vector(std::vector<assignment<bnode>>& inputs) : inputs(
 		std::move(inputs)) {}
 	input_vector(const std::string& type)
-		: _type(bnode::ba_types_t::type_id(type)) {}
+		: _type(get_ba_type_id<bnode>(type)) {}
 	input_vector(std::vector<assignment<bnode>>& inputs,
 		const std::string& type) : inputs(std::move(inputs)),
-			_type(bnode::ba_types_t::type_id(type)) {}
+			_type(get_ba_type_id<bnode>(type)) {}
 
 	std::optional<assignment<bnode>> get() const {
 		if (inputs.empty()) return { assignment<bnode>{} };
@@ -80,7 +80,7 @@ struct input_vector {
 	std::vector<assignment<bnode>> inputs;
 	assignment<bnode> streams;
 	size_t current = 0;
-	size_t _type = bnode::ba_types_t::type_id("sbf");
+	size_t _type = get_ba_type_id<bnode>("sbf");
 };
 
 void build_input(const std::string& name,
@@ -90,9 +90,9 @@ void build_input(const std::string& name,
 	size_t t = 0;
 	for (const auto& val : values) {
 		auto in_var = build_in_var_at_n<bnode>(name, t);
-		auto v = bnode::nso_factory_t::instance().parse(val, type);
+		auto v = bnode::nso_factory::instance().parse(val, type);
 		auto v_const = build_bf_ba_constant<bnode>(v.value(),
-			bnode::ba_types_t::type_id(type));
+			get_ba_type_id<bnode>(type));
 
 		if (assgn.size() <= t) {
 			typename tau::subtree_map a;
@@ -111,9 +111,9 @@ void build_output(const std::string& name, const std::vector<std::string>& value
 		if (val.empty()) {
 			assgn.emplace(out_var, nullptr);
 		} else {
-			auto v = bnode::nso_factory_t::instance().parse(val, type);
+			auto v = bnode::nso_factory::instance().parse(val, type);
 			auto v_const = build_bf_ba_constant<bnode>(v.value(),
-				bnode::ba_types_t::type_id(type));
+				get_ba_type_id<bnode>(type));
 			assgn.emplace(out_var, v_const);
 		}
 		++t;
@@ -371,7 +371,7 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 TEST_SUITE("configuration") {
 
 	TEST_CASE("logging") {
-		logging.trace();
+		logging::trace();
 	}
 
 	TEST_CASE("bdd initialization") {

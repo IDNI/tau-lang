@@ -2,6 +2,9 @@
 
 #include "tau_tree.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "tau_tree_extractors"
+
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------
@@ -75,7 +78,7 @@ void get_leaves(tref n, typename node::type branch, trefs& leaves) {
 		const auto& t = tree<node>::get(n);
 		if (t.is(branch)) return true;
 		if (t.child_is(branch)) return true;
-		BOOST_LOG_TRIVIAL(trace) << "(I) -- adding leave: " << t.to_str();
+		LOG_TRACE << "(I) -- adding leave: " << t.to_str();
 		return leaves.push_back(n), false;
 	};
 	pre_order<node>(n).visit(add_leave);
@@ -200,9 +203,9 @@ template <NodeType node>
 typename tree<node>::subtree_set get_free_vars_from_nso(tref n) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- Begin get_free_vars_from_nso of " << n;
+	LOG_TRACE << "(I) -- Begin get_free_vars_from_nso of " << TAU_TO_STR(n);
 	typename tau::subtree_set free_vars;
-	BOOST_LOG_TRIVIAL(trace) << "(I) -- End get_free_vars_from_nso";
+	LOG_TRACE << "(I) -- End get_free_vars_from_nso";
 	auto collector = [&free_vars](tref n) {
 		const auto& t = tau::get(n);
 		if (t.is(tau::wff_all) || t.is(tau::wff_ex)) {
@@ -211,7 +214,7 @@ typename tree<node>::subtree_set get_free_vars_from_nso(tref n) {
 			if (var) if (auto it = free_vars.find(var);
 				it != free_vars.end())
 			{
-				BOOST_LOG_TRIVIAL(trace) << "(I) -- removing quantified var: " << tau::get(var);
+				LOG_TRACE << "(I) -- removing quantified var: " << TAU_TO_STR(var);
 				free_vars.erase(it);
 			}
 		} else if (is_var_or_capture<node>(n)) {
@@ -223,7 +226,7 @@ typename tree<node>::subtree_set get_free_vars_from_nso(tref n) {
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
-						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child.value_tree();
+						LOG_TRACE << "(I) -- removing var: " << TAU_TO_STR(offset_child.value());
 						free_vars.erase(it);
 					}
 				} else if (offset_child.value_tree().is(tau::shift)) {
@@ -231,12 +234,12 @@ typename tree<node>::subtree_set get_free_vars_from_nso(tref n) {
 					if (auto it = free_vars.find(var);
 						it != free_vars.end())
 					{
-						BOOST_LOG_TRIVIAL(trace) << "(I) -- removing var: " << offset_child.value_tree();
+						LOG_TRACE << "(I) -- removing var: " << TAU_TO_STR(offset_child.value());
 						free_vars.erase(it);
 					}
 				}
 			}
-			BOOST_LOG_TRIVIAL(trace) << "(I) -- inserting var: " << tau::get(n);
+			LOG_TRACE << "(I) -- inserting var: " << TAU_TO_STR(n);
 			free_vars.insert(n);
 		}
 	};
@@ -266,7 +269,7 @@ bool has_open_tau_fm_in_constant(tref fm) {
 	for (tref c : consts) {
 		auto ba_const = tt(c) | tau::bf_constant | tt::ba_constant;
 		if (!std::visit(_closed, ba_const)) {
-			BOOST_LOG_TRIVIAL(error) << "(Error) A Tau formula constant must be closed: " << ba_const;
+			LOG_ERROR << "A Tau formula constant must be closed: " << ba_const;
 			return true;
 		}
 	}
