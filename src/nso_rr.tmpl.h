@@ -6,6 +6,9 @@
 #include "utility/measure.h"
 #endif // TAU_MEASURE
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "nso_rr"
+
 namespace idni::tau_lang {
 
 template <NodeType node>

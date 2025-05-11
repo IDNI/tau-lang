@@ -19,36 +19,42 @@
 namespace idni::tau_lang {
 
 // uncomment to enable logging for hooks
-// #define HOOK_LOGGING_ENABLED 1
+#define HOOK_LOGGING_ENABLED 1
 
 // list of enabled channels for TRACE and DEBUG messages
 // INFO, WARNING and ERROR messages are not filtered by channel
 // comment or uncomment as desired
 static const char* enabled_channels [] = {
-	"nso_ba",
-	"sbf_ba",
-	"ba_constants",
-	"ba_types_checker_and_propagator",
-	"execution",
-	"hooks",
-	"interpreter",
+	// "nso_ba",
+	// "sbf_ba",
+	// "tau_ba",
+	// "ba_types",
+	// "ba_types_inference",
+	// "ba_constants",
+	// "ba_constants_binder",
+	// "execution",
+	// "hooks",
+	// "interpreter",
 	"normal_forms",
+	"assign_and_reduce",
+	"reduce_deprecated",
+	"to_snf",
 	"normalizer",
 	"nso_rr",
-	"ref_types",
-	"repl_evaluator",
-	"satisfiability",
-	"solver",
-	"splitter",
-	"tau_tree",
-	"tau_tree_builders",
-	"tau_tree_extractors",
-	"tau_tree_from_parser",
-	"tau_tree_node",
-	"tau_tree_printers",
-	"tau_tree_queries",
-	"tau_tree_traverser",
-	"tau_tree_types",
+	// "ref_types",
+	// "repl_evaluator",
+	// "satisfiability",
+	// "solver",
+	// "splitter",
+	// "tau_tree",
+	// "builders",
+	// "extractors",
+	// "from_parser",
+	// "node",
+	// "printers",
+	// "queries",
+	// "traverser",
+	// "types",
 };
 
 // default channel name
@@ -57,7 +63,7 @@ static const char* enabled_channels [] = {
 // to define a channel name, redefine the LOG_CHANNEL_NAME macro.
 // All the following LOG_TRACE and LOG_DEBUG messages will go to this channel.
 
-// Usual place of a channel redefinition is at a header file right after all
+// Usual place of a channel redefinition is at a .tmpl.h file right after all
 // includes.
 // It can be also around some part of a code.
 // If other channel code follows, it has to be redefined to the proper channel.
@@ -147,10 +153,9 @@ struct logging {
 			case trivial::info: break; // no prefix
 			case trivial::trace: // (severity) channel: message
 			case trivial::debug:
-				ss << "(" << *sev << ") " << (rec[channel_attr]
-					? *rec[channel_attr]
-					: "global") << ": ";
-				while (ss.tellp() < 24) ss << " "; // padding
+				ss << "(" << *sev << ") [" << (rec[channel_attr]
+					? *rec[channel_attr] : "global") <<"] ";
+				while (ss.tellp() < 30) ss << " "; // padding
 				break;
 			}
 			os << ss.str() << rec[expressions::smessage];

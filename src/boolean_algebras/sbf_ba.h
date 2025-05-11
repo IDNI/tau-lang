@@ -7,9 +7,6 @@
 #include "boolean_algebras/tau_ba.h"
 #include "boolean_algebras/variant_ba.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "sbf_ba"
-
 namespace idni::tau_lang {
 
 /**

@@ -13,12 +13,12 @@ TEST_SUITE("normal forms: snf for wff") {
 
 	TEST_CASE("simple case: T") {
 		const char* sample = "T.";
-		CHECK( get_nso_rr_and_check(sample, tau_parser::wff_t) );
+		CHECK( get_nso_rr_and_check(sample, tau::wff_t) );
 	}
 
 	TEST_CASE("simple case: F") {
 		const char* sample = "F.";
-		CHECK( get_nso_rr_and_check(sample, tau_parser::wff_f) );
+		CHECK( get_nso_rr_and_check(sample, tau::wff_f) );
 	}
 
 	TEST_CASE("simple case: X = 0") {
@@ -85,6 +85,7 @@ TEST_SUITE("normal forms: snf for wff") {
 		CHECK( tau::get(result).to_str() == "x = 0" );
 	}*/
 
+	// TODO (HIGH) fix this test
 	TEST_CASE("simple case: xy = 0 && x = 0") {
 		const char* sample = "xy = 0 && x = 0.";
 		auto nso_rr = get_nso_rr(sample);
@@ -94,6 +95,7 @@ TEST_SUITE("normal forms: snf for wff") {
 		CHECK( tau::get(result).to_str() == "x = 0" );
 	}
 
+	// TODO (HIGH) fix this test
 	TEST_CASE("simple case: xy != 0 && x != 0") {
 		const char* sample = "xy != 0 && x != 0.";
 		auto nso_rr = get_nso_rr(sample);

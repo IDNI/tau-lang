@@ -5,9 +5,6 @@
 
 #include "tau_tree.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "hooks"
-
 #ifdef HOOK_LOGGING_ENABLED
 #define HOOK_LOGGING(x) x
 #else

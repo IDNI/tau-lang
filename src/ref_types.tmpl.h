@@ -2,6 +2,9 @@
 
 #include "ref_types.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ref_types"
+
 namespace idni::tau_lang {
 
 template <NodeType node>

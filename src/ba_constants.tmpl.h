@@ -8,6 +8,9 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 // BA types
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ba_types"
+
 template <typename... BAs>
 requires BAsPack<BAs...>
 size_t ba_types<BAs...>::type_id(size_t type_sid) {
@@ -61,6 +64,9 @@ std::ostream& print_ba_type(std::ostream& os, size_t ba_type_id) {
 
 // -----------------------------------------------------------------------------
 // BA constants
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ba_constants"
 
 template <typename... BAs>
 requires BAsPack<BAs...>
@@ -163,6 +169,9 @@ size_t ba_constants<BAs...>::get(const std::variant<BAs...>& b) {
 
 // -----------------------------------------------------------------------------
 // binder
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ba_constants_binder"
 
 template <typename... BAs>
 requires BAsPack<BAs...>

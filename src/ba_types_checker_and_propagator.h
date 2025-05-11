@@ -5,9 +5,6 @@
 
 #include "tau_tree.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "ba_types_checker_and_propagator"
-
 namespace idni::tau_lang {
 
 // propagator object takes a formula argument with () operator and it checks and

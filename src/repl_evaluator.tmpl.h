@@ -2,6 +2,9 @@
 
 #include "repl_evaluator.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "repl_evaluator"
+
 namespace idni::tau_lang {
 
 #define TC_STATUS        TC.BG_LIGHT_CYAN()
