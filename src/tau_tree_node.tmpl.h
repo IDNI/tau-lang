@@ -3,7 +3,7 @@
 #include "ba_constants.h"
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "tau_tree_node"
+#define LOG_CHANNEL_NAME "node"
 
 namespace idni::tau_lang {
 

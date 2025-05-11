@@ -3,6 +3,9 @@
 #include "boolean_algebras/sbf_ba.h"
 #include "../parser/sbf_parser.generated.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "sbf_ba"
+
 namespace idni::tau_lang {
 
 // evaluates a parsed bdd terminal node recursively

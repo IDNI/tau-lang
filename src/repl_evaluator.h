@@ -43,9 +43,6 @@
 #include "boolean_algebras/tau_ba.h"
 #include "utility/repl.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "repl_evaluator"
-
 namespace idni::tau_lang {
 
 enum repl_option { none_opt, invalid_opt, severity_opt, status_opt,

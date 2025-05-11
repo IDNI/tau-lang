@@ -5,9 +5,6 @@
 
 #include "solver.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "interpreter"
-
 namespace idni::tau_lang {
 
 // represents a solution  of variables to values.

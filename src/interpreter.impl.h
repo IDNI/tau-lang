@@ -3,8 +3,10 @@
 #include <string>
 
 #include "interpreter.h"
-
 #include "utility/term.h"
+
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "interpreter"
 
 namespace idni::tau_lang {
 

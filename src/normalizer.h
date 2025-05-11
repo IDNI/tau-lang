@@ -5,9 +5,6 @@
 
 #include "normal_forms.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "normalizer"
-
 // TODO (MEDIUM) fix proper types (alias) at this level of abstraction
 //
 // We should talk about statement, nso_rr (nso_with_rr?), library, rule, builder,

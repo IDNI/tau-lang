@@ -2,6 +2,9 @@
 
 #include "solver.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "solver"
+
 // In what follows we use the algorithms and notations of TABA book (cf.
 // Section 3.2).Chek (https://github.com/IDNI/tau-lang/blob/main/docs/taba.pdf)
 // for the details.

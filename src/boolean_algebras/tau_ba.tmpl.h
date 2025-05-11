@@ -2,6 +2,9 @@
 
 #include "boolean_algebras/tau_ba.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "tau_ba"
+
 namespace idni::tau_lang {
 
 template <typename... BAs>

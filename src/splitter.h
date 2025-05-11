@@ -5,9 +5,6 @@
 
 #include "satisfiability.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "splitter"
-
 namespace idni::tau_lang {
 
 enum class split_sym {

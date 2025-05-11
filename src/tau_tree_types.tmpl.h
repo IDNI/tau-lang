@@ -5,7 +5,7 @@
 // #include "ba_types_checker_and_propagator.h"
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "tau_tree_types"
+#define LOG_CHANNEL_NAME "types"
 
 namespace idni::tau_lang {
 

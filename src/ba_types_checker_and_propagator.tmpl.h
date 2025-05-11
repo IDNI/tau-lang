@@ -2,6 +2,9 @@
 
 #include "ba_types_checker_and_propagator.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "ba_types_inference"
+
 namespace idni::tau_lang {
 
 template <typename... BAs>

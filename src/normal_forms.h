@@ -8,9 +8,6 @@
 
 #include "execution.h"
 
-#undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "normal_forms"
-
 namespace idni::tau_lang {
 
 /**

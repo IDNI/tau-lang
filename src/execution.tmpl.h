@@ -2,6 +2,9 @@
 
 #include "execution.h"
 
+#undef LOG_CHANNEL_NAME
+#define LOG_CHANNEL_NAME "execution"
+
 namespace idni::tau_lang {
 
 // -----------------------------------------------------------------------------

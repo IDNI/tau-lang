@@ -3,7 +3,7 @@
 #include "tau_tree.h"
 
 #undef LOG_CHANNEL_NAME
-#define LOG_CHANNEL_NAME "tau_tree_traverser"
+#define LOG_CHANNEL_NAME "traverser"
 
 namespace idni::tau_lang {
 
