@@ -69,7 +69,7 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 	// "to_snf",
 	"normalizer",
 	// "nso_rr",
-	// "ref_types",
+	// "ref_types_inference",
 	// "repl_evaluator",
 	// "satisfiability",
 	// "solver",

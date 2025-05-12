@@ -1,7 +1,7 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#ifndef __IDNI__TAU__BA_TYPES_CHECKER_AND_PROPAGATOR_H__
-#define __IDNI__TAU__BA_TYPES_CHECKER_AND_PROPAGATOR_H__
+#ifndef __IDNI__TAU__BA_TYPES_INFERENCE_H__
+#define __IDNI__TAU__BA_TYPES_INFERENCE_H__
 
 #include "tau_tree.h"
 
@@ -11,7 +11,7 @@ namespace idni::tau_lang {
 // propagates BA types accross atomic formulas and checks variable scopes
 template <typename... BAs>
 requires BAsPack<BAs...>
-struct ba_types_checker_and_propagator {
+struct ba_types_inference {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
 	using tt = tau::traverser;
@@ -49,6 +49,6 @@ private:
 
 } // idni::tau_lang namespace
 
-#include "ba_types_checker_and_propagator.tmpl.h"
+#include "ba_types_inference.tmpl.h"
 
-#endif // __IDNI__TAU__BA_TYPES_CHECKER_AND_PROPAGATOR_H__
+#endif // __IDNI__TAU__BA_TYPES_INFERENCE_H__

@@ -1,15 +1,31 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
-#include "ba_types_checker_and_propagator.h"
+#include "ba_types_inference.h"
 
 #undef LOG_CHANNEL_NAME
 #define LOG_CHANNEL_NAME "ba_types_inference"
 
 namespace idni::tau_lang {
 
+// -----------------------------------------------------------------------------
+// BA types inference
+
+template <NodeType node>
+tref infer_ba_types(tref n) {
+	using tau = tree<node>;
+	LOG_TRACE_T("Infer BA types"); LOG_TRACE_F(n);
+	// static typename node::ba_types_inference infer;
+	// if ((n = infer(n)) == nullptr) return nullptr;
+	LOG_TRACE_T("Inferred BA types"); LOG_TRACE_F(n);
+	return n;
+}
+
+// -----------------------------------------------------------------------------
+// BA types checker and propagator
+
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref ba_types_checker_and_propagator<BAs...>::operator()(tref n) {
+tref ba_types_inference<BAs...>::operator()(tref n) {
 	if (disabled) return n;
 	LOG_TRACE_T("BA type check and propagate"); LOG_TRACE_F(n);
 	ts.clear(), untyped_n = 0;
@@ -17,11 +33,11 @@ tref ba_types_checker_and_propagator<BAs...>::operator()(tref n) {
 	tref x = replace_types_with_scope_ids(n, vsc, 0, tsid);
 	if (x == nullptr) return nullptr;
 
-	LOG_TRACE_T("BA type scoped") LOG_TRACE_F(x);
+	LOG_TRACE_T("BA type scoped"); LOG_TRACE_F(x);
 	static std::string untyped{"???"};
 	for (auto& [k, v] : ts)
 		LOG_TRACE_T("\t"<< (v.empty() ? untyped : v)<<" \t ( "<<k<<")");
-	LOG_TRACE_T("check_and_propagate BA types")
+	LOG_TRACE_T("check_and_propagate BA types");
 	auto nn = check_and_propagate(x);
 	if (!nn) return nullptr;
 
@@ -48,7 +64,7 @@ tref ba_types_checker_and_propagator<BAs...>::operator()(tref n) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref ba_types_checker_and_propagator<BAs...>::operator()(const tt& n) {
+tref ba_types_inference<BAs...>::operator()(const tt& n) {
 	if (!n.has_value()) return nullptr;
 	return (*this)(n.value());
 }
@@ -60,7 +76,7 @@ tref ba_types_checker_and_propagator<BAs...>::operator()(const tt& n) {
 // tsid = temporal scope id
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
+tref ba_types_inference<BAs...>::replace_types_with_scope_ids(
 	tref n, var_scopes_t& vsc, size_t csid, size_t& tsid)
 {
 	LOG_TRACE_T("replace_types_with_scope_ids: "); LOG_TRACE_F(n);
@@ -187,7 +203,7 @@ tref ba_types_checker_and_propagator<BAs...>::replace_types_with_scope_ids(
 // checks and propagates types within the scope (global or quantifier)
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref ba_types_checker_and_propagator<BAs...>::check_and_propagate(tref n) {
+tref ba_types_inference<BAs...>::check_and_propagate(tref n) {
 	bool err = false;
 	const auto checker_and_propagator = [this, &err](tref el) -> bool {
 		if (err) return false;
@@ -236,7 +252,7 @@ tref ba_types_checker_and_propagator<BAs...>::check_and_propagate(tref n) {
 
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref ba_types_checker_and_propagator<BAs...>::get_var_key_node(tref n) const {
+tref ba_types_inference<BAs...>::get_var_key_node(tref n) const {
 	auto io_var = tt(n) | tau::variable | tau::io_var | tt::only_child;
 	if (!io_var) return n;
 	return io_var.value_tree().first();
@@ -245,7 +261,7 @@ tref ba_types_checker_and_propagator<BAs...>::get_var_key_node(tref n) const {
 // check appearance of a single type in all BA elems, then propagate it
 template <typename... BAs>
 requires BAsPack<BAs...>
-bool ba_types_checker_and_propagator<BAs...>::propagate(tref n) {
+bool ba_types_inference<BAs...>::propagate(tref n) {
 	std::set<std::string> types;
 	auto els = tau::get(n).select_all(is_ba_element);
 	// collect types from BA elements
@@ -281,9 +297,7 @@ bool ba_types_checker_and_propagator<BAs...>::propagate(tref n) {
 // used as a cleaning (last) step after type checking and propagation
 template <typename... BAs>
 requires BAsPack<BAs...>
-tref ba_types_checker_and_propagator<BAs...>::replace_scope_ids_with_types(
-	tref n) const
-{
+tref ba_types_inference<BAs...>::replace_scope_ids_with_types(tref n) const {
 	const auto transformer = [this](const auto& el) {
 		if (is_ba_element(el)) {
 			auto key = get_var_key_node(el);
