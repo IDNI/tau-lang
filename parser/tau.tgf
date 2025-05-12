@@ -189,8 +189,8 @@ cli_command            =>
 # qelim
         | ("qelim":qelim_sym __ wff_cmd_arg)                  :qelim_cmd
 # option commands
-        | ("get":get_sym  [__ option_name])                   :get_cmd
-        | ("set":set_sym   __ option_name
+        | ("get":get_sym        [__ option_name])             :get_cmd
+        | ("set":set_sym         __ option_name
                                 (__ | _ '=' _) option_value)  :set_cmd
         | ("enable" :enable_sym  __ option_name)              :enable_cmd
         | ("disable":disable_sym __ option_name)              :disable_cmd
@@ -206,7 +206,7 @@ cli_command            =>
 
 # options
 solve_options          => (__ solve_option)*.
-solve_option           => ("--" solver_mode) | ("--" type).
+solve_option           => "--" (solver_mode | type).
 solver_mode            => ("minimum" | "min"):solver_mode_minimum
                         | ("maximum" | "max"):solver_mode_maximum.
 
