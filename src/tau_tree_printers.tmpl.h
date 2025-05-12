@@ -179,7 +179,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 // TODO review indenting and syntax highlighting
 
-// #define DEBUG_TRAVERSAL 1
+// #define DEBUG_PRETTY_PRINTER 1
 
 	std::vector<size_t> hl_path;
 	size_t depth = 0;
@@ -265,11 +265,9 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		auto p_it = prio.find(pt);
 		auto n_it = prio.find(nt);
 		if (p_it == prio.end() || n_it == prio.end()) {
-#ifdef DEBUG
-			std::cerr << "No priority for " << (p_it == prio.end()
-							? node::name(pt)
-							: node::name(nt))<<"\n";
-#endif
+			DBG(LOG_DEBUG << "No priority set for "
+				<< (p_it == prio.end()  ? node::name(pt)
+							: node::name(nt));)
 			return false;
 		}
 		// std::cerr << "\n"
@@ -348,8 +346,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	auto on_enter = [&](tref ref, tref parent) {
 		const auto& t = get(ref);
-#ifdef DEBUG_TRAVERSAL
-		std::cerr << "[" << t.get_type_name() << "]";
+#ifdef DEBUG_PRETTY_PRINTER
+		LOG_TRACE << "[" << t.get_type_name() << "]";
 #endif
 		// t.print_tree(os << "entering: ") << "\n";
 		size_t nt = t.get_type();
@@ -464,8 +462,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	auto on_between = [&](tref /*left*/, tref parent) {
 		if (parent == nullptr) return true;
 		const auto& t = get(parent);
-#ifdef DEBUG_TRAVERSAL
-		std::cerr << "[|" << t.get_type_name() << "] \n";
+#ifdef DEBUG_PRETTY_PRINTER
+		LOG_TRACE << "[|" << t.get_type_name() << "] \n";
 #endif
 		auto inc_chpos = [&chpos, &parent]() { return chpos[parent]++;};
 		auto chpos_end = [&chpos, &parent]() { chpos.erase(parent); };
@@ -529,8 +527,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	};
 	auto on_leave = [&](tref ref) {
 		const auto& t = get(ref);
-#ifdef DEBUG_TRAVERSAL
-		std::cerr << "\n[/" << t.get_type_name() << "]";
+#ifdef DEBUG_PRETTY_PRINTER
+		LOG_TRACE << "\n[/" << t.get_type_name() << "]";
 #endif
 		// t.print_tree( << "leaving: ") << "\n";
 		size_t nt = t.get_type();

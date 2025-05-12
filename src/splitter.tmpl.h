@@ -275,18 +275,21 @@ std::pair<tref, splitter_type> nso_tau_splitter(tref fm,
 				size_t type_c = tau::get(c).get_ba_type();
 				if (type_f && type_f != type_c) continue;
 				tref r = tau::build_bf_gteq(f.get(), c);
-				tref new_fm = rewriter::replace<node>(
-					fm, clause, tau::build_wff_and(clause, r));
-				new_fm = rewriter::replace<node>(new_fm, neq, tau::_T());
+				tref new_fm = rewriter::replace<node>(fm,
+					clause, tau::build_wff_and(clause, r));
+				new_fm = rewriter::replace<node>(
+							new_fm, neq, tau::_T());
 				if (is_splitter<BAs...>(fm, new_fm, spec_clause))
 					return { new_fm, st };
 			}
-			if (tref s = good_splitter_using_function<BAs...>(f.get(), st, clause);
+			if (tref s = good_splitter_using_function<BAs...>(
+							f.get(), st, clause);
 				tau::get(s) != tau::get(clause))
 			{
 				//TODO: this equiv check should happen in good_splitter_using_function
-				tref new_fm = rewriter::replace<node>(fm, clause, s);
-				if (is_splitter<BAs...>(fm, new_fm, spec_clause))
+				tref new_fm = rewriter::replace<node>(
+								fm, clause, s);
+				if (is_splitter<BAs...>(fm, new_fm,spec_clause))
 					return { new_fm, st };
 			}
 		}
@@ -310,9 +313,10 @@ requires BAsPack<BAs...>
 tref tau_splitter(tref fm, splitter_type st) {
 	using node = tau_lang::node<BAs...>;
 	using tau = tree<node>;
-	LOG_DEBUG << "(I) Start of tau_splitter";
+	LOG_DEBUG_I("Start of tau_splitter"); LOG_DEBUG_F(fm);
 	// First we decide if we deal with a temporal formula
-	if (!has_temp_var<node>(fm)) return nso_tau_splitter<BAs...>(fm, st).first;
+	if (!has_temp_var<node>(fm))
+		return nso_tau_splitter<BAs...>(fm, st).first;
 
 	auto splitter_of_clause = [&](tref clause) {
 		trefs specs = get_cnf_wff_clauses<node>(clause);
@@ -322,11 +326,12 @@ tref tau_splitter(tref fm, splitter_type st) {
 			auto [splitter, type] = nso_tau_splitter<BAs...>(
 					tau::get(spec)[0].first(), st, clause);
 			if (type != splitter_type::bad) {
-				LOG_TRACE << "Splitter of spec: " << splitter;
+				LOG_TRACE_I_F("Splitter of spec: ", splitter);
 				good_splitter = true;
-				if (is_aw) splitter = tau::build_wff_always(splitter);
-				else splitter = tau::build_wff_sometimes(splitter);
-				spec = splitter;
+				splitter = is_aw
+					? tau::build_wff_always(splitter)
+					: tau::build_wff_sometimes(splitter);
+				spec = splitter; // TODO (HIGH) what is meant by this?
 				break;
 			}
 		}

@@ -70,11 +70,11 @@ struct repl_evaluator {
 		bool debug_repl          = true;
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::debug;
-#else
+#else // DEBUG
 		bool debug_repl          = false;
 		boost::log::trivial::severity_level
 			severity = boost::log::trivial::info;
-#endif
+#endif // DEBUG
 		bool experimental        = false;
 	};
 

@@ -34,22 +34,19 @@ std::optional<solution<node>> find_solution(equality eq,
 	// g (Z) h (Z) (which is guaranteed to exist by Boole’s consistency condition).
 	// Then both f (h (Z) ,Z) = 0 and f (g′ (Z) ,Z) = 0.
 	// find a variable, say x, in the equality
-	DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-				<< " find_solution/eq: " << TAU_TO_STR(eq);)
+	DBG(LOG_TRACE << LOG_LINE << " find_solution/eq: " << TAU_TO_STR(eq);)
 	auto has_no_var = [](tref f) {
 		return !tau::get(f).find_top(is_child<node, tau::variable>);
 	};
 
 	if (!(tt(eq) | tau::bf_eq).has_value()) {
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-				<< " find_solution/solution[no_eq]: {}";)
+		DBG(LOG_TRACE <<LOG_LINE<<" find_solution/solution[no_eq]: {}";)
 		return {};
 	}
 
 	tref f = tt(eq) | tau::bf_eq | tau::bf | tt::ref;
 
-	DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-				<< " find_solution/f: " << TAU_TO_STR(f);)
+	DBG(LOG_TRACE << LOG_LINE << " find_solution/f: " << TAU_TO_STR(f);)
 
 	// FIXME convert vars to a set
 	if (trefs vars = tau::get(f)
@@ -62,19 +59,18 @@ std::optional<solution<node>> find_solution(equality eq,
 		tref gh = tt(tau::get(g) & tau::get(h))
 			| bf_reduce_canonical<node>() | tt::ref;
 
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " find_solution/var[0]: " << TAU_TO_STR(vars[0]) << "\n"
-			<< "solver.tmpl.h:" << __LINE__
-			<< " find_solution/g: " << TAU_TO_STR(g) << "\n"
-			<< "solver.tmpl.h:" << __LINE__
-			<< " find_solution/h: " << TAU_TO_STR(h) << "\n"
-			<< "solver.tmpl.h:" << __LINE__
-			<< " find_solution/gh: " << TAU_TO_STR(gh) << "\n";)
+#ifdef DEBUG
+		LOG_TRACE << LOG_LINE << " find_solution/var[0]: "
+							<< TAU_TO_STR(vars[0]);
+		LOG_TRACE << LOG_LINE << " find_solution/g: " << TAU_TO_STR(g);
+		LOG_TRACE << LOG_LINE << " find_solution/h: " << TAU_TO_STR(h);
+		LOG_TRACE << LOG_LINE << " find_solution/gh: "<< TAU_TO_STR(gh);
+#endif // DEBUG
 
 		if (has_no_var(gh)) {
 			if (!tau::get(gh).equals_0()) {
-				DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-					<< " find_solution/solution[gh_no_var,gh_!=_0]: {}";)
+				DBG(LOG_TRACE << LOG_LINE << " find_solution"
+					<< "/solution[gh_no_var,gh_!=_0]: {}";)
 				return {};
 			}
 			else {
@@ -87,15 +83,14 @@ std::optional<solution<node>> find_solution(equality eq,
 								substitution))
 					| bf_reduce_canonical<node>() | tt::ref;
 
-				#ifdef DEBUG
-				LOG_TRACE << "solver.tmpl.h:" << __LINE__
-					<< " find_solution/solution[gh_no_var,gh=0]: ";
+#ifdef DEBUG
+				LOG_TRACE << LOG_LINE << " find_solution"
+					<< "/solution[gh_no_var,gh=0]: ";
 				for (const auto& [k, v]: substitution)
-					LOG_TRACE
-						<< "solver.tmpl.h:" << __LINE__
+					LOG_TRACE << LOG_LINE
 						<< "\t" << TAU_TO_STR(k)
 						<< " := " << TAU_TO_STR(v) << " ";
-				#endif // DEBUG
+#endif // DEBUG
 
 				return substitution;
 			}
@@ -113,21 +108,20 @@ std::optional<solution<node>> find_solution(equality eq,
 							restricted.value()))
 				| bf_reduce_canonical<node>() | tt::ref;
 
-			#ifdef DEBUG
-			LOG_TRACE << "solver.tmpl.h:" << __LINE__
-				<< " find_solution/substitution[general]: ";
+#ifdef DEBUG
+			LOG_TRACE << LOG_LINE << " find_solution"
+						<< "/substitution[general]: ";
 			for (const auto& [k, v]: substitution)
-				LOG_TRACE << "solver.tmpl.h:" << __LINE__
+				LOG_TRACE << LOG_LINE
 					<< "\t" << TAU_TO_STR(k)
 					<< " := " << TAU_TO_STR(v) << " ";
-			#endif // DEBUG
+#endif // DEBUG
 
 			return substitution;
 		}
 	}
 
-	DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " find_solution/substitution[no_var]: {}";)
+	DBG(LOG_TRACE << LOG_LINE << " find_solution/substitution[no_var]: {}";)
 	return {};
 }
 
@@ -202,18 +196,16 @@ std::optional<solution<node>> lgrs(equality eq) {
 	using tau = tree<node>;
 	using tt = tau::traverser;
 	if (tau::get(eq).equals_T()) {
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-					<< " lgrs/solution: {}";)
+		DBG(LOG_TRACE << LOG_LINE << " lgrs/solution: {}";)
 		return solution<node>();
 	}
 
-	DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
+	DBG(LOG_TRACE << LOG_LINE
 				<< " lgrs/eq: " << TAU_TO_STR(eq) << "\n";)
 
 	auto s = find_solution<node>(eq);
 	if (!s.has_value()) {
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-					<< " lgrs/no solution";)
+		DBG(LOG_TRACE << LOG_LINE << " lgrs/no solution";)
 
 		return {};
 	}
@@ -224,17 +216,15 @@ std::optional<solution<node>> lgrs(equality eq) {
 			+ (tau::get(x_i) & ~tau::get(f)))
 				| bf_reduce_canonical<node>() | tt::ref;
 
-	#ifdef DEBUG
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " lgrs/equality: " << TAU_TO_STR(eq) << "\n"
-		<< "solver.tmpl.h:" << __LINE__ << " lgrs/solution: ";
+#ifdef DEBUG
+	LOG_TRACE << LOG_LINE << " lgrs/equality: " << TAU_TO_STR(eq);
+	LOG_TRACE << LOG_LINE << " lgrs/solution: ";
 	for (auto [k, v] : phi)
-		LOG_TRACE
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(k) << " := " << TAU_TO_STR(v) << " ";
+		LOG_TRACE << LOG_LINE << " \t" << TAU_TO_STR(k)
+				     << " := " << TAU_TO_STR(v) << " ";
 	tref check = snf_wff<node>(rewriter::replace<node>(eq, phi));
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " lgrs/check: " << TAU_TO_STR(check) << "\n";
-	#endif // DEBUG
+	LOG_TRACE << LOG_LINE << " lgrs/check: " << TAU_TO_STR(check) << "\n";
+#endif // DEBUG
 
 	return phi;
 }
@@ -333,11 +323,10 @@ private:
 			: rewriter::replace_with<node>(choices.back().var,
 				tau::_0(), choices.back().partial_bf);
 		tref current = (tau::get(cte) & tau::get(choices.back()
-							.partial_minterm)).get();
+						.partial_minterm)).get();
 
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " make_current_minterm/current: "
-			<< TAU_TO_STR(current);)
+		DBG(LOG_TRACE << LOG_LINE << " make_current_minterm/current: "
+							<< TAU_TO_STR(current);)
 
 		return current;
 	}
@@ -488,12 +477,12 @@ private:
 		for (auto& it : minterm_iterators)
 			minterms.insert(build_bf_neq<node>(*it));
 
-		#ifdef DEBUG
-		LOG_TRACE << "solver.tmpl.h:" << __LINE__
+#ifdef DEBUG
+		LOG_TRACE << LOG_LINE
 				<< " make_current_minterm_system/minterms: ";
-		for (tref minterm : minterms) LOG_TRACE << "solver.tmpl.h:"
-			<< __LINE__ << "\t" << TAU_TO_STR(minterm);
-		#endif // DEBUG
+		for (tref minterm : minterms)
+			LOG_TRACE << LOG_LINE << " \t" << TAU_TO_STR(minterm);
+#endif // DEBUG
 
 		return minterms;
 	}
@@ -503,11 +492,15 @@ private:
 		size_t last_changed_value = minterm_iterators.size();
 		while (last_changed_value > 0) {
 			--last_changed_value;
-			if (++minterm_iterators[last_changed_value] == ranges[last_changed_value].end())
-				minterm_iterators[last_changed_value] = ranges[last_changed_value].begin();
+			if (++minterm_iterators[last_changed_value]
+				== ranges[last_changed_value].end())
+					minterm_iterators[last_changed_value]
+					   = ranges[last_changed_value].begin();
 			else break;
 		}
-		if (last_changed_value == 0 && minterm_iterators[0] == ranges[0].begin()) {
+		if (last_changed_value == 0
+			&& minterm_iterators[0] == ranges[0].begin())
+		{
 			exhausted = true; return;
 		}
 		current = make_current_minterm_system();
@@ -583,25 +576,23 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 		const auto& new_m_cte = tau::get(get_constant<node>(new_m));
 		auto new_m_exp = get_exponent<node>(new_m);
 
-		#ifdef DEBUG
-		LOG_TRACE << "solver.tmpl.h:" << __LINE__
-				<< " add_minterm_to_disjoint/d: " << TAU_TO_STR(d) << "\n"
-			<< "solver.tmpl.h:" << __LINE__
-				<< " add_minterm_to_disjoint/new_m: " << TAU_TO_STR(new_m) << "\n"
-			<< "solver.tmpl.h:" << __LINE__
-				<< " add_minterm_to_disjoint/new_m_cte: " << new_m_cte.dump_to_str() << "\n"
-			<< "solver.tmpl.h:" << __LINE__
-				<< " add_minterm_to_disjoint/new_m_exp:\n";
-		for (tref e : new_m_exp) LOG_TRACE << "solver.tmpl.h:"
-					<< __LINE__ << "\t" << TAU_TO_STR(e);
-		#endif // DEBUG
+#ifdef DEBUG
+		LOG_TRACE << LOG_LINE << " add_minterm_to_disjoint/d:"
+			<< TAU_TO_STR(d);
+		LOG_TRACE << LOG_LINE << " add_minterm_to_disjoint/new_m:"
+			<< TAU_TO_STR(new_m);
+		LOG_TRACE << LOG_LINE << " add_minterm_to_disjoint/new_m_cte:"
+			<< new_m_cte.to_str();
+		LOG_TRACE << LOG_LINE << " add_minterm_to_disjoint/new_m_exp:";
+		for (tref e : new_m_exp)
+			LOG_TRACE << LOG_LINE << " \t" << TAU_TO_STR(e);
+#endif // DEBUG
 
 		// case 1
 		if (get_exponent<node>(d) == new_m_exp) {
 
-			DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-				<< " add_minterm_to_disjoint/[case1]/new_disjoint: "
-				<< TAU_TO_STR(d) << "\n";)
+			DBG(LOG_TRACE << LOG_LINE << " add_minterm_to_disjoint"
+				<< "/[case1]/new_disjoint: " << TAU_TO_STR(d);)
 
 			new_disjoint.insert(d);
 			continue;
@@ -613,8 +604,8 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 				const auto& x = ~new_m_cte & tau::get(d);
 				new_disjoint.insert(x.get());
 
-				DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-					<< " add_minterm_to_disjoint/[case2]/new_disjoint: "
+				DBG(LOG_TRACE << LOG_LINE << " add_minterm_to"
+					"_disjoint/[case2]/new_disjoint: "
 					<< x.dump_to_str() << "\n";)
 
 			// case 3
@@ -623,19 +614,18 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 				new_m = tt(~d_cte & tau::get(new_m))
 					| bf_reduce_canonical<node>() | tt::ref;
 
-				DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-					<< " add_minterm_to_disjoint/[case3]/new_disjoint: "
-					<< TAU_TO_STR(d) << "\n"
-					<< "solver.tmpl.h:" << __LINE__
-					<< " add_minterm_to_disjoint/[case3]/new_m: "
-					<< TAU_TO_STR(new_m) << "\n";)
+				DBG(LOG_TRACE << LOG_LINE
+					<< " add_minterm_to_disjoint/[case3]"
+					"/new_disjoint: " << TAU_TO_STR(d)<<"\n"
+					<< LOG_LINE <<" add_minterm_to_disjoint"
+					"/[case3]/new_m: "<< TAU_TO_STR(new_m);)
 
 			// case 4
 			} else {
 				// otherwise, go with the splitters
-				DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-					<< " add_minterm_to_disjoint/[case4]/d_cte: "
-					<< d_cte.dump_to_str() << "\n";)
+				DBG(LOG_TRACE << LOG_LINE
+					<< " add_minterm_to_disjoint"
+					"/[case4]/d_cte: " << d_cte.to_str();)
 
 				tref s = d_cte.equals_1()
 					// case 4.1
@@ -645,7 +635,7 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 						| tau::bf_constant
 						| tt::ref)).get();
 
-				DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
+				DBG(LOG_TRACE << LOG_LINE
 					<< " add_minterm_to_disjoint/[case4]/s: "
 					<< TAU_TO_STR(s) << "\n";)
 
@@ -654,20 +644,19 @@ std::optional<minterm_system<node>> add_minterm_to_disjoint(
 				new_m = tt(~st & tau::get(new_m))
 					| bf_reduce_canonical<node>() | tt::ref;
 
-				DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-					<< " add_minterm_to_disjoint/[case4]/new_disjoint: "
-					<< (st & tau::get(d)).dump_to_str() << "\n"
-					<< "solver.tmpl.h:" << __LINE__
-					<< " add_minterm_to_disjoint/[case4]/new_m: "
-					<< TAU_TO_STR(new_m) << "\n";)
+				DBG(LOG_TRACE << LOG_LINE
+					<< " add_minterm_to_disjoint/[case4]"
+					"/new_disjoint: "
+					<< (st & tau::get(d)).to_str() << "\n"
+					<< LOG_LINE <<" add_minterm_to_disjoint"
+					"/[case4]/new_m: "<< TAU_TO_STR(new_m);)
 			}
 		// case 5
 		} else {
 			new_disjoint.insert(d);
 
-			DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-				<< " add_minterm_to_disjoint/[case5]/new_disjoint: "
-				<< TAU_TO_STR(d) << "\n";)
+			DBG(LOG_TRACE << LOG_LINE << " add_minterm_to_disjoint"
+				<< "/[case5]/new_disjoint: " << TAU_TO_STR(d);)
 		}
 	}
 	new_disjoint.insert(new_m);
@@ -678,13 +667,11 @@ template <NodeType node>
 std::optional<minterm_system<node>> make_minterm_system_disjoint(
 	const minterm_system<node>& sys, const solver_options& options)
 {
-	#ifdef DEBUG
+#ifdef DEBUG
 	using tau = tree<node>;
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " make_minterm_system_disjoint/system: ";
-	for (minterm t : sys) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(t);
-	#endif // DEBUG
+	LOG_TRACE << LOG_LINE << " make_minterm_system_disjoint/system: ";
+	for (minterm t : sys) LOG_TRACE << LOG_LINE << " \t" << TAU_TO_STR(t);
+#endif // DEBUG
 
 	minterm_system<node> disjoints;
 	for (auto it = sys.begin(); it != sys.end(); ++it)
@@ -694,12 +681,10 @@ std::optional<minterm_system<node>> make_minterm_system_disjoint(
 				disjoints = new_disjoints.value();
 		else return {};
 
-	#ifdef DEBUG
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " make_minterm_system_disjoint/disjoints: ";
-	for (minterm t : disjoints) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(t);
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << LOG_LINE << " make_minterm_system_disjoint/disjoints: ";
+	for (minterm t : disjoints) LOG_TRACE << LOG_LINE<<" \t"<<TAU_TO_STR(t);
+#endif // DEBUG
 
 	return disjoints;
 }
@@ -715,12 +700,10 @@ std::optional<solution<node>> solve_minterm_system(
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	#ifdef DEBUG
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " solve_minterm_system/system: ";
-	for (minterm t : system) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(t);
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << LOG_LINE << " solve_minterm_system/system: ";
+	for (minterm t : system) LOG_TRACE << LOG_LINE << "\t" << TAU_TO_STR(t);
+#endif // DEBUG
 
 	// We know the system has a solution as we only iterate over non-negative
 	// minterms (which trivially satisfy the condition of Theorem 3.3)
@@ -730,35 +713,35 @@ std::optional<solution<node>> solve_minterm_system(
 
 	for (tref neq : disjoint_minterms.value()) {
 
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " solve_minterm_system/neq: " << TAU_TO_STR(neq);)
+		DBG(LOG_TRACE << LOG_LINE << " solve_minterm_system/neq: "
+							<< TAU_TO_STR(neq);)
 
 		tref nf = tt(neq) | tau::bf_neq | tau::bf
 			| bf_reduce_canonical<node>() | tt::ref;
 
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " solve_minterm_system/nf: " << TAU_TO_STR(nf);)
+		DBG(LOG_TRACE << LOG_LINE << " solve_minterm_system/nf: "
+							<< TAU_TO_STR(nf);)
 
 		if (tau::get(nf).equals_0()) continue;
 
 		tref cte = get_constant<node>(nf);
 
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " solve_minterm_system/cte: " << TAU_TO_STR(cte);)
+		DBG(LOG_TRACE << LOG_LINE << " solve_minterm_system/cte: "
+							<< TAU_TO_STR(cte);)
 
 		minterm t = get_minterm<node>(nf);
 
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " solve_minterm_system/minterm: " << TAU_TO_STR(t);)
+		DBG(LOG_TRACE << LOG_LINE << " solve_minterm_system/minterm: "
+							<< TAU_TO_STR(t);)
 
 		eq = (tau::get(eq) | (tau::get(cte) & ~tau::get(t))).get();
 
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " solve_minterm_system/eq[partial]: " << TAU_TO_STR(eq);)
+		DBG(LOG_TRACE << LOG_LINE<<" solve_minterm_system/eq[partial]: "
+							 << TAU_TO_STR(eq);)
 	}
 
-	DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " solve_minterm_system/eq[final]: " << TAU_TO_STR(eq);)
+	DBG(LOG_TRACE << LOG_LINE << " solve_minterm_system/eq[final]: "
+						<< TAU_TO_STR(eq);)
 
 	eq = build_bf_eq<node>(eq);
 	return find_solution<node>(eq);
@@ -784,12 +767,10 @@ std::optional<solution<node>> solve_inequality_system(
 	// for each possible choice of H_i's, we try to solve the minterm system
 	// using tthe above solve method.
 
-	#ifdef DEBUG
+#ifdef DEBUG
 	using tau = tree<node>;
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " solve_inequality_system/system: ";
-	for (inequality t : system) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(t);
+	LOG_TRACE << LOG_LINE << " solve_inequality_system/system: ";
+	for (inequality t : system) LOG_TRACE << LOG_LINE<<" \t"<<TAU_TO_STR(t);
 	#endif // DEBUG
 	// If no inequality is contained, return an empty solution
 	if (system.empty()) return solution<node>{};
@@ -797,19 +778,18 @@ std::optional<solution<node>> solve_inequality_system(
 	for (auto it = minterm_inequality_system_iterator<node>(system);
 		it != minterm_inequality_system_iterator<node>::end; ++it)
 	{
-		#ifdef DEBUG
-		LOG_TRACE << "solver.tmpl.h:" << __LINE__
+#ifdef DEBUG
+		LOG_TRACE << LOG_LINE
 			<< " solve_inequality_system/minterm system: ";
-		for (minterm t : *it) LOG_TRACE
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(t);
-		#endif // DEBUG
+		for (minterm t : *it)
+			LOG_TRACE << LOG_LINE << "\t" << TAU_TO_STR(t);
+#endif // DEBUG
 
 		auto solution = solve_minterm_system<node>(*it, options);
 		if (solution.has_value()) return solution;
 	}
 
-	DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " solve_inequality_system/solution: {}";)
+	DBG(LOG_TRACE << LOG_LINE << " solve_inequality_system/solution: {}";)
 
 	return {};
 }
@@ -834,17 +814,15 @@ std::optional<solution<node>> solve_general_system(
 	using tau = tree<node>;
 	using tt = tau::traverser;
 
-	#ifdef DEBUG
-	if (system.first.has_value()) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << " solve_system/eq: "
-		<< TAU_TO_STR(system.first.value());
+#ifdef DEBUG
+	if (system.first.has_value()) LOG_TRACE <<LOG_LINE<<" solve_system/eq: "
+					<< TAU_TO_STR(system.first.value());
 	if (!system.second.empty()) {
-		LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " solve_system/inequalities: ";
-		for (inequality t : system.second) LOG_TRACE
-			<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(t);
+		LOG_TRACE << LOG_LINE << " solve_system/inequalities: ";
+		for (inequality t : system.second)
+			LOG_TRACE << LOG_LINE << "\t" << TAU_TO_STR(t);
 	}
-	#endif // DEBUG
+#endif // DEBUG
 
 	if (!system.first)
 		return solve_inequality_system<node>(system.second, options);
@@ -854,13 +832,11 @@ std::optional<solution<node>> solve_general_system(
 	auto phi = lgrs<node>(system.first.value());
 	if (!phi.has_value()) return {};
 
-	#ifdef DEBUG
-	LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << " solve_system/phi: ";
-	for (const auto& [k, v]: phi.value()) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(k)
-						<< " := " << TAU_TO_STR(v);
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << LOG_LINE << " solve_system/phi: ";
+	for (const auto& [k, v]: phi.value()) LOG_TRACE << LOG_LINE << " \t"
+				<< TAU_TO_STR(k) << " := " << TAU_TO_STR(v);
+#endif // DEBUG
 
 	inequality_system<node> inequalities;
 	// for each inequality g_i we apply the transformation given by lgrs solution
@@ -870,44 +846,41 @@ std::optional<solution<node>> solve_general_system(
 			ng_i = tt(rewriter::replace<node>(g_i, nphi))
 				| bf_reduce_canonical<node>() | tt::ref;
 		if (tau::get(ng_i).equals_F()) {
-			DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
+			DBG(LOG_TRACE << LOG_LINE
 				<< " solve_system/inequality_solution: {}";)
 
 			return {};
 		}
 		else if (tau::get(ng_i).equals_T()) continue;
 
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
-			<< " solve_system/inequality: " << TAU_TO_STR(ng_i);)
+		DBG(LOG_TRACE << LOG_LINE << " solve_system/inequality: "
+							<< TAU_TO_STR(ng_i);)
 
 		inequalities.insert(ng_i);
 	}
 
-	#ifdef DEBUG
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " solve_system/inequalities: ";
-	for (inequality t : inequalities) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(t);
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << LOG_LINE << " solve_system/inequalities: ";
+	for (inequality t : inequalities)
+		LOG_TRACE << LOG_LINE << "\t" << TAU_TO_STR(t);
+#endif // DEBUG
 
 
 	// solve the given system  of inequalities
 	auto inequality_solution =
 			solve_inequality_system<node>(inequalities, options);
 	if (!inequality_solution.has_value()) {
-		DBG(LOG_TRACE << "solver.tmpl.h:" << __LINE__
+		DBG(LOG_TRACE << LOG_LINE
 			<< " solve_system/inequality_solution: {}";)
 
 		return {};
 	}
 
-	#ifdef DEBUG
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " solve_system/inequality_solution: ";
-	for (auto [k, v]: inequality_solution.value()) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(k)
-						<< " := " << TAU_TO_STR(v);
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << LOG_LINE << " solve_system/inequality_solution: ";
+	for (auto [k, v]: inequality_solution.value()) LOG_TRACE << LOG_LINE
+		<< " \t" << TAU_TO_STR(k) << " := " << TAU_TO_STR(v);
+#endif // DEBUG
 
 	// and finally, apply the solution to lgrs solution to get the final one (ϕ (T)).
 	// Solutions coming from inequality_solution for variables appearing also
@@ -920,18 +893,16 @@ std::optional<solution<node>> solve_general_system(
 						inequality_solution.value());
 		// Now assign the remaining variables to 0 and compute
 		// resulting value for var
-		solution[var] =	tt(replace_free_vars_by<node>(func_with_neq_assgm,
-							tau::_0_trimmed()))
-					| bf_reduce_canonical<node>() | tt::ref;
+		solution[var] =	tt(replace_free_vars_by<node>(
+					func_with_neq_assgm, tau::_0_trimmed()))
+				| bf_reduce_canonical<node>() | tt::ref;
 	}
 
-	#ifdef DEBUG
-	LOG_TRACE << "solver.tmpl.h:" << __LINE__
-		<< " solve_system/inequality_solution: ";
-	for (auto [k, v]: solution) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << "\t" << TAU_TO_STR(k)
-						<< " := " << TAU_TO_STR(v);
-	#endif // DEBUG
+#ifdef DEBUG
+	LOG_TRACE << LOG_LINE << " solve_system/inequality_solution: ";
+	for (auto [k, v]: solution) LOG_TRACE << LOG_LINE << " \t"
+				<< TAU_TO_STR(k) << " := " << TAU_TO_STR(v);
+#endif // DEBUG
 
 	return solution;
 }
@@ -942,17 +913,15 @@ bool check_extreme_solution(const equation_system<node>& system,
 {
 	using tau = tree<node>;
 	using tt = tau::traverser;
-	#ifdef DEBUG
-	if (system.first) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << " check_extreme_solution/eq: "
+#ifdef DEBUG
+	if (system.first) LOG_TRACE << LOG_LINE <<" check_extreme_solution/eq: "
 		<< TAU_TO_STR(system.first.value());
-	for (inequality t : system.second) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << " check_extreme_solution/ineq: "
-		<< TAU_TO_STR(t);
-	for (auto [k, v]: substitution) LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << " check_extreme_solution/substitution: "
+	for (inequality t : system.second) LOG_TRACE << LOG_LINE
+		<< " check_extreme_solution/ineq: " << TAU_TO_STR(t);
+	for (auto [k, v]: substitution) LOG_TRACE << LOG_LINE <<
+		" check_extreme_solution/substitution: "
 		<< TAU_TO_STR(k) << " := " << TAU_TO_STR(v);
-	#endif // DEBUG
+#endif // DEBUG
 	// We check if the solution satisfies the inequalities of the system
 	for (inequality t : system.second) {
 		tref value = tt(rewriter::replace<node>(t, substitution))
@@ -1037,21 +1006,20 @@ std::optional<solution<node>> solve(tref form, const solver_options& options) {
 	using tt = tau::traverser;
 	if (tau::get(form).equals_T()) return { solution<node>() };
 
-	#ifdef DEBUG
-	LOG_TRACE
-		<< "solver.tmpl.h:" << __LINE__ << " solve/form: " << TAU_TO_STR(form) << "\n"
-		<< "solver.tmpl.h:" << __LINE__ << " solve/options/type: " << options.type << "\n";
+#ifdef DEBUG
+	LOG_TRACE << LOG_LINE << " solve/form: " << TAU_TO_STR(form);
+	LOG_TRACE << LOG_LINE << " solve/options/type: " << options.type;
 	switch (options.mode) {
-		case solver_mode::maximum: LOG_TRACE
-			<< "solver.tmpl.h:" << __LINE__ << " solve/options.kind: maximum\n"; break;
-		case solver_mode::minimum: LOG_TRACE
-			<< "solver.tmpl.h:" << __LINE__ << " solve/options.kind: minimum"; break;
-		default: LOG_TRACE
-			<< "solver.tmpl.h:" << __LINE__ << " solve/options.kind: default\n"
-			<< "solver.tmpl.h:" << __LINE__ << " solve/options.splitter_one:"
-			<< options.splitter_one; break;
+		case solver_mode::maximum: LOG_TRACE << LOG_LINE
+				<< " solve/options.kind: maximum"; break;
+		case solver_mode::minimum: LOG_TRACE << LOG_LINE
+				<< " solve/options.kind: minimum"; break;
+		default: LOG_TRACE << LOG_LINE
+			<< " solve/options.kind: default";
+			LOG_TRACE << LOG_LINE << " solve/options.splitter_one:"
+				<< options.splitter_one; break;
 	}
-	#endif // DEBUG
+#endif // DEBUG
 
 	tref dnf = tt(form) | bf_reduce_canonical<node>() | tt::ref;
 	for (tref clause : get_leaves<node>(dnf, tau::wff_or)) {

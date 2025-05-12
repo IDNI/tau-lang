@@ -34,8 +34,10 @@ template <NodeType node>
 void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	size_t len, [[maybe_unused]] tref r)
 {
+	static constexpr bool track_each_call = false;
+	if (!track_each_call) return;
 	std::stringstream ss;
-	ss << "(H) -- [" << msg << "] ";
+	ss << "(H) [" << msg << "] ";
 	while (ss.tellp() < 32) ss << " ";
 	ss << v;
 	if (len) {
@@ -52,7 +54,7 @@ void get_hook<node>::log(const char* msg, const node& v, const tref* ch,
 	LOG_TRACE << ss.str();
 }
 void applied(const std::string& rule) {
-	LOG_TRACE << "(HOOK RULE) applied: " << rule;
+	LOG_TRACE << "(H) -- Rule applied: " << rule;
 }
 #endif // HOOK_LOGGING_ENABLED
 
@@ -110,16 +112,6 @@ const tree<node>& get_hook<node>::quantifier(const tref* ch) {
 template <NodeType node>
 const tree<node>& get_hook<node>::quantified_formula(const tref* ch) {
 	return tau::get(ch[0])[0];
-}
-
-template <NodeType node>
-tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
-	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
-{
-	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
-	auto l = arg1(ch).get_ba_constant();
-	size_t type = arg1(ch).get_ba_type();
-	return build_bf_ba_constant<node>(~l, type, right);
 }
 
 template <NodeType node>
@@ -461,42 +453,6 @@ tref get_hook<node>::term_xor(const node& v, const tref* ch, size_t len, tref r)
 	return tau::get(tau::build_bf_xor(arg1_fm(ch).get(), arg2_fm(ch).get()), r);
 }
 
-template <NodeType node>
-tref get_hook<node>::ctn_neg(tref n) {
-	const auto& t = tau::get(n);
-	auto num    = t.find_top(is<node, tau::num>);
-	auto ctnvar = t.find_top(is<node, tau::ctnvar>);
-	auto op = t[0].get_type();
-	switch (op) {
-		//RULE(BF_PUSH_NEGATION_INWARDS_2, "($X != $Y)' := $X = $Y.")
-	case tau::ctn_neq:
-		HOOK_LOGGING(applied("($X != $Y)' := $X = $Y.");)
-		return tau::build_wff_ctn_eq(ctnvar, num);
-		//RULE(BF_PUSH_NEGATION_INWARDS_3, "($X = $Y)' := $X != $Y.")
-	case tau::ctn_eq:
-		HOOK_LOGGING(applied("($X = $Y)' := $X != $Y.");)
-		return tau::build_wff_ctn_neq(ctnvar, num);
-		//RULE(BF_PUSH_NEGATION_INWARDS_4, "($X >= $Y)' := $X < $Y.")
-	case tau::ctn_gteq:
-		HOOK_LOGGING(applied("($X >= $Y)' := $X < $Y.");)
-		return tau::build_wff_ctn_lt(ctnvar, num);
-		//RULE(BF_PUSH_NEGATION_INWARDS_5, "($X > $Y)' := $X <= $Y.")
-	case tau::ctn_gt:
-		HOOK_LOGGING(applied("($X > $Y)' := $X <= $Y.");)
-		return tau::build_wff_ctn_lteq(ctnvar, num);
-		//RULE(BF_PUSH_NEGATION_INWARDS_6, "($X <= $Y)' := $X > $Y.")
-	case tau::ctn_lteq:
-		HOOK_LOGGING(applied("($X <= $Y)' := $X > $Y.");)
-		return tau::build_wff_ctn_gt(ctnvar, num);
-		//RULE(BF_PUSH_NEGATION_INWARDS_7, "($X < $Y)' := $X >= $Y.")
-	case tau::ctn_lt:
-		HOOK_LOGGING(applied("($X < $Y)' := $X >= $Y.");)
-		return tau::build_wff_ctn_gteq(ctnvar, num);
-	default: return n;
-	}
-	return nullptr;
-}
-
 // Simplify constants being syntactically true or false
 template <NodeType node>
 tref get_hook<node>::cte(const node& v, const tref* ch, size_t len, tref right){
@@ -555,6 +511,16 @@ tref get_hook<node>::cte_xor([[maybe_unused]] const node& v, const tref* ch,
 	auto type_r = arg2(ch).get_ba_type();
 	auto type = type_l ? type_l : type_r;
 	return build_bf_ba_constant<node>(l ^ r, type, right);
+}
+
+template <NodeType node>
+tref get_hook<node>::cte_neg([[maybe_unused]] const node& v, const tref* ch,
+	[[maybe_unused]] size_t len, [[maybe_unused]] tref right)
+{
+	HOOK_LOGGING(log("cte_neg", v, ch, len, right);)
+	auto l = arg1(ch).get_ba_constant();
+	size_t type = arg1(ch).get_ba_type();
+	return build_bf_ba_constant<node>(~l, type, right);
 }
 
 template <NodeType node>
@@ -680,6 +646,42 @@ tref get_hook<node>::wff_or(const node& v, const tref* ch, size_t len, tref r) {
 	//RULE(BF_EQ_OR_SIMPLIFY_0, "$X != 0 || $X = 0 ::= T.")
 	//RULE(BF_EQ_OR_SIMPLIFY_1, "$X = 0 || $X != 0 ::= T.")
 	return tau::get_raw(v, ch, len, r);
+}
+
+template <NodeType node>
+tref get_hook<node>::ctn_neg(tref n) {
+	const auto& t = tau::get(n);
+	auto num    = t.find_top(is<node, tau::num>);
+	auto ctnvar = t.find_top(is<node, tau::ctnvar>);
+	auto op = t[0].get_type();
+	switch (op) {
+		//RULE(BF_PUSH_NEGATION_INWARDS_2, "($X != $Y)' := $X = $Y.")
+	case tau::ctn_neq:
+		HOOK_LOGGING(applied("($X != $Y)' := $X = $Y.");)
+		return tau::build_wff_ctn_eq(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_3, "($X = $Y)' := $X != $Y.")
+	case tau::ctn_eq:
+		HOOK_LOGGING(applied("($X = $Y)' := $X != $Y.");)
+		return tau::build_wff_ctn_neq(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_4, "($X >= $Y)' := $X < $Y.")
+	case tau::ctn_gteq:
+		HOOK_LOGGING(applied("($X >= $Y)' := $X < $Y.");)
+		return tau::build_wff_ctn_lt(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_5, "($X > $Y)' := $X <= $Y.")
+	case tau::ctn_gt:
+		HOOK_LOGGING(applied("($X > $Y)' := $X <= $Y.");)
+		return tau::build_wff_ctn_lteq(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_6, "($X <= $Y)' := $X > $Y.")
+	case tau::ctn_lteq:
+		HOOK_LOGGING(applied("($X <= $Y)' := $X > $Y.");)
+		return tau::build_wff_ctn_gt(ctnvar, num);
+		//RULE(BF_PUSH_NEGATION_INWARDS_7, "($X < $Y)' := $X >= $Y.")
+	case tau::ctn_lt:
+		HOOK_LOGGING(applied("($X < $Y)' := $X >= $Y.");)
+		return tau::build_wff_ctn_gteq(ctnvar, num);
+	default: return n;
+	}
+	return nullptr;
 }
 
 template <NodeType node>

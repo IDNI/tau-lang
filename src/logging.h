@@ -1,5 +1,33 @@
 // To view the license please visit https://github.com/IDNI/tau-lang/blob/main/LICENSE.txt
 
+// Logging streams:
+//  LOG_ERROR   << "message";      // "(Error) message"
+//  LOG_WARNING << "message";      // "(Warning) message"
+//  LOG_INFO    << "message";      // "message"
+//  LOG_DEBUG   << "message";      // "(debug) [channel] log message"
+//  LOG_TRACE   << "message";      // "(trace) [channel] log message"
+
+// Logging macros:
+//  LOG_DEBUG_I("message");        // "(debug) [channel] (I) -- message";
+//  LOG_DEBUG_T("message");        // "(debug) [channel] (T) -- message";
+//  LOG_DEBUG_F(fm);               // "(debug) [channel] (F) " << TAU_TO_STR(fm);
+//  LOG_DEBUG_F_DUMP(fm);          // "(debug) [channel] (F) " << TAU_DUMP_TO_STR(fm);
+//  LOG_DEBUG_MF("message", fm);   // "(debug) [channel] (F) message " << TAU_TO_STR(fm);
+//  LOG_DEBUG_MF_DUMP("message", fm)//"(debug) [channel] (F) message " << TAU_DUMP_TO_STR(fm);
+
+//  LOG_TRACE_I("message");        // "(trace) [channel] (I) -- message";
+//  LOG_TRACE_T("message");        // "(trace) [channel] (T) -- message";
+//  LOG_TRACE_F(fm);               // "(trace) [channel] (F) " << TAU_TO_STR(fm);
+//  LOG_TRACE_F_DUMP(fm);          // "(trace) [channel] (F) " << TAU_DUMP_TO_STR(fm);
+//  LOG_TRACE_MF("message", fm);   // "(trace) [channel] (F) message " << TAU_TO_STR(fm);
+//  LOG_TRACE_MF_DUMP("message", fm)//"(trace) [channel] (F) message " << TAU_DUMP_TO_STR(fm);
+
+// Logging current file and line:
+//   LOG_TRACE << LOG_LINE_PATH << "message";
+//       (trace) [channel] /path/to/file.h:123 message
+//   LOG_TRACE << LOG_LINE << "message";
+//       (trace) [channel] file.h:123 message
+
 // TODO (LOW) maybe allow to set a list of enabled channels (addition to --severity trace or debug)
 // TODO (LOW) multiple channels for various warnings and allow user to filter them
 
@@ -14,8 +42,6 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/expressions.hpp>
 
-#include <set>
-
 namespace idni::tau_lang {
 
 // uncomment to enable logging for hooks
@@ -24,7 +50,7 @@ namespace idni::tau_lang {
 // list of enabled channels for TRACE and DEBUG messages
 // INFO, WARNING and ERROR messages are not filtered by channel
 // comment or uncomment as desired
-static const char* enabled_channels [] = {
+static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 	// "nso_ba",
 	// "sbf_ba",
 	// "tau_ba",
@@ -41,21 +67,85 @@ static const char* enabled_channels [] = {
 	"to_snf",
 	"normalizer",
 	"nso_rr",
-	// "ref_types",
+	"ref_types",
 	// "repl_evaluator",
 	// "satisfiability",
-	// "solver",
-	// "splitter",
+	"solver",
+	"splitter",
 	// "tau_tree",
 	// "builders",
-	// "extractors",
+	"extractors",
 	// "from_parser",
 	// "node",
 	// "printers",
 	// "queries",
 	// "traverser",
-	// "types",
+	"types",
 };
+
+// Logging stream for error messages. Prepends message with "(Error) "
+#define LOG_ERROR         BOOST_LOG_TRIVIAL(error)
+// Logging stream for warning messages. Prepends message with "(Warning) "
+#define LOG_WARNING       BOOST_LOG_TRIVIAL(warning)
+// Logging stream for info messages. Doesn't prepend anything
+#define LOG_INFO          BOOST_LOG_TRIVIAL(info)
+// Logging stream for debug messages. Prepends message with "(debug) [channel] "
+// locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
+#define LOG_DEBUG         BOOST_LOG_STREAM_SEV( \
+				logging::get_channel_logger(LOG_CHANNEL_NAME), \
+				boost::log::trivial::debug)
+// Logging stream for trace messages. Prepends message with "(trace) [channel] "
+// locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
+#define LOG_TRACE         BOOST_LOG_STREAM_SEV( \
+				logging::get_channel_logger(LOG_CHANNEL_NAME), \
+				boost::log::trivial::trace)
+
+// Logging helper macros
+
+// LOG_TRACE << LOG_LINE_PATH << "message";
+#define LOG_LINE_PATH            __FILE__      << ":" << __LINE__ << " "
+// LOG_TRACE << LOG_LINE_PATH << "message";
+#define LOG_LINE                 __FILE_NAME__ << ":" << __LINE__ << " "
+
+// info: (I) -- message
+#define LOG_TRACE_I(m)           LOG_TRACE << "(I) -- " << m
+#define LOG_DEBUG_I(m)           LOG_DEBUG << "(I) -- " << m
+
+// info: (I) -- message with a formula
+#define LOG_TRACE_I_F(m, f)      LOG_TRACE << "(I) -- " <<m<< " "<<TAU_TO_STR(f)
+#define LOG_DEBUG_I_F(m, f)      LOG_DEBUG << "(I) -- " <<m<< " "<<TAU_TO_STR(f)
+
+// info: (I) -- message with a formula dump
+#define LOG_TRACE_I_F_DUMP(m, f) LOG_TRACE << "(I) -- " <<m<< " "<<TAU_TO_STR(f)
+#define LOG_DEBUG_I_F_DUMP(m, f) LOG_DEBUG << "(I) -- " <<m<< " "<<TAU_TO_STR(f)
+
+// type inference: (T) -- message
+#define LOG_TRACE_T(m)           LOG_TRACE << "(T) -- " << m
+#define LOG_DEBUG_T(m)           LOG_DEBUG << "(T) -- " << m
+
+// formula: (F) formula
+#define LOG_TRACE_F(f)           LOG_TRACE << "(F) " << TAU_TO_STR(f)
+#define LOG_DEBUG_F(f)           LOG_DEBUG << "(F) " << TAU_TO_STR(f)
+
+// formula: (F) formula dump
+#define LOG_TRACE_F_DUMP(f)      LOG_TRACE << "(F) " << TAU_DUMP_TO_STR(f)
+#define LOG_DEBUG_F_DUMP(f)      LOG_DEBUG << "(F) " << TAU_DUMP_TO_STR(f)
+
+// formula: (F) -- message with a formula
+#define LOG_TRACE_F_F(m, f)      LOG_TRACE << "(F) -- "<<m<<" "<<TAU_TO_STR(f)
+#define LOG_DEBUG_F_F(m, f)      LOG_DEBUG << "(F) -- "<<m<<" "<<TAU_TO_STR(f)
+
+// formula: (F) -- messages with a formula
+#define LOG_TRACE_F_F_DUMP(m, f) LOG_TRACE << "(F) -- "<<m<<" "<<TAU_DUMP_TO_STR(f)
+#define LOG_DEBUG_F_F_DUMP(m, f) LOG_DEBUG << "(F) -- "<<m<<" "<<TAU_DUMP_TO_STR(f)
+
+// spec/rrs: (RR) -- specs
+#define LOG_TRACE_RR(r)          LOG_TRACE << "(RR) -- " << to_str<node>(r)
+#define LOG_DEBUG_RR(r)          LOG_DEBUG << "(RR) -- " << to_str<node>(r)
+
+
+// -----------------------------------------------------------------------------
+// Logging channels
 
 // default channel name
 #define LOG_CHANNEL_NAME "global"
@@ -72,29 +162,8 @@ static const char* enabled_channels [] = {
 //   #undef  LOG_CHANNEL_NAME
 //   #define LOG_CHANNEL_NAME "a_channel_name"
 
-// Logging streams:
-//  LOG_ERROR   << "log message"; prints "(Error) log message"
-//  LOG_WARNING << "log message"; prints "(Warning) log message"
-//  LOG_INFO    << "log message"; prints "log message"
-//  LOG_DEBUG   << "log message"; prints "(debug) channel_name:    log message"
-//  LOG_TRACE   << "log message"; prints "(trace) channel_name:    log message"
+// -----------------------------------------------------------------------------
 
-// Logging stream for error messages. Prepends message with "(Error) "
-#define LOG_ERROR         BOOST_LOG_TRIVIAL(error)
-// Logging stream for warning messages. Prepends message with "(Warning) "
-#define LOG_WARNING       BOOST_LOG_TRIVIAL(warning)
-// Logging stream for info messages. Doesn't prepend anything
-#define LOG_INFO          BOOST_LOG_TRIVIAL(info)
-// Logging stream for debug messages. Prepends message with "(debug) channel_name: "
-// locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
-#define LOG_DEBUG         BOOST_LOG_STREAM_SEV( \
-				logging::get_channel_logger(LOG_CHANNEL_NAME), \
-				boost::log::trivial::debug)
-// Logging stream for trace messages. Prepends message with "(trace) channel_name: "
-// locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
-#define LOG_TRACE         BOOST_LOG_STREAM_SEV( \
-				logging::get_channel_logger(LOG_CHANNEL_NAME), \
-				boost::log::trivial::trace)
 
 BOOST_LOG_ATTRIBUTE_KEYWORD(channel_attr, "Channel", std::string)
 BOOST_LOG_ATTRIBUTE_KEYWORD(severity,
@@ -102,15 +171,15 @@ BOOST_LOG_ATTRIBUTE_KEYWORD(severity,
 
 struct logging {
 	// set filter to trace level
-	inline static void trace()   { set_filter(boost::log::trivial::trace); }
+	inline static void trace()  { set_filter(boost::log::trivial::trace);  }
 	// set filter to debug level
-	inline static void debug()   { set_filter(boost::log::trivial::debug); }
+	inline static void debug()  { set_filter(boost::log::trivial::debug);  }
 	// set filter to print info, warning and error messages
-	inline static void info()    { set_filter(boost::log::trivial::info);  }
+	inline static void info()   { set_filter(boost::log::trivial::info);   }
 	// set filter to print warning and error messages
-	inline static void warning() { set_filter(boost::log::trivial::warning);}
+	inline static void warning(){ set_filter(boost::log::trivial::warning);}
 	// set filter to print error messages
-	inline static void error()   { set_filter(boost::log::trivial::error); }
+	inline static void error()  { set_filter(boost::log::trivial::error);  }
 
 	// set filter to a specific level
 	inline static void set_filter(boost::log::trivial::severity_level level)
@@ -123,7 +192,7 @@ struct logging {
 			if (level != trivial::trace && level != trivial::debug)
 				return true;
 			if (!ch || *ch == "global") return true;
-			for (auto& channel : enabled_channels)
+			for (auto& channel : LOG_ENABLED_CHANNELS)
 				if (channel == *ch) return true;
 			return false;
 		});
@@ -151,11 +220,11 @@ struct logging {
 			case trivial::error:   ss << "(Error) ";   break;
 			case trivial::warning: ss << "(Warning) "; break;
 			case trivial::info: break; // no prefix
-			case trivial::trace: // (severity) channel: message
+			case trivial::trace: // (severity) [channel] message
 			case trivial::debug:
 				ss << "(" << *sev << ") [" << (rec[channel_attr]
 					? *rec[channel_attr] : "global") <<"] ";
-				while (ss.tellp() < 30) ss << " "; // padding
+				while (ss.tellp() < 32) ss << " "; // padding
 				break;
 			}
 			os << ss.str() << rec[expressions::smessage];
