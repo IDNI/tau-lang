@@ -1,22 +1,25 @@
 set(TAU "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 set(TAU_HEADERS
-	defs.h
-	logging.h
-	tau_tree.h
-	ba_constants.h
-	dict.h
-	rr.h
-	nso_rr.h
-	execution.h
-	nso_factory.h
-	normal_forms.h
+	defs.h             # common macro and types definitions
+	logging.h          # logging and its macros
+	tau_tree.h         # tau tree, node, tree traverser, builders,
+	                   # extractors, printers, queries, and 
+	                   # transformations from the parse tree
+	ba_types.h         # BA types
+	ba_constants.h     # BA constants pool and binder
+	dict.h             # dictionaries of bdd var names and strings
+	rr.h               # recurrence relation structure
+	nso_rr.h           # nso_rr_apply
+	execution.h        # execution of nso rr rules
+	normal_forms.h     # normal form transformations
 	normalizer.h
 	satisfiability.h
 	splitter_types.h
 	splitter.h
 	solver.h
 	interpreter.h
+	nso_factory.h      # abstract template interface
 	boolean_algebras/bool_ba.h
 	boolean_algebras/variant_ba.h
 	boolean_algebras/nso_ba.h

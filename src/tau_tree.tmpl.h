@@ -9,15 +9,6 @@ namespace idni::tau_lang {
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// ba and ref types inference (tau_tree_types.tmpl.h)
-template <NodeType node>
-tref infer_ba_types(tref n);
-template <NodeType node>
-std::optional<rr> infer_ref_types(const rr& nso_rr);
-template <NodeType node>
-std::optional<rr> infer_ref_types(const rr& nso_rr, ref_types<node>& ts);
-
-// -----------------------------------------------------------------------------
 // various extractors (tau_tree_extractors.tmpl.h)
 template <NodeType node>
 size_t get_type_sid(tref n);
@@ -88,12 +79,14 @@ bool has_open_tau_fm_in_constant(tref fm);
 
 #include "tau_tree_builders.h"
 
+#include "ref_types_inference.h"
+#include "ba_types_inference.h"
+
 #include "tau_tree_node.tmpl.h"
 #include "tau_tree_traverser.tmpl.h"
 #include "tau_tree_printers.tmpl.h"
 #include "tau_tree_queries.tmpl.h"
-#include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name
-#include "tau_tree_types.tmpl.h"
+#include "tau_tree_extractors.tmpl.h"  // TODO rename this file to proper name?
 #include "tau_tree_from_parser.tmpl.h"
 
 #include "hooks.h"
