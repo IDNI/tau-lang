@@ -344,7 +344,7 @@ std::pair<std::optional<assignment<node>>, bool>
 			// Simplify after updating stream variables
 			current = normalize_non_temp<node>(current);
 
-			#ifdef DEBUG
+#ifdef DEBUG
 			LOG_TRACE << "step/type: " << ba_type_id << "\n"
 				<< "step/equations: " << equations << "\n"
 				<< "step/updated: " << updated << "\n"
@@ -352,11 +352,11 @@ std::pair<std::optional<assignment<node>>, bool>
 				<< "step/memory: ";
 			for (const auto& [k, v]: memory)
 				LOG_TRACE << "\t" << k << " := " << v << " ";
-			#endif // DEBUG
+#endif // DEBUG
 
 			auto solution = solution_with_max_update(current);
 
-			#ifdef DEBUG
+#ifdef DEBUG
 			if (solution) {
 				LOG_TRACE << "step/solution: ";
 				if (solution.value().empty())
@@ -371,7 +371,7 @@ std::pair<std::optional<assignment<node>>, bool>
 			} else {
 				LOG_TRACE << "step/solution: no solution\n";
 			}
-			#endif // DEBUG
+#endif // DEBUG
 
 			if (solution.has_value()) {
 				// std::cout << "solution: \n";
@@ -757,12 +757,6 @@ std::pair<tref, tref> interpreter<node, in_t, out_t>::get_executable_spec(
 			for (const auto& [uc, v] : model.value())
 				LOG_INFO << TAU_TO_STR(uc) << " := " << TAU_TO_STR(v);
 
-#ifdef DEBUG
-			LOG_TRACE << "compute_systems/constraints/model: ";
-			for (const auto& [k, v]: model.value())
-				LOG_TRACE << "\t" << TAU_TO_STR(k) << " := "
-					<< TAU_TO_STR(v) << " ";
-#endif // DEBUG
 			spec = rewriter::replace<node>(executable, model.value());
 			LOG_INFO << "Resulting Tau specification: "
 						<< TAU_TO_STR(spec) << "\n";

@@ -293,10 +293,10 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 {
 	tref spec = create_spec(sample);
 
-	#ifdef DEBUG
+#ifdef DEBUG
 	std::cout << "run_test/------------------------------------------------------\n";
 	std::cout << "run_test/sample: " << sample << "\n";
-	#endif // DEBUG
+#endif // DEBUG
 
 	auto intprtr = interpreter<bnode, input_vector, output_console>
 				::make_interpreter(spec, inputs, outputs);
@@ -307,27 +307,27 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 			// we execute the i-th step
 			auto in = inputs.get();
 
-			#ifdef DEBUG
+#ifdef DEBUG
 			std::cout << "run_test/input[" << i << "]: ";
 			if (in.has_value()) {
 				for (const auto& [var, value] : in.value())
 					std::cout << TAU_TO_STR(var) << " <- " << TAU_TO_STR(value) << " ... ";
 				std::cout << "\n";
 			} else std::cout << "{}\n"; // no input
-			#endif // DEBUG
+#endif // DEBUG
 
 			auto [out, _ ] = intprtr.value().step ();
 
 			// The output can be empty if all variables have been assigned in previous steps
 			if (!out.has_value()) {
 				intprtr.value().memory.clear();
-				#ifdef DEBUG
+#ifdef DEBUG
 				std::cout << "run_test/output[" << i << "]: {}\n"; // no output
-				#endif // DEBUG
+#endif // DEBUG
 				break;
 			}
 
-			#ifdef DEBUG
+#ifdef DEBUG
 			std::cout << "run_test/output[" << i << "]: ";
 			for (const auto& [var, value]: out.value()) {
 				std::cout << TAU_TO_STR(var) << " <- " << TAU_TO_STR(value) << " ... ";
@@ -338,7 +338,7 @@ std::optional<assignment<bnode>> run_test(const char* sample,
 				}
 			}
 			std::cout << "\n";
-			#endif // DEBUG
+#endif // DEBUG
 		}
 
 		return intprtr.value().memory;
@@ -658,9 +658,9 @@ TEST_SUITE("test outputs") {
 		output_map[var_sid] = {
 			get_typed_stream<bnode>("sbf", random_file()) };
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var_sid].second << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 
 		foutputs<bnode> outputs(output_map);
 		assignment<bnode> output = { { var_0, tau::_1() } };
@@ -682,10 +682,10 @@ TEST_SUITE("test outputs") {
 		output_map[var2_sid] = {
 			get_typed_stream<bnode>("sbf", random_file()) };
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_sid].second << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 
 		foutputs<bnode> outputs(output_map);
 		assignment<bnode> output = {
@@ -711,10 +711,10 @@ TEST_SUITE("test outputs") {
 		output_map[var2_sid] = {
 			get_typed_stream<bnode>("sbf", random_file()) };
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var1_sid].second << "\n";
 		std::cout << "test_outputs/writing_to_file/output: " << output_map[var2_sid].second << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 
 		foutputs<bnode> outputs(output_map);
 		assignment<bnode> output = {

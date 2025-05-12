@@ -111,9 +111,9 @@ steps<node, step<node>> to_steps(
 {
 	std::vector<step<node>> s;
 	for (auto& l : libs) {
-		LOG_TRACE << "to_steps library " << l.size() << " rules";
-		for (auto& r : l)
-			LOG_TRACE << "to_steps rule: " << to_str<node>(r);
+		// LOG_TRACE << "to_steps library " << l.size() << " rules";
+		// for (auto& r : l)
+		// 	LOG_TRACE << "to_steps rule: " << to_str<node>(r);
 		s.emplace_back(l);
 	}
 	return steps<node, step<node>>(std::move(s));

@@ -16,13 +16,12 @@ TEST_SUITE("bf operator hooks") {
 	bool check_unbound_hook(const char* sample) {
 		tref tau_sample = tau::get(sample, parse_bf());
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		string str(sample);
-		if (tau_sample)
-			cout << "sample: " << str << " expected error, got : " << tau_sample << "\n";
-		else
-			cout << "sample: " << str << " expected error, got it\n";
-		#endif // DEBUG
+		if (tau_sample) cout << "sample: " << str
+			<< " expected error, got : " << tau_sample << "\n";
+		else cout << "sample: " << str << " expected error, got it\n";
+#endif // DEBUG
 
 		return tau_sample == nullptr;
 	}
@@ -32,7 +31,7 @@ TEST_SUITE("bf operator hooks") {
 		tref tau_sample   = tau::get(sample, parse_bf());
 		tref tau_expected = tau::get(expected, parse_bf());
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		cout << "sample: " << string(sample) << " expected: ";
 		if (tau_expected == 0) cout << "nullptr";
 		else cout << TAU_DUMP_TO_STR(tau_expected);
@@ -40,7 +39,7 @@ TEST_SUITE("bf operator hooks") {
 		if (tau_sample == 0) cout << "nullptr";
 		else cout << TAU_DUMP_TO_STR(tau_sample);
 		cout << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 
 		return tau::subtree_equals(tau_sample, tau_expected);
 	}
@@ -52,13 +51,13 @@ TEST_SUITE("bf operator hooks") {
 		auto sample_type = get_ba_type_name<bnode>(type_id);
 		auto expected_type = get_ba_type_name<bnode>(type_expected_id);
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		string str(sample);
-		if (type_sample)
-			cout << "sample: " << str << " expected type: " << expected_type << " got: " << sample_type << "\n";
-		else
-			cout << "sample: " << str << " expected type: " << expected_type << " got: tau\n";
-		#endif // DEBUG
+		if (type_sample) cout << "sample: " << str << " expected type: "
+			<< expected_type << " got: " << sample_type << "\n";
+		else cout << "sample: " << str << " expected type: "
+				<< expected_type << " got: tau\n";
+#endif // DEBUG
 
 		return type_id == type_expected_id && sample_type == expected_type;
 	}

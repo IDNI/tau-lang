@@ -70,11 +70,11 @@ int execute_normalizer_benchmark(const std::string label, const std::string file
 	normalize_test_tau(sample.c_str());
 	// measures::stop_timer("tau_normalization");
 
-    outfile << "\n " << label << "\n";
+	outfile << "\n " << label << "\n";
 	outfile << "------------------------------------------------------------------------------------------\n";
 	outfile << " (time): " << measures::get_timer("tau_normalization") << " ms\n";
 	outfile << " (rules):";
-	#ifdef TAU_MEASURE
+#ifdef TAU_MEASURE
 	if (measures::rule_counters<tau_<tau_ba<sbf_ba>, sbf_ba>>.empty()) {
 		outfile << "n/a\n";
 	} else {
@@ -105,9 +105,9 @@ int execute_normalizer_benchmark(const std::string label, const std::string file
 			<< "\t" << " (total ratio): " << std::fixed << std::setprecision(2) << total_ratio << "%\n";
 		outfile.close();
 	}
-	#else
+#else // TAU_MEASURE
 	outfile << "n/a\n";
-	#endif // TAU_MEASURE
+#endif // TAU_MEASURE
 	outfile << "------------------------------------------------------------------------------------------\n";
 	outfile << "Tau git commit: " << GIT_COMMIT_HASH << "\n";
 	return 0;

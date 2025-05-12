@@ -15,12 +15,12 @@ bool check_solution(tref eq, const solution<node>& sol) {
 	using tau = tree<node>;
 	tref substitution = rewriter::replace<node>(eq, sol);
 	tref check = snf_wff<node>(substitution);
-	#ifdef DEBUG
+#ifdef DEBUG
 	// std::cout << "check_solution/solution: " << dump<node>(sol) << "\n";
 	std::cout << "check_solution/equation: " << TAU_DUMP_TO_STR(eq) << "\n";
 	std::cout << "check_solution/substitution: " << TAU_DUMP_TO_STR(substitution) << "\n";
 	std::cout << "check_solution/check: " << TAU_DUMP_TO_STR(check) << "\n";
-	#endif // DEBUG
+#endif // DEBUG
 	return tau::get(check).equals_T();
 }
 
@@ -30,11 +30,11 @@ TEST_SUITE("minterm_iterator") {
 		const char* sample = "x = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<bnode> it(fm);
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 		CHECK ( ++it == minterm_iterator<bnode>::end );
 	}
 
@@ -42,16 +42,16 @@ TEST_SUITE("minterm_iterator") {
 		const char* sample = "x | y = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<bnode> it(fm);
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 		size_t n = 1;
 		while (it++ != minterm_iterator<bnode>::end) {
-			#ifdef DEBUG
+#ifdef DEBUG
 			std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
-			#endif // DEBUG
+#endif // DEBUG
 			n++;
 		}
 		CHECK ( n == 3 );
@@ -61,16 +61,16 @@ TEST_SUITE("minterm_iterator") {
 		const char* sample = "x | y | z = 0.";
 		tref fm = tt(tau::get(sample)) | tau::bf_eq | tau::bf | tt::ref;
 		minterm_iterator<bnode> it(fm);
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
 		std::cout << "sample: " << TAU_DUMP_TO_STR(fm) << "\n";
 		std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 		size_t n = 1;
 		while (it++ != minterm_iterator<bnode>::end) {
-			#ifdef DEBUG
+#ifdef DEBUG
 			std::cout << "minterm: " << TAU_DUMP_TO_STR(*it) << "\n";
-			#endif // DEBUG
+#endif // DEBUG
 			n++;
 		}
 		CHECK ( n == 7 );
@@ -276,9 +276,9 @@ TEST_SUITE("configuration") {
 TEST_SUITE("find_solution") {
 
 	bool test_find_solution(const char* src) {
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
-		#endif // DEBUG
+#endif // DEBUG
 		tref equation = get_nso_rr<bnode>(tau::get(src)).value().main->get();
 		auto solution = find_solution<bnode>(equation);
 		return ( check_solution<bnode>(equation, solution.value()));
@@ -324,9 +324,9 @@ TEST_SUITE("find_solution") {
 TEST_SUITE("lgrs") {
 
 	bool test_lgrs(const char* src) {
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
-		#endif // DEBUG
+#endif // DEBUG
 		tref equation = get_nso_rr<bnode>(tau::get(src)).value().main->get();
 		auto solution = lgrs<bnode>(equation);
 		return ( check_solution<bnode>(equation, solution.value()) );
@@ -347,9 +347,9 @@ TEST_SUITE("solve_minterm_system") {
 
 	bool test_solve_minterm_system(const std::vector<std::string> minterms) {
 		using bnode = idni::tau_lang::node<sbf_ba>;
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
-		#endif // DEBUG
+#endif // DEBUG
 		minterm_system<bnode> system;
 		for (const auto& mt : minterms) system.insert(
 				get_nso_rr<bnode>(tau::get(mt)).value().main->get());
@@ -382,9 +382,9 @@ TEST_SUITE("solve_inequality_system") {
 
 	bool test_solve_inequality_system(const std::vector<std::string> inequalities) {
 		using bnode = idni::tau_lang::node<sbf_ba>;
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
-		#endif // DEBUG
+#endif // DEBUG
 		inequality_system<bnode> system;
 		for (const auto& ineq : inequalities) {
 			system.insert(get_nso_rr<bnode>(tau::get(ineq)).value().main->get());
@@ -470,20 +470,20 @@ TEST_SUITE("solve_system") {
 			const std::vector<std::string> inequalities)
 	{
 		using bnode = idni::tau_lang::node<sbf_ba>;
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
-		#endif // DEBUG
+#endif // DEBUG
 		equation_system<bnode> system;
 		if (equality.size() != 0) system.first = get_nso_rr<bnode>(tau::get(equality)).value().main->get();
-		#ifdef DEBUG
+#ifdef DEBUG
 		if (system.first)
 			std::cout << "test_solve_system/system.first: " << system.first.value() << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 		for (const auto& ineq : inequalities) {
 			system.second.insert(get_nso_rr<bnode>(tau::get(ineq)).value().main->get());
-			#ifdef DEBUG
+#ifdef DEBUG
 			std::cout << "test_solve_system/system.second: " << tau::get(get_nso_rr<bnode>(tau::get(ineq)).value().main).dump_to_str() << "\n";
-			#endif // DEBUG
+#endif // DEBUG
 		}
 
 		// setting the proper options
@@ -495,10 +495,10 @@ TEST_SUITE("solve_system") {
 		// calling the solver function
 		auto solution = solve_system<bnode>(system, options);
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		// if (solution)
 		// 	std::cout << "test_solve_system/solution: " << solution.value() << "\n";
-		#endif // DEBUG
+#endif // DEBUG
 		auto copy = solution.value();
 		bool check = system.first
 			? check_solution<bnode>(system.first.value(), copy)
@@ -609,9 +609,9 @@ TEST_SUITE("solve_system") {
 TEST_SUITE("solve") {
 
 	bool test_solve(const std::string system, const solver_options& options) {
-		#ifdef DEBUG
+#ifdef DEBUG
 		std::cout << "------------------------------------------------------\n";
-		#endif // DEBUG
+#endif // DEBUG
 		tref form = get_nso_rr<bnode>(tau::get(system)).value().main->get();
 		auto solution = solve<bnode>(form, options);
 		return solution ? check_solution<bnode>(form, solution.value()) : false;

@@ -459,9 +459,7 @@ void repl_evaluator<BAs...>::run_cmd(const tt& n) {
 	// TODO (HIGH) remove this step once we plug the computation of phi/chi infinity
 	// as we would get a formula in dnf already. However, we would need to
 	// kept the application of definitionsand call the computation of phi/chi infinity
-	#ifdef DEBUG
-	LOG_DEBUG << "run_cmd/applied: " << TAU_TO_STR(applied) << "\n";
-	#endif // DEBUG
+	DBG(LOG_DEBUG << "run_cmd/applied: " << TAU_TO_STR(applied);)
 
 	// -------------------------------------------------------------
 	// TODO: remove once type inference is ready
@@ -627,9 +625,7 @@ void repl_evaluator<BAs...>::solve_cmd(const tt& n) {
 		return;
 	}
 
-	#ifdef DEBUG
-	LOG_TRACE << "solve_cmd/applied: " << applied << "\n";
-	#endif // DEBUG
+	DBG(LOG_TRACE << "solve_cmd/applied: " << applied << "\n";)
 
 	auto solution = solve<node>(applied, options);
 	if (!solution) { std::cout << "no solution\n"; return; }
@@ -657,13 +653,8 @@ void repl_evaluator<BAs...>::lgrs_cmd(const tt& n) {
 		return;
 	}
 
-	#ifdef DEBUG
-	LOG_TRACE << "lgrs_cmd/applied: " << TAU_TO_STR(applied) << "\n";
-	#endif // DEBUG
-
-	#ifdef DEBUG
-	LOG_TRACE << "lgrs_cmd/equality: " << TAU_TO_STR(equality) << "\n";
-	#endif // DEBUG
+	DBG(LOG_TRACE << "lgrs_cmd/applied: " << TAU_TO_STR(applied) << "\n";)
+	DBG(LOG_TRACE << "lgrs_cmd/equality: " << TAU_TO_STR(equality) << "\n";)
 
 	auto solution = lgrs<node>(applied);
 	if (!solution) { std::cout << "no solution\n"; return; }
@@ -879,7 +870,7 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 #ifdef DEBUG
 	{ debug_opt, [this]() {
 		std::cout << "debug-repl:          " << pbool[opt.debug_repl] << "\n"; } },
-#endif
+#endif // DEBUG
 	{ status_opt,       [this]() {
 		std::cout << "status:              " << pbool[opt.status] << "\n"; } },
 	{ colors_opt,       [this]() {
@@ -898,7 +889,7 @@ void repl_evaluator<BAs...>::get_cmd(repl_option o) {
 		LOG_ERROR << "Debug option not available in release build\n";
 		return;
 	}
-#endif
+#endif // DEBUG
 	if (o == none_opt) { for (auto& [_, v] : printers) v(); return; }
 	printers[o]();
 }
@@ -923,7 +914,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 		LOG_ERROR << "Debug option not available\n";
 		return;
 	}
-#endif
+#endif // DEBUG
 	auto update_bool_value = [&v](bool& opt) {
 		if (v == "t" || v == "true" || v == "on" || v == "1"
 			|| v == "y" || v == "yes") opt = true;
@@ -936,7 +927,7 @@ void repl_evaluator<BAs...>::set_cmd(repl_option o, const std::string& v) {
 #ifdef DEBUG
 	{ debug_opt, [&]() {
 		update_bool_value(opt.debug_repl); } },
-#endif
+#endif // DEBUG
 	{ status_opt,   [&]() {
 		update_bool_value(opt.status); } },
 	{ colors_opt,   [&]() {
@@ -977,11 +968,11 @@ void repl_evaluator<BAs...>::update_bool_opt_cmd(repl_option o,
 		LOG_ERROR << "Debug option not available\n";
 		return;
 	}
-#endif
+#endif // DEBUG
 	switch (o) {
 #ifdef DEBUG
 	case debug_opt: update_fn(opt.debug_repl); break;
-#endif
+#endif // DEBUG
 	case colors_opt:       TC.set(update_fn(opt.colors)); break;
 	case charvar_opt:      update_charvar(update_fn(opt.charvar)); break;
 	case highlighting_opt: update_fn(pretty_printer_highlighting); break;
@@ -1011,7 +1002,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 		// std::cout << "command: " << command << "\n";
 		command.value_tree().print_tree(std::cout << "tree: ") << "\n";
 	}
-#endif
+#endif // DEBUG
 	tref result = 0;
 	switch (command_type) {
 	case tau::quit_cmd:           return std::cout << "Quit.\n", 1;
@@ -1068,7 +1059,7 @@ int repl_evaluator<BAs...>::eval_cmd(const tt& n) {
 #ifdef DEBUG
 	if (opt.debug_repl && result) tau::get(result).print_tree(
 		std::cout << "result tree: ") << "\n";
-#endif
+#endif // DEBUG
 	if (result) history_store(result);
 	return 0;
 }
@@ -1143,7 +1134,7 @@ void repl_evaluator<BAs...>::help(size_t nt) const {
 		"  <option>               <description>                        <value>\n"
 #ifdef DEBUG
 		"  debug-repl             show REPL commands             on/off\n"
-#endif
+#endif // DEBUG
 		"  status                 show status                          on/off\n"
 		"  colors                 use term colors                      on/off\n"
 		"  highlighting           syntax highlighting of Tau formulas  on/off\n"

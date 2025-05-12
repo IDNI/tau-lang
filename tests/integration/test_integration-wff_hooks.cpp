@@ -7,7 +7,7 @@ bool check_hook(const char* sample, const char* expected) {
 	tref tau_sample = tau::get(sample, parse_wff());
 	tref tau_expected = tau::get(expected, parse_wff());
 
-	#ifdef DEBUG
+#ifdef DEBUG
 	std::cout << "sample: " << string(sample) << " expected: ";
 	if (tau_expected == 0) cout << "nullptr";
 	else cout << TAU_DUMP_TO_STR(tau_expected);
@@ -15,7 +15,7 @@ bool check_hook(const char* sample, const char* expected) {
 	if (tau_sample == 0) cout << "nullptr";
 	else cout << TAU_DUMP_TO_STR(tau_sample);
 	cout << "\n";
-	#endif // DEBUG
+#endif // DEBUG
 
 	return tau::subtree_equals(tau_sample, tau_expected);
 }

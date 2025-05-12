@@ -156,7 +156,8 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 			// preprocess source node
 			case source:
 				src = ptr.get_terminals();
-				// LOG_DEBUG << "source: " << src;
+				DBG(LOG_TRACE << "BA constant source: `"
+							<< src << "`");
 				x = nullptr;
 				break;
 
@@ -202,14 +203,14 @@ tref tree<node>::get(binder& bind, const tau_parser::tree& ptr) {
 
 		m.emplace(t, x); // store new node into map
 
-		//#ifdef DEBUG
-		// if (!x) LOG_TRACE << " -- not emplaced: `"
-		// 			<< parse_tree::get(t).value << "`\n";
-		// else LOG_TRACE << " -- emplaced: `"
-		//	<< parse_tree::get(t).value << "` as "
-		// 	<< tree::get(x).get_type_name() << " `"
-		//	<< tree::get(x) << "`\n";
-		//#endif // DEBUG
+// #ifdef DEBUG
+// 		if (!x) LOG_TRACE << " -- not emplaced: `"
+// 					<< parse_tree::get(t).value << "`\n";
+// 		else LOG_TRACE << " -- emplaced: `"
+// 			<< parse_tree::get(t).value << "` as "
+// 			<< tree::get(x).get_type_name() << " `"
+// 			<< tree::get(x) << "`\n";
+// #endif // DEBUG
 		return true;
 	};
 	DBG(std::stringstream ss;)
