@@ -44,8 +44,10 @@
 
 namespace idni::tau_lang {
 
-// uncomment to enable logging for hooks
-#define HOOK_LOGGING_ENABLED 1
+// uncomment to compile in logging for hooks
+// #define HOOK_LOGGING_ENABLED 1
+// uncomment to compile in logging for pretty printer
+// #define PRETTY_PRINTER_LOGGING_ENABLED 1
 
 // list of enabled channels for TRACE and DEBUG messages
 // INFO, WARNING and ERROR messages are not filtered by channel
@@ -62,33 +64,56 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 	// "hooks",
 	// "interpreter",
 	"normal_forms",
-	"assign_and_reduce",
-	"reduce_deprecated",
-	"to_snf",
+	// "assign_and_reduce",
+	// "reduce_deprecated",
+	// "to_snf",
 	"normalizer",
-	"nso_rr",
-	"ref_types",
+	// "nso_rr",
+	// "ref_types",
 	// "repl_evaluator",
 	// "satisfiability",
-	"solver",
-	"splitter",
+	// "solver",
+	// "splitter",
 	// "tau_tree",
 	// "builders",
-	"extractors",
+	// "extractors",
 	// "from_parser",
 	// "node",
 	// "printers",
 	// "queries",
 	// "traverser",
-	"types",
+	// "types",
 };
+
+// -----------------------------------------------------------------------------
+// Logging channels
+
+// default channel name
+#define LOG_CHANNEL_NAME "global"
+
+// to define a channel name, redefine the LOG_CHANNEL_NAME macro.
+// All the following LOG_TRACE and LOG_DEBUG messages will go to this channel.
+
+// Usual place of a channel redefinition is at a .tmpl.h file right after all
+// includes.
+// It can be also around some part of a code.
+// If other channel code follows, it has to be redefined to the proper channel.
+
+// Channel name redefinition:
+//   #undef  LOG_CHANNEL_NAME
+//   #define LOG_CHANNEL_NAME "a_channel_name"
+
+// -----------------------------------------------------------------------------
 
 // Logging stream for error messages. Prepends message with "(Error) "
 #define LOG_ERROR         BOOST_LOG_TRIVIAL(error)
+
 // Logging stream for warning messages. Prepends message with "(Warning) "
 #define LOG_WARNING       BOOST_LOG_TRIVIAL(warning)
+
 // Logging stream for info messages. Doesn't prepend anything
 #define LOG_INFO          BOOST_LOG_TRIVIAL(info)
+
 // Logging stream for debug messages. Prepends message with "(debug) [channel] "
 // locally defined LOG_CHANNEL_NAME has to be contained in the list of enabled channels
 #define LOG_DEBUG         BOOST_LOG_STREAM_SEV( \
@@ -136,8 +161,8 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 #define LOG_DEBUG_F_F(m, f)      LOG_DEBUG << "(F) -- "<<m<<" "<<TAU_TO_STR(f)
 
 // formula: (F) -- messages with a formula
-#define LOG_TRACE_F_F_DUMP(m, f) LOG_TRACE << "(F) -- "<<m<<" "<<TAU_DUMP_TO_STR(f)
-#define LOG_DEBUG_F_F_DUMP(m, f) LOG_DEBUG << "(F) -- "<<m<<" "<<TAU_DUMP_TO_STR(f)
+#define LOG_TRACE_F_F_DUMP(m, f) LOG_TRACE<<"(F) -- "<<m<<" "<<TAU_DUMP_TO_STR(f)
+#define LOG_DEBUG_F_F_DUMP(m, f) LOG_DEBUG<<"(F) -- "<<m<<" "<<TAU_DUMP_TO_STR(f)
 
 // spec/rrs: (RR) -- specs
 #define LOG_TRACE_RR(r)          LOG_TRACE << "(RR) -- " << to_str<node>(r)
@@ -145,25 +170,6 @@ static constexpr const char* LOG_ENABLED_CHANNELS [] = {
 
 
 // -----------------------------------------------------------------------------
-// Logging channels
-
-// default channel name
-#define LOG_CHANNEL_NAME "global"
-
-// to define a channel name, redefine the LOG_CHANNEL_NAME macro.
-// All the following LOG_TRACE and LOG_DEBUG messages will go to this channel.
-
-// Usual place of a channel redefinition is at a .tmpl.h file right after all
-// includes.
-// It can be also around some part of a code.
-// If other channel code follows, it has to be redefined to the proper channel.
-
-// Channel name redefinition:
-//   #undef  LOG_CHANNEL_NAME
-//   #define LOG_CHANNEL_NAME "a_channel_name"
-
-// -----------------------------------------------------------------------------
-
 
 BOOST_LOG_ATTRIBUTE_KEYWORD(channel_attr, "Channel", std::string)
 BOOST_LOG_ATTRIBUTE_KEYWORD(severity,

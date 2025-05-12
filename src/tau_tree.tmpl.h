@@ -379,6 +379,12 @@ const tree<node>& tree<node>::only_child_tree() const {
 	return get(c);
 }
 
+template <NodeType node>
+const tree<node>& tree<node>::right_sibling_tree() const {
+	tref s = this->right_sibling(); DBG(assert(s != nullptr);)
+	return get(s);
+}
+
 //------------------------------------------------------------------------------
 // nt category helpers
 
