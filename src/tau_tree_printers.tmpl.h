@@ -179,8 +179,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 // TODO review indenting and syntax highlighting
 
-// #define DEBUG_PRETTY_PRINTER 1
-
 	std::vector<size_t> hl_path;
 	size_t depth = 0;
 	std::unordered_map<tref, size_t> chpos;
@@ -346,8 +344,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 
 	auto on_enter = [&](tref ref, tref parent) {
 		const auto& t = get(ref);
-#ifdef DEBUG_PRETTY_PRINTER
-		LOG_TRACE << "[" << t.get_type_name() << "]";
+#ifdef PRETTY_PRINTER_LOGGING_ENABLED
+		std::cerr << "[" << t.get_type_name() << "]";
 #endif
 		// t.print_tree(os << "entering: ") << "\n";
 		size_t nt = t.get_type();
@@ -380,14 +378,7 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case bf_constant:	ba_constants::print(os,
 							t.get_ba_constant_id());
 						break;
-			case wff: if (parent && last_quant_nt != start) {
-				// if we are in a quant we need to care of " "
-				size_t p = parent_nt(); // and clear last_quant_nt
-				if (p != wff_all && p != wff_ex) // if not in quant
-					last_quant_nt = start;
-				if (p != last_quant_nt) os << " ";
-			}
-				[[fallthrough]];
+			case wff:
 			case bf:
 				if (parent && is_to_wrap(
 					t.first_tree().get_type(), parent_nt()))
@@ -459,11 +450,11 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		}
 		return true;
 	};
-	auto on_between = [&](tref /*left*/, tref parent) {
+	auto on_between = [&](tref left, tref parent) {
 		if (parent == nullptr) return true;
 		const auto& t = get(parent);
-#ifdef DEBUG_PRETTY_PRINTER
-		LOG_TRACE << "[|" << t.get_type_name() << "] \n";
+#ifdef PRETTY_PRINTER_LOGGING_ENABLED
+		std::cerr << "[|" << t.get_type_name() << "] \n";
 #endif
 		auto inc_chpos = [&chpos, &parent]() { return chpos[parent]++;};
 		auto chpos_end = [&chpos, &parent]() { chpos.erase(parent); };
@@ -510,11 +501,18 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case shift:             os << "-"; break;
 			case bf_constant:       os << " : "; break;
 
+			case wff_all:
+			case wff_ex:
+				if (!tau::get(left).right_sibling_tree()
+					.child_is(last_quant_nt)) os << " ";
+				break;
+
 			case cli:               os << ". "; break;
 			case wff_conditional:
 				if (inc_chpos()) chpos_end(), os << " : ";
 				else os << " ? ";
 				break;
+
 			case inst_cmd:
 			case subst_cmd:
 				switch (inc_chpos()) {
@@ -527,8 +525,8 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 	};
 	auto on_leave = [&](tref ref) {
 		const auto& t = get(ref);
-#ifdef DEBUG_PRETTY_PRINTER
-		LOG_TRACE << "\n[/" << t.get_type_name() << "]";
+#ifdef PRETTY_PRINTER_LOGGING_ENABLED
+		std::cerr << "\n\t[/" << t.get_type_name() << "]";
 #endif
 		// t.print_tree( << "leaving: ") << "\n";
 		size_t nt = t.get_type();

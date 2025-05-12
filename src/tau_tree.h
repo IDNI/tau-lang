@@ -290,6 +290,7 @@ struct tree : public idni::lcrs_tree<N>, public tau_parser_nonterminals {
 	const tree& second_tree() const;
 	const tree& third_tree()  const;
 	const tree& only_child_tree() const;
+	const tree& right_sibling_tree() const;
 	
 	std::ostream& print(std::ostream& o) const;
 	std::ostream& print_tree(std::ostream& o, size_t s = 0) const;
