@@ -549,7 +549,7 @@ while sample predicate definitions are
 ```
 bottom(x) := x = 0
 not_atom(x) := ex y y < x && y != 0
-chain(x,y,z) := x < y < z  
+chain(x,y,z) := x < y && y < z  
 ```
 
 Furthermore, it is supported to define a function or a predicate by means of a
