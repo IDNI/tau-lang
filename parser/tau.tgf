@@ -130,9 +130,9 @@ z3                     => ('(' _ z3 _ ')')            :z3_parenthesis
                         | bitvector.
 
 # z3 constants
-bitvector              => "#b" bits [ _ ':' _ type _ ]
-                        | num [ _ ':' _ type _ ]
-                        | "#x" hexnum [ _ ':' _ type _ ].
+bitvector              => "#b" bits [ _ ':' _ bv_type _ ]
+                        | num [ _ ':' _ bv_type _ ]
+                        | "#x" hexnum [ _ ':' _ bv_type _ ].
 bits                  => ('0' | '1')+.
 hexnum                => xdigit+.
 
@@ -171,8 +171,9 @@ bf_constant            => '{' _ (capture | binding):constant _ '}'
 binding                => (src_c [ (src_c | space)* src_c ]):source.
 src_c                  => alnum | punct & ~'{' & ~'}' | '{' (src_c | space)* '}'.
 
-type                   => chars
-                        | chars _ '[' _ num _ ']'.
+type                   => bv_type | chars.
+# allowing non-default base bas
+bv_type                => "bv" _ '[' _ num _ ']'.
 
 # common elements
 chars                  => alpha (alnum | '_')*.
@@ -311,7 +312,7 @@ memory                 => ( "%"
 
 # remove all terminals except those we need after parsing
 @trim all terminals except children of
-        sym, digits, hexnum, bits, type, source, named_binding, capture,
+        sym, digits, hexnum, bits, type, bv_type, source, named_binding, capture,
         variable, in_var_name, out_var_name, uninter_const_name,
         file_name, ctnvar, option_name, option_value, integer.
 
