@@ -82,7 +82,7 @@ struct node {
 	static constexpr size_t nt_bits   = tau_parser_data::nt_bits;
 	static constexpr size_t ba_bits   = Pack_bitsize<BAs...>;
 	static constexpr size_t data_bits = bits - nt_bits - 1 - ba_bits - 1;
-	
+
 	// masks and shifts
 	static constexpr size_t nt_mask = (size_t(1) << nt_bits) - size_t(1);
 	static constexpr size_t data_mask = (size_t(1) << data_bits) - size_t(1);
@@ -98,7 +98,7 @@ struct node {
 	const T ba   : ba_bits   = 0; // id of the ba type, 0 = untyped
 	const T ext  : 1         = 0; // 1 = data is in the child node, 0 = data is in the node
 	const T data : data_bits = 0; // data or index in a container determined by nt, bf and ba
-
+                                      // if nt == io_var, data == 1 for input or data == 2 for output
 	const size_t hash;
 
 	// generic constructor
