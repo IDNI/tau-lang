@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.22.1 FATAL_ERROR)
 
 set(TESTS
 	ba_constants
-	
-	# new tree
 	bindings
 	bool
 	hbdd
