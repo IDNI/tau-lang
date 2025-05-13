@@ -342,18 +342,18 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		bf_and_arg1_last_char_written = str[str.size()-1];
 	};
 
+	auto get_nt = [](tref n) {
+		if (n) return get(n).get_type();
+		return nul;
+	};
+
 	auto on_enter = [&](tref ref, tref parent) {
 		const auto& t = get(ref);
 #ifdef PRETTY_PRINTER_LOGGING_ENABLED
 		std::cerr << "[" << t.get_type_name() << "]";
+		// t.print_in_line(std::cerr << "<") << ">";
 #endif
-		// t.print_tree(os << "entering: ") << "\n";
 		size_t nt = t.get_type();
-		auto parent_nt = [&parent]() {
-			if (parent) return get(parent).get_type();
-			return start;
-		};
-
 		auto track_chpos = [&]() { chpos[ref] = 0; };
 
 		if (inc_indent(nt)) indented.insert(ref);
@@ -374,14 +374,17 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case ref_args:          os << "("; break;
 			case constraint:
 			case offsets:           os << "["; break;
+			case offset:            if (get_nt(parent) == io_var)
+							os << "[";
+						break;
 			case bf_splitter:       os << "S("; break;
 			case bf_constant:	ba_constants<node>::print(os,
 							t.get_ba_constant_id());
 						break;
 			case wff:
 			case bf:
-				if (parent && is_to_wrap(
-					t.first_tree().get_type(), parent_nt()))
+				if (parent && is_to_wrap(t.first_tree()
+					.get_type(), get_nt(parent)))
 				{
 					wraps.insert(ref), os << "(";
 					if (static_cast<node::type>(nt) == wff)
@@ -497,7 +500,6 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 			case rec_relation:      os << " := "; break;
 			case wff_rule:          os << " ::= "; break;
 			case bf_rule:           os << " := "; break;
-			case io_var:            os << "["; break;
 			case shift:             os << "-"; break;
 			case bf_constant:       os << " : "; break;
 
@@ -523,28 +525,33 @@ std::ostream& tree<node>::print(std::ostream& os) const {
 		};
 		return true;
 	};
-	auto on_leave = [&](tref ref) {
+	auto on_leave = [&](tref ref, tref parent) {
 		const auto& t = get(ref);
 #ifdef PRETTY_PRINTER_LOGGING_ENABLED
-		std::cerr << "\n\t[/" << t.get_type_name() << "]";
+		std::cerr << "\n\t[/" << t.get_type_name();
+		if (parent)
+			std::cerr << " " << node::name(get_nt(parent));
+		std::cerr << "]";
 #endif
 		// t.print_tree( << "leaving: ") << "\n";
 		size_t nt = t.get_type();
 		switch (nt) {
-			case bf_neg:       os << "'"; break;
+			case bf_neg:            os << "'"; break;
 			case main: 
 			case builder:
 			case rec_relation:
 			case wff_rule:
-			case bf_rule:      os << "."; break;
-			case io_var:
+			case bf_rule:           os << "."; break;
 			case constraint:
 			case offsets:
 			case inst_cmd:
-			case subst_cmd:    os << "]"; break;
+			case subst_cmd:         os << "]"; break;
+			case offset:            if (get_nt(parent) == io_var)
+							os << "]";
+						break;
 			case bf_splitter:
 			case builder_head:
-			case ref_args:     os << ")"; break;
+			case ref_args:          os << ")"; break;
 			case bf:
 			case wff:
 				if (wraps.find(ref) != wraps.end()) {
